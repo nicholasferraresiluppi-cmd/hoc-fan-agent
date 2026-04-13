@@ -13,8 +13,7 @@
     "react-dom": "^18.3.0",
     "@anthropic-ai/sdk": "^0.30.0",
     "@vercel/kv": "^2.0.0",
-    "@clerk/nextjs": "^5.0.0",
-    "@clerk/localizations": "^2.0.0"
+    "@clerk/nextjs": "^5.0.0"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.0",
