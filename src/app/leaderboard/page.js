@@ -153,9 +153,14 @@ export default function LeaderboardPage() {
               I migliori operatori per score medio. Minimo {data?.minSessions || 2} sessioni per qualificarsi.
             </p>
           </div>
-          <a href="/" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>
-            ← Home
-          </a>
+          <div style={{ display: "flex", gap: "1rem" }}>
+            <a href="/leaderboard/storico" style={{ color: C.gold, textDecoration: "none", fontSize: "0.9rem" }}>
+              🏛️ Hall of Fame
+            </a>
+            <a href="/" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>
+              ← Home
+            </a>
+          </div>
         </div>
 
         {/* Filters */}
