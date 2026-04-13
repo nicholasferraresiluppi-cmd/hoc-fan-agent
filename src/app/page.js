@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { TRAINING_SCENARIOS, QUICK_CHALLENGES } from "@/lib/training-scenarios";
+import { CREATOR_PERSONAS } from "@/lib/creator-personas";
 
 // =========================================================
 // CONSTANTS & DATA
@@ -107,6 +108,8 @@ export default function Home() {
   const [feedbackRating, setFeedbackRating] = useState(null);
   const [feedbackComment, setFeedbackComment] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
+  const [selectedCreator, setSelectedCreator] = useState(null);
+  const [pendingScenario, setPendingScenario] = useState(null);
   const [pendingQueue, setPendingQueue] = useState([]); // operator messages queued awaiting fan reply
   const [queueCountdown, setQueueCountdown] = useState(0); // seconds remaining (0 = inactive)
   const chatEndRef = useRef(null);
@@ -161,6 +164,7 @@ export default function Home() {
         body: JSON.stringify({
           messages: currentMessages,
           scenarioId: scenario.id,
+          creatorId: selectedCreator?.id,
           fanState: fanStateRef.current,
         }),
       });
@@ -220,6 +224,51 @@ export default function Home() {
     flushQueue();
   };
 
+  // Called when the operator picks a creator from the persona modal
+  const startScenarioWithCreator = async (scenario, creator) => {
+    setSelectedScenario(scenario);
+    setSelectedCreator(creator);
+    setPendingScenario(null);
+    setMessages([]);
+    setMessageCount(0);
+    setMaxMessages(scenario.maxMessages || 6);
+    setSessionScore(null);
+    setSessionFeedback(null);
+    setFeedbackRating(null);
+    setFeedbackComment("");
+    setFeedbackSent(false);
+    setPendingQueue([]);
+    setFanState({ interest: 5, trust: 5, irritation: 0 });
+    setScreen("scenario-play");
+
+    setIsTyping(true);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "operator",
+              content: "[Inizia la conversazione con il tuo primo messaggio da fan, come descritto nel tuo personaggio.]",
+            },
+          ],
+          scenarioId: scenario.id,
+          creatorId: creator?.id,
+        }),
+      });
+      const data = await res.json();
+      if (data.reply) {
+        setMessages([{ role: "fan", content: data.reply }]);
+      }
+    } catch (e) {
+      console.error("Opening fan msg error:", e);
+    } finally {
+      setIsTyping(false);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  };
+
   const endScenario = async () => {
     if (!selectedScenario) return;
     setIsTyping(true);
@@ -231,6 +280,7 @@ export default function Home() {
         body: JSON.stringify({
           messages,
           scenarioId: selectedScenario.id,
+          creatorId: selectedCreator?.id,
         }),
       });
       const data = await res.json();
@@ -879,6 +929,93 @@ export default function Home() {
 
     return (
       <div style={{ backgroundColor: HOC_COLORS.bgDark, minHeight: "100vh" }}>
+        {/* Creator Picker Modal */}
+        {pendingScenario && (
+          <div
+            onClick={() => setPendingScenario(null)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.7)",
+              zIndex: 1000,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "2rem",
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: HOC_COLORS.bgDark,
+                border: `2px solid ${HOC_COLORS.orange}`,
+                borderRadius: "1rem",
+                padding: "2rem",
+                maxWidth: "720px",
+                width: "100%",
+              }}
+            >
+              <h2 style={{ margin: "0 0 0.25rem 0", color: HOC_COLORS.white, fontSize: "1.4rem" }}>
+                Scegli la creator per questo scenario
+              </h2>
+              <p style={{ margin: "0 0 1.5rem 0", color: HOC_COLORS.gray, fontSize: "0.9rem" }}>
+                "{pendingScenario.title}" — il tono che devi usare cambia in base alla creator.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "1rem" }}>
+                {CREATOR_PERSONAS.map((c) => (
+                  <div
+                    key={c.id}
+                    onClick={() => startScenarioWithCreator(pendingScenario, c)}
+                    style={{
+                      background: `${HOC_COLORS.white}08`,
+                      border: `2px solid ${HOC_COLORS.purple}50`,
+                      borderRadius: "0.75rem",
+                      padding: "1.25rem",
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = HOC_COLORS.orange;
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = `${HOC_COLORS.purple}50`;
+                      e.currentTarget.style.transform = "translateY(0)";
+                    }}
+                  >
+                    <div style={{ fontWeight: 900, color: HOC_COLORS.white, fontSize: "1.05rem", marginBottom: "0.25rem" }}>
+                      {c.name}
+                    </div>
+                    <div style={{ color: HOC_COLORS.orange, fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "0.5rem" }}>
+                      {c.archetype}
+                    </div>
+                    <div style={{ color: HOC_COLORS.gray, fontSize: "0.8rem", lineHeight: 1.4 }}>
+                      {c.shortDescription.substring(0, 90)}...
+                    </div>
+                    <div style={{ marginTop: "0.75rem", fontSize: "1.2rem" }}>
+                      {(c.emojis.primary || []).slice(0, 5).join(" ")}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => setPendingScenario(null)}
+                style={{
+                  marginTop: "1.5rem",
+                  padding: "0.5rem 1rem",
+                  background: "transparent",
+                  border: `1px solid ${HOC_COLORS.gray}`,
+                  color: HOC_COLORS.gray,
+                  borderRadius: "0.5rem",
+                  cursor: "pointer",
+                  fontSize: "0.85rem",
+                }}
+              >
+                Annulla
+              </button>
+            </div>
+          </div>
+        )}
         {/* Header */}
         <div
           style={{
@@ -936,44 +1073,8 @@ export default function Home() {
           {scenarioCards.map((scenario) => (
             <div
               key={scenario.id}
-              onClick={async () => {
-                setSelectedScenario(scenario);
-                setMessages([]);
-                setMessageCount(0);
-                setMaxMessages(scenario.maxMessages || 6);
-                setSessionScore(null);
-                setSessionFeedback(null);
-                setFeedbackRating(null);
-                setFeedbackComment("");
-                setFeedbackSent(false);
-                setFanState({ interest: 5, trust: 5, irritation: 0 });
-                setScreen("scenario-play");
-
-                // Fetch opening message from fan (AI-generated)
-                setIsTyping(true);
-                try {
-                  const res = await fetch("/api/chat", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      messages: [
-                        {
-                          role: "operator",
-                          content: "[Inizia la conversazione con il tuo primo messaggio da fan, come descritto nel tuo personaggio.]",
-                        },
-                      ],
-                      scenarioId: scenario.id,
-                    }),
-                  });
-                  const data = await res.json();
-                  if (data.reply) {
-                    setMessages([{ role: "fan", content: data.reply }]);
-                  }
-                } catch (e) {
-                  console.error("Opening fan msg error:", e);
-                } finally {
-                  setIsTyping(false);
-                }
+              onClick={() => {
+                setPendingScenario(scenario);
               }}
               style={{
                 background: `${HOC_COLORS.white}08`,
@@ -1077,6 +1178,19 @@ export default function Home() {
             <span title="Irritazione del fan" style={{ color: "#EF4444" }}>
               😤 {fanState.irritation}
             </span>
+            {selectedCreator && (
+              <span style={{
+                padding: "0.25rem 0.6rem",
+                background: `${HOC_COLORS.orange}20`,
+                border: `1px solid ${HOC_COLORS.orange}`,
+                borderRadius: "0.5rem",
+                color: HOC_COLORS.orange,
+                fontSize: "0.75rem",
+                fontWeight: 700,
+              }}>
+                {selectedCreator.name}
+              </span>
+            )}
             <span style={{ color: HOC_COLORS.orange, fontWeight: 700 }}>
               {messageCount} msg
             </span>

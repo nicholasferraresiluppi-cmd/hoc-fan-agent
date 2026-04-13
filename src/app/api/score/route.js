@@ -3,6 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 import { FAN_PROFILES, ANDREA_PATTERNS } from "@/lib/fan-profiles";
 import { TRAINING_SCENARIOS, SKILL_DIMENSIONS } from "@/lib/training-scenarios";
 import { pickExamples, formatExamplesForPrompt } from "@/lib/golden-examples";
+import { getCreatorById, formatCreatorPersonaForPrompt } from "@/lib/creator-personas";
+import { kv } from "@vercel/kv";
 
 function findScenarioById(scenarioId) {
   for (const category of TRAINING_SCENARIOS) {
@@ -19,7 +21,8 @@ export async function POST(request) {
       return Response.json({ error: "Non autenticato." }, { status: 401 });
     }
 
-    const { messages, fanProfileId, scenarioId } = await request.json();
+    const { messages, fanProfileId, scenarioId, creatorId } = await request.json();
+    const creator = creatorId ? getCreatorById(creatorId) : null;
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -59,6 +62,7 @@ DIFFICOLTÀ: ${scenario.difficulty}/5
 OBIETTIVO OPERATORE: ${scenario.goalForOperator}
 
 FAN SIMULATO: ${scenario.fanPersonality?.name}, ${scenario.fanPersonality?.age} anni, stile: ${scenario.fanPersonality?.style}, mood: ${scenario.fanPersonality?.mood}
+${creator ? `\nCREATOR: "${creator.name}" (${creator.archetype}). L'operatore DEVE scrivere con il tono di questa creator. Penalizza pesantemente la skill "tono" se lo stile è scollegato da: ${creator.shortDescription}` : ""}
 
 TECNICHE IDEALI da usare:
 ${techniques}
@@ -179,6 +183,30 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
         }
       } catch (ensembleErr) {
         console.error("Ensemble error (non-fatal):", ensembleErr);
+      }
+
+      // Index score history for SM dashboard (non-fatal if KV not configured)
+      try {
+        const timestamp = Date.now();
+        const historyKey = `score_hist:${userId}:${timestamp}`;
+        const record = {
+          userId,
+          timestamp,
+          scenarioId,
+          scenarioTitle: scenario.title,
+          categoryId: scenario.categoryId || scenario.category,
+          creatorId: creatorId || null,
+          creatorName: creator?.name || null,
+          overall: score.overall,
+          skills: score.skills,
+          stars: score.stars,
+          messageCount: messages.length,
+        };
+        await kv.set(historyKey, record);
+        await kv.zadd("score_hist:index", { score: timestamp, member: historyKey });
+        await kv.zadd(`score_hist:user:${userId}`, { score: timestamp, member: historyKey });
+      } catch (histErr) {
+        console.warn("Score history indexing failed (non-fatal):", histErr?.message);
       }
 
       return Response.json({ score });
