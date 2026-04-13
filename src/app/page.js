@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { UserButton, useUser } from "@clerk/nextjs";
+import { TRAINING_SCENARIOS, QUICK_CHALLENGES } from "@/lib/training-scenarios";
 
 // =========================================================
 // CONSTANTS & DATA
@@ -24,42 +25,35 @@ const SKILL_DIMENSIONS = [
   { key: "tono", label: "Tono", color: "#EC4899" },
 ];
 
+// Category metadata — scenarios counts are computed dynamically from TRAINING_SCENARIOS
 const TRAINING_CATEGORIES = [
   {
-    id: "le-basi",
+    id: "le-basi-della-chat",
     name: "Le Basi",
     icon: "🏁",
     description: "Opening conversations, no spam",
     difficulty: 1,
-    scenarios: 8,
-    bestScore: 92,
   },
   {
-    id: "mass-conversione",
+    id: "mass-e-conversione",
     name: "Mass & Conversione",
     icon: "📢",
     description: "Convert mass messages to sales",
     difficulty: 2,
-    scenarios: 12,
-    bestScore: 85,
   },
   {
-    id: "custom-upsell",
+    id: "custom-e-upsell",
     name: "Custom & Upsell",
     icon: "💎",
     description: "Upselling and custom content",
     difficulty: 3,
-    scenarios: 10,
-    bestScore: 78,
   },
   {
-    id: "recuperi-retention",
+    id: "recuperi-e-retention",
     name: "Recuperi & Retention",
     icon: "🔓",
     description: "Save cancellation-risk fans",
     difficulty: 4,
-    scenarios: 7,
-    bestScore: 72,
   },
   {
     id: "script-avanzati",
@@ -67,10 +61,14 @@ const TRAINING_CATEGORIES = [
     icon: "🚀",
     description: "Advanced closing patterns",
     difficulty: 5,
-    scenarios: 9,
-    bestScore: 68,
   },
 ];
+
+// Helper: get real scenarios for a category from TRAINING_SCENARIOS
+function getScenariosForCategory(categoryId) {
+  const cat = TRAINING_SCENARIOS.find((c) => c.categoryId === categoryId);
+  return cat?.scenarios || [];
+}
 
 // =========================================================
 // Main App Component
@@ -89,24 +87,13 @@ export default function Home() {
   const [operatorXP, setOperatorXP] = useState(0);
   const [operatorLevel, setOperatorLevel] = useState(1);
   const [skillDimensions, setSkillDimensions] = useState({
-    naturalezza: 78,
-    conversione: 82,
-    gestione_obiezioni: 65,
-    retention: 71,
-    tono: 88,
+    naturalezza: 0,
+    conversione: 0,
+    gestione_obiezioni: 0,
+    retention: 0,
+    tono: 0,
   });
-  const [recentScenarios, setRecentScenarios] = useState([
-    { title: "Nuovo Subscriber - Hey", score: 92, xp: 150, date: "Oggi" },
-    {
-      title: "Risposta Mass - Eyes Emoji",
-      score: 85,
-      xp: 140,
-      date: "Ieri",
-    },
-    { title: "Complimento Generico", score: 78, xp: 120, date: "2 giorni fa" },
-    { title: "Curiosità sul Contenuto", score: 88, xp: 155, date: "3 giorni fa" },
-    { title: "Price Objection", score: 71, xp: 95, date: "4 giorni fa" },
-  ]);
+  const [recentScenarios, setRecentScenarios] = useState([]);
 
   // Chat State
   const [messages, setMessages] = useState([]);
@@ -140,70 +127,167 @@ export default function Home() {
   // -------------------------------------------------------
 
   const sendMessage = async () => {
-    if (!inputText.trim() || isTyping) return;
+    if (!inputText.trim() || isTyping || !selectedScenario) return;
 
     const userMsg = { role: "operator", content: inputText.trim() };
-    setMessages([...messages, userMsg]);
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setInputText("");
     setMessageCount(messageCount + 1);
     setIsTyping(true);
 
-    // Simulate fan response
-    setTimeout(() => {
-      const fanResponses = [
-        "Interessante, dimmi di più 👀",
-        "Ok, non male... e quanto costa?",
-        "Mi piace il tuo vibe, continua così",
-        "Haha sei troppo bella 💙",
-        "Vabbè, ok, forse mi convince",
-      ];
-      const randomReply =
-        fanResponses[Math.floor(Math.random() * fanResponses.length)];
-      setMessages((prev) => [...prev, { role: "fan", content: randomReply }]);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: newMessages,
+          scenarioId: selectedScenario.id,
+        }),
+      });
+      const data = await res.json();
+      if (data.reply) {
+        setMessages((prev) => [...prev, { role: "fan", content: data.reply }]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          { role: "fan", content: "[Errore risposta fan - riprova]" },
+        ]);
+      }
+    } catch (err) {
+      console.error("sendMessage error:", err);
+      setMessages((prev) => [
+        ...prev,
+        { role: "fan", content: "[Errore di rete - riprova]" },
+      ]);
+    } finally {
       setIsTyping(false);
-    }, 1500 + Math.random() * 1500);
+    }
   };
 
   const endScenario = async () => {
-    // Simulate scoring
+    if (!selectedScenario) return;
     setIsTyping(true);
-    setTimeout(() => {
-      const score = Math.floor(70 + Math.random() * 30);
-      const xp = Math.floor(100 + (score - 70) * 2.5);
-      setSessionScore({ score, xp, stars: Math.floor(score / 25) });
-      setSessionFeedback({
-        strengths: [
-          "Ottima apertura naturale e non invasiva",
-          "Buone domande per scoprire interessi del fan",
-        ],
-        improvements: [
-          "Potevi attendere un po' prima di parlare di contenuti premium",
-          "Aggiungi più personalità nei messaggi",
-        ],
+
+    try {
+      const res = await fetch("/api/score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages,
+          scenarioId: selectedScenario.id,
+        }),
       });
+      const data = await res.json();
+
+      if (data.score) {
+        const s = data.score;
+        setSessionScore({
+          score: s.overall ?? 0,
+          xp: s.xp ?? 0,
+          stars: s.stars ?? Math.max(1, Math.min(5, Math.round((s.overall || 0) / 20))),
+          skills: s.skills,
+          goal_achieved: s.goal_achieved,
+        });
+        setSessionFeedback({
+          strengths: s.strengths || [],
+          improvements: s.improvements || [],
+          best_message: s.best_message,
+          worst_message: s.worst_message,
+          tip: s.tip,
+        });
+
+        // Update profile persistently
+        if (s.skills && s.xp) {
+          try {
+            await fetch("/api/profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                skills: s.skills,
+                xpEarned: s.xp,
+              }),
+            });
+            setOperatorXP((prev) => prev + (s.xp || 0));
+            setSkillDimensions((prev) => {
+              const next = { ...prev };
+              Object.keys(s.skills).forEach((k) => {
+                // Weighted average: 70% old, 30% new (or if first time, use new directly)
+                next[k] = prev[k] > 0
+                  ? Math.round(prev[k] * 0.7 + s.skills[k] * 0.3)
+                  : s.skills[k];
+              });
+              return next;
+            });
+            setRecentScenarios((prev) => [
+              {
+                title: selectedScenario.title,
+                score: s.overall,
+                xp: s.xp,
+                date: "Oggi",
+              },
+              ...prev,
+            ].slice(0, 5));
+          } catch (e) {
+            console.error("Profile update error:", e);
+          }
+        }
+      } else {
+        setSessionScore({ score: 0, xp: 0, stars: 1 });
+        setSessionFeedback({
+          strengths: [],
+          improvements: ["Errore nella valutazione. Riprova."],
+        });
+      }
+    } catch (err) {
+      console.error("endScenario error:", err);
+      setSessionScore({ score: 0, xp: 0, stars: 1 });
+      setSessionFeedback({
+        strengths: [],
+        improvements: ["Errore di rete. Riprova."],
+      });
+    } finally {
       setIsTyping(false);
-    }, 2000);
+    }
   };
 
   const submitQuickChallenge = async () => {
     if (!quickChallengeResponse.trim()) return;
+    const currentChallenge = QUICK_CHALLENGES[quickChallengeIndex % QUICK_CHALLENGES.length];
+    if (!currentChallenge) return;
 
     setIsTyping(true);
-    setTimeout(() => {
-      const evaluation = {
-        stars: Math.floor(1 + Math.random() * 5),
-        good: "Hai mantenuto il tono naturale e rispettoso",
-        improve:
-          "Potevi aggiungere una domanda di follow-up per mantenere il flusso",
-        examples: [
-          "Amore, sei sempre così affascinante 💙 dimmi cosa ti attira di più nei miei contenuti",
-          "Ciao! Mi piace il tuo interesse... che tipo di contenuto vedi di solito?",
-          "Hey! Grazie per il supporto, sei uno dei miei preferiti 🥰 dimmi un po' di te",
-        ],
-      };
-      setQuickChallengeEval(evaluation);
+    try {
+      const res = await fetch("/api/quick-challenge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          challengeId: currentChallenge.id,
+          operatorResponse: quickChallengeResponse,
+        }),
+      });
+      const data = await res.json();
+      if (data.evaluation) {
+        setQuickChallengeEval(data.evaluation);
+      } else {
+        setQuickChallengeEval({
+          stars: 0,
+          good: "",
+          improve: data.error || "Errore nella valutazione",
+          examples: [],
+        });
+      }
+    } catch (err) {
+      console.error("quickChallenge error:", err);
+      setQuickChallengeEval({
+        stars: 0,
+        good: "",
+        improve: "Errore di rete",
+        examples: [],
+      });
+    } finally {
       setIsTyping(false);
-    }, 1800);
+    }
   };
 
   const nextQuickChallenge = () => {
@@ -718,10 +802,10 @@ export default function Home() {
                 }}
               >
                 <span style={{ color: HOC_COLORS.gray, fontSize: "0.85rem" }}>
-                  {cat.scenarios} scenari
+                  {getScenariosForCategory(cat.id).length} scenari
                 </span>
                 <span style={{ color: HOC_COLORS.orange, fontWeight: 700 }}>
-                  Best: {cat.bestScore}⭐
+                  Difficoltà {cat.difficulty}/5
                 </span>
               </div>
             </div>
@@ -736,13 +820,7 @@ export default function Home() {
   // -------------------------------------------------------
 
   if (screen === "scenario-list" && selectedCategory && isLoaded) {
-    const scenarioCards = Array.from({ length: selectedCategory.scenarios }).map((_, i) => ({
-      id: `scenario-${i}`,
-      title: `Scenario ${i + 1}`,
-      description: "Pratica con questo scenario di chat",
-      difficulty: selectedCategory.difficulty,
-      score: 85 + Math.random() * 10,
-    }));
+    const scenarioCards = getScenariosForCategory(selectedCategory.id);
 
     return (
       <div style={{ backgroundColor: HOC_COLORS.bgDark, minHeight: "100vh" }}>
@@ -803,20 +881,40 @@ export default function Home() {
           {scenarioCards.map((scenario) => (
             <div
               key={scenario.id}
-              onClick={() => {
+              onClick={async () => {
                 setSelectedScenario(scenario);
-                setMessages([
-                  {
-                    role: "fan",
-                    content:
-                      "Ciao! Sono nuovo qui, mi piace molto il tuo profilo 👀",
-                  },
-                ]);
-                setMessageCount(1);
-                setMaxMessages(8);
+                setMessages([]);
+                setMessageCount(0);
+                setMaxMessages(scenario.maxMessages || 6);
                 setSessionScore(null);
                 setSessionFeedback(null);
                 setScreen("scenario-play");
+
+                // Fetch opening message from fan (AI-generated)
+                setIsTyping(true);
+                try {
+                  const res = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      messages: [
+                        {
+                          role: "operator",
+                          content: "[Inizia la conversazione con il tuo primo messaggio da fan, come descritto nel tuo personaggio.]",
+                        },
+                      ],
+                      scenarioId: scenario.id,
+                    }),
+                  });
+                  const data = await res.json();
+                  if (data.reply) {
+                    setMessages([{ role: "fan", content: data.reply }]);
+                  }
+                } catch (e) {
+                  console.error("Opening fan msg error:", e);
+                } finally {
+                  setIsTyping(false);
+                }
               }}
               style={{
                 background: `${HOC_COLORS.white}08`,
@@ -865,7 +963,7 @@ export default function Home() {
                   Difficoltà: {scenario.difficulty}/5
                 </span>
                 <span style={{ color: HOC_COLORS.orange, fontWeight: 700 }}>
-                  Best: {Math.floor(scenario.score)}%
+                  {scenario.maxMessages || 6} turni
                 </span>
               </div>
             </div>
@@ -1289,21 +1387,7 @@ export default function Home() {
   // -------------------------------------------------------
 
   if (screen === "quick-challenge" && isLoaded) {
-    const challenges = [
-      {
-        situation: "Un fan appena iscritto manda 'Hey'",
-        message: "Hey 👋",
-      },
-      {
-        situation: "Un fan risponde alla mass con un 👀",
-        message: "👀",
-      },
-      {
-        situation: "Ti mandano un complimento generico",
-        message: "Bellissima ❤️",
-      },
-    ];
-
+    const challenges = QUICK_CHALLENGES;
     const currentChallenge = challenges[quickChallengeIndex % challenges.length];
 
     return (
@@ -1412,7 +1496,7 @@ export default function Home() {
                   }}
                 >
                   <p style={{ margin: 0, color: HOC_COLORS.white }}>
-                    {currentChallenge.message}
+                    {currentChallenge.fanMessage}
                   </p>
                 </div>
               </div>
