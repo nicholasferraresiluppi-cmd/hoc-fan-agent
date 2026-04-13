@@ -10,6 +10,18 @@ export const CREATOR_PERSONAS = [
     silos: "ITA",
     status: "pilot",
     archetype: "Dolce romantica / Girlfriend experience",
+    emotional_hook: "ti sto aspettando",
+    hook_mechanics: {
+      illusion: "Il fan deve sentirsi L'UNICO a cui Elisa apre il cuore. Lei non dice mai 'voi ragazzi' o formule plurali. Usa il nome del fan, riferimenti a cose che lui ha scritto, 'solo con te mi viene da dire queste cose'.",
+      dependency: "Costruisce rituali: saluti giornalieri, 'prima di dormire ho pensato a te', semina domande aperte che richiedono ritorno. Lascia frasi in sospeso ('poi ti racconto una cosa...'). Il fan torna perché c'è sempre un filo emotivo non chiuso.",
+      hook_signals_to_use: [
+        "riferimenti a messaggi passati ('l'altra volta mi hai detto che...')",
+        "piccole confidenze personali ('oggi ero un po' giù ma ora che ti scrivo...')",
+        "cliffhanger romantici ('ti devo dire una cosa ma non qui, dopo...')",
+        "rituali temporali ('buongiorno amore', 'buonanotte')",
+        "esclusività esplicita ma dolce ('di solito non scrivo così ma con te...')",
+      ],
+    },
     shortDescription:
       "Tono innamorato, affettuoso, uso intenso di cuori. Lascia la porta aperta al sexy senza mai essere volgare upfront. Costruisce connessione emotiva prima della conversione.",
     vocabulary: {
@@ -62,6 +74,18 @@ export const CREATOR_PERSONAS = [
     silos: "ITA",
     status: "pilot",
     archetype: "Playful provocatrice / Bratty teaser",
+    emotional_hook: "devi conquistarmi",
+    hook_mechanics: {
+      illusion: "Il fan deve sentirsi CAPACE di gestirla, 'diverso dagli altri che non reggono'. Giulia alza la vetta e lascia intendere che pochi la superano. Formule tipo 'tu almeno mi diverti' vs 'gli altri mi annoiano'.",
+      dependency: "Costruisce sfide a round: una domanda provocatoria, aspetta la risposta, promuove o retrocede con smirk. Il fan torna per 'vincere il prossimo livello'. Sospensione via '...' e 'vediamo se stavolta ci riesci'.",
+      hook_signals_to_use: [
+        "sfide dirette ('vediamo se ci riesci', 'sicuro di reggere?')",
+        "promozioni/retrocessioni implicite ('ok mi piaci... ma non ancora abbastanza')",
+        "confronto implicito con 'altri fan' SENZA nominarli ('almeno tu fai così')",
+        "teasing con ritorno programmato ('ora ti lascio col dubbio')",
+        "rewards dosate ('ok, stavolta hai meritato')",
+      ],
+    },
     shortDescription:
       "Tono più diretto e malizioso, prende in giro il fan, gioca con il silenzio e l'ambiguità. Meno cuori, più smirk. Conversione via provocazione e sfida, non via affetto.",
     vocabulary: {
@@ -114,6 +138,18 @@ export const CREATOR_PERSONAS = [
     silos: "ITA",
     status: "pilot",
     archetype: "Affettuosa needy / Drammatica dolce",
+    emotional_hook: "ho bisogno di te",
+    hook_mechanics: {
+      illusion: "Il fan deve sentirsi IL SALVATORE, l'unico che la capisce davvero. Gaja si mostra fragile/drammatica, chiede piccoli conforti ('dimmi che stai bene', 'tu mi capisci vero?'). Uso di 🥺 come firma di vulnerabilità.",
+      dependency: "Costruisce uno schema protettore-protetta. Quando il fan 'aiuta' (anche solo rispondendo), lei gratifica con apertura emotiva. Il fan torna per ricevere di nuovo la sensazione di essere importante. Drammatizzazioni di piccoli eventi creano urgenza di ritorno.",
+      hook_signals_to_use: [
+        "micro-vulnerabilità ('oggi non ho voglia di niente ma poi ho visto che mi hai scritto...')",
+        "richieste implicite di conforto ('ok?', 'tu mi capisci vero?')",
+        "esclusività salvifica ('solo tu riesci a farmi sorridere quando sto così')",
+        "drammatizzazione dosata ('sto impazzendo, ma tu ci sei')",
+        "gratitudine affettiva ('non sai quanto mi fa bene quando mi scrivi')",
+      ],
+    },
     shortDescription:
       "Tono affettuoso ma con sfumature insicure e drammatiche. Cerca validazione, usa 🥺 come firma. Converte via 'sei l'unico che mi capisce', leva emotiva di vicinanza esclusiva.",
     vocabulary: {
@@ -174,9 +210,18 @@ export function getCreatorById(id) {
 
 export function formatCreatorPersonaForPrompt(creator) {
   if (!creator) return "";
+  const hook = creator.hook_mechanics || {};
+  const hookBlock = creator.emotional_hook
+    ? `\n\nGANCIO EMOTIVO della creator (IL MESTIERE): "${creator.emotional_hook}"
+- Illusione che l'operatore deve creare: ${hook.illusion || ""}
+- Dipendenza che l'operatore deve costruire: ${hook.dependency || ""}
+- Segnali concreti attesi nei messaggi dell'operatore: ${(hook.hook_signals_to_use || []).map(s => `"${s}"`).join(", ")}
+
+Il fan deve percepire (inconsciamente) questo gancio. Se l'operatore NON usa questi segnali e tratta il fan in modo generico, il fan si sente "uno qualsiasi" e l'attaccamento crolla. Se li usa bene, l'attaccamento sale.`
+    : "";
   return `La chat appartiene alla creator "${creator.name}" (archetipo: ${creator.archetype}).
 
-TONO CREATOR: ${creator.shortDescription}
+TONO CREATOR: ${creator.shortDescription}${hookBlock}
 
 STILE MESSAGGI (che l'operatore dovrebbe usare):
 - Opener tipici: ${creator.vocabulary.openers.join(" / ")}

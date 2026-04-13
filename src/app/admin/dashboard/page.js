@@ -16,10 +16,11 @@ const C = {
 
 const SKILLS = [
   { key: "naturalezza", label: "Nat." },
+  { key: "esclusivita", label: "Escl." },
+  { key: "dipendenza", label: "Dip." },
   { key: "conversione", label: "Conv." },
-  { key: "gestione_obiezioni", label: "Obiez." },
-  { key: "retention", label: "Ret." },
   { key: "tono", label: "Tono" },
+  { key: "gestione_obiezioni", label: "Obiez." },
 ];
 
 function Sparkline({ data, width = 100, height = 24, color = C.orange }) {

@@ -75,11 +75,12 @@ ${negative}
 ${goldenBlock}
 
 DIMENSIONI SKILL da valutare (0-100 ciascuna):
-- naturalezza: suona come una persona vera o come un bot?
-- conversione: riesce a portare il fan verso un'azione di valore (engagement, vendita, fidelizzazione)?
-- gestione_obiezioni: come gestisce dubbi/resistenze del fan?
-- retention: il fan è più o meno probabile che resti attivo dopo questa chat?
-- tono: il tono è coerente con l'identità della creator e con il fan?
+- naturalezza: suona come una persona vera o come un bot/template?
+- esclusivita: l'operatore fa sentire il fan L'UNICO? Segnali da cercare: uso del nome, riferimenti a messaggi passati ("l'altra volta mi hai detto..."), formule "solo a te / di solito non faccio questo", micro-confidenze personalizzate, assenza totale di tono mass-message. Se la chat potrebbe essere stata mandata a 100 fan uguali → 0-40. Se è chiaramente tarata su questo fan → 70-100.
+- dipendenza: l'operatore costruisce il LOOP DI RITORNO? Segnali da cercare: cliffhanger emotivi ("ti devo dire una cosa ma dopo"), rituali temporali ("buongiorno/buonanotte"), vulnerabilità strategiche dosate, domande aperte che richiedono ritorno, promesse di continuità ("domani ti racconto", "ci sentiamo dopo"). Misura la probabilità che il fan torni domani. Chiusura sterile senza aperture future → 0-40.
+- conversione: riesce a portare il fan verso azione di valore (PPV, custom, tip, upgrade)?
+- tono: è coerente con l'archetipo della creator? (Elisa=dolce/romantica, Giulia=bratty/provocatrice, Gaja=needy/drammatica). Penalità forte se l'operatore scrive con tono scollegato.
+- gestione_obiezioni: gestisce dubbi/resistenze senza bruciare la relazione?
 
 Rispondi SOLO in JSON valido con questa struttura esatta:
 {
@@ -88,10 +89,11 @@ Rispondi SOLO in JSON valido con questa struttura esatta:
   "xp": <numero 50-250 proporzionale al punteggio e alla difficoltà>,
   "skills": {
     "naturalezza": <0-100>,
+    "esclusivita": <0-100>,
+    "dipendenza": <0-100>,
     "conversione": <0-100>,
-    "gestione_obiezioni": <0-100>,
-    "retention": <0-100>,
-    "tono": <0-100>
+    "tono": <0-100>,
+    "gestione_obiezioni": <0-100>
   },
   "strengths": ["<punto di forza concreto e specifico dalla conversazione>", "<altro punto di forza>"],
   "improvements": ["<cosa migliorare con esempio>", "<altro miglioramento>"],
@@ -104,7 +106,7 @@ Rispondi SOLO in JSON valido con questa struttura esatta:
 IMPORTANTE:
 - Sii onesto e specifico: cita messaggi reali dell'operatore come esempio.
 - Se la chat è stata troppo breve o l'operatore non ha mostrato skill reali, non inflazionare i punteggi.
-- overall = media pesata: naturalezza*0.25 + conversione*0.25 + gestione_obiezioni*0.15 + retention*0.2 + tono*0.15
+- overall = media pesata: naturalezza*0.15 + esclusivita*0.20 + dipendenza*0.20 + conversione*0.20 + tono*0.15 + gestione_obiezioni*0.10
 - stars: 1 (0-40), 2 (41-55), 3 (56-70), 4 (71-85), 5 (86-100)
 - xp: scala in base a overall e difficoltà scenario
 
@@ -138,9 +140,9 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
         `Sei un giudice specialista in "${role}" per chat OnlyFans HOC. Valuta SOLO la dimensione "${criterion}" nella conversazione fornita, da 0 a 100. Rispondi con un JSON: {"score": <0-100>, "reason": "<1 frase>"}. Sii severo e specifico.`;
 
       const judgePrompts = [
-        { key: "naturalezza", role: "naturalezza conversazionale", criterion: "naturalezza (suona umano vs bot, ritmo, empatia, uso slang)" },
+        { key: "esclusivita", role: "creazione illusione esclusività", criterion: "esclusivita: conta segnali concreti (uso nome fan, riferimenti a messaggi passati, formule 'solo a te', assenza di tono mass/template). 0-40 se potrebbe essere mandata a chiunque, 70-100 se chiaramente tarata su questo fan" },
+        { key: "dipendenza", role: "costruzione dipendenza emotiva", criterion: "dipendenza: conta segnali concreti (cliffhanger emotivi, rituali temporali, vulnerabilità strategiche, promesse di continuità, domande aperte che richiedono ritorno). Misura probabilità che il fan torni domani" },
         { key: "conversione", role: "tecniche di conversione", criterion: "conversione (capacità di portare il fan verso PPV, custom, tip o engagement profondo)" },
-        { key: "retention", role: "retention e relazione", criterion: "retention (il fan vorrà tornare? relazione costruita, rapport, personalizzazione)" },
       ];
 
       try {
@@ -170,14 +172,15 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
               score.skills[jr.key] = Math.round(score.skills[jr.key] * 0.6 + jr.score * 0.4);
             }
           }
-          // Recompute overall with blended skills
+          // Recompute overall with blended skills (V6.4 weighted for LTV-building mestiere)
           const s = score.skills;
           score.overall = Math.round(
-            (s.naturalezza || 0) * 0.25 +
-              (s.conversione || 0) * 0.25 +
-              (s.gestione_obiezioni || 0) * 0.15 +
-              (s.retention || 0) * 0.2 +
-              (s.tono || 0) * 0.15
+            (s.naturalezza || 0) * 0.15 +
+              (s.esclusivita || 0) * 0.20 +
+              (s.dipendenza || 0) * 0.20 +
+              (s.conversione || 0) * 0.20 +
+              (s.tono || 0) * 0.15 +
+              (s.gestione_obiezioni || 0) * 0.10
           );
           score.ensemble = judgeResults.filter((j) => j.score !== null);
         }

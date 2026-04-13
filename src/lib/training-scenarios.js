@@ -853,32 +853,38 @@ export const SKILL_DIMENSIONS = [
   {
     id: 'naturalezza',
     label: 'Naturalezza',
-    description: 'Quanto suona naturale, personale, e autentica la comunicazione. Evita il "robotic" o "templated" feeling. Include personalità vera, humor, vulnerability appropriati.',
-    weight: 1.2
+    description: 'Quanto suona naturale, personale, autentica. Evita il "robotic" o "templated". Include personalità vera, humor appropriato.',
+    weight: 0.15
+  },
+  {
+    id: 'esclusivita',
+    label: 'Esclusività',
+    description: 'Capacità di far sentire il fan L\'UNICO. Uso del nome, riferimenti a conversazioni passate, formule tipo "solo a te", "di solito non faccio questo". Assenza di tono mass-message/template.',
+    weight: 0.20
+  },
+  {
+    id: 'dipendenza',
+    label: 'Dipendenza',
+    description: 'Capacità di costruire il loop di ritorno. Cliffhanger emotivi, semi di "continua domani", vulnerabilità condivise strategicamente, rituali temporali, vicinanza crescente. Misura la probabilità che il fan torni.',
+    weight: 0.20
   },
   {
     id: 'conversione',
     label: 'Conversione',
-    description: 'Abilità a convertire interest in action (sale, custom order, subscription upgrade). Include recognizing buying signals, overcoming objections, creating urgency.',
-    weight: 1.3
-  },
-  {
-    id: 'gestione_obiezioni',
-    label: 'Gestione Obiezioni',
-    description: 'Capacità a mantenere boundaries personali while handling objections, price negotiations, e richieste inappropriate. Firma say "no" kindly.',
-    weight: 1.1
-  },
-  {
-    id: 'retention',
-    label: 'Retention',
-    description: 'Abilità a tenere fan engaged, interested, e subscribed. Include making fans feel valued, reactivating inactive ones, preventing churn.',
-    weight: 1.2
+    description: 'Abilità a convertire interest in action (PPV, custom, tip, upgrade). Riconosce buying signals, crea urgency, gestisce obiezioni di prezzo.',
+    weight: 0.20
   },
   {
     id: 'tono',
     label: 'Tono',
-    description: 'Appropriateness of tone per il context. Flirty ma professional, matching la creator personality, reading the fan mood, adattando il registro appropriatamente.',
-    weight: 1.0
+    description: 'Coerenza con l\'archetipo della creator. Elisa = dolce/romantica, Giulia = bratty/provocatrice, Gaja = needy/affettuosa. Penalità se il tono è scollegato.',
+    weight: 0.15
+  },
+  {
+    id: 'gestione_obiezioni',
+    label: 'Gestione Obiezioni',
+    description: 'Capacità di mantenere l\'interesse davanti a dubbi, resistenze, richieste di sconto/gratis senza bruciare la relazione.',
+    weight: 0.10
   }
 ];
 

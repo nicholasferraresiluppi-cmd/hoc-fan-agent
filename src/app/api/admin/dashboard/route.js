@@ -88,10 +88,11 @@ export async function GET(request) {
         avgOverall,
         skills: {
           naturalezza: avgSkill(recs, "naturalezza"),
+          esclusivita: avgSkill(recs, "esclusivita"),
+          dipendenza: avgSkill(recs, "dipendenza"),
           conversione: avgSkill(recs, "conversione"),
-          gestione_obiezioni: avgSkill(recs, "gestione_obiezioni"),
-          retention: avgSkill(recs, "retention"),
           tono: avgSkill(recs, "tono"),
+          gestione_obiezioni: avgSkill(recs, "gestione_obiezioni"),
         },
         sparkline,
         trend, // diff last 7d vs prev 7d (can be null)
@@ -138,7 +139,7 @@ export async function GET(request) {
     }
 
     // Heatmap skill x creator (across all operators)
-    const skillNames = ["naturalezza", "conversione", "gestione_obiezioni", "retention", "tono"];
+    const skillNames = ["naturalezza", "esclusivita", "dipendenza", "conversione", "tono", "gestione_obiezioni"];
     const heatmap = {};
     for (const r of records) {
       if (!r.creatorId || !r.skills) continue;

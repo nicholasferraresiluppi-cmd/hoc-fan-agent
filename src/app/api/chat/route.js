@@ -23,8 +23,15 @@ export async function POST(request) {
     const creator = creatorId ? getCreatorById(creatorId) : null;
     const creatorContext = creator ? `\n\n--- CREATOR CONTEXT ---\n${formatCreatorPersonaForPrompt(creator)}\n--- FINE CREATOR CONTEXT ---\n` : "";
 
-    // Fan emotional state: tracks interest/trust/irritation (0-10) across turns.
-    const currentState = fanState || { interest: 5, trust: 5, irritation: 0 };
+    // Fan emotional state: tracks interest/trust/irritation/attachment (0-10) across turns.
+    // attachment = quanto il fan sente il gancio emotivo della creator (illusione esclusività + dipendenza).
+    const currentState = {
+      interest: 5,
+      trust: 5,
+      irritation: 0,
+      attachment: 3,
+      ...(fanState || {}),
+    };
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -48,15 +55,21 @@ STATO EMOTIVO ATTUALE (0-10):
 - interesse: ${currentState.interest} (più alto = più coinvolto nella chat)
 - fiducia: ${currentState.trust} (più alto = più disposto a spendere/aprirsi)
 - irritazione: ${currentState.irritation} (più alto = più probabile ghost/risposte brevi/chiusura)
+- attaccamento: ${currentState.attachment} (più alto = più difficile staccarsi, più probabile tornare domani. Sale se l'operatore usa il gancio emotivo della creator — esclusività, riferimenti personali, cliffhanger, rituali — scende se tratta il fan come uno qualsiasi / tono mass/template)
 
-Il tuo comportamento deve riflettere questo stato. Se irritazione ≥ 7 → risposte fredde, brevi, potresti ghostare. Se interesse ≥ 8 e fiducia ≥ 7 → sei molto ricettivo. Adatta tono e lunghezza.
+Il tuo comportamento deve riflettere questo stato:
+- Se irritazione ≥ 7 → risposte fredde, brevi, potresti ghostare.
+- Se interesse ≥ 8 e fiducia ≥ 7 → sei molto ricettivo.
+- Se attaccamento ≥ 7 → mostri segnali di dipendenza (riferimenti al "solo tu", chiedi quando torna, saluti affettivi). Se attaccamento ≤ 3 → tono distaccato, trattamento transazionale, risposte brevi e generiche.
+
+REGOLA CHIAVE per l'attaccamento: sale quando l'operatore (1) usa il tuo nome o ricorda cose che hai scritto prima, (2) usa formule di esclusività ("solo a te", "di solito non..."), (3) apre cliffhanger emotivi, (4) mostra vulnerabilità strategica, (5) crea rituali ("buongiorno", "prima di dormire"). Scende quando suona template/mass ("ciao amore come stai?" generico), non ti riconosce, è solo transazionale.
 
 Dopo la tua risposta, includi SEMPRE in fondo (su nuova riga) un blocco JSON con lo stato aggiornato in base all'ultimo messaggio dell'operatore:
-<STATE>{"interest": <0-10>, "trust": <0-10>, "irritation": <0-10>, "note": "<cosa ha causato il cambio, 1 frase>"}</STATE>
+<STATE>{"interest": <0-10>, "trust": <0-10>, "irritation": <0-10>, "attachment": <0-10>, "note": "<cosa ha causato il cambio, 1 frase>"}</STATE>
 
 Esempio:
 "Mmh interessante... dimmi di più 😏
-<STATE>{\\"interest\\": 7, \\"trust\\": 6, \\"irritation\\": 1, \\"note\\": \\"ha fatto una domanda personale, curiosità alzata\\"}</STATE>"`;
+<STATE>{\\"interest\\": 7, \\"trust\\": 6, \\"irritation\\": 1, \\"attachment\\": 5, \\"note\\": \\"ha usato il mio nome e ha fatto riferimento a quello che avevo detto ieri\\"}</STATE>"`;
     } else if (fanProfileId) {
       const profile = FAN_PROFILES.find((p) => p.id === fanProfileId);
       if (!profile) {
@@ -117,6 +130,7 @@ ISTRUZIONI AGGIUNTIVE:
           interest: Math.max(0, Math.min(10, parsed.interest ?? currentState.interest)),
           trust: Math.max(0, Math.min(10, parsed.trust ?? currentState.trust)),
           irritation: Math.max(0, Math.min(10, parsed.irritation ?? currentState.irritation)),
+          attachment: Math.max(0, Math.min(10, parsed.attachment ?? currentState.attachment)),
           note: parsed.note || "",
         };
       } catch (e) {

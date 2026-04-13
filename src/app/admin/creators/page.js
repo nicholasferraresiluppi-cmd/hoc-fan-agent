@@ -88,9 +88,39 @@ export default function CreatorsAdmin() {
             <div style={{ color: C.orange, fontSize: "0.85rem", fontWeight: 700, marginTop: "0.35rem" }}>
               {c.archetype}
             </div>
+            {c.emotional_hook && (
+              <div style={{
+                marginTop: "0.75rem",
+                padding: "0.6rem 0.85rem",
+                background: `${C.orange}15`,
+                border: `1px dashed ${C.orange}`,
+                borderRadius: "0.5rem",
+                fontSize: "0.9rem",
+              }}>
+                <div style={{ color: C.orange, fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Gancio emotivo
+                </div>
+                <div style={{ color: C.white, fontStyle: "italic", marginTop: "0.25rem" }}>
+                  "{c.emotional_hook}"
+                </div>
+              </div>
+            )}
             <p style={{ color: C.gray, fontSize: "0.88rem", lineHeight: 1.5, marginTop: "0.75rem" }}>
               {c.shortDescription}
             </p>
+            {c.hook_mechanics && (
+              <>
+                <Section title="Illusione da creare">
+                  {c.hook_mechanics.illusion}
+                </Section>
+                <Section title="Dipendenza da costruire">
+                  {c.hook_mechanics.dependency}
+                </Section>
+                <Section title="Segnali concreti da usare">
+                  <Chips items={c.hook_mechanics.hook_signals_to_use} color={C.orange} />
+                </Section>
+              </>
+            )}
 
             <Section title="Opener tipici">
               <Chips items={c.vocabulary?.openers} />

@@ -20,10 +20,11 @@ const HOC_COLORS = {
 
 const SKILL_DIMENSIONS = [
   { key: "naturalezza", label: "Naturalezza", color: "#10B981" },
+  { key: "esclusivita", label: "Esclusività", color: "#F59E0B" },
+  { key: "dipendenza", label: "Dipendenza", color: "#3B82F6" },
   { key: "conversione", label: "Conversione", color: "#F5A623" },
-  { key: "gestione_obiezioni", label: "Gestione Obiezioni", color: "#8B5CF6" },
-  { key: "retention", label: "Retention", color: "#3B82F6" },
   { key: "tono", label: "Tono", color: "#EC4899" },
+  { key: "gestione_obiezioni", label: "Gestione Obiezioni", color: "#8B5CF6" },
 ];
 
 // Category metadata — scenarios counts are computed dynamically from TRAINING_SCENARIOS
@@ -89,10 +90,11 @@ export default function Home() {
   const [operatorLevel, setOperatorLevel] = useState(1);
   const [skillDimensions, setSkillDimensions] = useState({
     naturalezza: 0,
+    esclusivita: 0,
+    dipendenza: 0,
     conversione: 0,
-    gestione_obiezioni: 0,
-    retention: 0,
     tono: 0,
+    gestione_obiezioni: 0,
   });
   const [recentScenarios, setRecentScenarios] = useState([]);
 
@@ -102,7 +104,7 @@ export default function Home() {
   const [isTyping, setIsTyping] = useState(false);
   const [messageCount, setMessageCount] = useState(0);
   const [maxMessages, setMaxMessages] = useState(1);
-  const [fanState, setFanState] = useState({ interest: 5, trust: 5, irritation: 0 });
+  const [fanState, setFanState] = useState({ interest: 5, trust: 5, irritation: 0, attachment: 3 });
   const [sessionScore, setSessionScore] = useState(null);
   const [sessionFeedback, setSessionFeedback] = useState(null);
   const [feedbackRating, setFeedbackRating] = useState(null);
@@ -117,7 +119,7 @@ export default function Home() {
   const queueTimerRef = useRef(null);
   const queueTickRef = useRef(null);
   const messagesRef = useRef([]);
-  const fanStateRef = useRef({ interest: 5, trust: 5, irritation: 0 });
+  const fanStateRef = useRef({ interest: 5, trust: 5, irritation: 0, attachment: 3 });
   const selectedScenarioRef = useRef(null);
 
   useEffect(() => { messagesRef.current = messages; }, [messages]);
@@ -238,7 +240,7 @@ export default function Home() {
     setFeedbackComment("");
     setFeedbackSent(false);
     setPendingQueue([]);
-    setFanState({ interest: 5, trust: 5, irritation: 0 });
+    setFanState({ interest: 5, trust: 5, irritation: 0, attachment: 3 });
     setScreen("scenario-play");
 
     setIsTyping(true);
@@ -1177,6 +1179,9 @@ export default function Home() {
             </span>
             <span title="Irritazione del fan" style={{ color: "#EF4444" }}>
               😤 {fanState.irritation}
+            </span>
+            <span title="Attaccamento (leva esclusività + dipendenza)" style={{ color: "#F59E0B" }}>
+              🔗 {fanState.attachment ?? 3}
             </span>
             {selectedCreator && (
               <span style={{
