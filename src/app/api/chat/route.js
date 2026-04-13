@@ -18,7 +18,10 @@ export async function POST(request) {
       return Response.json({ error: "Non autenticato." }, { status: 401 });
     }
 
-    const { messages, fanProfileId, scenarioId } = await request.json();
+    const { messages, fanProfileId, scenarioId, fanState } = await request.json();
+
+    // Fan emotional state: tracks interest/trust/irritation (0-10) across turns.
+    const currentState = fanState || { interest: 5, trust: 5, irritation: 0 };
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -36,7 +39,21 @@ export async function POST(request) {
       }
       systemPrompt = `${scenario.systemPromptForFan}
 
-CONTEXT: You are in an OnlyFans DM chat. The operator (managing the creator's account) is messaging you. You respond ONLY as the fan character described above. Never break character. Never reveal you're an AI. Keep replies short and natural like a real DM (usually 1-3 sentences). If the operator offers paid content, simulate buying/refusing based on your character's mood and history. Respond in the same language the operator uses (primarily Italian for Italian fans).`;
+CONTEXT: You are in an OnlyFans DM chat. The operator (managing the creator's account) is messaging you. You respond ONLY as the fan character described above. Never break character. Never reveal you're an AI. Keep replies short and natural like a real DM (usually 1-3 sentences). If the operator offers paid content, simulate buying/refusing based on your character's mood and history. Respond in the same language the operator uses (primarily Italian for Italian fans).
+
+STATO EMOTIVO ATTUALE (0-10):
+- interesse: ${currentState.interest} (più alto = più coinvolto nella chat)
+- fiducia: ${currentState.trust} (più alto = più disposto a spendere/aprirsi)
+- irritazione: ${currentState.irritation} (più alto = più probabile ghost/risposte brevi/chiusura)
+
+Il tuo comportamento deve riflettere questo stato. Se irritazione ≥ 7 → risposte fredde, brevi, potresti ghostare. Se interesse ≥ 8 e fiducia ≥ 7 → sei molto ricettivo. Adatta tono e lunghezza.
+
+Dopo la tua risposta, includi SEMPRE in fondo (su nuova riga) un blocco JSON con lo stato aggiornato in base all'ultimo messaggio dell'operatore:
+<STATE>{"interest": <0-10>, "trust": <0-10>, "irritation": <0-10>, "note": "<cosa ha causato il cambio, 1 frase>"}</STATE>
+
+Esempio:
+"Mmh interessante... dimmi di più 😏
+<STATE>{\\"interest\\": 7, \\"trust\\": 6, \\"irritation\\": 1, \\"note\\": \\"ha fatto una domanda personale, curiosità alzata\\"}</STATE>"`;
     } else if (fanProfileId) {
       const profile = FAN_PROFILES.find((p) => p.id === fanProfileId);
       if (!profile) {
@@ -73,9 +90,28 @@ ISTRUZIONI AGGIUNTIVE:
       messages: claudeMessages,
     });
 
-    const fanReply = response.content[0].text;
+    const rawReply = response.content[0].text;
 
-    return Response.json({ reply: fanReply });
+    // Extract optional <STATE>{...}</STATE> block for emotional state tracking
+    let fanReply = rawReply;
+    let newState = currentState;
+    const stateMatch = rawReply.match(/<STATE>([\s\S]*?)<\/STATE>/);
+    if (stateMatch) {
+      try {
+        const parsed = JSON.parse(stateMatch[1].trim());
+        newState = {
+          interest: Math.max(0, Math.min(10, parsed.interest ?? currentState.interest)),
+          trust: Math.max(0, Math.min(10, parsed.trust ?? currentState.trust)),
+          irritation: Math.max(0, Math.min(10, parsed.irritation ?? currentState.irritation)),
+          note: parsed.note || "",
+        };
+      } catch (e) {
+        // Ignore parse errors; keep existing state
+      }
+      fanReply = rawReply.replace(/<STATE>[\s\S]*?<\/STATE>/, "").trim();
+    }
+
+    return Response.json({ reply: fanReply, fanState: newState });
   } catch (error) {
     console.error("Chat API error:", error);
     if (error?.status === 401) {

@@ -101,8 +101,12 @@ export default function Home() {
   const [isTyping, setIsTyping] = useState(false);
   const [messageCount, setMessageCount] = useState(0);
   const [maxMessages, setMaxMessages] = useState(1);
+  const [fanState, setFanState] = useState({ interest: 5, trust: 5, irritation: 0 });
   const [sessionScore, setSessionScore] = useState(null);
   const [sessionFeedback, setSessionFeedback] = useState(null);
+  const [feedbackRating, setFeedbackRating] = useState(null);
+  const [feedbackComment, setFeedbackComment] = useState("");
+  const [feedbackSent, setFeedbackSent] = useState(false);
   const chatEndRef = useRef(null);
 
   // Quick Challenge State
@@ -143,11 +147,13 @@ export default function Home() {
         body: JSON.stringify({
           messages: newMessages,
           scenarioId: selectedScenario.id,
+          fanState,
         }),
       });
       const data = await res.json();
       if (data.reply) {
         setMessages((prev) => [...prev, { role: "fan", content: data.reply }]);
+        if (data.fanState) setFanState(data.fanState);
       } else {
         setMessages((prev) => [
           ...prev,
@@ -888,6 +894,10 @@ export default function Home() {
                 setMaxMessages(scenario.maxMessages || 6);
                 setSessionScore(null);
                 setSessionFeedback(null);
+                setFeedbackRating(null);
+                setFeedbackComment("");
+                setFeedbackSent(false);
+                setFanState({ interest: 5, trust: 5, irritation: 0 });
                 setScreen("scenario-play");
 
                 // Fetch opening message from fan (AI-generated)
@@ -1008,7 +1018,16 @@ export default function Home() {
               {selectedScenario.title}
             </h3>
           </div>
-          <div style={{ display: "flex", gap: "2rem", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "1.25rem", alignItems: "center", fontSize: "0.8rem" }}>
+            <span title="Interesse del fan" style={{ color: "#60A5FA" }}>
+              💙 {fanState.interest}
+            </span>
+            <span title="Fiducia del fan" style={{ color: "#10B981" }}>
+              🤝 {fanState.trust}
+            </span>
+            <span title="Irritazione del fan" style={{ color: "#EF4444" }}>
+              😤 {fanState.irritation}
+            </span>
             <span style={{ color: HOC_COLORS.orange, fontWeight: 700 }}>
               {messageCount}/{maxMessages}
             </span>
@@ -1335,6 +1354,116 @@ export default function Home() {
               </div>
             </>
           )}
+
+          {/* Feedback su valutazione AI */}
+          <div
+            style={{
+              background: `${HOC_COLORS.white}08`,
+              border: `1px solid ${HOC_COLORS.white}20`,
+              borderRadius: "1rem",
+              padding: "1.5rem",
+              marginBottom: "2rem",
+              textAlign: "left",
+            }}
+          >
+            <h3 style={{ margin: "0 0 0.5rem 0", color: HOC_COLORS.white, fontSize: "1rem", fontWeight: 800 }}>
+              La valutazione ti sembra corretta?
+            </h3>
+            <p style={{ margin: "0 0 1rem 0", color: HOC_COLORS.gray, fontSize: "0.85rem" }}>
+              Il tuo feedback aiuta a migliorare il coach AI.
+            </p>
+            {feedbackSent ? (
+              <p style={{ color: "#10B981", fontWeight: 700, margin: 0 }}>
+                ✅ Grazie per il feedback!
+              </p>
+            ) : (
+              <>
+                <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem" }}>
+                  <button
+                    onClick={() => setFeedbackRating("up")}
+                    style={{
+                      padding: "0.5rem 1rem",
+                      background: feedbackRating === "up" ? "#10B98130" : `${HOC_COLORS.white}10`,
+                      border: `2px solid ${feedbackRating === "up" ? "#10B981" : HOC_COLORS.white + "30"}`,
+                      color: HOC_COLORS.white,
+                      borderRadius: "0.5rem",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    👍 Giusta
+                  </button>
+                  <button
+                    onClick={() => setFeedbackRating("down")}
+                    style={{
+                      padding: "0.5rem 1rem",
+                      background: feedbackRating === "down" ? "#EF444430" : `${HOC_COLORS.white}10`,
+                      border: `2px solid ${feedbackRating === "down" ? "#EF4444" : HOC_COLORS.white + "30"}`,
+                      color: HOC_COLORS.white,
+                      borderRadius: "0.5rem",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    👎 Sbagliata
+                  </button>
+                </div>
+                {feedbackRating && (
+                  <>
+                    <textarea
+                      value={feedbackComment}
+                      onChange={(e) => setFeedbackComment(e.target.value)}
+                      placeholder="Dicci perché (opzionale, ma utilissimo)..."
+                      style={{
+                        width: "100%",
+                        minHeight: "70px",
+                        padding: "0.75rem",
+                        background: `${HOC_COLORS.white}05`,
+                        border: `1px solid ${HOC_COLORS.white}30`,
+                        borderRadius: "0.5rem",
+                        color: HOC_COLORS.white,
+                        fontFamily: "inherit",
+                        fontSize: "0.9rem",
+                        marginBottom: "0.75rem",
+                        resize: "vertical",
+                      }}
+                    />
+                    <button
+                      onClick={async () => {
+                        try {
+                          await fetch("/api/evaluation-feedback", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              scenarioId: selectedScenario?.id,
+                              rating: feedbackRating,
+                              comment: feedbackComment,
+                              scoreSnapshot: sessionScore,
+                              messages,
+                            }),
+                          });
+                          setFeedbackSent(true);
+                        } catch (err) {
+                          console.error("Feedback error:", err);
+                        }
+                      }}
+                      style={{
+                        padding: "0.5rem 1.25rem",
+                        background: HOC_COLORS.gradient,
+                        border: "none",
+                        color: HOC_COLORS.bgDark,
+                        borderRadius: "0.5rem",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Invia feedback
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Action Buttons */}
           <div

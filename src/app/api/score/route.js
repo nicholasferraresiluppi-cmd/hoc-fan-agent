@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
 import { FAN_PROFILES, ANDREA_PATTERNS } from "@/lib/fan-profiles";
 import { TRAINING_SCENARIOS, SKILL_DIMENSIONS } from "@/lib/training-scenarios";
+import { pickExamples, formatExamplesForPrompt } from "@/lib/golden-examples";
 
 function findScenarioById(scenarioId) {
   for (const category of TRAINING_SCENARIOS) {
@@ -45,6 +46,12 @@ export async function POST(request) {
       const negative = (scenario.scoringCriteria?.negativeSignals || []).map((s) => `- ${s}`).join("\n");
       const techniques = (scenario.idealTechniques || []).map((t) => `- ${t}`).join("\n");
 
+      // Few-shot injection from golden examples (real top-performer chats)
+      const goldenExamples = pickExamples(scenario.categoryId || scenario.category, 2, "success");
+      const goldenBlock = goldenExamples.length
+        ? `\n\nESEMPI DI ECCELLENZA (chat reali di top performer HOC, usa come benchmark):\n${formatExamplesForPrompt(goldenExamples)}\n`
+        : "";
+
       const systemPrompt = `Sei un coach esperto di operatori di chat OnlyFans per House of Creators. Devi valutare la performance dell'operatore in una conversazione simulata.
 
 SCENARIO: "${scenario.title}"
@@ -61,6 +68,7 @@ ${positive}
 
 SEGNALI NEGATIVI (da penalizzare):
 ${negative}
+${goldenBlock}
 
 DIMENSIONI SKILL da valutare (0-100 ciascuna):
 - naturalezza: suona come una persona vera o come un bot?
@@ -118,6 +126,59 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
       } catch (parseError) {
         console.error("Score parse error:", parseError, "Raw:", scoreText);
         return Response.json({ error: "Errore nel parsing della valutazione." }, { status: 500 });
+      }
+
+      // Evaluator ensemble — 3 specialist judges run in parallel to refine specific dimensions.
+      // Each returns a single 0-100 number for its specialty. We then blend with the main score.
+      const specialistPrompt = (role, criterion) =>
+        `Sei un giudice specialista in "${role}" per chat OnlyFans HOC. Valuta SOLO la dimensione "${criterion}" nella conversazione fornita, da 0 a 100. Rispondi con un JSON: {"score": <0-100>, "reason": "<1 frase>"}. Sii severo e specifico.`;
+
+      const judgePrompts = [
+        { key: "naturalezza", role: "naturalezza conversazionale", criterion: "naturalezza (suona umano vs bot, ritmo, empatia, uso slang)" },
+        { key: "conversione", role: "tecniche di conversione", criterion: "conversione (capacità di portare il fan verso PPV, custom, tip o engagement profondo)" },
+        { key: "retention", role: "retention e relazione", criterion: "retention (il fan vorrà tornare? relazione costruita, rapport, personalizzazione)" },
+      ];
+
+      try {
+        const judgeResults = await Promise.all(
+          judgePrompts.map((jp) =>
+            client.messages.create({
+              model: "claude-haiku-3-5-20241022",
+              max_tokens: 200,
+              system: specialistPrompt(jp.role, jp.criterion),
+              messages: [{ role: "user", content: `Conversazione:\n\n${conversationText}` }],
+            }).then((r) => {
+              try {
+                const t = r.content[0].text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+                const parsed = JSON.parse(t);
+                return { key: jp.key, score: parsed.score, reason: parsed.reason };
+              } catch {
+                return { key: jp.key, score: null, reason: null };
+              }
+            }).catch(() => ({ key: jp.key, score: null, reason: null }))
+          )
+        );
+
+        // Blend: 60% main evaluator, 40% specialist (where available)
+        if (score.skills) {
+          for (const jr of judgeResults) {
+            if (typeof jr.score === "number" && typeof score.skills[jr.key] === "number") {
+              score.skills[jr.key] = Math.round(score.skills[jr.key] * 0.6 + jr.score * 0.4);
+            }
+          }
+          // Recompute overall with blended skills
+          const s = score.skills;
+          score.overall = Math.round(
+            (s.naturalezza || 0) * 0.25 +
+              (s.conversione || 0) * 0.25 +
+              (s.gestione_obiezioni || 0) * 0.15 +
+              (s.retention || 0) * 0.2 +
+              (s.tono || 0) * 0.15
+          );
+          score.ensemble = judgeResults.filter((j) => j.score !== null);
+        }
+      } catch (ensembleErr) {
+        console.error("Ensemble error (non-fatal):", ensembleErr);
       }
 
       return Response.json({ score });
