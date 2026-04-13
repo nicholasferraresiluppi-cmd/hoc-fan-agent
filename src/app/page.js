@@ -711,7 +711,7 @@ export default function Home() {
 
             {/* Admin Area */}
             <a
-              href="/admin/access"
+              href="/admin"
               style={{
                 background: `${HOC_COLORS.gray}10`,
                 border: `2px dashed ${HOC_COLORS.gray}60`,

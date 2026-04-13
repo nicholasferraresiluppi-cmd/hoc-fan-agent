@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
+import AdminNav from "@/components/AdminNav";
 
 const C = {
   bgDark: "#0a0b1a",
@@ -92,6 +93,7 @@ export default function SMDashboard() {
 
   return (
     <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "2rem" }}>
+      <AdminNav />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1.5rem" }}>
         <div>
           <h1 style={{ margin: 0, fontSize: "1.75rem" }}>Dashboard SM</h1>

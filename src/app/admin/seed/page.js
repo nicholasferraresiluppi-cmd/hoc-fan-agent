@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import AdminNav from "@/components/AdminNav";
 
 const C = {
   bgDark: "#0a0b1a",
@@ -51,8 +52,10 @@ export default function SeedAdminPage() {
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1.5rem" }}>
           <h1 style={{ margin: 0 }}>🌱 Seed Demo Data</h1>
-          <a href="/" style={{ color: C.orange, textDecoration: "none" }}>← Home</a>
+          <a href="/admin" style={{ color: C.orange, textDecoration: "none" }}>← Hub Admin</a>
         </div>
+
+        <AdminNav />
 
         <p style={{ color: C.gray, lineHeight: 1.6, marginBottom: "1.5rem" }}>
           Popola la leaderboard con <strong>10 operatori fittizi</strong> e <strong>~60 giorni di sessioni</strong> con profili skill differenziati.

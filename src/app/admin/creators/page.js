@@ -1,6 +1,7 @@
 "use client";
 
 import { CREATOR_PERSONAS } from "@/lib/creator-personas";
+import AdminNav from "@/components/AdminNav";
 
 const C = {
   bgDark: "#0a0b1a",
@@ -47,6 +48,7 @@ function Chips({ items, color = C.purple }) {
 export default function CreatorsAdmin() {
   return (
     <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "2rem" }}>
+      <AdminNav />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1rem" }}>
         <div>
           <h1 style={{ margin: 0, fontSize: "1.75rem" }}>Creator personas — Pilot</h1>

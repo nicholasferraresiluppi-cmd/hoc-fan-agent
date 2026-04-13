@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
+import AdminNav from "@/components/AdminNav";
 
 const HOC_COLORS = {
   bgDark: "#0B0B0F",
@@ -69,6 +70,7 @@ export default function ReviewPage() {
 
   return (
     <div style={{ background: HOC_COLORS.bgDark, minHeight: "100vh", color: HOC_COLORS.white, padding: "2rem" }}>
+      <AdminNav />
       <h1 style={{ background: HOC_COLORS.gradient, backgroundClip: "text", color: "transparent", fontWeight: 900 }}>
         SM Review Dashboard
       </h1>
