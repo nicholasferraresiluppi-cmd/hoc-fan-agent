@@ -107,7 +107,19 @@ export default function Home() {
   const [feedbackRating, setFeedbackRating] = useState(null);
   const [feedbackComment, setFeedbackComment] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
+  const [pendingQueue, setPendingQueue] = useState([]); // operator messages queued awaiting fan reply
+  const [queueCountdown, setQueueCountdown] = useState(0); // seconds remaining (0 = inactive)
   const chatEndRef = useRef(null);
+  const inputRef = useRef(null);
+  const queueTimerRef = useRef(null);
+  const queueTickRef = useRef(null);
+  const messagesRef = useRef([]);
+  const fanStateRef = useRef({ interest: 5, trust: 5, irritation: 0 });
+  const selectedScenarioRef = useRef(null);
+
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+  useEffect(() => { fanStateRef.current = fanState; }, [fanState]);
+  useEffect(() => { selectedScenarioRef.current = selectedScenario; }, [selectedScenario]);
 
   // Quick Challenge State
   const [quickChallengeIndex, setQuickChallengIndex] = useState(0);
@@ -130,14 +142,16 @@ export default function Home() {
   // Helpers
   // -------------------------------------------------------
 
-  const sendMessage = async () => {
-    if (!inputText.trim() || isTyping || !selectedScenario) return;
+  // Flush the queued operator messages to the fan (Claude) and get a reply.
+  const flushQueue = async () => {
+    if (queueTimerRef.current) { clearTimeout(queueTimerRef.current); queueTimerRef.current = null; }
+    if (queueTickRef.current) { clearInterval(queueTickRef.current); queueTickRef.current = null; }
+    setQueueCountdown(0);
 
-    const userMsg = { role: "operator", content: inputText.trim() };
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
-    setInputText("");
-    setMessageCount(messageCount + 1);
+    const scenario = selectedScenarioRef.current;
+    if (!scenario) return;
+
+    const currentMessages = messagesRef.current;
     setIsTyping(true);
 
     try {
@@ -145,9 +159,9 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: newMessages,
-          scenarioId: selectedScenario.id,
-          fanState,
+          messages: currentMessages,
+          scenarioId: scenario.id,
+          fanState: fanStateRef.current,
         }),
       });
       const data = await res.json();
@@ -161,14 +175,49 @@ export default function Home() {
         ]);
       }
     } catch (err) {
-      console.error("sendMessage error:", err);
+      console.error("flushQueue error:", err);
       setMessages((prev) => [
         ...prev,
         { role: "fan", content: "[Errore di rete - riprova]" },
       ]);
     } finally {
       setIsTyping(false);
+      setPendingQueue([]);
+      // Re-focus input so operator can keep typing without clicking
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
+  };
+
+  const startOrResetQueueTimer = () => {
+    if (queueTimerRef.current) clearTimeout(queueTimerRef.current);
+    if (queueTickRef.current) clearInterval(queueTickRef.current);
+    setQueueCountdown(4);
+    queueTickRef.current = setInterval(() => {
+      setQueueCountdown((s) => (s > 1 ? s - 1 : 0));
+    }, 1000);
+    queueTimerRef.current = setTimeout(() => {
+      flushQueue();
+    }, 4000);
+  };
+
+  // Enqueue an operator message. Starts/resets a 4s timer;
+  // if no more messages arrive, the queue is flushed to the fan.
+  const sendMessage = async () => {
+    if (!inputText.trim() || isTyping || !selectedScenario) return;
+
+    const userMsg = { role: "operator", content: inputText.trim() };
+    setMessages((prev) => [...prev, userMsg]);
+    setPendingQueue((prev) => [...prev, userMsg.content]);
+    setInputText("");
+    setMessageCount((c) => c + 1);
+    startOrResetQueueTimer();
+    // Keep focus on input so operator can chain messages
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  // "Invia ora" — skip the 4s wait and send immediately
+  const sendNow = () => {
+    flushQueue();
   };
 
   const endScenario = async () => {
@@ -1029,7 +1078,7 @@ export default function Home() {
               😤 {fanState.irritation}
             </span>
             <span style={{ color: HOC_COLORS.orange, fontWeight: 700 }}>
-              {messageCount}/{maxMessages}
+              {messageCount} msg
             </span>
             <button
               onClick={endScenario}
@@ -1144,8 +1193,9 @@ export default function Home() {
           <div style={{ padding: "1.5rem", borderTop: `1px solid ${HOC_COLORS.purple}20` }}>
             <div style={{ display: "flex", gap: "1rem", marginBottom: "0.5rem" }}>
               <input
+                ref={inputRef}
                 type="text"
-                placeholder="Scrivi un messaggio..."
+                placeholder={pendingQueue.length > 0 ? "Scrivi un altro messaggio..." : "Scrivi un messaggio..."}
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={(e) => {
@@ -1154,7 +1204,8 @@ export default function Home() {
                     sendMessage();
                   }
                 }}
-                disabled={isTyping || messageCount >= maxMessages}
+                disabled={isTyping}
+                autoFocus
                 style={{
                   flex: 1,
                   padding: "0.75rem 1rem",
@@ -1168,7 +1219,7 @@ export default function Home() {
               />
               <button
                 onClick={sendMessage}
-                disabled={!inputText.trim() || isTyping || messageCount >= maxMessages}
+                disabled={!inputText.trim() || isTyping}
                 style={{
                   padding: "0.75rem 1.5rem",
                   background: !inputText.trim() ? `${HOC_COLORS.gray}40` : HOC_COLORS.orange,
@@ -1182,10 +1233,33 @@ export default function Home() {
               >
                 Invia
               </button>
+              {pendingQueue.length > 0 && !isTyping && (
+                <button
+                  onClick={sendNow}
+                  title="Invia subito al fan senza aspettare il timer"
+                  style={{
+                    padding: "0.75rem 1rem",
+                    background: "transparent",
+                    border: `2px solid ${HOC_COLORS.orange}`,
+                    color: HOC_COLORS.orange,
+                    borderRadius: "0.5rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  Invia ora →
+                </button>
+              )}
             </div>
-            {messageCount >= maxMessages && (
+            {pendingQueue.length > 0 && queueCountdown > 0 && !isTyping && (
+              <p style={{ margin: "0.5rem 0 0 0", color: HOC_COLORS.orange, fontSize: "0.85rem" }}>
+                {pendingQueue.length} {pendingQueue.length === 1 ? "messaggio in coda" : "messaggi in coda"} · il fan risponde tra {queueCountdown}s (scrivi ancora per aggiungerne un altro)
+              </p>
+            )}
+            {messageCount >= 15 && pendingQueue.length === 0 && !isTyping && (
               <p style={{ margin: "0.5rem 0 0 0", color: HOC_COLORS.gray, fontSize: "0.85rem" }}>
-                Hai raggiunto il numero massimo di messaggi. Clicca "Termina" per vedere i risultati.
+                Conversazione lunga — quando vuoi, clicca "Termina" per vedere i risultati.
               </p>
             )}
           </div>

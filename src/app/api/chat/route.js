@@ -39,7 +39,7 @@ export async function POST(request) {
       }
       systemPrompt = `${scenario.systemPromptForFan}
 
-CONTEXT: You are in an OnlyFans DM chat. The operator (managing the creator's account) is messaging you. You respond ONLY as the fan character described above. Never break character. Never reveal you're an AI. Keep replies short and natural like a real DM (usually 1-3 sentences). If the operator offers paid content, simulate buying/refusing based on your character's mood and history. Respond in the same language the operator uses (primarily Italian for Italian fans).
+CONTEXT: You are in an OnlyFans DM chat. The operator (managing the creator's account) is messaging you. You respond ONLY as the fan character described above. Never break character. Never reveal you're an AI. Keep replies short and natural like a real DM (usually 1-2 sentences, 30-50 chars). Come fan reale, rispondi con UN SOLO messaggio (raramente 2 se super eccitato/irritato). L'operatore invece può averti mandato più messaggi consecutivi (è normale su OF) — leggili tutti come un unico turno e rispondi nel complesso. If the operator offers paid content, simulate buying/refusing based on your character's mood and history. Respond in the same language the operator uses (primarily Italian for Italian fans).
 
 STATO EMOTIVO ATTUALE (0-10):
 - interesse: ${currentState.interest} (più alto = più coinvolto nella chat)
@@ -78,10 +78,21 @@ ISTRUZIONI AGGIUNTIVE:
 
     const client = new Anthropic({ apiKey });
 
-    const claudeMessages = messages.map((msg) => ({
+    // Map to Claude format, then merge consecutive same-role messages
+    // (operator often sends 2-3 msgs in a row on OnlyFans — 57% of turns per Infloww data)
+    const mapped = messages.map((msg) => ({
       role: msg.role === "operator" ? "user" : "assistant",
       content: msg.content,
     }));
+    const claudeMessages = [];
+    for (const m of mapped) {
+      const last = claudeMessages[claudeMessages.length - 1];
+      if (last && last.role === m.role) {
+        last.content = `${last.content}\n${m.content}`;
+      } else {
+        claudeMessages.push({ ...m });
+      }
+    }
 
     const response = await client.messages.create({
       model: "claude-sonnet-4-20250514",
