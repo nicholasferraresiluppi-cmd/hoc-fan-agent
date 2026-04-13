@@ -1,12 +1,19 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { auth } from "@clerk/nextjs/server";
 import { FAN_PROFILES, ANDREA_PATTERNS, CBS_DIMENSIONS } from "@/lib/fan-profiles";
 
 export async function POST(request) {
   try {
-    const { messages, fanProfileId, apiKey } = await request.json();
+    const { userId } = await auth();
+    if (!userId) {
+      return Response.json({ error: "Non autenticato." }, { status: 401 });
+    }
 
+    const { messages, fanProfileId } = await request.json();
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-      return Response.json({ error: "API key mancante." }, { status: 400 });
+      return Response.json({ error: "API key non configurata sul server." }, { status: 500 });
     }
 
     const profile = FAN_PROFILES.find((p) => p.id === fanProfileId);
@@ -16,7 +23,6 @@ export async function POST(request) {
 
     const client = new Anthropic({ apiKey });
 
-    // Formatta la conversazione per l'analisi
     const conversationText = messages
       .map((msg) => {
         const role = msg.role === "operator" ? "OPERATORE" : "FAN";
@@ -80,7 +86,6 @@ NOTA: rispondi SOLO con il JSON, nessun testo prima o dopo.`,
 
     const scoreText = response.content[0].text;
 
-    // Prova a parsare il JSON, gestendo eventuali markdown wrapper
     let score;
     try {
       const cleaned = scoreText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();

@@ -1,14 +1,22 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { auth } from "@clerk/nextjs/server";
 import { FAN_PROFILES } from "@/lib/fan-profiles";
 
 export async function POST(request) {
   try {
-    const { messages, fanProfileId, apiKey } = await request.json();
+    // Verifica autenticazione
+    const { userId } = await auth();
+    if (!userId) {
+      return Response.json({ error: "Non autenticato." }, { status: 401 });
+    }
 
+    const { messages, fanProfileId } = await request.json();
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       return Response.json(
-        { error: "API key mancante. Inseriscila nelle impostazioni." },
-        { status: 400 }
+        { error: "API key Anthropic non configurata sul server." },
+        { status: 500 }
       );
     }
 
@@ -22,10 +30,6 @@ export async function POST(request) {
 
     const client = new Anthropic({ apiKey });
 
-    // Costruisci la conversazione per Claude
-    // L'operatore parla come "assistant" dal punto di vista del fan (Claude),
-    // e il fan (Claude) risponde come "assistant"
-    // Invertiamo i ruoli: i messaggi dell'operatore sono "user" per Claude
     const claudeMessages = messages.map((msg) => ({
       role: msg.role === "operator" ? "user" : "assistant",
       content: msg.content,
@@ -55,8 +59,8 @@ ISTRUZIONI AGGIUNTIVE:
 
     if (error?.status === 401) {
       return Response.json(
-        { error: "API key non valida. Controlla la chiave inserita." },
-        { status: 401 }
+        { error: "API key Anthropic non valida. Contatta l'admin." },
+        { status: 500 }
       );
     }
 

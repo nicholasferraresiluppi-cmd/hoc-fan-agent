@@ -1,21 +1,23 @@
 import { kv } from "@vercel/kv";
+import { auth } from "@clerk/nextjs/server";
 
-// GET — Recupera stats aggregate (tutti gli operatori o uno specifico)
 export async function GET(request) {
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return Response.json({ error: "Non autenticato." }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const operator = searchParams.get("operator");
 
     if (operator) {
-      // Stats di un operatore specifico
       const stats = (await kv.get(`stats:${operator}`)) || null;
       return Response.json({ stats });
     }
 
-    // Ranking di tutti gli operatori
     const sessionIds = (await kv.lrange("sessions:all", 0, -1)) || [];
 
-    // Raccogli tutti gli operatori unici
     const operatorNames = new Set();
     for (const id of sessionIds) {
       const session = await kv.get(`session:${id}`);
@@ -24,7 +26,6 @@ export async function GET(request) {
       }
     }
 
-    // Recupera stats per ogni operatore
     const ranking = [];
     for (const name of operatorNames) {
       const stats = await kv.get(`stats:${name}`);
@@ -33,7 +34,6 @@ export async function GET(request) {
       }
     }
 
-    // Ordina per overall score (migliore prima)
     ranking.sort((a, b) => b.avgOverall - a.avgOverall);
 
     return Response.json({ ranking });

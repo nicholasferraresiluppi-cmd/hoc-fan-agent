@@ -1,10 +1,17 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { auth } from "@clerk/nextjs/server";
 import { FAN_PROFILES, ANDREA_PATTERNS } from "@/lib/fan-profiles";
 
 export async function POST(request) {
   try {
-    const { messages, fanProfileId, apiKey, lastOperatorMessage } = await request.json();
+    const { userId } = await auth();
+    if (!userId) {
+      return Response.json({ error: "Non autenticato." }, { status: 401 });
+    }
 
+    const { messages, fanProfileId, lastOperatorMessage } = await request.json();
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey || !lastOperatorMessage) {
       return Response.json({ error: "Dati mancanti." }, { status: 400 });
     }
@@ -16,7 +23,6 @@ export async function POST(request) {
 
     const client = new Anthropic({ apiKey });
 
-    // Formatta contesto conversazione (ultimi 6 messaggi per efficienza)
     const recentMessages = messages.slice(-6);
     const conversationContext = recentMessages
       .map((msg) => `[${msg.role === "operator" ? "OPERATORE" : "FAN"}]: ${msg.content}`)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { UserButton, useUser } from "@clerk/nextjs";
 
 // =========================================================
 // Fan profiles (mirrored client-side for UI display)
@@ -66,10 +67,10 @@ const SIGNAL_STYLES = {
 // Main App
 // =========================================================
 export default function Home() {
+  const { user, isLoaded } = useUser();
+  const operatorName = user?.firstName || user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] || "Operatore";
+
   const [screen, setScreen] = useState("landing"); // landing | setup | chat | scoring | results | analytics
-  const [operatorName, setOperatorName] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [apiKeyValid, setApiKeyValid] = useState(null);
   const [selectedFan, setSelectedFan] = useState(null);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
@@ -78,8 +79,8 @@ export default function Home() {
   const [error, setError] = useState("");
   const [mode, setMode] = useState("screening");
   const [sessionHistory, setSessionHistory] = useState([]);
-  const [feedbacks, setFeedbacks] = useState([]); // {index, signal, tip, pattern_detected, score_delta}
-  const [liveFeedback, setLiveFeedback] = useState(null); // feedback corrente visibile
+  const [feedbacks, setFeedbacks] = useState([]);
+  const [liveFeedback, setLiveFeedback] = useState(null);
   const [sessionStartTime, setSessionStartTime] = useState(null);
   const [analyticsData, setAnalyticsData] = useState({ ranking: [], sessions: [] });
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -89,30 +90,6 @@ export default function Home() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
-
-  useEffect(() => {
-    const saved = typeof window !== "undefined" && localStorage.getItem("hoc_api_key");
-    const savedName = typeof window !== "undefined" && localStorage.getItem("hoc_operator_name");
-    if (saved) { setApiKey(saved); setApiKeyValid(true); }
-    if (savedName) { setOperatorName(savedName); }
-  }, []);
-
-  // -------------------------------------------------------
-  // API Key validation
-  // -------------------------------------------------------
-  const validateApiKey = async () => {
-    if (!apiKey.startsWith("sk-ant-")) {
-      setApiKeyValid(false);
-      setError("La chiave deve iniziare con sk-ant-");
-      return;
-    }
-    setError("");
-    setApiKeyValid(true);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("hoc_api_key", apiKey);
-      localStorage.setItem("hoc_operator_name", operatorName);
-    }
-  };
 
   // -------------------------------------------------------
   // Get real-time feedback (training mode only)
@@ -125,7 +102,6 @@ export default function Home() {
         body: JSON.stringify({
           messages: allMessages,
           fanProfileId: selectedFan.id,
-          apiKey,
           lastOperatorMessage: operatorMessage,
         }),
       });
@@ -134,13 +110,12 @@ export default function Home() {
         const fb = { ...data.feedback, index: msgIndex };
         setFeedbacks((prev) => [...prev, fb]);
         setLiveFeedback(fb);
-        // Nascondi dopo 4 secondi
         setTimeout(() => setLiveFeedback(null), 4000);
       }
     } catch (e) {
       // Feedback fallisce silenziosamente
     }
-  }, [selectedFan, apiKey]);
+  }, [selectedFan]);
 
   // -------------------------------------------------------
   // Send message
@@ -156,7 +131,6 @@ export default function Home() {
     setIsTyping(true);
     setError("");
 
-    // Feedback in tempo reale (solo training, in parallelo)
     if (mode === "training" && selectedFan) {
       getFeedback(updatedMessages, operatorText, updatedMessages.length - 1);
     }
@@ -168,7 +142,6 @@ export default function Home() {
         body: JSON.stringify({
           messages: updatedMessages,
           fanProfileId: selectedFan.id,
-          apiKey,
         }),
       });
 
@@ -236,7 +209,6 @@ export default function Home() {
         body: JSON.stringify({
           messages,
           fanProfileId: selectedFan.id,
-          apiKey,
         }),
       });
 
@@ -250,7 +222,6 @@ export default function Home() {
 
       setScore(data.score);
 
-      // Salva nello storico locale
       setSessionHistory((prev) => [
         ...prev,
         {
@@ -261,7 +232,6 @@ export default function Home() {
         },
       ]);
 
-      // Salva nel database KV
       await saveSession(data.score);
 
       setScreen("results");
@@ -293,7 +263,6 @@ export default function Home() {
           body: JSON.stringify({
             messages: [{ role: "operator", content: "[Il fan ha appena aperto la chat]" }],
             fanProfileId: fan.id,
-            apiKey,
           }),
         });
         const data = await res.json();
@@ -335,100 +304,77 @@ export default function Home() {
   };
 
   // -------------------------------------------------------
+  // Loading state
+  // -------------------------------------------------------
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-400">Caricamento...</div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------
   // SCREEN: Landing
   // -------------------------------------------------------
   if (screen === "landing") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6">
         <div className="max-w-lg w-full space-y-8 text-center">
+          {/* User info top-right */}
+          <div className="fixed top-4 right-4 flex items-center gap-3">
+            <span className="text-sm text-gray-400">{operatorName}</span>
+            <UserButton
+              appearance={{
+                elements: {
+                  avatarBox: "w-9 h-9",
+                },
+              }}
+            />
+          </div>
+
           <div>
             <div className="text-5xl mb-4">🎭</div>
             <h1 className="text-3xl font-bold">HOC Fan Agent</h1>
             <p className="text-gray-400 mt-2">
               Simulatore AI per screening e training operatori
             </p>
+            <p className="text-indigo-400 mt-1 text-sm">
+              Ciao, {operatorName}!
+            </p>
           </div>
 
           <div className="space-y-4">
-            <input
-              type="text"
-              placeholder="Il tuo nome"
-              value={operatorName}
-              onChange={(e) => setOperatorName(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
-            />
-
-            <div className="relative">
-              <input
-                type="password"
-                placeholder="API Key Anthropic (sk-ant-...)"
-                value={apiKey}
-                onChange={(e) => {
-                  setApiKey(e.target.value);
-                  setApiKeyValid(null);
-                }}
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
-              />
-              {apiKeyValid === true && (
-                <span className="absolute right-3 top-3.5 text-green-400">✓</span>
-              )}
-              {apiKeyValid === false && (
-                <span className="absolute right-3 top-3.5 text-red-400">✗</span>
-              )}
-            </div>
-
-            {error && <p className="text-red-400 text-sm">{error}</p>}
-
             <div className="flex gap-3">
               <button
                 onClick={() => {
                   setMode("screening");
-                  validateApiKey().then(() => {
-                    if (operatorName.trim() && apiKey.startsWith("sk-ant-")) {
-                      setScreen("setup");
-                    }
-                  });
+                  setScreen("setup");
                 }}
-                disabled={!operatorName.trim() || !apiKey.trim()}
-                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500 rounded-xl font-medium transition"
+                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-medium transition"
               >
                 🎯 Screening
               </button>
               <button
                 onClick={() => {
                   setMode("training");
-                  validateApiKey().then(() => {
-                    if (operatorName.trim() && apiKey.startsWith("sk-ant-")) {
-                      setScreen("setup");
-                    }
-                  });
+                  setScreen("setup");
                 }}
-                disabled={!operatorName.trim() || !apiKey.trim()}
-                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:text-gray-500 rounded-xl font-medium transition"
+                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-medium transition"
               >
                 💪 Training
               </button>
             </div>
 
-            {/* Analytics button */}
             <button
               onClick={() => {
-                if (operatorName.trim() && apiKey.startsWith("sk-ant-")) {
-                  validateApiKey().then(() => {
-                    loadAnalytics();
-                    setScreen("analytics");
-                  });
-                }
+                loadAnalytics();
+                setScreen("analytics");
               }}
-              disabled={!operatorName.trim() || !apiKey.trim()}
-              className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-800/50 disabled:text-gray-600 border border-gray-700 rounded-xl text-sm text-gray-300 transition"
+              className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-sm text-gray-300 transition"
             >
               📊 Dashboard Analytics
             </button>
-
-            <p className="text-xs text-gray-500">
-              La API key resta nel tuo browser. Non viene salvata da nessuna parte.
-            </p>
           </div>
         </div>
       </div>
@@ -441,6 +387,12 @@ export default function Home() {
   if (screen === "setup") {
     return (
       <div className="min-h-screen p-6 max-w-4xl mx-auto">
+        {/* User info top-right */}
+        <div className="fixed top-4 right-4 flex items-center gap-3 z-10">
+          <span className="text-sm text-gray-400">{operatorName}</span>
+          <UserButton />
+        </div>
+
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-2xl font-bold">
@@ -612,7 +564,6 @@ export default function Home() {
                     >
                       <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                     </div>
-                    {/* Feedback dot under operator messages */}
                     {fb && msg.role === "operator" && (
                       <div className="flex items-center gap-1.5 mt-1 mr-1">
                         <div className={`w-2 h-2 rounded-full ${SIGNAL_STYLES[fb.signal]?.dot}`} />
@@ -728,7 +679,6 @@ export default function Home() {
 
     const grade = getOverallGrade(score.overall);
 
-    // Feedback summary for training
     const greenCount = feedbacks.filter((f) => f.signal === "green").length;
     const yellowCount = feedbacks.filter((f) => f.signal === "yellow").length;
     const redCount = feedbacks.filter((f) => f.signal === "red").length;
@@ -913,6 +863,12 @@ export default function Home() {
   if (screen === "analytics") {
     return (
       <div className="min-h-screen p-6 max-w-5xl mx-auto">
+        {/* User info top-right */}
+        <div className="fixed top-4 right-4 flex items-center gap-3 z-10">
+          <span className="text-sm text-gray-400">{operatorName}</span>
+          <UserButton />
+        </div>
+
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-2xl font-bold">📊 Dashboard Analytics</h2>
@@ -949,7 +905,6 @@ export default function Home() {
               {analyticsData.ranking.length === 0 ? (
                 <p className="text-gray-500 text-sm">
                   Nessuna sessione salvata ancora. Completa qualche sessione per vedere il ranking.
-                  {"\n\n"}Nota: serve configurare Vercel KV per lo storico. Vai su Vercel Dashboard → Storage → Create → KV.
                 </p>
               ) : (
                 <div className="space-y-3">
