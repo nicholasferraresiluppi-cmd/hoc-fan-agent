@@ -30,7 +30,7 @@ export async function GET(request) {
     for (const r of inPeriod) {
       if (!byUser[r.userId]) byUser[r.userId] = [];
       const val = skill === "overall" ? r.overall : r.skills?.[skill];
-      if (typeof val === "number") byUser[r.userId].push({ val, ts: r.timestamp });
+      if (typeof val === "number") byUser[r.userId].push({ val, ts: r.timestamp, displayName: r.displayName });
     }
 
     const MIN_SESSIONS = period === "week" ? 2 : period === "month" ? 3 : 5;
@@ -42,6 +42,7 @@ export async function GET(request) {
         avg: Math.round(arr.reduce((a, b) => a + b.val, 0) / arr.length),
         sessions: arr.length,
         lastTimestamp: Math.max(...arr.map((x) => x.ts)),
+        seedName: arr.find((x) => x.displayName)?.displayName,
       }))
       .sort((a, b) => b.avg - a.avg);
 
@@ -61,7 +62,7 @@ export async function GET(request) {
     const top10 = entries.slice(0, 10).map((e, i) => ({
       rank: i + 1,
       userId: e.userId,
-      name: nameMap[e.userId] || `Operatore ${e.userId.slice(-4)}`,
+      name: nameMap[e.userId] || e.seedName || `Operatore ${e.userId.slice(-4)}`,
       avg: e.avg,
       sessions: e.sessions,
       isMe: e.userId === currentUserId,
