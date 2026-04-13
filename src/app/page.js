@@ -542,16 +542,21 @@ export default function Home() {
                 padding: "1.5rem",
               }}
             >
-              <p
-                style={{
-                  color: HOC_COLORS.gray,
-                  fontSize: "0.85rem",
-                  margin: "0 0 1rem 0",
-                  textTransform: "uppercase",
-                }}
-              >
-                🏆 Top 3 Operatori
-              </p>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 0 1rem 0" }}>
+                <p
+                  style={{
+                    color: HOC_COLORS.gray,
+                    fontSize: "0.85rem",
+                    margin: 0,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  🏆 Top 3 Operatori
+                </p>
+                <a href="/leaderboard" style={{ color: HOC_COLORS.orange, fontSize: "0.8rem", fontWeight: 700, textDecoration: "none" }}>
+                  Classifica completa →
+                </a>
+              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {leaderboard.map((op, i) => (
                   <div
