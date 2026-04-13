@@ -86,8 +86,8 @@ export default function Home() {
   const [selectedScenario, setSelectedScenario] = useState(null);
 
   // Profile/Stats State
-  const [operatorXP, setOperatorXP] = useState(2850);
-  const [operatorLevel, setOperatorLevel] = useState(8);
+  const [operatorXP, setOperatorXP] = useState(0);
+  const [operatorLevel, setOperatorLevel] = useState(1);
   const [skillDimensions, setSkillDimensions] = useState({
     naturalezza: 78,
     conversione: 82,
@@ -113,7 +113,7 @@ export default function Home() {
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [messageCount, setMessageCount] = useState(0);
-  const [maxMessages, setMaxMessages] = useState(8);
+  const [maxMessages, setMaxMessages] = useState(1);
   const [sessionScore, setSessionScore] = useState(null);
   const [sessionFeedback, setSessionFeedback] = useState(null);
   const chatEndRef = useRef(null);
@@ -125,9 +125,9 @@ export default function Home() {
 
   // Leaderboard State
   const [leaderboard] = useState([
-    { rank: 1, name: "Andrea S.", xp: 8950, level: 15, score: 94 },
-    { rank: 2, name: "Marco D.", xp: 7420, level: 13, score: 91 },
-    { rank: 3, name: "Giulia P.", xp: 6780, level: 12, score: 88 },
+    
+    
+    
   ]);
 
   // Auto-scroll chat
