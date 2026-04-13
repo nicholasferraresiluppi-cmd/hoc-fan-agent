@@ -1,10 +1,6 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
-
-function isAdmin(userId) {
-  const ids = (process.env.HOC_ADMIN_USER_IDS || "").split(",").map((s) => s.trim());
-  return ids.includes(userId);
-}
+import { isUserIdAdmin } from "@/lib/admin";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -13,7 +9,7 @@ export async function GET(request) {
   try {
     const { userId } = await auth();
     if (!userId) return Response.json({ error: "Non autenticato." }, { status: 401 });
-    if (!isAdmin(userId)) return Response.json({ error: "Non autorizzato." }, { status: 403 });
+    if (!(await isUserIdAdmin(userId))) return Response.json({ error: "Non autorizzato." }, { status: 403 });
 
     // Pull last 500 records from global index (most recent first)
     const keys = (await kv.zrange("score_hist:index", 0, 499, { rev: true })) || [];

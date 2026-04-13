@@ -1,5 +1,6 @@
 import { kv } from "@vercel/kv";
 import { auth } from "@clerk/nextjs/server";
+import { isAdmin } from "@/lib/admin";
 
 const DAY = 24 * 60 * 60 * 1000;
 const SKILLS = ["naturalezza", "esclusivita", "dipendenza", "conversione", "tono", "gestione_obiezioni"];
@@ -50,13 +51,6 @@ function isoWeekKey(date) {
   const diff = (d - firstThursday) / DAY;
   const week = 1 + Math.round((diff - ((firstThursday.getUTCDay() + 6) % 7) + 3) / 7);
   return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
-}
-
-async function isAdmin() {
-  const { userId } = await auth();
-  if (!userId) return false;
-  const admins = (process.env.HOC_ADMIN_USER_IDS || "").split(",").map((s) => s.trim()).filter(Boolean);
-  return admins.includes(userId);
 }
 
 async function clearSeed() {

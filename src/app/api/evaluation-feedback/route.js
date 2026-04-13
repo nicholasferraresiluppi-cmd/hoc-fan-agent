@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
+import { isUserIdAdmin } from "@/lib/admin";
 
 export async function POST(request) {
   try {
@@ -40,9 +41,7 @@ export async function GET(request) {
     const { userId } = await auth();
     if (!userId) return Response.json({ error: "Non autenticato." }, { status: 401 });
 
-    // Only admins can list all feedback
-    const adminIds = (process.env.HOC_ADMIN_USER_IDS || "").split(",").map((s) => s.trim());
-    if (!adminIds.includes(userId)) {
+    if (!(await isUserIdAdmin(userId))) {
       return Response.json({ error: "Non autorizzato." }, { status: 403 });
     }
 

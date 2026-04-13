@@ -1,5 +1,6 @@
 import { kv } from "@vercel/kv";
 import { auth, clerkClient } from "@clerk/nextjs/server";
+import { isAdmin } from "@/lib/admin";
 
 const DAY = 24 * 60 * 60 * 1000;
 const SKILLS = ["naturalezza", "esclusivita", "dipendenza", "conversione", "tono", "gestione_obiezioni"];
@@ -23,15 +24,6 @@ function isAuthorized(request) {
   const secret = process.env.CRON_SECRET;
   if (secret && authHeader === `Bearer ${secret}`) return true;
   return false;
-}
-
-async function isAdmin() {
-  try {
-    const { userId } = await auth();
-    if (!userId) return false;
-    const admins = (process.env.HOC_ADMIN_USER_IDS || "").split(",").map((s) => s.trim()).filter(Boolean);
-    return admins.includes(userId);
-  } catch { return false; }
 }
 
 async function buildSnapshot({ weekCutoffMs, weekEndMs }) {

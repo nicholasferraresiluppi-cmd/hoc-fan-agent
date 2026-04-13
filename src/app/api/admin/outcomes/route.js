@@ -1,17 +1,13 @@
 import { auth } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
-
-function isAdmin(userId) {
-  const ids = (process.env.HOC_ADMIN_USER_IDS || "").split(",").map((s) => s.trim());
-  return ids.includes(userId);
-}
+import { isUserIdAdmin } from "@/lib/admin";
 
 // POST — salva outcome settimanale di un operatore (dati reali di vendita/retention)
 export async function POST(request) {
   try {
     const { userId } = await auth();
     if (!userId) return Response.json({ error: "Non autenticato." }, { status: 401 });
-    if (!isAdmin(userId)) return Response.json({ error: "Non autorizzato." }, { status: 403 });
+    if (!(await isUserIdAdmin(userId))) return Response.json({ error: "Non autorizzato." }, { status: 403 });
 
     const { operatorId, week, revenue, ppvCount, customCount, retentionRate, churnCount, notes } = await request.json();
 
@@ -48,7 +44,7 @@ export async function GET(request) {
   try {
     const { userId } = await auth();
     if (!userId) return Response.json({ error: "Non autenticato." }, { status: 401 });
-    if (!isAdmin(userId)) return Response.json({ error: "Non autorizzato." }, { status: 403 });
+    if (!(await isUserIdAdmin(userId))) return Response.json({ error: "Non autorizzato." }, { status: 403 });
 
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "100");

@@ -1,17 +1,13 @@
 import { auth } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
-
-function isAdmin(userId) {
-  const ids = (process.env.HOC_ADMIN_USER_IDS || "").split(",").map((s) => s.trim());
-  return ids.includes(userId);
-}
+import { isUserIdAdmin } from "@/lib/admin";
 
 // POST — SM overrides a score with corrected evaluation + comment
 export async function POST(request) {
   try {
     const { userId } = await auth();
     if (!userId) return Response.json({ error: "Non autenticato." }, { status: 401 });
-    if (!isAdmin(userId)) return Response.json({ error: "Non autorizzato." }, { status: 403 });
+    if (!(await isUserIdAdmin(userId))) return Response.json({ error: "Non autorizzato." }, { status: 403 });
 
     const { feedbackKey, correctedScore, smComment, outcome } = await request.json();
 
