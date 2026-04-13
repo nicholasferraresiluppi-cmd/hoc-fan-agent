@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 // =========================================================
 // Fan profiles (mirrored client-side for UI display)
@@ -56,11 +56,17 @@ const DIFFICULTY_COLORS = {
   5: "bg-red-500/20 text-red-400 border-red-500/30",
 };
 
+const SIGNAL_STYLES = {
+  green: { bg: "bg-emerald-500/20", border: "border-emerald-500/40", text: "text-emerald-400", dot: "bg-emerald-400", label: "Ottimo" },
+  yellow: { bg: "bg-yellow-500/20", border: "border-yellow-500/40", text: "text-yellow-400", dot: "bg-yellow-400", label: "Ok" },
+  red: { bg: "bg-red-500/20", border: "border-red-500/40", text: "text-red-400", dot: "bg-red-400", label: "Errore" },
+};
+
 // =========================================================
 // Main App
 // =========================================================
 export default function Home() {
-  const [screen, setScreen] = useState("landing"); // landing | setup | chat | scoring | results
+  const [screen, setScreen] = useState("landing"); // landing | setup | chat | scoring | results | analytics
   const [operatorName, setOperatorName] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [apiKeyValid, setApiKeyValid] = useState(null);
@@ -70,8 +76,13 @@ export default function Home() {
   const [isTyping, setIsTyping] = useState(false);
   const [score, setScore] = useState(null);
   const [error, setError] = useState("");
-  const [mode, setMode] = useState("screening"); // screening | training
+  const [mode, setMode] = useState("screening");
   const [sessionHistory, setSessionHistory] = useState([]);
+  const [feedbacks, setFeedbacks] = useState([]); // {index, signal, tip, pattern_detected, score_delta}
+  const [liveFeedback, setLiveFeedback] = useState(null); // feedback corrente visibile
+  const [sessionStartTime, setSessionStartTime] = useState(null);
+  const [analyticsData, setAnalyticsData] = useState({ ranking: [], sessions: [] });
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const chatEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -80,12 +91,10 @@ export default function Home() {
   }, [messages, isTyping]);
 
   useEffect(() => {
-    // Load API key from localStorage
     const saved = typeof window !== "undefined" && localStorage.getItem("hoc_api_key");
-    if (saved) {
-      setApiKey(saved);
-      setApiKeyValid(true);
-    }
+    const savedName = typeof window !== "undefined" && localStorage.getItem("hoc_operator_name");
+    if (saved) { setApiKey(saved); setApiKeyValid(true); }
+    if (savedName) { setOperatorName(savedName); }
   }, []);
 
   // -------------------------------------------------------
@@ -101,8 +110,37 @@ export default function Home() {
     setApiKeyValid(true);
     if (typeof window !== "undefined") {
       localStorage.setItem("hoc_api_key", apiKey);
+      localStorage.setItem("hoc_operator_name", operatorName);
     }
   };
+
+  // -------------------------------------------------------
+  // Get real-time feedback (training mode only)
+  // -------------------------------------------------------
+  const getFeedback = useCallback(async (allMessages, operatorMessage, msgIndex) => {
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: allMessages,
+          fanProfileId: selectedFan.id,
+          apiKey,
+          lastOperatorMessage: operatorMessage,
+        }),
+      });
+      const data = await res.json();
+      if (data.feedback) {
+        const fb = { ...data.feedback, index: msgIndex };
+        setFeedbacks((prev) => [...prev, fb]);
+        setLiveFeedback(fb);
+        // Nascondi dopo 4 secondi
+        setTimeout(() => setLiveFeedback(null), 4000);
+      }
+    } catch (e) {
+      // Feedback fallisce silenziosamente
+    }
+  }, [selectedFan, apiKey]);
 
   // -------------------------------------------------------
   // Send message
@@ -110,12 +148,18 @@ export default function Home() {
   const sendMessage = async () => {
     if (!inputText.trim() || isTyping) return;
 
-    const newMsg = { role: "operator", content: inputText.trim() };
+    const operatorText = inputText.trim();
+    const newMsg = { role: "operator", content: operatorText };
     const updatedMessages = [...messages, newMsg];
     setMessages(updatedMessages);
     setInputText("");
     setIsTyping(true);
     setError("");
+
+    // Feedback in tempo reale (solo training, in parallelo)
+    if (mode === "training" && selectedFan) {
+      getFeedback(updatedMessages, operatorText, updatedMessages.length - 1);
+    }
 
     try {
       const res = await fetch("/api/chat", {
@@ -136,7 +180,6 @@ export default function Home() {
         return;
       }
 
-      // Simula delay di risposta (1-3 secondi) per realismo
       const delay = 1000 + Math.random() * 2000;
       setTimeout(() => {
         setMessages((prev) => [...prev, { role: "fan", content: data.reply }]);
@@ -145,6 +188,32 @@ export default function Home() {
     } catch (err) {
       setError("Errore di rete. Controlla la connessione.");
       setIsTyping(false);
+    }
+  };
+
+  // -------------------------------------------------------
+  // Save session to KV
+  // -------------------------------------------------------
+  const saveSession = async (scoreData) => {
+    try {
+      await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operatorName,
+          mode,
+          fanProfileId: selectedFan.id,
+          fanName: selectedFan.name,
+          fanDifficulty: selectedFan.difficulty,
+          messageCount: messages.length,
+          messages,
+          score: scoreData,
+          feedbacks,
+          duration: sessionStartTime ? Math.round((Date.now() - sessionStartTime) / 1000) : 0,
+        }),
+      });
+    } catch (e) {
+      // Salvataggio fallisce silenziosamente
     }
   };
 
@@ -180,6 +249,8 @@ export default function Home() {
       }
 
       setScore(data.score);
+
+      // Salva nello storico locale
       setSessionHistory((prev) => [
         ...prev,
         {
@@ -189,6 +260,10 @@ export default function Home() {
           timestamp: new Date().toLocaleString("it-IT"),
         },
       ]);
+
+      // Salva nel database KV
+      await saveSession(data.score);
+
       setScreen("results");
     } catch (err) {
       setError("Errore di rete durante la valutazione.");
@@ -203,10 +278,12 @@ export default function Home() {
     setSelectedFan(fan);
     setMessages([]);
     setScore(null);
+    setFeedbacks([]);
+    setLiveFeedback(null);
     setError("");
+    setSessionStartTime(Date.now());
     setScreen("chat");
 
-    // Il fan inizia la conversazione in modo naturale
     setIsTyping(true);
     setTimeout(async () => {
       try {
@@ -223,11 +300,38 @@ export default function Home() {
         if (res.ok) {
           setMessages([{ role: "fan", content: data.reply }]);
         }
-      } catch (e) {
-        // Fan non risponde subito, l'operatore inizia
-      }
+      } catch (e) {}
       setIsTyping(false);
     }, 1500);
+  };
+
+  // -------------------------------------------------------
+  // Load analytics
+  // -------------------------------------------------------
+  const loadAnalytics = async () => {
+    setAnalyticsLoading(true);
+    try {
+      const [rankingRes, sessionsRes] = await Promise.all([
+        fetch("/api/sessions/stats"),
+        fetch("/api/sessions"),
+      ]);
+      const rankingData = await rankingRes.json();
+      const sessionsData = await sessionsRes.json();
+      setAnalyticsData({
+        ranking: rankingData.ranking || [],
+        sessions: sessionsData.sessions || [],
+      });
+    } catch (e) {
+      setAnalyticsData({ ranking: [], sessions: [] });
+    }
+    setAnalyticsLoading(false);
+  };
+
+  // -------------------------------------------------------
+  // Get feedback for a message by index
+  // -------------------------------------------------------
+  const getFeedbackForMessage = (index) => {
+    return feedbacks.find((f) => f.index === index);
   };
 
   // -------------------------------------------------------
@@ -306,6 +410,22 @@ export default function Home() {
               </button>
             </div>
 
+            {/* Analytics button */}
+            <button
+              onClick={() => {
+                if (operatorName.trim() && apiKey.startsWith("sk-ant-")) {
+                  validateApiKey().then(() => {
+                    loadAnalytics();
+                    setScreen("analytics");
+                  });
+                }
+              }}
+              disabled={!operatorName.trim() || !apiKey.trim()}
+              className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-800/50 disabled:text-gray-600 border border-gray-700 rounded-xl text-sm text-gray-300 transition"
+            >
+              📊 Dashboard Analytics
+            </button>
+
             <p className="text-xs text-gray-500">
               La API key resta nel tuo browser. Non viene salvata da nessuna parte.
             </p>
@@ -329,7 +449,7 @@ export default function Home() {
             <p className="text-gray-400 mt-1">
               {mode === "screening"
                 ? "Scegli un fan. Hai una conversazione per dimostrare le tue skill."
-                : "Scegli un fan su cui allenarti. Puoi ripetere quanto vuoi."}
+                : "Scegli un fan su cui allenarti. Riceverai feedback in tempo reale."}
             </p>
           </div>
           <button
@@ -384,11 +504,10 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Session history */}
         {sessionHistory.length > 0 && (
           <div className="mt-10">
             <h3 className="text-lg font-semibold mb-4 text-gray-300">
-              📊 Sessioni precedenti
+              📊 Sessioni di questa sessione
             </h3>
             <div className="space-y-2">
               {sessionHistory.map((session, i) => (
@@ -399,26 +518,13 @@ export default function Home() {
                   <div className="flex items-center gap-3">
                     <span>{session.fan.emoji}</span>
                     <span className="text-gray-300">{session.fan.name}</span>
-                    <span className="text-gray-500">
-                      {session.messageCount} msg
-                    </span>
+                    <span className="text-gray-500">{session.messageCount} msg</span>
                   </div>
                   <div className="flex items-center gap-4">
-                    <span className="text-emerald-400">
-                      C:{session.score.closer}
-                    </span>
-                    <span className="text-indigo-400">
-                      B:{session.score.builder}
-                    </span>
-                    <span className="text-red-400">
-                      S:{session.score.spammer}
-                    </span>
-                    <span className="font-bold text-white">
-                      {session.score.overall}/100
-                    </span>
-                    <span className="text-gray-500 text-xs">
-                      {session.timestamp}
-                    </span>
+                    <span className="text-emerald-400">C:{session.score.closer}</span>
+                    <span className="text-indigo-400">B:{session.score.builder}</span>
+                    <span className="text-red-400">S:{session.score.spammer}</span>
+                    <span className="font-bold text-white">{session.score.overall}/100</span>
                   </div>
                 </div>
               ))}
@@ -430,7 +536,7 @@ export default function Home() {
   }
 
   // -------------------------------------------------------
-  // SCREEN: Chat
+  // SCREEN: Chat (with real-time feedback in training)
   // -------------------------------------------------------
   if (screen === "chat") {
     return (
@@ -448,9 +554,7 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500">
-              {messages.length} messaggi
-            </span>
+            <span className="text-xs text-gray-500">{messages.length} msg</span>
             <button
               onClick={endSession}
               className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-sm hover:bg-red-500/30 transition"
@@ -460,37 +564,69 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Live feedback banner (training only) */}
+        {mode === "training" && liveFeedback && (
+          <div
+            className={`mx-4 mt-2 px-4 py-2 rounded-lg border text-sm flex items-center gap-3 transition-all ${
+              SIGNAL_STYLES[liveFeedback.signal]?.bg
+            } ${SIGNAL_STYLES[liveFeedback.signal]?.border}`}
+          >
+            <div className={`w-2.5 h-2.5 rounded-full ${SIGNAL_STYLES[liveFeedback.signal]?.dot}`} />
+            <span className={SIGNAL_STYLES[liveFeedback.signal]?.text}>
+              {liveFeedback.tip}
+            </span>
+            {liveFeedback.pattern_detected && liveFeedback.pattern_detected !== "null" && (
+              <span className="text-xs text-gray-400 ml-auto">
+                🧠 {liveFeedback.pattern_detected}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 chat-scroll">
-          {/* Context banner */}
           <div className="text-center py-3">
             <span className="text-xs text-gray-500 bg-gray-800/50 px-3 py-1 rounded-full">
               {mode === "screening"
                 ? "🎯 Screening — Dimostra le tue skill"
-                : "💪 Training — Allenati liberamente"}
+                : "💪 Training — Feedback attivo"}
             </span>
           </div>
 
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`flex ${
-                msg.role === "operator" ? "justify-end" : "justify-start"
-              }`}
-            >
-              <div
-                className={`max-w-[75%] px-4 py-2.5 rounded-2xl ${
-                  msg.role === "operator"
-                    ? "bg-indigo-600 text-white rounded-br-md"
-                    : "bg-gray-800 text-gray-100 rounded-bl-md"
-                }`}
-              >
-                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+          {messages.map((msg, i) => {
+            const fb = mode === "training" ? getFeedbackForMessage(i) : null;
+            return (
+              <div key={i}>
+                <div
+                  className={`flex ${
+                    msg.role === "operator" ? "justify-end" : "justify-start"
+                  }`}
+                >
+                  <div className="flex flex-col items-end max-w-[75%]">
+                    <div
+                      className={`px-4 py-2.5 rounded-2xl ${
+                        msg.role === "operator"
+                          ? "bg-indigo-600 text-white rounded-br-md"
+                          : "bg-gray-800 text-gray-100 rounded-bl-md"
+                      }`}
+                    >
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    </div>
+                    {/* Feedback dot under operator messages */}
+                    {fb && msg.role === "operator" && (
+                      <div className="flex items-center gap-1.5 mt-1 mr-1">
+                        <div className={`w-2 h-2 rounded-full ${SIGNAL_STYLES[fb.signal]?.dot}`} />
+                        <span className={`text-xs ${SIGNAL_STYLES[fb.signal]?.text}`}>
+                          {SIGNAL_STYLES[fb.signal]?.label}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
-          {/* Typing indicator */}
           {isTyping && (
             <div className="flex justify-start">
               <div className="bg-gray-800 px-4 py-3 rounded-2xl rounded-bl-md flex gap-1.5">
@@ -540,8 +676,7 @@ export default function Home() {
           </div>
           {mode === "training" && (
             <p className="text-xs text-gray-500 mt-2 text-center">
-              💡 Tip: prova a usare vulnerabilità emotiva, escalation graduale, e
-              sfida diretta
+              💡 I pallini sotto i tuoi messaggi indicano la qualità: 🟢 ottimo 🟡 ok 🔴 errore
             </p>
           )}
         </div>
@@ -593,9 +728,13 @@ export default function Home() {
 
     const grade = getOverallGrade(score.overall);
 
+    // Feedback summary for training
+    const greenCount = feedbacks.filter((f) => f.signal === "green").length;
+    const yellowCount = feedbacks.filter((f) => f.signal === "yellow").length;
+    const redCount = feedbacks.filter((f) => f.signal === "red").length;
+
     return (
       <div className="min-h-screen p-6 max-w-3xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-8">
           <div className="text-5xl mb-3">{grade.emoji}</div>
           <h2 className="text-3xl font-bold">
@@ -638,26 +777,43 @@ export default function Home() {
             <span className="text-2xl text-gray-500">/100</span>
           </p>
           <div className="flex justify-center gap-4 mt-3 text-sm">
-            {score.sale_achieved && (
+            {score.sale_achieved ? (
               <span className="text-emerald-400">💰 Vendita ottenuta</span>
-            )}
-            {score.fan_retained && (
-              <span className="text-indigo-400">🔒 Fan mantenuto</span>
-            )}
-            {!score.sale_achieved && (
+            ) : (
               <span className="text-gray-500">💰 Nessuna vendita</span>
             )}
-            {!score.fan_retained && (
+            {score.fan_retained ? (
+              <span className="text-indigo-400">🔒 Fan mantenuto</span>
+            ) : (
               <span className="text-red-400">🚪 Fan perso</span>
             )}
           </div>
         </div>
 
+        {/* Real-time feedback summary (training only) */}
+        {mode === "training" && feedbacks.length > 0 && (
+          <div className="bg-gray-800/50 rounded-xl p-5 mb-6">
+            <h3 className="font-semibold mb-3">⚡ Feedback in tempo reale</h3>
+            <div className="flex gap-6">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-emerald-400" />
+                <span className="text-sm text-gray-300">{greenCount} ottimi</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                <span className="text-sm text-gray-300">{yellowCount} ok</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-400" />
+                <span className="text-sm text-gray-300">{redCount} errori</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Pattern analysis */}
         <div className="bg-gray-800/50 rounded-xl p-6 mb-6">
-          <h3 className="font-semibold mb-4">
-            🧠 Pattern di Andrea Spagnuolo
-          </h3>
+          <h3 className="font-semibold mb-4">🧠 Pattern di Andrea Spagnuolo</h3>
           <div className="space-y-3">
             {score.patterns_used?.map((p, i) => (
               <div
@@ -665,10 +821,10 @@ export default function Home() {
                 className="flex items-start gap-3 p-3 bg-gray-900/50 rounded-lg"
               >
                 <span className="text-lg mt-0.5">
-                  {p.used ? (
-                    p.effectiveness === "alta" ? "🟢" :
-                    p.effectiveness === "media" ? "🟡" : "🟠"
-                  ) : "⚫"}
+                  {p.used
+                    ? p.effectiveness === "alta" ? "🟢"
+                    : p.effectiveness === "media" ? "🟡" : "🟠"
+                    : "⚫"}
                 </span>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
@@ -724,7 +880,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Tip */}
         {score.tip && (
           <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-5 mb-8">
             <p className="text-sm text-indigo-300">
@@ -748,6 +903,144 @@ export default function Home() {
             Scegli un altro fan →
           </button>
         </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------
+  // SCREEN: Analytics Dashboard
+  // -------------------------------------------------------
+  if (screen === "analytics") {
+    return (
+      <div className="min-h-screen p-6 max-w-5xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-2xl font-bold">📊 Dashboard Analytics</h2>
+            <p className="text-gray-400 mt-1">
+              Ranking operatori, progressi e storico sessioni
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={loadAnalytics}
+              className="text-gray-400 hover:text-white transition text-sm"
+            >
+              🔄 Aggiorna
+            </button>
+            <button
+              onClick={() => setScreen("landing")}
+              className="text-gray-400 hover:text-white transition"
+            >
+              ← Indietro
+            </button>
+          </div>
+        </div>
+
+        {analyticsLoading ? (
+          <div className="text-center py-20">
+            <div className="text-4xl mb-4 pulse-score">📊</div>
+            <p className="text-gray-400">Caricamento dati...</p>
+          </div>
+        ) : (
+          <>
+            {/* Ranking */}
+            <div className="bg-gray-800/50 rounded-xl p-6 mb-8">
+              <h3 className="font-semibold text-lg mb-4">🏆 Ranking Operatori</h3>
+              {analyticsData.ranking.length === 0 ? (
+                <p className="text-gray-500 text-sm">
+                  Nessuna sessione salvata ancora. Completa qualche sessione per vedere il ranking.
+                  {"\n\n"}Nota: serve configurare Vercel KV per lo storico. Vai su Vercel Dashboard → Storage → Create → KV.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {analyticsData.ranking.map((op, i) => (
+                    <div
+                      key={op.operatorName}
+                      className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg"
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className="text-2xl font-bold text-gray-500 w-8">
+                          {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
+                        </span>
+                        <div>
+                          <p className="font-semibold">{op.operatorName}</p>
+                          <p className="text-xs text-gray-500">
+                            {op.totalSessions} sessioni · {op.salesAchieved} vendite · {op.fansRetained} fan mantenuti
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <div className="text-center">
+                          <p className="text-xs text-emerald-400">Closer</p>
+                          <p className="font-bold">{op.avgCloser}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-indigo-400">Builder</p>
+                          <p className="font-bold">{op.avgBuilder}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-red-400">Spammer</p>
+                          <p className="font-bold">{op.avgSpammer}</p>
+                        </div>
+                        <div className="text-center border-l border-gray-700 pl-4">
+                          <p className="text-xs text-gray-400">Overall</p>
+                          <p className="font-bold text-xl">{op.avgOverall}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-yellow-400">Best</p>
+                          <p className="font-bold">{op.bestScore}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Recent sessions */}
+            <div className="bg-gray-800/50 rounded-xl p-6">
+              <h3 className="font-semibold text-lg mb-4">📋 Sessioni Recenti</h3>
+              {analyticsData.sessions.length === 0 ? (
+                <p className="text-gray-500 text-sm">Nessuna sessione ancora.</p>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto chat-scroll">
+                  {analyticsData.sessions.slice(0, 50).map((session) => {
+                    const fan = FAN_PROFILES.find((f) => f.id === session.fanProfileId);
+                    return (
+                      <div
+                        key={session.id}
+                        className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg text-sm"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`px-2 py-0.5 rounded text-xs ${
+                            session.mode === "screening"
+                              ? "bg-indigo-500/20 text-indigo-400"
+                              : "bg-emerald-500/20 text-emerald-400"
+                          }`}>
+                            {session.mode === "screening" ? "🎯" : "💪"}
+                          </span>
+                          <span className="font-medium">{session.operatorName}</span>
+                          <span>{fan?.emoji || "❓"}</span>
+                          <span className="text-gray-500">{session.fanName}</span>
+                          <span className="text-gray-600">{session.messageCount} msg</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-emerald-400">C:{session.score?.closer}</span>
+                          <span className="text-indigo-400">B:{session.score?.builder}</span>
+                          <span className="text-red-400">S:{session.score?.spammer}</span>
+                          <span className="font-bold">{session.score?.overall}/100</span>
+                          <span className="text-gray-600 text-xs">
+                            {new Date(session.timestamp).toLocaleDateString("it-IT")}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     );
   }
