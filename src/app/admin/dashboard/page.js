@@ -4,16 +4,17 @@ import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import AdminNav from "@/components/AdminNav";
 import PlayerCard from "@/components/PlayerCard";
+import { COLORS } from "@/lib/brand";
 
 const C = {
-  bgDark: "#0a0b1a",
-  orange: "#FF6B35",
-  purple: "#8B5CF6",
-  green: "#10B981",
-  red: "#EF4444",
-  yellow: "#F59E0B",
-  white: "#F9FAFB",
-  gray: "#9CA3AF",
+  bgDark: COLORS.obsidian,
+  orange: COLORS.champagne,
+  purple: COLORS.cobalt,
+  green: COLORS.verdant,
+  red: COLORS.signal,
+  yellow: COLORS.champagneDeep,
+  white: COLORS.alabaster,
+  gray: COLORS.mist,
 };
 
 const SKILLS = [
@@ -188,9 +189,9 @@ export default function SMDashboard() {
                           fontWeight: 800,
                           padding: "0.1rem 0.4rem",
                           borderRadius: "999px",
-                          background: "#EA580C22",
-                          border: "1px solid #EA580C",
-                          color: "#EA580C",
+                          background: `${COLORS.champagne}22`,
+                          border: `1px solid ${COLORS.champagne}`,
+                          color: COLORS.champagne,
                           letterSpacing: "0.03em",
                         }}
                       >
@@ -205,9 +206,9 @@ export default function SMDashboard() {
                           fontWeight: 800,
                           padding: "0.1rem 0.4rem",
                           borderRadius: "999px",
-                          background: "#7C3AED22",
-                          border: "1px solid #7C3AED",
-                          color: "#7C3AED",
+                          background: `${COLORS.champagneDeep}22`,
+                          border: `1px solid ${COLORS.champagneDeep}`,
+                          color: COLORS.champagneDeep,
                         }}
                       >
                         🔍 QA
@@ -221,9 +222,9 @@ export default function SMDashboard() {
                           fontWeight: 800,
                           padding: "0.1rem 0.4rem",
                           borderRadius: "999px",
-                          background: "#2563EB22",
-                          border: "1px solid #2563EB",
-                          color: "#2563EB",
+                          background: `${COLORS.cobalt}22`,
+                          border: `1px solid ${COLORS.cobalt}`,
+                          color: COLORS.cobalt,
                         }}
                       >
                         📊 SM

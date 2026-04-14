@@ -5,11 +5,11 @@ import { useUser } from "@clerk/nextjs";
 import AdminNav from "@/components/AdminNav";
 
 const HOC_COLORS = {
-  bgDark: "#0B0B0F",
-  white: "#FFFFFF",
-  gray: "#9CA3AF",
-  orange: "#F59E0B",
-  gradient: "linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)",
+  bgDark: "#08090F",
+  white: "#F5F6F8",
+  gray: "#6B7080",
+  orange: "#B89158",
+  gradient: "linear-gradient(135deg, #B89158 0%, #D44545 100%)",
 };
 
 function currentISOWeek() {
@@ -93,7 +93,7 @@ export default function OutcomesPage() {
         Inserisci i risultati reali settimanali degli operatori. Questi dati chiudono il ciclo: confrontiamo il punteggio AI con la performance vera.
       </p>
 
-      {error && <p style={{ color: "#EF4444" }}>{error}</p>}
+      {error && <p style={{ color: "#D44545" }}>{error}</p>}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: "2rem", marginTop: "2rem" }}>
         <form onSubmit={submit} style={{ background: `${HOC_COLORS.white}05`, padding: "1.5rem", borderRadius: "0.75rem" }}>
@@ -116,7 +116,7 @@ export default function OutcomesPage() {
           <button type="submit" style={{ padding: "0.6rem 1.5rem", background: HOC_COLORS.gradient, border: "none", color: HOC_COLORS.bgDark, borderRadius: "0.5rem", fontWeight: 700, cursor: "pointer" }}>
             Salva outcome
           </button>
-          {saved && <p style={{ color: "#10B981", marginTop: "0.5rem" }}>✅ Salvato</p>}
+          {saved && <p style={{ color: "#3FB97E", marginTop: "0.5rem" }}>✅ Salvato</p>}
         </form>
 
         <div>

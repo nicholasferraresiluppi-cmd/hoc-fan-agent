@@ -2,14 +2,15 @@
 
 import { CREATOR_PERSONAS } from "@/lib/creator-personas";
 import AdminNav from "@/components/AdminNav";
+import { COLORS } from "@/lib/brand";
 
 const C = {
-  bgDark: "#0a0b1a",
-  orange: "#FF6B35",
-  purple: "#8B5CF6",
-  white: "#F9FAFB",
-  gray: "#9CA3AF",
-  green: "#10B981",
+  bgDark: COLORS.obsidian,
+  orange: COLORS.champagne,
+  purple: COLORS.cobalt,
+  white: COLORS.alabaster,
+  gray: COLORS.mist,
+  green: COLORS.verdant,
 };
 
 function Section({ title, children }) {

@@ -55,16 +55,16 @@ export default function RolesAdminPage() {
       const c = customMap[rid];
       return { label: c.name, emoji: c.emoji, color: c.color };
     }
-    return { label: rid, emoji: "?", color: "#888" };
+    return { label: rid, emoji: "?", color: "#6B7080" };
   };
 
   return (
-    <div style={{ background: "#0D0D0D", minHeight: "100vh", color: "#fff", padding: "2rem" }}>
+    <div style={{ background: "#08090F", minHeight: "100vh", color: "#F5F6F8", padding: "2rem" }}>
       <AdminNav />
       <h1 style={{ marginTop: 0 }}>🛡️ Gestione ruoli</h1>
-      <p style={{ color: "#888", marginBottom: "1rem" }}>
+      <p style={{ color: "#6B7080", marginBottom: "1rem" }}>
         Un utente può avere <b>più ruoli</b> contemporaneamente — le capability si sommano (scope più ampio vince).
-        I ruoli custom si creano in <a href="/admin/ruoli-custom" style={{ color: "#60A5FA" }}>/admin/ruoli-custom</a>.
+        I ruoli custom si creano in <a href="/admin/ruoli-custom" style={{ color: "#4F8CCB" }}>/admin/ruoli-custom</a>.
       </p>
 
       {/* Legend */}
@@ -74,14 +74,14 @@ export default function RolesAdminPage() {
           return (
             <div key={r} style={{ border: `1px solid ${m.color}55`, borderRadius: 8, padding: "0.5rem 0.7rem", background: `${m.color}10` }}>
               <div style={{ fontWeight: 700, color: m.color, fontSize: "0.8rem" }}>{m.emoji} {m.label}</div>
-              <div style={{ color: "#aaa", fontSize: "0.7rem" }}>{m.description}</div>
+              <div style={{ color: "#B9BDC7", fontSize: "0.7rem" }}>{m.description}</div>
             </div>
           );
         })}
         {(data?.custom || []).map((c) => (
           <div key={c.id} style={{ border: `1px solid ${c.color}55`, borderRadius: 8, padding: "0.5rem 0.7rem", background: `${c.color}10` }}>
             <div style={{ fontWeight: 700, color: c.color, fontSize: "0.8rem" }}>{c.emoji} {c.name} <span style={{ fontSize: "0.6rem", opacity: 0.7 }}>CUSTOM</span></div>
-            <div style={{ color: "#aaa", fontSize: "0.7rem" }}>{c.description}</div>
+            <div style={{ color: "#B9BDC7", fontSize: "0.7rem" }}>{c.description}</div>
           </div>
         ))}
       </div>
@@ -91,7 +91,7 @@ export default function RolesAdminPage() {
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         placeholder="Filtra per nome, email, ID…"
-        style={{ padding: "0.5rem 0.75rem", background: "#111", border: "1px solid #333", borderRadius: 6, color: "#fff", marginBottom: "1rem", width: "100%", maxWidth: 400 }}
+        style={{ padding: "0.5rem 0.75rem", background: "#1B1E26", border: "1px solid #2A2E39", borderRadius: 6, color: "#F5F6F8", marginBottom: "1rem", width: "100%", maxWidth: 400 }}
       />
 
       {loading && <p>Caricamento…</p>}
@@ -100,7 +100,7 @@ export default function RolesAdminPage() {
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #333" }}>
+              <tr style={{ textAlign: "left", borderBottom: "1px solid #2A2E39" }}>
                 <th style={{ padding: "0.5rem" }}>Operatore</th>
                 <th style={{ padding: "0.5rem" }}>Ruoli attivi</th>
                 <th style={{ padding: "0.5rem" }}>Toggle ruoli</th>
@@ -108,10 +108,10 @@ export default function RolesAdminPage() {
             </thead>
             <tbody>
               {filtered.map((r) => (
-                <tr key={r.userId} style={{ borderBottom: "1px solid #222" }}>
+                <tr key={r.userId} style={{ borderBottom: "1px solid #2A2E39" }}>
                   <td style={{ padding: "0.5rem", verticalAlign: "top" }}>
                     <div style={{ fontWeight: 700 }}>{r.name}</div>
-                    <div style={{ fontSize: "0.7rem", color: "#666" }}>{r.email || r.userId}</div>
+                    <div style={{ fontSize: "0.7rem", color: "#6B7080" }}>{r.email || r.userId}</div>
                   </td>
                   <td style={{ padding: "0.5rem", verticalAlign: "top" }}>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
@@ -123,7 +123,7 @@ export default function RolesAdminPage() {
                           </span>
                         );
                       })}
-                      {(!r.roles || r.roles.length === 0) && <span style={{ color: "#666", fontSize: "0.72rem" }}>—</span>}
+                      {(!r.roles || r.roles.length === 0) && <span style={{ color: "#6B7080", fontSize: "0.72rem" }}>—</span>}
                     </div>
                   </td>
                   <td style={{ padding: "0.5rem", verticalAlign: "top" }}>
@@ -140,7 +140,7 @@ export default function RolesAdminPage() {
                             style={{
                               padding: "0.2rem 0.5rem",
                               background: active ? c.color : "transparent",
-                              color: active ? "#0D0D0D" : c.color,
+                              color: active ? "#08090F" : c.color,
                               border: `1px solid ${c.color}`,
                               borderRadius: 4,
                               fontSize: "0.68rem",

@@ -5,11 +5,11 @@ import { useUser } from "@clerk/nextjs";
 import AdminNav from "@/components/AdminNav";
 
 const HOC_COLORS = {
-  bgDark: "#0B0B0F",
-  white: "#FFFFFF",
-  gray: "#9CA3AF",
-  orange: "#F59E0B",
-  gradient: "linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)",
+  bgDark: "#08090F",
+  white: "#F5F6F8",
+  gray: "#6B7080",
+  orange: "#B89158",
+  gradient: "linear-gradient(135deg, #B89158 0%, #D44545 100%)",
 };
 
 export default function ReviewPage() {
@@ -66,7 +66,7 @@ export default function ReviewPage() {
     }
   }
 
-  if (!isLoaded) return <div style={{ color: "#fff", padding: 40 }}>Loading...</div>;
+  if (!isLoaded) return <div style={{ color: "#F5F6F8", padding: 40 }}>Loading...</div>;
 
   return (
     <div style={{ background: HOC_COLORS.bgDark, minHeight: "100vh", color: HOC_COLORS.white, padding: "2rem" }}>
@@ -78,7 +78,7 @@ export default function ReviewPage() {
         Feedback recenti degli operatori sulle valutazioni AI. Rivedi, correggi, promuovi ad esempi d&apos;oro.
       </p>
 
-      {error && <p style={{ color: "#EF4444" }}>Errore: {error}</p>}
+      {error && <p style={{ color: "#D44545" }}>Errore: {error}</p>}
       {loading && <p>Caricamento...</p>}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginTop: "2rem" }}>
@@ -91,7 +91,7 @@ export default function ReviewPage() {
               onClick={() => setSelected(it)}
               style={{
                 background: selected?.timestamp === it.timestamp ? `${HOC_COLORS.orange}20` : `${HOC_COLORS.white}08`,
-                border: `1px solid ${it.reviewed ? "#10B98155" : HOC_COLORS.white + "20"}`,
+                border: `1px solid ${it.reviewed ? "#3FB97E55" : HOC_COLORS.white + "20"}`,
                 borderRadius: "0.5rem",
                 padding: "0.75rem",
                 marginBottom: "0.5rem",
@@ -128,7 +128,7 @@ export default function ReviewPage() {
               <div style={{ background: `${HOC_COLORS.white}05`, padding: "0.75rem", borderRadius: "0.5rem", marginBottom: "1rem", maxHeight: "300px", overflowY: "auto" }}>
                 {(selected.messages || []).map((m, i) => (
                   <div key={i} style={{ marginBottom: "0.5rem" }}>
-                    <strong style={{ color: m.role === "operator" ? HOC_COLORS.orange : "#60A5FA" }}>
+                    <strong style={{ color: m.role === "operator" ? HOC_COLORS.orange : "#4F8CCB" }}>
                       [{m.role}]:
                     </strong>{" "}
                     {m.content}

@@ -2,15 +2,16 @@
 
 import { useState } from "react";
 import AdminNav from "@/components/AdminNav";
+import { COLORS } from "@/lib/brand";
 
 const C = {
-  bgDark: "#0a0b1a",
-  orange: "#FF6B35",
-  purple: "#8B5CF6",
-  green: "#10B981",
-  red: "#EF4444",
-  white: "#F9FAFB",
-  gray: "#9CA3AF",
+  bgDark: COLORS.obsidian,
+  orange: COLORS.champagne,
+  purple: COLORS.cobalt,
+  green: COLORS.verdant,
+  red: COLORS.signal,
+  white: COLORS.alabaster,
+  gray: COLORS.mist,
 };
 
 export default function SeedAdminPage() {
