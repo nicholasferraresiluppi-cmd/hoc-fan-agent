@@ -107,8 +107,9 @@ export default function Home() {
   const [recentScenarios, setRecentScenarios] = useState([]);
   const [seniority, setSeniority] = useState(null);
   const [league, setLeague] = useState(null);
+  const [certifications, setCertifications] = useState([]);
 
-  // Fetch seniority/league on mount / after user loaded
+  // Fetch seniority/league/certs on mount / after user loaded
   useEffect(() => {
     if (!isLoaded || !user) return;
     (async () => {
@@ -117,11 +118,20 @@ export default function Home() {
         const j = await r.json();
         if (j?.seniority) setSeniority(j.seniority);
         if (j?.league) setLeague(j.league);
+        if (j?.certifications) setCertifications(j.certifications);
       } catch (e) {
         console.warn("profile fetch failed:", e?.message);
       }
     })();
   }, [isLoaded, user]);
+
+  const CERT_UI = {
+    0: { emoji: "", color: "#666" },
+    1: { emoji: "🥉", color: "#CD7F32" },
+    2: { emoji: "🥈", color: "#C0C0C0" },
+    3: { emoji: "🥇", color: "#FFD700" },
+  };
+  const certByCreator = Object.fromEntries((certifications || []).map((c) => [c.creatorId, c]));
 
   const LEAGUE_UI = {
     bronze: { emoji: "🥉", color: "#CD7F32" },
@@ -537,6 +547,31 @@ export default function Home() {
               >
                 {seniority.tier === "master" ? "👑" : seniority.tier === "senior" ? "⭐" : "🌱"} {seniority.tier}
               </span>
+            )}
+            {certifications?.filter((c) => c.level > 0).length > 0 && (
+              <a
+                href="/profilo/certificazioni"
+                title="Le tue certificazioni per creator"
+                style={{
+                  display: "flex",
+                  gap: "0.2rem",
+                  alignItems: "center",
+                  padding: "0.2rem 0.45rem",
+                  background: "#FFD70018",
+                  border: "1px solid #FFD70055",
+                  borderRadius: "0.4rem",
+                  textDecoration: "none",
+                }}
+              >
+                {certifications.filter((c) => c.level > 0).slice(0, 3).map((c) => (
+                  <span key={c.creatorId} style={{ fontSize: "0.8rem" }}>
+                    {CERT_UI[c.level].emoji}
+                  </span>
+                ))}
+                <span style={{ fontSize: "0.7rem", color: "#FFD700", fontWeight: 800, marginLeft: 2 }}>
+                  {certifications.filter((c) => c.level > 0).length}
+                </span>
+              </a>
             )}
             <UserButton
               appearance={{
@@ -1113,8 +1148,23 @@ export default function Home() {
                       e.currentTarget.style.transform = "translateY(0)";
                     }}
                   >
-                    <div style={{ fontWeight: 900, color: HOC_COLORS.white, fontSize: "1.05rem", marginBottom: "0.25rem" }}>
+                    <div style={{ fontWeight: 900, color: HOC_COLORS.white, fontSize: "1.05rem", marginBottom: "0.25rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
                       {c.name}
+                      {certByCreator[c.id]?.level > 0 && (
+                        <span
+                          title={`Certificazione ${certByCreator[c.id].meta?.label || ""}`}
+                          style={{
+                            fontSize: "0.7rem",
+                            padding: "0.1rem 0.35rem",
+                            borderRadius: 4,
+                            border: `1px solid ${CERT_UI[certByCreator[c.id].level].color}`,
+                            color: CERT_UI[certByCreator[c.id].level].color,
+                            background: `${CERT_UI[certByCreator[c.id].level].color}18`,
+                          }}
+                        >
+                          {CERT_UI[certByCreator[c.id].level].emoji} L{certByCreator[c.id].level}
+                        </span>
+                      )}
                     </div>
                     <div style={{ color: HOC_COLORS.orange, fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "0.5rem" }}>
                       {c.archetype}

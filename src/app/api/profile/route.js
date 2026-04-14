@@ -2,6 +2,7 @@ import { kv } from "@vercel/kv";
 import { auth } from "@clerk/nextjs/server";
 import { computeSeniority } from "@/lib/seniority";
 import { getUserLeague } from "@/lib/leagues";
+import { getUserCertifications } from "@/lib/certifications";
 
 // Default profile structure
 const defaultProfile = {
@@ -42,6 +43,12 @@ export async function GET(request) {
     } catch (e) {
       console.warn("getUserLeague failed:", e?.message);
     }
+    let certifications = [];
+    try {
+      certifications = await getUserCertifications(userId);
+    } catch (e) {
+      console.warn("getUserCertifications failed:", e?.message);
+    }
 
     if (!profile) {
       const newProfile = {
@@ -49,11 +56,12 @@ export async function GET(request) {
         userId,
         seniority,
         league,
+        certifications,
       };
       return Response.json(newProfile);
     }
 
-    return Response.json({ ...profile, seniority, league });
+    return Response.json({ ...profile, seniority, league, certifications });
   } catch (error) {
     console.error("Profile GET error:", error);
     return Response.json(
