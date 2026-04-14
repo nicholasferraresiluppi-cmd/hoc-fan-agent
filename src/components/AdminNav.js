@@ -20,6 +20,7 @@ const SECTIONS = [
   { href: "/admin/seniority", label: "🎖️ Seniority" },
   { href: "/admin/seed", label: "🌱 Seed demo" },
   { href: "/admin/access", label: "🔐 Accessi" },
+  { href: "/admin/ruoli", label: "🛡️ Ruoli" },
 ];
 
 const PUBLIC_SECTIONS = [
