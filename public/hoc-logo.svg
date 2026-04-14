@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  HOC logo (ricostruito a partire dall'immagine inviata da Nicholas, apr 2026).
+  Versione stop-gap: sostituire con l'SVG originale quando disponibile.
+  Colore: monocromo currentColor -> si adatta a qualsiasi tema.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 220" fill="currentColor" aria-label="House of Creators">
+  <!-- Tetto/casa stilizzata -->
+  <g>
+    <!-- Linea tetto principale -->
+    <path d="M20 110 L260 30 L340 30 L580 110 L540 110 L300 52 L60 110 Z"/>
+    <!-- Base casa -->
+    <rect x="60" y="105" width="480" height="8"/>
+  </g>
+
+  <!-- Palma centrale -->
+  <g transform="translate(300 30)">
+    <!-- Tronco -->
+    <path d="M-6 0 L-4 80 L4 80 L6 0 Z"/>
+    <!-- Fronde (6 curve) -->
+    <path d="M0 10 C-40 -10 -75 -5 -95 15 C-75 5 -55 5 -30 15 Z"/>
+    <path d="M0 10 C 40 -10  75 -5  95 15 C 75  5  55  5  30 15 Z"/>
+    <path d="M0 6 C-30 -30 -50 -45 -60 -55 C-45 -35 -25 -20 -10 0 Z"/>
+    <path d="M0 6 C 30 -30  50 -45  60 -55 C 45 -35  25 -20  10 0 Z"/>
+    <path d="M0 2 C-10 -35 -10 -55 -5 -70 C-2 -55 -2 -35 0 -10 Z"/>
+    <path d="M0 2 C 10 -35  10 -55  5 -70 C 2 -55  2 -35  0 -10 Z"/>
+    <!-- Nocciole di cocco -->
+    <circle cx="-12" cy="8" r="3"/>
+    <circle cx="12" cy="8" r="3"/>
+    <circle cx="0" cy="14" r="3"/>
+  </g>
+
+  <!-- Wordmark "HOUSE OF CREATORS" -->
+  <g transform="translate(0 150)" font-family="Inter Tight, Arial Black, sans-serif" font-weight="800" font-size="58" letter-spacing="2">
+    <text x="20" y="50">HOUSE</text>
+    <text x="238" y="50" font-size="28" font-style="italic" font-weight="700">OF</text>
+    <text x="305" y="50">CREATORS</text>
+  </g>
+</svg>
