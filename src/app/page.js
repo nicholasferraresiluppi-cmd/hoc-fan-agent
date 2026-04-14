@@ -6,6 +6,8 @@ import { TRAINING_SCENARIOS, QUICK_CHALLENGES } from "@/lib/training-scenarios";
 import { CREATOR_PERSONAS } from "@/lib/creator-personas";
 import { FAN_ARCHETYPES, getFanArchetypeById } from "@/lib/fan-archetypes";
 import PlayerCard from "@/components/PlayerCard";
+import { COLORS, FONTS } from "@/lib/brand";
+import BrandLockup from "@/components/BrandLockup";
 
 // Pick a random archetype weighted by difficulty (favor medium/common ones)
 function pickRandomArchetype() {
@@ -18,22 +20,24 @@ function pickRandomArchetype() {
 // CONSTANTS & DATA
 // =========================================================
 
+// V9.0 rebrand — HOC_COLORS ora mappa alla nuova palette HOC Pro.
+// Le vecchie chiavi (orange/purple/ecc.) restano per retrocompat, ma puntano ai nuovi token.
 const HOC_COLORS = {
-  bgDark: "#0D0D0D",
-  white: "#FFFFFF",
-  orange: "#F5A623",
-  purple: "#8B5CF6",
-  gray: "#888888",
-  gradient: "linear-gradient(135deg, #8B5CF6 0%, #F5A623 100%)",
+  bgDark: COLORS.obsidian,      // #08090F
+  white: COLORS.alabaster,      // #F5F6F8
+  orange: COLORS.champagne,     // #D4AF7A — accento primario
+  purple: COLORS.cobalt,        // #4F8CCB — secondario (rari casi)
+  gray: COLORS.mist,            // #6B7080
+  gradient: `linear-gradient(135deg, ${COLORS.champagneDeep} 0%, ${COLORS.champagne} 100%)`,
 };
 
 const SKILL_DIMENSIONS = [
-  { key: "naturalezza", label: "Naturalezza", color: "#10B981" },
-  { key: "esclusivita", label: "Esclusività", color: "#F59E0B" },
-  { key: "dipendenza", label: "Dipendenza", color: "#3B82F6" },
-  { key: "conversione", label: "Conversione", color: "#F5A623" },
-  { key: "tono", label: "Tono", color: "#EC4899" },
-  { key: "gestione_obiezioni", label: "Gestione Obiezioni", color: "#8B5CF6" },
+  { key: "naturalezza", label: "Naturalezza", color: COLORS.verdant },
+  { key: "esclusivita", label: "Esclusività", color: COLORS.champagne },
+  { key: "dipendenza", label: "Dipendenza", color: COLORS.cobalt },
+  { key: "conversione", label: "Conversione", color: COLORS.champagneDeep },
+  { key: "tono", label: "Tono", color: COLORS.champagneLight },
+  { key: "gestione_obiezioni", label: "Gestione Obiezioni", color: COLORS.ember },
 ];
 
 // Category metadata — scenarios counts are computed dynamically from TRAINING_SCENARIOS
@@ -182,13 +186,14 @@ export default function Home() {
   };
   const certByCreator = Object.fromEntries((certifications || []).map((c) => [c.creatorId, c]));
 
+  // Allineato a TIER in /src/lib/brand.js (color = accent)
   const LEAGUE_UI = {
-    bronze: { emoji: "🥉", color: "#CD7F32" },
-    silver: { emoji: "🥈", color: "#C0C0C0" },
-    gold: { emoji: "🥇", color: "#FFD700" },
+    bronze: { emoji: "🥉", color: "#B08358" },
+    silver: { emoji: "🥈", color: "#B9BDC7" },
+    gold: { emoji: "🥇", color: COLORS.champagne },
     platinum: { emoji: "💠", color: "#E5E4E2" },
-    diamond: { emoji: "💎", color: "#60A5FA" },
-    unranked: { emoji: "⚪", color: "#666" },
+    diamond: { emoji: "💎", color: COLORS.cobalt },
+    unranked: { emoji: "⚪", color: COLORS.mist },
   };
 
   // Chat State
@@ -520,17 +525,20 @@ export default function Home() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <span style={{ fontSize: "2rem" }}>🌴</span>
-            <h1
+            <BrandLockup size="md" />
+            <span
               style={{
-                margin: 0,
-                fontSize: "1.75rem",
-                fontWeight: 900,
-                color: HOC_COLORS.white,
+                fontFamily: FONTS.mono,
+                fontSize: "0.65rem",
+                letterSpacing: "0.18em",
+                color: COLORS.mist,
+                textTransform: "uppercase",
+                paddingLeft: "0.75rem",
+                borderLeft: `1px solid ${COLORS.steel}`,
               }}
             >
-              HOC Fan Agent
-            </h1>
+              Training Ground
+            </span>
           </div>
           <div
             style={{
@@ -573,13 +581,13 @@ export default function Home() {
                       ? `${HOC_COLORS.purple}25`
                       : seniority.tier === "senior"
                       ? `${HOC_COLORS.orange}25`
-                      : "#10B98125",
+                      : `${COLORS.verdant}25`,
                   border: `1px solid ${
                     seniority.tier === "master"
                       ? HOC_COLORS.purple
                       : seniority.tier === "senior"
                       ? HOC_COLORS.orange
-                      : "#10B981"
+                      : COLORS.verdant
                   }`,
                   borderRadius: "0.4rem",
                   color:
@@ -587,7 +595,7 @@ export default function Home() {
                       ? HOC_COLORS.purple
                       : seniority.tier === "senior"
                       ? HOC_COLORS.orange
-                      : "#10B981",
+                      : COLORS.verdant,
                   fontSize: "0.7rem",
                   fontWeight: 800,
                   textTransform: "uppercase",
@@ -624,11 +632,11 @@ export default function Home() {
             )}
             {roleInfo && (() => {
               const RM = {
-                admin: { label: "Admin", emoji: "👑", color: "#DC2626" },
-                sales_manager: { label: "Sales Manager", emoji: "📊", color: "#2563EB" },
-                qa_reviewer: { label: "QA Reviewer", emoji: "🔍", color: "#7C3AED" },
-                team_lead: { label: "Team Lead", emoji: "⭐", color: "#EA580C" },
-                operator: { label: "Operator", emoji: "🎯", color: "#16A34A" },
+                admin: { label: "Admin", emoji: "◆", color: COLORS.signal },
+                sales_manager: { label: "Sales Manager", emoji: "◇", color: COLORS.cobalt },
+                qa_reviewer: { label: "QA Reviewer", emoji: "◈", color: COLORS.champagneDeep },
+                team_lead: { label: "Team Lead", emoji: "★", color: COLORS.champagne },
+                operator: { label: "Operator", emoji: "◉", color: COLORS.verdant },
               };
               const nonOpRoles = (roleInfo.roles || []).filter((r) => r !== "operator");
               if (nonOpRoles.length === 0) return null;
@@ -680,13 +688,15 @@ export default function Home() {
           <div style={{ marginBottom: "3rem" }}>
             <h2
               style={{
+                fontFamily: FONTS.display,
                 fontSize: "2rem",
-                fontWeight: 900,
+                fontWeight: 800,
+                letterSpacing: "-0.01em",
                 color: HOC_COLORS.white,
                 margin: "0 0 0.5rem 0",
               }}
             >
-              Ciao, {operatorName}! 👋
+              Ciao, {operatorName}.
             </h2>
             <p style={{ color: HOC_COLORS.gray, margin: 0 }}>
               Continua il tuo percorso di formazione
@@ -722,13 +732,13 @@ export default function Home() {
             <div
               style={{
                 background: dailyDrill.completed
-                  ? `linear-gradient(135deg, #10B98120, #10B98108)`
+                  ? `linear-gradient(135deg, ${COLORS.verdant}20, ${COLORS.verdant}08)`
                   : dailyDrill.mandatory
                   ? `linear-gradient(135deg, ${HOC_COLORS.orange}25, ${HOC_COLORS.orange}08)`
                   : `linear-gradient(135deg, ${HOC_COLORS.purple}22, ${HOC_COLORS.purple}08)`,
                 border: `2px solid ${
                   dailyDrill.completed
-                    ? "#10B981"
+                    ? COLORS.verdant
                     : dailyDrill.mandatory
                     ? HOC_COLORS.orange
                     : HOC_COLORS.purple
@@ -1552,7 +1562,7 @@ export default function Home() {
             <span title="Interesse del fan" style={{ color: "#60A5FA" }}>
               💙 {fanState.interest}
             </span>
-            <span title="Fiducia del fan" style={{ color: "#10B981" }}>
+            <span title="Fiducia del fan" style={{ color: COLORS.verdant }}>
               🤝 {fanState.trust}
             </span>
             <span title="Irritazione del fan" style={{ color: "#EF4444" }}>
@@ -1692,7 +1702,7 @@ export default function Home() {
                 marginTop: "1rem",
               }}
             >
-              <p style={{ margin: 0, fontWeight: 700, color: "#10B981" }}>
+              <p style={{ margin: 0, fontWeight: 700, color: COLORS.verdant }}>
                 Scenario completato!
               </p>
             </div>
@@ -1887,7 +1897,7 @@ export default function Home() {
               <div
                 style={{
                   background: `${HOC_COLORS.white}08`,
-                  border: `2px solid #10B981`,
+                  border: `2px solid ${COLORS.verdant}`,
                   borderRadius: "1rem",
                   padding: "1.5rem",
                   marginBottom: "1.5rem",
@@ -1897,7 +1907,7 @@ export default function Home() {
                 <h3
                   style={{
                     margin: "0 0 1rem 0",
-                    color: "#10B981",
+                    color: COLORS.verdant,
                     fontWeight: 900,
                   }}
                 >
@@ -1960,7 +1970,7 @@ export default function Home() {
               Il tuo feedback aiuta a migliorare il coach AI.
             </p>
             {feedbackSent ? (
-              <p style={{ color: "#10B981", fontWeight: 700, margin: 0 }}>
+              <p style={{ color: COLORS.verdant, fontWeight: 700, margin: 0 }}>
                 ✅ Grazie per il feedback!
               </p>
             ) : (
@@ -1970,8 +1980,8 @@ export default function Home() {
                     onClick={() => setFeedbackRating("up")}
                     style={{
                       padding: "0.5rem 1rem",
-                      background: feedbackRating === "up" ? "#10B98130" : `${HOC_COLORS.white}10`,
-                      border: `2px solid ${feedbackRating === "up" ? "#10B981" : HOC_COLORS.white + "30"}`,
+                      background: feedbackRating === "up" ? `${COLORS.verdant}30` : `${HOC_COLORS.white}10`,
+                      border: `2px solid ${feedbackRating === "up" ? COLORS.verdant : HOC_COLORS.white + "30"}`,
                       color: HOC_COLORS.white,
                       borderRadius: "0.5rem",
                       fontWeight: 700,
@@ -2273,14 +2283,14 @@ export default function Home() {
 
               <div
                 style={{
-                  background: `#10B98120`,
-                  border: `2px solid #10B981`,
+                  background: `${COLORS.verdant}20`,
+                  border: `2px solid ${COLORS.verdant}`,
                   borderRadius: "1rem",
                   padding: "1.5rem",
                   marginBottom: "1.5rem",
                 }}
               >
-                <p style={{ margin: "0 0 0.5rem 0", color: "#10B981", fontWeight: 700 }}>
+                <p style={{ margin: "0 0 0.5rem 0", color: COLORS.verdant, fontWeight: 700 }}>
                   ✅ Cosa hai fatto bene
                 </p>
                 <p style={{ margin: 0, color: HOC_COLORS.white }}>
@@ -2550,8 +2560,8 @@ export default function Home() {
           >
             <div
               style={{
-                background: `#10B98120`,
-                border: `2px solid #10B981`,
+                background: `${COLORS.verdant}20`,
+                border: `2px solid ${COLORS.verdant}`,
                 borderRadius: "1rem",
                 padding: "1.5rem",
               }}
@@ -2559,7 +2569,7 @@ export default function Home() {
               <h3
                 style={{
                   margin: "0 0 1rem 0",
-                  color: "#10B981",
+                  color: COLORS.verdant,
                   fontWeight: 900,
                 }}
               >
