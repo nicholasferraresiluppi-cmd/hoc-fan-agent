@@ -4,6 +4,14 @@ import { useState, useRef, useEffect } from "react";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { TRAINING_SCENARIOS, QUICK_CHALLENGES } from "@/lib/training-scenarios";
 import { CREATOR_PERSONAS } from "@/lib/creator-personas";
+import { FAN_ARCHETYPES, getFanArchetypeById } from "@/lib/fan-archetypes";
+
+// Pick a random archetype weighted by difficulty (favor medium/common ones)
+function pickRandomArchetype() {
+  const pool = FAN_ARCHETYPES;
+  if (!pool?.length) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 // =========================================================
 // CONSTANTS & DATA
@@ -111,6 +119,7 @@ export default function Home() {
   const [feedbackComment, setFeedbackComment] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [selectedCreator, setSelectedCreator] = useState(null);
+  const [selectedArchetype, setSelectedArchetype] = useState(null);
   const [pendingScenario, setPendingScenario] = useState(null);
   const [pendingQueue, setPendingQueue] = useState([]); // operator messages queued awaiting fan reply
   const [queueCountdown, setQueueCountdown] = useState(0); // seconds remaining (0 = inactive)
@@ -167,6 +176,7 @@ export default function Home() {
           messages: currentMessages,
           scenarioId: scenario.id,
           creatorId: selectedCreator?.id,
+          archetypeId: selectedArchetype?.id,
           fanState: fanStateRef.current,
         }),
       });
@@ -230,6 +240,8 @@ export default function Home() {
   const startScenarioWithCreator = async (scenario, creator) => {
     setSelectedScenario(scenario);
     setSelectedCreator(creator);
+    const archetype = pickRandomArchetype();
+    setSelectedArchetype(archetype);
     setPendingScenario(null);
     setMessages([]);
     setMessageCount(0);
@@ -257,6 +269,7 @@ export default function Home() {
           ],
           scenarioId: scenario.id,
           creatorId: creator?.id,
+          archetypeId: archetype?.id,
         }),
       });
       const data = await res.json();
@@ -283,6 +296,7 @@ export default function Home() {
           messages,
           scenarioId: selectedScenario.id,
           creatorId: selectedCreator?.id,
+          archetypeId: selectedArchetype?.id,
         }),
       });
       const data = await res.json();
@@ -1223,6 +1237,22 @@ export default function Home() {
                 fontWeight: 700,
               }}>
                 {selectedCreator.name}
+              </span>
+            )}
+            {selectedArchetype && (
+              <span
+                title={`${selectedArchetype.name} — ${selectedArchetype.profile}`}
+                style={{
+                  padding: "0.25rem 0.6rem",
+                  background: `${HOC_COLORS.purple}20`,
+                  border: `1px solid ${HOC_COLORS.purple}`,
+                  borderRadius: "0.5rem",
+                  color: HOC_COLORS.purple,
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                }}
+              >
+                {selectedArchetype.emoji} {selectedArchetype.name}
               </span>
             )}
             <span style={{ color: HOC_COLORS.orange, fontWeight: 700 }}>

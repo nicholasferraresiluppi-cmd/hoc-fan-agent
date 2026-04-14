@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { FAN_PROFILES } from "@/lib/fan-profiles";
 import { TRAINING_SCENARIOS } from "@/lib/training-scenarios";
 import { getCreatorById, formatCreatorPersonaForPrompt } from "@/lib/creator-personas";
+import { getFanArchetypeById, formatFanArchetypeForPrompt } from "@/lib/fan-archetypes";
 
 function findScenarioById(scenarioId) {
   for (const category of TRAINING_SCENARIOS) {
@@ -19,9 +20,11 @@ export async function POST(request) {
       return Response.json({ error: "Non autenticato." }, { status: 401 });
     }
 
-    const { messages, fanProfileId, scenarioId, fanState, creatorId } = await request.json();
+    const { messages, fanProfileId, scenarioId, fanState, creatorId, archetypeId } = await request.json();
     const creator = creatorId ? getCreatorById(creatorId) : null;
     const creatorContext = creator ? `\n\n--- CREATOR CONTEXT ---\n${formatCreatorPersonaForPrompt(creator)}\n--- FINE CREATOR CONTEXT ---\n` : "";
+    const archetype = archetypeId ? getFanArchetypeById(archetypeId) : null;
+    const archetypeContext = archetype ? `\n\n--- FAN ARCHETYPE ---\n${formatFanArchetypeForPrompt(archetype)}\n--- FINE FAN ARCHETYPE ---\n` : "";
 
     // Fan emotional state: tracks interest/trust/irritation/attachment (0-10) across turns.
     // attachment = quanto il fan sente il gancio emotivo della creator (illusione esclusività + dipendenza).
@@ -47,7 +50,7 @@ export async function POST(request) {
       if (!scenario) {
         return Response.json({ error: "Scenario non trovato." }, { status: 400 });
       }
-      systemPrompt = `${scenario.systemPromptForFan}${creatorContext}
+      systemPrompt = `${scenario.systemPromptForFan}${creatorContext}${archetypeContext}
 
 CONTEXT: You are in an OnlyFans DM chat. The operator (managing the creator's account) is messaging you. You respond ONLY as the fan character described above. Never break character. Never reveal you're an AI. Keep replies short and natural like a real DM (usually 1-2 sentences, 30-50 chars). Come fan reale, rispondi con UN SOLO messaggio (raramente 2 se super eccitato/irritato). L'operatore invece può averti mandato più messaggi consecutivi (è normale su OF) — leggili tutti come un unico turno e rispondi nel complesso. If the operator offers paid content, simulate buying/refusing based on your character's mood and history. Respond in the same language the operator uses (primarily Italian for Italian fans).
 

@@ -20,6 +20,7 @@ const CARDS = [
   { href: "/admin/review", title: "🔍 Review sessioni", desc: "Rivedi valutazioni recenti, correggi score e aggiungi commenti", color: C.purple },
   { href: "/admin/outcomes", title: "💰 Outcomes reali", desc: "Inserisci revenue, PPV, retention settimanali per validare le valutazioni AI", color: C.green },
   { href: "/admin/creators", title: "👤 Creator persona", desc: "Visualizza tone card, ganci emotivi e vocabolario dei 3 creator pilota", color: C.yellow },
+  { href: "/admin/fan-archetypes", title: "👥 Fan Archetypes", desc: "12 tipologie di fan (Whale, Lonely, Negoziatore, Fragile…) con strategie ottimali", color: C.purple },
   { href: "/admin/seed", title: "🌱 Seed demo data", desc: "Popola l'app con 10 operatori fittizi + 60 giorni di sessioni per testare", color: C.green },
   { href: "/admin/access", title: "🔐 Gestione accessi", desc: "Aggiungi/rimuovi admin via email, senza redeploy", color: C.red },
   { href: "/leaderboard", title: "🏆 Classifica (vista utenti)", desc: "Apri la classifica come la vedono gli operatori", color: C.orange },

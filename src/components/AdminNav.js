@@ -16,6 +16,7 @@ const SECTIONS = [
   { href: "/admin/review", label: "🔍 Review sessioni" },
   { href: "/admin/outcomes", label: "💰 Outcomes" },
   { href: "/admin/creators", label: "👤 Creator" },
+  { href: "/admin/fan-archetypes", label: "👥 Fan Archetypes" },
   { href: "/admin/seed", label: "🌱 Seed demo" },
   { href: "/admin/access", label: "🔐 Accessi" },
 ];

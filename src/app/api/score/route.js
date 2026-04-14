@@ -4,6 +4,7 @@ import { FAN_PROFILES, ANDREA_PATTERNS } from "@/lib/fan-profiles";
 import { TRAINING_SCENARIOS, SKILL_DIMENSIONS } from "@/lib/training-scenarios";
 import { pickExamples, formatExamplesForPrompt } from "@/lib/golden-examples";
 import { getCreatorById, formatCreatorPersonaForPrompt } from "@/lib/creator-personas";
+import { getFanArchetypeById } from "@/lib/fan-archetypes";
 import { kv } from "@vercel/kv";
 
 function findScenarioById(scenarioId) {
@@ -21,8 +22,9 @@ export async function POST(request) {
       return Response.json({ error: "Non autenticato." }, { status: 401 });
     }
 
-    const { messages, fanProfileId, scenarioId, creatorId } = await request.json();
+    const { messages, fanProfileId, scenarioId, creatorId, archetypeId } = await request.json();
     const creator = creatorId ? getCreatorById(creatorId) : null;
+    const archetype = archetypeId ? getFanArchetypeById(archetypeId) : null;
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -63,6 +65,7 @@ OBIETTIVO OPERATORE: ${scenario.goalForOperator}
 
 FAN SIMULATO: ${scenario.fanPersonality?.name}, ${scenario.fanPersonality?.age} anni, stile: ${scenario.fanPersonality?.style}, mood: ${scenario.fanPersonality?.mood}
 ${creator ? `\nCREATOR: "${creator.name}" (${creator.archetype}). L'operatore DEVE scrivere con il tono di questa creator. Penalizza pesantemente la skill "tono" se lo stile è scollegato da: ${creator.shortDescription}` : ""}
+${archetype ? `\nFAN ARCHETYPE: ${archetype.emoji} ${archetype.name} — ${archetype.profile}\nBISOGNO DOMINANTE: ${archetype.emotional_need}\nSTRATEGIA OTTIMALE: ${archetype.conversion_strategy}\nTRAPPOLE: ${archetype.avoid}\nValuta le scelte dell'operatore anche alla luce di questa tipologia: ha gestito l'archetipo in modo appropriato? Ha evitato le trappole tipiche?` : ""}
 
 TECNICHE IDEALI da usare:
 ${techniques}
