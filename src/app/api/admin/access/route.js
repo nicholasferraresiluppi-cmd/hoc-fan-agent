@@ -1,9 +1,11 @@
 import { kv } from "@vercel/kv";
 import { auth, clerkClient } from "@clerk/nextjs/server";
-import { isAdmin, listAdmins } from "@/lib/admin";
+import { listAdmins } from "@/lib/admin";
+import { authorize, CAPABILITIES } from "@/lib/rbac";
 
 export async function GET() {
-  if (!(await isAdmin())) return Response.json({ error: "Non autorizzato." }, { status: 403 });
+  const a = await authorize(CAPABILITIES.ACCESS_MGMT);
+  if (!a.ok) return Response.json({ error: a.message }, { status: a.status });
   try {
     const admins = await listAdmins();
     return Response.json({ admins });
@@ -15,7 +17,8 @@ export async function GET() {
 // POST { action: "add" | "remove", userId?: string, email?: string }
 // Permette di aggiungere/rimuovere admin via userId o via email (risolta da Clerk).
 export async function POST(request) {
-  if (!(await isAdmin())) return Response.json({ error: "Non autorizzato." }, { status: 403 });
+  const a = await authorize(CAPABILITIES.ACCESS_MGMT);
+  if (!a.ok) return Response.json({ error: a.message }, { status: a.status });
   try {
     const body = await request.json().catch(() => ({}));
     const action = body?.action;

@@ -1,13 +1,14 @@
 import { auth } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
-import { isUserIdAdmin } from "@/lib/admin";
+import { authorize, CAPABILITIES } from "@/lib/rbac";
 
 // POST — SM overrides a score with corrected evaluation + comment
 export async function POST(request) {
   try {
     const { userId } = await auth();
     if (!userId) return Response.json({ error: "Non autenticato." }, { status: 401 });
-    if (!(await isUserIdAdmin(userId))) return Response.json({ error: "Non autorizzato." }, { status: 403 });
+    const _az = await authorize(CAPABILITIES.SCORES_OVERRIDE);
+    if (!_az.ok) return Response.json({ error: _az.message }, { status: _az.status });
 
     const { feedbackKey, correctedScore, smComment, outcome } = await request.json();
 

@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
-import { isUserIdAdmin } from "@/lib/admin";
+import { authorize, CAPABILITIES } from "@/lib/rbac";
 
 export async function POST(request) {
   try {
@@ -41,9 +41,8 @@ export async function GET(request) {
     const { userId } = await auth();
     if (!userId) return Response.json({ error: "Non autenticato." }, { status: 401 });
 
-    if (!(await isUserIdAdmin(userId))) {
-      return Response.json({ error: "Non autorizzato." }, { status: 403 });
-    }
+    const _az = await authorize(CAPABILITIES.REVIEW);
+    if (!_az.ok) return Response.json({ error: _az.message }, { status: _az.status });
 
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "50");

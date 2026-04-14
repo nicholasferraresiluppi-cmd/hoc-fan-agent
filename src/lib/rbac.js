@@ -199,3 +199,19 @@ export async function myRole() {
   if (!userId) return null;
   return getUserRole(userId);
 }
+
+/**
+ * Helper per route handlers: verifica auth + capability.
+ * Ritorna { ok: true, userId, role, scope } oppure { ok: false, status, message }.
+ */
+export async function authorize(capability) {
+  const { userId } = await auth();
+  if (!userId) return { ok: false, status: 401, message: "unauthenticated" };
+  const scope = await getScope(userId, capability);
+  if (!scope) {
+    const role = await getUserRole(userId);
+    return { ok: false, status: 403, message: `missing capability ${capability} (role: ${role})` };
+  }
+  const role = await getUserRole(userId);
+  return { ok: true, userId, role, scope };
+}

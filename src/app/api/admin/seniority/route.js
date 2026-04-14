@@ -1,13 +1,12 @@
-import { isAdmin } from "@/lib/admin";
+import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { computeSeniority, setSeniorityOverride, TIERS } from "@/lib/seniority";
 import { kv } from "@vercel/kv";
 import { clerkClient } from "@clerk/nextjs/server";
 
 // GET /api/admin/seniority — lista operatori con sessioni e tier
 export async function GET() {
-  if (!(await isAdmin())) {
-    return Response.json({ error: "forbidden" }, { status: 403 });
-  }
+  const auth = await authorize(CAPABILITIES.SENIORITY_OVERRIDE);
+  if (!auth.ok) return Response.json({ error: auth.message }, { status: auth.status });
 
   // Discover operatori da leaderboard index (zset con members = userId)
   let userIds = [];
@@ -53,9 +52,8 @@ export async function GET() {
 
 // POST /api/admin/seniority { userId, tier } — set/clear override
 export async function POST(req) {
-  if (!(await isAdmin())) {
-    return Response.json({ error: "forbidden" }, { status: 403 });
-  }
+  const auth = await authorize(CAPABILITIES.SENIORITY_OVERRIDE);
+  if (!auth.ok) return Response.json({ error: auth.message }, { status: auth.status });
   try {
     const { userId, tier } = await req.json();
     if (!userId) return Response.json({ error: "userId required" }, { status: 400 });

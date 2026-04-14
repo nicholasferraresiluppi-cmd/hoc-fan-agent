@@ -1,5 +1,5 @@
 import { saveSeasonSnapshot, currentSeasonKey, previousSeasonKey } from "@/lib/leagues";
-import { isAdmin } from "@/lib/admin";
+import { authorize, CAPABILITIES } from "@/lib/rbac";
 
 function isAuthorized(request) {
   const authHeader = request.headers.get("authorization") || "";
@@ -12,7 +12,8 @@ function isAuthorized(request) {
 
 async function authorized(request) {
   if (isAuthorized(request)) return true;
-  return await isAdmin();
+  const a = await authorize(CAPABILITIES.LEAGUES_SNAPSHOT);
+  return a.ok;
 }
 
 // POST/GET: snapshot della stagione precedente (default) — chiusura mensile.

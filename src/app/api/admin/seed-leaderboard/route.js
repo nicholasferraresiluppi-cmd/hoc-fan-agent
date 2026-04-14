@@ -1,6 +1,6 @@
 import { kv } from "@vercel/kv";
 import { auth } from "@clerk/nextjs/server";
-import { isAdmin } from "@/lib/admin";
+import { authorize, CAPABILITIES } from "@/lib/rbac";
 
 const DAY = 24 * 60 * 60 * 1000;
 const SKILLS = ["naturalezza", "esclusivita", "dipendenza", "conversione", "tono", "gestione_obiezioni"];
@@ -179,7 +179,8 @@ async function seed() {
 }
 
 export async function POST(request) {
-  if (!(await isAdmin())) return Response.json({ error: "Non autorizzato. Serve essere admin." }, { status: 401 });
+  const a = await authorize(CAPABILITIES.SEED);
+  if (!a.ok) return Response.json({ error: a.message }, { status: a.status });
   try {
     const body = await request.json().catch(() => ({}));
     const action = body?.action || "seed";

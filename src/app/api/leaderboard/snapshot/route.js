@@ -1,6 +1,6 @@
 import { kv } from "@vercel/kv";
 import { auth, clerkClient } from "@clerk/nextjs/server";
-import { isAdmin } from "@/lib/admin";
+import { authorize, CAPABILITIES } from "@/lib/rbac";
 
 const DAY = 24 * 60 * 60 * 1000;
 const SKILLS = ["naturalezza", "esclusivita", "dipendenza", "conversione", "tono", "gestione_obiezioni"];
@@ -101,8 +101,12 @@ async function buildSnapshot({ weekCutoffMs, weekEndMs }) {
 }
 
 export async function POST(request) {
-  const authorized = isAuthorized(request) || (await isAdmin());
-  if (!authorized) return Response.json({ error: "Non autorizzato." }, { status: 401 });
+  let ok = isAuthorized(request);
+  if (!ok) {
+    const a = await authorize(CAPABILITIES.LEADERBOARD_SNAPSHOT);
+    ok = a.ok;
+  }
+  if (!ok) return Response.json({ error: "Non autorizzato." }, { status: 401 });
 
   try {
     const now = Date.now();
