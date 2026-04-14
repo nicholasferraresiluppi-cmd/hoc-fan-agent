@@ -19,18 +19,18 @@ export default function RolesAdminPage() {
       setLoading(false);
     }
   };
+  useEffect(() => { load(); }, []);
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  const setRole = async (userId, role) => {
+  const toggleRole = async (userId, currentRoles, roleId) => {
+    const set = new Set(currentRoles || []);
+    if (set.has(roleId)) set.delete(roleId);
+    else set.add(roleId);
     setBusy(userId);
     try {
       await fetch("/api/admin/roles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, role }),
+        body: JSON.stringify({ userId, roles: Array.from(set) }),
       });
       await load();
     } finally {
@@ -44,27 +44,47 @@ export default function RolesAdminPage() {
     return (r.name || "").toLowerCase().includes(f) || (r.email || "").toLowerCase().includes(f) || r.userId.toLowerCase().includes(f);
   });
 
+  const customMap = Object.fromEntries((data?.custom || []).map((c) => [c.id, c]));
+
+  const roleChip = (rid) => {
+    if (data?.meta?.[rid]) {
+      const m = data.meta[rid];
+      return { label: m.label, emoji: m.emoji, color: m.color };
+    }
+    if (customMap[rid]) {
+      const c = customMap[rid];
+      return { label: c.name, emoji: c.emoji, color: c.color };
+    }
+    return { label: rid, emoji: "?", color: "#888" };
+  };
+
   return (
     <div style={{ background: "#0D0D0D", minHeight: "100vh", color: "#fff", padding: "2rem" }}>
       <AdminNav />
-      <h1 style={{ marginTop: 0 }}>Gestione ruoli</h1>
+      <h1 style={{ marginTop: 0 }}>🛡️ Gestione ruoli</h1>
       <p style={{ color: "#888", marginBottom: "1rem" }}>
-        Assegna un ruolo a ciascun operatore. Il ruolo determina le capability accessibili nell'app. Ruolo default: <code style={{ color: "#10B981" }}>operator</code>.
+        Un utente può avere <b>più ruoli</b> contemporaneamente — le capability si sommano (scope più ampio vince).
+        I ruoli custom si creano in <a href="/admin/ruoli-custom" style={{ color: "#60A5FA" }}>/admin/ruoli-custom</a>.
       </p>
 
-      {data?.meta && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.75rem", marginBottom: "1.5rem" }}>
-          {data.roles.map((r) => {
-            const m = data.meta[r];
-            return (
-              <div key={r} style={{ border: `1px solid ${m.color}55`, borderRadius: 8, padding: "0.6rem 0.8rem", background: `${m.color}10` }}>
-                <div style={{ fontWeight: 700, color: m.color }}>{m.emoji} {m.label}</div>
-                <div style={{ color: "#aaa", fontSize: "0.75rem" }}>{m.description}</div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* Legend */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem", marginBottom: "1rem" }}>
+        {(data?.predefined || []).map((r) => {
+          const m = data.meta[r]; if (!m) return null;
+          return (
+            <div key={r} style={{ border: `1px solid ${m.color}55`, borderRadius: 8, padding: "0.5rem 0.7rem", background: `${m.color}10` }}>
+              <div style={{ fontWeight: 700, color: m.color, fontSize: "0.8rem" }}>{m.emoji} {m.label}</div>
+              <div style={{ color: "#aaa", fontSize: "0.7rem" }}>{m.description}</div>
+            </div>
+          );
+        })}
+        {(data?.custom || []).map((c) => (
+          <div key={c.id} style={{ border: `1px solid ${c.color}55`, borderRadius: 8, padding: "0.5rem 0.7rem", background: `${c.color}10` }}>
+            <div style={{ fontWeight: 700, color: c.color, fontSize: "0.8rem" }}>{c.emoji} {c.name} <span style={{ fontSize: "0.6rem", opacity: 0.7 }}>CUSTOM</span></div>
+            <div style={{ color: "#aaa", fontSize: "0.7rem" }}>{c.description}</div>
+          </div>
+        ))}
+      </div>
 
       <input
         type="text"
@@ -82,55 +102,61 @@ export default function RolesAdminPage() {
             <thead>
               <tr style={{ textAlign: "left", borderBottom: "1px solid #333" }}>
                 <th style={{ padding: "0.5rem" }}>Operatore</th>
-                <th style={{ padding: "0.5rem" }}>Ruolo attuale</th>
-                <th style={{ padding: "0.5rem" }}>Cambia ruolo</th>
+                <th style={{ padding: "0.5rem" }}>Ruoli attivi</th>
+                <th style={{ padding: "0.5rem" }}>Toggle ruoli</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => {
-                const m = data.meta[r.role] || { color: "#888", label: r.role, emoji: "" };
-                return (
-                  <tr key={r.userId} style={{ borderBottom: "1px solid #222" }}>
-                    <td style={{ padding: "0.5rem" }}>
-                      <div style={{ fontWeight: 700 }}>{r.name}</div>
-                      <div style={{ fontSize: "0.7rem", color: "#666" }}>{r.email || r.userId}</div>
-                    </td>
-                    <td style={{ padding: "0.5rem" }}>
-                      <span style={{ color: m.color, fontWeight: 700 }}>
-                        {m.emoji} {m.label}
-                      </span>
-                    </td>
-                    <td style={{ padding: "0.5rem" }}>
-                      <div style={{ display: "flex", gap: "0.25rem", flexWrap: "wrap" }}>
-                        {data.roles.map((role) => {
-                          const rm = data.meta[role];
-                          const active = r.role === role;
-                          return (
-                            <button
-                              key={role}
-                              disabled={busy === r.userId || active}
-                              onClick={() => setRole(r.userId, role)}
-                              style={{
-                                padding: "0.25rem 0.5rem",
-                                background: active ? rm.color : "transparent",
-                                color: active ? "#0D0D0D" : rm.color,
-                                border: `1px solid ${rm.color}`,
-                                borderRadius: 4,
-                                fontSize: "0.72rem",
-                                fontWeight: 700,
-                                cursor: active ? "default" : "pointer",
-                                opacity: busy === r.userId ? 0.5 : 1,
-                              }}
-                            >
-                              {rm.emoji} {role}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filtered.map((r) => (
+                <tr key={r.userId} style={{ borderBottom: "1px solid #222" }}>
+                  <td style={{ padding: "0.5rem", verticalAlign: "top" }}>
+                    <div style={{ fontWeight: 700 }}>{r.name}</div>
+                    <div style={{ fontSize: "0.7rem", color: "#666" }}>{r.email || r.userId}</div>
+                  </td>
+                  <td style={{ padding: "0.5rem", verticalAlign: "top" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
+                      {(r.roles || []).map((rid) => {
+                        const c = roleChip(rid);
+                        return (
+                          <span key={rid} style={{ padding: "0.15rem 0.45rem", borderRadius: 999, background: `${c.color}22`, border: `1px solid ${c.color}`, color: c.color, fontSize: "0.72rem", fontWeight: 700 }}>
+                            {c.emoji} {c.label}
+                          </span>
+                        );
+                      })}
+                      {(!r.roles || r.roles.length === 0) && <span style={{ color: "#666", fontSize: "0.72rem" }}>—</span>}
+                    </div>
+                  </td>
+                  <td style={{ padding: "0.5rem", verticalAlign: "top" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
+                      {[...(data.predefined || []), ...(data?.custom || []).map((c) => c.id)].map((rid) => {
+                        const c = roleChip(rid);
+                        const active = (r.roles || []).includes(rid);
+                        return (
+                          <button
+                            key={rid}
+                            disabled={busy === r.userId}
+                            onClick={() => toggleRole(r.userId, r.roles, rid)}
+                            title={active ? "Rimuovi" : "Aggiungi"}
+                            style={{
+                              padding: "0.2rem 0.5rem",
+                              background: active ? c.color : "transparent",
+                              color: active ? "#0D0D0D" : c.color,
+                              border: `1px solid ${c.color}`,
+                              borderRadius: 4,
+                              fontSize: "0.68rem",
+                              fontWeight: 700,
+                              cursor: busy === r.userId ? "wait" : "pointer",
+                              opacity: busy === r.userId ? 0.5 : 1,
+                            }}
+                          >
+                            {active ? "✓" : "+"} {c.emoji} {c.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

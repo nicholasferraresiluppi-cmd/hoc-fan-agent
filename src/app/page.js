@@ -118,7 +118,12 @@ export default function Home() {
       try {
         const r = await fetch("/api/whoami");
         const j = await r.json();
-        setRoleInfo({ role: j?.role || "operator", team: j?.team || null, admin: !!j?.admin });
+        setRoleInfo({
+          role: j?.role || "operator",
+          roles: Array.isArray(j?.roles) && j.roles.length ? j.roles : [j?.role || "operator"],
+          team: j?.team || null,
+          admin: !!j?.admin,
+        });
       } catch (e) {
         console.warn("whoami fetch failed:", e?.message);
       }
@@ -603,7 +608,7 @@ export default function Home() {
                 </span>
               </a>
             )}
-            {roleInfo && roleInfo.role !== "operator" && (() => {
+            {roleInfo && (() => {
               const RM = {
                 admin: { label: "Admin", emoji: "👑", color: "#DC2626" },
                 sales_manager: { label: "Sales Manager", emoji: "📊", color: "#2563EB" },
@@ -611,28 +616,36 @@ export default function Home() {
                 team_lead: { label: "Team Lead", emoji: "⭐", color: "#EA580C" },
                 operator: { label: "Operator", emoji: "🎯", color: "#16A34A" },
               };
-              const meta = RM[roleInfo.role] || RM.operator;
+              const nonOpRoles = (roleInfo.roles || []).filter((r) => r !== "operator");
+              if (nonOpRoles.length === 0) return null;
+              const shown = nonOpRoles.slice(0, 2);
+              const extra = nonOpRoles.length - shown.length;
               return (
-                <div
-                  title={roleInfo.team ? `Team: ${roleInfo.team}` : "Senza team"}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.35rem",
-                    padding: "0.35rem 0.65rem",
-                    borderRadius: "999px",
-                    background: `${meta.color}22`,
-                    border: `1px solid ${meta.color}`,
-                    color: meta.color,
-                    fontSize: "0.75rem",
-                    fontWeight: 800,
-                    letterSpacing: "0.02em",
-                  }}
-                >
-                  <span>{meta.emoji}</span>
-                  <span>{meta.label}</span>
+                <div style={{ display: "flex", gap: "0.3rem", alignItems: "center", flexWrap: "wrap" }}>
+                  {shown.map((r) => {
+                    const isCustom = typeof r === "string" && r.startsWith("c:");
+                    const meta = isCustom
+                      ? { label: r.slice(2), emoji: "🎖️", color: "#64748B" }
+                      : RM[r] || { label: r, emoji: "?", color: "#888" };
+                    return (
+                      <div key={r}
+                        title={roleInfo.team ? `Team: ${roleInfo.team}` : "Senza team"}
+                        style={{
+                          display: "flex", alignItems: "center", gap: "0.3rem",
+                          padding: "0.3rem 0.55rem", borderRadius: "999px",
+                          background: `${meta.color}22`, border: `1px solid ${meta.color}`, color: meta.color,
+                          fontSize: "0.72rem", fontWeight: 800,
+                        }}>
+                        <span>{meta.emoji}</span>
+                        <span>{meta.label}</span>
+                      </div>
+                    );
+                  })}
+                  {extra > 0 && (
+                    <span title={nonOpRoles.join(", ")} style={{ fontSize: "0.7rem", color: "#888", fontWeight: 700 }}>+{extra}</span>
+                  )}
                   {roleInfo.team && (
-                    <span style={{ opacity: 0.85, fontWeight: 600 }}>· {roleInfo.team}</span>
+                    <span style={{ fontSize: "0.7rem", color: "#aaa", fontWeight: 600 }}>· {roleInfo.team}</span>
                   )}
                 </div>
               );

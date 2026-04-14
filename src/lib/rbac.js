@@ -93,8 +93,137 @@ export const ROLE_CAPABILITIES = {
   },
 };
 
+/* ============================================================
+ * CUSTOM ROLES (V8.2) — ruoli creabili via UI, affiancano i predefiniti.
+ * Storage:
+ *  - `custom_roles:all` (set di id)
+ *  - `custom_role:{id}` → { id, name, emoji, color, description, capabilities: {CAP: scope} }
+ * Un custom role ID ha prefisso "c:" per distinguerlo dai predefiniti.
+ * ============================================================ */
+
+const SCOPE_RANK = { own: 1, team: 2, all: 3 };
+export const SCOPES = ["own", "team", "all"];
+
+export function scopeUnion(a, b) {
+  if (!a) return b || null;
+  if (!b) return a || null;
+  return (SCOPE_RANK[a] || 0) >= (SCOPE_RANK[b] || 0) ? a : b;
+}
+
+export async function listCustomRoles() {
+  const ids = (await kv.smembers("custom_roles:all")) || [];
+  if (!ids.length) return [];
+  const rows = await Promise.all(ids.map((id) => kv.get(`custom_role:${id}`)));
+  return rows.filter(Boolean);
+}
+
+export async function getCustomRole(id) {
+  if (!id) return null;
+  return (await kv.get(`custom_role:${id}`)) || null;
+}
+
+export async function saveCustomRole(role) {
+  if (!role || !role.id || !role.name) throw new Error("role id+name required");
+  if (!role.id.startsWith("c:")) role.id = `c:${role.id}`;
+  // sanitize capabilities
+  const caps = {};
+  for (const [k, v] of Object.entries(role.capabilities || {})) {
+    if (!Object.values(CAPABILITIES).includes(k)) continue;
+    if (!SCOPES.includes(v)) continue;
+    caps[k] = v;
+  }
+  const clean = {
+    id: role.id,
+    name: role.name,
+    emoji: role.emoji || "🎖️",
+    color: role.color || "#64748B",
+    description: role.description || "",
+    capabilities: caps,
+    updatedAt: Date.now(),
+  };
+  await kv.set(`custom_role:${clean.id}`, clean);
+  await kv.sadd("custom_roles:all", clean.id);
+  return clean;
+}
+
+export async function deleteCustomRole(id) {
+  if (!id) return;
+  await kv.del(`custom_role:${id}`);
+  await kv.srem("custom_roles:all", id);
+}
+
+/* ============================================================
+ * MULTI-ROLE per utente (V8.2): un utente può avere più ruoli
+ * (predefiniti + custom). Le capability vengono fuse prendendo
+ * lo scope più ampio ("all" > "team" > "own").
+ * Storage:
+ *  - `roles:{userId}` (set di roleId, sia predefiniti che "c:xxx")
+ *  - Legacy `role:{userId}` (string) resta come fallback retrocompat.
+ * ============================================================ */
+
+export async function getUserRoles(userId) {
+  if (!userId) return ["operator"];
+  try {
+    if (await isUserIdAdmin(userId)) return ["admin"];
+  } catch {}
+  // Multi-ruolo
+  const set = (await kv.smembers(`roles:${userId}`)) || [];
+  if (set.length) return set;
+  // Legacy single-role
+  const legacy = await kv.get(`role:${userId}`);
+  if (legacy) return [legacy];
+  // Fallback Clerk
+  try {
+    const cc = await clerkClient();
+    const u = await cc.users.getUser(userId);
+    const clerkRole = u?.publicMetadata?.role;
+    if (clerkRole) return [clerkRole];
+  } catch {}
+  return ["operator"];
+}
+
+export async function setUserRoles(userId, roles) {
+  if (!userId) throw new Error("userId required");
+  const arr = Array.isArray(roles) ? roles.filter(Boolean) : [];
+  // purge old set
+  const prev = (await kv.smembers(`roles:${userId}`)) || [];
+  for (const p of prev) await kv.srem(`roles:${userId}`, p);
+  for (const r of arr) await kv.sadd(`roles:${userId}`, r);
+  // Mantieni legacy role:{} come "primo predefinito" per retrocompat endpoint vecchi
+  const primaryPredef = arr.find((r) => ROLES.includes(r));
+  if (primaryPredef) {
+    await kv.set(`role:${userId}`, primaryPredef);
+    try {
+      const cc = await clerkClient();
+      await cc.users.updateUser(userId, { publicMetadata: { role: primaryPredef } });
+    } catch {}
+  }
+  return { userId, roles: arr };
+}
+
+async function resolveRoleCapabilities(roleId) {
+  if (ROLES.includes(roleId)) return ROLE_CAPABILITIES[roleId] || {};
+  if (roleId && roleId.startsWith("c:")) {
+    const cr = await getCustomRole(roleId);
+    return cr?.capabilities || {};
+  }
+  return {};
+}
+
+export async function getEffectiveCapabilities(userId) {
+  const roles = await getUserRoles(userId);
+  const out = {};
+  for (const r of roles) {
+    const caps = await resolveRoleCapabilities(r);
+    for (const [k, v] of Object.entries(caps)) {
+      out[k] = scopeUnion(out[k], v);
+    }
+  }
+  return out;
+}
+
 /**
- * Recupera il ruolo di un utente.
+ * Recupera il ruolo PRIMARIO di un utente (retrocompat).
  * Priorità: isAdmin legacy -> KV role:{userId} -> Clerk publicMetadata.role -> "operator".
  */
 export async function getUserRole(userId) {
@@ -160,8 +289,7 @@ export async function getTeamMembers(teamId) {
  */
 export async function getScope(userId, capability) {
   if (!userId) return null;
-  const role = await getUserRole(userId);
-  const caps = ROLE_CAPABILITIES[role] || {};
+  const caps = await getEffectiveCapabilities(userId);
   return caps[capability] || null;
 }
 

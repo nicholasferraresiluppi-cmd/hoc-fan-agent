@@ -21,6 +21,7 @@ const SECTIONS = [
   { href: "/admin/seed", label: "🌱 Seed demo" },
   { href: "/admin/access", label: "🔐 Accessi" },
   { href: "/admin/ruoli", label: "🛡️ Ruoli" },
+  { href: "/admin/ruoli-custom", label: "🎖️ Ruoli custom" },
   { href: "/admin/team", label: "👥 Team" },
 ];
 
