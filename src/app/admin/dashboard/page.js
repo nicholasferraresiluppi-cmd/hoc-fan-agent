@@ -26,6 +26,41 @@ const SKILLS = [
   { key: "gestione_obiezioni", label: "Obiez." },
 ];
 
+function MiniRadar({ skills, size = 56, color = C.orange }) {
+  const KEYS = ["naturalezza", "esclusivita", "dipendenza", "conversione", "tono", "gestione_obiezioni"];
+  const vals = KEYS.map((k) => (typeof skills?.[k] === "number" ? Math.max(0, Math.min(100, skills[k])) : 0));
+  const hasData = vals.some((v) => v > 0);
+  const cx = size / 2, cy = size / 2, r = size / 2 - 4;
+  const hex = (rad) => {
+    const pts = [];
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI / 3) * i - Math.PI / 2;
+      pts.push([cx + rad * Math.cos(a), cy + rad * Math.sin(a)]);
+    }
+    return pts;
+  };
+  const outer = hex(r);
+  const data = vals.map((v, i) => {
+    const a = (Math.PI / 3) * i - Math.PI / 2;
+    const rr = (v / 100) * r;
+    return [cx + rr * Math.cos(a), cy + rr * Math.sin(a)];
+  });
+  if (!hasData) {
+    return (
+      <svg width={size} height={size} style={{ display: "block" }}>
+        <polygon points={outer.map((p) => p.join(",")).join(" ")} fill="none" stroke={`${C.gray}40`} strokeWidth="1" />
+      </svg>
+    );
+  }
+  return (
+    <svg width={size} height={size} style={{ display: "block" }}>
+      <polygon points={outer.map((p) => p.join(",")).join(" ")} fill="none" stroke={`${color}30`} strokeWidth="1" />
+      <polygon points={hex(r * 0.5).map((p) => p.join(",")).join(" ")} fill="none" stroke={`${color}20`} strokeWidth="1" />
+      <polygon points={data.map((p) => p.join(",")).join(" ")} fill={`${color}50`} stroke={color} strokeWidth="1.25" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function Sparkline({ data, width = 100, height = 24, color = C.orange }) {
   if (!data || data.length === 0) {
     return <span style={{ color: C.gray, fontSize: "0.75rem" }}>—</span>;
@@ -162,6 +197,7 @@ export default function SMDashboard() {
           <thead>
             <tr style={{ background: `${C.white}08`, textAlign: "left" }}>
               <th style={{ padding: "0.6rem 1.25rem" }}>Nome</th>
+              <th style={{ padding: "0.6rem", textAlign: "center" }}>Rombo</th>
               <th style={{ padding: "0.6rem" }}>Sess.</th>
               <th style={{ padding: "0.6rem" }}>7g</th>
               <th style={{ padding: "0.6rem" }}>Media</th>
@@ -231,6 +267,14 @@ export default function SMDashboard() {
                       </span>
                     )}
                   </span>
+                </td>
+                <td style={{ padding: "0.3rem", textAlign: "center" }}>
+                  <div style={{ display: "inline-block" }}>
+                    <MiniRadar
+                      skills={op.skills || {}}
+                      color={op.avgOverall >= 70 ? C.green : op.avgOverall >= 55 ? C.yellow : C.red}
+                    />
+                  </div>
                 </td>
                 <td style={{ padding: "0.6rem" }}>{op.totalSessions}</td>
                 <td style={{ padding: "0.6rem" }}>{op.sessions7d}</td>
