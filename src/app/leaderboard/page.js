@@ -2,19 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
+import { COLORS, FONTS } from "@/lib/brand";
 
 const C = {
-  bgDark: "#0a0b1a",
-  orange: "#FF6B35",
-  purple: "#8B5CF6",
-  green: "#10B981",
-  yellow: "#F59E0B",
-  red: "#EF4444",
-  white: "#F9FAFB",
-  gray: "#9CA3AF",
-  gold: "#FFD700",
-  silver: "#C0C0C0",
-  bronze: "#CD7F32",
+  bgDark: COLORS.obsidian,
+  orange: COLORS.champagne,
+  purple: COLORS.cobalt,
+  green: COLORS.verdant,
+  yellow: COLORS.champagneDeep,
+  red: COLORS.signal,
+  white: COLORS.alabaster,
+  gray: COLORS.mist,
+  gold: "#F2D488",
+  silver: "#DADEE6",
+  bronze: "#C87D46",
+};
+
+const PODIUM_TIER = {
+  1: { grad: "linear-gradient(165deg, #7A5A1F 0%, #C59436 45%, #F2CC72 100%)", accent: "#F2D488", label: "CHAMPION", ink: "#2C1E06" },
+  2: { grad: "linear-gradient(165deg, #4A4F5B 0%, #8A93A3 45%, #C9D0DC 100%)", accent: "#DADEE6", label: "RUNNER-UP", ink: "#15181E" },
+  3: { grad: "linear-gradient(165deg, #6B3E1F 0%, #A8612F 45%, #D1833D 100%)", accent: "#C87D46", label: "THIRD", ink: "#2B1709" },
 };
 
 const PERIODS = [
@@ -41,46 +48,80 @@ function medalForRank(r) {
 }
 
 function PodiumCard({ entry, place }) {
-  const medal = medalForRank(place);
-  const heights = { 1: 140, 2: 110, 3: 90 };
+  const tier = PODIUM_TIER[place];
+  const heights = { 1: 170, 2: 130, 3: 100 };
+  const medals = { 1: "🥇", 2: "🥈", 3: "🥉" };
+  const isWinner = place === 1;
+  const glowKeyframes = isWinner ? {
+    animation: "hocGlow 2.4s ease-in-out infinite",
+  } : {};
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", flex: 1 }}>
-      <div style={{ fontSize: "2rem" }}>{medal?.emoji}</div>
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 180,
-          padding: "0.9rem 0.6rem",
-          background: entry?.isMe ? `${C.orange}25` : `${C.white}06`,
-          border: `2px solid ${entry?.isMe ? C.orange : medal?.color || C.purple}`,
-          borderRadius: "0.75rem",
-          textAlign: "center",
-        }}
-      >
-        <div style={{ fontSize: "0.85rem", fontWeight: 700, color: C.white, marginBottom: "0.35rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {entry?.name || "—"}
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.6rem", flex: 1, position: "relative" }}>
+      {isWinner && (
+        <div style={{ position: "absolute", top: -18, fontFamily: FONTS.mono, fontSize: 9, letterSpacing: "0.3em", color: tier.accent, fontWeight: 800 }}>
+          ★ {tier.label} ★
         </div>
-        <div style={{ fontSize: "1.6rem", fontWeight: 800, color: medal?.color || C.white }}>
-          {entry?.avg ?? "—"}
+      )}
+      {!isWinner && (
+        <div style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: "0.26em", color: tier.accent, fontWeight: 800, opacity: 0.75 }}>
+          {tier.label}
         </div>
-        <div style={{ fontSize: "0.7rem", color: C.gray, marginTop: "0.2rem" }}>
-          {entry?.sessions ?? 0} sess.
-        </div>
+      )}
+      <div style={{ fontSize: isWinner ? "2.2rem" : "1.7rem", filter: `drop-shadow(0 0 12px ${tier.accent}88)` }}>
+        {medals[place]}
       </div>
       <div
         style={{
           width: "100%",
-          maxWidth: 180,
+          maxWidth: isWinner ? 200 : 170,
+          padding: isWinner ? "1rem 0.75rem" : "0.8rem 0.6rem",
+          background: tier.grad,
+          border: `1px solid ${tier.accent}88`,
+          borderRadius: 12,
+          textAlign: "center",
+          position: "relative",
+          overflow: "hidden",
+          boxShadow: entry?.isMe
+            ? `0 0 0 2px ${C.orange}, 0 10px 30px rgba(0,0,0,0.45)`
+            : `0 10px 30px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.15)`,
+          ...glowKeyframes,
+        }}
+      >
+        <div style={{ position: "absolute", top: 0, left: "-20%", right: "-20%", height: "55%", background: "linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0))", pointerEvents: "none" }} />
+        <div style={{ fontFamily: FONTS.mono, fontSize: isWinner ? 48 : 38, fontWeight: 800, letterSpacing: "-0.02em", color: tier.ink, lineHeight: 1, textShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
+          {entry?.avg ?? "—"}
+        </div>
+        <div style={{ width: 24, height: 2, background: tier.ink, margin: "0.45rem auto 0.4rem", opacity: 0.55, borderRadius: 2 }} />
+        <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: isWinner ? "0.95rem" : "0.85rem", color: tier.ink, letterSpacing: "0.04em", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {entry?.name || "—"}
+        </div>
+        <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: tier.ink, opacity: 0.7, marginTop: 4, letterSpacing: "0.14em" }}>
+          {entry?.sessions ?? 0} SESS
+        </div>
+        {entry?.isMe && (
+          <div style={{ position: "absolute", top: 6, right: 6, fontFamily: FONTS.mono, fontSize: 8, padding: "2px 5px", background: C.orange, color: C.bgDark, fontWeight: 800, letterSpacing: "0.14em", borderRadius: 2 }}>
+            TU
+          </div>
+        )}
+      </div>
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 200,
           height: heights[place],
-          background: `linear-gradient(180deg, ${medal?.color}40 0%, ${medal?.color}15 100%)`,
-          borderTop: `3px solid ${medal?.color}`,
-          borderRadius: "0.25rem 0.25rem 0 0",
+          background: `linear-gradient(180deg, ${tier.accent}55 0%, ${tier.accent}18 60%, ${tier.accent}08 100%)`,
+          borderTop: `4px solid ${tier.accent}`,
+          borderLeft: `1px solid ${tier.accent}30`,
+          borderRight: `1px solid ${tier.accent}30`,
+          borderRadius: "4px 4px 0 0",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: medal?.color,
-          fontSize: "1.75rem",
+          color: tier.accent,
+          fontFamily: FONTS.mono,
+          fontSize: isWinner ? "2.4rem" : "2rem",
           fontWeight: 800,
+          textShadow: `0 0 20px ${tier.accent}88`,
         }}
       >
         {place}
@@ -145,6 +186,17 @@ export default function LeaderboardPage() {
 
   return (
     <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "2rem" }}>
+      <style>{`
+        @keyframes hocGlow {
+          0%, 100% { box-shadow: 0 0 0 2px rgba(242,212,136,0.35), 0 10px 30px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.15); }
+          50% { box-shadow: 0 0 0 4px rgba(242,212,136,0.55), 0 10px 40px rgba(242,212,136,0.35), inset 0 1px 0 rgba(255,255,255,0.25); }
+        }
+        @keyframes hocRise {
+          from { transform: translateY(12px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        .hoc-podium-item { animation: hocRise 0.5s ease-out both; }
+      `}</style>
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1.25rem" }}>
           <div>
@@ -254,10 +306,16 @@ export default function LeaderboardPage() {
 
             {/* Podium */}
             {top10.length >= 3 && (
-              <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-end", marginBottom: "2rem", padding: "1rem 0" }}>
-                <PodiumCard entry={podium[1]} place={2} />
-                <PodiumCard entry={podium[0]} place={1} />
-                <PodiumCard entry={podium[2]} place={3} />
+              <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", marginBottom: "2.5rem", padding: "1.5rem 0 0", justifyContent: "center" }}>
+                <div className="hoc-podium-item" style={{ flex: 1, animationDelay: "0.15s", maxWidth: 200 }}>
+                  <PodiumCard entry={podium[1]} place={2} />
+                </div>
+                <div className="hoc-podium-item" style={{ flex: 1, animationDelay: "0s", maxWidth: 220 }}>
+                  <PodiumCard entry={podium[0]} place={1} />
+                </div>
+                <div className="hoc-podium-item" style={{ flex: 1, animationDelay: "0.3s", maxWidth: 200 }}>
+                  <PodiumCard entry={podium[2]} place={3} />
+                </div>
               </div>
             )}
 
