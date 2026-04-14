@@ -109,6 +109,21 @@ export default function Home() {
   const [league, setLeague] = useState(null);
   const [certifications, setCertifications] = useState([]);
   const [dailyDrill, setDailyDrill] = useState(null);
+  const [roleInfo, setRoleInfo] = useState(null); // { role, team, admin }
+
+  // Fetch role/team from whoami
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+    (async () => {
+      try {
+        const r = await fetch("/api/whoami");
+        const j = await r.json();
+        setRoleInfo({ role: j?.role || "operator", team: j?.team || null, admin: !!j?.admin });
+      } catch (e) {
+        console.warn("whoami fetch failed:", e?.message);
+      }
+    })();
+  }, [isLoaded, user]);
 
   // Fetch daily drill state
   useEffect(() => {
@@ -588,6 +603,40 @@ export default function Home() {
                 </span>
               </a>
             )}
+            {roleInfo && roleInfo.role !== "operator" && (() => {
+              const RM = {
+                admin: { label: "Admin", emoji: "👑", color: "#DC2626" },
+                sales_manager: { label: "Sales Manager", emoji: "📊", color: "#2563EB" },
+                qa_reviewer: { label: "QA Reviewer", emoji: "🔍", color: "#7C3AED" },
+                team_lead: { label: "Team Lead", emoji: "⭐", color: "#EA580C" },
+                operator: { label: "Operator", emoji: "🎯", color: "#16A34A" },
+              };
+              const meta = RM[roleInfo.role] || RM.operator;
+              return (
+                <div
+                  title={roleInfo.team ? `Team: ${roleInfo.team}` : "Senza team"}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                    padding: "0.35rem 0.65rem",
+                    borderRadius: "999px",
+                    background: `${meta.color}22`,
+                    border: `1px solid ${meta.color}`,
+                    color: meta.color,
+                    fontSize: "0.75rem",
+                    fontWeight: 800,
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  <span>{meta.emoji}</span>
+                  <span>{meta.label}</span>
+                  {roleInfo.team && (
+                    <span style={{ opacity: 0.85, fontWeight: 600 }}>· {roleInfo.team}</span>
+                  )}
+                </div>
+              );
+            })()}
             <UserButton
               appearance={{
                 elements: {

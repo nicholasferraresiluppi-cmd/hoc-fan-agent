@@ -1,6 +1,6 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
-import { authorize, CAPABILITIES, getTeamMembers, getUserTeam } from "@/lib/rbac";
+import { authorize, CAPABILITIES, getTeamMembers, getUserTeam, getUserRole } from "@/lib/rbac";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -63,6 +63,18 @@ export async function GET(request) {
       return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
     };
 
+    // Ruoli e team per ogni operatore (best-effort, in parallelo)
+    const rolesById = {};
+    const teamsById = {};
+    await Promise.all(
+      userIds.map(async (uid) => {
+        try {
+          rolesById[uid] = await getUserRole(uid);
+          teamsById[uid] = await getUserTeam(uid);
+        } catch {}
+      })
+    );
+
     // Per-operator summary
     const operators = userIds.map((uid) => {
       const recs = byUser[uid].sort((a, b) => a.timestamp - b.timestamp);
@@ -95,6 +107,9 @@ export async function GET(request) {
       return {
         userId: uid,
         name: namesById[uid] || uid.slice(-6),
+        role: rolesById[uid] || "operator",
+        teamId: teamsById[uid] || null,
+        isTeamLead: rolesById[uid] === "team_lead",
         totalSessions: recs.length,
         sessions7d: recs7.length,
         avgOverall,

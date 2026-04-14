@@ -175,7 +175,60 @@ export default function SMDashboard() {
           <tbody>
             {operators.map((op) => (
               <tr key={op.userId} style={{ borderTop: `1px solid ${C.purple}20` }}>
-                <td style={{ padding: "0.6rem 1.25rem", fontWeight: 700 }}>{op.name}</td>
+                <td style={{ padding: "0.6rem 1.25rem", fontWeight: 700 }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+                    {op.name}
+                    {op.isTeamLead && (
+                      <span
+                        title={op.teamId ? `Team Lead · ${op.teamId}` : "Team Lead"}
+                        style={{
+                          fontSize: "0.65rem",
+                          fontWeight: 800,
+                          padding: "0.1rem 0.4rem",
+                          borderRadius: "999px",
+                          background: "#EA580C22",
+                          border: "1px solid #EA580C",
+                          color: "#EA580C",
+                          letterSpacing: "0.03em",
+                        }}
+                      >
+                        ⭐ LEAD
+                      </span>
+                    )}
+                    {op.role === "qa_reviewer" && (
+                      <span
+                        title="QA Reviewer"
+                        style={{
+                          fontSize: "0.65rem",
+                          fontWeight: 800,
+                          padding: "0.1rem 0.4rem",
+                          borderRadius: "999px",
+                          background: "#7C3AED22",
+                          border: "1px solid #7C3AED",
+                          color: "#7C3AED",
+                        }}
+                      >
+                        🔍 QA
+                      </span>
+                    )}
+                    {op.role === "sales_manager" && (
+                      <span
+                        title="Sales Manager"
+                        style={{
+                          fontSize: "0.65rem",
+                          fontWeight: 800,
+                          padding: "0.1rem 0.4rem",
+                          borderRadius: "999px",
+                          background: "#2563EB22",
+                          border: "1px solid #2563EB",
+                          color: "#2563EB",
+                        }}
+                      >
+                        📊 SM
+                      </span>
+                    )}
+                  </span>
+                </td>
                 <td style={{ padding: "0.6rem" }}>{op.totalSessions}</td>
                 <td style={{ padding: "0.6rem" }}>{op.sessions7d}</td>
                 <td style={{ padding: "0.6rem", fontWeight: 700, color: op.avgOverall >= 70 ? C.green : op.avgOverall >= 55 ? C.yellow : C.red }}>
