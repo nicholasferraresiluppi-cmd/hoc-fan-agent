@@ -1,6 +1,7 @@
 "use client";
 
 import { FAN_ARCHETYPES } from "@/lib/fan-archetypes";
+import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
 import { COLORS } from "@/lib/brand";
 
@@ -56,7 +57,7 @@ export default function FanArchetypesPage() {
             {FAN_ARCHETYPES.length} tipologie di fan derivate da pattern ricorrenti. Usate nei training per variare scenari e nelle valutazioni per contestualizzare le strategie ottimali.
           </p>
         </div>
-        <a href="/admin" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>← Hub Admin</a>
+        <Link href="/admin" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>← Hub Admin</Link>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))", gap: "1rem", marginTop: "1.5rem" }}>

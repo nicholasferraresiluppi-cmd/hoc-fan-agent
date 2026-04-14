@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import AdminNav from "@/components/AdminNav";
 import PlayerCard from "@/components/PlayerCard";
@@ -139,9 +140,9 @@ export default function SMDashboard() {
             {operators.length} operatori · {data?.totalRecords || 0} sessioni · media cohort {data?.cohortAvg || 0}/100
           </p>
         </div>
-        <a href="/" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>
+        <Link href="/" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>
           ← Home
-        </a>
+        </Link>
       </div>
 
       {/* Alerts */}
@@ -367,15 +368,15 @@ export default function SMDashboard() {
       )}
 
       <div style={{ marginTop: "1.5rem", display: "flex", gap: "1rem" }}>
-        <a href="/admin/review" style={{ color: C.orange, fontSize: "0.85rem", textDecoration: "none" }}>
+        <Link href="/admin/review" style={{ color: C.orange, fontSize: "0.85rem", textDecoration: "none" }}>
           → Review valutazioni
-        </a>
-        <a href="/admin/outcomes" style={{ color: C.orange, fontSize: "0.85rem", textDecoration: "none" }}>
+        </Link>
+        <Link href="/admin/outcomes" style={{ color: C.orange, fontSize: "0.85rem", textDecoration: "none" }}>
           → Outcomes revenue
-        </a>
-        <a href="/admin/creators" style={{ color: C.orange, fontSize: "0.85rem", textDecoration: "none" }}>
+        </Link>
+        <Link href="/admin/creators" style={{ color: C.orange, fontSize: "0.85rem", textDecoration: "none" }}>
           → Creator personas
-        </a>
+        </Link>
       </div>
 
       {/* Player Card Modal */}

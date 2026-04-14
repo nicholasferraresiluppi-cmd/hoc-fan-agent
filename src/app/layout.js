@@ -1,5 +1,6 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { itIT } from "@clerk/localizations";
+import Providers from "@/components/Providers";
 import "./globals.css";
 
 export const metadata = {
@@ -55,7 +56,7 @@ export default function RootLayout({ children }) {
           />
         </head>
         <body style={{ background: "#08090F", color: "#F5F6F8", minHeight: "100vh", fontFamily: "Inter, system-ui, sans-serif" }}>
-          {children}
+          <Providers>{children}</Providers>
         </body>
       </html>
     </ClerkProvider>

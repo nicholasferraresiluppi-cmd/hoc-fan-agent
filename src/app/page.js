@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import useSWR from "swr";
+import Link from "next/link";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { TRAINING_SCENARIOS, QUICK_CHALLENGES } from "@/lib/training-scenarios";
 import { CREATOR_PERSONAS } from "@/lib/creator-personas";
 import { FAN_ARCHETYPES, getFanArchetypeById } from "@/lib/fan-archetypes";
 import PlayerCard from "@/components/PlayerCard";
+import { PlayerCardSkeleton, XPBarSkeleton, GridSkeleton } from "@/components/Skeleton";
 import { COLORS, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
 
@@ -110,73 +113,27 @@ export default function Home() {
     gestione_obiezioni: 0,
   });
   const [recentScenarios, setRecentScenarios] = useState([]);
-  const [seniority, setSeniority] = useState(null);
-  const [league, setLeague] = useState(null);
-  const [certifications, setCertifications] = useState([]);
-  const [dailyDrill, setDailyDrill] = useState(null);
-  const [roleInfo, setRoleInfo] = useState(null); // { role, team, admin }
-  const [meStats, setMeStats] = useState(null); // { overall, skills, totalSessions }
 
-  // Fetch stats per la player card
-  useEffect(() => {
-    if (!isLoaded || !user) return;
-    (async () => {
-      try {
-        const r = await fetch("/api/me-stats");
-        const j = await r.json();
-        if (j?.skills) setMeStats(j);
-      } catch (e) { /* silent */ }
-    })();
-  }, [isLoaded, user, screen]);
+  // SWR-cached fetches — stale-while-revalidate keeps navigation snappy
+  const swrKey = isLoaded && user ? true : null;
+  const { data: meStatsRaw } = useSWR(swrKey ? "/api/me-stats" : null);
+  const { data: whoamiRaw } = useSWR(swrKey ? "/api/whoami" : null);
+  const { data: dailyDrillRaw } = useSWR(swrKey ? "/api/daily-drill" : null);
+  const { data: profileRaw } = useSWR(swrKey ? "/api/profile" : null);
 
-  // Fetch role/team from whoami
-  useEffect(() => {
-    if (!isLoaded || !user) return;
-    (async () => {
-      try {
-        const r = await fetch("/api/whoami");
-        const j = await r.json();
-        setRoleInfo({
-          role: j?.role || "operator",
-          roles: Array.isArray(j?.roles) && j.roles.length ? j.roles : [j?.role || "operator"],
-          team: j?.team || null,
-          admin: !!j?.admin,
-        });
-      } catch (e) {
-        console.warn("whoami fetch failed:", e?.message);
+  const meStats = meStatsRaw?.skills ? meStatsRaw : null;
+  const dailyDrill = dailyDrillRaw || null;
+  const roleInfo = whoamiRaw
+    ? {
+        role: whoamiRaw?.role || "operator",
+        roles: Array.isArray(whoamiRaw?.roles) && whoamiRaw.roles.length ? whoamiRaw.roles : [whoamiRaw?.role || "operator"],
+        team: whoamiRaw?.team || null,
+        admin: !!whoamiRaw?.admin,
       }
-    })();
-  }, [isLoaded, user]);
-
-  // Fetch daily drill state
-  useEffect(() => {
-    if (!isLoaded || !user) return;
-    (async () => {
-      try {
-        const r = await fetch("/api/daily-drill");
-        const j = await r.json();
-        setDailyDrill(j);
-      } catch (e) {
-        console.warn("daily-drill fetch failed:", e?.message);
-      }
-    })();
-  }, [isLoaded, user, screen]);
-
-  // Fetch seniority/league/certs on mount / after user loaded
-  useEffect(() => {
-    if (!isLoaded || !user) return;
-    (async () => {
-      try {
-        const r = await fetch("/api/profile");
-        const j = await r.json();
-        if (j?.seniority) setSeniority(j.seniority);
-        if (j?.league) setLeague(j.league);
-        if (j?.certifications) setCertifications(j.certifications);
-      } catch (e) {
-        console.warn("profile fetch failed:", e?.message);
-      }
-    })();
-  }, [isLoaded, user]);
+    : null;
+  const seniority = profileRaw?.seniority || null;
+  const league = profileRaw?.league || null;
+  const certifications = profileRaw?.certifications || [];
 
   const CERT_UI = {
     0: { emoji: "", color: "#666" },
@@ -552,8 +509,7 @@ export default function Home() {
               {operatorName}
             </span>
             {league?.tier && league.tier !== "unranked" && (
-              <a
-                href="/leaderboard/leghe"
+              <Link href="/leaderboard/leghe"
                 title={`Lega ${league.tier} — stagione ${league.seasonKey}${league.rank ? ` • rank #${league.rank}` : ""}`}
                 style={{
                   padding: "0.2rem 0.55rem",
@@ -569,7 +525,7 @@ export default function Home() {
                 }}
               >
                 {LEAGUE_UI[league.tier]?.emoji} {league.tier}
-              </a>
+              </Link>
             )}
             {seniority?.tier && (
               <span
@@ -606,8 +562,7 @@ export default function Home() {
               </span>
             )}
             {certifications?.filter((c) => c.level > 0).length > 0 && (
-              <a
-                href="/profilo/certificazioni"
+              <Link href="/profilo/certificazioni"
                 title="Le tue certificazioni per creator"
                 style={{
                   display: "flex",
@@ -628,7 +583,7 @@ export default function Home() {
                 <span style={{ fontSize: "0.7rem", color: "#FFD700", fontWeight: 800, marginLeft: 2 }}>
                   {certifications.filter((c) => c.level > 0).length}
                 </span>
-              </a>
+              </Link>
             )}
             {roleInfo && (() => {
               const RM = {
@@ -716,6 +671,11 @@ export default function Home() {
               </div>
 
               {/* XP bar orizzontale larga */}
+              {!meStats && (
+                <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 12, padding: "1.1rem 1.25rem" }}>
+                  <XPBarSkeleton />
+                </div>
+              )}
               {meStats && (() => {
                 const THRESHOLDS = { junior: 30, senior: 100 };
                 const NEXT = { junior: "SENIOR", senior: "MASTER", master: null };
@@ -795,10 +755,10 @@ export default function Home() {
               </div>
             </div>
 
-            {/* RIGHT — PlayerCard compact */}
-            {meStats && (
-              <div style={{ display: "flex", justifyContent: "center", minWidth: 0 }}>
-                {(() => {
+            {/* RIGHT — PlayerCard compact (skeleton finché meStats non è arrivato) */}
+            <div style={{ display: "flex", justifyContent: "center", minWidth: 0 }}>
+              {meStats ? (
+                (() => {
                   const POS = { operator: "OP", team_lead: "TL", sales_manager: "SM", qa_reviewer: "QA", admin: "AD" };
                   const primary = roleInfo?.roles?.find((r) => POS[r]) || roleInfo?.role || "operator";
                   const leagueTier = league?.tier || "unranked";
@@ -816,9 +776,11 @@ export default function Home() {
                       compact={true}
                     />
                   );
-                })()}
-              </div>
-            )}
+                })()
+              ) : (
+                <PlayerCardSkeleton compact={true} />
+              )}
+            </div>
           </div>
 
           {/* Badge Wall — strip orizzontale sotto l'hero */}
@@ -828,9 +790,9 @@ export default function Home() {
                 <span style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: "0.22em", color: COLORS.alabaster, fontWeight: 700 }}>
                   🎖️ BADGE WALL
                 </span>
-                <a href="/profilo/certificazioni" style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: "0.18em", color: COLORS.champagne, textDecoration: "none" }}>
+                <Link href="/profilo/certificazioni" style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: "0.18em", color: COLORS.champagne, textDecoration: "none" }}>
                   VEDI TUTTO →
-                </a>
+                </Link>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(220px, 1fr))`, gap: "0.75rem" }}>
                 {CREATOR_PERSONAS.map((cr) => {
@@ -1003,12 +965,12 @@ export default function Home() {
                   🏆 Top 3 Operatori
                 </p>
                 <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-                  <a href="/leaderboard/leghe" style={{ color: HOC_COLORS.purple, fontSize: "0.8rem", fontWeight: 700, textDecoration: "none" }}>
+                  <Link href="/leaderboard/leghe" style={{ color: HOC_COLORS.purple, fontSize: "0.8rem", fontWeight: 700, textDecoration: "none" }}>
                     🎖️ Leghe →
-                  </a>
-                  <a href="/leaderboard" style={{ color: HOC_COLORS.orange, fontSize: "0.8rem", fontWeight: 700, textDecoration: "none" }}>
+                  </Link>
+                  <Link href="/leaderboard" style={{ color: HOC_COLORS.orange, fontSize: "0.8rem", fontWeight: 700, textDecoration: "none" }}>
                     Ladder completa →
-                  </a>
+                  </Link>
                 </div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
@@ -1081,8 +1043,7 @@ export default function Home() {
             </div>
 
             {/* Admin Area */}
-            <a
-              href="/admin"
+            <Link href="/admin"
               style={{
                 background: `${HOC_COLORS.gray}10`,
                 border: `2px dashed ${HOC_COLORS.gray}60`,
@@ -1102,7 +1063,7 @@ export default function Home() {
               <p style={{ margin: 0, fontSize: "0.85rem", color: HOC_COLORS.gray }}>
                 Accessi, seed demo, classifica, dashboard SM
               </p>
-            </a>
+            </Link>
           </div>
 
           {/* Recent Activity */}

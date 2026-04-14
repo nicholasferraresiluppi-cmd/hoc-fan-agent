@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
 import { COLORS } from "@/lib/brand";
 
@@ -53,7 +54,7 @@ export default function SeedAdminPage() {
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1.5rem" }}>
           <h1 style={{ margin: 0 }}>🌱 Seed Demo Data</h1>
-          <a href="/admin" style={{ color: C.orange, textDecoration: "none" }}>← Hub Admin</a>
+          <Link href="/admin" style={{ color: C.orange, textDecoration: "none" }}>← Hub Admin</Link>
         </div>
 
         <AdminNav />
@@ -89,9 +90,9 @@ export default function SeedAdminPage() {
             <div style={{ color: C.green, fontWeight: 700, marginBottom: "0.5rem" }}>✓ OK — action: {result.action}</div>
             <pre style={{ color: C.white, fontSize: "0.8rem", margin: 0, whiteSpace: "pre-wrap" }}>{JSON.stringify(result, null, 2)}</pre>
             <div style={{ marginTop: "0.75rem", display: "flex", gap: "1rem" }}>
-              <a href="/leaderboard" style={{ color: C.orange }}>→ Classifica</a>
-              <a href="/leaderboard/storico" style={{ color: C.orange }}>→ Hall of Fame</a>
-              <a href="/admin/dashboard" style={{ color: C.orange }}>→ Dashboard SM</a>
+              <Link href="/leaderboard" style={{ color: C.orange }}>→ Classifica</Link>
+              <Link href="/leaderboard/storico" style={{ color: C.orange }}>→ Hall of Fame</Link>
+              <Link href="/admin/dashboard" style={{ color: C.orange }}>→ Dashboard SM</Link>
             </div>
           </div>
         )}

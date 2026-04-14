@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
 
 export default function RolesAdminPage() {
@@ -64,7 +65,7 @@ export default function RolesAdminPage() {
       <h1 style={{ marginTop: 0 }}>🛡️ Gestione ruoli</h1>
       <p style={{ color: "#6B7080", marginBottom: "1rem" }}>
         Un utente può avere <b>più ruoli</b> contemporaneamente — le capability si sommano (scope più ampio vince).
-        I ruoli custom si creano in <a href="/admin/ruoli-custom" style={{ color: "#4F8CCB" }}>/admin/ruoli-custom</a>.
+        I ruoli custom si creano in <Link href="/admin/ruoli-custom" style={{ color: "#4F8CCB" }}>/admin/ruoli-custom</Link>.
       </p>
 
       {/* Legend */}

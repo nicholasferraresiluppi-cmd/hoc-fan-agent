@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { COLORS, FONTS } from "@/lib/brand";
 
@@ -206,12 +207,12 @@ export default function LeaderboardPage() {
             </p>
           </div>
           <div style={{ display: "flex", gap: "1rem" }}>
-            <a href="/leaderboard/storico" style={{ color: C.gold, textDecoration: "none", fontSize: "0.9rem" }}>
+            <Link href="/leaderboard/storico" style={{ color: C.gold, textDecoration: "none", fontSize: "0.9rem" }}>
               🏛️ Hall of Fame
-            </a>
-            <a href="/" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>
+            </Link>
+            <Link href="/" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>
               ← Home
-            </a>
+            </Link>
           </div>
         </div>
 

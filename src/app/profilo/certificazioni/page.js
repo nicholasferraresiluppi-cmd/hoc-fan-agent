@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 const LEVEL_META = {
   0: { label: "Non certificato", emoji: "⚪", color: "#666" },
@@ -35,7 +36,7 @@ export default function CertificationsPage() {
     <div style={{ background: "#0D0D0D", minHeight: "100vh", color: "#fff", padding: "2rem" }}>
       <div style={{ maxWidth: 900, margin: "0 auto" }}>
         <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-          <a href="/" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>← Academy</a>
+          <Link href="/" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>← Academy</Link>
         </div>
 
         <h1 style={{ margin: "0 0 0.25rem 0", fontSize: "2rem" }}>🎖️ Badge Wall</h1>

@@ -1,6 +1,7 @@
 "use client";
 
 import { CREATOR_PERSONAS } from "@/lib/creator-personas";
+import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
 import { COLORS } from "@/lib/brand";
 
@@ -57,9 +58,9 @@ export default function CreatorsAdmin() {
             Tone card generate da analisi di 60k+ messaggi Infloww. Rivedi e approva. Edit disponibile in V6.4.
           </p>
         </div>
-        <a href="/admin/dashboard" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>
+        <Link href="/admin/dashboard" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>
           ← Dashboard
-        </a>
+        </Link>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(420px, 1fr))", gap: "1rem", marginTop: "1.5rem" }}>

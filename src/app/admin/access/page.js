@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
 import { COLORS } from "@/lib/brand";
 
@@ -70,7 +71,7 @@ export default function AccessPage() {
       <div style={{ maxWidth: 860, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1.5rem" }}>
           <h1 style={{ margin: 0 }}>🔐 Gestione Accessi Admin</h1>
-          <a href="/admin" style={{ color: C.orange, textDecoration: "none" }}>← Hub Admin</a>
+          <Link href="/admin" style={{ color: C.orange, textDecoration: "none" }}>← Hub Admin</Link>
         </div>
 
         <AdminNav />

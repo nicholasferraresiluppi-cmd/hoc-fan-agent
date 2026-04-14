@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 const TIER_ORDER = ["diamond", "platinum", "gold", "silver", "bronze"];
 const TIER_META = {
@@ -32,11 +33,11 @@ export default function LeaguesPage() {
     <div style={{ background: "#0D0D0D", minHeight: "100vh", color: "#fff", padding: "2rem" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
-          <a href="/" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>← Academy</a>
+          <Link href="/" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>← Academy</Link>
           <span style={{ color: "#444" }}>•</span>
-          <a href="/leaderboard" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>Ladder</a>
+          <Link href="/leaderboard" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>Ladder</Link>
           <span style={{ color: "#444" }}>•</span>
-          <a href="/leaderboard/storico" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>Hall of Fame</a>
+          <Link href="/leaderboard/storico" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>Hall of Fame</Link>
         </div>
 
         <h1 style={{ margin: "0 0 0.25rem 0", fontSize: "2rem" }}>Leghe — Stagione {data?.seasonKey || "…"}</h1>

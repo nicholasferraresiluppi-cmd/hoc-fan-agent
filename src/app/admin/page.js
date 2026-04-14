@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
 import { COLORS, FONTS } from "@/lib/brand";
 
@@ -51,7 +52,7 @@ export default function AdminHub() {
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
           <h1 style={{ margin: 0, fontSize: "1.75rem", fontFamily: FONTS.display, fontWeight: 800, letterSpacing: "-0.01em" }}>Console Admin</h1>
-          <a href="/" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>← Home</a>
+          <Link href="/" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>← Home</Link>
         </div>
         <p style={{ color: C.gray, margin: "0 0 1.25rem 0", fontSize: "0.9rem" }}>
           Tutti gli strumenti di gestione in un posto solo.
@@ -66,7 +67,7 @@ export default function AdminHub() {
             <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>⚠️ Non sei admin</div>
             <div style={{ color: C.white, fontSize: "0.9rem" }}>
               Puoi comunque vedere la home admin, ma i dati dentro le sezioni non caricheranno.
-              Vai su <a href="/admin/access" style={{ color: C.orange }}>🔐 Gestione accessi</a> per le istruzioni di bootstrap.
+              Vai su <Link href="/admin/access" style={{ color: C.orange }}>🔐 Gestione accessi</Link> per le istruzioni di bootstrap.
             </div>
           </div>
         )}
@@ -79,7 +80,7 @@ export default function AdminHub() {
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" }}>
           {CARDS.map((c) => (
-            <a
+            <Link
               key={c.href}
               href={c.href}
               style={{
@@ -96,7 +97,7 @@ export default function AdminHub() {
             >
               <h3 style={{ margin: "0 0 0.4rem 0", fontSize: "1.1rem", fontWeight: 800, color: c.color }}>{c.title}</h3>
               <p style={{ margin: 0, color: C.gray, fontSize: "0.85rem", lineHeight: 1.4 }}>{c.desc}</p>
-            </a>
+            </Link>
           ))}
         </div>
       </div>

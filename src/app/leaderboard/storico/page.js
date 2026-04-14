@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 const C = {
   bgDark: "#0a0b1a",
@@ -56,8 +57,8 @@ export default function HallOfFamePage() {
             </p>
           </div>
           <div style={{ display: "flex", gap: "1rem" }}>
-            <a href="/leaderboard" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>← Ladder corrente</a>
-            <a href="/" style={{ color: C.gray, textDecoration: "none", fontSize: "0.9rem" }}>Academy</a>
+            <Link href="/leaderboard" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>← Ladder corrente</Link>
+            <Link href="/" style={{ color: C.gray, textDecoration: "none", fontSize: "0.9rem" }}>Academy</Link>
           </div>
         </div>
 
