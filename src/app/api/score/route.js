@@ -5,6 +5,7 @@ import { TRAINING_SCENARIOS, SKILL_DIMENSIONS } from "@/lib/training-scenarios";
 import { pickExamples, formatExamplesForPrompt } from "@/lib/golden-examples";
 import { getCreatorById, formatCreatorPersonaForPrompt } from "@/lib/creator-personas";
 import { getFanArchetypeById } from "@/lib/fan-archetypes";
+import { getDrillForDate, markDrillCompleted, getDrillStatusForUser } from "@/lib/daily-drill";
 import { kv } from "@vercel/kv";
 
 function findScenarioById(scenarioId) {
@@ -213,6 +214,19 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
         await kv.zadd(`score_hist:user:${userId}`, { score: timestamp, member: historyKey });
       } catch (histErr) {
         console.warn("Score history indexing failed (non-fatal):", histErr?.message);
+      }
+
+      // Daily drill auto-complete: se lo scenario appena completato è il drill del giorno
+      try {
+        const drill = getDrillForDate();
+        if (drill?.scenario?.id === scenarioId) {
+          const status = await getDrillStatusForUser(userId);
+          if (!status.completed) {
+            await markDrillCompleted(userId, { scenarioId, score: score.overall });
+          }
+        }
+      } catch (dErr) {
+        console.warn("Daily drill autocomplete failed (non-fatal):", dErr?.message);
       }
 
       return Response.json({ score });

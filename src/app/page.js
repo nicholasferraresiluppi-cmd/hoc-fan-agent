@@ -108,6 +108,21 @@ export default function Home() {
   const [seniority, setSeniority] = useState(null);
   const [league, setLeague] = useState(null);
   const [certifications, setCertifications] = useState([]);
+  const [dailyDrill, setDailyDrill] = useState(null);
+
+  // Fetch daily drill state
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+    (async () => {
+      try {
+        const r = await fetch("/api/daily-drill");
+        const j = await r.json();
+        setDailyDrill(j);
+      } catch (e) {
+        console.warn("daily-drill fetch failed:", e?.message);
+      }
+    })();
+  }, [isLoaded, user, screen]);
 
   // Fetch seniority/league/certs on mount / after user loaded
   useEffect(() => {
@@ -601,6 +616,91 @@ export default function Home() {
               Continua il tuo percorso di formazione
             </p>
           </div>
+
+          {/* Daily Drill banner */}
+          {dailyDrill?.drill?.scenario && (
+            <div
+              style={{
+                background: dailyDrill.completed
+                  ? `linear-gradient(135deg, #10B98120, #10B98108)`
+                  : dailyDrill.mandatory
+                  ? `linear-gradient(135deg, ${HOC_COLORS.orange}25, ${HOC_COLORS.orange}08)`
+                  : `linear-gradient(135deg, ${HOC_COLORS.purple}22, ${HOC_COLORS.purple}08)`,
+                border: `2px solid ${
+                  dailyDrill.completed
+                    ? "#10B981"
+                    : dailyDrill.mandatory
+                    ? HOC_COLORS.orange
+                    : HOC_COLORS.purple
+                }`,
+                borderRadius: "1rem",
+                padding: "1.25rem 1.5rem",
+                marginBottom: "2rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "1rem",
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "1.5rem" }}>
+                    {dailyDrill.completed ? "✅" : dailyDrill.mandatory ? "⚡" : "🎯"}
+                  </span>
+                  <h3 style={{ margin: 0, fontSize: "1.1rem", color: HOC_COLORS.white }}>
+                    Daily Drill
+                  </h3>
+                  {dailyDrill.mandatory && !dailyDrill.completed && (
+                    <span style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem", background: HOC_COLORS.orange, color: HOC_COLORS.bgDark, borderRadius: 4, fontWeight: 800, textTransform: "uppercase" }}>
+                      Obbligatorio
+                    </span>
+                  )}
+                  {!dailyDrill.mandatory && !dailyDrill.completed && (
+                    <span style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem", background: `${HOC_COLORS.purple}40`, color: HOC_COLORS.purple, borderRadius: 4, fontWeight: 700, textTransform: "uppercase" }}>
+                      Opzionale
+                    </span>
+                  )}
+                  {dailyDrill.streak > 0 && (
+                    <span style={{ fontSize: "0.75rem", color: "#FFD700", fontWeight: 700 }}>
+                      🔥 streak {dailyDrill.streak}g
+                    </span>
+                  )}
+                </div>
+                <div style={{ color: HOC_COLORS.white, fontWeight: 600 }}>
+                  {dailyDrill.completed ? "Completato per oggi — ottimo lavoro!" : dailyDrill.drill.scenario.title}
+                </div>
+                {!dailyDrill.completed && (
+                  <div style={{ color: HOC_COLORS.gray, fontSize: "0.85rem", marginTop: 4 }}>
+                    Completa lo scenario di oggi per mantenere lo streak
+                  </div>
+                )}
+              </div>
+              {!dailyDrill.completed && (
+                <button
+                  onClick={() => {
+                    const cat = TRAINING_CATEGORIES.find((c) => c.id === dailyDrill.drill.scenario.categoryId);
+                    if (cat) {
+                      setSelectedCategory(cat);
+                      setScreen("category-detail");
+                    }
+                  }}
+                  style={{
+                    background: HOC_COLORS.orange,
+                    color: HOC_COLORS.bgDark,
+                    border: "none",
+                    padding: "0.7rem 1.4rem",
+                    borderRadius: "0.5rem",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  Inizia ora →
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Quick Stats */}
           <div
