@@ -703,9 +703,9 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Player Card (FIFA-style) */}
+          {/* Player Card (FIFA-style) + XP bar */}
           {meStats && (
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: "2.5rem" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "2.5rem", gap: "1.25rem" }}>
               {(() => {
                 const POS = { operator: "OP", team_lead: "TL", sales_manager: "SM", qa_reviewer: "QA", admin: "AD" };
                 const primary = roleInfo?.roles?.find((r) => POS[r]) || roleInfo?.role || "operator";
@@ -722,6 +722,36 @@ export default function Home() {
                     certifications={certifications}
                     totalSessions={meStats.totalSessions}
                   />
+                );
+              })()}
+              {(() => {
+                const THRESHOLDS = { junior: 30, senior: 100 };
+                const NEXT = { junior: "SENIOR", senior: "MASTER", master: null };
+                const CUR_LABEL = { junior: "JUNIOR", senior: "SENIOR", master: "MASTER" };
+                const tier = seniority?.tier || "junior";
+                const sess = seniority?.stats?.totalSessions ?? meStats.totalSessions ?? 0;
+                const nextTier = NEXT[tier];
+                const isMax = !nextTier;
+                const target = tier === "junior" ? THRESHOLDS.junior : tier === "senior" ? THRESHOLDS.senior : sess;
+                const prev = tier === "junior" ? 0 : tier === "senior" ? THRESHOLDS.junior : THRESHOLDS.senior;
+                const pct = isMax ? 100 : Math.min(100, Math.max(0, Math.round(((sess - prev) / (target - prev)) * 100)));
+                const remaining = isMax ? 0 : Math.max(0, target - sess);
+                const barColor = tier === "master" ? COLORS.champagne : tier === "senior" ? COLORS.cobalt : COLORS.verdant;
+                return (
+                  <div style={{ width: 320, display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontFamily: FONTS.mono, fontSize: 10, letterSpacing: "0.18em" }}>
+                      <span style={{ color: COLORS.alabaster, fontWeight: 700 }}>{CUR_LABEL[tier]}</span>
+                      {!isMax && <span style={{ color: COLORS.mist }}>→ {nextTier}</span>}
+                      {isMax && <span style={{ color: COLORS.champagne }}>MAX TIER</span>}
+                    </div>
+                    <div style={{ position: "relative", height: 10, background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 6, overflow: "hidden" }}>
+                      <div style={{ position: "absolute", inset: 0, width: `${pct}%`, background: `linear-gradient(90deg, ${barColor}AA, ${barColor})`, transition: "width .5s ease", boxShadow: `0 0 12px ${barColor}55` }} />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontFamily: FONTS.mono, fontSize: 11 }}>
+                      <span style={{ color: COLORS.fog }}>{sess}{!isMax ? `/${target}` : ""} sessioni</span>
+                      {!isMax && <span style={{ color: COLORS.mist }}>{remaining} al prossimo tier</span>}
+                    </div>
+                  </div>
                 );
               })()}
             </div>
