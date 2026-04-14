@@ -29,14 +29,51 @@ export const COLORS = {
   signal: "#D44545",
 };
 
-// Tier leghe — stessa base, accento diverso
+// Tier leghe — V10.0: accento + gradient FIFA-style per PlayerCard
+// Il gradient è usato come sfondo della card, l'accent come bordo/testo tier.
 export const TIER = {
-  bronze:   { accent: "#8A5A3B", label: "BRONZE" },
-  silver:   { accent: "#9AA3B0", label: "SILVER" },
-  gold:     { accent: "#D4AF7A", label: "GOLD" },
-  platinum: { accent: "#A8B8C9", label: "PLATINUM" },
-  diamond:  { accent: "#6BA9E0", label: "DIAMOND" },
-  unranked: { accent: "#6B7080", label: "UNRANKED" },
+  bronze: {
+    accent: "#C87D46",
+    label: "BRONZE",
+    gradient: "linear-gradient(145deg, #6B3E1F 0%, #A8612F 45%, #D1833D 100%)",
+    text: "#FFE4C2",
+    ink: "#2B1709",
+  },
+  silver: {
+    accent: "#DADEE6",
+    label: "SILVER",
+    gradient: "linear-gradient(145deg, #4A4F5B 0%, #8A93A3 45%, #C9D0DC 100%)",
+    text: "#FFFFFF",
+    ink: "#15181E",
+  },
+  gold: {
+    accent: "#F2D488",
+    label: "GOLD",
+    gradient: "linear-gradient(145deg, #7A5A1F 0%, #C59436 45%, #F2CC72 100%)",
+    text: "#FFF5D4",
+    ink: "#2C1E06",
+  },
+  platinum: {
+    accent: "#BFE4FF",
+    label: "PLATINUM",
+    gradient: "linear-gradient(145deg, #2D5874 0%, #4F93BC 40%, #9FD2EE 100%)",
+    text: "#E6F5FF",
+    ink: "#081B28",
+  },
+  diamond: {
+    accent: "#A1E3FF",
+    label: "DIAMOND",
+    gradient: "linear-gradient(145deg, #1B2F5A 0%, #3C5FA8 35%, #7AA9FF 75%, #C9E5FF 100%)",
+    text: "#EAF6FF",
+    ink: "#060B1F",
+  },
+  unranked: {
+    accent: "#6B7080",
+    label: "UNRANKED",
+    gradient: "linear-gradient(145deg, #111318 0%, #1B1E26 50%, #2A2E39 100%)",
+    text: "#F5F6F8",
+    ink: "#08090F",
+  },
 };
 
 export const FONTS = {
