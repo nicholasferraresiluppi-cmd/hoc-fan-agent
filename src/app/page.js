@@ -105,6 +105,21 @@ export default function Home() {
     gestione_obiezioni: 0,
   });
   const [recentScenarios, setRecentScenarios] = useState([]);
+  const [seniority, setSeniority] = useState(null);
+
+  // Fetch seniority on mount / after user loaded
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+    (async () => {
+      try {
+        const r = await fetch("/api/profile");
+        const j = await r.json();
+        if (j?.seniority) setSeniority(j.seniority);
+      } catch (e) {
+        console.warn("profile fetch failed:", e?.message);
+      }
+    })();
+  }, [isLoaded, user]);
 
   // Chat State
   const [messages, setMessages] = useState([]);
@@ -458,6 +473,40 @@ export default function Home() {
             <span style={{ color: HOC_COLORS.gray, fontSize: "0.9rem" }}>
               {operatorName}
             </span>
+            {seniority?.tier && (
+              <span
+                title={`Tier ${seniority.tier} — ${seniority.stats?.totalSessions || 0} sessioni`}
+                style={{
+                  padding: "0.2rem 0.55rem",
+                  background:
+                    seniority.tier === "master"
+                      ? `${HOC_COLORS.purple}25`
+                      : seniority.tier === "senior"
+                      ? `${HOC_COLORS.orange}25`
+                      : "#10B98125",
+                  border: `1px solid ${
+                    seniority.tier === "master"
+                      ? HOC_COLORS.purple
+                      : seniority.tier === "senior"
+                      ? HOC_COLORS.orange
+                      : "#10B981"
+                  }`,
+                  borderRadius: "0.4rem",
+                  color:
+                    seniority.tier === "master"
+                      ? HOC_COLORS.purple
+                      : seniority.tier === "senior"
+                      ? HOC_COLORS.orange
+                      : "#10B981",
+                  fontSize: "0.7rem",
+                  fontWeight: 800,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.4px",
+                }}
+              >
+                {seniority.tier === "master" ? "👑" : seniority.tier === "senior" ? "⭐" : "🌱"} {seniority.tier}
+              </span>
+            )}
             <UserButton
               appearance={{
                 elements: {

@@ -17,6 +17,7 @@ const SECTIONS = [
   { href: "/admin/outcomes", label: "💰 Outcomes" },
   { href: "/admin/creators", label: "👤 Creator" },
   { href: "/admin/fan-archetypes", label: "👥 Fan Archetypes" },
+  { href: "/admin/seniority", label: "🎖️ Seniority" },
   { href: "/admin/seed", label: "🌱 Seed demo" },
   { href: "/admin/access", label: "🔐 Accessi" },
 ];

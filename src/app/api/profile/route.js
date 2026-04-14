@@ -1,5 +1,6 @@
 import { kv } from "@vercel/kv";
 import { auth } from "@clerk/nextjs/server";
+import { computeSeniority } from "@/lib/seniority";
 
 // Default profile structure
 const defaultProfile = {
@@ -28,16 +29,23 @@ export async function GET(request) {
     }
 
     const profile = await kv.get(`profile:${userId}`);
+    let seniority = null;
+    try {
+      seniority = await computeSeniority(userId);
+    } catch (e) {
+      console.warn("computeSeniority failed:", e?.message);
+    }
 
     if (!profile) {
       const newProfile = {
         ...defaultProfile,
         userId,
+        seniority,
       };
       return Response.json(newProfile);
     }
 
-    return Response.json(profile);
+    return Response.json({ ...profile, seniority });
   } catch (error) {
     console.error("Profile GET error:", error);
     return Response.json(
