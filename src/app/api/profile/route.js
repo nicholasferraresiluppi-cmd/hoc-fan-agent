@@ -1,6 +1,7 @@
 import { kv } from "@vercel/kv";
 import { auth } from "@clerk/nextjs/server";
 import { computeSeniority } from "@/lib/seniority";
+import { getUserLeague } from "@/lib/leagues";
 
 // Default profile structure
 const defaultProfile = {
@@ -30,10 +31,16 @@ export async function GET(request) {
 
     const profile = await kv.get(`profile:${userId}`);
     let seniority = null;
+    let league = null;
     try {
       seniority = await computeSeniority(userId);
     } catch (e) {
       console.warn("computeSeniority failed:", e?.message);
+    }
+    try {
+      league = await getUserLeague(userId);
+    } catch (e) {
+      console.warn("getUserLeague failed:", e?.message);
     }
 
     if (!profile) {
@@ -41,11 +48,12 @@ export async function GET(request) {
         ...defaultProfile,
         userId,
         seniority,
+        league,
       };
       return Response.json(newProfile);
     }
 
-    return Response.json({ ...profile, seniority });
+    return Response.json({ ...profile, seniority, league });
   } catch (error) {
     console.error("Profile GET error:", error);
     return Response.json(

@@ -26,6 +26,7 @@ const PUBLIC_SECTIONS = [
   { href: "/", label: "🏠 Home" },
   { href: "/leaderboard", label: "🏆 Classifica" },
   { href: "/leaderboard/storico", label: "🏛️ Hall of Fame" },
+  { href: "/leaderboard/leghe", label: "🎖️ Leghe" },
 ];
 
 export default function AdminNav() {

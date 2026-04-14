@@ -3,6 +3,10 @@
     {
       "path": "/api/leaderboard/snapshot",
       "schedule": "5 0 * * 1"
+    },
+    {
+      "path": "/api/leagues/snapshot",
+      "schedule": "10 0 1 * *"
     }
   ]
 }

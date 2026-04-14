@@ -106,8 +106,9 @@ export default function Home() {
   });
   const [recentScenarios, setRecentScenarios] = useState([]);
   const [seniority, setSeniority] = useState(null);
+  const [league, setLeague] = useState(null);
 
-  // Fetch seniority on mount / after user loaded
+  // Fetch seniority/league on mount / after user loaded
   useEffect(() => {
     if (!isLoaded || !user) return;
     (async () => {
@@ -115,11 +116,21 @@ export default function Home() {
         const r = await fetch("/api/profile");
         const j = await r.json();
         if (j?.seniority) setSeniority(j.seniority);
+        if (j?.league) setLeague(j.league);
       } catch (e) {
         console.warn("profile fetch failed:", e?.message);
       }
     })();
   }, [isLoaded, user]);
+
+  const LEAGUE_UI = {
+    bronze: { emoji: "🥉", color: "#CD7F32" },
+    silver: { emoji: "🥈", color: "#C0C0C0" },
+    gold: { emoji: "🥇", color: "#FFD700" },
+    platinum: { emoji: "💠", color: "#E5E4E2" },
+    diamond: { emoji: "💎", color: "#60A5FA" },
+    unranked: { emoji: "⚪", color: "#666" },
+  };
 
   // Chat State
   const [messages, setMessages] = useState([]);
@@ -473,6 +484,26 @@ export default function Home() {
             <span style={{ color: HOC_COLORS.gray, fontSize: "0.9rem" }}>
               {operatorName}
             </span>
+            {league?.tier && league.tier !== "unranked" && (
+              <a
+                href="/leaderboard/leghe"
+                title={`Lega ${league.tier} — stagione ${league.seasonKey}${league.rank ? ` • rank #${league.rank}` : ""}`}
+                style={{
+                  padding: "0.2rem 0.55rem",
+                  background: `${LEAGUE_UI[league.tier]?.color || "#666"}22`,
+                  border: `1px solid ${LEAGUE_UI[league.tier]?.color || "#666"}`,
+                  borderRadius: "0.4rem",
+                  color: LEAGUE_UI[league.tier]?.color || "#fff",
+                  fontSize: "0.7rem",
+                  fontWeight: 800,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.4px",
+                  textDecoration: "none",
+                }}
+              >
+                {LEAGUE_UI[league.tier]?.emoji} {league.tier}
+              </a>
+            )}
             {seniority?.tier && (
               <span
                 title={`Tier ${seniority.tier} — ${seniority.stats?.totalSessions || 0} sessioni`}
@@ -616,9 +647,14 @@ export default function Home() {
                 >
                   🏆 Top 3 Operatori
                 </p>
-                <a href="/leaderboard" style={{ color: HOC_COLORS.orange, fontSize: "0.8rem", fontWeight: 700, textDecoration: "none" }}>
-                  Classifica completa →
-                </a>
+                <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                  <a href="/leaderboard/leghe" style={{ color: HOC_COLORS.purple, fontSize: "0.8rem", fontWeight: 700, textDecoration: "none" }}>
+                    🎖️ Leghe →
+                  </a>
+                  <a href="/leaderboard" style={{ color: HOC_COLORS.orange, fontSize: "0.8rem", fontWeight: 700, textDecoration: "none" }}>
+                    Classifica completa →
+                  </a>
+                </div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {leaderboard.map((op, i) => (
