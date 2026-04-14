@@ -20,11 +20,11 @@ const SECTIONS = [
 ];
 
 const PUBLIC_SECTIONS = [
-  { href: "/", label: "Home" },
-  { href: "/leaderboard", label: "Classifica" },
-  { href: "/leaderboard/storico", label: "Hall of Fame" },
+  { href: "/", label: "Academy" },
+  { href: "/leaderboard", label: "Ladder" },
   { href: "/leaderboard/leghe", label: "Leghe" },
-  { href: "/profilo/certificazioni", label: "Certificazioni" },
+  { href: "/leaderboard/storico", label: "Hall of Fame" },
+  { href: "/profilo/certificazioni", label: "Badge Wall" },
 ];
 
 export default function AdminNav() {

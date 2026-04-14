@@ -537,7 +537,7 @@ export default function Home() {
                 borderLeft: `1px solid ${COLORS.steel}`,
               }}
             >
-              Training Ground
+              Academy
             </span>
           </div>
           <div
@@ -897,7 +897,7 @@ export default function Home() {
                     🎖️ Leghe →
                   </a>
                   <a href="/leaderboard" style={{ color: HOC_COLORS.orange, fontSize: "0.8rem", fontWeight: 700, textDecoration: "none" }}>
-                    Classifica completa →
+                    Ladder completa →
                   </a>
                 </div>
               </div>
@@ -1040,7 +1040,7 @@ export default function Home() {
                   color: HOC_COLORS.purple,
                 }}
               >
-                📊 Il tuo Profilo
+                🎴 La tua Card
               </h3>
               <p
                 style={{
@@ -2406,7 +2406,7 @@ export default function Home() {
                 color: HOC_COLORS.white,
               }}
             >
-              📊 Il Tuo Profilo
+              🎴 La tua Card
             </h1>
             <button
               onClick={() => setScreen("home")}

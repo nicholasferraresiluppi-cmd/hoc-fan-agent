@@ -3,8 +3,8 @@ import { itIT } from "@clerk/localizations";
 import "./globals.css";
 
 export const metadata = {
-  title: "HOC Pro — Training Ground",
-  description: "Il training ground dei chatter di House of Creators. Misura, allena, progredisci.",
+  title: "HOC Pro — Academy",
+  description: "L'Academy dei chatter di House of Creators. Allena, compete, sali in classifica.",
 };
 
 export default function RootLayout({ children }) {

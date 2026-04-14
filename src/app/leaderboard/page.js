@@ -148,7 +148,7 @@ export default function LeaderboardPage() {
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1.25rem" }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: "1.75rem" }}>🏆 Classifica</h1>
+            <h1 style={{ margin: 0, fontSize: "1.75rem" }}>🏆 Ladder</h1>
             <p style={{ color: C.gray, margin: "0.25rem 0 0 0", fontSize: "0.9rem" }}>
               I migliori operatori per score medio. Minimo {data?.minSessions || 2} sessioni per qualificarsi.
             </p>

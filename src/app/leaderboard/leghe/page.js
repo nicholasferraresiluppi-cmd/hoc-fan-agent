@@ -32,16 +32,16 @@ export default function LeaguesPage() {
     <div style={{ background: "#0D0D0D", minHeight: "100vh", color: "#fff", padding: "2rem" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
-          <a href="/" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>← Home</a>
+          <a href="/" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>← Academy</a>
           <span style={{ color: "#444" }}>•</span>
-          <a href="/leaderboard" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>Classifica</a>
+          <a href="/leaderboard" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>Ladder</a>
           <span style={{ color: "#444" }}>•</span>
           <a href="/leaderboard/storico" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>Hall of Fame</a>
         </div>
 
         <h1 style={{ margin: "0 0 0.25rem 0", fontSize: "2rem" }}>Leghe — Stagione {data?.seasonKey || "…"}</h1>
         <p style={{ color: "#888", marginTop: 0 }}>
-          Classifica competitiva mensile. Tier assegnato per percentile (top 10% Diamond, poi Platinum, Gold, Silver, Bronze). Min 5 sessioni nel mese per essere classificati.
+          Ladder competitiva mensile. Tier assegnato per percentile (top 10% Diamond, poi Platinum, Gold, Silver, Bronze). Min 5 sessioni nel mese per essere classificati.
         </p>
 
         {loading && <p>Caricamento…</p>}
