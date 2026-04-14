@@ -25,6 +25,7 @@ const CARDS = [
   { href: "/admin/seed", title: "🌱 Seed demo data", desc: "Popola l'app con 10 operatori fittizi + 60 giorni di sessioni per testare", color: C.green },
   { href: "/admin/access", title: "🔐 Gestione accessi", desc: "Aggiungi/rimuovi admin via email, senza redeploy", color: C.red },
   { href: "/admin/ruoli", title: "🛡️ Ruoli & capabilities", desc: "Assegna ruoli (Operator/Team Lead/SM/QA/Admin) e capability", color: C.purple },
+  { href: "/admin/team", title: "👥 Team", desc: "Crea team, assegna operatori, nomina team lead", color: C.orange },
   { href: "/leaderboard", title: "🏆 Classifica (vista utenti)", desc: "Apri la classifica come la vedono gli operatori", color: C.orange },
   { href: "/leaderboard/storico", title: "🏛️ Hall of Fame", desc: "Albo storico dei campioni settimanali", color: C.gold },
 ];
