@@ -29,6 +29,19 @@ export default function RootLayout({ children }) {
           formFieldLabel: "text-[#B9BDC7]",
           formFieldInput: "bg-[#1B1E26] border-[#2A2E39] text-[#F5F6F8]",
           footerActionLink: "text-[#D4AF7A] hover:text-[#E8D4B0]",
+          // UserButton popover (account menu)
+          userButtonPopoverCard: "bg-[#111318] border border-[#1B1E26]",
+          userButtonPopoverMain: "bg-[#111318]",
+          userButtonPopoverActions: "bg-[#111318]",
+          userButtonPopoverActionButton: "text-[#F5F6F8] hover:bg-[#1B1E26]",
+          userButtonPopoverActionButtonText: "text-[#F5F6F8]",
+          userButtonPopoverActionButtonIcon: "text-[#D4AF7A]",
+          userButtonPopoverFooter: "bg-[#08090F] border-t border-[#1B1E26]",
+          userPreviewMainIdentifier: "text-[#F5F6F8]",
+          userPreviewSecondaryIdentifier: "text-[#B9BDC7]",
+          // Generic menu items (covers org switcher etc.)
+          menuItem: "text-[#F5F6F8] hover:bg-[#1B1E26]",
+          menuList: "bg-[#111318]",
         },
       }}
     >
