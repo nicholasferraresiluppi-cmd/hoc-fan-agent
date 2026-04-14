@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
-import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { authorize, CAPABILITIES, getTeamMembers, getUserTeam } from "@/lib/rbac";
 
 // POST — salva outcome settimanale di un operatore (dati reali di vendita/retention)
 export async function POST(request) {
@@ -14,6 +14,19 @@ export async function POST(request) {
 
     if (!operatorId || !week) {
       return Response.json({ error: "operatorId e week richiesti." }, { status: 400 });
+    }
+
+    // Scope enforcement sulla POST
+    if (_az.scope === "team") {
+      const myTeam = await getUserTeam(_az.userId);
+      if (!myTeam) return Response.json({ error: "Nessun team assegnato." }, { status: 403 });
+      const members = new Set(await getTeamMembers(myTeam));
+      members.add(_az.userId);
+      if (!members.has(operatorId)) {
+        return Response.json({ error: "Operatore fuori dal tuo team." }, { status: 403 });
+      }
+    } else if (_az.scope === "own" && operatorId !== _az.userId) {
+      return Response.json({ error: "Puoi scrivere solo i tuoi outcome." }, { status: 403 });
     }
 
     const key = `outcome:${operatorId}:${week}`;
@@ -51,8 +64,22 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "100");
     const keys = await kv.zrange("outcomes:index", 0, limit - 1, { rev: true });
-    const records = await Promise.all((keys || []).map((k) => kv.get(k)));
-    return Response.json({ outcomes: (records || []).filter(Boolean) });
+    let records = (await Promise.all((keys || []).map((k) => kv.get(k)))).filter(Boolean);
+
+    if (_az.scope === "team") {
+      const myTeam = await getUserTeam(_az.userId);
+      if (!myTeam) {
+        records = [];
+      } else {
+        const members = new Set(await getTeamMembers(myTeam));
+        members.add(_az.userId);
+        records = records.filter((r) => members.has(r.operatorId));
+      }
+    } else if (_az.scope === "own") {
+      records = records.filter((r) => r.operatorId === _az.userId);
+    }
+
+    return Response.json({ outcomes: records });
   } catch (error) {
     console.error("Outcomes GET error:", error);
     return Response.json({ outcomes: [], error: "Errore." }, { status: 200 });

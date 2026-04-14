@@ -1,6 +1,6 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
-import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { authorize, CAPABILITIES, getTeamMembers, getUserTeam } from "@/lib/rbac";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -14,7 +14,22 @@ export async function GET(request) {
 
     // Pull last 500 records from global index (most recent first)
     const keys = (await kv.zrange("score_hist:index", 0, 499, { rev: true })) || [];
-    const records = (await Promise.all(keys.map((k) => kv.get(k)))).filter(Boolean);
+    let records = (await Promise.all(keys.map((k) => kv.get(k)))).filter(Boolean);
+
+    // Scope filtering based on role
+    if (azn.scope === "team") {
+      const myTeam = await getUserTeam(azn.userId);
+      if (!myTeam) {
+        records = [];
+      } else {
+        const members = new Set(await getTeamMembers(myTeam));
+        members.add(azn.userId); // include il lead stesso
+        records = records.filter((r) => members.has(r.userId));
+      }
+    } else if (azn.scope === "own") {
+      records = records.filter((r) => r.userId === azn.userId);
+    }
+    // "all" → no filter
 
     const now = Date.now();
     const cutoff7 = now - 7 * DAY;
