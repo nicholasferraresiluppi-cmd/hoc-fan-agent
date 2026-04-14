@@ -757,6 +757,73 @@ export default function Home() {
             </div>
           )}
 
+          {/* Badge Wall — certificazioni per creator (locked/unlocked) */}
+          {CREATOR_PERSONAS?.length > 0 && (
+            <div style={{ marginBottom: "2rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.75rem" }}>
+                <span style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: "0.22em", color: COLORS.alabaster, fontWeight: 700 }}>
+                  🎖️ BADGE WALL
+                </span>
+                <a href="/profilo/certificazioni" style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: "0.18em", color: COLORS.champagne, textDecoration: "none" }}>
+                  VEDI TUTTO →
+                </a>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(180px, 1fr))`, gap: "0.75rem" }}>
+                {CREATOR_PERSONAS.map((cr) => {
+                  const cert = certByCreator?.[cr.id];
+                  const lvl = cert?.level || 0;
+                  const meta = cert?.meta || { label: "Locked", emoji: "🔒", color: COLORS.steel };
+                  const unlocked = lvl > 0;
+                  const sess = cert?.sessions || 0;
+                  const avg = cert?.avgOverall || 0;
+                  const NEXT_THRESH = { 0: { s: 10, a: 65, label: "L1" }, 1: { s: 25, a: 75, label: "L2" }, 2: { s: 50, a: 85, label: "L3" }, 3: null };
+                  const next = NEXT_THRESH[lvl];
+                  const progress = next ? Math.min(100, Math.round((sess / next.s) * 100)) : 100;
+                  const barColor = unlocked ? meta.color : COLORS.mist;
+                  return (
+                    <div
+                      key={cr.id}
+                      style={{
+                        background: unlocked ? `linear-gradient(145deg, ${meta.color}18, ${meta.color}04)` : COLORS.graphite,
+                        border: `1px solid ${unlocked ? meta.color + "55" : COLORS.charcoal}`,
+                        borderRadius: 10,
+                        padding: "0.85rem 0.95rem",
+                        opacity: unlocked ? 1 : 0.7,
+                        filter: unlocked ? "none" : "grayscale(0.6)",
+                        position: "relative",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {unlocked && (
+                        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: meta.color }} />
+                      )}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.5rem" }}>
+                        <div>
+                          <div style={{ fontSize: "0.9rem", fontWeight: 800, color: COLORS.alabaster, lineHeight: 1.2 }}>
+                            {cr.name}
+                          </div>
+                          <div style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: "0.16em", color: unlocked ? meta.color : COLORS.mist, fontWeight: 700, marginTop: 2, textTransform: "uppercase" }}>
+                            {unlocked ? meta.label : "LOCKED"}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: "1.6rem", lineHeight: 1, filter: unlocked ? `drop-shadow(0 0 8px ${meta.color}88)` : "none" }}>
+                          {unlocked ? meta.emoji : "🔒"}
+                        </div>
+                      </div>
+                      <div style={{ height: 6, background: COLORS.charcoal, borderRadius: 3, overflow: "hidden", marginBottom: "0.35rem" }}>
+                        <div style={{ width: `${progress}%`, height: "100%", background: barColor, transition: "width .4s ease" }} />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: FONTS.mono, fontSize: 9.5, color: COLORS.mist }}>
+                        <span>{sess} sess · {avg || "—"} avg</span>
+                        <span>{next ? `→ ${next.label}` : "MAX"}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Daily Drill banner */}
           {dailyDrill?.drill?.scenario && (
             <div
