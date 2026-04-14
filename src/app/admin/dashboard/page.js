@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import AdminNav from "@/components/AdminNav";
+import PlayerCard from "@/components/PlayerCard";
 
 const C = {
   bgDark: "#0a0b1a",
@@ -54,6 +55,7 @@ export default function SMDashboard() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [cardOp, setCardOp] = useState(null);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -174,7 +176,7 @@ export default function SMDashboard() {
           </thead>
           <tbody>
             {operators.map((op) => (
-              <tr key={op.userId} style={{ borderTop: `1px solid ${C.purple}20` }}>
+              <tr key={op.userId} onClick={() => setCardOp(op)} style={{ borderTop: `1px solid ${C.purple}20`, cursor: "pointer" }} title="Click per vedere la card FIFA-style">
                 <td style={{ padding: "0.6rem 1.25rem", fontWeight: 700 }}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
                     {op.name}
@@ -330,6 +332,37 @@ export default function SMDashboard() {
           → Creator personas
         </a>
       </div>
+
+      {/* Player Card Modal */}
+      {cardOp && (() => {
+        const POS = { operator: "OP", team_lead: "TL", sales_manager: "SM", qa_reviewer: "QA", admin: "AD" };
+        const leagueByScore = cardOp.avgOverall >= 85 ? "diamond" : cardOp.avgOverall >= 75 ? "platinum" : cardOp.avgOverall >= 65 ? "gold" : cardOp.avgOverall >= 50 ? "silver" : "bronze";
+        const pos = (cardOp.role && POS[cardOp.role]) ? POS[cardOp.role] : (cardOp.role?.startsWith("c:") ? "CR" : "OP");
+        return (
+          <div onClick={() => setCardOp(null)} style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
+            display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+          }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ position: "relative" }}>
+              <button onClick={() => setCardOp(null)} style={{
+                position: "absolute", top: -38, right: 0,
+                background: "transparent", border: `1px solid ${C.white}40`, color: C.white,
+                borderRadius: 8, padding: "0.25rem 0.6rem", cursor: "pointer", fontSize: "0.8rem",
+              }}>Chiudi ✕</button>
+              <PlayerCard
+                name={cardOp.name}
+                position={pos}
+                overall={cardOp.avgOverall}
+                skills={cardOp.skills || {}}
+                league={leagueByScore}
+                seniority={cardOp.avgOverall >= 75 ? "master" : cardOp.avgOverall >= 60 ? "senior" : "junior"}
+                certifications={[]}
+                totalSessions={cardOp.totalSessions}
+              />
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

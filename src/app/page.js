@@ -5,6 +5,7 @@ import { UserButton, useUser } from "@clerk/nextjs";
 import { TRAINING_SCENARIOS, QUICK_CHALLENGES } from "@/lib/training-scenarios";
 import { CREATOR_PERSONAS } from "@/lib/creator-personas";
 import { FAN_ARCHETYPES, getFanArchetypeById } from "@/lib/fan-archetypes";
+import PlayerCard from "@/components/PlayerCard";
 
 // Pick a random archetype weighted by difficulty (favor medium/common ones)
 function pickRandomArchetype() {
@@ -110,6 +111,19 @@ export default function Home() {
   const [certifications, setCertifications] = useState([]);
   const [dailyDrill, setDailyDrill] = useState(null);
   const [roleInfo, setRoleInfo] = useState(null); // { role, team, admin }
+  const [meStats, setMeStats] = useState(null); // { overall, skills, totalSessions }
+
+  // Fetch stats per la player card
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+    (async () => {
+      try {
+        const r = await fetch("/api/me-stats");
+        const j = await r.json();
+        if (j?.skills) setMeStats(j);
+      } catch (e) { /* silent */ }
+    })();
+  }, [isLoaded, user, screen]);
 
   // Fetch role/team from whoami
   useEffect(() => {
@@ -678,6 +692,30 @@ export default function Home() {
               Continua il tuo percorso di formazione
             </p>
           </div>
+
+          {/* Player Card (FIFA-style) */}
+          {meStats && (
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "2.5rem" }}>
+              {(() => {
+                const POS = { operator: "OP", team_lead: "TL", sales_manager: "SM", qa_reviewer: "QA", admin: "AD" };
+                const primary = roleInfo?.roles?.find((r) => POS[r]) || roleInfo?.role || "operator";
+                const leagueTier = league?.tier || "unranked";
+                const seniorityTier = seniority?.tier || "junior";
+                return (
+                  <PlayerCard
+                    name={operatorName}
+                    position={POS[primary] || "OP"}
+                    overall={meStats.overall}
+                    skills={meStats.skills}
+                    league={leagueTier}
+                    seniority={seniorityTier}
+                    certifications={certifications}
+                    totalSessions={meStats.totalSessions}
+                  />
+                );
+              })()}
+            </div>
+          )}
 
           {/* Daily Drill banner */}
           {dailyDrill?.drill?.scenario && (
