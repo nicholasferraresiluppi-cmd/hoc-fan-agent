@@ -685,46 +685,38 @@ export default function Home() {
         {/* Main Content */}
         <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem" }}>
           {/* Greeting */}
-          <div style={{ marginBottom: "3rem" }}>
-            <h2
-              style={{
-                fontFamily: FONTS.display,
-                fontSize: "2rem",
-                fontWeight: 800,
-                letterSpacing: "-0.01em",
-                color: HOC_COLORS.white,
-                margin: "0 0 0.5rem 0",
-              }}
-            >
-              Ciao, {operatorName}.
-            </h2>
-            <p style={{ color: HOC_COLORS.gray, margin: 0 }}>
-              Continua il tuo percorso di formazione
-            </p>
-          </div>
+          {/* ═══ HERO — 2-column: stats+CTA (left) · PlayerCard+Badge Wall (right) ═══ */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) minmax(0, 320px)",
+              gap: "2rem",
+              marginBottom: "2.5rem",
+              alignItems: "start",
+            }}
+          >
+            {/* LEFT — Greeting + XP bar + primary CTAs */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", minWidth: 0 }}>
+              <div>
+                <h2
+                  style={{
+                    fontFamily: FONTS.display,
+                    fontSize: "2.25rem",
+                    fontWeight: 800,
+                    letterSpacing: "-0.01em",
+                    color: HOC_COLORS.white,
+                    margin: "0 0 0.35rem 0",
+                  }}
+                >
+                  Ciao, {operatorName}.
+                </h2>
+                <p style={{ color: HOC_COLORS.gray, margin: 0, fontSize: "0.95rem" }}>
+                  Continua il tuo percorso di formazione
+                </p>
+              </div>
 
-          {/* Player Card (FIFA-style) + XP bar */}
-          {meStats && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "2.5rem", gap: "1.25rem" }}>
-              {(() => {
-                const POS = { operator: "OP", team_lead: "TL", sales_manager: "SM", qa_reviewer: "QA", admin: "AD" };
-                const primary = roleInfo?.roles?.find((r) => POS[r]) || roleInfo?.role || "operator";
-                const leagueTier = league?.tier || "unranked";
-                const seniorityTier = seniority?.tier || "junior";
-                return (
-                  <PlayerCard
-                    name={operatorName}
-                    position={POS[primary] || "OP"}
-                    overall={meStats.overall}
-                    skills={meStats.skills}
-                    league={leagueTier}
-                    seniority={seniorityTier}
-                    certifications={certifications}
-                    totalSessions={meStats.totalSessions}
-                  />
-                );
-              })()}
-              {(() => {
+              {/* XP bar orizzontale larga */}
+              {meStats && (() => {
                 const THRESHOLDS = { junior: 30, senior: 100 };
                 const NEXT = { junior: "SENIOR", senior: "MASTER", master: null };
                 const CUR_LABEL = { junior: "JUNIOR", senior: "SENIOR", master: "MASTER" };
@@ -738,26 +730,98 @@ export default function Home() {
                 const remaining = isMax ? 0 : Math.max(0, target - sess);
                 const barColor = tier === "master" ? COLORS.champagne : tier === "senior" ? COLORS.cobalt : COLORS.verdant;
                 return (
-                  <div style={{ width: 320, display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontFamily: FONTS.mono, fontSize: 10, letterSpacing: "0.18em" }}>
+                  <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 12, padding: "1.1rem 1.25rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, fontFamily: FONTS.mono, fontSize: 11, letterSpacing: "0.18em" }}>
                       <span style={{ color: COLORS.alabaster, fontWeight: 700 }}>{CUR_LABEL[tier]}</span>
                       {!isMax && <span style={{ color: COLORS.mist }}>→ {nextTier}</span>}
                       {isMax && <span style={{ color: COLORS.champagne }}>MAX TIER</span>}
                     </div>
-                    <div style={{ position: "relative", height: 10, background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 6, overflow: "hidden" }}>
-                      <div style={{ position: "absolute", inset: 0, width: `${pct}%`, background: `linear-gradient(90deg, ${barColor}AA, ${barColor})`, transition: "width .5s ease", boxShadow: `0 0 12px ${barColor}55` }} />
+                    <div style={{ position: "relative", height: 12, background: COLORS.obsidian, border: `1px solid ${COLORS.charcoal}`, borderRadius: 6, overflow: "hidden" }}>
+                      <div style={{ position: "absolute", inset: 0, width: `${pct}%`, background: `linear-gradient(90deg, ${barColor}AA, ${barColor})`, transition: "width .5s ease", boxShadow: `0 0 14px ${barColor}66` }} />
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontFamily: FONTS.mono, fontSize: 11 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 8, fontFamily: FONTS.mono, fontSize: 11 }}>
                       <span style={{ color: COLORS.fog }}>{sess}{!isMax ? `/${target}` : ""} sessioni</span>
                       {!isMax && <span style={{ color: COLORS.mist }}>{remaining} al prossimo tier</span>}
                     </div>
                   </div>
                 );
               })()}
-            </div>
-          )}
 
-          {/* Badge Wall — certificazioni per creator (locked/unlocked) */}
+              {/* CTA primari */}
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1rem" }}>
+                <button
+                  onClick={() => setScreen("training-hub")}
+                  style={{
+                    background: `linear-gradient(135deg, ${COLORS.champagne} 0%, ${COLORS.champagneDeep} 100%)`,
+                    border: "none",
+                    borderRadius: 12,
+                    padding: "1.1rem 1.25rem",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    color: COLORS.obsidian,
+                    transition: "transform 0.2s, box-shadow 0.2s",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 12px 28px ${COLORS.champagne}40`; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
+                >
+                  <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: "0.22em", fontWeight: 800, opacity: 0.75 }}>ENTRA IN</div>
+                  <div style={{ fontFamily: FONTS.display, fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.01em", marginTop: 2 }}>🎯 Training</div>
+                  <div style={{ fontSize: "0.85rem", marginTop: 4, opacity: 0.75 }}>Scenari guidati con coaching AI</div>
+                </button>
+                <button
+                  onClick={() => {
+                    setQuickChallengeIndex(0);
+                    setQuickChallengeResponse("");
+                    setQuickChallengeEval(null);
+                    setScreen("quick-challenge");
+                  }}
+                  style={{
+                    background: "transparent",
+                    border: `1px solid ${COLORS.cobalt}`,
+                    borderRadius: 12,
+                    padding: "1.1rem 1.25rem",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    color: COLORS.alabaster,
+                    transition: "background 0.2s",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = `${COLORS.cobalt}18`; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                >
+                  <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: "0.22em", fontWeight: 800, color: COLORS.cobalt }}>SFIDA</div>
+                  <div style={{ fontFamily: FONTS.display, fontSize: "1.25rem", fontWeight: 800, marginTop: 2 }}>⚡ Veloce</div>
+                  <div style={{ fontSize: "0.8rem", marginTop: 4, color: COLORS.mist }}>3 msg · 30s</div>
+                </button>
+              </div>
+            </div>
+
+            {/* RIGHT — PlayerCard compact */}
+            {meStats && (
+              <div style={{ display: "flex", justifyContent: "center", minWidth: 0 }}>
+                {(() => {
+                  const POS = { operator: "OP", team_lead: "TL", sales_manager: "SM", qa_reviewer: "QA", admin: "AD" };
+                  const primary = roleInfo?.roles?.find((r) => POS[r]) || roleInfo?.role || "operator";
+                  const leagueTier = league?.tier || "unranked";
+                  const seniorityTier = seniority?.tier || "junior";
+                  return (
+                    <PlayerCard
+                      name={operatorName}
+                      position={POS[primary] || "OP"}
+                      overall={meStats.overall}
+                      skills={meStats.skills}
+                      league={leagueTier}
+                      seniority={seniorityTier}
+                      certifications={certifications}
+                      totalSessions={meStats.totalSessions}
+                      compact={true}
+                    />
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+
+          {/* Badge Wall — strip orizzontale sotto l'hero */}
           {CREATOR_PERSONAS?.length > 0 && (
             <div style={{ marginBottom: "2rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.75rem" }}>
@@ -768,7 +832,7 @@ export default function Home() {
                   VEDI TUTTO →
                 </a>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(180px, 1fr))`, gap: "0.75rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(220px, 1fr))`, gap: "0.75rem" }}>
                 {CREATOR_PERSONAS.map((cr) => {
                   const cert = certByCreator?.[cr.id];
                   const lvl = cert?.level || 0;
@@ -909,66 +973,15 @@ export default function Home() {
             </div>
           )}
 
-          {/* Quick Stats */}
+          {/* Quick Stats — solo Top 3 preview (XP Card legacy rimossa, redundante con hero XP bar) */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
               gap: "1.5rem",
               marginBottom: "3rem",
             }}
           >
-            {/* XP Card */}
-            <div
-              style={{
-                background: `linear-gradient(135deg, ${HOC_COLORS.purple}30 0%, ${HOC_COLORS.orange}20 100%)`,
-                border: `2px solid ${HOC_COLORS.purple}`,
-                borderRadius: "1rem",
-                padding: "1.5rem",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <div>
-                  <p
-                    style={{
-                      color: HOC_COLORS.gray,
-                      fontSize: "0.85rem",
-                      margin: "0 0 0.5rem 0",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Livello
-                  </p>
-                  <h3 style={{ margin: 0, fontSize: "2.5rem", fontWeight: 900 }}>
-                    {operatorLevel}
-                  </h3>
-                </div>
-                <span style={{ fontSize: "3rem" }}>⭐</span>
-              </div>
-              <div style={{ marginTop: "1rem", fontSize: "0.9rem" }}>
-                <div
-                  style={{
-                    background: `${HOC_COLORS.purple}40`,
-                    height: "8px",
-                    borderRadius: "4px",
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      background: HOC_COLORS.orange,
-                      height: "100%",
-                      borderRadius: "4px",
-                      width: "65%",
-                    }}
-                  />
-                </div>
-                <p style={{ margin: 0, color: HOC_COLORS.gray, fontSize: "0.8rem" }}>
-                  {operatorXP} XP
-                </p>
-              </div>
-            </div>
-
             {/* Leaderboard Preview */}
             <div
               style={{
@@ -1023,7 +1036,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Main Sections */}
+          {/* Secondary Sections — Training/SfidaVeloce ora sono CTA nell'hero */}
           <div
             style={{
               display: "grid",
@@ -1032,89 +1045,6 @@ export default function Home() {
               marginBottom: "3rem",
             }}
           >
-            {/* Training - Main CTA */}
-            <div
-              onClick={() => setScreen("training-hub")}
-              style={{
-                background: HOC_COLORS.gradient,
-                border: `5px solid ${HOC_COLORS.orange}`,
-                borderRadius: "1.5rem",
-                padding: "2rem",
-                cursor: "pointer",
-                transition: "transform 0.3s, box-shadow 0.3s",
-                gridColumn: "span 2",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-4px)";
-                e.currentTarget.style.boxShadow = `0 20px 40px ${HOC_COLORS.orange}40`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
-            >
-              <h3
-                style={{
-                  margin: "0 0 0.5rem 0",
-                  fontSize: "1.5rem",
-                  fontWeight: 900,
-                  color: HOC_COLORS.white,
-                }}
-              >
-                💪 Training
-              </h3>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "1.1rem",
-                  color: `${HOC_COLORS.white}e0`,
-                  fontWeight: 500,
-                }}
-              >
-                Migliora le tue skill con scenari guidati
-              </p>
-            </div>
-
-            {/* Quick Challenge */}
-            <div
-              onClick={() => {
-                setQuickChallengeIndex(0);
-                setQuickChallengeResponse("");
-                setQuickChallengeEval(null);
-                setScreen("quick-challenge");
-              }}
-              style={{
-                background: `${HOC_COLORS.orange}15`,
-                border: `5px solid ${HOC_COLORS.orange}`,
-                borderRadius: "1.5rem",
-                padding: "1.5rem",
-                cursor: "pointer",
-                transition: "transform 0.3s",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-4px)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
-            >
-              <h3
-                style={{
-                  margin: "0 0 0.5rem 0",
-                  fontSize: "1.25rem",
-                  fontWeight: 900,
-                  color: HOC_COLORS.orange,
-                }}
-              >
-                ⚡ Sfida Veloce
-              </h3>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "0.95rem",
-                  color: HOC_COLORS.gray,
-                }}
-              >
-                3 messaggi, 30 secondi
-              </p>
-            </div>
-
             {/* Profile */}
             <div
               onClick={() => setScreen("profile")}
