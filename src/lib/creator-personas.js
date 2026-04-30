@@ -2,6 +2,16 @@
 // Tone cards generate automaticamente da analisi di 60k+ messaggi reali Infloww
 // (Elisa Esposito: 21.863 msg, Gaja: 30.572 msg, Giulia Vaneri: 9.411 msg).
 // SM può editare / approvare via /admin/creators.
+//
+// V6.5 — Aggiunto campo opzionale `benchmarkOperator` per ogni creator.
+// Lo scoring sceglie il benchmark di pattern da usare in base a questo campo.
+// Valori possibili: "spagnuolo" | "terranova". Default (campo assente):
+// "spagnuolo" (preserva il comportamento storico).
+//
+// Andrea Terranova è il top operator HOC che storicamente gestisce Elisa
+// Esposito e Gaja sul silos ITA — quindi gli scoring per le loro chat usano
+// i pattern estratti dai suoi 5.398 msg reali. Per Giulia Vaneri il
+// benchmark resta Spagnuolo.
 
 export const CREATOR_PERSONAS = [
   {
@@ -9,6 +19,7 @@ export const CREATOR_PERSONAS = [
     name: "Elisa Esposito",
     silos: "ITA",
     status: "pilot",
+    benchmarkOperator: "terranova",
     archetype: "Dolce romantica / Girlfriend experience",
     emotional_hook: "ti sto aspettando",
     hook_mechanics: {
@@ -73,6 +84,7 @@ export const CREATOR_PERSONAS = [
     name: "Giulia Vaneri",
     silos: "ITA",
     status: "pilot",
+    // benchmarkOperator non specificato — default spagnuolo
     archetype: "Playful provocatrice / Bratty teaser",
     emotional_hook: "devi conquistarmi",
     hook_mechanics: {
@@ -137,6 +149,7 @@ export const CREATOR_PERSONAS = [
     name: "Gaja Bertolin",
     silos: "ITA",
     status: "pilot",
+    benchmarkOperator: "terranova",
     archetype: "Affettuosa needy / Drammatica dolce",
     emotional_hook: "ho bisogno di te",
     hook_mechanics: {
