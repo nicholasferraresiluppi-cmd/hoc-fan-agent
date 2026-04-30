@@ -1,6 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
-import { FAN_PROFILES, ANDREA_PATTERNS } from "@/lib/fan-profiles";
+import {
+  FAN_PROFILES,
+  ANDREA_PATTERNS, // backward-compat (= SPAGNUOLO_PATTERNS)
+  getBenchmarkPatterns,
+  getBenchmarkLabel,
+} from "@/lib/fan-profiles";
 import { TRAINING_SCENARIOS, SKILL_DIMENSIONS } from "@/lib/training-scenarios";
 import { pickExamples, formatExamplesForPrompt } from "@/lib/golden-examples";
 import { getCreatorById, formatCreatorPersonaForPrompt } from "@/lib/creator-personas";
@@ -14,6 +19,24 @@ function findScenarioById(scenarioId) {
     if (found) return found;
   }
   return null;
+}
+
+/**
+ * Costruisce il blocco "PATTERN STILISTICI DI RIFERIMENTO" da iniettare nel
+ * prompt di scoring. Usa il benchmark indicato sulla creator (es. Terranova
+ * per Elisa Esposito e Gaja, Spagnuolo come default).
+ */
+function buildBenchmarkBlock(creator) {
+  const benchmarkKey = creator?.benchmarkOperator || "spagnuolo";
+  const patterns = getBenchmarkPatterns(benchmarkKey);
+  const label = getBenchmarkLabel(benchmarkKey);
+  const lines = Object.entries(patterns)
+    .map(([key, p]) => `- ${p.name} (peso ${p.weight}): ${p.description}`)
+    .join("\n");
+  return `\n\nPATTERN STILISTICI DI RIFERIMENTO (benchmark: ${label}):
+${lines}
+
+Usali come griglia per riconoscere se l'operatore sta replicando o meno il modello del top performer di riferimento per questa creator. Non penalizzare per parole singole — valuta l'uso concettuale dei pattern.`;
 }
 
 export async function POST(request) {
@@ -58,6 +81,10 @@ export async function POST(request) {
         ? `\n\nESEMPI DI ECCELLENZA (chat reali di top performer HOC, usa come benchmark):\n${formatExamplesForPrompt(goldenExamples)}\n`
         : "";
 
+      // Benchmark stilistico — Terranova per le creator che lui gestisce
+      // (Elisa, Gaja), Spagnuolo come default per le altre.
+      const benchmarkBlock = buildBenchmarkBlock(creator);
+
       const systemPrompt = `Sei un coach esperto di operatori di chat OnlyFans per House of Creators. Devi valutare la performance dell'operatore in una conversazione simulata.
 
 SCENARIO: "${scenario.title}"
@@ -76,6 +103,7 @@ ${positive}
 
 SEGNALI NEGATIVI (da penalizzare):
 ${negative}
+${benchmarkBlock}
 ${goldenBlock}
 
 DIMENSIONI SKILL da valutare (0-100 ciascuna):
@@ -204,6 +232,7 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
           categoryId: scenario.categoryId || scenario.category,
           creatorId: creatorId || null,
           creatorName: creator?.name || null,
+          benchmarkOperator: creator?.benchmarkOperator || "spagnuolo",
           overall: score.overall,
           skills: score.skills,
           stars: score.stars,
@@ -239,7 +268,9 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
         return Response.json({ error: "Profilo fan non trovato." }, { status: 400 });
       }
 
-      const patternsDescription = Object.entries(ANDREA_PATTERNS)
+      // Legacy path non ha creator → usa il default Spagnuolo via helper.
+      const legacyPatterns = getBenchmarkPatterns("spagnuolo");
+      const patternsDescription = Object.entries(legacyPatterns)
         .map(([key, p]) => `- ${p.name}: ${p.description}`)
         .join("\n");
 
