@@ -9,7 +9,11 @@
  * - personality: descrizione del tipo di fan
  * - systemPrompt: il prompt che guida Claude a simulare quel fan
  * - difficulty: 1-5 (1 = facile da convertire, 5 = molto difficile)
- * - idealPatterns: i pattern di Andrea Spagnuolo che funzionano meglio con questo fan
+ * - idealPatterns: i pattern di Spagnuolo che funzionano meglio con questo fan
+ *
+ * I benchmark di pattern operatore sono SPAGNUOLO_PATTERNS e TERRANOVA_PATTERNS
+ * (vedi sotto). Lo scoring sceglie il benchmark in base alla creator (vedi
+ * creator-personas.js, campo `benchmarkOperator`). Default: spagnuolo.
  */
 
 export const FAN_PROFILES = [
@@ -223,10 +227,16 @@ REGOLE:
 ];
 
 /**
- * Pattern psicologici di vendita — estratti da Andrea Spagnuolo (top operator HOC)
- * Usati dallo scoring engine per valutare le risposte dell'operatore
+ * Pattern psicologici di vendita — estratti da Andrea Spagnuolo (top operator HOC).
+ * Usati dallo scoring engine per valutare le risposte dell'operatore.
+ *
+ * Storicamente esportato come `ANDREA_PATTERNS`. Da V6.5 viene esportato anche
+ * come `SPAGNUOLO_PATTERNS` per chiarezza, dato che ora coesiste con
+ * `TERRANOVA_PATTERNS` (un secondo benchmark estratto dai messaggi reali di
+ * Andrea Terranova). `ANDREA_PATTERNS` resta come alias di `SPAGNUOLO_PATTERNS`
+ * per backward-compatibility.
  */
-export const ANDREA_PATTERNS = {
+export const SPAGNUOLO_PATTERNS = {
   emotional_vulnerability: {
     name: "Vulnerabilità Emotiva come leva",
     description: "Usare messaggi che creano intimità e connessione emotiva ('ho fatto questo solo per te', 'mi vergogno un po' a mandartelo'). Il fan si sente privilegiato e compra.",
@@ -258,6 +268,108 @@ export const ANDREA_PATTERNS = {
     weight: 1.5
   }
 };
+
+// Backward-compatibility alias. Codice esistente che importa ANDREA_PATTERNS
+// continua a funzionare senza modifiche.
+export const ANDREA_PATTERNS = SPAGNUOLO_PATTERNS;
+
+/**
+ * Pattern stilistici di vendita — estratti da Andrea Terranova (top operator
+ * HOC su silos ITA, 5.398 msg analizzati nel periodo 24-30 aprile 2026).
+ *
+ * Si differenzia da Spagnuolo perché si focalizza più su HOOK NARRATIVI
+ * ("se ti dicessi che oggi voglio esagerare"), INTIMITÀ PERFORMATIVA dosata
+ * ("mi sento pronta", "mi voglio fidare"), e CHIUSURE FISICHE esplicite
+ * ("ho tolto tutto colpa tua"). È il benchmark di riferimento per le creator
+ * che lui storicamente gestisce (Elisa Esposito, Gaja).
+ *
+ * Volumi riferimento ricavati dai dati: "se ti dicessi" 128x, "mi voglio
+ * fidare" 185x, "oggi voglio esagerare" 128x, "ho tolto tutto" 37x (PPV
+ * top-performing), "davvero/sinceramente/veramente" 377x (firma di voce).
+ *
+ * Nota: il pattern soft_no_recovery si applica esclusivamente a esitazioni
+ * di gusto/timing (es. "domani magari", "preferisco quello di ieri"), NON
+ * a vincoli economici dichiarati dal fan ("sono povero", "ho speso troppo").
+ * Su quei casi il comportamento corretto è chiudere e riaprire più avanti.
+ */
+export const TERRANOVA_PATTERNS = {
+  narrative_hook: {
+    name: "Hook narrativo / Apertura segreta",
+    description: "Apre con la promessa di un segreto da custodire. Crea curiosità e patto di complicità prima di qualunque proposta. È la prima mossa nella maggioranza dei PPV iniziati da Terranova.",
+    keywords: ["se ti dicessi", "questa cosina", "mi prometti che rimane qui", "rimane tra noi", "sono seria me lo devi promettere", "ti devo dire una cosa"],
+    weight: 1.4
+  },
+  performative_intimacy: {
+    name: "Intimità Performativa",
+    description: "Dichiarazioni che alzano il livello di confidenza prima del momento d'acquisto. Il rischio è proiettato sull'operatore (lei si sta fidando, lei si sente pronta), il fan è chiamato a essere all'altezza del passo. Diversa dalla 'emotional_vulnerability' di Spagnuolo perché qui è un setup narrativo lungo, non una formula breve.",
+    keywords: ["mi voglio fidare", "mi sto fidando", "mi sento pronta", "sento pronta a fare", "non avrei mai pensato", "mi tremano le mani", "ad oggi mi sento", "ci tengo davvero a te", "ci conosciamo da troppo tempo"],
+    weight: 1.3
+  },
+  today_exclusivity: {
+    name: "Oggi & Esclusività",
+    description: "Posiziona il momento come unico, fuori scala, OGGI. La parola 'oggi' è rituale (presente nel ~5% dei messaggi top-performing). Si lega a 'solo per te / lo sto mandando solo a te', non a scarsità generica.",
+    keywords: ["oggi voglio", "oggi voglio esagerare", "solo a te", "solo per te", "lo sto mandando solo", "una notte indimenticabile", "una notte di follie", "una cosa che solo al pensiero", "fuori di testa"],
+    weight: 1.2
+  },
+  reciprocity_proof: {
+    name: "Dimostrazione & Reciprocità",
+    description: "Sposta dalle parole ai fatti. Stabilisce un canale di reciprocità implicita: lei dimostra qualcosa, ora il fan è chiamato a contraccambiare. Centrale nei PPV venduti, marginale altrove.",
+    keywords: ["te lo voglio dimostrare", "non più con le parole", "con i fatti", "ti voglio dimostrare quanto", "voglio farti vedere"],
+    weight: 1.3
+  },
+  ppv_physical_close: {
+    name: "Apertura PPV / Chiusura Sessuale",
+    description: "Il momento dello sblocco. Combinazione di nudità esplicita + corresponsabilità ('è solo colpa tua') + CTA fisica diretta. È la formula presente nei PPV con tasso di conversione più alto.",
+    keywords: ["ho tolto tutto", "colpa tua", "fammi sent", "prendi cura del mio corpo", "ti prendi cura", "sblocca", "regalone", "corpo nudo"],
+    weight: 1.5
+  },
+  soft_no_recovery: {
+    name: "Recovery dopo Soft No",
+    description: "Quando il fan esita ('domani magari', 'non troppo', 'preferisco quello di ieri'), Terranova non chiude e non insiste sulla stessa proposta: cambia angolo, sposta sul piano emotivo, oppure rilancia con il narrative_hook. NB: questa logica si applica a esitazioni di gusto/timing, non a vincoli economici dichiarati dal fan.",
+    keywords: ["peccato", "credimi avrei mandato", "ti vogliooo", "non deludere la mia fiducia", "ci tengo davvero a te", "amo (monosillabo affettuoso)"],
+    weight: 1.1
+  },
+  voice_signature: {
+    name: "Firma di voce (tic stilistici)",
+    description: "Marker che fanno suonare un messaggio 'di Terranova' anche fuori contesto. Ridondanza affettiva (sinceramente/veramente/davvero — 377 occorrenze), puntini sospensivi multipli, vocali ripetute (oiii, ti vogliooo, regaloneee), monosillabi affettuosi (amo, siii). Tono colloquiale, mai 'pulito da segretaria'.",
+    keywords: ["sinceramente", "veramente", "davvero", "amo", "ti vogliooo", "regaloneee", "oiii", "heyyy", "ehehe", "🙈", "🥵", "🤤", "💗"],
+    weight: 1.0
+  }
+};
+
+/**
+ * Mappa benchmark → pattern dict. Usata da score/route.js per scegliere il
+ * benchmark giusto in base al campo `benchmarkOperator` della creator.
+ */
+export const OPERATOR_BENCHMARKS = {
+  spagnuolo: SPAGNUOLO_PATTERNS,
+  terranova: TERRANOVA_PATTERNS,
+};
+
+/**
+ * Restituisce il dict di pattern del benchmark richiesto.
+ * Default: spagnuolo (preserva il comportamento storico se la creator non
+ * specifica un benchmarkOperator).
+ */
+export function getBenchmarkPatterns(operatorKey) {
+  if (operatorKey && OPERATOR_BENCHMARKS[operatorKey]) {
+    return OPERATOR_BENCHMARKS[operatorKey];
+  }
+  return SPAGNUOLO_PATTERNS;
+}
+
+/**
+ * Etichetta umana del benchmark, da iniettare nei prompt di scoring.
+ */
+export function getBenchmarkLabel(operatorKey) {
+  switch (operatorKey) {
+    case "terranova":
+      return "Andrea Terranova (top operator HOC ITA — 5.398 msg analizzati)";
+    case "spagnuolo":
+    default:
+      return "Andrea Spagnuolo (top operator HOC)";
+  }
+}
 
 /**
  * C/B/S Profiling System
