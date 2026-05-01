@@ -129,7 +129,7 @@ ${outputSchema}`;
 
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
-      model: "claude-haiku-3-5-20241022",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: mode === "rich" ? 800 : 250,
       system: systemPrompt,
       messages: [{ role: "user", content: `Bozza dell'operatore da valutare:\n\n"${draft}"` }],
