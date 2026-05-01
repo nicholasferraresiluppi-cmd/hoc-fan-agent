@@ -39,6 +39,20 @@ ${lines}
 Usali come griglia per riconoscere se l'operatore sta replicando o meno il modello del top performer di riferimento per questa creator. Non penalizzare per parole singole — valuta l'uso concettuale dei pattern.`;
 }
 
+/**
+ * V6.6 — XP scaling con scaglioni espliciti.
+ * Risolve il bug "minimo 50 XP anche per conversazioni pessime": prima la
+ * scala era hardcoded "50-250" come minimo, ora è "0-250" con tier definiti.
+ * Una conversazione 11% riceveva +50 XP, ora ne riceve 0-15.
+ */
+const XP_RULES_PROMPT = `xp: <numero 0-250> seguendo questi scaglioni in base a overall:
+  - overall < 30: xp 0-15 (conversazione fallita, no XP gratis)
+  - 30-50: xp 15-50 (sotto la sufficienza, XP minimi)
+  - 50-70: xp 50-120 (sufficienza, XP medi)
+  - 70-85: xp 120-200 (buona prestazione)
+  - 85+: xp 200-250 (eccellenza)
+  Modula leggermente in base alla difficoltà dello scenario (scenario 5/5 dà fino al 15% in più rispetto alla base; scenario 1/5 fino al 15% in meno). Mai sopra 250, mai sotto 0.`;
+
 export async function POST(request) {
   try {
     const { userId } = await auth();
@@ -118,7 +132,7 @@ Rispondi SOLO in JSON valido con questa struttura esatta:
 {
   "overall": <numero 0-100>,
   "stars": <numero 1-5>,
-  "xp": <numero 50-250 proporzionale al punteggio e alla difficoltà>,
+  "xp": <numero 0-250 — vedi regola scaglioni sotto>,
   "skills": {
     "naturalezza": <0-100>,
     "esclusivita": <0-100>,
@@ -140,7 +154,7 @@ IMPORTANTE:
 - Se la chat è stata troppo breve o l'operatore non ha mostrato skill reali, non inflazionare i punteggi.
 - overall = media pesata: naturalezza*0.15 + esclusivita*0.20 + dipendenza*0.20 + conversione*0.20 + tono*0.15 + gestione_obiezioni*0.10
 - stars: 1 (0-40), 2 (41-55), 3 (56-70), 4 (71-85), 5 (86-100)
-- xp: scala in base a overall e difficoltà scenario
+- ${XP_RULES_PROMPT}
 
 Rispondi SOLO col JSON, nessun testo prima o dopo.`;
 
@@ -216,6 +230,26 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
           );
           score.ensemble = judgeResults.filter((j) => j.score !== null);
         }
+
+        // V6.6 — Server-side guardrail per XP: anche se Claude sgarra, costringiamo
+        // i tier corretti. Diff_factor copre la difficoltà scenario.
+        if (typeof score.overall === "number") {
+          const diff = scenario.difficulty || 3;
+          const diffFactor = 1 + (diff - 3) * 0.075; // 1=−15%, 5=+15%
+          let xpBase;
+          if (score.overall < 30) xpBase = Math.round((score.overall / 30) * 15);
+          else if (score.overall < 50) xpBase = 15 + Math.round(((score.overall - 30) / 20) * 35);
+          else if (score.overall < 70) xpBase = 50 + Math.round(((score.overall - 50) / 20) * 70);
+          else if (score.overall < 85) xpBase = 120 + Math.round(((score.overall - 70) / 15) * 80);
+          else xpBase = 200 + Math.round(((score.overall - 85) / 15) * 50);
+          const xpServer = Math.max(0, Math.min(250, Math.round(xpBase * diffFactor)));
+          // Usiamo il valore più severo tra il giudizio del modello e il calcolo server.
+          if (typeof score.xp !== "number" || score.xp < 0 || score.xp > 250) {
+            score.xp = xpServer;
+          } else {
+            score.xp = Math.min(score.xp, xpServer);
+          }
+        }
       } catch (ensembleErr) {
         console.error("Ensemble error (non-fatal):", ensembleErr);
       }
@@ -236,6 +270,7 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
           overall: score.overall,
           skills: score.skills,
           stars: score.stars,
+          xp: score.xp,
           messageCount: messages.length,
         };
         await kv.set(historyKey, record);
