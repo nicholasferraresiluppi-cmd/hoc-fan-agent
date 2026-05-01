@@ -11,6 +11,7 @@ import PlayerCard from "@/components/PlayerCard";
 import { PlayerCardSkeleton, XPBarSkeleton, GridSkeleton } from "@/components/Skeleton";
 import { COLORS, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
+import CoachPanel from "@/components/CoachPanel";
 
 // Pick a random archetype weighted by difficulty (favor medium/common ones)
 function pickRandomArchetype() {
@@ -1794,6 +1795,14 @@ export default function Home() {
                 Conversazione lunga — quando vuoi, clicca "Termina" per vedere i risultati.
               </p>
             )}
+<CoachPanel
+              draft={inputText}
+              scenarioId={selectedScenario?.id}
+              creatorId={selectedCreator?.id}
+              archetypeId={selectedArchetype?.id}
+              fanState={fanState}
+              onApplyAlternative={(text) => setInputText(text)}
+            />
           </div>
         )}
 
