@@ -1715,7 +1715,6 @@ export default function Home() {
                     sendMessage();
                   }
                 }}
-                disabled={isTyping}
                 autoFocus
                 style={{
                   flex: 1,
