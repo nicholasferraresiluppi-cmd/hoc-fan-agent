@@ -1064,6 +1064,28 @@ export default function Home() {
                 Accessi, seed demo, classifica, dashboard SM
               </p>
             </Link>
+                  {/* Playbook — libreria formativa visibile a tutti gli operatori */}
+            <Link href="/playbook"
+              style={{
+                background: `${HOC_COLORS.orange}10`,
+                border: `2px solid ${HOC_COLORS.orange}40`,
+                borderRadius: "1.5rem",
+                padding: "1.5rem",
+                cursor: "pointer",
+                transition: "transform 0.3s, border-color 0.3s",
+                textDecoration: "none",
+                display: "block",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.borderColor = HOC_COLORS.orange; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${HOC_COLORS.orange}40`; }}
+            >
+              <h3 style={{ margin: "0 0 0.5rem 0", fontSize: "1.1rem", fontWeight: 900, color: HOC_COLORS.white }}>
+                📚 Playbook
+              </h3>
+              <p style={{ margin: 0, fontSize: "0.85rem", color: HOC_COLORS.gray }}>
+                Libreria di esempi reali per la tua formazione
+              </p>
+            </Link>
           </div>
 
           {/* Recent Activity */}
