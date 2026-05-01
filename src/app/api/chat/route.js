@@ -13,6 +13,32 @@ function findScenarioById(scenarioId) {
   return null;
 }
 
+/**
+ * V6.6 — Costruisce il blocco "CHI È LA TUA INTERLOCUTRICE" per il prompt del
+ * fan. Riformulato rispetto a V6.5 dove la creator persona veniva iniettata
+ * direttamente come parte del prompt: il modello a volte la interpretava come
+ * "voce da usare" e iniziava a parlare COME la creator (es. correggere typo
+ * al femminile, usare emoji 💗, chiamare l'operatore con nomi affettivi tipici
+ * della creator). Adesso il contesto è esplicitamente chi è l'INTERLOCUTRICE,
+ * non chi è il fan stesso.
+ */
+function buildCreatorContextForFan(creator) {
+  if (!creator) return "";
+  const personaBlock = formatCreatorPersonaForPrompt(creator);
+  return `\n\n--- CHI È LA TUA INTERLOCUTRICE (NON sei tu) ---
+La persona con cui stai chattando in questa DM è **${creator.name}**, la creator. TU NON SEI ${creator.name}: tu sei il fan maschio descritto nel personaggio sopra. Quello che segue serve a farti riconoscere il tono di ${creator.name} quando ti scrive — NON è la tua voce da usare quando rispondi.
+
+${personaBlock}
+
+REGOLE STRETTE DI RUOLO (rispettale sempre, anche se l'operatore sbaglia un typo o scrive in modo confuso):
+- Rispondi SEMPRE come il fan maschio. Mai come la creator.
+- NON usare il vocabolario, le emoji o le frasi-firma della creator quando sei TU a scrivere ("amore mio", "ti aspettavo", 💗💗💗, ecc. sono parole che TI ASPETTI da lei, non tue).
+- NON correggere i typo dell'operatore commentandoli ("tranquilla*", "tranquilla con la a"). Accetta le imperfezioni come naturali in una DM.
+- Quando vuoi rivolgerti alla creator, chiamala col suo nome reale (${creator.name}) o con vocativi affettivi neutri ("amore", "tesoro", "bella"). NON inventare altri nomi e NON usare nomi maschili per lei.
+- Se nello scenario sopra compaiono nomi di esempio (es. "Marco", "Luca"), quelli sono nomi di TERZI o tuoi (del fan), MAI dell'interlocutrice.
+--- FINE CHI È LA TUA INTERLOCUTRICE ---\n`;
+}
+
 export async function POST(request) {
   try {
     const { userId } = await auth();
@@ -22,7 +48,7 @@ export async function POST(request) {
 
     const { messages, fanProfileId, scenarioId, fanState, creatorId, archetypeId } = await request.json();
     const creator = creatorId ? getCreatorById(creatorId) : null;
-    const creatorContext = creator ? `\n\n--- CREATOR CONTEXT ---\n${formatCreatorPersonaForPrompt(creator)}\n--- FINE CREATOR CONTEXT ---\n` : "";
+    const creatorContext = buildCreatorContextForFan(creator);
     const archetype = archetypeId ? getFanArchetypeById(archetypeId) : null;
     const archetypeContext = archetype ? `\n\n--- FAN ARCHETYPE ---\n${formatFanArchetypeForPrompt(archetype)}\n--- FINE FAN ARCHETYPE ---\n` : "";
 
@@ -53,6 +79,8 @@ export async function POST(request) {
       systemPrompt = `${scenario.systemPromptForFan}${creatorContext}${archetypeContext}
 
 CONTEXT: You are in an OnlyFans DM chat. The operator (managing the creator's account) is messaging you. You respond ONLY as the fan character described above. Never break character. Never reveal you're an AI. Keep replies short and natural like a real DM (usually 1-2 sentences, 30-50 chars). Come fan reale, rispondi con UN SOLO messaggio (raramente 2 se super eccitato/irritato). L'operatore invece può averti mandato più messaggi consecutivi (è normale su OF) — leggili tutti come un unico turno e rispondi nel complesso. If the operator offers paid content, simulate buying/refusing based on your character's mood and history. Respond in the same language the operator uses (primarily Italian for Italian fans).
+
+REGOLA RUOLO (FONDAMENTALE): tu sei IL FAN. La persona dall'altra parte è la CREATOR (vedi blocco "CHI È LA TUA INTERLOCUTRICE" sopra se presente). NON scambiare i ruoli, anche se l'operatore commette typo, scrive frasi confuse, manda emoji ambigue o ti chiede chi sei. Se l'operatore ti chiede "chi sei?" o "come ti chiami?", rispondi col tuo nome di fan (quello dello scenario o della tua identità del fan) — MAI col nome della creator.
 
 STATO EMOTIVO ATTUALE (0-10):
 - interesse: ${currentState.interest} (più alto = più coinvolto nella chat)
@@ -87,7 +115,8 @@ ISTRUZIONI AGGIUNTIVE:
 - Rispondi in modo naturale, come una persona vera su una chat.
 - I tuoi messaggi devono sembrare scritti da un ragazzo vero su OF.
 - Se l'operatore ti propone un contenuto a pagamento, simula l'acquisto dicendo qualcosa come "ok lo prendo" o "vabbè mandamelo" — non servono link reali.
-- Mantieni il tuo personaggio coerente per TUTTA la conversazione.`;
+- Mantieni il tuo personaggio coerente per TUTTA la conversazione.
+- REGOLA RUOLO: tu sei il FAN, non la creator. Anche se l'operatore scrive in modo confuso o sbaglia typo, NON correggerli al femminile come farebbe la creator e NON inventare nomi per la creator.`;
     } else {
       return Response.json(
         { error: "Devi specificare scenarioId o fanProfileId." },
