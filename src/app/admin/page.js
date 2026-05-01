@@ -21,6 +21,7 @@ const C = {
 const CARDS = [
   { href: "/admin/dashboard", title: "Dashboard SM", desc: "KPI per operatore, trend 7/30g, alert, heatmap skill×creator", color: C.orange },
   { href: "/admin/review", title: "Review sessioni", desc: "Rivedi valutazioni recenti, correggi score e aggiungi commenti", color: C.purple },
+  { href: "/admin/sessions", title: "Review chat", desc: "Leggi le conversazioni complete dei tuoi operatori con punteggio e feedback affiancati (V6.6)", color: C.purple },
   { href: "/admin/outcomes", title: "Outcomes reali", desc: "Inserisci revenue, PPV, retention settimanali per validare le valutazioni AI", color: C.green },
   { href: "/admin/creators", title: "Creator persona", desc: "Tone card, ganci emotivi e vocabolario dei creator pilota", color: C.yellow },
   { href: "/admin/fan-archetypes", title: "Fan Archetypes", desc: "Tipologie di fan (Whale, Lonely, Negoziatore, Fragile…) con strategie ottimali", color: C.purple },
