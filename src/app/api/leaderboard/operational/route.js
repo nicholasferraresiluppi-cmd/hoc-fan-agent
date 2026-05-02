@@ -10,14 +10,7 @@
  *   ?clock_in=yes|no                        (default: no)
  *   ?group=GROUP_NAME                       (opzionale, filtra per group)
  *
- * Response:
- *   {
- *     period_type, period_id, clock_in_mode,
- *     ranking: [{ rank, employee, group, score, tier, ...kpi }, ...],
- *     groups: ["MATILDE ITA", "Gaja ITA", ...],   // per dropdown UI
- *     total: number,
- *     mass_excluded: number,
- *   }
+ * v9: aggiunto groupAverages nella response per visualizzazione media Group accanto KPI.
  */
 import { kv } from "@vercel/kv";
 import { auth } from "@clerk/nextjs/server";
@@ -56,6 +49,7 @@ export async function GET(request) {
         period_id,
         ranking: [],
         groups: [],
+        groupAverages: {},
       },
       { status: 404 }
     );
@@ -64,8 +58,11 @@ export async function GET(request) {
   // Calcola la leaderboard
   const mode = clock_in ? "withClockIn" : "withoutClockIn";
   let ranking;
+  let groupAverages;
   try {
-    ranking = buildLeaderboard(records, mode);
+    const result = buildLeaderboard(records, mode);
+    ranking = result.ranking;
+    groupAverages = result.groupAverages;
   } catch (e) {
     console.error("buildLeaderboard error:", e);
     return Response.json(
@@ -77,7 +74,6 @@ export async function GET(request) {
   // Filtro per group (se richiesto)
   if (group_filter) {
     ranking = ranking.filter((r) => r.group === group_filter);
-    // Re-rank per la vista filtrata
     let rank = 1;
     for (const r of ranking) {
       if (r.score !== null) r.rank = rank++;
@@ -85,11 +81,23 @@ export async function GET(request) {
     }
   }
 
-  // Lista group disponibili per dropdown
-  const groups = Array.from(new Set(records.map((r) => r.group))).sort();
+  // Lista group disponibili per dropdown — solo group con almeno 1 operatore non-mass
+  const eligibleGroups = new Set();
+  for (const r of records) {
+    if (r.group && !r.is_mass) eligibleGroups.add(r.group);
+  }
+  const groups = Array.from(eligibleGroups).sort();
 
   // Conta mass esclusi
   const massExcluded = records.filter((r) => r.is_mass).length;
+
+  // Statistiche di overview
+  const eligibleRanking = ranking.filter((r) => r.score !== null);
+  const avgScore = eligibleRanking.length > 0
+    ? eligibleRanking.reduce((sum, r) => sum + r.score, 0) / eligibleRanking.length
+    : 0;
+  const eliteCount = eligibleRanking.filter((r) => r.tier === "Elite").length;
+  const strongCount = eligibleRanking.filter((r) => r.tier === "Strong").length;
 
   return Response.json({
     period_type,
@@ -97,7 +105,12 @@ export async function GET(request) {
     clock_in_mode: clock_in,
     ranking,
     groups,
+    groupAverages,
     total: ranking.length,
+    eligible_total: eligibleRanking.length,
     mass_excluded: massExcluded,
+    avg_score: Math.round(avgScore * 10) / 10,
+    elite_count: eliteCount,
+    strong_count: strongCount,
   });
 }
