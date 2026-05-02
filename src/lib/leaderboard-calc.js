@@ -1,22 +1,16 @@
 /**
  * HOC Fan Agent — Operational Leaderboard Calculations
  *
- * Funzioni pure per:
- *  - Parsing valori CSV Infloww (currency, percentuale, durata, ecc.)
- *  - Filtro account "Mass" (broadcast) dal calcolo
- *  - Aggregazione per group (team modella)
- *  - Normalizzazione 0-100 con soglie ±25%/±10%/0% sulla media del Group
- *  - Applicazione pesi → Score finale
- *  - Assegnazione tier (Critical/Weak/Average/Good/Strong/Elite)
- *
- * v9: buildLeaderboard ora ritorna { ranking, groupAverages } così la UI
- *     può mostrare la media del Group accanto al KPI dell'operatore.
+ * v10: tutte le funzioni di score accettano settings opzionali
+ *      ({ weights, thresholds, tiers }). Se mancano usano i default da config.
+ *      Questo permette alla pagina admin di sovrascrivere i pesi/soglie/tier
+ *      via KV senza modificare il codice.
  */
 
 import {
-  KPI_WEIGHTS,
-  SCORE_TIERS,
-  NORMALIZATION_THRESHOLDS,
+  KPI_WEIGHTS as DEFAULT_KPI_WEIGHTS,
+  SCORE_TIERS as DEFAULT_SCORE_TIERS,
+  NORMALIZATION_THRESHOLDS as DEFAULT_NORMALIZATION_THRESHOLDS,
   MASS_ACCOUNT_REGEX,
   CSV_COLUMN_MAP,
   DERIVED_KPIS,
@@ -219,17 +213,29 @@ export function calculateGroupAverages(records) {
   return out;
 }
 
-export function normalizeKpi(value, mean) {
+/**
+ * Normalizza in punti 0-100 confrontando con la media del Group.
+ * v10: thresholds passati come parametro (default a config).
+ */
+export function normalizeKpi(value, mean, thresholds = DEFAULT_NORMALIZATION_THRESHOLDS) {
   if (typeof value !== "number" || value <= 0) return 0;
   if (typeof mean !== "number" || mean <= 0) return 0;
-  for (const t of NORMALIZATION_THRESHOLDS) {
+  for (const t of thresholds) {
     if (value < mean * t.multiplier) return t.score;
   }
   return 100;
 }
 
-export function calculateScores(records, mode = "withoutClockIn") {
-  const weights = KPI_WEIGHTS[mode];
+/**
+ * Calcola Score 0-100 per ogni operatore × group.
+ * v10: settings = { weights?, thresholds?, tiers? } sovrascrive i default.
+ */
+export function calculateScores(records, mode = "withoutClockIn", settings = {}) {
+  const weightsByMode = settings.weights || DEFAULT_KPI_WEIGHTS;
+  const thresholds = settings.thresholds || DEFAULT_NORMALIZATION_THRESHOLDS;
+  const tiers = settings.tiers || DEFAULT_SCORE_TIERS;
+
+  const weights = weightsByMode[mode];
   if (!weights) {
     throw new Error(`Unknown mode: ${mode}. Use "withClockIn" or "withoutClockIn".`);
   }
@@ -241,12 +247,12 @@ export function calculateScores(records, mode = "withoutClockIn") {
     }
     const groupMeans = groupAvg[r.group];
     if (!groupMeans) {
-      return { ...r, score: 0, tier: assignTier(0), _excluded_reason: "no_group_data" };
+      return { ...r, score: 0, tier: assignTier(0, tiers), _excluded_reason: "no_group_data" };
     }
     let score = 0;
     const points = {};
     for (const [kpi, weight] of Object.entries(weights)) {
-      const norm = normalizeKpi(r[kpi], groupMeans[kpi]);
+      const norm = normalizeKpi(r[kpi], groupMeans[kpi], thresholds);
       points[kpi] = norm;
       score += norm * weight;
     }
@@ -254,7 +260,7 @@ export function calculateScores(records, mode = "withoutClockIn") {
     return {
       ...r,
       score,
-      tier: assignTier(score),
+      tier: assignTier(score, tiers),
       points_breakdown: points,
       group_means: groupMeans,
     };
@@ -263,26 +269,30 @@ export function calculateScores(records, mode = "withoutClockIn") {
   return { scored, groupAverages: groupAvg };
 }
 
-export function assignTier(score) {
+/**
+ * Tier assignato dato lo score.
+ * v10: tiers passati come parametro.
+ */
+export function assignTier(score, tiers = DEFAULT_SCORE_TIERS) {
   if (typeof score !== "number") return null;
-  for (const t of SCORE_TIERS) {
+  for (const t of tiers) {
     if (score >= t.min && score <= t.max) return t.label;
   }
   return null;
 }
 
-export function tierColor(tierLabel) {
-  const t = SCORE_TIERS.find((x) => x.label === tierLabel);
+export function tierColor(tierLabel, tiers = DEFAULT_SCORE_TIERS) {
+  const t = tiers.find((x) => x.label === tierLabel);
   return t ? t.color : "#6B7080";
 }
 
 /**
  * Pipeline completa.
- * v9: ritorna { ranking, groupAverages } invece del solo array.
+ * v10: settings opzionali — passa { weights, thresholds, tiers } da KV.
  */
-export function buildLeaderboard(rawDailyRecords, mode = "withoutClockIn") {
+export function buildLeaderboard(rawDailyRecords, mode = "withoutClockIn", settings = {}) {
   const aggregated = aggregateByEmployeeGroup(rawDailyRecords);
-  const { scored, groupAverages } = calculateScores(aggregated, mode);
+  const { scored, groupAverages } = calculateScores(aggregated, mode, settings);
   scored.sort((a, b) => {
     if (a.score === null && b.score === null) return 0;
     if (a.score === null) return 1;
