@@ -10,11 +10,13 @@
  *   ?clock_in=yes|no                        (default: no)
  *   ?group=GROUP_NAME                       (opzionale, filtra per group)
  *
- * v9: aggiunto groupAverages nella response per visualizzazione media Group accanto KPI.
+ * v10: carica settings (pesi/soglie/tier) da KV con fallback ai default.
+ *      Il calcolo Score usa i settings dinamici dell'admin invece di constanti.
  */
 import { kv } from "@vercel/kv";
 import { auth } from "@clerk/nextjs/server";
 import { buildLeaderboard } from "@/lib/leaderboard-calc";
+import { loadSettings } from "@/app/api/admin/leaderboard-settings/route";
 
 export async function GET(request) {
   const { userId } = await auth();
@@ -55,12 +57,26 @@ export async function GET(request) {
     );
   }
 
+  // Carica settings dinamici (pesi/soglie/tier) da KV o usa default
+  let settings;
+  try {
+    const loaded = await loadSettings();
+    settings = {
+      weights: loaded.weights,
+      thresholds: loaded.thresholds,
+      tiers: loaded.tiers,
+    };
+  } catch (e) {
+    console.error("loadSettings error, falling back to defaults:", e);
+    settings = {};
+  }
+
   // Calcola la leaderboard
   const mode = clock_in ? "withClockIn" : "withoutClockIn";
   let ranking;
   let groupAverages;
   try {
-    const result = buildLeaderboard(records, mode);
+    const result = buildLeaderboard(records, mode, settings);
     ranking = result.ranking;
     groupAverages = result.groupAverages;
   } catch (e) {
@@ -96,8 +112,10 @@ export async function GET(request) {
   const avgScore = eligibleRanking.length > 0
     ? eligibleRanking.reduce((sum, r) => sum + r.score, 0) / eligibleRanking.length
     : 0;
-  const eliteCount = eligibleRanking.filter((r) => r.tier === "Elite").length;
-  const strongCount = eligibleRanking.filter((r) => r.tier === "Strong").length;
+  const tierCounts = {};
+  for (const r of eligibleRanking) {
+    if (r.tier) tierCounts[r.tier] = (tierCounts[r.tier] || 0) + 1;
+  }
 
   return Response.json({
     period_type,
@@ -110,7 +128,9 @@ export async function GET(request) {
     eligible_total: eligibleRanking.length,
     mass_excluded: massExcluded,
     avg_score: Math.round(avgScore * 10) / 10,
-    elite_count: eliteCount,
-    strong_count: strongCount,
+    elite_count: tierCounts["Elite"] || 0,
+    strong_count: tierCounts["Strong"] || 0,
+    tier_counts: tierCounts,
+    tiers: settings.tiers,
   });
 }
