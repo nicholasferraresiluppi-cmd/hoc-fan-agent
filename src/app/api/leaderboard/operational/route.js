@@ -9,14 +9,18 @@
  *   ?period_id=2026-02 ecc.                 (required)
  *   ?clock_in=yes|no                        (default: no)
  *   ?group=GROUP_NAME                       (opzionale, filtra per group)
+ *   ?category=Big|Medium|Small              (opzionale, filtra per categoria Group)
  *
- * v10: carica settings (pesi/soglie/tier) da KV con fallback ai default.
- *      Il calcolo Score usa i settings dinamici dell'admin invece di constanti.
+ * v11: aggiunto filtro categoria Group. Ogni record include r.category basato
+ *      sulla mappa salvata in ops_kpi:group_categories.
  */
 import { kv } from "@vercel/kv";
 import { auth } from "@clerk/nextjs/server";
 import { buildLeaderboard } from "@/lib/leaderboard-calc";
 import { loadSettings } from "@/app/api/admin/leaderboard-settings/route";
+import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
+
+const VALID_CATEGORIES = ["Big", "Medium", "Small"];
 
 export async function GET(request) {
   const { userId } = await auth();
@@ -29,6 +33,7 @@ export async function GET(request) {
   const period_id = url.searchParams.get("period_id");
   const clock_in = url.searchParams.get("clock_in") === "yes";
   const group_filter = url.searchParams.get("group");
+  const category_filter = url.searchParams.get("category");
 
   if (!period_type || !["weekly", "monthly", "quarterly"].includes(period_type)) {
     return Response.json(
@@ -38,6 +43,12 @@ export async function GET(request) {
   }
   if (!period_id) {
     return Response.json({ error: "period_id required" }, { status: 400 });
+  }
+  if (category_filter && !VALID_CATEGORIES.includes(category_filter)) {
+    return Response.json(
+      { error: `category must be one of: ${VALID_CATEGORIES.join(", ")}` },
+      { status: 400 }
+    );
   }
 
   // Carica i dati dal KV
@@ -52,23 +63,27 @@ export async function GET(request) {
         ranking: [],
         groups: [],
         groupAverages: {},
+        categories: {},
       },
       { status: 404 }
     );
   }
 
-  // Carica settings dinamici (pesi/soglie/tier) da KV o usa default
+  // Carica settings dinamici e categorie Group
   let settings;
+  let categories = {};
   try {
-    const loaded = await loadSettings();
+    const [loaded, cats] = await Promise.all([loadSettings(), loadGroupCategories()]);
     settings = {
       weights: loaded.weights,
       thresholds: loaded.thresholds,
       tiers: loaded.tiers,
     };
+    categories = cats || {};
   } catch (e) {
-    console.error("loadSettings error, falling back to defaults:", e);
+    console.error("loadSettings/categories error, falling back to defaults:", e);
     settings = {};
+    categories = {};
   }
 
   // Calcola la leaderboard
@@ -87,9 +102,24 @@ export async function GET(request) {
     );
   }
 
+  // Decora ogni record con la categoria del proprio Group
+  ranking = ranking.map((r) => ({
+    ...r,
+    category: categories[r.group] || null,
+  }));
+
   // Filtro per group (se richiesto)
   if (group_filter) {
     ranking = ranking.filter((r) => r.group === group_filter);
+  }
+
+  // Filtro per categoria (se richiesto)
+  if (category_filter) {
+    ranking = ranking.filter((r) => r.category === category_filter);
+  }
+
+  // Re-rank dopo filtri (se almeno uno è applicato)
+  if (group_filter || category_filter) {
     let rank = 1;
     for (const r of ranking) {
       if (r.score !== null) r.rank = rank++;
@@ -116,6 +146,11 @@ export async function GET(request) {
   for (const r of eligibleRanking) {
     if (r.tier) tierCounts[r.tier] = (tierCounts[r.tier] || 0) + 1;
   }
+  const categoryCounts = { Big: 0, Medium: 0, Small: 0, Uncategorized: 0 };
+  for (const r of eligibleRanking) {
+    if (r.category && categoryCounts[r.category] !== undefined) categoryCounts[r.category] += 1;
+    else categoryCounts.Uncategorized += 1;
+  }
 
   return Response.json({
     period_type,
@@ -124,6 +159,7 @@ export async function GET(request) {
     ranking,
     groups,
     groupAverages,
+    categories,
     total: ranking.length,
     eligible_total: eligibleRanking.length,
     mass_excluded: massExcluded,
@@ -131,6 +167,7 @@ export async function GET(request) {
     elite_count: tierCounts["Elite"] || 0,
     strong_count: tierCounts["Strong"] || 0,
     tier_counts: tierCounts,
+    category_counts: categoryCounts,
     tiers: settings.tiers,
   });
 }
