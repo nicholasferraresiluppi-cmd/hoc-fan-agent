@@ -34,6 +34,7 @@ const CARDS = [
   { href: "/admin/leaderboard-import", title: "Import KPI Infloww", desc: "Carica CSV mensile/settimanale Infloww per alimentare la leaderboard operativa", color: C.green },
      { href: "/leaderboard/operational", title: "Leaderboard Operativa", desc: "Ranking del team basato sui KPI Infloww reali (Score 0-100, tier Critical→Elite)", color: C.orange },
   { href: "/admin/leaderboard-settings", title: "Settings Leaderboard", desc: "Modifica pesi KPI, soglie normalizzazione e cutoff tier (replica foglio Sheets)", color: C.green },
+  { href: "/admin/group-categories", title: "Categorie Group", desc: "Classifica i Group come Big/Medium/Small per filtro vista nella leaderboard", color: C.purple },
   { href: "/leaderboard", title: "Classifica (vista operatori)", desc: "Apri la classifica come la vedono gli operatori", color: C.orange },
   { href: "/leaderboard/storico", title: "Hall of Fame", desc: "Albo storico dei campioni settimanali", color: C.gold },
 ];
