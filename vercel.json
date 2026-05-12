@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/content-pipeline/cron",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 9 * * *"
     }
   ]
 }
