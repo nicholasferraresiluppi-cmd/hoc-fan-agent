@@ -52,14 +52,14 @@ export function getTalents(opts = {}) {
 }
 
 export function getOFOverview(opts = {}) {
-  return request("/overview/onlyfans", {
+  return request("/social-metrics/onlyfans/talents/timeframe", {
     query: opts.query,
     signal: opts.signal,
   });
 }
 
 export function getInstagramOverview(opts = {}) {
-  return request("/social-metrics/instagram/talents/timeframe", {
+  return request("/social-metrics/instagram/all/talents/timeframe", {
     query: opts.query,
     signal: opts.signal,
   });
@@ -73,7 +73,7 @@ export function getTikTokOverview(opts = {}) {
 }
 
 export function getSalesCreators(opts = {}) {
-  return request("/sales/creators", {
+  return request("/sales/sales-analytics/creators", {
     query: opts.query,
     signal: opts.signal,
   });
