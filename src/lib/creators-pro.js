@@ -48,7 +48,7 @@ async function request(path, { method = "GET", query, body, signal } = {}) {
 }
 
 export function getTalents(opts = {}) {
-  return request("/talents", { query: opts.query, signal: opts.signal });
+  return request("/social-metrics/talents", { query: opts.query, signal: opts.signal });
 }
 
 export function getOFOverview(opts = {}) {
