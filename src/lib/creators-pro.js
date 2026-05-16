@@ -59,14 +59,14 @@ export function getOFOverview(opts = {}) {
 }
 
 export function getInstagramOverview(opts = {}) {
-  return request("/overview/instagram", {
+  return request("/social-metrics/instagram/talents/timeframe", {
     query: opts.query,
     signal: opts.signal,
   });
 }
 
 export function getTikTokOverview(opts = {}) {
-  return request("/overview/tiktok", {
+  return request("/social-metrics/tiktok/talents/timeframe", {
     query: opts.query,
     signal: opts.signal,
   });
