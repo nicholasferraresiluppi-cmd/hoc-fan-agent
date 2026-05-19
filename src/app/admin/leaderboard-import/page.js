@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import * as XLSX from "xlsx";
 import { COLORS, FONTS } from "@/lib/brand";
 
 const PERIOD_OPTIONS = [
@@ -57,8 +58,26 @@ export default function LeaderboardImportPage() {
     if (!file) return;
     setError("");
     try {
-      const text = await file.text();
-      setCsvText(text);
+      const name = file.name.toLowerCase();
+      if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: "array", cellDates: true });
+        const firstSheetName = wb.SheetNames[0];
+        if (!firstSheetName) {
+          setError("Il file Excel non contiene fogli.");
+          return;
+        }
+        const sheet = wb.Sheets[firstSheetName];
+        const csv = XLSX.utils.sheet_to_csv(sheet, {
+          blankrows: false,
+          rawNumbers: false,
+          dateNF: "yyyy-mm-dd",
+        });
+        setCsvText(csv);
+      } else {
+        const text = await file.text();
+        setCsvText(text);
+      }
       setPreview(null);
     } catch (err) {
       setError("Impossibile leggere il file: " + String(err));
@@ -155,7 +174,7 @@ export default function LeaderboardImportPage() {
         <Link href="/admin" style={styles.backLink}>← Admin</Link>
         <h1 style={styles.title}>Import dati Operational Leaderboard</h1>
         <p style={styles.sub}>
-          Carica l'export CSV "By time and employee" da Infloww. I dati alimentano la
+          Carica l'export CSV o Excel "By time and employee" da Infloww. I dati alimentano la
           leaderboard operativa visibile a tutti gli operatori.
         </p>
 
@@ -172,8 +191,13 @@ export default function LeaderboardImportPage() {
         </div>
 
         <div style={styles.card}>
-          <h2 style={styles.h2}>2. File CSV Infloww</h2>
-          <input type="file" accept=".csv,text/csv" onChange={handleFileUpload} style={{ marginBottom: 12, color: COLORS.alabaster }} />
+          <h2 style={styles.h2}>2. File CSV o Excel Infloww</h2>
+          <input
+            type="file"
+            accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            onChange={handleFileUpload}
+            style={{ marginBottom: 12, color: COLORS.alabaster }}
+          />
           {csvText && <p style={{ fontSize: 12, color: COLORS.fog }}>{csvText.split(/\r?\n/).length} righe caricate · {(csvText.length / 1024).toFixed(1)} KB</p>}
         </div>
 
