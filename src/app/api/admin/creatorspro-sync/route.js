@@ -51,7 +51,10 @@ export async function POST(request) {
       if (!period_id || !/^\d{4}-\d{2}$/.test(period_id)) {
         return Response.json({ error: "period_id YYYY-MM richiesto" }, { status: 400 });
       }
-      const r = await prepareSync({ periodId: period_id });
+      // Modalità incrementale se page_offset specificato
+      const pageOffset = body.page_offset !== undefined ? parseInt(body.page_offset, 10) : null;
+      const pagesLimit = body.pages_limit !== undefined ? parseInt(body.pages_limit, 10) : null;
+      const r = await prepareSync({ periodId: period_id, pageOffset, pagesLimit });
       return Response.json({ ok: true, action, period_id, ...r });
     }
     if (action === "batch") {

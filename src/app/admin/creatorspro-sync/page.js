@@ -38,14 +38,22 @@ export default function CreatorsProSyncPage() {
   const [syncPhase, setSyncPhase] = useState("");
   const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0 });
 
-  async function callSync(payload) {
+  async function callSync(payload, phaseLabel) {
     const res = await fetch("/api/admin/creatorspro-sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const d = await res.json();
-    if (!res.ok || d.error) throw new Error(d.error + (d.reason ? " — " + d.reason : ""));
+    if (!res.ok) {
+      // Spesso 504/timeout torna HTML; provo a leggere il messaggio in chiaro
+      let detail = "";
+      try { detail = (await res.text()).slice(0, 200); } catch {}
+      throw new Error(`[${phaseLabel}] HTTP ${res.status}${detail ? " — " + detail : ""}`);
+    }
+    let d;
+    try { d = await res.json(); }
+    catch (e) { throw new Error(`[${phaseLabel}] risposta non-JSON (probabile timeout server)`); }
+    if (d.error) throw new Error(`[${phaseLabel}] ${d.error}${d.reason ? " — " + d.reason : ""}`);
     return d;
   }
 
@@ -58,31 +66,42 @@ export default function CreatorsProSyncPage() {
     setSyncProgress({ current: 0, total: 0 });
     try {
       // Step 1: refdata
-      await callSync({ action: "refdata" });
+      await callSync({ action: "refdata" }, "refdata");
 
-      // Step 2: prepare (fetch stub list)
-      setSyncPhase("preparing");
-      const prep = await callSync({ action: "prepare", period_id: periodId });
-      const totalWages = prep.total || 0;
-      setSyncProgress({ current: 0, total: totalWages });
+      // Step 2: prepare incrementale (5 pagine alla volta per stare safe sotto 60s)
+      const PAGES_PER_CALL = 5;
+      let pageOffset = 1;
+      let totalWages = 0;
+      let prepareDone = false;
+      while (!prepareDone) {
+        setSyncPhase(`preparing page ${pageOffset}`);
+        const prep = await callSync({
+          action: "prepare", period_id: periodId,
+          page_offset: pageOffset, pages_limit: PAGES_PER_CALL,
+        }, "prepare");
+        totalWages = prep.total || 0;
+        prepareDone = !!prep.done;
+        pageOffset = prep.next_page || pageOffset + PAGES_PER_CALL;
+        setSyncProgress({ current: 0, total: totalWages });
+      }
       if (totalWages === 0) {
         setSyncPhase("nothing-to-sync");
-        const fin = await callSync({ action: "finalize", period_id: periodId });
+        const fin = await callSync({ action: "finalize", period_id: periodId }, "finalize");
         setSyncResult(fin);
       } else {
-        // Step 3: loop batch
+        // Step 3: loop batch detail
         let offset = 0;
-        const BATCH = 50;
+        const BATCH = 30;
         while (offset < totalWages) {
           setSyncPhase(`batch ${Math.floor(offset / BATCH) + 1}/${Math.ceil(totalWages / BATCH)}`);
-          const r = await callSync({ action: "batch", period_id: periodId, offset, batch_size: BATCH });
+          const r = await callSync({ action: "batch", period_id: periodId, offset, batch_size: BATCH }, "batch");
           offset = r.next_offset;
           setSyncProgress({ current: offset, total: totalWages });
           if (r.done) break;
         }
         // Step 4: finalize
         setSyncPhase("finalizing");
-        const fin = await callSync({ action: "finalize", period_id: periodId });
+        const fin = await callSync({ action: "finalize", period_id: periodId }, "finalize");
         setSyncResult(fin);
       }
       await mutate("/api/admin/creatorspro-sync");

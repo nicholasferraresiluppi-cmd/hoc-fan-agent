@@ -24,6 +24,7 @@ import {
   fetchIntervals,
   fetchAllWageStubs,
   fetchWageDetailBatch,
+  fetchWages,
   bucketizeIntervalFromHour,
 } from "./creatorspro-api";
 
@@ -107,27 +108,84 @@ export async function syncRefdata() {
 
 /**
  * Step 2: prepare — fetcha la lista wage stub e salva l'indice in KV.
- * Non fetcha shifts. Tipicamente ~10-15s.
+ * Supporta modalità incrementale per stare sotto 60s di Vercel Hobby:
+ *
+ *   prepareSync({periodId})                          → fetch tutto in una chiamata (rischio timeout)
+ *   prepareSync({periodId, pageOffset, pagesLimit})  → fetch solo N pagine, ritorna next_page_offset
+ *
+ * Quando pageOffset > 0 fa append all'indice esistente.
  */
-export async function prepareSync({ periodId }) {
+export async function prepareSync({ periodId, pageOffset = null, pagesLimit = null }) {
   const { startedAt, endedAt } = monthBoundsIso(periodId);
+
+  // Modalità incrementale: chunk di pagine alla volta
+  if (pageOffset !== null && pagesLimit !== null) {
+    // Su prima chiamata (pageOffset=1) reset
+    if (pageOffset === 1) {
+      await kv.set(`cp:sync:state:${periodId}`, {
+        stubs: [],
+        total: 0,
+        raw_total: null,
+        started_at: Date.now(),
+        prepare_done: false,
+      }, { ex: TTL_SYNC_STATE });
+      await kv.set(`cp:wages:${periodId}`, [], { ex: TTL_WAGES });
+    }
+    // Fetch first page per scoprire pagination
+    const first = await fetchWages({ startedAt, endedAt, page: pageOffset, limit: 25 });
+    const totalCount = first.pagination?.dataCount || 0;
+    const pageCount = first.pagination?.pageCount || 1;
+    const stubsBatch = [...(first.data || [])];
+    // Fetch pagine successive in parallelo fino a pagesLimit
+    const lastPage = Math.min(pageCount, pageOffset + pagesLimit - 1);
+    if (lastPage > pageOffset) {
+      const pages = [];
+      for (let p = pageOffset + 1; p <= lastPage; p++) pages.push(p);
+      const CONCURRENCY = 5;
+      for (let i = 0; i < pages.length; i += CONCURRENCY) {
+        const slice = pages.slice(i, i + CONCURRENCY);
+        const results = await Promise.all(slice.map((p) =>
+          fetchWages({ startedAt, endedAt, page: p, limit: 25 }).catch((e) => ({ data: [], _err: String(e?.message || e) }))
+        ));
+        for (const r of results) if (r?.data) stubsBatch.push(...r.data);
+      }
+    }
+    // Append a state
+    const state = (await kv.get(`cp:sync:state:${periodId}`)) || { stubs: [], total: 0, started_at: Date.now() };
+    const idxStubs = stubsBatch.map((w) => ({
+      id: w?.info?.id, member_id: w?.info?.memberId, member_name: w?.info?.memberName, status: w?.info?.status,
+    })).filter((s) => s.id);
+    const newStubs = [...(state.stubs || []), ...idxStubs];
+    const nextPage = lastPage + 1;
+    const prepareDone = nextPage > pageCount;
+    await kv.set(`cp:sync:state:${periodId}`, {
+      ...state,
+      stubs: newStubs,
+      total: newStubs.length,
+      raw_total: totalCount,
+      page_count: pageCount,
+      prepare_done: prepareDone,
+    }, { ex: TTL_SYNC_STATE });
+    return {
+      total: newStubs.length,
+      raw_total: totalCount,
+      page_count: pageCount,
+      current_page: lastPage,
+      next_page: prepareDone ? null : nextPage,
+      done: prepareDone,
+    };
+  }
+
+  // Modalità classica (one-shot)
   const { stubs, totalCount } = await fetchAllWageStubs({ startedAt, endedAt });
-  // Salvo solo id+member essential per ridurre dimensione KV value
   const idxStubs = stubs.map((w) => ({
-    id: w?.info?.id,
-    member_id: w?.info?.memberId,
-    member_name: w?.info?.memberName,
-    status: w?.info?.status,
+    id: w?.info?.id, member_id: w?.info?.memberId, member_name: w?.info?.memberName, status: w?.info?.status,
   })).filter((s) => s.id);
   await kv.set(`cp:sync:state:${periodId}`, {
-    stubs: idxStubs,
-    total: idxStubs.length,
-    raw_total: totalCount,
-    started_at: Date.now(),
+    stubs: idxStubs, total: idxStubs.length, raw_total: totalCount, started_at: Date.now(), prepare_done: true,
   }, { ex: TTL_SYNC_STATE });
-  // Reset wage list per il periodo
   await kv.set(`cp:wages:${periodId}`, [], { ex: TTL_WAGES });
-  return { total: idxStubs.length, raw_total: totalCount };
+  return { total: idxStubs.length, raw_total: totalCount, done: true };
 }
 
 /**

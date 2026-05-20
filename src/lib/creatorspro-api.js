@@ -9,7 +9,7 @@
 const DEFAULT_BASE = "https://api.houseofcreators.com";
 const PAGE_LIMIT = 25;
 const DETAIL_CONCURRENCY = 20;
-const LIST_PAGES_CONCURRENCY = 5;
+const LIST_PAGES_CONCURRENCY = 10;
 
 let _tokenCache = { token: null, expiresAt: 0 };
 
