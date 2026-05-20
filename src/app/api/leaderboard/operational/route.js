@@ -21,6 +21,10 @@
  *      esclusi (mass/manual/non_chatter/data_quality/no_group_data) sono
  *      nascosti per default; usa include_excluded=1 e include_zero=1 per
  *      vederli (es. pagina audit /admin/leaderboard-exclusions).
+ * v13: aggregati per creator (sales/purch totali del profilo) + creator_impact
+ *      per ogni operatore (share_eur, share_pct, estimated:true per multi-creator).
+ *      I totali per creator sono calcolati su TUTTI gli operatori eligible del
+ *      periodo (ignorando i filtri di vista) per non far cambiare la % col filtro.
  */
 import { kv } from "@vercel/kv";
 import { auth } from "@clerk/nextjs/server";
@@ -31,6 +35,85 @@ import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
 const VALID_CATEGORIES = ["Big", "Medium", "Small"];
 const VALID_LANGUAGES = ["eng", "ita"];
 const EXCLUSIONS_KEY = "leaderboard:exclusions";
+
+/**
+ * Calcola aggregati per creator (sales totali + purch totali) distribuendo
+ * equamente le metriche di ogni operatore tra i suoi creators[].
+ * Es. operatore O con sales=$1500 e creators=["Bianca","Giulia","Sara"]
+ *     → contribuisce $500 a Bianca, $500 a Giulia, $500 a Sara.
+ * Per operatori mono-creator il contributo è 100% delle loro sales su quel creator.
+ *
+ * La somma di tutti i contributi su ogni creator NON è esatta nel mondo reale
+ * (un chatter può concentrare 90% del fatturato su un singolo creator), ma è
+ * la migliore stima possibile dato che Infloww non fornisce il breakdown
+ * operatore×creator. Per gli operatori mono-creator (estimated:false) il
+ * dato è esatto.
+ */
+function buildCreatorAggregates(eligibleRecords) {
+  const agg = {};
+  for (const op of eligibleRecords) {
+    const creators = Array.isArray(op.creators) ? op.creators.filter(Boolean) : [];
+    if (creators.length === 0) continue;
+    const sharePerCreator = (op.sales || 0) / creators.length;
+    const purchSharePerCreator = (op.ppvs_unlocked || 0) / creators.length;
+    for (const creator of creators) {
+      if (!agg[creator]) {
+        agg[creator] = { total_sales: 0, total_purch: 0, contributors: 0, top_operator: null, _top_share: 0 };
+      }
+      agg[creator].total_sales += sharePerCreator;
+      agg[creator].total_purch += purchSharePerCreator;
+      agg[creator].contributors += 1;
+      if (sharePerCreator > agg[creator]._top_share) {
+        agg[creator]._top_share = sharePerCreator;
+        agg[creator].top_operator = op.employee;
+      }
+    }
+  }
+  // Pulizia: arrotonda e rimuovi _top_share interno
+  for (const c of Object.keys(agg)) {
+    agg[c].total_sales = Math.round(agg[c].total_sales);
+    agg[c].total_purch = Math.round(agg[c].total_purch);
+    delete agg[c]._top_share;
+  }
+  return agg;
+}
+
+/**
+ * Decora un record con creator_impact e top_creator.
+ * creator_impact: array ordinato per share_eur desc, ciascun elemento ha
+ *   { creator, share_eur, share_pct, total_creator_sales, total_creator_purch, estimated }.
+ * top_creator: shortcut per la card (creator con share_eur più alto).
+ */
+function decorateCreatorImpact(op, aggregates) {
+  const creators = Array.isArray(op.creators) ? op.creators.filter(Boolean) : [];
+  if (creators.length === 0) return { ...op, creator_impact: [], top_creator: null };
+  const isMono = creators.length === 1;
+  const sharePerCreator = (op.sales || 0) / creators.length;
+  const purchSharePerCreator = (op.ppvs_unlocked || 0) / creators.length;
+  const impact = creators
+    .map((creator) => {
+      const ag = aggregates[creator];
+      const total = ag?.total_sales || 0;
+      return {
+        creator,
+        share_eur: Math.round(sharePerCreator),
+        share_purch: Math.round(purchSharePerCreator),
+        share_pct: total > 0 ? Math.round((sharePerCreator / total) * 1000) / 10 : 0,
+        total_creator_sales: ag?.total_sales || 0,
+        total_creator_purch: ag?.total_purch || 0,
+        estimated: !isMono,
+      };
+    })
+    .sort((a, b) => b.share_eur - a.share_eur);
+  const top = impact[0];
+  return {
+    ...op,
+    creator_impact: impact,
+    top_creator: top
+      ? { creator: top.creator, share_pct: top.share_pct, share_eur: top.share_eur, estimated: top.estimated }
+      : null,
+  };
+}
 
 export async function GET(request) {
   const { userId } = await auth();
@@ -83,6 +166,7 @@ export async function GET(request) {
         groups: [],
         groupAverages: {},
         categories: {},
+        creatorAggregates: {},
       },
       { status: 404 }
     );
@@ -128,11 +212,13 @@ export async function GET(request) {
     );
   }
 
-  // Decora ogni record con la categoria del proprio Group
-  ranking = ranking.map((r) => ({
-    ...r,
-    category: categories[r.group] || null,
-  }));
+  // Calcola creator aggregates su TUTTI gli eligible (pre-filtri di vista).
+  // Così la % impatto resta stabile anche cambiando filtri Group/Categoria/Lingua.
+  const eligibleForAggregates = ranking.filter((r) => !r._excluded_reason && r.score !== null && r.score > 0);
+  const creatorAggregates = buildCreatorAggregates(eligibleForAggregates);
+
+  // Decora ogni record con la categoria del proprio Group + creator_impact
+  ranking = ranking.map((r) => decorateCreatorImpact({ ...r, category: categories[r.group] || null }, creatorAggregates));
 
   // Filtro per group (se richiesto)
   if (group_filter) {
@@ -211,6 +297,7 @@ export async function GET(request) {
     groups,
     groupAverages,
     categories,
+    creatorAggregates,
     total: ranking.length,
     eligible_total: eligibleRanking.length,
     mass_excluded: massExcluded,
@@ -221,6 +308,7 @@ export async function GET(request) {
     tier_counts: tierCounts,
     category_counts: categoryCounts,
     language_counts: languageCounts,
+    creators_count: Object.keys(creatorAggregates).length,
     tiers: settings.tiers,
   });
 }
