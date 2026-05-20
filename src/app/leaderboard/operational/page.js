@@ -752,15 +752,111 @@ function HealthBar({ periodType }) {
 }
 
 /* =================================================
- * Action Center — Top 5 da cambiare separati per lingua (admin only).
+ * Action Center — Top N da cambiare separati per lingua (admin only).
  * Compatto, posizionato in alto sotto la Health bar per immediatezza.
+ * - Rispetta il filtro lingua principale (1 colonna se ITA o ENG attivo)
+ * - Selettore dimensione lista (3/5/7/10)
+ * - Azione "Ignora dalla lista" + collapsible per ripristinare ignorati
  * ================================================= */
 
-function UnderperformersColumn({ language, label, flag, periodType, periodId, onExcluded }) {
-  const url = `/api/leaderboard/underperformers?period_type=${periodType}&period_id=${periodId}&lookback=3&min_chronic=2&limit=5&language=${language}`;
+const SIZE_OPTIONS = [3, 5, 7, 10];
+
+function UnderperformersKebab({ employee, onExcluded, onIgnored }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open]);
+
+  async function handleIgnore() {
+    if (!confirm(`Ignorare "${employee}" dalla lista "da cambiare"?\n\nResta nella leaderboard ma non viene più conteggiato qui. Puoi ripristinarlo dal pannello "ignorati" sotto.`)) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/underperformers-ignored", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employee, note: "Ignorato dal pannello Action Center" }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) alert(data.error || "Errore");
+      else { setOpen(false); if (onIgnored) onIgnored(); }
+    } catch (err) { alert(String(err)); }
+    finally { setBusy(false); }
+  }
+
+  async function handleExclude(reason, label) {
+    if (!confirm(`Escludere "${employee}" dalla leaderboard?\nReason: ${label}\n\nScompare da TUTTA la classifica, non solo dal pannello "da cambiare".`)) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/leaderboard-exclusions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employee, reason, note: "Aggiunto dal pannello da-cambiare" }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) alert(data.error || "Errore");
+      else { setOpen(false); if (onExcluded) onExcluded(); }
+    } catch (err) { alert(String(err)); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div ref={wrapRef} style={{ position: "relative", display: "inline-block" }}>
+      <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }} disabled={busy}
+        style={{
+          width: 28, height: 28, background: open ? COLORS.charcoal : "transparent",
+          border: `1px solid ${open ? COLORS.steel : "transparent"}`, color: COLORS.fog,
+          borderRadius: 6, cursor: busy ? "wait" : "pointer", fontSize: 18, lineHeight: 1,
+          display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0,
+        }}>⋮</button>
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 4px)", right: 0, minWidth: 260,
+          background: COLORS.graphite, border: `1px solid ${COLORS.steel}`, borderRadius: 10,
+          boxShadow: "0 12px 32px rgba(0,0,0,0.6)", padding: 4, zIndex: 50,
+        }}>
+          <div style={{ padding: "8px 12px 6px", fontSize: 10, color: COLORS.mist, textTransform: "uppercase", letterSpacing: "0.1em", borderBottom: `1px solid ${COLORS.charcoal}`, marginBottom: 4 }}>
+            {employee}
+          </div>
+          <button onClick={handleIgnore} disabled={busy}
+            style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px",
+              background: "transparent", border: "none", color: COLORS.alabaster, fontSize: 13,
+              fontFamily: FONTS.body, cursor: busy ? "wait" : "pointer", borderRadius: 6 }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = COLORS.champagne + "20"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+            <div style={{ fontWeight: 600, color: COLORS.champagne }}>🔕 Ignora dalla lista</div>
+            <div style={{ fontSize: 11, color: COLORS.mist, marginTop: 2 }}>Resta in leaderboard, sparisce solo da qui</div>
+          </button>
+          <div style={{ borderTop: `1px solid ${COLORS.charcoal}`, margin: "4px 8px" }} />
+          {EXCLUSION_ACTIONS.map((a) => (
+            <button key={a.reason} onClick={() => handleExclude(a.reason, a.label.replace("Escludi — ", ""))} disabled={busy}
+              style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px",
+                background: "transparent", border: "none", color: COLORS.alabaster, fontSize: 13,
+                fontFamily: FONTS.body, cursor: busy ? "wait" : "pointer", borderRadius: 6 }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = a.color + "20"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+              <div style={{ fontWeight: 600, color: a.color }}>{a.label}</div>
+              <div style={{ fontSize: 11, color: COLORS.mist, marginTop: 2 }}>{a.description}</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UnderperformersColumn({ language, label, flag, periodType, periodId, size, onExcluded, onIgnored, fullWidth = false }) {
+  const url = `/api/leaderboard/underperformers?period_type=${periodType}&period_id=${periodId}&lookback=3&min_chronic=2&limit=${size}&language=${language}`;
   const { data } = useSWR(url, fetcher, { revalidateOnFocus: false });
   const list = data?.underperformers || [];
-  const isLoading = !data && !data?.error;
+  const isLoading = !data;
 
   return (
     <div style={{
@@ -773,7 +869,7 @@ function UnderperformersColumn({ language, label, flag, periodType, periodId, on
         <div style={{ fontSize: 11, color: COLORS.signal, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
           ⚠️ Da cambiare {flag} {label}
         </div>
-        <div style={{ fontSize: 11, color: COLORS.mist, fontFamily: FONTS.mono }}>{list.length}/5</div>
+        <div style={{ fontSize: 11, color: COLORS.mist, fontFamily: FONTS.mono }}>{list.length}/{size}</div>
       </div>
       {data?.error && <div style={{ color: COLORS.signal, fontSize: 12 }}>{data.error}</div>}
       {isLoading && <div style={{ color: COLORS.mist, fontSize: 12 }}>Caricamento…</div>}
@@ -810,7 +906,7 @@ function UnderperformersColumn({ language, label, flag, periodType, periodId, on
                 return <div key={i} title={`${h.period_id}: ${h.tier || "—"}`} style={{ width: 10, height: 10, borderRadius: 2, background: hColor + "AA", border: `1px solid ${hColor}` }} />;
               })}
             </div>
-            <AdminActionsMenu employee={op.employee} onExcluded={onExcluded} />
+            <UnderperformersKebab employee={op.employee} onExcluded={onExcluded} onIgnored={onIgnored} />
           </div>
         );
       })}
@@ -818,20 +914,99 @@ function UnderperformersColumn({ language, label, flag, periodType, periodId, on
   );
 }
 
-function UnderperformersActionCenter({ periodType, periodId, canExclude, onExcluded }) {
+function IgnoredPanel({ onChange }) {
+  const [open, setOpen] = useState(false);
+  const { data } = useSWR("/api/admin/underperformers-ignored", fetcher, { revalidateOnFocus: false });
+  const ignored = data?.ignored || {};
+  const entries = Object.entries(ignored).sort((a, b) => (b[1].ignored_at || 0) - (a[1].ignored_at || 0));
+
+  async function restore(name) {
+    if (!confirm(`Rimettere "${name}" nel computo da-cambiare?`)) return;
+    const res = await fetch(`/api/admin/underperformers-ignored?employee=${encodeURIComponent(name)}`, { method: "DELETE" });
+    const d = await res.json();
+    if (!res.ok || d.error) { alert(d.error || "Errore"); return; }
+    await mutate("/api/admin/underperformers-ignored");
+    if (onChange) onChange();
+  }
+
+  if (entries.length === 0) return null;
+  return (
+    <div style={{ marginTop: 10, background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 10 }}>
+      <button onClick={() => setOpen(!open)}
+        style={{ width: "100%", padding: "10px 14px", background: "transparent", border: "none",
+          color: COLORS.fog, fontSize: 12, fontFamily: FONTS.body, cursor: "pointer",
+          textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span>🔕 <b style={{ color: COLORS.alabaster }}>{entries.length}</b> ignorati — non conteggiati nel pannello "da cambiare"</span>
+        <span style={{ fontFamily: FONTS.mono, fontSize: 12 }}>{open ? "▾" : "▸"}</span>
+      </button>
+      {open && (
+        <div style={{ padding: "0 14px 14px", borderTop: `1px solid ${COLORS.charcoal}` }}>
+          {entries.map(([name, entry]) => (
+            <div key={name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "8px 0", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 13 }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <Link href={`/leaderboard/operational/${encodeURIComponent(name)}`} style={{ color: COLORS.alabaster, textDecoration: "none", fontWeight: 500 }}>{name}</Link>
+                {entry.note && <span style={{ color: COLORS.mist, fontSize: 11, marginLeft: 8, fontStyle: "italic" }}>"{entry.note}"</span>}
+              </div>
+              <span style={{ color: COLORS.mist, fontSize: 11, fontFamily: FONTS.mono }}>
+                {entry.ignored_at ? new Date(entry.ignored_at).toLocaleDateString("it-IT") : "—"}
+              </span>
+              <button onClick={() => restore(name)}
+                style={{ padding: "4px 10px", background: "transparent", color: COLORS.champagne,
+                  border: `1px solid ${COLORS.champagne}66`, borderRadius: 6, cursor: "pointer", fontSize: 11 }}>
+                ↺ Ripristina
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UnderperformersActionCenter({ periodType, periodId, canExclude, languageFilter, onExcluded }) {
+  const [size, setSize] = useState(5);
   if (!canExclude || !periodId) return null;
+
+  const onIgnored = () => {
+    // Force refresh degli SWR delle due colonne. SWR usa URL come key; passiamo per mutate globale.
+    mutate((key) => typeof key === "string" && key.startsWith("/api/leaderboard/underperformers"));
+    mutate("/api/admin/underperformers-ignored");
+  };
+
+  const showIta = !languageFilter || languageFilter === "ita";
+  const showEng = !languageFilter || languageFilter === "eng";
+  const cols = showIta && showEng ? "1fr 1fr" : "1fr";
+
   return (
     <div style={{ marginBottom: 22 }}>
-      <div style={{ fontSize: 11, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>
-        🎯 Action center — operatori da cambiare (admin only)
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ fontSize: 11, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.12em" }}>
+          🎯 Action center — operatori da cambiare (admin only)
+          {languageFilter && <span style={{ marginLeft: 8, color: COLORS.champagne }}>· filtrato {languageFilter.toUpperCase()}</span>}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 10, color: COLORS.mist, textTransform: "uppercase", letterSpacing: "0.08em" }}>Lista di:</span>
+          {SIZE_OPTIONS.map((n) => (
+            <button key={n} onClick={() => setSize(n)}
+              style={{
+                padding: "4px 10px",
+                background: size === n ? COLORS.champagne : "transparent",
+                color: size === n ? COLORS.obsidian : COLORS.fog,
+                border: `1px solid ${size === n ? COLORS.champagne : COLORS.steel}`,
+                borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: size === n ? 700 : 500,
+                fontFamily: FONTS.mono,
+              }}>{n}</button>
+          ))}
+        </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <UnderperformersColumn language="ita" label="ITA" flag="🇮🇹" periodType={periodType} periodId={periodId} onExcluded={onExcluded} />
-        <UnderperformersColumn language="eng" label="ENG" flag="🇬🇧" periodType={periodType} periodId={periodId} onExcluded={onExcluded} />
+      <div style={{ display: "grid", gridTemplateColumns: cols, gap: 12 }}>
+        {showIta && <UnderperformersColumn language="ita" label="ITA" flag="🇮🇹" periodType={periodType} periodId={periodId} size={size} onExcluded={onExcluded} onIgnored={onIgnored} />}
+        {showEng && <UnderperformersColumn language="eng" label="ENG" flag="🇬🇧" periodType={periodType} periodId={periodId} size={size} onExcluded={onExcluded} onIgnored={onIgnored} />}
       </div>
       <div style={{ fontSize: 10, color: COLORS.mist, marginTop: 8 }}>
         Criterio: score corrente più basso E almeno 2 dei 3 periodi precedenti sotto tier "Average". I quadratini mostrano gli ultimi 3 tier (colore = tier).
       </div>
+      <IgnoredPanel onChange={onIgnored} />
     </div>
   );
 }
@@ -1062,6 +1237,7 @@ export default function OperationalLeaderboardPage() {
           periodType={periodType}
           periodId={periodId}
           canExclude={canExclude}
+          languageFilter={languageFilter}
           onExcluded={onExcluded}
         />
 

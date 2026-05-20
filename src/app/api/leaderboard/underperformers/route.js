@@ -27,11 +27,13 @@
  *     ]
  *   }
  */
+import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { computeUnderperformers } from "@/lib/leaderboard-history";
 
 const VALID_PERIOD_TYPES = ["monthly", "weekly", "quarterly"];
 const VALID_LANGUAGES = ["eng", "ita"];
+const IGNORED_KEY = "underperformers:ignored";
 
 export async function GET(request) {
   const az = await authorize(CAPABILITIES.SEED);
@@ -55,6 +57,9 @@ export async function GET(request) {
     return Response.json({ error: `language must be one of: ${VALID_LANGUAGES.join(", ")}` }, { status: 400 });
   }
 
+  const ignoredObj = (await kv.get(IGNORED_KEY)) || {};
+  const ignoredSet = new Set(Object.keys(ignoredObj));
+
   const underperformers = await computeUnderperformers({
     periodType: period_type,
     currentPeriodId: period_id,
@@ -62,6 +67,7 @@ export async function GET(request) {
     minChronic: min_chronic,
     limit,
     languageFilter: language || null,
+    ignoredSet,
   });
 
   return Response.json({
@@ -71,6 +77,7 @@ export async function GET(request) {
     min_chronic,
     language: language || null,
     count: underperformers.length,
+    ignored_count: ignoredSet.size,
     underperformers,
   });
 }
