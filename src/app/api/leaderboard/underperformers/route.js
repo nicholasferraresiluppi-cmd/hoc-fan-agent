@@ -60,7 +60,7 @@ export async function GET(request) {
   const ignoredObj = (await kv.get(IGNORED_KEY)) || {};
   const ignoredSet = new Set(Object.keys(ignoredObj));
 
-  const underperformers = await computeUnderperformers({
+  const result = await computeUnderperformers({
     periodType: period_type,
     currentPeriodId: period_id,
     lookback,
@@ -76,8 +76,11 @@ export async function GET(request) {
     lookback,
     min_chronic,
     language: language || null,
-    count: underperformers.length,
+    count: result.list.length,
+    total_candidates: result.total_candidates,
+    lookback_total: result.lookback_total,
+    chronicity_available: result.chronicity_available,
     ignored_count: ignoredSet.size,
-    underperformers,
+    underperformers: result.list,
   });
 }

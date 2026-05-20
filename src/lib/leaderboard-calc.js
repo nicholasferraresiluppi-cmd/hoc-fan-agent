@@ -273,6 +273,14 @@ export function calculateScores(records, mode = "withoutClockIn", settings = {},
     if (!groupMeans) {
       return { ...r, score: 0, tier: assignTier(0, tiers), _excluded_reason: "no_group_data" };
     }
+    // v11: marca come "inattivo" gli operatori con tutti i KPI di volume a zero.
+    // Sono operatori che esistono nei dati ma non hanno operato nel periodo
+    // (es. fan_chatted=0 + sales=0 + messaggi=0). Li distinguiamo da chi
+    // ha operato ma ha tutti i KPI di efficienza sotto media (score basso ma >0).
+    const totalActivity = (r.direct_messages_sent || 0) + (r.fans_chatted || 0) + (r.sales || 0);
+    if (totalActivity === 0) {
+      return { ...r, score: 0, tier: assignTier(0, tiers), _inactive: true };
+    }
     let score = 0;
     const points = {};
     for (const [kpi, weight] of Object.entries(weights)) {

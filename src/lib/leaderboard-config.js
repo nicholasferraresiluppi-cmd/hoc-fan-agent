@@ -51,13 +51,16 @@ export const KPI_WEIGHTS = {
  * Diversi dai 5 leghe Bronze/Silver/Gold/Platinum/Diamond della Training
  * leaderboard — sono due sistemi paralleli per due dimensioni diverse.
  */
+// v11: max esteso ai frazionari per chiudere il gap (score=50.5 ora cade in
+// Critical invece che restare null). calculateScores arrotonda a 2 decimali
+// quindi .99 è la massima granularità possibile.
 export const SCORE_TIERS = [
-  { label: "Critical", min: 0,  max: 50,  color: "#D44545" },
-  { label: "Weak",     min: 51, max: 60,  color: "#E76F51" },
-  { label: "Average",  min: 61, max: 70,  color: "#B89158" },
-  { label: "Good",     min: 71, max: 80,  color: "#D4AF7A" },
-  { label: "Strong",   min: 81, max: 90,  color: "#3FB97E" },
-  { label: "Elite",    min: 91, max: 100, color: "#4F8CCB" },
+  { label: "Critical", min: 0,  max: 50.99, color: "#D44545" },
+  { label: "Weak",     min: 51, max: 60.99, color: "#E76F51" },
+  { label: "Average",  min: 61, max: 70.99, color: "#B89158" },
+  { label: "Good",     min: 71, max: 80.99, color: "#D4AF7A" },
+  { label: "Strong",   min: 81, max: 90.99, color: "#3FB97E" },
+  { label: "Elite",    min: 91, max: 100,   color: "#4F8CCB" },
 ];
 
 /**

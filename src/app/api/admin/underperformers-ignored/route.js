@@ -28,6 +28,7 @@
  */
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { logAuditAction } from "@/lib/audit-log";
 
 const KEY = "underperformers:ignored";
 
@@ -53,12 +54,20 @@ export async function POST(request) {
 
   const name = employee.trim();
   const ignored = (await kv.get(KEY)) || {};
+  const prev = ignored[name] || null;
   ignored[name] = {
     ignored_by: az.userId,
     ignored_at: Date.now(),
     note: typeof note === "string" ? note.trim() : "",
   };
   await kv.set(KEY, ignored);
+
+  await logAuditAction({
+    action: prev ? "ignored.update" : "ignored.add",
+    target: name,
+    by: az.userId,
+    meta: { note: ignored[name].note, previous: prev },
+  });
 
   return Response.json({ ok: true, employee: name, entry: ignored[name], total: Object.keys(ignored).length });
 }
@@ -74,7 +83,16 @@ export async function DELETE(request) {
   const ignored = (await kv.get(KEY)) || {};
   if (!(employee in ignored)) return Response.json({ error: "employee not in ignore list" }, { status: 404 });
 
+  const removed = ignored[employee];
   delete ignored[employee];
   await kv.set(KEY, ignored);
+
+  await logAuditAction({
+    action: "ignored.remove",
+    target: employee,
+    by: az.userId,
+    meta: { removed_entry: removed },
+  });
+
   return Response.json({ ok: true, removed: employee, total: Object.keys(ignored).length });
 }
