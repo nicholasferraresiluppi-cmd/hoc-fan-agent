@@ -31,6 +31,7 @@ import { auth } from "@clerk/nextjs/server";
 import { buildLeaderboard } from "@/lib/leaderboard-calc";
 import { loadSettings } from "@/app/api/admin/leaderboard-settings/route";
 import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
+import { loadGroupLanguages } from "@/app/api/admin/group-languages/route";
 
 const VALID_CATEGORIES = ["Big", "Medium", "Small", "Uncategorized"];
 const VALID_LANGUAGES = ["eng", "ita", "none"];
@@ -172,14 +173,16 @@ export async function GET(request) {
     );
   }
 
-  // Carica settings dinamici, categorie Group e denylist manuale in parallelo
+  // Carica settings dinamici, categorie Group, override lingua e denylist manuale in parallelo
   let settings;
   let categories = {};
+  let languageOverrides = {};
   let manualExclusions = {};
   try {
-    const [loaded, cats, excl] = await Promise.all([
+    const [loaded, cats, langs, excl] = await Promise.all([
       loadSettings(),
       loadGroupCategories(),
+      loadGroupLanguages(),
       kv.get(EXCLUSIONS_KEY),
     ]);
     settings = {
@@ -188,11 +191,13 @@ export async function GET(request) {
       tiers: loaded.tiers,
     };
     categories = cats || {};
+    languageOverrides = langs || {};
     manualExclusions = excl || {};
   } catch (e) {
-    console.error("loadSettings/categories/exclusions error, falling back to defaults:", e);
+    console.error("loadSettings/categories/languages/exclusions error, falling back to defaults:", e);
     settings = {};
     categories = {};
+    languageOverrides = {};
     manualExclusions = {};
   }
 
@@ -217,8 +222,14 @@ export async function GET(request) {
   const eligibleForAggregates = ranking.filter((r) => !r._excluded_reason && r.score !== null && r.score > 0);
   const creatorAggregates = buildCreatorAggregates(eligibleForAggregates);
 
-  // Decora ogni record con la categoria del proprio Group + creator_impact
-  ranking = ranking.map((r) => decorateCreatorImpact({ ...r, category: categories[r.group] || null }, creatorAggregates));
+  // Decora ogni record con la categoria del proprio Group + creator_impact.
+  // Applica override lingua manuale (KV group_languages) PRIMA della decorazione
+  // creator: l'override sostituisce la detection regex automatica.
+  ranking = ranking.map((r) => {
+    const langOverride = languageOverrides[r.group];
+    const language = langOverride || r.language || null;
+    return decorateCreatorImpact({ ...r, category: categories[r.group] || null, language }, creatorAggregates);
+  });
 
   // Counts per i filtri (lingua/categoria) calcolati su TUTTI gli eligible
   // PRE-filtri di vista — così le pill filtro mostrano sempre il totale

@@ -70,6 +70,16 @@ async function loadExclusions() {
 }
 
 /**
+ * Carica gli override lingua manuali da KV (con cache).
+ */
+async function loadLanguageOverrides() {
+  const cached = cacheGet("_lang_overrides");
+  if (cached !== null) return cached;
+  const v = (await kv.get("group_languages")) || {};
+  return cacheSet("_lang_overrides", v);
+}
+
+/**
  * Costruisce la classifica di un periodo (con cache).
  */
 async function buildRankingForPeriod(periodType, periodId) {
@@ -78,8 +88,16 @@ async function buildRankingForPeriod(periodType, periodId) {
   if (cached) return cached;
   const records = await loadPeriodRecords(periodType, periodId);
   if (!records || records.length === 0) return cacheSet(key, { ranking: [], groupAverages: {} });
-  const exclusions = await loadExclusions();
+  const [exclusions, langOverrides] = await Promise.all([loadExclusions(), loadLanguageOverrides()]);
   const result = buildLeaderboard(records, "withoutClockIn", {}, exclusions);
+  // Applica override lingua manuali (KV group_languages) — sovrascrive la
+  // detection regex automatica per i Group senza marker nel nome.
+  if (langOverrides && Object.keys(langOverrides).length > 0) {
+    result.ranking = result.ranking.map((r) => {
+      const o = langOverrides[r.group];
+      return o ? { ...r, language: o } : r;
+    });
+  }
   return cacheSet(key, result);
 }
 
