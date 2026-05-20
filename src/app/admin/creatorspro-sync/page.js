@@ -35,28 +35,62 @@ export default function CreatorsProSyncPage() {
 
   const monthlyOpts = useMemo(() => MonthlyOptions(12), []);
 
+  const [syncPhase, setSyncPhase] = useState("");
+  const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0 });
+
+  async function callSync(payload) {
+    const res = await fetch("/api/admin/creatorspro-sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const d = await res.json();
+    if (!res.ok || d.error) throw new Error(d.error + (d.reason ? " — " + d.reason : ""));
+    return d;
+  }
+
   async function runSync() {
-    if (!confirm(`Sincronizzare CreatorsPro per ${periodId}?\n\nL'operazione richiede 30-120 secondi e sovrascrive i dati esistenti del periodo. Non chiudere la tab.`)) return;
+    if (!confirm(`Sincronizzare CreatorsPro per ${periodId}?\n\nL'operazione fa più chiamate sequenziali (~3-5 min totali per un mese). Non chiudere la tab.`)) return;
     setSyncing(true);
     setSyncError("");
     setSyncResult(null);
+    setSyncPhase("refdata");
+    setSyncProgress({ current: 0, total: 0 });
     try {
-      const res = await fetch("/api/admin/creatorspro-sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ period_id: periodId }),
-      });
-      const d = await res.json();
-      if (!res.ok || d.error) {
-        setSyncError(d.error || "Errore sync");
-        if (d.reason) setSyncError((s) => s + " — " + d.reason);
+      // Step 1: refdata
+      await callSync({ action: "refdata" });
+
+      // Step 2: prepare (fetch stub list)
+      setSyncPhase("preparing");
+      const prep = await callSync({ action: "prepare", period_id: periodId });
+      const totalWages = prep.total || 0;
+      setSyncProgress({ current: 0, total: totalWages });
+      if (totalWages === 0) {
+        setSyncPhase("nothing-to-sync");
+        const fin = await callSync({ action: "finalize", period_id: periodId });
+        setSyncResult(fin);
       } else {
-        setSyncResult(d);
-        await mutate("/api/admin/creatorspro-sync");
-        await mutate("/api/admin/creatorspro-mapping");
+        // Step 3: loop batch
+        let offset = 0;
+        const BATCH = 50;
+        while (offset < totalWages) {
+          setSyncPhase(`batch ${Math.floor(offset / BATCH) + 1}/${Math.ceil(totalWages / BATCH)}`);
+          const r = await callSync({ action: "batch", period_id: periodId, offset, batch_size: BATCH });
+          offset = r.next_offset;
+          setSyncProgress({ current: offset, total: totalWages });
+          if (r.done) break;
+        }
+        // Step 4: finalize
+        setSyncPhase("finalizing");
+        const fin = await callSync({ action: "finalize", period_id: periodId });
+        setSyncResult(fin);
       }
+      await mutate("/api/admin/creatorspro-sync");
+      await mutate("/api/admin/creatorspro-mapping");
+      setSyncPhase("done");
     } catch (e) {
-      setSyncError(String(e));
+      setSyncError(String(e?.message || e));
+      setSyncPhase("error");
     } finally {
       setSyncing(false);
     }
@@ -173,7 +207,7 @@ export default function CreatorsProSyncPage() {
             {monthlyOpts.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
           <button style={styles.btn} onClick={runSync} disabled={syncing}>
-            {syncing ? "🔄 Sync in corso… (può richiedere 30-120s)" : "🔄 Sincronizza periodo selezionato"}
+            {syncing ? `🔄 ${syncPhase || "Sync"}${syncProgress.total > 0 ? ` · ${syncProgress.current}/${syncProgress.total}` : ""}` : "🔄 Sincronizza periodo selezionato"}
           </button>
           <p style={{ marginTop: 10, fontSize: 11, color: COLORS.mist }}>
             Sovrascrive i dati CP esistenti per il periodo. Non tocca i dati Infloww.

@@ -1,38 +1,37 @@
 /**
- * HOC Fan Agent — CreatorsPro sync orchestrator + storage.
+ * HOC Fan Agent — CreatorsPro sync orchestrator (v2 incrementale).
  *
- * Coordina fetch + normalizzazione + scrittura su KV. Lo storage KV è:
- *   cp:wages:{period_id}       → array di wage normalizzati con shifts[]
- *   cp:members                  → mappa { cp_member_id: { id, firstName, lastName, username } }
- *   cp:groups                   → mappa { cp_group_id: { id, name, parentId } }
- *   cp:intervals                → array intervalli /timeline/intervals
- *   cp:member_mapping           → mappa { cp_member_id: employee_infloww_name }
- *   cp:_meta                    → { last_sync_at, last_sync_period, counts: { wages, members, ... } }
+ * v2: split in 2 fasi separate per stare sotto Vercel Hobby 60s limit.
  *
- * period_id usa il formato HOC Fan Agent ("2026-04" per monthly).
+ *  - syncRefdata()                    : members + groups + intervals (rapido)
+ *  - prepareSync({periodId})          : fetch lista stub + salva index su KV
+ *  - syncWageBatch({periodId, offset, batchSize}) : detail di un chunk + append KV
+ *  - finalizeSync({periodId})         : auto-match + scrive meta + audit
  *
- * Sync flow:
- *   1. login
- *   2. fetch members + groups + intervals (overwrite KV)
- *   3. fetch all wages for period (paginate + detail per shifts)
- *   4. normalizza ogni wage in shape utile per la leaderboard
- *   5. tenta auto-mapping member↔employee Infloww (basato su nome)
- *   6. salva tutto in KV + aggiorna meta
+ * Il client UI (admin page) orchestra: refdata → prepare → loop batch → finalize.
+ *
+ * Storage KV (invariato):
+ *   cp:wages:{period_id}   → array wage normalizzati con shifts[]
+ *   cp:members, cp:groups, cp:intervals, cp:member_mapping, cp:_meta
+ *
+ * Stato sync in corso:
+ *   cp:sync:state:{period_id} → { stubs: [{id, member_id, ...}], total, started_at }
  */
 import { kv } from "@vercel/kv";
 import {
   fetchMembers,
   fetchGroups,
   fetchIntervals,
-  fetchAllWagesForPeriod,
+  fetchAllWageStubs,
+  fetchWageDetailBatch,
   bucketizeIntervalFromHour,
 } from "./creatorspro-api";
 
-const TTL_WAGES = 90 * 24 * 3600; // 90 giorni
-const TTL_REFDATA = 7 * 24 * 3600; // 7 giorni per members/groups/intervals
+const TTL_WAGES = 90 * 24 * 3600;
+const TTL_REFDATA = 7 * 24 * 3600;
+const TTL_SYNC_STATE = 6 * 3600; // 6 ore — un sync deve completarsi entro
 
 function monthBoundsIso(periodId) {
-  // periodId = "YYYY-MM"
   const m = periodId.match(/^(\d{4})-(\d{2})$/);
   if (!m) throw new Error(`period_id invalido (atteso YYYY-MM): ${periodId}`);
   const year = parseInt(m[1], 10);
@@ -42,10 +41,6 @@ function monthBoundsIso(periodId) {
   return { startedAt: start.toISOString(), endedAt: end.toISOString() };
 }
 
-/**
- * Normalizza un wage CP nella shape che la leaderboard può consumare
- * senza dover sapere lo schema CP completo.
- */
 function normalizeWage(wage) {
   const info = wage?.info || {};
   const shifts = Array.isArray(wage?.shifts) ? wage.shifts : [];
@@ -80,129 +75,154 @@ function normalizeWage(wage) {
 }
 
 /**
- * Auto-match member CP ↔ employee Infloww. Strategie in ordine:
- *   1. match esatto (firstName + " " + lastName) vs employee.trim()
- *   2. match case-insensitive
- *   3. match invertito (lastName firstName) — alcune agenzie scrivono cognome-nome
- * Restituisce { mapping: {cp_id: infloww_name}, unmatched_cp: [...] }
+ * Step 1: sync reference data (members, groups, intervals). Veloce.
  */
-async function autoMatchMembers(cpMembers) {
-  // Recupera tutti i nomi Infloww da tutti i periodi disponibili
-  const periodsRaw = (await kv.zrange("ops_kpi:imports", 0, -1, { rev: true })) || [];
-  const monthlyPeriods = periodsRaw.filter((p) => typeof p === "string" && p.startsWith("monthly:")).slice(0, 6);
-  const infwNames = new Set();
-  for (const p of monthlyPeriods) {
-    const periodId = p.replace("monthly:", "");
-    const recs = await kv.get(`ops_kpi:monthly:${periodId}`);
-    if (Array.isArray(recs)) {
-      for (const r of recs) {
-        if (r.employee && typeof r.employee === "string") {
-          infwNames.add(r.employee.trim());
-        }
-      }
-    }
-  }
-  const infwArr = Array.from(infwNames);
-  const infwLower = new Map(infwArr.map((n) => [n.toLowerCase(), n]));
-
-  // Preserva mapping esistenti
-  const existing = (await kv.get("cp:member_mapping")) || {};
-  const mapping = { ...existing };
-  const unmatched = [];
-
-  for (const m of cpMembers) {
-    if (mapping[m.id]) continue; // già mappato manualmente
-    const full = `${m.firstName || ""} ${m.lastName || ""}`.trim();
-    const fullRev = `${m.lastName || ""} ${m.firstName || ""}`.trim();
-    let hit = null;
-    if (infwLower.has(full.toLowerCase())) hit = infwLower.get(full.toLowerCase());
-    else if (infwLower.has(fullRev.toLowerCase())) hit = infwLower.get(fullRev.toLowerCase());
-    if (hit) {
-      mapping[m.id] = hit;
-    } else {
-      unmatched.push({ cp_id: m.id, cp_name: full, username: m.username });
-    }
-  }
-  return { mapping, unmatched };
-}
-
-/**
- * Sync entrypoint — chiamato dal route admin.
- *
- * @param {object} opts
- * @param {string} opts.periodId  es. "2026-04"
- * @param {function} [opts.onProgress]  ({phase, current, total, message})
- */
-export async function syncPeriod({ periodId, onProgress = () => {} }) {
-  const startTs = Date.now();
-  const { startedAt, endedAt } = monthBoundsIso(periodId);
-
-  // 1. Reference data
-  onProgress({ phase: "refdata", message: "fetching members/groups/intervals" });
+export async function syncRefdata() {
   const [members, groups, intervals] = await Promise.all([
     fetchMembers(),
     fetchGroups(),
     fetchIntervals(),
   ]);
-
   const membersMap = {};
   for (const m of members) {
-    membersMap[m.id] = {
-      id: m.id,
-      firstName: m.firstName,
-      lastName: m.lastName,
-      username: m.username,
-    };
+    membersMap[m.id] = { id: m.id, firstName: m.firstName, lastName: m.lastName, username: m.username };
   }
-  // Groups può essere hierarchical: appiattisco
   const groupsMap = {};
-  function flattenGroups(arr, parentId = null) {
+  function flatten(arr, parentId = null) {
     for (const g of arr || []) {
       groupsMap[g.id] = { id: g.id, name: g.name, parentId };
-      if (Array.isArray(g.childrens)) flattenGroups(g.childrens, g.id);
+      if (Array.isArray(g.childrens)) flatten(g.childrens, g.id);
     }
   }
-  flattenGroups(groups);
-
+  flatten(groups);
   await kv.set("cp:members", membersMap, { ex: TTL_REFDATA });
   await kv.set("cp:groups", groupsMap, { ex: TTL_REFDATA });
   await kv.set("cp:intervals", intervals, { ex: TTL_REFDATA });
+  return {
+    members: members.length,
+    groups: Object.keys(groupsMap).length,
+    intervals: intervals.length,
+  };
+}
 
-  // 2. Wages with shifts
-  onProgress({ phase: "wages", message: `fetching wages for ${periodId}` });
-  const { wages: rawWages, count: rawCount } = await fetchAllWagesForPeriod({
-    startedAt, endedAt,
-    onProgress: (p) => onProgress({ phase: p.phase, current: p.current, total: p.total }),
-  });
+/**
+ * Step 2: prepare — fetcha la lista wage stub e salva l'indice in KV.
+ * Non fetcha shifts. Tipicamente ~10-15s.
+ */
+export async function prepareSync({ periodId }) {
+  const { startedAt, endedAt } = monthBoundsIso(periodId);
+  const { stubs, totalCount } = await fetchAllWageStubs({ startedAt, endedAt });
+  // Salvo solo id+member essential per ridurre dimensione KV value
+  const idxStubs = stubs.map((w) => ({
+    id: w?.info?.id,
+    member_id: w?.info?.memberId,
+    member_name: w?.info?.memberName,
+    status: w?.info?.status,
+  })).filter((s) => s.id);
+  await kv.set(`cp:sync:state:${periodId}`, {
+    stubs: idxStubs,
+    total: idxStubs.length,
+    raw_total: totalCount,
+    started_at: Date.now(),
+  }, { ex: TTL_SYNC_STATE });
+  // Reset wage list per il periodo
+  await kv.set(`cp:wages:${periodId}`, [], { ex: TTL_WAGES });
+  return { total: idxStubs.length, raw_total: totalCount };
+}
 
-  const normalized = rawWages
+/**
+ * Step 3 (loop): sync di un batch di wage detail. Salva append su cp:wages:{periodId}.
+ * Ritorna progress + flag done.
+ */
+export async function syncWageBatch({ periodId, offset = 0, batchSize = 50 }) {
+  const state = await kv.get(`cp:sync:state:${periodId}`);
+  if (!state || !Array.isArray(state.stubs)) {
+    throw new Error(`Nessuno stato sync per ${periodId}. Chiama prima prepareSync.`);
+  }
+  const { stubs, total } = state;
+  if (offset >= total) {
+    return { done: true, processed: total, total, next_offset: total };
+  }
+  const sliceStubs = stubs.slice(offset, offset + batchSize);
+  const ids = sliceStubs.map((s) => s.id).filter(Boolean);
+  const details = await fetchWageDetailBatch(ids);
+  const normalized = details
     .filter((w) => !w?._error && w?.info?.id)
     .map(normalizeWage);
 
-  await kv.set(`cp:wages:${periodId}`, normalized, { ex: TTL_WAGES });
+  // Append a cp:wages:{periodId}
+  const existing = (await kv.get(`cp:wages:${periodId}`)) || [];
+  const merged = [...existing, ...normalized];
+  await kv.set(`cp:wages:${periodId}`, merged, { ex: TTL_WAGES });
 
-  // 3. Auto-match member ↔ infloww employee
-  onProgress({ phase: "matching", message: "auto-match members" });
-  const { mapping, unmatched } = await autoMatchMembers(members);
+  const newOffset = offset + sliceStubs.length;
+  return {
+    done: newOffset >= total,
+    processed: newOffset,
+    total,
+    next_offset: newOffset,
+    batch_normalized: normalized.length,
+    batch_errors: details.filter((d) => d?._error).length,
+  };
+}
+
+/**
+ * Step 4: finalize — auto-match members, scrive meta, cleanup state.
+ */
+export async function finalizeSync({ periodId }) {
+  const [state, wages, members] = await Promise.all([
+    kv.get(`cp:sync:state:${periodId}`),
+    kv.get(`cp:wages:${periodId}`),
+    kv.get("cp:members"),
+  ]);
+  if (!state) throw new Error(`Stato sync mancante per ${periodId}`);
+  const cpMembers = Object.values(members || {});
+
+  // Auto-match
+  const periodsRaw = (await kv.zrange("ops_kpi:imports", 0, -1, { rev: true })) || [];
+  const monthlyPeriods = periodsRaw.filter((p) => typeof p === "string" && p.startsWith("monthly:")).slice(0, 6);
+  const infwNames = new Set();
+  for (const p of monthlyPeriods) {
+    const pid = p.replace("monthly:", "");
+    const recs = await kv.get(`ops_kpi:monthly:${pid}`);
+    if (Array.isArray(recs)) {
+      for (const r of recs) if (r.employee && typeof r.employee === "string") infwNames.add(r.employee.trim());
+    }
+  }
+  const infwLower = new Map(Array.from(infwNames).map((n) => [n.toLowerCase(), n]));
+  const existingMapping = (await kv.get("cp:member_mapping")) || {};
+  const mapping = { ...existingMapping };
+  const unmatched = [];
+  for (const m of cpMembers) {
+    if (mapping[m.id]) continue;
+    const full = `${m.firstName || ""} ${m.lastName || ""}`.trim();
+    const fullRev = `${m.lastName || ""} ${m.firstName || ""}`.trim();
+    let hit = null;
+    if (infwLower.has(full.toLowerCase())) hit = infwLower.get(full.toLowerCase());
+    else if (infwLower.has(fullRev.toLowerCase())) hit = infwLower.get(fullRev.toLowerCase());
+    if (hit) mapping[m.id] = hit;
+    else unmatched.push({ cp_id: m.id, cp_name: full, username: m.username });
+  }
   await kv.set("cp:member_mapping", mapping);
 
-  // 4. Meta
+  const wagesArr = Array.isArray(wages) ? wages : [];
   const meta = {
     last_sync_at: Date.now(),
     last_sync_period: periodId,
-    duration_ms: Date.now() - startTs,
+    duration_ms: Date.now() - state.started_at,
     counts: {
-      members: members.length,
-      groups: Object.keys(groupsMap).length,
-      intervals: intervals.length,
-      wages_raw: rawCount,
-      wages_normalized: normalized.length,
-      shifts_total: normalized.reduce((a, w) => a + (w.shifts?.length || 0), 0),
+      members: cpMembers.length,
+      groups: Object.keys((await kv.get("cp:groups")) || {}).length,
+      intervals: ((await kv.get("cp:intervals")) || []).length,
+      wages_raw: state.raw_total || wagesArr.length,
+      wages_normalized: wagesArr.length,
+      shifts_total: wagesArr.reduce((a, w) => a + (w.shifts?.length || 0), 0),
       mapping_total: Object.keys(mapping).length,
       mapping_unmatched: unmatched.length,
     },
   };
   await kv.set("cp:_meta", meta);
+  await kv.del(`cp:sync:state:${periodId}`);
 
   return { meta, unmatched_sample: unmatched.slice(0, 20) };
 }
@@ -223,17 +243,11 @@ export async function getSyncStatus() {
   };
 }
 
-/**
- * Mapping override manuale (admin).
- */
 export async function setMemberMapping(cpMemberId, inflowwName) {
   if (!cpMemberId) throw new Error("cpMemberId required");
   const current = (await kv.get("cp:member_mapping")) || {};
-  if (!inflowwName) {
-    delete current[cpMemberId];
-  } else {
-    current[cpMemberId] = inflowwName.trim();
-  }
+  if (!inflowwName) delete current[cpMemberId];
+  else current[cpMemberId] = inflowwName.trim();
   await kv.set("cp:member_mapping", current);
   return current;
 }

@@ -1,27 +1,16 @@
 /**
- * HOC Fan Agent — CreatorsPro API client.
+ * HOC Fan Agent — CreatorsPro API client (v2).
  *
- * Wrapper server-only per chiamare api.houseofcreators.com con bearer
- * token rolling. Auth via email/password (env vars), token cacheato in
- * memoria del worker. Niente persistenza KV del token: rifare login ogni
- * cold start è ok (l'API è veloce).
- *
- * Capabilities richieste sull'account bot CreatorsPro:
- *   - sellersWage.manageWages
- *   - sellersWage.manageAlerts
- *   - timeline.manageShifts
- *
- * Env vars richieste:
- *   CREATORSPRO_API_BASE_URL  (default: https://api.houseofcreators.com)
- *   CREATORSPRO_BOT_EMAIL
- *   CREATORSPRO_BOT_PASSWORD
- *
- * Niente di tutto questo è esposto al client browser — server-only.
+ * v2: paginazione + detail parallelizzati. PAGE_LIMIT ridotto a 25 perché
+ * l'API CP timeout-a su limit=100. Aggiunta funzione fetchWageDetailBatch
+ * per chunking server-side che resta sotto Vercel Hobby 60s limit.
  */
 
 const DEFAULT_BASE = "https://api.houseofcreators.com";
+const PAGE_LIMIT = 25;
+const DETAIL_CONCURRENCY = 20;
+const LIST_PAGES_CONCURRENCY = 5;
 
-// Cache token in memoria del worker, refresh in caso 401
 let _tokenCache = { token: null, expiresAt: 0 };
 
 function getEnv() {
@@ -52,13 +41,11 @@ async function login(force = false) {
   const data = await res.json();
   const token = data?.data?.access_token;
   if (!token) throw new Error("CP login: no access_token in response");
-  // Token JWT RSA — non sappiamo la TTL esatta. Cachiamo per 50 min e
-  // facciamo refresh proattivo prima della scadenza tipica (1h).
   _tokenCache = { token, expiresAt: now + 50 * 60 * 1000 };
   return token;
 }
 
-async function apiFetch(path, { method = "GET", query = null, body = null, retries = 1 } = {}) {
+async function apiFetch(path, { method = "GET", query = null, body = null, retries = 1, timeoutMs = 30000 } = {}) {
   const { baseUrl } = getEnv();
   const token = await login();
   const url = new URL(`${baseUrl}${path}`);
@@ -67,18 +54,25 @@ async function apiFetch(path, { method = "GET", query = null, body = null, retri
       if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
     }
   }
-  const res = await fetch(url.toString(), {
-    method,
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      ...(body ? { "Content-Type": "application/json" } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const ctrl = new AbortController();
+  const tt = setTimeout(() => ctrl.abort(), timeoutMs);
+  let res;
+  try {
+    res = await fetch(url.toString(), {
+      method,
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        ...(body ? { "Content-Type": "application/json" } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ctrl.signal,
+    });
+  } finally {
+    clearTimeout(tt);
+  }
   if (res.status === 401 && retries > 0) {
-    // Token scaduto, force refresh + retry
     await login(true);
-    return apiFetch(path, { method, query, body, retries: retries - 1 });
+    return apiFetch(path, { method, query, body, retries: retries - 1, timeoutMs });
   }
   const text = await res.text();
   let data;
@@ -109,101 +103,92 @@ export async function fetchIntervals() {
   return r?.data || [];
 }
 
-/**
- * Lista wage paginata. Date in ISO completo (es. "2026-05-01T00:00:00.000Z").
- * Ritorna { data: [...], pagination: {...} }
- */
-export async function fetchWages({ startedAt, endedAt, page = 1, limit = 50, status, memberId, groupId }) {
+export async function fetchWages({ startedAt, endedAt, page = 1, limit = PAGE_LIMIT, status, memberId, groupId }) {
   if (!startedAt || !endedAt) throw new Error("startedAt + endedAt required");
   return apiFetch("/v1/sellers-wage/wages", {
     query: { startedAt, endedAt, page, limit, status, memberId, groupId },
   });
 }
 
-/**
- * Dettaglio singolo wage — popola shifts[] (la lista paginata non li ha).
- */
 export async function fetchWageDetail(wageId) {
   const r = await apiFetch(`/v1/sellers-wage/wages/${encodeURIComponent(wageId)}`);
   return r?.data || r;
 }
 
 export async function fetchDistinctMembersCount({ startedAt, endedAt }) {
-  const r = await apiFetch("/v1/sellers-wage/distinct-members-count", {
-    query: { startedAt, endedAt },
-  });
+  const r = await apiFetch("/v1/sellers-wage/distinct-members-count", { query: { startedAt, endedAt } });
   return r?.data || r;
 }
 
 export async function fetchWagesStatusCounts({ startedAt, endedAt, memberId, groupId }) {
-  const r = await apiFetch("/v1/sellers-wage/wages-status-counts", {
-    query: { startedAt, endedAt, memberId, groupId },
-  });
+  const r = await apiFetch("/v1/sellers-wage/wages-status-counts", { query: { startedAt, endedAt, memberId, groupId } });
   return r?.data || r;
 }
 
 /* ============================================================
- * Helpers di alto livello
+ * High-level helpers
  * ============================================================ */
 
 /**
- * Fetcha TUTTI i wage di un periodo (paginate fino a esaurimento) e per
- * ognuno carica il detail (per avere shifts[]). Concurrency = 5.
+ * Fetcha tutte le pagine LISTA (solo stub, niente shifts).
+ * Paginazione parallelizzata: prima pagina seriale per scoprire totalPages,
+ * poi tutte le restanti in parallelo a concurrency LIST_PAGES_CONCURRENCY.
  *
- * Attenzione: per un mese con 500+ wage può richiedere 60-120s. Pensato
- * per essere chiamato in route con maxDuration estesa o in cron job.
- *
- * @param {object} opts
- * @param {string} opts.startedAt  ISO timestamp (es. "2026-04-01T00:00:00.000Z")
- * @param {string} opts.endedAt
- * @param {function} [opts.onProgress]  callback({phase, current, total})
+ * Su un mese tipico (~554 wage / PAGE_LIMIT=25 = ~22 pagine) richiede
+ * ~10-15s totali — sicuramente sotto qualsiasi function timeout.
  */
-export async function fetchAllWagesForPeriod({ startedAt, endedAt, onProgress = null }) {
-  const PAGE_LIMIT = 100;
-  const DETAIL_CONCURRENCY = 5;
+export async function fetchAllWageStubs({ startedAt, endedAt }) {
+  const first = await fetchWages({ startedAt, endedAt, page: 1, limit: PAGE_LIMIT });
+  const stubs = [...(first.data || [])];
+  const pagination = first.pagination || {};
+  const totalCount = pagination.dataCount || stubs.length;
+  const pageCount = pagination.pageCount || Math.ceil(totalCount / PAGE_LIMIT) || 1;
+  if (pageCount <= 1) return { stubs, totalCount };
 
-  // 1. Paginate list
-  let page = 1;
-  let allWageStubs = [];
-  while (true) {
-    const r = await fetchWages({ startedAt, endedAt, page, limit: PAGE_LIMIT });
-    const batch = r.data || [];
-    allWageStubs.push(...batch);
-    const pg = r.pagination || {};
-    if (onProgress) onProgress({ phase: "list", current: allWageStubs.length, total: pg.dataCount || allWageStubs.length });
-    if (!pg.hasNextPage || batch.length === 0) break;
-    page++;
-    if (page > 50) break; // safety
-  }
-
-  // 2. Fetch details in parallel batches
-  const details = new Array(allWageStubs.length);
-  for (let i = 0; i < allWageStubs.length; i += DETAIL_CONCURRENCY) {
-    const slice = allWageStubs.slice(i, i + DETAIL_CONCURRENCY);
-    const ids = slice.map((w) => w?.info?.id).filter(Boolean);
-    const results = await Promise.all(ids.map((id) =>
-      fetchWageDetail(id).catch((e) => ({ _error: String(e?.message || e), _id: id }))
+  // Fetcha pagine 2..N in parallelo a chunks di LIST_PAGES_CONCURRENCY
+  const pages = [];
+  for (let p = 2; p <= pageCount; p++) pages.push(p);
+  const others = new Array(pages.length);
+  for (let i = 0; i < pages.length; i += LIST_PAGES_CONCURRENCY) {
+    const slice = pages.slice(i, i + LIST_PAGES_CONCURRENCY);
+    const results = await Promise.all(slice.map((p) =>
+      fetchWages({ startedAt, endedAt, page: p, limit: PAGE_LIMIT }).catch((e) => ({ data: [], _err: String(e?.message || e) }))
     ));
-    for (let j = 0; j < results.length; j++) {
-      details[i + j] = results[j];
-    }
-    if (onProgress) onProgress({ phase: "detail", current: i + slice.length, total: allWageStubs.length });
+    for (let j = 0; j < results.length; j++) others[i + j] = results[j];
   }
-
-  return { wages: details.filter(Boolean), count: details.filter((d) => !d?._error).length };
+  for (const r of others) {
+    if (r?.data) stubs.push(...r.data);
+  }
+  return { stubs, totalCount };
 }
 
 /**
- * Bucketizza un orario in fascia: After / Morning / Afternoon / Evening / Night.
- * Convenzioni (CET, ma usiamo l'ora UTC del timestamp che è quella già normalizzata):
+ * Fetcha detail per un BATCH di wage IDs. Parallelismo aggressivo
+ * (DETAIL_CONCURRENCY) per stare sotto il timeout.
+ *
+ * @returns {object[]} array di wage detail (o {_error, _id} se fallisce singolarmente)
+ */
+export async function fetchWageDetailBatch(wageIds) {
+  if (!Array.isArray(wageIds) || wageIds.length === 0) return [];
+  const out = new Array(wageIds.length);
+  for (let i = 0; i < wageIds.length; i += DETAIL_CONCURRENCY) {
+    const slice = wageIds.slice(i, i + DETAIL_CONCURRENCY);
+    const results = await Promise.all(slice.map((id) =>
+      fetchWageDetail(id).catch((e) => ({ _error: String(e?.message || e), _id: id }))
+    ));
+    for (let j = 0; j < results.length; j++) out[i + j] = results[j];
+  }
+  return out;
+}
+
+/**
+ * Bucketizza orario in fascia: After / Morning / Afternoon / Evening / Night.
+ * Convenzioni UTC:
  *   02-06 → After
  *   06-12 → Morning
  *   12-18 → Afternoon
  *   18-22 → Evening
  *   22-02 → Night
- *
- * Da rivedere se la convenzione HOC è diversa (puoi sovrascrivere con
- * /timeline/intervals.creators[] che ha già start/end per ogni shift).
  */
 export function bucketizeIntervalFromHour(isoTimestamp) {
   if (!isoTimestamp) return null;
@@ -214,5 +199,5 @@ export function bucketizeIntervalFromHour(isoTimestamp) {
   if (h >= 6 && h < 12) return "Morning";
   if (h >= 12 && h < 18) return "Afternoon";
   if (h >= 18 && h < 22) return "Evening";
-  return "Night"; // 22-02
+  return "Night";
 }
