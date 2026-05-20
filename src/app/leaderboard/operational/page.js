@@ -444,6 +444,71 @@ function HeroStat({ l, v, mean }) {
 }
 
 /* =================================================
+ * Hero — Impact su creator (panel sotto la card del #1)
+ * Mostra fino a 5 creator dell'operatore con barra % impatto.
+ * Per multi-creator i numeri sono stime equa (marker "~").
+ * ================================================= */
+
+function HeroCreatorImpact({ op }) {
+  if (!op?.creator_impact?.length) return null;
+  const items = op.creator_impact.slice(0, 5);
+  const maxPct = Math.max(...items.map((i) => i.share_pct || 0), 1);
+  const isMulti = (op.creators?.length || 0) > 1;
+  return (
+    <div style={{
+      background: COLORS.graphite,
+      border: `1px solid ${COLORS.charcoal}`,
+      borderRadius: 14,
+      padding: "18px 22px",
+      marginBottom: 22,
+    }}>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.12em" }}>
+          🎨 Impact su creator
+        </div>
+        <div style={{ fontSize: 12, color: COLORS.mist, marginTop: 4 }}>
+          {op.employee} ha lavorato su {op.creators?.length || 0} creator
+          {isMulti
+            ? " — le quote sono stime eque (marker ~). Per il dato esatto serve un breakdown operatore×creator che Infloww non fornisce."
+            : " — quote esatte."}
+        </div>
+      </div>
+      {items.map((it) => (
+        <div
+          key={it.creator}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1.4fr 1.6fr 70px 1.4fr",
+            gap: 16,
+            alignItems: "center",
+            padding: "10px 0",
+            borderTop: `1px solid ${COLORS.charcoal}88`,
+          }}
+        >
+          <div style={{ fontFamily: FONTS.display, fontSize: 14, fontWeight: 500 }}>{it.creator}</div>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.alabaster }}>
+            {it.estimated ? "~" : ""}{fmtCurrency(it.share_eur)}{" "}
+            <span style={{ color: COLORS.mist }}>/ {fmtCurrency(it.total_creator_sales)} tot</span>
+            <span style={{ color: COLORS.mist, marginLeft: 8 }}>· {it.share_purch ?? 0} purch</span>
+          </div>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 14, color: COLORS.champagne, fontWeight: 700, textAlign: "right" }}>
+            {it.estimated ? "~" : ""}{it.share_pct}%
+          </div>
+          <div style={{ height: 6, background: COLORS.charcoal, borderRadius: 999, overflow: "hidden" }}>
+            <div style={{
+              height: "100%",
+              background: COLORS.champagne,
+              width: `${Math.min(100, ((it.share_pct || 0) / maxPct) * 100)}%`,
+              transition: "width 0.3s",
+            }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* =================================================
  * Top4 cards (ranks 2-5)
  * ================================================= */
 
@@ -488,6 +553,27 @@ function Top4Card({ op, canExclude, onExcluded }) {
       <div style={{ height: 4, background: COLORS.charcoal, borderRadius: 999, overflow: "hidden" }}>
         <div style={{ height: "100%", background: tierColor, width: `${op.score || 0}%` }} />
       </div>
+      {op.top_creator && (
+        <div style={{
+          marginTop: 10, paddingTop: 8,
+          borderTop: `1px solid ${COLORS.charcoal}`,
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          fontSize: 11,
+        }}>
+          <span style={{ color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.06em", fontSize: 9 }}>Top creator</span>
+          <span style={{ color: COLORS.alabaster, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "60%" }} title={`${op.top_creator.creator}${op.top_creator.estimated ? " (stima equa)" : " (esatto)"}`}>
+            {op.top_creator.creator}
+            <span style={{ color: COLORS.champagne, marginLeft: 6 }}>
+              {op.top_creator.estimated ? "~" : ""}{op.top_creator.share_pct}%
+            </span>
+          </span>
+        </div>
+      )}
+      {op.creators?.length > 0 && !op.top_creator && (
+        <div style={{ marginTop: 10, fontSize: 11, color: COLORS.mist }}>
+          {op.creators.length} creator
+        </div>
+      )}
     </div>
   );
 }
@@ -499,8 +585,13 @@ function Top4Card({ op, canExclude, onExcluded }) {
 function StreamRow({ op, groupMeans, canExclude, onExcluded }) {
   const tierColor = TIER_COLORS[op.tier] || COLORS.alabaster;
   const cols = canExclude
-    ? "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 1fr 1fr 44px"
-    : "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 1fr 1fr";
+    ? "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 0.7fr 1fr 1fr 44px"
+    : "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 0.7fr 1fr 1fr";
+  const topCreatorTitle = op.top_creator
+    ? `Top creator: ${op.top_creator.creator} (${op.top_creator.estimated ? "stima ~" : "esatto"} ${op.top_creator.share_pct}%)`
+    : op.creators?.length > 0
+    ? `Creator: ${op.creators.join(", ")}`
+    : "Nessun creator associato";
   return (
     <div style={{
       display: "grid",
@@ -516,7 +607,7 @@ function StreamRow({ op, groupMeans, canExclude, onExcluded }) {
         {op.rank ? String(op.rank).padStart(2, "0") : "—"}
       </div>
       <Avatar name={op.employee} size={28} />
-      <div style={{ fontFamily: FONTS.display, fontSize: 14, fontWeight: 500 }}>{op.employee}</div>
+      <div style={{ fontFamily: FONTS.display, fontSize: 14, fontWeight: 500 }} title={topCreatorTitle}>{op.employee}</div>
       <div style={{ color: COLORS.fog, fontSize: 12 }}>
         {op.group}
         <CategoryBadge category={op.category} />
@@ -528,6 +619,12 @@ function StreamRow({ op, groupMeans, canExclude, onExcluded }) {
       <div><TierBadge tier={op.tier} /></div>
       <KpiVsGroup value={op.fan_cvr} mean={groupMeans?.fan_cvr} formatter={(v) => fmtPct(v)} label="Fan CVR" />
       <KpiVsGroup value={op.unlock_rate} mean={groupMeans?.unlock_rate} formatter={(v) => fmtPct(v)} label="Unlock" />
+      <div
+        title={op.ppv_sales != null ? `${op.ppvs_unlocked ?? 0} purch · ${fmtCurrency(op.ppv_sales)} PPV sales` : "Purch sbloccati nel periodo"}
+        style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.alabaster, fontWeight: 600 }}
+      >
+        {op.ppvs_unlocked != null ? Number(op.ppvs_unlocked).toLocaleString("it-IT") : "—"}
+      </div>
       <KpiVsGroup value={op.avg_earnings_per_paying_fan} mean={groupMeans?.avg_earnings_per_paying_fan} formatter={(v) => fmtCurrency(v)} label="$/paying" />
       <MiniBar value={op.score} color={tierColor} />
       {canExclude && (
@@ -651,8 +748,8 @@ export default function OperationalLeaderboardPage() {
     streamHead: {
       display: "grid",
       gridTemplateColumns: canExclude
-        ? "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 1fr 1fr 44px"
-        : "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 1fr 1fr",
+        ? "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 0.7fr 1fr 1fr 44px"
+        : "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 0.7fr 1fr 1fr",
       padding: "14px 22px",
       background: COLORS.obsidian + "80",
       color: COLORS.fog,
@@ -783,6 +880,9 @@ export default function OperationalLeaderboardPage() {
         {/* Hero #1 */}
         {heroOp && <HeroCard op={heroOp} groupMeans={groupAverages[heroOp.group]} canExclude={canExclude} onExcluded={onExcluded} />}
 
+        {/* Hero — Impact su creator (sotto la card) */}
+        {heroOp && <HeroCreatorImpact op={heroOp} />}
+
         {/* Top 2-5 */}
         {top4.length > 0 && (
           <div style={styles.top4Grid}>
@@ -804,6 +904,7 @@ export default function OperationalLeaderboardPage() {
               <div>Tier</div>
               <div>Fan CVR</div>
               <div>Unlock</div>
+              <div>Purch</div>
               <div>$/paying</div>
               <div>Progress</div>
               {canExclude && <div></div>}
