@@ -1202,39 +1202,53 @@ export default function OperationalLeaderboardPage() {
         {/* Filter bar — categoria */}
         <div style={styles.filterRow2}>
           <span style={styles.filterLabel}>Categoria:</span>
-          {CATEGORY_FILTERS.map((c) => (
-            <button
-              key={c.value}
-              style={styles.catPill(categoryFilter === c.value, CATEGORY_COLORS[c.value] || COLORS.champagne)}
-              onClick={() => setCategoryFilter(c.value)}
-            >
-              {c.label}
-              {data?.category_counts && c.value && (
-                <span style={{ marginLeft: 6, opacity: 0.7, fontFamily: FONTS.mono, fontSize: 11 }}>
-                  ({data.category_counts[c.value] ?? 0})
-                </span>
-              )}
-            </button>
-          ))}
+          {CATEGORY_FILTERS.map((c) => {
+            const count = data?.category_counts
+              ? (c.value
+                  ? (data.category_counts[c.value] ?? 0)
+                  : Object.values(data.category_counts).reduce((a, b) => a + (b || 0), 0))
+              : null;
+            return (
+              <button
+                key={c.value || "all"}
+                style={styles.catPill(categoryFilter === c.value, CATEGORY_COLORS[c.value] || COLORS.champagne)}
+                onClick={() => setCategoryFilter(c.value)}
+              >
+                {c.label}
+                {count != null && (
+                  <span style={{ marginLeft: 6, opacity: 0.7, fontFamily: FONTS.mono, fontSize: 11 }}>
+                    ({count})
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Filter bar — lingua */}
         <div style={styles.filterRow3}>
           <span style={styles.filterLabel}>Lingua:</span>
-          {LANGUAGE_FILTERS.map((l) => (
-            <button
-              key={l.value || "all"}
-              style={styles.catPill(languageFilter === l.value, LANGUAGE_COLORS[l.value] || COLORS.champagne)}
-              onClick={() => setLanguageFilter(l.value)}
-            >
-              {l.label}
-              {data?.language_counts && l.value && (
-                <span style={{ marginLeft: 6, opacity: 0.7, fontFamily: FONTS.mono, fontSize: 11 }}>
-                  ({data.language_counts[l.value] ?? 0})
-                </span>
-              )}
-            </button>
-          ))}
+          {LANGUAGE_FILTERS.map((l) => {
+            const count = data?.language_counts
+              ? (l.value
+                  ? (data.language_counts[l.value] ?? 0)
+                  : Object.values(data.language_counts).reduce((a, b) => a + (b || 0), 0))
+              : null;
+            return (
+              <button
+                key={l.value || "all"}
+                style={styles.catPill(languageFilter === l.value, LANGUAGE_COLORS[l.value] || COLORS.champagne)}
+                onClick={() => setLanguageFilter(l.value)}
+              >
+                {l.label}
+                {count != null && (
+                  <span style={{ marginLeft: 6, opacity: 0.7, fontFamily: FONTS.mono, fontSize: 11 }}>
+                    ({count})
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* States */}
