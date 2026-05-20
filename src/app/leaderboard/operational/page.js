@@ -305,6 +305,31 @@ function CategoryBadge({ category }) {
   );
 }
 
+function EstimatedTag({ small = false }) {
+  return (
+    <span
+      title="Stima equa: l'operatore lavora su più creator, Infloww non fornisce il breakdown esatto"
+      style={{
+        display: "inline-block",
+        marginLeft: 5,
+        padding: small ? "1px 5px" : "2px 6px",
+        fontSize: small ? 8 : 9,
+        letterSpacing: "0.06em",
+        color: COLORS.mist,
+        background: COLORS.charcoal,
+        border: `1px solid ${COLORS.steel}`,
+        borderRadius: 3,
+        fontFamily: FONTS.mono,
+        fontWeight: 500,
+        verticalAlign: "middle",
+        textTransform: "uppercase",
+      }}
+    >
+      ~stima
+    </span>
+  );
+}
+
 function LanguageBadge({ language }) {
   if (!language) return null;
   const color = LANGUAGE_COLORS[language] || COLORS.mist;
@@ -469,7 +494,7 @@ function HeroCreatorImpact({ op }) {
         <div style={{ fontSize: 12, color: COLORS.mist, marginTop: 4 }}>
           {op.employee} ha lavorato su {op.creators?.length || 0} creator
           {isMulti
-            ? " — le quote sono stime eque (marker ~). Per il dato esatto serve un breakdown operatore×creator che Infloww non fornisce."
+            ? " — quote distribuite equamente (etichetta ~stima). Per il dato esatto servirebbe il breakdown operatore×creator che Infloww non fornisce."
             : " — quote esatte."}
         </div>
       </div>
@@ -478,7 +503,7 @@ function HeroCreatorImpact({ op }) {
           key={it.creator}
           style={{
             display: "grid",
-            gridTemplateColumns: "1.4fr 1.6fr 70px 1.4fr",
+            gridTemplateColumns: "1.4fr 1.6fr 100px 1.4fr",
             gap: 16,
             alignItems: "center",
             padding: "10px 0",
@@ -487,12 +512,15 @@ function HeroCreatorImpact({ op }) {
         >
           <div style={{ fontFamily: FONTS.display, fontSize: 14, fontWeight: 500 }}>{it.creator}</div>
           <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.alabaster }}>
-            {it.estimated ? "~" : ""}{fmtCurrency(it.share_eur)}{" "}
-            <span style={{ color: COLORS.mist }}>/ {fmtCurrency(it.total_creator_sales)} tot</span>
-            <span style={{ color: COLORS.mist, marginLeft: 8 }}>· {it.share_purch ?? 0} purch</span>
+            {fmtCurrency(it.share_eur)}
+            <span style={{ color: COLORS.mist }}> / {fmtCurrency(it.total_creator_sales)} tot</span>
+            <span style={{ color: COLORS.mist, marginLeft: 8 }}>
+              · {it.share_purch ?? 0}{it.estimated ? ` di ${it.total_creator_purch ?? 0}` : ""} purch
+            </span>
           </div>
           <div style={{ fontFamily: FONTS.mono, fontSize: 14, color: COLORS.champagne, fontWeight: 700, textAlign: "right" }}>
-            {it.estimated ? "~" : ""}{it.share_pct}%
+            {it.share_pct}%
+            {it.estimated && <EstimatedTag small />}
           </div>
           <div style={{ height: 6, background: COLORS.charcoal, borderRadius: 999, overflow: "hidden" }}>
             <div style={{
@@ -561,11 +589,10 @@ function Top4Card({ op, canExclude, onExcluded }) {
           fontSize: 11,
         }}>
           <span style={{ color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.06em", fontSize: 9 }}>Top creator</span>
-          <span style={{ color: COLORS.alabaster, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "60%" }} title={`${op.top_creator.creator}${op.top_creator.estimated ? " (stima equa)" : " (esatto)"}`}>
+          <span style={{ color: COLORS.alabaster, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "65%" }} title={`${op.top_creator.creator}${op.top_creator.estimated ? " (stima equa)" : " (esatto)"}`}>
             {op.top_creator.creator}
-            <span style={{ color: COLORS.champagne, marginLeft: 6 }}>
-              {op.top_creator.estimated ? "~" : ""}{op.top_creator.share_pct}%
-            </span>
+            <span style={{ color: COLORS.champagne, marginLeft: 6 }}>{op.top_creator.share_pct}%</span>
+            {op.top_creator.estimated && <EstimatedTag small />}
           </span>
         </div>
       )}
@@ -607,7 +634,18 @@ function StreamRow({ op, groupMeans, canExclude, onExcluded }) {
         {op.rank ? String(op.rank).padStart(2, "0") : "—"}
       </div>
       <Avatar name={op.employee} size={28} />
-      <div style={{ fontFamily: FONTS.display, fontSize: 14, fontWeight: 500 }} title={topCreatorTitle}>{op.employee}</div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontFamily: FONTS.display, fontSize: 14, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={topCreatorTitle}>{op.employee}</div>
+        {op.top_creator ? (
+          <div style={{ fontSize: 10, color: COLORS.mist, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center" }}>
+            <span style={{ color: COLORS.fog, overflow: "hidden", textOverflow: "ellipsis" }}>{op.top_creator.creator}</span>
+            <span style={{ color: COLORS.champagne, marginLeft: 4, fontFamily: FONTS.mono, flexShrink: 0 }}>{op.top_creator.share_pct}%</span>
+            {op.top_creator.estimated && <EstimatedTag small />}
+          </div>
+        ) : op.creators?.length > 0 ? (
+          <div style={{ fontSize: 10, color: COLORS.mist, marginTop: 2 }}>{op.creators.length} creator</div>
+        ) : null}
+      </div>
       <div style={{ color: COLORS.fog, fontSize: 12 }}>
         {op.group}
         <CategoryBadge category={op.category} />
