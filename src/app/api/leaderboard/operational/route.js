@@ -220,6 +220,22 @@ export async function GET(request) {
   // Decora ogni record con la categoria del proprio Group + creator_impact
   ranking = ranking.map((r) => decorateCreatorImpact({ ...r, category: categories[r.group] || null }, creatorAggregates));
 
+  // Counts per i filtri (lingua/categoria) calcolati su TUTTI gli eligible
+  // PRE-filtri di vista — così le pill filtro mostrano sempre il totale
+  // disponibile, non quello del filtro corrente.
+  const allEligible = ranking.filter((r) => !r._excluded_reason && r.score !== null && r.score > 0);
+  const languageCountsGlobal = { eng: 0, ita: 0, unknown: 0 };
+  for (const r of allEligible) {
+    if (r.language === "eng") languageCountsGlobal.eng += 1;
+    else if (r.language === "ita") languageCountsGlobal.ita += 1;
+    else languageCountsGlobal.unknown += 1;
+  }
+  const categoryCountsGlobal = { Big: 0, Medium: 0, Small: 0, Uncategorized: 0 };
+  for (const r of allEligible) {
+    if (r.category && categoryCountsGlobal[r.category] !== undefined) categoryCountsGlobal[r.category] += 1;
+    else categoryCountsGlobal.Uncategorized += 1;
+  }
+
   // Filtro per group (se richiesto)
   if (group_filter) {
     ranking = ranking.filter((r) => r.group === group_filter);
@@ -272,19 +288,11 @@ export async function GET(request) {
   for (const r of eligibleRanking) {
     if (r.tier) tierCounts[r.tier] = (tierCounts[r.tier] || 0) + 1;
   }
-  const categoryCounts = { Big: 0, Medium: 0, Small: 0, Uncategorized: 0 };
-  for (const r of eligibleRanking) {
-    if (r.category && categoryCounts[r.category] !== undefined) categoryCounts[r.category] += 1;
-    else categoryCounts.Uncategorized += 1;
-  }
 
-  // Counts per lingua su tutti i record (utile per UI)
-  const languageCounts = { eng: 0, ita: 0, unknown: 0 };
-  for (const r of eligibleRanking) {
-    if (r.language === "eng") languageCounts.eng += 1;
-    else if (r.language === "ita") languageCounts.ita += 1;
-    else languageCounts.unknown += 1;
-  }
+  // category_counts e language_counts esposti = quelli GLOBAL (pre filtri di
+  // vista), così le pillole filtro mostrano sempre il totale potenziale.
+  const categoryCounts = categoryCountsGlobal;
+  const languageCounts = languageCountsGlobal;
 
   // Manual exclusions stats (utile per audit page)
   const manualExclusionCount = Object.keys(manualExclusions).length;

@@ -997,6 +997,26 @@ function UnderperformersActionCenter({ periodType, periodId, canExclude, languag
                 fontFamily: FONTS.mono,
               }}>{n}</button>
           ))}
+          <input
+            type="number"
+            min={1}
+            max={50}
+            value={size}
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10);
+              if (!isNaN(v)) setSize(Math.max(1, Math.min(50, v)));
+            }}
+            title="Numero personalizzato (1-50)"
+            style={{
+              width: 56, padding: "4px 8px",
+              background: SIZE_OPTIONS.includes(size) ? "transparent" : COLORS.champagne,
+              color: SIZE_OPTIONS.includes(size) ? COLORS.alabaster : COLORS.obsidian,
+              border: `1px solid ${SIZE_OPTIONS.includes(size) ? COLORS.steel : COLORS.champagne}`,
+              borderRadius: 6, fontSize: 11, fontFamily: FONTS.mono,
+              fontWeight: SIZE_OPTIONS.includes(size) ? 500 : 700,
+              outline: "none", textAlign: "center",
+            }}
+          />
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: cols, gap: 12 }}>
