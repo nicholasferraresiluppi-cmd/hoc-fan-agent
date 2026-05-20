@@ -26,6 +26,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
 import { loadHistoryForEmployee, computeEmployeeLTV } from "@/lib/leaderboard-history";
+import { getEmployeeHistory as getCpHistory } from "@/lib/creatorspro-data";
 
 const VALID_PERIOD_TYPES = ["monthly", "weekly", "quarterly"];
 
@@ -69,10 +70,12 @@ export async function GET(request) {
     return Response.json({ error: `period_type must be one of: ${VALID_PERIOD_TYPES.join(", ")}` }, { status: 400 });
   }
 
-  const [history, ltv, profile] = await Promise.all([
+  // v12: cp_history aggiunto in parallelo. Solo monthly per ora.
+  const [history, ltv, profile, cpHistory] = await Promise.all([
     loadHistoryForEmployee({ employee, periodType: period_type }),
     computeEmployeeLTV({ employee, periodType: period_type }),
     kv.get(`employee_profile:${employee}`),
+    period_type === "monthly" ? getCpHistory(employee, { periodType: "monthly", limit: 12 }) : Promise.resolve([]),
   ]);
 
   if (history.length === 0 && !profile) {
@@ -100,5 +103,7 @@ export async function GET(request) {
     tenure_inferred,
     ltv,
     history,
+    cp_history: cpHistory || [],
+    cp_available: (cpHistory || []).length > 0,
   });
 }

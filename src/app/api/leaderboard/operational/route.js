@@ -32,6 +32,7 @@ import { buildLeaderboard } from "@/lib/leaderboard-calc";
 import { loadSettings } from "@/app/api/admin/leaderboard-settings/route";
 import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
 import { loadGroupLanguages } from "@/app/api/admin/group-languages/route";
+import { indexWagesByInflowwName, getAgencyStats, hasCpDataForPeriod } from "@/lib/creatorspro-data";
 
 const VALID_CATEGORIES = ["Big", "Medium", "Small", "Uncategorized"];
 const VALID_LANGUAGES = ["eng", "ita", "none"];
@@ -231,6 +232,44 @@ export async function GET(request) {
     return decorateCreatorImpact({ ...r, category: categories[r.group] || null, language }, creatorAggregates);
   });
 
+  // v12: arricchimento con dati CreatorsPro (sales/shift) se disponibili
+  // per questo periodo. Periodo monthly only — CP sync è mensile.
+  // Se manca, skip silenzioso: la UI fa graceful degradation.
+  let cpAgency = null;
+  let cpAvailable = false;
+  if (period_type === "monthly") {
+    try {
+      cpAvailable = await hasCpDataForPeriod(period_id);
+      if (cpAvailable) {
+        const [cpIdx, cpStats] = await Promise.all([
+          indexWagesByInflowwName(period_id),
+          getAgencyStats(period_id),
+        ]);
+        cpAgency = cpStats;
+        ranking = ranking.map((r) => {
+          const cp = cpIdx[r.employee];
+          if (!cp) return r;
+          return {
+            ...r,
+            cp_data: {
+              total_sales: cp.total_attributed,
+              total_shifts: cp.total_shifts,
+              total_hours: cp.total_hours,
+              sales_per_shift: cp.sales_per_shift,
+              sales_per_hour: cp.sales_per_hour,
+              top_interval: cp.top_interval,
+              interval_shifts: cp.interval_shifts,
+              interval_sales: cp.interval_sales,
+            },
+          };
+        });
+      }
+    } catch (e) {
+      console.error("CP enrichment error:", e);
+      // Non fatale: leaderboard funziona senza
+    }
+  }
+
   // Counts per i filtri (lingua/categoria) calcolati su TUTTI gli eligible
   // PRE-filtri di vista — così le pill filtro mostrano sempre il totale
   // disponibile, non quello del filtro corrente.
@@ -332,6 +371,8 @@ export async function GET(request) {
     mass_excluded: massExcluded,
     manual_excluded: manualExclusionCount,
     inactive_count: inactiveCount,
+    cp_available: cpAvailable,
+    cp_agency: cpAgency,
     avg_score: Math.round(avgScore * 10) / 10,
     elite_count: tierCounts["Elite"] || 0,
     strong_count: tierCounts["Strong"] || 0,

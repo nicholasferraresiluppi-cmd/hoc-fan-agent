@@ -629,11 +629,11 @@ function Top4Card({ op, canExclude, onExcluded }) {
  * Stream row (ranks 6+)
  * ================================================= */
 
-function StreamRow({ op, groupMeans, canExclude, onExcluded }) {
+function StreamRow({ op, groupMeans, canExclude, onExcluded, cpAvailable = false }) {
   const tierColor = TIER_COLORS[op.tier] || COLORS.alabaster;
-  const cols = canExclude
-    ? "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 0.7fr 1fr 1fr 44px"
-    : "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 0.7fr 1fr 1fr";
+  // Cols: # avatar Operator Group Score Tier FanCVR Unlock Purch [CPSales] $/paying Progress [Kebab]
+  const base = "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 0.7fr" + (cpAvailable ? " 0.9fr" : "") + " 1fr 1fr";
+  const cols = canExclude ? base + " 44px" : base;
   const topCreatorTitle = op.top_creator
     ? `Top creator: ${op.top_creator.creator} (${op.top_creator.estimated ? "stima ~" : "esatto"} ${op.top_creator.share_pct}%)`
     : op.creators?.length > 0
@@ -688,6 +688,17 @@ function StreamRow({ op, groupMeans, canExclude, onExcluded }) {
       >
         {op.ppvs_unlocked != null ? Number(op.ppvs_unlocked).toLocaleString("it-IT") : "—"}
       </div>
+      {cpAvailable && (
+        <div
+          title={op.cp_data ? `CP: ${op.cp_data.total_shifts} shift, ${fmtCurrency(op.cp_data.total_sales)} sales, top fascia: ${op.cp_data.top_interval || "—"}` : "Dato CP non disponibile per questo operatore (mapping mancante?)"}
+          style={{ fontFamily: FONTS.mono, fontSize: 13, color: op.cp_data ? "#3FB97E" : COLORS.mist, fontWeight: 600 }}
+        >
+          {op.cp_data ? fmtCurrency(op.cp_data.sales_per_shift) : "—"}
+          {op.cp_data && (
+            <div style={{ fontSize: 9, color: COLORS.mist, marginTop: 1 }}>{op.cp_data.total_shifts}sh</div>
+          )}
+        </div>
+      )}
       <KpiVsGroup value={op.avg_earnings_per_paying_fan} mean={groupMeans?.avg_earnings_per_paying_fan} formatter={(v) => fmtCurrency(v)} label="$/paying" />
       <MiniBar value={op.score} color={tierColor} />
       {canExclude && (
@@ -1207,9 +1218,11 @@ export default function OperationalLeaderboardPage() {
     },
     streamHead: {
       display: "grid",
-      gridTemplateColumns: canExclude
-        ? "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 0.7fr 1fr 1fr 44px"
-        : "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 0.7fr 1fr 1fr",
+      gridTemplateColumns: (() => {
+        const cpAvail = !!data?.cp_available;
+        const base = "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 0.7fr" + (cpAvail ? " 0.9fr" : "") + " 1fr 1fr";
+        return canExclude ? base + " 44px" : base;
+      })(),
       padding: "14px 22px",
       background: COLORS.obsidian + "80",
       color: COLORS.fog,
@@ -1405,6 +1418,17 @@ export default function OperationalLeaderboardPage() {
                 tooltip="Click per andare al pannello esclusioni. Mass = account broadcast automatici. Manuali = aggiunti da admin."
               />
             </Link>
+            {data.cp_available && data.cp_agency && (
+              <Link href="/admin/creatorspro-sync" style={{ color: "inherit", textDecoration: "none" }}>
+                <StatCard
+                  label="Sales agency (CP)"
+                  value={fmtCurrency(data.cp_agency.total_sales)}
+                  sub={`${data.cp_agency.total_shifts} shift · avg ${fmtCurrency(data.cp_agency.avg_sales_per_shift)}/shift`}
+                  color="#3FB97E"
+                  tooltip={`Dati da CreatorsPro. Top fascia: ${Object.entries(data.cp_agency.interval_sales || {}).sort((a,b)=>b[1]-a[1])[0]?.[0] || "—"}. Click per sync.`}
+                />
+              </Link>
+            )}
           </div>
         )}
 
@@ -1436,6 +1460,7 @@ export default function OperationalLeaderboardPage() {
               <div title="Fan CVR = fan_paganti / fan_chattati. Più alto = più conversione">Fan CVR</div>
               <div title="Unlock rate = ppv_sbloccati / ppv_inviati. Misura conversione PPV">Unlock</div>
               <div title="Purch = PPV unlocked (count). Volume di acquisti del periodo">Purch</div>
+              {data?.cp_available && <div title="Sales medi per shift (da CreatorsPro). Verde = mappato, grigio = mapping mancante.">$/Shift</div>}
               <div title="$/paying fan = sales totali / fan_paganti. Valore medio per cliente">$/paying</div>
               <div title="Barra visiva proporzionale allo score">Progress</div>
               {canExclude && <div></div>}
@@ -1447,6 +1472,7 @@ export default function OperationalLeaderboardPage() {
                 groupMeans={groupAverages[op.group]}
                 canExclude={canExclude}
                 onExcluded={onExcluded}
+                cpAvailable={!!data?.cp_available}
               />
             ))}
           </div>
