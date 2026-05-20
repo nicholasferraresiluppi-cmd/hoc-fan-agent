@@ -32,8 +32,8 @@ import { buildLeaderboard } from "@/lib/leaderboard-calc";
 import { loadSettings } from "@/app/api/admin/leaderboard-settings/route";
 import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
 
-const VALID_CATEGORIES = ["Big", "Medium", "Small"];
-const VALID_LANGUAGES = ["eng", "ita"];
+const VALID_CATEGORIES = ["Big", "Medium", "Small", "Uncategorized"];
+const VALID_LANGUAGES = ["eng", "ita", "none"];
 const EXCLUSIONS_KEY = "leaderboard:exclusions";
 
 /**
@@ -243,12 +243,20 @@ export async function GET(request) {
 
   // Filtro per categoria (se richiesto)
   if (category_filter) {
-    ranking = ranking.filter((r) => r.category === category_filter);
+    if (category_filter === "Uncategorized") {
+      ranking = ranking.filter((r) => !r.category);
+    } else {
+      ranking = ranking.filter((r) => r.category === category_filter);
+    }
   }
 
   // Filtro per lingua (se richiesto)
   if (language_filter) {
-    ranking = ranking.filter((r) => r.language === language_filter);
+    if (language_filter === "none") {
+      ranking = ranking.filter((r) => !r.language);
+    } else {
+      ranking = ranking.filter((r) => r.language === language_filter);
+    }
   }
 
   // Visibilità di default: nascondi esclusi e score=0.

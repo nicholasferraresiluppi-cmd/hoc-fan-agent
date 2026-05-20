@@ -18,13 +18,18 @@ const CATEGORY_FILTERS = [
   { value: "Big", label: "Big" },
   { value: "Medium", label: "Medium" },
   { value: "Small", label: "Small" },
+  { value: "Uncategorized", label: "Senza cat" },
 ];
 
 const LANGUAGE_FILTERS = [
   { value: "", label: "Tutte" },
   { value: "ita", label: "🇮🇹 ITA" },
   { value: "eng", label: "🇬🇧 ENG" },
+  { value: "none", label: "Senza" },
 ];
+
+// Mappa value pill → chiave nei counts del backend
+const LANGUAGE_COUNT_KEY = { ita: "ita", eng: "eng", none: "unknown" };
 
 const MONTH_NAMES_IT = [
   "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
@@ -1231,7 +1236,7 @@ export default function OperationalLeaderboardPage() {
           {LANGUAGE_FILTERS.map((l) => {
             const count = data?.language_counts
               ? (l.value
-                  ? (data.language_counts[l.value] ?? 0)
+                  ? (data.language_counts[LANGUAGE_COUNT_KEY[l.value] || l.value] ?? 0)
                   : Object.values(data.language_counts).reduce((a, b) => a + (b || 0), 0))
               : null;
             return (
