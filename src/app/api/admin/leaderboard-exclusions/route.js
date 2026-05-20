@@ -25,6 +25,7 @@
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { MANUAL_EXCLUSION_REASONS } from "@/lib/leaderboard-config";
+import { logAuditAction } from "@/lib/audit-log";
 
 const KEY = "leaderboard:exclusions";
 
@@ -67,6 +68,7 @@ export async function POST(request) {
 
   const name = employee.trim();
   const exclusions = (await kv.get(KEY)) || {};
+  const prev = exclusions[name] || null;
   exclusions[name] = {
     reason,
     note: typeof note === "string" ? note.trim() : "",
@@ -74,6 +76,13 @@ export async function POST(request) {
     added_at: Date.now(),
   };
   await kv.set(KEY, exclusions);
+
+  await logAuditAction({
+    action: prev ? "exclusion.update" : "exclusion.add",
+    target: name,
+    by: az.userId,
+    meta: { reason, note: exclusions[name].note, previous: prev },
+  });
 
   return Response.json({
     ok: true,
@@ -99,8 +108,16 @@ export async function DELETE(request) {
   if (!(employee in exclusions)) {
     return Response.json({ error: "employee not in exclusions list" }, { status: 404 });
   }
+  const removed = exclusions[employee];
   delete exclusions[employee];
   await kv.set(KEY, exclusions);
+
+  await logAuditAction({
+    action: "exclusion.remove",
+    target: employee,
+    by: az.userId,
+    meta: { removed_entry: removed },
+  });
 
   return Response.json({
     ok: true,

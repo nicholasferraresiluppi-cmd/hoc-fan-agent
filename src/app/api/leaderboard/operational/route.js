@@ -235,6 +235,8 @@ export async function GET(request) {
   // PRE-filtri di vista — così le pill filtro mostrano sempre il totale
   // disponibile, non quello del filtro corrente.
   const allEligible = ranking.filter((r) => !r._excluded_reason && r.score !== null && r.score > 0);
+  // v11: inattivi = record con marker _inactive (sales=0, fans=0, msg=0).
+  const inactiveCount = ranking.filter((r) => r._inactive).length;
   const languageCountsGlobal = { eng: 0, ita: 0, unknown: 0 };
   for (const r of allEligible) {
     if (r.language === "eng") languageCountsGlobal.eng += 1;
@@ -329,6 +331,7 @@ export async function GET(request) {
     eligible_total: eligibleRanking.length,
     mass_excluded: massExcluded,
     manual_excluded: manualExclusionCount,
+    inactive_count: inactiveCount,
     avg_score: Math.round(avgScore * 10) / 10,
     elite_count: tierCounts["Elite"] || 0,
     strong_count: tierCounts["Strong"] || 0,

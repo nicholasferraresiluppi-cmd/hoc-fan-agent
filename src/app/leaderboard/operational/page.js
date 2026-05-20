@@ -146,7 +146,8 @@ function fmtCurrency(v, dec = 0) {
 }
 function fmtPct(v, dec = 2) {
   if (v == null) return "—";
-  return (v * 100).toFixed(dec) + "%";
+  // Formato italiano: 4,66% invece di 4.66%
+  return (v * 100).toFixed(dec).replace(".", ",") + "%";
 }
 function fmtNum(v, dec = 0) {
   if (v == null) return "—";
@@ -372,13 +373,19 @@ function MiniBar({ value, color }) {
   );
 }
 
-function StatCard({ label, value, sub, color }) {
+function StatCard({ label, value, sub, color, tooltip }) {
   return (
-    <div style={{
-      background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`,
-      borderRadius: 14, padding: "16px 18px",
-    }}>
-      <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 }}>{label}</div>
+    <div
+      title={tooltip || ""}
+      style={{
+        background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`,
+        borderRadius: 14, padding: "16px 18px",
+        cursor: tooltip ? "help" : "default",
+      }}
+    >
+      <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 }}>
+        {label}{tooltip && <span style={{ marginLeft: 4, opacity: 0.4 }}>ⓘ</span>}
+      </div>
       <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 22, color: color || COLORS.alabaster }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: COLORS.mist, marginTop: 4 }}>{sub}</div>}
     </div>
@@ -566,12 +573,15 @@ function Top4Card({ op, canExclude, onExcluded }) {
         }}>{op.rank}</div>
         <Avatar name={op.employee} size={38} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <Link href={`/leaderboard/operational/${encodeURIComponent(op.employee)}`} style={{ color: "inherit", textDecoration: "none" }}>
+          <Link href={`/leaderboard/operational/${encodeURIComponent(op.employee)}`} style={{ color: "inherit", textDecoration: "none" }} title="Apri scheda operatore">
             <div style={{
               fontFamily: FONTS.display, fontSize: 15, fontWeight: 500,
               lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
               cursor: "pointer",
-            }}>{op.employee}</div>
+            }}>
+              {op.employee}
+              <span style={{ marginLeft: 5, color: COLORS.champagne, opacity: 0.55, fontSize: 12 }}>›</span>
+            </div>
           </Link>
           <div style={{
             fontSize: 10, color: COLORS.fog, textTransform: "uppercase",
@@ -646,7 +656,10 @@ function StreamRow({ op, groupMeans, canExclude, onExcluded }) {
       <Avatar name={op.employee} size={28} />
       <div style={{ minWidth: 0 }}>
         <Link href={`/leaderboard/operational/${encodeURIComponent(op.employee)}`} style={{ color: "inherit", textDecoration: "none" }}>
-          <div style={{ fontFamily: FONTS.display, fontSize: 14, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer" }} title={topCreatorTitle}>{op.employee}</div>
+          <div className="hoc-clickable" style={{ fontFamily: FONTS.display, fontSize: 14, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer" }} title={topCreatorTitle || "Apri scheda operatore"}>
+            {op.employee}
+            <span style={{ marginLeft: 5, color: COLORS.champagne, opacity: 0.5, fontSize: 11 }}>›</span>
+          </div>
         </Link>
         {op.top_creator ? (
           <div style={{ fontSize: 10, color: COLORS.mist, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center" }}>
@@ -735,15 +748,26 @@ function HealthBar({ periodType }) {
           </div>
         </div>
       </div>
-      {/* Sparkline barre */}
+      {/* Sparkline barre con tooltip ricco */}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 50 }}>
         {history.map((h) => {
           const heightPct = ((h.avg_score || 0) / maxAvg) * 100;
           const tColor = h.avg_score >= 70 ? "#3FB97E" : h.avg_score >= 55 ? COLORS.champagne : "#E76F51";
+          const tc = h.tier_counts || {};
+          const tooltip = [
+            `Periodo: ${h.period_id}`,
+            `Score medio: ${h.avg_score.toFixed(1).replace(".", ",")} / 100`,
+            `Eligible: ${h.eligible}`,
+            `Elite: ${tc.Elite || 0} · Strong: ${tc.Strong || 0} · Good: ${tc.Good || 0}`,
+            `Average: ${tc.Average || 0} · Weak: ${tc.Weak || 0} · Critical: ${tc.Critical || 0}`,
+            `Qualità: ${h.elite_strong - h.critical_weak >= 0 ? "+" : ""}${h.elite_strong - h.critical_weak}`,
+          ].join("\n");
           return (
-            <div key={h.period_id} title={`${h.period_id}: ${h.avg_score.toFixed(1)} pt · ${h.eligible} op`}
-                 style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center" }}>
-              <div style={{ width: "100%", height: `${heightPct}%`, background: tColor, borderRadius: "2px 2px 0 0", minHeight: 2, opacity: 0.85 }} />
+            <div key={h.period_id} title={tooltip}
+                 style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", cursor: "help" }}>
+              <div style={{ width: "100%", height: `${heightPct}%`, background: tColor, borderRadius: "2px 2px 0 0", minHeight: 2, opacity: 0.85, transition: "opacity 0.15s" }}
+                   onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+                   onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.85"; }} />
             </div>
           );
         })}
@@ -862,6 +886,8 @@ function UnderperformersColumn({ language, label, flag, periodType, periodId, si
   const { data } = useSWR(url, fetcher, { revalidateOnFocus: false });
   const list = data?.underperformers || [];
   const isLoading = !data;
+  const totalCandidates = data?.total_candidates ?? list.length;
+  const chronicityAvailable = data?.chronicity_available !== false;
 
   return (
     <div style={{
@@ -874,8 +900,18 @@ function UnderperformersColumn({ language, label, flag, periodType, periodId, si
         <div style={{ fontSize: 11, color: COLORS.signal, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
           ⚠️ Da cambiare {flag} {label}
         </div>
-        <div style={{ fontSize: 11, color: COLORS.mist, fontFamily: FONTS.mono }}>{list.length}/{size}</div>
+        <div
+          title={totalCandidates > list.length ? `Mostro ${list.length} su ${totalCandidates} candidati totali. Alza il selettore size per vederne di più.` : `Tutti i ${list.length} candidati mostrati`}
+          style={{ fontSize: 11, color: COLORS.mist, fontFamily: FONTS.mono }}
+        >
+          {list.length}/{size}{totalCandidates > list.length ? ` · su ${totalCandidates}` : ""}
+        </div>
       </div>
+      {!chronicityAvailable && data && (
+        <div style={{ fontSize: 10, color: COLORS.champagne, opacity: 0.8, padding: "4px 0", borderTop: `1px solid ${COLORS.charcoal}88` }}>
+          ⓘ Solo periodo corrente disponibile — cronicità non calcolabile, mostro tutti i bottom score.
+        </div>
+      )}
       {data?.error && <div style={{ color: COLORS.signal, fontSize: 12 }}>{data.error}</div>}
       {isLoading && <div style={{ color: COLORS.mist, fontSize: 12 }}>Caricamento…</div>}
       {data && !data.error && list.length === 0 && (
@@ -905,11 +941,16 @@ function UnderperformersColumn({ language, label, flag, periodType, periodId, si
             <div title={`Score ${op.score?.toFixed(1)} · Tier ${op.tier}`} style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 14, color: tColor, minWidth: 36, textAlign: "right" }}>
               {op.score?.toFixed(1)}
             </div>
-            <div title={`Cronicità: ${op.chronic_count}/${op.lookback_total} periodi sotto Average`} style={{ display: "flex", gap: 2 }}>
-              {op.history?.map((h, i) => {
+            <div
+              title={op.lookback_total > 0
+                ? `Cronicità: ${op.chronic_count}/${op.lookback_total} periodi sotto Average`
+                : "Solo periodo corrente — cronicità non calcolabile"}
+              style={{ display: "flex", gap: 2, minWidth: 30 }}
+            >
+              {op.history?.length > 0 ? op.history.map((h, i) => {
                 const hColor = h.tier ? TIER_COLORS[h.tier] : COLORS.charcoal;
                 return <div key={i} title={`${h.period_id}: ${h.tier || "—"}`} style={{ width: 10, height: 10, borderRadius: 2, background: hColor + "AA", border: `1px solid ${hColor}` }} />;
-              })}
+              }) : <span style={{ fontSize: 9, color: COLORS.mist, fontStyle: "italic" }}>nuovo</span>}
             </div>
             <UnderperformersKebab employee={op.employee} onExcluded={onExcluded} onIgnored={onIgnored} />
           </div>
@@ -924,6 +965,7 @@ function IgnoredPanel({ onChange }) {
   const { data } = useSWR("/api/admin/underperformers-ignored", fetcher, { revalidateOnFocus: false });
   const ignored = data?.ignored || {};
   const entries = Object.entries(ignored).sort((a, b) => (b[1].ignored_at || 0) - (a[1].ignored_at || 0));
+  const isEmpty = entries.length === 0;
 
   async function restore(name) {
     if (!confirm(`Rimettere "${name}" nel computo da-cambiare?`)) return;
@@ -934,22 +976,40 @@ function IgnoredPanel({ onChange }) {
     if (onChange) onChange();
   }
 
-  if (entries.length === 0) return null;
+  // v11: sempre visibile (anche con 0 ignorati) per scoperta della feature.
   return (
-    <div style={{ marginTop: 10, background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 10 }}>
-      <button onClick={() => setOpen(!open)}
-        style={{ width: "100%", padding: "10px 14px", background: "transparent", border: "none",
-          color: COLORS.fog, fontSize: 12, fontFamily: FONTS.body, cursor: "pointer",
-          textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span>🔕 <b style={{ color: COLORS.alabaster }}>{entries.length}</b> ignorati — non conteggiati nel pannello "da cambiare"</span>
-        <span style={{ fontFamily: FONTS.mono, fontSize: 12 }}>{open ? "▾" : "▸"}</span>
+    <div style={{
+      marginTop: 10,
+      background: COLORS.graphite,
+      border: `1px solid ${COLORS.charcoal}`,
+      borderRadius: 10,
+      opacity: isEmpty ? 0.6 : 1,
+    }}>
+      <button
+        onClick={() => !isEmpty && setOpen(!open)}
+        disabled={isEmpty}
+        style={{
+          width: "100%", padding: "10px 14px", background: "transparent", border: "none",
+          color: COLORS.fog, fontSize: 12, fontFamily: FONTS.body,
+          cursor: isEmpty ? "default" : "pointer",
+          textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}
+        title={isEmpty ? "Nessun operatore ignorato finora. Usa il menu ⋮ sui candidati 'da cambiare' per ignorarli senza escluderli." : ""}
+      >
+        <span>
+          🔕 <b style={{ color: COLORS.alabaster }}>{entries.length}</b> ignorati
+          {isEmpty
+            ? <span style={{ marginLeft: 6, opacity: 0.7 }}>— usa il menu ⋮ per aggiungere</span>
+            : <span style={{ marginLeft: 6, opacity: 0.7 }}>— non conteggiati nel pannello "da cambiare"</span>}
+        </span>
+        {!isEmpty && <span style={{ fontFamily: FONTS.mono, fontSize: 12 }}>{open ? "▾" : "▸"}</span>}
       </button>
-      {open && (
+      {open && !isEmpty && (
         <div style={{ padding: "0 14px 14px", borderTop: `1px solid ${COLORS.charcoal}` }}>
           {entries.map(([name, entry]) => (
             <div key={name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "8px 0", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 13 }}>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <Link href={`/leaderboard/operational/${encodeURIComponent(name)}`} style={{ color: COLORS.alabaster, textDecoration: "none", fontWeight: 500 }}>{name}</Link>
+                <Link href={`/leaderboard/operational/${encodeURIComponent(name)}`} style={{ color: COLORS.alabaster, textDecoration: "none", fontWeight: 500 }}>{name} <span style={{ color: COLORS.champagne, opacity: 0.5, fontSize: 11 }}>›</span></Link>
                 {entry.note && <span style={{ color: COLORS.mist, fontSize: 11, marginLeft: 8, fontStyle: "italic" }}>"{entry.note}"</span>}
               </div>
               <span style={{ color: COLORS.mist, fontSize: 11, fontFamily: FONTS.mono }}>
@@ -1139,7 +1199,7 @@ export default function OperationalLeaderboardPage() {
       alignItems: "center", gap: 7,
       fontFamily: FONTS.body, fontWeight: clockIn ? 600 : 500,
     },
-    summary: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 },
+    summary: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 22 },
     top4Grid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 },
     streamWrap: {
       background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`,
@@ -1189,10 +1249,29 @@ export default function OperationalLeaderboardPage() {
           <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} style={styles.select}>
             {periodOptions.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
-          <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} style={styles.select}>
-            <option value="">Tutti i Group</option>
-            {data?.groups?.map((g) => <option key={g} value={g}>{g}</option>)}
-          </select>
+          <div style={{ position: "relative", minWidth: 200 }}>
+            <input
+              list="group-options"
+              value={groupFilter}
+              onChange={(e) => setGroupFilter(e.target.value)}
+              placeholder="Tutti i Group (digita per cercare)"
+              style={{ ...styles.select, paddingRight: groupFilter ? 28 : 14 }}
+            />
+            <datalist id="group-options">
+              {data?.groups?.map((g) => <option key={g} value={g} />)}
+            </datalist>
+            {groupFilter && (
+              <button
+                onClick={() => setGroupFilter("")}
+                title="Pulisci filtro Group"
+                style={{
+                  position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
+                  background: "transparent", border: "none", color: COLORS.fog,
+                  cursor: "pointer", fontSize: 16, padding: "0 6px",
+                }}
+              >×</button>
+            )}
+          </div>
           <label style={styles.checkbox}>
             <input
               type="checkbox"
@@ -1202,6 +1281,16 @@ export default function OperationalLeaderboardPage() {
             />
             Includi KPI clock-in
           </label>
+          <button
+            onClick={() => leaderboardKey && mutate(leaderboardKey)}
+            title="Ricarica dati"
+            style={{
+              padding: "9px 14px", background: COLORS.graphite,
+              border: `1px solid ${COLORS.charcoal}`, borderRadius: 10,
+              color: COLORS.fog, fontSize: 13, cursor: "pointer",
+              fontFamily: FONTS.body, marginLeft: "auto",
+            }}
+          >🔄 Aggiorna</button>
         </div>
 
         {/* Filter bar — categoria */}
@@ -1287,19 +1376,35 @@ export default function OperationalLeaderboardPage() {
               label="Operatori in classifica"
               value={fmtNum(data.eligible_total)}
               sub={data.total > data.eligible_total ? `+${data.total - data.eligible_total} senza score` : null}
+              tooltip="Operatori con score > 0 nel periodo selezionato. Score = 0 (inattivi) e operatori esclusi sono contati separatamente."
             />
-            <StatCard label="Score medio" value={`${data.avg_score?.toFixed(1)} / 100`} />
+            <StatCard
+              label="Score medio"
+              value={`${data.avg_score?.toFixed(1).replace(".", ",")} / 100`}
+              tooltip="Media aritmetica dello score degli operatori in classifica (esclusi gli inattivi)."
+            />
             <StatCard
               label="Tier Elite"
               value={fmtNum(data.elite_count)}
               sub={`${data.strong_count} Strong`}
               color={TIER_COLORS.Elite}
+              tooltip="Operatori in tier Elite (score 91-100). Strong = 81-90.99."
             />
             <StatCard
-              label="Esclusi"
-              value={fmtNum((data.mass_excluded || 0) + (data.manual_excluded || 0))}
-              sub={`${data.mass_excluded ?? 0} mass · ${data.manual_excluded ?? 0} manuali`}
+              label="Inattivi"
+              value={fmtNum(data.inactive_count || 0)}
+              sub={data.inactive_count > 0 ? "score 0 — nessuna attività" : null}
+              color={data.inactive_count > 0 ? COLORS.mist : COLORS.alabaster}
+              tooltip="Operatori senza KPI di volume nel periodo (sales=0, fans=0, messaggi=0). Non compaiono in classifica ma esistono nei dati."
             />
+            <Link href="/admin/leaderboard-exclusions" style={{ color: "inherit", textDecoration: "none" }}>
+              <StatCard
+                label="Esclusi"
+                value={fmtNum((data.mass_excluded || 0) + (data.manual_excluded || 0))}
+                sub={`${data.mass_excluded ?? 0} mass · ${data.manual_excluded ?? 0} manuali · click per gestire →`}
+                tooltip="Click per andare al pannello esclusioni. Mass = account broadcast automatici. Manuali = aggiunti da admin."
+              />
+            </Link>
           </div>
         )}
 
@@ -1326,13 +1431,13 @@ export default function OperationalLeaderboardPage() {
               <div></div>
               <div>Operatore</div>
               <div>Group</div>
-              <div>Score</div>
-              <div>Tier</div>
-              <div>Fan CVR</div>
-              <div>Unlock</div>
-              <div>Purch</div>
-              <div>$/paying</div>
-              <div>Progress</div>
+              <div title="Score 0-100, somma pesata KPI di efficienza vs media Group">Score</div>
+              <div title="Tier dello score: Critical < Weak < Average < Good < Strong < Elite">Tier</div>
+              <div title="Fan CVR = fan_paganti / fan_chattati. Più alto = più conversione">Fan CVR</div>
+              <div title="Unlock rate = ppv_sbloccati / ppv_inviati. Misura conversione PPV">Unlock</div>
+              <div title="Purch = PPV unlocked (count). Volume di acquisti del periodo">Purch</div>
+              <div title="$/paying fan = sales totali / fan_paganti. Valore medio per cliente">$/paying</div>
+              <div title="Barra visiva proporzionale allo score">Progress</div>
               {canExclude && <div></div>}
             </div>
             {stream.map((op, i) => (

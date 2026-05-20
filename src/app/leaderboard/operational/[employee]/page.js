@@ -100,7 +100,14 @@ function ScoreSpark({ history }) {
 export default function EmployeeDrilldownPage({ params }) {
   // Next 15 unwrap params via use(); funziona anche in Next 14 perché use() è polyfilled
   const resolved = typeof params?.then === "function" ? use(params) : params;
-  const employee = decodeURIComponent(resolved.employee || "");
+  // v11: try/catch sul decode per gestire nomi con apostrofi/accenti incollati
+  // manualmente nell'URL senza encoding (es. "Filippo Dall'Asta").
+  let employee = "";
+  try {
+    employee = decodeURIComponent(resolved.employee || "");
+  } catch {
+    employee = resolved.employee || "";
+  }
   const [periodType, setPeriodType] = useState("monthly");
 
   const { data, error, isLoading } = useSWR(
@@ -183,9 +190,12 @@ export default function EmployeeDrilldownPage({ params }) {
                       {data.tenure_inferred && <span style={{ color: COLORS.mist, marginLeft: 6, fontSize: 11, fontFamily: FONTS.body }}>(stima)</span>}
                     </div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em" }}>LTV {periodType === "monthly" ? "mensile" : periodType}</div>
+                  <div title={`Somma di "sales" su ${data.ltv?.periods_count ?? 0} periodi ${periodType} disponibili in KV. Include tutto: PPV, tips, DM sales.`}>
+                    <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                      Fatturato totale <span style={{ opacity: 0.4 }}>ⓘ</span>
+                    </div>
                     <div style={{ fontFamily: FONTS.mono, fontSize: 16, fontWeight: 600, marginTop: 2, color: "#3FB97E" }}>{fmtCurrency(data.ltv?.ltv_eur)}</div>
+                    <div style={{ fontSize: 10, color: COLORS.mist, marginTop: 2 }}>su {data.ltv?.periods_count ?? 0} {periodType === "monthly" ? "mesi" : periodType === "weekly" ? "settimane" : "trimestri"}</div>
                   </div>
                   <div>
                     <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em" }}>Purch totali</div>

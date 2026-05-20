@@ -18,19 +18,35 @@ import { kv } from "@vercel/kv";
 import { buildLeaderboard } from "./leaderboard-calc";
 
 const TTL_MS = 5 * 60 * 1000;
+const TTL_SEC = TTL_MS / 1000;
 const _cache = new Map();
 
-function cacheGet(key) {
+/**
+ * Cache 2-livelli: local (in-memory worker) + KV cross-instance.
+ * v11: write-through KV per evitare cold start = ricomputo completo.
+ *   - Hit local: zero RTT, immediato
+ *   - Hit KV: 1 RTT al primo accesso del worker (warming locale)
+ *   - Miss totale: ricomputa e scrive in entrambi
+ * TTL: 5 min — i dati storici cambiano solo al re-import.
+ */
+async function cacheGet(key) {
   const hit = _cache.get(key);
-  if (!hit) return null;
-  if (Date.now() - hit.t > TTL_MS) {
-    _cache.delete(key);
-    return null;
-  }
-  return hit.v;
+  if (hit && Date.now() - hit.t < TTL_MS) return hit.v;
+  if (hit) _cache.delete(key);
+  try {
+    const kvVal = await kv.get(`_cache:lb-history:${key}`);
+    if (kvVal !== null && kvVal !== undefined) {
+      _cache.set(key, { v: kvVal, t: Date.now() });
+      return kvVal;
+    }
+  } catch {}
+  return null;
 }
-function cacheSet(key, v) {
+async function cacheSet(key, v) {
   _cache.set(key, { v, t: Date.now() });
+  try {
+    await kv.set(`_cache:lb-history:${key}`, v, { ex: TTL_SEC });
+  } catch {}
   return v;
 }
 
@@ -40,7 +56,7 @@ function cacheSet(key, v) {
  */
 export async function listAvailablePeriods(periodType) {
   const key = `_periods:${periodType}`;
-  const cached = cacheGet(key);
+  const cached = await cacheGet(key);
   if (cached) return cached;
   const all = (await kv.zrange("ops_kpi:imports", 0, -1, { rev: true })) || [];
   const prefix = `${periodType}:`;
@@ -53,7 +69,7 @@ export async function listAvailablePeriods(periodType) {
  */
 async function loadPeriodRecords(periodType, periodId) {
   const key = `_records:${periodType}:${periodId}`;
-  const cached = cacheGet(key);
+  const cached = await cacheGet(key);
   if (cached !== null) return cached;
   const records = await kv.get(`ops_kpi:${periodType}:${periodId}`);
   return cacheSet(key, records || []);
@@ -63,7 +79,7 @@ async function loadPeriodRecords(periodType, periodId) {
  * Carica la denylist (con cache).
  */
 async function loadExclusions() {
-  const cached = cacheGet("_exclusions");
+  const cached = await cacheGet("_exclusions");
   if (cached !== null) return cached;
   const v = (await kv.get("leaderboard:exclusions")) || {};
   return cacheSet("_exclusions", v);
@@ -73,7 +89,7 @@ async function loadExclusions() {
  * Carica gli override lingua manuali da KV (con cache).
  */
 async function loadLanguageOverrides() {
-  const cached = cacheGet("_lang_overrides");
+  const cached = await cacheGet("_lang_overrides");
   if (cached !== null) return cached;
   const v = (await kv.get("group_languages")) || {};
   return cacheSet("_lang_overrides", v);
@@ -84,7 +100,7 @@ async function loadLanguageOverrides() {
  */
 async function buildRankingForPeriod(periodType, periodId) {
   const key = `_ranking:${periodType}:${periodId}`;
-  const cached = cacheGet(key);
+  const cached = await cacheGet(key);
   if (cached) return cached;
   const records = await loadPeriodRecords(periodType, periodId);
   if (!records || records.length === 0) return cacheSet(key, { ranking: [], groupAverages: {} });
@@ -198,10 +214,13 @@ export async function computeUnderperformers({ periodType, currentPeriodId, look
   if (ignoredSet && ignoredSet.size > 0) {
     currentEligible = currentEligible.filter((r) => !ignoredSet.has(r.employee));
   }
-  if (currentEligible.length === 0) return [];
+  if (currentEligible.length === 0) {
+    return { list: [], total_candidates: 0, lookback_total: 0, chronicity_available: false };
+  }
 
   const allPeriods = await listAvailablePeriods(periodType);
   const lookbackPeriods = allPeriods.filter((p) => p !== currentPeriodId).slice(0, lookback);
+  const chronicityAvailable = lookbackPeriods.length > 0;
 
   // Sort ascending by score (worst first)
   const bottom = [...currentEligible].sort((a, b) => a.score - b.score);
@@ -213,7 +232,9 @@ export async function computeUnderperformers({ periodType, currentPeriodId, look
     lookbackRankings[pid] = rr;
   }
 
-  const out = [];
+  // Conta TUTTI i candidati che matchano (cronicità o bottom se manca storico),
+  // poi taglia a limit. total_candidates = totale potenziale "da cambiare".
+  const matched = [];
   for (const candidate of bottom) {
     let chronic = 0;
     const history = [];
@@ -222,8 +243,11 @@ export async function computeUnderperformers({ periodType, currentPeriodId, look
       if (r && r.tier && BAD_TIERS.has(r.tier)) chronic += 1;
       history.push({ period_id: pid, score: r?.score ?? null, tier: r?.tier ?? null });
     }
-    if (chronic >= minChronic || lookbackPeriods.length === 0) {
-      out.push({
+    // Se non c'è storico, includiamo tutti i bottom score. Se c'è storico,
+    // solo chi è cronicamente sotto Average.
+    const isMatch = !chronicityAvailable || chronic >= minChronic;
+    if (isMatch) {
+      matched.push({
         employee: candidate.employee,
         group: candidate.group,
         language: candidate.language || null,
@@ -234,8 +258,13 @@ export async function computeUnderperformers({ periodType, currentPeriodId, look
         lookback_total: lookbackPeriods.length,
         history,
       });
-      if (out.length >= limit) break;
     }
   }
-  return out;
+
+  return {
+    list: matched.slice(0, limit),
+    total_candidates: matched.length,
+    lookback_total: lookbackPeriods.length,
+    chronicity_available: chronicityAvailable,
+  };
 }
