@@ -263,6 +263,89 @@ export default function EmployeeDrilldownPage({ params }) {
               </div>
             )}
 
+            {/* CP — Performance per fascia oraria + best/worst shift */}
+            {data.cp_available && data.cp_history?.length > 0 && (() => {
+              // Aggrego fasce orarie su tutti i periodi CP disponibili
+              const buckets = { After: 0, Morning: 0, Afternoon: 0, Evening: 0, Night: 0 };
+              const bucketsShifts = { After: 0, Morning: 0, Afternoon: 0, Evening: 0, Night: 0 };
+              for (const h of data.cp_history) {
+                for (const [k, v] of Object.entries(h.interval_sales || {})) buckets[k] += v;
+                for (const [k, v] of Object.entries(h.interval_shifts || {})) bucketsShifts[k] += v;
+              }
+              const totalSales = Object.values(buckets).reduce((a, b) => a + b, 0);
+              // best/worst shift globali (su tutti i periodi)
+              let bestShift = null, worstShift = null;
+              for (const h of data.cp_history) {
+                if (h.best_shift && (!bestShift || h.best_shift.total_attributed > bestShift.total_attributed)) bestShift = { ...h.best_shift, period_id: h.period_id };
+                if (h.worst_shift && (!worstShift || h.worst_shift.total_attributed < worstShift.total_attributed)) worstShift = { ...h.worst_shift, period_id: h.period_id };
+              }
+              const lastCp = data.cp_history[data.cp_history.length - 1];
+              return (
+                <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, padding: 18, marginBottom: 22 }}>
+                  <div style={{ fontSize: 11, color: "#3FB97E", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>
+                    🕐 CreatorsPro — Performance per fascia oraria
+                  </div>
+                  <div style={{ fontSize: 12, color: COLORS.mist, marginBottom: 14 }}>
+                    Dati aggregati su {data.cp_history.length} periodi · {fmtCurrency(totalSales)} sales totali · {Object.values(bucketsShifts).reduce((a,b)=>a+b,0)} shift
+                  </div>
+                  {/* Bar per fascia */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 18 }}>
+                    {["Morning","Afternoon","Evening","Night","After"].map((b) => {
+                      const sales = buckets[b] || 0;
+                      const sh = bucketsShifts[b] || 0;
+                      const pct = totalSales > 0 ? (sales / totalSales) * 100 : 0;
+                      const max = Math.max(...Object.values(buckets), 1);
+                      const heightPct = (sales / max) * 100;
+                      return (
+                        <div key={b} title={`${b}: ${fmtCurrency(sales)} su ${sh} shift (${pct.toFixed(1).replace(".",",")}% del totale)`} style={{ textAlign: "center" }}>
+                          <div style={{ height: 60, display: "flex", alignItems: "flex-end", justifyContent: "center", marginBottom: 4 }}>
+                            <div style={{ width: 28, height: `${heightPct}%`, background: "#3FB97E", borderRadius: "2px 2px 0 0", minHeight: 2, opacity: 0.85 }} />
+                          </div>
+                          <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.08em" }}>{b}</div>
+                          <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.alabaster, marginTop: 2 }}>{fmtCurrency(sales)}</div>
+                          <div style={{ fontSize: 9, color: COLORS.mist, marginTop: 1 }}>{sh} shift</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Best/worst shift */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    {bestShift && (
+                      <div style={{ padding: 12, background: COLORS.charcoal, borderRadius: 8, border: `1px solid #3FB97E55` }}>
+                        <div style={{ fontSize: 10, color: "#3FB97E", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>🏆 Best shift</div>
+                        <div style={{ fontFamily: FONTS.mono, fontSize: 18, fontWeight: 700, color: "#3FB97E" }}>{fmtCurrency(bestShift.total_attributed)}</div>
+                        <div style={{ fontSize: 11, color: COLORS.fog, marginTop: 4 }}>
+                          {new Date(bestShift.started_at).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })} · {bestShift.interval_bucket} · {bestShift.worked_hours?.toFixed(1).replace(".",",")}h
+                        </div>
+                        {bestShift.creator_aliases?.length > 0 && (
+                          <div style={{ fontSize: 11, color: COLORS.mist, marginTop: 2 }}>Creator: {bestShift.creator_aliases.join(", ")}</div>
+                        )}
+                      </div>
+                    )}
+                    {worstShift && (
+                      <div style={{ padding: 12, background: COLORS.charcoal, borderRadius: 8, border: `1px solid ${COLORS.signal}55` }}>
+                        <div style={{ fontSize: 10, color: COLORS.signal, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>⚠️ Worst shift</div>
+                        <div style={{ fontFamily: FONTS.mono, fontSize: 18, fontWeight: 700, color: COLORS.signal }}>{fmtCurrency(worstShift.total_attributed)}</div>
+                        <div style={{ fontSize: 11, color: COLORS.fog, marginTop: 4 }}>
+                          {new Date(worstShift.started_at).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })} · {worstShift.interval_bucket} · {worstShift.worked_hours?.toFixed(1).replace(".",",")}h
+                        </div>
+                        {worstShift.creator_aliases?.length > 0 && (
+                          <div style={{ fontSize: 11, color: COLORS.mist, marginTop: 2 }}>Creator: {worstShift.creator_aliases.join(", ")}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {lastCp && (
+                    <div style={{ marginTop: 14, padding: "8px 12px", background: COLORS.obsidian + "60", borderRadius: 6, fontSize: 12, color: COLORS.fog }}>
+                      <b>{formatPeriodLabel(lastCp.period_id, "monthly")}</b>:
+                      {" "}{fmtCurrency(lastCp.total_sales)} su {lastCp.total_shifts} shift = <b style={{ color: "#3FB97E" }}>{fmtCurrency(lastCp.sales_per_shift)}/shift</b>
+                      {lastCp.top_interval && <> · fascia top: <b>{lastCp.top_interval}</b></>}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* HISTORY TABLE */}
             <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, overflow: "hidden", marginBottom: 22 }}>
               <div style={{

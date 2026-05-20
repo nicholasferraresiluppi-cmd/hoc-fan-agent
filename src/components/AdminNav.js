@@ -15,6 +15,7 @@ const SECTIONS = [
   { href: "/admin/employee-profiles", label: "Profili" },
   { href: "/admin/group-languages", label: "Lingue" },
   { href: "/admin/leaderboard-exclusions", label: "Esclusioni" },
+  { href: "/admin/creatorspro-sync", label: "Sync CP" },
   { href: "/admin/seed", label: "Seed" },
   { href: "/admin/access", label: "Accessi" },
   { href: "/admin/ruoli", label: "Ruoli" },
