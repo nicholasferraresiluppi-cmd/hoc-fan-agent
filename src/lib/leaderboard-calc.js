@@ -5,6 +5,10 @@
  *      ({ weights, thresholds, tiers }). Se mancano usano i default da config.
  *      Questo permette alla pagina admin di sovrascrivere i pesi/soglie/tier
  *      via KV senza modificare il codice.
+ *
+ * v11: aggiunto detectLanguage() per ricavare ENG/ITA dal nome del Group,
+ *      e supporto a manualExclusions (denylist KV editabile da admin) in
+ *      buildLeaderboard / calculateScores.
  */
 
 import {
@@ -12,6 +16,7 @@ import {
   SCORE_TIERS as DEFAULT_SCORE_TIERS,
   NORMALIZATION_THRESHOLDS as DEFAULT_NORMALIZATION_THRESHOLDS,
   MASS_ACCOUNT_REGEX,
+  LANGUAGE_REGEX,
   CSV_COLUMN_MAP,
   DERIVED_KPIS,
 } from "./leaderboard-config";
@@ -112,6 +117,19 @@ export function isMassAccount(employeeName) {
 }
 
 /* ======================================================================
+ * LANGUAGE DETECTION — ricava "eng" | "ita" | null dal nome del Group.
+ * Convenzione HOC: il nome del Group contiene il marker (es. "Team Bianca ENG").
+ * Se cambi la convenzione, modifica LANGUAGE_REGEX in leaderboard-config.js.
+ * ====================================================================== */
+
+export function detectLanguage(groupName) {
+  if (!groupName || typeof groupName !== "string") return null;
+  if (LANGUAGE_REGEX.eng.test(groupName)) return "eng";
+  if (LANGUAGE_REGEX.ita.test(groupName)) return "ita";
+  return null;
+}
+
+/* ======================================================================
  * AGGREGATION & SCORING
  * ====================================================================== */
 
@@ -162,6 +180,7 @@ export function aggregateByEmployeeGroup(records) {
       email: b.email,
       creators: Array.from(b.creators),
       is_mass: b.is_mass,
+      language: detectLanguage(b.group),
       days: b._days,
       sales: b.sales,
       ppv_sales: b.ppv_sales,
@@ -229,8 +248,9 @@ export function normalizeKpi(value, mean, thresholds = DEFAULT_NORMALIZATION_THR
 /**
  * Calcola Score 0-100 per ogni operatore × group.
  * v10: settings = { weights?, thresholds?, tiers? } sovrascrive i default.
+ * v11: manualExclusions = { employeeName: { reason, ... } } marca esclusi manualmente.
  */
-export function calculateScores(records, mode = "withoutClockIn", settings = {}) {
+export function calculateScores(records, mode = "withoutClockIn", settings = {}, manualExclusions = {}) {
   const weightsByMode = settings.weights || DEFAULT_KPI_WEIGHTS;
   const thresholds = settings.thresholds || DEFAULT_NORMALIZATION_THRESHOLDS;
   const tiers = settings.tiers || DEFAULT_SCORE_TIERS;
@@ -242,6 +262,10 @@ export function calculateScores(records, mode = "withoutClockIn", settings = {})
   const groupAvg = calculateGroupAverages(records);
 
   const scored = records.map((r) => {
+    const manual = r.employee ? manualExclusions[r.employee] : null;
+    if (manual) {
+      return { ...r, score: null, tier: null, _excluded_reason: manual.reason || "manual", _exclusion_note: manual.note || null };
+    }
     if (r.is_mass) {
       return { ...r, score: null, tier: null, _excluded_reason: "mass_account" };
     }
@@ -289,10 +313,11 @@ export function tierColor(tierLabel, tiers = DEFAULT_SCORE_TIERS) {
 /**
  * Pipeline completa.
  * v10: settings opzionali — passa { weights, thresholds, tiers } da KV.
+ * v11: manualExclusions opzionale — passa { employeeName: { reason, ... } } da KV.
  */
-export function buildLeaderboard(rawDailyRecords, mode = "withoutClockIn", settings = {}) {
+export function buildLeaderboard(rawDailyRecords, mode = "withoutClockIn", settings = {}, manualExclusions = {}) {
   const aggregated = aggregateByEmployeeGroup(rawDailyRecords);
-  const { scored, groupAverages } = calculateScores(aggregated, mode, settings);
+  const { scored, groupAverages } = calculateScores(aggregated, mode, settings, manualExclusions);
   scored.sort((a, b) => {
     if (a.score === null && b.score === null) return 0;
     if (a.score === null) return 1;
@@ -301,7 +326,7 @@ export function buildLeaderboard(rawDailyRecords, mode = "withoutClockIn", setti
   });
   let rank = 1;
   for (const r of scored) {
-    if (r.score !== null) {
+    if (r.score !== null && r.score > 0) {
       r.rank = rank++;
     } else {
       r.rank = null;

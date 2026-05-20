@@ -20,6 +20,12 @@ const CATEGORY_FILTERS = [
   { value: "Small", label: "Small" },
 ];
 
+const LANGUAGE_FILTERS = [
+  { value: "", label: "Tutte" },
+  { value: "ita", label: "🇮🇹 ITA" },
+  { value: "eng", label: "🇬🇧 ENG" },
+];
+
 const MONTH_NAMES_IT = [
   "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
   "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre",
@@ -38,6 +44,11 @@ const CATEGORY_COLORS = {
   Big: "#4F8CCB",
   Medium: "#D4AF7A",
   Small: "#8F8A82",
+};
+
+const LANGUAGE_COLORS = {
+  ita: "#3FB97E",
+  eng: "#4F8CCB",
 };
 
 /* =================================================
@@ -166,6 +177,20 @@ function CategoryBadge({ category }) {
   );
 }
 
+function LanguageBadge({ language }) {
+  if (!language) return null;
+  const color = LANGUAGE_COLORS[language] || COLORS.mist;
+  const label = language === "eng" ? "EN" : language === "ita" ? "IT" : "?";
+  return (
+    <span style={{
+      display: "inline-block", padding: "1px 6px", borderRadius: 4,
+      fontSize: 9, fontWeight: 700, letterSpacing: "0.04em",
+      background: color + "20", color: color, border: `1px solid ${color}55`,
+      marginLeft: 6, verticalAlign: "middle", fontFamily: FONTS.mono,
+    }}>{label}</span>
+  );
+}
+
 function Avatar({ name, size = 40, large = false }) {
   return (
     <div style={{
@@ -249,6 +274,7 @@ function HeroCard({ op, groupMeans }) {
           <div style={{ color: COLORS.champagne, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 8 }}>
             {op.group}
             <CategoryBadge category={op.category} />
+            <LanguageBadge language={op.language} />
           </div>
           <TierBadge tier={op.tier} />
         </div>
@@ -313,6 +339,7 @@ function Top4Card({ op }) {
           }}>
             {op.group}
             <CategoryBadge category={op.category} />
+            <LanguageBadge language={op.language} />
           </div>
         </div>
       </div>
@@ -351,6 +378,7 @@ function StreamRow({ op, groupMeans }) {
       <div style={{ color: COLORS.fog, fontSize: 12 }}>
         {op.group}
         <CategoryBadge category={op.category} />
+        <LanguageBadge language={op.language} />
       </div>
       <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 14, color: tierColor }}>
         {op.score?.toFixed(1) ?? "—"}
@@ -374,6 +402,7 @@ export default function OperationalLeaderboardPage() {
   const [clockIn, setClockIn] = useState(false);
   const [groupFilter, setGroupFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [languageFilter, setLanguageFilter] = useState("");
 
   const periodOptions = useMemo(() => {
     if (periodType === "monthly") return generateMonthlyOptions();
@@ -396,8 +425,9 @@ export default function OperationalLeaderboardPage() {
     p.set("clock_in", clockIn ? "yes" : "no");
     if (groupFilter) p.set("group", groupFilter);
     if (categoryFilter) p.set("category", categoryFilter);
+    if (languageFilter) p.set("language", languageFilter);
     return p.toString();
-  }, [periodType, periodId, clockIn, groupFilter, categoryFilter]);
+  }, [periodType, periodId, clockIn, groupFilter, categoryFilter, languageFilter]);
 
   const { data, error, isLoading } = useSWR(
     periodId ? `/api/leaderboard/operational?${queryString}` : null,
@@ -419,7 +449,8 @@ export default function OperationalLeaderboardPage() {
     title: { fontFamily: FONTS.display, fontSize: 32, margin: "0 0 6px 0", letterSpacing: "-0.01em", fontWeight: 500 },
     sub: { color: COLORS.fog, fontSize: 14, marginBottom: 22, maxWidth: 900, lineHeight: 1.55 },
     filterBar: { display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" },
-    filterRow2: { display: "flex", gap: 10, alignItems: "center", marginBottom: 22, flexWrap: "wrap" },
+    filterRow2: { display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" },
+    filterRow3: { display: "flex", gap: 10, alignItems: "center", marginBottom: 22, flexWrap: "wrap" },
     filterLabel: { fontSize: 11, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em", marginRight: 4 },
     pill: (active) => ({
       padding: "9px 16px",
@@ -484,7 +515,8 @@ export default function OperationalLeaderboardPage() {
         <p style={styles.sub}>
           Performance reale del team su Infloww. Score 0-100 calcolato sui KPI di efficienza
           confrontati con la media del proprio Group (team modella). I volumi totali (Sales, PPV)
-          sono informativi ma non entrano nello Score. Account "Mass" esclusi automaticamente.
+          sono informativi ma non entrano nello Score. Account "Mass", operatori esclusi e score
+          zero sono nascosti automaticamente.
         </p>
 
         {/* Filter bar — periodo */}
@@ -533,6 +565,25 @@ export default function OperationalLeaderboardPage() {
           ))}
         </div>
 
+        {/* Filter bar — lingua */}
+        <div style={styles.filterRow3}>
+          <span style={styles.filterLabel}>Lingua:</span>
+          {LANGUAGE_FILTERS.map((l) => (
+            <button
+              key={l.value || "all"}
+              style={styles.catPill(languageFilter === l.value, LANGUAGE_COLORS[l.value] || COLORS.champagne)}
+              onClick={() => setLanguageFilter(l.value)}
+            >
+              {l.label}
+              {data?.language_counts && l.value && (
+                <span style={{ marginLeft: 6, opacity: 0.7, fontFamily: FONTS.mono, fontSize: 11 }}>
+                  ({data.language_counts[l.value] ?? 0})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         {/* States */}
         {isLoading && !data && <p style={{ color: COLORS.fog }}>Caricamento…</p>}
         {error && <p style={{ color: COLORS.signal }}>Errore di rete: {String(error)}</p>}
@@ -561,9 +612,9 @@ export default function OperationalLeaderboardPage() {
               color={TIER_COLORS.Elite}
             />
             <StatCard
-              label="Account mass esclusi"
-              value={fmtNum(data.mass_excluded)}
-              sub={data.mass_excluded > 0 ? "broadcast filtrati" : null}
+              label="Esclusi"
+              value={fmtNum((data.mass_excluded || 0) + (data.manual_excluded || 0))}
+              sub={`${data.mass_excluded ?? 0} mass · ${data.manual_excluded ?? 0} manuali`}
             />
           </div>
         )}
@@ -612,9 +663,9 @@ export default function OperationalLeaderboardPage() {
             borderRadius: 14, padding: 32, textAlign: "center", color: COLORS.fog,
           }}>
             Nessun operatore in classifica per questo filtro.
-            {categoryFilter && (
+            {(categoryFilter || languageFilter) && (
               <div style={{ marginTop: 8, fontSize: 12 }}>
-                Suggerimento: alcuni Group potrebbero non essere ancora classificati.{" "}
+                Suggerimento: prova a rimuovere uno dei filtri.{" "}
                 <Link href="/admin/group-categories" style={{ color: COLORS.champagne }}>Vai a Categorie Group →</Link>
               </div>
             )}

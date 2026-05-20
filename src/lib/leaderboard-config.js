@@ -98,6 +98,33 @@ export const NORMALIZATION_THRESHOLDS = [
 export const MASS_ACCOUNT_REGEX = /\b(MASS|Mass|mass)\b|^MASSA\s/;
 
 /**
+ * Regex per rilevare la lingua/mercato di un Group dal suo nome.
+ * Convenzione HOC: i Group ENG hanno "ENG" nel nome (es. "Team Bianca ENG"),
+ * quelli ITA hanno "ITA" (es. "Team Bianca ITA"). Se nessuna match, language=null.
+ *
+ * Se in futuro la convenzione cambia (es. suffisso diverso, lingua extra),
+ * modifica solo qui — `detectLanguage()` in leaderboard-calc.js è già generica.
+ */
+export const LANGUAGE_REGEX = {
+  eng: /\bENG\b/i,
+  ita: /\bITA\b/i,
+};
+
+/**
+ * Reason validi per la denylist manuale degli operatori
+ * (storage: KV `leaderboard:exclusions`, gestiti dalla pagina admin
+ * /admin/leaderboard-exclusions).
+ *
+ *  - non_chatter   → SM, trainer, account servizio: non sono operatori di chat
+ *  - manual        → esclusione amministrativa esplicita (caso per caso)
+ *  - data_quality  → dati incompleti/sospetti, da non considerare in classifica
+ *
+ * "mass" NON è in questa lista: gli account Mass sono rilevati automaticamente
+ * via MASS_ACCOUNT_REGEX e non vanno duplicati nella denylist.
+ */
+export const MANUAL_EXCLUSION_REASONS = ["non_chatter", "manual", "data_quality"];
+
+/**
  * Mappa colonne CSV Infloww → chiavi normalizzate del nostro sistema.
  * Quando importiamo un CSV, ogni colonna del CSV viene mappata qui.
  * Il parsing dei valori (currency, percentage, ecc.) è gestito in leaderboard-calc.js.
