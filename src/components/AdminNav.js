@@ -12,6 +12,7 @@ const SECTIONS = [
   { href: "/admin/creators", label: "Creator" },
   { href: "/admin/fan-archetypes", label: "Archetypes" },
   { href: "/admin/seniority", label: "Seniority" },
+  { href: "/admin/leaderboard-exclusions", label: "Esclusioni" },
   { href: "/admin/seed", label: "Seed" },
   { href: "/admin/access", label: "Accessi" },
   { href: "/admin/ruoli", label: "Ruoli" },

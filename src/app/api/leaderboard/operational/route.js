@@ -10,9 +10,17 @@
  *   ?clock_in=yes|no                        (default: no)
  *   ?group=GROUP_NAME                       (opzionale, filtra per group)
  *   ?category=Big|Medium|Small              (opzionale, filtra per categoria Group)
+ *   ?language=eng|ita                       (opzionale, filtra per lingua del Group)
+ *   ?include_excluded=1                     (opzionale, mostra gli esclusi — solo per audit)
+ *   ?include_zero=1                         (opzionale, mostra anche score=0)
  *
  * v11: aggiunto filtro categoria Group. Ogni record include r.category basato
  *      sulla mappa salvata in ops_kpi:group_categories.
+ * v12: aggiunto filtro language (ENG/ITA dedotto dal nome Group) + denylist
+ *      manuale operatori (KV `leaderboard:exclusions`). Score=0 e operatori
+ *      esclusi (mass/manual/non_chatter/data_quality/no_group_data) sono
+ *      nascosti per default; usa include_excluded=1 e include_zero=1 per
+ *      vederli (es. pagina audit /admin/leaderboard-exclusions).
  */
 import { kv } from "@vercel/kv";
 import { auth } from "@clerk/nextjs/server";
@@ -21,6 +29,8 @@ import { loadSettings } from "@/app/api/admin/leaderboard-settings/route";
 import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
 
 const VALID_CATEGORIES = ["Big", "Medium", "Small"];
+const VALID_LANGUAGES = ["eng", "ita"];
+const EXCLUSIONS_KEY = "leaderboard:exclusions";
 
 export async function GET(request) {
   const { userId } = await auth();
@@ -34,6 +44,9 @@ export async function GET(request) {
   const clock_in = url.searchParams.get("clock_in") === "yes";
   const group_filter = url.searchParams.get("group");
   const category_filter = url.searchParams.get("category");
+  const language_filter = url.searchParams.get("language");
+  const include_excluded = url.searchParams.get("include_excluded") === "1";
+  const include_zero = url.searchParams.get("include_zero") === "1";
 
   if (!period_type || !["weekly", "monthly", "quarterly"].includes(period_type)) {
     return Response.json(
@@ -47,6 +60,12 @@ export async function GET(request) {
   if (category_filter && !VALID_CATEGORIES.includes(category_filter)) {
     return Response.json(
       { error: `category must be one of: ${VALID_CATEGORIES.join(", ")}` },
+      { status: 400 }
+    );
+  }
+  if (language_filter && !VALID_LANGUAGES.includes(language_filter)) {
+    return Response.json(
+      { error: `language must be one of: ${VALID_LANGUAGES.join(", ")}` },
       { status: 400 }
     );
   }
@@ -69,21 +88,28 @@ export async function GET(request) {
     );
   }
 
-  // Carica settings dinamici e categorie Group
+  // Carica settings dinamici, categorie Group e denylist manuale in parallelo
   let settings;
   let categories = {};
+  let manualExclusions = {};
   try {
-    const [loaded, cats] = await Promise.all([loadSettings(), loadGroupCategories()]);
+    const [loaded, cats, excl] = await Promise.all([
+      loadSettings(),
+      loadGroupCategories(),
+      kv.get(EXCLUSIONS_KEY),
+    ]);
     settings = {
       weights: loaded.weights,
       thresholds: loaded.thresholds,
       tiers: loaded.tiers,
     };
     categories = cats || {};
+    manualExclusions = excl || {};
   } catch (e) {
-    console.error("loadSettings/categories error, falling back to defaults:", e);
+    console.error("loadSettings/categories/exclusions error, falling back to defaults:", e);
     settings = {};
     categories = {};
+    manualExclusions = {};
   }
 
   // Calcola la leaderboard
@@ -91,7 +117,7 @@ export async function GET(request) {
   let ranking;
   let groupAverages;
   try {
-    const result = buildLeaderboard(records, mode, settings);
+    const result = buildLeaderboard(records, mode, settings, manualExclusions);
     ranking = result.ranking;
     groupAverages = result.groupAverages;
   } catch (e) {
@@ -118,11 +144,25 @@ export async function GET(request) {
     ranking = ranking.filter((r) => r.category === category_filter);
   }
 
+  // Filtro per lingua (se richiesto)
+  if (language_filter) {
+    ranking = ranking.filter((r) => r.language === language_filter);
+  }
+
+  // Visibilità di default: nascondi esclusi e score=0.
+  // Per la pagina audit /admin/leaderboard-exclusions usa include_excluded=1 + include_zero=1.
+  if (!include_excluded) {
+    ranking = ranking.filter((r) => !r._excluded_reason);
+  }
+  if (!include_zero) {
+    ranking = ranking.filter((r) => r.score === null || r.score > 0);
+  }
+
   // Re-rank dopo filtri (se almeno uno è applicato)
-  if (group_filter || category_filter) {
+  if (group_filter || category_filter || language_filter || !include_excluded || !include_zero) {
     let rank = 1;
     for (const r of ranking) {
-      if (r.score !== null) r.rank = rank++;
+      if (r.score !== null && r.score > 0) r.rank = rank++;
       else r.rank = null;
     }
   }
@@ -137,8 +177,8 @@ export async function GET(request) {
   // Conta mass esclusi
   const massExcluded = records.filter((r) => r.is_mass).length;
 
-  // Statistiche di overview
-  const eligibleRanking = ranking.filter((r) => r.score !== null);
+  // Statistiche di overview — calcolate sui visibili (eligible)
+  const eligibleRanking = ranking.filter((r) => r.score !== null && r.score > 0);
   const avgScore = eligibleRanking.length > 0
     ? eligibleRanking.reduce((sum, r) => sum + r.score, 0) / eligibleRanking.length
     : 0;
@@ -152,6 +192,17 @@ export async function GET(request) {
     else categoryCounts.Uncategorized += 1;
   }
 
+  // Counts per lingua su tutti i record (utile per UI)
+  const languageCounts = { eng: 0, ita: 0, unknown: 0 };
+  for (const r of eligibleRanking) {
+    if (r.language === "eng") languageCounts.eng += 1;
+    else if (r.language === "ita") languageCounts.ita += 1;
+    else languageCounts.unknown += 1;
+  }
+
+  // Manual exclusions stats (utile per audit page)
+  const manualExclusionCount = Object.keys(manualExclusions).length;
+
   return Response.json({
     period_type,
     period_id,
@@ -163,11 +214,13 @@ export async function GET(request) {
     total: ranking.length,
     eligible_total: eligibleRanking.length,
     mass_excluded: massExcluded,
+    manual_excluded: manualExclusionCount,
     avg_score: Math.round(avgScore * 10) / 10,
     elite_count: tierCounts["Elite"] || 0,
     strong_count: tierCounts["Strong"] || 0,
     tier_counts: tierCounts,
     category_counts: categoryCounts,
+    language_counts: languageCounts,
     tiers: settings.tiers,
   });
 }

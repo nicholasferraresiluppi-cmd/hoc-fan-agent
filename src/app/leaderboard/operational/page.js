@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import useSWR from "swr";
+import { useState, useEffect, useMemo, useRef } from "react";
+import useSWR, { mutate } from "swr";
 import Link from "next/link";
 import { COLORS, FONTS } from "@/lib/brand";
 
@@ -18,6 +18,12 @@ const CATEGORY_FILTERS = [
   { value: "Big", label: "Big" },
   { value: "Medium", label: "Medium" },
   { value: "Small", label: "Small" },
+];
+
+const LANGUAGE_FILTERS = [
+  { value: "", label: "Tutte" },
+  { value: "ita", label: "🇮🇹 ITA" },
+  { value: "eng", label: "🇬🇧 ENG" },
 ];
 
 const MONTH_NAMES_IT = [
@@ -39,6 +45,17 @@ const CATEGORY_COLORS = {
   Medium: "#D4AF7A",
   Small: "#8F8A82",
 };
+
+const LANGUAGE_COLORS = {
+  ita: "#3FB97E",
+  eng: "#4F8CCB",
+};
+
+const EXCLUSION_ACTIONS = [
+  { reason: "non_chatter",  label: "Escludi — Non-chatter", description: "SM, trainer, account servizio", color: "#4F8CCB" },
+  { reason: "manual",       label: "Escludi — Manuale",     description: "Esclusione caso per caso",       color: "#D4AF7A" },
+  { reason: "data_quality", label: "Escludi — Data quality",description: "Dati incompleti/sospetti",       color: "#E76F51" },
+];
 
 /* =================================================
  * Period option generators
@@ -138,6 +155,128 @@ function getInitials(name) {
 }
 
 /* =================================================
+ * Admin actions menu (kebab ⋮) — visibile solo se canExclude.
+ * Permette di escludere l'operatore direttamente dalla leaderboard
+ * con un click, senza dover andare in /admin/leaderboard-exclusions.
+ * ================================================= */
+
+function AdminActionsMenu({ employee, onExcluded, light = false }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open]);
+
+  async function handleExclude(reason, label) {
+    if (!confirm(`Escludere "${employee}" dalla leaderboard?\nReason: ${label}\n\nTornerà visibile rimuovendolo da /admin/leaderboard-exclusions.`)) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/leaderboard-exclusions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employee, reason, note: "Aggiunto dalla leaderboard" }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        alert(data.error || "Errore esclusione");
+      } else {
+        setOpen(false);
+        if (onExcluded) onExcluded();
+      }
+    } catch (err) {
+      alert(String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div ref={wrapRef} style={{ position: "relative", display: "inline-block" }}>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        disabled={busy}
+        title="Azioni admin"
+        style={{
+          width: 28, height: 28,
+          background: open ? COLORS.charcoal : "transparent",
+          border: `1px solid ${open ? COLORS.steel : "transparent"}`,
+          color: light ? COLORS.obsidian : COLORS.fog,
+          borderRadius: 6, cursor: busy ? "wait" : "pointer",
+          fontSize: 18, lineHeight: 1, display: "inline-flex",
+          alignItems: "center", justifyContent: "center",
+          padding: 0, transition: "all 0.15s",
+        }}
+        onMouseEnter={(e) => { if (!open) e.currentTarget.style.background = COLORS.charcoal + "66"; }}
+        onMouseLeave={(e) => { if (!open) e.currentTarget.style.background = "transparent"; }}
+      >
+        ⋮
+      </button>
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            right: 0,
+            minWidth: 240,
+            background: COLORS.graphite,
+            border: `1px solid ${COLORS.steel}`,
+            borderRadius: 10,
+            boxShadow: "0 12px 32px rgba(0,0,0,0.6)",
+            padding: 4,
+            zIndex: 50,
+          }}
+        >
+          <div style={{
+            padding: "8px 12px 6px",
+            fontSize: 10, color: COLORS.mist,
+            textTransform: "uppercase", letterSpacing: "0.1em",
+            borderBottom: `1px solid ${COLORS.charcoal}`,
+            marginBottom: 4,
+          }}>
+            {employee}
+          </div>
+          {EXCLUSION_ACTIONS.map((a) => (
+            <button
+              key={a.reason}
+              onClick={() => handleExclude(a.reason, a.label.replace("Escludi — ", ""))}
+              disabled={busy}
+              style={{
+                display: "block", width: "100%", textAlign: "left",
+                padding: "8px 12px", background: "transparent",
+                border: "none", color: COLORS.alabaster,
+                fontSize: 13, fontFamily: FONTS.body,
+                cursor: busy ? "wait" : "pointer", borderRadius: 6,
+                transition: "background 0.1s",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = a.color + "20"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+            >
+              <div style={{ fontWeight: 600, color: a.color }}>{a.label}</div>
+              <div style={{ fontSize: 11, color: COLORS.mist, marginTop: 2 }}>{a.description}</div>
+            </button>
+          ))}
+          <div style={{ borderTop: `1px solid ${COLORS.charcoal}`, marginTop: 4, padding: "6px 12px" }}>
+            <Link
+              href="/admin/leaderboard-exclusions"
+              style={{ fontSize: 11, color: COLORS.fog, textDecoration: "none" }}
+            >
+              Gestione completa esclusioni →
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =================================================
  * Sub-components
  * ================================================= */
 
@@ -163,6 +302,20 @@ function CategoryBadge({ category }) {
       background: color + "20", color: color, border: `1px solid ${color}55`,
       marginLeft: 6, verticalAlign: "middle",
     }}>{category}</span>
+  );
+}
+
+function LanguageBadge({ language }) {
+  if (!language) return null;
+  const color = LANGUAGE_COLORS[language] || COLORS.mist;
+  const label = language === "eng" ? "EN" : language === "ita" ? "IT" : "?";
+  return (
+    <span style={{
+      display: "inline-block", padding: "1px 6px", borderRadius: 4,
+      fontSize: 9, fontWeight: 700, letterSpacing: "0.04em",
+      background: color + "20", color: color, border: `1px solid ${color}55`,
+      marginLeft: 6, verticalAlign: "middle", fontFamily: FONTS.mono,
+    }}>{label}</span>
   );
 }
 
@@ -219,7 +372,7 @@ function KpiVsGroup({ value, mean, formatter, label }) {
  * Hero card (#1)
  * ================================================= */
 
-function HeroCard({ op, groupMeans }) {
+function HeroCard({ op, groupMeans, canExclude, onExcluded }) {
   const tierColor = TIER_COLORS[op.tier] || COLORS.champagne;
   return (
     <div style={{
@@ -229,6 +382,11 @@ function HeroCard({ op, groupMeans }) {
       display: "grid", gridTemplateColumns: "auto 1fr auto auto",
       gap: 28, alignItems: "center", position: "relative", overflow: "hidden",
     }}>
+      {canExclude && (
+        <div style={{ position: "absolute", top: 12, right: 12, zIndex: 10 }}>
+          <AdminActionsMenu employee={op.employee} onExcluded={onExcluded} />
+        </div>
+      )}
       <div style={{
         position: "absolute", inset: 0,
         background: `radial-gradient(circle 300px at 100% 50%, ${tierColor}30, transparent 70%)`,
@@ -249,6 +407,7 @@ function HeroCard({ op, groupMeans }) {
           <div style={{ color: COLORS.champagne, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 8 }}>
             {op.group}
             <CategoryBadge category={op.category} />
+            <LanguageBadge language={op.language} />
           </div>
           <TierBadge tier={op.tier} />
         </div>
@@ -288,14 +447,19 @@ function HeroStat({ l, v, mean }) {
  * Top4 cards (ranks 2-5)
  * ================================================= */
 
-function Top4Card({ op }) {
+function Top4Card({ op, canExclude, onExcluded }) {
   const tierColor = TIER_COLORS[op.tier] || COLORS.alabaster;
   return (
     <div style={{
       background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`,
-      borderRadius: 14, padding: 16, transition: "all 0.2s", position: "relative", overflow: "hidden",
+      borderRadius: 14, padding: 16, transition: "all 0.2s", position: "relative", overflow: "visible",
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+      {canExclude && (
+        <div style={{ position: "absolute", top: 8, right: 8, zIndex: 5 }}>
+          <AdminActionsMenu employee={op.employee} onExcluded={onExcluded} />
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, paddingRight: canExclude ? 28 : 0 }}>
         <div style={{
           fontFamily: FONTS.display, fontStyle: "italic",
           fontSize: 24, color: COLORS.champagne, lineHeight: 1, width: 28,
@@ -313,6 +477,7 @@ function Top4Card({ op }) {
           }}>
             {op.group}
             <CategoryBadge category={op.category} />
+            <LanguageBadge language={op.language} />
           </div>
         </div>
       </div>
@@ -331,17 +496,21 @@ function Top4Card({ op }) {
  * Stream row (ranks 6+)
  * ================================================= */
 
-function StreamRow({ op, groupMeans }) {
+function StreamRow({ op, groupMeans, canExclude, onExcluded }) {
   const tierColor = TIER_COLORS[op.tier] || COLORS.alabaster;
+  const cols = canExclude
+    ? "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 1fr 1fr 44px"
+    : "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 1fr 1fr";
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 1fr 1fr",
+      gridTemplateColumns: cols,
       alignItems: "center",
       padding: "12px 22px",
       borderBottom: `1px solid ${COLORS.charcoal}88`,
       transition: "background 0.15s",
       fontSize: 13,
+      overflow: "visible",
     }}>
       <div style={{ fontFamily: FONTS.mono, fontWeight: 600, color: COLORS.fog, fontSize: 13 }}>
         {op.rank ? String(op.rank).padStart(2, "0") : "—"}
@@ -351,6 +520,7 @@ function StreamRow({ op, groupMeans }) {
       <div style={{ color: COLORS.fog, fontSize: 12 }}>
         {op.group}
         <CategoryBadge category={op.category} />
+        <LanguageBadge language={op.language} />
       </div>
       <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 14, color: tierColor }}>
         {op.score?.toFixed(1) ?? "—"}
@@ -360,6 +530,11 @@ function StreamRow({ op, groupMeans }) {
       <KpiVsGroup value={op.unlock_rate} mean={groupMeans?.unlock_rate} formatter={(v) => fmtPct(v)} label="Unlock" />
       <KpiVsGroup value={op.avg_earnings_per_paying_fan} mean={groupMeans?.avg_earnings_per_paying_fan} formatter={(v) => fmtCurrency(v)} label="$/paying" />
       <MiniBar value={op.score} color={tierColor} />
+      {canExclude && (
+        <div style={{ textAlign: "right" }}>
+          <AdminActionsMenu employee={op.employee} onExcluded={onExcluded} />
+        </div>
+      )}
     </div>
   );
 }
@@ -374,6 +549,7 @@ export default function OperationalLeaderboardPage() {
   const [clockIn, setClockIn] = useState(false);
   const [groupFilter, setGroupFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [languageFilter, setLanguageFilter] = useState("");
 
   const periodOptions = useMemo(() => {
     if (periodType === "monthly") return generateMonthlyOptions();
@@ -396,14 +572,20 @@ export default function OperationalLeaderboardPage() {
     p.set("clock_in", clockIn ? "yes" : "no");
     if (groupFilter) p.set("group", groupFilter);
     if (categoryFilter) p.set("category", categoryFilter);
+    if (languageFilter) p.set("language", languageFilter);
     return p.toString();
-  }, [periodType, periodId, clockIn, groupFilter, categoryFilter]);
+  }, [periodType, periodId, clockIn, groupFilter, categoryFilter, languageFilter]);
 
-  const { data, error, isLoading } = useSWR(
-    periodId ? `/api/leaderboard/operational?${queryString}` : null,
-    fetcher,
-    { revalidateOnFocus: false, keepPreviousData: true }
-  );
+  const leaderboardKey = periodId ? `/api/leaderboard/operational?${queryString}` : null;
+  const { data, error, isLoading } = useSWR(leaderboardKey, fetcher, {
+    revalidateOnFocus: false, keepPreviousData: true,
+  });
+
+  // Check capability admin (SEED) per mostrare i kebab menu inline
+  const { data: me } = useSWR("/api/whoami", fetcher, { revalidateOnFocus: false });
+  const canExclude = me?.capabilities?.seed === "all";
+
+  const onExcluded = () => { if (leaderboardKey) mutate(leaderboardKey); };
 
   const ranking = (data?.ranking || []).filter((r) => r.score !== null);
   const groupAverages = data?.groupAverages || {};
@@ -416,10 +598,12 @@ export default function OperationalLeaderboardPage() {
     page: { minHeight: "100vh", background: COLORS.obsidian, color: COLORS.alabaster, fontFamily: FONTS.body, padding: "32px 24px" },
     container: { maxWidth: 1500, margin: "0 auto" },
     backLink: { color: COLORS.fog, fontSize: 13, textDecoration: "none", display: "inline-block", marginBottom: 14 },
+    adminLink: { color: COLORS.champagne, fontSize: 12, textDecoration: "none", marginLeft: 14, padding: "4px 10px", border: `1px solid ${COLORS.champagne}44`, borderRadius: 6 },
     title: { fontFamily: FONTS.display, fontSize: 32, margin: "0 0 6px 0", letterSpacing: "-0.01em", fontWeight: 500 },
     sub: { color: COLORS.fog, fontSize: 14, marginBottom: 22, maxWidth: 900, lineHeight: 1.55 },
     filterBar: { display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" },
-    filterRow2: { display: "flex", gap: 10, alignItems: "center", marginBottom: 22, flexWrap: "wrap" },
+    filterRow2: { display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" },
+    filterRow3: { display: "flex", gap: 10, alignItems: "center", marginBottom: 22, flexWrap: "wrap" },
     filterLabel: { fontSize: 11, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em", marginRight: 4 },
     pill: (active) => ({
       padding: "9px 16px",
@@ -462,11 +646,13 @@ export default function OperationalLeaderboardPage() {
     top4Grid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 },
     streamWrap: {
       background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`,
-      borderRadius: 16, overflow: "hidden",
+      borderRadius: 16, overflow: "visible",
     },
     streamHead: {
       display: "grid",
-      gridTemplateColumns: "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 1fr 1fr",
+      gridTemplateColumns: canExclude
+        ? "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 1fr 1fr 44px"
+        : "50px 36px 1.7fr 1.4fr 0.8fr 1fr 1fr 1fr 1fr 1fr",
       padding: "14px 22px",
       background: COLORS.obsidian + "80",
       color: COLORS.fog,
@@ -479,12 +665,19 @@ export default function OperationalLeaderboardPage() {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <Link href="/leaderboard" style={styles.backLink}>← Leaderboard Training</Link>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
+          <Link href="/leaderboard" style={styles.backLink}>← Leaderboard Training</Link>
+          {canExclude && (
+            <Link href="/admin/leaderboard-exclusions" style={styles.adminLink}>⚙️ Gestione esclusioni</Link>
+          )}
+        </div>
         <h1 style={styles.title}>Leaderboard Operativa</h1>
         <p style={styles.sub}>
           Performance reale del team su Infloww. Score 0-100 calcolato sui KPI di efficienza
           confrontati con la media del proprio Group (team modella). I volumi totali (Sales, PPV)
-          sono informativi ma non entrano nello Score. Account "Mass" esclusi automaticamente.
+          sono informativi ma non entrano nello Score. Account "Mass", operatori esclusi e score
+          zero sono nascosti automaticamente.
+          {canExclude && <> <span style={{ color: COLORS.champagne }}>Click sul menu ⋮ per escludere un operatore al volo.</span></>}
         </p>
 
         {/* Filter bar — periodo */}
@@ -533,6 +726,25 @@ export default function OperationalLeaderboardPage() {
           ))}
         </div>
 
+        {/* Filter bar — lingua */}
+        <div style={styles.filterRow3}>
+          <span style={styles.filterLabel}>Lingua:</span>
+          {LANGUAGE_FILTERS.map((l) => (
+            <button
+              key={l.value || "all"}
+              style={styles.catPill(languageFilter === l.value, LANGUAGE_COLORS[l.value] || COLORS.champagne)}
+              onClick={() => setLanguageFilter(l.value)}
+            >
+              {l.label}
+              {data?.language_counts && l.value && (
+                <span style={{ marginLeft: 6, opacity: 0.7, fontFamily: FONTS.mono, fontSize: 11 }}>
+                  ({data.language_counts[l.value] ?? 0})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         {/* States */}
         {isLoading && !data && <p style={{ color: COLORS.fog }}>Caricamento…</p>}
         {error && <p style={{ color: COLORS.signal }}>Errore di rete: {String(error)}</p>}
@@ -561,21 +773,21 @@ export default function OperationalLeaderboardPage() {
               color={TIER_COLORS.Elite}
             />
             <StatCard
-              label="Account mass esclusi"
-              value={fmtNum(data.mass_excluded)}
-              sub={data.mass_excluded > 0 ? "broadcast filtrati" : null}
+              label="Esclusi"
+              value={fmtNum((data.mass_excluded || 0) + (data.manual_excluded || 0))}
+              sub={`${data.mass_excluded ?? 0} mass · ${data.manual_excluded ?? 0} manuali`}
             />
           </div>
         )}
 
         {/* Hero #1 */}
-        {heroOp && <HeroCard op={heroOp} groupMeans={groupAverages[heroOp.group]} />}
+        {heroOp && <HeroCard op={heroOp} groupMeans={groupAverages[heroOp.group]} canExclude={canExclude} onExcluded={onExcluded} />}
 
         {/* Top 2-5 */}
         {top4.length > 0 && (
           <div style={styles.top4Grid}>
             {top4.map((op) => (
-              <Top4Card key={`${op.employee}-${op.group}`} op={op} />
+              <Top4Card key={`${op.employee}-${op.group}`} op={op} canExclude={canExclude} onExcluded={onExcluded} />
             ))}
           </div>
         )}
@@ -594,12 +806,15 @@ export default function OperationalLeaderboardPage() {
               <div>Unlock</div>
               <div>$/paying</div>
               <div>Progress</div>
+              {canExclude && <div></div>}
             </div>
             {stream.map((op, i) => (
               <StreamRow
                 key={`${op.employee}-${op.group}-${i}`}
                 op={op}
                 groupMeans={groupAverages[op.group]}
+                canExclude={canExclude}
+                onExcluded={onExcluded}
               />
             ))}
           </div>
@@ -612,9 +827,9 @@ export default function OperationalLeaderboardPage() {
             borderRadius: 14, padding: 32, textAlign: "center", color: COLORS.fog,
           }}>
             Nessun operatore in classifica per questo filtro.
-            {categoryFilter && (
+            {(categoryFilter || languageFilter) && (
               <div style={{ marginTop: 8, fontSize: 12 }}>
-                Suggerimento: alcuni Group potrebbero non essere ancora classificati.{" "}
+                Suggerimento: prova a rimuovere uno dei filtri.{" "}
                 <Link href="/admin/group-categories" style={{ color: COLORS.champagne }}>Vai a Categorie Group →</Link>
               </div>
             )}
