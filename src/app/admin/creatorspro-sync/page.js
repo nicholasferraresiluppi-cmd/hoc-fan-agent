@@ -129,8 +129,34 @@ export default function CreatorsProSyncPage() {
   const meta = status?.meta;
   const mapping = mapData?.mapping || {};
   const members = mapData?.members || [];
-  const unmappedSample = mapData?.unmapped_sample || [];
+  const allUnmapped = mapData?.unmapped || mapData?.unmapped_sample || [];
   const inflowwNames = mapData?.infloww_names || [];
+
+  // v2: ricerca client-side su entrambe le tabelle
+  const [unmappedSearch, setUnmappedSearch] = useState("");
+  const [mappedSearch, setMappedSearch] = useState("");
+
+  const filteredUnmapped = useMemo(() => {
+    if (!unmappedSearch.trim()) return allUnmapped;
+    const q = unmappedSearch.toLowerCase();
+    return allUnmapped.filter((m) =>
+      (m.cp_name || "").toLowerCase().includes(q) ||
+      (m.username || "").toLowerCase().includes(q)
+    );
+  }, [allUnmapped, unmappedSearch]);
+
+  const mappedEntries = useMemo(() => Object.entries(mapping), [mapping]);
+  const filteredMapped = useMemo(() => {
+    if (!mappedSearch.trim()) return mappedEntries;
+    const q = mappedSearch.toLowerCase();
+    return mappedEntries.filter(([cpId, infloww]) => {
+      const m = members.find((x) => x.id === cpId);
+      const cpName = m ? `${m.firstName || ""} ${m.lastName || ""}` : "";
+      return cpName.toLowerCase().includes(q) ||
+             (infloww || "").toLowerCase().includes(q) ||
+             cpId.toLowerCase().includes(q);
+    });
+  }, [mappedEntries, mappedSearch, members]);
 
   const styles = {
     page: { minHeight: "100vh", background: COLORS.obsidian, color: COLORS.alabaster, fontFamily: FONTS.body, padding: "32px 24px" },
@@ -234,12 +260,20 @@ export default function CreatorsProSyncPage() {
         </div>
 
         {/* MAPPING NON RISOLTI */}
-        {unmappedSample.length > 0 && (
+        {allUnmapped.length > 0 && (
           <div style={styles.card}>
-            <h2 style={styles.h2}>Mapping da risolvere ({mapData?.unmapped_count})</h2>
+            <h2 style={styles.h2}>Mapping da risolvere ({allUnmapped.length})</h2>
             <p style={{ color: COLORS.fog, fontSize: 13, marginBottom: 14 }}>
               Member CreatorsPro senza corrispondenza Infloww. Assegna manualmente il nome Infloww per attivare il join dei dati.
+              <br/><span style={{ opacity: 0.7 }}>💡 In CP molti operatori sono salvati come "X HOC" ma in Infloww hanno il nome anagrafico. Controlla l'username CP per indizi.</span>
             </p>
+            <input
+              type="text"
+              placeholder="🔍 Cerca per nome CP o username..."
+              value={unmappedSearch}
+              onChange={(e) => setUnmappedSearch(e.target.value)}
+              style={{ ...styles.input, marginBottom: 12 }}
+            />
             <datalist id="cp-infloww-names">
               {inflowwNames.map((n) => <option key={n} value={n} />)}
             </datalist>
@@ -252,9 +286,9 @@ export default function CreatorsProSyncPage() {
                 </tr>
               </thead>
               <tbody>
-                {unmappedSample.map((m) => (
-                  <tr key={m.id}>
-                    <td style={{ ...styles.td, fontWeight: 600 }}>{m.firstName} {m.lastName}</td>
+                {filteredUnmapped.map((m) => (
+                  <tr key={m.cp_id || m.id}>
+                    <td style={{ ...styles.td, fontWeight: 600 }}>{m.cp_name || `${m.firstName || ""} ${m.lastName || ""}`.trim()}</td>
                     <td style={{ ...styles.td, color: COLORS.mist, fontSize: 12, fontFamily: FONTS.mono }}>{m.username || "—"}</td>
                     <td style={styles.td}>
                       <input
@@ -263,7 +297,7 @@ export default function CreatorsProSyncPage() {
                         style={styles.input}
                         onBlur={(e) => {
                           const v = e.target.value.trim();
-                          if (v) setMapping(m.id, v);
+                          if (v) setMapping(m.cp_id || m.id, v);
                         }}
                       />
                     </td>
@@ -271,11 +305,9 @@ export default function CreatorsProSyncPage() {
                 ))}
               </tbody>
             </table>
-            {mapData?.unmapped_count > unmappedSample.length && (
-              <p style={{ fontSize: 11, color: COLORS.mist, marginTop: 12 }}>
-                Mostrati i primi {unmappedSample.length} di {mapData.unmapped_count}. Re-sync dopo aver mappato manualmente per riprovare match automatici.
-              </p>
-            )}
+            <p style={{ fontSize: 11, color: COLORS.mist, marginTop: 12 }}>
+              {unmappedSearch ? `${filteredUnmapped.length} risultati su ${allUnmapped.length}` : `Mostrati tutti i ${allUnmapped.length}`}. Re-sync dopo aver mappato per riprovare match automatici.
+            </p>
           </div>
         )}
 
@@ -283,6 +315,13 @@ export default function CreatorsProSyncPage() {
         {Object.keys(mapping).length > 0 && (
           <div style={styles.card}>
             <h2 style={styles.h2}>Mapping attivi ({Object.keys(mapping).length})</h2>
+            <input
+              type="text"
+              placeholder="🔍 Cerca per nome CP, nome Infloww o cp_id..."
+              value={mappedSearch}
+              onChange={(e) => setMappedSearch(e.target.value)}
+              style={{ ...styles.input, marginBottom: 12 }}
+            />
             <table style={styles.table}>
               <thead>
                 <tr>
@@ -293,7 +332,7 @@ export default function CreatorsProSyncPage() {
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(mapping).slice(0, 100).map(([cpId, inflowwName]) => {
+                {filteredMapped.map(([cpId, inflowwName]) => {
                   const m = members.find((x) => x.id === cpId);
                   return (
                     <tr key={cpId}>
@@ -311,9 +350,9 @@ export default function CreatorsProSyncPage() {
                 })}
               </tbody>
             </table>
-            {Object.keys(mapping).length > 100 && (
-              <p style={{ fontSize: 11, color: COLORS.mist, marginTop: 12 }}>Mostrati i primi 100 di {Object.keys(mapping).length}.</p>
-            )}
+            <p style={{ fontSize: 11, color: COLORS.mist, marginTop: 12 }}>
+              {mappedSearch ? `${filteredMapped.length} risultati su ${mappedEntries.length}` : `Mostrati tutti i ${mappedEntries.length}`}
+            </p>
           </div>
         )}
       </div>

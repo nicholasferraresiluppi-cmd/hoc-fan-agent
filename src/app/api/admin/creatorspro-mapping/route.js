@@ -37,11 +37,15 @@ export async function GET() {
     }
   } catch {}
 
+  // v2: ritorno TUTTI gli unmapped (era limit 50). Per ~200 record è leggero.
+  // Mantengo unmapped_sample come alias retrocompat per la UI vecchia.
+  const sortedUnmapped = unmapped.sort((a, b) => (a.cp_name || "").localeCompare(b.cp_name || ""));
   return Response.json({
     mapping: m,
     members: members.sort((a, b) => `${a.firstName || ""} ${a.lastName || ""}`.localeCompare(`${b.firstName || ""} ${b.lastName || ""}`)),
     unmapped_count: unmapped.length,
-    unmapped_sample: unmapped.slice(0, 50),
+    unmapped: sortedUnmapped,
+    unmapped_sample: sortedUnmapped, // alias retrocompat
     infloww_names: inflowwNames,
   });
 }
