@@ -171,9 +171,12 @@ export async function loadGlobalHealthHistory({ periodType, limit = 12 }) {
  */
 const BAD_TIERS = new Set(["Critical", "Weak", "Average"]);
 
-export async function computeUnderperformers({ periodType, currentPeriodId, lookback = 3, minChronic = 2, limit = 10 }) {
+export async function computeUnderperformers({ periodType, currentPeriodId, lookback = 3, minChronic = 2, limit = 10, languageFilter = null }) {
   const { ranking } = await buildRankingForPeriod(periodType, currentPeriodId);
-  const currentEligible = ranking.filter((r) => r.score !== null && r.score > 0);
+  let currentEligible = ranking.filter((r) => r.score !== null && r.score > 0);
+  if (languageFilter) {
+    currentEligible = currentEligible.filter((r) => r.language === languageFilter);
+  }
   if (currentEligible.length === 0) return [];
 
   const allPeriods = await listAvailablePeriods(periodType);

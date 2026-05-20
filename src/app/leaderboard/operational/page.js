@@ -752,82 +752,86 @@ function HealthBar({ periodType }) {
 }
 
 /* =================================================
- * Underperformers — Top 10 da cambiare (admin only).
- * Bottom score corrente filtrati per cronicità ≥2 periodi sotto "Average".
+ * Action Center — Top 5 da cambiare separati per lingua (admin only).
+ * Compatto, posizionato in alto sotto la Health bar per immediatezza.
  * ================================================= */
 
-function UnderperformersSection({ periodType, periodId, canExclude, onExcluded }) {
-  const url = canExclude && periodId
-    ? `/api/leaderboard/underperformers?period_type=${periodType}&period_id=${periodId}&lookback=3&min_chronic=2&limit=10`
-    : null;
+function UnderperformersColumn({ language, label, flag, periodType, periodId, onExcluded }) {
+  const url = `/api/leaderboard/underperformers?period_type=${periodType}&period_id=${periodId}&lookback=3&min_chronic=2&limit=5&language=${language}`;
   const { data } = useSWR(url, fetcher, { revalidateOnFocus: false });
-  if (!url || !data) return null;
-  if (data.error) return null;
-  const list = data.underperformers || [];
+  const list = data?.underperformers || [];
+  const isLoading = !data && !data?.error;
 
   return (
     <div style={{
       background: COLORS.graphite,
-      border: `1px solid ${COLORS.signal}55`,
-      borderRadius: 14, padding: "18px 22px", marginTop: 24,
+      border: `1px solid ${COLORS.signal}40`,
+      borderRadius: 12, padding: "14px 16px",
+      display: "flex", flexDirection: "column", gap: 10,
     }}>
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 11, color: COLORS.signal, textTransform: "uppercase", letterSpacing: "0.12em" }}>
-          ⚠️ Top {list.length} da cambiare (admin only)
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+        <div style={{ fontSize: 11, color: COLORS.signal, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
+          ⚠️ Da cambiare {flag} {label}
         </div>
-        <div style={{ fontSize: 12, color: COLORS.mist, marginTop: 4 }}>
-          Operatori cronicamente deboli: score corrente più basso E almeno {data.min_chronic} dei {data.lookback} periodi precedenti sotto tier "Average".
-          Lista calcolata sul periodo {data.period_id}.
-        </div>
+        <div style={{ fontSize: 11, color: COLORS.mist, fontFamily: FONTS.mono }}>{list.length}/5</div>
       </div>
-      {list.length === 0 ? (
-        <p style={{ color: COLORS.fog, fontSize: 13 }}>Nessun operatore cronicamente debole nel periodo. Stato healthy ✓</p>
-      ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <thead>
-            <tr>
-              {["Operatore", "Group", "Score", "Tier", "Cronicità", "Storia tier"].map((h) => (
-                <th key={h} style={{ textAlign: "left", padding: "10px 12px", color: COLORS.fog, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", borderBottom: `1px solid ${COLORS.steel}` }}>{h}</th>
-              ))}
-              <th style={{ borderBottom: `1px solid ${COLORS.steel}` }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((op) => {
-              const tColor = TIER_COLORS[op.tier] || COLORS.mist;
-              return (
-                <tr key={op.employee}>
-                  <td style={{ padding: "10px 12px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontWeight: 600 }}>
-                    <Link href={`/leaderboard/operational/${encodeURIComponent(op.employee)}`} style={{ color: COLORS.alabaster, textDecoration: "none" }}>
-                      {op.employee} <span style={{ fontSize: 11, color: COLORS.champagne, opacity: 0.6 }}>→</span>
-                    </Link>
-                  </td>
-                  <td style={{ padding: "10px 12px", borderBottom: `1px solid ${COLORS.charcoal}88`, color: COLORS.fog, fontSize: 12 }}>
-                    {op.group}
-                    <LanguageBadge language={op.language} />
-                  </td>
-                  <td style={{ padding: "10px 12px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontFamily: FONTS.mono, fontWeight: 700, color: tColor }}>{op.score?.toFixed(1)}</td>
-                  <td style={{ padding: "10px 12px", borderBottom: `1px solid ${COLORS.charcoal}88` }}><TierBadge tier={op.tier} /></td>
-                  <td style={{ padding: "10px 12px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontFamily: FONTS.mono, fontSize: 12, color: COLORS.signal, fontWeight: 600 }}>
-                    {op.chronic_count}/{op.lookback_total}
-                  </td>
-                  <td style={{ padding: "10px 12px", borderBottom: `1px solid ${COLORS.charcoal}88` }}>
-                    <div style={{ display: "flex", gap: 3 }}>
-                      {op.history?.map((h, i) => {
-                        const hColor = h.tier ? TIER_COLORS[h.tier] : COLORS.charcoal;
-                        return <div key={i} title={`${h.period_id}: ${h.tier || "—"} (${h.score?.toFixed(1) || "—"})`} style={{ width: 14, height: 14, borderRadius: 3, background: hColor + "AA", border: `1px solid ${hColor}` }} />;
-                      })}
-                    </div>
-                  </td>
-                  <td style={{ padding: "10px 12px", borderBottom: `1px solid ${COLORS.charcoal}88`, textAlign: "right" }}>
-                    <AdminActionsMenu employee={op.employee} onExcluded={onExcluded} />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      {data?.error && <div style={{ color: COLORS.signal, fontSize: 12 }}>{data.error}</div>}
+      {isLoading && <div style={{ color: COLORS.mist, fontSize: 12 }}>Caricamento…</div>}
+      {data && !data.error && list.length === 0 && (
+        <div style={{ color: COLORS.fog, fontSize: 12, padding: "8px 0" }}>
+          ✓ Nessun cronico in {label}. Stato healthy.
+        </div>
       )}
+      {list.map((op) => {
+        const tColor = TIER_COLORS[op.tier] || COLORS.mist;
+        return (
+          <div key={op.employee} style={{
+            display: "grid",
+            gridTemplateColumns: "1fr auto auto 28px",
+            alignItems: "center", gap: 10,
+            padding: "8px 0",
+            borderTop: `1px solid ${COLORS.charcoal}88`,
+            fontSize: 13,
+          }}>
+            <div style={{ minWidth: 0 }}>
+              <Link href={`/leaderboard/operational/${encodeURIComponent(op.employee)}`} style={{ color: "inherit", textDecoration: "none" }}>
+                <div style={{ fontFamily: FONTS.display, fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer" }} title={op.employee}>
+                  {op.employee}
+                </div>
+              </Link>
+              <div style={{ fontSize: 10, color: COLORS.mist, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{op.group}</div>
+            </div>
+            <div title={`Score ${op.score?.toFixed(1)} · Tier ${op.tier}`} style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 14, color: tColor, minWidth: 36, textAlign: "right" }}>
+              {op.score?.toFixed(1)}
+            </div>
+            <div title={`Cronicità: ${op.chronic_count}/${op.lookback_total} periodi sotto Average`} style={{ display: "flex", gap: 2 }}>
+              {op.history?.map((h, i) => {
+                const hColor = h.tier ? TIER_COLORS[h.tier] : COLORS.charcoal;
+                return <div key={i} title={`${h.period_id}: ${h.tier || "—"}`} style={{ width: 10, height: 10, borderRadius: 2, background: hColor + "AA", border: `1px solid ${hColor}` }} />;
+              })}
+            </div>
+            <AdminActionsMenu employee={op.employee} onExcluded={onExcluded} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function UnderperformersActionCenter({ periodType, periodId, canExclude, onExcluded }) {
+  if (!canExclude || !periodId) return null;
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <div style={{ fontSize: 11, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>
+        🎯 Action center — operatori da cambiare (admin only)
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <UnderperformersColumn language="ita" label="ITA" flag="🇮🇹" periodType={periodType} periodId={periodId} onExcluded={onExcluded} />
+        <UnderperformersColumn language="eng" label="ENG" flag="🇬🇧" periodType={periodType} periodId={periodId} onExcluded={onExcluded} />
+      </div>
+      <div style={{ fontSize: 10, color: COLORS.mist, marginTop: 8 }}>
+        Criterio: score corrente più basso E almeno 2 dei 3 periodi precedenti sotto tier "Average". I quadratini mostrano gli ultimi 3 tier (colore = tier).
+      </div>
     </div>
   );
 }
@@ -1053,6 +1057,14 @@ export default function OperationalLeaderboardPage() {
         {/* Health bar — trend agenzia */}
         <HealthBar periodType={periodType} />
 
+        {/* Action center — top da cambiare (admin only) */}
+        <UnderperformersActionCenter
+          periodType={periodType}
+          periodId={periodId}
+          canExclude={canExclude}
+          onExcluded={onExcluded}
+        />
+
         {/* Summary cards */}
         {data && !data.error && (
           <div style={styles.summary}>
@@ -1118,16 +1130,6 @@ export default function OperationalLeaderboardPage() {
               />
             ))}
           </div>
-        )}
-
-        {/* Underperformers (admin only) */}
-        {canExclude && periodId && (
-          <UnderperformersSection
-            periodType={periodType}
-            periodId={periodId}
-            canExclude={canExclude}
-            onExcluded={onExcluded}
-          />
         )}
 
         {/* Empty state */}

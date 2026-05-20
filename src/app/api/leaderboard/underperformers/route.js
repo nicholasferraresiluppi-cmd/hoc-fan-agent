@@ -15,6 +15,7 @@
  *   ?lookback=3                            (default 3, max 12)
  *   ?min_chronic=2                         (default 2)
  *   ?limit=10                              (default 10, max 50)
+ *   ?language=eng|ita                      (opzionale, filtra per lingua del Group)
  *
  * Response:
  *   {
@@ -30,6 +31,7 @@ import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { computeUnderperformers } from "@/lib/leaderboard-history";
 
 const VALID_PERIOD_TYPES = ["monthly", "weekly", "quarterly"];
+const VALID_LANGUAGES = ["eng", "ita"];
 
 export async function GET(request) {
   const az = await authorize(CAPABILITIES.SEED);
@@ -41,12 +43,16 @@ export async function GET(request) {
   const lookback = Math.max(0, Math.min(12, parseInt(url.searchParams.get("lookback") || "3", 10)));
   const min_chronic = Math.max(0, Math.min(12, parseInt(url.searchParams.get("min_chronic") || "2", 10)));
   const limit = Math.max(1, Math.min(50, parseInt(url.searchParams.get("limit") || "10", 10)));
+  const language = url.searchParams.get("language");
 
   if (!VALID_PERIOD_TYPES.includes(period_type)) {
     return Response.json({ error: `period_type must be one of: ${VALID_PERIOD_TYPES.join(", ")}` }, { status: 400 });
   }
   if (!period_id) {
     return Response.json({ error: "period_id required" }, { status: 400 });
+  }
+  if (language && !VALID_LANGUAGES.includes(language)) {
+    return Response.json({ error: `language must be one of: ${VALID_LANGUAGES.join(", ")}` }, { status: 400 });
   }
 
   const underperformers = await computeUnderperformers({
@@ -55,6 +61,7 @@ export async function GET(request) {
     lookback,
     minChronic: min_chronic,
     limit,
+    languageFilter: language || null,
   });
 
   return Response.json({
@@ -62,6 +69,7 @@ export async function GET(request) {
     period_id,
     lookback,
     min_chronic,
+    language: language || null,
     count: underperformers.length,
     underperformers,
   });
