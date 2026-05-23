@@ -370,6 +370,29 @@ export async function finalizeSync({ periodId }) {
   const wagesArr = Array.isArray(wages) ? wages : [];
   const failedPages = state.failed_pages || [];
   const failedDetails = state.failed_details || [];
+
+  // Post-sync audit: chiama CP API live e confronta total con quanto abbiamo in KV.
+  // Se gap > 0 = il sync ha perso wage. Salva in meta.gap_check così il Hub
+  // può alertare l'utente subito. NB: chiamata best-effort, se fallisce non blocca.
+  let gapCheck = null;
+  try {
+    const { fetchWages } = await import("./creatorspro-api");
+    const probe = await fetchWages({ startedAt, endedAt, page: 1, limit: 1 });
+    const cpLiveCount = probe?.pagination?.dataCount ?? null;
+    if (cpLiveCount != null) {
+      const gap = Math.max(0, cpLiveCount - wagesArr.length);
+      gapCheck = {
+        cp_live_count: cpLiveCount,
+        kv_count: wagesArr.length,
+        gap,
+        is_complete: gap === 0,
+        checked_at: Date.now(),
+      };
+    }
+  } catch (e) {
+    gapCheck = { error: String(e?.message || e), checked_at: Date.now() };
+  }
+
   const meta = {
     last_sync_at: Date.now(),
     last_sync_period: periodId,
@@ -388,7 +411,8 @@ export async function finalizeSync({ periodId }) {
     },
     failed_pages_sample: failedPages.slice(0, 5),
     failed_details_sample: failedDetails.slice(0, 5),
-    has_warnings: failedPages.length > 0 || failedDetails.length > 0,
+    has_warnings: failedPages.length > 0 || failedDetails.length > 0 || (gapCheck?.gap > 0),
+    gap_check: gapCheck,
   };
   await kv.set("cp:_meta", meta);
   await kv.del(`cp:sync:state:${periodId}`);

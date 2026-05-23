@@ -144,6 +144,8 @@ export default function AdminHub() {
   const creatorsCount = creatorsData.data?.creators_count;
   const lastSync = syncStatusData.data?.meta?.last_sync_at;
   const syncPeriod = syncStatusData.data?.meta?.last_sync_period;
+  const gapCheck = syncStatusData.data?.meta?.gap_check;
+  const hasGap = gapCheck?.gap > 0;
   const syncOk = lastSync && (Date.now() - lastSync) < 7 * 24 * 3600 * 1000;
 
   const userName = user?.firstName || (me?.email || "").split("@")[0] || "Admin";
@@ -200,6 +202,35 @@ export default function AdminHub() {
           color={syncOk ? CP.textPrimary : CP.accentRed}
         />
       </div>
+
+      {/* WAGE GAP BANNER — alert se l'ultimo sync ha lasciato wage mancanti */}
+      {hasGap && (
+        <Link
+          href="/admin/wage-audit"
+          style={{
+            display: "flex", alignItems: "center", gap: 14,
+            padding: "14px 20px",
+            marginBottom: 18,
+            background: "linear-gradient(135deg, rgba(245,158,11,0.10) 0%, rgba(245,158,11,0.04) 100%)",
+            border: "1px solid rgba(245,158,11,0.45)",
+            borderRadius: 12,
+            textDecoration: "none", color: CP.textPrimary,
+          }}
+        >
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(245,158,11,0.20)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <AlertCircle size={20} color="#F59E0B" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>
+              {gapCheck.gap} wage mancanti nel sync di {syncPeriod}
+            </div>
+            <div style={{ fontSize: 12, color: CP.textSecondary }}>
+              KV: {gapCheck.kv_count} · CP API live: {gapCheck.cp_live_count}. Apri Wage Audit e clicca "Recupera tutti i mesi con gap" per riallineare lo storico.
+            </div>
+          </div>
+          <span style={{ color: "#F59E0B", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>Vai a Wage Audit →</span>
+        </Link>
+      )}
 
       {/* CLOSED-LOOP METRICS — il ciclo HR/coaching sta funzionando? */}
       <div style={{ marginBottom: 32 }}>
