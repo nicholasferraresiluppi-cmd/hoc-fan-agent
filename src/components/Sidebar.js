@@ -3,37 +3,51 @@
 /**
  * HOC Fan Agent — Sidebar globale CP-style.
  *
- * Sidebar fissa a sinistra (240px), dark, raggruppata per sezioni.
+ * Sidebar fissa a sinistra (248px), dark, raggruppata per sezioni.
  * Replica il pattern visivo di CreatorsPro (logo top → org → nav grouped).
  *
- * Le voci sono raggruppate per workflow:
- *   PERFORMANCE         — Ladder, Operativa, Sales CP, Creator, Heat-map, Leghe, Hall of Fame
- *   TRAINING            — Academy, Playbook, Review, Outcomes, Sessioni, Badge Wall
- *   INSIGHTS            — Dashboard, Fan Archetypes, Creator anagrafica
- *   CONTENT PIPELINE    — Pipeline, Creator (CP), Queue, History, Settings
- *   PEOPLE              — Team, Profili, Seniority, Accessi, Ruoli, Ruoli custom
- *   DATA & INTEGRATIONS — Sync CP, Esclusioni, Lingue, Categorie, Import, Settings, Seed
+ * FEATURES UX:
+ *   - Toggle "Essential / Advanced" in alto: Essential mostra 8 voci core
+ *     (per primo accesso / demo / consulenti), Advanced mostra tutto.
+ *   - Gruppi collapsible: Performance + Training aperti di default, gli altri
+ *     4 collassati. Click sul GroupLabel per toggle.
+ *   - Tutti gli stati persistiti in localStorage.
  *
- * Tutti gli URL sono identici a prima.
+ * Tutti gli URL identici a prima.
  */
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { UserButton, SignedIn } from "@clerk/nextjs";
 import {
-  Home, Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown,
+  Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown,
   GraduationCap, BookOpen, ClipboardCheck, Target, Brain, Award,
   LayoutDashboard, UserCog, Sparkles,
   Workflow, Image as ImageIcon, ListChecks, History, Settings,
   UserCircle2, Contact, Medal, Key, Lock, Wrench,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout,
-  Building2,
+  Building2, ChevronDown, ChevronRight, Compass, Layers,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
 
+// Voci "essential" (mostrate sempre): 8 core per primo accesso / demo.
+const ESSENTIAL_HREFS = new Set([
+  "/welcome",
+  "/admin",
+  "/leaderboard",
+  "/leaderboard/operational",
+  "/leaderboard/sales-cp",
+  "/leaderboard/creators",
+  "/",
+  "/playbook",
+  "/admin/team",
+]);
+
 const NAV_GROUPS = [
   {
     label: "Performance",
+    defaultOpen: true,
     items: [
       { href: "/leaderboard",                    label: "Ladder",       icon: Trophy },
       { href: "/leaderboard/operational",        label: "Operativa",    icon: BarChart3 },
@@ -46,6 +60,7 @@ const NAV_GROUPS = [
   },
   {
     label: "Training",
+    defaultOpen: true,
     items: [
       { href: "/",                               label: "Academy",      icon: GraduationCap, match: (p) => p === "/" },
       { href: "/playbook",                       label: "Playbook",     icon: BookOpen },
@@ -57,6 +72,7 @@ const NAV_GROUPS = [
   },
   {
     label: "Insights",
+    defaultOpen: false,
     items: [
       { href: "/admin/dashboard",                label: "Dashboard",       icon: LayoutDashboard },
       { href: "/admin/fan-archetypes",           label: "Fan Archetypes",  icon: Sparkles },
@@ -65,6 +81,7 @@ const NAV_GROUPS = [
   },
   {
     label: "Content Pipeline",
+    defaultOpen: false,
     items: [
       { href: "/content-pipeline",               label: "Pipeline",       icon: Workflow, match: (p) => p === "/content-pipeline" },
       { href: "/content-pipeline/creators",      label: "Creator (CP)",   icon: ImageIcon },
@@ -75,6 +92,7 @@ const NAV_GROUPS = [
   },
   {
     label: "People",
+    defaultOpen: false,
     items: [
       { href: "/admin/team",                     label: "Team",         icon: UserCircle2 },
       { href: "/admin/employee-profiles",        label: "Profili",      icon: Contact },
@@ -86,6 +104,7 @@ const NAV_GROUPS = [
   },
   {
     label: "Data & Integrations",
+    defaultOpen: false,
     items: [
       { href: "/admin/creatorspro-sync",         label: "Sync CP",         icon: RefreshCw },
       { href: "/admin/leaderboard-exclusions",   label: "Esclusioni",      icon: Ban },
@@ -145,29 +164,126 @@ function NavItem({ href, label, icon: Icon, isActive }) {
   );
 }
 
-function GroupLabel({ children }) {
+function GroupHeader({ label, isOpen, onToggle, visibleCount }) {
+  return (
+    <button
+      onClick={onToggle}
+      style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        width: "calc(100% - 16px)",
+        margin: "10px 8px 4px 8px",
+        padding: "6px 12px",
+        background: "transparent",
+        border: "none",
+        color: CP.textMuted,
+        fontFamily: FONTS.mono,
+        fontSize: 10,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: "0.14em",
+        cursor: "pointer",
+        borderRadius: 6,
+      }}
+      onMouseEnter={(e) => e.currentTarget.style.color = CP.textSecondary}
+      onMouseLeave={(e) => e.currentTarget.style.color = CP.textMuted}
+    >
+      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        {isOpen ? <ChevronDown size={11} strokeWidth={2.4} /> : <ChevronRight size={11} strokeWidth={2.4} />}
+        {label}
+      </span>
+      {!isOpen && visibleCount > 0 && (
+        <span style={{ fontSize: 9, opacity: 0.7 }}>{visibleCount}</span>
+      )}
+    </button>
+  );
+}
+
+function ViewToggle({ mode, onChange }) {
   return (
     <div style={{
-      padding: "16px 20px 6px 20px",
-      color: CP.textMuted,
-      fontFamily: FONTS.mono,
-      fontSize: 10,
-      fontWeight: 700,
-      textTransform: "uppercase",
-      letterSpacing: "0.14em",
+      display: "flex",
+      padding: 3,
+      background: CP.surface,
+      border: `1px solid ${CP.border}`,
+      borderRadius: 8,
+      margin: "8px 16px 0 16px",
     }}>
-      {children}
+      {[
+        { v: "essential", label: "Essential", icon: Compass, tooltip: "8 voci core — primo accesso, demo" },
+        { v: "advanced",  label: "Advanced",  icon: Layers,   tooltip: "Tutti gli strumenti" },
+      ].map((opt) => {
+        const active = mode === opt.v;
+        const Icon = opt.icon;
+        return (
+          <button
+            key={opt.v}
+            onClick={() => onChange(opt.v)}
+            title={opt.tooltip}
+            style={{
+              flex: 1,
+              display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5,
+              padding: "5px 8px",
+              background: active ? CP.surfaceAlt : "transparent",
+              border: active ? `1px solid ${CP.borderStrong}` : "1px solid transparent",
+              borderRadius: 6,
+              color: active ? CP.textPrimary : CP.textMuted,
+              fontSize: 11,
+              fontWeight: active ? 600 : 500,
+              fontFamily: FONTS.body,
+              cursor: "pointer",
+              transition: "color 0.12s, background 0.12s",
+            }}
+          >
+            <Icon size={12} strokeWidth={1.8} />
+            <span>{opt.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
 export default function Sidebar() {
   const pathname = usePathname() || "";
+
+  // Toggle Essential / Advanced
+  const [viewMode, setViewMode] = useState("essential");
+  // Map { label: isOpen } per i gruppi collassabili
+  const [openGroups, setOpenGroups] = useState(() => {
+    const init = {};
+    for (const g of NAV_GROUPS) init[g.label] = g.defaultOpen;
+    return init;
+  });
+
+  // Hydrate da localStorage (post-mount, evita hydration mismatch)
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("hoc:sidebar:viewMode");
+      if (v === "essential" || v === "advanced") setViewMode(v);
+      const og = localStorage.getItem("hoc:sidebar:openGroups");
+      if (og) {
+        const parsed = JSON.parse(og);
+        if (parsed && typeof parsed === "object") setOpenGroups((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch {}
+  }, []);
+
+  // Persist on change
+  useEffect(() => {
+    try { localStorage.setItem("hoc:sidebar:viewMode", viewMode); } catch {}
+  }, [viewMode]);
+  useEffect(() => {
+    try { localStorage.setItem("hoc:sidebar:openGroups", JSON.stringify(openGroups)); } catch {}
+  }, [openGroups]);
+
   const isItemActive = (item) => {
     if (item.match) return item.match(pathname);
     if (item.href === "/") return pathname === "/";
     return pathname === item.href || pathname.startsWith(item.href + "/");
   };
+
+  const isEssential = viewMode === "essential";
+  const toggleGroup = (label) => setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }));
 
   return (
     <aside
@@ -185,13 +301,13 @@ export default function Sidebar() {
     >
       {/* Top: brand */}
       <div style={{ padding: "18px 20px 14px 20px", borderBottom: `1px solid ${CP.border}` }}>
-        <Link href="/admin" style={{ textDecoration: "none", display: "block" }}>
+        <Link href="/welcome" style={{ textDecoration: "none", display: "block" }}>
           <BrandLockup size="sm" />
         </Link>
       </div>
 
       {/* Organization picker */}
-      <div style={{ padding: "12px 16px 12px 16px", borderBottom: `1px solid ${CP.border}` }}>
+      <div style={{ padding: "12px 16px 0 16px" }}>
         <div style={{
           display: "flex", alignItems: "center", gap: 10,
           padding: "8px 10px",
@@ -214,24 +330,47 @@ export default function Sidebar() {
         </div>
       </div>
 
+      {/* View mode toggle */}
+      <ViewToggle mode={viewMode} onChange={setViewMode} />
+
+      {/* Welcome link (always visible, both modes) */}
+      <div style={{ padding: "10px 0 4px 0", borderBottom: `1px solid ${CP.border}` }}>
+        <NavItem href="/welcome" label="Welcome / Tour" icon={Compass} isActive={pathname === "/welcome"} />
+        <NavItem href="/admin" label="Hub" icon={LayoutDashboard} isActive={pathname === "/admin"} />
+      </div>
+
       {/* Nav groups */}
       <nav style={{ flex: 1, overflowY: "auto", padding: "4px 0 16px 0", scrollbarWidth: "thin" }}>
-        {NAV_GROUPS.map((group) => (
-          <div key={group.label}>
-            <GroupLabel>{group.label}</GroupLabel>
-            <div>
-              {group.items.map((item) => (
-                <NavItem
-                  key={item.href}
-                  href={item.href}
-                  label={item.label}
-                  icon={item.icon}
-                  isActive={isItemActive(item)}
-                />
-              ))}
+        {NAV_GROUPS.map((group) => {
+          const visibleItems = isEssential
+            ? group.items.filter((it) => ESSENTIAL_HREFS.has(it.href))
+            : group.items;
+          if (visibleItems.length === 0) return null;
+          const isOpen = openGroups[group.label];
+          return (
+            <div key={group.label}>
+              <GroupHeader
+                label={group.label}
+                isOpen={isOpen}
+                onToggle={() => toggleGroup(group.label)}
+                visibleCount={visibleItems.length}
+              />
+              {isOpen && (
+                <div>
+                  {visibleItems.map((item) => (
+                    <NavItem
+                      key={item.href}
+                      href={item.href}
+                      label={item.label}
+                      icon={item.icon}
+                      isActive={isItemActive(item)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Bottom: UserButton */}
