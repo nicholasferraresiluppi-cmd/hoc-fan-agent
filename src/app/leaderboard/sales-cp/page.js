@@ -97,6 +97,8 @@ export default function SalesCpLeaderboardPage() {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   // Map employee → { state: 'idle'|'loading'|'success'|'error', message }
   const [recheckState, setRecheckState] = useState({});
+  // Bulk recheck progress: { running, done, total, recovered, errors }
+  const [bulkRecheck, setBulkRecheck] = useState({ running: false, done: 0, total: 0, recovered: 0, errors: 0 });
 
   async function recheckEmployee(employee) {
     setRecheckState((s) => ({ ...s, [employee]: { state: "loading" } }));
@@ -109,16 +111,44 @@ export default function SalesCpLeaderboardPage() {
       const j = await res.json();
       if (!res.ok || j.ok === false) {
         setRecheckState((s) => ({ ...s, [employee]: { state: "error", message: j.error || j.message || "Errore" } }));
-        return;
+        return { error: true };
       }
       setRecheckState((s) => ({ ...s, [employee]: { state: "success", message: j.message, added: j.added_to_kv } }));
-      // Se ha aggiunto wages → invalida cache SWR per ricaricare la pagina
-      if (j.added_to_kv > 0) {
-        setTimeout(() => mutate(url), 600);
-      }
+      return { error: false, added: j.added_to_kv || 0 };
     } catch (e) {
       setRecheckState((s) => ({ ...s, [employee]: { state: "error", message: e.message } }));
+      return { error: true };
     }
+  }
+
+  async function recheckAllNoCp() {
+    if (bulkRecheck.running) return;
+    const employees = noCpOps
+      .filter((op) => op.employee)
+      .filter((op) => recheckState[op.employee]?.state !== "success") // skip già completati
+      .map((op) => op.employee);
+    if (employees.length === 0) {
+      alert("Nessun operatore da ricercare (tutti già completati o lista vuota).");
+      return;
+    }
+    if (!confirm(`Lanciare il recheck su ${employees.length} operatori? La pagina si ricaricherà alla fine.`)) return;
+
+    setBulkRecheck({ running: true, done: 0, total: employees.length, recovered: 0, errors: 0 });
+    const CONCURRENCY = 5;
+    let done = 0, recovered = 0, errors = 0;
+    for (let i = 0; i < employees.length; i += CONCURRENCY) {
+      const slice = employees.slice(i, i + CONCURRENCY);
+      const results = await Promise.all(slice.map((emp) => recheckEmployee(emp)));
+      for (const r of results) {
+        done++;
+        if (r?.error) errors++;
+        else if (r?.added > 0) recovered++;
+      }
+      setBulkRecheck({ running: true, done, total: employees.length, recovered, errors });
+    }
+    setBulkRecheck({ running: false, done, total: employees.length, recovered, errors });
+    // Refresh leaderboard data
+    if (recovered > 0) setTimeout(() => mutate(url), 800);
   }
 
   const periodOptions = useMemo(() => generateMonthlyOptions(), []);
@@ -459,9 +489,45 @@ export default function SalesCpLeaderboardPage() {
 
                 {showNoCp && noCpOps.length > 0 && (
                   <>
-                    <div style={{ padding: "12px 22px", background: COLORS.obsidian + "60", fontSize: 11, color: COLORS.mist, borderTop: `1px solid ${COLORS.charcoal}`, borderBottom: `1px solid ${COLORS.charcoal}` }}>
-                      ⚠️ <b>{noCpOps.length} operatori SENZA dati CP</b> (non mappati o periodo senza shift) — appaiono senza score. Vai a <Link href="/admin/creatorspro-sync" style={{ color: COLORS.champagne }}>Sync CP</Link> per mappare.
+                    <div style={{ padding: "14px 22px", background: COLORS.obsidian + "80", borderTop: `1px solid ${COLORS.charcoal}`, borderBottom: `1px solid ${COLORS.charcoal}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                      <div style={{ fontSize: 12, color: COLORS.mist, flex: 1, minWidth: 280 }}>
+                        ⚠️ <b style={{ color: COLORS.alabaster }}>{noCpOps.length} operatori SENZA dati CP</b> (non mappati o periodo senza shift). Prova il recheck batch per recuperare le wage da CP API.
+                      </div>
+                      <button
+                        onClick={recheckAllNoCp}
+                        disabled={bulkRecheck.running}
+                        title="Chiama CP API per ogni operatore non matchato e auto-importa le wage trovate"
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: 6,
+                          padding: "8px 14px",
+                          background: bulkRecheck.running ? COLORS.charcoal : COLORS.champagne,
+                          color: bulkRecheck.running ? COLORS.fog : COLORS.obsidian,
+                          border: "none",
+                          borderRadius: 8,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: bulkRecheck.running ? "wait" : "pointer",
+                          fontFamily: FONTS.body,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {bulkRecheck.running ? (
+                          <>
+                            <Loader2 size={12} className="animate-spin" />
+                            {bulkRecheck.done}/{bulkRecheck.total} · {bulkRecheck.recovered} recuperati
+                          </>
+                        ) : (
+                          <>
+                            <Search size={12} /> Recheck batch ({noCpOps.length})
+                          </>
+                        )}
+                      </button>
                     </div>
+                    {!bulkRecheck.running && bulkRecheck.done > 0 && (
+                      <div style={{ padding: "10px 22px", background: bulkRecheck.recovered > 0 ? "#3FB97E18" : COLORS.obsidian + "40", fontSize: 11, borderBottom: `1px solid ${COLORS.charcoal}`, color: bulkRecheck.recovered > 0 ? "#3FB97E" : COLORS.fog }}>
+                        ✓ Batch completato: {bulkRecheck.done} controllati · <b>{bulkRecheck.recovered} recuperati con nuove wage</b> · {bulkRecheck.errors} errori · {bulkRecheck.done - bulkRecheck.recovered - bulkRecheck.errors} senza wage CP nel periodo
+                      </div>
+                    )}
                     {noCpOps.slice(0, 30).map((op, i) => (
                       <div key={`nocp-${op.employee}-${i}`} style={{ display: "grid", gridTemplateColumns: "50px 36px 1.6fr 1.3fr 0.7fr 0.7fr 0.9fr 0.9fr 0.8fr 0.8fr 0.9fr 1fr", alignItems: "center", padding: "10px 22px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 12, opacity: recheckState[op.employee]?.state === "success" && recheckState[op.employee]?.added > 0 ? 0.9 : 0.6 }}>
                         <div style={{ color: COLORS.mist }}>—</div>
