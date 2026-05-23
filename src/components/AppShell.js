@@ -16,6 +16,7 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Menu, X } from "lucide-react";
 import Sidebar, { SIDEBAR_WIDTH } from "./Sidebar";
+import ErrorBoundary from "./ErrorBoundary";
 import { CP } from "@/lib/brand";
 
 function isAuthRoute(path) {
@@ -43,8 +44,13 @@ export default function AppShell({ children }) {
 
   return (
     <div style={{ minHeight: "100vh", background: CP.bg }}>
-      {/* Desktop: sidebar fissa */}
-      {!isMobile && <Sidebar />}
+      {/* Desktop: sidebar fissa — wrapped in silent ErrorBoundary so a sidebar
+          crash never takes down the whole page */}
+      {!isMobile && (
+        <ErrorBoundary silent label="Sidebar">
+          <Sidebar />
+        </ErrorBoundary>
+      )}
 
       {/* Mobile: drawer + backdrop */}
       {isMobile && (
@@ -94,7 +100,11 @@ export default function AppShell({ children }) {
         minHeight: "100vh",
         background: CP.bg,
       }}>
-        {children}
+        {/* Visible ErrorBoundary around page content so we see the real
+            error instead of Next's generic "client-side exception" panel */}
+        <ErrorBoundary label="Pagina">
+          {children}
+        </ErrorBoundary>
       </main>
     </div>
   );

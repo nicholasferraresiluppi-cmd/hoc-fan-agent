@@ -15,7 +15,16 @@ import {
 import { CP, FONTS } from "@/lib/brand";
 import { SectionLabel, CpCard, StatCard } from "@/components/cp-style";
 
-const fetcher = (url) => fetch(url).then((r) => r.json());
+// Tollera 4xx/5xx: ritorna null invece di throware (stat cards mostrano "—")
+const fetcher = async (url) => {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  }
+};
 
 function currentMonthId() {
   const d = new Date();
@@ -101,7 +110,7 @@ const SHORTCUT_GROUPS = [
 ];
 
 export default function AdminHub() {
-  const { user } = useUser();
+  const { user, isLoaded: userLoaded } = useUser();
   const [me, setMe] = useState(null);
   const [loading, setLoading] = useState(true);
   const periodId = useMemo(() => currentMonthId(), []);
