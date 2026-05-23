@@ -30,10 +30,11 @@
     <circle cx="0" cy="14" r="3"/>
   </g>
 
-  <!-- Wordmark "HOUSE OF CREATORS" -->
-  <g transform="translate(0 150)" font-family="Inter Tight, Arial Black, sans-serif" font-weight="800" font-size="58" letter-spacing="2">
-    <text x="20" y="50">HOUSE</text>
-    <text x="238" y="50" font-size="28" font-style="italic" font-weight="700">OF</text>
-    <text x="305" y="50">CREATORS</text>
+  <!-- Wordmark "HOUSE OF CREATORS" — text-anchor=middle per centrare ogni parola
+       indipendentemente dalla larghezza esatta dei glifi del font caricato. -->
+  <g transform="translate(0 150)" font-family="Inter Tight, Arial Black, sans-serif" font-weight="800" font-size="58" letter-spacing="2" text-anchor="middle">
+    <text x="115" y="50">HOUSE</text>
+    <text x="258" y="50" font-size="44" font-style="italic" font-weight="700">OF</text>
+    <text x="450" y="50">CREATORS</text>
   </g>
 </svg>
