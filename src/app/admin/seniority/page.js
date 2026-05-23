@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
+import { CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const TIER_EMOJI = { junior: "🌱", senior: "⭐", master: "👑" };
 const TIER_COLOR = { junior: "#3FB97E", senior: "#D4AF7A", master: "#4F8CCB" };
@@ -41,12 +44,20 @@ export default function SeniorityAdminPage() {
   };
 
   return (
-    <div style={{ background: "#08090F", minHeight: "100vh", color: "#F5F6F8", padding: "2rem" }}>
+    <div style={{ background: "#08090F", minHeight: "100vh", color: "#F5F6F8", padding: "32px 28px 64px 28px", maxWidth: 1400, margin: "0 auto" }}>
       <AdminNav />
-      <h1 style={{ marginTop: 0 }}>Seniority operatori</h1>
-      <p style={{ color: "#6B7080", marginBottom: "1rem" }}>
-        Tier auto-calcolato da sessioni totali + overall medio recente. Override manuale disponibile.
-      </p>
+      <PageHeader
+        breadcrumb={
+          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+            <span style={{ color: CP.textMuted }}>›</span>
+            <span style={{ color: CP.textPrimary }}>Seniority</span>
+          </div>
+        }
+        section="People · Tier"
+        title="Seniority operatori"
+        subtitle="Tier auto-calcolato da sessioni totali + overall medio recente. Override manuale disponibile."
+      />
       <div style={{ background: "#D4AF7A10", border: "1px solid #D4AF7A40", borderRadius: 8, padding: "0.75rem 1rem", fontSize: "0.85rem", marginBottom: "1.5rem", color: "#B9BDC7" }}>
         <b>Soglie:</b> Senior = ≥30 sessioni totali + overall medio ultime 30 ≥ 70 • Master = ≥100 sessioni totali + overall medio ultime 50 ≥ 80
       </div>

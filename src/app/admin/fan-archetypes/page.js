@@ -3,7 +3,8 @@
 import { FAN_ARCHETYPES } from "@/lib/fan-archetypes";
 import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
-import { COLORS } from "@/lib/brand";
+import { COLORS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const C = {
   bgDark: COLORS.obsidian,
@@ -48,17 +49,20 @@ function Chips({ items, color = C.purple }) {
 
 export default function FanArchetypesPage() {
   return (
-    <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "2rem" }}>
+    <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "32px 28px 64px 28px", maxWidth: 1500, margin: "0 auto" }}>
       <AdminNav />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: "1.75rem" }}>👥 Fan Archetypes</h1>
-          <p style={{ color: C.gray, margin: "0.25rem 0 0 0", fontSize: "0.9rem" }}>
-            {FAN_ARCHETYPES.length} tipologie di fan derivate da pattern ricorrenti. Usate nei training per variare scenari e nelle valutazioni per contestualizzare le strategie ottimali.
-          </p>
-        </div>
-        <Link href="/admin" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>← Hub Admin</Link>
-      </div>
+      <PageHeader
+        breadcrumb={
+          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+            <span style={{ color: CP.textMuted }}>›</span>
+            <span style={{ color: CP.textPrimary }}>Fan Archetypes</span>
+          </div>
+        }
+        section="Insights · Training"
+        title="Fan Archetypes"
+        subtitle={`${FAN_ARCHETYPES.length} tipologie di fan derivate da pattern ricorrenti. Usate nei training per variare scenari e nelle valutazioni per contestualizzare le strategie ottimali.`}
+      />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))", gap: "1rem", marginTop: "1.5rem" }}>
         {FAN_ARCHETYPES.map((a) => {

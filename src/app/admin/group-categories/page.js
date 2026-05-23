@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const CATEGORIES = ["Big", "Medium", "Small"];
 
@@ -280,10 +281,19 @@ export default function GroupCategoriesPage() {
     return (
       <div style={styles.page}>
         <div style={styles.container}>
-          <Link href="/admin" style={styles.backLink}>← Admin</Link>
-          <h1 style={styles.title}>Categorie Group</h1>
+          <PageHeader
+            breadcrumb={
+              <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+                <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+                <span style={{ color: CP.textMuted }}>›</span>
+                <span style={{ color: CP.textPrimary }}>Categorie Group</span>
+              </div>
+            }
+            section="Data · Config"
+            title="Categorie Group"
+          />
           <div style={styles.info}>
-            Nessun dato disponibile. Importa prima un CSV su <Link href="/admin/leaderboard-import" style={{ color: COLORS.champagne }}>Import KPI Infloww</Link> per popolare i Group e calcolare i suggerimenti automatici.
+            Nessun dato disponibile. Importa prima un CSV su <Link href="/admin/leaderboard-import" style={{ color: CP.accentGreen }}>Import KPI Infloww</Link> per popolare i Group e calcolare i suggerimenti automatici.
           </div>
         </div>
       </div>
@@ -293,14 +303,18 @@ export default function GroupCategoriesPage() {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <Link href="/admin" style={styles.backLink}>← Admin</Link>
-        <h1 style={styles.title}>Categorie Group</h1>
-        <p style={styles.sub}>
-          Classifica ogni Group (team modella) come <b>Big</b>, <b>Medium</b> o <b>Small</b>.
-          Usato come filtro nella Leaderboard Operativa. Lo Score di ogni operatore resta calcolato
-          sulla media del proprio Group specifico — la categoria è solo una vista per confrontare
-          performer di scala simile.
-        </p>
+        <PageHeader
+          breadcrumb={
+            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <span style={{ color: CP.textPrimary }}>Categorie Group</span>
+            </div>
+          }
+          section="Data · Config"
+          title="Categorie Group"
+          subtitle={<>Classifica ogni Group (team modella) come <b>Big</b>/<b>Medium</b>/<b>Small</b>. Usato come filtro nella Leaderboard Operativa. Lo Score resta calcolato sulla media del proprio Group specifico — la categoria è solo una vista per confrontare performer di scala simile.</>}
+        />
 
         {error && <div style={styles.alertError}>{error}</div>}
         {message && <div style={styles.alertOk}>{message}</div>}

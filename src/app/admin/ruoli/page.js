@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
+import { CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 export default function RolesAdminPage() {
   const [data, setData] = useState(null);
@@ -60,13 +62,20 @@ export default function RolesAdminPage() {
   };
 
   return (
-    <div style={{ background: "#08090F", minHeight: "100vh", color: "#F5F6F8", padding: "2rem" }}>
+    <div style={{ background: "#08090F", minHeight: "100vh", color: "#F5F6F8", padding: "32px 28px 64px 28px", maxWidth: 1400, margin: "0 auto" }}>
       <AdminNav />
-      <h1 style={{ marginTop: 0 }}>🛡️ Gestione ruoli</h1>
-      <p style={{ color: "#6B7080", marginBottom: "1rem" }}>
-        Un utente può avere <b>più ruoli</b> contemporaneamente — le capability si sommano (scope più ampio vince).
-        I ruoli custom si creano in <Link href="/admin/ruoli-custom" style={{ color: "#4F8CCB" }}>/admin/ruoli-custom</Link>.
-      </p>
+      <PageHeader
+        breadcrumb={
+          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+            <span style={{ color: CP.textMuted }}>›</span>
+            <span style={{ color: CP.textPrimary }}>Ruoli</span>
+          </div>
+        }
+        section="People · Permissions"
+        title="Gestione ruoli"
+        subtitle={<>Un utente può avere <b>più ruoli</b> contemporaneamente — le capability si sommano (scope più ampio vince). I ruoli custom si creano in <Link href="/admin/ruoli-custom" style={{ color: CP.accentGreen }}>Ruoli custom</Link>.</>}
+      />
 
       {/* Legend */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem", marginBottom: "1rem" }}>

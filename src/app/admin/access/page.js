@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
-import { COLORS } from "@/lib/brand";
+import { COLORS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const C = {
   bgDark: COLORS.obsidian,
@@ -67,14 +68,21 @@ export default function AccessPage() {
   const copy = (s) => navigator.clipboard.writeText(s).then(() => setMsg({ type: "success", text: "Copiato" }));
 
   return (
-    <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "2rem" }}>
-      <div style={{ maxWidth: 860, margin: "0 auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1.5rem" }}>
-          <h1 style={{ margin: 0 }}>🔐 Gestione Accessi Admin</h1>
-          <Link href="/admin" style={{ color: C.orange, textDecoration: "none" }}>← Hub Admin</Link>
-        </div>
-
+    <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "32px 28px 64px 28px" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <AdminNav />
+        <PageHeader
+          breadcrumb={
+            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <span style={{ color: CP.textPrimary }}>Accessi</span>
+            </div>
+          }
+          section="People · Admin"
+          title="Gestione Accessi Admin"
+          subtitle="Aggiungi/rimuovi admin via email senza redeploy. Gli admin hanno accesso a tutti i tool del Hub."
+        />
 
         {/* Whoami card */}
         {me && (

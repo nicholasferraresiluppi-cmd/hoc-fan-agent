@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
+import { CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const CAP_LABELS = {
   "training.do": "Training — fare sessioni",
@@ -89,12 +92,20 @@ export default function CustomRolesPage() {
   const scopes = data?.scopes || ["own", "team", "all"];
 
   return (
-    <div style={{ background: "#08090F", minHeight: "100vh", color: "#F5F6F8", padding: "2rem" }}>
+    <div style={{ background: "#08090F", minHeight: "100vh", color: "#F5F6F8", padding: "32px 28px 64px 28px", maxWidth: 1400, margin: "0 auto" }}>
       <AdminNav />
-      <h1 style={{ marginTop: 0 }}>🎖️ Ruoli custom</h1>
-      <p style={{ color: "#6B7080", marginBottom: "1.5rem" }}>
-        Crea ruoli personalizzati affiancati ai 5 predefiniti. Per ogni capability scegli lo scope: <b style={{ color: SCOPE_COLOR.own }}>own</b> (solo sé), <b style={{ color: SCOPE_COLOR.team }}>team</b> (proprio team), <b style={{ color: SCOPE_COLOR.all }}>all</b> (tutti).
-      </p>
+      <PageHeader
+        breadcrumb={
+          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+            <span style={{ color: CP.textMuted }}>›</span>
+            <span style={{ color: CP.textPrimary }}>Ruoli custom</span>
+          </div>
+        }
+        section="People · Permissions"
+        title="Ruoli custom"
+        subtitle={<>Crea ruoli personalizzati affiancati ai 5 predefiniti. Per ogni capability scegli lo scope: <b style={{ color: SCOPE_COLOR.own }}>own</b> · <b style={{ color: SCOPE_COLOR.team }}>team</b> · <b style={{ color: SCOPE_COLOR.all }}>all</b>.</>}
+      />
 
       {/* Editor */}
       <div style={{ border: "1px solid #2A2E39", borderRadius: 10, padding: "1rem", background: "#1B1E26", marginBottom: "2rem" }}>

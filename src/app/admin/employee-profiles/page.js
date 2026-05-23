@@ -4,7 +4,8 @@ import { useState, useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -123,11 +124,18 @@ export default function EmployeeProfilesPage() {
     <div style={styles.page}>
       <div style={styles.container}>
         <AdminNav />
-        <h1 style={styles.title}>Profili Operatori</h1>
-        <p style={styles.sub}>
-          Anagrafica operatori: data di ingresso in agency (per il calcolo "tempo in agency" e LTV) +
-          note libere. Lo storico KPI è derivato automaticamente dai periodi importati e non va inserito qui.
-        </p>
+        <PageHeader
+          breadcrumb={
+            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <span style={{ color: CP.textPrimary }}>Profili Operatori</span>
+            </div>
+          }
+          section="People · Anagrafica"
+          title="Profili Operatori"
+          subtitle={'Data di ingresso in agency (per il calcolo "tempo in agency" e LTV) + note libere. Lo storico KPI è derivato automaticamente dai periodi importati.'}
+        />
 
         {/* PROFILI ESISTENTI */}
         <div style={styles.card}>

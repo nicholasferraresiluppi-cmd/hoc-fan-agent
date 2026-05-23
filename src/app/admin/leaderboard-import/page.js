@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const PERIOD_OPTIONS = [
   { value: "monthly", label: "Mensile" },
@@ -171,12 +172,18 @@ export default function LeaderboardImportPage() {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <Link href="/admin" style={styles.backLink}>← Admin</Link>
-        <h1 style={styles.title}>Import dati Operational Leaderboard</h1>
-        <p style={styles.sub}>
-          Carica l'export CSV o Excel "By time and employee" da Infloww. I dati alimentano la
-          leaderboard operativa visibile a tutti gli operatori.
-        </p>
+        <PageHeader
+          breadcrumb={
+            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <span style={{ color: CP.textPrimary }}>Import Infloww</span>
+            </div>
+          }
+          section="Data · Import"
+          title="Import dati Operational Leaderboard"
+          subtitle={'Carica l\'export CSV o Excel "By time and employee" da Infloww. I dati alimentano la leaderboard operativa visibile a tutti.'}
+        />
 
         <div style={styles.card}>
           <h2 style={styles.h2}>1. Periodo</h2>

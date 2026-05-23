@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
-import { COLORS } from "@/lib/brand";
+import { COLORS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const C = {
   bgDark: COLORS.obsidian,
@@ -50,19 +51,21 @@ export default function SeedAdminPage() {
   });
 
   return (
-    <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "2rem" }}>
-      <div style={{ maxWidth: 720, margin: "0 auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1.5rem" }}>
-          <h1 style={{ margin: 0 }}>🌱 Seed Demo Data</h1>
-          <Link href="/admin" style={{ color: C.orange, textDecoration: "none" }}>← Hub Admin</Link>
-        </div>
-
+    <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "32px 28px 64px 28px" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto" }}>
         <AdminNav />
-
-        <p style={{ color: C.gray, lineHeight: 1.6, marginBottom: "1.5rem" }}>
-          Popola la leaderboard con <strong>10 operatori fittizi</strong> e <strong>~60 giorni di sessioni</strong> con profili skill differenziati.
-          Crea anche 3 snapshot storici per la Hall of Fame.
-        </p>
+        <PageHeader
+          breadcrumb={
+            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <span style={{ color: CP.textPrimary }}>Seed Demo Data</span>
+            </div>
+          }
+          section="Data · Demo"
+          title="Seed Demo Data"
+          subtitle={<>Popola la leaderboard con <strong>10 operatori fittizi</strong> e <strong>~60 giorni di sessioni</strong> con profili skill differenziati. Crea anche 3 snapshot storici per la Hall of Fame.</>}
+        />
 
         <div style={{ background: `${C.purple}15`, border: `1px solid ${C.purple}40`, borderRadius: "0.75rem", padding: "1rem", marginBottom: "1.5rem", fontSize: "0.85rem" }}>
           <div style={{ color: C.purple, fontWeight: 700, marginBottom: "0.5rem" }}>📋 Profilo operatori:</div>

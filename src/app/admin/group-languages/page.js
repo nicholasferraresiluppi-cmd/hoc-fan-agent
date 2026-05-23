@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useMemo } from "react";
 import useSWR, { mutate } from "swr";
+import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 const URL_API = "/api/admin/group-languages";
@@ -158,12 +160,18 @@ export default function GroupLanguagesPage() {
     <div style={styles.page}>
       <div style={styles.container}>
         <AdminNav />
-        <h1 style={styles.title}>Lingue Group</h1>
-        <p style={styles.sub}>
-          La lingua di un Group viene rilevata <b>automaticamente</b> dal nome (regex ITA/ENG).
-          Quando il nome non contiene il marker, qui puoi assegnare manualmente la lingua.
-          Gli override sopravvivono al re-import del CSV — la regex resta il default per chi non ha override.
-        </p>
+        <PageHeader
+          breadcrumb={
+            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <span style={{ color: CP.textPrimary }}>Lingue Group</span>
+            </div>
+          }
+          section="Data · Config"
+          title="Lingue Group"
+          subtitle={<>La lingua di un Group viene rilevata <b>automaticamente</b> dal nome (regex ITA/ENG). Quando il nome non contiene il marker, qui puoi assegnare la lingua a mano. Gli override sopravvivono al re-import del CSV.</>}
+        />
 
         {message && (
           <div style={message.startsWith("✓") ? styles.success : styles.error}>{message}</div>

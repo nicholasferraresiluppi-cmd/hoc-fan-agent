@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
+import { CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 export default function TeamsAdminPage() {
   const [data, setData] = useState(null);
@@ -43,12 +46,20 @@ export default function TeamsAdminPage() {
   ];
 
   return (
-    <div style={{ background: "#08090F", minHeight: "100vh", color: "#F5F6F8", padding: "2rem" }}>
+    <div style={{ background: "#08090F", minHeight: "100vh", color: "#F5F6F8", padding: "32px 28px 64px 28px", maxWidth: 1400, margin: "0 auto" }}>
       <AdminNav />
-      <h1 style={{ marginTop: 0 }}>Team</h1>
-      <p style={{ color: "#6B7080", marginBottom: "1rem" }}>
-        Un operatore appartiene a 1 team. Il Team Lead del team vede le sessioni dei propri operatori.
-      </p>
+      <PageHeader
+        breadcrumb={
+          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+            <span style={{ color: CP.textMuted }}>›</span>
+            <span style={{ color: CP.textPrimary }}>Team</span>
+          </div>
+        }
+        section="People · Organizzazione"
+        title="Team"
+        subtitle="Un operatore appartiene a 1 team. Il Team Lead vede le sessioni dei propri operatori."
+      />
 
       {/* Create team */}
       <div style={{ background: "#1B1E26", border: "1px solid #2A2E39", borderRadius: 8, padding: "1rem", marginBottom: "1.5rem", display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>

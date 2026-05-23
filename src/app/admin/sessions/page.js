@@ -2,7 +2,8 @@
 
 import useSWR from "swr";
 import Link from "next/link";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -116,15 +117,18 @@ export default function SessionsListPage() {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <Link href="/admin" style={styles.backLink}>
-          ← Admin
-        </Link>
-        <h1 style={styles.title}>Review chat — sessioni recenti</h1>
-        <p style={styles.sub}>
-          Click su una sessione per leggere la conversazione completa con
-          punteggio e feedback. La lista è filtrata in base ai tuoi permessi
-          (own / team / all).
-        </p>
+        <PageHeader
+          breadcrumb={
+            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <span style={{ color: CP.textPrimary }}>Sessioni</span>
+            </div>
+          }
+          section="Training · Quality"
+          title="Review chat — sessioni recenti"
+          subtitle="Click su una sessione per leggere la conversazione completa con punteggio e feedback. La lista è filtrata in base ai tuoi permessi (own / team / all)."
+        />
 
         {isLoading && <p style={{ color: COLORS.fog }}>Caricamento…</p>}
 

@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
+import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
+import { CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const HOC_COLORS = {
   bgDark: "#08090F",
@@ -84,14 +87,20 @@ export default function OutcomesPage() {
   );
 
   return (
-    <div style={{ background: HOC_COLORS.bgDark, minHeight: "100vh", color: HOC_COLORS.white, padding: "2rem" }}>
+    <div style={{ background: HOC_COLORS.bgDark, minHeight: "100vh", color: HOC_COLORS.white, padding: "32px 28px 64px 28px", maxWidth: 1400, margin: "0 auto" }}>
       <AdminNav />
-      <h1 style={{ background: HOC_COLORS.gradient, backgroundClip: "text", color: "transparent", fontWeight: 900 }}>
-        Outcome Tracking
-      </h1>
-      <p style={{ color: HOC_COLORS.gray }}>
-        Inserisci i risultati reali settimanali degli operatori. Questi dati chiudono il ciclo: confrontiamo il punteggio AI con la performance vera.
-      </p>
+      <PageHeader
+        breadcrumb={
+          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+            <span style={{ color: CP.textMuted }}>›</span>
+            <span style={{ color: CP.textPrimary }}>Outcomes</span>
+          </div>
+        }
+        section="Training · Validation"
+        title="Outcome Tracking"
+        subtitle="Inserisci i risultati reali settimanali degli operatori. Questi dati chiudono il ciclo: confrontiamo il punteggio AI con la performance vera."
+      />
 
       {error && <p style={{ color: "#D44545" }}>{error}</p>}
 

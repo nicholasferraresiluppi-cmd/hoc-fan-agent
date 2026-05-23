@@ -3,7 +3,8 @@
 import { CREATOR_PERSONAS } from "@/lib/creator-personas";
 import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
-import { COLORS } from "@/lib/brand";
+import { COLORS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const C = {
   bgDark: COLORS.obsidian,
@@ -49,19 +50,20 @@ function Chips({ items, color = C.purple }) {
 
 export default function CreatorsAdmin() {
   return (
-    <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "2rem" }}>
+    <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "32px 28px 64px 28px", maxWidth: 1500, margin: "0 auto" }}>
       <AdminNav />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1rem" }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: "1.75rem" }}>Creator personas — Pilot</h1>
-          <p style={{ color: C.gray, margin: "0.25rem 0 0 0", fontSize: "0.9rem" }}>
-            Tone card generate da analisi di 60k+ messaggi Infloww. Rivedi e approva. Edit disponibile in V6.4.
-          </p>
-        </div>
-        <Link href="/admin/dashboard" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>
-          ← Dashboard
-        </Link>
-      </div>
+      <PageHeader
+        breadcrumb={
+          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+            <span style={{ color: CP.textMuted }}>›</span>
+            <span style={{ color: CP.textPrimary }}>Creator personas</span>
+          </div>
+        }
+        section="Insights · Anagrafica"
+        title="Creator personas — Pilot"
+        subtitle="Tone card generate da analisi di 60k+ messaggi Infloww. Rivedi e approva. Edit disponibile in V6.4."
+      />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(420px, 1fr))", gap: "1rem", marginTop: "1.5rem" }}>
         {CREATOR_PERSONAS.map((c) => (

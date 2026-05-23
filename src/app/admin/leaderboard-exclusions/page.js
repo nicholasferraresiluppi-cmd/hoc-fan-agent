@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -154,12 +155,18 @@ export default function LeaderboardExclusionsPage() {
     <div style={styles.page}>
       <div style={styles.container}>
         <AdminNav />
-        <h1 style={styles.title}>Esclusioni Leaderboard Operativa</h1>
-        <p style={styles.sub}>
-          Gestisci la denylist degli operatori da escludere dalla classifica e visualizza
-          chi non vi compare (automatici "Mass", esclusi manuali, score zero, dati mancanti).
-          Le modifiche hanno effetto al successivo caricamento della leaderboard.
-        </p>
+        <PageHeader
+          breadcrumb={
+            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <span style={{ color: CP.textPrimary }}>Esclusioni</span>
+            </div>
+          }
+          section="Data · Leaderboard"
+          title="Esclusioni Leaderboard Operativa"
+          subtitle={'Denylist degli operatori da escludere dalla classifica + vista di chi non vi compare (automatici "Mass", esclusi manuali, score zero, dati mancanti). Effetto immediato al successivo caricamento.'}
+        />
 
         {/* Esclusioni attive */}
         <div style={styles.card}>

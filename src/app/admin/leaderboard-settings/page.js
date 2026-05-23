@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 // Etichette KPI in italiano per UI (replicano il foglio Sheets)
 const KPI_LABELS = {
@@ -329,13 +330,18 @@ export default function LeaderboardSettingsPage() {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <Link href="/admin" style={styles.backLink}>← Admin</Link>
-        <h1 style={styles.title}>Settings Leaderboard Operativa</h1>
-        <p style={styles.sub}>
-          Configura pesi KPI, soglie di normalizzazione e cutoff dei tier — replicando il foglio
-          "Settings" dello Sheets HOC. Le modifiche si applicano immediatamente al ricalcolo della
-          leaderboard. I default da codice restano disponibili come fallback (ripristina sotto).
-        </p>
+        <PageHeader
+          breadcrumb={
+            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <span style={{ color: CP.textPrimary }}>Settings Leaderboard</span>
+            </div>
+          }
+          section="Data · Config"
+          title="Settings Leaderboard Operativa"
+          subtitle={'Pesi KPI, soglie di normalizzazione e cutoff tier — replica il foglio "Settings" dello Sheets HOC. Modifiche immediate. Ripristino default disponibile.'}
+        />
 
         {error && <div style={styles.alertError}>{error}</div>}
         {message && <div style={styles.alertOk}>{message}</div>}
