@@ -45,6 +45,7 @@ export default function ActionCenterPage() {
   const [languageFilter, setLanguageFilter] = useState(""); // "", "ita", "eng", "none"
   const [tierFilter, setTierFilter] = useState(""); // "", "Critical", "Weak", "Average"
   const [groupFilter, setGroupFilter] = useState(""); // "" o nome group
+  const [scoreThreshold, setScoreThreshold] = useState(25); // soglia score, default 25 (Average e sotto)
   const periodOptions = useMemo(() => monthOpts(), []);
   useEffect(() => { if (!periodId && periodOptions[0]) setPeriodId(periodOptions[0].value); }, [periodOptions, periodId]);
 
@@ -56,9 +57,10 @@ export default function ActionCenterPage() {
   const readyForHr = data?.ready_for_hr || [];
   const filterCounts = data?.filter_counts || { languages: {}, tiers: {}, groups: [] };
 
-  // Filtri client-side
+  // Filtri client-side (incluso scoreThreshold)
   const candidates = useMemo(() => {
     return allCandidates.filter((c) => {
+      if (c.score > scoreThreshold) return false;
       if (languageFilter === "ita" && c.language !== "ita") return false;
       if (languageFilter === "eng" && c.language !== "eng") return false;
       if (languageFilter === "none" && c.language) return false;
@@ -66,7 +68,7 @@ export default function ActionCenterPage() {
       if (groupFilter && c.group !== groupFilter) return false;
       return true;
     });
-  }, [allCandidates, languageFilter, tierFilter, groupFilter]);
+  }, [allCandidates, scoreThreshold, languageFilter, tierFilter, groupFilter]);
 
   async function callAction(employee, action, swap_with = undefined, note = undefined) {
     if (!periodId) return;
@@ -214,6 +216,57 @@ export default function ActionCenterPage() {
               </div>
             </CpCard>
           )}
+
+          {/* SLIDER SOGLIA SCORE */}
+          <CpCard padding="16px 22px" style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 280 }}>
+                <span style={{ fontSize: 11, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONTS.mono, fontWeight: 700, whiteSpace: "nowrap" }}>
+                  Soglia score
+                </span>
+                <span style={{ fontFamily: FONTS.mono, fontSize: 18, fontWeight: 700, color: scoreThreshold <= 25 ? CP.accentRed : scoreThreshold <= 50 ? "#F59E0B" : CP.accentGreen, minWidth: 36 }}>
+                  ≤ {scoreThreshold}
+                </span>
+                <span style={{ padding: "2px 8px", background: tierForScore(scoreThreshold).color + "22", color: tierForScore(scoreThreshold).color, borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: "0.04em" }}>
+                  fino a {tierForScore(scoreThreshold).label}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={75}
+                step={5}
+                value={scoreThreshold}
+                onChange={(e) => setScoreThreshold(parseInt(e.target.value, 10))}
+                style={{
+                  flex: 1, minWidth: 240, maxWidth: 600,
+                  accentColor: scoreThreshold <= 25 ? CP.accentRed : scoreThreshold <= 50 ? "#F59E0B" : CP.accentGreen,
+                  cursor: "pointer",
+                }}
+              />
+              <button
+                onClick={() => setScoreThreshold(25)}
+                disabled={scoreThreshold === 25}
+                style={{
+                  padding: "5px 12px",
+                  background: "transparent",
+                  border: `1px solid ${scoreThreshold === 25 ? CP.border : CP.borderStrong}`,
+                  borderRadius: 6,
+                  color: scoreThreshold === 25 ? CP.textMuted : CP.textSecondary,
+                  fontSize: 11,
+                  cursor: scoreThreshold === 25 ? "default" : "pointer",
+                  fontFamily: FONTS.body,
+                  whiteSpace: "nowrap",
+                }}
+                title="Ripristina soglia default (25 = Average e sotto)"
+              >
+                ↺ Default (25)
+              </button>
+            </div>
+            <div style={{ marginTop: 8, fontSize: 11, color: CP.textMuted }}>
+              💡 Alza la soglia per includere anche operatori <b>Weak/Average</b> nel pannello (utile per riorganizzazioni più ampie del team). Default {data?.config?.score_threshold_default_ui || 25}.
+            </div>
+          </CpCard>
 
           {/* FILTRI */}
           <CpCard padding="14px 18px" style={{ marginBottom: 14 }}>
@@ -508,6 +561,14 @@ function SwapPicker({ candidate, swapTargets, onChange }) {
       </select>
     </div>
   );
+}
+
+function tierForScore(score) {
+  if (score >= 75) return { label: "Strong", color: "#3B82F6" };
+  if (score >= 50) return { label: "Good", color: "#10B981" };
+  if (score >= 25) return { label: "Average", color: "#9CA3AF" };
+  if (score >= 10) return { label: "Weak", color: "#F59E0B" };
+  return { label: "Critical", color: "#EF4444" };
 }
 
 function FilterGroup({ label, children }) {

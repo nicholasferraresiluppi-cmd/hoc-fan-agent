@@ -35,9 +35,12 @@ import { detectLanguage } from "@/lib/leaderboard-calc";
 const SWAP_KEY = (periodId) => `action_center:swaps:${periodId}`;
 const IGNORED_KEY = "underperformers:ignored";
 
-const UNDERPERFORMER_SCORE_MAX = 25;   // Average e sotto
+// SOGLIA UI default = 25 (Average e sotto). Il backend ritorna fino a SCORE_MAX_BACKEND
+// (75 = include anche Good) così l'UI ha uno slider che alza la soglia senza rifetch.
+const SCORE_THRESHOLD_DEFAULT_UI = 25;
+const SCORE_MAX_BACKEND = 75;
 const UNDERPERFORMER_MIN_SHIFTS = 5;   // Almeno 5 shift TOTALI nel periodo
-const TOP_N = 30;                      // Max candidati ritornati
+const TOP_N = 200;                     // Max candidati ritornati (cap di sicurezza)
 
 function isValidPeriod(p) { return typeof p === "string" && /^\d{4}-\d{2}$/.test(p); }
 
@@ -77,11 +80,11 @@ export async function GET(request) {
   // Calcola score con buildCpLeaderboard (deriva da matrix v3)
   const { ranking } = await buildCpLeaderboard(operatorsDecorated, period_id);
 
-  // Filtra underperformers
+  // Filtra underperformers (allargato a SCORE_MAX_BACKEND, UI poi filtra con slider)
   const rawCandidates = ranking
     .filter((r) => {
       if (r.score == null) return false;
-      if (r.score > UNDERPERFORMER_SCORE_MAX) return false;
+      if (r.score > SCORE_MAX_BACKEND) return false;
       const totalShifts = r.cp_aggregates?.total_shifts || 0;
       if (totalShifts < UNDERPERFORMER_MIN_SHIFTS) return false;
       if (ignoredObj[r.employee]) return false;
@@ -162,6 +165,11 @@ export async function GET(request) {
       languages: langCounts,
       tiers: tierCounts,
       groups: Array.from(groups).sort(),
+    },
+    config: {
+      score_threshold_default_ui: SCORE_THRESHOLD_DEFAULT_UI,
+      score_max_backend: SCORE_MAX_BACKEND,
+      min_shifts: UNDERPERFORMER_MIN_SHIFTS,
     },
   });
 }
