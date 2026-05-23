@@ -94,6 +94,11 @@ export async function buildCreatorMatrix(periodId) {
         matrix[opName][d.creator].hours += d.hours;
         matrix[opName][d.creator].shifts += d.shift_count_share;
         matrix[opName][d.creator].shift_values.push(d.sales);
+        // v2: traccia mono vs split per trasparenza UI
+        if (!matrix[opName][d.creator].shift_split_count) matrix[opName][d.creator].shift_split_count = 0;
+        if (!matrix[opName][d.creator].shift_mono_count) matrix[opName][d.creator].shift_mono_count = 0;
+        if (d.estimated) matrix[opName][d.creator].shift_split_count += 1;
+        else matrix[opName][d.creator].shift_mono_count += 1;
         if (d.interval) matrix[opName][d.creator].interval_sales[d.interval] = (matrix[opName][d.creator].interval_sales[d.interval] || 0) + d.sales;
 
         if (!creators[d.creator]) creators[d.creator] = {
@@ -147,14 +152,22 @@ export async function buildCreatorMatrix(periodId) {
   }
 
   // Score relativo per ogni cella: normalize sales_per_shift vs media della creator
+  // v2: aggiunto low_confidence flag se total_shifts < 3 (poco affidabile statisticamente)
+  // v2: split_pct = % dei suoi shift che sono multi-creator (split equo)
+  const MIN_SHIFTS_RELIABLE = 3;
   for (const op of Object.keys(matrix)) {
     for (const cr of Object.keys(matrix[op])) {
       const cell = matrix[op][cr];
       const creatorMean = creators[cr]?.avg_sales_per_shift || 0;
+      const totalShiftEvents = (cell.shift_split_count || 0) + (cell.shift_mono_count || 0);
       cell.score_relative = creatorMean > 0
         ? Math.round((cell.sales_per_shift / creatorMean) * 100)
         : 0;
       cell.tier_relative = scoreTierFromRel(cell.score_relative);
+      cell.low_confidence = totalShiftEvents < MIN_SHIFTS_RELIABLE;
+      cell.split_pct = totalShiftEvents > 0
+        ? Math.round((cell.shift_split_count / totalShiftEvents) * 100)
+        : 0;
       delete cell.shift_values; // dropped da output
     }
   }
@@ -208,6 +221,10 @@ export async function getCreatorDrilldown(creatorAlias, periodId) {
         sales: cell.sales,
         hours: cell.hours,
         shifts: cell.shifts,
+        shift_split_count: cell.shift_split_count || 0,
+        shift_mono_count: cell.shift_mono_count || 0,
+        split_pct: cell.split_pct || 0,
+        low_confidence: !!cell.low_confidence,
         sales_per_shift: cell.sales_per_shift,
         sales_per_hour: cell.sales_per_hour,
         score: cell.score_relative,

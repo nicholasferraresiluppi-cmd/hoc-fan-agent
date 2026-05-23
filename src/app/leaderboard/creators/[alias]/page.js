@@ -129,38 +129,59 @@ export default function CreatorDrilldownPage({ params, searchParams }) {
                     <th style={styles.th}>Operatore</th>
                     <th style={styles.th}>Sales</th>
                     <th style={styles.th}>% sul totale</th>
-                    <th style={styles.th}>Shift</th>
+                    <th style={styles.th} title="Shift attribuiti: mono = solo questa creator, split = lavoro contemporaneo su più creator (stima 50/50)">Shift</th>
                     <th style={styles.th}>$/Shift</th>
                     <th style={styles.th}>$/h</th>
-                    <th style={styles.th} title="Score relativo: 100 = media creator. >130 Elite, <70 Critical">Score rel</th>
+                    <th style={styles.th} title="Score relativo: 100 = media creator. >130 Elite, <70 Critical. '—' se <3 shift (poco affidabile)">Score rel</th>
                     <th style={styles.th}>Tier</th>
                   </tr>
                 </thead>
                 <tbody>
                   {operators.map((op) => {
-                    const tColor = TIER_COLORS[op.tier] || COLORS.mist;
+                    const tColor = op.low_confidence ? COLORS.mist : (TIER_COLORS[op.tier] || COLORS.mist);
+                    const splitMostly = op.split_pct >= 50;
                     return (
-                      <tr key={op.employee}>
+                      <tr key={op.employee} style={{ opacity: op.low_confidence ? 0.7 : 1 }}>
                         <td style={{ ...styles.td, fontFamily: FONTS.mono, color: COLORS.fog }}>{String(op.rank).padStart(2, "0")}</td>
                         <td style={{ ...styles.td, fontWeight: 600 }}>
                           <Link href={`/leaderboard/operational/${encodeURIComponent(op.employee)}`} style={{ color: COLORS.alabaster, textDecoration: "none" }}>
                             {op.employee} <span style={{ color: COLORS.champagne, opacity: 0.5, fontSize: 11 }}>›</span>
                           </Link>
+                          {splitMostly && (
+                            <span title={`${op.split_pct}% dei suoi shift sono multi-creator (split equo con altre). Dato CP stimato, non esatto.`}
+                                  style={{ marginLeft: 6, padding: "1px 5px", fontSize: 9, fontFamily: FONTS.mono, fontWeight: 600, background: "#E76F5126", color: "#E76F51", border: "1px solid #E76F5155", borderRadius: 3 }}>
+                              ⚖️ {op.split_pct}% SPLIT
+                            </span>
+                          )}
                         </td>
                         <td style={{ ...styles.td, fontFamily: FONTS.mono, color: "#3FB97E", fontWeight: 600 }}>{fmtCurrency(op.sales)}</td>
                         <td style={{ ...styles.td, fontFamily: FONTS.mono, color: COLORS.fog }}>{fmtPct(op.sales_share_pct)}</td>
-                        <td style={{ ...styles.td, fontFamily: FONTS.mono, color: COLORS.fog }}>{fmtNum(op.shifts)}</td>
+                        <td style={{ ...styles.td, fontFamily: FONTS.mono, color: COLORS.fog }} title={`${op.shift_mono_count} mono + ${op.shift_split_count} split = ${op.shift_mono_count + op.shift_split_count} eventi shift totali`}>
+                          {fmtNum(op.shifts)}
+                          <span style={{ fontSize: 10, color: COLORS.mist, marginLeft: 4 }}>
+                            ({op.shift_mono_count}m+{op.shift_split_count}s)
+                          </span>
+                        </td>
                         <td style={{ ...styles.td, fontFamily: FONTS.mono }}>{fmtCurrency(op.sales_per_shift)}</td>
                         <td style={{ ...styles.td, fontFamily: FONTS.mono }}>{fmtCurrency(op.sales_per_hour)}</td>
-                        <td style={{ ...styles.td, fontFamily: FONTS.mono, fontWeight: 700, color: tColor }}>{op.score}</td>
+                        <td style={{ ...styles.td, fontFamily: FONTS.mono, fontWeight: 700, color: tColor }} title={op.low_confidence ? `Pochi shift totali (${op.shift_mono_count + op.shift_split_count}) — score non affidabile` : ""}>
+                          {op.low_confidence ? "—" : op.score}
+                        </td>
                         <td style={styles.td}>
-                          <span style={{ padding: "2px 8px", borderRadius: 999, fontSize: 10, fontWeight: 600, background: tColor + "26", color: tColor, border: `1px solid ${tColor}55` }}>{op.tier}</span>
+                          {op.low_confidence ? (
+                            <span style={{ fontSize: 10, color: COLORS.mist, fontStyle: "italic" }}>pochi shift</span>
+                          ) : (
+                            <span style={{ padding: "2px 8px", borderRadius: 999, fontSize: 10, fontWeight: 600, background: tColor + "26", color: tColor, border: `1px solid ${tColor}55` }}>{op.tier}</span>
+                          )}
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+              <p style={{ fontSize: 11, color: COLORS.mist, marginTop: 12 }}>
+                💡 <b>Mono</b>=shift su questa creator soltanto, <b>Split</b>=shift contemporaneo su più creator (dato stimato 50/50). Operatori con &lt;3 shift hanno score &quot;—&quot; perché statisticamente poco affidabili.
+              </p>
             </div>
           </>
         )}
