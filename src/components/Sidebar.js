@@ -25,7 +25,7 @@ import {
   LayoutDashboard, UserCog, Sparkles,
   Workflow, Image as ImageIcon, ListChecks, History, Settings,
   UserCircle2, Contact, Medal, Key, Lock, Wrench,
-  RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout,
+  RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
@@ -112,6 +112,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/admin/creatorspro-sync",         label: "Sync CP",         icon: RefreshCw },
       { href: "/admin/creatorspro-sync-history", label: "Sync CP storico", icon: History },
+      { href: "/admin/wage-audit",               label: "Wage Audit",      icon: ShieldCheck },
       { href: "/admin/leaderboard-exclusions",   label: "Esclusioni",      icon: Ban },
       { href: "/admin/group-languages",          label: "Lingue Group",    icon: Languages },
       { href: "/admin/group-categories",         label: "Categorie Group", icon: Tags },

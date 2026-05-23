@@ -43,7 +43,7 @@ function monthBoundsIso(periodId) {
   return { startedAt: start.toISOString(), endedAt: end.toISOString() };
 }
 
-function normalizeWage(wage) {
+export function normalizeWage(wage) {
   const info = wage?.info || {};
   const shifts = Array.isArray(wage?.shifts) ? wage.shifts : [];
   const normalizedShifts = shifts.map((s) => {
