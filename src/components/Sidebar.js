@@ -35,6 +35,7 @@ import BrandLockup from "@/components/BrandLockup";
 const ESSENTIAL_HREFS = new Set([
   "/welcome",
   "/welcome/score-friendly",
+  "/profilo",
   "/admin",
   "/leaderboard/sales-cp",
   "/leaderboard/creators",
@@ -339,6 +340,7 @@ export default function Sidebar() {
 
       {/* Welcome link (always visible, both modes) */}
       <div style={{ padding: "10px 0 4px 0", borderBottom: `1px solid ${CP.border}` }}>
+        <NavItem href="/profilo" label="Il mio profilo" icon={Award} isActive={pathname === "/profilo"} />
         <NavItem href="/welcome" label="Welcome / Tour" icon={Compass} isActive={pathname === "/welcome"} />
         <NavItem href="/admin" label="Hub" icon={LayoutDashboard} isActive={pathname === "/admin"} />
       </div>
