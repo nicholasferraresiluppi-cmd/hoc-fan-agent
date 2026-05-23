@@ -1,9 +1,15 @@
 /**
- * HOC Fan Agent — CreatorsPro API client (v2).
+ * HOC Fan Agent — CreatorsPro API client (v2.1).
  *
  * v2: paginazione + detail parallelizzati. PAGE_LIMIT ridotto a 25 perché
  * l'API CP timeout-a su limit=100. Aggiunta funzione fetchWageDetailBatch
  * per chunking server-side che resta sotto Vercel Hobby 60s limit.
+ *
+ * v2.1 (gen 2026): RETRY con backoff esponenziale su tutte le chiamate batch
+ * (fetchAllWageStubs, fetchWageDetailBatch). Le pagine/id che falliscono
+ * dopo 3 tentativi vengono RITORNATE come failed_pages / failed_ids invece
+ * di essere silenziate. Risolve il caso 'wage record mancante dopo sync
+ * apparentemente riuscito' (es. Francesco Casti Aprile 2026).
  */
 
 const DEFAULT_BASE = "https://api.houseofcreators.com";
@@ -126,6 +132,33 @@ export async function fetchWagesStatusCounts({ startedAt, endedAt, memberId, gro
 }
 
 /* ============================================================
+ * Retry helper (esponenziale + jitter)
+ * ============================================================ */
+
+/**
+ * Esegue fn con max N tentativi e backoff esponenziale (+jitter).
+ * Ritorna il risultato di fn se riesce, oppure { _failed: true, _error }.
+ * NON throwa, così possiamo collezionare i fallimenti senza interrompere
+ * il batch principale.
+ */
+async function withRetry(fn, { maxAttempts = 3, baseDelayMs = 500 } = {}) {
+  let lastErr = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      if (attempt < maxAttempts) {
+        const jitter = Math.random() * 200;
+        const delay = baseDelayMs * Math.pow(2, attempt - 1) + jitter;
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+  return { _failed: true, _error: String(lastErr?.message || lastErr) };
+}
+
+/* ============================================================
  * High-level helpers
  * ============================================================ */
 
@@ -134,8 +167,12 @@ export async function fetchWagesStatusCounts({ startedAt, endedAt, memberId, gro
  * Paginazione parallelizzata: prima pagina seriale per scoprire totalPages,
  * poi tutte le restanti in parallelo a concurrency LIST_PAGES_CONCURRENCY.
  *
+ * v2.1: ogni pagina ha 3 tentativi (backoff esponenziale + jitter). Le
+ * pagine che falliscono dopo i retry vengono RITORNATE in `failedPages[]`
+ * invece di essere silenziate. Il chiamante può decidere se ritentarle.
+ *
  * Su un mese tipico (~554 wage / PAGE_LIMIT=25 = ~22 pagine) richiede
- * ~10-15s totali — sicuramente sotto qualsiasi function timeout.
+ * ~10-15s totali (più qualche secondo di backoff in caso di errori).
  */
 export async function fetchAllWageStubs({ startedAt, endedAt }) {
   const first = await fetchWages({ startedAt, endedAt, page: 1, limit: PAGE_LIMIT });
@@ -143,23 +180,52 @@ export async function fetchAllWageStubs({ startedAt, endedAt }) {
   const pagination = first.pagination || {};
   const totalCount = pagination.dataCount || stubs.length;
   const pageCount = pagination.pageCount || Math.ceil(totalCount / PAGE_LIMIT) || 1;
-  if (pageCount <= 1) return { stubs, totalCount };
+  const failedPages = [];
+  if (pageCount <= 1) return { stubs, totalCount, pageCount, failedPages };
 
-  // Fetcha pagine 2..N in parallelo a chunks di LIST_PAGES_CONCURRENCY
+  // Fetcha pagine 2..N in parallelo a chunks di LIST_PAGES_CONCURRENCY, con retry
   const pages = [];
   for (let p = 2; p <= pageCount; p++) pages.push(p);
-  const others = new Array(pages.length);
   for (let i = 0; i < pages.length; i += LIST_PAGES_CONCURRENCY) {
     const slice = pages.slice(i, i + LIST_PAGES_CONCURRENCY);
-    const results = await Promise.all(slice.map((p) =>
-      fetchWages({ startedAt, endedAt, page: p, limit: PAGE_LIMIT }).catch((e) => ({ data: [], _err: String(e?.message || e) }))
-    ));
-    for (let j = 0; j < results.length; j++) others[i + j] = results[j];
+    const results = await Promise.all(slice.map(async (p) => {
+      const r = await withRetry(() => fetchWages({ startedAt, endedAt, page: p, limit: PAGE_LIMIT }));
+      return { page: p, result: r };
+    }));
+    for (const { page, result } of results) {
+      if (result?._failed) {
+        failedPages.push({ page, error: result._error });
+        // Log server-side per visibilità in Vercel logs
+        // eslint-disable-next-line no-console
+        console.warn(`[CP_SYNC] page ${page} FAILED after 3 retries:`, result._error);
+      } else if (result?.data) {
+        stubs.push(...result.data);
+      }
+    }
   }
-  for (const r of others) {
-    if (r?.data) stubs.push(...r.data);
+  return { stubs, totalCount, pageCount, failedPages };
+}
+
+/**
+ * Retry mirato: ri-pesca SOLO le pagine specifiche (es. quelle che erano in
+ * `failedPages` del run precedente). Utile per un "retry button" UI dopo che
+ * il sync iniziale ha lasciato alcune pagine fallite.
+ */
+export async function fetchWageStubsForPages({ startedAt, endedAt, pages }) {
+  const stubs = [];
+  const failedPages = [];
+  for (let i = 0; i < pages.length; i += LIST_PAGES_CONCURRENCY) {
+    const slice = pages.slice(i, i + LIST_PAGES_CONCURRENCY);
+    const results = await Promise.all(slice.map(async (p) => {
+      const r = await withRetry(() => fetchWages({ startedAt, endedAt, page: p, limit: PAGE_LIMIT }), { maxAttempts: 4, baseDelayMs: 800 });
+      return { page: p, result: r };
+    }));
+    for (const { page, result } of results) {
+      if (result?._failed) failedPages.push({ page, error: result._error });
+      else if (result?.data) stubs.push(...result.data);
+    }
   }
-  return { stubs, totalCount };
+  return { stubs, failedPages };
 }
 
 /**
@@ -173,9 +239,15 @@ export async function fetchWageDetailBatch(wageIds) {
   const out = new Array(wageIds.length);
   for (let i = 0; i < wageIds.length; i += DETAIL_CONCURRENCY) {
     const slice = wageIds.slice(i, i + DETAIL_CONCURRENCY);
-    const results = await Promise.all(slice.map((id) =>
-      fetchWageDetail(id).catch((e) => ({ _error: String(e?.message || e), _id: id }))
-    ));
+    const results = await Promise.all(slice.map(async (id) => {
+      const r = await withRetry(() => fetchWageDetail(id));
+      if (r?._failed) {
+        // eslint-disable-next-line no-console
+        console.warn(`[CP_SYNC] wage detail ${id} FAILED after 3 retries:`, r._error);
+        return { _error: r._error, _id: id };
+      }
+      return r;
+    }));
     for (let j = 0; j < results.length; j++) out[i + j] = results[j];
   }
   return out;

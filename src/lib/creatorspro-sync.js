@@ -23,6 +23,7 @@ import {
   fetchGroups,
   fetchIntervals,
   fetchAllWageStubs,
+  fetchWageStubsForPages,
   fetchWageDetailBatch,
   fetchWages,
   bucketizeIntervalFromHour,
@@ -142,34 +143,46 @@ export async function prepareSync({ periodId, pageOffset = null, pagesLimit = nu
         raw_total: null,
         started_at: Date.now(),
         prepare_done: false,
+        failed_pages: [],
       }, { ex: TTL_SYNC_STATE });
       await kv.set(`cp:wages:${periodId}`, [], { ex: TTL_WAGES });
     }
-    // Fetch first page per scoprire pagination
-    const first = await fetchWages({ startedAt, endedAt, page: pageOffset, limit: 25 });
-    const totalCount = first.pagination?.dataCount || 0;
-    const pageCount = first.pagination?.pageCount || 1;
-    const stubsBatch = [...(first.data || [])];
-    // Fetch pagine successive in parallelo fino a pagesLimit
+    // Fetch first page per scoprire pagination (con retry interno via fetchWageStubsForPages)
+    const firstResult = await fetchWageStubsForPages({ startedAt, endedAt, pages: [pageOffset] });
+    let pageCount = 1;
+    let totalCount = 0;
+    // fetchWageStubsForPages non ritorna pagination → la prendiamo con una micro-call fetchWages diretta
+    // (solo se è la prima invocazione e dobbiamo scoprire pageCount)
+    let stubsBatch = firstResult.stubs;
+    const pageFailures = [...firstResult.failedPages];
+    try {
+      const first = await fetchWages({ startedAt, endedAt, page: pageOffset, limit: 25 });
+      totalCount = first.pagination?.dataCount || 0;
+      pageCount = first.pagination?.pageCount || 1;
+      // Se sopra abbiamo fallito la pagina offset ma qui no, usiamo questi dati
+      if (pageFailures.length > 0 && first.data) {
+        pageFailures.length = 0;
+        stubsBatch = [...first.data];
+      }
+    } catch {
+      // Se anche questa chiamata fallisce, abbiamo già pageFailures tracciato
+    }
+    // Fetch pagine successive con retry tramite fetchWageStubsForPages
     const lastPage = Math.min(pageCount, pageOffset + pagesLimit - 1);
     if (lastPage > pageOffset) {
       const pages = [];
       for (let p = pageOffset + 1; p <= lastPage; p++) pages.push(p);
-      const CONCURRENCY = 5;
-      for (let i = 0; i < pages.length; i += CONCURRENCY) {
-        const slice = pages.slice(i, i + CONCURRENCY);
-        const results = await Promise.all(slice.map((p) =>
-          fetchWages({ startedAt, endedAt, page: p, limit: 25 }).catch((e) => ({ data: [], _err: String(e?.message || e) }))
-        ));
-        for (const r of results) if (r?.data) stubsBatch.push(...r.data);
-      }
+      const restResult = await fetchWageStubsForPages({ startedAt, endedAt, pages });
+      stubsBatch.push(...restResult.stubs);
+      pageFailures.push(...restResult.failedPages);
     }
     // Append a state
-    const state = (await kv.get(`cp:sync:state:${periodId}`)) || { stubs: [], total: 0, started_at: Date.now() };
+    const state = (await kv.get(`cp:sync:state:${periodId}`)) || { stubs: [], total: 0, started_at: Date.now(), failed_pages: [] };
     const idxStubs = stubsBatch.map((w) => ({
       id: w?.info?.id, member_id: w?.info?.memberId, member_name: w?.info?.memberName, status: w?.info?.status,
     })).filter((s) => s.id);
     const newStubs = [...(state.stubs || []), ...idxStubs];
+    const newFailedPages = [...(state.failed_pages || []), ...pageFailures];
     const nextPage = lastPage + 1;
     const prepareDone = nextPage > pageCount;
     await kv.set(`cp:sync:state:${periodId}`, {
@@ -179,6 +192,7 @@ export async function prepareSync({ periodId, pageOffset = null, pagesLimit = nu
       raw_total: totalCount,
       page_count: pageCount,
       prepare_done: prepareDone,
+      failed_pages: newFailedPages,
     }, { ex: TTL_SYNC_STATE });
     return {
       total: newStubs.length,
@@ -186,20 +200,52 @@ export async function prepareSync({ periodId, pageOffset = null, pagesLimit = nu
       page_count: pageCount,
       current_page: lastPage,
       next_page: prepareDone ? null : nextPage,
+      failed_pages: newFailedPages,
       done: prepareDone,
     };
   }
 
-  // Modalità classica (one-shot)
-  const { stubs, totalCount } = await fetchAllWageStubs({ startedAt, endedAt });
+  // Modalità classica (one-shot) — ora con retry interno
+  const { stubs, totalCount, pageCount, failedPages } = await fetchAllWageStubs({ startedAt, endedAt });
   const idxStubs = stubs.map((w) => ({
     id: w?.info?.id, member_id: w?.info?.memberId, member_name: w?.info?.memberName, status: w?.info?.status,
   })).filter((s) => s.id);
   await kv.set(`cp:sync:state:${periodId}`, {
-    stubs: idxStubs, total: idxStubs.length, raw_total: totalCount, started_at: Date.now(), prepare_done: true,
+    stubs: idxStubs, total: idxStubs.length, raw_total: totalCount, page_count: pageCount,
+    started_at: Date.now(), prepare_done: true, failed_pages: failedPages,
   }, { ex: TTL_SYNC_STATE });
   await kv.set(`cp:wages:${periodId}`, [], { ex: TTL_WAGES });
-  return { total: idxStubs.length, raw_total: totalCount, done: true };
+  return { total: idxStubs.length, raw_total: totalCount, failed_pages: failedPages, done: true };
+}
+
+/**
+ * Retry mirato: ri-pesca SOLO le pagine fallite del prepare precedente,
+ * e appende i nuovi stub allo state. Da chiamare dopo che lo state ha
+ * `failed_pages.length > 0` se vuoi recuperare i record persi.
+ */
+export async function retryFailedPages({ periodId }) {
+  const state = await kv.get(`cp:sync:state:${periodId}`);
+  if (!state) throw new Error(`Nessuno stato sync per ${periodId}`);
+  const failed = state.failed_pages || [];
+  if (failed.length === 0) return { retried: 0, recovered: 0, still_failed: [] };
+
+  const { startedAt, endedAt } = monthBoundsIso(periodId);
+  const pages = failed.map((f) => f.page);
+  const { stubs, failedPages: stillFailed } = await fetchWageStubsForPages({ startedAt, endedAt, pages });
+  const idxStubs = stubs.map((w) => ({
+    id: w?.info?.id, member_id: w?.info?.memberId, member_name: w?.info?.memberName, status: w?.info?.status,
+  })).filter((s) => s.id);
+  // Dedupe vs existing stubs
+  const existingIds = new Set((state.stubs || []).map((s) => s.id));
+  const newStubs = idxStubs.filter((s) => !existingIds.has(s.id));
+  const updatedStubs = [...(state.stubs || []), ...newStubs];
+  await kv.set(`cp:sync:state:${periodId}`, {
+    ...state,
+    stubs: updatedStubs,
+    total: updatedStubs.length,
+    failed_pages: stillFailed,
+  }, { ex: TTL_SYNC_STATE });
+  return { retried: pages.length, recovered: newStubs.length, still_failed: stillFailed };
 }
 
 /**
@@ -221,11 +267,22 @@ export async function syncWageBatch({ periodId, offset = 0, batchSize = 50 }) {
   const normalized = details
     .filter((w) => !w?._error && w?.info?.id)
     .map(normalizeWage);
+  const failedDetails = details.filter((d) => d?._error).map((d) => ({ id: d._id, error: d._error }));
 
   // Append a cp:wages:{periodId}
   const existing = (await kv.get(`cp:wages:${periodId}`)) || [];
   const merged = [...existing, ...normalized];
   await kv.set(`cp:wages:${periodId}`, merged, { ex: TTL_WAGES });
+
+  // Persist failed detail ids in state (per retry mirato eventuale)
+  if (failedDetails.length > 0) {
+    const updatedState = (await kv.get(`cp:sync:state:${periodId}`)) || state;
+    const existingFailed = updatedState.failed_details || [];
+    await kv.set(`cp:sync:state:${periodId}`, {
+      ...updatedState,
+      failed_details: [...existingFailed, ...failedDetails],
+    }, { ex: TTL_SYNC_STATE });
+  }
 
   const newOffset = offset + sliceStubs.length;
   return {
@@ -234,8 +291,41 @@ export async function syncWageBatch({ periodId, offset = 0, batchSize = 50 }) {
     total,
     next_offset: newOffset,
     batch_normalized: normalized.length,
-    batch_errors: details.filter((d) => d?._error).length,
+    batch_errors: failedDetails.length,
+    failed_detail_ids_sample: failedDetails.slice(0, 5).map((f) => f.id),
   };
+}
+
+/**
+ * Retry mirato dei wage detail falliti (raccolti durante syncWageBatch).
+ * Riprova ognuno con backoff e appende i normalizzati a cp:wages.
+ */
+export async function retryFailedDetails({ periodId }) {
+  const state = await kv.get(`cp:sync:state:${periodId}`);
+  if (!state) throw new Error(`Nessuno stato sync per ${periodId}`);
+  const failed = state.failed_details || [];
+  if (failed.length === 0) return { retried: 0, recovered: 0, still_failed: [] };
+
+  const ids = failed.map((f) => f.id);
+  const details = await fetchWageDetailBatch(ids);
+  const normalized = details
+    .filter((w) => !w?._error && w?.info?.id)
+    .map(normalizeWage);
+  const stillFailed = details.filter((d) => d?._error).map((d) => ({ id: d._id, error: d._error }));
+
+  const existing = (await kv.get(`cp:wages:${periodId}`)) || [];
+  // Dedupe by wage id
+  const existingIds = new Set(existing.map((w) => w.id));
+  const newWages = normalized.filter((w) => !existingIds.has(w.id));
+  const merged = [...existing, ...newWages];
+  await kv.set(`cp:wages:${periodId}`, merged, { ex: TTL_WAGES });
+
+  await kv.set(`cp:sync:state:${periodId}`, {
+    ...state,
+    failed_details: stillFailed,
+  }, { ex: TTL_SYNC_STATE });
+
+  return { retried: ids.length, recovered: newWages.length, still_failed: stillFailed };
 }
 
 /**
@@ -278,6 +368,8 @@ export async function finalizeSync({ periodId }) {
   await kv.set("cp:member_mapping", mapping);
 
   const wagesArr = Array.isArray(wages) ? wages : [];
+  const failedPages = state.failed_pages || [];
+  const failedDetails = state.failed_details || [];
   const meta = {
     last_sync_at: Date.now(),
     last_sync_period: periodId,
@@ -291,7 +383,12 @@ export async function finalizeSync({ periodId }) {
       shifts_total: wagesArr.reduce((a, w) => a + (w.shifts?.length || 0), 0),
       mapping_total: Object.keys(mapping).length,
       mapping_unmatched: unmatched.length,
+      failed_pages: failedPages.length,
+      failed_details: failedDetails.length,
     },
+    failed_pages_sample: failedPages.slice(0, 5),
+    failed_details_sample: failedDetails.slice(0, 5),
+    has_warnings: failedPages.length > 0 || failedDetails.length > 0,
   };
   await kv.set("cp:_meta", meta);
   await kv.del(`cp:sync:state:${periodId}`);

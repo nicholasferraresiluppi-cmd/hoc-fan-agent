@@ -28,6 +28,8 @@ import {
   syncWageBatch,
   finalizeSync,
   getSyncStatus,
+  retryFailedPages,
+  retryFailedDetails,
 } from "@/lib/creatorspro-sync";
 
 export const maxDuration = 60; // Hobby plan max
@@ -74,6 +76,28 @@ export async function POST(request) {
         meta: { counts: r.meta.counts, duration_ms: r.meta.duration_ms },
       });
       return Response.json({ ok: true, action, ...r });
+    }
+    if (action === "retry-pages") {
+      if (!period_id) return Response.json({ error: "period_id richiesto" }, { status: 400 });
+      const r = await retryFailedPages({ periodId: period_id });
+      await logAuditAction({
+        action: "creatorspro.retry-pages",
+        target: period_id,
+        by: az.userId,
+        meta: r,
+      });
+      return Response.json({ ok: true, action, period_id, ...r });
+    }
+    if (action === "retry-details") {
+      if (!period_id) return Response.json({ error: "period_id richiesto" }, { status: 400 });
+      const r = await retryFailedDetails({ periodId: period_id });
+      await logAuditAction({
+        action: "creatorspro.retry-details",
+        target: period_id,
+        by: az.userId,
+        meta: r,
+      });
+      return Response.json({ ok: true, action, period_id, ...r });
     }
 
     // Retrocompat: senza action, fa tutto in sequenza (rischio timeout su Hobby!)
