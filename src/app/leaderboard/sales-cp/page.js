@@ -6,7 +6,7 @@ import Link from "next/link";
 import { COLORS, FONTS, CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
-import { Info, Target, ArrowRight } from "lucide-react";
+import { Info, Target, ArrowRight, Search, Loader2, CheckCircle2, XCircle } from "lucide-react";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -95,6 +95,31 @@ export default function SalesCpLeaderboardPage() {
   const [languageFilter, setLanguageFilter] = useState("");
   const [showNoCp, setShowNoCp] = useState(true);
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  // Map employee → { state: 'idle'|'loading'|'success'|'error', message }
+  const [recheckState, setRecheckState] = useState({});
+
+  async function recheckEmployee(employee) {
+    setRecheckState((s) => ({ ...s, [employee]: { state: "loading" } }));
+    try {
+      const res = await fetch("/api/admin/wage-recheck", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ period_id: periodId, employee }),
+      });
+      const j = await res.json();
+      if (!res.ok || j.ok === false) {
+        setRecheckState((s) => ({ ...s, [employee]: { state: "error", message: j.error || j.message || "Errore" } }));
+        return;
+      }
+      setRecheckState((s) => ({ ...s, [employee]: { state: "success", message: j.message, added: j.added_to_kv } }));
+      // Se ha aggiunto wages → invalida cache SWR per ricaricare la pagina
+      if (j.added_to_kv > 0) {
+        setTimeout(() => mutate(url), 600);
+      }
+    } catch (e) {
+      setRecheckState((s) => ({ ...s, [employee]: { state: "error", message: e.message } }));
+    }
+  }
 
   const periodOptions = useMemo(() => generateMonthlyOptions(), []);
   useEffect(() => { if (!periodId && periodOptions[0]) setPeriodId(periodOptions[0].value); }, [periodOptions, periodId]);
@@ -438,12 +463,26 @@ export default function SalesCpLeaderboardPage() {
                       ⚠️ <b>{noCpOps.length} operatori SENZA dati CP</b> (non mappati o periodo senza shift) — appaiono senza score. Vai a <Link href="/admin/creatorspro-sync" style={{ color: COLORS.champagne }}>Sync CP</Link> per mappare.
                     </div>
                     {noCpOps.slice(0, 30).map((op, i) => (
-                      <div key={`nocp-${op.employee}-${i}`} style={{ display: "grid", gridTemplateColumns: "50px 36px 1.6fr 1.3fr 0.7fr 0.7fr 0.9fr 0.9fr 0.8fr 0.8fr 0.9fr 1fr", alignItems: "center", padding: "10px 22px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 12, opacity: 0.5 }}>
+                      <div key={`nocp-${op.employee}-${i}`} style={{ display: "grid", gridTemplateColumns: "50px 36px 1.6fr 1.3fr 0.7fr 0.7fr 0.9fr 0.9fr 0.8fr 0.8fr 0.9fr 1fr", alignItems: "center", padding: "10px 22px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 12, opacity: recheckState[op.employee]?.state === "success" && recheckState[op.employee]?.added > 0 ? 0.9 : 0.6 }}>
                         <div style={{ color: COLORS.mist }}>—</div>
                         <Avatar name={op.employee} size={28} />
-                        <div style={{ fontFamily: FONTS.display, fontSize: 13 }}>{op.employee}</div>
+                        <div style={{ fontFamily: FONTS.display, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                          <span>{op.employee}</span>
+                          <RecheckButton
+                            state={recheckState[op.employee]}
+                            onClick={() => recheckEmployee(op.employee)}
+                          />
+                        </div>
                         <div style={{ color: COLORS.fog, fontSize: 11 }}>{op.group || "—"}<CategoryBadge category={op.category} /><LanguageBadge language={op.language} /></div>
-                        <div style={{ gridColumn: "span 6", fontSize: 10, color: COLORS.mist, fontStyle: "italic" }}>no CP data</div>
+                        <div style={{ gridColumn: "span 6", fontSize: 10, fontStyle: "italic" }}>
+                          {recheckState[op.employee]?.message ? (
+                            <span style={{ color: recheckState[op.employee].state === "success" ? "#3FB97E" : recheckState[op.employee].state === "error" ? "#EF4444" : COLORS.mist }}>
+                              {recheckState[op.employee].message}
+                            </span>
+                          ) : (
+                            <span style={{ color: COLORS.mist }}>no CP data</span>
+                          )}
+                        </div>
                         <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.mist }}>{fmtCurrency(op.infloww_sales)} (Infw)</div>
                       </div>
                     ))}
@@ -466,4 +505,41 @@ function HeroStat({ l, v }) {
       <span style={{ fontFamily: FONTS.mono, fontWeight: 600, color: COLORS.alabaster, fontSize: 14 }}>{v}</span>
     </div>
   );
+}
+
+function RecheckButton({ state, onClick }) {
+  const s = state?.state || "idle";
+  if (s === "loading") {
+    return <span title="Cerco in CP API..." style={iconBtnStyle(COLORS.fog)}>
+      <Loader2 size={11} className="animate-spin" />
+    </span>;
+  }
+  if (s === "success") {
+    return <span title={state.message} style={iconBtnStyle("#3FB97E")}>
+      <CheckCircle2 size={11} />
+    </span>;
+  }
+  if (s === "error") {
+    return <button onClick={onClick} title={`Errore: ${state.message}. Click per riprovare`} style={iconBtnStyle("#EF4444", true)}>
+      <XCircle size={11} />
+    </button>;
+  }
+  return (
+    <button onClick={onClick} title="🔍 Cerca live in CP e auto-importa se trovato" style={iconBtnStyle(COLORS.champagne, true)}>
+      <Search size={11} />
+    </button>
+  );
+}
+
+function iconBtnStyle(color, isButton = false) {
+  return {
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    width: 22, height: 22,
+    background: `${color}18`,
+    color,
+    border: `1px solid ${color}44`,
+    borderRadius: 5,
+    cursor: isButton ? "pointer" : "default",
+    flexShrink: 0,
+  };
 }
