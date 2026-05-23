@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import useSWR from "swr";
+import { useUser } from "@clerk/nextjs";
 import {
   RefreshCw, CheckCircle2, AlertCircle, Clock, Play, Pause, Square,
   Calendar, Database,
@@ -84,6 +85,9 @@ async function postSync(body) {
 }
 
 export default function SyncHistoryPage() {
+  // Attiva Clerk frontend session management su questa pagina:
+  // mantiene il cookie JWT fresco in background tramite SDK Clerk.
+  useUser();
   const [months] = useState(() => lastMonths(24));
   const [progress, setProgress] = useState({ running: false, current: null, step: "", batchInfo: "", error: null, completed: [], total: 0 });
   const [monthStates, setMonthStates] = useState({}); // periodId → { synced, wages_count, shifts_count, last_sync_at }
@@ -179,10 +183,12 @@ export default function SyncHistoryPage() {
     }
 
     setProgress({ running: true, current: null, step: "", batchInfo: "", error: null, completed: [], total: toSync.length });
-    // Keep-alive ping ogni 4 min per evitare che la sessione Clerk scada durante batch lunghi (>30 min)
+    // Keep-alive ping ogni 60s: Clerk JWT TTL standard è 60s, quindi pingiamo
+    // alla stessa cadenza per garantire che il cookie venga rinfrescato dal
+    // middleware prima che il JWT scada.
     const keepAlive = setInterval(() => {
       fetch("/api/auth/ping").catch(() => {});
-    }, 4 * 60 * 1000);
+    }, 60 * 1000);
     try {
       const completed = [];
       for (const p of toSync) {
