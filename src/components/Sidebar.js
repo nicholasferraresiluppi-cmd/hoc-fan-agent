@@ -18,7 +18,7 @@
  */
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, SignedIn } from "@clerk/nextjs";
 import {
   Home, Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown,
   GraduationCap, BookOpen, ClipboardCheck, Target, Brain, Award,
@@ -236,13 +236,15 @@ export default function Sidebar() {
 
       {/* Bottom: UserButton */}
       <div style={{ padding: "12px 16px", borderTop: `1px solid ${CP.border}`, background: "#0B0D13" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <UserButton afterSignOutUrl="/sign-in" appearance={{ elements: { avatarBox: { width: 32, height: 32 } } }} />
-          <div style={{ flex: 1, minWidth: 0, fontSize: 11, color: CP.textMuted }}>
-            <div style={{ color: CP.textSecondary, fontWeight: 600, fontSize: 12 }}>Account</div>
-            <div style={{ fontSize: 10, marginTop: 1 }}>v2 · CP-style</div>
+        <SignedIn>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <UserButton afterSignOutUrl="/sign-in" />
+            <div style={{ flex: 1, minWidth: 0, fontSize: 11, color: CP.textMuted }}>
+              <div style={{ color: CP.textSecondary, fontWeight: 600, fontSize: 12 }}>Account</div>
+              <div style={{ fontSize: 10, marginTop: 1 }}>HOC Pro</div>
+            </div>
           </div>
-        </div>
+        </SignedIn>
       </div>
     </aside>
   );
