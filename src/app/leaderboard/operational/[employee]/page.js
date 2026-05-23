@@ -3,7 +3,7 @@
 import { useState, use } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, CP } from "@/lib/brand";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -126,11 +126,19 @@ export default function EmployeeDrilldownPage({ params }) {
   const deltaSales = current?.sales != null && previous?.sales != null ? current.sales - previous.sales : null;
 
   return (
-    <div style={{ minHeight: "100vh", background: COLORS.obsidian, color: COLORS.alabaster, fontFamily: FONTS.body, padding: "32px 24px" }}>
+    <div style={{ minHeight: "100vh", background: COLORS.obsidian, color: COLORS.alabaster, fontFamily: FONTS.body, padding: "32px 28px" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
-          <Link href="/leaderboard/operational" style={{ color: COLORS.fog, fontSize: 13, textDecoration: "none" }}>← Leaderboard Operativa</Link>
-          <Link href="/admin/employee-profiles" style={{ color: COLORS.champagne, fontSize: 12, textDecoration: "none", marginLeft: "auto", padding: "4px 10px", border: `1px solid ${COLORS.champagne}44`, borderRadius: 6 }}>⚙️ Gestione anagrafica</Link>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: 18, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+            <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>Academy</Link>
+            <span style={{ color: CP.textMuted }}>›</span>
+            <Link href="/leaderboard" style={{ color: "inherit", textDecoration: "none" }}>Ladder</Link>
+            <span style={{ color: CP.textMuted }}>›</span>
+            <Link href="/leaderboard/operational" style={{ color: "inherit", textDecoration: "none" }}>Operativa</Link>
+            <span style={{ color: CP.textMuted }}>›</span>
+            <span style={{ color: CP.textPrimary }}>Drill-down</span>
+          </div>
+          <Link href="/admin/employee-profiles" style={{ color: COLORS.champagne, fontSize: 12, textDecoration: "none", padding: "6px 12px", border: `1px solid ${COLORS.champagne}44`, borderRadius: 8 }}>⚙️ Anagrafica</Link>
         </div>
 
         {isLoading && <p style={{ color: COLORS.fog }}>Caricamento…</p>}

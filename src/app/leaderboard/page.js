@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, CP } from "@/lib/brand";
 
 const C = {
   bgDark: COLORS.obsidian,
@@ -198,22 +198,23 @@ export default function LeaderboardPage() {
         }
         .hoc-podium-item { animation: hocRise 0.5s ease-out both; }
       `}</style>
-      <div style={{ maxWidth: 960, margin: "0 auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1.25rem" }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: "1.75rem" }}>🏆 Ladder</h1>
-            <p style={{ color: C.gray, margin: "0.25rem 0 0 0", fontSize: "0.9rem" }}>
-              I migliori operatori per score medio. Minimo {data?.minSessions || 2} sessioni per qualificarsi.
-            </p>
-          </div>
-          <div style={{ display: "flex", gap: "1rem" }}>
-            <Link href="/leaderboard/storico" style={{ color: C.gold, textDecoration: "none", fontSize: "0.9rem" }}>
-              🏛️ Hall of Fame
-            </Link>
-            <Link href="/" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>
-              ← Home
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 28px 64px 28px" }}>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16, marginBottom: 12 }}>
+            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+              <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>Academy</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <span style={{ color: CP.textPrimary }}>Ladder</span>
+            </div>
+            <Link href="/leaderboard/storico" style={{ color: C.gold, textDecoration: "none", fontSize: 13, padding: "6px 12px", border: `1px solid ${C.gold}44`, borderRadius: 8 }}>
+              🏛️ Hall of Fame →
             </Link>
           </div>
+          <span style={{ color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.14em" }}>Performance · Training</span>
+          <h1 style={{ fontFamily: FONTS.display, fontSize: 34, margin: "8px 0 6px 0", fontWeight: 700, letterSpacing: "-0.02em" }}>🏆 Ladder</h1>
+          <p style={{ color: CP.textSecondary, fontSize: 14, margin: 0, lineHeight: 1.5, maxWidth: 760 }}>
+            I migliori operatori per score medio nelle sessioni di training Academy. Minimo {data?.minSessions || 2} sessioni per qualificarsi.
+          </p>
         </div>
 
         {/* Filters */}

@@ -3,7 +3,9 @@
 import { useState, useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import AdminNav from "@/components/AdminNav";
-import { COLORS, FONTS } from "@/lib/brand";
+import Link from "next/link";
+import { COLORS, FONTS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -183,12 +185,18 @@ export default function CreatorsProSyncPage() {
     <div style={styles.page}>
       <div style={styles.container}>
         <AdminNav />
-        <h1 style={styles.title}>Sync CreatorsPro</h1>
-        <p style={styles.sub}>
-          Sincronizza i dati di sales/shift da CreatorsPro nel KV di HOC Fan Agent.
-          Una volta sincronizzato, la leaderboard operativa mostrerà i KPI "Sales per shift",
-          "Fascia oraria top", e il drill-down operatore avrà best/worst shift.
-        </p>
+        <PageHeader
+          breadcrumb={
+            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <span style={{ color: CP.textPrimary }}>Sync CreatorsPro</span>
+            </div>
+          }
+          section="Data · Integration"
+          title="Sync CreatorsPro"
+          subtitle={'Sincronizza sales/shift da CreatorsPro nel KV di HOC. Una volta sync, la Leaderboard mostra "Sales/shift", "Fascia oraria top", e il drill-down avrà best/worst shift. Sync incrementale a chunk per stare sotto i 60s di Vercel Hobby.'}
+        />
 
         {/* STATUS */}
         <div style={styles.card}>

@@ -3,7 +3,8 @@
 import { useParams } from "next/navigation";
 import useSWR from "swr";
 import Link from "next/link";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -213,20 +214,20 @@ export default function SessionDetailPage() {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <Link href="/admin/sessions" style={styles.backLink}>
-          ← Lista sessioni
-        </Link>
-
-        <h1 style={styles.title}>
-          Sessione di {data.ownerDisplay || session.operatorName || "operatore"}
-        </h1>
-        <div style={{ color: COLORS.fog, fontSize: 13, marginTop: 4 }}>
-          {fmtDate(session.timestamp)} · scenario: {session.scenarioId || "—"} ·
-          {" "}
-          fan: {session.fanName || session.fanProfileId || "—"} · {session.mode}
-          {" · "}
-          {session.messageCount || messages.length} msg
-        </div>
+        <PageHeader
+          breadcrumb={
+            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <Link href="/admin/sessions" style={{ color: "inherit", textDecoration: "none" }}>Sessioni</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <span style={{ color: CP.textPrimary }}>Dettaglio</span>
+            </div>
+          }
+          section="Training · Sessione"
+          title={`Sessione di ${data.ownerDisplay || session.operatorName || "operatore"}`}
+          subtitle={`${fmtDate(session.timestamp)} · scenario ${session.scenarioId || "—"} · fan ${session.fanName || session.fanProfileId || "—"} · ${session.mode} · ${session.messageCount || messages.length} msg`}
+        />
 
         <div style={styles.grid}>
           {/* Conversazione */}

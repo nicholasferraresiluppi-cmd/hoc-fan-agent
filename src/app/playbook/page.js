@@ -3,7 +3,8 @@
 import { useState, useMemo } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -211,15 +212,18 @@ export default function PlaybookListPage() {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <Link href="/" style={styles.backLink}>← Home</Link>
-
-        <h1 style={styles.title}>Playbook</h1>
-        <p style={styles.sub}>
-          Libreria di esempi reali curati per la tua formazione. Cerca per situazione, filtra per
-          creator e benchmark. Le voci marcate <strong style={{ color: COLORS.champagne }}>Curato</strong> sono
-          pensate per la formazione (con commentary didattico, steps, takeaway). Le altre vengono
-          dal pool di calibrazione del giudice AI — utili per studiare ma con commentary più tecnico.
-        </p>
+        <PageHeader
+          breadcrumb={
+            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+              <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>Academy</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <span style={{ color: CP.textPrimary }}>Playbook</span>
+            </div>
+          }
+          section="Training · Library"
+          title="Playbook"
+          subtitle={<>Libreria di esempi reali curati per la tua formazione. <strong style={{ color: COLORS.champagne }}>Curato</strong> = pensato per la formazione (didattico). Altri = pool di calibrazione AI (più tecnici).</>}
+        />
 
         <div style={styles.filterBar}>
           <input

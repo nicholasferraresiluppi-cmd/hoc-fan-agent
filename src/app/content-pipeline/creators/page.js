@@ -3,6 +3,8 @@
 import { useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
+import { CP, FONTS } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -39,16 +41,29 @@ export default function CreatorsPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Creators</h1>
-        <button
-          onClick={() => setShowForm((s) => !s)}
-          className="bg-[#D4AF7A] text-[#08090F] px-4 py-2 rounded font-medium hover:bg-[#B89158]"
-        >
-          {showForm ? "Annulla" : "Nuovo creator"}
-        </button>
-      </div>
+    <div style={{ padding: "32px 28px 64px 28px", maxWidth: 1400, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }} className="space-y-4">
+      <PageHeader
+        breadcrumb={
+          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+            <span style={{ color: CP.textMuted }}>›</span>
+            <Link href="/content-pipeline" style={{ color: "inherit", textDecoration: "none" }}>Pipeline</Link>
+            <span style={{ color: CP.textMuted }}>›</span>
+            <span style={{ color: CP.textPrimary }}>Creators</span>
+          </div>
+        }
+        section="Content · Creators"
+        title="Creators"
+        subtitle="Gestione creator del flusso di content production: slug, Telegram channel, persona prompt."
+        toolbar={
+          <button
+            onClick={() => setShowForm((s) => !s)}
+            className="bg-[#D4AF7A] text-[#08090F] px-4 py-2 rounded font-medium hover:bg-[#B89158]"
+          >
+            {showForm ? "Annulla" : "+ Nuovo creator"}
+          </button>
+        }
+      />
 
       {showForm && (
         <form

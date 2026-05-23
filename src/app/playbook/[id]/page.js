@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import useSWR from "swr";
 import Link from "next/link";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, CP } from "@/lib/brand";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -112,7 +112,13 @@ export default function PlaybookEntryPage() {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <Link href="/playbook" style={styles.backLink}>← Playbook</Link>
+        <div style={{ marginBottom: 18, display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+          <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>Academy</Link>
+          <span style={{ color: CP.textMuted }}>›</span>
+          <Link href="/playbook" style={{ color: "inherit", textDecoration: "none" }}>Playbook</Link>
+          <span style={{ color: CP.textMuted }}>›</span>
+          <span style={{ color: CP.textPrimary }}>Dettaglio</span>
+        </div>
 
         <h1 style={styles.title}>{entry.title}</h1>
 

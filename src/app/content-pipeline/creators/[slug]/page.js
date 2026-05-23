@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import useSWR from "swr";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CP, FONTS } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -80,11 +83,23 @@ export default function CreatorDetailPage({ params }) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{c.displayName}</h1>
-        <span className="text-sm text-[#6B7080]">@{slug}</span>
-      </div>
+    <div style={{ padding: "32px 28px 64px 28px", maxWidth: 1100, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }} className="space-y-4">
+      <PageHeader
+        breadcrumb={
+          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+            <span style={{ color: CP.textMuted }}>›</span>
+            <Link href="/content-pipeline" style={{ color: "inherit", textDecoration: "none" }}>Pipeline</Link>
+            <span style={{ color: CP.textMuted }}>›</span>
+            <Link href="/content-pipeline/creators" style={{ color: "inherit", textDecoration: "none" }}>Creators</Link>
+            <span style={{ color: CP.textMuted }}>›</span>
+            <span style={{ color: CP.textPrimary }}>{slug}</span>
+          </div>
+        }
+        section={`@${slug}`}
+        title={c.displayName}
+        subtitle="Configurazione completa del creator: display name, Telegram channel/token, persona prompt."
+      />
 
       <form
         onSubmit={onSave}

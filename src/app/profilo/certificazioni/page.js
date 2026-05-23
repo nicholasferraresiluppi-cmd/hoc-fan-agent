@@ -33,19 +33,23 @@ export default function CertificationsPage() {
   }, []);
 
   return (
-    <div style={{ background: "#0D0D0D", minHeight: "100vh", color: "#fff", padding: "2rem" }}>
-      <div style={{ maxWidth: 900, margin: "0 auto" }}>
-        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-          <Link href="/" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>← Academy</Link>
+    <div style={{ background: "#08090F", minHeight: "100vh", color: "#fff", padding: "32px 28px 64px 28px", maxWidth: 1100, margin: "0 auto" }}>
+        <div style={{ marginBottom: 18, fontSize: 13, color: "#9CA3AF" }}>
+          <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>Academy</Link>
+          <span style={{ color: "#6B7080", margin: "0 8px" }}>›</span>
+          <span style={{ color: "#F5F6F8" }}>Badge Wall</span>
         </div>
 
-        <h1 style={{ margin: "0 0 0.25rem 0", fontSize: "2rem" }}>🎖️ Badge Wall</h1>
-        <p style={{ color: "#888", marginTop: 0 }}>
-          Le tue certificazioni per creator. Ogni creator ha il suo tono e le sue dinamiche: certificandoti dimostri di saperla gestire.
-        </p>
+        <div style={{ marginBottom: 24 }}>
+          <span style={{ color: "#6B7080", fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.14em" }}>Certificazioni</span>
+          <h1 style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 34, margin: "8px 0 6px 0", fontWeight: 700, letterSpacing: "-0.02em" }}>🎖️ Badge Wall</h1>
+          <p style={{ color: "#9CA3AF", fontSize: 14, margin: 0, lineHeight: 1.5, maxWidth: 760 }}>
+            Le tue certificazioni per creator. Ogni creator ha il suo tono e le sue dinamiche: certificandoti dimostri di saperla gestire.
+          </p>
+        </div>
 
-        <div style={{ background: "#F5A62310", border: "1px solid #F5A62340", borderRadius: 8, padding: "0.75rem 1rem", fontSize: "0.85rem", margin: "1rem 0 1.5rem 0" }}>
-          <b>Requisiti</b> (badge permanenti, una volta ottenuti non si perdono):<br/>
+        <div style={{ background: "#13151C", border: "1px solid #23262F", borderRadius: 10, padding: "12px 16px", fontSize: 13, marginBottom: 24, color: "#B9BDC7" }}>
+          <b>Requisiti</b> (badge permanenti):<br/>
           L1 Base → ≥10 sessioni con quella creator, overall medio ≥65<br/>
           L2 Expert → ≥25 sessioni, overall medio ≥75<br/>
           L3 Master → ≥50 sessioni, overall medio ≥85
@@ -105,7 +109,6 @@ export default function CertificationsPage() {
             })}
           </div>
         )}
-      </div>
     </div>
   );
 }
