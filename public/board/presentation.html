@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HOC Pro — Presentazione board</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #08090F;
+      --surface: #13151C;
+      --surface-alt: #1A1D26;
+      --border: #23262F;
+      --border-strong: #2F333E;
+      --text: #F5F6F8;
+      --text-secondary: #9CA3AF;
+      --text-muted: #6B7080;
+      --green: #10B981;
+      --blue: #3B82F6;
+      --red: #EF4444;
+      --orange: #F59E0B;
+      --purple: #A855F7;
+      --gray: #9CA3AF;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    .display { font-family: 'Inter Tight', sans-serif; font-weight: 700; letter-spacing: -0.02em; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+    }
+    section {
+      min-height: 100vh;
+      padding: 80px 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      position: relative;
+    }
+    .nav {
+      position: fixed;
+      top: 20px; right: 20px;
+      display: flex; gap: 8px;
+      z-index: 100;
+      background: rgba(8, 9, 15, 0.85);
+      backdrop-filter: blur(10px);
+      padding: 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+    .nav a {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--border-strong);
+      transition: background 0.2s;
+    }
+    .nav a:hover, .nav a.active { background: var(--green); }
+    .h1 { font-size: clamp(40px, 7vw, 72px); line-height: 1.05; margin-bottom: 24px; }
+    .h2 { font-size: clamp(28px, 4vw, 44px); line-height: 1.15; margin-bottom: 18px; }
+    .h3 { font-size: 22px; line-height: 1.25; margin-bottom: 12px; }
+    .lead { font-size: 18px; color: var(--text-secondary); line-height: 1.6; max-width: 760px; }
+    .green { color: var(--green); }
+    .blue { color: var(--blue); }
+    .red { color: var(--red); }
+    .orange { color: var(--orange); }
+    .purple { color: var(--purple); }
+    .muted { color: var(--text-secondary); }
+
+    /* HERO */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center;
+      background:
+        radial-gradient(ellipse 800px 400px at 50% 30%, rgba(16, 185, 129, 0.12), transparent),
+        radial-gradient(ellipse 600px 400px at 50% 70%, rgba(168, 85, 247, 0.08), transparent),
+        var(--bg);
+    }
+    .brand {
+      display: inline-flex; align-items: center; gap: 14px;
+      padding: 10px 18px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      margin-bottom: 30px;
+    }
+    .brand-logo {
+      width: 28px; height: 28px;
+      background: linear-gradient(135deg, var(--green), var(--blue));
+      border-radius: 8px;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: #0a0a0a; font-weight: 800;
+    }
+
+    /* CARDS */
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+    }
+    .card-accent-green { border-color: rgba(16, 185, 129, 0.4); background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), var(--surface)); }
+    .card-accent-blue { border-color: rgba(59, 130, 246, 0.4); background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), var(--surface)); }
+    .card-accent-red { border-color: rgba(239, 68, 68, 0.4); background: linear-gradient(135deg, rgba(239, 68, 68, 0.05), var(--surface)); }
+    .card-icon {
+      width: 52px; height: 52px;
+      border-radius: 14px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 26px; margin-bottom: 18px;
+      border: 1px solid var(--border);
+    }
+
+    /* TIER BADGE */
+    .tier {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .t-elite    { background: rgba(168, 85, 247, 0.15); color: #A855F7; border: 1px solid #A855F755; }
+    .t-strong   { background: rgba(59, 130, 246, 0.15); color: #3B82F6; border: 1px solid #3B82F655; }
+    .t-good     { background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid #10B98155; }
+    .t-average  { background: rgba(156, 163, 175, 0.15); color: #9CA3AF; border: 1px solid #9CA3AF55; }
+    .t-weak     { background: rgba(245, 158, 11, 0.15); color: #F59E0B; border: 1px solid #F59E0B55; }
+    .t-critical { background: rgba(239, 68, 68, 0.15); color: #EF4444; border: 1px solid #EF444455; }
+
+    /* TABLE MOCKUPS */
+    .mockup {
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 14px;
+      overflow: hidden;
+      margin: 24px 0;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .mockup-head {
+      background: rgba(8, 9, 15, 0.6);
+      padding: 14px 22px;
+      border-bottom: 1px solid var(--border-strong);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .mockup-body { padding: 0; }
+    .row {
+      display: grid;
+      padding: 12px 22px;
+      border-bottom: 1px solid var(--border);
+      align-items: center;
+      gap: 14px;
+      font-size: 13px;
+    }
+    .row.head { background: rgba(0,0,0,0.2); }
+    .row.head > div {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+    }
+    .avatar {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3B82F6, #1E40AF);
+      color: white;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+
+    /* FORMULA */
+    .formula {
+      padding: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      margin: 16px 0;
+    }
+    .kpi-chip {
+      display: inline-block;
+      padding: 6px 12px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .weight-chip {
+      display: inline-block;
+      padding: 6px 10px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--green);
+      border-radius: 8px;
+      font-weight: 700;
+    }
+    .op { color: var(--text-muted); padding: 0 4px; }
+
+    /* TIMELINE */
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin: 24px 0;
+    }
+    .timeline-step {
+      padding: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      position: relative;
+    }
+    .timeline-step::after {
+      content: "→";
+      position: absolute;
+      right: -22px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 20px;
+    }
+    .timeline-step:last-child::after { display: none; }
+
+    /* CTA */
+    .cta {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 16px 28px;
+      background: var(--green);
+      color: #0a0a0a;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 16px;
+      text-decoration: none;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .cta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(16, 185, 129, 0.3);
+    }
+    .cta-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    /* DIVIDER */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+      margin: 60px 0;
+    }
+    .section-counter {
+      position: absolute;
+      top: 60px; right: 40px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.2em;
+    }
+
+    /* CASE BADGES */
+    .case {
+      padding: 16px 20px;
+      background: var(--surface);
+      border-left: 3px solid var(--green);
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    .case.red { border-left-color: var(--red); }
+    .case.orange { border-left-color: var(--orange); }
+    .case-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+    .case-body { color: var(--text-secondary); font-size: 13px; }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      section { padding: 60px 20px; }
+      .timeline { grid-template-columns: 1fr; }
+      .timeline-step::after { display: none; }
+      .nav { display: none; }
+    }
+
+    /* PRINT */
+    @media print {
+      section { min-height: auto; page-break-after: always; padding: 40px 30px; }
+      .nav { display: none; }
+      .hero { min-height: 90vh; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navigation dots -->
+<div class="nav">
+  <a href="#hero" title="Intro"></a>
+  <a href="#problema" title="Il problema"></a>
+  <a href="#soluzione" title="La soluzione"></a>
+  <a href="#score" title="Score Sales CP"></a>
+  <a href="#confronto" title="Confronto Infloww"></a>
+  <a href="#action" title="Action Center"></a>
+  <a href="#flusso" title="Flusso operativo"></a>
+  <a href="#decisioni" title="Cosa serve dal board"></a>
+</div>
+
+<!-- HERO -->
+<section id="hero" class="hero">
+  <div class="brand">
+    <div class="brand-logo">H</div>
+    <span class="mono" style="font-size: 11px; letter-spacing: 0.16em; color: var(--text-secondary);">HOC PRO · v1.0</span>
+  </div>
+  <h1 class="display h1">
+    Una sola console.<br/>
+    <span class="green">Tre decisioni HR</span> più veloci.
+  </h1>
+  <p class="lead" style="margin-bottom: 40px;">
+    Misuriamo la performance reale dei chatter, confrontiamo CreatorsPro con Infloww per
+    scovare i casi interessanti, e produciamo la lista mensile per HR — in automatico.
+  </p>
+  <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+    <a href="#problema" class="cta">↓ Inizia presentazione</a>
+    <a href="https://hoc-fan-agent.vercel.app" class="cta cta-secondary">Apri la webapp</a>
+  </div>
+  <div style="margin-top: 80px; display: flex; gap: 40px; color: var(--text-muted); font-size: 13px;">
+    <div>📊 200+ chatter</div>
+    <div>🎨 30+ creator</div>
+    <div>💰 Score basato sui sales reali</div>
+    <div>⚡ Sync automatico CP</div>
+  </div>
+</section>
+
+<!-- PROBLEMA -->
+<section id="problema">
+  <div class="section-counter">01 — IL PROBLEMA</div>
+  <span class="label">Stato pre-HOC Pro</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Tre fonti dati scollegate.<br/>
+    Decisioni HR a sensazione.
+  </h2>
+  <p class="lead" style="margin-bottom: 40px;">
+    CreatorsPro dice una cosa, Infloww ne dice un'altra, e nessuno dei due risponde alla domanda
+    che conta davvero: <strong>questo chatter sta davvero performando bene rispetto ai pari?</strong>
+  </p>
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-icon" style="color: var(--red);">⚠️</div>
+      <h3 class="display h3">Sales totali fuorvianti</h3>
+      <p class="muted">
+        Un operatore con $20k di sales sembra top. Ma se ha lavorato su una creator big che si vende da sola,
+        e quei $20k sono il <em>meno peggio</em> tra i colleghi sulla stessa creator, non è merito suo.
+      </p>
+    </div>
+    <div class="card">
+      <div class="card-icon" style="color: var(--orange);">📉</div>
+      <h3 class="display h3">KPI chat che ingannano</h3>
+      <p class="muted">
+        Lo score Infloww (fan CVR, unlock rate) misura efficienza in chat. Ma in chat brillante
+        ≠ generatore di sales. Servono entrambi i segnali letti insieme.
+      </p>
+    </div>
+    <div class="card">
+      <div class="card-icon" style="color: var(--text-muted);">📋</div>
+      <h3 class="display h3">Lista HR fatta a mano</h3>
+      <p class="muted">
+        Aila riceveva ogni mese una lista costruita su feeling e screenshot. Niente sostituzioni
+        suggerite, niente coerenza tra mesi, niente trail di chi ha deciso cosa.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- SOLUZIONE -->
+<section id="soluzione">
+  <div class="section-counter">02 — LA SOLUZIONE</div>
+  <span class="label">HOC Pro · vista d'insieme</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Una webapp che fa <span class="green">3 cose collegate</span>.
+  </h2>
+  <p class="lead" style="margin-bottom: 50px;">
+    Sync automatico dei dati, score percentile basato sui sales reali, lista mensile per HR
+    con sostituzioni intelligenti. Tutto nello stesso flusso, tutto auditabile.
+  </p>
+  <div class="grid-3">
+    <div class="card card-accent-green">
+      <div class="card-icon" style="background: rgba(16, 185, 129, 0.2); color: var(--green); border-color: var(--green);">💰</div>
+      <h3 class="display h3">Score Sales CP</h3>
+      <p class="muted" style="margin-bottom: 14px;">
+        Classifica mensile per operatore basata sui sales reali da CreatorsPro.
+        Percentile 0–100, 6 tier (Elite → Critical), formula trasparente.
+      </p>
+      <div class="mono" style="font-size: 11px; color: var(--green);">→ Sezione 03</div>
+    </div>
+    <div class="card card-accent-blue">
+      <div class="card-icon" style="background: rgba(59, 130, 246, 0.2); color: var(--blue); border-color: var(--blue);">⚖️</div>
+      <h3 class="display h3">Confronto Infloww</h3>
+      <p class="muted" style="margin-bottom: 14px;">
+        Score CP vs Score Infloww affiancati. Le discrepanze importanti vengono evidenziate
+        e diventano segnali pratici (chi promuovere, chi coachare).
+      </p>
+      <div class="mono" style="font-size: 11px; color: var(--blue);">→ Sezione 04</div>
+    </div>
+    <div class="card card-accent-red">
+      <div class="card-icon" style="background: rgba(239, 68, 68, 0.2); color: var(--red); border-color: var(--red);">🎯</div>
+      <h3 class="display h3">Action Center HR</h3>
+      <p class="muted" style="margin-bottom: 14px;">
+        Lista mensile degli operatori da rivedere, con top 3 sostituti suggeriti per ognuno.
+        Click → CSV pronto per HR. Audit log completo.
+      </p>
+      <div class="mono" style="font-size: 11px; color: var(--red);">→ Sezione 05</div>
+    </div>
+  </div>
+</section>
+
+<!-- SCORE SALES CP -->
+<section id="score">
+  <div class="section-counter">03 — SCORE SALES CP</div>
+  <span class="label">Funzione 1 · Misura</span>
+  <h2 class="display h2" style="margin-top: 12px;">La domanda di partenza</h2>
+  <p class="lead" style="margin-bottom: 30px;">
+    <em>"Marco è un bravo chatter?"</em><br/>
+    Sembra facile, ma non lo è. Marco lavora su 2 creator. Su Sara vende molto, su Giulia poco.
+    Magari Giulia è una creator difficile. Confrontare Marco con un collega che lavora altrove sarebbe ingiusto.
+  </p>
+
+  <h3 class="display h3" style="margin-top: 30px;">La soluzione: due classifiche combinate</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 20px 0;">
+    <div class="card card-accent-blue">
+      <div class="label" style="color: var(--blue); margin-bottom: 8px;">vs Creator</div>
+      <h3 class="display h3">Sei tra i migliori<br/><em>sulla stessa creator</em>?</h3>
+      <p class="muted" style="font-size: 13px;">Percentile vs altri operatori che lavorano su quella creator.</p>
+    </div>
+    <div class="card card-accent-green">
+      <div class="label" style="color: var(--green); margin-bottom: 8px;">vs Agency</div>
+      <h3 class="display h3">In scala agency,<br/>quanto vali <em>in assoluto</em>?</h3>
+      <p class="muted" style="font-size: 13px;">Percentile vs tutti i chatter HOC del mese.</p>
+    </div>
+  </div>
+
+  <div class="formula">
+    <div style="margin-bottom: 14px;">
+      <span class="kpi-chip">percentile vs Creator</span>
+      <span class="op">×</span>
+      <span class="weight-chip">70%</span>
+      <span class="op">+</span>
+      <span class="kpi-chip">percentile vs Agency</span>
+      <span class="op">×</span>
+      <span class="weight-chip">30%</span>
+    </div>
+    <div style="color: var(--text-muted); font-size: 11px; margin-bottom: 10px;">↓ poi composto con consistency ↓</div>
+    <div>
+      <span class="kpi-chip">sales/shift</span>
+      <span class="op">×</span>
+      <span class="weight-chip">85%</span>
+      <span class="op">+</span>
+      <span class="kpi-chip">consistency</span>
+      <span class="op">×</span>
+      <span class="weight-chip">15%</span>
+    </div>
+    <div style="margin-top: 18px; color: var(--purple); font-weight: 700; font-size: 18px;">= score 0–100</div>
+  </div>
+
+  <p class="muted" style="font-size: 14px;">
+    Il 70% premia il merito locale (sei bravo dove lavori). Il 30% ancora alla performance assoluta
+    (non puoi finire Elite solo perché sei il meno peggio in un team debole). Min 3 turni sulla creator
+    per essere classificato.
+  </p>
+
+  <h3 class="display h3" style="margin-top: 40px;">I 6 tier (percentile-based)</h3>
+  <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px;">
+    <div class="card" style="flex: 1; min-width: 180px; padding: 16px;">
+      <span class="tier t-elite">ELITE</span>
+      <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">top 10% · eccellenza</div>
+    </div>
+    <div class="card" style="flex: 1; min-width: 180px; padding: 16px;">
+      <span class="tier t-strong">STRONG</span>
+      <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">top 25% · solidi</div>
+    </div>
+    <div class="card" style="flex: 1; min-width: 180px; padding: 16px;">
+      <span class="tier t-good">GOOD</span>
+      <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">top 50% · affidabili</div>
+    </div>
+    <div class="card" style="flex: 1; min-width: 180px; padding: 16px;">
+      <span class="tier t-average">AVERAGE</span>
+      <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">top 75% · in linea</div>
+    </div>
+    <div class="card" style="flex: 1; min-width: 180px; padding: 16px;">
+      <span class="tier t-weak">WEAK</span>
+      <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">top 90% · sotto media</div>
+    </div>
+    <div class="card" style="flex: 1; min-width: 180px; padding: 16px;">
+      <span class="tier t-critical">CRITICAL</span>
+      <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">bottom 10% · non sostenibili</div>
+    </div>
+  </div>
+</section>
+
+<!-- CONFRONTO INFLOWW -->
+<section id="confronto">
+  <div class="section-counter">04 — CONFRONTO INFLOWW</div>
+  <span class="label">Funzione 2 · Validazione</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Due score affiancati,<br/>
+    <span class="blue">le discrepanze contano</span>.
+  </h2>
+  <p class="lead" style="margin-bottom: 30px;">
+    Lo score Sales CP è il riferimento per le decisioni. Lo score Infloww (efficienza chat) resta visibile
+    come secondo segnale. Quando i due divergono di più di 10 punti, una freccia ↑/↓ segnala il caso.
+  </p>
+
+  <div class="mockup">
+    <div class="mockup-head">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span class="label">Stream Sales CP · Maggio 2026</span>
+      </div>
+      <span class="mono" style="font-size: 10px; color: var(--text-muted);">snippet</span>
+    </div>
+    <div class="mockup-body">
+      <div class="row head" style="grid-template-columns: 40px 200px 100px 80px 80px 100px;">
+        <div>#</div><div>Operatore</div><div>Score CP</div><div>Score Infw</div><div>Tier</div><div>CP Sales</div>
+      </div>
+      <div class="row" style="grid-template-columns: 40px 200px 100px 80px 80px 100px;">
+        <div class="mono muted">01</div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span class="avatar">SC</span> Simone Cherchi</div>
+        <div class="mono"><strong style="color: var(--purple);">94.2</strong></div>
+        <div class="mono muted">88.1</div>
+        <div><span class="tier t-elite">ELITE</span></div>
+        <div class="mono green">$10.5k</div>
+      </div>
+      <div class="row" style="grid-template-columns: 40px 200px 100px 80px 80px 100px;">
+        <div class="mono muted">02</div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span class="avatar" style="background: linear-gradient(135deg, #A855F7, #6B21A8);">IL</span> Ismael Lopez</div>
+        <div class="mono"><strong style="color: var(--blue);">82.7</strong></div>
+        <div class="mono muted">48.2 <span class="red" style="font-size: 10px;">↑ 34</span></div>
+        <div><span class="tier t-strong">STRONG</span></div>
+        <div class="mono green">$8.6k</div>
+      </div>
+      <div class="row" style="grid-template-columns: 40px 200px 100px 80px 80px 100px;">
+        <div class="mono muted">07</div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span class="avatar" style="background: linear-gradient(135deg, #10B981, #047857);">SM</span> Sabrina Mero</div>
+        <div class="mono"><strong style="color: var(--green);">62.4</strong></div>
+        <div class="mono muted">85.3 <span class="green" style="font-size: 10px;">↓ 23</span></div>
+        <div><span class="tier t-good">GOOD</span></div>
+        <div class="mono green">$7.2k</div>
+      </div>
+      <div class="row" style="grid-template-columns: 40px 200px 100px 80px 80px 100px;">
+        <div class="mono muted">141</div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span class="avatar" style="background: linear-gradient(135deg, #EF4444, #991B1B);">SH</span> Sofia HOC</div>
+        <div class="mono"><strong style="color: var(--red);">8.6</strong></div>
+        <div class="mono muted">17.6</div>
+        <div><span class="tier t-critical">CRITICAL</span></div>
+        <div class="mono green">$573</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="display h3" style="margin-top: 40px;">I 3 pattern che il confronto fa emergere</h3>
+  <div style="margin-top: 16px;">
+    <div class="case red">
+      <div class="case-title">🟢 Sales CP alto + 🔵 Infloww basso (es. Ismael, +34)</div>
+      <div class="case-body">
+        Vende molto ma efficienza chat scarsa. Probabilmente su creator forti che si vendono da sole.
+        <strong>Non promuoverlo come "top chatter"</strong> — il merito è della creator, non suo.
+      </div>
+    </div>
+    <div class="case orange">
+      <div class="case-title">🟢 Sales CP basso + 🔵 Infloww alto (es. Sabrina, -23)</div>
+      <div class="case-body">
+        Bravo in chat ma converte poco in $. Forse su creator deboli, oppure
+        <strong>opportunità di coaching</strong> su closing / PPV strategy.
+      </div>
+    </div>
+    <div class="case">
+      <div class="case-title">🟢 Sales CP ≈ Infloww (es. Simone, Sofia)</div>
+      <div class="case-body">
+        I due score concordano. <strong>Decisione HR più solida</strong>: i top sono top davvero,
+        i critical sono critical davvero.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ACTION CENTER -->
+<section id="action">
+  <div class="section-counter">05 — ACTION CENTER</div>
+  <span class="label">Funzione 3 · Esecuzione HR</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Dalla classifica alla <span class="red">lista per HR</span>,<br/>
+    in 5 minuti al mese.
+  </h2>
+  <p class="lead" style="margin-bottom: 30px;">
+    Pannello che ogni mese tira fuori gli operatori sotto soglia, propone fino a 3 sostituti
+    intelligenti per ognuno, e produce il CSV finale pronto per essere passato ad Aila.
+  </p>
+
+  <div class="mockup">
+    <div class="mockup-head">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 18px;">🎯</span>
+        <strong>Action Center · Aprile 2026</strong>
+        <span class="mono muted" style="font-size: 11px;">24 candidati · score ≤ 25</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <span class="tier" style="background: rgba(245, 158, 11, 0.15); color: var(--orange); border: 1px solid #F59E0B55;">FILTRI: ITA · WEAK</span>
+      </div>
+    </div>
+    <div class="mockup-body">
+      <div class="row head" style="grid-template-columns: 220px 140px 80px 80px 1fr 80px;">
+        <div>Operatore</div><div>Group</div><div>Score</div><div>Tier</div><div>Sostituisci con</div><div>Azioni</div>
+      </div>
+      <div class="row" style="grid-template-columns: 220px 140px 80px 80px 1fr 80px;">
+        <div>
+          <div style="font-weight: 700;">Sofia HOC</div>
+          <div class="mono muted" style="font-size: 10px;">Top: Rebecca Bardaro · $573</div>
+        </div>
+        <div class="muted">House of creators</div>
+        <div class="mono red"><strong>8.6</strong></div>
+        <div><span class="tier t-critical">CRITICAL</span></div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <span style="padding: 4px 10px; background: rgba(16,185,129,0.2); color: var(--green); border-radius: 6px; font-size: 11px; border: 1px solid #10B98155;">✨ Tinx H. <strong>86.6</strong></span>
+          <span style="padding: 4px 10px; background: var(--surface-alt); border-radius: 6px; font-size: 11px; border: 1px solid var(--border);">Nyoki H. 79.5</span>
+          <span style="padding: 4px 10px; background: var(--surface-alt); border-radius: 6px; font-size: 11px; border: 1px solid var(--border);">Ismael U. 74.5</span>
+        </div>
+        <div style="display: flex; gap: 4px;">
+          <button style="padding: 4px 10px; background: var(--green); color: #0a0a0a; border: none; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer;">HR</button>
+        </div>
+      </div>
+      <div class="row" style="grid-template-columns: 220px 140px 80px 80px 1fr 80px;">
+        <div>
+          <div style="font-weight: 700;">Roberta Cherchi</div>
+          <div class="mono muted" style="font-size: 10px;">Top: Alice Cappella · $1.2k</div>
+        </div>
+        <div class="muted">Alice Cappella</div>
+        <div class="mono red"><strong>5.6</strong></div>
+        <div><span class="tier t-critical">CRITICAL</span></div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <span style="padding: 4px 10px; background: rgba(16,185,129,0.2); color: var(--green); border-radius: 6px; font-size: 11px; border: 1px solid #10B98155;">✨ Mattia F. <strong>62.1</strong></span>
+          <span style="padding: 4px 10px; background: var(--surface-alt); border-radius: 6px; font-size: 11px; border: 1px solid var(--border);">— scegli altro —</span>
+        </div>
+        <div style="display: flex; gap: 4px;">
+          <button style="padding: 4px 10px; background: var(--green); color: #0a0a0a; border: none; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer;">HR</button>
+        </div>
+      </div>
+      <div class="row" style="grid-template-columns: 220px 140px 80px 80px 1fr 80px;">
+        <div>
+          <div style="font-weight: 700;">Francesca Scollo</div>
+          <div class="mono muted" style="font-size: 10px;">Top: Giulia Ottorini · $890</div>
+        </div>
+        <div class="muted">Giulia Ottorini</div>
+        <div class="mono orange"><strong>11.2</strong></div>
+        <div><span class="tier t-weak">WEAK</span></div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <span style="padding: 4px 10px; background: rgba(16,185,129,0.2); color: var(--green); border-radius: 6px; font-size: 11px; border: 1px solid #10B98155;">✨ Andrea S. <strong>78.4</strong></span>
+        </div>
+        <div style="display: flex; gap: 4px;">
+          <button style="padding: 4px 10px; background: var(--surface-alt); color: var(--text-muted); border: 1px solid var(--border); border-radius: 5px; font-size: 11px; cursor: pointer;">HR</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="display h3" style="margin-top: 40px;">L'algoritmo di matching sostituti</h3>
+  <p class="muted">
+    Per ogni operatore da sostituire, il sistema cerca tra i Good+ chi ha già performato bene <em>esattamente</em>
+    sulle creator dell'underperformer, pesando:
+  </p>
+  <ul style="margin: 16px 0 16px 30px; color: var(--text-secondary);">
+    <li><strong>Mix di X</strong> (50%) — le creator dove X spendeva il suo tempo</li>
+    <li><strong>Importanza agency</strong> (50%) — le creator strategiche per il fatturato totale</li>
+  </ul>
+  <div class="case">
+    <div class="case-title">Esempio: Livio Botolin (Critical)</div>
+    <div class="case-body">
+      Livio fa il 60% dei suoi sales su <strong>Eva Rizzoli</strong> e il 40% su Celine Vitale.
+      Eva è anche top 3 agency. Il sistema propone <strong>Tinx</strong> (fit 86.6 — ha lavorato bene proprio su Eva),
+      NON un Good generico che lavora altrove. Il sostituto suggerito mantiene il presidio sulle creator giuste.
+    </div>
+  </div>
+
+  <h3 class="display h3" style="margin-top: 40px;">L'output: CSV per HR</h3>
+  <p class="muted">
+    Quando hai marcato N operatori come "ready", il pulsante <strong>Esporta CSV HR</strong> produce un file con:
+    nome, group, score, tier, sales, shifts, top creator, sostituto scelto, data, note.
+    Pronto per il processo di sostituzione.
+  </p>
+</section>
+
+<!-- FLUSSO -->
+<section id="flusso">
+  <div class="section-counter">06 — FLUSSO OPERATIVO</div>
+  <span class="label">Chi fa cosa, quando</span>
+  <h2 class="display h2" style="margin-top: 12px;">Il ciclo mensile HR</h2>
+  <p class="lead" style="margin-bottom: 40px;">
+    Quattro step ricorrenti, totale ~30 minuti al mese per chiudere il ciclo.
+  </p>
+
+  <div class="timeline">
+    <div class="timeline-step">
+      <div class="label" style="color: var(--green);">Step 1 · Auto</div>
+      <h3 class="display h3" style="margin-top: 8px; font-size: 18px;">Sync CP</h3>
+      <p class="muted" style="font-size: 13px;">
+        Una volta al mese, click su <strong>"Sync CP"</strong>. Importa wage records + takes esatti da CreatorsPro via API.
+      </p>
+    </div>
+    <div class="timeline-step">
+      <div class="label" style="color: var(--blue);">Step 2 · Manuale</div>
+      <h3 class="display h3" style="margin-top: 8px; font-size: 18px;">Upload Infloww</h3>
+      <p class="muted" style="font-size: 13px;">
+        Esporta CSV "By time and employee" da Infloww, carica nella webapp. ~2 minuti.
+      </p>
+    </div>
+    <div class="timeline-step">
+      <div class="label" style="color: var(--orange);">Step 3 · Review</div>
+      <h3 class="display h3" style="margin-top: 8px; font-size: 18px;">Action Center</h3>
+      <p class="muted" style="font-size: 13px;">
+        Apri il pannello, per ogni candidato click sul sostituto suggerito + bottone HR. ~15 min.
+      </p>
+    </div>
+    <div class="timeline-step">
+      <div class="label" style="color: var(--red);">Step 4 · HR</div>
+      <h3 class="display h3" style="margin-top: 8px; font-size: 18px;">CSV → Aila</h3>
+      <p class="muted" style="font-size: 13px;">
+        Click <strong>Esporta CSV</strong>, mandi ad Aila. Lei avvia il processo sostituzioni.
+      </p>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <h3 class="display h3">Cosa cambia per ciascun ruolo</h3>
+  <div class="grid-3" style="margin-top: 20px;">
+    <div class="card">
+      <div class="label" style="color: var(--blue); margin-bottom: 8px;">SM / Team Lead</div>
+      <h3 class="display h3" style="font-size: 18px;">Vista performance team</h3>
+      <p class="muted" style="font-size: 13px;">
+        Aprono <span class="mono">/leaderboard/sales-cp</span> mensile per il proprio team. Confrontano con Infloww
+        per scovare casi interessanti (es. chi è bravo in chat ma converte poco → coaching).
+      </p>
+    </div>
+    <div class="card">
+      <div class="label" style="color: var(--red); margin-bottom: 8px;">HR (Aila + Nicholas)</div>
+      <h3 class="display h3" style="font-size: 18px;">Ciclo sostituzioni</h3>
+      <p class="muted" style="font-size: 13px;">
+        Action Center → scelta sostituti → CSV. Aila prende il file e avvia il processo
+        di colloqui di uscita / hiring sostituti.
+      </p>
+    </div>
+    <div class="card">
+      <div class="label" style="color: var(--purple); margin-bottom: 8px;">Board</div>
+      <h3 class="display h3" style="font-size: 18px;">Hub aggregato</h3>
+      <p class="muted" style="font-size: 13px;">
+        Vista live in <span class="mono">/admin</span>: sales agency mese, operatori attivi, creator coperte,
+        ultimo sync. Quando si discute di un operatore specifico, drill-down creator-by-creator.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- DECISIONI / CTA -->
+<section id="decisioni" style="text-align: center;">
+  <div class="section-counter">07 — COSA SERVE DAL BOARD</div>
+  <span class="label">Punti aperti</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Tre decisioni per <span class="green">far girare il sistema</span>.
+  </h2>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; margin: 40px 0; text-align: left;">
+    <div class="card">
+      <div style="font-size: 28px; margin-bottom: 12px;">①</div>
+      <h3 class="display h3" style="font-size: 18px;">Validazione metodologia</h3>
+      <p class="muted" style="font-size: 13px;">
+        Formula 70/30 e soglia 25 default sono calibrate sulla nostra esperienza, ma non immutabili.
+        Dopo i primi due mesi di uso possiamo ricalibrare insieme se vediamo troppi/pochi candidati.
+      </p>
+    </div>
+    <div class="card">
+      <div style="font-size: 28px; margin-bottom: 12px;">②</div>
+      <h3 class="display h3" style="font-size: 18px;">Frequenza ciclo HR</h3>
+      <p class="muted" style="font-size: 13px;">
+        Proposta: ciclo <strong>mensile</strong> (Action Center → CSV → Aila → sostituzioni entro 2 settimane).
+        Conferma o alternativa?
+      </p>
+    </div>
+    <div class="card">
+      <div style="font-size: 28px; margin-bottom: 12px;">③</div>
+      <h3 class="display h3" style="font-size: 18px;">Allineamento con Aila</h3>
+      <p class="muted" style="font-size: 13px;">
+        Posso coordinarmi direttamente con lei sull'handover CSV e processo sostituzioni,
+        o serve discussione collegiale prima?
+      </p>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <h2 class="display h2" style="margin-top: 0;">Pronta da usare. Già operativa.</h2>
+  <p class="lead" style="margin: 0 auto 40px auto;">
+    Siete tutti già admin. Vi consiglio di aprire e cliccare in giro per 5 minuti prima della riunione,
+    così la discussione è più veloce.
+  </p>
+
+  <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-bottom: 50px;">
+    <a href="https://hoc-fan-agent.vercel.app" class="cta">Apri HOC Pro →</a>
+    <a href="https://hoc-fan-agent.vercel.app/welcome/score-friendly" class="cta cta-secondary">📚 Tutorial Score</a>
+    <a href="https://hoc-fan-agent.vercel.app/admin/action-center" class="cta cta-secondary">🎯 Action Center</a>
+  </div>
+
+  <div style="display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; font-size: 13px; color: var(--text-muted);">
+    <div>📍 hoc-fan-agent.vercel.app</div>
+    <div>🔐 Sign-in Clerk · siete già autorizzati</div>
+    <div>📩 Domande → Nicholas</div>
+  </div>
+</section>
+
+<script>
+  // Update active nav dot on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const navDots = document.querySelectorAll('.nav a');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navDots.forEach(d => d.classList.remove('active'));
+        const link = document.querySelector('.nav a[href="#' + entry.target.id + '"]');
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { threshold: 0.4 });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>
