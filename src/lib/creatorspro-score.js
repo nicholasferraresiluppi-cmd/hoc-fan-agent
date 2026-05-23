@@ -1,178 +1,121 @@
 /**
- * HOC Fan Agent — CreatorsPro score calculation.
+ * HOC Fan Agent — CreatorsPro score (v3).
  *
- * Score 0-100 per ogni operatore basato sui KPI CP (sales/shift, sales/hour,
- * volume, consistency, margin). Stessa logica di normalize+sum della
- * leaderboard operativa Infloww ma con KPI diversi.
+ * Lo score operatore NON è più calcolato vs media Group (v1/v2):
+ * deriva dalla media pesata dei suoi score_per_creator (vedi
+ * creator-aggregates.buildCreatorMatrix).
  *
- * Funziona solo per operatori con almeno 1 shift CP nel periodo. Per gli
- * altri ritorna { score: null, _excluded_reason: "no_cp_data" }.
+ * Pipeline:
+ *   1) buildCreatorMatrix(period) — già calcola score per ogni (op, creator) e
+ *      aggrega in operators[opName].score (media pesata su sales).
+ *   2) buildCpLeaderboard(operatorsInput, period) — combina i dati da matrix
+ *      con quelli Infloww (group/category/language/infloww_kpis) e ritorna
+ *      ranking ordinato per score.
+ *
+ * Tier (percentile-based, uguale a creator-aggregates):
+ *   ≥90 Elite · ≥75 Strong · ≥50 Good · ≥25 Average · ≥10 Weak · <10 Critical
+ *
+ * Coerenza matematica: un operatore Elite a Sales CP è automaticamente Strong+
+ * sulla maggior parte delle creator dove vende molto.
  */
+import { buildCreatorMatrix, tierFromPercentile } from "./creator-aggregates";
 
-/**
- * Pesi default. Somma = 1.00.
- * Configurabili in futuro via KV se vorrai una pagina admin dedicata.
- */
-export const KPI_WEIGHTS_CP = {
-  sales_per_shift: 0.35,    // efficienza per turno
-  sales_per_hour: 0.25,     // efficienza oraria
-  shift_volume: 0.15,       // quanti shift fa
-  consistency: 0.15,        // bassa volatilità tra shift
-  margin: 0.10,             // sales / wage agency
-};
-
-/**
- * Tier riusati dalla operativa (Critical → Elite).
- */
 export const SCORE_TIERS_CP = [
-  { label: "Critical", min: 0,  max: 50.99, color: "#D44545" },
-  { label: "Weak",     min: 51, max: 60.99, color: "#E76F51" },
-  { label: "Average",  min: 61, max: 70.99, color: "#B89158" },
-  { label: "Good",     min: 71, max: 80.99, color: "#D4AF7A" },
-  { label: "Strong",   min: 81, max: 90.99, color: "#3FB97E" },
-  { label: "Elite",    min: 91, max: 100,   color: "#4F8CCB" },
+  { label: "Critical", min: 0,  max: 9.99,  color: "#EF4444" },
+  { label: "Weak",     min: 10, max: 24.99, color: "#F59E0B" },
+  { label: "Average",  min: 25, max: 49.99, color: "#9CA3AF" },
+  { label: "Good",     min: 50, max: 74.99, color: "#10B981" },
+  { label: "Strong",   min: 75, max: 89.99, color: "#3B82F6" },
+  { label: "Elite",    min: 90, max: 100,   color: "#A855F7" },
 ];
 
 /**
- * Soglie di normalizzazione (stesso pattern operativa).
- *  - score 0   se valore <= mean * 0.75
- *  - score 20  se valore <  mean * 0.90
- *  - score 40  se valore <  mean
- *  - score 60  se valore <  mean * 1.10
- *  - score 80  se valore <  mean * 1.25
- *  - score 100 altrimenti
- */
-const THRESHOLDS = [
-  { multiplier: 0.75, score: 0 },
-  { multiplier: 0.90, score: 20 },
-  { multiplier: 1.00, score: 40 },
-  { multiplier: 1.10, score: 60 },
-  { multiplier: 1.25, score: 80 },
-];
-
-function normalizeKpi(value, mean) {
-  if (typeof value !== "number" || value <= 0) return 0;
-  if (typeof mean !== "number" || mean <= 0) return 0;
-  for (const t of THRESHOLDS) {
-    if (value < mean * t.multiplier) return t.score;
-  }
-  return 100;
-}
-
-function assignTier(score, tiers = SCORE_TIERS_CP) {
-  if (typeof score !== "number") return null;
-  for (const t of tiers) {
-    if (score >= t.min && score <= t.max) return t.label;
-  }
-  return null;
-}
-
-/**
- * Calcola consistency score da un array di shift values.
- * Usa coefficient of variation (stddev/mean): bassa CV = alta consistency.
- * Ritorna un valore 0..1 dove 1 = perfettamente costante.
- */
-function calcConsistency(shiftValues) {
-  if (!shiftValues || shiftValues.length < 2) return 0.5; // troppo pochi shift per misurare
-  const positives = shiftValues.filter((v) => typeof v === "number" && v > 0);
-  if (positives.length < 2) return 0;
-  const mean = positives.reduce((a, b) => a + b, 0) / positives.length;
-  if (mean <= 0) return 0;
-  const variance = positives.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / positives.length;
-  const stddev = Math.sqrt(variance);
-  const cv = stddev / mean;
-  // Map cv → consistency: cv=0 → 1.0, cv=1 → 0.0, oltre 1 → ~0
-  return Math.max(0, Math.min(1, 1 - cv));
-}
-
-/**
- * Calcola medie KPI per Group (per la normalizzazione).
- */
-function groupMeansForCp(operators) {
-  const byGroup = new Map();
-  for (const op of operators) {
-    if (!op.group || !op.has_cp_data) continue;
-    if (!byGroup.has(op.group)) byGroup.set(op.group, []);
-    byGroup.get(op.group).push(op);
-  }
-  const out = {};
-  for (const [group, members] of byGroup.entries()) {
-    out[group] = { _count: members.length };
-    for (const kpi of Object.keys(KPI_WEIGHTS_CP)) {
-      const vals = members.map((m) => m._kpis?.[kpi]).filter((v) => typeof v === "number" && v > 0);
-      out[group][kpi] = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-    }
-  }
-  return out;
-}
-
-/**
- * Pipeline completa.
+ * Build leaderboard CP partendo dagli operatori arricchiti (Infloww + CP).
  *
- * @param {Array} operators  - array di { employee, group, has_cp_data, cp_aggregates? } dove
- *                             cp_aggregates = { total_sales, total_shifts, total_hours, total_wage, shifts_attributed[] }
- * @param {object} [settings] - { weights?, tiers? } sovrascrive default
- * @returns {object} { ranking, groupMeansCp }
+ * @param {Array} operators - oggetti con { employee, group, category, language,
+ *                            has_cp_data, cp_aggregates, infloww_* }
+ * @param {string} periodId - YYYY-MM, serve per pescare la matrix v3
+ * @returns {Promise<{ranking, groupMeansCp}>}
+ *
+ * Nota: groupMeansCp è kept per backward compat ma è {} (non più calcolato).
  */
-export function buildCpLeaderboard(operators, settings = {}) {
-  const weights = settings.weights || KPI_WEIGHTS_CP;
-  const tiers = settings.tiers || SCORE_TIERS_CP;
+export async function buildCpLeaderboard(operators, periodId) {
+  const { operators: opAgg } = await buildCreatorMatrix(periodId);
 
-  // Step 1: calcola KPI per ogni operatore
-  const withKpis = operators.map((op) => {
-    if (!op.has_cp_data || !op.cp_aggregates) {
-      return { ...op, _kpis: null };
+  // Step 1: merge — per ogni operator Infloww, pescare score aggregato da matrix
+  const merged = operators.map((op) => {
+    const fromMatrix = opAgg[op.employee];
+    if (!fromMatrix) {
+      // operatore non ha attribuzione su nessuna creator (no CP data)
+      return {
+        ...op,
+        score: null, tier: null,
+        _kpis_cp: null,
+        cp_breakdown: null,
+        _excluded_reason: op.has_cp_data ? "no_matrix_match" : "no_cp_data",
+      };
     }
-    const a = op.cp_aggregates;
-    const shifts = a.total_shifts || 0;
-    const hours = a.total_hours || 0;
-    const sales = a.total_sales || 0;
-    const wage = a.total_wage || 0;
-    const shiftSales = Array.isArray(a.shifts_attributed) ? a.shifts_attributed : [];
-    const kpis = {
-      sales_per_shift: shifts > 0 ? sales / shifts : 0,
-      sales_per_hour: hours > 0 ? sales / hours : 0,
-      shift_volume: shifts,
-      consistency: calcConsistency(shiftSales) * 100, // 0-100 scale per uniformare
-      margin: wage > 0 ? sales / wage : 0,
+    if (fromMatrix.score == null) {
+      // Ha dati CP ma sotto MIN_SHIFTS_RELIABLE su tutte le creator
+      return {
+        ...op,
+        score: null, tier: null,
+        _kpis_cp: deriveKpisFromAgg(op.cp_aggregates),
+        cp_breakdown: {
+          reliable_creators: 0,
+          top_creator: fromMatrix.top_creator,
+          total_creators: fromMatrix.total_creators,
+        },
+        _excluded_reason: "low_confidence_all_creators",
+      };
+    }
+    return {
+      ...op,
+      score: fromMatrix.score,
+      tier: fromMatrix.tier,
+      _kpis_cp: deriveKpisFromAgg(op.cp_aggregates),
+      cp_breakdown: {
+        reliable_creators: fromMatrix.reliable_creators_count,
+        total_creators: fromMatrix.total_creators,
+        top_creator: fromMatrix.top_creator,
+        top_creator_sales: fromMatrix.top_creator_sales,
+        specialization_pct: fromMatrix.specialization_pct,
+      },
     };
-    return { ...op, _kpis: kpis };
   });
 
-  // Step 2: medie Group
-  const groupMeans = groupMeansForCp(withKpis);
-
-  // Step 3: score per operatore
-  const scored = withKpis.map((op) => {
-    if (!op._kpis) {
-      return { ...op, score: null, tier: null, points_breakdown: null, _excluded_reason: "no_cp_data" };
-    }
-    const gm = groupMeans[op.group];
-    if (!gm) {
-      return { ...op, score: 0, tier: assignTier(0, tiers), _excluded_reason: "no_group_data" };
-    }
-    let score = 0;
-    const points = {};
-    for (const [kpi, weight] of Object.entries(weights)) {
-      const norm = normalizeKpi(op._kpis[kpi], gm[kpi]);
-      points[kpi] = norm;
-      score += norm * weight;
-    }
-    score = Math.round(score * 100) / 100;
-    return { ...op, score, tier: assignTier(score, tiers), points_breakdown: points, group_means_cp: gm, _kpis_cp: op._kpis };
-  });
-
-  // Step 4: sort + rank
-  scored.sort((a, b) => {
-    if (a.score === null && b.score === null) return 0;
-    if (a.score === null) return 1;
-    if (b.score === null) return -1;
+  // Step 2: sort by score desc (null in fondo)
+  merged.sort((a, b) => {
+    if (a.score == null && b.score == null) return 0;
+    if (a.score == null) return 1;
+    if (b.score == null) return -1;
     return b.score - a.score;
   });
+
+  // Step 3: rank
   let rank = 1;
-  for (const r of scored) {
-    if (r.score !== null && r.score > 0) r.rank = rank++;
+  for (const r of merged) {
+    if (r.score != null && r.score > 0) r.rank = rank++;
     else r.rank = null;
   }
-  return { ranking: scored, groupMeansCp: groupMeans };
+
+  return { ranking: merged, groupMeansCp: {} };
 }
+
+/**
+ * Deriva i KPI semplici per la UI (sales/shift, sales/h) — informativi.
+ * Lo score reale viene dalla matrix v3.
+ */
+function deriveKpisFromAgg(agg) {
+  if (!agg) return null;
+  const shifts = agg.total_shifts || 0;
+  const hours = agg.total_hours || 0;
+  const sales = agg.total_sales || 0;
+  return {
+    sales_per_shift: shifts > 0 ? Math.round((sales / shifts) * 100) / 100 : 0,
+    sales_per_hour: hours > 0 ? Math.round((sales / hours) * 100) / 100 : 0,
+  };
+}
+
+// Re-export per consumatori legacy
+export { tierFromPercentile };

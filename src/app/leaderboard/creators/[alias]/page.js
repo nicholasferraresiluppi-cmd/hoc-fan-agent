@@ -10,7 +10,7 @@ const fetcher = (url) => fetch(url).then((r) => r.json());
 
 const TIER_COLORS = {
   Critical: "#EF4444", Weak: "#F59E0B", Average: "#9CA3AF",
-  Good: "#10B981", Strong: "#10B981", Elite: "#3B82F6",
+  Good: "#10B981", Strong: "#3B82F6", Elite: "#A855F7",
 };
 
 function fmtCurrency(v) { if (v == null) return "—"; return "$ " + Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 }); }

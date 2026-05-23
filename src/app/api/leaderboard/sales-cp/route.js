@@ -74,8 +74,8 @@ export async function GET(request) {
       return { ...op, category: categories?.[op.group] || null, language: lang || null };
     });
 
-  // Build score
-  const { ranking: scored, groupMeansCp } = buildCpLeaderboard(decorated);
+  // Build score (v3: deriva da creator-matrix con percentile blending)
+  const { ranking: scored, groupMeansCp } = await buildCpLeaderboard(decorated, period_id);
 
   // Filtri di vista (post-score per non perdere counts globali)
   let view = scored;
