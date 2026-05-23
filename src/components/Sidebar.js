@@ -24,7 +24,7 @@ import {
   GraduationCap, BookOpen, ClipboardCheck, Target, Brain, Award,
   LayoutDashboard, UserCog, Sparkles,
   Workflow, Image as ImageIcon, ListChecks, History, Settings,
-  UserCircle2, IdCard, Medal, Key, Lock, Wrench,
+  UserCircle2, Contact, Medal, Key, Lock, Wrench,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout,
   Building2,
 } from "lucide-react";
@@ -77,7 +77,7 @@ const NAV_GROUPS = [
     label: "People",
     items: [
       { href: "/admin/team",                     label: "Team",         icon: UserCircle2 },
-      { href: "/admin/employee-profiles",        label: "Profili",      icon: IdCard },
+      { href: "/admin/employee-profiles",        label: "Profili",      icon: Contact },
       { href: "/admin/seniority",                label: "Seniority",    icon: Medal },
       { href: "/admin/access",                   label: "Accessi",      icon: Key },
       { href: "/admin/ruoli",                    label: "Ruoli",        icon: Lock },

@@ -9,7 +9,7 @@ import {
   GraduationCap, BookOpen, ClipboardCheck, Target, Brain, Award,
   LayoutDashboard, UserCog, Sparkles,
   Workflow, RefreshCw, Ban, Languages, Tags, Upload, Sliders,
-  UserCircle2, IdCard, Medal, Key, Lock, Wrench,
+  UserCircle2, Contact, Medal, Key, Lock, Wrench,
   ArrowUpRight, Calendar, Activity, CheckCircle2, AlertCircle,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
@@ -89,7 +89,7 @@ const SHORTCUT_GROUPS = [
     label: "People & Access",
     items: [
       { href: "/admin/team",              title: "Team",          desc: "Crea team + assegna operatori + nomina lead", icon: UserCircle2 },
-      { href: "/admin/employee-profiles", title: "Profili",       desc: "Anagrafica completa + override KPI", icon: IdCard },
+      { href: "/admin/employee-profiles", title: "Profili",       desc: "Anagrafica completa + override KPI", icon: Contact },
       { href: "/admin/seniority",         title: "Seniority",     desc: "Tier Junior/Senior/Master + override manuale", icon: Medal },
       { href: "/admin/access",            title: "Accessi",       desc: "Aggiungi/rimuovi admin via email", icon: Key },
       { href: "/admin/ruoli",             title: "Ruoli",         desc: "Capabilities multi-ruolo predefiniti", icon: Lock },
