@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HOC Pro — Roadmap & visione</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #08090F;
+      --surface: #13151C;
+      --surface-alt: #1A1D26;
+      --border: #23262F;
+      --border-strong: #2F333E;
+      --text: #F5F6F8;
+      --text-secondary: #9CA3AF;
+      --text-muted: #6B7080;
+      --green: #10B981;
+      --blue: #3B82F6;
+      --red: #EF4444;
+      --orange: #F59E0B;
+      --purple: #A855F7;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.55; -webkit-font-smoothing: antialiased; }
+    .display { font-family: 'Inter Tight', sans-serif; font-weight: 700; letter-spacing: -0.02em; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .label { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: var(--text-muted); }
+    section { min-height: 100vh; padding: 80px 40px; display: flex; flex-direction: column; justify-content: center; max-width: 1200px; margin: 0 auto; position: relative; }
+    .nav { position: fixed; top: 20px; right: 20px; display: flex; gap: 8px; z-index: 100; background: rgba(8, 9, 15, 0.85); backdrop-filter: blur(10px); padding: 8px; border-radius: 999px; border: 1px solid var(--border); }
+    .nav a { width: 10px; height: 10px; border-radius: 50%; background: var(--border-strong); transition: background 0.2s; }
+    .nav a:hover, .nav a.active { background: var(--green); }
+    .h1 { font-size: clamp(40px, 7vw, 72px); line-height: 1.05; margin-bottom: 24px; }
+    .h2 { font-size: clamp(28px, 4vw, 44px); line-height: 1.15; margin-bottom: 18px; }
+    .h3 { font-size: 22px; line-height: 1.25; margin-bottom: 12px; }
+    .lead { font-size: 18px; color: var(--text-secondary); line-height: 1.6; max-width: 760px; }
+    .green { color: var(--green); } .blue { color: var(--blue); } .red { color: var(--red); }
+    .orange { color: var(--orange); } .purple { color: var(--purple); } .muted { color: var(--text-secondary); }
+
+    .hero { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: radial-gradient(ellipse 800px 400px at 50% 30%, rgba(16, 185, 129, 0.12), transparent), radial-gradient(ellipse 600px 400px at 50% 70%, rgba(168, 85, 247, 0.08), transparent), var(--bg); }
+    .brand { display: inline-flex; align-items: center; gap: 14px; padding: 10px 18px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 999px; margin-bottom: 30px; }
+    .brand-logo { width: 28px; height: 28px; background: linear-gradient(135deg, var(--green), var(--blue)); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: #0a0a0a; font-weight: 800; }
+
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; }
+    .card-accent-green { border-color: rgba(16, 185, 129, 0.4); background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), var(--surface)); }
+    .card-accent-blue { border-color: rgba(59, 130, 246, 0.4); background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), var(--surface)); }
+    .card-accent-red { border-color: rgba(239, 68, 68, 0.4); background: linear-gradient(135deg, rgba(239, 68, 68, 0.05), var(--surface)); }
+    .card-accent-orange { border-color: rgba(245, 158, 11, 0.4); background: linear-gradient(135deg, rgba(245, 158, 11, 0.05), var(--surface)); }
+    .card-accent-purple { border-color: rgba(168, 85, 247, 0.4); background: linear-gradient(135deg, rgba(168, 85, 247, 0.05), var(--surface)); }
+    .card-icon { width: 52px; height: 52px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 18px; border: 1px solid var(--border); }
+
+    .tier { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-family: 'JetBrains Mono', monospace; }
+    .t-elite    { background: rgba(168, 85, 247, 0.15); color: #A855F7; border: 1px solid #A855F755; }
+    .t-strong   { background: rgba(59, 130, 246, 0.15); color: #3B82F6; border: 1px solid #3B82F655; }
+    .t-good     { background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid #10B98155; }
+    .t-weak     { background: rgba(245, 158, 11, 0.15); color: #F59E0B; border: 1px solid #F59E0B55; }
+    .t-critical { background: rgba(239, 68, 68, 0.15); color: #EF4444; border: 1px solid #EF444455; }
+
+    .mockup { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 14px; overflow: hidden; margin: 24px 0; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+    .mockup-head { background: rgba(8, 9, 15, 0.6); padding: 14px 22px; border-bottom: 1px solid var(--border-strong); display: flex; justify-content: space-between; align-items: center; }
+    .mockup-body { padding: 0; }
+    .row { display: grid; padding: 12px 22px; border-bottom: 1px solid var(--border); align-items: center; gap: 14px; font-size: 13px; }
+    .row.head { background: rgba(0,0,0,0.2); }
+    .row.head > div { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); }
+    .avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #3B82F6, #1E40AF); color: white; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+
+    .cta { display: inline-flex; align-items: center; gap: 10px; padding: 16px 28px; background: var(--green); color: #0a0a0a; border-radius: 12px; font-weight: 700; font-size: 16px; text-decoration: none; transition: transform 0.15s, box-shadow 0.15s; }
+    .cta:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(16, 185, 129, 0.3); }
+    .cta-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+
+    .section-counter { position: absolute; top: 60px; right: 40px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); letter-spacing: 0.2em; }
+
+    /* CICLO 4 FASI */
+    .cycle {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin: 32px 0;
+    }
+    .cycle-step {
+      padding: 24px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      position: relative;
+      text-align: center;
+    }
+    .cycle-step.has::after,
+    .cycle-step.partial::after,
+    .cycle-step.miss::after {
+      content: "";
+      position: absolute;
+      top: 14px; right: 14px;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+    }
+    .cycle-step.has::after { background: var(--green); box-shadow: 0 0 12px rgba(16,185,129,0.6); }
+    .cycle-step.partial::after { background: var(--orange); }
+    .cycle-step.miss::after { background: var(--red); }
+    .cycle-step .step-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.15em;
+      margin-bottom: 10px;
+    }
+    .cycle-step .step-label {
+      font-family: 'Inter Tight', sans-serif;
+      font-weight: 800;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+    }
+    .cycle-step .step-body {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* MOCKUP DRILL-DOWN PROPOSTO */
+    .blueprint {
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 16px;
+      padding: 24px;
+      margin: 24px 0;
+    }
+    .blueprint-block {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+      margin-bottom: 12px;
+    }
+    .blueprint-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--green);
+      letter-spacing: 0.15em;
+      margin-bottom: 8px;
+    }
+    .blueprint-block .desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .legend { display: flex; gap: 18px; margin: 20px 0; font-size: 12px; color: var(--text-secondary); flex-wrap: wrap; }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    .compare-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+    .compare-table th, .compare-table td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+    .compare-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); background: rgba(0,0,0,0.2); }
+    .compare-table tr:last-child td { border-bottom: none; }
+
+    .roadmap-step {
+      display: flex;
+      gap: 22px;
+      padding: 22px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 14px;
+      align-items: flex-start;
+    }
+    .roadmap-step .num {
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--green);
+      line-height: 1;
+      flex-shrink: 0;
+      min-width: 52px;
+    }
+    .roadmap-step .body h4 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    .roadmap-step .body p { color: var(--text-secondary); font-size: 14px; }
+    .effort {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      margin-left: 8px;
+    }
+    .effort.s { background: rgba(16,185,129,0.15); color: var(--green); }
+    .effort.m { background: rgba(245,158,11,0.15); color: var(--orange); }
+    .effort.l { background: rgba(168,85,247,0.15); color: var(--purple); }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="#hero" title="Inizio"></a>
+  <a href="#stato" title="Stato attuale"></a>
+  <a href="#ciclo" title="Il ciclo"></a>
+  <a href="#drilldown" title="Drill-down"></a>
+  <a href="#coaching" title="Coaching Center"></a>
+  <a href="#metriche" title="Closed-loop metrics"></a>
+  <a href="#percorsi" title="Percorsi utente"></a>
+  <a href="#roadmap" title="Roadmap"></a>
+</nav>
+
+<!-- HERO -->
+<section id="hero" class="hero">
+  <div class="brand">
+    <div class="brand-logo">H</div>
+    <span class="mono" style="font-size: 11px; letter-spacing: 0.16em; color: var(--text-secondary);">HOC PRO · ROADMAP & VISIONE</span>
+  </div>
+  <h1 class="display h1">
+    Chiudere il <span class="green">cerchio</span>.<br/>
+    Da console di misura a <span class="blue">sistema di crescita</span>.
+  </h1>
+  <p class="lead" style="margin-bottom: 40px;">
+    HOC Pro oggi misura performance e indica chi sostituire. Il prossimo passo:
+    diagnosticare il perché, agire su training mirati, e verificare se le azioni hanno funzionato.
+    Un'azienda di KPI vince così, non solo tagliando.
+  </p>
+  <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+    <a href="#stato" class="cta">↓ Inizia presentazione</a>
+    <a href="https://hoc-fan-agent.vercel.app" class="cta cta-secondary">Apri la webapp</a>
+  </div>
+</section>
+
+<!-- STATO ATTUALE -->
+<section id="stato">
+  <div class="section-counter">01 — DOVE SIAMO</div>
+  <span class="label">Stato attuale, onestamente</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Forti su <span class="green">misurare</span> e <span class="green">tagliare</span>.<br/>
+    Deboli su <span class="orange">capire</span> e <span class="red">verificare</span>.
+  </h2>
+  <p class="lead" style="margin-bottom: 40px;">
+    HOC Pro v1 ha messo a terra leaderboard + score percentile + Action Center.
+    Sono i due pezzi più visibili del flusso HR, ma da soli non chiudono un ciclo di
+    miglioramento continuo.
+  </p>
+
+  <div class="grid-2">
+    <div class="card card-accent-green">
+      <div class="card-icon" style="color: var(--green);">✓</div>
+      <h3 class="display h3">Cosa funziona già bene</h3>
+      <ul class="muted" style="padding-left: 20px; line-height: 1.85;">
+        <li><strong style="color: var(--text);">Misurazione affidabile</strong> — score CP v3 percentile, basato sui sales reali, calibrato sul vero pari</li>
+        <li><strong style="color: var(--text);">Decisione HR di sostituzione</strong> — Action Center con suggerimenti automatici di swap</li>
+        <li><strong style="color: var(--text);">Audit-loggato</strong> — chi ha deciso cosa, quando, con che alternativa</li>
+        <li><strong style="color: var(--text);">Validazione incrociata</strong> — confronto Sales CP vs Infloww per pattern</li>
+      </ul>
+    </div>
+    <div class="card card-accent-orange">
+      <div class="card-icon" style="color: var(--orange);">⚠️</div>
+      <h3 class="display h3">Cosa manca per chiudere il ciclo</h3>
+      <ul class="muted" style="padding-left: 20px; line-height: 1.85;">
+        <li><strong style="color: var(--text);">Diagnostica del "perché"</strong> — drill-down operatore è oggi un profilo statico, non risponde a "dove è debole, dove è forte"</li>
+        <li><strong style="color: var(--text);">Workflow coaching</strong> — chi è Weak/Average con margini ha bisogno di un percorso, non solo dell'asticella per essere sostituito</li>
+        <li><strong style="color: var(--text);">Tracking interventi</strong> — facciamo coaching o sostituiamo, ma non sappiamo dopo se è servito</li>
+        <li><strong style="color: var(--text);">Profilo per l'operatore</strong> — la vista è solo dei manager, l'operatore non vede "dove sta" né "cosa fare per salire"</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- IL CICLO 4 FASI -->
+<section id="ciclo">
+  <div class="section-counter">02 — IL CICLO</div>
+  <span class="label">Il framework</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Quattro fasi.<br/>
+    Oggi ne copriamo <span class="green">due</span>.
+  </h2>
+  <p class="lead">
+    Un'azienda di sales vince quando ogni decisione HR è incardinata in un ciclo
+    misura → diagnostica → agisci → verifica. Senza una delle quattro, il sistema zoppica.
+  </p>
+
+  <div class="cycle">
+    <div class="cycle-step has">
+      <div class="step-num">01 — OGGI ✓</div>
+      <div class="step-label green">MISURA</div>
+      <div class="step-body">Score CP percentile, leaderboard mensile, classifica per creator e per agency. Solido.</div>
+    </div>
+    <div class="cycle-step miss">
+      <div class="step-num">02 — DA FARE</div>
+      <div class="step-label orange">DIAGNOSTICA</div>
+      <div class="step-body">Per ogni operatore: <em>perché</em> il suo numero è quel numero? Drill per creator, pattern, peer compare.</div>
+    </div>
+    <div class="cycle-step partial">
+      <div class="step-num">03 — PARZIALE</div>
+      <div class="step-label blue">AGISCI</div>
+      <div class="step-body">Action Center fa sostituzione. Manca il Coaching Center per chi può crescere.</div>
+    </div>
+    <div class="cycle-step miss">
+      <div class="step-num">04 — DA FARE</div>
+      <div class="step-label red">VERIFICA</div>
+      <div class="step-body">Closed-loop: l'azione HR ha cambiato lo score? Quante sostituzioni hanno portato Good+? % training riusciti?</div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="legend-item"><span class="dot" style="background: var(--green);"></span> Coperto bene</span>
+    <span class="legend-item"><span class="dot" style="background: var(--orange);"></span> Parziale</span>
+    <span class="legend-item"><span class="dot" style="background: var(--red);"></span> Mancante</span>
+  </div>
+
+  <div class="card" style="margin-top: 32px; border-color: rgba(168, 85, 247, 0.4); background: linear-gradient(135deg, rgba(168, 85, 247, 0.06), var(--surface));">
+    <h3 class="display h3 purple">L'idea di fondo</h3>
+    <p class="muted" style="font-size: 16px; line-height: 1.7;">
+      Oggi HOC Pro risponde alla domanda <em style="color: var(--text);">"chi tagliare?"</em>.
+      Il prossimo livello risponde a <em style="color: var(--text);">"come faccio salire chi può salire?"</em>
+      e a <em style="color: var(--text);">"le mie decisioni di questo mese hanno spostato lo score
+      medio dell'agency?"</em>. Solo allora siamo un sistema di crescita, non solo di selezione.
+    </p>
+  </div>
+</section>
+
+<!-- DRILL-DOWN PROPOSTA -->
+<section id="drilldown">
+  <div class="section-counter">03 — DRILL-DOWN</div>
+  <span class="label">Pezzo 1 — la diagnostica</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Drill-down operatore<br/>
+    da <span class="orange">profilo</span> a <span class="green">diagnostico</span>.
+  </h2>
+  <p class="lead">
+    La pagina <span class="mono">/leaderboard/operational/[nome]</span> oggi mostra un riassunto
+    statico basato sull'Infloww v1. La trasformerei in uno strumento operativo a 4 blocchi
+    per rispondere a "perché questo numero?".
+  </p>
+
+  <table class="compare-table">
+    <thead>
+      <tr><th>Blocco</th><th>Oggi</th><th>Proposta</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Snapshot</strong></td>
+        <td class="muted">Player card con score Infloww + KPI aggregati</td>
+        <td>Player card con <span class="green">score CP</span> + tier + delta + posizione vs creator e vs agency + bottoni azione</td>
+      </tr>
+      <tr>
+        <td><strong>Performance per creator</strong></td>
+        <td class="red">Manca</td>
+        <td>Tabella: ogni creator lavorata, sales/shift, % vs cohort di quella creator, n. shift, Infloww affiancato</td>
+      </tr>
+      <tr>
+        <td><strong>Trend storico</strong></td>
+        <td class="muted">Lista tabellare di periodi</td>
+        <td>Grafico mensile con overlay degli interventi ("qui c'è stato coaching → score +8")</td>
+      </tr>
+      <tr>
+        <td><strong>Diagnosi + azioni</strong></td>
+        <td class="red">Manca</td>
+        <td>Auto-insight pattern (CP basso + Infloww alto → coaching closing), peer compare, CTA dirette</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 class="display h3" style="margin-top: 40px; margin-bottom: 16px;">Mockup del nuovo layout</h3>
+
+  <div class="blueprint">
+    <div class="blueprint-block" style="border-color: rgba(16, 185, 129, 0.3);">
+      <div class="blueprint-title">▎ BLOCCO 1 — SNAPSHOT</div>
+      <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap;">
+        <div class="avatar" style="width: 56px; height: 56px; font-size: 18px; background: linear-gradient(135deg, var(--blue), #1E40AF);">ML</div>
+        <div style="flex: 1; min-width: 220px;">
+          <div class="display" style="font-size: 22px; margin-bottom: 4px;">Michele Lepore</div>
+          <div class="muted" style="font-size: 12px;">Giulia Ottorini ITA · BIG · IT</div>
+        </div>
+        <div style="text-align: right;">
+          <div class="mono muted" style="font-size: 10px;">SCORE CP</div>
+          <div class="mono" style="font-size: 36px; color: var(--blue); font-weight: 700;">82.2</div>
+          <span class="tier t-strong">STRONG</span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <a href="#" style="padding: 8px 14px; background: rgba(239,68,68,0.15); color: var(--red); border-radius: 8px; font-size: 12px; text-decoration: none; font-weight: 700;">→ Action Center</a>
+          <a href="#" style="padding: 8px 14px; background: rgba(245,158,11,0.15); color: var(--orange); border-radius: 8px; font-size: 12px; text-decoration: none; font-weight: 700;">→ Coaching</a>
+          <a href="#" style="padding: 8px 14px; background: rgba(59,130,246,0.15); color: var(--blue); border-radius: 8px; font-size: 12px; text-decoration: none; font-weight: 700;">+ Nota</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="blueprint-block" style="border-color: rgba(59, 130, 246, 0.3);">
+      <div class="blueprint-title">▎ BLOCCO 2 — PERFORMANCE PER CREATOR (il "perché")</div>
+      <div class="row head" style="grid-template-columns: 1.8fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr; padding: 8px 0;">
+        <div>Creator</div><div>Score CP locale</div><div>Sales/shift</div><div>vs cohort</div><div>Shift</div><div>Score Infw</div>
+      </div>
+      <div class="row" style="grid-template-columns: 1.8fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr; padding: 8px 0; border-bottom: none;">
+        <div>Giulia Ottorini ITA</div>
+        <div class="mono blue">87.4</div>
+        <div class="mono green">$1340</div>
+        <div class="mono green">+18%</div>
+        <div class="mono">21</div>
+        <div class="mono muted">73.2</div>
+      </div>
+      <div class="row" style="grid-template-columns: 1.8fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr; padding: 8px 0; border-bottom: none;">
+        <div>Sara Sfamurri ITA</div>
+        <div class="mono orange">58.1</div>
+        <div class="mono">$520</div>
+        <div class="mono red">−24%</div>
+        <div class="mono">8</div>
+        <div class="mono muted">68.8</div>
+      </div>
+      <div class="desc" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border);">
+        <strong class="green">Lettura immediata:</strong> Michele è uno Strong su Giulia Ottorini (+18% sopra il cohort di quella creator) ma <strong class="red">underperforma su Sara Sfamurri</strong> (−24%). Il coaching deve essere mirato su quella specifica creator, non generico.
+      </div>
+    </div>
+
+    <div class="blueprint-block" style="border-color: rgba(168, 85, 247, 0.3);">
+      <div class="blueprint-title">▎ BLOCCO 3 — TREND STORICO (con overlay interventi)</div>
+      <div style="height: 90px; padding: 12px 0; display: flex; align-items: end; gap: 6px; position: relative;">
+        <div style="flex: 1; height: 40%; background: var(--orange); border-radius: 3px 3px 0 0;" title="Score 52"></div>
+        <div style="flex: 1; height: 48%; background: var(--orange); border-radius: 3px 3px 0 0;"></div>
+        <div style="flex: 1; height: 55%; background: var(--green); border-radius: 3px 3px 0 0;"></div>
+        <div style="flex: 1; height: 62%; background: var(--green); border-radius: 3px 3px 0 0;"></div>
+        <div style="flex: 1; height: 70%; background: var(--blue); border-radius: 3px 3px 0 0; position: relative;">
+          <div style="position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--purple); white-space: nowrap;">★ coaching</div>
+        </div>
+        <div style="flex: 1; height: 82%; background: var(--blue); border-radius: 3px 3px 0 0;"></div>
+        <div style="flex: 1; height: 84%; background: var(--blue); border-radius: 3px 3px 0 0;"></div>
+      </div>
+      <div class="desc" style="font-size: 11px; display: flex; justify-content: space-between; color: var(--text-muted); margin-top: 4px;">
+        <span>Ott</span><span>Nov</span><span>Dic</span><span>Gen</span><span>Feb</span><span>Mar</span><span>Apr</span>
+      </div>
+      <div class="desc" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border);">
+        Score nel tempo, con marker degli interventi HR (coaching, training, swap). Vedere visivamente <em>se</em> e <em>quando</em> un'azione ha cambiato la traiettoria.
+      </div>
+    </div>
+
+    <div class="blueprint-block" style="border-color: rgba(245, 158, 11, 0.3);">
+      <div class="blueprint-title">▎ BLOCCO 4 — DIAGNOSI + AZIONI (nuovo)</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div>
+          <div class="mono muted" style="font-size: 10px; margin-bottom: 6px;">AUTO-INSIGHT</div>
+          <div class="desc">
+            "Sales CP alto + Infloww basso → iper-efficiente. Investiga se è merito reale o creator forte che si vende da sola."
+          </div>
+        </div>
+        <div>
+          <div class="mono muted" style="font-size: 10px; margin-bottom: 6px;">PEER COMPARE</div>
+          <div class="desc">
+            Altri Strong sulle stesse creator: Simone Cherchi (94.2), Tommaso Amabile (86.3). Cosa fanno di diverso?
+          </div>
+        </div>
+        <div>
+          <div class="mono muted" style="font-size: 10px; margin-bottom: 6px;">SUGGESTED TRAINING</div>
+          <div class="desc">
+            Scenario consigliato: <strong style="color: var(--blue);">"PPV closing su Sara Sfamurri ITA"</strong> — durata 30 min
+          </div>
+        </div>
+        <div>
+          <div class="mono muted" style="font-size: 10px; margin-bottom: 6px;">CTA</div>
+          <div class="desc">
+            Bottoni: assegna training, prenota coaching, marca per review HR, esporta scheda
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COACHING CENTER -->
+<section id="coaching">
+  <div class="section-counter">04 — COACHING CENTER</div>
+  <span class="label">Pezzo 2 — il workflow che manca</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Un <span class="orange">Coaching Center</span> parallelo all'Action Center.
+  </h2>
+  <p class="lead">
+    L'Action Center è per chi va sostituito. Il Coaching Center è per chi può crescere.
+    Stessa logica operativa (lista mensile + suggerimenti automatici + workflow trackabile),
+    target diverso: <strong>Weak/Average con margini</strong>, non Critical.
+  </p>
+
+  <div class="grid-2" style="margin: 32px 0;">
+    <div class="card card-accent-red">
+      <div class="card-icon" style="color: var(--red);">✂️</div>
+      <h3 class="display h3">Action Center (esiste)</h3>
+      <p class="muted" style="margin-bottom: 12px;">Per: <strong style="color: var(--text);">Critical, score ≤ 25</strong></p>
+      <p class="muted" style="font-size: 13px;">Decisione: <strong style="color: var(--text);">sostituzione</strong>. Output: CSV per HR + sostituto suggerito.</p>
+    </div>
+    <div class="card card-accent-orange">
+      <div class="card-icon" style="color: var(--orange);">🎯</div>
+      <h3 class="display h3">Coaching Center (nuovo)</h3>
+      <p class="muted" style="margin-bottom: 12px;">Per: <strong style="color: var(--text);">Weak/Average con trend positivo</strong> o margini visibili</p>
+      <p class="muted" style="font-size: 13px;">Decisione: <strong style="color: var(--text);">intervento mirato</strong>. Output: training assegnato, sessione coaching prenotata, owner (TL) definito, follow-up mese dopo.</p>
+    </div>
+  </div>
+
+  <div class="card" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.06), var(--surface));">
+    <h3 class="display h3 green">Per ogni candidato Coaching, il sistema propone:</h3>
+    <div class="grid-3" style="margin-top: 20px;">
+      <div>
+        <div class="mono muted" style="font-size: 10px; margin-bottom: 6px;">PUNTO DEBOLE</div>
+        <div class="desc">Quale creator/KPI tira giù lo score (deriva dal Blocco 2 della drill-down)</div>
+      </div>
+      <div>
+        <div class="mono muted" style="font-size: 10px; margin-bottom: 6px;">TRAINING SCENARIO</div>
+        <div class="desc">Match automatico col modulo Academy esistente più rilevante</div>
+      </div>
+      <div>
+        <div class="mono muted" style="font-size: 10px; margin-bottom: 6px;">OWNER + DEADLINE</div>
+        <div class="desc">Team Lead della creator principale, deadline = fine mese</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CLOSED-LOOP METRICS -->
+<section id="metriche">
+  <div class="section-counter">05 — CLOSED-LOOP</div>
+  <span class="label">Pezzo 3 — la verifica</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Chiudere il loop:<br/>
+    <span class="green">le decisioni di questo mese hanno funzionato?</span>
+  </h2>
+  <p class="lead">
+    Senza queste tre metriche aggregate nel Hub, l'Action Center e il Coaching Center
+    rimangono fucine di decisioni senza feedback. Diventano <em>visibili</em> solo le
+    azioni, non i loro <em>esiti</em>.
+  </p>
+
+  <div class="grid-3" style="margin: 32px 0;">
+    <div class="card card-accent-green">
+      <div class="card-icon" style="color: var(--green);">📈</div>
+      <h3 class="display h3">Coaching effectiveness</h3>
+      <div class="mono" style="font-size: 32px; color: var(--green); font-weight: 700; margin: 12px 0;">
+        62%
+      </div>
+      <p class="muted" style="font-size: 13px;">
+        Operatori che dopo un coaching sono saliti di almeno mezzo tier nei 30 giorni successivi.
+      </p>
+    </div>
+    <div class="card card-accent-blue">
+      <div class="card-icon" style="color: var(--blue);">🔄</div>
+      <h3 class="display h3">Swap success rate</h3>
+      <div class="mono" style="font-size: 32px; color: var(--blue); font-weight: 700; margin: 12px 0;">
+        78%
+      </div>
+      <p class="muted" style="font-size: 13px;">
+        Sostituzioni HR che hanno generato un operatore Good+ sulla creator nel mese successivo.
+      </p>
+    </div>
+    <div class="card card-accent-purple">
+      <div class="card-icon" style="color: var(--purple);">🎯</div>
+      <h3 class="display h3">Agency score trend</h3>
+      <div class="mono" style="font-size: 32px; color: var(--purple); font-weight: 700; margin: 12px 0;">
+        +3.4
+      </div>
+      <p class="muted" style="font-size: 13px;">
+        Variazione score medio agency vs trimestre precedente. La metrica nord-stella di HOC Pro.
+      </p>
+    </div>
+  </div>
+
+  <div class="card" style="border-color: rgba(245, 158, 11, 0.4); background: linear-gradient(135deg, rgba(245, 158, 11, 0.05), var(--surface));">
+    <h3 class="display h3 orange">Perché la metrica nord-stella è "score medio agency"</h3>
+    <p class="muted" style="line-height: 1.7;">
+      Lo score CP è percentile: gli Elite sono <em>sempre</em> il top 10% del periodo. Quindi non
+      può salire "automaticamente" a livello aggregato. Se lo score <strong style="color: var(--text);">medio</strong>
+      sale, significa che <strong style="color: var(--text);">l'intera distribuzione si è spostata</strong>:
+      meno operatori in basso, più in alto. È l'unica metrica che certifica che il sistema HR + training
+      sta migliorando l'agency, non solo cambiando i nomi nelle stesse posizioni.
+    </p>
+  </div>
+</section>
+
+<!-- PERCORSI UTENTE -->
+<section id="percorsi">
+  <div class="section-counter">06 — PERCORSI UTENTE</div>
+  <span class="label">Chi fa cosa, ogni giorno</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Cinque ruoli,<br/>
+    cinque percorsi <span class="blue">cuciti addosso</span>.
+  </h2>
+  <p class="lead">
+    Un sistema HR è usabile solo se ogni ruolo sa subito dove cliccare. Oggi le viste
+    sono indifferenziate. Il prossimo passo è personalizzare l'entry-point e i tool per ognuno.
+  </p>
+
+  <div class="grid-2" style="margin-top: 32px;">
+    <div class="card">
+      <h3 class="display h3 green">Team Lead</h3>
+      <div class="mono muted" style="font-size: 10px; margin: 8px 0 14px;">QUOTIDIANO + MENSILE</div>
+      <p class="muted" style="margin-bottom: 8px;"><strong style="color: var(--text);">Daily:</strong> Hub team-filtrato → Sales CP del proprio team → drill-down sui Weak → coaching note</p>
+      <p class="muted"><strong style="color: var(--text);">Mensile:</strong> Coaching Center → assegna training ai propri operatori, owner = lui</p>
+    </div>
+    <div class="card">
+      <h3 class="display h3 blue">Sales Manager</h3>
+      <div class="mono muted" style="font-size: 10px; margin: 8px 0 14px;">SETTIMANALE + MENSILE</div>
+      <p class="muted" style="margin-bottom: 8px;"><strong style="color: var(--text);">Weekly:</strong> Sales CP filtrato silos → drill-down sui Critical → conferma valutazione</p>
+      <p class="muted"><strong style="color: var(--text);">Mensile:</strong> Action Center per i Critical, escalation a HR</p>
+    </div>
+    <div class="card">
+      <h3 class="display h3 orange">HR</h3>
+      <div class="mono muted" style="font-size: 10px; margin: 8px 0 14px;">MENSILE</div>
+      <p class="muted" style="margin-bottom: 8px;"><strong style="color: var(--text);">Mensile:</strong> Action Center → scegli swap → CSV → sostituzione</p>
+      <p class="muted"><strong style="color: var(--text);">Mese dopo:</strong> Tracking esiti — i nuovi operatori sono Good+? Le sostituzioni hanno funzionato?</p>
+    </div>
+    <div class="card">
+      <h3 class="display h3 purple">Operatore</h3>
+      <div class="mono muted" style="font-size: 10px; margin: 8px 0 14px;">CONTINUO</div>
+      <p class="muted" style="margin-bottom: 8px;"><strong style="color: var(--text);">Anytime:</strong> Mio profilo → score corrente, trend, ranking, posizione vs peer</p>
+      <p class="muted"><strong style="color: var(--text);">Sviluppo:</strong> Training disponibili, "cosa devo fare per salire di tier"</p>
+    </div>
+  </div>
+
+  <div class="card card-accent-purple" style="margin-top: 18px;">
+    <h3 class="display h3 purple">Board</h3>
+    <div class="mono muted" style="font-size: 10px; margin: 8px 0 14px;">QUARTERLY</div>
+    <p class="muted">
+      Hub board-only: KPI agency live (score medio, distribuzione tier, top creator) +
+      closed-loop metrics (coaching effectiveness, swap success rate, score trend trimestrale).
+      Risposta a: <em>"sta migliorando o no?"</em> in una schermata.
+    </p>
+  </div>
+</section>
+
+<!-- ROADMAP -->
+<section id="roadmap">
+  <div class="section-counter">07 — ROADMAP</div>
+  <span class="label">Come arrivarci, in ordine</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Quattro step.<br/>
+    <span class="green">Misurati, non un mega-deliverable.</span>
+  </h2>
+  <p class="lead">
+    Ogni step rilascia valore da solo. Si possono fermare e validare. Senza dipendenze
+    forti tra l'uno e l'altro tranne dove indicato.
+  </p>
+
+  <div style="margin-top: 40px;">
+    <div class="roadmap-step">
+      <div class="num">1</div>
+      <div class="body">
+        <h4>Drill-down operatore diagnostico <span class="effort s">S · 3-5 giorni</span></h4>
+        <p>Riscrittura della pagina <span class="mono">/leaderboard/operational/[nome]</span> con i 4 blocchi: snapshot CP-first, performance per creator, trend con overlay, auto-insight + peer compare. Riusa la matrix v3 esistente in <span class="mono">creator-aggregates.js</span>, nessun nuovo dato da raccogliere.</p>
+      </div>
+    </div>
+    <div class="roadmap-step">
+      <div class="num">2</div>
+      <div class="body">
+        <h4>Coaching Center <span class="effort m">M · 7-10 giorni</span></h4>
+        <p>Nuova pagina <span class="mono">/admin/coaching-center</span> sul modello dell'Action Center. Algoritmo che filtra Weak/Average con margine di crescita (es. delta positivo, score >25), match con training scenario dall'Academy esistente, owner = TL della creator principale, follow-up mese successivo automatico.</p>
+      </div>
+    </div>
+    <div class="roadmap-step">
+      <div class="num">3</div>
+      <div class="body">
+        <h4>Tracking interventi + closed-loop metrics nel Hub <span class="effort m">M · 5-7 giorni</span></h4>
+        <p>Storage delle azioni HR/coaching in KV (chi → cosa → quando → owner). Calcolo automatico nelle 3 metriche aggregate (coaching effectiveness, swap success rate, agency score trend) e widget nel Hub. <strong>Dipende dai punti 1+2</strong> per avere dati da tracciare.</p>
+      </div>
+    </div>
+    <div class="roadmap-step">
+      <div class="num">4</div>
+      <div class="body">
+        <h4>Profilo "io" per operatore <span class="effort l">L · 10-14 giorni</span></h4>
+        <p>Nuova pagina <span class="mono">/profilo</span> visibile a tutti gli operatori (auth basata su email = nome). Mostra: mio score, mio trend, mia posizione, training disponibili per salire. Sblocca trasparenza interna e responsabilizza chi vuole crescere, senza che debba chiedere al TL.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-accent-green" style="margin-top: 40px;">
+    <h3 class="display h3 green">L'ordine ha una ragione</h3>
+    <p class="muted" style="line-height: 1.7;">
+      Faccio prima la <strong style="color: var(--text);">diagnostica</strong> (1) perché senza
+      di lei il Coaching Center (2) non saprebbe cosa suggerire. Faccio il Coaching prima del
+      <strong style="color: var(--text);">tracking</strong> (3) perché senza azioni reali non c'è
+      nulla da tracciare. Il <strong style="color: var(--text);">profilo operatore</strong> (4)
+      è l'ultimo perché è il più grande in scope ma il meno urgente — gli altri 3 chiudono già
+      il loop manager-side.
+    </p>
+  </div>
+</section>
+
+<!-- CTA FINALE -->
+<section style="text-align: center; min-height: 60vh;">
+  <span class="label">Cosa serve da te</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Una sola decisione per partire:<br/>
+    <span class="green">parto dal punto 1?</span>
+  </h2>
+  <p class="lead" style="margin: 0 auto 32px;">
+    Drill-down operatore diagnostico. 3-5 giorni di lavoro. Nessuna nuova dipendenza,
+    riuso totale della matrix v3. Rilascio incrementale, posso fermare quando vuoi.
+  </p>
+  <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+    <a href="https://hoc-fan-agent.vercel.app" class="cta">→ Apri la webapp</a>
+    <a href="https://hoc-fan-agent.vercel.app/board/presentation.html" class="cta cta-secondary">← Presentazione board v1</a>
+  </div>
+</section>
+
+<script>
+  // Nav highlighting on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.nav a');
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach((s) => {
+      const top = s.offsetTop - 100;
+      if (window.scrollY >= top) current = s.id;
+    });
+    navLinks.forEach((a) => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+    });
+  }, { passive: true });
+</script>
+
+</body>
+</html>
