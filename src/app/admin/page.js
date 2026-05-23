@@ -88,6 +88,7 @@ const SHORTCUT_GROUPS = [
   {
     label: "People & Access",
     items: [
+      { href: "/admin/action-center",     title: "Action Center", desc: "Lista underperformers + swap + export HR", icon: Target },
       { href: "/admin/team",              title: "Team",          desc: "Crea team + assegna operatori + nomina lead", icon: UserCircle2 },
       { href: "/admin/employee-profiles", title: "Profili",       desc: "Anagrafica completa + override KPI", icon: Contact },
       { href: "/admin/seniority",         title: "Seniority",     desc: "Tier Junior/Senior/Master + override manuale", icon: Medal },
@@ -220,6 +221,11 @@ export default function AdminHub() {
           <ClipboardCheck size={16} />
           <span>Review sessioni AI</span>
           <ArrowUpRight size={14} color={CP.textMuted} />
+        </Link>
+        <Link href="/admin/action-center" style={{ ...quickActionStyle(), borderColor: CP.accentRed + "55", color: CP.textPrimary }}>
+          <Target size={16} color={CP.accentRed} />
+          <span>Action Center — operatori da cambiare</span>
+          <ArrowUpRight size={14} color={CP.accentRed} />
         </Link>
       </div>
 

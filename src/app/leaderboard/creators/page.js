@@ -5,6 +5,8 @@ import useSWR, { mutate } from "swr";
 import Link from "next/link";
 import { CP, FONTS, creatorDotColor } from "@/lib/brand";
 import { SectionLabel, StatCard, TrendPill, CreatorDot, MiniInsight, CpCard } from "@/components/cp-style";
+import ScoreTutorialModal from "@/components/ScoreTutorialModal";
+import { Info } from "lucide-react";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -30,6 +32,7 @@ function fmtNum(v) { if (v == null) return "—"; return Number(v).toLocaleStrin
 export default function CreatorsLeaderboardPage() {
   const [periodId, setPeriodId] = useState("");
   const [search, setSearch] = useState("");
+  const [tutorialOpen, setTutorialOpen] = useState(false);
   const periodOptions = useMemo(() => monthOpts(), []);
   useEffect(() => { if (!periodId && periodOptions[0]) setPeriodId(periodOptions[0].value); }, [periodOptions, periodId]);
 
@@ -69,6 +72,7 @@ export default function CreatorsLeaderboardPage() {
 
   return (
     <div style={styles.page}>
+      {tutorialOpen && <ScoreTutorialModal onClose={() => setTutorialOpen(false)} />}
       <div style={styles.container}>
         {/* Breadcrumb */}
         <div style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap", fontSize: 13 }}>
@@ -93,6 +97,13 @@ export default function CreatorsLeaderboardPage() {
             <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} style={{ ...styles.input, minWidth: 180, cursor: "pointer" }}>
               {periodOptions.map((p) => <option key={p.value} value={p.value} style={{ background: CP.surface }}>{p.label}</option>)}
             </select>
+            <button
+              onClick={() => setTutorialOpen(true)}
+              style={{ ...styles.button, color: CP.accentGreen, gap: 6 }}
+              title="Come funziona lo score"
+            >
+              <Info size={14} /> Score?
+            </button>
             <button onClick={() => url && mutate(url)} style={styles.button}>↻ Aggiorna</button>
             <Link href={`/leaderboard/creators/heatmap?period_id=${periodId}`} style={styles.primaryBtn}>🔥 Heat-map →</Link>
           </div>

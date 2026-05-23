@@ -5,6 +5,8 @@ import useSWR, { mutate } from "swr";
 import Link from "next/link";
 import { COLORS, FONTS, CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
+import ScoreTutorialModal from "@/components/ScoreTutorialModal";
+import { Info } from "lucide-react";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -92,6 +94,7 @@ export default function SalesCpLeaderboardPage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [languageFilter, setLanguageFilter] = useState("");
   const [showNoCp, setShowNoCp] = useState(true);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
 
   const periodOptions = useMemo(() => generateMonthlyOptions(), []);
   useEffect(() => { if (!periodId && periodOptions[0]) setPeriodId(periodOptions[0].value); }, [periodOptions, periodId]);
@@ -151,9 +154,28 @@ export default function SalesCpLeaderboardPage() {
           section="Performance · CreatorsPro"
           title="Leaderboard Sales CP"
           subtitle={<>
-            Ranking basato sui <b>sales reali</b> da CreatorsPro (sales/shift, sales/h, volume, consistency, margin) — affiancato dai KPI Infloww informativi. Score 0-100 normalizzato vs media del Group.
+            Ranking basato sui <b>sales reali</b> da CreatorsPro. Score 0-100 percentile-based (vs creator cohort + vs agency). Infloww KPI affiancati come informativi.
           </>}
+          toolbar={
+            <button
+              onClick={() => setTutorialOpen(true)}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "8px 14px",
+                background: CP.surface,
+                border: `1px solid ${CP.border}`,
+                borderRadius: 8,
+                color: CP.accentGreen,
+                fontSize: 12, fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: FONTS.body,
+              }}
+            >
+              <Info size={14} /> Come funziona lo score?
+            </button>
+          }
         />
+        {tutorialOpen && <ScoreTutorialModal onClose={() => setTutorialOpen(false)} />}
 
 
         <div style={styles.filterBar}>
