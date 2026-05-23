@@ -136,6 +136,7 @@ export default function AdminHub() {
   const salesCpData = useSWR(`/api/leaderboard/sales-cp?period_id=${periodId}`, fetcher);
   const creatorsData = useSWR(`/api/leaderboard/creators?period_id=${periodId}`, fetcher);
   const syncStatusData = useSWR(`/api/admin/creatorspro-sync`, fetcher);
+  const closedLoopData = useSWR(`/api/admin/closed-loop-metrics?period_id=${periodId}`, fetcher);
 
   const agencySales = salesCpData.data?.agency?.total_sales;
   const totalShifts = salesCpData.data?.agency?.total_shifts;
@@ -198,6 +199,64 @@ export default function AdminHub() {
           sub={syncPeriod || "—"}
           color={syncOk ? CP.textPrimary : CP.accentRed}
         />
+      </div>
+
+      {/* CLOSED-LOOP METRICS — il ciclo HR/coaching sta funzionando? */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10, gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <SectionLabel>Ciclo HR · Closed-loop</SectionLabel>
+            <h3 style={{ fontFamily: FONTS.display, fontSize: 18, fontWeight: 600, color: CP.textPrimary, margin: "4px 0 0 0" }}>
+              Le decisioni di questo mese hanno funzionato?
+            </h3>
+          </div>
+          <span style={{ fontSize: 12, color: CP.textMuted }}>vs mese precedente</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
+          <ClosedLoopCard
+            label="Coaching effectiveness"
+            value={closedLoopData.data?.coaching?.rate}
+            unit="%"
+            sub={closedLoopData.data?.coaching?.reason === "no_completed_coaching"
+              ? "Nessun coaching completato il mese scorso"
+              : closedLoopData.data?.coaching?.reason === "no_history"
+              ? "Servono 2 mesi consecutivi di dati CP"
+              : closedLoopData.data?.coaching
+              ? `${closedLoopData.data.coaching.improved}/${closedLoopData.data.coaching.total} migliorati (≥5 pt score)`
+              : "—"}
+            color={CP.accentGreen}
+            tooltip="% operatori che hanno completato un coaching nel mese precedente e sono migliorati di almeno 5 punti score CP nel mese corrente."
+          />
+          <ClosedLoopCard
+            label="Swap success rate"
+            value={closedLoopData.data?.swaps?.rate}
+            unit="%"
+            sub={closedLoopData.data?.swaps?.reason === "no_swaps_with_replacement"
+              ? "Nessuna sostituzione marcata HR il mese scorso"
+              : closedLoopData.data?.swaps?.reason === "no_history"
+              ? "Servono 2 mesi consecutivi di dati CP"
+              : closedLoopData.data?.swaps
+              ? `${closedLoopData.data.swaps.success}/${closedLoopData.data.swaps.total} sostituti Good+ sulla creator`
+              : "—"}
+            color={CP.accentBlue}
+            tooltip="% sostituzioni HR del mese precedente in cui il sostituto scelto risulta Good+ (score ≥50) sulla creator principale dell'operatore uscito."
+          />
+          <ClosedLoopCard
+            label="Agency score trend"
+            value={closedLoopData.data?.trend?.delta}
+            unit=" pt"
+            signed
+            sub={closedLoopData.data?.trend?.reason === "no_history"
+              ? "Servono 2 mesi consecutivi di dati CP"
+              : closedLoopData.data?.trend?.current != null
+              ? `Ora: ${closedLoopData.data.trend.current} · prima: ${closedLoopData.data.trend.previous}`
+              : "—"}
+            color={closedLoopData.data?.trend?.delta != null
+              ? (closedLoopData.data.trend.delta >= 0 ? CP.accentGreen : CP.accentRed)
+              : CP.textMuted}
+            tooltip="Variazione score medio agency (media di tutti gli operatori con score CP) tra periodo corrente e precedente. È la metrica nord-stella: se sale, tutto il sistema sta migliorando."
+          />
+        </div>
       </div>
 
       {/* TUTORIAL SCORE — banner prominente */}
@@ -398,4 +457,29 @@ function quickActionStyle() {
     textDecoration: "none",
     transition: "background 0.15s",
   };
+}
+
+function ClosedLoopCard({ label, value, unit, sub, color, signed, tooltip }) {
+  const display = value == null ? "—" : `${signed && value > 0 ? "+" : ""}${value}${unit || ""}`;
+  return (
+    <div
+      title={tooltip || ""}
+      style={{
+        background: CP.surface,
+        border: `1px solid ${color ? color + "33" : CP.border}`,
+        borderRadius: 14,
+        padding: "16px 18px",
+        cursor: tooltip ? "help" : "default",
+        position: "relative",
+      }}
+    >
+      <div style={{ fontSize: 10, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 }}>
+        {label}{tooltip && <span style={{ marginLeft: 4, opacity: 0.4 }}>ⓘ</span>}
+      </div>
+      <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 32, lineHeight: 1, color: value == null ? CP.textMuted : color }}>
+        {display}
+      </div>
+      {sub && <div style={{ fontSize: 11, color: CP.textSecondary, marginTop: 8, lineHeight: 1.4 }}>{sub}</div>}
+    </div>
+  );
 }
