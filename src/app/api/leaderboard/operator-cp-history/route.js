@@ -66,24 +66,35 @@ export async function GET(request) {
     });
   }
 
-  // 2. Per ogni mese sync'd, estrai il dato dell'operatore dal matrix
-  // Serializziamo per evitare di triggerare 12 matrix build paralleli (heavy su KV)
+  // 2. Per OGNI mese richiesto (anche non syncati), estrai il dato dell'operatore.
+  // Mostra esplicitamente lo stato: synced+active / synced+no_activity / not_synced.
+  // Serializziamo per evitare di triggerare 12 matrix build paralleli (heavy su KV).
+  const syncedSet = new Set(syncedPeriods);
   const history = [];
   let ltv = 0;
   let firstSeen = null;
   let lastSeen = null;
-  for (const pid of syncedPeriods.slice().reverse()) { // dal più vecchio al più recente
+  // Itera dal più vecchio al più recente
+  for (const pid of periodIds.slice().reverse()) {
+    if (!syncedSet.has(pid)) {
+      history.push({ period_id: pid, status: "not_synced", score: null, tier: null, total_sales: null, total_shifts: null });
+      continue;
+    }
     const { matrix, operators } = await buildCreatorMatrix(pid);
     const op = operators?.[employee];
     const cells = matrix?.[employee] || {};
     const totalSales = Object.values(cells).reduce((s, c) => s + (c.sales || 0), 0);
     const totalShifts = Object.values(cells).reduce((s, c) => s + (c.shifts || 0), 0);
-    if (totalSales <= 0 && (op?.score == null)) continue; // nessuna attività in questo mese
+    if (totalSales <= 0 && (op?.score == null)) {
+      history.push({ period_id: pid, status: "no_activity", score: null, tier: null, total_sales: 0, total_shifts: 0 });
+      continue;
+    }
     if (!firstSeen) firstSeen = pid;
     lastSeen = pid;
     ltv += totalSales;
     history.push({
       period_id: pid,
+      status: "active",
       score: op?.score ?? null,
       tier: op?.tier ?? null,
       total_sales: Math.round(totalSales),
@@ -91,6 +102,7 @@ export async function GET(request) {
       reliable_creators: op?.reliable_creators_count ?? 0,
     });
   }
+  const periodsActive = history.filter((h) => h.status === "active").length;
 
   // 3. Tenure: dal primo mese visto fino a oggi (inclusi mesi senza attività)
   const todayMonth = (() => {
@@ -106,7 +118,9 @@ export async function GET(request) {
     ltv_cp_eur: Math.round(ltv),
     first_seen_period: firstSeen,
     last_seen_period: lastSeen,
-    periods_count: history.length,
-    looked_back: syncedPeriods.length,
+    periods_count: periodsActive,
+    periods_synced: syncedPeriods.length,
+    periods_not_synced: lastN - syncedPeriods.length,
+    looked_back: lastN,
   });
 }

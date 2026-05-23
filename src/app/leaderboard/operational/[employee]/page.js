@@ -325,31 +325,43 @@ export default function EmployeeDrilldownPage({ params }) {
             </Section>
 
             {/* ===== BLOCCO 3: TREND STORICO ===== */}
-            <Section title="Trend storico CP" subtitle="Score CP percentile per mese (retrocalcolato dai matrix). Score Infloww affiancato nella tabella per riferimento.">
+            <Section title="Trend storico CP" subtitle="Score CP percentile per mese (retrocalcolato dai matrix). Score Infloww affiancato per riferimento. Mesi non syncati o senza attività dell'operatore sono mostrati esplicitamente.">
               {cpHistory.length === 0 && history.length === 0 ? (
                 <EmptyBlock text="Nessuno storico disponibile per questo operatore." />
               ) : (
                 <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, padding: 22 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 12, color: COLORS.fog, fontFamily: FONTS.mono, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                      Andamento score CP · {cpHistory.length} mesi sincronizzati
+                      Andamento score CP · {cpHist?.periods_count ?? 0} mesi attivi su {cpHist?.looked_back ?? 12}
                     </span>
-                    {cpHistory.length > 0 && <span style={{ fontSize: 11, color: COLORS.mist }}>Ultimo CP: <strong style={{ color: COLORS.alabaster }}>{cpHistory[cpHistory.length - 1]?.score?.toFixed(1) ?? "—"}</strong></span>}
+                    {cpHist?.periods_not_synced > 0 && (
+                      <Link href="/admin/wage-audit" style={{ fontSize: 11, color: "#F59E0B", padding: "4px 10px", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.4)", borderRadius: 999, textDecoration: "none" }}>
+                        ⚠ {cpHist.periods_not_synced} mesi non syncati · audit
+                      </Link>
+                    )}
                   </div>
-                  <ScoreSpark history={cpHistory.length > 0 ? cpHistory : history} />
-                  <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 0.7fr 0.6fr 0.7fr 0.8fr 0.6fr", gap: 8, fontSize: 11, color: COLORS.fog, paddingBottom: 6, borderBottom: `1px solid ${COLORS.charcoal}` }}>
-                    <div>Periodo</div><div>Score CP</div><div>Tier</div><div>Score Infw</div><div>Sales CP</div><div>Shift</div>
+                  <ScoreSpark history={cpHistory.filter((h) => h.status === "active")} />
+                  <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 0.7fr 0.6fr 0.7fr 0.8fr 0.6fr 1fr", gap: 8, fontSize: 11, color: COLORS.fog, paddingBottom: 6, borderBottom: `1px solid ${COLORS.charcoal}` }}>
+                    <div>Periodo</div><div>Score CP</div><div>Tier</div><div>Score Infw</div><div>Sales CP</div><div>Shift</div><div>Stato</div>
                   </div>
                   {cpHistory.slice().reverse().slice(0, 12).map((h, i) => {
                     const infwForPeriod = history.find((x) => x.period_id === h.period_id);
+                    const isActive = h.status === "active";
+                    const statusLabel = h.status === "not_synced" ? "non syncato"
+                      : h.status === "no_activity" ? "nessuna attività"
+                      : "attivo";
+                    const statusColor = h.status === "not_synced" ? "#F59E0B"
+                      : h.status === "no_activity" ? COLORS.mist
+                      : "#3FB97E";
                     return (
-                      <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 0.7fr 0.6fr 0.7fr 0.8fr 0.6fr", gap: 8, padding: "8px 0", borderBottom: `1px solid ${COLORS.charcoal}55`, fontSize: 12, alignItems: "center" }}>
+                      <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 0.7fr 0.6fr 0.7fr 0.8fr 0.6fr 1fr", gap: 8, padding: "8px 0", borderBottom: `1px solid ${COLORS.charcoal}55`, fontSize: 12, alignItems: "center", opacity: isActive ? 1 : 0.55 }}>
                         <div style={{ fontFamily: FONTS.mono }}>{formatPeriodLabel(h.period_id)}</div>
                         <div style={{ fontFamily: FONTS.mono, fontWeight: 600, color: h.tier ? TIER_COLORS[h.tier] : COLORS.mist }}>{h.score != null ? h.score.toFixed(1) : "—"}</div>
                         <div>{h.tier ? <TierBadge tier={h.tier} size="sm" /> : <span style={{ color: COLORS.mist }}>—</span>}</div>
                         <div style={{ fontFamily: FONTS.mono, color: COLORS.mist, fontSize: 11 }}>{infwForPeriod?.score != null ? infwForPeriod.score.toFixed(1) : "—"}</div>
-                        <div style={{ fontFamily: FONTS.mono, color: "#3FB97E" }}>{fmtCurrency(h.total_sales)}</div>
-                        <div style={{ fontFamily: FONTS.mono, color: COLORS.fog }}>{Math.round(h.total_shifts || 0)}</div>
+                        <div style={{ fontFamily: FONTS.mono, color: h.total_sales > 0 ? "#3FB97E" : COLORS.mist }}>{h.total_sales != null ? fmtCurrency(h.total_sales) : "—"}</div>
+                        <div style={{ fontFamily: FONTS.mono, color: COLORS.fog }}>{h.total_shifts != null ? Math.round(h.total_shifts) : "—"}</div>
+                        <div style={{ fontSize: 10, color: statusColor, fontWeight: 600 }}>{statusLabel}</div>
                       </div>
                     );
                   })}
