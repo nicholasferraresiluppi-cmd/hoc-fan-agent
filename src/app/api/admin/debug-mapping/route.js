@@ -17,6 +17,7 @@
  */
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { fetchWages } from "@/lib/creatorspro-api";
 
 function norm(s) { return String(s || "").trim().toLowerCase(); }
 function containsCI(haystack, needle) {
@@ -118,6 +119,44 @@ export async function GET(request) {
     });
   }
 
+  // === Step 6: LIVE CHECK vs CP API per i cp_member_id matchati ===
+  // Chiama direttamente CP /v1/sellers-wage/wages?memberId=X&startedAt=...&endedAt=...
+  // Così sappiamo se CP API ritorna o no la wage, indipendentemente dal sync KV.
+  const liveCpCheck = [];
+  const liveCheck = url.searchParams.get("live") !== "0"; // default true
+  if (liveCheck && mappingMatches.length > 0) {
+    const yearMonth = period_id.match(/^(\d{4})-(\d{2})$/);
+    if (yearMonth) {
+      const year = parseInt(yearMonth[1], 10);
+      const month = parseInt(yearMonth[2], 10);
+      const startedAt = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0)).toISOString();
+      const endedAt = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)).toISOString();
+      for (const m of mappingMatches) {
+        try {
+          const r = await fetchWages({ startedAt, endedAt, memberId: m.cp_member_id, limit: 25 });
+          liveCpCheck.push({
+            cp_member_id: m.cp_member_id,
+            live_query: { startedAt, endedAt },
+            live_wages_count: r?.data?.length || 0,
+            live_total_via_pagination: r?.pagination?.dataCount || 0,
+            live_wage_ids: (r?.data || []).map((w) => ({
+              id: w?.info?.id,
+              member_name: w?.info?.memberName,
+              status: w?.info?.status,
+              started_at: w?.info?.startedAt,
+              ended_at: w?.info?.endedAt,
+            })),
+          });
+        } catch (e) {
+          liveCpCheck.push({
+            cp_member_id: m.cp_member_id,
+            live_error: String(e?.message || e),
+          });
+        }
+      }
+    }
+  }
+
   return Response.json({
     query: { employee, period_id },
     counts: {
@@ -131,11 +170,12 @@ export async function GET(request) {
     cp_wages_by_name: wagesByName,
     infloww_matches: inflowwMatches,
     exact_match_checks: exactMatchChecks,
+    live_cp_check: liveCpCheck,
     interpretation_hints: [
-      "Se mapping_matches è vuoto → l'operatore non è ancora mappato lato CP.",
-      "Se mapping_matches OK ma wages_for_mapped_ids ha total_shifts=0 → il cp_member_id non ha lavorato in CP nel periodo (anche se ha lavorato in Infloww).",
-      "Se exact_match_checks ha found_in_infloww_exact=false → il nome scritto nel mapping NON corrisponde a nessun record Infloww del periodo (mismatch di stringa).",
-      "Confronta i byte (mapping_bytes vs employee_name_bytes Infloww) per scovare spazi invisibili o caratteri unicode.",
+      "Se live_wages_count > 0 ma wages_for_mapped_ids.total_shifts = 0 → il sync ha perso il record. Soluzione: re-sync 2026-MM.",
+      "Se live_wages_count = 0 → CP API stessa non ritorna wages per questo member_id nel range startedAt/endedAt (problema dati lato CP o filtro periodo).",
+      "Se mapping_matches è vuoto → l'operatore non è ancora mappato. Vai a /admin/creatorspro-sync.",
+      "Se exact_match_checks ha found_in_infloww_exact=false → nome in mapping ≠ nome Infloww (mismatch stringa).",
     ],
   });
 }

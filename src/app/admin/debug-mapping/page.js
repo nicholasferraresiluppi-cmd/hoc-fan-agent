@@ -67,24 +67,41 @@ export default function DebugMappingPage() {
     const inInfloww = (data.infloww_matches || []).length > 0;
     const exactMatchOk = (data.exact_match_checks || []).some((c) => c.found_in_infloww_exact);
     const cpWageByName = (data.cp_wages_by_name || []).filter((w) => !w.is_in_mapping);
+    const liveCpHits = (data.live_cp_check || []).reduce((s, c) => s + (c.live_wages_count || 0), 0);
+    const livePagination = (data.live_cp_check || []).reduce((s, c) => Math.max(s, c.live_total_via_pagination || 0), 0);
 
+    // Caso CRITICO: live CP dice "esiste!" ma KV dice "no shifts" → sync broken/stale
+    if (mapped && !hasWages && liveCpHits > 0) {
+      return {
+        tone: "error",
+        title: `Sync KV stale: CP API ritorna ${liveCpHits} wage record live, ma il sync KV ne ha 0`,
+        body: `Conferma definitiva: la wage di "${employee}" ESISTE in CP API (verificato live in questo momento) ma NON è nel cp:wages: del periodo. Significa che il sync precedente l'ha persa (probabilmente per errore transiente su una pagina, ora con il fix retry dovrebbe ripescare). SOLUZIONE: re-sync 2026-${data.query.period_id.split("-")[1]} da /admin/creatorspro-sync.`,
+      };
+    }
+    if (mapped && !hasWages && liveCpHits === 0 && livePagination === 0) {
+      return {
+        tone: "warn",
+        title: "Non ha lavorato in CP nel periodo",
+        body: "L'operatore è mappato correttamente, ma anche interrogando CP API in tempo reale non risulta alcuna wage per lui in questo mese. Probabilmente non ha effettivamente lavorato in CP nel periodo (magari solo Infloww, o periodo cambiato).",
+      };
+    }
     if (!mapped && cpWageByName.length === 0 && !inInfloww) {
       return { tone: "error", title: "Nome non trovato", body: "Nessun match né in mapping CP, né in wage records, né in record Infloww del periodo. Controlla l'ortografia." };
     }
     if (mapped && !hasWages) {
-      return { tone: "warn", title: "Mappato ma senza shift CP nel periodo", body: "L'operatore è correttamente mappato CP→Infloww, ma nel periodo selezionato non ha wage records / shift in CreatorsPro. Verifica che il sync CP sia completato e che l'operatore abbia effettivamente lavorato in CP quel mese (potrebbe aver lavorato solo Infloww)." };
+      return { tone: "warn", title: "Mappato ma senza shift CP nel periodo", body: "L'operatore è correttamente mappato CP→Infloww, ma nel periodo selezionato non ha wage records / shift in CreatorsPro." };
     }
     if (mapped && hasWages && !exactMatchOk && inInfloww) {
-      return { tone: "error", title: "Mismatch tra nome in mapping e nome in Infloww", body: "L'operatore ha shift in CP e c'è un record Infloww con nome simile, ma il nome scritto nel mapping NON corrisponde esattamente a quello nel CSV Infloww. Confronta i byte qui sotto per individuare la differenza (spazi invisibili, accenti, case)." };
+      return { tone: "error", title: "Mismatch tra nome in mapping e nome in Infloww", body: "L'operatore ha shift in CP e c'è un record Infloww con nome simile, ma il nome scritto nel mapping NON corrisponde esattamente a quello nel CSV Infloww. Confronta i byte qui sotto." };
     }
     if (!mapped && cpWageByName.length > 0) {
-      return { tone: "warn", title: "Esiste in CP ma non è mappato", body: "L'operatore ha wage records in CP ma il suo cp_member_id NON è in cp:member_mapping. Vai a /admin/creatorspro-sync e mappalo manualmente al nome Infloww corretto." };
+      return { tone: "warn", title: "Esiste in CP ma non è mappato", body: "L'operatore ha wage records in CP ma il suo cp_member_id NON è in cp:member_mapping. Vai a /admin/creatorspro-sync e mappalo." };
     }
     if (mapped && hasWages && exactMatchOk) {
-      return { tone: "ok", title: "Tutto in regola", body: "Mappato, ha shift in CP, e il match esatto con Infloww funziona. L'operatore dovrebbe apparire correttamente in Sales CP con dati CP." };
+      return { tone: "ok", title: "Tutto in regola", body: "Mappato, ha shift in CP, e il match esatto con Infloww funziona." };
     }
-    return { tone: "info", title: "Caso intermedio", body: "Controlla i dettagli sotto per la diagnosi completa." };
-  }, [data]);
+    return { tone: "info", title: "Caso intermedio", body: "Controlla i dettagli sotto." };
+  }, [data, employee]);
 
   return (
     <div style={{ padding: "32px 28px 80px 28px", maxWidth: 1100, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
@@ -220,6 +237,42 @@ export default function DebugMappingPage() {
                 <Row k="Tipo"                v={r.is_mass ? "Mass account" : "Chatter"} />
               </CpCard>
             ))}
+          </Section>
+
+          {/* 4.5) Live CP API check — il più importante */}
+          <Section title="🛰 Live check vs CP API (verifica direttamente con CreatorsPro)">
+            {(data.live_cp_check || []).length === 0 && <Empty>Nessuna verifica live disponibile (mapping vuoto).</Empty>}
+            {(data.live_cp_check || []).map((c, i) => {
+              if (c.live_error) {
+                return (
+                  <CpCard key={i} accent={CP.accentRed} padding="14px 18px" style={{ marginBottom: 8 }}>
+                    <Row k="CP member ID" v={c.cp_member_id} mono />
+                    <Row k="Errore live"  v={c.live_error} color={CP.accentRed} />
+                  </CpCard>
+                );
+              }
+              const ok = (c.live_wages_count || 0) > 0;
+              return (
+                <CpCard key={i} accent={ok ? CP.accentGreen : "#F59E0B"} padding="14px 18px" style={{ marginBottom: 8 }}>
+                  <Row k="CP member ID"           v={c.cp_member_id} mono />
+                  <Row k="Range chiesto"          v={`${c.live_query.startedAt} → ${c.live_query.endedAt}`} mono />
+                  <Row k="Wages live in CP API"   v={c.live_wages_count} color={ok ? CP.accentGreen : "#F59E0B"} highlight />
+                  <Row k="Totale via pagination"  v={c.live_total_via_pagination} />
+                  {c.live_wage_ids?.length > 0 && (
+                    <details style={{ marginTop: 8, fontSize: 12 }}>
+                      <summary style={{ cursor: "pointer", color: CP.textSecondary }}>Wage IDs trovati live ({c.live_wage_ids.length})</summary>
+                      <div style={{ marginTop: 6, padding: "8px 10px", background: CP.surfaceAlt, borderRadius: 6, fontSize: 11, color: CP.textPrimary }}>
+                        {c.live_wage_ids.map((w, j) => (
+                          <div key={j} style={{ marginBottom: 4, fontFamily: FONTS.mono }}>
+                            <b>{w.id}</b> · {w.member_name} · <span style={{ color: CP.textMuted }}>{w.status}</span> · {new Date(w.started_at).toLocaleDateString("it-IT")} → {new Date(w.ended_at).toLocaleDateString("it-IT")}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </CpCard>
+              );
+            })}
           </Section>
 
           {/* 5) Exact match check */}
