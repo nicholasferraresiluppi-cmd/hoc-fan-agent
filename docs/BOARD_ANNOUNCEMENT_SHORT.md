@@ -21,6 +21,6 @@ Documento esteso (anche con esempi numerici e flussi operativi): [link al ClickU
 
 Mi serve da voi:
 - Conferma su frequenza ciclo HR (proposto: mensile)
-- Allineamento con Aila sull'handover CSV — posso parlarci direttamente?
+- Handover col team HR sul CSV — posso coordinarmi direttamente?
 
 — Nicholas

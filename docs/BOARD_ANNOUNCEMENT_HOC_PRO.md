@@ -71,13 +71,15 @@ Nella stessa tabella mostriamo **due score affiancati**:
 
 Quando i due score divergono di più di 10 punti, compare un'icona ↑ o ↓ che segnala la discrepanza.
 
+> ⚠️ **Nota sulla qualità dei dati.** Su CreatorsPro alcuni team si dividono i *purch* (i takes), quindi a livello individuale il dato è parzialmente attribuito al collega di team. Su Infloww il dato è per-chatter, quindi più pulito sulla parte efficienza individuale. Le discrepanze nei team che si dividono i purch sono normali e non sempre sintomo di problema.
+
 ### Casi pratici che il confronto fa emergere
 
-| Pattern | Cosa significa | Decisione |
+| Pattern | Possibili letture | Decisione |
 |---|---|---|
-| Sales CP alto + Infloww basso | Vende molto ma efficienza chat scarsa | Probabilmente su creator forti che si vendono da sole — non promuoverlo come "top chatter" |
-| Sales CP basso + Infloww alto | Bravo a chattare ma converte poco in $ | Forse su creator deboli, oppure serve coaching su closing/PPV |
-| Sales CP ≈ Infloww | I due score concordano | Decisione HR più solida |
+| Sales CP alto + Infloww basso | **(a)** Iper-efficiente (vende molto con poco volume di chat) → da riconoscere come top reale. **(b)** Su creator che si vendono da sole → non promuoverlo come "top chatter". Drill-down operatore per distinguere. | Investigare |
+| Sales CP basso + Infloww alto | Bravo a chattare ma converte poco in $ | Coaching su closing / PPV — Leva 1 |
+| Sales CP ≈ Infloww | I due score concordano | Decisione HR lineare (riconoscere o sostituire) |
 
 In sintesi: l'Infloww **non guida più le decisioni HR**, ma resta visibile come secondo segnale per validare lo score CP e identificare pattern interessanti.
 
@@ -109,7 +111,7 @@ Esempio concreto:
 - **✕ Rimuovi** — toglie solo per questo mese, ricompare il prossimo
 
 ### Output: CSV per HR
-Quando hai marcato N operatori come "pronti per HR", il bottone **Esporta CSV HR** produce un file con: nome, group, score, tier, sales, shifts, top creator, sostituto scelto, data, note. Pronto per essere passato ad Aila / al processo di sostituzione.
+Quando hai marcato N operatori come "pronti per HR", il bottone **Esporta CSV HR** produce un file con: nome, group, score, tier, sales, shifts, top creator, sostituto scelto, data, note. Pronto per essere passato all'HR / al processo di sostituzione.
 
 ---
 
@@ -119,7 +121,7 @@ Quando hai marcato N operatori come "pronti per HR", il bottone **Esporta CSV HR
 - **Mensile**: aprono Sales CP per vedere la classifica del proprio team. Confrontano con Infloww per scovare i casi interessanti (sopratutto chi è "bravo ma converte poco" → opportunità di coaching).
 - Possono aprire il drill-down della singola creator per vedere chi è il team interno e dove lavorare sui matching.
 
-### Per HR (Aila + Nicholas)
+### Per HR
 - A fine mese, **dopo** che il sync CP è completato, aprono l'Action Center
 - Scorrono i candidati, per ognuno: scelgono uno dei 3 sostituti suggeriti (o uno alternativo dal dropdown completo) → click HR
 - Esportano CSV → comincia il processo di sostituzione/colloquio uscita
@@ -148,8 +150,8 @@ I vostri account sono già autorizzati come admin (single sign-on Clerk). Se non
 ## Cosa serve dal board
 
 1. **Validazione metodologia** — la formula 70/30 + soglia 25 default sono calibrate sulla nostra esperienza ma non immutabili. Se dopo i primi due mesi di uso vediamo che vengono fuori troppi/pochi candidati, ricalibriamo insieme.
-2. **Decisione su frequenza HR cycle** — proposto: mensile (Action Center → CSV → Aila → sostituzioni entro 2 settimane). Conferma o alternativa?
-3. **Allineamento con Aila** sul processo di handover CSV. Posso coordinarmi direttamente con lei o serve discussione collegiale?
+2. **Decisione su frequenza HR cycle** — proposto: mensile (Action Center → CSV → HR → sostituzioni entro 2 settimane). Conferma o alternativa?
+3. **Handover con HR** sul processo CSV. Posso coordinarmi direttamente col team HR o serve discussione collegiale?
 
 ---
 
