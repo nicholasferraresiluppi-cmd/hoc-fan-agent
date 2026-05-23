@@ -6,7 +6,7 @@ import Link from "next/link";
 import { COLORS, FONTS, CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
-import { Info } from "lucide-react";
+import { Info, Target, ArrowRight } from "lucide-react";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -118,6 +118,10 @@ export default function SalesCpLeaderboardPage() {
   const top4 = rankingWithScore.slice(1, 5);
   const stream = rankingWithScore.slice(5);
   const noCpOps = ranking.filter((r) => !r.has_cp_data);
+  // Underperformers candidati per Action Center (allineato ai criteri del backend)
+  const underperformers = rankingWithScore.filter(
+    (r) => r.score <= 25 && (r.cp_aggregates?.total_shifts || 0) >= 5
+  );
 
   const styles = {
     page: { minHeight: "100vh", background: COLORS.obsidian, color: COLORS.alabaster, fontFamily: FONTS.body, padding: "32px 24px" },
@@ -157,22 +161,40 @@ export default function SalesCpLeaderboardPage() {
             Ranking basato sui <b>sales reali</b> da CreatorsPro. Score 0-100 percentile-based (vs creator cohort + vs agency). Infloww KPI affiancati come informativi.
           </>}
           toolbar={
-            <button
-              onClick={() => setTutorialOpen(true)}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                padding: "8px 14px",
-                background: CP.surface,
-                border: `1px solid ${CP.border}`,
-                borderRadius: 8,
-                color: CP.accentGreen,
-                fontSize: 12, fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: FONTS.body,
-              }}
-            >
-              <Info size={14} /> Come funziona lo score?
-            </button>
+            <>
+              <button
+                onClick={() => setTutorialOpen(true)}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "8px 14px",
+                  background: CP.surface,
+                  border: `1px solid ${CP.border}`,
+                  borderRadius: 8,
+                  color: CP.accentGreen,
+                  fontSize: 12, fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: FONTS.body,
+                }}
+              >
+                <Info size={14} /> Come funziona lo score?
+              </button>
+              <Link
+                href={`/admin/action-center?period_id=${periodId}`}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "8px 14px",
+                  background: CP.accentRed + "18",
+                  border: `1px solid ${CP.accentRed}55`,
+                  borderRadius: 8,
+                  color: CP.accentRed,
+                  fontSize: 12, fontWeight: 700,
+                  textDecoration: "none",
+                  fontFamily: FONTS.body,
+                }}
+              >
+                <Target size={14} /> Operatori da cambiare <ArrowRight size={12} />
+              </Link>
+            </>
           }
         />
         {tutorialOpen && <ScoreTutorialModal onClose={() => setTutorialOpen(false)} />}
@@ -225,6 +247,52 @@ export default function SalesCpLeaderboardPage() {
               <StatCard label="Tier Elite" value={fmtNum(data.elite_count)} sub={`${data.strong_count} Strong`} color={TIER_COLORS.Elite} />
               <StatCard label="Sales agency (CP)" value={fmtCurrency(data.agency?.total_sales)} sub={`${data.agency?.total_shifts} shift · avg ${fmtCurrency(data.agency?.avg_sales_per_shift)}/shift`} color="#3FB97E" />
             </div>
+
+            {/* Banner Action Center: visibile solo se ci sono underperformer */}
+            {underperformers.length > 0 && (
+              <Link
+                href={`/admin/action-center?period_id=${periodId}`}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "14px 20px",
+                  marginBottom: 20,
+                  background: "linear-gradient(135deg, rgba(239,68,68,0.10) 0%, rgba(239,68,68,0.04) 100%)",
+                  border: "1px solid rgba(239,68,68,0.35)",
+                  borderRadius: 12,
+                  color: COLORS.alabaster,
+                  textDecoration: "none",
+                  gap: 14,
+                  transition: "background 0.15s, border-color 0.15s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(239,68,68,0.7)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(239,68,68,0.35)"; }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 10,
+                    background: "rgba(239,68,68,0.20)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <Target size={20} color="#EF4444" strokeWidth={2} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: COLORS.alabaster, marginBottom: 2 }}>
+                      {underperformers.length} operatori sotto soglia da rivedere questo mese
+                    </div>
+                    <div style={{ fontSize: 12, color: COLORS.fog }}>
+                      Score CP v3 ≤ 25 con ≥5 shift. Vai all&apos;Action Center per swap + export HR.
+                    </div>
+                  </div>
+                </div>
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  color: "#EF4444", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap",
+                }}>
+                  Apri Action Center <ArrowRight size={14} />
+                </div>
+              </Link>
+            )}
 
             {/* HERO #1 */}
             {heroOp && (
