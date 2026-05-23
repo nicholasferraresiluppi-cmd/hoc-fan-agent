@@ -6,6 +6,7 @@ import Link from "next/link";
 import { CP, FONTS, creatorDotColor } from "@/lib/brand";
 import { SectionLabel, StatCard, TrendPill, CreatorDot, MiniInsight, CpCard } from "@/components/cp-style";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
+import { useSmartPeriod } from "@/lib/use-smart-period";
 import { Info } from "lucide-react";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
@@ -30,11 +31,10 @@ function fmtCurrencyShort(v) {
 function fmtNum(v) { if (v == null) return "—"; return Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 }); }
 
 export default function CreatorsLeaderboardPage() {
-  const [periodId, setPeriodId] = useState("");
+  const [periodId, setPeriodId] = useSmartPeriod();
   const [search, setSearch] = useState("");
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const periodOptions = useMemo(() => monthOpts(), []);
-  useEffect(() => { if (!periodId && periodOptions[0]) setPeriodId(periodOptions[0].value); }, [periodOptions, periodId]);
 
   const url = periodId ? `/api/leaderboard/creators?period_id=${periodId}&include_suggestions=1` : null;
   const { data, error, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false, keepPreviousData: true });

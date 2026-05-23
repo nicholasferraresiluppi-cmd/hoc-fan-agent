@@ -10,6 +10,7 @@ import {
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, SectionLabel, CpCard, StatCard } from "@/components/cp-style";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
+import { useSmartPeriod } from "@/lib/use-smart-period";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -40,14 +41,13 @@ const TIER_COLORS = {
 };
 
 export default function ActionCenterPage() {
-  const [periodId, setPeriodId] = useState("");
+  const [periodId, setPeriodId] = useSmartPeriod();
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [languageFilter, setLanguageFilter] = useState(""); // "", "ita", "eng", "none"
   const [tierFilter, setTierFilter] = useState(""); // "", "Critical", "Weak", "Average"
   const [groupFilter, setGroupFilter] = useState(""); // "" o nome group
   const [scoreThreshold, setScoreThreshold] = useState(25); // soglia score, default 25 (Average e sotto)
   const periodOptions = useMemo(() => monthOpts(), []);
-  useEffect(() => { if (!periodId && periodOptions[0]) setPeriodId(periodOptions[0].value); }, [periodOptions, periodId]);
 
   const url = periodId ? `/api/admin/action-center?period_id=${periodId}` : null;
   const { data, error, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false, keepPreviousData: true });

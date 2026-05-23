@@ -6,6 +6,7 @@ import Link from "next/link";
 import { COLORS, FONTS, CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
+import { useSmartPeriod } from "@/lib/use-smart-period";
 import { Info, Target, ArrowRight, Search, Loader2, CheckCircle2, XCircle } from "lucide-react";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
@@ -89,7 +90,7 @@ function StatCard({ label, value, sub, color, tooltip }) {
 }
 
 export default function SalesCpLeaderboardPage() {
-  const [periodId, setPeriodId] = useState("");
+  const [periodId, setPeriodId] = useSmartPeriod();
   const [groupFilter, setGroupFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [languageFilter, setLanguageFilter] = useState("");
@@ -153,7 +154,7 @@ export default function SalesCpLeaderboardPage() {
   }
 
   const periodOptions = useMemo(() => generateMonthlyOptions(), []);
-  useEffect(() => { if (!periodId && periodOptions[0]) setPeriodId(periodOptions[0].value); }, [periodOptions, periodId]);
+  // periodId è gestito da useSmartPeriod (URL → localStorage → last_sync → mese corrente)
 
   const queryString = useMemo(() => {
     const p = new URLSearchParams();
