@@ -230,6 +230,48 @@ export default function SalesCpLeaderboardPage() {
     return v ?? "—";
   }
 
+  // Coloring relativo per KPI Infloww: top tercile = verde, bottom tercile = rosso,
+  // mezzo = grigio default. Calcolato sui valori validi (>0) di TUTTO lo stream.
+  // Per Score Infw usiamo la mappa già pronta inflowwScoreByEmployee.
+  const infwTercileCutoffs = useMemo(() => {
+    const fields = [
+      "infloww_avg_earnings_per_paying_fan",
+      "infloww_sales",
+      "infloww_purch",
+      "infloww_fan_cvr",
+      "infloww_unlock_rate",
+    ];
+    const cutoffs = {};
+    for (const f of fields) {
+      const vals = stream.map((op) => op[f]).filter((v) => v != null && v > 0).sort((a, b) => a - b);
+      if (vals.length < 6) { cutoffs[f] = null; continue; }
+      cutoffs[f] = {
+        low: vals[Math.floor(vals.length / 3)],
+        high: vals[Math.floor((vals.length * 2) / 3)],
+      };
+    }
+    // Score Infw cutoffs
+    const scoreVals = Array.from(inflowwScoreByEmployee.values()).map((x) => x.score).filter((v) => v != null && v > 0).sort((a, b) => a - b);
+    if (scoreVals.length >= 6) {
+      cutoffs.infloww_score = {
+        low: scoreVals[Math.floor(scoreVals.length / 3)],
+        high: scoreVals[Math.floor((scoreVals.length * 2) / 3)],
+      };
+    } else {
+      cutoffs.infloww_score = null;
+    }
+    return cutoffs;
+  }, [stream, inflowwScoreByEmployee]);
+
+  function infwColor(field, value) {
+    if (value == null) return COLORS.mist;
+    const c = infwTercileCutoffs[field];
+    if (!c) return COLORS.mist;
+    if (value >= c.high) return "#3FB97E"; // green — top tercile
+    if (value <= c.low) return "#E76F51";  // red — bottom tercile
+    return COLORS.mist;
+  }
+
   const styles = {
     page: { minHeight: "100vh", background: COLORS.obsidian, color: COLORS.alabaster, fontFamily: FONTS.body, padding: "32px 24px" },
     container: { maxWidth: 1500, margin: "0 auto" },
@@ -577,8 +619,8 @@ export default function SalesCpLeaderboardPage() {
                       </div>
                       <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 14, color: tColor }}>{op.score?.toFixed(1) ?? "—"}</div>
                       <div
-                        style={{ fontFamily: FONTS.mono, fontSize: 13, color: inflowwScore ? COLORS.mist : COLORS.charcoal }}
-                        title={inflowwScore ? `Infloww v1: ${inflowwScore.score.toFixed(1)} (${inflowwScore.tier})${diff !== null ? `\nDelta CP - Infloww: ${diff >= 0 ? "+" : ""}${diff.toFixed(1)}` : ""}` : "Score Infloww non disponibile per questo periodo"}
+                        style={{ fontFamily: FONTS.mono, fontSize: 13, fontWeight: 600, color: inflowwScore ? infwColor("infloww_score", inflowwScore.score) : COLORS.charcoal }}
+                        title={inflowwScore ? `Infloww v1: ${inflowwScore.score.toFixed(1)} (${inflowwScore.tier})${diff !== null ? `\nDelta CP - Infloww: ${diff >= 0 ? "+" : ""}${diff.toFixed(1)}` : ""}\nColore: verde = top 33%, rosso = bottom 33% della tabella` : "Score Infloww non disponibile per questo periodo"}
                       >
                         {inflowwScore ? (
                           <span>
@@ -596,9 +638,9 @@ export default function SalesCpLeaderboardPage() {
                       <div style={{ fontFamily: FONTS.mono, fontSize: 13 }}>{fmtCurrency(op._kpis_cp?.sales_per_shift)}</div>
                       <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.fog }}>{op.cp_aggregates?.total_shifts || 0}</div>
                       <div style={{ fontFamily: FONTS.mono, fontSize: 13 }}>{fmtCurrency(op._kpis_cp?.sales_per_hour)}</div>
-                      <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.mist }} title={`Infloww: ${fmtCurrency(op.infloww_sales)} sales, ${fmtPct(op.infloww_fan_cvr)} Fan CVR`}>{fmtCurrency(op.infloww_avg_earnings_per_paying_fan)}</div>
+                      <div style={{ fontFamily: FONTS.mono, fontSize: 12, fontWeight: 600, color: infwColor("infloww_avg_earnings_per_paying_fan", op.infloww_avg_earnings_per_paying_fan) }} title={`Infloww: ${fmtCurrency(op.infloww_sales)} sales, ${fmtPct(op.infloww_fan_cvr)} Fan CVR\nColore: verde = top 33%, rosso = bottom 33%`}>{fmtCurrency(op.infloww_avg_earnings_per_paying_fan)}</div>
                       {activeExtras.map((c) => (
-                        <div key={c.id} style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.mist }}>{renderExtraCell(op, c)}</div>
+                        <div key={c.id} style={{ fontFamily: FONTS.mono, fontSize: 12, fontWeight: 600, color: infwColor(c.id, op[c.id]) }} title={`Colore: verde = top 33%, rosso = bottom 33% della tabella`}>{renderExtraCell(op, c)}</div>
                       ))}
                     </div>
                   );
