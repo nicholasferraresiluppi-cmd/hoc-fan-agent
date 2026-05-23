@@ -47,15 +47,40 @@ function lastMonths(n) {
   return out;
 }
 
-async function postSync(body) {
+async function postSyncOnce(body) {
   const res = await fetch("/api/admin/creatorspro-sync", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  const ct = res.headers.get("content-type") || "";
+  // Vercel/Edge restituiscono HTML quando 504/timeout o 401 redirect → niente JSON.parse a caso
+  if (!ct.includes("application/json")) {
+    const txt = await res.text().catch(() => "");
+    const snippet = txt.slice(0, 80).replace(/\s+/g, " ");
+    if (res.status === 504 || /gateway.*timeout|timed?\s*out/i.test(txt)) {
+      throw new Error(`Timeout Vercel (60s) — il sync di questa pagina ha superato il limite. Snippet: ${snippet}`);
+    }
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(`Sessione scaduta (HTTP ${res.status}). Ricarica la pagina e rifai login.`);
+    }
+    throw new Error(`Risposta non-JSON (HTTP ${res.status}, ${ct || "no content-type"}). Snippet: ${snippet}`);
+  }
   const j = await res.json();
   if (!res.ok) throw new Error(j?.reason || j?.error || `HTTP ${res.status}`);
   return j;
+}
+
+async function postSync(body) {
+  // Un retry automatico su errori transienti (timeout / 5xx)
+  try {
+    return await postSyncOnce(body);
+  } catch (e) {
+    const transient = /timeout|HTTP 5\d\d|non-JSON/i.test(String(e?.message || ""));
+    if (!transient) throw e;
+    await new Promise((r) => setTimeout(r, 1500));
+    return await postSyncOnce(body);
+  }
 }
 
 export default function SyncHistoryPage() {
