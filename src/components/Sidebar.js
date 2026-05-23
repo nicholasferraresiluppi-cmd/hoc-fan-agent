@@ -304,7 +304,7 @@ export default function Sidebar() {
       {/* Top: brand */}
       <div style={{ padding: "18px 20px 14px 20px", borderBottom: `1px solid ${CP.border}` }}>
         <Link href="/welcome" style={{ textDecoration: "none", display: "block" }}>
-          <BrandLockup size="sm" showWordmark={false} />
+          <BrandLockup size="sm" />
         </Link>
       </div>
 

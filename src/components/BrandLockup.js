@@ -2,12 +2,17 @@
 
 /**
  * HOC Pro — Brand lockup.
- * Icona SVG (/public/hoc-logo.svg, solo tetto+palma) + wordmark HTML
- * "House of Creators" + separatore + accent "PRO".
  *
- * Il wordmark è HTML (non SVG <text>) perché i font caricati via CSS della
- * pagina non sono accessibili all'interno di <img src="...svg">, e i font
- * di fallback (Arial Black) rompono il layout del testo.
+ * Layout: [icona + wordmark stacked] | PRO
+ *   ┌────────────────────┬─────┐
+ *   │      [icon]        │     │
+ *   │                    │ PRO │
+ *   │ House of Creators  │     │
+ *   └────────────────────┴─────┘
+ *
+ * Il wordmark è HTML (non SVG <text>) perché i font caricati via CSS
+ * della pagina non sono accessibili dentro <img src="...svg">: i font
+ * di fallback rompevano il layout del testo.
  *
  * Varianti:
  *   primary  — icona bianca + wordmark bianco + PRO champagne su scuro
@@ -19,10 +24,11 @@ import { COLORS, FONTS } from "@/lib/brand";
 export default function BrandLockup({ variant = "primary", size = "md", showWordmark = true }) {
   const scale = size === "sm" ? 0.75 : size === "lg" ? 1.3 : 1;
   const iconHeight = 42 * scale;
-  const wordmarkFs = 13 * scale;
-  const proFs = 22 * scale;
-  const gap = 12 * scale;
-  const sepHeight = 32 * scale;
+  const wordmarkFs = 11 * scale;
+  const proFs = 24 * scale;
+  const gap = 14 * scale;
+  const sepHeight = (showWordmark ? 56 : 36) * scale;
+  const stackGap = 4 * scale;
 
   let iconColor = COLORS.alabaster;
   let wordmarkColor = COLORS.alabaster;
@@ -40,7 +46,6 @@ export default function BrandLockup({ variant = "primary", size = "md", showWord
     sepColor = COLORS.champagne;
   }
 
-  // L'SVG usa currentColor ma <img> non lo rispetta: forziamo via filter.
   const iconFilter =
     variant === "inverse"
       ? "none"
@@ -50,25 +55,28 @@ export default function BrandLockup({ variant = "primary", size = "md", showWord
 
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap }}>
-      <img
-        src="/hoc-logo.svg"
-        alt="House of Creators"
-        style={{ height: iconHeight, width: "auto", filter: iconFilter, display: "block" }}
-      />
-      {showWordmark && (
-        <div style={{
-          fontFamily: FONTS.display,
-          fontWeight: 800,
-          fontSize: wordmarkFs,
-          color: wordmarkColor,
-          letterSpacing: "0.08em",
-          lineHeight: 1.1,
-          textTransform: "uppercase",
-          whiteSpace: "nowrap",
-        }}>
-          House <span style={{ fontStyle: "italic", fontWeight: 700, opacity: 0.85 }}>of</span> Creators
-        </div>
-      )}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: stackGap }}>
+        <img
+          src="/hoc-logo.svg"
+          alt="House of Creators"
+          style={{ height: iconHeight, width: "auto", filter: iconFilter, display: "block" }}
+        />
+        {showWordmark && (
+          <div style={{
+            fontFamily: FONTS.display,
+            fontWeight: 800,
+            fontSize: wordmarkFs,
+            color: wordmarkColor,
+            letterSpacing: "0.14em",
+            lineHeight: 1.1,
+            textTransform: "uppercase",
+            whiteSpace: "nowrap",
+            textAlign: "center",
+          }}>
+            House <span style={{ fontStyle: "italic", fontWeight: 700, opacity: 0.8 }}>of</span> Creators
+          </div>
+        )}
+      </div>
       <div style={{ width: 1, height: sepHeight, background: sepColor, opacity: 0.6 }} />
       <div
         style={{
