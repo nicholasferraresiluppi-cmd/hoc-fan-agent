@@ -7,9 +7,19 @@ import { COLORS, FONTS, CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
 import { useSmartPeriod } from "@/lib/use-smart-period";
-import { Info, Target, ArrowRight, Search, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Info, Target, ArrowRight, Search, Loader2, CheckCircle2, XCircle, Columns3, Check } from "lucide-react";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
+
+// Colonne KPI Infloww opzionali (aggiungibili via picker)
+// id deve matchare il field sull'oggetto op restituito dall'API
+const EXTRA_COLUMNS = [
+  { id: "infloww_sales", label: "Sales Infw", tooltip: "Sales totali da Infloww (per-chatter, dato grezzo)", type: "currency", width: "0.9fr" },
+  { id: "infloww_purch", label: "Purch", tooltip: "Numero di PPV unlockati da Infloww", type: "number", width: "0.7fr" },
+  { id: "infloww_fan_cvr", label: "Fan CVR", tooltip: "% di fans paying / fans chattati", type: "percent", width: "0.8fr" },
+  { id: "infloww_unlock_rate", label: "Unlock %", tooltip: "% di PPV unlockati / PPV inviati", type: "percent", width: "0.8fr" },
+];
+const EXTRA_COLS_STORAGE_KEY = "hoc:sales_cp:extra_cols";
 
 const TIER_COLORS = {
   Critical: "#D44545", Weak: "#E76F51", Average: "#B89158",
@@ -97,6 +107,23 @@ export default function SalesCpLeaderboardPage() {
   const [showNoCp, setShowNoCp] = useState(true);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [showAllNoCp, setShowAllNoCp] = useState(false);
+  // Extra columns picker (Infloww KPIs aggiuntive)
+  const [extraCols, setExtraCols] = useState([]);
+  const [colsPickerOpen, setColsPickerOpen] = useState(false);
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(EXTRA_COLS_STORAGE_KEY) || "[]");
+      if (Array.isArray(stored)) setExtraCols(stored.filter((id) => EXTRA_COLUMNS.some((c) => c.id === id)));
+    } catch {}
+  }, []);
+  const toggleExtraCol = (id) => {
+    setExtraCols((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      try { localStorage.setItem(EXTRA_COLS_STORAGE_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+  const activeExtras = EXTRA_COLUMNS.filter((c) => extraCols.includes(c.id));
   // Map employee → { state: 'idle'|'loading'|'success'|'error', message }
   const [recheckState, setRecheckState] = useState({});
   // Bulk recheck progress: { running, done, total, recovered, errors }
@@ -191,6 +218,18 @@ export default function SalesCpLeaderboardPage() {
     (r) => r.score <= 25 && (r.cp_aggregates?.total_shifts || 0) >= 5
   );
 
+  const BASE_GRID = "50px 36px 1.6fr 1.3fr 0.7fr 0.7fr 0.9fr 0.9fr 0.8fr 0.8fr 0.9fr 1fr";
+  const streamGridTemplate = activeExtras.length
+    ? `${BASE_GRID} ${activeExtras.map((c) => c.width).join(" ")}`
+    : BASE_GRID;
+  function renderExtraCell(op, col) {
+    const v = op[col.id];
+    if (col.type === "currency") return fmtCurrency(v);
+    if (col.type === "percent") return fmtPct(v);
+    if (col.type === "number") return fmtNum(v);
+    return v ?? "—";
+  }
+
   const styles = {
     page: { minHeight: "100vh", background: COLORS.obsidian, color: COLORS.alabaster, fontFamily: FONTS.body, padding: "32px 24px" },
     container: { maxWidth: 1500, margin: "0 auto" },
@@ -205,7 +244,7 @@ export default function SalesCpLeaderboardPage() {
     summary: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 22 },
     top4Grid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 },
     streamWrap: { background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 16, overflow: "visible" },
-    streamHead: { display: "grid", gridTemplateColumns: "50px 36px 1.6fr 1.3fr 0.7fr 0.7fr 0.9fr 0.9fr 0.8fr 0.8fr 0.9fr 1fr", padding: "14px 22px", background: COLORS.obsidian + "80", color: COLORS.fog, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` },
+    streamHead: { display: "grid", gridTemplateColumns: streamGridTemplate, padding: "14px 22px", background: COLORS.obsidian + "80", color: COLORS.fog, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` },
   };
 
   return (
@@ -432,6 +471,76 @@ export default function SalesCpLeaderboardPage() {
               </div>
             )}
 
+            {/* COLUMN PICKER (sopra la stream table) */}
+            {(stream.length > 0 || (showNoCp && noCpOps.length > 0)) && (
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8, position: "relative" }}>
+                <button
+                  onClick={() => setColsPickerOpen((v) => !v)}
+                  title="Aggiungi o togli colonne KPI Infloww"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    padding: "7px 13px",
+                    background: extraCols.length ? COLORS.champagne + "22" : COLORS.graphite,
+                    border: `1px solid ${extraCols.length ? COLORS.champagne + "55" : COLORS.charcoal}`,
+                    borderRadius: 8,
+                    color: extraCols.length ? COLORS.champagne : COLORS.fog,
+                    fontSize: 12, fontWeight: 600,
+                    cursor: "pointer",
+                    fontFamily: FONTS.body,
+                  }}
+                >
+                  <Columns3 size={13} /> Colonne {extraCols.length > 0 && <span style={{ fontFamily: FONTS.mono, opacity: 0.8 }}>+{extraCols.length}</span>}
+                </button>
+                {colsPickerOpen && (
+                  <>
+                    <div onClick={() => setColsPickerOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+                    <div style={{
+                      position: "absolute", top: "100%", right: 0, marginTop: 6,
+                      background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`,
+                      borderRadius: 10, padding: 8, zIndex: 50,
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+                      minWidth: 260,
+                    }}>
+                      <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em", padding: "6px 10px 8px", borderBottom: `1px solid ${COLORS.charcoal}` }}>
+                        KPI Infloww aggiuntive
+                      </div>
+                      {EXTRA_COLUMNS.map((c) => {
+                        const checked = extraCols.includes(c.id);
+                        return (
+                          <div
+                            key={c.id}
+                            onClick={() => toggleExtraCol(c.id)}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 10,
+                              padding: "9px 10px", cursor: "pointer",
+                              borderRadius: 6,
+                              background: checked ? COLORS.champagne + "12" : "transparent",
+                            }}
+                            onMouseEnter={(e) => { if (!checked) e.currentTarget.style.background = COLORS.charcoal + "60"; }}
+                            onMouseLeave={(e) => { if (!checked) e.currentTarget.style.background = "transparent"; }}
+                          >
+                            <div style={{
+                              width: 16, height: 16, borderRadius: 4,
+                              border: `1.5px solid ${checked ? COLORS.champagne : COLORS.fog}`,
+                              background: checked ? COLORS.champagne : "transparent",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              flexShrink: 0,
+                            }}>
+                              {checked && <Check size={12} color={COLORS.obsidian} strokeWidth={3} />}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, color: COLORS.alabaster, fontWeight: 500 }}>{c.label}</div>
+                              <div style={{ fontSize: 11, color: COLORS.mist, marginTop: 1 }}>{c.tooltip}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             {/* STREAM */}
             {(stream.length > 0 || (showNoCp && noCpOps.length > 0)) && (
               <div style={styles.streamWrap}>
@@ -446,13 +555,16 @@ export default function SalesCpLeaderboardPage() {
                   <div title="Numero shift completati">Shift</div>
                   <div title="Sales medio orario">$/h</div>
                   <div title="Affianco informativo: $/paying fan da Infloww">Infloww $/pay</div>
+                  {activeExtras.map((c) => (
+                    <div key={c.id} title={c.tooltip}>{c.label}</div>
+                  ))}
                 </div>
                 {stream.map((op, i) => {
                   const tColor = TIER_COLORS[op.tier] || COLORS.alabaster;
                   const inflowwScore = inflowwScoreByEmployee.get(op.employee);
                   const diff = inflowwScore && op.score != null ? op.score - inflowwScore.score : null;
                   return (
-                    <div key={`${op.employee}-${i}`} style={{ display: "grid", gridTemplateColumns: "50px 36px 1.6fr 1.3fr 0.7fr 0.7fr 0.9fr 0.9fr 0.8fr 0.8fr 0.9fr 1fr", alignItems: "center", padding: "12px 22px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 13 }}>
+                    <div key={`${op.employee}-${i}`} style={{ display: "grid", gridTemplateColumns: streamGridTemplate, alignItems: "center", padding: "12px 22px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 13 }}>
                       <div style={{ fontFamily: FONTS.mono, fontWeight: 600, color: COLORS.fog }}>{op.rank ? String(op.rank).padStart(2, "0") : "—"}</div>
                       <Avatar name={op.employee} size={28} />
                       <div style={{ minWidth: 0 }}>
@@ -485,6 +597,9 @@ export default function SalesCpLeaderboardPage() {
                       <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.fog }}>{op.cp_aggregates?.total_shifts || 0}</div>
                       <div style={{ fontFamily: FONTS.mono, fontSize: 13 }}>{fmtCurrency(op._kpis_cp?.sales_per_hour)}</div>
                       <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.mist }} title={`Infloww: ${fmtCurrency(op.infloww_sales)} sales, ${fmtPct(op.infloww_fan_cvr)} Fan CVR`}>{fmtCurrency(op.infloww_avg_earnings_per_paying_fan)}</div>
+                      {activeExtras.map((c) => (
+                        <div key={c.id} style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.mist }}>{renderExtraCell(op, c)}</div>
+                      ))}
                     </div>
                   );
                 })}
@@ -531,7 +646,7 @@ export default function SalesCpLeaderboardPage() {
                       </div>
                     )}
                     {(showAllNoCp ? noCpOps : noCpOps.slice(0, 30)).map((op, i) => (
-                      <div key={`nocp-${op.employee}-${i}`} style={{ display: "grid", gridTemplateColumns: "50px 36px 1.6fr 1.3fr 0.7fr 0.7fr 0.9fr 0.9fr 0.8fr 0.8fr 0.9fr 1fr", alignItems: "center", padding: "10px 22px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 12, opacity: recheckState[op.employee]?.state === "success" && recheckState[op.employee]?.added > 0 ? 0.9 : 0.6 }}>
+                      <div key={`nocp-${op.employee}-${i}`} style={{ display: "grid", gridTemplateColumns: streamGridTemplate, alignItems: "center", padding: "10px 22px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 12, opacity: recheckState[op.employee]?.state === "success" && recheckState[op.employee]?.added > 0 ? 0.9 : 0.6 }}>
                         <div style={{ color: COLORS.mist }}>—</div>
                         <Avatar name={op.employee} size={28} />
                         <div style={{ fontFamily: FONTS.display, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
