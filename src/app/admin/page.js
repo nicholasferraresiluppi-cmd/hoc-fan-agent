@@ -200,6 +200,69 @@ export default function AdminHub() {
         />
       </div>
 
+      {/* DATA INGESTION — banner prominente per popolare lo storico */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 24 }}>
+        <Link
+          href="/admin/leaderboard-import"
+          style={{
+            display: "flex", alignItems: "center", gap: 16,
+            padding: "20px 24px",
+            background: `linear-gradient(135deg, ${CP.accentBlue}18 0%, ${CP.accentBlue}05 100%)`,
+            border: `1px solid ${CP.accentBlue}55`,
+            borderRadius: 14,
+            textDecoration: "none", color: CP.textPrimary,
+            transition: "transform 0.15s, border-color 0.15s",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = CP.accentBlue; e.currentTarget.style.transform = "translateY(-2px)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = CP.accentBlue + "55"; e.currentTarget.style.transform = "translateY(0)"; }}
+        >
+          <div style={{
+            width: 48, height: 48, borderRadius: 12,
+            background: CP.accentBlue + "22", border: `1px solid ${CP.accentBlue}`,
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <Upload size={22} color={CP.accentBlue} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Carica file Infloww</div>
+            <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.5 }}>
+              Importa CSV/Excel &quot;By time and employee&quot; di Infloww per popolare la leaderboard Operativa.
+            </div>
+          </div>
+          <ArrowUpRight size={18} color={CP.accentBlue} />
+        </Link>
+
+        <Link
+          href="/admin/creatorspro-sync-history"
+          style={{
+            display: "flex", alignItems: "center", gap: 16,
+            padding: "20px 24px",
+            background: `linear-gradient(135deg, ${CP.accentGreen}18 0%, ${CP.accentGreen}05 100%)`,
+            border: `1px solid ${CP.accentGreen}55`,
+            borderRadius: 14,
+            textDecoration: "none", color: CP.textPrimary,
+            transition: "transform 0.15s, border-color 0.15s",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = CP.accentGreen; e.currentTarget.style.transform = "translateY(-2px)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = CP.accentGreen + "55"; e.currentTarget.style.transform = "translateY(0)"; }}
+        >
+          <div style={{
+            width: 48, height: 48, borderRadius: 12,
+            background: CP.accentGreen + "22", border: `1px solid ${CP.accentGreen}`,
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <RefreshCw size={22} color={CP.accentGreen} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Sync CP storico (24 mesi)</div>
+            <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.5 }}>
+              Wizard automatico che popola lo storico CreatorsPro mese per mese (~1-3 min per mese).
+            </div>
+          </div>
+          <ArrowUpRight size={18} color={CP.accentGreen} />
+        </Link>
+      </div>
+
       {/* Quick actions row */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 36 }}>
         <Link href={`/leaderboard/creators?period_id=${periodId}`} style={quickActionStyle()}>

@@ -109,6 +109,7 @@ const NAV_GROUPS = [
     defaultOpen: false,
     items: [
       { href: "/admin/creatorspro-sync",         label: "Sync CP",         icon: RefreshCw },
+      { href: "/admin/creatorspro-sync-history", label: "Sync CP storico", icon: History },
       { href: "/admin/leaderboard-exclusions",   label: "Esclusioni",      icon: Ban },
       { href: "/admin/group-languages",          label: "Lingue Group",    icon: Languages },
       { href: "/admin/group-categories",         label: "Categorie Group", icon: Tags },
