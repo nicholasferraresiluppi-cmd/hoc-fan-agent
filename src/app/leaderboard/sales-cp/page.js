@@ -112,6 +112,17 @@ export default function SalesCpLeaderboardPage() {
   const url = periodId ? `/api/leaderboard/sales-cp?${queryString}` : null;
   const { data, error, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
 
+  // Fetch parallelo: leaderboard Infloww per comparativo (mappa employee → score Infloww)
+  const inflowwUrl = periodId ? `/api/leaderboard/operational?period_type=monthly&period_id=${periodId}` : null;
+  const { data: inflowwData } = useSWR(inflowwUrl, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
+  const inflowwScoreByEmployee = useMemo(() => {
+    const m = new Map();
+    for (const r of inflowwData?.ranking || []) {
+      if (r.employee && r.score != null) m.set(r.employee, { score: r.score, tier: r.tier });
+    }
+    return m;
+  }, [inflowwData]);
+
   const ranking = data?.ranking || [];
   const rankingWithScore = ranking.filter((r) => r.score !== null && r.score > 0);
   const heroOp = rankingWithScore[0];
@@ -137,7 +148,7 @@ export default function SalesCpLeaderboardPage() {
     summary: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 22 },
     top4Grid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 },
     streamWrap: { background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 16, overflow: "visible" },
-    streamHead: { display: "grid", gridTemplateColumns: "50px 36px 1.6fr 1.3fr 0.7fr 0.9fr 0.9fr 0.8fr 0.8fr 0.9fr 1fr", padding: "14px 22px", background: COLORS.obsidian + "80", color: COLORS.fog, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` },
+    streamHead: { display: "grid", gridTemplateColumns: "50px 36px 1.6fr 1.3fr 0.7fr 0.7fr 0.9fr 0.9fr 0.8fr 0.8fr 0.9fr 1fr", padding: "14px 22px", background: COLORS.obsidian + "80", color: COLORS.fog, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` },
   };
 
   return (
@@ -370,8 +381,9 @@ export default function SalesCpLeaderboardPage() {
                 <div style={styles.streamHead}>
                   <div>#</div><div></div>
                   <div>Operatore</div><div>Group</div>
-                  <div title="Score 0-100 calcolato sui KPI CP">Score</div>
-                  <div title="Tier dello score">Tier</div>
+                  <div title="Score CP v3 (sales reali da CreatorsPro)">Score CP</div>
+                  <div title="Score Infloww v1 (KPI efficienza chat) — per confronto">Score Infw</div>
+                  <div title="Tier dello score CP">Tier</div>
                   <div title="Sales totali attribuite da CP">CP Sales</div>
                   <div title="Sales medio per shift">$/Shift</div>
                   <div title="Numero shift completati">Shift</div>
@@ -380,8 +392,10 @@ export default function SalesCpLeaderboardPage() {
                 </div>
                 {stream.map((op, i) => {
                   const tColor = TIER_COLORS[op.tier] || COLORS.alabaster;
+                  const inflowwScore = inflowwScoreByEmployee.get(op.employee);
+                  const diff = inflowwScore && op.score != null ? op.score - inflowwScore.score : null;
                   return (
-                    <div key={`${op.employee}-${i}`} style={{ display: "grid", gridTemplateColumns: "50px 36px 1.6fr 1.3fr 0.7fr 0.9fr 0.9fr 0.8fr 0.8fr 0.9fr 1fr", alignItems: "center", padding: "12px 22px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 13 }}>
+                    <div key={`${op.employee}-${i}`} style={{ display: "grid", gridTemplateColumns: "50px 36px 1.6fr 1.3fr 0.7fr 0.7fr 0.9fr 0.9fr 0.8fr 0.8fr 0.9fr 1fr", alignItems: "center", padding: "12px 22px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 13 }}>
                       <div style={{ fontFamily: FONTS.mono, fontWeight: 600, color: COLORS.fog }}>{op.rank ? String(op.rank).padStart(2, "0") : "—"}</div>
                       <Avatar name={op.employee} size={28} />
                       <div style={{ minWidth: 0 }}>
@@ -393,6 +407,21 @@ export default function SalesCpLeaderboardPage() {
                         {op.group || "—"}<CategoryBadge category={op.category} /><LanguageBadge language={op.language} />
                       </div>
                       <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 14, color: tColor }}>{op.score?.toFixed(1) ?? "—"}</div>
+                      <div
+                        style={{ fontFamily: FONTS.mono, fontSize: 13, color: inflowwScore ? COLORS.mist : COLORS.charcoal }}
+                        title={inflowwScore ? `Infloww v1: ${inflowwScore.score.toFixed(1)} (${inflowwScore.tier})${diff !== null ? `\nDelta CP - Infloww: ${diff >= 0 ? "+" : ""}${diff.toFixed(1)}` : ""}` : "Score Infloww non disponibile per questo periodo"}
+                      >
+                        {inflowwScore ? (
+                          <span>
+                            {inflowwScore.score.toFixed(1)}
+                            {diff !== null && Math.abs(diff) >= 10 && (
+                              <span style={{ marginLeft: 4, fontSize: 10, color: diff > 0 ? "#3FB97E" : "#EF4444" }}>
+                                {diff > 0 ? "↑" : "↓"}
+                              </span>
+                            )}
+                          </span>
+                        ) : "—"}
+                      </div>
                       <div><TierBadge tier={op.tier} /></div>
                       <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: "#3FB97E", fontWeight: 600 }}>{fmtCurrency(op.cp_aggregates?.total_sales)}</div>
                       <div style={{ fontFamily: FONTS.mono, fontSize: 13 }}>{fmtCurrency(op._kpis_cp?.sales_per_shift)}</div>
@@ -409,12 +438,12 @@ export default function SalesCpLeaderboardPage() {
                       ⚠️ <b>{noCpOps.length} operatori SENZA dati CP</b> (non mappati o periodo senza shift) — appaiono senza score. Vai a <Link href="/admin/creatorspro-sync" style={{ color: COLORS.champagne }}>Sync CP</Link> per mappare.
                     </div>
                     {noCpOps.slice(0, 30).map((op, i) => (
-                      <div key={`nocp-${op.employee}-${i}`} style={{ display: "grid", gridTemplateColumns: "50px 36px 1.6fr 1.3fr 0.7fr 0.9fr 0.9fr 0.8fr 0.8fr 0.9fr 1fr", alignItems: "center", padding: "10px 22px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 12, opacity: 0.5 }}>
+                      <div key={`nocp-${op.employee}-${i}`} style={{ display: "grid", gridTemplateColumns: "50px 36px 1.6fr 1.3fr 0.7fr 0.7fr 0.9fr 0.9fr 0.8fr 0.8fr 0.9fr 1fr", alignItems: "center", padding: "10px 22px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 12, opacity: 0.5 }}>
                         <div style={{ color: COLORS.mist }}>—</div>
                         <Avatar name={op.employee} size={28} />
                         <div style={{ fontFamily: FONTS.display, fontSize: 13 }}>{op.employee}</div>
                         <div style={{ color: COLORS.fog, fontSize: 11 }}>{op.group || "—"}<CategoryBadge category={op.category} /><LanguageBadge language={op.language} /></div>
-                        <div style={{ gridColumn: "span 5", fontSize: 10, color: COLORS.mist, fontStyle: "italic" }}>no CP data</div>
+                        <div style={{ gridColumn: "span 6", fontSize: 10, color: COLORS.mist, fontStyle: "italic" }}>no CP data</div>
                         <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.mist }}>{fmtCurrency(op.infloww_sales)} (Infw)</div>
                       </div>
                     ))}
