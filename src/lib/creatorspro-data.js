@@ -188,3 +188,118 @@ export async function hasCpDataForPeriod(periodId) {
   const w = await loadWages(periodId);
   return Array.isArray(w) && w.length > 0;
 }
+
+/**
+ * Costruisce il dataset operatori per la NUOVA leaderboard Sales CP.
+ * Include:
+ *   - operatori CP mappati (con aggregates ricchi + shifts_attributed per consistency)
+ *   - operatori Infloww NON in mapping CP (con has_cp_data=false, _excluded_reason="no_cp_data")
+ *
+ * Per ogni operatore mappato decora `cp_aggregates.shifts_attributed[]` con
+ * la lista dei singoli `total_attributed` per shift — serve a `calcConsistency`.
+ *
+ * @param {string} periodId  es. "2026-04"
+ * @returns {Array} array di operator records pronti per buildCpLeaderboard
+ */
+export async function buildOperatorsForCpLeaderboard(periodId) {
+  const idx = await indexWagesByInflowwName(periodId);
+  // Decora con shifts_attributed[]
+  for (const agg of Object.values(idx)) {
+    agg.shifts_attributed = (agg.shifts || []).map((s) => s.total_attributed || 0);
+  }
+  // Carica anche operatori Infloww del periodo per includere i non-CP-mapped
+  const inflowwRecords = (await kv.get(`ops_kpi:monthly:${periodId}`)) || [];
+  const inflowwEmployees = new Map(); // employee → { group, language, category, infloww_kpis }
+  for (const r of inflowwRecords) {
+    if (!r.employee || r.is_mass) continue;
+    if (!inflowwEmployees.has(r.employee)) {
+      inflowwEmployees.set(r.employee, {
+        employee: r.employee,
+        group: r.group,
+        // language: rilevata da group name (lib leaderboard-calc); per ora la passo a null
+        // e sarà arricchita nel route che ha accesso ai language overrides
+        infloww_sales: 0,
+        infloww_purch: 0,
+        infloww_fans: 0,
+        infloww_fans_paying: 0,
+        infloww_msgs: 0,
+        infloww_unlocks: 0,
+        infloww_ppvs_sent: 0,
+      });
+    }
+    const op = inflowwEmployees.get(r.employee);
+    op.infloww_sales += r.sales || 0;
+    op.infloww_purch += r.ppvs_unlocked || 0;
+    op.infloww_fans += r.fans_chatted || 0;
+    op.infloww_fans_paying += r.fans_who_spent_money || 0;
+    op.infloww_msgs += r.direct_messages_sent || 0;
+    op.infloww_unlocks += r.ppvs_unlocked || 0;
+    op.infloww_ppvs_sent += r.direct_ppvs_sent || 0;
+  }
+  // KPI derivati Infloww (informativi)
+  for (const op of inflowwEmployees.values()) {
+    op.fan_cvr = op.infloww_fans > 0 ? op.infloww_fans_paying / op.infloww_fans : 0;
+    op.unlock_rate = op.infloww_ppvs_sent > 0 ? op.infloww_unlocks / op.infloww_ppvs_sent : 0;
+    op.avg_earnings_per_paying_fan = op.infloww_fans_paying > 0 ? op.infloww_sales / op.infloww_fans_paying : 0;
+  }
+  // Merge: per ogni infloww employee, se mappato CP arricchisci con cp_aggregates
+  const out = [];
+  for (const [name, infw] of inflowwEmployees.entries()) {
+    const cpAgg = idx[name];
+    out.push({
+      employee: name,
+      group: infw.group,
+      // infloww informativi
+      infloww_sales: Math.round(infw.infloww_sales),
+      infloww_purch: infw.infloww_purch,
+      infloww_fan_cvr: infw.fan_cvr,
+      infloww_unlock_rate: infw.unlock_rate,
+      infloww_avg_earnings_per_paying_fan: infw.avg_earnings_per_paying_fan,
+      // cp data
+      has_cp_data: !!cpAgg,
+      cp_aggregates: cpAgg ? {
+        total_sales: cpAgg.total_attributed,
+        total_shifts: cpAgg.total_shifts,
+        total_hours: cpAgg.total_hours,
+        total_wage: cpAgg.total_wage,
+        total_earnings: cpAgg.total_earnings,
+        shifts_attributed: cpAgg.shifts_attributed,
+        top_interval: cpAgg.top_interval,
+        interval_shifts: cpAgg.interval_shifts,
+        interval_sales: cpAgg.interval_sales,
+        best_shift: cpAgg.best_shift,
+        worst_shift: cpAgg.worst_shift,
+      } : null,
+    });
+  }
+  // Aggiungi anche operatori CP mappati che NON sono in Infloww (caso raro ma possibile)
+  const inflowwNames = new Set(inflowwEmployees.keys());
+  for (const [name, cpAgg] of Object.entries(idx)) {
+    if (inflowwNames.has(name)) continue;
+    out.push({
+      employee: name,
+      group: null, // non sappiamo il group senza Infloww
+      infloww_sales: 0,
+      infloww_purch: 0,
+      infloww_fan_cvr: null,
+      infloww_unlock_rate: null,
+      infloww_avg_earnings_per_paying_fan: null,
+      has_cp_data: true,
+      _no_infloww_match: true,
+      cp_aggregates: {
+        total_sales: cpAgg.total_attributed,
+        total_shifts: cpAgg.total_shifts,
+        total_hours: cpAgg.total_hours,
+        total_wage: cpAgg.total_wage,
+        total_earnings: cpAgg.total_earnings,
+        shifts_attributed: cpAgg.shifts_attributed,
+        top_interval: cpAgg.top_interval,
+        interval_shifts: cpAgg.interval_shifts,
+        interval_sales: cpAgg.interval_sales,
+        best_shift: cpAgg.best_shift,
+        worst_shift: cpAgg.worst_shift,
+      },
+    });
+  }
+  return out;
+}
