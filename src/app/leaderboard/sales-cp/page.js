@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -135,14 +136,25 @@ export default function SalesCpLeaderboardPage() {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
-          <Link href="/leaderboard" style={styles.backLink}>← Ladder</Link>
-          <Link href="/leaderboard/operational" style={{ ...styles.backLink, marginLeft: 6 }}>· Leaderboard Operativa (Infloww)</Link>
-        </div>
-        <h1 style={styles.title}>Leaderboard Sales CP</h1>
-        <p style={styles.sub}>
-          Ranking basato sui <b>sales reali</b> da CreatorsPro (sales/shift, sales/h, volume, consistency, margin) — affiancato dai KPI Infloww come dato informativo. Score 0-100 calcolato normalizzando vs media del Group, stesso pattern della leaderboard operativa ma con focus su rendimento economico vs efficienza in chat.
-        </p>
+        <PageHeader
+          breadcrumb={
+            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+              <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>Academy</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <Link href="/leaderboard" style={{ color: "inherit", textDecoration: "none" }}>Ladder</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <Link href="/leaderboard/operational" style={{ color: "inherit", textDecoration: "none" }}>Operativa</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <span style={{ color: CP.textPrimary }}>Sales CP</span>
+            </div>
+          }
+          section="Performance · CreatorsPro"
+          title="Leaderboard Sales CP"
+          subtitle={<>
+            Ranking basato sui <b>sales reali</b> da CreatorsPro (sales/shift, sales/h, volume, consistency, margin) — affiancato dai KPI Infloww informativi. Score 0-100 normalizzato vs media del Group.
+          </>}
+        />
+
 
         <div style={styles.filterBar}>
           {PERIOD_TYPES.map((pt) => (

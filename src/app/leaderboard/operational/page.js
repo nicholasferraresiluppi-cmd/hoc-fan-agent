@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -1235,20 +1236,27 @@ export default function OperationalLeaderboardPage() {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
-          <Link href="/leaderboard" style={styles.backLink}>← Leaderboard Training</Link>
-          {canExclude && (
-            <Link href="/admin/leaderboard-exclusions" style={styles.adminLink}>⚙️ Gestione esclusioni</Link>
+        <PageHeader
+          breadcrumb={
+            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+              <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>Academy</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <Link href="/leaderboard" style={{ color: "inherit", textDecoration: "none" }}>Ladder</Link>
+              <span style={{ color: CP.textMuted }}>›</span>
+              <span style={{ color: CP.textPrimary }}>Operativa</span>
+            </div>
+          }
+          section="Performance · Infloww"
+          title="Leaderboard Operativa"
+          subtitle={<>
+            Performance reale del team su Infloww. Score 0-100 calcolato sui KPI di efficienza confrontati con la media del proprio Group. I volumi totali (Sales, PPV) sono informativi ma non entrano nello Score. Account &quot;Mass&quot;, esclusi e score zero nascosti.
+            {canExclude && <> <span style={{ color: CP.accentGreen }}>Click sul menu ⋮ per escludere al volo.</span></>}
+          </>}
+          toolbar={canExclude && (
+            <Link href="/admin/leaderboard-exclusions" style={styles.adminLink}>⚙️ Esclusioni</Link>
           )}
-        </div>
-        <h1 style={styles.title}>Leaderboard Operativa</h1>
-        <p style={styles.sub}>
-          Performance reale del team su Infloww. Score 0-100 calcolato sui KPI di efficienza
-          confrontati con la media del proprio Group (team modella). I volumi totali (Sales, PPV)
-          sono informativi ma non entrano nello Score. Account "Mass", operatori esclusi e score
-          zero sono nascosti automaticamente.
-          {canExclude && <> <span style={{ color: COLORS.champagne }}>Click sul menu ⋮ per escludere un operatore al volo.</span></>}
-        </p>
+        />
+
 
         {/* Filter bar — periodo */}
         <div style={styles.filterBar}>

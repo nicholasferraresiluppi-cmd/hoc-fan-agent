@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import AdminNav from "@/components/AdminNav";
 import PlayerCard from "@/components/PlayerCard";
-import { COLORS } from "@/lib/brand";
+import { COLORS, CP } from "@/lib/brand";
+import { PageHeader } from "@/components/cp-style";
 
 const C = {
   bgDark: COLORS.obsidian,
@@ -131,19 +132,20 @@ export default function SMDashboard() {
   const heatmap = data?.heatmap || [];
 
   return (
-    <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "2rem" }}>
+    <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "32px 28px 64px 28px", maxWidth: 1400, margin: "0 auto" }}>
       <AdminNav />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1.5rem" }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: "1.75rem" }}>Dashboard SM</h1>
-          <p style={{ color: C.gray, margin: "0.25rem 0 0 0", fontSize: "0.9rem" }}>
-            {operators.length} operatori · {data?.totalRecords || 0} sessioni · media cohort {data?.cohortAvg || 0}/100
-          </p>
-        </div>
-        <Link href="/" style={{ color: C.orange, textDecoration: "none", fontSize: "0.9rem" }}>
-          ← Home
-        </Link>
-      </div>
+      <PageHeader
+        breadcrumb={
+          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
+            <span style={{ color: CP.textMuted }}>›</span>
+            <span style={{ color: CP.textPrimary }}>Dashboard SM</span>
+          </div>
+        }
+        section="Insights · Training"
+        title="Dashboard SM"
+        subtitle={`${operators.length} operatori · ${data?.totalRecords || 0} sessioni · media cohort ${data?.cohortAvg || 0}/100`}
+      />
 
       {/* Alerts */}
       {alerts.length > 0 && (

@@ -2,16 +2,28 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { CP, FONTS } from "@/lib/brand";
+import { PageHeader, CpCard, SectionLabel } from "@/components/cp-style";
 
 const TIER_ORDER = ["diamond", "platinum", "gold", "silver", "bronze"];
 const TIER_META = {
-  diamond: { label: "Diamond", emoji: "💎", color: "#60A5FA" },
+  diamond:  { label: "Diamond",  emoji: "💎", color: "#60A5FA" },
   platinum: { label: "Platinum", emoji: "💠", color: "#E5E4E2" },
-  gold: { label: "Gold", emoji: "🥇", color: "#FFD700" },
-  silver: { label: "Silver", emoji: "🥈", color: "#C0C0C0" },
-  bronze: { label: "Bronze", emoji: "🥉", color: "#CD7F32" },
-  unranked: { label: "Unranked", emoji: "⚪", color: "#666" },
+  gold:     { label: "Gold",     emoji: "🥇", color: "#FFD700" },
+  silver:   { label: "Silver",   emoji: "🥈", color: "#C0C0C0" },
+  bronze:   { label: "Bronze",   emoji: "🥉", color: "#CD7F32" },
+  unranked: { label: "Unranked", emoji: "⚪", color: CP.textMuted },
 };
+
+const Breadcrumb = () => (
+  <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
+    <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>Academy</Link>
+    <span style={{ color: CP.textMuted }}>›</span>
+    <Link href="/leaderboard" style={{ color: "inherit", textDecoration: "none" }}>Ladder</Link>
+    <span style={{ color: CP.textMuted }}>›</span>
+    <span style={{ color: CP.textPrimary }}>Leghe</span>
+  </div>
+);
 
 export default function LeaguesPage() {
   const [data, setData] = useState(null);
@@ -23,111 +35,93 @@ export default function LeaguesPage() {
         const r = await fetch("/api/leagues/standings");
         const j = await r.json();
         setData(j);
-      } finally {
-        setLoading(false);
-      }
+      } finally { setLoading(false); }
     })();
   }, []);
 
   return (
-    <div style={{ background: "#0D0D0D", minHeight: "100vh", color: "#fff", padding: "2rem" }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
-          <Link href="/" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>← Academy</Link>
-          <span style={{ color: "#444" }}>•</span>
-          <Link href="/leaderboard" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>Ladder</Link>
-          <span style={{ color: "#444" }}>•</span>
-          <Link href="/leaderboard/storico" style={{ color: "#F5A623", textDecoration: "none", fontSize: "0.85rem" }}>Hall of Fame</Link>
-        </div>
+    <div style={{ padding: "32px 28px 64px 28px", maxWidth: 1200, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
+      <PageHeader
+        breadcrumb={<Breadcrumb />}
+        section={`Stagione ${data?.seasonKey || "…"}`}
+        title="Leghe"
+        subtitle="Ladder competitiva mensile. Tier assegnato per percentile (top 10% Diamond, poi Platinum/Gold/Silver/Bronze). Min 5 sessioni nel mese per essere classificati."
+      />
 
-        <h1 style={{ margin: "0 0 0.25rem 0", fontSize: "2rem" }}>Leghe — Stagione {data?.seasonKey || "…"}</h1>
-        <p style={{ color: "#888", marginTop: 0 }}>
-          Ladder competitiva mensile. Tier assegnato per percentile (top 10% Diamond, poi Platinum, Gold, Silver, Bronze). Min 5 sessioni nel mese per essere classificati.
-        </p>
+      {loading && <p style={{ color: CP.textSecondary }}>Caricamento…</p>}
 
-        {loading && <p>Caricamento…</p>}
+      {data && !loading && data.totalRanked === 0 && (
+        <CpCard padding="28px" style={{ textAlign: "center", color: CP.textSecondary }}>
+          Nessun operatore classificato in questa stagione. Servono almeno 5 sessioni nel mese.
+        </CpCard>
+      )}
 
-        {data && !loading && data.totalRanked === 0 && (
-          <div style={{ padding: "2rem", background: "#111", border: "1px solid #333", borderRadius: 8, textAlign: "center" }}>
-            Nessun operatore classificato in questa stagione. Servono almeno 5 sessioni nel mese.
-          </div>
-        )}
-
-        {data && data.totalRanked > 0 && (
-          <div style={{ display: "grid", gap: "1.5rem" }}>
-            {TIER_ORDER.map((tier) => {
-              const entries = data.byTier?.[tier] || [];
-              if (!entries.length) return null;
-              const meta = TIER_META[tier];
-              return (
-                <div
-                  key={tier}
-                  style={{
-                    background: `${meta.color}10`,
-                    border: `2px solid ${meta.color}55`,
-                    borderRadius: 12,
-                    padding: "1.25rem",
-                  }}
-                >
-                  <h2 style={{ margin: "0 0 0.75rem 0", color: meta.color, fontSize: "1.25rem" }}>
-                    {meta.emoji} {meta.label} <span style={{ color: "#777", fontSize: "0.85rem", fontWeight: 400 }}>({entries.length})</span>
-                  </h2>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr style={{ textAlign: "left", color: "#888", fontSize: "0.75rem" }}>
-                        <th style={{ padding: "0.3rem 0.5rem" }}>#</th>
-                        <th style={{ padding: "0.3rem 0.5rem" }}>Operatore</th>
-                        <th style={{ padding: "0.3rem 0.5rem" }}>Avg</th>
-                        <th style={{ padding: "0.3rem 0.5rem" }}>Sessioni</th>
-                        <th style={{ padding: "0.3rem 0.5rem" }}>Trend</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {entries.map((e) => {
-                        const isMe = e.userId === data.me;
-                        return (
-                          <tr
-                            key={e.userId}
-                            style={{
-                              background: isMe ? `${meta.color}25` : "transparent",
-                              borderBottom: "1px solid #222",
-                            }}
-                          >
-                            <td style={{ padding: "0.4rem 0.5rem", color: "#aaa" }}>{e.rank ?? "—"}</td>
-                            <td style={{ padding: "0.4rem 0.5rem", fontWeight: isMe ? 800 : 500 }}>
-                              {e.name}
-                              {isMe && <span style={{ marginLeft: 8, color: "#F5A623", fontSize: "0.75rem" }}>(tu)</span>}
-                            </td>
-                            <td style={{ padding: "0.4rem 0.5rem" }}>{e.avgOverall}</td>
-                            <td style={{ padding: "0.4rem 0.5rem" }}>{e.sessions}</td>
-                            <td style={{ padding: "0.4rem 0.5rem" }}>
-                              {e.delta == null ? (
-                                <span style={{ color: "#555" }}>—</span>
-                              ) : e.delta > 0 ? (
-                                <span style={{ color: "#10B981" }}>↑ +{e.delta}</span>
-                              ) : e.delta < 0 ? (
-                                <span style={{ color: "#EF4444" }}>↓ {e.delta}</span>
-                              ) : (
-                                <span style={{ color: "#888" }}>=</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+      {data && data.totalRanked > 0 && (
+        <div style={{ display: "grid", gap: 16 }}>
+          {TIER_ORDER.map((tier) => {
+            const entries = data.byTier?.[tier] || [];
+            if (!entries.length) return null;
+            const meta = TIER_META[tier];
+            return (
+              <CpCard key={tier} accent={meta.color} padding="20px 24px">
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                  <span style={{ fontSize: 22 }}>{meta.emoji}</span>
+                  <h2 style={{ margin: 0, color: meta.color, fontSize: 18, fontFamily: FONTS.display, fontWeight: 700, letterSpacing: "-0.01em" }}>{meta.label}</h2>
+                  <span style={{ color: CP.textMuted, fontSize: 12, fontFamily: FONTS.mono }}>({entries.length})</span>
                 </div>
-              );
-            })}
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr>
+                      <th style={th}>#</th>
+                      <th style={th}>Operatore</th>
+                      <th style={th}>Avg</th>
+                      <th style={th}>Sessioni</th>
+                      <th style={th}>Trend</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entries.map((e) => {
+                      const isMe = e.userId === data.me;
+                      return (
+                        <tr key={e.userId} style={{ background: isMe ? `${meta.color}25` : "transparent", borderBottom: `1px solid ${CP.border}` }}>
+                          <td style={{ ...td, color: CP.textMuted, fontFamily: FONTS.mono }}>{e.rank ?? "—"}</td>
+                          <td style={{ ...td, fontWeight: isMe ? 700 : 500 }}>
+                            {e.name}
+                            {isMe && <span style={{ marginLeft: 8, color: meta.color, fontSize: 11 }}>(tu)</span>}
+                          </td>
+                          <td style={{ ...td, fontFamily: FONTS.mono }}>{e.avgOverall}</td>
+                          <td style={{ ...td, fontFamily: FONTS.mono, color: CP.textSecondary }}>{e.sessions}</td>
+                          <td style={td}>
+                            {e.delta == null ? (
+                              <span style={{ color: CP.textMuted }}>—</span>
+                            ) : e.delta > 0 ? (
+                              <span style={{ color: CP.accentGreen, fontFamily: FONTS.mono }}>↑ +{e.delta}</span>
+                            ) : e.delta < 0 ? (
+                              <span style={{ color: CP.accentRed, fontFamily: FONTS.mono }}>↓ {e.delta}</span>
+                            ) : (
+                              <span style={{ color: CP.textMuted }}>=</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </CpCard>
+            );
+          })}
 
-            {(data.byTier?.unranked || []).length > 0 && (
-              <div style={{ color: "#666", fontSize: "0.85rem", marginTop: "0.5rem" }}>
-                {data.byTier.unranked.length} operatori non classificati (meno di 5 sessioni questo mese).
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+          {(data.byTier?.unranked || []).length > 0 && (
+            <div style={{ color: CP.textMuted, fontSize: 12, padding: "8px 4px" }}>
+              <SectionLabel>{data.byTier.unranked.length} operatori non classificati</SectionLabel>
+              <span style={{ marginLeft: 8 }}>(meno di 5 sessioni questo mese)</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
+
+const th = { textAlign: "left", padding: "10px 12px", color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, borderBottom: `1px solid ${CP.borderStrong}` };
+const td = { padding: "10px 12px" };
