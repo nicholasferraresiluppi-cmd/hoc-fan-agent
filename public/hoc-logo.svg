@@ -4,7 +4,7 @@
   Versione stop-gap: sostituire con l'SVG originale quando disponibile.
   Colore: monocromo currentColor -> si adatta a qualsiasi tema.
 -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 220" fill="currentColor" aria-label="House of Creators">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 220" fill="currentColor" aria-label="House of Creators">
   <!-- Tetto/casa stilizzata -->
   <g>
     <!-- Linea tetto principale -->
