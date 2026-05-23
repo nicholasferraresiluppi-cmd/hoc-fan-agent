@@ -248,6 +248,48 @@ export function RankedItem({ rank, dotAlias, dotColor, name, badge, cols = [], h
 }
 
 /**
+ * PageHeader — Header pattern uniforme stile CP per pagine principali.
+ *
+ *   ┌──────────────────────────────────────────────────┐
+ *   │  SECTION · subtitle                  [toolbar]   │
+ *   │  Title big                                       │
+ *   │  Subtitle muted                                  │
+ *   └──────────────────────────────────────────────────┘
+ */
+export function PageHeader({ section, title, subtitle, toolbar, breadcrumb }) {
+  return (
+    <div style={{ marginBottom: 28 }}>
+      {breadcrumb && (
+        <div style={{ marginBottom: 12, fontSize: 13, color: CP.textSecondary }}>{breadcrumb}</div>
+      )}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          {section && <SectionLabel>{section}</SectionLabel>}
+          <h1 style={{
+            fontFamily: FONTS.display,
+            fontSize: 34, fontWeight: 700,
+            margin: section ? "8px 0 6px 0" : "0 0 6px 0",
+            letterSpacing: "-0.02em",
+            color: CP.textPrimary,
+            lineHeight: 1.15,
+          }}>{title}</h1>
+          {subtitle && (
+            <p style={{ color: CP.textSecondary, fontSize: 14, margin: 0, lineHeight: 1.5, maxWidth: 760 }}>
+              {subtitle}
+            </p>
+          )}
+        </div>
+        {toolbar && (
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            {toolbar}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Pill tab (es. After / Morning / Afternoon …): rotonda, dark, con icona.
  */
 export function PillTab({ active, onClick, children, icon, style }) {
