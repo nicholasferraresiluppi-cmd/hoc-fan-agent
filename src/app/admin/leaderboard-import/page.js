@@ -20,6 +20,26 @@ export default function LeaderboardImportPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [imports, setImports] = useState([]);
+  const [deletingPeriod, setDeletingPeriod] = useState(null);
+
+  async function deleteImport(period) {
+    if (!confirm(`Eliminare l'import "${period}"?\n\nVerranno cancellati TUTTI i dati Infloww di quel periodo dal KV (non recuperabili senza ri-caricare il file).`)) return;
+    setDeletingPeriod(period);
+    try {
+      const res = await fetch(`/api/admin/leaderboard-import?period=${encodeURIComponent(period)}`, { method: "DELETE" });
+      const j = await res.json();
+      if (!res.ok) { alert(j.error || "Errore"); return; }
+      // Reload list
+      fetch("/api/admin/leaderboard-import")
+        .then((r) => r.json())
+        .then((d) => setImports(d.imports || []));
+      alert(`✓ Rimosso "${period}" — ${j.records_deleted} record cancellati.`);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setDeletingPeriod(null);
+    }
+  }
   const [savedAt, setSavedAt] = useState(null);
 
   // Carica lista import precedenti
@@ -280,9 +300,27 @@ export default function LeaderboardImportPage() {
             <p style={{ color: COLORS.fog, fontSize: 13 }}>Nessun import effettuato.</p>
           ) : (
             imports.slice(0, 10).map((imp, i) => (
-              <div key={i} style={styles.importItem}>
-                <span><b>{imp.period}</b></span>
+              <div key={i} style={{ ...styles.importItem, alignItems: "center", gap: 12 }}>
+                <span style={{ flex: 1 }}><b>{imp.period}</b></span>
                 <span style={{ color: COLORS.fog }}>{new Date(imp.timestamp).toLocaleString("it-IT")}</span>
+                <button
+                  onClick={() => deleteImport(imp.period)}
+                  disabled={deletingPeriod === imp.period}
+                  title={`Elimina l'import ${imp.period} dal KV`}
+                  style={{
+                    padding: "4px 10px",
+                    background: deletingPeriod === imp.period ? COLORS.charcoal : "#EF444418",
+                    border: `1px solid ${deletingPeriod === imp.period ? COLORS.steel : "#EF444466"}`,
+                    borderRadius: 5,
+                    color: deletingPeriod === imp.period ? COLORS.fog : "#EF4444",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: deletingPeriod === imp.period ? "wait" : "pointer",
+                    fontFamily: FONTS.body,
+                  }}
+                >
+                  {deletingPeriod === imp.period ? "Eliminando…" : "🗑 Elimina"}
+                </button>
               </div>
             ))
           )}

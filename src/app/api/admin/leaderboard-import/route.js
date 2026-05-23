@@ -215,3 +215,45 @@ export async function GET() {
     return Response.json({ imports: [], error: String(e?.message || e) }, { status: 200 });
   }
 }
+
+/**
+ * DELETE /api/admin/leaderboard-import?period=monthly:2026-05
+ *
+ * Rimuove un import: cancella sia l'entry dal registro `ops_kpi:imports`
+ * che i dati effettivi `ops_kpi:{type}:{id}`.
+ *
+ * Capability: SEED (admin-only).
+ */
+export async function DELETE(request) {
+  const az = await authorize(CAPABILITIES.SEED);
+  if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
+
+  const url = new URL(request.url);
+  const period = url.searchParams.get("period");
+  if (!period || !/^(monthly|weekly|quarterly):/.test(period)) {
+    return Response.json({ error: "?period=monthly|weekly|quarterly:ID richiesto" }, { status: 400 });
+  }
+
+  // period es. "monthly:2026-05" → data key "ops_kpi:monthly:2026-05"
+  const [periodType, periodId] = period.split(":");
+  const dataKey = `ops_kpi:${periodType}:${periodId}`;
+
+  try {
+    // Conta prima per logging
+    const data = await kv.get(dataKey);
+    const recordCount = Array.isArray(data) ? data.length : 0;
+
+    // 1. Rimuovi dal registro imports
+    await kv.zrem("ops_kpi:imports", period);
+    // 2. Cancella i dati effettivi
+    await kv.del(dataKey);
+
+    return Response.json({
+      ok: true,
+      removed: period,
+      records_deleted: recordCount,
+    });
+  } catch (e) {
+    return Response.json({ error: `Errore eliminazione: ${e?.message || e}` }, { status: 500 });
+  }
+}
