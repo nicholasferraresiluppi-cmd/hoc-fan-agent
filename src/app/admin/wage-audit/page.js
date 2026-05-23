@@ -53,6 +53,29 @@ export default function WageAuditPage() {
   const months = data?.months || [];
   const totalMissing = data?.total_missing ?? 0;
   const monthsWithGap = data?.months_with_gap ?? 0;
+  const [bulkState, setBulkState] = useState({ running: false, message: "" });
+
+  async function recoverAll() {
+    if (bulkState.running) return;
+    if (!confirm(`Recuperare TUTTI i ${monthsWithGap} mesi con gap?\nQuesto chiama CP API per ogni mese, può durare 1-2 minuti totali.`)) return;
+    setBulkState({ running: true, message: "Recupero in corso…" });
+    try {
+      const res = await fetch("/api/admin/wage-audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "recover_all_gaps", last_n: lastN }),
+      });
+      const j = await res.json();
+      if (!res.ok) {
+        setBulkState({ running: false, message: `Errore: ${j.error || res.status}` });
+        return;
+      }
+      setBulkState({ running: false, message: j.message || "OK" });
+      setTimeout(() => mutate(url), 800);
+    } catch (e) {
+      setBulkState({ running: false, message: `Errore di rete: ${e?.message || e}` });
+    }
+  }
 
   return (
     <div style={{ padding: "32px 28px 80px", maxWidth: 1300, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
@@ -91,7 +114,30 @@ export default function WageAuditPage() {
         <button onClick={() => mutate(url)} style={{ padding: "8px 14px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 8, color: COLORS.alabaster, fontSize: 12, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
           <RefreshCw size={13} /> Ricarica
         </button>
+        {monthsWithGap > 0 && (
+          <button
+            onClick={recoverAll}
+            disabled={bulkState.running}
+            style={{
+              padding: "8px 14px",
+              background: bulkState.running ? COLORS.charcoal : "#F59E0B",
+              color: bulkState.running ? COLORS.mist : COLORS.obsidian,
+              border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700,
+              cursor: bulkState.running ? "wait" : "pointer",
+              display: "inline-flex", alignItems: "center", gap: 6,
+              marginLeft: "auto",
+            }}
+          >
+            {bulkState.running ? <Loader2 size={13} className="spin" /> : <RefreshCw size={13} />}
+            {bulkState.running ? "Recupero…" : `Recupera TUTTI i ${monthsWithGap} mesi con gap`}
+          </button>
+        )}
       </div>
+      {bulkState.message && (
+        <div style={{ marginBottom: 14, padding: "10px 14px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 8, fontSize: 12, color: COLORS.alabaster }}>
+          {bulkState.message}
+        </div>
+      )}
 
       {error && <p style={{ color: COLORS.signal }}>Errore: {String(error)}</p>}
       {data?.error && <p style={{ color: COLORS.signal, padding: 16, background: COLORS.signal + "20", borderRadius: 12 }}>{data.error}</p>}

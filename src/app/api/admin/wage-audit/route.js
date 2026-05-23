@@ -104,39 +104,75 @@ export async function POST(request) {
   let body;
   try { body = await request.json(); } catch { return Response.json({ error: "invalid JSON" }, { status: 400 }); }
   const { period_id, action } = body || {};
-  if (!period_id || !/^\d{4}-\d{2}$/.test(period_id)) return Response.json({ error: "period_id YYYY-MM required" }, { status: 400 });
-  if (action !== "recover_missing") return Response.json({ error: "action must be 'recover_missing'" }, { status: 400 });
 
-  // 1. Re-fetch tutti gli stubs CP (con retry) e ricostruisci la wage list completa
-  const { startedAt, endedAt } = monthBoundsIso(period_id);
-  const { stubs, totalCount, pageCount, failedPages } = await fetchAllWageStubs({ startedAt, endedAt });
+  // BULK: recover_all_gaps → loop su tutti i mesi con gap (last_n max 24)
+  if (action === "recover_all_gaps") {
+    const lastN = Math.max(1, Math.min(24, Number(body?.last_n) || 12));
+    const periodIds = lastMonthIds(lastN);
+    const kvWages = await Promise.all(periodIds.map((pid) => kv.get(`cp:wages:${pid}`)));
+    const liveCounts = await Promise.all(periodIds.map(async (pid) => {
+      try {
+        const { startedAt, endedAt } = monthBoundsIso(pid);
+        const r = await fetchWages({ startedAt, endedAt, page: 1, limit: 1 });
+        return r?.pagination?.dataCount ?? null;
+      } catch { return null; }
+    }));
+    const targets = periodIds
+      .map((pid, i) => ({ pid, kv: (Array.isArray(kvWages[i]) ? kvWages[i].length : 0), live: liveCounts[i] }))
+      .filter((x) => x.live != null && x.kv > 0 && x.live > x.kv);
 
-  // 2. KV current
-  const existing = (await kv.get(`cp:wages:${period_id}`)) || [];
-  const existingIds = new Set(existing.map((w) => w.id).filter(Boolean));
-
-  // 3. Calcola IDs mancanti (presenti in stubs ma non in KV)
-  const missingIds = stubs.filter((s) => s.id && !existingIds.has(s.id)).map((s) => s.id);
-  if (missingIds.length === 0) {
+    if (targets.length === 0) {
+      return Response.json({ ok: true, message: "Nessun mese con gap da recuperare.", processed: 0 });
+    }
+    // Processa SEQUENZIALMENTE per non saturare CP API rate limit
+    const results = [];
+    for (const t of targets) {
+      try {
+        const r = await recoverSingleMonth(t.pid, az.userId);
+        results.push({ period_id: t.pid, ...r });
+      } catch (e) {
+        results.push({ period_id: t.pid, ok: false, error: String(e?.message || e) });
+      }
+    }
+    const totalRecovered = results.reduce((s, r) => s + (r.recovered || 0), 0);
     return Response.json({
       ok: true,
-      period_id,
-      message: "Nessuna wage mancante. KV già allineato con CP live.",
-      stubs_total: stubs.length,
-      kv_total: existing.length,
-      failed_pages: failedPages.length,
+      message: `Processati ${results.length} mesi, recuperate ${totalRecovered} wage totali.`,
+      processed: results.length,
+      total_recovered: totalRecovered,
+      results,
     });
   }
 
-  // 4. Fetcha i detail dei mancanti
+  if (!period_id || !/^\d{4}-\d{2}$/.test(period_id)) return Response.json({ error: "period_id YYYY-MM required" }, { status: 400 });
+  if (action !== "recover_missing") return Response.json({ error: "action must be 'recover_missing' or 'recover_all_gaps'" }, { status: 400 });
+
+  const result = await recoverSingleMonth(period_id, az.userId);
+  return Response.json({ ok: true, period_id, ...result });
+}
+
+// Helper riutilizzabile per recovery di un singolo mese
+async function recoverSingleMonth(period_id, actorUserId) {
+  const { startedAt, endedAt } = monthBoundsIso(period_id);
+  const { stubs, totalCount, pageCount, failedPages } = await fetchAllWageStubs({ startedAt, endedAt });
+
+  const existing = (await kv.get(`cp:wages:${period_id}`)) || [];
+  const existingIds = new Set(existing.map((w) => w.id).filter(Boolean));
+
+  const missingIds = stubs.filter((s) => s.id && !existingIds.has(s.id)).map((s) => s.id);
+  if (missingIds.length === 0) {
+    return {
+      message: "Nessuna wage mancante. KV allineato con CP live.",
+      stubs_total: stubs.length,
+      kv_total: existing.length,
+      failed_pages: failedPages.length,
+      recovered: 0,
+    };
+  }
+
   const details = await fetchWageDetailBatch(missingIds);
   const goodDetails = details.filter((d) => d && !d._failed && d.id);
 
-  // 5. Merge in KV (preserva esistenti, append nuovi)
-  // NB: la normalizzazione completa la farebbe il sync via normalizeWage,
-  // qui appendiamo i detail grezzi così come arrivano (il prossimo
-  // finalize/re-sync li normalizzerà). Per ora però normalizziamoli al volo
-  // riusando la funzione di sync.
   const { normalizeWage } = await import("@/lib/creatorspro-sync");
   const normalized = [];
   for (const d of goodDetails) {
@@ -149,7 +185,7 @@ export async function POST(request) {
   await kv.set(`cp:wages:${period_id}`, merged);
 
   await logAuditAction({
-    actor: az.userId,
+    actor: actorUserId,
     action: "wage-audit.recover_missing",
     target: period_id,
     meta: {
@@ -161,9 +197,7 @@ export async function POST(request) {
     },
   }).catch(() => {});
 
-  return Response.json({
-    ok: true,
-    period_id,
+  return {
     stubs_total: stubs.length,
     kv_before: existing.length,
     kv_after: merged.length,
@@ -172,5 +206,5 @@ export async function POST(request) {
     failed_details: missingIds.length - normalized.length,
     failed_pages: failedPages.length,
     message: `Recuperate ${normalized.length}/${missingIds.length} wage mancanti.`,
-  });
+  };
 }
