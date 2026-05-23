@@ -28,6 +28,9 @@ import { logAuditAction } from "@/lib/audit-log";
 import { buildCreatorMatrix, computeSwapSuggestions } from "@/lib/creator-aggregates";
 import { buildOperatorsForCpLeaderboard, hasCpDataForPeriod } from "@/lib/creatorspro-data";
 import { buildCpLeaderboard } from "@/lib/creatorspro-score";
+import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
+import { loadGroupLanguages } from "@/app/api/admin/group-languages/route";
+import { detectLanguage } from "@/lib/leaderboard-calc";
 
 const SWAP_KEY = (periodId) => `action_center:swaps:${periodId}`;
 const IGNORED_KEY = "underperformers:ignored";
@@ -54,17 +57,25 @@ export async function GET(request) {
     }, { status: 404 });
   }
 
-  const [swaps, ignored, operatorsRaw, matrixResult] = await Promise.all([
+  const [swaps, ignored, operatorsRaw, matrixResult, categories, langOverrides] = await Promise.all([
     kv.get(SWAP_KEY(period_id)),
     kv.get(IGNORED_KEY),
     buildOperatorsForCpLeaderboard(period_id),
     buildCreatorMatrix(period_id),
+    loadGroupCategories(),
+    loadGroupLanguages(),
   ]);
   const swapsObj = swaps || {};
   const ignoredObj = ignored || {};
 
+  // Decora ogni operator con language (override > regex) e category
+  const operatorsDecorated = operatorsRaw.map((op) => {
+    const lang = langOverrides?.[op.group] || detectLanguage(op.group);
+    return { ...op, category: categories?.[op.group] || null, language: lang || null };
+  });
+
   // Calcola score con buildCpLeaderboard (deriva da matrix v3)
-  const { ranking } = await buildCpLeaderboard(operatorsRaw, period_id);
+  const { ranking } = await buildCpLeaderboard(operatorsDecorated, period_id);
 
   // Filtra underperformers
   const rawCandidates = ranking
@@ -89,6 +100,8 @@ export async function GET(request) {
     return {
       employee: r.employee,
       group: r.group || null,
+      language: r.language || null,
+      category: r.category || null,
       score: r.score,
       tier: r.tier,
       rank: r.rank,
@@ -99,7 +112,7 @@ export async function GET(request) {
       specialization_pct: r.cp_breakdown?.specialization_pct || 0,
       reliable_creators_count: r.cp_breakdown?.reliable_creators || 0,
       swap_entry: swapEntry,
-      suggested_swaps: suggestionsArr[i] || [], // top 5 fit-ranked
+      suggested_swaps: suggestionsArr[i] || [],
     };
   });
 
@@ -113,9 +126,23 @@ export async function GET(request) {
       score: r.score,
       tier: r.tier,
       group: r.group,
+      language: r.language || null,
+      category: r.category || null,
       total_shifts: r.cp_aggregates?.total_shifts || 0,
     }))
     .slice(0, 100); // top 100 sostituibili
+
+  // Counts per filter pills (globali, pre-filtro UI)
+  const langCounts = { ita: 0, eng: 0, none: 0 };
+  const tierCounts = {};
+  const groups = new Set();
+  for (const c of candidates) {
+    if (c.language === "ita") langCounts.ita++;
+    else if (c.language === "eng") langCounts.eng++;
+    else langCounts.none++;
+    if (c.tier) tierCounts[c.tier] = (tierCounts[c.tier] || 0) + 1;
+    if (c.group) groups.add(c.group);
+  }
 
   // Lista finale per HR
   const readyForHr = Object.entries(swapsObj)
@@ -131,6 +158,11 @@ export async function GET(request) {
     ignored_count: Object.keys(ignoredObj).length,
     ready_for_hr: readyForHr,
     swaps: swapsObj,
+    filter_counts: {
+      languages: langCounts,
+      tiers: tierCounts,
+      groups: Array.from(groups).sort(),
+    },
   });
 }
 

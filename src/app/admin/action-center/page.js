@@ -42,15 +42,31 @@ const TIER_COLORS = {
 export default function ActionCenterPage() {
   const [periodId, setPeriodId] = useState("");
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [languageFilter, setLanguageFilter] = useState(""); // "", "ita", "eng", "none"
+  const [tierFilter, setTierFilter] = useState(""); // "", "Critical", "Weak", "Average"
+  const [groupFilter, setGroupFilter] = useState(""); // "" o nome group
   const periodOptions = useMemo(() => monthOpts(), []);
   useEffect(() => { if (!periodId && periodOptions[0]) setPeriodId(periodOptions[0].value); }, [periodOptions, periodId]);
 
   const url = periodId ? `/api/admin/action-center?period_id=${periodId}` : null;
   const { data, error, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
 
-  const candidates = data?.candidates || [];
+  const allCandidates = data?.candidates || [];
   const swapTargets = data?.swap_targets || [];
   const readyForHr = data?.ready_for_hr || [];
+  const filterCounts = data?.filter_counts || { languages: {}, tiers: {}, groups: [] };
+
+  // Filtri client-side
+  const candidates = useMemo(() => {
+    return allCandidates.filter((c) => {
+      if (languageFilter === "ita" && c.language !== "ita") return false;
+      if (languageFilter === "eng" && c.language !== "eng") return false;
+      if (languageFilter === "none" && c.language) return false;
+      if (tierFilter && c.tier !== tierFilter) return false;
+      if (groupFilter && c.group !== groupFilter) return false;
+      return true;
+    });
+  }, [allCandidates, languageFilter, tierFilter, groupFilter]);
 
   async function callAction(employee, action, swap_with = undefined, note = undefined) {
     if (!periodId) return;
@@ -199,9 +215,83 @@ export default function ActionCenterPage() {
             </CpCard>
           )}
 
+          {/* FILTRI */}
+          <CpCard padding="14px 18px" style={{ marginBottom: 14 }}>
+            <div style={{ display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
+              {/* Lingua */}
+              <FilterGroup label="Lingua">
+                <FilterPill active={languageFilter === ""}      onClick={() => setLanguageFilter("")}      color="#9CA3AF">Tutte ({allCandidates.length})</FilterPill>
+                <FilterPill active={languageFilter === "ita"}   onClick={() => setLanguageFilter("ita")}   color="#10B981">🇮🇹 ITA ({filterCounts.languages?.ita || 0})</FilterPill>
+                <FilterPill active={languageFilter === "eng"}   onClick={() => setLanguageFilter("eng")}   color="#3B82F6">🇬🇧 ENG ({filterCounts.languages?.eng || 0})</FilterPill>
+                {(filterCounts.languages?.none || 0) > 0 && (
+                  <FilterPill active={languageFilter === "none"} onClick={() => setLanguageFilter("none")} color="#9CA3AF">Senza ({filterCounts.languages.none})</FilterPill>
+                )}
+              </FilterGroup>
+
+              {/* Tier */}
+              <FilterGroup label="Tier">
+                <FilterPill active={tierFilter === ""}          onClick={() => setTierFilter("")}          color="#9CA3AF">Tutti</FilterPill>
+                {(filterCounts.tiers?.Critical || 0) > 0 && (
+                  <FilterPill active={tierFilter === "Critical"} onClick={() => setTierFilter("Critical")} color="#EF4444">Critical ({filterCounts.tiers.Critical})</FilterPill>
+                )}
+                {(filterCounts.tiers?.Weak || 0) > 0 && (
+                  <FilterPill active={tierFilter === "Weak"}    onClick={() => setTierFilter("Weak")}    color="#F59E0B">Weak ({filterCounts.tiers.Weak})</FilterPill>
+                )}
+                {(filterCounts.tiers?.Average || 0) > 0 && (
+                  <FilterPill active={tierFilter === "Average"} onClick={() => setTierFilter("Average")} color="#9CA3AF">Average ({filterCounts.tiers.Average})</FilterPill>
+                )}
+              </FilterGroup>
+
+              {/* Group */}
+              {(filterCounts.groups || []).length > 0 && (
+                <FilterGroup label="Group">
+                  <select
+                    value={groupFilter}
+                    onChange={(e) => setGroupFilter(e.target.value)}
+                    style={{
+                      padding: "6px 10px",
+                      background: CP.surface,
+                      border: `1px solid ${groupFilter ? CP.accentGreen + "55" : CP.border}`,
+                      borderRadius: 6,
+                      color: CP.textPrimary,
+                      fontSize: 11,
+                      fontFamily: FONTS.body,
+                      cursor: "pointer",
+                      minWidth: 180,
+                      maxWidth: 240,
+                    }}
+                  >
+                    <option value="" style={{ background: CP.surface }}>Tutti i Group</option>
+                    {filterCounts.groups.map((g) => (
+                      <option key={g} value={g} style={{ background: CP.surface }}>{g}</option>
+                    ))}
+                  </select>
+                </FilterGroup>
+              )}
+
+              {(languageFilter || tierFilter || groupFilter) && (
+                <button
+                  onClick={() => { setLanguageFilter(""); setTierFilter(""); setGroupFilter(""); }}
+                  style={{
+                    padding: "5px 12px",
+                    background: "transparent",
+                    border: `1px solid ${CP.border}`,
+                    borderRadius: 6,
+                    color: CP.textSecondary,
+                    fontSize: 11,
+                    cursor: "pointer",
+                    fontFamily: FONTS.body,
+                  }}
+                >
+                  ✕ Reset filtri
+                </button>
+              )}
+            </div>
+          </CpCard>
+
           {/* CANDIDATES LIST */}
           <SectionLabel style={{ display: "block", marginBottom: 12 }}>
-            Candidati da rivedere ({candidates.length})
+            Candidati da rivedere ({candidates.length}{candidates.length !== allCandidates.length ? ` su ${allCandidates.length}` : ""})
           </SectionLabel>
 
           {candidates.length === 0 && (
@@ -417,6 +507,37 @@ function SwapPicker({ candidate, swapTargets, onChange }) {
         </optgroup>
       </select>
     </div>
+  );
+}
+
+function FilterGroup({ label, children }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <span style={{ fontSize: 10, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONTS.mono, fontWeight: 700, marginRight: 4 }}>{label}:</span>
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{children}</div>
+    </div>
+  );
+}
+
+function FilterPill({ active, onClick, children, color }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: "5px 11px",
+        background: active ? color : "transparent",
+        border: `1px solid ${active ? color : CP.border}`,
+        borderRadius: 999,
+        color: active ? "#0a0a0a" : CP.textSecondary,
+        fontSize: 11,
+        fontWeight: active ? 700 : 500,
+        cursor: "pointer",
+        fontFamily: FONTS.body,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
