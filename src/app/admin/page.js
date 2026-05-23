@@ -54,7 +54,6 @@ const SHORTCUT_GROUPS = [
     label: "Performance",
     items: [
       { href: "/leaderboard",                  title: "Ladder",        desc: "Classifica principale operatori", icon: Trophy },
-      { href: "/leaderboard/operational",      title: "Operativa",     desc: "KPI Infloww — sales/h, fan CVR, unlock rate", icon: BarChart3 },
       { href: "/leaderboard/sales-cp",         title: "Sales CP",      desc: "Score 0-100 da CreatorsPro", icon: DollarSign },
       { href: "/leaderboard/creators",         title: "Creator-first", desc: "Quanto rende ogni creator + team interno", icon: Users },
       { href: "/leaderboard/creators/heatmap", title: "Heat-map",      desc: "Score operatore × creator a colpo d'occhio", icon: Flame },

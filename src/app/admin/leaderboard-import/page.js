@@ -181,9 +181,37 @@ export default function LeaderboardImportPage() {
             </div>
           }
           section="Data · Import"
-          title="Import dati Operational Leaderboard"
-          subtitle={'Carica l\'export CSV o Excel "By time and employee" da Infloww. I dati alimentano la leaderboard operativa visibile a tutti.'}
+          title="Import dati Infloww"
+          subtitle={'Carica l\'export CSV o Excel "By time and employee" da Infloww. I dati alimentano lo score Sales CP (affianco Infloww) + l\'analisi efficienza chat.'}
         />
+
+        {/* ISTRUZIONI INLINE: come scaricare da Infloww */}
+        <div style={{
+          padding: "16px 20px",
+          background: `linear-gradient(135deg, ${CP.accentBlue}12 0%, ${CP.accentBlue}05 100%)`,
+          border: `1px solid ${CP.accentBlue}55`,
+          borderRadius: 12,
+          marginBottom: 20,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <span style={{ fontSize: 18 }}>📥</span>
+            <div style={{ fontWeight: 700, fontSize: 14, color: CP.textPrimary }}>Come scaricare il file da Infloww</div>
+          </div>
+          <ol style={{ margin: "0 0 12px 0", paddingLeft: 22, fontSize: 13, color: CP.textSecondary, lineHeight: 1.7 }}>
+            <li>Vai su <a href="https://app.infloww.com" target="_blank" rel="noreferrer" style={{ color: CP.accentBlue, fontWeight: 600 }}>app.infloww.com</a> → menu <b>Reports</b> → <b>Performance reports</b></li>
+            <li>Seleziona il report <b>&quot;By time and employee&quot;</b> (lo trovi nei modelli predefiniti)</li>
+            <li>Scegli il <b>periodo</b> (mese intero per la leaderboard mensile, settimana per quella settimanale)</li>
+            <li>Click su <b>Export → CSV</b> o <b>Excel (.xlsx)</b></li>
+            <li>Carica il file qui sotto e scegli lo stesso periodo</li>
+          </ol>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 12, color: CP.textMuted }}>
+            <a href="https://app.infloww.com" target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: CP.accentBlue, fontWeight: 600, textDecoration: "none" }}>
+              → Apri Infloww
+            </a>
+            <span style={{ color: CP.textMuted }}>·</span>
+            <span>Storico: ripeti per ogni mese che vuoi popolare (Infloww non ha bulk export)</span>
+          </div>
+        </div>
 
         <div style={styles.card}>
           <h2 style={styles.h2}>1. Periodo</h2>

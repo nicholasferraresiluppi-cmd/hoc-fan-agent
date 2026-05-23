@@ -184,6 +184,33 @@ export default function SyncHistoryPage() {
         subtitle="Popola la webapp con i dati CreatorsPro degli ultimi 24 mesi. Avvia un mese alla volta oppure 'sync tutti i mancanti' per riempire lo storico in batch automatico."
       />
 
+      {/* ISTRUZIONI INLINE: cosa fa questo wizard */}
+      <div style={{
+        padding: "16px 20px",
+        background: `linear-gradient(135deg, ${CP.accentGreen}12 0%, ${CP.accentGreen}05 100%)`,
+        border: `1px solid ${CP.accentGreen}55`,
+        borderRadius: 12,
+        marginBottom: 20,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+          <span style={{ fontSize: 18 }}>🤖</span>
+          <div style={{ fontWeight: 700, fontSize: 14, color: CP.textPrimary }}>Come funziona (sync automatico da CP API)</div>
+        </div>
+        <p style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.6, margin: "0 0 10px 0" }}>
+          <b>Non devi scaricare nulla a mano da CreatorsPro.</b> Questo wizard chiama direttamente la loro API e
+          importa i wage records mese per mese. Bastano le tue credenziali bot già configurate su Vercel.
+        </p>
+        <ul style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.7, paddingLeft: 22, margin: "0 0 10px 0" }}>
+          <li><b>Click &quot;🚀 Avvia sync ({neverSyncedCount})&quot;</b> per popolare automaticamente tutti i mesi mancanti</li>
+          <li>Ogni mese richiede ~1-3 minuti (refdata → prepare → batch wages → finalize)</li>
+          <li>Puoi <b>fermare</b> in qualsiasi momento — il mese in corso si completa prima dello stop</li>
+          <li>I dati popolano: Sales CP, Creator leaderboard, Action Center, heatmap</li>
+        </ul>
+        <div style={{ fontSize: 12, color: CP.textMuted, fontStyle: "italic" }}>
+          ⚠️ Solo lo sync mensile è disponibile via API (CP non espone export bulk multi-mese). Per questo cicliamo mese per mese.
+        </div>
+      </div>
+
       {/* Stat cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 24 }}>
         <StatCard label="Mesi disponibili" value={months.length} sub="ultimi 24 mesi" />

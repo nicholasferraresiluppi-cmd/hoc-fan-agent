@@ -37,7 +37,6 @@ const ESSENTIAL_HREFS = new Set([
   "/welcome/score-friendly",
   "/admin",
   "/leaderboard",
-  "/leaderboard/operational",
   "/leaderboard/sales-cp",
   "/leaderboard/creators",
   "/",
@@ -52,7 +51,6 @@ const NAV_GROUPS = [
     defaultOpen: true,
     items: [
       { href: "/leaderboard",                    label: "Ladder",       icon: Trophy },
-      { href: "/leaderboard/operational",        label: "Operativa",    icon: BarChart3 },
       { href: "/leaderboard/sales-cp",           label: "Sales CP",     icon: DollarSign },
       { href: "/leaderboard/creators",           label: "Creator",      icon: Users },
       { href: "/leaderboard/creators/heatmap",   label: "Heat-map",     icon: Flame },
