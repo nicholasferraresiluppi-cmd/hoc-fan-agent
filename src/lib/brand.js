@@ -86,6 +86,58 @@ export const SPACE = { xs: 4, sm: 8, md: 12, base: 16, lg: 24, xl: 32, xxl: 48, 
 export const RADIUS = { sm: 6, md: 12, lg: 18 };
 export const SHADOW = "0 10px 30px rgba(0,0,0,0.45)";
 
+/**
+ * CP-style design tokens (per pagine "creator-first" che replicano
+ * l'estetica di CreatorsPro Sales Analytics). Sovrapposti — non sostituiscono
+ * i token HOC core: convivono nelle pagine che li scelgono.
+ */
+export const CP = {
+  // Background ultradark CP-like
+  bg: "#08090F",          // matches obsidian — sfondo app
+  surface: "#13151C",     // card un filo più chiara di graphite
+  surfaceAlt: "#1A1D26",  // hover / tabular alt row
+  border: "#23262F",      // bordo sottile carta
+  borderStrong: "#2F333E",// bordo accentuato
+  textPrimary: "#F5F6F8",
+  textSecondary: "#9CA3AF",
+  textMuted: "#6B7080",
+  accentGreen: "#10B981", // crescita / sales positive
+  accentRed: "#EF4444",   // calo
+  accentBlue: "#3B82F6",  // info
+};
+
+/**
+ * Palette di "dot" colorati per creator (replica i pallini distintivi di CP).
+ * 16 tinte ben distinguibili — assegnazione deterministica via hash dell'alias
+ * cosicché lo stesso creator abbia sempre lo stesso colore in tutte le viste.
+ */
+export const CREATOR_DOT_PALETTE = [
+  "#10B981", // emerald
+  "#F59E0B", // amber
+  "#EF4444", // red
+  "#3B82F6", // blue
+  "#A855F7", // purple
+  "#EC4899", // pink
+  "#14B8A6", // teal
+  "#F97316", // orange
+  "#8B5CF6", // violet
+  "#06B6D4", // cyan
+  "#84CC16", // lime
+  "#EAB308", // yellow
+  "#22C55E", // green
+  "#D946EF", // fuchsia
+  "#0EA5E9", // sky
+  "#F43F5E", // rose
+];
+
+export function creatorDotColor(alias) {
+  if (!alias) return CP.textMuted;
+  const s = String(alias).toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
+  return CREATOR_DOT_PALETTE[hash % CREATOR_DOT_PALETTE.length];
+}
+
 // Retrocompat: alcuni file vecchi usavano HOC_COLORS — li rimappiamo per non rompere nulla.
 export const HOC_COLORS_COMPAT = {
   orange: COLORS.champagne,

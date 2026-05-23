@@ -26,6 +26,9 @@ const SECTIONS = [
 const PUBLIC_SECTIONS = [
   { href: "/", label: "Academy" },
   { href: "/leaderboard", label: "Ladder" },
+  { href: "/leaderboard/operational", label: "Operativa" },
+  { href: "/leaderboard/sales-cp", label: "Sales CP" },
+  { href: "/leaderboard/creators", label: "🎨 Creator" },
   { href: "/leaderboard/leghe", label: "Leghe" },
   { href: "/leaderboard/storico", label: "Hall of Fame" },
   { href: "/profilo/certificazioni", label: "Badge Wall" },
