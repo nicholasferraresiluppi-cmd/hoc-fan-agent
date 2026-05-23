@@ -27,6 +27,22 @@ export default class ErrorBoundary extends Component {
     this.setState({ info });
     // eslint-disable-next-line no-console
     console.error("[ErrorBoundary]", error, info);
+    // Diagnostic: report to /api/_debug-error so it gets persisted to KV
+    // and we can inspect from outside the browser. Fire-and-forget.
+    try {
+      fetch("/api/_debug-error", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: String(error?.message || error),
+          stack: String(error?.stack || ""),
+          componentStack: String(info?.componentStack || ""),
+          path: typeof window !== "undefined" ? window.location.pathname : "",
+          userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+        }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch {}
   }
 
   render() {
