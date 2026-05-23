@@ -161,8 +161,25 @@ export default function SyncHistoryPage() {
     }
     if (!confirm(`Sync di ${toSync.length} mese${toSync.length > 1 ? "i" : ""}? Operazione lunga (~1-3 min per mese). Puoi fermare in qualsiasi momento.`)) return;
 
+    // Ping immediato per verificare/rinfrescare la sessione PRIMA di iniziare:
+    // se è scaduta meglio scoprirlo subito che dopo 1 min di sync sprecato.
+    try {
+      const r = await fetch("/api/auth/ping");
+      if (r.status === 401) {
+        alert("Sessione scaduta. Ricarica la pagina (Cmd+R) e riprova.");
+        return;
+      }
+      if (!r.ok) {
+        alert(`Ping auth fallito (HTTP ${r.status}). Ricarica la pagina e riprova.`);
+        return;
+      }
+    } catch (e) {
+      alert(`Errore di rete sul ping auth: ${e.message}. Verifica la connessione.`);
+      return;
+    }
+
     setProgress({ running: true, current: null, step: "", batchInfo: "", error: null, completed: [], total: toSync.length });
-    // Keep-alive ping per evitare che la sessione Clerk scada durante batch lunghi (>30 min)
+    // Keep-alive ping ogni 4 min per evitare che la sessione Clerk scada durante batch lunghi (>30 min)
     const keepAlive = setInterval(() => {
       fetch("/api/auth/ping").catch(() => {});
     }, 4 * 60 * 1000);
