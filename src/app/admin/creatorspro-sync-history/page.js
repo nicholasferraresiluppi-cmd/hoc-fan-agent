@@ -162,31 +162,39 @@ export default function SyncHistoryPage() {
     if (!confirm(`Sync di ${toSync.length} mese${toSync.length > 1 ? "i" : ""}? Operazione lunga (~1-3 min per mese). Puoi fermare in qualsiasi momento.`)) return;
 
     setProgress({ running: true, current: null, step: "", batchInfo: "", error: null, completed: [], total: toSync.length });
-    const completed = [];
-    for (const p of toSync) {
-      if (stopRequested) {
-        setProgress((pr) => ({ ...pr, running: false, error: "Stop richiesto dall'utente" }));
-        return;
-      }
-      setProgress((pr) => ({ ...pr, current: p, step: "starting", batchInfo: "" }));
-      try {
-        await syncSingleMonth(p, (step) => {
-          setProgress((pr) => ({ ...pr, step, batchInfo: step.includes("batch") ? step : pr.batchInfo }));
-        });
-        completed.push(p);
-        setProgress((pr) => ({ ...pr, completed: [...pr.completed, p] }));
-      } catch (e) {
-        if (e.message === "STOPPED") {
-          setProgress((pr) => ({ ...pr, running: false, error: "Fermato dall'utente" }));
+    // Keep-alive ping per evitare che la sessione Clerk scada durante batch lunghi (>30 min)
+    const keepAlive = setInterval(() => {
+      fetch("/api/auth/ping").catch(() => {});
+    }, 4 * 60 * 1000);
+    try {
+      const completed = [];
+      for (const p of toSync) {
+        if (stopRequested) {
+          setProgress((pr) => ({ ...pr, running: false, error: "Stop richiesto dall'utente" }));
           return;
         }
-        setProgress((pr) => ({ ...pr, running: false, error: `Errore su ${p}: ${e.message}` }));
-        return;
+        setProgress((pr) => ({ ...pr, current: p, step: "starting", batchInfo: "" }));
+        try {
+          await syncSingleMonth(p, (step) => {
+            setProgress((pr) => ({ ...pr, step, batchInfo: step.includes("batch") ? step : pr.batchInfo }));
+          });
+          completed.push(p);
+          setProgress((pr) => ({ ...pr, completed: [...pr.completed, p] }));
+        } catch (e) {
+          if (e.message === "STOPPED") {
+            setProgress((pr) => ({ ...pr, running: false, error: "Fermato dall'utente" }));
+            return;
+          }
+          setProgress((pr) => ({ ...pr, running: false, error: `Errore su ${p}: ${e.message}` }));
+          return;
+        }
       }
+      setProgress((pr) => ({ ...pr, running: false, current: null, step: "Done" }));
+      refetchStatus();
+      refetchHistory();
+    } finally {
+      clearInterval(keepAlive);
     }
-    setProgress((pr) => ({ ...pr, running: false, current: null, step: "Done" }));
-    refetchStatus();
-    refetchHistory();
   }
 
   const neverSyncedCount = useMemo(() => months.filter((m) => !monthStates[m.id]?.synced).length, [months, monthStates]);
