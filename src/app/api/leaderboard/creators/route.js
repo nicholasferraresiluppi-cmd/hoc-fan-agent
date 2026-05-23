@@ -39,6 +39,8 @@ export async function GET(request) {
   list.forEach((c, i) => { c.rank = i + 1; });
 
   const totalAgency = list.reduce((s, c) => s + c.total_sales, 0);
+  const totalShifts = list.reduce((s, c) => s + (c.total_shifts || 0), 0);
+  const avgPerShift = totalShifts > 0 ? Math.round((totalAgency / totalShifts) * 100) / 100 : 0;
 
   let suggestions = null;
   if (includeSuggestions) {
@@ -51,6 +53,8 @@ export async function GET(request) {
     creators: list,
     creators_count: list.length,
     total_sales_agency: totalAgency,
+    total_shifts: totalShifts,
+    avg_sales_per_shift_agency: avgPerShift,
     avg_sales_per_creator: list.length > 0 ? Math.round(totalAgency / list.length) : 0,
     suggestions,
     operators_count: Object.keys(operators).length,

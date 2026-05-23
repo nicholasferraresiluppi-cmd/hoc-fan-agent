@@ -45,18 +45,32 @@ function monthBoundsIso(periodId) {
 function normalizeWage(wage) {
   const info = wage?.info || {};
   const shifts = Array.isArray(wage?.shifts) ? wage.shifts : [];
-  const normalizedShifts = shifts.map((s) => ({
-    id: s.id,
-    started_at: s.startedAt,
-    ended_at: s.endedAt,
-    worked_hours: s.workedHours || 0,
-    total_attributed: s.totalAttributed || 0,
-    total_earnings: s.totalEarnings || 0,
-    interval_bucket: bucketizeIntervalFromHour(s.startedAt),
-    creator_ids: (s.associatedCreators || []).map((c) => c.id).filter(Boolean),
-    creator_aliases: (s.associatedCreators || []).map((c) => c.alias).filter(Boolean),
-    takes_count: (s.takes || []).length,
-  }));
+  const normalizedShifts = shifts.map((s) => {
+    const rawTakes = Array.isArray(s.takes) ? s.takes : [];
+    // v3 / Opzione A: salviamo i takes con creator_alias + amount per attribuzione
+    // ESATTA per creator (sostituisce lo split equo 50/50 sui shift multi-creator).
+    // Teniamo solo i campi essenziali per limitare il payload KV.
+    const takes = rawTakes.map((t) => ({
+      amount: typeof t.amount === "number" ? t.amount : (Number(t.amount) || 0),
+      type: t.type || null,
+      creator_alias: t.creator?.alias || t.creatorAlias || null,
+      creator_id: t.creator?.id || t.creatorId || null,
+      status: t.status || null,
+    })).filter((t) => t.creator_alias && t.amount > 0);
+    return {
+      id: s.id,
+      started_at: s.startedAt,
+      ended_at: s.endedAt,
+      worked_hours: s.workedHours || 0,
+      total_attributed: s.totalAttributed || 0,
+      total_earnings: s.totalEarnings || 0,
+      interval_bucket: bucketizeIntervalFromHour(s.startedAt),
+      creator_ids: (s.associatedCreators || []).map((c) => c.id).filter(Boolean),
+      creator_aliases: (s.associatedCreators || []).map((c) => c.alias).filter(Boolean),
+      takes_count: rawTakes.length,
+      takes, // [{amount, type, creator_alias, creator_id, status}] — per attribuzione esatta
+    };
+  });
   return {
     id: info.id,
     member_id: info.memberId,

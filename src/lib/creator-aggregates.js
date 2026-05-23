@@ -41,21 +41,73 @@ function bucket(iso) {
 
 /**
  * Distribuisce le metriche di uno shift tra i suoi associatedCreators.
- * Se mono-creator: tutto su quella. Se multi: split equo (proxy).
+ *
+ * Strategia (Opzione A — attribuzione ESATTA via takes):
+ *   - Se lo shift ha `takes[]` con creator_alias + amount → attribuzione esatta
+ *     per creator (somma takes per alias). Le ore vengono distribuite
+ *     proporzionalmente alle sales (proxy ragionevole).
+ *   - Fallback (sync vecchi senza takes): split equo 50/50 sui creator coinvolti.
+ *
+ * Output per ogni distribuzione:
+ *   {
+ *     creator, sales, hours, earnings, interval, started_at,
+ *     shift_count_share, estimated (true se stima), exact_attribution (true se da takes)
+ *   }
  */
 function distributeShift(shift) {
   const creators = (shift.creator_aliases || []).filter(Boolean);
   if (creators.length === 0) return [];
+  const interval = shift.interval_bucket || bucket(shift.started_at);
+  const totalSales = shift.total_attributed || 0;
+  const totalHours = shift.worked_hours || 0;
+  const totalEarnings = shift.total_earnings || 0;
+
+  // OPZIONE A — attribuzione esatta da takes
+  const takes = Array.isArray(shift.takes) ? shift.takes : [];
+  const validTakes = takes.filter((t) => t && t.creator_alias && (t.amount || 0) > 0);
+  if (validTakes.length > 0) {
+    const byCreator = {};
+    let totalTakeAmount = 0;
+    for (const t of validTakes) {
+      byCreator[t.creator_alias] = (byCreator[t.creator_alias] || 0) + t.amount;
+      totalTakeAmount += t.amount;
+    }
+    // Includiamo anche eventuali creator presenti in associatedCreators ma senza takes
+    // (lo shift ufficialmente "li copriva" ma 0 sales — share 0 ma li registriamo).
+    for (const alias of creators) {
+      if (!(alias in byCreator)) byCreator[alias] = 0;
+    }
+    const aliases = Object.keys(byCreator);
+    return aliases.map((alias) => {
+      const shareSales = totalTakeAmount > 0 ? byCreator[alias] / totalTakeAmount : 0;
+      return {
+        creator: alias,
+        sales: byCreator[alias],
+        hours: totalHours * shareSales,
+        earnings: totalEarnings * shareSales,
+        interval,
+        started_at: shift.started_at,
+        shift_count_share: shareSales, // proporzionale alle sales (no doppio conteggio)
+        estimated: false,
+        exact_attribution: true,
+        multi_creator: aliases.length > 1,
+      };
+    });
+  }
+
+  // Fallback: split equo (retrocompat sync vecchi senza takes)
   const share = 1 / creators.length;
   return creators.map((alias) => ({
     creator: alias,
-    sales: (shift.total_attributed || 0) * share,
-    hours: (shift.worked_hours || 0) * share,
-    earnings: (shift.total_earnings || 0) * share,
-    interval: shift.interval_bucket || bucket(shift.started_at),
+    sales: totalSales * share,
+    hours: totalHours * share,
+    earnings: totalEarnings * share,
+    interval,
     started_at: shift.started_at,
-    shift_count_share: share, // per evitare di contare 2 volte lo stesso shift
+    shift_count_share: share,
     estimated: creators.length > 1,
+    exact_attribution: false,
+    multi_creator: creators.length > 1,
   }));
 }
 
@@ -94,11 +146,14 @@ export async function buildCreatorMatrix(periodId) {
         matrix[opName][d.creator].hours += d.hours;
         matrix[opName][d.creator].shifts += d.shift_count_share;
         matrix[opName][d.creator].shift_values.push(d.sales);
-        // v2: traccia mono vs split per trasparenza UI
-        if (!matrix[opName][d.creator].shift_split_count) matrix[opName][d.creator].shift_split_count = 0;
-        if (!matrix[opName][d.creator].shift_mono_count) matrix[opName][d.creator].shift_mono_count = 0;
-        if (d.estimated) matrix[opName][d.creator].shift_split_count += 1;
-        else matrix[opName][d.creator].shift_mono_count += 1;
+        // v3: traccia mono / split-estimated / exact per trasparenza UI
+        const cell = matrix[opName][d.creator];
+        if (!cell.shift_split_count) cell.shift_split_count = 0;   // multi-creator senza takes (50/50)
+        if (!cell.shift_mono_count) cell.shift_mono_count = 0;     // creator unico nello shift
+        if (!cell.shift_exact_count) cell.shift_exact_count = 0;   // multi-creator con takes esatti
+        if (d.exact_attribution && d.multi_creator) cell.shift_exact_count += 1;
+        else if (d.estimated) cell.shift_split_count += 1;
+        else cell.shift_mono_count += 1;
         if (d.interval) matrix[opName][d.creator].interval_sales[d.interval] = (matrix[opName][d.creator].interval_sales[d.interval] || 0) + d.sales;
 
         if (!creators[d.creator]) creators[d.creator] = {
@@ -159,14 +214,22 @@ export async function buildCreatorMatrix(periodId) {
     for (const cr of Object.keys(matrix[op])) {
       const cell = matrix[op][cr];
       const creatorMean = creators[cr]?.avg_sales_per_shift || 0;
-      const totalShiftEvents = (cell.shift_split_count || 0) + (cell.shift_mono_count || 0);
+      const mono = cell.shift_mono_count || 0;
+      const splitEst = cell.shift_split_count || 0;
+      const splitExact = cell.shift_exact_count || 0;
+      const totalShiftEvents = mono + splitEst + splitExact;
       cell.score_relative = creatorMean > 0
         ? Math.round((cell.sales_per_shift / creatorMean) * 100)
         : 0;
       cell.tier_relative = scoreTierFromRel(cell.score_relative);
       cell.low_confidence = totalShiftEvents < MIN_SHIFTS_RELIABLE;
+      // % shift "stimati" (split equo 50/50) — esclude gli esatti (anche se multi)
       cell.split_pct = totalShiftEvents > 0
-        ? Math.round((cell.shift_split_count / totalShiftEvents) * 100)
+        ? Math.round((splitEst / totalShiftEvents) * 100)
+        : 0;
+      // % shift con attribuzione esatta (mono + exact) — quanto è affidabile la cifra
+      cell.exact_pct = totalShiftEvents > 0
+        ? Math.round(((mono + splitExact) / totalShiftEvents) * 100)
         : 0;
       delete cell.shift_values; // dropped da output
     }
@@ -223,7 +286,9 @@ export async function getCreatorDrilldown(creatorAlias, periodId) {
         shifts: cell.shifts,
         shift_split_count: cell.shift_split_count || 0,
         shift_mono_count: cell.shift_mono_count || 0,
+        shift_exact_count: cell.shift_exact_count || 0,
         split_pct: cell.split_pct || 0,
+        exact_pct: cell.exact_pct || 0,
         low_confidence: !!cell.low_confidence,
         sales_per_shift: cell.sales_per_shift,
         sales_per_hour: cell.sales_per_hour,
