@@ -42,6 +42,7 @@ const ESSENTIAL_HREFS = new Set([
   "/playbook",
   "/admin/team",
   "/admin/action-center",
+  "/admin/coaching-center",
 ]);
 
 const NAV_GROUPS = [
@@ -95,6 +96,7 @@ const NAV_GROUPS = [
     defaultOpen: false,
     items: [
       { href: "/admin/action-center",            label: "Action Center", icon: Target },
+      { href: "/admin/coaching-center",          label: "Coaching Center", icon: GraduationCap },
       { href: "/admin/team",                     label: "Team",         icon: UserCircle2 },
       { href: "/admin/employee-profiles",        label: "Profili",      icon: Contact },
       { href: "/admin/seniority",                label: "Seniority",    icon: Medal },
