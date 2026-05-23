@@ -34,6 +34,7 @@ import BrandLockup from "@/components/BrandLockup";
 // Voci "essential" (mostrate sempre): 8 core per primo accesso / demo.
 const ESSENTIAL_HREFS = new Set([
   "/welcome",
+  "/welcome/score-friendly",
   "/admin",
   "/leaderboard",
   "/leaderboard/operational",
@@ -63,6 +64,7 @@ const NAV_GROUPS = [
     label: "Training",
     defaultOpen: true,
     items: [
+      { href: "/welcome/score-friendly",         label: "📚 Tutorial Score", icon: GraduationCap },
       { href: "/",                               label: "Academy",      icon: GraduationCap, match: (p) => p === "/" },
       { href: "/playbook",                       label: "Playbook",     icon: BookOpen },
       { href: "/admin/review",                   label: "Review",       icon: ClipboardCheck },

@@ -200,6 +200,38 @@ export default function AdminHub() {
         />
       </div>
 
+      {/* TUTORIAL SCORE — banner prominente */}
+      <Link
+        href="/welcome/score-friendly"
+        style={{
+          display: "flex", alignItems: "center", gap: 16,
+          padding: "18px 22px",
+          marginBottom: 14,
+          background: `linear-gradient(135deg, ${CP.accentGreen}18 0%, #A855F715 100%)`,
+          border: `1px solid ${CP.accentGreen}55`,
+          borderRadius: 14,
+          textDecoration: "none", color: CP.textPrimary,
+          transition: "transform 0.15s, border-color 0.15s",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = CP.accentGreen; e.currentTarget.style.transform = "translateY(-2px)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = CP.accentGreen + "55"; e.currentTarget.style.transform = "translateY(0)"; }}
+      >
+        <div style={{
+          width: 44, height: 44, borderRadius: 12,
+          background: CP.accentGreen + "22", border: `1px solid ${CP.accentGreen}`,
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>
+          <Sparkles size={20} color={CP.accentGreen} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 3 }}>📚 Capisci come funziona lo Score (tutorial)</div>
+          <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.5 }}>
+            Tutorial narrativo con esempi concreti + Q&amp;A interattivo. Puoi fare domande in qualsiasi punto se non ti torna.
+          </div>
+        </div>
+        <ArrowUpRight size={18} color={CP.accentGreen} />
+      </Link>
+
       {/* DATA INGESTION — banner prominente per popolare lo storico */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 24 }}>
         <Link
