@@ -95,6 +95,7 @@ export default function SalesCpLeaderboardPage() {
   const [languageFilter, setLanguageFilter] = useState("");
   const [showNoCp, setShowNoCp] = useState(true);
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [showAllNoCp, setShowAllNoCp] = useState(false);
   // Map employee → { state: 'idle'|'loading'|'success'|'error', message }
   const [recheckState, setRecheckState] = useState({});
   // Bulk recheck progress: { running, done, total, recovered, errors }
@@ -528,7 +529,7 @@ export default function SalesCpLeaderboardPage() {
                         ✓ Batch completato: {bulkRecheck.done} controllati · <b>{bulkRecheck.recovered} recuperati con nuove wage</b> · {bulkRecheck.errors} errori · {bulkRecheck.done - bulkRecheck.recovered - bulkRecheck.errors} senza wage CP nel periodo
                       </div>
                     )}
-                    {noCpOps.slice(0, 30).map((op, i) => (
+                    {(showAllNoCp ? noCpOps : noCpOps.slice(0, 30)).map((op, i) => (
                       <div key={`nocp-${op.employee}-${i}`} style={{ display: "grid", gridTemplateColumns: "50px 36px 1.6fr 1.3fr 0.7fr 0.7fr 0.9fr 0.9fr 0.8fr 0.8fr 0.9fr 1fr", alignItems: "center", padding: "10px 22px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 12, opacity: recheckState[op.employee]?.state === "success" && recheckState[op.employee]?.added > 0 ? 0.9 : 0.6 }}>
                         <div style={{ color: COLORS.mist }}>—</div>
                         <Avatar name={op.employee} size={28} />
@@ -552,7 +553,26 @@ export default function SalesCpLeaderboardPage() {
                         <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.mist }}>{fmtCurrency(op.infloww_sales)} (Infw)</div>
                       </div>
                     ))}
-                    {noCpOps.length > 30 && <div style={{ padding: "10px 22px", fontSize: 11, color: COLORS.mist, textAlign: "center" }}>+ altri {noCpOps.length - 30} no-CP</div>}
+                    {noCpOps.length > 30 && (
+                      <button
+                        onClick={() => setShowAllNoCp((v) => !v)}
+                        style={{
+                          width: "100%",
+                          padding: "12px 22px",
+                          background: COLORS.obsidian + "80",
+                          border: "none",
+                          borderTop: `1px solid ${COLORS.charcoal}`,
+                          color: COLORS.champagne,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          textAlign: "center",
+                          cursor: "pointer",
+                          fontFamily: FONTS.body,
+                        }}
+                      >
+                        {showAllNoCp ? `↑ Mostra solo primi 30` : `↓ Mostra anche gli altri ${noCpOps.length - 30} no-CP`}
+                      </button>
+                    )}
                   </>
                 )}
               </div>
