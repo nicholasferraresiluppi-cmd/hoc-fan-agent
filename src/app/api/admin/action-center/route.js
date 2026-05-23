@@ -25,7 +25,7 @@
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { logAuditAction } from "@/lib/audit-log";
-import { buildCreatorMatrix } from "@/lib/creator-aggregates";
+import { buildCreatorMatrix, computeSwapSuggestions } from "@/lib/creator-aggregates";
 import { buildOperatorsForCpLeaderboard, hasCpDataForPeriod } from "@/lib/creatorspro-data";
 import { buildCpLeaderboard } from "@/lib/creatorspro-score";
 
@@ -67,7 +67,7 @@ export async function GET(request) {
   const { ranking } = await buildCpLeaderboard(operatorsRaw, period_id);
 
   // Filtra underperformers
-  const candidates = ranking
+  const rawCandidates = ranking
     .filter((r) => {
       if (r.score == null) return false;
       if (r.score > UNDERPERFORMER_SCORE_MAX) return false;
@@ -77,24 +77,31 @@ export async function GET(request) {
       return true;
     })
     .sort((a, b) => a.score - b.score) // peggiore primo
-    .slice(0, TOP_N)
-    .map((r) => {
-      const swapEntry = swapsObj[r.employee] || null;
-      return {
-        employee: r.employee,
-        group: r.group || null,
-        score: r.score,
-        tier: r.tier,
-        rank: r.rank,
-        cp_total_sales: r.cp_aggregates?.total_sales || 0,
-        cp_total_shifts: r.cp_aggregates?.total_shifts || 0,
-        top_creator: r.cp_breakdown?.top_creator || null,
-        top_creator_sales: r.cp_breakdown?.top_creator_sales || 0,
-        specialization_pct: r.cp_breakdown?.specialization_pct || 0,
-        reliable_creators_count: r.cp_breakdown?.reliable_creators || 0,
-        swap_entry: swapEntry, // { marked_at, marked_by, status, swap_with, note } | null
-      };
-    });
+    .slice(0, TOP_N);
+
+  // Calcola suggerimenti SMART per ogni candidato (in parallelo)
+  const suggestionsArr = await Promise.all(
+    rawCandidates.map((r) => computeSwapSuggestions(r.employee, period_id, { limit: 5 }))
+  );
+
+  const candidates = rawCandidates.map((r, i) => {
+    const swapEntry = swapsObj[r.employee] || null;
+    return {
+      employee: r.employee,
+      group: r.group || null,
+      score: r.score,
+      tier: r.tier,
+      rank: r.rank,
+      cp_total_sales: r.cp_aggregates?.total_sales || 0,
+      cp_total_shifts: r.cp_aggregates?.total_shifts || 0,
+      top_creator: r.cp_breakdown?.top_creator || null,
+      top_creator_sales: r.cp_breakdown?.top_creator_sales || 0,
+      specialization_pct: r.cp_breakdown?.specialization_pct || 0,
+      reliable_creators_count: r.cp_breakdown?.reliable_creators || 0,
+      swap_entry: swapEntry,
+      suggested_swaps: suggestionsArr[i] || [], // top 5 fit-ranked
+    };
+  });
 
   // Lista candidati per swap (operatori "buoni" non in underperformer list)
   const swapTargets = ranking

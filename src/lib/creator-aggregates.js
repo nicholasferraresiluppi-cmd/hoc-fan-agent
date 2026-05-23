@@ -451,3 +451,102 @@ export async function computeMatchSuggestions(periodId, { minSalesThreshold = 10
   suggestions.sort((a, b) => b.gap - a.gap);
   return suggestions.slice(0, limit);
 }
+
+/**
+ * Swap suggestions: per un operatore X (es. underperformer da sostituire),
+ * trova i candidati con il miglior FIT — cioè quelli che hanno score alto
+ * sulle stesse creator dove X lavora, dando peso doppio:
+ *   - peso del mix di X (creator dove X fa più sales)
+ *   - peso dell'importanza agency-wide (creator con fatturato totale alto)
+ *
+ * Filosofia: vogliamo sostituire X mantenendo il presidio sulle creator dove
+ * X spendeva tempo, ma con preferenza per le creator strategiche per l'agency.
+ *
+ * @param {string} X - nome operatore da sostituire
+ * @param {string} periodId - YYYY-MM
+ * @param {object} opts
+ *   - limit: max suggerimenti (default 5)
+ *   - minCoverage: % minima delle creator di X coperte dal candidato (default 0.3)
+ *   - weightMixX: peso del mix di X (default 0.5)
+ *   - weightAgency: peso dell'importanza agency (default 0.5)
+ * @returns {Array<{ employee, fit_score, coverage_pct, breakdown: [{creator, weight, score}] }>}
+ */
+export async function computeSwapSuggestions(X, periodId, opts = {}) {
+  const { limit = 5, minCoverage = 0.3, weightMixX = 0.5, weightAgency = 0.5 } = opts;
+  const { matrix, creators, operators } = await buildCreatorMatrix(periodId);
+
+  const xCells = matrix[X];
+  if (!xCells) return [];
+
+  // Step 1: Calcola fatturato totale agency (somma sales di tutte le creator)
+  const agencyTotalSales = Object.values(creators).reduce((s, c) => s + (c.total_sales || 0), 0);
+
+  // Step 2: Calcola pesi per ogni creator di X
+  const xTotalSales = Object.values(xCells).reduce((s, c) => s + c.sales, 0);
+  const creatorWeights = {};
+  for (const [cr, cell] of Object.entries(xCells)) {
+    const shareX = xTotalSales > 0 ? cell.sales / xTotalSales : 0;
+    const shareAgency = agencyTotalSales > 0 ? (creators[cr]?.total_sales || 0) / agencyTotalSales : 0;
+    creatorWeights[cr] = weightMixX * shareX + weightAgency * shareAgency;
+  }
+  // Normalize pesi a somma=1 per coverage calculation
+  const totalW = Object.values(creatorWeights).reduce((a, b) => a + b, 0) || 1;
+  for (const cr of Object.keys(creatorWeights)) creatorWeights[cr] /= totalW;
+
+  // Step 3: Per ogni candidato (non X), calcola fit_score
+  const fits = [];
+  for (const [candName, candCells] of Object.entries(matrix)) {
+    if (candName === X) continue;
+
+    // Skip candidati che sono loro stessi sotto soglia (escludo Critical/Weak/Average dalle suggestions)
+    const candAgg = operators[candName];
+    if (!candAgg || candAgg.score == null || candAgg.score < 50) continue; // solo Good+ (score ≥50)
+
+    let fitScore = 0;
+    let coverage = 0;
+    const breakdown = [];
+
+    for (const [cr, w] of Object.entries(creatorWeights)) {
+      const candCell = candCells[cr];
+      if (candCell && candCell.score != null) {
+        fitScore += candCell.score * w;
+        coverage += w;
+        breakdown.push({
+          creator: cr,
+          weight_pct: Math.round(w * 100),
+          score: candCell.score,
+          tier: candCell.tier,
+          x_sales: xCells[cr]?.sales || 0,
+        });
+      }
+    }
+
+    if (coverage < minCoverage) continue; // candidato non copre abbastanza delle creator di X
+
+    // Normalize fit per coverage (così un candidato che copre 50% non viene penalizzato vs uno che copre 100%)
+    const fitNormalized = fitScore / coverage;
+
+    fits.push({
+      employee: candName,
+      fit_score: Math.round(fitNormalized * 10) / 10,
+      coverage_pct: Math.round(coverage * 100),
+      candidate_overall_score: candAgg.score,
+      candidate_tier: candAgg.tier,
+      candidate_total_shifts: cells_total_shifts(candCells),
+      // breakdown delle creator chiave (top 3 per peso)
+      breakdown: breakdown
+        .sort((a, b) => b.weight_pct - a.weight_pct)
+        .slice(0, 3),
+    });
+  }
+
+  fits.sort((a, b) => b.fit_score - a.fit_score);
+  return fits.slice(0, limit);
+}
+
+function cells_total_shifts(cells) {
+  let s = 0;
+  for (const c of Object.values(cells)) s += (c.shifts || 0);
+  return Math.round(s * 10) / 10;
+}
+

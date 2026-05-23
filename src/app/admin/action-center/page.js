@@ -5,7 +5,7 @@ import useSWR, { mutate } from "swr";
 import Link from "next/link";
 import {
   Target, Info, Download, X, CheckCircle2, Clock, AlertTriangle,
-  ArrowRightLeft, Trash2, FileText,
+  ArrowRightLeft, Trash2, FileText, Sparkles, ChevronDown,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, SectionLabel, CpCard, StatCard } from "@/components/cp-style";
@@ -259,31 +259,12 @@ export default function ActionCenterPage() {
                       <span style={{ fontSize: 10, color: CP.textMuted }}>{c.cp_total_shifts} shift</span>
                     </span>
 
-                    {/* Swap dropdown */}
-                    <select
-                      value={c.swap_entry?.swap_with || ""}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        callAction(c.employee, "set_swap", v || null);
-                      }}
-                      style={{
-                        padding: "6px 10px",
-                        background: CP.surface,
-                        border: `1px solid ${c.swap_entry?.swap_with ? CP.accentGreen + "66" : CP.border}`,
-                        borderRadius: 6,
-                        color: CP.textPrimary,
-                        fontSize: 12,
-                        fontFamily: FONTS.body,
-                        width: "100%",
-                      }}
-                    >
-                      <option value="" style={{ background: CP.surface }}>— scegli sostituto —</option>
-                      {swapTargets.map((t) => (
-                        <option key={t.employee} value={t.employee} style={{ background: CP.surface }}>
-                          {t.employee} ({t.tier}, {t.total_shifts} shift)
-                        </option>
-                      ))}
-                    </select>
+                    {/* Swap: suggeriti + dropdown completo */}
+                    <SwapPicker
+                      candidate={c}
+                      swapTargets={swapTargets}
+                      onChange={(v) => callAction(c.employee, "set_swap", v || null)}
+                    />
 
                     {/* Actions */}
                     <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
@@ -343,6 +324,98 @@ export default function ActionCenterPage() {
           </p>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * SwapPicker — UI per scegliere un sostituto.
+ * Mostra i top 3 suggeriti smart in cards in cima + dropdown completo sotto.
+ *
+ * Le "card suggerite" sono cliccabili e fanno set immediato. La dropdown
+ * resta come fallback "altri operatori".
+ */
+function SwapPicker({ candidate, swapTargets, onChange }) {
+  const current = candidate.swap_entry?.swap_with || "";
+  const top3 = (candidate.suggested_swaps || []).slice(0, 3);
+  const suggestedNames = new Set(top3.map((s) => s.employee));
+  const others = swapTargets.filter((t) => !suggestedNames.has(t.employee));
+
+  return (
+    <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6 }}>
+      {/* Suggeriti smart */}
+      {top3.length > 0 && (
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {top3.map((s, i) => {
+            const isSelected = current === s.employee;
+            const breakdownTxt = s.breakdown
+              .map((b) => `${b.creator}: score ${b.score} (peso ${b.weight_pct}%)`)
+              .join("\n");
+            return (
+              <button
+                key={s.employee}
+                onClick={() => onChange(isSelected ? "" : s.employee)}
+                title={`Fit ${s.fit_score} su ${s.coverage_pct}% delle creator di ${candidate.employee}\n\nBreakdown:\n${breakdownTxt}`}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  padding: "4px 8px",
+                  background: isSelected ? CP.accentGreen : (i === 0 ? CP.accentGreen + "22" : CP.surfaceAlt),
+                  border: `1px solid ${isSelected ? CP.accentGreen : (i === 0 ? CP.accentGreen + "55" : CP.border)}`,
+                  borderRadius: 6,
+                  color: isSelected ? "#0a0a0a" : CP.textPrimary,
+                  fontSize: 11,
+                  cursor: "pointer",
+                  fontWeight: isSelected ? 700 : 500,
+                  fontFamily: FONTS.body,
+                  maxWidth: "100%",
+                }}
+              >
+                {i === 0 && !isSelected && <Sparkles size={10} color={CP.accentGreen} />}
+                <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 110 }}>
+                  {s.employee.split(" ")[0]} {s.employee.split(" ").slice(-1)[0]?.[0] || ""}.
+                </span>
+                <span style={{ fontFamily: FONTS.mono, fontSize: 10, opacity: 0.85 }}>{s.fit_score}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Dropdown completo (fallback) */}
+      <select
+        value={current}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          padding: "5px 8px",
+          background: CP.surface,
+          border: `1px solid ${current ? CP.accentGreen + "66" : CP.border}`,
+          borderRadius: 6,
+          color: CP.textPrimary,
+          fontSize: 11,
+          fontFamily: FONTS.body,
+          width: "100%",
+        }}
+      >
+        <option value="" style={{ background: CP.surface }}>
+          {top3.length > 0 ? "— o scegli altro —" : "— scegli sostituto —"}
+        </option>
+        {top3.length > 0 && (
+          <optgroup label="🎯 Suggeriti">
+            {top3.map((s) => (
+              <option key={s.employee} value={s.employee} style={{ background: CP.surface }}>
+                {s.employee} · fit {s.fit_score} · cov {s.coverage_pct}%
+              </option>
+            ))}
+          </optgroup>
+        )}
+        <optgroup label={`Altri ${others.length}`}>
+          {others.map((t) => (
+            <option key={t.employee} value={t.employee} style={{ background: CP.surface }}>
+              {t.employee} ({t.tier}, {t.total_shifts} shift)
+            </option>
+          ))}
+        </optgroup>
+      </select>
     </div>
   );
 }
