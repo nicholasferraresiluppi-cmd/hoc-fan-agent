@@ -127,13 +127,18 @@ export default function EmployeeDrilldownPage({ params }) {
   const cpUrl = employee && periodId ? `/api/leaderboard/operator-drilldown?employee=${encodeURIComponent(employee)}&period_id=${periodId}` : null;
   const { data: cpData, error: cpError, isLoading: cpLoading } = useSWR(cpUrl, fetcher, { revalidateOnFocus: false });
 
-  // Infloww history (already trusted)
+  // CP history (nuovo: storia CP retrocalcolata, sostituisce Infloww per trend/tenure/LTV)
+  const cpHistUrl = employee ? `/api/leaderboard/operator-cp-history?employee=${encodeURIComponent(employee)}&last_n=12` : null;
+  const { data: cpHist } = useSWR(cpHistUrl, fetcher, { revalidateOnFocus: false });
+
+  // Infloww history (ancora utile per profile.note, group, language, e per il confronto Infloww score)
   const histUrl = employee ? `/api/leaderboard/employee-history?employee=${encodeURIComponent(employee)}&period_type=monthly` : null;
   const { data: histData } = useSWR(histUrl, fetcher, { revalidateOnFocus: false });
 
   const cp = cpData?.cp;
   const insights = cpData?.insights || [];
   const history = histData?.history || [];
+  const cpHistory = cpHist?.history || [];
 
   // Trova score Infloww del periodo corrente
   const inflowwCurrent = useMemo(() => {
@@ -236,8 +241,8 @@ export default function EmployeeDrilldownPage({ params }) {
                   <StatMini l="Sales mese" v={fmtCurrency(cp?.total_sales)} color="#3FB97E" />
                   <StatMini l="Shift" v={cp?.total_shifts != null ? Math.round(cp.total_shifts) : "—"} />
                   <StatMini l="Creator" v={cp?.per_creator?.length ?? 0} sub={cp?.specialization_pct ? `${cp.specialization_pct}% top` : null} />
-                  <StatMini l="Tempo in agency" v={fmtTenure(histData?.tenure_months)} sub={histData?.tenure_inferred ? "(stima)" : null} />
-                  <StatMini l="Fatturato totale" v={fmtCurrency(histData?.ltv?.ltv_eur)} sub={`${histData?.ltv?.periods_count ?? 0} mesi`} color="#3FB97E" />
+                  <StatMini l="Tempo in agency" v={fmtTenure(cpHist?.tenure_months_cp ?? histData?.tenure_months)} sub={cpHist?.first_seen_period ? `dal ${formatPeriodLabel(cpHist.first_seen_period)}` : (histData?.tenure_inferred ? "(stima)" : null)} />
+                  <StatMini l="Fatturato CP totale" v={fmtCurrency(cpHist?.ltv_cp_eur ?? histData?.ltv?.ltv_eur)} sub={`${cpHist?.periods_count ?? histData?.ltv?.periods_count ?? 0} mesi`} color="#3FB97E" />
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <ActionBtn href={`/admin/action-center?period_id=${periodId}`} color="#EF4444" icon={Target}>Action Center</ActionBtn>
@@ -320,30 +325,34 @@ export default function EmployeeDrilldownPage({ params }) {
             </Section>
 
             {/* ===== BLOCCO 3: TREND STORICO ===== */}
-            <Section title="Trend storico" subtitle="Score Infloww (KPI efficienza chat) mensile. NB: lo score CP storico non è ancora retrocalcolato — qui mostriamo solo l'Infloww che è disponibile da sempre.">
-              {history.length === 0 ? (
+            <Section title="Trend storico CP" subtitle="Score CP percentile per mese (retrocalcolato dai matrix). Score Infloww affiancato nella tabella per riferimento.">
+              {cpHistory.length === 0 && history.length === 0 ? (
                 <EmptyBlock text="Nessuno storico disponibile per questo operatore." />
               ) : (
                 <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, padding: 22 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                     <span style={{ fontSize: 12, color: COLORS.fog, fontFamily: FONTS.mono, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                      Andamento score · {history.length} periodi
+                      Andamento score CP · {cpHistory.length} mesi sincronizzati
                     </span>
-                    <span style={{ fontSize: 11, color: COLORS.mist }}>Ultimo: <strong style={{ color: COLORS.alabaster }}>{inflowwCurrent?.score?.toFixed(1) ?? "—"}</strong></span>
+                    {cpHistory.length > 0 && <span style={{ fontSize: 11, color: COLORS.mist }}>Ultimo CP: <strong style={{ color: COLORS.alabaster }}>{cpHistory[cpHistory.length - 1]?.score?.toFixed(1) ?? "—"}</strong></span>}
                   </div>
-                  <ScoreSpark history={history} />
-                  <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 0.8fr 0.6fr 0.8fr 0.8fr", gap: 8, fontSize: 11, color: COLORS.fog, paddingBottom: 6, borderBottom: `1px solid ${COLORS.charcoal}` }}>
-                    <div>Periodo</div><div>Score Infw</div><div>Tier</div><div>Sales</div><div>Group</div>
+                  <ScoreSpark history={cpHistory.length > 0 ? cpHistory : history} />
+                  <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 0.7fr 0.6fr 0.7fr 0.8fr 0.6fr", gap: 8, fontSize: 11, color: COLORS.fog, paddingBottom: 6, borderBottom: `1px solid ${COLORS.charcoal}` }}>
+                    <div>Periodo</div><div>Score CP</div><div>Tier</div><div>Score Infw</div><div>Sales CP</div><div>Shift</div>
                   </div>
-                  {history.slice().reverse().slice(0, 8).map((h, i) => (
-                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 0.8fr 0.6fr 0.8fr 0.8fr", gap: 8, padding: "8px 0", borderBottom: `1px solid ${COLORS.charcoal}55`, fontSize: 12, alignItems: "center" }}>
-                      <div style={{ fontFamily: FONTS.mono }}>{formatPeriodLabel(h.period_id)}</div>
-                      <div style={{ fontFamily: FONTS.mono, fontWeight: 600 }}>{h.score != null ? h.score.toFixed(1) : "—"}</div>
-                      <div>{h.tier ? <TierBadge tier={h.tier} size="sm" /> : <span style={{ color: COLORS.mist }}>—</span>}</div>
-                      <div style={{ fontFamily: FONTS.mono, color: "#3FB97E" }}>{fmtCurrency(h.sales)}</div>
-                      <div style={{ color: COLORS.fog, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.group || "—"}</div>
-                    </div>
-                  ))}
+                  {cpHistory.slice().reverse().slice(0, 12).map((h, i) => {
+                    const infwForPeriod = history.find((x) => x.period_id === h.period_id);
+                    return (
+                      <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 0.7fr 0.6fr 0.7fr 0.8fr 0.6fr", gap: 8, padding: "8px 0", borderBottom: `1px solid ${COLORS.charcoal}55`, fontSize: 12, alignItems: "center" }}>
+                        <div style={{ fontFamily: FONTS.mono }}>{formatPeriodLabel(h.period_id)}</div>
+                        <div style={{ fontFamily: FONTS.mono, fontWeight: 600, color: h.tier ? TIER_COLORS[h.tier] : COLORS.mist }}>{h.score != null ? h.score.toFixed(1) : "—"}</div>
+                        <div>{h.tier ? <TierBadge tier={h.tier} size="sm" /> : <span style={{ color: COLORS.mist }}>—</span>}</div>
+                        <div style={{ fontFamily: FONTS.mono, color: COLORS.mist, fontSize: 11 }}>{infwForPeriod?.score != null ? infwForPeriod.score.toFixed(1) : "—"}</div>
+                        <div style={{ fontFamily: FONTS.mono, color: "#3FB97E" }}>{fmtCurrency(h.total_sales)}</div>
+                        <div style={{ fontFamily: FONTS.mono, color: COLORS.fog }}>{Math.round(h.total_shifts || 0)}</div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </Section>

@@ -53,6 +53,10 @@ export default function MyProfilePage() {
   const drillUrl = employee && periodId ? `/api/leaderboard/operator-drilldown?employee=${encodeURIComponent(employee)}&period_id=${periodId}` : null;
   const { data: drill } = useSWR(drillUrl, fetcher, { revalidateOnFocus: false });
 
+  // CP history (per tenure + LTV CP)
+  const cpHistUrl = employee ? `/api/leaderboard/operator-cp-history?employee=${encodeURIComponent(employee)}&last_n=12` : null;
+  const { data: cpHist } = useSWR(cpHistUrl, fetcher, { revalidateOnFocus: false });
+
   // Coaching assignment se esiste
   const coachingUrl = periodId ? `/api/admin/coaching-center?period_id=${periodId}` : null;
   const { data: coachingData } = useSWR(coachingUrl, fetcher, { revalidateOnFocus: false });
@@ -135,6 +139,8 @@ export default function MyProfilePage() {
                     <StatMini l="Shift" v={Math.round(cp.total_shifts || 0)} />
                     <StatMini l="Creator attive" v={cp.per_creator?.length || 0} />
                     {cp.rank_agency && <StatMini l="Posizione" v={`#${cp.rank_agency}`} sub={`su ${cp.total_in_ranking}`} />}
+                    {cpHist?.tenure_months_cp != null && <StatMini l="Sei in agency da" v={`${cpHist.tenure_months_cp} mesi`} sub={cpHist.first_seen_period ? `dal ${formatPeriodLabel(cpHist.first_seen_period)}` : null} />}
+                    {cpHist?.ltv_cp_eur != null && <StatMini l="Fatturato CP totale" v={fmtCurrency(cpHist.ltv_cp_eur)} sub={`${cpHist.periods_count} mesi`} color="#3FB97E" />}
                   </div>
                 </div>
 
