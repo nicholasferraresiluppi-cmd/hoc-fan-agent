@@ -213,11 +213,21 @@ const STEPS = [
           <li>Le creator marginali (1-2 shift, sales bassissime) contano poco.</li>
           <li>Coerenza garantita tra le viste Sales CP e Creator.</li>
         </ul>
-        <div style={{ marginTop: 18, padding: "14px 16px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
-          <ArrowRight size={16} color={CP.accentGreen} />
-          <span style={{ fontSize: 13, color: CP.textSecondary }}>
-            Vuoi approfondire? <Link href="/welcome/score-explained" style={{ color: CP.accentGreen, fontWeight: 600 }}>Apri la pagina /welcome/score-explained →</Link>
-          </span>
+        <div style={{ marginTop: 18, padding: "14px 16px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <ArrowRight size={16} color={CP.accentGreen} />
+            <span style={{ fontSize: 13, color: CP.textSecondary }}>
+              Vuoi la versione narrativa con esempi e Q&amp;A?{" "}
+              <Link href="/welcome/score-friendly" style={{ color: CP.accentGreen, fontWeight: 600 }}>Tutorial guidato →</Link>
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <ArrowRight size={16} color="#3B82F6" />
+            <span style={{ fontSize: 13, color: CP.textSecondary }}>
+              Vuoi simulare uno score?{" "}
+              <Link href="/welcome/score-explained" style={{ color: "#3B82F6", fontWeight: 600 }}>Calcolatore interattivo →</Link>
+            </span>
+          </div>
         </div>
       </div>
     ),

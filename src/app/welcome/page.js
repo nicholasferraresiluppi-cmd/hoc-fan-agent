@@ -205,6 +205,45 @@ export default function WelcomePage() {
         </div>
       </div>
 
+      {/* Score primer banner */}
+      <Link
+        href="/welcome/score-friendly"
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "20px 24px",
+          marginBottom: 16,
+          background: `linear-gradient(135deg, ${CP.accentGreen}15 0%, ${CP.accentBlue}10 100%)`,
+          border: `1px solid ${CP.accentGreen}44`,
+          borderRadius: 14,
+          color: CP.textPrimary,
+          textDecoration: "none",
+          gap: 16,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 12,
+            background: CP.accentGreen + "22",
+            border: `1px solid ${CP.accentGreen}66`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
+          }}>
+            <Sparkles size={22} color={CP.accentGreen} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: CP.textPrimary }}>
+              Prima volta in HOC Pro? Capisci come funziona lo Score in 7 step
+            </div>
+            <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 4 }}>
+              Tutorial narrativo con esempi concreti e Q&amp;A interattivo. Puoi fare domande in qualsiasi punto.
+            </div>
+          </div>
+        </div>
+        <span style={{ color: CP.accentGreen, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          Apri guida <ArrowRight size={14} />
+        </span>
+      </Link>
+
       {/* FOOTER hints */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <CpCard padding="20px 24px">
