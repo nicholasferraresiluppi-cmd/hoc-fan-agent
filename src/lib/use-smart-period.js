@@ -6,7 +6,7 @@
  * Priorità di risoluzione del period_id iniziale:
  *   1. URL searchParam ?period_id=YYYY-MM (se presente)
  *   2. localStorage 'hoc:selected_period' (ultima scelta dell'utente)
- *   3. cp:_meta.last_sync_period (ultimo periodo sincronizzato)
+ *   3. ultimo mese con DATI EFFETTIVI (da /api/leaderboard/periods)
  *   4. mese corrente (fallback)
  *
  * Setter `setPeriod`:
@@ -31,12 +31,12 @@ function isValidPeriod(p) {
   return typeof p === "string" && /^\d{4}-\d{2}$/.test(p);
 }
 
-async function fetchLastSyncedPeriod() {
+async function fetchLastPeriodWithData() {
   try {
-    const res = await fetch("/api/admin/creatorspro-sync");
+    const res = await fetch("/api/leaderboard/periods");
     if (!res.ok) return null;
     const j = await res.json();
-    return j?.meta?.last_sync_period || null;
+    return j?.last_period_with_data || null;
   } catch {
     return null;
   }
@@ -67,9 +67,9 @@ export function useSmartPeriod() {
       } catch {}
 
       if (!resolved) {
-        // Fetch ultimo periodo sincronizzato
-        const lastSync = await fetchLastSyncedPeriod();
-        if (isValidPeriod(lastSync)) resolved = lastSync;
+        // Fetch ultimo periodo con dati effettivi
+        const lastWithData = await fetchLastPeriodWithData();
+        if (isValidPeriod(lastWithData)) resolved = lastWithData;
       }
 
       if (!resolved) resolved = currentMonthId();
