@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HOC Pro — Board presentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #08090F;
+      --surface: #13151C;
+      --surface-alt: #1A1D26;
+      --border: #23262F;
+      --border-strong: #2F333E;
+      --text: #F5F6F8;
+      --text-secondary: #9CA3AF;
+      --text-muted: #6B7080;
+      --green: #10B981;
+      --blue: #3B82F6;
+      --red: #EF4444;
+      --orange: #F59E0B;
+      --purple: #A855F7;
+      --gray: #9CA3AF;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    .display { font-family: 'Inter Tight', sans-serif; font-weight: 700; letter-spacing: -0.02em; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+    }
+    section {
+      min-height: 100vh;
+      padding: 80px 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      position: relative;
+    }
+    .nav {
+      position: fixed;
+      top: 20px; right: 20px;
+      display: flex; gap: 8px;
+      z-index: 100;
+      background: rgba(8, 9, 15, 0.85);
+      backdrop-filter: blur(10px);
+      padding: 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+    .nav a {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--border-strong);
+      transition: background 0.2s;
+    }
+    .nav a:hover, .nav a.active { background: var(--green); }
+    .h1 { font-size: clamp(40px, 7vw, 72px); line-height: 1.05; margin-bottom: 24px; }
+    .h2 { font-size: clamp(28px, 4vw, 44px); line-height: 1.15; margin-bottom: 18px; }
+    .h3 { font-size: 22px; line-height: 1.25; margin-bottom: 12px; }
+    .lead { font-size: 18px; color: var(--text-secondary); line-height: 1.6; max-width: 760px; }
+    .green { color: var(--green); }
+    .blue { color: var(--blue); }
+    .red { color: var(--red); }
+    .orange { color: var(--orange); }
+    .purple { color: var(--purple); }
+    .muted { color: var(--text-secondary); }
+
+    /* HERO */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center;
+      background:
+        radial-gradient(ellipse 800px 400px at 50% 30%, rgba(16, 185, 129, 0.12), transparent),
+        radial-gradient(ellipse 600px 400px at 50% 70%, rgba(168, 85, 247, 0.08), transparent),
+        var(--bg);
+    }
+    .brand {
+      display: inline-flex; align-items: center; gap: 14px;
+      padding: 10px 18px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      margin-bottom: 30px;
+    }
+    .brand-logo {
+      width: 28px; height: 28px;
+      background: linear-gradient(135deg, var(--green), var(--blue));
+      border-radius: 8px;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: #0a0a0a; font-weight: 800;
+    }
+
+    /* CARDS */
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+    }
+    .card-accent-green { border-color: rgba(16, 185, 129, 0.4); background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), var(--surface)); }
+    .card-accent-blue { border-color: rgba(59, 130, 246, 0.4); background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), var(--surface)); }
+    .card-accent-red { border-color: rgba(239, 68, 68, 0.4); background: linear-gradient(135deg, rgba(239, 68, 68, 0.05), var(--surface)); }
+    .card-accent-purple { border-color: rgba(168, 85, 247, 0.4); background: linear-gradient(135deg, rgba(168, 85, 247, 0.05), var(--surface)); }
+    .card-icon {
+      width: 52px; height: 52px;
+      border-radius: 14px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 26px; margin-bottom: 18px;
+      border: 1px solid var(--border);
+    }
+
+    /* HUGE NUMBER */
+    .big-number {
+      font-family: 'Inter Tight', sans-serif;
+      font-size: clamp(72px, 12vw, 140px);
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      background: linear-gradient(135deg, var(--green), var(--blue));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    /* TIER BADGE */
+    .tier {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .t-elite    { background: rgba(168, 85, 247, 0.15); color: #A855F7; border: 1px solid #A855F755; }
+    .t-strong   { background: rgba(59, 130, 246, 0.15); color: #3B82F6; border: 1px solid #3B82F655; }
+    .t-good     { background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid #10B98155; }
+    .t-average  { background: rgba(156, 163, 175, 0.15); color: #9CA3AF; border: 1px solid #9CA3AF55; }
+    .t-weak     { background: rgba(245, 158, 11, 0.15); color: #F59E0B; border: 1px solid #F59E0B55; }
+    .t-critical { background: rgba(239, 68, 68, 0.15); color: #EF4444; border: 1px solid #EF444455; }
+
+    /* TABLE MOCKUPS */
+    .mockup {
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 14px;
+      overflow: hidden;
+      margin: 24px 0;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .mockup-head {
+      background: rgba(8, 9, 15, 0.6);
+      padding: 14px 22px;
+      border-bottom: 1px solid var(--border-strong);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .mockup-body { padding: 0; }
+    .row {
+      display: grid;
+      padding: 12px 22px;
+      border-bottom: 1px solid var(--border);
+      align-items: center;
+      gap: 14px;
+      font-size: 13px;
+    }
+    .row.head { background: rgba(0,0,0,0.2); }
+    .row.head > div {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+    }
+    .avatar {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3B82F6, #1E40AF);
+      color: white;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* FORMULA */
+    .formula {
+      padding: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      margin: 16px 0;
+    }
+    .kpi-chip {
+      display: inline-block;
+      padding: 6px 12px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .weight-chip {
+      display: inline-block;
+      padding: 6px 10px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--green);
+      border-radius: 8px;
+      font-weight: 700;
+    }
+    .op { color: var(--text-muted); padding: 0 4px; }
+
+    /* TIMELINE */
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin: 24px 0;
+    }
+    .timeline-step {
+      padding: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      position: relative;
+    }
+    .timeline-step::after {
+      content: "→";
+      position: absolute;
+      right: -22px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 20px;
+    }
+    .timeline-step:last-child::after { display: none; }
+
+    /* CTA */
+    .cta {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 16px 28px;
+      background: var(--green);
+      color: #0a0a0a;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 16px;
+      text-decoration: none;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .cta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(16, 185, 129, 0.3);
+    }
+    .cta-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    /* DIVIDER */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+      margin: 60px 0;
+    }
+    .section-counter {
+      position: absolute;
+      top: 60px; right: 40px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.2em;
+    }
+
+    /* CASE BADGES */
+    .case {
+      padding: 16px 20px;
+      background: var(--surface);
+      border-left: 3px solid var(--green);
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    .case.red { border-left-color: var(--red); }
+    .case.orange { border-left-color: var(--orange); }
+    .case-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+    .case-body { color: var(--text-secondary); font-size: 13px; }
+
+    /* PILLAR (the 2 levers) */
+    .pillar {
+      padding: 36px;
+      background: var(--surface);
+      border-radius: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+    .pillar::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 4px;
+      background: var(--accent, var(--green));
+    }
+    .pillar-num {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.05);
+      color: var(--accent, var(--green));
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 22px; font-weight: 800;
+      display: inline-flex; align-items: center; justify-content: center;
+      margin-bottom: 18px;
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      section { padding: 60px 20px; }
+      .timeline { grid-template-columns: 1fr; }
+      .timeline-step::after { display: none; }
+      .nav { display: none; }
+    }
+
+    /* PRINT */
+    @media print {
+      section { min-height: auto; page-break-after: always; padding: 40px 30px; }
+      .nav { display: none; }
+      .hero { min-height: 90vh; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navigation dots -->
+<div class="nav">
+  <a href="#hero" title="Intro"></a>
+  <a href="#leaderboard" title="The leaderboard"></a>
+  <a href="#strategia" title="Strategic goal"></a>
+  <a href="#leve" title="The two levers"></a>
+  <a href="#score" title="How we measure the score"></a>
+  <a href="#confronto" title="Infloww comparison"></a>
+  <a href="#action" title="Action Center"></a>
+  <a href="#flusso" title="Operational flow"></a>
+  <a href="#decisioni" title="Board decisions"></a>
+</div>
+
+<!-- HERO -->
+<section id="hero" class="hero">
+  <div class="brand">
+    <div class="brand-logo">H</div>
+    <span class="mono" style="font-size: 11px; letter-spacing: 0.16em; color: var(--text-secondary);">HOC PRO · v1.0</span>
+  </div>
+  <h1 class="display h1">
+    Let's raise the <span class="green">average score</span><br/>
+    of the chatter team.
+  </h1>
+  <p class="lead" style="margin-bottom: 40px;">
+    A monthly leaderboard based on real sales, with two connected operational levers:
+    <strong>targeted training</strong> for those with room to grow,
+    <strong>targeted replacement</strong> for those who are chronically below threshold.
+  </p>
+  <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+    <a href="#leaderboard" class="cta">↓ Start presentation</a>
+    <a href="https://hoc-fan-agent.vercel.app" class="cta cta-secondary">Open the webapp</a>
+  </div>
+  <div style="margin-top: 80px; display: flex; gap: 40px; color: var(--text-muted); font-size: 13px; flex-wrap: wrap; justify-content: center;">
+    <div>📊 200+ chatters</div>
+    <div>🎨 30+ creators</div>
+    <div>💰 Real sales from CreatorsPro</div>
+    <div>⚡ Infloww side-by-side</div>
+  </div>
+</section>
+
+<!-- WHAT IS THE LEADERBOARD -->
+<section id="leaderboard">
+  <div class="section-counter">01 — WHAT IT IS</div>
+  <span class="label">The starting point</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    An <span class="green">internal leaderboard</span><br/>
+    of all our chatters.
+  </h2>
+  <p class="lead" style="margin-bottom: 30px;">
+    Every month, on a single page, we see how each chatter is performing
+    against their peers. A ranking with score 0–100, six tiers (Elite → Critical),
+    and comparative data to understand who deserves more and who's lagging.
+  </p>
+
+  <div class="mockup">
+    <div class="mockup-head">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 18px;">🏆</span>
+        <strong>Sales CP Leaderboard · May 2026</strong>
+      </div>
+      <span class="mono muted" style="font-size: 11px;">196 chatters ranked</span>
+    </div>
+    <div class="mockup-body">
+      <div class="row head" style="grid-template-columns: 40px 220px 100px 100px 100px 100px;">
+        <div>#</div><div>Operator</div><div>CP Score</div><div>Tier</div><div>CP Sales</div><div>Δ vs prev. month</div>
+      </div>
+      <div class="row" style="grid-template-columns: 40px 220px 100px 100px 100px 100px; background: rgba(168,85,247,0.05);">
+        <div class="mono muted">01</div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span class="avatar" style="background: linear-gradient(135deg, #A855F7, #6B21A8);">SC</span> Simone Cherchi</div>
+        <div class="mono"><strong style="color: var(--purple); font-size: 16px;">94.2</strong></div>
+        <div><span class="tier t-elite">ELITE</span></div>
+        <div class="mono green">$10.5k</div>
+        <div class="mono green">↑ +4.1</div>
+      </div>
+      <div class="row" style="grid-template-columns: 40px 220px 100px 100px 100px 100px;">
+        <div class="mono muted">07</div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span class="avatar" style="background: linear-gradient(135deg, #3B82F6, #1E40AF);">PG</span> Piero Gerli</div>
+        <div class="mono"><strong style="color: var(--blue);">82.4</strong></div>
+        <div><span class="tier t-strong">STRONG</span></div>
+        <div class="mono green">$8.1k</div>
+        <div class="mono muted">→ ±0</div>
+      </div>
+      <div class="row" style="grid-template-columns: 40px 220px 100px 100px 100px 100px;">
+        <div class="mono muted">42</div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span class="avatar" style="background: linear-gradient(135deg, #10B981, #047857);">EG</span> Eleonora Gallino</div>
+        <div class="mono"><strong style="color: var(--green);">61.7</strong></div>
+        <div><span class="tier t-good">GOOD</span></div>
+        <div class="mono green">$6.5k</div>
+        <div class="mono green">↑ +8.3</div>
+      </div>
+      <div class="row" style="grid-template-columns: 40px 220px 100px 100px 100px 100px;">
+        <div class="mono muted">128</div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span class="avatar" style="background: linear-gradient(135deg, #F59E0B, #92400E);">AU</span> Andrea Ursano</div>
+        <div class="mono"><strong style="color: var(--orange);">14.8</strong></div>
+        <div><span class="tier t-weak">WEAK</span></div>
+        <div class="mono green">$1.4k</div>
+        <div class="mono red">↓ -3.2</div>
+      </div>
+      <div class="row" style="grid-template-columns: 40px 220px 100px 100px 100px 100px; background: rgba(239,68,68,0.05);">
+        <div class="mono muted">141</div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span class="avatar" style="background: linear-gradient(135deg, #EF4444, #991B1B);">SH</span> Sofia HOC</div>
+        <div class="mono"><strong style="color: var(--red);">8.6</strong></div>
+        <div><span class="tier t-critical">CRITICAL</span></div>
+        <div class="mono green">$573</div>
+        <div class="mono red">↓ -1.4</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="muted" style="font-size: 13px; text-align: center; font-style: italic;">
+    Everything starts from this page: the analysis to improve who's in, and the list of who needs to be reviewed.
+  </p>
+</section>
+
+<!-- STRATEGIC GOAL -->
+<section id="strategia">
+  <div class="section-counter">02 — THE GOAL</div>
+  <span class="label">What the leaderboard is for</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Raise the <span class="green">average score</span><br/>
+    of the whole agency, month after month.
+  </h2>
+  <p class="lead" style="margin-bottom: 40px;">
+    A higher average agency score means more productive chatters, higher total sales, better margins.
+    The leaderboard isn't just a ranking: it's the starting point to decide where to intervene.
+  </p>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: center; margin-top: 30px;">
+    <div>
+      <div class="label" style="margin-bottom: 10px;">Average agency score</div>
+      <div style="display: flex; align-items: baseline; gap: 14px;">
+        <span class="big-number">→ 60</span>
+      </div>
+      <p class="muted" style="margin-top: 14px; font-size: 14px;">
+        We work to shift the median, both by raising the level of middle performers
+        and by removing chronic underperformers from the tail.
+      </p>
+    </div>
+    <div class="card">
+      <div class="label" style="margin-bottom: 12px;">How the average rises</div>
+      <ul style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 12px;">
+        <li style="display: flex; align-items: flex-start; gap: 10px;">
+          <span style="color: var(--green); font-size: 18px;">↑</span>
+          <span><strong>Middle performers grow</strong> thanks to targeted training based on the gaps the leaderboard reveals</span>
+        </li>
+        <li style="display: flex; align-items: flex-start; gap: 10px;">
+          <span style="color: var(--red); font-size: 18px;">✕</span>
+          <span><strong>Chronic underperformers exit</strong> and are replaced by those who already perform well on those creators</span>
+        </li>
+        <li style="display: flex; align-items: flex-start; gap: 10px;">
+          <span style="color: var(--purple); font-size: 18px;">★</span>
+          <span><strong>Top performers get recognized</strong> and become a reference for new hires (mentor / case study)</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- THE TWO LEVERS -->
+<section id="leve">
+  <div class="section-counter">03 — THE LEVERS</div>
+  <span class="label">The 2 operational mechanisms</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Two levers, one direction:<br/>
+    <span class="green">higher average score</span>.
+  </h2>
+  <p class="lead" style="margin-bottom: 50px;">
+    HOC Pro isn't just a ranking. From every listed operator, concrete decisions follow:
+    grow them or replace them. The leaderboard is the input, these 2 levers are the output.
+  </p>
+
+  <div class="grid-2">
+    <div class="pillar" style="--accent: var(--blue);">
+      <div class="pillar-num">1</div>
+      <h3 class="display h3">Targeted training</h3>
+      <p class="muted" style="font-size: 14px; margin-bottom: 18px;">
+        For those who are in and have room to grow. The leaderboard shows the exact gap:
+        good at chatting but converts poorly? coaching on closing / PPV strategy.
+        Strong on one creator but weak on another? targeted cross-training.
+      </p>
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-secondary); padding-top: 16px; border-top: 1px solid var(--border);">
+        <div>TOOLS</div>
+        <div style="margin-top: 8px; color: var(--text);">Academy · Playbook · Session review · Per-skill score</div>
+      </div>
+    </div>
+
+    <div class="pillar" style="--accent: var(--red);">
+      <div class="pillar-num">2</div>
+      <h3 class="display h3">Targeted replacement</h3>
+      <p class="muted" style="font-size: 14px; margin-bottom: 18px;">
+        For those who are chronically below threshold and haven't shown improvement.
+        Action Center identifies candidates, suggests the best replacements
+        (based on the creators the outgoing chatter works on), and prepares the list for HR.
+      </p>
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-secondary); padding-top: 16px; border-top: 1px solid var(--border);">
+        <div>TOOLS</div>
+        <div style="margin-top: 8px; color: var(--text);">Action Center · Swap suggestions · CSV export for HR</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <p class="lead" style="text-align: center; max-width: 720px; margin: 0 auto; font-size: 16px;">
+    The two levers are <strong>complementary</strong>: every month, part of the team improves through training,
+    part rotates through replacements. Together they push the average score upward.
+  </p>
+</section>
+
+<!-- HOW WE MEASURE THE SCORE -->
+<section id="score">
+  <div class="section-counter">04 — HOW WE MEASURE</div>
+  <span class="label">The method · The formula</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    The score, explained<br/>
+    with an example.
+  </h2>
+  <p class="lead" style="margin-bottom: 30px;">
+    <em>"Is Marco a good chatter?"</em><br/>
+    Sounds easy, but it isn't. Marco works on two creators. On Sara he sells a lot, on Giulia very little.
+    Maybe Giulia is a difficult creator. Comparing Marco with a colleague who works elsewhere would be unfair.
+  </p>
+
+  <h3 class="display h3" style="margin-top: 30px;">The solution: two combined rankings</h3>
+  <div class="grid-2" style="margin: 20px 0;">
+    <div class="card card-accent-blue">
+      <div class="label" style="color: var(--blue); margin-bottom: 8px;">vs Creator</div>
+      <h3 class="display h3">Are you among the best<br/><em>on the same creator</em>?</h3>
+      <p class="muted" style="font-size: 13px;">Percentile vs other operators working on that creator.</p>
+    </div>
+    <div class="card card-accent-green">
+      <div class="label" style="color: var(--green); margin-bottom: 8px;">vs Agency</div>
+      <h3 class="display h3">At agency scale,<br/>how good are you <em>in absolute terms</em>?</h3>
+      <p class="muted" style="font-size: 13px;">Percentile vs all HOC chatters for the month.</p>
+    </div>
+  </div>
+
+  <div class="formula">
+    <div style="margin-bottom: 14px;">
+      <span class="kpi-chip">percentile vs Creator</span>
+      <span class="op">×</span>
+      <span class="weight-chip">70%</span>
+      <span class="op">+</span>
+      <span class="kpi-chip">percentile vs Agency</span>
+      <span class="op">×</span>
+      <span class="weight-chip">30%</span>
+    </div>
+    <div style="color: var(--text-muted); font-size: 11px; margin-bottom: 10px;">↓ then composed with consistency ↓</div>
+    <div>
+      <span class="kpi-chip">sales/shift</span>
+      <span class="op">×</span>
+      <span class="weight-chip">85%</span>
+      <span class="op">+</span>
+      <span class="kpi-chip">consistency</span>
+      <span class="op">×</span>
+      <span class="weight-chip">15%</span>
+    </div>
+    <div style="margin-top: 18px; color: var(--purple); font-weight: 700; font-size: 18px;">= score 0–100</div>
+  </div>
+
+  <p class="muted" style="font-size: 14px;">
+    The 70% rewards local merit (you're good where you work). The 30% anchors absolute performance
+    (you can't end up Elite just because you're the least bad in a weak team). Min 3 shifts on a creator
+    to be ranked.
+  </p>
+
+  <h3 class="display h3" style="margin-top: 40px;">The 6 tiers (percentile-based)</h3>
+  <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px;">
+    <div class="card" style="flex: 1; min-width: 180px; padding: 16px;">
+      <span class="tier t-elite">ELITE</span>
+      <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">top 10% · excellence</div>
+    </div>
+    <div class="card" style="flex: 1; min-width: 180px; padding: 16px;">
+      <span class="tier t-strong">STRONG</span>
+      <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">top 25% · solid</div>
+    </div>
+    <div class="card" style="flex: 1; min-width: 180px; padding: 16px;">
+      <span class="tier t-good">GOOD</span>
+      <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">top 50% · reliable</div>
+    </div>
+    <div class="card" style="flex: 1; min-width: 180px; padding: 16px;">
+      <span class="tier t-average">AVERAGE</span>
+      <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">top 75% · in line</div>
+    </div>
+    <div class="card" style="flex: 1; min-width: 180px; padding: 16px;">
+      <span class="tier t-weak">WEAK</span>
+      <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">top 90% · below average</div>
+    </div>
+    <div class="card" style="flex: 1; min-width: 180px; padding: 16px;">
+      <span class="tier t-critical">CRITICAL</span>
+      <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">bottom 10% · unsustainable</div>
+    </div>
+  </div>
+</section>
+
+<!-- INFLOWW COMPARISON -->
+<section id="confronto">
+  <div class="section-counter">05 — VALIDATION</div>
+  <span class="label">Sales CP ↔ Infloww comparison</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Two scores side-by-side,<br/>
+    <span class="blue">discrepancies matter</span>.
+  </h2>
+  <p class="lead" style="margin-bottom: 24px;">
+    The Sales CP score (real sales) is the reference for decisions. The Infloww score (chat efficiency)
+    stays visible as a second signal. When the two diverge by more than 10 points, a ↑/↓ arrow flags
+    the interesting case — often this is where we understand if training is needed (Lever 1) or a replacement (Lever 2).
+  </p>
+
+  <!-- Data quality disclaimer -->
+  <div style="padding: 14px 18px; background: rgba(245, 158, 11, 0.08); border-left: 3px solid var(--orange); border-radius: 6px; margin-bottom: 30px;">
+    <div style="font-weight: 700; font-size: 13px; color: var(--orange); margin-bottom: 4px;">⚠️ Data quality note</div>
+    <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+      On <strong>CreatorsPro</strong> some teams split the <em>purch</em> (the takes), so at the individual
+      chatter level the data may be partially attributed to a teammate. On <strong>Infloww</strong>
+      the data is per-chatter instead and therefore cleaner on the individual chat efficiency side. For this reason
+      the comparison should be read with this nuance: discrepancies on teams that split purch are normal and not
+      always a sign of a problem.
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-head">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span class="label">Sales CP stream · May 2026 · snippet</span>
+      </div>
+    </div>
+    <div class="mockup-body">
+      <div class="row head" style="grid-template-columns: 40px 200px 100px 100px 80px 100px;">
+        <div>#</div><div>Operator</div><div>CP Score</div><div>Infw Score</div><div>Tier</div><div>CP Sales</div>
+      </div>
+      <div class="row" style="grid-template-columns: 40px 200px 100px 100px 80px 100px;">
+        <div class="mono muted">01</div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span class="avatar">SC</span> Simone Cherchi</div>
+        <div class="mono"><strong style="color: var(--purple);">94.2</strong></div>
+        <div class="mono muted">88.1</div>
+        <div><span class="tier t-elite">ELITE</span></div>
+        <div class="mono green">$10.5k</div>
+      </div>
+      <div class="row" style="grid-template-columns: 40px 200px 100px 100px 80px 100px;">
+        <div class="mono muted">02</div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span class="avatar" style="background: linear-gradient(135deg, #A855F7, #6B21A8);">IL</span> Ismael Lopez</div>
+        <div class="mono"><strong style="color: var(--blue);">82.7</strong></div>
+        <div class="mono muted">48.2 <span class="red" style="font-size: 10px;">↑ 34</span></div>
+        <div><span class="tier t-strong">STRONG</span></div>
+        <div class="mono green">$8.6k</div>
+      </div>
+      <div class="row" style="grid-template-columns: 40px 200px 100px 100px 80px 100px;">
+        <div class="mono muted">07</div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span class="avatar" style="background: linear-gradient(135deg, #10B981, #047857);">SM</span> Sabrina Mero</div>
+        <div class="mono"><strong style="color: var(--green);">62.4</strong></div>
+        <div class="mono muted">85.3 <span class="green" style="font-size: 10px;">↓ 23</span></div>
+        <div><span class="tier t-good">GOOD</span></div>
+        <div class="mono green">$7.2k</div>
+      </div>
+      <div class="row" style="grid-template-columns: 40px 200px 100px 100px 80px 100px;">
+        <div class="mono muted">141</div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span class="avatar" style="background: linear-gradient(135deg, #EF4444, #991B1B);">SH</span> Sofia HOC</div>
+        <div class="mono"><strong style="color: var(--red);">8.6</strong></div>
+        <div class="mono muted">17.6</div>
+        <div><span class="tier t-critical">CRITICAL</span></div>
+        <div class="mono green">$573</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="display h3" style="margin-top: 40px;">The 3 patterns the comparison reveals</h3>
+  <div style="margin-top: 16px;">
+    <div class="case orange">
+      <div class="case-title">🟢 CP Sales high + 🔵 Infloww low (e.g. Ismael, +34) → Ambiguous case, needs investigation</div>
+      <div class="case-body">
+        Two possible readings:<br/>
+        <strong>(a) Hyper-efficient</strong> — sells a lot with low chat volume. Sends few messages but closes well.
+        Should be recognized as a real top performer.<br/>
+        <strong>(b) On strong creators that sell themselves</strong> — sales come regardless of the chat.
+        In this case it's the creator's merit, not the chatter's.<br/>
+        <em>To distinguish: look at the number of messages/shift and unique fans contacted. Operator drill-down reveals which of the two it is.</em>
+      </div>
+    </div>
+    <div class="case orange">
+      <div class="case-title">🟢 CP Sales low + 🔵 Infloww high → Lever 1 (TRAINING)</div>
+      <div class="case-body">
+        Good at chatting but converts little to $. <strong>Coaching opportunity</strong> on closing / PPV strategy.
+        These often become top performers after 2-3 targeted sessions.
+      </div>
+    </div>
+    <div class="case">
+      <div class="case-title">🟢 CP Sales ≈ Infloww → Linear decision</div>
+      <div class="case-body">
+        The two scores agree. <strong>More solid HR decision</strong>: the tops are really tops,
+        the criticals are really criticals. Go straight to Lever 1 (recognize) or Lever 2 (replace).
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ACTION CENTER -->
+<section id="action">
+  <div class="section-counter">06 — LEVER 2 IN ACTION</div>
+  <span class="label">Action Center · Replacement execution</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    From the ranking to the <span class="red">HR list</span>,<br/>
+    in 5 minutes a month.
+  </h2>
+  <p class="lead" style="margin-bottom: 30px;">
+    Panel that every month surfaces operators below threshold, suggests up to 3 smart replacements
+    for each, and produces the final CSV ready to be handed to HR.
+  </p>
+
+  <div class="mockup">
+    <div class="mockup-head">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 18px;">🎯</span>
+        <strong>Action Center · April 2026</strong>
+        <span class="mono muted" style="font-size: 11px;">24 candidates · score ≤ 25</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <span class="tier" style="background: rgba(245, 158, 11, 0.15); color: var(--orange); border: 1px solid #F59E0B55;">FILTERS: ITA · WEAK</span>
+      </div>
+    </div>
+    <div class="mockup-body">
+      <div class="row head" style="grid-template-columns: 220px 140px 80px 80px 1fr 80px;">
+        <div>Operator</div><div>Group</div><div>Score</div><div>Tier</div><div>Replace with</div><div>Actions</div>
+      </div>
+      <div class="row" style="grid-template-columns: 220px 140px 80px 80px 1fr 80px;">
+        <div>
+          <div style="font-weight: 700;">Sofia HOC</div>
+          <div class="mono muted" style="font-size: 10px;">Top: Rebecca Bardaro · $573</div>
+        </div>
+        <div class="muted">House of creators</div>
+        <div class="mono red"><strong>8.6</strong></div>
+        <div><span class="tier t-critical">CRITICAL</span></div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <span style="padding: 4px 10px; background: rgba(16,185,129,0.2); color: var(--green); border-radius: 6px; font-size: 11px; border: 1px solid #10B98155;">✨ Tinx H. <strong>86.6</strong></span>
+          <span style="padding: 4px 10px; background: var(--surface-alt); border-radius: 6px; font-size: 11px; border: 1px solid var(--border);">Nyoki H. 79.5</span>
+          <span style="padding: 4px 10px; background: var(--surface-alt); border-radius: 6px; font-size: 11px; border: 1px solid var(--border);">Ismael U. 74.5</span>
+        </div>
+        <div style="display: flex; gap: 4px;">
+          <button style="padding: 4px 10px; background: var(--green); color: #0a0a0a; border: none; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer;">HR</button>
+        </div>
+      </div>
+      <div class="row" style="grid-template-columns: 220px 140px 80px 80px 1fr 80px;">
+        <div>
+          <div style="font-weight: 700;">Roberta Cherchi</div>
+          <div class="mono muted" style="font-size: 10px;">Top: Alice Cappella · $1.2k</div>
+        </div>
+        <div class="muted">Alice Cappella</div>
+        <div class="mono red"><strong>5.6</strong></div>
+        <div><span class="tier t-critical">CRITICAL</span></div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <span style="padding: 4px 10px; background: rgba(16,185,129,0.2); color: var(--green); border-radius: 6px; font-size: 11px; border: 1px solid #10B98155;">✨ Mattia F. <strong>62.1</strong></span>
+          <span style="padding: 4px 10px; background: var(--surface-alt); border-radius: 6px; font-size: 11px; border: 1px solid var(--border);">— pick another —</span>
+        </div>
+        <div style="display: flex; gap: 4px;">
+          <button style="padding: 4px 10px; background: var(--green); color: #0a0a0a; border: none; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer;">HR</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="display h3" style="margin-top: 40px;">The replacement matching algorithm</h3>
+  <p class="muted">
+    For each operator to be replaced, the system searches among Good+ for those who have already performed well <em>exactly</em>
+    on the outgoing chatter's creators, weighting:
+  </p>
+  <ul style="margin: 16px 0 16px 30px; color: var(--text-secondary);">
+    <li><strong>X's mix</strong> (50%) — the creators where X spent their time</li>
+    <li><strong>Agency importance</strong> (50%) — the strategic creators for total revenue</li>
+  </ul>
+  <div class="case">
+    <div class="case-title">Example: Livio Botolin (Critical)</div>
+    <div class="case-body">
+      Livio makes 60% of his sales on <strong>Eva Rizzoli</strong> and 40% on Celine Vitale.
+      The system also weighs how much Eva contributes to agency revenue and suggests <strong>Tinx</strong>
+      (fit 86.6 — has worked well precisely on Eva), NOT a generic Good performer working elsewhere.
+      The suggested replacement maintains coverage on the right creators.
+    </div>
+  </div>
+
+  <h3 class="display h3" style="margin-top: 40px;">The output: CSV for HR</h3>
+  <p class="muted">
+    When you've marked N operators as "ready", the <strong>Export HR CSV</strong> button produces a file with:
+    name, group, score, tier, sales, shifts, top creator, chosen replacement, date, notes.
+    Ready for the replacement process.
+  </p>
+</section>
+
+<!-- FLOW -->
+<section id="flusso">
+  <div class="section-counter">07 — FLOW</div>
+  <span class="label">Who does what, when</span>
+  <h2 class="display h2" style="margin-top: 12px;">The monthly HR cycle</h2>
+  <p class="lead" style="margin-bottom: 40px;">
+    Four recurring steps, total ~30 minutes per month to close the cycle. From here both training (Lever 1)
+    and replacements (Lever 2) start.
+  </p>
+
+  <div class="timeline">
+    <div class="timeline-step">
+      <div class="label" style="color: var(--green);">Step 1 · Auto</div>
+      <h3 class="display h3" style="margin-top: 8px; font-size: 18px;">CP Sync</h3>
+      <p class="muted" style="font-size: 13px;">
+        Once a month, click on <strong>"Sync CP"</strong>. Imports wage records + exact takes from CreatorsPro via API.
+      </p>
+    </div>
+    <div class="timeline-step">
+      <div class="label" style="color: var(--blue);">Step 2 · Manual</div>
+      <h3 class="display h3" style="margin-top: 8px; font-size: 18px;">Upload Infloww</h3>
+      <p class="muted" style="font-size: 13px;">
+        Export "By time and employee" CSV from Infloww, upload to the webapp. ~2 minutes.
+      </p>
+    </div>
+    <div class="timeline-step">
+      <div class="label" style="color: var(--orange);">Step 3 · Review</div>
+      <h3 class="display h3" style="margin-top: 8px; font-size: 18px;">Action Center</h3>
+      <p class="muted" style="font-size: 13px;">
+        Open the panel, for each candidate click on the suggested replacement + HR button. ~15 min.
+      </p>
+    </div>
+    <div class="timeline-step">
+      <div class="label" style="color: var(--red);">Step 4 · HR</div>
+      <h3 class="display h3" style="margin-top: 8px; font-size: 18px;">CSV → HR</h3>
+      <p class="muted" style="font-size: 13px;">
+        Click <strong>Export CSV</strong>, send to HR team. Replacement process starts.
+      </p>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <h3 class="display h3">What changes for each role</h3>
+  <div class="grid-3" style="margin-top: 20px;">
+    <div class="card">
+      <div class="label" style="color: var(--blue); margin-bottom: 8px;">SM / Team Lead</div>
+      <h3 class="display h3" style="font-size: 18px;">Team performance view</h3>
+      <p class="muted" style="font-size: 13px;">
+        Open the monthly leaderboard for their team. Compare CP with Infloww
+        to identify coaching opportunities (Lever 1) before they become Lever 2 candidates.
+      </p>
+    </div>
+    <div class="card">
+      <div class="label" style="color: var(--red); margin-bottom: 8px;">HR</div>
+      <h3 class="display h3" style="font-size: 18px;">Replacement cycle</h3>
+      <p class="muted" style="font-size: 13px;">
+        Action Center → replacement selection → CSV. The HR team takes the file and starts the
+        exit interview / hiring replacement process.
+      </p>
+    </div>
+    <div class="card">
+      <div class="label" style="color: var(--purple); margin-bottom: 8px;">Board</div>
+      <h3 class="display h3" style="font-size: 18px;">Aggregated view</h3>
+      <p class="muted" style="font-size: 13px;">
+        Central hub with average agency score, monthly trend, active operators, creators covered.
+        For strategic decisions on individual operators or creators, drill-down for details.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- DECISIONS / CTA -->
+<section id="decisioni" style="text-align: center;">
+  <div class="section-counter">08 — DECISIONS</div>
+  <span class="label">What we need from the board</span>
+  <h2 class="display h2" style="margin-top: 12px;">
+    Three decisions to <span class="green">make the system run</span>.
+  </h2>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; margin: 40px 0; text-align: left;">
+    <div class="card">
+      <div style="font-size: 28px; margin-bottom: 12px;">①</div>
+      <h3 class="display h3" style="font-size: 18px;">Methodology validation</h3>
+      <p class="muted" style="font-size: 13px;">
+        70/30 formula and default threshold of 25 are calibrated on our experience, but not immutable.
+        After the first two months of use we can recalibrate together if we see too many/too few candidates.
+      </p>
+    </div>
+    <div class="card">
+      <div style="font-size: 28px; margin-bottom: 12px;">②</div>
+      <h3 class="display h3" style="font-size: 18px;">HR cycle frequency</h3>
+      <p class="muted" style="font-size: 13px;">
+        Proposal: <strong>monthly</strong> cycle (Action Center → CSV → HR → replacements within 2 weeks).
+        Confirm or alternative?
+      </p>
+    </div>
+    <div class="card">
+      <div style="font-size: 28px; margin-bottom: 12px;">③</div>
+      <h3 class="display h3" style="font-size: 18px;">Handover with HR</h3>
+      <p class="muted" style="font-size: 13px;">
+        Can I coordinate directly with the HR team on the CSV handover and replacement process,
+        or is collective discussion needed first?
+      </p>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <h2 class="display h2" style="margin-top: 0;">Ready to use. Already operational.</h2>
+  <p class="lead" style="margin: 0 auto 40px auto;">
+    You're all already admins. I recommend opening it and clicking around for 5 minutes before the meeting,
+    so the discussion is faster.
+  </p>
+
+  <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-bottom: 50px;">
+    <a href="https://hoc-fan-agent.vercel.app" class="cta">Open HOC Pro →</a>
+    <a href="https://hoc-fan-agent.vercel.app/leaderboard/sales-cp" class="cta cta-secondary">🏆 Leaderboard</a>
+    <a href="https://hoc-fan-agent.vercel.app/admin/action-center" class="cta cta-secondary">🎯 Action Center</a>
+    <a href="https://hoc-fan-agent.vercel.app/welcome/score-friendly" class="cta cta-secondary">📚 Score Tutorial</a>
+  </div>
+
+  <div style="display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; font-size: 13px; color: var(--text-muted);">
+    <div>📍 hoc-fan-agent.vercel.app</div>
+    <div>🔐 Clerk sign-in · you're already authorized</div>
+    <div>📩 Questions → Nicholas</div>
+  </div>
+</section>
+
+<script>
+  // Update active nav dot on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const navDots = document.querySelectorAll('.nav a');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navDots.forEach(d => d.classList.remove('active'));
+        const link = document.querySelector('.nav a[href="#' + entry.target.id + '"]');
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { threshold: 0.4 });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>
