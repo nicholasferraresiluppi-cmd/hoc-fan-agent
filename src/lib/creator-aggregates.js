@@ -337,21 +337,27 @@ export async function buildCreatorMatrix(periodId) {
     }
   }
 
-  // Step 7: SCORE AGGREGATO per operatore (media pesata su sales)
+  // Step 7: SCORE AGGREGATO per operatore (media pesata sui SHIFTS, v3.1)
+  // v3.1 (feedback Riccardo, mag 2026): pesiamo sui turni lavorati, non sui sales totali.
+  // Motivo: lo score deve riflettere DOVE PASSI IL TEMPO (lavoro reale pagato),
+  // non DOVE FAI I SOLDI (eccezioni di pochi turni d'oro). Esempio: chi fa 5k$ in
+  // 3 turni su una creator e 1k$ in 10 turni su un'altra non può apparire Strong
+  // grazie ai 3 turni eccezionali se 10/13 turni totali li passa in modo improduttivo.
   const operators = {};
   for (const opName of Object.keys(matrix)) {
     const cells = Object.entries(matrix[opName]);
     const totalSales = cells.reduce((s, [, c]) => s + c.sales, 0);
+    // top creator: ancora deciso sui sales (è "dove ha guadagnato di più", non "dove ha lavorato di più")
     cells.sort((a, b) => b[1].sales - a[1].sales);
     const top = cells[0];
 
-    // Media pesata su sales — solo celle con score (low_confidence escluse)
+    // Media pesata sui SHIFTS — solo celle con score (low_confidence escluse)
     let weightedSum = 0;
     let weightSum = 0;
     for (const [, c] of cells) {
       if (c.score == null) continue;
-      weightedSum += c.score * c.sales;
-      weightSum += c.sales;
+      weightedSum += c.score * c.shifts;
+      weightSum += c.shifts;
     }
     const scoreAgg = weightSum > 0 ? Math.round((weightedSum / weightSum) * 10) / 10 : null;
 

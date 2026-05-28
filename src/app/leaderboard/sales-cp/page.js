@@ -588,17 +588,18 @@ export default function SalesCpLeaderboardPage() {
               <div style={styles.streamWrap}>
                 <div style={styles.streamHead}>
                   <div>#</div><div></div>
-                  <div>Operatore</div><div>Group</div>
-                  <div title="Score CP v3 (sales reali da CreatorsPro)">Score CP</div>
-                  <div title="Score Infloww v1 (KPI efficienza chat) — per confronto">Score Infw</div>
-                  <div title="Tier dello score CP">Tier</div>
-                  <div title="Sales totali attribuite da CP">CP Sales</div>
-                  <div title="Sales medio per shift">$/Shift</div>
-                  <div title="Numero shift completati">Shift</div>
-                  <div title="Sales medio orario">$/h</div>
-                  <div title="Affianco informativo: $/paying fan da Infloww">Infloww $/pay</div>
+                  <ColHead label="Operatore" tooltip="Nome operatore. Click per drill-down diagnostico." />
+                  <ColHead label="Group" tooltip="Group amministrativo arrivato da CreatorsPro. Può essere generico (es. 'House of Creators International'). Per la distribuzione reale sui creator vedi il drill-down." />
+                  <ColHead label="Score CP" tooltip="Score 0-100 sui sales reali. Fonte: CreatorsPro API. Calcolo: per ogni cella operatore×creator combina percentile vs operatori sulla stessa creator (70%) + percentile vs agency (30%) su base sales/shift. Le celle vengono poi mediate pesando sui SHIFTS lavorati (v3.1)." />
+                  <ColHead label="Score Infw v1" tooltip={"Score di efficienza chat 0-100. Fonte: Infloww (CSV mensile esportato a mano). Sistema legacy, mantenuto come secondo segnale di confronto. Media pesata di 9 KPI: Fan CVR (20%), Unlock rate (18%), $/paying fan (15%), Golden ratio (12%), Sales/h (10%), $/fan totale (8%), Lunghezza conversazione (7%), Caratteri per messaggio (5%), Messaggi/h (5%). Ogni KPI normalizzato vs media gruppo."} />
+                  <ColHead label="Tier" tooltip="Fascia derivata dallo Score CP. Percentile-based: Elite ≥top10%, Strong ≥top25%, Good ≥top50%, Average ≥top75%, Weak ≥top90%, Critical bottom10%." />
+                  <ColHead label="CP Sales" tooltip="Sales totali attribuiti all'operatore nel mese. Fonte: CreatorsPro API — somma dei 'take' sui wage del periodo." />
+                  <ColHead label="$/Shift" tooltip="Sales medi per turno lavorato. Fonte: CreatorsPro — CP Sales ÷ numero di turni del periodo. È la metrica base con cui calcoliamo il percentile dello Score CP." />
+                  <ColHead label="Shift" tooltip="Numero di shift attribuiti all'operatore nel periodo. Fonte: CreatorsPro." />
+                  <ColHead label="$/h" tooltip="Sales medi orari. Fonte: CreatorsPro — CP Sales ÷ ore lavorate (somma dei minuti di tutti i turni del periodo)." />
+                  <ColHead label="Infloww $/pay" tooltip="Sales medi per fan pagante. Fonte: Infloww — Sales Infloww totali ÷ numero di fan che hanno speso almeno 1$ nel periodo. Indica quanto spende mediamente un fan attivo nelle chat di questo operatore." />
                   {activeExtras.map((c) => (
-                    <div key={c.id} title={c.tooltip}>{c.label}</div>
+                    <ColHead key={c.id} label={c.label} tooltip={c.tooltip} />
                   ))}
                 </div>
                 {stream.map((op, i) => {
@@ -786,4 +787,15 @@ function iconBtnStyle(color, isButton = false) {
     cursor: isButton ? "pointer" : "default",
     flexShrink: 0,
   };
+}
+
+// Intestazione colonna leaderboard con icona ⓘ visibile + tooltip dettagliato
+// (fonte / definizione / come si calcola). Risponde al feedback Riccardo mag 2026.
+function ColHead({ label, tooltip }) {
+  return (
+    <div title={tooltip} style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "help" }}>
+      <span style={{ whiteSpace: "nowrap" }}>{label}</span>
+      <span aria-hidden="true" style={{ opacity: 0.45, fontSize: 11, lineHeight: 1, marginLeft: 1 }}>ⓘ</span>
+    </div>
+  );
 }
