@@ -791,11 +791,46 @@ function iconBtnStyle(color, isButton = false) {
 
 // Intestazione colonna leaderboard con icona ⓘ visibile + tooltip dettagliato
 // (fonte / definizione / come si calcola). Risponde al feedback Riccardo mag 2026.
+// Tooltip CUSTOM (no title="" HTML) per apparire istantaneamente, no delay browser.
 function ColHead({ label, tooltip }) {
+  const [show, setShow] = useState(false);
   return (
-    <div title={tooltip} style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "help" }}>
+    <div
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+      style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "help", position: "relative" }}
+    >
       <span style={{ whiteSpace: "nowrap" }}>{label}</span>
       <span aria-hidden="true" style={{ opacity: 0.45, fontSize: 11, lineHeight: 1, marginLeft: 1 }}>ⓘ</span>
+      {show && (
+        <div
+          role="tooltip"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: 0,
+            zIndex: 100,
+            maxWidth: 360,
+            minWidth: 240,
+            padding: "10px 12px",
+            background: COLORS.charcoal,
+            border: `1px solid ${COLORS.fog}55`,
+            borderRadius: 8,
+            color: COLORS.alabaster,
+            fontSize: 11,
+            fontWeight: 400,
+            lineHeight: 1.5,
+            letterSpacing: "normal",
+            textTransform: "none",
+            fontFamily: FONTS.body,
+            whiteSpace: "normal",
+            boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
+            pointerEvents: "none",
+          }}
+        >
+          {tooltip}
+        </div>
+      )}
     </div>
   );
 }
