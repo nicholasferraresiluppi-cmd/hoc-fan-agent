@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { COLORS, FONTS, CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
-import { BarChart3, ExternalLink, ArrowLeft, Maximize2 } from "lucide-react";
+import { BarChart3, ExternalLink, ArrowLeft, Maximize2, AlertTriangle } from "lucide-react";
 
 /**
  * Analytics — portale Looker Studio dentro HOC Pro.
@@ -89,12 +89,13 @@ export default function AnalyticsReportsPage() {
         </>}
       />
 
-      {/* Info banner */}
-      <div style={{ padding: "12px 16px", background: "rgba(59, 130, 246, 0.06)", border: "1px solid rgba(59, 130, 246, 0.3)", borderRadius: 10, fontSize: 12, color: CP.textSecondary, marginBottom: 22, display: "flex", alignItems: "flex-start", gap: 10 }}>
-        <span style={{ color: "#3B82F6", fontSize: 14, marginTop: 1 }}>ⓘ</span>
+      {/* Info banner — perché apriamo in nuova tab di default */}
+      <div style={{ padding: "12px 16px", background: "rgba(245, 158, 11, 0.06)", border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: 10, fontSize: 12, color: CP.textSecondary, marginBottom: 22, display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <AlertTriangle size={14} color="#F59E0B" style={{ marginTop: 1, flexShrink: 0 }} />
         <div>
-          Devi essere loggato al tuo account Google nello stesso browser. Se vedi una schermata di login Google dentro l'iframe,
-          completa il login e il report si carica. Per accessi mancanti, chiedi al proprietario del report di aggiungerti come Viewer/Editor.
+          I report si aprono di default in <strong>nuova tab</strong>. Motivo: i proprietari hanno disabilitato la visualizzazione embedded
+          ("La visualizzazione in altri siti è stata disattivata"). Per integrare un report dentro la webapp tramite iframe, il proprietario deve
+          aprire il report → File → Embed report → spuntare "Enable embedding". Da quel momento il bottone <em>"Prova embed"</em> qui sotto funzionerà.
         </div>
       </div>
 
@@ -109,9 +110,7 @@ export default function AnalyticsReportsPage() {
               borderRadius: 14,
               padding: 24,
               transition: "border-color 0.15s, transform 0.15s",
-              cursor: "pointer",
             }}
-            onClick={() => setActiveReport(r)}
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = r.accent + "88"; e.currentTarget.style.transform = "translateY(-2px)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = r.accent + "33"; e.currentTarget.style.transform = "translateY(0)"; }}
           >
@@ -124,19 +123,40 @@ export default function AnalyticsReportsPage() {
                 <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.5 }}>{r.description}</div>
               </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 18, paddingTop: 14, borderTop: `1px solid ${CP.border}` }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: r.accent, fontSize: 12, fontWeight: 700 }}>
-                <Maximize2 size={13} /> Apri full-screen
-              </span>
+            <div style={{ display: "flex", gap: 8, marginTop: 18, paddingTop: 14, borderTop: `1px solid ${CP.border}`, flexWrap: "wrap" }}>
               <a
                 href={r.viewUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                style={{ display: "inline-flex", alignItems: "center", gap: 4, color: CP.textMuted, fontSize: 11, textDecoration: "none" }}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "8px 14px",
+                  background: r.accent,
+                  color: "#0a0a0a",
+                  borderRadius: 8,
+                  fontSize: 12, fontWeight: 700,
+                  textDecoration: "none",
+                }}
               >
-                <ExternalLink size={11} /> tab esterna
+                <ExternalLink size={13} /> Apri in nuova tab
               </a>
+              <button
+                onClick={() => setActiveReport(r)}
+                title="Tenta l'embed dentro la webapp — funziona solo se il proprietario del report ha abilitato 'Enable embedding'"
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "8px 14px",
+                  background: "transparent",
+                  border: `1px solid ${CP.border}`,
+                  borderRadius: 8,
+                  color: CP.textSecondary,
+                  fontSize: 12, fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: FONTS.body,
+                }}
+              >
+                <Maximize2 size={13} /> Prova embed
+              </button>
             </div>
           </div>
         ))}
