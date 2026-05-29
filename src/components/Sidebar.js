@@ -113,6 +113,7 @@ const NAV_GROUPS = [
       { href: "/admin/creatorspro-sync",         label: "Sync CP",         icon: RefreshCw },
       { href: "/admin/creatorspro-sync-history", label: "Sync CP storico", icon: History },
       { href: "/admin/wage-audit",               label: "Wage Audit",      icon: ShieldCheck },
+      { href: "/admin/reports",                  label: "Analytics",       icon: BarChart3 },
       { href: "/admin/leaderboard-exclusions",   label: "Esclusioni",      icon: Ban },
       { href: "/admin/group-languages",          label: "Lingue Group",    icon: Languages },
       { href: "/admin/group-categories",         label: "Categorie Group", icon: Tags },
