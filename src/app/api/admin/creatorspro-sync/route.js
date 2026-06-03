@@ -122,8 +122,18 @@ export async function POST(request) {
 
     return Response.json({ error: "action required (refdata|prepare|batch|finalize) o period_id YYYY-MM" }, { status: 400 });
   } catch (e) {
-    console.error("CP sync error:", e);
-    return Response.json({ error: "Sync step failed", reason: String(e?.message || e), action }, { status: 500 });
+    // Log dettagliato lato server (visibile in Vercel logs)
+    console.error("CP sync error:", { action, period_id, message: e?.message, stack: e?.stack, raw: e });
+    // Serializza l'errore in modo che il client riceva sempre una stringa significativa
+    let reason;
+    if (typeof e?.message === "string" && e.message.length > 0) {
+      reason = e.message;
+    } else if (e && typeof e === "object") {
+      try { reason = JSON.stringify(e); } catch { reason = String(e); }
+    } else {
+      reason = String(e);
+    }
+    return Response.json({ error: "Sync step failed", reason, action, period_id }, { status: 500 });
   }
 }
 

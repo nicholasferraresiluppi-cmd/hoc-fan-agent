@@ -68,16 +68,34 @@ async function postSyncOnce(body) {
     throw new Error(`Risposta non-JSON (HTTP ${res.status}, ${ct || "no content-type"}). Snippet: ${snippet}`);
   }
   const j = await res.json();
-  if (!res.ok) throw new Error(j?.reason || j?.error || `HTTP ${res.status}`);
+  if (!res.ok) {
+    // reason/error potrebbero essere object (es. errori CP API strutturati) →
+    // JSON.stringify così non finiamo con "[object Object]" come messaggio
+    const toStr = (v) => {
+      if (v == null) return null;
+      if (typeof v === "string") return v;
+      try { return JSON.stringify(v); } catch { return String(v); }
+    };
+    const reasonStr = toStr(j?.reason);
+    const errorStr = toStr(j?.error);
+    const detail = reasonStr || errorStr || `HTTP ${res.status}`;
+    const err = new Error(`HTTP ${res.status} su ${body?.action || "sync"}${body?.period_id ? ` (${body.period_id})` : ""}: ${detail}`);
+    err.status = res.status;
+    err.body = j;
+    throw err;
+  }
   return j;
 }
 
+// Pattern di errori da considerare transient (auto-retry + auto-shrink)
+const TRANSIENT_RE = /timeout|HTTP\s*5\d\d|HTTP\s*429|non-JSON|Sync step failed|fetch failed|network|aborted|ECONN/i;
+
 async function postSync(body) {
-  // Un retry automatico su errori transienti (timeout / 5xx)
+  // Un retry automatico su errori transienti (timeout / 5xx / 429 / network glitch)
   try {
     return await postSyncOnce(body);
   } catch (e) {
-    const transient = /timeout|HTTP 5\d\d|non-JSON/i.test(String(e?.message || ""));
+    const transient = TRANSIENT_RE.test(String(e?.message || ""));
     if (!transient) throw e;
     await new Promise((r) => setTimeout(r, 1500));
     return await postSyncOnce(body);
@@ -133,7 +151,7 @@ export default function SyncHistoryPage() {
         prepDone = r.done;
         pageOffset = r.next_page || (pageOffset + pagesPerCall);
       } catch (e) {
-        const isTimeout = /timeout|HTTP 5\d\d|non-JSON/i.test(String(e?.message || ""));
+        const isTimeout = TRANSIENT_RE.test(String(e?.message || ""));
         if (isTimeout && pagesPerCall > 1) {
           pagesPerCall = Math.max(1, Math.floor(pagesPerCall / 2));
           onStep?.(`prepare timeout → riduco chunk a ${pagesPerCall} pagine e riprovo`);
@@ -159,7 +177,7 @@ export default function SyncHistoryPage() {
         onStep?.(`batch ${offset}/${total} (chunk ${batchSize})`);
         if (r.done) break;
       } catch (e) {
-        const isTimeout = /timeout|HTTP 5\d\d|non-JSON/i.test(String(e?.message || ""));
+        const isTimeout = TRANSIENT_RE.test(String(e?.message || ""));
         if (isTimeout && batchSize > 5) {
           batchSize = Math.max(5, Math.floor(batchSize / 2));
           onStep?.(`batch timeout → riduco chunk a ${batchSize} wages e riprovo`);
