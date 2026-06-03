@@ -116,34 +116,58 @@ export default function SyncHistoryPage() {
     onStep?.("refdata");
     await postSync({ action: "refdata" });
 
-    // Prepare incrementale: cicla finché done=true
+    // Prepare incrementale: cicla finché done=true.
+    // Default chunk = 4 pagine (era 8) per stare comodi sotto Vercel Hobby 60s.
+    // Auto-shrink: se una call va in timeout/5xx, dimezziamo il chunk per la
+    // prossima call (min 1). Mesi pesanti gestiti automaticamente.
     let prepDone = false;
     let pageOffset = 1;
-    const PAGES_PER_CALL = 8;
+    let pagesPerCall = 4;
     let prepRound = 0;
     while (!prepDone) {
       if (stopRequested) throw new Error("STOPPED");
       prepRound++;
-      onStep?.(`prepare round ${prepRound}`);
-      const r = await postSync({ action: "prepare", period_id: periodId, page_offset: pageOffset, pages_limit: PAGES_PER_CALL });
-      prepDone = r.done;
-      pageOffset = r.next_page || (pageOffset + PAGES_PER_CALL);
-      if (prepRound > 30) throw new Error("Prepare bloccato dopo 30 round");
+      onStep?.(`prepare round ${prepRound} (chunk ${pagesPerCall})`);
+      try {
+        const r = await postSync({ action: "prepare", period_id: periodId, page_offset: pageOffset, pages_limit: pagesPerCall });
+        prepDone = r.done;
+        pageOffset = r.next_page || (pageOffset + pagesPerCall);
+      } catch (e) {
+        const isTimeout = /timeout|HTTP 5\d\d|non-JSON/i.test(String(e?.message || ""));
+        if (isTimeout && pagesPerCall > 1) {
+          pagesPerCall = Math.max(1, Math.floor(pagesPerCall / 2));
+          onStep?.(`prepare timeout → riduco chunk a ${pagesPerCall} pagine e riprovo`);
+          continue; // retry stesso pageOffset
+        }
+        throw e;
+      }
+      if (prepRound > 60) throw new Error("Prepare bloccato dopo 60 round");
     }
 
-    // Batch loop dei wage detail
+    // Batch loop dei wage detail (stessa logica di auto-shrink)
     let offset = 0;
     let total = 0;
+    let batchSize = 50;
     let batchRound = 0;
     while (true) {
       if (stopRequested) throw new Error("STOPPED");
       batchRound++;
-      const r = await postSync({ action: "batch", period_id: periodId, offset, batch_size: 50 });
-      total = r.total;
-      offset = r.next_offset;
-      onStep?.(`batch ${offset}/${total}`);
-      if (r.done) break;
-      if (batchRound > 100) throw new Error("Batch loop bloccato dopo 100 round");
+      try {
+        const r = await postSync({ action: "batch", period_id: periodId, offset, batch_size: batchSize });
+        total = r.total;
+        offset = r.next_offset;
+        onStep?.(`batch ${offset}/${total} (chunk ${batchSize})`);
+        if (r.done) break;
+      } catch (e) {
+        const isTimeout = /timeout|HTTP 5\d\d|non-JSON/i.test(String(e?.message || ""));
+        if (isTimeout && batchSize > 5) {
+          batchSize = Math.max(5, Math.floor(batchSize / 2));
+          onStep?.(`batch timeout → riduco chunk a ${batchSize} wages e riprovo`);
+          continue;
+        }
+        throw e;
+      }
+      if (batchRound > 200) throw new Error("Batch loop bloccato dopo 200 round");
     }
 
     // Finalize
@@ -193,7 +217,7 @@ export default function SyncHistoryPage() {
       const completed = [];
       for (const p of toSync) {
         if (stopRequested) {
-          setProgress((pr) => ({ ...pr, running: false, error: "Stop richiesto dall'utente" }));
+          setProgress((pr) => ({ ...pr, running: false, current: null, step: "", batchInfo: "", error: "Stop richiesto dall'utente" }));
           return;
         }
         setProgress((pr) => ({ ...pr, current: p, step: "starting", batchInfo: "" }));
@@ -205,10 +229,13 @@ export default function SyncHistoryPage() {
           setProgress((pr) => ({ ...pr, completed: [...pr.completed, p] }));
         } catch (e) {
           if (e.message === "STOPPED") {
-            setProgress((pr) => ({ ...pr, running: false, error: "Fermato dall'utente" }));
+            setProgress((pr) => ({ ...pr, running: false, current: null, step: "", batchInfo: "", error: "Fermato dall'utente" }));
             return;
           }
-          setProgress((pr) => ({ ...pr, running: false, error: `Errore su ${p}: ${e.message}` }));
+          // current=null così la card del mese non rimane bloccata su "Sync in corso…"
+          setProgress((pr) => ({ ...pr, running: false, current: null, step: "", batchInfo: "", error: `Errore su ${p}: ${e.message}` }));
+          // Refresca stato per riflettere eventuali progressi parziali
+          refetchHistory();
           return;
         }
       }
