@@ -39,6 +39,11 @@ export default function DebugMappingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Lista candidati "problema": operatori che oggi appaiono come no-CP in classifica.
+  // La carichiamo dal feed leaderboard sales-cp così è sempre allineata.
+  const [candidates, setCandidates] = useState(null); // null = loading, [] = nessuno
+  const [candidatesErr, setCandidatesErr] = useState(null);
+
   const periodOptions = useMemo(() => monthOpts(), []);
   useEffect(() => { if (!periodId && periodOptions[0]) setPeriodId(periodOptions[0].value); }, [periodOptions, periodId]);
 
@@ -69,13 +74,37 @@ export default function DebugMappingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employee, periodId]);
 
-  async function search() {
-    if (!employee.trim() || !periodId) return;
+  // Carica candidati no-CP appena periodId è disponibile (e ricarica se cambi periodo)
+  useEffect(() => {
+    if (!periodId) return;
+    let cancelled = false;
+    setCandidates(null);
+    setCandidatesErr(null);
+    fetch(`/api/leaderboard/sales-cp?period_id=${periodId}&include_no_cp=1`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (cancelled) return;
+        const noCp = (j.ranking || []).filter((r) => !r.has_cp_data);
+        setCandidates(noCp);
+      })
+      .catch((e) => { if (!cancelled) setCandidatesErr(e.message); });
+    return () => { cancelled = true; };
+  }, [periodId]);
+
+  function pickCandidate(name) {
+    setEmployee(name);
+    // passa il nome esplicitamente per evitare lo stale closure su `employee`
+    search(name);
+  }
+
+  async function search(nameOverride) {
+    const name = (nameOverride ?? employee).trim();
+    if (!name || !periodId) return;
     setLoading(true);
     setError(null);
     setData(null);
     try {
-      const res = await fetch(`/api/admin/debug-mapping?employee=${encodeURIComponent(employee.trim())}&period_id=${periodId}`);
+      const res = await fetch(`/api/admin/debug-mapping?employee=${encodeURIComponent(name)}&period_id=${periodId}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
       setData(json);
@@ -182,32 +211,85 @@ export default function DebugMappingPage() {
 
       {/* Empty state: nessuna ricerca ancora fatta */}
       {!data && !loading && !error && (
-        <CpCard padding="24px 26px">
-          <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: CP.surfaceAlt, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <Compass size={22} color={CP.accentGreen} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: FONTS.display, fontSize: 16, fontWeight: 700, color: CP.textPrimary, marginBottom: 6 }}>
-                Scrivi un nome qua sopra per iniziare
+        <>
+          <CpCard padding="24px 26px" style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+              <div style={{ width: 44, height: 44, borderRadius: 10, background: CP.surfaceAlt, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Compass size={22} color={CP.accentGreen} />
               </div>
-              <div style={{ color: CP.textSecondary, fontSize: 13, lineHeight: 1.6, marginBottom: 14 }}>
-                Trovo automaticamente: <b>mapping CP→Infloww</b>, <b>shift CP nel periodo</b>,
-                <b> wage records cercati per nome</b>, <b>record Infloww simili</b>,
-                <b> verifica live su CP API</b> (per scoprire se la wage esiste davvero ma il sync l'ha persa),
-                e <b>confronto byte-per-byte</b> tra il nome nel mapping e il nome nel CSV Infloww (per scovare mismatch invisibili tipo spazi o accenti).
-              </div>
-              <div style={{ fontSize: 11, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 8, fontFamily: FONTS.mono }}>
-                Suggerimento
-              </div>
-              <div style={{ color: CP.textSecondary, fontSize: 12.5, lineHeight: 1.55 }}>
-                Se sei arrivato qui da un operatore <b>no-CP</b> in classifica, il nome dovrebbe essere già pre-compilato e la ricerca parte da sola.
-                Altrimenti, vai su <Link href="/leaderboard/sales-cp" style={{ color: CP.accentGreen, textDecoration: "none", fontWeight: 600 }}>Sales CP</Link>, attiva &quot;Mostra no-CP in fondo&quot;,
-                e clicca il nome del group per essere portato qui sull'operatore giusto.
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: FONTS.display, fontSize: 16, fontWeight: 700, color: CP.textPrimary, marginBottom: 6 }}>
+                  Operatori senza dato CP nel periodo
+                </div>
+                <div style={{ color: CP.textSecondary, fontSize: 13, lineHeight: 1.6 }}>
+                  Sotto trovi tutti gli operatori che oggi appaiono come <b>no-CP</b> in classifica per il periodo selezionato:
+                  o non sono mappati a CreatorsPro, o il sync ha mancato la loro wage. Clicca un nome per partire con la diagnosi automatica.
+                </div>
               </div>
             </div>
-          </div>
-        </CpCard>
+          </CpCard>
+
+          {/* Lista candidati */}
+          {candidatesErr && (
+            <CpCard accent={CP.accentRed} padding="12px 16px" style={{ marginBottom: 12 }}>
+              <div style={{ color: CP.accentRed, fontSize: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                <AlertCircle size={14} /> Impossibile caricare i candidati: {candidatesErr}
+              </div>
+            </CpCard>
+          )}
+          {candidates === null && !candidatesErr && (
+            <Empty>Carico l'elenco operatori no-CP per {periodId}…</Empty>
+          )}
+          {candidates && candidates.length === 0 && (
+            <CpCard accent={CP.accentGreen} padding="14px 18px">
+              <div style={{ color: CP.accentGreen, display: "flex", alignItems: "center", gap: 10, fontSize: 13, fontWeight: 600 }}>
+                <CheckCircle2 size={16} /> Nessun operatore no-CP in {periodId}. Tutto mappato.
+              </div>
+            </CpCard>
+          )}
+          {candidates && candidates.length > 0 && (
+            <CpCard padding="14px 16px">
+              <div style={{ fontSize: 11, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 12, fontFamily: FONTS.mono, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>Candidati da risolvere ({candidates.length})</span>
+                <Link href="/leaderboard/sales-cp" style={{ color: CP.textSecondary, textDecoration: "none", fontSize: 10, textTransform: "none", letterSpacing: 0, fontFamily: FONTS.body }}>
+                  Vedi in classifica →
+                </Link>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
+                {candidates.map((op, i) => (
+                  <button
+                    key={`${op.employee}-${i}`}
+                    onClick={() => pickCandidate(op.employee)}
+                    title={`Diagnostica ${op.employee}${op.group ? ` (${op.group})` : ""}`}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "10px 12px",
+                      background: CP.surface,
+                      border: `1px solid ${CP.border}`,
+                      borderRadius: 8,
+                      color: CP.textPrimary,
+                      fontSize: 13,
+                      fontFamily: FONTS.body,
+                      textAlign: "left",
+                      cursor: "pointer",
+                      transition: "border-color 0.12s, background 0.12s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = CP.accentGreen; e.currentTarget.style.background = CP.surfaceAlt; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = CP.border; e.currentTarget.style.background = CP.surface; }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{op.employee}</div>
+                      <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {op.group || "(no group)"}{op.language ? ` · ${op.language}` : ""}
+                      </div>
+                    </div>
+                    <Search size={13} color={CP.textMuted} />
+                  </button>
+                ))}
+              </div>
+            </CpCard>
+          )}
+        </>
       )}
 
       {data && (
