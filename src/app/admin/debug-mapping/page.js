@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import {
-  Search, AlertCircle, CheckCircle2, XCircle, Database, Link2, FileText,
+  Search, AlertCircle, CheckCircle2, XCircle, Database, Link2, FileText, Compass,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel } from "@/components/cp-style";
@@ -41,6 +41,33 @@ export default function DebugMappingPage() {
 
   const periodOptions = useMemo(() => monthOpts(), []);
   useEffect(() => { if (!periodId && periodOptions[0]) setPeriodId(periodOptions[0].value); }, [periodOptions, periodId]);
+
+  // Leggi ?employee= dal query param e pre-popola (es. arrivo da /leaderboard/sales-cp)
+  // Non triggera la search da solo: per evitare race con periodId, lasciamo che sia
+  // l'effect sotto a farlo appena entrambi sono pronti.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    const fromUrl = p.get("employee");
+    if (fromUrl && !employee) setEmployee(fromUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Quando l'URL ha ?employee= e periodId è impostato, fai partire una sola ricerca
+  // automatica. Flag per evitare loop.
+  const [autoSearched, setAutoSearched] = useState(false);
+  useEffect(() => {
+    if (autoSearched) return;
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    const fromUrl = p.get("employee");
+    if (fromUrl && employee === fromUrl && periodId) {
+      setAutoSearched(true);
+      // micro-delay per garantire render del campo prima della chiamata
+      setTimeout(() => search(), 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employee, periodId]);
 
   async function search() {
     if (!employee.trim() || !periodId) return;
@@ -149,6 +176,36 @@ export default function DebugMappingPage() {
         <CpCard accent={CP.accentRed} padding="14px 18px" style={{ marginBottom: 20 }}>
           <div style={{ color: CP.accentRed, display: "flex", alignItems: "center", gap: 10 }}>
             <AlertCircle size={16} /> {error}
+          </div>
+        </CpCard>
+      )}
+
+      {/* Empty state: nessuna ricerca ancora fatta */}
+      {!data && !loading && !error && (
+        <CpCard padding="24px 26px">
+          <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+            <div style={{ width: 44, height: 44, borderRadius: 10, background: CP.surfaceAlt, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Compass size={22} color={CP.accentGreen} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: FONTS.display, fontSize: 16, fontWeight: 700, color: CP.textPrimary, marginBottom: 6 }}>
+                Scrivi un nome qua sopra per iniziare
+              </div>
+              <div style={{ color: CP.textSecondary, fontSize: 13, lineHeight: 1.6, marginBottom: 14 }}>
+                Trovo automaticamente: <b>mapping CP→Infloww</b>, <b>shift CP nel periodo</b>,
+                <b> wage records cercati per nome</b>, <b>record Infloww simili</b>,
+                <b> verifica live su CP API</b> (per scoprire se la wage esiste davvero ma il sync l'ha persa),
+                e <b>confronto byte-per-byte</b> tra il nome nel mapping e il nome nel CSV Infloww (per scovare mismatch invisibili tipo spazi o accenti).
+              </div>
+              <div style={{ fontSize: 11, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 8, fontFamily: FONTS.mono }}>
+                Suggerimento
+              </div>
+              <div style={{ color: CP.textSecondary, fontSize: 12.5, lineHeight: 1.55 }}>
+                Se sei arrivato qui da un operatore <b>no-CP</b> in classifica, il nome dovrebbe essere già pre-compilato e la ricerca parte da sola.
+                Altrimenti, vai su <Link href="/leaderboard/sales-cp" style={{ color: CP.accentGreen, textDecoration: "none", fontWeight: 600 }}>Sales CP</Link>, attiva &quot;Mostra no-CP in fondo&quot;,
+                e clicca il nome del group per essere portato qui sull'operatore giusto.
+              </div>
+            </div>
           </div>
         </CpCard>
       )}
