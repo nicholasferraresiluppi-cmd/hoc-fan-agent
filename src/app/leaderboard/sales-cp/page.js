@@ -7,7 +7,7 @@ import { COLORS, FONTS, CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
 import { useSmartPeriod } from "@/lib/use-smart-period";
-import { Info, Target, ArrowRight, Search, Loader2, CheckCircle2, XCircle, Columns3, Check } from "lucide-react";
+import { Info, Target, ArrowRight, Search, Loader2, CheckCircle2, XCircle, Columns3, Check, Wrench, ShieldCheck, Languages, Tags, RefreshCw, Link2 } from "lucide-react";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -110,6 +110,8 @@ export default function SalesCpLeaderboardPage() {
   // Extra columns picker (Infloww KPIs aggiuntive)
   const [extraCols, setExtraCols] = useState([]);
   const [colsPickerOpen, setColsPickerOpen] = useState(false);
+  // Troubleshoot dropdown (shortcuts a pagine admin per risolvere problemi)
+  const [troubleshootOpen, setTroubleshootOpen] = useState(false);
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem(EXTRA_COLS_STORAGE_KEY) || "[]");
@@ -365,7 +367,51 @@ export default function SalesCpLeaderboardPage() {
             <input type="checkbox" checked={showNoCp} onChange={(e) => setShowNoCp(e.target.checked)} style={{ accentColor: COLORS.champagne }} />
             Mostra no-CP in fondo
           </label>
-          <button onClick={() => url && mutate(url)} title="Ricarica" style={{ padding: "9px 14px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 10, color: COLORS.fog, fontSize: 13, cursor: "pointer", marginLeft: "auto" }}>🔄 Aggiorna</button>
+          <div style={{ marginLeft: "auto", display: "inline-flex", gap: 8, position: "relative" }}>
+            <button
+              onClick={() => setTroubleshootOpen((v) => !v)}
+              title="Shortcut alle pagine admin per risolvere problemi visti in classifica"
+              style={{ padding: "9px 14px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 10, color: COLORS.fog, fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <Wrench size={14} /> Risolvi <span style={{ fontSize: 10, opacity: 0.7 }}>▾</span>
+            </button>
+            <button onClick={() => url && mutate(url)} title="Ricarica" style={{ padding: "9px 14px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 10, color: COLORS.fog, fontSize: 13, cursor: "pointer" }}>🔄 Aggiorna</button>
+            {troubleshootOpen && (
+              <>
+                {/* overlay click-out */}
+                <div onClick={() => setTroubleshootOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 50 }} />
+                <div role="menu" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 280, background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 10, boxShadow: "0 18px 40px rgba(0,0,0,0.6)", padding: 6, zIndex: 60 }}>
+                  <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 0.8, color: COLORS.fog, opacity: 0.6, padding: "8px 10px 4px" }}>Risolvi problemi</div>
+                  {[
+                    { href: "/admin/wage-audit", icon: ShieldCheck, label: "Wage Audit", hint: "wage / shift mancanti per mese" },
+                    { href: "/admin/debug-mapping", icon: Link2, label: "Debug Mapping", hint: "operatori senza match in CP" },
+                    { href: "/admin/group-categories", icon: Tags, label: "Group Categories", hint: "categorizza i group creator" },
+                    { href: "/admin/group-languages", icon: Languages, label: "Group Languages", hint: "assegna lingua ai group" },
+                    { href: "/admin/creatorspro-sync", icon: RefreshCw, label: "Sync CP", hint: "rifai sync sales da CreatorsPro" },
+                    { href: "/admin/creatorspro-sync-history", icon: RefreshCw, label: "Sync CP storico", hint: "rebuild full storico mesi" },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setTroubleshootOpen(false)}
+                        style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "9px 10px", borderRadius: 8, textDecoration: "none", color: COLORS.fog, transition: "background 0.12s" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = COLORS.charcoal)}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      >
+                        <Icon size={14} style={{ marginTop: 2, color: COLORS.champagne, flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>{item.label}</div>
+                          <div style={{ fontSize: 11, color: COLORS.fog, opacity: 0.6, marginTop: 1 }}>{item.hint}</div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         <div style={styles.filterRow}>
@@ -615,8 +661,16 @@ export default function SalesCpLeaderboardPage() {
                           <div style={{ fontFamily: FONTS.display, fontSize: 14, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer" }}>{op.employee} <span style={{ marginLeft: 5, color: COLORS.champagne, opacity: 0.5, fontSize: 11 }}>›</span></div>
                         </Link>
                       </div>
-                      <div style={{ color: COLORS.fog, fontSize: 12 }}>
-                        {op.group || "—"}<CategoryBadge category={op.category} /><LanguageBadge language={op.language} />
+                      <div style={{ color: COLORS.fog, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                        <Link href="/admin/group-categories" title="Categorizza i group creator (Big / Medium / Small)" style={{ color: "inherit", textDecoration: "none", borderBottom: `1px dotted ${COLORS.charcoal}` }}>
+                          {op.group || "—"}
+                        </Link>
+                        <Link href="/admin/group-categories" title="Cambia categoria" style={{ textDecoration: "none" }}>
+                          <CategoryBadge category={op.category} />
+                        </Link>
+                        <Link href="/admin/group-languages" title="Cambia lingua del group" style={{ textDecoration: "none" }}>
+                          <LanguageBadge language={op.language} />
+                        </Link>
                       </div>
                       <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 14, color: tColor }}>{op.score?.toFixed(1) ?? "—"}</div>
                       <div
@@ -699,7 +753,17 @@ export default function SalesCpLeaderboardPage() {
                             onClick={() => recheckEmployee(op.employee)}
                           />
                         </div>
-                        <div style={{ color: COLORS.fog, fontSize: 11 }}>{op.group || "—"}<CategoryBadge category={op.category} /><LanguageBadge language={op.language} /></div>
+                        <div style={{ color: COLORS.fog, fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                          <Link href={`/admin/debug-mapping?employee=${encodeURIComponent(op.employee)}`} title="Debug perché questo operatore non ha match in CP" style={{ color: "inherit", textDecoration: "none", borderBottom: `1px dotted ${COLORS.charcoal}` }}>
+                            {op.group || "—"}
+                          </Link>
+                          <Link href="/admin/group-categories" title="Cambia categoria" style={{ textDecoration: "none" }}>
+                            <CategoryBadge category={op.category} />
+                          </Link>
+                          <Link href="/admin/group-languages" title="Cambia lingua del group" style={{ textDecoration: "none" }}>
+                            <LanguageBadge language={op.language} />
+                          </Link>
+                        </div>
                         <div style={{ gridColumn: "span 6", fontSize: 10, fontStyle: "italic" }}>
                           {recheckState[op.employee]?.message ? (
                             <span style={{ color: recheckState[op.employee].state === "success" ? "#3FB97E" : recheckState[op.employee].state === "error" ? "#EF4444" : COLORS.mist }}>
