@@ -192,18 +192,69 @@ export default function PaymentProfilesPage() {
         </div>
       ))}
 
-      {/* Validation panel: raw JSON del primo profilo, per validare assunzioni */}
-      {data?.sample_first_profile_raw && (
-        <CpCard padding="14px 18px" style={{ marginTop: 32 }}>
+      {/* DEBUG panel — vediamo se il link profilo→creator è popolato o no */}
+      {data?.debug && (
+        <CpCard accent="#F59E0B" padding="16px 20px" style={{ marginTop: 24, marginBottom: 20 }}>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "#F59E0B", marginBottom: 10 }}>
+            🐛 Debug — perché "Creator coperti = 0"
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14, marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 11, color: CP.textMuted, marginBottom: 3 }}>Profili con creatorPaymentProfiles popolato</div>
+              <div style={{ fontFamily: FONTS.mono, fontSize: 18, color: data.debug.profiles_with_creatorPaymentProfiles_populated > 0 ? CP.accentGreen : CP.accentRed, fontWeight: 700 }}>
+                {data.debug.profiles_with_creatorPaymentProfiles_populated} / {data.total}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: CP.textMuted, marginBottom: 3 }}>Profili con array vuoto</div>
+              <div style={{ fontFamily: FONTS.mono, fontSize: 18, color: CP.textPrimary, fontWeight: 700 }}>
+                {data.debug.profiles_with_empty_creatorPaymentProfiles}
+              </div>
+            </div>
+          </div>
+          {data.debug.single_profile_probe && (
+            <details open>
+              <summary style={{ cursor: "pointer", color: CP.textSecondary, fontSize: 12, fontFamily: FONTS.mono }}>
+                Probe endpoint singolo profilo + varianti include/expand/with
+              </summary>
+              <div style={{ marginTop: 8 }}>
+                {data.debug.single_profile_probe.map((r) => (
+                  <div key={r.path} style={{ padding: "8px 10px", borderBottom: `1px solid ${CP.border}`, fontSize: 11, fontFamily: FONTS.mono }}>
+                    <div style={{ color: r.ok ? CP.accentGreen : CP.accentRed, display: "flex", justifyContent: "space-between" }}>
+                      <span>{r.path}</span>
+                      <span>HTTP {r.status ?? "ERR"}</span>
+                    </div>
+                    {r.sample && (
+                      <div style={{ marginTop: 4, color: CP.textSecondary, paddingLeft: 12, fontSize: 10 }}>
+                        keys: {r.sample.keys?.join(", ") || "—"}<br />
+                        cpp_count: <b style={{ color: r.sample.cpp_count > 0 ? CP.accentGreen : CP.textMuted }}>{r.sample.cpp_count ?? "—"}</b>
+                        {r.sample.cpp_first && (
+                          <pre style={{ marginTop: 6, padding: "6px 8px", background: CP.surfaceAlt, borderRadius: 4, fontSize: 10, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                            {JSON.stringify(r.sample.cpp_first, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </CpCard>
+      )}
+
+      {/* Validation panel: raw JSON dei primi 3 profili, per validare assunzioni */}
+      {data?.sample_first_3_profiles_raw && (
+        <CpCard padding="14px 18px" style={{ marginTop: 16 }}>
           <button
             onClick={() => setShowRaw((v) => !v)}
             style={{ background: "transparent", border: "none", color: CP.textSecondary, cursor: "pointer", fontSize: 12, padding: 0, fontFamily: FONTS.mono }}
           >
-            {showRaw ? "▼" : "▶"} Sample raw del primo profilo (per debug/validazione)
+            {showRaw ? "▼" : "▶"} Sample raw dei primi 3 profili (per debug/validazione)
           </button>
           {showRaw && (
             <pre style={{ marginTop: 10, padding: "10px 12px", background: CP.surfaceAlt, borderRadius: 6, fontFamily: FONTS.mono, fontSize: 11, color: CP.textPrimary, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 480, overflow: "auto" }}>
-              {JSON.stringify(data.sample_first_profile_raw, null, 2)}
+              {JSON.stringify(data.sample_first_3_profiles_raw, null, 2)}
             </pre>
           )}
         </CpCard>

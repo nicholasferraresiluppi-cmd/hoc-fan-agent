@@ -21,6 +21,33 @@ import { fetchAllPaymentProfiles, fetchGroups, fetchMembers } from "@/lib/creato
 
 export const maxDuration = 60;
 
+const DEFAULT_BASE = "https://api.houseofcreators.com";
+
+async function cpAuth() {
+  const email = process.env.CREATORSPRO_BOT_EMAIL;
+  const password = process.env.CREATORSPRO_BOT_PASSWORD;
+  const baseUrl = process.env.CREATORSPRO_API_BASE_URL || DEFAULT_BASE;
+  const res = await fetch(`${baseUrl}/v1/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const j = await res.json();
+  return { token: j?.data?.access_token, baseUrl };
+}
+
+async function cpGet(path, auth) {
+  try {
+    const r = await fetch(`${auth.baseUrl}${path}`, {
+      headers: { "Authorization": `Bearer ${auth.token}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    return { ok: r.ok, status: r.status, body: r.ok ? await r.json() : null };
+  } catch (e) {
+    return { ok: false, status: null, error: String(e?.message || e) };
+  }
+}
+
 function detectGroupKey(cpp) {
   // creatorPaymentProfiles[] potrebbe avere uno tra: groupId, creatorId,
   // creator_id, group_id, groupID. Prendiamo il primo che troviamo.
@@ -101,11 +128,54 @@ export async function GET() {
       }
     }
 
+    // DEBUG: prendiamo i primi 3 profili sample per confronto
+    const debugSamples = profiles.slice(0, 3);
+
+    // DEBUG: contiamo quanti profili hanno creatorPaymentProfiles non-vuoto
+    const profilesWithLinks = profiles.filter((p) => Array.isArray(p.creatorPaymentProfiles) && p.creatorPaymentProfiles.length > 0).length;
+
+    // DEBUG: proviamo a fetchare il primo profilo singolarmente per vedere se
+    // l'endpoint /v1/payment-profiles/{id} espande di più
+    let single_profile_probe = null;
+    if (profiles[0]?.id) {
+      const auth = await cpAuth();
+      const tries = [
+        `/v1/payment-profiles/${profiles[0].id}`,
+        `/v1/payment-profiles/${profiles[0].id}?include=creatorPaymentProfiles`,
+        `/v1/payment-profiles/${profiles[0].id}?include=creators,members,groups`,
+        `/v1/payment-profiles?include=creatorPaymentProfiles&limit=1`,
+        `/v1/payment-profiles?expand=creatorPaymentProfiles&limit=1`,
+        `/v1/payment-profiles?with=creatorPaymentProfiles&limit=1`,
+      ];
+      single_profile_probe = [];
+      for (const path of tries) {
+        const r = await cpGet(path, auth);
+        let sample = null;
+        if (r.ok && r.body) {
+          const item = Array.isArray(r.body?.data) ? r.body.data[0] : (r.body?.data || r.body);
+          sample = {
+            keys: item && typeof item === "object" ? Object.keys(item) : null,
+            cpp_count: Array.isArray(item?.creatorPaymentProfiles) ? item.creatorPaymentProfiles.length : null,
+            cpp_first: Array.isArray(item?.creatorPaymentProfiles) && item.creatorPaymentProfiles[0]
+              ? item.creatorPaymentProfiles[0]
+              : null,
+          };
+        }
+        single_profile_probe.push({ path, status: r.status, ok: r.ok, sample });
+      }
+    }
+
     return Response.json({
       total: enriched.length,
       groups_loaded: groups.length,
       members_loaded: members.length,
       sample_first_profile_raw: profiles[0] || null, // per validare assunzioni
+      sample_first_3_profiles_raw: debugSamples,
+      debug: {
+        profiles_with_creatorPaymentProfiles_populated: profilesWithLinks,
+        profiles_with_empty_creatorPaymentProfiles: profiles.length - profilesWithLinks,
+        single_profile_probe,
+      },
       counts: {
         by_cosellers: Object.fromEntries(Object.entries(by_cosellers).map(([k, v]) => [k, v.length])),
         by_tag_count: Object.keys(by_tag).length,
