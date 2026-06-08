@@ -131,6 +131,38 @@ export async function fetchWagesStatusCounts({ startedAt, endedAt, memberId, gro
   return r?.data || r;
 }
 
+/**
+ * Payment Profiles — endpoint scoperto via /admin/cp-probe.
+ * Path: /v1/payment-profiles
+ * Shape per record: { id, name, hourlyRate, cosellersCount, tag,
+ *   paymentProfileThresholds: [{ id, threshold, percentage }],
+ *   creatorPaymentProfiles: [...] }
+ */
+export async function fetchPaymentProfiles({ page = 1, limit = 100 } = {}) {
+  return apiFetch("/v1/payment-profiles", { query: { page, limit } });
+}
+
+/**
+ * Fetcha TUTTI i payment profiles ciclando la paginazione.
+ * Su Hobby resta ampiamente sotto 60s anche con 250+ profili.
+ */
+export async function fetchAllPaymentProfiles() {
+  const all = [];
+  let page = 1;
+  const limit = 100;
+  let safety = 0;
+  while (safety++ < 20) {
+    const r = await fetchPaymentProfiles({ page, limit });
+    const data = r?.data || [];
+    all.push(...data);
+    const pagination = r?.pagination || {};
+    const pageCount = pagination.pageCount || 1;
+    if (page >= pageCount || data.length === 0) break;
+    page++;
+  }
+  return all;
+}
+
 /* ============================================================
  * Retry helper (esponenziale + jitter)
  * ============================================================ */
