@@ -122,11 +122,26 @@ export async function GET() {
   const successes = results.filter((r) => r.ok);
   const interesting = results.filter((r) => r.status && r.status !== 404 && r.status !== 405);
 
+  // Se ho trovato /v1/payment-profiles, prendo anche un sample completo del
+  // primo profilo per capire la struttura di paymentProfileThresholds e
+  // creatorPaymentProfiles (i campi che ci interessano davvero).
+  let sample_full_profile = null;
+  try {
+    const r = await fetch(`${auth.baseUrl}/v1/payment-profiles?page=1&limit=1`, {
+      headers: { "Authorization": `Bearer ${auth.token}` },
+    });
+    if (r.ok) {
+      const j = await r.json();
+      sample_full_profile = j?.data?.[0] || null;
+    }
+  } catch {}
+
   return Response.json({
     group_used: firstGroup ? { id: firstGroup.id, name: firstGroup.name } : null,
     tried: all.length,
     success_count: successes.length,
     interesting_count: interesting.length,
+    sample_full_profile,
     successes,
     interesting,
     all: results,

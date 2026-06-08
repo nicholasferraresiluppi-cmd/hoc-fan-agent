@@ -126,6 +126,19 @@ export default function CpProbePage() {
             </>
           )}
 
+          {data.sample_full_profile && (
+            <>
+              <SectionLabel style={{ display: "block", marginBottom: 10, marginTop: 24, color: CP.accentGreen }}>
+                Sample completo del primo Payment Profile (struttura)
+              </SectionLabel>
+              <CpCard accent={CP.accentGreen} padding="14px 18px">
+                <pre style={{ margin: 0, padding: "10px 12px", background: CP.surfaceAlt, borderRadius: 6, fontFamily: FONTS.mono, fontSize: 11, color: CP.textPrimary, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 520, overflow: "auto" }}>
+                  {JSON.stringify(data.sample_full_profile, null, 2)}
+                </pre>
+              </CpCard>
+            </>
+          )}
+
           {data.interesting.length > data.successes.length && (
             <>
               <SectionLabel style={{ display: "block", marginBottom: 10, marginTop: 24, color: "#F59E0B" }}>
