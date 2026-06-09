@@ -13,8 +13,16 @@
  *  5. Verdetto: OK / REVIEW / OUT_OF_SCALE / UNKNOWN
  */
 import { authorize, CAPABILITIES } from "@/lib/rbac";
-import { fetchAllPaymentProfiles, fetchGroups, fetchMembers } from "@/lib/creatorspro-api";
+import { fetchAllPaymentProfiles, fetchGroups, fetchMembers, fetchWages, fetchWageDetail } from "@/lib/creatorspro-api";
 import { buildCreatorMatrix } from "@/lib/creator-aggregates";
+
+function monthBoundsIso(periodId) {
+  // YYYY-MM → { startedAt: "YYYY-MM-01T00:00:00.000Z", endedAt: "...next month..."}
+  const [y, m] = periodId.split("-").map(Number);
+  const start = new Date(Date.UTC(y, m - 1, 1));
+  const end = new Date(Date.UTC(y, m, 1));
+  return { startedAt: start.toISOString(), endedAt: end.toISOString() };
+}
 
 export const maxDuration = 60;
 
@@ -279,6 +287,43 @@ export async function GET(request) {
       }
     }
 
+    // DEBUG: fetch live un wage detail su questo creator per vedere come si chiama
+    // il campo "payment profile" nel raw shift. CP UI Timeline mostra "Payment Profile: X"
+    // a livello shift, quindi il campo è lì dentro — non in creatorPaymentProfiles del profilo.
+    let liveWageDebug = null;
+    try {
+      const mostRecent = periods[0];
+      const { startedAt, endedAt } = monthBoundsIso(mostRecent);
+      const wagesResp = await fetchWages({ startedAt, endedAt, page: 1, limit: 3, groupId: target.id });
+      const stubs = wagesResp?.data || [];
+      const details = [];
+      for (const stub of stubs.slice(0, 2)) {
+        const id = stub?.info?.id || stub?.id;
+        if (!id) continue;
+        try {
+          const d = await fetchWageDetail(id);
+          details.push(d);
+        } catch (e) { details.push({ _error: String(e?.message || e), id }); }
+      }
+      liveWageDebug = {
+        attempted_period: mostRecent,
+        startedAt, endedAt,
+        wages_found: stubs.length,
+        sample_wage_info_keys: details[0]?.info ? Object.keys(details[0].info) : null,
+        sample_first_shift: details[0]?.shifts?.[0] || null,
+        sample_first_shift_keys: details[0]?.shifts?.[0] ? Object.keys(details[0].shifts[0]) : null,
+        // estrai qualsiasi campo che contenga "payment" nel name
+        payment_related_fields_in_shift: details[0]?.shifts?.[0]
+          ? Object.fromEntries(Object.entries(details[0].shifts[0]).filter(([k]) => /payment|profile|tier|wage/i.test(k)))
+          : null,
+        payment_related_fields_in_info: details[0]?.info
+          ? Object.fromEntries(Object.entries(details[0].info).filter(([k]) => /payment|profile|tier|wage/i.test(k)))
+          : null,
+      };
+    } catch (e) {
+      liveWageDebug = { _error: String(e?.message || e) };
+    }
+
     const oldProfilesOnCreator = profilesOnCreator.filter((pp) => pp.isOld).map((pp) => ({
       id: pp.id, name: pp.name, tag: pp.tag,
       members_linked: pp.links.filter((l) => l.groupId === targetGroupId).map((l) => l.member?.firstName ? `${l.member.firstName} ${l.member.lastName || ""}`.trim() : (l.memberId || "?")),
@@ -295,6 +340,7 @@ export async function GET(request) {
       old_profiles_on_creator: oldProfilesOnCreator,
       total_profiles_on_creator: profilesOnCreator.length,
       diagnostics: {
+        live_wage_debug: liveWageDebug,
         groups_total: allGroups.length,
         members_total: members.length,
         profiles_total: profiles.length,
