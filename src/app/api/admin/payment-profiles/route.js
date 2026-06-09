@@ -48,16 +48,31 @@ async function cpGet(path, auth) {
   }
 }
 
-function detectGroupKey(cpp) {
-  // creatorPaymentProfiles[] potrebbe avere uno tra: groupId, creatorId,
-  // creator_id, group_id, groupID. Prendiamo il primo che troviamo.
-  if (!cpp || typeof cpp !== "object") return null;
-  return cpp.groupId || cpp.group_id || cpp.creatorId || cpp.creator_id || cpp.creatorGroupId || cpp.id || null;
+function isUuid(s) {
+  return typeof s === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 }
 
-function detectMemberKey(cpp) {
-  if (!cpp || typeof cpp !== "object") return null;
-  return cpp.memberId || cpp.member_id || cpp.sellerId || cpp.seller_id || cpp.userId || null;
+// Auto-resolve groupId/memberId scanning ricorsivamente tutti i campi UUID
+// del creatorPaymentProfile e verificando quali matchano i set di groups/members.
+// Più robusto del naming-guessing: funziona con qualsiasi convenzione naming CP.
+function resolveLinks(cpp, groupIdsSet, memberIdsSet) {
+  let groupId = null, memberId = null;
+  if (!cpp || typeof cpp !== "object") return { groupId, memberId };
+  function scan(obj, depth = 0) {
+    if (depth > 4 || !obj || typeof obj !== "object") return;
+    for (const v of Object.values(obj)) {
+      if (typeof v === "string" && isUuid(v)) {
+        if (!groupId && groupIdsSet.has(v)) groupId = v;
+        else if (!memberId && memberIdsSet.has(v)) memberId = v;
+      } else if (v && typeof v === "object" && !Array.isArray(v)) {
+        scan(v, depth + 1);
+      } else if (Array.isArray(v)) {
+        for (const item of v) scan(item, depth + 1);
+      }
+    }
+  }
+  scan(cpp);
+  return { groupId, memberId };
 }
 
 export async function GET() {
@@ -65,16 +80,29 @@ export async function GET() {
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   try {
-    const [profiles, groups, members] = await Promise.all([
+    const [profiles, groupsRaw, members] = await Promise.all([
       fetchAllPaymentProfiles(),
       fetchGroups().catch(() => []),
       fetchMembers().catch(() => []),
     ]);
+    const groups = groupsRaw;
+
+    // Groups arriva come tree (childrens nested) → flatten
+    const flatGroups = [];
+    function flattenGroups(arr) {
+      for (const g of arr || []) {
+        flatGroups.push(g);
+        if (Array.isArray(g.childrens)) flattenGroups(g.childrens);
+      }
+    }
+    flattenGroups(groups);
 
     const groupMap = {};
-    for (const g of groups) groupMap[g.id] = g;
+    for (const g of flatGroups) groupMap[g.id] = g;
     const memberMap = {};
     for (const m of members) memberMap[m.id] = m;
+    const groupIdsSet = new Set(Object.keys(groupMap));
+    const memberIdsSet = new Set(Object.keys(memberMap));
 
     // Enrich + sort thresholds
     const enriched = profiles.map((p) => {
@@ -83,10 +111,9 @@ export async function GET() {
         .sort((a, b) => (a.threshold ?? 0) - (b.threshold ?? 0));
 
       const links = (p.creatorPaymentProfiles || []).map((cpp) => {
-        const groupId = detectGroupKey(cpp);
-        const memberId = detectMemberKey(cpp);
+        const { groupId, memberId } = resolveLinks(cpp, groupIdsSet, memberIdsSet);
         return {
-          raw_keys: Object.keys(cpp),
+          raw_keys: Object.keys(cpp || {}),
           groupId,
           memberId,
           group: groupId ? (groupMap[groupId] || null) : null,
