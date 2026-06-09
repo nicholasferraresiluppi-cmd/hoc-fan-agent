@@ -57,16 +57,30 @@ function resolveLinks(cpp, groupIdsSet, memberIdsSet) {
   return { groupId, memberId };
 }
 
-// Trova la % vincente dato il sales: la soglia MAX <= sales determina lo scaglione
-function pctFromThresholds(sales, thresholds) {
-  if (!Array.isArray(thresholds) || thresholds.length === 0) return null;
-  const sorted = [...thresholds].sort((a, b) => (a.threshold ?? 0) - (b.threshold ?? 0));
-  let winning = null;
-  for (const t of sorted) {
-    if ((t.threshold ?? 0) <= sales) winning = t;
-    else break;
+// Calcolo CUMULATIVO degli scaglioni — confermato da CP UI:
+//   "Base 10% · >350$ 12% · >700$ 15%"
+// significa: 0-350 al 10%, 350-700 al 12% sul delta, >700 al 15% sul delta.
+// Restituisce { earning, effective_pct } dove effective_pct = earning/sales
+function calcCumulativeEarning(sales, thresholds) {
+  if (!Array.isArray(thresholds) || thresholds.length === 0 || sales <= 0) {
+    return { earning: 0, effective_pct: null, breakdown: [] };
   }
-  return winning?.percentage ?? sorted[0]?.percentage ?? null;
+  const sorted = [...thresholds].sort((a, b) => (a.threshold ?? 0) - (b.threshold ?? 0));
+  let earning = 0;
+  const breakdown = [];
+  for (let i = 0; i < sorted.length; i++) {
+    const t = sorted[i];
+    const from = t.threshold ?? 0;
+    const to = i < sorted.length - 1 ? (sorted[i + 1].threshold ?? Infinity) : Infinity;
+    if (sales <= from) break;
+    const tierSales = Math.min(sales, to) - from;
+    if (tierSales <= 0) continue;
+    const pct = t.percentage ?? 0;
+    const tierEarn = tierSales * pct;
+    earning += tierEarn;
+    breakdown.push({ from, to: to === Infinity ? null : to, tier_sales: tierSales, pct, tier_earning: tierEarn });
+  }
+  return { earning, effective_pct: sales > 0 ? earning / sales : null, breakdown };
 }
 
 function isOldProfile(name) {
@@ -223,8 +237,9 @@ export async function GET(request) {
       const chosenProfile = matchingProfiles[0] || candidatesNoMember[0] || null;
 
       const sales = agg.totalSales;
-      const pct = chosenProfile ? pctFromThresholds(sales, chosenProfile.thresholds) : null;
-      const estimatedEarning = pct != null ? Math.round(sales * pct) : null;
+      const calc = chosenProfile ? calcCumulativeEarning(sales, chosenProfile.thresholds) : { earning: null, effective_pct: null, breakdown: [] };
+      const pct = calc.effective_pct;
+      const estimatedEarning = calc.earning != null ? Math.round(calc.earning) : null;
 
       const totalEvents = agg.mono_shifts + agg.split_shifts + agg.exact_shifts;
       const mix_solo_pct = totalEvents > 0 ? Math.round((agg.mono_shifts / totalEvents) * 100) : null;
@@ -253,6 +268,7 @@ export async function GET(request) {
         candidates_without_member_match: candidatesNoMember.length,
         pct_effective: pct,
         estimated_earning: estimatedEarning,
+        earning_breakdown: calc.breakdown, // dettaglio scaglione per scaglione
       });
     }
 
@@ -285,6 +301,42 @@ export async function GET(request) {
       } else {
         o.verdict = "OK";
       }
+    }
+
+    // DEBUG: probe /v1/creators e variants — CP UI mostra "32 creators active"
+    // separati dai groups. Forse creatorPaymentProfiles[].xId punta a Creator entity, non Group.
+    let creatorsEndpointProbe = null;
+    try {
+      const tokenRes = await fetch(`${process.env.CREATORSPRO_API_BASE_URL || "https://api.houseofcreators.com"}/v1/auth/login`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: process.env.CREATORSPRO_BOT_EMAIL, password: process.env.CREATORSPRO_BOT_PASSWORD }),
+      });
+      const tok = (await tokenRes.json())?.data?.access_token;
+      const baseUrl = process.env.CREATORSPRO_API_BASE_URL || "https://api.houseofcreators.com";
+      const candidates = [
+        "/v1/creators",
+        "/v1/sellers-wage/creators",
+        "/v1/talents",
+        "/v1/manage-talents",
+        "/v1/sales-analytics/creators",
+      ];
+      creatorsEndpointProbe = [];
+      for (const p of candidates) {
+        try {
+          const r = await fetch(`${baseUrl}${p}?limit=1`, { headers: { Authorization: `Bearer ${tok}` }, signal: AbortSignal.timeout(6000) });
+          const txt = await r.text();
+          let parsed = null; try { parsed = JSON.parse(txt); } catch {}
+          const item = Array.isArray(parsed?.data) ? parsed.data[0] : (parsed?.data || parsed);
+          creatorsEndpointProbe.push({
+            path: p, status: r.status, ok: r.ok,
+            data_count: Array.isArray(parsed?.data) ? parsed.data.length : null,
+            first_keys: item && typeof item === "object" ? Object.keys(item).slice(0, 12) : null,
+            first_id_is_groupId: item?.id && groupIdsSet.has(item.id) ? true : (item?.id ? false : null),
+          });
+        } catch (e) { creatorsEndpointProbe.push({ path: p, error: String(e?.message || e) }); }
+      }
+    } catch (e) {
+      creatorsEndpointProbe = { _err: String(e?.message || e) };
     }
 
     // DEBUG: fetch live un wage detail su questo creator per vedere come si chiama
@@ -341,6 +393,7 @@ export async function GET(request) {
       total_profiles_on_creator: profilesOnCreator.length,
       diagnostics: {
         live_wage_debug: liveWageDebug,
+        creators_endpoint_probe: creatorsEndpointProbe,
         groups_total: allGroups.length,
         members_total: members.length,
         profiles_total: profiles.length,
