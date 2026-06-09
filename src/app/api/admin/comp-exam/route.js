@@ -117,7 +117,12 @@ export async function GET(request) {
     // "Laura 🇮🇹" / "Laura ENG 🇬🇧" mentre Infloww ha "Laura Sommaruga - IT" / "- EN".
     // Quindi il match CP può fallire — non è bloccante, procediamo cmq con alias.
     const q = creatorName.toLowerCase().trim();
-    const qTokens = q.split(/[\s_\-,]+/).filter((t) => t.length >= 3 && !/^(it|en|es|uk|us|ita|eng|esp)$/i.test(t));
+    // Tokens significativi: solo a-z0-9, length>=3, no lingua suffix.
+    // Esclude emoji bandiere e caratteri non-latini che farebbero fallire any/every match.
+    const qTokens = q
+      .split(/[\s_\-,]+/)
+      .map((t) => t.replace(/[^a-z0-9]/gi, "")) // strip emoji e diacritici
+      .filter((t) => t.length >= 3 && !/^(it|en|es|uk|us|ita|eng|esp)$/i.test(t));
     let target =
       allGroups.find((g) => (g.name || "").toLowerCase() === q) ||
       allGroups.find((g) => (g.name || "").toLowerCase().startsWith(q)) ||
@@ -172,6 +177,21 @@ export async function GET(request) {
         if (matched) aliasSet.add(cr);
       }
     }
+
+    // Debug: se aliasSet vuoto, salva la lista di TUTTI gli alias visti per
+    // capire se la creator non ha proprio shifts nel periodo o se è solo
+    // un problema di matching
+    const aliasMatchDebug = aliasSet.size === 0 ? {
+      reason: "Nessun alias Infloww del matrix corrisponde al creator richiesto",
+      q,
+      qTokens,
+      target_name: target?.name,
+      total_aliases_in_matrix: allAliasesInMatrix.size,
+      sample_aliases_in_matrix: [...allAliasesInMatrix].slice(0, 50),
+      potential_matches_via_first_name_letter: target?.name
+        ? [...allAliasesInMatrix].filter((a) => a.toLowerCase().startsWith((target.name.toLowerCase().split(/\s+/)[0] || "").slice(0, 3))).slice(0, 20)
+        : [],
+    } : null;
 
     // Se non abbiamo né target CP né alias match → 404 con suggestion utili
     if (!target && aliasSet.size === 0) {
@@ -458,6 +478,7 @@ export async function GET(request) {
       old_profiles_on_creator: oldProfilesOnCreator,
       total_profiles_on_creator: profilesOnCreator.length,
       diagnostics: {
+        alias_match_debug: aliasMatchDebug,
         live_wage_debug: liveWageDebug,
         creators_endpoint_probe: creatorsEndpointProbe,
         groups_total: allGroups.length,
