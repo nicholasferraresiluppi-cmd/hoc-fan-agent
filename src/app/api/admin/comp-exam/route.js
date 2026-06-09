@@ -158,7 +158,9 @@ export async function GET(request) {
       }
     }
 
-    // Aggrega per operatore
+    // Aggrega per operatore — include cell.earnings (= guadagno REALE per quel creator,
+    // calcolato da distributeShift come quota di shift.total_earnings proporzionale al
+    // sales). NO stima con scaglioni: questa è la verità che CP ci dà.
     const opAgg = {};
     for (const m of monthData) {
       if (m.error) continue;
@@ -168,20 +170,22 @@ export async function GET(request) {
           const cell = byCreator[alias];
           if (!cell) continue;
           if (!opAgg[opName]) opAgg[opName] = {
-            operator: opName, totalShifts: 0, totalSales: 0, totalHours: 0,
+            operator: opName, totalShifts: 0, totalSales: 0, totalHours: 0, totalEarnings: 0,
             mono_shifts: 0, split_shifts: 0, exact_shifts: 0, months: {}, aliases_seen: new Set(),
           };
           const a = opAgg[opName];
           a.totalShifts += cell.shifts || 0;
           a.totalSales += cell.sales || 0;
           a.totalHours += cell.hours || 0;
+          a.totalEarnings += cell.earnings || 0;
           a.mono_shifts += cell.shift_mono_count || 0;
           a.split_shifts += cell.shift_split_count || 0;
           a.exact_shifts += cell.shift_exact_count || 0;
           a.aliases_seen.add(alias);
-          if (!a.months[m.period_id]) a.months[m.period_id] = { shifts: 0, sales: 0 };
+          if (!a.months[m.period_id]) a.months[m.period_id] = { shifts: 0, sales: 0, earnings: 0 };
           a.months[m.period_id].shifts += cell.shifts || 0;
           a.months[m.period_id].sales += cell.sales || 0;
+          a.months[m.period_id].earnings += cell.earnings || 0;
         }
       }
     }
@@ -237,9 +241,9 @@ export async function GET(request) {
       const chosenProfile = matchingProfiles[0] || candidatesNoMember[0] || null;
 
       const sales = agg.totalSales;
-      const calc = chosenProfile ? calcCumulativeEarning(sales, chosenProfile.thresholds) : { earning: null, effective_pct: null, breakdown: [] };
-      const pct = calc.effective_pct;
-      const estimatedEarning = calc.earning != null ? Math.round(calc.earning) : null;
+      const realEarnings = Math.round(agg.totalEarnings);
+      // % REALE incassata = guadagno effettivo / sales (no stima, è il dato di CP)
+      const pctReal = sales > 0 ? agg.totalEarnings / sales : null;
 
       const totalEvents = agg.mono_shifts + agg.split_shifts + agg.exact_shifts;
       const mix_solo_pct = totalEvents > 0 ? Math.round((agg.mono_shifts / totalEvents) * 100) : null;
@@ -251,11 +255,19 @@ export async function GET(request) {
         totalShifts: Math.round(agg.totalShifts * 10) / 10,
         totalSales: Math.round(agg.totalSales),
         totalHours: Math.round(agg.totalHours * 10) / 10,
+        totalEarnings: realEarnings, // guadagno REALE che l'operatore ha incassato su questa creator
         sales_per_shift: agg.totalShifts > 0 ? Math.round((agg.totalSales / agg.totalShifts) * 100) / 100 : 0,
+        earnings_per_shift: agg.totalShifts > 0 ? Math.round((agg.totalEarnings / agg.totalShifts) * 100) / 100 : 0,
         mix_solo_pct,
         months_breakdown: Object.fromEntries(
-          Object.entries(agg.months).map(([k, v]) => [k, { shifts: Math.round(v.shifts * 10) / 10, sales: Math.round(v.sales) }])
+          Object.entries(agg.months).map(([k, v]) => [k, {
+            shifts: Math.round(v.shifts * 10) / 10,
+            sales: Math.round(v.sales),
+            earnings: Math.round(v.earnings),
+          }])
         ),
+        // Profilo "candidato attivo" (lookup per compatibilità + member match)
+        // Fase A: lo manteniamo solo come info di contesto; Fase B avrà profilo per-shift
         active_profile: chosenProfile ? {
           id: chosenProfile.id,
           name: chosenProfile.name,
@@ -266,40 +278,40 @@ export async function GET(request) {
           matched_via_member: matchingProfiles.length > 0,
         } : null,
         candidates_without_member_match: candidatesNoMember.length,
-        pct_effective: pct,
-        estimated_earning: estimatedEarning,
-        earning_breakdown: calc.breakdown, // dettaglio scaglione per scaglione
+        pct_effective: pctReal, // % REALE (CP data), non stimata
       });
     }
 
     operators.sort((a, b) => b.totalSales - a.totalSales);
 
-    // Team avg %
-    const validPcts = operators.filter((o) => o.pct_effective != null).map((o) => o.pct_effective);
-    const teamAvgPct = validPcts.length > 0 ? validPcts.reduce((s, v) => s + v, 0) / validPcts.length : null;
+    // Team avg % REALE = somma earnings team / somma sales team (weighted, non flat avg)
+    const totalTeamSales = operators.reduce((s, o) => s + o.totalSales, 0);
+    const totalTeamEarnings = operators.reduce((s, o) => s + o.totalEarnings, 0);
+    const teamAvgPct = totalTeamSales > 0 ? totalTeamEarnings / totalTeamSales : null;
 
-    // Verdetto
+    // Verdetto basato su % REALE incassata vs team avg
     for (const o of operators) {
-      if (!o.active_profile) {
+      if (o.pct_effective == null || o.totalSales === 0) {
         o.verdict = "UNKNOWN";
-        o.verdict_note = o.candidates_without_member_match > 0
-          ? `${o.candidates_without_member_match} profili linkano la creator ma non li attribuiamo a questo operatore (member non match)`
-          : "Nessun payment profile linkato a questo operatore per questa creator";
-      } else if (o.active_profile.isOld) {
-        o.verdict = "REVIEW";
-        o.verdict_note = `Profilo attivo "${o.active_profile.name}" sembra OLD/DISMESSO/TEST — da ripulire`;
-      } else if (teamAvgPct != null && o.pct_effective != null) {
+        o.verdict_note = "Nessuna vendita registrata su questa creator nel periodo";
+      } else if (teamAvgPct == null) {
+        o.verdict = "OK";
+      } else {
         const delta = (o.pct_effective - teamAvgPct) / teamAvgPct;
         if (Math.abs(delta) < 0.15) { o.verdict = "OK"; o.verdict_note = null; }
         else if (Math.abs(delta) < 0.35) {
           o.verdict = "REVIEW";
-          o.verdict_note = `% ${(o.pct_effective * 100).toFixed(1)}% vs team avg ${(teamAvgPct * 100).toFixed(1)}% (${delta > 0 ? "+" : ""}${(delta * 100).toFixed(0)}%)`;
+          o.verdict_note = `Incassa ${(o.pct_effective * 100).toFixed(1)}% vs team ${(teamAvgPct * 100).toFixed(1)}% (${delta > 0 ? "+" : ""}${(delta * 100).toFixed(0)}%)`;
         } else {
           o.verdict = "OUT_OF_SCALE";
-          o.verdict_note = `% ${(o.pct_effective * 100).toFixed(1)}% vs team avg ${(teamAvgPct * 100).toFixed(1)}% — fuori scala (${(delta * 100).toFixed(0)}%)`;
+          o.verdict_note = `Incassa ${(o.pct_effective * 100).toFixed(1)}% vs team ${(teamAvgPct * 100).toFixed(1)}% — gap di ${(delta * 100).toFixed(0)}%`;
         }
-      } else {
-        o.verdict = "OK";
+      }
+      // Side note se ha un profilo OLD candidato (anche se la % è OK)
+      if (o.active_profile?.isOld) {
+        o.verdict_note = (o.verdict_note ? o.verdict_note + " · " : "") +
+          `Profilo candidato "${o.active_profile.name}" è OLD/DISMESSO/TEST`;
+        if (o.verdict === "OK") o.verdict = "REVIEW";
       }
     }
 
@@ -387,7 +399,8 @@ export async function GET(request) {
       months_errors: monthData.filter((m) => m.error).map((m) => ({ period_id: m.period_id, error: m.error })),
       operators_count: operators.length,
       team_avg_pct: teamAvgPct,
-      total_team_sales: operators.reduce((s, o) => s + o.totalSales, 0),
+      total_team_sales: totalTeamSales,
+      total_team_earnings: totalTeamEarnings,
       operators,
       old_profiles_on_creator: oldProfilesOnCreator,
       total_profiles_on_creator: profilesOnCreator.length,

@@ -192,7 +192,8 @@ function distributeShift(shift) {
  *   }
  */
 export async function buildCreatorMatrix(periodId) {
-  const ck = `_matrix_v3:${periodId}`;
+  // v3.2: aggiunto earnings per cell + total_earnings per creator (Comp Exam Fase A)
+  const ck = `_matrix_v3.2:${periodId}`;
   const cached = cacheGet(ck);
   if (cached) return cached;
 
@@ -209,6 +210,7 @@ export async function buildCreatorMatrix(periodId) {
         if (!matrix[opName][d.creator]) {
           matrix[opName][d.creator] = {
             sales: 0, hours: 0, shifts: 0,
+            earnings: 0, // guadagno REALE attribuito a questo creator (da shift.total_earnings × shareSales)
             shift_sales_values: [], // per consistency calc
             interval_sales: { After: 0, Morning: 0, Afternoon: 0, Evening: 0, Night: 0 },
             shift_mono_count: 0,
@@ -220,6 +222,7 @@ export async function buildCreatorMatrix(periodId) {
         cell.sales += d.sales;
         cell.hours += d.hours;
         cell.shifts += d.shift_count_share;
+        cell.earnings += d.earnings || 0;
         cell.shift_sales_values.push(d.shift_sales);
         if (d.exact_attribution && d.multi_creator) cell.shift_exact_count += 1;
         else if (d.estimated) cell.shift_split_count += 1;
@@ -228,7 +231,7 @@ export async function buildCreatorMatrix(periodId) {
 
         if (!creators[d.creator]) creators[d.creator] = {
           alias: d.creator,
-          total_sales: 0, total_hours: 0, total_shifts: 0,
+          total_sales: 0, total_hours: 0, total_shifts: 0, total_earnings: 0,
           operators_count: 0, _operators_set: new Set(),
           interval_sales: { After: 0, Morning: 0, Afternoon: 0, Evening: 0, Night: 0 },
           top_operator: null,
@@ -236,6 +239,7 @@ export async function buildCreatorMatrix(periodId) {
         creators[d.creator].total_sales += d.sales;
         creators[d.creator].total_hours += d.hours;
         creators[d.creator].total_shifts += d.shift_count_share;
+        creators[d.creator].total_earnings += d.earnings || 0;
         creators[d.creator]._operators_set.add(opName);
         if (d.interval) creators[d.creator].interval_sales[d.interval] += d.sales;
       }
@@ -249,6 +253,8 @@ export async function buildCreatorMatrix(periodId) {
       cell.sales = Math.round(cell.sales * 100) / 100;
       cell.hours = Math.round(cell.hours * 10) / 10;
       cell.shifts = Math.round(cell.shifts * 10) / 10;
+      cell.earnings = Math.round(cell.earnings * 100) / 100;
+      cell.effective_pct = cell.sales > 0 ? Math.round((cell.earnings / cell.sales) * 1000) / 1000 : null;
       cell.sales_per_shift = cell.shifts > 0 ? Math.round((cell.sales / cell.shifts) * 100) / 100 : 0;
       cell.sales_per_hour = cell.hours > 0 ? Math.round((cell.sales / cell.hours) * 100) / 100 : 0;
       cell.consistency = consistencyScore(cell.shift_sales_values);
@@ -265,6 +271,8 @@ export async function buildCreatorMatrix(periodId) {
     c.total_sales = Math.round(c.total_sales);
     c.total_hours = Math.round(c.total_hours * 10) / 10;
     c.total_shifts = Math.round(c.total_shifts * 10) / 10;
+    c.total_earnings = Math.round(c.total_earnings || 0);
+    c.effective_pct = c.total_sales > 0 ? Math.round((c.total_earnings / c.total_sales) * 1000) / 1000 : null;
     c.operators_count = c._operators_set.size;
     c.avg_sales_per_shift = c.total_shifts > 0 ? Math.round((c.total_sales / c.total_shifts) * 100) / 100 : 0;
     c.avg_sales_per_operator = c.operators_count > 0 ? Math.round(c.total_sales / c.operators_count) : 0;

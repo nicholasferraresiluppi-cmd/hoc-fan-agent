@@ -148,12 +148,13 @@ function Results({ data }) {
   return (
     <>
       {/* Stat header */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginBottom: 20 }}>
         <StatCard label="Creator esaminata" value={data.creator.name} />
         <StatCard label="Operatori attivi" value={data.operators_count} sub={`su ${data.months_analyzed.length} mes${data.months_analyzed.length === 1 ? "e" : "i"}`} />
-        <StatCard label="Sales totale team" value={fmtCurrency(totalSales)} color={CP.accentGreen} />
-        <StatCard label="% media team" value={fmtPct(teamPct)} color="#D4AF7A" />
-        <StatCard label="Profili linkati alla creator" value={data.total_profiles_on_creator} sub={oldProfiles.length > 0 ? `${oldProfiles.length} sono OLD` : null} color={oldProfiles.length > 0 ? "#F59E0B" : null} />
+        <StatCard label="Sales team totale" value={fmtCurrency(totalSales)} color={CP.accentGreen} />
+        <StatCard label="Guadagno team totale" value={fmtCurrency(data.total_team_earnings)} color="#D4AF7A" />
+        <StatCard label="% media team incassata" value={fmtPct(teamPct)} color="#D4AF7A" sub="= guadagno / sales" />
+        <StatCard label="Profili linkati" value={data.total_profiles_on_creator} sub={oldProfiles.length > 0 ? `${oldProfiles.length} OLD da pulire` : null} color={oldProfiles.length > 0 ? "#F59E0B" : null} />
       </div>
 
       {/* Mesi analizzati */}
@@ -182,9 +183,9 @@ function Results({ data }) {
                 <Th align="right">Sales $</Th>
                 <Th align="right">Sales/turno</Th>
                 <Th align="right">Solo %</Th>
-                <Th>Profilo attivo</Th>
+                <Th align="right">Guadagno reale</Th>
                 <Th align="right">% effettiva</Th>
-                <Th align="right">Stima guadagno</Th>
+                <Th>Profilo candidato</Th>
                 <Th>Verdetto</Th>
               </tr>
             </thead>
@@ -209,8 +210,10 @@ function Results({ data }) {
         <div style={{ fontSize: 13, color: CP.textPrimary, lineHeight: 1.7 }}>
           <p>
             <b>{data.creator.name}</b> — analisi su {data.months_analyzed.length} mes{data.months_analyzed.length === 1 ? "e" : "i"} chius{data.months_analyzed.length === 1 ? "o" : "i"} ({data.months_analyzed.join(", ")}).
-            Su questa creator hanno lavorato <b>{data.operators_count} operatori</b>, generando <b>{fmtCurrency(totalSales)}</b> di sales totali.
-            La <b>% media effettiva</b> incassata dal team è <b>{fmtPct(teamPct)}</b> (= guadagno operatori / sales).
+            Su questa creator hanno lavorato <b>{data.operators_count} operatori</b>, generando <b>{fmtCurrency(totalSales)}</b> di sales totali e
+            incassando <b>{fmtCurrency(data.total_team_earnings)}</b> di compensi.
+            La <b>% media REALE</b> incassata dal team è <b>{fmtPct(teamPct)}</b> (= guadagno / sales, dato CP).
+            Margine residuo HOC: <b>{fmtCurrency(totalSales - data.total_team_earnings)}</b> ({fmtPct(teamPct != null ? 1 - teamPct : null)}).
           </p>
 
           {reviewOps.length > 0 && (
@@ -310,6 +313,16 @@ function OpRow({ o, rank, teamPct }) {
         ) : "—"}
         {showSplit && <div style={{ fontSize: 9, color: CP.textMuted }}>{100 - o.mix_solo_pct}% split</div>}
       </Td>
+      <Td align="right" mono>
+        <span style={{ color: "#D4AF7A", fontWeight: 600 }}>{fmtCurrency(o.totalEarnings)}</span>
+      </Td>
+      <Td align="right" mono>
+        {o.pct_effective != null ? (
+          <span style={{ color: teamPct != null && Math.abs((o.pct_effective - teamPct) / teamPct) > 0.15 ? "#F59E0B" : CP.textPrimary, fontWeight: 600 }}>
+            {fmtPct(o.pct_effective)}
+          </span>
+        ) : "—"}
+      </Td>
       <Td>
         {o.active_profile ? (
           <div>
@@ -323,21 +336,12 @@ function OpRow({ o, rank, teamPct }) {
             </div>
           </div>
         ) : (
-          <span style={{ color: CP.textMuted, fontStyle: "italic", fontSize: 12 }}>
-            non identificato
-            {o.candidates_without_member_match > 0 && <div style={{ fontSize: 10 }}>({o.candidates_without_member_match} candidati no-match)</div>}
+          <span style={{ color: CP.textMuted, fontStyle: "italic", fontSize: 11 }}>
+            {o.candidates_without_member_match > 0
+              ? `${o.candidates_without_member_match} candidati (no member match)`
+              : "—"}
           </span>
         )}
-      </Td>
-      <Td align="right" mono>
-        {o.pct_effective != null ? (
-          <span style={{ color: teamPct != null && Math.abs((o.pct_effective - teamPct) / teamPct) > 0.15 ? "#F59E0B" : CP.textPrimary, fontWeight: 600 }}>
-            {fmtPct(o.pct_effective)}
-          </span>
-        ) : "—"}
-      </Td>
-      <Td align="right" mono>
-        {o.estimated_earning != null ? fmtCurrency(o.estimated_earning) : "—"}
       </Td>
       <Td>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 8px", borderRadius: 4, background: v.color + "22", color: v.color, fontSize: 11, fontWeight: 700 }}>
