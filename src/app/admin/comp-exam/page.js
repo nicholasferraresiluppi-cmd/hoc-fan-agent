@@ -181,11 +181,10 @@ function Results({ data }) {
                 <Th>Operatore</Th>
                 <Th align="right">Turni</Th>
                 <Th align="right">Sales $</Th>
-                <Th align="right">Sales/turno</Th>
                 <Th align="right">Solo %</Th>
                 <Th align="right">Guadagno reale</Th>
                 <Th align="right">% effettiva</Th>
-                <Th>Profilo candidato</Th>
+                <Th>Mix scaglioni applicati</Th>
                 <Th>Verdetto</Th>
               </tr>
             </thead>
@@ -306,7 +305,6 @@ function OpRow({ o, rank, teamPct }) {
       </Td>
       <Td align="right" mono>{o.totalShifts.toFixed(1)}</Td>
       <Td align="right" mono><span style={{ color: CP.accentGreen, fontWeight: 600 }}>{fmtCurrency(o.totalSales)}</span></Td>
-      <Td align="right" mono>{fmtCurrency(o.sales_per_shift)}</Td>
       <Td align="right" mono>
         {o.mix_solo_pct != null ? (
           <span style={{ color: o.mix_solo_pct >= 80 ? "#4F8CCB" : "#D4AF7A" }}>{o.mix_solo_pct}%</span>
@@ -324,24 +322,7 @@ function OpRow({ o, rank, teamPct }) {
         ) : "—"}
       </Td>
       <Td>
-        {o.active_profile ? (
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 500 }}>
-              {o.active_profile.name}
-              {o.active_profile.isOld && <span style={{ marginLeft: 6, fontSize: 10, color: "#F59E0B" }}>OLD</span>}
-            </div>
-            <div style={{ fontSize: 10, color: CP.textMuted, fontFamily: FONTS.mono }}>
-              {o.active_profile.cosellersCount === 1 ? "solo" : `${o.active_profile.cosellersCount} coseller`} · {o.active_profile.thresholds.length} scaglion{o.active_profile.thresholds.length === 1 ? "e" : "i"}
-              {!o.active_profile.matched_via_member && <span style={{ color: "#F59E0B", marginLeft: 4 }}>· match solo via creator</span>}
-            </div>
-          </div>
-        ) : (
-          <span style={{ color: CP.textMuted, fontStyle: "italic", fontSize: 11 }}>
-            {o.candidates_without_member_match > 0
-              ? `${o.candidates_without_member_match} candidati (no member match)`
-              : "—"}
-          </span>
-        )}
+        <PctDistribution dist={o.pct_distribution} />
       </Td>
       <Td>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 8px", borderRadius: 4, background: v.color + "22", color: v.color, fontSize: 11, fontWeight: 700 }}>
@@ -350,6 +331,44 @@ function OpRow({ o, rank, teamPct }) {
         {o.verdict_note && <div style={{ fontSize: 10, color: CP.textMuted, marginTop: 3, maxWidth: 240 }}>{o.verdict_note}</div>}
       </Td>
     </tr>
+  );
+}
+
+function PctDistribution({ dist }) {
+  if (!dist || Object.keys(dist).length === 0) {
+    return <span style={{ color: CP.textMuted, fontStyle: "italic", fontSize: 11 }}>—</span>;
+  }
+  const entries = Object.entries(dist);
+  const totalShifts = entries.reduce((s, [, c]) => s + c, 0);
+  // Colore in base al bucket %: <0.10 rosso, 0.10-0.12 giallo, >=0.12 verde
+  const colorFor = (b) => {
+    const v = parseFloat(b);
+    if (v < 0.09) return "#D44545";
+    if (v < 0.11) return "#F59E0B";
+    if (v < 0.13) return "#D4AF7A";
+    return "#3FB97E";
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 110 }}>
+      {/* Mini-bar chart: una stripe per bucket, larghezza proporzionale al count */}
+      <div style={{ display: "flex", height: 6, borderRadius: 2, overflow: "hidden", background: CP.surfaceAlt }}>
+        {entries.map(([bucket, count]) => (
+          <div
+            key={bucket}
+            title={`${count} turn${count === 1 ? "o" : "i"} al ${(parseFloat(bucket) * 100).toFixed(1)}%`}
+            style={{ width: `${(count / totalShifts) * 100}%`, background: colorFor(bucket) }}
+          />
+        ))}
+      </div>
+      {/* Lista compatta */}
+      <div style={{ fontSize: 10, fontFamily: FONTS.mono, color: CP.textSecondary, lineHeight: 1.35 }}>
+        {entries.map(([bucket, count], i) => (
+          <span key={bucket} style={{ color: colorFor(bucket), marginRight: 6 }}>
+            {count}×{(parseFloat(bucket) * 100).toFixed(0)}%
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 

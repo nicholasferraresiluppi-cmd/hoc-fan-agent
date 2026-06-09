@@ -172,6 +172,7 @@ export async function GET(request) {
           if (!opAgg[opName]) opAgg[opName] = {
             operator: opName, totalShifts: 0, totalSales: 0, totalHours: 0, totalEarnings: 0,
             mono_shifts: 0, split_shifts: 0, exact_shifts: 0, months: {}, aliases_seen: new Set(),
+            pct_distribution: {}, // bucket: count su TUTTI gli shift dell'operatore su questo creator
           };
           const a = opAgg[opName];
           a.totalShifts += cell.shifts || 0;
@@ -182,6 +183,12 @@ export async function GET(request) {
           a.split_shifts += cell.shift_split_count || 0;
           a.exact_shifts += cell.shift_exact_count || 0;
           a.aliases_seen.add(alias);
+          // Merge pct_distribution dei vari mesi
+          if (cell.pct_distribution) {
+            for (const [bucket, count] of Object.entries(cell.pct_distribution)) {
+              a.pct_distribution[bucket] = (a.pct_distribution[bucket] || 0) + count;
+            }
+          }
           if (!a.months[m.period_id]) a.months[m.period_id] = { shifts: 0, sales: 0, earnings: 0 };
           a.months[m.period_id].shifts += cell.shifts || 0;
           a.months[m.period_id].sales += cell.sales || 0;
@@ -279,6 +286,13 @@ export async function GET(request) {
         } : null,
         candidates_without_member_match: candidatesNoMember.length,
         pct_effective: pctReal, // % REALE (CP data), non stimata
+        // Distribuzione di % per shift: bucket → count, ordinato per bucket asc
+        // Es. { "0.08": 5, "0.10": 12, "0.12": 8 } = 5 shift al 8%, 12 al 10%, 8 al 12%
+        pct_distribution: Object.fromEntries(
+          Object.entries(agg.pct_distribution)
+            .filter(([, c]) => c > 0)
+            .sort(([a], [b]) => parseFloat(a) - parseFloat(b))
+        ),
       });
     }
 

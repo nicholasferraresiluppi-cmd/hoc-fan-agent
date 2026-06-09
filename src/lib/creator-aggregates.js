@@ -192,8 +192,8 @@ function distributeShift(shift) {
  *   }
  */
 export async function buildCreatorMatrix(periodId) {
-  // v3.2: aggiunto earnings per cell + total_earnings per creator (Comp Exam Fase A)
-  const ck = `_matrix_v3.2:${periodId}`;
+  // v3.3: aggiunto pct_distribution per cell (Comp Review Hot list)
+  const ck = `_matrix_v3.3:${periodId}`;
   const cached = cacheGet(ck);
   if (cached) return cached;
 
@@ -212,6 +212,9 @@ export async function buildCreatorMatrix(periodId) {
             sales: 0, hours: 0, shifts: 0,
             earnings: 0, // guadagno REALE attribuito a questo creator (da shift.total_earnings × shareSales)
             shift_sales_values: [], // per consistency calc
+            // Distribuzione % per singolo shift (bucket allo 0.01 = 1 punto pct):
+            // { "0.08": 5, "0.10": 12, "0.12": 8 } → 5 shift al 8%, 12 al 10%, 8 al 12%
+            pct_distribution: {},
             interval_sales: { After: 0, Morning: 0, Afternoon: 0, Evening: 0, Night: 0 },
             shift_mono_count: 0,
             shift_split_count: 0,
@@ -224,6 +227,13 @@ export async function buildCreatorMatrix(periodId) {
         cell.shifts += d.shift_count_share;
         cell.earnings += d.earnings || 0;
         cell.shift_sales_values.push(d.shift_sales);
+        // Bucket della % di QUESTO shift (se ha sales attribuiti al creator)
+        if (d.sales > 0 && d.earnings != null) {
+          const pct = d.earnings / d.sales;
+          // bucket allo 0.01 — gli scaglioni CP sono tipicamente .08/.10/.12/.15
+          const bucket = (Math.round(pct * 100) / 100).toFixed(2);
+          cell.pct_distribution[bucket] = (cell.pct_distribution[bucket] || 0) + 1;
+        }
         if (d.exact_attribution && d.multi_creator) cell.shift_exact_count += 1;
         else if (d.estimated) cell.shift_split_count += 1;
         else cell.shift_mono_count += 1;
