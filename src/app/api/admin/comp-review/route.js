@@ -128,6 +128,23 @@ export async function GET(request) {
     const topCreators = Object.entries(byCreator).sort((a, b) => b[1] - a[1]).slice(0, 5);
     const topOperators = Object.entries(byOperator).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
+    // Tutti i creator analizzati + count di anomalie (anche quelli con 0).
+    // Utile per il dropdown filtro: capire se un creator non ha anomalie o
+    // se proprio non è stato analizzato (non esiste come group / no sync).
+    const allCreatorsAnalyzed = Object.keys(creators || {}).map((alias) => ({
+      alias,
+      anomaly_count: byCreator[alias] || 0,
+      total_sales: creators[alias].total_sales,
+      total_earnings: creators[alias].total_earnings,
+      team_avg_pct: creators[alias].effective_pct,
+      operators_count: creators[alias].operators_count,
+    })).sort((a, b) => {
+      // ordine: con anomalie prima (desc count), poi senza (alfabetico)
+      if ((b.anomaly_count > 0) !== (a.anomaly_count > 0)) return b.anomaly_count - a.anomaly_count;
+      if (b.anomaly_count !== a.anomaly_count) return b.anomaly_count - a.anomaly_count;
+      return a.alias.localeCompare(b.alias);
+    });
+
     return Response.json({
       period_id: periodId,
       filters: { min_sales: minSales, min_shifts: minShifts, direction },
@@ -144,6 +161,7 @@ export async function GET(request) {
         top_operators_with_anomalies: topOperators.map(([k, v]) => ({ operator: k, count: v })),
       },
       anomalies: anomalies.slice(0, limit),
+      all_creators_analyzed: allCreatorsAnalyzed,
       creators_analyzed: Object.keys(creators || {}).length,
       operators_analyzed: Object.keys(matrix || {}).length,
     });

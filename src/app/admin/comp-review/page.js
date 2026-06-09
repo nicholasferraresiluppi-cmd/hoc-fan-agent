@@ -34,8 +34,8 @@ export default function CompReviewPage() {
   const periods = useMemo(() => monthOpts(12), []);
   const [periodId, setPeriodId] = useState(periods[0]?.value || "");
   const [direction, setDirection] = useState("all");
-  const [minSales, setMinSales] = useState(500);
-  const [minShifts, setMinShifts] = useState(3);
+  const [minSales, setMinSales] = useState(200);
+  const [minShifts, setMinShifts] = useState(2);
   const [creatorFilter, setCreatorFilter] = useState("");
   const [operatorFilter, setOperatorFilter] = useState("");
 
@@ -54,10 +54,10 @@ export default function CompReviewPage() {
     });
   }, [data, creatorFilter, operatorFilter]);
 
-  const allCreators = useMemo(() => {
-    if (!data?.anomalies) return [];
-    return [...new Set(data.anomalies.map((a) => a.creator_alias))].sort();
-  }, [data]);
+  // TUTTI i creator analizzati (anche quelli con 0 anomalie) — utile per il
+  // dropdown filtro così Nicholas vede "Laura - IT (0)" e capisce che esiste
+  // ma non ha anomalie nel mese
+  const allCreatorsAnalyzed = data?.all_creators_analyzed || [];
 
   return (
     <div style={{ padding: "32px 28px 80px 28px", maxWidth: 1500, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
@@ -99,16 +99,33 @@ export default function CompReviewPage() {
             <label style={lbl}>Min turni</label>
             <input type="number" value={minShifts} onChange={(e) => setMinShifts(parseInt(e.target.value) || 1)} style={{ ...input, width: 70 }} />
           </div>
-          <div style={{ flex: 1, minWidth: 180, position: "relative" }}>
-            <label style={lbl}>Filtra per creator</label>
-            <input
+          <div style={{ flex: 1, minWidth: 220, position: "relative" }}>
+            <label style={lbl}>Filtra per creator ({allCreatorsAnalyzed.length} analizzati)</label>
+            <select
               value={creatorFilter}
               onChange={(e) => setCreatorFilter(e.target.value)}
-              placeholder="nome creator…"
-              style={{ ...input, paddingRight: creatorFilter ? 30 : 12, width: "100%" }}
-              list="creators-list"
-            />
-            <datalist id="creators-list">{allCreators.map((c) => <option key={c} value={c} />)}</datalist>
+              style={{ ...input, width: "100%", paddingRight: creatorFilter ? 30 : 12, cursor: "pointer" }}
+            >
+              <option value="" style={{ background: CP.surface }}>— Tutti i creator —</option>
+              {allCreatorsAnalyzed.filter((c) => c.anomaly_count > 0).length > 0 && (
+                <optgroup label="Con anomalie">
+                  {allCreatorsAnalyzed.filter((c) => c.anomaly_count > 0).map((c) => (
+                    <option key={c.alias} value={c.alias} style={{ background: CP.surface }}>
+                      {c.alias} ({c.anomaly_count} {c.anomaly_count === 1 ? "anomalia" : "anomalie"})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {allCreatorsAnalyzed.filter((c) => c.anomaly_count === 0).length > 0 && (
+                <optgroup label="Senza anomalie (tutto OK)">
+                  {allCreatorsAnalyzed.filter((c) => c.anomaly_count === 0).map((c) => (
+                    <option key={c.alias} value={c.alias} style={{ background: CP.surface }}>
+                      {c.alias} — 0 anomalie
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
             {creatorFilter && (
               <button onClick={() => setCreatorFilter("")} title="Rimuovi filtro" style={clearBtn}>
                 <X size={12} />
@@ -224,8 +241,22 @@ export default function CompReviewPage() {
                 </thead>
                 <tbody>
                   {filteredAnomalies.length === 0 && (
-                    <tr><td colSpan={13} style={{ padding: "30px 16px", textAlign: "center", color: CP.textMuted, fontStyle: "italic" }}>
-                      Nessuna anomalia trovata con questi filtri.
+                    <tr><td colSpan={13} style={{ padding: "30px 16px", textAlign: "center", color: CP.textMuted, fontSize: 13 }}>
+                      {creatorFilter ? (
+                        <>
+                          <div style={{ fontStyle: "italic", marginBottom: 12 }}>
+                            Nessuna anomalia su <b style={{ color: CP.accentGreen }}>{creatorFilter}</b> in {periodId} con le soglie attuali — tutti gli operatori sono in fascia OK.
+                          </div>
+                          <Link
+                            href={`/admin/comp-exam?creator=${encodeURIComponent(creatorFilter)}&months=1`}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 6, color: CP.accentGreen, fontSize: 12, fontWeight: 600, textDecoration: "none" }}
+                          >
+                            Vedi comunque la tabella completa di {creatorFilter} <ArrowRight size={12} />
+                          </Link>
+                        </>
+                      ) : (
+                        <span style={{ fontStyle: "italic" }}>Nessuna anomalia trovata con questi filtri.</span>
+                      )}
                     </td></tr>
                   )}
                   {filteredAnomalies.map((a, i) => <AnomalyRow key={`${a.creator_alias}-${a.operator}`} a={a} rank={i + 1} periodId={periodId} />)}
