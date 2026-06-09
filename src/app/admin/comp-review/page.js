@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Search, AlertTriangle, XCircle, ArrowRight, TrendingUp, TrendingDown, Filter, Loader2 } from "lucide-react";
+import { Search, AlertTriangle, XCircle, ArrowRight, TrendingUp, TrendingDown, Filter, Loader2, X, ChevronDown, ChevronRight } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
 
@@ -99,14 +99,35 @@ export default function CompReviewPage() {
             <label style={lbl}>Min turni</label>
             <input type="number" value={minShifts} onChange={(e) => setMinShifts(parseInt(e.target.value) || 1)} style={{ ...input, width: 70 }} />
           </div>
-          <div style={{ flex: 1, minWidth: 180 }}>
+          <div style={{ flex: 1, minWidth: 180, position: "relative" }}>
             <label style={lbl}>Filtra per creator</label>
-            <input value={creatorFilter} onChange={(e) => setCreatorFilter(e.target.value)} placeholder="nome creator…" style={input} list="creators-list" />
+            <input
+              value={creatorFilter}
+              onChange={(e) => setCreatorFilter(e.target.value)}
+              placeholder="nome creator…"
+              style={{ ...input, paddingRight: creatorFilter ? 30 : 12, width: "100%" }}
+              list="creators-list"
+            />
             <datalist id="creators-list">{allCreators.map((c) => <option key={c} value={c} />)}</datalist>
+            {creatorFilter && (
+              <button onClick={() => setCreatorFilter("")} title="Rimuovi filtro" style={clearBtn}>
+                <X size={12} />
+              </button>
+            )}
           </div>
-          <div style={{ flex: 1, minWidth: 180 }}>
+          <div style={{ flex: 1, minWidth: 180, position: "relative" }}>
             <label style={lbl}>Filtra per operatore</label>
-            <input value={operatorFilter} onChange={(e) => setOperatorFilter(e.target.value)} placeholder="nome operatore…" style={input} />
+            <input
+              value={operatorFilter}
+              onChange={(e) => setOperatorFilter(e.target.value)}
+              placeholder="nome operatore…"
+              style={{ ...input, paddingRight: operatorFilter ? 30 : 12, width: "100%" }}
+            />
+            {operatorFilter && (
+              <button onClick={() => setOperatorFilter("")} title="Rimuovi filtro" style={clearBtn}>
+                <X size={12} />
+              </button>
+            )}
           </div>
         </div>
       </CpCard>
@@ -207,7 +228,7 @@ export default function CompReviewPage() {
                       Nessuna anomalia trovata con questi filtri.
                     </td></tr>
                   )}
-                  {filteredAnomalies.map((a, i) => <AnomalyRow key={`${a.creator_alias}-${a.operator}`} a={a} rank={i + 1} />)}
+                  {filteredAnomalies.map((a, i) => <AnomalyRow key={`${a.creator_alias}-${a.operator}`} a={a} rank={i + 1} periodId={periodId} />)}
                 </tbody>
               </table>
             </div>
@@ -218,47 +239,140 @@ export default function CompReviewPage() {
   );
 }
 
-function AnomalyRow({ a, rank }) {
+function AnomalyRow({ a, rank, periodId }) {
+  const [expanded, setExpanded] = useState(false);
   const verdictColor = a.verdict === "OUT_OF_SCALE" ? CP.accentRed : "#F59E0B";
   const dirColor = a.direction === "overpaid" ? "#D44545" : "#4F8CCB";
   const DirIcon = a.direction === "overpaid" ? TrendingUp : TrendingDown;
   return (
-    <tr style={{ borderBottom: `1px solid ${CP.border}` }}>
-      <Td><span style={{ fontFamily: FONTS.mono, color: CP.textMuted, fontSize: 11 }}>{String(rank).padStart(2, "0")}</span></Td>
-      <Td><div style={{ fontWeight: 500 }}>{a.creator_alias}</div></Td>
-      <Td><div>{a.operator}</div></Td>
-      <Td align="right" mono>{a.shifts.toFixed(1)}</Td>
-      <Td align="right" mono><span style={{ color: CP.accentGreen, fontWeight: 600 }}>{fmtCurrency(a.sales)}</span></Td>
-      <Td align="right" mono><span style={{ color: "#D4AF7A" }}>{fmtCurrency(a.earnings)}</span></Td>
-      <Td align="right" mono><b>{fmtPct(a.effective_pct)}</b></Td>
-      <Td align="right" mono style={{ color: CP.textMuted }}>{fmtPct(a.team_avg_pct)}</Td>
-      <Td align="right" mono>
-        <span style={{ color: dirColor, fontWeight: 700 }}>
-          {a.delta_pct > 0 ? "+" : ""}{(a.delta_pct * 100).toFixed(0)}%
-        </span>
-      </Td>
-      <Td align="right" mono>
-        <span style={{ color: dirColor, fontWeight: 700 }}>
-          {a.impact_usd > 0 ? "+" : ""}{fmtCurrency(a.impact_usd)}
-        </span>
-      </Td>
-      <Td>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 8px", borderRadius: 4, background: dirColor + "22", color: dirColor, fontSize: 11, fontWeight: 700 }}>
-          <DirIcon size={11} /> {a.direction === "overpaid" ? "Sopra" : "Sotto"}
-        </span>
-        <div style={{ marginTop: 3, fontSize: 9, color: verdictColor, fontWeight: 700 }}>{a.verdict === "OUT_OF_SCALE" ? "FUORI SCALA" : "RIVEDIBILE"}</div>
-      </Td>
-      <Td><InlinePctDist dist={a.pct_distribution} /></Td>
-      <Td>
-        <Link
-          href={`/admin/comp-exam?creator=${encodeURIComponent(a.creator_alias)}&months=1`}
-          title="Drill-down dettaglio"
-          style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "5px 9px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 5, color: CP.accentGreen, fontSize: 11, fontWeight: 600, textDecoration: "none" }}
-        >
-          Drill <ArrowRight size={11} />
-        </Link>
-      </Td>
-    </tr>
+    <>
+      <tr style={{ borderBottom: expanded ? "none" : `1px solid ${CP.border}`, cursor: "pointer", background: expanded ? CP.surfaceAlt : "transparent" }} onClick={() => setExpanded((v) => !v)}>
+        <Td><span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: FONTS.mono, color: CP.textMuted, fontSize: 11 }}>
+          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          {String(rank).padStart(2, "0")}
+        </span></Td>
+        <Td><div style={{ fontWeight: 500 }}>{a.creator_alias}</div></Td>
+        <Td><div>{a.operator}</div></Td>
+        <Td align="right" mono>{a.shifts.toFixed(1)}</Td>
+        <Td align="right" mono><span style={{ color: CP.accentGreen, fontWeight: 600 }}>{fmtCurrency(a.sales)}</span></Td>
+        <Td align="right" mono><span style={{ color: "#D4AF7A" }}>{fmtCurrency(a.earnings)}</span></Td>
+        <Td align="right" mono><b>{fmtPct(a.effective_pct)}</b></Td>
+        <Td align="right" mono style={{ color: CP.textMuted }}>{fmtPct(a.team_avg_pct)}</Td>
+        <Td align="right" mono>
+          <span style={{ color: dirColor, fontWeight: 700 }}>
+            {a.delta_pct > 0 ? "+" : ""}{(a.delta_pct * 100).toFixed(0)}%
+          </span>
+        </Td>
+        <Td align="right" mono>
+          <span style={{ color: dirColor, fontWeight: 700 }}>
+            {a.impact_usd > 0 ? "+" : ""}{fmtCurrency(a.impact_usd)}
+          </span>
+        </Td>
+        <Td>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 8px", borderRadius: 4, background: dirColor + "22", color: dirColor, fontSize: 11, fontWeight: 700 }}>
+            <DirIcon size={11} /> {a.direction === "overpaid" ? "Sopra" : "Sotto"}
+          </span>
+          <div style={{ marginTop: 3, fontSize: 9, color: verdictColor, fontWeight: 700 }}>{a.verdict === "OUT_OF_SCALE" ? "FUORI SCALA" : "RIVEDIBILE"}</div>
+        </Td>
+        <Td><InlinePctDist dist={a.pct_distribution} /></Td>
+        <Td>
+          <Link
+            href={`/admin/comp-exam?creator=${encodeURIComponent(a.creator_alias)}&months=1`}
+            onClick={(e) => e.stopPropagation()}
+            title="Drill-down dettaglio creator completo"
+            style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "5px 9px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 5, color: CP.accentGreen, fontSize: 11, fontWeight: 600, textDecoration: "none" }}
+          >
+            Drill <ArrowRight size={11} />
+          </Link>
+        </Td>
+      </tr>
+      {expanded && (
+        <tr style={{ borderBottom: `1px solid ${CP.border}`, background: CP.surfaceAlt }}>
+          <td colSpan={13} style={{ padding: "0 16px 16px 16px" }}>
+            <ShiftBreakdown creator={a.creator_alias} operator={a.operator} periodId={periodId} expectedSales={a.sales} expectedEarnings={a.earnings} />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function ShiftBreakdown({ creator, operator, periodId, expectedSales, expectedEarnings }) {
+  const { data, error, isLoading } = useSWR(
+    `/api/admin/op-shifts?creator=${encodeURIComponent(creator)}&operator=${encodeURIComponent(operator)}&period_id=${periodId}`,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+
+  if (isLoading) return <div style={{ padding: 12, color: CP.textMuted, fontSize: 12 }}><Loader2 size={12} className="animate-spin" style={{ display: "inline", verticalAlign: "middle", marginRight: 6 }} />Carico shift…</div>;
+  if (error || data?.error) return <div style={{ padding: 12, color: CP.accentRed, fontSize: 12 }}>Errore: {data?.error || String(error)}</div>;
+  if (!data?.shifts || data.shifts.length === 0) return <div style={{ padding: 12, color: CP.textMuted, fontSize: 12, fontStyle: "italic" }}>Nessun shift trovato per questa coppia (mapping operatore?).</div>;
+
+  const totals = data.totals;
+  // Verifica integrità: i totali del breakdown devono matchare i totali dell'anomaly
+  const salesMatch = Math.abs(totals.sales - expectedSales) / Math.max(expectedSales, 1) < 0.05;
+  const earnMatch = Math.abs(totals.earnings - expectedEarnings) / Math.max(expectedEarnings, 1) < 0.05;
+
+  return (
+    <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, padding: 14, marginTop: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ fontSize: 12, color: CP.textSecondary }}>
+          <b>Breakdown shift-by-shift</b> · {data.shifts.length} turni · totale sales <b style={{ color: CP.accentGreen }}>{fmtCurrency(totals.sales)}</b> · totale guadagno <b style={{ color: "#D4AF7A" }}>{fmtCurrency(totals.earnings)}</b> · % media <b>{fmtPct(totals.overall_pct)}</b>
+        </div>
+        <div style={{ fontSize: 10, fontFamily: FONTS.mono, color: salesMatch && earnMatch ? CP.accentGreen : "#F59E0B" }}>
+          {salesMatch && earnMatch
+            ? "✓ Totali allineati con la tabella"
+            : `⚠ Disallineamento — atteso: $${expectedSales} sales / $${expectedEarnings} guadagno`}
+        </div>
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${CP.border}`, color: CP.textMuted }}>
+              <th style={{ padding: "6px 8px", textAlign: "left", fontFamily: FONTS.mono, fontSize: 9, textTransform: "uppercase" }}>Data</th>
+              <th style={{ padding: "6px 8px", textAlign: "left", fontFamily: FONTS.mono, fontSize: 9, textTransform: "uppercase" }}>Orario</th>
+              <th style={{ padding: "6px 8px", textAlign: "left", fontFamily: FONTS.mono, fontSize: 9, textTransform: "uppercase" }}>Fascia</th>
+              <th style={{ padding: "6px 8px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 9, textTransform: "uppercase" }}>Sales tot turno</th>
+              <th style={{ padding: "6px 8px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 9, textTransform: "uppercase" }}>Sales su creator</th>
+              <th style={{ padding: "6px 8px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 9, textTransform: "uppercase" }}>Guadagno</th>
+              <th style={{ padding: "6px 8px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 9, textTransform: "uppercase" }}>%</th>
+              <th style={{ padding: "6px 8px", textAlign: "left", fontFamily: FONTS.mono, fontSize: 9, textTransform: "uppercase" }}>Tipo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.shifts.map((s, i) => {
+              const dt = new Date(s.started_at);
+              const dtEnd = new Date(s.ended_at);
+              const fmtTime = (d) => d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+              const fmtDate = (d) => d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", weekday: "short" });
+              return (
+                <tr key={s.shift_id || i} style={{ borderBottom: `1px solid ${CP.border}88`, color: CP.textPrimary }}>
+                  <td style={{ padding: "6px 8px", fontFamily: FONTS.mono }}>{fmtDate(dt)}</td>
+                  <td style={{ padding: "6px 8px", fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmtTime(dt)}–{fmtTime(dtEnd)}</td>
+                  <td style={{ padding: "6px 8px", color: CP.textSecondary }}>{s.interval || "—"}</td>
+                  <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: FONTS.mono, color: CP.textMuted }}>{fmtCurrency(s.total_shift_sales)}</td>
+                  <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmtCurrency(s.sales_on_creator)}</td>
+                  <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: FONTS.mono, color: "#D4AF7A", fontWeight: 600 }}>{fmtCurrency(s.earnings_on_creator)}</td>
+                  <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700 }}>{fmtPct(s.pct_on_creator)}</td>
+                  <td style={{ padding: "6px 8px", fontSize: 9 }}>
+                    {s.multi_creator ? (
+                      <span title={`Multi creator: ${s.all_creators_in_shift.join(", ")}`} style={{ color: s.exact_attribution ? "#D4AF7A" : "#F59E0B" }}>
+                        {s.exact_attribution ? `SPLIT esatto (takes)` : `SPLIT 50/50`}
+                      </span>
+                    ) : (
+                      <span style={{ color: CP.accentGreen }}>MONO</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ marginTop: 10, padding: "8px 10px", background: CP.bg, borderRadius: 6, fontSize: 11, color: CP.textMuted, lineHeight: 1.6 }}>
+        🔍 <b>Verifica manuale</b>: apri CP → Timeline → <b>{creator}</b> a {periodId} → cerca gli shift di <b>{operator}</b> e confronta date/orari/sales. Per turni MONO il sales/% sono diretti. Per turni SPLIT il sales è proporzionale ai takes per creator (se "SPLIT esatto") o 50/50 (fallback).
+      </div>
+    </div>
   );
 }
 
@@ -299,3 +413,4 @@ function Td({ children, align, mono, style }) {
 const lbl = { display: "block", fontSize: 10, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
 const input = { padding: "8px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
 const chipBtn = { background: "transparent", border: "none", color: CP.textPrimary, fontSize: 13, cursor: "pointer", padding: 0, textAlign: "left", fontFamily: FONTS.body, textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: CP.border };
+const clearBtn = { position: "absolute", right: 8, top: 28, padding: 3, background: CP.surfaceAlt, border: "none", borderRadius: 3, color: CP.textMuted, cursor: "pointer", display: "flex", alignItems: "center" };

@@ -121,7 +121,7 @@ export const SCORE_BLEND = { vs_creator: 0.7, vs_agency: 0.3 };
  *   - Se lo shift ha `takes[]` con creator_alias + amount → attribuzione esatta.
  *   - Fallback (sync vecchi senza takes): split equo 50/50.
  */
-function distributeShift(shift) {
+export function distributeShift(shift) {
   const creators = (shift.creator_aliases || []).filter(Boolean);
   if (creators.length === 0) return [];
   const interval = shift.interval_bucket || bucket(shift.started_at);
