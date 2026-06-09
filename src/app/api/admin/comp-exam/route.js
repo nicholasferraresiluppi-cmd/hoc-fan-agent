@@ -112,21 +112,22 @@ export async function GET(request) {
       }
     })(groupsRaw);
 
-    // Trova target creator (exact > startsWith > substring)
+    // Trova target creator nei CP groups (exact > startsWith > substring > token match)
+    // ATTENZIONE: i nomi CP groups e gli alias Infloww sono DIVERSI! Es. CP ha
+    // "Laura 🇮🇹" / "Laura ENG 🇬🇧" mentre Infloww ha "Laura Sommaruga - IT" / "- EN".
+    // Quindi il match CP può fallire — non è bloccante, procediamo cmq con alias.
     const q = creatorName.toLowerCase().trim();
-    const target =
+    const qTokens = q.split(/[\s_\-,]+/).filter((t) => t.length >= 3 && !/^(it|en|es|uk|us|ita|eng|esp)$/i.test(t));
+    let target =
       allGroups.find((g) => (g.name || "").toLowerCase() === q) ||
       allGroups.find((g) => (g.name || "").toLowerCase().startsWith(q)) ||
       allGroups.find((g) => (g.name || "").toLowerCase().includes(q));
-
-    if (!target) {
-      return Response.json({
-        error: `Creator "${creatorName}" non trovato.`,
-        suggestions: allGroups
-          .filter((g) => g.name?.toLowerCase().includes(q.split(" ")[0] || ""))
-          .slice(0, 10)
-          .map((g) => g.name),
-      }, { status: 404 });
+    if (!target && qTokens.length > 0) {
+      // Token match: il group name contiene TUTTI i token significativi
+      target = allGroups.find((g) => {
+        const n = (g.name || "").toLowerCase();
+        return qTokens.every((t) => n.includes(t));
+      });
     }
 
     const groupIdsSet = new Set(allGroups.map((g) => g.id));
@@ -142,20 +143,52 @@ export async function GET(request) {
       return r.status === "fulfilled" ? { period_id: pid, ...r.value } : { period_id: pid, error: String(r.reason?.message || r.reason) };
     });
 
-    // Identifica nomi creator alias che corrispondono a questo target.
-    // Le matrici sono indicizzate per "alias" (= nome Infloww), che spesso coincide
-    // con il group.name CP ma può essere diverso. Cerchiamo qualsiasi alias che
-    // contenga il primo token del nome target (es. "ottorini").
-    const lastNameToken = (target.name || "").toLowerCase().split(/\s+/).filter(Boolean).pop() || q;
+    // Identifica alias Infloww che corrispondono al creator richiesto.
+    // Strategia multi-fallback (più tollerante possibile):
+    //  1. Exact match q vs alias lowercase
+    //  2. Alias contiene q
+    //  3. q contiene alias
+    //  4. Tutti i token significativi di q sono nell'alias
+    //  5. Se abbiamo trovato target CP: alias contiene il nome target o suoi token
     const aliasSet = new Set();
+    const allAliasesInMatrix = new Set();
     for (const m of monthData) {
       if (m.error) continue;
       for (const cr of Object.keys(m.creators || {})) {
+        allAliasesInMatrix.add(cr);
         const cl = cr.toLowerCase();
-        if (cl === q || cl.includes(lastNameToken) || cl.replace(/[\s_-]/g, "").includes(q.replace(/[\s_-]/g, ""))) {
-          aliasSet.add(cr);
+        const norm = (s) => s.replace(/[\s_\-,]/g, "");
+        let matched = false;
+        if (cl === q) matched = true;
+        else if (cl.includes(q)) matched = true;
+        else if (q.includes(cl)) matched = true;
+        else if (norm(cl) === norm(q) || norm(cl).includes(norm(q)) || norm(q).includes(norm(cl))) matched = true;
+        else if (qTokens.length > 0 && qTokens.every((t) => cl.includes(t))) matched = true;
+        else if (target?.name) {
+          const tName = target.name.toLowerCase();
+          const tTokens = tName.split(/\s+/).filter((t) => t.length >= 3);
+          if (cl.includes(tName) || tTokens.some((t) => cl.includes(t))) matched = true;
         }
+        if (matched) aliasSet.add(cr);
       }
+    }
+
+    // Se non abbiamo né target CP né alias match → 404 con suggestion utili
+    if (!target && aliasSet.size === 0) {
+      return Response.json({
+        error: `Creator "${creatorName}" non trovato né nei group CP né negli alias Infloww.`,
+        suggestions_cp_groups: allGroups
+          .filter((g) => qTokens.some((t) => (g.name || "").toLowerCase().includes(t)))
+          .slice(0, 10).map((g) => g.name),
+        suggestions_infloww_aliases: [...allAliasesInMatrix]
+          .filter((a) => qTokens.some((t) => a.toLowerCase().includes(t)))
+          .slice(0, 10),
+      }, { status: 404 });
+    }
+
+    // Se target CP non trovato, costruisco target "virtuale" usando il primo alias
+    if (!target) {
+      target = { id: null, name: [...aliasSet][0] || creatorName, parentId: null };
     }
 
     // Aggrega per operatore — include cell.earnings (= guadagno REALE per quel creator,
@@ -408,7 +441,13 @@ export async function GET(request) {
     }));
 
     return Response.json({
-      creator: { id: target.id, name: target.name, parentId: target.parentId, matched_aliases: [...aliasSet] },
+      creator: {
+        id: target.id,
+        name: target.name,
+        parentId: target.parentId,
+        matched_aliases: [...aliasSet],
+        cp_group_matched: !!target.id, // false se creator non c'è in CP groups (= match solo via alias Infloww)
+      },
       months_analyzed: periods,
       months_errors: monthData.filter((m) => m.error).map((m) => ({ period_id: m.period_id, error: m.error })),
       operators_count: operators.length,
