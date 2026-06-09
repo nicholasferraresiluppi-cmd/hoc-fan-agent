@@ -300,6 +300,37 @@ export async function GET(request) {
         profiles_total: profiles.length,
         profiles_with_resolved_group: profilesEnriched.filter((p) => p.links.some((l) => l.groupId)).length,
         profiles_with_resolved_member: profilesEnriched.filter((p) => p.links.some((l) => l.memberId)).length,
+        target_group_id: target.id,
+        target_group_parent_id: target.parentId,
+        target_group_children_count: Array.isArray(target.childrens) ? target.childrens.length : 0,
+        // Dump dei primi 3 creatorPaymentProfiles raw dei primi 3 profili,
+        // per capire cosa c'è davvero dentro
+        sample_raw_creatorPaymentProfiles: profiles.slice(0, 3).map((p) => ({
+          profile_name: p.name,
+          profile_id: p.id,
+          creatorPaymentProfiles_count: Array.isArray(p.creatorPaymentProfiles) ? p.creatorPaymentProfiles.length : 0,
+          first_cpp_raw: p.creatorPaymentProfiles?.[0] || null,
+        })),
+        // Dump dei primi 3 profili che CONTENGONO un UUID matching nei wage shifts
+        // (forse il link è per shift/wage non per group)
+        sample_first_3_profiles_all_uuids: profiles.slice(0, 3).map((p) => {
+          const uuids = [];
+          function scanForUuids(obj, path = "") {
+            if (!obj || typeof obj !== "object") return;
+            for (const [k, v] of Object.entries(obj)) {
+              const np = path ? `${path}.${k}` : k;
+              if (typeof v === "string" && isUuid(v)) {
+                uuids.push({
+                  path: np, value: v,
+                  in_groups: groupIdsSet.has(v),
+                  in_members: memberIdsSet.has(v),
+                });
+              } else if (v && typeof v === "object") scanForUuids(v, np);
+            }
+          }
+          scanForUuids(p.creatorPaymentProfiles?.[0] || {});
+          return { profile_name: p.name, uuids };
+        }),
       },
     });
   } catch (e) {
