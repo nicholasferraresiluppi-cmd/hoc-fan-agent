@@ -281,6 +281,36 @@ export default function CompCalendarPage() {
     return JSON.stringify(simByClass) !== JSON.stringify(origByClass);
   }, [simByClass, origByClass]);
 
+  // Vista griglia simulata: quando modifichi gli scaglioni, la TIMELINE si
+  // ricolora coi tier simulati → vedi a colpo d'occhio se le soglie sono
+  // calibrate (mix di colori) o troppo alte (tutto rosso = nessuno le supera)
+  const [gridSim, setGridSim] = useState(false);
+  useEffect(() => { setGridSim(simChanged); }, [simChanged]);
+
+  const simPctById = useMemo(() => {
+    if (!sim?.simRows) return null;
+    const m = new Map();
+    for (const r of sim.simRows) m.set(r.shift_id, r.sim_pct);
+    return m;
+  }, [sim]);
+
+  // Distribuzione turni per scaglione: reale → simulato (il check calibrazione)
+  const tierDist = useMemo(() => {
+    if (!grid) return null;
+    const real = {};
+    for (const r of grid.rows) if (r.expected_pct != null) {
+      const k = r.expected_pct.toFixed(3);
+      real[k] = (real[k] || 0) + 1;
+    }
+    const simD = {};
+    if (sim) for (const sr of sim.simRows) {
+      const k = sr.sim_pct.toFixed(3);
+      simD[k] = (simD[k] || 0) + 1;
+    }
+    const keys = [...new Set([...Object.keys(real), ...Object.keys(simD)])].sort((a, b) => parseFloat(a) - parseFloat(b));
+    return keys.map((k) => ({ pct: parseFloat(k), real: real[k] || 0, sim: simD[k] || 0 }));
+  }, [grid, sim]);
+
   return (
     <div style={{ padding: "32px 28px 80px 28px", maxWidth: 1500, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
       <PageHeader
@@ -392,7 +422,57 @@ export default function CompCalendarPage() {
           </div>
 
           {/* Griglia */}
-          <CpCard padding="0" style={{ overflow: "hidden", marginBottom: 22 }}>
+          {/* Calibrazione: toggle vista reale/simulata + distribuzione per scaglione */}
+          {tierDist && (
+            <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+              {sim && simChanged && (
+                <div style={{ display: "flex", gap: 4, padding: 3, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8 }}>
+                  {[["real", "Scaglioni reali"], ["sim", "Simulati"]].map(([v, lab]) => (
+                    <button
+                      key={v}
+                      onClick={() => setGridSim(v === "sim")}
+                      style={{
+                        padding: "5px 12px", borderRadius: 6, border: "none", cursor: "pointer",
+                        background: (gridSim ? "sim" : "real") === v ? CP.surfaceAlt : "transparent",
+                        color: (gridSim ? "sim" : "real") === v ? (v === "sim" ? CP.accent : CP.textPrimary) : CP.textMuted,
+                        fontSize: 12, fontWeight: 500, fontFamily: FONTS.body,
+                      }}
+                    >
+                      {lab}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                <span style={{ fontSize: 11, color: CP.textMuted }}>Turni per scaglione{simChanged ? " (reale → sim)" : ""}:</span>
+                {tierDist.map(({ pct, real, sim: simCount }) => {
+                  const col = grid.colorOf(pct);
+                  const delta = simCount - real;
+                  return (
+                    <span key={pct} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", background: col + "16", border: `1px solid ${col}50`, borderRadius: 6, fontSize: 11, fontFamily: FONTS.mono }}>
+                      <span style={{ width: 7, height: 7, borderRadius: 2, background: col }} />
+                      <b style={{ color: col }}>{fmtPct(pct)}</b>
+                      <span style={{ color: CP.textSecondary }}>{real}t</span>
+                      {simChanged && (
+                        <>
+                          <span style={{ color: CP.textMuted }}>→</span>
+                          <b style={{ color: col }}>{simCount}t</b>
+                          {delta !== 0 && <span style={{ color: delta > 0 ? CP.accentGreen : CP.accentRed, fontSize: 10 }}>({delta > 0 ? "+" : ""}{delta})</span>}
+                        </>
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+              {gridSim && (
+                <span style={{ fontSize: 11, color: CP.accent, fontStyle: "italic" }}>
+                  La griglia mostra i colori SIMULATI — tutto su un colore solo = soglie da ricalibrare
+                </span>
+              )}
+            </div>
+          )}
+
+          <CpCard padding="0" style={{ overflow: "hidden", marginBottom: 22, border: gridSim ? `1px solid ${CP.accent}55` : undefined }}>
             <div style={{ overflowX: "auto", maxHeight: 600, overflowY: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
                 <thead>
@@ -417,18 +497,22 @@ export default function CompCalendarPage() {
                           return (
                             <td key={c} style={{ ...td, padding: "3px 5px" }}>
                               {cell.map((r) => {
-                                const col = grid.colorOf(r.expected_pct);
-                                const mismatch = r.delta_pct != null && Math.abs(r.delta_pct) > 0.005;
-                                const flag = mismatch || grid.cosellerFlags.has(r.shift_id) || grid.wrongCreatorFlags.has(r.shift_id);
+                                // Vista simulata: il chip si colora col tier SIMULATO del turno
+                                const simPct = gridSim && simPctById ? simPctById.get(r.shift_id) : null;
+                                const dispPct = simPct ?? r.expected_pct;
+                                const tierChanged = simPct != null && r.expected_pct != null && Math.abs(simPct - r.expected_pct) > 0.0001;
+                                const col = grid.colorOf(dispPct);
+                                const mismatch = !gridSim && r.delta_pct != null && Math.abs(r.delta_pct) > 0.005;
+                                const flag = mismatch || (!gridSim && (grid.cosellerFlags.has(r.shift_id) || grid.wrongCreatorFlags.has(r.shift_id)));
                                 return (
                                   <div
                                     key={r.shift_id}
-                                    title={`${r.operator} · ${r.start}–${r.end}\nVenduto ${fmt$(r.sales_on_creator)} · pagato ${fmt$(r.earnings_attr)} (${fmtPct(r.eff_pct, 1)})\nProfilo "${r.profile_name || "?"}" (${r.profile_cosellers ?? "?"} cos.)${mismatch ? "\n⚠ FUORI SCAGLIONE" : ""}${grid.cosellerFlags.has(r.shift_id) ? "\n⚠ cosellers incoerenti" : ""}${grid.wrongCreatorFlags.has(r.shift_id) ? "\n⚠ profilo di altro creator" : ""}`}
+                                    title={`${r.operator} · ${r.start}–${r.end}\nVenduto ${fmt$(r.sales_on_creator)} · pagato ${fmt$(r.earnings_attr)} (${fmtPct(r.eff_pct, 1)})\nProfilo "${r.profile_name || "?"}" (${r.profile_cosellers ?? "?"} cos.)${simPct != null ? `\nSim: ${fmtPct(simPct)} (reale ${fmtPct(r.expected_pct)})${tierChanged ? " — CAMBIA SCAGLIONE" : ""}` : ""}${mismatch ? "\n⚠ FUORI SCAGLIONE" : ""}${grid.cosellerFlags.has(r.shift_id) ? "\n⚠ cosellers incoerenti" : ""}${grid.wrongCreatorFlags.has(r.shift_id) ? "\n⚠ profilo di altro creator" : ""}`}
                                     style={{
                                       display: "flex", justifyContent: "space-between", alignItems: "center", gap: 4,
                                       padding: "2px 6px", marginBottom: 2, borderRadius: 4,
                                       background: mismatch ? CP.accentRed + "30" : col + "16",
-                                      border: `1px solid ${mismatch ? CP.accentRed : col}50`,
+                                      border: `1px ${tierChanged ? "dashed" : "solid"} ${mismatch ? CP.accentRed : col}${tierChanged ? "" : "50"}`,
                                       fontSize: 10, cursor: "default",
                                     }}
                                   >
@@ -436,8 +520,8 @@ export default function CompCalendarPage() {
                                       {flag && <AlertTriangle size={8} style={{ display: "inline", marginRight: 2, color: CP.accentRed }} />}
                                       {r.operator.split(" ")[0]}
                                     </span>
-                                    <span style={{ fontFamily: FONTS.mono, fontWeight: 700, color: col, whiteSpace: "nowrap", fontSize: 9.5 }}>
-                                      {fmt$(r.sales_on_creator)}·{fmtPct(r.expected_pct)}
+                                    <span style={{ fontFamily: FONTS.mono, fontWeight: 500, color: col, whiteSpace: "nowrap", fontSize: 9.5 }}>
+                                      {fmt$(r.sales_on_creator)}·{fmtPct(dispPct)}
                                     </span>
                                   </div>
                                 );
