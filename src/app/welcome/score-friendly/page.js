@@ -347,7 +347,7 @@ function Section({ icon: Icon, color, title, badge, children }) {
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
           {badge && (
-            <div style={{ fontSize: 10, color: CP.textMuted, fontFamily: FONTS.mono, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em" }}>{badge}</div>
+            <div style={{ fontSize: 10, color: CP.textMuted, fontFamily: FONTS.mono, fontWeight: 700, letterSpacing: "0.12em" }}>{badge}</div>
           )}
           <h2 style={{ fontFamily: FONTS.display, fontSize: 22, fontWeight: 700, margin: "2px 0 0 0", letterSpacing: "-0.015em", color: CP.textPrimary }}>{title}</h2>
         </div>
@@ -386,7 +386,7 @@ function Example({ children }) {
       color: CP.textPrimary,
       lineHeight: 1.6,
     }}>
-      <div style={{ fontFamily: FONTS.mono, fontSize: 10, color: CP.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Esempio</div>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 10, color: CP.textMuted, fontWeight: 700, letterSpacing: "0.1em", marginBottom: 6 }}>Esempio</div>
       {children}
     </div>
   );

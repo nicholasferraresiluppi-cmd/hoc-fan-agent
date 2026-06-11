@@ -73,12 +73,12 @@ function getInitials(name) {
 function TierBadge({ tier }) {
   if (!tier) return null;
   const color = TIER_COLORS[tier] || COLORS.mist;
-  return <span style={{ display: "inline-block", padding: "3px 11px", borderRadius: 999, fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", background: color + "26", color, border: `1px solid ${color}55` }}>{tier}</span>;
+  return <span style={{ display: "inline-block", padding: "3px 11px", borderRadius: 999, fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", background: color + "26", color, border: `1px solid ${color}55` }}>{tier}</span>;
 }
 function CategoryBadge({ category }) {
   if (!category) return null;
   const color = CATEGORY_COLORS[category] || COLORS.mist;
-  return <span style={{ display: "inline-block", padding: "1px 7px", borderRadius: 999, fontSize: 9, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", background: color + "20", color, border: `1px solid ${color}55`, marginLeft: 6, verticalAlign: "middle" }}>{category}</span>;
+  return <span style={{ display: "inline-block", padding: "1px 7px", borderRadius: 999, fontSize: 9, fontWeight: 600, letterSpacing: "0.06em", background: color + "20", color, border: `1px solid ${color}55`, marginLeft: 6, verticalAlign: "middle" }}>{category}</span>;
 }
 function LanguageBadge({ language }) {
   if (!language) return null;
@@ -92,7 +92,7 @@ function Avatar({ name, size = 28, large = false }) {
 function StatCard({ label, value, sub, color, tooltip }) {
   return (
     <div title={tooltip || ""} style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, padding: "16px 18px", cursor: tooltip ? "help" : "default" }}>
-      <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 }}>{label}{tooltip && <span style={{ marginLeft: 4, opacity: 0.4 }}>ⓘ</span>}</div>
+      <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.12em", marginBottom: 6 }}>{label}{tooltip && <span style={{ marginLeft: 4, opacity: 0.4 }}>ⓘ</span>}</div>
       <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 22, color: color || COLORS.alabaster }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: COLORS.mist, marginTop: 4 }}>{sub}</div>}
     </div>
@@ -282,13 +282,13 @@ export default function SalesCpLeaderboardPage() {
     sub: { color: COLORS.fog, fontSize: 14, marginBottom: 22, maxWidth: 900, lineHeight: 1.55 },
     filterBar: { display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" },
     filterRow: { display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" },
-    filterLabel: { fontSize: 11, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em", marginRight: 4 },
+    filterLabel: { fontSize: 11, color: COLORS.fog, letterSpacing: "0.1em", marginRight: 4 },
     select: { padding: "9px 14px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 10, color: COLORS.alabaster, fontSize: 13, fontFamily: FONTS.body, cursor: "pointer", minWidth: 180, outline: "none" },
     catPill: (active, color) => ({ padding: "8px 14px", background: active ? color : COLORS.graphite, border: `1px solid ${active ? color : COLORS.charcoal}`, borderRadius: 999, color: active ? COLORS.obsidian : COLORS.alabaster, fontSize: 12, cursor: "pointer", fontWeight: active ? 600 : 500, fontFamily: FONTS.body }),
     summary: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 22 },
     top4Grid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 },
     streamWrap: { background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 16, overflow: "visible" },
-    streamHead: { display: "grid", gridTemplateColumns: streamGridTemplate, padding: "14px 22px", background: COLORS.obsidian + "80", color: COLORS.fog, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` },
+    streamHead: { display: "grid", gridTemplateColumns: streamGridTemplate, padding: "14px 22px", background: COLORS.obsidian + "80", color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` },
   };
 
   return (
@@ -381,7 +381,7 @@ export default function SalesCpLeaderboardPage() {
                 {/* overlay click-out */}
                 <div onClick={() => setTroubleshootOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 50 }} />
                 <div role="menu" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 280, background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 10, boxShadow: "0 18px 40px rgba(0,0,0,0.6)", padding: 6, zIndex: 60 }}>
-                  <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 0.8, color: COLORS.fog, opacity: 0.6, padding: "8px 10px 4px" }}>Risolvi problemi</div>
+                  <div style={{ fontSize: 10, letterSpacing: 0.8, color: COLORS.fog, opacity: 0.6, padding: "8px 10px 4px" }}>Risolvi problemi</div>
                   {[
                     { href: "/admin/wage-audit", icon: ShieldCheck, label: "Wage Audit", hint: "wage / shift mancanti per mese" },
                     { href: "/admin/debug-mapping", icon: Link2, label: "Debug Mapping", hint: "operatori senza match in CP" },
@@ -495,7 +495,7 @@ export default function SalesCpLeaderboardPage() {
                 <div style={{ textAlign: "center", position: "relative" }}>
                   <div style={{ fontSize: 32, marginBottom: 4 }}>💰</div>
                   <div style={{ fontFamily: FONTS.display, fontWeight: 500, fontStyle: "italic", fontSize: 56, lineHeight: 1, color: COLORS.champagne }}>1</div>
-                  <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.15em", marginTop: 4 }}>Top Sales CP</div>
+                  <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.15em", marginTop: 4 }}>Top Sales CP</div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 18, position: "relative" }}>
                   <Avatar name={heroOp.employee} size={84} large />
@@ -503,14 +503,14 @@ export default function SalesCpLeaderboardPage() {
                     <Link href={`/leaderboard/operational/${encodeURIComponent(heroOp.employee)}`} style={{ color: "inherit", textDecoration: "none" }}>
                       <div style={{ fontFamily: FONTS.display, fontSize: 28, fontWeight: 500, letterSpacing: "-0.01em", marginBottom: 4, cursor: "pointer" }}>{heroOp.employee} <span style={{ fontSize: 14, color: COLORS.champagne, opacity: 0.7 }}>›</span></div>
                     </Link>
-                    <div style={{ color: COLORS.champagne, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 8 }}>
+                    <div style={{ color: COLORS.champagne, fontSize: 12, letterSpacing: "0.12em", marginBottom: 8 }}>
                       {heroOp.group || "—"}<CategoryBadge category={heroOp.category} /><LanguageBadge language={heroOp.language} />
                     </div>
                     <TierBadge tier={heroOp.tier} />
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.15em" }}>Score CP</div>
+                  <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.15em" }}>Score CP</div>
                   <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 56, lineHeight: 1, color: TIER_COLORS[heroOp.tier] }}>{heroOp.score?.toFixed(1)}</div>
                   <div style={{ fontFamily: FONTS.mono, color: COLORS.mist, fontSize: 13, marginTop: 2 }}>/ 100</div>
                 </div>
@@ -537,7 +537,7 @@ export default function SalesCpLeaderboardPage() {
                           <Link href={`/leaderboard/operational/${encodeURIComponent(op.employee)}`} style={{ color: "inherit", textDecoration: "none" }}>
                             <div style={{ fontFamily: FONTS.display, fontSize: 15, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer" }}>{op.employee} <span style={{ color: COLORS.champagne, opacity: 0.55, fontSize: 12 }}>›</span></div>
                           </Link>
-                          <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.08em", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                             {op.group || "—"}<CategoryBadge category={op.category} /><LanguageBadge language={op.language} />
                           </div>
                         </div>
@@ -589,7 +589,7 @@ export default function SalesCpLeaderboardPage() {
                       boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
                       minWidth: 260,
                     }}>
-                      <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em", padding: "6px 10px 8px", borderBottom: `1px solid ${COLORS.charcoal}` }}>
+                      <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.1em", padding: "6px 10px 8px", borderBottom: `1px solid ${COLORS.charcoal}` }}>
                         KPI Infloww aggiuntive
                       </div>
                       {EXTRA_COLUMNS.map((c) => {
@@ -810,7 +810,7 @@ export default function SalesCpLeaderboardPage() {
 function HeroStat({ l, v }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, fontSize: 12 }}>
-      <span style={{ color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.06em", fontSize: 10 }}>{l}</span>
+      <span style={{ color: COLORS.fog, letterSpacing: "0.06em", fontSize: 10 }}>{l}</span>
       <span style={{ fontFamily: FONTS.mono, fontWeight: 600, color: COLORS.alabaster, fontSize: 14 }}>{v}</span>
     </div>
   );

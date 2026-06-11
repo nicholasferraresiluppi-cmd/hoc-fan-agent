@@ -21,11 +21,10 @@ export function SectionLabel({ children, color, size = 10, style }) {
     <span
       style={{
         color: color || CP.textMuted,
-        fontFamily: FONTS.mono,
-        fontSize: size,
-        fontWeight: 700,
-        textTransform: "uppercase",
-        letterSpacing: "0.14em",
+        fontFamily: FONTS.body,
+        fontSize: Math.max(size, 11),
+        fontWeight: 500,
+        letterSpacing: "0.02em",
         ...style,
       }}
     >
@@ -41,7 +40,7 @@ export function CpCard({ children, style, accent, padding = "20px 22px", onClick
       style={{
         background: CP.surface,
         border: `1px solid ${accent ? accent + "55" : CP.border}`,
-        borderRadius: 14,
+        borderRadius: 10,
         padding,
         cursor: onClick ? "pointer" : "default",
         ...style,
@@ -59,7 +58,7 @@ export function StatCard({ label, value, sub, color, tooltip, accent }) {
       style={{
         background: CP.surface,
         border: `1px solid ${accent ? accent + "55" : CP.border}`,
-        borderRadius: 14,
+        borderRadius: 10,
         padding: "18px 22px",
         cursor: tooltip ? "help" : "default",
         minHeight: 100,
@@ -82,12 +81,12 @@ export function StatCard({ label, value, sub, color, tooltip, accent }) {
       </div>
       <div
         style={{
-          fontFamily: FONTS.display,
-          fontWeight: 700,
-          fontSize: 34,
-          lineHeight: 1.05,
+          fontFamily: FONTS.body,
+          fontWeight: 500,
+          fontSize: 22,
+          lineHeight: 1.15,
           color: color || CP.textPrimary,
-          letterSpacing: "-0.02em",
+          letterSpacing: "-0.01em",
         }}
       >
         {value}
@@ -126,7 +125,7 @@ export function TrendPill({ value, suffix = "%", size = "md", neutralAt0 = true 
         color,
         borderRadius: 999,
         fontFamily: FONTS.mono,
-        fontWeight: 600,
+        fontWeight: 500,
         fontSize,
         lineHeight: 1,
       }}
@@ -165,7 +164,7 @@ export function MiniInsight({ label, children, accent, value }) {
       style={{
         background: CP.surface,
         border: `1px solid ${CP.border}`,
-        borderRadius: 12,
+        borderRadius: 10,
         padding: "14px 16px",
         display: "flex",
         flexDirection: "column",
@@ -174,11 +173,11 @@ export function MiniInsight({ label, children, accent, value }) {
     >
       <SectionLabel color={CP.textMuted} size={10}>{label}</SectionLabel>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <div style={{ minWidth: 0, flex: 1, fontSize: 14, color: CP.textPrimary, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div style={{ minWidth: 0, flex: 1, fontSize: 14, color: CP.textPrimary, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {children}
         </div>
         {value != null && (
-          <div style={{ fontFamily: FONTS.mono, fontSize: 16, fontWeight: 700, color: accent || CP.textPrimary, whiteSpace: "nowrap" }}>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 16, fontWeight: 500, color: accent || CP.textPrimary, whiteSpace: "nowrap" }}>
             {value}
           </div>
         )}
@@ -222,7 +221,7 @@ export function RankedItem({ rank, dotAlias, dotColor, name, badge, cols = [], h
       <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
         <span style={{ fontWeight: 500, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
         {badge && (
-          <span style={{ padding: "2px 8px", background: CP.accentGreen + "22", color: CP.accentGreen, fontSize: 10, fontWeight: 700, borderRadius: 4, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+          <span style={{ padding: "2px 8px", background: CP.accentGreen + "22", color: CP.accentGreen, fontSize: 10, fontWeight: 500, borderRadius: 4, letterSpacing: "0.04em" }}>
             {badge}
           </span>
         )}
@@ -233,7 +232,7 @@ export function RankedItem({ rank, dotAlias, dotColor, name, badge, cols = [], h
           style={{
             fontFamily: c.fontFamily || FONTS.mono,
             fontSize: 14,
-            fontWeight: 600,
+            fontWeight: 500,
             color: c.color || CP.textPrimary,
             whiteSpace: "nowrap",
             textAlign: "right",
@@ -267,7 +266,7 @@ export function PageHeader({ section, title, subtitle, toolbar, breadcrumb }) {
           {section && <SectionLabel>{section}</SectionLabel>}
           <h1 style={{
             fontFamily: FONTS.display,
-            fontSize: 34, fontWeight: 700,
+            fontSize: 34, fontWeight: 500,
             margin: section ? "8px 0 6px 0" : "0 0 6px 0",
             letterSpacing: "-0.02em",
             color: CP.textPrimary,

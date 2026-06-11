@@ -76,7 +76,7 @@ export default function PlaybookEntryPage() {
     grid: { display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 22, marginTop: 18 },
     card: { background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 12, padding: 20 },
     h2: { fontFamily: FONTS.display, fontSize: 16, margin: "0 0 12px 0", color: COLORS.alabaster, fontWeight: 600 },
-    label: { fontSize: 11, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 },
+    label: { fontSize: 11, color: COLORS.fog, letterSpacing: "0.06em", marginBottom: 6 },
     body: { fontSize: 14, color: COLORS.alabaster, lineHeight: 1.6 },
     takeaway: {
       fontSize: 14,

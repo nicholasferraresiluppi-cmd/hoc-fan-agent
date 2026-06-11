@@ -149,7 +149,7 @@ export default function ScoreExplainedPage() {
 
           {/* Calcolo passo passo */}
           <div style={{ marginTop: 20, padding: "16px 18px", background: CP.surfaceAlt, border: `1px solid ${CP.border}`, borderRadius: 10, fontFamily: FONTS.mono, fontSize: 13 }}>
-            <div style={{ color: CP.textMuted, marginBottom: 8, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700 }}>Calcolo</div>
+            <div style={{ color: CP.textMuted, marginBottom: 8, fontSize: 11, letterSpacing: "0.1em", fontWeight: 700 }}>Calcolo</div>
             <div style={calcLine}>
               <span>SPS_blended</span>
               <span>= 0.7 × {percCreator} + 0.3 × {percAgency}</span>

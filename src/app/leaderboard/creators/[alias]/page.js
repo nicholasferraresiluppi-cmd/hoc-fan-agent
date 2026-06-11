@@ -161,7 +161,7 @@ export default function CreatorDrilldownPage({ params, searchParams }) {
                         <div style={{ height: 96, display: "flex", alignItems: "flex-end", justifyContent: "center", marginBottom: 8 }}>
                           <div style={{ width: 44, height: `${heightPct}%`, background: isTop ? dotColor : CP.accentGreen, borderRadius: "6px 6px 0 0", minHeight: 3, opacity: isTop ? 1 : 0.7, transition: "all 0.2s" }} />
                         </div>
-                        <div style={{ fontSize: 11, color: isTop ? CP.textPrimary : CP.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: isTop ? 700 : 500 }}>{b}</div>
+                        <div style={{ fontSize: 11, color: isTop ? CP.textPrimary : CP.textMuted, letterSpacing: "0.08em", fontWeight: isTop ? 700 : 500 }}>{b}</div>
                         <div style={{ fontFamily: FONTS.mono, fontSize: 14, color: CP.textPrimary, marginTop: 4, fontWeight: 600 }}>{fmtCurrencyShort(sales)}</div>
                         <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 2 }}>{pct.toFixed(1).replace(".", ",")}%</div>
                       </div>
@@ -260,7 +260,7 @@ export default function CreatorDrilldownPage({ params, searchParams }) {
                       {op.low_confidence ? (
                         <span style={{ fontSize: 10, color: CP.textMuted, fontStyle: "italic" }}>n/a</span>
                       ) : (
-                        <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 10, fontWeight: 700, background: tColor + "22", color: tColor, letterSpacing: "0.04em", textTransform: "uppercase" }}>{op.tier}</span>
+                        <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 10, fontWeight: 700, background: tColor + "22", color: tColor, letterSpacing: "0.04em" }}>{op.tier}</span>
                       )}
                     </div>
                   </div>

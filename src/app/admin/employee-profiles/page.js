@@ -109,14 +109,14 @@ export default function EmployeeProfilesPage() {
     sub: { color: COLORS.fog, fontSize: 14, marginBottom: 24, maxWidth: 900, lineHeight: 1.55 },
     card: { background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, padding: 22, marginBottom: 22 },
     h2: { fontFamily: FONTS.display, fontSize: 18, margin: "0 0 14px 0", fontWeight: 500 },
-    label: { fontSize: 11, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6, display: "block" },
+    label: { fontSize: 11, color: COLORS.fog, letterSpacing: "0.1em", marginBottom: 6, display: "block" },
     input: { width: "100%", padding: "9px 14px", background: COLORS.charcoal, border: `1px solid ${COLORS.steel}`, borderRadius: 8, color: COLORS.alabaster, fontSize: 13, fontFamily: FONTS.body, marginBottom: 12, outline: "none" },
     btn: { padding: "9px 18px", background: COLORS.champagne, color: COLORS.obsidian, border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 13, fontFamily: FONTS.body },
     btnGhost: { padding: "9px 14px", background: "transparent", color: COLORS.alabaster, border: `1px solid ${COLORS.steel}`, borderRadius: 8, cursor: "pointer", fontSize: 13, fontFamily: FONTS.body, marginLeft: 8 },
     btnDanger: { padding: "5px 12px", background: "transparent", color: COLORS.signal, border: `1px solid ${COLORS.signal}66`, borderRadius: 6, cursor: "pointer", fontSize: 11, fontFamily: FONTS.body, marginLeft: 6 },
     error: { background: COLORS.signal + "20", color: COLORS.signal, padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 },
     table: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
-    th: { textAlign: "left", padding: "10px 12px", color: COLORS.fog, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", borderBottom: `1px solid ${COLORS.steel}` },
+    th: { textAlign: "left", padding: "10px 12px", color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", borderBottom: `1px solid ${COLORS.steel}` },
     td: { padding: "10px 12px", borderBottom: `1px solid ${COLORS.charcoal}88`, verticalAlign: "middle" },
   };
 

@@ -64,7 +64,7 @@ function EntryCard({ entry }) {
         <span
           style={{
             fontSize: 10,
-            textTransform: "uppercase",
+            
             letterSpacing: "0.06em",
             background: isDedicated ? COLORS.champagne : COLORS.charcoal,
             color: isDedicated ? COLORS.obsidian : COLORS.fog,

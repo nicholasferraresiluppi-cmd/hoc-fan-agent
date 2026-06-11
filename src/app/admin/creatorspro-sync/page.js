@@ -173,10 +173,10 @@ export default function CreatorsProSyncPage() {
     error: { background: COLORS.signal + "20", color: COLORS.signal, padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 13 },
     statRow: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 },
     statBox: { background: COLORS.charcoal, padding: "10px 14px", borderRadius: 8 },
-    statLabel: { fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em" },
+    statLabel: { fontSize: 10, color: COLORS.fog, letterSpacing: "0.1em" },
     statValue: { fontFamily: FONTS.mono, fontSize: 20, fontWeight: 700, marginTop: 4 },
     table: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
-    th: { textAlign: "left", padding: "10px 12px", color: COLORS.fog, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", borderBottom: `1px solid ${COLORS.steel}` },
+    th: { textAlign: "left", padding: "10px 12px", color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", borderBottom: `1px solid ${COLORS.steel}` },
     td: { padding: "10px 12px", borderBottom: `1px solid ${COLORS.charcoal}88`, verticalAlign: "middle" },
     input: { padding: "5px 10px", background: COLORS.charcoal, border: `1px solid ${COLORS.steel}`, borderRadius: 6, color: COLORS.alabaster, fontSize: 12, fontFamily: FONTS.body, width: "100%", outline: "none" },
   };

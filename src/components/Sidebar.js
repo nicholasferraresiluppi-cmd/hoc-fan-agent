@@ -159,7 +159,7 @@ function NavItem({ href, label, icon: Icon, isActive }) {
         color: isActive ? CP.textPrimary : CP.textSecondary,
         background: isActive ? CP.surfaceAlt : "transparent",
         fontSize: 13,
-        fontWeight: isActive ? 600 : 500,
+        fontWeight: isActive ? 500 : 400,
         fontFamily: FONTS.body,
         transition: "background 0.12s, color 0.12s",
         position: "relative",
@@ -180,7 +180,7 @@ function NavItem({ href, label, icon: Icon, isActive }) {
       {isActive && (
         <span style={{
           position: "absolute", left: -8, top: "20%", bottom: "20%",
-          width: 3, background: CP.accentGreen, borderRadius: "0 3px 3px 0",
+          width: 3, background: CP.accent, borderRadius: "0 3px 3px 0",
         }} />
       )}
       <Icon size={16} strokeWidth={1.8} />
@@ -204,7 +204,7 @@ function GroupHeader({ label, isOpen, onToggle, visibleCount }) {
         fontFamily: FONTS.mono,
         fontSize: 10,
         fontWeight: 700,
-        textTransform: "uppercase",
+        
         letterSpacing: "0.14em",
         cursor: "pointer",
         borderRadius: 6,
@@ -316,7 +316,7 @@ export default function Sidebar() {
         position: "fixed",
         top: 0, left: 0, bottom: 0,
         width: SIDEBAR_WIDTH,
-        background: "#0B0D13",
+        background: CP.bgSunken,
         borderRight: `1px solid ${CP.border}`,
         display: "flex",
         flexDirection: "column",
@@ -342,14 +342,14 @@ export default function Sidebar() {
         }}>
           <div style={{
             width: 28, height: 28, borderRadius: 6,
-            background: `linear-gradient(135deg, ${CP.accentGreen}, ${CP.accentGreen}88)`,
-            color: "#fff",
+            background: CP.accent,
+            color: CP.accentInk,
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontFamily: FONTS.display, fontWeight: 700, fontSize: 13,
+            fontFamily: FONTS.body, fontWeight: 500, fontSize: 13,
           }}>H</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 9, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.12em", fontFamily: FONTS.mono, fontWeight: 700 }}>Organization</div>
-            <div style={{ fontSize: 13, color: CP.textPrimary, fontWeight: 600, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>House of Creators</div>
+            <div style={{ fontSize: 10, color: CP.textMuted, letterSpacing: "0.02em", fontFamily: FONTS.body, fontWeight: 500 }}>Organization</div>
+            <div style={{ fontSize: 13, color: CP.textPrimary, fontWeight: 500, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>House of Creators</div>
           </div>
           <Building2 size={14} color={CP.textMuted} />
         </div>

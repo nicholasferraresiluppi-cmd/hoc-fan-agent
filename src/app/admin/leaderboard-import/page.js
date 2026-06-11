@@ -179,7 +179,7 @@ export default function LeaderboardImportPage() {
     sub: { color: COLORS.fog, fontSize: 14, marginBottom: 24 },
     card: { background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 12, padding: 18, marginBottom: 16 },
     h2: { fontFamily: FONTS.display, fontSize: 18, margin: "0 0 12px 0" },
-    label: { fontSize: 12, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, display: "block" },
+    label: { fontSize: 12, color: COLORS.fog, letterSpacing: "0.06em", marginBottom: 6, display: "block" },
     input: { width: "100%", padding: "10px 14px", background: COLORS.charcoal, border: `1px solid ${COLORS.charcoal}`, borderRadius: 8, color: COLORS.alabaster, fontSize: 14, fontFamily: FONTS.body, outline: "none", marginBottom: 12 },
     select: { width: "100%", padding: "10px 14px", background: COLORS.charcoal, border: `1px solid ${COLORS.charcoal}`, borderRadius: 8, color: COLORS.alabaster, fontSize: 14, fontFamily: FONTS.body, marginBottom: 12 },
     btn: { padding: "10px 18px", background: COLORS.champagne, color: COLORS.obsidian, border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 14, fontFamily: FONTS.body },

@@ -221,7 +221,7 @@ export default function CoachPanel({
       alignItems: "center",
       marginBottom: 10,
     },
-    title: { fontSize: 12, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 },
+    title: { fontSize: 12, color: COLORS.fog, letterSpacing: "0.06em", fontWeight: 600 },
     pauseBtn: {
       background: paused ? COLORS.signal + "20" : COLORS.charcoal,
       color: paused ? COLORS.signal : COLORS.fog,
@@ -249,7 +249,7 @@ export default function CoachPanel({
       transition: "border-color 0.15s",
       border: `1px solid transparent`,
     },
-    altLabel: { fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 },
+    altLabel: { fontSize: 10, color: COLORS.fog, letterSpacing: "0.05em", marginBottom: 3 },
     altText: { fontSize: 13, color: COLORS.alabaster, lineHeight: 1.45 },
     tip: {
       fontSize: 12,
@@ -261,7 +261,7 @@ export default function CoachPanel({
       fontStyle: "italic",
       marginTop: 8,
     },
-    sectionLabel: { fontSize: 11, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 12, marginBottom: 6 },
+    sectionLabel: { fontSize: 11, color: COLORS.fog, letterSpacing: "0.05em", marginTop: 12, marginBottom: 6 },
   };
 
   if (paused) {

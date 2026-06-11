@@ -34,14 +34,14 @@ export default function CompNav() {
               display: "inline-flex", alignItems: "center", gap: 6,
               padding: "7px 13px", borderRadius: 7,
               background: active ? CP.surfaceAlt : "transparent",
-              border: `1px solid ${active ? CP.accentGreen + "66" : "transparent"}`,
+              border: `1px solid ${active ? CP.accent + "66" : "transparent"}`,
               color: active ? CP.textPrimary : CP.textSecondary,
-              fontSize: 12, fontWeight: active ? 700 : 500,
+              fontSize: 12, fontWeight: active ? 500 : 400,
               fontFamily: FONTS.body, textDecoration: "none",
               whiteSpace: "nowrap",
             }}
           >
-            <Icon size={13} color={active ? CP.accentGreen : CP.textMuted} />
+            <Icon size={13} color={active ? CP.accent : CP.mutedIcons} />
             {label}
           </Link>
         );

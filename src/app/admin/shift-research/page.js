@@ -253,15 +253,15 @@ export default function ShiftResearchPage() {
   );
 }
 
-const lbl = { display: "block", fontSize: 10, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
+const lbl = { display: "block", fontSize: 10, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
 const input = { width: "100%", padding: "10px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
-const th = { padding: "10px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: CP.textMuted, textTransform: "uppercase", letterSpacing: 0.6, fontFamily: FONTS.mono, whiteSpace: "nowrap", background: CP.surfaceAlt };
+const th = { padding: "10px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: CP.textMuted, letterSpacing: 0.6, fontFamily: FONTS.mono, whiteSpace: "nowrap", background: CP.surfaceAlt };
 const td = { padding: "8px 12px", verticalAlign: "middle" };
 const primaryBtn = (disabled) => ({
   display: "inline-flex", alignItems: "center", gap: 8,
   padding: "11px 18px",
-  background: disabled ? CP.surfaceAlt : CP.accentGreen,
-  color: disabled ? CP.textMuted : "#0a0a0a",
+  background: disabled ? CP.surfaceAlt : CP.accent,
+  color: disabled ? CP.textMuted : CP.accentInk,
   border: "none", borderRadius: 8,
   fontSize: 13, fontWeight: 700, fontFamily: FONTS.body,
   cursor: disabled ? "not-allowed" : "pointer",

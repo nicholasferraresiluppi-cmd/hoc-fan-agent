@@ -76,8 +76,8 @@ export default function HeatmapPage({ searchParams }) {
     title: { fontFamily: FONTS.display, fontSize: 28, margin: "0 0 6px 0", fontWeight: 500 },
     sub: { color: COLORS.fog, fontSize: 13, marginBottom: 18, maxWidth: 900, lineHeight: 1.55 },
     table: { borderCollapse: "collapse", fontSize: 11 },
-    th: { padding: "10px 6px", color: COLORS.fog, fontSize: 9, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${COLORS.steel}`, fontWeight: 600, whiteSpace: "nowrap", verticalAlign: "bottom" },
-    thRot: { padding: "10px 4px", color: COLORS.fog, fontSize: 9, textTransform: "uppercase", borderBottom: `1px solid ${COLORS.steel}`, fontWeight: 600, height: 120, textAlign: "left" },
+    th: { padding: "10px 6px", color: COLORS.fog, fontSize: 9, letterSpacing: "0.06em", borderBottom: `1px solid ${COLORS.steel}`, fontWeight: 600, whiteSpace: "nowrap", verticalAlign: "bottom" },
+    thRot: { padding: "10px 4px", color: COLORS.fog, fontSize: 9, borderBottom: `1px solid ${COLORS.steel}`, fontWeight: 600, height: 120, textAlign: "left" },
     td: { padding: "4px 6px", borderBottom: `1px solid ${COLORS.charcoal}88`, textAlign: "center" },
     tdName: { padding: "6px 12px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontFamily: FONTS.display, fontSize: 12, fontWeight: 500, position: "sticky", left: 0, background: COLORS.obsidian, zIndex: 1 },
   };

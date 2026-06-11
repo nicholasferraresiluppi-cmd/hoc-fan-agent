@@ -443,8 +443,8 @@ export default function SyncHistoryPage() {
 const primaryBtn = (disabled) => ({
   display: "inline-flex", alignItems: "center", gap: 8,
   padding: "12px 20px",
-  background: disabled ? CP.surfaceAlt : CP.accentGreen,
-  color: disabled ? CP.textMuted : "#0a0a0a",
+  background: disabled ? CP.surfaceAlt : CP.accent,
+  color: disabled ? CP.textMuted : CP.accentInk,
   border: "none",
   borderRadius: 8,
   fontSize: 14, fontWeight: 700, fontFamily: FONTS.body,

@@ -263,7 +263,7 @@ function CandidateRow({ c, onAssign, onComplete, onReject, onDelete }) {
         </div>
 
         <div>
-          <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>
+          <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.1em", marginBottom: 4 }}>
             Pattern
           </div>
           <span style={{
@@ -274,7 +274,7 @@ function CandidateRow({ c, onAssign, onComplete, onReject, onDelete }) {
         </div>
 
         <div>
-          <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em" }}>Score CP</div>
+          <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.1em" }}>Score CP</div>
           <div style={{ fontFamily: FONTS.mono, fontSize: 22, fontWeight: 700, color: tierColor }}>{c.score.toFixed(1)}</div>
           <span style={{ display: "inline-block", padding: "1px 7px", borderRadius: 999, fontSize: 9, fontWeight: 700, background: tierColor + "26", color: tierColor, border: `1px solid ${tierColor}55`, marginTop: 2 }}>
             {c.tier}
@@ -305,7 +305,7 @@ function CandidateRow({ c, onAssign, onComplete, onReject, onDelete }) {
           <div style={{ padding: 14, background: COLORS.obsidian + "80", border: `1px solid ${COLORS.charcoal}`, borderRadius: 10, marginBottom: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
               <BookOpen size={16} color={COLORS.champagne} />
-              <span style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 600 }}>Training suggerito</span>
+              <span style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.12em", fontWeight: 600 }}>Training suggerito</span>
             </div>
             <div style={{ fontFamily: FONTS.display, fontSize: 16, fontWeight: 600, color: COLORS.alabaster, marginBottom: 4 }}>
               {c.training.categoryName}
@@ -370,7 +370,7 @@ function CandidateRow({ c, onAssign, onComplete, onReject, onDelete }) {
 function DiagBlock({ label, value, sub, color }) {
   return (
     <div style={{ padding: 12, background: COLORS.obsidian + "60", border: `1px solid ${COLORS.charcoal}`, borderRadius: 10 }}>
-      <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.1em", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 14, fontWeight: 600, color: color || COLORS.alabaster, marginBottom: 2 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: COLORS.mist }}>{sub}</div>}
     </div>
@@ -386,7 +386,7 @@ function getInitials(name) {
 
 const selectStyle = { padding: "9px 14px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 10, color: COLORS.alabaster, fontSize: 13, fontFamily: FONTS.body, cursor: "pointer", outline: "none" };
 const inputStyle = { padding: "9px 12px", background: COLORS.obsidian, border: `1px solid ${COLORS.charcoal}`, borderRadius: 8, color: COLORS.alabaster, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
-const filterLabel = { fontSize: 11, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em", marginRight: 4, alignSelf: "center" };
+const filterLabel = { fontSize: 11, color: COLORS.fog, letterSpacing: "0.1em", marginRight: 4, alignSelf: "center" };
 const chevronBtn = { background: "transparent", border: "none", color: COLORS.fog, cursor: "pointer", padding: 6, display: "inline-flex", alignItems: "center" };
 const pillStyle = (active, color) => ({ padding: "7px 12px", background: active ? color : COLORS.graphite, border: `1px solid ${active ? color : COLORS.charcoal}`, borderRadius: 999, color: active ? COLORS.obsidian : COLORS.alabaster, fontSize: 12, cursor: "pointer", fontWeight: active ? 700 : 500, fontFamily: FONTS.body });
 const actionBtn = (color) => ({ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", background: color + "18", border: `1px solid ${color}55`, borderRadius: 8, color, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.body });

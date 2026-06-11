@@ -18,7 +18,7 @@ const C = {
 function Section({ title, children }) {
   return (
     <div style={{ marginTop: "1rem" }}>
-      <div style={{ color: C.orange, fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "0.35rem" }}>
+      <div style={{ color: C.orange, fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.5px", marginBottom: "0.35rem" }}>
         {title}
       </div>
       <div style={{ color: C.white, fontSize: "0.88rem", lineHeight: 1.5 }}>{children}</div>
@@ -86,7 +86,7 @@ export default function CreatorsAdmin() {
                 color: C.green,
                 fontSize: "0.7rem",
                 fontWeight: 700,
-                textTransform: "uppercase",
+                
               }}>
                 {c.status || "pilot"}
               </span>
@@ -103,7 +103,7 @@ export default function CreatorsAdmin() {
                 borderRadius: "0.5rem",
                 fontSize: "0.9rem",
               }}>
-                <div style={{ color: C.orange, fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                <div style={{ color: C.orange, fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.5px" }}>
                   Gancio emotivo
                 </div>
                 <div style={{ color: C.white, fontStyle: "italic", marginTop: "0.25rem" }}>

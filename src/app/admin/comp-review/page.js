@@ -363,14 +363,14 @@ function ShiftBreakdown({ creator, operator, periodId, expectedSales, expectedEa
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
           <thead>
             <tr style={{ borderBottom: `1px solid ${CP.border}`, color: CP.textMuted }}>
-              <th style={{ padding: "6px 8px", textAlign: "left", fontFamily: FONTS.mono, fontSize: 9, textTransform: "uppercase" }}>Data</th>
-              <th style={{ padding: "6px 8px", textAlign: "left", fontFamily: FONTS.mono, fontSize: 9, textTransform: "uppercase" }}>Orario</th>
-              <th style={{ padding: "6px 8px", textAlign: "left", fontFamily: FONTS.mono, fontSize: 9, textTransform: "uppercase" }}>Fascia</th>
-              <th style={{ padding: "6px 8px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 9, textTransform: "uppercase" }}>Sales tot turno</th>
-              <th style={{ padding: "6px 8px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 9, textTransform: "uppercase" }}>Sales su creator</th>
-              <th style={{ padding: "6px 8px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 9, textTransform: "uppercase" }}>Guadagno</th>
-              <th style={{ padding: "6px 8px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 9, textTransform: "uppercase" }}>%</th>
-              <th style={{ padding: "6px 8px", textAlign: "left", fontFamily: FONTS.mono, fontSize: 9, textTransform: "uppercase" }}>Tipo</th>
+              <th style={{ padding: "6px 8px", textAlign: "left", fontFamily: FONTS.mono, fontSize: 9 }}>Data</th>
+              <th style={{ padding: "6px 8px", textAlign: "left", fontFamily: FONTS.mono, fontSize: 9 }}>Orario</th>
+              <th style={{ padding: "6px 8px", textAlign: "left", fontFamily: FONTS.mono, fontSize: 9 }}>Fascia</th>
+              <th style={{ padding: "6px 8px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 9 }}>Sales tot turno</th>
+              <th style={{ padding: "6px 8px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 9 }}>Sales su creator</th>
+              <th style={{ padding: "6px 8px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 9 }}>Guadagno</th>
+              <th style={{ padding: "6px 8px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 9 }}>%</th>
+              <th style={{ padding: "6px 8px", textAlign: "left", fontFamily: FONTS.mono, fontSize: 9 }}>Tipo</th>
             </tr>
           </thead>
           <tbody>
@@ -438,13 +438,13 @@ function InlinePctDist({ dist }) {
 }
 
 function Th({ children, align }) {
-  return <th style={{ padding: "11px 12px", textAlign: align || "left", fontSize: 10, fontWeight: 700, color: CP.textMuted, textTransform: "uppercase", letterSpacing: 0.6, fontFamily: FONTS.mono, whiteSpace: "nowrap" }}>{children}</th>;
+  return <th style={{ padding: "11px 12px", textAlign: align || "left", fontSize: 10, fontWeight: 700, color: CP.textMuted, letterSpacing: 0.6, fontFamily: FONTS.mono, whiteSpace: "nowrap" }}>{children}</th>;
 }
 function Td({ children, align, mono, style }) {
   return <td style={{ padding: "10px 12px", textAlign: align || "left", fontFamily: mono ? FONTS.mono : FONTS.body, verticalAlign: "middle", ...style }}>{children}</td>;
 }
 
-const lbl = { display: "block", fontSize: 10, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
+const lbl = { display: "block", fontSize: 10, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
 const input = { padding: "8px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
 const chipBtn = { background: "transparent", border: "none", color: CP.textPrimary, fontSize: 13, cursor: "pointer", padding: 0, textAlign: "left", fontFamily: FONTS.body, textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: CP.border };
 const clearBtn = { position: "absolute", right: 8, top: 28, padding: 3, background: CP.surfaceAlt, border: "none", borderRadius: 3, color: CP.textMuted, cursor: "pointer", display: "flex", alignItems: "center" };

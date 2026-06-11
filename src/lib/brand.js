@@ -92,18 +92,36 @@ export const SHADOW = "0 10px 30px rgba(0,0,0,0.45)";
  * i token HOC core: convivono nelle pagine che li scelgono.
  */
 export const CP = {
-  // Background ultradark CP-like
-  bg: "#08090F",          // matches obsidian — sfondo app
-  surface: "#13151C",     // card un filo più chiara di graphite
-  surfaceAlt: "#1A1D26",  // hover / tabular alt row
-  border: "#23262F",      // bordo sottile carta
-  borderStrong: "#2F333E",// bordo accentuato
-  textPrimary: "#F5F6F8",
-  textSecondary: "#9CA3AF",
-  textMuted: "#6B7080",
-  accentGreen: "#10B981", // crescita / sales positive
-  accentRed: "#EF4444",   // calo
-  accentBlue: "#3B82F6",  // info
+  // REBRAND "Dark SaaS" (giu 2026) — fonte di verità: docs/DESIGN.md +
+  // docs/design-reference.html. Regole: gerarchia per LUMINOSITÀ, UN solo
+  // accent (viola) col contagocce, niente nero/bianco puri, flat.
+  // I nomi chiave restano per retrocompatibilità: i VALORI sono i token
+  // del design system, quindi tutta l'app si aggiorna da qui.
+
+  // Superfici (dal più scuro al più chiaro)
+  bgSunken: "#0a0d11",    // sidebar, aree incassate
+  bg: "#0c0f14",          // sfondo pagina
+  surface: "#151a22",     // card, pannelli, input
+  surfaceAlt: "#20283a",  // hover, elemento attivo
+  // Bordi
+  border: "#232b3a",      // bordo standard card/input
+  borderSoft: "#1d2430",  // divider interni, righe tabella
+  borderStrong: "#2c3650",// bordo accentuato (legacy)
+  // Testo
+  textPrimary: "#f2f4f8",
+  textSecondary: "#cdd3de",
+  textMuted: "#8c95a8",
+  mutedIcons: "#5d6678",  // icone inattive
+  // Accent — UNO SOLO (viola): azione primaria, attivo, dato corrente
+  accent: "#8b7cf6",
+  accentInk: "#14101f",      // testo sopra superfici accent
+  accentSoft: "#2a2353",     // sfondo badge/chip accent
+  accentSoftText: "#b9aef9", // testo su accent-soft
+  accentDim: "#3a3470",      // serie non-correnti nei grafici
+  // Semantici (solo come segnale, mai superfici grandi)
+  accentGreen: "#4ade80", // success — delta positivi, ok
+  accentRed: "#f08c8c",   // danger — delta negativi, errori
+  accentBlue: "#b9aef9",  // legacy info → accent-soft-text
 };
 
 /**

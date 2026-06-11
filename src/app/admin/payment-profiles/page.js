@@ -20,7 +20,7 @@ const fetcher = (url) => fetch(url).then((r) => r.json());
 
 const COSELLERS_LABEL = { 1: "Solo", 2: "Coppia", 3: "Triplo", 4: "Quartetto" };
 const COSELLERS_ICON = { 1: User, 2: UsersRound, 3: Users, 4: Users };
-const COSELLERS_COLOR = { 1: "#4F8CCB", 2: "#D4AF7A", 3: "#3FB97E", 4: "#A35EE0" };
+const COSELLERS_COLOR = { 1: "#4F8CCB", 2: "#D4AF7A", 3: "#3FB97E", 4: CP.accent };
 
 function fmtPct(v) {
   if (v == null) return "—";
@@ -195,7 +195,7 @@ export default function PaymentProfilesPage() {
       {/* DEBUG panel — vediamo se il link profilo→creator è popolato o no */}
       {data?.debug && (
         <CpCard accent="#F59E0B" padding="16px 20px" style={{ marginTop: 24, marginBottom: 20 }}>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "#F59E0B", marginBottom: 10 }}>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: "#F59E0B", marginBottom: 10 }}>
             🐛 Debug — perché "Creator coperti = 0"
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14, marginBottom: 14 }}>
@@ -286,7 +286,7 @@ function ProfileCard({ p }) {
       {/* Scaglioni */}
       {p.thresholds && p.thresholds.length > 0 && (
         <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 10, color: CP.textMuted, textTransform: "uppercase", letterSpacing: 0.6, fontFamily: FONTS.mono, marginBottom: 6 }}>Scaglioni</div>
+          <div style={{ fontSize: 10, color: CP.textMuted, letterSpacing: 0.6, fontFamily: FONTS.mono, marginBottom: 6 }}>Scaglioni</div>
           <div style={{ background: CP.surfaceAlt, borderRadius: 6, overflow: "hidden" }}>
             {p.thresholds.map((t, i) => (
               <div key={t.id || i} style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 10, padding: "6px 10px", borderBottom: i < p.thresholds.length - 1 ? `1px solid ${CP.border}` : "none", fontSize: 12 }}>
@@ -304,7 +304,7 @@ function ProfileCard({ p }) {
       {/* Creator collegati */}
       {p.links && p.links.length > 0 && (
         <details style={{ fontSize: 12 }}>
-          <summary style={{ cursor: "pointer", color: CP.textSecondary, fontSize: 11, fontFamily: FONTS.mono, textTransform: "uppercase", letterSpacing: 0.6 }}>
+          <summary style={{ cursor: "pointer", color: CP.textSecondary, fontSize: 11, fontFamily: FONTS.mono, letterSpacing: 0.6 }}>
             Creator collegati ({p.links.length})
           </summary>
           <div style={{ marginTop: 6 }}>
@@ -322,6 +322,6 @@ function ProfileCard({ p }) {
   );
 }
 
-const lbl = { display: "block", fontSize: 10, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
+const lbl = { display: "block", fontSize: 10, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
 const input = { width: "100%", padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
-const badge = (c) => ({ display: "inline-flex", alignItems: "center", padding: "2px 7px", borderRadius: 4, background: c + "22", color: c, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, border: `1px solid ${c}55` });
+const badge = (c) => ({ display: "inline-flex", alignItems: "center", padding: "2px 7px", borderRadius: 4, background: c + "22", color: c, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, border: `1px solid ${c}55` });

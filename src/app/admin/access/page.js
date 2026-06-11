@@ -87,7 +87,7 @@ export default function AccessPage() {
         {/* Whoami card */}
         {me && (
           <div style={{ background: `${C.purple}15`, border: `1px solid ${C.purple}40`, borderRadius: "0.75rem", padding: "1rem 1.25rem", marginBottom: "1.5rem" }}>
-            <div style={{ color: C.purple, fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "0.35rem" }}>
+            <div style={{ color: C.purple, fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.5px", marginBottom: "0.35rem" }}>
               Il tuo account
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.75rem" }}>
@@ -141,7 +141,7 @@ export default function AccessPage() {
 
         {!loading && me?.admin && admins.length > 0 && (
           <div style={{ background: `${C.white}05`, border: `1px solid ${C.purple}30`, borderRadius: "0.75rem", overflow: "hidden" }}>
-            <div style={{ padding: "0.85rem 1.25rem", borderBottom: `1px solid ${C.purple}30`, fontWeight: 700, fontSize: "0.9rem", color: C.gray, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            <div style={{ padding: "0.85rem 1.25rem", borderBottom: `1px solid ${C.purple}30`, fontWeight: 700, fontSize: "0.9rem", color: C.gray, letterSpacing: "0.5px" }}>
               Admin attivi ({admins.length})
             </div>
             {admins.map((a) => (

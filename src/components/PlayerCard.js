@@ -233,7 +233,7 @@ export default function PlayerCard({
           fontWeight: 800,
           fontSize: compact ? 17 : 19,
           letterSpacing: "0.04em",
-          textTransform: "uppercase",
+          
           color: tier.text,
           lineHeight: 1.1,
           textShadow: "0 1px 4px rgba(0,0,0,0.3)",

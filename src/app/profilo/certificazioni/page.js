@@ -41,7 +41,7 @@ export default function CertificationsPage() {
         </div>
 
         <div style={{ marginBottom: 24 }}>
-          <span style={{ color: "#6B7080", fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.14em" }}>Certificazioni</span>
+          <span style={{ color: "#6B7080", fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: "0.14em" }}>Certificazioni</span>
           <h1 style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 34, margin: "8px 0 6px 0", fontWeight: 700, letterSpacing: "-0.02em" }}>🎖️ Badge Wall</h1>
           <p style={{ color: "#9CA3AF", fontSize: 14, margin: 0, lineHeight: 1.5, maxWidth: 760 }}>
             Le tue certificazioni per creator. Ogni creator ha il suo tono e le sue dinamiche: certificandoti dimostri di saperla gestire.
@@ -76,7 +76,7 @@ export default function CertificationsPage() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
                     <div>
                       <h2 style={{ margin: 0, fontSize: "1.3rem" }}>
-                        {c.creatorName} <span style={{ color: "#F5A623", fontSize: "0.7rem", fontWeight: 400, textTransform: "uppercase", marginLeft: 8 }}>{c.creatorArchetype}</span>
+                        {c.creatorName} <span style={{ color: "#F5A623", fontSize: "0.7rem", fontWeight: 400, marginLeft: 8 }}>{c.creatorArchetype}</span>
                       </h2>
                       <div style={{ color: meta.color, fontWeight: 800, fontSize: "1.1rem", marginTop: 6 }}>
                         {meta.emoji} {meta.label}

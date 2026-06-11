@@ -26,7 +26,7 @@ function monthOpts(n = 12) {
 }
 const fmt$ = (n) => n == null ? "—" : `$${Number(n).toLocaleString("it-IT", { maximumFractionDigits: 0 })}`;
 const fmtPct = (v, d = 1) => v == null ? "—" : `${(v * 100).toFixed(d)}%`;
-const TIER_COLORS = ["#D44545", "#F59E0B", "#3FB97E", "#4F8CCB", "#A35EE0"];
+const TIER_COLORS = ["#D44545", "#F59E0B", "#3FB97E", "#4F8CCB", CP.accent];
 
 // Formula BRACKET su intero importo (confermata dalla ricerca shift-research)
 function bracketPct(total, thresholds) {
@@ -174,7 +174,7 @@ export default function ProfilesComparePage() {
           <SectionLabel style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <FlaskConical size={13} /> Simulatore — un profilo standard per tutti i creator
           </SectionLabel>
-          <CpCard accent={simThs ? "#A35EE0" : undefined} padding="16px 20px" style={{ marginBottom: 18 }}>
+          <CpCard accent={simThs ? CP.accent : undefined} padding="16px 20px" style={{ marginBottom: 18 }}>
             <div style={{ fontSize: 11, color: CP.textMuted, marginBottom: 12, fontStyle: "italic" }}>
               Scenario "standard unico": applica UN solo set di scaglioni a TUTTI i turni di tutte le classi (Solo/Coppia/Triplo).
               Per simulare per classe coi profili reali di un creator, usa il simulatore nella sua griglia (bottone "Griglia").
@@ -236,7 +236,7 @@ export default function ProfilesComparePage() {
                 {sim && (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
                     <StatCard label="Pagato REALE (tutti)" value={fmt$(data.totals.earn_attr)} color="#D4AF7A" />
-                    <StatCard label="Pagato SIMULATO" value={fmt$(sim.total)} color="#A35EE0" />
+                    <StatCard label="Pagato SIMULATO" value={fmt$(sim.total)} color={CP.accent} />
                     <StatCard
                       label="Δ totale"
                       value={`${sim.delta >= 0 ? "+" : ""}${fmt$(sim.delta)}`}
@@ -312,7 +312,7 @@ export default function ProfilesComparePage() {
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmt$(c.sales)}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#D4AF7A" }}>{fmt$(c.earn_attr)}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700 }}>{fmtPct(c.cost_pct)}</td>
-                      {sim && <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#A35EE0" }}>{simPaid != null ? fmt$(simPaid) : "—"}</td>}
+                      {sim && <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accent }}>{simPaid != null ? fmt$(simPaid) : "—"}</td>}
                       {sim && (
                         <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: delta == null ? CP.textMuted : Math.abs(delta) < 1 ? CP.textMuted : delta > 0 ? CP.accentRed : CP.accentGreen }}>
                           {delta == null ? "—" : Math.abs(delta) < 1 ? "=" : `${delta > 0 ? "+" : ""}${fmt$(delta)}`}
@@ -344,8 +344,8 @@ export default function ProfilesComparePage() {
   );
 }
 
-const lbl = { display: "block", fontSize: 10, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
+const lbl = { display: "block", fontSize: 10, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
 const input = { padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
-const th = { padding: "10px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: CP.textMuted, textTransform: "uppercase", letterSpacing: 0.6, fontFamily: FONTS.mono, whiteSpace: "nowrap" };
+const th = { padding: "10px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: CP.textMuted, letterSpacing: 0.6, fontFamily: FONTS.mono, whiteSpace: "nowrap" };
 const td = { padding: "9px 12px", verticalAlign: "middle" };
 const iconBtn = { padding: "9px 10px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, cursor: "pointer", display: "inline-flex", alignItems: "center" };

@@ -123,5 +123,5 @@ export default function LeaguesPage() {
   );
 }
 
-const th = { textAlign: "left", padding: "10px 12px", color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, borderBottom: `1px solid ${CP.borderStrong}` };
+const th = { textAlign: "left", padding: "10px 12px", color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 10, letterSpacing: "0.1em", fontWeight: 700, borderBottom: `1px solid ${CP.borderStrong}` };
 const td = { padding: "10px 12px" };

@@ -69,8 +69,8 @@ export default function CpProbePage() {
             style={{
               display: "inline-flex", alignItems: "center", gap: 8,
               padding: "12px 22px",
-              background: loading ? CP.surfaceAlt : CP.accentGreen,
-              color: loading ? CP.textMuted : "#0a0a0a",
+              background: loading ? CP.surfaceAlt : CP.accent,
+              color: loading ? CP.textMuted : CP.accentInk,
               border: "none", borderRadius: 8,
               fontSize: 14, fontWeight: 700, cursor: loading ? "wait" : "pointer",
             }}
@@ -214,7 +214,7 @@ function Row({ k, v, mono, color }) {
 function MiniStat({ label, value, color }) {
   return (
     <div style={{ padding: "14px 16px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10 }}>
-      <div style={{ fontSize: 11, color: CP.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, fontFamily: FONTS.mono }}>{label}</div>
+      <div style={{ fontSize: 11, color: CP.textMuted, marginBottom: 6, letterSpacing: "0.08em", fontWeight: 700, fontFamily: FONTS.mono }}>{label}</div>
       <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 24, color: color || CP.textPrimary }}>{value}</div>
     </div>
   );

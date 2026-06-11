@@ -249,7 +249,7 @@ export default function DebugMappingPage() {
           )}
           {candidates && candidates.length > 0 && (
             <CpCard padding="14px 16px">
-              <div style={{ fontSize: 11, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 12, fontFamily: FONTS.mono, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 11, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 12, fontFamily: FONTS.mono, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span>Candidati da risolvere ({candidates.length})</span>
                 <Link href="/leaderboard/sales-cp" style={{ color: CP.textSecondary, textDecoration: "none", fontSize: 10, textTransform: "none", letterSpacing: 0, fontFamily: FONTS.body }}>
                   Vedi in classifica →
@@ -483,13 +483,13 @@ function diagnoseColor(tone) {
   return CP.textPrimary;
 }
 
-const lbl = { display: "block", fontSize: 11, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 6, fontFamily: FONTS.mono };
+const lbl = { display: "block", fontSize: 11, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 6, fontFamily: FONTS.mono };
 const input = { width: "100%", padding: "10px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
 const primaryBtn = (disabled) => ({
   display: "inline-flex", alignItems: "center", gap: 6,
   padding: "10px 18px",
-  background: disabled ? CP.surfaceAlt : CP.accentGreen,
-  color: disabled ? CP.textMuted : "#0a0a0a",
+  background: disabled ? CP.surfaceAlt : CP.accent,
+  color: disabled ? CP.textMuted : CP.accentInk,
   border: "none",
   borderRadius: 8,
   fontSize: 13, fontWeight: 700, fontFamily: FONTS.body,

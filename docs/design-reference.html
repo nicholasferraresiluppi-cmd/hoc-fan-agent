@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design reference — Dark SaaS (HOC)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-sunken:   #0a0d11;
+    --bg:          #0c0f14;
+    --surface:     #151a22;
+    --surface-2:   #20283a;
+    --border:      #232b3a;
+    --border-soft: #1d2430;
+    --text:        #f2f4f8;
+    --text-2:      #cdd3de;
+    --muted:       #8c95a8;
+    --muted-2:     #5d6678;
+    --accent:           #8b7cf6;
+    --accent-ink:       #14101f;
+    --accent-soft:      #2a2353;
+    --accent-soft-text: #b9aef9;
+    --accent-dim:       #3a3470;
+    --success: #4ade80;
+    --danger:  #f08c8c;
+    --radius-sm:   6px;
+    --radius-md:   10px;
+    --radius-pill: 999px;
+  }
+
+  * { box-sizing: border-box; margin: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 24px;
+  }
+
+  .page { max-width: 920px; margin: 0 auto; }
+  .section-label { font-size: 11px; color: var(--muted); margin: 28px 0 10px; letter-spacing: 0.02em; }
+
+  .app { display: flex; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+
+  .sidebar { width: 56px; flex-shrink: 0; background: var(--bg-sunken); border-right: 1px solid var(--border-soft); display: flex; flex-direction: column; align-items: center; padding: 14px 0; gap: 6px; min-height: 480px; }
+  .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font-weight: 500; font-size: 14px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+  .nav-item { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; color: var(--muted-2); font-size: 16px; cursor: pointer; }
+  .nav-item:hover { color: var(--muted); }
+  .nav-item.active { background: var(--surface-2); color: var(--accent); }
+  .nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .main { flex: 1; min-width: 0; padding: 16px 18px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .page-title { font-size: 15px; font-weight: 500; color: var(--text); }
+  .search { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 5px 12px; font-size: 11px; color: var(--muted); }
+  .avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-size: 11px; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; }
+  .kpi-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .kpi-value { font-size: 19px; font-weight: 500; color: var(--text); }
+  .kpi-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+  .badge { font-size: 11px; background: var(--accent-soft); color: var(--accent-soft-text); border-radius: var(--radius-sm); padding: 2px 6px; }
+  .delta-up { color: var(--success); font-size: 11px; }
+  .delta-down { color: var(--danger); font-size: 11px; }
+  .dot-online { width: 7px; height: 7px; border-radius: 50%; background: var(--success); display: inline-block; }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 14px; }
+  .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .panel-title { font-size: 12px; font-weight: 500; color: var(--text-2); }
+  .panel-sub { font-size: 11px; color: var(--muted); }
+
+  .bars { display: flex; align-items: flex-end; gap: 5px; height: 64px; }
+  .bar { flex: 1; background: var(--accent-dim); border-radius: 3px; }
+  .bar.current { background: var(--accent); }
+
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border-soft); }
+  .row:last-child { border-bottom: none; }
+  .row-name { display: inline-flex; align-items: center; gap: 8px; color: var(--text-2); }
+  .row-avatar { width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-soft-text); font-size: 11px; display: inline-flex; align-items: center; justify-content: center; }
+  .row-value { color: var(--text); }
+
+  .btn { font-family: inherit; font-size: 12px; font-weight: 500; border-radius: 8px; padding: 7px 14px; border: 1px solid transparent; cursor: pointer; }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn-primary { background: var(--accent); color: var(--accent-ink); }
+  .btn-secondary { background: var(--surface-2); color: var(--text-2); border-color: var(--border); }
+
+  .input { font-family: inherit; font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); padding: 8px 12px; width: 220px; }
+  .input::placeholder { color: var(--muted); }
+  .input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .swatch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 10px; }
+  .swatch { height: 34px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+  .swatch-name { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: ui-monospace, monospace; }
+
+  .specimen { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <p class="section-label">Dashboard di riferimento — dati di esempio</p>
+
+  <div class="app">
+    <nav class="sidebar" aria-label="Navigazione principale">
+      <div class="logo">H</div>
+      <button class="nav-item active" aria-label="Panoramica" style="border:none;background:var(--surface-2);">▦</button>
+      <button class="nav-item" aria-label="Creator" style="border:none;background:transparent;">◉</button>
+      <button class="nav-item" aria-label="Statistiche" style="border:none;background:transparent;">▤</button>
+      <button class="nav-item" aria-label="Classifica" style="border:none;background:transparent;">★</button>
+      <button class="nav-item" aria-label="Impostazioni" style="border:none;background:transparent;margin-top:auto;">⚙</button>
+    </nav>
+
+    <main class="main">
+      <div class="topbar">
+        <span class="page-title">Panoramica</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="search">⌕ Cerca</span>
+          <span class="avatar">N</span>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="card">
+          <p class="kpi-label">Ricavi del mese</p>
+          <div class="kpi-row"><span class="kpi-value">€ 128.400</span><span class="badge">+18%</span></div>
+        </div>
+        <div class="card">
+          <p class="kpi-label">Creator attive</p>
+          <div class="kpi-row"><span class="kpi-value">24</span><span class="panel-sub">su 3 mercati</span></div>
+        </div>
+        <div class="card">
+          <p class="kpi-label">Operatori online</p>
+          <div class="kpi-row"><span class="kpi-value">12</span><span class="dot-online"></span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Andamento ricavi</span>
+          <span class="panel-sub">ultimi 12 turni</span>
+        </div>
+        <div class="bars" role="img" aria-label="Grafico a barre dei ricavi degli ultimi 12 turni, in crescita">
+          <div class="bar" style="height:26px"></div>
+          <div class="bar" style="height:34px"></div>
+          <div class="bar" style="height:22px"></div>
+          <div class="bar" style="height:40px"></div>
+          <div class="bar" style="height:32px"></div>
+          <div class="bar" style="height:46px"></div>
+          <div class="bar" style="height:38px"></div>
+          <div class="bar" style="height:52px"></div>
+          <div class="bar" style="height:44px"></div>
+          <div class="bar" style="height:50px"></div>
+          <div class="bar" style="height:58px"></div>
+          <div class="bar current" style="height:64px"></div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:0;">
+        <span class="panel-title" style="display:block;margin-bottom:10px;">Top creator</span>
+        <div class="row">
+          <span class="row-name"><span class="row-avatar">A</span>Aurora B.</span>
+          <span class="row-value">€ 23.800 <span class="delta-up">+12%</span></span>
+        </div>
+        <div class="row">
+          <span class="row-name"><span class="row-avatar">M</span>Marta V.</span>
+          <span class="row-value">€ 19.450 <span class="delta-up">+8%</span></span>
+        </div>
+        <div class="row">
+          <span class="row-name"><span class="row-avatar">E</span>Elena R.</span>
+          <span class="row-value">€ 16.200 <span class="delta-down">-3%</span></span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <p class="section-label">Campionario componenti</p>
+
+  <div class="panel">
+    <div class="specimen" style="margin-bottom:14px;">
+      <button class="btn btn-primary">Azione primaria</button>
+      <button class="btn btn-secondary">Azione secondaria</button>
+      <span class="badge">+18%</span>
+      <span class="delta-up">+12%</span>
+      <span class="delta-down">-3%</span>
+      <span><span class="dot-online"></span> <span class="panel-sub">online</span></span>
+    </div>
+    <div class="specimen">
+      <input class="input" type="text" placeholder="Cerca una creator…">
+      <span class="search">⌕ Cerca</span>
+      <span class="avatar">N</span>
+    </div>
+  </div>
+
+  <p class="section-label">Palette — i sei valori chiave</p>
+
+  <div class="swatch-grid">
+    <div><div class="swatch" style="background:var(--bg)"></div><p class="swatch-name">#0c0f14 sfondo</p></div>
+    <div><div class="swatch" style="background:var(--surface)"></div><p class="swatch-name">#151a22 card</p></div>
+    <div><div class="swatch" style="background:var(--border)"></div><p class="swatch-name">#232b3a bordi</p></div>
+    <div><div class="swatch" style="background:var(--accent)"></div><p class="swatch-name">#8b7cf6 accent</p></div>
+    <div><div class="swatch" style="background:var(--text)"></div><p class="swatch-name">#f2f4f8 testo</p></div>
+    <div><div class="swatch" style="background:var(--muted)"></div><p class="swatch-name">#8c95a8 muto</p></div>
+  </div>
+
+</div>
+</body>
+</html>

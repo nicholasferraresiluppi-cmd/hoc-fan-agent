@@ -139,7 +139,7 @@ export default function SessionDetailPage() {
     label: {
       fontSize: 11,
       color: COLORS.fog,
-      textTransform: "uppercase",
+      
       letterSpacing: "0.06em",
       marginBottom: 4,
     },

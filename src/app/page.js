@@ -490,7 +490,7 @@ export default function Home() {
                 fontSize: "0.65rem",
                 letterSpacing: "0.18em",
                 color: COLORS.mist,
-                textTransform: "uppercase",
+                
                 paddingLeft: "0.75rem",
                 borderLeft: `1px solid ${COLORS.steel}`,
               }}
@@ -520,7 +520,7 @@ export default function Home() {
                   color: LEAGUE_UI[league.tier]?.color || "#fff",
                   fontSize: "0.7rem",
                   fontWeight: 800,
-                  textTransform: "uppercase",
+                  
                   letterSpacing: "0.4px",
                   textDecoration: "none",
                 }}
@@ -555,7 +555,7 @@ export default function Home() {
                       : COLORS.verdant,
                   fontSize: "0.7rem",
                   fontWeight: 800,
-                  textTransform: "uppercase",
+                  
                   letterSpacing: "0.4px",
                 }}
               >
@@ -829,7 +829,7 @@ export default function Home() {
                           <div style={{ fontSize: "0.9rem", fontWeight: 800, color: COLORS.alabaster, lineHeight: 1.2 }}>
                             {cr.name}
                           </div>
-                          <div style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: "0.16em", color: unlocked ? meta.color : COLORS.mist, fontWeight: 700, marginTop: 2, textTransform: "uppercase" }}>
+                          <div style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: "0.16em", color: unlocked ? meta.color : COLORS.mist, fontWeight: 700, marginTop: 2 }}>
                             {unlocked ? meta.label : "LOCKED"}
                           </div>
                         </div>
@@ -886,12 +886,12 @@ export default function Home() {
                     Daily Drill
                   </h3>
                   {dailyDrill.mandatory && !dailyDrill.completed && (
-                    <span style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem", background: HOC_COLORS.orange, color: HOC_COLORS.bgDark, borderRadius: 4, fontWeight: 800, textTransform: "uppercase" }}>
+                    <span style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem", background: HOC_COLORS.orange, color: HOC_COLORS.bgDark, borderRadius: 4, fontWeight: 800 }}>
                       Obbligatorio
                     </span>
                   )}
                   {!dailyDrill.mandatory && !dailyDrill.completed && (
-                    <span style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem", background: `${HOC_COLORS.purple}40`, color: HOC_COLORS.purple, borderRadius: 4, fontWeight: 700, textTransform: "uppercase" }}>
+                    <span style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem", background: `${HOC_COLORS.purple}40`, color: HOC_COLORS.purple, borderRadius: 4, fontWeight: 700 }}>
                       Opzionale
                     </span>
                   )}
@@ -960,7 +960,7 @@ export default function Home() {
                     color: HOC_COLORS.gray,
                     fontSize: "0.85rem",
                     margin: 0,
-                    textTransform: "uppercase",
+                    
                   }}
                 >
                   🏆 Top 3 Operatori
@@ -1387,7 +1387,7 @@ export default function Home() {
                         </span>
                       )}
                     </div>
-                    <div style={{ color: HOC_COLORS.orange, fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "0.5rem" }}>
+                    <div style={{ color: HOC_COLORS.orange, fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.5px", marginBottom: "0.5rem" }}>
                       {c.archetype}
                     </div>
                     <div style={{ color: HOC_COLORS.gray, fontSize: "0.8rem", lineHeight: 1.4 }}>
@@ -2205,7 +2205,7 @@ export default function Home() {
                     color: HOC_COLORS.gray,
                     fontSize: "0.9rem",
                     margin: "0 0 1rem 0",
-                    textTransform: "uppercase",
+                    
                   }}
                 >
                   Situazione
@@ -2460,7 +2460,7 @@ export default function Home() {
                   color: `${HOC_COLORS.white}90`,
                   fontSize: "0.9rem",
                   margin: "0 0 0.5rem 0",
-                  textTransform: "uppercase",
+                  
                 }}
               >
                 Operatore

@@ -60,7 +60,7 @@ function TierBadge({ tier, size = "md" }) {
   return (
     <span style={{
       display: "inline-block", padding, borderRadius: 999,
-      fontSize, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase",
+      fontSize, fontWeight: 600, letterSpacing: "0.05em", 
       background: color + "26", color, border: `1px solid ${color}55`,
       fontFamily: FONTS.body,
     }}>{tier}</span>
@@ -228,7 +228,7 @@ export default function EmployeeDrilldownPage({ params }) {
               <div style={{ position: "relative", minWidth: 0 }}>
                 <div style={{ fontFamily: FONTS.display, fontSize: 30, fontWeight: 500, letterSpacing: "-0.01em", marginBottom: 4 }}>{employee}</div>
                 {(cp?.top_creator || histData?.profile?.group) && (
-                  <div style={{ color: COLORS.champagne, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12 }}>
+                  <div style={{ color: COLORS.champagne, fontSize: 12, letterSpacing: "0.12em", marginBottom: 12 }}>
                     {cp?.top_creator || histData?.profile?.group}
                     {histData?.profile?.language && (
                       <span style={{ display: "inline-block", padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700, marginLeft: 8, background: langColor + "20", color: langColor, border: `1px solid ${langColor}55`, fontFamily: FONTS.mono }}>
@@ -253,7 +253,7 @@ export default function EmployeeDrilldownPage({ params }) {
 
               <div style={{ textAlign: "right", position: "relative", display: "flex", flexDirection: "column", gap: 16 }}>
                 <div>
-                  <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 2 }}>Score CP {formatPeriodLabel(periodId)}</div>
+                  <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.15em", marginBottom: 2 }}>Score CP {formatPeriodLabel(periodId)}</div>
                   <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 56, lineHeight: 1, color: cpTierColor }}>
                     {cp?.score != null ? cp.score.toFixed(1) : "—"}
                   </div>
@@ -268,7 +268,7 @@ export default function EmployeeDrilldownPage({ params }) {
                 </div>
                 {inflowwCurrent?.score != null && (
                   <div style={{ paddingTop: 12, borderTop: `1px solid ${COLORS.charcoal}` }}>
-                    <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.12em" }}>Score Infw (KPI chat)</div>
+                    <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.12em" }}>Score Infw (KPI chat)</div>
                     <div style={{ fontFamily: FONTS.mono, fontSize: 20, fontWeight: 600, color: COLORS.mist, marginTop: 2 }}>{inflowwCurrent.score.toFixed(1)}</div>
                     <div style={{ marginTop: 4 }}><Delta value={deltaInfloww} suffix=" pt" /></div>
                   </div>
@@ -282,7 +282,7 @@ export default function EmployeeDrilldownPage({ params }) {
                 <EmptyBlock text={`Nessun dato CP attribuito a ${employee} per ${formatPeriodLabel(periodId)}. Possibili cause: non mappato in CreatorsPro, oppure nessun shift sincronizzato.`} />
               ) : (
                 <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, overflow: "hidden" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.8fr 0.7fr 0.7fr 0.8fr 0.9fr 0.6fr 0.6fr 0.5fr", padding: "12px 20px", background: COLORS.obsidian + "80", color: COLORS.fog, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.8fr 0.7fr 0.7fr 0.8fr 0.9fr 0.6fr 0.6fr 0.5fr", padding: "12px 20px", background: COLORS.obsidian + "80", color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` }}>
                     <div>Creator</div>
                     <div title="Score CP percentile su quella specifica creator">Score loc.</div>
                     <div>Tier</div>
@@ -331,7 +331,7 @@ export default function EmployeeDrilldownPage({ params }) {
               ) : (
                 <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, padding: 22 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 12, color: COLORS.fog, fontFamily: FONTS.mono, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    <span style={{ fontSize: 12, color: COLORS.fog, fontFamily: FONTS.mono, letterSpacing: "0.1em" }}>
                       Andamento score CP · {cpHist?.periods_count ?? 0} mesi attivi su {cpHist?.looked_back ?? 12}
                     </span>
                     {cpHist?.periods_not_synced > 0 && (
@@ -383,7 +383,7 @@ export default function EmployeeDrilldownPage({ params }) {
 
               {cp?.peer_strong?.length > 0 && (
                 <div style={{ marginTop: 18 }}>
-                  <div style={{ fontSize: 11, color: COLORS.fog, fontFamily: FONTS.mono, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: COLORS.fog, fontFamily: FONTS.mono, letterSpacing: "0.1em", marginBottom: 10 }}>
                     Peer Strong+ sulle stesse creator
                   </div>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -417,7 +417,7 @@ export default function EmployeeDrilldownPage({ params }) {
 function StatMini({ l, v, sub, color }) {
   return (
     <div>
-      <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em" }}>{l}</div>
+      <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.1em" }}>{l}</div>
       <div style={{ fontFamily: FONTS.mono, fontSize: 16, fontWeight: 600, marginTop: 2, color: color || COLORS.alabaster }}>{v}</div>
       {sub && <div style={{ fontSize: 10, color: COLORS.mist, marginTop: 2 }}>{sub}</div>}
     </div>

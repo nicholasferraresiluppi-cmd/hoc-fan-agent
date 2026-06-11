@@ -243,7 +243,7 @@ function AdminActionsMenu({ employee, onExcluded, light = false }) {
           <div style={{
             padding: "8px 12px 6px",
             fontSize: 10, color: COLORS.mist,
-            textTransform: "uppercase", letterSpacing: "0.1em",
+            letterSpacing: "0.1em",
             borderBottom: `1px solid ${COLORS.charcoal}`,
             marginBottom: 4,
           }}>
@@ -293,7 +293,7 @@ function TierBadge({ tier }) {
   return (
     <span style={{
       display: "inline-block", padding: "3px 11px", borderRadius: 999,
-      fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase",
+      fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", 
       background: color + "26", color: color, border: `1px solid ${color}55`,
     }}>{tier}</span>
   );
@@ -305,7 +305,7 @@ function CategoryBadge({ category }) {
   return (
     <span style={{
       display: "inline-block", padding: "1px 7px", borderRadius: 999,
-      fontSize: 9, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase",
+      fontSize: 9, fontWeight: 600, letterSpacing: "0.06em", 
       background: color + "20", color: color, border: `1px solid ${color}55`,
       marginLeft: 6, verticalAlign: "middle",
     }}>{category}</span>
@@ -329,7 +329,7 @@ function EstimatedTag({ small = false }) {
         fontFamily: FONTS.mono,
         fontWeight: 500,
         verticalAlign: "middle",
-        textTransform: "uppercase",
+        
       }}
     >
       ~stima
@@ -384,7 +384,7 @@ function StatCard({ label, value, sub, color, tooltip }) {
         cursor: tooltip ? "help" : "default",
       }}
     >
-      <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 }}>
+      <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.12em", marginBottom: 6 }}>
         {label}{tooltip && <span style={{ marginLeft: 4, opacity: 0.4 }}>ⓘ</span>}
       </div>
       <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 22, color: color || COLORS.alabaster }}>{value}</div>
@@ -436,7 +436,7 @@ function HeroCard({ op, groupMeans, canExclude, onExcluded }) {
           fontFamily: FONTS.display, fontWeight: 500, fontStyle: "italic",
           fontSize: 56, lineHeight: 1, color: COLORS.champagne,
         }}>1</div>
-        <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.15em", marginTop: 4 }}>Top operator</div>
+        <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.15em", marginTop: 4 }}>Top operator</div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 18, position: "relative" }}>
         <Avatar name={op.employee} size={84} large />
@@ -444,7 +444,7 @@ function HeroCard({ op, groupMeans, canExclude, onExcluded }) {
           <Link href={`/leaderboard/operational/${encodeURIComponent(op.employee)}`} style={{ color: "inherit", textDecoration: "none" }}>
             <div style={{ fontFamily: FONTS.display, fontSize: 28, fontWeight: 500, letterSpacing: "-0.01em", marginBottom: 4, cursor: "pointer" }}>{op.employee} <span style={{ fontSize: 14, color: COLORS.champagne, opacity: 0.7 }}>→</span></div>
           </Link>
-          <div style={{ color: COLORS.champagne, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 8 }}>
+          <div style={{ color: COLORS.champagne, fontSize: 12, letterSpacing: "0.12em", marginBottom: 8 }}>
             {op.group}
             <CategoryBadge category={op.category} />
             <LanguageBadge language={op.language} />
@@ -453,7 +453,7 @@ function HeroCard({ op, groupMeans, canExclude, onExcluded }) {
         </div>
       </div>
       <div style={{ textAlign: "right", position: "relative" }}>
-        <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 2 }}>Score</div>
+        <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.15em", marginBottom: 2 }}>Score</div>
         <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 56, lineHeight: 1, color: tierColor }}>{op.score?.toFixed(1)}</div>
         <div style={{ fontFamily: FONTS.mono, color: COLORS.mist, fontSize: 13, marginTop: 2 }}>/ 100</div>
       </div>
@@ -474,7 +474,7 @@ function HeroCard({ op, groupMeans, canExclude, onExcluded }) {
 function HeroStat({ l, v, mean }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, fontSize: 12 }}>
-      <span style={{ color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.06em", fontSize: 10 }}>{l}</span>
+      <span style={{ color: COLORS.fog, letterSpacing: "0.06em", fontSize: 10 }}>{l}</span>
       <span>
         <span style={{ fontFamily: FONTS.mono, fontWeight: 600, color: COLORS.alabaster, fontSize: 14 }}>{v}</span>
         {mean && <span style={{ fontFamily: FONTS.mono, color: COLORS.mist, fontSize: 10, marginLeft: 6 }}>Ø {mean}</span>}
@@ -503,7 +503,7 @@ function HeroCreatorImpact({ op }) {
       marginBottom: 22,
     }}>
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 11, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.12em" }}>
+        <div style={{ fontSize: 11, color: COLORS.fog, letterSpacing: "0.12em" }}>
           🎨 Impact su creator
         </div>
         <div style={{ fontSize: 12, color: COLORS.mist, marginTop: 4 }}>
@@ -585,7 +585,7 @@ function Top4Card({ op, canExclude, onExcluded }) {
             </div>
           </Link>
           <div style={{
-            fontSize: 10, color: COLORS.fog, textTransform: "uppercase",
+            fontSize: 10, color: COLORS.fog, 
             letterSpacing: "0.08em", marginTop: 2,
             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
           }}>
@@ -609,7 +609,7 @@ function Top4Card({ op, canExclude, onExcluded }) {
           display: "flex", justifyContent: "space-between", alignItems: "center",
           fontSize: 11,
         }}>
-          <span style={{ color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.06em", fontSize: 9 }}>Top creator</span>
+          <span style={{ color: COLORS.fog, letterSpacing: "0.06em", fontSize: 9 }}>Top creator</span>
           <span style={{ color: COLORS.alabaster, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "65%" }} title={`${op.top_creator.creator}${op.top_creator.estimated ? " (stima equa)" : " (esatto)"}`}>
             {op.top_creator.creator}
             <span style={{ color: COLORS.champagne, marginLeft: 6 }}>{op.top_creator.share_pct}%</span>
@@ -731,7 +731,7 @@ function HealthBar({ periodType }) {
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <div style={{ fontSize: 11, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.12em" }}>
+          <div style={{ fontSize: 11, color: COLORS.fog, letterSpacing: "0.12em" }}>
             📈 Health agenzia — ultimi {history.length} {periodType === "monthly" ? "mesi" : periodType === "weekly" ? "settimane" : "trimestri"}
           </div>
           <div style={{ fontSize: 12, color: COLORS.mist, marginTop: 4 }}>
@@ -748,7 +748,7 @@ function HealthBar({ periodType }) {
         </div>
         <div style={{ display: "flex", gap: 18, fontSize: 11 }}>
           <div>
-            <div style={{ color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.08em", fontSize: 9 }}>Qualità (Elite+Strong vs Critical+Weak)</div>
+            <div style={{ color: COLORS.fog, letterSpacing: "0.08em", fontSize: 9 }}>Qualità (Elite+Strong vs Critical+Weak)</div>
             <div style={{ marginTop: 4, fontFamily: FONTS.mono, fontSize: 14, fontWeight: 600, color: "#3FB97E" }}>
               +{current.elite_strong - current.critical_weak}
               {previous && (
@@ -863,7 +863,7 @@ function UnderperformersKebab({ employee, onExcluded, onIgnored }) {
           background: COLORS.graphite, border: `1px solid ${COLORS.steel}`, borderRadius: 10,
           boxShadow: "0 12px 32px rgba(0,0,0,0.6)", padding: 4, zIndex: 50,
         }}>
-          <div style={{ padding: "8px 12px 6px", fontSize: 10, color: COLORS.mist, textTransform: "uppercase", letterSpacing: "0.1em", borderBottom: `1px solid ${COLORS.charcoal}`, marginBottom: 4 }}>
+          <div style={{ padding: "8px 12px 6px", fontSize: 10, color: COLORS.mist, letterSpacing: "0.1em", borderBottom: `1px solid ${COLORS.charcoal}`, marginBottom: 4 }}>
             {employee}
           </div>
           <button onClick={handleIgnore} disabled={busy}
@@ -909,7 +909,7 @@ function UnderperformersColumn({ language, label, flag, periodType, periodId, si
       display: "flex", flexDirection: "column", gap: 10,
     }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-        <div style={{ fontSize: 11, color: COLORS.signal, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
+        <div style={{ fontSize: 11, color: COLORS.signal, letterSpacing: "0.1em", fontWeight: 600 }}>
           ⚠️ Da cambiare {flag} {label}
         </div>
         <div
@@ -1057,12 +1057,12 @@ function UnderperformersActionCenter({ periodType, periodId, canExclude, languag
   return (
     <div style={{ marginBottom: 22 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
-        <div style={{ fontSize: 11, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.12em" }}>
+        <div style={{ fontSize: 11, color: COLORS.fog, letterSpacing: "0.12em" }}>
           🎯 Action center — operatori da cambiare (admin only)
           {languageFilter && <span style={{ marginLeft: 8, color: COLORS.champagne }}>· filtrato {languageFilter.toUpperCase()}</span>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 10, color: COLORS.mist, textTransform: "uppercase", letterSpacing: "0.08em" }}>Lista di:</span>
+          <span style={{ fontSize: 10, color: COLORS.mist, letterSpacing: "0.08em" }}>Lista di:</span>
           {SIZE_OPTIONS.map((n) => (
             <button key={n} onClick={() => setSize(n)}
               style={{
@@ -1173,7 +1173,7 @@ export default function OperationalLeaderboardPage() {
     filterBar: { display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" },
     filterRow2: { display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" },
     filterRow3: { display: "flex", gap: 10, alignItems: "center", marginBottom: 22, flexWrap: "wrap" },
-    filterLabel: { fontSize: 11, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em", marginRight: 4 },
+    filterLabel: { fontSize: 11, color: COLORS.fog, letterSpacing: "0.1em", marginRight: 4 },
     pill: (active) => ({
       padding: "9px 16px",
       background: active ? COLORS.champagne : COLORS.graphite,
@@ -1227,7 +1227,7 @@ export default function OperationalLeaderboardPage() {
       padding: "14px 22px",
       background: COLORS.obsidian + "80",
       color: COLORS.fog,
-      fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em",
+      fontSize: 10, letterSpacing: "0.1em",
       fontWeight: 500,
       borderBottom: `1px solid ${COLORS.charcoal}`,
     },

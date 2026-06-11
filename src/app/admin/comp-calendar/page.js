@@ -28,7 +28,7 @@ function monthOpts(n = 12) {
 const fmt$ = (n) => n == null ? "—" : `$${Number(n).toLocaleString("it-IT", { maximumFractionDigits: 0 })}`;
 const fmtPct = (v, d = 0) => v == null ? "—" : `${(v * 100).toFixed(d)}%`;
 
-const TIER_COLORS = ["#D44545", "#F59E0B", "#3FB97E", "#4F8CCB", "#A35EE0"];
+const TIER_COLORS = ["#D44545", "#F59E0B", "#3FB97E", "#4F8CCB", CP.accent];
 
 // % vincente con formula bracket su intero importo (confermata dalla ricerca)
 function bracketPct(total, thresholds) {
@@ -477,7 +477,7 @@ export default function CompCalendarPage() {
           <SectionLabel style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <FlaskConical size={13} /> Simulatore — profilo pagamento alternativo sui turni chiusi
           </SectionLabel>
-          <CpCard accent={simChanged ? "#A35EE0" : undefined} padding="18px 22px" style={{ marginBottom: 22 }}>
+          <CpCard accent={simChanged ? CP.accent : undefined} padding="18px 22px" style={{ marginBottom: 22 }}>
             {simByClass && (
               <>
                 {/* Un set di scaglioni PER OGNI classe cosellers — il match vero:
@@ -488,7 +488,7 @@ export default function CompCalendarPage() {
                   const clsLabel = cls === 1 ? "Solo (1×)" : cls === 2 ? "Coppia (2×)" : cls === 3 ? "Triplo (3×)" : `${cls}×`;
                   return (
                     <div key={cls} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 12, paddingBottom: 12, borderBottom: `1px dashed ${CP.border}` }}>
-                      <div style={{ minWidth: 92, fontSize: 12, fontWeight: 700, color: "#A35EE0", paddingBottom: 9, fontFamily: FONTS.mono }}>{clsLabel}</div>
+                      <div style={{ minWidth: 92, fontSize: 12, fontWeight: 700, color: CP.accent, paddingBottom: 9, fontFamily: FONTS.mono }}>{clsLabel}</div>
                       {tiers.map((t, i) => (
                         <div key={i} style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
                           <div>
@@ -538,7 +538,7 @@ export default function CompCalendarPage() {
                 {sim && (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
                     <StatCard label="Pagato REALE" value={fmt$(grid.totEarn)} color="#D4AF7A" />
-                    <StatCard label="Pagato SIMULATO" value={fmt$(sim.total)} color="#A35EE0" />
+                    <StatCard label="Pagato SIMULATO" value={fmt$(sim.total)} color={CP.accent} />
                     <StatCard
                       label="Δ per gli operatori"
                       value={`${sim.delta >= 0 ? "+" : ""}${fmt$(sim.delta)}`}
@@ -568,7 +568,7 @@ export default function CompCalendarPage() {
                           type="checkbox"
                           checked={showOnlyChanged}
                           onChange={(e) => setShowOnlyChanged(e.target.checked)}
-                          style={{ accentColor: "#A35EE0" }}
+                          style={{ accentColor: CP.accent }}
                         />
                         Solo turni che cambiano scaglione ({sim.changedCount})
                       </label>
@@ -592,15 +592,15 @@ export default function CompCalendarPage() {
                           {sim.simRows
                             .filter((r) => !showOnlyChanged || r.bracket_changed)
                             .map((r) => (
-                              <tr key={r.shift_id} style={{ borderBottom: `1px solid ${CP.border}44`, background: r.bracket_changed ? "#A35EE018" : "transparent" }}>
+                              <tr key={r.shift_id} style={{ borderBottom: `1px solid ${CP.border}44`, background: r.bracket_changed ? "#8b7cf618" : "transparent" }}>
                                 <td style={{ ...td, fontFamily: FONTS.mono }}>{r.date.slice(5)}</td>
                                 <td style={{ ...td, fontFamily: FONTS.mono, color: CP.textSecondary }}>{r.start}–{r.end}</td>
                                 <td style={td}>{r.operator}</td>
                                 <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmt$(r.sales_on_creator)}</td>
                                 <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: grid.colorOf(r.expected_pct) }}>{fmtPct(r.expected_pct ?? r.eff_pct)}</td>
                                 <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#D4AF7A" }}>{fmt$(r.earnings_attr)}</td>
-                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: r.bracket_changed ? "#A35EE0" : CP.textSecondary }}>{fmtPct(r.sim_pct)}</td>
-                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#A35EE0" }}>{fmt$(r.sim_earn)}</td>
+                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: r.bracket_changed ? CP.accent : CP.textSecondary }}>{fmtPct(r.sim_pct)}</td>
+                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accent }}>{fmt$(r.sim_earn)}</td>
                                 <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: Math.abs(r.row_delta) < 0.5 ? CP.textMuted : r.row_delta > 0 ? CP.accentRed : CP.accentGreen }}>
                                   {Math.abs(r.row_delta) < 0.5 ? "=" : `${r.row_delta > 0 ? "+" : ""}${fmt$(r.row_delta)}`}
                                 </td>
@@ -645,7 +645,7 @@ export default function CompCalendarPage() {
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono }}>{o.turni}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmt$(o.sales)}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#D4AF7A" }}>{fmt$(o.earn)}</td>
-                      {simChanged && <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#A35EE0" }}>{simEarn != null ? fmt$(simEarn) : "—"}</td>}
+                      {simChanged && <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accent }}>{simEarn != null ? fmt$(simEarn) : "—"}</td>}
                       {simChanged && (
                         <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: delta == null ? CP.textMuted : delta > 0 ? CP.accentRed : CP.accentGreen }}>
                           {delta != null ? `${delta >= 0 ? "+" : ""}${fmt$(delta)}` : "—"}
@@ -672,16 +672,16 @@ export default function CompCalendarPage() {
   );
 }
 
-const lbl = { display: "block", fontSize: 10, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
+const lbl = { display: "block", fontSize: 10, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
 const input = { width: "100%", padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
-const th = { padding: "8px 9px", textAlign: "left", fontSize: 9.5, fontWeight: 700, color: CP.textMuted, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: FONTS.mono, whiteSpace: "nowrap", background: CP.surfaceAlt };
+const th = { padding: "8px 9px", textAlign: "left", fontSize: 9.5, fontWeight: 700, color: CP.textMuted, letterSpacing: 0.5, fontFamily: FONTS.mono, whiteSpace: "nowrap", background: CP.surfaceAlt };
 const td = { padding: "5px 8px", verticalAlign: "top" };
 const iconBtn = { padding: "9px 10px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, cursor: "pointer", display: "inline-flex", alignItems: "center" };
 const primaryBtn = (disabled) => ({
   display: "inline-flex", alignItems: "center", gap: 8,
   padding: "10px 16px",
-  background: disabled ? CP.surfaceAlt : CP.accentGreen,
-  color: disabled ? CP.textMuted : "#0a0a0a",
+  background: disabled ? CP.surfaceAlt : CP.accent,
+  color: disabled ? CP.textMuted : CP.accentInk,
   border: "none", borderRadius: 8,
   fontSize: 13, fontWeight: 700, fontFamily: FONTS.body,
   cursor: disabled ? "not-allowed" : "pointer",

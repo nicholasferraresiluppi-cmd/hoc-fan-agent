@@ -182,7 +182,7 @@ const aBubble = {
 };
 const qLabel = { fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, color: CP.textMuted, letterSpacing: "0.08em" };
 const aLabel = { fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, color: CP.accentGreen, letterSpacing: "0.08em", display: "inline-flex", alignItems: "center", gap: 4 };
-const presetsLabel = { fontSize: 10, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, fontFamily: FONTS.mono, marginBottom: 8 };
+const presetsLabel = { fontSize: 10, color: CP.textMuted, letterSpacing: "0.1em", fontWeight: 700, fontFamily: FONTS.mono, marginBottom: 8 };
 const presetBtn = (used) => ({
   padding: "6px 11px",
   background: used ? CP.surfaceAlt : "transparent",
@@ -208,8 +208,8 @@ const textareaStyle = {
 };
 const submitBtn = (disabled) => ({
   padding: "0 18px",
-  background: disabled ? CP.surfaceAlt : CP.accentGreen,
-  color: disabled ? CP.textMuted : "#0a0a0a",
+  background: disabled ? CP.surfaceAlt : CP.accent,
+  color: disabled ? CP.textMuted : CP.accentInk,
   border: "none",
   borderRadius: 8,
   fontSize: 13,

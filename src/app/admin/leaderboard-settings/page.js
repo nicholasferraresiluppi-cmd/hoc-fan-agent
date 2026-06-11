@@ -201,7 +201,7 @@ export default function LeaderboardSettingsPage() {
       fontSize: 10,
       fontWeight: 600,
       letterSpacing: "0.06em",
-      textTransform: "uppercase",
+      
       background: COLORS.champagne + "26",
       color: COLORS.champagne,
       border: `1px solid ${COLORS.champagne}55`,
@@ -214,7 +214,7 @@ export default function LeaderboardSettingsPage() {
     th: {
       textAlign: "left", padding: "10px 12px",
       color: COLORS.fog, fontSize: 10,
-      textTransform: "uppercase", letterSpacing: "0.08em",
+      letterSpacing: "0.08em",
       fontWeight: 500,
       borderBottom: `1px solid ${COLORS.charcoal}`,
     },

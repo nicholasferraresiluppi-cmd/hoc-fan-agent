@@ -144,7 +144,7 @@ export default function WageAuditPage() {
 
       {data && !data.error && (
         <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr 0.8fr 1fr 1.5fr", padding: "14px 22px", background: COLORS.obsidian + "80", color: COLORS.fog, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr 0.8fr 1fr 1.5fr", padding: "14px 22px", background: COLORS.obsidian + "80", color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` }}>
             <div>Mese</div><div>KV</div><div>CP live</div><div>Gap</div><div>Stato</div><div>Azione</div>
           </div>
           {months.map((m) => {

@@ -195,7 +195,7 @@ export default function GroupCategoriesPage() {
       borderRadius: 12,
       padding: "14px 16px",
     }),
-    statLabel: { fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 },
+    statLabel: { fontSize: 10, color: COLORS.fog, letterSpacing: "0.12em", marginBottom: 4 },
     statValue: (color) => ({
       fontFamily: FONTS.mono, fontWeight: 700, fontSize: 22,
       color: color || COLORS.alabaster,
@@ -206,7 +206,7 @@ export default function GroupCategoriesPage() {
     th: {
       textAlign: "left", padding: "10px 12px",
       color: COLORS.fog, fontSize: 10,
-      textTransform: "uppercase", letterSpacing: "0.08em",
+      letterSpacing: "0.08em",
       fontWeight: 500,
       borderBottom: `1px solid ${COLORS.charcoal}`,
     },
@@ -231,7 +231,7 @@ export default function GroupCategoriesPage() {
       fontSize: 10,
       fontWeight: 600,
       letterSpacing: "0.05em",
-      textTransform: "uppercase",
+      
       background: color + "26",
       color: color,
       border: `1px solid ${color}55`,

@@ -31,7 +31,7 @@ function diffLabel(d) {
 function Section({ title, color, children }) {
   return (
     <div style={{ marginTop: "0.75rem" }}>
-      <div style={{ color, fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "0.3rem" }}>{title}</div>
+      <div style={{ color, fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.5px", marginBottom: "0.3rem" }}>{title}</div>
       <div style={{ color: C.white, fontSize: "0.85rem", lineHeight: 1.45 }}>{children}</div>
     </div>
   );

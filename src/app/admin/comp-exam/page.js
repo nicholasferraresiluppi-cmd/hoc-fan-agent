@@ -376,19 +376,19 @@ function PctDistribution({ dist }) {
 }
 
 function Th({ children, align }) {
-  return <th style={{ padding: "12px 14px", textAlign: align || "left", fontSize: 10, fontWeight: 700, color: CP.textMuted, textTransform: "uppercase", letterSpacing: 0.6, fontFamily: FONTS.mono }}>{children}</th>;
+  return <th style={{ padding: "12px 14px", textAlign: align || "left", fontSize: 10, fontWeight: 700, color: CP.textMuted, letterSpacing: 0.6, fontFamily: FONTS.mono }}>{children}</th>;
 }
 function Td({ children, align, mono }) {
   return <td style={{ padding: "11px 14px", textAlign: align || "left", fontFamily: mono ? FONTS.mono : FONTS.body, verticalAlign: "top" }}>{children}</td>;
 }
 
-const lbl = { display: "block", fontSize: 10, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
+const lbl = { display: "block", fontSize: 10, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
 const input = { width: "100%", padding: "10px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
 const primaryBtn = (disabled) => ({
   display: "inline-flex", alignItems: "center", gap: 8,
   padding: "12px 20px",
-  background: disabled ? CP.surfaceAlt : CP.accentGreen,
-  color: disabled ? CP.textMuted : "#0a0a0a",
+  background: disabled ? CP.surfaceAlt : CP.accent,
+  color: disabled ? CP.textMuted : CP.accentInk,
   border: "none", borderRadius: 8,
   fontSize: 13, fontWeight: 700, fontFamily: FONTS.body,
   cursor: disabled ? "not-allowed" : "pointer",

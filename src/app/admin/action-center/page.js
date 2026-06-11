@@ -221,7 +221,7 @@ export default function ActionCenterPage() {
           <CpCard padding="16px 22px" style={{ marginBottom: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 280 }}>
-                <span style={{ fontSize: 11, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONTS.mono, fontWeight: 700, whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 11, color: CP.textMuted, letterSpacing: "0.1em", fontFamily: FONTS.mono, fontWeight: 700, whiteSpace: "nowrap" }}>
                   Soglia score
                 </span>
                 <span style={{ fontFamily: FONTS.mono, fontSize: 18, fontWeight: 700, color: scoreThreshold <= 25 ? CP.accentRed : scoreThreshold <= 50 ? "#F59E0B" : CP.accentGreen, minWidth: 36 }}>
@@ -574,7 +574,7 @@ function tierForScore(score) {
 function FilterGroup({ label, children }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <span style={{ fontSize: 10, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONTS.mono, fontWeight: 700, marginRight: 4 }}>{label}:</span>
+      <span style={{ fontSize: 10, color: CP.textMuted, letterSpacing: "0.1em", fontFamily: FONTS.mono, fontWeight: 700, marginRight: 4 }}>{label}:</span>
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{children}</div>
     </div>
   );
@@ -603,7 +603,7 @@ function FilterPill({ active, onClick, children, color }) {
 }
 
 const headerRow = { padding: "12px 22px", borderBottom: `1px solid ${CP.borderStrong}`, alignItems: "center" };
-const th = { color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" };
+const th = { color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em" };
 const miniBtn = {
   display: "inline-flex", alignItems: "center", gap: 3,
   padding: "5px 8px",

@@ -93,7 +93,7 @@ function PodiumCard({ entry, place }) {
           {entry?.avg ?? "—"}
         </div>
         <div style={{ width: 24, height: 2, background: tier.ink, margin: "0.45rem auto 0.4rem", opacity: 0.55, borderRadius: 2 }} />
-        <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: isWinner ? "0.95rem" : "0.85rem", color: tier.ink, letterSpacing: "0.04em", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: isWinner ? "0.95rem" : "0.85rem", color: tier.ink, letterSpacing: "0.04em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {entry?.name || "—"}
         </div>
         <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: tier.ink, opacity: 0.7, marginTop: 4, letterSpacing: "0.14em" }}>
@@ -210,7 +210,7 @@ export default function LeaderboardPage() {
               🏛️ Hall of Fame →
             </Link>
           </div>
-          <span style={{ color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.14em" }}>Performance · Training</span>
+          <span style={{ color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em" }}>Performance · Training</span>
           <h1 style={{ fontFamily: FONTS.display, fontSize: 34, margin: "8px 0 6px 0", fontWeight: 700, letterSpacing: "-0.02em" }}>🏆 Ladder</h1>
           <p style={{ color: CP.textSecondary, fontSize: 14, margin: 0, lineHeight: 1.5, maxWidth: 760 }}>
             I migliori operatori per score medio nelle sessioni di training Academy. Minimo {data?.minSessions || 2} sessioni per qualificarsi.
@@ -288,7 +288,7 @@ export default function LeaderboardPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                   <div style={{ fontSize: "1.5rem" }}>{me.rank ? "📍" : "🎯"}</div>
                   <div>
-                    <div style={{ fontSize: "0.75rem", color: C.orange, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    <div style={{ fontSize: "0.75rem", color: C.orange, fontWeight: 700, letterSpacing: "0.5px" }}>
                       La tua posizione
                     </div>
                     {me.rank ? (

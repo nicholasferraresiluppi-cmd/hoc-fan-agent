@@ -138,7 +138,7 @@ export default function HallOfFamePage() {
                         borderRadius: 6,
                         fontSize: 12,
                       }}>
-                        <div style={{ color: CP.textMuted, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: FONTS.mono, fontWeight: 700 }}>
+                        <div style={{ color: CP.textMuted, fontSize: 10, letterSpacing: "0.08em", fontFamily: FONTS.mono, fontWeight: 700 }}>
                           {SKILL_LABELS[k] || k}
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>

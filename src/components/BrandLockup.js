@@ -69,7 +69,7 @@ export default function BrandLockup({ variant = "primary", size = "md", showWord
             color: wordmarkColor,
             letterSpacing: "0.14em",
             lineHeight: 1.1,
-            textTransform: "uppercase",
+            
             whiteSpace: "nowrap",
             textAlign: "center",
           }}>

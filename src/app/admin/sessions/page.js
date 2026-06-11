@@ -91,7 +91,7 @@ export default function SessionsListPage() {
       borderBottom: `1px solid ${COLORS.charcoal}`,
       color: COLORS.fog,
       fontSize: 12,
-      textTransform: "uppercase",
+      
       letterSpacing: "0.05em",
       fontWeight: 500,
     },

@@ -80,7 +80,7 @@ export default function MyProfilePage() {
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         {/* HEADER */}
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: CP.textMuted, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: CP.textMuted, letterSpacing: "0.12em", marginBottom: 4 }}>
             Il mio profilo · {formatPeriodLabel(periodId)}
           </div>
           <h1 style={{ fontFamily: FONTS.display, fontSize: 36, margin: "4px 0 4px", fontWeight: 700, letterSpacing: "-0.02em" }}>
@@ -130,7 +130,7 @@ export default function MyProfilePage() {
                 <div style={{ position: "relative" }}>
                   <div style={{ fontFamily: FONTS.display, fontSize: 28, fontWeight: 500, letterSpacing: "-0.01em", marginBottom: 4 }}>{employee}</div>
                   {cp.top_creator && (
-                    <div style={{ color: COLORS.champagne, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 14 }}>
+                    <div style={{ color: COLORS.champagne, fontSize: 12, letterSpacing: "0.12em", marginBottom: 14 }}>
                       Principale: {cp.top_creator}
                     </div>
                   )}
@@ -145,11 +145,11 @@ export default function MyProfilePage() {
                 </div>
 
                 <div style={{ textAlign: "right", position: "relative" }}>
-                  <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.15em" }}>Il tuo score</div>
+                  <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.15em" }}>Il tuo score</div>
                   <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 64, lineHeight: 1, color: tierColor }}>
                     {cp.score?.toFixed(1) ?? "—"}
                   </div>
-                  <span style={{ display: "inline-block", padding: "4px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", background: tierColor + "26", color: tierColor, border: `1px solid ${tierColor}55`, marginTop: 8, fontFamily: FONTS.body }}>
+                  <span style={{ display: "inline-block", padding: "4px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", background: tierColor + "26", color: tierColor, border: `1px solid ${tierColor}55`, marginTop: 8, fontFamily: FONTS.body }}>
                     {cp.tier}
                   </span>
                 </div>
@@ -174,7 +174,7 @@ export default function MyProfilePage() {
             {cp?.per_creator?.length > 0 && (
               <Section title="Le tue creator" subtitle="Dove stai andando forte, dove c'è margine. Lavora con il tuo Team Lead sui punti deboli.">
                 <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, overflow: "hidden" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.8fr 0.8fr 0.7fr 0.9fr 0.6fr 0.8fr", padding: "12px 20px", background: COLORS.obsidian + "80", color: COLORS.fog, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.8fr 0.8fr 0.7fr 0.9fr 0.6fr 0.8fr", padding: "12px 20px", background: COLORS.obsidian + "80", color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` }}>
                     <div>Creator</div><div>Score loc.</div><div>Tier</div><div>$/shift</div><div>Shift</div><div>vs cohort</div>
                   </div>
                   {cp.per_creator.map((row) => {
@@ -226,7 +226,7 @@ export default function MyProfilePage() {
 function StatMini({ l, v, sub, color }) {
   return (
     <div>
-      <div style={{ fontSize: 10, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.1em" }}>{l}</div>
+      <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.1em" }}>{l}</div>
       <div style={{ fontFamily: FONTS.mono, fontSize: 16, fontWeight: 600, marginTop: 2, color: color || COLORS.alabaster }}>{v}</div>
       {sub && <div style={{ fontSize: 10, color: COLORS.mist, marginTop: 2 }}>{sub}</div>}
     </div>
@@ -257,7 +257,7 @@ function NextTierBlock({ cp, nextTier }) {
     }}>
       <TrendingUp size={28} color={nextColor} />
       <div style={{ flex: 1, minWidth: 220 }}>
-        <div style={{ fontSize: 12, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>
+        <div style={{ fontSize: 12, color: COLORS.fog, letterSpacing: "0.12em", marginBottom: 4 }}>
           Prossimo obiettivo
         </div>
         <div style={{ fontFamily: FONTS.display, fontSize: 18, color: COLORS.alabaster }}>
@@ -283,7 +283,7 @@ function CoachingBlock({ assignment }) {
     }}>
       <GraduationCap size={28} color="#F59E0B" />
       <div style={{ flex: 1, minWidth: 220 }}>
-        <div style={{ fontSize: 12, color: COLORS.fog, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>
+        <div style={{ fontSize: 12, color: COLORS.fog, letterSpacing: "0.12em", marginBottom: 4 }}>
           Hai un coaching assegnato
         </div>
         <div style={{ fontFamily: FONTS.display, fontSize: 18, color: COLORS.alabaster, marginBottom: 4 }}>

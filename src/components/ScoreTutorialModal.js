@@ -290,7 +290,7 @@ export default function ScoreTutorialModal({ onClose }) {
               <Icon size={18} color={current.accent} strokeWidth={2} />
             </div>
             <div>
-              <div style={{ fontSize: 10, color: CP.textMuted, fontFamily: FONTS.mono, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+              <div style={{ fontSize: 10, color: CP.textMuted, fontFamily: FONTS.mono, fontWeight: 700, letterSpacing: "0.14em" }}>
                 Tutorial Score · Step {step + 1} di {total}
               </div>
               <div style={{ fontSize: 17, fontWeight: 700, color: CP.textPrimary, marginTop: 2, fontFamily: FONTS.display, letterSpacing: "-0.01em" }}>
@@ -356,7 +356,7 @@ const p = { color: CP.textSecondary, fontSize: 14, lineHeight: 1.55, margin: "0 
 const closeBtn = { background: "transparent", border: `1px solid ${CP.border}`, color: CP.textSecondary, borderRadius: 8, cursor: "pointer", padding: 6, display: "flex", alignItems: "center", justifyContent: "center" };
 const navBtn = { padding: "8px 14px", background: CP.surfaceAlt, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontFamily: FONTS.body };
 const miniCard = (col) => ({ padding: "14px 16px", background: `${col}10`, border: `1px solid ${col}44`, borderRadius: 10 });
-const miniHeader = { display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: CP.textSecondary, marginBottom: 6, fontFamily: FONTS.mono };
+const miniHeader = { display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: CP.textSecondary, marginBottom: 6, fontFamily: FONTS.mono };
 const miniBody = { fontSize: 13, color: CP.textPrimary, margin: 0, lineHeight: 1.5 };
 const formulaBlock = { padding: "18px 16px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12 };
 const formulaLine = { display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap", fontFamily: FONTS.mono, fontSize: 13 };
@@ -366,5 +366,5 @@ const op = { color: CP.textMuted, fontSize: 14 };
 const pillBlue = { padding: "5px 10px", background: "#3B82F622", color: "#3B82F6", border: "1px solid #3B82F644", borderRadius: 6, fontWeight: 600 };
 const pillGreen = { padding: "5px 10px", background: "#10B98122", color: "#10B981", border: "1px solid #10B98144", borderRadius: 6, fontWeight: 600 };
 const tbl = { width: "100%", borderCollapse: "collapse", fontSize: 12, marginTop: 14, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, overflow: "hidden" };
-const th = { padding: "9px 10px", textAlign: "left", color: CP.textMuted, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: `1px solid ${CP.borderStrong}`, fontFamily: FONTS.mono, fontWeight: 700 };
+const th = { padding: "9px 10px", textAlign: "left", color: CP.textMuted, fontSize: 10, letterSpacing: "0.08em", borderBottom: `1px solid ${CP.borderStrong}`, fontFamily: FONTS.mono, fontWeight: 700 };
 const td = { padding: "10px", borderBottom: `1px solid ${CP.border}`, color: CP.textPrimary, fontFamily: FONTS.mono, fontSize: 12 };

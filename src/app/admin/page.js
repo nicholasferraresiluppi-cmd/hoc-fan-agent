@@ -423,10 +423,10 @@ export default function AdminHub() {
           <span>P&L Live — margine per creator</span>
           <ArrowUpRight size={14} color="#3FB97E" />
         </Link>
-        <Link href="/admin/profiles-compare" style={{ ...quickActionStyle(), borderColor: "#A35EE055", color: CP.textPrimary }}>
-          <Scale size={16} color="#A35EE0" />
+        <Link href="/admin/profiles-compare" style={{ ...quickActionStyle(), borderColor: "#8b7cf655", color: CP.textPrimary }}>
+          <Scale size={16} color={CP.accent} />
           <span>Scaglioni a confronto — standardizzazione profili</span>
-          <ArrowUpRight size={14} color="#A35EE0" />
+          <ArrowUpRight size={14} color={CP.accent} />
         </Link>
       </div>
 
@@ -515,7 +515,7 @@ function ClosedLoopCard({ label, value, unit, sub, color, signed, tooltip }) {
         position: "relative",
       }}
     >
-      <div style={{ fontSize: 10, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 }}>
+      <div style={{ fontSize: 10, color: CP.textMuted, letterSpacing: "0.12em", marginBottom: 6 }}>
         {label}{tooltip && <span style={{ marginLeft: 4, opacity: 0.4 }}>ⓘ</span>}
       </div>
       <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 32, lineHeight: 1, color: value == null ? CP.textMuted : color }}>
