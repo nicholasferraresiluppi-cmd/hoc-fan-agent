@@ -8,13 +8,14 @@
  */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Wallet, Scale, CalendarDays, Activity, Search, FlaskConical } from "lucide-react";
+import { Wallet, Scale, CalendarDays, Activity, Search, FlaskConical, Ruler } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 
 const TOOLS = [
   { href: "/admin/pnl-live",         label: "P&L Live",     icon: Wallet },
   { href: "/admin/profiles-compare", label: "Scaglioni",    icon: Scale },
   { href: "/admin/comp-calendar",    label: "Calendar",     icon: CalendarDays },
+  { href: "/admin/threshold-study",  label: "Studio soglie", icon: Ruler },
   { href: "/admin/comp-review",      label: "Review",       icon: Activity },
   { href: "/admin/comp-exam",        label: "Esame creator", icon: Search },
   { href: "/admin/shift-research",   label: "Research",     icon: FlaskConical },

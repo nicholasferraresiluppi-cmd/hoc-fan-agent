@@ -27,7 +27,7 @@ import {
   UserCircle2, Contact, Medal, Key, Lock, Wrench,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
-  Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2,
+  Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
@@ -67,6 +67,7 @@ const NAV_GROUPS = [
       { href: "/admin/pnl-live",                 label: "P&L Live",              icon: Wallet },
       { href: "/admin/profiles-compare",         label: "Scaglioni a confronto", icon: Scale },
       { href: "/admin/comp-calendar",            label: "Comp Calendar",         icon: CalendarDays },
+      { href: "/admin/threshold-study",          label: "Studio soglie",         icon: Ruler },
       { href: "/admin/comp-review",              label: "Comp Review",           icon: Activity },
       { href: "/admin/comp-exam",                label: "Esame creator",         icon: Search },
       { href: "/admin/payment-profiles",         label: "Payment Profiles",      icon: Layers },
