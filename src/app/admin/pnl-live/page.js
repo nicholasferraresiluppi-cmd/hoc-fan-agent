@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Loader2, AlertCircle, TrendingUp, Check, ArrowRight } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
+import CompNav from "@/components/CompNav";
 
 /**
  * /admin/pnl-live — P&L operativo per creator, anche sul mese in corso.
@@ -84,6 +85,8 @@ export default function PnlLivePage() {
         title="P&L Live per creator"
         subtitle="Venduto CP × fee% del deal − costo operatori = margine operativo, anche sul mese in corso. La fee% la imposti tu una volta per creator (colonna editabile) e resta salvata."
       />
+
+      <CompNav />
 
       <CpCard accent="#F59E0B" padding="12px 16px" style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.5 }}>

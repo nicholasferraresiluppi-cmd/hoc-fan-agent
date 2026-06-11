@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Loader2, AlertCircle, CalendarDays, AlertTriangle, Download, FlaskConical, RotateCcw, Plus, X } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
+import CompNav from "@/components/CompNav";
 
 /**
  * /admin/comp-calendar — Griglia calendario compensation per creator × mese.
@@ -274,6 +275,8 @@ export default function CompCalendarPage() {
         title="Comp Calendar — turni × scaglioni"
         subtitle="Giorni × fasce orarie con scaglioni applicati, costo operatori attribuito al creator, e simulatore di profili pagamento alternativi sui turni chiusi."
       />
+
+      <CompNav />
 
       {/* Form con autocomplete */}
       <CpCard padding="16px 20px" style={{ marginBottom: 18 }}>

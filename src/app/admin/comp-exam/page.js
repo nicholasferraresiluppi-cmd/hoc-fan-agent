@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Search, AlertCircle, CheckCircle2, AlertTriangle, XCircle, HelpCircle, FileText, Loader2, Coins, Percent, Users } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
+import CompNav from "@/components/CompNav";
 
 /**
  * /admin/comp-exam — Esame compensation per UN creator.
@@ -85,6 +86,8 @@ export default function CompExamPage() {
         title="Esame compensation per creator"
         subtitle="Per un creator scelta: chi ha lavorato, con che risultati, con che profilo pagamento, e se quel profilo è coerente con la performance. Tabella + sintesi narrativa."
       />
+
+      <CompNav />
 
       {/* Form */}
       <CpCard padding="18px 22px" style={{ marginBottom: 20 }}>

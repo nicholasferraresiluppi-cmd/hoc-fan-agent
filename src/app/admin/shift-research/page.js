@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Search, Download, Loader2, AlertCircle, FlaskConical, CheckCircle2 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
+import CompNav from "@/components/CompNav";
 
 /**
  * /admin/shift-research — Ricerca one-shot per il match turno ↔ profilo pagamento.
@@ -64,6 +65,8 @@ export default function ShiftResearchPage() {
         title="Shift Research — match turno ↔ profilo"
         subtitle="Ricerca one-shot dal RAW CP API: il profilo pagamento è nel dato turno? Che formula usano gli scaglioni? Dataset completo scaricabile in CSV per ricostruire il foglio di calcolo."
       />
+
+      <CompNav />
 
       <CpCard padding="18px 22px" style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>

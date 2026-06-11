@@ -11,6 +11,7 @@ import {
   Workflow, RefreshCw, Ban, Languages, Tags, Upload, Sliders,
   UserCircle2, Contact, Medal, Key, Lock, Wrench,
   ArrowUpRight, Calendar, Activity, CheckCircle2, AlertCircle,
+  Wallet, Scale,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { SectionLabel, CpCard, StatCard } from "@/components/cp-style";
@@ -416,6 +417,16 @@ export default function AdminHub() {
           <GraduationCap size={16} color="#F59E0B" />
           <span>Coaching Center — operatori da far crescere</span>
           <ArrowUpRight size={14} color="#F59E0B" />
+        </Link>
+        <Link href="/admin/pnl-live" style={{ ...quickActionStyle(), borderColor: "#3FB97E55", color: CP.textPrimary }}>
+          <Wallet size={16} color="#3FB97E" />
+          <span>P&L Live — margine per creator</span>
+          <ArrowUpRight size={14} color="#3FB97E" />
+        </Link>
+        <Link href="/admin/profiles-compare" style={{ ...quickActionStyle(), borderColor: "#A35EE055", color: CP.textPrimary }}>
+          <Scale size={16} color="#A35EE0" />
+          <span>Scaglioni a confronto — standardizzazione profili</span>
+          <ArrowUpRight size={14} color="#A35EE0" />
         </Link>
       </div>
 

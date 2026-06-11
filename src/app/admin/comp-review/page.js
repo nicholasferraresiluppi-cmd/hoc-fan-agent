@@ -6,6 +6,7 @@ import useSWR from "swr";
 import { Search, AlertTriangle, XCircle, ArrowRight, TrendingUp, TrendingDown, Filter, Loader2, X, ChevronDown, ChevronRight } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
+import CompNav from "@/components/CompNav";
 
 /**
  * /admin/comp-review — Hot list globale anomalie compensation.
@@ -73,6 +74,8 @@ export default function CompReviewPage() {
         title="Comp Review — Hot list anomalie"
         subtitle="Tutti i creator esaminati insieme. Top N coppie (operatore × creator) dove la % effettiva si discosta dalla media del team. Ordinate per $ a rischio per HOC. Click su una riga per il drill-down con distribuzione shift-by-shift."
       />
+
+      <CompNav />
 
       {/* Filtri */}
       <CpCard padding="16px 20px" style={{ marginBottom: 20 }}>

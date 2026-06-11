@@ -27,6 +27,7 @@ import {
   UserCircle2, Contact, Medal, Key, Lock, Wrench,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
+  Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
@@ -44,6 +45,9 @@ const ESSENTIAL_HREFS = new Set([
   "/admin/team",
   "/admin/action-center",
   "/admin/coaching-center",
+  "/admin/pnl-live",
+  "/admin/profiles-compare",
+  "/admin/comp-calendar",
 ]);
 
 const NAV_GROUPS = [
@@ -54,6 +58,19 @@ const NAV_GROUPS = [
       { href: "/leaderboard/sales-cp",           label: "Sales CP",     icon: DollarSign },
       { href: "/leaderboard/creators",           label: "Creator",      icon: Users },
       { href: "/leaderboard/creators/heatmap",   label: "Heat-map",     icon: Flame },
+    ],
+  },
+  {
+    label: "Comp & Ben",
+    defaultOpen: true,
+    items: [
+      { href: "/admin/pnl-live",                 label: "P&L Live",              icon: Wallet },
+      { href: "/admin/profiles-compare",         label: "Scaglioni a confronto", icon: Scale },
+      { href: "/admin/comp-calendar",            label: "Comp Calendar",         icon: CalendarDays },
+      { href: "/admin/comp-review",              label: "Comp Review",           icon: Activity },
+      { href: "/admin/comp-exam",                label: "Esame creator",         icon: Search },
+      { href: "/admin/payment-profiles",         label: "Payment Profiles",      icon: Layers },
+      { href: "/admin/shift-research",           label: "Shift Research",        icon: FlaskConical },
     ],
   },
   {
@@ -113,6 +130,7 @@ const NAV_GROUPS = [
       { href: "/admin/creatorspro-sync",         label: "Sync CP",         icon: RefreshCw },
       { href: "/admin/creatorspro-sync-history", label: "Sync CP storico", icon: History },
       { href: "/admin/wage-audit",               label: "Wage Audit",      icon: ShieldCheck },
+      { href: "/admin/debug-mapping",            label: "Debug Mapping",   icon: Link2 },
       { href: "/admin/reports",                  label: "Analytics",       icon: BarChart3 },
       { href: "/admin/leaderboard-exclusions",   label: "Esclusioni",      icon: Ban },
       { href: "/admin/group-languages",          label: "Lingue Group",    icon: Languages },

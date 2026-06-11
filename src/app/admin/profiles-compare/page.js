@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Loader2, AlertCircle, Scale, ArrowRight, ArrowUpDown, FlaskConical, Plus, X, RotateCcw } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
+import CompNav from "@/components/CompNav";
 
 /**
  * /admin/profiles-compare — Scaglioni a confronto cross-creator.
@@ -122,6 +123,8 @@ export default function ProfilesComparePage() {
         title="Scaglioni a confronto"
         subtitle="Tutti i creator affiancati: scaglioni applicati, costo operatori, % costo su venduto. Per la conversazione di standardizzazione dei profili. Click su un creator per aprire la sua griglia calendario."
       />
+
+      <CompNav />
 
       <CpCard padding="14px 18px" style={{ marginBottom: 18 }}>
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
