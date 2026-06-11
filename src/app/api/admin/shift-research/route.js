@@ -240,6 +240,21 @@ export async function GET(request) {
         needs_resync: rows.length > 0 && rows.every((r) => !r.profile_name),
         mismatches: rows.filter((r) => r.delta_pct != null && Math.abs(r.delta_pct) > 0.005).length,
       },
+      // Set di scaglioni più comune tra i turni (per la legenda della griglia calendario)
+      thresholds_common: (() => {
+        const counts = new Map();
+        for (const w of wages) {
+          for (const s of w.shifts || []) {
+            if (!wageIdsWithTarget.has(w.id)) continue;
+            const ths2 = Array.isArray(s.thresholds) ? s.thresholds.filter((t) => t.percentage != null) : [];
+            if (ths2.length === 0) continue;
+            const key = JSON.stringify([...ths2].sort((a, b) => (a.threshold ?? 0) - (b.threshold ?? 0)));
+            counts.set(key, (counts.get(key) || 0) + 1);
+          }
+        }
+        const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+        return top ? JSON.parse(top[0]) : [];
+      })(),
       diagnostics: {
         wages_in_kv: wages.length,
         wages_touching_creator: wageIdsWithTarget.size,
