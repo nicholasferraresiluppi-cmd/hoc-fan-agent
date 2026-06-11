@@ -7,6 +7,7 @@ import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
 import CompNav from "@/components/CompNav";
 import HowToRead from "@/components/HowToRead";
+import HoverTip from "@/components/HoverTip";
 
 /**
  * /admin/threshold-study — Studio calibrazione soglie per il modello a bande.
@@ -128,7 +129,7 @@ export default function ThresholdStudyPage() {
                   ))}
                 </div>
               )}
-              <CpCard padding="0" style={{ overflow: "hidden" }}>
+              <CpCard padding="0" style={{ overflow: "visible" }}>
                 {b.classes.map((c, ci) => {
                   const lowSample = c.shifts < 20;
                   return (
@@ -137,7 +138,7 @@ export default function ThresholdStudyPage() {
                         <div style={{ fontWeight: 500, fontSize: 13 }}>{CLASS_LABEL[c.cls] || `${c.cls}×`}</div>
                         <div style={{ fontSize: 11, color: CP.textMuted }}>{c.shifts} turni{lowSample ? " · campione piccolo" : ""}</div>
                       </div>
-                      <Histogram buckets={c.histogram} bucketWidth={c.bucket_width} mid={c.suggested_mid} top={c.suggested_top} />
+                      <Histogram buckets={c.histogram} bucketWidth={c.bucket_width} mid={c.suggested_mid} top={c.suggested_top} totalShifts={c.shifts} />
                       <div style={{ display: "flex", gap: 26 }}>
                         <div>
                           <div style={lbl}>Soglia intermedia</div>
@@ -190,7 +191,7 @@ export default function ThresholdStudyPage() {
  * venduto quella cifra; linee verticali = soglie proposte. Si VEDE dove
  * taglia la soglia, senza nominare percentili.
  */
-function Histogram({ buckets = [], bucketWidth = 25, mid, top }) {
+function Histogram({ buckets = [], bucketWidth = 25, mid, top, totalShifts = 0 }) {
   if (buckets.length === 0) return <div style={{ flex: 1 }} />;
   const maxCount = Math.max(...buckets.map((b) => b.count), 1);
   const scale = buckets.length * bucketWidth;
@@ -198,19 +199,28 @@ function Histogram({ buckets = [], bucketWidth = 25, mid, top }) {
   return (
     <div style={{ position: "relative", flex: 1, minWidth: 280, height: 58 }}>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 44, marginTop: 8 }}>
-        {buckets.map((bk, i) => (
-          <div
-            key={i}
-            title={`$${bk.from}–$${bk.to}: ${bk.count} turni`}
-            style={{ flex: 1, height: Math.max(2, Math.round((bk.count / maxCount) * 44)), background: CP.accentDim, borderRadius: 2 }}
-          />
-        ))}
+        {buckets.map((bk, i) => {
+          const share = totalShifts > 0 ? Math.round((bk.count / totalShifts) * 100) : 0;
+          return (
+            <HoverTip
+              key={i}
+              tip={`Fascia $${bk.from.toLocaleString("it-IT")}–$${bk.to.toLocaleString("it-IT")}\n${bk.count} turni${bk.count > 0 ? ` (${share}% del totale)` : ""}`}
+              style={{ flex: 1, display: "flex", alignItems: "flex-end", height: "100%" }}
+            >
+              <div style={{ width: "100%", height: Math.max(2, Math.round((bk.count / maxCount) * 44)), background: CP.accentDim, borderRadius: 2 }} />
+            </HoverTip>
+          );
+        })}
       </div>
       {mid != null && (
-        <div title={`Soglia intermedia: $${mid}`} style={{ position: "absolute", top: 0, bottom: 4, left: pos(mid), width: 2, background: CP.accentSoftText, opacity: 0.75, borderRadius: 1 }} />
+        <HoverTip tip={`Soglia intermedia proposta: $${mid.toLocaleString("it-IT")}`} style={{ position: "absolute", top: 0, bottom: 4, left: pos(mid), width: 8, marginLeft: -3, display: "block", cursor: "default" }}>
+          <span style={{ display: "block", width: 2, height: "100%", margin: "0 auto", background: CP.accentSoftText, opacity: 0.75, borderRadius: 1 }} />
+        </HoverTip>
       )}
       {top != null && (
-        <div title={`Soglia top: $${top}`} style={{ position: "absolute", top: 0, bottom: 4, left: pos(top), width: 2, background: CP.accent, borderRadius: 1 }} />
+        <HoverTip tip={`Soglia top proposta: $${top.toLocaleString("it-IT")}`} style={{ position: "absolute", top: 0, bottom: 4, left: pos(top), width: 8, marginLeft: -3, display: "block", cursor: "default" }}>
+          <span style={{ display: "block", width: 2, height: "100%", margin: "0 auto", background: CP.accent, borderRadius: 1 }} />
+        </HoverTip>
       )}
       <div style={{ position: "absolute", bottom: -6, left: 0, fontSize: 9, color: CP.mutedIcons }}>$0</div>
       <div style={{ position: "absolute", bottom: -6, right: 0, fontSize: 9, color: CP.mutedIcons }}>${scale.toLocaleString("it-IT")}</div>

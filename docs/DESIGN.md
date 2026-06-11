@@ -149,3 +149,13 @@ Mapping: `accentGreen` → `--success` · `accentRed` → `--danger` ·
 `bgSunken/borderSoft/mutedIcons` → nuovi token. I componenti condivisi
 (`src/components/cp-style.js`) applicano tipografia e geometria del sistema.
 Per qualsiasi componente nuovo: usa i token CP, mai hex inline.
+
+## 10. Tooltip sui dati
+
+Per barre di grafici, chip e valori compatti usa `src/components/HoverTip.js`
+(immediato, surface-2 + bordo, niente ombre) — MAI il `title` nativo del
+browser sugli elementi dati: è lento e invisibile finché non lo scopri.
+Regola: ogni elemento dati il cui significato completo non sta nel layout
+deve rispondere al passaggio del mouse subito e in linguaggio piano.
+Eccezione: dentro container con overflow/scroll (es. griglie dense) il
+tooltip custom verrebbe tagliato — lì il title nativo resta accettabile.
