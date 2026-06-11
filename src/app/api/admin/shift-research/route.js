@@ -107,6 +107,10 @@ export async function GET(request) {
     // 3. Q3 — dataset: tutti gli shift che toccano il creator target
     const rows = [];
     const wageIdsWithTarget = new Set();
+    // Inventario profili REALI usati sul creator: name → {cosellers, thresholds, turni, venduto}.
+    // Un creator NON ha un solo profilo: 1/2/3 cosellers hanno profili propri con
+    // scaglioni potenzialmente diversi. Il match giusto è per-profilo, non per-creator.
+    const profInv = new Map();
     for (const w of wages) {
       for (const s of w.shifts || []) {
         const aliases = s.creator_aliases || [];
@@ -146,6 +150,21 @@ export async function GET(request) {
         const deltaPct = (expectedPct != null && effPct != null)
           ? Math.round((effPct - expectedPct) * 10000) / 10000
           : null;
+
+        // Inventario profili
+        if (profile?.name) {
+          if (!profInv.has(profile.name)) {
+            profInv.set(profile.name, {
+              name: profile.name,
+              cosellers_count: profile.cosellers_count ?? null,
+              thresholds: ths.length > 0 ? [...ths].sort((a, b) => (a.threshold ?? 0) - (b.threshold ?? 0)) : [],
+              shifts: 0, sales: 0,
+            });
+          }
+          const pi = profInv.get(profile.name);
+          pi.shifts += 1;
+          pi.sales += salesOnCreator;
+        }
 
         const startRome = romeParts(s.started_at);
         const endRome = romeParts(s.ended_at);
@@ -261,6 +280,11 @@ export async function GET(request) {
         needs_resync: rows.length > 0 && rows.every((r) => !r.profile_name),
         mismatches: rows.filter((r) => r.delta_pct != null && Math.abs(r.delta_pct) > 0.005).length,
       },
+      // Inventario completo dei profili usati sul creator (il match VERO:
+      // ogni profilo coi SUOI scaglioni, ordinato per turni desc)
+      profiles_inventory: [...profInv.values()]
+        .map((p) => ({ ...p, sales: Math.round(p.sales) }))
+        .sort((a, b) => b.shifts - a.shifts),
       // Set di scaglioni più comune tra i turni (per la legenda della griglia calendario)
       thresholds_common: (() => {
         const counts = new Map();

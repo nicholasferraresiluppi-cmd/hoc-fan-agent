@@ -175,6 +175,10 @@ export default function ProfilesComparePage() {
             <FlaskConical size={13} /> Simulatore — un profilo standard per tutti i creator
           </SectionLabel>
           <CpCard accent={simThs ? "#A35EE0" : undefined} padding="16px 20px" style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 11, color: CP.textMuted, marginBottom: 12, fontStyle: "italic" }}>
+              Scenario "standard unico": applica UN solo set di scaglioni a TUTTI i turni di tutte le classi (Solo/Coppia/Triplo).
+              Per simulare per classe coi profili reali di un creator, usa il simulatore nella sua griglia (bottone "Griglia").
+            </div>
             {!simThs ? (
               <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                 <span style={{ fontSize: 13, color: CP.textSecondary }}>
@@ -276,8 +280,25 @@ export default function ProfilesComparePage() {
                     <tr key={c.alias} style={{ borderBottom: `1px solid ${CP.border}55` }}>
                       <td style={{ ...td, fontWeight: 600 }}>{c.alias}</td>
                       <td style={td}>
-                        {c.thresholds.length === 0 ? (
+                        {(!c.profiles || c.profiles.length === 0) && c.thresholds.length === 0 ? (
                           <span style={{ color: CP.textMuted, fontStyle: "italic", fontSize: 11 }}>re-sync necessario</span>
+                        ) : c.profiles && c.profiles.length > 0 ? (
+                          // Inventario completo: una riga per profilo (Solo/Coppia/Triplo
+                          // hanno set propri — niente più "un solo profilo per creator")
+                          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                            {c.profiles.map((p) => (
+                              <div key={p.name} title={`${p.name} · ${p.shifts} turni`} style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                                <span style={{ fontSize: 9, fontWeight: 700, fontFamily: FONTS.mono, color: CP.textMuted, minWidth: 20 }}>
+                                  {p.cosellers_count != null ? `${p.cosellers_count}×` : "?"}
+                                </span>
+                                {(p.thresholds || []).map((t, i) => (
+                                  <span key={i} style={{ padding: "1px 6px", borderRadius: 4, background: colorOf(t.percentage) + "22", border: `1px solid ${colorOf(t.percentage)}55`, color: colorOf(t.percentage), fontSize: 9.5, fontWeight: 700, fontFamily: FONTS.mono, whiteSpace: "nowrap" }}>
+                                    {t.threshold > 0 ? `≥${fmt$(t.threshold)}` : "base"}→{fmtPct(t.percentage, 0)}
+                                  </span>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
                         ) : (
                           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                             {c.thresholds.map((t, i) => (

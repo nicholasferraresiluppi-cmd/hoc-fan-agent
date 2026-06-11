@@ -48,7 +48,10 @@ export default function CompCalendarPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [simThs, setSimThs] = useState(null);
+  // Simulatore PER CLASSE cosellers: un creator non ha un solo profilo —
+  // Solo/Coppia/Triplo hanno profili propri con scaglioni potenzialmente
+  // diversi. simByClass = { 1: tiers[], 2: tiers[], 3: tiers[] }.
+  const [simByClass, setSimByClass] = useState(null);
   const [showOnlyChanged, setShowOnlyChanged] = useState(false);
 
   // Deep-link: ?creator=X&period_id=YYYY-MM precompila e genera da solo
@@ -89,14 +92,27 @@ export default function CompCalendarPage() {
     return () => { cancelled = true; };
   }, [periodId]);
 
-  // Inizializza simulatore con gli scaglioni reali quando arrivano i dati
-  useEffect(() => {
-    if (data?.thresholds_common?.length) {
-      setSimThs(data.thresholds_common.map((t) => ({ threshold: t.threshold ?? 0, percentage: t.percentage ?? 0 })));
-    } else {
-      setSimThs(null);
+  // Scaglioni REALI per classe cosellers (dall'inventario profili):
+  // per ogni classe presente nei turni, il profilo più usato di quella classe
+  const origByClass = useMemo(() => {
+    if (!data?.rows?.length) return null;
+    const classes = [...new Set(data.rows.map((r) => r.profile_cosellers ?? 1))].sort((a, b) => a - b);
+    const inv = data.profiles_inventory || [];
+    const byClass = {};
+    for (const cls of classes) {
+      const prof = inv
+        .filter((p) => (p.cosellers_count ?? 1) === cls && p.thresholds?.length)
+        .sort((a, b) => b.shifts - a.shifts)[0];
+      const ths = prof?.thresholds?.length ? prof.thresholds : (data.thresholds_common || []);
+      if (ths.length) byClass[cls] = ths.map((t) => ({ threshold: t.threshold ?? 0, percentage: t.percentage ?? 0 }));
     }
+    return Object.keys(byClass).length ? byClass : null;
   }, [data]);
+
+  // Inizializza il simulatore dagli scaglioni reali per classe
+  useEffect(() => {
+    setSimByClass(origByClass ? JSON.parse(JSON.stringify(origByClass)) : null);
+  }, [origByClass]);
 
   async function run() {
     if (!creator.trim() || !periodId) return;
@@ -217,16 +233,19 @@ export default function CompCalendarPage() {
     return { rows, columns, mainSlots, days, cellMap, colTotals, dayTotals, colorOf, pcts, cosellerFlags, wrongCreatorFlags, operators, totSales, totEarn, emptyCells };
   }, [data]);
 
-  // ===== Simulazione scaglioni alternativi =====
+  // ===== Simulazione scaglioni alternativi (PER CLASSE cosellers) =====
   const sim = useMemo(() => {
-    if (!grid || !simThs?.length) return null;
-    const valid = simThs.filter((t) => t.percentage !== "" && t.percentage != null);
-    if (valid.length === 0) return null;
+    if (!grid || !simByClass) return null;
+    const classKeys = Object.keys(simByClass).map(Number).sort((a, b) => a - b);
+    if (classKeys.length === 0) return null;
     let simTot = 0;
     const opSim = {};
     const byPctSim = {};
     const simRows = [];
     for (const r of grid.rows) {
+      const cls = r.profile_cosellers ?? 1;
+      const tiers = simByClass[cls] || simByClass[classKeys[0]];
+      const valid = (tiers || []).filter((t) => t.percentage !== "" && t.percentage != null);
       const pct = bracketPct(r.sales_total_shift, valid);
       if (pct == null) continue;
       const e = pct * r.sales_on_creator;
@@ -234,10 +253,10 @@ export default function CompCalendarPage() {
       opSim[r.operator] = (opSim[r.operator] || 0) + e;
       const k = pct.toFixed(3);
       byPctSim[k] = (byPctSim[k] || 0) + 1;
-      // dettaglio per turno: reale vs simulato
       const realPct = r.expected_pct ?? r.eff_pct;
       simRows.push({
         ...r,
+        sim_class: cls,
         sim_pct: pct,
         sim_earn: Math.round(e * 100) / 100,
         row_delta: Math.round((e - r.earnings_attr) * 100) / 100,
@@ -252,14 +271,12 @@ export default function CompCalendarPage() {
       simRows,
       changedCount: simRows.filter((r) => r.bracket_changed).length,
     };
-  }, [grid, simThs]);
+  }, [grid, simByClass]);
 
   const simChanged = useMemo(() => {
-    if (!simThs || !data?.thresholds_common) return false;
-    const orig = data.thresholds_common;
-    if (simThs.length !== orig.length) return true;
-    return simThs.some((t, i) => Number(t.threshold) !== Number(orig[i]?.threshold ?? 0) || Number(t.percentage) !== Number(orig[i]?.percentage ?? 0));
-  }, [simThs, data]);
+    if (!simByClass || !origByClass) return false;
+    return JSON.stringify(simByClass) !== JSON.stringify(origByClass);
+  }, [simByClass, origByClass]);
 
   return (
     <div style={{ padding: "32px 28px 80px 28px", maxWidth: 1500, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
@@ -331,20 +348,31 @@ export default function CompCalendarPage() {
             <StatCard label="Slot vuoti (coverage)" value={grid.emptyCells} color={grid.emptyCells > 0 ? "#F59E0B" : CP.accentGreen} sub={`su ${grid.days.length * grid.mainSlots.length} slot`} />
           </div>
 
-          {/* Legenda + flags */}
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
-            <SectionLabel>Scaglioni:</SectionLabel>
-            {(data.thresholds_common || []).map((t, i) => (
-              <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", background: grid.colorOf(t.percentage) + "22", border: `1px solid ${grid.colorOf(t.percentage)}66`, borderRadius: 5, fontSize: 11, fontFamily: FONTS.mono }}>
-                <span style={{ width: 7, height: 7, borderRadius: 2, background: grid.colorOf(t.percentage) }} />
-                {t.threshold > 0 ? `≥${fmt$(t.threshold)}` : "base"}→<b>{fmtPct(t.percentage)}</b>
+          {/* Inventario profili: OGNI profilo usato sul creator coi SUOI scaglioni */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
+              <SectionLabel>Profili usati nel mese:</SectionLabel>
+              <span style={{ fontSize: 11, color: CP.textMuted }}>
+                {data.phase_b?.mismatches === 0 ? `✓ 0 mismatch` : `⚠ ${data.phase_b?.mismatches} fuori scaglione`}
+                {grid.cosellerFlags.size > 0 && ` · ⚠ ${grid.cosellerFlags.size} cosellers incoerenti`}
+                {grid.wrongCreatorFlags.size > 0 && ` · ⚠ ${grid.wrongCreatorFlags.size} profili di altro creator`}
               </span>
-            ))}
-            <span style={{ fontSize: 11, color: CP.textMuted }}>
-              {data.phase_b?.mismatches === 0 ? `✓ 0 mismatch` : `⚠ ${data.phase_b?.mismatches} fuori scaglione`}
-              {grid.cosellerFlags.size > 0 && ` · ⚠ ${grid.cosellerFlags.size} cosellers incoerenti`}
-              {grid.wrongCreatorFlags.size > 0 && ` · ⚠ ${grid.wrongCreatorFlags.size} profili di altro creator`}
-            </span>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {(data.profiles_inventory || []).map((p) => (
+                <div key={p.name} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "5px 10px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 11 }}>
+                  <b style={{ whiteSpace: "nowrap" }}>{p.name}</b>
+                  <span style={{ fontSize: 9, color: CP.textMuted, fontFamily: FONTS.mono }}>{p.cosellers_count ?? "?"}× · {p.shifts}t · {fmt$(p.sales)}</span>
+                  <span style={{ display: "inline-flex", gap: 4 }}>
+                    {(p.thresholds || []).map((t, i) => (
+                      <span key={i} style={{ padding: "1px 6px", borderRadius: 4, background: grid.colorOf(t.percentage) + "22", border: `1px solid ${grid.colorOf(t.percentage)}55`, color: grid.colorOf(t.percentage), fontSize: 10, fontWeight: 700, fontFamily: FONTS.mono, whiteSpace: "nowrap" }}>
+                        {t.threshold > 0 ? `≥${fmt$(t.threshold)}` : "base"}→{fmtPct(t.percentage)}
+                      </span>
+                    ))}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Griglia */}
@@ -434,48 +462,60 @@ export default function CompCalendarPage() {
             <FlaskConical size={13} /> Simulatore — profilo pagamento alternativo sui turni chiusi
           </SectionLabel>
           <CpCard accent={simChanged ? "#A35EE0" : undefined} padding="18px 22px" style={{ marginBottom: 22 }}>
-            {simThs && (
+            {simByClass && (
               <>
-                <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 16 }}>
-                  {simThs.map((t, i) => (
-                    <div key={i} style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
-                      <div>
-                        <label style={lbl}>{i === 0 ? "Base (da $)" : `Soglia ${i + 1} (da $)`}</label>
-                        <input
-                          type="number"
-                          value={t.threshold}
-                          disabled={i === 0}
-                          onChange={(e) => setSimThs(simThs.map((x, j) => j === i ? { ...x, threshold: e.target.value === "" ? "" : Number(e.target.value) } : x))}
-                          style={{ ...input, width: 100, opacity: i === 0 ? 0.5 : 1 }}
-                        />
-                      </div>
-                      <div>
-                        <label style={lbl}>%</label>
-                        <input
-                          type="number" step="0.5"
-                          value={t.percentage === "" ? "" : Math.round(Number(t.percentage) * 1000) / 10}
-                          onChange={(e) => setSimThs(simThs.map((x, j) => j === i ? { ...x, percentage: e.target.value === "" ? "" : Number(e.target.value) / 100 } : x))}
-                          style={{ ...input, width: 72 }}
-                        />
-                      </div>
-                      {i > 0 && (
-                        <button onClick={() => setSimThs(simThs.filter((_, j) => j !== i))} title="Rimuovi scaglione" style={iconBtn}>
-                          <X size={13} />
-                        </button>
-                      )}
+                {/* Un set di scaglioni PER OGNI classe cosellers — il match vero:
+                    Solo/Coppia/Triplo hanno profili propri, si simulano separati */}
+                {Object.keys(simByClass).map(Number).sort((a, b) => a - b).map((cls) => {
+                  const tiers = simByClass[cls];
+                  const setTiers = (next) => setSimByClass({ ...simByClass, [cls]: next });
+                  const clsLabel = cls === 1 ? "Solo (1×)" : cls === 2 ? "Coppia (2×)" : cls === 3 ? "Triplo (3×)" : `${cls}×`;
+                  return (
+                    <div key={cls} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 12, paddingBottom: 12, borderBottom: `1px dashed ${CP.border}` }}>
+                      <div style={{ minWidth: 92, fontSize: 12, fontWeight: 700, color: "#A35EE0", paddingBottom: 9, fontFamily: FONTS.mono }}>{clsLabel}</div>
+                      {tiers.map((t, i) => (
+                        <div key={i} style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
+                          <div>
+                            <label style={lbl}>{i === 0 ? "Base (da $)" : `Soglia ${i + 1}`}</label>
+                            <input
+                              type="number"
+                              value={t.threshold}
+                              disabled={i === 0}
+                              onChange={(e) => setTiers(tiers.map((x, j) => j === i ? { ...x, threshold: e.target.value === "" ? "" : Number(e.target.value) } : x))}
+                              style={{ ...input, width: 92, opacity: i === 0 ? 0.5 : 1 }}
+                            />
+                          </div>
+                          <div>
+                            <label style={lbl}>%</label>
+                            <input
+                              type="number" step="0.5"
+                              value={t.percentage === "" ? "" : Math.round(Number(t.percentage) * 1000) / 10}
+                              onChange={(e) => setTiers(tiers.map((x, j) => j === i ? { ...x, percentage: e.target.value === "" ? "" : Number(e.target.value) / 100 } : x))}
+                              style={{ ...input, width: 66 }}
+                            />
+                          </div>
+                          {i > 0 && (
+                            <button onClick={() => setTiers(tiers.filter((_, j) => j !== i))} title="Rimuovi scaglione" style={iconBtn}>
+                              <X size={13} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => setTiers([...tiers, { threshold: (Number(tiers[tiers.length - 1]?.threshold) || 0) + 500, percentage: (Number(tiers[tiers.length - 1]?.percentage) || 0.1) + 0.02 }])}
+                        title="Aggiungi scaglione" style={iconBtn}
+                      >
+                        <Plus size={13} />
+                      </button>
                     </div>
-                  ))}
+                  );
+                })}
+                <div style={{ marginBottom: 14 }}>
                   <button
-                    onClick={() => setSimThs([...simThs, { threshold: (Number(simThs[simThs.length - 1]?.threshold) || 0) + 500, percentage: (Number(simThs[simThs.length - 1]?.percentage) || 0.1) + 0.02 }])}
-                    title="Aggiungi scaglione" style={iconBtn}
-                  >
-                    <Plus size={13} />
-                  </button>
-                  <button
-                    onClick={() => setSimThs(data.thresholds_common.map((t) => ({ threshold: t.threshold ?? 0, percentage: t.percentage ?? 0 })))}
+                    onClick={() => setSimByClass(origByClass ? JSON.parse(JSON.stringify(origByClass)) : null)}
                     title="Reset agli scaglioni reali" style={{ ...iconBtn, color: CP.textSecondary }}
                   >
-                    <RotateCcw size={13} />
+                    <RotateCcw size={13} /> <span style={{ marginLeft: 6, fontSize: 12 }}>Reset ai profili reali</span>
                   </button>
                 </div>
 

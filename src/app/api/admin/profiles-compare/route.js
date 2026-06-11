@@ -52,6 +52,9 @@ export async function GET(request) {
         alias,
         sales: 0, earn_attr: 0, shifts: 0, mono_shifts: 0,
         operators: new Set(), thresholdSets: new Map(), profileNames: new Set(),
+        // Inventario per profilo: un creator NON ha un solo profilo — Solo/Coppia/
+        // Triplo hanno set propri. Popolato dai soli turni MONO (segnale pulito).
+        profilesByName: new Map(),
         mismatches: 0, checked: 0,
         // dataset compatto per il simulatore multi-creator client-side:
         // coppie [venduto_totale_turno, venduto_su_questo_creator]
@@ -102,6 +105,18 @@ export async function GET(request) {
           const key = JSON.stringify([...ths].sort((a, b) => (a.threshold ?? 0) - (b.threshold ?? 0)));
           agg.thresholdSets.set(key, (agg.thresholdSets.get(key) || 0) + 1);
         }
+        if (isMono && s.payment_profile?.name) {
+          const pn = s.payment_profile.name;
+          if (!agg.profilesByName.has(pn)) {
+            agg.profilesByName.set(pn, {
+              name: pn,
+              cosellers_count: s.payment_profile.cosellers_count ?? null,
+              thresholds: ths.length > 0 ? [...ths].sort((a, b) => (a.threshold ?? 0) - (b.threshold ?? 0)) : [],
+              shifts: 0,
+            });
+          }
+          agg.profilesByName.get(pn).shifts += 1;
+        }
         if (isMono && effPct != null && expPct != null) {
           agg.checked += 1;
           if (isMismatch) agg.mismatches += 1;
@@ -123,6 +138,8 @@ export async function GET(request) {
         mono_shifts: a.mono_shifts,
         operators_count: a.operators.size,
         thresholds: topThs ? JSON.parse(topThs[0]) : [],
+        // Inventario completo: ogni profilo (classe cosellers) coi suoi scaglioni
+        profiles: [...a.profilesByName.values()].sort((x, y) => y.shifts - x.shifts).slice(0, 5),
         profiles_seen: [...a.profileNames].sort().slice(0, 8),
         mismatches: a.mismatches,
         checked: a.checked,
