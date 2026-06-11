@@ -50,6 +50,34 @@ export default function CompCalendarPage() {
   const [simThs, setSimThs] = useState(null);
   const [showOnlyChanged, setShowOnlyChanged] = useState(false);
 
+  // Deep-link: ?creator=X&period_id=YYYY-MM precompila e genera da solo
+  // (es. arrivo da /admin/profiles-compare)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const c = sp.get("creator");
+    const p = sp.get("period_id");
+    if (p && /^\d{4}-\d{2}$/.test(p)) setPeriodId(p);
+    if (c) {
+      setCreator(c);
+      // auto-run con i valori dall'URL (non dallo state, non ancora aggiornato)
+      setTimeout(async () => {
+        setLoading(true); setError(null); setData(null);
+        try {
+          const res = await fetch(`/api/admin/shift-research?creator=${encodeURIComponent(c)}&period_id=${p && /^\d{4}-\d{2}$/.test(p) ? p : periodId}`);
+          const j = await res.json();
+          if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
+          setData(j);
+        } catch (e) {
+          setError(e.message);
+        } finally {
+          setLoading(false);
+        }
+      }, 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Autocomplete: alias reali del mese selezionato
   useEffect(() => {
     let cancelled = false;
