@@ -6,6 +6,7 @@ import { Loader2, AlertCircle, CalendarDays, AlertTriangle, Download, FlaskConic
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
 import CompNav from "@/components/CompNav";
+import HowToRead from "@/components/HowToRead";
 
 /**
  * /admin/comp-calendar — Griglia calendario compensation per creator × mese.
@@ -327,6 +328,14 @@ export default function CompCalendarPage() {
       />
 
       <CompNav />
+
+      <HowToRead items={[
+        "Ogni riga è un giorno del mese, ogni colonna una fascia oraria. Dentro ogni casella: chi ha lavorato, quanto ha venduto e che scaglione gli è stato applicato.",
+        "Il colore dice lo scaglione: più caldo (rosso) = scaglione basso, più freddo/acceso = scaglione alto. Una casella col puntino = nessun turno coperto.",
+        "Il triangolino ⚠ segnala qualcosa da controllare: pagamento fuori scaglione, numero di persone diverso dal profilo, o profilo di un'altra creator. Passa il mouse per i dettagli.",
+        "Nel simulatore in basso puoi cambiare le soglie e vedere subito: quanto sarebbe costato il mese, chi ci guadagnava e chi ci perdeva, turno per turno.",
+        "Quando modifichi le soglie, la griglia si ricolora con lo scenario simulato: se diventa quasi tutta di un colore, le soglie sono da ricalibrare.",
+      ]} />
 
       {/* Form con autocomplete */}
       <CpCard padding="16px 20px" style={{ marginBottom: 18 }}>

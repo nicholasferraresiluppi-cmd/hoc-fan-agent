@@ -6,6 +6,7 @@ import { Loader2, AlertCircle, Scale, ArrowRight, ArrowUpDown, FlaskConical, Plu
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
 import CompNav from "@/components/CompNav";
+import HowToRead from "@/components/HowToRead";
 
 /**
  * /admin/profiles-compare — Scaglioni a confronto cross-creator.
@@ -125,6 +126,14 @@ export default function ProfilesComparePage() {
       />
 
       <CompNav />
+
+      <HowToRead items={[
+        "Una riga per creator: i suoi scaglioni reali, quanto ha venduto, quanto sono costati gli operatori e quanto pesa quel costo sul venduto (% costo).",
+        "Nella colonna Scaglioni vedi più righe per creator: 1× è il profilo per chi lavora da solo, 2× in coppia, 3× in tre. Ogni configurazione ha le sue soglie.",
+        "Mismatch: ✓ verde = i pagamenti del mese rispettano gli scaglioni. Un numero rosso = turni pagati fuori scaglione, da verificare.",
+        "IL confronto da fare: la colonna '% costo' tra creator simili. Differenze grandi = profili da rivedere.",
+        "Il bottone Griglia apre il dettaglio giorno per giorno di quella creator.",
+      ]} />
 
       <CpCard padding="14px 18px" style={{ marginBottom: 18 }}>
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>

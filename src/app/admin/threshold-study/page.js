@@ -6,6 +6,7 @@ import { Loader2, AlertCircle, Ruler } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
 import CompNav from "@/components/CompNav";
+import HowToRead from "@/components/HowToRead";
 
 /**
  * /admin/threshold-study — Studio calibrazione soglie per il modello a bande.
@@ -65,6 +66,15 @@ export default function ThresholdStudyPage() {
 
       <CompNav />
 
+      <HowToRead items={[
+        "Ogni creator viene messa in una banda in base a quanto fattura al mese (banda 50K = creator che fanno circa 40-62mila dollari).",
+        "Per ogni banda guardiamo TUTTI i turni reali e quanto si è venduto in ciascuno. Da lì escono le soglie giuste.",
+        "Mediana = metà dei turni vende meno di quel numero. È la soglia naturale dello scaglione intermedio: metà dei turni la supera.",
+        "Soglia top suggerita = il valore che solo il 20-25% dei turni supera. Difficile il giusto: si suda, ma si vede raggiungibile.",
+        "IL numero da controllare: la colonna '% turni sopra top'. Verde = soglia calibrata bene. Ambra = da aggiustare.",
+        "Qui si parla SOLO di soglie in dollari. Le percentuali (10/12/15…) di ogni creator non si toccano.",
+      ]} />
+
       <CpCard padding="14px 18px" style={{ marginBottom: 18 }}>
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <div>
@@ -104,19 +114,33 @@ export default function ThresholdStudyPage() {
                   {b.creators.map((c) => `${c.alias} (${fmt$(c.sales)})`).join(" · ")}
                 </span>
               </div>
+              {/* Verdetto in chiaro: la frase che un non-analista legge e ha finito */}
+              {b.classes.some((c) => c.suggested_mid != null) && (
+                <div style={{ padding: "9px 14px", marginBottom: 8, background: CP.accentSoft + "55", border: `1px solid ${CP.accent}44`, borderRadius: 8, fontSize: 12.5, color: CP.textPrimary }}>
+                  Il dato dice:{" "}
+                  {b.classes.filter((c) => c.suggested_mid != null).map((c, i, arr) => (
+                    <span key={c.cls}>
+                      <b>{(CLASS_LABEL[c.cls] || `${c.cls}×`).split(" ")[0]}</b>
+                      {" "}→ scaglione intermedio da <b style={{ color: CP.accentSoftText }}>{fmt$(c.suggested_mid)}</b>, top da <b style={{ color: CP.accentSoftText }}>{fmt$(c.suggested_top)}</b>
+                      {c.shifts < 20 ? " (campione piccolo, prendere con cautela)" : ""}
+                      {i < arr.length - 1 ? " · " : ""}
+                    </span>
+                  ))}
+                </div>
+              )}
               <CpCard padding="0" style={{ overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                   <thead>
                     <tr style={{ background: CP.surfaceAlt, borderBottom: `1px solid ${CP.border}` }}>
                       <th style={th}>Classe</th>
-                      <th style={{ ...th, textAlign: "right" }}>Turni</th>
-                      <th style={{ ...th, textAlign: "right" }}>P25</th>
-                      <th style={{ ...th, textAlign: "right" }}>Mediana</th>
-                      <th style={{ ...th, textAlign: "right" }}>P75</th>
-                      <th style={{ ...th, textAlign: "right" }}>P80</th>
-                      <th style={{ ...th, textAlign: "right", color: CP.accent }}>Soglia mid sugg.</th>
-                      <th style={{ ...th, textAlign: "right", color: CP.accent }}>Soglia top sugg.</th>
-                      <th style={{ ...th, textAlign: "right" }}>% turni sopra top</th>
+                      <th style={{ ...th, textAlign: "right" }} title="Quanti turni mono-creator del mese stanno dietro a questi numeri">Turni</th>
+                      <th style={{ ...th, textAlign: "right" }} title="Il 25% dei turni vende meno di questo valore">P25</th>
+                      <th style={{ ...th, textAlign: "right" }} title="Metà dei turni vende meno di questo valore, metà di più">Mediana</th>
+                      <th style={{ ...th, textAlign: "right" }} title="Il 75% dei turni vende meno di questo valore">P75</th>
+                      <th style={{ ...th, textAlign: "right" }} title="L'80% dei turni vende meno di questo valore">P80</th>
+                      <th style={{ ...th, textAlign: "right", color: CP.accent }} title="Proposta per lo scaglione intermedio: la mediana arrotondata a $25 — metà dei turni la supera">Soglia mid sugg.</th>
+                      <th style={{ ...th, textAlign: "right", color: CP.accent }} title="Proposta per lo scaglione top: il valore che solo il 20-25% dei turni supera, arrotondato a $25">Soglia top sugg.</th>
+                      <th style={{ ...th, textAlign: "right" }} title="Verifica: quota di turni che supererebbe la soglia top suggerita. Verde = dentro il target 20-25%">% turni sopra top</th>
                     </tr>
                   </thead>
                   <tbody>

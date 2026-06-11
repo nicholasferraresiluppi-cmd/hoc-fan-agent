@@ -6,6 +6,7 @@ import { Loader2, AlertCircle, TrendingUp, Check, ArrowRight } from "lucide-reac
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
 import CompNav from "@/components/CompNav";
+import HowToRead from "@/components/HowToRead";
 
 /**
  * /admin/pnl-live — P&L operativo per creator, anche sul mese in corso.
@@ -87,6 +88,13 @@ export default function PnlLivePage() {
       />
 
       <CompNav />
+
+      <HowToRead items={[
+        "Per ogni creator: quanto ha venduto, la fee che HOC trattiene (la % la imposti tu nella colonna editabile, una volta sola), quanto sono costati gli operatori, e il margine che resta.",
+        "Margine = fee HOC − costo operatori. È il margine OPERATIVO della chat: marketing, AM e altri costi stanno nel foglio Finance.",
+        "Il mese marcato LIVE è quello in corso: sincronizzi i dati e vedi dove sta atterrando il margine oggi, senza aspettare la chiusura contabile.",
+        "IL numero da guardare: Margin % — sotto le aspettative su un creator grande = conversazione da fare.",
+      ]} />
 
       <CpCard accent="#F59E0B" padding="12px 16px" style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.5 }}>
