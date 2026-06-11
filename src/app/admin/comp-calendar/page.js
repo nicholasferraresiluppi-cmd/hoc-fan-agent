@@ -117,6 +117,15 @@ export default function CompCalendarPage() {
       const date = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       days.push({ date, dow: DAYS_IT[new Date(y, m - 1, d).getDay()], dayNum: d });
     }
+    // Turni che col fuso italiano scivolano fuori dal mese (es. 31/5 23:30 ITA
+    // sincronizzato nel wage di maggio ma datato 1/6): aggiungi i giorni extra
+    // in coda invece di perderli.
+    const monthDates = new Set(days.map((d) => d.date));
+    const extraDates = [...new Set(rows.map((r) => r.date))].filter((dt) => dt && !monthDates.has(dt)).sort();
+    for (const date of extraDates) {
+      const [ey, em, ed] = date.split("-").map(Number);
+      days.push({ date, dow: DAYS_IT[new Date(ey, em - 1, ed).getDay()], dayNum: ed, overflow: true });
+    }
 
     const cellMap = {};
     for (const r of rows) {

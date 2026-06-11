@@ -23,6 +23,25 @@ export const maxDuration = 60;
 
 const norm = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
+// CP salva startedAt/endedAt in UTC. HOC ragiona in ora ITALIANA (i turni di
+// Stormy partono alle 07:00, non alle 05:00). Conversione a Europe/Rome,
+// DST-aware (CET/CEST automatico). Gestisce anche il cambio giorno: un turno
+// alle 23:00 italiane sta nel giorno italiano giusto, non in quello UTC.
+const fmtRome = new Intl.DateTimeFormat("sv-SE", {
+  timeZone: "Europe/Rome",
+  year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", hour12: false,
+});
+function romeParts(iso) {
+  if (!iso) return { date: "", time: "" };
+  try {
+    const s = fmtRome.format(new Date(iso)); // "YYYY-MM-DD HH:MM"
+    return { date: s.slice(0, 10), time: s.slice(11, 16) };
+  } catch {
+    return { date: (iso || "").slice(0, 10), time: (iso || "").slice(11, 16) };
+  }
+}
+
 // Scan ricorsivo: colleziona path→valore per campi che matchano la regex
 function scanFields(obj, regex, path = "", out = [], depth = 0) {
   if (depth > 5 || !obj || typeof obj !== "object") return out;
@@ -128,10 +147,12 @@ export async function GET(request) {
           ? Math.round((effPct - expectedPct) * 10000) / 10000
           : null;
 
+        const startRome = romeParts(s.started_at);
+        const endRome = romeParts(s.ended_at);
         rows.push({
-          date: (s.started_at || "").slice(0, 10),
-          start: (s.started_at || "").slice(11, 16),
-          end: (s.ended_at || "").slice(11, 16),
+          date: startRome.date,
+          start: startRome.time,
+          end: endRome.time,
           operator: w.member_name || "?",
           creators_in_shift: aliases.length || 1,
           mono: isMono,
