@@ -48,6 +48,7 @@ export default function CompCalendarPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [simThs, setSimThs] = useState(null);
+  const [showOnlyChanged, setShowOnlyChanged] = useState(false);
 
   // Autocomplete: alias reali del mese selezionato
   useEffect(() => {
@@ -195,6 +196,7 @@ export default function CompCalendarPage() {
     let simTot = 0;
     const opSim = {};
     const byPctSim = {};
+    const simRows = [];
     for (const r of grid.rows) {
       const pct = bracketPct(r.sales_total_shift, valid);
       if (pct == null) continue;
@@ -203,12 +205,23 @@ export default function CompCalendarPage() {
       opSim[r.operator] = (opSim[r.operator] || 0) + e;
       const k = pct.toFixed(3);
       byPctSim[k] = (byPctSim[k] || 0) + 1;
+      // dettaglio per turno: reale vs simulato
+      const realPct = r.expected_pct ?? r.eff_pct;
+      simRows.push({
+        ...r,
+        sim_pct: pct,
+        sim_earn: Math.round(e * 100) / 100,
+        row_delta: Math.round((e - r.earnings_attr) * 100) / 100,
+        bracket_changed: realPct != null && Math.abs(pct - realPct) > 0.0001,
+      });
     }
     return {
       total: Math.round(simTot),
       delta: Math.round(simTot - grid.totEarn),
       opSim,
       byPctSim: Object.entries(byPctSim).map(([p, c]) => ({ pct: parseFloat(p), count: c })).sort((a, b) => a.pct - b.pct),
+      simRows,
+      changedCount: simRows.filter((r) => r.bracket_changed).length,
     };
   }, [grid, simThs]);
 
@@ -455,6 +468,65 @@ export default function CompCalendarPage() {
                 {!simChanged && (
                   <div style={{ marginTop: 10, fontSize: 11, color: CP.textMuted, fontStyle: "italic" }}>
                     Scaglioni = quelli reali del creator. Modifica soglie o % qui sopra per simulare un profilo diverso — il confronto si aggiorna in tempo reale sui {grid.rows.length} turni chiusi del mese.
+                  </div>
+                )}
+
+                {/* Dettaglio turno per turno: reale vs simulato */}
+                {sim && (
+                  <div style={{ marginTop: 18 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
+                      <SectionLabel>Tutti i turni · reale vs simulato ({sim.simRows.length})</SectionLabel>
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12, color: CP.textSecondary, cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={showOnlyChanged}
+                          onChange={(e) => setShowOnlyChanged(e.target.checked)}
+                          style={{ accentColor: "#A35EE0" }}
+                        />
+                        Solo turni che cambiano scaglione ({sim.changedCount})
+                      </label>
+                    </div>
+                    <div style={{ overflowX: "auto", maxHeight: 420, overflowY: "auto", border: `1px solid ${CP.border}`, borderRadius: 8 }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                        <thead>
+                          <tr style={{ position: "sticky", top: 0, zIndex: 1 }}>
+                            <th style={th}>Data</th>
+                            <th style={th}>Orario</th>
+                            <th style={th}>Operatore</th>
+                            <th style={{ ...th, textAlign: "right" }}>Venduto</th>
+                            <th style={{ ...th, textAlign: "right" }}>% reale</th>
+                            <th style={{ ...th, textAlign: "right" }}>Pagato reale</th>
+                            <th style={{ ...th, textAlign: "right" }}>% sim</th>
+                            <th style={{ ...th, textAlign: "right" }}>Pagato sim</th>
+                            <th style={{ ...th, textAlign: "right" }}>Δ turno</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sim.simRows
+                            .filter((r) => !showOnlyChanged || r.bracket_changed)
+                            .map((r) => (
+                              <tr key={r.shift_id} style={{ borderBottom: `1px solid ${CP.border}44`, background: r.bracket_changed ? "#A35EE018" : "transparent" }}>
+                                <td style={{ ...td, fontFamily: FONTS.mono }}>{r.date.slice(5)}</td>
+                                <td style={{ ...td, fontFamily: FONTS.mono, color: CP.textSecondary }}>{r.start}–{r.end}</td>
+                                <td style={td}>{r.operator}</td>
+                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmt$(r.sales_on_creator)}</td>
+                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: grid.colorOf(r.expected_pct) }}>{fmtPct(r.expected_pct ?? r.eff_pct)}</td>
+                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#D4AF7A" }}>{fmt$(r.earnings_attr)}</td>
+                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: r.bracket_changed ? "#A35EE0" : CP.textSecondary }}>{fmtPct(r.sim_pct)}</td>
+                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#A35EE0" }}>{fmt$(r.sim_earn)}</td>
+                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: Math.abs(r.row_delta) < 0.5 ? CP.textMuted : r.row_delta > 0 ? CP.accentRed : CP.accentGreen }}>
+                                  {Math.abs(r.row_delta) < 0.5 ? "=" : `${r.row_delta > 0 ? "+" : ""}${fmt$(r.row_delta)}`}
+                                </td>
+                              </tr>
+                            ))}
+                          {showOnlyChanged && sim.changedCount === 0 && (
+                            <tr><td colSpan={9} style={{ ...td, textAlign: "center", color: CP.textMuted, fontStyle: "italic", padding: 18 }}>
+                              Nessun turno cambia scaglione con queste soglie.
+                            </td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </>
