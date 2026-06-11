@@ -53,6 +53,9 @@ export async function GET(request) {
         sales: 0, earn_attr: 0, shifts: 0, mono_shifts: 0,
         operators: new Set(), thresholdSets: new Map(), profileNames: new Set(),
         mismatches: 0, checked: 0,
+        // dataset compatto per il simulatore multi-creator client-side:
+        // coppie [venduto_totale_turno, venduto_su_questo_creator]
+        shift_pairs: [],
       });
     }
     return byAlias.get(alias);
@@ -90,6 +93,7 @@ export async function GET(request) {
         agg.sales += aliasSales;
         agg.earn_attr += earnings * share;
         agg.shifts += 1;
+        if (aliasSales > 0) agg.shift_pairs.push([Math.round(salesTotal), Math.round(aliasSales)]);
         if (isMono) agg.mono_shifts += 1;
         if (w.member_name) agg.operators.add(w.member_name);
         if (s.payment_profile?.name) agg.profileNames.add(s.payment_profile.name);
@@ -122,6 +126,7 @@ export async function GET(request) {
         profiles_seen: [...a.profileNames].sort().slice(0, 8),
         mismatches: a.mismatches,
         checked: a.checked,
+        shift_pairs: a.shift_pairs,
       };
     })
     .sort((x, y) => y.sales - x.sales);
