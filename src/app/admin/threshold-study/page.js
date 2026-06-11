@@ -61,17 +61,17 @@ export default function ThresholdStudyPage() {
         }
         section="Data · Comp & Ben"
         title="Studio soglie — modello a bande"
-        subtitle="Per ogni banda di fatturato: distribuzione reale del venduto per turno per classe cosellers e soglie suggerite (mid = mediana, top = P77 → 20-25% dei turni sopra, target board). Solo soglie: le percentuali restano quelle correnti di ogni creator."
+        subtitle="Per ogni banda di fatturato: dove cadono i turni reali (le barre) e le soglie proposte (le linee). La soglia top è messa nel punto che solo il 20-25% dei turni supera. Solo soglie in dollari: le percentuali di ogni creator non si toccano."
       />
 
       <CompNav />
 
       <HowToRead items={[
-        "Ogni creator viene messa in una banda in base a quanto fattura al mese (banda 50K = creator che fanno circa 40-62mila dollari).",
-        "Per ogni banda guardiamo TUTTI i turni reali e quanto si è venduto in ciascuno. Da lì escono le soglie giuste.",
-        "Mediana = metà dei turni vende meno di quel numero. È la soglia naturale dello scaglione intermedio: metà dei turni la supera.",
-        "Soglia top suggerita = il valore che solo il 20-25% dei turni supera. Difficile il giusto: si suda, ma si vede raggiungibile.",
-        "IL numero da controllare: la colonna '% turni sopra top'. Verde = soglia calibrata bene. Ambra = da aggiustare.",
+        "Ogni creator finisce in una banda in base a quanto fattura al mese (banda 50K = creator intorno ai 40-62mila dollari).",
+        "Le barre mostrano i turni veri del mese: più una barra è alta, più turni hanno venduto quella cifra.",
+        "Le due linee verticali sono le soglie proposte: dove tagliano le barre, vedi a occhio quanti turni stanno sopra e quanti sotto.",
+        "La soglia intermedia è messa dove la supera circa metà dei turni. La soglia top dove la supera solo il 20-25%: difficile il giusto — si suda, ma si vede raggiungibile.",
+        "IL numero da controllare: la percentuale accanto alla soglia top. Verde = calibrata bene. Ambra = da aggiustare a mano.",
         "Qui si parla SOLO di soglie in dollari. Le percentuali (10/12/15…) di ogni creator non si toccano.",
       ]} />
 
@@ -129,44 +129,32 @@ export default function ThresholdStudyPage() {
                 </div>
               )}
               <CpCard padding="0" style={{ overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                  <thead>
-                    <tr style={{ background: CP.surfaceAlt, borderBottom: `1px solid ${CP.border}` }}>
-                      <th style={th}>Classe</th>
-                      <th style={{ ...th, textAlign: "right" }} title="Quanti turni mono-creator del mese stanno dietro a questi numeri">Turni</th>
-                      <th style={{ ...th, textAlign: "right" }} title="Il 25% dei turni vende meno di questo valore">P25</th>
-                      <th style={{ ...th, textAlign: "right" }} title="Metà dei turni vende meno di questo valore, metà di più">Mediana</th>
-                      <th style={{ ...th, textAlign: "right" }} title="Il 75% dei turni vende meno di questo valore">P75</th>
-                      <th style={{ ...th, textAlign: "right" }} title="L'80% dei turni vende meno di questo valore">P80</th>
-                      <th style={{ ...th, textAlign: "right", color: CP.accent }} title="Proposta per lo scaglione intermedio: la mediana arrotondata a $25 — metà dei turni la supera">Soglia mid sugg.</th>
-                      <th style={{ ...th, textAlign: "right", color: CP.accent }} title="Proposta per lo scaglione top: il valore che solo il 20-25% dei turni supera, arrotondato a $25">Soglia top sugg.</th>
-                      <th style={{ ...th, textAlign: "right" }} title="Verifica: quota di turni che supererebbe la soglia top suggerita. Verde = dentro il target 20-25%">% turni sopra top</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {b.classes.map((c) => {
-                      const lowSample = c.shifts < 20;
-                      return (
-                        <tr key={c.cls} style={{ borderBottom: `1px solid ${CP.borderSoft}`, opacity: lowSample ? 0.55 : 1 }}>
-                          <td style={{ ...td, fontWeight: 500 }}>
-                            {CLASS_LABEL[c.cls] || `${c.cls}×`}
-                            {lowSample && <span style={{ fontSize: 10, color: "#F59E0B", marginLeft: 6 }}>campione piccolo</span>}
-                          </td>
-                          <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono }}>{c.shifts}</td>
-                          <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textMuted }}>{fmt$(c.p25)}</td>
-                          <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono }}>{fmt$(c.p50)}</td>
-                          <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono }}>{fmt$(c.p75)}</td>
-                          <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textMuted }}>{fmt$(c.p80)}</td>
-                          <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 500, color: CP.accent }}>{fmt$(c.suggested_mid)}</td>
-                          <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 500, color: CP.accent }}>{fmt$(c.suggested_top)}</td>
-                          <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: c.top_share >= 18 && c.top_share <= 28 ? CP.accentGreen : "#F59E0B" }}>
-                            {c.top_share != null ? `${c.top_share}%` : "—"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                {b.classes.map((c, ci) => {
+                  const lowSample = c.shifts < 20;
+                  return (
+                    <div key={c.cls} style={{ display: "flex", alignItems: "center", gap: 20, padding: "12px 18px", borderBottom: ci < b.classes.length - 1 ? `1px solid ${CP.borderSoft}` : "none", opacity: lowSample ? 0.6 : 1, flexWrap: "wrap" }}>
+                      <div style={{ minWidth: 104 }}>
+                        <div style={{ fontWeight: 500, fontSize: 13 }}>{CLASS_LABEL[c.cls] || `${c.cls}×`}</div>
+                        <div style={{ fontSize: 11, color: CP.textMuted }}>{c.shifts} turni{lowSample ? " · campione piccolo" : ""}</div>
+                      </div>
+                      <Histogram buckets={c.histogram} bucketWidth={c.bucket_width} mid={c.suggested_mid} top={c.suggested_top} />
+                      <div style={{ display: "flex", gap: 26 }}>
+                        <div>
+                          <div style={lbl}>Soglia intermedia</div>
+                          <div style={{ fontSize: 19, fontWeight: 500, color: CP.accentSoftText, fontFamily: FONTS.mono }}>{fmt$(c.suggested_mid)}</div>
+                          <div style={{ fontSize: 10.5, color: CP.textMuted }}>{c.mid_share != null ? `la supera il ${c.mid_share}% dei turni` : "—"}</div>
+                        </div>
+                        <div>
+                          <div style={lbl}>Soglia top</div>
+                          <div style={{ fontSize: 19, fontWeight: 500, color: CP.accent, fontFamily: FONTS.mono }}>{fmt$(c.suggested_top)}</div>
+                          <div style={{ fontSize: 10.5, color: c.top_share >= 18 && c.top_share <= 28 ? CP.accentGreen : "#F59E0B" }}>
+                            {c.top_share != null ? `la supera il ${c.top_share}% (target 20-25%)` : "—"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </CpCard>
             </div>
           ))}
@@ -192,6 +180,40 @@ export default function ThresholdStudyPage() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+
+/**
+ * Istogramma della distribuzione venduto/turno: barre = quanti turni hanno
+ * venduto quella cifra; linee verticali = soglie proposte. Si VEDE dove
+ * taglia la soglia, senza nominare percentili.
+ */
+function Histogram({ buckets = [], bucketWidth = 25, mid, top }) {
+  if (buckets.length === 0) return <div style={{ flex: 1 }} />;
+  const maxCount = Math.max(...buckets.map((b) => b.count), 1);
+  const scale = buckets.length * bucketWidth;
+  const pos = (v) => `${Math.min(98.5, (v / scale) * 100)}%`;
+  return (
+    <div style={{ position: "relative", flex: 1, minWidth: 280, height: 58 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 44, marginTop: 8 }}>
+        {buckets.map((bk, i) => (
+          <div
+            key={i}
+            title={`$${bk.from}–$${bk.to}: ${bk.count} turni`}
+            style={{ flex: 1, height: Math.max(2, Math.round((bk.count / maxCount) * 44)), background: CP.accentDim, borderRadius: 2 }}
+          />
+        ))}
+      </div>
+      {mid != null && (
+        <div title={`Soglia intermedia: $${mid}`} style={{ position: "absolute", top: 0, bottom: 4, left: pos(mid), width: 2, background: CP.accentSoftText, opacity: 0.75, borderRadius: 1 }} />
+      )}
+      {top != null && (
+        <div title={`Soglia top: $${top}`} style={{ position: "absolute", top: 0, bottom: 4, left: pos(top), width: 2, background: CP.accent, borderRadius: 1 }} />
+      )}
+      <div style={{ position: "absolute", bottom: -6, left: 0, fontSize: 9, color: CP.mutedIcons }}>$0</div>
+      <div style={{ position: "absolute", bottom: -6, right: 0, fontSize: 9, color: CP.mutedIcons }}>${scale.toLocaleString("it-IT")}</div>
     </div>
   );
 }

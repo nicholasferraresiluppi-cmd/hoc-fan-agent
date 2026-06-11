@@ -115,6 +115,16 @@ export async function GET(request) {
         const sorted = [...vals].sort((x, y) => x - y);
         const p50 = percentile(sorted, 50);
         const p77 = percentile(sorted, 77);
+        // Istogramma per la UI: niente percentili a schermo, si FA VEDERE la
+        // distribuzione (bucket fino al P95, larghezza arrotondata a $25)
+        const cap = percentile(sorted, 95) || sorted[sorted.length - 1] || 0;
+        const nb = 12;
+        const bw = Math.max(25, Math.ceil(cap / nb / 25) * 25);
+        const histogram = Array.from({ length: nb }, (_, i) => ({ from: i * bw, to: (i + 1) * bw, count: 0 }));
+        for (const v of sorted) {
+          const idx = Math.min(nb - 1, Math.floor(v / bw));
+          histogram[idx].count += 1;
+        }
         return {
           cls: Number(cls),
           shifts: sorted.length,
@@ -122,11 +132,14 @@ export async function GET(request) {
           p50: Math.round(p50),
           p75: Math.round(percentile(sorted, 75)),
           p80: Math.round(percentile(sorted, 80)),
+          histogram,
+          bucket_width: bw,
           // Soglie suggerite (SOLO soglie — le % restano quelle del creator)
           suggested_mid: round25(p50),
           suggested_top: round25(p77),
           // quota turni che starebbe sopra la soglia top suggerita (sanity ~20-25%)
           top_share: sorted.length > 0 ? Math.round((sorted.filter((v) => v >= round25(p77)).length / sorted.length) * 100) : null,
+          mid_share: sorted.length > 0 ? Math.round((sorted.filter((v) => v >= round25(p50)).length / sorted.length) * 100) : null,
         };
       })
       .sort((x, y) => x.cls - y.cls);
