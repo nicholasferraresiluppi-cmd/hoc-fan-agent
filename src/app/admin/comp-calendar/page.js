@@ -48,11 +48,35 @@ export default function CompCalendarPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // Alias candidati quando la ricerca è ambigua (es. "Laura" → IT + ESP):
+  // mai fondere team diversi, l'utente sceglie quello esatto
+  const [candidates, setCandidates] = useState(null);
   // Simulatore PER CLASSE cosellers: un creator non ha un solo profilo —
   // Solo/Coppia/Triplo hanno profili propri con scaglioni potenzialmente
   // diversi. simByClass = { 1: tiers[], 2: tiers[], 3: tiers[] }.
   const [simByClass, setSimByClass] = useState(null);
   const [showOnlyChanged, setShowOnlyChanged] = useState(false);
+
+  async function fetchResearch(c, p) {
+    setLoading(true); setError(null); setData(null); setCandidates(null);
+    try {
+      const res = await fetch(`/api/admin/shift-research?creator=${encodeURIComponent(c)}&period_id=${p}`);
+      const j = await res.json();
+      if (!res.ok) {
+        if (j?.ambiguous && j?.candidates?.length) {
+          setCandidates(j.candidates);
+          setError(j.error);
+          return;
+        }
+        throw new Error(j?.error || `HTTP ${res.status}`);
+      }
+      setData(j);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   // Deep-link: ?creator=X&period_id=YYYY-MM precompila e genera da solo
   // (es. arrivo da /admin/profiles-compare)
@@ -64,20 +88,7 @@ export default function CompCalendarPage() {
     if (p && /^\d{4}-\d{2}$/.test(p)) setPeriodId(p);
     if (c) {
       setCreator(c);
-      // auto-run con i valori dall'URL (non dallo state, non ancora aggiornato)
-      setTimeout(async () => {
-        setLoading(true); setError(null); setData(null);
-        try {
-          const res = await fetch(`/api/admin/shift-research?creator=${encodeURIComponent(c)}&period_id=${p && /^\d{4}-\d{2}$/.test(p) ? p : periodId}`);
-          const j = await res.json();
-          if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
-          setData(j);
-        } catch (e) {
-          setError(e.message);
-        } finally {
-          setLoading(false);
-        }
-      }, 0);
+      setTimeout(() => fetchResearch(c, p && /^\d{4}-\d{2}$/.test(p) ? p : periodId), 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -114,19 +125,11 @@ export default function CompCalendarPage() {
     setSimByClass(origByClass ? JSON.parse(JSON.stringify(origByClass)) : null);
   }, [origByClass]);
 
-  async function run() {
-    if (!creator.trim() || !periodId) return;
-    setLoading(true); setError(null); setData(null);
-    try {
-      const res = await fetch(`/api/admin/shift-research?creator=${encodeURIComponent(creator.trim())}&period_id=${periodId}`);
-      const j = await res.json();
-      if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
-      setData(j);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+  async function run(overrideCreator) {
+    const c = (typeof overrideCreator === "string" ? overrideCreator : creator).trim();
+    if (!c || !periodId) return;
+    if (typeof overrideCreator === "string") setCreator(overrideCreator);
+    await fetchResearch(c, periodId);
   }
 
   // ===== Griglia + aggregati (con attribuzione earnings al creator) =====
@@ -330,10 +333,23 @@ export default function CompCalendarPage() {
       </CpCard>
 
       {error && (
-        <CpCard accent={CP.accentRed} padding="14px 18px" style={{ marginBottom: 18 }}>
-          <div style={{ color: CP.accentRed, display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+        <CpCard accent={candidates ? "#F59E0B" : CP.accentRed} padding="14px 18px" style={{ marginBottom: 18 }}>
+          <div style={{ color: candidates ? "#F59E0B" : CP.accentRed, display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
             <AlertCircle size={16} /> {error}
           </div>
+          {candidates && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+              {candidates.map((a) => (
+                <button
+                  key={a}
+                  onClick={() => run(a)}
+                  style={{ padding: "7px 14px", background: CP.surface, border: `1px solid ${CP.accentGreen}66`, borderRadius: 7, color: CP.accentGreen, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.body }}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+          )}
         </CpCard>
       )}
 

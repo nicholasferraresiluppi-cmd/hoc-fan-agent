@@ -88,11 +88,29 @@ export async function GET(request) {
         for (const t of s.takes || []) if (t.creator_alias) allAliases.add(t.creator_alias);
       }
     }
-    const matchedAliases = [...allAliases].filter((a) => {
+    // REGOLA DATI PULITI: un run = UN alias esatto, sempre. La fuzzy a token
+    // fondeva team diversi dello stesso creator (Laura IT + Laura ESP/EN) perché
+    // i suffissi -IT/-EN hanno <3 lettere e venivano scartati dai token. Ora:
+    // 1) match ESATTO (normalizzato) → si procede;
+    // 2) fuzzy con UN solo risultato → si procede;
+    // 3) fuzzy con PIÙ risultati → 422 con la lista: l'utente sceglie, MAI fusione.
+    const exactMatch = [...allAliases].filter((a) => norm(a) === q);
+    const fuzzyMatch = [...allAliases].filter((a) => {
       const an = norm(a);
-      return an.includes(q) || q.includes(an) || qTokens.every((t) => an.includes(t));
+      return an.includes(q) || q.includes(an) || (qTokens.length > 0 && qTokens.every((t) => an.includes(t)));
     });
-    if (matchedAliases.length === 0) {
+    let matchedAliases;
+    if (exactMatch.length === 1) {
+      matchedAliases = exactMatch;
+    } else if (fuzzyMatch.length === 1) {
+      matchedAliases = fuzzyMatch;
+    } else if (fuzzyMatch.length > 1) {
+      return Response.json({
+        error: `"${creatorName}" è ambiguo: ${fuzzyMatch.length} alias diversi nei dati (i team IT/EN/ESP sono creator separati). Scegli quello esatto.`,
+        ambiguous: true,
+        candidates: [...fuzzyMatch].sort(),
+      }, { status: 422 });
+    } else {
       return Response.json({
         error: `Nessun alias creator nei dati di ${periodId} matcha "${creatorName}"`,
         diagnostics: {
