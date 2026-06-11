@@ -111,6 +111,23 @@ export async function GET(request) {
 
         const earnings = Number(s.total_earnings) || 0;
         const effPct = salesTotal > 0 ? earnings / salesTotal : null;
+
+        // Fase B: profilo + % attesa (formula BRACKET su intero importo, confermata
+        // dalla ricerca Q2). Presenti solo se il mese è stato ri-sincronizzato dopo
+        // l'aggiunta di payment_profile/thresholds a normalizeWage.
+        const profile = s.payment_profile || null;
+        let expectedPct = null;
+        const ths = Array.isArray(s.thresholds) ? s.thresholds.filter((t) => t.percentage != null) : [];
+        if (ths.length > 0) {
+          const sorted = [...ths].sort((a, b) => (a.threshold ?? 0) - (b.threshold ?? 0));
+          let winning = sorted[0];
+          for (const t of sorted) if ((t.threshold ?? 0) <= salesTotal) winning = t;
+          expectedPct = winning?.percentage ?? null;
+        }
+        const deltaPct = (expectedPct != null && effPct != null)
+          ? Math.round((effPct - expectedPct) * 10000) / 10000
+          : null;
+
         rows.push({
           date: (s.started_at || "").slice(0, 10),
           start: (s.started_at || "").slice(11, 16),
@@ -122,6 +139,10 @@ export async function GET(request) {
           sales_total_shift: Math.round(salesTotal * 100) / 100,
           earnings: Math.round(earnings * 100) / 100,
           eff_pct: effPct != null ? Math.round(effPct * 10000) / 10000 : null,
+          profile_name: profile?.name ?? null,
+          profile_cosellers: profile?.cosellers_count ?? null,
+          expected_pct: expectedPct,
+          delta_pct: deltaPct,
           worked_hours: s.worked_hours || null,
           shift_id: s.id,
           wage_id: w.id,
@@ -185,9 +206,9 @@ export async function GET(request) {
 
     // CSV
     if (format === "csv") {
-      const header = "date,start,end,operator,creators_in_shift,mono,sales_on_creator,sales_total_shift,earnings,eff_pct,worked_hours,shift_id";
+      const header = "date,start,end,operator,creators_in_shift,mono,sales_on_creator,sales_total_shift,earnings,eff_pct,profile_name,profile_cosellers,expected_pct,delta_pct,worked_hours,shift_id";
       const lines = rows.map((r) =>
-        [r.date, r.start, r.end, `"${r.operator}"`, r.creators_in_shift, r.mono, r.sales_on_creator, r.sales_total_shift, r.earnings, r.eff_pct ?? "", r.worked_hours ?? "", r.shift_id].join(",")
+        [r.date, r.start, r.end, `"${r.operator}"`, r.creators_in_shift, r.mono, r.sales_on_creator, r.sales_total_shift, r.earnings, r.eff_pct ?? "", `"${r.profile_name ?? ""}"`, r.profile_cosellers ?? "", r.expected_pct ?? "", r.delta_pct ?? "", r.worked_hours ?? "", r.shift_id].join(",")
       );
       return new Response([header, ...lines].join("\n"), {
         headers: {
@@ -213,6 +234,12 @@ export async function GET(request) {
       q2_verdict,
       rows,
       csv_url: `/api/admin/shift-research?creator=${encodeURIComponent(creatorName)}&period_id=${periodId}&format=csv`,
+      phase_b: {
+        rows_with_profile: rows.filter((r) => r.profile_name).length,
+        rows_total: rows.length,
+        needs_resync: rows.length > 0 && rows.every((r) => !r.profile_name),
+        mismatches: rows.filter((r) => r.delta_pct != null && Math.abs(r.delta_pct) > 0.005).length,
+      },
       diagnostics: {
         wages_in_kv: wages.length,
         wages_touching_creator: wageIdsWithTarget.size,

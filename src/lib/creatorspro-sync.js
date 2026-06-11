@@ -70,6 +70,21 @@ export function normalizeWage(wage) {
       creator_aliases: (s.associatedCreators || []).map((c) => c.alias).filter(Boolean),
       takes_count: rawTakes.length,
       takes, // [{amount, type, creator_alias, creator_id, status}] — per attribuzione esatta
+      // v4 / Fase B: payment profile applicato al TURNO (scoperto via shift-research:
+      // il raw shift espone paymentProfile completo + thresholds snapshot scaglioni).
+      // Abilita: nome profilo per turno, check % attesa vs reale, coerenza cosellers.
+      payment_profile: s.paymentProfile ? {
+        id: s.paymentProfile.id ?? null,
+        name: s.paymentProfile.name ?? null,
+        cosellers_count: s.paymentProfile.cosellersCount ?? null,
+        hourly_rate: s.paymentProfile.hourlyRate ?? null,
+      } : null,
+      thresholds: Array.isArray(s.thresholds)
+        ? s.thresholds.map((t) => ({
+            threshold: t?.threshold ?? null,
+            percentage: t?.percentage ?? null,
+          }))
+        : [],
     };
   });
   return {

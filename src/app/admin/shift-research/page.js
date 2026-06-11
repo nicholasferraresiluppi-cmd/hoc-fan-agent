@@ -171,6 +171,30 @@ export default function ShiftResearchPage() {
             </div>
           </CpCard>
 
+          {/* Fase B status */}
+          {data.phase_b?.needs_resync && (
+            <CpCard accent="#F59E0B" padding="14px 18px" style={{ marginBottom: 16 }}>
+              <div style={{ color: "#F59E0B", fontSize: 13, display: "flex", alignItems: "center", gap: 10 }}>
+                <AlertCircle size={15} />
+                <span>
+                  I turni in KV non hanno ancora il payment profile (sync precedente al fix Fase B).
+                  <b> Re-sync di questo mese</b> da <Link href="/admin/creatorspro-sync-history" style={{ color: "#F59E0B" }}>Sync CP storico</Link> per popolare le colonne Profilo / % attesa / Δ.
+                </span>
+              </div>
+            </CpCard>
+          )}
+          {data.phase_b && !data.phase_b.needs_resync && data.phase_b.rows_with_profile > 0 && (
+            <CpCard accent={data.phase_b.mismatches > 0 ? CP.accentRed : CP.accentGreen} padding="14px 18px" style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 10 }}>
+                <CheckCircle2 size={15} color={data.phase_b.mismatches > 0 ? CP.accentRed : CP.accentGreen} />
+                <span>
+                  Fase B attiva: <b>{data.phase_b.rows_with_profile}/{data.phase_b.rows_total}</b> turni con profilo.
+                  {" "}Mismatch % attesa vs reale: <b style={{ color: data.phase_b.mismatches > 0 ? CP.accentRed : CP.accentGreen }}>{data.phase_b.mismatches}</b>
+                </span>
+              </div>
+            </CpCard>
+          )}
+
           {/* Q3 */}
           <SectionLabel style={{ display: "block", marginBottom: 10 }}>Q3 — Dataset turni ({data.rows?.length || 0}) · ordinato per data</SectionLabel>
           <CpCard padding="0" style={{ overflow: "hidden" }}>
@@ -185,12 +209,17 @@ export default function ShiftResearchPage() {
                     <th style={{ ...th, textAlign: "right" }}>Venduto (turno tot)</th>
                     <th style={{ ...th, textAlign: "right" }}>Guadagno</th>
                     <th style={{ ...th, textAlign: "right" }}>Eff %</th>
+                    <th style={th}>Profilo</th>
+                    <th style={{ ...th, textAlign: "right" }}>% attesa</th>
+                    <th style={{ ...th, textAlign: "right" }}>Δ</th>
                     <th style={th}>Tipo</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(data.rows || []).map((r, i) => (
-                    <tr key={r.shift_id || i} style={{ borderBottom: `1px solid ${CP.border}66` }}>
+                  {(data.rows || []).map((r, i) => {
+                    const mismatch = r.delta_pct != null && Math.abs(r.delta_pct) > 0.005;
+                    return (
+                    <tr key={r.shift_id || i} style={{ borderBottom: `1px solid ${CP.border}66`, background: mismatch ? CP.accentRed + "14" : "transparent" }}>
                       <td style={{ ...td, fontFamily: FONTS.mono }}>{r.date}</td>
                       <td style={{ ...td, fontFamily: FONTS.mono, color: CP.textSecondary }}>{r.start}–{r.end}</td>
                       <td style={td}>{r.operator}</td>
@@ -198,9 +227,19 @@ export default function ShiftResearchPage() {
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textMuted }}>{fmt$(r.sales_total_shift)}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#D4AF7A" }}>{fmt$(r.earnings)}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700 }}>{fmtPct(r.eff_pct)}</td>
+                      <td style={{ ...td, fontSize: 11 }}>
+                        {r.profile_name
+                          ? <span title={`cosellers: ${r.profile_cosellers ?? "?"}`}>{r.profile_name}</span>
+                          : <span style={{ color: CP.textMuted }}>—</span>}
+                      </td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmtPct(r.expected_pct)}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: mismatch ? CP.accentRed : (r.delta_pct != null ? CP.accentGreen : CP.textMuted) }}>
+                        {r.delta_pct != null ? (Math.abs(r.delta_pct) <= 0.005 ? "✓" : `${(r.delta_pct * 100).toFixed(1)}pp`) : "—"}
+                      </td>
                       <td style={{ ...td, fontSize: 10, color: r.mono ? CP.accentGreen : "#F59E0B" }}>{r.mono ? "MONO" : `${r.creators_in_shift} creator`}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
