@@ -403,6 +403,19 @@ export default function CompCalendarPage() {
             <StatCard label="Slot vuoti (coverage)" value={grid.emptyCells} color={grid.emptyCells > 0 ? "#F59E0B" : CP.accentGreen} sub={`su ${grid.days.length * grid.mainSlots.length} slot`} />
           </div>
 
+          {/* Data quality: venduto non attribuito (takes mancanti in CP) */}
+          {data.takes_quality && data.takes_quality.rows_no_sales > data.takes_quality.rows_total * 0.3 && (
+            <CpCard accent="#F59E0B" padding="12px 16px" style={{ marginBottom: 14 }}>
+              <div style={{ color: "#F59E0B", fontSize: 12, lineHeight: 1.55 }}>
+                ⚠ <b>{data.takes_quality.rows_no_sales} turni su {data.takes_quality.rows_total} senza venduto attribuito</b>
+                {" "}({data.takes_quality.rows_no_takes} senza alcun take registrato in CP).
+                Il pagato e gli scaglioni restano corretti — è il venduto per turno che manca alla fonte:
+                per questo team i takes non vengono registrati (tipico dei team condivisi, es. "laura esp + elisa").
+                Da sistemare in CP lato manager, non è un errore della webapp.
+              </div>
+            </CpCard>
+          )}
+
           {/* Inventario profili: OGNI profilo usato sul creator coi SUOI scaglioni */}
           <div style={{ marginBottom: 14 }}>
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>

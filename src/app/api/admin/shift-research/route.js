@@ -201,6 +201,7 @@ export async function GET(request) {
           profile_cosellers: profile?.cosellers_count ?? null,
           expected_pct: expectedPct,
           delta_pct: deltaPct,
+          takes_count: takes.length,
           worked_hours: s.worked_hours || null,
           shift_id: s.id,
           wage_id: w.id,
@@ -292,6 +293,12 @@ export async function GET(request) {
       q2_verdict,
       rows,
       csv_url: `/api/admin/shift-research?creator=${encodeURIComponent(creatorName)}&period_id=${periodId}&format=csv`,
+      // Diagnostica takes: turni senza venduto attribuito (takes mancanti in CP)
+      takes_quality: {
+        rows_no_sales: rows.filter((r) => r.sales_on_creator === 0).length,
+        rows_no_takes: rows.filter((r) => r.takes_count === 0).length,
+        rows_total: rows.length,
+      },
       phase_b: {
         rows_with_profile: rows.filter((r) => r.profile_name).length,
         rows_total: rows.length,
