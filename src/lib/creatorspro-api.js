@@ -90,6 +90,41 @@ async function apiFetch(path, { method = "GET", query = null, body = null, retri
   return data;
 }
 
+/**
+ * Probe non-throwing: GET grezzo contro un path candidato, ritorna
+ * {status, ok, sample} senza mai lanciare. Per scoprire endpoint nuovi
+ * (pattern usato per /v1/payment-profiles). baseOverride permette di
+ * testare host diversi da quello bot di default (es. social su altro host).
+ */
+export async function probeGet(path, { query = null, baseOverride = null, noAuth = false } = {}) {
+  try {
+    const { baseUrl } = getEnv();
+    const base = baseOverride || baseUrl;
+    const url = new URL(`${base}${path}`);
+    if (query) {
+      for (const [k, v] of Object.entries(query)) {
+        if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+      }
+    }
+    const headers = {};
+    if (!noAuth) headers["Authorization"] = `Bearer ${await login()}`;
+    const ctrl = new AbortController();
+    const tt = setTimeout(() => ctrl.abort(), 12000);
+    let res;
+    try {
+      res = await fetch(url.toString(), { headers, signal: ctrl.signal });
+    } finally {
+      clearTimeout(tt);
+    }
+    const text = await res.text();
+    let data;
+    try { data = text ? JSON.parse(text) : null; } catch { data = { _raw: text.slice(0, 200) }; }
+    return { status: res.status, ok: res.ok, sample: data };
+  } catch (e) {
+    return { status: 0, ok: false, error: String(e?.message || e) };
+  }
+}
+
 /* ============================================================
  * Endpoint wrappers
  * ============================================================ */
