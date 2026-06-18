@@ -144,10 +144,11 @@ export async function fetchIntervals() {
   return r?.data || [];
 }
 
-export async function fetchWages({ startedAt, endedAt, page = 1, limit = PAGE_LIMIT, status, memberId, groupId }) {
+export async function fetchWages({ startedAt, endedAt, page = 1, limit = PAGE_LIMIT, status, memberId, groupId, timeoutMs }) {
   if (!startedAt || !endedAt) throw new Error("startedAt + endedAt required");
   return apiFetch("/v1/sellers-wage/wages", {
     query: { startedAt, endedAt, page, limit, status, memberId, groupId },
+    ...(timeoutMs ? { timeoutMs } : {}),
   });
 }
 

@@ -52,14 +52,17 @@ export async function GET(request) {
   const lastN = Math.max(1, Math.min(24, parseInt(url.searchParams.get("last_n") || "12", 10)));
   const periodIds = lastMonthIds(lastN);
 
-  // KV counts (cheap)
-  const kvWages = await Promise.all(periodIds.map((pid) => kv.get(`cp:wages:${pid}`)));
+  // KV counts — letture difensive (allSettled: un kv.get lento/KO non fa
+  // crashare l'intero endpoint con risposta non-JSON)
+  const kvSettled = await Promise.allSettled(periodIds.map((pid) => kv.get(`cp:wages:${pid}`)));
+  const kvWages = kvSettled.map((r) => (r.status === "fulfilled" ? r.value : null));
 
-  // CP API live counts (1 call per period, in parallel)
+  // CP API live counts (1 call per period, parallele, timeout CORTO 8s: una
+  // chiamata CP lenta non deve trascinare l'endpoint verso il limite 60s)
   const liveCounts = await Promise.all(periodIds.map(async (pid) => {
     try {
       const { startedAt, endedAt } = monthBoundsIso(pid);
-      const r = await fetchWages({ startedAt, endedAt, page: 1, limit: 1 });
+      const r = await fetchWages({ startedAt, endedAt, page: 1, limit: 1, timeoutMs: 8000 });
       const dataCount = r?.pagination?.dataCount ?? null;
       return { ok: true, dataCount };
     } catch (e) {

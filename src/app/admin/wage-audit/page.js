@@ -7,7 +7,18 @@ import { COLORS, FONTS, CP } from "@/lib/brand";
 import { PageHeader, StatCard } from "@/components/cp-style";
 import { AlertCircle, CheckCircle2, RefreshCw, Loader2, Database, Search } from "lucide-react";
 
-const fetcher = (url) => fetch(url).then((r) => r.json());
+// Fetcher robusto: se il GET va in timeout Vercel risponde testo non-JSON
+// → messaggio leggibile invece di "Unexpected token 'A'".
+const fetcher = async (url) => {
+  const res = await fetch(url);
+  const text = await res.text();
+  let j = null;
+  try { j = text ? JSON.parse(text) : null; } catch {
+    throw new Error("Il controllo è andato in timeout (troppi mesi in una volta). Riduci 'Ultimi N mesi' a 6 e riprova.");
+  }
+  if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
+  return j;
+};
 
 const MONTH_IT = ["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"];
 function periodLabel(pid) {
