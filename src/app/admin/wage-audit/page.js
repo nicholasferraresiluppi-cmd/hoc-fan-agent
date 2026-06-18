@@ -98,8 +98,11 @@ export default function WageAuditPage() {
         setRecovering((s) => ({ ...s, [pid]: "error" }));
         setResults((s) => ({ ...s, [pid]: String(e?.message || e) }));
       }
-      await mutate(url);
+      // NB: niente mutate(url) qui dentro — ri-eseguire l'audit pesante (12
+      // chiamate live CP) durante il recupero satura CP API e fa fallire le
+      // probe live ("live failed"). Refresh UNA volta sola alla fine, a freddo.
     }
+    await mutate(url);
     setBulkState({
       running: false,
       message: errs.length === 0

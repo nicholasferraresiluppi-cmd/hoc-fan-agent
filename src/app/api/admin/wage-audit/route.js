@@ -62,7 +62,7 @@ export async function GET(request) {
   const liveCounts = await Promise.all(periodIds.map(async (pid) => {
     try {
       const { startedAt, endedAt } = monthBoundsIso(pid);
-      const r = await fetchWages({ startedAt, endedAt, page: 1, limit: 1, timeoutMs: 8000 });
+      const r = await fetchWages({ startedAt, endedAt, page: 1, limit: 1, timeoutMs: 12000 });
       const dataCount = r?.pagination?.dataCount ?? null;
       return { ok: true, dataCount };
     } catch (e) {
