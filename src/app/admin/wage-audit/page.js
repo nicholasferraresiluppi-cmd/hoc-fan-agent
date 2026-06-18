@@ -24,25 +24,32 @@ export default function WageAuditPage() {
   const url = `/api/admin/wage-audit?last_n=${lastN}`;
   const { data, error, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
 
+  // Parsing risposta robusto: se il server va in timeout Vercel risponde
+  // testo non-JSON ("An error occurred...") → niente più "Unexpected token".
+  async function postRecover(periodId) {
+    const res = await fetch("/api/admin/wage-audit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ period_id: periodId, action: "recover_missing" }),
+    });
+    const text = await res.text();
+    let j = null;
+    try { j = text ? JSON.parse(text) : null; } catch {
+      // Risposta non-JSON = quasi sempre timeout (mese troppo grande per 60s)
+      throw new Error("timeout: mese troppo grande in una sola richiesta — usa Re-sync da Sync CP storico (è chunkato)");
+    }
+    if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
+    return j;
+  }
+
   async function recover(periodId) {
     if (recovering[periodId] === "running") return;
     setRecovering((s) => ({ ...s, [periodId]: "running" }));
     setResults((s) => ({ ...s, [periodId]: "" }));
     try {
-      const res = await fetch("/api/admin/wage-audit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ period_id: periodId, action: "recover_missing" }),
-      });
-      const j = await res.json();
-      if (!res.ok) {
-        setRecovering((s) => ({ ...s, [periodId]: "error" }));
-        setResults((s) => ({ ...s, [periodId]: j.error || `HTTP ${res.status}` }));
-        return;
-      }
+      const j = await postRecover(periodId);
       setRecovering((s) => ({ ...s, [periodId]: "done" }));
       setResults((s) => ({ ...s, [periodId]: j.message || "OK" }));
-      // Refresh audit
       setTimeout(() => mutate(url), 800);
     } catch (e) {
       setRecovering((s) => ({ ...s, [periodId]: "error" }));
@@ -55,26 +62,39 @@ export default function WageAuditPage() {
   const monthsWithGap = data?.months_with_gap ?? 0;
   const [bulkState, setBulkState] = useState({ running: false, message: "" });
 
+  // Loop CLIENT-side: un mese per richiesta (ognuna bounded < 60s Vercel),
+  // invece di tutti in una sola richiesta server-side (che andava in timeout
+  // su 1596 wage → errore non-JSON). Sequenziale per non saturare CP API.
   async function recoverAll() {
     if (bulkState.running) return;
-    if (!confirm(`Recuperare TUTTI i ${monthsWithGap} mesi con gap?\nQuesto chiama CP API per ogni mese, può durare 1-2 minuti totali.`)) return;
-    setBulkState({ running: true, message: "Recupero in corso…" });
-    try {
-      const res = await fetch("/api/admin/wage-audit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "recover_all_gaps", last_n: lastN }),
-      });
-      const j = await res.json();
-      if (!res.ok) {
-        setBulkState({ running: false, message: `Errore: ${j.error || res.status}` });
-        return;
+    const gapMonths = months.filter((m) => m.status === "missing").map((m) => m.period_id);
+    if (gapMonths.length === 0) { setBulkState({ running: false, message: "Nessun gap da recuperare." }); return; }
+    if (!confirm(`Recuperare ${gapMonths.length} mesi con gap, uno alla volta?\nPuò durare 1-2 minuti.`)) return;
+    setBulkState({ running: true, message: `0/${gapMonths.length}…` });
+    let ok = 0;
+    const errs = [];
+    for (let i = 0; i < gapMonths.length; i++) {
+      const pid = gapMonths[i];
+      setBulkState({ running: true, message: `${i + 1}/${gapMonths.length}: ${pid}…` });
+      setRecovering((s) => ({ ...s, [pid]: "running" }));
+      try {
+        const j = await postRecover(pid);
+        ok++;
+        setRecovering((s) => ({ ...s, [pid]: "done" }));
+        setResults((s) => ({ ...s, [pid]: j.message || "OK" }));
+      } catch (e) {
+        errs.push(`${pid}: ${e?.message || e}`);
+        setRecovering((s) => ({ ...s, [pid]: "error" }));
+        setResults((s) => ({ ...s, [pid]: String(e?.message || e) }));
       }
-      setBulkState({ running: false, message: j.message || "OK" });
-      setTimeout(() => mutate(url), 800);
-    } catch (e) {
-      setBulkState({ running: false, message: `Errore di rete: ${e?.message || e}` });
+      await mutate(url);
     }
+    setBulkState({
+      running: false,
+      message: errs.length === 0
+        ? `Fatto: ${ok}/${gapMonths.length} mesi recuperati.`
+        : `${ok} ok, ${errs.length} falliti. ${errs.join(" · ")}`,
+    });
   }
 
   return (
