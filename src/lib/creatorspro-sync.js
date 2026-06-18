@@ -170,17 +170,29 @@ export async function prepareSync({ periodId, pageOffset = null, pagesLimit = nu
     // (solo se è la prima invocazione e dobbiamo scoprire pageCount)
     let stubsBatch = firstResult.stubs;
     const pageFailures = [...firstResult.failedPages];
-    try {
-      const first = await fetchWages({ startedAt, endedAt, page: pageOffset, limit: 25 });
-      totalCount = first.pagination?.dataCount || 0;
-      pageCount = first.pagination?.pageCount || 1;
-      // Se sopra abbiamo fallito la pagina offset ma qui no, usiamo questi dati
-      if (pageFailures.length > 0 && first.data) {
-        pageFailures.length = 0;
-        stubsBatch = [...first.data];
+    // FIX troncamento silenzioso: la scoperta di pageCount NON deve fallire in
+    // silenzio lasciando pageCount=1 (causava sync parziali — es. Aprile 125 =
+    // 5×25 — finalizzati come "ok"). Retry 3x, e se ancora fallisce THROW così
+    // il client ritenta invece di troncare.
+    let discovered = false;
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 3 && !discovered; attempt++) {
+      try {
+        const first = await fetchWages({ startedAt, endedAt, page: pageOffset, limit: 25 });
+        totalCount = first.pagination?.dataCount || 0;
+        pageCount = first.pagination?.pageCount || 1;
+        if (pageFailures.length > 0 && first.data) {
+          pageFailures.length = 0;
+          stubsBatch = [...first.data];
+        }
+        discovered = true;
+      } catch (e) {
+        lastErr = e;
+        if (attempt < 3) await new Promise((r) => setTimeout(r, 500 * attempt));
       }
-    } catch {
-      // Se anche questa chiamata fallisce, abbiamo già pageFailures tracciato
+    }
+    if (!discovered) {
+      throw new Error(`prepare ${periodId} pag.${pageOffset}: impossibile determinare il numero di pagine dopo 3 tentativi (${lastErr?.message || lastErr}). Sync interrotto per non troncare silenziosamente.`);
     }
     // Fetch pagine successive con retry tramite fetchWageStubsForPages
     const lastPage = Math.min(pageCount, pageOffset + pagesLimit - 1);
@@ -430,6 +442,16 @@ export async function finalizeSync({ periodId }) {
     gap_check: gapCheck,
   };
   await kv.set("cp:_meta", meta);
+  // Gap-check PER MESE (cp:_meta è globale e viene sovrascritto al sync
+  // successivo → l'info di completezza del singolo mese si perdeva). Così la
+  // card storico può mostrare ⚠ "incompleto: X/Y" sul mese giusto.
+  if (gapCheck) {
+    await kv.set(`cp:sync:gap:${periodId}`, {
+      ...gapCheck,
+      failed_pages: failedPages.length,
+      failed_details: failedDetails.length,
+    }, { ex: TTL_WAGES });
+  }
   await kv.del(`cp:sync:state:${periodId}`);
 
   return { meta, unmatched_sample: unmatched.slice(0, 20) };

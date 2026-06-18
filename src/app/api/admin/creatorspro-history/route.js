@@ -28,10 +28,13 @@ export async function GET(request) {
   const lastN = Math.max(1, Math.min(36, parseInt(url.searchParams.get("last_n") || "24", 10)));
   const periodIds = lastMonthIds(lastN);
 
-  const [meta, ...wagesArr] = await Promise.all([
+  const [meta, ...rest] = await Promise.all([
     kv.get("cp:_meta"),
     ...periodIds.map((pid) => kv.get(`cp:wages:${pid}`)),
+    ...periodIds.map((pid) => kv.get(`cp:sync:gap:${pid}`)),
   ]);
+  const wagesArr = rest.slice(0, periodIds.length);
+  const gapArr = rest.slice(periodIds.length);
 
   const months = periodIds.map((pid, i) => {
     const wages = wagesArr[i];
@@ -40,6 +43,11 @@ export async function GET(request) {
     const shifts = wagesList.reduce((s, w) => s + (w.shifts?.length || 0), 0);
     // Se questo è l'ultimo periodo syncato, usa il timestamp da meta
     const isLastSync = meta?.last_sync_period === pid;
+    // Completezza per-mese: gap-check salvato in finalize (cp:sync:gap:{pid}).
+    // Tolleranza 5 per il rumore noto dataCount-vs-normalizzato.
+    const gap = gapArr[i] || null;
+    const cpLive = gap?.cp_live_count ?? null;
+    const incomplete = cpLive != null && wagesList.length > 0 && (cpLive - wagesList.length) > 5;
     return {
       period_id: pid,
       synced,
@@ -47,6 +55,9 @@ export async function GET(request) {
       shifts_count: shifts,
       last_sync_at: isLastSync ? meta?.last_sync_at : null,
       is_last_sync: isLastSync,
+      cp_live_count: cpLive,
+      gap: cpLive != null ? Math.max(0, cpLive - wagesList.length) : null,
+      incomplete,
     };
   });
 

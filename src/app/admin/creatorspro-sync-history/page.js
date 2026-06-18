@@ -381,7 +381,8 @@ export default function SyncHistoryPage() {
           const synced = state?.synced;
           const isCurrent = progress.current === m.id;
           const isCompleted = progress.completed.includes(m.id);
-          const cardColor = isCurrent ? "#F59E0B" : isCompleted ? CP.accentGreen : synced ? CP.accentGreen : CP.textMuted;
+          const incomplete = state?.incomplete;
+          const cardColor = isCurrent ? "#F59E0B" : incomplete ? "#F59E0B" : isCompleted ? CP.accentGreen : synced ? CP.accentGreen : CP.textMuted;
           return (
             <CpCard key={m.id} accent={cardColor} padding="14px 18px">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
@@ -391,6 +392,8 @@ export default function SyncHistoryPage() {
                 </div>
                 {isCurrent ? (
                   <RefreshCw size={16} color="#F59E0B" className="animate-spin" />
+                ) : incomplete ? (
+                  <AlertCircle size={16} color="#F59E0B" />
                 ) : synced ? (
                   <CheckCircle2 size={16} color={CP.accentGreen} />
                 ) : (
@@ -400,6 +403,11 @@ export default function SyncHistoryPage() {
               {synced && state && (
                 <div style={{ fontSize: 11, color: CP.textSecondary, lineHeight: 1.6 }}>
                   <div>{state.wages_count || 0} wages · {state.shifts_count || 0} shifts</div>
+                  {incomplete && (
+                    <div style={{ color: "#F59E0B", fontWeight: 600 }}>
+                      ⚠ incompleto: {state.wages_count}/{state.cp_live_count} · mancano ~{state.gap}
+                    </div>
+                  )}
                   {state.last_sync_at && (
                     <div style={{ color: CP.textMuted }}>
                       Synced: {new Date(state.last_sync_at).toLocaleDateString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
