@@ -7,7 +7,7 @@ import { COLORS, FONTS, CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
 import { useSmartPeriod } from "@/lib/use-smart-period";
-import { Info, Target, ArrowRight, Search, Loader2, CheckCircle2, XCircle, Columns3, Check, Wrench, ShieldCheck, Languages, Tags, RefreshCw, Link2 } from "lucide-react";
+import { Info, Target, ArrowRight, Search, Loader2, CheckCircle2, XCircle, Columns3, Check, Wrench, ShieldCheck, Languages, Tags, RefreshCw, Link2, SlidersHorizontal, ChevronDown, ChevronUp } from "lucide-react";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -110,6 +110,7 @@ export default function SalesCpLeaderboardPage() {
   // Extra columns picker (Infloww KPIs aggiuntive)
   const [extraCols, setExtraCols] = useState([]);
   const [colsPickerOpen, setColsPickerOpen] = useState(false);
+  const [segFiltersOpen, setSegFiltersOpen] = useState(false);
   // Troubleshoot dropdown (shortcuts a pagine admin per risolvere problemi)
   const [troubleshootOpen, setTroubleshootOpen] = useState(false);
   useEffect(() => {
@@ -414,21 +415,42 @@ export default function SalesCpLeaderboardPage() {
           </div>
         </div>
 
-        <div style={styles.filterRow}>
-          <span style={styles.filterLabel}>Categoria:</span>
-          {CATEGORY_FILTERS.map((c) => {
-            const count = data?.category_counts ? (c.value ? (data.category_counts[c.value] ?? 0) : Object.values(data.category_counts).reduce((a,b)=>a+(b||0),0)) : null;
-            return <button key={c.value || "all"} style={styles.catPill(categoryFilter === c.value, CATEGORY_COLORS[c.value] || COLORS.champagne)} onClick={() => setCategoryFilter(c.value)}>{c.label}{count != null && <span style={{ marginLeft: 6, opacity: 0.7, fontFamily: FONTS.mono, fontSize: 11 }}>({count})</span>}</button>;
-          })}
+        {/* Filtri segmento (categoria + lingua) collassati di default: troppo
+            ingombranti "in evidenza". Riga compatta con riassunto attivo. */}
+        <div style={{ ...styles.filterRow, marginBottom: segFiltersOpen ? 10 : 14 }}>
+          <button
+            onClick={() => setSegFiltersOpen((v) => !v)}
+            style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "6px 12px", background: (categoryFilter || languageFilter) ? COLORS.champagne + "22" : COLORS.graphite, border: `1px solid ${(categoryFilter || languageFilter) ? COLORS.champagne + "55" : COLORS.charcoal}`, borderRadius: 8, color: (categoryFilter || languageFilter) ? COLORS.champagne : COLORS.fog, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONTS.body }}
+          >
+            <SlidersHorizontal size={13} /> Filtri segmento
+            <span style={{ fontSize: 11, opacity: 0.8 }}>
+              {`· ${CATEGORY_FILTERS.find((c) => c.value === categoryFilter)?.label || "Tutte"} · ${LANGUAGE_FILTERS.find((l) => l.value === languageFilter)?.label || "Tutte"}`}
+            </span>
+            {segFiltersOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          </button>
+          {(categoryFilter || languageFilter) && (
+            <button onClick={() => { setCategoryFilter(""); setLanguageFilter(""); }} style={{ fontSize: 11, color: COLORS.mist, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>azzera</button>
+          )}
         </div>
 
-        <div style={styles.filterRow}>
-          <span style={styles.filterLabel}>Lingua:</span>
-          {LANGUAGE_FILTERS.map((l) => {
-            const count = data?.language_counts ? (l.value ? (data.language_counts[LANGUAGE_COUNT_KEY[l.value] || l.value] ?? 0) : Object.values(data.language_counts).reduce((a,b)=>a+(b||0),0)) : null;
-            return <button key={l.value || "all"} style={styles.catPill(languageFilter === l.value, LANGUAGE_COLORS[l.value] || COLORS.champagne)} onClick={() => setLanguageFilter(l.value)}>{l.label}{count != null && <span style={{ marginLeft: 6, opacity: 0.7, fontFamily: FONTS.mono, fontSize: 11 }}>({count})</span>}</button>;
-          })}
-        </div>
+        {segFiltersOpen && (
+          <>
+            <div style={styles.filterRow}>
+              <span style={styles.filterLabel}>Categoria:</span>
+              {CATEGORY_FILTERS.map((c) => {
+                const count = data?.category_counts ? (c.value ? (data.category_counts[c.value] ?? 0) : Object.values(data.category_counts).reduce((a,b)=>a+(b||0),0)) : null;
+                return <button key={c.value || "all"} style={styles.catPill(categoryFilter === c.value, CATEGORY_COLORS[c.value] || COLORS.champagne)} onClick={() => setCategoryFilter(c.value)}>{c.label}{count != null && <span style={{ marginLeft: 6, opacity: 0.7, fontFamily: FONTS.mono, fontSize: 11 }}>({count})</span>}</button>;
+              })}
+            </div>
+            <div style={styles.filterRow}>
+              <span style={styles.filterLabel}>Lingua:</span>
+              {LANGUAGE_FILTERS.map((l) => {
+                const count = data?.language_counts ? (l.value ? (data.language_counts[LANGUAGE_COUNT_KEY[l.value] || l.value] ?? 0) : Object.values(data.language_counts).reduce((a,b)=>a+(b||0),0)) : null;
+                return <button key={l.value || "all"} style={styles.catPill(languageFilter === l.value, LANGUAGE_COLORS[l.value] || COLORS.champagne)} onClick={() => setLanguageFilter(l.value)}>{l.label}{count != null && <span style={{ marginLeft: 6, opacity: 0.7, fontFamily: FONTS.mono, fontSize: 11 }}>({count})</span>}</button>;
+              })}
+            </div>
+          </>
+        )}
 
         {isLoading && !data && <p style={{ color: COLORS.fog }}>Caricamento…</p>}
         {error && <p style={{ color: COLORS.signal }}>Errore: {String(error)}</p>}
