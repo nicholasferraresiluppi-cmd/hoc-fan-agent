@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
 import { COLORS, FONTS, CP } from "@/lib/brand";
@@ -103,6 +103,16 @@ export default function WageAuditPage() {
   const monthsTodo = months.filter((m) => m.status === "missing" || m.status === "not_synced").length;
   const [bulkState, setBulkState] = useState({ running: false, message: "" });
 
+  // Il sync gira nel browser su QUESTA pagina: se la chiudi/ricarichi a metà
+  // si interrompe. Avviso (beforeunload) + banner mentre è in corso.
+  const anyRunning = bulkState.running || Object.values(recovering).some((v) => v === "running");
+  useEffect(() => {
+    if (!anyRunning) return;
+    const h = (e) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, [anyRunning]);
+
   // Loop CLIENT-side: un mese per richiesta (ognuna bounded < 60s Vercel),
   // invece di tutti in una sola richiesta server-side (che andava in timeout
   // su 1596 wage → errore non-JSON). Sequenziale per non saturare CP API.
@@ -201,7 +211,13 @@ export default function WageAuditPage() {
           </button>
         )}
       </div>
-      {bulkState.message && (
+      {anyRunning && (
+        <div style={{ marginBottom: 14, padding: "10px 14px", background: CP.accentSoft, border: `1px solid ${CP.accent}`, borderRadius: 8, fontSize: 12.5, color: CP.accentSoftText, display: "flex", alignItems: "center", gap: 8 }}>
+          <Loader2 size={14} className="spin" />
+          Sync in corso — <b>resta su questa pagina</b>: se la chiudi o cambi sezione si interrompe (il mese ripartirà da capo la volta dopo).
+        </div>
+      )}
+      {bulkState.message && !anyRunning && (
         <div style={{ marginBottom: 14, padding: "10px 14px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 8, fontSize: 12, color: COLORS.alabaster }}>
           {bulkState.message}
         </div>
