@@ -35,22 +35,49 @@ export default function WageAuditPage() {
   const url = `/api/admin/wage-audit?last_n=${lastN}`;
   const { data, error, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
 
-  // Parsing risposta robusto: se il server va in timeout Vercel risponde
-  // testo non-JSON ("An error occurred...") → niente più "Unexpected token".
-  async function postRecover(periodId) {
-    const res = await fetch("/api/admin/wage-audit", {
+  // POST allo step di sync con parsing robusto (timeout server → non-JSON).
+  async function postSync(body) {
+    const res = await fetch("/api/admin/creatorspro-sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ period_id: periodId, action: "recover_missing" }),
+      body: JSON.stringify(body),
     });
     const text = await res.text();
     let j = null;
     try { j = text ? JSON.parse(text) : null; } catch {
-      // Risposta non-JSON = quasi sempre timeout (mese troppo grande per 60s)
-      throw new Error("timeout: mese troppo grande in una sola richiesta — usa Re-sync da Sync CP storico (è chunkato)");
+      throw new Error("timeout su uno step — riprova fra poco (CP lento)");
     }
-    if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
+    if (!res.ok) throw new Error(j?.error || j?.reason || `HTTP ${res.status}`);
     return j;
+  }
+
+  // Re-sync CHUNKATO inline: stessa sequenza della pagina Sync CP storico
+  // (refdata → prepare 5 pagine/volta → batch 30/volta → finalize). Ogni step
+  // è una richiesta separata < 60s, quindi NON va mai in timeout anche con CP
+  // lento — risolve il "mese troppo grande in una sola richiesta". Re-pesca
+  // l'intero mese (completo) e riscrive il gap-check.
+  async function chunkedResync(periodId, onPhase) {
+    await postSync({ action: "refdata" });
+    let pageOffset = 1, prepareDone = false, total = 0, guard = 0;
+    while (!prepareDone && guard++ < 200) {
+      onPhase?.(`prep pag ${pageOffset}`);
+      const prep = await postSync({ action: "prepare", period_id: periodId, page_offset: pageOffset, pages_limit: 5 });
+      total = prep.total || 0;
+      prepareDone = !!prep.done;
+      pageOffset = prep.next_page || pageOffset + 5;
+    }
+    if (total > 0) {
+      let offset = 0; guard = 0;
+      while (offset < total && guard++ < 500) {
+        onPhase?.(`batch ${Math.floor(offset / 30) + 1}/${Math.ceil(total / 30)}`);
+        const r = await postSync({ action: "batch", period_id: periodId, offset, batch_size: 30 });
+        offset = r.next_offset;
+        if (r.done) break;
+      }
+    }
+    onPhase?.("finalize");
+    const fin = await postSync({ action: "finalize", period_id: periodId });
+    return fin;
   }
 
   async function recover(periodId) {
@@ -58,9 +85,9 @@ export default function WageAuditPage() {
     setRecovering((s) => ({ ...s, [periodId]: "running" }));
     setResults((s) => ({ ...s, [periodId]: "" }));
     try {
-      const j = await postRecover(periodId);
+      await chunkedResync(periodId, (ph) => setResults((s) => ({ ...s, [periodId]: ph })));
       setRecovering((s) => ({ ...s, [periodId]: "done" }));
-      setResults((s) => ({ ...s, [periodId]: j.message || "OK" }));
+      setResults((s) => ({ ...s, [periodId]: "Re-sync completo" }));
       setTimeout(() => mutate(url), 800);
     } catch (e) {
       setRecovering((s) => ({ ...s, [periodId]: "error" }));
@@ -86,13 +113,12 @@ export default function WageAuditPage() {
     const errs = [];
     for (let i = 0; i < gapMonths.length; i++) {
       const pid = gapMonths[i];
-      setBulkState({ running: true, message: `${i + 1}/${gapMonths.length}: ${pid}…` });
       setRecovering((s) => ({ ...s, [pid]: "running" }));
       try {
-        const j = await postRecover(pid);
+        await chunkedResync(pid, (ph) => setBulkState({ running: true, message: `${i + 1}/${gapMonths.length} · ${pid}: ${ph}` }));
         ok++;
         setRecovering((s) => ({ ...s, [pid]: "done" }));
-        setResults((s) => ({ ...s, [pid]: j.message || "OK" }));
+        setResults((s) => ({ ...s, [pid]: "Re-sync completo" }));
       } catch (e) {
         errs.push(`${pid}: ${e?.message || e}`);
         setRecovering((s) => ({ ...s, [pid]: "error" }));
