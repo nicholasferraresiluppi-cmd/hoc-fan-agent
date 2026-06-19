@@ -263,16 +263,32 @@ export async function GET(request) {
       examples: [...e.distinct].slice(0, 5).map((s) => { try { return JSON.parse(s); } catch { return s; } }),
     })).sort((a, b) => b.count - a.count);
 
-    // CSV
+    // CSV — formattato per Excel ITALIANO: separatore ";" (Excel IT non
+    // splitta sulla virgola → tutto in colonna A), decimali con virgola,
+    // BOM UTF-8 (accenti ok), intestazioni in italiano, % leggibili, UUID
+    // in fondo. Così si apre già in colonne e leggibile.
     if (format === "csv") {
-      const header = "date,start,end,operator,creators_in_shift,mono,sales_on_creator,sales_total_shift,earnings,eff_pct,profile_name,profile_cosellers,expected_pct,delta_pct,worked_hours,shift_id";
-      const lines = rows.map((r) =>
-        [r.date, r.start, r.end, `"${r.operator}"`, r.creators_in_shift, r.mono, r.sales_on_creator, r.sales_total_shift, r.earnings, r.eff_pct ?? "", `"${r.profile_name ?? ""}"`, r.profile_cosellers ?? "", r.expected_pct ?? "", r.delta_pct ?? "", r.worked_hours ?? "", r.shift_id].join(",")
-      );
-      return new Response([header, ...lines].join("\n"), {
+      const itNum = (n, dec = 2) => (n == null || n === "" ? "" : Number(n).toFixed(dec).replace(".", ","));
+      const itPct = (v) => (v == null || v === "" ? "" : `${(Number(v) * 100).toFixed(1).replace(".", ",")}%`);
+      const q = (s) => `"${String(s ?? "").replace(/"/g, '""')}"`;
+      const cols = [
+        "Data", "Inizio", "Fine", "Operatore", "Creator nel turno", "Tipo",
+        "Venduto creator ($)", "Venduto turno ($)", "Pagato ($)", "% effettiva",
+        "Profilo", "Cosellers", "% attesa", "Δ (pp)", "Ore", "ID turno",
+      ];
+      const header = cols.join(";");
+      const lines = rows.map((r) => [
+        r.date, r.start, r.end, q(r.operator),
+        r.creators_in_shift, r.mono ? "Mono" : `${r.creators_in_shift} creator`,
+        itNum(r.sales_on_creator), itNum(r.sales_total_shift), itNum(r.earnings), itPct(r.eff_pct),
+        q(r.profile_name), r.profile_cosellers ?? "", itPct(r.expected_pct),
+        r.delta_pct == null ? "" : itNum(r.delta_pct * 100, 1), itNum(r.worked_hours, 1), r.shift_id,
+      ].join(";"));
+      const body = "﻿" + [header, ...lines].join("\r\n"); // BOM + CRLF
+      return new Response(body, {
         headers: {
           "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": `attachment; filename="shift-research-${norm(creatorName)}-${periodId}.csv"`,
+          "Content-Disposition": `attachment; filename="turni-${norm(creatorName)}-${periodId}.csv"`,
         },
       });
     }
