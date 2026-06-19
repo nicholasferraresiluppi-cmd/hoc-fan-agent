@@ -113,43 +113,64 @@ export default function WageAuditPage() {
     return () => window.removeEventListener("beforeunload", h);
   }, [anyRunning]);
 
-  // Loop CLIENT-side: un mese per richiesta (ognuna bounded < 60s Vercel),
-  // invece di tutti in una sola richiesta server-side (che andava in timeout
-  // su 1596 wage → errore non-JSON). Sequenziale per non saturare CP API.
+  // BULK via JOB server-side (Fase 1): lo stato vive in KV, il client guida
+  // il worker chiamando "step" in loop. Al RELOAD la pagina riprende il job
+  // (resume effect sotto) invece di ricominciare. Phase 2 (QStash) sostituirà
+  // il driver client con uno server-side che gira anche a tab chiuso.
+  async function driveJob() {
+    let guard = 0;
+    while (guard++ < 3000) {
+      let res, j = null;
+      try {
+        res = await fetch("/api/admin/cp-sync-job", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "step" }),
+        });
+        const text = await res.text();
+        try { j = text ? JSON.parse(text) : null; } catch { j = null; }
+      } catch { j = null; }
+      if (!j) { await new Promise((r) => setTimeout(r, 2500)); continue; } // step lento/timeout → ritenta
+      const p = j.progress;
+      if (p) {
+        setBulkState({ running: j.has_more, message: `${(p.month_index ?? 0) + 1}/${p.months_total} · ${p.last_step || p.phase || ""}${j.retry ? " (ritento…)" : ""}` });
+        for (const dm of p.done_months || []) setRecovering((s) => (s[dm] === "done" ? s : { ...s, [dm]: "done" }));
+      }
+      if (!j.has_more) { await mutate(url); break; }
+      if (j.retry) await new Promise((r) => setTimeout(r, 2000)); // chunk fallito → pausa breve
+    }
+  }
+
   async function recoverAll() {
     if (bulkState.running) return;
-    // Tutto ciò che NON è completo: gap (missing) + mai syncati (not_synced)
     const gapMonths = months.filter((m) => m.status === "missing" || m.status === "not_synced").map((m) => m.period_id);
     if (gapMonths.length === 0) { setBulkState({ running: false, message: "Tutto già sincronizzato." }); return; }
-    if (!confirm(`Sincronizzare/riparare ${gapMonths.length} mesi, uno alla volta?\nOgni mese ~1-3 min — puoi navigare via, continua in background finché la pagina è aperta.`)) return;
-    setBulkState({ running: true, message: `0/${gapMonths.length}…` });
-    let ok = 0;
-    const errs = [];
-    for (let i = 0; i < gapMonths.length; i++) {
-      const pid = gapMonths[i];
-      setRecovering((s) => ({ ...s, [pid]: "running" }));
-      try {
-        await chunkedResync(pid, (ph) => setBulkState({ running: true, message: `${i + 1}/${gapMonths.length} · ${pid}: ${ph}` }));
-        ok++;
-        setRecovering((s) => ({ ...s, [pid]: "done" }));
-        setResults((s) => ({ ...s, [pid]: "Re-sync completo" }));
-      } catch (e) {
-        errs.push(`${pid}: ${e?.message || e}`);
-        setRecovering((s) => ({ ...s, [pid]: "error" }));
-        setResults((s) => ({ ...s, [pid]: String(e?.message || e) }));
-      }
-      // NB: niente mutate(url) qui dentro — ri-eseguire l'audit pesante (12
-      // chiamate live CP) durante il recupero satura CP API e fa fallire le
-      // probe live ("live failed"). Refresh UNA volta sola alla fine, a freddo.
+    if (!confirm(`Sincronizzare/riparare ${gapMonths.length} mesi?\nGira come job: puoi ricaricare la pagina, riprende da solo. (Per continuare anche a pagina chiusa serve la Fase 2 / QStash.)`)) return;
+    setBulkState({ running: true, message: "Avvio job…" });
+    try {
+      await fetch("/api/admin/cp-sync-job", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "start", months: gapMonths }),
+      });
+      await driveJob();
+    } catch (e) {
+      setBulkState({ running: false, message: `Errore avvio: ${String(e?.message || e)}` });
     }
-    await mutate(url);
-    setBulkState({
-      running: false,
-      message: errs.length === 0
-        ? `Fatto: ${ok}/${gapMonths.length} mesi recuperati.`
-        : `${ok} ok, ${errs.length} falliti. ${errs.join(" · ")}`,
-    });
   }
+
+  // RESUME al reload: se in KV c'è un job "running", riattacca il driver.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/cp-sync-job");
+        const j = await res.json().catch(() => null);
+        if (j?.progress?.status === "running") {
+          setBulkState({ running: true, message: "Job ripreso dopo reload…" });
+          driveJob();
+        }
+      } catch {}
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div style={{ padding: "32px 28px 80px", maxWidth: 1300, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
@@ -214,7 +235,9 @@ export default function WageAuditPage() {
       {anyRunning && (
         <div style={{ marginBottom: 14, padding: "10px 14px", background: CP.accentSoft, border: `1px solid ${CP.accent}`, borderRadius: 8, fontSize: 12.5, color: CP.accentSoftText, display: "flex", alignItems: "center", gap: 8 }}>
           <Loader2 size={14} className="spin" />
-          Sync in corso — <b>resta su questa pagina</b>: se la chiudi o cambi sezione si interrompe (il mese ripartirà da capo la volta dopo).
+          {bulkState.running
+            ? <span>Sync in corso (job server-side) — <b>puoi ricaricare la pagina</b>, riprende da solo. A tab chiuso si mette in pausa e riparte quando riapri.</span>
+            : <span>Recupero singolo mese in corso — resta su questa pagina.</span>}
         </div>
       )}
       {bulkState.message && !anyRunning && (
