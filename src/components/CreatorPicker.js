@@ -45,7 +45,9 @@ export default function CreatorPicker({ aliases = [], value = "", onSelect, plac
   const enriched = useMemo(() => {
     return (aliases || [])
       .map((a) => ({ ...a, ...parseAlias(a.alias) }))
-      .sort((x, y) => (y.shifts || 0) - (x.shifts || 0));
+      // Ordine alfabetico per nome (si cerca per nome, non per volume), poi
+      // per lingua a parità di nome (es. Sara Sfamurri IT prima di EN).
+      .sort((x, y) => x.name.localeCompare(y.name, "it", { sensitivity: "base" }) || (x.lang || "").localeCompare(y.lang || ""));
   }, [aliases]);
 
   const maxShifts = useMemo(() => Math.max(1, ...enriched.map((a) => a.shifts || 0)), [enriched]);
