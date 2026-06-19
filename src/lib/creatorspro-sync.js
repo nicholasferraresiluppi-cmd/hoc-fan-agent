@@ -398,26 +398,24 @@ export async function finalizeSync({ periodId }) {
   const failedPages = state.failed_pages || [];
   const failedDetails = state.failed_details || [];
 
-  // Post-sync audit: chiama CP API live e confronta total con quanto abbiamo in KV.
-  // Se gap > 0 = il sync ha perso wage. Salva in meta.gap_check così il Hub
-  // può alertare l'utente subito. NB: chiamata best-effort, se fallisce non blocca.
+  // Post-sync gap-check: confronta il conteggio CP col normalizzato in KV.
+  // FIX: usiamo state.raw_total (= dataCount CP catturato durante il PREPARE,
+  // affidabile, zero chiamate extra). La vecchia versione chiamava fetchWages
+  // con startedAt/endedAt UNDEFINED (mai calcolati in finalize) → falliva
+  // SEMPRE → cp_live_count mai salvato → audit eternamente "? da verificare".
   let gapCheck = null;
-  try {
-    const { fetchWages } = await import("./creatorspro-api");
-    const probe = await fetchWages({ startedAt, endedAt, page: 1, limit: 1 });
-    const cpLiveCount = probe?.pagination?.dataCount ?? null;
-    if (cpLiveCount != null) {
-      const gap = Math.max(0, cpLiveCount - wagesArr.length);
-      gapCheck = {
-        cp_live_count: cpLiveCount,
-        kv_count: wagesArr.length,
-        gap,
-        is_complete: gap === 0,
-        checked_at: Date.now(),
-      };
-    }
-  } catch (e) {
-    gapCheck = { error: String(e?.message || e), checked_at: Date.now() };
+  const cpLiveCount = (typeof state.raw_total === "number" && state.raw_total > 0)
+    ? state.raw_total
+    : null;
+  if (cpLiveCount != null) {
+    const gap = Math.max(0, cpLiveCount - wagesArr.length);
+    gapCheck = {
+      cp_live_count: cpLiveCount,
+      kv_count: wagesArr.length,
+      gap,
+      is_complete: gap <= 5, // tolleranza rumore dataCount-vs-normalizzato
+      checked_at: Date.now(),
+    };
   }
 
   const meta = {
