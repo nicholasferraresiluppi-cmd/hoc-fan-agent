@@ -211,9 +211,9 @@ export default function SalesCpLeaderboardPage() {
 
   const ranking = data?.ranking || [];
   const rankingWithScore = ranking.filter((r) => r.score !== null && r.score > 0);
-  const heroOp = rankingWithScore[0];
-  const top4 = rankingWithScore.slice(1, 5);
-  const stream = rankingWithScore.slice(5);
+  // Tutti in tabella, top 5 inclusi: le card podio nascondevano le KPI
+  // (Score Infw, $/h, Purch, Fan CVR, Unlock%) proprio per i migliori.
+  const stream = rankingWithScore;
   const noCpOps = ranking.filter((r) => !r.has_cp_data);
   // Underperformers candidati per Action Center (allineato ai criteri del backend)
   const underperformers = rankingWithScore.filter(
@@ -487,76 +487,6 @@ export default function SalesCpLeaderboardPage() {
                   Apri Action Center <ArrowRight size={14} />
                 </div>
               </Link>
-            )}
-
-            {/* HERO #1 */}
-            {heroOp && (
-              <div style={{ background: `linear-gradient(135deg, ${TIER_COLORS[heroOp.tier]}1F 0%, ${COLORS.graphite}99 60%)`, border: `1px solid ${TIER_COLORS[heroOp.tier]}55`, borderRadius: 20, padding: "28px 32px", marginBottom: 16, display: "grid", gridTemplateColumns: "auto 1fr auto auto", gap: 28, alignItems: "center", position: "relative", overflow: "hidden" }}>
-                <div style={{ textAlign: "center", position: "relative" }}>
-                  <div style={{ fontSize: 32, marginBottom: 4 }}>💰</div>
-                  <div style={{ fontFamily: FONTS.display, fontWeight: 500, fontStyle: "italic", fontSize: 56, lineHeight: 1, color: COLORS.champagne }}>1</div>
-                  <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.15em", marginTop: 4 }}>Top Sales CP</div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 18, position: "relative" }}>
-                  <Avatar name={heroOp.employee} size={84} large />
-                  <div>
-                    <Link href={`/leaderboard/operational/${encodeURIComponent(heroOp.employee)}`} style={{ color: "inherit", textDecoration: "none" }}>
-                      <div style={{ fontFamily: FONTS.display, fontSize: 28, fontWeight: 500, letterSpacing: "-0.01em", marginBottom: 4, cursor: "pointer" }}>{heroOp.employee} <span style={{ fontSize: 14, color: COLORS.champagne, opacity: 0.7 }}>›</span></div>
-                    </Link>
-                    <div style={{ color: COLORS.champagne, fontSize: 12, letterSpacing: "0.12em", marginBottom: 8 }}>
-                      {heroOp.group || "—"}<CategoryBadge category={heroOp.category} /><LanguageBadge language={heroOp.language} />
-                    </div>
-                    <TierBadge tier={heroOp.tier} />
-                  </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.15em" }}>Score CP</div>
-                  <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 56, lineHeight: 1, color: TIER_COLORS[heroOp.tier] }}>{heroOp.score?.toFixed(1)}</div>
-                  <div style={{ fontFamily: FONTS.mono, color: COLORS.mist, fontSize: 13, marginTop: 2 }}>/ 100</div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, borderLeft: `1px solid ${COLORS.champagne}33`, paddingLeft: 24 }}>
-                  <HeroStat l="Sales/shift" v={fmtCurrency(heroOp._kpis_cp?.sales_per_shift)} />
-                  <HeroStat l="Sales/h" v={fmtCurrency(heroOp._kpis_cp?.sales_per_hour)} />
-                  <HeroStat l="Volume" v={`${heroOp.cp_aggregates?.total_shifts || 0} shift`} />
-                  <HeroStat l="Sales totale CP" v={fmtCurrency(heroOp.cp_aggregates?.total_sales)} />
-                </div>
-              </div>
-            )}
-
-            {/* TOP 4 */}
-            {top4.length > 0 && (
-              <div style={styles.top4Grid}>
-                {top4.map((op) => {
-                  const tColor = TIER_COLORS[op.tier] || COLORS.alabaster;
-                  return (
-                    <div key={`${op.employee}-${op.group}`} style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, padding: 16, position: "relative" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                        <div style={{ fontFamily: FONTS.display, fontStyle: "italic", fontSize: 24, color: COLORS.champagne, lineHeight: 1, width: 28 }}>{op.rank}</div>
-                        <Avatar name={op.employee} size={38} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <Link href={`/leaderboard/operational/${encodeURIComponent(op.employee)}`} style={{ color: "inherit", textDecoration: "none" }}>
-                            <div style={{ fontFamily: FONTS.display, fontSize: 15, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer" }}>{op.employee} <span style={{ color: COLORS.champagne, opacity: 0.55, fontSize: 12 }}>›</span></div>
-                          </Link>
-                          <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.08em", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {op.group || "—"}<CategoryBadge category={op.category} /><LanguageBadge language={op.language} />
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-                        <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 24, color: tColor }}>{op.score?.toFixed(1)}</div>
-                        <TierBadge tier={op.tier} />
-                      </div>
-                      <div style={{ height: 4, background: COLORS.charcoal, borderRadius: 999, overflow: "hidden" }}>
-                        <div style={{ height: "100%", background: tColor, width: `${op.score || 0}%` }} />
-                      </div>
-                      <div style={{ marginTop: 10, fontSize: 11, color: COLORS.fog, display: "flex", justifyContent: "space-between" }}>
-                        <span>{fmtCurrency(op._kpis_cp?.sales_per_shift)}/shift</span>
-                        <span>{op.cp_aggregates?.total_shifts || 0} shift</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
             )}
 
             {/* COLUMN PICKER (sopra la stream table) */}
