@@ -7,6 +7,7 @@ import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
 import CompNav from "@/components/CompNav";
 import HowToRead from "@/components/HowToRead";
+import CreatorPicker from "@/components/CreatorPicker";
 
 /**
  * /admin/comp-calendar — Griglia calendario compensation per creator × mese.
@@ -340,19 +341,13 @@ export default function CompCalendarPage() {
       {/* Form con autocomplete */}
       <CpCard padding="16px 20px" style={{ marginBottom: 18 }}>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 240 }}>
+          <div style={{ flex: 1, minWidth: 280 }}>
             <label style={lbl}>Creator · {aliases.length} disponibili nel mese</label>
-            <input
+            <CreatorPicker
+              aliases={aliases}
               value={creator}
-              onChange={(e) => setCreator(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && run()}
-              placeholder="inizia a scrivere…"
-              list="creator-aliases-list"
-              style={input}
+              onSelect={(alias) => run(alias)}
             />
-            <datalist id="creator-aliases-list">
-              {aliases.map((a) => <option key={a.alias} value={a.alias}>{`${a.shifts} turni`}</option>)}
-            </datalist>
           </div>
           <div>
             <label style={lbl}>Mese</label>
