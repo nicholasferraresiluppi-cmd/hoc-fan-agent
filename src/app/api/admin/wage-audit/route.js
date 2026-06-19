@@ -52,51 +52,50 @@ export async function GET(request) {
   const lastN = Math.max(1, Math.min(24, parseInt(url.searchParams.get("last_n") || "12", 10)));
   const periodIds = lastMonthIds(lastN);
 
-  // KV counts — letture difensive (allSettled: un kv.get lento/KO non fa
-  // crashare l'intero endpoint con risposta non-JSON)
-  const kvSettled = await Promise.allSettled(periodIds.map((pid) => kv.get(`cp:wages:${pid}`)));
-  const kvWages = kvSettled.map((r) => (r.status === "fulfilled" ? r.value : null));
-
-  // CP API live counts (1 call per period, parallele, timeout CORTO 8s: una
-  // chiamata CP lenta non deve trascinare l'endpoint verso il limite 60s)
-  const liveCounts = await Promise.all(periodIds.map(async (pid) => {
-    try {
-      const { startedAt, endedAt } = monthBoundsIso(pid);
-      const r = await fetchWages({ startedAt, endedAt, page: 1, limit: 1, timeoutMs: 12000 });
-      const dataCount = r?.pagination?.dataCount ?? null;
-      return { ok: true, dataCount };
-    } catch (e) {
-      return { ok: false, error: String(e?.message || e) };
-    }
-  }));
+  // v3: NIENTE 12 sonde live a ogni load (l'endpoint CP /wages è lento ->
+  // andavano in timeout/abort, "This operation was aborted"). Usiamo il
+  // conteggio CP live SALVATO al momento del sync (cp:sync:gap:{pid}, scritto
+  // da finalize). Istantaneo, zero carico su CP. Una sonda live on-demand si
+  // fa col Re-sync del mese (che riscrive il gap-check).
+  const settled = await Promise.allSettled([
+    ...periodIds.map((pid) => kv.get(`cp:wages:${pid}`)),
+    ...periodIds.map((pid) => kv.get(`cp:sync:gap:${pid}`)),
+  ]);
+  const vals = settled.map((r) => (r.status === "fulfilled" ? r.value : null));
+  const kvWages = vals.slice(0, periodIds.length);
+  const gapData = vals.slice(periodIds.length);
 
   const months = periodIds.map((pid, i) => {
     const kvList = Array.isArray(kvWages[i]) ? kvWages[i] : [];
     const kvCount = kvList.length;
-    const live = liveCounts[i];
-    const liveCount = live.ok ? live.dataCount : null;
-    const gap = (liveCount != null && kvCount != null) ? Math.max(0, liveCount - kvCount) : null;
+    const g = gapData[i] || null;
+    const liveCount = g?.cp_live_count ?? null;       // dall'ultimo sync del mese
+    const liveCheckedAt = g?.checked_at ?? null;
+    const gap = liveCount != null ? Math.max(0, liveCount - kvCount) : null;
     return {
       period_id: pid,
       kv_count: kvCount,
       live_count: liveCount,
-      live_error: live.ok ? null : live.error,
+      live_checked_at: liveCheckedAt,
       gap,
-      status: liveCount == null ? "live_failed"
-        : kvCount === 0 ? "not_synced"
-        : gap === 0 ? "ok"
-        : "missing",
+      status: kvCount === 0 ? "not_synced"
+        : liveCount == null ? "unknown"          // mai verificato post-fix: Re-sync per sapere
+        : gap > 5 ? "missing"                     // tolleranza rumore dataCount-vs-normalizzato
+        : "ok",
     };
   });
 
   const total_missing = months.reduce((s, m) => s + (m.gap || 0), 0);
   const months_with_gap = months.filter((m) => m.status === "missing").length;
+  const months_unknown = months.filter((m) => m.status === "unknown").length;
 
   return Response.json({
     months,
     total_missing,
     months_with_gap,
+    months_unknown,
     looked_back: lastN,
+    note: "Conteggio CP live preso dall'ultimo sync di ogni mese (cp:sync:gap). Per verificare/aggiornare un mese: Re-sync da Sync CP storico.",
   });
 }
 

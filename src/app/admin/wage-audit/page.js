@@ -186,10 +186,12 @@ export default function WageAuditPage() {
             const statusColor = status === "ok" ? "#10B981"
               : status === "missing" ? "#F59E0B"
               : status === "not_synced" ? COLORS.mist
+              : status === "unknown" ? COLORS.mist
               : "#EF4444";
             const statusLabel = status === "ok" ? "✓ allineato"
               : status === "missing" ? `⚠ ${m.gap} mancanti`
               : status === "not_synced" ? "—  non syncato"
+              : status === "unknown" ? "? da verificare"
               : "✗ live failed";
             const recState = recovering[m.period_id];
             const recMsg = results[m.period_id];
@@ -227,10 +229,10 @@ export default function WageAuditPage() {
                       → Sync questo mese
                     </Link>
                   )}
-                  {status === "live_failed" && (
-                    <span style={{ fontSize: 11, color: "#EF4444" }} title={m.live_error}>
-                      {(m.live_error || "Errore CP API").slice(0, 70)}
-                    </span>
+                  {status === "unknown" && (
+                    <Link href="/admin/creatorspro-sync-history" style={{ fontSize: 12, color: COLORS.champagne, textDecoration: "none" }} title="Conteggio CP live non verificato dopo il fix. Re-sync per controllare e aggiornare.">
+                      → Re-sync per verificare
+                    </Link>
                   )}
                   {recMsg && <div style={{ fontSize: 11, color: recState === "error" ? "#EF4444" : COLORS.mist, marginTop: 4 }}>{recMsg}</div>}
                 </div>
