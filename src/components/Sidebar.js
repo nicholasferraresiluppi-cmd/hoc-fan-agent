@@ -129,8 +129,7 @@ const NAV_GROUPS = [
     defaultOpen: false,
     items: [
       { href: "/admin/creatorspro-sync",         label: "Sync CP",         icon: RefreshCw },
-      { href: "/admin/creatorspro-sync-history", label: "Sync CP storico", icon: History },
-      { href: "/admin/wage-audit",               label: "Wage Audit",      icon: ShieldCheck },
+      { href: "/admin/wage-audit",               label: "Sync & Audit CP", icon: ShieldCheck },
       { href: "/admin/debug-mapping",            label: "Debug Mapping",   icon: Link2 },
       { href: "/admin/reports",                  label: "Analytics",       icon: BarChart3 },
       { href: "/admin/leaderboard-exclusions",   label: "Esclusioni",      icon: Ban },
