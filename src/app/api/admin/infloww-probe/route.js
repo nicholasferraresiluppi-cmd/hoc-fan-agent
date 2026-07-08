@@ -1,43 +1,33 @@
 /**
- * GET /api/admin/infloww-probe
+ * GET /api/admin/infloww-probe?creator=<substr>&days=<n>
  *
- * Verifica end-to-end della connessione Infloww API (beta) con i path e i
- * parametri CORRETTI (mappati dalla doc Stoplight). Catena self-contained:
- *   1. /v1/creators  → prende i creator reali, sceglie il primo (creatorId)
- *   2. /v1/employees → prende il primo employeeId
- *   3. con quel creatorId interroga transactions/refunds/messaggi/links
- *   4. con quell'employeeId interroga assigned-creators
+ * Verifica end-to-end + DIMENSIONAMENTO della connessione Infloww API (beta).
+ *   - elenca TUTTI i creator connessi (quanti sono, come sono nominati)
+ *   - sceglie il creator: ?creator=<substr> (match su name/userName/tagName),
+ *     altrimenti il primo
+ *   - con quel creatorId interroga transactions/refunds/messaggi/links su una
+ *     finestra di ?days giorni (default 30), aggregando la revenue reale per tipo
  *
- * Report per endpoint: status, ok, count, campi (item_keys). Per transactions
- * aggrega anche il NET reale (prova che la revenue live arriva). Nessun dato
- * personale dei fan viene restituito: solo nomi-campo e numeri aggregati.
- * Read-only, finestra 30 giorni, limit basso.
+ * Read-only. Nessun dato personale dei fan viene restituito: solo nomi-campo,
+ * conteggi e numeri aggregati. I nomi dei CREATOR (dato aziendale) sì, servono
+ * per il mapping.
  */
 import { authorize, CAPABILITIES } from "@/lib/rbac";
-import { inflowwGet, centsToUsd } from "@/lib/infloww-api";
+import { inflowwGet, inflowwPaged, centsToUsd } from "@/lib/infloww-api";
 
 export const maxDuration = 60;
 
-// Riassume la shape senza dumpare valori (no PII fan).
-function shapeOf(json) {
-  const d = json?.data ?? {};
-  const list = Array.isArray(d.list) ? d.list : (Array.isArray(d) ? d : null);
-  if (list) return { count: list.length, has_more: json?.hasMore ?? d?.hasMore ?? null, item_keys: list[0] ? Object.keys(list[0]) : [] };
-  return { keys: d && typeof d === "object" ? Object.keys(d).slice(0, 20) : [] };
+function itemKeys(json) {
+  const list = json?.data?.list;
+  return Array.isArray(list) && list[0] ? Object.keys(list[0]) : [];
 }
 
-async function tryGet(label, path, query) {
-  try {
-    const json = await inflowwGet(path, { query, timeoutMs: 18000 });
-    return { label, path, ok: true, status: 200, ...shapeOf(json), _json: json };
-  } catch (e) {
-    const m = String(e?.message || e);
-    const status = Number((m.match(/\((\d{3})\)/) || [])[1]) || 0;
-    return { label, path, ok: false, status, error: m };
-  }
+async function safe(fn) {
+  try { return { ok: true, value: await fn() }; }
+  catch (e) { return { ok: false, error: String(e?.message || e) }; }
 }
 
-export async function GET() {
+export async function GET(req) {
   const az = await authorize(CAPABILITIES.SEED);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
@@ -45,64 +35,92 @@ export async function GET() {
   if (!process.env.INFLOWW_API_KEY) missing.push("INFLOWW_API_KEY");
   if (!process.env.INFLOWW_OID) missing.push("INFLOWW_OID");
   if (missing.length) {
-    return Response.json({
-      error: `Env mancanti: ${missing.join(", ")}. Aggiungili in Vercel e ri-deploya.`,
-      base_url: "https://openapi.infloww.com",
-    }, { status: 428 });
+    return Response.json({ error: `Env mancanti: ${missing.join(", ")}.`, base_url: "https://openapi.infloww.com" }, { status: 428 });
   }
 
+  const url = new URL(req.url);
+  const creatorQ = (url.searchParams.get("creator") || "").trim().toLowerCase();
+  const days = Math.min(180, Math.max(1, Number(url.searchParams.get("days")) || 30));
   const endTime = new Date().toISOString();
-  const startTime = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const results = [];
+  const startTime = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-  // 1. Creator connessi → creatorId di riferimento
-  const creators = await tryGet("Connected creators", "/v1/creators", { limit: 5, platformCode: "OnlyFans" });
-  results.push(pub(creators));
-  const firstCreator = creators._json?.data?.list?.[0];
-  const creatorId = firstCreator?.id;
+  // 1. Roster completo creator connessi (sizing + naming per il mapping)
+  const creatorsRes = await safe(() => inflowwPaged("/v1/creators", { query: { platformCode: "OnlyFans" }, limit: 100, maxPages: 5 }));
+  if (!creatorsRes.ok) return Response.json({ error: `/v1/creators fallito: ${creatorsRes.error}` }, { status: 502 });
+  const allCreators = creatorsRes.value.items;
+  const creators_index = allCreators.map((c) => ({ id: c.id, name: c.name, userName: c.userName }));
 
-  // 2. Employees → employeeId di riferimento
-  const employees = await tryGet("Employees", "/v1/employees", { limit: 5 });
-  results.push(pub(employees));
-  const employeeId = employees._json?.data?.list?.[0]?.employeeId;
+  // 2. Scelta creator
+  let picked = null;
+  if (creatorQ) {
+    picked = allCreators.find((c) =>
+      [c.name, c.userName, c.nickName, c.tagName].some((f) => String(f || "").toLowerCase().includes(creatorQ))
+    ) || null;
+  }
+  if (!picked) picked = allCreators[0] || null;
 
-  // 3. Endpoint per-creator (serve creatorId)
-  if (creatorId != null) {
-    const tx = await tryGet("Transactions (revenue live)", "/v1/transactions", { creatorId, startTime, endTime, limit: 100, platformCode: "OnlyFans" });
-    // aggrega revenue reale (net, centesimi → $) come prova
-    const txList = tx._json?.data?.list || [];
-    tx.revenue_sample = {
-      transactions: txList.length,
-      net_usd: Math.round(txList.reduce((s, t) => s + centsToUsd(t.net), 0) * 100) / 100,
-      gross_usd: Math.round(txList.reduce((s, t) => s + centsToUsd(t.amount), 0) * 100) / 100,
-      types: [...new Set(txList.map((t) => t.type))],
-      window: "ultimi 30 giorni",
+  if (!picked) {
+    return Response.json({ base_url: "https://openapi.infloww.com", connected_creators: { total: allCreators.length, truncated: creatorsRes.value.truncated }, creators_index, note: "Nessun creator selezionabile." });
+  }
+  const creatorId = picked.id;
+  const noMatch = creatorQ && !allCreators.some((c) => [c.name, c.userName, c.nickName, c.tagName].some((f) => String(f || "").toLowerCase().includes(creatorQ)));
+
+  // 3. Transazioni: paginiamo fino a 5 pagine (500) per stimare il VOLUME e la revenue per tipo
+  const txRes = await safe(() => inflowwPaged("/v1/transactions", { query: { creatorId, startTime, endTime, platformCode: "OnlyFans" }, limit: 100, maxPages: 5 }));
+  let transactions = { error: txRes.ok ? undefined : txRes.error };
+  if (txRes.ok) {
+    const list = txRes.value.items;
+    const byType = {};
+    let net = 0, gross = 0, fee = 0;
+    for (const t of list) {
+      const n = centsToUsd(t.net), g = centsToUsd(t.amount), f = centsToUsd(t.fee);
+      net += n; gross += g; fee += f;
+      const k = t.type || "?";
+      if (!byType[k]) byType[k] = { n: 0, net_usd: 0 };
+      byType[k].n++; byType[k].net_usd += n;
+    }
+    for (const k of Object.keys(byType)) byType[k].net_usd = Math.round(byType[k].net_usd * 100) / 100;
+    transactions = {
+      pulled: list.length,
+      truncated: txRes.value.truncated,
+      note: txRes.value.truncated ? `>= ${list.length} in ${days}gg (troncato a 5 pagine): volume alto` : `${list.length} in ${days}gg`,
+      net_usd: Math.round(net * 100) / 100,
+      gross_usd: Math.round(gross * 100) / 100,
+      fee_usd: Math.round(fee * 100) / 100,
+      by_type: byType,
+      item_keys: itemKeys({ data: { list } }),
     };
-    results.push(pub(tx));
-
-    results.push(pub(await tryGet("Refunds", "/v1/refunds", { creatorId, startTime, endTime, limit: 50 })));
-    results.push(pub(await tryGet("Automated messages", "/v1/automated-messages", { creatorId, startTime, endTime, limit: 20 })));
-    results.push(pub(await tryGet("Priority mass messages", "/v1/priority-mass-messages", { creatorId, startTime, endTime, limit: 20 })));
-    results.push(pub(await tryGet("Links (CAMPAIGN)", "/v1/links", { creatorId, linkType: "CAMPAIGN", startTime, endTime, limit: 20 })));
-  } else {
-    results.push({ label: "Endpoint per-creator", ok: false, note: "Nessun creator connesso restituito: impossibile testare transactions/refunds/messaggi/links." });
   }
 
-  // 4. Assigned creators (serve employeeId)
-  if (employeeId != null) {
-    results.push(pub(await tryGet("Employee's assigned creators", "/v1/employees/assigned-creators", { employeeId, limit: 50 })));
-  } else {
-    results.push({ label: "Assigned creators", ok: false, note: "Nessun employee restituito: impossibile testare assigned-creators." });
+  // 4. Messaggi (aggreghiamo totalRevenue in $), refunds, links — 1 pagina ciascuno
+  async function msgSummary(path) {
+    const r = await safe(() => inflowwGet(path, { query: { creatorId, startTime, endTime, limit: 50, platformCode: "OnlyFans" } }));
+    if (!r.ok) return { error: r.error };
+    const list = r.value?.data?.list || [];
+    const rev = list.reduce((s, m) => s + centsToUsd(m.totalRevenue), 0);
+    const sent = list.reduce((s, m) => s + (Number(m.totalNumberOfTimeSent) || 0), 0);
+    const buys = list.reduce((s, m) => s + (Number(m.totalNumberOfPurchases) || 0), 0);
+    return { count: list.length, total_sent: sent, total_purchases: buys, total_revenue_usd: Math.round(rev * 100) / 100, item_keys: itemKeys(r.value) };
   }
+  const automated = await msgSummary("/v1/automated-messages");
+  const priority = await msgSummary("/v1/priority-mass-messages");
 
-  const hits = results.filter((r) => r.ok).length;
+  const refundsR = await safe(() => inflowwGet("/v1/refunds", { query: { creatorId, startTime, endTime, limit: 50 } }));
+  const refunds = refundsR.ok ? { count: (refundsR.value?.data?.list || []).length, item_keys: itemKeys(refundsR.value) } : { error: refundsR.error };
+
+  const linksR = await safe(() => inflowwGet("/v1/links", { query: { creatorId, linkType: "CAMPAIGN", startTime, endTime, limit: 50 } }));
+  const links_campaign = linksR.ok ? { count: (linksR.value?.data?.list || []).length, item_keys: itemKeys(linksR.value) } : { error: linksR.error };
+
   return Response.json({
     base_url: "https://openapi.infloww.com",
-    ref: { creatorId: creatorId ?? null, creatorName: firstCreator?.name ?? firstCreator?.userName ?? null, employeeId: employeeId ?? null },
-    summary: `${hits}/${results.length} endpoint OK (path + parametri corretti).`,
-    results,
+    window_days: days,
+    connected_creators: { total: allCreators.length, truncated: creatorsRes.value.truncated },
+    creators_index,
+    picked: { creatorId, name: picked.name, userName: picked.userName, matched_query: creatorQ || null, no_match_fell_back_to_first: noMatch || undefined },
+    transactions,
+    refunds,
+    automated_messages: automated,
+    priority_mass_messages: priority,
+    links_campaign,
   });
 }
-
-// Rimuove _json (contiene dati grezzi/PII) prima di serializzare la risposta.
-function pub(r) { const { _json, ...rest } = r; return rest; }
