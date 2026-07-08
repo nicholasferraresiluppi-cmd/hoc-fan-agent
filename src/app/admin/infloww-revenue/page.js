@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Loader2, AlertCircle, Radio } from "lucide-react";
+import { Loader2, AlertCircle, Radio, ArrowRight } from "lucide-react";
 import { CP, FONTS, creatorDotColor } from "@/lib/brand";
 import { PageHeader, CpCard, StatCard, SectionLabel, RankedItem, PillTab } from "@/components/cp-style";
 import HowToRead from "@/components/HowToRead";
@@ -39,7 +39,7 @@ export default function InflowwRevenuePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Roster all'avvio
+  // Roster all'avvio + preselect da ?creatorId= (drill-down dalla vista agency)
   useEffect(() => {
     (async () => {
       try {
@@ -49,6 +49,8 @@ export default function InflowwRevenuePage() {
         setCreators(j.creators || []);
       } catch (e) { setError(e.message); }
     })();
+    const cid = new URLSearchParams(window.location.search).get("creatorId");
+    if (cid) setCreatorId(cid);
   }, []);
 
   async function load(cid = creatorId, d = days) {
@@ -89,9 +91,14 @@ export default function InflowwRevenuePage() {
         title="Revenue live per creator"
         subtitle="Il ledger vero, fan per fan, direttamente da Infloww: quanto ha incassato una creator nel periodo, da cosa (chat, mance, abbonamenti), da chi, al netto della trattenuta OnlyFans. Nessuna attesa della chiusura: è il dato di adesso."
         toolbar={
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: CP.accentGreen, fontFamily: FONTS.mono }}>
-            <Radio size={13} /> LIVE
-          </span>
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <Link href="/admin/infloww-agency" style={{ fontSize: 12, color: CP.accentSoftText, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}>
+              Vista agency <ArrowRight size={12} />
+            </Link>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: CP.accentGreen, fontFamily: FONTS.mono }}>
+              <Radio size={13} /> LIVE
+            </span>
+          </div>
         }
       />
 
