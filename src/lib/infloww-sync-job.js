@@ -59,7 +59,7 @@ export async function startJob(days = 31) {
   const { items } = await inflowwPaged("/v1/creators", { query: { platformCode: "OnlyFans" }, limit: 100, maxPages: 5 });
   const creators = items.map((c) => ({ id: c.id, name: c.name || c.userName || String(c.id), userName: c.userName || "" }));
   await kv.set(ROSTER_KEY, creators, { ex: TTL_DATA });
-  const job = { days: d, creators, cursor: 0, synced: 0, status: "running", started_at: Date.now(), updated_at: Date.now(), last_step: "start" };
+  const job = { days: d, creators, total_creators: creators.length, cursor: 0, synced: 0, status: "running", started_at: Date.now(), updated_at: Date.now(), last_step: "start" };
   await kv.set(JOB_KEY, job, { ex: TTL_JOB });
   return job;
 }
@@ -106,20 +106,35 @@ export async function stepJob() {
   try {
     while (job.cursor < job.creators.length && (Date.now() - start) < STEP_BUDGET_MS) {
       const batch = job.creators.slice(job.cursor, job.cursor + CONC);
-      // Errori per-creator NON inghiottiti in silenzio: tracciati in failed_creators.
-      const res = await Promise.all(batch.map((c) => syncOneCreator(c, startTime, endTime).then(() => null).catch(() => c.name)));
+      // Errori per-creator NON inghiottiti in silenzio: tracciati (con l'oggetto
+      // intero, serve per i retry round) — l'API Infloww ha timeout transitori
+      // frequenti (~10/41 creator per giro, osservato lug 2026).
+      const res = await Promise.all(batch.map((c) => syncOneCreator(c, startTime, endTime).then(() => null).catch(() => c)));
       const failed = res.filter(Boolean);
-      if (failed.length) job.failed_creators = [...new Set([...(job.failed_creators || []), ...failed])].slice(0, 60);
+      if (failed.length) {
+        const seen = new Set((job.failed || []).map((f) => f.id));
+        job.failed = [...(job.failed || []), ...failed.filter((f) => !seen.has(f.id))].slice(0, 60);
+      }
       job.cursor += batch.length;
       job.synced = job.cursor;
-      job.last_step = `${job.cursor}/${job.creators.length}`;
+      job.last_step = `${job.cursor}/${job.creators.length}${job.retry_round ? ` (retry ${job.retry_round})` : ""}`;
     }
     if (job.cursor >= job.creators.length) {
-      job.status = "done";
-      await kv.set(META_KEY, {
-        last_sync_at: Date.now(), days: job.days, creators_total: job.creators.length,
-        failed_creators: job.failed_creators || [],
-      }, { ex: TTL_DATA });
+      // AUTO-RIPARAZIONE: ritenta le fallite (fino a 2 round) prima di chiudere.
+      if ((job.failed || []).length > 0 && (job.retry_round || 0) < 2) {
+        job.creators = job.failed;
+        job.failed = [];
+        job.cursor = 0;
+        job.synced = 0;
+        job.retry_round = (job.retry_round || 0) + 1;
+        job.last_step = `retry round ${job.retry_round}: ${job.creators.length} creator`;
+      } else {
+        job.status = "done";
+        await kv.set(META_KEY, {
+          last_sync_at: Date.now(), days: job.days, creators_total: job.total_creators || job.creators.length,
+          failed_creators: (job.failed || []).map((f) => f.name),
+        }, { ex: TTL_DATA });
+      }
     }
     job.updated_at = Date.now();
     await kv.set(JOB_KEY, job, { ex: TTL_JOB });
