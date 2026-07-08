@@ -47,9 +47,14 @@ function relTime(ts) {
 }
 
 // Semaforo sul rapporto CP/lordo-reale. Tolleranza fisiologica: gli
-// abbonamenti (~1-2%) non passano dagli operatori.
-function health(ratio) {
+// abbonamenti (~1-2%) non passano dagli operatori. Caso speciale: la creator
+// ESISTE nei turni ma $0 attribuiti → "vendite non attribuite" (takes mancanti).
+function health(row) {
+  const ratio = row.ratio_cp_over_gross;
   if (ratio == null) return { label: "n/d", color: CP.textMuted, bg: "transparent" };
+  if (row.cp_sales === 0 && (row.cp_shifts || 0) > 0) {
+    return { label: "vendite non attribuite", color: CP.accentRed, bg: CP.accentRed + "18", tip: `Esiste in CP (${row.cp_shifts} turni) ma nessuna vendita è registrata a suo nome: takes non registrati.` };
+  }
   if (ratio > 1.15) return { label: "anomalo", color: "#F59E0B", bg: "#F59E0B18" };
   if (ratio >= 0.9) return { label: "ok", color: CP.accentGreen, bg: CP.accentGreen + "18" };
   if (ratio >= 0.75) return { label: "da controllare", color: "#F59E0B", bg: "#F59E0B18" };
@@ -95,13 +100,14 @@ export default function InflowwReconcilePage() {
       return ra - rb;
     });
   }, [data]);
-  // Profili Infloww che incassano ma non hanno NESSUN dato CP abbinato:
-  // il caso peggiore (buco totale) o un alias non riconosciuto. Mai nasconderli.
+  // Profili Infloww che incassano ma non hanno NESSUNA traccia CP nel mese:
+  // il caso peggiore (buco totale). Mai nasconderli.
   const noCp = useMemo(() => (data?.unmatched_infloww || []).filter((u) => u.gross >= NO_CP_MIN_GROSS), [data]);
   const noCpGross = noCp.reduce((s, u) => s + u.gross, 0);
   const holes = rows.filter((r) => r.ratio_cp_over_gross != null && r.ratio_cp_over_gross < 0.75);
   const holesGap = holes.reduce((s, r) => s + Math.max(0, r.gap_gross), 0);
   const agencyRatio = data?.agency?.ratio_cp_over_infgross_matched;
+  const matchCov = data?.match_coverage;
   const ratioColor = agencyRatio == null ? CP.textMuted
     : agencyRatio >= 0.9 && agencyRatio <= 1.1 ? CP.accentGreen
     : agencyRatio < 0.75 ? CP.accentRed
@@ -132,7 +138,7 @@ export default function InflowwReconcilePage() {
       <HowToRead items={[
         "Ogni riga confronta due fonti sugli stessi giorni: quanto CP dice che una creator ha venduto, e quanto ha incassato DAVVERO (lordo Infloww).",
         "Rapporto ≈ 1.0 = CP completo (verde). Sotto 0.90 qualcosa manca (giallo). Sotto 0.75 = probabile buco: turni o vendite non registrati in CP (rosso).",
-        "'Vendite non attribuite' = la creator ESISTE in CP e ha turni, ma nessuna vendita è registrata a suo nome (team multi-creator senza takes): l'azione è far registrare i takes. 'Assente in CP' = non trovo proprio il suo alias nei turni del mese.",
+        "'Vendite non attribuite' = la creator ESISTE in CP e ha turni, ma nessuna vendita è registrata a suo nome (team multi-creator senza takes): l'azione è far registrare i takes. 'Assente in CP' = nessuna traccia nel mese: se sai chi è, collegala col menu 'collega a…' (resta salvato).",
         "Qualche punto sotto 1.0 è fisiologico: gli abbonamenti (~1-2% del lordo) non passano dagli operatori. È un allarme direzionale, non un confronto contabile.",
         "I 'non abbinati' in fondo sono profili che non ho saputo accoppiare con certezza tra le due piattaforme: guardali a mano prima di trarre conclusioni.",
       ]} />
@@ -224,6 +230,13 @@ export default function InflowwReconcilePage() {
                   : `${holes.length} sotto il 75%${noCp.length ? ` + ${noCp.length} senza CP` : ""} · ≈ ${fmt$(holesGap + noCpGross)} non registrati`
               }
             />
+            <StatCard
+              label="Copertura abbinamenti"
+              value={matchCov?.profiles != null ? `${Math.round(matchCov.profiles * 100)}%` : "—"}
+              color={matchCov?.profiles >= 1 ? CP.accentGreen : matchCov?.profiles >= 0.9 ? "#F59E0B" : CP.accentRed}
+              sub={`${data.counts.matched}/${data.counts.infloww_active} profili · ${matchCov?.gross_share != null ? Math.round(matchCov.gross_share * 100) : "—"}% del lordo — obiettivo 100%`}
+              tooltip="Quota di profili Infloww con un abbinamento CP. I mancanti si chiudono col menu 'collega a…' nei non abbinati."
+            />
           </div>
 
           {/* Tabella creator, peggiori in cima; in testa gli "assente in CP" */}
@@ -249,20 +262,14 @@ export default function InflowwReconcilePage() {
                     <tr key={u.id} style={{ borderBottom: `1px solid ${CP.border}55`, background: CP.accentRed + "08" }}>
                       <td style={td}>
                         <span style={{ display: "inline-block", padding: "3px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 600, color: CP.accentRed, background: CP.accentRed + "18", whiteSpace: "nowrap" }}
-                          title={u.cp_presence ? `Esiste in CP (${u.cp_presence.shifts} turni come "${u.cp_presence.alias}") ma nessuna vendita è attribuita a lei: takes non registrati.` : "Nessun alias CP riconducibile a lei nei turni del mese."}>
-                          {u.cp_presence ? "vendite non attribuite" : "assente in CP"}
+                          title="Nessuna traccia CP nel mese (né turni né vendite). Se sai chi è, collegala dal riquadro 'non abbinati' qui sotto.">
+                          assente in CP
                         </span>
                       </td>
                       <td style={td}>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
-                          <span style={{ width: 9, height: 9, borderRadius: "50%", background: creatorDotColor(u.cp_presence?.alias || u.name), flexShrink: 0 }} />
-                          <span style={{ fontWeight: 500 }}>{u.cp_presence?.alias || u.name}</span>
-                          {u.cp_presence && u.cp_presence.alias !== u.name && (
-                            <span style={{ fontSize: 10.5, color: CP.textMuted, fontFamily: FONTS.mono }}>↔ {u.name}</span>
-                          )}
-                          {u.cp_presence && (
-                            <span style={{ fontSize: 10.5, color: CP.textMuted }}>({u.cp_presence.shifts} turni, $0 attribuiti)</span>
-                          )}
+                          <span style={{ width: 9, height: 9, borderRadius: "50%", background: creatorDotColor(u.name), flexShrink: 0 }} />
+                          <span style={{ fontWeight: 500 }}>{u.name}</span>
                           {u.truncated && <span title="Dato Infloww troncato (volume altissimo): lordo sottostimato" style={{ color: "#F59E0B" }}>⚠</span>}
                         </span>
                       </td>
@@ -278,13 +285,13 @@ export default function InflowwReconcilePage() {
                     </tr>
                   ))}
                   {rows.map((mm) => {
-                    const h = health(mm.ratio_cp_over_gross);
+                    const h = health(mm);
                     const missing = Math.max(0, mm.gap_gross);
                     const isBad = mm.ratio_cp_over_gross != null && mm.ratio_cp_over_gross < 0.9;
                     return (
                       <tr key={mm.infloww_id} style={{ borderBottom: `1px solid ${CP.border}55` }}>
                         <td style={td}>
-                          <span style={{ display: "inline-block", padding: "3px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 600, color: h.color, background: h.bg, whiteSpace: "nowrap" }}>
+                          <span style={{ display: "inline-block", padding: "3px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 600, color: h.color, background: h.bg, whiteSpace: "nowrap" }} title={h.tip || ""}>
                             {h.label}
                           </span>
                         </td>
@@ -350,16 +357,15 @@ export default function InflowwReconcilePage() {
                       <select
                         defaultValue=""
                         onChange={(e) => { if (e.target.value) saveOverride(u.id, u.name, e.target.value); }}
-                        style={{ ...input, padding: "4px 8px", fontSize: 11, maxWidth: 180, cursor: "pointer" }}
-                        title="Collega manualmente a un alias CP"
+                        style={{ ...input, padding: "4px 8px", fontSize: 11, maxWidth: 200, cursor: "pointer" }}
+                        title="Collega manualmente a un alias CP (qualsiasi alias del mese, anche senza vendite)"
                       >
                         <option value="" style={{ background: CP.surface }}>collega a…</option>
                         {(data.unmatched_cp || []).map((c) => (
-                          <option key={c.alias} value={c.alias} style={{ background: CP.surface }}>{c.alias}</option>
+                          <option key={c.alias} value={c.alias} style={{ background: CP.surface }}>
+                            {c.alias}{c.shifts ? ` · ${c.shifts} turni` : ""}{c.sales ? ` · ${fmt$(c.sales)}` : ""}
+                          </option>
                         ))}
-                        {(u.cp_presence && !(data.unmatched_cp || []).some((c) => c.alias === u.cp_presence.alias)) && (
-                          <option value={u.cp_presence.alias} style={{ background: CP.surface }}>{u.cp_presence.alias}</option>
-                        )}
                       </select>
                     </span>
                   </div>

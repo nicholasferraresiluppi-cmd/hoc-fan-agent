@@ -72,9 +72,18 @@ function parseCp(alias) {
   if (m) { base = m[1]; tag = m[2]; lang = normLang(m[2]); }
   return { tokens: normName(base).split(" ").filter(Boolean), lang, tag };
 }
+// Primo nome compatibile anche con grafie unite/staccate ("Anna Rita" ↔
+// "Annarita"): se i primi DUE token di un lato, uniti, combaciano col primo
+// dell'altro, normalizza. Ritorna [tokensInf, tokensCp] o null.
+function firstCompat(a, b) {
+  if (a[0] === b[0]) return [a, b];
+  if (a.length >= 2 && a[0] + a[1] === b[0]) return [[a[0] + a[1], ...a.slice(2)], b];
+  if (b.length >= 2 && b[0] + b[1] === a[0]) return [a, [b[0] + b[1], ...b.slice(2)]];
+  return null;
+}
 /**
  * Punteggio match Infloww↔CP. 0 = incompatibile. Regole (post-review):
- *  - primo nome DEVE combaciare;
+ *  - primo nome DEVE combaciare (anche unito: "Anna Rita" ↔ "Annarita");
  *  - lingue esplicite diverse → MAI (0);
  *  - Infloww dichiara una lingua ma il CP no → 0 (niente fusioni alla cieca);
  *  - Infloww senza sigla → bonus al profilo IT (0.75) sopra le altre (0.5);
@@ -82,7 +91,9 @@ function parseCp(alias) {
  */
 function matchScore(inf, cp) {
   if (!inf.tokens.length || !cp.tokens.length) return 0;
-  if (inf.tokens[0] !== cp.tokens[0]) return 0;
+  const fc = firstCompat(inf.tokens, cp.tokens);
+  if (!fc) return 0;
+  const [ti, tc] = fc;
   let score = 1;
   if (inf.lang && cp.lang) {
     if (inf.lang !== cp.lang) return 0;
@@ -94,8 +105,8 @@ function matchScore(inf, cp) {
   } else {
     score += 0.5;
   }
-  const allInfInCp = inf.tokens.every((t) => cp.tokens.includes(t));
-  const allCpInInf = cp.tokens.every((t) => inf.tokens.includes(t));
+  const allInfInCp = ti.every((t) => tc.includes(t));
+  const allCpInInf = tc.every((t) => ti.includes(t));
   if (!allInfInCp && !allCpInInf) return 0;
   if (allInfInCp) score += 1;
   return score;
@@ -165,7 +176,17 @@ export async function GET(request) {
       }
     }
   }
-  const cpList = [...cpByAlias.entries()].map(([alias, sales]) => ({ alias, sales: r2(sales), p: parseCp(alias) }));
+  // Pool di matching = TUTTI gli alias presenti nel mese (nei turni O nei
+  // takes), con le vendite attribuite (anche $0). L'IDENTITÀ di una creator
+  // non dipende dall'avere vendite: separare "chi è" da "quanto le è stato
+  // attribuito" è ciò che permette di abbinare anche i casi 'takes mai
+  // registrati' (Martina Scavo: 35 turni, $0) invece di nasconderli.
+  const cpList = [...aliasShifts.entries()].map(([alias, n]) => ({
+    alias, shifts: n, sales: r2(cpByAlias.get(alias) || 0), p: parseCp(alias),
+  }));
+  for (const [alias, sales] of cpByAlias.entries()) {
+    if (!aliasShifts.has(alias)) cpList.push({ alias, shifts: 0, sales: r2(sales), p: parseCp(alias) });
+  }
   const cpTotal = cpList.reduce((s, c) => s + c.sales, 0);
 
   // Solo creator Infloww attivi nel mese
@@ -190,7 +211,8 @@ export async function GET(request) {
     usedCp.add(forced);
     matched.push({
       infloww_id: ic.id, infloww_name: ic.name, cp_alias: forced,
-      cp_sales: sales, infloww_gross: ic.gross, infloww_net: ic.net,
+      cp_sales: sales, cp_shifts: aliasShifts.get(forced) || 0,
+      infloww_gross: ic.gross, infloww_net: ic.net,
       ratio_cp_over_gross: ic.gross > 0 ? r2(sales / ic.gross) : null,
       gap_gross: r2(ic.gross - sales),
       truncated: ic.truncated || undefined,
@@ -222,6 +244,7 @@ export async function GET(request) {
       infloww_name: p.ic.name,
       cp_alias: p.cc.alias,
       cp_sales: p.cc.sales,
+      cp_shifts: p.cc.shifts || 0,
       infloww_gross: p.ic.gross,
       infloww_net: p.ic.net,
       ratio_cp_over_gross: p.ic.gross > 0 ? r2(p.cc.sales / p.ic.gross) : null,
@@ -232,29 +255,14 @@ export async function GET(request) {
   }
   matched.sort((a, b) => b.infloww_gross - a.infloww_gross);
 
-  // Per i profili Infloww senza vendite CP abbinate, distinguiamo DUE casi
-  // diversi (feedback Nicholas, lug 2026): (a) l'alias non esiste proprio nei
-  // turni del mese → "assente in CP"; (b) l'alias ESISTE nei turni ma nessuna
-  // vendita gli è attribuita (team multi-creator senza takes, es. Giulia
-  // Amici: 37 turni, $0 attribuiti) → "vendite non attribuite". Azioni diverse:
-  // configurare la creator vs far registrare i takes.
-  const presenceList = [...aliasShifts.entries()]
-    .filter(([alias]) => !usedCp.has(alias))
-    .map(([alias, n]) => ({ alias, n, p: parseCp(alias) }));
-  function findPresence(ic) {
-    let best = null, bestScore = 0, tie = false;
-    for (const pc of presenceList) {
-      const sc = matchScore(ic.p, pc.p);
-      if (sc > bestScore) { best = pc; bestScore = sc; tie = false; }
-      else if (sc === bestScore && sc > 0 && best && pc.alias !== best.alias) tie = true;
-    }
-    return best && bestScore >= 1.5 && !tie ? { alias: best.alias, shifts: best.n } : null;
-  }
+  // Con il pool unificato (identità ≠ vendite), i profili Infloww rimasti
+  // qui sono SENZA ALCUNA traccia CP nel mese: né turni né takes. Gli ultimi
+  // si chiudono a mano col "collega a…" (override persistente).
   const unmatchedInf = infList.filter((c) => !matched.some((mm) => mm.infloww_id === c.id))
-    .map((c) => ({ id: c.id, name: c.name, userName: c.userName, gross: c.gross, truncated: c.truncated || undefined, cp_presence: findPresence(c) }))
+    .map((c) => ({ id: c.id, name: c.name, userName: c.userName, gross: c.gross, truncated: c.truncated || undefined }))
     .sort((a, b) => b.gross - a.gross);
   const unmatchedCp = cpList.filter((c) => !usedCp.has(c.alias))
-    .map((c) => ({ alias: c.alias, sales: c.sales })).sort((a, b) => b.sales - a.sales);
+    .map((c) => ({ alias: c.alias, sales: c.sales, shifts: c.shifts })).sort((a, b) => b.sales - a.sales || b.shifts - a.shifts);
 
   const matchedCpSales = matched.reduce((s, mm) => s + mm.cp_sales, 0);
   const matchedInfGross = matched.reduce((s, mm) => s + mm.infloww_gross, 0);
@@ -277,6 +285,11 @@ export async function GET(request) {
       ratio_cp_over_infgross_matched: matchedInfGross > 0 ? r2(matchedCpSales / matchedInfGross) : null,
     },
     counts: { infloww_active: infList.length, cp_aliases: cpList.length, matched: matched.length, unmatched_infloww: unmatchedInf.length, unmatched_cp: unmatchedCp.length },
+    // Copertura abbinamenti: quota di profili e di lordo reale che ha una casa. Obiettivo: 100%.
+    match_coverage: {
+      profiles: infList.length > 0 ? r2(matched.length / infList.length) : null,
+      gross_share: infGrossTotal > 0 ? r2(matchedInfGross / infGrossTotal) : null,
+    },
     matched,
     unmatched_infloww: unmatchedInf,
     unmatched_cp: unmatchedCp,
