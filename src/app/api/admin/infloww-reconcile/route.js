@@ -26,10 +26,16 @@
  */
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { logAuditAction } from "@/lib/audit-log";
 import { readMonthlyByCreator } from "@/lib/infloww-sync-job";
 
 export const maxDuration = 30;
 const r2 = (x) => Math.round(x * 100) / 100;
+
+// Abbinamenti MANUALI (persistenti): { [inflowwCreatorId]: cpAlias }.
+// Per i casi che il matching automatico non può risolvere (nomi d'arte:
+// "Eva Fischietto" ↔ "Eva Rizzoli - SILO_1", confermato da Nicholas lug 2026).
+const OVERRIDES_KEY = "infloww:reconcile:overrides";
 
 const romeDayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" });
 function romeDay(x) {
@@ -169,19 +175,42 @@ export async function GET(request) {
   const infGrossTotal = infList.reduce((s, c) => s + c.gross, 0);
   const infNetTotal = infList.reduce((s, c) => s + c.net, 0);
 
-  // ── Assegnazione GLOBALE per score (poi per volume): il punteggio più
+  const usedInf = new Set(), usedCp = new Set();
+  const matched = [];
+
+  // ── 1. Abbinamenti MANUALI prima di tutto (vincono sull'automatico) ──
+  const overrides = (await kv.get(OVERRIDES_KEY)) || {};
+  for (const ic of infList) {
+    const forced = overrides[ic.id];
+    if (!forced) continue;
+    usedInf.add(ic.id);
+    const cc = cpList.find((c) => c.alias === forced);
+    const sales = cc ? cc.sales : (aliasShifts.has(forced) ? 0 : null);
+    if (sales === null) { usedInf.delete(ic.id); continue; } // alias non presente nel mese: torna al flusso normale
+    usedCp.add(forced);
+    matched.push({
+      infloww_id: ic.id, infloww_name: ic.name, cp_alias: forced,
+      cp_sales: sales, infloww_gross: ic.gross, infloww_net: ic.net,
+      ratio_cp_over_gross: ic.gross > 0 ? r2(sales / ic.gross) : null,
+      gap_gross: r2(ic.gross - sales),
+      truncated: ic.truncated || undefined,
+      manual: true, score: null,
+    });
+  }
+
+  // ── 2. Assegnazione GLOBALE per score (poi per volume): il punteggio più
   // alto vince l'alias, non il fatturato più grosso. Tie per lo stesso
   // profilo Infloww → non abbinare (conservativo).
   const pairs = [];
   for (const ic of infList) {
+    if (usedInf.has(ic.id)) continue;
     for (const cc of cpList) {
+      if (usedCp.has(cc.alias)) continue;
       const sc = matchScore(ic.p, cc.p);
       if (sc >= 1.5) pairs.push({ ic, cc, sc });
     }
   }
   pairs.sort((a, b) => b.sc - a.sc || b.ic.gross - a.ic.gross);
-  const usedInf = new Set(), usedCp = new Set();
-  const matched = [];
   for (const p of pairs) {
     if (usedInf.has(p.ic.id) || usedCp.has(p.cc.alias)) continue;
     const tie = pairs.some((q) => q !== p && q.ic.id === p.ic.id && q.sc === p.sc && !usedCp.has(q.cc.alias) && q.cc.alias !== p.cc.alias);
@@ -252,4 +281,35 @@ export async function GET(request) {
     unmatched_infloww: unmatchedInf,
     unmatched_cp: unmatchedCp,
   });
+}
+
+/**
+ * PUT body { infloww_id, infloww_name?, cp_alias }
+ *   cp_alias stringa → salva l'abbinamento manuale; null → lo rimuove.
+ * Persistente (niente TTL), audit-logged.
+ */
+export async function PUT(request) {
+  const az = await authorize(CAPABILITIES.SEED);
+  if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
+
+  let body;
+  try { body = await request.json(); } catch { return Response.json({ error: "Invalid JSON" }, { status: 400 }); }
+  const inflowwId = String(body?.infloww_id || "").trim();
+  const cpAlias = body?.cp_alias === null ? null : String(body?.cp_alias || "").trim();
+  if (!inflowwId) return Response.json({ error: "infloww_id richiesto" }, { status: 400 });
+  if (cpAlias === "") return Response.json({ error: "cp_alias stringa non vuota, oppure null per rimuovere" }, { status: 400 });
+
+  const overrides = (await kv.get(OVERRIDES_KEY)) || {};
+  const prev = overrides[inflowwId] || null;
+  if (cpAlias) overrides[inflowwId] = cpAlias;
+  else delete overrides[inflowwId];
+  await kv.set(OVERRIDES_KEY, overrides);
+
+  await logAuditAction({
+    action: cpAlias ? "infloww.reconcile.override.set" : "infloww.reconcile.override.remove",
+    target: body?.infloww_name || inflowwId,
+    by: az.userId,
+    meta: { infloww_id: inflowwId, prev, next: cpAlias },
+  });
+  return Response.json({ ok: true, overrides_count: Object.keys(overrides).length });
 }

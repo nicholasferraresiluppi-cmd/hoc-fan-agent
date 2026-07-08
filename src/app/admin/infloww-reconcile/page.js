@@ -75,6 +75,19 @@ export default function InflowwReconcilePage() {
   }
   useEffect(() => { load(periodId); /* eslint-disable-next-line */ }, [periodId]);
 
+  // Abbinamento manuale: collega un profilo Infloww a un alias CP (o scollega).
+  async function saveOverride(inflowwId, inflowwName, cpAlias) {
+    try {
+      const res = await fetch("/api/admin/infloww-reconcile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ infloww_id: inflowwId, infloww_name: inflowwName, cp_alias: cpAlias }),
+      });
+      if (!res.ok) throw new Error((await res.json())?.error || `HTTP ${res.status}`);
+      load(); // ricalcola col nuovo abbinamento
+    } catch (e) { setError(e.message); }
+  }
+
   // Righe abbinate ordinate: peggiori in cima (il problema si vede subito)
   const rows = useMemo(() => {
     return [...(data?.matched || [])].sort((a, b) => {
@@ -282,6 +295,13 @@ export default function InflowwReconcilePage() {
                             {mm.infloww_name !== mm.cp_alias && (
                               <span style={{ fontSize: 10.5, color: CP.textMuted, fontFamily: FONTS.mono }}>↔ {mm.infloww_name}</span>
                             )}
+                            {mm.manual && (
+                              <span style={{ fontSize: 10, color: CP.accentSoftText, background: CP.accentSoft, padding: "2px 7px", borderRadius: 999 }} title="Abbinamento impostato a mano">
+                                manuale
+                                <button onClick={() => saveOverride(mm.infloww_id, mm.infloww_name, null)} title="Rimuovi abbinamento manuale"
+                                  style={{ marginLeft: 5, background: "none", border: "none", color: CP.accentSoftText, cursor: "pointer", padding: 0, fontSize: 11 }}>×</button>
+                              </span>
+                            )}
                             {mm.truncated && <span title="Dato Infloww troncato (volume altissimo): lordo sottostimato" style={{ color: "#F59E0B" }}>⚠</span>}
                           </span>
                         </td>
@@ -319,11 +339,29 @@ export default function InflowwReconcilePage() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <CpCard padding="16px 18px">
                 <SectionLabel style={{ marginBottom: 4 }}>Su Infloww ma non abbinati ({data.unmatched_infloww.length})</SectionLabel>
-                <div style={{ fontSize: 11.5, color: CP.textMuted, marginBottom: 12 }}>Incassano su Infloww ma non ho trovato con certezza il loro alias CP. Quelli sopra ${NO_CP_MIN_GROSS} sono già in tabella come "assente in CP".</div>
+                <div style={{ fontSize: 11.5, color: CP.textMuted, marginBottom: 12 }}>
+                  Incassano su Infloww ma non ho trovato con certezza il loro alias CP. Se TU sai chi sono (es. nome d&apos;arte diverso), collegali qui: l&apos;abbinamento resta salvato per sempre.
+                </div>
                 {data.unmatched_infloww.map((u) => (
-                  <div key={u.id} style={unmRow}>
-                    <span>{u.name}</span>
-                    <span style={{ fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmt$(u.gross)}</span>
+                  <div key={u.id} style={{ ...unmRow, alignItems: "center" }}>
+                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.name}</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                      <span style={{ fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmt$(u.gross)}</span>
+                      <select
+                        defaultValue=""
+                        onChange={(e) => { if (e.target.value) saveOverride(u.id, u.name, e.target.value); }}
+                        style={{ ...input, padding: "4px 8px", fontSize: 11, maxWidth: 180, cursor: "pointer" }}
+                        title="Collega manualmente a un alias CP"
+                      >
+                        <option value="" style={{ background: CP.surface }}>collega a…</option>
+                        {(data.unmatched_cp || []).map((c) => (
+                          <option key={c.alias} value={c.alias} style={{ background: CP.surface }}>{c.alias}</option>
+                        ))}
+                        {(u.cp_presence && !(data.unmatched_cp || []).some((c) => c.alias === u.cp_presence.alias)) && (
+                          <option value={u.cp_presence.alias} style={{ background: CP.surface }}>{u.cp_presence.alias}</option>
+                        )}
+                      </select>
+                    </span>
                   </div>
                 ))}
                 {data.unmatched_infloww.length === 0 && <div style={{ fontSize: 12, color: CP.textMuted }}>Nessuno.</div>}
