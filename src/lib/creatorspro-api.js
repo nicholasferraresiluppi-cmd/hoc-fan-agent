@@ -178,6 +178,23 @@ export async function fetchWagesStatusCounts({ startedAt, endedAt, memberId, gro
  *   paymentProfileThresholds: [{ id, threshold, percentage }],
  *   creatorPaymentProfiles: [...] }
  */
+/* ─── Social Analytics (modulo talent di CP, scoperto lug 2026) ─────────
+ * Endpoint sniffati da app.creatorspro.com e verificati col BOT (200):
+ * - /v1/social-metrics/talents → anagrafica talent {id, name, creators[]}
+ * - /v1/social-metrics/overview/talents/timeframe → revenue per talent
+ *   nel range date, {totals, talents[]}. Date in ISO UTC.
+ */
+export async function fetchSocialTalents() {
+  return apiFetch("/v1/social-metrics/talents", { timeoutMs: 20000 });
+}
+
+export async function fetchSocialTalentRevenue({ startDate, endDate, page = 1, limit = 100, orderBy = "revenueOf", orderDirection = "desc" } = {}) {
+  return apiFetch("/v1/social-metrics/overview/talents/timeframe", {
+    query: { startDate, endDate, page, limit, orderBy, orderDirection },
+    timeoutMs: 25000,
+  });
+}
+
 export async function fetchPaymentProfiles({ page = 1, limit = 100 } = {}) {
   return apiFetch("/v1/payment-profiles", { query: { page, limit } });
 }
