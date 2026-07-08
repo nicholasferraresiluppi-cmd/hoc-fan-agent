@@ -116,6 +116,28 @@ export async function stepJob() {
 }
 
 /**
+ * Somma per creator gli aggregati KV di uno specifico mese ("YYYY-MM").
+ * Usato dalla reconciliation Infloww↔CP. Ritorna lordo+netto per creator
+ * (subs incluse: pesano ~1%, trascurabili per un confronto direzionale).
+ */
+export async function readMonthlyByCreator(periodId) {
+  const roster = (await kv.get(ROSTER_KEY)) || [];
+  if (!Array.isArray(roster) || roster.length === 0) return { needs_sync: true, creators: [] };
+  const dailies = await kv.mget(...roster.map((c) => dailyKey(c.id)));
+  const meta = await kv.get(META_KEY);
+  const creators = roster.map((c, i) => {
+    const dd = dailies[i]?.days || {};
+    let net = 0, gross = 0, tx = 0, daysCovered = 0;
+    for (const [day, v] of Object.entries(dd)) {
+      if (!day.startsWith(periodId)) continue;
+      net += v.net; gross += v.gross; tx += v.tx; daysCovered++;
+    }
+    return { id: c.id, name: c.name, userName: c.userName, net: r2(net), gross: r2(gross), tx, days_covered: daysCovered };
+  });
+  return { creators, last_sync_at: meta?.last_sync_at || null };
+}
+
+/**
  * Legge gli aggregati KV e somma i giorni della finestra richiesta.
  * Ritorna la stessa shape del read-through live, ma esatta e istantanea.
  */
