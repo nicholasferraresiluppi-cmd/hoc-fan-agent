@@ -17,7 +17,7 @@ import { fetchGroups } from "@/lib/creatorspro-api";
 
 export const maxDuration = 60;
 
-const DEFAULT_BASE = "https://api.houseofcreators.com";
+const DEFAULT_BASE = "https://api.creatorspro.com";
 
 // Token reuse: stessa logica della lib, riadattata locale al probe.
 async function cpLogin() {

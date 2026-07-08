@@ -21,7 +21,7 @@ import { fetchAllPaymentProfiles, fetchGroups, fetchMembers } from "@/lib/creato
 
 export const maxDuration = 60;
 
-const DEFAULT_BASE = "https://api.houseofcreators.com";
+const DEFAULT_BASE = "https://api.creatorspro.com";
 
 async function cpAuth() {
   const email = process.env.CREATORSPRO_BOT_EMAIL;

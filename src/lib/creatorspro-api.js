@@ -12,7 +12,11 @@
  * apparentemente riuscito' (es. Francesco Casti Aprile 2026).
  */
 
-const DEFAULT_BASE = "https://api.houseofcreators.com";
+// NB (lug 2026): CreatorsPro ha dismesso il sottodominio white-label
+// api.houseofcreators.com (ora 404 su tutto) e migrato l'API sull'host
+// principale. Verificato: POST /v1/auth/login su api.creatorspro.com risponde
+// con lo stesso contratto {email,password}. Override via CREATORSPRO_API_BASE_URL.
+const DEFAULT_BASE = "https://api.creatorspro.com";
 const PAGE_LIMIT = 25;
 const DETAIL_CONCURRENCY = 20;
 const LIST_PAGES_CONCURRENCY = 10;

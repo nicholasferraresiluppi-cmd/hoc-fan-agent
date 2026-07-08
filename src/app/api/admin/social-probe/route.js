@@ -61,7 +61,7 @@ export async function GET(request) {
 
   const hits = results.filter((r) => r.ok);
   return Response.json({
-    host_tested: baseOverride || "api.houseofcreators.com (default bot host)",
+    host_tested: baseOverride || "api.creatorspro.com (default bot host)",
     auth: noAuth ? "none" : "bot token",
     summary: hits.length > 0
       ? `${hits.length} endpoint social raggiungibili con le credenziali attuali → integrazione B fattibile su questo host`

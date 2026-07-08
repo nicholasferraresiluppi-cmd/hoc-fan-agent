@@ -386,12 +386,12 @@ export async function GET(request) {
     // separati dai groups. Forse creatorPaymentProfiles[].xId punta a Creator entity, non Group.
     let creatorsEndpointProbe = null;
     try {
-      const tokenRes = await fetch(`${process.env.CREATORSPRO_API_BASE_URL || "https://api.houseofcreators.com"}/v1/auth/login`, {
+      const tokenRes = await fetch(`${process.env.CREATORSPRO_API_BASE_URL || "https://api.creatorspro.com"}/v1/auth/login`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: process.env.CREATORSPRO_BOT_EMAIL, password: process.env.CREATORSPRO_BOT_PASSWORD }),
       });
       const tok = (await tokenRes.json())?.data?.access_token;
-      const baseUrl = process.env.CREATORSPRO_API_BASE_URL || "https://api.houseofcreators.com";
+      const baseUrl = process.env.CREATORSPRO_API_BASE_URL || "https://api.creatorspro.com";
       const candidates = [
         "/v1/creators",
         "/v1/sellers-wage/creators",

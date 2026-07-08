@@ -1,8 +1,8 @@
-// Client per l'API Creators Pro (api.houseofcreators.com).
-// Auth: bearer token in env var CREATORS_PRO_TOKEN.
+// Client per l'API Creators Pro (api.creatorspro.com; ex api.houseofcreators.com,
+// dismesso lug 2026). Auth: bearer token in env var CREATORS_PRO_TOKEN.
 
 const BASE_URL =
-  process.env.CREATORS_PRO_BASE_URL || "https://api.houseofcreators.com";
+  process.env.CREATORS_PRO_BASE_URL || "https://api.creatorspro.com";
 
 function getToken() {
   const token = process.env.CREATORS_PRO_TOKEN;
