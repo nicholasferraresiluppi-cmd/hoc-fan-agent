@@ -55,6 +55,12 @@ function health(row) {
   if (row.cp_sales === 0 && (row.cp_shifts || 0) > 0) {
     return { label: "vendite non attribuite", color: CP.accentRed, bg: CP.accentRed + "18", tip: `Esiste in CP (${row.cp_shifts} turni) ma nessuna vendita è registrata a suo nome: takes non registrati.` };
   }
+  // Buco INVERSO: l'analytics CP vede nettamente più di Infloww → l'"Incasso
+  // reale" della riga è probabilmente sottostimato, quindi anche un rapporto
+  // verde non è garantito. Da verificare la connessione Infloww dell'account.
+  if (row.social_vs_infloww != null && row.social_vs_infloww > 1.25) {
+    return { label: "Infloww incompleto?", color: "#F59E0B", bg: "#F59E0B18", tip: "L'analytics CP vede molto più di Infloww su questo account: l'incasso reale mostrato è probabilmente sottostimato (account scollegato da Infloww o ritardo di sync). Da verificare prima di fidarsi del rapporto." };
+  }
   if (ratio > 1.15) return { label: "anomalo", color: "#F59E0B", bg: "#F59E0B18" };
   if (ratio >= 0.9) return { label: "ok", color: CP.accentGreen, bg: CP.accentGreen + "18" };
   if (ratio >= 0.75) return { label: "da controllare", color: "#F59E0B", bg: "#F59E0B18" };
@@ -141,6 +147,7 @@ export default function InflowwReconcilePage() {
         "'Vendite non attribuite' = la creator ESISTE in CP e ha turni, ma nessuna vendita è registrata a suo nome (team multi-creator senza takes): l'azione è far registrare i takes. 'Senza turni in CP' = nel modulo turni/buste non c'è traccia nel mese (come talent può comunque esistere in CP): se sai il suo alias, collegala col menu 'collega a…'.",
         "Qualche punto sotto 1.0 è fisiologico: gli abbonamenti (~1-2% del lordo) non passano dagli operatori. È un allarme direzionale, non un confronto contabile.",
         "I 'non abbinati' in fondo sono profili che non ho saputo accoppiare con certezza tra le due piattaforme: guardali a mano prima di trarre conclusioni.",
+        "Colonna 'Controprova' = la revenue vista dal modulo Social Analytics di CP (fonte indipendente da Infloww), in LORDO STIMATO (netto ÷ 0,80, per questo c'è il ≈). Pallino verde = le due fonti sono coerenti (±15%): se i turni dicono molto meno, il buco è confermato da due fonti. Giallo ↑ = l'analytics vede più di Infloww: possibile account scollegato da Infloww o ritardo di sync — da verificare, e la riga diventa 'Infloww incompleto?'.",
       ]} />
 
       {/* Controlli + freshness */}
@@ -170,6 +177,9 @@ export default function InflowwReconcilePage() {
             confronto sui giorni <b>{fmtDayIt(data.coverage_from)} → {fmtDayIt(data.coverage_to)}</b>, gli stessi su entrambe le fonti (gli shift CP fuori da questa finestra sono esclusi).
             {data.failed_creators?.length > 0 && (
               <span style={{ color: CP.accentRed }}> · ⚠ {data.failed_creators.length} creator non sincronizzate nell'ultimo sync Infloww: i loro numeri possono mancare.</span>
+            )}
+            {data.third_source?.available && (
+              <span> · controprova analytics CP attiva: coerente con Infloww su <b>{data.third_source.agree}/{data.third_source.compared}</b> righe confrontabili (su {data.counts?.matched} abbinate).</span>
             )}
           </div>
         </CpCard>
@@ -251,6 +261,9 @@ export default function InflowwReconcilePage() {
                     <th style={th}>Esito</th>
                     <th style={th}>Creator</th>
                     <th style={{ ...th, textAlign: "right" }}>Incasso reale</th>
+                    {data.third_source?.available && (
+                      <th style={{ ...th, textAlign: "right" }} title="Controprova: revenue OnlyFans vista dal modulo Social Analytics di CP (fonte indipendente da Infloww). È un LORDO STIMATO (netto ÷ 0,80). Pallino verde = coerente con Infloww (±15%); giallo = divergono (↑ analytics più alta, ↓ più bassa).">Controprova ⓘ</th>
+                    )}
                     <th style={{ ...th, textAlign: "right" }}>Registrato CP</th>
                     <th style={{ ...th, textAlign: "right" }}>Cattura</th>
                     <th style={{ ...th, textAlign: "right" }}>Mancante</th>
@@ -274,6 +287,12 @@ export default function InflowwReconcilePage() {
                         </span>
                       </td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmt$(u.gross)}</td>
+                      {data.third_source?.available && (
+                        <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textSecondary, whiteSpace: "nowrap" }}
+                          title={u.social ? `L'analytics CP la conosce (talent "${u.social.talent}"): conferma indipendente che la revenue esiste. NB: il valore è il totale della PERSONA su tutti i suoi account (lordo stimato), non del singolo profilo.` : "Non trovata nemmeno nell'analytics CP per questo periodo."}>
+                          {u.social ? <>≈{fmt$(u.social.gross_eq)} <span style={{ fontSize: 10, color: CP.textMuted }}>persona</span></> : "—"}
+                        </td>
+                      )}
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentRed }}>$0</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 600, color: CP.accentRed }}>0%</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentRed }}>{fmt$(u.gross)}</td>
@@ -313,6 +332,28 @@ export default function InflowwReconcilePage() {
                           </span>
                         </td>
                         <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmt$(mm.infloww_gross)}</td>
+                        {data.third_source?.available && (
+                          <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textSecondary, whiteSpace: "nowrap" }}
+                            title={mm.social_gross_eq == null
+                              ? "Questo alias non compare nell'analytics CP per il periodo."
+                              : mm.social_vs_infloww == null
+                              ? "Dato Infloww troncato su questa riga: confronto non affidabile, mostro solo il valore analytics (lordo stimato)."
+                              : (mm.social_vs_infloww >= 0.85 && mm.social_vs_infloww <= 1.15
+                                ? "Le due fonti indipendenti sono coerenti (±15%): buon segnale che l'incasso reale sia quello mostrato."
+                                : mm.social_vs_infloww > 1.15
+                                ? "L'analytics CP vede più di Infloww (↑): può indicare un account non collegato a Infloww o un ritardo di sync — da verificare."
+                                : "L'analytics CP vede meno di Infloww (↓): può indicare un account non collegato all'analytics o un ritardo di sync — da verificare.")}>
+                            {mm.social_gross_eq != null ? (
+                              <>
+                                {mm.social_vs_infloww != null && (
+                                  <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", marginRight: 6, background: mm.social_vs_infloww >= 0.85 && mm.social_vs_infloww <= 1.15 ? CP.accentGreen : "#F59E0B" }} />
+                                )}
+                                ≈{fmt$(mm.social_gross_eq)}
+                                {mm.social_vs_infloww != null && (mm.social_vs_infloww > 1.15 ? " ↑" : mm.social_vs_infloww < 0.85 ? " ↓" : "")}
+                              </>
+                            ) : "—"}
+                          </td>
+                        )}
                         <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono }}>{fmt$(mm.cp_sales)}</td>
                         <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 600, color: h.color }}>
                           {mm.ratio_cp_over_gross != null ? `${Math.round(mm.ratio_cp_over_gross * 100)}%` : "—"}
@@ -329,7 +370,7 @@ export default function InflowwReconcilePage() {
                     );
                   })}
                   {rows.length === 0 && noCp.length === 0 && (
-                    <tr><td colSpan={7} style={{ ...td, textAlign: "center", color: CP.textMuted, padding: 26 }}>Nessuna creator abbinata per questo mese.</td></tr>
+                    <tr><td colSpan={data.third_source?.available ? 8 : 7} style={{ ...td, textAlign: "center", color: CP.textMuted, padding: 26 }}>Nessuna creator abbinata per questo mese.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -377,7 +418,10 @@ export default function InflowwReconcilePage() {
                 <div style={{ fontSize: 11.5, color: CP.textMuted, marginBottom: 12 }}>Hanno venduto in CP ma non ho trovato con certezza il loro profilo Infloww.</div>
                 {data.unmatched_cp.map((u) => (
                   <div key={u.alias} style={unmRow}>
-                    <span>{u.alias}</span>
+                    <span>
+                      {u.alias}
+                      {u.talent && <span style={{ fontSize: 10.5, color: CP.textMuted, fontFamily: FONTS.mono }}> · talent: {u.talent}</span>}
+                    </span>
                     <span style={{ fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmt$(u.sales)}</span>
                   </div>
                 ))}

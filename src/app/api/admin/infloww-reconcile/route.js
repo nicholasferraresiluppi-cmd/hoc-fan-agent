@@ -28,6 +28,7 @@ import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { logAuditAction } from "@/lib/audit-log";
 import { readMonthlyByCreator } from "@/lib/infloww-sync-job";
+import { fetchSocialTalentRevenue } from "@/lib/creatorspro-api";
 
 export const maxDuration = 30;
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -264,8 +265,102 @@ export async function GET(request) {
   const unmatchedCp = cpList.filter((c) => !usedCp.has(c.alias))
     .map((c) => ({ alias: c.alias, sales: c.sales, shifts: c.shifts })).sort((a, b) => b.sales - a.sales || b.shifts - a.shifts);
 
+  // ── TERZA FONTE: Social Analytics CP (best-effort, mai bloccante) ────
+  // fansites[].alias è l'alias buste ESATTO → mapping autoritativo per-account.
+  // La revenue analytics è NETTA (post-OF 20%, calibrato lug 2026: totale
+  // social $500k vs Infloww netto $523k ≈ 0.96): l'API la converte in LORDO
+  // equivalente (÷0.8) per confrontarla con venduto CP e lordo Infloww.
+  let thirdSource = { available: false };
+  const socialByAlias = new Map();
+  const socialTalents = [];
+  // Confini in ORA DI ROMA (le altre due fonti contano i giorni Rome-day):
+  // mezzanotte di coverageFrom → mezzanotte del giorno dopo coverageTo − 1s.
+  const romeMidnightIso = (dayStr) => {
+    let d = new Date(`${dayStr}T00:00:00+02:00`);
+    if (romeDay(d) !== dayStr) d = new Date(`${dayStr}T00:00:00+01:00`);
+    return d;
+  };
+  const dayAfterTo = new Date(Date.parse(`${coverageTo}T12:00:00Z`) + 86400000).toISOString().slice(0, 10);
+  try {
+    const soc = await fetchSocialTalentRevenue({
+      startDate: romeMidnightIso(coverageFrom).toISOString(),
+      endDate: new Date(romeMidnightIso(dayAfterTo).getTime() - 1000).toISOString(),
+      limit: 100,
+    });
+    const talents = soc?.data?.talents ?? soc?.talents ?? [];
+    let totNet = 0;
+    for (const t of talents) {
+      const tNet = t?.metrics?.["onlyfans-revenue"]?.value;
+      if (Number.isFinite(tNet)) totNet += tNet;
+      socialTalents.push({ name: t.name, net: Number.isFinite(tNet) ? r2(tNet) : null, p: parseInfloww(t.name || "") });
+      for (const f of t.fansites || []) {
+        const fNet = f?.metrics?.["onlyfans-revenue"]?.value;
+        if (f.alias) socialByAlias.set(f.alias, { talent: t.name, net: Number.isFinite(fNet) ? r2(fNet) : null });
+      }
+    }
+    thirdSource = { available: true, total_net: r2(totNet), total_gross_eq: r2(totNet / 0.8), talents: talents.length };
+  } catch (e) {
+    thirdSource = { available: false, error: String(e?.message || e).slice(0, 120) };
+  }
+
+  // Arricchisci le righe abbinate: lordo-equivalente analytics per alias +
+  // concordanza con Infloww (le due fonti INDIPENDENTI: se concordano e i
+  // turni no, il buco è certificato due volte; se analytics ≫ Infloww, è
+  // INFLOWW a perdere dati — caso "account scollegato").
+  if (thirdSource.available) {
+    for (const mm of matched) {
+      const s = socialByAlias.get(mm.cp_alias);
+      if (s && s.net != null) {
+        mm.social_gross_eq = r2(s.net / 0.8);
+        mm.social_talent = s.talent;
+        // Righe troncate: il gross Infloww è dichiaratamente sottostimato →
+        // il confronto gonfierebbe "analytics > Infloww". Niente verdetto.
+        mm.social_vs_infloww = (!mm.truncated && mm.infloww_gross > 0) ? r2(mm.social_gross_eq / mm.infloww_gross) : null;
+      }
+    }
+    // Anche i profili senza abbinamento: l'analytics li vede? I nomi TALENT
+    // aggregano tutte le lingue e non hanno mai sigla → il confronto qui è
+    // SENZA regole-lingua ("Elisa ENG" deve poter trovare "Elisa Esposito"):
+    // solo primo nome compatibile + cognomi non in conflitto. Best-score con
+    // tie-guard (mai il primo che capita).
+    const talentNameScore = (infP, talP) => {
+      if (!infP.tokens.length || !talP.tokens.length) return 0;
+      const fc = firstCompat(infP.tokens, talP.tokens);
+      if (!fc) return 0;
+      const [ti, tt] = fc;
+      const a = ti.every((t) => tt.includes(t));
+      const b = tt.every((t) => ti.includes(t));
+      if (!a && !b) return 0;
+      return 1 + (a ? 1 : 0);
+    };
+    for (const u of unmatchedInf) {
+      const up = parseInfloww(u.name);
+      let best = null, bestScore = 0, tie = false;
+      for (const st of socialTalents) {
+        if (st.net == null) continue;
+        const sc = talentNameScore(up, st.p);
+        if (sc > bestScore) { best = st; bestScore = sc; tie = false; }
+        else if (sc === bestScore && sc > 0 && best && st.name !== best.name) tie = true;
+      }
+      if (best && bestScore >= 1 && !tie) {
+        // NB: valore a livello PERSONA (tutti gli account del talent), non
+        // per-account: la UI lo dichiara. Serve solo come conferma di esistenza.
+        u.social = { talent: best.name, gross_eq: r2(best.net / 0.8), level: "talent" };
+      }
+    }
+    for (const c of unmatchedCp) {
+      const s = socialByAlias.get(c.alias);
+      if (s) c.talent = s.talent;
+    }
+  }
+
   const matchedCpSales = matched.reduce((s, mm) => s + mm.cp_sales, 0);
   const matchedInfGross = matched.reduce((s, mm) => s + mm.infloww_gross, 0);
+  const compared = matched.filter((mm) => mm.social_vs_infloww != null);
+  if (thirdSource.available) {
+    thirdSource.compared = compared.length;
+    thirdSource.agree = compared.filter((mm) => mm.social_vs_infloww >= 0.85 && mm.social_vs_infloww <= 1.15).length;
+  }
 
   return Response.json({
     period_id: periodId,
@@ -290,6 +385,7 @@ export async function GET(request) {
       profiles: infList.length > 0 ? r2(matched.length / infList.length) : null,
       gross_share: infGrossTotal > 0 ? r2(matchedInfGross / infGrossTotal) : null,
     },
+    third_source: thirdSource,
     matched,
     unmatched_infloww: unmatchedInf,
     unmatched_cp: unmatchedCp,
