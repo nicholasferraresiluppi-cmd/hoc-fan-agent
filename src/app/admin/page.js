@@ -11,7 +11,7 @@ import {
   Workflow, RefreshCw, Ban, Languages, Tags, Upload, Sliders,
   UserCircle2, Contact, Medal, Key, Lock, Wrench,
   ArrowUpRight, Calendar, Activity, CheckCircle2, AlertCircle,
-  Wallet, Scale,
+  Wallet, Scale, ShieldCheck,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { SectionLabel, CpCard, StatCard } from "@/components/cp-style";
@@ -104,6 +104,7 @@ const SHORTCUT_GROUPS = [
       { href: "/admin/creatorspro-sync",       title: "Sync CP",        desc: "Sincronizza wages + shifts CP (mensile)", icon: RefreshCw },
       { href: "/admin/infloww-agency",         title: "Revenue agency", desc: "Portfolio live: netto di tutte le creator, ranking", icon: Activity },
       { href: "/admin/infloww-revenue",        title: "Revenue live",   desc: "Ledger fan-by-fan di una creator, tempo reale", icon: Activity },
+      { href: "/admin/infloww-reconcile",      title: "Controllo dati CP", desc: "Il venduto CP è completo? Confronto col reale Infloww", icon: ShieldCheck },
       { href: "/admin/leaderboard-import",     title: "Import Infloww", desc: "Carica CSV mensile/settimanale", icon: Upload },
       { href: "/admin/leaderboard-exclusions", title: "Esclusioni",     desc: "Operatori da nascondere dalle classifiche", icon: Ban },
       { href: "/admin/group-languages",        title: "Lingue Group",   desc: "Override regex per matching ITA/ENG", icon: Languages },

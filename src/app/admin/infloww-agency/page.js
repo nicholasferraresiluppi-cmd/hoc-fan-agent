@@ -235,6 +235,11 @@ export default function InflowwAgencyPage() {
               ⚠ Dato live: alcune creator ad alto volume sono troncate (⚠ in tabella). Per i totali esatti usa Sincronizza.
             </div>
           )}
+          {!isLive && data.failed_creators?.length > 0 && (
+            <div style={{ marginBottom: 12, fontSize: 12, color: CP.accentRed }}>
+              ⚠ {data.failed_creators.length} creator non sincronizzate nell'ultimo sync (errore lato Infloww): {data.failed_creators.slice(0, 5).join(", ")}{data.failed_creators.length > 5 ? "…" : ""}. Rilancia Sincronizza per recuperarle.
+            </div>
+          )}
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16, alignItems: "start" }}>
             <CpCard padding="16px 18px">

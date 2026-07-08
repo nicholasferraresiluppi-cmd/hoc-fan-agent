@@ -7,14 +7,22 @@
  *   - CP: somma dei takes (venduto attribuito agli operatori) per creator, dal
  *     KV wages del mese.
  *   - Infloww: lordo/netto per creator del mese, dagli aggregati KV (sync).
- *   - Match dei creator per nome+lingua (conservativo: nel dubbio, non abbina).
+ *   - Match dei creator per nome+lingua, conservativo (mai fondere team
+ *     diversi). Tie-break: nome Infloww SENZA sigla lingua = profilo ITA
+ *     (pattern verificato sul roster: "Laura Sommaruga" vs "Laura ENG/ESP").
  *
- * Confronto direzionale (NON contabile): CP "venduto" ≈ lordo pagato dai fan →
- * si confronta col LORDO Infloww. Gli abbonamenti (non operator-driven) pesano
- * ~1% e sono trascurati. Serve a fare da ALLARME: se CP ≪ Infloww su una
- * creator, probabile buco nei dati CP.
+ * CALIBRAZIONE (lug 2026, dati veri): il "venduto" CP = LORDO pagato dai fan
+ * → si confronta col lordo Infloww. Baseline sano ratio ≈ 1.0 (Ottorini 0.98,
+ * Iri 1.01, Fishball 0.95). Ratio ≪ 1 = buco CP (Elisa 0.63, Gaja 0.61).
+ * Gli abbonamenti (~1-2% del lordo) non passano dagli operatori: tolleranza
+ * fisiologica di qualche punto. Confronto DIREZIONALE, non contabile.
  *
- * Output diagnostico ricco (agency + matched + non abbinati) per calibrare.
+ * COPERTURA (post-review adversariale): la finestra confrontabile è DERIVATA
+ * DAI DATI Infloww presenti in KV (primo/ultimo giorno del mese, unione su
+ * tutte le creator) e applicata a ENTRAMBE le fonti — gli shift CP fuori da
+ * [day_min, day_max] sono esclusi. Se il mese non ha alcun giorno Infloww
+ * (fuori finestra sync), la risposta è un esplicito needs_sync, MAI un
+ * verdetto verde su dati inesistenti.
  */
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
@@ -23,6 +31,12 @@ import { readMonthlyByCreator } from "@/lib/infloww-sync-job";
 export const maxDuration = 30;
 const r2 = (x) => Math.round(x * 100) / 100;
 
+const romeDayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" });
+function romeDay(x) {
+  const d = x instanceof Date ? x : new Date(x);
+  return Number.isNaN(d.getTime()) ? null : romeDayFmt.format(d);
+}
+
 function normName(s) {
   // NFD scompone gli accenti (é → e + segno); il replace successivo toglie i segni.
   return String(s || "").toLowerCase().normalize("NFD")
@@ -30,9 +44,9 @@ function normName(s) {
 }
 function normLang(s) {
   const u = String(s || "").toUpperCase();
-  if (/ESP|SPA/.test(u) || u === "ES") return "ESP";
-  if (/ENG/.test(u) || u === "EN") return "EN";
-  if (/ITA/.test(u) || u === "IT") return "IT";
+  if (/^(ESP|SPA|ES)$/.test(u)) return "ESP";
+  if (/^(ENG|EN)$/.test(u)) return "EN";
+  if (/^(ITA|IT)$/.test(u)) return "IT";
   return "";
 }
 // Infloww: "Laura ESP" → {tokens:["laura"], lang:"ESP"}; "Giulia ottorini" → {tokens, lang:""}
@@ -43,21 +57,42 @@ function parseInfloww(name) {
   if (m) { lang = normLang(m[1]); base = raw.slice(0, m.index); }
   return { tokens: normName(base).split(" ").filter(Boolean), lang };
 }
-// CP: "Giulia Ottorini - IT" → {tokens, lang:"IT"}
+// CP: "Giulia Ottorini - IT" → {tokens, lang:"IT"}; "Eva Rizzoli - SILO_1" →
+// {tokens:["eva","rizzoli"], lang:"", tag:"SILO_1"} — il suffisso "- XXX" è
+// SEMPRE un tag di team, mai parte del nome (i token spuri creavano fusioni).
 function parseCp(alias) {
-  const m = String(alias || "").match(/^(.*?)\s*[-–]\s*([A-Za-z]{2,4})\s*$/);
-  let base = alias, lang = "";
-  if (m) { base = m[1]; lang = normLang(m[2]); }
-  return { tokens: normName(base).split(" ").filter(Boolean), lang };
+  const m = String(alias || "").match(/^(.*?)\s*[-–]\s*([A-Za-z0-9_]{2,12})\s*$/);
+  let base = alias, lang = "", tag = "";
+  if (m) { base = m[1]; tag = m[2]; lang = normLang(m[2]); }
+  return { tokens: normName(base).split(" ").filter(Boolean), lang, tag };
 }
-// Punteggio match tra un creator Infloww e un alias CP.
+/**
+ * Punteggio match Infloww↔CP. 0 = incompatibile. Regole (post-review):
+ *  - primo nome DEVE combaciare;
+ *  - lingue esplicite diverse → MAI (0);
+ *  - Infloww dichiara una lingua ma il CP no → 0 (niente fusioni alla cieca);
+ *  - Infloww senza sigla → bonus al profilo IT (0.75) sopra le altre (0.5);
+ *  - cognomi in conflitto ("Elisa Esposito" vs "Elisa Vimercati") → 0.
+ */
 function matchScore(inf, cp) {
   if (!inf.tokens.length || !cp.tokens.length) return 0;
-  const firstMatch = inf.tokens[0] === cp.tokens[0] ? 1 : 0;
-  if (!firstMatch) return 0; // il primo nome DEVE combaciare
-  const langOk = (!inf.lang || !cp.lang) ? 0.5 : (inf.lang === cp.lang ? 1 : -5);
-  const allInfInCp = inf.tokens.every((t) => cp.tokens.includes(t)) ? 1 : 0;
-  return firstMatch + langOk + allInfInCp;
+  if (inf.tokens[0] !== cp.tokens[0]) return 0;
+  let score = 1;
+  if (inf.lang && cp.lang) {
+    if (inf.lang !== cp.lang) return 0;
+    score += 1;
+  } else if (inf.lang && !cp.lang) {
+    return 0;
+  } else if (!inf.lang && cp.lang === "IT") {
+    score += 0.75;
+  } else {
+    score += 0.5;
+  }
+  const allInfInCp = inf.tokens.every((t) => cp.tokens.includes(t));
+  const allCpInInf = cp.tokens.every((t) => inf.tokens.includes(t));
+  if (!allInfInCp && !allCpInInf) return 0;
+  if (allInfInCp) score += 1;
+  return score;
 }
 
 export async function GET(request) {
@@ -68,77 +103,123 @@ export async function GET(request) {
   const periodId = url.searchParams.get("period_id") || "";
   if (!/^\d{4}-\d{2}$/.test(periodId)) return Response.json({ error: "period_id YYYY-MM richiesto" }, { status: 400 });
 
-  // CP: venduto per alias
+  // ── Infloww: lordo/netto per creator del mese (da KV sync) ─────────
+  const inf = await readMonthlyByCreator(periodId);
+  if (inf.needs_sync) {
+    return Response.json({ period_id: periodId, needs_sync: "infloww", reason: "never_synced" });
+  }
+  if (!inf.day_min) {
+    // Mese senza alcun giorno Infloww in KV: fuori finestra di sync.
+    return Response.json({
+      period_id: periodId, needs_sync: "infloww", reason: "month_out_of_coverage",
+      last_sync_at: inf.last_sync_at,
+    });
+  }
+
+  // Finestra confrontabile = giorni Infloww realmente presenti per il mese.
+  const coverageFrom = inf.day_min;
+  const coverageTo = inf.day_max;
+  const monthStart = `${periodId}-01`;
+  const [y, m] = periodId.split("-").map(Number);
+  const monthEnd = `${periodId}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+  const today = romeDay(Date.now());
+  const expectedEnd = monthEnd < today ? monthEnd : today;
+  const coveragePartial = coverageFrom > monthStart || coverageTo < expectedEnd;
+
+  // ── CP: venduto per alias, SOLO shift dentro [coverageFrom, coverageTo] ──
   const wages = await kv.get(`cp:wages:${periodId}`);
+  const cpAvailable = Array.isArray(wages) && wages.length > 0;
+  if (!cpAvailable) {
+    return Response.json({ period_id: periodId, needs_sync: "cp", coverage_from: coverageFrom, coverage_to: coverageTo, last_sync_at: inf.last_sync_at });
+  }
   const cpByAlias = new Map();
-  if (Array.isArray(wages)) {
-    for (const w of wages) {
-      for (const s of w.shifts || []) {
-        const aliases = s.creator_aliases || [];
-        const takes = s.takes || [];
-        const salesTotal = Number(s.total_attributed) || 0;
-        const isMono = aliases.length <= 1;
-        const salesByAlias = new Map();
-        for (const t of takes) {
-          if (!t.creator_alias) continue;
-          salesByAlias.set(t.creator_alias, (salesByAlias.get(t.creator_alias) || 0) + (Number(t.amount) || 0));
-        }
-        if (salesByAlias.size === 0 && isMono && aliases[0]) salesByAlias.set(aliases[0], salesTotal);
-        for (const [alias, sales] of salesByAlias.entries()) {
-          cpByAlias.set(alias, (cpByAlias.get(alias) || 0) + sales);
-        }
+  let cpUnattributed = 0; // venduto che non sappiamo attribuire a una creator
+  for (const w of wages) {
+    for (const s of w.shifts || []) {
+      const day = s.started_at ? romeDay(s.started_at) : null;
+      if (day && (day < coverageFrom || day > coverageTo)) continue; // stessi giorni su entrambe le fonti
+      const aliases = s.creator_aliases || [];
+      const takes = s.takes || [];
+      const salesTotal = Number(s.total_attributed) || 0;
+      const isMono = aliases.length <= 1;
+      const salesByAlias = new Map();
+      for (const t of takes) {
+        const amt = Number(t.amount) || 0;
+        if (!t.creator_alias) { cpUnattributed += amt; continue; }
+        salesByAlias.set(t.creator_alias, (salesByAlias.get(t.creator_alias) || 0) + amt);
+      }
+      if (salesByAlias.size === 0) {
+        if (isMono && aliases[0]) salesByAlias.set(aliases[0], salesTotal);
+        else if (salesTotal > 0) cpUnattributed += salesTotal; // multi-creator senza takes: non inventiamo attribuzioni
+      }
+      for (const [alias, sales] of salesByAlias.entries()) {
+        cpByAlias.set(alias, (cpByAlias.get(alias) || 0) + sales);
       }
     }
   }
   const cpList = [...cpByAlias.entries()].map(([alias, sales]) => ({ alias, sales: r2(sales), p: parseCp(alias) }));
   const cpTotal = cpList.reduce((s, c) => s + c.sales, 0);
 
-  // Infloww: lordo/netto per creator del mese
-  const inf = await readMonthlyByCreator(periodId);
-  if (inf.needs_sync) {
-    return Response.json({ needs_sync: true, period_id: periodId, note: "Nessun dato Infloww sincronizzato: sincronizza la vista Revenue agency." });
-  }
-  const infList = inf.creators.filter((c) => c.tx > 0).map((c) => ({ ...c, p: parseInfloww(c.name) }));
+  // Solo creator Infloww attivi nel mese
+  const infList = inf.creators
+    .filter((c) => c.tx > 0)
+    .map((c) => ({ ...c, p: parseInfloww(c.name) }));
   const infGrossTotal = infList.reduce((s, c) => s + c.gross, 0);
   const infNetTotal = infList.reduce((s, c) => s + c.net, 0);
 
-  // Match conservativo: per ogni Infloww, miglior alias CP con score >= 1.5 e unico.
-  const usedCp = new Set();
-  const matched = [];
+  // ── Assegnazione GLOBALE per score (poi per volume): il punteggio più
+  // alto vince l'alias, non il fatturato più grosso. Tie per lo stesso
+  // profilo Infloww → non abbinare (conservativo).
+  const pairs = [];
   for (const ic of infList) {
-    let best = null, bestScore = 0, tie = false;
     for (const cc of cpList) {
-      if (usedCp.has(cc.alias)) continue;
       const sc = matchScore(ic.p, cc.p);
-      if (sc > bestScore) { best = cc; bestScore = sc; tie = false; }
-      else if (sc === bestScore && sc > 0) tie = true;
+      if (sc >= 1.5) pairs.push({ ic, cc, sc });
     }
-    if (best && bestScore >= 1.5 && !tie) {
-      usedCp.add(best.alias);
-      matched.push({
-        infloww_name: ic.name, cp_alias: best.alias,
-        cp_sales: best.sales, infloww_gross: ic.gross, infloww_net: ic.net,
-        ratio_cp_over_gross: ic.gross > 0 ? r2(best.sales / ic.gross) : null,
-        gap_gross: r2(ic.gross - best.sales),
-        score: bestScore, days_covered: ic.days_covered,
-      });
-    }
+  }
+  pairs.sort((a, b) => b.sc - a.sc || b.ic.gross - a.ic.gross);
+  const usedInf = new Set(), usedCp = new Set();
+  const matched = [];
+  for (const p of pairs) {
+    if (usedInf.has(p.ic.id) || usedCp.has(p.cc.alias)) continue;
+    const tie = pairs.some((q) => q !== p && q.ic.id === p.ic.id && q.sc === p.sc && !usedCp.has(q.cc.alias) && q.cc.alias !== p.cc.alias);
+    usedInf.add(p.ic.id);
+    if (tie) continue; // ambiguo: resta nei non abbinati
+    usedCp.add(p.cc.alias);
+    matched.push({
+      infloww_id: p.ic.id,
+      infloww_name: p.ic.name,
+      cp_alias: p.cc.alias,
+      cp_sales: p.cc.sales,
+      infloww_gross: p.ic.gross,
+      infloww_net: p.ic.net,
+      ratio_cp_over_gross: p.ic.gross > 0 ? r2(p.cc.sales / p.ic.gross) : null,
+      gap_gross: r2(p.ic.gross - p.cc.sales),
+      truncated: p.ic.truncated || undefined,
+      score: p.sc,
+    });
   }
   matched.sort((a, b) => b.infloww_gross - a.infloww_gross);
 
-  const unmatchedInf = infList.filter((c) => !matched.some((m) => m.infloww_name === c.name))
-    .map((c) => ({ name: c.name, userName: c.userName, gross: c.gross, net: c.net })).sort((a, b) => b.gross - a.gross);
+  const unmatchedInf = infList.filter((c) => !matched.some((mm) => mm.infloww_id === c.id))
+    .map((c) => ({ id: c.id, name: c.name, userName: c.userName, gross: c.gross, truncated: c.truncated || undefined }))
+    .sort((a, b) => b.gross - a.gross);
   const unmatchedCp = cpList.filter((c) => !usedCp.has(c.alias))
     .map((c) => ({ alias: c.alias, sales: c.sales })).sort((a, b) => b.sales - a.sales);
 
-  const matchedCpSales = matched.reduce((s, m) => s + m.cp_sales, 0);
-  const matchedInfGross = matched.reduce((s, m) => s + m.infloww_gross, 0);
+  const matchedCpSales = matched.reduce((s, mm) => s + mm.cp_sales, 0);
+  const matchedInfGross = matched.reduce((s, mm) => s + mm.infloww_gross, 0);
 
   return Response.json({
     period_id: periodId,
     last_sync_at: inf.last_sync_at,
+    failed_creators: inf.failed_creators || [],
+    coverage_from: coverageFrom,
+    coverage_to: coverageTo,
+    coverage_partial: coveragePartial,
     agency: {
       cp_sales_total: r2(cpTotal),
+      cp_unattributed: r2(cpUnattributed),
       infloww_gross_total: r2(infGrossTotal),
       infloww_net_total: r2(infNetTotal),
       // rapporti sui soli abbinati (confronto pulito)

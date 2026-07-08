@@ -34,6 +34,13 @@ const r2 = (x) => Math.round(x * 100) / 100;
 const romeDayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" });
 const romeDay = (ms) => { const n = Number(ms); return Number.isFinite(n) ? romeDayFmt.format(new Date(n)) : "?"; };
 
+// Mezzanotte di Roma (ISO) per un giorno "YYYY-MM-DD": prova CEST poi CET.
+function romeMidnightIso(dayStr) {
+  let d = new Date(`${dayStr}T00:00:00+02:00`);
+  if (romeDay(d.getTime()) !== dayStr) d = new Date(`${dayStr}T00:00:00+01:00`);
+  return d.toISOString();
+}
+
 export async function getJob() { return (await kv.get(JOB_KEY)) || null; }
 
 export function jobProgress(job) {
@@ -58,9 +65,9 @@ export async function startJob(days = 31) {
 }
 
 async function syncOneCreator(creator, startTime, endTime) {
-  const { items } = await inflowwPaged("/v1/transactions", {
+  const { items, truncated } = await inflowwPaged("/v1/transactions", {
     query: { creatorId: creator.id, startTime, endTime, platformCode: "OnlyFans" },
-    limit: 100, maxPages: 80, timeoutMs: 12000,
+    limit: 100, maxPages: 120, timeoutMs: 12000,
   });
   const days = {};
   for (const t of items) {
@@ -77,9 +84,12 @@ async function syncOneCreator(creator, startTime, endTime) {
     for (const k of Object.keys(x.byType)) x.byType[k] = r2(x.byType[k]);
   }
   // Merge: i giorni ri-pescati sovrascrivono (dato fresco), quelli fuori finestra restano.
+  // La finestra parte dalla MEZZANOTTE di Roma (vedi stepJob) → ogni bucket
+  // giornaliero pescato è completo, mai parziale sul giorno di confine.
   const prev = (await kv.get(dailyKey(creator.id))) || { days: {} };
   await kv.set(dailyKey(creator.id), {
     name: creator.name, userName: creator.userName, updated_at: Date.now(),
+    truncated_last_sync: truncated || undefined, // >12k tx/finestra: gross sottostimato
     days: { ...(prev.days || {}), ...days },
   }, { ex: TTL_DATA });
   return items.length;
@@ -90,19 +100,26 @@ export async function stepJob() {
   if (!job || job.status !== "running") return { has_more: false, job };
 
   const endTime = new Date().toISOString();
-  const startTime = new Date(Date.now() - job.days * 86400000).toISOString();
+  // Ancora la finestra alla mezzanotte di Roma del primo giorno: bucket completi.
+  const startTime = romeMidnightIso(romeDay(Date.now() - job.days * 86400000));
   const start = Date.now();
   try {
     while (job.cursor < job.creators.length && (Date.now() - start) < STEP_BUDGET_MS) {
       const batch = job.creators.slice(job.cursor, job.cursor + CONC);
-      await Promise.all(batch.map((c) => syncOneCreator(c, startTime, endTime).catch(() => 0)));
+      // Errori per-creator NON inghiottiti in silenzio: tracciati in failed_creators.
+      const res = await Promise.all(batch.map((c) => syncOneCreator(c, startTime, endTime).then(() => null).catch(() => c.name)));
+      const failed = res.filter(Boolean);
+      if (failed.length) job.failed_creators = [...new Set([...(job.failed_creators || []), ...failed])].slice(0, 60);
       job.cursor += batch.length;
       job.synced = job.cursor;
       job.last_step = `${job.cursor}/${job.creators.length}`;
     }
     if (job.cursor >= job.creators.length) {
       job.status = "done";
-      await kv.set(META_KEY, { last_sync_at: Date.now(), days: job.days, creators_total: job.creators.length }, { ex: TTL_DATA });
+      await kv.set(META_KEY, {
+        last_sync_at: Date.now(), days: job.days, creators_total: job.creators.length,
+        failed_creators: job.failed_creators || [],
+      }, { ex: TTL_DATA });
     }
     job.updated_at = Date.now();
     await kv.set(JOB_KEY, job, { ex: TTL_JOB });
@@ -125,16 +142,30 @@ export async function readMonthlyByCreator(periodId) {
   if (!Array.isArray(roster) || roster.length === 0) return { needs_sync: true, creators: [] };
   const dailies = await kv.mget(...roster.map((c) => dailyKey(c.id)));
   const meta = await kv.get(META_KEY);
+  // Copertura DERIVATA DAI DATI: primo/ultimo giorno del mese effettivamente
+  // presente in KV (unione su tutte le creator). È la finestra su cui un
+  // confronto con altre fonti è onesto — non fidarsi di last_sync_at da solo.
+  let dayMin = null, dayMax = null;
   const creators = roster.map((c, i) => {
-    const dd = dailies[i]?.days || {};
+    const rec = dailies[i] || {};
+    const dd = rec.days || {};
     let net = 0, gross = 0, tx = 0, daysCovered = 0;
     for (const [day, v] of Object.entries(dd)) {
       if (!day.startsWith(periodId)) continue;
       net += v.net; gross += v.gross; tx += v.tx; daysCovered++;
+      if (!dayMin || day < dayMin) dayMin = day;
+      if (!dayMax || day > dayMax) dayMax = day;
     }
-    return { id: c.id, name: c.name, userName: c.userName, net: r2(net), gross: r2(gross), tx, days_covered: daysCovered };
+    return { id: c.id, name: c.name, userName: c.userName, net: r2(net), gross: r2(gross), tx, days_covered: daysCovered, truncated: Boolean(rec.truncated_last_sync) };
   });
-  return { creators, last_sync_at: meta?.last_sync_at || null };
+  return {
+    creators,
+    last_sync_at: meta?.last_sync_at || null,
+    synced_days: meta?.days || null,
+    failed_creators: meta?.failed_creators || [],
+    day_min: dayMin,
+    day_max: dayMax,
+  };
 }
 
 /**
@@ -153,7 +184,8 @@ export async function readAgency(days) {
   const byType = {}, byDay = {};
   const creators = [];
   roster.forEach((c, i) => {
-    const dd = dailies[i]?.days || {};
+    const rec = dailies[i] || {};
+    const dd = rec.days || {};
     let cnet = 0, cgross = 0, cfee = 0, ctx = 0;
     const cByType = {};
     for (const [day, v] of Object.entries(dd)) {
@@ -165,7 +197,7 @@ export async function readAgency(days) {
     let topType = null, topN = -1;
     for (const [k, v] of Object.entries(cByType)) if (v > topN) { topN = v; topType = k; }
     net += cnet; gross += cgross; fee += cfee; tx += ctx;
-    creators.push({ id: c.id, name: c.name, userName: c.userName, net: r2(cnet), gross: r2(cgross), tx: ctx, topType });
+    creators.push({ id: c.id, name: c.name, userName: c.userName, net: r2(cnet), gross: r2(cgross), tx: ctx, topType, truncated: Boolean(rec.truncated_last_sync) });
   });
 
   return {
@@ -174,6 +206,7 @@ export async function readAgency(days) {
     window_days: d,
     last_sync_at: meta?.last_sync_at || null,
     synced_days: meta?.days || null,
+    failed_creators: meta?.failed_creators || [],
     loaded: roster.length,
     total_creators: roster.length,
     totals: { net_usd: r2(net), gross_usd: r2(gross), fee_usd: r2(fee), tx_count: tx },
