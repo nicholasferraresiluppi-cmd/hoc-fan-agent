@@ -39,9 +39,12 @@ export async function GET(request) {
   const url = new URL(request.url);
   const baseOverride = url.searchParams.get("base") || null;
   const noAuth = url.searchParams.get("noauth") === "1";
+  // ?path=/v1/... (url-encoded, query inclusa) → testa SOLO quel path.
+  const customPath = url.searchParams.get("path");
+  const paths = customPath ? [customPath] : CANDIDATE_PATHS;
 
   const results = [];
-  for (const path of CANDIDATE_PATHS) {
+  for (const path of paths) {
     const r = await probeGet(path, { baseOverride, noAuth });
     let sampleShape = null;
     if (r.ok && r.sample) {
