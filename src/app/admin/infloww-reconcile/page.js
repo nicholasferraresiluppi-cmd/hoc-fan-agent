@@ -138,7 +138,7 @@ export default function InflowwReconcilePage() {
       <HowToRead items={[
         "Ogni riga confronta due fonti sugli stessi giorni: quanto CP dice che una creator ha venduto, e quanto ha incassato DAVVERO (lordo Infloww).",
         "Rapporto ≈ 1.0 = CP completo (verde). Sotto 0.90 qualcosa manca (giallo). Sotto 0.75 = probabile buco: turni o vendite non registrati in CP (rosso).",
-        "'Vendite non attribuite' = la creator ESISTE in CP e ha turni, ma nessuna vendita è registrata a suo nome (team multi-creator senza takes): l'azione è far registrare i takes. 'Assente in CP' = nessuna traccia nel mese: se sai chi è, collegala col menu 'collega a…' (resta salvato).",
+        "'Vendite non attribuite' = la creator ESISTE in CP e ha turni, ma nessuna vendita è registrata a suo nome (team multi-creator senza takes): l'azione è far registrare i takes. 'Senza turni in CP' = nel modulo turni/buste non c'è traccia nel mese (come talent può comunque esistere in CP): se sai il suo alias, collegala col menu 'collega a…'.",
         "Qualche punto sotto 1.0 è fisiologico: gli abbonamenti (~1-2% del lordo) non passano dagli operatori. È un allarme direzionale, non un confronto contabile.",
         "I 'non abbinati' in fondo sono profili che non ho saputo accoppiare con certezza tra le due piattaforme: guardali a mano prima di trarre conclusioni.",
       ]} />
@@ -227,7 +227,7 @@ export default function InflowwReconcilePage() {
               sub={
                 holes.length + noCp.length === 0
                   ? "nessuna creator sotto il 75%"
-                  : `${holes.length} sotto il 75%${noCp.length ? ` + ${noCp.length} senza CP` : ""} · ≈ ${fmt$(holesGap + noCpGross)} non registrati`
+                  : `${holes.length} sotto il 75%${noCp.length ? ` + ${noCp.length} senza turni` : ""} · ≈ ${fmt$(holesGap + noCpGross)} non registrati`
               }
             />
             <StatCard
@@ -262,8 +262,8 @@ export default function InflowwReconcilePage() {
                     <tr key={u.id} style={{ borderBottom: `1px solid ${CP.border}55`, background: CP.accentRed + "08" }}>
                       <td style={td}>
                         <span style={{ display: "inline-block", padding: "3px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 600, color: CP.accentRed, background: CP.accentRed + "18", whiteSpace: "nowrap" }}
-                          title="Nessuna traccia CP nel mese (né turni né vendite). Se sai chi è, collegala dal riquadro 'non abbinati' qui sotto.">
-                          assente in CP
+                          title="Nel MODULO TURNI/BUSTE di CP questo mese non ha né turni né vendite. Come talent può comunque esistere in CP (Social Analytics). Se sai il suo alias turni, collegala dal riquadro 'non abbinati'.">
+                          senza turni in CP
                         </span>
                       </td>
                       <td style={td}>
