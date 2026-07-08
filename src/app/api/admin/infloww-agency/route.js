@@ -13,6 +13,7 @@
  */
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { inflowwPaged, centsToUsd } from "@/lib/infloww-api";
+import { readAgency } from "@/lib/infloww-sync-job";
 
 export const maxDuration = 60;
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -48,6 +49,15 @@ export async function GET(request) {
 
   const url = new URL(request.url);
   const days = Math.min(31, Math.max(1, Number(url.searchParams.get("days")) || 7));
+  const source = url.searchParams.get("source") || "kv";
+
+  // Default: aggregati KV (esatto, istantaneo). Se mai sincronizzato → needs_sync.
+  if (source === "kv") {
+    const kvRes = await readAgency(days);
+    return Response.json(kvRes);
+  }
+
+  // source=live: read-through on-demand (tronca le big creator, ma è "adesso")
   const endTime = new Date().toISOString();
   const startTime = new Date(Date.now() - days * 86400000).toISOString();
 
@@ -82,6 +92,8 @@ export async function GET(request) {
     .sort((a, b) => b.net - a.net);
 
   return Response.json({
+    source: "live",
+    exact: false,
     window_days: days,
     loaded: rows.length,
     total_creators: creators.length,
