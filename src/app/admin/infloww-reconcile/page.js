@@ -119,7 +119,7 @@ export default function InflowwReconcilePage() {
       <HowToRead items={[
         "Ogni riga confronta due fonti sugli stessi giorni: quanto CP dice che una creator ha venduto, e quanto ha incassato DAVVERO (lordo Infloww).",
         "Rapporto ≈ 1.0 = CP completo (verde). Sotto 0.90 qualcosa manca (giallo). Sotto 0.75 = probabile buco: turni o vendite non registrati in CP (rosso).",
-        "Le righe 'assente in CP' sono il caso peggiore: la creator incassa su Infloww ma non ho trovato NESSUN venduto CP da abbinarle — buco totale, o alias che non riconosco. Verificale per prime.",
+        "'Vendite non attribuite' = la creator ESISTE in CP e ha turni, ma nessuna vendita è registrata a suo nome (team multi-creator senza takes): l'azione è far registrare i takes. 'Assente in CP' = non trovo proprio il suo alias nei turni del mese.",
         "Qualche punto sotto 1.0 è fisiologico: gli abbonamenti (~1-2% del lordo) non passano dagli operatori. È un allarme direzionale, non un confronto contabile.",
         "I 'non abbinati' in fondo sono profili che non ho saputo accoppiare con certezza tra le due piattaforme: guardali a mano prima di trarre conclusioni.",
       ]} />
@@ -235,14 +235,21 @@ export default function InflowwReconcilePage() {
                   {noCp.map((u) => (
                     <tr key={u.id} style={{ borderBottom: `1px solid ${CP.border}55`, background: CP.accentRed + "08" }}>
                       <td style={td}>
-                        <span style={{ display: "inline-block", padding: "3px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 600, color: CP.accentRed, background: CP.accentRed + "18", whiteSpace: "nowrap" }}>
-                          assente in CP
+                        <span style={{ display: "inline-block", padding: "3px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 600, color: CP.accentRed, background: CP.accentRed + "18", whiteSpace: "nowrap" }}
+                          title={u.cp_presence ? `Esiste in CP (${u.cp_presence.shifts} turni come "${u.cp_presence.alias}") ma nessuna vendita è attribuita a lei: takes non registrati.` : "Nessun alias CP riconducibile a lei nei turni del mese."}>
+                          {u.cp_presence ? "vendite non attribuite" : "assente in CP"}
                         </span>
                       </td>
                       <td style={td}>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
-                          <span style={{ width: 9, height: 9, borderRadius: "50%", background: creatorDotColor(u.name), flexShrink: 0 }} />
-                          <span style={{ fontWeight: 500 }}>{u.name}</span>
+                          <span style={{ width: 9, height: 9, borderRadius: "50%", background: creatorDotColor(u.cp_presence?.alias || u.name), flexShrink: 0 }} />
+                          <span style={{ fontWeight: 500 }}>{u.cp_presence?.alias || u.name}</span>
+                          {u.cp_presence && u.cp_presence.alias !== u.name && (
+                            <span style={{ fontSize: 10.5, color: CP.textMuted, fontFamily: FONTS.mono }}>↔ {u.name}</span>
+                          )}
+                          {u.cp_presence && (
+                            <span style={{ fontSize: 10.5, color: CP.textMuted }}>({u.cp_presence.shifts} turni, $0 attribuiti)</span>
+                          )}
                           {u.truncated && <span title="Dato Infloww troncato (volume altissimo): lordo sottostimato" style={{ color: "#F59E0B" }}>⚠</span>}
                         </span>
                       </td>

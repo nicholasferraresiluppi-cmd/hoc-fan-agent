@@ -133,12 +133,14 @@ export async function GET(request) {
     return Response.json({ period_id: periodId, needs_sync: "cp", coverage_from: coverageFrom, coverage_to: coverageTo, last_sync_at: inf.last_sync_at });
   }
   const cpByAlias = new Map();
+  const aliasShifts = new Map(); // presenza nei turni (anche SENZA vendite attribuite)
   let cpUnattributed = 0; // venduto che non sappiamo attribuire a una creator
   for (const w of wages) {
     for (const s of w.shifts || []) {
       const day = s.started_at ? romeDay(s.started_at) : null;
       if (day && (day < coverageFrom || day > coverageTo)) continue; // stessi giorni su entrambe le fonti
       const aliases = s.creator_aliases || [];
+      for (const a of aliases) aliasShifts.set(a, (aliasShifts.get(a) || 0) + 1);
       const takes = s.takes || [];
       const salesTotal = Number(s.total_attributed) || 0;
       const isMono = aliases.length <= 1;
@@ -201,8 +203,26 @@ export async function GET(request) {
   }
   matched.sort((a, b) => b.infloww_gross - a.infloww_gross);
 
+  // Per i profili Infloww senza vendite CP abbinate, distinguiamo DUE casi
+  // diversi (feedback Nicholas, lug 2026): (a) l'alias non esiste proprio nei
+  // turni del mese → "assente in CP"; (b) l'alias ESISTE nei turni ma nessuna
+  // vendita gli è attribuita (team multi-creator senza takes, es. Giulia
+  // Amici: 37 turni, $0 attribuiti) → "vendite non attribuite". Azioni diverse:
+  // configurare la creator vs far registrare i takes.
+  const presenceList = [...aliasShifts.entries()]
+    .filter(([alias]) => !usedCp.has(alias))
+    .map(([alias, n]) => ({ alias, n, p: parseCp(alias) }));
+  function findPresence(ic) {
+    let best = null, bestScore = 0, tie = false;
+    for (const pc of presenceList) {
+      const sc = matchScore(ic.p, pc.p);
+      if (sc > bestScore) { best = pc; bestScore = sc; tie = false; }
+      else if (sc === bestScore && sc > 0 && best && pc.alias !== best.alias) tie = true;
+    }
+    return best && bestScore >= 1.5 && !tie ? { alias: best.alias, shifts: best.n } : null;
+  }
   const unmatchedInf = infList.filter((c) => !matched.some((mm) => mm.infloww_id === c.id))
-    .map((c) => ({ id: c.id, name: c.name, userName: c.userName, gross: c.gross, truncated: c.truncated || undefined }))
+    .map((c) => ({ id: c.id, name: c.name, userName: c.userName, gross: c.gross, truncated: c.truncated || undefined, cp_presence: findPresence(c) }))
     .sort((a, b) => b.gross - a.gross);
   const unmatchedCp = cpList.filter((c) => !usedCp.has(c.alias))
     .map((c) => ({ alias: c.alias, sales: c.sales })).sort((a, b) => b.sales - a.sales);
