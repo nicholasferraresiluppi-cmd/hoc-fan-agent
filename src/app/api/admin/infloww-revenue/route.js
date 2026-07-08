@@ -100,13 +100,14 @@ export async function GET(request) {
     .map(([date, v]) => ({ date, net_usd: round2(v) }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  // ── Refunds (paymentAmount già in $) ───────────────────────────────
+  // ── Refunds (paymentAmount in CENTESIMI, come le transazioni) ──────
+  // NB: la doc mostrava "29.99" (decimale) ma i dati reali sono cent interi.
   let refundCount = 0, refundUsd = 0;
   try {
     const rf = await inflowwGet("/v1/refunds", { query: { creatorId, startTime, endTime, limit: 100 } });
     const list = rf?.data?.list || [];
     refundCount = list.length;
-    refundUsd = round2(list.reduce((s, r) => s + (Number(r.paymentAmount) || 0), 0));
+    refundUsd = round2(list.reduce((s, r) => s + centsToUsd(r.paymentAmount), 0));
   } catch { /* refunds best-effort: se fallisce, mostriamo 0 senza rompere il ledger */ }
 
   return Response.json({
