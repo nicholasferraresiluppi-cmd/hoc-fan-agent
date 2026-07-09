@@ -51,9 +51,10 @@ export async function GET(request) {
 
   const members = await fetchMembers();
   const memberList = members?.data || members || [];
-  const member = (Array.isArray(memberList) ? memberList : []).find((mm) =>
-    String(mm.name || mm.memberName || "").toLowerCase().includes(memberQ));
+  const fullName = (mm) => `${mm.firstName || ""} ${mm.lastName || ""} ${mm.username || ""}`.toLowerCase();
+  const member = (Array.isArray(memberList) ? memberList : []).find((mm) => fullName(mm).includes(memberQ));
   if (!member) return Response.json({ error: `Membro '${memberQ}' non trovato (${Array.isArray(memberList) ? memberList.length : 0} membri)` }, { status: 404 });
+  member.name = `${member.firstName || ""} ${member.lastName || ""}`.trim();
 
   const { startedAt, endedAt } = monthBounds(periodId);
   const wagesResp = await fetchWages({ startedAt, endedAt, memberId: member.id, page: 1, limit: 5 });
