@@ -24,6 +24,7 @@ function monthBounds(periodId) {
 // Riassunto di un take GREZZO: tutte le chiavi + dove vive l'info creator.
 function summarizeTake(t) {
   return {
+    raw: JSON.stringify(t).slice(0, 900),
     keys: Object.keys(t || {}),
     amount: t?.amount ?? null,
     type: t?.type ?? null,
