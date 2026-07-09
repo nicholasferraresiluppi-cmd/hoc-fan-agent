@@ -362,9 +362,18 @@ export default function InflowwReconcilePage() {
                           {missing > 0 ? fmt$(missing) : "—"}
                         </td>
                         <td style={td}>
-                          <Link href={`/admin/infloww-revenue?creatorId=${encodeURIComponent(mm.infloww_id)}`} style={detailBtn}>
-                            Dettaglio <ArrowRight size={11} />
-                          </Link>
+                          <span style={{ display: "inline-flex", gap: 6 }}>
+                            <Link
+                              href={`/admin/attribution-drilldown?${new URLSearchParams({ alias: mm.cp_alias, period_id: data.period_id, infloww_id: mm.infloww_id })}`}
+                              style={detailBtn}
+                              title="Drill-down turni: chi non ha registrato i takes, giorno per giorno (con CSV per il backfill)"
+                            >
+                              Turni <ArrowRight size={11} />
+                            </Link>
+                            <Link href={`/admin/infloww-revenue?creatorId=${encodeURIComponent(mm.infloww_id)}`} style={detailBtn}>
+                              Ledger <ArrowRight size={11} />
+                            </Link>
+                          </span>
                         </td>
                       </tr>
                     );
