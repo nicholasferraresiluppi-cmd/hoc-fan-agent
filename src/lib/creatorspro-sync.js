@@ -51,13 +51,29 @@ export function normalizeWage(wage) {
     // v3 / Opzione A: salviamo i takes con creator_alias + amount per attribuzione
     // ESATTA per creator (sostituisce lo split equo 50/50 sui shift multi-creator).
     // Teniamo solo i campi essenziali per limitare il payload KV.
-    const takes = rawTakes.map((t) => ({
-      amount: typeof t.amount === "number" ? t.amount : (Number(t.amount) || 0),
-      type: t.type || null,
-      creator_alias: t.creator?.alias || t.creatorAlias || null,
-      creator_id: t.creator?.id || t.creatorId || null,
-      status: t.status || null,
-    })).filter((t) => t.creator_alias && t.amount > 0);
+    //
+    // v5 (lug 2026): con la migrazione host CP ha CAMBIATO lo schema del take:
+    //   vecchio: { amount, type, creator: {alias,id}, status }
+    //   nuovo:   { status, attribution, transaction: { amount, type, creator: {alias,id}, user } }
+    // Il parser v4 leggeva solo il vecchio → 100% dei takes nuovi scartati in
+    // silenzio (bug scovato da Nicholas: "i purch nelle wage si vedono e si
+    // separano"). Supportiamo ENTRAMBI. `attribution` = quota del take per
+    // questo membro (1 = tutto suo): moltiplichiamo se è una frazione valida.
+    const takes = rawTakes.map((t) => {
+      const tx = t.transaction || null;
+      const baseAmount = tx
+        ? (Number(tx.amount) || 0)
+        : (typeof t.amount === "number" ? t.amount : (Number(t.amount) || 0));
+      const attr = Number(t.attribution);
+      const share = tx && Number.isFinite(attr) && attr > 0 && attr <= 1 ? attr : 1;
+      return {
+        amount: Math.round(baseAmount * share * 100) / 100,
+        type: tx?.type || t.type || null,
+        creator_alias: tx?.creator?.alias || t.creator?.alias || t.creatorAlias || null,
+        creator_id: tx?.creator?.id || t.creator?.id || t.creatorId || null,
+        status: t.status || null,
+      };
+    }).filter((t) => t.creator_alias && t.amount > 0 && !/^(REJECTED|DECLINED)$/i.test(t.status || ""));
     return {
       id: s.id,
       started_at: s.startedAt,
