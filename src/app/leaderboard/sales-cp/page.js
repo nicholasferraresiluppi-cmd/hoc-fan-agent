@@ -25,8 +25,8 @@ const TIER_COLORS = {
   Critical: "#D44545", Weak: "#E76F51", Average: "#B89158",
   Good: "#D4AF7A", Strong: "#3FB97E", Elite: "#4F8CCB",
 };
-const CATEGORY_COLORS = { Big: "#4F8CCB", Medium: "#D4AF7A", Small: "#8F8A82" };
-const LANGUAGE_COLORS = { ita: "#3FB97E", eng: "#4F8CCB" };
+const CATEGORY_COLORS = { Big: "#b9aef9", Medium: "#8b7cf6", Small: "#8c95a8" };
+const LANGUAGE_COLORS = { ita: "#4ade80", eng: "#b9aef9" };
 
 const PERIOD_TYPES = [{ value: "monthly", label: "Mensile" }];
 const CATEGORY_FILTERS = [
@@ -87,7 +87,7 @@ function LanguageBadge({ language }) {
   return <span style={{ display: "inline-block", padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", background: color + "20", color, border: `1px solid ${color}55`, marginLeft: 6, verticalAlign: "middle", fontFamily: FONTS.mono }}>{label}</span>;
 }
 function Avatar({ name, size = 28, large = false }) {
-  return <div style={{ width: size, height: size, borderRadius: "50%", background: large ? `linear-gradient(135deg, ${COLORS.champagne} 0%, ${COLORS.charcoal} 100%)` : COLORS.charcoal, color: large ? COLORS.obsidian : COLORS.alabaster, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONTS.display, fontWeight: 600, fontSize: size * 0.36, flexShrink: 0, border: large ? `3px solid ${COLORS.graphite}` : `1px solid ${COLORS.charcoal}`, boxShadow: large ? `0 0 0 2px ${COLORS.champagne}, 0 8px 24px rgba(212,175,122,0.25)` : "none" }}>{getInitials(name)}</div>;
+  return <div style={{ width: size, height: size, borderRadius: "50%", background: large ? COLORS.champagne : COLORS.charcoal, color: large ? COLORS.obsidian : COLORS.alabaster, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONTS.display, fontWeight: 600, fontSize: size * 0.36, flexShrink: 0, border: large ? `3px solid ${COLORS.graphite}` : `1px solid ${COLORS.charcoal}`, boxShadow: large ? `0 0 0 2px ${COLORS.champagne}, 0 8px 24px rgba(139,124,246,0.25)` : "none" }}>{getInitials(name)}</div>;
 }
 function StatCard({ label, value, sub, color, tooltip }) {
   return (
@@ -270,8 +270,8 @@ export default function SalesCpLeaderboardPage() {
     if (value == null) return COLORS.mist;
     const c = infwTercileCutoffs[field];
     if (!c) return COLORS.mist;
-    if (value >= c.high) return "#3FB97E"; // green — top tercile
-    if (value <= c.low) return "#E76F51";  // red — bottom tercile
+    if (value >= c.high) return "#4ade80"; // green — top tercile
+    if (value <= c.low) return "#f08c8c";  // red — bottom tercile
     return COLORS.mist;
   }
 
@@ -376,7 +376,7 @@ export default function SalesCpLeaderboardPage() {
             >
               <Wrench size={14} /> Risolvi <span style={{ fontSize: 10, opacity: 0.7 }}>▾</span>
             </button>
-            <button onClick={() => url && mutate(url)} title="Ricarica" style={{ padding: "9px 14px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 10, color: COLORS.fog, fontSize: 13, cursor: "pointer" }}>🔄 Aggiorna</button>
+            <button onClick={() => url && mutate(url)} title="Ricarica" style={{ padding: "9px 14px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 10, color: COLORS.fog, fontSize: 13, cursor: "pointer" }}>Aggiorna</button>
             {troubleshootOpen && (
               <>
                 {/* overlay click-out */}
@@ -389,7 +389,7 @@ export default function SalesCpLeaderboardPage() {
                     { href: "/admin/group-categories", icon: Tags, label: "Group Categories", hint: "categorizza i group creator" },
                     { href: "/admin/group-languages", icon: Languages, label: "Group Languages", hint: "assegna lingua ai group" },
                     { href: "/admin/creatorspro-sync", icon: RefreshCw, label: "Sync CP", hint: "rifai sync sales da CreatorsPro" },
-                    { href: "/admin/creatorspro-sync-history", icon: RefreshCw, label: "Sync CP storico", hint: "rebuild full storico mesi" },
+                    { href: "/admin/wage-audit", icon: RefreshCw, label: "Sync & Audit CP", hint: "storico mesi: verifica e ripara" },
                   ].map((item) => {
                     const Icon = item.icon;
                     return (
@@ -462,7 +462,7 @@ export default function SalesCpLeaderboardPage() {
               <StatCard label="Operatori CP in classifica" value={fmtNum(data.eligible_total)} sub={data.no_cp_count > 0 ? `+${data.no_cp_count} senza CP data` : null} />
               <StatCard label="Score medio" value={`${data.avg_score?.toFixed(1).replace(".",",")} / 100`} tooltip="Media degli operatori in classifica" />
               <StatCard label="Tier Elite" value={fmtNum(data.elite_count)} sub={`${data.strong_count} Strong`} color={TIER_COLORS.Elite} />
-              <StatCard label="Sales agency (CP)" value={fmtCurrency(data.agency?.total_sales)} sub={`${data.agency?.total_shifts} shift · avg ${fmtCurrency(data.agency?.avg_sales_per_shift)}/shift`} color="#3FB97E" />
+              <StatCard label="Sales agency (CP)" value={fmtCurrency(data.agency?.total_sales)} sub={`${data.agency?.total_shifts} shift · avg ${fmtCurrency(data.agency?.avg_sales_per_shift)}/shift`} color={CP.accentGreen} />
             </div>
 
             {/* Banner Action Center: visibile solo se ci sono underperformer */}
@@ -473,25 +473,25 @@ export default function SalesCpLeaderboardPage() {
                   display: "flex", alignItems: "center", justifyContent: "space-between",
                   padding: "14px 20px",
                   marginBottom: 20,
-                  background: "linear-gradient(135deg, rgba(239,68,68,0.10) 0%, rgba(239,68,68,0.04) 100%)",
-                  border: "1px solid rgba(239,68,68,0.35)",
+                  background: CP.surface,
+                  border: `1px solid ${CP.accentRed}59`,
                   borderRadius: 12,
                   color: COLORS.alabaster,
                   textDecoration: "none",
                   gap: 14,
                   transition: "background 0.15s, border-color 0.15s",
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(239,68,68,0.7)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(239,68,68,0.35)"; }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = CP.accentRed + "b3"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = CP.accentRed + "59"; }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                   <div style={{
                     width: 40, height: 40, borderRadius: 10,
-                    background: "rgba(239,68,68,0.20)",
+                    background: CP.accentRed + "33",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     flexShrink: 0,
                   }}>
-                    <Target size={20} color="#EF4444" strokeWidth={2} />
+                    <Target size={20} color={CP.accentRed} strokeWidth={2} />
                   </div>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 15, color: COLORS.alabaster, marginBottom: 2 }}>
@@ -504,7 +504,7 @@ export default function SalesCpLeaderboardPage() {
                 </div>
                 <div style={{
                   display: "inline-flex", alignItems: "center", gap: 6,
-                  color: "#EF4444", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap",
+                  color: CP.accentRed, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap",
                 }}>
                   Apri Action Center <ArrowRight size={14} />
                 </div>
@@ -633,7 +633,7 @@ export default function SalesCpLeaderboardPage() {
                           <span>
                             {inflowwScore.score.toFixed(1)}
                             {diff !== null && Math.abs(diff) >= 10 && (
-                              <span style={{ marginLeft: 4, fontSize: 10, color: diff > 0 ? "#3FB97E" : "#EF4444" }}>
+                              <span style={{ marginLeft: 4, fontSize: 10, color: diff > 0 ? CP.accentGreen : CP.accentRed }}>
                                 {diff > 0 ? "↑" : "↓"}
                               </span>
                             )}
@@ -641,7 +641,7 @@ export default function SalesCpLeaderboardPage() {
                         ) : "—"}
                       </div>
                       <div><TierBadge tier={op.tier} /></div>
-                      <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: "#3FB97E", fontWeight: 600 }}>{fmtCurrency(op.cp_aggregates?.total_sales)}</div>
+                      <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: CP.accentGreen, fontWeight: 600 }}>{fmtCurrency(op.cp_aggregates?.total_sales)}</div>
                       <div style={{ fontFamily: FONTS.mono, fontSize: 13 }}>{fmtCurrency(op._kpis_cp?.sales_per_shift)}</div>
                       <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.fog }}>{op.cp_aggregates?.total_shifts || 0}</div>
                       <div style={{ fontFamily: FONTS.mono, fontSize: 13 }}>{fmtCurrency(op._kpis_cp?.sales_per_hour)}</div>
@@ -657,7 +657,7 @@ export default function SalesCpLeaderboardPage() {
                   <>
                     <div style={{ padding: "14px 22px", background: COLORS.obsidian + "80", borderTop: `1px solid ${COLORS.charcoal}`, borderBottom: `1px solid ${COLORS.charcoal}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                       <div style={{ fontSize: 12, color: COLORS.mist, flex: 1, minWidth: 280 }}>
-                        ⚠️ <b style={{ color: COLORS.alabaster }}>{noCpOps.length} operatori SENZA dati CP</b> (non mappati o periodo senza shift). Prova il recheck batch per recuperare le wage da CP API.
+                        <b style={{ color: COLORS.alabaster }}>{noCpOps.length} operatori SENZA dati CP</b> (non mappati o periodo senza shift). Prova il recheck batch per recuperare le wage da CP API.
                       </div>
                       <button
                         onClick={recheckAllNoCp}
@@ -690,7 +690,7 @@ export default function SalesCpLeaderboardPage() {
                       </button>
                     </div>
                     {!bulkRecheck.running && bulkRecheck.done > 0 && (
-                      <div style={{ padding: "10px 22px", background: bulkRecheck.recovered > 0 ? "#3FB97E18" : COLORS.obsidian + "40", fontSize: 11, borderBottom: `1px solid ${COLORS.charcoal}`, color: bulkRecheck.recovered > 0 ? "#3FB97E" : COLORS.fog }}>
+                      <div style={{ padding: "10px 22px", background: bulkRecheck.recovered > 0 ? CP.accentGreen + "18" : COLORS.obsidian + "40", fontSize: 11, borderBottom: `1px solid ${COLORS.charcoal}`, color: bulkRecheck.recovered > 0 ? CP.accentGreen : COLORS.fog }}>
                         ✓ Batch completato: {bulkRecheck.done} controllati · <b>{bulkRecheck.recovered} recuperati con nuove wage</b> · {bulkRecheck.errors} errori · {bulkRecheck.done - bulkRecheck.recovered - bulkRecheck.errors} senza wage CP nel periodo
                       </div>
                     )}
@@ -718,7 +718,7 @@ export default function SalesCpLeaderboardPage() {
                         </div>
                         <div style={{ gridColumn: "span 6", fontSize: 10, fontStyle: "italic" }}>
                           {recheckState[op.employee]?.message ? (
-                            <span style={{ color: recheckState[op.employee].state === "success" ? "#3FB97E" : recheckState[op.employee].state === "error" ? "#EF4444" : COLORS.mist }}>
+                            <span style={{ color: recheckState[op.employee].state === "success" ? CP.accentGreen : recheckState[op.employee].state === "error" ? CP.accentRed : COLORS.mist }}>
                               {recheckState[op.employee].message}
                             </span>
                           ) : (
@@ -776,17 +776,17 @@ function RecheckButton({ state, onClick }) {
     </span>;
   }
   if (s === "success") {
-    return <span title={state.message} style={iconBtnStyle("#3FB97E")}>
+    return <span title={state.message} style={iconBtnStyle(CP.accentGreen)}>
       <CheckCircle2 size={11} />
     </span>;
   }
   if (s === "error") {
-    return <button onClick={onClick} title={`Errore: ${state.message}. Click per riprovare`} style={iconBtnStyle("#EF4444", true)}>
+    return <button onClick={onClick} title={`Errore: ${state.message}. Click per riprovare`} style={iconBtnStyle(CP.accentRed, true)}>
       <XCircle size={11} />
     </button>;
   }
   return (
-    <button onClick={onClick} title="🔍 Cerca live in CP e auto-importa se trovato" style={iconBtnStyle(COLORS.champagne, true)}>
+    <button onClick={onClick} title="Cerca live in CP e auto-importa se trovato" style={iconBtnStyle(COLORS.champagne, true)}>
       <Search size={11} />
     </button>
   );

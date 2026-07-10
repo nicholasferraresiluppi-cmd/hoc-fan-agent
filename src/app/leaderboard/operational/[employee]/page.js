@@ -108,7 +108,7 @@ function ScoreSpark({ history }) {
 function Delta({ value, suffix = "" }) {
   if (value == null || value === 0) return <span style={{ color: COLORS.mist, fontSize: 11 }}>—</span>;
   const positive = value > 0;
-  const color = positive ? "#3FB97E" : "#E76F51";
+  const color = positive ? CP.accentGreen : CP.accentRed;
   return (
     <span style={{ color, fontWeight: 600, fontSize: 11, fontFamily: FONTS.mono }}>
       {positive ? "↑ +" : "↓ "}{Math.abs(value).toFixed(1)}{suffix}
@@ -194,7 +194,7 @@ export default function EmployeeDrilldownPage({ params }) {
             <span style={{ color: CP.textMuted }}>›</span>
             <span style={{ color: CP.textPrimary }}>{employee}</span>
           </div>
-          <Link href="/admin/employee-profiles" style={{ color: COLORS.champagne, fontSize: 12, textDecoration: "none", padding: "6px 12px", border: `1px solid ${COLORS.champagne}44`, borderRadius: 8 }}>⚙️ Anagrafica</Link>
+          <Link href="/admin/employee-profiles" style={{ color: COLORS.champagne, fontSize: 12, textDecoration: "none", padding: "6px 12px", border: `1px solid ${COLORS.champagne}44`, borderRadius: 8 }}>Anagrafica</Link>
         </div>
 
         {cpLoading && <p style={{ color: COLORS.fog }}>Caricamento diagnostico…</p>}
@@ -207,21 +207,20 @@ export default function EmployeeDrilldownPage({ params }) {
           <>
             {/* ===== BLOCCO 1: SNAPSHOT ===== */}
             <div style={{
-              background: `linear-gradient(135deg, ${cpTierColor}1F 0%, ${COLORS.graphite}99 60%)`,
+              background: CP.surface,
               border: `1px solid ${cpTierColor}55`,
               borderRadius: 20, padding: "28px 32px", marginBottom: 20,
               display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 28, alignItems: "center",
               position: "relative", overflow: "hidden",
             }}>
-              <div style={{ position: "absolute", inset: 0, background: `radial-gradient(circle 360px at 100% 50%, ${cpTierColor}30, transparent 70%)`, pointerEvents: "none" }} />
               <div style={{
                 width: 100, height: 100, borderRadius: "50%",
-                background: `linear-gradient(135deg, ${COLORS.champagne} 0%, ${COLORS.charcoal} 100%)`,
+                background: COLORS.champagne,
                 color: COLORS.obsidian,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontFamily: FONTS.display, fontWeight: 600, fontSize: 36,
                 border: `3px solid ${COLORS.graphite}`,
-                boxShadow: `0 0 0 3px ${COLORS.champagne}, 0 8px 24px rgba(212,175,122,0.3)`,
+                boxShadow: `0 0 0 3px ${COLORS.champagne}, 0 8px 24px rgba(139,124,246,0.3)`,
                 position: "relative",
               }}>{getInitials(employee)}</div>
 
@@ -238,16 +237,16 @@ export default function EmployeeDrilldownPage({ params }) {
                   </div>
                 )}
                 <div style={{ display: "flex", gap: 22, flexWrap: "wrap", fontSize: 13, marginBottom: 14 }}>
-                  <StatMini l="Sales mese" v={fmtCurrency(cp?.total_sales)} color="#3FB97E" />
+                  <StatMini l="Sales mese" v={fmtCurrency(cp?.total_sales)} color={CP.accentGreen} />
                   <StatMini l="Shift" v={cp?.total_shifts != null ? Math.round(cp.total_shifts) : "—"} />
                   <StatMini l="Creator" v={cp?.per_creator?.length ?? 0} sub={cp?.specialization_pct ? `${cp.specialization_pct}% top` : null} />
                   <StatMini l="Tempo in agency" v={fmtTenure(cpHist?.tenure_months_cp ?? histData?.tenure_months)} sub={cpHist?.first_seen_period ? `dal ${formatPeriodLabel(cpHist.first_seen_period)}` : (histData?.tenure_inferred ? "(stima)" : null)} />
-                  <StatMini l="Fatturato CP totale" v={fmtCurrency(cpHist?.ltv_cp_eur ?? histData?.ltv?.ltv_eur)} sub={`${cpHist?.periods_count ?? histData?.ltv?.periods_count ?? 0} mesi`} color="#3FB97E" />
+                  <StatMini l="Fatturato CP totale" v={fmtCurrency(cpHist?.ltv_cp_eur ?? histData?.ltv?.ltv_eur)} sub={`${cpHist?.periods_count ?? histData?.ltv?.periods_count ?? 0} mesi`} color={CP.accentGreen} />
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <ActionBtn href={`/admin/action-center?period_id=${periodId}`} color="#EF4444" icon={Target}>Action Center</ActionBtn>
-                  <ActionBtn href="#blocco-azioni" color="#F59E0B" icon={GraduationCap}>Coaching</ActionBtn>
-                  <ActionBtn href="/admin/employee-profiles" color="#3B82F6" icon={FileText}>Anagrafica + note</ActionBtn>
+                  <ActionBtn href={`/admin/action-center?period_id=${periodId}`} color={CP.accentRed} icon={Target}>Action Center</ActionBtn>
+                  <ActionBtn href="#blocco-azioni" color={CP.accent} icon={GraduationCap}>Coaching</ActionBtn>
+                  <ActionBtn href="/admin/employee-profiles" color={CP.accentSoftText} icon={FileText}>Anagrafica + note</ActionBtn>
                 </div>
               </div>
 
@@ -295,7 +294,7 @@ export default function EmployeeDrilldownPage({ params }) {
                   {cp.per_creator.map((row) => {
                     const tierColor = row.tier ? TIER_COLORS[row.tier] : COLORS.mist;
                     const cohortColor = row.vs_cohort_pct == null ? COLORS.mist
-                      : row.vs_cohort_pct > 0 ? "#3FB97E" : "#E76F51";
+                      : row.vs_cohort_pct > 0 ? CP.accentGreen : CP.accentRed;
                     return (
                       <div key={row.creator} style={{ display: "grid", gridTemplateColumns: "1.8fr 0.7fr 0.7fr 0.8fr 0.9fr 0.6fr 0.6fr 0.5fr", padding: "12px 20px", borderBottom: `1px solid ${COLORS.charcoal}88`, alignItems: "center", fontSize: 13 }}>
                         <div>
@@ -308,7 +307,7 @@ export default function EmployeeDrilldownPage({ params }) {
                           {row.low_confidence && <span title={`Solo ${row.shift_events_total} shift events: dato non affidabile`} style={{ color: COLORS.mist, fontSize: 10, marginLeft: 4 }}>⚠</span>}
                         </div>
                         <div><TierBadge tier={row.tier} size="sm" /></div>
-                        <div style={{ fontFamily: FONTS.mono, color: "#3FB97E", fontWeight: 600 }}>{fmtCurrency(row.sales)}</div>
+                        <div style={{ fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmtCurrency(row.sales)}</div>
                         <div style={{ fontFamily: FONTS.mono }}>{fmtCurrency(row.sales_per_shift)}</div>
                         <div style={{ fontFamily: FONTS.mono, color: COLORS.fog }}>{Math.round(row.shifts)}</div>
                         <div style={{ fontFamily: FONTS.mono, fontWeight: 600, color: cohortColor, fontSize: 12 }}>
@@ -335,7 +334,7 @@ export default function EmployeeDrilldownPage({ params }) {
                       Andamento score CP · {cpHist?.periods_count ?? 0} mesi attivi su {cpHist?.looked_back ?? 12}
                     </span>
                     {cpHist?.periods_not_synced > 0 && (
-                      <Link href="/admin/wage-audit" style={{ fontSize: 11, color: "#F59E0B", padding: "4px 10px", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.4)", borderRadius: 999, textDecoration: "none" }}>
+                      <Link href="/admin/wage-audit" style={{ fontSize: 11, color: CP.accentRed, padding: "4px 10px", background: CP.accentRed + "1F", border: `1px solid ${CP.accentRed}66`, borderRadius: 999, textDecoration: "none" }}>
                         ⚠ {cpHist.periods_not_synced} mesi non syncati · audit
                       </Link>
                     )}
@@ -350,16 +349,16 @@ export default function EmployeeDrilldownPage({ params }) {
                     const statusLabel = h.status === "not_synced" ? "non syncato"
                       : h.status === "no_activity" ? "nessuna attività"
                       : "attivo";
-                    const statusColor = h.status === "not_synced" ? "#F59E0B"
+                    const statusColor = h.status === "not_synced" ? CP.accentRed
                       : h.status === "no_activity" ? COLORS.mist
-                      : "#3FB97E";
+                      : CP.accentGreen;
                     return (
                       <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 0.7fr 0.6fr 0.7fr 0.8fr 0.6fr 1fr", gap: 8, padding: "8px 0", borderBottom: `1px solid ${COLORS.charcoal}55`, fontSize: 12, alignItems: "center", opacity: isActive ? 1 : 0.55 }}>
                         <div style={{ fontFamily: FONTS.mono }}>{formatPeriodLabel(h.period_id)}</div>
                         <div style={{ fontFamily: FONTS.mono, fontWeight: 600, color: h.tier ? TIER_COLORS[h.tier] : COLORS.mist }}>{h.score != null ? h.score.toFixed(1) : "—"}</div>
                         <div>{h.tier ? <TierBadge tier={h.tier} size="sm" /> : <span style={{ color: COLORS.mist }}>—</span>}</div>
                         <div style={{ fontFamily: FONTS.mono, color: COLORS.mist, fontSize: 11 }}>{infwForPeriod?.score != null ? infwForPeriod.score.toFixed(1) : "—"}</div>
-                        <div style={{ fontFamily: FONTS.mono, color: h.total_sales > 0 ? "#3FB97E" : COLORS.mist }}>{h.total_sales != null ? fmtCurrency(h.total_sales) : "—"}</div>
+                        <div style={{ fontFamily: FONTS.mono, color: h.total_sales > 0 ? CP.accentGreen : COLORS.mist }}>{h.total_sales != null ? fmtCurrency(h.total_sales) : "—"}</div>
                         <div style={{ fontFamily: FONTS.mono, color: COLORS.fog }}>{h.total_shifts != null ? Math.round(h.total_shifts) : "—"}</div>
                         <div style={{ fontSize: 10, color: statusColor, fontWeight: 600 }}>{statusLabel}</div>
                       </div>
@@ -446,8 +445,8 @@ function EmptyBlock({ text, icon: Icon }) {
 
 function InsightCard({ insight }) {
   const colors = {
-    warning: { bg: "rgba(245, 158, 11, 0.08)", border: "rgba(245, 158, 11, 0.35)", icon: "#F59E0B", Icon: AlertTriangle },
-    info:    { bg: "rgba(59, 130, 246, 0.08)", border: "rgba(59, 130, 246, 0.35)", icon: "#3B82F6", Icon: Info },
+    warning: { bg: CP.accentRed + "14", border: CP.accentRed + "59", icon: CP.accentRed, Icon: AlertTriangle },
+    info:    { bg: CP.accentSoftText + "14", border: CP.accentSoftText + "59", icon: CP.accentSoftText, Icon: Info },
   };
   const c = colors[insight.severity] || colors.info;
   return (

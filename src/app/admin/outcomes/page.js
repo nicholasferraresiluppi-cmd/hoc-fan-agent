@@ -3,16 +3,15 @@
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import AdminNav from "@/components/AdminNav";
 import { CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const HOC_COLORS = {
-  bgDark: "#08090F",
-  white: "#F5F6F8",
-  gray: "#6B7080",
-  orange: "#B89158",
-  gradient: "linear-gradient(135deg, #B89158 0%, #D44545 100%)",
+  bgDark: "#0a0d11",
+  white: "#f2f4f8",
+  gray: "#8c95a8",
+  orange: "#8b7cf6",
+  gradient: "#8b7cf6",
 };
 
 function currentISOWeek() {
@@ -88,7 +87,6 @@ export default function OutcomesPage() {
 
   return (
     <div style={{ background: HOC_COLORS.bgDark, minHeight: "100vh", color: HOC_COLORS.white, padding: "32px 28px 64px 28px", maxWidth: 1400, margin: "0 auto" }}>
-      <AdminNav />
       <PageHeader
         breadcrumb={
           <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
@@ -102,7 +100,7 @@ export default function OutcomesPage() {
         subtitle="Inserisci i risultati reali settimanali degli operatori. Questi dati chiudono il ciclo: confrontiamo il punteggio AI con la performance vera."
       />
 
-      {error && <p style={{ color: "#D44545" }}>{error}</p>}
+      {error && <p style={{ color: CP.accentRed }}>{error}</p>}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: "2rem", marginTop: "2rem" }}>
         <form onSubmit={submit} style={{ background: `${HOC_COLORS.white}05`, padding: "1.5rem", borderRadius: "0.75rem" }}>
@@ -125,7 +123,7 @@ export default function OutcomesPage() {
           <button type="submit" style={{ padding: "0.6rem 1.5rem", background: HOC_COLORS.gradient, border: "none", color: HOC_COLORS.bgDark, borderRadius: "0.5rem", fontWeight: 700, cursor: "pointer" }}>
             Salva outcome
           </button>
-          {saved && <p style={{ color: "#3FB97E", marginTop: "0.5rem" }}>✅ Salvato</p>}
+          {saved && <p style={{ color: CP.accentGreen, marginTop: "0.5rem" }}>Salvato</p>}
         </form>
 
         <div>

@@ -392,7 +392,7 @@ export default function CompCalendarPage() {
           {/* Stat cards: venduto / pagato / % / coverage */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 18 }}>
             <StatCard label="Venduto (creator)" value={fmt$(grid.totSales)} color={CP.accentGreen} sub={`${grid.rows.length} turni`} />
-            <StatCard label="Pagato operatori (attr.)" value={fmt$(grid.totEarn)} color="#D4AF7A" sub="quota attribuita a questa creator" />
+            <StatCard label="Pagato operatori (attr.)" value={fmt$(grid.totEarn)} color="#b9aef9" sub="quota attribuita a questa creator" />
             <StatCard label="% costo su venduto" value={grid.totSales > 0 ? fmtPct(grid.totEarn / grid.totSales, 1) : "—"} />
             <StatCard label="Operatori attivi" value={grid.operators.length} />
             <StatCard label="Slot vuoti (coverage)" value={grid.emptyCells} color={grid.emptyCells > 0 ? "#F59E0B" : CP.accentGreen} sub={`su ${grid.days.length * grid.mainSlots.length} slot`} />
@@ -505,7 +505,7 @@ export default function CompCalendarPage() {
                     const weekend = d.dow === "Sab" || d.dow === "Dom";
                     return (
                       <tr key={d.date} style={{ borderBottom: `1px solid ${CP.border}55`, background: weekend ? CP.surfaceAlt + "44" : "transparent" }}>
-                        <td style={{ ...td, position: "sticky", left: 0, background: CP.surface, fontFamily: FONTS.mono, fontSize: 10, whiteSpace: "nowrap", color: weekend ? "#D4AF7A" : CP.textSecondary, zIndex: 1 }}>
+                        <td style={{ ...td, position: "sticky", left: 0, background: CP.surface, fontFamily: FONTS.mono, fontSize: 10, whiteSpace: "nowrap", color: weekend ? "#b9aef9" : CP.textSecondary, zIndex: 1 }}>
                           {d.dow} {d.dayNum}
                         </td>
                         {grid.columns.map((c) => {
@@ -638,7 +638,7 @@ export default function CompCalendarPage() {
 
                 {sim && (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-                    <StatCard label="Pagato REALE" value={fmt$(grid.totEarn)} color="#D4AF7A" />
+                    <StatCard label="Pagato REALE" value={fmt$(grid.totEarn)} color="#b9aef9" />
                     <StatCard label="Pagato SIMULATO" value={fmt$(sim.total)} color={CP.accent} />
                     <StatCard
                       label="Δ per gli operatori"
@@ -699,7 +699,7 @@ export default function CompCalendarPage() {
                                 <td style={td}>{r.operator}</td>
                                 <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmt$(r.sales_on_creator)}</td>
                                 <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: grid.colorOf(r.expected_pct) }}>{fmtPct(r.expected_pct ?? r.eff_pct)}</td>
-                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#D4AF7A" }}>{fmt$(r.earnings_attr)}</td>
+                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#b9aef9" }}>{fmt$(r.earnings_attr)}</td>
                                 <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: r.bracket_changed ? CP.accent : CP.textSecondary }}>{fmtPct(r.sim_pct)}</td>
                                 <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accent }}>{fmt$(r.sim_earn)}</td>
                                 <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: Math.abs(r.row_delta) < 0.5 ? CP.textMuted : r.row_delta > 0 ? CP.accentRed : CP.accentGreen }}>
@@ -745,7 +745,7 @@ export default function CompCalendarPage() {
                       <td style={{ ...td, fontWeight: 600 }}>{o.name}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono }}>{o.turni}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmt$(o.sales)}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#D4AF7A" }}>{fmt$(o.earn)}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#b9aef9" }}>{fmt$(o.earn)}</td>
                       {simChanged && <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accent }}>{simEarn != null ? fmt$(simEarn) : "—"}</td>}
                       {simChanged && (
                         <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: delta == null ? CP.textMuted : delta > 0 ? CP.accentRed : CP.accentGreen }}>

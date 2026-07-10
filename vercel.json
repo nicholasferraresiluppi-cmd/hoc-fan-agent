@@ -7,10 +7,6 @@
     {
       "path": "/api/leagues/snapshot",
       "schedule": "10 0 1 * *"
-    },
-    {
-      "path": "/api/content-pipeline/cron",
-      "schedule": "0 9 * * *"
     }
   ]
 }

@@ -2,11 +2,12 @@
 
 // V10.7 — skeleton placeholders to make navigation feel snappy.
 // Generic shimmer block + ready-made shapes for hero / cards / rows.
+// Flat per DESIGN.md: niente gradient, pulse di opacità su superficie solida.
 
-import { COLORS } from "@/lib/brand";
+import { COLORS, CP } from "@/lib/brand";
 
-const BASE = COLORS.charcoal || "#1B1E26";
-const HIGHLIGHT = COLORS.graphite || "#111318";
+const BASE = COLORS.charcoal || "#151a22";
+const BLOCK = CP.surfaceAlt; // blocco skeleton flat, visibile sia su bg che su surface
 
 export function Shimmer({ width = "100%", height = 16, radius = 6, style = {} }) {
   return (
@@ -15,8 +16,7 @@ export function Shimmer({ width = "100%", height = 16, radius = 6, style = {} })
         width,
         height,
         borderRadius: radius,
-        background: `linear-gradient(90deg, ${BASE} 0%, ${HIGHLIGHT} 50%, ${BASE} 100%)`,
-        backgroundSize: "200% 100%",
+        background: BLOCK,
         animation: "hocShimmer 1.4s ease-in-out infinite",
         ...style,
       }}
@@ -33,7 +33,7 @@ export function PlayerCardSkeleton({ compact = false }) {
         width: w,
         height: h,
         borderRadius: 18,
-        background: `linear-gradient(180deg, ${HIGHLIGHT} 0%, ${BASE} 100%)`,
+        background: BASE,
         border: `1px solid ${BASE}`,
         padding: "1.25rem",
         display: "flex",
@@ -87,6 +87,6 @@ export function GridSkeleton({ count = 6, minWidth = 220, height = 140 }) {
 if (typeof window !== "undefined" && !document.getElementById("hoc-shimmer-keyframes")) {
   const s = document.createElement("style");
   s.id = "hoc-shimmer-keyframes";
-  s.textContent = `@keyframes hocShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`;
+  s.textContent = `@keyframes hocShimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }`;
   document.head.appendChild(s);
 }

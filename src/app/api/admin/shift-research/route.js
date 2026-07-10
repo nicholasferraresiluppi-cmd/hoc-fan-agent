@@ -73,7 +73,7 @@ export async function GET(request) {
     const wages = (await kv.get(`cp:wages:${periodId}`)) || [];
     if (!Array.isArray(wages) || wages.length === 0) {
       return Response.json({
-        error: `Nessuna wage in KV per ${periodId}. Il mese è stato sincronizzato? Vai su /admin/creatorspro-sync-history.`,
+        error: `Nessuna wage in KV per ${periodId}. Il mese è stato sincronizzato? Vai su /admin/wage-audit.`,
         diagnostics: { kv_key: `cp:wages:${periodId}`, kv_value_type: typeof wages },
       }, { status: 404 });
     }

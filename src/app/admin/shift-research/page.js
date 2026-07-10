@@ -161,9 +161,9 @@ export default function ShiftResearchPage() {
 
           {/* Q2 */}
           <SectionLabel style={{ display: "block", marginBottom: 10 }}>Q2 — Formula scaglioni (bracket intero vs cumulativa)</SectionLabel>
-          <CpCard accent="#D4AF7A" padding="16px 20px" style={{ marginBottom: 22 }}>
+          <CpCard accent="#b9aef9" padding="16px 20px" style={{ marginBottom: 22 }}>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
-              <CheckCircle2 size={15} color="#D4AF7A" /> {data.q2_verdict}
+              <CheckCircle2 size={15} color="#b9aef9" /> {data.q2_verdict}
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {(data.q2_eff_pct_distribution || []).slice(0, 12).map((b) => (
@@ -181,7 +181,7 @@ export default function ShiftResearchPage() {
                 <AlertCircle size={15} />
                 <span>
                   I turni in KV non hanno ancora il payment profile (sync precedente al fix Fase B).
-                  <b> Re-sync di questo mese</b> da <Link href="/admin/creatorspro-sync-history" style={{ color: "#F59E0B" }}>Sync CP storico</Link> per popolare le colonne Profilo / % attesa / Δ.
+                  <b> Re-sync di questo mese</b> da <Link href="/admin/wage-audit" style={{ color: "#F59E0B" }}>Sync &amp; Audit CP</Link> per popolare le colonne Profilo / % attesa / Δ.
                 </span>
               </div>
             </CpCard>
@@ -228,7 +228,7 @@ export default function ShiftResearchPage() {
                       <td style={td}>{r.operator}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmt$(r.sales_on_creator)}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textMuted }}>{fmt$(r.sales_total_shift)}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#D4AF7A" }}>{fmt$(r.earnings)}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#b9aef9" }}>{fmt$(r.earnings)}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700 }}>{fmtPct(r.eff_pct)}</td>
                       <td style={{ ...td, fontSize: 11 }}>
                         {r.profile_name

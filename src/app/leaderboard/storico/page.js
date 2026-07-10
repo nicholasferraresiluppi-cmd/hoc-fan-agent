@@ -54,7 +54,7 @@ export default function HallOfFamePage() {
       <PageHeader
         breadcrumb={<Breadcrumb />}
         section="Albo storico"
-        title="🏛️ Hall of Fame"
+        title="Hall of Fame"
         subtitle="I campioni settimana per settimana — top 3 della Academy + champions per ogni skill."
       />
 
@@ -69,7 +69,7 @@ export default function HallOfFamePage() {
       {/* Hall of Fame — most wins */}
       {hof.length > 0 && (
         <div style={{ marginBottom: 24 }}>
-          <SectionLabel style={{ marginBottom: 10, display: "block" }}>👑 Più vittorie settimanali</SectionLabel>
+          <SectionLabel style={{ marginBottom: 10, display: "block" }}>Più vittorie settimanali</SectionLabel>
           <CpCard accent={GOLD} padding="0">
             {hof.map((h, i) => (
               <div key={h.userId} style={{

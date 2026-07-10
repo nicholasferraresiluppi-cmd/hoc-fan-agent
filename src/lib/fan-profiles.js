@@ -230,11 +230,9 @@ REGOLE:
  * Pattern psicologici di vendita — estratti da Andrea Spagnuolo (top operator HOC).
  * Usati dallo scoring engine per valutare le risposte dell'operatore.
  *
- * Storicamente esportato come `ANDREA_PATTERNS`. Da V6.5 viene esportato anche
- * come `SPAGNUOLO_PATTERNS` per chiarezza, dato che ora coesiste con
+ * Esportato come `SPAGNUOLO_PATTERNS` da V6.5, dato che coesiste con
  * `TERRANOVA_PATTERNS` (un secondo benchmark estratto dai messaggi reali di
- * Andrea Terranova). `ANDREA_PATTERNS` resta come alias di `SPAGNUOLO_PATTERNS`
- * per backward-compatibility.
+ * Andrea Terranova).
  */
 export const SPAGNUOLO_PATTERNS = {
   emotional_vulnerability: {
@@ -268,10 +266,6 @@ export const SPAGNUOLO_PATTERNS = {
     weight: 1.5
   }
 };
-
-// Backward-compatibility alias. Codice esistente che importa ANDREA_PATTERNS
-// continua a funzionare senza modifiche.
-export const ANDREA_PATTERNS = SPAGNUOLO_PATTERNS;
 
 /**
  * Pattern stilistici di vendita — estratti da Andrea Terranova (top operator

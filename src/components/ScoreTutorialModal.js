@@ -33,22 +33,22 @@ const STEPS = [
     id: "what",
     title: "Cosa misura lo score?",
     icon: Target,
-    accent: "#10B981",
+    accent: CP.accent,
     body: ({ onNext }) => (
       <div>
         <p style={p}>
           Lo score di un operatore <b>su una creator</b> risponde a una domanda doppia:
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 18, marginBottom: 18 }}>
-          <div style={miniCard("#10B981")}>
-            <div style={miniHeader}><Users size={14} color="#10B981" /> vs Creator</div>
+          <div style={miniCard(CP.accentGreen)}>
+            <div style={miniHeader}><Users size={14} color={CP.accentGreen} /> vs Creator</div>
             <p style={miniBody}>
               "Sei tra i migliori che lavorano <b>su quella creator</b>?"<br />
               <span style={{ color: CP.textMuted, fontSize: 11 }}>Percentile vs altri operatori della stessa creator.</span>
             </p>
           </div>
-          <div style={miniCard("#3B82F6")}>
-            <div style={miniHeader}><Sparkles size={14} color="#3B82F6" /> vs Agency</div>
+          <div style={miniCard(CP.accentSoftText)}>
+            <div style={miniHeader}><Sparkles size={14} color={CP.accentSoftText} /> vs Agency</div>
             <p style={miniBody}>
               "In scala agency, <b>quanto vali in assoluto</b>?"<br />
               <span style={{ color: CP.textMuted, fontSize: 11 }}>Percentile vs tutti gli operatori del mese.</span>
@@ -65,7 +65,7 @@ const STEPS = [
     id: "formula",
     title: "La formula in 1 schermata",
     icon: Calculator,
-    accent: "#3B82F6",
+    accent: CP.accent,
     body: () => (
       <div>
         <div style={formulaBlock}>
@@ -89,7 +89,7 @@ const STEPS = [
             <span style={weight}>30%</span>
           </div>
           <div style={{ color: CP.textMuted, fontSize: 11, textAlign: "center", marginTop: 4 }}>↓ Blending dei 2 percentili</div>
-          <div style={{ textAlign: "center", marginTop: 12, fontFamily: FONTS.mono, fontWeight: 700, color: "#A855F7", fontSize: 18 }}>
+          <div style={{ textAlign: "center", marginTop: 12, fontFamily: FONTS.mono, fontWeight: 700, color: CP.accentSoftText, fontSize: 18 }}>
             = score 0..100
           </div>
         </div>
@@ -107,7 +107,7 @@ const STEPS = [
     id: "perspectives",
     title: "Perché 2 percentili?",
     icon: Activity,
-    accent: "#A855F7",
+    accent: CP.accent,
     body: () => (
       <div>
         <p style={p}>
@@ -163,7 +163,7 @@ const STEPS = [
     id: "tiers",
     title: "I 6 tier di classificazione",
     icon: Award,
-    accent: "#F59E0B",
+    accent: CP.accent,
     body: () => (
       <div>
         <p style={p}>
@@ -194,7 +194,7 @@ const STEPS = [
     id: "aggregate",
     title: "Score aggregato operatore",
     icon: Users,
-    accent: "#10B981",
+    accent: CP.accent,
     body: () => (
       <div>
         <p style={p}>
@@ -222,10 +222,10 @@ const STEPS = [
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <ArrowRight size={16} color="#3B82F6" />
+            <ArrowRight size={16} color={CP.accentSoftText} />
             <span style={{ fontSize: 13, color: CP.textSecondary }}>
               Vuoi simulare uno score?{" "}
-              <Link href="/welcome/score-explained" style={{ color: "#3B82F6", fontWeight: 600 }}>Calcolatore interattivo →</Link>
+              <Link href="/welcome/score-explained" style={{ color: CP.accentSoftText, fontWeight: 600 }}>Calcolatore interattivo →</Link>
             </span>
           </div>
         </div>
@@ -278,7 +278,7 @@ export default function ScoreTutorialModal({ onClose }) {
         <div style={{
           padding: "18px 22px", borderBottom: `1px solid ${CP.border}`,
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          background: `linear-gradient(135deg, ${current.accent}15, transparent)`,
+          background: CP.surface,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{
@@ -337,11 +337,11 @@ export default function ScoreTutorialModal({ onClose }) {
             {step + 1} / {total}
           </span>
           {step < total - 1 ? (
-            <button onClick={() => setStep(step + 1)} style={{ ...navBtn, background: current.accent, color: "#0a0a0a", border: "none", fontWeight: 700 }}>
+            <button onClick={() => setStep(step + 1)} style={{ ...navBtn, background: current.accent, color: CP.accentInk, border: "none", fontWeight: 700 }}>
               Avanti <ChevronRight size={14} />
             </button>
           ) : (
-            <button onClick={onClose} style={{ ...navBtn, background: current.accent, color: "#0a0a0a", border: "none", fontWeight: 700 }}>
+            <button onClick={onClose} style={{ ...navBtn, background: current.accent, color: CP.accentInk, border: "none", fontWeight: 700 }}>
               Capito ✓
             </button>
           )}
@@ -363,8 +363,8 @@ const formulaLine = { display: "flex", alignItems: "center", justifyContent: "ce
 const kpi = { padding: "5px 10px", background: CP.surfaceAlt, border: `1px solid ${CP.border}`, borderRadius: 6, color: CP.textPrimary, fontWeight: 600 };
 const weight = { padding: "5px 8px", background: CP.accentGreen + "22", color: CP.accentGreen, borderRadius: 6, fontWeight: 700 };
 const op = { color: CP.textMuted, fontSize: 14 };
-const pillBlue = { padding: "5px 10px", background: "#3B82F622", color: "#3B82F6", border: "1px solid #3B82F644", borderRadius: 6, fontWeight: 600 };
-const pillGreen = { padding: "5px 10px", background: "#10B98122", color: "#10B981", border: "1px solid #10B98144", borderRadius: 6, fontWeight: 600 };
+const pillBlue = { padding: "5px 10px", background: CP.accentSoft, color: CP.accentSoftText, border: `1px solid ${CP.accentDim}`, borderRadius: 6, fontWeight: 600 };
+const pillGreen = { padding: "5px 10px", background: CP.accentGreen + "22", color: CP.accentGreen, border: `1px solid ${CP.accentGreen}44`, borderRadius: 6, fontWeight: 600 };
 const tbl = { width: "100%", borderCollapse: "collapse", fontSize: 12, marginTop: 14, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, overflow: "hidden" };
 const th = { padding: "9px 10px", textAlign: "left", color: CP.textMuted, fontSize: 10, letterSpacing: "0.08em", borderBottom: `1px solid ${CP.borderStrong}`, fontFamily: FONTS.mono, fontWeight: 700 };
 const td = { padding: "10px", borderBottom: `1px solid ${CP.border}`, color: CP.textPrimary, fontFamily: FONTS.mono, fontSize: 12 };

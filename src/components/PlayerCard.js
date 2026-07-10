@@ -152,11 +152,11 @@ export default function PlayerCard({
         flexDirection: "column",
       }}
     >
-      {/* Shine overlay */}
+      {/* Shine overlay — disattivato: flat per DESIGN.md (niente gradient/glow) */}
       <div style={{
         position: "absolute",
         top: 0, left: "-20%", right: "-20%", height: "55%",
-        background: "linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 100%)",
+        background: "none",
         pointerEvents: "none",
       }} />
 

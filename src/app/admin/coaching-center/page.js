@@ -125,10 +125,10 @@ export default function CoachingCenterPage() {
             style={{
               display: "inline-flex", alignItems: "center", gap: 6,
               padding: "8px 14px",
-              background: "rgba(239,68,68,0.1)",
-              border: "1px solid rgba(239,68,68,0.4)",
+              background: `${CP.accentRed}1a`,
+              border: `1px solid ${CP.accentRed}66`,
               borderRadius: 8,
-              color: "#EF4444",
+              color: CP.accentRed,
               fontSize: 12, fontWeight: 700,
               textDecoration: "none",
             }}
@@ -141,8 +141,8 @@ export default function CoachingCenterPage() {
       {/* SUMMARY */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
         <StatCard label="Candidati coaching" value={candidates.length} sub={`Score 25-50, ${periodId}`} />
-        <StatCard label="Già assegnati" value={assignedCount} color="#F59E0B" />
-        <StatCard label="Completati questo mese" value={completedCount} color="#10B981" />
+        <StatCard label="Già assegnati" value={assignedCount} color={CP.accentRed} />
+        <StatCard label="Completati questo mese" value={completedCount} color={CP.accentGreen} />
         <StatCard label="In lista da rivedere" value={filtered.length} sub={hideAssigned ? "nascondi assegnati: ON" : "tutti visibili"} />
       </div>
 
@@ -236,7 +236,7 @@ function CandidateRow({ c, onAssign, onComplete, onReject, onDelete }) {
   return (
     <div style={{
       background: COLORS.graphite,
-      border: `1px solid ${isAssigned ? "#F59E0B55" : isCompleted ? "#10B98155" : COLORS.charcoal}`,
+      border: `1px solid ${isAssigned ? CP.accentRed + "55" : isCompleted ? CP.accentGreen + "55" : COLORS.charcoal}`,
       borderRadius: 14,
       padding: "16px 20px",
       opacity: isRejected ? 0.5 : 1,
@@ -245,8 +245,8 @@ function CandidateRow({ c, onAssign, onComplete, onReject, onDelete }) {
       <div style={{ display: "grid", gridTemplateColumns: "auto 1.6fr 1fr 0.8fr auto", gap: 16, alignItems: "center" }}>
         <div style={{
           width: 44, height: 44, borderRadius: "50%",
-          background: `linear-gradient(135deg, ${COLORS.champagne}, ${COLORS.charcoal})`,
-          color: COLORS.obsidian,
+          background: CP.accentSoft,
+          color: CP.accentSoftText,
           display: "flex", alignItems: "center", justifyContent: "center",
           fontFamily: FONTS.display, fontWeight: 700, fontSize: 14,
         }}>{getInitials(c.employee)}</div>
@@ -282,8 +282,8 @@ function CandidateRow({ c, onAssign, onComplete, onReject, onDelete }) {
         </div>
 
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          {isAssigned && <span style={{ padding: "4px 10px", background: "#F59E0B22", color: "#F59E0B", borderRadius: 999, fontSize: 11, fontWeight: 700 }}>ASSEGNATO</span>}
-          {isCompleted && <span style={{ padding: "4px 10px", background: "#10B98122", color: "#10B981", borderRadius: 999, fontSize: 11, fontWeight: 700 }}>COMPLETATO</span>}
+          {isAssigned && <span style={{ padding: "4px 10px", background: CP.accentRed + "22", color: CP.accentRed, borderRadius: 999, fontSize: 11, fontWeight: 700 }}>ASSEGNATO</span>}
+          {isCompleted && <span style={{ padding: "4px 10px", background: CP.accentGreen + "22", color: CP.accentGreen, borderRadius: 999, fontSize: 11, fontWeight: 700 }}>COMPLETATO</span>}
           {isRejected && <span style={{ padding: "4px 10px", background: COLORS.charcoal, color: COLORS.mist, borderRadius: 999, fontSize: 11, fontWeight: 700 }}>RIFIUTATO</span>}
           <button onClick={() => setExpanded((v) => !v)} style={chevronBtn}>
             <ChevronDown size={16} style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
@@ -296,9 +296,9 @@ function CandidateRow({ c, onAssign, onComplete, onReject, onDelete }) {
         <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${COLORS.charcoal}` }}>
           {/* Diagnosi */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 16 }}>
-            <DiagBlock label="Punto debole" value={c.weakest_creator || "—"} sub={c.weakest_creator_score != null ? `score loc. ${c.weakest_creator_score}` : null} color="#EF4444" />
-            <DiagBlock label="Punto di forza" value={c.strongest_creator || "—"} sub={c.strongest_creator_score != null ? `score loc. ${c.strongest_creator_score}` : null} color="#10B981" />
-            <DiagBlock label="Sales mese" value={fmtCurrency(c.total_sales)} sub={`${c.total_creators} creator, ${c.reliable_creators_count} affidabili`} color="#3FB97E" />
+            <DiagBlock label="Punto debole" value={c.weakest_creator || "—"} sub={c.weakest_creator_score != null ? `score loc. ${c.weakest_creator_score}` : null} color={CP.accentRed} />
+            <DiagBlock label="Punto di forza" value={c.strongest_creator || "—"} sub={c.strongest_creator_score != null ? `score loc. ${c.strongest_creator_score}` : null} color={CP.accentGreen} />
+            <DiagBlock label="Sales mese" value={fmtCurrency(c.total_sales)} sub={`${c.total_creators} creator, ${c.reliable_creators_count} affidabili`} color={CP.accentGreen} />
           </div>
 
           {/* Training scenario suggerito */}
@@ -328,21 +328,21 @@ function CandidateRow({ c, onAssign, onComplete, onReject, onDelete }) {
           {/* Azioni */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {!isAssigned && !isCompleted && (
-              <button onClick={() => onAssign(c.training.categoryId, owner, deadline, note)} style={actionBtn("#F59E0B")}>
+              <button onClick={() => onAssign(c.training.categoryId, owner, deadline, note)} style={actionBtn(CP.accentRed)}>
                 <GraduationCap size={14} /> Assegna training
               </button>
             )}
             {isAssigned && (
               <>
-                <button onClick={() => onComplete(note)} style={actionBtn("#10B981")}>
+                <button onClick={() => onComplete(note)} style={actionBtn(CP.accentGreen)}>
                   <CheckCircle2 size={14} /> Marca completato
                 </button>
-                <button onClick={() => onReject(note)} style={actionBtn("#9CA3AF")}>
+                <button onClick={() => onReject(note)} style={actionBtn(CP.textMuted)}>
                   <X size={14} /> Rifiuta
                 </button>
               </>
             )}
-            <Link href={`/leaderboard/operational/${encodeURIComponent(c.employee)}`} style={{ ...actionBtn("#3B82F6"), textDecoration: "none" }}>
+            <Link href={`/leaderboard/operational/${encodeURIComponent(c.employee)}`} style={{ ...actionBtn(CP.accentSoftText), textDecoration: "none" }}>
               <FileText size={14} /> Apri drill-down
             </Link>
             {c.assignment && (

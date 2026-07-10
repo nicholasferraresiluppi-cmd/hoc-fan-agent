@@ -105,7 +105,7 @@ export default function CreatorsLeaderboardPage() {
               <Info size={14} /> Score?
             </button>
             <button onClick={() => url && mutate(url)} style={styles.button}>↻ Aggiorna</button>
-            <Link href={`/leaderboard/creators/heatmap?period_id=${periodId}`} style={styles.primaryBtn}>🔥 Heat-map →</Link>
+            <Link href={`/leaderboard/creators/heatmap?period_id=${periodId}`} style={styles.primaryBtn}>Heat-map →</Link>
           </div>
         </div>
 
@@ -204,7 +204,7 @@ export default function CreatorsLeaderboardPage() {
             {suggestions.length > 0 && (
               <CpCard padding="20px 24px" style={{ marginBottom: 24 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                  <SectionLabel>💡 Match Suggestions — Specializzazioni</SectionLabel>
+                  <SectionLabel>Match Suggestions — Specializzazioni</SectionLabel>
                   <span style={{ fontSize: 11, color: CP.textMuted }}>Top {Math.min(5, suggestions.length)} di {suggestions.length}</span>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: 12 }}>
@@ -229,7 +229,7 @@ export default function CreatorsLeaderboardPage() {
             {/* SEARCH + RANKED LIST RESTO CREATOR */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 12, flexWrap: "wrap" }}>
               <SectionLabel size={11}>Tutte le creator ({filtered.length}{search ? ` su ${creators.length}` : ""})</SectionLabel>
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 Cerca creator o operatore…" style={{ ...styles.input, width: 320 }} />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cerca creator o operatore…" style={{ ...styles.input, width: 320 }} />
             </div>
 
             <CpCard padding="0">
@@ -283,7 +283,7 @@ export default function CreatorsLeaderboardPage() {
             </CpCard>
 
             <p style={{ fontSize: 11, color: CP.textMuted, marginTop: 16, fontStyle: "italic" }}>
-              💡 Le sales degli shift multi-creator sono attribuite usando i singoli <code style={{ background: CP.surfaceAlt, padding: "1px 6px", borderRadius: 3 }}>takes</code> di CP quando disponibili (attribuzione esatta), altrimenti split 50/50 (stima). Re-sync CP per aggiornare.
+              Le sales degli shift multi-creator sono attribuite usando i singoli <code style={{ background: CP.surfaceAlt, padding: "1px 6px", borderRadius: 3 }}>takes</code> di CP quando disponibili (attribuzione esatta), altrimenti split 50/50 (stima). Re-sync CP per aggiornare.
             </p>
           </>
         )}

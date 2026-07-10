@@ -172,7 +172,7 @@ export async function fetchWagesStatusCounts({ startedAt, endedAt, memberId, gro
 }
 
 /**
- * Payment Profiles — endpoint scoperto via /admin/cp-probe.
+ * Payment Profiles — endpoint scoperto via probe (lug 2026, tool poi rimosso).
  * Path: /v1/payment-profiles
  * Shape per record: { id, name, hourlyRate, cosellersCount, tag,
  *   paymentProfileThresholds: [{ id, threshold, percentage }],

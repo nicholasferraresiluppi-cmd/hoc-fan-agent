@@ -2,7 +2,6 @@ import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
 import {
   FAN_PROFILES,
-  ANDREA_PATTERNS, // backward-compat (= SPAGNUOLO_PATTERNS)
   getBenchmarkPatterns,
   getBenchmarkLabel,
 } from "@/lib/fan-profiles";

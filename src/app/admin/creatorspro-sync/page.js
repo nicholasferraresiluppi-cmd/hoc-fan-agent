@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import useSWR, { mutate } from "swr";
-import AdminNav from "@/components/AdminNav";
 import Link from "next/link";
 import { COLORS, FONTS, CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
@@ -184,7 +183,6 @@ export default function CreatorsProSyncPage() {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <AdminNav />
         <PageHeader
           breadcrumb={
             <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>

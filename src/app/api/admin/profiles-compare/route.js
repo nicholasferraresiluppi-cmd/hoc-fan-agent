@@ -40,7 +40,7 @@ export async function GET(request) {
   const wages = (await kv.get(`cp:wages:${periodId}`)) || [];
   if (!Array.isArray(wages) || wages.length === 0) {
     return Response.json({
-      error: `Nessuna wage in KV per ${periodId}. Sincronizza il mese da /admin/creatorspro-sync-history.`,
+      error: `Nessuna wage in KV per ${periodId}. Sincronizza il mese da /admin/wage-audit.`,
     }, { status: 404 });
   }
 

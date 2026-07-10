@@ -8,8 +8,8 @@ import {
   Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown,
   GraduationCap, BookOpen, ClipboardCheck, Target, Brain, Award,
   LayoutDashboard, UserCog, Sparkles,
-  Workflow, RefreshCw, Ban, Languages, Tags, Upload, Sliders,
-  UserCircle2, Contact, Medal, Key, Lock, Wrench,
+  RefreshCw, Ban, Languages, Tags, Upload, Sliders,
+  UserCircle2, Contact, Medal, Key, Lock, Wrench, Link2,
   ArrowUpRight, Calendar, Activity, CheckCircle2, AlertCircle,
   Wallet, Scale, ShieldCheck,
 } from "lucide-react";
@@ -79,13 +79,6 @@ const SHORTCUT_GROUPS = [
     ],
   },
   {
-    label: "Content Pipeline",
-    items: [
-      { href: "/content-pipeline",          title: "Pipeline",  desc: "Flusso di content production end-to-end", icon: Workflow },
-      { href: "/content-pipeline/queue",    title: "Queue",     desc: "Code attive: foto, edit, approval", icon: Activity },
-    ],
-  },
-  {
     label: "People & Access",
     items: [
       { href: "/admin/action-center",     title: "Action Center", desc: "Lista underperformers + swap + export HR", icon: Target },
@@ -102,6 +95,9 @@ const SHORTCUT_GROUPS = [
     label: "Data & Integrations",
     items: [
       { href: "/admin/creatorspro-sync",       title: "Sync CP",        desc: "Sincronizza wages + shifts CP (mensile)", icon: RefreshCw },
+      { href: "/admin/wage-audit",             title: "Sync & Audit CP", desc: "Storico mese per mese: KV vs live CP, sync/ripara", icon: ShieldCheck },
+      { href: "/admin/debug-mapping",          title: "Debug Mapping",  desc: "Perché un operatore risulta senza dati CP", icon: Link2 },
+      { href: "/admin/reports",                title: "Analytics",      desc: "Report Looker Studio dell'agency", icon: BarChart3 },
       { href: "/admin/infloww-agency",         title: "Revenue agency", desc: "Portfolio live: netto di tutte le creator, ranking", icon: Activity },
       { href: "/admin/infloww-revenue",        title: "Revenue live",   desc: "Ledger fan-by-fan di una creator, tempo reale", icon: Activity },
       { href: "/admin/infloww-reconcile",      title: "Controllo dati CP", desc: "Il venduto CP è completo? Confronto col reale Infloww", icon: ShieldCheck },
@@ -215,14 +211,14 @@ export default function AdminHub() {
             display: "flex", alignItems: "center", gap: 14,
             padding: "14px 20px",
             marginBottom: 18,
-            background: "linear-gradient(135deg, rgba(245,158,11,0.10) 0%, rgba(245,158,11,0.04) 100%)",
-            border: "1px solid rgba(245,158,11,0.45)",
+            background: CP.surface,
+            border: `1px solid ${CP.accentRed}55`,
             borderRadius: 12,
             textDecoration: "none", color: CP.textPrimary,
           }}
         >
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(245,158,11,0.20)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <AlertCircle size={20} color="#F59E0B" />
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: CP.accentRed + "22", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <AlertCircle size={20} color={CP.accentRed} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>
@@ -232,7 +228,7 @@ export default function AdminHub() {
               KV: {gapCheck.kv_count} · CP API live: {gapCheck.cp_live_count}. Apri Wage Audit e clicca "Recupera tutti i mesi con gap" per riallineare lo storico.
             </div>
           </div>
-          <span style={{ color: "#F59E0B", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>Vai a Wage Audit →</span>
+          <span style={{ color: CP.accentRed, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>Vai a Wage Audit →</span>
         </Link>
       )}
 
@@ -301,7 +297,7 @@ export default function AdminHub() {
           display: "flex", alignItems: "center", gap: 16,
           padding: "18px 22px",
           marginBottom: 14,
-          background: `linear-gradient(135deg, ${CP.accentGreen}18 0%, #A855F715 100%)`,
+          background: CP.surface,
           border: `1px solid ${CP.accentGreen}55`,
           borderRadius: 14,
           textDecoration: "none", color: CP.textPrimary,
@@ -318,7 +314,7 @@ export default function AdminHub() {
           <Sparkles size={20} color={CP.accentGreen} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 3 }}>📚 Capisci come funziona lo Score (tutorial)</div>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 3 }}>Capisci come funziona lo Score (tutorial)</div>
           <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.5 }}>
             Tutorial narrativo con esempi concreti + Q&amp;A interattivo. Puoi fare domande in qualsiasi punto se non ti torna.
           </div>
@@ -333,7 +329,7 @@ export default function AdminHub() {
           style={{
             display: "flex", alignItems: "center", gap: 16,
             padding: "20px 24px",
-            background: `linear-gradient(135deg, ${CP.accentBlue}18 0%, ${CP.accentBlue}05 100%)`,
+            background: CP.accentSoft,
             border: `1px solid ${CP.accentBlue}55`,
             borderRadius: 14,
             textDecoration: "none", color: CP.textPrimary,
@@ -359,11 +355,11 @@ export default function AdminHub() {
         </Link>
 
         <Link
-          href="/admin/creatorspro-sync-history"
+          href="/admin/wage-audit"
           style={{
             display: "flex", alignItems: "center", gap: 16,
             padding: "20px 24px",
-            background: `linear-gradient(135deg, ${CP.accentGreen}18 0%, ${CP.accentGreen}05 100%)`,
+            background: CP.surface,
             border: `1px solid ${CP.accentGreen}55`,
             borderRadius: 14,
             textDecoration: "none", color: CP.textPrimary,
@@ -380,9 +376,9 @@ export default function AdminHub() {
             <RefreshCw size={22} color={CP.accentGreen} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Sync CP storico (24 mesi)</div>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Sync &amp; Audit CP</div>
             <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.5 }}>
-              Wizard automatico che popola lo storico CreatorsPro mese per mese (~1-3 min per mese).
+              Storico mese per mese: confronta KV vs live CP e sincronizza/ripara i mesi con buchi.
             </div>
           </div>
           <ArrowUpRight size={18} color={CP.accentGreen} />
@@ -416,17 +412,17 @@ export default function AdminHub() {
           <span>Action Center — operatori da cambiare</span>
           <ArrowUpRight size={14} color={CP.accentRed} />
         </Link>
-        <Link href="/admin/coaching-center" style={{ ...quickActionStyle(), borderColor: "#F59E0B55", color: CP.textPrimary }}>
-          <GraduationCap size={16} color="#F59E0B" />
+        <Link href="/admin/coaching-center" style={{ ...quickActionStyle(), borderColor: CP.accentRed + "55", color: CP.textPrimary }}>
+          <GraduationCap size={16} color={CP.accentRed} />
           <span>Coaching Center — operatori da far crescere</span>
-          <ArrowUpRight size={14} color="#F59E0B" />
+          <ArrowUpRight size={14} color={CP.accentRed} />
         </Link>
-        <Link href="/admin/pnl-live" style={{ ...quickActionStyle(), borderColor: "#3FB97E55", color: CP.textPrimary }}>
-          <Wallet size={16} color="#3FB97E" />
+        <Link href="/admin/pnl-live" style={{ ...quickActionStyle(), borderColor: CP.accentGreen + "55", color: CP.textPrimary }}>
+          <Wallet size={16} color={CP.accentGreen} />
           <span>P&L Live — margine per creator</span>
-          <ArrowUpRight size={14} color="#3FB97E" />
+          <ArrowUpRight size={14} color={CP.accentGreen} />
         </Link>
-        <Link href="/admin/profiles-compare" style={{ ...quickActionStyle(), borderColor: "#8b7cf655", color: CP.textPrimary }}>
+        <Link href="/admin/profiles-compare" style={{ ...quickActionStyle(), borderColor: CP.accent + "55", color: CP.textPrimary }}>
           <Scale size={16} color={CP.accent} />
           <span>Scaglioni a confronto — standardizzazione profili</span>
           <ArrowUpRight size={14} color={CP.accent} />

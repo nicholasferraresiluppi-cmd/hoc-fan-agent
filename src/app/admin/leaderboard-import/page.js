@@ -208,13 +208,12 @@ export default function LeaderboardImportPage() {
         {/* ISTRUZIONI INLINE: come scaricare da Infloww */}
         <div style={{
           padding: "16px 20px",
-          background: `linear-gradient(135deg, ${CP.accentBlue}12 0%, ${CP.accentBlue}05 100%)`,
+          background: CP.accentSoft,
           border: `1px solid ${CP.accentBlue}55`,
           borderRadius: 12,
           marginBottom: 20,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-            <span style={{ fontSize: 18 }}>📥</span>
             <div style={{ fontWeight: 700, fontSize: 14, color: CP.textPrimary }}>Come scaricare il file da Infloww</div>
           </div>
           <ol style={{ margin: "0 0 12px 0", paddingLeft: 22, fontSize: 13, color: CP.textSecondary, lineHeight: 1.7 }}>
@@ -309,17 +308,17 @@ export default function LeaderboardImportPage() {
                   title={`Elimina l'import ${imp.period} dal KV`}
                   style={{
                     padding: "4px 10px",
-                    background: deletingPeriod === imp.period ? COLORS.charcoal : "#EF444418",
-                    border: `1px solid ${deletingPeriod === imp.period ? COLORS.steel : "#EF444466"}`,
+                    background: deletingPeriod === imp.period ? COLORS.charcoal : CP.accentRed + "18",
+                    border: `1px solid ${deletingPeriod === imp.period ? COLORS.steel : CP.accentRed + "66"}`,
                     borderRadius: 5,
-                    color: deletingPeriod === imp.period ? COLORS.fog : "#EF4444",
+                    color: deletingPeriod === imp.period ? COLORS.fog : CP.accentRed,
                     fontSize: 11,
                     fontWeight: 600,
                     cursor: deletingPeriod === imp.period ? "wait" : "pointer",
                     fontFamily: FONTS.body,
                   }}
                 >
-                  {deletingPeriod === imp.period ? "Eliminando…" : "🗑 Elimina"}
+                  {deletingPeriod === imp.period ? "Eliminando…" : "Elimina"}
                 </button>
               </div>
             ))

@@ -7,12 +7,12 @@ import { PageHeader, CpCard, SectionLabel } from "@/components/cp-style";
 
 const TIER_ORDER = ["diamond", "platinum", "gold", "silver", "bronze"];
 const TIER_META = {
-  diamond:  { label: "Diamond",  emoji: "💎", color: "#60A5FA" },
-  platinum: { label: "Platinum", emoji: "💠", color: "#E5E4E2" },
-  gold:     { label: "Gold",     emoji: "🥇", color: "#FFD700" },
-  silver:   { label: "Silver",   emoji: "🥈", color: "#C0C0C0" },
-  bronze:   { label: "Bronze",   emoji: "🥉", color: "#CD7F32" },
-  unranked: { label: "Unranked", emoji: "⚪", color: CP.textMuted },
+  diamond:  { label: "Diamond",  color: "#60A5FA" },
+  platinum: { label: "Platinum", color: "#E5E4E2" },
+  gold:     { label: "Gold",     color: "#FFD700" },
+  silver:   { label: "Silver",   color: "#C0C0C0" },
+  bronze:   { label: "Bronze",   color: "#CD7F32" },
+  unranked: { label: "Unranked", color: CP.textMuted },
 };
 
 const Breadcrumb = () => (
@@ -65,7 +65,6 @@ export default function LeaguesPage() {
             return (
               <CpCard key={tier} accent={meta.color} padding="20px 24px">
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                  <span style={{ fontSize: 22 }}>{meta.emoji}</span>
                   <h2 style={{ margin: 0, color: meta.color, fontSize: 18, fontFamily: FONTS.display, fontWeight: 700, letterSpacing: "-0.01em" }}>{meta.label}</h2>
                   <span style={{ color: CP.textMuted, fontSize: 12, fontFamily: FONTS.mono }}>({entries.length})</span>
                 </div>
