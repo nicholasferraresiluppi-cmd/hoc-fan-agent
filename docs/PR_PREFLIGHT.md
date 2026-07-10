@@ -57,7 +57,7 @@ Bug ricorrenti, tutti riscontrati su `/leaderboard/operational`.
 
 - [ ] **Capability check sia BE che FE**: il backend rifiuta con 403, il frontend non mostra il pulsante in primo luogo
 - [ ] **Niente leak di feature admin**: per un utente non-admin la pagina è identica a prima del cambio. Test con account secondario
-- [ ] **Pagina admin in `/admin/*` ha sempre `<AdminNav />`** in alto per navigazione
+- [ ] **Pagina nuova raggiungibile da Sidebar E hub** (`src/components/Sidebar.js` `NAV_GROUPS` + `src/app/admin/page.js` `SHORTCUT_GROUPS`) — la divergenza tra i due è stata fonte storica di pagine orfane (lug 2026; AdminNav non esiste più)
 - [ ] **Link admin (es. "⚙️ Gestisci…") visibili solo se canExclude/admin**
 
 ## 7. Anagrafica e profili

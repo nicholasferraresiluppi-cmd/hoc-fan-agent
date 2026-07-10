@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
-import AdminNav from "@/components/AdminNav";
 import { COLORS, FONTS, CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
@@ -159,7 +158,6 @@ export default function GroupLanguagesPage() {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <AdminNav />
         <PageHeader
           breadcrumb={
             <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>

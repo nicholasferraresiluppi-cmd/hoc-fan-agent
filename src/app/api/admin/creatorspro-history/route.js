@@ -2,7 +2,7 @@
  * GET /api/admin/creatorspro-history?last_n=24
  *
  * Ritorna lo stato di sync (presenza/conteggi wages) per gli ultimi N mesi.
- * Usato dalla pagina /admin/creatorspro-sync-history per disegnare la lista
+ * Usato dalla pagina /admin/wage-audit per disegnare la lista
  * mesi con badge "synced/never".
  *
  * Capability: SEED (admin-only).

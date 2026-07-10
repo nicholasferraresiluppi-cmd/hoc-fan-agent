@@ -19,10 +19,12 @@ const C = {
   bronze: "#C87D46",
 };
 
+// Flat per DESIGN.md: superficie standard, identità del tier affidata ad
+// accent (bordo/testo) — stesso pattern di TIER in brand.js.
 const PODIUM_TIER = {
-  1: { grad: "linear-gradient(165deg, #7A5A1F 0%, #C59436 45%, #F2CC72 100%)", accent: "#F2D488", label: "CHAMPION", ink: "#2C1E06" },
-  2: { grad: "linear-gradient(165deg, #4A4F5B 0%, #8A93A3 45%, #C9D0DC 100%)", accent: "#DADEE6", label: "RUNNER-UP", ink: "#15181E" },
-  3: { grad: "linear-gradient(165deg, #6B3E1F 0%, #A8612F 45%, #D1833D 100%)", accent: "#C87D46", label: "THIRD", ink: "#2B1709" },
+  1: { grad: CP.surface, accent: "#F2D488", label: "CHAMPION", ink: "#FFF5D4" },
+  2: { grad: CP.surface, accent: "#DADEE6", label: "RUNNER-UP", ink: "#f2f4f8" },
+  3: { grad: CP.surface, accent: "#C87D46", label: "THIRD", ink: "#FFE4C2" },
 };
 
 const PERIODS = [
@@ -88,7 +90,6 @@ function PodiumCard({ entry, place }) {
           ...glowKeyframes,
         }}
       >
-        <div style={{ position: "absolute", top: 0, left: "-20%", right: "-20%", height: "55%", background: "linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0))", pointerEvents: "none" }} />
         <div style={{ fontFamily: FONTS.mono, fontSize: isWinner ? 48 : 38, fontWeight: 800, letterSpacing: "-0.02em", color: tier.ink, lineHeight: 1, textShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
           {entry?.avg ?? "—"}
         </div>
@@ -110,7 +111,7 @@ function PodiumCard({ entry, place }) {
           width: "100%",
           maxWidth: 200,
           height: heights[place],
-          background: `linear-gradient(180deg, ${tier.accent}55 0%, ${tier.accent}18 60%, ${tier.accent}08 100%)`,
+          background: `${tier.accent}18`,
           borderTop: `4px solid ${tier.accent}`,
           borderLeft: `1px solid ${tier.accent}30`,
           borderRight: `1px solid ${tier.accent}30`,
@@ -206,12 +207,12 @@ export default function LeaderboardPage() {
               <span style={{ color: CP.textMuted }}>›</span>
               <span style={{ color: CP.textPrimary }}>Ladder</span>
             </div>
-            <Link href="/leaderboard/storico" style={{ color: C.gold, textDecoration: "none", fontSize: 13, padding: "6px 12px", border: `1px solid ${C.gold}44`, borderRadius: 8 }}>
-              🏛️ Hall of Fame →
+            <Link href="/leaderboard/storico" style={{ color: CP.accent, textDecoration: "none", fontSize: 13, padding: "6px 12px", border: `1px solid ${CP.accent}44`, borderRadius: 8 }}>
+              Hall of Fame →
             </Link>
           </div>
           <span style={{ color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em" }}>Performance · Training</span>
-          <h1 style={{ fontFamily: FONTS.display, fontSize: 34, margin: "8px 0 6px 0", fontWeight: 700, letterSpacing: "-0.02em" }}>🏆 Ladder</h1>
+          <h1 style={{ fontFamily: FONTS.display, fontSize: 34, margin: "8px 0 6px 0", fontWeight: 700, letterSpacing: "-0.02em" }}>Ladder</h1>
           <p style={{ color: CP.textSecondary, fontSize: 14, margin: 0, lineHeight: 1.5, maxWidth: 760 }}>
             I migliori operatori per score medio nelle sessioni di training Academy. Minimo {data?.minSessions || 2} sessioni per qualificarsi.
           </p>
@@ -286,7 +287,6 @@ export default function LeaderboardPage() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                  <div style={{ fontSize: "1.5rem" }}>{me.rank ? "📍" : "🎯"}</div>
                   <div>
                     <div style={{ fontSize: "0.75rem", color: C.orange, fontWeight: 700, letterSpacing: "0.5px" }}>
                       La tua posizione

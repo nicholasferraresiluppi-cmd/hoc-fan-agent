@@ -1,83 +1,88 @@
 /**
  * HOC Pro — Brand design tokens.
  * Single source of truth per palette, tipografia e spacing.
- * V9.0 rebrand (apr 2026) — sostituisce HOC_COLORS / ad-hoc colors.
+ *
+ * Rebrand "Dark SaaS" (giu 2026) — fonte di verità docs/DESIGN.md.
+ * I NOMI chiave della palette V9 (obsidian, charcoal, champagne…) restano
+ * per retrocompatibilità con i file che li importano, ma i VALORI sono i
+ * token del design system: aggiornare qui = aggiornare tutta l'app.
  */
 
 export const COLORS = {
-  // Neutri
-  obsidian: "#08090F",
-  graphite: "#111318",
-  charcoal: "#1B1E26",
-  steel: "#2A2E39",
-  mist: "#6B7080",
-  fog: "#B9BDC7",
-  alabaster: "#F5F6F8",
+  // Neutri → scala superfici/testo del design system
+  obsidian: "#0a0d11",   // --bg-sunken
+  graphite: "#0c0f14",   // --bg
+  charcoal: "#151a22",   // --surface (card, pannelli)
+  steel: "#232b3a",      // --border
+  mist: "#8c95a8",       // --muted
+  fog: "#cdd3de",        // --text-2
+  alabaster: "#f2f4f8",  // --text
 
-  // Accento primario — Champagne
-  champagne: "#D4AF7A",
-  champagneDeep: "#B89158",
-  champagneLight: "#E8D4B0",
+  // Accento primario → viola (unico accent del design system)
+  champagne: "#8b7cf6",      // --accent
+  champagneDeep: "#3a3470",  // --accent-dim
+  champagneLight: "#b9aef9", // --accent-soft-text
 
-  // Data
-  cobalt: "#4F8CCB",
-  cobaltDeep: "#2A5A8A",
+  // Data → famiglia viola, distinta per luminosità (DESIGN.md §4 Grafici)
+  cobalt: "#b9aef9",     // serie secondaria (più chiara dell'accent)
+  cobaltDeep: "#3a3470", // serie di contesto (--accent-dim)
 
   // Semantici
-  verdant: "#3FB97E",
-  ember: "#E76F51",
-  signal: "#D44545",
+  verdant: "#4ade80",    // --success
+  ember: "#f08c8c",      // warning → --danger (il sistema non ha token warning)
+  signal: "#f08c8c",     // --danger
 };
 
-// Tier leghe — V10.0: accento + gradient FIFA-style per PlayerCard
-// Il gradient è usato come sfondo della card, l'accent come bordo/testo tier.
+// Tier leghe — flat per DESIGN.md (niente gradienti): superficie standard,
+// identità del tier affidata ad accent (bordo/testo). La chiave si chiama
+// ancora `gradient` per retrocompatibilità con i caller (PlayerCard & co.).
 export const TIER = {
   bronze: {
     accent: "#C87D46",
     label: "BRONZE",
-    gradient: "linear-gradient(145deg, #6B3E1F 0%, #A8612F 45%, #D1833D 100%)",
+    gradient: "#151a22",
     text: "#FFE4C2",
     ink: "#2B1709",
   },
   silver: {
     accent: "#DADEE6",
     label: "SILVER",
-    gradient: "linear-gradient(145deg, #4A4F5B 0%, #8A93A3 45%, #C9D0DC 100%)",
-    text: "#FFFFFF",
+    gradient: "#151a22",
+    text: "#f2f4f8",
     ink: "#15181E",
   },
   gold: {
     accent: "#F2D488",
     label: "GOLD",
-    gradient: "linear-gradient(145deg, #7A5A1F 0%, #C59436 45%, #F2CC72 100%)",
+    gradient: "#151a22",
     text: "#FFF5D4",
     ink: "#2C1E06",
   },
   platinum: {
     accent: "#BFE4FF",
     label: "PLATINUM",
-    gradient: "linear-gradient(145deg, #2D5874 0%, #4F93BC 40%, #9FD2EE 100%)",
+    gradient: "#151a22",
     text: "#E6F5FF",
     ink: "#081B28",
   },
   diamond: {
     accent: "#A1E3FF",
     label: "DIAMOND",
-    gradient: "linear-gradient(145deg, #1B2F5A 0%, #3C5FA8 35%, #7AA9FF 75%, #C9E5FF 100%)",
+    gradient: "#151a22",
     text: "#EAF6FF",
     ink: "#060B1F",
   },
   unranked: {
-    accent: "#6B7080",
+    accent: "#8c95a8",
     label: "UNRANKED",
-    gradient: "linear-gradient(145deg, #111318 0%, #1B1E26 50%, #2A2E39 100%)",
-    text: "#F5F6F8",
-    ink: "#08090F",
+    gradient: "#151a22",
+    text: "#f2f4f8",
+    ink: "#0a0d11",
   },
 };
 
 export const FONTS = {
-  display: "'Inter Tight', system-ui, sans-serif",
+  display: "'Inter', system-ui, sans-serif",
   body: "'Inter', system-ui, sans-serif",
   mono: "'JetBrains Mono', ui-monospace, Menlo, monospace",
 };

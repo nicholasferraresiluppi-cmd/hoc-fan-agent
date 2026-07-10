@@ -20,7 +20,8 @@ const fetcher = (url) => fetch(url).then((r) => r.json());
 
 const COSELLERS_LABEL = { 1: "Solo", 2: "Coppia", 3: "Triplo", 4: "Quartetto" };
 const COSELLERS_ICON = { 1: User, 2: UsersRound, 3: Users, 4: Users };
-const COSELLERS_COLOR = { 1: "#4F8CCB", 2: "#D4AF7A", 3: "#3FB97E", 4: CP.accent };
+// Famiglia viola-grigio per luminosità (DESIGN.md §4 Grafici) — 3 e 4 condividono l'accent (in UI sono aggregati "3+")
+const COSELLERS_COLOR = { 1: "#8c95a8", 2: "#b9aef9", 3: CP.accent, 4: CP.accent };
 
 function fmtPct(v) {
   if (v == null) return "—";
@@ -147,7 +148,7 @@ export default function PaymentProfilesPage() {
             onClick={() => mutate()}
             style={{ padding: "9px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, cursor: "pointer" }}
           >
-            🔄 Ricarica
+            Ricarica
           </button>
         </div>
         <div style={{ marginTop: 10, fontSize: 12, color: CP.textMuted }}>
@@ -278,7 +279,7 @@ function ProfileCard({ p }) {
             <span style={badge(color)}>{COSELLERS_LABEL[p.cosellersCount] || `${p.cosellersCount} pers`}</span>
             {p.hourlyRate > 0 && <span style={badge("#8F8A82")}><Coins size={9} style={{ marginRight: 3 }} />{fmtCurrency(p.hourlyRate)}/h</span>}
             {p.thresholds_count > 0 && <span style={badge(CP.accentGreen)}><Layers size={9} style={{ marginRight: 3 }} />{p.thresholds_count} scaglion{p.thresholds_count === 1 ? "e" : "i"}</span>}
-            {p.links_count > 0 && <span style={badge("#D4AF7A")}>{p.links_count} link</span>}
+            {p.links_count > 0 && <span style={badge("#b9aef9")}>{p.links_count} link</span>}
           </div>
         </div>
       </div>

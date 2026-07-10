@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { CP } from "@/lib/brand";
 
 const LEVEL_META = {
   0: { label: "Non certificato", emoji: "⚪", color: "#666" },
@@ -33,22 +34,22 @@ export default function CertificationsPage() {
   }, []);
 
   return (
-    <div style={{ background: "#08090F", minHeight: "100vh", color: "#fff", padding: "32px 28px 64px 28px", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ marginBottom: 18, fontSize: 13, color: "#9CA3AF" }}>
+    <div style={{ background: CP.bgSunken, minHeight: "100vh", color: CP.textPrimary, padding: "32px 28px 64px 28px", maxWidth: 1100, margin: "0 auto" }}>
+        <div style={{ marginBottom: 18, fontSize: 13, color: CP.textMuted }}>
           <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>Academy</Link>
-          <span style={{ color: "#6B7080", margin: "0 8px" }}>›</span>
-          <span style={{ color: "#F5F6F8" }}>Badge Wall</span>
+          <span style={{ color: CP.textMuted, margin: "0 8px" }}>›</span>
+          <span style={{ color: CP.textPrimary }}>Badge Wall</span>
         </div>
 
         <div style={{ marginBottom: 24 }}>
-          <span style={{ color: "#6B7080", fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: "0.14em" }}>Certificazioni</span>
-          <h1 style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 34, margin: "8px 0 6px 0", fontWeight: 700, letterSpacing: "-0.02em" }}>🎖️ Badge Wall</h1>
-          <p style={{ color: "#9CA3AF", fontSize: 14, margin: 0, lineHeight: 1.5, maxWidth: 760 }}>
+          <span style={{ color: CP.textMuted, fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: "0.14em" }}>Certificazioni</span>
+          <h1 style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 34, margin: "8px 0 6px 0", fontWeight: 700, letterSpacing: "-0.02em" }}>Badge Wall</h1>
+          <p style={{ color: CP.textMuted, fontSize: 14, margin: 0, lineHeight: 1.5, maxWidth: 760 }}>
             Le tue certificazioni per creator. Ogni creator ha il suo tono e le sue dinamiche: certificandoti dimostri di saperla gestire.
           </p>
         </div>
 
-        <div style={{ background: "#13151C", border: "1px solid #23262F", borderRadius: 10, padding: "12px 16px", fontSize: 13, marginBottom: 24, color: "#B9BDC7" }}>
+        <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, padding: "12px 16px", fontSize: 13, marginBottom: 24, color: CP.textSecondary }}>
           <b>Requisiti</b> (badge permanenti):<br/>
           L1 Base → ≥10 sessioni con quella creator, overall medio ≥65<br/>
           L2 Expert → ≥25 sessioni, overall medio ≥75<br/>
@@ -76,18 +77,18 @@ export default function CertificationsPage() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
                     <div>
                       <h2 style={{ margin: 0, fontSize: "1.3rem" }}>
-                        {c.creatorName} <span style={{ color: "#F5A623", fontSize: "0.7rem", fontWeight: 400, marginLeft: 8 }}>{c.creatorArchetype}</span>
+                        {c.creatorName} <span style={{ color: CP.accent, fontSize: "0.7rem", fontWeight: 400, marginLeft: 8 }}>{c.creatorArchetype}</span>
                       </h2>
                       <div style={{ color: meta.color, fontWeight: 800, fontSize: "1.1rem", marginTop: 6 }}>
                         {meta.emoji} {meta.label}
                       </div>
                       {c.achievedAt && c.level > 0 && (
-                        <div style={{ color: "#888", fontSize: "0.75rem", marginTop: 4 }}>
+                        <div style={{ color: CP.textMuted, fontSize: "0.75rem", marginTop: 4 }}>
                           Ottenuta il {new Date(c.achievedAt).toLocaleDateString("it-IT")}
                         </div>
                       )}
                     </div>
-                    <div style={{ textAlign: "right", color: "#aaa", fontSize: "0.85rem" }}>
+                    <div style={{ textAlign: "right", color: CP.textMuted, fontSize: "0.85rem" }}>
                       <div>{c.stats.sessions} sessioni</div>
                       <div>avg {c.stats.avgOverall}</div>
                     </div>
@@ -95,11 +96,11 @@ export default function CertificationsPage() {
 
                   {nextLevel && (
                     <div style={{ marginTop: "1rem" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "#888", marginBottom: 4 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: CP.textMuted, marginBottom: 4 }}>
                         <span>Prossimo: {LEVEL_META[nextLevel.level].emoji} {LEVEL_META[nextLevel.level].label}</span>
                         <span>{c.stats.sessions}/{nextLevel.sessions} sessioni • avg {c.stats.avgOverall}/{nextLevel.avg}</span>
                       </div>
-                      <div style={{ height: 6, background: "#222", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: 6, background: CP.surfaceAlt, borderRadius: 3, overflow: "hidden" }}>
                         <div style={{ height: "100%", width: `${progressSess}%`, background: meta.color, transition: "width 0.3s" }} />
                       </div>
                     </div>

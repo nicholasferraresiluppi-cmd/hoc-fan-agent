@@ -9,7 +9,7 @@ import { CREATOR_PERSONAS } from "@/lib/creator-personas";
 import { FAN_ARCHETYPES, getFanArchetypeById } from "@/lib/fan-archetypes";
 import PlayerCard from "@/components/PlayerCard";
 import { PlayerCardSkeleton, XPBarSkeleton, GridSkeleton } from "@/components/Skeleton";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, CP } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
 import CoachPanel from "@/components/CoachPanel";
 
@@ -24,15 +24,16 @@ function pickRandomArchetype() {
 // CONSTANTS & DATA
 // =========================================================
 
-// V9.0 rebrand — HOC_COLORS ora mappa alla nuova palette HOC Pro.
+// Dark SaaS rebrand — HOC_COLORS mappa ai token del design system (docs/DESIGN.md).
 // Le vecchie chiavi (orange/purple/ecc.) restano per retrocompat, ma puntano ai nuovi token.
 const HOC_COLORS = {
-  bgDark: COLORS.obsidian,      // #08090F
-  white: COLORS.alabaster,      // #F5F6F8
-  orange: COLORS.champagne,     // #D4AF7A — accento primario
-  purple: COLORS.cobalt,        // #4F8CCB — secondario (rari casi)
-  gray: COLORS.mist,            // #6B7080
-  gradient: `linear-gradient(135deg, ${COLORS.champagneDeep} 0%, ${COLORS.champagne} 100%)`,
+  bgDark: COLORS.obsidian,      // #0a0d11 — bg-sunken
+  white: COLORS.alabaster,      // #f2f4f8 — text
+  orange: COLORS.champagne,     // #8b7cf6 — accent
+  purple: COLORS.cobalt,        // #b9aef9 — accent-soft-text
+  gray: COLORS.mist,            // #8c95a8 — muted
+  green: COLORS.verdant,        // #4ade80 — success
+  gradient: COLORS.champagne,   // flat: era un gradient accent, ora tinta unica (accent)
 };
 
 const SKILL_DIMENSIONS = [
@@ -49,35 +50,35 @@ const TRAINING_CATEGORIES = [
   {
     id: "le-basi-della-chat",
     name: "Le Basi",
-    icon: "🏁",
+    icon: "",
     description: "Opening conversations, no spam",
     difficulty: 1,
   },
   {
     id: "mass-e-conversione",
     name: "Mass & Conversione",
-    icon: "📢",
+    icon: "",
     description: "Convert mass messages to sales",
     difficulty: 2,
   },
   {
     id: "custom-e-upsell",
     name: "Custom & Upsell",
-    icon: "💎",
+    icon: "",
     description: "Upselling and custom content",
     difficulty: 3,
   },
   {
     id: "recuperi-e-retention",
     name: "Recuperi & Retention",
-    icon: "🔓",
+    icon: "",
     description: "Save cancellation-risk fans",
     difficulty: 4,
   },
   {
     id: "script-avanzati",
     name: "Script Avanzati",
-    icon: "🚀",
+    icon: "",
     description: "Advanced closing patterns",
     difficulty: 5,
   },
@@ -187,13 +188,6 @@ export default function Home() {
   const [quickChallengeIndex, setQuickChallengIndex] = useState(0);
   const [quickChallengeResponse, setQuickChallengeResponse] = useState("");
   const [quickChallengeEval, setQuickChallengeEval] = useState(null);
-
-  // Leaderboard State
-  const [leaderboard] = useState([
-    
-    
-    
-  ]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -689,7 +683,6 @@ export default function Home() {
                 const prev = tier === "junior" ? 0 : tier === "senior" ? THRESHOLDS.junior : THRESHOLDS.senior;
                 const pct = isMax ? 100 : Math.min(100, Math.max(0, Math.round(((sess - prev) / (target - prev)) * 100)));
                 const remaining = isMax ? 0 : Math.max(0, target - sess);
-                const barColor = tier === "master" ? COLORS.champagne : tier === "senior" ? COLORS.cobalt : COLORS.verdant;
                 return (
                   <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 12, padding: "1.1rem 1.25rem" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, fontFamily: FONTS.mono, fontSize: 11, letterSpacing: "0.18em" }}>
@@ -698,7 +691,7 @@ export default function Home() {
                       {isMax && <span style={{ color: COLORS.champagne }}>MAX TIER</span>}
                     </div>
                     <div style={{ position: "relative", height: 12, background: COLORS.obsidian, border: `1px solid ${COLORS.charcoal}`, borderRadius: 6, overflow: "hidden" }}>
-                      <div style={{ position: "absolute", inset: 0, width: `${pct}%`, background: `linear-gradient(90deg, ${barColor}AA, ${barColor})`, transition: "width .5s ease", boxShadow: `0 0 14px ${barColor}66` }} />
+                      <div style={{ position: "absolute", inset: 0, width: `${pct}%`, background: CP.accent, transition: "width .5s ease" }} />
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 8, fontFamily: FONTS.mono, fontSize: 11 }}>
                       <span style={{ color: COLORS.fog }}>{sess}{!isMax ? `/${target}` : ""} sessioni</span>
@@ -713,7 +706,7 @@ export default function Home() {
                 <button
                   onClick={() => setScreen("training-hub")}
                   style={{
-                    background: `linear-gradient(135deg, ${COLORS.champagne} 0%, ${COLORS.champagneDeep} 100%)`,
+                    background: COLORS.champagne,
                     border: "none",
                     borderRadius: 12,
                     padding: "1.1rem 1.25rem",
@@ -726,7 +719,7 @@ export default function Home() {
                   onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
                 >
                   <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: "0.22em", fontWeight: 800, opacity: 0.75 }}>ENTRA IN</div>
-                  <div style={{ fontFamily: FONTS.display, fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.01em", marginTop: 2 }}>🎯 Training</div>
+                  <div style={{ fontFamily: FONTS.display, fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.01em", marginTop: 2 }}>Training</div>
                   <div style={{ fontSize: "0.85rem", marginTop: 4, opacity: 0.75 }}>Scenari guidati con coaching AI</div>
                 </button>
                 <button
@@ -750,7 +743,7 @@ export default function Home() {
                   onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                 >
                   <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: "0.22em", fontWeight: 800, color: COLORS.cobalt }}>SFIDA</div>
-                  <div style={{ fontFamily: FONTS.display, fontSize: "1.25rem", fontWeight: 800, marginTop: 2 }}>⚡ Veloce</div>
+                  <div style={{ fontFamily: FONTS.display, fontSize: "1.25rem", fontWeight: 800, marginTop: 2 }}>Veloce</div>
                   <div style={{ fontSize: "0.8rem", marginTop: 4, color: COLORS.mist }}>3 msg · 30s</div>
                 </button>
               </div>
@@ -789,7 +782,7 @@ export default function Home() {
             <div style={{ marginBottom: "2rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.75rem" }}>
                 <span style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: "0.22em", color: COLORS.alabaster, fontWeight: 700 }}>
-                  🎖️ BADGE WALL
+                  BADGE WALL
                 </span>
                 <Link href="/profilo/certificazioni" style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: "0.18em", color: COLORS.champagne, textDecoration: "none" }}>
                   VEDI TUTTO →
@@ -811,7 +804,7 @@ export default function Home() {
                     <div
                       key={cr.id}
                       style={{
-                        background: unlocked ? `linear-gradient(145deg, ${meta.color}18, ${meta.color}04)` : COLORS.graphite,
+                        background: unlocked ? `${meta.color}10` : COLORS.graphite,
                         border: `1px solid ${unlocked ? meta.color + "55" : COLORS.charcoal}`,
                         borderRadius: 10,
                         padding: "0.85rem 0.95rem",
@@ -855,11 +848,7 @@ export default function Home() {
           {dailyDrill?.drill?.scenario && (
             <div
               style={{
-                background: dailyDrill.completed
-                  ? `linear-gradient(135deg, ${COLORS.verdant}20, ${COLORS.verdant}08)`
-                  : dailyDrill.mandatory
-                  ? `linear-gradient(135deg, ${HOC_COLORS.orange}25, ${HOC_COLORS.orange}08)`
-                  : `linear-gradient(135deg, ${HOC_COLORS.purple}22, ${HOC_COLORS.purple}08)`,
+                background: dailyDrill.completed ? CP.surface : CP.accentSoft,
                 border: `2px solid ${
                   dailyDrill.completed
                     ? COLORS.verdant
@@ -879,9 +868,6 @@ export default function Home() {
             >
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "1.5rem" }}>
-                    {dailyDrill.completed ? "✅" : dailyDrill.mandatory ? "⚡" : "🎯"}
-                  </span>
                   <h3 style={{ margin: 0, fontSize: "1.1rem", color: HOC_COLORS.white }}>
                     Daily Drill
                   </h3>
@@ -936,69 +922,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* Quick Stats — solo Top 3 preview (XP Card legacy rimossa, redundante con hero XP bar) */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-              gap: "1.5rem",
-              marginBottom: "3rem",
-            }}
-          >
-            {/* Leaderboard Preview */}
-            <div
-              style={{
-                background: `${HOC_COLORS.purple}10`,
-                border: `2px solid ${HOC_COLORS.purple}30`,
-                borderRadius: "1rem",
-                padding: "1.5rem",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 0 1rem 0" }}>
-                <p
-                  style={{
-                    color: HOC_COLORS.gray,
-                    fontSize: "0.85rem",
-                    margin: 0,
-                    
-                  }}
-                >
-                  🏆 Top 3 Operatori
-                </p>
-                <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-                  <Link href="/leaderboard/leghe" style={{ color: HOC_COLORS.purple, fontSize: "0.8rem", fontWeight: 700, textDecoration: "none" }}>
-                    🎖️ Leghe →
-                  </Link>
-                  <Link href="/leaderboard" style={{ color: HOC_COLORS.orange, fontSize: "0.8rem", fontWeight: 700, textDecoration: "none" }}>
-                    Ladder completa →
-                  </Link>
-                </div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {leaderboard.map((op, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "0.5rem",
-                      borderRadius: "0.5rem",
-                      background: `${HOC_COLORS.white}05`,
-                    }}
-                  >
-                    <span style={{ fontSize: "1.2rem", fontWeight: 700 }}>
-                      {["🥇", "🥈", "🥉"][i]} {op.name}
-                    </span>
-                    <span style={{ color: HOC_COLORS.orange, fontWeight: 700 }}>
-                      L{op.level}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
           {/* Secondary Sections — Training/SfidaVeloce ora sono CTA nell'hero */}
           <div
             style={{
@@ -1030,7 +953,7 @@ export default function Home() {
                   color: HOC_COLORS.purple,
                 }}
               >
-                🎴 La tua Card
+                La tua Card
               </h3>
               <p
                 style={{
@@ -1059,7 +982,7 @@ export default function Home() {
               onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${HOC_COLORS.gray}60`; }}
             >
               <h3 style={{ margin: "0 0 0.5rem 0", fontSize: "1.1rem", fontWeight: 900, color: HOC_COLORS.white }}>
-                🔐 Area Admin
+                Area Admin
               </h3>
               <p style={{ margin: 0, fontSize: "0.85rem", color: HOC_COLORS.gray }}>
                 Accessi, seed demo, classifica, dashboard SM
@@ -1081,7 +1004,7 @@ export default function Home() {
               onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${HOC_COLORS.orange}40`; }}
             >
               <h3 style={{ margin: "0 0 0.5rem 0", fontSize: "1.1rem", fontWeight: 900, color: HOC_COLORS.white }}>
-                📚 Playbook
+                Playbook
               </h3>
               <p style={{ margin: 0, fontSize: "0.85rem", color: HOC_COLORS.gray }}>
                 Libreria di esempi reali per la tua formazione
@@ -1099,7 +1022,7 @@ export default function Home() {
                 marginBottom: "1rem",
               }}
             >
-              📋 Attività Recente
+              Attività Recente
             </h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               {recentScenarios.map((scenario, i) => (
@@ -1178,7 +1101,7 @@ export default function Home() {
                 color: HOC_COLORS.white,
               }}
             >
-              💪 Training Hub
+              Training Hub
             </h1>
             <p style={{ color: HOC_COLORS.gray, margin: "0.5rem 0 0 0" }}>
               Scegli una categoria per iniziare
@@ -1436,7 +1359,7 @@ export default function Home() {
                 color: HOC_COLORS.white,
               }}
             >
-              {selectedCategory.icon} {selectedCategory.name}
+              {selectedCategory.name}
             </h1>
             <p style={{ color: HOC_COLORS.gray, margin: "0.5rem 0 0 0" }}>
               {selectedCategory.description}
@@ -1929,7 +1852,7 @@ export default function Home() {
                     fontWeight: 900,
                   }}
                 >
-                  💪 Cosa hai fatto bene
+                  Cosa hai fatto bene
                 </h3>
                 <ul style={{ margin: 0, paddingLeft: "1.5rem", color: HOC_COLORS.white }}>
                   {sessionFeedback.strengths.map((s, i) => (
@@ -1957,7 +1880,7 @@ export default function Home() {
                     fontWeight: 900,
                   }}
                 >
-                  📌 Dove migliorare
+                  Dove migliorare
                 </h3>
                 <ul style={{ margin: 0, paddingLeft: "1.5rem", color: HOC_COLORS.white }}>
                   {sessionFeedback.improvements.map((imp, i) => (
@@ -1989,7 +1912,7 @@ export default function Home() {
             </p>
             {feedbackSent ? (
               <p style={{ color: COLORS.verdant, fontWeight: 700, margin: 0 }}>
-                ✅ Grazie per il feedback!
+                Grazie per il feedback!
               </p>
             ) : (
               <>
@@ -2006,7 +1929,7 @@ export default function Home() {
                       cursor: "pointer",
                     }}
                   >
-                    👍 Giusta
+                    Giusta
                   </button>
                   <button
                     onClick={() => setFeedbackRating("down")}
@@ -2020,7 +1943,7 @@ export default function Home() {
                       cursor: "pointer",
                     }}
                   >
-                    👎 Sbagliata
+                    Sbagliata
                   </button>
                 </div>
                 {feedbackRating && (
@@ -2160,7 +2083,7 @@ export default function Home() {
                 color: HOC_COLORS.white,
               }}
             >
-              ⚡ Sfida Veloce
+              Sfida Veloce
             </h1>
             <button
               onClick={() => setScreen("home")}
@@ -2309,7 +2232,7 @@ export default function Home() {
                 }}
               >
                 <p style={{ margin: "0 0 0.5rem 0", color: COLORS.verdant, fontWeight: 700 }}>
-                  ✅ Cosa hai fatto bene
+                  Cosa hai fatto bene
                 </p>
                 <p style={{ margin: 0, color: HOC_COLORS.white }}>
                   {quickChallengeEval.good}
@@ -2326,7 +2249,7 @@ export default function Home() {
                 }}
               >
                 <p style={{ margin: "0 0 0.5rem 0", color: HOC_COLORS.orange, fontWeight: 700 }}>
-                  💡 Cosa migliorare
+                  Cosa migliorare
                 </p>
                 <p style={{ margin: 0, color: HOC_COLORS.white }}>
                   {quickChallengeEval.improve}
@@ -2343,7 +2266,7 @@ export default function Home() {
                 }}
               >
                 <p style={{ margin: "0 0 1rem 0", color: HOC_COLORS.purple, fontWeight: 700 }}>
-                  💭 Esempi di risposte ideali
+                  Esempi di risposte ideali
                 </p>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                   {quickChallengeEval.examples.map((ex, i) => (
@@ -2424,7 +2347,7 @@ export default function Home() {
                 color: HOC_COLORS.white,
               }}
             >
-              🎴 La tua Card
+              La tua Card
             </h1>
             <button
               onClick={() => setScreen("home")}
@@ -2444,7 +2367,7 @@ export default function Home() {
           {/* Profile Card */}
           <div
             style={{
-              background: HOC_COLORS.gradient,
+              background: CP.accentSoft,
               border: `5px solid ${HOC_COLORS.orange}`,
               borderRadius: "1.5rem",
               padding: "2rem",
@@ -2492,7 +2415,6 @@ export default function Home() {
                 alignItems: "center",
               }}
             >
-              <span style={{ fontSize: "4rem", marginBottom: "0.5rem" }}>🎖️</span>
               <p style={{ margin: 0, color: `${HOC_COLORS.white}90`, fontSize: "0.9rem" }}>
                 Certificazione{" "}
               </p>
@@ -2520,7 +2442,7 @@ export default function Home() {
                 color: HOC_COLORS.white,
               }}
             >
-              💪 Skill Dimensions
+              Skill Dimensions
             </h3>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -2591,7 +2513,7 @@ export default function Home() {
                   fontWeight: 900,
                 }}
               >
-                💪 Punti di Forza
+                Punti di Forza
               </h3>
               <ul
                 style={{
@@ -2623,7 +2545,7 @@ export default function Home() {
                   fontWeight: 900,
                 }}
               >
-                📌 Aree di Miglioramento
+                Aree di Miglioramento
               </h3>
               <ul
                 style={{
@@ -2658,7 +2580,7 @@ export default function Home() {
                 color: HOC_COLORS.white,
               }}
             >
-              📋 Attività Recente
+              Attività Recente
             </h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               {recentScenarios.map((scenario, i) => (
@@ -2708,9 +2630,6 @@ export default function Home() {
         }}
       >
         <div style={{ textAlign: "center" }}>
-          <span style={{ fontSize: "3rem", marginBottom: "1rem", display: "block" }}>
-            🌴
-          </span>
           <p style={{ color: HOC_COLORS.gray }}>Caricamento...</p>
         </div>
       </div>

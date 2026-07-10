@@ -166,7 +166,7 @@ export default function ProfilesComparePage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 16 }}>
             <StatCard label="Creator nel mese" value={data.creators_count} />
             <StatCard label="Venduto totale" value={fmt$(data.totals.sales)} color={CP.accentGreen} />
-            <StatCard label="Pagato operatori" value={fmt$(data.totals.earn_attr)} color="#D4AF7A" />
+            <StatCard label="Pagato operatori" value={fmt$(data.totals.earn_attr)} color="#b9aef9" />
             <StatCard label="% costo media" value={data.totals.sales > 0 ? fmtPct(data.totals.earn_attr / data.totals.sales) : "—"} />
           </div>
 
@@ -174,7 +174,7 @@ export default function ProfilesComparePage() {
             <CpCard accent="#F59E0B" padding="12px 16px" style={{ marginBottom: 16 }}>
               <div style={{ color: "#F59E0B", fontSize: 12, display: "flex", alignItems: "center", gap: 8 }}>
                 <AlertCircle size={14} />
-                {missingPhaseB} creator senza scaglioni visibili — il mese va ri-sincronizzato post-Fase B da <Link href="/admin/creatorspro-sync-history" style={{ color: "#F59E0B" }}>Sync CP storico</Link> per popolare tutti.
+                {missingPhaseB} creator senza scaglioni visibili — il mese va ri-sincronizzato post-Fase B da <Link href="/admin/wage-audit" style={{ color: "#F59E0B" }}>Sync &amp; Audit CP</Link> per popolare tutti.
               </div>
             </CpCard>
           )}
@@ -244,7 +244,7 @@ export default function ProfilesComparePage() {
                 </div>
                 {sim && (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-                    <StatCard label="Pagato REALE (tutti)" value={fmt$(data.totals.earn_attr)} color="#D4AF7A" />
+                    <StatCard label="Pagato REALE (tutti)" value={fmt$(data.totals.earn_attr)} color="#b9aef9" />
                     <StatCard label="Pagato SIMULATO" value={fmt$(sim.total)} color={CP.accent} />
                     <StatCard
                       label="Δ totale"
@@ -319,7 +319,7 @@ export default function ProfilesComparePage() {
                         )}
                       </td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmt$(c.sales)}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#D4AF7A" }}>{fmt$(c.earn_attr)}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#b9aef9" }}>{fmt$(c.earn_attr)}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700 }}>{fmtPct(c.cost_pct)}</td>
                       {sim && <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accent }}>{simPaid != null ? fmt$(simPaid) : "—"}</td>}
                       {sim && (

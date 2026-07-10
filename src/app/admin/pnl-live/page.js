@@ -116,7 +116,7 @@ export default function PnlLivePage() {
               Ultimo sync: {new Date(data.last_sync_at).toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
             </span>
           )}
-          <Link href="/admin/creatorspro-sync-history" style={{ fontSize: 11, color: CP.accentGreen, paddingBottom: 10, textDecoration: "none" }}>
+          <Link href="/admin/wage-audit" style={{ fontSize: 11, color: CP.accentGreen, paddingBottom: 10, textDecoration: "none" }}>
             Aggiorna dati (sync) →
           </Link>
           {loading && <Loader2 size={16} className="animate-spin" style={{ color: CP.textSecondary, marginBottom: 10 }} />}
@@ -136,7 +136,7 @@ export default function PnlLivePage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 18 }}>
             <StatCard label="Venduto totale" value={fmt$(data.totals.sales)} color={CP.accentGreen} />
             <StatCard label="Fee HOC (dove impostata)" value={fmt$(data.totals.fee_usd)} sub={`fee config: ${data.totals.fee_coverage} creator`} />
-            <StatCard label="Costo operatori" value={fmt$(data.totals.cost_ops)} color="#D4AF7A" />
+            <StatCard label="Costo operatori" value={fmt$(data.totals.cost_ops)} color="#b9aef9" />
             <StatCard label="Margine operativo" value={fmt$(data.totals.margin)} color={data.totals.margin >= 0 ? CP.accentGreen : CP.accentRed} sub="solo creator con fee impostata" />
           </div>
 
@@ -177,7 +177,7 @@ export default function PnlLivePage() {
                         </span>
                       </td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono }}>{fmt$(r.fee_usd)}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#D4AF7A" }}>{fmt$(r.cost_ops)}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#b9aef9" }}>{fmt$(r.cost_ops)}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmtPct(r.cost_pct)}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: r.margin == null ? CP.textMuted : r.margin >= 0 ? CP.accentGreen : CP.accentRed }}>{fmt$(r.margin)}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: r.margin_pct == null ? CP.textMuted : r.margin_pct >= 0 ? CP.accentGreen : CP.accentRed }}>{fmtPct(r.margin_pct)}</td>
@@ -198,7 +198,7 @@ export default function PnlLivePage() {
                     <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: CP.accentGreen }}>{fmt$(data.totals.sales)}</td>
                     <td style={td}></td>
                     <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700 }}>{fmt$(data.totals.fee_usd)}</td>
-                    <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: "#D4AF7A" }}>{fmt$(data.totals.cost_ops)}</td>
+                    <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: "#b9aef9" }}>{fmt$(data.totals.cost_ops)}</td>
                     <td style={td}></td>
                     <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: data.totals.margin >= 0 ? CP.accentGreen : CP.accentRed }}>{fmt$(data.totals.margin)}</td>
                     <td style={td}></td>

@@ -7,8 +7,9 @@
  * Replica il pattern visivo di CreatorsPro (logo top → org → nav grouped).
  *
  * FEATURES UX:
- *   - Toggle "Essential / Advanced" in alto: Essential mostra 8 voci core
- *     (per primo accesso / demo / consulenti), Advanced mostra tutto.
+ *   - Toggle "Essential / Advanced" in alto: Essential mostra solo le voci
+ *     core in ESSENTIAL_HREFS (primo accesso / demo / consulenti), Advanced
+ *     mostra tutto.
  *   - Gruppi collapsible: Performance + Training aperti di default, gli altri
  *     4 collassati. Click sul GroupLabel per toggle.
  *   - Tutti gli stati persistiti in localStorage.
@@ -23,7 +24,6 @@ import {
   Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown,
   GraduationCap, BookOpen, ClipboardCheck, Target, Brain, Award,
   LayoutDashboard, UserCog, Sparkles,
-  Workflow, Image as ImageIcon, ListChecks, History, Settings,
   UserCircle2, Contact, Medal, Key, Lock, Wrench,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
@@ -32,7 +32,7 @@ import {
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
 
-// Voci "essential" (mostrate sempre): 8 core per primo accesso / demo.
+// Voci "essential" (mostrate sempre): core per primo accesso / demo.
 const ESSENTIAL_HREFS = new Set([
   "/welcome",
   "/welcome/score-friendly",
@@ -78,7 +78,7 @@ const NAV_GROUPS = [
     label: "Training",
     defaultOpen: true,
     items: [
-      { href: "/welcome/score-friendly",         label: "📚 Tutorial Score", icon: GraduationCap },
+      { href: "/welcome/score-friendly",         label: "Tutorial Score", icon: GraduationCap },
       { href: "/",                               label: "Academy",      icon: GraduationCap, match: (p) => p === "/" },
       { href: "/playbook",                       label: "Playbook",     icon: BookOpen },
       { href: "/leaderboard",                    label: "Ladder Academy", icon: Trophy },
@@ -97,17 +97,6 @@ const NAV_GROUPS = [
       { href: "/admin/dashboard",                label: "Dashboard",       icon: LayoutDashboard },
       { href: "/admin/fan-archetypes",           label: "Fan Archetypes",  icon: Sparkles },
       { href: "/admin/creators",                 label: "Creator (anag.)", icon: UserCog },
-    ],
-  },
-  {
-    label: "Content Pipeline",
-    defaultOpen: false,
-    items: [
-      { href: "/content-pipeline",               label: "Pipeline",       icon: Workflow, match: (p) => p === "/content-pipeline" },
-      { href: "/content-pipeline/creators",      label: "Creator (CP)",   icon: ImageIcon },
-      { href: "/content-pipeline/queue",         label: "Queue",          icon: ListChecks },
-      { href: "/content-pipeline/history",       label: "History",        icon: History },
-      { href: "/content-pipeline/settings",      label: "Settings",       icon: Settings },
     ],
   },
   {
@@ -234,7 +223,7 @@ function ViewToggle({ mode, onChange }) {
       margin: "8px 16px 0 16px",
     }}>
       {[
-        { v: "essential", label: "Essential", icon: Compass, tooltip: "8 voci core — primo accesso, demo" },
+        { v: "essential", label: "Essential", icon: Compass, tooltip: "Voci core — primo accesso, demo" },
         { v: "advanced",  label: "Advanced",  icon: Layers,   tooltip: "Tutti gli strumenti" },
       ].map((opt) => {
         const active = mode === opt.v;

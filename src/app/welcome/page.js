@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import {
-  BarChart3, GraduationCap, Workflow, Users,
+  BarChart3, GraduationCap, Users,
   ArrowRight, Sparkles, Trophy, Brain, Award,
   LayoutDashboard, Layers,
 } from "lucide-react";
@@ -23,7 +23,7 @@ const MODULES = [
   {
     key: "performance",
     icon: BarChart3,
-    color: "#10B981",
+    color: CP.accentGreen,
     title: "Performance Analytics",
     subtitle: "Quanto vendono i tuoi operatori e creator",
     description:
@@ -37,7 +37,7 @@ const MODULES = [
   {
     key: "training",
     icon: GraduationCap,
-    color: "#3B82F6",
+    color: CP.accentBlue,
     title: "Training Academy",
     subtitle: "Allena i chatter con AI + valuta automaticamente",
     description:
@@ -49,23 +49,23 @@ const MODULES = [
     ],
   },
   {
-    key: "pipeline",
-    icon: Workflow,
-    color: "#A855F7",
-    title: "Content Pipeline",
-    subtitle: "Flow di content production per i canali Telegram",
+    key: "comp",
+    icon: Layers,
+    color: CP.accentSoftText,
+    title: "Comp & Ben",
+    subtitle: "Compensation, scaglioni e margine per creator",
     description:
-      "Pipeline draft → approval → schedule → publish per i canali Telegram di ciascun creator. Multi-creator, multi-bot, history pubblicati.",
-    primaryCta: { href: "/content-pipeline", label: "Apri Pipeline" },
+      "P&L Live per creator (venduto × fee − costo operatori), scaglioni a confronto cross-creator, hot list anomalie compensation ed esame verticale di un creator su N mesi.",
+    primaryCta: { href: "/admin/pnl-live", label: "Apri P&L Live" },
     secondaryCtas: [
-      { href: "/content-pipeline/queue", label: "Code attive" },
-      { href: "/content-pipeline/creators", label: "Creator pipeline" },
+      { href: "/admin/profiles-compare", label: "Scaglioni a confronto" },
+      { href: "/admin/comp-review", label: "Comp Review" },
     ],
   },
   {
     key: "team",
     icon: Users,
-    color: "#F59E0B",
+    color: CP.accent,
     title: "Team Management",
     subtitle: "Organizzazione, ruoli, anagrafica, accessi",
     description:
@@ -98,7 +98,7 @@ export default function WelcomePage() {
           HOC Pro — il sistema operativo di <span style={{ color: CP.accentGreen }}>House of Creators</span>
         </h1>
         <p style={{ color: CP.textSecondary, fontSize: 17, margin: 0, lineHeight: 1.6, maxWidth: 900 }}>
-          Performance analytics, training AI, content pipeline e team management — in un'unica console.
+          Performance analytics, training AI, compensation e team management — in un'unica console.
           Connesso a <b style={{ color: CP.textPrimary }}>CreatorsPro</b> (sales reali) e <b style={{ color: CP.textPrimary }}>Infloww</b> (KPI chat).
         </p>
 
@@ -140,7 +140,7 @@ export default function WelcomePage() {
               <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
                 <div style={{
                   width: 52, height: 52, borderRadius: 12,
-                  background: `linear-gradient(135deg, ${m.color}33, ${m.color}11)`,
+                  background: m.color + "22",
                   border: `1px solid ${m.color}55`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   flexShrink: 0,
@@ -169,7 +169,7 @@ export default function WelcomePage() {
                     display: "inline-flex", alignItems: "center", justifyContent: "space-between",
                     padding: "10px 14px",
                     background: m.color,
-                    color: "#0a0a0a",
+                    color: CP.accentInk,
                     border: "none",
                     borderRadius: 8,
                     fontSize: 13,
@@ -212,7 +212,7 @@ export default function WelcomePage() {
           display: "flex", alignItems: "center", justifyContent: "space-between",
           padding: "20px 24px",
           marginBottom: 16,
-          background: `linear-gradient(135deg, ${CP.accentGreen}15 0%, ${CP.accentBlue}10 100%)`,
+          background: CP.surface,
           border: `1px solid ${CP.accentGreen}44`,
           borderRadius: 14,
           color: CP.textPrimary,
@@ -265,7 +265,7 @@ export default function WelcomePage() {
             <div style={{ fontWeight: 600, fontSize: 14 }}>Hai bisogno di TUTTI gli strumenti?</div>
           </div>
           <p style={{ color: CP.textSecondary, fontSize: 13, margin: "0 0 12px 0", lineHeight: 1.5 }}>
-            La sidebar in alto a sinistra ha un toggle <b>Essential / Advanced</b>. In modalità Advanced compaiono anche le sezioni Insights, Content Pipeline e Data &amp; Integrations.
+            La sidebar in alto a sinistra ha un toggle <b>Essential / Advanced</b>. In modalità Advanced compaiono tutte le voci di ogni sezione, incluse Insights e Data &amp; Integrations.
           </p>
           <span style={{ color: CP.textMuted, fontSize: 12, fontStyle: "italic" }}>
             Click sull'icona <b>Layers</b> in sidebar per passare a Advanced.

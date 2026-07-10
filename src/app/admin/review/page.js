@@ -3,16 +3,15 @@
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import AdminNav from "@/components/AdminNav";
 import { CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const HOC_COLORS = {
-  bgDark: "#08090F",
-  white: "#F5F6F8",
-  gray: "#6B7080",
-  orange: "#B89158",
-  gradient: "linear-gradient(135deg, #B89158 0%, #D44545 100%)",
+  bgDark: "#0a0d11",
+  white: "#f2f4f8",
+  gray: "#8c95a8",
+  orange: "#8b7cf6",
+  gradient: "#8b7cf6",
 };
 
 export default function ReviewPage() {
@@ -69,11 +68,10 @@ export default function ReviewPage() {
     }
   }
 
-  if (!isLoaded) return <div style={{ color: "#F5F6F8", padding: 40 }}>Loading...</div>;
+  if (!isLoaded) return <div style={{ color: CP.textPrimary, padding: 40 }}>Loading...</div>;
 
   return (
     <div style={{ background: HOC_COLORS.bgDark, minHeight: "100vh", color: HOC_COLORS.white, padding: "32px 28px 64px 28px", maxWidth: 1400, margin: "0 auto" }}>
-      <AdminNav />
       <PageHeader
         breadcrumb={
           <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
@@ -87,7 +85,7 @@ export default function ReviewPage() {
         subtitle="Feedback recenti degli operatori sulle valutazioni AI. Rivedi, correggi, promuovi ad esempi d'oro."
       />
 
-      {error && <p style={{ color: "#D44545" }}>Errore: {error}</p>}
+      {error && <p style={{ color: CP.accentRed }}>Errore: {error}</p>}
       {loading && <p>Caricamento...</p>}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginTop: "2rem" }}>
@@ -100,7 +98,7 @@ export default function ReviewPage() {
               onClick={() => setSelected(it)}
               style={{
                 background: selected?.timestamp === it.timestamp ? `${HOC_COLORS.orange}20` : `${HOC_COLORS.white}08`,
-                border: `1px solid ${it.reviewed ? "#3FB97E55" : HOC_COLORS.white + "20"}`,
+                border: `1px solid ${it.reviewed ? CP.accentGreen + "55" : HOC_COLORS.white + "20"}`,
                 borderRadius: "0.5rem",
                 padding: "0.75rem",
                 marginBottom: "0.5rem",
@@ -112,7 +110,7 @@ export default function ReviewPage() {
               </div>
               <div style={{ fontSize: "0.8rem", color: HOC_COLORS.gray }}>
                 {new Date(it.timestamp).toLocaleString("it-IT")} • user {it.userId?.slice(-6)}
-                {it.reviewed ? " • ✅ reviewed" : ""}
+                {it.reviewed ? " • reviewed" : ""}
               </div>
               {it.comment && <div style={{ fontSize: "0.85rem", marginTop: "0.25rem" }}>&quot;{it.comment}&quot;</div>}
             </div>
@@ -137,7 +135,7 @@ export default function ReviewPage() {
               <div style={{ background: `${HOC_COLORS.white}05`, padding: "0.75rem", borderRadius: "0.5rem", marginBottom: "1rem", maxHeight: "300px", overflowY: "auto" }}>
                 {(selected.messages || []).map((m, i) => (
                   <div key={i} style={{ marginBottom: "0.5rem" }}>
-                    <strong style={{ color: m.role === "operator" ? HOC_COLORS.orange : "#4F8CCB" }}>
+                    <strong style={{ color: m.role === "operator" ? HOC_COLORS.orange : CP.accentSoftText }}>
                       [{m.role}]:
                     </strong>{" "}
                     {m.content}
@@ -159,8 +157,8 @@ export default function ReviewPage() {
                 style={{ display: "block", width: "100%", padding: "0.5rem", background: `${HOC_COLORS.white}05`, border: `1px solid ${HOC_COLORS.white}30`, borderRadius: "0.5rem", color: HOC_COLORS.white, marginBottom: "1rem" }}
               >
                 <option value="">— nessuno —</option>
-                <option value="success">✅ Golden success</option>
-                <option value="failure">❌ Golden failure (anti-pattern)</option>
+                <option value="success">Golden success</option>
+                <option value="failure">Golden failure (anti-pattern)</option>
               </select>
 
               <button

@@ -2,7 +2,6 @@
 
 import { CREATOR_PERSONAS } from "@/lib/creator-personas";
 import Link from "next/link";
-import AdminNav from "@/components/AdminNav";
 import { COLORS, CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
@@ -51,7 +50,6 @@ function Chips({ items, color = C.purple }) {
 export default function CreatorsAdmin() {
   return (
     <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "32px 28px 64px 28px", maxWidth: 1500, margin: "0 auto" }}>
-      <AdminNav />
       <PageHeader
         breadcrumb={
           <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>

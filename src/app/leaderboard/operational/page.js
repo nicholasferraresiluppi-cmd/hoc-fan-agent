@@ -58,9 +58,9 @@ const LANGUAGE_COLORS = {
 };
 
 const EXCLUSION_ACTIONS = [
-  { reason: "non_chatter",  label: "Escludi — Non-chatter", description: "SM, trainer, account servizio", color: "#4F8CCB" },
-  { reason: "manual",       label: "Escludi — Manuale",     description: "Esclusione caso per caso",       color: "#D4AF7A" },
-  { reason: "data_quality", label: "Escludi — Data quality",description: "Dati incompleti/sospetti",       color: "#E76F51" },
+  { reason: "non_chatter",  label: "Escludi — Non-chatter", description: "SM, trainer, account servizio", color: CP.accentSoftText },
+  { reason: "manual",       label: "Escludi — Manuale",     description: "Esclusione caso per caso",       color: CP.accent },
+  { reason: "data_quality", label: "Escludi — Data quality",description: "Dati incompleti/sospetti",       color: CP.accentRed },
 ];
 
 /* =================================================
@@ -355,13 +355,13 @@ function Avatar({ name, size = 40, large = false }) {
   return (
     <div style={{
       width: size, height: size, borderRadius: "50%",
-      background: large ? `linear-gradient(135deg, ${COLORS.champagne} 0%, ${COLORS.charcoal} 100%)` : COLORS.charcoal,
+      background: large ? COLORS.champagne : COLORS.charcoal,
       color: large ? COLORS.obsidian : COLORS.alabaster,
       display: "flex", alignItems: "center", justifyContent: "center",
       fontFamily: FONTS.display, fontWeight: 600, fontSize: size * 0.36,
       flexShrink: 0,
       border: large ? `3px solid ${COLORS.graphite}` : `1px solid ${COLORS.charcoal}`,
-      boxShadow: large ? `0 0 0 2px ${COLORS.champagne}, 0 8px 24px rgba(212,175,122,0.25)` : "none",
+      boxShadow: large ? `0 0 0 2px ${COLORS.champagne}, 0 8px 24px rgba(139,124,246,0.25)` : "none",
     }}>{getInitials(name)}</div>
   );
 }
@@ -398,7 +398,7 @@ function KpiVsGroup({ value, mean, formatter, label }) {
   const isAbove = mean && value > mean;
   return (
     <div title={`${label}: media Group ${formatter(mean)}`}>
-      <div style={{ fontFamily: FONTS.mono, fontSize: 13, fontWeight: 600, color: isAbove ? "#3FB97E" : COLORS.alabaster }}>{formatter(value)}</div>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 13, fontWeight: 600, color: isAbove ? CP.accentGreen : COLORS.alabaster }}>{formatter(value)}</div>
       {mean != null && mean > 0 && (
         <div style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.mist, marginTop: 1 }}>Ø {formatter(mean)}</div>
       )}
@@ -414,7 +414,7 @@ function HeroCard({ op, groupMeans, canExclude, onExcluded }) {
   const tierColor = TIER_COLORS[op.tier] || COLORS.champagne;
   return (
     <div style={{
-      background: `linear-gradient(135deg, ${tierColor}1F 0%, ${COLORS.graphite}99 60%)`,
+      background: CP.surface,
       border: `1px solid ${tierColor}55`,
       borderRadius: 20, padding: "28px 32px", marginBottom: 16,
       display: "grid", gridTemplateColumns: "auto 1fr auto auto",
@@ -425,11 +425,6 @@ function HeroCard({ op, groupMeans, canExclude, onExcluded }) {
           <AdminActionsMenu employee={op.employee} onExcluded={onExcluded} />
         </div>
       )}
-      <div style={{
-        position: "absolute", inset: 0,
-        background: `radial-gradient(circle 300px at 100% 50%, ${tierColor}30, transparent 70%)`,
-        pointerEvents: "none",
-      }} />
       <div style={{ textAlign: "center", position: "relative" }}>
         <div style={{ fontSize: 32, marginBottom: 4 }}>👑</div>
         <div style={{
@@ -504,7 +499,7 @@ function HeroCreatorImpact({ op }) {
     }}>
       <div style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 11, color: COLORS.fog, letterSpacing: "0.12em" }}>
-          🎨 Impact su creator
+          Impact su creator
         </div>
         <div style={{ fontSize: 12, color: COLORS.mist, marginTop: 4 }}>
           {op.employee} ha lavorato su {op.creators?.length || 0} creator
@@ -692,7 +687,7 @@ function StreamRow({ op, groupMeans, canExclude, onExcluded, cpAvailable = false
       {cpAvailable && (
         <div
           title={op.cp_data ? `CP: ${op.cp_data.total_shifts} shift, ${fmtCurrency(op.cp_data.total_sales)} sales, top fascia: ${op.cp_data.top_interval || "—"}` : "Dato CP non disponibile per questo operatore (mapping mancante?)"}
-          style={{ fontFamily: FONTS.mono, fontSize: 13, color: op.cp_data ? "#3FB97E" : COLORS.mist, fontWeight: 600 }}
+          style={{ fontFamily: FONTS.mono, fontSize: 13, color: op.cp_data ? CP.accentGreen : COLORS.mist, fontWeight: 600 }}
         >
           {op.cp_data ? fmtCurrency(op.cp_data.sales_per_shift) : "—"}
           {op.cp_data && (
@@ -725,20 +720,20 @@ function HealthBar({ periodType }) {
 
   return (
     <div style={{
-      background: `linear-gradient(135deg, ${COLORS.graphite} 0%, ${COLORS.obsidian} 100%)`,
+      background: CP.surface,
       border: `1px solid ${COLORS.steel}`,
       borderRadius: 14, padding: "18px 22px", marginBottom: 22,
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 12 }}>
         <div>
           <div style={{ fontSize: 11, color: COLORS.fog, letterSpacing: "0.12em" }}>
-            📈 Health agenzia — ultimi {history.length} {periodType === "monthly" ? "mesi" : periodType === "weekly" ? "settimane" : "trimestri"}
+            Health agenzia — ultimi {history.length} {periodType === "monthly" ? "mesi" : periodType === "weekly" ? "settimane" : "trimestri"}
           </div>
           <div style={{ fontSize: 12, color: COLORS.mist, marginTop: 4 }}>
             Score medio attuale {current.avg_score.toFixed(1)}/100 su {current.eligible} eligible{previous ? " · vs precedente:" : ""}{previous && (
               <span style={{
                 marginLeft: 6,
-                color: delta_avg > 0 ? "#3FB97E" : delta_avg < 0 ? "#E76F51" : COLORS.mist,
+                color: delta_avg > 0 ? CP.accentGreen : delta_avg < 0 ? CP.accentRed : COLORS.mist,
                 fontWeight: 600, fontFamily: FONTS.mono,
               }}>
                 {delta_avg > 0 ? "↑ +" : delta_avg < 0 ? "↓ " : ""}{Math.abs(delta_avg).toFixed(1)} pt
@@ -749,10 +744,10 @@ function HealthBar({ periodType }) {
         <div style={{ display: "flex", gap: 18, fontSize: 11 }}>
           <div>
             <div style={{ color: COLORS.fog, letterSpacing: "0.08em", fontSize: 9 }}>Qualità (Elite+Strong vs Critical+Weak)</div>
-            <div style={{ marginTop: 4, fontFamily: FONTS.mono, fontSize: 14, fontWeight: 600, color: "#3FB97E" }}>
+            <div style={{ marginTop: 4, fontFamily: FONTS.mono, fontSize: 14, fontWeight: 600, color: CP.accentGreen }}>
               +{current.elite_strong - current.critical_weak}
               {previous && (
-                <span style={{ marginLeft: 8, fontSize: 11, color: delta_quality > 0 ? "#3FB97E" : delta_quality < 0 ? "#E76F51" : COLORS.mist }}>
+                <span style={{ marginLeft: 8, fontSize: 11, color: delta_quality > 0 ? CP.accentGreen : delta_quality < 0 ? CP.accentRed : COLORS.mist }}>
                   {delta_quality > 0 ? "↑ +" : delta_quality < 0 ? "↓ " : ""}{Math.abs(delta_quality)}
                 </span>
               )}
@@ -764,7 +759,7 @@ function HealthBar({ periodType }) {
       <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 50 }}>
         {history.map((h) => {
           const heightPct = ((h.avg_score || 0) / maxAvg) * 100;
-          const tColor = h.avg_score >= 70 ? "#3FB97E" : h.avg_score >= 55 ? COLORS.champagne : "#E76F51";
+          const tColor = h.avg_score >= 70 ? CP.accentGreen : h.avg_score >= 55 ? COLORS.champagne : CP.accentRed;
           const tc = h.tier_counts || {};
           const tooltip = [
             `Periodo: ${h.period_id}`,
@@ -872,7 +867,7 @@ function UnderperformersKebab({ employee, onExcluded, onIgnored }) {
               fontFamily: FONTS.body, cursor: busy ? "wait" : "pointer", borderRadius: 6 }}
             onMouseEnter={(e) => { e.currentTarget.style.background = COLORS.champagne + "20"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
-            <div style={{ fontWeight: 600, color: COLORS.champagne }}>🔕 Ignora dalla lista</div>
+            <div style={{ fontWeight: 600, color: COLORS.champagne }}>Ignora dalla lista</div>
             <div style={{ fontSize: 11, color: COLORS.mist, marginTop: 2 }}>Resta in leaderboard, sparisce solo da qui</div>
           </button>
           <div style={{ borderTop: `1px solid ${COLORS.charcoal}`, margin: "4px 8px" }} />
@@ -910,7 +905,7 @@ function UnderperformersColumn({ language, label, flag, periodType, periodId, si
     }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
         <div style={{ fontSize: 11, color: COLORS.signal, letterSpacing: "0.1em", fontWeight: 600 }}>
-          ⚠️ Da cambiare {flag} {label}
+          Da cambiare {flag} {label}
         </div>
         <div
           title={totalCandidates > list.length ? `Mostro ${list.length} su ${totalCandidates} candidati totali. Alza il selettore size per vederne di più.` : `Tutti i ${list.length} candidati mostrati`}
@@ -1009,7 +1004,7 @@ function IgnoredPanel({ onChange }) {
         title={isEmpty ? "Nessun operatore ignorato finora. Usa il menu ⋮ sui candidati 'da cambiare' per ignorarli senza escluderli." : ""}
       >
         <span>
-          🔕 <b style={{ color: COLORS.alabaster }}>{entries.length}</b> ignorati
+          <b style={{ color: COLORS.alabaster }}>{entries.length}</b> ignorati
           {isEmpty
             ? <span style={{ marginLeft: 6, opacity: 0.7 }}>— usa il menu ⋮ per aggiungere</span>
             : <span style={{ marginLeft: 6, opacity: 0.7 }}>— non conteggiati nel pannello "da cambiare"</span>}
@@ -1058,7 +1053,7 @@ function UnderperformersActionCenter({ periodType, periodId, canExclude, languag
     <div style={{ marginBottom: 22 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontSize: 11, color: COLORS.fog, letterSpacing: "0.12em" }}>
-          🎯 Action center — operatori da cambiare (admin only)
+          Action center — operatori da cambiare (admin only)
           {languageFilter && <span style={{ marginLeft: 8, color: COLORS.champagne }}>· filtrato {languageFilter.toUpperCase()}</span>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1253,7 +1248,7 @@ export default function OperationalLeaderboardPage() {
             {canExclude && <> <span style={{ color: CP.accentGreen }}>Click sul menu ⋮ per escludere al volo.</span></>}
           </>}
           toolbar={canExclude && (
-            <Link href="/admin/leaderboard-exclusions" style={styles.adminLink}>⚙️ Esclusioni</Link>
+            <Link href="/admin/leaderboard-exclusions" style={styles.adminLink}>Esclusioni</Link>
           )}
         />
 
@@ -1311,7 +1306,7 @@ export default function OperationalLeaderboardPage() {
               color: COLORS.fog, fontSize: 13, cursor: "pointer",
               fontFamily: FONTS.body, marginLeft: "auto",
             }}
-          >🔄 Aggiorna</button>
+          >Aggiorna</button>
         </div>
 
         {/* Filter bar — categoria */}
@@ -1432,7 +1427,7 @@ export default function OperationalLeaderboardPage() {
                   label="Sales agency (CP)"
                   value={fmtCurrency(data.cp_agency.total_sales)}
                   sub={`${data.cp_agency.total_shifts} shift · avg ${fmtCurrency(data.cp_agency.avg_sales_per_shift)}/shift`}
-                  color="#3FB97E"
+                  color={CP.accentGreen}
                   tooltip={`Dati da CreatorsPro. Top fascia: ${Object.entries(data.cp_agency.interval_sales || {}).sort((a,b)=>b[1]-a[1])[0]?.[0] || "—"}. Click per sync.`}
                 />
               </Link>

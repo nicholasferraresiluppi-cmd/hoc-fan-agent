@@ -110,21 +110,20 @@ export default function MyProfilePage() {
             {/* HERO CARD */}
             {cp ? (
               <div style={{
-                background: `linear-gradient(135deg, ${tierColor}1F 0%, ${COLORS.graphite}99 60%)`,
+                background: CP.surface,
                 border: `1px solid ${tierColor}55`,
                 borderRadius: 20, padding: "30px 32px", marginBottom: 24,
                 display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 28, alignItems: "center",
                 position: "relative", overflow: "hidden",
               }}>
-                <div style={{ position: "absolute", inset: 0, background: `radial-gradient(circle 360px at 100% 50%, ${tierColor}30, transparent 70%)`, pointerEvents: "none" }} />
                 <div style={{
                   width: 100, height: 100, borderRadius: "50%",
-                  background: `linear-gradient(135deg, ${COLORS.champagne}, ${COLORS.charcoal})`,
+                  background: COLORS.champagne,
                   color: COLORS.obsidian,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontFamily: FONTS.display, fontWeight: 600, fontSize: 36,
                   border: `3px solid ${COLORS.graphite}`,
-                  boxShadow: `0 0 0 3px ${COLORS.champagne}, 0 8px 24px rgba(212,175,122,0.3)`,
+                  boxShadow: `0 0 0 3px ${COLORS.champagne}`,
                 }}>{getInitials(employee)}</div>
 
                 <div style={{ position: "relative" }}>
@@ -135,12 +134,12 @@ export default function MyProfilePage() {
                     </div>
                   )}
                   <div style={{ display: "flex", gap: 22, flexWrap: "wrap", fontSize: 13 }}>
-                    <StatMini l="Sales mese" v={fmtCurrency(cp.total_sales)} color="#3FB97E" />
+                    <StatMini l="Sales mese" v={fmtCurrency(cp.total_sales)} color={CP.accentGreen} />
                     <StatMini l="Shift" v={Math.round(cp.total_shifts || 0)} />
                     <StatMini l="Creator attive" v={cp.per_creator?.length || 0} />
                     {cp.rank_agency && <StatMini l="Posizione" v={`#${cp.rank_agency}`} sub={`su ${cp.total_in_ranking}`} />}
                     {cpHist?.tenure_months_cp != null && <StatMini l="Sei in agency da" v={`${cpHist.tenure_months_cp} mesi`} sub={cpHist.first_seen_period ? `dal ${formatPeriodLabel(cpHist.first_seen_period)}` : null} />}
-                    {cpHist?.ltv_cp_eur != null && <StatMini l="Fatturato CP totale" v={fmtCurrency(cpHist.ltv_cp_eur)} sub={`${cpHist.periods_count} mesi`} color="#3FB97E" />}
+                    {cpHist?.ltv_cp_eur != null && <StatMini l="Fatturato CP totale" v={fmtCurrency(cpHist.ltv_cp_eur)} sub={`${cpHist.periods_count} mesi`} color={CP.accentGreen} />}
                   </div>
                 </div>
 
@@ -179,7 +178,7 @@ export default function MyProfilePage() {
                   </div>
                   {cp.per_creator.map((row) => {
                     const tCol = row.tier ? TIER_COLORS[row.tier] : COLORS.mist;
-                    const cohortColor = row.vs_cohort_pct == null ? COLORS.mist : row.vs_cohort_pct > 0 ? "#3FB97E" : "#E76F51";
+                    const cohortColor = row.vs_cohort_pct == null ? COLORS.mist : row.vs_cohort_pct > 0 ? CP.accentGreen : CP.accentRed;
                     return (
                       <div key={row.creator} style={{ display: "grid", gridTemplateColumns: "1.8fr 0.8fr 0.7fr 0.9fr 0.6fr 0.8fr", padding: "12px 20px", borderBottom: `1px solid ${COLORS.charcoal}88`, alignItems: "center", fontSize: 13 }}>
                         <div style={{ fontWeight: 500 }}>{row.creator}</div>
@@ -250,7 +249,7 @@ function NextTierBlock({ cp, nextTier }) {
     <div style={{
       padding: "20px 24px",
       marginBottom: 24,
-      background: `linear-gradient(135deg, ${nextColor}10, ${COLORS.graphite}99)`,
+      background: CP.surface,
       border: `1px solid ${nextColor}44`,
       borderRadius: 14,
       display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap",
@@ -276,23 +275,23 @@ function CoachingBlock({ assignment }) {
     <div style={{
       padding: "20px 24px",
       marginBottom: 24,
-      background: `linear-gradient(135deg, #F59E0B14, ${COLORS.graphite}99)`,
-      border: `1px solid #F59E0B66`,
+      background: CP.accentSoft,
+      border: `1px solid ${CP.accentDim}`,
       borderRadius: 14,
       display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap",
     }}>
-      <GraduationCap size={28} color="#F59E0B" />
+      <GraduationCap size={28} color={CP.accentSoftText} />
       <div style={{ flex: 1, minWidth: 220 }}>
         <div style={{ fontSize: 12, color: COLORS.fog, letterSpacing: "0.12em", marginBottom: 4 }}>
           Hai un coaching assegnato
         </div>
         <div style={{ fontFamily: FONTS.display, fontSize: 18, color: COLORS.alabaster, marginBottom: 4 }}>
-          Categoria: <strong style={{ color: "#F59E0B" }}>{assignment.training_category_id}</strong>
+          Categoria: <strong style={{ color: CP.accentSoftText }}>{assignment.training_category_id}</strong>
         </div>
         {assignment.owner && <div style={{ fontSize: 12, color: COLORS.fog }}>Owner: <strong>{assignment.owner}</strong>{assignment.deadline && ` · deadline ${assignment.deadline}`}</div>}
         {assignment.note && <div style={{ fontSize: 12, color: COLORS.mist, marginTop: 6, fontStyle: "italic" }}>"{assignment.note}"</div>}
       </div>
-      <Link href={`/academy?category=${assignment.training_category_id}`} style={{ padding: "10px 16px", background: "#F59E0B", color: COLORS.obsidian, borderRadius: 10, fontSize: 13, fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <Link href={`/academy?category=${assignment.training_category_id}`} style={{ padding: "10px 16px", background: CP.accent, color: CP.accentInk, borderRadius: 10, fontSize: 13, fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
         Inizia <ArrowRight size={14} />
       </Link>
     </div>

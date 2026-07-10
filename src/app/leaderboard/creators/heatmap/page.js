@@ -86,7 +86,7 @@ export default function HeatmapPage({ searchParams }) {
     <div style={styles.page}>
       <div style={styles.container}>
         <Link href={`/leaderboard/creators?period_id=${periodId}`} style={styles.backLink}>← Leaderboard Creator</Link>
-        <h1 style={styles.title}>🔥 Heat-map Operatore × Creator</h1>
+        <h1 style={styles.title}>Heat-map Operatore × Creator</h1>
         <p style={styles.sub}>
           Ogni cella mostra lo <b>score relativo</b> dell'operatore su quella creator (100 = media creator).
           Verde = sopra media, Rosso = sotto media. Vuoto = non hanno lavorato insieme nel periodo.
@@ -131,7 +131,7 @@ export default function HeatmapPage({ searchParams }) {
                             return (
                               <td key={c.alias} style={{ ...styles.td, width: 38, height: 28, background: color + (cell ? "AA" : ""), cursor: cell ? "help" : "default" }}
                                   title={cell ? `${opName} su ${c.alias}: score ${cell.score} · ${fmtCurrency(cell.sales)} su ${cell.shifts} shift` : "Non hanno lavorato insieme"}>
-                                {cell && <span style={{ color: cell.score >= 130 ? "#fff" : COLORS.obsidian, fontWeight: 700, fontSize: 10 }}>{cell.score}</span>}
+                                {cell && <span style={{ color: cell.score >= 130 ? COLORS.alabaster : COLORS.obsidian, fontWeight: 700, fontSize: 10 }}>{cell.score}</span>}
                               </td>
                             );
                           })}
