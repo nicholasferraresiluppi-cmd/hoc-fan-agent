@@ -37,36 +37,59 @@ export async function GET(request) {
   const [y, m] = periodId.split("-").map(Number);
   const monthEnd = `${periodId}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
 
-  // Prova filtro server-side; verifica sull'esito. Param names ignoti → tentativi.
-  const paramTrials = [
-    { name: "creatorId", q: { creatorId } },
-    { name: "creator", q: { creator: creatorId } },
-    { name: "nessuno (filtro client-side)", q: {} },
-  ];
-  let mode = null, useQ = {};
-  for (const trial of paramTrials) {
-    const r = await probeGet(`/v1/take-credit/transactions`, { query: { ...trial.q, limit: 20, page: 1 } });
-    if (!r.ok) continue;
-    const rows = Array.isArray(r.sample?.data) ? r.sample.data : (Array.isArray(r.sample) ? r.sample : []);
-    if (rows.length === 0) { mode = trial.name; useQ = trial.q; break; }
-    const allMatch = rows.every((t) => String(t?.creator?.id ?? "") === String(creatorId));
-    if (trial.q.creatorId || trial.q.creator) {
-      if (allMatch) { mode = trial.name; useQ = trial.q; break; }
-    } else { mode = trial.name; useQ = trial.q; break; }
-  }
-  if (mode == null) return Response.json({ error: "endpoint take-credit non risponde" }, { status: 502 });
+  // Discovery RIGOROSA del filtro creator: la UI di CP filtra per creator,
+  // quindi l'API lo supporta — va trovato il nome giusto del parametro.
+  // Verifica: (a) la pagina non filtrata contiene ANCHE altri creator (controllo
+  // che il filtro cambi davvero il risultato), (b) col parametro attivo TUTTE
+  // le righe appartengono al creator richiesto e non è vuoto.
+  const rowsOf = (r) => Array.isArray(r?.sample?.data) ? r.sample.data : (Array.isArray(r?.sample) ? r.sample : []);
+  const baseline = await probeGet(`/v1/take-credit/transactions`, { query: { limit: 20, page: 1 } });
+  const baseRows = rowsOf(baseline);
+  const baselineMixed = baseRows.some((t) => String(t?.creator?.id ?? "") !== String(creatorId));
 
-  // Pagina e aggrega. Ordine sconosciuto → cap pagine + filtro data client-side.
+  const creatorParams = ["creatorIds", "creatorIds[]", "creators", "creators[]", "creatorId", "creator", "fansiteIds", "fansiteIds[]", "fansiteId"];
+  let mode = "nessuno (filtro client-side)", useQ = {};
+  for (const p of creatorParams) {
+    const r = await probeGet(`/v1/take-credit/transactions`, { query: { [p]: creatorId, limit: 20, page: 1 } });
+    if (!r.ok) continue;
+    const rows = rowsOf(r);
+    if (rows.length > 0 && rows.every((t) => String(t?.creator?.id ?? "") === String(creatorId)) && baselineMixed) {
+      mode = p; useQ = { [p]: creatorId };
+      break;
+    }
+  }
+
+  // Discovery filtro PERIODO (la UI ha "Period"): valida chiedendo solo fino
+  // al 3 del mese → se la riga più recente è ≤ giorno 3, il parametro agisce.
+  const probeEnd = `${periodId}-03`;
+  const datePairs = [
+    ["startedAt", "endedAt"], ["startDate", "endDate"], ["from", "to"], ["dateFrom", "dateTo"], ["start", "end"],
+  ];
+  let dateMode = null, dateQ = {};
+  for (const [a, b] of datePairs) {
+    const r = await probeGet(`/v1/take-credit/transactions`, {
+      query: { ...useQ, [a]: `${monthStart}T00:00:00.000Z`, [b]: `${probeEnd}T23:59:59.999Z`, limit: 20, page: 1 },
+    });
+    if (!r.ok) continue;
+    const rows = rowsOf(r);
+    if (rows.length === 0) continue;
+    const newest = rows.map((t) => romeDay(t?.createdAt)).filter(Boolean).sort().pop();
+    if (newest && newest <= probeEnd) { dateMode = `${a}/${b}`; dateQ = { [a]: `${monthStart}T00:00:00.000Z` }; dateQ._endKey = b; break; }
+  }
+
+  // Pagina e aggrega. Con filtri server-side il mese intero è ~10-30 pagine.
   const agg = {
     n_total: 0, n_taken: 0, n_free: 0,
     amount_total: 0, amount_taken: 0, amount_free: 0,
     by_type_free: {}, by_day_free: {},
-    sample_take_fields: null, sample_free: [],
+    sample_take_fields: null, free_all: [],
   };
   let pages = 0, stop = false, scanned = 0, oldestSeen = null, newestSeen = null;
   const MAXP = 60;
+  const pageQ = { ...useQ };
+  if (dateMode) { const endKey = dateQ._endKey; pageQ[Object.keys(dateQ)[0]] = dateQ[Object.keys(dateQ)[0]]; pageQ[endKey] = `${monthEnd}T23:59:59.999Z`; }
   while (pages < MAXP && !stop) {
-    const r = await probeGet(`/v1/take-credit/transactions`, { query: { ...useQ, limit: 100, page: pages + 1 } });
+    const r = await probeGet(`/v1/take-credit/transactions`, { query: { ...pageQ, limit: 100, page: pages + 1 } });
     if (!r.ok) break;
     const rows = Array.isArray(r.sample?.data) ? r.sample.data : (Array.isArray(r.sample) ? r.sample : []);
     if (rows.length === 0) break;
@@ -92,7 +115,7 @@ export async function GET(request) {
         const ty = t?.type || "?";
         agg.by_type_free[ty] = r2((agg.by_type_free[ty] || 0) + amt);
         agg.by_day_free[day] = r2((agg.by_day_free[day] || 0) + amt);
-        if (agg.sample_free.length < 8) agg.sample_free.push({ day, amount: amt, type: t?.type || null, status: t?.status || null });
+        agg.free_all.push({ day, amount: amt, type: t?.type || null });
       }
       if (!agg.sample_take_fields && takesArr[0]) agg.sample_take_fields = Object.keys(takesArr[0]);
     }
@@ -101,9 +124,14 @@ export async function GET(request) {
     if (allOlder && oldestSeen && oldestSeen < monthStart) stop = true;
   }
 
+  // Le TRANSAZIONI SINGOLE più grosse rimaste libere: gli aggregati per
+  // tipo/giorno sono SOMME e non vanno mai raccontati come movimenti singoli.
+  const topFree = [...agg.free_all].sort((a, b) => b.amount - a.amount).slice(0, 10);
+
   return Response.json({
     period_id: periodId, creator_id: creatorId, alias: alias || null,
-    filter_mode: mode, pages_scanned: pages, rows_scanned: scanned,
+    filter_creator: mode, filter_periodo: dateMode || "nessuno (client-side)",
+    pages_scanned: pages, rows_scanned: scanned,
     date_range_seen: { oldest: oldestSeen, newest: newestSeen },
     summary: {
       transazioni: agg.n_total,
@@ -114,9 +142,9 @@ export async function GET(request) {
       importo_libero: r2(agg.amount_free),
       pct_libero: agg.amount_total > 0 ? r2(agg.amount_free / agg.amount_total * 100) : null,
     },
-    libere_per_tipo: agg.by_type_free,
-    libere_per_giorno: agg.by_day_free,
-    sample_libere: agg.sample_free,
+    libere_per_tipo_SOMME: agg.by_type_free,
+    libere_per_giorno_SOMME: agg.by_day_free,
+    top_transazioni_libere_singole: topFree,
     take_fields: agg.sample_take_fields,
   });
 }
