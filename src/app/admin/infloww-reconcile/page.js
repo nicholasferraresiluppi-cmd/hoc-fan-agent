@@ -217,6 +217,56 @@ export default function InflowwReconcilePage() {
         </CpCard>
       )}
 
+      {/* SENTINELLA PARSER: se scatta, i numeri CP sotto non sono affidabili */}
+      {hasData && data.data_quality?.parser_warning && (
+        <CpCard accent={CP.accentRed} padding="14px 18px" style={{ marginBottom: 16 }}>
+          <div style={{ color: CP.accentRed, fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
+            ⛔ Takes non riconosciuti dal parser ({Math.round((data.data_quality.parse_rate || 0) * 100)}% letti su {data.data_quality.takes_raw.toLocaleString("it-IT")})
+          </div>
+          <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.5 }}>
+            I takes grezzi ESISTONO nelle buste ma il parser ne riconosce troppo pochi: probabile nuovo cambio di schema lato CreatorsPro (è già successo a luglio 2026).
+            <b> Non fidarti dei numeri "Registrato CP" qui sotto</b> finché il parser non viene aggiornato — verifica con <code>/api/admin/cp-wage-raw-probe</code>.
+          </div>
+        </CpCard>
+      )}
+
+      {/* DA SISTEMARE: tutte le incongruenze rilevate, in un'unica lista azionabile */}
+      {hasData && (() => {
+        const unattrib = rows.filter((r) => r.cp_sales === 0 && (r.cp_shifts || 0) > 0);
+        const infIncompleti = rows.filter((r) => r.social_vs_infloww != null && r.social_vs_infloww > 1.25);
+        const troncate = rows.filter((r) => r.truncated);
+        const items = [
+          holes.length > 0 && { color: CP.accentRed, text: `${holes.length} probabili buchi di registrazione (≈ ${fmt$(holesGap)} mancanti)`, hint: "righe rosse in tabella → apri 'Turni' per il recupero" },
+          unattrib.length > 0 && { color: CP.accentRed, text: `${unattrib.length} creator con turni ma zero vendite attribuite`, hint: "takes da registrare in CP" },
+          noCp.length > 0 && { color: CP.accentRed, text: `${noCp.length} creator che incassano ma senza turni in CP (≈ ${fmt$(noCpGross)})`, hint: "configurare turni/creator in CP" },
+          infIncompleti.length > 0 && { color: "#F59E0B", text: `${infIncompleti.length} account dove l'analytics vede più di Infloww`, hint: "verificare la connessione Infloww dell'account" },
+          (data.unmatched_infloww.length + data.unmatched_cp.length) > 0 && { color: "#F59E0B", text: `${data.unmatched_infloww.length + data.unmatched_cp.length} profili non abbinati tra le piattaforme`, hint: "usa 'collega a…' nei riquadri in fondo" },
+          data.failed_creators?.length > 0 && { color: CP.accentRed, text: `${data.failed_creators.length} creator non sincronizzate da Infloww`, hint: "rilancia il sync da Revenue agency" },
+          troncate.length > 0 && { color: "#F59E0B", text: `${troncate.length} righe con dato Infloww troncato`, hint: "lordo sottostimato su volumi altissimi" },
+        ].filter(Boolean);
+        if (items.length === 0) {
+          return (
+            <CpCard padding="12px 16px" style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12.5, color: CP.accentGreen }}>✓ Nessuna incongruenza rilevata per questo mese: le fonti si trovano.</div>
+            </CpCard>
+          );
+        }
+        return (
+          <CpCard padding="14px 18px" style={{ marginBottom: 16 }}>
+            <SectionLabel style={{ marginBottom: 10 }}>Da sistemare — {items.length} {items.length === 1 ? "incongruenza rilevata" : "incongruenze rilevate"}</SectionLabel>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {items.map((it, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 9, fontSize: 12.5 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: it.color, flexShrink: 0, position: "relative", top: 1 }} />
+                  <span style={{ color: CP.textPrimary }}>{it.text}</span>
+                  <span style={{ color: CP.textMuted, fontSize: 11 }}>→ {it.hint}</span>
+                </div>
+              ))}
+            </div>
+          </CpCard>
+        );
+      })()}
+
       {hasData && (
         <>
           {/* KPI */}

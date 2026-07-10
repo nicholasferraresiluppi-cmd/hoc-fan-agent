@@ -153,8 +153,15 @@ export async function GET(request) {
   const cpByAlias = new Map();
   const aliasShifts = new Map(); // presenza nei turni (anche SENZA vendite attribuite)
   let cpUnattributed = 0; // venduto che non sappiamo attribuire a una creator
+  // SENTINELLA PARSER (lezione del bug schema-takes, lug 2026): se i takes
+  // GREZZI esistono (takes_count) ma il parser ne riconosce pochi, CP ha
+  // probabilmente cambiato schema di nuovo → i numeri CP diventano inaffidabili
+  // IN SILENZIO. Qui lo misuriamo e lo urliamo, invece di scoprirlo a valle.
+  let takesRaw = 0, takesParsed = 0;
   for (const w of wages) {
     for (const s of w.shifts || []) {
+      takesRaw += Number.isFinite(Number(s.takes_count)) ? Number(s.takes_count) : (s.takes || []).length;
+      takesParsed += (s.takes || []).length;
       const day = s.started_at ? romeDay(s.started_at) : null;
       if (day && (day < coverageFrom || day > coverageTo)) continue; // stessi giorni su entrambe le fonti
       const aliases = s.creator_aliases || [];
@@ -386,6 +393,14 @@ export async function GET(request) {
       gross_share: infGrossTotal > 0 ? r2(matchedInfGross / infGrossTotal) : null,
     },
     third_source: thirdSource,
+    // Salute della pipeline: quota di takes grezzi che il parser riconosce.
+    // REJECTED/senza-creator fanno scendere un po' sotto 1.0: sano ≥ 0.7.
+    data_quality: {
+      takes_raw: takesRaw,
+      takes_parsed: takesParsed,
+      parse_rate: takesRaw > 0 ? r2(takesParsed / takesRaw) : null,
+      parser_warning: takesRaw >= 100 && takesParsed / takesRaw < 0.7,
+    },
     matched,
     unmatched_infloww: unmatchedInf,
     unmatched_cp: unmatchedCp,
