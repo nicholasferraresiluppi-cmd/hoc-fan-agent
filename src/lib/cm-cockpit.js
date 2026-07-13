@@ -86,12 +86,28 @@ export async function getTimelineRoster({ startedAt, endedAt }) {
         if (!sh?.member) continue; // slot senza assegnazione
         const checkins = Array.isArray(sh.checkin) ? sh.checkin : [];
         const last = checkins.length ? checkins[checkins.length - 1] : null;
+        const cid = ev?.creators?.[0]?.creator?.id != null ? String(ev.creators[0].creator.id) : null;
+        // Durata slot dal template interval del creator: le fasce dipendono
+        // dal mercato (ITA 5h, ENG 6h) — mai assumere una durata fissa.
+        const tpl = (ev?.interval?.creators || []).find((c) => String(c?.creatorId) === cid);
+        let slotHours = null;
+        let slotEndedAt = null;
+        if (tpl?.startedAt && tpl?.endedAt) {
+          const durMs = Date.parse(tpl.endedAt) - Date.parse(tpl.startedAt);
+          if (durMs > 0 && durMs <= 24 * 3600 * 1000) {
+            slotHours = Math.round(durMs / 360000) / 10;
+            const startMs = Date.parse(ev.startedAt);
+            if (startMs) slotEndedAt = new Date(startMs + durMs).toISOString();
+          }
+        }
         rows.push({
           event_id: ev.id,
           shift_id: sh.id,
           started_at: ev.startedAt,
+          slot_ended_at: slotEndedAt,
+          slot_hours: slotHours,
           interval: ev?.interval?.name || null,
-          creator_id: ev?.creators?.[0]?.creator?.id != null ? String(ev.creators[0].creator.id) : null,
+          creator_id: cid,
           creator_alias: ev?.creators?.[0]?.creator?.alias || null,
           member_id: sh.member.id,
           member_name: `${sh.member.firstName || ""} ${sh.member.lastName || ""}`.trim(),

@@ -21,19 +21,26 @@ const fmt$ = (n) => (n == null ? "—" : `$${Number(n).toLocaleString("it-IT", {
 const fmt$2 = (n) => (n == null ? "—" : `$${Number(n).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 const hhmm = (iso) => (iso ? new Date(iso).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "—");
 
-function isoLocalToUtc(v) {
-  return v ? new Date(v).toISOString() : null;
-}
-function defaultWindow() {
-  const now = new Date();
-  const start = new Date(now); start.setMinutes(0, 0, 0);
-  const end = new Date(start.getTime() + 6 * 3600 * 1000);
-  const toLocal = (d) => {
-    const p = (x) => String(x).padStart(2, "0");
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+/**
+ * Le fasce NON sono fisse: dipendono dal mercato (ITA 5h, ENG 6h) e arrivano
+ * dagli slot template della timeline CP (slot_ended_at/slot_hours per riga).
+ * Il roster si carica su una finestra larga (−2h → +10h) e si raggruppa per
+ * interval; la finestra della supervisione si CALCOLA dagli slot selezionati.
+ */
+function rosterQueryWindow() {
+  const now = Date.now();
+  return {
+    startedAt: new Date(now - 2 * 3600 * 1000).toISOString(),
+    endedAt: new Date(now + 10 * 3600 * 1000).toISOString(),
   };
-  return { start: toLocal(start), end: toLocal(end) };
 }
+const slotEnd = (r) => r.slot_ended_at || (Date.parse(r.started_at) ? new Date(Date.parse(r.started_at) + 6 * 3600 * 1000).toISOString() : null);
+const coversNow = (r) => {
+  const s = Date.parse(r.started_at) || 0;
+  const e = Date.parse(slotEnd(r)) || 0;
+  const now = Date.now();
+  return s <= now && now < e;
+};
 
 /* Barra venduto vs soglie mid/top (scala = top × 1.5, come mockup) */
 function ThresholdBar({ venduto, thresholds }) {
@@ -80,9 +87,9 @@ export default function CmCockpitPage() {
   const [error, setError] = useState(null);
 
   // Vista 1
-  const [{ start, end }, setWindowState] = useState(defaultWindow());
   const [roster, setRoster] = useState(null);
   const [rosterLoading, setRosterLoading] = useState(false);
+  const [fascia, setFascia] = useState(null); // interval name attivo
   const [selected, setSelected] = useState({}); // shift_id → bool
   const [offName, setOffName] = useState("");
   const [offList, setOffList] = useState([]);
@@ -112,29 +119,63 @@ export default function CmCockpitPage() {
   const loadRoster = useCallback(async () => {
     setRosterLoading(true); setError(null);
     try {
-      const qs = new URLSearchParams({ startedAt: isoLocalToUtc(start), endedAt: isoLocalToUtc(end) });
+      const win = rosterQueryWindow();
+      const qs = new URLSearchParams({ startedAt: win.startedAt, endedAt: win.endedAt });
       const r = await fetch(`/api/cm-cockpit/roster?${qs}`);
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
       setRoster(j.roster);
-      // default: selezionati quelli con check-in aperto
+      // fascia default: quella che copre ADESSO (o la prima disponibile)
+      const current = j.roster.find(coversNow);
+      const first = j.roster[0];
+      const f = current?.interval || first?.interval || null;
+      setFascia(f);
+      // default: selezionati quelli della fascia con check-in aperto
       const sel = {};
-      for (const row of j.roster) if (row.checkin && !row.checkin.ended_at) sel[row.shift_id] = true;
+      for (const row of j.roster) {
+        if (row.interval === f && row.checkin && !row.checkin.ended_at) sel[row.shift_id] = true;
+      }
       setSelected(sel);
     } catch (e) {
       setError(String(e?.message || e));
     } finally {
       setRosterLoading(false);
     }
-  }, [start, end]);
+  }, []);
 
   useEffect(() => { if (phase === "open") loadRoster(); }, [phase, loadRoster]);
+
+  const fasce = useMemo(() => {
+    const map = new Map();
+    for (const r of roster || []) {
+      const key = r.interval || "—";
+      if (!map.has(key)) map.set(key, { name: key, rows: [], minStart: null, maxEnd: null });
+      const g = map.get(key);
+      g.rows.push(r);
+      const s = Date.parse(r.started_at) || null;
+      const e = Date.parse(slotEnd(r)) || null;
+      if (s && (!g.minStart || s < g.minStart)) g.minStart = s;
+      if (e && (!g.maxEnd || e > g.maxEnd)) g.maxEnd = e;
+    }
+    return [...map.values()].sort((a, b) => (a.minStart || 0) - (b.minStart || 0));
+  }, [roster]);
+
+  const fasciaRows = useMemo(
+    () => (roster || []).filter((r) => (fascia ? r.interval === fascia : true)),
+    [roster, fascia]
+  );
 
   const openSupervision = useCallback(async () => {
     setOpening(true); setError(null);
     try {
+      const rows = fasciaRows.filter((r) => selected[r.shift_id]);
+      // Finestra = dagli slot REALI selezionati (ITA 5h, ENG 6h — mai fissa)
+      const starts = rows.map((r) => Date.parse(r.started_at)).filter(Boolean);
+      const ends = rows.map((r) => Date.parse(slotEnd(r))).filter(Boolean);
+      const winStart = starts.length ? new Date(Math.min(...starts)).toISOString() : new Date().toISOString();
+      const winEnd = ends.length ? new Date(Math.max(...ends)).toISOString() : new Date(Date.now() + 6 * 3600 * 1000).toISOString();
       const operators = [
-        ...(roster || []).filter((r) => selected[r.shift_id]).map((r) => ({
+        ...rows.map((r) => ({
           member_id: r.member_id, member_name: r.member_name,
           creator_id: r.creator_id, creator_alias: r.creator_alias,
           shift_id: r.shift_id, payment_profile: r.payment_profile, off_schedule: false,
@@ -143,7 +184,7 @@ export default function CmCockpitPage() {
       ];
       const r = await fetch("/api/cm-cockpit/supervision", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "open", window: { startedAt: isoLocalToUtc(start), endedAt: isoLocalToUtc(end) }, operators }),
+        body: JSON.stringify({ action: "open", window: { startedAt: winStart, endedAt: winEnd }, operators }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
@@ -154,7 +195,7 @@ export default function CmCockpitPage() {
     } finally {
       setOpening(false);
     }
-  }, [roster, selected, offList, start, end]);
+  }, [fasciaRows, selected, offList]);
 
   /* ---------- Vista 2: live ---------- */
   const loadLive = useCallback(async () => {
@@ -253,21 +294,31 @@ export default function CmCockpitPage() {
 
   /* ---------- Vista 1 ---------- */
   if (phase === "open") {
-    const selCount = Object.values(selected).filter(Boolean).length + offList.length;
+    const selCount = fasciaRows.filter((r) => selected[r.shift_id]).length + offList.length;
     return shell(
       <>
         <CpCard style={{ marginBottom: 16 }}>
-          <SectionLabel>Finestra del turno</SectionLabel>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
-            <input type="datetime-local" value={start} onChange={(e) => setWindowState((w) => ({ ...w, start: e.target.value }))}
-              style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, padding: "8px 10px", fontSize: 13, fontFamily: FONTS.body, colorScheme: "dark" }} />
-            <span style={{ color: CP.textMuted }}>→</span>
-            <input type="datetime-local" value={end} onChange={(e) => setWindowState((w) => ({ ...w, end: e.target.value }))}
-              style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, padding: "8px 10px", fontSize: 13, fontFamily: FONTS.body, colorScheme: "dark" }} />
+          <SectionLabel>Fascia</SectionLabel>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+            {fasce.map((f) => {
+              const active = f.name === fascia;
+              return (
+                <button key={f.name} onClick={() => setFascia(f.name)}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 7, background: active ? CP.accentSoft : CP.surface, color: active ? CP.accentSoftText : CP.textSecondary, border: `1px solid ${active ? CP.accent + "66" : CP.border}`, borderRadius: 99, padding: "7px 15px", fontSize: 13, fontWeight: active ? 600 : 400, cursor: "pointer", fontFamily: FONTS.body }}>
+                  {f.name}
+                  <span style={{ fontFamily: FONTS.mono, fontSize: 11, color: active ? CP.accentSoftText : CP.textMuted }}>
+                    {f.minStart ? hhmm(new Date(f.minStart).toISOString()) : "—"}–{f.maxEnd ? hhmm(new Date(f.maxEnd).toISOString()) : "—"} · {f.rows.length}
+                  </span>
+                </button>
+              );
+            })}
             <button onClick={loadRoster} disabled={rosterLoading}
               style={{ display: "inline-flex", alignItems: "center", gap: 6, background: CP.surface, color: CP.textSecondary, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "8px 14px", fontSize: 13, cursor: "pointer", fontFamily: FONTS.body }}>
-              {rosterLoading ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Aggiorna roster
+              {rosterLoading ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Aggiorna
             </button>
+          </div>
+          <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 10 }}>
+            Le fasce e le durate arrivano dagli slot reali della timeline CP: i profili ENG hanno turni da 6h, gli ITA da 5h — la finestra della supervisione si calcola dagli slot che selezioni, non è mai fissa.
           </div>
         </CpCard>
 
@@ -275,8 +326,10 @@ export default function CmCockpitPage() {
           <SectionLabel>Operatori in turno (da timeline CP)</SectionLabel>
           {rosterLoading && !roster ? (
             <div style={{ display: "flex", gap: 8, alignItems: "center", color: CP.textMuted, fontSize: 13, marginTop: 10 }}><Loader2 size={14} className="animate-spin" /> Leggo la timeline (30-40 creator)…</div>
-          ) : !roster || roster.length === 0 ? (
-            <div style={{ color: CP.textMuted, fontSize: 13, marginTop: 10 }}>Nessun turno assegnato in timeline in questa finestra.</div>
+          ) : fasciaRows.length === 0 ? (
+            <div style={{ color: CP.textMuted, fontSize: 13, marginTop: 10 }}>
+              Nessun turno assegnato in timeline {fascia ? `per la fascia ${fascia}` : "in questa finestra"} — cambia fascia o usa &quot;Aggiorna&quot;.
+            </div>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
               <thead>
@@ -287,7 +340,7 @@ export default function CmCockpitPage() {
                 </tr>
               </thead>
               <tbody>
-                {roster.map((r) => {
+                {fasciaRows.map((r) => {
                   const on = !!selected[r.shift_id];
                   const checkedIn = r.checkin && !r.checkin.ended_at;
                   return (
@@ -309,7 +362,12 @@ export default function CmCockpitPage() {
                           <span style={{ color: CP.textMuted, fontSize: 12 }}>non ancora</span>
                         )}
                       </td>
-                      <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 12 }}>{hhmm(r.started_at)} · {r.interval || ""}</td>
+                      <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 12 }}>
+                        {hhmm(r.started_at)}–{hhmm(slotEnd(r))}
+                        {r.slot_hours ? (
+                          <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, color: CP.accentSoftText, background: CP.accentSoft, borderRadius: 99, padding: "1px 7px" }}>{r.slot_hours}h</span>
+                        ) : null}
+                      </td>
                     </tr>
                   );
                 })}
