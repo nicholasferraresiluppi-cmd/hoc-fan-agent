@@ -48,7 +48,8 @@ Debiti noti accettati: font-weight 600/700 ancora diffusi inline (normalizzazion
 
 - RBAC custom in `src/lib/rbac.js`: capability con scope own/team/all; ruoli predefiniti operator / team_lead / sales_manager / qa_reviewer / admin + ruoli custom (`/admin/ruoli-custom`). La capability più usata nelle pagine admin è `SEED` (admin only).
 - Status admin (`src/lib/admin.js`), 3 sorgenti in OR: env `HOC_ADMIN_USER_IDS`, Clerk `publicMetadata.role === "admin"`, set KV `admins:set` (gestibile da `/admin/access`).
-- ⚠️ Il gating è a livello API, non di UI: le pagine `/admin/*` si aprono a chiunque sia loggato (le fetch tornano 403). Le API leaderboard (`/api/leaderboard/*`) sono aperte a ogni utente loggato ed espongono venduto/score di tutti: **da sistemare prima di onboardare utenti fuori dal cerchio board**.
+- ⚠️ Il gating è a livello API, non di UI: le pagine `/admin/*` si aprono a chiunque sia loggato (le fetch tornano 403).
+- Le API con dati denaro (`operational`, `sales-cp`, `creators[/alias]`, `employee-history`, `operator-cp-history`, `operator-drilldown`) richiedono `authorizeAll(SCORES_VIEW)` = scope "all" (admin/SM/QA; team_lead e operator → 403). Le API training/gamification (ladder, hall of fame, health, leghe, dati own) restano auth-only by design. Helper `authorizeAll` in `rbac.js` (PR #24, lug 2026).
 
 ## Navigazione
 
@@ -71,6 +72,8 @@ Debiti noti accettati: font-weight 600/700 ancora diffusi inline (normalizzazion
 
 Decisioni strutturali tracciate qui (1 riga + link); il rationale dello scoring vive in `docs/BOARD_ANNOUNCEMENT_HOC_PRO.md` e nei commenti versionati di `creatorspro-score.js` / `creator-aggregates.js`.
 
+- **2026-07-13 — Gating dati denaro pre-CM**: helper `authorizeAll` (scope "all" obbligatorio) su 7 route leaderboard denaro + `closed-loop-metrics` → ANALYTICS_VIEW, prima dell'onboarding CM pilota (ruolo team_lead, cockpit `/cm-cockpit`). Motivo: le route esponevano venduto/score di tutti a qualsiasi utente loggato. PR #24.
+- **2026-07-13 — Career ladder + Cockpit CM**: `docs/CAREER_LADDER.md` (Fase 0 people lifecycle) è l'artefatto sorgente di livelli/gate/comp; cockpit CM live (PR #22/#23) con tracciamento supervisioni (KV `cm:sup:*`), override 3% in shadow mode, capability `cm.cockpit`.
 - **2026-07-10 — Potatura superficie**: rimosse 14 route/lib morte (probe CP/Infloww, `/api/sessions`, `/api/feedback`, `/api/challenge`, client CP duplicato), AdminNav stub, Content Pipeline fuori da nav/hub/welcome/cron, COLORS legacy rimappata sui token Dark SaaS, TIER flat. Motivo: 3 generazioni di tool sedimentate rendevano l'app illeggibile per un nuovo utente. Reversibile via git.
 
 ## Non fare
