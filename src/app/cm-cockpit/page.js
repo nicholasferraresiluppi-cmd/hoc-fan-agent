@@ -17,6 +17,14 @@ import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
 
 const LIVE_POLL_MS = 120_000;
+const QUICK_TAGS = [
+  "Ottimo ritmo",
+  "Coaching: escalation PPV",
+  "Coaching: retention fan",
+  "Coaching: tono/brand voice",
+  "Segnalato: profilo errato",
+  "Ritardo/assenza",
+];
 const fmt$ = (n) => (n == null ? "—" : `$${Number(n).toLocaleString("it-IT", { maximumFractionDigits: 0 })}`);
 const fmt$2 = (n) => (n == null ? "—" : `$${Number(n).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 // SEMPRE ora italiana esplicita (mai browser-local): un CM all'estero deve
@@ -103,6 +111,15 @@ export default function CmCockpitPage() {
   const [closing, setClosing] = useState(false);
   const seenTakesRef = useRef(new Set());
   const [newTakeKeys, setNewTakeKeys] = useState(new Set());
+
+  // Vista 4 (pannello chiusura con note per operatore)
+  const [closingOpen, setClosingOpen] = useState(false);
+  const [noteDraft, setNoteDraft] = useState({}); // opKey → { tags: [], text: "" }
+
+  // Vista 3 (guadagni del mese)
+  const [tab, setTab] = useState("turno");
+  const [earnings, setEarnings] = useState(null);
+  const [earningsLoading, setEarningsLoading] = useState(false);
 
   const checkActive = useCallback(async () => {
     try {
@@ -231,8 +248,9 @@ export default function CmCockpitPage() {
     return () => clearInterval(t);
   }, [phase, loadLive]);
 
-  const closeShift = useCallback(async () => {
-    if (!window.confirm("Chiudere il turno di supervisione?")) return;
+  const opKey = (op) => op.shift_id || op.member_name;
+
+  const confirmClose = useCallback(async () => {
     setClosing(true); setError(null);
     try {
       const summary = live
@@ -244,20 +262,56 @@ export default function CmCockpitPage() {
             override_shadow_usd: live.earnings?.override_shadow_usd ?? 0,
           }
         : null;
+      const notes = (live?.operators || [])
+        .map((op) => {
+          const d = noteDraft[opKey(op)];
+          if (!d || ((d.tags || []).length === 0 && !(d.text || "").trim())) return null;
+          return { member_id: op.member_id, member_name: op.member_name, tags: d.tags || [], text: (d.text || "").trim() };
+        })
+        .filter(Boolean);
       const r = await fetch("/api/cm-cockpit/supervision", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "close", summary }),
+        body: JSON.stringify({ action: "close", summary, notes }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+      setClosingOpen(false);
+      setNoteDraft({});
       setLive(null);
+      setEarnings(null); // il mese è cambiato: ricarica al prossimo accesso
       setPhase("open");
     } catch (e) {
       setError(String(e?.message || e));
     } finally {
       setClosing(false);
     }
-  }, [live]);
+  }, [live, noteDraft]);
+
+  const toggleTag = (key, tag) =>
+    setNoteDraft((d) => {
+      const cur = d[key] || { tags: [], text: "" };
+      const tags = cur.tags.includes(tag) ? cur.tags.filter((t) => t !== tag) : [...cur.tags, tag];
+      return { ...d, [key]: { ...cur, tags } };
+    });
+
+  /* ---------- Vista 3: guadagni ---------- */
+  const loadEarnings = useCallback(async () => {
+    setEarningsLoading(true);
+    try {
+      const r = await fetch("/api/cm-cockpit/earnings");
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+      setEarnings(j);
+    } catch (e) {
+      setError(String(e?.message || e));
+    } finally {
+      setEarningsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (phase === "open" && tab === "guadagni" && !earnings && !earningsLoading) loadEarnings();
+  }, [phase, tab, earnings, earningsLoading, loadEarnings]);
 
   const allTakes = useMemo(() => {
     if (!live) return [];
@@ -294,11 +348,79 @@ export default function CmCockpitPage() {
     return shell(<CpCard><div style={{ fontSize: 13, color: CP.textSecondary }}>Non hai accesso al cockpit. Serve il ruolo Team Lead (o superiore) — chiedi a un admin da <code>/admin/ruoli</code>.</div></CpCard>);
   }
 
-  /* ---------- Vista 1 ---------- */
+  /* ---------- Vista 1 + Vista 3 (tab) ---------- */
   if (phase === "open") {
     const selCount = fasciaRows.filter((r) => selected[r.shift_id]).length + offList.length;
+    const tabsRow = (
+      <div style={{ display: "flex", gap: 6, marginBottom: 18, padding: 5, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, width: "fit-content" }}>
+        {[{ id: "turno", label: "Apri turno" }, { id: "guadagni", label: "I miei guadagni" }].map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            style={{ padding: "7px 15px", borderRadius: 7, fontSize: 12.5, cursor: "pointer", fontFamily: FONTS.body, background: tab === t.id ? CP.surfaceAlt : "transparent", border: `1px solid ${tab === t.id ? CP.accent + "66" : "transparent"}`, color: tab === t.id ? CP.textPrimary : CP.textSecondary, fontWeight: tab === t.id ? 500 : 400 }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+    );
+
+    if (tab === "guadagni") {
+      const tot = earnings?.totals;
+      return shell(
+        <>
+          {tabsRow}
+          {earningsLoading && !earnings ? (
+            <div style={{ display: "flex", gap: 8, alignItems: "center", color: CP.textMuted, fontSize: 13 }}><Loader2 size={14} className="animate-spin" /> Carico lo storico…</div>
+          ) : (
+            <>
+              <CpCard style={{ marginBottom: 16 }} accent>
+                <SectionLabel>Mese corrente {earnings?.month_id ? `(${earnings.month_id})` : ""} · shadow mode</SectionLabel>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 10 }}>
+                  <StatCard label="Turni supervisione" value={tot?.shifts_count ?? 0} />
+                  <StatCard label="Fisso maturato" value={`€${tot?.fixed_eur ?? 0}`} />
+                  <StatCard label="Override (shadow)" value={fmt$2(tot?.override_shadow_usd)} sub={`eccedenza ${fmt$(tot?.excess_total)}`} />
+                  <StatCard label="Note lasciate" value={tot?.notes_total ?? 0} />
+                </div>
+                <div style={{ fontSize: 11.5, color: CP.textMuted, marginTop: 12 }}>
+                  L&apos;override è simulato al 3% (§10.3 career ladder): diventa reale dopo il primo mese di supervisioni tracciate. Il fisso €28/turno resta pagato fuori piattaforma — qui è solo conteggiato.
+                </div>
+              </CpCard>
+              <CpCard>
+                <SectionLabel>Turni chiusi</SectionLabel>
+                {!earnings || earnings.shifts.length === 0 ? (
+                  <div style={{ color: CP.textMuted, fontSize: 13, marginTop: 10 }}>Nessun turno chiuso questo mese — apri il primo dalla tab &quot;Apri turno&quot;.</div>
+                ) : (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
+                    <thead>
+                      <tr>
+                        {["Data", "Finestra", "Operatori", "Sopra soglia", "Eccedenza", "Override 3%", "Note"].map((h) => (
+                          <th key={h} style={{ textAlign: "left", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: CP.textMuted, fontWeight: 600, padding: "6px 8px", borderBottom: `1px solid ${CP.border}` }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {earnings.shifts.map((s) => (
+                        <tr key={s.id}>
+                          <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, color: CP.textPrimary }}>{s.opened_at ? new Date(s.opened_at).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", timeZone: "Europe/Rome" }) : "—"}</td>
+                          <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, color: CP.textSecondary, fontFamily: FONTS.mono, fontSize: 12 }}>{hhmm(s.window?.startedAt)}–{hhmm(s.window?.endedAt)}</td>
+                          <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, fontFamily: FONTS.mono }}>{s.operators_count}</td>
+                          <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, fontFamily: FONTS.mono }}>{s.sopra_soglia ?? "—"}</td>
+                          <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, fontFamily: FONTS.mono }}>{fmt$(s.excess_total)}</td>
+                          <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, fontFamily: FONTS.mono, color: CP.accentSoftText }}>{fmt$2(s.override_shadow_usd)}</td>
+                          <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, fontFamily: FONTS.mono }}>{s.notes_count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </CpCard>
+            </>
+          )}
+        </>
+      );
+    }
+
     return shell(
       <>
+        {tabsRow}
         <CpCard style={{ marginBottom: 16 }}>
           <SectionLabel>Fascia</SectionLabel>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
@@ -425,9 +547,9 @@ export default function CmCockpitPage() {
               €28 + {fmt$2(earn?.override_shadow_usd)}{" "}
               <span style={{ color: CP.accentSoftText, fontSize: 11 }}>override {earn?.override_pct ?? 3}% · shadow</span>
             </span>
-            <button onClick={closeShift} disabled={closing}
+            <button onClick={() => setClosingOpen(true)} disabled={closing || closingOpen}
               style={{ display: "inline-flex", alignItems: "center", gap: 6, background: CP.surface, color: CP.textSecondary, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "8px 14px", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body }}>
-              {closing ? <Loader2 size={13} className="animate-spin" /> : <Square size={12} />} Chiudi turno
+              <Square size={12} /> Chiudi turno
             </button>
           </div>
         </div>
@@ -435,6 +557,64 @@ export default function CmCockpitPage() {
 
       {!live ? (
         <div style={{ display: "flex", gap: 8, alignItems: "center", color: CP.textMuted, fontSize: 13 }}><Loader2 size={14} className="animate-spin" /> Primo pull dati CP…</div>
+      ) : closingOpen ? (
+        /* ---------- Vista 4: chiusura con note ---------- */
+        <>
+          <CpCard style={{ marginBottom: 16 }}>
+            <SectionLabel>Riepilogo turno</SectionLabel>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginTop: 10 }}>
+              <StatCard label="Venduto team" value={fmt$((live.operators || []).reduce((s, o) => s + (o.venduto || 0), 0))} />
+              <StatCard label="Sopra soglia" value={`${(live.operators || []).filter((o) => o.thresholds?.top != null && o.venduto >= o.thresholds.top).length}/${(live.operators || []).length}`} />
+              <StatCard label="Override turno (shadow)" value={fmt$2(earn?.override_shadow_usd)} />
+            </div>
+          </CpCard>
+          <CpCard style={{ marginBottom: 16 }}>
+            <SectionLabel>Note per operatore <span style={{ textTransform: "none", letterSpacing: 0, color: CP.textMuted }}>— opzionali, 60 secondi</span></SectionLabel>
+            <div style={{ marginTop: 6 }}>
+              {(live.operators || []).map((op) => {
+                const key = opKey(op);
+                const d = noteDraft[key] || { tags: [], text: "" };
+                return (
+                  <div key={key} style={{ display: "grid", gridTemplateColumns: "170px 1fr", gap: 12, padding: "11px 0", borderBottom: `1px solid ${CP.borderSoft}`, alignItems: "start" }}>
+                    <div>
+                      <div style={{ color: CP.textPrimary, fontWeight: 600, fontSize: 13 }}>{op.member_name}</div>
+                      <div style={{ color: CP.textMuted, fontSize: 11.5 }}>{op.wage_shift_found ? fmt$(op.venduto) : "—"}{op.thresholds?.top != null && op.venduto >= op.thresholds.top ? " · sopra top" : ""}</div>
+                    </div>
+                    <div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {QUICK_TAGS.map((tag) => {
+                          const on = d.tags.includes(tag);
+                          return (
+                            <button key={tag} onClick={() => toggleTag(key, tag)}
+                              style={{ fontSize: 11, fontWeight: 600, borderRadius: 99, padding: "3px 10px", cursor: "pointer", fontFamily: FONTS.body, color: on ? CP.accentSoftText : CP.textMuted, background: on ? CP.accentSoft : CP.surface, border: `1px solid ${on ? CP.accent + "66" : CP.border}` }}>
+                              {tag}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <input value={d.text} onChange={(e) => setNoteDraft((nd) => ({ ...nd, [key]: { ...d, text: e.target.value } }))}
+                        placeholder="Nota libera (opzionale)…" maxLength={600}
+                        style={{ marginTop: 8, width: "100%", boxSizing: "border-box", background: CP.bgSunken, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, padding: "7px 10px", fontSize: 12.5, fontFamily: FONTS.body }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 10 }}>
+              Le note entrano nel fascicolo dell&apos;operatore (gate L2→L3: mentoring osservabile) e nel tuo storico CM (bonus sviluppo).
+            </div>
+          </CpCard>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={confirmClose} disabled={closing}
+              style={{ display: "inline-flex", alignItems: "center", gap: 8, background: CP.accent, color: CP.accentInk, border: "none", borderRadius: 10, padding: "11px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.body }}>
+              {closing ? <Loader2 size={15} className="animate-spin" /> : <Square size={14} />} Conferma chiusura
+            </button>
+            <button onClick={() => setClosingOpen(false)} disabled={closing}
+              style={{ background: CP.surface, color: CP.textSecondary, border: `1px solid ${CP.border}`, borderRadius: 10, padding: "11px 18px", fontSize: 13, cursor: "pointer", fontFamily: FONTS.body }}>
+              Continua il turno
+            </button>
+          </div>
+        </>
       ) : (
         <>
           <CpCard style={{ marginBottom: 16 }}>
