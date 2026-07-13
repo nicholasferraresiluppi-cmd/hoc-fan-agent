@@ -63,7 +63,11 @@ export async function POST(request) {
     }
 
     if (body.action === "close") {
-      const sup = await closeSupervision({ userId: az.userId, summary: body.summary || null });
+      const sup = await closeSupervision({
+        userId: az.userId,
+        summary: body.summary || null,
+        notes: Array.isArray(body.notes) ? body.notes : null,
+      });
       return Response.json({ ok: true, supervision: sup });
     }
 

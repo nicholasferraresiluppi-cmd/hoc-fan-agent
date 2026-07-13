@@ -131,10 +131,31 @@ export async function getTimelineRoster({ startedAt, endedAt }) {
       }
     }
   }
-  rows.sort((a, b) => (a.creator_alias || "").localeCompare(b.creator_alias || ""));
+  // Dedup: CP a volte espone DUE eventi per stesso member+creator con slot
+  // sovrapposti (osservato in prod: uno matcha il template interval — ha
+  // slot_hours — l'altro no). Regola: per finestre sovrapposte si tiene la
+  // riga col template; a parità, quella col check-in; poi start più vecchio.
+  const deduped = [];
+  const byKey = new Map();
+  for (const r of rows) {
+    const key = `${r.member_id}|${r.creator_id}`;
+    const prev = byKey.get(key);
+    if (!prev) { byKey.set(key, r); deduped.push(r); continue; }
+    const overl = overlaps(prev.started_at, prev.slot_ended_at, r.started_at, r.slot_ended_at);
+    if (!overl) { deduped.push(r); continue; } // slot distinti (es. doppio turno): entrambi validi
+    const better =
+      (r.slot_hours != null) - (prev.slot_hours != null) ||
+      (!!r.checkin) - (!!prev.checkin) ||
+      (Date.parse(prev.started_at) || 0) - (Date.parse(r.started_at) || 0);
+    if (better > 0) {
+      deduped[deduped.indexOf(prev)] = r;
+      byKey.set(key, r);
+    }
+  }
+  deduped.sort((a, b) => (a.creator_alias || "").localeCompare(b.creator_alias || ""));
   // Parziale (soft deadline superata): non cachare, il prossimo refresh completa
-  if (!partial) await kv.set(cacheKey, rows, { ex: ROSTER_TTL });
-  return rows;
+  if (!partial) await kv.set(cacheKey, deduped, { ex: ROSTER_TTL });
+  return deduped;
 }
 
 /* ============================================================
@@ -270,15 +291,68 @@ export async function openSupervision({ userId, cmName, window, operators }) {
   return sup;
 }
 
-export async function closeSupervision({ userId, summary }) {
+export async function closeSupervision({ userId, summary, notes }) {
   const sup = await getActiveSupervision(userId);
   if (!sup) throw new Error("Nessun turno di supervisione aperto.");
   sup.status = "closed";
   sup.closed_at = new Date().toISOString();
   if (summary) sup.summary = summary; // snapshot venduto/override alla chiusura
+  if (Array.isArray(notes) && notes.length > 0) {
+    // Note per operatore (Vista 4): seed del fascicolo promozione —
+    // mentoring osservabile del CM (bonus sviluppo) + storico coaching operatore.
+    sup.notes = notes.map((n) => ({
+      member_id: n.member_id || null,
+      member_name: String(n.member_name || "").slice(0, 80),
+      tags: (Array.isArray(n.tags) ? n.tags : []).map((t) => String(t).slice(0, 60)).slice(0, 6),
+      text: String(n.text || "").slice(0, 600),
+    })).filter((n) => n.tags.length > 0 || n.text);
+  }
   await kv.set(`cm:sup:${sup.id}`, sup, { ex: 90 * 24 * 3600 });
   await kv.del(`cm:sup:active:${userId}`);
   return sup;
+}
+
+/**
+ * Storico supervisioni del CM nel mese (Vista 3): aggrega fisso, override
+ * shadow e riepiloghi dai record chiusi in cm:sup:index.
+ */
+export async function getEarnings({ userId, monthId }) {
+  const m = /^(\d{4})-(\d{2})$/.exec(monthId || "");
+  if (!m) throw new Error("monthId YYYY-MM richiesto");
+  const start = Date.UTC(Number(m[1]), Number(m[2]) - 1, 1);
+  const end = Date.UTC(Number(m[1]), Number(m[2]), 1) - 1;
+  const ids = (await kv.zrange("cm:sup:index", start, end, { byScore: true })) || [];
+  if (ids.length === 0) return { month_id: monthId, shifts: [], totals: emptyTotals() };
+
+  const recs = (await Promise.all(ids.map((id) => kv.get(`cm:sup:${id}`)))).filter(Boolean);
+  const mine = recs.filter((s) => s.cm_user_id === userId && s.status === "closed");
+  const shifts = mine
+    .map((s) => ({
+      id: s.id,
+      opened_at: s.opened_at,
+      closed_at: s.closed_at,
+      window: s.window,
+      operators_count: (s.operators || []).length,
+      sopra_soglia: s.summary?.sopra_soglia ?? null,
+      venduto_team: s.summary?.venduto_team ?? null,
+      excess_total: s.summary?.excess_total ?? 0,
+      override_shadow_usd: s.summary?.override_shadow_usd ?? 0,
+      notes_count: (s.notes || []).length,
+    }))
+    .sort((a, b) => (Date.parse(b.opened_at) || 0) - (Date.parse(a.opened_at) || 0));
+
+  const totals = {
+    shifts_count: shifts.length,
+    fixed_eur: shifts.length * 28,
+    override_shadow_usd: Math.round(shifts.reduce((x, s) => x + (s.override_shadow_usd || 0), 0) * 100) / 100,
+    excess_total: Math.round(shifts.reduce((x, s) => x + (s.excess_total || 0), 0)),
+    notes_total: shifts.reduce((x, s) => x + s.notes_count, 0),
+  };
+  return { month_id: monthId, shifts, totals };
+}
+
+function emptyTotals() {
+  return { shifts_count: 0, fixed_eur: 0, override_shadow_usd: 0, excess_total: 0, notes_total: 0 };
 }
 
 /* ============================================================
