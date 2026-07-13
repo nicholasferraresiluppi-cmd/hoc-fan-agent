@@ -9,10 +9,17 @@
  * {status, ok, sample}) con range = ultime 3 ore. Stesso pattern usato
  * per scoprire /v1/payment-profiles (lug 2026).
  */
-import { probeGet } from "@/lib/creatorspro-api";
+import { probeGet, fetchWages, fetchWageDetail } from "@/lib/creatorspro-api";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 
 export const maxDuration = 60;
+
+function monthRangeNow() {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+  return { startedAt: start.toISOString(), endedAt: end.toISOString() };
+}
 
 export async function GET() {
   const az = await authorize(CAPABILITIES.SEED);
@@ -23,37 +30,59 @@ export async function GET() {
   const range = { startedAt: from.toISOString(), endedAt: now.toISOString() };
   const rangeAlt = { startDate: from.toISOString(), endDate: now.toISOString() };
 
+  // 1. Recupera un creatorId reale dai take recenti (v1: /v1/timeline/events
+  //    risponde 400 "creatorId must be a string" → esiste, serve l'id).
+  let creatorId = null, creatorAlias = null;
+  const list = await fetchWages({ ...monthRangeNow(), page: 1, limit: 10 });
+  for (const stub of list?.data || []) {
+    if (creatorId) break;
+    try {
+      const d = await fetchWageDetail(stub?.info?.id ?? stub?.id);
+      for (const s of d?.shifts || []) {
+        for (const t of s?.takes || []) {
+          const id = t?.transaction?.creator?.id || t?.creator?.id;
+          if (id) {
+            creatorId = String(id);
+            creatorAlias = t?.transaction?.creator?.alias || t?.creator?.alias || null;
+            break;
+          }
+        }
+        if (creatorId) break;
+      }
+    } catch { /* stub illeggibile: prova il prossimo */ }
+  }
+
+  if (!creatorId) {
+    return Response.json({ now: now.toISOString(), error: "Nessun creatorId trovato nei take recenti." }, { status: 404 });
+  }
+
+  // 2. /v1/timeline/events con varianti di parametri data
   const candidates = [
-    { path: "/v1/timeline", query: range },
-    { path: "/v1/timeline", query: rangeAlt },
-    { path: "/v1/timeline/transactions", query: range },
-    { path: "/v1/timeline/events", query: range },
-    { path: "/v1/timeline/sales", query: range },
-    { path: "/v1/transactions", query: { ...range, page: 1, limit: 5 } },
-    { path: "/v1/transactions", query: { ...rangeAlt, page: 1, limit: 5 } },
-    { path: "/v1/sales", query: { ...range, page: 1, limit: 5 } },
-    { path: "/v1/sellers-wage/transactions", query: range },
-    { path: "/v1/sellers-wage/takes", query: range },
-    { path: "/v1/creators", query: { page: 1, limit: 3 } },
-    { path: "/v1/analytics/transactions", query: rangeAlt },
+    { path: "/v1/timeline/events", query: { creatorId, ...range } },
+    { path: "/v1/timeline/events", query: { creatorId, ...rangeAlt } },
+    { path: "/v1/timeline/events", query: { creatorId, from: range.startedAt, to: range.endedAt } },
+    { path: "/v1/timeline/events", query: { creatorId } },
   ];
 
   const results = [];
   for (const c of candidates) {
     const r = await probeGet(c.path, { query: c.query });
+    const sample = typeof r?.sample === "string" ? r.sample.slice(0, 1800) : r?.sample ?? null;
     results.push({
       path: c.path,
-      query_style: Object.keys(c.query).slice(0, 2).join(","),
+      query_keys: Object.keys(c.query).join(","),
       status: r?.status ?? null,
       ok: r?.ok ?? false,
-      sample: typeof r?.sample === "string" ? r.sample.slice(0, 600) : r?.sample ?? null,
+      sample,
     });
+    if (r?.ok) break; // trovata la forma giusta: basta così
   }
 
   return Response.json({
     now: now.toISOString(),
+    creator_used: { id: creatorId, alias: creatorAlias },
     range,
     results,
-    hint: "Cerco endpoint con transazioni recenti + timestamp: un 200 con dati freschi = candidato feed live per il cockpit.",
+    hint: "Se un 200 contiene eventi/transazioni con timestamp vicini a `now`, la timeline è il feed live del cockpit.",
   });
 }
