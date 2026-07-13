@@ -17,7 +17,7 @@
  *   { ranking[], groupMeansCp, total, eligible_total, no_cp_count,
  *     cp_available, agency_stats, categories, language_counts, category_counts }
  */
-import { auth } from "@clerk/nextjs/server";
+import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { kv } from "@vercel/kv";
 import { buildOperatorsForCpLeaderboard, hasCpDataForPeriod } from "@/lib/creatorspro-data";
 import { buildCpLeaderboard } from "@/lib/creatorspro-score";
@@ -29,8 +29,8 @@ const VALID_CATEGORIES = ["Big", "Medium", "Small", "Uncategorized"];
 const VALID_LANGUAGES = ["eng", "ita", "none"];
 
 export async function GET(request) {
-  const { userId } = await auth();
-  if (!userId) return Response.json({ error: "Non autenticato." }, { status: 401 });
+  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);
   const period_id = url.searchParams.get("period_id");

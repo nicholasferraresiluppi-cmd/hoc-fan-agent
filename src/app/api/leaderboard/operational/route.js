@@ -26,8 +26,8 @@
  *      I totali per creator sono calcolati su TUTTI gli operatori eligible del
  *      periodo (ignorando i filtri di vista) per non far cambiare la % col filtro.
  */
+import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { kv } from "@vercel/kv";
-import { auth } from "@clerk/nextjs/server";
 import { buildLeaderboard } from "@/lib/leaderboard-calc";
 import { loadSettings } from "@/app/api/admin/leaderboard-settings/route";
 import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
@@ -118,10 +118,8 @@ function decorateCreatorImpact(op, aggregates) {
 }
 
 export async function GET(request) {
-  const { userId } = await auth();
-  if (!userId) {
-    return Response.json({ error: "Non autenticato." }, { status: 401 });
-  }
+  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);
   const period_type = url.searchParams.get("period_type");

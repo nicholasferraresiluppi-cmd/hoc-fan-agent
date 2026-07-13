@@ -18,7 +18,7 @@
  *
  * Auth: qualsiasi utente loggato.
  */
-import { auth } from "@clerk/nextjs/server";
+import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { kv } from "@vercel/kv";
 import { buildCreatorMatrix } from "@/lib/creator-aggregates";
 
@@ -40,8 +40,8 @@ function monthsBetween(startId, endId) {
 }
 
 export async function GET(request) {
-  const { userId } = await auth();
-  if (!userId) return Response.json({ error: "Non autenticato." }, { status: 401 });
+  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);
   const employee = url.searchParams.get("employee");

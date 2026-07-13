@@ -347,3 +347,19 @@ export async function authorize(capability) {
   const role = await getUserRole(userId);
   return { ok: true, userId, role, scope };
 }
+
+/**
+ * Come authorize(), ma richiede scope "all": per endpoint che restituiscono
+ * dati denaro di TUTTA l'org (leaderboard venduto, drill-down revenue).
+ * Un ruolo con scope own/team NON passa: quando serviranno viste
+ * team-filtered si implementa il filtro nell'endpoint, non si allarga lo
+ * scope qui. (Gating pass lug 2026, pre-onboarding CM pilota.)
+ */
+export async function authorizeAll(capability) {
+  const az = await authorize(capability);
+  if (!az.ok) return az;
+  if (az.scope !== "all") {
+    return { ok: false, status: 403, message: `capability ${capability} richiede scope "all" (role: ${az.role}, scope: ${az.scope})` };
+  }
+  return az;
+}
