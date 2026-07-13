@@ -46,6 +46,7 @@ export const CAPABILITIES = {
   SENIORITY_OVERRIDE: "seniority.override",   // override tier seniority
   LEAGUES_SNAPSHOT: "leagues.snapshot",       // forzare snapshot leghe
   LEADERBOARD_SNAPSHOT: "leaderboard.snapshot", // forzare snapshot classifica
+  CM_COCKPIT: "cm.cockpit",                   // cockpit turno di supervisione CM
 };
 
 // "all" = tutta l'org | "team" = solo proprio team | "own" = solo sé stesso | "none" = nessun accesso
@@ -60,6 +61,7 @@ export const ROLE_CAPABILITIES = {
     [CAPABILITIES.REVIEW]: "team",
     [CAPABILITIES.OUTCOMES_WRITE]: "team",
     [CAPABILITIES.ANALYTICS_VIEW]: "team",
+    [CAPABILITIES.CM_COCKPIT]: "own",
   },
   sales_manager: {
     [CAPABILITIES.TRAINING_DO]: "own",
@@ -70,6 +72,7 @@ export const ROLE_CAPABILITIES = {
     [CAPABILITIES.ANALYTICS_VIEW]: "all",
     [CAPABILITIES.CREATORS_MANAGE]: "all",
     [CAPABILITIES.SENIORITY_OVERRIDE]: "all",
+    [CAPABILITIES.CM_COCKPIT]: "all",
   },
   qa_reviewer: {
     [CAPABILITIES.TRAINING_DO]: "own",
@@ -90,6 +93,7 @@ export const ROLE_CAPABILITIES = {
     [CAPABILITIES.SENIORITY_OVERRIDE]: "all",
     [CAPABILITIES.LEAGUES_SNAPSHOT]: "all",
     [CAPABILITIES.LEADERBOARD_SNAPSHOT]: "all",
+    [CAPABILITIES.CM_COCKPIT]: "all",
   },
 };
 
