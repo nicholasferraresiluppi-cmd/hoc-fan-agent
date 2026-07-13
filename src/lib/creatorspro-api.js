@@ -154,9 +154,12 @@ export async function fetchIntervals() {
  * shift.paymentProfile (nome + cosellersCount) e shift.checkin LIVE
  * (checkin.endedAt null finché l'operatore è al lavoro).
  */
-export async function fetchTimelineEvents({ creatorId, startedAt, endedAt }) {
+export async function fetchTimelineEvents({ creatorId, startedAt, endedAt, timeoutMs }) {
   if (!creatorId || !startedAt || !endedAt) throw new Error("creatorId + startedAt + endedAt required");
-  const r = await apiFetch("/v1/timeline/events", { query: { creatorId, startedAt, endedAt } });
+  const r = await apiFetch("/v1/timeline/events", {
+    query: { creatorId, startedAt, endedAt },
+    ...(timeoutMs ? { timeoutMs } : {}),
+  });
   return r?.data || [];
 }
 

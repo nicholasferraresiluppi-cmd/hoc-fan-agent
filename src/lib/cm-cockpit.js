@@ -22,7 +22,10 @@ import { fetchIntervals, fetchTimelineEvents, fetchWages, fetchWageDetail } from
 
 const ROSTER_TTL = 60;
 const THRESHOLDS_TTL = 6 * 3600;
-const TIMELINE_CONCURRENCY = 6;
+const CREATOR_IDS_TTL = 6 * 3600;
+const TIMELINE_CONCURRENCY = 12;
+const TIMELINE_CALL_TIMEOUT_MS = 8000;
+const ROSTER_SOFT_DEADLINE_MS = 40_000; // sotto il maxDuration 60s: meglio parziale che timeout
 const OVERRIDE_PCT = 0.03; // shadow — % proposta §10.3, da confermare board
 
 /* ============================================================
@@ -30,6 +33,9 @@ const OVERRIDE_PCT = 0.03; // shadow — % proposta §10.3, da confermare board
  * ============================================================ */
 
 export async function getCreatorIds() {
+  const cached = await kv.get("cm:creator_ids");
+  if (Array.isArray(cached) && cached.length > 0) return cached;
+
   let intervals = await kv.get("cp:intervals");
   if (!Array.isArray(intervals) || intervals.length === 0) {
     try {
@@ -44,18 +50,21 @@ export async function getCreatorIds() {
       if (c?.creatorId != null) ids.add(String(c.creatorId));
     }
   }
-  if (ids.size > 0) return [...ids];
-
-  // Fallback: creator visti nei take del mese wage più recente in KV
-  const { wages } = await latestWageMonth();
-  for (const w of wages || []) {
-    for (const s of w.shifts || []) {
-      for (const t of s.takes || []) {
-        if (t.creator_id != null) ids.add(String(t.creator_id));
+  if (ids.size === 0) {
+    // Fallback: creator visti nei take del mese wage più recente in KV
+    // (lettura KV pesante: solo se gli intervals non bastano)
+    const { wages } = await latestWageMonth();
+    for (const w of wages || []) {
+      for (const s of w.shifts || []) {
+        for (const t of s.takes || []) {
+          if (t.creator_id != null) ids.add(String(t.creator_id));
+        }
       }
     }
   }
-  return [...ids];
+  const out = [...ids];
+  if (out.length > 0) await kv.set("cm:creator_ids", out, { ex: CREATOR_IDS_TTL });
+  return out;
 }
 
 /* ============================================================
@@ -69,12 +78,15 @@ export async function getTimelineRoster({ startedAt, endedAt }) {
 
   const ids = await getCreatorIds();
   const rows = [];
+  const t0 = Date.now();
+  let partial = false;
   for (let i = 0; i < ids.length; i += TIMELINE_CONCURRENCY) {
+    if (Date.now() - t0 > ROSTER_SOFT_DEADLINE_MS) { partial = true; break; }
     const chunk = ids.slice(i, i + TIMELINE_CONCURRENCY);
     const results = await Promise.all(
       chunk.map(async (creatorId) => {
         try {
-          return await fetchTimelineEvents({ creatorId, startedAt, endedAt });
+          return await fetchTimelineEvents({ creatorId, startedAt, endedAt, timeoutMs: TIMELINE_CALL_TIMEOUT_MS });
         } catch {
           return [];
         }
@@ -120,7 +132,8 @@ export async function getTimelineRoster({ startedAt, endedAt }) {
     }
   }
   rows.sort((a, b) => (a.creator_alias || "").localeCompare(b.creator_alias || ""));
-  await kv.set(cacheKey, rows, { ex: ROSTER_TTL });
+  // Parziale (soft deadline superata): non cachare, il prossimo refresh completa
+  if (!partial) await kv.set(cacheKey, rows, { ex: ROSTER_TTL });
   return rows;
 }
 
