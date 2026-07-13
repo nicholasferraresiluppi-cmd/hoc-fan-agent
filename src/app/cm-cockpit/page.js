@@ -19,7 +19,9 @@ import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-styl
 const LIVE_POLL_MS = 120_000;
 const fmt$ = (n) => (n == null ? "—" : `$${Number(n).toLocaleString("it-IT", { maximumFractionDigits: 0 })}`);
 const fmt$2 = (n) => (n == null ? "—" : `$${Number(n).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
-const hhmm = (iso) => (iso ? new Date(iso).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "—");
+// SEMPRE ora italiana esplicita (mai browser-local): un CM all'estero deve
+// vedere gli stessi orari di chi pianifica i turni. Etichetta in UI.
+const hhmm = (iso) => (iso ? new Date(iso).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" }) : "—");
 
 /**
  * Le fasce NON sono fisse: dipendono dal mercato (ITA 5h, ENG 6h) e arrivano
@@ -318,7 +320,7 @@ export default function CmCockpitPage() {
             </button>
           </div>
           <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 10 }}>
-            Le fasce e le durate arrivano dagli slot reali della timeline CP: i profili ENG hanno turni da 6h, gli ITA da 5h — la finestra della supervisione si calcola dagli slot che selezioni, non è mai fissa.
+            Tutti gli orari sono in <strong>ora italiana</strong>. Le fasce e le durate arrivano dagli slot reali della timeline CP: i profili ENG hanno turni da 6h, gli ITA da 5h — la finestra della supervisione si calcola dagli slot che selezioni, non è mai fissa.
           </div>
         </CpCard>
 
@@ -472,7 +474,7 @@ export default function CmCockpitPage() {
               </tbody>
             </table>
             <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 10, fontFamily: FONTS.mono }}>
-              Dati CP · aggiornati {hhmm(live.pulled_at)} · i take arrivano a blocchi (~15-20 min) · quadro completo a fine turno
+              Dati CP · aggiornati {hhmm(live.pulled_at)} (ora italiana) · i take arrivano a blocchi (~15-20 min) · quadro completo a fine turno
             </div>
           </CpCard>
 
