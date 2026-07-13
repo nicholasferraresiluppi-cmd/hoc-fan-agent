@@ -148,6 +148,18 @@ export async function fetchIntervals() {
   return r?.data || [];
 }
 
+/**
+ * Timeline events per creator — endpoint scoperto via cp-timeline-probe
+ * (lug 2026). Ogni event = slot turno programmato con shift.member,
+ * shift.paymentProfile (nome + cosellersCount) e shift.checkin LIVE
+ * (checkin.endedAt null finché l'operatore è al lavoro).
+ */
+export async function fetchTimelineEvents({ creatorId, startedAt, endedAt }) {
+  if (!creatorId || !startedAt || !endedAt) throw new Error("creatorId + startedAt + endedAt required");
+  const r = await apiFetch("/v1/timeline/events", { query: { creatorId, startedAt, endedAt } });
+  return r?.data || [];
+}
+
 export async function fetchWages({ startedAt, endedAt, page = 1, limit = PAGE_LIMIT, status, memberId, groupId, timeoutMs }) {
   if (!startedAt || !endedAt) throw new Error("startedAt + endedAt required");
   return apiFetch("/v1/sellers-wage/wages", {

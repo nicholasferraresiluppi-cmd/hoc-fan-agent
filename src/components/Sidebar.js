@@ -24,7 +24,7 @@ import {
   Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown,
   GraduationCap, BookOpen, ClipboardCheck, Target, Brain, Award,
   LayoutDashboard, UserCog, Sparkles,
-  UserCircle2, Contact, Medal, Key, Lock, Wrench,
+  UserCircle2, Contact, Medal, Key, Lock, Wrench, Gauge,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler,
@@ -103,6 +103,7 @@ const NAV_GROUPS = [
     label: "People",
     defaultOpen: false,
     items: [
+      { href: "/cm-cockpit",                     label: "Cockpit CM",   icon: Gauge },
       { href: "/admin/action-center",            label: "Action Center", icon: Target },
       { href: "/admin/coaching-center",          label: "Coaching Center", icon: GraduationCap },
       { href: "/admin/team",                     label: "Team",         icon: UserCircle2 },
