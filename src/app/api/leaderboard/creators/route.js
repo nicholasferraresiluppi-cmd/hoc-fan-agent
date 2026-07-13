@@ -10,13 +10,13 @@
  *
  * Response: { period_id, creators[], suggestions[]?, total_sales_agency }
  */
-import { auth } from "@clerk/nextjs/server";
+import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { buildCreatorMatrix, computeMatchSuggestions } from "@/lib/creator-aggregates";
 import { hasCpDataForPeriod } from "@/lib/creatorspro-data";
 
 export async function GET(request) {
-  const { userId } = await auth();
-  if (!userId) return Response.json({ error: "Non autenticato." }, { status: 401 });
+  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);
   const period_id = url.searchParams.get("period_id");

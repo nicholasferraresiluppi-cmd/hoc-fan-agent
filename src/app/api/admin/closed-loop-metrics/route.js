@@ -14,12 +14,12 @@
  * idealmente un job batch + KV. Per ora va in tempo reale con la cache
  * in-memory di buildCreatorMatrix.
  */
-import { auth } from "@clerk/nextjs/server";
+import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { computeClosedLoopMetrics } from "@/lib/closed-loop-metrics";
 
 export async function GET(request) {
-  const { userId } = await auth();
-  if (!userId) return Response.json({ error: "Non autenticato." }, { status: 401 });
+  const az = await authorize(CAPABILITIES.ANALYTICS_VIEW);
+  if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);
   const period_id = url.searchParams.get("period_id");

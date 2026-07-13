@@ -7,13 +7,13 @@
  * Path param: alias = nome creator (es. "Bianca Rossi") — URL-encoded.
  * Query: ?period_id=YYYY-MM (required)
  */
-import { auth } from "@clerk/nextjs/server";
+import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { getCreatorDrilldown } from "@/lib/creator-aggregates";
 import { hasCpDataForPeriod } from "@/lib/creatorspro-data";
 
 export async function GET(request, { params }) {
-  const { userId } = await auth();
-  if (!userId) return Response.json({ error: "Non autenticato." }, { status: 401 });
+  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const resolved = typeof params?.then === "function" ? await params : params;
   let alias = "";
