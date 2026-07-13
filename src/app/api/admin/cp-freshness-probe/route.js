@@ -83,10 +83,13 @@ export async function GET(request) {
     })
   );
 
-  // 3. Turni recenti (in corso o ultime 48h), ordinati per started_at desc
+  // 3. Turni ATTIVI ADESSO (started ≤ now < ended) o chiusi nelle ultime 48h.
+  //    I turni futuri programmati sono contati a parte (utile per la Vista 1
+  //    del cockpit: il calendario esiste già in CP) ma esclusi dall'analisi.
   const cutoff = now - 48 * 3600 * 1000;
   const recentShifts = [];
-  const allTimestampPaths = new Map(); // path → max ms
+  const ingestDeltas = []; // take.createdAt − transaction.createdAt (secondi)
+  let futureShifts = 0;
   let latestTake = null;
 
   for (const d of details) {
@@ -95,36 +98,51 @@ export async function GET(request) {
     for (const s of d.shifts || []) {
       const startMs = Date.parse(s.startedAt || 0) || 0;
       const endMs = s.endedAt ? Date.parse(s.endedAt) : null;
-      const inProgress = !endMs || endMs > now;
-      if (!inProgress && startMs < cutoff) continue;
+      if (startMs > now) { futureShifts += 1; continue; }
+      const activeNow = startMs <= now && (!endMs || endMs > now);
+      if (!activeNow && startMs < cutoff) continue;
 
       const rawTakes = Array.isArray(s.takes) ? s.takes : [];
-      const lastTakesRaw = rawTakes.slice(-TAKES_PER_SHIFT);
+      const takesTimed = [];
       for (const t of rawTakes) {
-        for (const ts of collectTimestamps(t)) {
-          const prev = allTimestampPaths.get(ts.path) || 0;
-          if (ts.ms > prev) allTimestampPaths.set(ts.path, ts.ms);
-          if (ts.ms <= now + 60_000 && (!latestTake || ts.ms > latestTake.ms)) {
-            latestTake = { ...ts, member, shift_started_at: s.startedAt };
+        const takeMs = Date.parse(t?.createdAt || 0) || null;
+        const txMs = Date.parse(t?.transaction?.createdAt || 0) || null;
+        if (takeMs && txMs && takeMs >= txMs) {
+          ingestDeltas.push(Math.round((takeMs - txMs) / 1000));
+        }
+        if (takeMs) {
+          takesTimed.push({
+            take_created_at: t.createdAt,
+            transaction_created_at: t?.transaction?.createdAt || null,
+            amount: t?.transaction?.amount ?? t?.amount ?? null,
+            type: t?.transaction?.type ?? t?.type ?? null,
+          });
+          if (!latestTake || takeMs > (latestTake.ms || 0)) {
+            latestTake = { ms: takeMs, iso: t.createdAt, member, shift_started_at: s.startedAt };
           }
         }
       }
+      takesTimed.sort((a, b) => (Date.parse(b.take_created_at) || 0) - (Date.parse(a.take_created_at) || 0));
 
       recentShifts.push({
         member,
-        shift_id: s.id,
+        active_now: activeNow,
         started_at: s.startedAt,
         ended_at: s.endedAt || null,
-        in_progress: inProgress,
-        worked_hours: s.workedHours ?? null,
         total_attributed: s.totalAttributed ?? null,
         takes_count: rawTakes.length,
         payment_profile: s.paymentProfile?.name ?? null,
-        last_takes_raw: lastTakesRaw,
+        last_takes: takesTimed.slice(0, TAKES_PER_SHIFT),
       });
     }
   }
-  recentShifts.sort((a, b) => (Date.parse(b.started_at) || 0) - (Date.parse(a.started_at) || 0));
+  // attivi prima, poi per started_at desc
+  recentShifts.sort((a, b) =>
+    (b.active_now - a.active_now) || ((Date.parse(b.started_at) || 0) - (Date.parse(a.started_at) || 0))
+  );
+
+  const dsorted = [...ingestDeltas].sort((a, b) => a - b);
+  const pick = (p) => (dsorted.length ? dsorted[Math.min(dsorted.length - 1, Math.floor((p / 100) * dsorted.length))] : null);
 
   return Response.json({
     now: new Date(now).toISOString(),
@@ -132,16 +150,22 @@ export async function GET(request) {
     stubs_on_page: stubs.length,
     wages_inspected: toInspect.length,
     wages_failed: details.filter((d) => d?._failed).length,
-    recent_shifts_found: recentShifts.length,
-    freshness: {
-      latest_take: latestTake
-        ? { ...latestTake, lag_seconds: Math.round((now - latestTake.ms) / 1000) }
-        : null,
-      timestamp_fields_seen: [...allTimestampPaths.entries()]
-        .map(([path, ms]) => ({ path, latest: new Date(ms).toISOString() }))
-        .sort((a, b) => (a.path < b.path ? -1 : 1)),
-      note: "lag_seconds è un TETTO: misura distanza dall'ultimo take trovato, che dipende anche dal ritmo vendite. Rilanciare più volte durante un turno attivo per stimare il ritardo reale.",
+    shifts: {
+      analyzed: recentShifts.length,
+      active_now: recentShifts.filter((s) => s.active_now).length,
+      future_scheduled_seen: futureShifts,
     },
+    ingestion_lag: {
+      note: "delta = take.createdAt − transaction.createdAt: quanto CP impiega a far comparire l'acquisto nel wage. È il ritardo che vedrebbe il cockpit (+ intervallo di polling).",
+      samples: dsorted.length,
+      p50_seconds: pick(50),
+      p90_seconds: pick(90),
+      max_seconds: dsorted.length ? dsorted[dsorted.length - 1] : null,
+      min_seconds: dsorted.length ? dsorted[0] : null,
+    },
+    latest_take: latestTake
+      ? { iso: latestTake.iso, member: latestTake.member, age_seconds: Math.round((now - latestTake.ms) / 1000) }
+      : null,
     recent_shifts: recentShifts.slice(0, SHIFTS_LIMIT),
   });
 }
