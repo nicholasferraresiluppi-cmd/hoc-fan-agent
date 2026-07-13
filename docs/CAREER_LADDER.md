@@ -1,10 +1,11 @@
 # HOC Career Ladder — Chat Sales
 
-**Versione:** 0.2 (bozza per review Nicholas, poi board)
+**Versione:** 0.3 (bozza per review Nicholas, poi board)
 **Data:** 2026-07-13
 **Owner:** Nicholas · **DRI stesura:** Claude (Strategic PM)
-**Stato:** PROPOSED — numeri dei gate da calibrare su distribuzione storica reale prima dell'adozione
+**Stato:** PROPOSED — gate validati empiricamente su 6 mesi di storico (§4.1); restano da fissare gli importi bonus sviluppo e la % override definitiva (post shadow mode)
 
+**Changelog v0.3:** aggiunta §4.1 validazione empirica dei gate su gen-giu 2026 (Sales CP score, 216 operatori) · gate L4b ammorbidito da Strong 5/6 a **Strong 4/6** (col 5/6 passava 1 solo operatore: track vuoto = inutile) · base dati dei gate esplicitata: **Sales CP score v3** (riferimento HR, 12 mesi di storico) con Infloww come segnale di contrappeso · costo premium al lancio quantificato ($3.000/mese)
 **Changelog v0.2:** naming "Sales Operator" confermato da Nicholas · §10 comp riscritta sul modello reale a scaglioni per turno (dati CP maggio 2026 + P&L Finance Nov/25-Apr/26) · aggiunto §8.1 processo QA · piazzamento iniziale data-driven (no grandfathering manuale) · integrazione con seniority training e certificazioni esistenti in HOC Pro
 
 ---
@@ -42,7 +43,7 @@ Nota naming: "Sales Operator" sostituisce "chatter" come titolo formale (profess
 
 ## 4. Gate di promozione
 
-Base dati: Score operativo 0-100 di HOC Pro (9 KPI pesati: Fan CVR, Unlock Rate, Avg Earnings/Paying Fan, Golden Ratio, ecc.) e relativi tier (Critical <51, Weak 51-60, Average 61-70, Good 71-80, Strong 81-90, Elite 91+).
+Base dati: **Sales CP score v3** (0-100, calcolato sui KPI CreatorsPro — il riferimento per le decisioni HR, con 12 mesi di storico) e relativi tier (Critical <51, Weak 51-60, Average 61-70, Good 71-80, Strong 81-90, Elite 91+). Lo score Infloww (9 KPI chat) resta come segnale di contrappeso qualitativo, non come gate primario — HOC Pro ha due score e i gate devono averne UNO solo come fonte di verità.
 
 > ⚠️ **Nota tecnica vincolante:** lo Score è normalizzato sulla media del Group — misura la posizione *relativa al team*. Un gate su metrica relativa penalizza chi sta in team forti. Mitigazioni obbligatorie: (a) i gate combinano tier + minimi assoluti di volume, (b) la calibrazione trimestrale (§8) confronta cross-group prima di approvare, (c) prima dell'adozione va fatta un'analisi di distribuzione sui dati storici per validare le soglie proposte.
 
@@ -54,10 +55,44 @@ Tutti i numeri sotto sono **proposte iniziali, confidence ~60%**, da calibrare s
 | L1 → L2 | ≥ 6 mesi in L1 | Tier ≥ **Average** in 3 degli ultimi 4 mesi, nessun mese Critical | QA trimestrale pass; response time nei limiti | Certificazioni base complete |
 | L2 → L3 | ≥ 10 mesi in L2 | Tier ≥ **Good** in 4 degli ultimi 6 mesi | QA pass; zero violazioni compliance in 6 mesi | **Mentoring di ≥ 2 nuovi ingressi con esito positivo** |
 | L3 → L4a (TL) | ≥ 6 mesi in L3 | Tier ≥ Good mantenuto (floor, non gate primario) | — | **TL Academy completata (§6) + selezione su segnali di coaching/collaborazione, non su classifica** |
-| L3 → L4b (Specialist) | ≥ 6 mesi in L3 | Tier ≥ **Strong** in 5 degli ultimi 6 mesi | QA eccellente | Nessun requisito di gestione persone |
+| L3 → L4b (Specialist) | ≥ 6 mesi in L3 | Tier ≥ **Strong** in 4 degli ultimi 6 mesi *(rivisto in v0.3: col 5/6 il track era vuoto — 1 solo eleggibile)* | QA eccellente | Nessun requisito di gestione persone |
 | L4a → L5 | ≥ 12 mesi in L4a | Risultati aggregati del team (score medio, retention team, coperture) | — | Decisione collegiale (comitato, come hiring) |
 
 Il requisito di mentoring a L2→L3 è deliberato: crea il segnale di collaborazione osservabile su cui si seleziona il futuro Team Lead (principio 4) e dà a ogni team capacità di onboarding distribuita.
+
+### 4.1 Validazione empirica — simulazione su gennaio-giugno 2026
+
+Gate applicati allo storico reale del Sales CP score (6 mesi pieni, luglio escluso perché parziale; 216 operatori visti, di cui 104 presenti in tutti e 6 i mesi). Solo la parte performance dei gate: tenure, QA e mentoring non sono simulabili dai dati score.
+
+**Piazzamento automatico al lancio (tutti i 216):**
+
+| Livello | Operatori | Costo premium |
+|---|---|---|
+| L3 (Good 4/6) | **14** | $150 × 14 = $2.100/mese |
+| L2 (Average 3/4 recenti, no Critical) | **12** | $75 × 12 = $900/mese |
+| L1 (resto) | 190 — di cui ~112 con presenza dati parziale (nuovi/usciti: fisiologico) | — |
+| **Totale premium al lancio** | | **~$3.000/mese** (~0,3% del pool fee) |
+
+**Tassi di passaggio su chi ha presenza piena** (la lettura corretta del funnel):
+
+| Gate | Variante | Passano |
+|---|---|---|
+| L2 (su 117 con 4/4 mesi recenti) | Average 2/4 | 43 (37%) |
+| | **Average 3/4 (proposta)** | **29 (25%)** |
+| | Average 4/4 | 12 (10%) |
+| L3 (su 104 con 6/6 mesi) | Good 3/6 | 21 (20%) |
+| | **Good 4/6 (proposta)** | **13 (12,5%)** |
+| | Good 5/6 | 9 (9%) |
+| L4b (su 104) | Strong 4/6 *(proposta v0.3)* | 2 (2%) |
+| | Strong 5/6 *(proposta originale, scartata)* | 1 (1%) |
+
+**Letture chiave:**
+
+1. **La costanza è il filtro vero, come da design.** In un singolo mese ~45% degli attivi è Good+; sostenerlo 4 mesi su 6 lo fa solo il 12,5%. Il gate misura esattamente ciò che l'evidenza SDR chiedeva: la ripetizione, non il mese caldo. 37 operatori su 104 con presenza piena non toccano mai Average+ in 6 mesi — la volatilità individuale è alta.
+2. **La piramide risultante è sana**: ~25% L2+, ~12,5% L3, ~2% L4b tra chi ha storia completa. In linea con le strutture sales mature.
+3. **Il gate L4b originale (Strong 5/6) produceva un track vuoto** — 1 solo eleggibile. Rivisto a 4/6 (2 eleggibili oggi). Da tenere d'occhio in calibrazione: lo score è relativo alla media del team, quindi penalizza i forti nei team forti — i candidati L4b vanno verificati anche sul venduto assoluto.
+4. **Il costo del lancio è modesto**: $3k/mese di premium contro i ~$14,5k/mese stimati a regime — la distribuzione a regime si costruirà negli anni con le promozioni, non è un big bang di costo.
+5. **Caveat**: piazzamento reale = questi gate + tenure reale + QA pass; i numeri sopra sono il tetto della sola componente performance.
 
 ## 5. Steps (progressione dentro il livello)
 
@@ -181,7 +216,7 @@ Benchmark di settore (solo contesto): modello ibrido $10-13/h + 3-8% nelle agenc
 | # | Decisione | Stato |
 |---|---|---|
 | 1 | Naming | ✅ **"Sales Operator"** (Nicholas, 2026-07-13) |
-| 2 | Soglie dei gate | 🔄 Analisi di distribuzione sui dati storici in corso (pre-adozione) |
+| 2 | Soglie dei gate | ✅ Validate empiricamente su gen-giu 2026 (§4.1): piramide sana, L4b rivisto a Strong 4/6, costo lancio $3k/mese. Fonte dati gate fissata: Sales CP score v3 |
 | 3 | Comp per livello | 🔄 Proposta in §10.2 su dati reali — da validare: simulazione su take reali + verifica fiscale/contrattuale Roberta/Ilaria + struttura L4a TL |
 | 4 | QA strutturata | ✅ Disegnata in §8.1 — da approvare |
 | 5 | Piazzamento al lancio | ✅ Confermato (Nicholas, 2026-07-13): piazzamento automatico data-driven sugli ultimi 6 mesi, nessuna mappatura manuale |
