@@ -76,10 +76,19 @@ Due sole severità by design: con 3+ livelli si discute di tassonomie invece di 
 ## Trade-off accettati
 
 - Freschezza settimanale (+ bottone "Aggiorna ora" per il refresh manuale)
-- La mail del lunedì (nudge push) è FUORI da questa v1: non esiste un provider email
-  nello stack. Va deciso (es. Resend) e aggiunto come step separato — il digest è già
-  calcolabile dallo store
 - Niente layer LLM in v1: previsto come secondo "scrittore" sullo stesso store
+
+## Mail del lunedì (aggiunta 2026-07-17, stessa PR)
+
+Provider scelto: **Resend** (account HOC creato da Nicholas, free tier).
+`POST /api/admin/ops-alerts/digest` — cron lunedì 06:05 UTC, 5 min dopo il run.
+Parte SOLO se ci sono critici aperti: se non arriva niente, va tutto bene.
+Contenuto: righe critici (valore, titolo, età, presa in carico) + link alla
+pagina. Destinatari in `HOC_ALERTS_EMAILS` (v1: solo Nicholas; estendere al
+board quando il flusso convince). Finché il dominio non è verificato su Resend
+il mittente è `onboarding@resend.dev` (recapita solo all'email dell'account);
+dopo la verifica: impostare `HOC_ALERTS_FROM`. Ultimo invio in KV
+`ops:alerts:last_digest`.
 
 ## Trigger di re-evaluation
 
