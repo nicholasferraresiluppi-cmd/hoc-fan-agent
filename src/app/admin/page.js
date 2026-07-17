@@ -12,7 +12,7 @@ import {
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Link2, Gauge,
   ArrowUpRight, Calendar, Activity, CheckCircle2, AlertCircle,
   Wallet, Scale, ShieldCheck, History, FlaskConical, MessageSquareWarning,
-  Signpost,
+  Signpost, Bell,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { SectionLabel, CpCard, StatCard } from "@/components/cp-style";
@@ -100,6 +100,7 @@ const SHORTCUT_GROUPS = [
   {
     label: "Data & Integrations",
     items: [
+      { href: "/admin/alerts",                 title: "Alert operativi", desc: "Check automatici: wage gap, fee, import fermi, sotto soglia", icon: Bell },
       { href: "/admin/creatorspro-sync",       title: "Sync CP",        desc: "Sincronizza wages + shifts CP (mensile)", icon: RefreshCw },
       { href: "/admin/wage-audit",             title: "Sync & Audit CP", desc: "Storico mese per mese: KV vs live CP, sync/ripara", icon: ShieldCheck },
       { href: "/admin/debug-mapping",          title: "Debug Mapping",  desc: "Perché un operatore risulta senza dati CP", icon: Link2 },
@@ -152,9 +153,15 @@ export default function AdminHub() {
   const creatorsCount = creatorsData.data?.creators_count;
   const lastSync = syncStatusData.data?.meta?.last_sync_at;
   const syncPeriod = syncStatusData.data?.meta?.last_sync_period;
-  const gapCheck = syncStatusData.data?.meta?.gap_check;
-  const hasGap = gapCheck?.gap > 0;
   const syncOk = lastSync && (Date.now() - lastSync) < 7 * 24 * 3600 * 1000;
+
+  // Alert operativi (findings store — ADR docs/ALERT_OPERATIVI.md).
+  // Sostituisce il vecchio banner wage hardcoded: wage-gap è il primo check migrato.
+  const opsAlertsData = useSWR(`/api/admin/ops-alerts`, fetcher);
+  const opsAlerts = opsAlertsData.data?.alerts || null;
+  const opsOpen = (opsAlerts || []).filter((a) => a.status !== "resolved");
+  const opsCrit = opsOpen.filter((a) => a.severity === "critical");
+  const opsWarn = opsOpen.filter((a) => a.severity === "warning");
 
   const userName = user?.firstName || (me?.email || "").split("@")[0] || "Admin";
 
@@ -211,33 +218,53 @@ export default function AdminHub() {
         />
       </div>
 
-      {/* WAGE GAP BANNER — alert se l'ultimo sync ha lasciato wage mancanti */}
-      {hasGap && (
-        <Link
-          href="/admin/wage-audit"
-          style={{
-            display: "flex", alignItems: "center", gap: 14,
-            padding: "14px 20px",
-            marginBottom: 18,
-            background: CP.surface,
-            border: `1px solid ${CP.accentRed}55`,
-            borderRadius: 12,
-            textDecoration: "none", color: CP.textPrimary,
-          }}
-        >
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: CP.accentRed + "22", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <AlertCircle size={20} color={CP.accentRed} />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>
-              {gapCheck.gap} wage mancanti nel sync di {syncPeriod}
+      {/* ALERT OPERATIVI — top 3 dal findings store (sostituisce il banner wage) */}
+      {opsAlerts !== null && (
+        <div style={{
+          marginBottom: 18, background: CP.surface,
+          border: `1px solid ${opsCrit.length > 0 ? CP.accentRed + "55" : CP.border}`,
+          borderRadius: 12, padding: "14px 20px",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Bell size={15} color={opsCrit.length > 0 ? CP.accentRed : CP.textMuted} />
+              <span style={{ fontWeight: 600, fontSize: 14, color: CP.textPrimary }}>Alert operativi</span>
             </div>
-            <div style={{ fontSize: 12, color: CP.textSecondary }}>
-              KV: {gapCheck.kv_count} · CP API live: {gapCheck.cp_live_count}. Apri Wage Audit e clicca "Recupera tutti i mesi con gap" per riallineare lo storico.
+            <div style={{ display: "flex", gap: 14, fontSize: 12, fontWeight: 600 }}>
+              {opsCrit.length > 0 && <span style={{ color: CP.accentRed }}>{opsCrit.length} critici</span>}
+              {opsWarn.length > 0 && <span style={{ color: CP.accentSoftText }}>{opsWarn.length} avvisi</span>}
+              {opsOpen.length === 0 && <span style={{ color: CP.accentGreen, display: "inline-flex", alignItems: "center", gap: 6 }}><CheckCircle2 size={13} /> nessun problema rilevato</span>}
             </div>
           </div>
-          <span style={{ color: CP.accentRed, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>Vai a Wage Audit →</span>
-        </Link>
+          {opsOpen.slice(0, 3).map((a) => (
+            <div key={a.fingerprint} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+              padding: "10px 0", borderTop: `1px solid ${CP.borderSoft}`, marginTop: 10, flexWrap: "wrap",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, background: a.severity === "critical" ? CP.accentRed : CP.accentSoftText }} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: CP.textPrimary, fontWeight: 500 }}>
+                    {a.value ? `${a.value} · ` : ""}{a.title}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: CP.textMuted, marginTop: 1 }}>
+                    aperto {fmtRelativeTime(a.firstSeen)} · {a.status === "ack" ? `in carico: ${a.ackBy || "?"}` : "nessuno in carico"}
+                  </div>
+                </div>
+              </div>
+              {a.cta?.href && (
+                <Link href={a.cta.href} style={{ color: CP.accentSoftText, fontSize: 12.5, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}>
+                  {a.cta.label || "Apri"} →
+                </Link>
+              )}
+            </div>
+          ))}
+          <div style={{ borderTop: `1px solid ${CP.borderSoft}`, marginTop: opsOpen.length === 0 ? 10 : 0, paddingTop: 10, textAlign: "center" }}>
+            <Link href="/admin/alerts" style={{ color: CP.accentSoftText, fontSize: 12.5, fontWeight: 600, textDecoration: "none" }}>
+              {opsOpen.length > 3 ? `Vedi tutti gli alert (${opsOpen.length} aperti) →` : "Vedi alert operativi e storico →"}
+            </Link>
+          </div>
+        </div>
       )}
 
       {/* CLOSED-LOOP METRICS — il ciclo HR/coaching sta funzionando? */}
