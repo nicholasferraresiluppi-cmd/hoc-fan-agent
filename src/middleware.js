@@ -1,7 +1,8 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
-const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)']);
+// /api/ingest/* è headless (auth a segreto condiviso nell'endpoint stesso), non via sessione Clerk.
+const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/api/ingest/(.*)']);
 const isApiRoute = createRouteMatcher(['/api/(.*)']);
 
 export default clerkMiddleware(async (auth, request) => {
