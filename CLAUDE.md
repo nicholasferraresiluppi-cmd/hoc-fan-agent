@@ -60,6 +60,7 @@ Debiti noti accettati: font-weight 600/700 ancora diffusi inline (normalizzazion
 ## Pattern KV principali
 
 - `ops_kpi:{period_type}:{period_id}` — dati Infloww del periodo; `ops_kpi:imports` — ZSET indice import; `ops_kpi:group_categories`, `group_languages`
+- `ops_kpi:score_snapshot:{pt}:{pid}` + ZSET `ops_kpi:score_snapshots` — formula score congelata a ogni import (drift detection); `ops_kpi:score_draft:{id}` + set `ops_kpi:score_drafts:all` — bozze formula con backtest/publish
 - `wages:{period_id}` e chiavi sync CP (job in KV, vedi `src/lib/` sync); mapping CP↔Infloww via `/api/admin/creatorspro-mapping`
 - `leaderboard:exclusions`, `underperformers:ignored`
 - `employee_profile:{name}` + `employee_profile:_index` (set)
@@ -72,6 +73,7 @@ Debiti noti accettati: font-weight 600/700 ancora diffusi inline (normalizzazion
 
 Decisioni strutturali tracciate qui (1 riga + link); il rationale dello scoring vive in `docs/BOARD_ANNOUNCEMENT_HOC_PRO.md` e nei commenti versionati di `creatorspro-score.js` / `creator-aggregates.js`.
 
+- **2026-07-18 — Governance formula score + gate benchmark chiusi**: snapshot della formula a ogni import (`/admin/score-config-history`) e bozze con backtest sui mesi reali + publish confermato (`/admin/score-config-drafts`); dossier benchmark in `docs/BENCHMARK_DEEP_STUDY.md`, superficie Infloww in `docs/INFLOWW_SURFACE.md` (API ufficiale senza endpoint transcript → fonte chat = export Message Dashboard; chiave API in env è placeholder, da sostituire), policy dispute in `docs/CAREER_LADDER.md` §8.2, requisiti legali in `docs/LEGAL_SCORING_REQUIREMENTS.md`. PR #27-#30.
 - **2026-07-13 — Gating dati denaro pre-CM**: helper `authorizeAll` (scope "all" obbligatorio) su 7 route leaderboard denaro + `closed-loop-metrics` → ANALYTICS_VIEW, prima dell'onboarding CM pilota (ruolo team_lead, cockpit `/cm-cockpit`). Motivo: le route esponevano venduto/score di tutti a qualsiasi utente loggato. PR #24.
 - **2026-07-13 — Career ladder + Cockpit CM**: `docs/CAREER_LADDER.md` (Fase 0 people lifecycle) è l'artefatto sorgente di livelli/gate/comp; cockpit CM live (PR #22/#23) con tracciamento supervisioni (KV `cm:sup:*`), override 3% in shadow mode, capability `cm.cockpit`.
 - **2026-07-10 — Potatura superficie**: rimosse 14 route/lib morte (probe CP/Infloww, `/api/sessions`, `/api/feedback`, `/api/challenge`, client CP duplicato), AdminNav stub, Content Pipeline fuori da nav/hub/welcome/cron, COLORS legacy rimappata sui token Dark SaaS, TIER flat. Motivo: 3 generazioni di tool sedimentate rendevano l'app illeggibile per un nuovo utente. Reversibile via git.
