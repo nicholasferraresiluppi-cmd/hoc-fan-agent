@@ -1,10 +1,11 @@
 # HOC Career Ladder — Chat Sales
 
-**Versione:** 0.4 (bozza per review Nicholas, poi board)
-**Data:** 2026-07-13
+**Versione:** 0.5 (bozza per review Nicholas, poi board)
+**Data:** 2026-07-18
 **Owner:** Nicholas · **DRI stesura:** Claude (Strategic PM)
 **Stato:** PROPOSED — gate validati empiricamente sullo storico (§4.1); restano da fissare gli importi bonus sviluppo e la % override definitiva (post shadow mode)
 
+**Changelog v0.5:** aggiunta §8.2 policy dispute/correzioni/retroattività dello score (gate 0d del benchmark: correzione = riscrittura del mese con audit-log visibile + ri-valutazione gate, mai silenziosa; flusso di appello operatore) · aggiunto §8.3 requisiti di difendibilità legale dello scoring algoritmico (rimando a `docs/LEGAL_SCORING_REQUIREMENTS.md`, gate 0c — da validare con consulenza) · §11 aggiornata. Contesto: chiusura gate benchmark, cfr. `docs/BENCHMARK_DEEP_STUDY.md` e `docs/INFLOWW_SURFACE.md`
 **Changelog v0.4:** fonte dati gate cambiata su decisione di Nicholas: **score Infloww operational** (metriche di mestiere, appropriate al ruolo) al posto del Sales CP — rationale in §4 · §4.1 rifatta sui dati Infloww gen-mag 2026 (268 operatori) con confronto CP · L4b ridefinito come gate a doppio segnale con selezione in calibrazione (ogni variante puramente automatica produceva un track con 0-1 persone) · nuovo vincolo di processo: import Infloww mensile = SLA (senza import i gate non si calcolano)
 **Changelog v0.3:** aggiunta §4.1 validazione empirica dei gate (Sales CP score, 216 operatori) · gate L4b ammorbidito · costo premium al lancio quantificato
 **Changelog v0.2:** naming "Sales Operator" confermato da Nicholas · §10 comp riscritta sul modello reale a scaglioni per turno (dati CP maggio 2026 + P&L Finance Nov/25-Apr/26) · aggiunto §8.1 processo QA · piazzamento iniziale data-driven (no grandfathering manuale) · integrazione con seniority training e certificazioni esistenti in HOC Pro
@@ -139,6 +140,30 @@ I gate richiedono un segnale di qualità che i dati Infloww/CP non contengono (m
 - **Rubrica (scala 1-4 per dimensione):** (1) compliance e safety; (2) aderenza a brand voice/persona della creator; (3) tecnica di vendita non pressante (no spam PPV, escalation corretta); (4) retention del fan (riapertura conversazione, follow-up); (5) qualità di scrittura. **Pass = media ≥ 3 e nessun fail su compliance.** Un fail compliance congela qualsiasi promozione in corso.
 - **Dove vive:** HOC Pro (fase 2/4 del progetto): form reviewer + storico per operatore, alimenta automaticamente il fascicolo promozione.
 - **Evoluzione (fase 5):** pre-screening AI delle conversazioni campione (l'app ha già l'SDK Anthropic) con conferma umana — riduce il carico reviewer a ~1/3. Non si parte da qui: prima la rubrica deve stabilizzarsi con giudizio umano.
+
+### 8.2 Dispute, correzioni e retroattività dello score
+
+Lo score diventa denaro (priorità di assegnazione sulle bande alte, premium, gate di promozione): appena questo accade, un dato sbagliato o un import corretto in ritardo non è un dettaglio tecnico, è una decisione che l'operatore ha diritto di contestare e che HOC deve poter difendere. Principio derivato dal benchmark (CaptivateIQ inquiry, Zendesk QA dispute, Observe.AI right-of-reply — cfr. `docs/BENCHMARK_DEEP_STUDY.md`) e dall'invariante HOC "gli operatori non devono mai vedere lo storico cambiare in silenzio".
+
+**Invariante — nessun cambiamento silenzioso.** Ogni correzione di uno score già pubblicato (re-import di un mese, fix di attribuzione, ricalcolo dopo cambio formula) **riscrive il mese interessato** e lascia una **voce di audit visibile**: cosa è cambiato, da quale valore a quale, perché, quando, per mano di chi. Mai una modifica in-place non tracciata. L'operatore vede lo storico *e* il perché del cambiamento, non un numero che si muove da solo.
+
+**Ri-valutazione automatica dei gate.** Se una correzione tocca un mese dentro la finestra di un gate (3/4 o 4/6 mesi), il motore di progressione **ri-valuta il gate** con i valori corretti e registra l'esito. Due direzioni, entrambe esplicite:
+- correzione che *sblocca* un gate prima negato → l'operatore risale in coda con data-effetto retroattiva al mese corretto;
+- correzione che *invalida* un gate già passato → **non si retrocede automaticamente** una promozione già comunicata (una promozione è un fatto sociale e contrattuale, non un numero): il caso va in calibrazione trimestrale (§8) con decisione umana registrata. Il sistema segnala, gli umani decidono.
+
+**Flusso di appello dell'operatore.** L'operatore può contestare uno score o un esito di gate tramite un oggetto strutturato in HOC Pro (fase 2), non via chat:
+1. apre una contestazione agganciata al mese/metrica specifici, con motivazione;
+2. la riceve **non il proprio TL da solo** (stesso conflitto della §8.1: il TL propone le promozioni) ma la rotazione reviewer + Sales Manager;
+3. la risoluzione è registrata (accolta/parziale/respinta + motivo) e, se accolta, innesca la correzione tracciata di cui sopra;
+4. SLA di risposta definito (proposta: 10 giorni lavorativi), così l'appello non diventa un limbo.
+
+**Import in ritardo (SLA §4).** Un mese non ancora importato è "non valutabile" (la finestra scorre), non zero. Quando arriva l'import tardivo, vale la regola di correzione: il mese entra, i gate nella cui finestra ricade vengono ri-valutati, tutto tracciato. Nessun operatore perde un gate per un ritardo di processo.
+
+**Cosa serve in HOC Pro (fase 2):** append-only audit log per score corretti (chiave KV dedicata), oggetto contestazione (`dispute:{operatore}:{periodo}` con stato), ri-valutazione gate on-correction, vista operatore "il mio storico + eventuali correzioni". Prerequisito tecnico dello snapshot: il [registro versionato di formula/pesi a ogni import](INFLOWW_SURFACE.md) (gate 0b) — senza sapere *con quale formula* un mese è stato scorato, una correzione non è ricostruibile.
+
+### 8.3 Difendibilità legale dello scoring algoritmico (da validare con consulenza)
+
+I gate di questo ladder, l'Action Center che esporta gli underperformer a HR, e (fase 5) il pre-screening AI delle conversazioni sono **decisioni assistite da algoritmo su lavoratori**. Per una società italiana di ~200 persone questo tocca EU AI Act (gestione dei lavoratori = area ad alto rischio, obblighi in fase-in dal 2026), GDPR art. 22 (decisioni automatizzate), art. 4 Statuto dei Lavoratori (controllo a distanza), e lo status contrattuale degli operatori. I requisiti di prodotto che ne discendono — human-in-the-loop documentato, spiegabilità dello score, diritto di accesso e appello (già in §8.2), no-decisione-solo-automatica su esiti che incidono sul rapporto — sono raccolti in bozza in `docs/LEGAL_SCORING_REQUIREMENTS.md`. **Non è una consulenza legale**: è la lista di domande e requisiti da portare a un legale prima di far incidere lo score su comp/promozioni/uscite. È un gate a monte, non un blocco al lavoro di prodotto sui pezzi che non hanno conseguenze HR (score di qualità, coaching, training).
 
 ## 9. Onboarding (L0) — struttura a fasi
 
