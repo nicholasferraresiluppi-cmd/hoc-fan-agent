@@ -28,6 +28,7 @@ import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { parseCsvRow, isMassAccount } from "@/lib/leaderboard-calc";
 import { CSV_COLUMN_MAP } from "@/lib/leaderboard-config";
+import { snapshotScoreConfig } from "@/lib/score-config-snapshot";
 
 /**
  * Parser CSV minimale che supporta valori quoted (per gestire virgole dentro
@@ -173,11 +174,15 @@ export async function POST(request) {
         score: timestamp,
         member: `${period_type}:${period_id}`,
       });
+      // Congela la formula score effettiva a questo import (drift detection, gate 0b).
+      // Non-bloccante: uno snapshot fallito non deve invalidare un import riuscito.
+      const snap = await snapshotScoreConfig({ period_type, period_id, ts: timestamp, source: "admin-import" });
       return Response.json({
         ...stats,
         mode: "save",
         kv_key: key,
         saved_at: new Date(timestamp).toISOString(),
+        score_config_hash: snap.hash || null,
       });
     } catch (e) {
       console.error("Leaderboard import KV save error:", e);

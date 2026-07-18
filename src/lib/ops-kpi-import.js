@@ -1,6 +1,7 @@
 import { kv } from "@vercel/kv";
 import { parseCsvRow } from "@/lib/leaderboard-calc";
 import { CSV_COLUMN_MAP } from "@/lib/leaderboard-config";
+import { snapshotScoreConfig } from "@/lib/score-config-snapshot";
 
 /**
  * Import CSV Infloww (Employee statistics) → KV ops_kpi.
@@ -90,5 +91,8 @@ export async function importOpsKpiCsv({ csv, period_type, period_id, mode = "sav
   await kv.set(key, records);
   const ts = Date.now();
   await kv.zadd("ops_kpi:imports", { score: ts, member: `${period_type}:${period_id}` });
-  return { ok: true, status: 200, body: { ...stats, mode: "save", kv_key: key, saved_at: new Date(ts).toISOString() } };
+  // Congela la formula score effettiva a questo import (drift detection, gate 0b).
+  // Non-bloccante: uno snapshot fallito non deve invalidare un import riuscito.
+  const snap = await snapshotScoreConfig({ period_type, period_id, ts, source: "ingest" });
+  return { ok: true, status: 200, body: { ...stats, mode: "save", kv_key: key, saved_at: new Date(ts).toISOString(), score_config_hash: snap.hash || null } };
 }

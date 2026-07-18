@@ -11,7 +11,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders,
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Link2, Gauge,
   ArrowUpRight, Calendar, Activity, CheckCircle2, AlertCircle,
-  Wallet, Scale, ShieldCheck,
+  Wallet, Scale, ShieldCheck, History,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { SectionLabel, CpCard, StatCard } from "@/components/cp-style";
@@ -107,6 +107,7 @@ const SHORTCUT_GROUPS = [
       { href: "/admin/group-languages",        title: "Lingue Group",   desc: "Override regex per matching ITA/ENG", icon: Languages },
       { href: "/admin/group-categories",       title: "Categorie",      desc: "Classifica Group come Big/Medium/Small", icon: Tags },
       { href: "/admin/leaderboard-settings",   title: "Settings ladder", desc: "Pesi KPI + soglie + cutoff tier", icon: Sliders },
+      { href: "/admin/score-config-history",   title: "Storico formula", desc: "Con quale formula è stato scorato ogni mese + drift", icon: History },
     ],
   },
 ];

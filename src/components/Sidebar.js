@@ -28,6 +28,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler,
+  History,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
@@ -127,6 +128,7 @@ const NAV_GROUPS = [
       { href: "/admin/group-categories",         label: "Categorie Group", icon: Tags },
       { href: "/admin/leaderboard-import",       label: "Import ladder",   icon: Upload },
       { href: "/admin/leaderboard-settings",     label: "Settings ladder", icon: Sliders },
+      { href: "/admin/score-config-history",     label: "Storico formula", icon: History },
       { href: "/admin/seed",                     label: "Seed",            icon: Sprout },
     ],
   },
