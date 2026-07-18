@@ -129,6 +129,7 @@ const NAV_GROUPS = [
       { href: "/admin/leaderboard-import",       label: "Import ladder",   icon: Upload },
       { href: "/admin/leaderboard-settings",     label: "Settings ladder", icon: Sliders },
       { href: "/admin/score-config-history",     label: "Storico formula", icon: History },
+      { href: "/admin/score-config-drafts",      label: "Bozze formula",   icon: FlaskConical },
       { href: "/admin/seed",                     label: "Seed",            icon: Sprout },
     ],
   },
