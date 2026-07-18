@@ -11,7 +11,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders,
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Link2, Gauge,
   ArrowUpRight, Calendar, Activity, CheckCircle2, AlertCircle,
-  Wallet, Scale, ShieldCheck, History,
+  Wallet, Scale, ShieldCheck, History, FlaskConical,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { SectionLabel, CpCard, StatCard } from "@/components/cp-style";
@@ -108,6 +108,7 @@ const SHORTCUT_GROUPS = [
       { href: "/admin/group-categories",       title: "Categorie",      desc: "Classifica Group come Big/Medium/Small", icon: Tags },
       { href: "/admin/leaderboard-settings",   title: "Settings ladder", desc: "Pesi KPI + soglie + cutoff tier", icon: Sliders },
       { href: "/admin/score-config-history",   title: "Storico formula", desc: "Con quale formula è stato scorato ogni mese + drift", icon: History },
+      { href: "/admin/score-config-drafts",    title: "Bozze formula",   desc: "Prova e backtest di una nuova formula prima del publish", icon: FlaskConical },
     ],
   },
 ];

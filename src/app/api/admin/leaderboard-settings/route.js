@@ -68,7 +68,7 @@ export async function loadSettings() {
  * Validators
  * ================================================= */
 
-function validateWeights(w) {
+export function validateWeights(w) {
   if (!w || typeof w !== "object") return "weights deve essere un oggetto.";
   for (const mode of ["withClockIn", "withoutClockIn"]) {
     if (!w[mode] || typeof w[mode] !== "object") {
@@ -86,7 +86,7 @@ function validateWeights(w) {
   return null;
 }
 
-function validateThresholds(t) {
+export function validateThresholds(t) {
   if (!Array.isArray(t)) return "thresholds deve essere un array.";
   if (t.length < 2) return "thresholds richiede almeno 2 elementi.";
   for (let i = 0; i < t.length; i++) {
@@ -110,7 +110,7 @@ function validateThresholds(t) {
   return null;
 }
 
-function validateTiers(t) {
+export function validateTiers(t) {
   if (!Array.isArray(t)) return "tiers deve essere un array.";
   if (t.length < 2) return "tiers richiede almeno 2 elementi.";
   for (let i = 0; i < t.length; i++) {
