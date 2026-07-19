@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import Link from "next/link";
 import { Wallet, HelpCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import { CP, FONTS } from "@/lib/brand";
@@ -110,7 +111,7 @@ export default function MyPayoutPage() {
           </div>
 
           <p style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 18, lineHeight: 1.6 }}>
-            Gli scaglioni sono cumulativi: ogni fascia si applica solo alla parte di venduto che ci cade dentro. Un numero non ti torna? Segnalalo: ogni correzione viene tracciata.
+            Gli scaglioni sono cumulativi: ogni fascia si applica solo alla parte di venduto che ci cade dentro. Un numero non ti torna? <Link href="/me/contestazioni" style={{ color: CP.accent }}>Apri una contestazione</Link> — ogni correzione viene tracciata.
           </p>
         </>
       )}

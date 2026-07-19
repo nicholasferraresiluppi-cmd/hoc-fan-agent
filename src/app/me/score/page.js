@@ -156,7 +156,7 @@ export default function MyScorePage() {
           )}
 
           <p style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 18, lineHeight: 1.6 }}>
-            Pensi che un numero sia sbagliato? Presto potrai aprire una contestazione formale da qui; intanto segnalalo al tuo team lead — le correzioni vengono sempre tracciate, mai fatte in silenzio.
+            Pensi che un numero sia sbagliato? <Link href="/me/contestazioni" style={{ color: CP.accent }}>Apri una contestazione</Link> — le correzioni vengono sempre tracciate, mai fatte in silenzio.
           </p>
         </>
       )}
