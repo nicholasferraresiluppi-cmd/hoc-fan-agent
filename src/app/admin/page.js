@@ -11,7 +11,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders,
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Link2, Gauge,
   ArrowUpRight, Calendar, Activity, CheckCircle2, AlertCircle,
-  Wallet, Scale, ShieldCheck, History, FlaskConical,
+  Wallet, Scale, ShieldCheck, History, FlaskConical, MessageSquareWarning,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { SectionLabel, CpCard, StatCard } from "@/components/cp-style";
@@ -84,6 +84,7 @@ const SHORTCUT_GROUPS = [
       { href: "/cm-cockpit",              title: "Cockpit CM",    desc: "Turno di supervisione: team live, soglie, override shadow", icon: Gauge },
       { href: "/admin/action-center",     title: "Action Center", desc: "Lista underperformers + swap + export HR", icon: Target },
       { href: "/admin/coaching-center",   title: "Coaching Center", desc: "Operatori con margini di crescita + training mirato", icon: GraduationCap },
+      { href: "/admin/disputes",          title: "Contestazioni", desc: "Coda dispute score/compensi + risoluzione motivata", icon: MessageSquareWarning },
       { href: "/admin/team",              title: "Team",          desc: "Crea team + assegna operatori + nomina lead", icon: UserCircle2 },
       { href: "/admin/employee-profiles", title: "Profili",       desc: "Anagrafica completa + override KPI", icon: Contact },
       { href: "/admin/seniority",         title: "Seniority",     desc: "Tier Junior/Senior/Master + override manuale", icon: Medal },
