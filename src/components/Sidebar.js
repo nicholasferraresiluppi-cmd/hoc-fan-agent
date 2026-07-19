@@ -38,6 +38,9 @@ const ESSENTIAL_HREFS = new Set([
   "/welcome",
   "/welcome/score-friendly",
   "/profilo",
+  "/me/score",
+  "/me/compenso",
+  "/me/percorso",
   "/admin",
   "/leaderboard/sales-cp",
   "/leaderboard/creators",
@@ -52,6 +55,16 @@ const ESSENTIAL_HREFS = new Set([
 ]);
 
 const NAV_GROUPS = [
+  {
+    label: "Il mio quadro",
+    defaultOpen: true,
+    items: [
+      { href: "/profilo",     label: "Il mio profilo",  icon: UserCircle2 },
+      { href: "/me/score",    label: "Il mio score",    icon: Gauge },
+      { href: "/me/compenso", label: "Il mio compenso", icon: Wallet },
+      { href: "/me/percorso", label: "Il mio percorso", icon: Compass },
+    ],
+  },
   {
     label: "Performance",
     defaultOpen: true,
