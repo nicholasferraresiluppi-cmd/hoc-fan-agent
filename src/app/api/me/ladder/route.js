@@ -16,6 +16,7 @@
  */
 import { resolveEmployeeForUser, resolveInflowwName } from "@/lib/me";
 import { loadHistoryForEmployee } from "@/lib/leaderboard-history";
+import { listReviewsForEmployee, qaStatusForGate } from "@/lib/qa-reviews";
 
 const TIER_ORDER = ["Critical", "Weak", "Average", "Good", "Strong", "Elite"];
 const rank = (tier) => TIER_ORDER.indexOf(tier);
@@ -67,6 +68,23 @@ export async function GET() {
     return Response.json({ linked: true, employee: who.employee, reason: "no_history" });
   }
 
+  // QA reale (§8.1) quando esistono review; senza review resta "non tracciato".
+  let qa3 = null;
+  let qa6 = null;
+  try {
+    const reviews = await listReviewsForEmployee(who.employee);
+    qa3 = qaStatusForGate(reviews, { windowMonths: 3 });
+    qa6 = qaStatusForGate(reviews, { windowMonths: 6 });
+  } catch {}
+  const qaReq = (qs, label) =>
+    qs
+      ? {
+          label,
+          status: qs.frozen_by_compliance ? "compliance_fail" : qs.pass ? "met" : "not_met",
+          detail: `${qs.passes}/${qs.reviews} review pass negli ultimi ${qs.window_months} mesi${qs.compliance_fails ? ` · ${qs.compliance_fails} fail compliance` : ""}`,
+        }
+      : { label, status: "not_tracked" };
+
   // Gate performance dalla ladder v0.5 §4 (solo componente performance).
   const gates = [
     {
@@ -75,7 +93,7 @@ export async function GET() {
       time_floor: "≥ 6 mesi in L1",
       performance: evalGate(history, { minTier: "Average", needed: 3, window: 4, noCritical: true }),
       other_requirements: [
-        { label: "QA trimestrale pass", status: "not_tracked" },
+        qaReq(qa3, "QA trimestrale pass"),
         { label: "Certificazioni base complete", status: "check_academy" },
         { label: "Time floor (tenure nel livello)", status: "not_tracked" },
       ],
@@ -86,7 +104,7 @@ export async function GET() {
       time_floor: "≥ 10 mesi in L2",
       performance: evalGate(history, { minTier: "Good", needed: 4, window: 6 }),
       other_requirements: [
-        { label: "QA pass, zero violazioni compliance 6 mesi", status: "not_tracked" },
+        qaReq(qa6, "QA pass, zero violazioni compliance 6 mesi"),
         { label: "Mentoring di ≥ 2 nuovi ingressi", status: "not_tracked" },
         { label: "Time floor (tenure nel livello)", status: "not_tracked" },
       ],

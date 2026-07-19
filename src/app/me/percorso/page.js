@@ -89,15 +89,26 @@ export default function MyLadderPage() {
 
                 {/* Altri requisiti */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                  {(g.other_requirements || []).map((r, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: CP.textMuted }}>
-                      {r.status === "not_tracked" ? <Lock size={12} color={CP.mutedIcons} /> : <Circle size={12} color={CP.mutedIcons} />}
-                      {r.label}
-                      <span style={{ fontSize: 11, color: CP.faint || CP.textMuted }}>
-                        {r.status === "not_tracked" ? "· tracciamento in arrivo" : "· vedi Academy"}
-                      </span>
-                    </div>
-                  ))}
+                  {(g.other_requirements || []).map((r, i) => {
+                    const met = r.status === "met";
+                    const fail = r.status === "compliance_fail";
+                    const notMet = r.status === "not_met";
+                    return (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: fail ? CP.accentRed : met ? CP.textSecondary : CP.textMuted, flexWrap: "wrap" }}>
+                        {met ? <CheckCircle2 size={12} color={CP.accentGreen} />
+                          : fail ? <Lock size={12} color={CP.accentRed} />
+                          : r.status === "not_tracked" ? <Lock size={12} color={CP.mutedIcons} />
+                          : <Circle size={12} color={notMet ? CP.textMuted : CP.mutedIcons} />}
+                        {r.label}
+                        <span style={{ fontSize: 11, color: fail ? CP.accentRed : CP.textMuted }}>
+                          {r.status === "not_tracked" && "· tracciamento in arrivo"}
+                          {r.status === "check_academy" && "· vedi Academy"}
+                          {(met || notMet || fail) && r.detail ? `· ${r.detail}` : ""}
+                          {fail && " · congela le promozioni in corso (§8.1)"}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </CpCard>
             );
