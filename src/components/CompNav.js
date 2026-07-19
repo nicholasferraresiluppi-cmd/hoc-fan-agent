@@ -8,7 +8,7 @@
  */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Wallet, Scale, CalendarDays, Activity, Search, FlaskConical, Ruler } from "lucide-react";
+import { Wallet, Scale, CalendarDays, Activity, Search, FlaskConical, Ruler, ListTree } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 
 const TOOLS = [
@@ -18,6 +18,7 @@ const TOOLS = [
   { href: "/admin/threshold-study",  label: "Studio soglie", icon: Ruler },
   { href: "/admin/comp-review",      label: "Review",       icon: Activity },
   { href: "/admin/comp-exam",        label: "Esame creator", icon: Search },
+  { href: "/admin/payout-tree",      label: "Albero payout", icon: ListTree },
   { href: "/admin/shift-research",   label: "Research",     icon: FlaskConical },
 ];
 
