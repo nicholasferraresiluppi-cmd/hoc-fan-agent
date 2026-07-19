@@ -16,6 +16,7 @@
  */
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { isCronAuthorized } from "@/lib/cron-auth";
+import { continueChain, chainDepth } from "@/lib/cron-chain";
 import {
   getLedgerJob, startLedgerJob, stepLedgerJob, getLedgerMeta, romePeriod,
 } from "@/lib/payout-ledger";
@@ -64,41 +65,19 @@ async function tick(chain = 0) {
 // riparte domani dal cron.
 const MAX_CHAIN = 25;
 
-async function continueChain(request, chain) {
-  if (chain >= MAX_CHAIN) return { chained: false, reason: "max_chain" };
-  const origin = new URL(request.url).origin;
-  const secret = process.env.CRON_SECRET;
-  const headers = { "x-tick-chain": String(chain + 1) };
-  if (secret) headers["Authorization"] = `Bearer ${secret}`;
-  else headers["x-vercel-cron"] = "1"; // transizione senza secret: stesso lasciapassare del cron
-  try {
-    // Aspetta solo l'handshake (1.5s): al figlio basta che la richiesta ARRIVI
-    // alla piattaforma — poi corre da solo mentre il padre chiude entro il
-    // proprio maxDuration. Best-effort: se la catena si spezza, il cron di
-    // domani (o il bottone in UI) riprende dal cursore salvato in KV.
-    await Promise.race([
-      fetch(`${origin}/api/cron/payout-ledger`, { method: "POST", headers }),
-      new Promise((resolve) => setTimeout(resolve, 1500)),
-    ]);
-    return { chained: true };
-  } catch {
-    return { chained: false, reason: "fetch_failed" };
-  }
-}
-
 export async function POST(request) {
   if (!isCronAuthorized(request)) {
     const az = await authorize(CAPABILITIES.SEED);
     if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   }
-  const chain = Number(request.headers.get("x-tick-chain") || 0);
+  const chain = chainDepth(request);
   try {
     const out = await tick(chain);
     // Continua la catena finché il tick produce lavoro: quando risponde
     // idle/skip (o esaurisce i periodi stantii) la catena muore da sola.
     let chained = null;
     if (out.action === "step" || out.action === "start") {
-      chained = await continueChain(request, chain);
+      chained = await continueChain(request, chain, { maxChain: MAX_CHAIN });
     }
     return Response.json({ ...out, chain, ...(chained ? { next: chained } : {}) });
   } catch (e) {
