@@ -7,6 +7,14 @@
     {
       "path": "/api/leagues/snapshot",
       "schedule": "10 0 1 * *"
+    },
+    {
+      "path": "/api/admin/ops-alerts/run",
+      "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/admin/ops-alerts/digest",
+      "schedule": "5 6 * * 1"
     }
   ]
 }

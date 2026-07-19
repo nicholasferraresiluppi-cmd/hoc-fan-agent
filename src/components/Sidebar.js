@@ -19,6 +19,7 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import useSWR from "swr";
 import { UserButton, SignedIn } from "@clerk/nextjs";
 import {
   Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown,
@@ -28,7 +29,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler,
-  History, Signpost,
+  History, Signpost, Bell,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
@@ -45,6 +46,7 @@ const ESSENTIAL_HREFS = new Set([
   "/me/qualita",
   "/me/coaching",
   "/admin",
+  "/admin/alerts",
   "/leaderboard/sales-cp",
   "/leaderboard/creators",
   "/",
@@ -161,7 +163,7 @@ const NAV_GROUPS = [
 
 export const SIDEBAR_WIDTH = 248;
 
-function NavItem({ href, label, icon: Icon, isActive }) {
+function NavItem({ href, label, icon: Icon, isActive, badge }) {
   return (
     <Link
       href={href}
@@ -202,6 +204,14 @@ function NavItem({ href, label, icon: Icon, isActive }) {
       )}
       <Icon size={16} strokeWidth={1.8} />
       <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
+      {badge > 0 && (
+        <span style={{
+          marginLeft: "auto", minWidth: 18, height: 18, padding: "0 5px",
+          borderRadius: 9, background: CP.accentRed, color: "#2b0f0f",
+          fontFamily: FONTS.mono, fontSize: 10.5, fontWeight: 700,
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+        }}>{badge}</span>
+      )}
     </Link>
   );
 }
@@ -285,8 +295,30 @@ function ViewToggle({ mode, onChange }) {
   );
 }
 
+// Fetcher silenzioso: la sidebar è renderizzata per TUTTI gli utenti loggati,
+// ma /api/admin/ops-alerts risponde 403 sotto SCORES_VIEW "all" — in quel caso
+// niente badge, nessun errore.
+const silentFetcher = async (url) => {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  }
+};
+
 export default function Sidebar() {
   const pathname = usePathname() || "";
+
+  // Badge alert operativi: SOLO i critici aperti (un segnale sempre acceso è spento).
+  const { data: opsAlertsData } = useSWR("/api/admin/ops-alerts", silentFetcher, {
+    revalidateOnFocus: false,
+    refreshInterval: 5 * 60 * 1000,
+  });
+  const criticalCount = (opsAlertsData?.alerts || []).filter(
+    (a) => a.severity === "critical" && a.status !== "resolved"
+  ).length;
 
   // Toggle Essential / Advanced
   const [viewMode, setViewMode] = useState("essential");
@@ -380,6 +412,7 @@ export default function Sidebar() {
         <NavItem href="/profilo" label="Il mio profilo" icon={Award} isActive={pathname === "/profilo"} />
         <NavItem href="/welcome" label="Welcome / Tour" icon={Compass} isActive={pathname === "/welcome"} />
         <NavItem href="/admin" label="Hub" icon={LayoutDashboard} isActive={pathname === "/admin"} />
+        <NavItem href="/admin/alerts" label="Alert operativi" icon={Bell} isActive={pathname.startsWith("/admin/alerts")} badge={criticalCount} />
       </div>
 
       {/* Nav groups */}
