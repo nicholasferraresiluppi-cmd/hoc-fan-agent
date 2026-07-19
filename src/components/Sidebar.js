@@ -148,6 +148,7 @@ const NAV_GROUPS = [
       { href: "/admin/creatorspro-sync",         label: "Sync CP",         icon: RefreshCw },
       { href: "/admin/wage-audit",               label: "Sync & Audit CP", icon: ShieldCheck },
       { href: "/admin/debug-mapping",            label: "Debug Mapping",   icon: Link2 },
+      { href: "/admin/user-mapping",             label: "Collega utenti",  icon: Link2 },
       { href: "/admin/reports",                  label: "Analytics",       icon: BarChart3 },
       { href: "/admin/leaderboard-exclusions",   label: "Esclusioni",      icon: Ban },
       { href: "/admin/group-languages",          label: "Lingue Group",    icon: Languages },
