@@ -10,7 +10,8 @@
  * Attribuzione: la vendita originale si cerca nelle wage CP del MESE DEL
  * PAGAMENTO (paymentTime del refund), per finestra turno + importo esatto —
  * stessa logica del match engine, stessa natura direzionale. La stima comp
- * usa l'effective_pct del turno (media scaglioni), marcata come ~STIMA.
+ * è MARGINALE (v2, metodo di Nicholas): ricalcolo degli scaglioni del turno
+ * senza il venduto rimborsato, differenza = comp risparmiata. Marcata ~STIMA.
  */
 import { kv } from "@vercel/kv";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
@@ -43,6 +44,29 @@ function shiftEffPct(shift) {
   const hourly = (Number(shift.payment_profile?.hourly_rate) || 0) * (Number(shift.worked_hours) || 0);
   const commission = Math.max(0, earnings - hourly);
   return salesTotal > 0 ? commission / salesTotal : null;
+}
+
+/**
+ * Comp risparmiata su un rimborso: metodo MARGINALE (idea di Nicholas, 20 lug
+ * 2026) — si ricalcola il turno SENZA il venduto rimborsato e si prende la
+ * differenza: comp(venduto − già_rimborsato) − comp(venduto − già_rimborsato −
+ * questo_rimborso). Con scaglioni progressivi i dollari stornati escono dalla
+ * CIMA della scala (aliquota più alta), quindi la vecchia stima "rimborso × %
+ * media" sottostimava sempre. `alreadyRefunded` accumula i rimborsi
+ * precedenti sullo stesso turno: due storni non possono occupare entrambi la
+ * stessa fetta alta.
+ */
+function marginalLeak(shift, alreadyRefunded, amountUsd) {
+  const salesTotal = Number(shift.total_attributed) || (shift.takes || []).reduce((a, t) => a + (Number(t.amount) || 0), 0);
+  const ths = Array.isArray(shift.thresholds) ? shift.thresholds.filter((t) => t.percentage != null) : [];
+  if (ths.length > 0 && salesTotal > 0) {
+    const base = Math.max(0, salesTotal - alreadyRefunded);
+    const a = calcCumulativeEarning(base, ths).earning;
+    const b = calcCumulativeEarning(Math.max(0, base - amountUsd), ths).earning;
+    return { leak: Math.max(0, a - b), method: "scaglioni" };
+  }
+  const eff = shiftEffPct(shift);
+  return { leak: eff != null ? amountUsd * eff : 0, method: "media" };
 }
 
 export async function GET(request) {
@@ -120,6 +144,9 @@ export async function GET(request) {
     // Un take già attribuito a un refund non può coprirne un altro: pool di
     // consumo condiviso tra i refund del payPeriod (speculare a payout-match).
     const consumedTakes = new Set();
+    // Rimborsi cumulati per turno: il ricalcolo marginale deve scendere la
+    // scala degli scaglioni progressivamente, non ripartire dalla cima.
+    const refundedByShift = new Map();
 
     // Indice alias del mese di pagamento → creatorId, poi invertito. Il greedy
     // matcha solo le creator ATTIVE nel periodo (parità con reconcile), quando
@@ -213,21 +240,27 @@ export async function GET(request) {
       // Quote coseller: ogni candidato è stato pagato sulla propria frazione →
       // leak = Σ take × eff del suo turno. Importo pieno: un solo venditore
       // reale → se i candidati sono più d'uno è ambiguo (si stima sul primo).
-      let leak = 0, effShown = null;
+      let leak = 0, leakMethod = null;
       const opLeaks = [];
       if (shares.length > 0) {
         for (const c of candidates) {
-          const eff = shiftEffPct(c.shift);
-          const li = eff != null ? (Number(c.take.amount) || 0) * eff : 0;
+          const amt = Number(c.take.amount) || 0;
+          const prev = refundedByShift.get(c.shift) || 0;
+          const { leak: li, method } = marginalLeak(c.shift, prev, amt);
+          refundedByShift.set(c.shift, prev + amt);
           leak += li;
-          opLeaks.push({ operator: c.operator, refunded_share_usd: r2(Number(c.take.amount) || 0), leak_usd: r2(li) });
+          leakMethod = leakMethod === "media" ? "media" : method;
+          opLeaks.push({ operator: c.operator, refunded_share_usd: r2(amt), leak_usd: r2(li) });
         }
-        effShown = null;
       } else {
-        const eff = shiftEffPct(candidates[0].shift);
-        effShown = eff;
-        if (eff != null) leak = (r.amt / 100) * eff;
-        opLeaks.push({ operator: candidates[0].operator, refunded_share_usd: r2(r.amt / 100), leak_usd: r2(leak) });
+        const amt = r.amt / 100;
+        const sh = candidates[0].shift;
+        const prev = refundedByShift.get(sh) || 0;
+        const { leak: li, method } = marginalLeak(sh, prev, amt);
+        refundedByShift.set(sh, prev + amt);
+        leak = li;
+        leakMethod = method;
+        opLeaks.push({ operator: candidates[0].operator, refunded_share_usd: r2(amt), leak_usd: r2(li) });
       }
       const operators = [...new Set(candidates.map((c) => c.operator))];
       // Ambiguo = esistono OPERATORI DIVERSI, non attribuiti, che avrebbero
@@ -244,7 +277,9 @@ export async function GET(request) {
         shared_between: shares.length > 0 && operators.length > 1 ? operators.length : undefined,
         shift_id: candidates[0].shift.id,
         shift_started_at: candidates[0].shift.started_at,
-        eff_pct: effShown != null ? Math.round(effShown * 10000) / 10000 : null,
+        // % marginale implicita di QUESTO rimborso (leak/importo), non la media del turno
+        eff_pct: r.amt > 0 && leak > 0 ? Math.round((leak / (r.amt / 100)) * 10000) / 10000 : null,
+        leak_method: leakMethod,
         comp_leak_usd: r2(leak),
         op_leaks: opLeaks,
       });

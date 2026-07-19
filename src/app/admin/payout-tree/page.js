@@ -468,8 +468,8 @@ function RefundTab({ periodId, goSync }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
         <StatCard label="Refund nel mese" value={fmtInt(t?.refunds)} sub={fmtUsd(t?.refunded_usd)} />
         <StatCard label="Su vendite attribuite" value={fmtInt(t?.attributed)} sub={fmtUsd(t?.attributed_usd)} />
-        <StatCard label="Comp pagata su refund" value={fmtUsd(t?.comp_leak_usd)} sub="~STIMA (eff. % turno)" color={t?.comp_leak_usd > 0 ? CP.accentRed : undefined} tooltip="Stima della commissione pagata all'operatore su vendite poi rimborsate al fan: importo take × percentuale effettiva del turno (media scaglioni)." />
-        <StatCard label="Non attribuiti" value={fmtInt(t?.unattributed)} tooltip="Refund su transazioni mai attribuite a un operatore in CP: soprattutto rinnovi abbonamento automatici. Nessuna comp pagata." />
+        <StatCard label="Comp pagata su refund" value={fmtUsd(t?.comp_leak_usd)} sub="~STIMA (ricalcolo scaglioni)" color={t?.comp_leak_usd > 0 ? CP.accentRed : undefined} tooltip="Stima marginale: il turno viene ricalcolato senza il venduto rimborsato e la comp risparmiata è la differenza — i dollari stornati escono dalla cima della scala scaglioni, dove l'aliquota è più alta." />
+        <StatCard label="Non attribuiti" value={fmtInt(t?.unattributed)} tooltip="Refund su vendite senza operatore in CP: mass/auto message, turni non tracciati o creator fuori CP. Nessuna comp pagata su queste." />
         {t?.wages_missing > 0 && (
           <StatCard
             label="Wage CP mancanti"
