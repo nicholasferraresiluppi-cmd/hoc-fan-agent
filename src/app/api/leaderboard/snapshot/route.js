@@ -1,6 +1,7 @@
 import { kv } from "@vercel/kv";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { isCronAuthorized } from "@/lib/cron-auth";
 
 const DAY = 24 * 60 * 60 * 1000;
 const SKILLS = ["naturalezza", "esclusivita", "dipendenza", "conversione", "tono", "gestione_obiezioni"];
@@ -16,15 +17,10 @@ function isoWeekKey(date) {
   return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
-function isAuthorized(request) {
-  // Vercel Cron header OR explicit CRON_SECRET
-  const authHeader = request.headers.get("authorization") || "";
-  const cronHeader = request.headers.get("x-vercel-cron");
-  if (cronHeader) return true;
-  const secret = process.env.CRON_SECRET;
-  if (secret && authHeader === `Bearer ${secret}`) return true;
-  return false;
-}
+// Auth cron centralizzata in lib/cron-auth (fix 20 lug 2026: i path cron sono
+// ora pubblici nel middleware → l'header x-vercel-cron da solo non è più prova
+// sufficiente quando CRON_SECRET è configurato).
+const isAuthorized = (request) => isCronAuthorized(request);
 
 async function buildSnapshot({ weekCutoffMs, weekEndMs }) {
   // Read all records from last 14d to be safe, then filter into [start, end)
