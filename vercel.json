@@ -15,6 +15,10 @@
     {
       "path": "/api/admin/ops-alerts/digest",
       "schedule": "5 6 * * 1"
+    },
+    {
+      "path": "/api/cron/payout-ledger",
+      "schedule": "*/10 4-6 * * *"
     }
   ]
 }

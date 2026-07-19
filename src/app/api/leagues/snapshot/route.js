@@ -1,14 +1,11 @@
 import { saveSeasonSnapshot, currentSeasonKey, previousSeasonKey } from "@/lib/leagues";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { isCronAuthorized } from "@/lib/cron-auth";
 
-function isAuthorized(request) {
-  const authHeader = request.headers.get("authorization") || "";
-  const cronHeader = request.headers.get("x-vercel-cron");
-  if (cronHeader) return true;
-  const secret = process.env.CRON_SECRET;
-  if (secret && authHeader === `Bearer ${secret}`) return true;
-  return false;
-}
+// Auth cron centralizzata in lib/cron-auth (fix 20 lug 2026: i path cron sono
+// ora pubblici nel middleware → l'header x-vercel-cron da solo non è più prova
+// sufficiente quando CRON_SECRET è configurato).
+const isAuthorized = (request) => isCronAuthorized(request);
 
 async function authorized(request) {
   if (isAuthorized(request)) return true;
