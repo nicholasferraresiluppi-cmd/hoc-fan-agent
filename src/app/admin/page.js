@@ -67,6 +67,7 @@ const SHORTCUT_GROUPS = [
       { href: "/admin/review",            title: "Review sessioni",  desc: "Valuta + correggi score AI sulle conversazioni", icon: ClipboardCheck },
       { href: "/admin/outcomes",          title: "Outcomes reali",   desc: "Revenue/PPV/retention per validare AI", icon: Target },
       { href: "/admin/sessions",          title: "Review chat",      desc: "Leggi le conversazioni complete con feedback affiancato", icon: Brain },
+      { href: "/admin/qa-reviews",        title: "QA conversazioni", desc: "Rubrica §8.1: review qualità che alimentano i gate ladder", icon: ClipboardCheck },
       { href: "/profilo/certificazioni",  title: "Badge Wall",       desc: "Wall pubblico delle certificazioni operatori", icon: Award },
     ],
   },
