@@ -28,7 +28,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler,
-  History,
+  History, Signpost,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
@@ -55,6 +55,7 @@ const ESSENTIAL_HREFS = new Set([
   "/admin/pnl-live",
   "/admin/profiles-compare",
   "/admin/comp-calendar",
+  "/admin/roadmap",
 ]);
 
 const NAV_GROUPS = [
@@ -118,6 +119,7 @@ const NAV_GROUPS = [
       { href: "/admin/dashboard",                label: "Dashboard",       icon: LayoutDashboard },
       { href: "/admin/fan-archetypes",           label: "Fan Archetypes",  icon: Sparkles },
       { href: "/admin/creators",                 label: "Creator (anag.)", icon: UserCog },
+      { href: "/admin/roadmap",                  label: "Roadmap",         icon: Signpost },
     ],
   },
   {

@@ -12,6 +12,7 @@ import {
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Link2, Gauge,
   ArrowUpRight, Calendar, Activity, CheckCircle2, AlertCircle,
   Wallet, Scale, ShieldCheck, History, FlaskConical, MessageSquareWarning,
+  Signpost,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { SectionLabel, CpCard, StatCard } from "@/components/cp-style";
@@ -77,6 +78,7 @@ const SHORTCUT_GROUPS = [
       { href: "/admin/dashboard",          title: "Dashboard SM",      desc: "KPI per operatore, trend 7/30g, alert", icon: LayoutDashboard },
       { href: "/admin/fan-archetypes",     title: "Fan Archetypes",    desc: "Whale, Lonely, Negoziatore + strategie ottimali", icon: Sparkles },
       { href: "/admin/creators",           title: "Creator anagrafica", desc: "Tone card + ganci emotivi + vocabolario creator", icon: UserCog },
+      { href: "/admin/roadmap",            title: "Roadmap",           desc: "Cosa è in corso, cosa viene dopo, cosa è parcheggiato e dietro quale gate", icon: Signpost },
     ],
   },
   {
