@@ -66,6 +66,7 @@ Debiti noti accettati: font-weight 600/700 ancora diffusi inline (normalizzazion
 - `employee_profile:{name}` + `employee_profile:_index` (set)
 - `session:{id}`, `score_hist:*` — sessioni training e storico score
 - `roles:{userId}` (multi-ruolo), `role:{userId}` (legacy), `custom_role:{id}`, `admins:set`
+- `roadmap:items` — roadmap di prodotto (`/admin/roadmap`, admin-only)
 - `content:*` — namespace content-pipeline (vedi `docs/CONTENT_PIPELINE.md`)
 - Audit di azioni (non di uso): `audit:leaderboard-actions` (cap 200), `content:audit:log` (cap 5000). Non esiste tracking di utilizzo pagine.
 
@@ -73,6 +74,7 @@ Debiti noti accettati: font-weight 600/700 ancora diffusi inline (normalizzazion
 
 Decisioni strutturali tracciate qui (1 riga + link); il rationale dello scoring vive in `docs/BOARD_ANNOUNCEMENT_HOC_PRO.md` e nei commenti versionati di `creatorspro-score.js` / `creator-aggregates.js`.
 
+- **2026-07-19 — Roadmap di prodotto in-app**: le idee/feature future vivono in `/admin/roadmap` (KV `roadmap:items`, admin-only, colonne in corso/prossime/più avanti/parcheggiate con gate esplicito) invece che come pagine placeholder in nav — lezione Content Pipeline. Le nuove idee di sessione vanno aggiunte lì, non costruite come scaffolding. Studio traffic automation (OnlyFlow) in `docs/TRAFFIC_AUTOMATION_STUDY.md`, parcheggiato dietro gate board su risk appetite.
 - **2026-07-18 — Governance formula score + gate benchmark chiusi**: snapshot della formula a ogni import (`/admin/score-config-history`) e bozze con backtest sui mesi reali + publish confermato (`/admin/score-config-drafts`); dossier benchmark in `docs/BENCHMARK_DEEP_STUDY.md`, superficie Infloww in `docs/INFLOWW_SURFACE.md` (API ufficiale senza endpoint transcript → fonte chat = export Message Dashboard; chiave API in env è placeholder, da sostituire), policy dispute in `docs/CAREER_LADDER.md` §8.2, requisiti legali in `docs/LEGAL_SCORING_REQUIREMENTS.md`. PR #27-#30.
 - **2026-07-13 — Gating dati denaro pre-CM**: helper `authorizeAll` (scope "all" obbligatorio) su 7 route leaderboard denaro + `closed-loop-metrics` → ANALYTICS_VIEW, prima dell'onboarding CM pilota (ruolo team_lead, cockpit `/cm-cockpit`). Motivo: le route esponevano venduto/score di tutti a qualsiasi utente loggato. PR #24.
 - **2026-07-13 — Career ladder + Cockpit CM**: `docs/CAREER_LADDER.md` (Fase 0 people lifecycle) è l'artefatto sorgente di livelli/gate/comp; cockpit CM live (PR #22/#23) con tracciamento supervisioni (KV `cm:sup:*`), override 3% in shadow mode, capability `cm.cockpit`.
