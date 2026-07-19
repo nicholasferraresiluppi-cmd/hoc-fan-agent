@@ -47,11 +47,14 @@ export async function POST(request) {
 
   let body;
   try { body = await request.json(); } catch { return Response.json({ error: "invalid JSON" }, { status: 400 }); }
-  const { user_id, employee } = body || {};
+  const { user_id, employee, employee_id } = body || {};
   if (!user_id || !employee) return Response.json({ error: "user_id e employee richiesti" }, { status: 400 });
 
-  await kv.set(USER_EMP_KEY(user_id), employee);
-  return Response.json({ ok: true, user_id, employee });
+  // Se l'admin passa l'employeeId (scelto dal roster Infloww), lo ancoriamo:
+  // il collegamento sopravvive a refusi e cambi nome. Altrimenti stringa legacy.
+  const value = employee_id ? { employeeId: String(employee_id), employeeName: String(employee) } : String(employee);
+  await kv.set(USER_EMP_KEY(user_id), value);
+  return Response.json({ ok: true, user_id, employee, employee_id: employee_id || null });
 }
 
 /**

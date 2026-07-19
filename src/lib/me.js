@@ -1,6 +1,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
 import { buildCreatorMatrix } from "@/lib/creator-aggregates";
+import { rosterMatchForEmail, nameForEmployeeId } from "@/lib/infloww-roster";
 
 /**
  * Risoluzione identità per la superficie operatore (scope own).
@@ -31,7 +32,18 @@ export async function findLatestWagePeriod() {
 
 /**
  * Risolve l'operatore dell'utente loggato.
- * @returns {Promise<{userId:string|null, employee:string|null, source?:string, reason?:string, candidates?:string[], email?:string|null}>}
+ *
+ * Ordine (dal 19 lug: ancoraggio all'API Infloww quando disponibile):
+ *   1. Override admin — può essere { employeeId, employeeName } (ancora stabile,
+ *      scelta dal roster) o una stringa nome (legacy). L'employeeId sopravvive a
+ *      refusi/cambi nome; il nome resta la chiave di join col resto dell'app.
+ *   2. Email → ROSTER Infloww ufficiale (MASS-filtrato) — nomi autoritativi + id.
+ *   3. Email → matrice CP (fallback storico: copre chi è in CP ma non ancora nel
+ *      roster, e i casi in cui l'API è giù). Non-bloccante per costruzione.
+ *
+ * Ritorna sempre `employee` (nome, contratto invariato per le superfici a valle)
+ * + `employee_id` quando noto.
+ * @returns {Promise<{userId, employee, employee_id?, source?, reason?, candidates?, email?}>}
  */
 export async function resolveEmployeeForUser() {
   const { userId } = await auth();
@@ -39,13 +51,35 @@ export async function resolveEmployeeForUser() {
 
   // 1. Override esplicito (gestito da admin)
   const override = await kv.get(USER_EMP_KEY(userId));
-  if (override) return { userId, employee: override, source: "override" };
+  if (override) {
+    if (typeof override === "object" && override.employeeName) {
+      // Ancora all'employeeId: se il nome nel roster è cambiato, preferisci quello fresco.
+      let name = override.employeeName;
+      if (override.employeeId) {
+        const fresh = await nameForEmployeeId(override.employeeId).catch(() => null);
+        if (fresh) name = fresh;
+      }
+      return { userId, employee: name, employee_id: override.employeeId || null, source: "override" };
+    }
+    return { userId, employee: String(override), source: "override" };
+  }
 
-  // 2. Email match sulla lista operatori dell'ultimo periodo con dati CP
   const user = await currentUser();
   const email = user?.emailAddresses?.[0]?.emailAddress || null;
   if (!email) return { userId, employee: null, email: null, reason: "no_email" };
 
+  // 2. Roster Infloww ufficiale (MASS-filtrato). Non-bloccante: se vuoto, si scende al CP.
+  try {
+    const r = await rosterMatchForEmail(email);
+    if (r && r.employeeName) {
+      return { userId, employee: r.employeeName, employee_id: r.employeeId, source: `roster_${r.match || "match"}`, email };
+    }
+    if (r && r.ambiguous) {
+      return { userId, employee: null, candidates: r.candidates.map((c) => c.employeeName), email, reason: "ambiguous", source: "roster" };
+    }
+  } catch {}
+
+  // 3. Fallback: matrice CP (comportamento storico)
   const normLocal = normalizeName(email.split("@")[0] || "");
   const periodId = await findLatestWagePeriod();
   if (!periodId) return { userId, employee: null, email, reason: "no_cp_data" };
@@ -53,16 +87,12 @@ export async function resolveEmployeeForUser() {
   const { operators } = await buildCreatorMatrix(periodId);
   const names = Object.keys(operators || {});
 
+  // SOLO match esatto normalizzato: il matching per prefisso è vietato perché
+  // l'identità gate-a dati privati (un prefisso mappava "nicholas.xxx" →
+  // operatore "Nicholas"). Chi non matcha esatto va collegato da un admin.
   const exact = names.filter((n) => normalizeName(n) === normLocal);
-  if (exact.length === 1) return { userId, employee: exact[0], source: "email_match", email };
+  if (exact.length === 1) return { userId, employee: exact[0], source: "cp_email_match", email };
   if (exact.length > 1) return { userId, employee: null, candidates: exact, email, reason: "ambiguous" };
-
-  const partial = names.filter((n) => {
-    const nn = normalizeName(n);
-    return nn.startsWith(normLocal) || normLocal.startsWith(nn);
-  });
-  if (partial.length === 1) return { userId, employee: partial[0], source: "email_match_partial", email };
-  if (partial.length > 1) return { userId, employee: null, candidates: partial.slice(0, 5), email, reason: "ambiguous" };
 
   return { userId, employee: null, email, reason: "no_match", period_id: periodId };
 }
