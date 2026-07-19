@@ -29,6 +29,9 @@ import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { logAuditAction } from "@/lib/audit-log";
 import { readMonthlyByCreator } from "@/lib/infloww-sync-job";
 import { fetchSocialTalentRevenue } from "@/lib/creatorspro-api";
+// Matching identità Infloww↔CP: estratto in lib condivisa (lug 2026) perché
+// serve anche all'albero payout — stessa logica qui e là, un solo posto.
+import { parseInfloww, parseCp, firstCompat, matchScore } from "@/lib/creator-match";
 
 export const maxDuration = 30;
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -42,75 +45,6 @@ const romeDayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", y
 function romeDay(x) {
   const d = x instanceof Date ? x : new Date(x);
   return Number.isNaN(d.getTime()) ? null : romeDayFmt.format(d);
-}
-
-function normName(s) {
-  // NFD scompone gli accenti (é → e + segno); il replace successivo toglie i segni.
-  return String(s || "").toLowerCase().normalize("NFD")
-    .replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-}
-function normLang(s) {
-  const u = String(s || "").toUpperCase();
-  if (/^(ESP|SPA|ES)$/.test(u)) return "ESP";
-  if (/^(ENG|EN)$/.test(u)) return "EN";
-  if (/^(ITA|IT)$/.test(u)) return "IT";
-  return "";
-}
-// Infloww: "Laura ESP" → {tokens:["laura"], lang:"ESP"}; "Giulia ottorini" → {tokens, lang:""}
-function parseInfloww(name) {
-  const raw = String(name || "");
-  const m = raw.match(/\b(ESP|ENG|ITA|EN|IT|ES|SPA)\s*$/i);
-  let lang = "", base = raw;
-  if (m) { lang = normLang(m[1]); base = raw.slice(0, m.index); }
-  return { tokens: normName(base).split(" ").filter(Boolean), lang };
-}
-// CP: "Giulia Ottorini - IT" → {tokens, lang:"IT"}; "Eva Rizzoli - SILO_1" →
-// {tokens:["eva","rizzoli"], lang:"", tag:"SILO_1"} — il suffisso "- XXX" è
-// SEMPRE un tag di team, mai parte del nome (i token spuri creavano fusioni).
-function parseCp(alias) {
-  const m = String(alias || "").match(/^(.*?)\s*[-–]\s*([A-Za-z0-9_]{2,12})\s*$/);
-  let base = alias, lang = "", tag = "";
-  if (m) { base = m[1]; tag = m[2]; lang = normLang(m[2]); }
-  return { tokens: normName(base).split(" ").filter(Boolean), lang, tag };
-}
-// Primo nome compatibile anche con grafie unite/staccate ("Anna Rita" ↔
-// "Annarita"): se i primi DUE token di un lato, uniti, combaciano col primo
-// dell'altro, normalizza. Ritorna [tokensInf, tokensCp] o null.
-function firstCompat(a, b) {
-  if (a[0] === b[0]) return [a, b];
-  if (a.length >= 2 && a[0] + a[1] === b[0]) return [[a[0] + a[1], ...a.slice(2)], b];
-  if (b.length >= 2 && b[0] + b[1] === a[0]) return [a, [b[0] + b[1], ...b.slice(2)]];
-  return null;
-}
-/**
- * Punteggio match Infloww↔CP. 0 = incompatibile. Regole (post-review):
- *  - primo nome DEVE combaciare (anche unito: "Anna Rita" ↔ "Annarita");
- *  - lingue esplicite diverse → MAI (0);
- *  - Infloww dichiara una lingua ma il CP no → 0 (niente fusioni alla cieca);
- *  - Infloww senza sigla → bonus al profilo IT (0.75) sopra le altre (0.5);
- *  - cognomi in conflitto ("Elisa Esposito" vs "Elisa Vimercati") → 0.
- */
-function matchScore(inf, cp) {
-  if (!inf.tokens.length || !cp.tokens.length) return 0;
-  const fc = firstCompat(inf.tokens, cp.tokens);
-  if (!fc) return 0;
-  const [ti, tc] = fc;
-  let score = 1;
-  if (inf.lang && cp.lang) {
-    if (inf.lang !== cp.lang) return 0;
-    score += 1;
-  } else if (inf.lang && !cp.lang) {
-    return 0;
-  } else if (!inf.lang && cp.lang === "IT") {
-    score += 0.75;
-  } else {
-    score += 0.5;
-  }
-  const allInfInCp = ti.every((t) => tc.includes(t));
-  const allCpInInf = tc.every((t) => ti.includes(t));
-  if (!allInfInCp && !allCpInInf) return 0;
-  if (allInfInCp) score += 1;
-  return score;
 }
 
 export async function GET(request) {

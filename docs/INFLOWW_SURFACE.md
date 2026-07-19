@@ -16,7 +16,7 @@ Endpoint disponibili (mappa v1.2 + probe del 18 lug): `/v1/employees`, `/v1/crea
 
 **Conseguenza per la gamba qualità (voce #1 del backlog):** i transcript per-chatter si prendono **dall'export del Message Dashboard** (CSV via email, per-chatter, include messaggi ritirati), non dall'API. L'API resta preziosa per anagrafica, assegnazioni e transazioni fan-level. Il gate 0a è **chiuso**: dati disponibili, canale definito (export), niente ignoti residui sui docs.
 
-⚠️ **Azione per Nicholas (2 minuti):** la variabile `INFLOWW_API_KEY` in `.env.local` contiene un placeholder, non una chiave valida (l'API risponde "Invalid API key"; le chiavi vere iniziano con `sk-`). Serve incollare la chiave reale (quella dell'8 lug se salvata, o crearne una seconda dalla pagina API keys — max 3) in `.env.local` e nelle env Vercel, così il client v1.2 già pronto diventa operativo.
+~~⚠️ **Azione per Nicholas (2 minuti):** la variabile `INFLOWW_API_KEY` in `.env.local` contiene un placeholder…~~ → **risolto il 19 lug**: chiave reale attiva in `.env.local` + env Vercel, API operativa (42 creator, probe 200). Vedi sezione "Aggiornamento 19 lug" in fondo.
 
 ## Correzione importante a una gap del benchmark
 
@@ -55,3 +55,12 @@ Clock in/out dalla barra, **auto clock-out dopo 2 min di inattività**, dashboar
 - **Finestra di lookback** dell'attribuzione "converter" (non specificata nei docs).
 - Esistenza di un'API partner privata dietro le integrazioni "ufficiali" MYM/Fanvue (nulla di pubblico).
 - ~~Endpoint messaggi/transcript nell'API ufficiale~~ → **risolto il 18 lug** (vedi TL;DR): non esistono, 404 a livello routing; fonte transcript = export Message Dashboard.
+
+## Aggiornamento 19 lug 2026 — chiave attiva, schema transazioni/refund verificato LIVE
+
+Probe read-only con la chiave reale (42 creator connesse). Fatti nuovi rispetto al 18 lug:
+
+- **Record `/v1/transactions`** (più ricco dei commenti storici del client): `id`, **`transactionId` (uuid 32-hex STABILE)**, `fanId`, `fanName`, `createdTime` (ms string), `type` (Messages/Subscription/Tips/…), `tipSource`, `status` (`loading` = pending, `complete`, `reverse`), `amount`/`fee`/`net` (centesimi string), `currency`. **Nessun campo employee/chatter** → l'attribuzione operatore↔transazione non vive nel payload (coerente con l'assenza del param `employeeId` sulla query): resta inferita dai turni CP.
+- **Record `/v1/refunds`**: `id`, **`transactionId` = quello della vendita originale → join ESATTO refund↔transazione**, `fanId`, `paymentTime`, `refundTime`, `paymentStatus` (`undo`), `paymentAmount` (**CENTESIMI** — la doc mostrava decimali, i dati reali sono cent interi), `transactionType` (es. `subscribes`).
+- **Storico interrogabile ≥ 12 mesi** sulle creator storiche (Ottorini, Fishball: dati presenti a −360gg); vuoto oltre solo per le creator connesse di recente → backfill annuale fattibile.
+- **Conseguenza per la trasparenza comp (costruita in questa data):** il `transactionId` stabile rende persistibile e dedupabile un ledger fan-level per periodo (`src/lib/payout-ledger.js`, KV `infloww:txns:*`), con refund agganciati in modo autoritativo — mentre il lato take CP resta senza uuid, quindi il match take↔transazione è euristico (finestra turno + importo lordo, `src/lib/payout-match.js`).

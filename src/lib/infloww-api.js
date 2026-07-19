@@ -26,8 +26,21 @@
  *
  * Unità importi (attenzione, disomogenee):
  *   transactions: amount/fee/net in CENTESIMI, come stringa ("7400" = $74.00)
- *   refunds:      paymentAmount in DOLLARI (29.99)
+ *   refunds:      paymentAmount in CENTESIMI ("1000" = $10.00) — la doc
+ *                 mostrava "29.99" decimale, ma i dati reali sono cent interi
+ *                 (verificato live 19 lug 2026, coerente con centsToUsd usato
+ *                 da infloww-revenue sui dati veri)
  *   messages:     price/revenue in CENTESIMI (numero)
+ *
+ * Schema record VERIFICATO live (probe 19 lug 2026):
+ *   transazione: id, transactionId (uuid 32-hex STABILE), fanId, fanName,
+ *                createdTime (ms string), type, tipSource, status, amount/fee/net, currency
+ *   refund:      id, transactionId (= transazione originale → join ESATTO),
+ *                fanId, paymentTime, refundTime, paymentStatus ("undo"),
+ *                paymentAmount, transactionType
+ *   NB: NESSUN campo employee/chatter sulla transazione → l'attribuzione
+ *   all'operatore non vive nell'API (la fa payout-match via turni CP).
+ *   Storico interrogabile ≥ 12 mesi sulle creator storiche.
  */
 const DEFAULT_BASE = "https://openapi.infloww.com";
 
@@ -83,12 +96,14 @@ export async function inflowwGet(path, { query = null, timeoutMs = 20000 } = {})
  * Ritorna { items, pages, truncated }. `truncated` = c'erano altre pagine ma
  * abbiamo fermato al cap (per non sforare 60s / rate limit).
  */
-export async function inflowwPaged(path, { query = {}, limit = 100, maxPages = 20, maxItems = Infinity, timeoutMs = 20000 } = {}) {
+export async function inflowwPaged(path, { query = {}, limit = 100, maxPages = 20, maxItems = Infinity, timeoutMs = 20000, deadline = null } = {}) {
   const items = [];
   let cursor;
   let pages = 0;
   let hasMore = true;
-  while (hasMore && pages < maxPages && items.length < maxItems) {
+  // `deadline` (epoch ms): esci con truncated=true invece di sforare il tempo
+  // della serverless function — il chiamante degrada nel percorso truncated.
+  while (hasMore && pages < maxPages && items.length < maxItems && (!deadline || Date.now() < deadline)) {
     const json = await inflowwGet(path, { query: { ...query, limit, cursor }, timeoutMs });
     const d = json?.data ?? {};
     const list = Array.isArray(d.list) ? d.list : (Array.isArray(d) ? d : []);
