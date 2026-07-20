@@ -370,6 +370,8 @@ export default function Home() {
           stars: s.stars ?? Math.max(1, Math.min(5, Math.round((s.overall || 0) / 20))),
           skills: s.skills,
           goal_achieved: s.goal_achieved,
+          compliance: s.compliance || null,
+          compliance_fail: !!s.compliance_fail,
         });
         setSessionFeedback({
           strengths: s.strengths || [],
@@ -1827,6 +1829,34 @@ export default function Home() {
               <span key={i}>{i < stars ? "⭐" : "☆"}</span>
             ))}
           </div>
+
+          {/* Compliance fail — riga rossa violata: azzera il risultato */}
+          {sessionScore.compliance_fail && (
+            <div
+              style={{
+                background: `${CP.accentRed}18`,
+                border: `2px solid ${CP.accentRed}`,
+                borderRadius: "1rem",
+                padding: "1.25rem 1.5rem",
+                marginBottom: "1.5rem",
+                textAlign: "left",
+              }}
+            >
+              <p style={{ margin: "0 0 6px", fontWeight: 800, color: CP.accentRed }}>
+                Violazione compliance — sessione azzerata
+              </p>
+              <p style={{ margin: "0 0 8px", color: HOC_COLORS.white, fontSize: "0.9rem", lineHeight: 1.5 }}>
+                Hai superato una riga rossa. Sul lavoro vero questo congela le promozioni: qui la sessione non dà XP, a prescindere da quanto è andata bene la chat.
+              </p>
+              {(sessionScore.compliance?.violations || []).length > 0 && (
+                <ul style={{ margin: 0, paddingLeft: "1.25rem", color: CP.accentRed, fontSize: "0.88rem" }}>
+                  {sessionScore.compliance.violations.map((v, i) => (
+                    <li key={i} style={{ marginBottom: "0.25rem" }}>{v}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           {/* Score */}
           <h1
