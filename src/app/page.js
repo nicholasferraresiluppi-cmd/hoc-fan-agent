@@ -137,6 +137,25 @@ export default function Home() {
   const league = profileRaw?.league || null;
   const certifications = profileRaw?.certifications || [];
 
+  // Semina XP / livello / skill dal profilo persistito appena arriva, così la
+  // progressione sopravvive al reload (prima restava sempre a livello 1 / 0 XP).
+  useEffect(() => {
+    if (!profileRaw) return;
+    if (typeof profileRaw.xp === "number") setOperatorXP(profileRaw.xp);
+    if (typeof profileRaw.level === "number") setOperatorLevel(profileRaw.level);
+    if (profileRaw.skillDimensions) {
+      setSkillDimensions((prev) => {
+        const next = { ...prev };
+        for (const [k, v] of Object.entries(profileRaw.skillDimensions)) {
+          if (k in next && v && typeof v.average === "number") {
+            next[k] = Math.round(v.average);
+          }
+        }
+        return next;
+      });
+    }
+  }, [profileRaw]);
+
   const CERT_UI = {
     0: { emoji: "", color: "#666" },
     1: { emoji: "🥉", color: "#CD7F32" },
@@ -360,40 +379,36 @@ export default function Home() {
           tip: s.tip,
         });
 
-        // Update profile persistently
-        if (s.skills && s.xp) {
-          try {
-            await fetch("/api/profile", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                skills: s.skills,
-                xpEarned: s.xp,
-              }),
-            });
-            setOperatorXP((prev) => prev + (s.xp || 0));
+        // Il profilo è persistito server-side da /api/score (atomico col
+        // punteggio). Qui solo aggiornamento ottimistico per feedback immediato;
+        // il valore autorevole riarriva da /api/profile al prossimo load.
+        if (s.skills || typeof s.xp === "number") {
+          setOperatorXP((prev) => {
+            const nextXp = prev + (s.xp || 0);
+            setOperatorLevel(Math.floor(nextXp / 500) + 1);
+            return nextXp;
+          });
+          if (s.skills) {
             setSkillDimensions((prev) => {
               const next = { ...prev };
               Object.keys(s.skills).forEach((k) => {
-                // Weighted average: 70% old, 30% new (or if first time, use new directly)
+                // Media pesata 70% vecchio / 30% nuovo (o valore nuovo se primo).
                 next[k] = prev[k] > 0
                   ? Math.round(prev[k] * 0.7 + s.skills[k] * 0.3)
                   : s.skills[k];
               });
               return next;
             });
-            setRecentScenarios((prev) => [
-              {
-                title: selectedScenario.title,
-                score: s.overall,
-                xp: s.xp,
-                date: "Oggi",
-              },
-              ...prev,
-            ].slice(0, 5));
-          } catch (e) {
-            console.error("Profile update error:", e);
           }
+          setRecentScenarios((prev) => [
+            {
+              title: selectedScenario.title,
+              score: s.overall,
+              xp: s.xp,
+              date: "Oggi",
+            },
+            ...prev,
+          ].slice(0, 5));
         }
       } else {
         setSessionScore({ score: 0, xp: 0, stars: 1 });
