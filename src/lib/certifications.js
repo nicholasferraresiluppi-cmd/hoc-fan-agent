@@ -13,6 +13,11 @@ import { CREATOR_PERSONAS } from "@/lib/creator-personas";
  *   L2 Expert — >=25 sessioni con quel creator && overall medio >=75
  *   L3 Master — >=50 sessioni con quel creator && overall medio >=85
  *
+ * Compliance (arco Academy PR4): una violazione delle righe rosse negli ultimi
+ * 90gg CONGELA l'avanzamento di livello — stessa logica del fail compliance che
+ * congela le promozioni sul vivo (qa-reviews §8.1). Il badge già conseguito resta
+ * (permanente, no downgrade) ma viene flaggato (`compliance_ok=false`).
+ *
  * Persistenza: ogni volta che computiamo la certificazione e supera un livello,
  * salviamo la data di achievement su KV `cert:{userId}:{creatorId}` = { level, achievedAt, stats }.
  * In questo modo il badge resta anche se la media cala.
@@ -49,6 +54,8 @@ function computeLevel(sessions, avgOverall) {
  * Compute + persist certification level per creator.
  * Non downgrade: se già conseguito L2 e ora scende, resta L2 (badge permanente).
  */
+const NINETY_DAYS_MS = 90 * 24 * 3600 * 1000;
+
 export async function computeCertificationForCreator(userId, creatorId) {
   if (!userId || !creatorId) return null;
 
@@ -56,14 +63,26 @@ export async function computeCertificationForCreator(userId, creatorId) {
   const count = sessions.length;
   const avgOverall = count ? Math.round((sessions.reduce((s, r) => s + r.overall, 0) / count) * 10) / 10 : 0;
 
-  const liveLevel = computeLevel(count, avgOverall);
+  // Compliance: violazioni delle righe rosse negli ultimi 90gg. Le sessioni
+  // pre-PR3 non hanno il campo compliance → trattate come pulite (default ok).
+  const since = Date.now() - NINETY_DAYS_MS;
+  const complianceFails = sessions.filter(
+    (r) => r?.compliance && r.compliance.pass === false && (r.timestamp || 0) >= since
+  ).length;
+  const complianceOk = complianceFails === 0;
+
+  const normalLevel = computeLevel(count, avgOverall);
 
   const saved = (await kv.get(`cert:${userId}:${creatorId}`)) || { level: 0, achievedAt: null };
+
+  // Con una violazione recente NON si avanza di livello (freeze); il badge già
+  // conseguito resta (permanente, no downgrade) ma viene flaggato.
+  const liveLevel = complianceOk ? normalLevel : Math.min(normalLevel, saved.level || 0);
 
   let finalLevel = Math.max(saved.level || 0, liveLevel);
   let achievedAt = saved.achievedAt || null;
 
-  if (liveLevel > (saved.level || 0)) {
+  if (complianceOk && liveLevel > (saved.level || 0)) {
     achievedAt = Date.now();
     const record = {
       userId,
@@ -83,6 +102,8 @@ export async function computeCertificationForCreator(userId, creatorId) {
     level: finalLevel,
     liveLevel,
     achievedAt,
+    compliance_ok: complianceOk,
+    compliance_fails: complianceFails,
     stats: { sessions: count, avgOverall },
     meta: getCertMeta(finalLevel),
   };

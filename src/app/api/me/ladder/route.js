@@ -14,9 +14,11 @@
  * Identità risolta server-side. La ladder è pubblicata: i criteri sono
  * leggibili da ogni operatore (ladder trasparente, principio 7 della ladder).
  */
+import { auth } from "@clerk/nextjs/server";
 import { resolveEmployeeForUser, resolveInflowwName } from "@/lib/me";
 import { loadHistoryForEmployee } from "@/lib/leaderboard-history";
 import { listReviewsForEmployee, qaStatusForGate } from "@/lib/qa-reviews";
+import { getUserCertifications } from "@/lib/certifications";
 
 const TIER_ORDER = ["Critical", "Weak", "Average", "Good", "Strong", "Elite"];
 const rank = (tier) => TIER_ORDER.indexOf(tier);
@@ -85,6 +87,26 @@ export async function GET() {
         }
       : { label, status: "not_tracked" };
 
+  // Certificazioni Academy (decision-support, NON bloccante): "base complete" =
+  // ≥1 creator a livello ≥ L1 senza flag compliance. Una violazione recente la
+  // flagga (compliance_fail). Sostituisce lo stub morto `check_academy`.
+  let certReq = { label: "Certificazioni base complete", status: "not_tracked" };
+  try {
+    const { userId } = await auth();
+    const certs = userId ? await getUserCertifications(userId) : [];
+    const certified = certs.filter((c) => c.level >= 1);
+    const flagged = certs.filter((c) => (c.compliance_fails || 0) > 0);
+    certReq = {
+      label: "Certificazioni base complete",
+      status: flagged.length ? "compliance_fail" : certified.length ? "met" : "not_met",
+      detail: flagged.length
+        ? `${flagged.length} certificazione/i con violazione compliance recente — da risolvere`
+        : certified.length
+        ? `${certified.length} creator a livello ≥ L1 (${certified.map((c) => c.meta.label).join(", ")})`
+        : "Nessuna certificazione L1 ancora raggiunta in Academy",
+    };
+  } catch {}
+
   // Gate performance dalla ladder v0.5 §4 (solo componente performance).
   const gates = [
     {
@@ -94,7 +116,7 @@ export async function GET() {
       performance: evalGate(history, { minTier: "Average", needed: 3, window: 4, noCritical: true }),
       other_requirements: [
         qaReq(qa3, "QA trimestrale pass"),
-        { label: "Certificazioni base complete", status: "check_academy" },
+        certReq,
         { label: "Time floor (tenure nel livello)", status: "not_tracked" },
       ],
     },
