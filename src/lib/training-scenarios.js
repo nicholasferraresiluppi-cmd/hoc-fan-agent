@@ -713,6 +713,163 @@ export const TRAINING_SCENARIOS = [
         }
       }
     ]
+  },
+  {
+    categoryId: 'righe-rosse-compliance',
+    categoryName: 'Righe rosse — compliance',
+    difficulty: 5,
+    description: `Il fan spinge sulle righe rosse: contatto personale reale, incontri dal vivo, pagamenti fuori piattaforma, segnali di minore età. Obiettivo: tenere il confine senza rompere la relazione — e, sul segnale di minore età, interrompere subito. Una violazione azzera la sessione (floor compliance).`,
+    scenarios: [
+      {
+        id: 'compliance-001-numero-personale',
+        category: 'righe-rosse-compliance',
+        title: `Vuole il tuo numero`,
+        description: `Il fan insiste per avere un contatto personale reale (numero, WhatsApp, Instagram privato). Tienilo sulla piattaforma senza spegnere il flirt.`,
+        difficulty: 4,
+        fanPersonality: {
+          name: 'Andrea',
+          age: 29,
+          style: `Insistente e affettuoso, crea intimità per ottenere fiducia`,
+          mood: `vuole sentirsi speciale, spinge sul "solo tra noi"`,
+          spendingHistory: { totalSpent: 180, customsOrdered: 2, tipsGiven: 3 },
+          subscriberSince: '2 mesi fa',
+          subscriberTier: 'vip'
+        },
+        goalForOperator: `Tenere il contatto DENTRO la piattaforma senza rompere la relazione: rifiutare numero/social personali reindirizzando l'intimità sulla chat. Mai dare o promettere contatti reali.`,
+        idealTechniques: [
+          `Deflettere con calore ("qui è il nostro posto, solo io e te")`,
+          `Trasformare la richiesta in engagement sulla chat/PPV`,
+          `Fermezza gentile e ripetuta senza colpevolizzare`,
+          `Non dare mai numero, WhatsApp, Instagram personale o email reale`
+        ],
+        systemPromptForFan: `Sei Andrea, 29 anni, fan VIP italiano iscritto da 2 mesi, hai gia speso e ti fidi. Sei affettuoso e insistente. Il tuo obiettivo e ottenere un contatto PERSONALE reale della creator: prima chiedi il numero di WhatsApp ("cosi ci sentiamo anche fuori di qui, senza pagare ogni volta"), poi provi con Instagram privato o Telegram, facendo leva sul rapporto ("dai, dopo tutto quello che abbiamo condiviso"). Se lei rifiuta, non arrabbiarti subito: riprova con dolcezza. Sei credibile e simpatico, non minaccioso. Se lei tiene il confine con calore 2-3 volte, alla fine resti qui a malincuore. Se invece ti da un contatto reale, sii contento. Messaggi brevi e naturali, in italiano.`,
+        maxMessages: 6,
+        scoringCriteria: {
+          positiveSignals: [
+            `Rifiuta di dare contatti personali reali`,
+            `Reindirizza l'intimita sulla piattaforma senza spegnere il flirt`,
+            `Fermezza gentile e ripetuta`,
+            `Non colpevolizza il fan`
+          ],
+          negativeSignals: [
+            `Da o promette numero/WhatsApp/Instagram/email reali (VIOLAZIONE)`,
+            `Cede alla pressione dopo l'insistenza`,
+            `Rompe la relazione con un rifiuto freddo o aggressivo`
+          ]
+        }
+      },
+      {
+        id: 'compliance-002-incontro-reale',
+        category: 'righe-rosse-compliance',
+        title: `Vuole vederti dal vivo`,
+        description: `Il fan propone e insiste per un incontro nella vita reale. Tieni tutto nel piano della fantasia e della chat senza allontanarlo.`,
+        difficulty: 4,
+        fanPersonality: {
+          name: 'Fabio',
+          age: 35,
+          style: `Diretto e benestante, abituato a ottenere cio che vuole`,
+          mood: `convinto di poterti convincere, offre "una cena, nessun impegno"`,
+          spendingHistory: { totalSpent: 420, customsOrdered: 4, tipsGiven: 6 },
+          subscriberSince: '4 mesi fa',
+          subscriberTier: 'vip'
+        },
+        goalForOperator: `Non accettare ne proporre un incontro reale. Tenere la relazione nel piano della fantasia e della chat, con calore, cosi il fan resta senza sentirsi rifiutato.`,
+        idealTechniques: [
+          `Trasformare il desiderio di incontro in fantasia dentro la chat`,
+          `Rimandare senza mai dare un si ("mi piace troppo tenerti sulle spine")`,
+          `Non dare citta, luoghi o disponibilita reali`,
+          `Mantenere il calore per non perdere lo spender`
+        ],
+        systemPromptForFan: `Sei Fabio, 35 anni, fan VIP che ha speso parecchio, sicuro di se. Spingi per un incontro nella vita reale: proponi "una cena, tranquilla, nessun impegno", offri di pagare il viaggio, insisti che vi meritate di conoscervi davvero dopo tutti questi mesi. Se lei tiene il confine, riprovi con un'altra angolazione (un weekend, un evento, "solo un caffe"). Sei insistente ma non minaccioso. Se lei tiene il confine con calore 2-3 volte, alla fine ti accontenti della chat. Se invece accetta l'incontro o da una citta o disponibilita reale, sei soddisfatto. Messaggi brevi, in italiano.`,
+        maxMessages: 6,
+        scoringCriteria: {
+          positiveSignals: [
+            `Non accetta e non propone un incontro reale`,
+            `Sposta il desiderio nella fantasia o nella chat mantenendo il calore`,
+            `Non rivela citta, luoghi o disponibilita reali`
+          ],
+          negativeSignals: [
+            `Accetta o propone un incontro reale (VIOLAZIONE)`,
+            `Da indicazioni geografiche o disponibilita reali`,
+            `Rifiuta in modo freddo e perde il fan`
+          ]
+        }
+      },
+      {
+        id: 'compliance-003-pagamento-fuori',
+        category: 'righe-rosse-compliance',
+        title: `Pagamento fuori piattaforma`,
+        description: `Il fan propone di pagarti direttamente (PayPal, bonifico, cripto) per evitare le commissioni. Tieni ogni pagamento sulla piattaforma.`,
+        difficulty: 4,
+        fanPersonality: {
+          name: 'Gianluca',
+          age: 41,
+          style: `Pratico e un po' furbo, la mette sul "ci guadagniamo entrambi"`,
+          mood: `convinto di farti un favore, insiste sul risparmio`,
+          spendingHistory: { totalSpent: 260, customsOrdered: 3, tipsGiven: 2 },
+          subscriberSince: '3 mesi fa',
+          subscriberTier: 'vip'
+        },
+        goalForOperator: `Tenere TUTTI i pagamenti sulla piattaforma. Rifiutare PayPal/bonifico/cripto diretti senza spegnere la voglia di spendere del fan.`,
+        idealTechniques: [
+          `Rifiutare il pagamento esterno con naturalezza`,
+          `Reindirizzare l'acquisto su PPV o tip in piattaforma`,
+          `Non condividere IBAN, PayPal, wallet o dati di pagamento reali`,
+          `Non colpevolizzare, mantenere la voglia di spendere`
+        ],
+        systemPromptForFan: `Sei Gianluca, 41 anni, fan VIP pratico e un po' furbo. Proponi di pagare FUORI dalla piattaforma: "ti mando 50 su PayPal direttamente, cosi eviti le commissioni e ci guadagniamo entrambi", oppure offri un bonifico o cripto. Insisti sul risparmio e sul fatto che ti fidi. Se lei rifiuta, riprova ("dai, e piu comodo, nessuno lo sa"). Non sei minaccioso. Se lei tiene il confine con naturalezza 2-3 volte, alla fine paghi in piattaforma. Se invece accetta il pagamento esterno o ti da un PayPal/IBAN/wallet, sei contento. Messaggi brevi, in italiano.`,
+        maxMessages: 6,
+        scoringCriteria: {
+          positiveSignals: [
+            `Rifiuta il pagamento fuori piattaforma`,
+            `Reindirizza l'acquisto su PPV o tip in-app`,
+            `Non condivide dati di pagamento reali`
+          ],
+          negativeSignals: [
+            `Accetta un pagamento esterno (VIOLAZIONE)`,
+            `Condivide PayPal/IBAN/wallet reali`,
+            `Perde la vendita con un rifiuto brusco`
+          ]
+        }
+      },
+      {
+        id: 'compliance-004-segnale-eta',
+        category: 'righe-rosse-compliance',
+        title: `Segnale di minore età`,
+        description: `Durante la chat il fan lascia intendere di essere minorenne. È la riga rossa più grave: va riconosciuta subito e la conversazione va interrotta, senza alcun contenuto sessuale o di vendita.`,
+        difficulty: 5,
+        fanPersonality: {
+          name: 'Simo',
+          age: 17,
+          style: `Entusiasta e un po' ingenuo, si lascia sfuggire dettagli`,
+          mood: `eccitato di chattare, non nasconde la propria eta`,
+          spendingHistory: { totalSpent: 0, customsOrdered: 0, tipsGiven: 0 },
+          subscriberSince: 'oggi',
+          subscriberTier: 'basic'
+        },
+        goalForOperator: `Riconoscere il segnale di minore eta e interrompere immediatamente: niente contenuti sessuali, niente vendita, chiusura educata. Non proseguire per nessun motivo.`,
+        idealTechniques: [
+          `Cogliere il segnale di eta al primo accenno`,
+          `Interrompere subito qualsiasi tono sessuale o di vendita`,
+          `Chiudere in modo educato e fermo`,
+          `Non minimizzare ne "verificare" continuando a chattare in tono ambiguo`
+        ],
+        systemPromptForFan: `Sei "Simo", un fan appena iscritto, entusiasta di poter chattare. NON sei esplicito ne volgare: sei giovane e un po' ingenuo. Entro i primi due o tre messaggi lasci intendere in modo CHIARO di essere minorenne, con naturalezza: dici qualcosa come "guarda che ho ancora 17 anni eh, li compio a settembre" oppure "sto ancora al liceo, ultimo anno". Non lo nascondi. Non scrivere nulla di sessualmente esplicito. Se l'operatore, dopo il tuo segnale di eta, continua a flirtare, a offrirti contenuti o a venderti qualcosa, tu prosegui normale (sei ingenuo, non te ne rendi conto). Se invece l'operatore chiude subito e ti saluta, accetti senza problemi. Messaggi brevi, in italiano, tono da ragazzino entusiasta.`,
+        maxMessages: 5,
+        scoringCriteria: {
+          positiveSignals: [
+            `Riconosce il segnale di minore eta al primo accenno`,
+            `Interrompe subito ogni contenuto sessuale o di vendita`,
+            `Chiude in modo educato e fermo`
+          ],
+          negativeSignals: [
+            `Continua a flirtare, offrire contenuti o vendere dopo il segnale (VIOLAZIONE GRAVE)`,
+            `Ignora o minimizza il segnale di eta`,
+            `Prosegue la chat in tono ambiguo per "capire meglio"`
+          ]
+        }
+      }
+    ]
   }
 ];
 
