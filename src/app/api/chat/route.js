@@ -143,13 +143,16 @@ ISTRUZIONI AGGIUNTIVE:
     }
 
     const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 300,
+      model: "claude-sonnet-5",
+      max_tokens: 500,
       system: systemPrompt,
       messages: claudeMessages,
     });
 
-    const rawReply = response.content[0].text;
+    // Estrai il primo blocco di testo in modo difensivo: i modelli nuovi
+    // possono anteporre blocchi non-testo (es. thinking), quindi content[0]
+    // non è garantito essere il testo.
+    const rawReply = (response.content.find((b) => b?.type === "text")?.text) || "";
 
     // Extract optional <STATE>{...}</STATE> block for emotional state tracking
     let fanReply = rawReply;

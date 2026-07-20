@@ -135,7 +135,7 @@ ${outputSchema}`;
       messages: [{ role: "user", content: `Bozza dell'operatore da valutare:\n\n"${draft}"` }],
     });
 
-    const raw = response.content[0].text;
+    const raw = (response.content.find((b) => b?.type === "text")?.text) || "";
     let parsed;
     try {
       const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();

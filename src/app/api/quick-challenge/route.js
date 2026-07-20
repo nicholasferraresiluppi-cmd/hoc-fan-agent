@@ -56,8 +56,8 @@ CRITERI:
 Sii onesto. Non inflazionare il punteggio. Cita parole specifiche dalla risposta.`;
 
     const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 600,
+      model: "claude-sonnet-5",
+      max_tokens: 1200,
       system: systemPrompt,
       messages: [
         {
@@ -67,7 +67,7 @@ Sii onesto. Non inflazionare il punteggio. Cita parole specifiche dalla risposta
       ],
     });
 
-    const text = response.content[0].text;
+    const text = (response.content.find((b) => b?.type === "text")?.text) || "";
     let evaluation;
     try {
       const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
