@@ -1,10 +1,11 @@
 # HOC Career Ladder — Chat Sales
 
-**Versione:** 0.5 (bozza per review Nicholas, poi board)
-**Data:** 2026-07-18
+**Versione:** 0.6 (bozza per review Nicholas, poi board)
+**Data:** 2026-07-20
 **Owner:** Nicholas · **DRI stesura:** Claude (Strategic PM)
 **Stato:** PROPOSED — gate validati empiricamente sullo storico (§4.1); restano da fissare gli importi bonus sviluppo e la % override definitiva (post shadow mode)
 
+**Changelog v0.6:** aggiunta §13 — schema software del ciclo di vita (event-store persona) derivato da questo ladder: enum livelli + tassonomia eventi congelati come contratto stabile, così l'implementazione HOC Pro nasce solida. Le soglie dei gate NON sono toccate (restano §4.1/§11, da calibrare). Spec in `docs/PERSON_EVENT_STORE.md`, schema in codice `src/lib/person-events.js`.
 **Changelog v0.5:** aggiunta §8.2 policy dispute/correzioni/retroattività dello score (gate 0d del benchmark: correzione = riscrittura del mese con audit-log visibile + ri-valutazione gate, mai silenziosa; flusso di appello operatore) · aggiunto §8.3 requisiti di difendibilità legale dello scoring algoritmico (rimando a `docs/LEGAL_SCORING_REQUIREMENTS.md`, gate 0c — da validare con consulenza) · §11 aggiornata. Contesto: chiusura gate benchmark, cfr. `docs/BENCHMARK_DEEP_STUDY.md` e `docs/INFLOWW_SURFACE.md`
 **Changelog v0.4:** fonte dati gate cambiata su decisione di Nicholas: **score Infloww operational** (metriche di mestiere, appropriate al ruolo) al posto del Sales CP — rationale in §4 · §4.1 rifatta sui dati Infloww gen-mag 2026 (268 operatori) con confronto CP · L4b ridefinito come gate a doppio segnale con selezione in calibrazione (ogni variante puramente automatica produceva un track con 0-1 persone) · nuovo vincolo di processo: import Infloww mensile = SLA (senza import i gate non si calcolano)
 **Changelog v0.3:** aggiunta §4.1 validazione empirica dei gate (Sales CP score, 216 operatori) · gate L4b ammorbidito · costo premium al lancio quantificato
@@ -257,3 +258,12 @@ Benchmark di settore (solo contesto): modello ibrido $10-13/h + 3-8% nelle agenc
 ## 12. Fonti principali
 
 Benson, Li & Shue, *Promotions and the Peter Principle* (QJE 2019) · ADP Research Institute, *The Business Impact of Promotions* (2023) · Bridge Group SDR metrics (via fonti secondarie) · LinkedIn Workplace Learning Report 2022 · Gallup su turnover prevenibile · Buffer *Career Framework* (Levels/Steps) · GitLab Handbook (interim reversibile) · Teleperformance JUMP/Foundations · Stanford GSB, caso Wells Fargo (Goodhart) · Ricerca competitiva agency OF e tool di settore, luglio 2026 (report interni sessione).
+
+## 13. Schema software — event-store persona
+
+Questo ladder è l'artefatto sorgente; la sua implementazione in HOC Pro è un **event-store append-only per persona** che materializza il ciclo di vita descritto qui (onboarding §9 → gate §4 → step §5 → QA §8.1 → dispute §8.2 → uscita). Lo **schema** — enum livelli (§3) e tassonomia eventi — è stato congelato come contratto stabile (decisione di sequenza di Nicholas del 2026-07-20: fissare lo schema prima di scrivere codice sopra).
+
+- **Spec / ADR:** [`docs/PERSON_EVENT_STORE.md`](PERSON_EVENT_STORE.md) — decisione append-only, chiavi KV `person:*`, identità (`personId`, decisione aperta), backfill dai dati esistenti, fasi.
+- **Schema in codice:** [`src/lib/person-events.js`](../src/lib/person-events.js) — livelli, 16 tipi di evento in 5 categorie, validazione, proiezione dello stato corrente. Puro e inerte: nessuna scrittura KV finché l'ADR non è accettato.
+
+**Confine deliberato:** lo schema implementa i gate, **non ne fissa le soglie**. I valori dei gate restano quelli di §4.1/§11 (proposte a confidence ~60%, da calibrare sulla finestra 6 mesi piena post-import giugno/luglio) e sono decisione HR/board, non di prodotto. Un evento `level_change` è nello schema; *quando* scatta è policy del ladder.
