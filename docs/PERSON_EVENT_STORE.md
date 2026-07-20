@@ -77,9 +77,9 @@ Verifica diretta sul KV di produzione (dry-run del backfill): il roster conta **
 1. Schema — enum livelli, tassonomia eventi, validazione, proiezione stato (`deriveState`). Puro, testato.
 2. Write-path — `src/lib/person-store.js`: resolver identità (nome→employeeId via roster, verificato su 410 operatori), `writePersonEvents`/`appendPersonEvent` idempotenti (id evento deterministico → backfill ri-eseguibile), letture + proiezione cachata.
 3. Backfill — `src/lib/person-backfill.js` + route `POST/GET /api/admin/person-backfill` (SEED): legge tutte le 6 fonti, mappa a eventi, dry-run + reale. **Oggi no-op** (fonti vuote, §5.1).
+4. Scheda 360 — `/admin/persone` (indice: roster + persone con timeline + trigger backfill + ricerca) e `/admin/persone/[id]` (timeline lifecycle + stato + link alla scheda performance esistente). SEED. **Stati vuoti espliciti**: con le fonti vuote la timeline è vuota e la pagina lo dichiara — nessun dato finto. Si accende sull'adozione.
 
 **Prossimo (quando c'è dato / dopo calibrazione gate):**
-4. Scheda persona 360 (`/admin/persone/[id]` nel gruppo People): eventi + stato + performance esistente. Da costruire **quando le fonti hanno dato** (altrimenti è vuota) — ri-lanciare il backfill dopo i primi profili/QA reali.
 5. Write online dalla UI con capability `people.events.write` (HR = lifecycle, TL = development/quality del proprio team, decisione §8).
 6. Progression engine: calcola i gate e appende `level_change`/`step_change`. Parte **dopo la calibrazione delle soglie** (ladder §11) — lo schema le implementa, non le fissa.
 

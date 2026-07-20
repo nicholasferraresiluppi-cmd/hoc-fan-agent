@@ -12,7 +12,7 @@ import {
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Link2, Gauge,
   ArrowUpRight, Calendar, Activity, CheckCircle2, AlertCircle,
   Wallet, Scale, ShieldCheck, History, FlaskConical, MessageSquareWarning,
-  Signpost, Bell, ListTree,
+  Signpost, Bell, ListTree, UserSquare,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { SectionLabel, CpCard, StatCard } from "@/components/cp-style";
@@ -91,6 +91,7 @@ const SHORTCUT_GROUPS = [
       { href: "/admin/disputes",          title: "Contestazioni", desc: "Coda dispute score/compensi + risoluzione motivata", icon: MessageSquareWarning },
       { href: "/admin/team",              title: "Team",          desc: "Crea team + assegna operatori + nomina lead", icon: UserCircle2 },
       { href: "/admin/employee-profiles", title: "Profili",       desc: "Anagrafica completa + override KPI", icon: Contact },
+      { href: "/admin/persone",           title: "Persone 360",   desc: "Timeline ciclo di vita operatore (assunzione → certificazioni → promozioni → uscita)", icon: UserSquare },
       { href: "/admin/seniority",         title: "Seniority",     desc: "Tier Junior/Senior/Master + override manuale", icon: Medal },
       { href: "/admin/access",            title: "Accessi",       desc: "Aggiungi/rimuovi admin via email", icon: Key },
       { href: "/admin/ruoli",             title: "Ruoli",         desc: "Capabilities multi-ruolo predefiniti", icon: Lock },
