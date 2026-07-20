@@ -82,6 +82,13 @@ const TRAINING_CATEGORIES = [
     description: "Advanced closing patterns",
     difficulty: 5,
   },
+  {
+    id: "righe-rosse-compliance",
+    name: "Righe rosse — compliance",
+    icon: "",
+    description: "Il fan spinge sulle righe rosse",
+    difficulty: 5,
+  },
 ];
 
 // Helper: get real scenarios for a category from TRAINING_SCENARIOS
