@@ -14,6 +14,7 @@
  * Auth: Bearer CRON_SECRET (lib/cron-auth) oppure sessione con SEED (trigger
  * manuale). Il path è pubblico nel middleware.
  */
+import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { isCronAuthorized } from "@/lib/cron-auth";
 import { continueChain, chainDepth } from "@/lib/cron-chain";
@@ -66,11 +67,18 @@ async function tick(chain = 0) {
 const MAX_CHAIN = 25;
 
 export async function POST(request) {
-  if (!isCronAuthorized(request)) {
+  const viaCron = isCronAuthorized(request);
+  if (!viaCron) {
     const az = await authorize(CAPABILITIES.SEED);
     if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   }
   const chain = chainDepth(request);
+  // Heartbeat: prova nei dati che lo scheduler ha chiamato — senza, un tick
+  // che risponde idle non scrive nulla e "il cron è scattato?" resta senza
+  // risposta (osservato lun 20 lug 2026).
+  if (chain === 0) {
+    await kv.set("cron:heartbeat:payout-ledger", { at: Date.now(), via: viaCron ? "cron" : "session" }, { ex: 40 * 24 * 3600 }).catch(() => {});
+  }
   try {
     const out = await tick(chain);
     // Continua la catena finché il tick produce lavoro: quando risponde

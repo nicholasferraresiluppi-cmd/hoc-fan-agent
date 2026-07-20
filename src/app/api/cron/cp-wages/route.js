@@ -134,11 +134,17 @@ async function tick(chain) {
 }
 
 export async function POST(request) {
-  if (!isCronAuthorized(request)) {
+  const viaCron = isCronAuthorized(request);
+  if (!viaCron) {
     const az = await authorize(CAPABILITIES.SEED);
     if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   }
   const chain = chainDepth(request);
+  // Heartbeat: prova nei dati che lo scheduler ha chiamato (anche sui tick
+  // idle, che altrimenti non scrivono nulla) — vedi payout-ledger.
+  if (chain === 0) {
+    await kv.set("cron:heartbeat:cp-wages", { at: Date.now(), via: viaCron ? "cron" : "session" }, { ex: 40 * 24 * 3600 }).catch(() => {});
+  }
   try {
     const out = await tick(chain);
     let chained = null;
