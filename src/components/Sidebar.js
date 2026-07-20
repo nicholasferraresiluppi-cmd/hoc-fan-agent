@@ -104,6 +104,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/welcome/score-friendly",         label: "Tutorial Score", icon: GraduationCap },
       { href: "/",                               label: "Academy",      icon: GraduationCap, match: (p) => p === "/" },
+      { href: "/academy/multi",                  label: "Multi-chat",   icon: Layers },
       { href: "/playbook",                       label: "Playbook",     icon: BookOpen },
       { href: "/leaderboard",                    label: "Ladder Academy", icon: Trophy },
       { href: "/leaderboard/leghe",              label: "Leghe",        icon: Swords },
