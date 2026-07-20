@@ -102,7 +102,6 @@ export default function MyLadderPage() {
                         {r.label}
                         <span style={{ fontSize: 11, color: fail ? CP.accentRed : CP.textMuted }}>
                           {r.status === "not_tracked" && "· tracciamento in arrivo"}
-                          {r.status === "check_academy" && "· vedi Academy"}
                           {(met || notMet || fail) && r.detail ? `· ${r.detail}` : ""}
                           {fail && " · congela le promozioni in corso (§8.1)"}
                         </span>
