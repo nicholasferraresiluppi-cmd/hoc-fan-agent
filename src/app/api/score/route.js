@@ -10,6 +10,7 @@ import { pickExamples, formatExamplesForPrompt } from "@/lib/golden-examples";
 import { getCreatorById, formatCreatorPersonaForPrompt } from "@/lib/creator-personas";
 import { getFanArchetypeById } from "@/lib/fan-archetypes";
 import { getDrillForDate, markDrillCompleted, getDrillStatusForUser } from "@/lib/daily-drill";
+import { applyScoreToProfile } from "@/lib/operator-profile";
 import { kv } from "@vercel/kv";
 
 function findScenarioById(scenarioId) {
@@ -253,13 +254,15 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
         console.error("Ensemble error (non-fatal):", ensembleErr);
       }
 
+      // Timestamp condiviso tra score history, transcript e profilo.
+      const now = Date.now();
+
       // Index score history for SM dashboard (non-fatal if KV not configured)
       try {
-        const timestamp = Date.now();
-        const historyKey = `score_hist:${userId}:${timestamp}`;
+        const historyKey = `score_hist:${userId}:${now}`;
         const record = {
           userId,
-          timestamp,
+          timestamp: now,
           scenarioId,
           scenarioTitle: scenario.title,
           categoryId: scenario.categoryId || scenario.category,
@@ -273,10 +276,52 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
           messageCount: messages.length,
         };
         await kv.set(historyKey, record);
-        await kv.zadd("score_hist:index", { score: timestamp, member: historyKey });
-        await kv.zadd(`score_hist:user:${userId}`, { score: timestamp, member: historyKey });
+        await kv.zadd("score_hist:index", { score: now, member: historyKey });
+        await kv.zadd(`score_hist:user:${userId}`, { score: now, member: historyKey });
       } catch (histErr) {
         console.warn("Score history indexing failed (non-fatal):", histErr?.message);
+      }
+
+      // Persist full transcript (session:*) — la review admin/trainer legge già
+      // questi record ma finora NESSUNO li scriveva. Servono anche come base
+      // per la validazione predittiva (training → vendite vere). TTL 400gg.
+      try {
+        const sessionId = `${userId}_${now}`;
+        const sessionRecord = {
+          id: sessionId,
+          userId,
+          mode: "scenario",
+          scenarioId,
+          scenarioTitle: scenario.title,
+          categoryId: scenario.categoryId || scenario.category,
+          creatorId: creatorId || null,
+          creatorName: creator?.name || null,
+          archetypeId: archetypeId || null,
+          fanName: archetype?.name || scenario.fanPersonality?.name || null,
+          messages,
+          messageCount: messages.length,
+          score,
+          timestamp: now,
+          createdAt: new Date(now).toISOString(),
+        };
+        await kv.set(`session:${sessionId}`, sessionRecord, { ex: 60 * 60 * 24 * 400 });
+        await kv.lpush("sessions:all", sessionId);
+        await kv.ltrim("sessions:all", 0, 4999);
+      } catch (sessErr) {
+        console.warn("Session transcript persist failed (non-fatal):", sessErr?.message);
+      }
+
+      // Aggiorna il profilo operatore (XP, livello, medie skill) server-side,
+      // così la progressione è persistente e coerente col punteggio.
+      try {
+        await applyScoreToProfile(userId, {
+          scenarioId,
+          skills: score.skills,
+          xp: score.xp,
+          stars: score.stars,
+        });
+      } catch (profErr) {
+        console.warn("Profile update failed (non-fatal):", profErr?.message);
       }
 
       // Daily drill auto-complete: se lo scenario appena completato è il drill del giorno
