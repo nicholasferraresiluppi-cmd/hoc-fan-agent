@@ -34,3 +34,30 @@ export async function continueChain(request, chain, { maxChain = 25 } = {}) {
 export function chainDepth(request) {
   return Number(request.headers.get("x-tick-chain") || 0);
 }
+
+/**
+ * Accende un altro endpoint cron con le stesse credenziali (per il
+ * dispatcher: il piano Hobby registra pochi cron → uno smista gli altri).
+ * `awaitResponse: true` per i lavori rapidi da eseguire in sequenza (es.
+ * alert run PRIMA del digest); default handshake per i tick auto-concatenanti.
+ */
+export async function kickEndpoint(request, path, { awaitResponse = false } = {}) {
+  const url = new URL(request.url);
+  const secret = process.env.CRON_SECRET;
+  const headers = {};
+  if (secret) headers["Authorization"] = `Bearer ${secret}`;
+  else headers["x-vercel-cron"] = "1";
+  try {
+    if (awaitResponse) {
+      const res = await fetch(`${url.origin}${path}`, { method: "POST", headers });
+      return { ok: res.ok, status: res.status };
+    }
+    await Promise.race([
+      fetch(`${url.origin}${path}`, { method: "POST", headers }),
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]);
+    return { kicked: true };
+  } catch (e) {
+    return { ok: false, error: String(e?.message || e) };
+  }
+}
