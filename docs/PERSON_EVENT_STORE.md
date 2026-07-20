@@ -46,11 +46,9 @@ Forma canonica evento: `{ id, type, at (ms), by (userId|system), source, payload
 
 Nessuna di queste esiste oggi: namespace pulito, nessuna migrazione di dati esistenti richiesta.
 
-## 4. Identità della persona (decisione aperta)
+## 4. Identità della persona — DECISO
 
-`personId` deve essere stabile e joinabile con il resto di HOC Pro. Oggi coesistono tre identificatori: **nome operatore** (chiave di `employee_profile:{name}`, score history, wage CP), **Clerk userId** (`roles:{userId}`), **Infloww employeeId** (`/admin/user-mapping`).
-
-**Proposta:** `personId = employeeId Infloww` (id macchina stabile, non cambia con rinomine) come chiave primaria, con il nome canonico come display e ponte di join finché la consolidazione identità non è completa. Lo schema non impone la scelta: `person-events.js` riceve un `personId` già risolto dal chiamante. **Da confermare** con Nicholas prima di scrivere il primo evento — è la scelta più costosa da invertire dell'intero disegno.
+`personId = employeeId Infloww` (Nicholas, 2026-07-20). Id macchina stabile, non cambia con rinomine, già chiave dell'attribuzione KPI. Il nome canonico resta come display e ponte di join con le fonti keyed-by-name (`employee_profile`, score history) via il mapping `/admin/user-mapping`. `person-events.js` riceve un `personId` già risolto: il resolver name→employeeId vive nel write-path/backfill, non nello schema.
 
 ## 5. Backfill — dati esistenti → eventi
 
@@ -67,15 +65,23 @@ Buona parte della timeline è già in HOC Pro e diventa eventi al primo popolame
 
 Mancano a oggi (richiedono cattura nuova, fase 2/3): `onboarding_phase`, `graduation`, `level_change`, `step_change`, `mentoring`, `checkin`, `offboarding`. Sono gli eventi del **progression engine**, che nasce con questo store.
 
+### 5.1 Stato dati a oggi (2026-07-20) — le fonti sono vuote
+
+Verifica diretta sul KV di produzione (dry-run del backfill): il roster conta **410 operatori** (il resolver identità funziona), ma **tutte e 6 le fonti timeline sono vuote** — nessun `employee_profile`, `cert`, `qa:review`, `coaching:session`, `dispute`, `action_center`. Coerente con lo stato del prodotto (people-feature costruite ma non ancora in uso: nessun operatore onboardato, 5-10 utenti reali del board).
+
+**Conseguenza operativa:** il backfill oggi è un **no-op** (scrive 0 eventi) e la scheda 360 sarebbe vuota per tutti. L'infrastruttura (schema + write-path + backfill + route) è costruita e verificata a vuoto; **si popola da sola** man mano che le people-feature vengono usate (si crea un profilo, si registra una QA, si logga un coaching → l'evento entra). Il "CRM persone" non è un problema di build, è un problema di **adozione a monte**: la timeline esiste nel momento in cui il team comincia a usare gli strumenti HR già presenti. La **scheda 360** si costruisce quando c'è dato da mostrare (ri-lanciando il backfill dopo i primi profili/QA reali).
+
 ## 6. Cosa è costruito ora / cosa no
 
-**Ora (questo PR):** lo schema — enum livelli, tassonomia eventi, key builder, validazione, proiezione dello stato (`deriveState`). Puro, testato, **inerte**: nessuna scrittura KV.
+**Costruito e verificato (PR schema + PR store):**
+1. Schema — enum livelli, tassonomia eventi, validazione, proiezione stato (`deriveState`). Puro, testato.
+2. Write-path — `src/lib/person-store.js`: resolver identità (nome→employeeId via roster, verificato su 410 operatori), `writePersonEvents`/`appendPersonEvent` idempotenti (id evento deterministico → backfill ri-eseguibile), letture + proiezione cachata.
+3. Backfill — `src/lib/person-backfill.js` + route `POST/GET /api/admin/person-backfill` (SEED): legge tutte le 6 fonti, mappa a eventi, dry-run + reale. **Oggi no-op** (fonti vuote, §5.1).
+4. Scheda 360 — `/admin/persone` (indice: roster + persone con timeline + trigger backfill + ricerca) e `/admin/persone/[id]` (timeline lifecycle + stato + link alla scheda performance esistente). SEED. **Stati vuoti espliciti**: con le fonti vuote la timeline è vuota e la pagina lo dichiara — nessun dato finto. Si accende sull'adozione.
 
-**Prossimo (dopo conferma ADR + identità §4):**
-1. Percorso di scrittura: `appendPersonEvent()` + reindex proiezione (una modifica al modello dati KV → è il punto in cui questo diventa one-way semi).
-2. Backfill one-shot dalle fonti §5.
-3. Scheda persona 360 (`/admin/persone/[id]` nel gruppo People) che legge eventi + stato + performance (score/comp già esistenti) e rende la timeline.
-4. Progression engine (fase 3): calcola i gate del ladder e appende `level_change`/`step_change`. **Le soglie dei gate restano decisione HR/board** (ladder §11 #2/#3/#7) — lo schema le implementa, non le fissa.
+**Prossimo (quando c'è dato / dopo calibrazione gate):**
+5. Write online dalla UI con capability `people.events.write` (HR = lifecycle, TL = development/quality del proprio team, decisione §8).
+6. Progression engine: calcola i gate e appende `level_change`/`step_change`. Parte **dopo la calibrazione delle soglie** (ladder §11) — lo schema le implementa, non le fissa.
 
 ## 7. Reversibilità, trigger, sunset
 
@@ -83,12 +89,12 @@ Mancano a oggi (richiedono cattura nuova, fase 2/3): `onboarding_phase`, `gradua
 - **Trigger di re-evaluation:** dopo il backfill + prime 4 settimane della scheda 360, verificare che la timeline sia effettivamente usata in una decisione di livello reale. Se no, è debito.
 - **Sunset:** se il progression engine non parte entro il lancio del ladder, lo store resta come sola timeline anagrafica (comunque utile) — non si costruiscono gli eventi di gate a vuoto.
 
-## 8. Domande aperte per Nicholas / board
+## 8. Decisioni (Nicholas, 2026-07-20)
 
-1. **Identità (§4):** confermi `employeeId` Infloww come `personId`, o preferisci nome canonico / userId Clerk?
-2. **Perimetro backfill:** al primo popolamento importiamo tutte le fonti §5, o partiamo da un sottoinsieme (es. solo hire + certificazioni) per validare la scheda?
-3. **Chi scrive gli eventi manuali** (onboarding, mentoring, offboarding): HR execution (Aila) o il Team Lead? — determina i permessi di scrittura.
-4. Le **soglie dei gate** restano come da ladder §11 (aperte, da calibrare su finestra 6 mesi post-import giu/lug): confermato che lo schema non le anticipa.
+1. **Identità (§4):** ✅ `personId` = **employeeId Infloww**.
+2. **Perimetro backfill:** ✅ **tutte le fonti §5 subito** (ogni mapping va verificato in dry-run su dati reali prima della scrittura effettiva).
+3. **Chi scrive gli eventi manuali:** ✅ **HR + TL con permessi distinti** — HR execution per lifecycle (hire/onboarding/offboarding), Team Lead per development/quality del proprio team (mentoring/coaching). Serve capability RBAC dedicata (`people.events.write`) con scope by-team per il TL.
+4. **Soglie dei gate:** restano come da ladder §11 (aperte, da calibrare su finestra 6 mesi post-import giu/lug) — lo schema non le anticipa. Il progression engine (che appende `level_change`/`step_change`) parte dopo la calibrazione.
 
 ## 9. Fonti
 

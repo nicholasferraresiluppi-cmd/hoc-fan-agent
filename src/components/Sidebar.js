@@ -29,7 +29,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler,
-  History, Signpost, Bell, ListTree,
+  History, Signpost, Bell, ListTree, UserSquare,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
@@ -136,6 +136,7 @@ const NAV_GROUPS = [
       { href: "/admin/disputes",                 label: "Contestazioni", icon: MessageSquareWarning },
       { href: "/admin/team",                     label: "Team",         icon: UserCircle2 },
       { href: "/admin/employee-profiles",        label: "Profili",      icon: Contact },
+      { href: "/admin/persone",                  label: "Persone 360",  icon: UserSquare },
       { href: "/admin/seniority",                label: "Seniority",    icon: Medal },
       { href: "/admin/access",                   label: "Accessi",      icon: Key },
       { href: "/admin/ruoli",                    label: "Ruoli",        icon: Lock },
