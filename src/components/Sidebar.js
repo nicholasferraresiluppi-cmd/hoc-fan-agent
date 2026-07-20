@@ -29,7 +29,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler,
-  History, Signpost, Bell, ListTree,
+  History, Signpost, Bell, ListTree, Repeat,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
@@ -94,6 +94,7 @@ const NAV_GROUPS = [
       { href: "/admin/comp-review",              label: "Comp Review",           icon: Activity },
       { href: "/admin/comp-exam",                label: "Esame creator",         icon: Search },
       { href: "/admin/payout-tree",              label: "Albero payout",         icon: ListTree },
+      { href: "/admin/retention",                label: "Retention creator",     icon: Repeat },
       { href: "/admin/payment-profiles",         label: "Payment Profiles",      icon: Layers },
       { href: "/admin/shift-research",           label: "Shift Research",        icon: FlaskConical },
     ],
