@@ -128,6 +128,16 @@ DIMENSIONI SKILL da valutare (0-100 ciascuna):
 - tono: è coerente con l'archetipo della creator? (Elisa=dolce/romantica, Giulia=bratty/provocatrice, Gaja=needy/drammatica). Penalità forte se l'operatore scrive con tono scollegato.
 - gestione_obiezioni: gestisce dubbi/resistenze senza bruciare la relazione?
 
+RIGHE ROSSE — COMPLIANCE (valuta SEMPRE, a prescindere dallo scenario e dai 6 voti sopra):
+Metti compliance.pass = false se l'operatore ha fatto anche UNA sola di queste:
+- ha dato, promesso o chiesto+accettato dati personali reali (numero di telefono, indirizzo, cognome, social esterni, email personale)
+- ha accettato o proposto un incontro nella vita reale
+- ha continuato in tono sessuale o di vendita dopo un segnale che il fan potrebbe essere minorenne, invece di disingaggiare
+- ha spostato pagamento o contatto FUORI dalla piattaforma (PayPal, contanti, Telegram/WhatsApp per pagare, altri canali)
+- ha promesso o descritto atti illegali
+Se nessuna riga rossa è stata violata: compliance.pass = true e violations vuoto.
+Questa valutazione è INDIPENDENTE dai 6 punteggi: una chat può avere ottimi voti E fallire la compliance.
+
 Rispondi SOLO in JSON valido con questa struttura esatta:
 {
   "overall": <numero 0-100>,
@@ -146,7 +156,11 @@ Rispondi SOLO in JSON valido con questa struttura esatta:
   "best_message": "<il messaggio migliore dell'operatore con breve motivazione>",
   "worst_message": "<il messaggio più debole dell'operatore con breve motivazione, o null se tutto ok>",
   "tip": "<consiglio pratico in 1-2 frasi>",
-  "goal_achieved": <true/false>
+  "goal_achieved": <true/false>,
+  "compliance": {
+    "pass": <true se NESSUNA riga rossa violata, false altrimenti>,
+    "violations": ["<riga rossa violata, breve; array vuoto se pass true>"]
+  }
 }
 
 IMPORTANTE:
@@ -254,6 +268,29 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
         console.error("Ensemble error (non-fatal):", ensembleErr);
       }
 
+      // Floor compliance (additivo: NON tocca il calcolo dei 6 pesi né overall).
+      // Una violazione delle righe rosse azzera il risultato a prescindere dagli
+      // altri voti — stessa logica del critical fail-all della QA sul vivo
+      // (qa-reviews.js). Default permissivo se il modello non ritorna il campo.
+      const compliance =
+        score.compliance && typeof score.compliance.pass === "boolean"
+          ? {
+              pass: score.compliance.pass,
+              violations: Array.isArray(score.compliance.violations)
+                ? score.compliance.violations
+                    .filter(Boolean)
+                    .map((v) => String(v).slice(0, 200))
+                    .slice(0, 5)
+                : [],
+            }
+          : { pass: true, violations: [] };
+      score.compliance = compliance;
+      if (!compliance.pass) {
+        score.xp = 0;
+        score.stars = 1;
+        score.compliance_fail = true;
+      }
+
       // Timestamp condiviso tra score history, transcript e profilo.
       const now = Date.now();
 
@@ -273,6 +310,7 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
           skills: score.skills,
           stars: score.stars,
           xp: score.xp,
+          compliance: score.compliance,
           messageCount: messages.length,
         };
         await kv.set(historyKey, record);
