@@ -173,8 +173,8 @@ IMPORTANTE:
 Rispondi SOLO col JSON, nessun testo prima o dopo.`;
 
       const response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1500,
+        model: "claude-sonnet-5",
+        max_tokens: 3000,
         system: systemPrompt,
         messages: [
           {
@@ -184,7 +184,7 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
         ],
       });
 
-      const scoreText = response.content[0].text;
+      const scoreText = (response.content.find((b) => b?.type === "text")?.text) || "";
       let score;
       try {
         const cleaned = scoreText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
@@ -209,13 +209,13 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
         const judgeResults = await Promise.all(
           judgePrompts.map((jp) =>
             client.messages.create({
-              model: "claude-haiku-3-5-20241022",
+              model: "claude-haiku-4-5-20251001",
               max_tokens: 200,
               system: specialistPrompt(jp.role, jp.criterion),
               messages: [{ role: "user", content: `Conversazione:\n\n${conversationText}` }],
             }).then((r) => {
               try {
-                const t = r.content[0].text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+                const t = ((r.content.find((b) => b?.type === "text")?.text) || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
                 const parsed = JSON.parse(t);
                 return { key: jp.key, score: parsed.score, reason: parsed.reason };
               } catch {
@@ -392,8 +392,8 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
         .join("\n");
 
       const response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1500,
+        model: "claude-sonnet-5",
+        max_tokens: 3000,
         system: `Sei un analista esperto di performance per operatori di chatting su OnlyFans.
 Valuta la performance in una conversazione simulata con un fan.
 
@@ -420,7 +420,7 @@ Rispondi SOLO in JSON valido:
         messages: [{ role: "user", content: `Conversazione:\n\n${conversationText}` }],
       });
 
-      const scoreText = response.content[0].text;
+      const scoreText = (response.content.find((b) => b?.type === "text")?.text) || "";
       let score;
       try {
         const cleaned = scoreText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
