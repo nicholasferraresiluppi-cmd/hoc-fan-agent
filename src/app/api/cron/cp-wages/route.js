@@ -63,6 +63,11 @@ async function tickPeriod(period, chain) {
   if (chain === 0 && prog.updated_at && Date.now() - prog.updated_at < FRESH_MS) {
     return { action: "skip", period, reason: "tick già in corso", phase: prog.phase };
   }
+  // L'errore salvato appartiene a un tentativo passato: se stiamo di nuovo
+  // lavorando, via — altrimenti resta "appiccicato" nei salvataggi successivi
+  // e confonde la diagnosi (osservato col primo run: errore locale rimasto
+  // scritto per tutta la catena prod riuscita).
+  delete prog.error;
 
   const t0 = Date.now();
   const save = async () => {
