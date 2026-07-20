@@ -5,6 +5,7 @@ import Link from "next/link";
 import { HelpCircle, CheckCircle2, XCircle, ShieldAlert } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel } from "@/components/cp-style";
+import { academyForQaDim, VOCAB_GAPS } from "@/lib/skill-vocabulary";
 
 /**
  * /me/qualita — "La mia qualità" (scope own, docs/VISIBILITY_POLICY.md).
@@ -58,6 +59,47 @@ export default function MyQaPage() {
             <CpCard style={{ marginBottom: 18 }}>
               <p style={{ color: CP.textSecondary, fontSize: 14, margin: 0 }}>Nessuna review negli ultimi 3 mesi — appena arriva la prima la vedi qui, con le note.</p>
             </CpCard>
+          )}
+
+          {dims.length > 0 && (
+            <>
+              <SectionLabel>Come si allena</SectionLabel>
+              <CpCard style={{ marginTop: 10, marginBottom: 18 }}>
+                <p style={{ fontSize: 13, color: CP.textMuted, margin: "0 0 12px", lineHeight: 1.6 }}>
+                  Ogni dimensione su cui ti valutano ha un allenamento diretto nell'<Link href="/" style={{ color: CP.accent }}>Academy</Link>: è la stessa competenza, con lo stesso nome.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                  {dims.map((d) => {
+                    const map = academyForQaDim(d.key);
+                    return (
+                      <div key={d.key} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 13, color: CP.textSecondary, minWidth: 210 }}>{d.label}</span>
+                        <span style={{ color: CP.textMuted, fontFamily: FONTS.mono }}>→</span>
+                        {map && map.sim.length ? (
+                          map.sim.map((s) => (
+                            <span key={s.key} style={{ fontSize: 12, color: CP.textSecondary, background: CP.surfaceAlt, border: `1px solid ${CP.borderSoft}`, borderRadius: 99, padding: "3px 11px" }}>
+                              {s.label}
+                            </span>
+                          ))
+                        ) : (
+                          <span style={{ fontSize: 12.5, color: "#d9a44a" }}>
+                            {d.key === "compliance" ? "non ancora allenabile in Academy" : "—"}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {VOCAB_GAPS.academyBlind.includes("compliance") && (
+                  <div style={{ display: "flex", gap: 8, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${CP.borderSoft}` }}>
+                    <ShieldAlert size={16} color={CP.accentRed} style={{ flexShrink: 0, marginTop: 2 }} />
+                    <p style={{ fontSize: 12.5, color: CP.textMuted, margin: 0, lineHeight: 1.55 }}>
+                      La <b style={{ color: CP.textSecondary }}>compliance</b> oggi si misura solo sul lavoro vero: in Academy non c'è ancora un esercizio dedicato. È la dimensione critica dei gate — trattala col massimo scrupolo sul turno.
+                    </p>
+                  </div>
+                )}
+              </CpCard>
+            </>
           )}
 
           <SectionLabel>Le mie review</SectionLabel>

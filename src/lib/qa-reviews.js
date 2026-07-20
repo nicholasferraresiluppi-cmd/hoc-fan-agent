@@ -1,4 +1,5 @@
 import { kv } from "@vercel/kv";
+import { QA_DIMENSIONS } from "./skill-vocabulary";
 
 /**
  * QA conversazionale — implementa CAREER_LADDER §8.1 (il contrappeso qualità
@@ -9,6 +10,9 @@ import { kv } from "@vercel/kv";
  * La rubrica è VERSIONATA (stessa disciplina della formula score): ogni review
  * registra la versione con cui è stata valutata.
  *
+ * Le dimensioni (QA_DIMENSIONS) vivono in `skill-vocabulary.js` — sorgente
+ * unica del vocabolario condivisa col crosswalk Academy↔vivo, per non driftare.
+ *
  * KV:
  *   qa:review:{id}        → oggetto review
  *   qa:reviews:all        → ZSET (score=created_at)
@@ -17,13 +21,8 @@ import { kv } from "@vercel/kv";
 
 export const QA_RUBRIC_VERSION = "v1"; // CAREER_LADDER v0.5 §8.1
 
-export const QA_DIMENSIONS = [
-  { key: "compliance", label: "Compliance e safety", critical: true },
-  { key: "brand_voice", label: "Aderenza a brand voice / persona creator", critical: false },
-  { key: "sales_technique", label: "Tecnica di vendita non pressante", critical: false },
-  { key: "retention", label: "Retention del fan (riaperture, follow-up)", critical: false },
-  { key: "writing", label: "Qualità di scrittura", critical: false },
-];
+// Re-export per i chiamanti storici (import { QA_DIMENSIONS } from "@/lib/qa-reviews").
+export { QA_DIMENSIONS };
 
 export const QA_PASS_AVG = 3; // media minima
 export const QA_COMPLIANCE_FAIL_AT = 1; // compliance = 1 → fail automatico
