@@ -6,6 +6,13 @@
 --        contesto alle window function → niente left-censoring sul giorno più vecchio).
 -- NON legge body / user_data. Referenzia SOLO 6 colonne scalari:
 --        id, creator_id, user_id, sender_id, created_at, commit_timestamp.
+-- ⚠️  SCOPE TENANT: `ws_chat` è MULTI-TENANT (contiene creator di altre agenzie
+--        clienti di CreatorsPro) e NON ha organization_id. Lo scope all'org di HOC
+--        è iniettato A RUNTIME da src/lib/conversation-intelligence.js
+--        (scopedCITier1SQL → filtro via onlyfans.reach, prima della QUALIFY).
+--        Questa .sql, eseguita GREZZA in console, include TUTTE le agenzie: per
+--        HOC-only aggiungere `AND creator_id IN (SELECT creator_id FROM
+--        onlyfans.reach WHERE organization_id = '<HOC>')` alla WHERE della CTE base.
 -- Attribuzione al SINGOLO OPERATORE = FUORI SCOPE: sender_id lato-creator è
 --        l'ACCOUNT, non l'umano. Il join sul turno si fa a valle in HOC Pro.
 --

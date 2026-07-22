@@ -215,3 +215,21 @@ export function bigQueryConfigured() {
     return false;
   }
 }
+
+// ─── Scope tenant HOC ────────────────────────────────────────────────────────
+// Il warehouse è MULTI-TENANT: `hoc.ws_chat` (e le tabelle onlyfans.*) contengono
+// anche i creator/fan di ALTRE agenzie clienti di CreatorsPro. Ogni query esposta
+// agli operatori HOC va ristretta all'organizzazione di HOC, altrimenti la vista
+// (Presidio chat, Priority Queue) mostra dati che non sono di HOC e che l'operatore
+// non può nemmeno gestire (leak cross-tenant + rumore operativo).
+//
+// `ws_chat` NON ha una colonna organization_id → lo scope si fa via `onlyfans.reach`
+// (creator_id → organization_id). L'id è overridabile via env (default = org HOC).
+export const HOC_ORGANIZATION_ID =
+  process.env.HOC_ORGANIZATION_ID || "5598597c-7fab-4fe1-acb3-5358df7d9dc5";
+
+// Frammento SQL che restringe `col` (default `creator_id`) ai soli creator dell'org
+// HOC, via sub-select su reach (tabella piccola). Usare come condizione AND in un WHERE.
+export function hocCreatorScopeSQL(dataProject, col = "creator_id") {
+  return `${col} IN (SELECT creator_id FROM \`${dataProject}.onlyfans.reach\` WHERE organization_id = '${HOC_ORGANIZATION_ID}')`;
+}

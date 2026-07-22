@@ -8,7 +8,7 @@
 // l'operatore incolla nella ricerca Infloww. Vedi docs/CONVERSATION_INTELLIGENCE.md.
 
 import { kv } from "@vercel/kv";
-import { bqQuery, bigQueryConfigured } from "@/lib/bigquery-api";
+import { bqQuery, bigQueryConfigured, HOC_ORGANIZATION_ID, hocCreatorScopeSQL } from "@/lib/bigquery-api";
 
 const DATA = () => process.env.BIGQUERY_DATA_PROJECT || "house-of-creators-358213";
 const QUEUE_TTL = 1800; // 30 min — è una coda "ora", non deve essere troppo stantia
@@ -26,6 +26,7 @@ export async function getCreators() {
     LEFT JOIN (SELECT DISTINCT creator_id, creator_name FROM \`${DATA()}.onlyfans.reach\` WHERE creator_name IS NOT NULL) r
       ON r.creator_id = c.creator_id
     WHERE c.created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
+      AND ${hocCreatorScopeSQL(DATA(), "c.creator_id")}
     GROUP BY c.creator_id
     HAVING msgs_7d >= 500
     ORDER BY creator_name`;
@@ -51,11 +52,13 @@ function queueSQL(creatorId) {
       COUNTIF(created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)) AS msgs_30d
     FROM \`${DATA()}.hoc.ws_chat\`
     WHERE creator_id=${cid} AND created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 DAY)
+      AND ${hocCreatorScopeSQL(DATA())}
     GROUP BY user_id
   ),
   val AS (
     SELECT user_id, ANY_VALUE(username) username, SUM(total_net_expenses) ltv, SUM(transaction_count) tx
-    FROM \`${DATA()}.onlyfans.users_research\` WHERE creator_id=${cid} GROUP BY user_id
+    FROM \`${DATA()}.onlyfans.users_research\`
+    WHERE creator_id=${cid} AND organization_id = '${HOC_ORGANIZATION_ID}' GROUP BY user_id
   )
   SELECT * FROM (
     SELECT
