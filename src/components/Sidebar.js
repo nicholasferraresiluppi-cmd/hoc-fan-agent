@@ -29,7 +29,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler,
-  History, Signpost, Bell, ListTree,
+  History, Signpost, Bell, ListTree, Inbox,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
@@ -55,6 +55,7 @@ const ESSENTIAL_HREFS = new Set([
   "/admin/action-center",
   "/admin/coaching-center",
   "/admin/pnl-live",
+  "/admin/conversation-intelligence",
   "/admin/profiles-compare",
   "/admin/comp-calendar",
   "/admin/roadmap",
@@ -81,6 +82,7 @@ const NAV_GROUPS = [
       { href: "/leaderboard/sales-cp",           label: "Sales CP",     icon: DollarSign },
       { href: "/leaderboard/creators",           label: "Creator",      icon: Users },
       { href: "/leaderboard/creators/heatmap",   label: "Heat-map",     icon: Flame },
+      { href: "/admin/conversation-intelligence", label: "Presidio chat", icon: Activity },
     ],
   },
   {
@@ -131,6 +133,7 @@ const NAV_GROUPS = [
     defaultOpen: false,
     items: [
       { href: "/cm-cockpit",                     label: "Cockpit CM",   icon: Gauge },
+      { href: "/admin/priority-queue",           label: "Priority queue", icon: Inbox },
       { href: "/admin/action-center",            label: "Action Center", icon: Target },
       { href: "/admin/coaching-center",          label: "Coaching Center", icon: GraduationCap },
       { href: "/admin/coaching-sessions",        label: "Sessioni coaching", icon: GraduationCap },
