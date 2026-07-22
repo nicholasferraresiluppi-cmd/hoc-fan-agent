@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import useSWR from "swr";
 import { Check, Flame } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
@@ -8,11 +8,13 @@ import { PageHeader, CpCard, SectionLabel } from "@/components/cp-style";
 import RitualiAvatar from "@/components/RitualiAvatar";
 
 /**
- * /me/rituali — centro controllo personale delle abitudini (CRAWL v1).
+ * /me/rituali — centro controllo personale delle abitudini (CRAWL v1) + diario.
  * docs/RITUALI_PERSONALI.md — modulo personale, gated admin, isolato dai dati HOC.
  */
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
+
+const MOODS = ["giù", "fiacco", "ok", "bene", "su"]; // indice 0..4 → mood 1..5
 
 function localTodayISO() {
   const d = new Date();
@@ -50,6 +52,31 @@ export default function RitualiPage() {
 
   const doneSet = new Set(data?.today?.done || []);
 
+  // Stato locale del diario (source of truth degli input), idratato una volta dal server.
+  const [mood, setMood] = useState(null);
+  const [effort, setEffort] = useState(3);
+  const [note, setNote] = useState("");
+  const hydrated = useRef(false);
+  const noteTimer = useRef(null);
+
+  useEffect(() => {
+    if (data && !hydrated.current) {
+      const j = data.today?.journal || {};
+      setMood(typeof j.mood === "number" ? j.mood : null);
+      setEffort(typeof j.effort === "number" ? j.effort : 3);
+      setNote(typeof j.note === "string" ? j.note : "");
+      hydrated.current = true;
+    }
+  }, [data]);
+
+  function applyState(j) {
+    if (j?.ok) {
+      mutate({ config: data.config, today: j.today, adherence: j.adherence, streak: j.streak, traits: j.traits }, false);
+    } else {
+      mutate();
+    }
+  }
+
   async function toggle(habitId) {
     if (!data?.config) return;
     const isDone = doneSet.has(habitId);
@@ -63,15 +90,29 @@ export default function RitualiPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date: today, habitId, done: !isDone }),
       });
-      const j = await r.json();
-      if (j?.ok) {
-        mutate({ config: data.config, today: j.today, adherence: j.adherence, streak: j.streak, traits: j.traits }, false);
-      } else {
-        mutate();
-      }
+      applyState(await r.json());
     } catch {
       mutate();
     }
+  }
+
+  async function saveJournal(partial) {
+    try {
+      const r = await fetch("/api/me/rituali", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: today, journal: partial }),
+      });
+      applyState(await r.json());
+    } catch { /* silenzioso: lo stato locale resta */ }
+  }
+
+  function onMood(m) { setMood(m); saveJournal({ mood: m }); }
+  function onEffort(v) { setEffort(v); saveJournal({ effort: v }); }
+  function onNote(v) {
+    setNote(v);
+    clearTimeout(noteTimer.current);
+    noteTimer.current = setTimeout(() => saveJournal({ note: v }), 800);
   }
 
   const config = data?.config;
@@ -93,87 +134,147 @@ export default function RitualiPage() {
       )}
 
       {config && !data?.error && (
-        <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "flex-start" }}>
-          {/* Colonna avatar */}
-          <CpCard style={{ flex: "1 1 260px", minWidth: 260, textAlign: "center" }}>
-            <RitualiAvatar adherence={adherence} traits={traits} size={220} />
-            <div style={{ marginTop: 4 }}>
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 8 }}>
-                <span style={{ fontFamily: FONTS.display, fontSize: 30, fontWeight: 500, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{adherence}%</span>
-                <span style={{ fontSize: 13, color: CP.accentSoftText }}>{stageLabel(adherence)}</span>
-              </div>
-              <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2 }}>costanza · ultimi 30 giorni</div>
-              {streak > 0 && (
-                <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 10, padding: "4px 11px", borderRadius: 999, background: CP.accentSoft, color: CP.accentSoftText, fontSize: 12.5 }}>
-                  <Flame size={13} strokeWidth={2} /> {streak} {streak === 1 ? "giorno" : "giorni"} di fila
+        <>
+          <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "flex-start" }}>
+            {/* Colonna avatar */}
+            <CpCard style={{ flex: "1 1 260px", minWidth: 260, textAlign: "center" }}>
+              <RitualiAvatar adherence={adherence} traits={traits} size={220} />
+              <div style={{ marginTop: 4 }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 8 }}>
+                  <span style={{ fontFamily: FONTS.display, fontSize: 30, fontWeight: 500, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{adherence}%</span>
+                  <span style={{ fontSize: 13, color: CP.accentSoftText }}>{stageLabel(adherence)}</span>
                 </div>
-              )}
-            </div>
-
-            {/* Tratti per pilastro */}
-            <div style={{ marginTop: 18, textAlign: "left" }}>
-              <SectionLabel>Come stai crescendo</SectionLabel>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
-                {config.pillars.map((p) => {
-                  const t = traits[p.trait] || { level: 0 };
-                  return (
-                    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: CP.textSecondary }}>
-                      <span>{p.label}</span>
-                      <LevelDots level={t.level} />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </CpCard>
-
-          {/* Colonna abitudini */}
-          <div style={{ flex: "2 1 380px", minWidth: 300 }}>
-            {config.pillars.map((p) => {
-              const habits = config.habits.filter((h) => h.pillar === p.id);
-              if (!habits.length) return null;
-              return (
-                <div key={p.id} style={{ marginBottom: 18 }}>
-                  <SectionLabel style={{ textTransform: "uppercase", letterSpacing: "0.06em", color: CP.textMuted }}>{p.label}</SectionLabel>
-                  <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-                    {habits.map((h) => {
-                      const done = doneSet.has(h.id);
-                      return (
-                        <button
-                          key={h.id}
-                          onClick={() => toggle(h.id)}
-                          style={{
-                            display: "flex", alignItems: "center", gap: 12,
-                            width: "100%", textAlign: "left",
-                            padding: "12px 14px", borderRadius: 11,
-                            border: `1px solid ${done ? CP.accent + "88" : CP.border}`,
-                            background: done ? CP.accentSoft : CP.surface,
-                            cursor: "pointer", transition: "background 0.12s, border-color 0.12s",
-                            fontFamily: FONTS.body,
-                          }}
-                        >
-                          <span style={{
-                            width: 24, height: 24, borderRadius: 7, flexShrink: 0,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            border: `1.5px solid ${done ? CP.accent : CP.mutedIcons}`,
-                            background: done ? CP.accent : "transparent",
-                            color: CP.accentInk,
-                          }}>
-                            {done && <Check size={15} strokeWidth={3} />}
-                          </span>
-                          <span style={{ fontSize: 14, color: done ? CP.textPrimary : CP.textSecondary }}>{h.label}</span>
-                        </button>
-                      );
-                    })}
+                <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2 }}>costanza · ultimi 30 giorni</div>
+                {streak > 0 && (
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 10, padding: "4px 11px", borderRadius: 999, background: CP.accentSoft, color: CP.accentSoftText, fontSize: 12.5 }}>
+                    <Flame size={13} strokeWidth={2} /> {streak} {streak === 1 ? "giorno" : "giorni"} di fila
                   </div>
+                )}
+              </div>
+
+              {/* Tratti per pilastro */}
+              <div style={{ marginTop: 18, textAlign: "left" }}>
+                <SectionLabel>Come stai crescendo</SectionLabel>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+                  {config.pillars.map((p) => {
+                    const t = traits[p.trait] || { level: 0 };
+                    return (
+                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: CP.textSecondary }}>
+                        <span>{p.label}</span>
+                        <LevelDots level={t.level} />
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-            <p style={{ fontSize: 12, color: CP.textMuted, lineHeight: 1.6, marginTop: 4 }}>
-              La costanza si misura sugli ultimi 30 giorni, non a giorni consecutivi: saltare un giorno non azzera niente. I tratti dell'avatar crescono con quello che fai e si affievoliscono piano se molli — mai un castigo.
-            </p>
+              </div>
+            </CpCard>
+
+            {/* Colonna abitudini */}
+            <div style={{ flex: "2 1 380px", minWidth: 300 }}>
+              {config.pillars.map((p) => {
+                const habits = config.habits.filter((h) => h.pillar === p.id);
+                if (!habits.length) return null;
+                return (
+                  <div key={p.id} style={{ marginBottom: 18 }}>
+                    <SectionLabel style={{ textTransform: "uppercase", letterSpacing: "0.06em", color: CP.textMuted }}>{p.label}</SectionLabel>
+                    <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                      {habits.map((h) => {
+                        const done = doneSet.has(h.id);
+                        return (
+                          <button
+                            key={h.id}
+                            onClick={() => toggle(h.id)}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 12,
+                              width: "100%", textAlign: "left",
+                              padding: "12px 14px", borderRadius: 11,
+                              border: `1px solid ${done ? CP.accent + "88" : CP.border}`,
+                              background: done ? CP.accentSoft : CP.surface,
+                              cursor: "pointer", transition: "background 0.12s, border-color 0.12s",
+                              fontFamily: FONTS.body,
+                            }}
+                          >
+                            <span style={{
+                              width: 24, height: 24, borderRadius: 7, flexShrink: 0,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              border: `1.5px solid ${done ? CP.accent : CP.mutedIcons}`,
+                              background: done ? CP.accent : "transparent",
+                              color: CP.accentInk,
+                            }}>
+                              {done && <Check size={15} strokeWidth={3} />}
+                            </span>
+                            <span style={{ fontSize: 14, color: done ? CP.textPrimary : CP.textSecondary }}>{h.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+
+          {/* Diario di oggi */}
+          <CpCard style={{ marginTop: 4 }}>
+            <SectionLabel>Diario di oggi</SectionLabel>
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginTop: 14 }}>
+              {/* Umore */}
+              <div style={{ flex: "1 1 240px", minWidth: 220 }}>
+                <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 8 }}>Come ti senti</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {MOODS.map((label, i) => {
+                    const val = i + 1;
+                    const active = mood === val;
+                    return (
+                      <button
+                        key={val}
+                        onClick={() => onMood(val)}
+                        style={{
+                          flex: 1, padding: "8px 4px", borderRadius: 8,
+                          border: `1px solid ${active ? CP.accent : CP.border}`,
+                          background: active ? CP.accentSoft : CP.surface,
+                          color: active ? CP.accentSoftText : CP.textMuted,
+                          fontSize: 12, cursor: "pointer", fontFamily: FONTS.body,
+                          fontWeight: active ? 500 : 400,
+                        }}
+                      >{label}</button>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Sforzo */}
+              <div style={{ flex: "1 1 240px", minWidth: 220 }}>
+                <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 8 }}>Quanto ti è costato</div>
+                <input
+                  type="range" min={1} max={5} step={1} value={effort}
+                  onChange={(e) => onEffort(Number(e.target.value))}
+                  style={{ width: "100%", accentColor: CP.accent }}
+                />
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: CP.textMuted, marginTop: 2 }}>
+                  <span>scorrevole</span><span>durissimo</span>
+                </div>
+              </div>
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 8 }}>Nota</div>
+              <textarea
+                value={note}
+                onChange={(e) => onNote(e.target.value)}
+                placeholder="Com'è andata oggi? Cosa ha funzionato, cosa no."
+                rows={3}
+                style={{
+                  width: "100%", resize: "vertical",
+                  background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 9,
+                  padding: "10px 12px", color: CP.textPrimary, fontSize: 13.5,
+                  fontFamily: FONTS.body, lineHeight: 1.5, outline: "none",
+                }}
+              />
+            </div>
+            <p style={{ fontSize: 12, color: CP.textMuted, lineHeight: 1.6, marginTop: 12 }}>
+              La costanza si misura sugli ultimi 30 giorni, non a giorni consecutivi: saltare un giorno non azzera niente. I tratti dell'avatar crescono con quello che fai e si affievoliscono piano se molli — mai un castigo. Il diario si salva da solo.
+            </p>
+          </CpCard>
+        </>
       )}
     </div>
   );

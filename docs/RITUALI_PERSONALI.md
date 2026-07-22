@@ -21,9 +21,10 @@ Identità risolta **sempre server-side** da `auth()` (userId), mai dal client. G
 
 ## Superficie
 
-- `GET /api/me/rituali?date=YYYY-MM-DD` → `{ config, today:{date,done}, adherence, streak, traits }`.
-- `POST /api/me/rituali` `{ date, habitId, done? }` → toggle abitudine, ricomputa e ritorna lo stato fresco.
-- Pagina `src/app/me/rituali/page.js` (client, SWR, optimistic toggle).
+- `GET /api/me/rituali?date=YYYY-MM-DD` → `{ config, today:{date,done,journal}, adherence, streak, traits }`.
+- `POST /api/me/rituali` `{ date, habitId, done? }` → toggle abitudine (preserva il diario del giorno).
+- `POST /api/me/rituali` `{ date, journal:{mood,effort,note} }` → salva/aggiorna il **diario** del giorno (merge). WALK step 1: il check-in qualitativo consigliato dalla ricerca (umore + "quanto ti è costato" + nota).
+- Pagina `src/app/me/rituali/page.js` (client, SWR, optimistic toggle + diario con salvataggio automatico).
 - Componente `src/components/RitualiAvatar.js` (SVG parametrico: forza→corporatura, vitalità→luce, lettura→libro/occhiali, adherence→postura+aura+anello).
 - Nav: voce "I miei rituali" in "Il mio quadro" (`Sidebar.js`), visibile solo agli admin.
 

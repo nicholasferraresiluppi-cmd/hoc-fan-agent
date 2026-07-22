@@ -1,8 +1,10 @@
 /**
  * /api/me/rituali — modulo personale "rituali" (CRAWL v1). docs/RITUALI_PERSONALI.md
  *
- * GET  ?date=YYYY-MM-DD  → { config, today:{date,done}, adherence, streak, traits }
- * POST { date, habitId, done? } → toggle abitudine del giorno, ricomputa e ritorna
+ * GET  ?date=YYYY-MM-DD  → { config, today:{date,done,journal}, adherence, streak, traits }
+ * POST { date, habitId, done? }      → toggle abitudine del giorno
+ * POST { date, journal:{mood,effort,note} } → salva/aggiorna il diario del giorno
+ * Entrambe ricomputano e ritornano lo stato fresco.
  *
  * Identità risolta SERVER-SIDE (userId Clerk). Gate admin (feature board/personale).
  * Dati chiavati per userId: mai dati di altri, mai employee HOC.
@@ -32,8 +34,13 @@ async function gate() {
 
 async function freshState(userId, config, date) {
   const map = await loadLogWindow(userId, date, WINDOW_LOAD_DAYS);
+  let journal = null;
+  try {
+    const bucket = await kv.get(logKey(userId, yearMonthOf(date)));
+    journal = (bucket && bucket[date] && bucket[date].journal) || null;
+  } catch {}
   return {
-    today: { date, done: map[date] || [] },
+    today: { date, done: map[date] || [], journal },
     adherence: computeAdherence(map, config, date, 30),
     streak: computeStreak(map, date),
     traits: computeTraits(map, config, date, 30),
@@ -65,21 +72,33 @@ export async function POST(request) {
   }
 
   const config = await loadConfig(g.userId);
-  const habitIds = new Set(config.habits.map((h) => h.id));
-  if (!habitIds.has(body.habitId)) {
-    return Response.json({ error: "Abitudine sconosciuta." }, { status: 400 });
-  }
-
   const bucketKey = logKey(g.userId, yearMonthOf(date));
   let bucket = null;
   try { bucket = await kv.get(bucketKey); } catch {}
   if (!bucket || typeof bucket !== "object") bucket = {};
+  const entry = (bucket[date] && typeof bucket[date] === "object") ? bucket[date] : {};
 
-  const set = new Set(Array.isArray(bucket[date]?.done) ? bucket[date].done : []);
-  const want = body.done !== undefined ? !!body.done : !set.has(body.habitId);
-  if (want) set.add(body.habitId);
-  else set.delete(body.habitId);
-  bucket[date] = { done: [...set], ts: new Date().toISOString() };
+  if (body.journal && typeof body.journal === "object") {
+    // Aggiorna il diario del giorno (merge: preserva i campi non inviati).
+    const j = { ...(entry.journal || {}) };
+    if (typeof body.journal.mood === "number") j.mood = Math.max(1, Math.min(5, Math.round(body.journal.mood)));
+    if (typeof body.journal.effort === "number") j.effort = Math.max(1, Math.min(5, Math.round(body.journal.effort)));
+    if (typeof body.journal.note === "string") j.note = body.journal.note.slice(0, 1000);
+    entry.journal = j;
+  } else {
+    // Toggle abitudine (preserva il diario eventuale del giorno).
+    const habitIds = new Set(config.habits.map((h) => h.id));
+    if (!habitIds.has(body.habitId)) {
+      return Response.json({ error: "Abitudine sconosciuta." }, { status: 400 });
+    }
+    const set = new Set(Array.isArray(entry.done) ? entry.done : []);
+    const want = body.done !== undefined ? !!body.done : !set.has(body.habitId);
+    if (want) set.add(body.habitId);
+    else set.delete(body.habitId);
+    entry.done = [...set];
+  }
+  entry.ts = new Date().toISOString();
+  bucket[date] = entry;
 
   try {
     await kv.set(bucketKey, bucket);
