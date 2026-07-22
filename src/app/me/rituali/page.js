@@ -71,7 +71,7 @@ export default function RitualiPage() {
 
   function applyState(j) {
     if (j?.ok) {
-      mutate({ config: data.config, today: j.today, adherence: j.adherence, streak: j.streak, traits: j.traits }, false);
+      mutate({ config: data.config, today: j.today, adherence: j.adherence, streak: j.streak, traits: j.traits, planner: j.planner }, false);
     } else {
       mutate();
     }
@@ -135,6 +135,51 @@ export default function RitualiPage() {
 
       {config && !data?.error && (
         <>
+          {data.planner && (
+            <CpCard style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+                <SectionLabel>Piano di oggi</SectionLabel>
+                <span style={{ fontSize: 12.5, color: CP.textMuted }}>
+                  {data.planner.total - data.planner.remaining}/{data.planner.total} fatti oggi
+                </span>
+              </div>
+              {data.planner.next ? (
+                <div style={{ marginTop: 12 }}>
+                  <button
+                    onClick={() => toggle(data.planner.next.habitId)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
+                      padding: "12px 14px", borderRadius: 11,
+                      border: `1px solid ${CP.accent}66`, background: CP.accentSoft,
+                      cursor: "pointer", fontFamily: FONTS.body,
+                    }}
+                  >
+                    <span style={{
+                      width: 26, height: 26, borderRadius: 8, flexShrink: 0,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      border: `1.5px solid ${CP.accent}`, color: CP.accent,
+                    }}>
+                      <Check size={15} strokeWidth={3} />
+                    </span>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: "block", fontSize: 11, color: CP.accentSoftText, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        Adesso · {data.planner.next.slot}
+                      </span>
+                      <span style={{ display: "block", fontSize: 15, color: CP.textPrimary, fontWeight: 500 }}>{data.planner.next.label}</span>
+                      <span style={{ display: "block", fontSize: 12, color: CP.textMuted }}>{data.planner.next.anchor}</span>
+                    </span>
+                  </button>
+                  {data.planner.upNext?.length > 0 && (
+                    <div style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 10 }}>Poi: {data.planner.upNext.join(" · ")}</div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, color: CP.accentGreen, fontSize: 14 }}>
+                  <Check size={16} strokeWidth={2.5} /> Tutto fatto per oggi. Bel lavoro.
+                </div>
+              )}
+            </CpCard>
+          )}
           <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "flex-start" }}>
             {/* Colonna avatar */}
             <CpCard style={{ flex: "1 1 260px", minWidth: 260, textAlign: "center" }}>

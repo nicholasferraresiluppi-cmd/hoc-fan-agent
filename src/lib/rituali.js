@@ -150,3 +150,53 @@ export function computeTraits(map, config, endISO, windowDays = 30) {
   }
   return traits;
 }
+
+/**
+ * Planner "che suggerisce" (WALK step 2). Deterministico, NON agisce: propone
+ * l'ordine dei rituali della giornata ancorandoli a un cue esistente (momento
+ * della giornata), coerente con la scienza cue→routine→reward.
+ */
+export const PLANNER_SLOTS = [
+  { id: "mattina", label: "Mattina", anchor: "al risveglio, dopo colazione" },
+  { id: "giornata", label: "Durante il giorno", anchor: "tra un impegno e l'altro" },
+  { id: "sera", label: "Sera", anchor: "prima di cena, prima di dormire" },
+];
+
+// Cue di default per abitudine (i config già seminati non hanno il campo `cue`):
+// si risolve per habit id, poi per pilastro, poi "giornata".
+const CUE_BY_HABIT = {
+  forza: "mattina", passi: "giornata", proteine: "giornata", acqua: "giornata",
+  noserale: "sera", lettura: "sera", respiro: "mattina",
+};
+const PILLAR_DEFAULT_SLOT = { allenamento: "mattina", alimentazione: "giornata", mente: "sera" };
+
+export function slotForHabit(h) {
+  if (h.cue && PLANNER_SLOTS.some((s) => s.id === h.cue)) return h.cue;
+  return CUE_BY_HABIT[h.id] || PILLAR_DEFAULT_SLOT[h.pillar] || "giornata";
+}
+
+export function computePlanner(config, doneList) {
+  const done = new Set(doneList || []);
+  const bySlot = {};
+  for (const s of PLANNER_SLOTS) bySlot[s.id] = [];
+  for (const h of config.habits) {
+    const slot = slotForHabit(h);
+    (bySlot[slot] || bySlot.giornata).push({ habitId: h.id, label: h.label, done: done.has(h.id) });
+  }
+  const slots = PLANNER_SLOTS
+    .map((s) => ({ id: s.id, label: s.label, anchor: s.anchor, items: bySlot[s.id] }))
+    .filter((s) => s.items.length > 0);
+
+  let next = null;
+  let remaining = 0;
+  const upNext = [];
+  for (const s of slots) {
+    for (const it of s.items) {
+      if (it.done) continue;
+      remaining++;
+      if (!next) next = { habitId: it.habitId, label: it.label, slot: s.label, anchor: s.anchor };
+      else if (upNext.length < 3) upNext.push(it.label);
+    }
+  }
+  return { remaining, total: config.habits.length, next, upNext, slots };
+}

@@ -14,7 +14,7 @@ import { kv } from "@vercel/kv";
 import { isUserIdAdmin } from "@/lib/admin";
 import {
   logKey, yearMonthOf, isValidDateISO,
-  loadConfig, loadLogWindow, computeAdherence, computeStreak, computeTraits,
+  loadConfig, loadLogWindow, computeAdherence, computeStreak, computeTraits, computePlanner,
 } from "@/lib/rituali";
 
 const WINDOW_LOAD_DAYS = 35;
@@ -39,11 +39,13 @@ async function freshState(userId, config, date) {
     const bucket = await kv.get(logKey(userId, yearMonthOf(date)));
     journal = (bucket && bucket[date] && bucket[date].journal) || null;
   } catch {}
+  const doneToday = map[date] || [];
   return {
-    today: { date, done: map[date] || [], journal },
+    today: { date, done: doneToday, journal },
     adherence: computeAdherence(map, config, date, 30),
     streak: computeStreak(map, date),
     traits: computeTraits(map, config, date, 30),
+    planner: computePlanner(config, doneToday),
   };
 }
 
