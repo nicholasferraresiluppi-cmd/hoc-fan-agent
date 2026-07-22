@@ -29,7 +29,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler,
-  History, Signpost, Bell, ListTree,
+  History, Signpost, Bell, ListTree, Inbox,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
@@ -45,6 +45,7 @@ const ESSENTIAL_HREFS = new Set([
   "/me/contestazioni",
   "/me/qualita",
   "/me/coaching",
+  "/me/rituali",
   "/admin",
   "/admin/alerts",
   "/leaderboard/sales-cp",
@@ -55,6 +56,7 @@ const ESSENTIAL_HREFS = new Set([
   "/admin/action-center",
   "/admin/coaching-center",
   "/admin/pnl-live",
+  "/admin/conversation-intelligence",
   "/admin/profiles-compare",
   "/admin/comp-calendar",
   "/admin/roadmap",
@@ -72,6 +74,7 @@ const NAV_GROUPS = [
       { href: "/me/qualita", label: "La mia qualità", icon: ClipboardCheck },
       { href: "/me/coaching", label: "Il mio coaching", icon: GraduationCap },
       { href: "/me/contestazioni", label: "Le mie contestazioni", icon: MessageSquareWarning },
+      { href: "/me/rituali", label: "I miei rituali", icon: Sprout, adminOnly: true },
     ],
   },
   {
@@ -81,6 +84,7 @@ const NAV_GROUPS = [
       { href: "/leaderboard/sales-cp",           label: "Sales CP",     icon: DollarSign },
       { href: "/leaderboard/creators",           label: "Creator",      icon: Users },
       { href: "/leaderboard/creators/heatmap",   label: "Heat-map",     icon: Flame },
+      { href: "/admin/conversation-intelligence", label: "Presidio chat", icon: Activity },
     ],
   },
   {
@@ -131,6 +135,7 @@ const NAV_GROUPS = [
     defaultOpen: false,
     items: [
       { href: "/cm-cockpit",                     label: "Cockpit CM",   icon: Gauge },
+      { href: "/admin/priority-queue",           label: "Priority queue", icon: Inbox },
       { href: "/admin/action-center",            label: "Action Center", icon: Target },
       { href: "/admin/coaching-center",          label: "Coaching Center", icon: GraduationCap },
       { href: "/admin/coaching-sessions",        label: "Sessioni coaching", icon: GraduationCap },
@@ -323,6 +328,10 @@ export default function Sidebar() {
     (a) => a.severity === "critical" && a.status !== "resolved"
   ).length;
 
+  // Voci personali riservate (es. /me/rituali): visibili solo agli admin.
+  const { data: whoami } = useSWR("/api/whoami", silentFetcher, { revalidateOnFocus: false });
+  const isAdmin = !!whoami?.admin;
+
   // Toggle Essential / Advanced
   const [viewMode, setViewMode] = useState("essential");
   // Map { label: isOpen } per i gruppi collassabili
@@ -421,9 +430,10 @@ export default function Sidebar() {
       {/* Nav groups */}
       <nav style={{ flex: 1, overflowY: "auto", padding: "4px 0 16px 0", scrollbarWidth: "thin" }}>
         {NAV_GROUPS.map((group) => {
-          const visibleItems = isEssential
+          const baseItems = isEssential
             ? group.items.filter((it) => ESSENTIAL_HREFS.has(it.href))
             : group.items;
+          const visibleItems = baseItems.filter((it) => !it.adminOnly || isAdmin);
           if (visibleItems.length === 0) return null;
           const isOpen = openGroups[group.label];
           return (
