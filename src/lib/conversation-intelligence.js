@@ -8,7 +8,7 @@
 // il join sul turno (pattern payout-match.js), fase 2 gated. Vedi docs/CONVERSATION_INTELLIGENCE.md.
 
 import { kv } from "@vercel/kv";
-import { bqQuery, bigQueryConfigured } from "@/lib/bigquery-api";
+import { bqQuery, bigQueryConfigured, HOC_ORGANIZATION_ID, hocCreatorScopeSQL } from "@/lib/bigquery-api";
 import { CI_TIER1_SQL } from "@/lib/conversation-intelligence-sql";
 
 const CACHE_KEY = "bq:ci:tier1";
@@ -20,10 +20,11 @@ function dataProject() {
 }
 
 // Mappa creator_id → nome (da onlyfans.reach, stesso id space di ws_chat). Best-effort.
+// Ristretta all'org HOC per non mappare (né esporre) nomi di altre agenzie.
 async function fetchNames() {
   try {
     const { rows } = await bqQuery(
-      `SELECT DISTINCT creator_id, creator_name FROM \`${dataProject()}.onlyfans.reach\` WHERE creator_name IS NOT NULL`
+      `SELECT DISTINCT creator_id, creator_name FROM \`${dataProject()}.onlyfans.reach\` WHERE creator_name IS NOT NULL AND organization_id = '${HOC_ORGANIZATION_ID}'`
     );
     const map = {};
     for (const r of rows) map[String(r.creator_id)] = r.creator_name;
@@ -65,12 +66,26 @@ function aggregate(rows, names) {
     .sort((x, y) => (x.within_5min ?? 1) - (y.within_5min ?? 1)); // peggior presidio prima
 }
 
+// Applica lo scope tenant HOC alla CI Tier-1 SQL. `ws_chat` non ha organization_id,
+// quindi si inietta il filtro (via reach) come ultima condizione del WHERE della CTE
+// `base`, subito prima della QUALIFY. FAIL-CLOSED: se l'ancora non c'è più (SQL
+// modificata a monte) si lancia, invece di eseguire senza filtro e leakare altri tenant.
+function scopedCITier1SQL() {
+  const anchor = "QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY commit_timestamp DESC) = 1";
+  if (!CI_TIER1_SQL.includes(anchor)) {
+    throw new Error(
+      "CI Tier-1 SQL: ancora per lo scope org non trovata → filtro tenant NON applicabile, abort per sicurezza"
+    );
+  }
+  return CI_TIER1_SQL.replace(anchor, `AND ${hocCreatorScopeSQL(dataProject())}\n  ${anchor}`);
+}
+
 export async function getConversationIntelligence({ force = false } = {}) {
   if (!force) {
     const cached = await kv.get(CACHE_KEY);
     if (cached) return { ...cached, cached: true };
   }
-  const [tier1, names] = await Promise.all([bqQuery(CI_TIER1_SQL), fetchNames()]);
+  const [tier1, names] = await Promise.all([bqQuery(scopedCITier1SQL()), fetchNames()]);
   const byCreator = aggregate(tier1.rows, names);
   const payload = {
     by_creator: byCreator,
