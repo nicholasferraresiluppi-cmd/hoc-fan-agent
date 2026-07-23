@@ -28,7 +28,7 @@ import {
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Gauge, MessageSquareWarning,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
-  Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler,
+  Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
   History, Signpost, Bell, ListTree, Inbox,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
@@ -83,6 +83,7 @@ const NAV_GROUPS = [
       { href: "/leaderboard/creators",           label: "Creator",      icon: Users },
       { href: "/leaderboard/creators/heatmap",   label: "Heat-map",     icon: Flame },
       { href: "/admin/conversation-intelligence", label: "Presidio chat", icon: Activity },
+      { href: "/admin/shift-quality",            label: "Qualità turni", icon: MessagesSquare },
     ],
   },
   {

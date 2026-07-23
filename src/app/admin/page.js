@@ -10,7 +10,7 @@ import {
   LayoutDashboard, UserCog, Sparkles,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders,
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Link2, Gauge,
-  ArrowUpRight, Calendar, Activity, CheckCircle2, AlertCircle,
+  ArrowUpRight, Calendar, Activity, CheckCircle2, AlertCircle, MessagesSquare,
   Wallet, Scale, ShieldCheck, History, FlaskConical, MessageSquareWarning,
   Signpost, Bell, ListTree, Inbox,
 } from "lucide-react";
@@ -60,6 +60,7 @@ const SHORTCUT_GROUPS = [
       { href: "/leaderboard/creators",         title: "Creator-first", desc: "Quanto rende ogni creator + team interno", icon: Users },
       { href: "/leaderboard/creators/heatmap", title: "Heat-map",      desc: "Score operatore × creator a colpo d'occhio", icon: Flame },
       { href: "/admin/conversation-intelligence", title: "Presidio chat", desc: "Latenza risposta, % entro 5 min e response rate per creator (dai transcript, solo metadati)", icon: Activity },
+      { href: "/admin/shift-quality", title: "Qualità turni", desc: "Turno×operatore: conversazioni, funnel PPV, venduto e analisi contenuto — attribuzione onesta singolo/duo", icon: MessagesSquare },
       { href: "/leaderboard/leghe",            title: "Leghe",         desc: "Tornei mensili + tier promozione/retrocessione", icon: Swords },
     ],
   },
