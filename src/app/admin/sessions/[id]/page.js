@@ -5,6 +5,7 @@ import useSWR from "swr";
 import Link from "next/link";
 import { COLORS, FONTS, CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
+import SignalsPanel from "@/components/SignalsPanel";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -338,6 +339,12 @@ export default function SessionDetailPage() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {score.signals && (
+              <div style={{ marginTop: 14 }}>
+                <SignalsPanel data={score.signals} />
               </div>
             )}
 

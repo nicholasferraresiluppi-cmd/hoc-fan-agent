@@ -12,6 +12,7 @@ import { PlayerCardSkeleton, XPBarSkeleton, GridSkeleton } from "@/components/Sk
 import { COLORS, FONTS, CP } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
 import CoachPanel from "@/components/CoachPanel";
+import SignalsPanel from "@/components/SignalsPanel";
 
 // Pick a random archetype weighted by difficulty (favor medium/common ones)
 function pickRandomArchetype() {
@@ -379,6 +380,7 @@ export default function Home() {
           goal_achieved: s.goal_achieved,
           compliance: s.compliance || null,
           compliance_fail: !!s.compliance_fail,
+          signals: s.signals || null,
         });
         setSessionFeedback({
           strengths: s.strengths || [],
@@ -1943,6 +1945,12 @@ export default function Home() {
                 </ul>
               </div>
             </>
+          )}
+
+          {sessionScore?.signals && (
+            <div style={{ marginBottom: "2rem", textAlign: "left" }}>
+              <SignalsPanel data={sessionScore.signals} />
+            </div>
           )}
 
           {/* Feedback su valutazione AI */}
