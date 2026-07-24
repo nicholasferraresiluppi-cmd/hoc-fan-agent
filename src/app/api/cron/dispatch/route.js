@@ -15,8 +15,8 @@
  * (sensibile al confine settimana, resta alle 00:05 del lunedì) e questo
  * dispatcher (03:00 UTC ogni giorno), che esegue il resto in SEQUENZA
  * deterministica in base al giorno:
- *   - sempre:            tick cp-wages e payout-ledger (auto-concatenanti,
- *                        i loro gate di freschezza decidono se c'è lavoro)
+ *   - sempre:            tick cp-wages e payout-ledger (auto-concatenanti)
+ *                        + snapshot coda del loop azione→esito (queue-snapshot)
  *   - lunedì:            run alert operativi + digest email (in sequenza:
  *                        il digest legge i findings scritti dal run)
  *   - giorno 1 del mese: snapshot leghe (chiusura stagione)
@@ -53,6 +53,7 @@ export async function POST(request) {
   }
   out.cp_wages = await kickEndpoint(request, "/api/cron/cp-wages");
   out.payout_ledger = await kickEndpoint(request, "/api/cron/payout-ledger");
+  out.queue_snapshot = await kickEndpoint(request, "/api/cron/queue-snapshot");
 
   // Riscalda la cache degli Academy Signals (query analitica pesante): così la
   // GET admin legge sempre dalla cache invece di calcolare inline. Best-effort:

@@ -132,6 +132,7 @@ const NAV_GROUPS = [
       { href: "/admin/dashboard",                label: "Dashboard",       icon: LayoutDashboard },
       { href: "/admin/fan-archetypes",           label: "Fan Archetypes",  icon: Sparkles },
       { href: "/admin/creators",                 label: "Creator (anag.)", icon: UserCog },
+      { href: "/admin/loop",                     label: "Loop azione→esito", icon: RefreshCw },
       { href: "/admin/roadmap",                  label: "Roadmap",         icon: Signpost },
     ],
   },
