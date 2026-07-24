@@ -40,11 +40,11 @@ function FanCard({ row, copied, onCopy }) {
         <button
           onClick={() => onCopy(row.username)}
           title="Copia @username (incollalo nella ricerca Infloww)"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${CP.border}`, borderRadius: 8, padding: "4px 10px", color: CP.text, fontFamily: FONTS.mono, fontSize: 13, cursor: "pointer" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${CP.border}`, borderRadius: 8, padding: "4px 10px", color: CP.textPrimary, fontFamily: FONTS.mono, fontSize: 13, cursor: "pointer" }}
         >
           @{row.username} {copied === row.username ? <Check size={13} color={CP.accentGreen} /> : <Copy size={13} color={CP.textMuted} />}
         </button>
-        <span style={{ fontFamily: FONTS.mono, fontSize: 13.5, color: CP.text }}>{usd(row.ltv_usd)}</span>
+        <span style={{ fontFamily: FONTS.mono, fontSize: 13.5, color: CP.textPrimary }}>{usd(row.ltv_usd)}</span>
         <span style={{ fontSize: 12, color: CP.textMuted }}>{row.txns} acquisti · {row.msgs_30d} msg/30g</span>
         <StateChip row={row} />
         {l && OBIEZIONE_LABEL[l.obiezione] ? (
@@ -59,8 +59,15 @@ function FanCard({ row, copied, onCopy }) {
         </p>
       ) : null}
       <div style={{ marginTop: 10, borderTop: `1px solid ${CP.borderSoft || CP.border}`, paddingTop: 10 }}>
-        <p style={{ margin: 0, fontSize: 13.5, color: CP.text, fontWeight: 500 }}>→ {row.play.mossa}</p>
-        <p style={{ margin: "3px 0 0", fontSize: 12, color: CP.textMuted }}>perché: {row.play.perche}</p>
+        <p style={{ margin: 0, fontSize: 13.5, color: CP.textPrimary, fontWeight: 600 }}>→ {row.play.mossa}</p>
+        {row.play.angolo ? <p style={{ margin: "5px 0 0", fontSize: 12.5, color: CP.textSecondary, lineHeight: 1.5 }}>{row.play.angolo}</p> : null}
+        {row.play.offerta ? (
+          <p style={{ margin: "7px 0 0", fontSize: 12.5, color: CP.accentSoftText, fontFamily: FONTS.mono, display: "inline-block", background: CP.accentSoft, border: `1px solid ${CP.accent}44`, borderRadius: 7, padding: "3px 9px" }}>{row.play.offerta}</p>
+        ) : null}
+        {row.play.freno ? (
+          <p style={{ margin: "7px 0 0", fontSize: 12, color: CP.accentRed, background: "rgba(240,140,140,.09)", border: `1px solid ${CP.accentRed}33`, borderRadius: 7, padding: "5px 9px", fontWeight: 500 }}>Freno · {row.play.freno}</p>
+        ) : null}
+        <p style={{ margin: "6px 0 0", fontSize: 11.5, color: CP.textMuted }}>perché: {row.play.perche}</p>
       </div>
     </div>
   );
@@ -129,7 +136,7 @@ export default function MyShiftPage() {
           <select
             value={demoCreator}
             onChange={(e) => setDemoCreator(e.target.value)}
-            style={{ background: CP.surface, color: CP.text, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 13 }}
+            style={{ background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 13 }}
           >
             <option value="">— il mio turno —</option>
             {creatorsForSelect.map((c) => (
