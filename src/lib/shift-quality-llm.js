@@ -259,6 +259,24 @@ async function finalizeAnalysis(cid, day, job) {
       opportunita: evidence((l) => l.opportunita_non_chiusa),
       churn: evidence((l) => l.rischio_churn),
     },
+    // Mappa per-fan (uid → ultima etichetta del giorno): alimenta la scheda-fan
+    // di /me/turno ("dov'era rimasta la conversazione"). Solo campi minimi,
+    // niente nomi: il fan resta user_id anche qui.
+    fans: Object.fromEntries(
+      labels.map((l) => [
+        l.uid,
+        {
+          obiezione: l.obiezione,
+          sentiment: l.sentiment_fan,
+          tono: l.tono_chatter,
+          flag_onesta: l.flag_onesta || undefined,
+          opportunita_non_chiusa: l.opportunita_non_chiusa || undefined,
+          rischio_churn: l.rischio_churn || undefined,
+          sintesi: l.sintesi,
+          last_t: l.last_t,
+        },
+      ])
+    ),
     generated_at: new Date().toISOString(),
   };
   await kv.set(analysisKey(cid, day), analysis, { ex: ANALYSIS_TTL });
