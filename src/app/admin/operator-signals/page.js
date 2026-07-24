@@ -73,6 +73,130 @@ function MetricChip({ m }) {
   );
 }
 
+// --- Copertura duo (segnali export Infloww) ---
+const fmtDuoVal = (key, v) => {
+  if (v == null) return "—";
+  if (key === "question_rate") return `${Math.round(v * 100)}%`;
+  if (key === "avg_ppv_price") return `$${Math.round(v)}`;
+  return String(v);
+};
+// "2026-07-20" → "20/07/2026" (parse manuale: niente shift di fuso su new Date)
+const fmtDateIt = (s) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || ""));
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "?";
+};
+function duoVerdictColor(r) {
+  if (r.verdict === "coerente") return CP.textMuted;
+  if (r.key === "avg_ppv_price") return CP.accentBlue; // informativo, non un giudizio
+  return r.verdict === "più domande in duo" ? CP.accentRed : CP.accentGreen;
+}
+
+function DuoBlock({ duo, operator }) {
+  if (!duo) return null;
+  const periodTxt = duo.period ? `${fmtDateIt(duo.period.from)}–${fmtDateIt(duo.period.to)}` : null;
+  // nome export mostrato solo se differisce dal nome warehouse: espone un
+  // eventuale match dubbio (stessa normalizzazione, scrittura diversa).
+  const nameDiffers = duo.operator_export && operator && duo.operator_export.trim().toLowerCase() !== operator.trim().toLowerCase();
+  const meta = [nameDiffers ? `export "${duo.operator_export}"` : null, duo.msgs != null ? `${duo.msgs.toLocaleString("it-IT")} msg` : null, periodTxt].filter(Boolean).join(" · ");
+  // il flag è "forte" (rosso, bordo acceso) solo se il periodo dell'export è noto e
+  // recente: altrimenti il delta può venire dallo sfasamento temporale, non dai duo.
+  const liveFlag = duo.flag && !duo.stale && duo.period_known;
+  const flagNote = duo.stale ? " · export vecchio" : !duo.period_known ? " · periodo sconosciuto" : "";
+  return (
+    <div style={{ marginTop: 10, padding: "8px 11px", background: CP.bgSunken, border: `1px solid ${liveFlag ? `${CP.accentRed}55` : CP.borderSoft}`, borderRadius: 8 }}>
+      <div style={{ fontSize: 10.5, color: CP.textMuted, marginBottom: duo.rows.length ? 6 : 0, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <span>Copertura duo — singolo (warehouse) vs tutti i turni (export)</span>
+        {duo.flag && (
+          <span style={{ color: liveFlag ? CP.accentRed : CP.textMuted }} title={liveFlag ? undefined : "confronto meno affidabile: verifica il periodo dell'export"}>
+            più domande in duo{flagNote}
+          </span>
+        )}
+        {meta && <span style={{ marginLeft: "auto" }}>{meta}</span>}
+      </div>
+      {duo.rows.length === 0 ? (
+        <div style={{ fontSize: 11.5, color: CP.textMuted }}>Export presente ma nessun segnale confrontabile.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {duo.rows.map((r) => (
+            <div key={r.key} style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: 12, flexWrap: "wrap" }}>
+              <span style={{ color: CP.textMuted, minWidth: 118 }}>
+                {r.label}
+                {r.caveat && <span style={{ color: CP.accentBlue }}> *</span>}
+              </span>
+              <span style={{ color: CP.textSecondary }}>
+                {fmtDuoVal(r.key, r.single)} <span style={{ color: CP.textMuted }}>singolo</span>
+              </span>
+              <span style={{ color: CP.textMuted }}>→</span>
+              <span style={{ color: CP.textPrimary }}>
+                {fmtDuoVal(r.key, r.all)} <span style={{ color: CP.textMuted }}>tutti</span>
+              </span>
+              <span style={{ color: duoVerdictColor(r), fontSize: 11 }}>{r.verdict}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InflowwOnly({ list }) {
+  return (
+    <details style={{ marginTop: 8 }}>
+      <summary style={{ cursor: "pointer", fontSize: 12, color: CP.accentSoftText }}>
+        {list.length} operatori visibili solo dall&apos;export duo
+      </summary>
+      <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+        {list.map((o) => (
+          <div key={o.operator} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: 12, flexWrap: "wrap" }}>
+            <span style={{ color: CP.textPrimary, minWidth: 120, fontWeight: 500 }}>{o.operator}</span>
+            <span style={{ color: CP.textMuted }}>{o.msgs != null ? o.msgs.toLocaleString("it-IT") : "—"} msg</span>
+            {o.question_rate != null && <span style={{ color: CP.textSecondary }}>domande {Math.round(o.question_rate * 100)}%</span>}
+            {o.avg_ppv_price != null && <span style={{ color: CP.textSecondary }}>PPV ${Math.round(o.avg_ppv_price)}</span>}
+          </div>
+        ))}
+        <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 2 }}>
+          Nessun turno singolo sufficiente per un profilo warehouse — oppure il nome nell&apos;export non combacia. Solo segnali dell&apos;export, coaching.
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function DuoCoverageSection({ dc }) {
+  // dc null = store non leggibile: silenzioso, il profilo regge lo stesso.
+  if (!dc) return null;
+  if (!dc.store_count) {
+    return (
+      <div style={{ padding: "12px 14px", marginBottom: 14, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, fontSize: 12.5, color: CP.textSecondary }}>
+        Copertura duo: nessun export Infloww ingerito. I turni in duo restano fuori dal profilo (il warehouse non attribuisce chi ha scritto).{" "}
+        <Link href="/admin/infloww-ingest" style={{ color: CP.accentSoftText, textDecoration: "none" }}>
+          Carica un export →
+        </Link>
+      </div>
+    );
+  }
+  return (
+    <div style={{ padding: "12px 14px", marginBottom: 14, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10 }}>
+      <div style={{ fontSize: 12.5, color: CP.textSecondary, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "baseline" }}>
+        <span style={{ color: CP.textPrimary, fontWeight: 500 }}>Copertura duo</span>
+        <span>{dc.matched} con confronto</span>
+        {dc.diverging > 0 && <span style={{ color: CP.accentRed }}>{dc.diverging} con più domande in duo</span>}
+        {dc.infloww_only.length > 0 && <span>{dc.infloww_only.length} solo da export</span>}
+        {dc.warehouse_only > 0 && <span style={{ color: CP.textMuted }}>{dc.warehouse_only} senza export</span>}
+        {dc.ambiguous > 0 && (
+          <span style={{ color: CP.textMuted }} title="nomi che coincidono una volta normalizzati: non attribuiti per prudenza">
+            {dc.ambiguous} {dc.ambiguous === 1 ? "nome ambiguo" : "nomi ambigui"}
+          </span>
+        )}
+        <span style={{ marginLeft: "auto", color: CP.textMuted, fontSize: 11.5 }}>
+          export agg. {dc.store_updated_at ? new Date(dc.store_updated_at).toLocaleDateString("it-IT") : "—"}
+        </span>
+      </div>
+      {dc.infloww_only.length > 0 && <InflowwOnly list={dc.infloww_only} />}
+    </div>
+  );
+}
+
 function OperatorCard({ p }) {
   return (
     <div
@@ -132,6 +256,8 @@ function OperatorCard({ p }) {
           <MetricChip key={m.key} m={m} />
         ))}
       </div>
+
+      <DuoBlock duo={p.duo} operator={p.operator} />
     </div>
   );
 }
@@ -218,6 +344,8 @@ export default function OperatorSignalsPage() {
         <div style={{ color: CP.textMuted, fontSize: 14 }}>Calcolo dai turni reali…</div>
       ) : (
         <>
+          <DuoCoverageSection dc={data?.duo_coverage} />
+
           {profiles.length > 0 && (
             <>
               <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
@@ -284,7 +412,10 @@ export default function OperatorSignalsPage() {
             Base: turni a operatore singolo degli ultimi {data?.params?.days} giorni, min {data?.params?.minOpShifts} turni per operatore.
             <strong> Metodo</strong>: media dei segnali comportamentali vs la distribuzione org. <strong>Resa</strong>: venduto reale ÷ venduto
             atteso dato il mix di creator che lavora (baseline = venduto/ora dei pari sullo stesso creator) → +% sopra i pari, −% sotto. Le due
-            misure sono <strong>affiancate, mai fuse</strong>. Metodologia {data?.version}. Aggiornato {data?.generated_at ? new Date(data.generated_at).toLocaleString("it-IT", { timeZone: "Europe/Rome" }) : "—"}.{data?.cached ? " (cache)" : ""}
+            misure sono <strong>affiancate, mai fuse</strong>. <strong>Copertura duo</strong>: dove esiste un export Infloww per l&apos;operatore, il
+            tasso domande e il prezzo PPV del solo turno singolo (warehouse) sono affiancati agli stessi segnali su <em>tutti</em> i turni (export,
+            inclusi i duo) — la differenza riguarda anche i turni in duo. Fonti separate, finestre e definizioni diverse: è un invito a guardare,
+            non un dato contabile. Metodologia {data?.version}. Aggiornato {data?.generated_at ? new Date(data.generated_at).toLocaleString("it-IT", { timeZone: "Europe/Rome" }) : "—"}.{data?.cached ? " (cache)" : ""}
           </div>
         </>
       )}
