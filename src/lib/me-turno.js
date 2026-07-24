@@ -87,57 +87,104 @@ export async function getMyShiftNow() {
  */
 export function suggestPlay(row, label) {
   const whale = (row.ltv_usd || 0) >= WHALE_LTV;
+  const typ = row.med_buy || row.avg_buy || null; // prezzo tipico del fan
+  const bundle = typ ? Math.max(10, Math.round((typ * 1.3) / 5) * 5) : null;
+  const offerBundle = bundle
+    ? `Proponi un bundle a ~$${bundle}${typ ? ` (il suo PPV tipico è $${typ})` : ""}`
+    : null;
+  const ref = row.last_buy_days != null ? `Ultimo acquisto ${row.last_buy_days}g fa` : null;
+
+  // FRENO ETICO ("alta spesa ≠ sano"): confronta il tasso di spesa degli ultimi
+  // 14g con la baseline PULITA dei 76g precedenti (spend_90d − spend_14d): così
+  // la norma non è diluita dallo stesso picco che deve rilevare. Senza baseline
+  // (fan nuovo) non si parla di "accelerazione" → non scatta.
+  const r14 = (row.spend_14d || 0) / 14;
+  const prior = Math.max(0, (row.spend_90d || 0) - (row.spend_14d || 0));
+  const r76 = prior / 76;
+  const accel = (row.spend_14d || 0) >= 150 && r76 > 0 && r14 >= 2.5 * r76;
+  const freno = accel
+    ? `Spesa in accelerazione ($${row.spend_14d} negli ultimi 14g, ~${Math.round(r14 / r76)}× la sua norma precedente): rallenta, tutela prima di vendere`
+    : null;
+
+  if (accel) {
+    return {
+      mossa: "Frena: relazione, non vendita — nessun push in questo tocco",
+      angolo: "Sta spendendo molto più del suo normale in poco tempo. Un altro rilancio ora è esattamente il rischio da evitare: tienila calda, non caldissima.",
+      offerta: null, freno,
+      perche: "tutelare il fan protegge anche la relazione lunga (e HOC)",
+    };
+  }
   if (label?.rischio_churn) {
     return {
-      mossa: "Ripara prima di vendere: tono di servizio, riconosci il problema, zero push in questo tocco",
-      perche: "l'ultima conversazione l'ha lasciato frustrato: un altro push ora lo perde",
+      mossa: "Ripara prima di vendere: tono di servizio, riconosci il problema",
+      angolo: "L'ultima conversazione l'ha lasciata frustrata. Riconosci cosa è andato storto, zero offerta in questo tocco.",
+      offerta: null, freno,
+      perche: "un altro push ora la perde",
     };
   }
   if (row.state === "waiting") {
     switch (label?.obiezione) {
       case "prezzo":
         return {
-          mossa: "Riconosci l'obiezione prezzo e proponi un bundle mirato — niente sconto al primo tocco",
-          perche: "aprire con lo sconto insegna ad aspettarlo; il bundle sposta il valore, non il prezzo",
+          mossa: "Riconosci il budget e sposta il valore col bundle — niente sconto al primo tocco",
+          angolo: `Non riproporre lo stesso PPV. ${ref ? ref + ". " : ""}Inquadra l'offerta come privilegio, non come sconto, e chiudi con una domanda.`,
+          offerta: offerBundle, freno,
+          perche: "aprire con lo sconto insegna ad aspettarlo; il bundle sposta il valore",
         };
       case "fiducia":
         return {
-          mossa: "Rassicura con fatti concreti (cosa riceve, quando): prometti solo ciò che vedi consegnabile",
-          perche: "la fiducia incrinata si ripara coi fatti, non con l'insistenza",
+          mossa: "Rassicura coi fatti: cosa riceve e quando",
+          angolo: "Prometti solo il consegnabile, niente vaghezza sui dettagli. La fiducia incrinata si ripara concreta, non con l'insistenza.",
+          offerta: null, freno,
+          perche: "la fiducia si ripara coi fatti",
         };
       case "interesse":
         return {
-          mossa: "Cambia angolo: riparti da ciò che l'ha fatto spendere in passato, non riproporre lo stesso contenuto",
-          perche: "l'obiezione era interesse, non prezzo: serve un contenuto diverso, non uno sconto",
+          mossa: "Cambia angolo: riparti da ciò che l'ha fatta spendere",
+          angolo: `${ref ? ref + ". " : ""}Non riproporre lo stesso contenuto: proponi qualcosa di diverso, legato a ciò che ha già comprato.`,
+          offerta: typ ? `Tieni l'offerta vicino al suo tipico $${typ}` : null, freno,
+          perche: "era interesse, non prezzo: serve contenuto diverso, non uno sconto",
         };
       case "tempo":
         return {
-          mossa: "Risposta breve adesso + fissa un momento preciso (“stasera alle 22?”)",
-          perche: "non era un no: era “non ora” — l'appuntamento concreto converte più del rilancio",
+          mossa: "Risposta breve ora + proponi un momento preciso",
+          angolo: "Fissa un orario concreto invece di lasciare aperto: l'appuntamento converte più del rilancio.",
+          offerta: null, freno,
+          perche: "non era un no, era «non ora»",
         };
       default:
         return {
-          mossa: "Rispondi ora, apertura personale (mai broadcast): sta aspettando",
-          perche: "fan in attesa oltre SLA: il tempismo vale più dell'offerta",
+          mossa: "Rispondi ora, apertura personale (mai broadcast)",
+          angolo: whale
+            ? `È una whale in attesa. ${ref ? ref + ". " : ""}Apertura calda e personale, poi porta l'offerta.`
+            : "Sta aspettando: il tempismo vale più dell'offerta.",
+          offerta: whale ? offerBundle : null, freno,
+          perche: "fan in attesa oltre SLA",
         };
     }
   }
   // cooling
   if (label?.opportunita_non_chiusa) {
     return {
-      mossa: "Il terreno era caldo e nessuno ha proposto: riprendi il filo dell'ultima conversazione e stavolta proponi (soft)",
-      perche: "fan positivo + tono buono senza proposta = vendita lasciata sul tavolo",
+      mossa: "Il terreno era caldo e nessuno ha proposto: riprendi e proponi soft",
+      angolo: `${ref ? ref + ". " : ""}Riprendi il filo dell'ultima conversazione, stavolta con una proposta leggera.`,
+      offerta: offerBundle, freno,
+      perche: "fan positivo senza proposta = vendita lasciata sul tavolo",
     };
   }
   if (whale) {
     return {
-      mossa: "Aggancio personale legato all'ultima conversazione — relazione, non vendita, in questo tocco",
-      perche: "le whale si raffreddano in silenzio: il valore si protegge prima che sparisca",
+      mossa: "Aggancio personale legato all'ultima conversazione — relazione prima della vendita",
+      angolo: `Whale che si raffredda in silenzio. ${ref ? ref + ". " : ""}Un tocco personale riapre la porta senza pressione.`,
+      offerta: null, freno,
+      perche: "il valore si protegge prima che sparisca",
     };
   }
   return {
     mossa: "Riaggancio leggero e personale (non commerciale)",
-    perche: "si sta raffreddando: un tocco di relazione riapre la porta senza pressione",
+    angolo: "Un tocco di relazione riapre la porta, senza pressione.",
+    offerta: null, freno,
+    perche: "si sta raffreddando",
   };
 }
 
@@ -168,6 +215,24 @@ export async function getFanCards(creatorId) {
     FROM \`${DATA()}.onlyfans.users_research\`
     WHERE creator_id=${cid} AND ${hocCreatorScopeSQL(DATA())}
     GROUP BY user_id
+  ),
+  spend AS (
+    SELECT user_id,
+      -- prezzo tipico SOLO sui PPV veri (message/post): rinnovi subscription e
+      -- tip da $3-8 falserebbero l'ancora e sottodimensionerebbero il bundle
+      CAST(ROUND(AVG(IF(is_ppv, net, NULL)),0) AS INT64) avg_buy,
+      CAST(ROUND(APPROX_QUANTILES(IF(is_ppv, net, NULL), 2 IGNORE NULLS)[OFFSET(1)],0) AS INT64) med_buy,
+      UNIX_SECONDS(MAX(IF(is_ppv, created_at, NULL))) last_buy_t,
+      -- spesa LORDA attribuita totale (tutti i tipi) per il freno etico
+      CAST(ROUND(SUM(IF(created_at>=TIMESTAMP_SUB(CURRENT_TIMESTAMP(),INTERVAL 14 DAY),net,0)),0) AS INT64) spend_14d,
+      CAST(ROUND(SUM(IF(created_at>=TIMESTAMP_SUB(CURRENT_TIMESTAMP(),INTERVAL 90 DAY),net,0)),0) AS INT64) spend_90d
+    FROM (
+      SELECT user_id, net, created_at, (type IN ('message','post')) AS is_ppv
+      FROM \`${DATA()}.onlyfans.attributed_transactions\`
+      WHERE creator_id=${cid} AND ${hocCreatorScopeSQL(DATA())} AND net>0 AND id IS NOT NULL
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY updated_at DESC)=1
+    )
+    GROUP BY user_id
   )
   SELECT * FROM (
     SELECT
@@ -183,8 +248,10 @@ export async function getFanCards(creatorId) {
       END AS state,
       CAST(ROUND(TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), m.last_fan_ts, HOUR)) AS INT64) AS hrs_since_fan,
       CAST(ROUND(TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), m.last_any_ts, HOUR)) AS INT64) AS hrs_since_active,
-      m.msgs_30d
+      m.msgs_30d,
+      sp.med_buy, sp.avg_buy, sp.last_buy_t, sp.spend_14d, sp.spend_90d
     FROM msgs m JOIN val ON val.user_id = m.user_id
+      LEFT JOIN spend sp ON sp.user_id = m.user_id
     WHERE val.ltv >= ${LTV_FLOOR}
   )
   WHERE state != 'ok'
@@ -199,6 +266,11 @@ export async function getFanCards(creatorId) {
       hrs_since_fan: r.hrs_since_fan == null ? null : Number(r.hrs_since_fan),
       hrs_since_active: r.hrs_since_active == null ? null : Number(r.hrs_since_active),
       msgs_30d: Number(r.msgs_30d) || 0,
+      med_buy: r.med_buy == null ? null : Number(r.med_buy),
+      avg_buy: r.avg_buy == null ? null : Number(r.avg_buy),
+      last_buy_days: r.last_buy_t == null ? null : Math.floor((Date.now() / 1000 - Number(r.last_buy_t)) / 86400),
+      spend_14d: Number(r.spend_14d) || 0,
+      spend_90d: Number(r.spend_90d) || 0,
     }));
     await kv.set(key, queue, { ex: QUEUE_TTL });
   }
