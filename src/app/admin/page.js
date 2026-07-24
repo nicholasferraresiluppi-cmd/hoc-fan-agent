@@ -111,6 +111,7 @@ const SHORTCUT_GROUPS = [
       { href: "/admin/alerts",                 title: "Alert operativi", desc: "Check automatici: wage gap, fee, import fermi, sotto soglia", icon: Bell },
       { href: "/admin/creatorspro-sync",       title: "Sync CP",        desc: "Sincronizza wages + shifts CP (mensile)", icon: RefreshCw },
       { href: "/admin/wage-audit",             title: "Sync & Audit CP", desc: "Storico mese per mese: KV vs live CP, sync/ripara", icon: ShieldCheck },
+      { href: "/admin/creatorspro-sync-history", title: "Storico sync CP", desc: "Storico dei job di sincronizzazione CreatorsPro", icon: History },
       { href: "/admin/debug-mapping",          title: "Debug Mapping",  desc: "Perché un operatore risulta senza dati CP", icon: Link2 },
       { href: "/admin/user-mapping",           title: "Collega utenti", desc: "Utenti Clerk → operatore via roster Infloww (employeeId)", icon: Link2 },
       { href: "/admin/reports",                title: "Analytics",      desc: "Report Looker Studio dell'agency", icon: BarChart3 },
