@@ -47,6 +47,7 @@ export const CAPABILITIES = {
   LEAGUES_SNAPSHOT: "leagues.snapshot",       // forzare snapshot leghe
   LEADERBOARD_SNAPSHOT: "leaderboard.snapshot", // forzare snapshot classifica
   CM_COCKPIT: "cm.cockpit",                   // cockpit turno di supervisione CM
+  COPILOT_PILOT: "copilot.pilot",             // scheda-fan "Il mio turno" (pilota: espone LTV fan)
 };
 
 // "all" = tutta l'org | "team" = solo proprio team | "own" = solo sé stesso | "none" = nessun accesso
@@ -94,6 +95,7 @@ export const ROLE_CAPABILITIES = {
     [CAPABILITIES.LEAGUES_SNAPSHOT]: "all",
     [CAPABILITIES.LEADERBOARD_SNAPSHOT]: "all",
     [CAPABILITIES.CM_COCKPIT]: "all",
+    [CAPABILITIES.COPILOT_PILOT]: "all",
   },
 };
 

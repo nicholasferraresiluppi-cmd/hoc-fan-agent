@@ -24,7 +24,7 @@ import { UserButton, SignedIn } from "@clerk/nextjs";
 import {
   Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown,
   GraduationCap, BookOpen, ClipboardCheck, Target, Brain, Award,
-  LayoutDashboard, UserCog, Sparkles,
+  LayoutDashboard, UserCog, Sparkles, Radar,
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Gauge, MessageSquareWarning,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
@@ -44,6 +44,7 @@ const ESSENTIAL_HREFS = new Set([
   "/me/percorso",
   "/me/contestazioni",
   "/me/qualita",
+  "/me/turno",
   "/me/coaching",
   "/admin",
   "/admin/alerts",
@@ -73,6 +74,7 @@ const NAV_GROUPS = [
       { href: "/me/qualita", label: "La mia qualità", icon: ClipboardCheck },
       { href: "/me/coaching", label: "Il mio coaching", icon: GraduationCap },
       { href: "/me/contestazioni", label: "Le mie contestazioni", icon: MessageSquareWarning },
+      { href: "/me/turno", label: "Il mio turno", icon: Radar },
     ],
   },
   {
