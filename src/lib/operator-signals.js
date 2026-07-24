@@ -21,7 +21,7 @@ import { bqQuery, bigQueryConfigured, HOC_ORGANIZATION_ID } from "@/lib/bigquery
 
 const DATA = () => process.env.BIGQUERY_DATA_PROJECT || "house-of-creators-358213";
 
-export const OPERATOR_SIGNALS_VERSION = "op-sig-2-2026-07"; // +disciplina di risposta (slow_reply_rate)
+export const OPERATOR_SIGNALS_VERSION = "op-sig-3-2026-07"; // +disciplina di risposta (slow_reply_rate) + resa aggiustata per creator (rev_index) + quadrante metodo×resa
 const CACHE_KEY = `operator:signals:${OPERATOR_SIGNALS_VERSION}`;
 const CACHE_TTL = 25 * 3600; // riscaldata dal cron dispatch
 
@@ -69,6 +69,7 @@ single AS (
 -- una riga per SHIFT (mai fondere turni distinti)
 feat AS (
   SELECT s.member_name, s.shift_id,
+    ANY_VALUE(s.creator_id) AS creator_id,
     ANY_VALUE(s.hours) AS hours, ANY_VALUE(s.revenue) AS revenue,
     COUNTIF(c.sender_id = c.creator_id) AS op_msgs,
     SUM(IF(c.sender_id = c.creator_id, c.words, 0)) AS op_words,
@@ -82,21 +83,44 @@ feat AS (
   WHERE c.created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${days + 1} DAY)
     AND c.organization_id = '${org}'
   GROUP BY 1, 2
+),
+-- turni singoli "produttivi" (con abbastanza messaggi): base comune per
+-- comportamento e per la baseline creator, così sono coerenti.
+prod AS (
+  SELECT * FROM feat WHERE hours > 0 AND op_msgs >= ${minShiftMsgs}
+),
+-- ore e venduto per operatore×creator e per creator (totale): servono al
+-- confronto LEAVE-ONE-OUT (la baseline del creator esclude l'operatore misurato).
+oc AS (SELECT member_name, creator_id, SUM(hours) AS oc_h, SUM(revenue) AS oc_rev FROM prod GROUP BY 1, 2),
+ct AS (SELECT creator_id, SUM(hours) AS tot_h, SUM(revenue) AS tot_rev FROM prod GROUP BY 1),
+-- RESA aggiustata: venduto reale vs atteso al rate dei PARI sullo stesso creator,
+-- con la baseline che ESCLUDE l'operatore stesso (niente auto-inclusione che
+-- schiaccerebbe l'indice verso 1) e conta SOLO i creator dove restano pari
+-- (ore altrui > 0). cmp_h/all_h danno la copertura del confronto.
+outcome AS (
+  SELECT oc.member_name,
+    SUM(IF(ct.tot_h - oc.oc_h > 0, oc.oc_rev, 0)) AS cmp_rev,
+    SUM(IF(ct.tot_h - oc.oc_h > 0, ((ct.tot_rev - oc.oc_rev) / (ct.tot_h - oc.oc_h)) * oc.oc_h, 0)) AS exp_rev,
+    SUM(IF(ct.tot_h - oc.oc_h > 0, oc.oc_h, 0)) AS cmp_h,
+    SUM(oc.oc_h) AS all_h
+  FROM oc JOIN ct USING (creator_id) GROUP BY 1
+),
+beh AS (
+  SELECT p.member_name,
+    COUNT(*) AS shifts,
+    SUM(p.op_msgs) AS msgs,
+    SUM(p.op_q) / SUM(p.op_msgs) AS question_rate,
+    SAFE_DIVIDE(SUM(p.ppv), SUM(p.hours)) AS ppv_per_h,
+    SAFE_DIVIDE(SUM(p.ppv_amount), NULLIF(SUM(p.ppv), 0)) AS avg_ppv_price,
+    SUM(p.op_msgs) / SUM(p.hours) AS msgs_per_h,
+    SAFE_DIVIDE(SUM(p.op_words), NULLIF(SUM(p.op_msgs), 0)) AS words_per_msg,
+    SAFE_DIVIDE(SUM(p.op_words), NULLIF(SUM(p.op_words) + SUM(p.fan_words), 0)) AS talk_ratio,
+    SUM(p.revenue) / SUM(p.hours) AS rev_per_h
+  FROM prod p GROUP BY p.member_name
+  HAVING shifts >= ${minOpShifts} AND SUM(p.op_msgs) > 0
 )
-SELECT member_name,
-  COUNT(*) AS shifts,
-  SUM(op_msgs) AS msgs,
-  SUM(op_q) / SUM(op_msgs) AS question_rate,
-  SAFE_DIVIDE(SUM(ppv), SUM(hours)) AS ppv_per_h,
-  SAFE_DIVIDE(SUM(ppv_amount), NULLIF(SUM(ppv), 0)) AS avg_ppv_price,
-  SUM(op_msgs) / SUM(hours) AS msgs_per_h,
-  SAFE_DIVIDE(SUM(op_words), NULLIF(SUM(op_msgs), 0)) AS words_per_msg,
-  SAFE_DIVIDE(SUM(op_words), NULLIF(SUM(op_words) + SUM(fan_words), 0)) AS talk_ratio,
-  SUM(revenue) / SUM(hours) AS rev_per_h
-FROM feat
-WHERE hours > 0 AND op_msgs >= ${minShiftMsgs}
-GROUP BY member_name
-HAVING shifts >= ${minOpShifts} AND SUM(op_msgs) > 0`;
+SELECT b.*, o.cmp_rev, o.exp_rev, o.cmp_h, o.all_h
+FROM beh b JOIN outcome o USING (member_name)`;
 }
 
 // Percentile-rank di v nell'array ordinato asc (frazione di valori <= v).
@@ -190,6 +214,10 @@ function buildProfiles(rows) {
       shifts: Number(r.shifts),
       msgs: Number(r.msgs),
       rev_per_h: r.rev_per_h == null ? null : Number(r.rev_per_h),
+      cmp_rev: r.cmp_rev == null ? null : Number(r.cmp_rev),
+      exp_rev: r.exp_rev == null ? null : Number(r.exp_rev),
+      cmp_h: r.cmp_h == null ? null : Number(r.cmp_h),
+      all_h: r.all_h == null ? null : Number(r.all_h),
       words_per_msg: r.words_per_msg == null ? null : Number(r.words_per_msg),
       talk_ratio: r.talk_ratio == null ? null : Number(r.talk_ratio),
       vals: {
@@ -239,11 +267,32 @@ function buildProfiles(rows) {
     const best = scored.slice().sort((a, b) => b.goodness - a.goodness)[0] || null;
     const topGap = worst && worst.verdict === "gap" ? { key: worst.key, label: worst.label, coaching: worst.coaching } : null;
 
+    // ALLINEAMENTO = media della goodness sui comportamenti. Il prezzo PPV nullo
+    // significa "non ha mai proposto PPV" (scelta comportamentale) → conta come
+    // PEGGIORE (0), non va scartato, altrimenti chi non monetizza mai gonfia il
+    // proprio metodo rispetto a chi vende ma sottoprezza.
+    const alignVals = metrics
+      .map((m) => (m.goodness != null ? m.goodness : m.key === "avg_ppv_price" ? 0 : null))
+      .filter((v) => v != null);
+    const alignment = alignVals.length ? +(alignVals.reduce((a, v) => a + v, 0) / alignVals.length).toFixed(2) : null;
+    // RESA aggiustata leave-one-out: venduto reale vs atteso al rate dei PARI sugli
+    // stessi creator (baseline che ESCLUDE l'operatore). Valido solo se il confronto
+    // copre almeno metà delle sue ore (cmp_h ≥ 50% all_h): altrimenti troppi turni
+    // senza pari (operatore solo/dominante) → nessun confronto onesto, revIndex null.
+    const hasPeers = o.exp_rev != null && o.exp_rev > 0 && o.cmp_rev != null && o.cmp_h != null && o.all_h > 0 && o.cmp_h >= 0.5 * o.all_h;
+    const revIndex = hasPeers ? +(o.cmp_rev / o.exp_rev).toFixed(2) : null;
+    // Quadrante: metodo (alto/basso) × resa (sopra/sotto pari). Le DIAGONALI OPPOSTE
+    // sono le interessanti (metodo ≠ resa). Confronto, non fusione.
+    const quadrant = alignment != null && revIndex != null ? classifyQuadrant(alignment, revIndex) : null;
+
     return {
       operator: o.operator,
       shifts: o.shifts,
       msgs: o.msgs,
       rev_per_h: o.rev_per_h == null ? null : Math.round(o.rev_per_h),
+      rev_index: revIndex,
+      alignment,
+      quadrant,
       metrics,
       top_gap: topGap,
       top_strength: best && best.verdict === "forte" ? { key: best.key, label: best.label } : null,
@@ -256,11 +305,27 @@ function buildProfiles(rows) {
     return (b.rev_per_h ?? 0) - (a.rev_per_h ?? 0);
   });
 
+  const quad_counts = { star: 0, potential: 0, fragile: 0, coach: 0 };
+  for (const p of profiles) if (p.quadrant) quad_counts[p.quadrant.key] = (quad_counts[p.quadrant.key] || 0) + 1;
+
   return {
     profiles,
     operators: profiles.length,
     org_medians: Object.fromEntries(METRICS.map((m) => [m.key, dist[m.key].median])),
+    quad_counts,
   };
+}
+
+// Quadrante metodo × resa. Le diagonali opposte (metodo≠resa) sono le interessanti.
+const ALIGN_HI = 0.5; // goodness percentile-based → mediana ~0.5
+const REV_HI = 1.0; // 1.0 = pari coi colleghi sugli stessi creator
+function classifyQuadrant(alignment, revIndex) {
+  const method = alignment >= ALIGN_HI;
+  const outcome = revIndex >= REV_HI;
+  if (method && outcome) return { key: "star", label: "Metodo e resa", note: "Fa le mosse che pagano e rende sopra i pari — da replicare." };
+  if (method && !outcome) return { key: "potential", label: "Buone abitudini, resa sotto", note: "Fa le cose giuste ma rende sotto i pari sugli stessi creator: guarda contesto/assegnazione, potenziale da sbloccare." };
+  if (!method && outcome) return { key: "fragile", label: "Rende senza metodo", note: "Sopra i pari ma senza i comportamenti che di solito lo sostengono: fragile, regge finché regge il creator." };
+  return { key: "coach", label: "Da coachare", note: "Sotto sui comportamenti e sotto sulla resa: target di coaching chiaro." };
 }
 
 function clampInt(v, def, lo, hi) {

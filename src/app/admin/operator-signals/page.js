@@ -20,6 +20,32 @@ const VERDICT = {
   "n/d": { color: CP.textMuted, label: "n/d" },
 };
 
+// Quadrante metodo × resa (dal lib). Colori: verde=bene, rosso=coach, blu/viola=le
+// diagonali interessanti (metodo ≠ resa).
+// short DEVE combaciare con classifyQuadrant (lib) — stessa etichetta ovunque.
+const QUAD = {
+  star: { color: CP.accentGreen, short: "Metodo e resa" },
+  potential: { color: CP.accentBlue, short: "Buone abitudini, resa sotto" },
+  fragile: { color: CP.accent, short: "Rende senza metodo" },
+  coach: { color: CP.accentRed, short: "Da coachare" },
+};
+const QUAD_ORDER = ["star", "potential", "fragile", "coach"];
+const revVsPeers = (idx) => {
+  if (idx == null) return null;
+  const d = Math.round((idx - 1) * 100);
+  return `${d < 0 ? "−" : "+"}${Math.abs(d)}% vs pari`; // − U+2212 come la legenda
+};
+
+function QuadrantBadge({ q }) {
+  if (!q) return null;
+  const c = QUAD[q.key] || QUAD.coach;
+  return (
+    <span title={q.note} style={{ fontSize: 11, color: c.color, background: `${c.color}1c`, border: `1px solid ${c.color}55`, padding: "2px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>
+      {q.label}
+    </span>
+  );
+}
+
 function MetricChip({ m }) {
   const v = VERDICT[m.verdict] || VERDICT["n/d"];
   return (
@@ -58,9 +84,14 @@ function OperatorCard({ p }) {
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, fontFamily: FONTS.display }}>{p.operator}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, fontFamily: FONTS.display }}>{p.operator}</span>
+          <QuadrantBadge q={p.quadrant} />
+        </div>
         <div style={{ fontSize: 12, color: CP.textMuted }}>
-          {p.shifts} turni singoli · {p.msgs.toLocaleString("it-IT")} messaggi{p.rev_per_h != null ? ` · $${p.rev_per_h.toLocaleString("it-IT")}/h` : ""}
+          {p.shifts} turni singoli · {p.msgs.toLocaleString("it-IT")} messaggi
+          {p.rev_per_h != null ? ` · $${p.rev_per_h.toLocaleString("it-IT")}/h` : ""}
+          {p.rev_index != null ? <span style={{ color: p.rev_index >= 1 ? CP.accentGreen : CP.accentRed }}>{` · ${revVsPeers(p.rev_index)}`}</span> : ""}
         </div>
       </div>
 
@@ -111,6 +142,7 @@ export default function OperatorSignalsPage() {
   const [refreshErr, setRefreshErr] = useState(null);
   const [q, setQ] = useState("");
   const [onlyGaps, setOnlyGaps] = useState(false);
+  const [quadFilter, setQuadFilter] = useState(null);
 
   async function refresh() {
     setBusy(true);
@@ -131,7 +163,22 @@ export default function OperatorSignalsPage() {
   const withGap = profiles.filter((p) => p.top_gap).length;
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return profiles.filter((p) => (!onlyGaps || p.top_gap) && (!needle || p.operator.toLowerCase().includes(needle)));
+    return profiles.filter(
+      (p) =>
+        (!onlyGaps || p.top_gap) &&
+        (!quadFilter || p.quadrant?.key === quadFilter) &&
+        (!needle || p.operator.toLowerCase().includes(needle))
+    );
+  }, [profiles, q, onlyGaps, quadFilter]);
+
+  // conteggi per quadrante sul sottoinsieme visibile (ricerca + solo-gap), non
+  // globali: così il numero sul bottone riflette cosa restituisce cliccarlo.
+  const quadCounts = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    const base = profiles.filter((p) => (!onlyGaps || p.top_gap) && (!needle || p.operator.toLowerCase().includes(needle)));
+    const c = { star: 0, potential: 0, fragile: 0, coach: 0 };
+    for (const p of base) if (p.quadrant) c[p.quadrant.key] = (c[p.quadrant.key] || 0) + 1;
+    return c;
   }, [profiles, q, onlyGaps]);
 
   const inputStyle = { background: CP.bgSunken, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, padding: "8px 10px", outline: "none" };
@@ -141,7 +188,7 @@ export default function OperatorSignalsPage() {
       <PageHeader
         section="Admin · Academy"
         title="Profilo segnali operatore"
-        subtitle="Dove ogni operatore è carente, dal suo lavoro VERO (turni a operatore singolo), sui comportamenti che monetizzano. Diagnosi di coaching, non un punteggio: non entra in score né comp. Copertura limitata ai turni singoli — quelli in duo si estendono con il match dell'export Infloww."
+        subtitle="Per ogni operatore: quanto fa le mosse che pagano (metodo) e quanto rende rispetto ai pari sugli stessi creator (resa aggiustata per il mix). Due misure separate, confrontate — non fuse: le diagonali opposte (abitudini ok ma resa bassa, o viceversa) sono le più istruttive. Turni a operatore singolo. Coaching, non score."
         toolbar={
           <button
             onClick={refresh}
@@ -171,16 +218,49 @@ export default function OperatorSignalsPage() {
         <div style={{ color: CP.textMuted, fontSize: 14 }}>Calcolo dai turni reali…</div>
       ) : (
         <>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
-            <input placeholder="Cerca operatore…" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...inputStyle, minWidth: 200 }} />
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: CP.textSecondary, cursor: "pointer" }}>
-              <input type="checkbox" checked={onlyGaps} onChange={(e) => setOnlyGaps(e.target.checked)} />
-              solo con gap
-            </label>
-            <span style={{ fontSize: 13, color: CP.textMuted, marginLeft: "auto" }}>
-              {profiles.length} operatori · {withGap} con un gap da coachare
-            </span>
-          </div>
+          {profiles.length > 0 && (
+            <>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
+                <input placeholder="Cerca operatore…" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...inputStyle, minWidth: 200 }} />
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: CP.textSecondary, cursor: "pointer" }}>
+                  <input type="checkbox" checked={onlyGaps} onChange={(e) => setOnlyGaps(e.target.checked)} />
+                  solo con gap
+                </label>
+                <span style={{ fontSize: 13, color: CP.textMuted, marginLeft: "auto" }}>
+                  {profiles.length} operatori · {withGap} con un gap da coachare
+                </span>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                {QUAD_ORDER.map((k) => {
+                  const c = QUAD[k];
+                  const active = quadFilter === k;
+                  return (
+                    <button
+                      key={k}
+                      onClick={() => setQuadFilter(active ? null : k)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        background: active ? `${c.color}22` : CP.surface,
+                        border: `1px solid ${active ? c.color : CP.border}`,
+                        borderRadius: 10,
+                        padding: "8px 12px",
+                        fontSize: 12.5,
+                        color: CP.textSecondary,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <span style={{ width: 8, height: 8, borderRadius: 999, background: c.color, flexShrink: 0 }} />
+                      <span style={{ color: CP.textPrimary, fontWeight: 500 }}>{quadCounts[k] || 0}</span>
+                      {c.short}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
           {profiles.length === 0 ? (
             <div style={{ padding: "20px 24px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, color: CP.textSecondary, fontSize: 14 }}>
@@ -202,9 +282,9 @@ export default function OperatorSignalsPage() {
 
           <div style={{ marginTop: 12, fontSize: 12, color: CP.textMuted, lineHeight: 1.6 }}>
             Base: turni a operatore singolo degli ultimi {data?.params?.days} giorni, min {data?.params?.minOpShifts} turni per operatore.
-            Verdetti per confronto con la distribuzione org (mediana domande {data?.org_medians?.question_rate != null ? Math.round(data.org_medians.question_rate * 100) + "%" : "—"},
-            prezzo PPV ${data?.org_medians?.avg_ppv_price != null ? Math.round(data.org_medians.avg_ppv_price) : "—"}).
-            Metodologia {data?.version}. Aggiornato {data?.generated_at ? new Date(data.generated_at).toLocaleString("it-IT", { timeZone: "Europe/Rome" }) : "—"}.{data?.cached ? " (cache)" : ""}
+            <strong> Metodo</strong>: media dei segnali comportamentali vs la distribuzione org. <strong>Resa</strong>: venduto reale ÷ venduto
+            atteso dato il mix di creator che lavora (baseline = venduto/ora dei pari sullo stesso creator) → +% sopra i pari, −% sotto. Le due
+            misure sono <strong>affiancate, mai fuse</strong>. Metodologia {data?.version}. Aggiornato {data?.generated_at ? new Date(data.generated_at).toLocaleString("it-IT", { timeZone: "Europe/Rome" }) : "—"}.{data?.cached ? " (cache)" : ""}
           </div>
         </>
       )}
