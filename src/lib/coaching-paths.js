@@ -39,6 +39,10 @@ const GAP_TO_PATH = {
     focus: "Presidia di più: tieni viva la conversazione e riaggancia chi si sta raffreddando.",
     categories: ["le-basi-della-chat", "recuperi-e-retention"],
   },
+  slow_reply_rate: {
+    focus: "Rispondi prima: non lasciare in attesa i fan caldi, la lentezza raffredda la vendita.",
+    categories: ["le-basi-della-chat", "recuperi-e-retention"],
+  },
 };
 
 let _byCat = null;
