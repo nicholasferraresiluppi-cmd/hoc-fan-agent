@@ -9,9 +9,14 @@
  * Scope OWN by design: riusa il motore org-level (che nella vista d'insieme è
  * SEED/admin, perché espone tutti gli operatori) ma restituisce SOLO il profilo
  * dell'utente loggato — mai la distribuzione, mai gli altri operatori, mai il
- * percentile grezzo. Gate identico al copilot (COPILOT_PILOT) + anti-spoof:
- * vale solo il collegamento esplicito user_employee:* impostato da un admin,
- * come /api/me/turno.
+ * percentile grezzo. Gate: COPILOT_PILOT (aperto a tutta HOC, scope own).
+ *
+ * Identità via lo STESSO resolver di /me/score e /profilo (override admin OPPURE
+ * match email su roster/CP): questi segnali sono comportamentali e NON espongono
+ * PII fan, quindi non serve il pilot-link esplicito — così la diagnostica
+ * personale è self-serve. (L'override resta obbligatorio solo dove si mostrano
+ * gli LTV fan, cioè le card di /api/me/turno.) Anti-spoof invariato: l'employee
+ * lo risolve sempre il server dall'utente Clerk, mai il client.
  *
  * Niente di questa superficie entra negli score (policy dati-operatore: i
  * segnali informano il coaching, non la comp).
@@ -37,11 +42,11 @@ export async function GET() {
     return Response.json({ error: "BigQuery non configurato" }, { status: 503 });
   }
 
-  // Identità server-side + anti-spoof: vale solo il link esplicito da admin
-  // (stessa regola di /api/me/turno — mai un employee dal client).
+  // Identità server-side (override admin o match email roster/CP), mai dal client.
+  // Segnali comportamentali, nessuna PII fan → il match email basta (come /me/score).
   const who = await resolveEmployeeForUser();
-  if (!who?.employee || who.source !== "override") {
-    return Response.json({ linked: false });
+  if (!who?.employee) {
+    return Response.json({ linked: false, reason: who?.reason || "no_match" });
   }
 
   let all;

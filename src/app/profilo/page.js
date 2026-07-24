@@ -7,6 +7,7 @@ import { COLORS, FONTS, CP } from "@/lib/brand";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { useUser } from "@clerk/nextjs";
 import { Sparkles, TrendingUp, GraduationCap, BookOpen, Mail, ArrowRight, Target, Award } from "lucide-react";
+import SignalsStrip from "@/components/SignalsStrip";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -61,6 +62,10 @@ export default function MyProfilePage() {
   const coachingUrl = periodId ? `/api/admin/coaching-center?period_id=${periodId}` : null;
   const { data: coachingData } = useSWR(coachingUrl, fetcher, { revalidateOnFocus: false });
   const myCoaching = employee && coachingData?.assignments?.[employee] ? coachingData.assignments[employee] : null;
+
+  // Profilo-segnali comportamentale (metodo dal lavoro vero + percorso di training),
+  // self-serve via match email — stessa diagnostica del cockpit turno.
+  const { data: sig } = useSWR("/api/me/signals", fetcher, { revalidateOnFocus: false });
 
   const cp = drill?.cp;
   const tierColor = cp?.tier ? TIER_COLORS[cp.tier] : COLORS.champagne;
@@ -168,6 +173,9 @@ export default function MyProfilePage() {
             {myCoaching && myCoaching.status === "assigned" && (
               <CoachingBlock assignment={myCoaching} />
             )}
+
+            {/* PROFILO-SEGNALI — metodo dal lavoro vero + percorso (self-serve, own) */}
+            <SignalsStrip sig={sig} />
 
             {/* PERFORMANCE PER CREATOR */}
             {cp?.per_creator?.length > 0 && (

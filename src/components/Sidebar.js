@@ -162,6 +162,10 @@ const NAV_GROUPS = [
     items: [
       { href: "/admin/creatorspro-sync",         label: "Sync CP",         icon: RefreshCw },
       { href: "/admin/wage-audit",               label: "Sync & Audit CP", icon: ShieldCheck },
+      { href: "/admin/creatorspro-sync-history", label: "Storico sync CP", icon: History },
+      { href: "/admin/infloww-agency",           label: "Revenue agency",  icon: Gauge },
+      { href: "/admin/infloww-revenue",          label: "Revenue live",    icon: BarChart3 },
+      { href: "/admin/infloww-reconcile",        label: "Controllo dati CP", icon: Link2 },
       { href: "/admin/debug-mapping",            label: "Debug Mapping",   icon: Link2 },
       { href: "/admin/user-mapping",             label: "Collega utenti",  icon: Link2 },
       { href: "/admin/reports",                  label: "Analytics",       icon: BarChart3 },
@@ -425,7 +429,6 @@ export default function Sidebar() {
 
       {/* Welcome link (always visible, both modes) */}
       <div style={{ padding: "10px 0 4px 0", borderBottom: `1px solid ${CP.border}` }}>
-        <NavItem href="/profilo" label="Il mio profilo" icon={Award} isActive={pathname === "/profilo"} />
         <NavItem href="/welcome" label="Welcome / Tour" icon={Compass} isActive={pathname === "/welcome"} />
         <NavItem href="/admin" label="Hub" icon={LayoutDashboard} isActive={pathname === "/admin"} />
         <NavItem href="/admin/alerts" label="Alert operativi" icon={Bell} isActive={pathname.startsWith("/admin/alerts")} badge={criticalCount} />
