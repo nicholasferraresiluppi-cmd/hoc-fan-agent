@@ -54,6 +54,21 @@ export async function POST(request) {
   out.cp_wages = await kickEndpoint(request, "/api/cron/cp-wages");
   out.payout_ledger = await kickEndpoint(request, "/api/cron/payout-ledger");
 
+  // Riscalda la cache degli Academy Signals (query analitica pesante): così la
+  // GET admin legge sempre dalla cache invece di calcolare inline. Best-effort:
+  // un errore qui non deve far fallire il dispatcher.
+  try {
+    const { getAcademySignals, bigQueryConfigured } = await import("@/lib/academy-signals");
+    if (bigQueryConfigured()) {
+      await getAcademySignals({ force: true });
+      out.academy_signals = "ok";
+    } else {
+      out.academy_signals = "skip:no-bq";
+    }
+  } catch (e) {
+    out.academy_signals = "err:" + (e?.message || "unknown");
+  }
+
   return Response.json(out);
 }
 
