@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import useSWR from "swr";
 import { Copy, Check, Clock, Snowflake, HelpCircle, Compass } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
@@ -68,17 +68,22 @@ function FanCard({ row, copied, onCopy }) {
 
 export default function MyShiftPage() {
   const [demoCreator, setDemoCreator] = useState("");
+  const [adminCreators, setAdminCreators] = useState(null);
   const url = "/api/me/turno" + (demoCreator ? `?creator_id=${demoCreator}` : "");
   const { data, error, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false, refreshInterval: 5 * 60000 });
   const [copied, setCopied] = useState(null);
   const onCopy = useCallback((username) => {
     try {
-      navigator.clipboard.writeText(username);
+      navigator.clipboard.writeText(username).catch(() => {});
       setCopied(username);
       setTimeout(() => setCopied((c) => (c === username ? null : c)), 1400);
     } catch {}
   }, []);
 
+  useEffect(() => {
+    if (data?.admin_creators) setAdminCreators(data.admin_creators);
+  }, [data?.admin_creators]);
+  const creatorsForSelect = data?.admin_creators || adminCreators;
   const groups = data?.groups || [];
   const denied = data?.error && !data?.groups;
 
@@ -108,13 +113,17 @@ export default function MyShiftPage() {
         <CpCard>
           <div style={{ textAlign: "center", padding: "30px 16px" }}>
             <HelpCircle size={30} color={CP.mutedIcons} />
-            <p style={{ color: CP.textSecondary, fontSize: 14.5, margin: "12px 0 6px" }}>Account non ancora collegato a un profilo operatore.</p>
-            <p style={{ color: CP.textMuted, fontSize: 13, margin: 0 }}>Chiedi a un admin di collegare la tua email al tuo nome operatore.</p>
+            <p style={{ color: CP.textSecondary, fontSize: 14.5, margin: "12px 0 6px" }}>
+              {data.reason === "pilot_link_required"
+                ? "Per il pilota serve il collegamento esplicito del tuo account operatore."
+                : "Account non ancora collegato a un profilo operatore."}
+            </p>
+            <p style={{ color: CP.textMuted, fontSize: 13, margin: 0 }}>Lo fa un admin in un minuto: chiedi di collegare il tuo account al tuo nome operatore.</p>
           </div>
         </CpCard>
       )}
 
-      {data?.admin_creators ? (
+      {creatorsForSelect ? (
         <div style={{ marginBottom: 18, display: "flex", gap: 10, alignItems: "center" }}>
           <span style={{ fontSize: 12, color: CP.textMuted }}>Spot-check (solo scope all):</span>
           <select
@@ -123,7 +132,7 @@ export default function MyShiftPage() {
             style={{ background: CP.surface, color: CP.text, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 13 }}
           >
             <option value="">— il mio turno —</option>
-            {data.admin_creators.map((c) => (
+            {creatorsForSelect.map((c) => (
               <option key={c.creator_id} value={c.creator_id}>{c.creator_name}</option>
             ))}
           </select>
@@ -151,6 +160,10 @@ export default function MyShiftPage() {
           In turno {hhmm(data.shift.start)}–{hhmm(data.shift.end)} (ora italiana)
           {data.shift.k > 1 ? <span style={{ color: CP.textMuted }}> · profilo coseller</span> : null}
         </p>
+      ) : null}
+
+      {data?.shift && data.mode !== "demo" && groups.length === 0 ? (
+        <CpCard><p style={{ color: CP.textMuted, fontSize: 13.5, margin: 0 }}>Nessun account del turno è tra i creator HOC attivi in chat: scheda vuota.</p></CpCard>
       ) : null}
 
       {groups.map((g) => {

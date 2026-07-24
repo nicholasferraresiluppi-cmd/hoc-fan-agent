@@ -38,7 +38,9 @@ export async function GET(request) {
   // Creator del turno attivo; override solo per scope "all" (demo/spot-check).
   let creatorIds = who.active?.creator_ids || [];
   let mode = who.active ? "turno" : "nessun_turno";
-  if (requested && az.scope === "all") {
+  // demo/spot-check: SOLO ruolo admin (non basta scope all: un ruolo custom
+  // potrebbe concederlo per errore — review 23 lug)
+  if (requested && az.role === "admin") {
     const cid = parseInt(requested, 10);
     if (!Number.isInteger(cid)) return Response.json({ error: "creator_id non valido" }, { status: 400 });
     creatorIds = [cid];
@@ -66,8 +68,8 @@ export async function GET(request) {
     shift: who.active || null,
     upcoming: who.upcoming || null,
     groups,
-    // il selettore demo compare solo per chi ha scope all
-    admin_creators: az.scope === "all" ? hocCreators : undefined,
+    // il selettore demo compare solo per gli admin
+    admin_creators: az.role === "admin" ? hocCreators : undefined,
     generated_at: new Date().toISOString(),
   });
 }

@@ -13,7 +13,7 @@
 //   - dati fan = LTV + tempi: per questo la pagina è gated COPILOT_PILOT (pilota)
 
 import { kv } from "@vercel/kv";
-import { bqQuery, bigQueryConfigured } from "@/lib/bigquery-api";
+import { bqQuery, bigQueryConfigured, hocCreatorScopeSQL } from "@/lib/bigquery-api";
 import { resolveEmployeeForUser, normalizeName } from "@/lib/me";
 import { getCreators } from "@/lib/priority-queue";
 
@@ -33,12 +33,20 @@ export { bigQueryConfigured, getCreators };
 export async function getMyShiftNow() {
   const who = await resolveEmployeeForUser();
   if (!who?.employee) return { employee: null, reason: who?.reason || "no_match" };
+  // SICUREZZA (review 23 lug): il resolver via email matcha solo la parte locale
+  // (dominio ignorato) → spoofabile aggiungendo un'email al profilo Clerk. Le
+  // altre /me espongono solo dati PROPRI; qui ci sono LTV fan → per il pilota
+  // vale SOLO il collegamento esplicito impostato da un admin (user_employee:*).
+  if (who.source !== "override") {
+    return { employee: null, reason: "pilot_link_required" };
+  }
 
   const now = Date.now();
   // mese corrente + precedente: i turni notturni stanno nel mese dello started_at
   const months = new Set([
     new Date(now).toISOString().slice(0, 7),
     new Date(now - 2 * 86400_000).toISOString().slice(0, 7),
+    new Date(now + 12 * 3600_000).toISOString().slice(0, 7), // upcoming oltre il cambio mese
   ]);
   const wageSets = await Promise.all([...months].map((m) => kv.get(`cp:wages:${m}`)));
   const wanted = normalizeName(who.employee);
@@ -152,11 +160,14 @@ export async function getFanCards(creatorId) {
       COUNTIF(created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)) AS msgs_30d
     FROM \`${DATA()}.hoc.ws_chat\`
     WHERE creator_id=${cid} AND created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 DAY)
+      AND ${hocCreatorScopeSQL(DATA())}
     GROUP BY user_id
   ),
   val AS (
     SELECT user_id, ANY_VALUE(username) username, SUM(total_net_expenses) ltv, SUM(transaction_count) tx
-    FROM \`${DATA()}.onlyfans.users_research\` WHERE creator_id=${cid} GROUP BY user_id
+    FROM \`${DATA()}.onlyfans.users_research\`
+    WHERE creator_id=${cid} AND ${hocCreatorScopeSQL(DATA())}
+    GROUP BY user_id
   )
   SELECT * FROM (
     SELECT
@@ -201,7 +212,17 @@ export async function getFanCards(creatorId) {
   const labelByUid = new Map();
   for (const a of analyses) {
     for (const [uid, l] of Object.entries(a?.fans || {})) {
-      if (!labelByUid.has(uid)) labelByUid.set(uid, { ...l, day: a.day });
+      if (labelByUid.has(uid)) continue;
+      // niente tono/flag_onesta qui: sono segnali sul lavoro di un COLLEGA
+      // (altro turno), non contesto sul fan — restano nell'analisi admin
+      labelByUid.set(uid, {
+        obiezione: l.obiezione,
+        sentiment: l.sentiment,
+        sintesi: l.sintesi,
+        rischio_churn: l.rischio_churn,
+        opportunita_non_chiusa: l.opportunita_non_chiusa,
+        day: a.day,
+      });
     }
   }
 

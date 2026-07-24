@@ -44,6 +44,7 @@ const ESSENTIAL_HREFS = new Set([
   "/me/percorso",
   "/me/contestazioni",
   "/me/qualita",
+  "/me/turno",
   "/me/coaching",
   "/admin",
   "/admin/alerts",
