@@ -11,6 +11,7 @@ import { getCreatorById, formatCreatorPersonaForPrompt } from "@/lib/creator-per
 import { getFanArchetypeById } from "@/lib/fan-archetypes";
 import { getDrillForDate, markDrillCompleted, getDrillStatusForUser } from "@/lib/daily-drill";
 import { applyScoreToProfile } from "@/lib/operator-profile";
+import { scoreTranscriptSignals } from "@/lib/academy-signal-scoring";
 import { kv } from "@vercel/kv";
 
 function findScenarioById(scenarioId) {
@@ -291,6 +292,15 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
         score.compliance_fail = true;
       }
 
+      // Signals (Tier 3): check DETERMINISTICO additivo dell'allineamento ai
+      // comportamenti che monetizzano da noi (evidenza warehouse). NON tocca
+      // overall/xp/stars/ladder — è una lente di coaching versionata.
+      try {
+        score.signals = scoreTranscriptSignals(messages);
+      } catch (sigErr) {
+        console.warn("Signal scoring failed (non-fatal):", sigErr?.message);
+      }
+
       // Timestamp condiviso tra score history, transcript e profilo.
       const now = Date.now();
 
@@ -311,6 +321,7 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
           stars: score.stars,
           xp: score.xp,
           compliance: score.compliance,
+          signals: score.signals || null,
           messageCount: messages.length,
         };
         await kv.set(historyKey, record);
