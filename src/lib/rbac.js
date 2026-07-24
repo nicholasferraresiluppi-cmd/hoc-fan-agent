@@ -47,7 +47,7 @@ export const CAPABILITIES = {
   LEAGUES_SNAPSHOT: "leagues.snapshot",       // forzare snapshot leghe
   LEADERBOARD_SNAPSHOT: "leaderboard.snapshot", // forzare snapshot classifica
   CM_COCKPIT: "cm.cockpit",                   // cockpit turno di supervisione CM
-  COPILOT_PILOT: "copilot.pilot",             // scheda-fan "Il mio turno" (pilota: espone LTV fan)
+  COPILOT_PILOT: "copilot.pilot",             // scheda-fan "Il mio turno" (aperto a tutta HOC; espone LTV fan del PROPRIO turno)
 };
 
 // "all" = tutta l'org | "team" = solo proprio team | "own" = solo sé stesso | "none" = nessun accesso
@@ -55,6 +55,7 @@ export const ROLE_CAPABILITIES = {
   operator: {
     [CAPABILITIES.TRAINING_DO]: "own",
     [CAPABILITIES.SCORES_VIEW]: "own",
+    [CAPABILITIES.COPILOT_PILOT]: "own",   // copilot "Il mio turno" aperto a tutta HOC (24 lug)
   },
   team_lead: {
     [CAPABILITIES.TRAINING_DO]: "own",
@@ -63,6 +64,7 @@ export const ROLE_CAPABILITIES = {
     [CAPABILITIES.OUTCOMES_WRITE]: "team",
     [CAPABILITIES.ANALYTICS_VIEW]: "team",
     [CAPABILITIES.CM_COCKPIT]: "own",
+    [CAPABILITIES.COPILOT_PILOT]: "own",
   },
   sales_manager: {
     [CAPABILITIES.TRAINING_DO]: "own",
@@ -74,12 +76,14 @@ export const ROLE_CAPABILITIES = {
     [CAPABILITIES.CREATORS_MANAGE]: "all",
     [CAPABILITIES.SENIORITY_OVERRIDE]: "all",
     [CAPABILITIES.CM_COCKPIT]: "all",
+    [CAPABILITIES.COPILOT_PILOT]: "all",
   },
   qa_reviewer: {
     [CAPABILITIES.TRAINING_DO]: "own",
     [CAPABILITIES.SCORES_VIEW]: "all",
     [CAPABILITIES.SCORES_OVERRIDE]: "all",
     [CAPABILITIES.REVIEW]: "all",
+    [CAPABILITIES.COPILOT_PILOT]: "all",
   },
   admin: {
     [CAPABILITIES.TRAINING_DO]: "own",

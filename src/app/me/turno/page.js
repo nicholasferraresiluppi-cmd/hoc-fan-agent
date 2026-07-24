@@ -122,7 +122,7 @@ export default function MyShiftPage() {
             <HelpCircle size={30} color={CP.mutedIcons} />
             <p style={{ color: CP.textSecondary, fontSize: 14.5, margin: "12px 0 6px" }}>
               {data.reason === "pilot_link_required"
-                ? "Per il pilota serve il collegamento esplicito del tuo account operatore."
+                ? "Serve il collegamento del tuo account operatore per aprire la tua scheda-turno."
                 : "Account non ancora collegato a un profilo operatore."}
             </p>
             <p style={{ color: CP.textMuted, fontSize: 13, margin: 0 }}>Lo fa un admin in un minuto: chiedi di collegare il tuo account al tuo nome operatore.</p>

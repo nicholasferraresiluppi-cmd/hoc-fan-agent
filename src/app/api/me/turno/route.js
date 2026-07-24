@@ -23,7 +23,7 @@ export async function GET(request) {
   const az = await authorize(CAPABILITIES.COPILOT_PILOT);
   if (!az.ok) {
     return Response.json(
-      { error: "Pagina in pilota: serve l'abilitazione copilot.pilot (chiedi a un admin)." },
+      { error: "Il tuo account non è ancora abilitato al copilot: chiedi a un admin di collegarti." },
       { status: az.status || 403 }
     );
   }
