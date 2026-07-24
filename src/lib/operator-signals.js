@@ -21,11 +21,13 @@ import { bqQuery, bigQueryConfigured, HOC_ORGANIZATION_ID } from "@/lib/bigquery
 
 const DATA = () => process.env.BIGQUERY_DATA_PROJECT || "house-of-creators-358213";
 
-export const OPERATOR_SIGNALS_VERSION = "op-sig-1-2026-07";
+export const OPERATOR_SIGNALS_VERSION = "op-sig-2-2026-07"; // +disciplina di risposta (slow_reply_rate)
 const CACHE_KEY = `operator:signals:${OPERATOR_SIGNALS_VERSION}`;
 const CACHE_TTL = 25 * 3600; // riscaldata dal cron dispatch
 
 const DEFAULTS = { days: 60, minShiftMsgs: 20, minOpShifts: 5 };
+const SLOW_REPLY_S = 300;   // "fatto attendere": fan che aspetta > 5 min una risposta
+const MIN_REPLY_PINGS = 30; // ping minimi per un tasso di disciplina affidabile
 
 // Comportamenti scorati (direzione dall'evidenza). `better`: "low" o "high".
 const METRICS = [
@@ -33,6 +35,7 @@ const METRICS = [
   { key: "avg_ppv_price", label: "Prezzo medio PPV", better: "high", fmt: (v) => `$${Math.round(v)}`, coaching: "Non svenderti: alza il prezzo quando il fan è caldo.", caveat: "Dipende in parte dal mix di creator/fan che segui, non solo da te." },
   { key: "ppv_per_h", label: "Cadenza PPV", better: "high", fmt: (v) => `${v.toFixed(1)}/h`, coaching: "Proponi contenuti a pagamento con più continuità.", caveat: null },
   { key: "msgs_per_h", label: "Cadenza messaggi", better: "high", fmt: (v) => `${Math.round(v)}/h`, coaching: "Tieni viva la conversazione, presidia di più.", caveat: null },
+  { key: "slow_reply_rate", label: "Fan fatti attendere", better: "low", fmt: (v) => `${Math.round(v * 100)}%`, coaching: "Rispondi prima ai fan in attesa: la lentezza raffredda la vendita.", caveat: "Quota di fan che aspettano oltre 5 min una risposta, sui tuoi turni singoli. Rispondere in fretta a chi è in attesa vale molto di più (a monte: ≤30 min ≈ 2-2,8x revenue)." },
 ];
 
 function opSignalsSQL(days, minShiftMsgs, minOpShifts) {
@@ -115,6 +118,71 @@ function median(sortedAsc) {
   return sortedAsc.length % 2 ? sortedAsc[m] : (sortedAsc[m - 1] + sortedAsc[m]) / 2;
 }
 
+// Disciplina di risposta: quota di "ping" del fan (inizio di un'attesa) a cui
+// l'operatore risponde OLTRE SLOW_REPLY_S, sui suoi turni a operatore SINGOLO.
+// La mediana del tempo di risposta è satura (~25-30s: quando è attivo risponde
+// subito) → il segnale che discrimina è la CODA — chi lascia languire i fan.
+// Un "ping" = primo messaggio fan di un'attesa (il precedente non è del fan);
+// il tempo è il gap fino alla prima risposta operatore nella stessa
+// conversazione dentro il turno. Attribuzione pulita: solo turni singoli.
+function opLatencySQL(days) {
+  const org = HOC_ORGANIZATION_ID;
+  const D = DATA();
+  return `
+WITH all_shifts AS (
+  SELECT creator_id, member_name, started_at, ended_at
+  FROM \`${D}.onlyfans.cache_members\`
+  WHERE started_date >= DATE_SUB(CURRENT_DATE(), INTERVAL ${days + 1} DAY)
+    AND organization_id = '${org}'
+    AND member_name IS NOT NULL AND started_at IS NOT NULL AND ended_at IS NOT NULL AND ended_at > started_at
+),
+chatter AS (
+  SELECT shift_id, member_name, creator_id, started_at, ended_at
+  FROM \`${D}.onlyfans.cache_members\`
+  WHERE started_date >= DATE_SUB(CURRENT_DATE(), INTERVAL ${days} DAY)
+    AND organization_id = '${org}'
+    AND 'HOC - Chatter' IN UNNEST(role_names)
+    AND effective_working_hours BETWEEN 1 AND 14
+    AND started_at IS NOT NULL AND ended_at IS NOT NULL AND ended_at > started_at
+),
+single AS (
+  SELECT s.* FROM chatter s
+  WHERE NOT EXISTS (
+    SELECT 1 FROM all_shifts o
+    WHERE o.creator_id = s.creator_id AND o.member_name != s.member_name
+      AND o.started_at < s.ended_at AND o.ended_at > s.started_at)
+),
+msgs AS (
+  SELECT s.member_name, s.shift_id, c.user_id, c.created_at,
+    (c.sender_id = c.user_id) AS is_fan, (c.sender_id = c.creator_id) AS is_op
+  FROM single s
+  JOIN \`${D}.onlyfans.chat\` c
+    ON c.creator_id = s.creator_id AND c.created_at >= s.started_at AND c.created_at < s.ended_at
+  WHERE c.created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${days + 1} DAY)
+    AND c.organization_id = '${org}'
+    AND c.user_id IS NOT NULL AND c.sender_id IS NOT NULL
+),
+seq AS (
+  SELECT member_name, created_at, is_fan,
+    LAG(is_fan) OVER (PARTITION BY shift_id, user_id ORDER BY created_at) AS prev_is_fan,
+    MIN(IF(is_op, created_at, NULL)) OVER (
+      PARTITION BY shift_id, user_id ORDER BY created_at
+      ROWS BETWEEN 1 FOLLOWING AND UNBOUNDED FOLLOWING) AS next_op_ts
+  FROM msgs
+),
+episodes AS (
+  SELECT member_name, TIMESTAMP_DIFF(next_op_ts, created_at, SECOND) AS wait_s
+  FROM seq
+  WHERE is_fan AND (prev_is_fan IS NULL OR prev_is_fan = FALSE) AND next_op_ts IS NOT NULL
+)
+SELECT member_name,
+  COUNTIF(wait_s > ${SLOW_REPLY_S}) / COUNT(*) AS slow_reply_rate,
+  COUNT(*) AS reply_pings
+FROM episodes
+GROUP BY member_name
+HAVING COUNT(*) >= ${MIN_REPLY_PINGS}`;
+}
+
 function buildProfiles(rows) {
   const ops = rows
     .map((r) => ({
@@ -129,6 +197,7 @@ function buildProfiles(rows) {
         avg_ppv_price: r.avg_ppv_price == null ? null : Number(r.avg_ppv_price),
         ppv_per_h: r.ppv_per_h == null ? null : Number(r.ppv_per_h),
         msgs_per_h: r.msgs_per_h == null ? null : Number(r.msgs_per_h),
+        slow_reply_rate: r.slow_reply_rate == null ? null : Number(r.slow_reply_rate),
       },
     }))
     .filter((o) => o.shifts > 0);
@@ -214,10 +283,15 @@ export async function getOperatorSignalProfiles({ force = false, days, minShiftM
     if (cached) return { ...cached, cached: true };
   }
 
-  const { rows, totalBytesProcessed } = await bqQuery(
-    opSignalsSQL(params.days, params.minShiftMsgs, params.minOpShifts),
-    { maxBytesBilled: 8 * 1024 * 1024 * 1024 }
-  );
+  const CAP = 8 * 1024 * 1024 * 1024;
+  const [beh, lat] = await Promise.all([
+    bqQuery(opSignalsSQL(params.days, params.minShiftMsgs, params.minOpShifts), { maxBytesBilled: CAP }),
+    bqQuery(opLatencySQL(params.days), { maxBytesBilled: CAP }),
+  ]);
+  // Merge del segnale di disciplina (per operatore) nelle righe comportamentali.
+  const slowByOp = new Map((lat.rows || []).map((r) => [r.member_name, r.slow_reply_rate == null ? null : Number(r.slow_reply_rate)]));
+  const rows = (beh.rows || []).map((r) => ({ ...r, slow_reply_rate: slowByOp.has(r.member_name) ? slowByOp.get(r.member_name) : null }));
+  const totalBytesProcessed = (beh.totalBytesProcessed || 0) + (lat.totalBytesProcessed || 0);
   const built = buildProfiles(rows);
   const payload = {
     version: OPERATOR_SIGNALS_VERSION,
