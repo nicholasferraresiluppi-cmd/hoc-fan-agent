@@ -25,7 +25,15 @@ export { getCreators, bigQueryConfigured };
 
 const dayRe = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Turni CP che toccano il creator nel giorno (UTC), raggruppati per finestra identica (duo). */
+/**
+ * Turni CP che toccano il creator nel giorno (UTC), raggruppati per finestra
+ * SCHEDULATA identica (duo). Le finestre effettive però sono i CHECK-IN REALI
+ * (postgres.public_checkins, join sull'id turno CP) quando esistono: l'operatore
+ * che entra alle 20:04 su un turno delle 17:00 va misurato dalle 20:04.
+ * Fallback per turno senza check-in: orario schedulato (marcato real=false).
+ */
+const CHECKIN_TOL_MS = 6 * 3600_000; // check-in oltre ±6h dallo schedulato = dato sporco, ignora
+
 export async function loadShiftsForDay(creatorIds, day) {
   if (!dayRe.test(day)) throw new Error("day non valido (YYYY-MM-DD)");
   const ids = creatorIds.map(Number).filter(Number.isInteger);
@@ -38,33 +46,100 @@ export async function loadShiftsForDay(creatorIds, day) {
   months.add(prev.toISOString().slice(0, 7));
   const wageSets = await Promise.all([...months].map((m) => kv.get(`cp:wages:${m}`)));
 
-  const byWindow = new Map(); // "start|end|cids" → { start, end, cids, k, operators[] }
+  // 1) un entry per operatore×turno, con l'id turno CP per il join check-in
+  const entries = [];
+  const seen = new Set();
   for (const wages of wageSets) {
     for (const rec of wages || []) {
-      for (const s of rec.shifts || []) {
-        const cids = (s.creator_ids || []).map(Number).filter((c) => ids.includes(c));
+      for (const sh of rec.shifts || []) {
+        const cids = (sh.creator_ids || []).map(Number).filter((c) => ids.includes(c));
         if (!cids.length) continue;
-        const st = Date.parse(s.started_at);
-        const en = Date.parse(s.ended_at);
+        const st = Date.parse(sh.started_at);
+        const en = Date.parse(sh.ended_at);
         if (!Number.isFinite(st)) continue;
         const enSafe = Number.isFinite(en) ? en : Date.now();
-        // il turno tocca il giorno se la finestra interseca [dayStart, dayEnd)
-        if (enSafe <= dayStart || st >= dayEnd) continue;
+        // pre-filtro largo: il check-in reale può slittare rispetto allo schedulato
+        if (enSafe <= dayStart - CHECKIN_TOL_MS || st >= dayEnd + CHECKIN_TOL_MS) continue;
+        const dedup = `${sh.id}|${rec.member_name}`;
+        if (seen.has(dedup)) continue;
+        seen.add(dedup);
         cids.sort((a, b) => a - b);
-        const key = `${st}|${enSafe}|${cids.join(",")}`;
-        const w = byWindow.get(key) || {
-          start: st, end: enSafe, cids,
-          k: Number(s.payment_profile?.cosellers_count) || 1,
-          operators: [],
-        };
-        if (!w.operators.includes(rec.member_name)) w.operators.push(rec.member_name);
-        byWindow.set(key, w);
+        entries.push({
+          sid: sh.id, op: rec.member_name, cids, schedSt: st, schedEn: enSafe,
+          st, en: enSafe, real: false,
+          k: Number(sh.payment_profile?.cosellers_count) || 1,
+        });
       }
     }
   }
+  if (!entries.length) return [];
+
+  // 2) check-in reali in batch (1 query). Best-effort: se fallisce si resta
+  //    sugli orari schedulati — la vista non si blocca mai per questo.
+  try {
+    if (bigQueryConfigured()) {
+      const sids = [...new Set(entries.map((e) => `'${String(e.sid).replace(/[^0-9a-zA-Z-]/g, "")}'`))];
+      const { rows } = await bqQuery(
+        `SELECT shift_id, UNIX_SECONDS(MIN(started_at)) AS cs, UNIX_SECONDS(MAX(ended_at)) AS ce,
+                COUNTIF(ended_at IS NULL) > 0 AS open
+         FROM \`${DATA()}.postgres.public_checkins\`
+         WHERE shift_id IN (${sids.join(",")}) AND started_at IS NOT NULL
+         GROUP BY shift_id`,
+        { maxBytesBilled: 256 * 1024 * 1024 }
+      );
+      const bySid = new Map(rows.map((r) => [String(r.shift_id), r]));
+      for (const e of entries) {
+        const ck = bySid.get(String(e.sid));
+        if (!ck || ck.cs == null) continue;
+        const cs = Number(ck.cs) * 1000;
+        if (Math.abs(cs - e.schedSt) > CHECKIN_TOL_MS) continue; // dato sporco
+        // checkout mancante o turno ancora aperto → si chiude allo schedulato;
+        // checkout chiuso in ritardo estremo (dato sporco) → clamp a schedEn+tol,
+        // così la finestra reale resta dentro il pre-filtro (sched ±tol) e un
+        // turno non assorbe mai mezza giornata successiva.
+        const rawCe = (ck.open || ck.ce == null) ? e.schedEn : Number(ck.ce) * 1000;
+        const ce = Math.min(rawCe, e.schedEn + CHECKIN_TOL_MS);
+        if (ce <= cs) continue;
+        e.st = cs; e.en = ce; e.real = true;
+      }
+    }
+  } catch { /* fallback silenzioso agli orari schedulati */ }
+
+  // 3) filtro giorno sulle finestre effettive
+  const active = entries.filter((e) => e.en > dayStart && e.st < dayEnd);
+  if (!active.length) return [];
+
+  // 4) raggruppa per finestra SCHEDULATA identica (il duo CP condivide lo slot);
+  //    la finestra effettiva della riga = unione dei check-in dei membri.
+  const byWindow = new Map();
+  for (const e of active) {
+    const key = `${e.schedSt}|${e.schedEn}|${e.cids.join(",")}`;
+    const w = byWindow.get(key) || {
+      start: e.st, end: e.en, cids: e.cids, k: e.k, operators: [], members: [],
+    };
+    w.start = Math.min(w.start, e.st);
+    w.end = Math.max(w.end, e.en);
+    w.k = Math.max(w.k, e.k);
+    if (!w.operators.includes(e.op)) w.operators.push(e.op);
+    w.members.push({ op: e.op, start: e.st, end: e.en, real: e.real });
+    byWindow.set(key, w);
+  }
   const shifts = [...byWindow.values()].sort((a, b) => a.start - b.start);
-  // duo = più operatori nella stessa finestra O payment profile coseller
-  for (const s of shifts) s.duo = s.operators.length > 1 || s.k > 1;
+  for (const s of shifts) {
+    s.members.sort((a, b) => a.start - b.start);
+    s.real = s.members.every((m) => m.real) ? "reale" : s.members.some((m) => m.real) ? "parziale" : "schedulato";
+    // duo = più operatori nella stessa finestra O payment profile coseller
+    s.duo = s.operators.length > 1 || s.k > 1;
+  }
+  // sovrapposizione reale tra righe sullo stesso account (cambio turno): info, non fusione
+  for (const s of shifts) {
+    let ov = 0;
+    for (const o of shifts) {
+      if (o === s || !o.cids.some((c) => s.cids.includes(c))) continue;
+      ov = Math.max(ov, Math.min(s.end, o.end) - Math.max(s.start, o.start));
+    }
+    s.overlap_min = ov > 0 ? Math.round(ov / 60000) : 0;
+  }
   return shifts;
 }
 
@@ -124,43 +199,74 @@ bucketed AS (
   FROM base
 ),
 flagged AS (
-  SELECT user_id, created_at, is_fan, price, opened, tip,
+  SELECT id, user_id, created_at, is_fan, price, opened, tip,
     SUM(IF(rn = 1, 1, 0)) OVER (PARTITION BY sender_id, sec_bucket) AS recipients
   FROM bucketed
 ),
 msgs AS (
-  SELECT user_id, UNIX_SECONDS(created_at) AS t, is_fan,
+  SELECT id, user_id, UNIX_SECONDS(created_at) AS t, is_fan,
     (NOT is_fan AND recipients < ${BROADCAST_MIN}) AS is_personal_reply,
     (NOT is_fan AND recipients >= ${BROADCAST_MIN}) AS is_broadcast,
     price, opened, tip
   FROM flagged
 )
-SELECT sh.idx,
-  COUNT(DISTINCT IF(m.is_fan, m.user_id, NULL))                            AS active_fans,
-  COUNTIF(m.is_fan)                                                        AS fan_msgs,
-  COUNTIF(m.is_personal_reply)                                             AS op_msgs,
-  COUNTIF(m.is_broadcast)                                                  AS broadcast_msgs,
-  COUNTIF(m.is_personal_reply AND m.price > 0 AND NOT m.tip)               AS ppv_proposed,
-  COUNTIF(m.is_personal_reply AND m.price > 0 AND NOT m.tip AND m.opened)  AS ppv_unlocked
-FROM msgs m
-JOIN UNNEST([${structs}]) sh ON m.t >= sh.s AND m.t < sh.e
-GROUP BY sh.idx`;
+SELECT idx,
+  COUNT(DISTINCT IF(is_fan, user_id, NULL))                        AS active_fans,
+  COUNTIF(is_fan)                                                  AS fan_msgs,
+  COUNTIF(is_personal_reply)                                       AS op_msgs,
+  COUNTIF(is_broadcast)                                            AS broadcast_msgs,
+  COUNTIF(is_personal_reply AND price > 0 AND NOT tip)             AS ppv_proposed,
+  COUNTIF(is_personal_reply AND price > 0 AND NOT tip AND opened)  AS ppv_unlocked
+FROM (
+  -- le finestre reali possono sovrapporsi al cambio turno: ogni messaggio conta
+  -- in UN solo turno, quello iniziato più di recente (il subentrante "possiede" l'orario)
+  SELECT m.*, sh.idx
+  FROM msgs m
+  JOIN UNNEST([${structs}]) sh ON m.t >= sh.s AND m.t < sh.e
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY m.id ORDER BY sh.s DESC, sh.e DESC, sh.idx) = 1
+)
+GROUP BY idx`;
 
   const txnSQL = `
-SELECT sh.idx,
-  CAST(ROUND(SUM(x.net), 2) AS FLOAT64) AS net_usd,
+SELECT idx,
+  CAST(ROUND(SUM(net), 2) AS FLOAT64) AS net_usd,
   COUNT(*) AS txns
 FROM (
-  SELECT UNIX_SECONDS(created_at) AS t, net
+  SELECT x.id, x.t, x.net, sh.idx
+  FROM (
+    -- dedup re-ingest CDC: stesso id può comparire più volte (survivor = più recente)
+    SELECT id, UNIX_SECONDS(created_at) AS t, net
+    FROM \`${DATA()}.onlyfans.attributed_transactions\`
+    WHERE creator_id = ${cid}
+      AND created_at >= TIMESTAMP_SECONDS(${Math.floor(minS)})
+      AND created_at <  TIMESTAMP_SECONDS(${Math.ceil(maxE)})
+      AND id IS NOT NULL
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY updated_at DESC) = 1
+  ) x
+  JOIN UNNEST([${structs}]) sh ON x.t >= sh.s AND x.t < sh.e
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY x.id ORDER BY sh.s DESC, sh.e DESC, sh.idx) = 1
+)
+GROUP BY idx`;
+
+  // Venduto di CALENDARIO del giorno (00:00→24:00 UTC): è il KPI "giorno" onesto —
+  // le righe turno hanno finestre reali che possono sconfinare nel giorno prima/dopo.
+  const dayNetSQL = `
+SELECT CAST(ROUND(SUM(net), 2) AS FLOAT64) AS net_usd, COUNT(*) AS txns
+FROM (
+  SELECT net
   FROM \`${DATA()}.onlyfans.attributed_transactions\`
   WHERE creator_id = ${cid}
-    AND created_at >= TIMESTAMP_SECONDS(${Math.floor(minS)})
-    AND created_at <  TIMESTAMP_SECONDS(${Math.ceil(maxE)})
-) x
-JOIN UNNEST([${structs}]) sh ON x.t >= sh.s AND x.t < sh.e
-GROUP BY sh.idx`;
+    AND created_at >= TIMESTAMP('${day}T00:00:00Z')
+    AND created_at <  TIMESTAMP_ADD(TIMESTAMP('${day}T00:00:00Z'), INTERVAL 1 DAY)
+    AND id IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY updated_at DESC) = 1
+)`;
 
-  const [chat, txn] = await Promise.all([bqQuery(chatSQL), bqQuery(txnSQL, { maxBytesBilled: 512 * 1024 * 1024 })]);
+  const [chat, txn, dayNet] = await Promise.all([
+    bqQuery(chatSQL),
+    bqQuery(txnSQL, { maxBytesBilled: 512 * 1024 * 1024 }),
+    bqQuery(dayNetSQL, { maxBytesBilled: 256 * 1024 * 1024 }),
+  ]);
   const chatByIdx = new Map(chat.rows.map((r) => [Number(r.idx), r]));
   const txnByIdx = new Map(txn.rows.map((r) => [Number(r.idx), r]));
 
@@ -171,6 +277,11 @@ GROUP BY sh.idx`;
       start: new Date(s.start).toISOString(),
       end: new Date(s.end).toISOString(),
       operators: s.operators,
+      members: (s.members || []).map((m) => ({
+        op: m.op, start: new Date(m.start).toISOString(), end: new Date(m.end).toISOString(), real: m.real,
+      })),
+      windows: s.real || "schedulato",
+      overlap_min: s.overlap_min || 0,
       attribution: s.duo ? "duo" : "singolo",
       k: s.k,
       active_fans: Number(c.active_fans) || 0,
@@ -185,17 +296,19 @@ GROUP BY sh.idx`;
   });
   payload.totals = payload.shifts.reduce(
     (a, s) => ({
-      net_usd: Math.round((a.net_usd + s.net_usd) * 100) / 100,
-      txns: a.txns + s.txns,
+      shifts_net: Math.round((a.shifts_net + s.net_usd) * 100) / 100,
       ppv_proposed: a.ppv_proposed + s.ppv_proposed,
       ppv_unlocked: a.ppv_unlocked + s.ppv_unlocked,
       active_fans_max: Math.max(a.active_fans_max, s.active_fans),
       singolo_net: Math.round((a.singolo_net + (s.attribution === "singolo" ? s.net_usd : 0)) * 100) / 100,
       duo_net: Math.round((a.duo_net + (s.attribution === "duo" ? s.net_usd : 0)) * 100) / 100,
     }),
-    { net_usd: 0, txns: 0, ppv_proposed: 0, ppv_unlocked: 0, active_fans_max: 0, singolo_net: 0, duo_net: 0 }
+    { shifts_net: 0, ppv_proposed: 0, ppv_unlocked: 0, active_fans_max: 0, singolo_net: 0, duo_net: 0 }
   );
-  payload.bytes_processed = (chat.totalBytesProcessed || 0) + (txn.totalBytesProcessed || 0);
+  payload.totals.net_usd = Number(dayNet.rows?.[0]?.net_usd) || 0;
+  payload.totals.txns = Number(dayNet.rows?.[0]?.txns) || 0;
+  payload.bytes_processed =
+    (chat.totalBytesProcessed || 0) + (txn.totalBytesProcessed || 0) + (dayNet.totalBytesProcessed || 0);
 
   await kv.set(cacheKey, payload, { ex: DAY_TTL });
   return { ...payload, cached: false };

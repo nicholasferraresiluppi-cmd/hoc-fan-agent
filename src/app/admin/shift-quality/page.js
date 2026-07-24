@@ -19,6 +19,15 @@ const num = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { maxi
 const usd = (v) => (v == null ? "—" : "$" + Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 }));
 const pctOf = (a, b) => (b > 0 ? Math.round((a / b) * 100) + "%" : "—");
 const hhmm = (iso) => new Date(iso).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
+const romeDate = (iso) => new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Europe/Rome" });
+// marker ±1g: la riga parte in un giorno (Roma) diverso da quello di riferimento della vista
+const dayMark = (iso, day) => {
+  const refMs = Date.parse((day || "") + "T12:00:00Z");
+  if (!iso || !Number.isFinite(refMs)) return "";
+  const ref = romeDate(new Date(refMs).toISOString());
+  const d = romeDate(iso);
+  return d > ref ? "+1g" : d < ref ? "−1g" : "";
+};
 
 function yesterdayUTC() {
   const d = new Date(Date.now() - 86400_000);
@@ -204,7 +213,7 @@ export default function ShiftQualityPage() {
           </div>
 
           {/* Turni */}
-          <SectionLabel style={{ marginTop: 28 }}>Turni del giorno (orari Europe/Rome · giorno UTC)</SectionLabel>
+          <SectionLabel style={{ marginTop: 28 }}>Turni del giorno (finestre = check-in reali · orari Europe/Rome · giorno UTC)</SectionLabel>
           <CpCard style={{ marginTop: 10, padding: 0 }}>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
@@ -223,8 +232,17 @@ export default function ShiftQualityPage() {
                     <tr key={i} style={{ borderBottom: i < data.shifts.length - 1 ? `1px solid ${CP.borderSoft || CP.border}` : "none" }}>
                       <td style={{ padding: "10px 14px", fontFamily: FONTS.mono, fontSize: 13, whiteSpace: "nowrap" }}>
                         {hhmm(s.start)}–{hhmm(s.end)}
+                        {s.windows && s.windows !== "reale" ? <span title="check-in mancante: orario schedulato" style={{ color: CP.textMuted }}> ~</span> : null}
+                        {dayMark(s.start, day) ? <span style={{ marginLeft: 6, fontSize: 10.5, color: CP.textMuted, border: `1px solid ${CP.border}`, borderRadius: 4, padding: "1px 4px" }}>{dayMark(s.start, day)}</span> : null}
                       </td>
-                      <td style={{ padding: "10px 14px", fontSize: 13, color: CP.textSecondary }}>{s.operators.join(" + ")}</td>
+                      <td style={{ padding: "10px 14px", fontSize: 13, color: CP.textSecondary }}>{s.operators.join(" + ")}
+                        {(s.members || []).length > 1 || (s.members || []).some((mm) => Math.abs(Date.parse(mm.start) - Date.parse(s.start)) > 600000 || Math.abs(Date.parse(mm.end) - Date.parse(s.end)) > 600000) ? (
+                          <div style={{ marginTop: 3, fontSize: 11, color: CP.textMuted, fontFamily: FONTS.mono }}>
+                            {(s.members || []).map((mm, ii) => (
+                              <span key={ii}>{ii > 0 ? " · " : ""}{mm.op} {hhmm(mm.start)}→{hhmm(mm.end)}{mm.real ? "" : " ~"}</span>
+                            ))}
+                          </div>
+                        ) : null}</td>
                       <td style={{ padding: "10px 14px", textAlign: "right" }}>
                         <span style={{
                           fontSize: 10.5, fontFamily: FONTS.mono, fontWeight: 700, letterSpacing: "0.03em",
