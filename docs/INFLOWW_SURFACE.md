@@ -51,7 +51,8 @@ Clock in/out dalla barra, **auto clock-out dopo 2 min di inattività**, dashboar
 - **Nessun prodotto fintech/pagamenti** oltre al Wallet dei referral. **Nessun export schedulato/ricorrente e nessun webhook documentato** — tutti gli export sono manuali UI-triggered (l'API è l'unica via programmatica).
 
 ## Cosa resta non verificato
-- **Schema colonne esatto** degli export Message Dashboard / Employee Reports (non enumerato nei docs, tranne Clocked Hours XLSX) — si chiude col primo export reale.
+- ~~**Schema colonne esatto** dell'export Message Dashboard~~ → **CHIUSO il 24 lug 2026 col primo export reale** (vedi sezione dedicata sotto).
+- **Schema colonne** Employee Reports (non ancora esportato).
 - **Finestra di lookback** dell'attribuzione "converter" (non specificata nei docs).
 - Esistenza di un'API partner privata dietro le integrazioni "ufficiali" MYM/Fanvue (nulla di pubblico).
 - ~~Endpoint messaggi/transcript nell'API ufficiale~~ → **risolto il 18 lug** (vedi TL;DR): non esistono, 404 a livello routing; fonte transcript = export Message Dashboard.
@@ -64,3 +65,25 @@ Probe read-only con la chiave reale (42 creator connesse). Fatti nuovi rispetto 
 - **Record `/v1/refunds`**: `id`, **`transactionId` = quello della vendita originale → join ESATTO refund↔transazione**, `fanId`, `paymentTime`, `refundTime`, `paymentStatus` (`undo`), `paymentAmount` (**CENTESIMI** — la doc mostrava decimali, i dati reali sono cent interi), `transactionType` (es. `subscribes`).
 - **Storico interrogabile ≥ 12 mesi** sulle creator storiche (Ottorini, Fishball: dati presenti a −360gg); vuoto oltre solo per le creator connesse di recente → backfill annuale fattibile.
 - **Conseguenza per la trasparenza comp (costruita in questa data):** il `transactionId` stabile rende persistibile e dedupabile un ledger fan-level per periodo (`src/lib/payout-ledger.js`, KV `infloww:txns:*`), con refund agganciati in modo autoritativo — mentre il lato take CP resta senza uuid, quindi il match take↔transazione è euristico (finestra turno + importo lordo, `src/lib/payout-match.js`).
+
+## Aggiornamento 24 lug 2026 — export Message Dashboard: schema reale + match warehouse VALIDATO
+
+Primo export reale del **Message Dashboard** ingerito (`.xlsx`, foglio "Message Dashboard", ~500k righe/mese org). Chiude l'ignoto storico sullo schema colonne.
+
+**Schema (12 colonne, per-messaggio, lato operatore):**
+`Sender` (operatore umano) · `Creator` (nome creator, formato Infloww es. "Gaja ITA" ≠ warehouse "Gaja Bertolin - IT") · `Fans Message` (spesso vuoto: è la vista dei messaggi inviati) · `Creator Message` (testo, HTML `<p>…</p>`) · `Sent time` (`HH:MM:SS`) · `Sent date` (`Jul 24, 2026`) · `Replay time` · `Price` (PPV) · `Purchased` (yes/no) · `Source` (`Employee`/mass/automated) · `Status` (`Sent`) · `Sent to` (`username (uNNNNN)` → **user_id del fan**).
+
+**Perché è oro:** `Sender` porta **l'operatore umano** che il warehouse NON ha (là `sender_id` = account creator). Risolve l'attribuzione nei turni in DUO — il buco di copertura di `operator-signals.js` (solo turni singoli).
+
+**Match export↔warehouse VALIDATO su dati reali (40 messaggi campione, 21 lug):**
+- **36/40 abbinati** per `user_id` (da `Sent to`) + testo normalizzato; i 4 mancati ai bordi finestra/normalizzazione.
+- **Prezzo PPV coincide 36/36.**
+- **Fuso: offset COSTANTE +1h** (export UTC+1, warehouse UTC) — mediana esatta −3600s → si allinea con un offset, non è un problema.
+
+**Cross-validazione segnali (Infloww vs warehouse, 119 operatori in entrambe le fonti):**
+- **tasso domande: corr 0.78** (errore medio 7 punti%); **prezzo PPV: corr 0.63**.
+- Il non-1.0 è ATTESO: misurano insiemi di messaggi diversi (Infloww = tutti i turni, warehouse = solo singoli). Chi diverge (es. 24% vs 44%) è chi si comporta diversamente in duo → è proprio il valore aggiunto della copertura Infloww.
+
+**Engine:** `src/lib/infloww-signals.js` (`computeInflowwOperatorSignals`) calcola per-operatore i segnali COUNT-based affidabili da questo export: **tasso domande, prezzo medio PPV, quota PPV**. NB: la **cadenza-per-ora NON è derivabile** da questo export (mancano le ore lavorate → serve Clocked Hours o le finestre turno del warehouse). Unit-testato.
+
+**Prossimo (non costruito):** superficie di upload self-serve (per export scoped per-operatore, upload-friendly) + ingest batch del file pieno; il match al warehouse per agganciare revenue/conversazione intera. Vincolo: 48MB/500k righe → parsing lato-batch o export scoped, non drag&drop di 48MB nel browser.
