@@ -90,11 +90,15 @@ WITH base AS (
     AND user_id IS NOT NULL AND sender_id IS NOT NULL AND creator_id <> user_id
   QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY commit_timestamp DESC) = 1
 ),
+bucketed AS (
+  SELECT user_id, created_at, is_fan, sender_id, sec_bucket,
+    ROW_NUMBER() OVER (PARTITION BY sender_id, sec_bucket, user_id ORDER BY created_at, id) AS rn
+  FROM base
+),
 flagged AS (
   SELECT user_id, created_at, is_fan,
-    SUM(IF(ROW_NUMBER() OVER (PARTITION BY sender_id, sec_bucket, user_id ORDER BY created_at, id) = 1, 1, 0))
-      OVER (PARTITION BY sender_id, sec_bucket) AS recipients
-  FROM base
+    SUM(IF(rn = 1, 1, 0)) OVER (PARTITION BY sender_id, sec_bucket) AS recipients
+  FROM bucketed
 )
 SELECT user_id,
   COUNTIF(is_fan) AS fan_msgs,
