@@ -70,6 +70,19 @@ export async function POST(request) {
     out.academy_signals = "err:" + (e?.message || "unknown");
   }
 
+  // Stessa logica per i profili-segnali per operatore (query analitica).
+  try {
+    const { getOperatorSignalProfiles, bigQueryConfigured } = await import("@/lib/operator-signals");
+    if (bigQueryConfigured()) {
+      await getOperatorSignalProfiles({ force: true });
+      out.operator_signals = "ok";
+    } else {
+      out.operator_signals = "skip:no-bq";
+    }
+  } catch (e) {
+    out.operator_signals = "err:" + (e?.message || "unknown");
+  }
+
   return Response.json(out);
 }
 
