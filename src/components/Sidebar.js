@@ -29,7 +29,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
-  History, Signpost, Bell, ListTree, Inbox,
+  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
@@ -52,6 +52,7 @@ const ESSENTIAL_HREFS = new Set([
   "/leaderboard/creators",
   "/",
   "/playbook",
+  "/academy/tapes",
   "/admin/team",
   "/admin/action-center",
   "/admin/coaching-center",
@@ -110,6 +111,7 @@ const NAV_GROUPS = [
       { href: "/welcome/score-friendly",         label: "Tutorial Score", icon: GraduationCap },
       { href: "/",                               label: "Academy",      icon: GraduationCap, match: (p) => p === "/" },
       { href: "/academy/multi",                  label: "Multi-chat",   icon: Layers },
+      { href: "/academy/tapes",                  label: "Game tape",    icon: Film },
       { href: "/playbook",                       label: "Playbook",     icon: BookOpen },
       { href: "/leaderboard",                    label: "Ladder Academy", icon: Trophy },
       { href: "/leaderboard/leghe",              label: "Leghe",        icon: Swords },
@@ -118,6 +120,7 @@ const NAV_GROUPS = [
       { href: "/admin/outcomes",                 label: "Outcomes",     icon: Target },
       { href: "/admin/sessions",                 label: "Sessioni",     icon: Brain },
       { href: "/admin/qa-reviews",               label: "QA conversazioni", icon: ClipboardCheck },
+      { href: "/admin/academy-tapes",            label: "Curatela tape", icon: Clapperboard },
       { href: "/profilo/certificazioni",         label: "Badge Wall",   icon: Award },
     ],
   },

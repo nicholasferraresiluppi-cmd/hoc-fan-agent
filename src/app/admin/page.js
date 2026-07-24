@@ -12,7 +12,7 @@ import {
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Link2, Gauge,
   ArrowUpRight, Calendar, Activity, CheckCircle2, AlertCircle, MessagesSquare,
   Wallet, Scale, ShieldCheck, History, FlaskConical, MessageSquareWarning,
-  Signpost, Bell, ListTree, Inbox,
+  Signpost, Bell, ListTree, Inbox, Clapperboard,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { SectionLabel, CpCard, StatCard } from "@/components/cp-style";
@@ -71,6 +71,7 @@ const SHORTCUT_GROUPS = [
       { href: "/admin/outcomes",          title: "Outcomes reali",   desc: "Revenue/PPV/retention per validare AI", icon: Target },
       { href: "/admin/sessions",          title: "Review chat",      desc: "Leggi le conversazioni complete con feedback affiancato", icon: Brain },
       { href: "/admin/qa-reviews",        title: "QA conversazioni", desc: "Rubrica §8.1: review qualità che alimentano i gate ladder", icon: ClipboardCheck },
+      { href: "/admin/academy-tapes",     title: "Game tape",        desc: "Estrai le migliori azioni di vendita reali dal warehouse e pubblicale in Academy", icon: Clapperboard },
       { href: "/profilo/certificazioni",  title: "Badge Wall",       desc: "Wall pubblico delle certificazioni operatori", icon: Award },
     ],
   },
