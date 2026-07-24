@@ -98,12 +98,20 @@ export function suggestPlay(row, label) {
   // 14g con la baseline PULITA dei 76g precedenti (spend_90d − spend_14d): così
   // la norma non è diluita dallo stesso picco che deve rilevare. Senza baseline
   // (fan nuovo) non si parla di "accelerazione" → non scatta.
-  const r14 = (row.spend_14d || 0) / 14;
-  const prior = Math.max(0, (row.spend_90d || 0) - (row.spend_14d || 0));
+  const s14 = row.spend_14d || 0;
+  const r14 = s14 / 14;
+  const prior = Math.max(0, (row.spend_90d || 0) - s14);
   const r76 = prior / 76;
-  const accel = (row.spend_14d || 0) >= 150 && r76 > 0 && r14 >= 2.5 * r76;
+  // Floor assoluto $400/14g: sotto non è "spesa alta", è attività normale — il
+  // freno deve mirare a chi spende DAVVERO tanto e accelera, non a un fan che si
+  // sta solo attivando. Scatta se accelera vs baseline reale, OPPURE se quasi
+  // tutta la spesa è concentrata di recente (picco da base ~0). Il moltiplicatore
+  // mostrato è cappato: da base ~0 sarebbe un numero assurdo (73×), inutile.
+  const accel = s14 >= 400 && ((r76 > 0 && r14 >= 2.5 * r76) || prior <= s14 * 0.2);
+  const mult = r76 > 0 ? r14 / r76 : Infinity;
+  const multTxt = Number.isFinite(mult) && mult <= 10 ? `~${Math.round(mult)}× la sua norma` : "molto sopra la sua norma";
   const freno = accel
-    ? `Spesa in accelerazione ($${row.spend_14d} negli ultimi 14g, ~${Math.round(r14 / r76)}× la sua norma precedente): rallenta, tutela prima di vendere`
+    ? `Spesa in accelerazione ($${s14} negli ultimi 14g, ${multTxt}): rallenta, tutela prima di vendere`
     : null;
 
   if (accel) {
