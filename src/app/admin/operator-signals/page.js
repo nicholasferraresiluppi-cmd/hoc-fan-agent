@@ -6,6 +6,7 @@
 
 import { useState, useMemo } from "react";
 import useSWR from "swr";
+import Link from "next/link";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
@@ -64,8 +65,28 @@ function OperatorCard({ p }) {
       </div>
 
       {p.top_gap ? (
-        <div style={{ margin: "8px 0 0", fontSize: 13, color: CP.textSecondary }}>
-          <span style={{ color: CP.accentRed }}>Da lavorare — {p.top_gap.label}:</span> {p.top_gap.coaching}
+        <div style={{ margin: "8px 0 0" }}>
+          <div style={{ fontSize: 13, color: CP.textSecondary }}>
+            <span style={{ color: CP.accentRed }}>Da lavorare — {p.top_gap.label}:</span>{" "}
+            {p.top_gap.path?.focus || p.top_gap.coaching}
+          </div>
+          {p.top_gap.path?.scenarios?.length > 0 && (
+            <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontSize: 11, color: CP.textMuted }}>Percorso:</span>
+              {p.top_gap.path.scenarios.map((s) => (
+                <span
+                  key={s.id}
+                  title={`${s.title} · difficoltà ${s.difficulty}/5`}
+                  style={{ fontSize: 11.5, color: CP.textSecondary, background: CP.surfaceAlt, border: `1px solid ${CP.borderSoft}`, padding: "3px 9px", borderRadius: 999 }}
+                >
+                  {s.title.length > 46 ? s.title.slice(0, 44) + "…" : s.title}
+                </span>
+              ))}
+              <Link href="/" style={{ fontSize: 11.5, color: CP.accentSoftText, textDecoration: "none" }}>
+                apri Academy →
+              </Link>
+            </div>
+          )}
         </div>
       ) : p.top_strength ? (
         <div style={{ margin: "8px 0 0", fontSize: 13, color: CP.textSecondary }}>

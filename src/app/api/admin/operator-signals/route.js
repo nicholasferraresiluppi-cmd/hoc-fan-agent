@@ -12,13 +12,16 @@ export const maxDuration = 60;
 
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { getOperatorSignalProfiles, bigQueryConfigured } from "@/lib/operator-signals";
+import { attachCoachingPaths } from "@/lib/coaching-paths";
 
 export async function GET() {
   const az = await authorize(CAPABILITIES.SEED);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   if (!bigQueryConfigured()) return Response.json({ bigquery: false, profiles: [] });
   try {
-    const data = await getOperatorSignalProfiles();
+    // percorso consigliato calcolato a read-time dal catalogo scenari (non in cache:
+    // così resta sempre allineato al catalogo Academy corrente).
+    const data = attachCoachingPaths(await getOperatorSignalProfiles());
     return Response.json({ bigquery: true, ...data });
   } catch (e) {
     return Response.json({ error: e.message || "Calcolo profili fallito" }, { status: 500 });
@@ -36,7 +39,7 @@ export async function POST(request) {
     /* body opzionale */
   }
   try {
-    const data = await getOperatorSignalProfiles({ force: true, ...body });
+    const data = attachCoachingPaths(await getOperatorSignalProfiles({ force: true, ...body }));
     return Response.json({ bigquery: true, ...data });
   } catch (e) {
     return Response.json({ error: e.message || "Calcolo profili fallito" }, { status: 500 });
