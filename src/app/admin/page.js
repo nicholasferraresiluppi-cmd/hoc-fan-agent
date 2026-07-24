@@ -74,6 +74,7 @@ const SHORTCUT_GROUPS = [
       { href: "/admin/academy-tapes",     title: "Game tape",        desc: "Estrai le migliori azioni di vendita reali dal warehouse e pubblicale in Academy", icon: Clapperboard },
       { href: "/admin/academy-signals",   title: "Signals",          desc: "Quali comportamenti operatore correlano col revenue/ora, dai turni reali — informa il coaching", icon: TrendingUp },
       { href: "/admin/operator-signals",  title: "Profilo operatore", desc: "Dove ogni operatore è carente, dal suo lavoro vero (turni singoli): diagnosi per il coaching su misura", icon: UserSearch },
+      { href: "/admin/infloww-ingest",    title: "Ingest Infloww",    desc: "Carica l'export Message Dashboard per operatore → estende la copertura dei segnali ai turni in duo", icon: Upload },
       { href: "/profilo/certificazioni",  title: "Badge Wall",       desc: "Wall pubblico delle certificazioni operatori", icon: Award },
     ],
   },
