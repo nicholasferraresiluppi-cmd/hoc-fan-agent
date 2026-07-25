@@ -6,11 +6,18 @@ import { NextResponse } from 'next/server';
 // schedulate di Vercel non hanno sessione → prendevano 401 dal middleware e i
 // cron non sono MAI scattati in produzione). Ogni route cron si difende da sola
 // con CRON_SECRET via lib/cron-auth — mai aggiungere qui un path senza quello.
+// Assessment candidati (pre-hire): il candidato NON è un utente Clerk. La
+// pagina /assessment/[token] e le API /api/candidate/* sono pubbliche e si
+// difendono DA SOLE col token monouso (lib/candidate-assessments: validità,
+// scadenza, stato, sequenza) — mai aggiungere qui un path senza quella difesa
+// nella route stessa. I dati candidato vivono nel namespace KV candidate:*,
+// isolato da operatori/leghe/denaro.
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)', '/sign-up(.*)', '/api/ingest/(.*)',
   '/api/cron/(.*)',
   '/api/admin/ops-alerts/run', '/api/admin/ops-alerts/digest',
   '/api/leaderboard/snapshot', '/api/leagues/snapshot',
+  '/assessment/(.*)', '/api/candidate/(.*)',
 ]);
 const isApiRoute = createRouteMatcher(['/api/(.*)']);
 
