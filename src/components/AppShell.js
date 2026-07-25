@@ -17,6 +17,7 @@ import { useState, useEffect } from "react";
 import { Menu, X } from "lucide-react";
 import Sidebar, { SIDEBAR_WIDTH } from "./Sidebar";
 import ErrorBoundary from "./ErrorBoundary";
+import OnboardingNudge from "./OnboardingNudge";
 import { CP } from "@/lib/brand";
 
 function isAuthRoute(path) {
@@ -103,6 +104,11 @@ export default function AppShell({ children }) {
           {children}
         </ErrorBoundary>
       </main>
+
+      {/* Onboarding: modale primo-accesso col funnel di strumenti per ruolo */}
+      <ErrorBoundary silent label="OnboardingNudge">
+        <OnboardingNudge />
+      </ErrorBoundary>
     </div>
   );
 }

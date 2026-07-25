@@ -67,6 +67,7 @@ const SHORTCUT_GROUPS = [
   {
     label: "Training & Quality",
     items: [
+      { href: "/guida",                   title: "Guida strumenti",  desc: "Il funnel degli strumenti per ruolo (operatore, manager, leadership, HR) — onboarding e reference", icon: Signpost },
       { href: "/admin/review",            title: "Review sessioni",  desc: "Valuta + correggi score AI sulle conversazioni", icon: ClipboardCheck },
       { href: "/admin/outcomes",          title: "Outcomes reali",   desc: "Revenue/PPV/retention per validare AI", icon: Target },
       { href: "/admin/sessions",          title: "Review chat",      desc: "Leggi le conversazioni complete con feedback affiancato", icon: Brain },
