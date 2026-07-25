@@ -13,6 +13,25 @@ export const maxDuration = 60;
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { getOperatorSignalProfiles, bigQueryConfigured } from "@/lib/operator-signals";
 import { attachCoachingPaths } from "@/lib/coaching-paths";
+import { getInflowwStore, storeToList } from "@/lib/infloww-ingest";
+import { normalizeName } from "@/lib/me";
+import { buildDuoCoverage } from "@/lib/operator-duo-coverage";
+
+// Copertura duo a read-time: congiunge i segnali dell'export Infloww (turni in duo)
+// al profilo warehouse (solo singoli). Additivo e non-fatale: lo store è indipendente
+// e potrebbe essere vuoto/errore → in quel caso duo_coverage=null, il profilo regge.
+// Stessa identità operatore del resto dell'app (normalizeName di src/lib/me.js).
+async function attachDuoCoverage(data) {
+  if (!data || !Array.isArray(data.profiles)) return data;
+  try {
+    const store = await getInflowwStore();
+    const summary = buildDuoCoverage(data.profiles, storeToList(store), { normalize: normalizeName });
+    data.duo_coverage = { ...summary, store_updated_at: store?.updated_at || null };
+  } catch {
+    data.duo_coverage = null;
+  }
+  return data;
+}
 
 export async function GET() {
   const az = await authorize(CAPABILITIES.SEED);
@@ -21,7 +40,7 @@ export async function GET() {
   try {
     // percorso consigliato calcolato a read-time dal catalogo scenari (non in cache:
     // così resta sempre allineato al catalogo Academy corrente).
-    const data = attachCoachingPaths(await getOperatorSignalProfiles());
+    const data = await attachDuoCoverage(attachCoachingPaths(await getOperatorSignalProfiles()));
     return Response.json({ bigquery: true, ...data });
   } catch (e) {
     return Response.json({ error: e.message || "Calcolo profili fallito" }, { status: 500 });
@@ -39,7 +58,7 @@ export async function POST(request) {
     /* body opzionale */
   }
   try {
-    const data = attachCoachingPaths(await getOperatorSignalProfiles({ force: true, ...body }));
+    const data = await attachDuoCoverage(attachCoachingPaths(await getOperatorSignalProfiles({ force: true, ...body })));
     return Response.json({ bigquery: true, ...data });
   } catch (e) {
     return Response.json({ error: e.message || "Calcolo profili fallito" }, { status: 500 });
