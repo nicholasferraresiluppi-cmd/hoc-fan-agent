@@ -23,7 +23,7 @@ import useSWR from "swr";
 import { UserButton, SignedIn } from "@clerk/nextjs";
 import {
   Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown,
-  GraduationCap, BookOpen, ClipboardCheck, Target, Brain, Award,
+  GraduationCap, BookOpen, BookMarked, ClipboardCheck, Target, Brain, Award,
   LayoutDashboard, UserCog, Sparkles, Radar,
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Gauge, MessageSquareWarning,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
@@ -113,6 +113,7 @@ const NAV_GROUPS = [
       { href: "/academy/multi",                  label: "Multi-chat",   icon: Layers },
       { href: "/academy/tapes",                  label: "Game tape",    icon: Film },
       { href: "/playbook",                       label: "Playbook",     icon: BookOpen },
+      { href: "/academy/lezioni",                label: "Lezioni",      icon: BookMarked },
       { href: "/leaderboard",                    label: "Ladder Academy", icon: Trophy },
       { href: "/leaderboard/leghe",              label: "Leghe",        icon: Swords },
       { href: "/leaderboard/storico",            label: "Hall of Fame", icon: Crown },

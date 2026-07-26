@@ -249,6 +249,21 @@ function OperatorCard({ p }) {
               </Link>
             </div>
           )}
+          {p.top_gap.path?.lessons?.length > 0 && (
+            <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontSize: 11, color: CP.textMuted }}>Lezione dal reale:</span>
+              {p.top_gap.path.lessons.map((l) => (
+                <Link
+                  key={l.id}
+                  href={`/academy/lezioni/${l.id}`}
+                  title={l.primary ? "Allena proprio questo gap" : "Allena anche questo gap"}
+                  style={{ fontSize: 11.5, color: CP.accentSoftText, textDecoration: "none", background: CP.accentSoft, border: `1px solid ${CP.accentDim}`, padding: "3px 9px", borderRadius: 999 }}
+                >
+                  {l.title.length > 42 ? l.title.slice(0, 40) + "…" : l.title} →
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       ) : p.top_strength ? (
         <div style={{ margin: "8px 0 0", fontSize: 13, color: CP.textSecondary }}>
