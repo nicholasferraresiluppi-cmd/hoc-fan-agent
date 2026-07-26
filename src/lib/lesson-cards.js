@@ -397,7 +397,7 @@ const SILENZIO_REHOOK_ELISA = {
       name: "[Portante] Tieni corto: 1-4 parole",
       evidence: "dato",
       claim: "Il cortissimo batte la via di mezzo; il paragrafo medio (5-12 parole) è la fascia peggiore.",
-      numbers: "1-4 parole: re-ingaggio 21,4% / conv 8% (n=13.612). 5-12 parole: 13,9% / 4,7% (n=5.284). 13+ parole va bene ma è raro (22%, n=246: non sovrappesarlo).",
+      numbers: "1-4 parole: re-ingaggio 21,4% / conv 8% (n=13.612). 5-12 parole: 13,9% / 4,7% (n=5.284). 13+ parole: su Elisa 22% (n=246) MA su Ottorini è la fascia peggiore (3,8%) → la «coda lunga buona» era Elisa-specifica/rumore, non insegnarla. Ciò che regge su entrambi: cortissimo batte la via di mezzo.",
       how_to: "Apri con un aggancio di 1-4 parole (un nome, un «eii», un «ci sei?»). Evita lo spiegone medio: è la fascia dove il fan scivola via.",
       quote: "r-019: solo il nome del fan",
     },
@@ -518,8 +518,41 @@ const SILENZIO_REHOOK_ELISA = {
       "Il simulatore non modella né l'ora né il prezzo: la finestra 24-48h, la fascia pomeriggio/sera e il PPV-dopo-la-risposta si allenano solo sul vivo; qui alleni solo il testo. E nel sim il fan risponde comunque: «ha risposto» non è la prova che l'aggancio fosse buono — giudica con la rubrica, non con l'esito. Tetto: un solo re-hook per fan.",
   },
 
+  // Test di generalizzazione su un 2º creator (Giulia Ottorini, 44.353 re-hook +
+  // 240 sequenze etichettate). Il re-hook generalizza molto più dei gradini:
+  // tocca dinamiche universali di ri-ingaggio, non il sistema-prezzi del creator.
+  generalization: {
+    intro:
+      "Il re-hook è stato rifatto su un 2º creator (Giulia Ottorini, 44.353 re-hook + 240 sequenze etichettate). Generalizza molto più dei gradini: il cancello (~23% converte dopo la risposta, quasi identico), la forma del timing e «corto batte medio» replicano nettamente. Ciò che cambia è il LIVELLO (base rate, prezzo), non il pattern — Ottorini non è «diversa», è più in basso sulla stessa curva. 2 creator confermano forma e direzione, non fanno una legge.",
+    regge: [
+      "Il cancello è la stella polare: dopo la risposta, ~1 fan su 4 converte — 22,8% (Elisa) vs 23,8% (Ottorini), quasi identico nonostante il re-ingaggio di base sia dimezzato (19,3% vs 8,8%). Tasso di sistema-fan, non del creator.",
+      "Tieni corto: 1-4 parole battono 5-12 su entrambi. NON forzare «anche il lungo va bene»: su Ottorini 13+ è la fascia peggiore.",
+      "Timing: picco a 24-48h, buca sulla settimana (7-30g), leggera risalita oltre il mese — stessa forma su entrambi, solo i livelli scalano.",
+      "Constatazione batte domanda in CONVERSIONE su entrambi (7,5% vs 6,2% Elisa; 3,6% vs 2,2% Ottorini). Sul tasso di risposta è rumore.",
+      "Il pomeriggio è la fascia migliore su entrambi (ma è contesto/turno, non gesto allenabile).",
+    ],
+    sistema_elisa: [
+      "Il base rate (re-ingaggio 19,3% vs 8,8%, conversione 7,1% vs 3,0%) e il valore medio ($69,9 vs $29,9): livello del sistema-fan e price point del creator, non skill dell'operatore.",
+      "La «coda lunga buona» (13+ parole rende su Elisa, peggiore su Ottorini): Elisa-specifica/rumore. Trasferibile solo «corto batte medio».",
+      "Il ranking della sera come co-vincitrice: solo Elisa (lì sera ≈ pomeriggio); su Ottorini la sera è in fondo.",
+      "I tag a campione singolo che FLIPPANO tra i due creator: la domanda diretta al fan (negativa su Ottorini, positiva su Elisa), miss_you (negativo su Elisa, piatto su Ottorini), il PPV dentro il re-hook (fortissimo su Elisa, neutro su Ottorini) — provvisori, non meccanismi provati.",
+    ],
+    per_move: [
+      { move: "Il cancello: converte ~1 su 4 dopo la risposta", elisa_evidence: "22,8% (base 19,3%)", ottorini_evidence: "23,8% (base 8,8%)", verdict: "generalizza", note: "Invariante più forte: base dimezzato, cancello identico. Correlazionale (chi risponde è già più caldo)." },
+      { move: "Timing: picco 24-48h, buca 7-30g", elisa_evidence: "24,0→15,4→17,5", ottorini_evidence: "11,7→7,2→7,8", verdict: "generalizza", note: "Stessa forma, livelli più bassi. «La buca è la settimana, non il mese» confermato." },
+      { move: "Cortissimo (1-4) batte la via di mezzo (5-12)", elisa_evidence: "21,4>13,9; ma 13+=22 (U-shape)", ottorini_evidence: "11,1>6,4>3,8 (monotono)", verdict: "generalizza", note: "Il core regge; la U-shape era Elisa-specifica (n=246, rumore)." },
+      { move: "Constatazione batte domanda (in conversione)", elisa_evidence: "conv 7,5 vs 6,2; reeng 19,5 vs 18,8 (rumore)", ottorini_evidence: "conv 3,6 vs 2,2", verdict: "generalizza", note: "Robusto in conversione; la domanda DIRETTA al fan è incoerente tra creator (positiva su Elisa, negativa su Ottorini)." },
+      { move: "Il pomeriggio è la fascia migliore", elisa_evidence: "pom 21,0 ≈ sera 20,8", ottorini_evidence: "pom 10,2 stacca; sera 8,4 in fondo", verdict: "generalizza", note: "Solo «pomeriggio best»; il ranking della sera è Elisa-specifico. Contesto, non gesto." },
+      { move: "Il check-in leggero è il tipo che più riaggancia", elisa_evidence: "+9pp (73 vs 64), n~88 (~2 SE)", ottorini_evidence: "+22pp (63 vs 41), netto", verdict: "generalizza", note: "Direzione coerente ma da confermare: su Elisa il campione è piccolo. Non equiparare agli invarianti forti." },
+      { move: "miss_you come marcatore negativo", elisa_evidence: "5% vs 16% (n 6/19)", ottorini_evidence: "13% vs 14% (piatto)", verdict: "dati-insufficienti", note: "Non replica su Ottorini; campioni Elisa minuscoli. Non promuovere a regola." },
+    ],
+    implicazione:
+      "La lezione si legge su due strati: il metodo universale (cancello, corto, timing, constatazione-in-conversione, check-in) è candidato a metodo generale — molto più solido dei gradini, perché il re-ingaggio è dinamica umana, non sistema-prezzi; il livello (base rate, prezzo) e i dettagli a campione piccolo (U-shape, miss_you, PPV-nel-rehook, ranking sera) sono creator-specifici o provvisori. Come per i gradini: 2 creator confermano forma e direzione, servono un 3º/4º per una legge.",
+  },
+
   limits: [
     "Il cancello 22,8% vs 3,4% è in gran parte selezione, non effetto del re-hook: chi risponde è già un fan più caldo e auto-selezionato. Il divario sovrastima quanto «produce» il riagganciare; la mossa (aprire per la risposta) resta giusta, ma il numero non è l'effetto causale del messaggio.",
+    "Generalizzazione: testata su 2 creator (Elisa + Ottorini). Forma e direzione dei pattern reggono, ma 2 creator non fanno una legge — e i tag a campione singolo flippano direzione tra i due (provvisori, non meccanismi provati).",
     "Il vantaggio del tempismo (24-48h 24% vs 7-30g 15,4%) è in parte selezione (chi re-hooka presto ha fan più caldi) ed è non monotòno: oltre il mese risale a 17,5%. Non leggerlo come «prima è sempre meglio».",
     "Constatazione vs domanda è rumore, non una leva: 19,5% vs 18,8%. Per questo non è tra le mosse — al massimo, a parità, un tocco leggero batte di un soffio l'interrogatorio.",
     "continuation poggia su base minima (10 riagganciati vs 1 ignorato): direzionale, mai un superlativo. Il tipo che davvero separa di più ed è il più frequente tra chi torna è il check-in generico (+9pt).",
