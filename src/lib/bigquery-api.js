@@ -105,16 +105,34 @@ async function getAccessToken(force = false) {
 }
 
 // Converte lo schema+righe BigQuery ({ f:[{v}] }) in array di oggetti JS con coercizione base.
+// Gestisce anche REPEATED e RECORD/STRUCT (formato wire: ARRAY → v=[{v:…}],
+// STRUCT → v={f:[{v:…}]}), così ARRAY_AGG(STRUCT(…)) arriva come array di oggetti.
 function rowsToObjects(schema, rows) {
   const fields = schema?.fields || [];
-  return (rows || []).map((row) => {
-    const obj = {};
-    fields.forEach((field, i) => {
-      const v = row.f?.[i]?.v;
-      obj[field.name] = coerce(v, field.type);
-    });
-    return obj;
+  return (rows || []).map((row) => objectFromF(fields, row));
+}
+
+function objectFromF(fields, row) {
+  const obj = {};
+  fields.forEach((field, i) => {
+    obj[field.name] = coerceField(row.f?.[i]?.v, field);
   });
+  return obj;
+}
+
+function coerceField(v, field) {
+  if (field.mode === "REPEATED") {
+    return Array.isArray(v) ? v.map((item) => coerceScalar(item?.v, field)) : [];
+  }
+  return coerceScalar(v, field);
+}
+
+function coerceScalar(v, field) {
+  if (v === null || v === undefined) return null;
+  if (field.type === "RECORD" || field.type === "STRUCT") {
+    return objectFromF(field.fields || [], v);
+  }
+  return coerce(v, field.type);
 }
 
 function coerce(v, type) {
@@ -169,10 +187,10 @@ export async function bqQuery(sql, opts = {}) {
     throw new Error(`BigQuery query fallita (${res.status}): ${msg}`);
   }
 
-  // Query completata entro timeoutMs → risultati inline.
+  // Query completata entro timeoutMs → risultati inline (+ eventuali pagine successive).
   if (data.jobComplete) {
     return {
-      rows: rowsToObjects(data.schema, data.rows),
+      rows: rowsToObjects(data.schema, await withRemainingPages(env, token, data, location)),
       totalBytesProcessed: Number(data.totalBytesProcessed || 0),
       cacheHit: Boolean(data.cacheHit),
     };
@@ -182,6 +200,29 @@ export async function bqQuery(sql, opts = {}) {
   const jobId = data.jobReference?.jobId;
   const jobLocation = data.jobReference?.location || location;
   return pollJobResults(env, token, jobId, jobLocation);
+}
+
+// Segue le pagine successive di getQueryResults (pageToken). Senza, i risultati
+// oltre la prima pagina (~10MB) andrebbero PERSI IN SILENZIO — con ORDER BY
+// ascendente sparirebbero proprio le righe più recenti.
+async function withRemainingPages(env, token, first, jobLocation) {
+  let rows = first.rows || [];
+  let pageToken = first.pageToken;
+  const jobId = first.jobReference?.jobId;
+  while (pageToken && jobId) {
+    const url = new URL(`${BQ_BASE}/projects/${env.billingProject}/queries/${jobId}`);
+    url.searchParams.set("pageToken", pageToken);
+    if (jobLocation) url.searchParams.set("location", jobLocation);
+    const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    if (!res.ok) {
+      const msg = data?.error?.message || res.statusText;
+      throw new Error(`BigQuery pagina successiva fallita (${res.status}): ${msg}`);
+    }
+    rows = rows.concat(data.rows || []);
+    pageToken = data.pageToken;
+  }
+  return rows;
 }
 
 async function pollJobResults(env, token, jobId, jobLocation, attempts = 10) {
@@ -197,7 +238,7 @@ async function pollJobResults(env, token, jobId, jobLocation, attempts = 10) {
     }
     if (data.jobComplete) {
       return {
-        rows: rowsToObjects(data.schema, data.rows),
+        rows: rowsToObjects(data.schema, await withRemainingPages(env, token, data, jobLocation)),
         totalBytesProcessed: Number(data.totalBytesProcessed || 0),
         cacheHit: Boolean(data.cacheHit),
       };
