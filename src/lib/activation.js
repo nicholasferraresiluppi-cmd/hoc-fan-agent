@@ -55,6 +55,27 @@ export function computeActivation(events, cfg = ACTIVATION_THRESHOLDS) {
   return computeActivationCore(events, cfg, gapCategoriesFor);
 }
 
+/**
+ * Progresso self-help dell'operatore per la checklist della /guida (scope own).
+ * Vista LENIENT (nessuna finestra): l'operatore vede il suo avanzamento all-time
+ * sull'anello diagnostica → allena → applica. Distinta dalla METRICA di activation
+ * (windowed, per l'admin): qui è incoraggiante, lì è disciplinata — così la checklist
+ * non diventa il bersaglio da gamare (la metrica vera resta validata sul warehouse).
+ */
+export async function getOperatorGuideProgress(userId) {
+  const events = await readEvents(userId);
+  const wide = { ...ACTIVATION_THRESHOLDS, windowDays: 36500 }; // ~100 anni = nessuna finestra
+  const state = computeActivation(events, wide);
+  return {
+    diagnosed: state.ahaReached,
+    gapKey: state.gapKey,
+    trained: state.gapScenariosInWindow,
+    target: ACTIVATION_THRESHOLDS.minGapScenarios,
+    applied: events.some((e) => e && e.t === EVENT.TURNO_VIEWED),
+    eventCount: events.length,
+  };
+}
+
 const EVENTS_KEY = (u) => `activation:events:${u}`;
 const IDENTITY_KEY = (u) => `activation:identity:${u}`;
 const FIRST_KEY = (u) => `activation:first:${u}`;

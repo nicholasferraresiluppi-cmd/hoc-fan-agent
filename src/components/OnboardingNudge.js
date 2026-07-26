@@ -25,6 +25,7 @@ import { Compass, X, ArrowRight } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { selectFunnels, getFunnel } from "@/lib/role-funnels";
 import RoleFunnelGuide from "@/components/RoleFunnelGuide";
+import RoleFunnelChecklist from "@/components/RoleFunnelChecklist";
 
 const SEEN_KEY = "hoc:guida:seen:v1";
 
@@ -33,6 +34,10 @@ export default function OnboardingNudge() {
   const { user, isLoaded } = useUser();
   const swrKey = isLoaded && user ? "/api/whoami" : null;
   const { data: whoami } = useSWR(swrKey);
+  const primaryKey = whoami ? selectFunnels(whoami).primaryKey : null;
+  // Progresso proprio per il checklist-launcher — SOLO se l'utente è operatore
+  // (evita il resolveEmployeeForUser pesante per i non-operatori a ogni pagina).
+  const { data: act } = useSWR(isLoaded && user && primaryKey === "operator" ? "/api/me/activation" : null);
 
   const [open, setOpen] = useState(false);
   const [checkedStorage, setCheckedStorage] = useState(false);
@@ -72,7 +77,6 @@ export default function OnboardingNudge() {
   if (!isLoaded || !user || !whoami) return null;
   if (pathname === "/guida") return null;
 
-  const { primaryKey } = selectFunnels(whoami);
   const funnel = getFunnel(primaryKey);
   if (!funnel) return null;
 
@@ -136,9 +140,13 @@ export default function OnboardingNudge() {
           </button>
         </div>
 
-        {/* Corpo: il funnel primario */}
+        {/* Corpo: checklist per l'operatore (learn-by-doing), read-only per gli altri ruoli */}
         <div style={{ padding: "18px 22px", overflowY: "auto" }}>
-          <RoleFunnelGuide funnel={funnel} onNavigate={markSeen} />
+          {primaryKey === "operator" && act?.linked ? (
+            <RoleFunnelChecklist funnel={funnel} progress={act.progress} focus={act.focus} onNavigate={markSeen} />
+          ) : (
+            <RoleFunnelGuide funnel={funnel} onNavigate={markSeen} />
+          )}
         </div>
 
         {/* Footer */}

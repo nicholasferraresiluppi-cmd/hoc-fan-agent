@@ -18,6 +18,7 @@ import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, PillTab } from "@/components/cp-style";
 import { selectFunnels, getFunnel } from "@/lib/role-funnels";
 import RoleFunnelGuide from "@/components/RoleFunnelGuide";
+import RoleFunnelChecklist from "@/components/RoleFunnelChecklist";
 
 export default function GuidaPage() {
   const { user, isLoaded } = useUser();
@@ -33,6 +34,11 @@ export default function GuidaPage() {
   // La chiave attiva: quella scelta dall'utente se ancora visibile, altrimenti il primario.
   const activeKey = active && visibleKeys.includes(active) ? active : primaryKey;
   const funnel = getFunnel(activeKey);
+
+  // Il percorso operatore è una CHECKLIST agganciata al proprio progresso reale
+  // (learn-by-doing + misura); gli altri ruoli restano read-only.
+  const { data: act } = useSWR(activeKey === "operator" ? "/api/me/activation" : null);
+  const operatorChecklist = activeKey === "operator" && !(act && act.linked === false);
 
   const loading = !isLoaded || (swrKey && !whoami);
 
@@ -80,7 +86,11 @@ export default function GuidaPage() {
             </div>
           )}
 
-          <RoleFunnelGuide funnel={funnel} />
+          {operatorChecklist ? (
+            <RoleFunnelChecklist funnel={funnel} progress={act?.progress} focus={act?.focus} />
+          ) : (
+            <RoleFunnelGuide funnel={funnel} />
+          )}
         </>
       )}
     </div>
