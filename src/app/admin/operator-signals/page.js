@@ -162,6 +162,43 @@ function InflowwOnly({ list }) {
   );
 }
 
+// Coda film: momenti NUOVI da giudicare sugli operatori seguiti (libreria
+// attivata). È il punto d'ingresso del rituale settimanale del coach: si parte
+// da qui, non dal ricordarsi di aprire N pagine.
+function FilmQueueBanner() {
+  const { data } = useSWR("/api/admin/operator-film/queue", fetcher, { revalidateOnFocus: false });
+  if (!data || !data.rows?.length) return null;
+  return (
+    <div style={{ padding: "12px 14px", marginBottom: 14, background: CP.surface, border: `1px solid ${data.nuovi > 0 ? `${CP.accent}55` : CP.border}`, borderRadius: 10 }}>
+      <div style={{ fontSize: 12.5, color: CP.textSecondary, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "baseline" }}>
+        <span style={{ color: CP.textPrimary, fontWeight: 500 }}>Coda film</span>
+        <span>{data.operators} operatori seguiti</span>
+        {data.nuovi > 0 ? (
+          <span style={{ color: CP.accent, fontWeight: 500 }}>{data.nuovi} momenti nuovi da giudicare</span>
+        ) : (
+          <span style={{ color: CP.textMuted }}>nessun momento nuovo</span>
+        )}
+      </div>
+      {data.nuovi > 0 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+          {data.rows
+            .filter((r) => r.counts?.nuovi > 0)
+            .slice(0, 12)
+            .map((r) => (
+              <Link
+                key={r.operator}
+                href={`/admin/operator-signals/${encodeURIComponent(r.operator)}`}
+                style={{ fontSize: 11.5, color: CP.textSecondary, background: CP.surfaceAlt, border: `1px solid ${CP.borderSoft}`, padding: "3px 10px", borderRadius: 999, textDecoration: "none" }}
+              >
+                {r.operator} · <span style={{ color: CP.accent }}>{r.counts.nuovi}</span>
+              </Link>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DuoCoverageSection({ dc }) {
   // dc null = store non leggibile: silenzioso, il profilo regge lo stesso.
   if (!dc) return null;
@@ -351,6 +388,7 @@ export default function OperatorSignalsPage() {
         <div style={{ color: CP.textMuted, fontSize: 14 }}>Calcolo dai turni reali…</div>
       ) : (
         <>
+          <FilmQueueBanner />
           <DuoCoverageSection dc={data?.duo_coverage} />
 
           {profiles.length > 0 && (

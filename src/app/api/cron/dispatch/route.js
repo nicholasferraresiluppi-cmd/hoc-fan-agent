@@ -54,6 +54,9 @@ export async function POST(request) {
   out.cp_wages = await kickEndpoint(request, "/api/cron/cp-wages");
   out.payout_ledger = await kickEndpoint(request, "/api/cron/payout-ledger");
   out.queue_snapshot = await kickEndpoint(request, "/api/cron/queue-snapshot");
+  // librerie game film: rinfresca le 2 più stantie → momenti nuovi in coda
+  // ogni notte senza che un coach debba aprire la pagina (blueprint 26 lug)
+  out.film_refresh = await kickEndpoint(request, "/api/cron/film-refresh");
 
   // Riscalda la cache degli Academy Signals (query analitica pesante): così la
   // GET admin legge sempre dalla cache invece di calcolare inline. Best-effort:
