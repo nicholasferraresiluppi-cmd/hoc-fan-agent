@@ -211,6 +211,13 @@ function OperatorCard({ p }) {
         <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
           <span style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, fontFamily: FONTS.display }}>{p.operator}</span>
           <QuadrantBadge q={p.quadrant} />
+          <Link
+            href={`/admin/operator-signals/${encodeURIComponent(p.operator)}`}
+            title="Vinte da studiare e occasioni scivolate, dalle sue conversazioni reali"
+            style={{ fontSize: 11.5, color: CP.accentSoftText, textDecoration: "none", whiteSpace: "nowrap" }}
+          >
+            game film →
+          </Link>
         </div>
         <div style={{ fontSize: 12, color: CP.textMuted }}>
           {p.shifts} turni singoli · {p.msgs.toLocaleString("it-IT")} messaggi

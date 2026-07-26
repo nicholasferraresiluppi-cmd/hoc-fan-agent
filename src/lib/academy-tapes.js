@@ -55,7 +55,9 @@ function tapeSecret() {
 function fanHmac(creatorId, userId) {
   return crypto.createHmac("sha256", tapeSecret()).update(`${creatorId}:${userId}`).digest("hex");
 }
-function fanAlias(creatorId, userId) {
+// Esportata: unica implementazione della pseudonimizzazione fan (stesso segreto,
+// stesso alias per lo stesso fan ovunque — game tape e game film coerenti).
+export function fanAlias(creatorId, userId) {
   return `Fan ${fanHmac(creatorId, userId).slice(0, 4).toUpperCase()}`;
 }
 
