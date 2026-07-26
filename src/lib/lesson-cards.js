@@ -328,7 +328,199 @@ const PPV_GRADINI_ELISA = {
   ],
 };
 
-const CARDS = [PPV_GRADINI_ELISA];
+// PROVENIENZA lezione "silenzio-rehook-elisa": estrazione BigQuery onlyfans.chat
+// (Elisa Esposito, 2026-04-01→07-25). Re-hook = messaggio dell'operatore che
+// rompe un silenzio ≥24h dopo che il fan aveva ghostato il suo ultimo messaggio.
+// Outcome: re-ingaggio = fan risponde entro 48h; conversione = acquisto entro 7g.
+// 19.142 re-hook; 240 sequenze etichettate (120 riagganciate + 120 ignorate);
+// distillazione con 3 critici avversariali (onestà-dati, compliance, pedagogia:
+// 14 correzioni imposte). Copre il caso maggioritario (~74% degli episodi PPV è
+// un invio singolo senza ingaggio) che la carta "gradini" lasciava fuori.
+const SILENZIO_REHOOK_ELISA = {
+  id: "silenzio-rehook-elisa",
+  status: "pilota",
+  title: "Il silenzio e il re-hook: far tornare un fan che ti ha ghostato",
+  creator: "Elisa Esposito",
+  subtitle:
+    "Copre il caso maggioritario che la carta «gradini» lasciava fuori: ~74% degli episodi PPV è un invio singolo senza ingaggio. Distillata da 19.142 re-hook reali, 240 sequenze etichettate riagganciate-vs-ignorate, 3 critici avversariali. Ogni affermazione porta la sua etichetta di evidenza.",
+  provenance: {
+    episodi: 19142,
+    episodi_label: "re-hook analizzati",
+    finestra: "2026-04-01 → 2026-07-25",
+    sequenze_etichettate: 240,
+    seq_label: "sequenze etichettate (riagganciate + ignorate)",
+    winrate_medio: 19.3,
+    metric_label: "re-ingaggio a 48h",
+    correzioni_critici: 14,
+  },
+
+  three_things: [
+    {
+      title: "Il cancello è la risposta, non la vendita",
+      body:
+        "Chi torna a scriverti converte 22,8% (importo medio $69,9); chi resta muto 3,4%. Quindi il primo messaggio non deve vendere: deve strappare un «ci sono». Il PPV arriva dopo. Onestà: chi risponde è già un fan più caldo, quindi quel 22,8% non è merito solo del tuo aggancio — ma la mossa giusta resta aprire per la risposta, non per l'offerta.",
+    },
+    {
+      title: "Presto e corto",
+      body:
+        "La finestra 24-48h è il picco (re-ingaggio 24%), ma non è «prima è sempre meglio»: la settimana-mese (7-30g) è la buca (15,4%) e oltre il mese risale (17,5%). E un'apertura di 1-4 parole batte nettamente il paragrafo medio (21,4% vs 13,9%). Metti in cima i ghost freschi, apri breve.",
+    },
+    {
+      title: "Un invito, non un assedio",
+      body:
+        "A 19,3% di risposte è un gioco di volume sulla lista, non un colpo sul singolo. Regola dura: un solo re-hook per silenzio. Se non aggancia non ri-colpire a raffica — al massimo molto più avanti, con un testo diverso. Se il fan mostra fastidio, dice basta o è ostile, si chiude: è un no da rispettare, non un ostacolo da aggirare.",
+    },
+  ],
+
+  moves: [
+    {
+      tier: "core", n: 1,
+      name: "[Portante] Punta alla risposta, non alla vendita",
+      evidence: "correlazione",
+      claim: "Monetizzi soprattutto chi prima ti ha risposto; ma chi risponde è un sottoinsieme già più caldo, quindi il divario sovrastima l'effetto del solo aggancio.",
+      numbers: "Dopo risposta: converte 22,8% (importo medio $69,9; n=3.702 riagganciati). Senza risposta visibile: 3,4%.",
+      how_to: "Apri leggero e senza PPV. L'unico obiettivo del primo messaggio è strappare un «ci sono»; l'offerta viene dopo.",
+      quote: "r-005: «heyyyyy»",
+    },
+    {
+      tier: "core", n: 2,
+      name: "[Portante] Tieni corto: 1-4 parole",
+      evidence: "dato",
+      claim: "Il cortissimo batte la via di mezzo; il paragrafo medio (5-12 parole) è la fascia peggiore.",
+      numbers: "1-4 parole: re-ingaggio 21,4% / conv 8% (n=13.612). 5-12 parole: 13,9% / 4,7% (n=5.284). 13+ parole va bene ma è raro (22%, n=246: non sovrappesarlo).",
+      how_to: "Apri con un aggancio di 1-4 parole (un nome, un «eii», un «ci sei?»). Evita lo spiegone medio: è la fascia dove il fan scivola via.",
+      quote: "r-019: solo il nome del fan",
+    },
+    {
+      tier: "core", n: 3,
+      name: "[Portante] Colpisci presto — ma la buca è la settimana, non il mese",
+      evidence: "dato",
+      claim: "Il picco di risposta è a 24-48h, poi non è monotòno: 7-30 giorni è la fascia peggiore e oltre il mese risale.",
+      numbers: "24-48h: re-ingaggio 24% / conv 8,6% (n=4.102, picco). 2-7g: 20,1% / 7,2% (n=8.178). 7-30g: 15,4% / 6% (n=5.899, buca). 30g+: 17,5% / 7,9% (n=963, risale).",
+      how_to: "Metti in cima alla coda i ghost di 1-2 giorni. Ma non pensare «prima è sempre meglio»: chi supera il mese recupera, mentre la settimana-morta rende meno.",
+      quote: "r-016: «ah si ?»",
+    },
+    {
+      tier: "core", n: 4,
+      name: "[Forma] Il check-in leggero è il tipo che più riaggancia",
+      evidence: "osservato-contrastato",
+      claim: "Il check-in leggero e generico è sia il più frequente tra chi riaggancia sia quello che più separa chi torna da chi no; riprendere un filo lasciato a metà aiuta, ma su pochissimi casi.",
+      numbers: "check-in generico: 73% dei riagganciati vs 64% degli ignorati (+9pt, il più comune). continuation: 8% vs 1% (+7pt) ma su appena 10 riagganciati vs 1 ignorato — base minima, solo direzionale. (240 conversazioni etichettate.)",
+      how_to: "Apri con un check-in leggero e naturale. Se puoi riprendere un discorso reale lasciato a metà, meglio ancora — ma non è una leva provata da sola: non forzarla su un filo che non esiste.",
+      quote: "r-006: «come va la serata amio?»",
+    },
+    {
+      tier: "core", n: 5,
+      name: "[Contesto] L'ora conta, ma spesso non la scegli",
+      evidence: "dato",
+      claim: "Pomeriggio e sera rendono più di mattina e notte; ma è un fattore di contesto, non un gesto allenabile (sei in turno, e il simulatore non modella l'ora).",
+      numbers: "Pomeriggio 12-18: re-ingaggio 21% / conv 8,6%. Sera 18-24: 20,8% / 7,6%. Mattina 6-12: 17,3% / 5,8%. Notte 0-6: 17,9% / 6,2% (ora di Roma).",
+      how_to: "Se puoi scegliere, concentra i re-hook dal primo pomeriggio a tarda sera. Ma trattalo come contesto: non è una mossa di testo da drillare.",
+      quote: "r-010: «se ti dicessi che oggi voglio esagerare»",
+    },
+    {
+      tier: "core", n: 6,
+      name: "[Cornice] Lavora la lista con un tetto: un re-hook per silenzio",
+      evidence: "osservato",
+      claim: "A 19,3% di risposte nessun singolo re-hook è garantito: contano costanza sulla lista e un limite superiore per fan. Il tetto è una scelta di rispetto, non un numero ottimizzato.",
+      numbers: "re-ingaggio 19,3% su 19.142 re-hook. Stesso testo «amoo??»: ignorato in i-001, riaggancia in r-022 (esito opposto → non è la frase, è timing + stato del fan + costanza).",
+      how_to: "Un solo re-hook per silenzio. Se non aggancia, non ri-colpire lo stesso fan a raffica: lascialo andare, al massimo ritenta molto più avanti con un messaggio diverso. Fastidio, «basta», «non scrivermi» o ostilità = stop: si chiude, non si aggira.",
+      quote: "i-001 vs r-022: «amoo??» (stesso testo, esito opposto)",
+    },
+  ],
+
+  worked_examples: [
+    {
+      id: "r-006", tag: "check-in leggero",
+      title: "Il tipo che più riaggancia: fa parlare il fan senza vendere",
+      beats: [
+        "Stato prima: silenzio recente sul fan",
+        "Hook: «come va la serata amio?» — breve, naturale, zero PPV",
+        "Decisione chiave: l'obiettivo è una risposta, non l'offerta",
+        "Esito: il fan risponde e in seguito converte → il cancello è aperto",
+      ],
+    },
+    {
+      id: "r-016", tag: "continuation (base minima)",
+      title: "Riapre un filo lasciato a metà con due parole, senza colpe né PPV",
+      beats: [
+        "Stato prima: uno scambio era rimasto sospeso giorni prima",
+        "Hook: «ah si ?» come se il tempo non fosse passato",
+        "Decisione chiave: zero colpevolizzazione, zero offerta — solo riprende il filo",
+        "Esito: il fan torna a scrivere. Nota: continuation riaggancia su base minima (10 vs 1), non è la leva più forte",
+      ],
+    },
+    {
+      id: "r-010", tag: "curiosità",
+      title: "Sospende una promessa senza chiedere nulla; il fan morde, e solo allora il prezzo",
+      beats: [
+        "Stato prima: fan ghostato da riattivare",
+        "Hook: apre con curiosità aperta («oggi voglio esagerare»), non un interrogatorio",
+        "Decisione chiave: promette senza chiedere soldi — crea tensione, non pressione",
+        "Esito: il fan si incuriosisce → il PPV si tratta solo ora, dopo la risposta",
+      ],
+    },
+  ],
+
+  anti_examples: [
+    {
+      id: "i-029",
+      title: "Il template riciclato uguale per tutti",
+      body:
+        "Template identico riconoscibile come copia-incolla, ignorato nonostante il timing buono (24-48h). ↳ Il timing giusto non salva un testo prefabbricato: rileggi l'ultimo messaggio reale del fan e riparti da lì con 3-4 parole tue («ma quella cosa di ieri poi?»), non da un template.",
+      note: "caso osservato, senza base rate del template → aneddoto, non prova di inefficacia",
+    },
+    {
+      id: "i-012",
+      title: "Apre vendendo, prima della risposta",
+      body:
+        "Apre col tease di contenuto pronto («sono pronta a mostrartele») prima di avere una risposta, poi si lamenta di essere ignorata. ↳ Prima la risposta, poi l'offerta: il primo messaggio è un aggancio corto e senza PPV; il tease arriva solo dopo il «ci sono». Si converte 22,8% dopo una risposta, 3,4% senza.",
+      note: "guidare con la vendita su un fan freddo salta il cancello",
+    },
+  ],
+
+  do_not_teach: [
+    {
+      title: "Colpevolizzazione, finta preoccupazione e drammi come apertura",
+      body:
+        "«mi manchi», «sei sparito, sono preoccupata», «non ti piaccio più?», emoji piangenti. Tag miss_you: 5% dei riagganciati vs 16% degli ignorati (su base piccola, 6 vs 19 su 240: direzionale). Sostituisci con un check-in leggero e un filo ripreso; una micro-colpa scherzosa («non mi scrivi nulla??») è il limite massimo, mai allarme o dramma.",
+      why: "È manipolativo e contrario alla policy HOC (mai molestia). La direzione dei dati suggerisce anche che sia inefficace, ma la ragione primaria per non insegnarlo è etica, non statistica.",
+    },
+    {
+      title: "Raffiche di poke automatici (cinque «ci sei?» di fila)",
+      body:
+        "Nessuna evidenza numerica che le raffiche riducano il re-ingaggio (provocazione/insistenza ~16% vs 17%, praticamente pari). Un poke leggero, non una scarica: se il primo non aggancia, cambia messaggio o momento — non alzare il volume sullo stesso fan. Rispetta il tetto: un re-hook per silenzio.",
+      why: "Scelta di policy relazionale ed etica, non un risultato dei dati: anche quando rompe il silenzio, la raffica danneggia la relazione (fastidio dichiarato) e ha forma molesta; il re-ingaggio così ottenuto è di bassa qualità.",
+    },
+  ],
+
+  drill: {
+    title: "Il drill: riprendi il filo",
+    scenario:
+      "Prendi 5 conversazioni ghostate; per ciascuna scrivi un solo re-hook che punti a una risposta, non a una vendita. Rubrica pass/fail auto-somministrata:",
+    steps: [
+      "L'aggancio cita qualcosa di specifico dall'ultimo messaggio reale del fan, oppure è un check-in leggero e naturale?",
+      "Zero «mi manchi» / «perché non rispondi» / finte urgenze?",
+      "Zero PPV?",
+    ],
+    fail: "Un «mi manchi» drammatico, un PPV nel primo messaggio, o un template uguale per tutti. Tendi al cortissimo (1-4 parole) — ma se stai riprendendo un filo reale e servono 5-6 parole, va bene: non sacrificare il filo alla lunghezza.",
+    reality:
+      "Il simulatore non modella né l'ora né il prezzo: la finestra 24-48h, la fascia pomeriggio/sera e il PPV-dopo-la-risposta si allenano solo sul vivo; qui alleni solo il testo. E nel sim il fan risponde comunque: «ha risposto» non è la prova che l'aggancio fosse buono — giudica con la rubrica, non con l'esito. Tetto: un solo re-hook per fan.",
+  },
+
+  limits: [
+    "Il cancello 22,8% vs 3,4% è in gran parte selezione, non effetto del re-hook: chi risponde è già un fan più caldo e auto-selezionato. Il divario sovrastima quanto «produce» il riagganciare; la mossa (aprire per la risposta) resta giusta, ma il numero non è l'effetto causale del messaggio.",
+    "Il vantaggio del tempismo (24-48h 24% vs 7-30g 15,4%) è in parte selezione (chi re-hooka presto ha fan più caldi) ed è non monotòno: oltre il mese risale a 17,5%. Non leggerlo come «prima è sempre meglio».",
+    "Constatazione vs domanda è rumore, non una leva: 19,5% vs 18,8%. Per questo non è tra le mosse — al massimo, a parità, un tocco leggero batte di un soffio l'interrogatorio.",
+    "continuation poggia su base minima (10 riagganciati vs 1 ignorato): direzionale, mai un superlativo. Il tipo che davvero separa di più ed è il più frequente tra chi torna è il check-in generico (+9pt).",
+    "Il re-hook-con-PPV riaggancia 32,6% ma su n=46: aneddotico, non prescrivibile. La regola resta: prima la risposta, il PPV dopo.",
+    "L'estremo lungo (13+ parole, 22%) ha n=246: non sovrappesarlo. Il segnale solido è che 1-4 parole battono la via di mezzo (5-12).",
+    "Il contrasto per tipo viene da 240 conversazioni etichettate: direzionale, non definitivo; qualche etichetta è rumorosa (esiti di singola riga da leggere con cautela).",
+    "Tutto è specifico di Elisa Esposito, una sola creator, finestra apr-lug 2026. Citazioni pseudonimizzate, singoli messaggi: non generalizzare ad altre creator senza rimisurare.",
+  ],
+};
+
+const CARDS = [PPV_GRADINI_ELISA, SILENZIO_REHOOK_ELISA];
 
 /** Lista leggera per l'indice (senza il corpo della lezione). */
 export function listLessonCards() {

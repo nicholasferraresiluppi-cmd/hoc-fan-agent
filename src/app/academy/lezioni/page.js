@@ -76,9 +76,9 @@ export default function LezioniPage() {
           ))}
 
           <div style={{ marginTop: 8, padding: "16px 20px", background: CP.surface, border: `1px dashed ${CP.border}`, borderRadius: 12, fontSize: 13, color: CP.textMuted, lineHeight: 1.6 }}>
-            <span style={{ color: CP.textSecondary, fontWeight: 500 }}>In coda:</span> la lezione sul silenzio e il re-hook
-            (il 74% degli episodi PPV è un invio senza risposta — fuori scope della carta gradini) e la replica del formato
-            sugli altri creator. Le lezioni si aggiungono solo dopo estrazione dal reale e curatela.
+            <span style={{ color: CP.textSecondary, fontWeight: 500 }}>In coda:</span> la replica del formato sugli altri
+            creator (per separare il metodo generale dal sistema-creator, come già fatto per i gradini) e un batch di
+            sequenze perse citabili per rafforzare gli anti-esempi. Le lezioni si aggiungono solo dopo estrazione dal reale e curatela.
           </div>
         </div>
       )}

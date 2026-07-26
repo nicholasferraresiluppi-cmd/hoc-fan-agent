@@ -120,9 +120,9 @@ export default function LessonCardPage() {
       {/* provenienza + legenda evidenza */}
       <Card style={{ background: CP.bgSunken, display: "flex", flexWrap: "wrap", gap: "10px 22px", fontSize: 12.5, color: CP.textMuted }}>
         <span>{c.creator}</span>
-        <span>{fmtInt(c.provenance.episodi)} episodi 1:1</span>
-        <span>{fmtInt(c.provenance.sequenze_etichettate)} sequenze etichettate (vinte + perse)</span>
-        <span>winrate medio {String(c.provenance.winrate_medio).replace(".", ",")}%</span>
+        <span>{fmtInt(c.provenance.episodi)} {c.provenance.episodi_label || "episodi 1:1"}</span>
+        <span>{fmtInt(c.provenance.sequenze_etichettate)} {c.provenance.seq_label || "sequenze etichettate (vinte + perse)"}</span>
+        <span>{c.provenance.metric_label || "winrate medio"} {String(c.provenance.winrate_medio).replace(".", ",")}%</span>
         <span>{c.provenance.correzioni_critici} correzioni dai critici</span>
       </Card>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 18px", margin: "12px 2px 0", fontSize: 12, color: CP.textMuted, alignItems: "center" }}>
@@ -145,7 +145,8 @@ export default function LessonCardPage() {
         ))}
       </div>
 
-      {/* mappa dei gradini */}
+      {/* mappa dei gradini (solo se la lezione ne ha una) */}
+      {c.chain_map && (<>
       <SectionTitle kicker="L'artefatto da memorizzare" title="La mappa dei gradini" sub={c.chain_map.intro} />
       <Card>
         <div style={{ fontSize: 11, fontFamily: FONTS.mono, letterSpacing: "0.1em", textTransform: "uppercase", color: CP.textMuted, marginBottom: 6 }}>Ingresso</div>
@@ -158,19 +159,24 @@ export default function LessonCardPage() {
           {c.chain_map.nota}
         </div>
       </Card>
+      </>)}
 
       {/* mosse */}
-      <SectionTitle kicker="Velocità 2" title="Le sei mosse core" sub="Ordinate come le usa l'operatore, dall'aggancio alla chiusura. Ogni mossa: quando scatta → cosa fai, con la battuta vera." />
+      <SectionTitle kicker="Velocità 2" title="Le mosse core" sub="Ordinate come le usa l'operatore. Ogni mossa: quando scatta → cosa fai, con la battuta vera." />
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {core.map((m) => <MoveCard key={m.n} m={m} />)}
       </div>
-      <SectionTitle kicker="Velocità 2" title="Le tre di secondo giro" sub="Utili ma meno discriminanti: si appoggiano alle mosse core, non le sostituiscono." />
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {secondo.map((m) => <MoveCard key={m.n} m={m} secondo />)}
-      </div>
+      {secondo.length > 0 && (
+        <>
+          <SectionTitle kicker="Velocità 2" title="Le mosse di secondo giro" sub="Utili ma meno discriminanti: si appoggiano alle mosse core, non le sostituiscono." />
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {secondo.map((m) => <MoveCard key={m.n} m={m} secondo />)}
+          </div>
+        </>
+      )}
 
       {/* worked examples */}
-      <SectionTitle kicker="Vedi come si fa" title="Tre partite vinte, mossa per mossa" />
+      <SectionTitle kicker="Vedi come si fa" title="Partite vinte, mossa per mossa" />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 12 }}>
         {c.worked_examples.map((w) => (
           <Card key={w.id}>
@@ -217,23 +223,30 @@ export default function LessonCardPage() {
       <SectionTitle kicker="Prova tu" title={c.drill.title} />
       <Card style={{ borderLeft: `2px solid ${CP.accent}` }}>
         <div style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary, marginBottom: 8 }}>Scenario: {c.drill.scenario}</div>
-        <ol style={{ margin: "0 0 12px", paddingLeft: 20, display: "grid", gap: 6 }}>
-          {c.drill.steps.map((s, i) => (
-            <li key={i} style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.55 }}>{s}</li>
-          ))}
-        </ol>
-        <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.55, marginBottom: 6 }}>
-          <span style={{ color: CP.textPrimary, fontWeight: 500 }}>Errore squalificante: </span>{c.drill.fail}
-        </div>
-        <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.55, marginBottom: 12 }}>
-          <span style={{ color: CP.textPrimary, fontWeight: 500 }}>Twist: </span>{c.drill.twist}
-        </div>
+        {c.drill.steps?.length > 0 && (
+          <ol style={{ margin: "0 0 12px", paddingLeft: 20, display: "grid", gap: 6 }}>
+            {c.drill.steps.map((s, i) => (
+              <li key={i} style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.55 }}>{s}</li>
+            ))}
+          </ol>
+        )}
+        {c.drill.fail && (
+          <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.55, marginBottom: 6 }}>
+            <span style={{ color: CP.textPrimary, fontWeight: 500 }}>Errore squalificante: </span>{c.drill.fail}
+          </div>
+        )}
+        {c.drill.twist && (
+          <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.55, marginBottom: 12 }}>
+            <span style={{ color: CP.textPrimary, fontWeight: 500 }}>Twist: </span>{c.drill.twist}
+          </div>
+        )}
         <div style={{ background: CP.surfaceAlt, borderRadius: 8, padding: "12px 14px", fontSize: 12, color: CP.textMuted, lineHeight: 1.6 }}>
           <span style={{ color: CP.textSecondary, fontWeight: 500 }}>Dove si esegue oggi: </span>{c.drill.reality}
         </div>
       </Card>
 
-      {/* generalizzazione */}
+      {/* generalizzazione (solo se la lezione è stata testata su un 2º creator) */}
+      {c.generalization && (<>
       <SectionTitle kicker="Secondo creator" title="Cosa regge e cosa è sistema-Elisa" sub={c.generalization.intro} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12 }}>
         <Card>
@@ -282,6 +295,7 @@ export default function LessonCardPage() {
       <Card style={{ marginTop: 12, background: CP.bgSunken }}>
         <div style={{ fontSize: 12.5, color: CP.textSecondary, lineHeight: 1.6 }}>{c.generalization.implicazione}</div>
       </Card>
+      </>)}
 
       {/* limiti */}
       <SectionTitle kicker="Integrità del metodo" title="I limiti, dichiarati" sub="«Tieni / non misurato» vuol dire «non contraddetto dai dati», non «validato». Questo registro separa lo strumento onesto da uno che finge rigore." />
