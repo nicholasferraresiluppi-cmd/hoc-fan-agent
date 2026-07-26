@@ -29,7 +29,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
-  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch,
+  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
@@ -143,6 +143,7 @@ const NAV_GROUPS = [
     defaultOpen: false,
     items: [
       { href: "/cm-cockpit",                     label: "Cockpit CM",   icon: Gauge },
+      { href: "/admin/candidate-assessments",    label: "Assessment candidati", icon: UserCheck },
       { href: "/admin/priority-queue",           label: "Priority queue", icon: Inbox },
       { href: "/admin/action-center",            label: "Action Center", icon: Target },
       { href: "/admin/coaching-center",          label: "Coaching Center", icon: GraduationCap },

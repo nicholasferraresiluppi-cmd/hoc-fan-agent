@@ -24,6 +24,13 @@ function isAuthRoute(path) {
   return path.startsWith("/sign-in") || path.startsWith("/sign-up");
 }
 
+// Superfici full-screen SENZA chrome interno (sidebar/nav): l'assessment
+// candidati è rivolto a persone ESTERNE (non dipendenti Clerk) → mai esporre
+// la navigazione interna dell'app.
+function isBareRoute(path) {
+  return path.startsWith("/assessment");
+}
+
 export default function AppShell({ children }) {
   const pathname = usePathname() || "";
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -39,7 +46,7 @@ export default function AppShell({ children }) {
   // Close drawer on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
-  if (isAuthRoute(pathname)) {
+  if (isAuthRoute(pathname) || isBareRoute(pathname)) {
     return <>{children}</>;
   }
 
