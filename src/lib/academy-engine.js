@@ -15,6 +15,17 @@
  * getCreatorById, getFanArchetypeById) e passano gli oggetti già risolti; qui
  * si assume input valido. La persistenza (score_hist / session / profilo per
  * l'operatore; namespace candidate:* per il candidato) resta nelle route.
+ *
+ * COMPLIANCE v2 (2026-07-26): la sezione RIGHE ROSSE è stata rafforzata oltre
+ * l'iniziativa esplicita dell'operatore, con il principio "conta l'ESITO, non
+ * chi propone": ora becca anche (a) l'operatore che ASSECONDA/non rifiuta una
+ * proposta off-platform del fan, (b) l'ELUSIONE di richieste esplicite di
+ * conferma → vendita ambigua, (c) l'invenzione di meccaniche di piattaforma
+ * inesistenti. Additivo (NON tocca i 6 pesi né l'overall). Validato via gold-set
+ * A/B su transcript a etichetta nota (G3 elusione, G4 meccanica: base PASS →
+ * corretto FAIL; 0 falsi positivi sui controlli), coerente con i failure mode
+ * reali w-025/w-036 etichettati sul warehouse. Cfr memory
+ * assessment-validation-methodology.
  */
 
 import {
@@ -273,11 +284,14 @@ DIMENSIONI SKILL da valutare (0-100 ciascuna):
 - gestione_obiezioni: gestisce dubbi/resistenze senza bruciare la relazione?
 
 RIGHE ROSSE — COMPLIANCE (valuta SEMPRE, a prescindere dallo scenario e dai 6 voti sopra):
+PRINCIPIO CHIAVE: conta l'ESITO, non chi ha avuto l'iniziativa. Se la conversazione scivola fuori norma è irrilevante che l'abbia proposto il fan: l'operatore DEVE bloccarla con un rifiuto CHIARO. Assecondare, glissare, rispondere in modo ambiguo o non rifiutare nettamente vale come violazione quanto proporre in prima persona.
 Metti compliance.pass = false se l'operatore ha fatto anche UNA sola di queste:
 - ha dato, promesso o chiesto+accettato dati personali reali (numero di telefono, indirizzo, cognome, social esterni, email personale)
-- ha accettato o proposto un incontro nella vita reale
+- ha accettato, proposto o NON rifiutato nettamente un incontro nella vita reale
 - ha continuato in tono sessuale o di vendita dopo un segnale che il fan potrebbe essere minorenne, invece di disingaggiare
-- ha spostato pagamento o contatto FUORI dalla piattaforma (PayPal, contanti, Telegram/WhatsApp per pagare, altri canali)
+- ha spostato, proposto, ACCETTATO o non rifiutato in modo netto uno spostamento di pagamento o contatto FUORI dalla piattaforma (PayPal, contanti, Telegram/WhatsApp, altri canali) — vale ANCHE quando è il FAN a proporlo: se l'operatore ci sta, glissa o risponde ambiguo invece di rifiutare, è violazione
+- ha ELUSO o aggirato una richiesta esplicita di conferma/consenso del fan (es. il fan chiede conferma di cosa riceverà o che "è tutto ok" e l'operatore evita di rispondere ma porta comunque alla vendita → vendita ambigua/estorta)
+- ha inventato o affermato meccaniche, regole o garanzie di piattaforma inesistenti pur di convincere il fan
 - ha promesso o descritto atti illegali
 Se nessuna riga rossa è stata violata: compliance.pass = true e violations vuoto.
 Questa valutazione è INDIPENDENTE dai 6 punteggi: una chat può avere ottimi voti E fallire la compliance.
