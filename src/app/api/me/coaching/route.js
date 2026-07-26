@@ -9,6 +9,7 @@
  */
 import { resolveEmployeeForUser } from "@/lib/me";
 import { getSession, saveSession, listSessionsForEmployee } from "@/lib/coaching-sessions";
+import { recordActivationEvent, recordActivationIdentity, EVENT } from "@/lib/activation";
 
 export async function GET() {
   const who = await resolveEmployeeForUser();
@@ -51,6 +52,17 @@ export async function POST(request) {
     session.reply_at = session.acknowledged_at;
   }
   await saveSession(session);
+
+  // Strumentazione activation (non-fatale): l'acknowledge CON replica è ingaggio,
+  // non un click liquidatorio (segnale secondario / soglia cold-start).
+  try {
+    await recordActivationEvent(who.userId, EVENT.COACHING_ACKNOWLEDGED, {
+      session_id: id,
+      has_reply: !!(reply_note && String(reply_note).trim()),
+    });
+    await recordActivationIdentity(who.userId, who.employee, who.employee_id);
+  } catch {}
+
   const { coach_id, closed_by, ...safe } = session;
   return Response.json({ ok: true, session: safe });
 }
