@@ -132,8 +132,9 @@ function transcriptsSQL(moments, days) {
   const cids = [...new Set(moments.map((m) => m.creator_id))];
   const tMin = Math.min(...moments.map((m) => m.shift_start));
   const tMax = Math.max(...moments.map((m) => m.shift_end));
+  // NB: l'alias è \`ts\` e non \`at\` — AT è keyword riservata in BigQuery
   return `
-SELECT creator_id, user_id, UNIX_MILLIS(created_at) AS at,
+SELECT creator_id, user_id, UNIX_MILLIS(created_at) AS ts,
   IF(sender_id = creator_id, 'op', 'fan') AS who,
   CAST(price AS FLOAT64) AS price, SUBSTR(text, 1, 400) AS text
 FROM \`${D}.onlyfans.chat\`
@@ -213,7 +214,8 @@ export async function getOperatorGameFilm({ operator, days, maxWins, maxLosses, 
     for (const m of tr.rows || []) {
       const k = `${m.creator_id}:${m.user_id}`;
       if (!byConvo.has(k)) byConvo.set(k, []);
-      byConvo.get(k).push(m);
+      // ts (alias SQL) → at (contratto del core/UI)
+      byConvo.get(k).push({ at: Number(m.ts), who: m.who, price: m.price, text: m.text });
     }
   }
   const transcriptFor = (m) =>
