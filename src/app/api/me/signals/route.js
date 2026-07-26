@@ -25,6 +25,7 @@ import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { resolveEmployeeForUser, normalizeName } from "@/lib/me";
 import { getOperatorSignalProfiles, bigQueryConfigured } from "@/lib/operator-signals";
 import { recommendPathForGap } from "@/lib/coaching-paths";
+import { recordActivationEvent, recordActivationIdentity, recordActivationBaseline, EVENT } from "@/lib/activation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,6 +80,24 @@ export async function GET() {
     verdict: m.verdict,
     caveat: m.caveat || null,
   }));
+
+  // Strumentazione activation (non-fatale): l'aha = ha visto un gap reale sul
+  // suo lavoro. Aggancia l'identità (join warehouse) e congela la baseline dei
+  // segnali (validazione forward del movimento comportamentale).
+  try {
+    await recordActivationEvent(who.userId, EVENT.SIGNALS_VIEWED, {
+      has_profile: true,
+      top_gap_key: mine.top_gap?.key || null,
+    });
+    await recordActivationIdentity(who.userId, who.employee, who.employee_id);
+    if (mine.top_gap) {
+      await recordActivationBaseline(who.employee, {
+        version: all.version,
+        top_gap_key: mine.top_gap.key,
+        verdicts: metrics.map((m) => ({ key: m.key, verdict: m.verdict })),
+      });
+    }
+  } catch {}
 
   return Response.json({
     linked: true,

@@ -12,6 +12,7 @@
  */
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { getMyShiftNow, getFanCards, getCreators, bigQueryConfigured } from "@/lib/me-turno";
+import { recordActivationEvent, recordActivationIdentity, EVENT } from "@/lib/activation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,6 +60,15 @@ export async function GET(request) {
       rows: await getFanCards(cid),
     }))
   );
+
+  // Strumentazione activation (non-fatale): tocco dello stadio "agisci".
+  try {
+    await recordActivationEvent(az.userId, EVENT.TURNO_VIEWED, {
+      mode,
+      has_cards: groups.some((g) => g.rows?.length),
+    });
+    await recordActivationIdentity(az.userId, who.employee);
+  } catch {}
 
   return Response.json({
     employee: who.employee,

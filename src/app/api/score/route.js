@@ -6,6 +6,7 @@ import { getFanArchetypeById } from "@/lib/fan-archetypes";
 import { getDrillForDate, markDrillCompleted, getDrillStatusForUser } from "@/lib/daily-drill";
 import { applyScoreToProfile } from "@/lib/operator-profile";
 import { findScenarioById, evaluateScenarioTranscript } from "@/lib/academy-engine";
+import { recordActivationEvent, EVENT } from "@/lib/activation";
 import { kv } from "@vercel/kv";
 
 export async function POST(request) {
@@ -71,6 +72,18 @@ export async function POST(request) {
         await kv.zadd(`score_hist:user:${userId}`, { score: now, member: historyKey });
       } catch (histErr) {
         console.warn("Score history indexing failed (non-fatal):", histErr?.message);
+      }
+
+      // Strumentazione activation (non-fatale): scenario completato → il gap-match
+      // (categoryId ∈ categorie del gap) si calcola a read-time nella vista admin.
+      try {
+        await recordActivationEvent(userId, EVENT.SCENARIO_COMPLETED, {
+          scenarioId,
+          categoryId: scenario.categoryId || scenario.category || null,
+          overall: score.overall,
+        });
+      } catch (actErr) {
+        console.warn("Activation event failed (non-fatal):", actErr?.message);
       }
 
       // Persist full transcript (session:*) — la review admin/trainer legge già

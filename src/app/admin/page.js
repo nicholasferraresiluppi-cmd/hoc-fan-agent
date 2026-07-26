@@ -12,7 +12,7 @@ import {
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Link2, Gauge,
   ArrowUpRight, Calendar, Activity, CheckCircle2, AlertCircle, MessagesSquare,
   Wallet, Scale, ShieldCheck, History, FlaskConical, MessageSquareWarning,
-  Signpost, Bell, ListTree, Inbox, Clapperboard, TrendingUp, UserSearch, UserCheck,
+  Signpost, Bell, ListTree, Inbox, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { SectionLabel, CpCard, StatCard } from "@/components/cp-style";
@@ -75,6 +75,7 @@ const SHORTCUT_GROUPS = [
       { href: "/admin/academy-tapes",     title: "Game tape",        desc: "Estrai le migliori azioni di vendita reali dal warehouse e pubblicale in Academy", icon: Clapperboard },
       { href: "/admin/academy-signals",   title: "Signals",          desc: "Quali comportamenti operatore correlano col revenue/ora, dai turni reali — informa il coaching", icon: TrendingUp },
       { href: "/admin/operator-signals",  title: "Profilo operatore", desc: "Dove ogni operatore è carente, dal suo lavoro vero (turni singoli): diagnosi per il coaching su misura", icon: UserSearch },
+      { href: "/admin/activation",        title: "Attivazione",       desc: "L'aha moment dell'operatore (gap diagnosticato + allenato) come leading indicator: funnel, rate, latenza — strumentato, validato in avanti sui segnali reali", icon: Rocket },
       { href: "/admin/infloww-ingest",    title: "Ingest Infloww",    desc: "Carica l'export Message Dashboard per operatore → estende la copertura dei segnali ai turni in duo", icon: Upload },
       { href: "/profilo/certificazioni",  title: "Badge Wall",       desc: "Wall pubblico delle certificazioni operatori", icon: Award },
     ],

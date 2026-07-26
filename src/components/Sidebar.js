@@ -29,7 +29,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
-  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck,
+  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
@@ -123,6 +123,7 @@ const NAV_GROUPS = [
       { href: "/admin/academy-tapes",            label: "Curatela tape", icon: Clapperboard },
       { href: "/admin/academy-signals",          label: "Signals",       icon: TrendingUp },
       { href: "/admin/operator-signals",         label: "Profilo operatore", icon: UserSearch },
+      { href: "/admin/activation",               label: "Attivazione",   icon: Rocket },
       { href: "/admin/infloww-ingest",           label: "Ingest Infloww",  icon: Upload },
       { href: "/profilo/certificazioni",         label: "Badge Wall",   icon: Award },
     ],
