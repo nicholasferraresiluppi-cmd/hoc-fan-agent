@@ -40,6 +40,11 @@ const PPV_GRADINI_ELISA = {
     correzioni_critici: 17,
   },
 
+  // Gap del profilo-segnali (operator-signals) che questa lezione allena, in
+  // ordine di rilevanza. Mappatura curatoriale, NON transfer validato: dice
+  // "questa lezione tratta quel comportamento", non "chi la studia migliora".
+  trains_gaps: ["avg_ppv_price", "ppv_per_h", "question_rate"],
+
   // "Se ricordi solo tre cose" — la velocità 1.
   three_things: [
     {
@@ -354,6 +359,11 @@ const SILENZIO_REHOOK_ELISA = {
     correzioni_critici: 14,
   },
 
+  // Vedi nota su trains_gaps nella carta PPV. Il re-hook allena il presidio /
+  // riaggancio (cadenza messaggi); slow_reply_rate è adiacente ma NON coperto
+  // (qui è ghost ≥24h, non latenza <5min) → volutamente escluso, resta un buco onesto.
+  trains_gaps: ["msgs_per_h"],
+
   three_things: [
     {
       title: "Il cancello è la risposta, non la vendita",
@@ -522,6 +532,20 @@ const SILENZIO_REHOOK_ELISA = {
 
 const CARDS = [PPV_GRADINI_ELISA, SILENZIO_REHOOK_ELISA];
 
+// Etichette dei gap del profilo-segnali (coerenti con SIGNALS in operator-signals.js).
+// Tenute qui per non importare operator-signals (dipendenze BigQuery pesanti).
+const GAP_LABELS = {
+  question_rate: "Tasso di domande",
+  avg_ppv_price: "Prezzo medio PPV",
+  ppv_per_h: "Cadenza PPV",
+  msgs_per_h: "Cadenza messaggi",
+  slow_reply_rate: "Fan fatti attendere",
+};
+
+function gapTags(card) {
+  return (card.trains_gaps || []).map((k) => ({ key: k, label: GAP_LABELS[k] || k }));
+}
+
 /** Lista leggera per l'indice (senza il corpo della lezione). */
 export function listLessonCards() {
   return CARDS.map((c) => ({
@@ -531,10 +555,40 @@ export function listLessonCards() {
     creator: c.creator,
     subtitle: c.subtitle,
     provenance: c.provenance,
+    trains: gapTags(c),
   }));
 }
 
 /** Carta completa per id (null se non esiste). */
 export function getLessonCard(id) {
   return CARDS.find((c) => c.id === id) || null;
+}
+
+/**
+ * Dal gap comportamentale (top_gap.key del profilo-segnali) alle lezioni che lo
+ * allenano — l'anello che porta la diagnosi al curriculum. Mappatura curatoriale
+ * dichiarata (i tag trains_gaps sulle carte), NON transfer validato. Ritorna refs
+ * leggeri, ordinati come i tag (rilevanza). Array vuoto se nessuna lezione copre
+ * ancora quel gap (buco onesto, es. slow_reply_rate oggi).
+ * @param {string} gapKey
+ * @returns {{id:string, title:string, status:string, primary:boolean}[]}
+ */
+export function recommendLessonsForGap(gapKey) {
+  if (!gapKey) return [];
+  return CARDS
+    .filter((c) => (c.trains_gaps || []).includes(gapKey))
+    .map((c) => ({
+      id: c.id,
+      title: c.title,
+      status: c.status,
+      // primary = questa lezione mette quel gap tra i suoi obiettivi principali (primo tag)
+      primary: (c.trains_gaps || [])[0] === gapKey,
+    }))
+    // prima le lezioni per cui il gap è obiettivo primario
+    .sort((a, b) => (b.primary ? 1 : 0) - (a.primary ? 1 : 0));
+}
+
+/** Etichetta leggibile di un gap (per le superfici che mostrano i tag). */
+export function gapLabel(gapKey) {
+  return GAP_LABELS[gapKey] || gapKey;
 }

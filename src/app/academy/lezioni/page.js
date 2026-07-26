@@ -72,6 +72,19 @@ export default function LezioniPage() {
                 <span>{fmtInt(c.provenance?.sequenze_etichettate)} sequenze etichettate</span>
                 <span>{c.provenance?.finestra}</span>
               </div>
+              {c.trains?.length > 0 && (
+                <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                  <span style={{ fontSize: 11, color: CP.textMuted }}>Allena il gap:</span>
+                  {c.trains.map((t) => (
+                    <span
+                      key={t.key}
+                      style={{ fontSize: 11, color: CP.accentSoftText, background: CP.accentSoft, borderRadius: 999, padding: "2px 9px" }}
+                    >
+                      {t.label}
+                    </span>
+                  ))}
+                </div>
+              )}
             </Link>
           ))}
 
