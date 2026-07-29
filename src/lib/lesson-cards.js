@@ -232,18 +232,25 @@ const PPV_GRADINI_ELISA = {
 
   anti_examples: [
     {
+      id: "l-105",
+      title: "Persa vera: spinge oltre il «non posso permettermelo»",
+      body:
+        "Fan caldo (complimenti, «ho sempre più voglia»); l'op manda il PPV a 69; il fan: «non posso permettermi altro ora». L'op risponde «perché non puoi?» — interroga il vincolo dichiarato. Non comprato. È la mossa CORE 6 violata, su una perdita REALE: al «non posso permettermelo» la vendita si chiude con calore, non si sfida il fan sul perché. «Perché non puoi?» lo mette sulla difensiva e brucia il turno — e il rientro del mese dopo.",
+      note: "persa reale (PPV inviato, mai comprato) — non una vittoria pirrica",
+    },
+    {
+      id: "l-104",
+      title: "Persa vera: vende più forte a un fan ostile",
+      body:
+        "Il fan è disingaggiato e ostile («non mi freghi più», «la serietà non è per te»); l'op continua a spingere il PPV a 200 e a difendersi («sono seria», «cosa fai ancora nel mio profilo»). Non comprato. Quando il fan è ostile, vendere più forte non converte e mettersi sulla difensiva peggiora: si legge lo stato del fan — si de-escala o si lascia andare, non si insiste sulla vendita.",
+      note: "persa reale — leggere la stanza prima di rilanciare",
+    },
+    {
       id: "w-022",
       title: "Il crollo dell'ancora: da 800 dichiarati a 50 in un solo messaggio",
       body:
         "Ancora a 800, PPV a 200, poi crollo diretto al 50 del fan («va bene amio»): −75% senza gradini, senza ragione, senza contropartita. Ha incassato 50, ma è l'anatomia dello sconto-senza-ragione (10/22 nelle perse): il salto al numero del fan azzera retroattivamente l'ancora e addestra il fan a offrire poco la prossima volta. Confronta w-015: stessa situazione, chiusura a 155.",
-      note: "vinta usata come anti-esempio — il costo si vede nel contrasto aggregato",
-    },
-    {
-      id: "w-025",
-      title: "L'ambiguità che brucia: tre conferme eluse, vendita a 60, fan perso",
-      body:
-        "Il fan chiede tre volte cosa si vede; l'op vende cedendo da 200 a 60 mantenendo l'ambiguità, e dopo l'acquisto ammette «non ho mai detto che si vedono» — chiusura con minaccia di denuncia. Quando la domanda è esplicita e ripetuta, il redirect diventa inganno e si paga in refund e churn. Il contrasto giusto: «no» onesto sul gradino basso, nudo ancorato al 200, chiude comunque.",
-      note: "vinta usata come anti-esempio — survivorship nella sua forma più pura",
+      note: "vinta pirrica, tenuta per illustrare il crollo dell'ancora — il costo si vede nel contrasto aggregato",
     },
   ],
 
@@ -325,7 +332,7 @@ const PPV_GRADINI_ELISA = {
     "Il caso maggioritario è fuori scope: il 74% degli episodi è un singolo invio nel silenzio del fan — la gestione del silenzio/re-hook merita una lezione dedicata.",
     "n piccoli sul contrasto per mossa: push/close dopo vincolo hanno n=7 e n=4 (inconclusivi, citati comunque); il 62,9% del flag automatico resta ipotesi interpretativa; upsell 36/0 in parte tautologico.",
     "Survivorship mitigato, non eliminato: churn e refund post-finestra sono invisibili — alcune «vittorie» potrebbero essere perdite nette a 60 giorni.",
-    "Gli anti-esempi sono vinte pirriche (il batch citabile non ha perse citabili): un batch di perse renderebbe la lezione più forte.",
+    "Due dei tre anti-esempi sono perdite REALI (PPV inviato, mai comprato); il terzo (crollo dell'ancora) resta una vittoria pirrica, tenuta per illustrare quel pattern specifico.",
     "Solo turni attribuibili dal warehouse (operatore singolo); il duo è coperto solo in aggregato via export Infloww.",
     "Il simulatore non modella prezzi né tempi: gradini/ancora/upsell si allenano in sim solo a livello concettuale; la verifica del transfer reale non è ancora costruita.",
     "n=2 sistemi: la generalizzazione è una replica su un secondo caso, non una legge di mercato — il terzo creator può ribaltare di nuovo (come ha già fatto la curva d'ancora). E i due sistemi non sono osservazioni indipendenti: stessa agenzia, stessa finestra, operatori potenzialmente formati insieme.",
