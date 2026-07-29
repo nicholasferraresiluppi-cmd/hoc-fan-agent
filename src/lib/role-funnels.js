@@ -97,6 +97,21 @@ export const ROLE_FUNNELS = [
         do: "Chiudi il cerchio e riparti dalla diagnostica.",
       },
     ],
+    // Checklist d'azione (operatore-facing): l'anello ridotto ai ≤5 passi che
+    // CONTANO, agganciati agli eventi di attivazione → si spuntano da soli quando
+    // l'operatore compie l'azione davvero (learn-by-doing + progresso + testa di
+    // partenza). Il resto del percorso resta in `steps` (read-only, disclosure).
+    // Il campo `check` mappa sui campi di /api/me/activation.
+    checklist: [
+      { id: "linked", title: "Account collegato", icon: "UserCircle2", check: "linked",
+        why: "Sei agganciato al tuo profilo operatore — il punto di partenza è già fatto." },
+      { id: "diagnose", title: "Diagnostica il tuo gap", href: "/profilo", icon: "UserCircle2", check: "diagnosed",
+        why: "Apri il tuo profilo e leggi dove sei carente, dai tuoi turni reali. È l'aha: parti da un dato vero su di te." },
+      { id: "train", title: "Allena il tuo gap", href: "/", icon: "GraduationCap", check: "trained",
+        why: "Completa gli scenari sulla categoria del tuo gap — non a caso. Ripeti finché il gesto diventa automatico." },
+      { id: "apply", title: "Applica sul turno", href: "/me/turno", icon: "Radar", check: "applied",
+        why: "Porta ciò che hai allenato sul vivo, nel cockpit del turno — dove il metodo diventa vendita." },
+    ],
   },
 
   {
