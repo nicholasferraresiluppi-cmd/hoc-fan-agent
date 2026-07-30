@@ -124,6 +124,7 @@ const NAV_GROUPS = [
       { href: "/admin/academy-tapes",            label: "Curatela tape", icon: Clapperboard },
       { href: "/admin/academy-signals",          label: "Signals",       icon: TrendingUp },
       { href: "/admin/operator-signals",         label: "Profilo operatore", icon: UserSearch },
+      { href: "/admin/transfer",                 label: "Transfer",     icon: Activity },
       { href: "/admin/activation",               label: "Attivazione",   icon: Rocket },
       { href: "/admin/infloww-ingest",           label: "Ingest Infloww",  icon: Upload },
       { href: "/profilo/certificazioni",         label: "Badge Wall",   icon: Award },

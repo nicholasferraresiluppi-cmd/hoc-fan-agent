@@ -83,6 +83,20 @@ export async function POST(request) {
     out.operator_signals = "err:" + (e?.message || "unknown");
   }
 
+  // Transfer measurement (traiettoria comportamentale per operatore, mese×mese).
+  try {
+    const { getTransferTrajectories } = await import("@/lib/transfer-measurement");
+    const { bigQueryConfigured } = await import("@/lib/operator-signals");
+    if (bigQueryConfigured()) {
+      await getTransferTrajectories({ force: true });
+      out.transfer = "ok";
+    } else {
+      out.transfer = "skip:no-bq";
+    }
+  } catch (e) {
+    out.transfer = "err:" + (e?.message || "unknown");
+  }
+
   return Response.json(out);
 }
 
