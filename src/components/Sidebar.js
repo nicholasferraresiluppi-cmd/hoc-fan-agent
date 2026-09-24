@@ -29,7 +29,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
-  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket,
+  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
@@ -53,6 +53,8 @@ const ESSENTIAL_HREFS = new Set([
   "/",
   "/playbook",
   "/academy/tapes",
+  "/academy/vendere",
+  "/admin/sales-coaching",
   "/admin/team",
   "/admin/action-center",
   "/admin/coaching-center",
@@ -87,6 +89,7 @@ const NAV_GROUPS = [
       { href: "/leaderboard/creators/heatmap",   label: "Heat-map",     icon: Flame },
       { href: "/admin/conversation-intelligence", label: "Presidio chat", icon: Activity },
       { href: "/admin/shift-quality",            label: "Qualità turni", icon: MessagesSquare },
+      { href: "/admin/sales-coaching",           label: "Coaching vendite", icon: HandCoins },
     ],
   },
   {
@@ -112,6 +115,7 @@ const NAV_GROUPS = [
       { href: "/",                               label: "Academy",      icon: GraduationCap, match: (p) => p === "/" },
       { href: "/academy/multi",                  label: "Multi-chat",   icon: Layers },
       { href: "/academy/tapes",                  label: "Game tape",    icon: Film },
+      { href: "/academy/vendere",                label: "Vendere in chat", icon: MessageCircle },
       { href: "/playbook",                       label: "Playbook",     icon: BookOpen },
       { href: "/leaderboard",                    label: "Ladder Academy", icon: Trophy },
       { href: "/leaderboard/leghe",              label: "Leghe",        icon: Swords },

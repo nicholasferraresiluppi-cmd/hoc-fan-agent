@@ -57,6 +57,9 @@ export async function POST(request) {
   // librerie game film: rinfresca le 2 più stantie → momenti nuovi in coda
   // ogni notte senza che un coach debba aprire la pagina (blueprint 26 lug)
   out.film_refresh = await kickEndpoint(request, "/api/cron/film-refresh");
+  // coaching vendite (split / operatori / test): gira nella SUA route (budget
+  // proprio), ricalcola solo se la cache ha più di 20h
+  out.sales_coaching = await kickEndpoint(request, "/api/cron/sales-coaching");
 
   // Riscalda la cache degli Academy Signals (query analitica pesante): così la
   // GET admin legge sempre dalla cache invece di calcolare inline. Best-effort:
