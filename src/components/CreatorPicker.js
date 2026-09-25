@@ -26,7 +26,8 @@ function parseAlias(alias) {
   return { name: alias || "", lang: "" };
 }
 
-export default function CreatorPicker({ aliases = [], value = "", onSelect, placeholder = "scegli creator…" }) {
+export default function CreatorPicker({ aliases = [], value = "", onSelect, placeholder = "scegli creator…" , palette }) {
+  const P = palette || CP; // palette alternativa (tema chiaro del pilota)
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [langFilter, setLangFilter] = useState("");
@@ -78,8 +79,8 @@ export default function CreatorPicker({ aliases = [], value = "", onSelect, plac
         onClick={() => setOpen((o) => !o)}
         style={{
           width: "100%", display: "flex", alignItems: "center", gap: 10,
-          padding: "9px 12px", background: CP.surface, border: `1px solid ${open ? CP.accent + "88" : CP.border}`,
-          borderRadius: 8, color: value ? CP.textPrimary : CP.textMuted, fontSize: 13,
+          padding: "9px 12px", background: P.surface, border: `1px solid ${open ? P.accent + "88" : P.border}`,
+          borderRadius: 8, color: value ? P.textPrimary : P.textMuted, fontSize: 13,
           fontFamily: FONTS.body, cursor: "pointer", textAlign: "left",
         }}
       >
@@ -90,31 +91,31 @@ export default function CreatorPicker({ aliases = [], value = "", onSelect, plac
         {value && selected.lang && (
           <span style={langChip}>{selected.lang}</span>
         )}
-        <ChevronDown size={15} color={CP.textMuted} style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
+        <ChevronDown size={15} color={P.textMuted} style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
       </button>
 
       {/* Pannello */}
       {open && (
         <div style={{
           position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, zIndex: 60,
-          background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10,
+          background: P.surface, border: `1px solid ${P.border}`, borderRadius: 10,
           boxShadow: "0 12px 32px rgba(0,0,0,0.45)", padding: 10, maxHeight: 420, display: "flex", flexDirection: "column",
         }}>
           {/* Ricerca */}
           <div style={{ position: "relative", marginBottom: 10 }}>
-            <Search size={15} color={CP.textMuted} style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)" }} />
+            <Search size={15} color={P.textMuted} style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)" }} />
             <input
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="cerca creator…"
               style={{
-                width: "100%", padding: "8px 12px 8px 34px", background: CP.bg, border: `1px solid ${CP.border}`,
-                borderRadius: 7, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none",
+                width: "100%", padding: "8px 12px 8px 34px", background: P.bg, border: `1px solid ${P.border}`,
+                borderRadius: 7, color: P.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none",
               }}
             />
             {query && (
-              <button onClick={() => setQuery("")} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: CP.textMuted, display: "inline-flex" }}>
+              <button onClick={() => setQuery("")} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: P.textMuted, display: "inline-flex" }}>
                 <X size={14} />
               </button>
             )}
@@ -135,7 +136,7 @@ export default function CreatorPicker({ aliases = [], value = "", onSelect, plac
           {/* Lista */}
           <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 1 }}>
             {filtered.length === 0 && (
-              <div style={{ padding: 16, textAlign: "center", fontSize: 12, color: CP.textMuted }}>Nessun creator trovato</div>
+              <div style={{ padding: 16, textAlign: "center", fontSize: 12, color: P.textMuted }}>Nessun creator trovato</div>
             )}
             {filtered.map((a) => {
               const col = creatorDotColor(a.alias);
@@ -146,20 +147,20 @@ export default function CreatorPicker({ aliases = [], value = "", onSelect, plac
                   onClick={() => { onSelect?.(a.alias); setOpen(false); setQuery(""); }}
                   style={{
                     display: "flex", alignItems: "center", gap: 11, padding: "8px 9px",
-                    background: isSel ? CP.surfaceAlt : "transparent", border: "none", borderRadius: 7,
+                    background: isSel ? P.surfaceAlt : "transparent", border: "none", borderRadius: 7,
                     cursor: "pointer", textAlign: "left", width: "100%",
                   }}
-                  onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = CP.surfaceAlt; }}
+                  onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = P.surfaceAlt; }}
                   onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.background = "transparent"; }}
                 >
                   <span style={{ width: 11, height: 11, borderRadius: "50%", background: col, flexShrink: 0 }} />
-                  <span style={{ fontSize: 14, color: CP.textPrimary, fontWeight: isSel ? 500 : 400, minWidth: 0, flex: "0 1 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>{a.name}</span>
+                  <span style={{ fontSize: 14, color: P.textPrimary, fontWeight: isSel ? 500 : 400, minWidth: 0, flex: "0 1 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>{a.name}</span>
                   {a.lang && <span style={langChip}>{a.lang}</span>}
-                  <span style={{ flex: 1, height: 4, borderRadius: 2, background: CP.border, position: "relative", minWidth: 30, maxWidth: 110 }}>
+                  <span style={{ flex: 1, height: 4, borderRadius: 2, background: P.border, position: "relative", minWidth: 30, maxWidth: 110 }}>
                     <span style={{ position: "absolute", inset: 0, width: `${Math.round(((a.shifts || 0) / maxShifts) * 100)}%`, background: col, borderRadius: 2 }} />
                   </span>
-                  <span style={{ fontSize: 12, color: CP.textSecondary, fontFamily: FONTS.mono, minWidth: 44, textAlign: "right" }}>{a.shifts || 0} t</span>
-                  {isSel && <Check size={14} color={CP.accentGreen} style={{ flexShrink: 0 }} />}
+                  <span style={{ fontSize: 12, color: P.textSecondary, fontFamily: FONTS.mono, minWidth: 44, textAlign: "right" }}>{a.shifts || 0} t</span>
+                  {isSel && <Check size={14} color={P.accentGreen} style={{ flexShrink: 0 }} />}
                 </button>
               );
             })}
@@ -171,8 +172,8 @@ export default function CreatorPicker({ aliases = [], value = "", onSelect, plac
 }
 
 const langChip = {
-  fontSize: 10, fontFamily: FONTS.mono, color: CP.textMuted,
-  border: `1px solid ${CP.border}`, padding: "1px 6px", borderRadius: 4, flexShrink: 0,
+  fontSize: 10, fontFamily: FONTS.mono, color: P.textMuted,
+  border: `1px solid ${P.border}`, padding: "1px 6px", borderRadius: 4, flexShrink: 0,
 };
 
 function Pill({ active, onClick, children }) {
@@ -181,9 +182,9 @@ function Pill({ active, onClick, children }) {
       onClick={onClick}
       style={{
         fontSize: 11, fontFamily: FONTS.body, padding: "4px 11px", borderRadius: 999,
-        background: active ? CP.accent : "transparent",
-        color: active ? CP.accentInk : CP.textSecondary,
-        border: `1px solid ${active ? CP.accent : CP.border}`,
+        background: active ? P.accent : "transparent",
+        color: active ? P.accentInk : P.textSecondary,
+        border: `1px solid ${active ? P.accent : P.border}`,
         cursor: "pointer", whiteSpace: "nowrap",
       }}
     >
