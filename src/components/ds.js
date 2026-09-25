@@ -124,13 +124,16 @@ export function DataTable({ columns, rows, defaultSort, onRowClick, selected, mi
       return ((x ?? -Infinity) - (y ?? -Infinity)) * sort.dir;
     });
   }, [rows, sort, columns]);
+  // Prima colonna "di testo" ferma quando la tabella scorre di lato (telefono):
+  // resta visibile di chi è la riga. Salta una colonna di rango numerica (#).
+  const stickyIdx = columns.findIndex((c) => c.align !== "right");
   const th = { position: "sticky", top: 0, zIndex: 1, padding: "10px 12px", fontSize: 12, fontWeight: 500, color: CP.textMuted, whiteSpace: "nowrap", background: CP.surface, borderBottom: `1px solid ${CP.border}`, userSelect: "none" };
   return (
     // maxHeight: la tabella scorre dentro di sé e l'intestazione resta visibile
     <div style={{ ...card, overflow: "auto", ...(maxHeight ? { maxHeight } : {}) }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth }}>
-        <thead><tr>{columns.map((c) => (
-          <th key={c.key} style={{ ...th, textAlign: c.align || "left", cursor: c.sortable === false ? "default" : "pointer" }}
+        <thead><tr>{columns.map((c, ci) => (
+          <th key={c.key} style={{ ...th, textAlign: c.align || "left", cursor: c.sortable === false ? "default" : "pointer", ...(ci === stickyIdx ? { left: 0, zIndex: 2 } : {}) }}
             onClick={() => c.sortable !== false && setSort({ key: c.key, dir: sort?.key === c.key ? -sort.dir : (c.align === "right" ? -1 : 1) })}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>{c.label}{sort?.key === c.key && (sort.dir < 0 ? <ArrowDown size={12} /> : <ArrowUp size={12} />)}</span>
           </th>
@@ -142,8 +145,8 @@ export function DataTable({ columns, rows, defaultSort, onRowClick, selected, mi
             return (
               <tr key={r.id ?? r.key ?? i} onClick={onRowClick ? () => onRowClick(r) : undefined}
                 style={{ borderTop: `1px solid ${CP.borderSoft}`, cursor: onRowClick ? "pointer" : "default", background: sel ? CP.accentSoft : "transparent" }}>
-                {columns.map((c) => (
-                  <td key={c.key} style={{ padding: "9px 12px", textAlign: c.align || "left", color: c.muted ? CP.textSecondary : CP.textPrimary, verticalAlign: "middle", ...(c.align === "right" ? NUM : {}) }}>
+                {columns.map((c, ci) => (
+                  <td key={c.key} style={{ padding: "9px 12px", textAlign: c.align || "left", color: c.muted ? CP.textSecondary : CP.textPrimary, verticalAlign: "middle", ...(c.align === "right" ? NUM : {}), ...(ci === stickyIdx ? { position: "sticky", left: 0, zIndex: 1, background: sel ? CP.accentSoft : CP.surface } : {}) }}>
                     {c.render ? c.render(r) : r[c.key]}
                   </td>
                 ))}

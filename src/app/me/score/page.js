@@ -70,6 +70,8 @@ function NotLinked({ reason }) {
 // percentile (soglie fisse tarate a gen-mag): Andrea Terranova, 2º per vendite
 // (89,1), leggeva "27,6 Critical". v0.6: fasce ricalibrate sui percentili reali
 // (leaderboard-config v12), di nuovo mostrate.
+const MESI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
+const monthLabel = (pid) => (/^\d{4}-\d{2}$/.test(pid || "") ? `${MESI[Number(pid.slice(5)) - 1]} ${pid.slice(0, 4)}` : pid);
 function currentMonth() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
 
 export default function MyScorePage() {
@@ -91,7 +93,7 @@ export default function MyScorePage() {
 
       {cp && (
         <CpCard style={{ marginBottom: 18 }}>
-          <SectionLabel>Vendite · {salesMonth} (in corso)</SectionLabel>
+          <SectionLabel>Vendite · {monthLabel(salesMonth)} (in corso)</SectionLabel>
           <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
             <span style={{ fontFamily: FONTS.display, fontSize: 34, fontWeight: 600, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{cp.score != null ? cp.score.toFixed(1).replace(".", ",") : "—"}</span>
             {cp.tier && <span style={{ fontSize: 13, color: CP.textSecondary }}>{cp.tier}</span>}
@@ -126,7 +128,7 @@ export default function MyScorePage() {
               {data.available_periods.map((p) => (
                 <button key={p} onClick={() => setPeriodId(p)}
                   style={{ padding: "5px 12px", borderRadius: 99, border: `1px solid ${p === data.period_id ? CP.accent : CP.border}`, background: p === data.period_id ? CP.accentSoft : "transparent", color: p === data.period_id ? CP.accent : CP.textMuted, fontSize: 12.5, cursor: "pointer", fontFamily: FONTS.body }}>
-                  {p}
+                  {monthLabel(p)}
                 </button>
               ))}
             </div>
@@ -135,9 +137,9 @@ export default function MyScorePage() {
           {/* Headline: score, tier, percentile */}
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
             <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, padding: "16px 22px", minWidth: 150 }}>
-              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: CP.textMuted, marginBottom: 4 }}>Mestiere · {data.period_id}</div>
+              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: CP.textMuted, marginBottom: 4 }}>Mestiere · {monthLabel(data.period_id)}</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                <span style={{ fontFamily: FONTS.display, fontSize: 34, fontWeight: 600, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{data.score}</span>
+                <span style={{ fontFamily: FONTS.display, fontSize: 34, fontWeight: 600, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{Number(data.score).toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
               </div>
               <div style={{ fontSize: 13, fontWeight: 600, color: TIER_COLORS[data.tier] || CP.textSecondary }}>{data.tier}</div>
             </div>
