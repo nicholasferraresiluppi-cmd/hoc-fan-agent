@@ -193,6 +193,10 @@ export function distributeShift(shift) {
  */
 export async function buildCreatorMatrix(periodId) {
   // v3.3: aggiunto pct_distribution per cell (Comp Review Hot list)
+  // v3.3.1 (25/09/2026, INPUT non formula): la matrice riceve solo turni già
+  // iniziati (startedShifts in creatorspro-data). Prima, nel mese in corso, i
+  // turni programmati a $0 entravano nelle celle → score del mese corrente
+  // distorti. Mesi chiusi invariati.
   const ck = `_matrix_v3.3:${periodId}`;
   const cached = cacheGet(ck);
   if (cached) return cached;

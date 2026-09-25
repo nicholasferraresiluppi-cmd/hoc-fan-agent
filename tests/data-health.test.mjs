@@ -25,4 +25,8 @@ const us = unmappedSales([
 t("unmapped totale e quota", us.total === 1050 && us.unmapped === 150 && Math.abs(us.share - 150 / 1050) < 1e-9);
 t("unmapped per persona sommato, zero escluso", us.people.length === 1 && us.people[0].sales === 150 && us.people[0].shifts === 4);
 t("unmapped vuoto robusto", unmappedSales(null, null).share === 0);
+const fut = new Date(Date.now() + 86400000).toISOString();
+const past = new Date(Date.now() - 86400000).toISOString();
+const sf = shiftsByCreator([{ shifts: [{ started_at: past, creator_aliases: ["A"] }, { started_at: fut, creator_aliases: ["A"] }] }]);
+t("turni futuri esclusi", sf.A === 1);
 console.log(`${ok} ok / ${ko} failed`); if (ko) process.exit(1);
