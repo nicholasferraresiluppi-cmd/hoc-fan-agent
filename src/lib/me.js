@@ -65,8 +65,20 @@ export async function resolveEmployeeForUser() {
   }
 
   const user = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress || null;
+  // Email PRIMARIA e VERIFICATA (non emailAddresses[0]).
+  const primary = user?.emailAddresses?.find((e) => e.id === user.primaryEmailAddressId) || user?.emailAddresses?.[0];
+  const email = primary?.emailAddress || null;
   if (!email) return { userId, employee: null, email: null, reason: "no_email" };
+  if (primary?.verification?.status !== "verified") return { userId, employee: null, email, reason: "email_not_verified" };
+
+  // L'abbinamento automatico usa il NOME prima della @: vale solo sui domini
+  // aziendali. Con un dominio qualsiasi, "mario.rossi@gmail.com" di chiunque
+  // diventava l'operatore Mario Rossi e ne vedeva compenso e score (audit set
+  // 2026). Fuori dominio → collegamento esplicito di un admin (/admin/user-mapping).
+  const domains = (process.env.HOC_EMPLOYEE_EMAIL_DOMAINS || "houseofcreators.com")
+    .split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
+  const domain = email.split("@")[1]?.toLowerCase() || "";
+  if (!domains.includes(domain)) return { userId, employee: null, email, reason: "needs_link" };
 
   // 2. Roster Infloww ufficiale (MASS-filtrato). Non-bloccante: se vuoto, si scende al CP.
   try {

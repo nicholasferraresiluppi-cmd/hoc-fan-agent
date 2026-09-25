@@ -1,7 +1,7 @@
 import { kv } from "@vercel/kv";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { listAdmins } from "@/lib/admin";
-import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { authorize, authorizeAdmin, auditAccess, CAPABILITIES } from "@/lib/rbac";
 
 export async function GET() {
   const a = await authorize(CAPABILITIES.ACCESS_MGMT);
@@ -17,7 +17,7 @@ export async function GET() {
 // POST { action: "add" | "remove", userId?: string, email?: string }
 // Permette di aggiungere/rimuovere admin via userId o via email (risolta da Clerk).
 export async function POST(request) {
-  const a = await authorize(CAPABILITIES.ACCESS_MGMT);
+  const a = await authorizeAdmin();
   if (!a.ok) return Response.json({ error: a.message }, { status: a.status });
   try {
     const body = await request.json().catch(() => ({}));
@@ -41,6 +41,7 @@ export async function POST(request) {
 
     if (action === "add") {
       await kv.sadd("admins:set", targetId);
+      await auditAccess(a.userId, "admin_add", { target: targetId });
       return Response.json({ ok: true, action, userId: targetId });
     }
     if (action === "remove") {
@@ -52,7 +53,9 @@ export async function POST(request) {
         }, { status: 400 });
       }
       // Rimuovi dal set KV
+      if (targetId === a.userId) return Response.json({ error: "Non puoi rimuovere te stesso dagli admin: chiedilo a un altro admin." }, { status: 400 });
       await kv.srem("admins:set", targetId);
+      await auditAccess(a.userId, "admin_remove", { target: targetId });
       // Se ha role=admin via Clerk metadata, mostra avviso
       try {
         const cc = await clerkClient();

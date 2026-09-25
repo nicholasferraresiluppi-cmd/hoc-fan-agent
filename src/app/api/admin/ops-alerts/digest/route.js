@@ -104,5 +104,8 @@ export async function POST(request) {
 }
 
 export async function GET(request) {
+  // GET solo per il cron (Bearer): con la sessione basta un link cliccato
+  // da un admin per far partire il lavoro (CSRF). La UI usa POST.
+  if (!isCronAuthorized(request)) return Response.json({ error: "unauthorized" }, { status: 401 });
   return POST(request);
 }

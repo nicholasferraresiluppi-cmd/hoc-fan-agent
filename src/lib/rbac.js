@@ -211,7 +211,9 @@ export async function setUserRoles(userId, roles) {
     await kv.set(`role:${userId}`, primaryPredef);
     try {
       const cc = await clerkClient();
-      await cc.users.updateUser(userId, { publicMetadata: { role: primaryPredef } });
+      // updateUserMetadata fa MERGE: updateUser sovrascriveva tutto publicMetadata
+      // (perdendo contentPipeline, invited_by, …)
+      await cc.users.updateUserMetadata(userId, { publicMetadata: { role: primaryPredef, roles: arr } });
     } catch {}
   }
   return { userId, roles: arr };
@@ -269,7 +271,7 @@ export async function setUserRole(userId, role) {
   // Mirror su Clerk
   try {
     const cc = await clerkClient();
-    await cc.users.updateUser(userId, { publicMetadata: { role } });
+    await cc.users.updateUserMetadata(userId, { publicMetadata: { role } });
   } catch (e) {
     console.warn("clerk role mirror failed:", e?.message);
   }
@@ -353,8 +355,7 @@ export async function authorize(capability) {
   if (!userId) return { ok: false, status: 401, message: "unauthenticated" };
   const scope = await getScope(userId, capability);
   if (!scope) {
-    const role = await getUserRole(userId);
-    return { ok: false, status: 403, message: `missing capability ${capability} (role: ${role})` };
+    return { ok: false, status: 403, message: "Non hai il permesso per questa azione" };
   }
   const role = await getUserRole(userId);
   return { ok: true, userId, role, scope };
@@ -367,11 +368,34 @@ export async function authorize(capability) {
  * team-filtered si implementa il filtro nell'endpoint, non si allarga lo
  * scope qui. (Gating pass lug 2026, pre-onboarding CM pilota.)
  */
+/**
+ * Solo admin veri (env / Clerk role=admin / admins:set), a prescindere dalle
+ * capability. Per le azioni che creano poteri: nominare admin, assegnare
+ * ruoli, creare ruoli custom. Prima bastava ACCESS_MGMT, che un ruolo custom
+ * può concedere → chi lo riceveva poteva darsi admin da solo (audit set 2026).
+ */
+export async function authorizeAdmin() {
+  const { userId } = await auth();
+  if (!userId) return { ok: false, status: 401, message: "unauthenticated" };
+  if (!(await isUserIdAdmin(userId).catch(() => false))) {
+    return { ok: false, status: 403, message: "Serve un admin" };
+  }
+  return { ok: true, userId, role: "admin", scope: "all" };
+}
+
+/** Registro dei cambi di accesso (chi ha dato cosa a chi). Cap 1000. */
+export async function auditAccess(actorId, action, detail = {}) {
+  try {
+    await kv.lpush("audit:access", JSON.stringify({ at: Date.now(), actor: actorId, action, ...detail }));
+    await kv.ltrim("audit:access", 0, 999);
+  } catch {}
+}
+
 export async function authorizeAll(capability) {
   const az = await authorize(capability);
   if (!az.ok) return az;
   if (az.scope !== "all") {
-    return { ok: false, status: 403, message: `capability ${capability} richiede scope "all" (role: ${az.role}, scope: ${az.scope})` };
+    return { ok: false, status: 403, message: "Non hai il permesso per questa azione" };
   }
   return az;
 }
