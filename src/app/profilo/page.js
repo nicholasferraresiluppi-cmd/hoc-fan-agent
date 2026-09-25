@@ -149,7 +149,7 @@ export default function MyProfilePage() {
                 </div>
 
                 <div style={{ textAlign: "right", position: "relative" }}>
-                  <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.15em" }}>Il tuo score</div>
+                  <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.15em" }}>Il tuo score vendite</div>
                   <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 64, lineHeight: 1, color: tierColor }}>
                     {cp.score?.toFixed(1) ?? "—"}
                   </div>
