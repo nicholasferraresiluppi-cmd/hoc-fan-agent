@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
@@ -125,8 +125,8 @@ export default function LeaderboardExclusionsPage() {
     label: { fontSize: 11, color: COLORS.fog, letterSpacing: "0.1em", marginBottom: 6, display: "block" },
     input: { width: "100%", padding: "9px 14px", background: COLORS.charcoal, border: `1px solid ${COLORS.steel}`, borderRadius: 8, color: COLORS.alabaster, fontSize: 13, fontFamily: FONTS.body, marginBottom: 12, outline: "none" },
     btn: { padding: "9px 18px", background: COLORS.champagne, color: COLORS.obsidian, border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 13, fontFamily: FONTS.body },
-    btnDanger: { padding: "5px 12px", background: "transparent", color: COLORS.signal, border: `1px solid ${COLORS.signal}66`, borderRadius: 6, cursor: "pointer", fontSize: 11, fontFamily: FONTS.body },
-    error: { background: COLORS.signal + "20", color: COLORS.signal, padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 },
+    btnDanger: { padding: "5px 12px", background: "transparent", color: COLORS.signal, border: `1px solid ${alpha(COLORS.signal, "66")}`, borderRadius: 6, cursor: "pointer", fontSize: 11, fontFamily: FONTS.body },
+    error: { background: alpha(COLORS.signal, "20"), color: COLORS.signal, padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 },
     reasonPill: (active, color) => ({
       padding: "8px 14px",
       background: active ? color : "transparent",
@@ -140,13 +140,13 @@ export default function LeaderboardExclusionsPage() {
     }),
     table: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
     th: { textAlign: "left", padding: "10px 12px", color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", borderBottom: `1px solid ${COLORS.steel}` },
-    td: { padding: "10px 12px", borderBottom: `1px solid ${COLORS.charcoal}88`, verticalAlign: "middle" },
+    td: { padding: "10px 12px", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, verticalAlign: "middle" },
     reasonBadge: (reason) => ({
       display: "inline-block", padding: "2px 8px", borderRadius: 999,
       fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", 
       background: (REASON_COLOR[reason] || COLORS.mist) + "26",
       color: REASON_COLOR[reason] || COLORS.mist,
-      border: `1px solid ${REASON_COLOR[reason] || COLORS.mist}55`,
+      border: `1px solid ${alpha(REASON_COLOR[reason] || COLORS.mist, "55")}`,
     }),
   };
 

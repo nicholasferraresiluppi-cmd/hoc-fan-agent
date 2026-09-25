@@ -4,7 +4,7 @@
 // evidenza. Usato dalla libreria operatore (/academy/tapes) e dalla curatela
 // admin (/admin/academy-tapes). Solo presentazione: nessuna fetch qui dentro.
 
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 
 const fmtTime = (ms) =>
   new Date(ms).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
@@ -15,7 +15,7 @@ const usd = (n) => `$${Math.round(Number(n) || 0).toLocaleString("it-IT")}`;
 function Chip({ children, tone }) {
   const tones = {
     accent: { background: CP.accentSoft, color: CP.accentSoftText },
-    green: { background: `${CP.accentGreen}1f`, color: CP.accentGreen },
+    green: { background: `${alpha(CP.accentGreen, "1f")}`, color: CP.accentGreen },
     plain: { background: CP.surfaceAlt, color: CP.textSecondary },
   };
   return (
@@ -87,9 +87,9 @@ export default function TapeReplay({ tape }) {
             <div key={i} style={{ display: "flex", justifyContent: "center", padding: "6px 0" }}>
               <span
                 style={{
-                  background: `${CP.accentGreen}1f`,
+                  background: `${alpha(CP.accentGreen, "1f")}`,
                   color: CP.accentGreen,
-                  border: `1px solid ${CP.accentGreen}55`,
+                  border: `1px solid ${alpha(CP.accentGreen, "55")}`,
                   padding: "4px 14px",
                   borderRadius: 999,
                   fontSize: 12.5,

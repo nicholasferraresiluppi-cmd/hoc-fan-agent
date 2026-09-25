@@ -7,7 +7,7 @@
 
 import { useState, useMemo } from "react";
 import useSWR from "swr";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 import { computeInflowwOperatorSignals } from "@/lib/infloww-signals";
 
@@ -157,7 +157,7 @@ export default function InflowwIngestPage() {
             fontSize: 13,
             color: msg.ok ? CP.accentGreen : CP.accentRed,
             background: CP.surface,
-            border: `1px solid ${msg.ok ? `${CP.accentGreen}44` : `${CP.accentRed}55`}`,
+            border: `1px solid ${msg.ok ? `${alpha(CP.accentGreen, "44")}` : `${alpha(CP.accentRed, "55")}`}`,
             borderRadius: 10,
             padding: "10px 14px",
             marginBottom: 16,
@@ -168,7 +168,7 @@ export default function InflowwIngestPage() {
       )}
 
       {error ? (
-        <div style={{ marginTop: 8, padding: "20px 24px", background: CP.surface, border: `1px solid ${CP.accentRed}55`, borderRadius: 12, color: CP.accentRed, fontSize: 14 }}>
+        <div style={{ marginTop: 8, padding: "20px 24px", background: CP.surface, border: `1px solid ${alpha(CP.accentRed, "55")}`, borderRadius: 12, color: CP.accentRed, fontSize: 14 }}>
           Impossibile caricare i profili: {error.message}.
         </div>
       ) : isLoading ? (

@@ -6,7 +6,7 @@ import {
   Calculator, Users, Sparkles, Award, Target,
   ArrowRight, Info, Activity,
 } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { SectionLabel, CpCard } from "@/components/cp-style";
 
 /**
@@ -18,7 +18,7 @@ const TIER_BADGES = [
   { tier: "Elite",    range: "top 10%",  color: "#A855F7", desc: "Eccellenza assoluta — rari e iper-performanti su tutto" },
   { tier: "Strong",   range: "top 25%",  color: "#3B82F6", desc: "Solidi performer — sopra media in modo consistente" },
   { tier: "Good",     range: "top 50%",  color: "#10B981", desc: "Sopra mediana — affidabili, contribuiscono attivamente" },
-  { tier: "Average",  range: "top 75%",  color: "#9CA3AF", desc: "Mediocri — non distinguono ma non sono problema" },
+  { tier: "Average",  range: "top 75%",  color: CP.textMuted, desc: "Mediocri — non distinguono ma non sono problema" },
   { tier: "Weak",     range: "top 90%",  color: "#F59E0B", desc: "Sotto media — area di intervento, da monitorare" },
   { tier: "Critical", range: "bottom 10%", color: "#EF4444", desc: "Performance non sostenibili — candidati a swap/cambio ruolo" },
 ];
@@ -167,7 +167,7 @@ export default function ScoreExplainedPage() {
             <span style={{ color: CP.textMuted, fontSize: 13 }}>Tier risultante:</span>
             <span style={{
               padding: "8px 18px",
-              background: finalColor + "22",
+              background: alpha(finalColor, "22"),
               color: finalColor,
               border: `2px solid ${finalColor}`,
               borderRadius: 999,
@@ -193,13 +193,13 @@ export default function ScoreExplainedPage() {
           {TIER_BADGES.map((t) => (
             <div key={t.tier} style={{
               padding: "14px 18px",
-              background: `${t.color}10`,
-              border: `1px solid ${t.color}55`,
+              background: `${alpha(t.color, "10")}`,
+              border: `1px solid ${alpha(t.color, "55")}`,
               borderRadius: 12,
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
                 <span style={{
-                  padding: "3px 11px", background: t.color, color: "#0a0a0a",
+                  padding: "3px 11px", background: t.color, color: CP.bgSunken,
                   borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: "0.04em",
                 }}>{t.tier.toUpperCase()}</span>
                 <span style={{ fontSize: 11, color: CP.textMuted, fontFamily: FONTS.mono }}>{t.range}</span>
@@ -267,7 +267,7 @@ function Section({ icon: Icon, color, title, children }) {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
         <div style={{
           width: 38, height: 38, borderRadius: 10,
-          background: `${color}22`, border: `1px solid ${color}66`,
+          background: `${alpha(color, "22")}`, border: `1px solid ${alpha(color, "66")}`,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           <Icon size={18} color={color} strokeWidth={2} />
@@ -311,7 +311,7 @@ const ctaCard = (col) => ({
   display: "flex", alignItems: "center", justifyContent: "space-between",
   padding: "18px 22px",
   background: CP.surface,
-  border: `1px solid ${col}44`,
+  border: `1px solid ${alpha(col, "44")}`,
   borderRadius: 12,
   textDecoration: "none",
 });

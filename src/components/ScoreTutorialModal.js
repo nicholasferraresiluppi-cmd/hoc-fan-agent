@@ -17,13 +17,13 @@ import {
   X, ChevronLeft, ChevronRight, Target, Activity, Users, Award,
   Calculator, ArrowRight, Sparkles,
 } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 
 const TIER_BADGES = [
   { tier: "Elite",    range: "top 10%",  color: "#A855F7" },
   { tier: "Strong",   range: "top 25%",  color: "#3B82F6" },
   { tier: "Good",     range: "top 50%",  color: "#10B981" },
-  { tier: "Average",  range: "top 75%",  color: "#9CA3AF" },
+  { tier: "Average",  range: "top 75%",  color: CP.textMuted },
   { tier: "Weak",     range: "top 90%",  color: "#F59E0B" },
   { tier: "Critical", range: "bottom 10%", color: "#EF4444" },
 ];
@@ -174,10 +174,10 @@ const STEPS = [
             <div key={t.tier} style={{
               display: "flex", alignItems: "center", gap: 10,
               padding: "10px 14px",
-              background: `${t.color}15`, border: `1px solid ${t.color}55`,
+              background: `${alpha(t.color, "15")}`, border: `1px solid ${alpha(t.color, "55")}`,
               borderRadius: 10,
             }}>
-              <span style={{ padding: "3px 10px", background: t.color, color: "#0a0a0a", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: "0.04em" }}>
+              <span style={{ padding: "3px 10px", background: t.color, color: CP.bgSunken, borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: "0.04em" }}>
                 {t.tier.toUpperCase()}
               </span>
               <span style={{ fontSize: 12, color: CP.textSecondary }}>{t.range}</span>
@@ -283,8 +283,8 @@ export default function ScoreTutorialModal({ onClose }) {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{
               width: 36, height: 36, borderRadius: 10,
-              background: `${current.accent}22`,
-              border: `1px solid ${current.accent}66`,
+              background: `${alpha(current.accent, "22")}`,
+              border: `1px solid ${alpha(current.accent, "66")}`,
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               <Icon size={18} color={current.accent} strokeWidth={2} />
@@ -355,16 +355,16 @@ export default function ScoreTutorialModal({ onClose }) {
 const p = { color: CP.textSecondary, fontSize: 14, lineHeight: 1.55, margin: "0 0 12px 0" };
 const closeBtn = { background: "transparent", border: `1px solid ${CP.border}`, color: CP.textSecondary, borderRadius: 8, cursor: "pointer", padding: 6, display: "flex", alignItems: "center", justifyContent: "center" };
 const navBtn = { padding: "8px 14px", background: CP.surfaceAlt, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontFamily: FONTS.body };
-const miniCard = (col) => ({ padding: "14px 16px", background: `${col}10`, border: `1px solid ${col}44`, borderRadius: 10 });
+const miniCard = (col) => ({ padding: "14px 16px", background: `${alpha(col, "10")}`, border: `1px solid ${alpha(col, "44")}`, borderRadius: 10 });
 const miniHeader = { display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: CP.textSecondary, marginBottom: 6, fontFamily: FONTS.mono };
 const miniBody = { fontSize: 13, color: CP.textPrimary, margin: 0, lineHeight: 1.5 };
 const formulaBlock = { padding: "18px 16px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12 };
 const formulaLine = { display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap", fontFamily: FONTS.mono, fontSize: 13 };
 const kpi = { padding: "5px 10px", background: CP.surfaceAlt, border: `1px solid ${CP.border}`, borderRadius: 6, color: CP.textPrimary, fontWeight: 600 };
-const weight = { padding: "5px 8px", background: CP.accentGreen + "22", color: CP.accentGreen, borderRadius: 6, fontWeight: 700 };
+const weight = { padding: "5px 8px", background: alpha(CP.accentGreen, "22"), color: CP.accentGreen, borderRadius: 6, fontWeight: 700 };
 const op = { color: CP.textMuted, fontSize: 14 };
 const pillBlue = { padding: "5px 10px", background: CP.accentSoft, color: CP.accentSoftText, border: `1px solid ${CP.accentDim}`, borderRadius: 6, fontWeight: 600 };
-const pillGreen = { padding: "5px 10px", background: CP.accentGreen + "22", color: CP.accentGreen, border: `1px solid ${CP.accentGreen}44`, borderRadius: 6, fontWeight: 600 };
+const pillGreen = { padding: "5px 10px", background: alpha(CP.accentGreen, "22"), color: CP.accentGreen, border: `1px solid ${alpha(CP.accentGreen, "44")}`, borderRadius: 6, fontWeight: 600 };
 const tbl = { width: "100%", borderCollapse: "collapse", fontSize: 12, marginTop: 14, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, overflow: "hidden" };
 const th = { padding: "9px 10px", textAlign: "left", color: CP.textMuted, fontSize: 10, letterSpacing: "0.08em", borderBottom: `1px solid ${CP.borderStrong}`, fontFamily: FONTS.mono, fontWeight: 700 };
 const td = { padding: "10px", borderBottom: `1px solid ${CP.border}`, color: CP.textPrimary, fontFamily: FONTS.mono, fontSize: 12 };

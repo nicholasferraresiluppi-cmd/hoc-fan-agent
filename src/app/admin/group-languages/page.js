@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
@@ -21,7 +21,7 @@ function LangBadge({ language }) {
     <span style={{
       display: "inline-block", padding: "2px 7px", borderRadius: 4,
       fontSize: 10, fontWeight: 700, fontFamily: FONTS.mono,
-      background: opt.color + "20", color: opt.color, border: `1px solid ${opt.color}55`,
+      background: alpha(opt.color, "20"), color: opt.color, border: `1px solid ${alpha(opt.color, "55")}`,
     }}>{opt.label}</span>
   );
 }
@@ -125,7 +125,7 @@ export default function GroupLanguagesPage() {
     card: { background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, padding: 22, marginBottom: 22 },
     table: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
     th: { textAlign: "left", padding: "10px 12px", color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", borderBottom: `1px solid ${COLORS.steel}` },
-    td: { padding: "10px 12px", borderBottom: `1px solid ${COLORS.charcoal}88`, verticalAlign: "middle" },
+    td: { padding: "10px 12px", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, verticalAlign: "middle" },
     filterPill: (active) => ({
       padding: "6px 12px", marginRight: 6,
       background: active ? COLORS.champagne : COLORS.graphite,
@@ -136,7 +136,7 @@ export default function GroupLanguagesPage() {
     }),
     btn: { padding: "9px 18px", background: COLORS.champagne, color: COLORS.obsidian, border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 13 },
     btnGhost: { padding: "9px 14px", background: "transparent", color: COLORS.alabaster, border: `1px solid ${COLORS.steel}`, borderRadius: 8, cursor: "pointer", fontSize: 13, marginLeft: 8 },
-    btnDanger: { padding: "9px 14px", background: "transparent", color: COLORS.signal, border: `1px solid ${COLORS.signal}66`, borderRadius: 8, cursor: "pointer", fontSize: 12, marginLeft: 8 },
+    btnDanger: { padding: "9px 14px", background: "transparent", color: COLORS.signal, border: `1px solid ${alpha(COLORS.signal, "66")}`, borderRadius: 8, cursor: "pointer", fontSize: 12, marginLeft: 8 },
     select: (value) => ({
       padding: "5px 10px",
       background: COLORS.charcoal,
@@ -145,7 +145,7 @@ export default function GroupLanguagesPage() {
       borderRadius: 6, fontSize: 12, fontFamily: FONTS.body, cursor: "pointer", outline: "none",
     }),
     success: { background: "#3FB97E20", color: "#3FB97E", padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 },
-    error: { background: COLORS.signal + "20", color: COLORS.signal, padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 },
+    error: { background: alpha(COLORS.signal, "20"), color: COLORS.signal, padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 },
   };
 
   const counts = {

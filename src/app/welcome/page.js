@@ -6,7 +6,7 @@ import {
   ArrowRight, Sparkles, Trophy, Brain, Award,
   LayoutDashboard, Layers,
 } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { SectionLabel, CpCard } from "@/components/cp-style";
 
 /**
@@ -129,7 +129,7 @@ export default function WelcomePage() {
                 transition: "border-color 0.15s, transform 0.15s",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = m.color + "66";
+                e.currentTarget.style.borderColor = alpha(m.color, "66");
                 e.currentTarget.style.transform = "translateY(-2px)";
               }}
               onMouseLeave={(e) => {
@@ -140,8 +140,8 @@ export default function WelcomePage() {
               <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
                 <div style={{
                   width: 52, height: 52, borderRadius: 12,
-                  background: m.color + "22",
-                  border: `1px solid ${m.color}55`,
+                  background: alpha(m.color, "22"),
+                  border: `1px solid ${alpha(m.color, "55")}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   flexShrink: 0,
                 }}>
@@ -213,7 +213,7 @@ export default function WelcomePage() {
           padding: "20px 24px",
           marginBottom: 16,
           background: CP.surface,
-          border: `1px solid ${CP.accentGreen}44`,
+          border: `1px solid ${alpha(CP.accentGreen, "44")}`,
           borderRadius: 14,
           color: CP.textPrimary,
           textDecoration: "none",
@@ -223,8 +223,8 @@ export default function WelcomePage() {
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{
             width: 44, height: 44, borderRadius: 12,
-            background: CP.accentGreen + "22",
-            border: `1px solid ${CP.accentGreen}66`,
+            background: alpha(CP.accentGreen, "22"),
+            border: `1px solid ${alpha(CP.accentGreen, "66")}`,
             display: "flex", alignItems: "center", justifyContent: "center",
             flexShrink: 0,
           }}>

@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import { HelpCircle, CheckCircle2, Circle, Lock } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel } from "@/components/cp-style";
 
 /**
@@ -64,7 +64,7 @@ export default function MyLadderPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
                   <h3 style={{ fontFamily: FONTS.display, fontSize: 17, fontWeight: 600, color: CP.textPrimary, margin: 0 }}>{g.label}</h3>
                   {perf.performance_met ? (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 650, color: CP.accentGreen, background: CP.accentGreen + "18", borderRadius: 99, padding: "3px 10px" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 650, color: CP.accentGreen, background: alpha(CP.accentGreen, "18"), borderRadius: 99, padding: "3px 10px" }}>
                       <CheckCircle2 size={13} /> performance raggiunta
                     </span>
                   ) : (
@@ -79,7 +79,7 @@ export default function MyLadderPage() {
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
                   {(perf.months || []).map((m) => (
                     <div key={m.period_id} style={{ textAlign: "center" }}>
-                      <div style={{ width: 54, padding: "6px 0", borderRadius: 8, background: m.counts ? CP.accentGreen + "1c" : CP.surfaceAlt, border: `1px solid ${m.counts ? CP.accentGreen : CP.border}` }}>
+                      <div style={{ width: 54, padding: "6px 0", borderRadius: 8, background: m.counts ? alpha(CP.accentGreen, "1c") : CP.surfaceAlt, border: `1px solid ${m.counts ? CP.accentGreen : CP.border}` }}>
                         <span style={{ fontSize: 11.5, fontWeight: 650, color: TIER_COLORS[m.tier] || CP.textMuted }}>{m.tier || "—"}</span>
                       </div>
                       <span style={{ fontSize: 10, color: CP.textMuted }}>{String(m.period_id).slice(5)}</span>

@@ -14,7 +14,7 @@
  */
 import Link from "next/link";
 import { CheckCircle2, Circle, UserCircle2, GraduationCap, Radar, ArrowRight } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 
 const ICONS = { UserCircle2, GraduationCap, Radar };
 
@@ -103,7 +103,7 @@ export default function RoleFunnelChecklist({ funnel, progress, focus, onNavigat
             display: "flex", gap: 12, alignItems: "flex-start",
             padding: "13px 15px", borderRadius: 10, textDecoration: "none",
             background: CP.surface,
-            border: `1px solid ${st.done ? CP.accentGreen + "44" : CP.border}`,
+            border: `1px solid ${st.done ? alpha(CP.accentGreen, "44") : CP.border}`,
           };
           return it.href ? (
             <Link key={it.id} href={it.href} onClick={onNavigate} style={{ ...style, cursor: "pointer" }}>{body}</Link>

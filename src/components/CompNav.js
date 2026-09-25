@@ -9,7 +9,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Wallet, Scale, CalendarDays, Activity, Search, FlaskConical, Ruler, ListTree } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 
 const TOOLS = [
   { href: "/admin/pnl-live",         label: "P&L Live",     icon: Wallet },
@@ -37,7 +37,7 @@ export default function CompNav({ palette } = {}) {
               display: "inline-flex", alignItems: "center", gap: 6,
               padding: "7px 13px", borderRadius: 7,
               background: active ? P.surfaceAlt : "transparent",
-              border: `1px solid ${active ? P.accent + "66" : "transparent"}`,
+              border: `1px solid ${active ? alpha(P.accent, "66") : "transparent"}`,
               color: active ? P.textPrimary : P.textSecondary,
               fontSize: 12, fontWeight: active ? 500 : 400,
               fontFamily: FONTS.body, textDecoration: "none",

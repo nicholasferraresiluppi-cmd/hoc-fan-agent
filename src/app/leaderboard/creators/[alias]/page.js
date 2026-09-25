@@ -3,13 +3,13 @@
 import { use, useMemo } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { CP, FONTS, creatorDotColor } from "@/lib/brand";
+import { CP, FONTS, creatorDotColor, alpha } from "@/lib/brand";
 import { SectionLabel, StatCard, MiniInsight, CpCard, CreatorDot, TrendPill } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
 const TIER_COLORS = {
-  Critical: "#EF4444", Weak: "#F59E0B", Average: "#9CA3AF",
+  Critical: "#EF4444", Weak: "#F59E0B", Average: CP.textMuted,
   Good: "#10B981", Strong: "#3B82F6", Elite: "#A855F7",
 };
 
@@ -82,7 +82,7 @@ export default function CreatorDrilldownPage({ params, searchParams }) {
 
         {isLoading && !data && <p style={{ color: CP.textSecondary }}>Caricamento…</p>}
         {error && <p style={{ color: CP.accentRed }}>Errore: {String(error)}</p>}
-        {data?.error && <div style={{ background: CP.accentRed + "20", color: CP.accentRed, padding: 16, borderRadius: 12 }}>{data.error}</div>}
+        {data?.error && <div style={{ background: alpha(CP.accentRed, "20"), color: CP.accentRed, padding: 16, borderRadius: 12 }}>{data.error}</div>}
 
         {data && !data.error && creator && (
           <>
@@ -93,7 +93,7 @@ export default function CreatorDrilldownPage({ params, searchParams }) {
                 background: dotColor,
                 color: CP.textPrimary, display: "flex", alignItems: "center", justifyContent: "center",
                 fontFamily: FONTS.display, fontWeight: 700, fontSize: 28,
-                border: `2px solid ${CP.bg}`, boxShadow: `0 0 0 3px ${dotColor}44`, flexShrink: 0,
+                border: `2px solid ${CP.bg}`, boxShadow: `0 0 0 3px ${alpha(dotColor, "44")}`, flexShrink: 0,
               }}>{getInitials(creator.alias)}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
@@ -231,13 +231,13 @@ export default function CreatorDrilldownPage({ params, searchParams }) {
                       </Link>
                       {hasExact && hasEstimate === false && (op.shift_exact_count > 0) && (
                         <span title={`${op.shift_exact_count} shift multi-creator con attribuzione esatta (takes)`}
-                              style={{ padding: "1px 6px", fontSize: 9, fontFamily: FONTS.mono, fontWeight: 700, background: CP.accentGreen + "22", color: CP.accentGreen, borderRadius: 3, letterSpacing: "0.04em" }}>
+                              style={{ padding: "1px 6px", fontSize: 9, fontFamily: FONTS.mono, fontWeight: 700, background: alpha(CP.accentGreen, "22"), color: CP.accentGreen, borderRadius: 3, letterSpacing: "0.04em" }}>
                           ✓ ESATTO
                         </span>
                       )}
                       {hasEstimate && op.split_pct >= 30 && (
                         <span title={`${op.split_pct}% degli shift sono multi-creator senza takes (stima 50/50)`}
-                              style={{ padding: "1px 6px", fontSize: 9, fontFamily: FONTS.mono, fontWeight: 700, background: CP.accentRed + "22", color: CP.accentRed, borderRadius: 3, letterSpacing: "0.04em" }}>
+                              style={{ padding: "1px 6px", fontSize: 9, fontFamily: FONTS.mono, fontWeight: 700, background: alpha(CP.accentRed, "22"), color: CP.accentRed, borderRadius: 3, letterSpacing: "0.04em" }}>
                           ≈ {op.split_pct}% STIMA
                         </span>
                       )}
@@ -260,7 +260,7 @@ export default function CreatorDrilldownPage({ params, searchParams }) {
                       {op.low_confidence ? (
                         <span style={{ fontSize: 10, color: CP.textMuted, fontStyle: "italic" }}>n/a</span>
                       ) : (
-                        <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 10, fontWeight: 700, background: tColor + "22", color: tColor, letterSpacing: "0.04em" }}>{op.tier}</span>
+                        <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 10, fontWeight: 700, background: alpha(tColor, "22"), color: tColor, letterSpacing: "0.04em" }}>{op.tier}</span>
                       )}
                     </div>
                   </div>

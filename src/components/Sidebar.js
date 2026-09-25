@@ -20,6 +20,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
+import { canSee } from "@/lib/nav-access";
+import { useTheme } from "@/lib/theme-client";
 import { UserButton, SignedIn } from "@clerk/nextjs";
 import {
   Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown,
@@ -29,8 +31,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
-  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle,
-} from "lucide-react";
+  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
 
@@ -350,6 +351,13 @@ export default function Sidebar() {
     (a) => a.severity === "critical" && a.status !== "resolved"
   ).length;
 
+  // Menu per ruolo: si nascondono le voci che per questi permessi risponderebbero
+  // "non hai il permesso" (lib/nav-access). Finché i permessi non arrivano si
+  // mostra tutto, come prima (niente menu che "salta" vuoto).
+  const { data: me } = useSWR("/api/whoami", silentFetcher, { revalidateOnFocus: false });
+  const allowed = (href) => !me?.authenticated || canSee(href, me.capabilities, me.admin);
+  const [theme, setTheme] = useTheme();
+
   // Toggle Essential / Advanced
   const [viewMode, setViewMode] = useState("essential");
   // Map { label: isOpen } per i gruppi collassabili
@@ -441,16 +449,16 @@ export default function Sidebar() {
       <div style={{ padding: "10px 0 4px 0", borderBottom: `1px solid ${CP.border}` }}>
         <NavItem href="/welcome" label="Welcome / Tour" icon={Compass} isActive={pathname === "/welcome"} />
         <NavItem href="/guida" label="Guida strumenti" icon={Signpost} isActive={pathname === "/guida"} />
-        <NavItem href="/admin" label="Hub" icon={LayoutDashboard} isActive={pathname === "/admin"} />
-        <NavItem href="/admin/alerts" label="Alert operativi" icon={Bell} isActive={pathname.startsWith("/admin/alerts")} badge={criticalCount} />
+        {allowed("/admin") && <NavItem href="/admin" label="Hub" icon={LayoutDashboard} isActive={pathname === "/admin"} />}
+        {allowed("/admin/alerts") && <NavItem href="/admin/alerts" label="Alert operativi" icon={Bell} isActive={pathname.startsWith("/admin/alerts")} badge={criticalCount} />}
       </div>
 
       {/* Nav groups */}
       <nav style={{ flex: 1, overflowY: "auto", padding: "4px 0 16px 0", scrollbarWidth: "thin" }}>
         {NAV_GROUPS.map((group) => {
-          const visibleItems = isEssential
+          const visibleItems = (isEssential
             ? group.items.filter((it) => ESSENTIAL_HREFS.has(it.href))
-            : group.items;
+            : group.items).filter((it) => allowed(it.href));
           if (visibleItems.length === 0) return null;
           const isOpen = openGroups[group.label];
           return (
@@ -480,14 +488,18 @@ export default function Sidebar() {
       </nav>
 
       {/* Bottom: UserButton */}
-      <div style={{ padding: "12px 16px", borderTop: `1px solid ${CP.border}`, background: "#0B0D13" }}>
+      <div style={{ padding: "12px 16px", borderTop: `1px solid ${CP.border}`, background: CP.bgSunken }}>
         <SignedIn>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <UserButton afterSignOutUrl="/sign-in" />
             <div style={{ flex: 1, minWidth: 0, fontSize: 11, color: CP.textMuted }}>
-              <div style={{ color: CP.textSecondary, fontWeight: 600, fontSize: 12 }}>Account</div>
+              <div style={{ color: CP.textSecondary, fontWeight: 500, fontSize: 12 }}>Account</div>
               <div style={{ fontSize: 10, marginTop: 1 }}>HOC Pro</div>
             </div>
+            <button onClick={() => setTheme(theme === "light" ? "dark" : "light")} title={theme === "light" ? "Passa al tema scuro" : "Passa al tema chiaro"} aria-label="Cambia tema"
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textSecondary, cursor: "pointer" }}>
+              {theme === "light" ? <Moon size={15} /> : <Sun size={15} />}
+            </button>
           </div>
         </SignedIn>
       </div>

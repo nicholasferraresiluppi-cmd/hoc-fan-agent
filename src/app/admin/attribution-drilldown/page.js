@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { Loader2, AlertCircle, Download, ClipboardList } from "lucide-react";
-import { CP, FONTS, creatorDotColor } from "@/lib/brand";
+import { CP, FONTS, creatorDotColor, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, StatCard, SectionLabel } from "@/components/cp-style";
 import HowToRead from "@/components/HowToRead";
 
@@ -162,7 +162,7 @@ export default function AttributionDrilldownPage() {
                       <div style={{ position: "relative", height: 14, background: CP.borderSoft, borderRadius: 4, overflow: "hidden" }}
                         title={`${d.day}: reale ${fmt$(d.infloww_gross)} · attribuito ${fmt$(d.cp_mine)}${d.gap != null ? ` · gap ${fmt$(d.gap)}` : ""} · ${d.shifts} turni (${d.shifts_no_takes} senza takes)`}>
                         {d.infloww_gross != null && (
-                          <div style={{ position: "absolute", inset: 0, width: `${(d.infloww_gross / maxDayVal) * 100}%`, background: CP.accentRed + "55", borderRadius: 4 }} />
+                          <div style={{ position: "absolute", inset: 0, width: `${(d.infloww_gross / maxDayVal) * 100}%`, background: alpha(CP.accentRed, "55"), borderRadius: 4 }} />
                         )}
                         <div style={{ position: "absolute", inset: 0, width: `${((d.cp_mine || 0) / maxDayVal) * 100}%`, background: CP.accent, borderRadius: 4 }} />
                       </div>
@@ -215,7 +215,7 @@ export default function AttributionDrilldownPage() {
                 </thead>
                 <tbody>
                   {data.shifts.map((s, i) => (
-                    <tr key={i} style={{ borderBottom: `1px solid ${CP.border}55`, background: s.no_takes ? CP.accentRed + "0A" : "transparent" }}>
+                    <tr key={i} style={{ borderBottom: `1px solid ${alpha(CP.border, "55")}`, background: s.no_takes ? alpha(CP.accentRed, "0A") : "transparent" }}>
                       <td style={{ ...td, fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmtDay(s.day)}</td>
                       <td style={{ ...td, fontFamily: FONTS.mono, color: CP.textMuted }}>{s.start}{s.end ? `–${s.end}` : ""}</td>
                       <td style={{ ...td, fontWeight: 500 }}>{s.operator}</td>

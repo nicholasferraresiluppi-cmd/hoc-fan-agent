@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 import TapeReplay from "@/components/TapeReplay";
 
@@ -186,7 +186,7 @@ export default function AdminTapesPage() {
       />
 
       {data?.error && (
-        <div style={{ padding: 14, borderRadius: 10, background: CP.surface, border: `1px solid ${CP.accentRed}55`, color: CP.accentRed, fontSize: 13, marginBottom: 16 }}>
+        <div style={{ padding: 14, borderRadius: 10, background: CP.surface, border: `1px solid ${alpha(CP.accentRed, "55")}`, color: CP.accentRed, fontSize: 13, marginBottom: 16 }}>
           {data.error}
         </div>
       )}

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 import { PageHeader, StatCard } from "@/components/cp-style";
 import { AlertCircle, CheckCircle2, RefreshCw, Loader2, Database, Search } from "lucide-react";
 import HowToRead from "@/components/HowToRead";
@@ -247,11 +247,11 @@ export default function WageAuditPage() {
       )}
 
       {error && <p style={{ color: COLORS.signal }}>Errore: {String(error)}</p>}
-      {data?.error && <p style={{ color: COLORS.signal, padding: 16, background: COLORS.signal + "20", borderRadius: 12 }}>{data.error}</p>}
+      {data?.error && <p style={{ color: COLORS.signal, padding: 16, background: alpha(COLORS.signal, "20"), borderRadius: 12 }}>{data.error}</p>}
 
       {data && !data.error && (
         <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr 0.8fr 1fr 1.5fr", padding: "14px 22px", background: COLORS.obsidian + "80", color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr 0.8fr 1fr 1.5fr", padding: "14px 22px", background: alpha(COLORS.obsidian, "80"), color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` }}>
             <div>Mese</div><div>KV</div><div>CP live</div><div>Gap</div><div>Stato</div><div>Azione</div>
           </div>
           {months.map((m) => {
@@ -269,7 +269,7 @@ export default function WageAuditPage() {
             const recState = recovering[m.period_id];
             const recMsg = results[m.period_id];
             return (
-              <div key={m.period_id} style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr 0.8fr 1fr 1.5fr", padding: "14px 22px", borderBottom: `1px solid ${COLORS.charcoal}88`, alignItems: "center", fontSize: 13 }}>
+              <div key={m.period_id} style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr 0.8fr 1fr 1.5fr", padding: "14px 22px", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, alignItems: "center", fontSize: 13 }}>
                 <div style={{ fontWeight: 500 }}>{periodLabel(m.period_id)} <span style={{ color: COLORS.mist, fontFamily: FONTS.mono, fontSize: 11, marginLeft: 6 }}>{m.period_id}</span></div>
                 <div style={{ fontFamily: FONTS.mono }}>{m.kv_count}</div>
                 <div style={{ fontFamily: FONTS.mono }}>{m.live_count ?? "—"}</div>

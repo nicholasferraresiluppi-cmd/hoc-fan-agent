@@ -17,7 +17,7 @@
  */
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Search, ChevronDown, X, Check } from "lucide-react";
-import { CP, FONTS, creatorDotColor } from "@/lib/brand";
+import { CP, FONTS, creatorDotColor, alpha } from "@/lib/brand";
 
 // "Giulia Ottorini - IT" → { name: "Giulia Ottorini", lang: "IT" }
 function parseAlias(alias) {
@@ -79,7 +79,7 @@ export default function CreatorPicker({ aliases = [], value = "", onSelect, plac
         onClick={() => setOpen((o) => !o)}
         style={{
           width: "100%", display: "flex", alignItems: "center", gap: 10,
-          padding: "9px 12px", background: P.surface, border: `1px solid ${open ? P.accent + "88" : P.border}`,
+          padding: "9px 12px", background: P.surface, border: `1px solid ${open ? alpha(P.accent, "88") : P.border}`,
           borderRadius: 8, color: value ? P.textPrimary : P.textMuted, fontSize: 13,
           fontFamily: FONTS.body, cursor: "pointer", textAlign: "left",
         }}

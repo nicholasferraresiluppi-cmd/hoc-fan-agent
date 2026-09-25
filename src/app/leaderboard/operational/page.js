@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
@@ -220,7 +220,7 @@ function AdminActionsMenu({ employee, onExcluded, light = false }) {
           alignItems: "center", justifyContent: "center",
           padding: 0, transition: "all 0.15s",
         }}
-        onMouseEnter={(e) => { if (!open) e.currentTarget.style.background = COLORS.charcoal + "66"; }}
+        onMouseEnter={(e) => { if (!open) e.currentTarget.style.background = alpha(COLORS.charcoal, "66"); }}
         onMouseLeave={(e) => { if (!open) e.currentTarget.style.background = "transparent"; }}
       >
         ⋮
@@ -262,7 +262,7 @@ function AdminActionsMenu({ employee, onExcluded, light = false }) {
                 cursor: busy ? "wait" : "pointer", borderRadius: 6,
                 transition: "background 0.1s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = a.color + "20"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = alpha(a.color, "20"); }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
             >
               <div style={{ fontWeight: 600, color: a.color }}>{a.label}</div>
@@ -294,7 +294,7 @@ function TierBadge({ tier }) {
     <span style={{
       display: "inline-block", padding: "3px 11px", borderRadius: 999,
       fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", 
-      background: color + "26", color: color, border: `1px solid ${color}55`,
+      background: alpha(color, "26"), color: color, border: `1px solid ${alpha(color, "55")}`,
     }}>{tier}</span>
   );
 }
@@ -306,7 +306,7 @@ function CategoryBadge({ category }) {
     <span style={{
       display: "inline-block", padding: "1px 7px", borderRadius: 999,
       fontSize: 9, fontWeight: 600, letterSpacing: "0.06em", 
-      background: color + "20", color: color, border: `1px solid ${color}55`,
+      background: alpha(color, "20"), color: color, border: `1px solid ${alpha(color, "55")}`,
       marginLeft: 6, verticalAlign: "middle",
     }}>{category}</span>
   );
@@ -345,7 +345,7 @@ function LanguageBadge({ language }) {
     <span style={{
       display: "inline-block", padding: "1px 6px", borderRadius: 4,
       fontSize: 9, fontWeight: 700, letterSpacing: "0.04em",
-      background: color + "20", color: color, border: `1px solid ${color}55`,
+      background: alpha(color, "20"), color: color, border: `1px solid ${alpha(color, "55")}`,
       marginLeft: 6, verticalAlign: "middle", fontFamily: FONTS.mono,
     }}>{label}</span>
   );
@@ -415,7 +415,7 @@ function HeroCard({ op, groupMeans, canExclude, onExcluded }) {
   return (
     <div style={{
       background: CP.surface,
-      border: `1px solid ${tierColor}55`,
+      border: `1px solid ${alpha(tierColor, "55")}`,
       borderRadius: 20, padding: "28px 32px", marginBottom: 16,
       display: "grid", gridTemplateColumns: "auto 1fr auto auto",
       gap: 28, alignItems: "center", position: "relative", overflow: "hidden",
@@ -454,7 +454,7 @@ function HeroCard({ op, groupMeans, canExclude, onExcluded }) {
       </div>
       <div style={{
         display: "flex", flexDirection: "column", gap: 10,
-        borderLeft: `1px solid ${COLORS.champagne}33`,
+        borderLeft: `1px solid ${alpha(COLORS.champagne, "33")}`,
         paddingLeft: 24, position: "relative",
       }}>
         <HeroStat l="Fan CVR" v={fmtPct(op.fan_cvr)} mean={fmtPct(groupMeans?.fan_cvr)} />
@@ -517,7 +517,7 @@ function HeroCreatorImpact({ op }) {
             gap: 16,
             alignItems: "center",
             padding: "10px 0",
-            borderTop: `1px solid ${COLORS.charcoal}88`,
+            borderTop: `1px solid ${alpha(COLORS.charcoal, "88")}`,
           }}
         >
           <div style={{ fontFamily: FONTS.display, fontSize: 14, fontWeight: 500 }}>{it.creator}</div>
@@ -641,7 +641,7 @@ function StreamRow({ op, groupMeans, canExclude, onExcluded, cpAvailable = false
       gridTemplateColumns: cols,
       alignItems: "center",
       padding: "12px 22px",
-      borderBottom: `1px solid ${COLORS.charcoal}88`,
+      borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`,
       transition: "background 0.15s",
       fontSize: 13,
       overflow: "visible",
@@ -865,7 +865,7 @@ function UnderperformersKebab({ employee, onExcluded, onIgnored }) {
             style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px",
               background: "transparent", border: "none", color: COLORS.alabaster, fontSize: 13,
               fontFamily: FONTS.body, cursor: busy ? "wait" : "pointer", borderRadius: 6 }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = COLORS.champagne + "20"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = alpha(COLORS.champagne, "20"); }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
             <div style={{ fontWeight: 600, color: COLORS.champagne }}>Ignora dalla lista</div>
             <div style={{ fontSize: 11, color: COLORS.mist, marginTop: 2 }}>Resta in leaderboard, sparisce solo da qui</div>
@@ -876,7 +876,7 @@ function UnderperformersKebab({ employee, onExcluded, onIgnored }) {
               style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px",
                 background: "transparent", border: "none", color: COLORS.alabaster, fontSize: 13,
                 fontFamily: FONTS.body, cursor: busy ? "wait" : "pointer", borderRadius: 6 }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = a.color + "20"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = alpha(a.color, "20"); }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
               <div style={{ fontWeight: 600, color: a.color }}>{a.label}</div>
               <div style={{ fontSize: 11, color: COLORS.mist, marginTop: 2 }}>{a.description}</div>
@@ -899,7 +899,7 @@ function UnderperformersColumn({ language, label, flag, periodType, periodId, si
   return (
     <div style={{
       background: COLORS.graphite,
-      border: `1px solid ${COLORS.signal}40`,
+      border: `1px solid ${alpha(COLORS.signal, "40")}`,
       borderRadius: 12, padding: "14px 16px",
       display: "flex", flexDirection: "column", gap: 10,
     }}>
@@ -915,7 +915,7 @@ function UnderperformersColumn({ language, label, flag, periodType, periodId, si
         </div>
       </div>
       {!chronicityAvailable && data && (
-        <div style={{ fontSize: 10, color: COLORS.champagne, opacity: 0.8, padding: "4px 0", borderTop: `1px solid ${COLORS.charcoal}88` }}>
+        <div style={{ fontSize: 10, color: COLORS.champagne, opacity: 0.8, padding: "4px 0", borderTop: `1px solid ${alpha(COLORS.charcoal, "88")}` }}>
           ⓘ Solo periodo corrente disponibile — cronicità non calcolabile, mostro tutti i bottom score.
         </div>
       )}
@@ -934,7 +934,7 @@ function UnderperformersColumn({ language, label, flag, periodType, periodId, si
             gridTemplateColumns: "1fr auto auto 28px",
             alignItems: "center", gap: 10,
             padding: "8px 0",
-            borderTop: `1px solid ${COLORS.charcoal}88`,
+            borderTop: `1px solid ${alpha(COLORS.charcoal, "88")}`,
             fontSize: 13,
           }}>
             <div style={{ minWidth: 0 }}>
@@ -956,7 +956,7 @@ function UnderperformersColumn({ language, label, flag, periodType, periodId, si
             >
               {op.history?.length > 0 ? op.history.map((h, i) => {
                 const hColor = h.tier ? TIER_COLORS[h.tier] : COLORS.charcoal;
-                return <div key={i} title={`${h.period_id}: ${h.tier || "—"}`} style={{ width: 10, height: 10, borderRadius: 2, background: hColor + "AA", border: `1px solid ${hColor}` }} />;
+                return <div key={i} title={`${h.period_id}: ${h.tier || "—"}`} style={{ width: 10, height: 10, borderRadius: 2, background: alpha(hColor, "AA"), border: `1px solid ${hColor}` }} />;
               }) : <span style={{ fontSize: 9, color: COLORS.mist, fontStyle: "italic" }}>nuovo</span>}
             </div>
             <UnderperformersKebab employee={op.employee} onExcluded={onExcluded} onIgnored={onIgnored} />
@@ -1014,7 +1014,7 @@ function IgnoredPanel({ onChange }) {
       {open && !isEmpty && (
         <div style={{ padding: "0 14px 14px", borderTop: `1px solid ${COLORS.charcoal}` }}>
           {entries.map(([name, entry]) => (
-            <div key={name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "8px 0", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 13 }}>
+            <div key={name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "8px 0", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, fontSize: 13 }}>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <Link href={`/leaderboard/operational/${encodeURIComponent(name)}`} style={{ color: COLORS.alabaster, textDecoration: "none", fontWeight: 500 }}>{name} <span style={{ color: COLORS.champagne, opacity: 0.5, fontSize: 11 }}>›</span></Link>
                 {entry.note && <span style={{ color: COLORS.mist, fontSize: 11, marginLeft: 8, fontStyle: "italic" }}>"{entry.note}"</span>}
@@ -1024,7 +1024,7 @@ function IgnoredPanel({ onChange }) {
               </span>
               <button onClick={() => restore(name)}
                 style={{ padding: "4px 10px", background: "transparent", color: COLORS.champagne,
-                  border: `1px solid ${COLORS.champagne}66`, borderRadius: 6, cursor: "pointer", fontSize: 11 }}>
+                  border: `1px solid ${alpha(COLORS.champagne, "66")}`, borderRadius: 6, cursor: "pointer", fontSize: 11 }}>
                 ↺ Ripristina
               </button>
             </div>
@@ -1162,7 +1162,7 @@ export default function OperationalLeaderboardPage() {
     page: { minHeight: "100vh", background: COLORS.obsidian, color: COLORS.alabaster, fontFamily: FONTS.body, padding: "32px 24px" },
     container: { maxWidth: 1500, margin: "0 auto" },
     backLink: { color: COLORS.fog, fontSize: 13, textDecoration: "none", display: "inline-block", marginBottom: 14 },
-    adminLink: { color: COLORS.champagne, fontSize: 12, textDecoration: "none", marginLeft: 14, padding: "4px 10px", border: `1px solid ${COLORS.champagne}44`, borderRadius: 6 },
+    adminLink: { color: COLORS.champagne, fontSize: 12, textDecoration: "none", marginLeft: 14, padding: "4px 10px", border: `1px solid ${alpha(COLORS.champagne, "44")}`, borderRadius: 6 },
     title: { fontFamily: FONTS.display, fontSize: 32, margin: "0 0 6px 0", letterSpacing: "-0.01em", fontWeight: 500 },
     sub: { color: COLORS.fog, fontSize: 14, marginBottom: 22, maxWidth: 900, lineHeight: 1.55 },
     filterBar: { display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" },
@@ -1220,7 +1220,7 @@ export default function OperationalLeaderboardPage() {
         return canExclude ? base + " 44px" : base;
       })(),
       padding: "14px 22px",
-      background: COLORS.obsidian + "80",
+      background: alpha(COLORS.obsidian, "80"),
       color: COLORS.fog,
       fontSize: 10, letterSpacing: "0.1em",
       fontWeight: 500,
@@ -1365,7 +1365,7 @@ export default function OperationalLeaderboardPage() {
         {isLoading && !data && <p style={{ color: COLORS.fog }}>Caricamento…</p>}
         {error && <p style={{ color: COLORS.signal }}>Errore di rete: {String(error)}</p>}
         {data?.error && (
-          <div style={{ background: COLORS.signal + "20", color: COLORS.signal, padding: 16, borderRadius: 12, marginBottom: 14 }}>
+          <div style={{ background: alpha(COLORS.signal, "20"), color: COLORS.signal, padding: 16, borderRadius: 12, marginBottom: 14 }}>
             {data.error}{" "}
             <Link href="/admin/leaderboard-import" style={{ color: COLORS.champagne, marginLeft: 6 }}>
               Importa CSV →

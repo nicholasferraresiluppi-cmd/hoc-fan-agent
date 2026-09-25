@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const CATEGORIES = ["Big", "Medium", "Small"];
@@ -191,7 +191,7 @@ export default function GroupCategoriesPage() {
     },
     statCard: (color) => ({
       background: COLORS.graphite,
-      border: `1px solid ${color || COLORS.charcoal}55`,
+      border: `1px solid ${alpha(color || COLORS.charcoal, "55")}`,
       borderRadius: 12,
       padding: "14px 16px",
     }),
@@ -212,7 +212,7 @@ export default function GroupCategoriesPage() {
     },
     td: {
       padding: "10px 12px",
-      borderBottom: `1px solid ${COLORS.charcoal}88`,
+      borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`,
     },
     select: {
       padding: "6px 10px",
@@ -232,9 +232,9 @@ export default function GroupCategoriesPage() {
       fontWeight: 600,
       letterSpacing: "0.05em",
       
-      background: color + "26",
+      background: alpha(color, "26"),
       color: color,
-      border: `1px solid ${color}55`,
+      border: `1px solid ${alpha(color, "55")}`,
     }),
     actions: {
       display: "flex", gap: 10, marginTop: 18,
@@ -381,7 +381,7 @@ export default function GroupCategoriesPage() {
                         style={{
                           ...styles.select,
                           color: cur ? CATEGORY_COLORS[cur] : COLORS.fog,
-                          borderColor: cur ? CATEGORY_COLORS[cur] + "55" : COLORS.charcoal,
+                          borderColor: cur ? alpha(CATEGORY_COLORS[cur], "55") : COLORS.charcoal,
                         }}
                       >
                         <option value="">Nessuna</option>

@@ -7,7 +7,7 @@ import {
   GraduationCap, Info, CheckCircle2, X, BookOpen, ArrowRight,
   Trash2, FileText, Sparkles, ChevronDown, AlertTriangle,
 } from "lucide-react";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 import { PageHeader, SectionLabel, StatCard } from "@/components/cp-style";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 
@@ -29,13 +29,13 @@ function fmtCurrency(v) {
 }
 
 const TIER_COLORS = {
-  Critical: "#EF4444", Weak: "#F59E0B", Average: "#9CA3AF",
+  Critical: "#EF4444", Weak: "#F59E0B", Average: CP.textMuted,
   Good: "#10B981", Strong: "#3B82F6", Elite: "#A855F7",
 };
 
 const PATTERN_COLORS = {
   low_conversion: "#F59E0B",
-  uniform_low: "#9CA3AF",
+  uniform_low: CP.textMuted,
   polarized_creators: "#A855F7",
   low_volume_specialist: "#3B82F6",
   general: "#6B7280",
@@ -125,8 +125,8 @@ export default function CoachingCenterPage() {
             style={{
               display: "inline-flex", alignItems: "center", gap: 6,
               padding: "8px 14px",
-              background: `${CP.accentRed}1a`,
-              border: `1px solid ${CP.accentRed}66`,
+              background: `${alpha(CP.accentRed, "1a")}`,
+              border: `1px solid ${alpha(CP.accentRed, "66")}`,
               borderRadius: 8,
               color: CP.accentRed,
               fontSize: 12, fontWeight: 700,
@@ -189,7 +189,7 @@ export default function CoachingCenterPage() {
       {isLoading && !data && <p style={{ color: COLORS.fog }}>Caricamento candidati…</p>}
       {error && <p style={{ color: COLORS.signal }}>Errore: {String(error)}</p>}
       {data?.error && (
-        <div style={{ background: COLORS.signal + "20", color: COLORS.signal, padding: 16, borderRadius: 12 }}>
+        <div style={{ background: alpha(COLORS.signal, "20"), color: COLORS.signal, padding: 16, borderRadius: 12 }}>
           {data.error}
         </div>
       )}
@@ -236,7 +236,7 @@ function CandidateRow({ c, onAssign, onComplete, onReject, onDelete }) {
   return (
     <div style={{
       background: COLORS.graphite,
-      border: `1px solid ${isAssigned ? CP.accentRed + "55" : isCompleted ? CP.accentGreen + "55" : COLORS.charcoal}`,
+      border: `1px solid ${isAssigned ? alpha(CP.accentRed, "55") : isCompleted ? alpha(CP.accentGreen, "55") : COLORS.charcoal}`,
       borderRadius: 14,
       padding: "16px 20px",
       opacity: isRejected ? 0.5 : 1,
@@ -269,21 +269,21 @@ function CandidateRow({ c, onAssign, onComplete, onReject, onDelete }) {
           <span style={{
             display: "inline-block", padding: "3px 10px", borderRadius: 999,
             fontSize: 11, fontWeight: 600, letterSpacing: "0.04em",
-            background: patternColor + "20", color: patternColor, border: `1px solid ${patternColor}55`,
+            background: alpha(patternColor, "20"), color: patternColor, border: `1px solid ${alpha(patternColor, "55")}`,
           }}>{PATTERN_LABELS[c.pattern] || c.pattern}</span>
         </div>
 
         <div>
           <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.1em" }}>Score CP</div>
           <div style={{ fontFamily: FONTS.mono, fontSize: 22, fontWeight: 700, color: tierColor }}>{c.score.toFixed(1)}</div>
-          <span style={{ display: "inline-block", padding: "1px 7px", borderRadius: 999, fontSize: 9, fontWeight: 700, background: tierColor + "26", color: tierColor, border: `1px solid ${tierColor}55`, marginTop: 2 }}>
+          <span style={{ display: "inline-block", padding: "1px 7px", borderRadius: 999, fontSize: 9, fontWeight: 700, background: alpha(tierColor, "26"), color: tierColor, border: `1px solid ${alpha(tierColor, "55")}`, marginTop: 2 }}>
             {c.tier}
           </span>
         </div>
 
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          {isAssigned && <span style={{ padding: "4px 10px", background: CP.accentRed + "22", color: CP.accentRed, borderRadius: 999, fontSize: 11, fontWeight: 700 }}>ASSEGNATO</span>}
-          {isCompleted && <span style={{ padding: "4px 10px", background: CP.accentGreen + "22", color: CP.accentGreen, borderRadius: 999, fontSize: 11, fontWeight: 700 }}>COMPLETATO</span>}
+          {isAssigned && <span style={{ padding: "4px 10px", background: alpha(CP.accentRed, "22"), color: CP.accentRed, borderRadius: 999, fontSize: 11, fontWeight: 700 }}>ASSEGNATO</span>}
+          {isCompleted && <span style={{ padding: "4px 10px", background: alpha(CP.accentGreen, "22"), color: CP.accentGreen, borderRadius: 999, fontSize: 11, fontWeight: 700 }}>COMPLETATO</span>}
           {isRejected && <span style={{ padding: "4px 10px", background: COLORS.charcoal, color: COLORS.mist, borderRadius: 999, fontSize: 11, fontWeight: 700 }}>RIFIUTATO</span>}
           <button onClick={() => setExpanded((v) => !v)} style={chevronBtn}>
             <ChevronDown size={16} style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
@@ -302,7 +302,7 @@ function CandidateRow({ c, onAssign, onComplete, onReject, onDelete }) {
           </div>
 
           {/* Training scenario suggerito */}
-          <div style={{ padding: 14, background: COLORS.obsidian + "80", border: `1px solid ${COLORS.charcoal}`, borderRadius: 10, marginBottom: 14 }}>
+          <div style={{ padding: 14, background: alpha(COLORS.obsidian, "80"), border: `1px solid ${COLORS.charcoal}`, borderRadius: 10, marginBottom: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
               <BookOpen size={16} color={COLORS.champagne} />
               <span style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.12em", fontWeight: 600 }}>Training suggerito</span>
@@ -369,7 +369,7 @@ function CandidateRow({ c, onAssign, onComplete, onReject, onDelete }) {
 
 function DiagBlock({ label, value, sub, color }) {
   return (
-    <div style={{ padding: 12, background: COLORS.obsidian + "60", border: `1px solid ${COLORS.charcoal}`, borderRadius: 10 }}>
+    <div style={{ padding: 12, background: alpha(COLORS.obsidian, "60"), border: `1px solid ${COLORS.charcoal}`, borderRadius: 10 }}>
       <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.1em", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 14, fontWeight: 600, color: color || COLORS.alabaster, marginBottom: 2 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: COLORS.mist }}>{sub}</div>}
@@ -389,4 +389,4 @@ const inputStyle = { padding: "9px 12px", background: COLORS.obsidian, border: `
 const filterLabel = { fontSize: 11, color: COLORS.fog, letterSpacing: "0.1em", marginRight: 4, alignSelf: "center" };
 const chevronBtn = { background: "transparent", border: "none", color: COLORS.fog, cursor: "pointer", padding: 6, display: "inline-flex", alignItems: "center" };
 const pillStyle = (active, color) => ({ padding: "7px 12px", background: active ? color : COLORS.graphite, border: `1px solid ${active ? color : COLORS.charcoal}`, borderRadius: 999, color: active ? COLORS.obsidian : COLORS.alabaster, fontSize: 12, cursor: "pointer", fontWeight: active ? 700 : 500, fontFamily: FONTS.body });
-const actionBtn = (color) => ({ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", background: color + "18", border: `1px solid ${color}55`, borderRadius: 8, color, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.body });
+const actionBtn = (color) => ({ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", background: alpha(color, "18"), border: `1px solid ${alpha(color, "55")}`, borderRadius: 8, color, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.body });

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { Search, AlertTriangle, XCircle, ArrowRight, TrendingUp, TrendingDown, Filter, Loader2, X, ChevronDown, ChevronRight } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
 import CompNav from "@/components/CompNav";
 
@@ -303,7 +303,7 @@ function AnomalyRow({ a, rank, periodId }) {
           </span>
         </Td>
         <Td>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 8px", borderRadius: 4, background: dirColor + "22", color: dirColor, fontSize: 11, fontWeight: 700 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 8px", borderRadius: 4, background: alpha(dirColor, "22"), color: dirColor, fontSize: 11, fontWeight: 700 }}>
             <DirIcon size={11} /> {a.direction === "overpaid" ? "Sopra" : "Sotto"}
           </span>
           <div style={{ marginTop: 3, fontSize: 9, color: verdictColor, fontWeight: 700 }}>{a.verdict === "OUT_OF_SCALE" ? "FUORI SCALA" : "RIVEDIBILE"}</div>
@@ -380,7 +380,7 @@ function ShiftBreakdown({ creator, operator, periodId, expectedSales, expectedEa
               const fmtTime = (d) => d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
               const fmtDate = (d) => d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", weekday: "short" });
               return (
-                <tr key={s.shift_id || i} style={{ borderBottom: `1px solid ${CP.border}88`, color: CP.textPrimary }}>
+                <tr key={s.shift_id || i} style={{ borderBottom: `1px solid ${alpha(CP.border, "88")}`, color: CP.textPrimary }}>
                   <td style={{ padding: "6px 8px", fontFamily: FONTS.mono }}>{fmtDate(dt)}</td>
                   <td style={{ padding: "6px 8px", fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmtTime(dt)}–{fmtTime(dtEnd)}</td>
                   <td style={{ padding: "6px 8px", color: CP.textSecondary }}>{s.interval || "—"}</td>

@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { Loader2, AlertCircle, Scale, ArrowRight, ArrowUpDown, FlaskConical, Plus, X, RotateCcw } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
 import CompNav from "@/components/CompNav";
 import HowToRead from "@/components/HowToRead";
@@ -166,7 +166,7 @@ export default function ProfilesComparePage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 16 }}>
             <StatCard label="Creator nel mese" value={data.creators_count} />
             <StatCard label="Venduto totale" value={fmt$(data.totals.sales)} color={CP.accentGreen} />
-            <StatCard label="Pagato operatori" value={fmt$(data.totals.earn_attr)} color="#b9aef9" />
+            <StatCard label="Pagato operatori" value={fmt$(data.totals.earn_attr)} color={CP.accentSoftText} />
             <StatCard label="% costo media" value={data.totals.sales > 0 ? fmtPct(data.totals.earn_attr / data.totals.sales) : "—"} />
           </div>
 
@@ -244,7 +244,7 @@ export default function ProfilesComparePage() {
                 </div>
                 {sim && (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-                    <StatCard label="Pagato REALE (tutti)" value={fmt$(data.totals.earn_attr)} color="#b9aef9" />
+                    <StatCard label="Pagato REALE (tutti)" value={fmt$(data.totals.earn_attr)} color={CP.accentSoftText} />
                     <StatCard label="Pagato SIMULATO" value={fmt$(sim.total)} color={CP.accent} />
                     <StatCard
                       label="Δ totale"
@@ -286,7 +286,7 @@ export default function ProfilesComparePage() {
                     const simPaid = sim?.perCreator?.[c.alias];
                     const delta = simPaid != null ? simPaid - c.earn_attr : null;
                     return (
-                    <tr key={c.alias} style={{ borderBottom: `1px solid ${CP.border}55` }}>
+                    <tr key={c.alias} style={{ borderBottom: `1px solid ${alpha(CP.border, "55")}` }}>
                       <td style={{ ...td, fontWeight: 600 }}>{c.alias}</td>
                       <td style={td}>
                         {(!c.profiles || c.profiles.length === 0) && c.thresholds.length === 0 ? (
@@ -301,7 +301,7 @@ export default function ProfilesComparePage() {
                                   {p.cosellers_count != null ? `${p.cosellers_count}×` : "?"}
                                 </span>
                                 {(p.thresholds || []).map((t, i) => (
-                                  <span key={i} style={{ padding: "1px 6px", borderRadius: 4, background: colorOf(t.percentage) + "22", border: `1px solid ${colorOf(t.percentage)}55`, color: colorOf(t.percentage), fontSize: 9.5, fontWeight: 700, fontFamily: FONTS.mono, whiteSpace: "nowrap" }}>
+                                  <span key={i} style={{ padding: "1px 6px", borderRadius: 4, background: alpha(colorOf(t.percentage), "22"), border: `1px solid ${alpha(colorOf(t.percentage), "55")}`, color: colorOf(t.percentage), fontSize: 9.5, fontWeight: 700, fontFamily: FONTS.mono, whiteSpace: "nowrap" }}>
                                     {t.threshold > 0 ? `≥${fmt$(t.threshold)}` : "base"}→{fmtPct(t.percentage, 0)}
                                   </span>
                                 ))}
@@ -311,7 +311,7 @@ export default function ProfilesComparePage() {
                         ) : (
                           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                             {c.thresholds.map((t, i) => (
-                              <span key={i} style={{ padding: "2px 7px", borderRadius: 4, background: colorOf(t.percentage) + "22", border: `1px solid ${colorOf(t.percentage)}55`, color: colorOf(t.percentage), fontSize: 10, fontWeight: 700, fontFamily: FONTS.mono, whiteSpace: "nowrap" }}>
+                              <span key={i} style={{ padding: "2px 7px", borderRadius: 4, background: alpha(colorOf(t.percentage), "22"), border: `1px solid ${alpha(colorOf(t.percentage), "55")}`, color: colorOf(t.percentage), fontSize: 10, fontWeight: 700, fontFamily: FONTS.mono, whiteSpace: "nowrap" }}>
                                 {t.threshold > 0 ? `≥${fmt$(t.threshold)}` : "base"}→{fmtPct(t.percentage, 0)}
                               </span>
                             ))}
@@ -319,7 +319,7 @@ export default function ProfilesComparePage() {
                         )}
                       </td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmt$(c.sales)}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#b9aef9" }}>{fmt$(c.earn_attr)}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentSoftText }}>{fmt$(c.earn_attr)}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700 }}>{fmtPct(c.cost_pct)}</td>
                       {sim && <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accent }}>{simPaid != null ? fmt$(simPaid) : "—"}</td>}
                       {sim && (

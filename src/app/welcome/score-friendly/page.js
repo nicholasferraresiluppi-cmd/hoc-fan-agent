@@ -5,7 +5,7 @@ import {
   User, BarChart3, Trophy, Calculator, Award, Combine,
   ArrowRight, Lightbulb, AlertCircle, CheckCircle2,
 } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { SectionLabel, CpCard } from "@/components/cp-style";
 import InlineQA from "@/components/InlineQA";
 
@@ -212,13 +212,13 @@ export default function ScoreFriendlyPage() {
             { tier: "Elite",    range: "90-100", color: "#A855F7", desc: "Top 10%, performance di eccellenza" },
             { tier: "Strong",   range: "75-89",  color: "#3B82F6", desc: "Top 25%, solidi performer" },
             { tier: "Good",     range: "50-74",  color: "#10B981", desc: "Top 50%, affidabili" },
-            { tier: "Average",  range: "25-49",  color: "#9CA3AF", desc: "Top 75%, in linea con la media" },
+            { tier: "Average",  range: "25-49",  color: CP.textMuted, desc: "Top 75%, in linea con la media" },
             { tier: "Weak",     range: "10-24",  color: "#F59E0B", desc: "Top 90%, area di monitoraggio" },
             { tier: "Critical", range: "0-9",    color: "#EF4444", desc: "Bottom 10%, performance non sostenibili" },
           ].map((t) => (
-            <div key={t.tier} style={{ padding: "10px 14px", background: t.color + "10", border: `1px solid ${t.color}55`, borderRadius: 10 }}>
+            <div key={t.tier} style={{ padding: "10px 14px", background: alpha(t.color, "10"), border: `1px solid ${alpha(t.color, "55")}`, borderRadius: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                <span style={{ padding: "2px 9px", background: t.color, color: "#0a0a0a", borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: "0.04em" }}>{t.tier.toUpperCase()}</span>
+                <span style={{ padding: "2px 9px", background: t.color, color: CP.bgSunken, borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: "0.04em" }}>{t.tier.toUpperCase()}</span>
                 <span style={{ fontSize: 11, color: CP.textMuted, fontFamily: FONTS.mono }}>{t.range}</span>
               </div>
               <div style={{ fontSize: 12, color: CP.textSecondary }}>{t.desc}</div>
@@ -247,7 +247,7 @@ export default function ScoreFriendlyPage() {
           • Percentile vs Agenzia = <b>20</b><br />
           • Score sales/shift = 70% × 38 + 30% × 20 = <b>32,6</b><br />
           • Consistency 0,60 → 15% × 60 = <b>+9</b><br />
-          • <b>Score(Marco, Giulia) = 85% × 32,6 + 15% × 60 = 41,7</b> → <span style={{ color: "#9CA3AF", fontWeight: 700 }}>AVERAGE</span>
+          • <b>Score(Marco, Giulia) = 85% × 32,6 + 15% × 60 = 41,7</b> → <span style={{ color: CP.textMuted, fontWeight: 700 }}>AVERAGE</span>
         </Example>
 
         <p style={p}>
@@ -255,7 +255,7 @@ export default function ScoreFriendlyPage() {
         </p>
         <ul style={ul}>
           <li>Su Sara: <b style={{ color: "#3B82F6" }}>79,1 (Strong)</b></li>
-          <li>Su Giulia: <b style={{ color: "#9CA3AF" }}>41,7 (Average)</b></li>
+          <li>Su Giulia: <b style={{ color: CP.textMuted }}>41,7 (Average)</b></li>
         </ul>
 
         <InlineQA
@@ -340,7 +340,7 @@ function Section({ icon: Icon, color, title, badge, children }) {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
         <div style={{
           width: 40, height: 40, borderRadius: 10,
-          background: `${color}22`, border: `1px solid ${color}66`,
+          background: `${alpha(color, "22")}`, border: `1px solid ${alpha(color, "66")}`,
           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
         }}>
           <Icon size={19} color={color} strokeWidth={2} />
@@ -366,7 +366,7 @@ function Quote({ children }) {
       color: CP.textPrimary,
       fontStyle: "italic",
       fontSize: 15,
-      background: CP.accentGreen + "08",
+      background: alpha(CP.accentGreen, "08"),
       borderRadius: "0 8px 8px 0",
     }}>
       {children}
@@ -404,7 +404,7 @@ const ctaCard = (col) => ({
   display: "flex", alignItems: "center", justifyContent: "space-between",
   padding: "18px 22px",
   background: CP.surface,
-  border: `1px solid ${col}44`,
+  border: `1px solid ${alpha(col, "44")}`,
   borderRadius: 12,
   textDecoration: "none",
   color: CP.textPrimary,

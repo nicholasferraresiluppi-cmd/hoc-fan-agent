@@ -14,7 +14,7 @@
  *
  * Usano i token brand.CP per palette / brand.FONTS per tipografia.
  */
-import { CP, FONTS, creatorDotColor } from "@/lib/brand";
+import { CP, FONTS, creatorDotColor, alpha } from "@/lib/brand";
 
 export function SectionLabel({ children, color, size = 10, style }) {
   return (
@@ -39,7 +39,7 @@ export function CpCard({ children, style, accent, padding = "20px 22px", onClick
       onClick={onClick}
       style={{
         background: CP.surface,
-        border: `1px solid ${accent ? accent + "55" : CP.border}`,
+        border: `1px solid ${accent ? alpha(accent, "55") : CP.border}`,
         borderRadius: 10,
         padding,
         cursor: onClick ? "pointer" : "default",
@@ -57,7 +57,7 @@ export function StatCard({ label, value, sub, color, tooltip, accent }) {
       title={tooltip || ""}
       style={{
         background: CP.surface,
-        border: `1px solid ${accent ? accent + "55" : CP.border}`,
+        border: `1px solid ${accent ? alpha(accent, "55") : CP.border}`,
         borderRadius: 10,
         padding: "18px 22px",
         cursor: tooltip ? "help" : "default",
@@ -121,7 +121,7 @@ export function TrendPill({ value, suffix = "%", size = "md", neutralAt0 = true 
         alignItems: "center",
         gap: 4,
         padding,
-        background: color + "18",
+        background: alpha(color, "18"),
         color,
         borderRadius: 999,
         fontFamily: FONTS.mono,
@@ -221,7 +221,7 @@ export function RankedItem({ rank, dotAlias, dotColor, name, badge, cols = [], h
       <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
         <span style={{ fontWeight: 500, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
         {badge && (
-          <span style={{ padding: "2px 8px", background: CP.accentGreen + "22", color: CP.accentGreen, fontSize: 10, fontWeight: 500, borderRadius: 4, letterSpacing: "0.04em" }}>
+          <span style={{ padding: "2px 8px", background: alpha(CP.accentGreen, "22"), color: CP.accentGreen, fontSize: 10, fontWeight: 500, borderRadius: 4, letterSpacing: "0.04em" }}>
             {badge}
           </span>
         )}

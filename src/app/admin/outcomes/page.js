@@ -3,15 +3,15 @@
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { CP } from "@/lib/brand";
+import { CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const HOC_COLORS = {
-  bgDark: "#0a0d11",
-  white: "#f2f4f8",
-  gray: "#8c95a8",
-  orange: "#8b7cf6",
-  gradient: "#8b7cf6",
+  bgDark: CP.bgSunken,
+  white: CP.textPrimary,
+  gray: CP.textMuted,
+  orange: CP.accent,
+  gradient: CP.accent,
 };
 
 function currentISOWeek() {
@@ -80,7 +80,7 @@ export default function OutcomesPage() {
         type={type}
         value={form[key]}
         onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-        style={{ width: "100%", padding: "0.5rem", background: `${HOC_COLORS.white}05`, border: `1px solid ${HOC_COLORS.white}30`, borderRadius: "0.5rem", color: HOC_COLORS.white }}
+        style={{ width: "100%", padding: "0.5rem", background: `${alpha(HOC_COLORS.white, "05")}`, border: `1px solid ${alpha(HOC_COLORS.white, "30")}`, borderRadius: "0.5rem", color: HOC_COLORS.white }}
       />
     </div>
   );
@@ -103,7 +103,7 @@ export default function OutcomesPage() {
       {error && <p style={{ color: CP.accentRed }}>{error}</p>}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: "2rem", marginTop: "2rem" }}>
-        <form onSubmit={submit} style={{ background: `${HOC_COLORS.white}05`, padding: "1.5rem", borderRadius: "0.75rem" }}>
+        <form onSubmit={submit} style={{ background: `${alpha(HOC_COLORS.white, "05")}`, padding: "1.5rem", borderRadius: "0.75rem" }}>
           <h2 style={{ fontSize: "1rem", marginTop: 0 }}>Nuovo record</h2>
           {input("Operator ID (es. user_abc123 o alias)", "operatorId")}
           {input("Settimana ISO (es. 2026-W15)", "week")}
@@ -117,7 +117,7 @@ export default function OutcomesPage() {
             <textarea
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              style={{ width: "100%", minHeight: "60px", padding: "0.5rem", background: `${HOC_COLORS.white}05`, border: `1px solid ${HOC_COLORS.white}30`, borderRadius: "0.5rem", color: HOC_COLORS.white }}
+              style={{ width: "100%", minHeight: "60px", padding: "0.5rem", background: `${alpha(HOC_COLORS.white, "05")}`, border: `1px solid ${alpha(HOC_COLORS.white, "30")}`, borderRadius: "0.5rem", color: HOC_COLORS.white }}
             />
           </div>
           <button type="submit" style={{ padding: "0.6rem 1.5rem", background: HOC_COLORS.gradient, border: "none", color: HOC_COLORS.bgDark, borderRadius: "0.5rem", fontWeight: 700, cursor: "pointer" }}>
@@ -130,7 +130,7 @@ export default function OutcomesPage() {
           <h2 style={{ fontSize: "1rem" }}>Storico ({outcomes.length})</h2>
           <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
             {outcomes.map((o) => (
-              <div key={`${o.operatorId}-${o.week}`} style={{ background: `${HOC_COLORS.white}05`, padding: "0.75rem", borderRadius: "0.5rem", marginBottom: "0.5rem" }}>
+              <div key={`${o.operatorId}-${o.week}`} style={{ background: `${alpha(HOC_COLORS.white, "05")}`, padding: "0.75rem", borderRadius: "0.5rem", marginBottom: "0.5rem" }}>
                 <div style={{ fontWeight: 700 }}>{o.operatorId} — {o.week}</div>
                 <div style={{ fontSize: "0.85rem", color: HOC_COLORS.gray }}>
                   ${o.revenue} • {o.ppvCount} PPV • {o.customCount} custom • retention {o.retentionRate}% • churn {o.churnCount}

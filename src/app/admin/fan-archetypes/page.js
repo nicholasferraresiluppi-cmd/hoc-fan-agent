@@ -2,7 +2,7 @@
 
 import { FAN_ARCHETYPES } from "@/lib/fan-archetypes";
 import Link from "next/link";
-import { COLORS, CP } from "@/lib/brand";
+import { COLORS, CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const C = {
@@ -40,7 +40,7 @@ function Chips({ items, color = C.purple }) {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
       {(items || []).map((it, i) => (
-        <span key={i} style={{ padding: "0.2rem 0.5rem", background: `${color}25`, border: `1px solid ${color}60`, borderRadius: "0.3rem", color: C.white, fontSize: "0.75rem" }}>{it}</span>
+        <span key={i} style={{ padding: "0.2rem 0.5rem", background: `${alpha(color, "25")}`, border: `1px solid ${alpha(color, "60")}`, borderRadius: "0.3rem", color: C.white, fontSize: "0.75rem" }}>{it}</span>
       ))}
     </div>
   );
@@ -66,11 +66,11 @@ export default function FanArchetypesPage() {
         {FAN_ARCHETYPES.map((a) => {
           const dc = diffColor(a.difficulty);
           return (
-            <div key={a.id} style={{ background: `${C.white}05`, border: `1px solid ${C.purple}30`, borderRadius: "0.85rem", padding: "1.1rem 1.25rem" }}>
+            <div key={a.id} style={{ background: `${alpha(C.white, "05")}`, border: `1px solid ${alpha(C.purple, "30")}`, borderRadius: "0.85rem", padding: "1.1rem 1.25rem" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginBottom: "0.35rem" }}>
                 <span style={{ fontSize: "1.4rem" }}>{a.emoji}</span>
                 <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800 }}>{a.name}</h3>
-                <span style={{ marginLeft: "auto", padding: "0.15rem 0.5rem", fontSize: "0.7rem", fontWeight: 700, color: dc, background: `${dc}20`, border: `1px solid ${dc}`, borderRadius: "0.3rem" }}>
+                <span style={{ marginLeft: "auto", padding: "0.15rem 0.5rem", fontSize: "0.7rem", fontWeight: 700, color: dc, background: `${alpha(dc, "20")}`, border: `1px solid ${dc}`, borderRadius: "0.3rem" }}>
                   {diffLabel(a.difficulty)}
                 </span>
               </div>
@@ -81,7 +81,7 @@ export default function FanArchetypesPage() {
               <Section title="✅ Strategia ottimale" color={C.green}>{a.conversion_strategy}</Section>
               <Section title="⚠️ Trappole" color={C.red}>{a.avoid}</Section>
 
-              <div style={{ marginTop: "0.75rem", paddingTop: "0.5rem", borderTop: `1px solid ${C.purple}20`, display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: C.gray }}>
+              <div style={{ marginTop: "0.75rem", paddingTop: "0.5rem", borderTop: `1px solid ${alpha(C.purple, "20")}`, display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: C.gray }}>
                 <span><code>{a.id}</code></span>
                 <span>LTV: {a.typical_ltv}</span>
               </div>

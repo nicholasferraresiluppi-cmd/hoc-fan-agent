@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 import { ArrowUp, ArrowDown, Minus } from "lucide-react";
 
@@ -139,13 +139,13 @@ export default function AcademySignalsPage() {
       />
 
       {refreshErr && (
-        <div style={{ padding: "12px 16px", marginBottom: 12, background: CP.surface, border: `1px solid ${CP.accentRed}55`, borderRadius: 10, color: CP.accentRed, fontSize: 13 }}>
+        <div style={{ padding: "12px 16px", marginBottom: 12, background: CP.surface, border: `1px solid ${alpha(CP.accentRed, "55")}`, borderRadius: 10, color: CP.accentRed, fontSize: 13 }}>
           Ricalcolo fallito: {refreshErr}.
         </div>
       )}
 
       {error ? (
-        <div style={{ padding: "20px 24px", background: CP.surface, border: `1px solid ${CP.accentRed}55`, borderRadius: 12, color: CP.accentRed, fontSize: 14 }}>
+        <div style={{ padding: "20px 24px", background: CP.surface, border: `1px solid ${alpha(CP.accentRed, "55")}`, borderRadius: 12, color: CP.accentRed, fontSize: 14 }}>
           Non riesco a calcolare i signals: {error.message}.
         </div>
       ) : data?.bigquery === false ? (

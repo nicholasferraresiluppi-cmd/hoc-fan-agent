@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { COLORS, CP } from "@/lib/brand";
+import { COLORS, CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const C = {
@@ -84,20 +84,20 @@ export default function AccessPage() {
 
         {/* Whoami card */}
         {me && (
-          <div style={{ background: `${C.purple}15`, border: `1px solid ${C.purple}40`, borderRadius: "0.75rem", padding: "1rem 1.25rem", marginBottom: "1.5rem" }}>
+          <div style={{ background: `${alpha(C.purple, "15")}`, border: `1px solid ${alpha(C.purple, "40")}`, borderRadius: "0.75rem", padding: "1rem 1.25rem", marginBottom: "1.5rem" }}>
             <div style={{ color: C.purple, fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.5px", marginBottom: "0.35rem" }}>
               Il tuo account
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.75rem" }}>
               <div style={{ fontWeight: 700 }}>{me.name || me.email || "—"}</div>
               {me.admin ? (
-                <span style={{ padding: "0.2rem 0.5rem", background: `${C.green}25`, color: C.green, border: `1px solid ${C.green}`, borderRadius: "0.3rem", fontSize: "0.75rem", fontWeight: 700 }}>ADMIN</span>
+                <span style={{ padding: "0.2rem 0.5rem", background: `${alpha(C.green, "25")}`, color: C.green, border: `1px solid ${C.green}`, borderRadius: "0.3rem", fontSize: "0.75rem", fontWeight: 700 }}>ADMIN</span>
               ) : (
-                <span style={{ padding: "0.2rem 0.5rem", background: `${C.gray}25`, color: C.gray, border: `1px solid ${C.gray}`, borderRadius: "0.3rem", fontSize: "0.75rem", fontWeight: 700 }}>operatore</span>
+                <span style={{ padding: "0.2rem 0.5rem", background: `${alpha(C.gray, "25")}`, color: C.gray, border: `1px solid ${C.gray}`, borderRadius: "0.3rem", fontSize: "0.75rem", fontWeight: 700 }}>operatore</span>
               )}
               <code style={{ color: C.gray, fontSize: "0.8rem" }}>{me.userId}</code>
               {me.userId && (
-                <button onClick={() => copy(me.userId)} style={{ padding: "0.2rem 0.5rem", background: "transparent", color: C.orange, border: `1px solid ${C.orange}60`, borderRadius: "0.3rem", fontSize: "0.7rem", cursor: "pointer" }}>Copia</button>
+                <button onClick={() => copy(me.userId)} style={{ padding: "0.2rem 0.5rem", background: "transparent", color: C.orange, border: `1px solid ${alpha(C.orange, "60")}`, borderRadius: "0.3rem", fontSize: "0.7rem", cursor: "pointer" }}>Copia</button>
               )}
             </div>
           </div>
@@ -105,7 +105,7 @@ export default function AccessPage() {
 
         {/* Add */}
         {me?.admin && (
-          <div style={{ background: `${C.white}05`, border: `1px solid ${C.purple}30`, borderRadius: "0.75rem", padding: "1.25rem", marginBottom: "1.5rem" }}>
+          <div style={{ background: `${alpha(C.white, "05")}`, border: `1px solid ${alpha(C.purple, "30")}`, borderRadius: "0.75rem", padding: "1.25rem", marginBottom: "1.5rem" }}>
             <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>➕ Aggiungi admin</div>
             <div style={{ color: C.gray, fontSize: "0.8rem", marginBottom: "0.75rem" }}>Incolla una email (si auto-risolve via Clerk) oppure direttamente uno user_id.</div>
             <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -114,7 +114,7 @@ export default function AccessPage() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && add()}
                 placeholder="email@houseofcreators.com  oppure  user_xxx"
-                style={{ flex: 1, padding: "0.6rem 0.75rem", background: `${C.bgDark}`, color: C.white, border: `1px solid ${C.purple}40`, borderRadius: "0.5rem", fontSize: "0.9rem" }}
+                style={{ flex: 1, padding: "0.6rem 0.75rem", background: `${C.bgDark}`, color: C.white, border: `1px solid ${alpha(C.purple, "40")}`, borderRadius: "0.5rem", fontSize: "0.9rem" }}
               />
               <button onClick={add} style={{ padding: "0.6rem 1.25rem", background: C.green, color: C.white, border: "none", borderRadius: "0.5rem", fontWeight: 700, cursor: "pointer" }}>
                 Aggiungi
@@ -124,7 +124,7 @@ export default function AccessPage() {
         )}
 
         {msg && (
-          <div style={{ padding: "0.75rem 1rem", marginBottom: "1rem", background: msg.type === "error" ? `${C.red}15` : msg.type === "warning" ? `${C.yellow}15` : `${C.green}15`, border: `1px solid ${msg.type === "error" ? C.red : msg.type === "warning" ? C.yellow : C.green}`, borderRadius: "0.5rem", color: msg.type === "error" ? C.red : msg.type === "warning" ? C.yellow : C.green, fontSize: "0.9rem" }}>
+          <div style={{ padding: "0.75rem 1rem", marginBottom: "1rem", background: msg.type === "error" ? `${alpha(C.red, "15")}` : msg.type === "warning" ? `${alpha(C.yellow, "15")}` : `${alpha(C.green, "15")}`, border: `1px solid ${msg.type === "error" ? C.red : msg.type === "warning" ? C.yellow : C.green}`, borderRadius: "0.5rem", color: msg.type === "error" ? C.red : msg.type === "warning" ? C.yellow : C.green, fontSize: "0.9rem" }}>
             {msg.text}
           </div>
         )}
@@ -132,18 +132,18 @@ export default function AccessPage() {
         {loading && <div style={{ color: C.gray }}>Caricamento...</div>}
 
         {!loading && !me?.admin && (
-          <div style={{ padding: "1.5rem", background: `${C.yellow}15`, border: `1px solid ${C.yellow}`, borderRadius: "0.75rem", color: C.yellow }}>
+          <div style={{ padding: "1.5rem", background: `${alpha(C.yellow, "15")}`, border: `1px solid ${C.yellow}`, borderRadius: "0.75rem", color: C.yellow }}>
             Non sei admin. Per bootstrapparti la prima volta, aggiungi il tuo userId <code>{me?.userId}</code> in <strong>Vercel → Settings → Env Vars → HOC_ADMIN_USER_IDS</strong> e rifa deploy. Dopo, tutto si gestisce qui.
           </div>
         )}
 
         {!loading && me?.admin && admins.length > 0 && (
-          <div style={{ background: `${C.white}05`, border: `1px solid ${C.purple}30`, borderRadius: "0.75rem", overflow: "hidden" }}>
-            <div style={{ padding: "0.85rem 1.25rem", borderBottom: `1px solid ${C.purple}30`, fontWeight: 700, fontSize: "0.9rem", color: C.gray, letterSpacing: "0.5px" }}>
+          <div style={{ background: `${alpha(C.white, "05")}`, border: `1px solid ${alpha(C.purple, "30")}`, borderRadius: "0.75rem", overflow: "hidden" }}>
+            <div style={{ padding: "0.85rem 1.25rem", borderBottom: `1px solid ${alpha(C.purple, "30")}`, fontWeight: 700, fontSize: "0.9rem", color: C.gray, letterSpacing: "0.5px" }}>
               Admin attivi ({admins.length})
             </div>
             {admins.map((a) => (
-              <div key={a.userId} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.75rem", padding: "0.85rem 1.25rem", borderTop: `1px solid ${C.purple}20` }}>
+              <div key={a.userId} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.75rem", padding: "0.85rem 1.25rem", borderTop: `1px solid ${alpha(C.purple, "20")}` }}>
                 <div style={{ flex: "1 1 220px" }}>
                   <div style={{ fontWeight: 700 }}>{a.name || a.email || a.userId}</div>
                   <code style={{ color: C.gray, fontSize: "0.75rem" }}>{a.userId}</code>
@@ -152,7 +152,7 @@ export default function AccessPage() {
                   {(a.sources || []).map((s) => {
                     const cfg = SOURCE_LABEL[s] || { label: s, color: C.gray };
                     return (
-                      <span key={s} title={cfg.desc} style={{ padding: "0.15rem 0.45rem", fontSize: "0.65rem", fontWeight: 700, color: cfg.color, background: `${cfg.color}15`, border: `1px solid ${cfg.color}50`, borderRadius: "0.3rem" }}>
+                      <span key={s} title={cfg.desc} style={{ padding: "0.15rem 0.45rem", fontSize: "0.65rem", fontWeight: 700, color: cfg.color, background: `${alpha(cfg.color, "15")}`, border: `1px solid ${alpha(cfg.color, "50")}`, borderRadius: "0.3rem" }}>
                         {cfg.label}
                       </span>
                     );
@@ -161,7 +161,7 @@ export default function AccessPage() {
                 <button
                   onClick={() => remove(a.userId)}
                   disabled={a.sources?.includes("env") && a.sources.length === 1}
-                  style={{ padding: "0.35rem 0.75rem", background: "transparent", color: C.red, border: `1px solid ${C.red}60`, borderRadius: "0.4rem", fontSize: "0.8rem", cursor: "pointer", opacity: a.sources?.includes("env") && a.sources.length === 1 ? 0.4 : 1 }}
+                  style={{ padding: "0.35rem 0.75rem", background: "transparent", color: C.red, border: `1px solid ${alpha(C.red, "60")}`, borderRadius: "0.4rem", fontSize: "0.8rem", cursor: "pointer", opacity: a.sources?.includes("env") && a.sources.length === 1 ? 0.4 : 1 }}
                 >
                   Rimuovi
                 </button>
@@ -170,7 +170,7 @@ export default function AccessPage() {
           </div>
         )}
 
-        <div style={{ marginTop: "2rem", padding: "1rem", background: `${C.white}03`, borderRadius: "0.5rem", color: C.gray, fontSize: "0.8rem", lineHeight: 1.6 }}>
+        <div style={{ marginTop: "2rem", padding: "1rem", background: `${alpha(C.white, "03")}`, borderRadius: "0.5rem", color: C.gray, fontSize: "0.8rem", lineHeight: 1.6 }}>
           <strong style={{ color: C.white }}>💡 Come funziona:</strong>
           <br />• Un utente è admin se compare in <code>HOC_ADMIN_USER_IDS</code> (env), nel set <code>admins:set</code> (KV gestito qui), o ha <code>publicMetadata.role = "admin"</code> su Clerk.
           <br />• La via più comoda è aggiungerli qui via email — nessun redeploy necessario.

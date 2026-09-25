@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import PlayerCard from "@/components/PlayerCard";
-import { COLORS, CP } from "@/lib/brand";
+import { COLORS, CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const C = {
@@ -49,15 +49,15 @@ function MiniRadar({ skills, size = 56, color = C.orange }) {
   if (!hasData) {
     return (
       <svg width={size} height={size} style={{ display: "block" }}>
-        <polygon points={outer.map((p) => p.join(",")).join(" ")} fill="none" stroke={`${C.gray}40`} strokeWidth="1" />
+        <polygon points={outer.map((p) => p.join(",")).join(" ")} fill="none" stroke={`${alpha(C.gray, "40")}`} strokeWidth="1" />
       </svg>
     );
   }
   return (
     <svg width={size} height={size} style={{ display: "block" }}>
-      <polygon points={outer.map((p) => p.join(",")).join(" ")} fill="none" stroke={`${color}30`} strokeWidth="1" />
-      <polygon points={hex(r * 0.5).map((p) => p.join(",")).join(" ")} fill="none" stroke={`${color}20`} strokeWidth="1" />
-      <polygon points={data.map((p) => p.join(",")).join(" ")} fill={`${color}50`} stroke={color} strokeWidth="1.25" strokeLinejoin="round" />
+      <polygon points={outer.map((p) => p.join(",")).join(" ")} fill="none" stroke={`${alpha(color, "30")}`} strokeWidth="1" />
+      <polygon points={hex(r * 0.5).map((p) => p.join(",")).join(" ")} fill="none" stroke={`${alpha(color, "20")}`} strokeWidth="1" />
+      <polygon points={data.map((p) => p.join(",")).join(" ")} fill={`${alpha(color, "50")}`} stroke={color} strokeWidth="1.25" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -81,10 +81,10 @@ function Sparkline({ data, width = 100, height = 24, color = C.orange }) {
 }
 
 function skillColor(v) {
-  if (v === null || v === undefined) return `${C.gray}20`;
-  if (v >= 75) return `${C.green}40`;
-  if (v >= 60) return `${C.yellow}40`;
-  return `${C.red}40`;
+  if (v === null || v === undefined) return `${alpha(C.gray, "20")}`;
+  if (v >= 75) return `${alpha(C.green, "40")}`;
+  if (v >= 60) return `${alpha(C.yellow, "40")}`;
+  return `${alpha(C.red, "40")}`;
 }
 
 export default function SMDashboard() {
@@ -149,7 +149,7 @@ export default function SMDashboard() {
       {alerts.length > 0 && (
         <div
           style={{
-            background: `${C.red}10`,
+            background: `${alpha(C.red, "10")}`,
             border: `1px solid ${C.red}`,
             borderRadius: "0.75rem",
             padding: "1rem 1.25rem",
@@ -184,19 +184,19 @@ export default function SMDashboard() {
       {/* Operators table */}
       <div
         style={{
-          background: `${C.white}05`,
-          border: `1px solid ${C.purple}30`,
+          background: `${alpha(C.white, "05")}`,
+          border: `1px solid ${alpha(C.purple, "30")}`,
           borderRadius: "0.75rem",
           overflow: "hidden",
           marginBottom: "1.5rem",
         }}
       >
-        <div style={{ padding: "1rem 1.25rem", borderBottom: `1px solid ${C.purple}30` }}>
+        <div style={{ padding: "1rem 1.25rem", borderBottom: `1px solid ${alpha(C.purple, "30")}` }}>
           <h3 style={{ margin: 0, fontSize: "1rem" }}>Operatori</h3>
         </div>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
           <thead>
-            <tr style={{ background: `${C.white}08`, textAlign: "left" }}>
+            <tr style={{ background: `${alpha(C.white, "08")}`, textAlign: "left" }}>
               <th style={{ padding: "0.6rem 1.25rem" }}>Nome</th>
               <th style={{ padding: "0.6rem", textAlign: "center" }}>Rombo</th>
               <th style={{ padding: "0.6rem" }}>Sess.</th>
@@ -214,7 +214,7 @@ export default function SMDashboard() {
           </thead>
           <tbody>
             {operators.map((op) => (
-              <tr key={op.userId} onClick={() => setCardOp(op)} style={{ borderTop: `1px solid ${C.purple}20`, cursor: "pointer" }} title="Click per vedere la card FIFA-style">
+              <tr key={op.userId} onClick={() => setCardOp(op)} style={{ borderTop: `1px solid ${alpha(C.purple, "20")}`, cursor: "pointer" }} title="Click per vedere la card FIFA-style">
                 <td style={{ padding: "0.6rem 1.25rem", fontWeight: 700 }}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
                     {op.name}
@@ -226,7 +226,7 @@ export default function SMDashboard() {
                           fontWeight: 800,
                           padding: "0.1rem 0.4rem",
                           borderRadius: "999px",
-                          background: `${COLORS.champagne}22`,
+                          background: `${alpha(COLORS.champagne, "22")}`,
                           border: `1px solid ${COLORS.champagne}`,
                           color: COLORS.champagne,
                           letterSpacing: "0.03em",
@@ -243,7 +243,7 @@ export default function SMDashboard() {
                           fontWeight: 800,
                           padding: "0.1rem 0.4rem",
                           borderRadius: "999px",
-                          background: `${COLORS.champagneDeep}22`,
+                          background: `${alpha(COLORS.champagneDeep, "22")}`,
                           border: `1px solid ${COLORS.champagneDeep}`,
                           color: COLORS.champagneDeep,
                         }}
@@ -259,7 +259,7 @@ export default function SMDashboard() {
                           fontWeight: 800,
                           padding: "0.1rem 0.4rem",
                           borderRadius: "999px",
-                          background: `${COLORS.cobalt}22`,
+                          background: `${alpha(COLORS.cobalt, "22")}`,
                           border: `1px solid ${COLORS.cobalt}`,
                           color: COLORS.cobalt,
                         }}
@@ -320,13 +320,13 @@ export default function SMDashboard() {
       {heatmap.length > 0 && (
         <div
           style={{
-            background: `${C.white}05`,
-            border: `1px solid ${C.purple}30`,
+            background: `${alpha(C.white, "05")}`,
+            border: `1px solid ${alpha(C.purple, "30")}`,
             borderRadius: "0.75rem",
             overflow: "hidden",
           }}
         >
-          <div style={{ padding: "1rem 1.25rem", borderBottom: `1px solid ${C.purple}30` }}>
+          <div style={{ padding: "1rem 1.25rem", borderBottom: `1px solid ${alpha(C.purple, "30")}` }}>
             <h3 style={{ margin: 0, fontSize: "1rem" }}>Heatmap skill × creator</h3>
             <p style={{ margin: "0.25rem 0 0 0", color: C.gray, fontSize: "0.8rem" }}>
               Dove la cohort è più debole — individua training mirato per creator.
@@ -334,7 +334,7 @@ export default function SMDashboard() {
           </div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
             <thead>
-              <tr style={{ background: `${C.white}08`, textAlign: "left" }}>
+              <tr style={{ background: `${alpha(C.white, "08")}`, textAlign: "left" }}>
                 <th style={{ padding: "0.6rem 1.25rem" }}>Creator</th>
                 <th style={{ padding: "0.6rem" }}>Sess.</th>
                 {SKILLS.map((s) => (
@@ -344,7 +344,7 @@ export default function SMDashboard() {
             </thead>
             <tbody>
               {heatmap.map((h) => (
-                <tr key={h.creatorId} style={{ borderTop: `1px solid ${C.purple}20` }}>
+                <tr key={h.creatorId} style={{ borderTop: `1px solid ${alpha(C.purple, "20")}` }}>
                   <td style={{ padding: "0.6rem 1.25rem", fontWeight: 700 }}>{h.creatorName}</td>
                   <td style={{ padding: "0.6rem", color: C.gray }}>{h.totalSessions}</td>
                   {SKILLS.map((s) => (
@@ -392,7 +392,7 @@ export default function SMDashboard() {
             <div onClick={(e) => e.stopPropagation()} style={{ position: "relative" }}>
               <button onClick={() => setCardOp(null)} style={{
                 position: "absolute", top: -38, right: 0,
-                background: "transparent", border: `1px solid ${C.white}40`, color: C.white,
+                background: "transparent", border: `1px solid ${alpha(C.white, "40")}`, color: C.white,
                 borderRadius: 8, padding: "0.25rem 0.6rem", cursor: "pointer", fontSize: "0.8rem",
               }}>Chiudi ✕</button>
               <PlayerCard

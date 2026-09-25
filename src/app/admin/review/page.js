@@ -3,15 +3,15 @@
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { CP } from "@/lib/brand";
+import { CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const HOC_COLORS = {
-  bgDark: "#0a0d11",
-  white: "#f2f4f8",
-  gray: "#8c95a8",
-  orange: "#8b7cf6",
-  gradient: "#8b7cf6",
+  bgDark: CP.bgSunken,
+  white: CP.textPrimary,
+  gray: CP.textMuted,
+  orange: CP.accent,
+  gradient: CP.accent,
 };
 
 export default function ReviewPage() {
@@ -97,8 +97,8 @@ export default function ReviewPage() {
               key={`${it.timestamp}-${it.userId}`}
               onClick={() => setSelected(it)}
               style={{
-                background: selected?.timestamp === it.timestamp ? `${HOC_COLORS.orange}20` : `${HOC_COLORS.white}08`,
-                border: `1px solid ${it.reviewed ? CP.accentGreen + "55" : HOC_COLORS.white + "20"}`,
+                background: selected?.timestamp === it.timestamp ? `${alpha(HOC_COLORS.orange, "20")}` : `${alpha(HOC_COLORS.white, "08")}`,
+                border: `1px solid ${it.reviewed ? alpha(CP.accentGreen, "55") : alpha(HOC_COLORS.white, "20")}`,
                 borderRadius: "0.5rem",
                 padding: "0.75rem",
                 marginBottom: "0.5rem",
@@ -122,7 +122,7 @@ export default function ReviewPage() {
           {!selected && <p style={{ color: HOC_COLORS.gray }}>Seleziona un feedback a sinistra.</p>}
           {selected && (
             <div>
-              <div style={{ background: `${HOC_COLORS.white}05`, padding: "1rem", borderRadius: "0.5rem", marginBottom: "1rem" }}>
+              <div style={{ background: `${alpha(HOC_COLORS.white, "05")}`, padding: "1rem", borderRadius: "0.5rem", marginBottom: "1rem" }}>
                 <p><strong>Scenario:</strong> {selected.scenarioId}</p>
                 <p><strong>Rating operatore:</strong> {selected.rating}</p>
                 <p><strong>Commento:</strong> {selected.comment || "—"}</p>
@@ -132,7 +132,7 @@ export default function ReviewPage() {
               </div>
 
               <h3 style={{ fontSize: "0.95rem" }}>Messaggi</h3>
-              <div style={{ background: `${HOC_COLORS.white}05`, padding: "0.75rem", borderRadius: "0.5rem", marginBottom: "1rem", maxHeight: "300px", overflowY: "auto" }}>
+              <div style={{ background: `${alpha(HOC_COLORS.white, "05")}`, padding: "0.75rem", borderRadius: "0.5rem", marginBottom: "1rem", maxHeight: "300px", overflowY: "auto" }}>
                 {(selected.messages || []).map((m, i) => (
                   <div key={i} style={{ marginBottom: "0.5rem" }}>
                     <strong style={{ color: m.role === "operator" ? HOC_COLORS.orange : CP.accentSoftText }}>
@@ -147,14 +147,14 @@ export default function ReviewPage() {
               <textarea
                 value={smComment}
                 onChange={(e) => setSmComment(e.target.value)}
-                style={{ width: "100%", minHeight: "80px", padding: "0.5rem", background: `${HOC_COLORS.white}05`, border: `1px solid ${HOC_COLORS.white}30`, borderRadius: "0.5rem", color: HOC_COLORS.white, marginBottom: "0.75rem" }}
+                style={{ width: "100%", minHeight: "80px", padding: "0.5rem", background: `${alpha(HOC_COLORS.white, "05")}`, border: `1px solid ${alpha(HOC_COLORS.white, "30")}`, borderRadius: "0.5rem", color: HOC_COLORS.white, marginBottom: "0.75rem" }}
               />
 
               <label style={{ fontSize: "0.9rem" }}>Promuovi ad esempio:</label>
               <select
                 value={outcome}
                 onChange={(e) => setOutcome(e.target.value)}
-                style={{ display: "block", width: "100%", padding: "0.5rem", background: `${HOC_COLORS.white}05`, border: `1px solid ${HOC_COLORS.white}30`, borderRadius: "0.5rem", color: HOC_COLORS.white, marginBottom: "1rem" }}
+                style={{ display: "block", width: "100%", padding: "0.5rem", background: `${alpha(HOC_COLORS.white, "05")}`, border: `1px solid ${alpha(HOC_COLORS.white, "30")}`, borderRadius: "0.5rem", color: HOC_COLORS.white, marginBottom: "1rem" }}
               >
                 <option value="">— nessuno —</option>
                 <option value="success">Golden success</option>

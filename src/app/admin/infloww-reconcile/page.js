@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { Loader2, AlertCircle, ArrowRight, ShieldCheck, RefreshCw } from "lucide-react";
-import { CP, FONTS, creatorDotColor } from "@/lib/brand";
+import { CP, FONTS, creatorDotColor, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, StatCard, SectionLabel } from "@/components/cp-style";
 import HowToRead from "@/components/HowToRead";
 
@@ -53,7 +53,7 @@ function health(row) {
   const ratio = row.ratio_cp_over_gross;
   if (ratio == null) return { label: "n/d", color: CP.textMuted, bg: "transparent" };
   if (row.cp_sales === 0 && (row.cp_shifts || 0) > 0) {
-    return { label: "vendite non attribuite", color: CP.accentRed, bg: CP.accentRed + "18", tip: `Esiste in CP (${row.cp_shifts} turni) ma nessuna vendita è registrata a suo nome: takes non registrati.` };
+    return { label: "vendite non attribuite", color: CP.accentRed, bg: alpha(CP.accentRed, "18"), tip: `Esiste in CP (${row.cp_shifts} turni) ma nessuna vendita è registrata a suo nome: takes non registrati.` };
   }
   // Buco INVERSO: l'analytics CP vede nettamente più di Infloww → l'"Incasso
   // reale" della riga è probabilmente sottostimato, quindi anche un rapporto
@@ -62,9 +62,9 @@ function health(row) {
     return { label: "Infloww incompleto?", color: "#F59E0B", bg: "#F59E0B18", tip: "L'analytics CP vede molto più di Infloww su questo account: l'incasso reale mostrato è probabilmente sottostimato (account scollegato da Infloww o ritardo di sync). Da verificare prima di fidarsi del rapporto." };
   }
   if (ratio > 1.15) return { label: "anomalo", color: "#F59E0B", bg: "#F59E0B18" };
-  if (ratio >= 0.9) return { label: "ok", color: CP.accentGreen, bg: CP.accentGreen + "18" };
+  if (ratio >= 0.9) return { label: "ok", color: CP.accentGreen, bg: alpha(CP.accentGreen, "18") };
   if (ratio >= 0.75) return { label: "da controllare", color: "#F59E0B", bg: "#F59E0B18" };
-  return { label: "probabile buco", color: CP.accentRed, bg: CP.accentRed + "18" };
+  return { label: "probabile buco", color: CP.accentRed, bg: alpha(CP.accentRed, "18") };
 }
 
 export default function InflowwReconcilePage() {
@@ -322,9 +322,9 @@ export default function InflowwReconcilePage() {
                 </thead>
                 <tbody>
                   {noCp.map((u) => (
-                    <tr key={u.id} style={{ borderBottom: `1px solid ${CP.border}55`, background: CP.accentRed + "08" }}>
+                    <tr key={u.id} style={{ borderBottom: `1px solid ${alpha(CP.border, "55")}`, background: alpha(CP.accentRed, "08") }}>
                       <td style={td}>
-                        <span style={{ display: "inline-block", padding: "3px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 600, color: CP.accentRed, background: CP.accentRed + "18", whiteSpace: "nowrap" }}
+                        <span style={{ display: "inline-block", padding: "3px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 600, color: CP.accentRed, background: alpha(CP.accentRed, "18"), whiteSpace: "nowrap" }}
                           title="Nel MODULO TURNI/BUSTE di CP questo mese non ha né turni né vendite. Come talent può comunque esistere in CP (Social Analytics). Se sai il suo alias turni, collegala dal riquadro 'non abbinati'.">
                           senza turni in CP
                         </span>
@@ -358,7 +358,7 @@ export default function InflowwReconcilePage() {
                     const missing = Math.max(0, mm.gap_gross);
                     const isBad = mm.ratio_cp_over_gross != null && mm.ratio_cp_over_gross < 0.9;
                     return (
-                      <tr key={mm.infloww_id} style={{ borderBottom: `1px solid ${CP.border}55` }}>
+                      <tr key={mm.infloww_id} style={{ borderBottom: `1px solid ${alpha(CP.border, "55")}` }}>
                         <td style={td}>
                           <span style={{ display: "inline-block", padding: "3px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 600, color: h.color, background: h.bg, whiteSpace: "nowrap" }} title={h.tip || ""}>
                             {h.label}

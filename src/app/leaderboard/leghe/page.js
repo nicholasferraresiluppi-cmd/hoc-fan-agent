@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel } from "@/components/cp-style";
 
 const TIER_ORDER = ["diamond", "platinum", "gold", "silver", "bronze"];
@@ -82,7 +82,7 @@ export default function LeaguesPage() {
                     {entries.map((e) => {
                       const isMe = e.userId === data.me;
                       return (
-                        <tr key={e.userId} style={{ background: isMe ? `${meta.color}25` : "transparent", borderBottom: `1px solid ${CP.border}` }}>
+                        <tr key={e.userId} style={{ background: isMe ? `${alpha(meta.color, "25")}` : "transparent", borderBottom: `1px solid ${CP.border}` }}>
                           <td style={{ ...td, color: CP.textMuted, fontFamily: FONTS.mono }}>{e.rank ?? "—"}</td>
                           <td style={{ ...td, fontWeight: isMe ? 700 : 500 }}>
                             {e.name}

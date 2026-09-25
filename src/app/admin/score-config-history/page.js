@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { History, AlertTriangle, CheckCircle2, GitCompare, Sliders } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, PillTab } from "@/components/cp-style";
 
 /**
@@ -158,7 +158,7 @@ export default function ScoreConfigHistoryPage() {
                   </span>
 
                   {snap.drift_vs_prev ? (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: CP.accentBlue, background: CP.accentBlue + "18", borderRadius: 999, padding: "3px 10px" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: CP.accentBlue, background: alpha(CP.accentBlue, "18"), borderRadius: 999, padding: "3px 10px" }}>
                       <GitCompare size={13} /> formula cambiata vs {snap.prev_period_id}
                     </span>
                   ) : (
@@ -166,7 +166,7 @@ export default function ScoreConfigHistoryPage() {
                   )}
 
                   {isActive && (
-                    <span style={{ fontSize: 12, fontWeight: 600, color: CP.accentGreen, background: CP.accentGreen + "18", borderRadius: 999, padding: "3px 10px" }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: CP.accentGreen, background: alpha(CP.accentGreen, "18"), borderRadius: 999, padding: "3px 10px" }}>
                       = formula attiva
                     </span>
                   )}

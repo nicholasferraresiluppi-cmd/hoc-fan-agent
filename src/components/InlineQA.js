@@ -17,7 +17,7 @@
  */
 import { useState } from "react";
 import { HelpCircle, ChevronDown, ChevronUp, Sparkles, Loader2 } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 
 export default function InlineQA({ sectionId, presets = [] }) {
   const [open, setOpen] = useState(false);
@@ -147,7 +147,7 @@ const triggerBtn = (open) => ({
   display: "flex", alignItems: "center", gap: 8,
   width: "100%", padding: "10px 14px",
   background: open ? CP.surface : CP.surface,
-  border: `1px solid ${open ? CP.accentGreen + "55" : CP.border}`,
+  border: `1px solid ${open ? alpha(CP.accentGreen, "55") : CP.border}`,
   borderRadius: 10,
   color: CP.textSecondary, fontSize: 13, fontFamily: FONTS.body,
   cursor: "pointer", transition: "border-color 0.15s",
@@ -172,8 +172,8 @@ const qBubble = {
 };
 const aBubble = {
   padding: "10px 12px",
-  background: CP.accentGreen + "10",
-  border: `1px solid ${CP.accentGreen}33`,
+  background: alpha(CP.accentGreen, "10"),
+  border: `1px solid ${alpha(CP.accentGreen, "33")}`,
   borderRadius: 8,
   fontSize: 13,
   color: CP.textPrimary,
@@ -222,8 +222,8 @@ const submitBtn = (disabled) => ({
 const errorBox = {
   marginTop: 10,
   padding: "10px 12px",
-  background: CP.accentRed + "15",
-  border: `1px solid ${CP.accentRed}55`,
+  background: alpha(CP.accentRed, "15"),
+  border: `1px solid ${alpha(CP.accentRed, "55")}`,
   borderRadius: 8,
   fontSize: 12,
   color: CP.accentRed,

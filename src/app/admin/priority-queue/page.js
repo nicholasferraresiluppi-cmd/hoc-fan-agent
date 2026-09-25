@@ -10,7 +10,7 @@
  */
 import { useEffect, useState, useCallback } from "react";
 import { Loader2, AlertCircle, Copy, Check, Clock, Snowflake } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel } from "@/components/cp-style";
 
 const usd = (v) => (v == null ? "—" : "$ " + Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 }));
@@ -180,7 +180,7 @@ export default function PriorityQueuePage() {
                             title="Copia lo username per la ricerca Infloww"
                             style={{
                               display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 7, cursor: "pointer",
-                              background: copied === r.username ? CP.accentGreen + "22" : CP.surfaceAlt,
+                              background: copied === r.username ? alpha(CP.accentGreen, "22") : CP.surfaceAlt,
                               color: copied === r.username ? CP.accentGreen : CP.textSecondary,
                               border: `1px solid ${CP.border}`, fontSize: 11.5, fontWeight: 600, fontFamily: FONTS.body,
                             }}

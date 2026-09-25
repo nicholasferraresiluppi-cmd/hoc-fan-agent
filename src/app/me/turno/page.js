@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import useSWR from "swr";
 import { Copy, Check, Clock, Snowflake, HelpCircle, Compass } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel } from "@/components/cp-style";
 import SignalsStrip from "@/components/SignalsStrip";
 
@@ -63,10 +63,10 @@ function FanCard({ row, copied, onCopy }) {
         <p style={{ margin: 0, fontSize: 13.5, color: CP.textPrimary, fontWeight: 600 }}>→ {row.play.mossa}</p>
         {row.play.angolo ? <p style={{ margin: "5px 0 0", fontSize: 12.5, color: CP.textSecondary, lineHeight: 1.5 }}>{row.play.angolo}</p> : null}
         {row.play.offerta ? (
-          <p style={{ margin: "7px 0 0", fontSize: 12.5, color: CP.accentSoftText, fontFamily: FONTS.mono, display: "inline-block", background: CP.accentSoft, border: `1px solid ${CP.accent}44`, borderRadius: 7, padding: "3px 9px" }}>{row.play.offerta}</p>
+          <p style={{ margin: "7px 0 0", fontSize: 12.5, color: CP.accentSoftText, fontFamily: FONTS.mono, display: "inline-block", background: CP.accentSoft, border: `1px solid ${alpha(CP.accent, "44")}`, borderRadius: 7, padding: "3px 9px" }}>{row.play.offerta}</p>
         ) : null}
         {row.play.freno ? (
-          <p style={{ margin: "7px 0 0", fontSize: 12, color: CP.accentRed, background: "rgba(240,140,140,.09)", border: `1px solid ${CP.accentRed}33`, borderRadius: 7, padding: "5px 9px", fontWeight: 500 }}>Freno · {row.play.freno}</p>
+          <p style={{ margin: "7px 0 0", fontSize: 12, color: CP.accentRed, background: "rgba(240,140,140,.09)", border: `1px solid ${alpha(CP.accentRed, "33")}`, borderRadius: 7, padding: "5px 9px", fontWeight: 500 }}>Freno · {row.play.freno}</p>
         ) : null}
         <p style={{ margin: "6px 0 0", fontSize: 11.5, color: CP.textMuted }}>perché: {row.play.perche}</p>
       </div>

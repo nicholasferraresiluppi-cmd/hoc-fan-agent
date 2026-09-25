@@ -3,7 +3,7 @@
 import { use, useMemo, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, alpha } from "@/lib/brand";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -78,8 +78,8 @@ export default function HeatmapPage({ searchParams }) {
     table: { borderCollapse: "collapse", fontSize: 11 },
     th: { padding: "10px 6px", color: COLORS.fog, fontSize: 9, letterSpacing: "0.06em", borderBottom: `1px solid ${COLORS.steel}`, fontWeight: 600, whiteSpace: "nowrap", verticalAlign: "bottom" },
     thRot: { padding: "10px 4px", color: COLORS.fog, fontSize: 9, borderBottom: `1px solid ${COLORS.steel}`, fontWeight: 600, height: 120, textAlign: "left" },
-    td: { padding: "4px 6px", borderBottom: `1px solid ${COLORS.charcoal}88`, textAlign: "center" },
-    tdName: { padding: "6px 12px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontFamily: FONTS.display, fontSize: 12, fontWeight: 500, position: "sticky", left: 0, background: COLORS.obsidian, zIndex: 1 },
+    td: { padding: "4px 6px", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, textAlign: "center" },
+    tdName: { padding: "6px 12px", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, fontFamily: FONTS.display, fontSize: 12, fontWeight: 500, position: "sticky", left: 0, background: COLORS.obsidian, zIndex: 1 },
   };
 
   return (
@@ -94,7 +94,7 @@ export default function HeatmapPage({ searchParams }) {
         </p>
 
         {!data && <p style={{ color: COLORS.fog }}>Caricamento creator…</p>}
-        {data?.error && <div style={{ background: COLORS.signal + "20", color: COLORS.signal, padding: 16, borderRadius: 12 }}>{data.error}</div>}
+        {data?.error && <div style={{ background: alpha(COLORS.signal, "20"), color: COLORS.signal, padding: 16, borderRadius: 12 }}>{data.error}</div>}
         {data && !data.error && (
           <>
             {allDrills.isLoading && <p style={{ color: COLORS.fog, marginTop: 14 }}>Caricamento matrice (top {topCreators.length} creator)…</p>}

@@ -15,7 +15,7 @@ import {
   Signpost, Bell, ListTree, Inbox, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket,
   HandCoins, MessageCircle,
 } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { SectionLabel, CpCard, StatCard } from "@/components/cp-style";
 
 // Tollera 4xx/5xx: ritorna null invece di throware (stat cards mostrano "—")
@@ -198,12 +198,12 @@ export default function AdminHub() {
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {me?.admin && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", background: CP.accentGreen + "18", color: CP.accentGreen, borderRadius: 999, fontSize: 12, fontWeight: 600 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", background: alpha(CP.accentGreen, "18"), color: CP.accentGreen, borderRadius: 999, fontSize: 12, fontWeight: 600 }}>
               <CheckCircle2 size={14} /> Admin
             </span>
           )}
           {notAdmin && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", background: CP.accentRed + "18", color: CP.accentRed, borderRadius: 999, fontSize: 12, fontWeight: 600 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", background: alpha(CP.accentRed, "18"), color: CP.accentRed, borderRadius: 999, fontSize: 12, fontWeight: 600 }}>
               <AlertCircle size={14} /> Non admin — accesso limitato
             </span>
           )}
@@ -240,7 +240,7 @@ export default function AdminHub() {
       {opsAlerts !== null && (
         <div style={{
           marginBottom: 18, background: CP.surface,
-          border: `1px solid ${opsCrit.length > 0 ? CP.accentRed + "55" : CP.border}`,
+          border: `1px solid ${opsCrit.length > 0 ? alpha(CP.accentRed, "55") : CP.border}`,
           borderRadius: 12, padding: "14px 20px",
         }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -351,17 +351,17 @@ export default function AdminHub() {
           padding: "18px 22px",
           marginBottom: 14,
           background: CP.surface,
-          border: `1px solid ${CP.accentGreen}55`,
+          border: `1px solid ${alpha(CP.accentGreen, "55")}`,
           borderRadius: 14,
           textDecoration: "none", color: CP.textPrimary,
           transition: "transform 0.15s, border-color 0.15s",
         }}
         onMouseEnter={(e) => { e.currentTarget.style.borderColor = CP.accentGreen; e.currentTarget.style.transform = "translateY(-2px)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = CP.accentGreen + "55"; e.currentTarget.style.transform = "translateY(0)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = alpha(CP.accentGreen, "55"); e.currentTarget.style.transform = "translateY(0)"; }}
       >
         <div style={{
           width: 44, height: 44, borderRadius: 12,
-          background: CP.accentGreen + "22", border: `1px solid ${CP.accentGreen}`,
+          background: alpha(CP.accentGreen, "22"), border: `1px solid ${CP.accentGreen}`,
           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
         }}>
           <Sparkles size={20} color={CP.accentGreen} />
@@ -383,17 +383,17 @@ export default function AdminHub() {
             display: "flex", alignItems: "center", gap: 16,
             padding: "20px 24px",
             background: CP.accentSoft,
-            border: `1px solid ${CP.accentBlue}55`,
+            border: `1px solid ${alpha(CP.accentBlue, "55")}`,
             borderRadius: 14,
             textDecoration: "none", color: CP.textPrimary,
             transition: "transform 0.15s, border-color 0.15s",
           }}
           onMouseEnter={(e) => { e.currentTarget.style.borderColor = CP.accentBlue; e.currentTarget.style.transform = "translateY(-2px)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = CP.accentBlue + "55"; e.currentTarget.style.transform = "translateY(0)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = alpha(CP.accentBlue, "55"); e.currentTarget.style.transform = "translateY(0)"; }}
         >
           <div style={{
             width: 48, height: 48, borderRadius: 12,
-            background: CP.accentBlue + "22", border: `1px solid ${CP.accentBlue}`,
+            background: alpha(CP.accentBlue, "22"), border: `1px solid ${CP.accentBlue}`,
             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
           }}>
             <Upload size={22} color={CP.accentBlue} />
@@ -413,17 +413,17 @@ export default function AdminHub() {
             display: "flex", alignItems: "center", gap: 16,
             padding: "20px 24px",
             background: CP.surface,
-            border: `1px solid ${CP.accentGreen}55`,
+            border: `1px solid ${alpha(CP.accentGreen, "55")}`,
             borderRadius: 14,
             textDecoration: "none", color: CP.textPrimary,
             transition: "transform 0.15s, border-color 0.15s",
           }}
           onMouseEnter={(e) => { e.currentTarget.style.borderColor = CP.accentGreen; e.currentTarget.style.transform = "translateY(-2px)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = CP.accentGreen + "55"; e.currentTarget.style.transform = "translateY(0)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = alpha(CP.accentGreen, "55"); e.currentTarget.style.transform = "translateY(0)"; }}
         >
           <div style={{
             width: 48, height: 48, borderRadius: 12,
-            background: CP.accentGreen + "22", border: `1px solid ${CP.accentGreen}`,
+            background: alpha(CP.accentGreen, "22"), border: `1px solid ${CP.accentGreen}`,
             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
           }}>
             <RefreshCw size={22} color={CP.accentGreen} />
@@ -460,22 +460,22 @@ export default function AdminHub() {
           <span>Review sessioni AI</span>
           <ArrowUpRight size={14} color={CP.textMuted} />
         </Link>
-        <Link href="/admin/action-center" style={{ ...quickActionStyle(), borderColor: CP.accentRed + "55", color: CP.textPrimary }}>
+        <Link href="/admin/action-center" style={{ ...quickActionStyle(), borderColor: alpha(CP.accentRed, "55"), color: CP.textPrimary }}>
           <Target size={16} color={CP.accentRed} />
           <span>Action Center — operatori da cambiare</span>
           <ArrowUpRight size={14} color={CP.accentRed} />
         </Link>
-        <Link href="/admin/coaching-center" style={{ ...quickActionStyle(), borderColor: CP.accentRed + "55", color: CP.textPrimary }}>
+        <Link href="/admin/coaching-center" style={{ ...quickActionStyle(), borderColor: alpha(CP.accentRed, "55"), color: CP.textPrimary }}>
           <GraduationCap size={16} color={CP.accentRed} />
           <span>Coaching Center — operatori da far crescere</span>
           <ArrowUpRight size={14} color={CP.accentRed} />
         </Link>
-        <Link href="/admin/pnl-live" style={{ ...quickActionStyle(), borderColor: CP.accentGreen + "55", color: CP.textPrimary }}>
+        <Link href="/admin/pnl-live" style={{ ...quickActionStyle(), borderColor: alpha(CP.accentGreen, "55"), color: CP.textPrimary }}>
           <Wallet size={16} color={CP.accentGreen} />
           <span>P&L Live — margine per creator</span>
           <ArrowUpRight size={14} color={CP.accentGreen} />
         </Link>
-        <Link href="/admin/profiles-compare" style={{ ...quickActionStyle(), borderColor: CP.accent + "55", color: CP.textPrimary }}>
+        <Link href="/admin/profiles-compare" style={{ ...quickActionStyle(), borderColor: alpha(CP.accent, "55"), color: CP.textPrimary }}>
           <Scale size={16} color={CP.accent} />
           <span>Scaglioni a confronto — standardizzazione profili</span>
           <ArrowUpRight size={14} color={CP.accent} />
@@ -560,7 +560,7 @@ function ClosedLoopCard({ label, value, unit, sub, color, signed, tooltip }) {
       title={tooltip || ""}
       style={{
         background: CP.surface,
-        border: `1px solid ${color ? color + "33" : CP.border}`,
+        border: `1px solid ${color ? alpha(color, "33") : CP.border}`,
         borderRadius: 14,
         padding: "16px 18px",
         cursor: tooltip ? "help" : "default",
