@@ -21,6 +21,7 @@ import { TRAINING_SCENARIOS } from "@/lib/training-scenarios";
 import { getCreatorById } from "@/lib/creator-personas";
 import { getFanArchetypeById } from "@/lib/fan-archetypes";
 import { getBenchmarkPatterns, getBenchmarkLabel } from "@/lib/fan-profiles";
+import { checkRateLimit, tooMany } from "@/lib/rate-limit";
 
 function findScenarioById(scenarioId) {
   if (!scenarioId) return null;
@@ -34,6 +35,8 @@ function findScenarioById(scenarioId) {
 export async function POST(request) {
   try {
     const { userId } = await auth();
+    // tetto anti-abuso sui costi LLM (lib/rate-limit)
+    if (userId) { const rl = await checkRateLimit("llm_eval", userId); if (!rl.ok) return tooMany(rl.retryAfter); }
     if (!userId) {
       return Response.json({ error: "Non autenticato." }, { status: 401 });
     }

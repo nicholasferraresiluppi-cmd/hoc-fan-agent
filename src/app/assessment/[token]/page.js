@@ -91,7 +91,12 @@ export default function AssessmentPage() {
             messages: [{ role: "operator", content: SEED_CUE }],
           }),
         });
-        if (data?.reply) {
+        if (Array.isArray(data?.transcript) && data.transcript.length) {
+          // scenario già iniziato (pagina ricaricata): riprende dal server
+          setMessages(data.transcript);
+          setOpCount(data.transcript.filter((m) => m.role === "operator").length);
+          if (data.fanState) setFanState(data.fanState);
+        } else if (data?.reply) {
           setMessages([{ role: "fan", content: data.reply }]);
           if (data.fanState) setFanState(data.fanState);
         } else {
@@ -300,6 +305,7 @@ export default function AssessmentPage() {
           )}
           <div style={{ display: "flex", gap: 8 }}>
             <textarea
+              maxLength={1200}
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
