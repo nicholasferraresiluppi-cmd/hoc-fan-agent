@@ -23,6 +23,10 @@ import { getWages } from "@/lib/cp-wages-store";
 
 export const maxDuration = 30;
 const FEES_KEY = "pnl:deal_fees";
+// Fee standard (25/09/2026): la maggior parte dei deal ha la stessa %; si
+// imposta una volta e si scrivono solo le eccezioni. Tenuta in chiave a parte
+// così una creator senza riga resta distinguibile ("standard" vs "sua").
+const DEFAULT_KEY = "pnl:deal_fee_default";
 
 export async function GET(request) {
   const az = await authorize(CAPABILITIES.SEED);
@@ -34,10 +38,11 @@ export async function GET(request) {
     return Response.json({ error: "period_id YYYY-MM richiesto" }, { status: 400 });
   }
 
-  const [wages, fees, meta] = await Promise.all([
+  const [wages, fees, meta, defaultFee] = await Promise.all([
     getWages(periodId),
     kv.get(FEES_KEY),
     kv.get("cp:_meta"),
+    kv.get(DEFAULT_KEY),
   ]);
   if (!Array.isArray(wages) || wages.length === 0) {
     return Response.json({
@@ -75,7 +80,9 @@ export async function GET(request) {
   const rows = [...byAlias.entries()]
     .filter(([, a]) => a.sales > 0)
     .map(([alias, a]) => {
-      const fee_pct = typeof feeMap[alias] === "number" ? feeMap[alias] : null;
+      const own = typeof feeMap[alias] === "number" ? feeMap[alias] : null;
+      const fee_pct = own != null ? own : (typeof defaultFee === "number" ? defaultFee : null);
+      const fee_source = own != null ? "creator" : fee_pct != null ? "standard" : null;
       const fee_usd = fee_pct != null ? a.sales * fee_pct : null;
       const margin = fee_usd != null ? fee_usd - a.cost : null;
       return {
@@ -84,6 +91,7 @@ export async function GET(request) {
         cost_ops: Math.round(a.cost),
         cost_pct: a.sales > 0 ? Math.round((a.cost / a.sales) * 1000) / 1000 : null,
         fee_pct,
+        fee_source,
         fee_usd: fee_usd != null ? Math.round(fee_usd) : null,
         margin: margin != null ? Math.round(margin) : null,
         margin_pct: margin != null && a.sales > 0 ? Math.round((margin / a.sales) * 1000) / 1000 : null,
@@ -94,6 +102,7 @@ export async function GET(request) {
 
   const withFee = rows.filter((r) => r.fee_pct != null);
   return Response.json({
+    default_fee_pct: typeof defaultFee === "number" ? defaultFee : null,
     period_id: periodId,
     last_sync_at: meta?.last_sync_at ?? null,
     last_sync_period: meta?.last_sync_period ?? null,
@@ -114,6 +123,26 @@ export async function PUT(request) {
 
   let body;
   try { body = await request.json(); } catch { return Response.json({ error: "Invalid JSON" }, { status: 400 }); }
+  // Fee standard
+  if (body && "default_fee_pct" in body) {
+    const d = body.default_fee_pct;
+    if (d !== null && (typeof d !== "number" || d < 0 || d > 1)) return Response.json({ error: "default_fee_pct deve essere 0..1 oppure null" }, { status: 400 });
+    const prev = await kv.get(DEFAULT_KEY);
+    if (d === null) await kv.del(DEFAULT_KEY); else await kv.set(DEFAULT_KEY, d);
+    await logAuditAction({ action: "pnl.deal_fee.default", target: "*", by: az.userId, meta: { prev: prev ?? null, next: d } });
+    return Response.json({ ok: true, default_fee_pct: d });
+  }
+  // Import in blocco (incolla da foglio): [{ alias, fee_pct }]
+  if (Array.isArray(body?.bulk)) {
+    const rows = body.bulk.filter((r) => r && typeof r.alias === "string" && r.alias.trim() && typeof r.fee_pct === "number" && r.fee_pct >= 0 && r.fee_pct <= 1);
+    if (!rows.length || rows.length > 300) return Response.json({ error: "Nessuna riga valida (o più di 300)" }, { status: 400 });
+    const fees = (await kv.get(FEES_KEY)) || {};
+    const changes = rows.map((r) => ({ alias: r.alias.trim(), prev: fees[r.alias.trim()] ?? null, next: r.fee_pct }));
+    for (const c of changes) fees[c.alias] = c.next;
+    await kv.set(FEES_KEY, fees);
+    await logAuditAction({ action: "pnl.deal_fee.bulk", target: `${changes.length} creator`, by: az.userId, meta: { changes } });
+    return Response.json({ ok: true, updated: changes.length });
+  }
   const alias = (body?.alias || "").trim();
   let fee = body?.fee_pct;
   if (!alias) return Response.json({ error: "alias richiesto" }, { status: 400 });

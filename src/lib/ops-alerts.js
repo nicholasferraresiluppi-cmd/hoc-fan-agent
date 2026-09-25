@@ -22,6 +22,7 @@ import { loadGroupLanguages } from "@/app/api/admin/group-languages/route";
 import { detectLanguage } from "@/lib/leaderboard-calc";
 import { getWages } from "@/lib/cp-wages-store";
 import { shiftsByCreator, creatorDrops, monthShrink } from "@/lib/data-health-core";
+import { getEndedCreators } from "@/lib/creators-ended";
 
 const monthOffset = (id, n) => {
   const [y, m] = id.split("-").map(Number);
@@ -87,11 +88,14 @@ const CHECKS = [
       // Stessa aggregazione di /api/admin/pnl-live: creator del mese = alias
       // con sales > 0 nelle wages CP; fee dalla mappa pnl:deal_fees.
       const period = currentMonthId();
-      const [wagesCur, fees, meta] = await Promise.all([
+      const [wagesCur, fees, meta, defaultFee] = await Promise.all([
         getWages(period),
         kv.get("pnl:deal_fees"),
         kv.get("cp:_meta"),
+        kv.get("pnl:deal_fee_default"),
       ]);
+      // con una fee standard impostata ogni creator ha una fee: niente buco
+      if (typeof defaultFee === "number") return [];
       let wages = wagesCur;
       let effPeriod = period;
       if ((!Array.isArray(wages) || wages.length === 0) && meta?.last_sync_period) {
@@ -269,11 +273,16 @@ const CHECKS = [
           current: shiftsByCreator(w), previous: shiftsByCreator(pw),
           isCurrentMonth: c.isCurrentMonth, dayOfMonth: now.getUTCDate(), daysInMonth: new Date(Date.UTC(y, mm, 0)).getUTCDate(),
         });
-        if (!drops.length) continue;
+        // creator che hanno smesso (segnate da un admin) prima del mese: calo atteso
+        const ended = await getEndedCreators();
+        const monthStart = `${c.m}-01`;
+        const real = drops.filter((d) => !(ended[d.creator]?.ended_on && ended[d.creator].ended_on < monthStart));
+        if (!real.length) continue;
+        drops.length = 0; drops.push(...real);
         out.push({
           fingerprint: `creator-activity-drop:${c.m}`,
           title: `${c.m}: ${drops.length} ${drops.length === 1 ? "creator ha" : "creator hanno"} molti meno turni del previsto`,
-          detail: drops.slice(0, 6).map((d) => `${d.creator}: ${d.current} turni (attesi ~${d.expected})`).join(" · ") + ". Può essere reale (creator in pausa) o un buco di dati: guarda prima di prendere decisioni su quei numeri.",
+          detail: drops.slice(0, 6).map((d) => `${d.creator}: ${d.current} turni (attesi ~${d.expected})`).join(" · ") + ". Può essere reale (creator in pausa o che ha smesso: segnala in Alert → Creator terminate) o un buco di dati: guarda prima di usare quei numeri.",
           value: String(drops.length),
           cta: { href: "/leaderboard/creators", label: "Apri Creator" },
         });

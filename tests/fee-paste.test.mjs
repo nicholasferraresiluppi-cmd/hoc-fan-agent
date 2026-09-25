@@ -1,0 +1,12 @@
+import { parseFeePaste, parsePercent } from "../src/lib/fee-paste.js";
+let ok = 0, ko = 0; const t = (n, c) => { c ? ok++ : (ko++, console.log("FAIL", n)); };
+const aliases = ["Gaja Bertolin - IT", "Gaja Bertolin - EN", "Elisa Esposito - IT", "Fishball - IT", "Laura Sommaruga - ES"];
+t("50", parsePercent("50") === 0.5); t("50%", parsePercent("50%") === 0.5); t("0.4", parsePercent("0.4") === 0.4); t("37,5", parsePercent("37,5") === 0.375); t("abc", parsePercent("abc") === null); t("150", parsePercent("150") === null);
+const r = parseFeePaste("Gaja Bertolin\t40%\nelisa esposito;50\nFishball 45,5\nSconosciuta 30\nsolo nome", aliases);
+t("gaja su IT+EN", r[0].aliases.length === 2 && r[0].fee_pct === 0.4);
+t("minuscole e ;", r[1].aliases[0] === "Elisa Esposito - IT" && r[1].fee_pct === 0.5);
+t("virgola decimale", r[2].fee_pct === 0.455);
+t("non trovata", r[3].error === "creator non trovata");
+t("senza %", r[4].error === "manca la percentuale");
+t("alias esatto con lingua", parseFeePaste("Laura Sommaruga - ES 30", aliases)[0].aliases[0] === "Laura Sommaruga - ES");
+console.log(`${ok} ok / ${ko} failed`); if (ko) process.exit(1);

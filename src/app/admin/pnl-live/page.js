@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { parseFeePaste } from "@/lib/fee-paste";
 import { Loader2, AlertCircle, TrendingUp, Check, ArrowRight } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
@@ -98,10 +99,11 @@ export default function PnlLivePage() {
 
       <CpCard accent="#F59E0B" padding="12px 16px" style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.5 }}>
-          ⚠ <b>P&L operativo chat, in $</b>: include solo il costo operatori. Marketing, AM, struttura e gli altri costi restano nel foglio Finance (€). Le fee% puoi prenderle dal doc{" "}
-          <a href="https://app.clickup.com/9012548730/docs/8ck153u-707752/8ck153u-243912" target="_blank" rel="noopener noreferrer" style={{ color: "#F59E0B" }}>Deal Economics</a> — ma verifica i contratti reali prima di fidarti.
+          ⚠ <b>P&L operativo chat, in $</b>: include solo il costo operatori. Marketing, AM, struttura e gli altri costi restano nel foglio Finance (€). La fee% di ogni creator la imposti qui sotto: una standard per tutte più le eccezioni, anche incollandole da un foglio.
         </div>
       </CpCard>
+
+      {data && <FeeSetup data={data} onDone={() => load()} />}
 
       <CpCard padding="14px 18px" style={{ marginBottom: 18 }}>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
@@ -165,8 +167,9 @@ export default function PnlLivePage() {
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                           <input
                             type="number" step="0.5" min="0" max="100"
-                            placeholder="—"
-                            value={editing[r.alias] !== undefined ? editing[r.alias] : (r.fee_pct != null ? Math.round(r.fee_pct * 1000) / 10 : "")}
+                            placeholder={r.fee_source === "standard" ? String(Math.round(r.fee_pct * 1000) / 10) : "—"}
+                            title={r.fee_source === "standard" ? "Fee standard: scrivi un valore solo se questa creator ha un deal diverso" : undefined}
+                            value={editing[r.alias] !== undefined ? editing[r.alias] : (r.fee_source === "creator" ? Math.round(r.fee_pct * 1000) / 10 : "")}
                             onChange={(e) => setEditing((s) => ({ ...s, [r.alias]: e.target.value }))}
                             onBlur={(e) => { if (editing[r.alias] !== undefined) { saveFee(r.alias, e.target.value); setEditing((s) => { const n = { ...s }; delete n[r.alias]; return n; }); } }}
                             onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
@@ -218,3 +221,62 @@ const lbl = { display: "block", fontSize: 10, color: CP.textMuted, letterSpacing
 const input = { padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
 const th = { padding: "10px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: CP.textMuted, letterSpacing: 0.6, fontFamily: FONTS.mono, whiteSpace: "nowrap" };
 const td = { padding: "8px 12px", verticalAlign: "middle" };
+
+
+// Impostazione fee in blocco: standard + eccezioni incollate da un foglio.
+function FeeSetup({ data, onDone }) {
+  const [std, setStd] = useState(data.default_fee_pct != null ? String(Math.round(data.default_fee_pct * 1000) / 10) : "");
+  const [paste, setPaste] = useState("");
+  const [msg, setMsg] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const aliases = (data.rows || []).map((r) => r.alias);
+  const preview = paste.trim() ? parseFeePaste(paste, aliases) : [];
+  const valid = preview.filter((p) => !p.error);
+
+  async function put(body, okText) {
+    setBusy(true); setMsg(null);
+    const r = await fetch("/api/admin/pnl-live", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) return setMsg({ err: true, text: j.error || "Errore" });
+    setMsg({ text: okText }); onDone();
+  }
+
+  const missing = (data.rows || []).filter((r) => r.fee_pct == null).length;
+  return (
+    <CpCard padding="16px 18px" style={{ marginBottom: 18 }}>
+      <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Fee delle creator</div>
+      <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 12 }}>
+        {missing ? `${missing} creator senza fee: il margine non si può calcolare per loro. ` : "Tutte le creator hanno una fee. "}
+        Il modo più veloce: imposta la fee standard, poi incolla solo le eccezioni.
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
+        <span style={{ fontSize: 13, color: CP.textSecondary }}>Fee standard</span>
+        <input type="number" min="0" max="100" step="0.5" value={std} onChange={(e) => setStd(e.target.value)} placeholder="es. 50"
+          style={{ width: 80, padding: "6px 8px", background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 6, color: CP.textPrimary, textAlign: "right" }} />
+        <span style={{ fontSize: 12, color: CP.textMuted }}>%</span>
+        <button disabled={busy} onClick={() => put({ default_fee_pct: std === "" ? null : Number(std) / 100 }, std === "" ? "Fee standard tolta" : `Fee standard ${std}% salvata`)}
+          style={{ padding: "6px 12px", borderRadius: 7, border: `1px solid ${CP.accent}`, background: CP.accent, color: CP.accentInk, fontSize: 12, cursor: "pointer" }}>Salva standard</button>
+        <span style={{ fontSize: 12, color: CP.textMuted }}>vale per ogni creator senza una fee sua</span>
+      </div>
+      <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Eccezioni: incolla da un foglio (una riga per creator: nome e percentuale)</div>
+      <textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={4} placeholder={"Gaja Bertolin\t40%\nElisa Esposito\t45"}
+        style={{ width: "100%", boxSizing: "border-box", padding: 10, background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, fontFamily: "inherit" }} />
+      {preview.length > 0 && (
+        <div style={{ marginTop: 10, fontSize: 12 }}>
+          {preview.map((p, i) => (
+            <div key={i} style={{ padding: "3px 0", color: p.error ? CP.accentRed : CP.textSecondary }}>
+              {p.error ? `✗ «${p.line}»: ${p.error}` : `✓ ${p.aliases.join(", ")} → ${Math.round(p.fee_pct * 1000) / 10}%`}
+            </div>
+          ))}
+          <button disabled={busy || !valid.length}
+            onClick={() => put({ bulk: valid.flatMap((p) => p.aliases.map((a) => ({ alias: a, fee_pct: p.fee_pct }))) }, `Fee salvate per ${valid.reduce((n, p) => n + p.aliases.length, 0)} profili`).then(() => setPaste(""))}
+            style={{ marginTop: 8, padding: "6px 12px", borderRadius: 7, border: `1px solid ${CP.accent}`, background: CP.accent, color: CP.accentInk, fontSize: 12, cursor: "pointer", opacity: valid.length ? 1 : 0.5 }}>
+            Salva {valid.length} {valid.length === 1 ? "riga" : "righe"} valide
+          </button>
+        </div>
+      )}
+      {msg && <div style={{ marginTop: 10, fontSize: 12, color: msg.err ? CP.accentRed : CP.accentGreen }}>{msg.text}</div>}
+    </CpCard>
+  );
+}
