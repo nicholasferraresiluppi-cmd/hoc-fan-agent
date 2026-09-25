@@ -1,227 +1,192 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import Link from "next/link";
-import { parseFeePaste } from "@/lib/fee-paste";
-import { Loader2, AlertCircle, TrendingUp, Check, ArrowRight } from "lucide-react";
-import { CP, FONTS, alpha } from "@/lib/brand";
-import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
-import CompNav from "@/components/CompNav";
-import HowToRead from "@/components/HowToRead";
-
 /**
  * /admin/pnl-live — P&L operativo per creator, anche sul mese in corso.
- * Venduto (CP) × fee% deal (config editabile) − costo operatori = margine.
- * Il "live": sincronizzi il mese corrente → vedi dove atterra il margine
- * a oggi, senza aspettare la chiusura del foglio Finance.
+ * Venduto (CP) × fee% deal − costo operatori = margine.
+ *
+ * Redesign 25/09/2026 (struttura del pilota Calendario compensi): numero
+ * principale col confronto sul mese prima → filtri (senza fee, costo alto) +
+ * ricerca → tabella ordinabile. Finché mancano fee il numero principale è il
+ * COSTO OPERATORI sul venduto (l'unico calcolabile) e l'impostazione fee sta
+ * in cima; a fee complete diventa il margine e l'impostazione si richiude.
  */
+import { useState, useMemo } from "react";
+import useSWR from "swr";
+import Link from "next/link";
+import { Check, Percent } from "lucide-react";
+import { parseFeePaste } from "@/lib/fee-paste";
+import { CP, FONTS } from "@/lib/brand";
+import CompNav from "@/components/CompNav";
+import { fmt$, fmtPct, fmtDelta, fmtAgo, MONTHS_IT } from "@/lib/format";
+import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice } from "@/components/ds";
 
-const MONTH_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
+const fetcher = async (url) => {
+  const r = await fetch(url);
+  const j = await r.json().catch(() => ({}));
+  return r.ok ? j : { error: j.error || `Errore ${r.status}` };
+};
+const HIGH_COST_PTS = 0.04; // costo operatori ≥ 4 punti sopra la mediana = da guardare
+
 function monthOpts(n = 13) {
-  const out = [];
   const now = new Date();
-  for (let i = 0; i < n; i++) { // i=0 → mese CORRENTE (live)
+  return Array.from({ length: n }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    out.push({
-      value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-      label: `${MONTH_IT[d.getMonth()]} ${d.getFullYear()}${i === 0 ? " · LIVE" : ""}`,
-    });
-  }
-  return out;
+    return { value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: `${MONTHS_IT[d.getMonth()]} ${d.getFullYear()}${i === 0 ? " (in corso)" : ""}` };
+  });
 }
-const fmt$ = (n) => n == null ? "—" : `$${Number(n).toLocaleString("it-IT", { maximumFractionDigits: 0 })}`;
-const fmtPct = (v, d = 1) => v == null ? "—" : `${(v * 100).toFixed(d)}%`;
+const prevOf = (pid) => { const [y, m] = pid.split("-").map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+const pts = (d) => d == null ? "" : `${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.abs(d * 100).toLocaleString("it-IT", { maximumFractionDigits: 1 })} punti`;
 
 export default function PnlLivePage() {
   const periods = useMemo(() => monthOpts(), []);
-  const [periodId, setPeriodId] = useState(periods[0]?.value || "");
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [editing, setEditing] = useState({}); // alias → valore input in corso
-  const [saved, setSaved] = useState({});     // alias → true flash
+  const [periodId, setPeriodId] = useState(periods[0].value);
+  const [view, setView] = useState("all");
+  const [q, setQ] = useState("");
+  const [feeOpen, setFeeOpen] = useState(null); // null = automatico (aperto se mancano fee)
+  const [editing, setEditing] = useState({});
+  const [saved, setSaved] = useState({});
 
-  async function load(pid = periodId) {
-    setLoading(true); setError(null);
-    try {
-      const res = await fetch(`/api/admin/pnl-live?period_id=${pid}`);
-      const j = await res.json();
-      if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
-      setData(j);
-    } catch (e) {
-      setError(e.message); setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }
-  useEffect(() => { load(periodId); /* eslint-disable-next-line */ }, [periodId]);
+  const url = `/api/admin/pnl-live?period_id=${periodId}`;
+  const { data, isLoading, mutate } = useSWR(url, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
+  const { data: prev } = useSWR(`/api/admin/pnl-live?period_id=${prevOf(periodId)}`, fetcher, { revalidateOnFocus: false });
 
   async function saveFee(alias, raw) {
     const v = raw === "" ? null : Number(raw) / 100;
     if (v !== null && (isNaN(v) || v < 0 || v > 1)) return;
-    try {
-      const res = await fetch("/api/admin/pnl-live", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ alias, fee_pct: v }),
-      });
-      if (res.ok) {
-        setSaved((s) => ({ ...s, [alias]: true }));
-        setTimeout(() => setSaved((s) => ({ ...s, [alias]: false })), 1500);
-        load(); // ricalcola margini
-      }
-    } catch {}
+    const res = await fetch("/api/admin/pnl-live", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ alias, fee_pct: v }) }).catch(() => null);
+    if (res?.ok) {
+      setSaved((s) => ({ ...s, [alias]: true }));
+      setTimeout(() => setSaved((s) => ({ ...s, [alias]: false })), 1500);
+      mutate();
+    }
   }
 
-  return (
-    <div style={{ padding: "32px 28px 80px 28px", maxWidth: 1300, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
-      <PageHeader
-        breadcrumb={
-          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <span style={{ color: CP.textPrimary }}>P&L Live</span>
-          </div>
-        }
-        section="Data · Comp & Ben"
-        title="P&L Live per creator"
-        subtitle="Venduto CP × fee% del deal − costo operatori = margine operativo, anche sul mese in corso. La fee% la imposti tu una volta per creator (colonna editabile) e resta salvata."
-      />
+  const ok = data && !data.error;
+  const rows = ok ? data.rows : [];
+  const t = ok ? data.totals : null;
+  const costPct = t?.sales ? t.cost_ops / t.sales : null;
+  const prevCostPct = prev?.totals?.sales ? prev.totals.cost_ops / prev.totals.sales : null;
+  const missing = rows.filter((r) => r.fee_pct == null).length;
+  const allFees = ok && rows.length > 0 && missing === 0;
+  const median = useMemo(() => {
+    const v = rows.map((r) => r.cost_pct).filter((x) => x != null).sort((a, b) => a - b);
+    return v.length ? v[Math.floor(v.length / 2)] : null;
+  }, [rows]);
+  const isHigh = (r) => median != null && r.cost_pct != null && r.cost_pct >= median + HIGH_COST_PTS;
+  const counts = { nofee: missing, high: rows.filter(isHigh).length };
+  const needle = q.trim().toLowerCase();
+  const shown = rows.filter((r) => (!needle || r.alias.toLowerCase().includes(needle))
+    && (view === "nofee" ? r.fee_pct == null : view === "high" ? isHigh(r) : true)).map((r) => ({ ...r, id: r.alias }));
+  const feeIsOpen = feeOpen ?? !allFees;
+  const monthName = MONTHS_IT[Number(periodId.slice(5)) - 1];
+  const prevName = MONTHS_IT[Number(prevOf(periodId).slice(5)) - 1];
+  const isCurrent = periodId === periods[0].value;
 
+  const columns = [
+    { key: "alias", label: "Creator", render: (r) => <span style={{ fontWeight: 500 }}>{r.alias}</span> },
+    { key: "sales", label: "Venduto", align: "right", render: (r) => fmt$(r.sales) },
+    { key: "cost_ops", label: "Costo operatori", align: "right", render: (r) => fmt$(r.cost_ops) },
+    { key: "cost_pct", label: "% sul venduto", align: "right", render: (r) => (
+      <span style={{ color: isHigh(r) ? CP.accentRed : CP.textPrimary }} title={isHigh(r) ? `Almeno ${HIGH_COST_PTS * 100} punti sopra la mediana (${fmtPct(median, 1)})` : ""}>{fmtPct(r.cost_pct, 1)}</span>
+    ) },
+    { key: "fee_pct", label: "Fee del deal", align: "right", sortable: false, render: (r) => (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }} onClick={(e) => e.stopPropagation()}>
+        <input type="number" step="0.5" min="0" max="100" aria-label={`Fee ${r.alias}`}
+          placeholder={r.fee_source === "standard" ? String(Math.round(r.fee_pct * 1000) / 10) : "—"}
+          title={r.fee_source === "standard" ? "Fee standard: scrivi un valore solo se questa creator ha un deal diverso" : "Fee di questa creator"}
+          value={editing[r.alias] !== undefined ? editing[r.alias] : (r.fee_source === "creator" ? Math.round(r.fee_pct * 1000) / 10 : "")}
+          onChange={(e) => setEditing((s) => ({ ...s, [r.alias]: e.target.value }))}
+          onBlur={(e) => { if (editing[r.alias] !== undefined) { saveFee(r.alias, e.target.value); setEditing((s) => { const n = { ...s }; delete n[r.alias]; return n; }); } }}
+          onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+          style={{ width: 64, padding: "4px 8px", textAlign: "right", background: CP.bg, border: `1px solid ${r.fee_pct == null ? CP.accentRed : CP.border}`, borderRadius: 6, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body }} />
+        <span style={{ fontSize: 12, color: CP.textMuted }}>%</span>
+        <span style={{ width: 14 }}>{saved[r.alias] && <Check size={13} color={CP.accentGreen} />}</span>
+      </span>
+    ) },
+    { key: "margin", label: "Margine", align: "right", render: (r) => <span style={{ color: r.margin == null ? CP.textMuted : r.margin < 0 ? CP.accentRed : CP.textPrimary }}>{fmt$(r.margin)}</span> },
+    { key: "margin_pct", label: "Margine %", align: "right", render: (r) => <span style={{ color: r.margin_pct == null ? CP.textMuted : r.margin_pct < 0 ? CP.accentRed : CP.textPrimary }}>{fmtPct(r.margin_pct, 1)}</span> },
+    { key: "go", label: "", sortable: false, render: (r) => (
+      <Link href={`/admin/comp-calendar?creator=${encodeURIComponent(r.alias)}&period_id=${periodId}`} style={{ fontSize: 13, color: CP.accentSoftText, textDecoration: "none", whiteSpace: "nowrap" }}>Giorni →</Link>
+    ) },
+  ];
+
+  return (
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Comp & Ben" }, { label: "P&L Live" }]}
+        title="P&L Live"
+        subtitle="Quanto resta a HOC su ogni creator: fee del deal meno costo degli operatori, anche sul mese in corso. Solo il costo della chat, in dollari: marketing, AM e struttura restano nel foglio Finance."
+        actions={
+          <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} aria-label="Mese"
+            style={{ padding: "8px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body }}>
+            {periods.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </select>
+        }
+      />
       <CompNav />
 
-      <HowToRead items={[
-        "Per ogni creator: quanto ha venduto, la fee che HOC trattiene (la % la imposti tu nella colonna editabile, una volta sola), quanto sono costati gli operatori, e il margine che resta.",
-        "Margine = fee HOC − costo operatori. È il margine OPERATIVO della chat: marketing, AM e altri costi stanno nel foglio Finance.",
-        "Il mese marcato LIVE è quello in corso: sincronizzi i dati e vedi dove sta atterrando il margine oggi, senza aspettare la chiusura contabile.",
-        "IL numero da guardare: Margin % — sotto le aspettative su un creator grande = conversazione da fare.",
-      ]} />
+      {isLoading && !data && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
+      {data?.error && <Notice danger>{data.error} <Link href="/admin/wage-audit" style={{ color: CP.accentSoftText }}>Sync e verifica CP →</Link></Notice>}
 
-      <CpCard accent="#F59E0B" padding="12px 16px" style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.5 }}>
-          ⚠ <b>P&L operativo chat, in $</b>: include solo il costo operatori. Marketing, AM, struttura e gli altri costi restano nel foglio Finance (€). La fee% di ogni creator la imposti qui sotto: una standard per tutte più le eccezioni, anche incollandole da un foglio.
+      {ok && (<>
+        {allFees ? (
+          <HeroMetric label={`Margine operativo · ${monthName}${isCurrent ? " finora" : ""}`} value={fmt$(t.margin)}
+            compare={prev?.totals?.margin != null && prev.totals.fee_coverage?.split("/")[0] === prev.totals.fee_coverage?.split("/")[1] ? `${prevName}: ${fmt$(prev.totals.margin)} (${fmtDelta(t.margin, prev.totals.margin)})` : null}
+            hint={`${fmtPct(t.sales ? t.margin / t.sales : null, 1)} del venduto`}>
+            <Metrics t={t} prev={prev} costPct={costPct} prevCostPct={prevCostPct} />
+          </HeroMetric>
+        ) : (
+          <HeroMetric label={`Costo operatori sul venduto · ${monthName}${isCurrent ? " finora" : ""}`} value={fmtPct(costPct, 1)}
+            compare={prevCostPct != null ? `${prevName}: ${fmtPct(prevCostPct, 1)} (${pts(costPct - prevCostPct)})` : null}
+            hint={`Il margine non si può ancora calcolare: mancano le fee di ${missing} creator su ${rows.length}.`}>
+            <Metrics t={t} prev={prev} />
+          </HeroMetric>
+        )}
+
+        <Disclosure open={feeIsOpen} onToggle={() => setFeeOpen(!feeIsOpen)} icon={<Percent size={15} />}
+          title={allFees ? "Fee delle creator" : `Imposta le fee (${missing} mancanti)`}
+          summary={data.default_fee_pct != null ? `standard ${fmtPct(data.default_fee_pct, 1)} + eccezioni` : "nessuna fee standard"}>
+          <FeeSetup data={data} onDone={() => mutate()} />
+        </Disclosure>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "18px 0 8px" }}>
+          <FilterChip label={`Tutte (${rows.length})`} active={view === "all"} onClick={() => setView("all")} />
+          <FilterChip label={`Senza fee (${counts.nofee})`} danger={counts.nofee > 0} disabled={!counts.nofee} active={view === "nofee"} onClick={() => setView(view === "nofee" ? "all" : "nofee")} />
+          <FilterChip label={`Costo alto (${counts.high})`} disabled={!counts.high} active={view === "high"} onClick={() => setView(view === "high" ? "all" : "high")} />
+          <span style={{ flex: 1 }} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca creator" aria-label="Cerca creator"
+            style={{ padding: "7px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, width: 220, fontFamily: FONTS.body }} />
         </div>
-      </CpCard>
-
-      {data && <FeeSetup data={data} onDone={() => load()} />}
-
-      <CpCard padding="14px 18px" style={{ marginBottom: 18 }}>
-        <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div>
-            <label style={lbl}>Mese</label>
-            <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} style={{ ...input, minWidth: 180, cursor: "pointer" }}>
-              {periods.map((p) => <option key={p.value} value={p.value} style={{ background: CP.surface }}>{p.label}</option>)}
-            </select>
-          </div>
-          {data?.last_sync_at && data?.last_sync_period === periodId && (
-            <span style={{ fontSize: 11, color: CP.textMuted, paddingBottom: 10 }}>
-              Ultimo sync: {new Date(data.last_sync_at).toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-            </span>
-          )}
-          <Link href="/admin/wage-audit" style={{ fontSize: 11, color: CP.accentGreen, paddingBottom: 10, textDecoration: "none" }}>
-            Aggiorna dati (sync) →
-          </Link>
-          {loading && <Loader2 size={16} className="animate-spin" style={{ color: CP.textSecondary, marginBottom: 10 }} />}
+        <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 8 }}>
+          “Costo alto” = costo operatori almeno {HIGH_COST_PTS * 100} punti sopra la mediana delle creator ({fmtPct(median, 1)}). La fee si scrive direttamente in tabella; il bordo rosso indica che manca.
         </div>
-      </CpCard>
-
-      {error && (
-        <CpCard accent={CP.accentRed} padding="14px 18px" style={{ marginBottom: 18 }}>
-          <div style={{ color: CP.accentRed, display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-            <AlertCircle size={16} /> {error}
-          </div>
-        </CpCard>
-      )}
-
-      {data && (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 18 }}>
-            <StatCard label="Venduto totale" value={fmt$(data.totals.sales)} color={CP.accentGreen} />
-            <StatCard label="Fee HOC (dove impostata)" value={fmt$(data.totals.fee_usd)} sub={`fee config: ${data.totals.fee_coverage} creator`} />
-            <StatCard label="Costo operatori" value={fmt$(data.totals.cost_ops)} color={CP.accentSoftText} />
-            <StatCard label="Margine operativo" value={fmt$(data.totals.margin)} color={data.totals.margin >= 0 ? CP.accentGreen : CP.accentRed} sub="solo creator con fee impostata" />
-          </div>
-
-          <CpCard padding="0" style={{ overflow: "hidden" }}>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                <thead>
-                  <tr style={{ background: CP.surfaceAlt, borderBottom: `2px solid ${CP.border}` }}>
-                    <th style={th}>Creator</th>
-                    <th style={{ ...th, textAlign: "right" }}>Venduto</th>
-                    <th style={{ ...th, textAlign: "right" }}>Fee % deal</th>
-                    <th style={{ ...th, textAlign: "right" }}>Fee $</th>
-                    <th style={{ ...th, textAlign: "right" }}>Costo ops</th>
-                    <th style={{ ...th, textAlign: "right" }}>% costo</th>
-                    <th style={{ ...th, textAlign: "right" }}>Margine</th>
-                    <th style={{ ...th, textAlign: "right" }}>Margin %</th>
-                    <th style={th}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.rows.map((r) => (
-                    <tr key={r.alias} style={{ borderBottom: `1px solid ${alpha(CP.border, "55")}` }}>
-                      <td style={{ ...td, fontWeight: 600 }}>{r.alias}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmt$(r.sales)}</td>
-                      <td style={{ ...td, textAlign: "right" }}>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                          <input
-                            type="number" step="0.5" min="0" max="100"
-                            placeholder={r.fee_source === "standard" ? String(Math.round(r.fee_pct * 1000) / 10) : "—"}
-                            title={r.fee_source === "standard" ? "Fee standard: scrivi un valore solo se questa creator ha un deal diverso" : undefined}
-                            value={editing[r.alias] !== undefined ? editing[r.alias] : (r.fee_source === "creator" ? Math.round(r.fee_pct * 1000) / 10 : "")}
-                            onChange={(e) => setEditing((s) => ({ ...s, [r.alias]: e.target.value }))}
-                            onBlur={(e) => { if (editing[r.alias] !== undefined) { saveFee(r.alias, e.target.value); setEditing((s) => { const n = { ...s }; delete n[r.alias]; return n; }); } }}
-                            onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
-                            style={{ ...input, width: 68, textAlign: "right", fontFamily: FONTS.mono, padding: "5px 8px" }}
-                          />
-                          <span style={{ fontSize: 11, color: CP.textMuted }}>%</span>
-                          {saved[r.alias] && <Check size={13} color={CP.accentGreen} />}
-                        </span>
-                      </td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono }}>{fmt$(r.fee_usd)}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentSoftText }}>{fmt$(r.cost_ops)}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmtPct(r.cost_pct)}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: r.margin == null ? CP.textMuted : r.margin >= 0 ? CP.accentGreen : CP.accentRed }}>{fmt$(r.margin)}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: r.margin_pct == null ? CP.textMuted : r.margin_pct >= 0 ? CP.accentGreen : CP.accentRed }}>{fmtPct(r.margin_pct)}</td>
-                      <td style={td}>
-                        <Link
-                          href={`/admin/comp-calendar?creator=${encodeURIComponent(r.alias)}&period_id=${data.period_id}`}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 9px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 5, color: CP.accentGreen, fontSize: 11, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}
-                        >
-                          Griglia <ArrowRight size={11} />
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr style={{ borderTop: `2px solid ${CP.border}`, background: CP.surfaceAlt }}>
-                    <td style={{ ...td, fontFamily: FONTS.mono, fontWeight: 700 }}>TOTALI</td>
-                    <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: CP.accentGreen }}>{fmt$(data.totals.sales)}</td>
-                    <td style={td}></td>
-                    <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700 }}>{fmt$(data.totals.fee_usd)}</td>
-                    <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: CP.accentSoftText }}>{fmt$(data.totals.cost_ops)}</td>
-                    <td style={td}></td>
-                    <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: data.totals.margin >= 0 ? CP.accentGreen : CP.accentRed }}>{fmt$(data.totals.margin)}</td>
-                    <td style={td}></td>
-                    <td style={td}></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </CpCard>
-        </>
-      )}
+        <DataTable columns={columns} rows={shown} defaultSort={{ key: "sales", dir: -1 }} minWidth={900} maxHeight="calc(100vh - 120px)"
+          empty={needle ? `Nessuna creator corrisponde a “${q}”.` : "Nessuna creator in questa vista."} />
+        <div style={{ display: "flex", gap: 24, flexWrap: "wrap", fontSize: 13, color: CP.textSecondary, padding: "10px 4px" }}>
+          <span>Totale venduto <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmt$(t.sales)}</b></span>
+          <span>Costo operatori <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmt$(t.cost_ops)}</b></span>
+          <span>Fee HOC <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmt$(t.fee_usd)}</b> ({t.fee_coverage} creator)</span>
+          <span>Margine <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmt$(t.margin)}</b></span>
+        </div>
+        <div style={{ fontSize: 12, color: CP.textMuted }}>
+          Venduto di tutte le creator, compresi i turni di operatori fuori dalla classifica Sales CP (per questo il totale è più alto di quello di Sales CP).
+          {data.last_sync_at ? ` Dati CreatorsPro aggiornati ${fmtAgo(data.last_sync_at)}.` : ""}
+        </div>
+      </>)}
     </div>
   );
 }
 
-const lbl = { display: "block", fontSize: 10, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
-const input = { padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
-const th = { padding: "10px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: CP.textMuted, letterSpacing: 0.6, fontFamily: FONTS.mono, whiteSpace: "nowrap" };
-const td = { padding: "8px 12px", verticalAlign: "middle" };
-
+function Metrics({ t, prev, costPct, prevCostPct }) {
+  return (
+    <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+      <Metric label="Venduto" value={fmt$(t.sales)} delta={fmtDelta(t.sales, prev?.totals?.sales)} />
+      <Metric label="Costo operatori" value={fmt$(t.cost_ops)} delta={fmtDelta(t.cost_ops, prev?.totals?.cost_ops)} />
+      {costPct != null && <Metric label="Costo sul venduto" value={fmtPct(costPct, 1)} note={prevCostPct != null ? pts(costPct - prevCostPct) : null} />}
+      <Metric label="Fee HOC" value={fmt$(t.fee_usd)} note={`${t.fee_coverage} creator con fee`} />
+    </div>
+  );
+}
 
 // Impostazione fee in blocco: standard + eccezioni incollate da un foglio.
 function FeeSetup({ data, onDone }) {
@@ -244,8 +209,7 @@ function FeeSetup({ data, onDone }) {
 
   const missing = (data.rows || []).filter((r) => r.fee_pct == null).length;
   return (
-    <CpCard padding="16px 18px" style={{ marginBottom: 18 }}>
-      <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Fee delle creator</div>
+    <div>
       <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 12 }}>
         {missing ? `${missing} creator senza fee: il margine non si può calcolare per loro. ` : "Tutte le creator hanno una fee. "}
         Il modo più veloce: imposta la fee standard, poi incolla solo le eccezioni.
@@ -277,6 +241,6 @@ function FeeSetup({ data, onDone }) {
         </div>
       )}
       {msg && <div style={{ marginTop: 10, fontSize: 12, color: msg.err ? CP.accentRed : CP.accentGreen }}>{msg.text}</div>}
-    </CpCard>
+    </div>
   );
 }

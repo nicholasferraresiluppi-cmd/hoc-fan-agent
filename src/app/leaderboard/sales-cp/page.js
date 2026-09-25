@@ -228,7 +228,7 @@ export default function SalesCpLeaderboardPage() {
           <FilterChip label={`Da rivedere (${counts.review})`} danger={counts.review > 0} active={view === "review"} disabled={!counts.review} onClick={() => setView(view === "review" ? "all" : "review")} />
           <FilterChip label={`In calo (${counts.down})`} active={view === "down"} disabled={!counts.down} onClick={() => setView(view === "down" ? "all" : "down")} />
           <FilterChip label={`In crescita (${counts.up})`} active={view === "up"} disabled={!counts.up} onClick={() => setView(view === "up" ? "all" : "up")} />
-          <FilterChip label={`Pochi turni (${counts.thin})`} active={view === "thin"} disabled={!counts.thin} onClick={() => setView(view === "thin" ? "all" : "thin")} />
+          <FilterChip label={`Meno di ${MIN_SHIFTS} turni (${counts.thin})`} active={view === "thin"} disabled={!counts.thin} onClick={() => setView(view === "thin" ? "all" : "thin")} />
           <span style={{ flex: 1 }} />
           <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Categoria creator" style={selStyle}>
             <option value="">Tutte le categorie</option><option value="Big">Big</option><option value="Medium">Medium</option><option value="Small">Small</option><option value="Uncategorized">Senza categoria</option>
