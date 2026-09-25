@@ -203,7 +203,9 @@ export async function loadGlobalHealthHistory({ periodType, limit = 12 }) {
  * che sono stati sotto tier "Average" per almeno minChronic dei lookback
  * periodi precedenti. Vuoto se manca lo storico.
  */
-const BAD_TIERS = new Set(["Critical", "Weak", "Average"]);
+// v12: le fasce sono state rinominate (leaderboard-config): "sotto Good v11" = score < 71.
+// Soglia numerica per non cambiare chi risulta cronicamente sotto.
+const CHRONIC_BELOW = 71;
 
 export async function computeUnderperformers({ periodType, currentPeriodId, lookback = 3, minChronic = 2, limit = 10, languageFilter = null, ignoredSet = null }) {
   const { ranking } = await buildRankingForPeriod(periodType, currentPeriodId);
@@ -240,7 +242,7 @@ export async function computeUnderperformers({ periodType, currentPeriodId, look
     const history = [];
     for (const pid of lookbackPeriods) {
       const r = (lookbackRankings[pid] || []).find((x) => x.employee === candidate.employee);
-      if (r && r.tier && BAD_TIERS.has(r.tier)) chronic += 1;
+      if (r && typeof r.score === "number" && r.score < CHRONIC_BELOW) chronic += 1;
       history.push({ period_id: pid, score: r?.score ?? null, tier: r?.tier ?? null });
     }
     // Se non c'è storico, includiamo tutti i bottom score. Se c'è storico,

@@ -20,25 +20,26 @@ import { loadHistoryForEmployee } from "@/lib/leaderboard-history";
 import { listReviewsForEmployee, qaStatusForGate } from "@/lib/qa-reviews";
 import { getUserCertifications } from "@/lib/certifications";
 
-const TIER_ORDER = ["Critical", "Weak", "Average", "Good", "Strong", "Elite"];
-const rank = (tier) => TIER_ORDER.indexOf(tier);
-
-/** Valuta "tier >= minTier in almeno needed degli ultimi window mesi valutabili". */
-function evalGate(history, { minTier, needed, window, noCritical = false }) {
-  const usable = history.filter((h) => h.tier).slice(0, window); // history è desc
-  const hits = usable.filter((h) => rank(h.tier) >= rank(minTier)).length;
-  const criticals = usable.filter((h) => h.tier === "Critical").length;
-  const months = usable.map((h) => ({ period_id: h.period_id, tier: h.tier, score: h.score ?? null, counts: rank(h.tier) >= rank(minTier) }));
+// Gate in NUMERI (v0.6, 25/09/2026): le fasce sono state rinominate sulla
+// distribuzione reale, i gate NO — sono gli stessi valori di prima scritti come
+// score (Average v11 = 61, Good v11 = 71, "nessun Critical" v11 = mai sotto 51),
+// quindi passano esattamente le stesse persone.
+/** "score ≥ minScore in almeno needed degli ultimi window mesi valutabili (e mai sotto floor)". */
+function evalGate(history, { minScore, needed, window, floor = null }) {
+  const usable = history.filter((h) => typeof h.score === "number").slice(0, window); // history è desc
+  const hits = usable.filter((h) => h.score >= minScore).length;
+  const belowFloor = floor == null ? 0 : usable.filter((h) => h.score < floor).length;
+  const months = usable.map((h) => ({ period_id: h.period_id, tier: h.tier, score: h.score, counts: h.score >= minScore, below_floor: floor != null && h.score < floor }));
   const evaluable = usable.length >= Math.min(needed, window);
-  const passedPerf = evaluable && hits >= needed && (!noCritical || criticals === 0);
+  const passedPerf = evaluable && hits >= needed && belowFloor === 0;
   return {
-    requirement: `tier ≥ ${minTier} in ${needed} degli ultimi ${window} mesi${noCritical ? ", nessun mese Critical" : ""}`,
+    requirement: `score mestiere ≥ ${minScore} in ${needed} degli ultimi ${window} mesi${floor != null ? `, mai sotto ${floor}` : ""}`,
     evaluable,
     months_available: usable.length,
     hits,
     needed,
     window,
-    criticals,
+    below_floor: belowFloor,
     performance_met: passedPerf,
     months,
   };
@@ -113,7 +114,7 @@ export async function GET() {
       id: "L1_L2",
       label: "Sales Operator I → II",
       time_floor: "≥ 6 mesi in L1",
-      performance: evalGate(history, { minTier: "Average", needed: 3, window: 4, noCritical: true }),
+      performance: evalGate(history, { minScore: 61, needed: 3, window: 4, floor: 51 }),
       other_requirements: [
         qaReq(qa3, "QA trimestrale pass"),
         certReq,
@@ -124,7 +125,7 @@ export async function GET() {
       id: "L2_L3",
       label: "Sales Operator II → III (Senior)",
       time_floor: "≥ 10 mesi in L2",
-      performance: evalGate(history, { minTier: "Good", needed: 4, window: 6 }),
+      performance: evalGate(history, { minScore: 71, needed: 4, window: 6 }),
       other_requirements: [
         qaReq(qa6, "QA pass, zero violazioni compliance 6 mesi"),
         { label: "Mentoring di ≥ 2 nuovi ingressi", status: "not_tracked" },

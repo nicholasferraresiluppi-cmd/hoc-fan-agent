@@ -9,9 +9,9 @@ import { PageHeader, CpCard, SectionLabel } from "@/components/cp-style";
  * /me/percorso — "Il mio percorso" (scope own, docs/VISIBILITY_POLICY.md).
  * La componente performance dei gate della career ladder, spiegata mese per mese.
  * Ladder pubblica per principio: i criteri sono visibili dal giorno uno.
- * 25/09/2026: fasce dello score mestiere SOSPESE (soglie fisse tarate su gen-mag:
- * "Critical" anche per chi è al 68° percentile o tra i primi per vendite).
- * Si mostrano i numeri; il conteggio dei mesi utili torna con le soglie nuove.
+ * v0.6 (25/09/2026): fasce ricalibrate sulla distribuzione reale e gate scritti
+ * in numeri (stesse persone che passano di prima). Si mostra lo score mese per
+ * mese e se conta per il passaggio.
  */
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
@@ -51,14 +51,14 @@ export default function MyLadderPage() {
       {data?.linked && Array.isArray(data.gates) && data.gates.length > 0 && (
         <>
           <div style={{ padding: "12px 14px", marginBottom: 16, borderRadius: 10, border: `1px solid ${CP.border}`, background: CP.surface, fontSize: 13, color: CP.textSecondary, lineHeight: 1.55 }}>
-            Le fasce dello score mestiere (Critical, Weak, Average…) sono in ricalibrazione sui dati di quest&apos;anno: finché non escono le soglie nuove il conteggio dei &quot;mesi utili&quot; è sospeso e qui vedi i tuoi numeri mese per mese. I requisiti restano quelli scritti.
+            I passaggi di livello si basano sullo <b style={{ color: CP.textPrimary }}>score mestiere</b> (come chatti, rispetto al tuo gruppo). Per salire non basta un mese buono: serve stare sopra la soglia in più mesi. Le fasce vanno da Critical (il 10% più basso) a Elite (il 10% più alto).
           </div>
           {data.current && (
             <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, padding: "16px 22px", marginBottom: 18, display: "inline-block" }}>
               <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: CP.textMuted, marginBottom: 4 }}>Ultimo mese valutato · {data.current.period_id}</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
                 <span style={{ fontFamily: FONTS.display, fontSize: 28, fontWeight: 600, color: CP.textPrimary }}>{data.current.score != null ? Math.round(data.current.score) : "—"}</span>
-                <span style={{ fontSize: 13, color: CP.textMuted }}>score mestiere</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: TIER_COLORS[data.current.tier] || CP.textSecondary }}>{data.current.tier}</span>
               </div>
             </div>
           )}
@@ -66,10 +66,16 @@ export default function MyLadderPage() {
           {data.gates.map((g) => {
             const perf = g.performance || {};
             return (
-              <CpCard key={g.id} style={{ marginBottom: 14 }}>
+              <CpCard key={g.id} style={{ marginBottom: 14 }} accent={perf.performance_met ? CP.accentGreen : undefined}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
                   <h3 style={{ fontFamily: FONTS.display, fontSize: 17, fontWeight: 600, color: CP.textPrimary, margin: 0 }}>{g.label}</h3>
-                  <span style={{ fontSize: 12, color: CP.textMuted }}>conteggio sospeso (soglie in ricalibrazione)</span>
+                  {perf.performance_met ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: CP.accentGreen, background: alpha(CP.accentGreen, "18"), borderRadius: 99, padding: "3px 10px" }}>
+                      <CheckCircle2 size={13} /> performance raggiunta
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 12, color: CP.textMuted }}>{perf.evaluable ? `${perf.hits} mesi su ${perf.needed} necessari${perf.below_floor ? ` · ${perf.below_floor} sotto il minimo` : ""}` : "storico non ancora sufficiente"}</span>
+                  )}
                 </div>
                 <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 10px" }}>
                   Requisito performance: <b style={{ color: CP.textPrimary }}>{perf.requirement}</b> · Time floor: {g.time_floor}
@@ -79,10 +85,11 @@ export default function MyLadderPage() {
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
                   {(perf.months || []).map((m) => (
                     <div key={m.period_id} style={{ textAlign: "center" }}>
-                      <div style={{ width: 54, padding: "6px 0", borderRadius: 8, background: CP.surfaceAlt, border: `1px solid ${CP.border}` }}>
+                      <div title={m.counts ? "Conta per il passaggio" : m.below_floor ? "Sotto il minimo richiesto" : "Sotto la soglia di questo passaggio"}
+                        style={{ width: 54, padding: "6px 0", borderRadius: 8, background: m.counts ? alpha(CP.accentGreen, "1c") : CP.surfaceAlt, border: `1px solid ${m.counts ? CP.accentGreen : m.below_floor ? CP.accentRed : CP.border}` }}>
                         <span style={{ fontSize: 12.5, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{m.score != null ? Math.round(m.score) : "—"}</span>
                       </div>
-                      <span style={{ fontSize: 10, color: CP.textMuted }}>{String(m.period_id).slice(5)}</span>
+                      <span style={{ fontSize: 10, color: CP.textMuted }}>{String(m.period_id).slice(5)}{m.tier ? ` · ${m.tier}` : ""}</span>
                     </div>
                   ))}
                 </div>

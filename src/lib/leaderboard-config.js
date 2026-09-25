@@ -54,13 +54,23 @@ export const KPI_WEIGHTS = {
 // v11: max esteso ai frazionari per chiudere il gap (score=50.5 ora cade in
 // Critical invece che restare null). calculateScores arrotonda a 2 decimali
 // quindi .99 è la massima granularità possibile.
+// v12 (25/09/2026, approvato da Nicholas — docs/CAREER_LADDER.md v0.6): le
+// soglie v11 (Critical <51 … Elite ≥91) non erano mai state tarate sulla scala
+// di questo score, dove chi è nella MEDIA del suo gruppo prende ~40-45: ogni mese
+// da gennaio ~60% degli operatori risultava "Critical" (anche al 68° percentile).
+// Nuove soglie = percentili dello score su gen-ago 2026 (1.614 schede mensili):
+// p10 14,4 · p25 27,2 · p50 44 · p75 60,8 · p90 75,2 → Critical = 10% più basso,
+// Elite = 10% più alto (stessa semantica delle fasce dello score vendite CP).
+// SOLO le etichette cambiano: il calcolo dello score è identico, e i gate della
+// career ladder sono stati riscritti in NUMERI (/api/me/ladder) così passano
+// esattamente le stesse persone di prima.
 export const SCORE_TIERS = [
-  { label: "Critical", min: 0,  max: 50.99, color: "#D44545" },
-  { label: "Weak",     min: 51, max: 60.99, color: "#E76F51" },
-  { label: "Average",  min: 61, max: 70.99, color: "#B89158" },
-  { label: "Good",     min: 71, max: 80.99, color: "#D4AF7A" },
-  { label: "Strong",   min: 81, max: 90.99, color: "#3FB97E" },
-  { label: "Elite",    min: 91, max: 100,   color: "#4F8CCB" },
+  { label: "Critical", min: 0,  max: 14.99, color: "#D44545" },
+  { label: "Weak",     min: 15, max: 26.99, color: "#E76F51" },
+  { label: "Average",  min: 27, max: 43.99, color: "#B89158" },
+  { label: "Good",     min: 44, max: 60.99, color: "#D4AF7A" },
+  { label: "Strong",   min: 61, max: 74.99, color: "#3FB97E" },
+  { label: "Elite",    min: 75, max: 100,   color: "#4F8CCB" },
 ];
 
 /**
