@@ -1,293 +1,183 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import useSWR, { mutate } from "swr";
+// Creator (redesign 25/09/2026, struttura del pilota Calendario compensi).
+// Domanda: "quanto rende ogni creator e chi ci lavora meglio?".
+// Numero principale col riferimento al mese prima → filtri (in calo/in
+// crescita per venduto a turno, nuove) + ricerca → tabella ordinabile →
+// abbinamenti operatore↔creator spiegati in parole (prima: 5 di 8, etichette
+// criptiche). Confronto sul mese in corso fatto su una misura a turno, mai sul
+// totale del mese prima intero.
+import { useMemo, useState } from "react";
+import useSWR from "swr";
 import Link from "next/link";
-import { CP, FONTS, creatorDotColor, alpha } from "@/lib/brand";
-import { SectionLabel, StatCard, TrendPill, CreatorDot, MiniInsight, CpCard } from "@/components/cp-style";
+import { Info, Shuffle } from "lucide-react";
+import { CP, FONTS } from "@/lib/brand";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
 import { useSmartPeriod } from "@/lib/use-smart-period";
-import { Info } from "lucide-react";
+import { fmt$, fmtInt, fmtPct, fmtDelta, MONTHS_IT } from "@/lib/format";
+import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice } from "@/components/ds";
 
-const fetcher = (url) => fetch(url).then((r) => r.json());
+const fetcher = async (url) => {
+  const r = await fetch(url);
+  const j = await r.json().catch(() => ({}));
+  return r.ok ? j : { ...j, error: j.error || `Errore ${r.status}` };
+};
+const MOVE = 0.15; // ±15% di venduto a turno = si è mosso davvero
 
-const MONTH_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 function monthOpts(n = 18) {
-  const out = [];
   const now = new Date();
-  for (let i = 0; i < n; i++) {
+  return Array.from({ length: n }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    out.push({ value: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`, label: `${MONTH_IT[d.getMonth()]} ${d.getFullYear()}` });
-  }
-  return out;
+    return { value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: `${MONTHS_IT[d.getMonth()]} ${d.getFullYear()}` };
+  });
 }
-function fmtCurrency(v, dec = 0) { if (v == null) return "—"; return "$ " + Number(v).toLocaleString("it-IT", { maximumFractionDigits: dec }); }
-function fmtCurrencyShort(v) {
-  if (v == null) return "—";
-  const n = Number(v);
-  if (Math.abs(n) >= 1000) return "$ " + (n / 1000).toLocaleString("it-IT", { maximumFractionDigits: 1 }) + "k";
-  return "$ " + n.toLocaleString("it-IT", { maximumFractionDigits: 0 });
-}
-function fmtNum(v) { if (v == null) return "—"; return Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 }); }
+const prevOf = (pid) => { if (!pid) return null; const [y, m] = pid.split("-").map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+const num1 = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { maximumFractionDigits: 1 }));
 
 export default function CreatorsLeaderboardPage() {
   const [periodId, setPeriodId] = useSmartPeriod();
-  const [search, setSearch] = useState("");
+  const [view, setView] = useState("all");
+  const [q, setQ] = useState("");
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [matchOpen, setMatchOpen] = useState(false);
   const periodOptions = useMemo(() => monthOpts(), []);
+  const prevId = prevOf(periodId);
+  const isCurrent = periodId === periodOptions[0].value;
 
-  const url = periodId ? `/api/leaderboard/creators?period_id=${periodId}&include_suggestions=1` : null;
-  const { data, error, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
+  const { data, isLoading } = useSWR(periodId ? `/api/leaderboard/creators?period_id=${periodId}&include_suggestions=1` : null, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
+  const { data: prev } = useSWR(prevId ? `/api/leaderboard/creators?period_id=${prevId}` : null, fetcher, { revalidateOnFocus: false });
 
-  const creators = data?.creators || [];
-  const filtered = useMemo(() => {
-    if (!search.trim()) return creators;
-    const q = search.toLowerCase();
-    return creators.filter((c) =>
-      c.alias.toLowerCase().includes(q) ||
-      (c.top_operator?.name || "").toLowerCase().includes(q)
-    );
-  }, [creators, search]);
+  const ok = data && !data.error;
+  const total = data?.total_sales_agency || 0;
+  const prevBy = useMemo(() => new Map((prev?.creators || []).map((c) => [c.alias, c])), [prev]);
+  const rows = useMemo(() => (ok ? data.creators : []).map((c) => {
+    const p = prevBy.get(c.alias);
+    const per = c.avg_sales_per_shift ?? (c.total_shifts ? c.total_sales / c.total_shifts : null);
+    const pPer = p ? (p.avg_sales_per_shift ?? (p.total_shifts ? p.total_sales / p.total_shifts : null)) : null;
+    return {
+      ...c, id: c.alias, per,
+      share: total > 0 ? c.total_sales / total : null,
+      move: per != null && pPer ? (per - pPer) / pPer : null,
+      isNew: prev?.creators && !p,
+      prevSales: p?.total_sales ?? null,
+    };
+  }), [ok, data, prevBy, prev, total]);
 
-  const suggestions = data?.suggestions || [];
-
-  // Calcoli derivati per la vista
-  const totalSales = data?.total_sales_agency || 0;
-  const topCreator = creators[0] || null;
-  const top5 = filtered.slice(0, 5);
-  const rest = filtered.slice(5);
-
-  const styles = {
-    page: { minHeight: "100vh", background: CP.bg, color: CP.textPrimary, fontFamily: FONTS.body, padding: "32px 28px" },
-    container: { maxWidth: 1500, margin: "0 auto" },
-    backLink: { color: CP.textSecondary, fontSize: 13, textDecoration: "none" },
-    headerRow: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16, marginBottom: 28 },
-    title: { fontFamily: FONTS.display, fontSize: 36, margin: "0 0 6px 0", fontWeight: 700, letterSpacing: "-0.02em" },
-    sub: { color: CP.textSecondary, fontSize: 14, lineHeight: 1.5, maxWidth: 720 },
-    toolbar: { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" },
-    input: { padding: "9px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" },
-    button: { padding: "9px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, color: CP.textSecondary, fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 },
-    primaryBtn: { padding: "9px 14px", background: CP.accentGreen, border: `1px solid ${CP.accentGreen}`, borderRadius: 10, color: CP.bg, fontSize: 13, fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 },
+  const counts = {
+    down: rows.filter((r) => r.move != null && r.move <= -MOVE).length,
+    up: rows.filter((r) => r.move != null && r.move >= MOVE).length,
+    fresh: rows.filter((r) => r.isNew).length,
   };
+  const needle = q.trim().toLowerCase();
+  const shown = rows.filter((r) => {
+    if (needle && !`${r.alias} ${r.top_operator?.name || ""}`.toLowerCase().includes(needle)) return false;
+    if (view === "down") return r.move != null && r.move <= -MOVE;
+    if (view === "up") return r.move != null && r.move >= MOVE;
+    if (view === "new") return r.isNew;
+    return true;
+  });
+  const suggestions = data?.suggestions || [];
+  const prevName = prevId ? MONTHS_IT[Number(prevId.slice(5)) - 1] : "";
+  const monthLabel = periodOptions.find((p) => p.value === periodId)?.label || periodId;
+
+  const columns = [
+    { key: "rank", label: "#", align: "right", muted: true },
+    { key: "alias", label: "Creator", render: (r) => (
+      <Link href={`/leaderboard/creators/${encodeURIComponent(r.alias)}?period_id=${periodId}`} style={{ color: CP.textPrimary, textDecoration: "none", fontWeight: 500 }}>
+        {r.alias}{r.isNew && <span style={{ marginLeft: 8, fontSize: 12, color: CP.accentSoftText }}>nuova</span>}
+      </Link>
+    ) },
+    { key: "total_sales", label: "Venduto", align: "right", render: (r) => fmt$(r.total_sales) },
+    { key: "share", label: "Quota", align: "right", muted: true, render: (r) => fmtPct(r.share, 1) },
+    { key: "per", label: "Per turno", align: "right", render: (r) => fmt$(r.per) },
+    { key: "move", label: "Per turno sul mese prima", align: "right", render: (r) => (
+      <span style={{ color: r.move == null ? CP.textMuted : r.move <= -MOVE ? CP.accentRed : r.move >= MOVE ? CP.accentGreen : CP.textSecondary }}>
+        {r.move == null ? "—" : `${r.move > 0 ? "+" : r.move < 0 ? "−" : ""}${Math.abs(Math.round(r.move * 100))}%`}
+      </span>
+    ) },
+    { key: "total_shifts", label: "Turni", align: "right", render: (r) => fmtInt(r.total_shifts) },
+    { key: "operators_count", label: "Operatori", align: "right" },
+    { key: "top", label: "Chi vende di più", sort: (r) => r.top_operator?.sales || 0, render: (r) => r.top_operator ? (
+      <span><Link href={`/leaderboard/operational/${encodeURIComponent(r.top_operator.name)}`} style={{ color: CP.textPrimary, textDecoration: "none" }}>{r.top_operator.name}</Link>
+        <span style={{ color: CP.textMuted, marginLeft: 6 }}>{fmt$(r.top_operator.sales)}</span></span>
+    ) : "—" },
+  ];
 
   return (
-    <div style={styles.page}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
       {tutorialOpen && <ScoreTutorialModal onClose={() => setTutorialOpen(false)} />}
-      <div style={styles.container}>
-        {/* Breadcrumb */}
-        <div style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap", fontSize: 13 }}>
-          <Link href="/leaderboard" style={styles.backLink}>Ladder</Link>
-          <span style={{ color: CP.textMuted }}>›</span>
-          <Link href="/leaderboard/operational" style={styles.backLink}>Operativa</Link>
-          <span style={{ color: CP.textMuted }}>›</span>
-          <Link href="/leaderboard/sales-cp" style={styles.backLink}>Sales CP</Link>
-          <span style={{ color: CP.textMuted }}>›</span>
-          <span style={{ color: CP.textPrimary }}>Creator</span>
+      <PageHead
+        crumbs={[{ label: "Performance" }, { label: "Creator" }]}
+        title="Creator"
+        subtitle="Quanto rende ogni creator e chi ci lavora meglio. Clic su una creator per il suo team, su un operatore per la sua scheda."
+        actions={<>
+          <select value={periodId || ""} onChange={(e) => setPeriodId(e.target.value)} aria-label="Mese" style={ctl}>
+            {periodOptions.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </select>
+          <Link href={`/leaderboard/creators/heatmap?period_id=${periodId}`} style={{ ...ctl, textDecoration: "none" }}>Mappa operatore × creator</Link>
+          <button onClick={() => setTutorialOpen(true)} style={{ ...ctl, display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}><Info size={14} /> Lo score</button>
+        </>}
+      />
+
+      {isLoading && !data && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
+      {data?.error && <Notice danger>{data.error} <Link href="/admin/creatorspro-sync" style={{ color: CP.accentSoftText }}>Sync CP →</Link></Notice>}
+
+      {ok && (<>
+        <HeroMetric
+          label={`Venduto delle creator · ${monthLabel}${isCurrent ? " finora" : ""}`}
+          value={fmt$(total)}
+          compare={prev?.total_sales_agency ? (isCurrent ? `${prevName} intero: ${fmt$(prev.total_sales_agency)}` : `${prevName}: ${fmt$(prev.total_sales_agency)} (${fmtDelta(total, prev.total_sales_agency)})`) : null}
+          hint="Solo i turni di operatori collegati: le persone CreatorsPro non collegate restano fuori (vedi Alert)."
+        >
+          <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+            <Metric label="Creator attive" value={fmtInt(data.creators_count)} note={prev?.creators_count ? `${prevName}: ${prev.creators_count}` : null} />
+            <Metric label="Operatori" value={fmtInt(data.operators_count)} />
+            <Metric label="Venduto per turno" value={fmt$(data.avg_sales_per_shift_agency)} delta={fmtDelta(data.avg_sales_per_shift_agency, prev?.avg_sales_per_shift_agency)} />
+            <Metric label="Venduto medio per creator" value={fmt$(data.avg_sales_per_creator)} />
+          </div>
+        </HeroMetric>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+          <FilterChip label={`Tutte (${rows.length})`} active={view === "all"} onClick={() => setView("all")} />
+          <FilterChip label={`In calo (${counts.down})`} danger={counts.down > 0} disabled={!counts.down} active={view === "down"} onClick={() => setView(view === "down" ? "all" : "down")} />
+          <FilterChip label={`In crescita (${counts.up})`} disabled={!counts.up} active={view === "up"} onClick={() => setView(view === "up" ? "all" : "up")} />
+          <FilterChip label={`Nuove (${counts.fresh})`} disabled={!counts.fresh} active={view === "new"} onClick={() => setView(view === "new" ? "all" : "new")} />
+          <span style={{ flex: 1 }} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca creator o operatore" aria-label="Cerca creator o operatore" style={{ ...ctl, width: 240 }} />
+        </div>
+        <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 8 }}>
+          In calo / in crescita = venduto per turno cambiato di almeno {MOVE * 100}% rispetto a {prevName} (misura a turno: vale anche a mese in corso).
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <DataTable columns={columns} rows={shown} defaultSort={{ key: "total_sales", dir: -1 }} minWidth={980} maxHeight="calc(100vh - 120px)"
+            empty={needle ? `Nessuna creator corrisponde a “${q}”.` : "Nessuna creator in questa vista."} />
         </div>
 
-        {/* Header */}
-        <div style={styles.headerRow}>
-          <div>
-            <h1 style={styles.title}>Creator Leaderboard</h1>
-            <p style={styles.sub}>
-              Chi sono le creator più redditizie del mese, chi è il loro top chatter e quanti operatori ci lavorano. Click su una creator per il drill-down del team interno.
-            </p>
-          </div>
-          <div style={styles.toolbar}>
-            <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} style={{ ...styles.input, minWidth: 180, cursor: "pointer" }}>
-              {periodOptions.map((p) => <option key={p.value} value={p.value} style={{ background: CP.surface }}>{p.label}</option>)}
-            </select>
-            <button
-              onClick={() => setTutorialOpen(true)}
-              style={{ ...styles.button, color: CP.accentGreen, gap: 6 }}
-              title="Come funziona lo score"
-            >
-              <Info size={14} /> Score?
-            </button>
-            <button onClick={() => url && mutate(url)} style={styles.button}>↻ Aggiorna</button>
-            <Link href={`/leaderboard/creators/heatmap?period_id=${periodId}`} style={styles.primaryBtn}>Heat-map →</Link>
-          </div>
-        </div>
-
-        {isLoading && !data && <p style={{ color: CP.textSecondary }}>Caricamento…</p>}
-        {error && <p style={{ color: CP.accentRed }}>Errore: {String(error)}</p>}
-        {data?.error && <div style={{ background: alpha(CP.accentRed, "20"), color: CP.accentRed, padding: 16, borderRadius: 12 }}>{data.error}{" "}<Link href="/admin/creatorspro-sync" style={{ color: CP.accentGreen }}>Sync CP →</Link></div>}
-
-        {data && !data.error && (
-          <>
-            {/* STAT CARDS top */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 24 }}>
-              <StatCard label="Creator attive" value={fmtNum(data.creators_count)} />
-              <StatCard label="Sales agency totale" value={fmtCurrencyShort(totalSales)} sub={`${fmtNum(data.operators_count)} operatori`} color={CP.accentGreen} />
-              <StatCard label="Avg sales / creator" value={fmtCurrencyShort(data.avg_sales_per_creator)} />
-              <StatCard
-                label="Top creator"
-                value={topCreator?.alias || "—"}
-                sub={topCreator ? `${fmtCurrencyShort(topCreator.total_sales)} · ${topCreator.operators_count} op` : null}
-                color={topCreator ? creatorDotColor(topCreator.alias) : null}
-              />
+        {suggestions.length > 0 && (
+          <Disclosure open={matchOpen} onToggle={() => setMatchOpen((v) => !v)} icon={<Shuffle size={15} />}
+            title={`Abbinamenti da valutare (${suggestions.length})`}
+            summary="operatori che rendono molto di più su una creator che nella loro media">
+            <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 10 }}>
+              Operatori il cui score su una creator supera di molto la loro media: candidati a lavorarci di più. È un segnale da verificare (turni, disponibilità), non un ordine.
             </div>
-
-            {/* RANKED LIST CP-STYLE: Revenue Split by Creator */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
-              {/* Sinistra: Big stat card */}
-              <CpCard padding="24px 28px" style={{ display: "flex", flexDirection: "column", justifyContent: "center", minHeight: 320 }}>
-                <SectionLabel>My Agency Revenue</SectionLabel>
-                <div style={{ fontFamily: FONTS.display, fontSize: 64, fontWeight: 700, lineHeight: 1.05, letterSpacing: "-0.03em", color: CP.textPrimary, marginTop: 12 }}>
-                  {fmtCurrencyShort(totalSales)}
+            {suggestions.map((s, i) => (
+              <div key={i} style={{ padding: "10px 0", borderTop: `1px solid ${CP.borderSoft}`, fontSize: 14, lineHeight: 1.5 }}>
+                <Link href={`/leaderboard/operational/${encodeURIComponent(s.employee)}`} style={{ color: CP.textPrimary, fontWeight: 500, textDecoration: "none" }}>{s.employee}</Link>
+                {" rende molto di più su "}
+                <Link href={`/leaderboard/creators/${encodeURIComponent(s.top_creator)}?period_id=${periodId}`} style={{ color: CP.textPrimary, fontWeight: 500, textDecoration: "none" }}>{s.top_creator}</Link>
+                <div style={{ fontSize: 13, color: CP.textMuted }}>
+                  score {num1(s.top_score)} su di lei contro {num1(s.avg_score)} di media sua (+{num1(s.gap)} punti) · {fmt$(s.top_sales)} venduti lì questo mese
                 </div>
-                <div style={{ marginTop: 14, display: "flex", gap: 12, alignItems: "center", fontSize: 13, color: CP.textSecondary }}>
-                  <span>{data.creators_count} creator</span>
-                  <span style={{ color: CP.textMuted }}>·</span>
-                  <span>{data.operators_count} operatori</span>
-                </div>
-                {data.total_shifts != null && (
-                  <div style={{ marginTop: 6, fontSize: 12, color: CP.textMuted }}>
-                    {fmtNum(data.total_shifts)} shift totali · avg {fmtCurrency(data.avg_sales_per_shift_agency)} / shift
-                  </div>
-                )}
-              </CpCard>
-
-              {/* Destra: Revenue Split by Creator (top 5) */}
-              <CpCard padding="20px 0 8px 0">
-                <div style={{ padding: "0 24px 14px 24px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div>
-                    <div style={{ fontFamily: FONTS.display, fontSize: 17, fontWeight: 600, color: CP.textPrimary, marginBottom: 4 }}>Revenue Split by Creator</div>
-                    <div style={{ fontSize: 12, color: CP.textMuted }}>Top creator del periodo (cliccabili)</div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <SectionLabel size={9}>Avg Revenue</SectionLabel>
-                    <div style={{ fontFamily: FONTS.mono, fontSize: 16, fontWeight: 700, color: CP.textPrimary, marginTop: 2 }}>
-                      {fmtCurrencyShort(data.avg_sales_per_creator)}
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  {top5.map((c, i) => {
-                    const pctShare = totalSales > 0 ? (c.total_sales / totalSales) * 100 : 0;
-                    return (
-                      <Link
-                        key={c.alias}
-                        href={`/leaderboard/creators/${encodeURIComponent(c.alias)}?period_id=${periodId}`}
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "32px 14px 1fr auto auto",
-                          gap: 14,
-                          alignItems: "center",
-                          padding: "11px 24px",
-                          borderTop: `1px solid ${CP.border}`,
-                          color: CP.textPrimary,
-                          textDecoration: "none",
-                          transition: "background 0.12s",
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = CP.surfaceAlt}
-                        onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                      >
-                        <span style={{ fontFamily: FONTS.mono, fontSize: 13, color: CP.textMuted, textAlign: "right" }}>{i + 1}.</span>
-                        <CreatorDot alias={c.alias} size={11} />
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                          <span style={{ fontWeight: 500, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.alias}</span>
-                          {i === 0 && (
-                            <span style={{ padding: "2px 7px", background: alpha(CP.accentGreen, "22"), color: CP.accentGreen, fontSize: 10, fontWeight: 700, borderRadius: 4, letterSpacing: "0.04em" }}>🏆 TOP</span>
-                          )}
-                        </div>
-                        <span style={{ fontFamily: FONTS.mono, fontSize: 14, fontWeight: 700, color: CP.textPrimary }}>{fmtCurrencyShort(c.total_sales)}</span>
-                        <span style={{ fontFamily: FONTS.mono, fontSize: 12, color: CP.textSecondary, minWidth: 50, textAlign: "right" }}>{pctShare.toFixed(1)}%</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </CpCard>
-            </div>
-
-            {/* MATCH SUGGESTIONS (insight strip) */}
-            {suggestions.length > 0 && (
-              <CpCard padding="20px 24px" style={{ marginBottom: 24 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                  <SectionLabel>Match Suggestions — Specializzazioni</SectionLabel>
-                  <span style={{ fontSize: 11, color: CP.textMuted }}>Top {Math.min(5, suggestions.length)} di {suggestions.length}</span>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: 12 }}>
-                  {suggestions.slice(0, 5).map((s, i) => (
-                    <div key={i} style={{ background: CP.surfaceAlt, border: `1px solid ${CP.border}`, borderRadius: 10, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                      <div style={{ fontSize: 13, lineHeight: 1.5 }}>
-                        <Link href={`/leaderboard/operational/${encodeURIComponent(s.employee)}`} style={{ color: CP.textPrimary, fontWeight: 600, textDecoration: "none" }}>{s.employee}</Link>
-                        {" → "}
-                        <CreatorDot alias={s.top_creator} size={8} style={{ verticalAlign: "middle", margin: "0 4px" }} />
-                        <Link href={`/leaderboard/creators/${encodeURIComponent(s.top_creator)}?period_id=${periodId}`} style={{ color: CP.textPrimary, fontWeight: 600, textDecoration: "none" }}>{s.top_creator}</Link>
-                        <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 4 }}>
-                          score <b style={{ color: CP.accentGreen }}>{s.top_score}</b> · media sua {s.avg_score} · <TrendPill value={s.gap} suffix="" size="sm" />
-                        </div>
-                      </div>
-                      <span style={{ color: CP.textPrimary, fontFamily: FONTS.mono, fontSize: 13, fontWeight: 700 }}>{fmtCurrencyShort(s.top_sales)}</span>
-                    </div>
-                  ))}
-                </div>
-              </CpCard>
-            )}
-
-            {/* SEARCH + RANKED LIST RESTO CREATOR */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 12, flexWrap: "wrap" }}>
-              <SectionLabel size={11}>Tutte le creator ({filtered.length}{search ? ` su ${creators.length}` : ""})</SectionLabel>
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cerca creator o operatore…" style={{ ...styles.input, width: 320 }} />
-            </div>
-
-            <CpCard padding="0">
-              {/* Header tabella */}
-              <div style={{ display: "grid", gridTemplateColumns: "40px 14px 1.6fr 1fr 0.8fr 0.8fr 1.2fr", gap: 16, padding: "14px 22px", borderBottom: `1px solid ${CP.borderStrong}` }}>
-                <SectionLabel>#</SectionLabel>
-                <span></span>
-                <SectionLabel>Creator</SectionLabel>
-                <SectionLabel style={{ textAlign: "right" }}>Sales totale</SectionLabel>
-                <SectionLabel style={{ textAlign: "right" }}>Shift</SectionLabel>
-                <SectionLabel style={{ textAlign: "right" }}>Operatori</SectionLabel>
-                <SectionLabel style={{ textAlign: "right" }}>Top operator</SectionLabel>
               </div>
-              {filtered.map((c, i) => (
-                <Link
-                  key={c.alias}
-                  href={`/leaderboard/creators/${encodeURIComponent(c.alias)}?period_id=${periodId}`}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "40px 14px 1.6fr 1fr 0.8fr 0.8fr 1.2fr",
-                    gap: 16,
-                    alignItems: "center",
-                    padding: "12px 22px",
-                    borderBottom: `1px solid ${CP.border}`,
-                    color: CP.textPrimary,
-                    textDecoration: "none",
-                    transition: "background 0.12s",
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = CP.surfaceAlt}
-                  onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                >
-                  <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: CP.textMuted, textAlign: "right" }}>{String(c.rank).padStart(2, "0")}</div>
-                  <CreatorDot alias={c.alias} size={11} />
-                  <div style={{ fontWeight: 600, fontSize: 14, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {c.alias}
-                    <span style={{ color: CP.textMuted, marginLeft: 6, fontSize: 12 }}>›</span>
-                  </div>
-                  <div style={{ fontFamily: FONTS.mono, fontSize: 14, fontWeight: 700, color: CP.accentGreen, textAlign: "right" }}>{fmtCurrencyShort(c.total_sales)}</div>
-                  <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: CP.textSecondary, textAlign: "right" }}>{fmtNum(c.total_shifts)}</div>
-                  <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: CP.textSecondary, textAlign: "right" }}>{c.operators_count}</div>
-                  <div style={{ fontSize: 13, color: CP.textPrimary, textAlign: "right", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {c.top_operator ? (
-                      <>
-                        {c.top_operator.name}
-                        <span style={{ color: CP.textMuted, fontSize: 11, marginLeft: 6, fontFamily: FONTS.mono }}>{fmtCurrencyShort(c.top_operator.sales)}</span>
-                      </>
-                    ) : "—"}
-                  </div>
-                </Link>
-              ))}
-            </CpCard>
-
-            <p style={{ fontSize: 11, color: CP.textMuted, marginTop: 16, fontStyle: "italic" }}>
-              Le sales degli shift multi-creator sono attribuite usando i singoli <code style={{ background: CP.surfaceAlt, padding: "1px 6px", borderRadius: 3 }}>takes</code> di CP quando disponibili (attribuzione esatta), altrimenti split 50/50 (stima). Re-sync CP per aggiornare.
-            </p>
-          </>
+            ))}
+          </Disclosure>
         )}
-      </div>
+        <div style={{ fontSize: 12, color: CP.textMuted }}>
+          Nei turni su più creator il venduto è attribuito con le singole vendite di CreatorsPro quando ci sono, altrimenti diviso in parti uguali (stima).
+        </div>
+      </>)}
     </div>
   );
 }
+
+const ctl = { padding: "8px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
