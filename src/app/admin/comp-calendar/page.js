@@ -35,6 +35,7 @@ import { useTheme, setTheme as setAppTheme } from "@/lib/theme-client";
 import CompNav from "@/components/CompNav";
 import HowToRead from "@/components/HowToRead";
 import CreatorPicker from "@/components/CreatorPicker";
+import { fmt$, fmtSigned$, fmtPct, fmtPts, fmtInt } from "@/lib/format";
 
 /* ------------------------------------------------------------------ */
 /* Palette e formati                                                   */
@@ -44,11 +45,6 @@ const MONTH_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Lugli
 const DAYS_IT = ["Dom","Lun","Mar","Mer","Gio","Ven","Sab"];
 const NUM = { fontVariantNumeric: "tabular-nums" };
 const MIN_SHIFTS = 5; // sotto: resa per turno non affidabile
-const nf0 = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0, useGrouping: "always" });
-const fmt$ = (n) => (n == null || isNaN(n) ? "—" : `$${nf0.format(Math.round(n))}`);
-const fmtSigned$ = (n) => (n == null ? "—" : Math.round(n) === 0 ? "$0" : `${n > 0 ? "+" : "−"}$${nf0.format(Math.abs(Math.round(n)))}`);
-const fmtPct = (v, d = 0) => (v == null || isNaN(v) ? "—" : `${(v * 100).toLocaleString("it-IT", { minimumFractionDigits: d, maximumFractionDigits: d })}%`);
-const fmtPts = (v) => (v == null ? "" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v * 100).toLocaleString("it-IT", { maximumFractionDigits: 1 })} punti`);
 
 function monthOpts(n = 12) {
   const out = [];
@@ -266,7 +262,7 @@ export default function CompCalendarPage() {
               </div>
               <Metric P={P} label="Venduto" value={fmt$(agg.totSales)} prev={aggPrev?.totSales} cur={agg.totSales} />
               <Metric P={P} label="Pagato agli operatori" value={fmt$(agg.totEarn)} prev={aggPrev?.totEarn} cur={agg.totEarn} />
-              <Metric P={P} label="Turni" value={nf0.format(agg.rows.length)} prev={aggPrev?.rows.length} cur={agg.rows.length} />
+              <Metric P={P} label="Turni" value={fmtInt(agg.rows.length)} prev={aggPrev?.rows.length} cur={agg.rows.length} />
               <Metric P={P} label="Operatori" value={String(agg.operators.length)} prev={aggPrev?.operators.length} cur={agg.operators.length} />
             </section>
 
