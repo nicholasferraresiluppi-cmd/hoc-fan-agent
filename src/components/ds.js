@@ -112,7 +112,7 @@ export function Notice({ children, danger }) {
  * Tabella ordinabile. columns: [{ key, label, align, render(row), sort(row) }]
  * Righe cliccabili con onRowClick; `selected(row)` evidenzia.
  */
-export function DataTable({ columns, rows, defaultSort, onRowClick, selected, minWidth = 600, empty = "Nessun dato." }) {
+export function DataTable({ columns, rows, defaultSort, onRowClick, selected, minWidth = 600, empty = "Nessun dato.", maxHeight }) {
   const [sort, setSort] = useState(defaultSort || null);
   const sorted = useMemo(() => {
     if (!sort) return rows;
@@ -124,9 +124,10 @@ export function DataTable({ columns, rows, defaultSort, onRowClick, selected, mi
       return ((x ?? -Infinity) - (y ?? -Infinity)) * sort.dir;
     });
   }, [rows, sort, columns]);
-  const th = { padding: "10px 12px", fontSize: 12, fontWeight: 500, color: CP.textMuted, whiteSpace: "nowrap", background: CP.surface, borderBottom: `1px solid ${CP.border}`, userSelect: "none" };
+  const th = { position: "sticky", top: 0, zIndex: 1, padding: "10px 12px", fontSize: 12, fontWeight: 500, color: CP.textMuted, whiteSpace: "nowrap", background: CP.surface, borderBottom: `1px solid ${CP.border}`, userSelect: "none" };
   return (
-    <div style={{ ...card, overflowX: "auto" }}>
+    // maxHeight: la tabella scorre dentro di sé e l'intestazione resta visibile
+    <div style={{ ...card, overflow: "auto", ...(maxHeight ? { maxHeight } : {}) }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth }}>
         <thead><tr>{columns.map((c) => (
           <th key={c.key} style={{ ...th, textAlign: c.align || "left", cursor: c.sortable === false ? "default" : "pointer" }}
