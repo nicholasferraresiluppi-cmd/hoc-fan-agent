@@ -82,7 +82,8 @@ export async function createInvitation({ email, roles, inviterId, inviterName, o
     err.code = "exists";
     throw err;
   }
-  const primary = wanted.find((r) => ROLES.includes(r)) || "operator";
+  // ruolo principale = il più alto tra i predefiniti scelti (admin prima di tutto)
+  const primary = [...ROLES].reverse().find((r) => wanted.includes(r)) || "operator";
   const inv = await cc.invitations.createInvitation({
     emailAddress: mail,
     redirectUrl: `${origin}/sign-up`,
