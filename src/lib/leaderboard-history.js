@@ -16,6 +16,7 @@
  */
 import { kv } from "@vercel/kv";
 import { buildLeaderboard } from "./leaderboard-calc";
+import { loadSettings } from "@/app/api/admin/leaderboard-settings/route";
 
 const TTL_MS = 5 * 60 * 1000;
 const TTL_SEC = TTL_MS / 1000;
@@ -104,8 +105,11 @@ async function buildRankingForPeriod(periodType, periodId) {
   if (cached) return cached;
   const records = await loadPeriodRecords(periodType, periodId);
   if (!records || records.length === 0) return cacheSet(key, { ranking: [], groupAverages: {} });
-  const [exclusions, langOverrides] = await Promise.all([loadExclusions(), loadLanguageOverrides()]);
-  const result = buildLeaderboard(records, "withoutClockIn", {}, exclusions);
+  const [exclusions, langOverrides, active] = await Promise.all([loadExclusions(), loadLanguageOverrides(), loadSettings().catch(() => ({}))]);
+  // Formula ATTIVA (prima: {} = impostazioni di fabbrica → le pagine operatore
+  // e i gate della ladder ignoravano una formula pubblicata dalle bozze).
+  const settings = { weights: active.weights, thresholds: active.thresholds, tiers: active.tiers, ...(active.small_group ? { small_group: active.small_group } : {}), group_languages: langOverrides || {} };
+  const result = buildLeaderboard(records, "withoutClockIn", settings, exclusions);
   // Applica override lingua manuali (KV group_languages) — sovrascrive la
   // detection regex automatica per i Group senza marker nel nome.
   if (langOverrides && Object.keys(langOverrides).length > 0) {
