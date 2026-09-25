@@ -188,6 +188,8 @@ export async function GET(request) {
       weights: loaded.weights,
       thresholds: loaded.thresholds,
       tiers: loaded.tiers,
+      ...(loaded.small_group ? { small_group: loaded.small_group } : {}),
+      group_languages: langs || {},
     };
     categories = cats || {};
     languageOverrides = langs || {};

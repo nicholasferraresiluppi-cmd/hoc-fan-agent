@@ -33,6 +33,7 @@ import {
 const KV_WEIGHTS = "ops_kpi:settings:weights";
 const KV_THRESHOLDS = "ops_kpi:settings:thresholds";
 const KV_TIERS = "ops_kpi:settings:tiers";
+const KV_SMALL_GROUP = "ops_kpi:settings:small_group"; // v13: { min_size } o assente
 
 /**
  * Carica settings da KV con fallback ai default.
@@ -51,11 +52,16 @@ export async function loadSettings() {
   try {
     tiers = await kv.get(KV_TIERS);
   } catch {}
+  let small_group = null;
+  try {
+    small_group = await kv.get(KV_SMALL_GROUP);
+  } catch {}
 
   return {
     weights: weights || KPI_WEIGHTS,
     thresholds: thresholds || NORMALIZATION_THRESHOLDS,
     tiers: tiers || SCORE_TIERS,
+    ...(small_group?.min_size ? { small_group } : {}),
     isCustom: {
       weights: !!weights,
       thresholds: !!thresholds,

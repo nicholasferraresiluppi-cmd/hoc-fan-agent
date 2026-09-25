@@ -184,6 +184,8 @@ function DraftCard({ draft, open, onToggle, call, busy }) {
           {isDraft && (
             <WeightsEditor draft={draft} onSave={onSaveWeights} busy={busy} />
           )}
+          <SmallGroupEditor draft={draft} editable={isDraft} busy={busy}
+            onSave={(small_group) => call("/api/admin/score-config-drafts", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: draft.id, small_group }) })} />
 
           {/* Backtest */}
           <div style={{ marginTop: 18 }}>
@@ -222,7 +224,7 @@ function DraftCard({ draft, open, onToggle, call, busy }) {
                   <CheckCircle2 size={14} /> Pubblica come formula attiva
                 </button>
                 <span style={{ fontSize: 12, color: CP.textMuted, maxWidth: 380, lineHeight: 1.4 }}>
-                  Forward-only: i mesi già importati restano scorati con la formula del loro snapshot; la precedente viene archiviata qui.
+                  Attenzione: la formula attiva ricalcola ANCHE i mesi passati (classifiche, pagine operatore, percorso di carriera). Lo snapshot registra con quale formula era stato importato ogni mese; la formula precedente viene archiviata qui.
                 </span>
               </>
             )}
@@ -237,6 +239,32 @@ function DraftCard({ draft, open, onToggle, call, busy }) {
         </div>
       )}
     </CpCard>
+  );
+}
+
+// v13: regola "gruppi piccoli" (C1 approvata da Nicholas 25/09/2026)
+function SmallGroupEditor({ draft, editable, busy, onSave }) {
+  const on = !!draft.small_group?.min_size;
+  const [n, setN] = useState(draft.small_group?.min_size || 5);
+  return (
+    <div style={{ marginTop: 16, padding: "12px 14px", border: `1px solid ${CP.border}`, borderRadius: 10 }}>
+      <SectionLabel>Gruppi piccoli</SectionLabel>
+      <div style={{ fontSize: 13, color: CP.textSecondary, margin: "6px 0 10px", lineHeight: 1.5 }}>
+        Chi ha meno di <b>{on ? draft.small_group.min_size : n}</b> operatori nel suo gruppo viene confrontato con la media di tutti gli operatori della sua lingua, invece che con 1-4 colleghi (confronto troppo rumoroso). Limite: per queste persone conta un po&apos; di più la creator su cui lavorano.
+      </div>
+      {editable ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13, color: CP.textMuted }}>Stato: <b style={{ color: on ? CP.accentGreen : CP.textPrimary }}>{on ? "attiva" : "spenta"}</b></span>
+          <input type="number" min={2} max={20} value={n} onChange={(e) => setN(Number(e.target.value))} aria-label="Soglia gruppo piccolo"
+            style={{ width: 70, background: CP.bgSunken, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "6px 8px", color: CP.textPrimary }} />
+          <button disabled={busy} onClick={() => onSave({ min_size: n })}
+            style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: CP.accent, color: CP.accentInk, fontSize: 13, cursor: "pointer" }}>{on ? "Aggiorna soglia" : "Attiva"}</button>
+          {on && <button disabled={busy} onClick={() => onSave(null)} style={{ padding: "6px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: "transparent", color: CP.textPrimary, fontSize: 13, cursor: "pointer" }}>Spegni</button>}
+        </div>
+      ) : (
+        <div style={{ fontSize: 13, color: CP.textMuted }}>{on ? `Attiva (meno di ${draft.small_group.min_size} operatori)` : "Spenta"}</div>
+      )}
+    </div>
   );
 }
 
