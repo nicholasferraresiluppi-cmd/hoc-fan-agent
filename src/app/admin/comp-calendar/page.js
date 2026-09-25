@@ -55,6 +55,7 @@ const DATA_SCALE = {
 const MONTH_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const DAYS_IT = ["Dom","Lun","Mar","Mer","Gio","Ven","Sab"];
 const NUM = { fontVariantNumeric: "tabular-nums" };
+const MIN_SHIFTS = 5; // sotto: resa per turno non affidabile
 const nf0 = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0, useGrouping: "always" });
 const fmt$ = (n) => (n == null || isNaN(n) ? "—" : `$${nf0.format(Math.round(n))}`);
 const fmtSigned$ = (n) => (n == null ? "—" : Math.round(n) === 0 ? "$0" : `${n > 0 ? "+" : "−"}$${nf0.format(Math.abs(Math.round(n)))}`);
@@ -203,7 +204,10 @@ export default function CompCalendarPage() {
     if (!agg) return [];
     const arr = agg.operators.map((o) => ({ ...o, per_shift: o.turni ? o.sales / o.turni : 0, cost_pct: o.sales ? o.earn / o.sales : null }));
     const k = sort.key;
-    return arr.sort((a, b) => (typeof a[k] === "string" ? a[k].localeCompare(b[k]) * sort.dir : ((a[k] ?? 0) - (b[k] ?? 0)) * sort.dir));
+    // Chi ha pochi turni in fondo quando si ordina per resa: un turno solo non dice
+    // chi è bravo (con 1 turno da $8.000 si finiva in cima).
+    const few = (o) => (["per_shift", "cost_pct"].includes(k) && o.turni < MIN_SHIFTS ? 1 : 0);
+    return arr.sort((a, b) => few(a) - few(b) || (typeof a[k] === "string" ? a[k].localeCompare(b[k]) * sort.dir : ((a[k] ?? 0) - (b[k] ?? 0)) * sort.dir));
   }, [agg, sort]);
 
   /* ---------------- stili (dipendono dal tema) ---------------- */
@@ -312,10 +316,10 @@ export default function CompCalendarPage() {
                     const sel = focus && typeof focus === "object" && focus.operator === o.name;
                     return (
                       <tr key={o.name} onClick={() => setFocus(sel ? null : { operator: o.name })} style={{ borderTop: `1px solid ${P.borderSoft}`, cursor: "pointer", background: sel ? P.accentSoft : "transparent" }} title="Clicca per vedere solo i suoi turni nella griglia">
-                        <td style={{ ...st.td, color: P.textPrimary }}>{o.name}</td>
+                        <td style={{ ...st.td, color: P.textPrimary }}>{o.name}{o.turni < MIN_SHIFTS && <span style={{ fontSize: 12, color: P.textMuted, marginLeft: 8 }}>pochi turni</span>}</td>
                         <td style={{ ...st.td, ...NUM, textAlign: "right", color: P.textSecondary }}>{o.turni}</td>
                         <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmt$(o.sales)}</td>
-                        <td style={{ ...st.td, ...NUM, textAlign: "right", fontWeight: 500 }}>{fmt$(o.per_shift)}</td>
+                        <td style={{ ...st.td, ...NUM, textAlign: "right", fontWeight: 500, color: o.turni < MIN_SHIFTS ? P.textMuted : P.textPrimary }}>{fmt$(o.per_shift)}</td>
                         <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmt$(o.earn)}</td>
                         <td style={{ ...st.td, ...NUM, textAlign: "right", color: P.textSecondary }}>{fmtPct(o.cost_pct, 1)}</td>
                         <td style={st.td}><TierBar byPct={o.byPct} tier={tier} P={P} /></td>
