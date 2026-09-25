@@ -57,6 +57,18 @@ export default function MyProfilePage() {
   // CP history (per tenure + LTV CP)
   const cpHistUrl = employee ? `/api/leaderboard/operator-cp-history?employee=${encodeURIComponent(employee)}&last_n=12` : null;
   const { data: cpHist } = useSWR(cpHistUrl, fetcher, { revalidateOnFocus: false });
+  // Anzianità: primo mese in QUALSIASI fonte (CP parte da giugno 2026, lo storico
+  // Infloww da gennaio) — prima contava solo i mesi CP ("4 mesi" per chi c'è da gennaio).
+  const { data: myScore } = useSWR(employee ? "/api/me/score" : null, fetcher, { revalidateOnFocus: false });
+  const firstSeen = useMemo(() => {
+    const cands = [cpHist?.first_seen_period, ...((myScore?.history || []).filter((h) => h.score != null).map((h) => h.period_id))].filter((x) => /^\d{4}-\d{2}$/.test(x || ""));
+    return cands.length ? cands.sort()[0] : null;
+  }, [cpHist, myScore]);
+  const tenureMonths = useMemo(() => {
+    if (!firstSeen) return null;
+    const [y, m] = firstSeen.split("-").map(Number); const d = new Date();
+    return (d.getFullYear() - y) * 12 + (d.getMonth() + 1 - m);
+  }, [firstSeen]);
 
   // Coaching assignment se esiste
   const coachingUrl = periodId ? `/api/admin/coaching-center?period_id=${periodId}` : null;
@@ -143,7 +155,7 @@ export default function MyProfilePage() {
                     <StatMini l="Shift" v={Math.round(cp.total_shifts || 0)} />
                     <StatMini l="Creator attive" v={cp.per_creator?.length || 0} />
                     {cp.rank_agency && <StatMini l="Posizione" v={`#${cp.rank_agency}`} sub={`su ${cp.total_in_ranking}`} />}
-                    {cpHist?.tenure_months_cp != null && <StatMini l="Sei in agency da" v={`${cpHist.tenure_months_cp} mesi`} sub={cpHist.first_seen_period ? `dal ${formatPeriodLabel(cpHist.first_seen_period)}` : null} />}
+                    {tenureMonths != null && <StatMini l="Sei in agency da" v={`${tenureMonths} ${tenureMonths === 1 ? "mese" : "mesi"}`} sub={`dal ${formatPeriodLabel(firstSeen)}`} />}
                     {cpHist?.ltv_cp_eur != null && <StatMini l="Fatturato CP totale" v={fmtCurrency(cpHist.ltv_cp_eur)} sub={`${cpHist.periods_count} mesi`} color={CP.accentGreen} />}
                   </div>
                 </div>

@@ -170,7 +170,10 @@ export default function MyScorePage() {
               ))}
             </div>
             <p style={{ fontSize: 12, color: CP.textMuted, margin: "14px 0 0", lineHeight: 1.5 }}>
-              Ogni barra è la tua posizione rispetto alla media del tuo team su quella dimensione (100 = molto sopra la media). Le barre rosse sono dove recuperi più punti: parlane col tuo team lead.
+              {data.comparison === "language"
+                ? `Nel tuo gruppo siete in pochi (${data.group_size ?? "meno di 5"}), quindi ogni barra confronta te con la media di tutti gli operatori della tua lingua: un confronto con 1-4 colleghi sarebbe troppo casuale. `
+                : "Ogni barra è la tua posizione rispetto alla media del tuo gruppo su quella voce. "}
+              100 = molto sopra la media, 40 = appena sotto. Le barre rosse sono dove recuperi più punti: parlane col tuo team lead.
             </p>
           </CpCard>
 
