@@ -8,7 +8,7 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import useSWR from "swr";
 import Link from "next/link";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 import { FILM_THRESHOLDS } from "@/lib/game-film-core";
 import { LEGIT_REASONS } from "@/lib/film-library-core";
@@ -49,8 +49,8 @@ function Bubble({ m }) {
           borderRadius: 10,
           fontSize: 12.5,
           lineHeight: 1.45,
-          background: op ? `${CP.accent}26` : CP.bgSunken,
-          border: `1px solid ${op ? `${CP.accent}55` : CP.borderSoft}`,
+          background: op ? `${alpha(CP.accent, "26")}` : CP.bgSunken,
+          border: `1px solid ${op ? `${alpha(CP.accent, "55")}` : CP.borderSoft}`,
           color: CP.textPrimary,
         }}
       >
@@ -62,8 +62,8 @@ function Bubble({ m }) {
               padding: "1px 7px",
               borderRadius: 999,
               fontSize: 10.5,
-              background: `${CP.accentGreen}22`,
-              border: `1px solid ${CP.accentGreen}55`,
+              background: `${alpha(CP.accentGreen, "22")}`,
+              border: `1px solid ${alpha(CP.accentGreen, "55")}`,
               color: CP.accentGreen,
               whiteSpace: "nowrap",
             }}
@@ -146,7 +146,7 @@ function JudgmentBar({ m, operator, onJudged }) {
       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
         <span
           title={m.judgment?.note || undefined}
-          style={{ fontSize: 10.5, color: s.color, background: `${s.color}1c`, border: `1px solid ${s.color}55`, padding: "2px 9px", borderRadius: 999 }}
+          style={{ fontSize: 10.5, color: s.color, background: `${alpha(s.color, "1c")}`, border: `1px solid ${alpha(s.color, "55")}`, padding: "2px 9px", borderRadius: 999 }}
         >
           {st === "legittima" && m.judgment?.reason ? `legittima · ${(LEGIT_REASONS[m.judgment.reason] || m.judgment.reason).toLowerCase().slice(0, 34)}` : s.label}
         </span>
@@ -191,7 +191,7 @@ function JudgmentBar({ m, operator, onJudged }) {
 
 function MomentCard({ m, tone, twin, onOpenTwin, operator, onJudged }) {
   const [open, setOpen] = useState(false);
-  const border = tone === "win" ? `${CP.accentGreen}44` : `${CP.accentRed}44`;
+  const border = tone === "win" ? `${alpha(CP.accentGreen, "44")}` : `${alpha(CP.accentRed, "44")}`;
   const reason = m.reason ? REASON[m.reason] : null;
   return (
     <div style={{ background: CP.surface, border: `1px solid ${border}`, borderRadius: 12, padding: "13px 15px" }}>
@@ -228,7 +228,7 @@ function MomentCard({ m, tone, twin, onOpenTwin, operator, onJudged }) {
               {twin.creator_id !== m.creator_id && (
                 <span
                   title="La vinta comparabile è su un altro creator: contesto e pricing possono differire"
-                  style={{ marginLeft: 6, fontSize: 10.5, padding: "1px 7px", borderRadius: 999, background: `${CP.accentBlue}22`, border: `1px solid ${CP.accentBlue}55`, color: CP.accentBlue, whiteSpace: "nowrap" }}
+                  style={{ marginLeft: 6, fontSize: 10.5, padding: "1px 7px", borderRadius: 999, background: `${alpha(CP.accentBlue, "22")}`, border: `1px solid ${alpha(CP.accentBlue, "55")}`, color: CP.accentBlue, whiteSpace: "nowrap" }}
                 >
                   creator diverso
                 </span>
@@ -295,7 +295,7 @@ function LibrarySection({ library, operator, topKeys, onOpenTop, onJudged }) {
       key={key || "all"}
       onClick={() => setFilter(filter === key ? null : key)}
       style={{
-        background: filter === key ? `${color}22` : CP.surface,
+        background: filter === key ? `${alpha(color, "22")}` : CP.surface,
         border: `1px solid ${filter === key ? color : CP.border}`,
         borderRadius: 999,
         padding: "5px 12px",
@@ -340,7 +340,7 @@ function LibrarySection({ library, operator, topKeys, onOpenTop, onJudged }) {
                 ) : (
                   <span style={{ color: CP.textSecondary }}>{REASON[m.reason]?.label || "—"}</span>
                 )}
-                <span style={{ fontSize: 10.5, color: st.color, background: `${st.color}1c`, border: `1px solid ${st.color}55`, padding: "1px 8px", borderRadius: 999 }}>{st.label}</span>
+                <span style={{ fontSize: 10.5, color: st.color, background: `${alpha(st.color, "1c")}`, border: `1px solid ${alpha(st.color, "55")}`, padding: "1px 8px", borderRadius: 999 }}>{st.label}</span>
                 <button
                   onClick={() => openMoment(m.key)}
                   style={{ marginLeft: "auto", background: "none", border: "none", color: CP.accentSoftText, cursor: "pointer", fontSize: 12 }}
@@ -431,13 +431,13 @@ export default function OperatorFilmPage() {
       />
 
       {refreshErr && (
-        <div style={{ padding: "12px 16px", marginBottom: 12, background: CP.surface, border: `1px solid ${CP.accentRed}55`, borderRadius: 10, color: CP.accentRed, fontSize: 13 }}>
+        <div style={{ padding: "12px 16px", marginBottom: 12, background: CP.surface, border: `1px solid ${alpha(CP.accentRed, "55")}`, borderRadius: 10, color: CP.accentRed, fontSize: 13 }}>
           Ricalcolo fallito: {refreshErr}.
         </div>
       )}
 
       {error ? (
-        <div style={{ padding: "20px 24px", background: CP.surface, border: `1px solid ${CP.accentRed}55`, borderRadius: 12, color: CP.accentRed, fontSize: 14 }}>
+        <div style={{ padding: "20px 24px", background: CP.surface, border: `1px solid ${alpha(CP.accentRed, "55")}`, borderRadius: 12, color: CP.accentRed, fontSize: 14 }}>
           Non riesco a montare il film: {error.message}.
         </div>
       ) : isLoading || !data ? (

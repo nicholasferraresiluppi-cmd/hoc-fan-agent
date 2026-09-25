@@ -6,7 +6,7 @@
 
 import { COLORS, CP } from "@/lib/brand";
 
-const BASE = COLORS.charcoal || "#151a22";
+const BASE = COLORS.charcoal || CP.surface;
 const BLOCK = CP.surfaceAlt; // blocco skeleton flat, visibile sia su bg che su surface
 
 export function Shimmer({ width = "100%", height = 16, radius = 6, style = {} }) {

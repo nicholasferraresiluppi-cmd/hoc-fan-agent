@@ -9,7 +9,7 @@ import { CREATOR_PERSONAS } from "@/lib/creator-personas";
 import { FAN_ARCHETYPES, getFanArchetypeById } from "@/lib/fan-archetypes";
 import PlayerCard from "@/components/PlayerCard";
 import { PlayerCardSkeleton, XPBarSkeleton, GridSkeleton } from "@/components/Skeleton";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
 import CoachPanel from "@/components/CoachPanel";
 import SignalsPanel from "@/components/SignalsPanel";
@@ -212,7 +212,7 @@ export default function Home() {
   useEffect(() => { selectedScenarioRef.current = selectedScenario; }, [selectedScenario]);
 
   // Quick Challenge State
-  const [quickChallengeIndex, setQuickChallengIndex] = useState(0);
+  const [quickChallengeIndex, setQuickChallengeIndex] = useState(0);
   const [quickChallengeResponse, setQuickChallengeResponse] = useState("");
   const [quickChallengeEval, setQuickChallengeEval] = useState(null);
 
@@ -499,7 +499,7 @@ export default function Home() {
             justifyContent: "space-between",
             alignItems: "center",
             padding: "1.5rem 2rem",
-            borderBottom: `1px solid ${HOC_COLORS.purple}20`,
+            borderBottom: `1px solid ${alpha(HOC_COLORS.purple, "20")}`,
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
@@ -534,7 +534,7 @@ export default function Home() {
                 title={`Lega ${league.tier} — stagione ${league.seasonKey}${league.rank ? ` • rank #${league.rank}` : ""}`}
                 style={{
                   padding: "0.2rem 0.55rem",
-                  background: `${LEAGUE_UI[league.tier]?.color || "#666"}22`,
+                  background: `${alpha(LEAGUE_UI[league.tier]?.color || "#666", "22")}`,
                   border: `1px solid ${LEAGUE_UI[league.tier]?.color || "#666"}`,
                   borderRadius: "0.4rem",
                   color: LEAGUE_UI[league.tier]?.color || "#fff",
@@ -555,10 +555,10 @@ export default function Home() {
                   padding: "0.2rem 0.55rem",
                   background:
                     seniority.tier === "master"
-                      ? `${HOC_COLORS.purple}25`
+                      ? `${alpha(HOC_COLORS.purple, "25")}`
                       : seniority.tier === "senior"
-                      ? `${HOC_COLORS.orange}25`
-                      : `${COLORS.verdant}25`,
+                      ? `${alpha(HOC_COLORS.orange, "25")}`
+                      : `${alpha(COLORS.verdant, "25")}`,
                   border: `1px solid ${
                     seniority.tier === "master"
                       ? HOC_COLORS.purple
@@ -631,7 +631,7 @@ export default function Home() {
                         style={{
                           display: "flex", alignItems: "center", gap: "0.3rem",
                           padding: "0.3rem 0.55rem", borderRadius: "999px",
-                          background: `${meta.color}22`, border: `1px solid ${meta.color}`, color: meta.color,
+                          background: `${alpha(meta.color, "22")}`, border: `1px solid ${meta.color}`, color: meta.color,
                           fontSize: "0.72rem", fontWeight: 800,
                         }}>
                         <span>{meta.emoji}</span>
@@ -741,7 +741,7 @@ export default function Home() {
                     color: COLORS.obsidian,
                     transition: "transform 0.2s, box-shadow 0.2s",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 12px 28px ${COLORS.champagne}40`; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 12px 28px ${alpha(COLORS.champagne, "40")}`; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
                 >
                   <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: "0.22em", fontWeight: 800, opacity: 0.75 }}>ENTRA IN</div>
@@ -765,7 +765,7 @@ export default function Home() {
                     color: COLORS.alabaster,
                     transition: "background 0.2s",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = `${COLORS.cobalt}18`; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = `${alpha(COLORS.cobalt, "18")}`; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                 >
                   <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: "0.22em", fontWeight: 800, color: COLORS.cobalt }}>SFIDA</div>
@@ -830,8 +830,8 @@ export default function Home() {
                     <div
                       key={cr.id}
                       style={{
-                        background: unlocked ? `${meta.color}10` : COLORS.graphite,
-                        border: `1px solid ${unlocked ? meta.color + "55" : COLORS.charcoal}`,
+                        background: unlocked ? `${alpha(meta.color, "10")}` : COLORS.graphite,
+                        border: `1px solid ${unlocked ? alpha(meta.color, "55") : COLORS.charcoal}`,
                         borderRadius: 10,
                         padding: "0.85rem 0.95rem",
                         opacity: unlocked ? 1 : 0.7,
@@ -852,7 +852,7 @@ export default function Home() {
                             {unlocked ? meta.label : "LOCKED"}
                           </div>
                         </div>
-                        <div style={{ fontSize: "1.6rem", lineHeight: 1, filter: unlocked ? `drop-shadow(0 0 8px ${meta.color}88)` : "none" }}>
+                        <div style={{ fontSize: "1.6rem", lineHeight: 1, filter: unlocked ? `drop-shadow(0 0 8px ${alpha(meta.color, "88")})` : "none" }}>
                           {unlocked ? meta.emoji : "🔒"}
                         </div>
                       </div>
@@ -903,7 +903,7 @@ export default function Home() {
                     </span>
                   )}
                   {!dailyDrill.mandatory && !dailyDrill.completed && (
-                    <span style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem", background: `${HOC_COLORS.purple}40`, color: HOC_COLORS.purple, borderRadius: 4, fontWeight: 700 }}>
+                    <span style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem", background: `${alpha(HOC_COLORS.purple, "40")}`, color: HOC_COLORS.purple, borderRadius: 4, fontWeight: 700 }}>
                       Opzionale
                     </span>
                   )}
@@ -961,7 +961,7 @@ export default function Home() {
             <div
               onClick={() => setScreen("profile")}
               style={{
-                background: `${HOC_COLORS.purple}15`,
+                background: `${alpha(HOC_COLORS.purple, "15")}`,
                 border: `5px solid ${HOC_COLORS.purple}`,
                 borderRadius: "1.5rem",
                 padding: "1.5rem",
@@ -995,8 +995,8 @@ export default function Home() {
             {/* Admin Area */}
             <Link href="/admin"
               style={{
-                background: `${HOC_COLORS.gray}10`,
-                border: `2px dashed ${HOC_COLORS.gray}60`,
+                background: `${alpha(HOC_COLORS.gray, "10")}`,
+                border: `2px dashed ${alpha(HOC_COLORS.gray, "60")}`,
                 borderRadius: "1.5rem",
                 padding: "1.5rem",
                 cursor: "pointer",
@@ -1005,7 +1005,7 @@ export default function Home() {
                 display: "block",
               }}
               onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.borderColor = HOC_COLORS.orange; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${HOC_COLORS.gray}60`; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${alpha(HOC_COLORS.gray, "60")}`; }}
             >
               <h3 style={{ margin: "0 0 0.5rem 0", fontSize: "1.1rem", fontWeight: 900, color: HOC_COLORS.white }}>
                 Area Admin
@@ -1017,8 +1017,8 @@ export default function Home() {
                   {/* Playbook — libreria formativa visibile a tutti gli operatori */}
             <Link href="/playbook"
               style={{
-                background: `${HOC_COLORS.orange}10`,
-                border: `2px solid ${HOC_COLORS.orange}40`,
+                background: `${alpha(HOC_COLORS.orange, "10")}`,
+                border: `2px solid ${alpha(HOC_COLORS.orange, "40")}`,
                 borderRadius: "1.5rem",
                 padding: "1.5rem",
                 cursor: "pointer",
@@ -1027,7 +1027,7 @@ export default function Home() {
                 display: "block",
               }}
               onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.borderColor = HOC_COLORS.orange; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${HOC_COLORS.orange}40`; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${alpha(HOC_COLORS.orange, "40")}`; }}
             >
               <h3 style={{ margin: "0 0 0.5rem 0", fontSize: "1.1rem", fontWeight: 900, color: HOC_COLORS.white }}>
                 Playbook
@@ -1059,8 +1059,8 @@ export default function Home() {
                     justifyContent: "space-between",
                     alignItems: "center",
                     padding: "1rem",
-                    background: `${HOC_COLORS.white}08`,
-                    border: `1px solid ${HOC_COLORS.white}10`,
+                    background: `${alpha(HOC_COLORS.white, "08")}`,
+                    border: `1px solid ${alpha(HOC_COLORS.white, "10")}`,
                     borderRadius: "0.75rem",
                   }}
                 >
@@ -1115,7 +1115,7 @@ export default function Home() {
             justifyContent: "space-between",
             alignItems: "center",
             padding: "1.5rem 2rem",
-            borderBottom: `1px solid ${HOC_COLORS.purple}20`,
+            borderBottom: `1px solid ${alpha(HOC_COLORS.purple, "20")}`,
           }}
         >
           <div>
@@ -1170,7 +1170,7 @@ export default function Home() {
                 setScreen("scenario-list");
               }}
               style={{
-                background: `${HOC_COLORS.white}08`,
+                background: `${alpha(HOC_COLORS.white, "08")}`,
                 border: `5px solid ${HOC_COLORS.purple}`,
                 borderRadius: "1rem",
                 padding: "1.5rem",
@@ -1208,7 +1208,7 @@ export default function Home() {
                         width: "8px",
                         height: "8px",
                         borderRadius: "50%",
-                        background: i < cat.difficulty ? HOC_COLORS.orange : `${HOC_COLORS.white}20`,
+                        background: i < cat.difficulty ? HOC_COLORS.orange : `${alpha(HOC_COLORS.white, "20")}`,
                       }}
                     />
                   ))}
@@ -1237,7 +1237,7 @@ export default function Home() {
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  borderTop: `1px solid ${HOC_COLORS.white}10`,
+                  borderTop: `1px solid ${alpha(HOC_COLORS.white, "10")}`,
                   paddingTop: "1rem",
                 }}
               >
@@ -1302,8 +1302,8 @@ export default function Home() {
                     key={c.id}
                     onClick={() => startScenarioWithCreator(pendingScenario, c)}
                     style={{
-                      background: `${HOC_COLORS.white}08`,
-                      border: `2px solid ${HOC_COLORS.purple}50`,
+                      background: `${alpha(HOC_COLORS.white, "08")}`,
+                      border: `2px solid ${alpha(HOC_COLORS.purple, "50")}`,
                       borderRadius: "0.75rem",
                       padding: "1.25rem",
                       cursor: "pointer",
@@ -1314,7 +1314,7 @@ export default function Home() {
                       e.currentTarget.style.transform = "translateY(-2px)";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = `${HOC_COLORS.purple}50`;
+                      e.currentTarget.style.borderColor = `${alpha(HOC_COLORS.purple, "50")}`;
                       e.currentTarget.style.transform = "translateY(0)";
                     }}
                   >
@@ -1373,7 +1373,7 @@ export default function Home() {
             justifyContent: "space-between",
             alignItems: "center",
             padding: "1.5rem 2rem",
-            borderBottom: `1px solid ${HOC_COLORS.purple}20`,
+            borderBottom: `1px solid ${alpha(HOC_COLORS.purple, "20")}`,
           }}
         >
           <div>
@@ -1427,7 +1427,7 @@ export default function Home() {
                 setPendingScenario(scenario);
               }}
               style={{
-                background: `${HOC_COLORS.white}08`,
+                background: `${alpha(HOC_COLORS.white, "08")}`,
                 border: `2px solid ${HOC_COLORS.purple}`,
                 borderRadius: "1rem",
                 padding: "1.5rem",
@@ -1465,7 +1465,7 @@ export default function Home() {
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  borderTop: `1px solid ${HOC_COLORS.white}10`,
+                  borderTop: `1px solid ${alpha(HOC_COLORS.white, "10")}`,
                   paddingTop: "1rem",
                 }}
               >
@@ -1504,7 +1504,7 @@ export default function Home() {
             justifyContent: "space-between",
             alignItems: "center",
             padding: "1rem 1.5rem",
-            borderBottom: `1px solid ${HOC_COLORS.purple}20`,
+            borderBottom: `1px solid ${alpha(HOC_COLORS.purple, "20")}`,
           }}
         >
           <div>
@@ -1534,7 +1534,7 @@ export default function Home() {
             {selectedCreator && (
               <span style={{
                 padding: "0.25rem 0.6rem",
-                background: `${HOC_COLORS.orange}20`,
+                background: `${alpha(HOC_COLORS.orange, "20")}`,
                 border: `1px solid ${HOC_COLORS.orange}`,
                 borderRadius: "0.5rem",
                 color: HOC_COLORS.orange,
@@ -1549,7 +1549,7 @@ export default function Home() {
                 title={`${selectedArchetype.name} — ${selectedArchetype.profile}`}
                 style={{
                   padding: "0.25rem 0.6rem",
-                  background: `${HOC_COLORS.purple}20`,
+                  background: `${alpha(HOC_COLORS.purple, "20")}`,
                   border: `1px solid ${HOC_COLORS.purple}`,
                   borderRadius: "0.5rem",
                   color: HOC_COLORS.purple,
@@ -1567,7 +1567,7 @@ export default function Home() {
               onClick={endScenario}
               disabled={messageCount < 3}
               style={{
-                background: messageCount < 3 ? `${HOC_COLORS.gray}40` : HOC_COLORS.orange,
+                background: messageCount < 3 ? `${alpha(HOC_COLORS.gray, "40")}` : HOC_COLORS.orange,
                 border: "none",
                 color: HOC_COLORS.bgDark,
                 padding: "0.6rem 1.2rem",
@@ -1609,7 +1609,7 @@ export default function Home() {
                   background:
                     msg.role === "operator"
                       ? HOC_COLORS.gradient
-                      : `${HOC_COLORS.white}10`,
+                      : `${alpha(HOC_COLORS.white, "10")}`,
                   color: HOC_COLORS.white,
                   borderBottomRightRadius: msg.role === "operator" ? "0.25rem" : "1rem",
                   borderBottomLeftRadius: msg.role === "operator" ? "1rem" : "0.25rem",
@@ -1655,7 +1655,7 @@ export default function Home() {
           {sessionScore && (
             <div
               style={{
-                background: `${HOC_COLORS.green}20`,
+                background: `${alpha(HOC_COLORS.green, "20")}`,
                 border: `2px solid ${HOC_COLORS.green}`,
                 borderRadius: "1rem",
                 padding: "1.5rem",
@@ -1673,7 +1673,7 @@ export default function Home() {
 
         {/* Input Area */}
         {!sessionScore && (
-          <div style={{ padding: "1.5rem", borderTop: `1px solid ${HOC_COLORS.purple}20` }}>
+          <div style={{ padding: "1.5rem", borderTop: `1px solid ${alpha(HOC_COLORS.purple, "20")}` }}>
             <div style={{ display: "flex", gap: "1rem", marginBottom: "0.5rem" }}>
               <input
                 ref={inputRef}
@@ -1691,8 +1691,8 @@ export default function Home() {
                 style={{
                   flex: 1,
                   padding: "0.75rem 1rem",
-                  background: `${HOC_COLORS.white}10`,
-                  border: `1px solid ${HOC_COLORS.purple}30`,
+                  background: `${alpha(HOC_COLORS.white, "10")}`,
+                  border: `1px solid ${alpha(HOC_COLORS.purple, "30")}`,
                   borderRadius: "0.5rem",
                   color: HOC_COLORS.white,
                   fontSize: "0.95rem",
@@ -1704,7 +1704,7 @@ export default function Home() {
                 disabled={!inputText.trim() || isTyping}
                 style={{
                   padding: "0.75rem 1.5rem",
-                  background: !inputText.trim() ? `${HOC_COLORS.gray}40` : HOC_COLORS.orange,
+                  background: !inputText.trim() ? `${alpha(HOC_COLORS.gray, "40")}` : HOC_COLORS.orange,
                   border: "none",
                   color: HOC_COLORS.bgDark,
                   borderRadius: "0.5rem",
@@ -1759,7 +1759,7 @@ export default function Home() {
           <div
             style={{
               padding: "1.5rem",
-              borderTop: `1px solid ${HOC_COLORS.purple}20`,
+              borderTop: `1px solid ${alpha(HOC_COLORS.purple, "20")}`,
               display: "flex",
               gap: "1rem",
               justifyContent: "center",
@@ -1779,8 +1779,8 @@ export default function Home() {
               }}
               style={{
                 padding: "0.75rem 1.5rem",
-                background: `${HOC_COLORS.white}15`,
-                border: `2px solid ${HOC_COLORS.white}30`,
+                background: `${alpha(HOC_COLORS.white, "15")}`,
+                border: `2px solid ${alpha(HOC_COLORS.white, "30")}`,
                 color: HOC_COLORS.white,
                 borderRadius: "0.5rem",
                 fontWeight: 700,
@@ -1843,7 +1843,7 @@ export default function Home() {
           {sessionScore.compliance_fail && (
             <div
               style={{
-                background: `${CP.accentRed}18`,
+                background: `${alpha(CP.accentRed, "18")}`,
                 border: `2px solid ${CP.accentRed}`,
                 borderRadius: "1rem",
                 padding: "1.25rem 1.5rem",
@@ -1891,7 +1891,7 @@ export default function Home() {
             <>
               <div
                 style={{
-                  background: `${HOC_COLORS.white}08`,
+                  background: `${alpha(HOC_COLORS.white, "08")}`,
                   border: `2px solid ${COLORS.verdant}`,
                   borderRadius: "1rem",
                   padding: "1.5rem",
@@ -1919,7 +1919,7 @@ export default function Home() {
 
               <div
                 style={{
-                  background: `${HOC_COLORS.orange}15`,
+                  background: `${alpha(HOC_COLORS.orange, "15")}`,
                   border: `2px solid ${HOC_COLORS.orange}`,
                   borderRadius: "1rem",
                   padding: "1.5rem",
@@ -1956,8 +1956,8 @@ export default function Home() {
           {/* Feedback su valutazione AI */}
           <div
             style={{
-              background: `${HOC_COLORS.white}08`,
-              border: `1px solid ${HOC_COLORS.white}20`,
+              background: `${alpha(HOC_COLORS.white, "08")}`,
+              border: `1px solid ${alpha(HOC_COLORS.white, "20")}`,
               borderRadius: "1rem",
               padding: "1.5rem",
               marginBottom: "2rem",
@@ -1981,8 +1981,8 @@ export default function Home() {
                     onClick={() => setFeedbackRating("up")}
                     style={{
                       padding: "0.5rem 1rem",
-                      background: feedbackRating === "up" ? `${COLORS.verdant}30` : `${HOC_COLORS.white}10`,
-                      border: `2px solid ${feedbackRating === "up" ? COLORS.verdant : HOC_COLORS.white + "30"}`,
+                      background: feedbackRating === "up" ? `${alpha(COLORS.verdant, "30")}` : `${alpha(HOC_COLORS.white, "10")}`,
+                      border: `2px solid ${feedbackRating === "up" ? COLORS.verdant : alpha(HOC_COLORS.white, "30")}`,
                       color: HOC_COLORS.white,
                       borderRadius: "0.5rem",
                       fontWeight: 700,
@@ -1995,8 +1995,8 @@ export default function Home() {
                     onClick={() => setFeedbackRating("down")}
                     style={{
                       padding: "0.5rem 1rem",
-                      background: feedbackRating === "down" ? "#EF444430" : `${HOC_COLORS.white}10`,
-                      border: `2px solid ${feedbackRating === "down" ? "#EF4444" : HOC_COLORS.white + "30"}`,
+                      background: feedbackRating === "down" ? "#EF444430" : `${alpha(HOC_COLORS.white, "10")}`,
+                      border: `2px solid ${feedbackRating === "down" ? "#EF4444" : alpha(HOC_COLORS.white, "30")}`,
                       color: HOC_COLORS.white,
                       borderRadius: "0.5rem",
                       fontWeight: 700,
@@ -2016,8 +2016,8 @@ export default function Home() {
                         width: "100%",
                         minHeight: "70px",
                         padding: "0.75rem",
-                        background: `${HOC_COLORS.white}05`,
-                        border: `1px solid ${HOC_COLORS.white}30`,
+                        background: `${alpha(HOC_COLORS.white, "05")}`,
+                        border: `1px solid ${alpha(HOC_COLORS.white, "30")}`,
                         borderRadius: "0.5rem",
                         color: HOC_COLORS.white,
                         fontFamily: "inherit",
@@ -2076,8 +2076,8 @@ export default function Home() {
               onClick={() => setScreen("training-hub")}
               style={{
                 padding: "0.75rem 1.5rem",
-                background: `${HOC_COLORS.white}15`,
-                border: `2px solid ${HOC_COLORS.white}30`,
+                background: `${alpha(HOC_COLORS.white, "15")}`,
+                border: `2px solid ${alpha(HOC_COLORS.white, "30")}`,
                 color: HOC_COLORS.white,
                 borderRadius: "0.5rem",
                 fontWeight: 700,
@@ -2176,7 +2176,7 @@ export default function Home() {
               {/* Situation */}
               <div
                 style={{
-                  background: `${HOC_COLORS.white}08`,
+                  background: `${alpha(HOC_COLORS.white, "08")}`,
                   border: `2px solid ${HOC_COLORS.purple}`,
                   borderRadius: "1rem",
                   padding: "1.5rem",
@@ -2215,7 +2215,7 @@ export default function Home() {
               >
                 <div
                   style={{
-                    background: `${HOC_COLORS.white}10`,
+                    background: `${alpha(HOC_COLORS.white, "10")}`,
                     padding: "1rem",
                     borderRadius: "1rem",
                     borderBottomLeftRadius: "0.25rem",
@@ -2236,8 +2236,8 @@ export default function Home() {
                 style={{
                   width: "100%",
                   padding: "1rem",
-                  background: `${HOC_COLORS.white}10`,
-                  border: `1px solid ${HOC_COLORS.purple}30`,
+                  background: `${alpha(HOC_COLORS.white, "10")}`,
+                  border: `1px solid ${alpha(HOC_COLORS.purple, "30")}`,
                   borderRadius: "0.75rem",
                   color: HOC_COLORS.white,
                   fontSize: "1rem",
@@ -2257,7 +2257,7 @@ export default function Home() {
                   width: "100%",
                   padding: "1rem",
                   background: !quickChallengeResponse.trim()
-                    ? `${HOC_COLORS.gray}40`
+                    ? `${alpha(HOC_COLORS.gray, "40")}`
                     : HOC_COLORS.gradient,
                   border: "none",
                   color: HOC_COLORS.bgDark,
@@ -2284,7 +2284,7 @@ export default function Home() {
 
               <div
                 style={{
-                  background: `${COLORS.verdant}20`,
+                  background: `${alpha(COLORS.verdant, "20")}`,
                   border: `2px solid ${COLORS.verdant}`,
                   borderRadius: "1rem",
                   padding: "1.5rem",
@@ -2301,7 +2301,7 @@ export default function Home() {
 
               <div
                 style={{
-                  background: `${HOC_COLORS.orange}20`,
+                  background: `${alpha(HOC_COLORS.orange, "20")}`,
                   border: `2px solid ${HOC_COLORS.orange}`,
                   borderRadius: "1rem",
                   padding: "1.5rem",
@@ -2318,7 +2318,7 @@ export default function Home() {
 
               <div
                 style={{
-                  background: `${HOC_COLORS.purple}20`,
+                  background: `${alpha(HOC_COLORS.purple, "20")}`,
                   border: `2px solid ${HOC_COLORS.purple}`,
                   borderRadius: "1rem",
                   padding: "1.5rem",
@@ -2335,7 +2335,7 @@ export default function Home() {
                       style={{
                         margin: 0,
                         padding: "0.75rem",
-                        background: `${HOC_COLORS.white}05`,
+                        background: `${alpha(HOC_COLORS.white, "05")}`,
                         borderRadius: "0.5rem",
                         color: HOC_COLORS.white,
                         fontSize: "0.9rem",
@@ -2440,7 +2440,7 @@ export default function Home() {
             <div>
               <p
                 style={{
-                  color: `${HOC_COLORS.white}90`,
+                  color: `${alpha(HOC_COLORS.white, "90")}`,
                   fontSize: "0.9rem",
                   margin: "0 0 0.5rem 0",
                   
@@ -2460,7 +2460,7 @@ export default function Home() {
               </h2>
               <p
                 style={{
-                  color: `${HOC_COLORS.white}80`,
+                  color: `${alpha(HOC_COLORS.white, "80")}`,
                   margin: 0,
                 }}
               >
@@ -2475,7 +2475,7 @@ export default function Home() {
                 alignItems: "center",
               }}
             >
-              <p style={{ margin: 0, color: `${HOC_COLORS.white}90`, fontSize: "0.9rem" }}>
+              <p style={{ margin: 0, color: `${alpha(HOC_COLORS.white, "90")}`, fontSize: "0.9rem" }}>
                 Certificazione{" "}
               </p>
               <p style={{ margin: "0.5rem 0 0 0", fontWeight: 700, color: HOC_COLORS.white }}>
@@ -2487,7 +2487,7 @@ export default function Home() {
           {/* Skill Dimensions */}
           <div
             style={{
-              background: `${HOC_COLORS.white}08`,
+              background: `${alpha(HOC_COLORS.white, "08")}`,
               border: `2px solid ${HOC_COLORS.purple}`,
               borderRadius: "1rem",
               padding: "2rem",
@@ -2529,7 +2529,7 @@ export default function Home() {
                   </div>
                   <div
                     style={{
-                      background: `${HOC_COLORS.white}10`,
+                      background: `${alpha(HOC_COLORS.white, "10")}`,
                       borderRadius: "0.5rem",
                       height: "10px",
                       overflow: "hidden",
@@ -2560,7 +2560,7 @@ export default function Home() {
           >
             <div
               style={{
-                background: `${COLORS.verdant}20`,
+                background: `${alpha(COLORS.verdant, "20")}`,
                 border: `2px solid ${COLORS.verdant}`,
                 borderRadius: "1rem",
                 padding: "1.5rem",
@@ -2592,7 +2592,7 @@ export default function Home() {
 
             <div
               style={{
-                background: `${HOC_COLORS.orange}20`,
+                background: `${alpha(HOC_COLORS.orange, "20")}`,
                 border: `2px solid ${HOC_COLORS.orange}`,
                 borderRadius: "1rem",
                 padding: "1.5rem",
@@ -2626,8 +2626,8 @@ export default function Home() {
           {/* Recent Activity */}
           <div
             style={{
-              background: `${HOC_COLORS.white}08`,
-              border: `2px solid ${HOC_COLORS.white}20`,
+              background: `${alpha(HOC_COLORS.white, "08")}`,
+              border: `2px solid ${alpha(HOC_COLORS.white, "20")}`,
               borderRadius: "1rem",
               padding: "1.5rem",
             }}
@@ -2651,7 +2651,7 @@ export default function Home() {
                     justifyContent: "space-between",
                     alignItems: "center",
                     padding: "0.75rem",
-                    background: `${HOC_COLORS.white}05`,
+                    background: `${alpha(HOC_COLORS.white, "05")}`,
                     borderRadius: "0.5rem",
                   }}
                 >

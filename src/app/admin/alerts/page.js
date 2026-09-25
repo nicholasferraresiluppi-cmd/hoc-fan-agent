@@ -10,7 +10,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import { useUser } from "@clerk/nextjs";
 import { AlertCircle, CheckCircle2, RefreshCw, Loader2, ArrowUpRight } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, PillTab } from "@/components/cp-style";
 
 const fetcher = async (url) => {
@@ -48,7 +48,7 @@ function SeverityBadge({ severity, resolved }) {
 function StatusPill({ alert }) {
   if (alert.status === "resolved") {
     return (
-      <span style={{ fontSize: 11.5, padding: "3px 10px", borderRadius: 999, border: `1px solid ${CP.accentGreen}44`, color: CP.accentGreen, whiteSpace: "nowrap" }}>
+      <span style={{ fontSize: 11.5, padding: "3px 10px", borderRadius: 999, border: `1px solid ${alpha(CP.accentGreen, "44")}`, color: CP.accentGreen, whiteSpace: "nowrap" }}>
         Auto-risolto {alert.resolvedAt ? fmtRelativeTime(alert.resolvedAt) : ""}
       </span>
     );
@@ -61,7 +61,7 @@ function StatusPill({ alert }) {
     );
   }
   return (
-    <span style={{ fontSize: 11.5, padding: "3px 10px", borderRadius: 999, border: `1px solid ${CP.accentRed}55`, color: CP.accentRed, whiteSpace: "nowrap" }}>
+    <span style={{ fontSize: 11.5, padding: "3px 10px", borderRadius: 999, border: `1px solid ${alpha(CP.accentRed, "55")}`, color: CP.accentRed, whiteSpace: "nowrap" }}>
       Aperto
     </span>
   );

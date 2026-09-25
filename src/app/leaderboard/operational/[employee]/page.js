@@ -3,7 +3,7 @@
 import { useState, use, useMemo } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { Target, GraduationCap, FileText, ArrowRight, AlertTriangle, Info, Sparkles } from "lucide-react";
 
@@ -61,7 +61,7 @@ function TierBadge({ tier, size = "md" }) {
     <span style={{
       display: "inline-block", padding, borderRadius: 999,
       fontSize, fontWeight: 600, letterSpacing: "0.05em", 
-      background: color + "26", color, border: `1px solid ${color}55`,
+      background: alpha(color, "26"), color, border: `1px solid ${alpha(color, "55")}`,
       fontFamily: FONTS.body,
     }}>{tier}</span>
   );
@@ -71,8 +71,8 @@ function ActionBtn({ href, color, icon: Icon, children, onClick }) {
   const style = {
     display: "inline-flex", alignItems: "center", gap: 6,
     padding: "8px 14px",
-    background: color + "1A",
-    border: `1px solid ${color}55`,
+    background: alpha(color, "1A"),
+    border: `1px solid ${alpha(color, "55")}`,
     borderRadius: 8,
     color,
     fontSize: 12, fontWeight: 700,
@@ -194,13 +194,13 @@ export default function EmployeeDrilldownPage({ params }) {
             <span style={{ color: CP.textMuted }}>›</span>
             <span style={{ color: CP.textPrimary }}>{employee}</span>
           </div>
-          <Link href="/admin/employee-profiles" style={{ color: COLORS.champagne, fontSize: 12, textDecoration: "none", padding: "6px 12px", border: `1px solid ${COLORS.champagne}44`, borderRadius: 8 }}>Anagrafica</Link>
+          <Link href="/admin/employee-profiles" style={{ color: COLORS.champagne, fontSize: 12, textDecoration: "none", padding: "6px 12px", border: `1px solid ${alpha(COLORS.champagne, "44")}`, borderRadius: 8 }}>Anagrafica</Link>
         </div>
 
         {cpLoading && <p style={{ color: COLORS.fog }}>Caricamento diagnostico…</p>}
         {cpError && <p style={{ color: COLORS.signal }}>Errore di rete: {String(cpError)}</p>}
         {cpData?.error && (
-          <div style={{ background: COLORS.signal + "20", color: COLORS.signal, padding: 16, borderRadius: 12 }}>{cpData.error}</div>
+          <div style={{ background: alpha(COLORS.signal, "20"), color: COLORS.signal, padding: 16, borderRadius: 12 }}>{cpData.error}</div>
         )}
 
         {cpData && !cpData.error && (
@@ -208,7 +208,7 @@ export default function EmployeeDrilldownPage({ params }) {
             {/* ===== BLOCCO 1: SNAPSHOT ===== */}
             <div style={{
               background: CP.surface,
-              border: `1px solid ${cpTierColor}55`,
+              border: `1px solid ${alpha(cpTierColor, "55")}`,
               borderRadius: 20, padding: "28px 32px", marginBottom: 20,
               display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 28, alignItems: "center",
               position: "relative", overflow: "hidden",
@@ -230,7 +230,7 @@ export default function EmployeeDrilldownPage({ params }) {
                   <div style={{ color: COLORS.champagne, fontSize: 12, letterSpacing: "0.12em", marginBottom: 12 }}>
                     {cp?.top_creator || histData?.profile?.group}
                     {histData?.profile?.language && (
-                      <span style={{ display: "inline-block", padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700, marginLeft: 8, background: langColor + "20", color: langColor, border: `1px solid ${langColor}55`, fontFamily: FONTS.mono }}>
+                      <span style={{ display: "inline-block", padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700, marginLeft: 8, background: alpha(langColor, "20"), color: langColor, border: `1px solid ${alpha(langColor, "55")}`, fontFamily: FONTS.mono }}>
                         {histData.profile.language === "eng" ? "EN" : "IT"}
                       </span>
                     )}
@@ -281,7 +281,7 @@ export default function EmployeeDrilldownPage({ params }) {
                 <EmptyBlock text={`Nessun dato CP attribuito a ${employee} per ${formatPeriodLabel(periodId)}. Possibili cause: non mappato in CreatorsPro, oppure nessun shift sincronizzato.`} />
               ) : (
                 <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, overflow: "hidden" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.8fr 0.7fr 0.7fr 0.8fr 0.9fr 0.6fr 0.6fr 0.5fr", padding: "12px 20px", background: COLORS.obsidian + "80", color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.8fr 0.7fr 0.7fr 0.8fr 0.9fr 0.6fr 0.6fr 0.5fr", padding: "12px 20px", background: alpha(COLORS.obsidian, "80"), color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` }}>
                     <div>Creator</div>
                     <div title="Score CP percentile su quella specifica creator">Score loc.</div>
                     <div>Tier</div>
@@ -296,7 +296,7 @@ export default function EmployeeDrilldownPage({ params }) {
                     const cohortColor = row.vs_cohort_pct == null ? COLORS.mist
                       : row.vs_cohort_pct > 0 ? CP.accentGreen : CP.accentRed;
                     return (
-                      <div key={row.creator} style={{ display: "grid", gridTemplateColumns: "1.8fr 0.7fr 0.7fr 0.8fr 0.9fr 0.6fr 0.6fr 0.5fr", padding: "12px 20px", borderBottom: `1px solid ${COLORS.charcoal}88`, alignItems: "center", fontSize: 13 }}>
+                      <div key={row.creator} style={{ display: "grid", gridTemplateColumns: "1.8fr 0.7fr 0.7fr 0.8fr 0.9fr 0.6fr 0.6fr 0.5fr", padding: "12px 20px", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, alignItems: "center", fontSize: 13 }}>
                         <div>
                           <Link href={`/leaderboard/creators/${encodeURIComponent(row.creator)}`} style={{ color: COLORS.alabaster, textDecoration: "none", fontWeight: 500 }}>
                             {row.creator} <span style={{ color: COLORS.champagne, opacity: 0.5, fontSize: 11 }}>›</span>
@@ -334,7 +334,7 @@ export default function EmployeeDrilldownPage({ params }) {
                       Andamento score CP · {cpHist?.periods_count ?? 0} mesi attivi su {cpHist?.looked_back ?? 12}
                     </span>
                     {cpHist?.periods_not_synced > 0 && (
-                      <Link href="/admin/wage-audit" style={{ fontSize: 11, color: CP.accentRed, padding: "4px 10px", background: CP.accentRed + "1F", border: `1px solid ${CP.accentRed}66`, borderRadius: 999, textDecoration: "none" }}>
+                      <Link href="/admin/wage-audit" style={{ fontSize: 11, color: CP.accentRed, padding: "4px 10px", background: alpha(CP.accentRed, "1F"), border: `1px solid ${alpha(CP.accentRed, "66")}`, borderRadius: 999, textDecoration: "none" }}>
                         ⚠ {cpHist.periods_not_synced} mesi non syncati · audit
                       </Link>
                     )}
@@ -353,7 +353,7 @@ export default function EmployeeDrilldownPage({ params }) {
                       : h.status === "no_activity" ? COLORS.mist
                       : CP.accentGreen;
                     return (
-                      <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 0.7fr 0.6fr 0.7fr 0.8fr 0.6fr 1fr", gap: 8, padding: "8px 0", borderBottom: `1px solid ${COLORS.charcoal}55`, fontSize: 12, alignItems: "center", opacity: isActive ? 1 : 0.55 }}>
+                      <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 0.7fr 0.6fr 0.7fr 0.8fr 0.6fr 1fr", gap: 8, padding: "8px 0", borderBottom: `1px solid ${alpha(COLORS.charcoal, "55")}`, fontSize: 12, alignItems: "center", opacity: isActive ? 1 : 0.55 }}>
                         <div style={{ fontFamily: FONTS.mono }}>{formatPeriodLabel(h.period_id)}</div>
                         <div style={{ fontFamily: FONTS.mono, fontWeight: 600, color: h.tier ? TIER_COLORS[h.tier] : COLORS.mist }}>{h.score != null ? h.score.toFixed(1) : "—"}</div>
                         <div>{h.tier ? <TierBadge tier={h.tier} size="sm" /> : <span style={{ color: COLORS.mist }}>—</span>}</div>
@@ -445,8 +445,8 @@ function EmptyBlock({ text, icon: Icon }) {
 
 function InsightCard({ insight }) {
   const colors = {
-    warning: { bg: CP.accentRed + "14", border: CP.accentRed + "59", icon: CP.accentRed, Icon: AlertTriangle },
-    info:    { bg: CP.accentSoftText + "14", border: CP.accentSoftText + "59", icon: CP.accentSoftText, Icon: Info },
+    warning: { bg: alpha(CP.accentRed, "14"), border: alpha(CP.accentRed, "59"), icon: CP.accentRed, Icon: AlertTriangle },
+    info:    { bg: alpha(CP.accentSoftText, "14"), border: alpha(CP.accentSoftText, "59"), icon: CP.accentSoftText, Icon: Info },
   };
   const c = colors[insight.severity] || colors.info;
   return (

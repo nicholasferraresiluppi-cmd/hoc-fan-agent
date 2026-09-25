@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Search, Download, Loader2, AlertCircle, FlaskConical, CheckCircle2 } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
 import CompNav from "@/components/CompNav";
 
@@ -136,7 +136,7 @@ export default function ShiftResearchPage() {
                   </thead>
                   <tbody>
                     {data.q1_profile_fields.map((f) => (
-                      <tr key={f.path} style={{ borderBottom: `1px solid ${CP.border}66` }}>
+                      <tr key={f.path} style={{ borderBottom: `1px solid ${alpha(CP.border, "66")}` }}>
                         <td style={{ ...td, fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{f.path}</td>
                         <td style={{ ...td, fontFamily: FONTS.mono }}>{f.count}</td>
                         <td style={{ ...td, fontFamily: FONTS.mono }}>{f.distinct_values}</td>
@@ -161,9 +161,9 @@ export default function ShiftResearchPage() {
 
           {/* Q2 */}
           <SectionLabel style={{ display: "block", marginBottom: 10 }}>Q2 — Formula scaglioni (bracket intero vs cumulativa)</SectionLabel>
-          <CpCard accent="#b9aef9" padding="16px 20px" style={{ marginBottom: 22 }}>
+          <CpCard accent={CP.accentSoftText} padding="16px 20px" style={{ marginBottom: 22 }}>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
-              <CheckCircle2 size={15} color="#b9aef9" /> {data.q2_verdict}
+              <CheckCircle2 size={15} color={CP.accentSoftText} /> {data.q2_verdict}
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {(data.q2_eff_pct_distribution || []).slice(0, 12).map((b) => (
@@ -222,13 +222,13 @@ export default function ShiftResearchPage() {
                   {(data.rows || []).map((r, i) => {
                     const mismatch = r.delta_pct != null && Math.abs(r.delta_pct) > 0.005;
                     return (
-                    <tr key={r.shift_id || i} style={{ borderBottom: `1px solid ${CP.border}66`, background: mismatch ? CP.accentRed + "14" : "transparent" }}>
+                    <tr key={r.shift_id || i} style={{ borderBottom: `1px solid ${alpha(CP.border, "66")}`, background: mismatch ? alpha(CP.accentRed, "14") : "transparent" }}>
                       <td style={{ ...td, fontFamily: FONTS.mono }}>{r.date}</td>
                       <td style={{ ...td, fontFamily: FONTS.mono, color: CP.textSecondary }}>{r.start}–{r.end}</td>
                       <td style={td}>{r.operator}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmt$(r.sales_on_creator)}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textMuted }}>{fmt$(r.sales_total_shift)}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#b9aef9" }}>{fmt$(r.earnings)}</td>
+                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentSoftText }}>{fmt$(r.earnings)}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700 }}>{fmtPct(r.eff_pct)}</td>
                       <td style={{ ...td, fontSize: 11 }}>
                         {r.profile_name

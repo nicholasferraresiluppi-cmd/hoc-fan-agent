@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
-import { CP, FONTS, creatorDotColor } from "@/lib/brand";
+import { CP, FONTS, creatorDotColor, alpha } from "@/lib/brand";
 import { SectionLabel, StatCard, TrendPill, CreatorDot, MiniInsight, CpCard } from "@/components/cp-style";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
 import { useSmartPeriod } from "@/lib/use-smart-period";
@@ -111,7 +111,7 @@ export default function CreatorsLeaderboardPage() {
 
         {isLoading && !data && <p style={{ color: CP.textSecondary }}>Caricamento…</p>}
         {error && <p style={{ color: CP.accentRed }}>Errore: {String(error)}</p>}
-        {data?.error && <div style={{ background: CP.accentRed + "20", color: CP.accentRed, padding: 16, borderRadius: 12 }}>{data.error}{" "}<Link href="/admin/creatorspro-sync" style={{ color: CP.accentGreen }}>Sync CP →</Link></div>}
+        {data?.error && <div style={{ background: alpha(CP.accentRed, "20"), color: CP.accentRed, padding: 16, borderRadius: 12 }}>{data.error}{" "}<Link href="/admin/creatorspro-sync" style={{ color: CP.accentGreen }}>Sync CP →</Link></div>}
 
         {data && !data.error && (
           <>
@@ -188,7 +188,7 @@ export default function CreatorsLeaderboardPage() {
                         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                           <span style={{ fontWeight: 500, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.alias}</span>
                           {i === 0 && (
-                            <span style={{ padding: "2px 7px", background: CP.accentGreen + "22", color: CP.accentGreen, fontSize: 10, fontWeight: 700, borderRadius: 4, letterSpacing: "0.04em" }}>🏆 TOP</span>
+                            <span style={{ padding: "2px 7px", background: alpha(CP.accentGreen, "22"), color: CP.accentGreen, fontSize: 10, fontWeight: 700, borderRadius: 4, letterSpacing: "0.04em" }}>🏆 TOP</span>
                           )}
                         </div>
                         <span style={{ fontFamily: FONTS.mono, fontSize: 14, fontWeight: 700, color: CP.textPrimary }}>{fmtCurrencyShort(c.total_sales)}</span>

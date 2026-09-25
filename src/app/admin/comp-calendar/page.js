@@ -30,7 +30,8 @@
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { Loader2, AlertCircle, AlertTriangle, Download, FlaskConical, RotateCcw, Plus, X, ChevronDown, ChevronRight, Sun, Moon, ArrowUp, ArrowDown } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, DATA_SCALE } from "@/lib/brand";
+import { useTheme, setTheme as setAppTheme } from "@/lib/theme-client";
 import CompNav from "@/components/CompNav";
 import HowToRead from "@/components/HowToRead";
 import CreatorPicker from "@/components/CreatorPicker";
@@ -39,19 +40,6 @@ import CreatorPicker from "@/components/CreatorPicker";
 /* Palette e formati                                                   */
 /* ------------------------------------------------------------------ */
 
-const LIGHT = {
-  ...CP,
-  bg: "#f5f6f8", bgSunken: "#eceef2", surface: "#ffffff", surfaceAlt: "#eef0f4",
-  border: "#dcdfe6", borderSoft: "#eceef2", borderStrong: "#c9cdd6",
-  textPrimary: "#14171f", textSecondary: "#434a58", textMuted: "#687183", mutedIcons: "#8a92a2",
-  accent: "#6353e0", accentInk: "#ffffff", accentSoft: "#ebe8fd", accentSoftText: "#4a3bc4", accentDim: "#c7c0f5",
-  accentGreen: "#17803d", accentRed: "#c53030",
-};
-// Scala dati sequenziale (teal), separata dall'accento: chiaro = scaglione basso.
-const DATA_SCALE = {
-  dark: { fill: ["#16303b", "#1a4a5a", "#1f6a7c", "#2a8da0", "#46b0c0"], text: ["#cfe7ec", "#dff1f4", "#eef8fa", "#ffffff", "#ffffff"] },
-  light: { fill: ["#e6f3f6", "#c8e6ee", "#9fd1df", "#6fb6cb", "#3f93ad"], text: ["#14171f", "#14171f", "#14171f", "#0b1a20", "#ffffff"] },
-};
 const MONTH_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const DAYS_IT = ["Dom","Lun","Mar","Mer","Gio","Ven","Sab"];
 const NUM = { fontVariantNumeric: "tabular-nums" };
@@ -97,7 +85,7 @@ async function getResearch(creator, pid) {
 
 export default function CompCalendarPage() {
   const periods = useMemo(() => monthOpts(), []);
-  const [theme, setTheme] = useState("light");
+  const [theme] = useTheme(); // tema dell'app (menu laterale → sole/luna)
   const [creator, setCreator] = useState("");
   const [periodId, setPeriodId] = useState(periods[1]?.value || periods[0]?.value || "");
   const [aliases, setAliases] = useState([]);
@@ -114,23 +102,17 @@ export default function CompCalendarPage() {
   const [simByProfile, setSimByProfile] = useState(null);
   const [onlyChanged, setOnlyChanged] = useState(true);
 
-  const P = theme === "light" ? LIGHT : CP;
+  const P = CP; // i token seguono il tema (CSS variables)
   const S = DATA_SCALE[theme];
 
-  // tema: ?theme=light|dark ha la precedenza (screenshot/test), poi la preferenza salvata
+  // ?theme=light|dark (foto e test automatici) imposta il tema dell'app
   useEffect(() => {
     try {
       const q = new URLSearchParams(window.location.search).get("theme");
-      const saved = localStorage.getItem("hoc:theme");
-      const t = q === "light" || q === "dark" ? q : saved === "dark" ? "dark" : "light"; // chiaro predefinito (test utenti v2: 4 su 5)
-      setTheme(t);
+      if (q === "light" || q === "dark") setAppTheme(q);
     } catch {}
   }, []);
-  const toggleTheme = () => {
-    const t = theme === "light" ? "dark" : "light";
-    setTheme(t);
-    try { localStorage.setItem("hoc:theme", t); } catch {}
-  };
+  const toggleTheme = () => setAppTheme(theme === "light" ? "dark" : "light");
 
   async function load(c, p) {
     setLoading(true); setError(null); setData(null); setPrev(null); setCandidates(null); setFocus(null);

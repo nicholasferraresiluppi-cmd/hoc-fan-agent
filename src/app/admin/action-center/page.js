@@ -7,7 +7,7 @@ import {
   Target, Info, Download, X, CheckCircle2, Clock, AlertTriangle,
   ArrowRightLeft, Trash2, FileText, Sparkles, ChevronDown,
 } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, SectionLabel, CpCard, StatCard } from "@/components/cp-style";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
 import { useSmartPeriod } from "@/lib/use-smart-period";
@@ -36,7 +36,7 @@ function fmtDate(ms) {
 }
 
 const TIER_COLORS = {
-  Critical: "#EF4444", Weak: "#F59E0B", Average: "#9CA3AF",
+  Critical: "#EF4444", Weak: "#F59E0B", Average: CP.textMuted,
   Good: "#10B981", Strong: "#3B82F6", Elite: "#A855F7",
 };
 
@@ -158,7 +158,7 @@ export default function ActionCenterPage() {
       {isLoading && !data && <p style={{ color: CP.textSecondary }}>Caricamento…</p>}
       {error && <p style={{ color: CP.accentRed }}>Errore: {String(error)}</p>}
       {data?.error && (
-        <div style={{ background: CP.accentRed + "20", color: CP.accentRed, padding: 16, borderRadius: 12 }}>
+        <div style={{ background: alpha(CP.accentRed, "20"), color: CP.accentRed, padding: 16, borderRadius: 12 }}>
           {data.error}
           {" "}<Link href="/admin/creatorspro-sync" style={{ color: CP.accentGreen }}>Sync CP →</Link>
         </div>
@@ -208,7 +208,7 @@ export default function ActionCenterPage() {
                 <button onClick={exportCsv} style={{
                   display: "inline-flex", alignItems: "center", gap: 8,
                   padding: "10px 18px",
-                  background: CP.accentGreen, color: "#0a0a0a", border: "none",
+                  background: CP.accentGreen, color: CP.bgSunken, border: "none",
                   borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer",
                 }}>
                   <Download size={14} /> Esporta CSV HR
@@ -227,7 +227,7 @@ export default function ActionCenterPage() {
                 <span style={{ fontFamily: FONTS.mono, fontSize: 18, fontWeight: 700, color: scoreThreshold <= 25 ? CP.accentRed : scoreThreshold <= 50 ? "#F59E0B" : CP.accentGreen, minWidth: 36 }}>
                   ≤ {scoreThreshold}
                 </span>
-                <span style={{ padding: "2px 8px", background: tierForScore(scoreThreshold).color + "22", color: tierForScore(scoreThreshold).color, borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: "0.04em" }}>
+                <span style={{ padding: "2px 8px", background: alpha(tierForScore(scoreThreshold).color, "22"), color: tierForScore(scoreThreshold).color, borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: "0.04em" }}>
                   fino a {tierForScore(scoreThreshold).label}
                 </span>
               </div>
@@ -273,17 +273,17 @@ export default function ActionCenterPage() {
             <div style={{ display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
               {/* Lingua */}
               <FilterGroup label="Lingua">
-                <FilterPill active={languageFilter === ""}      onClick={() => setLanguageFilter("")}      color="#9CA3AF">Tutte ({allCandidates.length})</FilterPill>
+                <FilterPill active={languageFilter === ""}      onClick={() => setLanguageFilter("")}      color={CP.textMuted}>Tutte ({allCandidates.length})</FilterPill>
                 <FilterPill active={languageFilter === "ita"}   onClick={() => setLanguageFilter("ita")}   color="#10B981">🇮🇹 ITA ({filterCounts.languages?.ita || 0})</FilterPill>
                 <FilterPill active={languageFilter === "eng"}   onClick={() => setLanguageFilter("eng")}   color="#3B82F6">🇬🇧 ENG ({filterCounts.languages?.eng || 0})</FilterPill>
                 {(filterCounts.languages?.none || 0) > 0 && (
-                  <FilterPill active={languageFilter === "none"} onClick={() => setLanguageFilter("none")} color="#9CA3AF">Senza ({filterCounts.languages.none})</FilterPill>
+                  <FilterPill active={languageFilter === "none"} onClick={() => setLanguageFilter("none")} color={CP.textMuted}>Senza ({filterCounts.languages.none})</FilterPill>
                 )}
               </FilterGroup>
 
               {/* Tier */}
               <FilterGroup label="Tier">
-                <FilterPill active={tierFilter === ""}          onClick={() => setTierFilter("")}          color="#9CA3AF">Tutti</FilterPill>
+                <FilterPill active={tierFilter === ""}          onClick={() => setTierFilter("")}          color={CP.textMuted}>Tutti</FilterPill>
                 {(filterCounts.tiers?.Critical || 0) > 0 && (
                   <FilterPill active={tierFilter === "Critical"} onClick={() => setTierFilter("Critical")} color="#EF4444">Critical ({filterCounts.tiers.Critical})</FilterPill>
                 )}
@@ -291,7 +291,7 @@ export default function ActionCenterPage() {
                   <FilterPill active={tierFilter === "Weak"}    onClick={() => setTierFilter("Weak")}    color="#F59E0B">Weak ({filterCounts.tiers.Weak})</FilterPill>
                 )}
                 {(filterCounts.tiers?.Average || 0) > 0 && (
-                  <FilterPill active={tierFilter === "Average"} onClick={() => setTierFilter("Average")} color="#9CA3AF">Average ({filterCounts.tiers.Average})</FilterPill>
+                  <FilterPill active={tierFilter === "Average"} onClick={() => setTierFilter("Average")} color={CP.textMuted}>Average ({filterCounts.tiers.Average})</FilterPill>
                 )}
               </FilterGroup>
 
@@ -304,7 +304,7 @@ export default function ActionCenterPage() {
                     style={{
                       padding: "6px 10px",
                       background: CP.surface,
-                      border: `1px solid ${groupFilter ? CP.accentGreen + "55" : CP.border}`,
+                      border: `1px solid ${groupFilter ? alpha(CP.accentGreen, "55") : CP.border}`,
                       borderRadius: 6,
                       color: CP.textPrimary,
                       fontSize: 11,
@@ -378,7 +378,7 @@ export default function ActionCenterPage() {
                     alignItems: "center",
                     padding: "14px 22px",
                     borderTop: `1px solid ${CP.border}`,
-                    background: isReady ? CP.accentGreen + "08" : "transparent",
+                    background: isReady ? alpha(CP.accentGreen, "08") : "transparent",
                     fontSize: 13,
                   }}>
                     <span style={{ fontFamily: FONTS.mono, color: CP.textMuted, fontSize: 12 }}>{c.rank ? String(c.rank).padStart(2, "0") : "—"}</span>
@@ -393,7 +393,7 @@ export default function ActionCenterPage() {
                     <span style={{ color: CP.textSecondary, fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.group || "—"}</span>
                     <span style={{ fontFamily: FONTS.mono, color: tColor, fontWeight: 700, fontSize: 15 }}>{c.score.toFixed(1)}</span>
                     <span>
-                      <span style={{ padding: "3px 9px", background: tColor + "22", color: tColor, borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: "0.04em" }}>
+                      <span style={{ padding: "3px 9px", background: alpha(tColor, "22"), color: tColor, borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: "0.04em" }}>
                         {c.tier?.toUpperCase()}
                       </span>
                     </span>
@@ -416,7 +416,7 @@ export default function ActionCenterPage() {
                           onClick={() => callAction(c.employee, "set_ready")}
                           disabled={!c.swap_entry?.swap_with}
                           title={c.swap_entry?.swap_with ? "Pronto per HR" : "Scegli prima un sostituto"}
-                          style={{ ...miniBtn, background: c.swap_entry?.swap_with ? CP.accentGreen : CP.surfaceAlt, color: c.swap_entry?.swap_with ? "#0a0a0a" : CP.textMuted, cursor: c.swap_entry?.swap_with ? "pointer" : "not-allowed" }}
+                          style={{ ...miniBtn, background: c.swap_entry?.swap_with ? CP.accentGreen : CP.surfaceAlt, color: c.swap_entry?.swap_with ? CP.bgSunken : CP.textMuted, cursor: c.swap_entry?.swap_with ? "pointer" : "not-allowed" }}
                         >
                           <CheckCircle2 size={11} /> HR
                         </button>
@@ -432,7 +432,7 @@ export default function ActionCenterPage() {
                       <button onClick={() => unmark(c.employee)} title="Rimuovi dal pannello (resta in leaderboard)" style={miniBtn}>
                         <X size={11} />
                       </button>
-                      <button onClick={() => ignorePermanent(c.employee)} title="Ignora permanentemente (anche mesi futuri)" style={{ ...miniBtn, color: CP.accentRed, borderColor: CP.accentRed + "55" }}>
+                      <button onClick={() => ignorePermanent(c.employee)} title="Ignora permanentemente (anche mesi futuri)" style={{ ...miniBtn, color: CP.accentRed, borderColor: alpha(CP.accentRed, "55") }}>
                         <Trash2 size={11} />
                       </button>
                     </div>
@@ -502,10 +502,10 @@ function SwapPicker({ candidate, swapTargets, onChange }) {
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 4,
                   padding: "4px 8px",
-                  background: isSelected ? CP.accentGreen : (i === 0 ? CP.accentGreen + "22" : CP.surfaceAlt),
-                  border: `1px solid ${isSelected ? CP.accentGreen : (i === 0 ? CP.accentGreen + "55" : CP.border)}`,
+                  background: isSelected ? CP.accentGreen : (i === 0 ? alpha(CP.accentGreen, "22") : CP.surfaceAlt),
+                  border: `1px solid ${isSelected ? CP.accentGreen : (i === 0 ? alpha(CP.accentGreen, "55") : CP.border)}`,
                   borderRadius: 6,
-                  color: isSelected ? "#0a0a0a" : CP.textPrimary,
+                  color: isSelected ? CP.bgSunken : CP.textPrimary,
                   fontSize: 11,
                   cursor: "pointer",
                   fontWeight: isSelected ? 700 : 500,
@@ -531,7 +531,7 @@ function SwapPicker({ candidate, swapTargets, onChange }) {
         style={{
           padding: "5px 8px",
           background: CP.surface,
-          border: `1px solid ${current ? CP.accentGreen + "66" : CP.border}`,
+          border: `1px solid ${current ? alpha(CP.accentGreen, "66") : CP.border}`,
           borderRadius: 6,
           color: CP.textPrimary,
           fontSize: 11,
@@ -566,7 +566,7 @@ function SwapPicker({ candidate, swapTargets, onChange }) {
 function tierForScore(score) {
   if (score >= 75) return { label: "Strong", color: "#3B82F6" };
   if (score >= 50) return { label: "Good", color: "#10B981" };
-  if (score >= 25) return { label: "Average", color: "#9CA3AF" };
+  if (score >= 25) return { label: "Average", color: CP.textMuted };
   if (score >= 10) return { label: "Weak", color: "#F59E0B" };
   return { label: "Critical", color: "#EF4444" };
 }
@@ -589,7 +589,7 @@ function FilterPill({ active, onClick, children, color }) {
         background: active ? color : "transparent",
         border: `1px solid ${active ? color : CP.border}`,
         borderRadius: 999,
-        color: active ? "#0a0a0a" : CP.textSecondary,
+        color: active ? CP.bgSunken : CP.textSecondary,
         fontSize: 11,
         fontWeight: active ? 700 : 500,
         cursor: "pointer",

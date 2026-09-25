@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 import TapeReplay from "@/components/TapeReplay";
 
@@ -84,7 +84,7 @@ export default function TapesPage() {
           style={{
             padding: "20px 24px",
             background: CP.surface,
-            border: `1px solid ${CP.accentRed}55`,
+            border: `1px solid ${alpha(CP.accentRed, "55")}`,
             borderRadius: 12,
             color: CP.accentRed,
             fontSize: 14,

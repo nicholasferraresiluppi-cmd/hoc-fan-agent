@@ -7,7 +7,7 @@
 import { useState, useMemo } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) =>
@@ -40,7 +40,7 @@ function QuadrantBadge({ q }) {
   if (!q) return null;
   const c = QUAD[q.key] || QUAD.coach;
   return (
-    <span title={q.note} style={{ fontSize: 11, color: c.color, background: `${c.color}1c`, border: `1px solid ${c.color}55`, padding: "2px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>
+    <span title={q.note} style={{ fontSize: 11, color: c.color, background: `${alpha(c.color, "1c")}`, border: `1px solid ${alpha(c.color, "55")}`, padding: "2px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>
       {q.label}
     </span>
   );
@@ -57,7 +57,7 @@ function MetricChip({ m }) {
         gap: 2,
         padding: "6px 10px",
         background: CP.bgSunken,
-        border: `1px solid ${m.verdict === "gap" ? `${CP.accentRed}55` : CP.borderSoft}`,
+        border: `1px solid ${m.verdict === "gap" ? `${alpha(CP.accentRed, "55")}` : CP.borderSoft}`,
         borderRadius: 8,
         minWidth: 92,
       }}
@@ -103,7 +103,7 @@ function DuoBlock({ duo, operator }) {
   const liveFlag = duo.flag && !duo.stale && duo.period_known;
   const flagNote = duo.stale ? " · export vecchio" : !duo.period_known ? " · periodo sconosciuto" : "";
   return (
-    <div style={{ marginTop: 10, padding: "8px 11px", background: CP.bgSunken, border: `1px solid ${liveFlag ? `${CP.accentRed}55` : CP.borderSoft}`, borderRadius: 8 }}>
+    <div style={{ marginTop: 10, padding: "8px 11px", background: CP.bgSunken, border: `1px solid ${liveFlag ? `${alpha(CP.accentRed, "55")}` : CP.borderSoft}`, borderRadius: 8 }}>
       <div style={{ fontSize: 10.5, color: CP.textMuted, marginBottom: duo.rows.length ? 6 : 0, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <span>Copertura duo — singolo (warehouse) vs tutti i turni (export)</span>
         {duo.flag && (
@@ -169,7 +169,7 @@ function FilmQueueBanner() {
   const { data } = useSWR("/api/admin/operator-film/queue", fetcher, { revalidateOnFocus: false });
   if (!data || !data.rows?.length) return null;
   return (
-    <div style={{ padding: "12px 14px", marginBottom: 14, background: CP.surface, border: `1px solid ${data.nuovi > 0 ? `${CP.accent}55` : CP.border}`, borderRadius: 10 }}>
+    <div style={{ padding: "12px 14px", marginBottom: 14, background: CP.surface, border: `1px solid ${data.nuovi > 0 ? `${alpha(CP.accent, "55")}` : CP.border}`, borderRadius: 10 }}>
       <div style={{ fontSize: 12.5, color: CP.textSecondary, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "baseline" }}>
         <span style={{ color: CP.textPrimary, fontWeight: 500 }}>Coda film</span>
         <span>{data.operators} operatori seguiti</span>
@@ -239,7 +239,7 @@ function OperatorCard({ p }) {
     <div
       style={{
         background: CP.surface,
-        border: `1px solid ${p.top_gap ? `${CP.accentRed}44` : CP.border}`,
+        border: `1px solid ${p.top_gap ? `${alpha(CP.accentRed, "44")}` : CP.border}`,
         borderRadius: 12,
         padding: "14px 16px",
       }}
@@ -371,13 +371,13 @@ export default function OperatorSignalsPage() {
       />
 
       {refreshErr && (
-        <div style={{ padding: "12px 16px", marginBottom: 12, background: CP.surface, border: `1px solid ${CP.accentRed}55`, borderRadius: 10, color: CP.accentRed, fontSize: 13 }}>
+        <div style={{ padding: "12px 16px", marginBottom: 12, background: CP.surface, border: `1px solid ${alpha(CP.accentRed, "55")}`, borderRadius: 10, color: CP.accentRed, fontSize: 13 }}>
           Ricalcolo fallito: {refreshErr}.
         </div>
       )}
 
       {error ? (
-        <div style={{ padding: "20px 24px", background: CP.surface, border: `1px solid ${CP.accentRed}55`, borderRadius: 12, color: CP.accentRed, fontSize: 14 }}>
+        <div style={{ padding: "20px 24px", background: CP.surface, border: `1px solid ${alpha(CP.accentRed, "55")}`, borderRadius: 12, color: CP.accentRed, fontSize: 14 }}>
           Non riesco a calcolare i profili: {error.message}.
         </div>
       ) : data?.bigquery === false ? (
@@ -416,7 +416,7 @@ export default function OperatorSignalsPage() {
                         display: "flex",
                         alignItems: "center",
                         gap: 8,
-                        background: active ? `${c.color}22` : CP.surface,
+                        background: active ? `${alpha(c.color, "22")}` : CP.surface,
                         border: `1px solid ${active ? c.color : CP.border}`,
                         borderRadius: 10,
                         padding: "8px 12px",

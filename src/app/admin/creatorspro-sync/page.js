@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
@@ -169,14 +169,14 @@ export default function CreatorsProSyncPage() {
     btn: { padding: "10px 18px", background: COLORS.champagne, color: COLORS.obsidian, border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 13 },
     select: { padding: "9px 14px", background: COLORS.charcoal, border: `1px solid ${COLORS.steel}`, borderRadius: 8, color: COLORS.alabaster, fontSize: 13, fontFamily: FONTS.body, marginRight: 10 },
     success: { background: "#3FB97E20", color: "#3FB97E", padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 13 },
-    error: { background: COLORS.signal + "20", color: COLORS.signal, padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 13 },
+    error: { background: alpha(COLORS.signal, "20"), color: COLORS.signal, padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 13 },
     statRow: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 },
     statBox: { background: COLORS.charcoal, padding: "10px 14px", borderRadius: 8 },
     statLabel: { fontSize: 10, color: COLORS.fog, letterSpacing: "0.1em" },
     statValue: { fontFamily: FONTS.mono, fontSize: 20, fontWeight: 700, marginTop: 4 },
     table: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
     th: { textAlign: "left", padding: "10px 12px", color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", borderBottom: `1px solid ${COLORS.steel}` },
-    td: { padding: "10px 12px", borderBottom: `1px solid ${COLORS.charcoal}88`, verticalAlign: "middle" },
+    td: { padding: "10px 12px", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, verticalAlign: "middle" },
     input: { padding: "5px 10px", background: COLORS.charcoal, border: `1px solid ${COLORS.steel}`, borderRadius: 6, color: COLORS.alabaster, fontSize: 12, fontFamily: FONTS.body, width: "100%", outline: "none" },
   };
 
@@ -348,7 +348,7 @@ export default function CreatorsProSyncPage() {
                       <td style={{ ...styles.td, textAlign: "right" }}>
                         <button
                           onClick={() => { if (confirm(`Rimuovere mapping per ${m ? m.firstName + " " + m.lastName : cpId}?`)) setMapping(cpId, null); }}
-                          style={{ padding: "4px 10px", background: "transparent", color: COLORS.signal, border: `1px solid ${COLORS.signal}66`, borderRadius: 6, cursor: "pointer", fontSize: 11 }}
+                          style={{ padding: "4px 10px", background: "transparent", color: COLORS.signal, border: `1px solid ${alpha(COLORS.signal, "66")}`, borderRadius: 6, cursor: "pointer", fontSize: 11 }}
                         >Rimuovi</button>
                       </td>
                     </tr>

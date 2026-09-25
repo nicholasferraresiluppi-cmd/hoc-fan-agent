@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import useSWR from "swr";
 import Link from "next/link";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -131,7 +131,7 @@ export default function PlaybookEntryPage() {
           {entry.benchmark && <span style={styles.badge}>benchmark: {entry.benchmark}</span>}
           {entry.difficulty && <span style={styles.badge}>{entry.difficulty}</span>}
           {entry.outcome === "failure" && (
-            <span style={{ ...styles.badge, background: COLORS.signal + "20", color: COLORS.signal }}>
+            <span style={{ ...styles.badge, background: alpha(COLORS.signal, "20"), color: COLORS.signal }}>
               esempio negativo (cosa NON funziona)
             </span>
           )}

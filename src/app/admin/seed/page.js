@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { COLORS, CP } from "@/lib/brand";
+import { COLORS, CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const C = {
@@ -65,7 +65,7 @@ export default function SeedAdminPage() {
           subtitle={<>Popola la leaderboard con <strong>10 operatori fittizi</strong> e <strong>~60 giorni di sessioni</strong> con profili skill differenziati. Crea anche 3 snapshot storici per la Hall of Fame.</>}
         />
 
-        <div style={{ background: `${C.purple}15`, border: `1px solid ${C.purple}40`, borderRadius: "0.75rem", padding: "1rem", marginBottom: "1.5rem", fontSize: "0.85rem" }}>
+        <div style={{ background: `${alpha(C.purple, "15")}`, border: `1px solid ${alpha(C.purple, "40")}`, borderRadius: "0.75rem", padding: "1rem", marginBottom: "1.5rem", fontSize: "0.85rem" }}>
           <div style={{ color: C.purple, fontWeight: 700, marginBottom: "0.5rem" }}>📋 Profilo operatori:</div>
           <div style={{ color: C.gray, lineHeight: 1.8 }}>
             Giorgia (top: esclusività+dipendenza) · Martina (top: conversione) · Alessia (top: naturalezza) · Sara (top: dipendenza) · Elena · Chiara · Federica · Valentina · Ilaria · Roberta (meno attiva)
@@ -87,7 +87,7 @@ export default function SeedAdminPage() {
         {loading && <div style={{ marginTop: "1.5rem", color: C.gray }}>Esecuzione in corso... (può richiedere 10-30s)</div>}
 
         {result && (
-          <div style={{ marginTop: "1.5rem", padding: "1rem", background: `${C.green}15`, border: `1px solid ${C.green}`, borderRadius: "0.5rem" }}>
+          <div style={{ marginTop: "1.5rem", padding: "1rem", background: `${alpha(C.green, "15")}`, border: `1px solid ${C.green}`, borderRadius: "0.5rem" }}>
             <div style={{ color: C.green, fontWeight: 700, marginBottom: "0.5rem" }}>✓ OK — action: {result.action}</div>
             <pre style={{ color: C.white, fontSize: "0.8rem", margin: 0, whiteSpace: "pre-wrap" }}>{JSON.stringify(result, null, 2)}</pre>
             <div style={{ marginTop: "0.75rem", display: "flex", gap: "1rem" }}>
@@ -99,7 +99,7 @@ export default function SeedAdminPage() {
         )}
 
         {error && (
-          <div style={{ marginTop: "1.5rem", padding: "1rem", background: `${C.red}15`, border: `1px solid ${C.red}`, borderRadius: "0.5rem", color: C.red }}>
+          <div style={{ marginTop: "1.5rem", padding: "1rem", background: `${alpha(C.red, "15")}`, border: `1px solid ${C.red}`, borderRadius: "0.5rem", color: C.red }}>
             ✗ {error}
           </div>
         )}

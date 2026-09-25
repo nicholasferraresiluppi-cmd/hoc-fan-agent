@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 import { BarChart3, ExternalLink } from "lucide-react";
 
@@ -60,18 +60,18 @@ export default function AnalyticsReportsPage() {
             style={{
               display: "block",
               background: CP.surface,
-              border: `1px solid ${r.accent}33`,
+              border: `1px solid ${alpha(r.accent, "33")}`,
               borderRadius: 14,
               padding: 24,
               textDecoration: "none",
               color: "inherit",
               transition: "border-color 0.15s, transform 0.15s",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = r.accent + "88"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = r.accent + "33"; e.currentTarget.style.transform = "translateY(0)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = alpha(r.accent, "88"); e.currentTarget.style.transform = "translateY(-2px)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = alpha(r.accent, "33"); e.currentTarget.style.transform = "translateY(0)"; }}
           >
             <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 12 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, background: r.accent + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 10, background: alpha(r.accent, "22"), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>
                 {r.icon}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>

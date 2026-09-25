@@ -8,29 +8,24 @@
  * token del design system: aggiornare qui = aggiornare tutta l'app.
  */
 
+// Nomi legacy (palette V9) → puntano ai token del tema corrente (CSS variables):
+// così anche le pagine vecchie seguono chiaro/scuro senza riscriverle.
 export const COLORS = {
-  // Neutri → scala superfici/testo del design system
-  obsidian: "#0a0d11",   // --bg-sunken
-  graphite: "#0c0f14",   // --bg
-  charcoal: "#151a22",   // --surface (card, pannelli)
-  steel: "#232b3a",      // --border
-  mist: "#8c95a8",       // --muted
-  fog: "#cdd3de",        // --text-2
-  alabaster: "#f2f4f8",  // --text
-
-  // Accento primario → viola (unico accent del design system)
-  champagne: "#8b7cf6",      // --accent
-  champagneDeep: "#3a3470",  // --accent-dim
-  champagneLight: "#b9aef9", // --accent-soft-text
-
-  // Data → famiglia viola, distinta per luminosità (DESIGN.md §4 Grafici)
-  cobalt: "#b9aef9",     // serie secondaria (più chiara dell'accent)
-  cobaltDeep: "#3a3470", // serie di contesto (--accent-dim)
-
-  // Semantici
-  verdant: "#4ade80",    // --success
-  ember: "#f08c8c",      // warning → --danger (il sistema non ha token warning)
-  signal: "#f08c8c",     // --danger
+  obsidian: "var(--cp-bgSunken)",
+  graphite: "var(--cp-bg)",
+  charcoal: "var(--cp-surface)",
+  steel: "var(--cp-border)",
+  mist: "var(--cp-textMuted)",
+  fog: "var(--cp-textSecondary)",
+  alabaster: "var(--cp-textPrimary)",
+  champagne: "var(--cp-accent)",
+  champagneDeep: "var(--cp-accentDim)",
+  champagneLight: "var(--cp-accentSoftText)",
+  cobalt: "var(--cp-accentSoftText)",
+  cobaltDeep: "var(--cp-accentDim)",
+  verdant: "var(--cp-accentGreen)",
+  ember: "var(--cp-accentRed)",
+  signal: "var(--cp-accentRed)",
 };
 
 // Tier leghe — flat per DESIGN.md (niente gradienti): superficie standard,
@@ -40,42 +35,42 @@ export const TIER = {
   bronze: {
     accent: "#C87D46",
     label: "BRONZE",
-    gradient: "#151a22",
+    gradient: "var(--cp-surface)",
     text: "#FFE4C2",
     ink: "#2B1709",
   },
   silver: {
     accent: "#DADEE6",
     label: "SILVER",
-    gradient: "#151a22",
+    gradient: "var(--cp-surface)",
     text: "#f2f4f8",
     ink: "#15181E",
   },
   gold: {
     accent: "#F2D488",
     label: "GOLD",
-    gradient: "#151a22",
+    gradient: "var(--cp-surface)",
     text: "#FFF5D4",
     ink: "#2C1E06",
   },
   platinum: {
     accent: "#BFE4FF",
     label: "PLATINUM",
-    gradient: "#151a22",
+    gradient: "var(--cp-surface)",
     text: "#E6F5FF",
     ink: "#081B28",
   },
   diamond: {
     accent: "#A1E3FF",
     label: "DIAMOND",
-    gradient: "#151a22",
+    gradient: "var(--cp-surface)",
     text: "#EAF6FF",
     ink: "#060B1F",
   },
   unranked: {
     accent: "#8c95a8",
     label: "UNRANKED",
-    gradient: "#151a22",
+    gradient: "var(--cp-surface)",
     text: "#f2f4f8",
     ink: "#0a0d11",
   },
@@ -96,7 +91,7 @@ export const SHADOW = "0 10px 30px rgba(0,0,0,0.45)";
  * l'estetica di CreatorsPro Sales Analytics). Sovrapposti — non sostituiscono
  * i token HOC core: convivono nelle pagine che li scelgono.
  */
-export const CP = {
+export const CP_DARK = {
   // REBRAND "Dark SaaS" (giu 2026) — fonte di verità: docs/DESIGN.md +
   // docs/design-reference.html. Regole: gerarchia per LUMINOSITÀ, UN solo
   // accent (viola) col contagocce, niente nero/bianco puri, flat.
@@ -128,6 +123,39 @@ export const CP = {
   accentRed: "#f08c8c",   // danger — delta negativi, errori
   accentBlue: "#b9aef9",  // legacy info → accent-soft-text
 };
+// Tema chiaro (25/09/2026): per tabelle dense di numeri il testo scuro su fondo
+// chiaro si legge meglio (Piepenbrock et al. 2013); scelto da 4 tester su 5 nel
+// pilota Calendario compensi. Stessi nomi, stessa gerarchia per luminosità.
+export const CP_LIGHT = {
+  bgSunken: "#eceef2", bg: "#f5f6f8", surface: "#ffffff", surfaceAlt: "#eef0f4",
+  border: "#dcdfe6", borderSoft: "#eceef2", borderStrong: "#c9cdd6",
+  textPrimary: "#14171f", textSecondary: "#434a58", textMuted: "#687183", mutedIcons: "#8a92a2",
+  accent: "#6353e0", accentInk: "#ffffff", accentSoft: "#ebe8fd", accentSoftText: "#4a3bc4", accentDim: "#c7c0f5",
+  accentGreen: "#17803d", accentRed: "#c53030", accentBlue: "#4a3bc4",
+};
+
+// Scala per i DATI (sequenziale, separata dall'accento viola che è per ciò che si
+// clicca): chiaro = valore basso. Una tinta, 5 passi, per tema.
+export const DATA_SCALE = {
+  dark: { fill: ["#16303b", "#1a4a5a", "#1f6a7c", "#2a8da0", "#46b0c0"], text: ["#cfe7ec", "#dff1f4", "#eef8fa", "#ffffff", "#ffffff"] },
+  light: { fill: ["#e6f3f6", "#c8e6ee", "#9fd1df", "#6fb6cb", "#3f93ad"], text: ["#14171f", "#14171f", "#14171f", "#0b1a20", "#ffffff"] },
+};
+
+// I token che le pagine usano: CSS variables → seguono il tema scelto.
+export const CP = Object.fromEntries(Object.keys(CP_DARK).map((k) => [k, `var(--cp-${k})`]));
+
+/** Trasparenza su qualsiasi colore (anche variabili): alpha(CP.accent, "55"). */
+export function alpha(color, hex) {
+  const pct = Math.round((parseInt(hex, 16) / 255) * 100);
+  return `color-mix(in srgb, ${color} ${pct}%, transparent)`;
+}
+
+/** CSS dei due temi (iniettato nel <head> da app/layout). */
+export function themeCss() {
+  const vars = (o) => Object.entries(o).map(([k, v]) => `--cp-${k}:${v};`).join("");
+  return `:root{${vars(CP_DARK)}color-scheme:dark}:root[data-theme="light"]{${vars(CP_LIGHT)}color-scheme:light}`;
+}
+
 
 /**
  * Palette di "dot" colorati per creator (replica i pallini distintivi di CP).

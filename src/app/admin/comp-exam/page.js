@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, AlertCircle, CheckCircle2, AlertTriangle, XCircle, HelpCircle, FileText, Loader2, Coins, Percent, Users } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
 import CompNav from "@/components/CompNav";
 
@@ -328,7 +328,7 @@ function OpRow({ o, rank, teamPct }) {
         <PctDistribution dist={o.pct_distribution} />
       </Td>
       <Td>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 8px", borderRadius: 4, background: v.color + "22", color: v.color, fontSize: 11, fontWeight: 700 }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 8px", borderRadius: 4, background: alpha(v.color, "22"), color: v.color, fontSize: 11, fontWeight: 700 }}>
           <Icon size={12} /> {v.label}
         </div>
         {o.verdict_note && <div style={{ fontSize: 10, color: CP.textMuted, marginTop: 3, maxWidth: 240 }}>{o.verdict_note}</div>}
@@ -393,4 +393,4 @@ const primaryBtn = (disabled) => ({
   fontSize: 13, fontWeight: 700, fontFamily: FONTS.body,
   cursor: disabled ? "not-allowed" : "pointer",
 });
-const mono = { padding: "2px 6px", background: "#0a0a0a", borderRadius: 4, fontFamily: "ui-monospace, monospace", fontSize: 11, margin: "0 3px", color: "#f0f0f0" };
+const mono = { padding: "2px 6px", background: CP.bgSunken, borderRadius: 4, fontFamily: "ui-monospace, monospace", fontSize: 11, margin: "0 3px", color: "#f0f0f0" };

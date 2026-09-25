@@ -79,7 +79,7 @@ export default function AppShell({ children }) {
           {/* Mobile header bar */}
           <div style={{
             position: "sticky", top: 0, zIndex: 40,
-            background: "#0B0D13",
+            background: CP.bgSunken,
             borderBottom: `1px solid ${CP.border}`,
             padding: "10px 14px",
             display: "flex", alignItems: "center", justifyContent: "space-between",

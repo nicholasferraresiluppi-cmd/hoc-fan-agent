@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { Loader2, AlertCircle, Ruler } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
 import CompNav from "@/components/CompNav";
 import HowToRead from "@/components/HowToRead";
@@ -117,7 +117,7 @@ export default function ThresholdStudyPage() {
               </div>
               {/* Verdetto in chiaro: la frase che un non-analista legge e ha finito */}
               {b.classes.some((c) => c.suggested_mid != null) && (
-                <div style={{ padding: "9px 14px", marginBottom: 8, background: CP.accentSoft + "55", border: `1px solid ${CP.accent}44`, borderRadius: 8, fontSize: 12.5, color: CP.textPrimary }}>
+                <div style={{ padding: "9px 14px", marginBottom: 8, background: alpha(CP.accentSoft, "55"), border: `1px solid ${alpha(CP.accent, "44")}`, borderRadius: 8, fontSize: 12.5, color: CP.textPrimary }}>
                   Il dato dice:{" "}
                   {b.classes.filter((c) => c.suggested_mid != null).map((c, i, arr) => (
                     <span key={c.cls}>

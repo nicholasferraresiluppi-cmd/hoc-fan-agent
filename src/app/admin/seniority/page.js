@@ -6,7 +6,7 @@ import { CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const TIER_EMOJI = { junior: "🌱", senior: "⭐", master: "👑" };
-const TIER_COLOR = { junior: "#4ade80", senior: "#8b7cf6", master: "#b9aef9" };
+const TIER_COLOR = { junior: CP.accentGreen, senior: CP.accent, master: CP.accentSoftText };
 
 export default function SeniorityAdminPage() {
   const [data, setData] = useState(null);
@@ -43,7 +43,7 @@ export default function SeniorityAdminPage() {
   };
 
   return (
-    <div style={{ background: "#0c0f14", minHeight: "100vh", color: "#f2f4f8", padding: "32px 28px 64px 28px", maxWidth: 1400, margin: "0 auto" }}>
+    <div style={{ background: CP.bg, minHeight: "100vh", color: CP.textPrimary, padding: "32px 28px 64px 28px", maxWidth: 1400, margin: "0 auto" }}>
       <PageHeader
         breadcrumb={
           <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
@@ -56,7 +56,7 @@ export default function SeniorityAdminPage() {
         title="Seniority operatori"
         subtitle="Tier auto-calcolato da sessioni totali + overall medio recente. Override manuale disponibile."
       />
-      <div style={{ background: "#8b7cf610", border: "1px solid #8b7cf640", borderRadius: 8, padding: "0.75rem 1rem", fontSize: "0.85rem", marginBottom: "1.5rem", color: "#cdd3de" }}>
+      <div style={{ background: "#8b7cf610", border: "1px solid #8b7cf640", borderRadius: 8, padding: "0.75rem 1rem", fontSize: "0.85rem", marginBottom: "1.5rem", color: CP.textSecondary }}>
         <b>Soglie:</b> Senior = ≥30 sessioni totali + overall medio ultime 30 ≥ 70 • Master = ≥100 sessioni totali + overall medio ultime 50 ≥ 80
       </div>
 
@@ -66,7 +66,7 @@ export default function SeniorityAdminPage() {
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #232b3a" }}>
+              <tr style={{ textAlign: "left", borderBottom: `1px solid ${CP.border}` }}>
                 <th style={{ padding: "0.5rem" }}>Operatore</th>
                 <th style={{ padding: "0.5rem" }}>Tier attivo</th>
                 <th style={{ padding: "0.5rem" }}>Auto</th>
@@ -79,18 +79,18 @@ export default function SeniorityAdminPage() {
             </thead>
             <tbody>
               {data.rows.map((r) => (
-                <tr key={r.userId} style={{ borderBottom: "1px solid #232b3a" }}>
+                <tr key={r.userId} style={{ borderBottom: `1px solid ${CP.border}` }}>
                   <td style={{ padding: "0.5rem" }}>
                     <div style={{ fontWeight: 700 }}>{r.name}</div>
-                    <div style={{ fontSize: "0.7rem", color: "#8c95a8" }}>{r.userId}</div>
+                    <div style={{ fontSize: "0.7rem", color: CP.textMuted }}>{r.userId}</div>
                   </td>
                   <td style={{ padding: "0.5rem" }}>
                     <span style={{ color: TIER_COLOR[r.tier], fontWeight: 700 }}>
                       {TIER_EMOJI[r.tier]} {r.tier}
                     </span>
                   </td>
-                  <td style={{ padding: "0.5rem", color: "#cdd3de" }}>{r.auto}</td>
-                  <td style={{ padding: "0.5rem", color: r.override ? "#8b7cf6" : "#8c95a8" }}>{r.override || "—"}</td>
+                  <td style={{ padding: "0.5rem", color: CP.textSecondary }}>{r.auto}</td>
+                  <td style={{ padding: "0.5rem", color: r.override ? CP.accent : CP.textMuted }}>{r.override || "—"}</td>
                   <td style={{ padding: "0.5rem" }}>{r.totalSessions}</td>
                   <td style={{ padding: "0.5rem" }}>{r.avgRecent30 || "—"}</td>
                   <td style={{ padding: "0.5rem" }}>{r.avgRecent50 || "—"}</td>
@@ -103,7 +103,7 @@ export default function SeniorityAdminPage() {
                         style={{
                           padding: "0.25rem 0.5rem",
                           background: r.override === t ? TIER_COLOR[t] : "transparent",
-                          color: r.override === t ? "#14101f" : TIER_COLOR[t],
+                          color: r.override === t ? CP.accentInk : TIER_COLOR[t],
                           border: `1px solid ${TIER_COLOR[t]}`,
                           borderRadius: 4,
                           fontSize: "0.75rem",
@@ -119,7 +119,7 @@ export default function SeniorityAdminPage() {
                       style={{
                         padding: "0.25rem 0.5rem",
                         background: "transparent",
-                        color: "#8c95a8",
+                        color: CP.textMuted,
                         border: "1px solid #444",
                         borderRadius: 4,
                         fontSize: "0.75rem",

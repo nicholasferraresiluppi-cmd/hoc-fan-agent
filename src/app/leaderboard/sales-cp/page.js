@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
 import { useSmartPeriod } from "@/lib/use-smart-period";
@@ -25,8 +25,8 @@ const TIER_COLORS = {
   Critical: "#D44545", Weak: "#E76F51", Average: "#B89158",
   Good: "#D4AF7A", Strong: "#3FB97E", Elite: "#4F8CCB",
 };
-const CATEGORY_COLORS = { Big: "#b9aef9", Medium: "#8b7cf6", Small: "#8c95a8" };
-const LANGUAGE_COLORS = { ita: "#4ade80", eng: "#b9aef9" };
+const CATEGORY_COLORS = { Big: CP.accentSoftText, Medium: CP.accent, Small: CP.textMuted };
+const LANGUAGE_COLORS = { ita: CP.accentGreen, eng: CP.accentSoftText };
 
 const PERIOD_TYPES = [{ value: "monthly", label: "Mensile" }];
 const CATEGORY_FILTERS = [
@@ -73,18 +73,18 @@ function getInitials(name) {
 function TierBadge({ tier }) {
   if (!tier) return null;
   const color = TIER_COLORS[tier] || COLORS.mist;
-  return <span style={{ display: "inline-block", padding: "3px 11px", borderRadius: 999, fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", background: color + "26", color, border: `1px solid ${color}55` }}>{tier}</span>;
+  return <span style={{ display: "inline-block", padding: "3px 11px", borderRadius: 999, fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", background: alpha(color, "26"), color, border: `1px solid ${alpha(color, "55")}` }}>{tier}</span>;
 }
 function CategoryBadge({ category }) {
   if (!category) return null;
   const color = CATEGORY_COLORS[category] || COLORS.mist;
-  return <span style={{ display: "inline-block", padding: "1px 7px", borderRadius: 999, fontSize: 9, fontWeight: 600, letterSpacing: "0.06em", background: color + "20", color, border: `1px solid ${color}55`, marginLeft: 6, verticalAlign: "middle" }}>{category}</span>;
+  return <span style={{ display: "inline-block", padding: "1px 7px", borderRadius: 999, fontSize: 9, fontWeight: 600, letterSpacing: "0.06em", background: alpha(color, "20"), color, border: `1px solid ${alpha(color, "55")}`, marginLeft: 6, verticalAlign: "middle" }}>{category}</span>;
 }
 function LanguageBadge({ language }) {
   if (!language) return null;
   const color = LANGUAGE_COLORS[language] || COLORS.mist;
   const label = language === "eng" ? "EN" : "IT";
-  return <span style={{ display: "inline-block", padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", background: color + "20", color, border: `1px solid ${color}55`, marginLeft: 6, verticalAlign: "middle", fontFamily: FONTS.mono }}>{label}</span>;
+  return <span style={{ display: "inline-block", padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", background: alpha(color, "20"), color, border: `1px solid ${alpha(color, "55")}`, marginLeft: 6, verticalAlign: "middle", fontFamily: FONTS.mono }}>{label}</span>;
 }
 function Avatar({ name, size = 28, large = false }) {
   return <div style={{ width: size, height: size, borderRadius: "50%", background: large ? COLORS.champagne : COLORS.charcoal, color: large ? COLORS.obsidian : COLORS.alabaster, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONTS.display, fontWeight: 600, fontSize: size * 0.36, flexShrink: 0, border: large ? `3px solid ${COLORS.graphite}` : `1px solid ${COLORS.charcoal}`, boxShadow: large ? `0 0 0 2px ${COLORS.champagne}, 0 8px 24px rgba(139,124,246,0.25)` : "none" }}>{getInitials(name)}</div>;
@@ -270,8 +270,8 @@ export default function SalesCpLeaderboardPage() {
     if (value == null) return COLORS.mist;
     const c = infwTercileCutoffs[field];
     if (!c) return COLORS.mist;
-    if (value >= c.high) return "#4ade80"; // green — top tercile
-    if (value <= c.low) return "#f08c8c";  // red — bottom tercile
+    if (value >= c.high) return CP.accentGreen; // green — top tercile
+    if (value <= c.low) return CP.accentRed;  // red — bottom tercile
     return COLORS.mist;
   }
 
@@ -289,7 +289,7 @@ export default function SalesCpLeaderboardPage() {
     summary: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 22 },
     top4Grid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 },
     streamWrap: { background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 16, overflow: "visible" },
-    streamHead: { display: "grid", gridTemplateColumns: streamGridTemplate, padding: "14px 22px", background: COLORS.obsidian + "80", color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` },
+    streamHead: { display: "grid", gridTemplateColumns: streamGridTemplate, padding: "14px 22px", background: alpha(COLORS.obsidian, "80"), color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` },
   };
 
   return (
@@ -335,8 +335,8 @@ export default function SalesCpLeaderboardPage() {
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 6,
                   padding: "8px 14px",
-                  background: CP.accentRed + "18",
-                  border: `1px solid ${CP.accentRed}55`,
+                  background: alpha(CP.accentRed, "18"),
+                  border: `1px solid ${alpha(CP.accentRed, "55")}`,
                   borderRadius: 8,
                   color: CP.accentRed,
                   fontSize: 12, fontWeight: 700,
@@ -420,7 +420,7 @@ export default function SalesCpLeaderboardPage() {
         <div style={{ ...styles.filterRow, marginBottom: segFiltersOpen ? 10 : 14 }}>
           <button
             onClick={() => setSegFiltersOpen((v) => !v)}
-            style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "6px 12px", background: (categoryFilter || languageFilter) ? COLORS.champagne + "22" : COLORS.graphite, border: `1px solid ${(categoryFilter || languageFilter) ? COLORS.champagne + "55" : COLORS.charcoal}`, borderRadius: 8, color: (categoryFilter || languageFilter) ? COLORS.champagne : COLORS.fog, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONTS.body }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "6px 12px", background: (categoryFilter || languageFilter) ? alpha(COLORS.champagne, "22") : COLORS.graphite, border: `1px solid ${(categoryFilter || languageFilter) ? alpha(COLORS.champagne, "55") : COLORS.charcoal}`, borderRadius: 8, color: (categoryFilter || languageFilter) ? COLORS.champagne : COLORS.fog, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONTS.body }}
           >
             <SlidersHorizontal size={13} /> Filtri segmento
             <span style={{ fontSize: 11, opacity: 0.8 }}>
@@ -454,7 +454,7 @@ export default function SalesCpLeaderboardPage() {
 
         {isLoading && !data && <p style={{ color: COLORS.fog }}>Caricamento…</p>}
         {error && <p style={{ color: COLORS.signal }}>Errore: {String(error)}</p>}
-        {data?.error && <div style={{ background: COLORS.signal + "20", color: COLORS.signal, padding: 16, borderRadius: 12 }}>{data.error}{" "}<Link href="/admin/creatorspro-sync" style={{ color: COLORS.champagne }}>Vai a Sync CP →</Link></div>}
+        {data?.error && <div style={{ background: alpha(COLORS.signal, "20"), color: COLORS.signal, padding: 16, borderRadius: 12 }}>{data.error}{" "}<Link href="/admin/creatorspro-sync" style={{ color: COLORS.champagne }}>Vai a Sync CP →</Link></div>}
 
         {data && !data.error && (
           <>
@@ -474,20 +474,20 @@ export default function SalesCpLeaderboardPage() {
                   padding: "14px 20px",
                   marginBottom: 20,
                   background: CP.surface,
-                  border: `1px solid ${CP.accentRed}59`,
+                  border: `1px solid ${alpha(CP.accentRed, "59")}`,
                   borderRadius: 12,
                   color: COLORS.alabaster,
                   textDecoration: "none",
                   gap: 14,
                   transition: "background 0.15s, border-color 0.15s",
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = CP.accentRed + "b3"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = CP.accentRed + "59"; }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = alpha(CP.accentRed, "b3"); }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = alpha(CP.accentRed, "59"); }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                   <div style={{
                     width: 40, height: 40, borderRadius: 10,
-                    background: CP.accentRed + "33",
+                    background: alpha(CP.accentRed, "33"),
                     display: "flex", alignItems: "center", justifyContent: "center",
                     flexShrink: 0,
                   }}>
@@ -520,8 +520,8 @@ export default function SalesCpLeaderboardPage() {
                   style={{
                     display: "inline-flex", alignItems: "center", gap: 6,
                     padding: "7px 13px",
-                    background: extraCols.length ? COLORS.champagne + "22" : COLORS.graphite,
-                    border: `1px solid ${extraCols.length ? COLORS.champagne + "55" : COLORS.charcoal}`,
+                    background: extraCols.length ? alpha(COLORS.champagne, "22") : COLORS.graphite,
+                    border: `1px solid ${extraCols.length ? alpha(COLORS.champagne, "55") : COLORS.charcoal}`,
                     borderRadius: 8,
                     color: extraCols.length ? COLORS.champagne : COLORS.fog,
                     fontSize: 12, fontWeight: 600,
@@ -554,9 +554,9 @@ export default function SalesCpLeaderboardPage() {
                               display: "flex", alignItems: "center", gap: 10,
                               padding: "9px 10px", cursor: "pointer",
                               borderRadius: 6,
-                              background: checked ? COLORS.champagne + "12" : "transparent",
+                              background: checked ? alpha(COLORS.champagne, "12") : "transparent",
                             }}
-                            onMouseEnter={(e) => { if (!checked) e.currentTarget.style.background = COLORS.charcoal + "60"; }}
+                            onMouseEnter={(e) => { if (!checked) e.currentTarget.style.background = alpha(COLORS.charcoal, "60"); }}
                             onMouseLeave={(e) => { if (!checked) e.currentTarget.style.background = "transparent"; }}
                           >
                             <div style={{
@@ -605,7 +605,7 @@ export default function SalesCpLeaderboardPage() {
                   const inflowwScore = inflowwScoreByEmployee.get(op.employee);
                   const diff = inflowwScore && op.score != null ? op.score - inflowwScore.score : null;
                   return (
-                    <div key={`${op.employee}-${i}`} style={{ display: "grid", gridTemplateColumns: streamGridTemplate, alignItems: "center", padding: "12px 22px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 13 }}>
+                    <div key={`${op.employee}-${i}`} style={{ display: "grid", gridTemplateColumns: streamGridTemplate, alignItems: "center", padding: "12px 22px", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, fontSize: 13 }}>
                       <div style={{ fontFamily: FONTS.mono, fontWeight: 600, color: COLORS.fog }}>{op.rank ? String(op.rank).padStart(2, "0") : "—"}</div>
                       <Avatar name={op.employee} size={28} />
                       <div style={{ minWidth: 0 }}>
@@ -655,7 +655,7 @@ export default function SalesCpLeaderboardPage() {
 
                 {showNoCp && noCpOps.length > 0 && (
                   <>
-                    <div style={{ padding: "14px 22px", background: COLORS.obsidian + "80", borderTop: `1px solid ${COLORS.charcoal}`, borderBottom: `1px solid ${COLORS.charcoal}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                    <div style={{ padding: "14px 22px", background: alpha(COLORS.obsidian, "80"), borderTop: `1px solid ${COLORS.charcoal}`, borderBottom: `1px solid ${COLORS.charcoal}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                       <div style={{ fontSize: 12, color: COLORS.mist, flex: 1, minWidth: 280 }}>
                         <b style={{ color: COLORS.alabaster }}>{noCpOps.length} operatori SENZA dati CP</b> (non mappati o periodo senza shift). Prova il recheck batch per recuperare le wage da CP API.
                       </div>
@@ -690,12 +690,12 @@ export default function SalesCpLeaderboardPage() {
                       </button>
                     </div>
                     {!bulkRecheck.running && bulkRecheck.done > 0 && (
-                      <div style={{ padding: "10px 22px", background: bulkRecheck.recovered > 0 ? CP.accentGreen + "18" : COLORS.obsidian + "40", fontSize: 11, borderBottom: `1px solid ${COLORS.charcoal}`, color: bulkRecheck.recovered > 0 ? CP.accentGreen : COLORS.fog }}>
+                      <div style={{ padding: "10px 22px", background: bulkRecheck.recovered > 0 ? alpha(CP.accentGreen, "18") : alpha(COLORS.obsidian, "40"), fontSize: 11, borderBottom: `1px solid ${COLORS.charcoal}`, color: bulkRecheck.recovered > 0 ? CP.accentGreen : COLORS.fog }}>
                         ✓ Batch completato: {bulkRecheck.done} controllati · <b>{bulkRecheck.recovered} recuperati con nuove wage</b> · {bulkRecheck.errors} errori · {bulkRecheck.done - bulkRecheck.recovered - bulkRecheck.errors} senza wage CP nel periodo
                       </div>
                     )}
                     {(showAllNoCp ? noCpOps : noCpOps.slice(0, 30)).map((op, i) => (
-                      <div key={`nocp-${op.employee}-${i}`} style={{ display: "grid", gridTemplateColumns: streamGridTemplate, alignItems: "center", padding: "10px 22px", borderBottom: `1px solid ${COLORS.charcoal}88`, fontSize: 12, opacity: recheckState[op.employee]?.state === "success" && recheckState[op.employee]?.added > 0 ? 0.9 : 0.6 }}>
+                      <div key={`nocp-${op.employee}-${i}`} style={{ display: "grid", gridTemplateColumns: streamGridTemplate, alignItems: "center", padding: "10px 22px", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, fontSize: 12, opacity: recheckState[op.employee]?.state === "success" && recheckState[op.employee]?.added > 0 ? 0.9 : 0.6 }}>
                         <div style={{ color: COLORS.mist }}>—</div>
                         <Avatar name={op.employee} size={28} />
                         <div style={{ fontFamily: FONTS.display, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
@@ -734,7 +734,7 @@ export default function SalesCpLeaderboardPage() {
                         style={{
                           width: "100%",
                           padding: "12px 22px",
-                          background: COLORS.obsidian + "80",
+                          background: alpha(COLORS.obsidian, "80"),
                           border: "none",
                           borderTop: `1px solid ${COLORS.charcoal}`,
                           color: COLORS.champagne,
@@ -796,9 +796,9 @@ function iconBtnStyle(color, isButton = false) {
   return {
     display: "inline-flex", alignItems: "center", justifyContent: "center",
     width: 22, height: 22,
-    background: `${color}18`,
+    background: `${alpha(color, "18")}`,
     color,
-    border: `1px solid ${color}44`,
+    border: `1px solid ${alpha(color, "44")}`,
     borderRadius: 5,
     cursor: isButton ? "pointer" : "default",
     flexShrink: 0,
@@ -830,7 +830,7 @@ function ColHead({ label, tooltip }) {
             minWidth: 240,
             padding: "10px 12px",
             background: COLORS.charcoal,
-            border: `1px solid ${COLORS.fog}55`,
+            border: `1px solid ${alpha(COLORS.fog, "55")}`,
             borderRadius: 8,
             color: COLORS.alabaster,
             fontSize: 11,

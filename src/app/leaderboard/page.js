@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 
 const C = {
   bgDark: COLORS.obsidian,
@@ -23,7 +23,7 @@ const C = {
 // accent (bordo/testo) — stesso pattern di TIER in brand.js.
 const PODIUM_TIER = {
   1: { grad: CP.surface, accent: "#F2D488", label: "CHAMPION", ink: "#FFF5D4" },
-  2: { grad: CP.surface, accent: "#DADEE6", label: "RUNNER-UP", ink: "#f2f4f8" },
+  2: { grad: CP.surface, accent: "#DADEE6", label: "RUNNER-UP", ink: CP.textPrimary },
   3: { grad: CP.surface, accent: "#C87D46", label: "THIRD", ink: "#FFE4C2" },
 };
 
@@ -70,7 +70,7 @@ function PodiumCard({ entry, place }) {
           {tier.label}
         </div>
       )}
-      <div style={{ fontSize: isWinner ? "2.2rem" : "1.7rem", filter: `drop-shadow(0 0 12px ${tier.accent}88)` }}>
+      <div style={{ fontSize: isWinner ? "2.2rem" : "1.7rem", filter: `drop-shadow(0 0 12px ${alpha(tier.accent, "88")})` }}>
         {medals[place]}
       </div>
       <div
@@ -79,7 +79,7 @@ function PodiumCard({ entry, place }) {
           maxWidth: isWinner ? 200 : 170,
           padding: isWinner ? "1rem 0.75rem" : "0.8rem 0.6rem",
           background: tier.grad,
-          border: `1px solid ${tier.accent}88`,
+          border: `1px solid ${alpha(tier.accent, "88")}`,
           borderRadius: 12,
           textAlign: "center",
           position: "relative",
@@ -111,10 +111,10 @@ function PodiumCard({ entry, place }) {
           width: "100%",
           maxWidth: 200,
           height: heights[place],
-          background: `${tier.accent}18`,
+          background: `${alpha(tier.accent, "18")}`,
           borderTop: `4px solid ${tier.accent}`,
-          borderLeft: `1px solid ${tier.accent}30`,
-          borderRight: `1px solid ${tier.accent}30`,
+          borderLeft: `1px solid ${alpha(tier.accent, "30")}`,
+          borderRight: `1px solid ${alpha(tier.accent, "30")}`,
           borderRadius: "4px 4px 0 0",
           display: "flex",
           alignItems: "center",
@@ -123,7 +123,7 @@ function PodiumCard({ entry, place }) {
           fontFamily: FONTS.mono,
           fontSize: isWinner ? "2.4rem" : "2rem",
           fontWeight: 800,
-          textShadow: `0 0 20px ${tier.accent}88`,
+          textShadow: `0 0 20px ${alpha(tier.accent, "88")}`,
         }}
       >
         {place}
@@ -173,7 +173,7 @@ export default function LeaderboardPage() {
       <span
         style={{
           padding: "0.25rem 0.6rem",
-          background: `${color}25`,
+          background: `${alpha(color, "25")}`,
           border: `1px solid ${color}`,
           borderRadius: "0.4rem",
           color,
@@ -207,7 +207,7 @@ export default function LeaderboardPage() {
               <span style={{ color: CP.textMuted }}>›</span>
               <span style={{ color: CP.textPrimary }}>Ladder</span>
             </div>
-            <Link href="/leaderboard/storico" style={{ color: CP.accent, textDecoration: "none", fontSize: 13, padding: "6px 12px", border: `1px solid ${CP.accent}44`, borderRadius: 8 }}>
+            <Link href="/leaderboard/storico" style={{ color: CP.accent, textDecoration: "none", fontSize: 13, padding: "6px 12px", border: `1px solid ${alpha(CP.accent, "44")}`, borderRadius: 8 }}>
               Hall of Fame →
             </Link>
           </div>
@@ -227,9 +227,9 @@ export default function LeaderboardPage() {
                 onClick={() => setPeriod(p.key)}
                 style={{
                   padding: "0.45rem 0.9rem",
-                  background: period === p.key ? C.orange : `${C.white}08`,
+                  background: period === p.key ? C.orange : `${alpha(C.white, "08")}`,
                   color: period === p.key ? C.bgDark : C.white,
-                  border: `1px solid ${period === p.key ? C.orange : C.purple + "40"}`,
+                  border: `1px solid ${period === p.key ? C.orange : alpha(C.purple, "40")}`,
                   borderRadius: "0.5rem",
                   fontSize: "0.85rem",
                   fontWeight: 700,
@@ -245,9 +245,9 @@ export default function LeaderboardPage() {
             onChange={(e) => setSkill(e.target.value)}
             style={{
               padding: "0.45rem 0.75rem",
-              background: `${C.white}08`,
+              background: `${alpha(C.white, "08")}`,
               color: C.white,
-              border: `1px solid ${C.purple}40`,
+              border: `1px solid ${alpha(C.purple, "40")}`,
               borderRadius: "0.5rem",
               fontSize: "0.85rem",
               fontWeight: 700,
@@ -274,8 +274,8 @@ export default function LeaderboardPage() {
             {me && (
               <div
                 style={{
-                  background: me.rank ? `${C.orange}15` : `${C.white}05`,
-                  border: `2px solid ${me.rank ? C.orange : C.purple + "40"}`,
+                  background: me.rank ? `${alpha(C.orange, "15")}` : `${alpha(C.white, "05")}`,
+                  border: `2px solid ${me.rank ? C.orange : alpha(C.purple, "40")}`,
                   borderRadius: "0.85rem",
                   padding: "1rem 1.25rem",
                   marginBottom: "1.5rem",
@@ -325,8 +325,8 @@ export default function LeaderboardPage() {
             {rest.length > 0 && (
               <div
                 style={{
-                  background: `${C.white}05`,
-                  border: `1px solid ${C.purple}30`,
+                  background: `${alpha(C.white, "05")}`,
+                  border: `1px solid ${alpha(C.purple, "30")}`,
                   borderRadius: "0.75rem",
                   overflow: "hidden",
                 }}
@@ -339,8 +339,8 @@ export default function LeaderboardPage() {
                       alignItems: "center",
                       gap: "1rem",
                       padding: "0.75rem 1.25rem",
-                      borderTop: `1px solid ${C.purple}20`,
-                      background: e.isMe ? `${C.orange}15` : "transparent",
+                      borderTop: `1px solid ${alpha(C.purple, "20")}`,
+                      background: e.isMe ? `${alpha(C.orange, "15")}` : "transparent",
                     }}
                   >
                     <div style={{ width: 32, textAlign: "center", color: C.gray, fontWeight: 700 }}>
@@ -359,7 +359,7 @@ export default function LeaderboardPage() {
             )}
 
             {top10.length === 0 && (
-              <div style={{ padding: "2rem", textAlign: "center", color: C.gray, background: `${C.white}05`, borderRadius: "0.75rem", border: `1px solid ${C.purple}30` }}>
+              <div style={{ padding: "2rem", textAlign: "center", color: C.gray, background: `${alpha(C.white, "05")}`, borderRadius: "0.75rem", border: `1px solid ${alpha(C.purple, "30")}` }}>
                 Nessun operatore qualificato in questo periodo. Servono almeno {data?.minSessions || 2} sessioni con valutazione.
               </div>
             )}
@@ -376,8 +376,8 @@ export default function LeaderboardPage() {
                         alignItems: "center",
                         gap: "1rem",
                         padding: "0.85rem 1.25rem",
-                        background: e.isMe ? `${C.orange}15` : `${C.white}05`,
-                        border: `2px solid ${medal?.color || C.purple}40`,
+                        background: e.isMe ? `${alpha(C.orange, "15")}` : `${alpha(C.white, "05")}`,
+                        border: `2px solid ${alpha(medal?.color || C.purple, "40")}`,
                         borderRadius: "0.75rem",
                       }}
                     >

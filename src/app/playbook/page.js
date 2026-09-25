@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
@@ -92,7 +92,7 @@ function EntryCard({ entry }) {
           </span>
         )}
         {entry.benchmark && (
-          <span style={{ background: COLORS.cobalt + "30", color: COLORS.cobalt, padding: "2px 8px", borderRadius: 10 }}>
+          <span style={{ background: alpha(COLORS.cobalt, "30"), color: COLORS.cobalt, padding: "2px 8px", borderRadius: 10 }}>
             {BENCHMARK_LABELS[entry.benchmark] || entry.benchmark}
           </span>
         )}
@@ -110,7 +110,7 @@ function EntryCard({ entry }) {
           </span>
         )}
         {entry.outcome === "failure" && (
-          <span style={{ background: COLORS.signal + "20", color: COLORS.signal, padding: "2px 8px", borderRadius: 10, fontWeight: 500 }}>
+          <span style={{ background: alpha(COLORS.signal, "20"), color: COLORS.signal, padding: "2px 8px", borderRadius: 10, fontWeight: 500 }}>
             esempio negativo
           </span>
         )}

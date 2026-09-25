@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, AlertCircle, Radio, Play, Square, RefreshCw, UserPlus, ShieldAlert } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
 
 const LIVE_POLL_MS = 120_000;
@@ -355,7 +355,7 @@ export default function CmCockpitPage() {
       <div style={{ display: "flex", gap: 6, marginBottom: 18, padding: 5, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, width: "fit-content" }}>
         {[{ id: "turno", label: "Apri turno" }, { id: "guadagni", label: "I miei guadagni" }].map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            style={{ padding: "7px 15px", borderRadius: 7, fontSize: 12.5, cursor: "pointer", fontFamily: FONTS.body, background: tab === t.id ? CP.surfaceAlt : "transparent", border: `1px solid ${tab === t.id ? CP.accent + "66" : "transparent"}`, color: tab === t.id ? CP.textPrimary : CP.textSecondary, fontWeight: tab === t.id ? 500 : 400 }}>
+            style={{ padding: "7px 15px", borderRadius: 7, fontSize: 12.5, cursor: "pointer", fontFamily: FONTS.body, background: tab === t.id ? CP.surfaceAlt : "transparent", border: `1px solid ${tab === t.id ? alpha(CP.accent, "66") : "transparent"}`, color: tab === t.id ? CP.textPrimary : CP.textSecondary, fontWeight: tab === t.id ? 500 : 400 }}>
             {t.label}
           </button>
         ))}
@@ -428,7 +428,7 @@ export default function CmCockpitPage() {
               const active = f.name === fascia;
               return (
                 <button key={f.name} onClick={() => setFascia(f.name)}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 7, background: active ? CP.accentSoft : CP.surface, color: active ? CP.accentSoftText : CP.textSecondary, border: `1px solid ${active ? CP.accent + "66" : CP.border}`, borderRadius: 99, padding: "7px 15px", fontSize: 13, fontWeight: active ? 600 : 400, cursor: "pointer", fontFamily: FONTS.body }}>
+                  style={{ display: "inline-flex", alignItems: "center", gap: 7, background: active ? CP.accentSoft : CP.surface, color: active ? CP.accentSoftText : CP.textSecondary, border: `1px solid ${active ? alpha(CP.accent, "66") : CP.border}`, borderRadius: 99, padding: "7px 15px", fontSize: 13, fontWeight: active ? 600 : 400, cursor: "pointer", fontFamily: FONTS.body }}>
                   {f.name}
                   <span style={{ fontFamily: FONTS.mono, fontSize: 11, color: active ? CP.accentSoftText : CP.textMuted }}>
                     {f.minStart ? hhmm(new Date(f.minStart).toISOString()) : "—"}–{f.maxEnd ? hhmm(new Date(f.maxEnd).toISOString()) : "—"} · {f.rows.length}
@@ -586,7 +586,7 @@ export default function CmCockpitPage() {
                           const on = d.tags.includes(tag);
                           return (
                             <button key={tag} onClick={() => toggleTag(key, tag)}
-                              style={{ fontSize: 11, fontWeight: 600, borderRadius: 99, padding: "3px 10px", cursor: "pointer", fontFamily: FONTS.body, color: on ? CP.accentSoftText : CP.textMuted, background: on ? CP.accentSoft : CP.surface, border: `1px solid ${on ? CP.accent + "66" : CP.border}` }}>
+                              style={{ fontSize: 11, fontWeight: 600, borderRadius: 99, padding: "3px 10px", cursor: "pointer", fontFamily: FONTS.body, color: on ? CP.accentSoftText : CP.textMuted, background: on ? CP.accentSoft : CP.surface, border: `1px solid ${on ? alpha(CP.accent, "66") : CP.border}` }}>
                               {tag}
                             </button>
                           );

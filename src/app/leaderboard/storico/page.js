@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel } from "@/components/cp-style";
 
 const GOLD = "#FFD700";
@@ -107,8 +107,8 @@ export default function HallOfFamePage() {
                   return (
                     <div key={e.userId} style={{
                       padding: "10px 12px",
-                      background: `${color}15`,
-                      border: `1px solid ${color}55`,
+                      background: `${alpha(color, "15")}`,
+                      border: `1px solid ${alpha(color, "55")}`,
                       borderRadius: 8,
                       display: "flex", alignItems: "center", gap: 8,
                     }}>

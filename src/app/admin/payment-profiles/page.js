@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { Search, Users, User, UsersRound, Tag, Layers, AlertCircle, Coins, Percent, Loader2 } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
 
 /**
@@ -21,7 +21,7 @@ const fetcher = (url) => fetch(url).then((r) => r.json());
 const COSELLERS_LABEL = { 1: "Solo", 2: "Coppia", 3: "Triplo", 4: "Quartetto" };
 const COSELLERS_ICON = { 1: User, 2: UsersRound, 3: Users, 4: Users };
 // Famiglia viola-grigio per luminosità (DESIGN.md §4 Grafici) — 3 e 4 condividono l'accent (in UI sono aggregati "3+")
-const COSELLERS_COLOR = { 1: "#8c95a8", 2: "#b9aef9", 3: CP.accent, 4: CP.accent };
+const COSELLERS_COLOR = { 1: CP.textMuted, 2: CP.accentSoftText, 3: CP.accent, 4: CP.accent };
 
 function fmtPct(v) {
   if (v == null) return "—";
@@ -270,7 +270,7 @@ function ProfileCard({ p }) {
   return (
     <CpCard accent={color} padding="14px 16px">
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 8, background: color + "22", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 8, background: alpha(color, "22"), display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <Icon size={18} color={color} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -279,7 +279,7 @@ function ProfileCard({ p }) {
             <span style={badge(color)}>{COSELLERS_LABEL[p.cosellersCount] || `${p.cosellersCount} pers`}</span>
             {p.hourlyRate > 0 && <span style={badge("#8F8A82")}><Coins size={9} style={{ marginRight: 3 }} />{fmtCurrency(p.hourlyRate)}/h</span>}
             {p.thresholds_count > 0 && <span style={badge(CP.accentGreen)}><Layers size={9} style={{ marginRight: 3 }} />{p.thresholds_count} scaglion{p.thresholds_count === 1 ? "e" : "i"}</span>}
-            {p.links_count > 0 && <span style={badge("#b9aef9")}>{p.links_count} link</span>}
+            {p.links_count > 0 && <span style={badge(CP.accentSoftText)}>{p.links_count} link</span>}
           </div>
         </div>
       </div>
@@ -325,4 +325,4 @@ function ProfileCard({ p }) {
 
 const lbl = { display: "block", fontSize: 10, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
 const input = { width: "100%", padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
-const badge = (c) => ({ display: "inline-flex", alignItems: "center", padding: "2px 7px", borderRadius: 4, background: c + "22", color: c, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, border: `1px solid ${c}55` });
+const badge = (c) => ({ display: "inline-flex", alignItems: "center", padding: "2px 7px", borderRadius: 4, background: alpha(c, "22"), color: c, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, border: `1px solid ${alpha(c, "55")}` });

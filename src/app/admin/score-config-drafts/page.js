@@ -4,7 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { FlaskConical, Play, Trash2, Plus, AlertTriangle, CheckCircle2, GitCompare, History } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, PillTab } from "@/components/cp-style";
 
 /**
@@ -169,7 +169,7 @@ function DraftCard({ draft, open, onToggle, call, busy }) {
             {draft.note ? ` · ${draft.note}` : ""}
           </div>
         </div>
-        <span style={{ fontSize: 12, fontWeight: 600, color: meta.color, background: meta.color + "18", borderRadius: 999, padding: "3px 10px" }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: meta.color, background: alpha(meta.color, "18"), borderRadius: 999, padding: "3px 10px" }}>
           {meta.label}
         </span>
         {draft.backtest && (

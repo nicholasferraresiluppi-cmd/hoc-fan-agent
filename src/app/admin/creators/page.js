@@ -2,7 +2,7 @@
 
 import { CREATOR_PERSONAS } from "@/lib/creator-personas";
 import Link from "next/link";
-import { COLORS, CP } from "@/lib/brand";
+import { COLORS, CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const C = {
@@ -33,7 +33,7 @@ function Chips({ items, color = C.purple }) {
           key={i}
           style={{
             padding: "0.2rem 0.55rem",
-            background: `${color}30`,
+            background: `${alpha(color, "30")}`,
             border: `1px solid ${color}`,
             borderRadius: "0.35rem",
             color: C.white,
@@ -68,8 +68,8 @@ export default function CreatorsAdmin() {
           <div
             key={c.id}
             style={{
-              background: `${C.white}05`,
-              border: `2px solid ${C.purple}50`,
+              background: `${alpha(C.white, "05")}`,
+              border: `2px solid ${alpha(C.purple, "50")}`,
               borderRadius: "0.75rem",
               padding: "1.5rem",
             }}
@@ -78,7 +78,7 @@ export default function CreatorsAdmin() {
               <h2 style={{ margin: 0, fontSize: "1.25rem" }}>{c.name}</h2>
               <span style={{
                 padding: "0.2rem 0.5rem",
-                background: `${C.green}30`,
+                background: `${alpha(C.green, "30")}`,
                 border: `1px solid ${C.green}`,
                 borderRadius: "0.35rem",
                 color: C.green,
@@ -96,7 +96,7 @@ export default function CreatorsAdmin() {
               <div style={{
                 marginTop: "0.75rem",
                 padding: "0.6rem 0.85rem",
-                background: `${C.orange}15`,
+                background: `${alpha(C.orange, "15")}`,
                 border: `1px dashed ${C.orange}`,
                 borderRadius: "0.5rem",
                 fontSize: "0.9rem",
@@ -155,7 +155,7 @@ export default function CreatorsAdmin() {
             <Section title="Esempi opener">
               <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
                 {(c.example_openers || []).map((e, i) => (
-                  <div key={i} style={{ padding: "0.5rem 0.75rem", background: `${C.purple}15`, borderRadius: "0.5rem", fontStyle: "italic" }}>
+                  <div key={i} style={{ padding: "0.5rem 0.75rem", background: `${alpha(C.purple, "15")}`, borderRadius: "0.5rem", fontStyle: "italic" }}>
                     "{e}"
                   </div>
                 ))}

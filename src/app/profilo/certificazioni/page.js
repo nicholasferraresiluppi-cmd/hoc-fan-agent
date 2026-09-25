@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CP } from "@/lib/brand";
+import { CP, alpha } from "@/lib/brand";
 
 const LEVEL_META = {
   0: { label: "Non certificato", emoji: "⚪", color: "#666" },
@@ -68,8 +68,8 @@ export default function CertificationsPage() {
                 <div
                   key={c.creatorId}
                   style={{
-                    background: `${meta.color}10`,
-                    border: `2px solid ${meta.color}55`,
+                    background: `${alpha(meta.color, "10")}`,
+                    border: `2px solid ${alpha(meta.color, "55")}`,
                     borderRadius: 12,
                     padding: "1.25rem",
                   }}

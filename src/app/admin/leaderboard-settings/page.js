@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 // Etichette KPI in italiano per UI (replicano il foglio Sheets)
@@ -202,9 +202,9 @@ export default function LeaderboardSettingsPage() {
       fontWeight: 600,
       letterSpacing: "0.06em",
       
-      background: COLORS.champagne + "26",
+      background: alpha(COLORS.champagne, "26"),
       color: COLORS.champagne,
-      border: `1px solid ${COLORS.champagne}55`,
+      border: `1px solid ${alpha(COLORS.champagne, "55")}`,
       marginLeft: 8,
       verticalAlign: "middle",
     },
@@ -220,7 +220,7 @@ export default function LeaderboardSettingsPage() {
     },
     td: {
       padding: "10px 12px",
-      borderBottom: `1px solid ${COLORS.charcoal}88`,
+      borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`,
     },
     input: {
       padding: "7px 10px",

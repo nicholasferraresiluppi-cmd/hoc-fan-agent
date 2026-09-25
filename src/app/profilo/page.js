@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { useUser } from "@clerk/nextjs";
 import { Sparkles, TrendingUp, GraduationCap, BookOpen, Mail, ArrowRight, Target, Award } from "lucide-react";
@@ -116,7 +116,7 @@ export default function MyProfilePage() {
             {cp ? (
               <div style={{
                 background: CP.surface,
-                border: `1px solid ${tierColor}55`,
+                border: `1px solid ${alpha(tierColor, "55")}`,
                 borderRadius: 20, padding: "30px 32px", marginBottom: 24,
                 display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 28, alignItems: "center",
                 position: "relative", overflow: "hidden",
@@ -153,7 +153,7 @@ export default function MyProfilePage() {
                   <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 64, lineHeight: 1, color: tierColor }}>
                     {cp.score?.toFixed(1) ?? "—"}
                   </div>
-                  <span style={{ display: "inline-block", padding: "4px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", background: tierColor + "26", color: tierColor, border: `1px solid ${tierColor}55`, marginTop: 8, fontFamily: FONTS.body }}>
+                  <span style={{ display: "inline-block", padding: "4px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", background: alpha(tierColor, "26"), color: tierColor, border: `1px solid ${alpha(tierColor, "55")}`, marginTop: 8, fontFamily: FONTS.body }}>
                     {cp.tier}
                   </span>
                 </div>
@@ -181,17 +181,17 @@ export default function MyProfilePage() {
             {cp?.per_creator?.length > 0 && (
               <Section title="Le tue creator" subtitle="Dove stai andando forte, dove c'è margine. Lavora con il tuo Team Lead sui punti deboli.">
                 <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, overflow: "hidden" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.8fr 0.8fr 0.7fr 0.9fr 0.6fr 0.8fr", padding: "12px 20px", background: COLORS.obsidian + "80", color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.8fr 0.8fr 0.7fr 0.9fr 0.6fr 0.8fr", padding: "12px 20px", background: alpha(COLORS.obsidian, "80"), color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` }}>
                     <div>Creator</div><div>Score loc.</div><div>Tier</div><div>$/shift</div><div>Shift</div><div>vs cohort</div>
                   </div>
                   {cp.per_creator.map((row) => {
                     const tCol = row.tier ? TIER_COLORS[row.tier] : COLORS.mist;
                     const cohortColor = row.vs_cohort_pct == null ? COLORS.mist : row.vs_cohort_pct > 0 ? CP.accentGreen : CP.accentRed;
                     return (
-                      <div key={row.creator} style={{ display: "grid", gridTemplateColumns: "1.8fr 0.8fr 0.7fr 0.9fr 0.6fr 0.8fr", padding: "12px 20px", borderBottom: `1px solid ${COLORS.charcoal}88`, alignItems: "center", fontSize: 13 }}>
+                      <div key={row.creator} style={{ display: "grid", gridTemplateColumns: "1.8fr 0.8fr 0.7fr 0.9fr 0.6fr 0.8fr", padding: "12px 20px", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, alignItems: "center", fontSize: 13 }}>
                         <div style={{ fontWeight: 500 }}>{row.creator}</div>
                         <div style={{ fontFamily: FONTS.mono, fontWeight: 700, color: tCol }}>{row.score != null ? row.score.toFixed(1) : "—"}</div>
-                        <div>{row.tier ? <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 999, fontSize: 10, fontWeight: 600, background: tCol + "26", color: tCol, border: `1px solid ${tCol}55` }}>{row.tier}</span> : <span style={{ color: COLORS.mist }}>—</span>}</div>
+                        <div>{row.tier ? <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 999, fontSize: 10, fontWeight: 600, background: alpha(tCol, "26"), color: tCol, border: `1px solid ${alpha(tCol, "55")}` }}>{row.tier}</span> : <span style={{ color: COLORS.mist }}>—</span>}</div>
                         <div style={{ fontFamily: FONTS.mono }}>{fmtCurrency(row.sales_per_shift)}</div>
                         <div style={{ fontFamily: FONTS.mono, color: COLORS.fog }}>{Math.round(row.shifts)}</div>
                         <div style={{ fontFamily: FONTS.mono, fontWeight: 600, color: cohortColor }}>{fmtPctSign(row.vs_cohort_pct)}</div>
@@ -258,7 +258,7 @@ function NextTierBlock({ cp, nextTier }) {
       padding: "20px 24px",
       marginBottom: 24,
       background: CP.surface,
-      border: `1px solid ${nextColor}44`,
+      border: `1px solid ${alpha(nextColor, "44")}`,
       borderRadius: 14,
       display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap",
     }}>

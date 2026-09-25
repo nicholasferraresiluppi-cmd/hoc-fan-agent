@@ -4,7 +4,7 @@
 // comportamenti che monetizzano da noi (vedi src/lib/academy-signal-scoring.js).
 // Solo presentazione: riceve l'oggetto `data` (score.signals) e lo rende.
 
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 
 const VERDICT = {
   ok: { color: CP.accentGreen, label: "conduci bene" },
@@ -16,7 +16,7 @@ function StatusTag({ s }) {
   if (s.status === "scored" && s.verdict) {
     const v = VERDICT[s.verdict] || VERDICT.watch;
     return (
-      <span style={{ fontSize: 11, color: v.color, background: `${v.color}1f`, padding: "2px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>
+      <span style={{ fontSize: 11, color: v.color, background: `${alpha(v.color, "1f")}`, padding: "2px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>
         {v.label}
       </span>
     );

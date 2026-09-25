@@ -287,7 +287,7 @@ export default function ShiftQualityPage() {
                   Solo admin · costa API · le etichette servono al coaching e <b>non entrano in nessuno score</b>.
                 </div>
                 <button onClick={() => startAnalysis(false)} style={{
-                  display: "flex", alignItems: "center", gap: 8, background: CP.accent, color: "#0a0d11",
+                  display: "flex", alignItems: "center", gap: 8, background: CP.accent, color: CP.bgSunken,
                   border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
                 }}>
                   <Sparkles size={14} /> Analizza giornata

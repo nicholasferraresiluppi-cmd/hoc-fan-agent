@@ -10,8 +10,8 @@
 
 body {
   font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
-  background-color: #0c0f14;
-  color: #f2f4f8;
+  background-color: var(--cp-bg);
+  color: var(--cp-textPrimary);
 }
 
 /* Design system: due pesi soltanto (400/500), mai 600+ */

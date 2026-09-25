@@ -3,6 +3,7 @@ import { itIT } from "@clerk/localizations";
 import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
 import "./globals.css";
+import { themeCss, CP } from "@/lib/brand";
 
 export const metadata = {
   title: "HOC Pro",
@@ -20,11 +21,11 @@ export default function RootLayout({ children }) {
       localization={itIT}
       appearance={{
         variables: {
-          colorPrimary: "#8b7cf6",
-          colorBackground: "#0c0f14",
-          colorText: "#f2f4f8",
-          colorInputBackground: "#151a22",
-          colorInputText: "#f2f4f8",
+          colorPrimary: CP.accent,
+          colorBackground: CP.bg,
+          colorText: CP.textPrimary,
+          colorInputBackground: CP.surface,
+          colorInputText: CP.textPrimary,
           fontFamily: "Inter, system-ui, sans-serif",
         },
         elements: {
@@ -52,8 +53,12 @@ export default function RootLayout({ children }) {
         },
       }}
     >
-      <html lang="it">
+      <html lang="it" suppressHydrationWarning>
         <head>
+          {/* Tema chiaro/scuro: variabili dei due temi + scelta salvata applicata PRIMA
+              del primo disegno (niente lampo del tema sbagliato). Default: scuro. */}
+          <style dangerouslySetInnerHTML={{ __html: themeCss() }} />
+          <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem("hoc:theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}` }} />
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
           <link
@@ -61,7 +66,7 @@ export default function RootLayout({ children }) {
             rel="stylesheet"
           />
         </head>
-        <body style={{ background: "#0c0f14", color: "#f2f4f8", minHeight: "100vh", fontFamily: "Inter, system-ui, sans-serif" }}>
+        <body style={{ background: "var(--cp-bg)", color: "var(--cp-textPrimary)", minHeight: "100vh", fontFamily: "Inter, system-ui, sans-serif" }}>
           <Providers>
             <AppShell>{children}</AppShell>
           </Providers>

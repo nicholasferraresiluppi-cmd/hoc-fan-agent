@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
-import { COLORS, FONTS, CP } from "@/lib/brand";
+import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
 const PERIOD_OPTIONS = [
@@ -184,7 +184,7 @@ export default function LeaderboardImportPage() {
     select: { width: "100%", padding: "10px 14px", background: COLORS.charcoal, border: `1px solid ${COLORS.charcoal}`, borderRadius: 8, color: COLORS.alabaster, fontSize: 14, fontFamily: FONTS.body, marginBottom: 12 },
     btn: { padding: "10px 18px", background: COLORS.champagne, color: COLORS.obsidian, border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 14, fontFamily: FONTS.body },
     btnGhost: { padding: "10px 18px", background: "transparent", color: COLORS.alabaster, border: `1px solid ${COLORS.charcoal}`, borderRadius: 8, cursor: "pointer", fontSize: 14, fontFamily: FONTS.body, marginRight: 8 },
-    error: { background: COLORS.signal + "20", color: COLORS.signal, padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 13 },
+    error: { background: alpha(COLORS.signal, "20"), color: COLORS.signal, padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 13 },
     statRow: { display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${COLORS.charcoal}`, fontSize: 14 },
     importItem: { display: "flex", justifyContent: "space-between", padding: "8px 12px", background: COLORS.charcoal, borderRadius: 6, marginBottom: 6, fontSize: 13 },
   };
@@ -209,7 +209,7 @@ export default function LeaderboardImportPage() {
         <div style={{
           padding: "16px 20px",
           background: CP.accentSoft,
-          border: `1px solid ${CP.accentBlue}55`,
+          border: `1px solid ${alpha(CP.accentBlue, "55")}`,
           borderRadius: 12,
           marginBottom: 20,
         }}>
@@ -308,8 +308,8 @@ export default function LeaderboardImportPage() {
                   title={`Elimina l'import ${imp.period} dal KV`}
                   style={{
                     padding: "4px 10px",
-                    background: deletingPeriod === imp.period ? COLORS.charcoal : CP.accentRed + "18",
-                    border: `1px solid ${deletingPeriod === imp.period ? COLORS.steel : CP.accentRed + "66"}`,
+                    background: deletingPeriod === imp.period ? COLORS.charcoal : alpha(CP.accentRed, "18"),
+                    border: `1px solid ${deletingPeriod === imp.period ? COLORS.steel : alpha(CP.accentRed, "66")}`,
                     borderRadius: 5,
                     color: deletingPeriod === imp.period ? COLORS.fog : CP.accentRed,
                     fontSize: 11,

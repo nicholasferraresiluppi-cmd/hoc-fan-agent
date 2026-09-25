@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { Loader2, AlertCircle, Radio, ArrowRight, RefreshCw, CheckCircle2 } from "lucide-react";
-import { CP, FONTS, creatorDotColor } from "@/lib/brand";
+import { CP, FONTS, creatorDotColor, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, StatCard, SectionLabel, PillTab } from "@/components/cp-style";
 import HowToRead from "@/components/HowToRead";
 
@@ -294,7 +294,7 @@ export default function InflowwAgencyPage() {
                 </thead>
                 <tbody>
                   {data.creators.map((c, i) => (
-                    <tr key={c.id} style={{ borderBottom: `1px solid ${CP.border}55` }}>
+                    <tr key={c.id} style={{ borderBottom: `1px solid ${alpha(CP.border, "55")}` }}>
                       <td style={{ ...td, color: CP.textMuted, fontFamily: FONTS.mono }}>{i + 1}</td>
                       <td style={td}>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
