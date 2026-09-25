@@ -158,7 +158,9 @@ export function alpha(color, hex) {
 /** CSS dei due temi (iniettato nel <head> da app/layout). */
 export function themeCss() {
   const vars = (o) => Object.entries(o).map(([k, v]) => `--cp-${k}:${v};`).join("");
-  return `:root{${vars(CP_DARK)}color-scheme:dark}:root[data-theme="light"]{${vars(CP_LIGHT)}color-scheme:light}`;
+  return `:root{${vars(CP_DARK)}color-scheme:dark}:root[data-theme="light"]{${vars(CP_LIGHT)}color-scheme:light}`
+    // Segnaposto sempre tenue: nel tema scuro gli esempi sembravano dati inseriti
+    + `::placeholder{color:var(--cp-textMuted);opacity:.65}`;
 }
 
 

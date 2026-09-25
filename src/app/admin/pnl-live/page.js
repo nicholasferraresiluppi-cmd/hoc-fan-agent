@@ -133,13 +133,13 @@ export default function PnlLivePage() {
           <HeroMetric label={`Margine operativo · ${monthName}${isCurrent ? " finora" : ""}`} value={fmt$(t.margin)}
             compare={prev?.totals?.margin != null && prev.totals.fee_coverage?.split("/")[0] === prev.totals.fee_coverage?.split("/")[1] ? `${prevName}: ${fmt$(prev.totals.margin)} (${fmtDelta(t.margin, prev.totals.margin)})` : null}
             hint={`${fmtPct(t.sales ? t.margin / t.sales : null, 1)} del venduto`}>
-            <Metrics t={t} prev={prev} costPct={costPct} prevCostPct={prevCostPct} />
+            <Metrics t={t} prev={prev} costPct={costPct} prevCostPct={prevCostPct} partial={isCurrent} prevName={prevName} />
           </HeroMetric>
         ) : (
           <HeroMetric label={`Costo operatori sul venduto · ${monthName}${isCurrent ? " finora" : ""}`} value={fmtPct(costPct, 1)}
             compare={prevCostPct != null ? `${prevName}: ${fmtPct(prevCostPct, 1)} (${pts(costPct - prevCostPct)})` : null}
             hint={`Il margine non si può ancora calcolare: mancano le fee di ${missing} creator su ${rows.length}.`}>
-            <Metrics t={t} prev={prev} />
+            <Metrics t={t} prev={prev} partial={isCurrent} prevName={prevName} />
           </HeroMetric>
         )}
 
@@ -177,11 +177,14 @@ export default function PnlLivePage() {
   );
 }
 
-function Metrics({ t, prev, costPct, prevCostPct }) {
+// Sul mese in corso il confronto in % col mese prima INTERO sarebbe ingannevole
+// (settembre a metà "−24%"): si mostra il totale del mese prima come riferimento.
+function Metrics({ t, prev, costPct, prevCostPct, partial, prevName }) {
+  const ref = (v, pv) => partial ? { note: pv != null ? `${prevName} intero: ${fmt$(pv)}` : null } : { delta: fmtDelta(v, pv) };
   return (
     <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
-      <Metric label="Venduto" value={fmt$(t.sales)} delta={fmtDelta(t.sales, prev?.totals?.sales)} />
-      <Metric label="Costo operatori" value={fmt$(t.cost_ops)} delta={fmtDelta(t.cost_ops, prev?.totals?.cost_ops)} />
+      <Metric label="Venduto" value={fmt$(t.sales)} {...ref(t.sales, prev?.totals?.sales)} />
+      <Metric label="Costo operatori" value={fmt$(t.cost_ops)} {...ref(t.cost_ops, prev?.totals?.cost_ops)} />
       {costPct != null && <Metric label="Costo sul venduto" value={fmtPct(costPct, 1)} note={prevCostPct != null ? pts(costPct - prevCostPct) : null} />}
       <Metric label="Fee HOC" value={fmt$(t.fee_usd)} note={`${t.fee_coverage} creator con fee`} />
     </div>
