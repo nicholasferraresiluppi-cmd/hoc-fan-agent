@@ -374,14 +374,17 @@ export default function CreatorsProSyncPage() {
 
 // Nome operatore già esistente che corrisponde alla persona CP (senza "HOC",
 // emoji, maiuscole): "Erick Jhon HOC" → "Erick Jhon". Solo match esatti o
-// univoci per prefisso: meglio nessun suggerimento che quello sbagliato.
+// univoci per prefisso di nome+cognome: meglio nessun suggerimento che quello sbagliato.
 const norm = (x) => (x || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z ]/g, " ").replace(/\bHOC\b/gi, " ").replace(/\s+/g, " ").trim().toLowerCase();
 function suggestName(cpName, names) {
   const n = norm(cpName);
   if (!n) return null;
   const exact = names.filter((x) => norm(x) === n);
   if (exact.length === 1) return exact[0];
-  const pre = names.filter((x) => { const k = norm(x); return k && (k.startsWith(n + " ") || n.startsWith(k + " ")); });
+  // prefisso solo se la parte comune ha almeno nome E cognome: col solo nome
+  // ("Salvatore HOC") si suggeriva lo stesso operatore a due Salvatore diversi
+  const two = (k) => k.split(" ").length >= 2;
+  const pre = names.filter((x) => { const k = norm(x); return k && ((two(n) && k.startsWith(n + " ")) || (two(k) && n.startsWith(k + " "))); });
   return pre.length === 1 ? pre[0] : null;
 }
 const linkBtn = { background: "none", border: "none", padding: 0, color: "var(--cp-accentSoftText)", fontSize: 13, cursor: "pointer" };
