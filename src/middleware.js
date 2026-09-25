@@ -31,6 +31,11 @@ export default clerkMiddleware(async (auth, request) => {
   if (isApiRoute(request)) {
     return NextResponse.json({ error: 'Sessione scaduta o assente.' }, { status: 401 });
   }
+  // Radice senza sessione: dopo il login si passa da /start, che manda chi
+  // gestisce all'Hub e gli operatori all'Academy (i link profondi restano tali).
+  if (request.nextUrl.pathname === '/') {
+    return authObj.redirectToSignIn({ returnBackUrl: new URL('/start', request.url).toString() });
+  }
   return authObj.redirectToSignIn();
 });
 
