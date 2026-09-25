@@ -98,7 +98,7 @@ export function ViewAsBanner() {
       <span style={{ flex: "1 1 300px" }}>
         Stai vedendo l&apos;app come <b>{va.label}</b>: menu, pagine e dati sono quelli dei suoi permessi. Sola lettura: non puoi modificare niente. Le pagine personali mostrano comunque i tuoi dati.
       </span>
-      <button onClick={exit} style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: CP.accentInk, color: "#fff", fontSize: 12, cursor: "pointer" }}>Esci dall&apos;anteprima</button>
+      <button onClick={exit} style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: "#ffffff", color: "#14101f", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>Esci dall&apos;anteprima</button>
     </div>
   );
 }
