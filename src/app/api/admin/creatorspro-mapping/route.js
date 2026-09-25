@@ -12,6 +12,8 @@ import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { logAuditAction } from "@/lib/audit-log";
 import { setMemberMapping } from "@/lib/creatorspro-sync";
+import { getWages } from "@/lib/cp-wages-store";
+import { unmappedSales } from "@/lib/data-health-core";
 
 export async function GET() {
   const az = await authorize(CAPABILITIES.SEED);
@@ -37,9 +39,34 @@ export async function GET() {
     }
   } catch {}
 
+  // Venduto dei non collegati negli ultimi 2 mesi: si collega prima chi pesa
+  // (le persone senza collegamento spariscono dalle viste performance).
+  const now = new Date();
+  const mid = (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  const months = [mid(now), mid(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)))];
+  const salesById = {};
+  let impact = null;
+  try {
+    const ws = await Promise.all(months.map((p) => getWages(p)));
+    ws.forEach((w, i) => {
+      const u = unmappedSales(w || [], m);
+      if (i === 0) impact = { period_id: months[0], unmapped: Math.round(u.unmapped), share: u.share, people: u.people.length };
+      for (const p of u.people) {
+        const cur = salesById[p.member_id] || { cur: 0, prev: 0, name: p.name };
+        cur[i === 0 ? "cur" : "prev"] += Math.round(p.sales);
+        salesById[p.member_id] = cur;
+      }
+    });
+  } catch {}
+  for (const mb of unmapped) {
+    const s = salesById[mb.id];
+    mb.sales_cur = s?.cur || 0;
+    mb.sales_prev = s?.prev || 0;
+  }
+
   // v2: ritorno TUTTI gli unmapped (era limit 50). Per ~200 record è leggero.
   // Mantengo unmapped_sample come alias retrocompat per la UI vecchia.
-  const sortedUnmapped = unmapped.sort((a, b) => (a.cp_name || "").localeCompare(b.cp_name || ""));
+  const sortedUnmapped = unmapped.sort((a, b) => (b.sales_cur + b.sales_prev) - (a.sales_cur + a.sales_prev) || (a.cp_name || "").localeCompare(b.cp_name || ""));
   return Response.json({
     mapping: m,
     members: members.sort((a, b) => `${a.firstName || ""} ${a.lastName || ""}`.localeCompare(`${b.firstName || ""} ${b.lastName || ""}`)),
@@ -47,6 +74,7 @@ export async function GET() {
     unmapped: sortedUnmapped,
     unmapped_sample: sortedUnmapped, // alias retrocompat
     infloww_names: inflowwNames,
+    impact,
   });
 }
 

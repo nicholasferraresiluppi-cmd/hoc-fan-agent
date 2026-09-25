@@ -41,3 +41,27 @@ export function monthShrink({ currentCount, previousCount, minRatio = 0.7 }) {
   const ratio = currentCount / previousCount;
   return ratio < minRatio ? { currentCount, previousCount, ratio: Math.round(ratio * 100) / 100 } : null;
 }
+
+/**
+ * Venduto CP di persone NON collegate a un operatore (cp:member_mapping).
+ * Queste persone spariscono da Sales CP, Creator, Action/Coaching Center:
+ * a set 2026 erano 168 persone e $126k (7% del mese) — trovato per caso
+ * confrontando i totali di tre pagine. Pura: wages + mapping → sintesi.
+ */
+export function unmappedSales(wages, mapping) {
+  const map = mapping || {};
+  let total = 0, unmapped = 0;
+  const byMember = new Map();
+  for (const w of wages || []) {
+    const s = Number(w.total_attributed_from_takes) || 0;
+    total += s;
+    if (map[w.member_id]) continue;
+    unmapped += s;
+    const cur = byMember.get(w.member_id) || { member_id: w.member_id, name: w.member_name || String(w.member_id), sales: 0, shifts: 0 };
+    cur.sales += s;
+    cur.shifts += Number(w.total_worked_shifts) || 0;
+    byMember.set(w.member_id, cur);
+  }
+  const people = [...byMember.values()].filter((p) => p.sales > 0).sort((a, b) => b.sales - a.sales);
+  return { total, unmapped, share: total > 0 ? unmapped / total : 0, people };
+}
