@@ -201,6 +201,31 @@ const CHECKS = [
       }];
     },
   },
+  {
+    // Watchdog della catena notturna: dal 20/07 al 25/09/2026 i lavori smistati
+    // dal dispatcher prendevano 401 dalla Deployment Protection Vercel e nessuno
+    // se n'è accorto (il dispatcher scriveva "kicked"). Qui si guarda la PROVA
+    // di esecuzione: il heartbeat dei figli, non l'esito dichiarato dal padre.
+    id: "cron-chain-broken",
+    severity: "critical",
+    label: "Lavori notturni fermi",
+    async run() {
+      const dispatch = await kv.get("cron:heartbeat:dispatch");
+      if (!dispatch?.at) return [];
+      const children = ["cp-wages", "payout-ledger"];
+      const beats = await Promise.all(children.map((c) => kv.get(`cron:heartbeat:${c}`).catch(() => null)));
+      const stale = children.filter((c, i) => !beats[i]?.at || Date.now() - beats[i].at > 30 * 3600 * 1000);
+      const failed = dispatch.failed_kicks || [];
+      if (!stale.length && !failed.length) return [];
+      return [{
+        fingerprint: "cron-chain-broken",
+        title: "Lavori notturni non partiti",
+        detail: [stale.length ? `Senza esecuzione da oltre 30h: ${stale.join(", ")}` : null, failed.length ? `Kick falliti: ${failed.join(", ")}` : null].filter(Boolean).join(" · "),
+        value: String(stale.length + failed.length),
+        cta: { href: "/admin/creatorspro-sync", label: "Apri sync CP" },
+      }];
+    },
+  },
 ];
 
 /* ------------------------------------------------------------------ */

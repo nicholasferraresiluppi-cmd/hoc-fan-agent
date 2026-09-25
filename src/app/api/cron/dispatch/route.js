@@ -17,8 +17,8 @@
  * deterministica in base al giorno:
  *   - sempre:            tick cp-wages e payout-ledger (auto-concatenanti)
  *                        + snapshot coda del loop azione→esito (queue-snapshot)
- *   - lunedì:            run alert operativi + digest email (in sequenza:
- *                        il digest legge i findings scritti dal run)
+ *   - sempre:            run alert operativi (watchdog catena incluso)
+ *   - lunedì:            + digest email (dopo il run: legge i suoi findings)
  *   - giorno 1 del mese: snapshot leghe (chiusura stagione)
  *
  * Gli endpoint smistati restano invocabili singolarmente (UI/manuale).
@@ -44,8 +44,11 @@ export async function POST(request) {
   };
   await kv.set("cron:heartbeat:dispatch", { at: Date.now(), via: viaCron ? "cron" : "session" }, { ex: 40 * 24 * 3600 }).catch(() => {});
 
+  // Alert ogni notte (prima solo il lunedì): il check "lavori notturni fermi"
+  // deve accendersi entro un giorno, non entro una settimana. Il digest email
+  // resta del lunedì.
+  out.alerts_run = await kickEndpoint(request, "/api/admin/ops-alerts/run", { awaitResponse: true });
   if (out.monday) {
-    out.alerts_run = await kickEndpoint(request, "/api/admin/ops-alerts/run", { awaitResponse: true });
     out.alerts_digest = await kickEndpoint(request, "/api/admin/ops-alerts/digest", { awaitResponse: true });
   }
   if (out.first_of_month) {
@@ -88,6 +91,12 @@ export async function POST(request) {
   } catch (e) {
     out.operator_signals = "err:" + (e?.message || "unknown");
   }
+
+  // Esito dei kick nel heartbeat: un 401 dei figli deve lasciare traccia
+  // (per 2 mesi sono falliti tutti senza che nessuno lo vedesse).
+  const failed = Object.entries(out).filter(([, v]) => v && typeof v === "object" && (v.kicked === false || v.ok === false)).map(([k, v]) => `${k}:${v.status || v.error || "err"}`);
+  out.failed_kicks = failed;
+  await kv.set("cron:heartbeat:dispatch", { at: Date.now(), via: viaCron ? "cron" : "session", failed_kicks: failed }, { ex: 40 * 24 * 3600 }).catch(() => {});
 
   return Response.json(out);
 }
