@@ -1,5 +1,6 @@
+import { kv } from "@vercel/kv";
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { isUserIdAdmin } from "@/lib/admin";
+import { isUserIdAdmin, isUserIdAdminRaw, userHasMfa, adminMfaRequired } from "@/lib/admin";
 import { getUserRole, getUserRoles, getUserTeam, getEffectiveCapabilities } from "@/lib/rbac";
 
 export async function GET() {
@@ -12,6 +13,12 @@ export async function GET() {
     const roles = await getUserRoles(userId); // multi
     const team = await getUserTeam(userId);
     const capabilities = await getEffectiveCapabilities(userId); // unione
+    const adminRaw = admin || (await isUserIdAdminRaw(userId));
+    // appena attivata la 2FA la cache del controllo si aggiorna subito
+    if (adminRaw && user?.twoFactorEnabled) await kv.set(`mfa:ok:${userId}`, 1, { ex: 600 }).catch(() => {});
+    const security = adminRaw
+      ? { admin_raw: true, mfa_enabled: !!user?.twoFactorEnabled, mfa_required: await adminMfaRequired() }
+      : { admin_raw: false };
     return Response.json({
       authenticated: true,
       userId,
@@ -20,6 +27,7 @@ export async function GET() {
       roles,
       team,
       capabilities,
+      security,
       email: user?.emailAddresses?.[0]?.emailAddress,
       name: `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || null,
     });

@@ -60,6 +60,8 @@ export default function UsagePage() {
 
       {r && (
         <>
+          <FeedbackInbox />
+
           {/* Cose da sapere */}
           <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginBottom: 24 }}>
             {r.insights.map((i, k) => (
@@ -210,5 +212,45 @@ function Kpi({ label, value, sub }) {
       <div style={{ fontSize: 24, fontWeight: 500, margin: "4px 0 2px" }}>{value}</div>
       <div style={{ fontSize: 11, color: CP.textMuted }}>{sub}</div>
     </div>
+  );
+}
+
+
+const KIND_LABEL = { problem: "Problema", idea: "Idea", question: "Domanda" };
+const STATUS = [["new", "Nuova"], ["seen", "Letta"], ["done", "Fatta"]];
+
+// Segnalazioni dal tasto "Segnala o suggerisci": la voce diretta di chi usa l'app.
+function FeedbackInbox() {
+  const [items, setItems] = useState(null);
+  const [showDone, setShowDone] = useState(false);
+  const load = () => fetch("/api/admin/feedback").then((r) => (r.ok ? r.json() : null)).then((j) => setItems(j?.items || [])).catch(() => setItems([]));
+  useEffect(() => { load(); }, []);
+  if (!items) return null;
+  const setStatus = async (id, status) => { await fetch("/api/admin/feedback", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) }); load(); };
+  const open = items.filter((i) => i.status !== "done");
+  const shown = showDone ? items : open;
+  return (
+    <section style={{ marginBottom: 24 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+        <h2 style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>Segnalazioni ricevute · {open.length} aperte</h2>
+        <button onClick={() => setShowDone((v) => !v)} style={{ background: "transparent", border: "none", color: CP.accentSoftText, fontSize: 12, cursor: "pointer" }}>{showDone ? "Nascondi fatte" : "Mostra anche fatte"}</button>
+      </div>
+      <div style={{ ...card }}>
+        {shown.length === 0 && <div style={{ padding: 14, fontSize: 13, color: CP.textMuted }}>Nessuna segnalazione {showDone ? "" : "aperta"}. Arrivano dal tasto «Segnala o suggerisci» in basso a destra di ogni pagina.</div>}
+        {shown.map((i, k) => (
+          <div key={i.id} style={{ padding: "12px 14px", borderTop: k ? `1px solid ${CP.borderSoft}` : "none" }}>
+            <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 4 }}>
+              {KIND_LABEL[i.kind] || "Idea"} · {i.name || "—"} · {new Date(i.at).toLocaleString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · <Link href={i.page || "/"} style={{ color: CP.accentSoftText }}>{i.page}</Link>
+            </div>
+            <div style={{ fontSize: 14, color: CP.textPrimary, whiteSpace: "pre-wrap", marginBottom: 8 }}>{i.text}</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {STATUS.map(([st, l]) => (
+                <button key={st} onClick={() => setStatus(i.id, st)} style={{ padding: "3px 9px", borderRadius: 999, fontSize: 11, cursor: "pointer", border: `1px solid ${i.status === st ? CP.accent : CP.border}`, background: i.status === st ? CP.accentSoft : "transparent", color: i.status === st ? CP.accentSoftText : CP.textMuted }}>{l}</button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

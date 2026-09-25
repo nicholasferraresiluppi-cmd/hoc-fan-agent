@@ -20,6 +20,7 @@ export const LIMITS = {
   bq_user:       [{ window: 3600, max: 30 }, { window: 86400, max: 150 }],  // query warehouse lato operatore
   candidate_chat:[{ window: 60, max: 20 },  { window: 86400, max: 400 }],
   candidate_eval:[{ window: 3600, max: 20 }],
+  feedback:      [{ window: 86400, max: 30 }],
 };
 
 /**

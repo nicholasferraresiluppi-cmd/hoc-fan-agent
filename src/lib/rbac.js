@@ -1,6 +1,6 @@
 import { kv } from "@vercel/kv";
 import { auth, clerkClient } from "@clerk/nextjs/server";
-import { isUserIdAdmin } from "@/lib/admin";
+import { isUserIdAdmin, adminMfaOk } from "@/lib/admin";
 
 /**
  * RBAC — Role-Based Access Control.
@@ -178,12 +178,19 @@ export async function getUserRoles(userId) {
   try {
     if (await isUserIdAdmin(userId)) return ["admin"];
   } catch {}
+  // Il ruolo "admin" scritto nei ruoli vale solo se passa la verifica 2FA
+  // (quando richiesta): stessa regola di isUserIdAdmin.
+  const gate = async (roles) => {
+    if (!roles.includes("admin") || (await adminMfaOk(userId))) return roles;
+    const rest = roles.filter((r) => r !== "admin");
+    return rest.length ? rest : ["operator"];
+  };
   // Multi-ruolo
   const set = (await kv.smembers(`roles:${userId}`)) || [];
-  if (set.length) return set;
+  if (set.length) return gate(set);
   // Legacy single-role
   const legacy = await kv.get(`role:${userId}`);
-  if (legacy) return [legacy];
+  if (legacy) return gate([legacy]);
   // Fallback Clerk
   try {
     const cc = await clerkClient();
@@ -191,9 +198,9 @@ export async function getUserRoles(userId) {
     // `roles` (array, anche ruoli custom "c:…") arriva dagli inviti fatti in app;
     // `role` è il ruolo primario predefinito (legacy / mirror di setUserRoles)
     const clerkRoles = u?.publicMetadata?.roles;
-    if (Array.isArray(clerkRoles) && clerkRoles.length) return clerkRoles.map(String);
+    if (Array.isArray(clerkRoles) && clerkRoles.length) return gate(clerkRoles.map(String));
     const clerkRole = u?.publicMetadata?.role;
-    if (clerkRole) return [clerkRole];
+    if (clerkRole) return gate([clerkRole]);
   } catch {}
   return ["operator"];
 }
