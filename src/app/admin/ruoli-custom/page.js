@@ -15,6 +15,7 @@ const CAP_LABELS = {
   "creators.manage": "Creator — gestione persona",
   seed: "Seed dati demo",
   "access.mgmt": "Gestione accessi & ruoli",
+  "users.invite": "Persone — invitare nuove persone",
   "seniority.override": "Seniority — override tier",
   "leagues.snapshot": "Leagues — snapshot manuale",
   "leaderboard.snapshot": "Leaderboard — snapshot manuale",

@@ -73,7 +73,7 @@ const MODULES = [
     primaryCta: { href: "/admin/team", label: "Gestisci Team" },
     secondaryCtas: [
       { href: "/admin/employee-profiles", label: "Profili" },
-      { href: "/admin/ruoli", label: "Ruoli" },
+      { href: "/admin/ruoli", label: "Membri" },
     ],
   },
 ];
