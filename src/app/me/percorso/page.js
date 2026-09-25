@@ -57,7 +57,7 @@ export default function MyLadderPage() {
             <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, padding: "16px 22px", marginBottom: 18, display: "inline-block" }}>
               <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: CP.textMuted, marginBottom: 4 }}>Ultimo mese valutato · {data.current.period_id}</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                <span style={{ fontFamily: FONTS.display, fontSize: 28, fontWeight: 600, color: CP.textPrimary }}>{data.current.score != null ? Math.round(data.current.score) : "—"}</span>
+                <span style={{ fontFamily: FONTS.display, fontSize: 28, fontWeight: 600, color: CP.textPrimary }}>{data.current.score != null ? data.current.score.toLocaleString("it-IT", { maximumFractionDigits: 1 }) : "—"}</span>
                 <span style={{ fontSize: 13, fontWeight: 600, color: TIER_COLORS[data.current.tier] || CP.textSecondary }}>{data.current.tier}</span>
               </div>
             </div>
@@ -87,7 +87,7 @@ export default function MyLadderPage() {
                     <div key={m.period_id} style={{ textAlign: "center" }}>
                       <div title={m.counts ? "Conta per il passaggio" : m.below_floor ? "Sotto il minimo richiesto" : "Sotto la soglia di questo passaggio"}
                         style={{ width: 54, padding: "6px 0", borderRadius: 8, background: m.counts ? alpha(CP.accentGreen, "1c") : CP.surfaceAlt, border: `1px solid ${m.counts ? CP.accentGreen : m.below_floor ? CP.accentRed : CP.border}` }}>
-                        <span style={{ fontSize: 12.5, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{m.score != null ? Math.round(m.score) : "—"}</span>
+                        <span style={{ fontSize: 12.5, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{m.score != null ? m.score.toLocaleString("it-IT", { maximumFractionDigits: 1 }) : "—"}</span>
                       </div>
                       <span style={{ fontSize: 10, color: CP.textMuted }}>{String(m.period_id).slice(5)}{m.tier ? ` · ${m.tier}` : ""}</span>
                     </div>
