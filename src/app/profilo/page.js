@@ -356,6 +356,10 @@ function NotMatchedBlock({ data }) {
           <>L'email <strong style={{ color: COLORS.alabaster }}>{data.email}</strong> non matcha nessun operatore noto nel database CP. Se sei un operatore, chiedi all'admin di assegnare il tuo account.</>
         )}
         {data?.reason === "no_email" && <>Non riesco a leggere l'email del tuo account Clerk. Contatta l'admin.</>}
+        {data?.reason === "needs_link" && (
+          <>Il tuo account (<strong style={{ color: COLORS.alabaster }}>{data.email}</strong>) va collegato al tuo nome operatore da un admin: per sicurezza il collegamento automatico vale solo per le email aziendali.</>
+        )}
+        {data?.reason === "email_not_verified" && <>La tua email non risulta verificata. Esci e rientra con il codice che ti arriva via email.</>}
         {data?.reason === "no_cp_data" && <>Non ci sono ancora dati CP sincronizzati nel sistema. Riprova dopo il prossimo sync.</>}
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

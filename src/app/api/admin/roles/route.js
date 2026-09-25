@@ -1,4 +1,4 @@
-import { authorize, CAPABILITIES, getUserRoles, setUserRoles, ROLES, ROLE_META, listCustomRoles } from "@/lib/rbac";
+import { authorize, authorizeAdmin, auditAccess, CAPABILITIES, getUserRoles, setUserRoles, ROLES, ROLE_META, listCustomRoles } from "@/lib/rbac";
 import { clerkClient } from "@clerk/nextjs/server";
 
 // GET /api/admin/roles — lista utenti con ruoli correnti + meta ruoli predefiniti + custom
@@ -52,7 +52,7 @@ export async function GET() {
 
 // POST { userId, roles: [string] } — set ruoli multipli
 export async function POST(req) {
-  const a = await authorize(CAPABILITIES.ACCESS_MGMT);
+  const a = await authorizeAdmin();
   if (!a.ok) return Response.json({ error: a.message }, { status: a.status });
   try {
     const body = await req.json();
@@ -68,7 +68,9 @@ export async function POST(req) {
     const customIds = new Set(custom.map((c) => c.id));
     const invalid = roles.filter((r) => !ROLES.includes(r) && !customIds.has(r));
     if (invalid.length) return Response.json({ error: `invalid roles: ${invalid.join(", ")}` }, { status: 400 });
+    const before = await getUserRoles(userId);
     await setUserRoles(userId, roles);
+    await auditAccess(a.userId, "roles_set", { target: userId, before, after: roles });
     return Response.json({ ok: true, userId, roles });
   } catch (e) {
     return Response.json({ error: e?.message || "error" }, { status: 500 });

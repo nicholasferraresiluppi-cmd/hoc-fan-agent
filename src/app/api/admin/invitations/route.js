@@ -3,7 +3,8 @@
 export const runtime = "nodejs";
 
 import { currentUser } from "@clerk/nextjs/server";
-import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { authorize, auditAccess, CAPABILITIES } from "@/lib/rbac";
+import { internalOrigin } from "@/lib/cron-chain";
 import { listInvitations, createInvitation, revokeInvitation, assignableRoles } from "@/lib/invitations";
 
 export async function GET() {
@@ -25,8 +26,10 @@ export async function POST(request) {
   try {
     const me = await currentUser().catch(() => null);
     const inviterName = [me?.firstName, me?.lastName].filter(Boolean).join(" ") || me?.emailAddresses?.[0]?.emailAddress || null;
-    const origin = new URL(request.url).origin;
+    // origin fisso (dominio pubblico), non l'host della richiesta
+    const origin = internalOrigin(request);
     const invitation = await createInvitation({ email: body?.email, roles: body?.roles, inviterId: az.userId, inviterName, origin });
+    await auditAccess(az.userId, "invite", { email: invitation.email, roles: invitation.roles });
     return Response.json({ ok: true, invitation });
   } catch (e) {
     const msg = e?.errors?.[0]?.longMessage || e?.errors?.[0]?.message || e.message || "Invito non riuscito";
@@ -39,7 +42,8 @@ export async function DELETE(request) {
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const id = new URL(request.url).searchParams.get("id");
   try {
-    await revokeInvitation(id);
+    await revokeInvitation(id, az.userId);
+    await auditAccess(az.userId, "invite_revoke", { invitation: id });
     return Response.json({ ok: true });
   } catch (e) {
     return Response.json({ error: e.message || "Annullamento non riuscito" }, { status: 400 });

@@ -47,5 +47,7 @@ export async function POST(request) {
   return handle(request);
 }
 export async function GET(request) {
+  // GET solo per il cron (Bearer): niente avvio via link con la sessione (CSRF)
+  if (!isCronAuthorized(request)) return Response.json({ error: "unauthorized" }, { status: 401 });
   return handle(request);
 }
