@@ -9,11 +9,13 @@ export async function GET() {
   if (!a.ok) return Response.json({ error: a.message }, { status: a.status });
   const admins = await listAdmins();
   const cc = await clerkClient();
-  const rows = await Promise.all(admins.map(async (ad) => {
-    let mfa = false;
-    try { mfa = !!(await cc.users.getUser(ad.userId))?.twoFactorEnabled; } catch {}
-    return { userId: ad.userId, name: ad.name || ad.userId, email: ad.email || null, mfa };
-  }));
+  // solo account che esistono davvero (id rimasti da vecchie installazioni = fantasmi, si saltano)
+  const rows = (await Promise.all(admins.map(async (ad) => {
+    try {
+      const u = await cc.users.getUser(ad.userId);
+      return { userId: ad.userId, name: ad.name || [u.firstName, u.lastName].filter(Boolean).join(" ") || ad.userId, email: ad.email || u.emailAddresses?.[0]?.emailAddress || null, mfa: !!u?.twoFactorEnabled };
+    } catch { return null; }
+  }))).filter(Boolean);
   return Response.json({ required: await adminMfaRequired(), me_mfa: await userHasMfa(a.userId), admins: rows });
 }
 

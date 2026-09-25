@@ -35,42 +35,42 @@ export const TIER = {
   bronze: {
     accent: "#C87D46",
     label: "BRONZE",
-    gradient: "var(--cp-surface)",
+    gradient: "#151a22",
     text: "#FFE4C2",
     ink: "#2B1709",
   },
   silver: {
     accent: "#DADEE6",
     label: "SILVER",
-    gradient: "var(--cp-surface)",
+    gradient: "#151a22",
     text: "#f2f4f8",
     ink: "#15181E",
   },
   gold: {
     accent: "#F2D488",
     label: "GOLD",
-    gradient: "var(--cp-surface)",
+    gradient: "#151a22",
     text: "#FFF5D4",
     ink: "#2C1E06",
   },
   platinum: {
     accent: "#BFE4FF",
     label: "PLATINUM",
-    gradient: "var(--cp-surface)",
+    gradient: "#151a22",
     text: "#E6F5FF",
     ink: "#081B28",
   },
   diamond: {
     accent: "#A1E3FF",
     label: "DIAMOND",
-    gradient: "var(--cp-surface)",
+    gradient: "#151a22",
     text: "#EAF6FF",
     ink: "#060B1F",
   },
   unranked: {
     accent: "#8c95a8",
     label: "UNRANKED",
-    gradient: "var(--cp-surface)",
+    gradient: "#151a22",
     text: "#f2f4f8",
     ink: "#0a0d11",
   },
@@ -122,6 +122,10 @@ export const CP_DARK = {
   accentGreen: "#4ade80", // success — delta positivi, ok
   accentRed: "#f08c8c",   // danger — delta negativi, errori
   accentBlue: "#b9aef9",  // legacy info → accent-soft-text
+  // Logo: l'icona è un SVG nero → si rende bianca sullo scuro
+  logoFilter: "brightness(0) invert(1)",
+  // Avvisi (fondo tenue rosso, testo leggibile in entrambi i temi)
+  dangerSoft: "#2a1d1d",
 };
 // Tema chiaro (25/09/2026): per tabelle dense di numeri il testo scuro su fondo
 // chiaro si legge meglio (Piepenbrock et al. 2013); scelto da 4 tester su 5 nel
@@ -132,6 +136,7 @@ export const CP_LIGHT = {
   textPrimary: "#14171f", textSecondary: "#434a58", textMuted: "#687183", mutedIcons: "#8a92a2",
   accent: "#6353e0", accentInk: "#ffffff", accentSoft: "#ebe8fd", accentSoftText: "#4a3bc4", accentDim: "#c7c0f5",
   accentGreen: "#17803d", accentRed: "#c53030", accentBlue: "#4a3bc4",
+  logoFilter: "brightness(0)", dangerSoft: "#fdecec",
 };
 
 // Scala per i DATI (sequenziale, separata dall'accento viola che è per ciò che si
