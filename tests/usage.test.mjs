@@ -40,4 +40,12 @@ t("insight mai aperte", r.insights.some((i) => /mai aperte/.test(i.title)));
 t("daily lunghezza", r.daily.length === 30 && r.daily[29].users === 2);
 const empty = buildUsageReport({ days: {}, members, nav, now });
 t("vuoto → insight informativo", empty.insights.length === 1 && empty.insights[0].kind === "info");
+// dati da 1 solo giorno: niente conclusioni premature
+const d1 = Object.fromEntries(d.map((x) => [x, {}])); d1[d[59]] = { "u1\t/admin": 1 };
+const young = buildUsageReport({ days: d1, members, nav, now, window: 30 });
+t("partial", young.partial === true && young.tracked_days === 1);
+t("niente 'mai aperte' il primo giorno", !young.insights.some((i) => /mai aperte/.test(i.title)));
+t("niente 'non si torna' il primo giorno", !young.insights.some((i) => /non si torna|non tornano/.test(i.title)));
+t("dichiara i giorni di dati", young.insights.some((i) => /Dati raccolti da 1 giorno/.test(i.title)));
+t("storia lunga → non partial", r.partial === false && r.tracked_days === 50);
 console.log(`${ok} ok / ${ko} failed`); if (ko) process.exit(1);

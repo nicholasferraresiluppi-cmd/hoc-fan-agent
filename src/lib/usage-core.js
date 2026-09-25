@@ -131,9 +131,19 @@ export function buildUsageReport({ days, members = [], nav = [], now = Date.now(
 
   const never = nav.filter((n) => !pages[n.href] || pages[n.href].views === 0);
 
+  // Da quando abbiamo dati: il tracciamento è partito il 25/09/2026. Finché la
+  // storia è più corta della finestra, i numeri vanno letti come parziali e le
+  // conclusioni "mai aperta" / "non si torna" NON si traggono (sarebbero false).
+  const dataDays = Object.keys(days).filter((d) => Object.keys(days[d] || {}).length).sort();
+  const since = dataDays[0] || null;
+  const trackedDays = since ? Math.round((Date.parse(dayId(now)) - Date.parse(since)) / 86400000) + 1 : 0;
+
   const report = {
     window,
     generated_at: now,
+    since,
+    tracked_days: trackedDays,
+    partial: trackedDays < window,
     kpi: {
       members: members.length,
       active_7d: wau.size,
@@ -165,6 +175,16 @@ export function buildInsights(r, now = Date.now()) {
     out.push({ kind: "info", title: "Ancora nessun dato d'uso", text: "Il tracciamento è appena partito: i primi numeri arrivano dalle prossime visite." });
     return out;
   }
+  const young = r.tracked_days < 7;
+  if (r.partial) {
+    out.push({
+      kind: "info",
+      title: `Dati raccolti da ${r.tracked_days} ${r.tracked_days === 1 ? "giorno" : "giorni"}`,
+      text: young
+        ? "Troppo presto per dire cosa non si usa o chi non torna: queste conclusioni compaiono dopo una settimana di dati."
+        : `La finestra è di ${r.window} giorni ma i dati partono dal ${r.since}: leggi i numeri come parziali.`,
+    });
+  }
 
   const neverIn = r.people.filter((p) => p.email && !p.last_day && !p.last_sign_in_at);
   if (neverIn.length) {
@@ -175,7 +195,7 @@ export function buildInsights(r, now = Date.now()) {
     });
   }
 
-  const dormant = r.people.filter((p) => p.last_day && daysSince(p.last_day) >= 7);
+  const dormant = young ? [] : r.people.filter((p) => p.last_day && daysSince(p.last_day) >= 7);
   if (dormant.length) {
     out.push({
       kind: "warn",
@@ -189,7 +209,7 @@ export function buildInsights(r, now = Date.now()) {
     out.push({ kind: "good", title: "Le pagine che contano davvero", text: `${top.join(", ")}: qui vanno le energie di miglioramento, perché le usa più gente.` });
   }
 
-  if (r.never_opened.length) {
+  if (!young && r.never_opened.length) {
     out.push({
       kind: "info",
       title: `${r.never_opened.length} voci di menu mai aperte in ${r.window} giorni`,
@@ -197,7 +217,7 @@ export function buildInsights(r, now = Date.now()) {
     });
   }
 
-  if (r.kpi.active_30d && r.kpi.avg_active_days < 3) {
+  if (!young && r.kpi.active_30d && r.kpi.avg_active_days < 3) {
     out.push({ kind: "warn", title: "Si entra, ma non si torna", text: `Chi usa l'app lo fa in media ${r.kpi.avg_active_days} giorni su ${r.window}: non è ancora un'abitudine.` });
   }
   return out;

@@ -69,8 +69,8 @@ export default function UsagePage() {
           {/* KPI */}
           <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 24 }}>
             <Kpi label="Attivi negli ultimi 7 giorni" value={`${r.kpi.active_7d} / ${r.kpi.members}`} sub="persone con almeno una visita" />
-            <Kpi label={`Attivi in ${win} giorni`} value={`${r.kpi.active_30d} / ${r.kpi.members}`} sub="sui membri totali" />
-            <Kpi label="Giorni di uso a testa" value={String(r.kpi.avg_active_days)} sub={`media su ${win} giorni: misura l'abitudine`} />
+            <Kpi label={`Attivi in ${win} giorni`} value={`${r.kpi.active_30d} / ${r.kpi.members}`} sub={r.partial ? `dati dal ${fmtDay(r.since)}` : "sui membri totali"} />
+            <Kpi label="Giorni di uso a testa" value={r.tracked_days < 7 ? "—" : String(r.kpi.avg_active_days)} sub={r.tracked_days < 7 ? "serve almeno una settimana di dati" : `media su ${win} giorni: misura l'abitudine`} />
             <Kpi label="Pagine aperte" value={String(r.kpi.views_30d)} sub={`in ${win} giorni`} />
           </section>
 
@@ -91,7 +91,7 @@ export default function UsagePage() {
           <h2 style={{ fontSize: 15, fontWeight: 500, margin: "0 0 10px" }}>Pagine, per numero di persone che le usano</h2>
           <div style={{ ...card, overflowX: "auto", marginBottom: 24 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 560 }}>
-              <thead><tr><th style={th}>Pagina</th><th style={th}>Persone</th><th style={th}>Aperture</th><th style={th}>Rispetto ai {win} giorni prima</th><th style={th}>Ultimo uso</th></tr></thead>
+              <thead><tr><th style={th}>Pagina</th><th style={th}>Persone</th><th style={th}>Aperture</th><th style={th}>{r.partial ? "Periodo prima" : `Rispetto ai ${win} giorni prima`}</th><th style={th}>Ultimo uso</th></tr></thead>
               <tbody>
                 {r.pages.length === 0 && <tr><td style={td} colSpan={5}>Nessuna visita nel periodo.</td></tr>}
                 {r.pages.map((p) => {
@@ -101,7 +101,7 @@ export default function UsagePage() {
                       <td style={td}><div style={{ color: CP.textPrimary }}>{p.label || p.page}</div>{p.label && <div style={{ fontSize: 11, color: CP.textMuted }}>{p.group} · {p.page}</div>}</td>
                       <td style={td}>{p.users}</td>
                       <td style={td}>{p.views}</td>
-                      <td style={{ ...td, color: diff > 0 ? CP.accentGreen : diff < 0 ? CP.accentRed : CP.textMuted }}>{diff > 0 ? `+${diff} persone` : diff < 0 ? `${diff} persone` : "uguale"}</td>
+                      <td style={{ ...td, color: r.partial ? CP.textMuted : diff > 0 ? CP.accentGreen : diff < 0 ? CP.accentRed : CP.textMuted }}>{r.partial ? "nessun dato" : diff > 0 ? `+${diff} persone` : diff < 0 ? `${diff} persone` : "uguale"}</td>
                       <td style={td}>{fmtDay(p.last_day)}</td>
                     </tr>
                   );
@@ -131,7 +131,11 @@ export default function UsagePage() {
 
           {/* Mai aperte */}
           <h2 style={{ fontSize: 15, fontWeight: 500, margin: "0 0 4px" }}>Voci di menu mai aperte · {r.never_opened.length}</h2>
-          <p style={{ fontSize: 13, color: CP.textMuted, margin: "0 0 10px" }}>Candidate a finire in modalità Advanced o a essere tolte: meno voci, app più leggibile.</p>
+          <p style={{ fontSize: 13, color: CP.textMuted, margin: "0 0 10px" }}>
+            {r.tracked_days < 7
+              ? `Dati da ${r.tracked_days} ${r.tracked_days === 1 ? "giorno" : "giorni"}: per ora l'elenco dice solo cosa non è ancora stato aperto, non cosa è inutile.`
+              : "Candidate a finire in modalità Advanced o a essere tolte: meno voci, app più leggibile."}
+          </p>
           <div style={{ ...card, padding: 14, display: "flex", flexWrap: "wrap", gap: 6 }}>
             {r.never_opened.length === 0 && <span style={{ fontSize: 13, color: CP.textMuted }}>Tutte le voci sono state aperte almeno una volta.</span>}
             {r.never_opened.map((n) => (
