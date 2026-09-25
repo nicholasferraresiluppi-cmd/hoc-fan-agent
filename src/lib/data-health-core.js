@@ -11,7 +11,11 @@
 /** turni per creator in un array di wage CP normalizzate */
 export function shiftsByCreator(wages) {
   const out = {};
+  // turni programmati e non ancora iniziati esclusi (gonfiavano il mese in corso)
+  const now = Date.now();
   for (const w of wages || []) for (const s of w.shifts || []) {
+    const t = Date.parse(s?.started_at);
+    if (Number.isFinite(t) && t > now) continue;
     for (const a of new Set(s.creator_aliases || [])) out[a] = (out[a] || 0) + 1;
   }
   return out;
