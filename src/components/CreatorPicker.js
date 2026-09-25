@@ -124,9 +124,9 @@ export default function CreatorPicker({ aliases = [], value = "", onSelect, plac
           {/* Pill lingua */}
           {langs.length > 1 && (
             <div style={{ display: "flex", gap: 5, marginBottom: 10, flexWrap: "wrap" }}>
-              <Pill active={langFilter === ""} onClick={() => setLangFilter("")}>tutte · {enriched.length}</Pill>
+              <Pill P={P} active={langFilter === ""} onClick={() => setLangFilter("")}>tutte · {enriched.length}</Pill>
               {langs.map((l) => (
-                <Pill key={l} active={langFilter === l} onClick={() => setLangFilter(langFilter === l ? "" : l)}>
+                <Pill P={P} key={l} active={langFilter === l} onClick={() => setLangFilter(langFilter === l ? "" : l)}>
                   {l} · {langCounts[l]}
                 </Pill>
               ))}
@@ -172,11 +172,11 @@ export default function CreatorPicker({ aliases = [], value = "", onSelect, plac
 }
 
 const langChip = {
-  fontSize: 10, fontFamily: FONTS.mono, color: P.textMuted,
-  border: `1px solid ${P.border}`, padding: "1px 6px", borderRadius: 4, flexShrink: 0,
+  fontSize: 10, fontFamily: FONTS.mono, color: CP.textMuted,
+  border: `1px solid ${CP.border}`, padding: "1px 6px", borderRadius: 4, flexShrink: 0,
 };
 
-function Pill({ active, onClick, children }) {
+function Pill({ active, onClick, children, P = CP }) {
   return (
     <button
       onClick={onClick}
