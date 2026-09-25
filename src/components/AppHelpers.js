@@ -19,7 +19,7 @@ export function SecurityBanner() {
   const sec = data?.security;
   if (!sec?.admin_raw || sec.mfa_enabled) return null;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: "#2a1d1d", borderBottom: `1px solid ${CP.border}`, fontSize: 13, color: CP.textPrimary, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: CP.dangerSoft, borderBottom: `1px solid ${CP.border}`, fontSize: 13, color: CP.textPrimary, flexWrap: "wrap" }}>
       <ShieldAlert size={16} color={CP.accentRed} />
       <span style={{ flex: "1 1 300px" }}>
         {sec.mfa_required
