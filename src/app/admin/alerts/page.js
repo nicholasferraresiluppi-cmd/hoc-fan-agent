@@ -127,7 +127,7 @@ export default function OpsAlertsPage() {
         breadcrumb={<><Link href="/admin" style={{ color: CP.textSecondary }}>Hub</Link> › Alert operativi</>}
         section="Sistema · Salute operativa"
         title="Alert operativi"
-        subtitle="Check automatici sullo stato dei dati e delle azioni aperte. Il cron gira ogni lunedì alle 8:00; ogni alert si chiude da solo quando la condizione rientra."
+        subtitle="Controlli automatici sui dati e sulle azioni aperte. Girano ogni notte (e con “Aggiorna ora”): i valori sono quelli dell’ultimo controllo, quindi possono differire di poco dalle pagine, che calcolano al momento. Ogni alert si chiude da solo quando il problema rientra."
         toolbar={
           <>
             <span style={{ fontSize: 12, color: CP.textMuted }}>
@@ -242,6 +242,8 @@ export default function OpsAlertsPage() {
         </CpCard>
       )}
 
+      <h2 style={{ fontSize: 16, fontWeight: 500, margin: "36px 0 0", color: CP.textPrimary }}>Impostazioni dei controlli</h2>
+      <div style={{ fontSize: 13, color: CP.textMuted, marginTop: 4 }}>Informazioni che servono ai controlli per non dare falsi allarmi.</div>
       <EndedCreators />
 
       <p style={{ fontSize: 12, color: CP.textMuted, marginTop: 16, lineHeight: 1.6, maxWidth: 720 }}>
