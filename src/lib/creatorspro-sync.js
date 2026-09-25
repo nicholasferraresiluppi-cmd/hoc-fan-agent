@@ -28,7 +28,20 @@ import {
   fetchWages,
   bucketizeIntervalFromHour,
 } from "./creatorspro-api";
-import { getWages, setWages } from "@/lib/cp-wages-store";
+import { getWages, setWages, deleteWages } from "@/lib/cp-wages-store";
+
+// RICOSTRUZIONE IN STAGING (25/09/2026): prima prepare SVUOTAVA cp:wages:{mese}
+// e i batch lo riempivano sul posto → ogni notte il mese corrente era
+// PARZIALE per tutta la durata della catena, e se la catena si spezzava (es. un
+// deploy) restava parziale fino alla notte dopo. Caso reale: Alessandra
+// Sparagno mostrata con 1 turno invece di 122. Ora si costruisce in
+// `{mese}:staging` e finalize sostituisce il mese in un colpo solo: chi legge
+// vede sempre l'ultima versione COMPLETA.
+const stagingId = (periodId) => `${periodId}:staging`;
+const TTL_STAGING = 2 * 24 * 3600;
+// Se la nuova versione è molto più piccola della precedente non la si pubblica:
+// quasi sempre è un fetch andato male, non un mese che si è dimezzato.
+const MIN_SHRINK_RATIO = 0.7;
 
 const TTL_WAGES = 90 * 24 * 3600;
 const TTL_REFDATA = 7 * 24 * 3600;
@@ -177,7 +190,7 @@ export async function prepareSync({ periodId, pageOffset = null, pagesLimit = nu
         prepare_done: false,
         failed_pages: [],
       }, { ex: TTL_SYNC_STATE });
-      await setWages(periodId, [], { ex: TTL_WAGES });
+      await setWages(stagingId(periodId), [], { ex: TTL_STAGING });
     }
     // Fetch first page per scoprire pagination (con retry interno via fetchWageStubsForPages)
     const firstResult = await fetchWageStubsForPages({ startedAt, endedAt, pages: [pageOffset] });
@@ -258,7 +271,7 @@ export async function prepareSync({ periodId, pageOffset = null, pagesLimit = nu
     stubs: idxStubs, total: idxStubs.length, raw_total: totalCount, page_count: pageCount,
     started_at: Date.now(), prepare_done: true, failed_pages: failedPages,
   }, { ex: TTL_SYNC_STATE });
-  await setWages(periodId, [], { ex: TTL_WAGES });
+  await setWages(stagingId(periodId), [], { ex: TTL_STAGING });
   return { total: idxStubs.length, raw_total: totalCount, failed_pages: failedPages, done: true };
 }
 
@@ -314,9 +327,9 @@ export async function syncWageBatch({ periodId, offset = 0, batchSize = 50 }) {
   const failedDetails = details.filter((d) => d?._error).map((d) => ({ id: d._id, error: d._error }));
 
   // Append a cp:wages:{periodId}
-  const existing = (await getWages(periodId)) || [];
+  const existing = (await getWages(stagingId(periodId))) || [];
   const merged = [...existing, ...normalized];
-  await setWages(periodId, merged, { ex: TTL_WAGES });
+  await setWages(stagingId(periodId), merged, { ex: TTL_STAGING });
 
   // Persist failed detail ids in state (per retry mirato eventuale)
   if (failedDetails.length > 0) {
@@ -357,12 +370,12 @@ export async function retryFailedDetails({ periodId }) {
     .map(normalizeWage);
   const stillFailed = details.filter((d) => d?._error).map((d) => ({ id: d._id, error: d._error }));
 
-  const existing = (await getWages(periodId)) || [];
+  const existing = (await getWages(stagingId(periodId))) || [];
   // Dedupe by wage id
   const existingIds = new Set(existing.map((w) => w.id));
   const newWages = normalized.filter((w) => !existingIds.has(w.id));
   const merged = [...existing, ...newWages];
-  await setWages(periodId, merged, { ex: TTL_WAGES });
+  await setWages(stagingId(periodId), merged, { ex: TTL_STAGING });
 
   await kv.set(`cp:sync:state:${periodId}`, {
     ...state,
@@ -376,12 +389,27 @@ export async function retryFailedDetails({ periodId }) {
  * Step 4: finalize — auto-match members, scrive meta, cleanup state.
  */
 export async function finalizeSync({ periodId }) {
-  const [state, wages, members] = await Promise.all([
+  const [state, staged, published, members] = await Promise.all([
     kv.get(`cp:sync:state:${periodId}`),
+    getWages(stagingId(periodId)),
     getWages(periodId),
     kv.get("cp:members"),
   ]);
   if (!state) throw new Error(`Stato sync mancante per ${periodId}`);
+  // Pubblica la versione ricostruita, salvo crollo sospetto (vedi MIN_SHRINK_RATIO).
+  let wages = published;
+  let promotion = "kept_previous";
+  if (Array.isArray(staged)) {
+    const prevLen = Array.isArray(published) ? published.length : 0;
+    if (prevLen > 0 && staged.length < prevLen * MIN_SHRINK_RATIO) {
+      promotion = "blocked_shrink";
+    } else {
+      await setWages(periodId, staged, { ex: TTL_WAGES });
+      wages = staged;
+      promotion = "published";
+    }
+    await deleteWages(stagingId(periodId));
+  }
   const cpMembers = Object.values(members || {});
 
   // Auto-match
@@ -453,8 +481,10 @@ export async function finalizeSync({ periodId }) {
     },
     failed_pages_sample: failedPages.slice(0, 5),
     failed_details_sample: failedDetails.slice(0, 5),
-    has_warnings: failedPages.length > 0 || failedDetails.length > 0 || (gapCheck?.gap > 0),
+    has_warnings: failedPages.length > 0 || failedDetails.length > 0 || (gapCheck?.gap > 0) || promotion === "blocked_shrink",
     gap_check: gapCheck,
+    promotion, // published | blocked_shrink (tenuta la versione precedente) | kept_previous
+    staged_count: Array.isArray(staged) ? staged.length : null,
   };
   await kv.set("cp:_meta", meta);
   // Gap-check PER MESE (cp:_meta è globale e viene sovrascritto al sync

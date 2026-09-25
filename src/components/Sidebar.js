@@ -65,7 +65,7 @@ const ESSENTIAL_HREFS = new Set([
   "/admin/roadmap",
 ]);
 
-const NAV_GROUPS = [
+export const NAV_GROUPS = [
   {
     label: "Il mio quadro",
     defaultOpen: true,
@@ -136,6 +136,7 @@ const NAV_GROUPS = [
     label: "Insights",
     defaultOpen: false,
     items: [
+      { href: "/admin/utilizzo",                 label: "Utilizzo app",    icon: Activity },
       { href: "/admin/dashboard",                label: "Dashboard",       icon: LayoutDashboard },
       { href: "/admin/fan-archetypes",           label: "Fan Archetypes",  icon: Sparkles },
       { href: "/admin/creators",                 label: "Creator (anag.)", icon: UserCog },
@@ -188,6 +189,9 @@ const NAV_GROUPS = [
 ];
 
 export const SIDEBAR_WIDTH = 248;
+
+/** Voci di menu piatte { href, label, group } — per l'analytics d'uso. */
+export const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label, group: g.label })));
 
 function NavItem({ href, label, icon: Icon, isActive, badge }) {
   return (

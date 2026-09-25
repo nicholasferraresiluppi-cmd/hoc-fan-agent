@@ -86,6 +86,7 @@ const SHORTCUT_GROUPS = [
   {
     label: "Insights",
     items: [
+      { href: "/admin/utilizzo",           title: "Utilizzo app",      desc: "Chi usa HOC Pro, pagine più usate e mai aperte, cosa migliorare", icon: Activity },
       { href: "/admin/dashboard",          title: "Dashboard SM",      desc: "KPI per operatore, trend 7/30g, alert", icon: LayoutDashboard },
       { href: "/admin/fan-archetypes",     title: "Fan Archetypes",    desc: "Whale, Lonely, Negoziatore + strategie ottimali", icon: Sparkles },
       { href: "/admin/creators",           title: "Creator anagrafica", desc: "Tone card + ganci emotivi + vocabolario creator", icon: UserCog },

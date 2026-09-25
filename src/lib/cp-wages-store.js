@@ -56,3 +56,11 @@ export async function appendWages(periodId, more, { ex } = {}) {
   const existing = (await getWages(periodId)) || [];
   return setWages(periodId, [...existing, ...(more || [])], { ex });
 }
+
+/** Cancella il mese (manifest + pezzi). */
+export async function deleteWages(periodId) {
+  const v = await kv.get(`cp:wages:${periodId}`);
+  const n = v && v.chunked ? v.n : 0;
+  for (let i = 0; i < n; i++) await kv.del(chunkKey(periodId, i));
+  await kv.del(`cp:wages:${periodId}`);
+}
