@@ -28,7 +28,7 @@ function isAuthRoute(path) {
 // candidati è rivolto a persone ESTERNE (non dipendenti Clerk) → mai esporre
 // la navigazione interna dell'app.
 function isBareRoute(path) {
-  return path.startsWith("/assessment");
+  return path.startsWith("/assessment") || path === "/privacy";
 }
 
 export default function AppShell({ children }) {

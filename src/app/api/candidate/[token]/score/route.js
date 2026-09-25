@@ -13,16 +13,23 @@ export const maxDuration = 60;
 import Anthropic from "@anthropic-ai/sdk";
 import {
   getAssessment,
-  isActionable,
+  canInteract,
   currentScenarioId,
   recordScenarioResult,
+  getTranscript,
 } from "@/lib/candidate-assessments";
 import { findScenarioById, evaluateScenarioTranscript } from "@/lib/academy-engine";
+import { checkRateLimit, tooMany } from "@/lib/rate-limit";
 
 export async function POST(request, { params }) {
-  const rec = await getAssessment(params?.token);
+  const { token } = await params;
+  const rec = await getAssessment(token);
   if (!rec) return Response.json({ error: "Link non valido." }, { status: 404 });
-  if (!isActionable(rec)) return Response.json({ error: `Assessment ${rec.status}.` }, { status: 410 });
+  if (!canInteract(rec)) {
+    return Response.json({ error: rec.consentAt ? `Assessment ${rec.status}.` : "Prima accetta l'informativa." }, { status: 410 });
+  }
+  const rl = await checkRateLimit("candidate_eval", token);
+  if (!rl.ok) return tooMany(rl.retryAfter);
 
   let body;
   try {
@@ -30,13 +37,20 @@ export async function POST(request, { params }) {
   } catch {
     return Response.json({ error: "Body non valido." }, { status: 400 });
   }
-  const { scenarioId, messages } = body || {};
+  const { scenarioId } = body || {};
 
   if (scenarioId !== currentScenarioId(rec)) {
     return Response.json({ error: "Scenario fuori sequenza." }, { status: 409 });
   }
   const scenario = findScenarioById(scenarioId);
   if (!scenario) return Response.json({ error: "Scenario non trovato." }, { status: 400 });
+
+  // Si valuta SOLO la conversazione salvata dal server, mai quella mandata dal
+  // browser (che il candidato potrebbe riscrivere).
+  const { messages } = await getTranscript(token, scenarioId);
+  if (!messages.some((m) => m.role === "operator")) {
+    return Response.json({ error: "Scrivi almeno un messaggio prima di concludere." }, { status: 400 });
+  }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return Response.json({ error: "Servizio non disponibile." }, { status: 500 });
@@ -50,11 +64,11 @@ export async function POST(request, { params }) {
     return Response.json({ error: "Errore nella valutazione. Riprova." }, { status: 500 });
   }
 
-  const result = await recordScenarioResult(params.token, {
+  const result = await recordScenarioResult(token, {
     scenarioId,
     scenarioTitle: scenario.title,
     score,
-    messageCount: Array.isArray(messages) ? messages.length : 0,
+    messageCount: messages.length,
   });
   if (!result.ok) {
     return Response.json({ error: result.error || "Errore." }, { status: result.status || 500 });

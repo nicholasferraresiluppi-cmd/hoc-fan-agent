@@ -1,10 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
 import { QUICK_CHALLENGES } from "@/lib/training-scenarios";
+import { checkRateLimit, tooMany } from "@/lib/rate-limit";
 
 export async function POST(request) {
   try {
     const { userId } = await auth();
+    // tetto anti-abuso sui costi LLM (lib/rate-limit)
+    if (userId) { const rl = await checkRateLimit("llm_eval", userId); if (!rl.ok) return tooMany(rl.retryAfter); }
     if (!userId) {
       return Response.json({ error: "Non autenticato." }, { status: 401 });
     }

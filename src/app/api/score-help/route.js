@@ -16,6 +16,7 @@
  */
 import { auth } from "@clerk/nextjs/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { checkRateLimit, tooMany } from "@/lib/rate-limit";
 
 const MODEL = "claude-haiku-4-5-20251001";
 const MAX_OUTPUT_TOKENS = 600;
@@ -82,6 +83,8 @@ function getClient() {
 
 export async function POST(request) {
   const { userId } = await auth();
+  // tetto anti-abuso sui costi LLM (lib/rate-limit)
+  if (userId) { const rl = await checkRateLimit("llm_eval", userId); if (!rl.ok) return tooMany(rl.retryAfter); }
   if (!userId) return Response.json({ error: "Non autenticato" }, { status: 401 });
 
   let body;

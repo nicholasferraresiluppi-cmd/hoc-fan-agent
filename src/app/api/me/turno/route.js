@@ -11,6 +11,7 @@
  * custom (/admin/ruoli-custom).
  */
 import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { checkRateLimit, tooMany } from "@/lib/rate-limit";
 import { getMyShiftNow, getFanCards, getCreators, bigQueryConfigured } from "@/lib/me-turno";
 import { recordActivationEvent, recordActivationIdentity, EVENT } from "@/lib/activation";
 
@@ -28,6 +29,9 @@ export async function GET(request) {
       { status: az.status || 403 }
     );
   }
+  // tetto anti-abuso sui costi BigQuery (lib/rate-limit)
+  const rl = await checkRateLimit("bq_user", az.userId);
+  if (!rl.ok) return tooMany(rl.retryAfter);
   if (!bigQueryConfigured()) {
     return Response.json({ error: "BigQuery non configurato" }, { status: 503 });
   }

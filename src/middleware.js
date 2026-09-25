@@ -13,7 +13,7 @@ import { NextResponse } from 'next/server';
 // nella route stessa. I dati candidato vivono nel namespace KV candidate:*,
 // isolato da operatori/leghe/denaro.
 const isPublicRoute = createRouteMatcher([
-  '/sign-in(.*)', '/sign-up(.*)', '/api/ingest/(.*)',
+  '/sign-in(.*)', '/sign-up(.*)', '/privacy', '/api/ingest/(.*)',
   '/api/cron/(.*)',
   '/api/admin/ops-alerts/run', '/api/admin/ops-alerts/digest',
   '/api/leaderboard/snapshot', '/api/leagues/snapshot',
