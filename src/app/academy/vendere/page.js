@@ -85,7 +85,7 @@ export default function VenderePage() {
       <PageHeader
         section="Academy"
         title="Vendere in chat"
-        subtitle="Quattro abitudini che fanno comprare chi non ha mai comprato. Non sono opinioni: vengono da più di 100.000 PPV mandati sulle nostre pagine, confrontando quelli comprati con quelli ignorati. Chi compra la prima volta spende in media $40–110 nel mese dopo."
+        subtitle="Quattro abitudini che fanno comprare chi non ha mai comprato. Non sono opinioni: vengono da più di 100.000 PPV mandati sulle nostre creator, confrontando quelli comprati con quelli ignorati. Chi compra la prima volta spende in media $40–110 nel mese dopo."
       />
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {HABITS.map((h, i) => (
@@ -120,7 +120,7 @@ export default function VenderePage() {
 
         <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <h2 style={{ fontSize: 18, fontWeight: 500, color: CP.textPrimary, margin: "8px 0 0" }}>Esempi reali da studiare</h2>
-          <p style={{ fontSize: 13.5, color: CP.textSecondary, margin: 0, lineHeight: 1.55 }}>Vendite vere delle nostre pagine a fan che non avevano mai pagato, scelte dal tuo responsabile. I dati dei fan sono oscurati.</p>
+          <p style={{ fontSize: 13.5, color: CP.textSecondary, margin: 0, lineHeight: 1.55 }}>Vendite vere delle nostre creator a fan che non avevano mai pagato, scelte dal tuo responsabile. I dati dei fan sono oscurati.</p>
           {examples.map((ex) => <Example key={ex.id} ex={ex} />)}
           {!examples.length && <div style={{ ...box, fontSize: 13, color: CP.textMuted }}>Gli esempi arrivano appena il responsabile li approva.</div>}
         </section>

@@ -1,9 +1,9 @@
 "use client";
 
 // Coaching vendite — la superficie del sales manager.
-// Uno split = un insieme di pagine. Per quello split: come vendono le pagine ai
-// fan che non hanno mai pagato, chi vende meglio a parità di pagina, cosa fa
-// vendere, il riferimento HOC (pagine e operatori modello), i test in corso e
+// Uno split = un insieme di creator. Per quello split: come vendono le creator ai
+// fan che non hanno mai pagato, chi vende meglio a parità di creator, cosa fa
+// vendere, il riferimento HOC (creator e operatori modello), i test in corso e
 // gli esempi reali da far studiare agli operatori (/academy/vendere).
 // Coaching, non score: l'indice serve a decidere chi affiancare a chi.
 
@@ -137,8 +137,8 @@ function SplitEditor({ names, allIds, split, onSaved, onCancel }) {
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <label htmlFor="split-name" style={{ fontSize: 12, color: CP.textMuted }}>Nome split</label>
         <input id="split-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="es. Split Nicholas" style={{ ...input, minWidth: 220 }} />
-        <input id="split-filter" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca pagina" style={{ ...input, minWidth: 160 }} />
-        <span style={{ fontSize: 12, color: CP.textMuted }}>{sel.size} pagine scelte</span>
+        <input id="split-filter" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca creator" style={{ ...input, minWidth: 160 }} />
+        <span style={{ fontSize: 12, color: CP.textMuted }}>{sel.size} creator scelte</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 6, maxHeight: 280, overflowY: "auto" }}>
         {list.map((c) => (
@@ -166,17 +166,17 @@ function Panoramica({ d, name }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
-        <Kpi label="Comprano in chat (fan mai paganti)" value={pct(t.conv_nonpayer)} accent sub={`Pagine modello HOC ${pct(g?.conv_nonpayer)} · tutta HOC ${pct(org?.conv_nonpayer)}`} />
-        <Kpi label="PPV mandati a chat ferma" value={pct(t.dead_share)} sub={`Lì compra solo il ${pct(t.conv_dead)}. Pagine modello: ${pct(g?.dead_share)} dei PPV`} />
-        <Kpi label="Offerte con bonus o prezzo di riferimento" value={pct(t.tech_share)} sub={`Pagine modello ${pct(g?.tech_share)}`} />
-        <Kpi label="Comprano i fan che hanno già pagato" value={pct(t.conv_payer)} sub={`Pagine modello ${pct(g?.conv_payer)}`} />
+        <Kpi label="% che compra in chat · fan mai paganti" value={pct(t.conv_nonpayer)} accent sub={`Creator modello ${pct(g?.conv_nonpayer)} · tutta HOC ${pct(org?.conv_nonpayer)}`} />
+        <Kpi label="PPV mandati a chat ferma" value={pct(t.dead_share)} sub={`Lì compra solo il ${pct(t.conv_dead)}. Creator modello: ${pct(g?.dead_share)} dei PPV`} />
+        <Kpi label="PPV con bonus o prezzo di riferimento" value={pct(t.tech_share)} sub={`Creator modello ${pct(g?.tech_share)}`} />
+        <Kpi label="% che compra in chat · fan già paganti" value={pct(t.conv_payer)} sub={`Creator modello ${pct(g?.conv_payer)}`} />
       </div>
       <div>
-        <H2 sub={`Ultime ${d.meta.recent_n} settimane chiuse (${fmtDate(d.meta.recent_weeks[0])}–${fmtDate(d.meta.recent_weeks.at(-1))}), tra parentesi la variazione in punti rispetto alle ${d.meta.recent_n} precedenti. "In chat" esclude il messaggio di benvenuto automatico.`}>Pagine {name ? `di ${name}` : "di tutta HOC"}</H2>
+        <H2 sub={`Ultime ${d.meta.recent_n} settimane chiuse (${fmtDate(d.meta.recent_weeks[0])}–${fmtDate(d.meta.recent_weeks.at(-1))}), tra parentesi la variazione in punti rispetto alle ${d.meta.recent_n} precedenti. "In chat" esclude il messaggio di benvenuto automatico.`}>Tabella creator {name ? `· ${name}` : "· tutta HOC"}</H2>
         <div style={{ overflowX: "auto", border: `1px solid ${CP.border}`, borderRadius: 10 }}>
           <table style={{ borderCollapse: "collapse", width: "100%" }}>
             <thead><tr>
-              <th style={{ ...th, textAlign: "left" }}>Pagina</th><th style={th}>Incasso PPV</th><th style={th}>PPV in chat</th><th style={th}>Comprano mai paganti</th><th style={th}>Comprano già paganti</th><th style={th}>A chat viva</th><th style={th}>A chat ferma</th><th style={th}>Bonus/ancoraggio</th><th style={th}>Benvenuto</th>
+              <th style={{ ...th, textAlign: "left" }}>Creator</th><th style={th}>Incasso PPV</th><th style={th}>PPV in chat</th><th style={th}>% compra · mai paganti</th><th style={th}>% compra · già paganti</th><th style={th}>PPV a chat viva</th><th style={th}>PPV a chat ferma</th><th style={th}>Bonus o prezzo di rif.</th><th style={th}>% compra · benvenuto</th>
             </tr></thead>
             <tbody>
               {d.pages.pages.map((p) => (
@@ -192,7 +192,7 @@ function Panoramica({ d, name }) {
                   <td style={td}>{pct(p.recent.conv_welcome)}</td>
                 </tr>
               ))}
-              {!d.pages.pages.length && <tr><td style={{ ...tdL, color: CP.textMuted }} colSpan={9}>Nessun PPV su queste pagine nel periodo. Controlla le pagine dello split con "Modifica split".</td></tr>}
+              {!d.pages.pages.length && <tr><td style={{ ...tdL, color: CP.textMuted }} colSpan={9}>Nessun PPV su queste creator nel periodo. Controlla le creator dello split con "Modifica split".</td></tr>}
             </tbody>
           </table>
         </div>
@@ -213,14 +213,14 @@ function Operatori({ d }) {
   const rows = d.operators.filter((o) => all || o.reliable);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <H2 sub={`Indice = quanto incassa l'operatore rispetto a quanto ci si aspetta sui SUOI PPV (stessa pagina, stesso tipo di fan). 1,00 = in media; sopra 1,10 verde, sotto 0,90 rosso. Solo turni in cui era l'unico in chat; indice solo sopra ${d.meta.min_op_ppv} PPV. Serve a decidere chi affiancare a chi: non è una classifica da pubblicare né una base per decisioni disciplinari.`}>Chi vende meglio a parità di pagina</H2>
+      <H2 sub={`Indice di resa = quanto incassa l'operatore rispetto a quanto ci si aspetta sui SUOI PPV (stessa creator, stesso tipo di fan). 1,00 = in media; sopra 1,10 verde, sotto 0,90 rosso. Solo turni in cui era l'unico in chat; indice solo sopra ${d.meta.min_op_ppv} PPV. Serve a decidere chi affiancare a chi: non è una classifica da pubblicare né una base per decisioni disciplinari.`}>Chi vende meglio a parità di creator</H2>
       <label style={{ fontSize: 12, color: CP.textSecondary, display: "flex", gap: 6, alignItems: "center" }}>
         <input type="checkbox" id="ops-all" checked={all} onChange={(e) => setAll(e.target.checked)} style={{ accentColor: CP.accent }} /> Mostra anche chi ha pochi PPV
       </label>
       <div style={{ overflowX: "auto", border: `1px solid ${CP.border}`, borderRadius: 10 }}>
         <table style={{ borderCollapse: "collapse", width: "100%" }}>
           <thead><tr>
-            <th style={{ ...th, textAlign: "left" }}>Operatore</th><th style={th}>Indice</th><th style={th}>PPV in chat</th><th style={th}>Comprano mai paganti</th><th style={th}>A chat viva</th><th style={th}>A chat ferma</th><th style={th}>Bonus/ancoraggio</th><th style={{ ...th, textAlign: "left" }}>Pagine</th><th style={th}>8 settimane</th>
+            <th style={{ ...th, textAlign: "left" }}>Operatore</th><th style={th}>Indice di resa</th><th style={th}>PPV in chat</th><th style={th}>% compra · mai paganti</th><th style={th}>PPV a chat viva</th><th style={th}>PPV a chat ferma</th><th style={th}>Bonus o prezzo di rif.</th><th style={{ ...th, textAlign: "left" }}>Creator</th><th style={th}>Andamento 8 settimane</th>
           </tr></thead>
           <tbody>
             {rows.map((o) => (
@@ -248,16 +248,16 @@ function Riferimento({ d }) {
   const r = d.reference;
   const t = d.pages.total;
   const rows = [
-    ["Comprano in chat (fan mai paganti)", t.conv_nonpayer, r.goal?.conv_nonpayer, true],
+    ["% che compra in chat · fan mai paganti", t.conv_nonpayer, r.goal?.conv_nonpayer, true],
     ["PPV mandati a chat viva", t.live_share, r.goal?.live_share, true],
     ["PPV mandati a chat ferma", t.dead_share, r.goal?.dead_share, false],
-    ["Offerte con bonus o prezzo di riferimento", t.tech_share, r.goal?.tech_share, true],
-    ["Comprano i fan che hanno già pagato", t.conv_payer, r.goal?.conv_payer, true],
+    ["PPV con bonus o prezzo di riferimento", t.tech_share, r.goal?.tech_share, true],
+    ["% che compra in chat · fan già paganti", t.conv_payer, r.goal?.conv_payer, true],
   ];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
       <div>
-        <H2 sub="Le pagine dove si vende di più ai fan che non hanno mai pagato, con un volume minimo. È il traguardo di formazione: il pubblico cambia da pagina a pagina, quindi i numeri sono una direzione, non una promessa.">Pagine modello di HOC</H2>
+        <H2 sub="Le creator di tutta HOC dove i fan mai paganti comprano di più in chat (con un volume minimo di PPV). Sono il traguardo di formazione: il pubblico cambia da creator a creator, quindi i numeri sono una direzione, non una promessa.">Creator modello di HOC</H2>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {r.model_pages.map((p) => (
             <span key={p.creator_id} style={{ fontSize: 12, padding: "5px 10px", borderRadius: 999, background: CP.accentSoft, color: CP.accentSoftText }}>
@@ -268,7 +268,7 @@ function Riferimento({ d }) {
       </div>
       <div style={{ overflowX: "auto", border: `1px solid ${CP.border}`, borderRadius: 10 }}>
         <table style={{ borderCollapse: "collapse", width: "100%" }}>
-          <thead><tr><th style={{ ...th, textAlign: "left" }}>Comportamento</th><th style={th}>{d.split ? d.split.name : "Tutta HOC"}</th><th style={th}>Pagine modello</th><th style={th}>Distanza</th></tr></thead>
+          <thead><tr><th style={{ ...th, textAlign: "left" }}>Comportamento</th><th style={th}>{d.split ? d.split.name : "Tutta HOC"}</th><th style={th}>Creator modello</th><th style={th}>Distanza</th></tr></thead>
           <tbody>
             {rows.map(([label, now, goal, up]) => {
               const dd = deltaPts(now, goal);
@@ -286,10 +286,10 @@ function Riferimento({ d }) {
         </table>
       </div>
       <div>
-        <H2 sub={`I migliori a parità di pagina su tutta HOC (${r.operators_evaluated} operatori valutati) e i migliori dei team delle pagine modello. Da qui vengono gli esempi da studiare. Sono un riferimento per la formazione: chi mettere su una pagina si sceglie tra gli operatori dello split, nella scheda Operatori.`}>Operatori modello</H2>
+        <H2 sub={`I migliori a parità di creator su tutta HOC (${r.operators_evaluated} operatori valutati) e i migliori dei team delle creator modello. Da qui vengono gli esempi da studiare. Sono un riferimento per la formazione: chi mettere su una creator si sceglie tra gli operatori dello split, nella scheda Operatori.`}>Operatori modello</H2>
         <div style={{ overflowX: "auto", border: `1px solid ${CP.border}`, borderRadius: 10 }}>
           <table style={{ borderCollapse: "collapse", width: "100%" }}>
-            <thead><tr><th style={{ ...th, textAlign: "left" }}>Operatore</th><th style={{ ...th, textAlign: "left" }}>Perché</th><th style={th}>Indice</th><th style={th}>Comprano mai paganti</th><th style={th}>A chat viva</th><th style={th}>Bonus/ancoraggio</th><th style={{ ...th, textAlign: "left" }}>Pagine</th></tr></thead>
+            <thead><tr><th style={{ ...th, textAlign: "left" }}>Operatore</th><th style={{ ...th, textAlign: "left" }}>Perché</th><th style={th}>Indice di resa</th><th style={th}>% compra · mai paganti</th><th style={th}>PPV a chat viva</th><th style={th}>Bonus o prezzo di rif.</th><th style={{ ...th, textAlign: "left" }}>Creator</th></tr></thead>
             <tbody>
               {r.operators.map((o) => (
                 <tr key={o.op}>
@@ -320,7 +320,7 @@ function Comportamenti({ d }) {
   const max = Math.max(0.05, ...order.flatMap((k) => [d.lifts.org[k]?.with || 0, d.lifts.org[k]?.without || 0, d.lifts.split[k]?.with || 0, d.lifts.split[k]?.without || 0]));
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <H2 sub="Solo fan che non hanno mai pagato, solo vendite in chat. Conversione CON e SENZA il comportamento, confrontata dentro la stessa pagina e allo stesso punto della relazione col fan (primo PPV, secondo, …). Sono correlazioni: dicono dove guardare, la conferma la dà un test.">Cosa fa comprare chi non ha mai comprato</H2>
+      <H2 sub="Solo fan che non hanno mai pagato, solo vendite in chat. Conversione CON e SENZA il comportamento, confrontata dentro la stessa creator e allo stesso punto della relazione col fan (primo PPV, secondo, …). Sono correlazioni: dicono dove guardare, la conferma la dà un test.">Cosa fa comprare chi non ha mai comprato</H2>
       {order.map((k) => {
         const o = d.lifts.org[k], s = d.lifts.split[k];
         return (
@@ -371,7 +371,7 @@ function ExperimentForm({ d, exp, onDone }) {
   return (
     <div style={{ ...card, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
       <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: CP.textMuted }}>Nome del test<input id="exp-name" style={input} value={f.name} onChange={set("name")} placeholder="es. Operatori forti su Martina" /></label>
-      <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: CP.textMuted }}>Pagina
+      <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: CP.textMuted }}>Creator
         <select id="exp-page" style={input} value={f.creator_id} onChange={set("creator_id")}>{pages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
       </label>
       <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: CP.textMuted }}>Inizio<input id="exp-start" type="date" style={input} value={f.start} onChange={set("start")} /></label>
@@ -403,7 +403,7 @@ function Test({ d, reload }) {
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <H2 sub="Un test = un cambiamento su una pagina (operatori diversi, un'abitudine nuova) e un numero da guardare: quanti fan mai paganti comprano in chat. Il confronto è con le 4 settimane prima dell'inizio. I dati si aggiornano ogni notte e contano i PPV fino a 3 giorni fa (servono 72 ore per sapere se sono stati comprati).">Test in corso</H2>
+      <H2 sub="Un test = un cambiamento su una creator (operatori diversi, un'abitudine nuova) e un numero da guardare: quanti fan mai paganti comprano in chat. Il confronto è con le 4 settimane prima dell'inizio. I dati si aggiornano ogni notte e contano i PPV fino a 3 giorni fa (servono 72 ore per sapere se sono stati comprati).">Test in corso</H2>
       {edit ? <ExperimentForm d={d} exp={edit === "new" ? null : edit} onDone={() => { setEdit(null); reload(); }} /> : <div><button style={btnPrimary} onClick={() => setEdit("new")}>Nuovo test</button></div>}
       {list.map((e) => {
         const v = e.view;
@@ -443,7 +443,7 @@ function Test({ d, reload }) {
           </div>
         );
       })}
-      {!list.length && !edit && <Note>Nessun test su queste pagine. Esempio: "Joshua De Luca e Mattia Tripodi su Martina in turni singoli per due settimane, obiettivo 10%".</Note>}
+      {!list.length && !edit && <Note>Nessun test su queste creator. Esempio: "Joshua De Luca e Mattia Tripodi su Martina in turni singoli per due settimane, obiettivo 10%".</Note>}
     </div>
   );
 }
@@ -516,7 +516,7 @@ function Programma() {
     ["Un numero personale, non una classifica", "Ogni operatore guarda i suoi numeri rispetto alla sua settimana prima (scheda Operatori, colonna 8 settimane). Le classifiche pubbliche motivano chi è in cima e scoraggiano gli altri."],
     ["Quindici minuti a settimana con ciascuno", "Due sue conversazioni (una vinta, una persa) accanto a un esempio approvato nella stessa situazione. Prima si chiede \"cosa cambieresti qui?\", poi si dice."],
     ["Pratica prima del turno", "Dieci minuti sul simulatore Academy o in coppia: una fa il fan che dice \"costa troppo\", l'altra chiude senza scendere alla sua cifra."],
-    ["Affiancare, non spostare", "Chi ha indice sotto 0,90 fa alcuni turni in coppia con chi è sopra 1,10 sulla stessa pagina."],
+    ["Affiancare, non spostare", "Chi ha indice sotto 0,90 fa alcuni turni in coppia con chi è sopra 1,10 sulla stessa creator."],
     ["Misurare dopo due settimane", "Se il numero si muove si passa all'abitudine successiva; per i cambi più grossi si apre un test nella scheda Test in corso."],
   ];
   return (
@@ -530,6 +530,37 @@ function Programma() {
       ))}
       <Note>Il materiale per gli operatori (le quattro abitudini, la checklist prima di ogni PPV, gli esercizi e gli esempi approvati) è nella pagina <Link href="/academy/vendere" style={{ color: CP.accent }}>Vendere in chat</Link>, visibile a tutti.</Note>
     </div>
+  );
+}
+
+// Glossario: le STESSE parole del tutorial per il sales manager. Se cambi un
+// termine qui, cambialo anche lì (e nelle intestazioni delle tabelle).
+const GLOSSARY = [
+  ["Creator", "Ogni account è una creator a sé: \"Martina Scavo - IT\" e un eventuale \"- EN\" sono due righe diverse."],
+  ["Split", "Il gruppo di creator seguito da un sales manager."],
+  ["PPV in chat", "PPV mandato a mano in chat. Non conta i messaggi di massa né il PPV di benvenuto."],
+  ["PPV di benvenuto", "Il PPV che parte da solo quando un fan si iscrive. È misurato a parte perché nessun operatore lo sceglie."],
+  ["Fan mai pagante", "Un fan che fino a quel momento non ha mai comprato niente da quella creator."],
+  ["% che compra", "Su 100 PPV mandati, quanti vengono comprati entro 72 ore."],
+  ["Chat viva / ferma", "Viva: il fan ha scritto almeno 3 messaggi nell'ora prima del PPV. Ferma: nell'ora prima non ha scritto niente."],
+  ["Bonus o prezzo di riferimento", "Nell'ora prima del PPV l'operatore ha offerto qualcosa in più (\"ti mando anche…\") o ha detto quanto vale normalmente (\"di solito lo mando a 60…\")."],
+  ["Indice di resa", "Quanto incassa un operatore rispetto a quanto si incassa di solito su quelle creator con quel tipo di fan. 1,00 = nella media."],
+  ["Creator modello", "Le creator di tutta HOC dove i fan mai paganti comprano di più: il traguardo."],
+];
+
+function Glossary() {
+  return (
+    <details style={{ ...card, padding: "10px 14px", marginBottom: 16 }}>
+      <summary style={{ cursor: "pointer", fontSize: 13, color: CP.textPrimary }}>Le parole usate in questa pagina</summary>
+      <dl style={{ display: "grid", gridTemplateColumns: "minmax(140px, 220px) 1fr", gap: "6px 16px", margin: "12px 0 4px" }}>
+        {GLOSSARY.map(([t, d]) => (
+          <div key={t} style={{ display: "contents" }}>
+            <dt style={{ fontSize: 13, color: CP.textPrimary }}>{t}</dt>
+            <dd style={{ margin: 0, fontSize: 13, color: CP.textSecondary, lineHeight: 1.5 }}>{d}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   );
 }
 
@@ -569,7 +600,7 @@ export default function SalesCoachingPage() {
     <PageHeader
       section="Performance · Coaching vendite"
       title="Vendere in chat"
-      subtitle="Come vendono le tue pagine ai fan che non hanno mai pagato, chi lo fa meglio a parità di pagina, cosa li fa comprare e come allenare il team. Aggiornato ogni notte dal warehouse."
+      subtitle="Come vendono le creator del tuo split ai fan che non hanno mai pagato, chi lo fa meglio a parità di creator, cosa li fa comprare e come allenare il team. Aggiornato ogni notte."
     />
   );
 
@@ -606,6 +637,7 @@ export default function SalesCoachingPage() {
           onSaved={(s) => { setEditing(null); chooseSplit(s ? s.id : null); mutate(); }}
         />
       )}
+      <Glossary />
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 20, borderBottom: `1px solid ${CP.border}`, paddingBottom: 10 }}>
         {TABS.map(([k, l]) => <PillTab key={k} active={tab === k} onClick={() => { setTab(k); try { history.replaceState(null, "", `#${k}`); } catch { /* ok */ } }}>{l}</PillTab>)}
       </div>
@@ -617,7 +649,7 @@ export default function SalesCoachingPage() {
       {tab === "esempi" && <Esempi d={data} reload={mutate} />}
       {tab === "programma" && <Programma />}
       <Note style={{ marginTop: 28 }}>
-        Come si calcola: PPV mandati a mano in chat (esclusi messaggi di massa e il benvenuto automatico), comprato = acquisto dello stesso fan per lo stesso importo entro 72 ore (abbinamento dedotto, uguale per tutte le pagine). Operatori solo nei turni in cui erano gli unici in chat (circa metà dei PPV: i turni in duo non si possono attribuire). Bonus, prezzo di riferimento e obiezioni sono riconosciuti da parole chiave, quindi qualcuno sfugge. Non entra in score né compensi.
+        Come si calcola: PPV mandati a mano in chat (esclusi messaggi di massa e il benvenuto automatico), comprato = acquisto dello stesso fan per lo stesso importo entro 72 ore (abbinamento dedotto, uguale per tutte le creator). Operatori solo nei turni in cui erano gli unici in chat (circa metà dei PPV: i turni in duo non si possono attribuire). Bonus, prezzo di riferimento e obiezioni sono riconosciuti da parole chiave, quindi qualcuno sfugge. Non entra in score né compensi.
       </Note>
     </div>
   );
