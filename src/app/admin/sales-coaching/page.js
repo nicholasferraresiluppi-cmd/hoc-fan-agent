@@ -589,6 +589,17 @@ export default function SalesCoachingPage() {
 
   const allIds = useMemo(() => (data?.names ? Object.keys(data.names).map(Number) : []), [data?.names]);
 
+  // Rete di sicurezza per il ricalcolo notturno (25/09: il giro del dispatcher
+  // non è partito e la pagina mostrava dati di ieri): se chi apre la pagina
+  // trova i dati scaduti, parte UN solo ricalcolo per visita. Il lock
+  // single-flight lato server evita doppioni tra più persone.
+  const [autoRefreshed, setAutoRefreshed] = useState(false);
+  useEffect(() => {
+    if (!data?.meta?.stale || data.computing || autoRefreshed) return;
+    setAutoRefreshed(true);
+    fetch("/api/admin/sales-coaching", { method: "POST" }).catch(() => {}).finally(() => mutate());
+  }, [data?.meta?.stale, data?.computing, autoRefreshed, mutate]);
+
   async function recompute() {
     setRecomputing(true);
     await fetch("/api/admin/sales-coaching", { method: "POST" }).catch(() => {});
@@ -623,7 +634,7 @@ export default function SalesCoachingPage() {
         {split && <button style={btn} onClick={() => setEditing(split)}>Modifica split</button>}
         <span style={{ marginLeft: "auto", fontSize: 11.5, color: CP.textMuted }}>
           Dati al {new Date(data.meta.generated_at).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-          {data.meta.stale ? " · da aggiornare" : ""}
+          {data.meta.stale ? (autoRefreshed ? " · aggiorno…" : " · da aggiornare") : ""}
         </span>
         <button style={btn} disabled={recomputing || data.computing} onClick={recompute}>{recomputing || data.computing ? "Aggiorno…" : "Aggiorna ora"}</button>
       </div>
