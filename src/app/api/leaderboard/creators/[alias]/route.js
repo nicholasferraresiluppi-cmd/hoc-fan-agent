@@ -11,7 +11,8 @@ import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { getCreatorDrilldown } from "@/lib/creator-aggregates";
 import { hasCpDataForPeriod } from "@/lib/creatorspro-data";
 
-export async function GET(request, { params }) {
+export async function GET(request, props) {
+  const params = await props.params;
   const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 

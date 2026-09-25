@@ -10,7 +10,8 @@ function publicize(creator) {
   return { ...safe, hasToken: !!telegramBotTokenEnc };
 }
 
-export async function GET(_request, { params }) {
+export async function GET(_request, props) {
+  const params = await props.params;
   const gate = await requireContentAdmin();
   if (!gate.ok) return Response.json({ error: gate.message }, { status: gate.status });
   const c = await getCreator(params.slug);
@@ -18,7 +19,8 @@ export async function GET(_request, { params }) {
   return Response.json({ creator: publicize(c) });
 }
 
-export async function PATCH(request, { params }) {
+export async function PATCH(request, props) {
+  const params = await props.params;
   const gate = await requireContentAdmin();
   if (!gate.ok) return Response.json({ error: gate.message }, { status: gate.status });
 
@@ -66,7 +68,8 @@ export async function PATCH(request, { params }) {
   return Response.json({ creator: publicize(next) });
 }
 
-export async function DELETE(_request, { params }) {
+export async function DELETE(_request, props) {
+  const params = await props.params;
   const gate = await requireContentAdmin();
   if (!gate.ok) return Response.json({ error: gate.message }, { status: gate.status });
 
