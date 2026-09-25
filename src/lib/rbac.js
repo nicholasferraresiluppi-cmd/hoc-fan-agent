@@ -48,6 +48,7 @@ export const CAPABILITIES = {
   LEADERBOARD_SNAPSHOT: "leaderboard.snapshot", // forzare snapshot classifica
   CM_COCKPIT: "cm.cockpit",                   // cockpit turno di supervisione CM
   COPILOT_PILOT: "copilot.pilot",             // scheda-fan "Il mio turno" (aperto a tutta HOC; espone LTV fan del PROPRIO turno)
+  USERS_INVITE: "users.invite",               // invitare persone in HOC Pro (accesso solo su invito dal 25/09/2026)
 };
 
 // "all" = tutta l'org | "team" = solo proprio team | "own" = solo sé stesso | "none" = nessun accesso
@@ -95,6 +96,7 @@ export const ROLE_CAPABILITIES = {
     [CAPABILITIES.CREATORS_MANAGE]: "all",
     [CAPABILITIES.SEED]: "all",
     [CAPABILITIES.ACCESS_MGMT]: "all",
+    [CAPABILITIES.USERS_INVITE]: "all",
     [CAPABILITIES.SENIORITY_OVERRIDE]: "all",
     [CAPABILITIES.LEAGUES_SNAPSHOT]: "all",
     [CAPABILITIES.LEADERBOARD_SNAPSHOT]: "all",
@@ -186,6 +188,10 @@ export async function getUserRoles(userId) {
   try {
     const cc = await clerkClient();
     const u = await cc.users.getUser(userId);
+    // `roles` (array, anche ruoli custom "c:…") arriva dagli inviti fatti in app;
+    // `role` è il ruolo primario predefinito (legacy / mirror di setUserRoles)
+    const clerkRoles = u?.publicMetadata?.roles;
+    if (Array.isArray(clerkRoles) && clerkRoles.length) return clerkRoles.map(String);
     const clerkRole = u?.publicMetadata?.role;
     if (clerkRole) return [clerkRole];
   } catch {}

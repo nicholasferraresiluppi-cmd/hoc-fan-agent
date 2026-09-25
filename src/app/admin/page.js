@@ -107,7 +107,7 @@ const SHORTCUT_GROUPS = [
       { href: "/admin/employee-profiles", title: "Profili",       desc: "Anagrafica completa + override KPI", icon: Contact },
       { href: "/admin/seniority",         title: "Seniority",     desc: "Tier Junior/Senior/Master + override manuale", icon: Medal },
       { href: "/admin/access",            title: "Accessi",       desc: "Aggiungi/rimuovi admin via email", icon: Key },
-      { href: "/admin/ruoli",             title: "Ruoli",         desc: "Capabilities multi-ruolo predefiniti", icon: Lock },
+      { href: "/admin/ruoli",             title: "Membri",        desc: "Chi ha accesso e con che ruolo + Aggiungi membro (invito via email)", icon: Lock },
       { href: "/admin/ruoli-custom",      title: "Ruoli custom",  desc: "Crea ruoli personalizzati con scope", icon: Wrench },
     ],
   },

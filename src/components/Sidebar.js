@@ -158,7 +158,7 @@ const NAV_GROUPS = [
       { href: "/admin/employee-profiles",        label: "Profili",      icon: Contact },
       { href: "/admin/seniority",                label: "Seniority",    icon: Medal },
       { href: "/admin/access",                   label: "Accessi",      icon: Key },
-      { href: "/admin/ruoli",                    label: "Ruoli",        icon: Lock },
+      { href: "/admin/ruoli",                    label: "Membri",       icon: Lock },
       { href: "/admin/ruoli-custom",             label: "Ruoli custom", icon: Wrench },
     ],
   },
