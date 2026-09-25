@@ -58,6 +58,12 @@ export default function EmployeeDrilldownPage({ params }) {
   const { data: cpHist } = useSWR(employee ? `/api/leaderboard/operator-cp-history?employee=${q}&last_n=12` : null, fetcher, { revalidateOnFocus: false });
   const { data: histData } = useSWR(employee ? `/api/leaderboard/employee-history?employee=${q}&period_type=monthly` : null, fetcher, { revalidateOnFocus: false });
 
+  const { data: me } = useSWR("/api/whoami", fetcher, { revalidateOnFocus: false });
+  async function previewAsOperator() {
+    const r = await fetch("/api/admin/view-as", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employee }) });
+    if (r.ok) window.location.href = "/profilo";
+    else alert((await r.json().catch(() => ({}))).error || "Non riuscito");
+  }
   const cp = cpData?.cp;
   const cpHistory = cpHist?.history || [];
   const infw = histData?.history || [];
@@ -136,6 +142,7 @@ export default function EmployeeDrilldownPage({ params }) {
           </select>
           {cp?.score != null && cp.score <= REVIEW && <Link href={`/admin/action-center?period_id=${periodId}`} style={{ ...ctl, textDecoration: "none" }}>Action Center</Link>}
           <Link href="/admin/employee-profiles" style={{ ...ctl, textDecoration: "none" }}>Anagrafica e note</Link>
+          {me?.admin && <button onClick={previewAsOperator} style={{ ...ctl, cursor: "pointer" }} title="Apre le sue pagine personali come le vede lui, in sola lettura">Vedi le sue pagine</button>}
         </>}
       />
 

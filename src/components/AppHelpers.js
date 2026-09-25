@@ -106,7 +106,7 @@ export function ViewAsBanner() {
     <div style={{ position: "sticky", top: 0, zIndex: 50, display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: CP.accent, color: CP.accentInk, fontSize: 13, flexWrap: "wrap" }}>
       <Eye size={16} />
       <span style={{ flex: "1 1 300px" }}>
-        Stai vedendo l&apos;app come <b>{va.label}</b>: menu, pagine e dati sono quelli dei suoi permessi. Sola lettura: non puoi modificare niente. Le pagine personali mostrano comunque i tuoi dati.
+        Stai vedendo l&apos;app come <b>{va.label}</b>: menu, pagine e dati sono quelli dei suoi permessi. Sola lettura: non puoi modificare niente. {va.employee ? <>Le pagine personali (Il mio quadro) mostrano i dati di <b>{va.employee}</b>.</> : "Le pagine personali mostrano comunque i tuoi dati."}
       </span>
       <button onClick={exit} style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: "#ffffff", color: "#14101f", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>Esci dall&apos;anteprima</button>
     </div>

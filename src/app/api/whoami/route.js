@@ -29,7 +29,7 @@ export async function GET() {
       team,
       capabilities,
       security,
-      view_as: adminRaw ? await viewAsFor(userId).then((v) => (v ? { label: v.label, roles: v.roles, exp: v.exp } : null)).catch(() => null) : null,
+      view_as: adminRaw ? await viewAsFor(userId).then((v) => (v ? { label: v.label, roles: v.roles, exp: v.exp, employee: v.employee || null } : null)).catch(() => null) : null,
       email: user?.emailAddresses?.[0]?.emailAddress,
       name: `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || null,
     });

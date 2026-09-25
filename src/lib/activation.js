@@ -30,6 +30,7 @@
  *   activation:baseline:{employee}  snapshot segnali all'aha (SET nx) — validazione forward
  */
 import { kv } from "@vercel/kv";
+import { isPreviewing } from "@/lib/view-as";
 import { recommendPathForGap } from "@/lib/coaching-paths";
 import {
   ACTIVATION_VERSION,
@@ -95,6 +96,7 @@ const EVENT_CAP = 1000;
  */
 export async function recordActivationEvent(userId, type, payload = {}) {
   if (!userId || !type) return;
+  if (await isPreviewing()) return; // anteprima admin: non è l'operatore che guarda
   try {
     const ev = { t: type, ts: Date.now(), ...payload };
     const key = EVENTS_KEY(userId);
@@ -115,6 +117,7 @@ export async function recordActivationEvent(userId, type, payload = {}) {
  */
 export async function recordActivationIdentity(userId, employee, employeeId) {
   if (!userId || !employee) return;
+  if (await isPreviewing()) return;
   try {
     let empId = employeeId || null;
     if (!empId) {
@@ -133,6 +136,7 @@ export async function recordActivationIdentity(userId, employee, employeeId) {
  */
 export async function recordActivationBaseline(employee, snapshot) {
   if (!employee || !snapshot) return;
+  if (await isPreviewing()) return;
   try {
     await kv.set(BASELINE_KEY(employee), { ...snapshot, at: Date.now() }, { nx: true });
   } catch (e) {

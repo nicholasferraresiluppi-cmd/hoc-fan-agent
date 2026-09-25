@@ -10,8 +10,12 @@
  *    riguarda l'utente loggato, mai quando l'app legge i ruoli di altre persone);
  *  - sola lettura: il middleware blocca ogni scrittura via API finché è attivo;
  *  - ogni attivazione finisce nel registro audit:access.
- * Le pagine personali (/me/*) restano sui dati di chi guarda: si simulano i
- * PERMESSI, non l'identità.
+ * Le pagine personali (/me/*) restano sui dati di chi guarda, TRANNE con
+ * "Vedi come operatore" (campo `employee`, 25/09/2026): l'admin vede le pagine
+ * personali con i dati di quell'operatore, per capire cosa vede davvero chi
+ * lavora in chat (la maggior parte degli operatori non ha ancora un account).
+ * Stesse regole: solo admin veri, sola lettura, audit; e nessun evento di
+ * attività registrato a nome dell'operatore (lib/activation salta le scritture).
  */
 import { cookies } from "next/headers";
 import { auth } from "@clerk/nextjs/server";
@@ -52,4 +56,12 @@ export async function viewAsFor(userId) {
   let me = null;
   try { me = (await auth()).userId; } catch { return null; }
   return me === userId ? v : null;
+}
+
+/** True se la richiesta corrente è un'anteprima "Vedi come…" (qualsiasi tipo). */
+export async function isPreviewing() {
+  try {
+    const { userId } = await auth();
+    return !!(await viewAsFor(userId));
+  } catch { return false; }
 }
