@@ -22,7 +22,7 @@ import { isCronAuthorized } from "@/lib/cron-auth";
 
 export const maxDuration = 30;
 
-const APP_URL = "https://hoc-fan-agent.vercel.app";
+const APP_URL = "https://houseofcreators.app";
 
 // Auth cron centralizzata in lib/cron-auth (fix 20 lug 2026: i path cron sono
 // ora pubblici nel middleware → l'header x-vercel-cron da solo non è più prova
