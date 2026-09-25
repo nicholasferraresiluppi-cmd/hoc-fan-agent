@@ -21,11 +21,19 @@ export async function isUserIdAdminRaw(userId) {
   const { envIds, kvIds } = await getAdminSources();
   if (envIds.includes(userId)) return true;
   if (kvIds.includes(userId)) return true;
-  // Clerk metadata check
+  // Ruolo "admin" assegnato in app (Membri): set KV roles:{id} — scrivibile solo da admin
+  try {
+    const set = (await kv.smembers(`roles:${userId}`)) || [];
+    if (set.includes("admin")) return true;
+  } catch { /* silent */ }
+  // Clerk metadata check: ruolo principale O lista ruoli (gli inviti in app scrivono
+  // `roles`; prima si guardava solo `role` e un invitato "admin + altri" non era admin)
   try {
     const cc = await clerkClient();
     const u = await cc.users.getUser(userId);
-    if (u?.publicMetadata?.role === "admin" || u?.privateMetadata?.role === "admin") return true;
+    const pm = u?.publicMetadata || {};
+    if (pm.role === "admin" || u?.privateMetadata?.role === "admin") return true;
+    if (Array.isArray(pm.roles) && pm.roles.includes("admin")) return true;
   } catch { /* silent */ }
   return false;
 }
