@@ -242,6 +242,8 @@ export default function OpsAlertsPage() {
         </CpCard>
       )}
 
+      <EndedCreators />
+
       <p style={{ fontSize: 12, color: CP.textMuted, marginTop: 16, lineHeight: 1.6, maxWidth: 720 }}>
         Gli alert sono deduplicati per fingerprint (un run che ritrova la stessa condizione aggiorna la riga,
         non ne crea una nuova) e si auto-risolvono quando il check ripassa. "Prendi in carico" è visibile a
@@ -250,5 +252,48 @@ export default function OpsAlertsPage() {
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
+  );
+}
+
+
+// Creator che hanno smesso: il controllo "turni crollati" non le segnala più
+// dai mesi successivi (una creator ferma non è un buco di dati).
+function EndedCreators() {
+  const { data, mutate } = useSWR("/api/admin/creators-ended", (u) => fetch(u).then((r) => (r.ok ? r.json() : null)));
+  const prevMonth = (() => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1); return d.toISOString().slice(0, 7); })();
+  const { data: pnl } = useSWR(`/api/admin/pnl-live?period_id=${prevMonth}`, (u) => fetch(u).then((r) => (r.ok ? r.json() : null)));
+  const [alias, setAlias] = useState("");
+  const [date, setDate] = useState("");
+  const [err, setErr] = useState(null);
+  if (!data) return null;
+  const ended = Object.entries(data.ended || {}).sort((a, b) => b[1].ended_on.localeCompare(a[1].ended_on));
+  const add = async () => {
+    setErr(null);
+    const r = await fetch("/api/admin/creators-ended", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ alias, ended_on: date }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return setErr(j.error || "Errore");
+    setAlias(""); setDate(""); mutate();
+  };
+  const remove = async (a) => { await fetch(`/api/admin/creators-ended?alias=${encodeURIComponent(a)}`, { method: "DELETE" }); mutate(); };
+  const inp = { padding: "6px 9px", background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 6, color: CP.textPrimary, fontSize: 13 };
+  return (
+    <CpCard padding="16px 18px" style={{ marginTop: 18 }}>
+      <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Creator terminate</div>
+      <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 12 }}>Segna qui chi ha smesso di lavorare con HOC: dai mesi dopo la data di fine, i controlli non la segnalano più come “turni crollati”.</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+        <input list="ended-aliases" value={alias} onChange={(e) => setAlias(e.target.value)} placeholder="Creator (nome come in CreatorsPro)" style={{ ...inp, minWidth: 260 }} />
+        <datalist id="ended-aliases">{(pnl?.rows || []).map((r) => <option key={r.alias} value={r.alias} />)}</datalist>
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} title="Ultimo giorno di lavoro" />
+        <button onClick={add} disabled={!alias || !date} style={{ padding: "6px 12px", borderRadius: 7, border: `1px solid ${CP.accent}`, background: CP.accent, color: CP.accentInk, fontSize: 12, cursor: "pointer", opacity: alias && date ? 1 : 0.5 }}>Segna terminata</button>
+        {err && <span style={{ fontSize: 12, color: CP.accentRed }}>{err}</span>}
+      </div>
+      {ended.length === 0 ? <div style={{ fontSize: 12, color: CP.textMuted }}>Nessuna creator segnata.</div> : ended.map(([a, v]) => (
+        <div key={a} style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 13, padding: "5px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
+          <span style={{ flex: 1 }}>{a}</span>
+          <span style={{ color: CP.textMuted }}>fine {new Date(v.ended_on + "T12:00:00Z").toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" })}</span>
+          <button onClick={() => remove(a)} style={{ background: "transparent", border: `1px solid ${CP.border}`, color: CP.textSecondary, borderRadius: 6, fontSize: 12, padding: "3px 8px", cursor: "pointer" }}>Togli</button>
+        </div>
+      ))}
+    </CpCard>
   );
 }
