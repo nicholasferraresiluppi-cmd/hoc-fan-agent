@@ -8,7 +8,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { useClerk } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
-import { MessageSquarePlus, ShieldAlert, X } from "lucide-react";
+import { MessageSquarePlus, ShieldAlert, X, Eye } from "lucide-react";
 import { CP } from "@/lib/brand";
 
 const fetcher = (u) => fetch(u).then((r) => (r.ok ? r.json() : null));
@@ -83,5 +83,22 @@ export function FeedbackButton() {
         </div>
       )}
     </>
+  );
+}
+
+// Barra "Vedi come…": sempre visibile mentre l'anteprima è attiva (lib/view-as).
+export function ViewAsBanner() {
+  const { data } = useSWR("/api/whoami", fetcher);
+  const va = data?.view_as;
+  if (!va) return null;
+  const exit = async () => { await fetch("/api/admin/view-as", { method: "DELETE" }); window.location.reload(); };
+  return (
+    <div style={{ position: "sticky", top: 0, zIndex: 50, display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: CP.accent, color: CP.accentInk, fontSize: 13, flexWrap: "wrap" }}>
+      <Eye size={16} />
+      <span style={{ flex: "1 1 300px" }}>
+        Stai vedendo l&apos;app come <b>{va.label}</b>: menu, pagine e dati sono quelli dei suoi permessi. Sola lettura: non puoi modificare niente. Le pagine personali mostrano comunque i tuoi dati.
+      </span>
+      <button onClick={exit} style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: CP.accentInk, color: "#fff", fontSize: 12, cursor: "pointer" }}>Esci dall&apos;anteprima</button>
+    </div>
   );
 }

@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
+import { CAP_LABELS, SCOPE_LABELS } from "@/lib/capability-labels";
 
 const btn = (primary) => ({
   padding: "8px 14px",
@@ -74,6 +75,14 @@ export default function MembersPage() {
     } finally { setBusy(null); }
   };
 
+  // "Vedi come…": anteprima dell'app con i permessi di un membro o di un ruolo (sola lettura)
+  const viewAs = async (body) => {
+    const r = await fetch("/api/admin/view-as", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return setMsg({ type: "error", text: j.error || "Anteprima non disponibile" });
+    window.location.href = "/";
+  };
+
   const revoke = async (inv) => {
     if (!confirm(`Annullare l'invito a ${inv.email}? Il link nell'email smetterà di funzionare.`)) return;
     setBusy(inv.id);
@@ -105,7 +114,17 @@ export default function MembersPage() {
         section="People · Accessi"
         title="Membri"
         subtitle="Chi può entrare in HOC Pro e cosa può fare. L'app è solo su invito: per dare accesso a una persona usa Aggiungi membro."
-        toolbar={canInvite ? <button style={btn(true)} onClick={() => { setMsg(null); setShowAdd(true); }}>Aggiungi membro</button> : null}
+        toolbar={
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {canManage && (
+              <select defaultValue="" onChange={(e) => e.target.value && viewAs({ roles: [e.target.value] })} style={{ ...btn(false), cursor: "pointer" }} title="Guarda l'app con i permessi di un ruolo">
+                <option value="" disabled>Vedi come un ruolo…</option>
+                {allRoleIds.map((rid) => <option key={rid} value={rid}>{roleLabel(rid)}</option>)}
+              </select>
+            )}
+            {canInvite && <button style={btn(true)} onClick={() => { setMsg(null); setShowAdd(true); }}>Aggiungi membro</button>}
+          </div>
+        }
       />
 
       {msg && (
@@ -169,10 +188,25 @@ export default function MembersPage() {
                     </div>
                   </div>
                   <RoleChips ids={r.roles} label={roleLabel} />
+                  <button style={btn(false)} onClick={() => viewAs({ userId: r.userId })} title="Guarda l'app con i suoi permessi (sola lettura)">Vedi come</button>
                   <button style={btn(false)} onClick={() => setEditing(editing === r.userId ? null : r.userId)}>
-                    {editing === r.userId ? "Chiudi" : "Modifica ruoli"}
+                    {editing === r.userId ? "Chiudi" : "Ruoli e accessi"}
                   </button>
                 </div>
+                {editing === r.userId && (
+                  <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 8, background: CP.bg, border: `1px solid ${CP.borderSoft}` }}>
+                    <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 6 }}>Cosa può fare oggi</div>
+                    {Object.keys(r.caps || {}).length === 0 ? <div style={{ fontSize: 13, color: CP.textSecondary }}>Nessun permesso oltre all&apos;accesso di base.</div> : (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "4px 16px" }}>
+                        {Object.entries(r.caps).sort().map(([cap, scope]) => (
+                          <div key={cap} style={{ fontSize: 13, color: CP.textSecondary }}>
+                            {CAP_LABELS[cap] || cap} <span style={{ color: CP.textMuted }}>· {SCOPE_LABELS[scope] || scope}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {editing === r.userId && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
                     {allRoleIds.map((rid) => {

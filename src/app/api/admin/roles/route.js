@@ -1,4 +1,4 @@
-import { authorize, authorizeAdmin, auditAccess, CAPABILITIES, getUserRoles, setUserRoles, ROLES, ROLE_META, listCustomRoles } from "@/lib/rbac";
+import { authorize, authorizeAdmin, auditAccess, CAPABILITIES, getUserRoles, getEffectiveCapabilities, setUserRoles, ROLES, ROLE_META, listCustomRoles } from "@/lib/rbac";
 import { clerkClient } from "@clerk/nextjs/server";
 
 // GET /api/admin/roles — lista utenti con ruoli correnti + meta ruoli predefiniti + custom
@@ -36,6 +36,7 @@ export async function GET() {
       last_sign_in_at: nameMap[uid]?.lastSignInAt || null,
       created_at: nameMap[uid]?.createdAt || null,
       roles: await getUserRoles(uid),
+      caps: await getEffectiveCapabilities(uid).catch(() => ({})),
     }))
   );
   rows.sort((a, b) => (a.name || "").localeCompare(b.name || ""));

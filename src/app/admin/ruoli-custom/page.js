@@ -1,25 +1,13 @@
 "use client";
 
+import { CAP_LABELS as CAP_LABELS_SHARED } from "@/lib/capability-labels";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 
-const CAP_LABELS = {
-  "training.do": "Training — fare sessioni",
-  "scores.view": "Score — visualizzare",
-  "scores.override": "Score — override/correzione",
-  review: "Review sessioni",
-  "outcomes.write": "Outcomes — scrittura",
-  "analytics.view": "Analytics — dashboard",
-  "creators.manage": "Creator — gestione persona",
-  seed: "Seed dati demo",
-  "access.mgmt": "Gestione accessi & ruoli",
-  "users.invite": "Persone — invitare nuove persone",
-  "seniority.override": "Seniority — override tier",
-  "leagues.snapshot": "Leagues — snapshot manuale",
-  "leaderboard.snapshot": "Leaderboard — snapshot manuale",
-};
+const CAP_LABELS = CAP_LABELS_SHARED;
 
 const SCOPE_LABEL = { own: "own (sé)", team: "team", all: "all" };
 const SCOPE_COLOR = { own: "#4ade80", team: "#b9aef9", all: "#8b7cf6" };

@@ -1,5 +1,6 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
+import { viewAsFor } from "@/lib/view-as";
 
 /**
  * Admin gate unificato. Un utente è admin se:
@@ -67,6 +68,9 @@ export async function adminMfaOk(userId) {
 
 export async function isUserIdAdmin(userId) {
   if (!(await isUserIdAdminRaw(userId))) return false;
+  // "Vedi come…": un admin in anteprima è admin solo se lo è il ruolo simulato
+  const va = await viewAsFor(userId);
+  if (va) return va.roles.includes("admin");
   return adminMfaOk(userId);
 }
 
