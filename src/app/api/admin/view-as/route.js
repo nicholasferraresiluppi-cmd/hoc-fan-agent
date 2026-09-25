@@ -19,6 +19,10 @@ export async function POST(request) {
       const u = await (await clerkClient()).users.getUser(body.userId);
       label = [u.firstName, u.lastName].filter(Boolean).join(" ") || u.emailAddresses?.[0]?.emailAddress || body.userId;
     } catch { label = body.userId; }
+  } else if (typeof body.employee === "string" && body.employee.trim()) {
+    // "Vedi come operatore": permessi da operatore + pagine personali con i SUOI dati
+    roles = ["operator"];
+    label = `operatore ${body.employee.trim().slice(0, 80)}`;
   } else if (Array.isArray(body.roles) && body.roles.length) {
     const custom = await listCustomRoles().catch(() => []);
     const ok = new Set([...ROLES, ...custom.map((c) => c.id)]);
@@ -28,9 +32,10 @@ export async function POST(request) {
   } else {
     return Response.json({ error: "Indica un membro o un ruolo" }, { status: 400 });
   }
-  const v = { by: userId, roles, label, target: body.userId || null, exp: Date.now() + VIEW_AS_TTL_MS };
+  const employee = typeof body.employee === "string" && body.employee.trim() ? body.employee.trim().slice(0, 80) : null;
+  const v = { by: userId, roles, label, target: body.userId || null, employee, exp: Date.now() + VIEW_AS_TTL_MS };
   (await cookies()).set(VIEW_AS_COOKIE, encodeViewAs(v), { ...cookieOpts, maxAge: VIEW_AS_TTL_MS / 1000 });
-  await auditAccess(userId, "view_as_start", { label, roles, target: v.target });
+  await auditAccess(userId, "view_as_start", { label, roles, target: v.target, employee });
   return Response.json({ ok: true, label, roles });
 }
 

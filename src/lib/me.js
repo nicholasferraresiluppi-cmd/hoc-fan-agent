@@ -3,6 +3,8 @@ import { kv } from "@vercel/kv";
 import { buildCreatorMatrix } from "@/lib/creator-aggregates";
 import { rosterMatchForEmail, nameForEmployeeId } from "@/lib/infloww-roster";
 import { getWages } from "@/lib/cp-wages-store";
+import { viewAsFor } from "@/lib/view-as";
+import { isUserIdAdminRaw } from "@/lib/admin";
 
 /**
  * Risoluzione identità per la superficie operatore (scope own).
@@ -49,6 +51,12 @@ export async function findLatestWagePeriod() {
 export async function resolveEmployeeForUser() {
   const { userId } = await auth();
   if (!userId) return { userId: null, employee: null, reason: "unauthenticated" };
+
+  // 0. "Vedi come operatore": solo per admin veri, in sola lettura (middleware).
+  const va = await viewAsFor(userId);
+  if (va?.employee && (await isUserIdAdminRaw(userId))) {
+    return { userId, employee: va.employee, employee_id: va.employee_id || null, source: "view_as" };
+  }
 
   // 1. Override esplicito (gestito da admin)
   const override = await kv.get(USER_EMP_KEY(userId));
