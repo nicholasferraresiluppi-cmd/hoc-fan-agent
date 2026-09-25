@@ -80,6 +80,19 @@ export async function resolveEmployeeForUser() {
   if (!email) return { userId, employee: null, email: null, reason: "no_email" };
   if (primary?.verification?.status !== "verified") return { userId, employee: null, email, reason: "email_not_verified" };
 
+  // Collegamento da INVITO operatore (lib/operator-invites, 25/09/2026): l'admin
+  // ha invitato questa email come operatore X; l'email è primaria e verificata
+  // (il link d'invito arriva solo a quella casella) → diventa override definitivo,
+  // come se l'avesse impostato un admin a mano. Una volta sola.
+  try {
+    const link = await kv.get(`invite_employee:${email.trim().toLowerCase()}`);
+    if (link?.employeeName) {
+      await kv.set(USER_EMP_KEY(userId), { employeeName: link.employeeName, employeeId: null, source: "invite", linked_at: Date.now() });
+      await kv.del(`invite_employee:${email.trim().toLowerCase()}`);
+      return { userId, employee: link.employeeName, employee_id: null, source: "override" };
+    }
+  } catch {}
+
   // L'abbinamento automatico usa il NOME prima della @: vale solo sui domini
   // aziendali. Con un dominio qualsiasi, "mario.rossi@gmail.com" di chiunque
   // diventava l'operatore Mario Rossi e ne vedeva compenso e score (audit set
