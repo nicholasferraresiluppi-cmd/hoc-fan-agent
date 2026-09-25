@@ -21,7 +21,7 @@ import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
 import { loadGroupLanguages } from "@/app/api/admin/group-languages/route";
 import { detectLanguage } from "@/lib/leaderboard-calc";
 import { getWages } from "@/lib/cp-wages-store";
-import { shiftsByCreator, creatorDrops, monthShrink } from "@/lib/data-health-core";
+import { shiftsByCreator, creatorDrops, monthShrink, unmappedSales } from "@/lib/data-health-core";
 import { getEndedCreators } from "@/lib/creators-ended";
 
 const monthOffset = (id, n) => {
@@ -291,6 +291,31 @@ const CHECKS = [
     },
   },
   {
+    // Venduto di persone CP non collegate a un operatore: spariscono da tutte
+    // le viste performance (set 2026: 168 persone, $126k = 7% del mese, visto
+    // solo confrontando i totali di Sales CP / Creator / P&L).
+    id: "cp-unmapped-sales",
+    severity: "warning",
+    label: "Venduto di persone non collegate",
+    async run() {
+      const cur = currentMonthId();
+      const m = new Date().getUTCDate() >= 5 ? cur : monthOffset(cur, -1);
+      const [w, mapping] = await Promise.all([getWages(m), kv.get("cp:member_mapping")]);
+      if (!w?.length) return [];
+      const u = unmappedSales(w, mapping);
+      if (u.share < 0.02 && u.unmapped < 5000) return [];
+      const pct = Math.round(u.share * 1000) / 10;
+      return [{
+        fingerprint: `cp-unmapped-sales:${m}`,
+        severity: u.share >= 0.05 ? "critical" : "warning",
+        title: `${m}: $${Math.round(u.unmapped).toLocaleString("it-IT")} di venduto da ${u.people.length} persone non collegate a un operatore`,
+        detail: `${pct}% del venduto del mese non compare in Sales CP, Creator, Action e Coaching Center. I più grandi: ${u.people.slice(0, 5).map((p) => `${p.name} $${Math.round(p.sales).toLocaleString("it-IT")}`).join(" · ")}.`,
+        value: `${pct}%`,
+        cta: { href: "/admin/creatorspro-sync#collega", label: "Collega le persone" },
+      }];
+    },
+  },
+  {
     // Watchdog della catena notturna: dal 20/07 al 25/09/2026 i lavori smistati
     // dal dispatcher prendevano 401 dalla Deployment Protection Vercel e nessuno
     // se n'è accorto (il dispatcher scriveva "kicked"). Qui si guarda la PROVA
@@ -398,6 +423,7 @@ export async function runChecks({ trigger = "cron" } = {}) {
       const next = {
         ...prev,
         title: finding.title, detail: finding.detail, value: finding.value, cta: finding.cta,
+        severity: finding.severity || check.severity,
         lastSeen: now, runCount: (prev.runCount || 1) + 1,
       };
       await kv.set(alertKey(fp), next);
@@ -405,7 +431,7 @@ export async function runChecks({ trigger = "cron" } = {}) {
     } else {
       // nuovo, o ri-fallito dopo una risoluzione: riparte da open
       const next = {
-        fingerprint: fp, checkId: check.id, severity: check.severity,
+        fingerprint: fp, checkId: check.id, severity: finding.severity || check.severity,
         title: finding.title, detail: finding.detail, value: finding.value, cta: finding.cta,
         status: "open", firstSeen: now, lastSeen: now, runCount: 1,
         ackBy: null, ackByUserId: null, ackAt: null, resolvedAt: null,

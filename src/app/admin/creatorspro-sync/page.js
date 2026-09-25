@@ -136,6 +136,7 @@ export default function CreatorsProSyncPage() {
   // v2: ricerca client-side su entrambe le tabelle
   const [unmappedSearch, setUnmappedSearch] = useState("");
   const [mappedSearch, setMappedSearch] = useState("");
+  const [showIdle, setShowIdle] = useState(false);
 
   const filteredUnmapped = useMemo(() => {
     if (!unmappedSearch.trim()) return allUnmapped;
@@ -265,57 +266,61 @@ export default function CreatorsProSyncPage() {
           </p>
         </div>
 
-        {/* MAPPING NON RISOLTI */}
-        {allUnmapped.length > 0 && (
-          <div style={styles.card}>
-            <h2 style={styles.h2}>Mapping da risolvere ({allUnmapped.length})</h2>
-            <p style={{ color: COLORS.fog, fontSize: 13, marginBottom: 14 }}>
-              Member CreatorsPro senza corrispondenza Infloww. Assegna manualmente il nome Infloww per attivare il join dei dati.
-              <br/><span style={{ opacity: 0.7 }}>💡 In CP molti operatori sono salvati come "X HOC" ma in Infloww hanno il nome anagrafico. Controlla l'username CP per indizi.</span>
+        {/* PERSONE DA COLLEGARE (25/09/2026): ordinate per venduto — chi non è
+            collegato sparisce da Sales CP, Creator, Action/Coaching Center. */}
+        {allUnmapped.length > 0 && (() => {
+          const withSales = filteredUnmapped.filter((m) => (m.sales_cur || 0) + (m.sales_prev || 0) > 0);
+          const idle = filteredUnmapped.filter((m) => !((m.sales_cur || 0) + (m.sales_prev || 0) > 0));
+          const rows = showIdle ? [...withSales, ...idle] : withSales;
+          const nameOf = (m) => (m.cp_name || `${m.firstName || ""} ${m.lastName || ""}`).trim();
+          const imp = mapData?.impact;
+          return (
+          <div id="collega" style={styles.card}>
+            <h2 style={styles.h2}>Persone da collegare a un operatore ({withSales.length} con vendite)</h2>
+            <p style={{ color: COLORS.fog, fontSize: 13, marginBottom: 14, lineHeight: 1.5 }}>
+              {imp?.unmapped ? <>Nel mese {imp.period_id}: <b style={{ color: COLORS.alabaster }}>${imp.unmapped.toLocaleString("it-IT")}</b> ({(imp.share * 100).toLocaleString("it-IT", { maximumFractionDigits: 1 })}% del venduto) viene da persone non collegate, che quindi non compaiono in Sales CP, Creator, Action e Coaching Center. </> : null}
+              Scegli il nome dell&apos;operatore se esiste già (suggerito quando lo riconosco), altrimenti “Usa il nome CP”.
             </p>
-            <input
-              type="text"
-              placeholder="🔍 Cerca per nome CP o username..."
-              value={unmappedSearch}
-              onChange={(e) => setUnmappedSearch(e.target.value)}
-              style={{ ...styles.input, marginBottom: 12 }}
-            />
-            <datalist id="cp-infloww-names">
-              {inflowwNames.map((n) => <option key={n} value={n} />)}
-            </datalist>
+            <input type="text" placeholder="Cerca per nome CP o username…" value={unmappedSearch} onChange={(e) => setUnmappedSearch(e.target.value)} style={{ ...styles.input, marginBottom: 12 }} />
+            <datalist id="cp-infloww-names">{inflowwNames.map((n) => <option key={n} value={n} />)}</datalist>
             <table style={styles.table}>
               <thead>
                 <tr>
-                  <th style={styles.th}>CP Member</th>
-                  <th style={styles.th}>Username</th>
-                  <th style={styles.th}>Nome Infloww (typed/picked)</th>
+                  <th style={styles.th}>Persona in CreatorsPro</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>Venduto mese</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>Mese prima</th>
+                  <th style={styles.th}>Operatore</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredUnmapped.map((m) => (
-                  <tr key={m.cp_id || m.id}>
-                    <td style={{ ...styles.td, fontWeight: 600 }}>{m.cp_name || `${m.firstName || ""} ${m.lastName || ""}`.trim()}</td>
-                    <td style={{ ...styles.td, color: COLORS.mist, fontSize: 12, fontFamily: FONTS.mono }}>{m.username || "—"}</td>
-                    <td style={styles.td}>
-                      <input
-                        list="cp-infloww-names"
-                        placeholder="Cerca o digita nome Infloww"
-                        style={styles.input}
-                        onBlur={(e) => {
-                          const v = e.target.value.trim();
-                          if (v) setMapping(m.cp_id || m.id, v);
-                        }}
-                      />
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((m) => {
+                  const id = m.cp_id || m.id;
+                  const sug = suggestName(nameOf(m), inflowwNames);
+                  return (
+                    <tr key={id}>
+                      <td style={{ ...styles.td, fontWeight: 500 }}>{nameOf(m)}{m.username ? <span style={{ color: COLORS.mist, fontSize: 12, marginLeft: 8 }}>@{m.username}</span> : null}</td>
+                      <td style={{ ...styles.td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{m.sales_cur ? `$${m.sales_cur.toLocaleString("it-IT")}` : "—"}</td>
+                      <td style={{ ...styles.td, textAlign: "right", fontVariantNumeric: "tabular-nums", color: COLORS.mist }}>{m.sales_prev ? `$${m.sales_prev.toLocaleString("it-IT")}` : "—"}</td>
+                      <td style={styles.td}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                          <input list="cp-infloww-names" placeholder="Nome operatore" defaultValue="" style={{ ...styles.input, width: 200 }}
+                            onBlur={(e) => { const v = e.target.value.trim(); if (v) setMapping(id, v); }} />
+                          {sug && <button onClick={() => setMapping(id, sug)} style={linkBtn}>Collega a “{sug}”</button>}
+                          <button onClick={() => setMapping(id, nameOf(m))} style={linkBtn}>Usa il nome CP</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
-            <p style={{ fontSize: 11, color: COLORS.mist, marginTop: 12 }}>
-              {unmappedSearch ? `${filteredUnmapped.length} risultati su ${allUnmapped.length}` : `Mostrati tutti i ${allUnmapped.length}`}. Re-sync dopo aver mappato per riprovare match automatici.
+            <p style={{ fontSize: 12, color: COLORS.mist, marginTop: 12 }}>
+              {idle.length > 0 && <button onClick={() => setShowIdle((v) => !v)} style={linkBtn}>{showIdle ? "Nascondi" : "Mostra anche"} le {idle.length} persone senza vendite negli ultimi 2 mesi</button>}
+              {" "}Il collegamento vale subito, anche per i mesi passati.
             </p>
           </div>
-        )}
+          );
+        })()}
 
         {/* MAPPING ATTIVI */}
         {Object.keys(mapping).length > 0 && (
@@ -365,3 +370,18 @@ export default function CreatorsProSyncPage() {
     </div>
   );
 }
+
+
+// Nome operatore già esistente che corrisponde alla persona CP (senza "HOC",
+// emoji, maiuscole): "Erick Jhon HOC" → "Erick Jhon". Solo match esatti o
+// univoci per prefisso: meglio nessun suggerimento che quello sbagliato.
+const norm = (x) => (x || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z ]/g, " ").replace(/\bHOC\b/gi, " ").replace(/\s+/g, " ").trim().toLowerCase();
+function suggestName(cpName, names) {
+  const n = norm(cpName);
+  if (!n) return null;
+  const exact = names.filter((x) => norm(x) === n);
+  if (exact.length === 1) return exact[0];
+  const pre = names.filter((x) => { const k = norm(x); return k && (k.startsWith(n + " ") || n.startsWith(k + " ")); });
+  return pre.length === 1 ? pre[0] : null;
+}
+const linkBtn = { background: "none", border: "none", padding: 0, color: "var(--cp-accentSoftText)", fontSize: 13, cursor: "pointer" };
