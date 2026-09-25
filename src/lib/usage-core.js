@@ -222,3 +222,69 @@ export function buildInsights(r, now = Date.now()) {
   }
   return out;
 }
+
+/* ------------------------------------------------------------------ */
+/* Esperienza d'uso: dove si clicca, cosa frustra, cosa non si vede.    */
+/* ------------------------------------------------------------------ */
+
+// Soglie minime di campione: sotto, niente conclusioni (regola di onestà).
+export const UX_MIN = { clicks: 5, rage: 3, scrollViews: 5, loadViews: 3, slowMs: 3000, lowScrollPct: 40 };
+
+/**
+ * @param {Record<string, Record<string, number>>} ux  giorno → hash usage:x
+ * @param {object} navByHref  href → { label }
+ */
+export function buildUxReport(ux, navByHref = {}) {
+  const pages = {};
+  const P = (p) => (pages[p] ||= { page: p, label: navByHref[p]?.label || null, clicks: {}, rage: {}, errors: {}, scrollSum: 0, scrollN: 0, loadSum: 0, loadN: 0 });
+  for (const h of Object.values(ux || {})) {
+    for (const [f, raw] of Object.entries(h || {})) {
+      const n = Number(raw) || 0;
+      const parts = f.split("\t");
+      const kind = parts[0], page = parts[1];
+      if (!page) continue;
+      const p = P(page);
+      if (kind === "c") {
+        const [fold, zone] = String(parts[3] || "?|?").split("|");
+        const c = (p.clicks[parts[2]] ||= { label: parts[2], count: 0, below: 0, zones: {} });
+        c.count += n; if (fold === "scorrendo") c.below += n; c.zones[zone] = (c.zones[zone] || 0) + n;
+      } else if (kind === "r") p.rage[parts[2]] = (p.rage[parts[2]] || 0) + n;
+      else if (kind === "e") p.errors[parts[2]] = (p.errors[parts[2]] || 0) + n;
+      else if (kind === "s") parts[2] === "sum" ? (p.scrollSum += n) : (p.scrollN += n);
+      else if (kind === "l") parts[2] === "sum" ? (p.loadSum += n) : (p.loadN += n);
+    }
+  }
+  const rows = Object.values(pages).map((p) => {
+    const clicks = Object.values(p.clicks).sort((a, b) => b.count - a.count).map((c) => ({
+      label: c.label, count: c.count,
+      below_share: c.count ? Math.round((c.below / c.count) * 100) / 100 : 0,
+      zone: Object.entries(c.zones).sort((a, b) => b[1] - a[1])[0]?.[0] || "?",
+    }));
+    return {
+      page: p.page, label: p.label,
+      clicks, total_clicks: clicks.reduce((a, c) => a + c.count, 0),
+      rage: Object.entries(p.rage).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count),
+      errors: Object.entries(p.errors).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count),
+      scroll_avg: p.scrollN ? Math.round(p.scrollSum / p.scrollN) : null, scroll_n: p.scrollN,
+      load_avg_ms: p.loadN ? Math.round(p.loadSum / p.loadN) : null, load_n: p.loadN,
+    };
+  }).sort((a, b) => b.total_clicks - a.total_clicks);
+  return { pages: rows, insights: buildUxInsights(rows) };
+}
+
+export function buildUxInsights(rows) {
+  const out = [];
+  const name = (r) => r.label || r.page;
+  for (const r of rows) {
+    // tasto molto usato che si trova solo scorrendo
+    const top = r.clicks.slice(0, 3).filter((c) => c.count >= UX_MIN.clicks && c.below_share >= 0.6 && !c.label.startsWith("→ "));
+    for (const c of top) out.push({ kind: "warn", page: r.page, title: `«${c.label}» è tra i tasti più usati di ${name(r)}, ma per trovarlo bisogna scorrere`, text: `${c.count} clic, ${Math.round(c.below_share * 100)}% sotto la parte visibile all'apertura: spostarlo in alto fa risparmiare uno scroll a ogni uso.` });
+    for (const g of r.rage.filter((x) => x.count >= UX_MIN.rage)) out.push({ kind: "warn", page: r.page, title: `Clic ripetuti per frustrazione su «${g.label}» (${name(r)})`, text: `${g.count} volte qualcuno ha cliccato 3+ volte di fila nello stesso punto: di solito vuol dire che non risponde, è lento o sembra cliccabile e non lo è.` });
+    const errs = r.errors.reduce((a, e) => a + e.count, 0);
+    if (errs) out.push({ kind: "warn", page: r.page, title: `${errs} ${errs === 1 ? "errore" : "errori"} su ${name(r)}`, text: `Il più frequente: «${r.errors[0].label}». Da correggere: chi lo incontra vede una pagina rotta.` });
+    if (r.load_n >= UX_MIN.loadViews && r.load_avg_ms >= UX_MIN.slowMs) out.push({ kind: "info", page: r.page, title: `${name(r)} è lenta ad aprirsi`, text: `In media ${(r.load_avg_ms / 1000).toFixed(1)} secondi al primo caricamento.` });
+    if (r.scroll_n >= UX_MIN.scrollViews && r.scroll_avg < UX_MIN.lowScrollPct) out.push({ kind: "info", page: r.page, title: `Su ${name(r)} si guarda solo la parte alta`, text: `In media si scorre fino al ${r.scroll_avg}% della pagina: quello che sta sotto quasi nessuno lo vede. Le cose importanti vanno in cima.` });
+  }
+  const rank = { warn: 0, info: 1, good: 2 };
+  return out.sort((a, b) => rank[a.kind] - rank[b.kind]);
+}
