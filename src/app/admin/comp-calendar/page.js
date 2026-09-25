@@ -97,7 +97,7 @@ async function getResearch(creator, pid) {
 
 export default function CompCalendarPage() {
   const periods = useMemo(() => monthOpts(), []);
-  const [theme, setTheme] = useState("dark");
+  const [theme, setTheme] = useState("light");
   const [creator, setCreator] = useState("");
   const [periodId, setPeriodId] = useState(periods[1]?.value || periods[0]?.value || "");
   const [aliases, setAliases] = useState([]);
@@ -110,6 +110,7 @@ export default function CompCalendarPage() {
   const [sort, setSort] = useState({ key: "per_shift", dir: -1 });
   const [showProfiles, setShowProfiles] = useState(false);
   const [showSim, setShowSim] = useState(false);
+  const [showShifts, setShowShifts] = useState(false);
   const [simByProfile, setSimByProfile] = useState(null);
   const [onlyChanged, setOnlyChanged] = useState(true);
 
@@ -121,7 +122,7 @@ export default function CompCalendarPage() {
     try {
       const q = new URLSearchParams(window.location.search).get("theme");
       const saved = localStorage.getItem("hoc:theme");
-      const t = q === "light" || q === "dark" ? q : saved === "light" ? "light" : "dark";
+      const t = q === "light" || q === "dark" ? q : saved === "dark" ? "dark" : "light"; // chiaro predefinito (test utenti v2: 4 su 5)
       setTheme(t);
     } catch {}
   }, []);
@@ -284,7 +285,7 @@ export default function CompCalendarPage() {
               <Metric P={P} label="Venduto" value={fmt$(agg.totSales)} prev={aggPrev?.totSales} cur={agg.totSales} />
               <Metric P={P} label="Pagato agli operatori" value={fmt$(agg.totEarn)} prev={aggPrev?.totEarn} cur={agg.totEarn} />
               <Metric P={P} label="Turni" value={nf0.format(agg.rows.length)} prev={aggPrev?.rows.length} cur={agg.rows.length} />
-              <Metric P={P} label="Operatori" value={String(agg.operators.length)} />
+              <Metric P={P} label="Operatori" value={String(agg.operators.length)} prev={aggPrev?.operators.length} cur={agg.operators.length} />
             </section>
 
             {/* 2. Cosa guardare: filtri */}
@@ -347,8 +348,8 @@ export default function CompCalendarPage() {
                 <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }}>
                   <thead><tr style={{ position: "sticky", top: 0, zIndex: 3 }}>
                     <th style={{ ...st.th, position: "sticky", left: 0, zIndex: 4, minWidth: 74 }}>Giorno</th>
-                    {agg.columns.map((c) => <th key={c} style={{ ...st.th, minWidth: 180 }}>{c.replace("–", " – ")}</th>)}
-                    <th style={{ ...st.th, textAlign: "right", minWidth: 100 }}>Totale giorno</th>
+                    {agg.columns.map((c) => <th key={c} style={{ ...st.th, minWidth: 148 }}>{c.replace("–", " – ")}</th>)}
+                    <th style={{ ...st.th, textAlign: "right", minWidth: 92, position: "sticky", right: 0, zIndex: 4, boxShadow: `-1px 0 0 ${P.border}` }}>Totale giorno</th>
                   </tr></thead>
                   <tbody>
                     {agg.days.map((d) => {
@@ -380,7 +381,7 @@ export default function CompCalendarPage() {
                                   return (
                                     <div key={g.key}
                                       title={g.rows.map((r) => `${r.operator} · ${r.start}–${r.end} · venduto ${fmt$(r.sales_on_creator)} · pagato ${fmt$(r.earnings_attr)} (${fmtPct(r.eff_pct, 1)}) · profilo "${r.profile_name || "?"}"${agg.issueText[r.shift_id] ? ` · ${agg.issueText[r.shift_id]}` : ""}`).join("\n")}
-                                      style={{ background: t.fill, color: t.text, borderRadius: 6, padding: "5px 8px", marginBottom: 4, opacity: matches ? 1 : 0.22, outline: hasIssue ? `2px solid ${P.accentRed}` : "none", outlineOffset: -2, transition: "opacity .15s" }}>
+                                      style={{ background: t.fill, color: t.text, borderRadius: 6, padding: "5px 8px", marginBottom: 4, boxShadow: theme === "dark" ? `inset 0 0 0 1px ${P.borderStrong}` : "none", opacity: matches ? 1 : 0.22, outline: hasIssue ? `2px solid ${P.accentRed}` : "none", outlineOffset: -2, transition: "opacity .15s" }}>
                                       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
                                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                           {hasIssue && <AlertTriangle size={12} style={{ display: "inline", marginRight: 4, verticalAlign: "-1px", color: P.accentRed }} />}
@@ -394,7 +395,7 @@ export default function CompCalendarPage() {
                               </td>
                             );
                           })}
-                          <td style={{ ...st.gridTd, ...NUM, textAlign: "right", background: weekend ? P.surfaceAlt : P.surface, color: dt ? P.textPrimary : P.textMuted, fontWeight: 500 }}>{dt ? fmt$(dt.sales) : "—"}</td>
+                          <td style={{ ...st.gridTd, ...NUM, textAlign: "right", position: "sticky", right: 0, zIndex: 1, boxShadow: `-1px 0 0 ${P.border}`, background: weekend ? P.surfaceAlt : P.surface, color: dt ? P.textPrimary : P.textMuted, fontWeight: 500 }}>{dt ? fmt$(dt.sales) : "—"}</td>
                         </tr>
                       );
                     })}
@@ -402,22 +403,52 @@ export default function CompCalendarPage() {
                   <tfoot><tr style={{ position: "sticky", bottom: 0, zIndex: 3 }}>
                     <td style={{ ...st.footTd, position: "sticky", left: 0, zIndex: 4 }}>Totale mese</td>
                     {agg.columns.map((c) => (
-                      <td key={c} style={{ ...st.footTd, ...NUM }}>{fmt$(agg.colTotals[c].sales)} <span style={{ color: P.textMuted, fontWeight: 400 }}>· {agg.colTotals[c].count} turni · {fmt$(agg.colTotals[c].count ? agg.colTotals[c].sales / agg.colTotals[c].count : 0)} a turno</span></td>
+                      <td key={c} style={{ ...st.footTd, ...NUM }}>{fmt$(agg.colTotals[c].sales)}<div style={{ color: P.textMuted, fontWeight: 400, fontSize: 12 }}>{agg.colTotals[c].count} turni · {fmt$(agg.colTotals[c].count ? agg.colTotals[c].sales / agg.colTotals[c].count : 0)} a turno</div></td>
                     ))}
-                    <td style={{ ...st.footTd, ...NUM, textAlign: "right" }}>{fmt$(agg.totSales)}</td>
+                    <td style={{ ...st.footTd, ...NUM, textAlign: "right", position: "sticky", right: 0, zIndex: 4, boxShadow: `-1px 0 0 ${P.border}` }}>{fmt$(agg.totSales)}</td>
                   </tr></tfoot>
                 </table>
               </div>
             </div>
 
-            {/* 5. Su richiesta: profili */}
+            {/* 5. Turni uno per uno: per rispondere alle contestazioni senza passare il mouse */}
+            <Disclosure P={P} open={showShifts || (focus && typeof focus === "object") || focus === "issues"} onToggle={() => setShowShifts(!showShifts)}
+              title={`Turni uno per uno${focus && typeof focus === "object" ? ` · ${focus.operator}` : focus === "issues" ? " · da controllare" : ""}`}
+              summary="Data, orario, profilo, percentuale pagata e dovuta, motivo delle anomalie">
+              <div style={{ overflowX: "auto", maxHeight: 460, overflowY: "auto", border: `1px solid ${P.border}`, borderRadius: 8 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead><tr>{["Data", "Orario", "Operatore", "Profilo", "Venduto nel turno", "Venduto sulla creator", "% pagata", "% dovuta", "Pagato", "Nota"].map((h, i) => <th key={h} style={{ ...st.th, textAlign: i >= 4 && i <= 8 ? "right" : "left", position: "sticky", top: 0 }}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {agg.rows.filter((r) => (focus && typeof focus === "object" ? r.operator === focus.operator : focus === "issues" ? agg.issueIds.has(r.shift_id) : true)).map((r) => {
+                      const issue = agg.issueText[r.shift_id];
+                      return (
+                        <tr key={r.shift_id} style={{ borderTop: `1px solid ${P.borderSoft}` }}>
+                          <td style={{ ...st.td, ...NUM, color: P.textSecondary, whiteSpace: "nowrap" }}>{r.date.slice(8)}/{r.date.slice(5, 7)}</td>
+                          <td style={{ ...st.td, ...NUM, color: P.textSecondary, whiteSpace: "nowrap" }}>{r.start}–{r.end}</td>
+                          <td style={{ ...st.td, whiteSpace: "nowrap" }}>{r.operator}</td>
+                          <td style={{ ...st.td, color: P.textSecondary, whiteSpace: "nowrap" }}>{profileLabel((data.profiles_inventory || []).find((x) => x.name === r.profile_name) || { name: r.profile_name, cosellers_count: r.profile_cosellers })}</td>
+                          <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmt$(r.sales_total_shift)}</td>
+                          <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmt$(r.sales_on_creator)}</td>
+                          <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmtPct(r.eff_pct, 1)}</td>
+                          <td style={{ ...st.td, ...NUM, textAlign: "right", color: P.textSecondary }}>{fmtPct(r.expected_pct)}</td>
+                          <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmt$(r.earnings_attr)}</td>
+                          <td style={{ ...st.td, color: issue ? P.accentRed : P.textMuted, fontSize: 12 }}>{issue || "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Disclosure>
+
+            {/* 6. Su richiesta: profili */}
             <Disclosure P={P} open={showProfiles} onToggle={() => setShowProfiles(!showProfiles)}
               title="Profili di pagamento del mese" summary={profilesSummary(data.profiles_inventory || [])}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                 <thead><tr><th style={st.th}>Profilo</th><th style={{ ...st.th, textAlign: "right" }}>Persone nel turno</th><th style={{ ...st.th, textAlign: "right" }}>Turni</th><th style={{ ...st.th, textAlign: "right" }}>Venduto</th><th style={st.th}>Scaglioni</th></tr></thead>
                 <tbody>{(data.profiles_inventory || []).map((p) => (
                   <tr key={p.name} style={{ borderTop: `1px solid ${P.borderSoft}` }}>
-                    <td style={st.td}>{p.name}</td>
+                    <td style={st.td}>{profileLabel(p)}<div style={{ fontSize: 12, color: P.textMuted }}>{p.name}</div></td>
                     <td style={{ ...st.td, ...NUM, textAlign: "right", color: P.textSecondary }}>{p.cosellers_count ?? "?"}</td>
                     <td style={{ ...st.td, ...NUM, textAlign: "right", color: P.textSecondary }}>{p.shifts}</td>
                     <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmt$(p.sales)}</td>
@@ -443,15 +474,18 @@ export default function CompCalendarPage() {
                           const setTiers = (next) => setSimByProfile({ ...simByProfile, [name]: next });
                           return (
                             <tr key={name} style={{ borderTop: `1px solid ${P.borderSoft}` }}>
-                              <td style={{ ...st.td, whiteSpace: "nowrap" }}>{name}</td>
+                              <td style={{ ...st.td, whiteSpace: "nowrap" }}>{profileLabel((data.profiles_inventory || []).find((x) => x.name === name) || { name })}<div style={{ fontSize: 12, color: P.textMuted }}>{name}</div></td>
                               <td style={st.td}>
                                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                                   {tiers.map((t, i) => (
                                     <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                                       <span style={{ color: P.textMuted, fontSize: 12 }}>{i === 0 ? "base" : "da $"}</span>
-                                      {i > 0 && <input type="number" value={t.threshold} aria-label={`Soglia ${i + 1} ${name}`} onChange={(e) => setTiers(tiers.map((x, j) => (j === i ? { ...x, threshold: e.target.value === "" ? "" : Number(e.target.value) } : x)))} style={{ ...st.input, width: 76, padding: "6px 8px", ...NUM }} />}
+                                      {i > 0 && <SimInput P={P} st={st} value={t.threshold} was={realByProfile?.[name]?.[i]?.threshold} label={`Soglia ${i + 1} ${name}`} width={76}
+                                        onChange={(v) => setTiers(tiers.map((x, j) => (j === i ? { ...x, threshold: v === "" ? "" : Number(v) } : x)))} />}
                                       <span style={{ color: P.textMuted }}>→</span>
-                                      <input type="number" step="0.5" value={t.percentage === "" ? "" : Math.round(Number(t.percentage) * 1000) / 10} aria-label={`Percentuale ${i + 1} ${name}`} onChange={(e) => setTiers(tiers.map((x, j) => (j === i ? { ...x, percentage: e.target.value === "" ? "" : Number(e.target.value) / 100 } : x)))} style={{ ...st.input, width: 60, padding: "6px 8px", ...NUM }} />
+                                      <SimInput P={P} st={st} step="0.5" value={t.percentage === "" ? "" : Math.round(Number(t.percentage) * 1000) / 10}
+                                        was={realByProfile?.[name]?.[i]?.percentage != null ? Math.round(realByProfile[name][i].percentage * 1000) / 10 : undefined} label={`Percentuale ${i + 1} ${name}`} width={60}
+                                        onChange={(v) => setTiers(tiers.map((x, j) => (j === i ? { ...x, percentage: v === "" ? "" : Number(v) / 100 } : x)))} />
                                       <span style={{ color: P.textMuted, fontSize: 12 }}>%</span>
                                       {i > 0 && <button onClick={() => setTiers(tiers.filter((_, j) => j !== i))} aria-label="Togli scaglione" style={{ ...st.iconBtn, padding: 5 }}><X size={12} /></button>}
                                       {i < tiers.length - 1 && <span style={{ color: P.border, margin: "0 2px" }}>|</span>}
@@ -471,16 +505,21 @@ export default function CompCalendarPage() {
                   </div>
                   {sim && (
                     <>
-                      <div style={{ display: "flex", gap: 32, flexWrap: "wrap", marginBottom: 14 }}>
-                        <Metric P={P} label="Con gli scaglioni di oggi" value={fmt$(sim.base)} />
-                        <Metric P={P} label="Con quelli provati" value={fmt$(sim.next)} />
+                      {/* Risultato ancorato al pagato REALE: si applica solo la differenza dovuta agli
+                          scaglioni (prima c'erano due totali quasi uguali, $18.615 e $18.616: confondeva) */}
+                      <div style={{ display: "flex", gap: 32, flexWrap: "wrap", marginBottom: 6 }}>
                         <div>
-                          <div style={{ fontSize: 13, color: P.textSecondary }}>Differenza per gli operatori</div>
-                          <div style={{ fontSize: 22, fontWeight: 500, ...NUM }}>{fmtSigned$(sim.delta)}</div>
-                          <div style={{ fontSize: 12, color: P.textMuted }}>{sim.base ? `${sim.delta >= 0 ? "+" : "−"}${Math.abs((100 * sim.delta) / sim.base).toLocaleString("it-IT", { maximumFractionDigits: 1 })}%` : ""} · {sim.delta > 0 ? "gli operatori guadagnerebbero di più" : sim.delta < 0 ? "gli operatori guadagnerebbero di meno" : "nessun cambiamento"}</div>
+                          <div style={{ fontSize: 13, color: P.textSecondary }}>Costo operatori sul venduto</div>
+                          <div style={{ fontSize: 22, fontWeight: 500, ...NUM }}>{fmtPct(costPct, 1)} → {fmtPct(agg.totSales ? (agg.totEarn + sim.delta) / agg.totSales : null, 1)}</div>
+                          <div style={{ fontSize: 12, color: P.textMuted }}>{fmtPts(agg.totSales ? sim.delta / agg.totSales : 0)}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 13, color: P.textSecondary }}>Pagato agli operatori nel mese</div>
+                          <div style={{ fontSize: 22, fontWeight: 500, ...NUM }}>{fmt$(agg.totEarn)} → {fmt$(agg.totEarn + sim.delta)}</div>
+                          <div style={{ fontSize: 12, color: P.textMuted }}>{fmtSigned$(sim.delta)} · {sim.delta > 0 ? "gli operatori guadagnerebbero di più" : sim.delta < 0 ? "gli operatori guadagnerebbero di meno" : "nessun cambiamento"}</div>
                         </div>
                       </div>
-                      <div style={{ fontSize: 12, color: P.textMuted, marginBottom: 12 }}>Il pagato reale del mese ({fmt$(agg.totEarn)}) comprende anche voci che non dipendono dallo scaglione: per questo il confronto si fa tra scaglioni, sugli stessi turni.</div>
+                      <div style={{ fontSize: 12, color: P.textMuted, marginBottom: 14 }}>Cambia solo la parte che dipende dallo scaglione; il resto del pagato resta com'è.</div>
                       {simChanged && (
                         <>
                           <h3 style={{ fontSize: 14, fontWeight: 500, margin: "4px 0 8px" }}>Chi ci guadagna e chi ci perde</h3>
@@ -616,15 +655,24 @@ function groupCell(cell) {
   return [...groups.values()];
 }
 
+// "2 Giulia Ottorini Mattino" → "In coppia · mattino": il nome interno di CreatorsPro
+// non dice niente a chi legge; persone nel turno + variante sì.
+function profileLabel(p) {
+  const n = p?.cosellers_count;
+  const who = n === 1 ? "Da solo" : n === 2 ? "In coppia" : n === 3 ? "In tre" : n ? `In ${n}` : "Profilo";
+  const variant = (String(p?.name || "").match(/mattin\w*|notturn\w*|serale|serata|weekend|condivis\w*/gi) || []).map((x) => x.toLowerCase());
+  return variant.length ? `${who} · ${variant.join(" · ")}` : who;
+}
 function thresholdsText(ths) {
   return (ths || []).map((t) => `${t.threshold > 0 ? `da ${fmt$(t.threshold)}` : "base"} ${fmtPct(t.percentage)}`).join(" · ");
 }
 function profilesSummary(inv) {
   if (!inv.length) return "Nessun profilo";
   const byTh = {};
-  for (const p of inv) (byTh[thresholdsText(p.thresholds)] ||= []).push(p.name);
+  for (const p of inv) (byTh[thresholdsText(p.thresholds)] ||= []).push(profileLabel(p));
   const groups = Object.entries(byTh).sort((a, b) => b[1].length - a[1].length);
-  return `${inv.length} profili · ` + groups.map(([th, names]) => `${names.length === 1 ? names[0] : `${names.length} profili`}: ${th}`).join("  ·  ");
+  if (groups.length === 1) return `${inv.length} profili, tutti con ${groups[0][0]}`;
+  return groups.map(([th, labels]) => `${[...new Set(labels)].join(", ")}: ${th}`).join("  —  ");
 }
 
 /* ------------------------------------------------------------------ */
@@ -638,6 +686,18 @@ function Metric({ P, label, value, prev, cur }) {
       <div style={{ fontSize: 22, fontWeight: 500, lineHeight: 1.25, fontVariantNumeric: "tabular-nums" }}>{value}</div>
       {d != null && <div style={{ fontSize: 12, color: P.textMuted, fontVariantNumeric: "tabular-nums" }}>{d >= 0 ? "+" : "−"}{Math.abs(d * 100).toLocaleString("it-IT", { maximumFractionDigits: 0 })}% sul mese prima</div>}
     </div>
+  );
+}
+
+// Campo del simulatore: se il valore è diverso da quello reale si vede (bordo + "era X")
+function SimInput({ P, st, value, was, onChange, label, width, step }) {
+  const changed = was !== undefined && String(value) !== String(was);
+  return (
+    <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-start" }}>
+      <input type="number" step={step} value={value} aria-label={label} onChange={(e) => onChange(e.target.value)}
+        style={{ ...st.input, width, padding: "6px 8px", fontVariantNumeric: "tabular-nums", borderColor: changed ? P.accent : P.border, boxShadow: changed ? `0 0 0 1px ${P.accent}` : "none" }} />
+      <span style={{ fontSize: 11, color: P.accentSoftText, height: 14 }}>{changed ? `era ${was}` : ""}</span>
+    </span>
   );
 }
 

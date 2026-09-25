@@ -98,7 +98,7 @@ export const NAV_GROUPS = [
     items: [
       { href: "/admin/pnl-live",                 label: "P&L Live",              icon: Wallet },
       { href: "/admin/profiles-compare",         label: "Scaglioni a confronto", icon: Scale },
-      { href: "/admin/comp-calendar",            label: "Comp Calendar",         icon: CalendarDays },
+      { href: "/admin/comp-calendar",            label: "Calendario compensi",   icon: CalendarDays },
       { href: "/admin/threshold-study",          label: "Studio soglie",         icon: Ruler },
       { href: "/admin/comp-review",              label: "Comp Review",           icon: Activity },
       { href: "/admin/comp-exam",                label: "Esame creator",         icon: Search },
