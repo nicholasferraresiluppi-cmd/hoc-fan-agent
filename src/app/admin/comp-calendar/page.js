@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { Loader2, AlertCircle, CalendarDays, AlertTriangle, Download, FlaskConical, RotateCcw, Plus, X } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
+import { PageHeader, CpCard, StatCard } from "@/components/cp-style";
 import CompNav from "@/components/CompNav";
 import HowToRead from "@/components/HowToRead";
 import CreatorPicker from "@/components/CreatorPicker";
@@ -30,7 +30,13 @@ function monthOpts(n = 12) {
 const fmt$ = (n) => n == null ? "—" : `$${Number(n).toLocaleString("it-IT", { maximumFractionDigits: 0 })}`;
 const fmtPct = (v, d = 0) => v == null ? "—" : `${(v * 100).toFixed(d)}%`;
 
-const TIER_COLORS = ["#D44545", "#F59E0B", "#3FB97E", "#4F8CCB", CP.accent];
+// Design (25/09/2026, pilota leggibilità): lo scaglione è un dato ORDINATO →
+// scala SEQUENZIALE di una sola tinta (scuro = scaglione basso, chiaro = alto),
+// come vuole la letteratura sui colori nei dati (Brewer). Il rosso resta SOLO
+// per le anomalie: se tutto è colorato, niente spicca.
+const TIER_SCALE = ["#5b52a8", "#7a6ee0", "#9d91f7", "#c3bafa", "#e4e0fd"];
+const tierColor = (i, n) => TIER_SCALE[n <= 1 ? 2 : Math.round((i / (n - 1)) * (TIER_SCALE.length - 1))];
+const NUM = { fontVariantNumeric: "tabular-nums" };
 
 // % vincente con formula bracket su intero importo (confermata dalla ricerca)
 function bracketPct(total, thresholds) {
@@ -155,10 +161,10 @@ export default function CompCalendarPage() {
     const colorOf = (pct) => {
       if (pct == null) return CP.textMuted;
       const i = pcts.indexOf(pct);
-      if (i >= 0) return TIER_COLORS[Math.min(i, TIER_COLORS.length - 1)];
-      // pct simulato non presente nella scala reale: scala per posizione relativa
+      if (i >= 0) return tierColor(i, pcts.length);
+      // pct simulato non presente nella scala reale: posizione relativa
       const below = pcts.filter((p) => p < pct).length;
-      return TIER_COLORS[Math.min(below, TIER_COLORS.length - 1)];
+      return tierColor(Math.min(below, pcts.length - 1), pcts.length);
     };
 
     const [y, m] = (data.period_id || "").split("-").map(Number);
@@ -320,34 +326,29 @@ export default function CompCalendarPage() {
           <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
             <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
             <span style={{ color: CP.textMuted }}>›</span>
-            <span style={{ color: CP.textPrimary }}>Comp Calendar</span>
+            <span style={{ color: CP.textPrimary }}>Calendario compensi</span>
           </div>
         }
-        section="Data · Comp & Ben"
-        title="Comp Calendar — turni × scaglioni"
-        subtitle="Giorni × fasce orarie con scaglioni applicati, costo operatori attribuito al creator, e simulatore di profili pagamento alternativi sui turni chiusi."
+        section="Comp & Ben"
+        title="Calendario compensi"
+        subtitle="Per una creator e un mese: chi ha lavorato in ogni fascia, quanto ha venduto, quale scaglione è stato pagato. Sotto, il simulatore per provare scaglioni diversi sui turni già chiusi."
       />
 
       <CompNav />
 
       <HowToRead items={[
-        "Ogni riga è un giorno del mese, ogni colonna una fascia oraria. Dentro ogni casella: chi ha lavorato, quanto ha venduto e che scaglione gli è stato applicato.",
-        "Il colore dice lo scaglione: più caldo (rosso) = scaglione basso, più freddo/acceso = scaglione alto. Una casella col puntino = nessun turno coperto.",
-        "Il triangolino ⚠ segnala qualcosa da controllare: pagamento fuori scaglione, numero di persone diverso dal profilo, o profilo di un'altra creator. Passa il mouse per i dettagli.",
-        "Nel simulatore in basso puoi cambiare le soglie e vedere subito: quanto sarebbe costato il mese, chi ci guadagnava e chi ci perdeva, turno per turno.",
-        "Quando modifichi le soglie, la griglia si ricolora con lo scenario simulato: se diventa quasi tutta di un colore, le soglie sono da ricalibrare.",
+        "Ogni riga è un giorno, ogni colonna una fascia oraria. In ogni casella: chi ha lavorato, quanto ha venduto e la percentuale pagata.",
+        "La barretta a sinistra del nome indica lo scaglione: più chiara = scaglione più alto. Il colore è uno solo apposta: salta all'occhio solo ciò che è anomalo, in rosso.",
+        "Il triangolo rosso segnala qualcosa da controllare: pagamento fuori scaglione, numero di persone diverso dal profilo, o profilo di un'altra creator. Passa il mouse per i dettagli.",
+        "Nel simulatore cambi le soglie e vedi subito quanto sarebbe costato il mese e chi ci guadagnava o perdeva, turno per turno.",
       ]} />
 
-      {/* Form con autocomplete */}
-      <CpCard padding="16px 20px" style={{ marginBottom: 18 }}>
+      {/* Scelta creator e mese */}
+      <CpCard padding="16px 20px" style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 280 }}>
-            <label style={lbl}>Creator · {aliases.length} disponibili nel mese</label>
-            <CreatorPicker
-              aliases={aliases}
-              value={creator}
-              onSelect={(alias) => run(alias)}
-            />
+            <label style={lbl}>Creator <span style={{ color: CP.textMuted, fontWeight: 400 }}>· {aliases.length} attive nel mese</span></label>
+            <CreatorPicker aliases={aliases} value={creator} onSelect={(alias) => run(alias)} />
           </div>
           <div>
             <label style={lbl}>Mese</label>
@@ -356,31 +357,25 @@ export default function CompCalendarPage() {
             </select>
           </div>
           <button onClick={run} disabled={loading || !creator.trim()} style={primaryBtn(loading || !creator.trim())}>
-            {loading ? <><Loader2 size={14} className="animate-spin" /> Carico…</> : <><CalendarDays size={14} /> Genera</>}
+            {loading ? <><Loader2 size={14} className="animate-spin" /> Carico…</> : <><CalendarDays size={14} /> Mostra</>}
           </button>
           {data?.csv_url && (
-            <a href={data.csv_url} style={{ ...primaryBtn(false), background: CP.surface, color: CP.accentGreen, border: `1px solid ${CP.border}`, textDecoration: "none" }}>
-              <Download size={14} /> CSV
+            <a href={data.csv_url} style={ghostBtn}>
+              <Download size={14} /> Scarica CSV
             </a>
           )}
         </div>
       </CpCard>
 
       {error && (
-        <CpCard accent={candidates ? "#F59E0B" : CP.accentRed} padding="14px 18px" style={{ marginBottom: 18 }}>
-          <div style={{ color: candidates ? "#F59E0B" : CP.accentRed, display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-            <AlertCircle size={16} /> {error}
+        <CpCard padding="14px 18px" style={{ marginBottom: 18 }}>
+          <div style={{ color: candidates ? CP.textPrimary : CP.accentRed, display: "flex", alignItems: "center", gap: 10, fontSize: 14 }}>
+            <AlertCircle size={16} color={candidates ? CP.textMuted : CP.accentRed} /> {error}
           </div>
           {candidates && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
               {candidates.map((a) => (
-                <button
-                  key={a}
-                  onClick={() => run(a)}
-                  style={{ padding: "7px 14px", background: CP.surface, border: `1px solid ${CP.accentGreen}66`, borderRadius: 7, color: CP.accentGreen, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.body }}
-                >
-                  {a}
-                </button>
+                <button key={a} onClick={() => run(a)} style={ghostBtn}>{a}</button>
               ))}
             </div>
           )}
@@ -389,114 +384,113 @@ export default function CompCalendarPage() {
 
       {data && grid && (
         <>
-          {/* Stat cards: venduto / pagato / % / coverage */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 18 }}>
-            <StatCard label="Venduto (creator)" value={fmt$(grid.totSales)} color={CP.accentGreen} sub={`${grid.rows.length} turni`} />
-            <StatCard label="Pagato operatori (attr.)" value={fmt$(grid.totEarn)} color="#b9aef9" sub="quota attribuita a questa creator" />
-            <StatCard label="% costo su venduto" value={grid.totSales > 0 ? fmtPct(grid.totEarn / grid.totSales, 1) : "—"} />
-            <StatCard label="Operatori attivi" value={grid.operators.length} />
-            <StatCard label="Slot vuoti (coverage)" value={grid.emptyCells} color={grid.emptyCells > 0 ? "#F59E0B" : CP.accentGreen} sub={`su ${grid.days.length * grid.mainSlots.length} slot`} />
+          {/* Numeri chiave: valori nel colore del testo, il colore solo dove c'è un segnale */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 20 }}>
+            <StatCard label="Venduto sulla creator" value={fmt$(grid.totSales)} sub={`${grid.rows.length} turni`} />
+            <StatCard label="Pagato agli operatori" value={fmt$(grid.totEarn)} sub="quota attribuita a questa creator" />
+            <StatCard label="Costo sul venduto" value={grid.totSales > 0 ? fmtPct(grid.totEarn / grid.totSales, 1) : "—"} sub="pagato ÷ venduto" />
+            <StatCard label="Operatori" value={grid.operators.length} sub="con almeno un turno" />
+            <StatCard label="Fasce scoperte" value={grid.emptyCells} color={grid.emptyCells > 0 ? CP.accentRed : undefined} sub={`su ${grid.days.length * grid.mainSlots.length} fasce del mese`} />
           </div>
 
-          {/* Data quality: venduto non attribuito (takes mancanti in CP) */}
+          {/* Qualità del dato: venduto non attribuito */}
           {data.takes_quality && data.takes_quality.rows_no_sales > data.takes_quality.rows_total * 0.3 && (
-            <CpCard accent="#F59E0B" padding="12px 16px" style={{ marginBottom: 14 }}>
-              <div style={{ color: "#F59E0B", fontSize: 12, lineHeight: 1.55 }}>
-                ⚠ <b>{data.takes_quality.rows_no_sales} turni su {data.takes_quality.rows_total} senza venduto attribuito</b>
-                {" "}({data.takes_quality.rows_no_takes} senza alcun take registrato in CP).
-                Il pagato e gli scaglioni restano corretti — è il venduto per turno che manca alla fonte:
-                per questo team i takes non vengono registrati (tipico dei team condivisi, es. "laura esp + elisa").
-                Da sistemare in CP lato manager, non è un errore della webapp.
-              </div>
-            </CpCard>
+            <Notice>
+              <b>{data.takes_quality.rows_no_sales} turni su {data.takes_quality.rows_total} senza venduto attribuito</b>{" "}
+              ({data.takes_quality.rows_no_takes} senza alcuna vendita registrata in CreatorsPro). Pagato e scaglioni restano corretti:
+              manca il venduto per turno alla fonte, tipico dei team condivisi. Va sistemato in CreatorsPro, non è un errore dell&apos;app.
+            </Notice>
           )}
 
-          {/* Inventario profili: OGNI profilo usato sul creator coi SUOI scaglioni */}
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
-              <SectionLabel>Profili usati nel mese:</SectionLabel>
-              <span style={{ fontSize: 11, color: CP.textMuted }}>
-                {data.phase_b?.mismatches === 0 ? `✓ 0 mismatch` : `⚠ ${data.phase_b?.mismatches} fuori scaglione`}
-                {grid.cosellerFlags.size > 0 && ` · ⚠ ${grid.cosellerFlags.size} cosellers incoerenti`}
-                {grid.wrongCreatorFlags.size > 0 && ` · ⚠ ${grid.wrongCreatorFlags.size} profili di altro creator`}
-              </span>
-            </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {(data.profiles_inventory || []).map((p) => (
-                <div key={p.name} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "5px 10px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 11 }}>
-                  <b style={{ whiteSpace: "nowrap" }}>{p.name}</b>
-                  <span style={{ fontSize: 9, color: CP.textMuted, fontFamily: FONTS.mono }}>{p.cosellers_count ?? "?"}× · {p.shifts}t · {fmt$(p.sales)}</span>
-                  <span style={{ display: "inline-flex", gap: 4 }}>
-                    {(p.thresholds || []).map((t, i) => (
-                      <span key={i} style={{ padding: "1px 6px", borderRadius: 4, background: grid.colorOf(t.percentage) + "22", border: `1px solid ${grid.colorOf(t.percentage)}55`, color: grid.colorOf(t.percentage), fontSize: 10, fontWeight: 700, fontFamily: FONTS.mono, whiteSpace: "nowrap" }}>
-                        {t.threshold > 0 ? `≥${fmt$(t.threshold)}` : "base"}→{fmtPct(t.percentage)}
-                      </span>
-                    ))}
+          {/* Controlli: prima le anomalie, poi il riepilogo */}
+          {(() => {
+            const mism = data.phase_b?.mismatches || 0;
+            const issues = [
+              mism ? `${mism} turni pagati fuori scaglione` : null,
+              grid.cosellerFlags.size ? `${grid.cosellerFlags.size} turni con numero di persone diverso dal profilo` : null,
+              grid.wrongCreatorFlags.size ? `${grid.wrongCreatorFlags.size} turni con il profilo di un'altra creator` : null,
+            ].filter(Boolean);
+            return issues.length ? (
+              <Notice danger>
+                <b>Da controllare:</b> {issues.join(" · ")}. Nella griglia li trovi col triangolo rosso.
+              </Notice>
+            ) : (
+              <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 16 }}>Nessuna anomalia: tutti i turni sono pagati secondo il loro scaglione.</div>
+            );
+          })()}
+
+          {/* Profili di pagamento usati: testo semplice, niente etichette colorate */}
+          <section style={{ marginBottom: 20 }}>
+            <h2 style={h2}>Profili di pagamento usati nel mese</h2>
+            <div style={{ border: `1px solid ${CP.border}`, borderRadius: 10, overflow: "hidden" }}>
+              {(data.profiles_inventory || []).map((p, i) => (
+                <div key={p.name} style={{ display: "flex", gap: 16, alignItems: "baseline", flexWrap: "wrap", padding: "10px 14px", borderTop: i ? `1px solid ${CP.borderSoft}` : "none", fontSize: 13 }}>
+                  <span style={{ flex: "1 1 220px", color: CP.textPrimary }}>{p.name}</span>
+                  <span style={{ color: CP.textMuted, ...NUM, minWidth: 190 }}>{p.cosellers_count ?? "?"} {p.cosellers_count === 1 ? "persona" : "persone"} · {p.shifts} turni · {fmt$(p.sales)}</span>
+                  <span style={{ color: CP.textSecondary, ...NUM }}>
+                    {(p.thresholds || []).map((t) => `${t.threshold > 0 ? `da ${fmt$(t.threshold)}` : "base"} ${fmtPct(t.percentage)}`).join("  ·  ")}
                   </span>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
 
-          {/* Griglia */}
-          {/* Calibrazione: toggle vista reale/simulata + distribuzione per scaglione */}
+          {/* Distribuzione per scaglione: una barra proporzionale (si confronta a colpo d'occhio) */}
           {tierDist && (
-            <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
-              {sim && simChanged && (
-                <div style={{ display: "flex", gap: 4, padding: 3, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8 }}>
-                  {[["real", "Scaglioni reali"], ["sim", "Simulati"]].map(([v, lab]) => (
-                    <button
-                      key={v}
-                      onClick={() => setGridSim(v === "sim")}
-                      style={{
-                        padding: "5px 12px", borderRadius: 6, border: "none", cursor: "pointer",
-                        background: (gridSim ? "sim" : "real") === v ? CP.surfaceAlt : "transparent",
-                        color: (gridSim ? "sim" : "real") === v ? (v === "sim" ? CP.accent : CP.textPrimary) : CP.textMuted,
-                        fontSize: 12, fontWeight: 500, fontFamily: FONTS.body,
-                      }}
-                    >
-                      {lab}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                <span style={{ fontSize: 11, color: CP.textMuted }}>Turni per scaglione{simChanged ? " (reale → sim)" : ""}:</span>
-                {tierDist.map(({ pct, real, sim: simCount }) => {
-                  const col = grid.colorOf(pct);
-                  const delta = simCount - real;
-                  return (
-                    <span key={pct} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", background: col + "16", border: `1px solid ${col}50`, borderRadius: 6, fontSize: 11, fontFamily: FONTS.mono }}>
-                      <span style={{ width: 7, height: 7, borderRadius: 2, background: col }} />
-                      <b style={{ color: col }}>{fmtPct(pct)}</b>
-                      <span style={{ color: CP.textSecondary }}>{real}t</span>
-                      {simChanged && (
-                        <>
-                          <span style={{ color: CP.textMuted }}>→</span>
-                          <b style={{ color: col }}>{simCount}t</b>
-                          {delta !== 0 && <span style={{ color: delta > 0 ? CP.accentGreen : CP.accentRed, fontSize: 10 }}>({delta > 0 ? "+" : ""}{delta})</span>}
-                        </>
-                      )}
-                    </span>
-                  );
-                })}
+            <section style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+                <h2 style={{ ...h2, margin: 0 }}>Turni per scaglione</h2>
+                {sim && simChanged && (
+                  <div style={{ display: "flex", gap: 4, padding: 3, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8 }}>
+                    {[["real", "Reali"], ["sim", "Simulati"]].map(([v, lab]) => (
+                      <button key={v} onClick={() => setGridSim(v === "sim")}
+                        style={{ padding: "5px 12px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontFamily: FONTS.body,
+                          background: (gridSim ? "sim" : "real") === v ? CP.surfaceAlt : "transparent",
+                          color: (gridSim ? "sim" : "real") === v ? CP.textPrimary : CP.textMuted }}>
+                        {lab}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              {gridSim && (
-                <span style={{ fontSize: 11, color: CP.accent, fontStyle: "italic" }}>
-                  La griglia mostra i colori SIMULATI — tutto su un colore solo = soglie da ricalibrare
-                </span>
-              )}
-            </div>
+              {(() => {
+                const tot = tierDist.reduce((a, t) => a + (gridSim ? t.sim : t.real), 0) || 1;
+                return (
+                  <>
+                    <div style={{ display: "flex", height: 10, borderRadius: 5, overflow: "hidden", background: CP.surface, maxWidth: 720 }}>
+                      {tierDist.map((t) => {
+                        const v = gridSim ? t.sim : t.real;
+                        return v ? <div key={t.pct} title={`${fmtPct(t.pct)}: ${v} turni`} style={{ width: `${(v / tot) * 100}%`, background: grid.colorOf(t.pct) }} /> : null;
+                      })}
+                    </div>
+                    <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginTop: 8, fontSize: 13, color: CP.textSecondary, ...NUM }}>
+                      {tierDist.map((t) => {
+                        const delta = t.sim - t.real;
+                        return (
+                          <span key={t.pct} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: 2, background: grid.colorOf(t.pct) }} />
+                            <span style={{ color: CP.textPrimary }}>{fmtPct(t.pct)}</span> {t.real} turni
+                            {simChanged && delta !== 0 && <span style={{ color: CP.textMuted }}>→ {t.sim} ({delta > 0 ? "+" : ""}{delta})</span>}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </>
+                );
+              })()}
+              {gridSim && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 6 }}>La griglia mostra gli scaglioni simulati. Se quasi tutto finisce nello stesso scaglione, le soglie vanno ricalibrate.</div>}
+            </section>
           )}
 
-          <CpCard padding="0" style={{ overflow: "hidden", marginBottom: 22, border: gridSim ? `1px solid ${CP.accent}55` : undefined }}>
-            <div style={{ overflowX: "auto", maxHeight: 600, overflowY: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+          {/* Griglia: righe sottili, niente scatole; il colore solo nella barretta dello scaglione */}
+          <div style={{ border: `1px solid ${gridSim ? CP.accent + "66" : CP.border}`, borderRadius: 10, overflow: "hidden", marginBottom: 28 }}>
+            <div style={{ overflowX: "auto", maxHeight: 640, overflowY: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ position: "sticky", top: 0, zIndex: 3 }}>
-                    <th style={{ ...th, position: "sticky", left: 0, zIndex: 4, minWidth: 64 }}>Giorno</th>
-                    {grid.columns.map((c) => <th key={c} style={{ ...th, minWidth: 138 }}>{c}</th>)}
-                    <th style={{ ...th, textAlign: "right", minWidth: 78 }}>Tot</th>
+                    <th style={{ ...th, position: "sticky", left: 0, zIndex: 4, minWidth: 72 }}>Giorno</th>
+                    {grid.columns.map((c) => <th key={c} style={{ ...th, minWidth: 170 }}>{c.replace("–", " – ")}</th>)}
+                    <th style={{ ...th, textAlign: "right", minWidth: 90 }}>Totale</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -504,178 +498,134 @@ export default function CompCalendarPage() {
                     const dt = grid.dayTotals[d.date];
                     const weekend = d.dow === "Sab" || d.dow === "Dom";
                     return (
-                      <tr key={d.date} style={{ borderBottom: `1px solid ${CP.border}55`, background: weekend ? CP.surfaceAlt + "44" : "transparent" }}>
-                        <td style={{ ...td, position: "sticky", left: 0, background: CP.surface, fontFamily: FONTS.mono, fontSize: 10, whiteSpace: "nowrap", color: weekend ? "#b9aef9" : CP.textSecondary, zIndex: 1 }}>
-                          {d.dow} {d.dayNum}
+                      <tr key={d.date} style={{ borderTop: `1px solid ${CP.borderSoft}`, background: weekend ? "rgba(255,255,255,0.018)" : "transparent" }}>
+                        <td style={{ ...td, position: "sticky", left: 0, background: CP.bg, whiteSpace: "nowrap", color: CP.textSecondary, zIndex: 1 }}>
+                          <span style={{ color: weekend ? CP.textPrimary : CP.textSecondary }}>{d.dow}</span> <span style={NUM}>{d.dayNum}</span>
                         </td>
                         {grid.columns.map((c) => {
                           const cell = grid.cellMap[`${d.date}|${c}`] || [];
-                          if (cell.length === 0) return <td key={c} style={{ ...td, color: CP.border, textAlign: "center", fontSize: 9 }}>·</td>;
+                          if (cell.length === 0) return <td key={c} style={{ ...td, color: CP.textMuted }}>—</td>;
                           return (
-                            <td key={c} style={{ ...td, padding: "3px 5px" }}>
+                            <td key={c} style={td}>
                               {cell.map((r) => {
-                                // Vista simulata: il chip si colora col tier SIMULATO del turno
                                 const simPct = gridSim && simPctById ? simPctById.get(r.shift_id) : null;
                                 const dispPct = simPct ?? r.expected_pct;
                                 const tierChanged = simPct != null && r.expected_pct != null && Math.abs(simPct - r.expected_pct) > 0.0001;
-                                const col = grid.colorOf(dispPct);
                                 const mismatch = !gridSim && r.delta_pct != null && Math.abs(r.delta_pct) > 0.005;
                                 const flag = mismatch || (!gridSim && (grid.cosellerFlags.has(r.shift_id) || grid.wrongCreatorFlags.has(r.shift_id)));
                                 return (
-                                  <div
-                                    key={r.shift_id}
-                                    title={`${r.operator} · ${r.start}–${r.end}\nVenduto ${fmt$(r.sales_on_creator)} · pagato ${fmt$(r.earnings_attr)} (${fmtPct(r.eff_pct, 1)})\nProfilo "${r.profile_name || "?"}" (${r.profile_cosellers ?? "?"} cos.)${simPct != null ? `\nSim: ${fmtPct(simPct)} (reale ${fmtPct(r.expected_pct)})${tierChanged ? " — CAMBIA SCAGLIONE" : ""}` : ""}${mismatch ? "\n⚠ FUORI SCAGLIONE" : ""}${grid.cosellerFlags.has(r.shift_id) ? "\n⚠ cosellers incoerenti" : ""}${grid.wrongCreatorFlags.has(r.shift_id) ? "\n⚠ profilo di altro creator" : ""}`}
-                                    style={{
-                                      display: "flex", justifyContent: "space-between", alignItems: "center", gap: 4,
-                                      padding: "2px 6px", marginBottom: 2, borderRadius: 4,
-                                      background: mismatch ? CP.accentRed + "30" : col + "16",
-                                      border: `1px ${tierChanged ? "dashed" : "solid"} ${mismatch ? CP.accentRed : col}${tierChanged ? "" : "50"}`,
-                                      fontSize: 10, cursor: "default",
-                                    }}
-                                  >
-                                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 70 }}>
-                                      {flag && <AlertTriangle size={8} style={{ display: "inline", marginRight: 2, color: CP.accentRed }} />}
+                                  <div key={r.shift_id}
+                                    title={`${r.operator} · ${r.start}–${r.end}\nVenduto ${fmt$(r.sales_on_creator)} · pagato ${fmt$(r.earnings_attr)} (${fmtPct(r.eff_pct, 1)})\nProfilo "${r.profile_name || "?"}" (${r.profile_cosellers ?? "?"} persone)${simPct != null ? `\nSimulato: ${fmtPct(simPct)} (reale ${fmtPct(r.expected_pct)})${tierChanged ? " — cambia scaglione" : ""}` : ""}${mismatch ? "\nPagato fuori scaglione" : ""}${grid.cosellerFlags.has(r.shift_id) ? "\nNumero di persone diverso dal profilo" : ""}${grid.wrongCreatorFlags.has(r.shift_id) ? "\nProfilo di un'altra creator" : ""}`}
+                                    style={{ display: "grid", gridTemplateColumns: "3px 1fr auto auto", alignItems: "center", columnGap: 8, padding: "3px 0", cursor: "default" }}>
+                                    <span style={{ width: 3, height: 14, borderRadius: 2, background: grid.colorOf(dispPct), outline: tierChanged ? `1px solid ${CP.textPrimary}` : "none" }} />
+                                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: flag ? CP.accentRed : CP.textSecondary }}>
+                                      {flag && <AlertTriangle size={11} style={{ display: "inline", marginRight: 4, verticalAlign: "-1px" }} />}
                                       {r.operator.split(" ")[0]}
                                     </span>
-                                    <span style={{ fontFamily: FONTS.mono, fontWeight: 500, color: col, whiteSpace: "nowrap", fontSize: 9.5 }}>
-                                      {fmt$(r.sales_on_creator)}·{fmtPct(dispPct)}
-                                    </span>
+                                    <span style={{ ...NUM, color: CP.textPrimary, textAlign: "right" }}>{fmt$(r.sales_on_creator)}</span>
+                                    <span style={{ ...NUM, color: CP.textMuted, fontSize: 12, minWidth: 30, textAlign: "right" }}>{fmtPct(dispPct)}</span>
                                   </div>
                                 );
                               })}
                             </td>
                           );
                         })}
-                        <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 600, fontSize: 10, color: dt ? CP.accentGreen : CP.border }}>
-                          {dt ? fmt$(dt.sales) : "·"}
+                        <td style={{ ...td, textAlign: "right", ...NUM, color: dt ? CP.textPrimary : CP.textMuted, fontWeight: 500 }}>
+                          {dt ? fmt$(dt.sales) : "—"}
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
                 <tfoot>
-                  <tr style={{ borderTop: `2px solid ${CP.border}`, background: CP.surfaceAlt, position: "sticky", bottom: 0 }}>
-                    <td style={{ ...td, fontFamily: FONTS.mono, fontWeight: 700, fontSize: 10, position: "sticky", left: 0, background: CP.surfaceAlt }}>TOT</td>
+                  <tr style={{ borderTop: `1px solid ${CP.border}`, background: CP.surface, position: "sticky", bottom: 0 }}>
+                    <td style={{ ...td, fontWeight: 500, position: "sticky", left: 0, background: CP.surface }}>Totale</td>
                     {grid.columns.map((c) => {
                       const t = grid.colTotals[c];
                       return (
-                        <td key={c} style={{ ...td, fontFamily: FONTS.mono, fontSize: 10 }}>
-                          <span style={{ color: CP.accentGreen, fontWeight: 700 }}>{fmt$(t.sales)}</span>
-                          <span style={{ color: CP.textMuted }}> ·{t.count}t</span>
+                        <td key={c} style={{ ...td, ...NUM }}>
+                          <span style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmt$(t.sales)}</span>
+                          <span style={{ color: CP.textMuted }}> · {t.count} turni</span>
                         </td>
                       );
                     })}
-                    <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, fontSize: 10, color: CP.accentGreen }}>
-                      {fmt$(grid.totSales)}
-                    </td>
+                    <td style={{ ...td, textAlign: "right", ...NUM, fontWeight: 500 }}>{fmt$(grid.totSales)}</td>
                   </tr>
                 </tfoot>
               </table>
             </div>
-          </CpCard>
+          </div>
 
           {/* ===== Simulatore ===== */}
-          <SectionLabel style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <FlaskConical size={13} /> Simulatore — profilo pagamento alternativo sui turni chiusi
-          </SectionLabel>
-          <CpCard accent={simChanged ? CP.accent : undefined} padding="18px 22px" style={{ marginBottom: 22 }}>
+          <h2 style={{ ...h2, display: "flex", alignItems: "center", gap: 8 }}>
+            <FlaskConical size={15} color={CP.textMuted} /> Simulatore: e se gli scaglioni fossero diversi?
+          </h2>
+          <CpCard accent={simChanged ? CP.accent : undefined} padding="18px 22px" style={{ marginBottom: 28 }}>
             {simByClass && (
               <>
-                {/* Un set di scaglioni PER OGNI classe cosellers — il match vero:
-                    Solo/Coppia/Triplo hanno profili propri, si simulano separati */}
                 {Object.keys(simByClass).map(Number).sort((a, b) => a - b).map((cls) => {
                   const tiers = simByClass[cls];
                   const setTiers = (next) => setSimByClass({ ...simByClass, [cls]: next });
-                  const clsLabel = cls === 1 ? "Solo (1×)" : cls === 2 ? "Coppia (2×)" : cls === 3 ? "Triplo (3×)" : `${cls}×`;
+                  const clsLabel = cls === 1 ? "Da solo" : cls === 2 ? "In coppia" : cls === 3 ? "In tre" : `In ${cls}`;
                   return (
-                    <div key={cls} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 12, paddingBottom: 12, borderBottom: `1px dashed ${CP.border}` }}>
-                      <div style={{ minWidth: 92, fontSize: 12, fontWeight: 700, color: CP.accent, paddingBottom: 9, fontFamily: FONTS.mono }}>{clsLabel}</div>
+                    <div key={cls} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${CP.borderSoft}` }}>
+                      <div style={{ minWidth: 92, fontSize: 13, color: CP.textPrimary, paddingBottom: 10 }}>{clsLabel}</div>
                       {tiers.map((t, i) => (
                         <div key={i} style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
                           <div>
-                            <label style={lbl}>{i === 0 ? "Base (da $)" : `Soglia ${i + 1}`}</label>
-                            <input
-                              type="number"
-                              value={t.threshold}
-                              disabled={i === 0}
+                            <label style={lbl}>{i === 0 ? "Base, da $" : `Soglia ${i + 1}, da $`}</label>
+                            <input type="number" value={t.threshold} disabled={i === 0}
                               onChange={(e) => setTiers(tiers.map((x, j) => j === i ? { ...x, threshold: e.target.value === "" ? "" : Number(e.target.value) } : x))}
-                              style={{ ...input, width: 92, opacity: i === 0 ? 0.5 : 1 }}
-                            />
+                              style={{ ...input, width: 96, opacity: i === 0 ? 0.5 : 1, ...NUM }} />
                           </div>
                           <div>
                             <label style={lbl}>%</label>
-                            <input
-                              type="number" step="0.5"
-                              value={t.percentage === "" ? "" : Math.round(Number(t.percentage) * 1000) / 10}
+                            <input type="number" step="0.5" value={t.percentage === "" ? "" : Math.round(Number(t.percentage) * 1000) / 10}
                               onChange={(e) => setTiers(tiers.map((x, j) => j === i ? { ...x, percentage: e.target.value === "" ? "" : Number(e.target.value) / 100 } : x))}
-                              style={{ ...input, width: 66 }}
-                            />
+                              style={{ ...input, width: 68, ...NUM }} />
                           </div>
-                          {i > 0 && (
-                            <button onClick={() => setTiers(tiers.filter((_, j) => j !== i))} title="Rimuovi scaglione" style={iconBtn}>
-                              <X size={13} />
-                            </button>
-                          )}
+                          {i > 0 && <button onClick={() => setTiers(tiers.filter((_, j) => j !== i))} title="Rimuovi scaglione" aria-label="Rimuovi scaglione" style={iconBtn}><X size={13} /></button>}
                         </div>
                       ))}
-                      <button
-                        onClick={() => setTiers([...tiers, { threshold: (Number(tiers[tiers.length - 1]?.threshold) || 0) + 500, percentage: (Number(tiers[tiers.length - 1]?.percentage) || 0.1) + 0.02 }])}
-                        title="Aggiungi scaglione" style={iconBtn}
-                      >
-                        <Plus size={13} />
-                      </button>
+                      <button onClick={() => setTiers([...tiers, { threshold: (Number(tiers[tiers.length - 1]?.threshold) || 0) + 500, percentage: (Number(tiers[tiers.length - 1]?.percentage) || 0.1) + 0.02 }])}
+                        title="Aggiungi scaglione" aria-label="Aggiungi scaglione" style={iconBtn}><Plus size={13} /></button>
                     </div>
                   );
                 })}
-                <div style={{ marginBottom: 14 }}>
-                  <button
-                    onClick={() => setSimByClass(origByClass ? JSON.parse(JSON.stringify(origByClass)) : null)}
-                    title="Reset agli scaglioni reali" style={{ ...iconBtn, color: CP.textSecondary }}
-                  >
-                    <RotateCcw size={13} /> <span style={{ marginLeft: 6, fontSize: 12 }}>Reset ai profili reali</span>
+                <div style={{ marginBottom: 16 }}>
+                  <button onClick={() => setSimByClass(origByClass ? JSON.parse(JSON.stringify(origByClass)) : null)} style={ghostBtn}>
+                    <RotateCcw size={13} /> Torna agli scaglioni reali
                   </button>
                 </div>
 
                 {sim && (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-                    <StatCard label="Pagato REALE" value={fmt$(grid.totEarn)} color="#b9aef9" />
-                    <StatCard label="Pagato SIMULATO" value={fmt$(sim.total)} color={CP.accent} />
-                    <StatCard
-                      label="Δ per gli operatori"
-                      value={`${sim.delta >= 0 ? "+" : ""}${fmt$(sim.delta)}`}
-                      color={sim.delta > 0 ? CP.accentRed : CP.accentGreen}
-                      sub={grid.totEarn > 0 ? `${sim.delta >= 0 ? "+" : ""}${(100 * sim.delta / grid.totEarn).toFixed(1)}% vs reale` : null}
-                    />
-                    <StatCard
-                      label="Margine creator post-sim"
-                      value={grid.totSales > 0 ? fmtPct((grid.totSales - sim.total) / grid.totSales, 1) : "—"}
-                      sub={`reale: ${grid.totSales > 0 ? fmtPct((grid.totSales - grid.totEarn) / grid.totSales, 1) : "—"}`}
-                    />
+                    <StatCard label="Pagato davvero" value={fmt$(grid.totEarn)} />
+                    <StatCard label="Pagato con la simulazione" value={fmt$(sim.total)} />
+                    <StatCard label="Differenza per gli operatori" value={`${sim.delta >= 0 ? "+" : ""}${fmt$(sim.delta)}`}
+                      color={sim.delta === 0 ? undefined : sim.delta > 0 ? CP.accentRed : CP.accentGreen}
+                      sub={grid.totEarn > 0 ? `${sim.delta >= 0 ? "+" : ""}${(100 * sim.delta / grid.totEarn).toFixed(1)}% rispetto al reale` : null} />
+                    <StatCard label="Margine sul venduto" value={grid.totSales > 0 ? fmtPct((grid.totSales - sim.total) / grid.totSales, 1) : "—"}
+                      sub={`oggi: ${grid.totSales > 0 ? fmtPct((grid.totSales - grid.totEarn) / grid.totSales, 1) : "—"}`} />
                   </div>
                 )}
                 {!simChanged && (
-                  <div style={{ marginTop: 10, fontSize: 11, color: CP.textMuted, fontStyle: "italic" }}>
-                    Scaglioni = quelli reali del creator. Modifica soglie o % qui sopra per simulare un profilo diverso — il confronto si aggiorna in tempo reale sui {grid.rows.length} turni chiusi del mese.
+                  <div style={{ marginTop: 12, fontSize: 13, color: CP.textMuted }}>
+                    Qui sopra ci sono gli scaglioni reali. Cambia una soglia o una percentuale: il confronto si aggiorna subito sui {grid.rows.length} turni del mese.
                   </div>
                 )}
 
-                {/* Dettaglio turno per turno: reale vs simulato */}
                 {sim && (
-                  <div style={{ marginTop: 18 }}>
+                  <div style={{ marginTop: 20 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
-                      <SectionLabel>Tutti i turni · reale vs simulato ({sim.simRows.length})</SectionLabel>
-                      <label style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12, color: CP.textSecondary, cursor: "pointer" }}>
-                        <input
-                          type="checkbox"
-                          checked={showOnlyChanged}
-                          onChange={(e) => setShowOnlyChanged(e.target.checked)}
-                          style={{ accentColor: CP.accent }}
-                        />
-                        Solo turni che cambiano scaglione ({sim.changedCount})
+                      <h3 style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>Turno per turno: reale e simulato ({sim.simRows.length})</h3>
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, color: CP.textSecondary, cursor: "pointer" }}>
+                        <input type="checkbox" checked={showOnlyChanged} onChange={(e) => setShowOnlyChanged(e.target.checked)} style={{ accentColor: CP.accent }} />
+                        Solo i turni che cambiano scaglione ({sim.changedCount})
                       </label>
                     </div>
                     <div style={{ overflowX: "auto", maxHeight: 420, overflowY: "auto", border: `1px solid ${CP.border}`, borderRadius: 8 }}>
-                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                         <thead>
                           <tr style={{ position: "sticky", top: 0, zIndex: 1 }}>
                             <th style={th}>Data</th>
@@ -684,33 +634,29 @@ export default function CompCalendarPage() {
                             <th style={{ ...th, textAlign: "right" }}>Venduto</th>
                             <th style={{ ...th, textAlign: "right" }}>% reale</th>
                             <th style={{ ...th, textAlign: "right" }}>Pagato reale</th>
-                            <th style={{ ...th, textAlign: "right" }}>% sim</th>
-                            <th style={{ ...th, textAlign: "right" }}>Pagato sim</th>
-                            <th style={{ ...th, textAlign: "right" }}>Δ turno</th>
+                            <th style={{ ...th, textAlign: "right" }}>% simulata</th>
+                            <th style={{ ...th, textAlign: "right" }}>Pagato simulato</th>
+                            <th style={{ ...th, textAlign: "right" }}>Differenza</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {sim.simRows
-                            .filter((r) => !showOnlyChanged || r.bracket_changed)
-                            .map((r) => (
-                              <tr key={r.shift_id} style={{ borderBottom: `1px solid ${CP.border}44`, background: r.bracket_changed ? "#8b7cf618" : "transparent" }}>
-                                <td style={{ ...td, fontFamily: FONTS.mono }}>{r.date.slice(5)}</td>
-                                <td style={{ ...td, fontFamily: FONTS.mono, color: CP.textSecondary }}>{r.start}–{r.end}</td>
-                                <td style={td}>{r.operator}</td>
-                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmt$(r.sales_on_creator)}</td>
-                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: grid.colorOf(r.expected_pct) }}>{fmtPct(r.expected_pct ?? r.eff_pct)}</td>
-                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#b9aef9" }}>{fmt$(r.earnings_attr)}</td>
-                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: r.bracket_changed ? CP.accent : CP.textSecondary }}>{fmtPct(r.sim_pct)}</td>
-                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accent }}>{fmt$(r.sim_earn)}</td>
-                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: Math.abs(r.row_delta) < 0.5 ? CP.textMuted : r.row_delta > 0 ? CP.accentRed : CP.accentGreen }}>
-                                  {Math.abs(r.row_delta) < 0.5 ? "=" : `${r.row_delta > 0 ? "+" : ""}${fmt$(r.row_delta)}`}
-                                </td>
-                              </tr>
-                            ))}
+                          {sim.simRows.filter((r) => !showOnlyChanged || r.bracket_changed).map((r) => (
+                            <tr key={r.shift_id} style={{ borderTop: `1px solid ${CP.borderSoft}`, background: r.bracket_changed ? CP.accentSoft + "55" : "transparent" }}>
+                              <td style={{ ...td, ...NUM, color: CP.textSecondary }}>{r.date.slice(8)}/{r.date.slice(5, 7)}</td>
+                              <td style={{ ...td, ...NUM, color: CP.textSecondary }}>{r.start}–{r.end}</td>
+                              <td style={td}>{r.operator}</td>
+                              <td style={{ ...td, ...NUM, textAlign: "right" }}>{fmt$(r.sales_on_creator)}</td>
+                              <td style={{ ...td, ...NUM, textAlign: "right", color: CP.textSecondary }}>{fmtPct(r.expected_pct ?? r.eff_pct)}</td>
+                              <td style={{ ...td, ...NUM, textAlign: "right", color: CP.textSecondary }}>{fmt$(r.earnings_attr)}</td>
+                              <td style={{ ...td, ...NUM, textAlign: "right", color: r.bracket_changed ? CP.textPrimary : CP.textSecondary, fontWeight: r.bracket_changed ? 500 : 400 }}>{fmtPct(r.sim_pct)}</td>
+                              <td style={{ ...td, ...NUM, textAlign: "right" }}>{fmt$(r.sim_earn)}</td>
+                              <td style={{ ...td, ...NUM, textAlign: "right", color: Math.abs(r.row_delta) < 0.5 ? CP.textMuted : r.row_delta > 0 ? CP.accentRed : CP.accentGreen }}>
+                                {Math.abs(r.row_delta) < 0.5 ? "—" : `${r.row_delta > 0 ? "+" : ""}${fmt$(r.row_delta)}`}
+                              </td>
+                            </tr>
+                          ))}
                           {showOnlyChanged && sim.changedCount === 0 && (
-                            <tr><td colSpan={9} style={{ ...td, textAlign: "center", color: CP.textMuted, fontStyle: "italic", padding: 18 }}>
-                              Nessun turno cambia scaglione con queste soglie.
-                            </td></tr>
+                            <tr><td colSpan={9} style={{ ...td, textAlign: "center", color: CP.textMuted, padding: 18 }}>Nessun turno cambia scaglione con queste soglie.</td></tr>
                           )}
                         </tbody>
                       </table>
@@ -721,19 +667,19 @@ export default function CompCalendarPage() {
             )}
           </CpCard>
 
-          {/* Per operatore: reale + simulato */}
-          <SectionLabel style={{ display: "block", marginBottom: 10 }}>Per operatore · pagato reale {simChanged ? "vs simulato" : ""}</SectionLabel>
-          <CpCard padding="0" style={{ overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          {/* Per operatore */}
+          <h2 style={h2}>Per operatore{simChanged ? ": reale e simulato" : ""}</h2>
+          <div style={{ border: `1px solid ${CP.border}`, borderRadius: 10, overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
-                <tr style={{ background: CP.surfaceAlt, borderBottom: `2px solid ${CP.border}` }}>
+                <tr>
                   <th style={th}>Operatore</th>
                   <th style={{ ...th, textAlign: "right" }}>Turni</th>
                   <th style={{ ...th, textAlign: "right" }}>Venduto</th>
-                  <th style={{ ...th, textAlign: "right" }}>Pagato (attr.)</th>
+                  <th style={{ ...th, textAlign: "right" }}>Pagato</th>
                   {simChanged && <th style={{ ...th, textAlign: "right" }}>Simulato</th>}
-                  {simChanged && <th style={{ ...th, textAlign: "right" }}>Δ</th>}
-                  <th style={th}>Mix scaglioni</th>
+                  {simChanged && <th style={{ ...th, textAlign: "right" }}>Differenza</th>}
+                  <th style={th}>Turni per scaglione</th>
                 </tr>
               </thead>
               <tbody>
@@ -741,49 +687,60 @@ export default function CompCalendarPage() {
                   const simEarn = sim?.opSim?.[o.name];
                   const delta = simEarn != null ? simEarn - o.earn : null;
                   return (
-                    <tr key={o.name} style={{ borderBottom: `1px solid ${CP.border}55` }}>
-                      <td style={{ ...td, fontWeight: 600 }}>{o.name}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono }}>{o.turni}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmt$(o.sales)}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#b9aef9" }}>{fmt$(o.earn)}</td>
-                      {simChanged && <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accent }}>{simEarn != null ? fmt$(simEarn) : "—"}</td>}
+                    <tr key={o.name} style={{ borderTop: `1px solid ${CP.borderSoft}` }}>
+                      <td style={{ ...td, color: CP.textPrimary }}>{o.name}</td>
+                      <td style={{ ...td, ...NUM, textAlign: "right", color: CP.textSecondary }}>{o.turni}</td>
+                      <td style={{ ...td, ...NUM, textAlign: "right" }}>{fmt$(o.sales)}</td>
+                      <td style={{ ...td, ...NUM, textAlign: "right" }}>{fmt$(o.earn)}</td>
+                      {simChanged && <td style={{ ...td, ...NUM, textAlign: "right" }}>{simEarn != null ? fmt$(simEarn) : "—"}</td>}
                       {simChanged && (
-                        <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: delta == null ? CP.textMuted : delta > 0 ? CP.accentRed : CP.accentGreen }}>
+                        <td style={{ ...td, ...NUM, textAlign: "right", color: delta == null || Math.abs(delta) < 0.5 ? CP.textMuted : delta > 0 ? CP.accentRed : CP.accentGreen }}>
                           {delta != null ? `${delta >= 0 ? "+" : ""}${fmt$(delta)}` : "—"}
                         </td>
                       )}
-                      <td style={td}>
-                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                          {Object.entries(o.byPct).sort(([a], [b]) => parseFloat(a) - parseFloat(b)).map(([pct, count]) => (
-                            <span key={pct} style={{ padding: "1px 6px", borderRadius: 4, background: grid.colorOf(parseFloat(pct)) + "22", color: grid.colorOf(parseFloat(pct)), fontSize: 10, fontWeight: 700, fontFamily: FONTS.mono }}>
-                              {count}×{fmtPct(parseFloat(pct))}
-                            </span>
-                          ))}
-                        </div>
+                      <td style={{ ...td, ...NUM, color: CP.textSecondary }}>
+                        {Object.entries(o.byPct).sort(([a], [b]) => parseFloat(a) - parseFloat(b)).map(([pct, count]) => (
+                          <span key={pct} style={{ display: "inline-flex", alignItems: "center", gap: 5, marginRight: 14 }}>
+                            <span style={{ width: 3, height: 12, borderRadius: 2, background: grid.colorOf(parseFloat(pct)) }} />
+                            {count} a {fmtPct(parseFloat(pct))}
+                          </span>
+                        ))}
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-          </CpCard>
+          </div>
         </>
       )}
     </div>
   );
 }
 
-const lbl = { display: "block", fontSize: 10, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
-const input = { width: "100%", padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
-const th = { padding: "8px 9px", textAlign: "left", fontSize: 9.5, fontWeight: 700, color: CP.textMuted, letterSpacing: 0.5, fontFamily: FONTS.mono, whiteSpace: "nowrap", background: CP.surfaceAlt };
-const td = { padding: "5px 8px", verticalAlign: "top" };
-const iconBtn = { padding: "9px 10px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, cursor: "pointer", display: "inline-flex", alignItems: "center" };
+// Avviso: testo leggibile su superficie neutra; rosso solo nel bordo se è un problema.
+function Notice({ children, danger }) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "12px 14px", marginBottom: 16, borderRadius: 10, background: CP.surface, border: `1px solid ${CP.border}`, borderLeft: `3px solid ${danger ? CP.accentRed : CP.textMuted}`, fontSize: 13, lineHeight: 1.55, color: CP.textSecondary }}>
+      <AlertTriangle size={15} color={danger ? CP.accentRed : CP.textMuted} style={{ flexShrink: 0, marginTop: 2 }} />
+      <div>{children}</div>
+    </div>
+  );
+}
+
+const h2 = { fontSize: 15, fontWeight: 500, color: CP.textPrimary, margin: "0 0 10px" };
+const lbl = { display: "block", fontSize: 12, color: CP.textSecondary, fontWeight: 500, marginBottom: 6, fontFamily: FONTS.body };
+const input = { width: "100%", padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, outline: "none" };
+const th = { padding: "10px 12px", textAlign: "left", fontSize: 12, fontWeight: 500, color: CP.textMuted, fontFamily: FONTS.body, whiteSpace: "nowrap", background: CP.surface, borderBottom: `1px solid ${CP.border}` };
+const td = { padding: "6px 12px", verticalAlign: "top" };
+const iconBtn = { padding: "9px 10px", background: "transparent", border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textSecondary, cursor: "pointer", display: "inline-flex", alignItems: "center" };
+const ghostBtn = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 14px", background: "transparent", border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textSecondary, fontSize: 13, fontFamily: FONTS.body, cursor: "pointer", textDecoration: "none" };
 const primaryBtn = (disabled) => ({
   display: "inline-flex", alignItems: "center", gap: 8,
   padding: "10px 16px",
   background: disabled ? CP.surfaceAlt : CP.accent,
   color: disabled ? CP.textMuted : CP.accentInk,
   border: "none", borderRadius: 8,
-  fontSize: 13, fontWeight: 700, fontFamily: FONTS.body,
+  fontSize: 14, fontWeight: 500, fontFamily: FONTS.body,
   cursor: disabled ? "not-allowed" : "pointer",
 });
