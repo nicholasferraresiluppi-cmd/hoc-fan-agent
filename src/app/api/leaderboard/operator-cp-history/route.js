@@ -19,6 +19,7 @@
  * Auth: qualsiasi utente loggato.
  */
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
+import { resolveEmployeeForUser, normalizeName } from "@/lib/me";
 import { kv } from "@vercel/kv";
 import { buildCreatorMatrix } from "@/lib/creator-aggregates";
 import { getWages } from "@/lib/cp-wages-store";
@@ -41,11 +42,20 @@ function monthsBetween(startId, endId) {
 }
 
 export async function GET(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
-  if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
-
   const url = new URL(request.url);
   const employee = url.searchParams.get("employee");
+  // Chi vede tutta l'agenzia: qualsiasi operatore. Un operatore: SOLO se stesso
+  // (identità risolta dal server, mai dal client). Prima (lug 2026, #24) l'API
+  // era solo scope "all" e /profilo mostrava "nessun dato" a TUTTI gli operatori.
+  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  let ownOnly = false;
+  if (!az.ok) {
+    const who = await resolveEmployeeForUser();
+    if (!who?.employee || !employee || normalizeName(who.employee) !== normalizeName(employee)) {
+      return Response.json({ error: az.message }, { status: az.status });
+    }
+    ownOnly = true;
+  }
   const lastN = Math.max(1, Math.min(24, parseInt(url.searchParams.get("last_n") || "12", 10)));
   if (!employee) return Response.json({ error: "employee required" }, { status: 400 });
 

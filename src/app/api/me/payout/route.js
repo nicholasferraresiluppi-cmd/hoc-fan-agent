@@ -13,6 +13,7 @@ import { kv } from "@vercel/kv";
 import { resolveEmployeeForUser, findLatestWagePeriod, findOwnRecord } from "@/lib/me";
 import { calcCumulativeEarning } from "@/lib/wage-calc";
 import { getWages } from "@/lib/cp-wages-store";
+import { startedShifts } from "@/lib/creatorspro-data";
 
 export async function GET(request) {
   const who = await resolveEmployeeForUser();
@@ -39,7 +40,9 @@ export async function GET(request) {
     return Response.json({ linked: true, employee: who.employee, period_id: periodId, reason: "not_in_period" });
   }
 
-  const shifts = (mine.shifts || [])
+  // Solo turni già iniziati: CP mette in calendario anche quelli futuri, a $0
+  // (a set 2026 l'operatore vedeva "27 set · venduto $0" e il conteggio turni gonfiato).
+  const shifts = startedShifts(mine.shifts)
     .map((s) => {
       const sold = Number(s.total_attributed) || 0;
       const calc = calcCumulativeEarning(sold, s.thresholds || []);
@@ -66,7 +69,7 @@ export async function GET(request) {
       wage: Number(mine.total_wage) || 0,
       from_takes: Number(mine.total_earnings_from_takes) || 0,
       from_hours: Number(mine.total_earnings_from_hours) || 0,
-      shifts: mine.total_worked_shifts ?? shifts.length,
+      shifts: shifts.length,
       hours: mine.total_worked_hours ?? null,
     },
     shifts,

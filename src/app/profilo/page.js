@@ -78,7 +78,7 @@ export default function MyProfilePage() {
     if (h < 18) return "Buon pomeriggio";
     return "Buonasera";
   }, []);
-  const displayName = user?.firstName || employee?.split(" ")[0] || "";
+  const displayName = meEmp?.source === "view_as" ? employee?.split(" ")[0] : (user?.firstName || employee?.split(" ")[0] || "");
 
   return (
     <div style={{ minHeight: "100vh", background: COLORS.obsidian, color: COLORS.alabaster, fontFamily: FONTS.body, padding: "32px 28px 80px" }}>
@@ -105,7 +105,7 @@ export default function MyProfilePage() {
         {/* Employee matchato */}
         {employee && (
           <>
-            {meEmp.source !== "override" && (
+            {meEmp.source !== "override" && meEmp.source !== "view_as" && (
               <div style={{ marginBottom: 16, padding: "8px 14px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 10, fontSize: 12, color: COLORS.fog, display: "inline-flex", alignItems: "center", gap: 8 }}>
                 <Mail size={12} /> Account collegato a <strong style={{ color: COLORS.alabaster }}>{employee}</strong> via email{" "}
                 {meEmp.email && <span style={{ color: COLORS.mist }}>({meEmp.email})</span>}
