@@ -1,6 +1,7 @@
 import { kv } from "@vercel/kv";
 import { auth, clerkClient } from "@clerk/nextjs/server";
-import { isUserIdAdmin, adminMfaOk } from "@/lib/admin";
+import { isUserIdAdmin, isUserIdAdminRaw, adminMfaOk } from "@/lib/admin";
+import { viewAsFor } from "@/lib/view-as";
 
 /**
  * RBAC — Role-Based Access Control.
@@ -175,6 +176,11 @@ export async function deleteCustomRole(id) {
 
 export async function getUserRoles(userId) {
   if (!userId) return ["operator"];
+  // "Vedi come…" (lib/view-as): solo per un admin vero e solo sulla sua sessione
+  try {
+    const va = await viewAsFor(userId);
+    if (va && (await isUserIdAdminRaw(userId))) return va.roles.length ? va.roles : ["operator"];
+  } catch {}
   try {
     if (await isUserIdAdmin(userId)) return ["admin"];
   } catch {}

@@ -18,7 +18,7 @@ import { Menu, X } from "lucide-react";
 import Sidebar, { SIDEBAR_WIDTH } from "./Sidebar";
 import ErrorBoundary from "./ErrorBoundary";
 import OnboardingNudge from "./OnboardingNudge";
-import { SecurityBanner, FeedbackButton } from "./AppHelpers";
+import { SecurityBanner, FeedbackButton, ViewAsBanner } from "./AppHelpers";
 import { CP } from "@/lib/brand";
 import { uxPageChange } from "@/lib/ux-client";
 
@@ -121,6 +121,9 @@ export default function AppShell({ children }) {
         minHeight: "100vh",
         background: CP.bg,
       }}>
+        <ErrorBoundary silent label="ViewAsBanner">
+          <ViewAsBanner />
+        </ErrorBoundary>
         <ErrorBoundary silent label="SecurityBanner">
           <SecurityBanner />
         </ErrorBoundary>

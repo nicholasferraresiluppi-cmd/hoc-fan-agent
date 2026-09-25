@@ -21,10 +21,22 @@ const isPublicRoute = createRouteMatcher([
 ]);
 const isApiRoute = createRouteMatcher(['/api/(.*)']);
 
+// "Vedi come…" (lib/view-as): finché l'anteprima è attiva l'app è in SOLA LETTURA.
+// Il cookie viene verificato (firma + admin) nelle route; qui basta la presenza:
+// bloccare le scritture a chi ha il cookie non può mai dare permessi in più.
+const VIEW_AS_WRITE_OK = ['/api/admin/view-as', '/api/track', '/api/feedback'];
+
 export default clerkMiddleware(async (auth, request) => {
   if (isPublicRoute(request)) return;
   const authObj = await auth();
-  if (authObj.userId) return;
+  if (authObj.userId) {
+    const m = request.method;
+    if (m !== 'GET' && m !== 'HEAD' && m !== 'OPTIONS' && request.cookies.get('hoc_view_as')?.value
+      && isApiRoute(request) && !VIEW_AS_WRITE_OK.includes(request.nextUrl.pathname)) {
+      return NextResponse.json({ error: 'Modalità "Vedi come": sola lettura. Esci dall\'anteprima per modificare.' }, { status: 403 });
+    }
+    return;
+  }
 
   // Sessione assente: per le API restituiamo JSON 401 (no redirect),
   // altrimenti il client si aspetta JSON e riceve HTML del sign-in.
