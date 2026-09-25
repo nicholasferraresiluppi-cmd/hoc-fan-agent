@@ -143,6 +143,8 @@ export default function MembersPage() {
 
       {!loading && canManage && <AdminSecurityCard />}
 
+      {!loading && canInvite && <OperatorInvites onSent={() => load()} />}
+
       {/* Inviti in attesa */}
       {!loading && canInvite && pending.length > 0 && (
         <section style={{ marginBottom: 28 }}>
@@ -366,6 +368,93 @@ function AdminSecurityCard() {
       </div>
       {!d.required && !d.me_mfa && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 8 }}>Per renderla obbligatoria devi prima attivarla sul tuo account, così non ti chiudi fuori.</div>}
       {err && <div style={{ fontSize: 12, color: CP.accentRed, marginTop: 8 }}>{err}</div>}
+    </section>
+  );
+}
+
+
+// "Porta gli operatori nell'app" (25/09/2026): gli operatori attivi dell'ultimo
+// mese Infloww con la loro email; si scelgono e si invitano come "operatore".
+// Al primo accesso l'account si collega da solo al nome operatore (lib/me).
+function OperatorInvites({ onSent }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(null);
+  const [open, setOpen] = useState(false);
+  const [sel, setSel] = useState(new Set());
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const [q, setQ] = useState("");
+  const loadList = async () => {
+    setErr(null);
+    const r = await fetch("/api/admin/operator-invites");
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return setErr(j.error || "Elenco non disponibile");
+    setData(j);
+    setSel(new Set(j.operators.filter((o) => o.status === "ready").map((o) => o.email)));
+  };
+  useEffect(() => { if (open && !data) loadList(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ready = (data?.operators || []).filter((o) => o.status === "ready");
+  const needle = q.trim().toLowerCase();
+  const shown = (data?.operators || []).filter((o) => !needle || `${o.employee} ${o.email || ""}`.toLowerCase().includes(needle));
+  const toggle = (e) => setSel((s) => { const n = new Set(s); n.has(e) ? n.delete(e) : n.add(e); return n; });
+  const chosen = [...sel];
+  const send = async () => {
+    if (!chosen.length) return;
+    if (!window.confirm(`Mandare l'invito a ${chosen.length} operatori?\n\nRiceveranno un'email da HOC Pro per creare l'account. Al primo accesso vedranno solo le loro pagine personali (score, compenso, percorso).`)) return;
+    setBusy(true); setResult(null);
+    const all = [];
+    for (let i = 0; i < chosen.length; i += 50) {
+      const r = await fetch("/api/admin/operator-invites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emails: chosen.slice(i, i + 50) }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { all.push({ ok: false, error: j.error || "errore" }); break; }
+      all.push(...j.results);
+    }
+    setBusy(false);
+    setResult({ ok: all.filter((x) => x.ok).length, ko: all.filter((x) => !x.ok) });
+    await loadList(); onSent?.();
+  };
+  const label = { ready: "da invitare", invited: "invitato, in attesa", has_account: "ha già l'account", no_email: "senza email" };
+  return (
+    <section style={{ marginBottom: 28, border: `1px solid ${CP.border}`, borderRadius: 12, background: CP.surface }}>
+      <button onClick={() => setOpen((v) => !v)} style={{ width: "100%", textAlign: "left", padding: "14px 16px", background: "transparent", border: "none", cursor: "pointer", color: CP.textPrimary }}>
+        <span style={{ fontSize: 15, fontWeight: 500 }}>Porta gli operatori nell&apos;app</span>
+        <span style={{ fontSize: 13, color: CP.textMuted, marginLeft: 10 }}>
+          {data ? `${data.counts.ready} da invitare · ${data.counts.invited} in attesa · ${data.counts.has_account} con account` : "inviti in blocco agli operatori attivi, collegati da soli al loro nome"}
+        </span>
+      </button>
+      {open && (
+        <div style={{ padding: "0 16px 16px" }}>
+          {err && <div style={{ color: CP.accentRed, fontSize: 13, marginBottom: 8 }}>{err}</div>}
+          {!data && !err && <div style={{ color: CP.textMuted, fontSize: 13 }}>Caricamento…</div>}
+          {data && (<>
+            <p style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.55, margin: "0 0 10px" }}>
+              Operatori dell&apos;ultimo mese Infloww ({data.period_id}), con l&apos;email dell&apos;export. Ognuno riceve un invito come <b>operatore</b>: vede solo le sue pagine personali. Al primo accesso l&apos;account si collega da solo al suo nome, senza passare da un admin.
+            </p>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+              <button style={btn(true)} disabled={busy || !chosen.length} onClick={send}>{busy ? "Invio in corso…" : `Invita ${chosen.length} operatori`}</button>
+              <button style={btn(false)} onClick={() => setSel(new Set(ready.map((o) => o.email)))}>Seleziona tutti da invitare ({ready.length})</button>
+              <button style={btn(false)} onClick={() => setSel(new Set())}>Nessuno</button>
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca nome o email" aria-label="Cerca operatore"
+                style={{ padding: "7px 10px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.bg, color: CP.textPrimary, fontSize: 13, width: 220 }} />
+            </div>
+            {result && (
+              <div style={{ fontSize: 13, marginBottom: 10, color: result.ko.length ? CP.accentRed : CP.accentGreen }}>
+                Inviti mandati: {result.ok}.{result.ko.length ? ` Non riusciti: ${result.ko.length} (${result.ko.slice(0, 3).map((x) => `${x.email || ""} ${x.error}`).join("; ")}).` : ""}
+              </div>
+            )}
+            <div style={{ maxHeight: 420, overflow: "auto", border: `1px solid ${CP.borderSoft}`, borderRadius: 8 }}>
+              {shown.map((o) => (
+                <label key={o.employee} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderTop: `1px solid ${CP.borderSoft}`, fontSize: 14, cursor: o.status === "ready" ? "pointer" : "default", opacity: o.status === "ready" ? 1 : 0.6 }}>
+                  <input type="checkbox" disabled={o.status !== "ready"} checked={sel.has(o.email)} onChange={() => toggle(o.email)} />
+                  <span style={{ flex: "1 1 180px", color: CP.textPrimary }}>{o.employee}</span>
+                  <span style={{ flex: "1 1 220px", color: CP.textMuted, fontSize: 13 }}>{o.email || "—"}</span>
+                  <span style={{ fontSize: 12, color: o.status === "has_account" ? CP.accentGreen : CP.textMuted, minWidth: 130, textAlign: "right" }}>{label[o.status]}</span>
+                </label>
+              ))}
+            </div>
+          </>)}
+        </div>
+      )}
     </section>
   );
 }
