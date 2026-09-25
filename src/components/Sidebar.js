@@ -72,7 +72,7 @@ export const NAV_GROUPS = [
     defaultOpen: true,
     items: [
       { href: "/profilo",     label: "Il mio profilo",  icon: UserCircle2 },
-      { href: "/me/score",    label: "Il mio score",    icon: Gauge },
+      { href: "/me/score",    label: "I miei score",    icon: Gauge },
       { href: "/me/compenso", label: "Il mio compenso", icon: Wallet },
       { href: "/me/percorso", label: "Il mio percorso", icon: Compass },
       { href: "/me/qualita", label: "La mia qualità", icon: ClipboardCheck },

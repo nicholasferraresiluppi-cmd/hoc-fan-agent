@@ -62,18 +62,45 @@ function NotLinked({ reason }) {
   );
 }
 
+// Due score, ognuno col suo nome (decisione Nicholas 25/09/2026, "strada 1"):
+//  - VENDITE (CreatorsPro): venduto per turno vs chi lavora sulle stesse creator;
+//    è quello guardato nelle revisioni mensili (Action/Coaching Center).
+//  - MESTIERE (Infloww): come chatti; è quello del percorso di carriera.
+// Prima l'operatore vedeva solo il secondo, etichettato "Critical" anche al 68°
+// percentile (soglie fisse tarate a gen-mag): Andrea Terranova, 2º per vendite
+// (89,1), leggeva "27,6 Critical". Le fasce del mestiere sono SOSPESE finché non
+// vengono ricalibrate: si mostrano numero e posizione, non l'etichetta.
+function currentMonth() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
+
 export default function MyScorePage() {
   const [periodId, setPeriodId] = useState(null);
   const url = periodId ? `/api/me/score?period_id=${periodId}` : "/api/me/score";
   const { data, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false });
+  const { data: meEmp } = useSWR("/api/me/employee", fetcher, { revalidateOnFocus: false });
+  const salesMonth = currentMonth();
+  const { data: sales } = useSWR(meEmp?.employee ? `/api/leaderboard/operator-drilldown?employee=${encodeURIComponent(meEmp.employee)}&period_id=${salesMonth}` : null, fetcher, { revalidateOnFocus: false });
+  const cp = sales?.cp;
 
   return (
     <div style={{ padding: "32px 24px 64px", maxWidth: 880, margin: "0 auto" }}>
       <PageHeader
         section="Il mio quadro"
-        title="Il mio score"
-        subtitle="Come si compone il tuo score operativo: quali comportamenti lo alzano, quali lo tengono giù, e come sta andando nel tempo. Vedi solo i tuoi dati — è un diritto, non una concessione."
+        title="I miei score"
+        subtitle="Hai due score che misurano cose diverse. Vendite: quanto vendi per turno rispetto a chi lavora sulle tue stesse creator — è quello delle revisioni mensili. Mestiere: come chatti — è quello del percorso di carriera. Vedi solo i tuoi dati: è un diritto, non una concessione."
       />
+
+      {cp && (
+        <CpCard style={{ marginBottom: 18 }}>
+          <SectionLabel>Vendite · {salesMonth} (in corso)</SectionLabel>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: FONTS.display, fontSize: 34, fontWeight: 600, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{cp.score != null ? cp.score.toFixed(1).replace(".", ",") : "—"}</span>
+            {cp.tier && <span style={{ fontSize: 13, color: CP.textSecondary }}>{cp.tier}</span>}
+          </div>
+          <p style={{ fontSize: 13, color: CP.textMuted, margin: "6px 0 0", lineHeight: 1.5 }}>
+            0-100: il tuo venduto per turno confrontato con chi lavora sulle tue stesse creator (70%) e con tutta l&apos;agenzia (30%). Il dettaglio per creator è nel <Link href="/profilo" style={{ color: CP.accent }}>tuo profilo</Link>.
+          </p>
+        </CpCard>
+      )}
 
       {isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
       {data && !data.linked && !data.error && <NotLinked reason={data.reason} />}
@@ -108,11 +135,11 @@ export default function MyScorePage() {
           {/* Headline: score, tier, percentile */}
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
             <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, padding: "16px 22px", minWidth: 150 }}>
-              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: CP.textMuted, marginBottom: 4 }}>Score · {data.period_id}</div>
+              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: CP.textMuted, marginBottom: 4 }}>Mestiere · {data.period_id}</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
                 <span style={{ fontFamily: FONTS.display, fontSize: 34, fontWeight: 600, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{data.score}</span>
-                <span style={{ fontSize: 13, fontWeight: 650, color: TIER_COLORS[data.tier] || CP.textSecondary }}>{data.tier}</span>
               </div>
+              <div style={{ fontSize: 12, color: CP.textMuted }}>fasce in ricalibrazione</div>
             </div>
             <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, padding: "16px 22px", minWidth: 150 }}>
               <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: CP.textMuted, marginBottom: 4 }}>La tua posizione</div>
@@ -121,18 +148,11 @@ export default function MyScorePage() {
               </div>
               <div style={{ fontSize: 12, color: CP.textMuted }}>dei {data.scored_count} operatori valutati</div>
             </div>
-            {data.formula && (
-              <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, padding: "16px 22px", minWidth: 150 }}>
-                <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: CP.textMuted, marginBottom: 4 }}>Formula del periodo</div>
-                <div style={{ fontFamily: FONTS.mono, fontSize: 15, color: CP.textSecondary }}>{data.formula.hash}</div>
-                <div style={{ fontSize: 11.5, color: CP.textMuted }}>congelata all'import — il tuo storico non cambia in silenzio</div>
-              </div>
-            )}
           </div>
 
           {/* Composizione */}
           <CpCard style={{ marginBottom: 16 }}>
-            <SectionLabel>Come si compone (0–100 per dimensione × peso)</SectionLabel>
+            <SectionLabel>Mestiere: come si compone (0–100 per voce × peso)</SectionLabel>
             <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
               {(data.composition || []).sort((a, b) => (b.weight || 0) - (a.weight || 0)).map((c) => (
                 <div key={c.kpi}>
@@ -157,12 +177,12 @@ export default function MyScorePage() {
           {/* Storico */}
           {Array.isArray(data.history) && data.history.length > 1 && (
             <CpCard>
-              <SectionLabel>Il mio andamento</SectionLabel>
+              <SectionLabel>Mestiere: il mio andamento</SectionLabel>
               <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginTop: 14, height: 120, overflowX: "auto", paddingBottom: 4 }}>
                 {data.history.map((h) => (
                   <div key={h.period_id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 52 }}>
                     <span style={{ fontSize: 11.5, fontFamily: FONTS.mono, color: CP.textSecondary }}>{h.score != null ? Math.round(h.score) : "—"}</span>
-                    <div style={{ width: 26, height: `${Math.max(4, (h.score || 0) * 0.8)}px`, background: TIER_COLORS[h.tier] || CP.surfaceAlt, borderRadius: 5, opacity: 0.9 }} />
+                    <div style={{ width: 26, height: `${Math.max(4, (h.score || 0) * 0.8)}px`, background: CP.accent, borderRadius: 5, opacity: 0.75 }} />
                     <span style={{ fontSize: 10, color: CP.textMuted }}>{String(h.period_id).slice(5)}</span>
                   </div>
                 ))}
@@ -171,6 +191,9 @@ export default function MyScorePage() {
           )}
 
           <p style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 18, lineHeight: 1.6 }}>
+            Lo score mestiere viene dall&apos;export Infloww e si aggiorna quando il mese viene importato. Le fasce (Critical, Weak…) sono sospese mentre le soglie vengono ricalibrate sui dati di quest&apos;anno.{data.formula?.hash ? ` Formula del mese ${data.formula.hash}, congelata all'import: il tuo storico non cambia in silenzio.` : ""}
+          </p>
+          <p style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 8, lineHeight: 1.6 }}>
             Pensi che un numero sia sbagliato? <Link href="/me/contestazioni" style={{ color: CP.accent }}>Apri una contestazione</Link> — le correzioni vengono sempre tracciate, mai fatte in silenzio.
           </p>
         </>

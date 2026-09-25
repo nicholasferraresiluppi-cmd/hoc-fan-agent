@@ -28,7 +28,7 @@ function evalGate(history, { minTier, needed, window, noCritical = false }) {
   const usable = history.filter((h) => h.tier).slice(0, window); // history è desc
   const hits = usable.filter((h) => rank(h.tier) >= rank(minTier)).length;
   const criticals = usable.filter((h) => h.tier === "Critical").length;
-  const months = usable.map((h) => ({ period_id: h.period_id, tier: h.tier, counts: rank(h.tier) >= rank(minTier) }));
+  const months = usable.map((h) => ({ period_id: h.period_id, tier: h.tier, score: h.score ?? null, counts: rank(h.tier) >= rank(minTier) }));
   const evaluable = usable.length >= Math.min(needed, window);
   const passedPerf = evaluable && hits >= needed && (!noCritical || criticals === 0);
   return {
