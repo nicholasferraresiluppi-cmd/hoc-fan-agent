@@ -3,13 +3,13 @@
 // (serve l'elenco del menu, che vive nel componente Sidebar). Solo admin.
 import { clerkClient } from "@clerk/nextjs/server";
 import { authorizeAdmin, getUserRoles } from "@/lib/rbac";
-import { getUsageDays } from "@/lib/usage";
+import { getUsageDays, getUxDays } from "@/lib/usage";
 
 export async function GET() {
   const a = await authorizeAdmin();
   if (!a.ok) return Response.json({ error: a.message }, { status: a.status });
-  const [days, members] = await Promise.all([getUsageDays(60), listMembers()]);
-  return Response.json({ days, members });
+  const [days, members, ux] = await Promise.all([getUsageDays(60), listMembers(), getUxDays(30)]);
+  return Response.json({ days, members, ux });
 }
 
 async function listMembers() {

@@ -10,7 +10,7 @@ import Link from "next/link";
 import { CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 import { NAV_ITEMS } from "@/components/Sidebar";
-import { buildUsageReport } from "@/lib/usage-core";
+import { buildUsageReport, buildUxReport } from "@/lib/usage-core";
 
 const card = { border: `1px solid ${CP.border}`, borderRadius: 12, background: CP.surface };
 const th = { textAlign: "left", fontSize: 12, fontWeight: 500, color: CP.textMuted, padding: "10px 14px", borderBottom: `1px solid ${CP.border}` };
@@ -32,6 +32,10 @@ export default function UsagePage() {
 
   const r = useMemo(() => (raw ? buildUsageReport({ days: raw.days, members: raw.members, nav: NAV_ITEMS, window: win }) : null), [raw, win]);
   const maxDaily = r ? Math.max(1, ...r.daily.map((d) => d.users)) : 1;
+  const navByHref = useMemo(() => Object.fromEntries(NAV_ITEMS.map((n) => [n.href, n])), []);
+  const ux = useMemo(() => (raw?.ux ? buildUxReport(raw.ux, navByHref) : null), [raw, navByHref]);
+  const [uxPage, setUxPage] = useState(null);
+  const sel = ux?.pages.find((p) => p.page === uxPage) || ux?.pages[0] || null;
 
   return (
     <div style={{ background: CP.bg, minHeight: "100vh", color: CP.textPrimary, padding: "32px 28px 64px", maxWidth: 1200, margin: "0 auto" }}>
@@ -109,6 +113,55 @@ export default function UsagePage() {
               </tbody>
             </table>
           </div>
+
+          {/* Esperienza d'uso */}
+          <h2 style={{ fontSize: 15, fontWeight: 500, margin: "0 0 4px" }}>Come si usano le pagine</h2>
+          <p style={{ fontSize: 13, color: CP.textMuted, margin: "0 0 10px" }}>
+            Su cosa si clicca e dove sta nella pagina, dove qualcuno clicca più volte per frustrazione, fin dove si scorre, errori e lentezza. Ultimi 30 giorni, nessun contenuto registrato.
+          </p>
+          {ux && ux.insights.length > 0 && (
+            <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginBottom: 12 }}>
+              {ux.insights.slice(0, 6).map((i, k) => (
+                <div key={k} style={{ ...card, padding: "14px 16px", borderLeft: `3px solid ${KIND[i.kind] || CP.border}` }}>
+                  <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 6 }}>{i.title}</div>
+                  <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.55 }}>{i.text}</div>
+                </div>
+              ))}
+            </section>
+          )}
+          {(!ux || ux.pages.length === 0) ? (
+            <div style={{ ...card, padding: 14, fontSize: 13, color: CP.textMuted, marginBottom: 24 }}>Nessun segnale ancora: arrivano con le prossime visite.</div>
+          ) : (
+            <div style={{ ...card, padding: 14, marginBottom: 24 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+                <span style={{ fontSize: 13, color: CP.textSecondary }}>Pagina</span>
+                <select value={sel?.page || ""} onChange={(e) => setUxPage(e.target.value)} style={{ padding: "6px 9px", background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 6, color: CP.textPrimary, fontSize: 13, maxWidth: "100%" }}>
+                  {ux.pages.map((p) => <option key={p.page} value={p.page}>{(p.label || p.page) + ` · ${p.total_clicks} clic`}</option>)}
+                </select>
+                {sel && <span style={{ fontSize: 12, color: CP.textMuted }}>
+                  {sel.scroll_avg != null ? `scorrimento medio ${sel.scroll_avg}%` : "scorrimento: pochi dati"} · {sel.load_avg_ms != null ? `apertura ${(sel.load_avg_ms / 1000).toFixed(1)}s` : "tempo di apertura: pochi dati"}
+                </span>}
+              </div>
+              {sel && (
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead><tr><th style={th}>Elemento</th><th style={th}>Clic</th><th style={th}>Dove sta</th><th style={th}>Visibile all'apertura?</th></tr></thead>
+                  <tbody>
+                    {sel.clicks.slice(0, 12).map((c) => (
+                      <tr key={c.label}>
+                        <td style={td}>{c.label}</td>
+                        <td style={td}>{c.count}</td>
+                        <td style={td}>{c.zone}</td>
+                        <td style={{ ...td, color: c.below_share >= 0.6 ? CP.accentRed : CP.textSecondary }}>{c.below_share >= 0.6 ? "no, bisogna scorrere" : c.below_share > 0 ? "a volte" : "sì"}</td>
+                      </tr>
+                    ))}
+                    {sel.clicks.length === 0 && <tr><td style={td} colSpan={4}>Nessun clic registrato su questa pagina.</td></tr>}
+                  </tbody>
+                </table>
+              )}
+              {sel?.rage.length > 0 && <div style={{ fontSize: 12, color: CP.accentRed, marginTop: 10 }}>Clic di frustrazione: {sel.rage.map((g) => `${g.label} (${g.count})`).join(", ")}</div>}
+              {sel?.errors.length > 0 && <div style={{ fontSize: 12, color: CP.accentRed, marginTop: 6 }}>Errori: {sel.errors.map((g) => `${g.label} (${g.count})`).join(", ")}</div>}
+            </div>
+          )}
 
           {/* Persone */}
           <h2 style={{ fontSize: 15, fontWeight: 500, margin: "0 0 10px" }}>Persone</h2>

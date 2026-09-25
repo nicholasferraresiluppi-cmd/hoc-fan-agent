@@ -19,6 +19,7 @@ import Sidebar, { SIDEBAR_WIDTH } from "./Sidebar";
 import ErrorBoundary from "./ErrorBoundary";
 import OnboardingNudge from "./OnboardingNudge";
 import { CP } from "@/lib/brand";
+import { uxPageChange } from "@/lib/ux-client";
 
 function isAuthRoute(path) {
   return path.startsWith("/sign-in") || path.startsWith("/sign-up");
@@ -55,6 +56,7 @@ export default function AppShell({ children }) {
       if (navigator.sendBeacon) navigator.sendBeacon("/api/track", new Blob([body], { type: "application/json" }));
       else fetch("/api/track", { method: "POST", body, keepalive: true }).catch(() => {});
     } catch {}
+    try { uxPageChange(pathname); } catch {}
   }, [pathname]);
 
   if (isAuthRoute(pathname) || isBareRoute(pathname)) {
