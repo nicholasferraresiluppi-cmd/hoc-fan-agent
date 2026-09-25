@@ -21,6 +21,13 @@ import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
 import { loadGroupLanguages } from "@/app/api/admin/group-languages/route";
 import { detectLanguage } from "@/lib/leaderboard-calc";
 import { getWages } from "@/lib/cp-wages-store";
+import { shiftsByCreator, creatorDrops, monthShrink } from "@/lib/data-health-core";
+
+const monthOffset = (id, n) => {
+  const [y, m] = id.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+};
 
 const INDEX_KEY = "ops:alerts:index";
 const LAST_RUN_KEY = "ops:alerts:last_run";
@@ -200,6 +207,78 @@ const CHECKS = [
         value: `${age} giorni fa`,
         cta: { href: "/admin/creatorspro-sync", label: "Apri sync CP" },
       }];
+    },
+  },
+  {
+    // Sanità dati (25/09/2026, caso Sparagno): la ricostruzione notturna non è
+    // stata pubblicata perché molto più piccola della versione precedente.
+    id: "cp-promotion-blocked",
+    severity: "critical",
+    label: "Sync CP non pubblicata",
+    async run() {
+      const meta = await kv.get("cp:_meta");
+      if (meta?.promotion !== "blocked_shrink") return [];
+      return [{
+        fingerprint: `cp-promotion-blocked:${meta.last_sync_period}`,
+        title: `Sync CreatorsPro di ${meta.last_sync_period} scartata: dati molto più scarsi del solito`,
+        detail: `Ricostruite ${meta.staged_count} wage contro ${meta.counts?.wages_normalized} già pubblicate: si continua a mostrare la versione precedente. Probabile errore di scaricamento da CreatorsPro.`,
+        value: String(meta.staged_count ?? "?"),
+        cta: { href: "/admin/wage-audit", label: "Apri Sync & Audit CP" },
+      }];
+    },
+  },
+  {
+    id: "cp-month-shrink",
+    severity: "critical",
+    label: "Mese CP incompleto",
+    async run() {
+      const cur = currentMonthId();
+      const out = [];
+      const pairs = [[monthOffset(cur, -1), monthOffset(cur, -2)]];
+      if (new Date().getUTCDate() >= 7) pairs.unshift([cur, monthOffset(cur, -1)]);
+      for (const [m, prevM] of pairs) {
+        const [w, pw] = await Promise.all([getWages(m), getWages(prevM)]);
+        const hit = monthShrink({ currentCount: (w || []).length, previousCount: (pw || []).length });
+        if (!hit) continue;
+        out.push({
+          fingerprint: `cp-month-shrink:${m}`,
+          title: `${m}: operatori pagati molto meno del mese prima`,
+          detail: `${hit.currentCount} wage contro ${hit.previousCount} di ${prevM} (${Math.round(hit.ratio * 100)}%). Di solito è un sync incompleto, non un calo vero: controlla prima di usare i numeri del mese.`,
+          value: `${Math.round(hit.ratio * 100)}%`,
+          cta: { href: "/admin/wage-audit", label: "Verifica il mese" },
+        });
+      }
+      return out;
+    },
+  },
+  {
+    id: "creator-activity-drop",
+    severity: "warning",
+    label: "Creator con turni crollati",
+    async run() {
+      const now = new Date();
+      const cur = currentMonthId();
+      const out = [];
+      const checks = [{ m: monthOffset(cur, -1), prevM: monthOffset(cur, -2), isCurrentMonth: false }];
+      if (now.getUTCDate() >= 7) checks.unshift({ m: cur, prevM: monthOffset(cur, -1), isCurrentMonth: true });
+      for (const c of checks) {
+        const [w, pw] = await Promise.all([getWages(c.m), getWages(c.prevM)]);
+        if (!w?.length || !pw?.length) continue;
+        const [y, mm] = c.m.split("-").map(Number);
+        const drops = creatorDrops({
+          current: shiftsByCreator(w), previous: shiftsByCreator(pw),
+          isCurrentMonth: c.isCurrentMonth, dayOfMonth: now.getUTCDate(), daysInMonth: new Date(Date.UTC(y, mm, 0)).getUTCDate(),
+        });
+        if (!drops.length) continue;
+        out.push({
+          fingerprint: `creator-activity-drop:${c.m}`,
+          title: `${c.m}: ${drops.length} ${drops.length === 1 ? "creator ha" : "creator hanno"} molti meno turni del previsto`,
+          detail: drops.slice(0, 6).map((d) => `${d.creator}: ${d.current} turni (attesi ~${d.expected})`).join(" · ") + ". Può essere reale (creator in pausa) o un buco di dati: guarda prima di prendere decisioni su quei numeri.",
+          value: String(drops.length),
+          cta: { href: "/leaderboard/creators", label: "Apri Creator" },
+        });
+      }
+      return out;
     },
   },
   {

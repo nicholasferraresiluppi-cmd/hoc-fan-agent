@@ -46,6 +46,17 @@ export default function AppShell({ children }) {
   // Close drawer on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
+  // Analytics d'uso (/admin/utilizzo): una riga per pagina aperta — solo
+  // persona+pagina+giorno. sendBeacon non blocca la navigazione.
+  useEffect(() => {
+    if (!pathname || isAuthRoute(pathname) || isBareRoute(pathname)) return;
+    try {
+      const body = JSON.stringify({ path: pathname });
+      if (navigator.sendBeacon) navigator.sendBeacon("/api/track", new Blob([body], { type: "application/json" }));
+      else fetch("/api/track", { method: "POST", body, keepalive: true }).catch(() => {});
+    } catch {}
+  }, [pathname]);
+
   if (isAuthRoute(pathname) || isBareRoute(pathname)) {
     return <>{children}</>;
   }
