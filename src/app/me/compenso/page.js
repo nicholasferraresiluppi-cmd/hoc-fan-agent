@@ -14,7 +14,8 @@ import { PageHeader, CpCard, SectionLabel } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
-const fmtUsd = (v) => (v == null ? "—" : "$" + Number(v).toLocaleString("it-IT", { maximumFractionDigits: 2 }));
+// sempre 2 decimali: "$137,1" accanto a "$226,25" sembrava un errore (pannello UX)
+const fmtUsd = (v) => (v == null ? "—" : "$" + Number(v).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" }));
 const fmtDate = (iso) => {
   if (!iso) return "—";
   try { return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }); } catch { return iso; }

@@ -30,16 +30,26 @@
  * Auth: qualsiasi utente loggato.
  */
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
+import { resolveEmployeeForUser, normalizeName } from "@/lib/me";
 import { buildCreatorMatrix } from "@/lib/creator-aggregates";
 import { buildCpLeaderboard } from "@/lib/creatorspro-score";
 import { buildOperatorsForCpLeaderboard } from "@/lib/creatorspro-data";
 
 export async function GET(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
-  if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
-
   const url = new URL(request.url);
   const employee = url.searchParams.get("employee");
+  // Chi vede tutta l'agenzia: qualsiasi operatore. Un operatore: SOLO se stesso
+  // (identità risolta dal server, mai dal client). Prima (lug 2026, #24) l'API
+  // era solo scope "all" e /profilo mostrava "nessun dato" a TUTTI gli operatori.
+  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  let ownOnly = false;
+  if (!az.ok) {
+    const who = await resolveEmployeeForUser();
+    if (!who?.employee || !employee || normalizeName(who.employee) !== normalizeName(employee)) {
+      return Response.json({ error: az.message }, { status: az.status });
+    }
+    ownOnly = true;
+  }
   const period_id = url.searchParams.get("period_id");
   if (!employee) return Response.json({ error: "employee richiesto" }, { status: 400 });
   if (!period_id || !/^\d{4}-\d{2}$/.test(period_id)) {
@@ -140,6 +150,7 @@ export async function GET(request) {
   return Response.json({
     employee,
     period_id,
+    own_only: ownOnly,
     cp: opRow ? {
       score: opRow.score,
       tier: opRow.tier,
@@ -154,7 +165,7 @@ export async function GET(request) {
       per_creator,
       agency_avg_score,
       agency_size: rankedWithScore.length,
-      peer_strong,
+      peer_strong: ownOnly ? [] : peer_strong, // nomi e score dei colleghi: non all'operatore
     } : null,
     insights,
   });

@@ -38,7 +38,7 @@ export async function getMyShiftNow() {
   // (dominio ignorato) → spoofabile aggiungendo un'email al profilo Clerk. Le
   // altre /me espongono solo dati PROPRI; qui ci sono LTV fan → per il pilota
   // vale SOLO il collegamento esplicito impostato da un admin (user_employee:*).
-  if (who.source !== "override") {
+  if (who.source !== "override" && who.source !== "view_as") { // view_as: anteprima admin in sola lettura
     return { employee: null, reason: "pilot_link_required" };
   }
 

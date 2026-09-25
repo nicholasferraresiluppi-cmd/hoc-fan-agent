@@ -26,6 +26,20 @@ const KPI_LABELS = {
   messages_sent_per_hour: "Messaggi per ora",
 };
 
+// Una riga di spiegazione per voce (pannello tester: "Golden ratio" e "Cura dei
+// messaggi" non si capivano al primo mese)
+const KPI_HELP = {
+  fan_cvr: "Quanti dei fan con cui chatti comprano qualcosa.",
+  unlock_rate: "Quanti dei PPV che mandi vengono sbloccati.",
+  avg_earnings_per_paying_fan: "Quanto spende in media chi compra da te.",
+  golden_ratio: "Quanti PPV mandi rispetto ai messaggi: se proponi abbastanza, o chatti senza vendere.",
+  sales_per_hour: "Quanto vendi per ogni ora di turno.",
+  avg_revenue_per_fan: "Quanto rende in media ogni fan con cui chatti.",
+  avg_length_of_conversation: "Quanto durano le conversazioni.",
+  input_per_message: "Quanto scrivi in ogni messaggio (messaggi curati, non monosillabi).",
+  messages_sent_per_hour: "Quanti messaggi mandi per ora.",
+};
+
 const TIER_COLORS = {
   Critical: CP.accentRed, Weak: "#d9a44a", Average: "#cba55f",
   Good: CP.accentGreen, Strong: CP.accentBlue, Elite: CP.accent,
@@ -128,6 +142,7 @@ export default function MyScorePage() {
                     </span>
                     <span style={{ fontFamily: FONTS.mono, color: c.points >= 60 ? CP.accentGreen : c.points >= 40 ? CP.textSecondary : CP.accentRed }}>{c.points}</span>
                   </div>
+                  {KPI_HELP[c.kpi] && <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 4 }}>{KPI_HELP[c.kpi]}</div>}
                   <div style={{ height: 7, background: CP.surfaceAlt, borderRadius: 99, overflow: "hidden" }}>
                     <div style={{ width: `${Math.max(2, Math.min(100, c.points))}%`, height: "100%", background: c.points >= 60 ? CP.accentGreen : c.points >= 40 ? CP.accent : CP.accentRed, borderRadius: 99 }} />
                   </div>
