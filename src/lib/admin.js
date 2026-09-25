@@ -14,7 +14,8 @@ export async function getAdminSources() {
   return { envIds, kvIds };
 }
 
-export async function isUserIdAdmin(userId) {
+/** Admin per sorgenti (env / KV / metadata), SENZA il controllo 2FA. */
+export async function isUserIdAdminRaw(userId) {
   if (!userId) return false;
   const { envIds, kvIds } = await getAdminSources();
   if (envIds.includes(userId)) return true;
@@ -26,6 +27,47 @@ export async function isUserIdAdmin(userId) {
     if (u?.publicMetadata?.role === "admin" || u?.privateMetadata?.role === "admin") return true;
   } catch { /* silent */ }
   return false;
+}
+
+/* ------------------------------------------------------------------ */
+/* Verifica in due passaggi per gli admin (25/09/2026)                 */
+/* ------------------------------------------------------------------ */
+// Un admin vede compensi e dati di tutta l'org: con la sola password rubata
+// entra chiunque. Quando `security:admin_mfa_required` è attivo, un admin
+// SENZA 2FA su Clerk perde i poteri da admin (resta un utente normale) finché
+// non la attiva. L'interruttore lo accende solo un admin che ha già la 2FA
+// (vedi /api/admin/security): impossibile chiudersi fuori per sbaglio.
+export const MFA_FLAG_KEY = "security:admin_mfa_required";
+
+export async function adminMfaRequired() {
+  return (await kv.get(MFA_FLAG_KEY).catch(() => null)) === true;
+}
+
+/** true se l'utente ha la verifica in due passaggi attiva su Clerk (cache 10 min). */
+export async function userHasMfa(userId) {
+  if (!userId) return false;
+  const ck = `mfa:ok:${userId}`;
+  const cached = await kv.get(ck).catch(() => null);
+  if (cached === 1 || cached === 0) return cached === 1;
+  let ok = false;
+  try {
+    const cc = await clerkClient();
+    const u = await cc.users.getUser(userId);
+    ok = !!u?.twoFactorEnabled;
+  } catch { return false; }
+  await kv.set(ck, ok ? 1 : 0, { ex: 600 }).catch(() => {});
+  return ok;
+}
+
+/** L'utente, se admin, può esercitare i poteri da admin? */
+export async function adminMfaOk(userId) {
+  if (!(await adminMfaRequired())) return true;
+  return userHasMfa(userId);
+}
+
+export async function isUserIdAdmin(userId) {
+  if (!(await isUserIdAdminRaw(userId))) return false;
+  return adminMfaOk(userId);
 }
 
 export async function isAdmin() {

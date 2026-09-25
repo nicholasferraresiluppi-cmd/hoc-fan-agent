@@ -122,6 +122,8 @@ export default function MembersPage() {
         </div>
       )}
 
+      {!loading && canManage && <AdminSecurityCard />}
+
       {/* Inviti in attesa */}
       {!loading && canInvite && pending.length > 0 && (
         <section style={{ marginBottom: 28 }}>
@@ -293,5 +295,43 @@ function AddMemberModal({ assignable, onClose, onDone }) {
         </div>
       </form>
     </div>
+  );
+}
+
+
+// Verifica in due passaggi per gli admin: chi l'ha attivata + interruttore.
+function AdminSecurityCard() {
+  const [d, setD] = useState(null);
+  const [err, setErr] = useState(null);
+  const load = () => fetch("/api/admin/security").then((r) => (r.ok ? r.json() : null)).then(setD).catch(() => {});
+  useEffect(() => { load(); }, []);
+  if (!d) return null;
+  const without = d.admins.filter((a) => !a.mfa);
+  const toggle = async () => {
+    setErr(null);
+    const r = await fetch("/api/admin/security", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ required: !d.required }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return setErr(j.error || "Errore");
+    load();
+  };
+  return (
+    <section style={{ marginBottom: 28, border: `1px solid ${CP.border}`, borderRadius: 12, background: CP.surface, padding: "14px 16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 320px" }}>
+          <div style={{ fontSize: 14, fontWeight: 500 }}>Verifica in due passaggi per gli admin {d.required ? "· obbligatoria" : "· facoltativa"}</div>
+          <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4 }}>
+            {d.admins.length - without.length} admin su {d.admins.length} l'hanno attivata.
+            {without.length ? ` Mancano: ${without.map((a) => a.name).join(", ")}.` : ""}
+            {d.required ? " Chi non l'ha attivata non ha i poteri da admin finché non lo fa." : " Quando è obbligatoria, un admin senza verifica perde i poteri da admin finché non la attiva."}
+          </div>
+        </div>
+        <button onClick={toggle} disabled={!d.required && !d.me_mfa} title={!d.required && !d.me_mfa ? "Prima attivala sul tuo account (in basso a sinistra: Account → Sicurezza)" : undefined}
+          style={{ ...btn(!d.required), opacity: !d.required && !d.me_mfa ? 0.5 : 1 }}>
+          {d.required ? "Rendi facoltativa" : "Rendi obbligatoria"}
+        </button>
+      </div>
+      {!d.required && !d.me_mfa && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 8 }}>Per renderla obbligatoria devi prima attivarla sul tuo account, così non ti chiudi fuori.</div>}
+      {err && <div style={{ fontSize: 12, color: CP.accentRed, marginTop: 8 }}>{err}</div>}
+    </section>
   );
 }
