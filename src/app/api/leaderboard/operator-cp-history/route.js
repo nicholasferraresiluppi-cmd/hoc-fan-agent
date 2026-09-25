@@ -21,6 +21,7 @@
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { kv } from "@vercel/kv";
 import { buildCreatorMatrix } from "@/lib/creator-aggregates";
+import { getWages } from "@/lib/cp-wages-store";
 
 function lastMonthIds(n) {
   const out = [];
@@ -51,7 +52,7 @@ export async function GET(request) {
   const periodIds = lastMonthIds(lastN);
 
   // 1. Quali mesi hanno dati CP (parallelo, leggero)
-  const wagesCheck = await Promise.all(periodIds.map((pid) => kv.get(`cp:wages:${pid}`)));
+  const wagesCheck = await Promise.all(periodIds.map((pid) => getWages(pid)));
   const syncedPeriods = periodIds.filter((_, i) => Array.isArray(wagesCheck[i]) && wagesCheck[i].length > 0);
 
   if (syncedPeriods.length === 0) {

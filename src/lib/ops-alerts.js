@@ -20,6 +20,7 @@ import { buildCpLeaderboard } from "@/lib/creatorspro-score";
 import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
 import { loadGroupLanguages } from "@/app/api/admin/group-languages/route";
 import { detectLanguage } from "@/lib/leaderboard-calc";
+import { getWages } from "@/lib/cp-wages-store";
 
 const INDEX_KEY = "ops:alerts:index";
 const LAST_RUN_KEY = "ops:alerts:last_run";
@@ -80,7 +81,7 @@ const CHECKS = [
       // con sales > 0 nelle wages CP; fee dalla mappa pnl:deal_fees.
       const period = currentMonthId();
       const [wagesCur, fees, meta] = await Promise.all([
-        kv.get(`cp:wages:${period}`),
+        getWages(period),
         kv.get("pnl:deal_fees"),
         kv.get("cp:_meta"),
       ]);
@@ -88,7 +89,7 @@ const CHECKS = [
       let effPeriod = period;
       if ((!Array.isArray(wages) || wages.length === 0) && meta?.last_sync_period) {
         effPeriod = meta.last_sync_period;
-        wages = await kv.get(`cp:wages:${effPeriod}`);
+        wages = await getWages(effPeriod);
       }
       if (!Array.isArray(wages) || wages.length === 0) return [];
       const feeMap = fees && typeof fees === "object" ? fees : {};

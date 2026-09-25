@@ -20,6 +20,7 @@ import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { logAuditAction } from "@/lib/audit-log";
 import { fetchWages, fetchWageDetailBatch, bucketizeIntervalFromHour } from "@/lib/creatorspro-api";
+import { getWages, setWages } from "@/lib/cp-wages-store";
 
 const TTL_WAGES = 90 * 24 * 3600;
 
@@ -156,13 +157,13 @@ export async function POST(request) {
   const failedDetails = details.filter((d) => d?._error).length;
 
   // Step 4: appende a cp:wages:{period_id} con DEDUPE per wage.id
-  const existing = (await kv.get(`cp:wages:${period_id}`)) || [];
+  const existing = (await getWages(period_id)) || [];
   const existingIds = new Set(existing.map((w) => w.id));
   const newWages = normalized.filter((w) => !existingIds.has(w.id));
   const wasAlreadyPresent = normalized.length > 0 && newWages.length === 0;
   const merged = [...existing, ...newWages];
   if (newWages.length > 0) {
-    await kv.set(`cp:wages:${period_id}`, merged, { ex: TTL_WAGES });
+    await setWages(period_id, merged, { ex: TTL_WAGES });
   }
 
   const totalShiftsAdded = newWages.reduce((s, w) => s + (w.shifts?.length || 0), 0);

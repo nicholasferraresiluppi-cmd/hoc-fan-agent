@@ -16,6 +16,7 @@ import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { buildAliasIndex } from "@/lib/creator-match";
 import { getLedgerMeta, getLedgerPeriods, getLedgerActivity, readLedgerTxns, readRefunds } from "@/lib/payout-ledger";
 import { matchOperatorPeriod } from "@/lib/payout-match";
+import { getWages } from "@/lib/cp-wages-store";
 
 export const maxDuration = 30;
 
@@ -33,7 +34,7 @@ export async function GET(request) {
   }
 
   const [wages, ledgerMeta] = await Promise.all([
-    kv.get(`cp:wages:${periodId}`),
+    getWages(periodId),
     getLedgerMeta(periodId),
   ]);
   if (!Array.isArray(wages) || wages.length === 0) {

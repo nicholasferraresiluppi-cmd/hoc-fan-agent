@@ -19,6 +19,7 @@
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { logAuditAction } from "@/lib/audit-log";
+import { getWages } from "@/lib/cp-wages-store";
 
 export const maxDuration = 30;
 const FEES_KEY = "pnl:deal_fees";
@@ -34,7 +35,7 @@ export async function GET(request) {
   }
 
   const [wages, fees, meta] = await Promise.all([
-    kv.get(`cp:wages:${periodId}`),
+    getWages(periodId),
     kv.get(FEES_KEY),
     kv.get("cp:_meta"),
   ]);

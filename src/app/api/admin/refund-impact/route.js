@@ -18,6 +18,7 @@ import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { buildAliasIndex } from "@/lib/creator-match";
 import { getLedgerMeta, getLedgerPeriods, getLedgerActivity, readRefunds, romePeriod, periodBounds } from "@/lib/payout-ledger";
 import { calcCumulativeEarning } from "@/lib/wage-calc";
+import { getWages } from "@/lib/cp-wages-store";
 
 export const maxDuration = 60;
 
@@ -103,7 +104,7 @@ export async function GET(request) {
   const wagesMissing = [];
   const ledgerPeriods = await getLedgerPeriods();
   for (const [payPeriod, list] of [...byPayPeriod.entries()].sort()) {
-    const wages = await kv.get(`cp:wages:${payPeriod}`);
+    const wages = await getWages(payPeriod);
     if (!Array.isArray(wages) || wages.length === 0) {
       wagesMissing.push(payPeriod);
       for (const r of list) {
@@ -132,11 +133,11 @@ export async function GET(request) {
       const needPrev = list.some((r) => r.pt && r.pt - pStart < H12);
       const needNext = list.some((r) => r.pt && pEnd - r.pt < H12);
       if (needPrev) {
-        const wPrev = await kv.get(`cp:wages:${shiftPeriod(payPeriod, -1)}`);
+        const wPrev = await getWages(shiftPeriod(payPeriod, -1));
         if (Array.isArray(wPrev)) scanWages = [...wPrev, ...scanWages];
       }
       if (needNext) {
-        const wNext = await kv.get(`cp:wages:${shiftPeriod(payPeriod, 1)}`);
+        const wNext = await getWages(shiftPeriod(payPeriod, 1));
         if (Array.isArray(wNext)) scanWages = [...scanWages, ...wNext];
       }
     } catch { /* confini non calcolabili: si scansiona solo il mese */ }

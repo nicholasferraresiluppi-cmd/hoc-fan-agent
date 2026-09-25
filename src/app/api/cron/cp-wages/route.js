@@ -117,7 +117,9 @@ async function tickPeriod(period, chain) {
     }
     return { action: "step", period, phase: prog.phase, page: prog.page, offset: prog.offset };
   } catch (e) {
-    const msg = String(e?.message || e);
+    // Tronco: l'errore Upstash "max request size" riporta il COMANDO intero
+    // (MB di JSON) → salvarlo nel progress faceva esplodere anche quello.
+    const msg = String(e?.message || e).slice(0, 500);
     // Stato dell'orchestrazione scaduto (TTL 6h): riparti pulito al prossimo
     // tick invece di ribattere per sempre sulla stessa fase.
     if (/Nessuno stato sync/i.test(msg)) prog = { phase: "refdata", page: 1, offset: 0, repair_rounds: 0, started_at: Date.now(), updated_at: 0 };

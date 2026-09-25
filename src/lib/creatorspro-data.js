@@ -8,6 +8,7 @@
  * potenzialmente molte volte per request (per ogni record del ranking).
  */
 import { kv } from "@vercel/kv";
+import { getWages } from "@/lib/cp-wages-store";
 
 const TTL_MS = 5 * 60 * 1000;
 const _cache = new Map();
@@ -24,7 +25,7 @@ async function loadWages(periodId) {
   const k = `_wages:${periodId}`;
   const c = cacheGet(k);
   if (c !== null) return c;
-  const w = (await kv.get(`cp:wages:${periodId}`)) || [];
+  const w = (await getWages(periodId)) || [];
   return cacheSet(k, w);
 }
 

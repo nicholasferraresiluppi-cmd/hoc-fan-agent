@@ -9,6 +9,7 @@
  */
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { getWages } from "@/lib/cp-wages-store";
 
 function lastMonthIds(n) {
   const out = [];
@@ -30,7 +31,7 @@ export async function GET(request) {
 
   const [meta, ...rest] = await Promise.all([
     kv.get("cp:_meta"),
-    ...periodIds.map((pid) => kv.get(`cp:wages:${pid}`)),
+    ...periodIds.map((pid) => getWages(pid)),
     ...periodIds.map((pid) => kv.get(`cp:sync:gap:${pid}`)),
   ]);
   const wagesArr = rest.slice(0, periodIds.length);

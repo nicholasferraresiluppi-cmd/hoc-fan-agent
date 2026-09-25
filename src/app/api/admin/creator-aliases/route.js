@@ -8,6 +8,7 @@
  */
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { getWages } from "@/lib/cp-wages-store";
 
 export const maxDuration = 30;
 
@@ -21,7 +22,7 @@ export async function GET(request) {
     return Response.json({ error: "period_id YYYY-MM richiesto" }, { status: 400 });
   }
 
-  const wages = (await kv.get(`cp:wages:${periodId}`)) || [];
+  const wages = (await getWages(periodId)) || [];
   const counts = new Map();
   for (const w of Array.isArray(wages) ? wages : []) {
     for (const s of w.shifts || []) {

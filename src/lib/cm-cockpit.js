@@ -1,5 +1,6 @@
 import { kv } from "@vercel/kv";
 import { fetchIntervals, fetchTimelineEvents, fetchWages, fetchWageDetail } from "./creatorspro-api";
+import { getWages } from "@/lib/cp-wages-store";
 
 /**
  * CM Cockpit (Fase 2a career ladder) — lib server-side.
@@ -184,7 +185,7 @@ async function latestWageMonth() {
   for (let back = 0; back < 8; back++) {
     const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - back, 1));
     const pid = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-    const wages = await kv.get(`cp:wages:${pid}`);
+    const wages = await getWages(pid);
     if (Array.isArray(wages) && wages.length > 0) return { period_id: pid, wages };
   }
   return { period_id: null, wages: [] };
