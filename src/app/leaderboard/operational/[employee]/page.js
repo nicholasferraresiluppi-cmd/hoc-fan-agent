@@ -1,462 +1,242 @@
 "use client";
 
-import { useState, use, useMemo } from "react";
+// Scheda operatore (redesign 25/09/2026, struttura del pilota Calendario compensi).
+// Da qui si decide su una PERSONA: prima i fatti giusti, poi il resto.
+// Correzioni di sostanza rispetto alla versione precedente:
+//  - il confronto CP↔Infloww avveniva anche tra MESI DIVERSI (se Infloww non
+//    aveva il mese corrente prendeva l'ultimo disponibile): Francesco Caporusso
+//    risultava "bravo a chattare ma converte poco" con lo score CP di settembre
+//    contro l'Infloww di agosto. Ora solo stesso mese, altrimenti niente.
+//  - "in agenzia da" era contato dai soli mesi CP sincronizzati (da giugno 2026):
+//    ora prende la data d'inizio in anagrafica o il primo mese visto in QUALSIASI
+//    fonte (CP o Infloww).
+//  - i mesi "non sincronizzati" non sono un allarme sull'operatore: dichiarato
+//    da dove parte lo storico, righe vuote tolte.
+import { use, useMemo, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
+import { AlertTriangle, Info } from "lucide-react";
+import { CP, FONTS } from "@/lib/brand";
 import { useSmartPeriod } from "@/lib/use-smart-period";
-import { Target, GraduationCap, FileText, ArrowRight, AlertTriangle, Info, Sparkles } from "lucide-react";
+import { fmt$, fmtInt, MONTHS_IT } from "@/lib/format";
+import { PageHead, HeroMetric, Metric, SectionTitle, DataTable, Notice, card } from "@/components/ds";
 
-const fetcher = (url) => fetch(url).then((r) => r.json());
-
-const TIER_COLORS = {
-  Critical: "#D44545", Weak: "#E76F51", Average: "#B89158",
-  Good: "#D4AF7A", Strong: "#3FB97E", Elite: "#4F8CCB",
+const fetcher = async (url) => {
+  const r = await fetch(url);
+  const j = await r.json().catch(() => ({}));
+  return r.ok ? j : { ...j, error: j.error || `Errore ${r.status}` };
 };
-const LANGUAGE_COLORS = { ita: "#3FB97E", eng: "#4F8CCB" };
-
-function fmtCurrency(v) {
-  if (v == null) return "—";
-  return "$" + Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 });
+const REVIEW = 25;
+const sc = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
+const pts = (d) => (d == null ? "" : `${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.abs(d).toLocaleString("it-IT", { maximumFractionDigits: 1 })} punti`);
+const monthName = (pid) => (pid ? `${MONTHS_IT[Number(pid.slice(5)) - 1]} ${pid.slice(0, 4)}` : "");
+const tierColor = (t) => (t === "Critical" || t === "Weak" ? CP.accentRed : t === "Strong" || t === "Elite" ? CP.accentGreen : CP.textSecondary);
+function monthsBetween(a, b) { const [ay, am] = a.split("-").map(Number); const [by, bm] = b.split("-").map(Number); return (by - ay) * 12 + (bm - am); }
+function fmtTenure(m) {
+  if (m == null) return "—";
+  if (m < 1) return "meno di un mese";
+  if (m < 12) return `${m} ${m === 1 ? "mese" : "mesi"}`;
+  const y = Math.floor(m / 12), r = m % 12;
+  return `${y} ${y === 1 ? "anno" : "anni"}${r ? ` e ${r} ${r === 1 ? "mese" : "mesi"}` : ""}`;
 }
-function fmtNum(v) {
-  if (v == null) return "—";
-  return Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 });
-}
-function fmtPctSign(v) {
-  if (v == null) return "—";
-  const sign = v > 0 ? "+" : "";
-  return `${sign}${v}%`;
-}
-function getInitials(name) {
-  if (!name) return "?";
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-function fmtTenure(months) {
-  if (months == null) return "—";
-  if (months < 1) return "< 1 mese";
-  if (months < 12) return `${Math.round(months)} mes${Math.round(months) === 1 ? "e" : "i"}`;
-  const years = Math.floor(months / 12);
-  const rem = Math.round(months - years * 12);
-  if (rem === 0) return `${years} ann${years === 1 ? "o" : "i"}`;
-  return `${years}a ${rem}m`;
-}
-function formatPeriodLabel(periodId) {
-  const m = periodId?.match?.(/^(\d{4})-(\d{2})$/);
-  if (m) {
-    const names = ["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"];
-    return `${names[parseInt(m[2]) - 1]} ${m[1]}`;
-  }
-  return periodId;
-}
-
-function TierBadge({ tier, size = "md" }) {
-  if (!tier) return null;
-  const color = TIER_COLORS[tier] || COLORS.mist;
-  const padding = size === "sm" ? "2px 8px" : "3px 11px";
-  const fontSize = size === "sm" ? 10 : 11;
-  return (
-    <span style={{
-      display: "inline-block", padding, borderRadius: 999,
-      fontSize, fontWeight: 600, letterSpacing: "0.05em", 
-      background: alpha(color, "26"), color, border: `1px solid ${alpha(color, "55")}`,
-      fontFamily: FONTS.body,
-    }}>{tier}</span>
-  );
-}
-
-function ActionBtn({ href, color, icon: Icon, children, onClick }) {
-  const style = {
-    display: "inline-flex", alignItems: "center", gap: 6,
-    padding: "8px 14px",
-    background: alpha(color, "1A"),
-    border: `1px solid ${alpha(color, "55")}`,
-    borderRadius: 8,
-    color,
-    fontSize: 12, fontWeight: 700,
-    cursor: "pointer", textDecoration: "none",
-    fontFamily: FONTS.body,
-  };
-  if (href) return <Link href={href} style={style}>{Icon && <Icon size={13} />}{children}</Link>;
-  return <button onClick={onClick} style={style}>{Icon && <Icon size={13} />}{children}</button>;
-}
-
-function ScoreSpark({ history }) {
-  if (!history?.length || history.length < 2) return null;
-  const max = 100;
-  const w = 100 / Math.max(1, history.length - 1);
-  const points = history.map((h, i) => {
-    const y = h.score != null ? 100 - h.score : 50;
-    return `${(i * w).toFixed(2)},${y.toFixed(1)}`;
-  });
-  return (
-    <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: "100%", height: 50, display: "block" }}>
-      <polyline fill="none" stroke={COLORS.champagne} strokeWidth="1.5" vectorEffect="non-scaling-stroke" points={points.join(" ")} />
-      {history.map((h, i) => {
-        if (h.score == null) return null;
-        const cx = i * w;
-        const cy = 100 - h.score;
-        const color = TIER_COLORS[h.tier] || COLORS.champagne;
-        return <circle key={i} cx={cx} cy={cy} r="1.6" fill={color} vectorEffect="non-scaling-stroke" />;
-      })}
-    </svg>
-  );
-}
-
-function Delta({ value, suffix = "" }) {
-  if (value == null || value === 0) return <span style={{ color: COLORS.mist, fontSize: 11 }}>—</span>;
-  const positive = value > 0;
-  const color = positive ? CP.accentGreen : CP.accentRed;
-  return (
-    <span style={{ color, fontWeight: 600, fontSize: 11, fontFamily: FONTS.mono }}>
-      {positive ? "↑ +" : "↓ "}{Math.abs(value).toFixed(1)}{suffix}
-    </span>
-  );
+function monthOpts(n = 12) {
+  const now = new Date();
+  return Array.from({ length: n }, (_, i) => { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; });
 }
 
 export default function EmployeeDrilldownPage({ params }) {
   const resolved = typeof params?.then === "function" ? use(params) : params;
   let employee = "";
   try { employee = decodeURIComponent(resolved.employee || ""); } catch { employee = resolved.employee || ""; }
+  const [periodId, setPeriodId] = useSmartPeriod();
+  const [showAllMonths, setShowAllMonths] = useState(false);
+  const months = useMemo(() => monthOpts(), []);
+  const isCurrent = periodId === months[0];
 
-  const [periodId] = useSmartPeriod();
-
-  // CP drill-down (current period)
-  const cpUrl = employee && periodId ? `/api/leaderboard/operator-drilldown?employee=${encodeURIComponent(employee)}&period_id=${periodId}` : null;
-  const { data: cpData, error: cpError, isLoading: cpLoading } = useSWR(cpUrl, fetcher, { revalidateOnFocus: false });
-
-  // CP history (nuovo: storia CP retrocalcolata, sostituisce Infloww per trend/tenure/LTV)
-  const cpHistUrl = employee ? `/api/leaderboard/operator-cp-history?employee=${encodeURIComponent(employee)}&last_n=12` : null;
-  const { data: cpHist } = useSWR(cpHistUrl, fetcher, { revalidateOnFocus: false });
-
-  // Infloww history (ancora utile per profile.note, group, language, e per il confronto Infloww score)
-  const histUrl = employee ? `/api/leaderboard/employee-history?employee=${encodeURIComponent(employee)}&period_type=monthly` : null;
-  const { data: histData } = useSWR(histUrl, fetcher, { revalidateOnFocus: false });
+  const q = encodeURIComponent(employee);
+  const { data: cpData, isLoading } = useSWR(employee && periodId ? `/api/leaderboard/operator-drilldown?employee=${q}&period_id=${periodId}` : null, fetcher, { revalidateOnFocus: false });
+  const { data: cpHist } = useSWR(employee ? `/api/leaderboard/operator-cp-history?employee=${q}&last_n=12` : null, fetcher, { revalidateOnFocus: false });
+  const { data: histData } = useSWR(employee ? `/api/leaderboard/employee-history?employee=${q}&period_type=monthly` : null, fetcher, { revalidateOnFocus: false });
 
   const cp = cpData?.cp;
-  const insights = cpData?.insights || [];
-  const history = histData?.history || [];
   const cpHistory = cpHist?.history || [];
+  const infw = histData?.history || [];
+  const infwBy = useMemo(() => new Map(infw.map((h) => [h.period_id, h])), [infw]);
+  const infwSame = infwBy.get(periodId) || null; // SOLO stesso mese
 
-  // Trova score Infloww del periodo corrente
-  const inflowwCurrent = useMemo(() => {
-    if (!history.length || !periodId) return null;
-    return history.find((h) => h.period_id === periodId) || history[history.length - 1];
-  }, [history, periodId]);
+  // mese prima dallo storico CP
+  const prevId = useMemo(() => { const [y, m] = (periodId || "2000-01").split("-").map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }, [periodId]);
+  const prevCp = cpHistory.find((h) => h.period_id === prevId);
+  const prevScore = prevCp?.status === "active" ? prevCp.score : null;
 
-  const inflowwPrev = useMemo(() => {
-    if (!history.length) return null;
-    const idx = history.findIndex((h) => h.period_id === periodId);
-    return idx > 0 ? history[idx - 1] : null;
-  }, [history, periodId]);
+  // anzianità: anagrafica, altrimenti primo mese visto in qualsiasi fonte
+  const tenure = useMemo(() => {
+    if (histData?.profile?.start_date) return { months: histData.tenure_months, source: "anagrafica" };
+    const firsts = [cpHist?.first_seen_period, histData?.ltv?.first_seen, ...infw.map((h) => h.period_id)].filter((x) => /^\d{4}-\d{2}$/.test(x || ""));
+    if (!firsts.length) return null;
+    const first = firsts.sort()[0];
+    return { months: monthsBetween(first, months[0]), source: `primo mese nei dati: ${monthName(first)}` };
+  }, [histData, cpHist, infw, months]);
 
-  // Insight client-side: confronto CP vs Infloww
-  const cpInflowwInsight = useMemo(() => {
-    if (!cp?.score || !inflowwCurrent?.score) return null;
-    const delta = cp.score - inflowwCurrent.score;
-    if (delta > 15) return {
-      severity: "info",
-      text: `Sales CP molto più alto dell'Infloww (Δ ${delta.toFixed(1)}). Due letture possibili: (a) iper-efficiente (vende molto con poco volume chat — top reale), (b) lavora su creator forti che si vendono da sole. La sezione "Performance per creator" sopra aiuta a distinguere.`,
-    };
-    if (delta < -15) return {
-      severity: "warning",
-      text: `Sales CP più basso dell'Infloww (Δ ${delta.toFixed(1)}). Bravo a chattare ma converte poco in $. Opportunità coaching su closing / PPV.`,
-    };
-    return null;
-  }, [cp, inflowwCurrent]);
+  // mesi sotto soglia consecutivi (fino al mese scelto)
+  const streak = useMemo(() => {
+    const act = cpHistory.filter((h) => h.status === "active" && h.period_id <= periodId).sort((a, b) => b.period_id.localeCompare(a.period_id));
+    let n = 0;
+    for (const h of act) { if (h.score != null && h.score <= REVIEW) n++; else break; }
+    return n;
+  }, [cpHistory, periodId]);
 
-  const allInsights = useMemo(() => {
-    const list = [...insights];
-    if (cpInflowwInsight) list.unshift({ kind: "cp_vs_infloww", ...cpInflowwInsight });
-    return list;
-  }, [insights, cpInflowwInsight]);
+  // Da considerare: diagnosi del server + confronto CP↔Infloww SOLO stesso mese
+  const notes = useMemo(() => {
+    const out = [];
+    if (cp?.score != null && cp.score <= REVIEW) {
+      out.push({ severity: "warning", text: streak >= 2 ? `Sotto soglia da ${streak} mesi di fila.` : prevScore != null ? `Primo mese sotto soglia: a ${monthName(prevId)} aveva ${sc(prevScore)}. Un mese storto può dipendere dalla creator o dai turni: guarda “Dove lavora” prima di decidere.` : "Sotto soglia; non c'è un mese prima con cui confrontare." });
+    }
+    if (isCurrent) out.push({ severity: "info", text: `${monthName(periodId)} è ancora in corso: lo score può cambiare fino a fine mese.` });
+    if (cp?.score != null && infwSame?.score != null) {
+      const d = cp.score - infwSame.score;
+      if (d < -15) out.push({ severity: "warning", text: `Nello stesso mese lo score vendite (${sc(cp.score)}) è molto più basso dello score chat Infloww (${sc(infwSame.score)}): chatta bene ma converte poco in vendite. Possibile coaching su chiusura e PPV.` });
+      if (d > 15) out.push({ severity: "info", text: `Nello stesso mese lo score vendite (${sc(cp.score)}) è molto più alto dello score chat Infloww (${sc(infwSame.score)}): vende molto con poca chat, oppure lavora su creator che si vendono da sole — controlla “Dove lavora”.` });
+    }
+    for (const i of cpData?.insights || []) out.push(i);
+    return out;
+  }, [cp, infwSame, cpData, streak, prevScore, prevId, isCurrent, periodId]);
 
-  const cpTierColor = cp?.tier ? TIER_COLORS[cp.tier] : COLORS.champagne;
-  const langColor = histData?.profile?.language ? LANGUAGE_COLORS[histData.profile.language] : COLORS.mist;
+  const perCreator = (cp?.per_creator || []).map((r) => ({ ...r, id: r.creator }));
+  const creatorCols = [
+    { key: "creator", label: "Creator", render: (r) => <Link href={`/leaderboard/creators/${encodeURIComponent(r.creator)}?period_id=${periodId}`} style={{ color: CP.textPrimary, textDecoration: "none", fontWeight: 500 }}>{r.creator}</Link> },
+    { key: "score", label: "Score su questa creator", align: "right", render: (r) => r.low_confidence
+      ? <span style={{ color: CP.textMuted }} title="Troppo pochi turni per uno score affidabile">pochi turni</span>
+      : <span style={{ color: tierColor(r.tier), fontWeight: 500 }}>{sc(r.score)}</span> },
+    { key: "sales", label: "Venduto", align: "right", render: (r) => fmt$(r.sales) },
+    { key: "sales_per_shift", label: "Per turno", align: "right", render: (r) => fmt$(r.sales_per_shift) },
+    { key: "vs_cohort_pct", label: "Rispetto agli altri su questa creator", align: "right", render: (r) => (
+      <span style={{ color: r.vs_cohort_pct == null || r.low_confidence ? CP.textMuted : r.vs_cohort_pct < 0 ? CP.accentRed : CP.accentGreen }} title={r.low_confidence ? "Troppo pochi turni: non è un segnale" : ""}>
+        {r.vs_cohort_pct == null ? "—" : `${r.vs_cohort_pct > 0 ? "+" : r.vs_cohort_pct < 0 ? "−" : ""}${Math.abs(r.vs_cohort_pct)}% per turno`}
+      </span>
+    ) },
+    { key: "shifts", label: "Turni", align: "right", render: (r) => fmtInt(r.shifts) },
+  ];
 
-  // Delta vs ultimo periodo Infloww (per la sparkline)
-  const deltaInfloww = inflowwCurrent?.score != null && inflowwPrev?.score != null
-    ? Math.round((inflowwCurrent.score - inflowwPrev.score) * 10) / 10 : null;
+  const active = cpHistory.filter((h) => h.status === "active");
+  const firstCp = cpHistory.find((h) => h.status !== "not_synced")?.period_id;
+  const histRows = cpHistory.slice().reverse()
+    .filter((h) => showAllMonths || h.status === "active" || infwBy.get(h.period_id)?.score != null)
+    .map((h) => ({ ...h, id: h.period_id, infw: infwBy.get(h.period_id)?.score ?? null }));
 
   return (
-    <div style={{ minHeight: "100vh", background: COLORS.obsidian, color: COLORS.alabaster, fontFamily: FONTS.body, padding: "32px 28px" }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-        {/* HEADER */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: 18, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary, flexWrap: "wrap" }}>
-            <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>Academy</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <Link href="/leaderboard" style={{ color: "inherit", textDecoration: "none" }}>Ladder</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <Link href="/leaderboard/sales-cp" style={{ color: "inherit", textDecoration: "none" }}>Sales CP</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <span style={{ color: CP.textPrimary }}>{employee}</span>
-          </div>
-          <Link href="/admin/employee-profiles" style={{ color: COLORS.champagne, fontSize: 12, textDecoration: "none", padding: "6px 12px", border: `1px solid ${alpha(COLORS.champagne, "44")}`, borderRadius: 8 }}>Anagrafica</Link>
-        </div>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Performance" }, { label: "Sales CP", href: "/leaderboard/sales-cp" }, { label: employee }]}
+        title={employee}
+        subtitle={[cp?.top_creator ? `Lavora soprattutto su ${cp.top_creator}${cp.specialization_pct ? ` (${cp.specialization_pct}% del suo venduto)` : ""}` : null, tenure ? `in agenzia da ${fmtTenure(tenure.months)}` : null].filter(Boolean).join(" · ")}
+        actions={<>
+          <select value={periodId || ""} onChange={(e) => setPeriodId(e.target.value)} aria-label="Mese" style={ctl}>
+            {months.map((m, i) => <option key={m} value={m}>{monthName(m)}{i === 0 ? " (in corso)" : ""}</option>)}
+          </select>
+          {cp?.score != null && cp.score <= REVIEW && <Link href={`/admin/action-center?period_id=${periodId}`} style={{ ...ctl, textDecoration: "none" }}>Action Center</Link>}
+          <Link href="/admin/employee-profiles" style={{ ...ctl, textDecoration: "none" }}>Anagrafica e note</Link>
+        </>}
+      />
 
-        {cpLoading && <p style={{ color: COLORS.fog }}>Caricamento diagnostico…</p>}
-        {cpError && <p style={{ color: COLORS.signal }}>Errore di rete: {String(cpError)}</p>}
-        {cpData?.error && (
-          <div style={{ background: alpha(COLORS.signal, "20"), color: COLORS.signal, padding: 16, borderRadius: 12 }}>{cpData.error}</div>
-        )}
+      {isLoading && !cpData && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
+      {cpData?.error && <Notice danger>{cpData.error}</Notice>}
 
-        {cpData && !cpData.error && (
-          <>
-            {/* ===== BLOCCO 1: SNAPSHOT ===== */}
-            <div style={{
-              background: CP.surface,
-              border: `1px solid ${alpha(cpTierColor, "55")}`,
-              borderRadius: 20, padding: "28px 32px", marginBottom: 20,
-              display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 28, alignItems: "center",
-              position: "relative", overflow: "hidden",
-            }}>
-              <div style={{
-                width: 100, height: 100, borderRadius: "50%",
-                background: COLORS.champagne,
-                color: COLORS.obsidian,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontFamily: FONTS.display, fontWeight: 600, fontSize: 36,
-                border: `3px solid ${COLORS.graphite}`,
-                boxShadow: `0 0 0 3px ${COLORS.champagne}, 0 8px 24px rgba(139,124,246,0.3)`,
-                position: "relative",
-              }}>{getInitials(employee)}</div>
-
-              <div style={{ position: "relative", minWidth: 0 }}>
-                <div style={{ fontFamily: FONTS.display, fontSize: 30, fontWeight: 500, letterSpacing: "-0.01em", marginBottom: 4 }}>{employee}</div>
-                {(cp?.top_creator || histData?.profile?.group) && (
-                  <div style={{ color: COLORS.champagne, fontSize: 12, letterSpacing: "0.12em", marginBottom: 12 }}>
-                    {cp?.top_creator || histData?.profile?.group}
-                    {histData?.profile?.language && (
-                      <span style={{ display: "inline-block", padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700, marginLeft: 8, background: alpha(langColor, "20"), color: langColor, border: `1px solid ${alpha(langColor, "55")}`, fontFamily: FONTS.mono }}>
-                        {histData.profile.language === "eng" ? "EN" : "IT"}
-                      </span>
-                    )}
-                  </div>
-                )}
-                <div style={{ display: "flex", gap: 22, flexWrap: "wrap", fontSize: 13, marginBottom: 14 }}>
-                  <StatMini l="Sales mese" v={fmtCurrency(cp?.total_sales)} color={CP.accentGreen} />
-                  <StatMini l="Shift" v={cp?.total_shifts != null ? Math.round(cp.total_shifts) : "—"} />
-                  <StatMini l="Creator" v={cp?.per_creator?.length ?? 0} sub={cp?.specialization_pct ? `${cp.specialization_pct}% top` : null} />
-                  <StatMini l="Tempo in agency" v={fmtTenure(cpHist?.tenure_months_cp ?? histData?.tenure_months)} sub={cpHist?.first_seen_period ? `dal ${formatPeriodLabel(cpHist.first_seen_period)}` : (histData?.tenure_inferred ? "(stima)" : null)} />
-                  <StatMini l="Fatturato CP totale" v={fmtCurrency(cpHist?.ltv_cp_eur ?? histData?.ltv?.ltv_eur)} sub={`${cpHist?.periods_count ?? histData?.ltv?.periods_count ?? 0} mesi`} color={CP.accentGreen} />
-                </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <ActionBtn href={`/admin/action-center?period_id=${periodId}`} color={CP.accentRed} icon={Target}>Action Center</ActionBtn>
-                  <ActionBtn href="#blocco-azioni" color={CP.accent} icon={GraduationCap}>Coaching</ActionBtn>
-                  <ActionBtn href="/admin/employee-profiles" color={CP.accentSoftText} icon={FileText}>Anagrafica + note</ActionBtn>
-                </div>
-              </div>
-
-              <div style={{ textAlign: "right", position: "relative", display: "flex", flexDirection: "column", gap: 16 }}>
-                <div>
-                  <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.15em", marginBottom: 2 }}>Score CP {formatPeriodLabel(periodId)}</div>
-                  <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 56, lineHeight: 1, color: cpTierColor }}>
-                    {cp?.score != null ? cp.score.toFixed(1) : "—"}
-                  </div>
-                  <div style={{ marginTop: 6, display: "flex", justifyContent: "flex-end", gap: 8, alignItems: "center" }}>
-                    <TierBadge tier={cp?.tier} />
-                    {cp?.rank_agency && (
-                      <span style={{ fontFamily: FONTS.mono, color: COLORS.mist, fontSize: 12 }}>
-                        #{cp.rank_agency}/{cp.total_in_ranking}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {inflowwCurrent?.score != null && (
-                  <div style={{ paddingTop: 12, borderTop: `1px solid ${COLORS.charcoal}` }}>
-                    <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.12em" }}>Score Infw (KPI chat)</div>
-                    <div style={{ fontFamily: FONTS.mono, fontSize: 20, fontWeight: 600, color: COLORS.mist, marginTop: 2 }}>{inflowwCurrent.score.toFixed(1)}</div>
-                    <div style={{ marginTop: 4 }}><Delta value={deltaInfloww} suffix=" pt" /></div>
-                  </div>
-                )}
-              </div>
+      {cpData && !cpData.error && (<>
+        {!cp ? (
+          <Notice>Nessun dato CreatorsPro per {employee} a {monthName(periodId)}: non collegato a CreatorsPro o nessun turno nel mese. <Link href="/admin/creatorspro-sync#collega" style={{ color: CP.accentSoftText }}>Persone da collegare →</Link></Notice>
+        ) : (
+          <HeroMetric
+            label={`Score vendite · ${monthName(periodId)}${isCurrent ? " (in corso)" : ""}`}
+            value={<span style={{ color: tierColor(cp.tier) }}>{sc(cp.score)}</span>}
+            compare={[cp.tier, cp.rank_agency ? `${cp.rank_agency}º su ${cp.total_in_ranking}` : null, prevScore != null ? `${monthName(prevId)}: ${sc(prevScore)} (${pts(cp.score - prevScore)})` : null].filter(Boolean).join(" · ")}
+            hint="0-100: venduto per turno rispetto a chi lavora sulle stesse creator (70%) e a tutta l'agenzia (30%)."
+          >
+            <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+              <Metric label={isCurrent ? "Venduto finora" : "Venduto"} value={fmt$(cp.total_sales)} note={prevCp?.total_sales != null && prevCp.status === "active" ? `${monthName(prevId)}: ${fmt$(prevCp.total_sales)}` : null} />
+              <Metric label="Turni" value={fmtInt(cp.total_shifts)} />
+              <Metric label="Per turno" value={fmt$(cp.total_shifts ? cp.total_sales / cp.total_shifts : null)} note={prevCp?.status === "active" && prevCp.total_shifts ? `${monthName(prevId)}: ${fmt$(prevCp.total_sales / prevCp.total_shifts)}` : null} />
+              {infwSame?.score != null && <Metric label="Score chat Infloww" value={sc(infwSame.score)} note="stesso mese" />}
             </div>
-
-            {/* ===== BLOCCO 2: PERFORMANCE PER CREATOR ===== */}
-            <Section title="Performance per creator" subtitle="Dove è forte, dove è debole. Score CP locale = come performa rispetto agli altri operatori sulla stessa creator.">
-              {!cp?.per_creator?.length ? (
-                <EmptyBlock text={`Nessun dato CP attribuito a ${employee} per ${formatPeriodLabel(periodId)}. Possibili cause: non mappato in CreatorsPro, oppure nessun shift sincronizzato.`} />
-              ) : (
-                <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, overflow: "hidden" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.8fr 0.7fr 0.7fr 0.8fr 0.9fr 0.6fr 0.6fr 0.5fr", padding: "12px 20px", background: alpha(COLORS.obsidian, "80"), color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` }}>
-                    <div>Creator</div>
-                    <div title="Score CP percentile su quella specifica creator">Score loc.</div>
-                    <div>Tier</div>
-                    <div title="Sales totali attribuite (split su shift multi-creator)">Sales</div>
-                    <div title="Sales medio per shift">$/Shift</div>
-                    <div title="Numero shift attribuiti">Shift</div>
-                    <div title="Differenza % vs sales/shift medio degli operatori sulla stessa creator">vs cohort</div>
-                    <div></div>
-                  </div>
-                  {cp.per_creator.map((row) => {
-                    const tierColor = row.tier ? TIER_COLORS[row.tier] : COLORS.mist;
-                    const cohortColor = row.vs_cohort_pct == null ? COLORS.mist
-                      : row.vs_cohort_pct > 0 ? CP.accentGreen : CP.accentRed;
-                    return (
-                      <div key={row.creator} style={{ display: "grid", gridTemplateColumns: "1.8fr 0.7fr 0.7fr 0.8fr 0.9fr 0.6fr 0.6fr 0.5fr", padding: "12px 20px", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, alignItems: "center", fontSize: 13 }}>
-                        <div>
-                          <Link href={`/leaderboard/creators/${encodeURIComponent(row.creator)}`} style={{ color: COLORS.alabaster, textDecoration: "none", fontWeight: 500 }}>
-                            {row.creator} <span style={{ color: COLORS.champagne, opacity: 0.5, fontSize: 11 }}>›</span>
-                          </Link>
-                        </div>
-                        <div style={{ fontFamily: FONTS.mono, fontWeight: 700, color: tierColor }}>
-                          {row.score != null ? row.score.toFixed(1) : "—"}
-                          {row.low_confidence && <span title={`Solo ${row.shift_events_total} shift events: dato non affidabile`} style={{ color: COLORS.mist, fontSize: 10, marginLeft: 4 }}>⚠</span>}
-                        </div>
-                        <div><TierBadge tier={row.tier} size="sm" /></div>
-                        <div style={{ fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmtCurrency(row.sales)}</div>
-                        <div style={{ fontFamily: FONTS.mono }}>{fmtCurrency(row.sales_per_shift)}</div>
-                        <div style={{ fontFamily: FONTS.mono, color: COLORS.fog }}>{Math.round(row.shifts)}</div>
-                        <div style={{ fontFamily: FONTS.mono, fontWeight: 600, color: cohortColor, fontSize: 12 }}>
-                          {fmtPctSign(row.vs_cohort_pct)}
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <Link href={`/leaderboard/creators/${encodeURIComponent(row.creator)}`} style={{ color: COLORS.champagne, opacity: 0.6, textDecoration: "none", fontSize: 11 }}>open</Link>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </Section>
-
-            {/* ===== BLOCCO 3: TREND STORICO ===== */}
-            <Section title="Trend storico CP" subtitle="Score CP percentile per mese (retrocalcolato dai matrix). Score Infloww affiancato per riferimento. Mesi non syncati o senza attività dell'operatore sono mostrati esplicitamente.">
-              {cpHistory.length === 0 && history.length === 0 ? (
-                <EmptyBlock text="Nessuno storico disponibile per questo operatore." />
-              ) : (
-                <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, padding: 22 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 12, color: COLORS.fog, fontFamily: FONTS.mono, letterSpacing: "0.1em" }}>
-                      Andamento score CP · {cpHist?.periods_count ?? 0} mesi attivi su {cpHist?.looked_back ?? 12}
-                    </span>
-                    {cpHist?.periods_not_synced > 0 && (
-                      <Link href="/admin/wage-audit" style={{ fontSize: 11, color: CP.accentRed, padding: "4px 10px", background: alpha(CP.accentRed, "1F"), border: `1px solid ${alpha(CP.accentRed, "66")}`, borderRadius: 999, textDecoration: "none" }}>
-                        ⚠ {cpHist.periods_not_synced} mesi non syncati · audit
-                      </Link>
-                    )}
-                  </div>
-                  <ScoreSpark history={cpHistory.filter((h) => h.status === "active")} />
-                  <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 0.7fr 0.6fr 0.7fr 0.8fr 0.6fr 1fr", gap: 8, fontSize: 11, color: COLORS.fog, paddingBottom: 6, borderBottom: `1px solid ${COLORS.charcoal}` }}>
-                    <div>Periodo</div><div>Score CP</div><div>Tier</div><div>Score Infw</div><div>Sales CP</div><div>Shift</div><div>Stato</div>
-                  </div>
-                  {cpHistory.slice().reverse().slice(0, 12).map((h, i) => {
-                    const infwForPeriod = history.find((x) => x.period_id === h.period_id);
-                    const isActive = h.status === "active";
-                    const statusLabel = h.status === "not_synced" ? "non syncato"
-                      : h.status === "no_activity" ? "nessuna attività"
-                      : "attivo";
-                    const statusColor = h.status === "not_synced" ? CP.accentRed
-                      : h.status === "no_activity" ? COLORS.mist
-                      : CP.accentGreen;
-                    return (
-                      <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 0.7fr 0.6fr 0.7fr 0.8fr 0.6fr 1fr", gap: 8, padding: "8px 0", borderBottom: `1px solid ${alpha(COLORS.charcoal, "55")}`, fontSize: 12, alignItems: "center", opacity: isActive ? 1 : 0.55 }}>
-                        <div style={{ fontFamily: FONTS.mono }}>{formatPeriodLabel(h.period_id)}</div>
-                        <div style={{ fontFamily: FONTS.mono, fontWeight: 600, color: h.tier ? TIER_COLORS[h.tier] : COLORS.mist }}>{h.score != null ? h.score.toFixed(1) : "—"}</div>
-                        <div>{h.tier ? <TierBadge tier={h.tier} size="sm" /> : <span style={{ color: COLORS.mist }}>—</span>}</div>
-                        <div style={{ fontFamily: FONTS.mono, color: COLORS.mist, fontSize: 11 }}>{infwForPeriod?.score != null ? infwForPeriod.score.toFixed(1) : "—"}</div>
-                        <div style={{ fontFamily: FONTS.mono, color: h.total_sales > 0 ? CP.accentGreen : COLORS.mist }}>{h.total_sales != null ? fmtCurrency(h.total_sales) : "—"}</div>
-                        <div style={{ fontFamily: FONTS.mono, color: COLORS.fog }}>{h.total_shifts != null ? Math.round(h.total_shifts) : "—"}</div>
-                        <div style={{ fontSize: 10, color: statusColor, fontWeight: 600 }}>{statusLabel}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </Section>
-
-            {/* ===== BLOCCO 4: DIAGNOSI + AZIONI ===== */}
-            <Section title="Diagnosi automatica" subtitle="Pattern derivati dai dati: usali come prompt di conversazione per le decisioni HR / coaching." id="blocco-azioni">
-              {allInsights.length === 0 ? (
-                <EmptyBlock text="Nessun pattern significativo rilevato. Performance allineata, niente outlier evidenti." icon={Sparkles} />
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {allInsights.map((ins, i) => (
-                    <InsightCard key={i} insight={ins} />
-                  ))}
-                </div>
-              )}
-
-              {cp?.peer_strong?.length > 0 && (
-                <div style={{ marginTop: 18 }}>
-                  <div style={{ fontSize: 11, color: COLORS.fog, fontFamily: FONTS.mono, letterSpacing: "0.1em", marginBottom: 10 }}>
-                    Peer Strong+ sulle stesse creator
-                  </div>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    {cp.peer_strong.map((p) => (
-                      <Link key={p.name} href={`/leaderboard/operational/${encodeURIComponent(p.name)}`} style={{
-                        display: "inline-flex", alignItems: "center", gap: 8,
-                        padding: "8px 14px",
-                        background: COLORS.graphite,
-                        border: `1px solid ${COLORS.charcoal}`,
-                        borderRadius: 999,
-                        color: COLORS.alabaster,
-                        textDecoration: "none",
-                        fontSize: 13,
-                      }}>
-                        <span style={{ fontWeight: 500 }}>{p.name}</span>
-                        <span style={{ fontFamily: FONTS.mono, color: TIER_COLORS[p.tier] || COLORS.champagne, fontWeight: 700 }}>{p.score.toFixed(1)}</span>
-                        <span style={{ fontSize: 10, color: COLORS.mist }}>{p.shared} creator condiv.</span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </Section>
-          </>
+          </HeroMetric>
         )}
+
+        {notes.length > 0 && (
+          <section style={{ ...card, padding: "12px 16px", marginBottom: 18 }}>
+            <SectionTitle aside="letture automatiche: spunti per la conversazione, non verdetti">Da considerare</SectionTitle>
+            {notes.map((n, i) => (
+              <div key={i} style={{ display: "flex", gap: 10, padding: "8px 0", borderTop: i ? `1px solid ${CP.borderSoft}` : "none", fontSize: 14, lineHeight: 1.5, color: CP.textPrimary }}>
+                {n.severity === "warning" ? <AlertTriangle size={15} color={CP.accentRed} style={{ flexShrink: 0, marginTop: 3 }} /> : <Info size={15} color={CP.textMuted} style={{ flexShrink: 0, marginTop: 3 }} />}
+                <span>{n.text}</span>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {perCreator.length > 0 && (
+          <section style={{ marginBottom: 18 }}>
+            <SectionTitle aside="dove rende e dove no, rispetto a chi lavora sulle stesse creator">Dove lavora</SectionTitle>
+            <DataTable columns={creatorCols} rows={perCreator} defaultSort={{ key: "sales", dir: -1 }} minWidth={760} />
+          </section>
+        )}
+
+        <section style={{ marginBottom: 18 }}>
+          <SectionTitle aside={firstCp ? `storico CreatorsPro disponibile da ${monthName(firstCp)}` : null}>Andamento</SectionTitle>
+          {active.length >= 2 && <Spark points={active} />}
+          {histRows.length === 0 ? (
+            <div style={{ ...card, padding: 16, fontSize: 14, color: CP.textMuted }}>Nessuno storico disponibile.</div>
+          ) : (
+            <DataTable rows={histRows} minWidth={640} columns={[
+              { key: "period_id", label: "Mese", render: (h) => monthName(h.period_id) },
+              { key: "score", label: "Score vendite", align: "right", render: (h) => h.status === "active" ? <span style={{ color: tierColor(h.tier), fontWeight: 500 }}>{sc(h.score)}</span> : <span style={{ color: CP.textMuted }}>{h.status === "no_activity" ? "nessun turno" : "dati CP non disponibili"}</span> },
+              { key: "total_sales", label: "Venduto", align: "right", render: (h) => h.status === "active" ? fmt$(h.total_sales) : "—" },
+              { key: "total_shifts", label: "Turni", align: "right", render: (h) => h.status === "active" ? fmtInt(h.total_shifts) : "—" },
+              { key: "infw", label: "Score chat Infloww", align: "right", muted: true, render: (h) => sc(h.infw) },
+            ]} />
+          )}
+          <button onClick={() => setShowAllMonths((v) => !v)} style={{ marginTop: 8, background: "none", border: "none", padding: 0, color: CP.accentSoftText, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body }}>
+            {showAllMonths ? "Mostra solo i mesi con dati" : "Mostra tutti gli ultimi 12 mesi"}
+          </button>
+        </section>
+
+        {cp?.peer_strong?.length > 0 && (
+          <section style={{ marginBottom: 18 }}>
+            <SectionTitle aside="utili come riferimento o affiancamento">Chi rende meglio sulle stesse creator</SectionTitle>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {cp.peer_strong.map((p) => (
+                <Link key={p.name} href={`/leaderboard/operational/${encodeURIComponent(p.name)}`} style={{ ...card, padding: "8px 12px", textDecoration: "none", color: CP.textPrimary, fontSize: 14, display: "inline-flex", gap: 8 }}>
+                  <span style={{ fontWeight: 500 }}>{p.name}</span>
+                  <span style={{ color: tierColor(p.tier) }}>{sc(p.score)}</span>
+                  <span style={{ color: CP.textMuted, fontSize: 13 }}>{p.shared} {p.shared === 1 ? "creator in comune" : "creator in comune"}</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+      </>)}
+    </div>
+  );
+}
+
+// Andamento dello score sui mesi con dati: linea + soglia di revisione.
+function Spark({ points }) {
+  const W = 600, H = 90, pad = 8;
+  const xs = (i) => pad + (i * (W - 2 * pad)) / Math.max(1, points.length - 1);
+  const ys = (v) => H - pad - ((v ?? 0) / 100) * (H - 2 * pad);
+  return (
+    <div style={{ ...card, padding: "10px 14px", marginBottom: 8 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 90, display: "block" }} role="img" aria-label="Andamento score">
+        <line x1={pad} x2={W - pad} y1={ys(REVIEW)} y2={ys(REVIEW)} stroke={CP.accentRed} strokeDasharray="4 4" strokeWidth="1" opacity="0.6" />
+        <polyline fill="none" stroke={CP.accent} strokeWidth="2" points={points.map((p, i) => `${xs(i)},${ys(p.score)}`).join(" ")} />
+        {points.map((p, i) => <circle key={p.period_id} cx={xs(i)} cy={ys(p.score)} r="4" fill={CP.surface} stroke={CP.accent} strokeWidth="2" />)}
+      </svg>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: CP.textMuted }}>
+        <span>{monthName(points[0].period_id)}</span>
+        <span>linea tratteggiata = soglia di revisione ({REVIEW})</span>
+        <span>{monthName(points[points.length - 1].period_id)}</span>
       </div>
     </div>
   );
 }
 
-function StatMini({ l, v, sub, color }) {
-  return (
-    <div>
-      <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.1em" }}>{l}</div>
-      <div style={{ fontFamily: FONTS.mono, fontSize: 16, fontWeight: 600, marginTop: 2, color: color || COLORS.alabaster }}>{v}</div>
-      {sub && <div style={{ fontSize: 10, color: COLORS.mist, marginTop: 2 }}>{sub}</div>}
-    </div>
-  );
-}
-
-function Section({ title, subtitle, children, id }) {
-  return (
-    <div id={id} style={{ marginBottom: 24 }}>
-      <h2 style={{ fontFamily: FONTS.display, fontSize: 20, fontWeight: 500, letterSpacing: "-0.01em", marginBottom: 4 }}>{title}</h2>
-      {subtitle && <p style={{ color: COLORS.fog, fontSize: 13, marginBottom: 14, maxWidth: 900, lineHeight: 1.5 }}>{subtitle}</p>}
-      {children}
-    </div>
-  );
-}
-
-function EmptyBlock({ text, icon: Icon }) {
-  return (
-    <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, padding: "32px 22px", textAlign: "center", color: COLORS.mist, fontSize: 13 }}>
-      {Icon && <Icon size={28} color={COLORS.champagne} style={{ marginBottom: 8, opacity: 0.6 }} />}
-      {Icon && <br />}
-      {text}
-    </div>
-  );
-}
-
-function InsightCard({ insight }) {
-  const colors = {
-    warning: { bg: alpha(CP.accentRed, "14"), border: alpha(CP.accentRed, "59"), icon: CP.accentRed, Icon: AlertTriangle },
-    info:    { bg: alpha(CP.accentSoftText, "14"), border: alpha(CP.accentSoftText, "59"), icon: CP.accentSoftText, Icon: Info },
-  };
-  const c = colors[insight.severity] || colors.info;
-  return (
-    <div style={{
-      display: "flex", gap: 14, padding: "16px 20px",
-      background: c.bg, border: `1px solid ${c.border}`,
-      borderRadius: 12, alignItems: "flex-start",
-    }}>
-      <c.Icon size={18} color={c.icon} style={{ flexShrink: 0, marginTop: 1 }} />
-      <div style={{ fontSize: 14, lineHeight: 1.55, color: COLORS.alabaster }}>{insight.text}</div>
-    </div>
-  );
-}
+const ctl = { padding: "8px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
