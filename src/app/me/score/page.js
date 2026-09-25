@@ -68,8 +68,8 @@ function NotLinked({ reason }) {
 //  - MESTIERE (Infloww): come chatti; è quello del percorso di carriera.
 // Prima l'operatore vedeva solo il secondo, etichettato "Critical" anche al 68°
 // percentile (soglie fisse tarate a gen-mag): Andrea Terranova, 2º per vendite
-// (89,1), leggeva "27,6 Critical". Le fasce del mestiere sono SOSPESE finché non
-// vengono ricalibrate: si mostrano numero e posizione, non l'etichetta.
+// (89,1), leggeva "27,6 Critical". v0.6: fasce ricalibrate sui percentili reali
+// (leaderboard-config v12), di nuovo mostrate.
 function currentMonth() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
 
 export default function MyScorePage() {
@@ -139,7 +139,7 @@ export default function MyScorePage() {
               <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
                 <span style={{ fontFamily: FONTS.display, fontSize: 34, fontWeight: 600, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{data.score}</span>
               </div>
-              <div style={{ fontSize: 12, color: CP.textMuted }}>fasce in ricalibrazione</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: TIER_COLORS[data.tier] || CP.textSecondary }}>{data.tier}</div>
             </div>
             <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, padding: "16px 22px", minWidth: 150 }}>
               <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: CP.textMuted, marginBottom: 4 }}>La tua posizione</div>
@@ -182,7 +182,7 @@ export default function MyScorePage() {
                 {data.history.map((h) => (
                   <div key={h.period_id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 52 }}>
                     <span style={{ fontSize: 11.5, fontFamily: FONTS.mono, color: CP.textSecondary }}>{h.score != null ? Math.round(h.score) : "—"}</span>
-                    <div style={{ width: 26, height: `${Math.max(4, (h.score || 0) * 0.8)}px`, background: CP.accent, borderRadius: 5, opacity: 0.75 }} />
+                    <div style={{ width: 26, height: `${Math.max(4, (h.score || 0) * 0.8)}px`, background: TIER_COLORS[h.tier] || CP.accent, borderRadius: 5, opacity: 0.85 }} />
                     <span style={{ fontSize: 10, color: CP.textMuted }}>{String(h.period_id).slice(5)}</span>
                   </div>
                 ))}
@@ -191,7 +191,7 @@ export default function MyScorePage() {
           )}
 
           <p style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 18, lineHeight: 1.6 }}>
-            Lo score mestiere viene dall&apos;export Infloww e si aggiorna quando il mese viene importato. Le fasce (Critical, Weak…) sono sospese mentre le soglie vengono ricalibrate sui dati di quest&apos;anno.{data.formula?.hash ? ` Formula del mese ${data.formula.hash}, congelata all'import: il tuo storico non cambia in silenzio.` : ""}
+            Lo score mestiere viene dall&apos;export Infloww e si aggiorna quando il mese viene importato. Le fasce vanno da Critical (il 10% più basso) a Elite (il 10% più alto), tarate sui dati di quest&apos;anno.{data.formula?.hash ? ` Formula del mese ${data.formula.hash}, congelata all'import: il tuo storico non cambia in silenzio.` : ""}
           </p>
           <p style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 8, lineHeight: 1.6 }}>
             Pensi che un numero sia sbagliato? <Link href="/me/contestazioni" style={{ color: CP.accent }}>Apri una contestazione</Link> — le correzioni vengono sempre tracciate, mai fatte in silenzio.
