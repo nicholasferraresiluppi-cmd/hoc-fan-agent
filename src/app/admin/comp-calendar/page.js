@@ -388,7 +388,7 @@ export default function CompCalendarPage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 20 }}>
             <StatCard label="Venduto sulla creator" value={fmt$(grid.totSales)} sub={`${grid.rows.length} turni`} />
             <StatCard label="Pagato agli operatori" value={fmt$(grid.totEarn)} sub="quota attribuita a questa creator" />
-            <StatCard label="Costo sul venduto" value={grid.totSales > 0 ? fmtPct(grid.totEarn / grid.totSales, 1) : "—"} sub="pagato ÷ venduto" />
+            <StatCard label="Costo sul venduto" value={grid.totSales > 0 ? fmtPct(grid.totEarn / grid.totSales, 1) : "—"} sub="quanto pagato su ogni $ venduto" />
             <StatCard label="Operatori" value={grid.operators.length} sub="con almeno un turno" />
             <StatCard label="Fasce scoperte" value={grid.emptyCells} color={grid.emptyCells > 0 ? CP.accentRed : undefined} sub={`su ${grid.days.length * grid.mainSlots.length} fasce del mese`} />
           </div>
