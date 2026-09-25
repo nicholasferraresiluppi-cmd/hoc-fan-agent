@@ -19,6 +19,7 @@
  */
 import { auth } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
+import { getWages } from "@/lib/cp-wages-store";
 
 function lastMonthIds(n) {
   const out = [];
@@ -38,7 +39,7 @@ export async function GET(request) {
   const lastN = Math.max(1, Math.min(36, parseInt(url.searchParams.get("last_n") || "24", 10)));
   const periodIds = lastMonthIds(lastN);
 
-  const wagesArr = await Promise.all(periodIds.map((pid) => kv.get(`cp:wages:${pid}`)));
+  const wagesArr = await Promise.all(periodIds.map((pid) => getWages(pid)));
 
   const periods = periodIds.map((pid, i) => {
     const wages = Array.isArray(wagesArr[i]) ? wagesArr[i] : [];

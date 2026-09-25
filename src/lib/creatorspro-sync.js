@@ -28,6 +28,7 @@ import {
   fetchWages,
   bucketizeIntervalFromHour,
 } from "./creatorspro-api";
+import { getWages, setWages } from "@/lib/cp-wages-store";
 
 const TTL_WAGES = 90 * 24 * 3600;
 const TTL_REFDATA = 7 * 24 * 3600;
@@ -176,7 +177,7 @@ export async function prepareSync({ periodId, pageOffset = null, pagesLimit = nu
         prepare_done: false,
         failed_pages: [],
       }, { ex: TTL_SYNC_STATE });
-      await kv.set(`cp:wages:${periodId}`, [], { ex: TTL_WAGES });
+      await setWages(periodId, [], { ex: TTL_WAGES });
     }
     // Fetch first page per scoprire pagination (con retry interno via fetchWageStubsForPages)
     const firstResult = await fetchWageStubsForPages({ startedAt, endedAt, pages: [pageOffset] });
@@ -257,7 +258,7 @@ export async function prepareSync({ periodId, pageOffset = null, pagesLimit = nu
     stubs: idxStubs, total: idxStubs.length, raw_total: totalCount, page_count: pageCount,
     started_at: Date.now(), prepare_done: true, failed_pages: failedPages,
   }, { ex: TTL_SYNC_STATE });
-  await kv.set(`cp:wages:${periodId}`, [], { ex: TTL_WAGES });
+  await setWages(periodId, [], { ex: TTL_WAGES });
   return { total: idxStubs.length, raw_total: totalCount, failed_pages: failedPages, done: true };
 }
 
@@ -313,9 +314,9 @@ export async function syncWageBatch({ periodId, offset = 0, batchSize = 50 }) {
   const failedDetails = details.filter((d) => d?._error).map((d) => ({ id: d._id, error: d._error }));
 
   // Append a cp:wages:{periodId}
-  const existing = (await kv.get(`cp:wages:${periodId}`)) || [];
+  const existing = (await getWages(periodId)) || [];
   const merged = [...existing, ...normalized];
-  await kv.set(`cp:wages:${periodId}`, merged, { ex: TTL_WAGES });
+  await setWages(periodId, merged, { ex: TTL_WAGES });
 
   // Persist failed detail ids in state (per retry mirato eventuale)
   if (failedDetails.length > 0) {
@@ -356,12 +357,12 @@ export async function retryFailedDetails({ periodId }) {
     .map(normalizeWage);
   const stillFailed = details.filter((d) => d?._error).map((d) => ({ id: d._id, error: d._error }));
 
-  const existing = (await kv.get(`cp:wages:${periodId}`)) || [];
+  const existing = (await getWages(periodId)) || [];
   // Dedupe by wage id
   const existingIds = new Set(existing.map((w) => w.id));
   const newWages = normalized.filter((w) => !existingIds.has(w.id));
   const merged = [...existing, ...newWages];
-  await kv.set(`cp:wages:${periodId}`, merged, { ex: TTL_WAGES });
+  await setWages(periodId, merged, { ex: TTL_WAGES });
 
   await kv.set(`cp:sync:state:${periodId}`, {
     ...state,
@@ -377,7 +378,7 @@ export async function retryFailedDetails({ periodId }) {
 export async function finalizeSync({ periodId }) {
   const [state, wages, members] = await Promise.all([
     kv.get(`cp:sync:state:${periodId}`),
-    kv.get(`cp:wages:${periodId}`),
+    getWages(periodId),
     kv.get("cp:members"),
   ]);
   if (!state) throw new Error(`Stato sync mancante per ${periodId}`);

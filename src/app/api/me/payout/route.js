@@ -12,6 +12,7 @@
 import { kv } from "@vercel/kv";
 import { resolveEmployeeForUser, findLatestWagePeriod, findOwnRecord } from "@/lib/me";
 import { calcCumulativeEarning } from "@/lib/wage-calc";
+import { getWages } from "@/lib/cp-wages-store";
 
 export async function GET(request) {
   const who = await resolveEmployeeForUser();
@@ -31,7 +32,7 @@ export async function GET(request) {
 
   let wages = [];
   try {
-    wages = (await kv.get(`cp:wages:${periodId}`)) || [];
+    wages = (await getWages(periodId)) || [];
   } catch {}
   const mine = findOwnRecord(wages, who.employee, "member_name");
   if (!mine) {

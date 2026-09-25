@@ -2,6 +2,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
 import { buildCreatorMatrix } from "@/lib/creator-aggregates";
 import { rosterMatchForEmail, nameForEmployeeId } from "@/lib/infloww-roster";
+import { getWages } from "@/lib/cp-wages-store";
 
 /**
  * Risoluzione identità per la superficie operatore (scope own).
@@ -24,7 +25,7 @@ export async function findLatestWagePeriod() {
   for (let i = 0; i < 24; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const pid = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const wages = await kv.get(`cp:wages:${pid}`);
+    const wages = await getWages(pid);
     if (Array.isArray(wages) && wages.length > 0) return pid;
   }
   return null;

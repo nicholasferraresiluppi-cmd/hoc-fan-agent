@@ -24,6 +24,7 @@ import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { fetchWages, fetchAllWageStubs, fetchWageDetailBatch } from "@/lib/creatorspro-api";
 import { logAuditAction } from "@/lib/audit-log";
+import { getWages, setWages } from "@/lib/cp-wages-store";
 
 export const maxDuration = 60;
 
@@ -54,7 +55,7 @@ export async function GET(request) {
 
   // KV counts + gap-check cachato (rete di sicurezza), letture difensive
   const settled = await Promise.allSettled([
-    ...periodIds.map((pid) => kv.get(`cp:wages:${pid}`)),
+    ...periodIds.map((pid) => getWages(pid)),
     ...periodIds.map((pid) => kv.get(`cp:sync:gap:${pid}`)),
   ]);
   const vals = settled.map((r) => (r.status === "fulfilled" ? r.value : null));
@@ -117,7 +118,7 @@ export async function POST(request) {
   if (action === "recover_all_gaps") {
     const lastN = Math.max(1, Math.min(24, Number(body?.last_n) || 12));
     const periodIds = lastMonthIds(lastN);
-    const kvWages = await Promise.all(periodIds.map((pid) => kv.get(`cp:wages:${pid}`)));
+    const kvWages = await Promise.all(periodIds.map((pid) => getWages(pid)));
     const liveCounts = await Promise.all(periodIds.map(async (pid) => {
       try {
         const { startedAt, endedAt } = monthBoundsIso(pid);
@@ -164,7 +165,7 @@ async function recoverSingleMonth(period_id, actorUserId) {
   const { startedAt, endedAt } = monthBoundsIso(period_id);
   const { stubs, totalCount, pageCount, failedPages } = await fetchAllWageStubs({ startedAt, endedAt });
 
-  const existing = (await kv.get(`cp:wages:${period_id}`)) || [];
+  const existing = (await getWages(period_id)) || [];
   const existingIds = new Set(existing.map((w) => w.id).filter(Boolean));
 
   const missingIds = stubs.filter((s) => s.id && !existingIds.has(s.id)).map((s) => s.id);
@@ -190,7 +191,7 @@ async function recoverSingleMonth(period_id, actorUserId) {
     } catch {}
   }
   const merged = [...existing, ...normalized];
-  await kv.set(`cp:wages:${period_id}`, merged);
+  await setWages(period_id, merged);
 
   await logAuditAction({
     actor: actorUserId,
