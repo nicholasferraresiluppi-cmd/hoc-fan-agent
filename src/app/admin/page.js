@@ -189,7 +189,7 @@ export default function AdminHub() {
         label={`Venduto agenzia · ${monthName} finora`}
         value={fmt$(soFar)}
         compare={projection && prevTotal ? `A questo ritmo ~${fmt$(projection)} a fine mese · ${MONTHS_IT[(now.getMonth() + 11) % 12]} intero: ${fmt$(prevTotal)} (${fmtDelta(projection, prevTotal)})` : prevTotal ? `${MONTHS_IT[(now.getMonth() + 11) % 12]} intero: ${fmt$(prevTotal)}` : null}
-        hint={`Dati CreatorsPro aggiornati ${fmtAgo(lastSync)}${syncStale ? " — più vecchi del solito, controlla il sync" : ""}`}
+        hint={sync ? `Dati CreatorsPro aggiornati ${fmtAgo(lastSync)}${syncStale ? " — più vecchi del solito, controlla il sync" : ""}` : null}
       >
         <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
           <Metric label="Operatori attivi" value={fmtInt(sales?.eligible_total)} delta={fmtDelta(sales?.eligible_total, salesPrev?.eligible_total)} />
@@ -213,7 +213,7 @@ export default function AdminHub() {
             <ActionRow key={a.fingerprint} severity={a.severity}
               title={`${a.value ? `${a.value} · ` : ""}${a.title}`}
               detail={`aperto ${fmtAgo(a.firstSeen)} · ${a.status === "ack" ? `in carico a ${a.ackBy || "?"}` : "nessuno in carico"}`}
-              href={a.cta?.href} cta={a.cta?.label} />
+              href={a.cta?.href && allowed(a.cta.href.split("?")[0]) ? a.cta.href : null} cta={a.cta?.label} />
           ))}
           <div style={{ padding: "10px 16px", borderTop: `1px solid ${CP.borderSoft}` }}>
             <Link href="/admin/alerts" style={{ fontSize: 13, color: CP.accentSoftText, textDecoration: "none" }}>
