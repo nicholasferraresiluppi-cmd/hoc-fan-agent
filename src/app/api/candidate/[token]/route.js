@@ -33,13 +33,15 @@ function toContext(rec) {
   };
 }
 
-export async function GET(request, { params }) {
+export async function GET(request, props) {
+  const params = await props.params;
   const rec = await getAssessment(params?.token);
   if (!rec) return Response.json({ ok: false, error: "Link non valido." }, { status: 404 });
   return Response.json(toContext(rec));
 }
 
-export async function POST(request, { params }) {
+export async function POST(request, props) {
+  const params = await props.params;
   const rec = await getAssessment(params?.token);
   if (!rec) return Response.json({ ok: false, error: "Link non valido." }, { status: 404 });
   if (rec.status === ASSESSMENT_STATUS.COMPLETED) {

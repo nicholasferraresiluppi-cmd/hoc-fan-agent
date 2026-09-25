@@ -10,8 +10,13 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
+  // `dynamic` (Clerk 6): ripristina il comportamento di Clerk 5 — stato auth
+  // letto a ogni richiesta e nessuna pagina prerenderizzata statica. Senza,
+  // Next 15 prova a prerenderizzare le pagine client (useSearchParams senza
+  // Suspense → build rotta) e il primo paint non conosce l'utente.
   return (
     <ClerkProvider
+      dynamic
       localization={itIT}
       appearance={{
         variables: {

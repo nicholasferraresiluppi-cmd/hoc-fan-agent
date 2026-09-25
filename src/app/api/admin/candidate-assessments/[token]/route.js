@@ -12,7 +12,8 @@ import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { getAssessment, recordOutcome } from "@/lib/candidate-assessments";
 import { logAuditAction } from "@/lib/audit-log";
 
-export async function GET(request, { params }) {
+export async function GET(request, props) {
+  const params = await props.params;
   const az = await authorize(CAPABILITIES.SEED);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const item = await getAssessment(params?.token);
@@ -20,7 +21,8 @@ export async function GET(request, { params }) {
   return Response.json({ item });
 }
 
-export async function PATCH(request, { params }) {
+export async function PATCH(request, props) {
+  const params = await props.params;
   const az = await authorize(CAPABILITIES.SEED);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
