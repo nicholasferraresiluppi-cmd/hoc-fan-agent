@@ -46,17 +46,18 @@ export async function GET(request) {
     return Response.json({ linked: true, employee, period_id: periodId, reason: "no_data_for_period", available_periods: periods.slice(0, 12) });
   }
 
-  const [settings, exclusions, snapshot] = await Promise.all([
+  const [settings, exclusions, snapshot, groupLanguages] = await Promise.all([
     loadSettings(),
     kv.get("leaderboard:exclusions").catch(() => ({})),
     kv.get(`ops_kpi:score_snapshot:monthly:${periodId}`).catch(() => null),
+    kv.get("group_languages").catch(() => ({})),
   ]);
 
   // Stesso default della vista operational (?clock_in default "no"): la modalità
   // senza clock-in è quella pubblicata; teniamo la stessa per coerenza di numeri.
   const mode = "withoutClockIn";
 
-  const { ranking } = buildLeaderboard(records, mode, settings, exclusions || {});
+  const { ranking } = buildLeaderboard(records, mode, { ...settings, group_languages: groupLanguages || {} }, exclusions || {});
   const scored = ranking.filter((r) => r.score !== null);
 
   const target = normalizeName(employee);
@@ -107,6 +108,8 @@ export async function GET(request) {
     tier: mine.tier,
     percentile,
     scored_count: scored.length,
+    comparison: mine.comparison === "language" ? "language" : "group", // v13: gruppo piccolo → media della lingua
+    group_size: mine.group_size ?? mine.group_means?._count ?? null,
     composition,
     formula: snapshot ? { hash: snapshot.hash, captured_at_iso: snapshot.captured_at_iso } : null,
     history,
