@@ -130,11 +130,13 @@ export default function MyProfilePage() {
                 background: CP.surface,
                 border: `1px solid ${alpha(tierColor, "55")}`,
                 borderRadius: 20, padding: "30px 32px", marginBottom: 24,
-                display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 28, alignItems: "center",
+                display: "flex", flexWrap: "wrap", gap: 24, alignItems: "center",
                 position: "relative", overflow: "hidden",
-              }}>
-                <div style={{
-                  width: 100, height: 100, borderRadius: "50%",
+              }} className="pf-hero">
+                {/* sul telefono: niente avatar, score sopra (prima usciva dallo schermo) */}
+                <style>{`@media (max-width: 640px){.pf-hero{padding:20px!important}.pf-avatar{display:none!important}.pf-score{order:-1;width:100%;text-align:left!important}}`}</style>
+                <div className="pf-avatar" style={{
+                  width: 100, height: 100, borderRadius: "50%", flexShrink: 0,
                   background: COLORS.champagne,
                   color: COLORS.obsidian,
                   display: "flex", alignItems: "center", justifyContent: "center",
@@ -143,7 +145,7 @@ export default function MyProfilePage() {
                   boxShadow: `0 0 0 3px ${COLORS.champagne}`,
                 }}>{getInitials(employee)}</div>
 
-                <div style={{ position: "relative" }}>
+                <div style={{ position: "relative", flex: "1 1 300px", minWidth: 0 }}>
                   <div style={{ fontFamily: FONTS.display, fontSize: 28, fontWeight: 500, letterSpacing: "-0.01em", marginBottom: 4 }}>{employee}</div>
                   {cp.top_creator && (
                     <div style={{ color: COLORS.champagne, fontSize: 12, letterSpacing: "0.12em", marginBottom: 14 }}>
@@ -160,7 +162,7 @@ export default function MyProfilePage() {
                   </div>
                 </div>
 
-                <div style={{ textAlign: "right", position: "relative" }}>
+                <div className="pf-score" style={{ textAlign: "right", position: "relative", marginLeft: "auto" }}>
                   <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.15em" }}>Il tuo score vendite</div>
                   <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 64, lineHeight: 1, color: tierColor }}>
                     {cp.score?.toFixed(1) ?? "—"}
