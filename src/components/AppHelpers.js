@@ -17,7 +17,11 @@ export function SecurityBanner() {
   const { data } = useSWR("/api/whoami", fetcher, { revalidateOnFocus: true });
   const { openUserProfile } = useClerk();
   const sec = data?.security;
+  // "Più tardi": nasconde il promemoria per 24h (pannello tester: in cima a ogni
+  // pagina toglieva spazio al contenuto). Se la 2FA è OBBLIGATORIA non si nasconde.
+  const [snoozed, setSnoozed] = useState(() => { try { return Date.now() < Number(localStorage.getItem("hoc:mfa-snooze") || 0); } catch { return false; } });
   if (!sec?.admin_raw || sec.mfa_enabled) return null;
+  if (snoozed && !sec.mfa_required) return null;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: CP.dangerSoft, borderBottom: `1px solid ${CP.border}`, fontSize: 13, color: CP.textPrimary, flexWrap: "wrap" }}>
       <ShieldAlert size={16} color={CP.accentRed} />
@@ -29,6 +33,12 @@ export function SecurityBanner() {
       <button onClick={() => openUserProfile()} style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: CP.accent, color: CP.accentInk, fontSize: 12, cursor: "pointer" }}>
         Attivala ora
       </button>
+      {!sec.mfa_required && (
+        <button onClick={() => { try { localStorage.setItem("hoc:mfa-snooze", String(Date.now() + 86400000)); } catch {} setSnoozed(true); }}
+          style={{ padding: "6px 10px", borderRadius: 7, border: `1px solid ${CP.border}`, background: "transparent", color: CP.textSecondary, fontSize: 12, cursor: "pointer" }}>
+          Più tardi
+        </button>
+      )}
     </div>
   );
 }
