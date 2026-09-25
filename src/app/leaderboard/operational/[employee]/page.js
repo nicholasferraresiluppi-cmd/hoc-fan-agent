@@ -220,7 +220,7 @@ export default function EmployeeDrilldownPage({ params }) {
 
 // Andamento dello score sui mesi con dati: linea + soglia di revisione.
 function Spark({ points }) {
-  const W = 600, H = 90, pad = 8;
+  const W = 1100, H = 90, pad = 10; // proporzioni vicine al contenitore: niente grafico rimpicciolito al centro
   const xs = (i) => pad + (i * (W - 2 * pad)) / Math.max(1, points.length - 1);
   const ys = (v) => H - pad - ((v ?? 0) / 100) * (H - 2 * pad);
   return (
