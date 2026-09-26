@@ -8,6 +8,7 @@ import { fmtPct } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, BandBar, ScoreChart, card, NUM } from "@/components/ds";
 import { tierLabel, tierColor } from "@/lib/tier-label";
 import { useStyle } from "@/lib/theme-client";
+import { normalizeKpi } from "@/lib/leaderboard-calc";
 
 /**
  * /me/score — "Il mio score, spiegato" (scope own, docs/VISIBILITY_POLICY.md).
@@ -43,8 +44,6 @@ const KPI_HELP = {
   messages_sent_per_hour: "Quanti messaggi mandi per ora.",
 };
 
-// Fascia come segnale sul dato, non come superficie: rosso solo per la fascia
-// più bassa, verde per le tre alte, neutro in mezzo (un solo accento, DESIGN.md §1).
 // colore fasce: lib/tier-label (basse mai rosse, 26/09)
 
 // Due score, ognuno col suo nome (decisione Nicholas 25/09/2026, "strada 1"):
@@ -61,8 +60,58 @@ const monthShort = (pid) => (/^\d{4}-\d{2}$/.test(pid || "") ? MESI[Number(pid.s
 function currentMonth() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
 const fmtScore = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
 
+// Unità di misura delle voci (come le calcola leaderboard-calc): rapporti 0-1
+// mostrati in %, importi in $, lunghezze in caratteri per messaggio.
+const KPI_UNIT = {
+  fan_cvr: "pct", unlock_rate: "pct", golden_ratio: "pct",
+  avg_earnings_per_paying_fan: "usd", avg_revenue_per_fan: "usd", sales_per_hour: "usd",
+  avg_length_of_conversation: "chars", input_per_message: "chars",
+  messages_sent_per_hour: "num",
+};
+// Formattazione del TRAGUARDO arrotondata PER ECCESSO alla precisione mostrata:
+// raggiungere il numero scritto deve bastare a far scattare lo scalino (se lo
+// arrotondassimo per difetto potremmo promettere un traguardo che non basta).
+function fmtKpi(kpi, v, up = false) {
+  if (v == null || !Number.isFinite(Number(v))) return "—";
+  const u = KPI_UNIT[kpi] || "num";
+  const r = (x, d) => (up ? Math.ceil(x * 10 ** d - 1e-9) / 10 ** d : x);
+  if (u === "pct") return `${r(v * 100, 1).toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+  if (u === "usd") return "$" + r(v, 2).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (u === "chars") return `${Math.round(r(v, 0)).toLocaleString("it-IT")} caratteri`;
+  return r(v, 1).toLocaleString("it-IT", { maximumFractionDigits: 1 });
+}
+
+/*
+ * Azione per voce: "portare <voce> da X a Y = +Z punti".
+ * Come si calcolano i punti (stessa regola del calcolo, normalizeKpi):
+ *   punti voce = scalino in cui cade il rapporto tuo valore / media del gruppo
+ *     (default: <0,75x → 0 · <0,90x → 20 · <1,00x → 40 · <1,10x → 60 · <1,25x → 80 · oltre → 100)
+ *   score = Σ punti voce × peso  →  +Z sullo score = (punti al traguardo − punti oggi) × peso.
+ * Traguardo Y: se sei sotto la media del gruppo, la MEDIA (il riferimento più
+ * onesto: è quello che fa il tuo gruppo, non un +10 arbitrario); se sei già
+ * sopra, lo scalino successivo (media × moltiplicatore). A parità del resto: la
+ * media del gruppo si muove anche lei ogni mese, e lo diciamo a schermo.
+ * Se mancano valore, media o scalini → null: niente numeri inventati.
+ */
+function actionFor(c, steps) {
+  const v = Number(c.my_value), m = Number(c.group_mean), w = Number(c.weight);
+  if (!Array.isArray(steps) || !steps.length || !Number.isFinite(m) || m <= 0 || !Number.isFinite(w) || w <= 0 || c.my_value == null) return null;
+  const ratio = Number.isFinite(v) && v > 0 ? v / m : 0;
+  const mults = steps.map((t) => Number(t.multiplier)).filter(Number.isFinite).sort((a, b) => a - b);
+  const target = mults.find((x) => x > ratio && x >= 1);
+  if (target == null) return { atMax: true };
+  const targetValue = m * target;
+  const now = normalizeKpi(v, m, steps);
+  const then = normalizeKpi(targetValue * (1 + 1e-9), m, steps);
+  const gain = (then - now) * w;
+  if (!(gain > 0)) return null;
+  return { from: v, to: targetValue, gain, toMean: target === 1 };
+}
+const fmtGain = (g) => `+${g.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} punti`;
+
 const note = { fontSize: 13, color: CP.textMuted, margin: "0 0 8px", lineHeight: 1.6 };
 const link = { color: CP.accentSoftText };
+const btnTrain = { display: "inline-flex", alignItems: "center", padding: "6px 12px", background: CP.accent, color: CP.accentInk, borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap" };
 
 export default function MyScorePage() {
   const [periodId, setPeriodId] = useState(null);
@@ -81,6 +130,19 @@ export default function MyScorePage() {
   const [st] = useStyle();
   const v3 = st === "v3";
   const tiers = Array.isArray(data?.tiers) ? data.tiers : [];
+  // Azioni per voce + voce con più margine = peso × distanza dalla media, cioè i
+  // punti recuperabili (lo stesso numero dell'azione). Senza scalini nell'API si
+  // sceglie per peso × (media − valore)/media e non si mostrano punti.
+  const steps = Array.isArray(data?.normalization) && data.normalization.length ? data.normalization : null;
+  const actions = Object.fromEntries(composition.map((c) => [c.kpi, actionFor(c, steps)]));
+  const marginOf = (c) => {
+    const a = actions[c.kpi];
+    if (a && !a.atMax) return a.gain;
+    const v = Number(c.my_value), m = Number(c.group_mean), w = Number(c.weight);
+    return !steps && m > 0 && w > 0 && Number.isFinite(v) && v < m ? (w * (m - v)) / m : 0;
+  };
+  const topKpi = composition.reduce((best, c) => (marginOf(c) > (best ? marginOf(best) : 0) ? c : best), null)?.kpi || null;
+  const meanPoints = steps ? normalizeKpi(1, 1, steps) : null;
   const chartThresholds = tiers.filter((t) => t.min > 0).map((t) => ({ label: tierLabel(t.label), min: t.min }));
 
   return (
@@ -151,28 +213,49 @@ export default function MyScorePage() {
             </div>
           )}
 
-          {/* Composizione */}
+          {/* Composizione: niente rosso sulle persone (regola del board). Il segnale è
+              la voce con più margine, in accento, con l'azione concreta. */}
           <section style={{ marginBottom: 22 }}>
             <SectionTitle aside="0–100 per voce × peso">Mestiere: come si compone</SectionTitle>
             <div style={{ ...card, padding: "16px 18px" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
                 {composition.map((c) => {
-                  const low = c.points < 40;
+                  const act = actions[c.kpi];
+                  const isTop = topKpi === c.kpi;
+                  const label = KPI_LABELS[c.kpi] || c.kpi.replace(/_/g, " ");
                   return (
                     <div key={c.kpi}>
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 14, marginBottom: 2 }}>
-                        <span style={{ color: CP.textPrimary }}>
-                          {KPI_LABELS[c.kpi] || c.kpi.replace(/_/g, " ")}
-                          <span style={{ color: CP.textMuted }}> · peso {fmtPct(c.weight)}</span>
+                        <span style={{ color: CP.textPrimary, display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <span>{label}<span style={{ color: CP.textMuted }}> · peso {fmtPct(c.weight)}</span></span>
+                          {isTop && <span style={{ fontSize: 11, fontWeight: 500, padding: "1px 8px", borderRadius: 999, background: CP.accentSoft, color: CP.accentSoftText }}>più margine</span>}
                         </span>
-                        <span style={{ ...NUM, fontWeight: 500, color: c.points >= 60 ? CP.accentGreen : low ? CP.accentRed : CP.textSecondary }}>
+                        <span style={{ ...NUM, fontWeight: 500, color: CP.textPrimary }}>
                           {Number(c.points).toLocaleString("it-IT")}
                         </span>
                       </div>
                       {KPI_HELP[c.kpi] && <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 6 }}>{KPI_HELP[c.kpi]}</div>}
-                      <div style={{ height: 6, background: CP.surfaceAlt, borderRadius: 999, overflow: "hidden" }}>
-                        <div style={{ width: `${Math.max(2, Math.min(100, c.points))}%`, height: "100%", background: low ? CP.accentRed : CP.accent, borderRadius: 999 }} />
+                      <div style={{ position: "relative", height: 6, background: CP.track, borderRadius: 999 }}>
+                        <div style={{ width: `${Math.max(2, Math.min(100, c.points))}%`, height: "100%", background: isTop ? CP.accent : CP.neu, borderRadius: 999 }} />
+                        {/* tacca = i punti che fa chi è esattamente sulla media del gruppo */}
+                        {meanPoints != null && <span aria-hidden title="Media del gruppo" style={{ position: "absolute", left: `${meanPoints}%`, top: -3, width: 2, height: 12, background: CP.textPrimary, borderRadius: 1 }} />}
                       </div>
+                      {act && !act.atMax && (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginTop: 8, padding: "8px 12px", borderRadius: 8, border: `1px solid ${isTop ? CP.accentDim : CP.borderSoft}`, background: isTop ? CP.accentSoft : "transparent", fontSize: 13, color: CP.textSecondary, ...NUM }}>
+                          <span>
+                            Portare {label.charAt(0).toLowerCase() + label.slice(1)} da <span style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtKpi(c.kpi, act.from)}</span> a <span style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtKpi(c.kpi, act.to, true)}</span>
+                            {act.toMean ? " (la media del tuo gruppo)" : ""} = <span style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtGain(act.gain)}</span>
+                          </span>
+                          {isTop && <Link href="/" style={btnTrain}>Allenati su questo</Link>}
+                        </div>
+                      )}
+                      {act?.atMax && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 6 }}>Su questa voce hai già il massimo dei punti.</div>}
+                      {!act && isTop && (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginTop: 8, padding: "8px 12px", borderRadius: 8, border: `1px solid ${CP.accentDim}`, background: CP.accentSoft, fontSize: 13, color: CP.textSecondary }}>
+                          <span>È la voce con più margine: allenala.</span>
+                          <Link href="/" style={btnTrain}>Allenati su questo</Link>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -181,7 +264,8 @@ export default function MyScorePage() {
                 {data.comparison === "language"
                   ? `Il tuo gruppo è piccolo (${data.group_size ?? "meno di 5"} persone), quindi ogni barra confronta te con la media di tutti gli operatori della tua lingua: un confronto con 1-4 colleghi sarebbe troppo casuale. `
                   : "Ogni barra è la tua posizione rispetto alla media del tuo gruppo su quella voce. "}
-                100 = molto sopra la media, 40 = appena sotto. Le barre rosse sono dove recuperi più punti: parlane col tuo team lead.
+                {meanPoints != null ? `La tacca è dove sta chi è esattamente sulla media (${meanPoints} punti). ` : ""}
+                100 = molto sopra la media, 40 = appena sotto. I punti di ogni azione sono quelli che aggiungeresti allo score a parità del resto (anche la media del gruppo si muove ogni mese). Da dove partire: la voce con più margine, dove peso e distanza dalla media rendono di più.
               </p>
             </div>
           </section>

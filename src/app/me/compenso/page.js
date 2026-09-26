@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtPct } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, SectionTitle, DataTable, Notice, card, NUM } from "@/components/ds";
@@ -25,10 +25,54 @@ const fmtDate = (iso) => {
 const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
 const monthLabel = (pid) => (/^\d{4}-\d{2}$/.test(pid || "") ? `${MESI[Number(pid.slice(5)) - 1]} ${pid.slice(0, 4)}` : pid);
 
+// Soglie: "$400" se intera, altrimenti coi centesimi
+const fmtSoglia = (v) => (Number.isInteger(Number(v)) ? "$" + Number(v).toLocaleString("it-IT", { useGrouping: "always" }) : fmtUsd(v));
+
+/*
+ * Scaglione raggiunto nel turno, in chiaro: "10% · superata la soglia di $400".
+ * Solo lettura di dati già calcolati dall'API (thresholds del profilo di
+ * pagamento + breakdown di calcCumulativeEarning): nessuna logica di compenso
+ * nuova. Gli scaglioni sono cumulativi, quindi la percentuale raggiunta vale
+ * sulla parte sopra la soglia: la quota sull'intero turno resta nella colonna
+ * "Quota riconosciuta".
+ */
+function tierReached(s) {
+  const th = [...(s.thresholds || [])].sort((a, b) => (a.from ?? 0) - (b.from ?? 0));
+  if (!th.length) return null;
+  const top = (s.breakdown || [])[s.breakdown.length - 1] || null;
+  const cur = top ? th.find((t) => (t.from ?? 0) === top.from) || { from: top.from, pct: top.pct } : th[0];
+  const next = th.find((t) => (t.from ?? 0) > (cur.from ?? 0));
+  const why = (cur.from ?? 0) > 0
+    ? `superata la soglia di ${fmtSoglia(cur.from)}`
+    : next ? `sotto la soglia di ${fmtSoglia(next.from)}` : "scaglione unico";
+  return { pct: cur.pct, why };
+}
+
+// Hover disponibile? (desktop sì, telefono no): decide se mostrare il link
+// "contesta" nella riga o affidarlo al pannello del turno.
+function useCanHover() {
+  const [can, setCan] = useState(true);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(hover: hover)");
+    const on = () => setCan(mq.matches);
+    on();
+    mq.addEventListener?.("change", on);
+    return () => mq.removeEventListener?.("change", on);
+  }, []);
+  return can;
+}
+
+const contestLink = { color: CP.accentSoftText, fontSize: 13, textDecoration: "underline", textUnderlineOffset: 3 };
+
 const SHIFT_COLUMNS = [
   { key: "date", label: "Turno", render: (s) => fmtDate(s.started_at), sort: (s) => s.started_at || "" },
   { key: "creators", label: "Creator", muted: true, render: (s) => (s.creators || []).join(", ") || "—", sort: (s) => (s.creators || []).join(", ") },
   { key: "sold", label: "Venduto", align: "right", render: (s) => fmtUsd(s.sold) },
+  { key: "tier", label: "Scaglione raggiunto", sortable: false, render: (s) => {
+    const t = tierReached(s);
+    return t ? <span style={{ whiteSpace: "nowrap" }}><span style={{ fontWeight: 500, ...NUM }}>{fmtPct(t.pct)}</span><span style={{ color: CP.textSecondary }}> · {t.why}</span></span> : <span style={{ color: CP.textMuted }}>—</span>;
+  } },
   { key: "effective_pct", label: "Quota riconosciuta", align: "right", render: (s) => (s.effective_pct != null ? fmtPct(s.effective_pct, 1) : "—") },
   { key: "earned", label: "Compenso", align: "right", render: (s) => <span style={{ fontWeight: 500 }}>{fmtUsd(s.earned)}</span> },
 ];
@@ -45,6 +89,17 @@ export default function MyPayoutPage() {
   const [open, setOpen] = useState(null);
   const shifts = useMemo(() => (data?.shifts || []).map((s, i) => ({ ...s, key: i })), [data]);
   const sel = open != null ? shifts.find((s) => s.key === open) : null;
+  const canHover = useCanHover();
+  const detailRef = useRef(null);
+  // Telefono: il dettaglio è un pannello dal basso; il focus ci va dentro.
+  useEffect(() => { if (sel && !canHover && detailRef.current) detailRef.current.focus(); }, [sel, canHover]);
+  // "Contesta" discreto nella riga: visibile su hover, focus o riga selezionata
+  // (CSS .me-contest in globals). Mai un bottone primario. Sul telefono niente
+  // colonna: il link sta in fondo al pannello del turno.
+  const columns = useMemo(() => (canHover ? [...SHIFT_COLUMNS, {
+    key: "contest", label: "", sortable: false, align: "right",
+    render: () => <Link href="/me/contestazioni" className="me-contest" style={contestLink} onClick={(e) => e.stopPropagation()}>Contesta</Link>,
+  }] : SHIFT_COLUMNS), [canHover]);
 
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
@@ -84,11 +139,11 @@ export default function MyPayoutPage() {
           </HeroMetric>
 
           <section style={{ marginTop: 22, marginBottom: 14 }}>
-            <SectionTitle aside="dal più recente · tocca un turno per vedere gli scaglioni">I miei turni</SectionTitle>
+            <SectionTitle aside="dal più recente · apri un turno per il dettaglio">I miei turni</SectionTitle>
             <DataTable
-              columns={SHIFT_COLUMNS}
+              columns={columns}
               rows={shifts}
-              minWidth={620}
+              minWidth={820}
               maxHeight={440}
               onRowClick={(s) => setOpen(open === s.key ? null : s.key)}
               selected={(s) => s.key === open}
@@ -97,10 +152,14 @@ export default function MyPayoutPage() {
           </section>
 
           {sel && (
-            <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
-              <SectionTitle aside={(sel.creators || []).join(", ") || null}>Turno del {fmtDate(sel.started_at)}</SectionTitle>
+            <section ref={detailRef} tabIndex={-1} className="me-shift-sheet" aria-label={`Turno del ${fmtDate(sel.started_at)}`} style={{ ...card, padding: "16px 18px", marginBottom: 14, outline: "none" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                <SectionTitle aside={(sel.creators || []).join(", ") || null}>Turno del {fmtDate(sel.started_at)}</SectionTitle>
+                <button type="button" onClick={() => setOpen(null)} aria-label="Chiudi il dettaglio del turno" style={{ background: "transparent", border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textSecondary, padding: "4px 10px", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>Chiudi</button>
+              </div>
               <div style={{ display: "flex", gap: 24, flexWrap: "wrap", fontSize: 14, color: CP.textSecondary, marginBottom: 12, ...NUM }}>
                 <span>Venduto <span style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtUsd(sel.sold)}</span></span>
+                {tierReached(sel) && <span>Scaglione <span style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtPct(tierReached(sel).pct)}</span> · {tierReached(sel).why}</span>}
                 <span>Compenso <span style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtUsd(sel.earned)}</span></span>
               </div>
               {sel.profile && (
@@ -113,6 +172,9 @@ export default function MyPayoutPage() {
               ) : (
                 <p style={{ fontSize: 13, color: CP.textMuted, margin: 0 }}>Nessuno scaglione registrato per questo turno.</p>
               )}
+              <p style={{ fontSize: 13, color: CP.textMuted, margin: "14px 0 0" }}>
+                Qualcosa non torna? <Link href="/me/contestazioni" style={contestLink}>Contesta</Link> — scrivi la data del turno ({fmtDate(sel.started_at)}) nella contestazione.
+              </p>
             </section>
           )}
 

@@ -153,3 +153,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 /* ScoreChart (componente nuovo): sotto 520px solo le soglie vicine al valore */
 @media (max-width: 519px) { .ds-sc .ds-sc-far { display: none; } }
+
+/* /me/compenso: "Contesta" discreto nella riga — visibile su hover, focus o riga
+   selezionata/attiva; mai un bottone primario (passo 4a, 26/09/2026) */
+.ds-tr .me-contest { opacity: 0; transition: opacity .12s; }
+.ds-tr:hover .me-contest, .ds-tr:focus-within .me-contest, .ds-tr[data-sel] .me-contest, .ds-tr[data-active] .me-contest, .me-contest:focus-visible { opacity: 1; }
+/* Telefono: il dettaglio del turno è un pannello dal basso */
+@media (max-width: 699px) {
+  .me-shift-sheet { position: fixed !important; left: 8px; right: 8px; bottom: 8px; z-index: 60; max-height: 80vh; overflow: auto; margin: 0 !important; box-shadow: 0 -12px 40px rgba(0,0,0,.35); }
+}

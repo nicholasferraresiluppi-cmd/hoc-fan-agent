@@ -34,6 +34,9 @@ function evalGate(history, { minScore, needed, window, floor = null }) {
   const passedPerf = evaluable && hits >= needed && belowFloor === 0;
   return {
     requirement: `score mestiere ≥ ${minScore} in ${needed} degli ultimi ${window} mesi${floor != null ? `, mai sotto ${floor}` : ""}`,
+    // soglie in numeri per la pagina (solo lettura: la regola resta quella sopra)
+    min_score: minScore,
+    floor,
     evaluable,
     months_available: usable.length,
     hits,

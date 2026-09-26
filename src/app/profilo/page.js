@@ -111,7 +111,8 @@ export default function MyProfilePage() {
     { key: "sales_per_shift", label: "Venduto per turno", align: "right", render: (r) => fmt$(r.sales_per_shift) },
     { key: "shifts", label: "Turni", align: "right", render: (r) => fmtInt(r.shifts) },
     { key: "vs_cohort_pct", label: "Rispetto alla media della creator", align: "right",
-      render: (r) => <span style={{ color: r.vs_cohort_pct == null ? CP.textMuted : r.vs_cohort_pct > 0 ? CP.accentGreen : r.vs_cohort_pct < 0 ? CP.accentRed : CP.textPrimary }}>{fmtPctSign(r.vs_cohort_pct)}</span> },
+      // niente rosso sulle persone (regola del board): sotto la media = neutro
+      render: (r) => <span style={{ color: r.vs_cohort_pct == null ? CP.textMuted : r.vs_cohort_pct > 0 ? CP.accentGreen : CP.textSecondary }}>{fmtPctSign(r.vs_cohort_pct)}</span> },
   ];
 
   return (
@@ -162,8 +163,12 @@ export default function MyProfilePage() {
                 <Metric label="Venduto nel mese" value={fmt$(cp.total_sales)} />
                 <Metric label="Turni" value={fmtInt(cp.total_shifts || 0)} />
                 <Metric label="Creator attive" value={fmtInt(cp.per_creator?.length || 0)} />
-                {/* posizione sull'agenzia solo se nella metà alta (decisione 26/09: niente "sei in fondo") */}
-                {cp.rank_agency && cp.total_in_ranking && cp.rank_agency <= Math.ceil(cp.total_in_ranking / 2) && <Metric label="Posizione" value={`#${fmtInt(cp.rank_agency)}`} note={`su ${fmtInt(cp.total_in_ranking)}`} />}
+                {/* Posizione: la STESSA di /me/score (tra i colleghi dello stesso gruppo,
+                    mai su tutta l'agenzia). Metà alta = "N° su M"; metà bassa = distanza
+                    dalla fascia successiva, mai la posizione in fondo (decisione 26/09). */}
+                {myScore?.peer_rank && (myScore.peer_rank.top_half
+                  ? <Metric label="Mestiere · tra i tuoi colleghi" value={`${myScore.peer_rank.position}° su ${myScore.peer_rank.size}`} note={myScore.peer_rank.label ? `su ${myScore.peer_rank.label}` : null} />
+                  : myScore.next_tier ? <Metric label="Mestiere · il prossimo passo" value={`${dec1(myScore.next_tier.gap)} punti`} note={`per la fascia «${tierLabel(myScore.next_tier.tier)}»`} /> : null)}
                 {tenureMonths != null && <Metric label="In agenzia da" value={`${fmtInt(tenureMonths)} ${tenureMonths === 1 ? "mese" : "mesi"}`} note={`da ${formatPeriodLabel(firstSeen)}`} />}
                 {cpHist?.ltv_cp_eur != null && <Metric label="Fatturato CP totale" value={fmt$(cpHist.ltv_cp_eur)} note={`${fmtInt(cpHist.periods_count)} mesi`} />}
               </div>
