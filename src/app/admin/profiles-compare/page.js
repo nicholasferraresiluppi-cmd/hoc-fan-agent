@@ -303,7 +303,7 @@ export default function ProfilesComparePage() {
                           // Inventario completo: una riga per profilo (Solo/Coppia/Triplo
                           // hanno set propri — niente più "un solo profilo per creator")
                           <div style={{ display: "flex", flexDirection: "column" }}>
-                            {c.profiles.map((p, pi) => (
+                            {c.profiles.map((p, pi, all) => (
                               <div key={p.name} title={`${p.name} · ${p.shifts} turni`} style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", padding: "3px 0", borderTop: pi ? `1px dashed ${CP.borderSoft}` : "none" }}>
                                 <span style={{ fontSize: 11, color: CP.textMuted, minWidth: 44 }}>
                                   {p.cosellers_count === 1 ? "da solo" : p.cosellers_count === 2 ? "in 2" : p.cosellers_count != null ? `in ${p.cosellers_count}` : "?"}
@@ -313,6 +313,10 @@ export default function ProfilesComparePage() {
                                     {t.threshold > 0 ? `≥${fmt$(t.threshold)}` : "base"}→{fmtPct(t.percentage, 0)}
                                   </span>
                                 ))}
+                                {/* più profili per la stessa squadra (es. due "da solo"): il nome li distingue, sennò sembrano doppioni */}
+                                {all.filter((x) => x.cosellers_count === p.cosellers_count).length > 1 && (
+                                  <span style={{ fontSize: 11, color: CP.textMuted }}>{p.name} · {p.shifts} turni</span>
+                                )}
                               </div>
                             ))}
                           </div>

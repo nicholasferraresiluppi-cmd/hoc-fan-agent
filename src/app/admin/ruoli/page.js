@@ -9,11 +9,13 @@
 // La pagina mostra solo le parti per cui l'API risponde: chi non ha nessuno dei
 // due vede un messaggio, non una tabella vuota.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CP } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
 import { CAP_LABELS, SCOPE_LABELS } from "@/lib/capability-labels";
+import WelcomeCertificate, { certButton } from "@/components/WelcomeCertificate";
+import { WELCOME_FIELDS, composeWelcome, welcomeVars } from "@/lib/welcome-card";
 
 const btn = (primary) => ({
   padding: "8px 14px",
@@ -142,6 +144,8 @@ export default function MembersPage() {
       )}
 
       {!loading && canManage && <AdminSecurityCard />}
+
+      {!loading && canInvite && <WelcomeEditor />}
 
       {!loading && canInvite && <OperatorInvites onSent={() => load()} />}
 
@@ -455,6 +459,89 @@ function OperatorInvites({ onSent }) {
               ))}
             </div>
           </>)}
+        </div>
+      )}
+    </section>
+  );
+}
+
+
+// Attestato di benvenuto (26/09/2026): il messaggio che accoglie gli operatori
+// invitati, scritto qui. Anteprima dal vivo = esattamente ciò che arriva (email
+// quando il dominio è verificato, schermata al primo accesso sempre).
+function WelcomeEditor() {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [sample, setSample] = useState("Mario Rossi");
+  const [msg, setMsg] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const load = async () => {
+    const r = await fetch("/api/admin/welcome");
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return setMsg({ bad: true, text: j.error || "Non disponibile" });
+    setData(j); setDraft(j.template);
+  };
+  useEffect(() => { if (open && !data) load(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const card = useMemo(() => (draft ? composeWelcome(draft, welcomeVars({ employee: sample, creator: "Gaja ITA", number: 7 })) : null), [draft, sample]);
+  const dirty = data && draft && JSON.stringify(draft) !== JSON.stringify(data.template);
+  const call = async (method, body, okText) => {
+    setBusy(true); setMsg(null);
+    const r = await fetch("/api/admin/welcome", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) return setMsg({ bad: true, text: j.error || "Errore" });
+    if (j.template) { setData((d) => ({ ...d, template: j.template })); setDraft(j.template); }
+    setMsg({ bad: false, text: okText(j) });
+  };
+  const field = { width: "100%", padding: "8px 10px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.bg, color: CP.textPrimary, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box" };
+  return (
+    <section style={{ marginBottom: 20, border: `1px solid ${CP.border}`, borderRadius: 12, background: CP.surface }}>
+      <button onClick={() => setOpen((v) => !v)} style={{ width: "100%", textAlign: "left", padding: "14px 16px", background: "transparent", border: "none", cursor: "pointer", color: CP.textPrimary }}>
+        <span style={{ fontSize: 15, fontWeight: 500 }}>Messaggio di benvenuto</span>
+        <span style={{ fontSize: 13, color: CP.textMuted, marginLeft: 10 }}>l&apos;attestato che accoglie chi inviti: lo scrivi qui</span>
+      </button>
+      {open && (
+        <div style={{ padding: "0 16px 16px" }}>
+          {!draft && !msg && <div style={{ color: CP.textMuted, fontSize: 13 }}>Caricamento…</div>}
+          {data && (
+            <div style={{ fontSize: 13, lineHeight: 1.55, color: CP.textSecondary, padding: "10px 12px", borderRadius: 8, background: CP.bg, border: `1px solid ${CP.borderSoft}`, marginBottom: 14 }}>
+              {data.mail.ready
+                ? <>L&apos;attestato parte <b>per email</b> con l&apos;invito (il link per entrare è dentro) e ricompare al primo accesso.</>
+                : <>Per ora l&apos;email d&apos;invito resta quella standard: {String(data.mail.reason || "").toLowerCase()}. L&apos;attestato compare comunque <b>al primo accesso</b> nell&apos;app. Appena il dominio è verificato, parte anche per email senza cambiare nulla qui.</>}
+              {" "}Puoi usare <code>{"{nome}"}</code>, <code>{"{nome_completo}"}</code>, <code>{"{creator}"}</code>, <code>{"{mese}"}</code>.
+              {data.updated_at && <> Ultima modifica {new Date(data.updated_at).toLocaleString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}{data.updated_by ? ` · ${data.updated_by}` : ""}.</>}
+            </div>
+          )}
+          {draft && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, alignItems: "start" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {WELCOME_FIELDS.map((f) => (
+                  <label key={f.key} style={{ fontSize: 12, color: CP.textMuted, display: "flex", flexDirection: "column", gap: 4 }}>
+                    {f.label}
+                    {f.multiline
+                      ? <textarea value={draft[f.key]} maxLength={f.max} rows={12} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} style={{ ...field, resize: "vertical", lineHeight: 1.5 }} />
+                      : <input value={draft[f.key]} maxLength={f.max} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} style={field} />}
+                  </label>
+                ))}
+                <div style={{ fontSize: 12, color: CP.textMuted }}>Nel messaggio, una riga vuota separa i paragrafi.</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+                  <button style={btn(true)} disabled={busy || !dirty} onClick={() => call("PUT", { template: draft }, () => "Salvato: i prossimi inviti useranno questo testo.")}>Salva</button>
+                  <button style={btn(false)} disabled={busy || !dirty} onClick={() => setDraft(data.template)}>Annulla modifiche</button>
+                  <button style={btn(false)} disabled={busy} onClick={() => call("POST", { template: draft, sample }, (j) => `Prova mandata a ${j.to}.`)}>Mandami una prova</button>
+                  <button style={btn(false)} disabled={busy} onClick={() => window.confirm("Tornare al testo originale?") && call("PUT", { reset: true }, () => "Testo originale ripristinato.")}>Testo originale</button>
+                </div>
+                {msg && <div style={{ fontSize: 13, color: msg.bad ? CP.accentRed : CP.accentGreen }}>{msg.text}</div>}
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: CP.textMuted, display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+                  Anteprima per
+                  <input value={sample} onChange={(e) => setSample(e.target.value)} style={{ ...field, width: 200 }} aria-label="Nome di esempio" />
+                </label>
+                <WelcomeCertificate card={card} compact cta={<span style={certButton}>{card.cta}</span>} />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </section>
