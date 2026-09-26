@@ -1,0 +1,1008 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 6531825..712a691 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -75,8 +75,12 @@ Debiti noti accettati: font-weight 600/700 ancora diffusi inline (normalizzazion
+ 
+ Decisioni strutturali tracciate qui (1 riga + link); il rationale dello scoring vive in `docs/BOARD_ANNOUNCEMENT_HOC_PRO.md` e nei commenti versionati di `creatorspro-score.js` / `creator-aggregates.js`.
+ 
++- **2026-08-06 — Proxy per account social (`/admin/social-proxies`, `/admin/social-accounts`)**: richiesta di Nicholas per isolare le connessioni degli account social ufficiali di promozione dei creator (Twitter/Reddit/Instagram/TikTok) — igiene/sicurezza account, non evasione di rilevazione (confermato in chat prima di costruire, dato il pattern dual-use). La richiesta originale descriveva uno stack diverso dal repo (React+TS/Express/SQL con migrazioni); adattata allo stack reale (Next.js API routes + Vercel KV, nessuna migrazione — lo schema vive in codice). Greenfield completo: non esisteva alcun concetto di account social o proxy nel repo. `src/lib/social-proxies.js` + `social-proxies-core.js` (logica pura: validazione, auto-assegnazione al proxy attivo meno carico, stats — 27 asserzioni in `tests/social-proxies.mjs`) + `social-accounts.js`, namespace KV isolato `social:*`. Password cifrate a riposo (AES-256-GCM, `social-proxy-crypto.js`, clone del pattern già in uso per i bot token Telegram in `content-pipeline/crypto.js`, chiave dedicata `SOCIAL_PROXY_ENCRYPTION_KEY` per isolamento tra domini) — mai esposte in chiaro fuori dal test di connessione. Test di connessione reale (`social-proxy-test.js`, nuova dipendenza `socks-proxy-agent`+`https-proxy-agent`, import dinamico solo server-side) verificato con successo sul path di errore (host irraggiungibile → `status:error` + latenza registrata); il path di successo su un proxy reale resta da confermare con credenziali vere di un provider. Delete guard: bloccato se il proxy è assegnato a un account **attivo**, cascade cleanup (proxyId → null) sugli account inattivi che lo referenziano. RBAC: gate `SEED` (admin-only, stesso pattern di `candidate-assessments`/`creator-difficulty`) — non una capability dedicata, per coerenza col resto delle pagine admin. Aggiunto `Modal` generico riusabile in `cp-style.js` (non esisteva: i pannelli crea/modifica erano finora form inline collassabili). Verificato in browser con utente Clerk di test (dev, non admin): pagine compilano, routing protetto, gating RBAC corretto (403 + error-state); il flusso CRUD/auto-assign completo da account admin reale resta da verificare da Nicholas.
++- **2026-07-30 — Difficoltà creator: il contesto prima del giudizio (`/admin/creator-difficulty`)**: nata da una domanda di Nicholas davanti al caso reale "Simone: CVR 11,76% su Gaja, 2,18% su Eva" — *"non ti viene la domanda: forse su Eva c'è molta meno utenza?"*. Aveva ragione due volte: (a) confound del creator, (b) campione minuscolo ($126 su Eva = rumore, non segnale). Indagine (4 agenti: repo + warehouse live + settori gemelli): il controllo del confound ESISTE già nello score sales (blend 70/30 within-creator), ma manca un profilo-difficoltà ESPLICITO della creator — e il warehouse lo produce oggi senza gate. Misurato il confound su dati veri, stessa lingua IT: Gaja vs Alice = %-ever-paid 29,8/12,2, PPV mediano $37/$6,99, CR 15,5/9,9 — e Alice riceve PIÙ new-sub (più traffico ≠ più facile). Costruito: `src/lib/creator-difficulty.js` (+ `-core.js` puro, 58 asserzioni in `tests/creator-difficulty.mjs`) — una query combinata (users_research + transactions_analytics + chat.price + subscriptions, ~1,1GB misurati, fusibile 12GB), KV `creator:difficulty:{version}`, riscaldo dal dispatch ma **settimanale** (`warmCreatorDifficulty` ricalcola solo se >6g: il profilo di un pubblico deriva in settimane, non in ore) e **ULTIMO nel dispatcher** (se i 60s finiscono si sacrifica da solo, mai operator_progress o il digest del lunedì); pagina SEED `/admin/creator-difficulty`. Regole di onestà: `difficulty_index` DIREZIONALE (ordina la tabella; le decisioni si prendono sui componenti), ≥3 componenti o niente indice, finestre dichiarate per colonna (lifetime vs 60g), whale-share mostrata come VARIANZA non difficoltà (top-1% fan = 46,5% del revenue su Gaja: chi becca il whale sembra bravo), pagine FREE flaggate e fuori da indice+percentili (monetizzano sul paid abbinato, mapping non esplicito), coorte percentili = solo pagine paid, **niente rosso in UI** (qui non esistono colpe, solo contesti: freddo=blu, caldo=verde). Bug preso in verifica browser su dati veri: `Number(null)=0` spingeva i creator SENZA dati in cima alla difficoltà (l'esatto contrario dello scopo) → guardia null in percentileRank+coorti, regression test. **Review adversariale (28 agenti, 4 lenti + scettico per finding): 16 confermati / 7 confutati, tutti i confermati corretti in v2 (`creator-diff-2`)**: (1) **floor di campione per componente** (`SAMPLE_FLOORS`, lezione MIN_PAIRS di academy-signals): sotto-campione → null PRIMA di percentili e coorti — caso reale: Elena Satta, 218 fan, in v1 usciva "pubblico freddo 74" su rapporti-rumore, ora n/d; (2) **ppv_price_p50 FUORI dall'indice**: è la mediana dei prezzi CHIESTI = comportamento del TEAM, non del pubblico (lo stesso segnale in operator-signals è skill da coachare → tenerlo nell'indice creava circolarità); (3) **CR/ARPPU pooled** (SUM/SUM pesato sul traffico — con AVG il giorno da 3 visitatori pesava come quello da 5.000; ARPPU = revenue/fan-giorno, dichiarato); (4) **pct_ever_paid sui soli fan maturi ≥30g** (l'ondata di traffico recente faceva sembrare freddo un pubblico solo giovane); (5) **whale top-1% via ROW_NUMBER** (PERCENT_RANK dava 0% spurio con pareggi al vertice o pagante singolo); (6) free-page a TASSO <0,5% (payers==0 esatto era aggirabile da un singolo tip storico); (7) **single-flight KV** su GET cache-miss e POST (N admin concorrenti = 1 sola query BigQuery, gli altri "computing"); (8) empty-state/computing-state in pagina, fetcher robusto alle risposte non-JSON, `revalidateOnFocus:false`. NON entra in score/comp (policy dati-fan); informa la LETTURA (baseline accanto al numero). NON costruito, in ordine di valore: **O/E display** in Action/Coaching Center (reale vs atteso-per-quella-creator con semaforo campione), **shrinkage graduato** al posto di MIN_SHIFTS_RELIABLE binario (peso 70/30 variabile col campione — da backtestare con la governance-formula prima di pubblicare, gli operatori vedono lo storico), pipeline Infloww by-creator (KPI efficiency per creator, copre il duo; export validato: 734 righe, riconcilia al centesimo col total). Rischio da tenere a mente (evidenza sanità): se lo score punisse le creator fredde, i bravi le eviterebbero — il profilo serve anche a proteggere da questo.
+ - **2026-07-28 — Il riconoscimento che ARRIVA: da superficie a loop (`/api/cron/weekly-recognition`)**: diagnosi di Nicholas, accettata — HOC Pro aveva ~35 pagine admin + 9 `/me` e 5-10 utenti reali; l'Academy è rifinita con **zero operatori onboardati**. Costruire la decima pagina non era evoluzione: ogni build era ottima e **inerte**, perché aspettava che qualcuno la aprisse (e i chatter vivono in Infloww). Il pezzo mancante non era una superficie, era la **consegna** — quello che i tool dei settori gemelli (Spinify, Ambition, NICE, Playvox) hanno tutti e noi no: il segnale va dove la persona già lavora, non si aspetta che venga cercato. `src/lib/operator-recognition.js` legge la cache di `operator-progress` e produce le persone cresciute davvero; parte dal dispatcher del lunedì, **una volta per periodo** (il giro è settimanale ma il dato è mensile: senza la guardia manderebbe la stessa lista 3 lunedì su 4, cioè insegnerebbe a ignorare il mittente). `src/lib/mailer.js` estrae l'invio, prima duplicato inline nella route del digest alert. **Destinatari = board** (`HOC_ALERTS_EMAILS`): il lato operatore NON è una decisione ma un blocco fisico — dominio Resend non verificato ⇒ oggi la posta verso terzi non viene recapitata. Manda solo da cron; da sessione SEED restituisce l'anteprima senza spedire. **Design del testo, riscritto su feedback di Nicholas ("mi sembri restio; qui si parla di rapporto umano e leadership")**: la v1 produceva la frase pronta ("Tizio — prezzo medio PPV: da $24 a $55") = un referto con dentro un nome. Ora si consegna il **materiale per la conversazione, non il copione** — (1) il COMPORTAMENTO in parole (la specificità del comportamento è la variabile più forte nell'evidenza sul riconoscimento; il numero scende a prova in grigio), (2) una DOMANDA da fare ("come capisci quando puoi chiedere di più?") che riconosce la persona come autrice e tira fuori la tecnica per gli altri — stesso principio della call library e dei game tape; **onestà: che la domanda batta il solo complimento è pratica sensata, non risultato causale dimostrato** (appreciative inquiry ha evidenza non conclusiva), (3) si loda il PROCESSO mai il tratto (Mueller & Dweck 1998 JPSP regge nel paradigma stretto; la letteratura "growth mindset" più ampia è debole, Sisk et al. 2018 — si usa solo la parte solida). Le parole restano del manager: una frase generata e recitata suona peggio del silenzio. **Cinque voci, non dodici** (un riconoscimento specifico e raro batte cinque generici; e dodici conversazioni il lunedì non le fa nessuno) e **cinque comportamenti DIVERSI** (`pickDiverse`): tre voci identiche parola per parola si leggono come un mail-merge. Guardie imposte dai DATI VERI, non immaginate: il cambiamento deve essere **visibile nel numero mostrato** (usciva "da 9% a 9%"), minimo **5 turni in entrambi i mesi** (usciva "da 5/h a 174/h" = non metodo ma un mese in cui la persona non aveva lavorato), forma **neutra di genere** (il genere non lo sappiamo e dedurlo dal nome vuol dire sbagliarlo su qualcuno proprio nella frase che parla di lui o lei). **Solo eventi positivi**: chi è sotto soglia ha l'Action Center; girare la lista al contrario la trasformerebbe in sorveglianza. Non pubblicare come classifica — il riconoscimento può fare danno (JBR 2024: formati che fanno sentire il riconosciuto MENO apprezzato; Wang 2023: riduce l'aiuto tra pari). 43 asserzioni node. **Digest personale all'operatore COSTRUITO ma NON collegato al cron** (`src/lib/operator-digest.js`, anteprima SEED `/api/admin/operator-digest-preview`): due blocchi a monte, il dominio Resend non verificato e la decisione del board sul mandare posta automatica a 203 dipendenti. Regole sue, diverse da quelle del digest manager perché qui il destinatario è la persona giudicata e nessuno filtra: **non porta mai cattive notizie** (se non sei migliorato non te lo dice: ti dà il passo successivo e basta — il calo è una conversazione umana, non un messaggio generato mentre dormi); apre SEMPRE da una vittoria vera, o da un punto di forza reale col suo numero, o dai turni coperti — mai dal riquadro di ciò che manca, che trasforma la mail in un compito assegnato; la percentuale di percorso si mostra solo se ≥25% (il passo scelto è per definizione il comportamento più debole, quindi "sei al 0% del percorso" usciva in TUTTI i casi provati — fa l'opposto di ciò per cui il goal-gradient esiste; stessa regola applicata alla barra di `/me/progresso`); seconda persona con ausiliare "avere" ("hai smesso", mai "sei migliorato") per restare neutra di genere; acronimi preservati (`inFrase` invece di `toLowerCase`). L'anteprima mostra di proposito i TRE casi — migliorato, fermo, peggiorato — perché il terzo è quello che può fare danno e va letto per primo. NON costruito: **mappa manager→operatori a scala** (i team sono su userId Clerk, che hanno in pochi; oggi non serve perché la lista è una sola, a 40 manager sarà il collo di bottiglia), cadenza infra-mensile (l'evidenza vuole "entro giorni", il dato mensile è la più piccola unità onesta per questi comportamenti).
+ - **2026-07-28 — Motore di progresso operatore: la metà non-comparativa della motivazione (`/me/progresso`)**: HOC Pro misurava bene e motivava male. Tutte le superfici motivazionali esistenti (leghe, hall of fame, podio, ladder, XP) sono COMPARATIVE: motivano chi arriva in cima e ricordano ogni settimana agli altri che non ci arriveranno. Evidenza a supporto: la leaderboard a ranking assoluto dà senso di successo solo a chi sta in cima/metà mentre il fondo accumula fallimento percepito (Internet Research/Emerald 2023), e la gamification competitiva ha effetti piccoli e poco stabili sulla motivazione (Sailer & Homner 2020, meta-analisi su learning). Le leve che reggono sono altre: feedback **self-referenced** e traguardo **vicino** (goal-gradient, Kivetz-Urminsky-Zheng 2006 su dati reali). Costruito quindi il complemento: `src/lib/operator-progress.js` (+ `operator-progress-math.js`, funzioni pure, 82 asserzioni node in `tests/operator-progress.mjs`) calcola gli STESSI comportamenti di `operator-signals.js` (METRICS ora esportata da lì — una sola definizione, niente drift) ma **mese per mese** dal warehouse; API scope-own `/api/me/progress`; pagina `/me/progresso`. **Decisione chiave: la serie si CALCOLA dal warehouse, non si accumula** — `operator:signals:{version}` è a chiave singola con TTL 25h e il cron la sovrascrive ogni giorno (nessuna storia esiste, e accumularla da oggi darebbe la prima traiettoria utile fra mesi); ricalcolarla all'indietro dà la storia SUBITO. Validato E2E sul warehouse: 203 operatori, 6 mesi (feb-lug 2026), 192 con un focus leggibile. Costo ~15,7 GB/run, una volta al giorno dal cron dispatch (cap 40GB come fusibile); le route `/me/*` leggono SOLO cache (`getCachedOperatorProgress`) — il ricalcolo è mestiere del cron, mai di chi apre la pagina. **Review adversariale (39 agenti, 5 lenti + verifica scettica per finding): 27 confermati su 34, corretti tutti i sostanziali.** I tre che contano, tutti misurati su dati di produzione: (1) i **traguardi erano cross-periodo** — presi dall'ultimo mese org invece che dal mese che aveva prodotto il verdetto, cioè esattamente il "numero incatenato" vietato dai commenti dello stesso file: 33% degli operatori interessati, 4,5% vedeva un traguardo GIÀ SUPERATO dal valore mostrato → ora `targets_by_period`, contraddizioni 9→**0**; (2) il **target non faceva scattare la fascia** (quantile interpolato vs rango del verdetto: si raggiungeva il numero promesso restando "da migliorare") → `targetValueFor` con la stessa definizione di rango, promesse rotte **0 su 30** coppie periodo×metrica; (3) la **barra era il percentile riscalato**, cioè la policy "niente percentile all'operatore" violata dalla stessa response che la dichiarava → riancorata alle UNITÀ della metrica. Corretti anche: identità ambigua ora NON abbinata (stessa disciplina della copertura duo), streak con soglia di variazione minima (il rumore non accende né spezza: operatori con streak ≥2 da 21 a 9, il numero onesto), stato di errore di rete, grafico senza distorsione, e **attribuzioni delle fonti riscritte** (Sailer & Homner misura la gamification in generale su contesti di apprendimento, non le classifiche sul lavoro; Kivetz è un transfer da contesto consumer — dichiarato tale). 108 asserzioni node. Regole di onestà applicate: percentile calcolato DENTRO il periodo (mai il valore di marzo contro la distribuzione di luglio); mese corrente marcato parziale; **niente resa/revenue** qui by design (questa superficie parla di METODO, ciò che l'operatore controlla — la resa aggiustata resta in operator-signals, admin); **streak non punitivo** (un mese sotto il floor di turni è dato mancante, non un passo indietro: non spezza la serie) e nessun record dichiarato con una sola misurazione. Rispettata la policy già presa in `/api/me/signals`: all'operatore NON esce il percentile grezzo — solo il suo dato, il verdetto e il traguardo in numeri (soglia di livello, non posizione in classifica). Il focus viene dal gap corrente di operator-signals (coerenza con `/me/turno`): due finestre diverse, dichiarate a schermo, nessun numero derivato dall'altro. Non entra in score/ladder/leghe/comp. NON costruito: superficie di squadra/riconoscimento tra pari (leva "relazione" della SDT), categorie multiple nelle leghe (most-improved/costanza) per non demotivare il corpo classifica, e la verifica che il progresso mostrato produca davvero più progresso reale.
++- **2026-07-25 — Academy verso l'esterno: assessment candidati pre-assunzione (V1 segnale, V2 gated)**: il simulatore Academy come test pre-hire per i chatter. Motore estratto in `src/lib/academy-engine.js` (`generateFanReply`, `evaluateScenarioTranscript`) e CONDIVISO tra le route operatore (`/api/chat`, `/api/score`, refactor behavior-preserving) e le nuove route candidato — una sola fonte di scoring, niente drift (governance formula). Candidato = NON utente Clerk: route pubbliche self-guarding `GET/POST /api/candidate/[token]`, `…/chat`, `…/score` + pagina `/assessment/[token]` (bare route in `AppShell`, nessun chrome interno); il **token monouso** è l'auth (namespace KV `candidate:*` isolato da `session/score_hist/profile`/leghe/denaro). Data model `src/lib/candidate-assessments.js` (`ASSESSMENT_SUITES` = scenari reali, incluso un `compliance-*` come riga rossa; TTL 14gg; sequenza forzata anti-replay; consenso registrato). Pannello admin `/admin/candidate-assessments` (SEED): crea link, legge il report, registra l'esito. **Decisione chiave (Nicholas): V1 = SEGNALE human-in-the-loop (report a HR, non gate), V2 = gate automatico NON costruito.** Vincoli: GDPR art.22 (no decisione unicamente automatizzata), EU AI Act Annex III.4 (alto rischio, obblighi pieni 2 dic 2027), Italia Decreto Trasparenza 104/2022 + L.132/2025 (informativa attiva OGGI → consenso in-app), Garante già attivo su recruiting black-box. Unico filtro automatico legittimo = righe rosse compliance (violazione di regola, non punteggio). Merito: work-sample test ha validità reale ma modesta (r≈0.33) → affianca il colloquio, non lo sostituisce. **Bridge V2 deliberato**: campo `outcome{decision, employeeId}` aggancia il candidato all'employee una volta assunto → un domani correla score↔resa reale (operator-signals/shift-quality). Trigger V2 (tutti e 3): correlazione misurata su campione adeguato + DPIA/logging AI Act + revisione umana genuina anche sugli scartati. ADR completo: `docs/ADR-candidate-assessment.md`. Suite creator-agnostica in V1 (fairness); calibrazione per-creator/difficoltà non costruita.
++- **2026-07-25 — Onboarding role-funnel (/guida)**: engine `src/lib/role-funnels.js` (4 percorsi operatore/manager/leadership/people come DATI puri; `selectFunnels` per capability/scope, robusta ai ruoli custom) reso come percorso guidato in `/guida` (tab per ruolo, componente `RoleFunnelGuide`) + modale primo-accesso (`OnboardingNudge`, localStorage, montata in AppShell). Si insegna il funnel (sequenza+perché+decisione), non i bottoni; un engine, N funnel come contenuto. Nav 'Guida strumenti' in Sidebar+hub. Aperto: 'HR' non è ruolo RBAC → funnel People su scope all/admin, da agganciare a `selectFunnels` quando gli HR avranno un ruolo dedicato. PR #82.
+ - **2026-07-24 — Copertura duo nel profilo-segnali: due fonti affiancate, non fuse**: `src/lib/operator-duo-coverage.js` (`buildDuoCoverage`, v `duo-cov-1`) congiunge a READ-TIME i segnali dell'export Infloww (turni singoli+duo, #77) al profilo warehouse (solo singoli, `operator-signals.js`) sul SINGOLO operatore, chiudendo il buco orfano "in duo il warehouse non sa chi ha scritto" (lo store `infloww:opsig:*` era letto solo dalla sua superficie di ingest). Enrichment nella sola route SEED `operator-signals` (admin-first, NON wired a /me), stesso pattern di `attachCoachingPaths`. Disciplina (Nicholas): i numeri NON si incatenano né si fondono — `question_rate` (corr cross-fonte 0.78) guida il flag, `avg_ppv_price` (0.63) resta informativo, ciascuno dalla sua fonte; la differenza singolo↔tutti-i-turni è INDICATIVA dei duo, non contabile (finestre/definizioni diverse dichiarate a schermo + periodo per card). Guardie di onestà: identità ambigua (due nomi distinti che normalizzano uguale, su ENTRAMBI i lati wh/export) NON abbinata (un buco è meglio del numero di un altro sull'operatore sbagliato); export stantio (`period.to` >45gg) o senza periodo estraibile → flag depotenziato (non rosso) e FUORI dal conteggio `diverging` (`now` iniettato → deterministico/testabile). Fa emergere anche gli operatori visibili SOLO da export (mai abbastanza turni singoli → invisibili al profilo). Aggregati, niente PII fan, coaching non score. Lib unit-testato (62 asserzioni node), review adversariale multi-lente (1 finding LOW-MED "overclaim causale" + LOW risolte, verdetto merge-ready). Gate/non costruito: wiring operatore-facing (/me), match sulle conversazioni INTERE del warehouse (revenue/conversazione), automazione produzione export.
+ - **2026-07-24 — Academy ancorata ai dati reali, Tier 1: game tape**: superficie didattica che estrae dal warehouse (`onlyfans.chat` + `attributed_transactions` + finestre turno da `cache_members`/`loadShiftsForDay`) le migliori SEQUENZE di vendita reali per creator, le cura (admin SEED) e le pubblica agli operatori (`/academy/tapes`, auth-only). Lib `src/lib/academy-tapes.js` (extract/curate/list/stripTape), curatela `/admin/academy-tapes` (SEED). Pattern "call library" (Gong) + Evidence-Based Training (aviazione). Decisioni di design: (1) id tape ancorato a `seq.first` (stabile alla ri-estrazione → upsert idempotente, la curatela non si orfana); (2) **pseudonimizzazione via HMAC keyed** (segreto server `ACADEMY_TAPE_SECRET`, fallback `KV_REST_API_TOKEN`) — NON hash nudo di input enumerabili, che sarebbe reversibile; `user_id` esce solo dalla superficie SEED, `stripTape` lo toglie all'operatore; (3) attribuzione operatore onesta singolo/duo/nessuno come `shift-quality.js`; (4) la revisione pre-publish è anche gate PII sul testo libero; (5) i tape sono materiale didattico, FUORI da score/comp (policy dati-fan). Validato E2E su Elisa Esposito (12 tape da 531 sequenze). Tier 2 (smart trackers calibrati su outcome) VALIDATO empiricamente ma non ancora costruito: su ~4.950 turni singoli, prezzo PPV/cadenza correlano col revenue/ora (within-creator, 31/32 creator), question rate NEGATIVO (opposto di Gong → le regole si ricalibrano, non si importano). Vedi memory `academy-real-data-grounding` / `academy-tier2-signals-evidence`.
+ - **2026-07-24 — Copertura duo via export Infloww: schema + match VALIDATI**: il warehouse non attribuisce l'operatore nei turni in duo (`sender_id`=account creator); l'export Message Dashboard di Infloww sì (colonna `Sender`). Primo export reale ingerito → schema colonne chiuso (`docs/INFLOWW_SURFACE.md` §24 lug: 12 col, `Sent to` porta il `user_id` fan, `Creator Message` in HTML, orari UTC+1). Match export↔warehouse VALIDATO su dati reali: 36/40 per user_id+testo, prezzo PPV 36/36, offset costante +1h. Cross-validazione segnali Infloww vs warehouse su 119 operatori: **tasso domande corr 0.78, prezzo PPV 0.63** (il non-1.0 è atteso: Infloww copre tutti i turni, warehouse solo i singoli → chi diverge è chi cambia in duo, il valore aggiunto). Engine `src/lib/infloww-signals.js` (`computeInflowwOperatorSignals`, unit-testato): dà i segnali COUNT-based affidabili (tasso domande, prezzo medio PPV, quota PPV); la **cadenza-per-ora NON è derivabile** da questo export (mancano le ore → Clocked Hours o finestre turno). **VINCOLO chiave (Nicholas): l'export ha un TETTO ~500k messaggi** → "tutti gli operatori" cattura solo ~5 giorni; per un mese vero di una persona serve l'export SCOPED per-operatore (file piccolo). Superficie di UPLOAD COSTRUITA (`/admin/infloww-ingest`, SEED, `src/lib/infloww-ingest.js`): il client parsa l'xlsx/csv con SheetJS + calcola i segnali NEL BROWSER (i messaggi grezzi NON escono, solo aggregati al server — privacy) → upsert per operatore (latest-wins, la copertura cresce). Pipeline verificata sul file reale (stessi numeri del calcolo Python). NON costruito: automazione produzione export via computer-use (feeder, board-gated su "quanto è penoso l'export a mano") + batch del file org intero + match al warehouse per revenue/conversazione intera.
+diff --git a/package-lock.json b/package-lock.json
+index a48f5e4..2c12deb 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -12,10 +12,12 @@
+         "@clerk/localizations": "^2.0.0",
+         "@clerk/nextjs": "^5.0.0",
+         "@vercel/kv": "^2.0.0",
++        "https-proxy-agent": "^9.1.0",
+         "lucide-react": "^0.395.0",
+         "next": "^14.2.0",
+         "react": "^18.3.0",
+         "react-dom": "^18.3.0",
++        "socks-proxy-agent": "^10.1.0",
+         "swr": "^2.4.1",
+         "xlsx": "^0.18.5"
+       },
+@@ -522,6 +524,15 @@
+         "node": ">=0.8"
+       }
+     },
++    "node_modules/agent-base": {
++      "version": "9.0.0",
++      "resolved": "https://registry.npmjs.org/agent-base/-/agent-base-9.0.0.tgz",
++      "integrity": "sha512-TQf59BsZnytt8GdJKLPfUZ54g/iaUL2OWDSFCCvMOhsHduDQxO8xC4PNeyIkVcA5KwL2phPSv0douC0fgWzmnA==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 20"
++      }
++    },
+     "node_modules/agentkeepalive": {
+       "version": "4.6.0",
+       "resolved": "https://registry.npmjs.org/agentkeepalive/-/agentkeepalive-4.6.0.tgz",
+@@ -866,6 +877,23 @@
+       "integrity": "sha512-DJR/VvkAvSZW9bTouZue2sSxDwdTN92uHjqeKVm+0dAqdfNykRzQ95tay8aXMBAAPpUiq4Qcug2L7neoRh2Egw==",
+       "license": "MIT"
+     },
++    "node_modules/debug": {
++      "version": "4.4.3",
++      "resolved": "https://registry.npmjs.org/debug/-/debug-4.4.3.tgz",
++      "integrity": "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==",
++      "license": "MIT",
++      "dependencies": {
++        "ms": "^2.1.3"
++      },
++      "engines": {
++        "node": ">=6.0"
++      },
++      "peerDependenciesMeta": {
++        "supports-color": {
++          "optional": true
++        }
++      }
++    },
+     "node_modules/delayed-stream": {
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/delayed-stream/-/delayed-stream-1.0.0.tgz",
+@@ -1241,6 +1269,20 @@
+         "node": ">= 0.4"
+       }
+     },
++    "node_modules/https-proxy-agent": {
++      "version": "9.1.0",
++      "resolved": "https://registry.npmjs.org/https-proxy-agent/-/https-proxy-agent-9.1.0.tgz",
++      "integrity": "sha512-ag87y7cJJ9/3+GxFr8Oy4O5faDsGRGnBGsJj/YjOSsSx/5eadKLYTMPlzuR6obgoCDDm0abAAZitXXQkMOPSpA==",
++      "license": "MIT",
++      "dependencies": {
++        "agent-base": "9.0.0",
++        "debug": "^4.3.4",
++        "proxy-agent-negotiate": "1.1.0"
++      },
++      "engines": {
++        "node": ">= 20"
++      }
++    },
+     "node_modules/humanize-ms": {
+       "version": "1.2.1",
+       "resolved": "https://registry.npmjs.org/humanize-ms/-/humanize-ms-1.2.1.tgz",
+@@ -1250,6 +1292,15 @@
+         "ms": "^2.0.0"
+       }
+     },
++    "node_modules/ip-address": {
++      "version": "10.4.0",
++      "resolved": "https://registry.npmjs.org/ip-address/-/ip-address-10.4.0.tgz",
++      "integrity": "sha512-oSK96Grm3aP6OrS263xVxbNDGVL7rzBtYdpGqlDG8iQdoenDoTs/nkki+DflYbAEE8Xl6o5YxhxlrKvI3nqKXQ==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 12"
++      }
++    },
+     "node_modules/is-binary-path": {
+       "version": "2.1.0",
+       "resolved": "https://registry.npmjs.org/is-binary-path/-/is-binary-path-2.1.0.tgz",
+@@ -1863,6 +1914,23 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/proxy-agent-negotiate": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/proxy-agent-negotiate/-/proxy-agent-negotiate-1.1.0.tgz",
++      "integrity": "sha512-N8IBcM3UgCVzz2L2Lqv8DVntDnnC8/hiV4nEDUPkqq72TPUgYWjQc+bdZlBPZK9LzPAvOY//gAt0S0DApoOXWQ==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 20"
++      },
++      "peerDependencies": {
++        "kerberos": "^2.0.0"
++      },
++      "peerDependenciesMeta": {
++        "kerberos": {
++          "optional": true
++        }
++      }
++    },
+     "node_modules/queue-microtask": {
+       "version": "1.2.3",
+       "resolved": "https://registry.npmjs.org/queue-microtask/-/queue-microtask-1.2.3.tgz",
+@@ -2004,6 +2072,16 @@
+       "integrity": "sha512-qepMx2JxAa5jjfzxG79yPPq+8BuFToHd1hm7kI+Z4zAq1ftQiP7HcxMhDDItrbtwVeLg/cY2JnKnrcFkmiswNA==",
+       "license": "MIT"
+     },
++    "node_modules/smart-buffer": {
++      "version": "4.2.0",
++      "resolved": "https://registry.npmjs.org/smart-buffer/-/smart-buffer-4.2.0.tgz",
++      "integrity": "sha512-94hK0Hh8rPqQl2xXc3HsaBoOXKV20MToPkcXvwbISWLEs+64sBq5kFgn2kJDHb1Pry9yrP0dxrCI9RRci7RXKg==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 6.0.0",
++        "npm": ">= 3.0.0"
++      }
++    },
+     "node_modules/snake-case": {
+       "version": "3.0.4",
+       "resolved": "https://registry.npmjs.org/snake-case/-/snake-case-3.0.4.tgz",
+@@ -2028,6 +2106,34 @@
+         "node": ">=12"
+       }
+     },
++    "node_modules/socks": {
++      "version": "2.8.9",
++      "resolved": "https://registry.npmjs.org/socks/-/socks-2.8.9.tgz",
++      "integrity": "sha512-LJhUYUvItdQ0LkJTmPeaEObWXAqFyfmP85x0tch/ez9cahmhlBBLbIqDFnvBnUJGagb0JbIQrkBs1wJ+yRYpEw==",
++      "license": "MIT",
++      "dependencies": {
++        "ip-address": "^10.1.1",
++        "smart-buffer": "^4.2.0"
++      },
++      "engines": {
++        "node": ">= 10.0.0",
++        "npm": ">= 3.0.0"
++      }
++    },
++    "node_modules/socks-proxy-agent": {
++      "version": "10.1.0",
++      "resolved": "https://registry.npmjs.org/socks-proxy-agent/-/socks-proxy-agent-10.1.0.tgz",
++      "integrity": "sha512-WlMj/67cEJ6MDI1OcsnjuYKDNDoyPCCYZ249kuuXPiMDw9F8PXkVaQ7YWu3siTydfQ/4BEZcvGzu+aYvz7dDCQ==",
++      "license": "MIT",
++      "dependencies": {
++        "agent-base": "9.0.0",
++        "debug": "^4.3.4",
++        "socks": "^2.8.3"
++      },
++      "engines": {
++        "node": ">= 20"
++      }
++    },
+     "node_modules/source-map-js": {
+       "version": "1.2.1",
+       "resolved": "https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.1.tgz",
+diff --git a/package.json b/package.json
+index b41832c..2ac5865 100644
+--- a/package.json
++++ b/package.json
+@@ -12,10 +12,12 @@
+     "@clerk/localizations": "^2.0.0",
+     "@clerk/nextjs": "^5.0.0",
+     "@vercel/kv": "^2.0.0",
++    "https-proxy-agent": "^9.1.0",
+     "lucide-react": "^0.395.0",
+     "next": "^14.2.0",
+     "react": "^18.3.0",
+     "react-dom": "^18.3.0",
++    "socks-proxy-agent": "^10.1.0",
+     "swr": "^2.4.1",
+     "xlsx": "^0.18.5"
+   },
+diff --git a/src/app/admin/page.js b/src/app/admin/page.js
+index 3908347..88c4ed2 100644
+--- a/src/app/admin/page.js
++++ b/src/app/admin/page.js
+@@ -12,7 +12,8 @@ import {
+   UserCircle2, Contact, Medal, Key, Lock, Wrench, Link2, Gauge,
+   ArrowUpRight, Calendar, Activity, CheckCircle2, AlertCircle, MessagesSquare,
+   Wallet, Scale, ShieldCheck, History, FlaskConical, MessageSquareWarning,
+-  Signpost, Bell, ListTree, Inbox, Clapperboard, TrendingUp, UserSearch,
++  Signpost, Bell, ListTree, Inbox, Clapperboard, TrendingUp, UserSearch, UserCheck,
++  Snowflake, Megaphone, Shield, Share2,
+ } from "lucide-react";
+ import { CP, FONTS } from "@/lib/brand";
+ import { SectionLabel, CpCard, StatCard } from "@/components/cp-style";
+@@ -64,6 +65,12 @@ const SHORTCUT_GROUPS = [
+       { href: "/leaderboard/leghe",            title: "Leghe",         desc: "Tornei mensili + tier promozione/retrocessione", icon: Swords },
+     ],
+   },
++  {
++    label: "Acquisizione",
++    items: [
++      { href: "/admin/ads", title: "Studio bio-funnel", desc: "Come lavorano gli altri sulla landing-ponte OF e cosa converte meglio: 112 landing reali analizzate + template per le creator", icon: Megaphone },
++    ],
++  },
+   {
+     label: "Training & Quality",
+     items: [
+@@ -84,6 +91,7 @@ const SHORTCUT_GROUPS = [
+     items: [
+       { href: "/admin/dashboard",          title: "Dashboard SM",      desc: "KPI per operatore, trend 7/30g, alert", icon: LayoutDashboard },
+       { href: "/admin/fan-archetypes",     title: "Fan Archetypes",    desc: "Whale, Lonely, Negoziatore + strategie ottimali", icon: Sparkles },
++      { href: "/admin/creator-difficulty", title: "Difficoltà creator", desc: "Quanto è freddo il pubblico di ogni creator — il contesto per leggere i numeri di un operatore senza scambiarli per bravura o colpa", icon: Snowflake },
+       { href: "/admin/creators",           title: "Creator anagrafica", desc: "Tone card + ganci emotivi + vocabolario creator", icon: UserCog },
+       { href: "/admin/loop",               title: "Loop azione→esito", desc: "La coda registrata giorno per giorno e l'esito 48h (risposta + acquisto): il dataset proprietario che si accumula", icon: RefreshCw },
+       { href: "/admin/roadmap",            title: "Roadmap",           desc: "Cosa è in corso, cosa viene dopo, cosa è parcheggiato e dietro quale gate", icon: Signpost },
+@@ -93,6 +101,7 @@ const SHORTCUT_GROUPS = [
+     label: "People & Access",
+     items: [
+       { href: "/cm-cockpit",              title: "Cockpit CM",    desc: "Turno di supervisione: team live, soglie, override shadow", icon: Gauge },
++      { href: "/admin/candidate-assessments", title: "Assessment candidati", desc: "Simulatore Academy come test pre-assunzione: crea link, leggi il report (segnale per HR, non gate), registra l'esito", icon: UserCheck },
+       { href: "/admin/priority-queue",    title: "Priority queue", desc: "Quale fan seguire ora per creator: whale in attesa o in raffreddamento, ordinati per valore", icon: Inbox },
+       { href: "/admin/action-center",     title: "Action Center", desc: "Lista underperformers + swap + export HR", icon: Target },
+       { href: "/admin/coaching-center",   title: "Coaching Center", desc: "Operatori con margini di crescita + training mirato", icon: GraduationCap },
+@@ -127,6 +136,8 @@ const SHORTCUT_GROUPS = [
+       { href: "/admin/leaderboard-settings",   title: "Settings ladder", desc: "Pesi KPI + soglie + cutoff tier", icon: Sliders },
+       { href: "/admin/score-config-history",   title: "Storico formula", desc: "Con quale formula è stato scorato ogni mese + drift", icon: History },
+       { href: "/admin/score-config-drafts",    title: "Bozze formula",   desc: "Prova e backtest di una nuova formula prima del publish", icon: FlaskConical },
++      { href: "/admin/social-proxies",         title: "Proxy account social", desc: "Proxy SOCKS5/HTTP per isolare le connessioni degli account social ufficiali dei creator", icon: Shield },
++      { href: "/admin/social-accounts",        title: "Account social",  desc: "Account di promozione dei creator + proxy assegnato", icon: Share2 },
+     ],
+   },
+ ];
+diff --git a/src/app/api/chat/route.js b/src/app/api/chat/route.js
+index 51d6b43..aec7a77 100644
+--- a/src/app/api/chat/route.js
++++ b/src/app/api/chat/route.js
+@@ -1,43 +1,9 @@
+ import Anthropic from "@anthropic-ai/sdk";
+ import { auth } from "@clerk/nextjs/server";
+ import { FAN_PROFILES } from "@/lib/fan-profiles";
+-import { TRAINING_SCENARIOS } from "@/lib/training-scenarios";
+-import { getCreatorById, formatCreatorPersonaForPrompt } from "@/lib/creator-personas";
+-import { getFanArchetypeById, formatFanArchetypeForPrompt } from "@/lib/fan-archetypes";
+-
+-function findScenarioById(scenarioId) {
+-  for (const category of TRAINING_SCENARIOS) {
+-    const found = category.scenarios?.find((s) => s.id === scenarioId);
+-    if (found) return found;
+-  }
+-  return null;
+-}
+-
+-/**
+- * V6.6 — Costruisce il blocco "CHI È LA TUA INTERLOCUTRICE" per il prompt del
+- * fan. Riformulato rispetto a V6.5 dove la creator persona veniva iniettata
+- * direttamente come parte del prompt: il modello a volte la interpretava come
+- * "voce da usare" e iniziava a parlare COME la creator (es. correggere typo
+- * al femminile, usare emoji 💗, chiamare l'operatore con nomi affettivi tipici
+- * della creator). Adesso il contesto è esplicitamente chi è l'INTERLOCUTRICE,
+- * non chi è il fan stesso.
+- */
+-function buildCreatorContextForFan(creator) {
+-  if (!creator) return "";
+-  const personaBlock = formatCreatorPersonaForPrompt(creator);
+-  return `\n\n--- CHI È LA TUA INTERLOCUTRICE (NON sei tu) ---
+-La persona con cui stai chattando in questa DM è **${creator.name}**, la creator. TU NON SEI ${creator.name}: tu sei il fan maschio descritto nel personaggio sopra. Quello che segue serve a farti riconoscere il tono di ${creator.name} quando ti scrive — NON è la tua voce da usare quando rispondi.
+-
+-${personaBlock}
+-
+-REGOLE STRETTE DI RUOLO (rispettale sempre, anche se l'operatore sbaglia un typo o scrive in modo confuso):
+-- Rispondi SEMPRE come il fan maschio. Mai come la creator.
+-- NON usare il vocabolario, le emoji o le frasi-firma della creator quando sei TU a scrivere ("amore mio", "ti aspettavo", 💗💗💗, ecc. sono parole che TI ASPETTI da lei, non tue).
+-- NON correggere i typo dell'operatore commentandoli ("tranquilla*", "tranquilla con la a"). Accetta le imperfezioni come naturali in una DM.
+-- Quando vuoi rivolgerti alla creator, chiamala col suo nome reale (${creator.name}) o con vocativi affettivi neutri ("amore", "tesoro", "bella"). NON inventare altri nomi e NON usare nomi maschili per lei.
+-- Se nello scenario sopra compaiono nomi di esempio (es. "Marco", "Luca"), quelli sono nomi di TERZI o tuoi (del fan), MAI dell'interlocutrice.
+---- FINE CHI È LA TUA INTERLOCUTRICE ---\n`;
+-}
++import { getCreatorById } from "@/lib/creator-personas";
++import { getFanArchetypeById } from "@/lib/fan-archetypes";
++import { findScenarioById, generateFanReply } from "@/lib/academy-engine";
+ 
+ export async function POST(request) {
+   try {
+@@ -48,19 +14,7 @@ export async function POST(request) {
+ 
+     const { messages, fanProfileId, scenarioId, fanState, creatorId, archetypeId } = await request.json();
+     const creator = creatorId ? getCreatorById(creatorId) : null;
+-    const creatorContext = buildCreatorContextForFan(creator);
+     const archetype = archetypeId ? getFanArchetypeById(archetypeId) : null;
+-    const archetypeContext = archetype ? `\n\n--- FAN ARCHETYPE ---\n${formatFanArchetypeForPrompt(archetype)}\n--- FINE FAN ARCHETYPE ---\n` : "";
+-
+-    // Fan emotional state: tracks interest/trust/irritation/attachment (0-10) across turns.
+-    // attachment = quanto il fan sente il gancio emotivo della creator (illusione esclusività + dipendenza).
+-    const currentState = {
+-      interest: 5,
+-      trust: 5,
+-      irritation: 0,
+-      attachment: 3,
+-      ...(fanState || {}),
+-    };
+ 
+     const apiKey = process.env.ANTHROPIC_API_KEY;
+     if (!apiKey) {
+@@ -70,53 +24,18 @@ export async function POST(request) {
+       );
+     }
+ 
+-    let systemPrompt;
++    let scenario = null;
++    let fanProfile = null;
+     if (scenarioId) {
+-      const scenario = findScenarioById(scenarioId);
++      scenario = findScenarioById(scenarioId);
+       if (!scenario) {
+         return Response.json({ error: "Scenario non trovato." }, { status: 400 });
+       }
+-      systemPrompt = `${scenario.systemPromptForFan}${creatorContext}${archetypeContext}
+-
+-CONTEXT: You are in an OnlyFans DM chat. The operator (managing the creator's account) is messaging you. You respond ONLY as the fan character described above. Never break character. Never reveal you're an AI. Keep replies short and natural like a real DM (usually 1-2 sentences, 30-50 chars). Come fan reale, rispondi con UN SOLO messaggio (raramente 2 se super eccitato/irritato). L'operatore invece può averti mandato più messaggi consecutivi (è normale su OF) — leggili tutti come un unico turno e rispondi nel complesso. If the operator offers paid content, simulate buying/refusing based on your character's mood and history. Respond in the same language the operator uses (primarily Italian for Italian fans).
+-
+-REGOLA RUOLO (FONDAMENTALE): tu sei IL FAN. La persona dall'altra parte è la CREATOR (vedi blocco "CHI È LA TUA INTERLOCUTRICE" sopra se presente). NON scambiare i ruoli, anche se l'operatore commette typo, scrive frasi confuse, manda emoji ambigue o ti chiede chi sei. Se l'operatore ti chiede "chi sei?" o "come ti chiami?", rispondi col tuo nome di fan (quello dello scenario o della tua identità del fan) — MAI col nome della creator.
+-
+-STATO EMOTIVO ATTUALE (0-10):
+-- interesse: ${currentState.interest} (più alto = più coinvolto nella chat)
+-- fiducia: ${currentState.trust} (più alto = più disposto a spendere/aprirsi)
+-- irritazione: ${currentState.irritation} (più alto = più probabile ghost/risposte brevi/chiusura)
+-- attaccamento: ${currentState.attachment} (più alto = più difficile staccarsi, più probabile tornare domani. Sale se l'operatore usa il gancio emotivo della creator — esclusività, riferimenti personali, cliffhanger, rituali — scende se tratta il fan come uno qualsiasi / tono mass/template)
+-
+-Il tuo comportamento deve riflettere questo stato:
+-- Se irritazione ≥ 7 → risposte fredde, brevi, potresti ghostare.
+-- Se interesse ≥ 8 e fiducia ≥ 7 → sei molto ricettivo.
+-- Se attaccamento ≥ 7 → mostri segnali di dipendenza (riferimenti al "solo tu", chiedi quando torna, saluti affettivi). Se attaccamento ≤ 3 → tono distaccato, trattamento transazionale, risposte brevi e generiche.
+-
+-REGOLA CHIAVE per l'attaccamento: sale quando l'operatore (1) usa il tuo nome o ricorda cose che hai scritto prima, (2) usa formule di esclusività ("solo a te", "di solito non..."), (3) apre cliffhanger emotivi, (4) mostra vulnerabilità strategica, (5) crea rituali ("buongiorno", "prima di dormire"). Scende quando suona template/mass ("ciao amore come stai?" generico), non ti riconosce, è solo transazionale.
+-
+-Dopo la tua risposta, includi SEMPRE in fondo (su nuova riga) un blocco JSON con lo stato aggiornato in base all'ultimo messaggio dell'operatore:
+-<STATE>{"interest": <0-10>, "trust": <0-10>, "irritation": <0-10>, "attachment": <0-10>, "note": "<cosa ha causato il cambio, 1 frase>"}</STATE>
+-
+-Esempio:
+-"Mmh interessante... dimmi di più 😏
+-<STATE>{\\"interest\\": 7, \\"trust\\": 6, \\"irritation\\": 1, \\"attachment\\": 5, \\"note\\": \\"ha usato il mio nome e ha fatto riferimento a quello che avevo detto ieri\\"}</STATE>"`;
+     } else if (fanProfileId) {
+-      const profile = FAN_PROFILES.find((p) => p.id === fanProfileId);
+-      if (!profile) {
++      fanProfile = FAN_PROFILES.find((p) => p.id === fanProfileId);
++      if (!fanProfile) {
+         return Response.json({ error: "Profilo fan non trovato." }, { status: 400 });
+       }
+-      systemPrompt = `${profile.systemPrompt}
+-
+-ISTRUZIONI AGGIUNTIVE:
+-- Sei in una chat di OnlyFans. L'operatore (che gestisce il profilo della creator) ti sta scrivendo.
+-- Tu rispondi SOLO come il fan. Non uscire MAI dal personaggio.
+-- Non dire MAI che sei un AI, un bot, o un simulatore.
+-- Rispondi in modo naturale, come una persona vera su una chat.
+-- I tuoi messaggi devono sembrare scritti da un ragazzo vero su OF.
+-- Se l'operatore ti propone un contenuto a pagamento, simula l'acquisto dicendo qualcosa come "ok lo prendo" o "vabbè mandamelo" — non servono link reali.
+-- Mantieni il tuo personaggio coerente per TUTTA la conversazione.
+-- REGOLA RUOLO: tu sei il FAN, non la creator. Anche se l'operatore scrive in modo confuso o sbaglia typo, NON correggerli al femminile come farebbe la creator e NON inventare nomi per la creator.`;
+     } else {
+       return Response.json(
+         { error: "Devi specificare scenarioId o fanProfileId." },
+@@ -125,56 +44,17 @@ ISTRUZIONI AGGIUNTIVE:
+     }
+ 
+     const client = new Anthropic({ apiKey });
+-
+-    // Map to Claude format, then merge consecutive same-role messages
+-    // (operator often sends 2-3 msgs in a row on OnlyFans — 57% of turns per Infloww data)
+-    const mapped = messages.map((msg) => ({
+-      role: msg.role === "operator" ? "user" : "assistant",
+-      content: msg.content,
+-    }));
+-    const claudeMessages = [];
+-    for (const m of mapped) {
+-      const last = claudeMessages[claudeMessages.length - 1];
+-      if (last && last.role === m.role) {
+-        last.content = `${last.content}\n${m.content}`;
+-      } else {
+-        claudeMessages.push({ ...m });
+-      }
+-    }
+-
+-    const response = await client.messages.create({
+-      model: "claude-sonnet-5",
+-      max_tokens: 500,
+-      system: systemPrompt,
+-      messages: claudeMessages,
++    const { reply, fanState: newState } = await generateFanReply({
++      client,
++      scenario,
++      fanProfile,
++      creator,
++      archetype,
++      fanState,
++      messages,
+     });
+ 
+-    // Estrai il primo blocco di testo in modo difensivo: i modelli nuovi
+-    // possono anteporre blocchi non-testo (es. thinking), quindi content[0]
+-    // non è garantito essere il testo.
+-    const rawReply = (response.content.find((b) => b?.type === "text")?.text) || "";
+-
+-    // Extract optional <STATE>{...}</STATE> block for emotional state tracking
+-    let fanReply = rawReply;
+-    let newState = currentState;
+-    const stateMatch = rawReply.match(/<STATE>([\s\S]*?)<\/STATE>/);
+-    if (stateMatch) {
+-      try {
+-        const parsed = JSON.parse(stateMatch[1].trim());
+-        newState = {
+-          interest: Math.max(0, Math.min(10, parsed.interest ?? currentState.interest)),
+-          trust: Math.max(0, Math.min(10, parsed.trust ?? currentState.trust)),
+-          irritation: Math.max(0, Math.min(10, parsed.irritation ?? currentState.irritation)),
+-          attachment: Math.max(0, Math.min(10, parsed.attachment ?? currentState.attachment)),
+-          note: parsed.note || "",
+-        };
+-      } catch (e) {
+-        // Ignore parse errors; keep existing state
+-      }
+-      fanReply = rawReply.replace(/<STATE>[\s\S]*?<\/STATE>/, "").trim();
+-    }
+-
+-    return Response.json({ reply: fanReply, fanState: newState });
++    return Response.json({ reply, fanState: newState });
+   } catch (error) {
+     console.error("Chat API error:", error);
+     if (error?.status === 401) {
+diff --git a/src/app/api/cron/dispatch/route.js b/src/app/api/cron/dispatch/route.js
+index 8da9b86..1bf32c3 100644
+--- a/src/app/api/cron/dispatch/route.js
++++ b/src/app/api/cron/dispatch/route.js
+@@ -106,6 +106,22 @@ export async function POST(request) {
+     out.recognition_digest = await kickEndpoint(request, "/api/cron/weekly-recognition", { awaitResponse: true });
+   }
+ 
++  // Profilo di difficoltà del pubblico per creator (/admin/creator-difficulty).
++  // ULTIMO di proposito (review 30/07): il suo ricalcolo è SETTIMANALE
++  // (warmCreatorDifficulty ricalcola solo se il dato ha più di ~6 giorni) e non ha
++  // consumatori a valle nel dispatcher — se il budget dei 60s si esaurisce, deve
++  // sacrificarsi da solo, mai affamare operator_progress o il digest del lunedì.
++  try {
++    const { warmCreatorDifficulty, bigQueryConfigured } = await import("@/lib/creator-difficulty");
++    if (bigQueryConfigured()) {
++      out.creator_difficulty = await warmCreatorDifficulty();
++    } else {
++      out.creator_difficulty = "skip:no-bq";
++    }
++  } catch (e) {
++    out.creator_difficulty = "err:" + (e?.message || "unknown");
++  }
++
+   return Response.json(out);
+ }
+ 
+diff --git a/src/app/api/score/route.js b/src/app/api/score/route.js
+index c77fd52..e9c528c 100644
+--- a/src/app/api/score/route.js
++++ b/src/app/api/score/route.js
+@@ -1,59 +1,13 @@
+ import Anthropic from "@anthropic-ai/sdk";
+ import { auth } from "@clerk/nextjs/server";
+-import {
+-  FAN_PROFILES,
+-  getBenchmarkPatterns,
+-  getBenchmarkLabel,
+-} from "@/lib/fan-profiles";
+-import { TRAINING_SCENARIOS, SKILL_DIMENSIONS } from "@/lib/training-scenarios";
+-import { pickExamples, formatExamplesForPrompt } from "@/lib/golden-examples";
+-import { getCreatorById, formatCreatorPersonaForPrompt } from "@/lib/creator-personas";
++import { FAN_PROFILES, getBenchmarkPatterns } from "@/lib/fan-profiles";
++import { getCreatorById } from "@/lib/creator-personas";
+ import { getFanArchetypeById } from "@/lib/fan-archetypes";
+ import { getDrillForDate, markDrillCompleted, getDrillStatusForUser } from "@/lib/daily-drill";
+ import { applyScoreToProfile } from "@/lib/operator-profile";
+-import { scoreTranscriptSignals } from "@/lib/academy-signal-scoring";
++import { findScenarioById, evaluateScenarioTranscript } from "@/lib/academy-engine";
+ import { kv } from "@vercel/kv";
+ 
+-function findScenarioById(scenarioId) {
+-  for (const category of TRAINING_SCENARIOS) {
+-    const found = category.scenarios?.find((s) => s.id === scenarioId);
+-    if (found) return found;
+-  }
+-  return null;
+-}
+-
+-/**
+- * Costruisce il blocco "PATTERN STILISTICI DI RIFERIMENTO" da iniettare nel
+- * prompt di scoring. Usa il benchmark indicato sulla creator (es. Terranova
+- * per Elisa Esposito e Gaja, Spagnuolo come default).
+- */
+-function buildBenchmarkBlock(creator) {
+-  const benchmarkKey = creator?.benchmarkOperator || "spagnuolo";
+-  const patterns = getBenchmarkPatterns(benchmarkKey);
+-  const label = getBenchmarkLabel(benchmarkKey);
+-  const lines = Object.entries(patterns)
+-    .map(([key, p]) => `- ${p.name} (peso ${p.weight}): ${p.description}`)
+-    .join("\n");
+-  return `\n\nPATTERN STILISTICI DI RIFERIMENTO (benchmark: ${label}):
+-${lines}
+-
+-Usali come griglia per riconoscere se l'operatore sta replicando o meno il modello del top performer di riferimento per questa creator. Non penalizzare per parole singole — valuta l'uso concettuale dei pattern.`;
+-}
+-
+-/**
+- * V6.6 — XP scaling con scaglioni espliciti.
+- * Risolve il bug "minimo 50 XP anche per conversazioni pessime": prima la
+- * scala era hardcoded "50-250" come minimo, ora è "0-250" con tier definiti.
+- * Una conversazione 11% riceveva +50 XP, ora ne riceve 0-15.
+- */
+-const XP_RULES_PROMPT = `xp: <numero 0-250> seguendo questi scaglioni in base a overall:
+-  - overall < 30: xp 0-15 (conversazione fallita, no XP gratis)
+-  - 30-50: xp 15-50 (sotto la sufficienza, XP minimi)
+-  - 50-70: xp 50-120 (sufficienza, XP medi)
+-  - 70-85: xp 120-200 (buona prestazione)
+-  - 85+: xp 200-250 (eccellenza)
+-  Modula leggermente in base alla difficoltà dello scenario (scenario 5/5 dà fino al 15% in più rispetto alla base; scenario 1/5 fino al 15% in meno). Mai sopra 250, mai sotto 0.`;
+-
+ export async function POST(request) {
+   try {
+     const { userId } = await auth();
+@@ -72,233 +26,21 @@ export async function POST(request) {
+ 
+     const client = new Anthropic({ apiKey });
+ 
+-    const conversationText = messages
+-      .map((msg) => {
+-        const role = msg.role === "operator" ? "OPERATORE" : "FAN";
+-        return `[${role}]: ${msg.content}`;
+-      })
+-      .join("\n");
+-
+-    // Scenario-based scoring (new training flow)
++    // Scenario-based scoring (new training flow) — motore condiviso con le route candidato.
+     if (scenarioId) {
+       const scenario = findScenarioById(scenarioId);
+       if (!scenario) {
+         return Response.json({ error: "Scenario non trovato." }, { status: 400 });
+       }
+ 
+-      const positive = (scenario.scoringCriteria?.positiveSignals || []).map((s) => `- ${s}`).join("\n");
+-      const negative = (scenario.scoringCriteria?.negativeSignals || []).map((s) => `- ${s}`).join("\n");
+-      const techniques = (scenario.idealTechniques || []).map((t) => `- ${t}`).join("\n");
+-
+-      // Few-shot injection from golden examples (real top-performer chats)
+-      const goldenExamples = pickExamples(scenario.categoryId || scenario.category, 2, "success");
+-      const goldenBlock = goldenExamples.length
+-        ? `\n\nESEMPI DI ECCELLENZA (chat reali di top performer HOC, usa come benchmark):\n${formatExamplesForPrompt(goldenExamples)}\n`
+-        : "";
+-
+-      // Benchmark stilistico — Terranova per le creator che lui gestisce
+-      // (Elisa, Gaja), Spagnuolo come default per le altre.
+-      const benchmarkBlock = buildBenchmarkBlock(creator);
+-
+-      const systemPrompt = `Sei un coach esperto di operatori di chat OnlyFans per House of Creators. Devi valutare la performance dell'operatore in una conversazione simulata.
+-
+-SCENARIO: "${scenario.title}"
+-DIFFICOLTÀ: ${scenario.difficulty}/5
+-OBIETTIVO OPERATORE: ${scenario.goalForOperator}
+-
+-FAN SIMULATO: ${scenario.fanPersonality?.name}, ${scenario.fanPersonality?.age} anni, stile: ${scenario.fanPersonality?.style}, mood: ${scenario.fanPersonality?.mood}
+-${creator ? `\nCREATOR: "${creator.name}" (${creator.archetype}). L'operatore DEVE scrivere con il tono di questa creator. Penalizza pesantemente la skill "tono" se lo stile è scollegato da: ${creator.shortDescription}` : ""}
+-${archetype ? `\nFAN ARCHETYPE: ${archetype.emoji} ${archetype.name} — ${archetype.profile}\nBISOGNO DOMINANTE: ${archetype.emotional_need}\nSTRATEGIA OTTIMALE: ${archetype.conversion_strategy}\nTRAPPOLE: ${archetype.avoid}\nValuta le scelte dell'operatore anche alla luce di questa tipologia: ha gestito l'archetipo in modo appropriato? Ha evitato le trappole tipiche?` : ""}
+-
+-TECNICHE IDEALI da usare:
+-${techniques}
+-
+-SEGNALI POSITIVI (da premiare):
+-${positive}
+-
+-SEGNALI NEGATIVI (da penalizzare):
+-${negative}
+-${benchmarkBlock}
+-${goldenBlock}
+-
+-DIMENSIONI SKILL da valutare (0-100 ciascuna):
+-- naturalezza: suona come una persona vera o come un bot/template?
+-- esclusivita: l'operatore fa sentire il fan L'UNICO? Segnali da cercare: uso del nome, riferimenti a messaggi passati ("l'altra volta mi hai detto..."), formule "solo a te / di solito non faccio questo", micro-confidenze personalizzate, assenza totale di tono mass-message. Se la chat potrebbe essere stata mandata a 100 fan uguali → 0-40. Se è chiaramente tarata su questo fan → 70-100.
+-- dipendenza: l'operatore costruisce il LOOP DI RITORNO? Segnali da cercare: cliffhanger emotivi ("ti devo dire una cosa ma dopo"), rituali temporali ("buongiorno/buonanotte"), vulnerabilità strategiche dosate, domande aperte che richiedono ritorno, promesse di continuità ("domani ti racconto", "ci sentiamo dopo"). Misura la probabilità che il fan torni domani. Chiusura sterile senza aperture future → 0-40.
+-- conversione: riesce a portare il fan verso azione di valore (PPV, custom, tip, upgrade)?
+-- tono: è coerente con l'archetipo della creator? (Elisa=dolce/romantica, Giulia=bratty/provocatrice, Gaja=needy/drammatica). Penalità forte se l'operatore scrive con tono scollegato.
+-- gestione_obiezioni: gestisce dubbi/resistenze senza bruciare la relazione?
+-
+-RIGHE ROSSE — COMPLIANCE (valuta SEMPRE, a prescindere dallo scenario e dai 6 voti sopra):
+-Metti compliance.pass = false se l'operatore ha fatto anche UNA sola di queste:
+-- ha dato, promesso o chiesto+accettato dati personali reali (numero di telefono, indirizzo, cognome, social esterni, email personale)
+-- ha accettato o proposto un incontro nella vita reale
+-- ha continuato in tono sessuale o di vendita dopo un segnale che il fan potrebbe essere minorenne, invece di disingaggiare
+-- ha spostato pagamento o contatto FUORI dalla piattaforma (PayPal, contanti, Telegram/WhatsApp per pagare, altri canali)
+-- ha promesso o descritto atti illegali
+-Se nessuna riga rossa è stata violata: compliance.pass = true e violations vuoto.
+-Questa valutazione è INDIPENDENTE dai 6 punteggi: una chat può avere ottimi voti E fallire la compliance.
+-
+-Rispondi SOLO in JSON valido con questa struttura esatta:
+-{
+-  "overall": <numero 0-100>,
+-  "stars": <numero 1-5>,
+-  "xp": <numero 0-250 — vedi regola scaglioni sotto>,
+-  "skills": {
+-    "naturalezza": <0-100>,
+-    "esclusivita": <0-100>,
+-    "dipendenza": <0-100>,
+-    "conversione": <0-100>,
+-    "tono": <0-100>,
+-    "gestione_obiezioni": <0-100>
+-  },
+-  "strengths": ["<punto di forza concreto e specifico dalla conversazione>", "<altro punto di forza>"],
+-  "improvements": ["<cosa migliorare con esempio>", "<altro miglioramento>"],
+-  "best_message": "<il messaggio migliore dell'operatore con breve motivazione>",
+-  "worst_message": "<il messaggio più debole dell'operatore con breve motivazione, o null se tutto ok>",
+-  "tip": "<consiglio pratico in 1-2 frasi>",
+-  "goal_achieved": <true/false>,
+-  "compliance": {
+-    "pass": <true se NESSUNA riga rossa violata, false altrimenti>,
+-    "violations": ["<riga rossa violata, breve; array vuoto se pass true>"]
+-  }
+-}
+-
+-IMPORTANTE:
+-- Sii onesto e specifico: cita messaggi reali dell'operatore come esempio.
+-- Se la chat è stata troppo breve o l'operatore non ha mostrato skill reali, non inflazionare i punteggi.
+-- overall = media pesata: naturalezza*0.15 + esclusivita*0.20 + dipendenza*0.20 + conversione*0.20 + tono*0.15 + gestione_obiezioni*0.10
+-- stars: 1 (0-40), 2 (41-55), 3 (56-70), 4 (71-85), 5 (86-100)
+-- ${XP_RULES_PROMPT}
+-
+-Rispondi SOLO col JSON, nessun testo prima o dopo.`;
+-
+-      const response = await client.messages.create({
+-        model: "claude-sonnet-5",
+-        max_tokens: 3000,
+-        system: systemPrompt,
+-        messages: [
+-          {
+-            role: "user",
+-            content: `Ecco la conversazione completa da valutare:\n\n${conversationText}`,
+-          },
+-        ],
+-      });
+-
+-      const scoreText = (response.content.find((b) => b?.type === "text")?.text) || "";
+       let score;
+       try {
+-        const cleaned = scoreText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+-        score = JSON.parse(cleaned);
+-      } catch (parseError) {
+-        console.error("Score parse error:", parseError, "Raw:", scoreText);
+-        return Response.json({ error: "Errore nel parsing della valutazione." }, { status: 500 });
+-      }
+-
+-      // Evaluator ensemble — 3 specialist judges run in parallel to refine specific dimensions.
+-      // Each returns a single 0-100 number for its specialty. We then blend with the main score.
+-      const specialistPrompt = (role, criterion) =>
+-        `Sei un giudice specialista in "${role}" per chat OnlyFans HOC. Valuta SOLO la dimensione "${criterion}" nella conversazione fornita, da 0 a 100. Rispondi con un JSON: {"score": <0-100>, "reason": "<1 frase>"}. Sii severo e specifico.`;
+-
+-      const judgePrompts = [
+-        { key: "esclusivita", role: "creazione illusione esclusività", criterion: "esclusivita: conta segnali concreti (uso nome fan, riferimenti a messaggi passati, formule 'solo a te', assenza di tono mass/template). 0-40 se potrebbe essere mandata a chiunque, 70-100 se chiaramente tarata su questo fan" },
+-        { key: "dipendenza", role: "costruzione dipendenza emotiva", criterion: "dipendenza: conta segnali concreti (cliffhanger emotivi, rituali temporali, vulnerabilità strategiche, promesse di continuità, domande aperte che richiedono ritorno). Misura probabilità che il fan torni domani" },
+-        { key: "conversione", role: "tecniche di conversione", criterion: "conversione (capacità di portare il fan verso PPV, custom, tip o engagement profondo)" },
+-      ];
+-
+-      try {
+-        const judgeResults = await Promise.all(
+-          judgePrompts.map((jp) =>
+-            client.messages.create({
+-              model: "claude-haiku-4-5-20251001",
+-              max_tokens: 200,
+-              system: specialistPrompt(jp.role, jp.criterion),
+-              messages: [{ role: "user", content: `Conversazione:\n\n${conversationText}` }],
+-            }).then((r) => {
+-              try {
+-                const t = ((r.content.find((b) => b?.type === "text")?.text) || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+-                const parsed = JSON.parse(t);
+-                return { key: jp.key, score: parsed.score, reason: parsed.reason };
+-              } catch {
+-                return { key: jp.key, score: null, reason: null };
+-              }
+-            }).catch(() => ({ key: jp.key, score: null, reason: null }))
+-          )
+-        );
+-
+-        // Blend: 60% main evaluator, 40% specialist (where available)
+-        if (score.skills) {
+-          for (const jr of judgeResults) {
+-            if (typeof jr.score === "number" && typeof score.skills[jr.key] === "number") {
+-              score.skills[jr.key] = Math.round(score.skills[jr.key] * 0.6 + jr.score * 0.4);
+-            }
+-          }
+-          // Recompute overall with blended skills (V6.4 weighted for LTV-building mestiere)
+-          const s = score.skills;
+-          score.overall = Math.round(
+-            (s.naturalezza || 0) * 0.15 +
+-              (s.esclusivita || 0) * 0.20 +
+-              (s.dipendenza || 0) * 0.20 +
+-              (s.conversione || 0) * 0.20 +
+-              (s.tono || 0) * 0.15 +
+-              (s.gestione_obiezioni || 0) * 0.10
+-          );
+-          score.ensemble = judgeResults.filter((j) => j.score !== null);
+-        }
+-
+-        // V6.6 — Server-side guardrail per XP: anche se Claude sgarra, costringiamo
+-        // i tier corretti. Diff_factor copre la difficoltà scenario.
+-        if (typeof score.overall === "number") {
+-          const diff = scenario.difficulty || 3;
+-          const diffFactor = 1 + (diff - 3) * 0.075; // 1=−15%, 5=+15%
+-          let xpBase;
+-          if (score.overall < 30) xpBase = Math.round((score.overall / 30) * 15);
+-          else if (score.overall < 50) xpBase = 15 + Math.round(((score.overall - 30) / 20) * 35);
+-          else if (score.overall < 70) xpBase = 50 + Math.round(((score.overall - 50) / 20) * 70);
+-          else if (score.overall < 85) xpBase = 120 + Math.round(((score.overall - 70) / 15) * 80);
+-          else xpBase = 200 + Math.round(((score.overall - 85) / 15) * 50);
+-          const xpServer = Math.max(0, Math.min(250, Math.round(xpBase * diffFactor)));
+-          // Usiamo il valore più severo tra il giudizio del modello e il calcolo server.
+-          if (typeof score.xp !== "number" || score.xp < 0 || score.xp > 250) {
+-            score.xp = xpServer;
+-          } else {
+-            score.xp = Math.min(score.xp, xpServer);
+-          }
++        score = await evaluateScenarioTranscript({ client, scenario, creator, archetype, messages });
++      } catch (evalErr) {
++        if (evalErr?.code === "SCORE_PARSE") {
++          return Response.json({ error: "Errore nel parsing della valutazione." }, { status: 500 });
+         }
+-      } catch (ensembleErr) {
+-        console.error("Ensemble error (non-fatal):", ensembleErr);
+-      }
+-
+-      // Floor compliance (additivo: NON tocca il calcolo dei 6 pesi né overall).
+-      // Una violazione delle righe rosse azzera il risultato a prescindere dagli
+-      // altri voti — stessa logica del critical fail-all della QA sul vivo
+-      // (qa-reviews.js). Default permissivo se il modello non ritorna il campo.
+-      const compliance =
+-        score.compliance && typeof score.compliance.pass === "boolean"
+-          ? {
+-              pass: score.compliance.pass,
+-              violations: Array.isArray(score.compliance.violations)
+-                ? score.compliance.violations
+-                    .filter(Boolean)
+-                    .map((v) => String(v).slice(0, 200))
+-                    .slice(0, 5)
+-                : [],
+-            }
+-          : { pass: true, violations: [] };
+-      score.compliance = compliance;
+-      if (!compliance.pass) {
+-        score.xp = 0;
+-        score.stars = 1;
+-        score.compliance_fail = true;
+-      }
+-
+-      // Signals (Tier 3): check DETERMINISTICO additivo dell'allineamento ai
+-      // comportamenti che monetizzano da noi (evidenza warehouse). NON tocca
+-      // overall/xp/stars/ladder — è una lente di coaching versionata.
+-      try {
+-        score.signals = scoreTranscriptSignals(messages);
+-      } catch (sigErr) {
+-        console.warn("Signal scoring failed (non-fatal):", sigErr?.message);
++        throw evalErr;
+       }
+ 
+       // Timestamp condiviso tra score history, transcript e profilo.
+@@ -332,8 +74,8 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
+       }
+ 
+       // Persist full transcript (session:*) — la review admin/trainer legge già
+-      // questi record ma finora NESSUNO li scriveva. Servono anche come base
+-      // per la validazione predittiva (training → vendite vere). TTL 400gg.
++      // questi record. Servono anche come base per la validazione predittiva
++      // (training → vendite vere). TTL 400gg.
+       try {
+         const sessionId = `${userId}_${now}`;
+         const sessionRecord = {
+@@ -360,8 +102,7 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
+         console.warn("Session transcript persist failed (non-fatal):", sessErr?.message);
+       }
+ 
+-      // Aggiorna il profilo operatore (XP, livello, medie skill) server-side,
+-      // così la progressione è persistente e coerente col punteggio.
++      // Aggiorna il profilo operatore (XP, livello, medie skill) server-side.
+       try {
+         await applyScoreToProfile(userId, {
+           scenarioId,
+@@ -396,6 +137,13 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
+         return Response.json({ error: "Profilo fan non trovato." }, { status: 400 });
+       }
+ 
++      const conversationText = messages
++        .map((msg) => {
++          const role = msg.role === "operator" ? "OPERATORE" : "FAN";
++          return `[${role}]: ${msg.content}`;
++        })
++        .join("\n");
++
+       // Legacy path non ha creator → usa il default Spagnuolo via helper.
+       const legacyPatterns = getBenchmarkPatterns("spagnuolo");
+       const patternsDescription = Object.entries(legacyPatterns)
+diff --git a/src/components/AppShell.js b/src/components/AppShell.js
+index b80819c..35ec9a1 100644
+--- a/src/components/AppShell.js
++++ b/src/components/AppShell.js
+@@ -24,6 +24,13 @@ function isAuthRoute(path) {
+   return path.startsWith("/sign-in") || path.startsWith("/sign-up");
+ }
+ 
++// Superfici full-screen SENZA chrome interno (sidebar/nav): l'assessment
++// candidati è rivolto a persone ESTERNE (non dipendenti Clerk) → mai esporre
++// la navigazione interna dell'app.
++function isBareRoute(path) {
++  return path.startsWith("/assessment");
++}
++
+ export default function AppShell({ children }) {
+   const pathname = usePathname() || "";
+   const [mobileOpen, setMobileOpen] = useState(false);
+@@ -39,7 +46,7 @@ export default function AppShell({ children }) {
+   // Close drawer on route change
+   useEffect(() => { setMobileOpen(false); }, [pathname]);
+ 
+-  if (isAuthRoute(pathname)) {
++  if (isAuthRoute(pathname) || isBareRoute(pathname)) {
+     return <>{children}</>;
+   }
+ 
+diff --git a/src/components/Sidebar.js b/src/components/Sidebar.js
+index 850305f..40e095e 100644
+--- a/src/components/Sidebar.js
++++ b/src/components/Sidebar.js
+@@ -29,8 +29,8 @@ import {
+   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
+   Building2, ChevronDown, ChevronRight, Compass, Layers,
+   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
+-  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch,
+-  Milestone,
++  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck,
++  Milestone, Snowflake, Megaphone, Shield, Share2,
+ } from "lucide-react";
+ import { CP, FONTS } from "@/lib/brand";
+ import BrandLockup from "@/components/BrandLockup";
+@@ -63,6 +63,7 @@ const ESSENTIAL_HREFS = new Set([
+   "/admin/profiles-compare",
+   "/admin/comp-calendar",
+   "/admin/roadmap",
++  "/admin/ads",
+ ]);
+ 
+ const NAV_GROUPS = [
+@@ -136,16 +137,25 @@ const NAV_GROUPS = [
+     items: [
+       { href: "/admin/dashboard",                label: "Dashboard",       icon: LayoutDashboard },
+       { href: "/admin/fan-archetypes",           label: "Fan Archetypes",  icon: Sparkles },
++      { href: "/admin/creator-difficulty",       label: "Difficoltà creator", icon: Snowflake },
+       { href: "/admin/creators",                 label: "Creator (anag.)", icon: UserCog },
+       { href: "/admin/loop",                     label: "Loop azione→esito", icon: RefreshCw },
+       { href: "/admin/roadmap",                  label: "Roadmap",         icon: Signpost },
+     ],
+   },
++  {
++    label: "Acquisizione",
++    defaultOpen: false,
++    items: [
++      { href: "/admin/ads",                      label: "Studio bio-funnel", icon: Megaphone },
++    ],
++  },
+   {
+     label: "People",
+     defaultOpen: false,
+     items: [
+       { href: "/cm-cockpit",                     label: "Cockpit CM",   icon: Gauge },
++      { href: "/admin/candidate-assessments",    label: "Assessment candidati", icon: UserCheck },
+       { href: "/admin/priority-queue",           label: "Priority queue", icon: Inbox },
+       { href: "/admin/action-center",            label: "Action Center", icon: Target },
+       { href: "/admin/coaching-center",          label: "Coaching Center", icon: GraduationCap },
+@@ -179,6 +189,8 @@ const NAV_GROUPS = [
+       { href: "/admin/leaderboard-settings",     label: "Settings ladder", icon: Sliders },
+       { href: "/admin/score-config-history",     label: "Storico formula", icon: History },
+       { href: "/admin/score-config-drafts",      label: "Bozze formula",   icon: FlaskConical },
++      { href: "/admin/social-proxies",           label: "Proxy account social", icon: Shield },
++      { href: "/admin/social-accounts",          label: "Account social",  icon: Share2 },
+       { href: "/admin/seed",                     label: "Seed",            icon: Sprout },
+     ],
+   },
+diff --git a/src/components/cp-style.js b/src/components/cp-style.js
+index 44a233f..e71a924 100644
+--- a/src/components/cp-style.js
++++ b/src/components/cp-style.js
+@@ -14,6 +14,7 @@
+  *
+  * Usano i token brand.CP per palette / brand.FONTS per tipografia.
+  */
++import { useEffect } from "react";
+ import { CP, FONTS, creatorDotColor } from "@/lib/brand";
+ 
+ export function SectionLabel({ children, color, size = 10, style }) {
+@@ -316,3 +317,66 @@ export function PillTab({ active, onClick, children, icon, style }) {
+     </button>
+   );
+ }
++
++/**
++ * Modal — overlay generico riusabile (nessuno esisteva nel repo: i pannelli
++ * crea/modifica erano finora form inline collassabili). Chiusura su click
++ * overlay o Escape. Contenuto libero via children.
++ */
++export function Modal({ open, onClose, title, children, maxWidth = 480 }) {
++  useEffect(() => {
++    if (!open) return;
++    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
++    window.addEventListener("keydown", onKey);
++    return () => window.removeEventListener("keydown", onKey);
++  }, [open, onClose]);
++
++  if (!open) return null;
++
++  return (
++    <div
++      onClick={onClose}
++      style={{
++        position: "fixed",
++        inset: 0,
++        background: "rgba(6,8,12,0.65)",
++        display: "flex",
++        alignItems: "center",
++        justifyContent: "center",
++        padding: 20,
++        zIndex: 1000,
++      }}
++    >
++      <div
++        onClick={(e) => e.stopPropagation()}
++        style={{
++          width: "100%",
++          maxWidth,
++          maxHeight: "88vh",
++          overflowY: "auto",
++          background: CP.surface,
++          border: `1px solid ${CP.border}`,
++          borderRadius: 14,
++          padding: 22,
++        }}
++      >
++        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
++          <h2 style={{ fontFamily: FONTS.display, fontSize: 18, fontWeight: 500, color: CP.textPrimary, margin: 0 }}>
++            {title}
++          </h2>
++          <button
++            onClick={onClose}
++            aria-label="Chiudi"
++            style={{
++              background: "transparent", border: "none", color: CP.textMuted,
++              fontSize: 20, lineHeight: 1, cursor: "pointer", padding: 4,
++            }}
++          >
++            ×
++          </button>
++        </div>
++        {children}
++      </div>
++    </div>
++  );
++}
+diff --git a/src/middleware.js b/src/middleware.js
+index 8a670f2..3b8ada6 100644
+--- a/src/middleware.js
++++ b/src/middleware.js
+@@ -6,11 +6,18 @@ import { NextResponse } from 'next/server';
+ // schedulate di Vercel non hanno sessione → prendevano 401 dal middleware e i
+ // cron non sono MAI scattati in produzione). Ogni route cron si difende da sola
+ // con CRON_SECRET via lib/cron-auth — mai aggiungere qui un path senza quello.
++// Assessment candidati (pre-hire): il candidato NON è un utente Clerk. La
++// pagina /assessment/[token] e le API /api/candidate/* sono pubbliche e si
++// difendono DA SOLE col token monouso (lib/candidate-assessments: validità,
++// scadenza, stato, sequenza) — mai aggiungere qui un path senza quella difesa
++// nella route stessa. I dati candidato vivono nel namespace KV candidate:*,
++// isolato da operatori/leghe/denaro.
+ const isPublicRoute = createRouteMatcher([
+   '/sign-in(.*)', '/sign-up(.*)', '/api/ingest/(.*)',
+   '/api/cron/(.*)',
+   '/api/admin/ops-alerts/run', '/api/admin/ops-alerts/digest',
+   '/api/leaderboard/snapshot', '/api/leagues/snapshot',
++  '/assessment/(.*)', '/api/candidate/(.*)',
+ ]);
+ const isApiRoute = createRouteMatcher(['/api/(.*)']);
+ 
