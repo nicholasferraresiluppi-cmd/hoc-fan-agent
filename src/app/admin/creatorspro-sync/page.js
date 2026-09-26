@@ -137,6 +137,7 @@ export default function CreatorsProSyncPage() {
   const [unmappedSearch, setUnmappedSearch] = useState("");
   const [mappedSearch, setMappedSearch] = useState("");
   const [showIdle, setShowIdle] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const filteredUnmapped = useMemo(() => {
     if (!unmappedSearch.trim()) return allUnmapped;
@@ -281,6 +282,27 @@ export default function CreatorsProSyncPage() {
               {imp?.unmapped ? <>Nel mese {imp.period_id}: <b style={{ color: COLORS.alabaster }}>${imp.unmapped.toLocaleString("it-IT")}</b> ({(imp.share * 100).toLocaleString("it-IT", { maximumFractionDigits: 1 })}% del venduto) viene da persone non collegate, che quindi non compaiono in Sales CP, Creator, Action e Coaching Center. </> : null}
               Scegli il nome dell&apos;operatore se esiste già (suggerito quando lo riconosco), altrimenti “Usa il nome CP”.
             </p>
+            {(() => {
+              // Proposte SICURE: nome identico (a parte accenti/emoji/"HOC") a un
+              // operatore Infloww non ancora collegato a nessun'altra persona CP.
+              const taken = new Set((mapData?.taken_names || []).map(norm));
+              const safe = withSales.map((m) => ({ m, name: exactName(nameOf(m), inflowwNames) })).filter((x) => x.name && !taken.has(norm(x.name)));
+              if (!safe.length) return null;
+              return (
+                <div style={{ margin: "0 0 14px", padding: "12px 14px", borderRadius: 10, border: `1px solid ${COLORS.charcoal}` }}>
+                  <div style={{ fontSize: 14, color: COLORS.alabaster, marginBottom: 6 }}><b>{safe.length} proposte sicure</b>: stesso nome di un operatore esistente (a parte accenti, emoji, &quot;HOC&quot;).</div>
+                  <div style={{ fontSize: 12, color: COLORS.mist, marginBottom: 10 }}>{safe.map((x) => `${nameOf(x.m)} → ${x.name}`).join(" · ")}</div>
+                  <button disabled={bulkBusy} onClick={async () => {
+                    if (!confirm(`Collegare ${safe.length} persone al loro operatore?`)) return;
+                    setBulkBusy(true);
+                    for (const x of safe) await setMapping(x.m.cp_id || x.m.id, x.name);
+                    setBulkBusy(false);
+                  }} style={{ ...linkBtn, fontSize: 14, padding: "6px 12px", border: "1px solid var(--cp-accent)", borderRadius: 8 }}>
+                    {bulkBusy ? "Collego…" : `Collega le ${safe.length} proposte sicure`}
+                  </button>
+                </div>
+              );
+            })()}
             <input type="text" placeholder="Cerca per nome CP o username…" value={unmappedSearch} onChange={(e) => setUnmappedSearch(e.target.value)} style={{ ...styles.input, marginBottom: 12 }} />
             <datalist id="cp-infloww-names">{inflowwNames.map((n) => <option key={n} value={n} />)}</datalist>
             <table style={styles.table}>
@@ -376,6 +398,13 @@ export default function CreatorsProSyncPage() {
 // emoji, maiuscole): "Erick Jhon HOC" → "Erick Jhon". Solo match esatti o
 // univoci per prefisso di nome+cognome: meglio nessun suggerimento che quello sbagliato.
 const norm = (x) => (x || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z ]/g, " ").replace(/\bHOC\b/gi, " ").replace(/\s+/g, " ").trim().toLowerCase();
+// Solo match ESATTO (normalizzato) e univoco: base delle "proposte sicure".
+function exactName(cpName, names) {
+  const n = norm(cpName);
+  if (!n) return null;
+  const hits = names.filter((x) => norm(x) === n);
+  return hits.length === 1 ? hits[0] : null;
+}
 function suggestName(cpName, names) {
   const n = norm(cpName);
   if (!n) return null;
