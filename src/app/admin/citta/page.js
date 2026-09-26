@@ -27,6 +27,6 @@ export default function CittaPage() {
   );
   if (isLoading) return msg("Sto costruendo la città…");
   if (data?.error) return msg(data.error);
-  if (!data?.spaces?.length) return msg("Non c'è ancora una fotografia di ClickUp da mostrare.");
+  if (!data?.projects?.length) return msg("Non c'è ancora una fotografia di ClickUp da mostrare.");
   return <CityScene data={data} />;
 }
