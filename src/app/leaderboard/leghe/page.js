@@ -62,7 +62,7 @@ export default function LeaguesPage() {
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
-        crumbs={[{ label: "Academy", href: "/" }, { label: "Ladder", href: "/leaderboard" }, { label: "Leghe" }]}
+        crumbs={[{ label: "Academy", href: "/" }, { label: "Classifica allenamento", href: "/leaderboard" }, { label: "Leghe" }]}
         title={data?.seasonKey ? `Leghe · stagione ${data.seasonKey}` : "Leghe"}
         subtitle="La classifica mensile degli allenamenti nel simulatore. Le fasce vanno per posizione nel mese: il 10% più alto è Diamond, poi Platinum, Gold, Silver e Bronze. Per entrare servono almeno 5 sessioni nel mese."
       />

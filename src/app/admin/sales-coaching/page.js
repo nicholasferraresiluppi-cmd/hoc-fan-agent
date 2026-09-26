@@ -629,7 +629,7 @@ export default function SalesCoachingPage() {
   const header = (
     <PageHead
       crumbs={[{ label: "Performance" }, { label: "Coaching vendite" }]}
-      title="Vendere in chat"
+      title="Coaching vendite"
       subtitle="Come vendono le creator del tuo split ai fan che non hanno mai pagato, chi lo fa meglio a parità di creator e cosa allenare nel team. Serve a decidere chi affiancare a chi. Aggiornato ogni notte."
     />
   );

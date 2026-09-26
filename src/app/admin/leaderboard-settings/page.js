@@ -186,7 +186,7 @@ export default function LeaderboardSettingsPage() {
   const head = (
     <PageHead
       crumbs={[{ label: "Hub", href: "/admin" }, { label: "Dati" }, { label: "Impostazioni leaderboard" }]}
-      title="Impostazioni leaderboard operativa"
+      title="Impostazioni della classifica mestiere"
       subtitle="La formula dello score Mestiere (dati Infloww): quanto pesa ogni KPI, come un KPI diventa punti e dove iniziano le fasce. Da qui la cambi direttamente."
       actions={<>
         <Link href="/admin/score-config-drafts" style={{ ...btn(false), textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}><FlaskConical size={14} /> Bozze formula</Link>

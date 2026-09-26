@@ -210,7 +210,7 @@ export default function CreatorDifficultyPage() {
           <div style={{ fontSize: 12, color: CP.textMuted, margin: "10px 0 18px", lineHeight: 1.6 }}>
             {data.creators_total} creator · {data.free_pages} pagine free · aggiornato{" "}
             {data.generated_at ? new Date(data.generated_at).toLocaleString("it-IT") : "—"}
-            {data.stale ? " · in ricalcolo al prossimo giro notturno" : ""} · metodo {data.version}
+            {data.stale ? " · in ricalcolo al prossimo giro notturno" : ""}
           </div>
 
           {free.length > 0 && (
