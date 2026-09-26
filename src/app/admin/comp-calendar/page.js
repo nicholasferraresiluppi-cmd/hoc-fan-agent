@@ -28,14 +28,14 @@
  */
 
 import { useState, useMemo, useEffect } from "react";
-import Link from "next/link";
-import { Loader2, AlertCircle, AlertTriangle, Download, FlaskConical, RotateCcw, Plus, X, ChevronDown, ChevronRight, Sun, Moon, ArrowUp, ArrowDown } from "lucide-react";
+import { Loader2, AlertTriangle, Download, FlaskConical, RotateCcw, Plus, X, Sun, Moon, ArrowUp, ArrowDown } from "lucide-react";
 import { CP, FONTS, DATA_SCALE } from "@/lib/brand";
 import { useTheme, setTheme as setAppTheme } from "@/lib/theme-client";
 import CompNav from "@/components/CompNav";
 import HowToRead from "@/components/HowToRead";
 import CreatorPicker from "@/components/CreatorPicker";
-import { fmt$, fmtSigned$, fmtPct, fmtPts, fmtInt } from "@/lib/format";
+import { fmt$, fmtSigned$, fmtPct, fmtPts, fmtInt, fmtDelta } from "@/lib/format";
+import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Disclosure, Notice, card, NUM } from "@/components/ds";
 
 /* ------------------------------------------------------------------ */
 /* Palette e formati                                                   */
@@ -43,7 +43,6 @@ import { fmt$, fmtSigned$, fmtPct, fmtPts, fmtInt } from "@/lib/format";
 
 const MONTH_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const DAYS_IT = ["Dom","Lun","Mar","Mer","Gio","Ven","Sab"];
-const NUM = { fontVariantNumeric: "tabular-nums" };
 const MIN_SHIFTS = 5; // sotto: resa per turno non affidabile
 
 function monthOpts(n = 12) {
@@ -204,18 +203,19 @@ export default function CompCalendarPage() {
   const costPrev = aggPrev && aggPrev.totSales > 0 ? aggPrev.totEarn / aggPrev.totSales : null;
   const issuesCount = agg ? agg.issueIds.size : 0;
 
+  const prevName = MONTH_IT[Number(prevMonth(periodId).slice(5)) - 1].toLowerCase();
+  const dl = (cur, prv) => (prv != null ? fmtDelta(cur, prv) : null);
+
   return (
-    <div style={{ background: P.bg, minHeight: "100vh", color: P.textPrimary, fontFamily: FONTS.body }}>
-      <div style={{ padding: "28px 28px 80px", maxWidth: 1400, margin: "0 auto" }}>
-        {/* Testata compatta: titolo + scelte + tema */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: P.textSecondary, marginBottom: 6 }}>
-          <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link><span style={{ color: P.textMuted }}>›</span><span>Comp &amp; Ben</span>
-          <button onClick={toggleTheme} style={{ ...st.ghostBtn, marginLeft: "auto", padding: "6px 10px" }} title="Cambia tema">
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1400, margin: "0 auto", fontFamily: FONTS.body, color: P.textPrimary }}>
+        <PageHead
+          crumbs={[{ label: "Hub", href: "/admin" }, { label: "Comp & Ben" }, { label: "Calendario compensi" }]}
+          title="Calendario compensi"
+          subtitle="Quanto ci costano gli operatori su una creator, chi rende e dove, e cosa succederebbe cambiando gli scaglioni."
+          actions={<button onClick={toggleTheme} style={{ ...st.ghostBtn, padding: "6px 10px" }} title="Cambia tema">
             {theme === "light" ? <Moon size={14} /> : <Sun size={14} />} {theme === "light" ? "Tema scuro" : "Tema chiaro"}
-          </button>
-        </div>
-        <h1 style={{ fontSize: 28, fontWeight: 500, margin: "0 0 4px", letterSpacing: "-0.01em" }}>Calendario compensi</h1>
-        <p style={{ fontSize: 14, color: P.textSecondary, margin: "0 0 18px", maxWidth: 760 }}>Quanto ci costano gli operatori su una creator, chi rende e dove, e cosa succederebbe cambiando gli scaglioni.</p>
+          </button>}
+        />
 
         <CompNav palette={P} />
 
@@ -241,45 +241,44 @@ export default function CompCalendarPage() {
         ]} />
 
         {error && (
-          <div style={{ ...st.card, padding: 14, marginBottom: 16, display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap", fontSize: 14 }}>
-            <AlertCircle size={16} color={candidates ? P.textMuted : P.accentRed} style={{ marginTop: 2 }} />
-            <span style={{ flex: 1 }}>{error}</span>
-            {candidates && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", width: "100%" }}>{candidates.map((a) => <button key={a} onClick={() => pick(a)} style={st.ghostBtn}>{a}</button>)}</div>}
-          </div>
+          <Notice danger={!candidates}>
+            <div>{error}</div>
+            {candidates && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>{candidates.map((a) => <button key={a} onClick={() => pick(a)} style={st.ghostBtn}>{a}</button>)}</div>}
+          </Notice>
         )}
-        {!data && !loading && !error && <div style={{ ...st.card, padding: 24, color: P.textMuted, fontSize: 14 }}>Scegli una creator per vedere il mese.</div>}
+        {!data && !loading && !error && <div style={{ ...card, padding: 24, color: P.textMuted, fontSize: 14 }}>Scegli una creator per vedere il mese: in cima trovi quanto sono costati gli operatori sul venduto, poi chi ha reso di più e i turni giorno per giorno.</div>}
+        {data && !agg && !loading && <Notice>Nessun turno registrato per questa creator nel mese scelto. Se il mese è appena finito, la sincronizzazione con CreatorsPro potrebbe non essere ancora completa: prova il mese prima.</Notice>}
 
         {agg && (
           <>
             {/* 1. La risposta: un numero principale, col confronto */}
-            <section style={{ ...st.card, padding: "20px 22px", marginBottom: 14, display: "flex", gap: 32, flexWrap: "wrap", alignItems: "flex-end" }}>
-              <div style={{ minWidth: 220 }}>
-                <div style={{ fontSize: 13, color: P.textSecondary }}>Costo operatori sul venduto</div>
-                <div style={{ fontSize: 40, fontWeight: 500, letterSpacing: "-0.02em", lineHeight: 1.1, ...NUM }}>{fmtPct(costPct, 1)}</div>
-                <div style={{ fontSize: 13, color: P.textMuted, marginTop: 4 }}>
-                  {costPrev != null ? <>era {fmtPct(costPrev, 1)} a {MONTH_IT[Number(prevMonth(periodId).slice(5)) - 1].toLowerCase()} ({fmtPts(costPct - costPrev)})</> : "nessun dato del mese prima"}
-                </div>
+            <HeroMetric
+              label="Costo operatori sul venduto"
+              value={fmtPct(costPct, 1)}
+              compare={costPrev != null ? <>era {fmtPct(costPrev, 1)} a {prevName} ({fmtPts(costPct - costPrev)})</> : "nessun dato del mese prima"}
+            >
+              <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <Metric label="Venduto" value={fmt$(agg.totSales)} delta={dl(agg.totSales, aggPrev?.totSales)} />
+                <Metric label="Pagato agli operatori" value={fmt$(agg.totEarn)} delta={dl(agg.totEarn, aggPrev?.totEarn)} />
+                <Metric label="Turni" value={fmtInt(agg.rows.length)} delta={dl(agg.rows.length, aggPrev?.rows.length)} />
+                <Metric label="Operatori" value={fmtInt(agg.operators.length)} delta={dl(agg.operators.length, aggPrev?.operators.length)} />
               </div>
-              <Metric P={P} label="Venduto" value={fmt$(agg.totSales)} prev={aggPrev?.totSales} cur={agg.totSales} />
-              <Metric P={P} label="Pagato agli operatori" value={fmt$(agg.totEarn)} prev={aggPrev?.totEarn} cur={agg.totEarn} />
-              <Metric P={P} label="Turni" value={fmtInt(agg.rows.length)} prev={aggPrev?.rows.length} cur={agg.rows.length} />
-              <Metric P={P} label="Operatori" value={String(agg.operators.length)} prev={aggPrev?.operators.length} cur={agg.operators.length} />
-            </section>
+            </HeroMetric>
 
             {/* 2. Cosa guardare: filtri */}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 22 }}>
-              <FilterChip P={P} active={focus === "issues"} danger={issuesCount > 0} onClick={() => setFocus(focus === "issues" ? null : "issues")}
+              <FilterChip active={focus === "issues"} danger={issuesCount > 0} onClick={() => setFocus(focus === "issues" ? null : "issues")}
                 label={issuesCount ? `${issuesCount} turni da controllare` : "Nessun turno da controllare"} disabled={!issuesCount} />
-              <FilterChip P={P} active={focus === "gaps"} onClick={() => setFocus(focus === "gaps" ? null : "gaps")}
+              <FilterChip active={focus === "gaps"} onClick={() => setFocus(focus === "gaps" ? null : "gaps")}
                 label={`${agg.emptyCells} fasce scoperte su ${agg.days.length * agg.mainSlots.length}`} disabled={!agg.emptyCells} />
               {focus && typeof focus === "object" && (
-                <FilterChip P={P} active onClick={() => setFocus(null)} label={`Solo ${focus.operator}`} closable />
+                <FilterChip active onClick={() => setFocus(null)} label={`Solo ${focus.operator}`} closable />
               )}
               {focus === "issues" && <span style={{ fontSize: 13, color: P.textSecondary }}>{agg.issueSummary}</span>}
             </div>
 
             {/* 3. Chi rende: per operatore, ordinabile */}
-            <h2 style={st.h2}>Operatori su questa creator</h2>
+            <SectionTitle aside="Clicca un operatore per vedere solo i suoi turni. Chi ha meno di 5 turni va in fondo quando ordini per resa.">Operatori su questa creator</SectionTitle>
             <div style={{ ...st.card, overflowX: "auto", marginBottom: 26 }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: 680 }}>
                 <thead><tr>
@@ -311,7 +310,7 @@ export default function CompCalendarPage() {
 
             {/* 4. Dove: la griglia */}
             <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", marginBottom: 8 }}>
-              <h2 style={{ ...st.h2, margin: 0 }}>Giorno per giorno</h2>
+              <h2 style={{ fontSize: 16, fontWeight: 500, margin: 0, color: P.textPrimary }}>Giorno per giorno</h2>
               <span style={{ display: "inline-flex", gap: 12, fontSize: 13, color: P.textSecondary, flexWrap: "wrap" }}>
                 {agg.pcts.map((p) => (
                   <span key={p} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -390,7 +389,7 @@ export default function CompCalendarPage() {
             </div>
 
             {/* 5. Turni uno per uno: per rispondere alle contestazioni senza passare il mouse */}
-            <Disclosure P={P} open={showShifts || (focus && typeof focus === "object") || focus === "issues"} onToggle={() => setShowShifts(!showShifts)}
+            <Disclosure open={showShifts || (focus && typeof focus === "object") || focus === "issues"} onToggle={() => setShowShifts(!showShifts)}
               title={`Turni uno per uno${focus && typeof focus === "object" ? ` · ${focus.operator}` : focus === "issues" ? " · da controllare" : ""}`}
               summary="Data, orario, profilo, percentuale pagata e dovuta, motivo delle anomalie">
               <div style={{ overflowX: "auto", maxHeight: 460, overflowY: "auto", border: `1px solid ${P.border}`, borderRadius: 8 }}>
@@ -420,7 +419,7 @@ export default function CompCalendarPage() {
             </Disclosure>
 
             {/* 6. Su richiesta: profili */}
-            <Disclosure P={P} open={showProfiles} onToggle={() => setShowProfiles(!showProfiles)}
+            <Disclosure open={showProfiles} onToggle={() => setShowProfiles(!showProfiles)}
               title="Profili di pagamento del mese" summary={profilesSummary(data.profiles_inventory || [])}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                 <thead><tr><th style={st.th}>Profilo</th><th style={{ ...st.th, textAlign: "right" }}>Persone nel turno</th><th style={{ ...st.th, textAlign: "right" }}>Turni</th><th style={{ ...st.th, textAlign: "right" }}>Venduto</th><th style={st.th}>Scaglioni</th></tr></thead>
@@ -437,7 +436,7 @@ export default function CompCalendarPage() {
             </Disclosure>
 
             {/* 6. Su richiesta: simulatore */}
-            <Disclosure P={P} open={showSim} onToggle={() => setShowSim(!showSim)} icon={<FlaskConical size={15} />}
+            <Disclosure open={showSim} onToggle={() => setShowSim(!showSim)} icon={<FlaskConical size={15} />}
               title="Simulatore: e se gli scaglioni fossero diversi?"
               summary={sim && simChanged ? `Con le soglie provate: ${fmtSigned$(sim.delta)} agli operatori in un mese (${sim.changedCount} turni cambiano scaglione)` : "Prova soglie diverse sui turni di questo mese"}>
               {simByProfile && (
@@ -544,7 +543,6 @@ export default function CompCalendarPage() {
             </Disclosure>
           </>
         )}
-      </div>
     </div>
   );
 }
@@ -656,17 +654,6 @@ function profilesSummary(inv) {
 /* ------------------------------------------------------------------ */
 /* Componenti locali                                                   */
 /* ------------------------------------------------------------------ */
-function Metric({ P, label, value, prev, cur }) {
-  const d = prev != null && prev !== 0 && cur != null ? (cur - prev) / prev : null;
-  return (
-    <div style={{ minWidth: 130 }}>
-      <div style={{ fontSize: 13, color: P.textSecondary }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 500, lineHeight: 1.25, fontVariantNumeric: "tabular-nums" }}>{value}</div>
-      {d != null && <div style={{ fontSize: 12, color: P.textMuted, fontVariantNumeric: "tabular-nums" }}>{d >= 0 ? "+" : "−"}{Math.abs(d * 100).toLocaleString("it-IT", { maximumFractionDigits: 0 })}% sul mese prima</div>}
-    </div>
-  );
-}
-
 // Campo del simulatore: se il valore è diverso da quello reale si vede (bordo + "era X")
 function SimInput({ P, st, value, was, onChange, label, width, step }) {
   const changed = was !== undefined && String(value) !== String(was);
@@ -676,18 +663,6 @@ function SimInput({ P, st, value, was, onChange, label, width, step }) {
         style={{ ...st.input, width, padding: "6px 8px", fontVariantNumeric: "tabular-nums", borderColor: changed ? P.accent : P.border, boxShadow: changed ? `0 0 0 1px ${P.accent}` : "none" }} />
       <span style={{ fontSize: 11, color: P.accentSoftText, height: 14 }}>{changed ? `era ${was}` : ""}</span>
     </span>
-  );
-}
-
-function FilterChip({ P, label, active, danger, onClick, disabled, closable }) {
-  return (
-    <button onClick={onClick} disabled={disabled}
-      style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 999, fontSize: 13, cursor: disabled ? "default" : "pointer", fontFamily: FONTS.body,
-        border: `1px solid ${active ? P.accent : danger ? P.accentRed : P.border}`,
-        background: active ? P.accentSoft : P.surface,
-        color: active ? P.accentSoftText : danger ? P.accentRed : disabled ? P.textMuted : P.textPrimary }}>
-      {danger && !active && <AlertTriangle size={13} />}{label}{closable && <X size={12} />}
-    </button>
   );
 }
 
@@ -701,21 +676,6 @@ function TierBar({ byPct, tier, P }) {
       </div>
       <span style={{ fontSize: 12, color: P.textMuted, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{entries.map(([p, c]) => `${c}×${fmtPct(p)}`).join(" ")}</span>
     </div>
-  );
-}
-
-function Disclosure({ P, open, onToggle, title, summary, icon, children }) {
-  return (
-    <section style={{ border: `1px solid ${P.border}`, borderRadius: 10, background: P.surface, marginBottom: 14 }}>
-      <button onClick={onToggle} aria-expanded={open}
-        style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", background: "transparent", border: "none", cursor: "pointer", textAlign: "left", color: P.textPrimary, fontFamily: FONTS.body }}>
-        {open ? <ChevronDown size={16} color={P.textMuted} /> : <ChevronRight size={16} color={P.textMuted} />}
-        {icon && <span style={{ color: P.textMuted, display: "inline-flex" }}>{icon}</span>}
-        <span style={{ fontSize: 15, fontWeight: 500 }}>{title}</span>
-        {!open && <span style={{ fontSize: 13, color: P.textMuted, marginLeft: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{summary}</span>}
-      </button>
-      {open && <div style={{ padding: "0 16px 16px" }}>{children}</div>}
-    </section>
   );
 }
 

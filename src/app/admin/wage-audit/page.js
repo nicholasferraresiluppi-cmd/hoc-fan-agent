@@ -2,11 +2,18 @@
 
 import { useState, useEffect } from "react";
 import useSWR, { mutate } from "swr";
-import Link from "next/link";
-import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
-import { PageHeader, StatCard } from "@/components/cp-style";
-import { AlertCircle, CheckCircle2, RefreshCw, Loader2, Database, Search } from "lucide-react";
+import { FONTS, CP } from "@/lib/brand";
+import { AlertCircle, CheckCircle2, RefreshCw, Loader2 } from "lucide-react";
 import HowToRead from "@/components/HowToRead";
+import { fmtInt } from "@/lib/format";
+import { PageHead, HeroMetric, Metric, SectionTitle, Notice, DataTable, card } from "@/components/ds";
+
+// Redesign 26/09/2026 (design system, pannello tester PAY/BOARD/UX): gergo
+// tradotto (KV / CP live / wage / gap → scaricati da noi / dichiarati da
+// CreatorsPro / compensi / mancanti), mese in corso marcato come tale (prima
+// "6 mancanti" in arancione sembrava un guasto), "Compensi mancanti" separa i
+// mesi mai scaricati dai buchi veri, bottoni di riga neutri (un solo accento:
+// l'azione "tutto"). Sync, job e API invariati.
 
 // Fetcher robusto: se il GET va in timeout Vercel risponde testo non-JSON
 // → messaggio leggibile invece di "Unexpected token 'A'".
@@ -15,13 +22,15 @@ const fetcher = async (url) => {
   const text = await res.text();
   let j = null;
   try { j = text ? JSON.parse(text) : null; } catch {
-    throw new Error("Il controllo è andato in timeout (troppi mesi in una volta). Riduci 'Ultimi N mesi' a 6 e riprova.");
+    throw new Error("Il controllo è andato in timeout (troppi mesi in una volta). Scegli “Ultimi 6 mesi” e riprova.");
   }
   if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
   return j;
 };
 
-const MONTH_IT = ["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"];
+const MONTH_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
+const ctl = { padding: "8px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
+const ghostBtn = { padding: "7px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, display: "inline-flex", alignItems: "center", gap: 6 };
 function periodLabel(pid) {
   const m = pid?.match?.(/^(\d{4})-(\d{2})$/);
   if (m) return `${MONTH_IT[parseInt(m[2]) - 1]} ${m[1]}`;
@@ -88,7 +97,7 @@ export default function WageAuditPage() {
     try {
       await chunkedResync(periodId, (ph) => setResults((s) => ({ ...s, [periodId]: ph })));
       setRecovering((s) => ({ ...s, [periodId]: "done" }));
-      setResults((s) => ({ ...s, [periodId]: "Re-sync completo" }));
+      setResults((s) => ({ ...s, [periodId]: "Mese scaricato per intero" }));
       setTimeout(() => mutate(url), 800);
     } catch (e) {
       setRecovering((s) => ({ ...s, [periodId]: "error" }));
@@ -143,9 +152,9 @@ export default function WageAuditPage() {
   async function recoverAll() {
     if (bulkState.running) return;
     const gapMonths = months.filter((m) => m.status === "missing" || m.status === "not_synced").map((m) => m.period_id);
-    if (gapMonths.length === 0) { setBulkState({ running: false, message: "Tutto già sincronizzato." }); return; }
-    if (!confirm(`Sincronizzare/riparare ${gapMonths.length} mesi?\nGira come job: puoi ricaricare la pagina, riprende da solo. (Per continuare anche a pagina chiusa serve la Fase 2 / QStash.)`)) return;
-    setBulkState({ running: true, message: "Avvio job…" });
+    if (gapMonths.length === 0) { setBulkState({ running: false, message: "Tutti i mesi sono già completi." }); return; }
+    if (!confirm(`Scaricare e completare ${gapMonths.length} mesi?\nPuoi ricaricare la pagina: riprende da solo. Se chiudi la scheda si mette in pausa.`)) return;
+    setBulkState({ running: true, message: "Avvio…" });
     try {
       await fetch("/api/admin/cp-sync-job", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -153,7 +162,7 @@ export default function WageAuditPage() {
       });
       await driveJob();
     } catch (e) {
-      setBulkState({ running: false, message: `Errore avvio: ${String(e?.message || e)}` });
+      setBulkState({ running: false, message: `Non sono riuscito ad avviare: ${String(e?.message || e)}` });
     }
   }
 
@@ -164,7 +173,7 @@ export default function WageAuditPage() {
         const res = await fetch("/api/admin/cp-sync-job");
         const j = await res.json().catch(() => null);
         if (j?.progress?.status === "running") {
-          setBulkState({ running: true, message: "Job ripreso dopo reload…" });
+          setBulkState({ running: true, message: "ripreso dopo il ricaricamento" });
           driveJob();
         }
       } catch {}
@@ -172,145 +181,118 @@ export default function WageAuditPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const now = new Date();
+  const currentPid = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const missingNeverSynced = months.filter((m) => m.status === "not_synced").reduce((s, m) => s + (m.gap || 0), 0);
+  const curRow = months.find((m) => m.period_id === currentPid);
+
+  const statusView = (m) => {
+    const s = m.status;
+    if (s === "ok") return { label: "Completo", color: CP.textMuted };
+    if (s === "missing") return { label: `${fmtInt(m.gap)} mancanti${m.period_id === currentPid ? " · mese in corso" : ""}`, color: m.period_id === currentPid ? CP.textSecondary : CP.accentRed };
+    if (s === "not_synced") return { label: "Mai scaricato", color: CP.textSecondary };
+    if (s === "unknown") return { label: "Da verificare", color: CP.textSecondary };
+    return { label: "CreatorsPro non risponde", color: CP.accentRed };
+  };
+
+  const columns = [
+    { key: "period_id", label: "Mese", render: (m) => (
+      <span>{periodLabel(m.period_id)}{m.period_id === currentPid && <span style={{ fontSize: 12, color: CP.textMuted, marginLeft: 6 }}>in corso</span>}</span>
+    ) },
+    { key: "kv_count", label: "Scaricati da noi", align: "right", render: (m) => fmtInt(m.kv_count) },
+    { key: "live_count", label: "Dichiarati da CreatorsPro", align: "right", render: (m) => (m.live_count == null ? "—" : fmtInt(m.live_count)) },
+    { key: "gap", label: "Mancanti", align: "right", render: (m) => (m.gap == null ? "—" : <span style={{ fontWeight: m.gap > 0 ? 500 : 400, color: m.gap > 0 ? CP.textPrimary : CP.textMuted }}>{fmtInt(m.gap)}</span>) },
+    { key: "status", label: "Stato", sortable: false, render: (m) => { const v = statusView(m); return <span style={{ color: v.color, fontSize: 13 }}>{v.label}</span>; } },
+    { key: "action", label: "", sortable: false, render: (m) => {
+      const recState = recovering[m.period_id];
+      const recMsg = results[m.period_id];
+      if (m.status === "ok") return <span style={{ fontSize: 13, color: CP.textMuted, display: "inline-flex", alignItems: "center", gap: 5 }}><CheckCircle2 size={13} /> niente da fare</span>;
+      return (
+        <div>
+          {/* missing / not_synced / unknown → stessa azione: re-sync a pezzi */}
+          <button onClick={() => recover(m.period_id)} disabled={recState === "running"}
+            style={{ ...ghostBtn, cursor: recState === "running" ? "wait" : "pointer", color: recState === "error" ? CP.accentRed : CP.textPrimary, borderColor: recState === "error" ? CP.accentRed : CP.border }}>
+            {recState === "running" ? <><Loader2 size={13} className="animate-spin" /> In corso…</>
+              : recState === "done" ? <><CheckCircle2 size={13} /> Fatto</>
+              : recState === "error" ? <><AlertCircle size={13} /> Riprova</>
+              : <><RefreshCw size={13} /> {m.status === "not_synced" ? "Scarica" : m.status === "missing" ? "Completa" : "Verifica"}</>}
+          </button>
+          {recMsg && <div style={{ fontSize: 12, color: recState === "error" ? CP.accentRed : CP.textMuted, marginTop: 4 }}>{recMsg}</div>}
+        </div>
+      );
+    } },
+  ];
+
   return (
-    <div style={{ padding: "32px 28px 80px", maxWidth: 1300, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
-      <PageHeader
-        breadcrumb={
-          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <span style={{ color: CP.textPrimary }}>Sync & Audit CP</span>
-          </div>
-        }
-        section="Data · Integration"
-        title="Sync & Audit CP"
-        subtitle="Sincronizza i dati CreatorsPro e verifica che ogni mese sia scaricato per intero. Per ogni mese: quanto hai in KV vs quanto dichiara CP, e un'azione sola per sincronizzare o riparare."
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Dati" }, { label: "Sync e controllo CP" }]}
+        title="Sync e controllo CreatorsPro"
+        subtitle="Controlla che ogni mese sia scaricato per intero da CreatorsPro e, se mancano dei compensi, li scarica. Compensi, P&L e soglie in tutta l'app sono affidabili solo sui mesi completi."
+        actions={<>
+          <select value={lastN} onChange={(e) => setLastN(parseInt(e.target.value))} aria-label="Mesi da controllare" style={ctl}>
+            <option value={6}>Ultimi 6 mesi</option>
+            <option value={12}>Ultimi 12 mesi</option>
+            <option value={18}>Ultimi 18 mesi</option>
+            <option value={24}>Ultimi 24 mesi</option>
+          </select>
+          <button onClick={() => mutate(url)} style={{ ...ctl, display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+            <RefreshCw size={13} /> Ricontrolla
+          </button>
+        </>}
       />
 
       <HowToRead items={[
-        "KV = quante buste (wage) hai scaricato. CP live = quante ne dichiara CreatorsPro adesso. Se KV < CP live, mancano dei dati.",
-        "Stato: ✓ allineato = mese completo · ⚠ N mancanti = sync incompleto da riparare · — non syncato = mese mai scaricato.",
-        "Il bottone su ogni riga (Sync / Ripara) fa un re-sync chunkato — 5 pagine alla volta, non va mai in timeout anche se CP è lento.",
-        "IL numero da tenere a 0: 'Wages mancanti'. Quando tutte le righe sono ✓ allineato, i dati di tutta l'app (comp, P&L, soglie) sono affidabili.",
-        "Il mese corrente (es. Giugno) è normale che risulti incompleto: è in corso. Sincronizzalo quando vuoi i dati aggiornati a oggi.",
+        "Per ogni mese: quanti compensi (uno per turno) abbiamo scaricato noi e quanti ne dichiara CreatorsPro adesso. Se i nostri sono meno, mancano dei dati.",
+        "Stato: “Completo” = mese intero · “N mancanti” = scaricato a metà, da completare · “Mai scaricato” = mese che non abbiamo mai preso.",
+        "Il bottone su ogni riga (Scarica / Completa) scarica il mese a pezzi, 5 pagine alla volta: non va in timeout anche se CreatorsPro è lento.",
+        "Il numero da tenere a zero: i compensi mancanti nei mesi che usi. Un mese mai scaricato va preso solo se ti serve.",
+        "Il mese in corso è normale che risulti incompleto: scaricalo quando vuoi i dati aggiornati a oggi (lo fa anche la sincronizzazione notturna).",
       ]} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginBottom: 24 }}>
-        <StatCard label="Mesi analizzati" value={months.length} sub={`ultimi ${lastN} mesi`} />
-        <StatCard label="Da sincronizzare/riparare" value={monthsTodo} color={monthsTodo > 0 ? "#F59E0B" : "#10B981"} sub={`${monthsWithGap} con gap · ${monthsNeverSynced} mai syncati`} />
-        <StatCard label="Wages mancanti" value={totalMissing} color={totalMissing > 0 ? "#F59E0B" : "#10B981"} sub={totalMissing > 0 ? "azione per mese sotto" : "tutto allineato"} />
-        <StatCard label="Ultimo refresh" value={isLoading ? "Carico…" : "Live"} sub="ricarica per riconfrontare" />
-      </div>
-
-      <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
-        <label style={{ fontSize: 12, color: COLORS.fog }}>Ultimi N mesi:</label>
-        <select value={lastN} onChange={(e) => setLastN(parseInt(e.target.value))} style={{ padding: "8px 12px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 8, color: COLORS.alabaster, fontSize: 13 }}>
-          <option value={6}>6 mesi</option>
-          <option value={12}>12 mesi</option>
-          <option value={18}>18 mesi</option>
-          <option value={24}>24 mesi</option>
-        </select>
-        <button onClick={() => mutate(url)} style={{ padding: "8px 14px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 8, color: COLORS.alabaster, fontSize: 12, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <RefreshCw size={13} /> Ricarica
-        </button>
-        {monthsTodo > 0 && (
-          <button
-            onClick={recoverAll}
-            disabled={bulkState.running}
-            style={{
-              padding: "8px 14px",
-              background: bulkState.running ? COLORS.charcoal : CP.accent,
-              color: bulkState.running ? COLORS.mist : CP.accentInk,
-              border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500,
-              cursor: bulkState.running ? "wait" : "pointer",
-              display: "inline-flex", alignItems: "center", gap: 6,
-              marginLeft: "auto",
-            }}
-          >
-            {bulkState.running ? <Loader2 size={13} className="spin" /> : <RefreshCw size={13} />}
-            {bulkState.running ? "In corso…" : `Sincronizza/ripara tutto (${monthsTodo})`}
-          </button>
-        )}
-      </div>
-      {anyRunning && (
-        <div style={{ marginBottom: 14, padding: "10px 14px", background: CP.accentSoft, border: `1px solid ${CP.accent}`, borderRadius: 8, fontSize: 12.5, color: CP.accentSoftText, display: "flex", alignItems: "center", gap: 8 }}>
-          <Loader2 size={14} className="spin" />
-          {bulkState.running
-            ? <span>Sync in corso (job server-side) — <b>puoi ricaricare la pagina</b>, riprende da solo. A tab chiuso si mette in pausa e riparte quando riapri.</span>
-            : <span>Recupero singolo mese in corso — resta su questa pagina.</span>}
-        </div>
-      )}
-      {bulkState.message && !anyRunning && (
-        <div style={{ marginBottom: 14, padding: "10px 14px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 8, fontSize: 12, color: COLORS.alabaster }}>
-          {bulkState.message}
-        </div>
-      )}
-
-      {error && <p style={{ color: COLORS.signal }}>Errore: {String(error)}</p>}
-      {data?.error && <p style={{ color: COLORS.signal, padding: 16, background: alpha(COLORS.signal, "20"), borderRadius: 12 }}>{data.error}</p>}
+      {isLoading && !data && <div style={{ ...card, padding: "18px 20px", color: CP.textSecondary, fontSize: 14, display: "flex", gap: 8, alignItems: "center" }}><Loader2 size={15} className="animate-spin" /> Confronto i mesi con CreatorsPro…</div>}
+      {error && <Notice danger>{String(error?.message || error)}</Notice>}
+      {data?.error && <Notice danger>{data.error}</Notice>}
 
       {data && !data.error && (
-        <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr 0.8fr 1fr 1.5fr", padding: "14px 22px", background: alpha(COLORS.obsidian, "80"), color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` }}>
-            <div>Mese</div><div>KV</div><div>CP live</div><div>Gap</div><div>Stato</div><div>Azione</div>
-          </div>
-          {months.map((m) => {
-            const status = m.status;
-            const statusColor = status === "ok" ? "#10B981"
-              : status === "missing" ? "#F59E0B"
-              : status === "not_synced" ? COLORS.mist
-              : status === "unknown" ? COLORS.mist
-              : "#EF4444";
-            const statusLabel = status === "ok" ? "✓ allineato"
-              : status === "missing" ? `⚠ ${m.gap} mancanti`
-              : status === "not_synced" ? "—  non syncato"
-              : status === "unknown" ? "? da verificare"
-              : "✗ live failed";
-            const recState = recovering[m.period_id];
-            const recMsg = results[m.period_id];
-            return (
-              <div key={m.period_id} style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr 0.8fr 1fr 1.5fr", padding: "14px 22px", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, alignItems: "center", fontSize: 13 }}>
-                <div style={{ fontWeight: 500 }}>{periodLabel(m.period_id)} <span style={{ color: COLORS.mist, fontFamily: FONTS.mono, fontSize: 11, marginLeft: 6 }}>{m.period_id}</span></div>
-                <div style={{ fontFamily: FONTS.mono }}>{m.kv_count}</div>
-                <div style={{ fontFamily: FONTS.mono }}>{m.live_count ?? "—"}</div>
-                <div style={{ fontFamily: FONTS.mono, color: m.gap > 0 ? "#F59E0B" : COLORS.fog, fontWeight: m.gap > 0 ? 700 : 500 }}>{m.gap == null ? "—" : m.gap > 0 ? `+${m.gap}` : 0}</div>
-                <div style={{ color: statusColor, fontSize: 12, fontWeight: 600 }}>{statusLabel}</div>
-                <div>
-                  {status === "ok" ? (
-                    <span style={{ fontSize: 12, color: "#10B981" }}><CheckCircle2 size={12} style={{ verticalAlign: "middle" }} /> Tutto OK</span>
-                  ) : (
-                    // missing / not_synced / unknown → stessa azione: re-sync chunkato
-                    <button
-                      onClick={() => recover(m.period_id)}
-                      disabled={recState === "running"}
-                      style={{
-                        padding: "8px 14px",
-                        background: recState === "done" ? "#10B98122" : recState === "error" ? "#EF444422" : CP.accentSoft,
-                        border: `1px solid ${recState === "done" ? "#10B981" : recState === "error" ? "#EF4444" : CP.accent}`,
-                        borderRadius: 8,
-                        color: recState === "done" ? "#10B981" : recState === "error" ? "#EF4444" : CP.accentSoftText,
-                        fontSize: 12, fontWeight: 500, cursor: recState === "running" ? "wait" : "pointer",
-                        display: "inline-flex", alignItems: "center", gap: 6,
-                      }}
-                    >
-                      {recState === "running" ? <><Loader2 size={13} className="spin" /> In corso…</>
-                        : recState === "done" ? <><CheckCircle2 size={13} /> Fatto</>
-                        : recState === "error" ? <><AlertCircle size={13} /> Riprova</>
-                        : <><RefreshCw size={13} /> {status === "not_synced" ? "Sync" : status === "missing" ? "Ripara" : "Verifica"}</>}
-                    </button>
-                  )}
-                  {recMsg && <div style={{ fontSize: 11, color: recState === "error" ? "#EF4444" : COLORS.mist, marginTop: 4 }}>{recMsg}</div>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+        <>
+          <HeroMetric
+            label="Mesi da completare o scaricare"
+            value={fmtInt(monthsTodo)}
+            compare={`su ${fmtInt(months.length)} mesi controllati`}
+            hint={curRow && curRow.status === "missing" ? "Il mese in corso risulta incompleto per definizione: non è un errore." : null}
+          >
+            <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <Metric label="Scaricati a metà" value={fmtInt(monthsWithGap)} danger={months.some((m) => m.status === "missing" && m.period_id !== currentPid)} />
+              <Metric label="Mai scaricati" value={fmtInt(monthsNeverSynced)} />
+              <Metric label="Compensi mancanti" value={fmtInt(totalMissing)} note={missingNeverSynced > 0 ? `${fmtInt(missingNeverSynced)} nei mesi mai scaricati` : null} />
+            </div>
+          </HeroMetric>
 
-      <style jsx>{`
-        @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
-        .spin { animation: spin 1s linear infinite; }
-      `}</style>
+          <div style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <SectionTitle aside="i numeri sono letti da CreatorsPro adesso">Mese per mese</SectionTitle>
+            {monthsTodo > 0 && (
+              <button onClick={recoverAll} disabled={bulkState.running}
+                style={{ marginLeft: "auto", padding: "8px 14px", background: bulkState.running ? CP.surfaceAlt : CP.accent, color: bulkState.running ? CP.textMuted : CP.accentInk, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: bulkState.running ? "wait" : "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                {bulkState.running ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                {bulkState.running ? "In corso…" : `Scarica e completa tutto (${monthsTodo} mesi)`}
+              </button>
+            )}
+          </div>
+          {anyRunning && (
+            <div style={{ marginBottom: 12, padding: "10px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderLeft: `3px solid ${CP.accent}`, borderRadius: 10, fontSize: 13, color: CP.textSecondary, display: "flex", alignItems: "center", gap: 8 }}>
+              <Loader2 size={14} className="animate-spin" />
+              {bulkState.running
+                ? <span>Scaricamento in corso ({bulkState.message}). Puoi ricaricare la pagina: riprende da solo. Se chiudi la scheda si mette in pausa e riparte quando la riapri.</span>
+                : <span>Scaricamento di un mese in corso: resta su questa pagina finché non finisce.</span>}
+            </div>
+          )}
+          {bulkState.message && !anyRunning && <Notice>{bulkState.message}</Notice>}
+
+          <DataTable columns={columns} rows={months.map((m) => ({ ...m, id: m.period_id }))} minWidth={760}
+            empty="Nessun mese da controllare." />
+        </>
+      )}
     </div>
   );
 }
