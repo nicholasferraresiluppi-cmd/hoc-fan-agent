@@ -174,13 +174,6 @@ h1, h2, h3, h4, h5, h6 {
 .ac-cv-fields { display: grid; grid-template-columns: 2fr 1fr 2fr; gap: 12px; }
 @media (max-width: 760px) { .ac-cv-grid, .ac-cv-fields { grid-template-columns: 1fr; } }
 
-/* "Couture": numeri protagonisti e titoli di pagina in Cormorant, cifre allineate;
-   angoli sartoriali (6px) su card e pannelli */
-[data-style="v3"] .ds-h1, [data-style="v3"] .ds-hero-v { font-family: var(--cp-display) !important; font-weight: 500 !important; font-variant-numeric: lining-nums proportional-nums !important; letter-spacing: -.01em !important; }
-[data-style="v3"] .ds-hero-v { font-size: 64px !important; }
-@media (max-width: 899px) { [data-style="v3"] .ds-hero-v { font-size: 50px !important; } }
-[data-style="v3"] .ds-metric-v { font-family: var(--cp-display) !important; font-weight: 600 !important; font-variant-numeric: lining-nums tabular-nums !important; letter-spacing: 0 !important; }
-
 /* Couture — rifinitura menu: marchio "Pro" champagne, titoli di gruppo sobri, avatar neutro */
 [data-style="v3"] .hoc-brand-pro {
   text-transform: none !important; font-family: var(--cp-display) !important; font-weight: 500 !important;
@@ -192,3 +185,100 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: .02em !important;
 }
 [data-style="v3"] .hoc-avatar img { filter: saturate(.12) brightness(.95); }
+
+
+/* ═══ Stile "Casa" (v3, anteprima — 26/09/2026 notte) ═══════════════════════
+   Dal prototipo "La casa": fondo quasi nero con luce morbida e grana, testo
+   avorio, niente riquadri (superfici velate, linee sottili), Instrument Serif
+   grande per titoli e numeri protagonisti, entrata in scena a ogni pagina.
+   Tutto SOLO sotto [data-style="v3"]: lo stile attuale non cambia. */
+[data-style="v3"] body { background: radial-gradient(120% 90% at 62% 8%, #1b1c22 0%, #08090c 72%) fixed, #08090c !important; }
+[data-style="v3"] .hoc-root, [data-style="v3"] .hoc-main { background: transparent !important; }
+[data-style="v3"] body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 9998; opacity: .05;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+[data-style="v3"] ::selection { background: rgba(217,180,106,.28); }
+
+/* Titoli e numeri */
+[data-style="v3"] .ds-head { margin-bottom: 44px !important; }
+[data-style="v3"] .ds-crumbs { font-size: 13px !important; color: var(--cp-textMuted) !important; margin-bottom: 14px !important; }
+[data-style="v3"] .ds-h1 { font-family: var(--cp-display) !important; font-weight: 400 !important; font-size: clamp(42px, 4.6vw, 66px) !important; line-height: 1 !important; letter-spacing: -.012em !important; margin: 0 0 16px !important; }
+[data-style="v3"] .ds-sub { font-size: 15.5px !important; line-height: 1.6 !important; color: var(--cp-textSecondary) !important; max-width: 720px !important; }
+[data-style="v3"] .ds-sect { font-family: var(--cp-display) !important; font-weight: 400 !important; font-size: 30px !important; letter-spacing: -.005em !important; line-height: 1.1; }
+[data-style="v3"] .ds-lbl { font-size: 13.5px !important; font-weight: 400 !important; letter-spacing: 0 !important; color: var(--cp-textMuted) !important; }
+[data-style="v3"] .ds-hero {
+  background: transparent !important; border: 0 !important; border-bottom: 1px solid var(--cp-border) !important;
+  border-radius: 0 !important; padding: 8px 0 44px !important; margin-bottom: 44px !important; gap: 36px 56px !important;
+}
+[data-style="v3"] .ds-hero-v {
+  font-family: var(--cp-display) !important; font-weight: 400 !important; font-size: clamp(68px, 8.4vw, 124px) !important;
+  line-height: .9 !important; letter-spacing: -.02em !important; margin: 14px 0 14px !important;
+  font-variant-numeric: lining-nums proportional-nums !important;
+}
+[data-style="v3"] .ds-metric-v { font-family: var(--cp-display) !important; font-weight: 400 !important; font-size: 42px !important; line-height: 1 !important; letter-spacing: 0 !important; margin: 8px 0 6px !important; font-variant-numeric: lining-nums !important; }
+[data-style="v3"] .ds-chip { background: transparent !important; font-weight: 400 !important; }
+[data-style="v3"] .ds-notice { border: 0 !important; border-left: 1px solid var(--cp-borderStrong) !important; border-radius: 0 !important; background: transparent !important; padding: 4px 0 4px 16px !important; }
+[data-style="v3"] .ds-notice[data-danger] { border-left-color: var(--cp-accentRed) !important; }
+[data-style="v3"] .ds-tbl { font-size: 14px !important; }
+[data-style="v3"] .ds-tbl td { height: 48px; }
+[data-style="v3"] .ds-tbl[data-density="compact"] td { height: 36px; }
+[data-style="v3"] input, [data-style="v3"] select, [data-style="v3"] textarea { color-scheme: dark; }
+[data-style="v3"] select option { background: #15161c; color: #f2eee6; }
+@media (max-width: 899px) {
+  [data-style="v3"] .ds-h1 { font-size: 40px !important; }
+  [data-style="v3"] .ds-hero-v { font-size: 64px !important; }
+  [data-style="v3"] .ds-metric-v { font-size: 34px !important; }
+  [data-style="v3"] .ds-head { margin-bottom: 32px !important; }
+}
+
+/* Entrata in scena: i blocchi della pagina salgono uno dopo l'altro */
+@keyframes casa-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+[data-style="v3"] .casa-page > * > * { animation: casa-rise .8s cubic-bezier(.2,.8,.2,1) both; }
+[data-style="v3"] .casa-page > * > *:nth-child(2) { animation-delay: .08s; }
+[data-style="v3"] .casa-page > * > *:nth-child(3) { animation-delay: .16s; }
+[data-style="v3"] .casa-page > * > *:nth-child(4) { animation-delay: .24s; }
+[data-style="v3"] .casa-page > * > *:nth-child(5) { animation-delay: .32s; }
+[data-style="v3"] .casa-page > * > *:nth-child(n+6) { animation-delay: .4s; }
+
+/* Apertura (una volta per sessione, decisa dallo script in layout prima del primo disegno) */
+@keyframes casa-intro { 0% { opacity: 1; color: transparent; } 25% { color: #f2eee6; } 72% { opacity: 1; color: #f2eee6; } 100% { opacity: 0; visibility: hidden; color: #f2eee6; } }
+@keyframes casa-line { 0% { transform: translateX(-50%) scaleX(0); opacity: 1; } 55% { transform: translateX(-50%) scaleX(1); opacity: 1; } 72% { opacity: 1; } 100% { transform: translateX(-50%) scaleX(1); opacity: 0; visibility: hidden; } }
+html.casa-intro[data-style="v3"] body::after {
+  content: "House of Creators"; position: fixed; inset: 0; z-index: 10000; pointer-events: none;
+  display: flex; align-items: center; justify-content: center; background: #07080b;
+  font-family: var(--f-display), Georgia, serif; font-size: clamp(40px, 5vw, 72px); letter-spacing: .01em;
+  animation: casa-intro 2.1s ease forwards;
+}
+html.casa-intro[data-style="v3"]::after {
+  content: ""; position: fixed; left: 50%; top: calc(50% + 50px); z-index: 10001; pointer-events: none;
+  width: min(320px, 60vw); height: 1px; background: linear-gradient(90deg, transparent, #d9b46a, transparent);
+  animation: casa-line 2.1s cubic-bezier(.2,.8,.2,1) forwards;
+}
+
+/* Menu */
+[data-style="v3"] .casa-side { display: flex; flex-direction: column; gap: 26px; padding: 30px 22px 18px 24px; background: rgba(8,9,12,.55); border-right: 1px solid var(--cp-border); font-family: var(--cp-font); }
+@media (max-width: 899px) { [data-style="v3"] .casa-side { background: #0a0b0f; } }
+[data-style="v3"] .casa-brand { display: block; text-decoration: none; color: var(--cp-textPrimary); font-family: var(--cp-display); font-size: 23px; line-height: 1.05; }
+[data-style="v3"] .casa-brand em { font-style: normal; color: var(--cp-gold); }
+[data-style="v3"] .casa-brand small { display: block; font-family: var(--cp-font); font-size: 12.5px; color: var(--cp-textMuted); margin-top: 7px; }
+[data-style="v3"] .casa-nav { flex: 1; overflow-y: auto; scrollbar-width: none; margin-right: -8px; padding-right: 8px; }
+[data-style="v3"] .casa-nav::-webkit-scrollbar { display: none; }
+[data-style="v3"] .casa-nav h4 { font-size: 12px; font-weight: 500; color: var(--cp-textMuted); margin: 20px 0 6px; letter-spacing: .03em; }
+[data-style="v3"] .casa-nav a { position: relative; display: flex; justify-content: space-between; padding: 7px 0 7px 16px; color: var(--cp-textSecondary); text-decoration: none; font-size: 14.5px; transition: color .25s; }
+[data-style="v3"] .casa-nav a:hover, [data-style="v3"] .casa-nav a.on { color: var(--cp-textPrimary); }
+[data-style="v3"] .casa-nav a.on::before { content: ""; position: absolute; left: 0; top: 50%; width: 8px; height: 1px; background: var(--cp-gold); }
+[data-style="v3"] .casa-nav a .b { font-size: 12px; color: var(--cp-gold); }
+[data-style="v3"] .casa-tools { display: flex; justify-content: space-between; width: 100%; margin-top: 24px; padding: 8px 0; background: none; border: 0; border-top: 1px solid var(--cp-border); color: var(--cp-textMuted); font-size: 13px; cursor: pointer; font-family: var(--cp-font); }
+[data-style="v3"] .casa-tools:hover { color: var(--cp-textPrimary); }
+[data-style="v3"] .casa-all a { font-size: 13.5px; padding: 5px 0 5px 16px; }
+[data-style="v3"] .casa-me { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--cp-textSecondary); }
+[data-style="v3"] .casa-me .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-style="v3"] .casa-style { margin-top: -12px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--cp-border); background: transparent; color: var(--cp-textMuted); font-size: 12px; cursor: pointer; text-align: left; font-family: var(--cp-font); }
+[data-style="v3"] .casa-style:hover { color: var(--cp-textPrimary); border-color: var(--cp-borderStrong); }
+@media (max-width: 899px) { [data-style="v3"] .casa-nav a { min-height: 44px; align-items: center; } }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-style="v3"] .casa-page > * > * { animation: none; }
+  html.casa-intro[data-style="v3"] body::after, html.casa-intro[data-style="v3"]::after { display: none; }
+}

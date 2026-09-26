@@ -4,15 +4,15 @@ import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
 import "./globals.css";
 import { themeCss, CP } from "@/lib/brand";
-import { Jost, Cormorant_Garamond } from "next/font/google";
+import { Manrope, Instrument_Serif } from "next/font/google";
 
-// Caratteri dello stile v3 (anteprima): serviti dal nostro dominio da next/font,
-// con misure di riserva calcolate (niente salto al caricamento). Usati solo
-// sotto data-style="v3" tramite --f-sans / --f-display.
-// "Couture" (26/09 sera): Jost per l'interfaccia, Cormorant Garamond per numeri
-// protagonisti e titoli di pagina (mai nelle tabelle).
-const fSans = Jost({ subsets: ["latin", "latin-ext"], display: "swap", variable: "--f-sans" });
-const fSig = Cormorant_Garamond({ subsets: ["latin", "latin-ext"], weight: ["500", "600"], style: ["normal", "italic"], display: "swap", variable: "--f-display" });
+// Caratteri dello stile v3 "Casa" (anteprima): serviti dal nostro dominio da
+// next/font, con misure di riserva calcolate (niente salto al caricamento).
+// Usati solo sotto data-style="v3" tramite --f-sans / --f-display.
+// Manrope per l'interfaccia, Instrument Serif per titoli e numeri protagonisti
+// (mai nelle tabelle). Gli stessi di "La casa" (26/09 notte).
+const fSans = Manrope({ subsets: ["latin", "latin-ext"], weight: ["400", "500", "600"], display: "swap", variable: "--f-sans" });
+const fSig = Instrument_Serif({ subsets: ["latin", "latin-ext"], weight: "400", style: ["normal", "italic"], display: "swap", variable: "--f-display" });
 
 export const metadata = {
   title: "HOC Pro",
@@ -67,7 +67,7 @@ export default function RootLayout({ children }) {
           {/* Tema chiaro/scuro: variabili dei due temi + scelta salvata applicata PRIMA
               del primo disegno (niente lampo del tema sbagliato). Default: scuro. */}
           <style dangerouslySetInnerHTML={{ __html: themeCss() }} />
-          <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem("hoc:theme")==="dark")document.documentElement.removeAttribute("data-theme");if(localStorage.getItem("hoc:style")==="v3")document.documentElement.setAttribute("data-style","v3")}catch(e){}` }} />
+          <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem("hoc:theme")==="dark")document.documentElement.removeAttribute("data-theme");if(localStorage.getItem("hoc:style")==="v3"){document.documentElement.setAttribute("data-style","v3");if(!sessionStorage.getItem("hoc:intro")&&!matchMedia("(prefers-reduced-motion: reduce)").matches){document.documentElement.classList.add("casa-intro");sessionStorage.setItem("hoc:intro","1")}}}catch(e){}` }} />
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
           <link

@@ -136,6 +136,7 @@ export const CP_DARK = {
   tierTop: "#4ade80", tierStrong: "#4ade80",
   // attenzione su PERSONE (da rivedere, cali): nel vecchio stile resta rosso; in Couture il rosso è solo denaro/allarmi
   attn: "#f08c8c",
+  panel: "#151a22",
 };
 // Tema chiaro (25/09/2026): per tabelle dense di numeri il testo scuro su fondo
 // chiaro si legge meglio (Piepenbrock et al. 2013); scelto da 4 tester su 5 nel
@@ -152,6 +153,7 @@ export const CP_LIGHT = {
   scrim: "rgba(20,23,31,.38)", cool: "#4a3bc4", warm: "#17803d", heroBg: "#ffffff",
   tierTop: "#17803d", tierStrong: "#17803d",
   attn: "#c53030",
+  panel: "#ffffff",
 };
 
 // ── Stile v3 "Notte / Carta" (26/09/2026) ─────────────────────────────────────
@@ -161,21 +163,22 @@ export const CP_LIGHT = {
 // Rosso SOLO per denaro negativo e allarmi; champagne ("gold") solo per sigillo,
 // fascia Eccellente, "Pro" e traguardi (max 2 per schermata).
 export const CP_NOTTE = {
-  // "Couture" scuro (26/09 sera, scelto dal board tra 22 stili): antracite con velluto,
-  // azioni in AVORIO (testo inchiostro), champagne SOLO per il merito (Eccellente,
-  // Pro, traguardi). Il viola non c'è più.
-  bgSunken: "#090a0f", bg: "#0c0d13", surface: "#13141b", surfaceAlt: "#1d1e27",
-  border: "rgba(238,233,223,.11)", borderSoft: "rgba(238,233,223,.07)", borderStrong: "rgba(238,233,223,.18)",
-  textPrimary: "#eee9df", textSecondary: "#c7c1b5", textMuted: "#9a958b", mutedIcons: "#76716a",
-  accent: "#ece7db", accentInk: "#17140e", accentSoft: "rgba(236,231,219,.10)", accentSoftText: "#eee9df", accentDim: "#4a463f",
-  accentGreen: "#a3d4b2", accentRed: "#f0a3a3", accentBlue: "#c7c1b5",
-  logoFilter: "brightness(0) invert(1)", dangerSoft: "rgba(240,130,130,.11)",
-  gold: "#d6bd8e", goldSoft: "rgba(214,189,142,.09)", track: "#66636b", neu: "#cfc8ba",
-  ruleData: "#5b5a62", fieldBd: "#6f6c73", sel: "rgba(236,231,219,.07)", hover: "rgba(255,255,255,.025)",
-  scrim: "rgba(4,5,9,.6)", cool: "#a9bfe8", warm: "#a3d4b2",
-  heroBg: "linear-gradient(180deg, #181a24, #121319)",
-  tierTop: "#d6bd8e", tierStrong: "#eee9df",
-  attn: "#eee9df",
+  // "Casa" (26/09 notte, scelto dal board sul prototipo di "La casa"): fondo quasi
+  // nero con luce morbida e grana (in globals.css), testo avorio, NIENTE riquadri:
+  // superfici appena velate, linee sottili. Oro solo per traguardi, voce attiva e "Pro".
+  bgSunken: "#08090c", bg: "#0b0c10", surface: "rgba(242,238,230,.028)", surfaceAlt: "rgba(242,238,230,.06)",
+  panel: "#15161c",
+  border: "rgba(242,238,230,.09)", borderSoft: "rgba(242,238,230,.06)", borderStrong: "rgba(242,238,230,.18)",
+  textPrimary: "#f2eee6", textSecondary: "rgba(242,238,230,.66)", textMuted: "rgba(242,238,230,.46)", mutedIcons: "rgba(242,238,230,.34)",
+  accent: "#f2eee6", accentInk: "#101114", accentSoft: "rgba(242,238,230,.08)", accentSoftText: "#f2eee6", accentDim: "rgba(242,238,230,.22)",
+  accentGreen: "#7fe0b8", accentRed: "#f08a8a", accentBlue: "rgba(242,238,230,.66)",
+  logoFilter: "brightness(0) invert(1)", dangerSoft: "rgba(240,138,138,.09)",
+  gold: "#d9b46a", goldSoft: "rgba(217,180,106,.09)", track: "rgba(242,238,230,.16)", neu: "rgba(242,238,230,.8)",
+  ruleData: "rgba(242,238,230,.2)", fieldBd: "rgba(242,238,230,.24)", sel: "rgba(242,238,230,.06)", hover: "rgba(242,238,230,.03)",
+  scrim: "rgba(4,5,8,.72)", cool: "#a9bfe8", warm: "#7fe0b8",
+  heroBg: "transparent",
+  tierTop: "#d9b46a", tierStrong: "#f2eee6",
+  attn: "#f2eee6",
 };
 // Carta: chiaro caldo, stesso mondo dell'attestato; grigi ricalcolati per AA sul
 // caldo (--muted #655f54 dalla revisione accessibilità), card staccate dal fondo.
@@ -193,6 +196,7 @@ export const CP_CARTA = {
   scrim: "rgba(28,24,16,.38)", cool: "#2a569f", warm: "#1b6b49", heroBg: "#fcf9f3",
   tierTop: "#8a6a32", tierStrong: "#2a2521",
   attn: "#2a2521",
+  panel: "#fbf8f1",
 };
 
 // Menu notte sotto Carta: stesso schema di CP_NOTTE ma col nero CALDO, così il
@@ -228,11 +232,10 @@ export function themeCss() {
   return `:root{${vars(CP_DARK)}${fontOld}color-scheme:dark}:root[data-theme="light"]{${vars(CP_LIGHT)}color-scheme:light}`
     // stile v3 in anteprima (vince per specificità/ordine sui due temi attuali)
     + `:root[data-style="v3"]{${vars(CP_NOTTE)}${fontV3}color-scheme:dark}`
-    + `:root[data-style="v3"][data-theme="light"]{${vars(CP_CARTA)}color-scheme:light}`
+    + `:root[data-style="v3"][data-theme="light"]{${vars(CP_NOTTE)}color-scheme:dark}`
     // Menu laterale v3: sempre notte, anche in Carta (dove il nero è CALDO)
     + `:root[data-style="v3"] .hoc-side{${vars(CP_NOTTE)}color-scheme:dark}`
-    + `:root[data-style="v3"][data-theme="light"] .hoc-side{${vars(CP_NOTTE_CALDA)}}`
-    // Segnaposto sempre tenue: nel tema scuro gli esempi sembravano dati inseriti
+        // Segnaposto sempre tenue: nel tema scuro gli esempi sembravano dati inseriti
     + `::placeholder{color:var(--cp-textMuted);opacity:.65}`;
 }
 

@@ -204,7 +204,7 @@ export default function SMDashboard() {
         return (
           <div onClick={() => setCardOp(null)} style={{ position: "fixed", inset: 0, background: "rgba(6,8,12,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
             <div onClick={(e) => e.stopPropagation()} style={{ position: "relative" }}>
-              <button onClick={() => setCardOp(null)} style={{ position: "absolute", top: -42, right: 0, display: "inline-flex", alignItems: "center", gap: 6, background: CP.surface, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 13, fontFamily: FONTS.body }}>
+              <button onClick={() => setCardOp(null)} style={{ position: "absolute", top: -42, right: 0, display: "inline-flex", alignItems: "center", gap: 6, background: CP.panel, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 13, fontFamily: FONTS.body }}>
                 <X size={14} /> Chiudi
               </button>
               <PlayerCard
