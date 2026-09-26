@@ -19,7 +19,7 @@ import {
   Wallet, Scale, ShieldCheck, History, FlaskConical, MessageSquareWarning,
   Signpost, Bell, ListTree, Inbox, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket,
   HandCoins, MessageCircle,
-  Snowflake,
+  Snowflake, Megaphone, Share2, Shield,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee } from "@/lib/nav-access";
@@ -90,6 +90,14 @@ const SHORTCUT_GROUPS = [
       { href: "/admin/creators",           title: "Creator anagrafica", desc: "Tone card + ganci emotivi + vocabolario creator", icon: UserCog },
       { href: "/admin/loop",               title: "Loop azione→esito", desc: "La coda registrata giorno per giorno e l'esito 48h (risposta + acquisto): il dataset proprietario che si accumula", icon: RefreshCw },
       { href: "/admin/roadmap",            title: "Roadmap",           desc: "Cosa è in corso, cosa viene dopo, cosa è parcheggiato e dietro quale gate", icon: Signpost },
+    ],
+  },
+  {
+    label: "Marketing",
+    items: [
+      { href: "/admin/ads", title: "Studio bio-funnel", desc: "Come lavorano gli altri sulla landing-ponte OF e cosa converte meglio: 112 landing reali analizzate + template per le creator", icon: Megaphone },
+      { href: "/admin/social-accounts", title: "Account social", desc: "Account di promozione dei creator + proxy assegnato", icon: Share2 },
+      { href: "/admin/social-proxies", title: "Proxy account social", desc: "Proxy SOCKS5/HTTP per isolare le connessioni degli account social ufficiali dei creator", icon: Shield },
     ],
   },
   {

@@ -32,6 +32,7 @@ import {
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
   History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
+Megaphone, Share2, Shield,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
@@ -145,6 +146,15 @@ export const NAV_GROUPS = [
       { href: "/admin/creators",                 label: "Creator (anag.)", icon: UserCog },
       { href: "/admin/loop",                     label: "Loop azione→esito", icon: RefreshCw },
       { href: "/admin/roadmap",                  label: "Roadmap",         icon: Signpost },
+    ],
+  },
+  {
+    // Marketing (26/09/2026): moduli di luglio-agosto rimasti non pubblicati
+    label: "Marketing",
+    items: [
+      { href: "/admin/ads",                      label: "Studio bio-funnel", icon: Megaphone },
+      { href: "/admin/social-accounts",          label: "Account social",  icon: Share2 },
+      { href: "/admin/social-proxies",           label: "Proxy account social", icon: Shield },
     ],
   },
   {
