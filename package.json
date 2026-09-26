@@ -20,6 +20,7 @@
     "react-dom": "^19.3.0",
     "socks-proxy-agent": "^10.1.0",
     "swr": "^2.4.1",
+    "three": "0.147.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {

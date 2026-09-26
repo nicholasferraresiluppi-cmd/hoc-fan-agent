@@ -24,8 +24,8 @@ const num = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { maxi
 const dec = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
 
 const OK5 = 0.85, LOW5 = 0.7, OKP90 = 6, BADP90 = 12;
-const col5 = (v) => (v == null ? CP.textMuted : v >= OK5 ? CP.accentGreen : v >= LOW5 ? CP.textPrimary : CP.accentRed);
-const colP90 = (v) => (v == null ? CP.textMuted : v <= OKP90 ? CP.accentGreen : v <= BADP90 ? CP.textPrimary : CP.accentRed);
+const col5 = (v) => (v == null ? CP.textMuted : v >= OK5 ? CP.accentGreen : v >= LOW5 ? CP.textPrimary : CP.attn);
+const colP90 = (v) => (v == null ? CP.textMuted : v <= OKP90 ? CP.accentGreen : v <= BADP90 ? CP.textPrimary : CP.attn);
 const isLow = (r) => r.within_5min != null && r.within_5min < LOW5;
 // Coda lunga: la maggior parte risponde entro 5 min ma 1 fan su 10 aspetta oltre la soglia critica
 const longTail = (r) => !isLow(r) && r.frt_p90_min != null && r.frt_p90_min > BADP90;

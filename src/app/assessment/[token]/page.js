@@ -284,7 +284,7 @@ export default function AssessmentPage() {
             </span>
           </div>
           <div style={{ height: 4, background: CP.surfaceAlt, borderRadius: 2, overflow: "hidden", marginBottom: 14 }} aria-hidden="true">
-            <div style={{ width: `${(stepIndex / Math.max(1, scenarios.length)) * 100}%`, height: "100%", background: CP.accent, transition: "width .3s" }} />
+            <div style={{ width: `${(stepIndex / Math.max(1, scenarios.length)) * 100}%`, height: "100%", background: CP.scale, transition: "width .3s" }} />
           </div>
           {currentScenario && <PageHead title={currentScenario.title} subtitle={currentScenario.description} />}
         </div>

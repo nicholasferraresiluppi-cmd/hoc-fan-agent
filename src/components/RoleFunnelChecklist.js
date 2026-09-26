@@ -64,7 +64,7 @@ export default function RoleFunnelChecklist({ funnel, progress, focus, onNavigat
           <span style={{ fontFamily: FONTS.mono, fontSize: 12, color: CP.textMuted }}>{loading ? "" : `${pct}%`}</span>
         </div>
         <div style={{ height: 8, borderRadius: 999, background: CP.surfaceAlt, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${pct}%`, background: CP.accent, borderRadius: 999, transition: "width .5s cubic-bezier(.4,0,.2,1)" }} />
+          <div style={{ height: "100%", width: `${pct}%`, background: CP.scale, borderRadius: 999, transition: "width .5s cubic-bezier(.4,0,.2,1)" }} />
         </div>
       </div>
 

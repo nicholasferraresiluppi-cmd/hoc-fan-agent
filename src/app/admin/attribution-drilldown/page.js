@@ -185,7 +185,7 @@ export default function AttributionDrilldownPage() {
                         {d.infloww_gross != null && (
                           <div style={{ position: "absolute", inset: 0, width: `${(d.infloww_gross / maxDayVal) * 100}%`, background: alpha(CP.accentRed, "40"), borderRadius: 4 }} />
                         )}
-                        <div style={{ position: "absolute", inset: 0, width: `${((d.cp_mine || 0) / maxDayVal) * 100}%`, background: CP.accent, borderRadius: 4 }} />
+                        <div style={{ position: "absolute", inset: 0, width: `${((d.cp_mine || 0) / maxDayVal) * 100}%`, background: CP.scale, borderRadius: 4 }} />
                       </div>
                       <span style={{ color: d.gap > 0 ? CP.accentRed : CP.textMuted, minWidth: 76, textAlign: "right", ...NUM }}>
                         {d.gap != null ? (d.gap > 0 ? `−${fmt$(d.gap).slice(1)}` : "ok") : `${d.shifts} turni`}

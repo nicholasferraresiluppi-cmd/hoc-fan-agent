@@ -23,7 +23,7 @@ export function SecurityBanner() {
   if (!sec?.admin_raw || sec.mfa_enabled) return null;
   if (snoozed && !sec.mfa_required) return null;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: CP.dangerSoft, borderBottom: `1px solid ${CP.border}`, fontSize: 13, color: CP.textPrimary, flexWrap: "wrap" }}>
+    <div className="hoc-banner" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: CP.dangerSoft, borderBottom: `1px solid ${CP.border}`, fontSize: 13, color: CP.textPrimary, flexWrap: "wrap" }}>
       <ShieldAlert size={16} color={CP.accentRed} />
       <span style={{ flex: "1 1 300px" }}>
         {sec.mfa_required
@@ -103,12 +103,12 @@ export function ViewAsBanner() {
   if (!va) return null;
   const exit = async () => { await fetch("/api/admin/view-as", { method: "DELETE" }); window.location.reload(); };
   return (
-    <div style={{ position: "sticky", top: 0, zIndex: 50, display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: CP.accent, color: CP.accentInk, fontSize: 13, flexWrap: "wrap" }}>
+    <div className="hoc-banner hoc-banner-va" style={{ position: "sticky", top: 0, zIndex: 50, display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: CP.accent, color: CP.accentInk, fontSize: 13, flexWrap: "wrap" }}>
       <Eye size={16} />
       <span style={{ flex: "1 1 300px" }}>
         Stai vedendo l&apos;app come <b>{va.label}</b>: menu, pagine e dati sono quelli dei suoi permessi. Sola lettura: non puoi modificare niente. {va.employee ? <>Le pagine personali (Il mio quadro) mostrano i dati di <b>{va.employee}</b>.</> : "Le pagine personali mostrano comunque i tuoi dati."}
       </span>
-      <button onClick={exit} style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: "#ffffff", color: "#14101f", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>Esci dall&apos;anteprima</button>
+      <button onClick={exit} className="hoc-banner-btn" style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: "#ffffff", color: "#14101f", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>Esci dall&apos;anteprima</button>
     </div>
   );
 }

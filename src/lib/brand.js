@@ -137,6 +137,8 @@ export const CP_DARK = {
   // attenzione su PERSONE (da rivedere, cali): nel vecchio stile resta rosso; in Couture il rosso è solo denaro/allarmi
   attn: "#f08c8c",
   panel: "#151a22",
+  // colore dei DATI (barre, scale): nel vecchio stile = accento; in Casa oro (l'avorio pieno abbaglia)
+  scale: "#8b7cf6",
 };
 // Tema chiaro (25/09/2026): per tabelle dense di numeri il testo scuro su fondo
 // chiaro si legge meglio (Piepenbrock et al. 2013); scelto da 4 tester su 5 nel
@@ -154,6 +156,7 @@ export const CP_LIGHT = {
   tierTop: "#17803d", tierStrong: "#17803d",
   attn: "#c53030",
   panel: "#ffffff",
+  scale: "#6353e0",
 };
 
 // ── Stile v3 "Notte / Carta" (26/09/2026) ─────────────────────────────────────
@@ -179,6 +182,7 @@ export const CP_NOTTE = {
   heroBg: "transparent",
   tierTop: "#d9b46a", tierStrong: "#f2eee6",
   attn: "#f2eee6",
+  scale: "#d9b46a",
 };
 // Carta: chiaro caldo, stesso mondo dell'attestato; grigi ricalcolati per AA sul
 // caldo (--muted #655f54 dalla revisione accessibilità), card staccate dal fondo.
@@ -197,6 +201,7 @@ export const CP_CARTA = {
   tierTop: "#8a6a32", tierStrong: "#2a2521",
   attn: "#2a2521",
   panel: "#fbf8f1",
+  scale: "#8a6a32",
 };
 
 // Menu notte sotto Carta: stesso schema di CP_NOTTE ma col nero CALDO, così il
@@ -228,7 +233,7 @@ export function alpha(color, hex) {
 export function themeCss() {
   const vars = (o) => Object.entries(o).map(([k, v]) => `--cp-${k}:${v};`).join("");
   const fontOld = `--cp-font:'Inter',system-ui,-apple-system,sans-serif;--cp-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;--cp-sig:Georgia,serif;`;
-  const fontV3 = `--cp-font:var(--f-sans),ui-sans-serif,system-ui,-apple-system,sans-serif;--cp-mono:ui-monospace,"SF Mono",Menlo,monospace;--cp-sig:var(--f-display),Georgia,serif;--cp-display:var(--f-display),Georgia,serif;`;
+  const fontV3 = `--cp-font:var(--f-sans),ui-sans-serif,system-ui,-apple-system,sans-serif;--cp-mono:var(--f-sans),ui-sans-serif,system-ui,sans-serif;--cp-sig:var(--f-display),Georgia,serif;--cp-display:var(--f-display),Georgia,serif;`;
   return `:root{${vars(CP_DARK)}${fontOld}color-scheme:dark}:root[data-theme="light"]{${vars(CP_LIGHT)}color-scheme:light}`
     // stile v3 in anteprima (vince per specificità/ordine sui due temi attuali)
     + `:root[data-style="v3"]{${vars(CP_NOTTE)}${fontV3}color-scheme:dark}`

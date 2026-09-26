@@ -32,6 +32,7 @@ const MANAGER = [
   { title: null, items: [
     { href: "/admin", label: "Oggi", exact: true },
     { href: "/admin/alerts", label: "Alert", badge: true },
+    { href: "/admin/citta", label: "La città" },
   ] },
   { title: "Agenzia", items: [
     { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
@@ -100,6 +101,7 @@ export default function SidebarCasa() {
 
   // Pagina corrente fuori dal menu corto → si apre l'elenco completo, così si vede dove si è
   const inShort = sections.some((s) => s.items.some(isActive));
+  const shortHrefs = new Set(sections.flatMap((s) => s.items.map((i) => i.href)));
 
   return (
     <aside className="hoc-side casa-side" style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: SIDEBAR_WIDTH, zIndex: 50 }}>
@@ -125,7 +127,8 @@ export default function SidebarCasa() {
           Tutti gli strumenti <span aria-hidden="true">{tools || !inShort ? "−" : "+"}</span>
         </button>
         {(tools || !inShort) && NAV_GROUPS.map((g) => {
-          const items = g.items.filter((i) => allowed(i.href));
+          // le voci già nel menu corto non si ripetono (tranne quella aperta ora, per vedere dove si è)
+          const items = g.items.filter((i) => allowed(i.href) && (!shortHrefs.has(i.href) || (!inShort && pathname === i.href)));
           if (!items.length) return null;
           return (
             <div key={g.label} className="casa-all">

@@ -21,7 +21,7 @@ export const NAV_ACCESS = {
   "/admin/priority-queue": all("scores.view"), "/admin/disputes": all("scores.view"),
   "/admin/pnl-live": SEED, "/admin/profiles-compare": SEED, "/admin/comp-calendar": SEED, "/admin/threshold-study": SEED,
   "/admin/comp-review": SEED, "/admin/comp-exam": SEED, "/admin/payment-profiles": SEED, "/admin/shift-research": SEED,
-  "/admin/academy-tapes": SEED, "/admin/academy-signals": SEED, "/admin/creator-difficulty": SEED, "/admin/ads": SEED, "/admin/social-accounts": SEED, "/admin/social-proxies": SEED, "/admin/operator-signals": SEED, "/admin/activation": SEED,
+  "/admin/academy-tapes": SEED, "/admin/academy-signals": SEED, "/admin/creator-difficulty": SEED, "/admin/citta": SEED, "/admin/ads": SEED, "/admin/social-accounts": SEED, "/admin/social-proxies": SEED, "/admin/operator-signals": SEED, "/admin/activation": SEED,
   "/admin/infloww-ingest": SEED, "/admin/roadmap": SEED, "/admin/candidate-assessments": SEED, "/admin/action-center": SEED,
   "/admin/coaching-center": SEED, "/admin/employee-profiles": SEED, "/admin/creatorspro-sync": SEED, "/admin/wage-audit": SEED,
   "/admin/creatorspro-sync-history": SEED, "/admin/infloww-agency": SEED, "/admin/infloww-revenue": SEED, "/admin/infloww-reconcile": SEED,

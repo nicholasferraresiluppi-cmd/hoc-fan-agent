@@ -639,7 +639,7 @@ export default function Home() {
                     {isMax && <span style={{ color: CP.accentSoftText }}>Livello massimo</span>}
                   </div>
                   <div style={{ position: "relative", height: 10, background: CP.surfaceAlt, borderRadius: 999, overflow: "hidden" }}>
-                    <div style={{ position: "absolute", inset: 0, width: `${pct}%`, background: CP.accent, transition: "width .5s ease" }} />
+                    <div style={{ position: "absolute", inset: 0, width: `${pct}%`, background: CP.scale, transition: "width .5s ease" }} />
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 8, fontSize: 12, gap: 12, ...NUM }}>
                     <span style={{ color: CP.textSecondary }}>{sess}{!isMax ? `/${target}` : ""} sessioni</span>
@@ -653,7 +653,7 @@ export default function Home() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
               <button
                 onClick={() => setScreen("training-hub")}
-                style={{ ...card, background: CP.accent, border: `1px solid ${CP.accent}`, padding: "16px 18px", cursor: "pointer", textAlign: "left", color: CP.accentInk, fontFamily: FONTS.body }}
+                className="hoc-cta-card" style={{ ...card, background: CP.accent, border: `1px solid ${CP.accent}`, padding: "16px 18px", cursor: "pointer", textAlign: "left", color: CP.accentInk, fontFamily: FONTS.body }}
               >
                 <div style={{ fontSize: 13, opacity: 0.85 }}>Entra in</div>
                 <div style={{ fontSize: 22, fontWeight: 500, letterSpacing: "-0.01em", marginTop: 2 }}>Allenamento</div>
