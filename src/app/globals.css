@@ -296,3 +296,6 @@ html.casa-intro[data-style="v3"]::after {
 [data-style="v3"] .hub-tool:hover { background: var(--cp-hover) !important; }
 /* la regola globale "* { font-family }" batteva i figli dei titoli: qui ereditano il serif */
 [data-style="v3"] .ds-h1 *, [data-style="v3"] .ds-hero-v *, [data-style="v3"] .ds-metric-v *, [data-style="v3"] .ds-sect * { font-family: inherit !important; }
+/* colonna ferma delle tabelle: fondo PIENO (col velo trasparente si vedeva una banda) */
+[data-style="v3"] .ds-stk { background-color: #111217 !important; }
+[data-style="v3"] th.ds-stk, [data-style="v3"] .ds-tbl th { background-color: #111217 !important; }

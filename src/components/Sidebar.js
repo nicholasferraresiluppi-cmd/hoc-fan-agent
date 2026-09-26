@@ -87,7 +87,7 @@ export const NAV_GROUPS = [
     label: "Performance",
     defaultOpen: true,
     items: [
-      { href: "/leaderboard/sales-cp",           label: "Sales CP",     icon: DollarSign },
+      { href: "/leaderboard/sales-cp",           label: "Classifica vendite", icon: DollarSign },
       { href: "/leaderboard/creators",           label: "Creator",      icon: Users },
       { href: "/leaderboard/creators/heatmap",   label: "Mappa operatore×creator",     icon: Flame },
       { href: "/admin/conversation-intelligence", label: "Presidio chat", icon: Activity },

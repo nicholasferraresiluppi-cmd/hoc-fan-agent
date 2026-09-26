@@ -179,8 +179,8 @@ export default function SalesCpLeaderboardPage() {
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
-        crumbs={[{ label: "Performance" }, { label: "Sales CP" }]}
-        title="Sales CP"
+        crumbs={[{ label: "Performance" }, { label: "Classifica vendite" }]}
+        title="Classifica vendite"
         subtitle="Chi sta andando bene e chi va rivisto. Lo score (0-100) confronta il venduto reale di CreatorsPro di ogni operatore con chi lavora sulle stesse creator (70%) e con tutta l'agenzia (30%)."
         actions={<>
           <select value={periodId || ""} onChange={(e) => setPeriodId(e.target.value)} aria-label="Mese"

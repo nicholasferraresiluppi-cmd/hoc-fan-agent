@@ -234,7 +234,7 @@ export function DataTable({ columns, rows, defaultSort, onRowClick, selected, mi
         {...(nav ? { tabIndex: 0, role: "grid", onKeyDown, "aria-activedescendant": active >= 0 ? rowId(active) : undefined } : {})}
         style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth }}>
         <thead><tr>{columns.map((c, ci) => (
-          <th key={c.key} style={{ ...th, textAlign: c.align || "left", cursor: c.sortable === false ? "default" : "pointer", ...(ci === stickyIdx ? { left: 0, zIndex: 2 } : {}) }}
+          <th key={c.key} className={ci === stickyIdx ? "ds-stk" : undefined} style={{ ...th, textAlign: c.align || "left", cursor: c.sortable === false ? "default" : "pointer", ...(ci === stickyIdx ? { left: 0, zIndex: 2 } : {}) }}
             onClick={() => c.sortable !== false && setSort({ key: c.key, dir: sort?.key === c.key ? -sort.dir : (c.align === "right" ? -1 : 1) })}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>{c.label}{sort?.key === c.key && (sort.dir < 0 ? <ArrowDown size={12} /> : <ArrowUp size={12} />)}</span>
           </th>
@@ -249,7 +249,7 @@ export function DataTable({ columns, rows, defaultSort, onRowClick, selected, mi
                 onClick={onRowClick ? () => { if (nav) setActive(i); onRowClick(r); } : undefined}
                 style={{ borderTop: `1px solid ${CP.borderSoft}`, cursor: onRowClick ? "pointer" : "default", background: sel ? CP.accentSoft : "transparent" }}>
                 {columns.map((c, ci) => (
-                  <td key={c.key} style={{ padding: "9px 12px", textAlign: c.align || "left", color: c.muted ? CP.textSecondary : CP.textPrimary, verticalAlign: "middle", ...(c.align === "right" ? NUM : {}), ...(ci === stickyIdx ? { position: "sticky", left: 0, zIndex: 1, background: sel ? CP.accentSoft : CP.surface } : {}) }}>
+                  <td key={c.key} className={ci === stickyIdx ? "ds-stk" : undefined} style={{ padding: "9px 12px", textAlign: c.align || "left", color: c.muted ? CP.textSecondary : CP.textPrimary, verticalAlign: "middle", ...(c.align === "right" ? NUM : {}), ...(ci === stickyIdx ? { position: "sticky", left: 0, zIndex: 1, background: sel ? CP.accentSoft : CP.surface } : {}) }}>
                     {c.render ? c.render(r) : r[c.key]}
                   </td>
                 ))}

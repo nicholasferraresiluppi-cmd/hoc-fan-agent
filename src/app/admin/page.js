@@ -55,7 +55,7 @@ const SHORTCUT_GROUPS = [
     label: "Performance",
     items: [
       { href: "/leaderboard",                  title: "Classifica allenamento",        desc: "Classifica principale operatori", icon: Trophy },
-      { href: "/leaderboard/sales-cp",         title: "Sales CP",      desc: "Score 0-100 da CreatorsPro", icon: DollarSign },
+      { href: "/leaderboard/sales-cp",         title: "Classifica vendite", desc: "Score 0-100 da CreatorsPro", icon: DollarSign },
       { href: "/leaderboard/creators",         title: "Creator-first", desc: "Quanto rende ogni creator + team interno", icon: Users },
       { href: "/leaderboard/creators/heatmap", title: "Mappa operatore×creator",      desc: "Score operatore × creator a colpo d'occhio", icon: Flame },
       { href: "/admin/conversation-intelligence", title: "Presidio chat", desc: "Latenza risposta, % entro 5 min e response rate per creator (dai transcript, solo metadati)", icon: Activity },
