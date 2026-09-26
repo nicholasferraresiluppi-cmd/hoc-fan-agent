@@ -24,6 +24,7 @@ const cleanTower = (p) => ({
   areas: (Array.isArray(p?.areas) ? p.areas : []).slice(0, 10).map(cleanArea),
   total: int(p?.total),
   other: int(p?.other),
+  nospace: Boolean(p?.nospace),
 });
 
 /**
