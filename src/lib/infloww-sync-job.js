@@ -109,7 +109,9 @@ export async function stepJob() {
       // Errori per-creator NON inghiottiti in silenzio: tracciati (con l'oggetto
       // intero, serve per i retry round) — l'API Infloww ha timeout transitori
       // frequenti (~10/41 creator per giro, osservato lug 2026).
-      const res = await Promise.all(batch.map((c) => syncOneCreator(c, startTime, endTime).then(() => null).catch(() => c)));
+      // il MOTIVO dell'errore resta sul creator (prima veniva buttato: il 26/09
+      // tutte le 38 creator fallivano e non si capiva perché)
+      const res = await Promise.all(batch.map((c) => syncOneCreator(c, startTime, endTime).then(() => { job.ok_count = (job.ok_count || 0) + 1; return null; }).catch((e) => ({ ...c, error: String(e?.message || e).slice(0, 200) }))));
       const failed = res.filter(Boolean);
       if (failed.length) {
         const seen = new Set((job.failed || []).map((f) => f.id));
@@ -130,9 +132,17 @@ export async function stepJob() {
         job.last_step = `retry round ${job.retry_round}: ${job.creators.length} creator`;
       } else {
         job.status = "done";
+        const failed = job.failed || [];
+        const prevMeta = (await kv.get(META_KEY)) || {};
+        // "aggiornato" SOLO se almeno una creator è arrivata: un giro tutto in
+        // errore non deve far sembrare freschi i dati (e zittire l'allarme)
         await kv.set(META_KEY, {
-          last_sync_at: Date.now(), days: job.days, creators_total: job.total_creators || job.creators.length,
-          failed_creators: (job.failed || []).map((f) => f.name),
+          last_sync_at: (job.ok_count || 0) > 0 ? Date.now() : prevMeta.last_sync_at || null,
+          last_attempt_at: Date.now(),
+          ok_creators: job.ok_count || 0,
+          days: job.days, creators_total: job.total_creators || job.creators.length,
+          failed_creators: failed.map((f) => f.name),
+          last_error: failed[0]?.error || null,
         }, { ex: TTL_DATA });
       }
     }
