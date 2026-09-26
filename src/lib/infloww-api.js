@@ -96,7 +96,39 @@ export async function inflowwGet(path, { query = null, timeoutMs = 20000 } = {})
  * Ritorna { items, pages, truncated }. `truncated` = c'erano altre pagine ma
  * abbiamo fermato al cap (per non sforare 60s / rate limit).
  */
-export async function inflowwPaged(path, { query = {}, limit = 100, maxPages = 20, maxItems = Infinity, timeoutMs = 20000, deadline = null } = {}) {
+// Limite dell'API (misurato il 26/09/2026): startTime→endTime al massimo 31
+// giorni (744h; 745h → 400 "Query time span exceeds the maximum allowed days").
+// Una finestra "31 giorni da mezzanotte" o un mese di 31 giorni col cambio
+// dell'ora legale (ottobre: 745h) lo sforano: le finestre più lunghe di 30
+// giorni vengono spezzate qui, in modo trasparente per chi chiama.
+export const INFLOWW_MAX_SPAN_MS = 30 * 24 * 3600 * 1000;
+
+export async function inflowwPaged(path, opts = {}) {
+  const q = opts.query || {};
+  const s = q.startTime ? Date.parse(q.startTime) : NaN;
+  const e = q.endTime ? Date.parse(q.endTime) : NaN;
+  if (!Number.isFinite(s) || !Number.isFinite(e) || e - s <= INFLOWW_MAX_SPAN_MS) return inflowwPagedOnce(path, opts);
+  const items = [];
+  const seen = new Set();
+  let pages = 0;
+  let truncated = false;
+  for (let from = s; from <= e; from += INFLOWW_MAX_SPAN_MS) {
+    const to = Math.min(e, from + INFLOWW_MAX_SPAN_MS - 1);
+    const left = (opts.maxPages ?? 20) - pages;
+    if (left <= 0 || (opts.deadline && Date.now() >= opts.deadline)) { truncated = true; break; }
+    const r = await inflowwPagedOnce(path, { ...opts, maxPages: left, query: { ...q, startTime: new Date(from).toISOString(), endTime: new Date(to).toISOString() } });
+    for (const it of r.items) {
+      const k = it?.id ?? it?.transactionId ?? null;
+      if (k != null) { if (seen.has(k)) continue; seen.add(k); }
+      items.push(it);
+    }
+    pages += r.pages;
+    truncated = truncated || r.truncated;
+  }
+  return { items, pages, truncated };
+}
+
+async function inflowwPagedOnce(path, { query = {}, limit = 100, maxPages = 20, maxItems = Infinity, timeoutMs = 20000, deadline = null } = {}) {
   const items = [];
   let cursor;
   let pages = 0;
