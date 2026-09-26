@@ -6,31 +6,38 @@ import { kv } from "@vercel/kv";
 
 export const CITTA_KEY = "citta:snapshot";
 const MAX_SPACES = 200;
-const MAX_FLOORS = 12;
 
 const str = (v, n = 120) => String(v ?? "").slice(0, n);
 const int = (v) => Math.max(0, Math.min(1e6, Math.round(Number(v) || 0)));
 
-/** Normalizza e limita una fotografia (niente campi estranei, niente testi lunghi). */
+const STATES = new Set(["ok", "wait", "stop", "none"]);
+const cleanArea = (a) => ({
+  n: str(a?.n, 30),
+  s: STATES.has(a?.s) ? a.s : "none",
+  open: int(a?.open),
+  late: int(a?.late),
+  l: str(a?.l, 220),
+  who: (Array.isArray(a?.who) ? a.who : []).slice(0, 3).map((w) => str(w, 30)),
+});
+const cleanTower = (p) => ({
+  n: str(p?.n, 60),
+  areas: (Array.isArray(p?.areas) ? p.areas : []).slice(0, 10).map(cleanArea),
+  total: int(p?.total),
+  other: int(p?.other),
+});
+
+/**
+ * Normalizza e limita una fotografia (niente campi estranei, niente testi lunghi).
+ * Formato attuale (città di Nicholas): { generated, projects:[{n, areas:[{n,s,open,late,l,who}], total, other}], hq, coverage }
+ */
 export function cleanSnapshot(raw) {
-  if (!raw || !Array.isArray(raw.spaces)) throw new Error("Formato non valido: servono { generated, spaces[] }");
-  const generated = /^\d{4}-\d{2}-\d{2}$/.test(raw.generated || "") ? raw.generated : null;
+  const generated = /^\d{4}-\d{2}-\d{2}$/.test(raw?.generated || "") ? raw.generated : null;
   if (!generated) throw new Error("Data della fotografia mancante (generated: AAAA-MM-GG)");
-  const spaces = raw.spaces.slice(0, MAX_SPACES).map((s) => ({
-    id: str(s.id, 40),
-    name: str(s.name, 80),
-    district: s.district === "creator" ? "creator" : "sede",
-    open: int(s.open),
-    overdue: int(s.overdue),
-    in_progress: int(s.in_progress),
-    last_update: /^\d{4}-\d{2}-\d{2}$/.test(s.last_update || "") ? s.last_update : null,
-    stale: Boolean(s.stale),
-    truncated: Boolean(s.truncated),
-    people: (Array.isArray(s.people) ? s.people : []).slice(0, 6).map((p) => [str(p?.[0], 40), int(p?.[1])]),
-    late_items: (Array.isArray(s.late_items) ? s.late_items : []).slice(0, 5).map((t) => str(t, 90)),
-    floors: (Array.isArray(s.floors) ? s.floors : []).slice(0, MAX_FLOORS).map((f) => ({ name: str(f?.name, 60), open: int(f?.open), overdue: int(f?.overdue) })),
-  })).filter((s) => s.id && s.name);
-  return { generated, spaces, saved_at: Date.now() };
+  if (!Array.isArray(raw?.projects) || !raw?.hq) throw new Error("Formato non valido: servono { generated, projects[], hq }");
+  const projects = raw.projects.slice(0, MAX_SPACES).map(cleanTower).filter((p) => p.n && p.areas.length);
+  const hq = cleanTower(raw.hq);
+  const coverage = Math.max(0, Math.min(1, Number(raw.coverage) || 0));
+  return { generated, projects, hq, coverage, saved_at: Date.now() };
 }
 
 export async function getCitySnapshot() {
