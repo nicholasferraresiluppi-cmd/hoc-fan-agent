@@ -20,6 +20,7 @@ import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { logAuditAction } from "@/lib/audit-log";
 import { getWages } from "@/lib/cp-wages-store";
+import { aggregateWagesByAlias } from "@/lib/pnl-aggregate";
 
 export const maxDuration = 30;
 const FEES_KEY = "pnl:deal_fees";
@@ -51,31 +52,8 @@ export async function GET(request) {
   }
   const feeMap = fees && typeof fees === "object" ? fees : {};
 
-  // Aggregazione per alias: venduto (takes esatti) + costo operatori attribuito
-  const byAlias = new Map();
-  for (const w of wages) {
-    for (const s of w.shifts || []) {
-      const aliases = s.creator_aliases || [];
-      const takes = s.takes || [];
-      const salesTotal = Number(s.total_attributed) || 0;
-      const earnings = Number(s.total_earnings) || 0;
-      const isMono = aliases.length <= 1;
-      const salesByAlias = new Map();
-      for (const t of takes) {
-        if (!t.creator_alias) continue;
-        salesByAlias.set(t.creator_alias, (salesByAlias.get(t.creator_alias) || 0) + (Number(t.amount) || 0));
-      }
-      if (salesByAlias.size === 0 && isMono && aliases[0]) salesByAlias.set(aliases[0], salesTotal);
-      for (const [alias, aliasSales] of salesByAlias.entries()) {
-        if (!byAlias.has(alias)) byAlias.set(alias, { sales: 0, cost: 0, shifts: 0 });
-        const agg = byAlias.get(alias);
-        const share = salesTotal > 0 ? aliasSales / salesTotal : (isMono ? 1 : 0);
-        agg.sales += aliasSales;
-        agg.cost += earnings * share;
-        agg.shifts += 1;
-      }
-    }
-  }
+  // Aggregazione per alias: venduto (takes esatti) + costo operatori attribuito (lib condivisa con la città)
+  const byAlias = aggregateWagesByAlias(wages);
 
   const rows = [...byAlias.entries()]
     .filter(([, a]) => a.sales > 0)
