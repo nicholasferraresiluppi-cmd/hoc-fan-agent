@@ -19,7 +19,9 @@
  *
  * GET    ?period_id=YYYY-MM             → ritorna swaps + lista underperformers
  * POST   body { period_id, employee, action, swap_with?, note?, status? }
- *         → upsert entry (action="mark", "set_swap", "set_ready", "set_pending")
+ *         → upsert entry (action="mark", "set_swap", "set_ready", "set_pending", "set_agreement")
+ *         set_agreement: body.agreement { next_step, verify_date (YYYY-MM-DD), operator_words }
+ *         → entry.agreement (cosa si è concordato nel colloquio, con by/at)
  * DELETE ?period_id=YYYY-MM&employee=N → rimuove entry (unmark)
  */
 import { kv } from "@vercel/kv";
@@ -32,6 +34,8 @@ import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
 import { loadGroupLanguages } from "@/app/api/admin/group-languages/route";
 import { detectLanguage } from "@/lib/leaderboard-calc";
 import { getCachedCreatorDifficulty } from "@/lib/creator-difficulty";
+import { getCachedOperatorSignalProfiles } from "@/lib/operator-signals";
+import { recommendPathForGap } from "@/lib/coaching-paths";
 
 const SWAP_KEY = (periodId) => `action_center:swaps:${periodId}`;
 const IGNORED_KEY = "underperformers:ignored";
@@ -134,6 +138,40 @@ export async function GET(request) {
     };
   }
 
+  // Cosa allenare (vista colloquio, 26/09): dal profilo-segnali in CACHE (mai
+  // BigQuery qui). Abbinamento per nome esatto normalizzato; nomi ambigui (due
+  // profili che normalizzano uguale) NON abbinati: meglio niente che il dato di
+  // un altro. Finestra diversa dal mese CP (ultimi giorni, turni singoli): la UI
+  // lo dichiara. Coaching, non score.
+  const norm = (x) => String(x || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const sigByName = new Map();
+  let sigMeta = null;
+  try {
+    const sig = await getCachedOperatorSignalProfiles();
+    if (sig?.profiles) {
+      sigMeta = { days: sig.params?.days ?? null, generated_at: sig.generated_at || null };
+      const seen = new Map();
+      for (const p of sig.profiles) { const k = norm(p.operator); seen.set(k, (seen.get(k) || 0) + 1); }
+      for (const p of sig.profiles) { const k = norm(p.operator); if (seen.get(k) === 1) sigByName.set(k, p); }
+    }
+  } catch {}
+  function coachingFor(employee) {
+    const p = sigByName.get(norm(employee));
+    const g = p?.top_gap;
+    if (!g?.key) return null;
+    const m = (p.metrics || []).find((x) => x.key === g.key);
+    const path = recommendPathForGap(g.key);
+    return {
+      label: g.label,
+      display: m?.display ?? null,
+      org_median: m?.org_median ?? null,
+      advice: g.coaching || null,
+      focus: path?.focus || null,
+      scenarios: (path?.scenarios || []).map((s) => s.title).filter(Boolean),
+      window_days: sigMeta?.days ?? null,
+    };
+  }
+
   const candidates = rawCandidates.map((r, i) => {
     const swapEntry = swapsObj[r.employee] || null;
     return {
@@ -153,6 +191,7 @@ export async function GET(request) {
       swap_entry: swapEntry,
       suggested_swaps: suggestionsArr[i] || [],
       context: contextFor(r),
+      coaching: coachingFor(r.employee),
     };
   });
 
@@ -222,7 +261,7 @@ export async function POST(request) {
   if (!isValidPeriod(period_id)) return Response.json({ error: "period_id YYYY-MM required" }, { status: 400 });
   if (!employee || typeof employee !== "string") return Response.json({ error: "employee (string) required" }, { status: 400 });
 
-  const validActions = ["mark", "set_swap", "set_ready", "set_pending"];
+  const validActions = ["mark", "set_swap", "set_ready", "set_pending", "set_agreement"];
   if (!validActions.includes(action)) return Response.json({ error: `action must be ${validActions.join("|")}` }, { status: 400 });
 
   const key = SWAP_KEY(period_id);
@@ -239,6 +278,7 @@ export async function POST(request) {
     swap_with: prev?.swap_with || null,
     note: prev?.note || "",
     hr: prev?.hr || null,
+    agreement: prev?.agreement || null,
   };
 
   if (action === "mark") {
@@ -261,6 +301,17 @@ export async function POST(request) {
     if (voice.length < 10) return Response.json({ error: "Scrivi cosa ha detto l'operatore nel colloquio" }, { status: 400 });
     next.status = "ready_for_hr";
     next.hr = { colloquio_date: date, motivazione: why.slice(0, 2000), voce_operatore: voice.slice(0, 2000), by: az.userId, at: now };
+  } else if (action === "set_agreement") {
+    // Vista colloquio (26/09): cosa si è concordato con la persona. Non cambia lo
+    // stato del caso: è memoria del colloquio, non una decisione.
+    const ag = body?.agreement || {};
+    const nextStep = String(ag.next_step || "").trim();
+    const verify = String(ag.verify_date || "").trim();
+    const words = String(ag.operator_words || "").trim();
+    if (verify && !/^\d{4}-\d{2}-\d{2}$/.test(verify)) return Response.json({ error: "Data di verifica non valida (AAAA-MM-GG)" }, { status: 400 });
+    if (nextStep.length > 2000 || words.length > 2000) return Response.json({ error: "Testo troppo lungo (massimo 2000 caratteri)" }, { status: 400 });
+    if (!nextStep && !verify && !words) return Response.json({ error: "Scrivi almeno il prossimo passo o la data di verifica" }, { status: 400 });
+    next.agreement = { next_step: nextStep, verify_date: verify || null, operator_words: words, by: az.userId, at: now };
   } else if (action === "set_pending") {
     next.status = "marked";
     next.hr = null;
