@@ -21,7 +21,7 @@ import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
 import { loadGroupLanguages } from "@/app/api/admin/group-languages/route";
 import { detectLanguage } from "@/lib/leaderboard-calc";
 import { getWages } from "@/lib/cp-wages-store";
-import { shiftsByCreator, creatorDrops, monthShrink, unmappedSales } from "@/lib/data-health-core";
+import { shiftsByCreator, creatorDrops, monthShrink, unmappedSales, dayHoles } from "@/lib/data-health-core";
 import { getEndedCreators } from "@/lib/creators-ended";
 
 const monthOffset = (id, n) => {
@@ -54,6 +54,8 @@ function currentMonthId() {
 }
 
 const daysAgo = (ts) => Math.floor((Date.now() - ts) / 86400000);
+
+const h0 = (holes) => holes[0]?.median || 0;
 
 /* ------------------------------------------------------------------ */
 /* Check registry — ogni check emette SOLO le condizioni fallite.      */
@@ -285,6 +287,33 @@ const CHECKS = [
           detail: drops.slice(0, 6).map((d) => `${d.creator}: ${d.current} turni (attesi ~${d.expected})`).join(" · ") + ". Può essere reale (creator in pausa o che ha smesso: segnala in Alert → Creator terminate) o un buco di dati: guarda prima di usare quei numeri.",
           value: String(drops.length),
           cta: { href: "/leaderboard/creators", label: "Apri Creator" },
+        });
+      }
+      return out;
+    },
+  },
+  {
+    // Giorni bucati nei dati CP (set 2026: luglio con 20-26/07 quasi a zero e 5
+    // giorni mancanti, invisibile al controllo sul numero di wage). Mese in corso
+    // (fino a 2 giorni fa) + i due precedenti.
+    id: "cp-day-holes",
+    severity: "critical",
+    label: "Giorni mancanti nei dati CP",
+    async run() {
+      const cur = currentMonthId();
+      const lastFull = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+      const out = [];
+      for (const m of [cur, monthOffset(cur, -1), monthOffset(cur, -2)]) {
+        const w = await getWages(m);
+        if (!w?.length) continue;
+        const holes = dayHoles(w, m, { lastFullDay: m === cur ? lastFull : null });
+        if (!holes.length) continue;
+        out.push({
+          fingerprint: `cp-day-holes:${m}`,
+          title: `${m}: ${holes.length} ${holes.length === 1 ? "giorno" : "giorni"} con vendite CP quasi a zero`,
+          detail: `${holes.slice(0, 8).map((h) => h.day.slice(8)).join(", ")} (sotto il 30% di un giorno tipico, $${h0(holes).toLocaleString("it-IT")}). Quasi sempre è una sincronizzazione incompleta: rilancia il sync del mese prima di usarne i numeri.`,
+          value: String(holes.length),
+          cta: { href: "/admin/wage-audit", label: "Verifica e ripara il mese" },
         });
       }
       return out;

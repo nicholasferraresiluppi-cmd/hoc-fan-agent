@@ -1,4 +1,4 @@
-import { shiftsByCreator, creatorDrops, monthShrink, unmappedSales } from "../src/lib/data-health-core.js";
+import { shiftsByCreator, creatorDrops, monthShrink, unmappedSales, dayHoles } from "../src/lib/data-health-core.js";
 let ok = 0, ko = 0; const t = (n, c) => { c ? ok++ : (ko++, console.log("FAIL", n)); };
 const w = [{ shifts: [{ creator_aliases: ["A"] }, { creator_aliases: ["A", "B"] }, { creator_aliases: ["A", "A"] }] }];
 const s = shiftsByCreator(w);
@@ -29,4 +29,11 @@ const fut = new Date(Date.now() + 86400000).toISOString();
 const past = new Date(Date.now() - 86400000).toISOString();
 const sf = shiftsByCreator([{ shifts: [{ started_at: past, creator_aliases: ["A"] }, { started_at: fut, creator_aliases: ["A"] }] }]);
 t("turni futuri esclusi", sf.A === 1);
+const mkDay = (d, v) => ({ shifts: [{ started_at: `2026-07-${String(d).padStart(2,"0")}T10:00:00Z`, total_attributed: v }] });
+const jul = []; for (let d = 1; d <= 31; d++) jul.push(mkDay(d, d >= 20 && d <= 26 ? 500 : 70000));
+const holes = dayHoles(jul, "2026-07");
+t("buchi 20-26 luglio trovati", holes.length === 7 && holes[0].day === "2026-07-20");
+const jul2 = jul.filter((_, i) => i !== 4); // manca il 5
+t("giorno mancante trovato", dayHoles(jul2, "2026-07").some((h) => h.day === "2026-07-05"));
+t("mese in corso: oltre lastFullDay ignorato", dayHoles(jul.slice(0, 10), "2026-07", { lastFullDay: "2026-07-10" }).length === 0);
 console.log(`${ok} ok / ${ko} failed`); if (ko) process.exit(1);
