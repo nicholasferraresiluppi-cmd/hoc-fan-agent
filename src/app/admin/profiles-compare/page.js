@@ -6,6 +6,7 @@ import { Loader2, AlertCircle, Scale, ArrowRight, ArrowUpDown, FlaskConical, Plu
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
 import CompNav from "@/components/CompNav";
+import { Notice } from "@/components/ds";
 import HowToRead from "@/components/HowToRead";
 
 /**
@@ -27,7 +28,9 @@ function monthOpts(n = 12) {
 }
 const fmt$ = (n) => n == null ? "—" : `$${Number(n).toLocaleString("it-IT", { maximumFractionDigits: 0 })}`;
 const fmtPct = (v, d = 1) => v == null ? "—" : `${(v * 100).toFixed(d)}%`;
-const TIER_COLORS = ["#D44545", "#F59E0B", "#3FB97E", "#4F8CCB", CP.accent];
+// Scala sequenziale su UN colore (DESIGN.md: un solo accento): più scuro = % più alta.
+// Prima arcobaleno rosso/arancio/verde/blu senza legenda: l'arancione sembrava un allarme.
+const TIER_ALPHA = ["14", "26", "40", "5c", "80"];
 
 // Formula BRACKET su intero importo (confermata dalla ricerca shift-research)
 function bracketPct(total, thresholds) {
@@ -80,12 +83,14 @@ export default function ProfilesComparePage() {
     for (const c of data.creators) for (const t of c.thresholds || []) if (t.percentage != null) s.add(t.percentage);
     return [...s].sort((a, b) => a - b);
   }, [data]);
-  const colorOf = (pct) => {
+  const chipStyle = (pct, big) => {
     const i = pctScale.indexOf(pct);
-    return i >= 0 ? TIER_COLORS[Math.min(i, TIER_COLORS.length - 1)] : CP.textMuted;
+    const a = i >= 0 ? TIER_ALPHA[Math.min(Math.round((i / Math.max(1, pctScale.length - 1)) * (TIER_ALPHA.length - 1)), TIER_ALPHA.length - 1)] : "10";
+    return { padding: big ? "2px 7px" : "1px 6px", borderRadius: 4, background: alpha(CP.accent, a), border: `1px solid ${alpha(CP.accent, "40")}`, color: CP.textPrimary, fontSize: big ? 11 : 10.5, fontWeight: 500, fontFamily: FONTS.mono, whiteSpace: "nowrap" };
   };
 
   const missingPhaseB = data ? data.creators_count - data.phase_b_coverage : 0;
+  const noProfiles = (data?.creators || []).filter((c) => (!c.profiles || c.profiles.length === 0) && (c.thresholds || []).length === 0).map((c) => c.alias);
 
   // Simulazione: profilo standard applicato a TUTTI i creator
   const sim = useMemo(() => {
@@ -130,7 +135,7 @@ export default function ProfilesComparePage() {
       <HowToRead items={[
         "Una riga per creator: i suoi scaglioni reali, quanto ha venduto, quanto sono costati gli operatori e quanto pesa quel costo sul venduto (% costo).",
         "Nella colonna Scaglioni vedi più righe per creator: 1× è il profilo per chi lavora da solo, 2× in coppia, 3× in tre. Ogni configurazione ha le sue soglie.",
-        "Mismatch: ✓ verde = i pagamenti del mese rispettano gli scaglioni. Un numero rosso = turni pagati fuori scaglione, da verificare.",
+        "Fuori scaglione: ✓ = i pagamenti del mese rispettano gli scaglioni. \"3 su 120\" in rosso = 3 turni pagati con una % diversa, da verificare nella Griglia.",
         "IL confronto da fare: la colonna '% costo' tra creator simili. Differenze grandi = profili da rivedere.",
         "Il bottone Griglia apre il dettaglio giorno per giorno di quella creator.",
       ]} />
@@ -171,12 +176,10 @@ export default function ProfilesComparePage() {
           </div>
 
           {missingPhaseB > 0 && (
-            <CpCard accent="#F59E0B" padding="12px 16px" style={{ marginBottom: 16 }}>
-              <div style={{ color: "#F59E0B", fontSize: 12, display: "flex", alignItems: "center", gap: 8 }}>
-                <AlertCircle size={14} />
-                {missingPhaseB} creator senza scaglioni visibili — il mese va ri-sincronizzato post-Fase B da <Link href="/admin/wage-audit" style={{ color: "#F59E0B" }}>Sync &amp; Audit CP</Link> per popolare tutti.
-              </div>
-            </CpCard>
+            <Notice>
+              {missingPhaseB === 1 ? "1 creator non ha" : `${missingPhaseB} creator non hanno`} gli scaglioni del mese
+              {noProfiles.length ? `: ${noProfiles.join(", ")}` : ""}. Si recuperano ri-sincronizzando il mese da <Link href="/admin/wage-audit" style={{ color: CP.accent }}>Sync &amp; Audit CP</Link>.
+            </Notice>
           )}
 
           {/* Simulatore profilo STANDARD su tutti i creator */}
@@ -263,6 +266,11 @@ export default function ProfilesComparePage() {
             )}
           </CpCard>
 
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", fontSize: 12, color: CP.textSecondary, marginBottom: 8 }}>
+            <span>Scaglioni: <b style={{ fontWeight: 500 }}>da solo / in 2 / in 3</b> = profilo per chi lavora da solo o in squadra; <span style={chipStyle(pctScale[0], true)}>base→%</span> fino a <span style={chipStyle(pctScale[pctScale.length - 1], true)}>≥$→%</span> = più scuro, percentuale più alta</span>
+            <span>Pagato (attr.) = compenso dei turni attribuito a quella creator</span>
+            <span>Fuori scaglione: turni pagati con una % diversa da quella prevista (✓ = tutti in regola)</span>
+          </div>
           <CpCard padding="0" style={{ overflow: "hidden" }}>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
@@ -277,7 +285,7 @@ export default function ProfilesComparePage() {
                     {sim && <th style={{ ...th, textAlign: "right" }}>Δ</th>}
                     <th style={{ ...th, textAlign: "right" }}>Turni</th>
                     <th style={{ ...th, textAlign: "right" }}>Operatori</th>
-                    <th style={{ ...th, textAlign: "right" }}>Mismatch</th>
+                    <th style={{ ...th, textAlign: "right" }}>Fuori scaglione</th>
                     <th style={th}></th>
                   </tr>
                 </thead>
@@ -294,14 +302,14 @@ export default function ProfilesComparePage() {
                         ) : c.profiles && c.profiles.length > 0 ? (
                           // Inventario completo: una riga per profilo (Solo/Coppia/Triplo
                           // hanno set propri — niente più "un solo profilo per creator")
-                          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                            {c.profiles.map((p) => (
-                              <div key={p.name} title={`${p.name} · ${p.shifts} turni`} style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-                                <span style={{ fontSize: 9, fontWeight: 700, fontFamily: FONTS.mono, color: CP.textMuted, minWidth: 20 }}>
-                                  {p.cosellers_count != null ? `${p.cosellers_count}×` : "?"}
+                          <div style={{ display: "flex", flexDirection: "column" }}>
+                            {c.profiles.map((p, pi) => (
+                              <div key={p.name} title={`${p.name} · ${p.shifts} turni`} style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", padding: "3px 0", borderTop: pi ? `1px dashed ${CP.borderSoft}` : "none" }}>
+                                <span style={{ fontSize: 11, color: CP.textMuted, minWidth: 44 }}>
+                                  {p.cosellers_count === 1 ? "da solo" : p.cosellers_count === 2 ? "in 2" : p.cosellers_count != null ? `in ${p.cosellers_count}` : "?"}
                                 </span>
                                 {(p.thresholds || []).map((t, i) => (
-                                  <span key={i} style={{ padding: "1px 6px", borderRadius: 4, background: alpha(colorOf(t.percentage), "22"), border: `1px solid ${alpha(colorOf(t.percentage), "55")}`, color: colorOf(t.percentage), fontSize: 9.5, fontWeight: 700, fontFamily: FONTS.mono, whiteSpace: "nowrap" }}>
+                                  <span key={i} style={chipStyle(t.percentage)}>
                                     {t.threshold > 0 ? `≥${fmt$(t.threshold)}` : "base"}→{fmtPct(t.percentage, 0)}
                                   </span>
                                 ))}
@@ -311,7 +319,7 @@ export default function ProfilesComparePage() {
                         ) : (
                           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                             {c.thresholds.map((t, i) => (
-                              <span key={i} style={{ padding: "2px 7px", borderRadius: 4, background: alpha(colorOf(t.percentage), "22"), border: `1px solid ${alpha(colorOf(t.percentage), "55")}`, color: colorOf(t.percentage), fontSize: 10, fontWeight: 700, fontFamily: FONTS.mono, whiteSpace: "nowrap" }}>
+                              <span key={i} style={chipStyle(t.percentage, true)}>
                                 {t.threshold > 0 ? `≥${fmt$(t.threshold)}` : "base"}→{fmtPct(t.percentage, 0)}
                               </span>
                             ))}
@@ -329,8 +337,11 @@ export default function ProfilesComparePage() {
                       )}
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textSecondary }}>{c.shifts}</td>
                       <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textSecondary }}>{c.operators_count}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: c.mismatches > 0 ? CP.accentRed : CP.accentGreen }}>
-                        {c.checked > 0 ? (c.mismatches > 0 ? c.mismatches : "✓") : "—"}
+                      <td title={c.checked > 0 ? (c.mismatches > 0 ? `${c.mismatches} turni su ${c.checked} controllati pagati con una % diversa dallo scaglione: apri la Griglia per vederli` : `Tutti i ${c.checked} turni controllati rispettano gli scaglioni`) : "Nessun turno controllabile (scaglioni mancanti)"}
+                        style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 500, color: c.mismatches > 0 ? CP.accentRed : CP.accentGreen }}>
+                        {c.checked > 0 ? (c.mismatches > 0
+                          ? <Link href={`/admin/comp-calendar?creator=${encodeURIComponent(c.alias)}&period_id=${data.period_id}`} style={{ color: CP.accentRed }}>{c.mismatches} su {c.checked}</Link>
+                          : "✓") : "—"}
                       </td>
                       <td style={td}>
                         <Link

@@ -40,9 +40,14 @@ const TABS = [
 ];
 
 const card = { background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, padding: "16px 18px" };
-const th = { textAlign: "right", padding: "8px 10px", fontSize: 11, color: CP.textMuted, fontWeight: 500, borderBottom: `1px solid ${CP.border}`, whiteSpace: "nowrap", background: CP.bgSunken };
+// Intestazione ferma: le tabelle lunghe scorrono dentro il riquadro (pannello 26/09)
+const th = { position: "sticky", top: 0, zIndex: 1, textAlign: "right", padding: "8px 10px", fontSize: 11, color: CP.textMuted, fontWeight: 500, borderBottom: `1px solid ${CP.border}`, whiteSpace: "nowrap", background: CP.bgSunken };
 const td = { textAlign: "right", padding: "8px 10px", fontSize: 13, color: CP.textSecondary, borderBottom: `1px solid ${CP.borderSoft}`, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" };
 const tdL = { ...td, textAlign: "left", color: CP.textPrimary };
+const scrollBox = { overflow: "auto", maxHeight: "70vh", border: `1px solid ${CP.border}`, borderRadius: 10 };
+// Sotto questa soglia di PPV le percentuali di una creator sono rumore: "pochi dati", non un numero
+const MIN_ROW_PPV = 30;
+const few = (n) => <span title={`Solo ${n} PPV nel periodo: percentuale non affidabile`} style={{ color: CP.textMuted, fontSize: 12 }}>pochi dati</span>;
 const btn = { background: CP.surfaceAlt, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "7px 12px", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body };
 const btnPrimary = { ...btn, background: CP.accent, color: CP.accentInk, border: `1px solid ${CP.accent}`, fontWeight: 500 };
 const input = { background: CP.bgSunken, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: FONTS.body };
@@ -173,25 +178,29 @@ function Panoramica({ d, name }) {
       </div>
       <div>
         <H2 sub={`Ultime ${d.meta.recent_n} settimane chiuse (${fmtDate(d.meta.recent_weeks[0])}–${fmtDate(d.meta.recent_weeks.at(-1))}), tra parentesi la variazione in punti rispetto alle ${d.meta.recent_n} precedenti. "In chat" esclude il messaggio di benvenuto automatico.`}>Tabella creator {name ? `· ${name}` : "· tutta HOC"}</H2>
-        <div style={{ overflowX: "auto", border: `1px solid ${CP.border}`, borderRadius: 10 }}>
+        <div style={scrollBox}>
           <table style={{ borderCollapse: "collapse", width: "100%" }}>
             <thead><tr>
               <th style={{ ...th, textAlign: "left" }}>Creator</th><th style={th}>Incasso PPV</th><th style={th}>PPV in chat</th><th style={th}>% compra · mai paganti</th><th style={th}>% compra · già paganti</th><th style={th}>PPV a chat viva</th><th style={th}>PPV a chat ferma</th><th style={th}>Bonus o prezzo di rif.</th><th style={th}>% compra · benvenuto</th>
             </tr></thead>
             <tbody>
-              {d.pages.pages.map((p) => (
+              {d.pages.pages.map((p) => {
+                const n = p.recent.chat_ppv || 0;
+                const thin = n < MIN_ROW_PPV;
+                return (
                 <tr key={p.creator_id}>
                   <td style={tdL}>{d.names[String(p.creator_id)] || p.creator_id}</td>
                   <td style={td}>{usd(p.recent.net)}</td>
-                  <td style={td}>{p.recent.chat_ppv.toLocaleString("it-IT")}</td>
-                  <td style={{ ...td, color: CP.textPrimary }}>{pct(p.recent.conv_nonpayer)}<Delta now={p.recent.conv_nonpayer} prev={p.prev.conv_nonpayer} /></td>
-                  <td style={td}>{pct(p.recent.conv_payer)}</td>
-                  <td style={td}>{pct(p.recent.live_share, 0)}</td>
-                  <td style={td}>{pct(p.recent.dead_share, 0)}</td>
-                  <td style={td}>{pct(p.recent.tech_share, 0)}</td>
+                  <td style={td}>{n.toLocaleString("it-IT")}</td>
+                  <td style={{ ...td, color: CP.textPrimary }}>{thin ? few(n) : <>{pct(p.recent.conv_nonpayer)}<Delta now={p.recent.conv_nonpayer} prev={p.prev.conv_nonpayer} /></>}</td>
+                  <td style={td}>{thin ? few(n) : pct(p.recent.conv_payer)}</td>
+                  <td style={td}>{thin ? few(n) : pct(p.recent.live_share, 0)}</td>
+                  <td style={td}>{thin ? few(n) : pct(p.recent.dead_share, 0)}</td>
+                  <td style={td}>{thin ? few(n) : pct(p.recent.tech_share, 0)}</td>
                   <td style={td}>{pct(p.recent.conv_welcome)}</td>
                 </tr>
-              ))}
+                );
+              })}
               {!d.pages.pages.length && <tr><td style={{ ...tdL, color: CP.textMuted }} colSpan={9}>Nessun PPV su queste creator nel periodo. Controlla le creator dello split con "Modifica split".</td></tr>}
             </tbody>
           </table>
@@ -217,7 +226,7 @@ function Operatori({ d }) {
       <label style={{ fontSize: 12, color: CP.textSecondary, display: "flex", gap: 6, alignItems: "center" }}>
         <input type="checkbox" id="ops-all" checked={all} onChange={(e) => setAll(e.target.checked)} style={{ accentColor: CP.accent }} /> Mostra anche chi ha pochi PPV
       </label>
-      <div style={{ overflowX: "auto", border: `1px solid ${CP.border}`, borderRadius: 10 }}>
+      <div style={scrollBox}>
         <table style={{ borderCollapse: "collapse", width: "100%" }}>
           <thead><tr>
             <th style={{ ...th, textAlign: "left" }}>Operatore</th><th style={th}>Indice di resa</th><th style={th}>PPV in chat</th><th style={th}>% compra · mai paganti</th><th style={th}>PPV a chat viva</th><th style={th}>PPV a chat ferma</th><th style={th}>Bonus o prezzo di rif.</th><th style={{ ...th, textAlign: "left" }}>Creator</th><th style={th}>Andamento 8 settimane</th>
@@ -650,7 +659,7 @@ export default function SalesCoachingPage() {
       )}
       <Glossary />
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 20, borderBottom: `1px solid ${CP.border}`, paddingBottom: 10 }}>
-        {TABS.map(([k, l]) => <PillTab key={k} active={tab === k} onClick={() => { setTab(k); try { history.replaceState(null, "", `#${k}`); } catch { /* ok */ } }}>{l}</PillTab>)}
+        {TABS.map(([k, l]) => <PillTab key={k} active={tab === k} onClick={() => { setTab(k); try { window.history.replaceState(null, "", `#${k}`); } catch { /* ok */ } }}>{l}</PillTab>)}
       </div>
       {tab === "panoramica" && <Panoramica d={data} name={split?.name} />}
       {tab === "operatori" && <Operatori d={data} />}

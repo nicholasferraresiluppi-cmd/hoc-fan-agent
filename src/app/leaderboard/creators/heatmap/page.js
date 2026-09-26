@@ -26,6 +26,7 @@ export default function HeatmapPage({ searchParams }) {
   const resolved = typeof searchParams?.then === "function" ? use(searchParams) : searchParams;
   const periodId = resolved?.period_id || currentMonthId();
   const [minSales, setMinSales] = useState(500);
+  const [q, setQ] = useState("");
   const { data } = useSWR(`/api/leaderboard/creators?period_id=${periodId}`, fetcher, { revalidateOnFocus: false });
 
   const topCreators = (data?.creators || []).slice(0, 25);
@@ -47,7 +48,21 @@ export default function HeatmapPage({ searchParams }) {
     }
     return out;
   }, [allDrills.data, minSales]);
-  const names = useMemo(() => Object.keys(matrix).sort((a, b) => matrix[b]._total - matrix[a]._total), [matrix]);
+  const allNames = useMemo(() => Object.keys(matrix).sort((a, b) => matrix[b]._total - matrix[a]._total), [matrix]);
+  const needle = q.trim().toLowerCase();
+  const names = needle ? allNames.filter((n) => n.toLowerCase().includes(needle)) : allNames;
+  // Riepilogo: celle affidabili per fascia (quante coppie operatore×creator rendono bene/male)
+  const summary = useMemo(() => {
+    const out = { cells: 0, strong: 0, weak: 0, thin: 0 };
+    for (const n of allNames) for (const [k, cell] of Object.entries(matrix[n])) {
+      if (k === "_total") continue;
+      if (cell.low_confidence) { out.thin += 1; continue; }
+      out.cells += 1;
+      if (cell.tier === "Strong" || cell.tier === "Elite") out.strong += 1;
+      if (cell.tier === "Critical" || cell.tier === "Weak") out.weak += 1;
+    }
+    return out;
+  }, [allNames, matrix]);
 
   const months = Array.from({ length: 12 }, (_, i) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; });
   const ctl = { padding: "7px 10px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
@@ -73,7 +88,22 @@ export default function HeatmapPage({ searchParams }) {
       {data?.error && <Notice danger>{data.error}</Notice>}
       {data && !data.error && allDrills.isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento della mappa (prime {topCreators.length} creator per venduto)…</div>}
 
-      {allDrills.data && names.length > 0 && (<>
+      {allDrills.data && allNames.length > 0 && (<>
+        <div style={{ ...card, padding: "14px 18px", marginBottom: 12, display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
+          {[
+            ["Operatori", allNames.length],
+            ["Coppie con dati affidabili", summary.cells],
+            ["Rendono bene (Strong/Elite)", summary.strong],
+            ["Rendono poco (Critical/Weak)", summary.weak],
+          ].map(([l, v]) => (
+            <div key={l}>
+              <div style={{ fontSize: 12, color: CP.textSecondary }}>{l}</div>
+              <div style={{ fontSize: 22, fontWeight: 500, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{v.toLocaleString("it-IT")}</div>
+            </div>
+          ))}
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca un operatore…" aria-label="Cerca un operatore"
+            style={{ marginLeft: "auto", padding: "8px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, minWidth: 200, fontFamily: FONTS.body }} />
+        </div>
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12, color: CP.textSecondary, marginBottom: 10, alignItems: "center" }}>
           {TIERS.map((t) => (
             <span key={t} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
@@ -126,6 +156,7 @@ export default function HeatmapPage({ searchParams }) {
             </tbody>
           </table>
         </div>
+        {names.length === 0 && <div style={{ color: CP.textMuted, fontSize: 13, padding: 12 }}>Nessun operatore con “{q}”.</div>}
         <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 8 }}>{names.length} operatori × {topCreators.length} creator (le prime per venduto). Passa sopra una cella per il dettaglio; clic sul nome per la scheda.</div>
       </>)}
     </div>
