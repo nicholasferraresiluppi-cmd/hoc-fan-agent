@@ -342,7 +342,8 @@ function AdminSecurityCard() {
   const load = () => fetch("/api/admin/security").then((r) => (r.ok ? r.json() : null)).then(setD).catch(() => {});
   useEffect(() => { load(); }, []);
   if (!d) return null;
-  const without = d.admins.filter((a) => !a.mfa);
+  const exempt = d.admins.filter((a) => a.exempt);
+  const without = d.admins.filter((a) => !a.mfa && !a.exempt);
   const toggle = async () => {
     setErr(null);
     const r = await fetch("/api/admin/security", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ required: !d.required }) });
@@ -358,6 +359,7 @@ function AdminSecurityCard() {
           <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4 }}>
             {d.admins.length - without.length} admin su {d.admins.length} l'hanno attivata.
             {without.length ? ` Mancano: ${without.map((a) => a.name).join(", ")}.` : ""}
+            {exempt.length ? ` Esenti: ${exempt.map((a) => `${a.name} (${a.exempt})`).join("; ")}.` : ""}
             {d.required ? " Chi non l'ha attivata non ha i poteri da admin finché non lo fa." : " Quando è obbligatoria, un admin senza verifica perde i poteri da admin finché non la attiva."}
           </div>
         </div>

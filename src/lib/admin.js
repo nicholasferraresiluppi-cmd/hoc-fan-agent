@@ -69,8 +69,17 @@ export async function userHasMfa(userId) {
 }
 
 /** L'utente, se admin, può esercitare i poteri da admin? */
+// Esenzioni dall'obbligo 2FA (26/09/2026): SOLO account di servizio senza
+// password, per i controlli automatici (account QA: accesso via Google di Nicholas
+// o sign-in token server-side). Hash KV userId → motivazione, visibile in Membri.
+export const MFA_EXEMPT_KEY = "security:mfa_exempt";
+export async function mfaExemptions() {
+  return (await kv.hgetall(MFA_EXEMPT_KEY).catch(() => null)) || {};
+}
+
 export async function adminMfaOk(userId) {
   if (!(await adminMfaRequired())) return true;
+  if (userId && (await kv.hget(MFA_EXEMPT_KEY, userId).catch(() => null))) return true;
   return userHasMfa(userId);
 }
 
