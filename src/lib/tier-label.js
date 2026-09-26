@@ -8,7 +8,7 @@ import { CP } from "@/lib/brand";
 
 export const TIER_IT = {
   Critical: "Da costruire",
-  Weak: "In crescita",
+  Weak: "Da rafforzare", // prima "In crescita": nell'Action Center si leggeva "sta migliorando" (26/09)
   Average: "Nella media",
   Good: "Buona",
   Strong: "Forte",

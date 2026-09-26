@@ -275,10 +275,10 @@ function TrendCard({ health, periodType, periodId }) {
           <div style={{ fontSize: 13, color: CP.textMuted, marginTop: 2 }}>Mestiere medio negli ultimi {history.length} {unit}. Passa sopra una barra per le fasce di quel periodo.</div>
         </div>
         {cur && (
-          <div title="Operatori in Eccellente o Forte meno operatori in Da costruire o In crescita, nel periodo evidenziato">
+          <div title="Operatori in Eccellente o Forte meno operatori in Da costruire o Da rafforzare, nel periodo evidenziato">
             <div style={{ fontSize: 13, color: CP.textSecondary }}>Fasce alte meno fasce basse</div>
             <div style={{ fontSize: 20, fontWeight: 500, color: CP.textPrimary, ...NUM }}>{fmtSignedInt(balance)}</div>
-            <div style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>{cur.elite_strong} in Eccellente o Forte · {cur.critical_weak} in Da costruire o In crescita</div>
+            <div style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>{cur.elite_strong} in Eccellente o Forte · {cur.critical_weak} in Da costruire o Da rafforzare</div>
           </div>
         )}
       </div>
@@ -292,7 +292,7 @@ function TrendCard({ health, periodType, periodId }) {
             `Mestiere medio: ${fmtScore(h.avg_score)} / 100`,
             `In classifica: ${h.eligible}`,
             `Eccellente: ${tc.Elite || 0} · Forte: ${tc.Strong || 0} · Buona: ${tc.Good || 0}`,
-            `Nella media: ${tc.Average || 0} · In crescita: ${tc.Weak || 0} · Da costruire: ${tc.Critical || 0}`,
+            `Nella media: ${tc.Average || 0} · Da rafforzare: ${tc.Weak || 0} · Da costruire: ${tc.Critical || 0}`,
             `Fasce alte meno fasce basse: ${fmtSignedInt(q)}`,
           ].join("\n");
           const isCur = h.period_id === cur?.period_id;
@@ -771,7 +771,7 @@ export default function OperationalLeaderboardPage() {
             <Metric label="In classifica" value={fmtInt(data.eligible_total)} note={data.total > data.eligible_total ? `+${fmtInt(data.total - data.eligible_total)} senza score` : null} />
             <Metric label="Eccellente o Forte" value={fmtInt((data.elite_count || 0) + (data.strong_count || 0))} note={`mestiere da ${strongMin} in su`} />
             <div>
-              <Metric label="Da costruire o In crescita" value={fmtInt(counts.low)} note={`sotto ${averageMin}`} />
+              <Metric label="Da costruire o Da rafforzare" value={fmtInt(counts.low)} note={`sotto ${averageMin}`} />
               {counts.low > 0 && view !== "low" && <button onClick={() => setView("low")} style={{ ...linkBtn, marginTop: 2 }}>Mostrali →</button>}
             </div>
             {cpAvailable && data.cp_agency && (
@@ -796,7 +796,7 @@ export default function OperationalLeaderboardPage() {
         <SectionTitle aside={`${fmtInt(shown.length)} ${shown.length === 1 ? "operatore" : "operatori"}`}>Classifica</SectionTitle>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
           <FilterChip label={`Tutti (${rows.length})`} active={view === "all"} onClick={() => setView("all")} />
-          <FilterChip label={`Da costruire o In crescita (${counts.low})`} active={view === "low"} disabled={!counts.low} onClick={() => setView(view === "low" ? "all" : "low")} />
+          <FilterChip label={`Da costruire o Da rafforzare (${counts.low})`} active={view === "low"} disabled={!counts.low} onClick={() => setView(view === "low" ? "all" : "low")} />
           {counts.small > 0 && (
             <FilterChip label={`Confrontati con la lingua (${counts.small})`} active={view === "small"} onClick={() => setView(view === "small" ? "all" : "small")} />
           )}
