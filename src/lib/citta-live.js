@@ -2,7 +2,8 @@
 // vengono dagli STESSI calcoli delle pagine di HOC Pro (P&L live, Classifica vendite / Action
 // Center), non da ClickUp. HR, Deal e Contenuti restano la stima dai titoli ClickUp.
 //
-//   Sales    — venduto per turno del mese vs mese prima: calo ≥ 15% = ambra (stessa soglia "In calo" di Creator)
+//   Sales    — venduto e venduto per turno dalla matrice della pagina Creator (turni a quota, solo turni iniziati);
+//              calo per turno ≥ 15% sul mese prima = ambra (stessa soglia "In calo")
 //   Finance  — costo operatori sul venduto vs mediana delle creator: ≥ +4 punti = ambra ("Costo alto" del P&L)
 //   Chatting — operatori sotto soglia (score ≤ 25, ≥ 5 turni: "Da rivedere") tra chi lavora soprattutto qui
 //
@@ -10,6 +11,7 @@
 import { kv } from "@vercel/kv";
 import { getWages } from "@/lib/cp-wages-store";
 import { aggregateWagesByAlias } from "@/lib/pnl-aggregate";
+import { buildCreatorMatrix } from "@/lib/creator-aggregates";
 import { buildOperatorsForCpLeaderboard, hasCpDataForPeriod } from "@/lib/creatorspro-data";
 import { buildCpLeaderboard } from "@/lib/creatorspro-score";
 import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
@@ -45,9 +47,13 @@ const median = (xs) => { const v = xs.filter((x) => x != null).sort((a, b) => a 
 
 export async function computeCityLive(periodId = monthOf()) {
   const prevId = prevMonth(periodId);
-  const [wCur, wPrev] = await Promise.all([getWages(periodId), getWages(prevId)]);
-  const aCur = aggregateWagesByAlias(wCur), aPrev = aggregateWagesByAlias(wPrev);
-  const cur = byPerson(aCur), prev = byPerson(aPrev);
+  const [wCur, mCur, mPrev] = await Promise.all([getWages(periodId), buildCreatorMatrix(periodId), buildCreatorMatrix(prevId)]);
+  // costo: P&L (takes × compenso del turno); venduto e turni: matrice di Creator (una sola definizione di turno per l'app)
+  const aCur = aggregateWagesByAlias(wCur);
+  const costBy = byPerson(aCur);
+  const fromMatrix = (m) => { const o = {}; for (const [alias, c] of Object.entries(m?.creators || {})) { const n = personOf(alias); if (!o[n]) o[n] = { sales: 0, shifts: 0 }; o[n].sales += c.total_sales || 0; o[n].shifts += c.total_shifts || 0; } return o; };
+  const cur = fromMatrix(mCur), prev = fromMatrix(mPrev);
+  for (const n of Object.keys(cur)) cur[n].cost = costBy[n] ? costBy[n].cost * (cur[n].sales / (costBy[n].sales || cur[n].sales || 1)) : 0;
   // mediana del costo sul venduto tra le creator (a livello di pagina, come il P&L)
   const medianCostPct = median([...aCur.values()].filter((a) => a.sales > 0).map((a) => a.cost / a.sales));
 
@@ -94,7 +100,7 @@ export async function computeCityLive(periodId = monthOf()) {
 }
 
 export async function getCityLive(periodId = monthOf()) {
-  const key = `citta:live:${periodId}`;
+  const key = `citta:live:v2:${periodId}`;
   const hit = await kv.get(key);
   if (hit && Date.now() - (hit.computed_at || 0) < TTL * 1000) return hit;
   const fresh = await computeCityLive(periodId);
@@ -111,7 +117,7 @@ function salesArea(x, live) {
   if (!x || !x.sales) return { n: "Sales", s: "none", open: 0, late: 0, l: `Nessun venduto a ${monthName(live.period)} finora.`, src: "hoc" };
   const d = x.perShift != null && x.perShiftPrev ? x.perShift / x.perShiftPrev - 1 : null;
   const s = d != null && d <= SALES_DROP ? "wait" : "ok";
-  const l = `Venduto a ${monthName(live.period)}: ${usd(x.sales)} in ${x.shifts} turni, ${usd(x.perShift)} a turno` +
+  const l = `Venduto a ${monthName(live.period)}: ${usd(x.sales)} in ${Math.round(x.shifts).toLocaleString("it-IT")} turni, ${usd(x.perShift)} a turno` +
     (d != null ? ` (${d >= 0 ? "+" : "−"}${pct(Math.abs(d), 0)} rispetto a ${monthName(live.prev)}).` : ".");
   return { n: "Sales", s, open: 0, late: 0, l, src: "hoc" };
 }
