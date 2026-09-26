@@ -237,7 +237,7 @@ export default function ActionCenterPage() {
           <FilterChip label={`Da osservare (${nWatch})`} active={bucket === "watch"} onClick={() => setBucket("watch")} />
           <span style={{ width: 12 }} />
           <FilterChip label={`Tutti (${inThreshold.length})`} active={stage === "all"} onClick={() => setStage("all")} />
-          <FilterChip label={`Da decidere (${n("todo")})`} active={stage === "todo"} disabled={!n("todo")} onClick={() => setStage(stage === "todo" ? "all" : "todo")} />
+          <FilterChip label={`Senza sostituto (${n("todo")})`} active={stage === "todo"} disabled={!n("todo")} onClick={() => setStage(stage === "todo" ? "all" : "todo")} />
           <FilterChip label={`Sostituto scelto (${n("swap")})`} active={stage === "swap"} disabled={!n("swap")} onClick={() => setStage(stage === "swap" ? "all" : "swap")} />
           <FilterChip label={`Pronti per HR (${n("ready")})`} active={stage === "ready"} disabled={!n("ready")} onClick={() => setStage(stage === "ready" ? "all" : "ready")} />
           <span style={{ width: 12 }} />

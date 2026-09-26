@@ -63,7 +63,7 @@ export default function ScoreExplainedPage() {
       />
 
       <Notice>
-        Questa pagina spiega lo score <b style={b}>Vendite</b>, usato nelle revisioni mensili. L&apos;altro score, <b style={b}>Mestiere</b>, misura come lavori in chat (dati Infloww) ed è quello del percorso di carriera: ha fasce proprie («Da costruire» sotto 15, «In crescita» 15–27, «Nella media» 27–44, «Buona» 44–61, «Forte» 61–75, «Eccellente» da 75).
+        Questa pagina spiega lo score <b style={b}>Vendite</b>, usato nelle revisioni mensili. L&apos;altro score, <b style={b}>Mestiere</b>, misura come lavori in chat (dati Infloww) ed è quello del percorso di carriera: ha fasce proprie («Da costruire» sotto 15, «Da rafforzare» 15–27, «Nella media» 27–44, «Buona» 44–61, «Forte» 61–75, «Eccellente» da 75).
       </Notice>
 
       {/* 1 — Cosa misura */}
