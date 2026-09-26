@@ -31,7 +31,8 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
-  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon } from "lucide-react";
+  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
+} from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
 
@@ -127,6 +128,7 @@ export const NAV_GROUPS = [
       { href: "/admin/qa-reviews",               label: "QA conversazioni", icon: ClipboardCheck },
       { href: "/admin/academy-tapes",            label: "Curatela tape", icon: Clapperboard },
       { href: "/admin/academy-signals",          label: "Signals",       icon: TrendingUp },
+      { href: "/admin/creator-difficulty",       label: "Difficoltà creator", icon: Snowflake },
       { href: "/admin/operator-signals",         label: "Profilo operatore", icon: UserSearch },
       { href: "/admin/activation",               label: "Attivazione",   icon: Rocket },
       { href: "/admin/infloww-ingest",           label: "Ingest Infloww",  icon: Upload },

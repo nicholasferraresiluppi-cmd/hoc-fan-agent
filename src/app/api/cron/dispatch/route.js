@@ -98,6 +98,18 @@ export async function POST(request) {
   out.failed_kicks = failed;
   await kv.set("cron:heartbeat:dispatch", { at: Date.now(), via: viaCron ? "cron" : "session", failed_kicks: failed }, { ex: 40 * 24 * 3600 }).catch(() => {});
 
+  // Profilo di difficoltà del pubblico per creator (/admin/creator-difficulty).
+  // ULTIMO di proposito (review 30/07): ricalcolo SETTIMANALE (warmCreatorDifficulty
+  // ricalcola solo se il dato ha più di ~6 giorni) e nessun consumatore a valle qui:
+  // se il budget dei 60s finisce si sacrifica da solo. Portato in produzione il 26/09
+  // (era rimasto non pubblicato nella cartella locale, vedi ramo rescue/).
+  try {
+    const { warmCreatorDifficulty, bigQueryConfigured } = await import("@/lib/creator-difficulty");
+    out.creator_difficulty = bigQueryConfigured() ? await warmCreatorDifficulty() : "skip:no-bq";
+  } catch (e) {
+    out.creator_difficulty = "err:" + (e?.message || "unknown");
+  }
+
   return Response.json(out);
 }
 
