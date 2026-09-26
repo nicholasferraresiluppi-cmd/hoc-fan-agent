@@ -7,8 +7,6 @@ const EVT = "hoc:theme-change";
 
 export function getTheme() {
   if (typeof document === "undefined") return "dark";
-  // Stile "Casa" (v3): esiste solo scuro, qualunque tema sia salvato
-  if (document.documentElement.getAttribute("data-style") === "v3") return "dark";
   return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
 }
 
