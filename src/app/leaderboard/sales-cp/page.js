@@ -16,9 +16,9 @@ import { CP, FONTS } from "@/lib/brand";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmt$, fmtInt, fmtDelta, MONTHS_IT } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, card, NUM } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, card, NUM, ATTN } from "@/components/ds";
 
-import { tierLabel } from "@/lib/tier-label";
+import { tierLabel, tierColor } from "@/lib/tier-label";
 const fetcher = async (url) => {
   const r = await fetch(url);
   const j = await r.json().catch(() => ({}));
@@ -29,12 +29,6 @@ const MIN_SHIFTS = 5;        // come il backend dell'Action Center
 const REVIEW_SCORE = 25;     // soglia "da rivedere" (score ≤ 25 con ≥ 5 turni)
 const MOVE_PTS = 10;         // variazione che conta come crescita/calo
 
-// Fasce: il colore porta solo il segnale (verde = sopra, rosso = da guardare)
-function tierColor(t) {
-  if (t === "Elite" || t === "Strong") return CP.accentGreen;
-  // fasce basse mai rosse (26/09: il rosso = denaro negativo o allarme)
-  return CP.textSecondary;
-}
 const fmtScore = (v) => (v == null ? "—" : v.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
 const fmtPtsDelta = (d) => (d == null ? "—" : `${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.abs(d).toLocaleString("it-IT", { maximumFractionDigits: 1 })}`);
 
@@ -169,7 +163,7 @@ export default function SalesCpLeaderboardPage() {
     ) },
     { key: "tier", label: "Fascia", muted: true, sort: (r) => r.score, render: (r) => <span style={{ color: tierColor(r.tier) === CP.textSecondary ? CP.textSecondary : tierColor(r.tier) }}>{tierLabel(r.tier) || "—"}</span> },
     { key: "delta", label: "Sul mese prima", align: "right", render: (r) => (
-      <span style={{ color: r.delta == null ? CP.textMuted : r.delta <= -MOVE_PTS ? CP.accentRed : r.delta >= MOVE_PTS ? CP.accentGreen : CP.textSecondary }}>{r.delta == null ? "nuovo" : fmtPtsDelta(r.delta)}</span>
+      <span style={r.delta != null && r.delta <= -MOVE_PTS ? ATTN : { color: r.delta == null ? CP.textMuted : r.delta >= MOVE_PTS ? CP.accentGreen : CP.textSecondary }}>{r.delta == null ? "nuovo" : fmtPtsDelta(r.delta)}</span>
     ) },
     { key: "sales", label: "Venduto", align: "right", render: (r) => fmt$(r.sales) },
     { key: "perShift", label: "Per turno", align: "right", render: (r) => fmt$(r.perShift) },
@@ -218,7 +212,7 @@ export default function SalesCpLeaderboardPage() {
             <Metric label="Venduto" value={fmt$(agency?.total_sales)} note={`${fmtInt(agency?.total_shifts)} turni`} />
             <Metric label="Venduto per turno" value={fmt$(agency?.avg_sales_per_shift)} delta={fmtDelta(agency?.avg_sales_per_shift, prev?.agency?.avg_sales_per_shift)} />
             <div>
-              <Metric label="Da rivedere" value={fmtInt(counts.review)} danger={counts.review > 0} note={`score ≤ ${REVIEW_SCORE}, almeno ${MIN_SHIFTS} turni`} />
+              <Metric label="Da rivedere" value={fmtInt(counts.review)} attn={counts.review > 0} note={`score ≤ ${REVIEW_SCORE}, almeno ${MIN_SHIFTS} turni`} />
               {counts.review > 0 && <Link href={`/admin/action-center?period_id=${periodId}`} style={{ fontSize: 13, color: CP.accentSoftText, textDecoration: "none" }}>Apri Action Center →</Link>}
             </div>
           </div>
@@ -226,7 +220,7 @@ export default function SalesCpLeaderboardPage() {
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
           <FilterChip label={`Tutti (${rows.length})`} active={view === "all"} onClick={() => setView("all")} />
-          <FilterChip label={`Da rivedere (${counts.review})`} danger={counts.review > 0} active={view === "review"} disabled={!counts.review} onClick={() => setView(view === "review" ? "all" : "review")} />
+          <FilterChip label={`Da rivedere (${counts.review})`} attn={counts.review > 0} active={view === "review"} disabled={!counts.review} onClick={() => setView(view === "review" ? "all" : "review")} />
           <FilterChip label={`In calo (${counts.down})`} active={view === "down"} disabled={!counts.down} onClick={() => setView(view === "down" ? "all" : "down")} />
           <FilterChip label={`In miglioramento (${counts.up})`} active={view === "up"} disabled={!counts.up} onClick={() => setView(view === "up" ? "all" : "up")} />
           <FilterChip label={`Meno di ${MIN_SHIFTS} turni (${counts.thin})`} active={view === "thin"} disabled={!counts.thin} onClick={() => setView(view === "thin" ? "all" : "thin")} />
@@ -244,7 +238,7 @@ export default function SalesCpLeaderboardPage() {
           </label>
         </div>
         <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 8 }}>
-          “Sul mese prima” = punti di score rispetto a {prevLabel || "il mese precedente"}; in rosso/verde chi si è spostato di almeno {MOVE_PTS}. Il pallino indica la fascia. Clic sul nome per la scheda operatore.
+          “Sul mese prima” = punti di score rispetto a {prevLabel || "il mese precedente"}; evidenziato chi si è spostato di almeno {MOVE_PTS} punti. Il pallino indica la fascia. Clic sul nome per la scheda operatore.
         </div>
 
         <div style={{ marginBottom: 14 }}>

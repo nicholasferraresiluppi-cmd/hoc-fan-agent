@@ -134,6 +134,8 @@ export const CP_DARK = {
   ruleData: "#5d6678", fieldBd: "#2c3650", sel: "rgba(139,124,246,.12)", hover: "rgba(255,255,255,.03)",
   scrim: "rgba(0,0,0,.6)", cool: "#b9aef9", warm: "#4ade80", heroBg: "#151a22",
   tierTop: "#4ade80", tierStrong: "#4ade80",
+  // attenzione su PERSONE (da rivedere, cali): nel vecchio stile resta rosso; in Couture il rosso è solo denaro/allarmi
+  attn: "#f08c8c",
 };
 // Tema chiaro (25/09/2026): per tabelle dense di numeri il testo scuro su fondo
 // chiaro si legge meglio (Piepenbrock et al. 2013); scelto da 4 tester su 5 nel
@@ -149,6 +151,7 @@ export const CP_LIGHT = {
   ruleData: "#8a92a2", fieldBd: "#c9cdd6", sel: "rgba(99,83,224,.08)", hover: "rgba(20,23,31,.03)",
   scrim: "rgba(20,23,31,.38)", cool: "#4a3bc4", warm: "#17803d", heroBg: "#ffffff",
   tierTop: "#17803d", tierStrong: "#17803d",
+  attn: "#c53030",
 };
 
 // ── Stile v3 "Notte / Carta" (26/09/2026) ─────────────────────────────────────
@@ -172,6 +175,7 @@ export const CP_NOTTE = {
   scrim: "rgba(4,5,9,.6)", cool: "#a9bfe8", warm: "#a3d4b2",
   heroBg: "linear-gradient(180deg, #181a24, #121319)",
   tierTop: "#d6bd8e", tierStrong: "#eee9df",
+  attn: "#eee9df",
 };
 // Carta: chiaro caldo, stesso mondo dell'attestato; grigi ricalcolati per AA sul
 // caldo (--muted #655f54 dalla revisione accessibilità), card staccate dal fondo.
@@ -188,6 +192,7 @@ export const CP_CARTA = {
   ruleData: "#a39886", fieldBd: "#8c8272", sel: "rgba(42,37,33,.06)", hover: "rgba(40,30,10,.025)",
   scrim: "rgba(28,24,16,.38)", cool: "#2a569f", warm: "#1b6b49", heroBg: "#fcf9f3",
   tierTop: "#8a6a32", tierStrong: "#2a2521",
+  attn: "#2a2521",
 };
 
 // Menu notte sotto Carta: stesso schema di CP_NOTTE ma col nero CALDO, così il

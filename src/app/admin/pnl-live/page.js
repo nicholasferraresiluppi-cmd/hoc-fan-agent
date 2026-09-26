@@ -98,7 +98,7 @@ export default function PnlLivePage() {
           onChange={(e) => setEditing((s) => ({ ...s, [r.alias]: e.target.value }))}
           onBlur={(e) => { if (editing[r.alias] !== undefined) { saveFee(r.alias, e.target.value); setEditing((s) => { const n = { ...s }; delete n[r.alias]; return n; }); } }}
           onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
-          style={{ width: 64, padding: "4px 8px", textAlign: "right", background: CP.bg, border: `1px solid ${r.fee_pct == null ? CP.accentRed : CP.border}`, borderRadius: 6, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body }} />
+          style={{ width: 64, padding: "4px 8px", textAlign: "right", background: CP.bg, border: `1px ${r.fee_pct == null ? "dashed" : "solid"} ${r.fee_pct == null ? CP.textMuted : CP.border}`, borderRadius: 6, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body }} />
         <span style={{ fontSize: 12, color: CP.textMuted }}>%</span>
         <span style={{ width: 14 }}>{saved[r.alias] && <Check size={13} color={CP.accentGreen} />}</span>
       </span>
@@ -158,7 +158,7 @@ export default function PnlLivePage() {
             style={{ padding: "7px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, width: 220, fontFamily: FONTS.body }} />
         </div>
         <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 8 }}>
-          “Costo alto” = costo operatori almeno {HIGH_COST_PTS * 100} punti sopra la mediana delle creator ({fmtPct(median, 1)}). La fee si scrive direttamente in tabella; il bordo rosso indica che manca.
+          “Costo alto” = costo operatori almeno {HIGH_COST_PTS * 100} punti sopra la mediana delle creator ({fmtPct(median, 1)}). La fee si scrive direttamente in tabella; il bordo tratteggiato indica che manca.
         </div>
         <DataTable columns={columns} rows={shown} defaultSort={{ key: "sales", dir: -1 }} minWidth={900} maxHeight="calc(100vh - 120px)"
           empty={needle ? `Nessuna creator corrisponde a “${q}”.` : "Nessuna creator in questa vista."} />

@@ -263,6 +263,7 @@ function GroupHeader({ label, isOpen, onToggle, visibleCount }) {
   return (
     <button
       onClick={onToggle}
+      className="hoc-grp"
       style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         width: "calc(100% - 16px)",
@@ -448,7 +449,7 @@ export default function Sidebar() {
             fontFamily: FONTS.body, fontWeight: 500, fontSize: 13,
           }}>H</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 10, color: CP.textMuted, letterSpacing: "0.02em", fontFamily: FONTS.body, fontWeight: 500 }}>Organization</div>
+            <div style={{ fontSize: 10, color: CP.textMuted, letterSpacing: "0.02em", fontFamily: FONTS.body, fontWeight: 500 }}>Organizzazione</div>
             <div style={{ fontSize: 13, color: CP.textPrimary, fontWeight: 500, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>House of Creators</div>
           </div>
           <Building2 size={14} color={CP.textMuted} />
@@ -460,7 +461,7 @@ export default function Sidebar() {
 
       {/* Welcome link (always visible, both modes) */}
       <div style={{ padding: "10px 0 4px 0", borderBottom: `1px solid ${CP.border}` }}>
-        <NavItem href="/welcome" label="Welcome / Tour" icon={Compass} isActive={pathname === "/welcome"} />
+        <NavItem href="/welcome" label="Benvenuto" icon={Compass} isActive={pathname === "/welcome"} />
         <NavItem href="/guida" label="Guida strumenti" icon={Signpost} isActive={pathname === "/guida"} />
         {allowed("/admin") && <NavItem href="/admin" label="Hub" icon={LayoutDashboard} isActive={pathname === "/admin"} />}
         {allowed("/admin/alerts") && <NavItem href="/admin/alerts" label="Alert operativi" icon={Bell} isActive={pathname.startsWith("/admin/alerts")} badge={criticalCount} />}
@@ -504,9 +505,9 @@ export default function Sidebar() {
       <div style={{ padding: "12px 16px", borderTop: `1px solid ${CP.border}`, background: CP.bgSunken }}>
         <SignedIn>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <UserButton afterSignOutUrl="/sign-in" />
+            <span className="hoc-avatar"><UserButton afterSignOutUrl="/sign-in" /></span>
             <div style={{ flex: 1, minWidth: 0, fontSize: 11, color: CP.textMuted }}>
-              <div style={{ color: CP.textSecondary, fontWeight: 500, fontSize: 12 }}>Account</div>
+              <div style={{ color: CP.textSecondary, fontWeight: 500, fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me?.name || "Account"}</div>
               <div style={{ fontSize: 10, marginTop: 1 }}>HOC Pro</div>
             </div>
             <button onClick={() => setTheme(theme === "light" ? "dark" : "light")} title={theme === "light" ? "Passa al tema scuro" : "Passa al tema chiaro"} aria-label="Cambia tema"
