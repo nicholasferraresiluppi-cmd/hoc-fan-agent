@@ -63,7 +63,14 @@ export async function GET() {
     // I gate valutano gli ULTIMI mesi di CALENDARIO: ordina per period_id desc
     // (la lib segue l'ordine di import, non cronologico).
     history = (h || [])
-      .map((x) => ({ period_id: x.period_id, score: x.score, tier: x.tier }))
+      // Mese non lavorato (tutti i KPI a zero → "inattivo", o escluso dal calcolo)
+      // = dato mancante, non un mese andato male: fuori dai gate. Prima entrava
+      // come score 0 "Critical" e contava come "sotto il minimo" (pannello 26/09:
+      // il mese di assunzione di un'operatrice nuova appariva in rosso).
+      // Stessa regola non punitiva del motore di progresso (operator-progress).
+      .map((x) => (x.inactive || x.excluded_reason
+        ? { period_id: x.period_id, score: null, tier: null, no_data: true }
+        : { period_id: x.period_id, score: x.score, tier: x.tier }))
       .sort((a, b) => String(b.period_id).localeCompare(String(a.period_id)));
   } catch {}
 
@@ -137,7 +144,7 @@ export async function GET() {
   return Response.json({
     linked: true,
     employee: who.employee,
-    current: history[0] || null,
+    current: history.find((h) => typeof h.score === "number") || null,
     history,
     gates,
     formal_level: null, // arriverà col piazzamento data-driven (ladder, decisione #5)

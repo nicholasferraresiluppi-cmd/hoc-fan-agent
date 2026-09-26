@@ -185,8 +185,10 @@ export default function MyScorePage() {
                     const cur = h.period_id === data.period_id;
                     return (
                       <div key={h.period_id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 48 }}>
-                        <span style={{ fontSize: 12, color: cur ? CP.textPrimary : CP.textSecondary, ...NUM }}>{h.score != null ? Math.round(h.score) : "—"}</span>
-                        <div style={{ width: 24, height: `${Math.max(4, ((h.score || 0) / maxHist) * 80)}px`, background: cur ? CP.accent : CP.accentDim, borderRadius: 4 }} />
+                        <span title={h.score == null ? "Mese senza turni lavorati: non conta" : undefined} style={{ fontSize: 12, color: cur ? CP.textPrimary : CP.textSecondary, ...NUM }}>{h.score != null ? Math.round(h.score) : "—"}</span>
+                        {h.score != null
+                          ? <div style={{ width: 24, height: `${Math.max(4, (h.score / maxHist) * 80)}px`, background: cur ? CP.accent : CP.accentDim, borderRadius: 4 }} />
+                          : <div title="Mese senza turni lavorati: non conta" style={{ width: 24, height: 12, border: `1px dashed ${CP.textMuted}`, borderRadius: 4 }} />}
                         <span style={{ fontSize: 11, color: CP.textMuted }}>{monthShort(h.period_id)}</span>
                       </div>
                     );
@@ -198,7 +200,7 @@ export default function MyScorePage() {
 
           <div style={{ borderTop: `1px solid ${CP.borderSoft}`, paddingTop: 14 }}>
             <p style={note}>
-              Lo score mestiere viene dall&apos;export Infloww e si aggiorna quando il mese viene importato. Le fasce vanno da Critical (il 10% più basso) a Elite (il 10% più alto), tarate sui dati di quest&apos;anno.{data.formula?.hash ? ` Formula del mese ${data.formula.hash}, congelata all'import: il tuo storico non cambia in silenzio.` : ""}
+              Lo score mestiere viene dall&apos;export Infloww e si aggiorna quando il mese viene importato. Le fasce vanno da Critical a Elite, tarate sui dati reali di quest&apos;anno. I mesi senza turni lavorati non contano (trattino nel grafico).{data.formula?.hash ? ` Formula del mese ${data.formula.hash}, congelata all'import: il tuo storico non cambia in silenzio.` : ""}
             </p>
             <p style={note}>
               Pensi che un numero sia sbagliato? <Link href="/me/contestazioni" style={link}>Apri una contestazione</Link> — le correzioni vengono sempre tracciate, mai fatte in silenzio.
