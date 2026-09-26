@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import * as XLSX from "xlsx";
-import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
+import { Upload, Loader2, Check } from "lucide-react";
+import { FONTS, CP } from "@/lib/brand";
+import { PageHead, Metric, SectionTitle, Disclosure, Notice, DataTable, card, NUM } from "@/components/ds";
+import { fmtInt, fmtAgo, MONTHS_IT } from "@/lib/format";
 
 const PERIOD_OPTIONS = [
   { value: "monthly", label: "Mensile" },
@@ -21,6 +22,9 @@ export default function LeaderboardImportPage() {
   const [busy, setBusy] = useState(false);
   const [imports, setImports] = useState([]);
   const [deletingPeriod, setDeletingPeriod] = useState(null);
+  const [fileName, setFileName] = useState("");
+  const [howOpen, setHowOpen] = useState(false);
+  const [groupsOpen, setGroupsOpen] = useState(false);
 
   async function deleteImport(period) {
     if (!confirm(`Eliminare l'import "${period}"?\n\nVerranno cancellati TUTTI i dati Infloww di quel periodo dal KV (non recuperabili senza ri-caricare il file).`)) return;
@@ -171,160 +175,160 @@ export default function LeaderboardImportPage() {
     }
   }
 
-  const styles = {
-    page: { minHeight: "100vh", background: COLORS.obsidian, color: COLORS.alabaster, fontFamily: FONTS.body, padding: "32px 24px" },
-    container: { maxWidth: 1100, margin: "0 auto" },
-    backLink: { color: COLORS.fog, fontSize: 13, textDecoration: "none", display: "inline-block", marginBottom: 12 },
-    title: { fontFamily: FONTS.display, fontSize: 28, margin: "0 0 6px 0" },
-    sub: { color: COLORS.fog, fontSize: 14, marginBottom: 24 },
-    card: { background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 12, padding: 18, marginBottom: 16 },
-    h2: { fontFamily: FONTS.display, fontSize: 18, margin: "0 0 12px 0" },
-    label: { fontSize: 12, color: COLORS.fog, letterSpacing: "0.06em", marginBottom: 6, display: "block" },
-    input: { width: "100%", padding: "10px 14px", background: COLORS.charcoal, border: `1px solid ${COLORS.charcoal}`, borderRadius: 8, color: COLORS.alabaster, fontSize: 14, fontFamily: FONTS.body, outline: "none", marginBottom: 12 },
-    select: { width: "100%", padding: "10px 14px", background: COLORS.charcoal, border: `1px solid ${COLORS.charcoal}`, borderRadius: 8, color: COLORS.alabaster, fontSize: 14, fontFamily: FONTS.body, marginBottom: 12 },
-    btn: { padding: "10px 18px", background: COLORS.champagne, color: COLORS.obsidian, border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 14, fontFamily: FONTS.body },
-    btnGhost: { padding: "10px 18px", background: "transparent", color: COLORS.alabaster, border: `1px solid ${COLORS.charcoal}`, borderRadius: 8, cursor: "pointer", fontSize: 14, fontFamily: FONTS.body, marginRight: 8 },
-    error: { background: alpha(COLORS.signal, "20"), color: COLORS.signal, padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 13 },
-    statRow: { display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${COLORS.charcoal}`, fontSize: 14 },
-    importItem: { display: "flex", justifyContent: "space-between", padding: "8px 12px", background: COLORS.charcoal, borderRadius: 6, marginBottom: 6, fontSize: 13 },
-  };
+  // Redesign 26/09/2026 (pannello tester BOARD/PAY/UX): la domanda di chi apre
+  // la pagina è "i dati Infloww sono aggiornati?" — la risposta era in fondo, in
+  // uno storico con chiavi tecniche (monthly:2026-09). Ora è in cima, con l'età
+  // del dato; il caricamento resta in 3 passi con anteprima e conferma; i termini
+  // dell'anteprima sono tradotti. Logica di lettura file, anteprima e salvataggio invariata.
+  const latest = imports[0] || null;
+  const curMonthKey = (() => { const d = new Date(); return `monthly:${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
+  const curMonth = imports.find((i) => i.period === curMonthKey);
+  const curAgeDays = curMonth ? (Date.now() - new Date(curMonth.timestamp).getTime()) / 86400000 : null;
+  const canPreview = !!csvText && !!periodId && !busy;
+  const importRows = imports.slice(0, 10).map((imp) => ({ ...imp, id: imp.period }));
+  const importCols = [
+    { key: "period", label: "Periodo", render: (imp) => <span><span style={{ fontWeight: 500 }}>{periodLabel(imp.period)}</span> <span style={{ fontSize: 12, color: CP.textMuted }}>{imp.period}</span></span> },
+    { key: "timestamp", label: "Caricato", align: "right", muted: true, sort: (imp) => new Date(imp.timestamp).getTime(), render: (imp) => `${new Date(imp.timestamp).toLocaleString("it-IT")} · ${fmtAgo(new Date(imp.timestamp).getTime())}` },
+    { key: "del", label: "", align: "right", sortable: false, render: (imp) => (
+      <button onClick={() => deleteImport(imp.period)} disabled={deletingPeriod === imp.period} title={`Elimina l'import ${imp.period} dal KV`}
+        style={{ ...btnGhost, padding: "4px 10px", fontSize: 12, color: deletingPeriod === imp.period ? CP.textMuted : CP.accentRed, cursor: deletingPeriod === imp.period ? "wait" : "pointer" }}>
+        {deletingPeriod === imp.period ? "Elimino…" : "Elimina"}
+      </button>
+    ) },
+  ];
 
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <PageHeader
-          breadcrumb={
-            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-              <span style={{ color: CP.textMuted }}>›</span>
-              <span style={{ color: CP.textPrimary }}>Import Infloww</span>
-            </div>
-          }
-          section="Data · Import"
-          title="Import dati Infloww"
-          subtitle={'Carica l\'export CSV o Excel "By time and employee" da Infloww. I dati alimentano lo score Sales CP (affianco Infloww) + l\'analisi efficienza chat.'}
-        />
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Import Infloww" }]}
+        title="Import dati Infloww"
+        subtitle="Carica il report “By time and employee” di Infloww per un periodo: alimenta lo score mestiere (quello Infloww, accanto alle vendite CP) e l'analisi dell'efficienza in chat."
+      />
 
-        {/* ISTRUZIONI INLINE: come scaricare da Infloww */}
-        <div style={{
-          padding: "16px 20px",
-          background: CP.accentSoft,
-          border: `1px solid ${alpha(CP.accentBlue, "55")}`,
-          borderRadius: 12,
-          marginBottom: 20,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: CP.textPrimary }}>Come scaricare il file da Infloww</div>
+      {/* Stato: i dati sono aggiornati? */}
+      <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+        <SectionTitle>Ultimo import</SectionTitle>
+        {imports.length === 0 ? (
+          <div style={{ fontSize: 14, color: CP.textSecondary }}>Nessun import ancora fatto: carica il primo file qui sotto.</div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
+            <Metric label="Più recente" value={periodLabel(latest.period)} note={`${fmtAgo(new Date(latest.timestamp).getTime())} · ${new Date(latest.timestamp).toLocaleString("it-IT")}`} />
+            <Metric label="Mese in corso" value={curMonth ? fmtAgo(new Date(curMonth.timestamp).getTime()) : "non caricato"} note={curMonth ? "ultimo aggiornamento" : "nessun file per questo mese"} danger={!curMonth || curAgeDays > 2} />
+            <Metric label="Periodi in archivio" value={fmtInt(imports.length)} />
           </div>
-          <ol style={{ margin: "0 0 12px 0", paddingLeft: 22, fontSize: 13, color: CP.textSecondary, lineHeight: 1.7 }}>
-            <li>Vai su <a href="https://app.infloww.com" target="_blank" rel="noreferrer" style={{ color: CP.accentBlue, fontWeight: 600 }}>app.infloww.com</a> → menu <b>Reports</b> → <b>Performance reports</b></li>
-            <li>Seleziona il report <b>&quot;By time and employee&quot;</b> (lo trovi nei modelli predefiniti)</li>
-            <li>Scegli il <b>periodo</b> (mese intero per la leaderboard mensile, settimana per quella settimanale)</li>
-            <li>Click su <b>Export → CSV</b> o <b>Excel (.xlsx)</b></li>
-            <li>Carica il file qui sotto e scegli lo stesso periodo</li>
-          </ol>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 12, color: CP.textMuted }}>
-            <a href="https://app.infloww.com" target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: CP.accentBlue, fontWeight: 600, textDecoration: "none" }}>
-              → Apri Infloww
-            </a>
-            <span style={{ color: CP.textMuted }}>·</span>
-            <span>Storico: ripeti per ogni mese che vuoi popolare (Infloww non ha bulk export)</span>
-          </div>
-        </div>
+        )}
+      </section>
+      {imports.length > 0 && (!curMonth || curAgeDays > 2) && (
+        <Notice>
+          {curMonth
+            ? `Il mese in corso non si aggiorna da ${Math.floor(curAgeDays)} giorni: leaderboard e score mostrano i numeri di allora. Scarica un export aggiornato e caricalo qui sotto (sovrascrive quello vecchio).`
+            : "Per il mese in corso non c'è ancora nessun file: leaderboard e score del mese restano vuoti finché non lo carichi."}
+        </Notice>
+      )}
 
-        <div style={styles.card}>
-          <h2 style={styles.h2}>1. Periodo</h2>
-          <label style={styles.label}>Tipo periodo</label>
-          <select style={styles.select} value={periodType} onChange={(e) => { setPeriodType(e.target.value); setPeriodId(""); }}>
-            {PERIOD_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-          </select>
-          <label style={styles.label}>
-            Identificatore periodo {periodType === "monthly" ? "(es. 2026-02)" : periodType === "weekly" ? "(es. 2026-W05)" : "(es. 2026-Q1)"}
+      <Disclosure open={howOpen} onToggle={() => setHowOpen((v) => !v)} title="Come scaricare il file da Infloww" summary="Reports → Performance reports → By time and employee → Export">
+        <ol style={{ margin: "0 0 12px 0", paddingLeft: 22, fontSize: 13, color: CP.textSecondary, lineHeight: 1.7 }}>
+          <li>Vai su <a href="https://app.infloww.com" target="_blank" rel="noreferrer" style={{ color: CP.accentSoftText }}>app.infloww.com</a> → menu Reports → Performance reports</li>
+          <li>Seleziona il report “By time and employee” (è tra i modelli predefiniti)</li>
+          <li>Scegli il periodo: il mese intero per la leaderboard mensile, la settimana per quella settimanale</li>
+          <li>Premi Export → CSV o Excel (.xlsx)</li>
+          <li>Caricalo qui sotto e scegli lo stesso periodo</li>
+        </ol>
+        <div style={{ fontSize: 12, color: CP.textMuted }}>Per lo storico ripeti per ogni mese: Infloww non ha un export di più periodi insieme.</div>
+      </Disclosure>
+
+      {/* Caricamento in 3 passi */}
+      <section style={{ ...card, padding: "18px 18px", marginBottom: 14 }}>
+        <SectionTitle>Carica un file</SectionTitle>
+
+        <div style={stepLabel}>1. Periodo</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 16 }}>
+          <label style={fieldLabel}>
+            Tipo di periodo
+            <select style={field} value={periodType} onChange={(e) => { setPeriodType(e.target.value); setPeriodId(""); }}>
+              {PERIOD_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
           </label>
-          <input style={styles.input} value={periodId} onChange={(e) => setPeriodId(e.target.value)} placeholder={periodType === "monthly" ? "2026-02" : periodType === "weekly" ? "2026-W05" : "2026-Q1"} />
+          <label style={fieldLabel}>
+            Periodo {periodType === "monthly" ? "(es. 2026-02)" : periodType === "weekly" ? "(es. 2026-W05)" : "(es. 2026-Q1)"}
+            <input style={field} value={periodId} onChange={(e) => setPeriodId(e.target.value)} placeholder={periodType === "monthly" ? "2026-02" : periodType === "weekly" ? "2026-W05" : "2026-Q1"} />
+          </label>
         </div>
 
-        <div style={styles.card}>
-          <h2 style={styles.h2}>2. File CSV o Excel Infloww</h2>
-          <input
-            type="file"
-            accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-            onChange={handleFileUpload}
-            style={{ marginBottom: 12, color: COLORS.alabaster }}
-          />
-          {csvText && <p style={{ fontSize: 12, color: COLORS.fog }}>{csvText.split(/\r?\n/).length} righe caricate · {(csvText.length / 1024).toFixed(1)} KB</p>}
+        <div style={stepLabel}>2. File CSV o Excel</div>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
+          <label style={{ ...btnGhost, cursor: "pointer" }}>
+            <Upload size={14} /> {fileName ? "Cambia file" : "Scegli file"}
+            <input
+              type="file"
+              accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+              onChange={(e) => { setFileName(e.target.files?.[0]?.name || ""); handleFileUpload(e); }}
+              style={{ display: "none" }}
+            />
+          </label>
+          <span style={{ fontSize: 13, color: csvText ? CP.textSecondary : CP.textMuted }}>
+            {csvText ? <>{fileName && <span style={{ color: CP.textPrimary }}>{fileName}</span>} · {fmtInt(csvText.split(/\r?\n/).length)} righe · {(csvText.length / 1024).toLocaleString("it-IT", { maximumFractionDigits: 1 })} KB</> : "Nessun file scelto"}
+          </span>
         </div>
 
-        {error && <div style={styles.error}>{error}</div>}
+        {error && <Notice danger>{error}</Notice>}
 
-        <div style={styles.card}>
-          <h2 style={styles.h2}>3. Anteprima</h2>
-          <button style={styles.btn} onClick={runPreview} disabled={!csvText || !periodId || busy}>
-            {busy ? "Elaborazione..." : "Calcola anteprima"}
+        <div style={stepLabel}>3. Controlla l&apos;anteprima e salva</div>
+        {!preview && (
+          <button style={{ ...btnPrimary, opacity: canPreview ? 1 : 0.5, cursor: canPreview ? "pointer" : "default" }} onClick={runPreview} disabled={!csvText || !periodId || busy}>
+            {busy ? <><Loader2 size={14} className="animate-spin" /> Elaboro…</> : "Calcola anteprima"}
           </button>
+        )}
+        {!preview && !csvText && <span style={{ marginLeft: 10, fontSize: 12, color: CP.textMuted }}>Scegli prima il file.</span>}
 
-          {preview && (
-            <div style={{ marginTop: 18 }}>
-              <div style={styles.statRow}><span>Record totali</span><b>{preview.totalRecords}</b></div>
-              <div style={styles.statRow}><span>Account Mass esclusi</span><b style={{ color: COLORS.fog }}>{preview.massCount}</b></div>
-              <div style={styles.statRow}><span>Eligible per Score</span><b style={{ color: COLORS.verdant }}>{preview.eligibleCount}</b></div>
-              <div style={styles.statRow}><span>Periodo dati</span><b>{preview.dateRange ? `${preview.dateRange.from} → ${preview.dateRange.to}` : "n/a"}</b></div>
-              <div style={styles.statRow}><span>Group (team modella)</span><b>{Object.keys(preview.byGroup).length}</b></div>
-              {preview.errors?.length > 0 && (
-                <div style={styles.statRow}><span>Errori parsing</span><b style={{ color: COLORS.signal }}>{preview.errors.length}</b></div>
-              )}
-
-              <div style={{ marginTop: 14 }}>
-                <div style={styles.label}>Distribuzione per Group</div>
-                {Object.entries(preview.byGroup).sort((a,b)=>b[1]-a[1]).slice(0, 15).map(([g, c]) => (
-                  <div key={g} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13 }}>
-                    <span style={{ color: COLORS.fog }}>{g}</span><span>{c} record</span>
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ marginTop: 18 }}>
-                <button style={styles.btn} onClick={runSave} disabled={busy}>
-                  {busy ? "Salvataggio..." : "✓ Salva nel database"}
-                </button>
-                <button style={styles.btnGhost} onClick={() => { setPreview(null); setCsvText(""); }}>Annulla</button>
-              </div>
+        {preview && (
+          <div style={{ marginTop: 4 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16, marginBottom: 14 }}>
+              <Metric label="Righe lette" value={fmtInt(preview.totalRecords)} />
+              <Metric label="Valide per lo score" value={fmtInt(preview.eligibleCount)} />
+              <Metric label="Account “Mass” esclusi" value={fmtInt(preview.massCount)} note="non entrano nello score" />
+              <Metric label="Giorni nel file" value={preview.dateRange ? `${preview.dateRange.from} → ${preview.dateRange.to}` : "n/d"} />
+              <Metric label="Gruppi (team per creator)" value={fmtInt(Object.keys(preview.byGroup).length)} />
+              {preview.errors?.length > 0 && <Metric label="Righe non lette" value={fmtInt(preview.errors.length)} danger />}
             </div>
-          )}
-        </div>
+            <Disclosure open={groupsOpen} onToggle={() => setGroupsOpen((v) => !v)} title="Righe per gruppo" summary="i 15 gruppi più grandi">
+              {Object.entries(preview.byGroup).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([g, c]) => (
+                <div key={g} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", fontSize: 13, borderBottom: `1px solid ${CP.borderSoft}` }}>
+                  <span style={{ color: CP.textSecondary }}>{g}</span><span style={NUM}>{fmtInt(c)} righe</span>
+                </div>
+              ))}
+            </Disclosure>
+            <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 10 }}>
+              Salvando, i dati di {periodType}:{periodId} vengono sostituiti da questo file.
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button style={btnPrimary} onClick={runSave} disabled={busy}>
+                {busy ? <><Loader2 size={14} className="animate-spin" /> Salvo…</> : <><Check size={14} /> Salva i dati</>}
+              </button>
+              <button style={btnGhost} onClick={() => { setPreview(null); setCsvText(""); setFileName(""); }}>Annulla</button>
+            </div>
+          </div>
+        )}
+      </section>
 
-        <div style={styles.card}>
-          <h2 style={styles.h2}>Storico import</h2>
-          {imports.length === 0 ? (
-            <p style={{ color: COLORS.fog, fontSize: 13 }}>Nessun import effettuato.</p>
-          ) : (
-            imports.slice(0, 10).map((imp, i) => (
-              <div key={i} style={{ ...styles.importItem, alignItems: "center", gap: 12 }}>
-                <span style={{ flex: 1 }}><b>{imp.period}</b></span>
-                <span style={{ color: COLORS.fog }}>{new Date(imp.timestamp).toLocaleString("it-IT")}</span>
-                <button
-                  onClick={() => deleteImport(imp.period)}
-                  disabled={deletingPeriod === imp.period}
-                  title={`Elimina l'import ${imp.period} dal KV`}
-                  style={{
-                    padding: "4px 10px",
-                    background: deletingPeriod === imp.period ? COLORS.charcoal : alpha(CP.accentRed, "18"),
-                    border: `1px solid ${deletingPeriod === imp.period ? COLORS.steel : alpha(CP.accentRed, "66")}`,
-                    borderRadius: 5,
-                    color: deletingPeriod === imp.period ? COLORS.fog : CP.accentRed,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: deletingPeriod === imp.period ? "wait" : "pointer",
-                    fontFamily: FONTS.body,
-                  }}
-                >
-                  {deletingPeriod === imp.period ? "Eliminando…" : "Elimina"}
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      <SectionTitle aside="ultimi 10">Storico import</SectionTitle>
+      <DataTable columns={importCols} rows={importRows} minWidth={560} empty="Nessun import effettuato." />
+      <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 8 }}>Eliminare un import cancella tutti i dati Infloww di quel periodo: per riaverli va ricaricato il file.</div>
     </div>
   );
 }
+
+// "monthly:2026-09" → "settembre 2026"; "weekly:2026-W05" → "settimana 5 del 2026"
+function periodLabel(p) {
+  const [type, id] = String(p || "").split(":");
+  if (type === "monthly" && /^\d{4}-\d{2}$/.test(id || "")) { const [y, m] = id.split("-").map(Number); return `${MONTHS_IT[m - 1]} ${y}`; }
+  if (type === "weekly" && /^\d{4}-W\d{2}$/.test(id || "")) return `settimana ${Number(id.slice(6))} del ${id.slice(0, 4)}`;
+  if (type === "quarterly" && /^\d{4}-Q\d$/.test(id || "")) return `trimestre ${id.slice(6)} del ${id.slice(0, 4)}`;
+  return String(p || "—");
+}
+
+const field = { display: "block", width: "100%", boxSizing: "border-box", marginTop: 6, padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
+const fieldLabel = { fontSize: 13, color: CP.textSecondary };
+const stepLabel = { fontSize: 13, color: CP.textMuted, marginBottom: 8 };
+const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", background: CP.accent, color: CP.accentInk, border: "1px solid transparent", borderRadius: 8, fontSize: 14, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };
+const btnGhost = { display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px", background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 14, fontFamily: FONTS.body, cursor: "pointer" };

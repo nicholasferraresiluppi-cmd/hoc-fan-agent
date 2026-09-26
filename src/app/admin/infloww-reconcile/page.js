@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Loader2, AlertCircle, ArrowRight, ShieldCheck, RefreshCw } from "lucide-react";
+import { Loader2, ArrowRight, ShieldCheck, RefreshCw, CheckCircle2 } from "lucide-react";
 import { CP, FONTS, creatorDotColor, alpha } from "@/lib/brand";
-import { PageHeader, CpCard, StatCard, SectionLabel } from "@/components/cp-style";
-import HowToRead from "@/components/HowToRead";
+import { PageHead, HeroMetric, Metric, SectionTitle, Disclosure, Notice, DataTable, ActionRow, card, NUM } from "@/components/ds";
+import { fmtInt, fmtAgo } from "@/lib/format";
 
 /**
  * /admin/infloww-reconcile — Controllo dati CP: il venduto registrato in
@@ -36,15 +36,10 @@ function fmtDayIt(iso) {
   const [y, m, d] = iso.split("-");
   return `${Number(d)} ${MONTH_IT[Number(m) - 1].toLowerCase().slice(0, 3)} ${y}`;
 }
-function relTime(ts) {
-  if (!ts) return "mai";
-  const min = Math.floor((Date.now() - ts) / 60000);
-  if (min < 1) return "ora";
-  if (min < 60) return `${min} min fa`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `${h}h fa`;
-  return `${Math.floor(h / 24)}g fa`;
-}
+
+// Avviso (né ok né buco): stesso colore dell'avviso di ActionRow nel DS.
+const WARN = CP.accentSoftText;
+const WARN_BG = CP.accentSoft;
 
 // Semaforo sul rapporto CP/lordo-reale. Tolleranza fisiologica: gli
 // abbonamenti (~1-2%) non passano dagli operatori. Caso speciale: la creator
@@ -59,11 +54,11 @@ function health(row) {
   // reale" della riga è probabilmente sottostimato, quindi anche un rapporto
   // verde non è garantito. Da verificare la connessione Infloww dell'account.
   if (row.social_vs_infloww != null && row.social_vs_infloww > 1.25) {
-    return { label: "Infloww incompleto?", color: "#F59E0B", bg: "#F59E0B18", tip: "L'analytics CP vede molto più di Infloww su questo account: l'incasso reale mostrato è probabilmente sottostimato (account scollegato da Infloww o ritardo di sync). Da verificare prima di fidarsi del rapporto." };
+    return { label: "Infloww incompleto?", color: WARN, bg: WARN_BG, tip: "L'analytics CP vede molto più di Infloww su questo account: l'incasso reale mostrato è probabilmente sottostimato (account scollegato da Infloww o ritardo di sync). Da verificare prima di fidarsi del rapporto." };
   }
-  if (ratio > 1.15) return { label: "anomalo", color: "#F59E0B", bg: "#F59E0B18" };
+  if (ratio > 1.15) return { label: "anomalo", color: WARN, bg: WARN_BG };
   if (ratio >= 0.9) return { label: "ok", color: CP.accentGreen, bg: alpha(CP.accentGreen, "18") };
-  if (ratio >= 0.75) return { label: "da controllare", color: "#F59E0B", bg: "#F59E0B18" };
+  if (ratio >= 0.75) return { label: "da controllare", color: WARN, bg: WARN_BG };
   return { label: "probabile buco", color: CP.accentRed, bg: alpha(CP.accentRed, "18") };
 }
 
@@ -73,6 +68,7 @@ export default function InflowwReconcilePage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [howOpen, setHowOpen] = useState(false);
 
   async function load(pid = periodId) {
     setLoading(true); setError(null); setData(null); // mai numeri del mese vecchio sotto il selettore nuovo
@@ -114,355 +110,240 @@ export default function InflowwReconcilePage() {
   const holesGap = holes.reduce((s, r) => s + Math.max(0, r.gap_gross), 0);
   const agencyRatio = data?.agency?.ratio_cp_over_infgross_matched;
   const matchCov = data?.match_coverage;
-  const ratioColor = agencyRatio == null ? CP.textMuted
-    : agencyRatio >= 0.9 && agencyRatio <= 1.1 ? CP.accentGreen
-    : agencyRatio < 0.75 ? CP.accentRed
-    : "#F59E0B";
 
   const hasData = data && !data.needs_sync;
 
-  return (
-    <div style={{ padding: "32px 28px 80px 28px", maxWidth: 1300, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
-      <PageHeader
-        breadcrumb={
-          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <span style={{ color: CP.textPrimary }}>Controllo dati CP</span>
-          </div>
-        }
-        section="Data · Controllo qualità"
-        title="Controllo dati CP"
-        subtitle="Il venduto registrato in CreatorsPro è completo? Per ogni creator lo confrontiamo con l'incasso reale (lordo) da Infloww, una fonte indipendente, sugli stessi giorni. Se CP registra molto meno del reale, lì c'è un buco nei dati — e lo vedi prima che inquini buste, P&L e classifiche."
-        toolbar={
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: CP.accentSoftText, fontFamily: FONTS.mono }}>
-            <ShieldCheck size={13} /> guardiano dati
+  // Redesign 26/09/2026 (pannello tester BOARD/PAY/UX). Problemi trovati:
+  // (1) sul mese in corso con sync Infloww vecchio (79 giorni) diceva "Infloww
+  // non copre questo mese … conserva fino a 60 giorni": la causa vera era il sync
+  // fermo, e l'azione giusta (sincronizzare) era nascosta dietro una spiegazione
+  // sbagliata; (2) il numero che risponde alla domanda ("CP è completo?") era
+  // una card tra cinque; (3) sei paragrafi di "come si legge" prima dei dati.
+  const periodLabel = periods.find((p) => p.value === periodId)?.label || periodId;
+  const monthStartTs = periodId ? new Date(`${periodId}-01T00:00:00`).getTime() : null;
+  const syncBeforeMonth = data?.last_sync_at != null && monthStartTs != null && data.last_sync_at < monthStartTs;
+  const verdictColor = agencyRatio == null ? CP.textPrimary : agencyRatio < 0.75 ? CP.accentRed : agencyRatio >= 0.9 && agencyRatio <= 1.1 ? CP.accentGreen : CP.textPrimary;
+  const third = data?.third_source?.available;
+
+  const tableRows = hasData ? [
+    ...noCp.map((u) => ({ ...u, kind: "nocp", id: `nocp:${u.id}` })),
+    ...rows.map((mm) => ({ ...mm, kind: "match", id: `m:${mm.infloww_id}` })),
+  ] : [];
+
+  const socialTip = (mm) => (mm.social_gross_eq == null
+    ? "Questo alias non compare nell'analytics CP per il periodo."
+    : mm.social_vs_infloww == null
+    ? "Dato Infloww troncato su questa riga: confronto non affidabile, mostro solo il valore analytics (lordo stimato)."
+    : (mm.social_vs_infloww >= 0.85 && mm.social_vs_infloww <= 1.15
+      ? "Le due fonti indipendenti sono coerenti (±15%): buon segnale che l'incasso reale sia quello mostrato."
+      : mm.social_vs_infloww > 1.15
+      ? "L'analytics CP vede più di Infloww (↑): può indicare un account non collegato a Infloww o un ritardo di sync — da verificare."
+      : "L'analytics CP vede meno di Infloww (↓): può indicare un account non collegato all'analytics o un ritardo di sync — da verificare."));
+
+  const columns = [
+    { key: "esito", label: "Esito", sort: (r) => (r.kind === "nocp" ? -1 : (r.ratio_cp_over_gross ?? 99)), render: (r) => {
+      if (r.kind === "nocp") return <Badge color={CP.accentRed} bg={alpha(CP.accentRed, "18")} tip="Nel MODULO TURNI/BUSTE di CP questo mese non ha né turni né vendite. Come talent può comunque esistere in CP (Social Analytics). Se sai il suo alias turni, collegala dal riquadro 'non abbinati'.">senza turni in CP</Badge>;
+      const h = health(r);
+      return <Badge color={h.color} bg={h.bg} tip={h.tip}>{h.label}</Badge>;
+    } },
+    { key: "name", label: "Creator", sort: (r) => (r.kind === "nocp" ? r.name : r.cp_alias), render: (r) => (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ width: 9, height: 9, borderRadius: "50%", background: creatorDotColor(r.kind === "nocp" ? r.name : r.cp_alias), flexShrink: 0 }} />
+        <span style={{ fontWeight: 500 }}>{r.kind === "nocp" ? r.name : r.cp_alias}</span>
+        {r.kind === "match" && r.infloww_name !== r.cp_alias && <span style={{ fontSize: 12, color: CP.textMuted }}>↔ {r.infloww_name}</span>}
+        {r.kind === "match" && r.manual && (
+          <span style={{ fontSize: 12, color: CP.accentSoftText, background: CP.accentSoft, padding: "1px 7px", borderRadius: 999 }} title="Abbinamento impostato a mano">
+            manuale
+            <button onClick={() => saveOverride(r.infloww_id, r.infloww_name, null)} title="Rimuovi abbinamento manuale" aria-label="Rimuovi abbinamento manuale"
+              style={{ marginLeft: 5, background: "none", border: "none", color: CP.accentSoftText, cursor: "pointer", padding: 0, fontSize: 12 }}>×</button>
           </span>
-        }
+        )}
+        {r.truncated && <span title="Dato Infloww troncato (volume altissimo): lordo sottostimato" style={{ fontSize: 12, color: CP.textMuted }}>troncato</span>}
+      </span>
+    ) },
+    { key: "gross", label: "Incasso reale", align: "right", muted: true, sort: (r) => (r.kind === "nocp" ? r.gross : r.infloww_gross), render: (r) => fmt$(r.kind === "nocp" ? r.gross : r.infloww_gross) },
+    ...(third ? [{ key: "social", label: "Controprova", align: "right", muted: true, sort: (r) => (r.kind === "nocp" ? r.social?.gross_eq : r.social_gross_eq) ?? null, render: (r) => {
+      if (r.kind === "nocp") return (
+        <span title={r.social ? `L'analytics CP la conosce (talent "${r.social.talent}"): conferma indipendente che la revenue esiste. NB: il valore è il totale della PERSONA su tutti i suoi account (lordo stimato), non del singolo profilo.` : "Non trovata nemmeno nell'analytics CP per questo periodo."} style={{ whiteSpace: "nowrap" }}>
+          {r.social ? <>≈{fmt$(r.social.gross_eq)} <span style={{ fontSize: 11, color: CP.textMuted }}>persona</span></> : "—"}
+        </span>
+      );
+      if (r.social_gross_eq == null) return <span title={socialTip(r)}>—</span>;
+      const agree = r.social_vs_infloww != null && r.social_vs_infloww >= 0.85 && r.social_vs_infloww <= 1.15;
+      return (
+        <span title={socialTip(r)} style={{ whiteSpace: "nowrap" }}>
+          {r.social_vs_infloww != null && <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", marginRight: 6, background: agree ? CP.accentGreen : CP.accentSoftText }} />}
+          ≈{fmt$(r.social_gross_eq)}
+          {r.social_vs_infloww != null && (r.social_vs_infloww > 1.15 ? " ↑" : r.social_vs_infloww < 0.85 ? " ↓" : "")}
+        </span>
+      );
+    } }] : []),
+    { key: "cp", label: "Registrato CP", align: "right", sort: (r) => (r.kind === "nocp" ? 0 : r.cp_sales), render: (r) => (r.kind === "nocp" ? <span style={{ color: CP.accentRed }}>$0</span> : fmt$(r.cp_sales)) },
+    { key: "ratio", label: "Cattura", align: "right", sort: (r) => (r.kind === "nocp" ? -1 : (r.ratio_cp_over_gross ?? 99)), render: (r) => {
+      if (r.kind === "nocp") return <span style={{ color: CP.accentRed, fontWeight: 500 }}>0%</span>;
+      const h = health(r);
+      return <span style={{ color: h.color, fontWeight: 500 }}>{r.ratio_cp_over_gross != null ? `${Math.round(r.ratio_cp_over_gross * 100)}%` : "—"}</span>;
+    } },
+    { key: "missing", label: "Mancante", align: "right", sort: (r) => (r.kind === "nocp" ? r.gross : Math.max(0, r.gap_gross)), render: (r) => {
+      if (r.kind === "nocp") return <span style={{ color: CP.accentRed }}>{fmt$(r.gross)}</span>;
+      const missing = Math.max(0, r.gap_gross);
+      const isBad = r.ratio_cp_over_gross != null && r.ratio_cp_over_gross < 0.9;
+      return <span style={{ color: isBad && missing > 0 ? CP.accentRed : CP.textMuted }}>{missing > 0 ? fmt$(missing) : "—"}</span>;
+    } },
+    { key: "go", label: "", sortable: false, render: (r) => (
+      <span style={{ display: "inline-flex", gap: 12, whiteSpace: "nowrap" }}>
+        {r.kind === "match" && (
+          <Link href={`/admin/attribution-drilldown?${new URLSearchParams({ alias: r.cp_alias, period_id: data.period_id, infloww_id: r.infloww_id })}`} style={detailLink}
+            title="Drill-down turni: chi non ha registrato i takes, giorno per giorno (con CSV per il backfill)">
+            Turni <ArrowRight size={12} />
+          </Link>
+        )}
+        <Link href={`/admin/infloww-revenue?creatorId=${encodeURIComponent(r.kind === "nocp" ? r.id.slice(5) : r.infloww_id)}`} style={detailLink}>
+          Incassi <ArrowRight size={12} />
+        </Link>
+      </span>
+    ) },
+  ];
+
+  return (
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Controllo dati CP" }]}
+        title="Controllo dati CP"
+        subtitle="Il venduto registrato in CreatorsPro è completo? Per ogni creator lo confrontiamo con l'incasso reale su Infloww negli stessi giorni: se CP registra molto meno, c'è un buco da sistemare prima che finisca in buste, P&L e classifiche."
+        actions={<>
+          <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} style={{ ...ctl, minWidth: 190, cursor: "pointer" }} aria-label="Mese">
+            {periods.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </select>
+        </>}
       />
 
-      <HowToRead items={[
-        "Ogni riga confronta due fonti sugli stessi giorni: quanto CP dice che una creator ha venduto, e quanto ha incassato DAVVERO (lordo Infloww).",
-        "Rapporto ≈ 1.0 = CP completo (verde). Sotto 0.90 qualcosa manca (giallo). Sotto 0.75 = probabile buco: turni o vendite non registrati in CP (rosso).",
-        "'Vendite non attribuite' = la creator ESISTE in CP e ha turni, ma nessuna vendita è registrata a suo nome (team multi-creator senza takes): l'azione è far registrare i takes. 'Senza turni in CP' = nel modulo turni/buste non c'è traccia nel mese (come talent può comunque esistere in CP): se sai il suo alias, collegala col menu 'collega a…'.",
-        "Qualche punto sotto 1.0 è fisiologico: gli abbonamenti (~1-2% del lordo) non passano dagli operatori. È un allarme direzionale, non un confronto contabile.",
-        "I 'non abbinati' in fondo sono profili che non ho saputo accoppiare con certezza tra le due piattaforme: guardali a mano prima di trarre conclusioni.",
-        "Colonna 'Controprova' = la revenue vista dal modulo Social Analytics di CP (fonte indipendente da Infloww), in LORDO STIMATO (netto ÷ 0,80, per questo c'è il ≈). Pallino verde = le due fonti sono coerenti (±15%): se i turni dicono molto meno, il buco è confermato da due fonti. Giallo ↑ = l'analytics vede più di Infloww: possibile account scollegato da Infloww o ritardo di sync — da verificare, e la riga diventa 'Infloww incompleto?'.",
-      ]} />
+      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", fontSize: 13, color: CP.textMuted, marginBottom: 14 }}>
+        {data?.last_sync_at != null && (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <ShieldCheck size={14} /> Dati Infloww aggiornati {fmtAgo(data.last_sync_at)} ·{" "}
+            <Link href="/admin/infloww-agency" style={{ color: CP.accentSoftText, textDecoration: "none" }}>aggiorna da Revenue agency</Link>
+          </span>
+        )}
+        {loading && <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: CP.textSecondary }}><Loader2 size={14} className="animate-spin" /> Confronto le due fonti…</span>}
+      </div>
 
-      {/* Controlli + freshness */}
-      <CpCard padding="14px 18px" style={{ marginBottom: 12 }}>
-        <div style={{ display: "flex", gap: 14, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div>
-            <label style={lbl}>Mese</label>
-            <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} style={{ ...input, minWidth: 190, cursor: "pointer" }}>
-              {periods.map((p) => <option key={p.value} value={p.value} style={{ background: CP.surface }}>{p.label}</option>)}
-            </select>
-          </div>
-          {data?.last_sync_at != null && (
-            <span style={{ fontSize: 11, color: CP.textMuted, paddingBottom: 10 }}>
-              dati Infloww: sync {relTime(data.last_sync_at)} ·{" "}
-              <Link href="/admin/infloww-agency" style={{ color: CP.accentSoftText, textDecoration: "none" }}>aggiorna →</Link>
-            </span>
-          )}
-          {loading && <Loader2 size={16} className="animate-spin" style={{ color: CP.textSecondary, marginBottom: 10 }} />}
-        </div>
-      </CpCard>
-
-      {/* Banner copertura: SEMPRE esplicito su quali giorni stiamo confrontando */}
-      {hasData && (
-        <CpCard accent={data.coverage_partial ? "#F59E0B" : undefined} padding="10px 16px" style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, color: data.coverage_partial ? "#F59E0B" : CP.textSecondary }}>
-            {data.coverage_partial ? "⚠ Copertura parziale: " : ""}
-            confronto sui giorni <b>{fmtDayIt(data.coverage_from)} → {fmtDayIt(data.coverage_to)}</b>, gli stessi su entrambe le fonti (gli shift CP fuori da questa finestra sono esclusi).
-            {data.failed_creators?.length > 0 && (
-              <span style={{ color: CP.accentRed }}> · ⚠ {data.failed_creators.length} creator non sincronizzate nell'ultimo sync Infloww: i loro numeri possono mancare.</span>
-            )}
-            {data.third_source?.available && (
-              <span> · controprova analytics CP attiva: coerente con Infloww su <b>{data.third_source.agree}/{data.third_source.compared}</b> righe confrontabili (su {data.counts?.matched} abbinate).</span>
-            )}
-          </div>
-        </CpCard>
-      )}
-
-      {error && (
-        <CpCard accent={CP.accentRed} padding="14px 18px" style={{ marginBottom: 18 }}>
-          <div style={{ color: CP.accentRed, display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-            <AlertCircle size={16} /> {error}
-          </div>
-        </CpCard>
-      )}
+      {error && <Notice danger>Qualcosa non ha funzionato: {error}</Notice>}
 
       {/* Stati "manca una delle due fonti" — mai un verdetto su dati inesistenti */}
       {data?.needs_sync === "infloww" && (
-        <CpCard padding="30px" style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 8 }}>
-            {data.reason === "month_out_of_coverage" ? "Infloww non copre questo mese" : "Manca il dato Infloww"}
+        <section style={{ ...card, padding: "22px 20px", marginBottom: 14 }}>
+          <div style={{ fontSize: 16, fontWeight: 500, color: CP.textPrimary, marginBottom: 6 }}>
+            Nessun verdetto per {periodLabel}: manca il dato Infloww
           </div>
-          <div style={{ fontSize: 13, color: CP.textMuted, maxWidth: 500, margin: "0 auto 16px" }}>
-            {data.reason === "month_out_of_coverage"
-              ? "Il sync Infloww conserva una finestra recente (fino a 60 giorni): per questo mese non ci sono giorni sincronizzati, quindi NON posso dire se i dati CP sono completi o no. Nessun verdetto ≠ tutto ok."
+          <div style={{ fontSize: 14, color: CP.textSecondary, maxWidth: 640, lineHeight: 1.55, marginBottom: 14 }}>
+            {syncBeforeMonth
+              ? <>L&apos;ultimo sync Infloww è di {fmtAgo(data.last_sync_at)}, prima dell&apos;inizio del mese: per questo mese non c&apos;è ancora nessun giorno da confrontare. Sincronizza da Revenue agency (qualche minuto), poi torna qui.</>
+              : data.reason === "month_out_of_coverage"
+              ? "Il sync Infloww conserva solo gli ultimi 60 giorni circa: per questo mese non ci sono giorni sincronizzati, quindi non posso dire se i dati CP sono completi."
               : "Per confrontare serve prima sincronizzare la revenue reale da Infloww."}
+            {" "}Nessun verdetto non vuol dire che è tutto a posto.
           </div>
-          <Link href="/admin/infloww-agency" style={btnLink}><RefreshCw size={13} /> Vai a Revenue agency e sincronizza</Link>
-        </CpCard>
+          <Link href="/admin/infloww-agency" style={btnLink}><RefreshCw size={14} /> Vai a Revenue agency e sincronizza</Link>
+        </section>
       )}
       {data?.needs_sync === "cp" && (
-        <CpCard padding="30px" style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 8 }}>Manca il dato CP per questo mese</div>
-          <div style={{ fontSize: 13, color: CP.textMuted, maxWidth: 460, margin: "0 auto 16px" }}>
-            Le buste di {periods.find((p) => p.value === periodId)?.label || periodId} non sono in archivio: sincronizza il mese da Sync & Audit CP.
+        <section style={{ ...card, padding: "22px 20px", marginBottom: 14 }}>
+          <div style={{ fontSize: 16, fontWeight: 500, color: CP.textPrimary, marginBottom: 6 }}>Nessun verdetto per {periodLabel}: manca il dato CP</div>
+          <div style={{ fontSize: 14, color: CP.textSecondary, maxWidth: 600, lineHeight: 1.55, marginBottom: 14 }}>
+            Le buste di {periodLabel} non sono in archivio: sincronizza il mese da Sync &amp; Audit CP, poi torna qui.
           </div>
-          <Link href="/admin/wage-audit" style={btnLink}><RefreshCw size={13} /> Vai a Sync & Audit CP</Link>
-        </CpCard>
+          <Link href="/admin/wage-audit" style={btnLink}><RefreshCw size={14} /> Vai a Sync &amp; Audit CP</Link>
+        </section>
       )}
-
-      {/* SENTINELLA PARSER: se scatta, i numeri CP sotto non sono affidabili */}
-      {hasData && data.data_quality?.parser_warning && (
-        <CpCard accent={CP.accentRed} padding="14px 18px" style={{ marginBottom: 16 }}>
-          <div style={{ color: CP.accentRed, fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
-            ⛔ Takes non riconosciuti dal parser ({Math.round((data.data_quality.parse_rate || 0) * 100)}% letti su {data.data_quality.takes_raw.toLocaleString("it-IT")})
-          </div>
-          <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.5 }}>
-            I takes grezzi ESISTONO nelle buste ma il parser ne riconosce troppo pochi: probabile nuovo cambio di schema lato CreatorsPro (è già successo a luglio 2026).
-            <b> Non fidarti dei numeri "Registrato CP" qui sotto</b> finché il parser non viene aggiornato — verifica con <code>/api/admin/cp-wage-raw-probe</code>.
-          </div>
-        </CpCard>
-      )}
-
-      {/* DA SISTEMARE: tutte le incongruenze rilevate, in un'unica lista azionabile */}
-      {hasData && (() => {
-        const unattrib = rows.filter((r) => r.cp_sales === 0 && (r.cp_shifts || 0) > 0);
-        const infIncompleti = rows.filter((r) => r.social_vs_infloww != null && r.social_vs_infloww > 1.25);
-        const troncate = rows.filter((r) => r.truncated);
-        const items = [
-          holes.length > 0 && { color: CP.accentRed, text: `${holes.length} probabili buchi di registrazione (≈ ${fmt$(holesGap)} mancanti)`, hint: "righe rosse in tabella → apri 'Turni' per il recupero" },
-          unattrib.length > 0 && { color: CP.accentRed, text: `${unattrib.length} creator con turni ma zero vendite attribuite`, hint: "takes da registrare in CP" },
-          noCp.length > 0 && { color: CP.accentRed, text: `${noCp.length} creator che incassano ma senza turni in CP (≈ ${fmt$(noCpGross)})`, hint: "configurare turni/creator in CP" },
-          infIncompleti.length > 0 && { color: "#F59E0B", text: `${infIncompleti.length} account dove l'analytics vede più di Infloww`, hint: "verificare la connessione Infloww dell'account" },
-          (data.unmatched_infloww.length + data.unmatched_cp.length) > 0 && { color: "#F59E0B", text: `${data.unmatched_infloww.length + data.unmatched_cp.length} profili non abbinati tra le piattaforme`, hint: "usa 'collega a…' nei riquadri in fondo" },
-          data.failed_creators?.length > 0 && { color: CP.accentRed, text: `${data.failed_creators.length} creator non sincronizzate da Infloww`, hint: "rilancia il sync da Revenue agency" },
-          troncate.length > 0 && { color: "#F59E0B", text: `${troncate.length} righe con dato Infloww troncato`, hint: "lordo sottostimato su volumi altissimi" },
-        ].filter(Boolean);
-        if (items.length === 0) {
-          return (
-            <CpCard padding="12px 16px" style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12.5, color: CP.accentGreen }}>✓ Nessuna incongruenza rilevata per questo mese: le fonti si trovano.</div>
-            </CpCard>
-          );
-        }
-        return (
-          <CpCard padding="14px 18px" style={{ marginBottom: 16 }}>
-            <SectionLabel style={{ marginBottom: 10 }}>Da sistemare — {items.length} {items.length === 1 ? "incongruenza rilevata" : "incongruenze rilevate"}</SectionLabel>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {items.map((it, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 9, fontSize: 12.5 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: it.color, flexShrink: 0, position: "relative", top: 1 }} />
-                  <span style={{ color: CP.textPrimary }}>{it.text}</span>
-                  <span style={{ color: CP.textMuted, fontSize: 11 }}>→ {it.hint}</span>
-                </div>
-              ))}
-            </div>
-          </CpCard>
-        );
-      })()}
 
       {hasData && (
         <>
-          {/* KPI */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(175px, 1fr))", gap: 12, marginBottom: 18 }}>
-            <StatCard label="Incasso reale (lordo Infloww)" value={fmt$(data.agency.matched_infloww_gross)} sub={`${data.counts.matched} creator abbinate`} />
-            <StatCard label="Venduto registrato in CP" value={fmt$(data.agency.matched_cp_sales)} sub="stesse creator, stessi giorni" />
-            <StatCard
-              label="Quanto cattura CP"
-              value={agencyRatio != null ? `${Math.round(agencyRatio * 100)}%` : "—"}
-              color={ratioColor}
-              sub="del venduto reale (sano ≈ 95-100%)"
-              tooltip="Venduto CP ÷ lordo Infloww, sulle sole creator abbinate. Sopra il 110% è anomalo quanto sotto il 90%."
-            />
-            <StatCard
-              label="Probabili buchi"
-              value={holes.length + noCp.length}
-              color={holes.length + noCp.length > 0 ? CP.accentRed : CP.accentGreen}
-              sub={
-                holes.length + noCp.length === 0
-                  ? "nessuna creator sotto il 75%"
-                  : `${holes.length} sotto il 75%${noCp.length ? ` + ${noCp.length} senza turni` : ""} · ≈ ${fmt$(holesGap + noCpGross)} non registrati`
-              }
-            />
-            <StatCard
-              label="Copertura abbinamenti"
-              value={matchCov?.profiles != null ? `${Math.round(matchCov.profiles * 100)}%` : "—"}
-              color={matchCov?.profiles >= 1 ? CP.accentGreen : matchCov?.profiles >= 0.9 ? "#F59E0B" : CP.accentRed}
-              sub={`${data.counts.matched}/${data.counts.infloww_active} profili · ${matchCov?.gross_share != null ? Math.round(matchCov.gross_share * 100) : "—"}% del lordo — obiettivo 100%`}
-              tooltip="Quota di profili Infloww con un abbinamento CP. I mancanti si chiudono col menu 'collega a…' nei non abbinati."
-            />
-          </div>
+          {/* SENTINELLA PARSER: se scatta, i numeri CP sotto non sono affidabili */}
+          {data.data_quality?.parser_warning && (
+            <Notice danger>
+              <span style={{ color: CP.textPrimary }}>Non fidarti dei numeri “Registrato CP” qui sotto.</span> Il sistema legge solo il {Math.round((data.data_quality.parse_rate || 0) * 100)}% delle vendite grezze nelle buste (su {data.data_quality.takes_raw.toLocaleString("it-IT")}): probabile cambio di formato lato CreatorsPro, come a luglio 2026. Va aggiornata la lettura prima di usare questa pagina — verifica con <code>/api/admin/cp-wage-raw-probe</code>.
+            </Notice>
+          )}
 
-          {/* Tabella creator, peggiori in cima; in testa gli "assente in CP" */}
-          <CpCard padding="0" style={{ overflow: "hidden", marginBottom: 16 }}>
-            <div style={{ padding: "14px 18px", borderBottom: `1px solid ${CP.border}` }}>
-              <SectionLabel>Creator a confronto — peggiori in cima</SectionLabel>
+          <HeroMetric
+            label={`Quanto del venduto reale è registrato in CP · ${periodLabel}`}
+            value={agencyRatio != null ? <span style={{ color: verdictColor }}>{Math.round(agencyRatio * 100)}%</span> : "—"}
+            compare={`CP registra ${fmt$(data.agency.matched_cp_sales)} su ${fmt$(data.agency.matched_infloww_gross)} incassati davvero (stesse creator, stessi giorni) · sano tra 95% e 100%`}
+            hint={`Confronto sui giorni ${fmtDayIt(data.coverage_from)} → ${fmtDayIt(data.coverage_to)}, gli stessi su entrambe le fonti${data.coverage_partial ? " (copertura parziale del mese)" : ""}.`}>
+            <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+              <Metric label="Probabili buchi" value={fmtInt(holes.length + noCp.length)} danger={holes.length + noCp.length > 0}
+                note={holes.length + noCp.length === 0 ? "nessuna creator sotto il 75%" : `≈ ${fmt$(holesGap + noCpGross)} non registrati`} />
+              <Metric label="Creator abbinate" value={matchCov?.profiles != null ? `${Math.round(matchCov.profiles * 100)}%` : "—"}
+                note={`${data.counts.matched} di ${data.counts.infloww_active} profili · ${matchCov?.gross_share != null ? Math.round(matchCov.gross_share * 100) : "—"}% dell'incasso · obiettivo 100%`} />
+              {third && <Metric label="Controprova analytics CP" value={`${data.third_source.agree} di ${data.third_source.compared}`} note="righe dove conferma Infloww" />}
             </div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-                <thead>
-                  <tr style={{ background: CP.surfaceAlt, borderBottom: `2px solid ${CP.border}` }}>
-                    <th style={th}>Esito</th>
-                    <th style={th}>Creator</th>
-                    <th style={{ ...th, textAlign: "right" }}>Incasso reale</th>
-                    {data.third_source?.available && (
-                      <th style={{ ...th, textAlign: "right" }} title="Controprova: revenue OnlyFans vista dal modulo Social Analytics di CP (fonte indipendente da Infloww). È un LORDO STIMATO (netto ÷ 0,80). Pallino verde = coerente con Infloww (±15%); giallo = divergono (↑ analytics più alta, ↓ più bassa).">Controprova ⓘ</th>
-                    )}
-                    <th style={{ ...th, textAlign: "right" }}>Registrato CP</th>
-                    <th style={{ ...th, textAlign: "right" }}>Cattura</th>
-                    <th style={{ ...th, textAlign: "right" }}>Mancante</th>
-                    <th style={th}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {noCp.map((u) => (
-                    <tr key={u.id} style={{ borderBottom: `1px solid ${alpha(CP.border, "55")}`, background: alpha(CP.accentRed, "08") }}>
-                      <td style={td}>
-                        <span style={{ display: "inline-block", padding: "3px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 600, color: CP.accentRed, background: alpha(CP.accentRed, "18"), whiteSpace: "nowrap" }}
-                          title="Nel MODULO TURNI/BUSTE di CP questo mese non ha né turni né vendite. Come talent può comunque esistere in CP (Social Analytics). Se sai il suo alias turni, collegala dal riquadro 'non abbinati'.">
-                          senza turni in CP
-                        </span>
-                      </td>
-                      <td style={td}>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
-                          <span style={{ width: 9, height: 9, borderRadius: "50%", background: creatorDotColor(u.name), flexShrink: 0 }} />
-                          <span style={{ fontWeight: 500 }}>{u.name}</span>
-                          {u.truncated && <span title="Dato Infloww troncato (volume altissimo): lordo sottostimato" style={{ color: "#F59E0B" }}>⚠</span>}
-                        </span>
-                      </td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmt$(u.gross)}</td>
-                      {data.third_source?.available && (
-                        <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textSecondary, whiteSpace: "nowrap" }}
-                          title={u.social ? `L'analytics CP la conosce (talent "${u.social.talent}"): conferma indipendente che la revenue esiste. NB: il valore è il totale della PERSONA su tutti i suoi account (lordo stimato), non del singolo profilo.` : "Non trovata nemmeno nell'analytics CP per questo periodo."}>
-                          {u.social ? <>≈{fmt$(u.social.gross_eq)} <span style={{ fontSize: 10, color: CP.textMuted }}>persona</span></> : "—"}
-                        </td>
-                      )}
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentRed }}>$0</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 600, color: CP.accentRed }}>0%</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentRed }}>{fmt$(u.gross)}</td>
-                      <td style={td}>
-                        <Link href={`/admin/infloww-revenue?creatorId=${encodeURIComponent(u.id)}`} style={detailBtn}>
-                          Dettaglio <ArrowRight size={11} />
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                  {rows.map((mm) => {
-                    const h = health(mm);
-                    const missing = Math.max(0, mm.gap_gross);
-                    const isBad = mm.ratio_cp_over_gross != null && mm.ratio_cp_over_gross < 0.9;
-                    return (
-                      <tr key={mm.infloww_id} style={{ borderBottom: `1px solid ${alpha(CP.border, "55")}` }}>
-                        <td style={td}>
-                          <span style={{ display: "inline-block", padding: "3px 9px", borderRadius: 999, fontSize: 10.5, fontWeight: 600, color: h.color, background: h.bg, whiteSpace: "nowrap" }} title={h.tip || ""}>
-                            {h.label}
-                          </span>
-                        </td>
-                        <td style={td}>
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
-                            <span style={{ width: 9, height: 9, borderRadius: "50%", background: creatorDotColor(mm.cp_alias), flexShrink: 0 }} />
-                            <span style={{ fontWeight: 500 }}>{mm.cp_alias}</span>
-                            {mm.infloww_name !== mm.cp_alias && (
-                              <span style={{ fontSize: 10.5, color: CP.textMuted, fontFamily: FONTS.mono }}>↔ {mm.infloww_name}</span>
-                            )}
-                            {mm.manual && (
-                              <span style={{ fontSize: 10, color: CP.accentSoftText, background: CP.accentSoft, padding: "2px 7px", borderRadius: 999 }} title="Abbinamento impostato a mano">
-                                manuale
-                                <button onClick={() => saveOverride(mm.infloww_id, mm.infloww_name, null)} title="Rimuovi abbinamento manuale"
-                                  style={{ marginLeft: 5, background: "none", border: "none", color: CP.accentSoftText, cursor: "pointer", padding: 0, fontSize: 11 }}>×</button>
-                              </span>
-                            )}
-                            {mm.truncated && <span title="Dato Infloww troncato (volume altissimo): lordo sottostimato" style={{ color: "#F59E0B" }}>⚠</span>}
-                          </span>
-                        </td>
-                        <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmt$(mm.infloww_gross)}</td>
-                        {data.third_source?.available && (
-                          <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textSecondary, whiteSpace: "nowrap" }}
-                            title={mm.social_gross_eq == null
-                              ? "Questo alias non compare nell'analytics CP per il periodo."
-                              : mm.social_vs_infloww == null
-                              ? "Dato Infloww troncato su questa riga: confronto non affidabile, mostro solo il valore analytics (lordo stimato)."
-                              : (mm.social_vs_infloww >= 0.85 && mm.social_vs_infloww <= 1.15
-                                ? "Le due fonti indipendenti sono coerenti (±15%): buon segnale che l'incasso reale sia quello mostrato."
-                                : mm.social_vs_infloww > 1.15
-                                ? "L'analytics CP vede più di Infloww (↑): può indicare un account non collegato a Infloww o un ritardo di sync — da verificare."
-                                : "L'analytics CP vede meno di Infloww (↓): può indicare un account non collegato all'analytics o un ritardo di sync — da verificare.")}>
-                            {mm.social_gross_eq != null ? (
-                              <>
-                                {mm.social_vs_infloww != null && (
-                                  <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", marginRight: 6, background: mm.social_vs_infloww >= 0.85 && mm.social_vs_infloww <= 1.15 ? CP.accentGreen : "#F59E0B" }} />
-                                )}
-                                ≈{fmt$(mm.social_gross_eq)}
-                                {mm.social_vs_infloww != null && (mm.social_vs_infloww > 1.15 ? " ↑" : mm.social_vs_infloww < 0.85 ? " ↓" : "")}
-                              </>
-                            ) : "—"}
-                          </td>
-                        )}
-                        <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono }}>{fmt$(mm.cp_sales)}</td>
-                        <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 600, color: h.color }}>
-                          {mm.ratio_cp_over_gross != null ? `${Math.round(mm.ratio_cp_over_gross * 100)}%` : "—"}
-                        </td>
-                        <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: isBad && missing > 0 ? CP.accentRed : CP.textMuted }}>
-                          {missing > 0 ? fmt$(missing) : "—"}
-                        </td>
-                        <td style={td}>
-                          <span style={{ display: "inline-flex", gap: 6 }}>
-                            <Link
-                              href={`/admin/attribution-drilldown?${new URLSearchParams({ alias: mm.cp_alias, period_id: data.period_id, infloww_id: mm.infloww_id })}`}
-                              style={detailBtn}
-                              title="Drill-down turni: chi non ha registrato i takes, giorno per giorno (con CSV per il backfill)"
-                            >
-                              Turni <ArrowRight size={11} />
-                            </Link>
-                            <Link href={`/admin/infloww-revenue?creatorId=${encodeURIComponent(mm.infloww_id)}`} style={detailBtn}>
-                              Ledger <ArrowRight size={11} />
-                            </Link>
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {rows.length === 0 && noCp.length === 0 && (
-                    <tr><td colSpan={data.third_source?.available ? 8 : 7} style={{ ...td, textAlign: "center", color: CP.textMuted, padding: 26 }}>Nessuna creator abbinata per questo mese.</td></tr>
-                  )}
-                </tbody>
-              </table>
+          </HeroMetric>
+
+          {data.coverage_partial && <Notice>Copertura parziale: il confronto vale solo per i giorni {fmtDayIt(data.coverage_from)} → {fmtDayIt(data.coverage_to)}. I turni CP fuori da questa finestra sono esclusi.</Notice>}
+
+          {/* DA SISTEMARE: tutte le incongruenze rilevate, in un'unica lista azionabile */}
+          {(() => {
+            const unattrib = rows.filter((r) => r.cp_sales === 0 && (r.cp_shifts || 0) > 0);
+            const infIncompleti = rows.filter((r) => r.social_vs_infloww != null && r.social_vs_infloww > 1.25);
+            const troncate = rows.filter((r) => r.truncated);
+            const items = [
+              holes.length > 0 && { severity: "critical", title: `${holes.length} probabili buchi di registrazione (≈ ${fmt$(holesGap)} mancanti)`, detail: "righe “probabile buco” in tabella → apri “Turni” per vedere chi non ha registrato le vendite" },
+              unattrib.length > 0 && { severity: "critical", title: `${unattrib.length} creator con turni ma nessuna vendita attribuita`, detail: "le vendite (takes) vanno registrate in CP" },
+              noCp.length > 0 && { severity: "critical", title: `${noCp.length} creator che incassano ma senza turni in CP (≈ ${fmt$(noCpGross)})`, detail: "configurare turni e creator in CP, o collegarle qui sotto se hanno un altro nome" },
+              infIncompleti.length > 0 && { severity: "warning", title: `${infIncompleti.length} account dove l'analytics CP vede più di Infloww`, detail: "verificare che l'account sia collegato a Infloww" },
+              (data.unmatched_infloww.length + data.unmatched_cp.length) > 0 && { severity: "warning", title: `${data.unmatched_infloww.length + data.unmatched_cp.length} profili non abbinati tra le due piattaforme`, detail: "usa “collega a…” nella sezione in fondo" },
+              data.failed_creators?.length > 0 && { severity: "critical", title: `${data.failed_creators.length} creator non sincronizzate da Infloww`, detail: "i loro numeri possono mancare: rilancia il sync da Revenue agency" },
+              troncate.length > 0 && { severity: "warning", title: `${troncate.length} righe con dato Infloww troncato`, detail: "incasso sottostimato su volumi altissimi" },
+            ].filter(Boolean);
+            if (items.length === 0) {
+              return (
+                <section style={{ ...card, padding: "12px 16px", marginBottom: 14, display: "flex", gap: 10, alignItems: "center", fontSize: 14, color: CP.textSecondary }}>
+                  <CheckCircle2 size={16} color={CP.accentGreen} /> Nessuna incongruenza per questo mese: le due fonti si trovano.
+                </section>
+              );
+            }
+            return (
+              <section style={{ ...card, marginBottom: 18, overflow: "hidden" }}>
+                <div style={{ padding: "14px 16px 10px" }}>
+                  <SectionTitle aside={`${items.length} ${items.length === 1 ? "incongruenza" : "incongruenze"}`}>Da sistemare</SectionTitle>
+                </div>
+                {items.map((it, i) => <ActionRow key={i} severity={it.severity} title={it.title} detail={it.detail} />)}
+              </section>
+            );
+          })()}
+
+          <SectionTitle aside="le peggiori in cima · clicca le colonne per riordinare">Creator a confronto</SectionTitle>
+          <DataTable columns={columns} rows={tableRows} defaultSort={{ key: "ratio", dir: 1 }} minWidth={third ? 1060 : 940} maxHeight={640} empty="Nessuna creator abbinata per questo mese." />
+          {data.agency.cp_unattributed > 0 && (
+            <div style={{ padding: "8px 2px", fontSize: 12, color: CP.textMuted }}>
+              ≈ {fmt$(data.agency.cp_unattributed)} di venduto CP non attribuibile a una creator specifica (turni su più creator senza dettaglio): esclusi dai rapporti, non dai totali CP.
             </div>
-            {data.agency.cp_unattributed > 0 && (
-              <div style={{ padding: "10px 18px", borderTop: `1px solid ${CP.borderSoft}`, fontSize: 11.5, color: CP.textMuted }}>
-                ≈ {fmt$(data.agency.cp_unattributed)} di venduto CP non attribuibile a una creator specifica (turni multi-creator senza dettaglio): esclusi dai rapporti, non dai totali CP.
-              </div>
-            )}
-          </CpCard>
+          )}
 
           {/* Non abbinati */}
           {(data.unmatched_infloww.length > 0 || data.unmatched_cp.length > 0) && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <CpCard padding="16px 18px">
-                <SectionLabel style={{ marginBottom: 4 }}>Su Infloww ma non abbinati ({data.unmatched_infloww.length})</SectionLabel>
-                <div style={{ fontSize: 11.5, color: CP.textMuted, marginBottom: 12 }}>
-                  Incassano su Infloww ma non ho trovato con certezza il loro alias CP. Se TU sai chi sono (es. nome d&apos;arte diverso), collegali qui: l&apos;abbinamento resta salvato per sempre.
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14, marginTop: 18, marginBottom: 14 }}>
+              <section style={{ ...card, padding: "16px 18px" }}>
+                <SectionTitle aside={`${data.unmatched_infloww.length}`}>Su Infloww ma non abbinati</SectionTitle>
+                <div style={{ fontSize: 13, color: CP.textMuted, margin: "-4px 0 10px", lineHeight: 1.5 }}>
+                  Incassano su Infloww ma non ho trovato con certezza il loro nome in CP. Se sai chi sono (per esempio un nome d&apos;arte diverso), collegali qui: l&apos;abbinamento resta salvato.
                 </div>
                 {data.unmatched_infloww.map((u) => (
                   <div key={u.id} style={{ ...unmRow, alignItems: "center" }}>
                     <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.name}</span>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                      <span style={{ fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmt$(u.gross)}</span>
+                      <span style={{ color: CP.textSecondary, ...NUM }}>{fmt$(u.gross)}</span>
                       <select
                         defaultValue=""
                         onChange={(e) => { if (e.target.value) saveOverride(u.id, u.name, e.target.value); }}
-                        style={{ ...input, padding: "4px 8px", fontSize: 11, maxWidth: 200, cursor: "pointer" }}
+                        style={{ ...ctl, padding: "4px 8px", fontSize: 13, maxWidth: 200, cursor: "pointer" }}
                         title="Collega manualmente a un alias CP (qualsiasi alias del mese, anche senza vendite)"
+                        aria-label={`Collega ${u.name} a un alias CP`}
                       >
-                        <option value="" style={{ background: CP.surface }}>collega a…</option>
+                        <option value="">collega a…</option>
                         {(data.unmatched_cp || []).map((c) => (
-                          <option key={c.alias} value={c.alias} style={{ background: CP.surface }}>
+                          <option key={c.alias} value={c.alias}>
                             {c.alias}{c.shifts ? ` · ${c.shifts} turni` : ""}{c.sales ? ` · ${fmt$(c.sales)}` : ""}
                           </option>
                         ))}
@@ -470,34 +351,47 @@ export default function InflowwReconcilePage() {
                     </span>
                   </div>
                 ))}
-                {data.unmatched_infloww.length === 0 && <div style={{ fontSize: 12, color: CP.textMuted }}>Nessuno.</div>}
-              </CpCard>
-              <CpCard padding="16px 18px">
-                <SectionLabel style={{ marginBottom: 4 }}>In CP ma non abbinati ({data.unmatched_cp.length})</SectionLabel>
-                <div style={{ fontSize: 11.5, color: CP.textMuted, marginBottom: 12 }}>Hanno venduto in CP ma non ho trovato con certezza il loro profilo Infloww.</div>
+                {data.unmatched_infloww.length === 0 && <div style={{ fontSize: 13, color: CP.textMuted }}>Nessuno.</div>}
+              </section>
+              <section style={{ ...card, padding: "16px 18px" }}>
+                <SectionTitle aside={`${data.unmatched_cp.length}`}>In CP ma non abbinati</SectionTitle>
+                <div style={{ fontSize: 13, color: CP.textMuted, margin: "-4px 0 10px" }}>Hanno venduto in CP ma non ho trovato con certezza il loro profilo Infloww.</div>
                 {data.unmatched_cp.map((u) => (
                   <div key={u.alias} style={unmRow}>
                     <span>
                       {u.alias}
-                      {u.talent && <span style={{ fontSize: 10.5, color: CP.textMuted, fontFamily: FONTS.mono }}> · talent: {u.talent}</span>}
+                      {u.talent && <span style={{ fontSize: 12, color: CP.textMuted }}> · talent: {u.talent}</span>}
                     </span>
-                    <span style={{ fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmt$(u.sales)}</span>
+                    <span style={{ color: CP.textSecondary, ...NUM }}>{fmt$(u.sales)}</span>
                   </div>
                 ))}
-                {data.unmatched_cp.length === 0 && <div style={{ fontSize: 12, color: CP.textMuted }}>Nessuno.</div>}
-              </CpCard>
+                {data.unmatched_cp.length === 0 && <div style={{ fontSize: 13, color: CP.textMuted }}>Nessuno.</div>}
+              </section>
             </div>
           )}
         </>
       )}
+
+      <div style={{ height: 8 }} />
+      <Disclosure open={howOpen} onToggle={() => setHowOpen((v) => !v)} title="Come si legge questa pagina" summary="cattura, esiti, controprova">
+        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: CP.textSecondary, lineHeight: 1.6 }}>
+          <li>Ogni riga confronta due fonti sugli stessi giorni: quanto CP dice che una creator ha venduto, e quanto ha incassato davvero (lordo Infloww).</li>
+          <li>Cattura = registrato in CP ÷ incasso reale. Vicino al 100% = CP completo (ok). Tra 75% e 90% manca qualcosa (da controllare). Sotto il 75% = probabile buco: turni o vendite non registrati. Sopra il 115% è anomalo quanto sotto.</li>
+          <li>Qualche punto sotto il 100% è normale: gli abbonamenti (1-2% del lordo) non passano dagli operatori. È un allarme che indica la direzione, non un confronto contabile.</li>
+          <li>“Vendite non attribuite” = la creator ha turni in CP ma nessuna vendita a suo nome: vanno registrate le vendite (takes). “Senza turni in CP” = nel modulo turni/buste non c&apos;è traccia nel mese: se conosci il suo nome in CP, collegala con “collega a…”.</li>
+          <li>Controprova = la revenue vista dal modulo Social Analytics di CP, una terza fonte indipendente, stimata al lordo (netto ÷ 0,80, per questo c&apos;è il ≈). Pallino verde = coerente con Infloww (±15%). “Infloww incompleto?” = l&apos;analytics vede molto più di Infloww: l&apos;account potrebbe essere scollegato da Infloww.</li>
+          <li>I “non abbinati” in fondo sono profili che non ho saputo accoppiare con certezza: guardali a mano prima di trarre conclusioni.</li>
+        </ul>
+      </Disclosure>
     </div>
   );
 }
 
-const lbl = { display: "block", fontSize: 10, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
-const input = { padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
-const th = { padding: "10px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: CP.textMuted, letterSpacing: 0.6, fontFamily: FONTS.mono, whiteSpace: "nowrap" };
-const td = { padding: "9px 12px", verticalAlign: "middle" };
-const unmRow = { display: "flex", justifyContent: "space-between", gap: 12, padding: "7px 0", borderBottom: `1px solid ${CP.borderSoft}`, fontSize: 12.5 };
-const btnLink = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", background: CP.accent, color: CP.accentInk, borderRadius: 8, fontSize: 12.5, fontWeight: 600, textDecoration: "none" };
-const detailBtn = { display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 9px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 5, color: CP.accentSoftText, fontSize: 11, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" };
+function Badge({ color, bg, tip, children }) {
+  return <span style={{ display: "inline-block", padding: "2px 9px", borderRadius: 999, fontSize: 12, fontWeight: 500, color, background: bg, whiteSpace: "nowrap" }} title={tip || ""}>{children}</span>;
+}
+
+const unmRow = { display: "flex", justifyContent: "space-between", gap: 12, padding: "7px 0", borderBottom: `1px solid ${CP.borderSoft}`, fontSize: 13 };
+const btnLink = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", background: CP.accent, color: CP.accentInk, borderRadius: 8, fontSize: 14, fontWeight: 500, textDecoration: "none" };
+const detailLink = { display: "inline-flex", alignItems: "center", gap: 4, color: CP.accentSoftText, fontSize: 13, textDecoration: "none", whiteSpace: "nowrap" };
+const ctl = { padding: "8px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };

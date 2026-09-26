@@ -2,11 +2,10 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import {
-  Search, AlertCircle, CheckCircle2, XCircle, Database, Link2, FileText, Compass,
-} from "lucide-react";
+import { Search, AlertCircle, CheckCircle2, XCircle, Loader2, ArrowRight } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHeader, CpCard, SectionLabel } from "@/components/cp-style";
+import { PageHead, Metric, SectionTitle, Notice, DataTable, card, NUM } from "@/components/ds";
+import { fmt$, fmtInt } from "@/lib/format";
 
 /**
  * /admin/debug-mapping
@@ -115,7 +114,8 @@ export default function DebugMappingPage() {
     }
   }
 
-  // Interpretazione automatica del risultato
+  // Interpretazione automatica del risultato (stesse regole; testi riscritti in
+  // italiano semplice il 26/09/2026 — prima: "Sync KV stale", "cp:member_mapping").
   const diagnosis = useMemo(() => {
     if (!data) return null;
     const mapped = (data.mapping_matches || []).length > 0;
@@ -130,164 +130,113 @@ export default function DebugMappingPage() {
     if (mapped && !hasWages && liveCpHits > 0) {
       return {
         tone: "error",
-        title: `Sync KV stale: CP API ritorna ${liveCpHits} wage record live, ma il sync KV ne ha 0`,
-        body: `Conferma definitiva: la wage di "${employee}" ESISTE in CP API (verificato live in questo momento) ma NON è nel cp:wages: del periodo. Significa che il sync precedente l'ha persa (probabilmente per errore transiente su una pagina, ora con il fix retry dovrebbe ripescare). SOLUZIONE: re-sync 2026-${data.query.period_id.split("-")[1]} da /admin/creatorspro-sync.`,
+        title: `L'ultimo sync ha perso le sue buste: in CreatorsPro ce ne sono ${liveCpHits}, in HOC Pro 0`,
+        body: `Ho appena chiesto a CreatorsPro: le buste di "${employee}" per questo mese esistono, ma non sono arrivate in HOC Pro (probabile errore temporaneo durante il sync). Cosa fare: risincronizza ${data.query.period_id} da Sync CreatorsPro.`,
+        action: { href: "/admin/creatorspro-sync", label: "Vai a Sync CreatorsPro" },
       };
     }
     if (mapped && !hasWages && liveCpHits === 0 && livePagination === 0) {
       return {
         tone: "warn",
-        title: "Non ha lavorato in CP nel periodo",
-        body: "L'operatore è mappato correttamente, ma anche interrogando CP API in tempo reale non risulta alcuna wage per lui in questo mese. Probabilmente non ha effettivamente lavorato in CP nel periodo (magari solo Infloww, o periodo cambiato).",
+        title: "Non ha lavorato in CreatorsPro questo mese",
+        body: "È collegato correttamente, ma nemmeno chiedendo a CreatorsPro adesso risultano buste per questo mese. Probabilmente non ha lavorato su CP nel periodo (magari solo su Infloww, o ha cambiato periodo).",
       };
     }
     if (!mapped && cpWageByName.length === 0 && !inInfloww) {
-      return { tone: "error", title: "Nome non trovato", body: "Nessun match né in mapping CP, né in wage records, né in record Infloww del periodo. Controlla l'ortografia." };
+      return { tone: "error", title: "Nome non trovato", body: "Nessuna corrispondenza né nei collegamenti CP, né nelle buste CP, né nei dati Infloww del mese. Controlla come è scritto il nome." };
     }
     if (mapped && !hasWages) {
-      return { tone: "warn", title: "Mappato ma senza shift CP nel periodo", body: "L'operatore è correttamente mappato CP→Infloww, ma nel periodo selezionato non ha wage records / shift in CreatorsPro." };
+      return { tone: "warn", title: "Collegato, ma senza turni in CP questo mese", body: "Il collegamento CP → operatore è corretto, ma nel mese scelto non ha buste né turni in CreatorsPro." };
     }
     if (mapped && hasWages && !exactMatchOk && inInfloww) {
-      return { tone: "error", title: "Mismatch tra nome in mapping e nome in Infloww", body: "L'operatore ha shift in CP e c'è un record Infloww con nome simile, ma il nome scritto nel mapping NON corrisponde esattamente a quello nel CSV Infloww. Confronta i byte qui sotto." };
+      return { tone: "error", title: "Il nome collegato non è identico a quello in Infloww", body: "Ha turni in CP e in Infloww c'è un nome simile, ma il nome scritto nel collegamento non è identico a quello del file Infloww (spazi, maiuscole o caratteri invisibili). Confronta i caratteri nel dettaglio qui sotto e correggi il collegamento.",
+        action: { href: "/admin/creatorspro-sync", label: "Correggi in Sync CreatorsPro" } };
     }
     if (!mapped && cpWageByName.length > 0) {
-      return { tone: "warn", title: "Esiste in CP ma non è mappato", body: "L'operatore ha wage records in CP ma il suo cp_member_id NON è in cp:member_mapping. Vai a /admin/creatorspro-sync e mappalo." };
+      return { tone: "warn", title: "Esiste in CreatorsPro ma non è collegato", body: "Ha buste in CP ma la sua persona CP non è collegata a nessun operatore. Collegala nella sezione “Persone da collegare”.", action: { href: "/admin/creatorspro-sync#collega", label: "Collega in Sync CreatorsPro" } };
     }
     if (mapped && hasWages && exactMatchOk) {
-      return { tone: "ok", title: "Tutto in regola", body: "Mappato, ha shift in CP, e il match esatto con Infloww funziona." };
+      return { tone: "ok", title: "Tutto in regola", body: "Collegato, ha turni in CP e il nome corrisponde esattamente a quello in Infloww." };
     }
-    return { tone: "info", title: "Caso intermedio", body: "Controlla i dettagli sotto." };
+    return { tone: "info", title: "Caso intermedio", body: "Controlla i dettagli qui sotto." };
   }, [data, employee]);
 
+  // Redesign 26/09/2026 (pannello tester BOARD/PAY/UX): 111 schede tutte uguali
+  // senza ordine né peso (in mezzo anche account non-operatori: HR, audit, agenzie);
+  // diagnosi in gergo (KV, wage, cp:member_mapping) senza il passo successivo.
+  // Ora: tabella ordinabile per venduto Infloww (chi pesa in classifica in cima),
+  // diagnosi in italiano con il link dove si risolve, prove tecniche sotto.
+  const periodLabel = periodOptions.find((p) => p.value === periodId)?.label || periodId;
+  const candRows = (candidates || []).map((op, i) => ({ ...op, id: `${op.employee}-${i}` }));
+  const hasSalesCol = candRows.some((r) => r.infloww_sales != null);
+  const candCols = [
+    { key: "employee", label: "Operatore", render: (op) => <span style={{ fontWeight: 500 }}>{op.employee}</span> },
+    { key: "group", label: "Gruppo", muted: true, render: (op) => `${op.group || "(nessun gruppo)"}${op.language ? ` · ${op.language}` : ""}` },
+    ...(hasSalesCol ? [{ key: "infloww_sales", label: "Venduto su Infloww", align: "right", render: (op) => (op.infloww_sales ? fmt$(op.infloww_sales) : "—") }] : []),
+    { key: "go", label: "", sortable: false, render: () => <span style={{ fontSize: 13, color: CP.accentSoftText, whiteSpace: "nowrap" }}>Diagnosi →</span> },
+  ];
+  const toneColor = diagnosis ? diagnoseColor(diagnosis.tone) : CP.textPrimary;
+
   return (
-    <div style={{ padding: "32px 28px 80px 28px", maxWidth: 1100, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
-      <PageHeader
-        breadcrumb={
-          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <Link href="/admin/creatorspro-sync" style={{ color: "inherit", textDecoration: "none" }}>Sync CP</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <span style={{ color: CP.textPrimary }}>Debug Mapping</span>
-          </div>
-        }
-        section="Data · Diagnostica"
-        title="Debug mapping CP ↔ Infloww"
-        subtitle="Investigazione per capire perché un operatore appare come 'no CP data' nella leaderboard Sales CP nonostante sia mappato. Cerca per nome e ottieni una diagnosi automatica."
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Sync CP", href: "/admin/creatorspro-sync" }, { label: "Debug mapping" }]}
+        title="Perché un operatore non ha dati CP"
+        subtitle="Per chi in Sales CP compare senza dati CreatorsPro: cerca il nome e ottieni la causa (non collegato, sync incompleto, nome scritto diverso) e dove si risolve."
       />
 
-      {/* Form ricerca */}
-      <CpCard padding="20px 24px" style={{ marginBottom: 24 }}>
+      {/* Ricerca */}
+      <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <label style={lbl}>Nome operatore (anche parziale)</label>
+          <label style={{ flex: "1 1 240px", fontSize: 13, color: CP.textSecondary }}>
+            Nome operatore (anche solo una parte)
             <input
               value={employee}
               onChange={(e) => setEmployee(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") search(); }}
               placeholder="es. Francesco Casti"
-              style={input}
+              style={{ ...input, marginTop: 6 }}
             />
-          </div>
-          <div>
-            <label style={lbl}>Periodo</label>
-            <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} style={{ ...input, minWidth: 180, cursor: "pointer" }}>
-              {periodOptions.map((p) => <option key={p.value} value={p.value} style={{ background: CP.surface }}>{p.label}</option>)}
+          </label>
+          <label style={{ fontSize: 13, color: CP.textSecondary }}>
+            Mese
+            <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} style={{ ...input, marginTop: 6, minWidth: 180, cursor: "pointer" }}>
+              {periodOptions.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
-          </div>
-          <button onClick={search} disabled={loading || !employee.trim()} style={primaryBtn(loading || !employee.trim())}>
-            <Search size={14} /> {loading ? "Ricerca…" : "Cerca"}
+          </label>
+          <button onClick={() => search()} disabled={loading || !employee.trim()} style={primaryBtn(loading || !employee.trim())}>
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />} {loading ? "Cerco…" : "Cerca"}
           </button>
         </div>
-      </CpCard>
+      </section>
 
-      {error && (
-        <CpCard accent={CP.accentRed} padding="14px 18px" style={{ marginBottom: 20 }}>
-          <div style={{ color: CP.accentRed, display: "flex", alignItems: "center", gap: 10 }}>
-            <AlertCircle size={16} /> {error}
-          </div>
-        </CpCard>
-      )}
+      {error && <Notice danger>La ricerca non è andata a buon fine: {error}</Notice>}
 
-      {/* Empty state: nessuna ricerca ancora fatta */}
+      {/* Nessuna ricerca ancora: i candidati */}
       {!data && !loading && !error && (
         <>
-          <CpCard padding="24px 26px" style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, background: CP.surfaceAlt, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Compass size={22} color={CP.accentGreen} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: FONTS.display, fontSize: 16, fontWeight: 700, color: CP.textPrimary, marginBottom: 6 }}>
-                  Operatori senza dato CP nel periodo
-                </div>
-                <div style={{ color: CP.textSecondary, fontSize: 13, lineHeight: 1.6 }}>
-                  Sotto trovi tutti gli operatori che oggi appaiono come <b>no-CP</b> in classifica per il periodo selezionato:
-                  o non sono mappati a CreatorsPro, o il sync ha mancato la loro wage. Clicca un nome per partire con la diagnosi automatica.
-                </div>
-              </div>
-            </div>
-          </CpCard>
-
-          {/* Lista candidati */}
-          {candidatesErr && (
-            <CpCard accent={CP.accentRed} padding="12px 16px" style={{ marginBottom: 12 }}>
-              <div style={{ color: CP.accentRed, fontSize: 12, display: "flex", alignItems: "center", gap: 8 }}>
-                <AlertCircle size={14} /> Impossibile caricare i candidati: {candidatesErr}
-              </div>
-            </CpCard>
-          )}
+          {candidatesErr && <Notice danger>Non riesco a caricare gli operatori senza dati CP: {candidatesErr}</Notice>}
           {candidates === null && !candidatesErr && (
-            <Empty>Carico l'elenco operatori no-CP per {periodId}…</Empty>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, color: CP.textMuted, fontSize: 14 }}><Loader2 size={15} className="animate-spin" /> Carico gli operatori senza dati CP di {periodLabel}…</div>
           )}
           {candidates && candidates.length === 0 && (
-            <CpCard accent={CP.accentGreen} padding="14px 18px">
-              <div style={{ color: CP.accentGreen, display: "flex", alignItems: "center", gap: 10, fontSize: 13, fontWeight: 600 }}>
-                <CheckCircle2 size={16} /> Nessun operatore no-CP in {periodId}. Tutto mappato.
-              </div>
-            </CpCard>
+            <section style={{ ...card, padding: "12px 16px", display: "flex", gap: 10, alignItems: "center", fontSize: 14, color: CP.textSecondary }}>
+              <CheckCircle2 size={16} color={CP.accentGreen} /> Nessun operatore senza dati CP in {periodLabel}: sono tutti collegati.
+            </section>
           )}
           {candidates && candidates.length > 0 && (
-            <CpCard padding="14px 16px">
-              <div style={{ fontSize: 11, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 12, fontFamily: FONTS.mono, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span>Candidati da risolvere ({candidates.length})</span>
-                <Link href="/leaderboard/sales-cp" style={{ color: CP.textSecondary, textDecoration: "none", fontSize: 10, textTransform: "none", letterSpacing: 0, fontFamily: FONTS.body }}>
-                  Vedi in classifica →
-                </Link>
+            <>
+              <SectionTitle aside={<Link href="/leaderboard/sales-cp" style={{ color: CP.accentSoftText, textDecoration: "none" }}>Vedi in Sales CP →</Link>}>
+                {candidates.length} operatori senza dati CP · {periodLabel}
+              </SectionTitle>
+              <div style={{ fontSize: 13, color: CP.textSecondary, margin: "-4px 0 10px", lineHeight: 1.5 }}>
+                In Sales CP compaiono senza score: o non sono collegati a una persona CreatorsPro, o il sync ha perso le loro buste. Clicca una riga per la diagnosi.
+                {" "}Il modo più veloce per collegarli è la sezione <Link href="/admin/creatorspro-sync#collega" style={{ color: CP.accentSoftText, textDecoration: "none" }}>Persone da collegare</Link> in Sync CreatorsPro.
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
-                {candidates.map((op, i) => (
-                  <button
-                    key={`${op.employee}-${i}`}
-                    onClick={() => pickCandidate(op.employee)}
-                    title={`Diagnostica ${op.employee}${op.group ? ` (${op.group})` : ""}`}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      padding: "10px 12px",
-                      background: CP.surface,
-                      border: `1px solid ${CP.border}`,
-                      borderRadius: 8,
-                      color: CP.textPrimary,
-                      fontSize: 13,
-                      fontFamily: FONTS.body,
-                      textAlign: "left",
-                      cursor: "pointer",
-                      transition: "border-color 0.12s, background 0.12s",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = CP.accentGreen; e.currentTarget.style.background = CP.surfaceAlt; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = CP.border; e.currentTarget.style.background = CP.surface; }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{op.employee}</div>
-                      <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {op.group || "(no group)"}{op.language ? ` · ${op.language}` : ""}
-                      </div>
-                    </div>
-                    <Search size={13} color={CP.textMuted} />
-                  </button>
-                ))}
-              </div>
-            </CpCard>
+              <DataTable columns={candCols} rows={candRows} onRowClick={(op) => pickCandidate(op.employee)}
+                defaultSort={hasSalesCol ? { key: "infloww_sales", dir: -1 } : undefined} minWidth={560} maxHeight={620} />
+              {hasSalesCol && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 8 }}>In cima chi vende di più: sono quelli che pesano in classifica. Chi ha “—” spesso non è un operatore di chat (HR, audit, agenzie).</div>}
+            </>
           )}
         </>
       )}
@@ -296,139 +245,143 @@ export default function DebugMappingPage() {
         <>
           {/* Diagnosi automatica */}
           {diagnosis && (
-            <CpCard accent={diagnoseColor(diagnosis.tone)} padding="20px 24px" style={{ marginBottom: 20 }}>
+            <section style={{ ...card, padding: "18px 20px", marginBottom: 14, borderLeft: `3px solid ${toneColor}` }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                {diagnosis.tone === "ok" ? <CheckCircle2 size={24} color={CP.accentGreen} />
-                  : diagnosis.tone === "error" ? <XCircle size={24} color={CP.accentRed} />
-                  : <AlertCircle size={24} color="#F59E0B" />}
+                {diagnosis.tone === "ok" ? <CheckCircle2 size={22} color={CP.accentGreen} style={{ flexShrink: 0 }} />
+                  : diagnosis.tone === "error" ? <XCircle size={22} color={CP.accentRed} style={{ flexShrink: 0 }} />
+                  : <AlertCircle size={22} color={toneColor} style={{ flexShrink: 0 }} />}
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 17, color: diagnoseColor(diagnosis.tone), marginBottom: 4 }}>
-                    {diagnosis.title}
-                  </div>
-                  <div style={{ color: CP.textSecondary, fontSize: 14, lineHeight: 1.55 }}>
-                    {diagnosis.body}
-                  </div>
+                  <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 2 }}>Diagnosi per “{employee}” · {periodLabel}</div>
+                  <div style={{ fontWeight: 500, fontSize: 17, color: CP.textPrimary, marginBottom: 6 }}>{diagnosis.title}</div>
+                  <div style={{ color: CP.textSecondary, fontSize: 14, lineHeight: 1.55 }}>{diagnosis.body}</div>
+                  {diagnosis.action && (
+                    <Link href={diagnosis.action.href} style={{ ...primaryBtn(false), marginTop: 12, textDecoration: "none" }}>{diagnosis.action.label} <ArrowRight size={14} /></Link>
+                  )}
                 </div>
               </div>
-            </CpCard>
+            </section>
           )}
 
-          {/* Counts globali */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 20 }}>
-            <MiniStat icon={Link2} label="Mapping totale" value={data.counts.mapping_total} />
-            <MiniStat icon={Database} label="CP members" value={data.counts.cp_members_total} />
-            <MiniStat icon={FileText} label={`Wages CP ${periodId}`} value={data.counts.wages_records} />
-            <MiniStat icon={FileText} label={`Records Infloww ${periodId}`} value={data.counts.infloww_records} />
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 6 }}>
+            <button onClick={() => { setData(null); setEmployee(""); }} style={{ background: "none", border: "none", padding: 0, color: CP.accentSoftText, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body }}>← Torna all&apos;elenco</button>
+          </div>
+
+          <SectionTitle aside="le prove su cui si basa la diagnosi">Dettaglio</SectionTitle>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, marginBottom: 8 }}>
+            <Metric label="Persone collegate in totale" value={fmtInt(data.counts.mapping_total)} />
+            <Metric label="Persone in CreatorsPro" value={fmtInt(data.counts.cp_members_total)} />
+            <Metric label={`Buste CP · ${periodLabel}`} value={fmtInt(data.counts.wages_records)} />
+            <Metric label={`Righe Infloww · ${periodLabel}`} value={fmtInt(data.counts.infloww_records)} />
           </div>
 
           {/* 1) Mapping matches */}
-          <Section title={`Mapping CP↔Infloww (${data.mapping_matches.length} match)`}>
-            {data.mapping_matches.length === 0 && <Empty>Nessun cp_member_id mappato a un nome simile a &quot;{employee}&quot;.</Empty>}
+          <Section title={`Collegamenti CP → operatore con nome simile (${data.mapping_matches.length})`}>
+            {data.mapping_matches.length === 0 && <Empty>Nessuna persona CP collegata a un nome simile a “{employee}”.</Empty>}
             {data.mapping_matches.map((m, i) => (
-              <CpCard key={i} padding="14px 18px" style={{ marginBottom: 8 }}>
-                <Row k="CP member ID"        v={m.cp_member_id} mono />
-                <Row k="Nome CP"             v={m.cp_member_name || "—"} />
-                <Row k="Username CP"         v={m.cp_member_username || "—"} mono />
-                <Row k="Mappato su Infloww"  v={m.infloww_name_in_mapping} highlight />
-              </CpCard>
+              <Box key={i}>
+                <Row k="Codice persona CP" v={m.cp_member_id} mono />
+                <Row k="Nome CP" v={m.cp_member_name || "—"} />
+                <Row k="Username CP" v={m.cp_member_username || "—"} mono />
+                <Row k="Collegato all'operatore" v={m.infloww_name_in_mapping} highlight />
+              </Box>
             ))}
           </Section>
 
           {/* 2) Wages per cp_member_id matchati */}
-          <Section title={`Shift in CP del periodo per i cp_member_id matchati`}>
-            {data.wages_for_mapped_ids.length === 0 && <Empty>Nessun cp_member_id matchato da analizzare.</Empty>}
+          <Section title="Turni in CP del mese per le persone collegate">
+            {data.wages_for_mapped_ids.length === 0 && <Empty>Nessuna persona collegata da controllare.</Empty>}
             {data.wages_for_mapped_ids.map((w, i) => {
               const ok = w.total_shifts > 0;
               return (
-                <CpCard key={i} accent={ok ? CP.accentGreen : CP.accentRed} padding="14px 18px" style={{ marginBottom: 8 }}>
-                  <Row k="CP member ID"      v={w.cp_member_id} mono />
-                  <Row k="Mappato a"          v={w.infloww_name_in_mapping} />
-                  <Row k="Wage records nel periodo" v={w.wage_records} color={ok ? CP.accentGreen : CP.accentRed} />
-                  <Row k="Shift totali"      v={w.total_shifts} color={ok ? CP.accentGreen : CP.accentRed} highlight />
-                  {w.wage_member_names.length > 0 && <Row k="Nomi nei wage" v={w.wage_member_names.join(", ")} />}
-                </CpCard>
+                <Box key={i} tone={ok ? CP.accentGreen : CP.accentRed}>
+                  <Row k="Codice persona CP" v={w.cp_member_id} mono />
+                  <Row k="Collegato a" v={w.infloww_name_in_mapping} />
+                  <Row k="Buste nel mese" v={w.wage_records} color={ok ? CP.accentGreen : CP.accentRed} />
+                  <Row k="Turni totali" v={w.total_shifts} color={ok ? CP.accentGreen : CP.accentRed} highlight />
+                  {w.wage_member_names.length > 0 && <Row k="Nomi nelle buste" v={w.wage_member_names.join(", ")} />}
+                </Box>
               );
             })}
           </Section>
 
           {/* 3) Wages cercati direttamente per nome */}
-          <Section title={`Wages CP con nome simile a "${employee}" (${data.cp_wages_by_name.length})`}>
-            {data.cp_wages_by_name.length === 0 && <Empty>Nessun wage record CP con nome simile.</Empty>}
+          <Section title={`Buste CP con nome simile a “${employee}” (${data.cp_wages_by_name.length})`}>
+            {data.cp_wages_by_name.length === 0 && <Empty>Nessuna busta CP con nome simile.</Empty>}
             {data.cp_wages_by_name.map((w, i) => (
-              <CpCard key={i} accent={w.is_in_mapping ? CP.accentGreen : "#F59E0B"} padding="14px 18px" style={{ marginBottom: 8 }}>
-                <Row k="Nome CP"      v={w.cp_member_name} highlight />
-                <Row k="CP member ID" v={w.cp_member_id} mono />
-                <Row k="Username"     v={w.member_username || "—"} mono />
-                <Row k="Shift"        v={w.shifts} color={w.shifts > 0 ? CP.accentGreen : CP.textMuted} />
-                <Row k="In mapping?"  v={w.is_in_mapping ? `✓ Sì → ${w.mapped_to}` : "✗ NO — manca mapping"} color={w.is_in_mapping ? CP.accentGreen : "#F59E0B"} />
-              </CpCard>
+              <Box key={i} tone={w.is_in_mapping ? CP.accentGreen : WARN}>
+                <Row k="Nome CP" v={w.cp_member_name} highlight />
+                <Row k="Codice persona CP" v={w.cp_member_id} mono />
+                <Row k="Username" v={w.member_username || "—"} mono />
+                <Row k="Turni" v={w.shifts} color={w.shifts > 0 ? CP.accentGreen : CP.textMuted} />
+                <Row k="Collegata?" v={w.is_in_mapping ? `Sì → ${w.mapped_to}` : "No, manca il collegamento"} color={w.is_in_mapping ? CP.accentGreen : WARN} />
+              </Box>
             ))}
           </Section>
 
           {/* 4) Record Infloww */}
-          <Section title={`Record Infloww del periodo con nome simile (${data.infloww_matches.length})`}>
-            {data.infloww_matches.length === 0 && <Empty>Nessun record Infloww con nome simile a &quot;{employee}&quot; in {periodId}.</Empty>}
+          <Section title={`Righe Infloww del mese con nome simile (${data.infloww_matches.length})`}>
+            {data.infloww_matches.length === 0 && <Empty>Nessuna riga Infloww con nome simile a “{employee}” in {periodLabel}.</Empty>}
             {data.infloww_matches.map((r, i) => (
-              <CpCard key={i} padding="14px 18px" style={{ marginBottom: 8 }}>
-                <Row k="Nome employee (CSV)" v={`"${r.employee_name_in_csv}"`} mono highlight />
-                <Row k="Group"               v={r.group || "—"} />
-                <Row k="Lunghezza nome"       v={`${r.employee_name_in_csv.length} caratteri`} />
-                <Row k="Tipo"                v={r.is_mass ? "Mass account" : "Chatter"} />
-              </CpCard>
+              <Box key={i}>
+                <Row k="Nome nel file Infloww" v={`"${r.employee_name_in_csv}"`} mono highlight />
+                <Row k="Gruppo" v={r.group || "—"} />
+                <Row k="Lunghezza nome" v={`${r.employee_name_in_csv.length} caratteri`} />
+                <Row k="Tipo" v={r.is_mass ? "Account “Mass”" : "Chatter"} />
+              </Box>
             ))}
           </Section>
 
           {/* 4.5) Live CP API check — il più importante */}
-          <Section title="🛰 Live check vs CP API (verifica direttamente con CreatorsPro)">
-            {(data.live_cp_check || []).length === 0 && <Empty>Nessuna verifica live disponibile (mapping vuoto).</Empty>}
+          <Section title="Verifica in tempo reale su CreatorsPro">
+            {(data.live_cp_check || []).length === 0 && <Empty>Nessuna verifica possibile: nessuna persona collegata.</Empty>}
             {(data.live_cp_check || []).map((c, i) => {
               if (c.live_error) {
                 return (
-                  <CpCard key={i} accent={CP.accentRed} padding="14px 18px" style={{ marginBottom: 8 }}>
-                    <Row k="CP member ID" v={c.cp_member_id} mono />
-                    <Row k="Errore live"  v={c.live_error} color={CP.accentRed} />
-                  </CpCard>
+                  <Box key={i} tone={CP.accentRed}>
+                    <Row k="Codice persona CP" v={c.cp_member_id} mono />
+                    <Row k="Errore" v={c.live_error} color={CP.accentRed} />
+                  </Box>
                 );
               }
               const ok = (c.live_wages_count || 0) > 0;
               return (
-                <CpCard key={i} accent={ok ? CP.accentGreen : "#F59E0B"} padding="14px 18px" style={{ marginBottom: 8 }}>
-                  <Row k="CP member ID"           v={c.cp_member_id} mono />
-                  <Row k="Range chiesto"          v={`${c.live_query.startedAt} → ${c.live_query.endedAt}`} mono />
-                  <Row k="Wages live in CP API"   v={c.live_wages_count} color={ok ? CP.accentGreen : "#F59E0B"} highlight />
-                  <Row k="Totale via pagination"  v={c.live_total_via_pagination} />
+                <Box key={i} tone={ok ? CP.accentGreen : WARN}>
+                  <Row k="Codice persona CP" v={c.cp_member_id} mono />
+                  <Row k="Date chieste" v={`${c.live_query.startedAt} → ${c.live_query.endedAt}`} mono />
+                  <Row k="Buste trovate adesso in CP" v={c.live_wages_count} color={ok ? CP.accentGreen : WARN} highlight />
+                  <Row k="Totale dichiarato da CP" v={c.live_total_via_pagination} />
                   {c.live_wage_ids?.length > 0 && (
                     <details style={{ marginTop: 8, fontSize: 12 }}>
-                      <summary style={{ cursor: "pointer", color: CP.textSecondary }}>Wage IDs trovati live ({c.live_wage_ids.length})</summary>
-                      <div style={{ marginTop: 6, padding: "8px 10px", background: CP.surfaceAlt, borderRadius: 6, fontSize: 11, color: CP.textPrimary }}>
+                      <summary style={{ cursor: "pointer", color: CP.textSecondary }}>Buste trovate ({c.live_wage_ids.length})</summary>
+                      <div style={{ marginTop: 6, padding: "8px 10px", background: CP.surfaceAlt, borderRadius: 6, fontSize: 12, color: CP.textPrimary }}>
                         {c.live_wage_ids.map((w, j) => (
-                          <div key={j} style={{ marginBottom: 4, fontFamily: FONTS.mono }}>
-                            <b>{w.id}</b> · {w.member_name} · <span style={{ color: CP.textMuted }}>{w.status}</span> · {new Date(w.started_at).toLocaleDateString("it-IT")} → {new Date(w.ended_at).toLocaleDateString("it-IT")}
+                          <div key={j} style={{ marginBottom: 4, ...CODE }}>
+                            <span style={{ fontWeight: 500 }}>{w.id}</span> · {w.member_name} · <span style={{ color: CP.textMuted }}>{w.status}</span> · {new Date(w.started_at).toLocaleDateString("it-IT")} → {new Date(w.ended_at).toLocaleDateString("it-IT")}
                           </div>
                         ))}
                       </div>
                     </details>
                   )}
-                </CpCard>
+                </Box>
               );
             })}
           </Section>
 
           {/* 5) Exact match check */}
-          <Section title="Confronto byte-per-byte (nome in mapping vs nome in Infloww)">
-            {data.exact_match_checks.length === 0 && <Empty>Nessun check disponibile.</Empty>}
+          <Section title="Il nome collegato è identico a quello in Infloww?">
+            {data.exact_match_checks.length === 0 && <Empty>Nessun controllo disponibile.</Empty>}
             {data.exact_match_checks.map((c, i) => (
-              <CpCard key={i} accent={c.found_in_infloww_exact ? CP.accentGreen : CP.accentRed} padding="14px 18px" style={{ marginBottom: 8 }}>
-                <Row k="Nome in mapping"      v={`"${c.mapping_says}"`} mono highlight />
-                <Row k="Match esatto Infloww" v={c.found_in_infloww_exact ? "✓ Trovato" : "✗ NON trovato"} color={c.found_in_infloww_exact ? CP.accentGreen : CP.accentRed} />
-                <Row k="N. record Infloww"   v={c.infloww_record_count_for_exact_name} />
+              <Box key={i} tone={c.found_in_infloww_exact ? CP.accentGreen : CP.accentRed}>
+                <Row k="Nome nel collegamento" v={`"${c.mapping_says}"`} mono highlight />
+                <Row k="Identico in Infloww" v={c.found_in_infloww_exact ? "Sì" : "No"} color={c.found_in_infloww_exact ? CP.accentGreen : CP.accentRed} />
+                <Row k="Righe Infloww con quel nome" v={c.infloww_record_count_for_exact_name} />
                 <details style={{ marginTop: 8, fontSize: 12 }}>
-                  <summary style={{ cursor: "pointer", color: CP.textSecondary, fontFamily: FONTS.mono }}>Byte del nome (per debug invisible chars)</summary>
-                  <div style={{ marginTop: 6, padding: "8px 10px", background: CP.surfaceAlt, borderRadius: 6, fontFamily: FONTS.mono, fontSize: 11, color: CP.textMuted }}>
-                    {c.mapping_bytes.map((b, j) => `${String.fromCharCode(b)}(${b})`).join(" ")}
+                  <summary style={{ cursor: "pointer", color: CP.textSecondary }}>Carattere per carattere (per scovare spazi o caratteri invisibili)</summary>
+                  <div style={{ marginTop: 6, padding: "8px 10px", background: CP.surfaceAlt, borderRadius: 6, color: CP.textMuted, wordBreak: "break-all", ...CODE }}>
+                    {c.mapping_bytes.map((b) => `${String.fromCharCode(b)}(${b})`).join(" ")}
                   </div>
                 </details>
-              </CpCard>
+              </Box>
             ))}
           </Section>
         </>
@@ -439,59 +392,55 @@ export default function DebugMappingPage() {
 
 function Section({ title, children }) {
   return (
-    <div style={{ marginTop: 24, marginBottom: 16 }}>
-      <SectionLabel style={{ display: "block", marginBottom: 10 }}>{title}</SectionLabel>
+    <div style={{ marginTop: 20, marginBottom: 12 }}>
+      <div style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary, marginBottom: 8 }}>{title}</div>
       {children}
     </div>
   );
 }
 
+function Box({ tone, children }) {
+  return <div style={{ ...card, padding: "10px 16px", marginBottom: 8, ...(tone ? { borderLeft: `3px solid ${tone}` } : {}) }}>{children}</div>;
+}
+
 function Row({ k, v, mono, highlight, color }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", gap: 14, fontSize: 13 }}>
-      <span style={{ color: CP.textMuted, fontSize: 12, flexShrink: 0 }}>{k}</span>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", gap: 14, fontSize: 13, flexWrap: "wrap" }}>
+      <span style={{ color: CP.textMuted, fontSize: 13, flexShrink: 0 }}>{k}</span>
       <span style={{
         color: color || CP.textPrimary,
-        fontFamily: mono ? FONTS.mono : FONTS.body,
-        fontWeight: highlight ? 700 : 500,
+        fontWeight: highlight ? 500 : 400,
         textAlign: "right",
-        overflow: "hidden", textOverflow: "ellipsis",
+        overflow: "hidden", textOverflow: "ellipsis", wordBreak: "break-all",
+        ...(mono ? CODE : NUM),
       }}>{v}</span>
     </div>
   );
 }
 
-function MiniStat({ icon: Icon, label, value }) {
-  return (
-    <div style={{ padding: "14px 16px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: CP.textMuted, fontSize: 11, marginBottom: 6 }}>
-        <Icon size={13} /> {label}
-      </div>
-      <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 22, color: CP.textPrimary }}>{value}</div>
-    </div>
-  );
-}
-
 function Empty({ children }) {
-  return <div style={{ padding: "12px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textMuted, fontSize: 13, fontStyle: "italic" }}>{children}</div>;
+  return <div style={{ ...card, padding: "10px 14px", color: CP.textMuted, fontSize: 13 }}>{children}</div>;
 }
 
+// Avviso (né ok né errore): stesso colore dell'avviso di ActionRow nel DS.
+const WARN = CP.accentSoftText;
 function diagnoseColor(tone) {
   if (tone === "ok") return CP.accentGreen;
   if (tone === "error") return CP.accentRed;
-  if (tone === "warn") return "#F59E0B";
+  if (tone === "warn") return WARN;
   return CP.textPrimary;
 }
 
-const lbl = { display: "block", fontSize: 11, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 6, fontFamily: FONTS.mono };
-const input = { width: "100%", padding: "10px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
+// Codici e ID (non numeri da confrontare): monospazio di sistema per leggerli carattere per carattere.
+const CODE = { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12 };
+const input = { display: "block", width: "100%", boxSizing: "border-box", padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
 const primaryBtn = (disabled) => ({
   display: "inline-flex", alignItems: "center", gap: 6,
-  padding: "10px 18px",
+  padding: "9px 16px",
   background: disabled ? CP.surfaceAlt : CP.accent,
   color: disabled ? CP.textMuted : CP.accentInk,
   border: "none",
   borderRadius: 8,
-  fontSize: 13, fontWeight: 700, fontFamily: FONTS.body,
+  fontSize: 14, fontWeight: 500, fontFamily: FONTS.body,
   cursor: disabled ? "not-allowed" : "pointer",
 });
