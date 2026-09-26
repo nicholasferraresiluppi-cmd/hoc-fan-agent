@@ -18,6 +18,8 @@ const cleanArea = (a) => ({
   late: int(a?.late),
   l: str(a?.l, 220),
   who: (Array.isArray(a?.who) ? a.who : []).slice(0, 3).map((w) => str(w, 30)),
+  // solo link a ClickUp (attività in ritardo più vecchia): mai URL arbitrari nella pagina
+  link: /^https:\/\/app\.clickup\.com\/t\/[A-Za-z0-9]+$/.test(a?.link || "") ? a.link : null,
 });
 const cleanTower = (p) => ({
   n: str(p?.n, 60),
@@ -49,4 +51,42 @@ export async function saveCitySnapshot(raw) {
   const snap = cleanSnapshot(raw);
   await kv.set(CITTA_KEY, snap);
   return snap;
+}
+
+// ── Prese in carico: chi si occupa di un piano (torre|area). Stato di team, non per utente.
+export const CLAIMS_KEY = "citta:claims";
+export async function getClaims() {
+  return (await kv.get(CLAIMS_KEY)) || {};
+}
+export async function setClaim(tower, area, who) {
+  const key = `${str(tower, 60)}|${str(area, 30)}`;
+  const claims = await getClaims();
+  if (who) claims[key] = { by: str(who.name || "?", 60), userId: str(who.userId || "", 60), at: Date.now() };
+  else delete claims[key];
+  await kv.set(CLAIMS_KEY, claims);
+  return claims;
+}
+
+// ── Storico giornaliero degli stati (per l'avviso "ambra da due settimane")
+const dayKey = (d) => `citta:day:${d}`;
+export function romeDay(t = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" }).format(t);
+}
+export async function recordCityDay(merged, day = romeDay()) {
+  const states = {};
+  for (const t of [...(merged?.projects || []), ...(merged?.hq ? [merged.hq] : [])]) {
+    for (const a of t.areas || []) states[`${t.n}|${a.n}`] = a.s;
+  }
+  await kv.set(dayKey(day), { day, states }, { ex: 40 * 24 * 3600 });
+  return Object.keys(states).length;
+}
+/** Piani in "wait" in tutti gli ultimi `days` giorni registrati (serve lo storico completo). */
+export async function stuckAreas(days = 14, now = new Date()) {
+  const keys = [];
+  for (let k = 0; k < days; k++) keys.push(dayKey(romeDay(new Date(now.getTime() - k * 864e5))));
+  const rows = await kv.mget(...keys);
+  if (rows.some((r) => !r)) return { complete: false, stuck: [] };
+  const first = rows[0].states;
+  const stuck = Object.keys(first).filter((k) => rows.every((r) => r.states[k] === "wait"));
+  return { complete: true, stuck };
 }

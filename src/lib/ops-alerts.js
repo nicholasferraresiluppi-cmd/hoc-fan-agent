@@ -164,6 +164,25 @@ const CHECKS = [
     },
   },
   {
+    // La città: un piano in ritardo per 14 giorni di fila non è più un incidente, è un problema
+    // che nessuno sta risolvendo. Serve lo storico completo (citta:day:*, scritto ogni notte).
+    id: "citta-stuck",
+    severity: "warning",
+    label: "Piani della città in ritardo da due settimane",
+    async run() {
+      const { stuckAreas } = await import("@/lib/citta");
+      const { complete, stuck } = await stuckAreas(14);
+      if (!complete || stuck.length === 0) return [];
+      return [{
+        fingerprint: "citta-stuck",
+        title: "Piani della città in ritardo da due settimane",
+        detail: stuck.slice(0, 8).map((k) => k.replace("|", " · ")).join(" — ") + (stuck.length > 8 ? ` e altri ${stuck.length - 8}` : ""),
+        value: String(stuck.length),
+        cta: { href: "/admin/citta", label: "Apri la città" },
+      }];
+    },
+  },
+  {
     id: "underperformers",
     severity: "warning",
     label: "Operatori sotto soglia",
