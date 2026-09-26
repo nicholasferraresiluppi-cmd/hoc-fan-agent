@@ -217,7 +217,7 @@ export default function SessionDetailPage() {
                 <span style={{ color: CP.textMuted }}>Id utente</span><span style={{ color: CP.textSecondary, wordBreak: "break-all" }}>{session.userId}</span>
                 <span style={{ color: CP.textMuted }}>Profilo fan</span><span style={{ color: CP.textSecondary }}>{session.fanProfileId || "—"}</span>
                 <span style={{ color: CP.textMuted }}>Creator</span><span style={{ color: CP.textSecondary }}>{session.creatorName || score.creatorName || "—"}</span>
-                <span style={{ color: CP.textMuted }}>Operatore di riferimento del voto</span><span style={{ color: CP.textSecondary }}>{score.benchmarkOperator || "spagnuolo (default)"}</span>
+                <span style={{ color: CP.textMuted }}>Operatore di riferimento del voto</span><span style={{ color: CP.textSecondary }}>{/* il voto AI confronta la chat con i modi di scrivere di un operatore modello (fan-profiles.js) */}{score.benchmarkOperator ? score.benchmarkOperator.charAt(0).toUpperCase() + score.benchmarkOperator.slice(1) : "Spagnuolo (predefinito)"}</span>
                 <span style={{ color: CP.textMuted }}>Durata</span><span style={{ color: CP.textSecondary, fontVariantNumeric: "tabular-nums" }}>{session.duration || 0} s</span>
               </div>
             </Disclosure>
