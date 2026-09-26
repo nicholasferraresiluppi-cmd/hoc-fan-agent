@@ -45,38 +45,42 @@ function byPerson(byAlias) {
 }
 const median = (xs) => { const v = xs.filter((x) => x != null).sort((a, b) => a - b); if (!v.length) return null; const k = Math.floor(v.length / 2); return v.length % 2 ? v[k] : (v[k - 1] + v[k]) / 2; };
 
+async function chattingBy(periodId) {
+  // Chatting: stessa classifica (e stesse decorazioni) di Classifica vendite / alert "sotto soglia"
+  const chat = {};
+  if (!(await hasCpDataForPeriod(periodId))) return chat;
+  const [opsRaw, categories, langs, excl] = await Promise.all([
+    buildOperatorsForCpLeaderboard(periodId), loadGroupCategories(), loadGroupLanguages(), kv.get("leaderboard:exclusions"),
+  ]);
+  const exclusions = excl || {};
+  const decorated = opsRaw.filter((op) => !exclusions[op.employee]).map((op) => {
+    const lang = langs?.[op.group] || detectLanguage(op.group);
+    return { ...op, category: categories?.[op.group] || null, language: lang || null };
+  });
+  const { ranking } = await buildCpLeaderboard(decorated, periodId);
+  for (const r of ranking) {
+    const n = personOf(r.cp_breakdown?.top_creator);
+    if (!n || r.score == null) continue;
+    if (!chat[n]) chat[n] = { ops: 0, under: 0, scoreSum: 0 };
+    chat[n].ops += 1; chat[n].scoreSum += r.score;
+    if (r.score > 0 && r.score <= UNDER_SCORE && (r.cp_aggregates?.total_shifts || 0) >= UNDER_MIN_SHIFTS) chat[n].under += 1;
+  }
+  return chat;
+}
+
 export async function computeCityLive(periodId = monthOf()) {
   const prevId = prevMonth(periodId);
-  const [wCur, mCur, mPrev] = await Promise.all([getWages(periodId), buildCreatorMatrix(periodId), buildCreatorMatrix(prevId)]);
+  const [wCur, wPrev, mCur, mPrev] = await Promise.all([getWages(periodId), getWages(prevId), buildCreatorMatrix(periodId), buildCreatorMatrix(prevId)]);
   // costo: P&L (takes × compenso del turno); venduto e turni: matrice di Creator (una sola definizione di turno per l'app)
   const aCur = aggregateWagesByAlias(wCur);
-  const costBy = byPerson(aCur);
-  const fromMatrix = (m) => { const o = {}; for (const [alias, c] of Object.entries(m?.creators || {})) { const n = personOf(alias); if (!o[n]) o[n] = { sales: 0, shifts: 0 }; o[n].sales += c.total_sales || 0; o[n].shifts += c.total_shifts || 0; } return o; };
+  const costBy = byPerson(aCur), costPrevBy = byPerson(aggregateWagesByAlias(wPrev));
+  const fromMatrix = (m) => { const o = {}; for (const [alias, c] of Object.entries(m?.creators || {})) { const n = personOf(alias); if (!o[n]) o[n] = { sales: 0, shifts: 0, top: null, topSales: -1 }; o[n].sales += c.total_sales || 0; o[n].shifts += c.total_shifts || 0; if ((c.total_sales || 0) > o[n].topSales) { o[n].topSales = c.total_sales || 0; o[n].top = alias; } } return o; };
   const cur = fromMatrix(mCur), prev = fromMatrix(mPrev);
   for (const n of Object.keys(cur)) cur[n].cost = costBy[n] ? costBy[n].cost * (cur[n].sales / (costBy[n].sales || cur[n].sales || 1)) : 0;
   // mediana del costo sul venduto tra le creator (a livello di pagina, come il P&L)
   const medianCostPct = median([...aCur.values()].filter((a) => a.sales > 0).map((a) => a.cost / a.sales));
 
-  // Chatting: stessa classifica (e stesse decorazioni) di Classifica vendite / alert "sotto soglia"
-  const chat = {};
-  if (await hasCpDataForPeriod(periodId)) {
-    const [opsRaw, categories, langs, excl] = await Promise.all([
-      buildOperatorsForCpLeaderboard(periodId), loadGroupCategories(), loadGroupLanguages(), kv.get("leaderboard:exclusions"),
-    ]);
-    const exclusions = excl || {};
-    const decorated = opsRaw.filter((op) => !exclusions[op.employee]).map((op) => {
-      const lang = langs?.[op.group] || detectLanguage(op.group);
-      return { ...op, category: categories?.[op.group] || null, language: lang || null };
-    });
-    const { ranking } = await buildCpLeaderboard(decorated, periodId);
-    for (const r of ranking) {
-      const n = personOf(r.cp_breakdown?.top_creator);
-      if (!n || r.score == null) continue;
-      if (!chat[n]) chat[n] = { ops: 0, under: 0, scoreSum: 0 };
-      chat[n].ops += 1; chat[n].scoreSum += r.score;
-      if (r.score > 0 && r.score <= UNDER_SCORE && (r.cp_aggregates?.total_shifts || 0) >= UNDER_MIN_SHIFTS) chat[n].under += 1;
-    }
-  }
+  const [chat, chatPrev] = await Promise.all([chattingBy(periodId), chattingBy(prevId)]);
 
   const people = {};
   for (const n of new Set([...Object.keys(cur), ...Object.keys(prev), ...Object.keys(chat)])) {
@@ -85,22 +89,26 @@ export async function computeCityLive(periodId = monthOf()) {
       sales: Math.round(c.sales), shifts: c.shifts, perShift: c.shifts ? c.sales / c.shifts : null,
       salesPrev: Math.round(p.sales), perShiftPrev: p.shifts ? p.sales / p.shifts : null,
       costPct: c.sales > 0 ? c.cost / c.sales : null,
+      costPctPrev: costPrevBy[n]?.sales > 0 ? costPrevBy[n].cost / costPrevBy[n].sales : null,
+      underPrev: chatPrev[n]?.under ?? null, topAlias: c.top || null,
       ops: ch?.ops || 0, under: ch?.under || 0, avgScore: ch?.ops ? ch.scoreSum / ch.ops : null,
     };
   }
   const sum = (o, k) => Object.values(o).reduce((s, x) => s + (x[k] || 0), 0);
   const agency = {
     sales: Math.round(sum(cur, "sales")), shifts: sum(cur, "shifts"), salesPrev: Math.round(sum(prev, "sales")), shiftsPrev: sum(prev, "shifts"),
-    cost: sum(cur, "cost"), ops: sum(chat, "ops"), under: sum(chat, "under"),
+    cost: sum(cur, "cost"), ops: sum(chat, "ops"), under: sum(chat, "under"), underPrev: sum(chatPrev, "under"),
+    costPrev: sum(costPrevBy, "cost"), salesPrevWages: sum(costPrevBy, "sales"),
   };
   agency.perShift = agency.shifts ? agency.sales / agency.shifts : null;
   agency.perShiftPrev = agency.shiftsPrev ? agency.salesPrev / agency.shiftsPrev : null;
   agency.costPct = agency.sales > 0 ? agency.cost / agency.sales : null;
+  agency.costPctPrev = agency.salesPrevWages > 0 ? agency.costPrev / agency.salesPrevWages : null;
   return { period: periodId, prev: prevId, medianCostPct, people, agency, computed_at: Date.now() };
 }
 
 export async function getCityLive(periodId = monthOf()) {
-  const key = `citta:live:v3:${periodId}`;
+  const key = `citta:live:v4:${periodId}`;
   const hit = await kv.get(key);
   if (hit && Date.now() - (hit.computed_at || 0) < TTL * 1000) return hit;
   const fresh = await computeCityLive(periodId);
@@ -120,38 +128,51 @@ function salesArea(x, live) {
   const s = d != null && d <= SALES_DROP ? "wait" : "ok";
   const l = `Venduto a ${monthName(live.period)}: ${usd(x.sales)} in ${grp(x.shifts)} turni, ${usd(x.perShift)} a turno` +
     (d != null ? ` (${d >= 0 ? "+" : "−"}${pct(Math.abs(d), 0)} rispetto a ${monthName(live.prev)}).` : ".");
-  return { n: "Sales", s, open: 0, late: 0, l, src: "hoc" };
+  const trend = d == null ? null : d >= 0.05 ? "up" : d <= -0.05 ? "down" : "flat";
+  return { n: "Sales", s, open: 0, late: 0, l, src: "hoc", trend, link: x.topAlias ? `/leaderboard/creators/${encodeURIComponent(x.topAlias)}` : "/leaderboard/creators" };
 }
 function financeArea(x, live) {
   if (!x || x.costPct == null) return { n: "Finance", s: "none", open: 0, late: 0, l: "Nessun venduto: costo operatori non calcolabile.", src: "hoc" };
   const high = live.medianCostPct != null && x.costPct >= live.medianCostPct + COST_HIGH_PTS;
-  return { n: "Finance", s: high ? "wait" : "ok", open: 0, late: 0, src: "hoc",
+  const dc = x.costPctPrev != null ? x.costPct - x.costPctPrev : null;
+  const trend = dc == null ? null : dc <= -0.01 ? "up" : dc >= 0.01 ? "down" : "flat";
+  return { n: "Finance", s: high ? "wait" : "ok", open: 0, late: 0, src: "hoc", trend, link: "/admin/pnl-live",
     l: `Costo operatori ${pct(x.costPct)} del venduto` + (live.medianCostPct != null ? ` (mediana delle creator ${pct(live.medianCostPct)}${high ? ": costo alto" : ""}).` : ".") };
 }
 function chattingArea(x) {
   if (!x || !x.ops) return { n: "Chatting", s: "none", open: 0, late: 0, l: "Nessun operatore ha questa creator come principale questo mese.", src: "hoc" };
   const avg = x.avgScore != null ? x.avgScore.toLocaleString("it-IT", { maximumFractionDigits: 1 }) : "—";
-  return { n: "Chatting", s: x.under ? "wait" : "ok", open: 0, late: x.under, src: "hoc",
+  const du = x.underPrev != null ? x.under - x.underPrev : null;
+  const trend = du == null ? null : du < 0 ? "up" : du > 0 ? "down" : "flat";
+  return { n: "Chatting", s: x.under ? "wait" : "ok", open: 0, late: x.under, src: "hoc", trend, link: "/admin/action-center",
     l: `${x.ops} ${x.ops === 1 ? "operatore lavora" : "operatori lavorano"} soprattutto qui, score vendite medio ${avg}` +
       (x.under ? `; ${x.under} sotto soglia (score ≤ ${UNDER_SCORE}): vedi Action Center.` : "; nessuno sotto soglia.") };
 }
 
-/** Sostituisce Sales/Finance/Chatting con i dati di HOC Pro e aggiunge il venduto (altezza). */
-export function mergeCityLive(snap, live) {
+/** Sostituisce Sales/Finance/Chatting con i dati di HOC Pro e aggiunge il venduto (altezza).
+ *  past=true: vista di un mese passato → i piani ClickUp non hanno storico (la fotografia è di oggi). */
+export function mergeCityLive(snap, live, { past = false, claims = {} } = {}) {
   if (!snap?.projects || !live) return snap;
-  const swap = (areas, map) => areas.map((a) => map[a.n] || { ...a, src: "clickup" });
+  const noHist = (a) => ({ n: a.n, s: "none", open: 0, late: 0, src: "clickup", l: "Nessuno storico ClickUp per questo mese: la fotografia di ClickUp è di oggi." });
+  const swapT = (tower, areas, map) => areas.map((a) => { const b = map[a.n] || (past ? noHist(a) : { ...a, src: "clickup" }); const c = claims[`${tower}|${a.n}`]; return c ? { ...b, claim: { by: c.by, at: c.at } } : b; });
   const projects = snap.projects.map((p) => {
     const x = live.people[p.n];
     return { ...p, sales: x?.sales || 0, salesPrev: x?.salesPrev || 0,
-      areas: swap(p.areas, { Sales: salesArea(x, live), Finance: financeArea(x, live), Chatting: chattingArea(x) }) };
+      areas: swapT(p.n, p.areas, { Sales: salesArea(x, live), Finance: financeArea(x, live), Chatting: chattingArea(x) }) };
   });
   const ag = live.agency;
   const hq = { ...snap.hq, sales: ag.sales,
-    areas: swap(snap.hq.areas, {
+    areas: swapT(snap.hq.n, snap.hq.areas, {
       Sales: salesArea({ ...ag }, live),
-      Finance: financeArea({ costPct: ag.costPct }, { ...live, medianCostPct: null }),
-      Chatting: { n: "Chatting", s: ag.under ? "wait" : "ok", open: 0, late: ag.under, src: "hoc",
+      Finance: financeArea({ costPct: ag.costPct, costPctPrev: ag.costPctPrev }, { ...live, medianCostPct: null }),
+      Chatting: { n: "Chatting", s: ag.under ? "wait" : "ok", open: 0, late: ag.under, src: "hoc", link: "/admin/action-center",
+        trend: ag.underPrev == null ? null : ag.under < ag.underPrev ? "up" : ag.under > ag.underPrev ? "down" : "flat",
         l: `${ag.under} operatori sotto soglia (score ≤ ${UNDER_SCORE}, almeno ${UNDER_MIN_SHIFTS} turni) su ${ag.ops} in classifica.` },
     }) };
-  return { ...snap, projects, hq, live: { period: live.period, prev: live.prev, computed_at: live.computed_at } };
+  return { ...snap, projects, hq, live: { period: live.period, prev: live.prev, computed_at: live.computed_at, past, label: monthName(live.period) } };
+}
+
+export const currentMonthId = () => monthOf();
+export const previousMonthId = (pid) => prevMonth(pid || monthOf());
+export function monthLabel(pid) { return monthName(pid);
 }
