@@ -137,6 +137,14 @@ export async function GET(request) {
     score: Number(mine.score.toFixed(1)),
     tier: mine.tier,
     peer_rank,
+    // Traguardo raggiungibile da tutti (26/09, comitato esperti): per la metà
+    // bassa il riferimento è la FASCIA SUCCESSIVA (assoluta), non "la metà alta"
+    // che per definizione metà del gruppo non può raggiungere.
+    next_tier: (() => {
+      const ts = (settings.tiers || []).slice().sort((a, b) => a.min - b.min);
+      const nx = ts.find((t) => t.min > mine.score);
+      return nx ? { tier: nx.label, gap: Number(Math.max(0.1, nx.min - mine.score).toFixed(1)) } : null;
+    })(),
     comparison: mine.comparison === "language" ? "language" : "group", // v13: gruppo piccolo → media della lingua
     group_size: mine.group_size ?? mine.group_means?._count ?? null,
     composition,
