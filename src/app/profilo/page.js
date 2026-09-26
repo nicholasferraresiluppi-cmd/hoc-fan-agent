@@ -165,7 +165,7 @@ export default function MyProfilePage() {
                 <div className="pf-score" style={{ textAlign: "right", position: "relative", marginLeft: "auto" }}>
                   <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.15em" }}>Il tuo score vendite</div>
                   <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 64, lineHeight: 1, color: tierColor }}>
-                    {cp.score?.toFixed(1) ?? "—"}
+                    {cp.score != null ? cp.score.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "—"}
                   </div>
                   <span style={{ display: "inline-block", padding: "4px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", background: alpha(tierColor, "26"), color: tierColor, border: `1px solid ${alpha(tierColor, "55")}`, marginTop: 8, fontFamily: FONTS.body }}>
                     {cp.tier}

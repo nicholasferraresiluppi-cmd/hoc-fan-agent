@@ -99,7 +99,7 @@ async function loadLanguageOverrides() {
 /**
  * Costruisce la classifica di un periodo (con cache).
  */
-async function buildRankingForPeriod(periodType, periodId) {
+export async function buildRankingForPeriod(periodType, periodId) {
   const key = `_ranking:${periodType}:${periodId}`;
   const cached = await cacheGet(key);
   if (cached) return cached;

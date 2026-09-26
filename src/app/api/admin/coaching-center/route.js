@@ -33,6 +33,7 @@ import { buildCoachingCandidates } from "@/lib/coaching-center";
 import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
 import { loadGroupLanguages } from "@/app/api/admin/group-languages/route";
 import { detectLanguage } from "@/lib/leaderboard-calc";
+import { buildRankingForPeriod } from "@/lib/leaderboard-history";
 
 const ASSIGN_KEY = (periodId) => `coaching_center:assignments:${periodId}`;
 
@@ -57,14 +58,14 @@ export async function GET(request) {
     }, { status: 404 });
   }
 
-  // Carica Infloww scores se disponibili (per pattern detection)
+  // Score Infloww dello STESSO mese (pattern "chatta bene, vende poco").
+  // 26/09/2026: prima qui c'era un segnaposto mai completato → mappa sempre vuota
+  // → il pattern low_conversion non scattava mai. Mai un altro mese al posto di
+  // questo (lezione scheda operatore): se il mese non è importato, niente pattern.
   let inflowwScoreByEmployee = new Map();
   try {
-    const infwUrl = new URL(request.url);
-    infwUrl.pathname = "/api/leaderboard/operational";
-    infwUrl.searchParams.set("period_type", "monthly");
-    infwUrl.searchParams.set("period_id", period_id);
-    // chiamata interna evitata: pattern detection lavora anche senza Infloww
+    const { ranking } = await buildRankingForPeriod("monthly", period_id);
+    for (const r of ranking || []) if (r.employee && typeof r.score === "number" && r.score > 0) inflowwScoreByEmployee.set(r.employee, r.score);
   } catch {}
 
   const [assignments, candidates, categories, langOverrides] = await Promise.all([
