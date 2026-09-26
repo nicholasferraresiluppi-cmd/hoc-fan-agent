@@ -53,12 +53,12 @@ export default function RootLayout({ children }) {
         },
       }}
     >
-      <html lang="it" suppressHydrationWarning>
+      <html lang="it" data-theme="light" suppressHydrationWarning>
         <head>
           {/* Tema chiaro/scuro: variabili dei due temi + scelta salvata applicata PRIMA
               del primo disegno (niente lampo del tema sbagliato). Default: scuro. */}
           <style dangerouslySetInnerHTML={{ __html: themeCss() }} />
-          <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem("hoc:theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}` }} />
+          <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem("hoc:theme")==="dark")document.documentElement.removeAttribute("data-theme")}catch(e){}` }} />
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
           <link

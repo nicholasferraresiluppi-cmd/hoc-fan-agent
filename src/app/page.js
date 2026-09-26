@@ -13,6 +13,7 @@ import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
 import CoachPanel from "@/components/CoachPanel";
 import SignalsPanel from "@/components/SignalsPanel";
+import { canSee } from "@/lib/nav-access";
 
 // Pick a random archetype weighted by difficulty (favor medium/common ones)
 function pickRandomArchetype() {
@@ -992,8 +993,8 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Admin Area */}
-            <Link href="/admin"
+            {/* Admin Area — solo per chi può aprire l'Hub (prima la vedevano anche gli operatori) */}
+            {canSee("/admin", whoamiRaw?.capabilities, !!whoamiRaw?.admin) && whoamiRaw?.authenticated && (<Link href="/admin"
               style={{
                 background: `${alpha(HOC_COLORS.gray, "10")}`,
                 border: `2px dashed ${alpha(HOC_COLORS.gray, "60")}`,
@@ -1013,7 +1014,7 @@ export default function Home() {
               <p style={{ margin: 0, fontSize: "0.85rem", color: HOC_COLORS.gray }}>
                 Accessi, seed demo, classifica, dashboard SM
               </p>
-            </Link>
+            </Link>)}
                   {/* Playbook — libreria formativa visibile a tutti gli operatori */}
             <Link href="/playbook"
               style={{

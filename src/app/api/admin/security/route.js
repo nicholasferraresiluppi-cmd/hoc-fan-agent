@@ -2,7 +2,7 @@
 import { clerkClient } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
 import { authorizeAdmin, auditAccess } from "@/lib/rbac";
-import { listAdmins, userHasMfa, adminMfaRequired, MFA_FLAG_KEY } from "@/lib/admin";
+import { listAdmins, userHasMfa, adminMfaRequired, MFA_FLAG_KEY, mfaExemptions } from "@/lib/admin";
 
 export async function GET() {
   const a = await authorizeAdmin();
@@ -16,6 +16,8 @@ export async function GET() {
       return { userId: ad.userId, name: ad.name || [u.firstName, u.lastName].filter(Boolean).join(" ") || ad.userId, email: ad.email || u.emailAddresses?.[0]?.emailAddress || null, mfa: !!u?.twoFactorEnabled };
     } catch { return null; }
   }))).filter(Boolean);
+  const exempt = await mfaExemptions();
+  for (const r of rows) if (exempt[r.userId]) r.exempt = exempt[r.userId];
   return Response.json({ required: await adminMfaRequired(), me_mfa: await userHasMfa(a.userId), admins: rows });
 }
 
