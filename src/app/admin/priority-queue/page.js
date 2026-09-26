@@ -136,8 +136,8 @@ export default function PriorityQueuePage() {
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
-        crumbs={[{ label: "Hub", href: "/admin" }, { label: "People" }, { label: "Priority queue" }]}
-        title="Priority queue"
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "People" }, { label: "Fan da seguire ora" }]}
+        title="Fan da seguire ora"
         subtitle="Quale fan seguire adesso, creator per creator: chi ha scritto e aspetta ancora una risposta, e i fan che spendono tanto ma sono spariti da qualche giorno. In cima quelli che valgono di più."
         actions={
           <select

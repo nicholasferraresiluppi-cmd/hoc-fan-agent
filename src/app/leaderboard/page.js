@@ -93,8 +93,8 @@ export default function LeaderboardPage() {
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
-        crumbs={[{ label: "Academy", href: "/" }, { label: "Ladder" }]}
-        title="Ladder"
+        crumbs={[{ label: "Academy", href: "/" }, { label: "Classifica allenamento" }]}
+        title="Classifica allenamento"
         subtitle={`Chi si sta allenando meglio nel simulatore dell'Academy, per punteggio medio delle sessioni. Per entrare servono almeno ${minSessions} sessioni valutate nel periodo.`}
         actions={
           <Link href="/leaderboard/storico" style={{ color: CP.textPrimary, textDecoration: "none", fontSize: 13, padding: "7px 12px", border: `1px solid ${CP.border}`, borderRadius: 10, background: CP.surface }}>
