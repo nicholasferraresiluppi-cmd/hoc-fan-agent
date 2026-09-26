@@ -27,17 +27,18 @@ export async function GET() {
   const members = Object.values(membersMap || {});
   const unmapped = members.filter((mb) => !m[mb.id]);
 
-  // Suggerimenti Infloww — leggi i nomi disponibili dal periodo più recente
+  // Nomi operatore Infloww: gli ultimi DUE mesi per data del periodo (non per
+  // data di import: il 26/09 l'ultimo importato era luglio, ricaricato dopo
+  // settembre). + nomi già collegati a un'altra persona CP (non riproporli).
   let inflowwNames = [];
   try {
-    const periodsRaw = (await kv.zrange("ops_kpi:imports", 0, 0, { rev: true })) || [];
-    if (periodsRaw.length > 0 && typeof periodsRaw[0] === "string") {
-      const recs = (await kv.get(`ops_kpi:${periodsRaw[0]}`)) || [];
-      const set = new Set();
-      for (const r of recs) if (r.employee) set.add(r.employee.trim());
-      inflowwNames = Array.from(set).sort();
-    }
+    const all = (await kv.zrange("ops_kpi:imports", 0, -1)) || [];
+    const months = all.filter((x) => typeof x === "string" && x.startsWith("monthly:")).sort().slice(-2);
+    const set = new Set();
+    for (const key of months) for (const r of (await kv.get(`ops_kpi:${key}`)) || []) if (r.employee && !r.is_mass) set.add(r.employee.trim());
+    inflowwNames = Array.from(set).sort();
   } catch {}
+  const takenNames = Array.from(new Set(Object.values(m)));
 
   // Venduto dei non collegati negli ultimi 2 mesi: si collega prima chi pesa
   // (le persone senza collegamento spariscono dalle viste performance).
@@ -74,6 +75,7 @@ export async function GET() {
     unmapped: sortedUnmapped,
     unmapped_sample: sortedUnmapped, // alias retrocompat
     infloww_names: inflowwNames,
+    taken_names: takenNames,
     impact,
   });
 }
