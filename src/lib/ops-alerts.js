@@ -320,6 +320,29 @@ const CHECKS = [
     },
   },
   {
+    // Ricavi agenzia Infloww (Revenue agency, Controllo dati CP) non aggiornati:
+    // il sync era solo a bottone ed è rimasto fermo dall'8/07 al 26/09 senza che
+    // nessuno se ne accorgesse (le pagine mostravano $0). Ora gira ogni notte:
+    // questo controllo dice se la catena si è fermata. Severità per finding.
+    id: "infloww-agency-stale",
+    severity: "warning",
+    label: "Ricavi Infloww non aggiornati",
+    async run() {
+      const meta = await kv.get("infloww:sync:meta").catch(() => null);
+      const age = meta?.last_sync_at ? (Date.now() - meta.last_sync_at) / 86400000 : Infinity;
+      if (age <= 3) return [];
+      const days = Number.isFinite(age) ? Math.floor(age) : null;
+      return [{
+        fingerprint: "infloww-agency-stale",
+        severity: age > 7 ? "critical" : "warning",
+        title: days != null ? `Ricavi Infloww fermi da ${days} giorni` : "Ricavi Infloww mai sincronizzati",
+        detail: `Revenue agency e Controllo dati CP leggono una copia dei ricavi Infloww che si aggiorna ogni notte. ${days != null ? `L'ultimo aggiornamento è del ${new Date(meta.last_sync_at).toLocaleDateString("it-IT")}` : "Non risulta nessun aggiornamento"}: finché non riparte quelle pagine mostrano numeri vecchi o a zero.${meta?.failed_creators?.length ? ` Ultimo giro: ${meta.failed_creators.length} creator non scaricate.` : ""}`,
+        value: days != null ? `${days}g` : "mai",
+        cta: { href: "/admin/infloww-agency", label: "Apri Revenue agency e rilancia" },
+      }];
+    },
+  },
+  {
     // Venduto di persone CP non collegate a un operatore: spariscono da tutte
     // le viste performance (set 2026: 168 persone, $126k = 7% del mese, visto
     // solo confrontando i totali di Sales CP / Creator / P&L).
@@ -355,7 +378,7 @@ const CHECKS = [
     async run() {
       const dispatch = await kv.get("cron:heartbeat:dispatch");
       if (!dispatch?.at) return [];
-      const children = ["cp-wages", "payout-ledger"];
+      const children = ["cp-wages", "payout-ledger", "infloww-agency"];
       const beats = await Promise.all(children.map((c) => kv.get(`cron:heartbeat:${c}`).catch(() => null)));
       const stale = children.filter((c, i) => !beats[i]?.at || Date.now() - beats[i].at > 30 * 3600 * 1000);
       const failed = dispatch.failed_kicks || [];

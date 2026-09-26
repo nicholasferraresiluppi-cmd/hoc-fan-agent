@@ -15,7 +15,7 @@
  * (sensibile al confine settimana, resta alle 00:05 del lunedì) e questo
  * dispatcher (03:00 UTC ogni giorno), che esegue il resto in SEQUENZA
  * deterministica in base al giorno:
- *   - sempre:            tick cp-wages e payout-ledger (auto-concatenanti)
+ *   - sempre:            tick cp-wages, payout-ledger e infloww-agency (auto-concatenanti)
  *                        + snapshot coda del loop azione→esito (queue-snapshot)
  *   - sempre:            run alert operativi (watchdog catena incluso)
  *   - lunedì:            + digest email (dopo il run: legge i suoi findings)
@@ -56,6 +56,9 @@ export async function POST(request) {
   }
   out.cp_wages = await kickEndpoint(request, "/api/cron/cp-wages");
   out.payout_ledger = await kickEndpoint(request, "/api/cron/payout-ledger");
+  // ricavi agenzia Infloww (Revenue agency / Controllo dati CP): prima solo a
+  // bottone, fermo dall'8 luglio senza che nessuno se ne accorgesse (26/09)
+  out.infloww_agency = await kickEndpoint(request, "/api/cron/infloww-agency");
   out.queue_snapshot = await kickEndpoint(request, "/api/cron/queue-snapshot");
   // librerie game film: rinfresca le 2 più stantie → momenti nuovi in coda
   // ogni notte senza che un coach debba aprire la pagina (blueprint 26 lug)
