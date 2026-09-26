@@ -77,7 +77,7 @@ export const TIER = {
 };
 
 // Caratteri come variabili: lo stile v3 ("Notte/Carta", anteprima 26/09) passa a
-// Instrument Sans senza toccare le pagine; lo stile attuale resta Inter.
+// Jost + Cormorant Garamond ("Couture") senza toccare le pagine; lo stile attuale resta Inter.
 export const FONTS = {
   display: "var(--cp-font)",
   body: "var(--cp-font)",
@@ -133,6 +133,7 @@ export const CP_DARK = {
   gold: "#d9c29a", goldSoft: "rgba(217,194,154,.10)", track: "#2c3650", neu: "#8c95a8",
   ruleData: "#5d6678", fieldBd: "#2c3650", sel: "rgba(139,124,246,.12)", hover: "rgba(255,255,255,.03)",
   scrim: "rgba(0,0,0,.6)", cool: "#b9aef9", warm: "#4ade80", heroBg: "#151a22",
+  tierTop: "#4ade80", tierStrong: "#4ade80",
 };
 // Tema chiaro (25/09/2026): per tabelle dense di numeri il testo scuro su fondo
 // chiaro si legge meglio (Piepenbrock et al. 2013); scelto da 4 tester su 5 nel
@@ -147,6 +148,7 @@ export const CP_LIGHT = {
   gold: "#7a5f2c", goldSoft: "rgba(122,95,44,.07)", track: "#c9cdd6", neu: "#434a58",
   ruleData: "#8a92a2", fieldBd: "#c9cdd6", sel: "rgba(99,83,224,.08)", hover: "rgba(20,23,31,.03)",
   scrim: "rgba(20,23,31,.38)", cool: "#4a3bc4", warm: "#17803d", heroBg: "#ffffff",
+  tierTop: "#17803d", tierStrong: "#17803d",
 };
 
 // ── Stile v3 "Notte / Carta" (26/09/2026) ─────────────────────────────────────
@@ -156,36 +158,45 @@ export const CP_LIGHT = {
 // Rosso SOLO per denaro negativo e allarmi; champagne ("gold") solo per sigillo,
 // fascia Eccellente, "Pro" e traguardi (max 2 per schermata).
 export const CP_NOTTE = {
-  bgSunken: "#0e0d13", bg: "#0b0a0f", surface: "#16151c", surfaceAlt: "#1d1c24",
-  border: "rgba(255,255,255,.10)", borderSoft: "rgba(255,255,255,.07)", borderStrong: "rgba(255,255,255,.16)",
-  textPrimary: "#f2f1f6", textSecondary: "#c2c0cc", textMuted: "#9794a4", mutedIcons: "#75727f",
-  accent: "#7355f5", accentInk: "#ffffff", accentSoft: "rgba(115,85,245,.16)", accentSoftText: "#c4b8ff", accentDim: "#3b3470",
-  accentGreen: "#7fd3a8", accentRed: "#ff9aa6", accentBlue: "#c4b8ff",
-  logoFilter: "brightness(0) invert(1)", dangerSoft: "rgba(255,110,130,.12)",
-  gold: "#d9c29a", goldSoft: "rgba(217,194,154,.09)", track: "#6a6776", neu: "#c4c1ce",
-  ruleData: "#5c5968", fieldBd: "#75727f", sel: "rgba(115,85,245,.12)", hover: "rgba(255,255,255,.03)",
-  scrim: "rgba(5,4,8,.55)", cool: "#a9c1ee", warm: "#9fd8bb", heroBg: "#17161d",
+  // "Couture" scuro (26/09 sera, scelto dal board tra 22 stili): antracite con velluto,
+  // azioni in AVORIO (testo inchiostro), champagne SOLO per il merito (Eccellente,
+  // Pro, traguardi). Il viola non c'è più.
+  bgSunken: "#090a0f", bg: "#0c0d13", surface: "#13141b", surfaceAlt: "#1d1e27",
+  border: "rgba(238,233,223,.11)", borderSoft: "rgba(238,233,223,.07)", borderStrong: "rgba(238,233,223,.18)",
+  textPrimary: "#eee9df", textSecondary: "#c7c1b5", textMuted: "#9a958b", mutedIcons: "#76716a",
+  accent: "#ece7db", accentInk: "#17140e", accentSoft: "rgba(236,231,219,.10)", accentSoftText: "#eee9df", accentDim: "#4a463f",
+  accentGreen: "#a3d4b2", accentRed: "#f0a3a3", accentBlue: "#c7c1b5",
+  logoFilter: "brightness(0) invert(1)", dangerSoft: "rgba(240,130,130,.11)",
+  gold: "#d6bd8e", goldSoft: "rgba(214,189,142,.09)", track: "#66636b", neu: "#cfc8ba",
+  ruleData: "#5b5a62", fieldBd: "#6f6c73", sel: "rgba(236,231,219,.07)", hover: "rgba(255,255,255,.025)",
+  scrim: "rgba(4,5,9,.6)", cool: "#a9bfe8", warm: "#a3d4b2",
+  heroBg: "linear-gradient(180deg, #181a24, #121319)",
+  tierTop: "#d6bd8e", tierStrong: "#eee9df",
 };
 // Carta: chiaro caldo, stesso mondo dell'attestato; grigi ricalcolati per AA sul
 // caldo (--muted #655f54 dalla revisione accessibilità), card staccate dal fondo.
 export const CP_CARTA = {
-  bgSunken: "#ece7dc", bg: "#f4f1ea", surface: "#fffefb", surfaceAlt: "#f2eee4",
-  border: "#ddd5c4", borderSoft: "#e7e1d4", borderStrong: "#cfc6b3",
-  textPrimary: "#1c1a15", textSecondary: "#46423a", textMuted: "#655f54", mutedIcons: "#8c877b",
-  accent: "#7355f5", accentInk: "#ffffff", accentSoft: "#efeafc", accentSoftText: "#5a3de0", accentDim: "#cbbff5",
-  accentGreen: "#1b6b49", accentRed: "#a61e33", accentBlue: "#5a3de0",
-  logoFilter: "brightness(0)", dangerSoft: "#fbeae8",
-  gold: "#7a5f2c", goldSoft: "rgba(122,95,44,.07)", track: "#8c877b", neu: "#3e3a33",
-  ruleData: "#9a9384", fieldBd: "#8c877b", sel: "rgba(115,85,245,.07)", hover: "rgba(40,30,10,.025)",
-  scrim: "rgba(28,24,16,.38)", cool: "#2a569f", warm: "#1b6b49", heroBg: "#fffefb",
+  // "Couture" chiaro (Atelier): crema e carta pesante, azioni in INCHIOSTRO,
+  // champagne scuro solo per il merito; grigi a contrasto AA sul caldo.
+  bgSunken: "#ede6d8", bg: "#f5f0e6", surface: "#fbf8f1", surfaceAlt: "#f0e9dc",
+  border: "#ddd3c1", borderSoft: "#e8e0d1", borderStrong: "#cdc2ad",
+  textPrimary: "#2a2521", textSecondary: "#4b433b", textMuted: "#6b6157", mutedIcons: "#8c8272",
+  accent: "#2a2521", accentInk: "#fbf8f1", accentSoft: "#ebe4d6", accentSoftText: "#2a2521", accentDim: "#cfc5b2",
+  accentGreen: "#1b6b49", accentRed: "#a61e33", accentBlue: "#4b433b",
+  logoFilter: "brightness(0)", dangerSoft: "#f8e8e5",
+  gold: "#8a6a32", goldSoft: "rgba(138,106,50,.07)", track: "#a39886", neu: "#3e3a33",
+  ruleData: "#a39886", fieldBd: "#8c8272", sel: "rgba(42,37,33,.06)", hover: "rgba(40,30,10,.025)",
+  scrim: "rgba(28,24,16,.38)", cool: "#2a569f", warm: "#1b6b49", heroBg: "#fcf9f3",
+  tierTop: "#8a6a32", tierStrong: "#2a2521",
 };
 
 // Menu notte sotto Carta: stesso schema di CP_NOTTE ma col nero CALDO, così il
 // menu scuro appartiene al mondo della carta invece di sembrare un'altra app.
 export const CP_NOTTE_CALDA = {
   ...CP_NOTTE,
-  bgSunken: "#1a1813", bg: "#1a1813", surface: "#221f19", surfaceAlt: "#2b2820", heroBg: "#221f19",
-  textMuted: "#a39d90", mutedIcons: "#807a6e", hover: "rgba(255,245,225,.04)",
+  // menu su Carta: inchiostro caldo, stessa famiglia del chiaro
+  bgSunken: "#1f1b17", bg: "#1f1b17", surface: "#28231e", surfaceAlt: "#322c26", heroBg: "#28231e",
+  textMuted: "#a8a092", mutedIcons: "#857d70", hover: "rgba(255,245,225,.04)",
 };
 
 // Scala per i DATI (sequenziale, separata dall'accento viola che è per ciò che si
@@ -208,7 +219,7 @@ export function alpha(color, hex) {
 export function themeCss() {
   const vars = (o) => Object.entries(o).map(([k, v]) => `--cp-${k}:${v};`).join("");
   const fontOld = `--cp-font:'Inter',system-ui,-apple-system,sans-serif;--cp-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;--cp-sig:Georgia,serif;`;
-  const fontV3 = `--cp-font:var(--f-sans),ui-sans-serif,system-ui,-apple-system,sans-serif;--cp-mono:ui-monospace,"SF Mono",Menlo,monospace;--cp-sig:var(--f-sig),Georgia,serif;`;
+  const fontV3 = `--cp-font:var(--f-sans),ui-sans-serif,system-ui,-apple-system,sans-serif;--cp-mono:ui-monospace,"SF Mono",Menlo,monospace;--cp-sig:var(--f-display),Georgia,serif;--cp-display:var(--f-display),Georgia,serif;`;
   return `:root{${vars(CP_DARK)}${fontOld}color-scheme:dark}:root[data-theme="light"]{${vars(CP_LIGHT)}color-scheme:light}`
     // stile v3 in anteprima (vince per specificità/ordine sui due temi attuali)
     + `:root[data-style="v3"]{${vars(CP_NOTTE)}${fontV3}color-scheme:dark}`

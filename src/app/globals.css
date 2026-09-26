@@ -125,7 +125,7 @@ h1, h2, h3, h4, h5, h6 {
 [data-style="v3"] .ds-sect { font-size: 17px !important; font-weight: 500 !important; letter-spacing: -.01em; }
 [data-style="v3"] .ds-lbl { font-size: 12px !important; font-weight: 500 !important; letter-spacing: .01em; color: var(--cp-textMuted) !important; }
 /* card hero: fondo dedicato, bordo 1px, niente glow */
-[data-style="v3"] .ds-hero { background: var(--cp-heroBg) !important; border: 1px solid var(--cp-border) !important; border-radius: 16px !important; box-shadow: none !important; }
+[data-style="v3"] .ds-hero { background: var(--cp-heroBg) !important; border: 1px solid var(--cp-border) !important; border-radius: 6px !important; box-shadow: none !important; }
 /* numero protagonista: 80/56, 500, cifre proporzionali (decimali composti da NumText) */
 [data-style="v3"] .ds-hero-v { font-size: 60px !important; font-weight: 500 !important; line-height: .95 !important; letter-spacing: -.025em !important; font-variant-numeric: proportional-nums lining-nums !important; margin: 6px 0 4px; }
 /* KPI: 32/28, 500, tabellari */
@@ -173,3 +173,10 @@ h1, h2, h3, h4, h5, h6 {
 .ac-cv-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .ac-cv-fields { display: grid; grid-template-columns: 2fr 1fr 2fr; gap: 12px; }
 @media (max-width: 760px) { .ac-cv-grid, .ac-cv-fields { grid-template-columns: 1fr; } }
+
+/* "Couture": numeri protagonisti e titoli di pagina in Cormorant, cifre allineate;
+   angoli sartoriali (6px) su card e pannelli */
+[data-style="v3"] .ds-h1, [data-style="v3"] .ds-hero-v { font-family: var(--cp-display) !important; font-weight: 500 !important; font-variant-numeric: lining-nums proportional-nums !important; letter-spacing: -.01em !important; }
+[data-style="v3"] .ds-hero-v { font-size: 64px !important; }
+@media (max-width: 899px) { [data-style="v3"] .ds-hero-v { font-size: 50px !important; } }
+[data-style="v3"] .ds-metric-v { font-family: var(--cp-display) !important; font-weight: 600 !important; font-variant-numeric: lining-nums tabular-nums !important; letter-spacing: 0 !important; }

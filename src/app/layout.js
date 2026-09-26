@@ -4,13 +4,15 @@ import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
 import "./globals.css";
 import { themeCss, CP } from "@/lib/brand";
-import { Instrument_Sans, Instrument_Serif } from "next/font/google";
+import { Jost, Cormorant_Garamond } from "next/font/google";
 
 // Caratteri dello stile v3 (anteprima): serviti dal nostro dominio da next/font,
 // con misure di riserva calcolate (niente salto al caricamento). Usati solo
-// sotto data-style="v3" tramite --f-sans / --f-sig.
-const fSans = Instrument_Sans({ subsets: ["latin", "latin-ext"], display: "swap", variable: "--f-sans" });
-const fSig = Instrument_Serif({ subsets: ["latin"], weight: "400", style: "italic", display: "swap", preload: false, variable: "--f-sig" });
+// sotto data-style="v3" tramite --f-sans / --f-display.
+// "Couture" (26/09 sera): Jost per l'interfaccia, Cormorant Garamond per numeri
+// protagonisti e titoli di pagina (mai nelle tabelle).
+const fSans = Jost({ subsets: ["latin", "latin-ext"], display: "swap", variable: "--f-sans" });
+const fSig = Cormorant_Garamond({ subsets: ["latin", "latin-ext"], weight: ["500", "600"], style: ["normal", "italic"], display: "swap", variable: "--f-display" });
 
 export const metadata = {
   title: "HOC Pro",

@@ -19,4 +19,6 @@ export const TIER_ORDER = ["Critical", "Weak", "Average", "Good", "Strong", "Eli
 export const tierLabel = (t) => (t ? TIER_IT[t] || t : t);
 export const isHighTier = (t) => t === "Strong" || t === "Elite";
 export const isLowTier = (t) => t === "Critical" || t === "Weak";
-export const tierColor = (t) => (isHighTier(t) ? CP.accentGreen : CP.textSecondary);
+// Eccellente = metallo del merito (champagne nello stile Couture, verde nello
+// stile attuale); Forte = segnale sobrio; le altre neutre.
+export const tierColor = (t) => (t === "Elite" ? CP.tierTop : t === "Strong" ? CP.tierStrong : CP.textSecondary);
