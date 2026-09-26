@@ -2,25 +2,28 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import {
-  Calculator, Users, Sparkles, Award, Target,
-  ArrowRight, Info, Activity,
-} from "lucide-react";
-import { CP, FONTS, alpha } from "@/lib/brand";
-import { SectionLabel, CpCard } from "@/components/cp-style";
+import { Sparkles, Target, ArrowRight } from "lucide-react";
+import { CP, FONTS } from "@/lib/brand";
+import { PageHead, SectionTitle, Notice, card, NUM } from "@/components/ds";
 
 /**
- * /welcome/score-explained — Pagina dedicata che spiega in dettaglio lo
- * score CP v3, con un calcolatore interattivo.
+ * /welcome/score-explained — La formula dello score Vendite (score CP v3) con
+ * un calcolatore interattivo.
+ *
+ * Redesign 26/09/2026 sul design system. Contenuto riallineato al codice
+ * (src/lib/creator-aggregates.js): l'aggregato per operatore è pesato sui TURNI
+ * (v3.1), non sui sales; le creator sotto 3 turni sono escluse dal calcolo.
+ * La logica del calcolatore è invariata.
  */
 
+// Fasce dello score Vendite: soglie di tierFromPercentile in creator-aggregates.js.
 const TIER_BADGES = [
-  { tier: "Elite",    range: "top 10%",  color: "#A855F7", desc: "Eccellenza assoluta — rari e iper-performanti su tutto" },
-  { tier: "Strong",   range: "top 25%",  color: "#3B82F6", desc: "Solidi performer — sopra media in modo consistente" },
-  { tier: "Good",     range: "top 50%",  color: "#10B981", desc: "Sopra mediana — affidabili, contribuiscono attivamente" },
-  { tier: "Average",  range: "top 75%",  color: CP.textMuted, desc: "Mediocri — non distinguono ma non sono problema" },
-  { tier: "Weak",     range: "top 90%",  color: "#F59E0B", desc: "Sotto media — area di intervento, da monitorare" },
-  { tier: "Critical", range: "bottom 10%", color: "#EF4444", desc: "Performance non sostenibili — candidati a swap/cambio ruolo" },
+  { tier: "Elite",    range: "90–100", desc: "La fascia più alta: risultati eccellenti e costanti" },
+  { tier: "Strong",   range: "75–89",  desc: "Sopra la media in modo netto e stabile" },
+  { tier: "Good",     range: "50–74",  desc: "Nella metà alta: risultati affidabili" },
+  { tier: "Average",  range: "25–49",  desc: "Vicino alla media, nella metà bassa" },
+  { tier: "Weak",     range: "10–24",  desc: "Sotto la media: c'è qualcosa da capire insieme al tuo responsabile" },
+  { tier: "Critical", range: "0–9",    desc: "La fascia più bassa: se si ripete, il caso viene rivisto (cambio di creator o di ruolo)" },
 ];
 
 function tierFromPercentile(p) {
@@ -32,10 +35,13 @@ function tierFromPercentile(p) {
   if (p >= 10) return "Weak";
   return "Critical";
 }
+// Il colore porta solo il segnale: verde = sopra, rosso = da guardare.
 function colorForTier(t) {
-  const b = TIER_BADGES.find((x) => x.tier === t);
-  return b?.color || CP.textMuted;
+  if (t === "Elite" || t === "Strong") return CP.accentGreen;
+  if (t === "Weak" || t === "Critical") return CP.accentRed;
+  return CP.textSecondary;
 }
+const fmt1 = (v) => v.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 export default function ScoreExplainedPage() {
   // Calcolatore interattivo
@@ -49,242 +55,186 @@ export default function ScoreExplainedPage() {
   const finalColor = colorForTier(finalTier);
 
   return (
-    <div style={{ padding: "32px 28px 80px 28px", maxWidth: 1100, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
-      {/* Breadcrumb */}
-      <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary, marginBottom: 14 }}>
-        <Link href="/welcome" style={{ color: "inherit", textDecoration: "none" }}>Welcome</Link>
-        <span style={{ color: CP.textMuted }}>›</span>
-        <span style={{ color: CP.textPrimary }}>Score Explained</span>
-      </div>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1000, margin: "0 auto", fontFamily: FONTS.body, color: CP.textPrimary }}>
+      <PageHead
+        crumbs={[{ label: "Benvenuto", href: "/welcome" }, { label: "Score Vendite, la formula" }]}
+        title="La formula dello score Vendite"
+        subtitle="Come si passa dalle vendite dei turni a un numero da 0 a 100, con un calcolatore per provarlo. Solo dati reali di CreatorsPro, confrontati ogni mese con quelli dei colleghi."
+      />
 
-      {/* Header */}
-      <SectionLabel>Tutorial · Score CP v3</SectionLabel>
-      <h1 style={{ fontFamily: FONTS.display, fontSize: 40, fontWeight: 700, margin: "10px 0 8px 0", letterSpacing: "-0.025em", lineHeight: 1.1 }}>
-        Come funziona <span style={{ color: CP.accentGreen }}>lo score</span>?
-      </h1>
-      <p style={{ color: CP.textSecondary, fontSize: 16, margin: 0, lineHeight: 1.55, maxWidth: 820 }}>
-        Una guida passo-passo alla formula che classifica i tuoi operatori. Niente magia: solo dati CP reali, percentili e una calibrazione automatica sul mese corrente.
-      </p>
+      <Notice>
+        Questa pagina spiega lo score <b style={b}>Vendite</b>, usato nelle revisioni mensili. L&apos;altro score, <b style={b}>Mestiere</b>, misura come lavori in chat (dati Infloww) ed è quello del percorso di carriera: ha fasce proprie (Critical sotto 15, Weak 15–27, Average 27–44, Good 44–61, Strong 61–75, Elite da 75).
+      </Notice>
 
-      {/* SEZIONE 1 — Cosa misura */}
-      <Section icon={Target} color="#10B981" title="1. Cosa misura lo score">
-        <p style={pBig}>
-          Lo score di un operatore <b>su una creator</b> risponde a due domande in contemporanea:
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
-          <CpCard accent="#3B82F6" padding="18px 20px">
-            <div style={iconRow}><Users size={16} color="#3B82F6" /><b>vs Creator</b></div>
-            <p style={pSm}>Sei tra i migliori che lavorano <b>su quella creator</b>? Percentile vs altri operatori della stessa creator.</p>
-          </CpCard>
-          <CpCard accent="#10B981" padding="18px 20px">
-            <div style={iconRow}><Sparkles size={16} color="#10B981" /><b>vs Agency</b></div>
-            <p style={pSm}>In scala agency, <b>quanto vali in assoluto</b>? Percentile vs tutti gli operatori del mese.</p>
-          </CpCard>
+      {/* 1 — Cosa misura */}
+      <Block title="1. Cosa misura">
+        <p style={pBig}>Lo score di un operatore <b style={b}>su una creator</b> risponde a due domande insieme:</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12, marginTop: 12 }}>
+          <div style={{ ...card, padding: "14px 16px" }}>
+            <div style={cardTitle}>Confronto sulla creator</div>
+            <p style={pSm}>Sei tra chi vende di più <b style={b}>su quella creator</b>? È il percentile rispetto agli altri operatori della stessa creator.</p>
+          </div>
+          <div style={{ ...card, padding: "14px 16px" }}>
+            <div style={cardTitle}>Confronto con l&apos;agenzia</div>
+            <p style={pSm}>Quanto vendi <b style={b}>rispetto a tutta l&apos;agenzia</b>? È il percentile rispetto a tutti gli operatori del mese.</p>
+          </div>
         </div>
-        <p style={{ ...pBig, marginTop: 18 }}>
-          Le due risposte vengono <b>combinate (70% creator + 30% agency)</b> per evitare distorsioni: chi è top di un team debole non vince "Elite" se in assoluto è mediocre.
+        <p style={{ ...pBig, marginTop: 14 }}>
+          Le due risposte si combinano, <b style={b}>70% creator e 30% agenzia</b>, per evitare distorsioni: chi è il migliore di un team debole non arriva a Elite se in assoluto vende poco.
         </p>
-      </Section>
+      </Block>
 
-      {/* SEZIONE 2 — Formula */}
-      <Section icon={Calculator} color="#3B82F6" title="2. La formula in 3 step">
+      {/* 2 — Formula */}
+      <Block title="2. La formula in 3 passi">
         <ol style={ol}>
           <li>
-            <b>Calcola i 2 KPI base</b> per la coppia (operatore × creator):
+            <b style={b}>Due indicatori</b> per ogni coppia operatore × creator:
             <ul style={ul}>
-              <li><code style={code}>sales/shift</code> — quanto generi a parità di turno (KPI principale)</li>
-              <li><code style={code}>consistency</code> — bassa volatilità tra shift = più affidabile (0..1)</li>
+              <li><Code>vendite per turno</Code>: quanto vendi in un turno, in media (l&apos;indicatore principale)</li>
+              <li><Code>regolarità</Code>: quanto si somigliano i turni tra loro, da 0 a 1 (più alta = più affidabile)</li>
             </ul>
           </li>
           <li>
-            <b>Trasforma sales/shift in 2 percentili</b>:
+            <b style={b}>Le vendite per turno diventano due percentili</b>:
             <ul style={ul}>
-              <li><code style={code}>perc_vs_creator</code> = posizione tra gli operatori che lavorano sulla stessa creator</li>
-              <li><code style={code}>perc_vs_agency</code> = posizione tra tutti gli operatori del mese</li>
+              <li><Code>percentile sulla creator</Code>: la posizione tra chi lavora sulla stessa creator</li>
+              <li><Code>percentile con l&apos;agenzia</Code>: la posizione tra tutti gli operatori del mese</li>
             </ul>
-            E li <b>blend</b>: <code style={code}>SPS_blended = 0.7 × perc_vs_creator + 0.3 × perc_vs_agency</code>
+            e si combinano: <Code>vendite (score) = 0,7 × percentile creator + 0,3 × percentile agenzia</Code>
           </li>
           <li>
-            <b>Score finale</b> = blend pesato dei 2 KPI:
-            <div style={{ marginTop: 8, padding: "10px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, fontFamily: FONTS.mono, fontSize: 13, color: CP.textPrimary }}>
-              score = 0.85 × SPS_blended + 0.15 × consistency × 100
+            <b style={b}>Score finale</b>, che unisce i due indicatori:
+            <div style={{ ...card, marginTop: 8, padding: "10px 14px", fontSize: 14, color: CP.textPrimary, ...NUM }}>
+              score = 0,85 × vendite (score) + 0,15 × regolarità × 100
             </div>
           </li>
         </ol>
-        <div style={{ marginTop: 18, padding: "12px 16px", background: "#F59E0B12", border: "1px solid #F59E0B44", borderRadius: 10, fontSize: 13, color: CP.textSecondary, display: "flex", gap: 10, alignItems: "flex-start" }}>
-          <Info size={16} color="#F59E0B" style={{ flexShrink: 0, marginTop: 2 }} />
-          <span>
-            <b>Le ore extra non entrano nello score.</b> Modello: lo shift è l'unità atomica; estendere uno shift di 1-2h è informativo ma non altera il merito.
-          </span>
+        <div style={{ marginTop: 14 }}>
+          <Notice>
+            <b style={b}>Le ore extra non entrano nello score.</b> L&apos;unità è il turno: allungarlo di 1-2 ore si vede nei dati, ma non cambia il merito.
+          </Notice>
         </div>
-      </Section>
+      </Block>
 
-      {/* SEZIONE 3 — Calcolatore */}
-      <Section icon={Activity} color="#A855F7" title="3. Calcolatore interattivo">
-        <p style={pBig}>
-          Sposta i 3 slider per vedere come cambia lo score in tempo reale.
-        </p>
-        <CpCard padding="24px 28px" style={{ marginTop: 14 }}>
-          <SliderRow
-            label="Percentile vs Creator"
-            value={percCreator}
-            onChange={setPercCreator}
-            color="#3B82F6"
-            hint="Sei top tra i colleghi sulla stessa creator?"
-          />
-          <SliderRow
-            label="Percentile vs Agency"
-            value={percAgency}
-            onChange={setPercAgency}
-            color="#10B981"
-            hint="In assoluto, dove ti collochi nel pool intero?"
-          />
-          <SliderRow
-            label="Consistency"
-            value={consistency}
-            onChange={setConsistency}
-            color="#F59E0B"
-            hint="0 = molto volatile, 100 = uniforme tra shift"
-          />
+      {/* 3 — Calcolatore */}
+      <Block title="3. Calcolatore" aside="Sposta i tre cursori e guarda come cambia lo score">
+        <section style={{ ...card, padding: "20px 22px" }}>
+          <SliderRow label="Percentile sulla creator" value={percCreator} onChange={setPercCreator} hint="Quanto sei in alto tra i colleghi sulla stessa creator" />
+          <SliderRow label="Percentile con l'agenzia" value={percAgency} onChange={setPercAgency} hint="Quanto sei in alto tra tutti gli operatori" />
+          <SliderRow label="Regolarità" value={consistency} onChange={setConsistency} hint="0 = turni molto diversi tra loro, 100 = turni sempre simili" />
 
-          {/* Calcolo passo passo */}
-          <div style={{ marginTop: 20, padding: "16px 18px", background: CP.surfaceAlt, border: `1px solid ${CP.border}`, borderRadius: 10, fontFamily: FONTS.mono, fontSize: 13 }}>
-            <div style={{ color: CP.textMuted, marginBottom: 8, fontSize: 11, letterSpacing: "0.1em", fontWeight: 700 }}>Calcolo</div>
+          <div style={{ marginTop: 18, padding: "14px 16px", background: CP.surfaceAlt, borderRadius: 8, fontSize: 13, ...NUM }}>
+            <div style={{ color: CP.textMuted, marginBottom: 6, fontSize: 12 }}>Calcolo</div>
             <div style={calcLine}>
-              <span>SPS_blended</span>
-              <span>= 0.7 × {percCreator} + 0.3 × {percAgency}</span>
-              <span style={{ color: CP.textPrimary, fontWeight: 700 }}>= {spsBlended.toFixed(1)}</span>
+              <span>Vendite (score)</span>
+              <span>= 0,7 × {percCreator} + 0,3 × {percAgency}</span>
+              <span style={{ color: CP.textPrimary, fontWeight: 500 }}>= {fmt1(spsBlended)}</span>
             </div>
             <div style={calcLine}>
-              <span>score finale</span>
-              <span>= 0.85 × {spsBlended.toFixed(1)} + 0.15 × {consistency}</span>
-              <span style={{ color: finalColor, fontWeight: 700, fontSize: 17 }}>= {finalScore.toFixed(1)}</span>
+              <span>Score finale</span>
+              <span>= 0,85 × {fmt1(spsBlended)} + 0,15 × {consistency}</span>
+              <span style={{ color: CP.textPrimary, fontWeight: 500, fontSize: 17 }}>= {fmt1(finalScore)}</span>
             </div>
           </div>
 
-          {/* Tier risultante */}
-          <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 14, justifyContent: "center" }}>
-            <span style={{ color: CP.textMuted, fontSize: 13 }}>Tier risultante:</span>
-            <span style={{
-              padding: "8px 18px",
-              background: alpha(finalColor, "22"),
-              color: finalColor,
-              border: `2px solid ${finalColor}`,
-              borderRadius: 999,
-              fontSize: 15,
-              fontWeight: 700,
-              letterSpacing: "0.05em",
-            }}>
-              {finalTier?.toUpperCase()}
+          <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+            <span style={{ color: CP.textMuted, fontSize: 13 }}>Fascia:</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 999, fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>
+              <span style={{ width: 8, height: 8, borderRadius: 999, background: finalColor }} />
+              {finalTier}
             </span>
-            <span style={{ fontSize: 12, color: CP.textMuted, fontFamily: FONTS.mono }}>
-              ({TIER_BADGES.find((t) => t.tier === finalTier)?.range})
+            <span style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>
+              (score {TIER_BADGES.find((t) => t.tier === finalTier)?.range})
             </span>
           </div>
-        </CpCard>
-      </Section>
+        </section>
+      </Block>
 
-      {/* SEZIONE 4 — Tier */}
-      <Section icon={Award} color="#F59E0B" title="4. I 6 tier di classificazione">
+      {/* 4 — Fasce */}
+      <Block title="4. Le sei fasce">
         <p style={pBig}>
-          I tier sono <b>percentile-based</b>: gli "Elite" sono sempre il top 10%, non una soglia fissa. Stabili nel tempo, ricalibrati ogni mese sui dati reali.
+          Lo score è fatto di percentili ricalcolati ogni mese sui dati reali: per questo le fasce mantengono lo stesso significato nel tempo, anche se il livello delle vendite dell&apos;agenzia cambia.
         </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12, marginTop: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 10, marginTop: 12 }}>
           {TIER_BADGES.map((t) => (
-            <div key={t.tier} style={{
-              padding: "14px 18px",
-              background: `${alpha(t.color, "10")}`,
-              border: `1px solid ${alpha(t.color, "55")}`,
-              borderRadius: 12,
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                <span style={{
-                  padding: "3px 11px", background: t.color, color: CP.bgSunken,
-                  borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: "0.04em",
-                }}>{t.tier.toUpperCase()}</span>
-                <span style={{ fontSize: 11, color: CP.textMuted, fontFamily: FONTS.mono }}>{t.range}</span>
+            <div key={t.tier} style={{ ...card, padding: "12px 14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 999, background: colorForTier(t.tier), flexShrink: 0 }} />
+                <span style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary }}>{t.tier}</span>
+                <span style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>{t.range}</span>
               </div>
-              <p style={{ fontSize: 12, color: CP.textSecondary, margin: 0, lineHeight: 1.5 }}>{t.desc}</p>
+              <p style={{ fontSize: 13, color: CP.textSecondary, margin: 0, lineHeight: 1.45 }}>{t.desc}</p>
             </div>
           ))}
         </div>
-        <p style={{ color: CP.textMuted, fontSize: 12, marginTop: 16, fontStyle: "italic" }}>
-          ⚠ Operatori con <b>meno di 3 shift</b> sulla creator hanno score "—" (campione troppo piccolo).
+        <p style={{ color: CP.textMuted, fontSize: 13, marginTop: 12 }}>
+          Con <b style={b}>meno di 3 turni</b> su una creator lo score su quella creator è &quot;—&quot;: il campione è troppo piccolo.
         </p>
-      </Section>
+      </Block>
 
-      {/* SEZIONE 5 — Score aggregato */}
-      <Section icon={Users} color="#10B981" title="5. Score aggregato (pagina Sales CP)">
+      {/* 5 — Aggregato */}
+      <Block title="5. Il numero unico di Sales CP">
         <p style={pBig}>
-          Lo score che vedi su <b>Sales CP</b> per un operatore è la <b>media pesata su sales</b> degli score per creator:
+          Lo score che vedi in <b style={b}>Sales CP</b> per un operatore è la <b style={b}>media degli score per creator, pesata sui turni</b>:
         </p>
-        <div style={{ marginTop: 14, padding: "18px 20px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, textAlign: "center" }}>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 15, color: CP.textPrimary, fontWeight: 600 }}>
-            score(op) = Σ ( score(op, creator) × sales(op, creator) ) / sales_totali(op)
-          </div>
+        <div style={{ ...card, marginTop: 10, padding: "14px 16px", textAlign: "center", fontSize: 14, color: CP.textPrimary, ...NUM }}>
+          score(operatore) = Σ ( score(operatore, creator) × turni(operatore, creator) ) / turni totali
         </div>
-        <p style={{ ...pBig, marginTop: 18 }}>
-          <b>Effetto pratico:</b>
-        </p>
-        <ul style={{ color: CP.textSecondary, fontSize: 14, lineHeight: 1.7, paddingLeft: 22 }}>
-          <li>Le creator dove l'operatore vende di più <b>pesano di più</b>.</li>
-          <li>Non puoi essere <span style={{ color: "#A855F7", fontWeight: 700 }}>Elite</span> a Sales CP se sei <span style={{ color: "#EF4444", fontWeight: 700 }}>Critical</span> sulle creator dove fai il 70% del fatturato.</li>
-          <li>Le creator marginali (1-2 shift, sales bassissime) contano poco.</li>
-          <li>Coerenza matematica garantita: <b>Sales CP</b> e <b>Creator</b> raccontano la stessa storia.</li>
+        <p style={{ ...pBig, marginTop: 14 }}><b style={b}>Cosa vuol dire in pratica:</b></p>
+        <ul style={{ ...ul, fontSize: 14 }}>
+          <li>Le creator su cui fai più turni <b style={b}>pesano di più</b>.</li>
+          <li>Non puoi essere Elite in Sales CP se vai male sulle creator dove passi la maggior parte dei turni: pochi turni fortunati non bastano.</li>
+          <li>Le creator con meno di 3 turni non entrano nel calcolo.</li>
+          <li>Sales CP e la vista per creator raccontano la stessa storia: i numeri sono gli stessi.</li>
         </ul>
-      </Section>
+      </Block>
 
-      {/* CTA finali */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 32 }}>
-        <Link href="/leaderboard/sales-cp" style={ctaCard("#10B981")}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Sparkles size={20} color="#10B981" />
+      {/* Dove andare adesso */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginTop: 32 }}>
+        <Link href="/leaderboard/sales-cp" style={ctaCard}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Sparkles size={18} color={CP.textMuted} />
             <div>
-              <div style={{ fontWeight: 700, fontSize: 15, color: CP.textPrimary }}>Vai a Sales CP</div>
-              <div style={{ fontSize: 12, color: CP.textSecondary }}>Vedi gli score reali del mese corrente</div>
+              <div style={{ fontWeight: 500, fontSize: 15 }}>Vai a Sales CP</div>
+              <div style={{ fontSize: 12, color: CP.textSecondary }}>Gli score reali del mese in corso</div>
             </div>
           </div>
-          <ArrowRight size={16} color="#10B981" />
+          <ArrowRight size={16} color={CP.accentSoftText} />
         </Link>
-        <Link href="/admin/action-center" style={ctaCard("#EF4444")}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Target size={20} color="#EF4444" />
+        <Link href="/admin/action-center" style={ctaCard}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Target size={18} color={CP.textMuted} />
             <div>
-              <div style={{ fontWeight: 700, fontSize: 15, color: CP.textPrimary }}>Action Center</div>
-              <div style={{ fontSize: 12, color: CP.textSecondary }}>Lista operatori da rivedere → swap → HR</div>
+              <div style={{ fontWeight: 500, fontSize: 15 }}>Action Center</div>
+              <div style={{ fontSize: 12, color: CP.textSecondary }}>Chi rivedere questo mese e cosa fare (per chi gestisce il team)</div>
             </div>
           </div>
-          <ArrowRight size={16} color="#EF4444" />
+          <ArrowRight size={16} color={CP.accentSoftText} />
         </Link>
       </div>
     </div>
   );
 }
 
-function Section({ icon: Icon, color, title, children }) {
+function Block({ title, aside, children }) {
   return (
-    <div style={{ marginTop: 44 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-        <div style={{
-          width: 38, height: 38, borderRadius: 10,
-          background: `${alpha(color, "22")}`, border: `1px solid ${alpha(color, "66")}`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <Icon size={18} color={color} strokeWidth={2} />
-        </div>
-        <h2 style={{ fontFamily: FONTS.display, fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.015em", color: CP.textPrimary }}>{title}</h2>
-      </div>
-      <div style={{ paddingLeft: 50 }}>{children}</div>
-    </div>
+    <section style={{ marginTop: 32 }}>
+      <SectionTitle aside={aside}>{title}</SectionTitle>
+      {children}
+    </section>
   );
 }
 
-function SliderRow({ label, value, onChange, color, hint }) {
+function Code({ children }) {
+  return <code style={{ background: CP.surfaceAlt, padding: "1px 7px", borderRadius: 4, fontFamily: FONTS.body, fontSize: 13, color: CP.textPrimary, ...NUM }}>{children}</code>;
+}
+
+function SliderRow({ label, value, onChange, hint }) {
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-        <label style={{ fontSize: 13, color: CP.textPrimary, fontWeight: 600 }}>{label}</label>
-        <span style={{ fontFamily: FONTS.mono, fontSize: 14, color, fontWeight: 700 }}>{value}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6, gap: 12 }}>
+        <label style={{ fontSize: 14, color: CP.textPrimary, fontWeight: 500 }}>{label}</label>
+        <span style={{ fontSize: 15, color: CP.textPrimary, fontWeight: 500, ...NUM }}>{value}</span>
       </div>
       <input
         type="range"
@@ -292,26 +242,24 @@ function SliderRow({ label, value, onChange, color, hint }) {
         max={100}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        style={{ width: "100%", accentColor: color, cursor: "pointer" }}
+        aria-label={label}
+        style={{ width: "100%", accentColor: CP.accent, cursor: "pointer" }}
       />
-      <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 4 }}>{hint}</div>
+      <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4 }}>{hint}</div>
     </div>
   );
 }
 
-// === styles ===
-const pBig = { color: CP.textSecondary, fontSize: 14, lineHeight: 1.6, margin: "0 0 8px 0" };
-const pSm = { fontSize: 13, color: CP.textPrimary, margin: 0, lineHeight: 1.55 };
+// === stili ===
+const b = { color: CP.textPrimary, fontWeight: 500 };
+const pBig = { color: CP.textSecondary, fontSize: 14, lineHeight: 1.6, margin: "0 0 8px" };
+const pSm = { fontSize: 13, color: CP.textSecondary, margin: 0, lineHeight: 1.55 };
+const cardTitle = { fontSize: 14, fontWeight: 500, color: CP.textPrimary, marginBottom: 6 };
 const ol = { color: CP.textSecondary, fontSize: 14, lineHeight: 1.7, paddingLeft: 22, margin: "8px 0" };
 const ul = { color: CP.textSecondary, fontSize: 13, lineHeight: 1.7, paddingLeft: 22, marginTop: 4 };
-const iconRow = { display: "flex", alignItems: "center", gap: 8, color: CP.textPrimary, fontSize: 14, marginBottom: 6 };
-const code = { background: CP.surfaceAlt, padding: "1px 7px", borderRadius: 4, fontFamily: FONTS.mono, fontSize: 12, color: CP.textPrimary };
-const calcLine = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", gap: 10, color: CP.textSecondary };
-const ctaCard = (col) => ({
-  display: "flex", alignItems: "center", justifyContent: "space-between",
-  padding: "18px 22px",
-  background: CP.surface,
-  border: `1px solid ${alpha(col, "44")}`,
-  borderRadius: 12,
-  textDecoration: "none",
-});
+const calcLine = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", gap: 10, color: CP.textSecondary, flexWrap: "wrap" };
+const ctaCard = {
+  ...card,
+  display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+  padding: "16px 18px", textDecoration: "none", color: CP.textPrimary,
+};

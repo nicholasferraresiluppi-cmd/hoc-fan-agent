@@ -1,14 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { CP, alpha } from "@/lib/brand";
+import { Award } from "lucide-react";
+import { CP, FONTS } from "@/lib/brand";
+import { PageHead, SectionTitle, Notice, card, NUM } from "@/components/ds";
+
+// Ridisegno sul design system 26/09/2026: stessa fonte (/api/profile), stessi
+// requisiti e stessa barra di avanzamento (sulle sessioni). Tolte le medaglie
+// emoji e i colori bronzo/argento/oro: il livello si legge a parole.
 
 const LEVEL_META = {
-  0: { label: "Non certificato", emoji: "⚪", color: "#666" },
-  1: { label: "L1 Base", emoji: "🥉", color: "#CD7F32" },
-  2: { label: "L2 Expert", emoji: "🥈", color: "#C0C0C0" },
-  3: { label: "L3 Master", emoji: "🥇", color: "#FFD700" },
+  0: { label: "Nessun livello ancora" },
+  1: { label: "L1 Base" },
+  2: { label: "L2 Expert" },
+  3: { label: "L3 Master" },
 };
 
 const REQUIREMENTS = [
@@ -20,6 +25,7 @@ const REQUIREMENTS = [
 export default function CertificationsPage() {
   const [certs, setCerts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -27,6 +33,8 @@ export default function CertificationsPage() {
         const r = await fetch("/api/profile");
         const j = await r.json();
         setCerts(j?.certifications || []);
+      } catch {
+        setFailed(true);
       } finally {
         setLoading(false);
       }
@@ -34,82 +42,83 @@ export default function CertificationsPage() {
   }, []);
 
   return (
-    <div style={{ background: CP.bgSunken, minHeight: "100vh", color: CP.textPrimary, padding: "32px 28px 64px 28px", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ marginBottom: 18, fontSize: 13, color: CP.textMuted }}>
-          <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>Academy</Link>
-          <span style={{ color: CP.textMuted, margin: "0 8px" }}>›</span>
-          <span style={{ color: CP.textPrimary }}>Badge Wall</span>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1100, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Academy", href: "/" }, { label: "Certificazioni" }]}
+        title="Le mie certificazioni"
+        subtitle="Una certificazione per ogni creator. Ognuna ha il suo tono e le sue dinamiche: la certificazione dimostra che sai gestirla. Si ottiene allenandosi nel simulatore e resta per sempre."
+      />
+
+      <section style={{ ...card, padding: "14px 18px", marginBottom: 20 }}>
+        <SectionTitle>Cosa serve per ogni livello</SectionTitle>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
+          {REQUIREMENTS.map((r) => (
+            <div key={r.level} style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.5, ...NUM }}>
+              <div style={{ fontWeight: 500, color: CP.textPrimary }}>{LEVEL_META[r.level].label}</div>
+              Almeno {r.sessions} sessioni con quella creator e punteggio medio almeno {r.avg}
+            </div>
+          ))}
         </div>
+      </section>
 
-        <div style={{ marginBottom: 24 }}>
-          <span style={{ color: CP.textMuted, fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: "0.14em" }}>Certificazioni</span>
-          <h1 style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 34, margin: "8px 0 6px 0", fontWeight: 700, letterSpacing: "-0.02em" }}>Badge Wall</h1>
-          <p style={{ color: CP.textMuted, fontSize: 14, margin: 0, lineHeight: 1.5, maxWidth: 760 }}>
-            Le tue certificazioni per creator. Ogni creator ha il suo tono e le sue dinamiche: certificandoti dimostri di saperla gestire.
-          </p>
+      {loading && <p style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</p>}
+      {!loading && failed && <Notice danger>Errore di rete: le certificazioni non si sono caricate. Riprova tra poco.</Notice>}
+      {!loading && !failed && certs.length === 0 && (
+        <div style={{ ...card, padding: "18px 20px", fontSize: 14, color: CP.textSecondary }}>
+          Nessuna certificazione da mostrare per ora. Allenati nel simulatore con una creator per iniziare il percorso.
         </div>
+      )}
 
-        <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, padding: "12px 16px", fontSize: 13, marginBottom: 24, color: CP.textSecondary }}>
-          <b>Requisiti</b> (badge permanenti):<br/>
-          L1 Base → ≥10 sessioni con quella creator, overall medio ≥65<br/>
-          L2 Expert → ≥25 sessioni, overall medio ≥75<br/>
-          L3 Master → ≥50 sessioni, overall medio ≥85
-        </div>
-
-        {loading && <p>Caricamento…</p>}
-
-        {!loading && (
-          <div style={{ display: "grid", gap: "1rem" }}>
-            {certs.map((c) => {
-              const meta = LEVEL_META[c.level] || LEVEL_META[0];
-              const nextLevel = REQUIREMENTS.find((r) => r.level === c.level + 1);
-              const progressSess = nextLevel ? Math.min(100, Math.round((c.stats.sessions / nextLevel.sessions) * 100)) : 100;
-              return (
-                <div
-                  key={c.creatorId}
-                  style={{
-                    background: `${alpha(meta.color, "10")}`,
-                    border: `2px solid ${alpha(meta.color, "55")}`,
-                    borderRadius: 12,
-                    padding: "1.25rem",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
-                    <div>
-                      <h2 style={{ margin: 0, fontSize: "1.3rem" }}>
-                        {c.creatorName} <span style={{ color: CP.accent, fontSize: "0.7rem", fontWeight: 400, marginLeft: 8 }}>{c.creatorArchetype}</span>
-                      </h2>
-                      <div style={{ color: meta.color, fontWeight: 800, fontSize: "1.1rem", marginTop: 6 }}>
-                        {meta.emoji} {meta.label}
-                      </div>
-                      {c.achievedAt && c.level > 0 && (
-                        <div style={{ color: CP.textMuted, fontSize: "0.75rem", marginTop: 4 }}>
-                          Ottenuta il {new Date(c.achievedAt).toLocaleDateString("it-IT")}
-                        </div>
-                      )}
+      {!loading && certs.length > 0 && (
+        <div style={{ display: "grid", gap: 12 }}>
+          {certs.map((c) => {
+            const meta = LEVEL_META[c.level] || LEVEL_META[0];
+            const nextLevel = REQUIREMENTS.find((r) => r.level === c.level + 1);
+            const progressSess = nextLevel ? Math.min(100, Math.round((c.stats.sessions / nextLevel.sessions) * 100)) : 100;
+            const achieved = c.level > 0;
+            return (
+              <article key={c.creatorId} style={{ ...card, padding: "16px 18px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <h2 style={{ margin: 0, fontSize: 17, fontWeight: 500, color: CP.textPrimary }}>
+                      {c.creatorName}
+                      {c.creatorArchetype && <span style={{ color: CP.textMuted, fontSize: 13, fontWeight: 400, marginLeft: 8 }}>{c.creatorArchetype}</span>}
+                    </h2>
+                    <div style={{ marginTop: 8 }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, fontSize: 13, fontWeight: 500,
+                        background: achieved ? CP.accentSoft : CP.surfaceAlt, color: achieved ? CP.accentSoftText : CP.textMuted }}>
+                        {achieved && <Award size={13} />}{meta.label}
+                      </span>
                     </div>
-                    <div style={{ textAlign: "right", color: CP.textMuted, fontSize: "0.85rem" }}>
-                      <div>{c.stats.sessions} sessioni</div>
-                      <div>avg {c.stats.avgOverall}</div>
+                    {c.achievedAt && achieved && (
+                      <div style={{ color: CP.textMuted, fontSize: 12, marginTop: 6 }}>
+                        Ottenuta il {new Date(c.achievedAt).toLocaleDateString("it-IT")}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ textAlign: "right", color: CP.textSecondary, fontSize: 13, lineHeight: 1.5, ...NUM }}>
+                    <div>{c.stats.sessions} sessioni</div>
+                    <div>punteggio medio {c.stats.avgOverall}</div>
+                  </div>
+                </div>
+
+                {nextLevel && (
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 6, fontSize: 12, color: CP.textMuted, marginBottom: 6, ...NUM }}>
+                      <span>Prossimo livello: {LEVEL_META[nextLevel.level].label}</span>
+                      <span>Sessioni {c.stats.sessions} su {nextLevel.sessions} · punteggio medio {c.stats.avgOverall} su {nextLevel.avg}</span>
+                    </div>
+                    <div role="progressbar" aria-valuenow={progressSess} aria-valuemin={0} aria-valuemax={100} aria-label="Sessioni verso il prossimo livello"
+                      style={{ height: 6, background: CP.surfaceAlt, borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${progressSess}%`, background: CP.accent, transition: "width 0.3s" }} />
                     </div>
                   </div>
-
-                  {nextLevel && (
-                    <div style={{ marginTop: "1rem" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: CP.textMuted, marginBottom: 4 }}>
-                        <span>Prossimo: {LEVEL_META[nextLevel.level].emoji} {LEVEL_META[nextLevel.level].label}</span>
-                        <span>{c.stats.sessions}/{nextLevel.sessions} sessioni • avg {c.stats.avgOverall}/{nextLevel.avg}</span>
-                      </div>
-                      <div style={{ height: 6, background: CP.surfaceAlt, borderRadius: 3, overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${progressSess}%`, background: meta.color, transition: "width 0.3s" }} />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

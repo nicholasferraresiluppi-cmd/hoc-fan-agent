@@ -3,13 +3,14 @@
 import { useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { Gauge, HelpCircle, TrendingUp } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHeader, CpCard, SectionLabel } from "@/components/cp-style";
+import { fmtPct } from "@/lib/format";
+import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, card, NUM } from "@/components/ds";
 
 /**
  * /me/score — "Il mio score, spiegato" (scope own, docs/VISIBILITY_POLICY.md).
  * Mostra SOLO i dati dell'operatore loggato + aggregati non nominativi.
+ * 26/09/2026: portata sul design system (contenuti e linguaggio invariati).
  */
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
@@ -40,27 +41,10 @@ const KPI_HELP = {
   messages_sent_per_hour: "Quanti messaggi mandi per ora.",
 };
 
-const TIER_COLORS = {
-  Critical: CP.accentRed, Weak: "#d9a44a", Average: "#cba55f",
-  Good: CP.accentGreen, Strong: CP.accentBlue, Elite: CP.accent,
-};
-
-function NotLinked({ reason }) {
-  return (
-    <CpCard>
-      <div style={{ textAlign: "center", padding: "30px 16px" }}>
-        <HelpCircle size={30} color={CP.mutedIcons} />
-        <p style={{ color: CP.textSecondary, fontSize: 14.5, margin: "12px 0 6px" }}>
-          Il tuo account non è ancora collegato a un profilo operatore.
-        </p>
-        <p style={{ color: CP.textMuted, fontSize: 13, margin: 0, lineHeight: 1.6 }}>
-          Chiedi a un admin di collegare la tua email al tuo nome operatore
-          {reason === "ambiguous" ? " (la tua email corrisponde a più profili)" : ""}.
-        </p>
-      </div>
-    </CpCard>
-  );
-}
+// Fascia come segnale sul dato, non come superficie: rosso solo per la fascia
+// più bassa, verde per le tre alte, neutro in mezzo (un solo accento, DESIGN.md §1).
+const tierColor = (tier) =>
+  tier === "Critical" ? CP.accentRed : ["Good", "Strong", "Elite"].includes(tier) ? CP.accentGreen : CP.textSecondary;
 
 // Due score, ognuno col suo nome (decisione Nicholas 25/09/2026, "strada 1"):
 //  - VENDITE (CreatorsPro): venduto per turno vs chi lavora sulle stesse creator;
@@ -72,135 +56,154 @@ function NotLinked({ reason }) {
 // (leaderboard-config v12), di nuovo mostrate.
 const MESI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
 const monthLabel = (pid) => (/^\d{4}-\d{2}$/.test(pid || "") ? `${MESI[Number(pid.slice(5)) - 1]} ${pid.slice(0, 4)}` : pid);
+const monthShort = (pid) => (/^\d{4}-\d{2}$/.test(pid || "") ? MESI[Number(pid.slice(5)) - 1] : String(pid || "").slice(5));
 function currentMonth() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
+const fmtScore = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
+
+const note = { fontSize: 13, color: CP.textMuted, margin: "0 0 8px", lineHeight: 1.6 };
+const link = { color: CP.accentSoftText };
 
 export default function MyScorePage() {
   const [periodId, setPeriodId] = useState(null);
   const url = periodId ? `/api/me/score?period_id=${periodId}` : "/api/me/score";
-  const { data, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false });
+  const { data, error, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false });
   const { data: meEmp } = useSWR("/api/me/employee", fetcher, { revalidateOnFocus: false });
   const salesMonth = currentMonth();
   const { data: sales } = useSWR(meEmp?.employee ? `/api/leaderboard/operator-drilldown?employee=${encodeURIComponent(meEmp.employee)}&period_id=${salesMonth}` : null, fetcher, { revalidateOnFocus: false });
   const cp = sales?.cp;
+  const hasMestiere = data?.linked && data.score !== undefined;
+  const composition = [...(data?.composition || [])].sort((a, b) => (b.weight || 0) - (a.weight || 0));
+  const history = Array.isArray(data?.history) ? data.history : [];
+  const maxHist = Math.max(100, ...history.map((h) => h.score || 0));
 
   return (
-    <div style={{ padding: "32px 24px 64px", maxWidth: 880, margin: "0 auto" }}>
-      <PageHeader
-        section="Il mio quadro"
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Il mio quadro" }, { label: "I miei score" }]}
         title="I miei score"
-        subtitle="Hai due score che misurano cose diverse. Vendite: quanto vendi per turno rispetto a chi lavora sulle tue stesse creator — è quello delle revisioni mensili. Mestiere: come chatti — è quello del percorso di carriera. Vedi solo i tuoi dati: è un diritto, non una concessione."
+        subtitle="Hai due score che misurano cose diverse: Vendite (quanto vendi per turno) e Mestiere (come chatti). Vedi solo i tuoi dati: è un diritto, non una concessione."
       />
 
-      {cp && (
-        <CpCard style={{ marginBottom: 18 }}>
-          <SectionLabel>Vendite · {monthLabel(salesMonth)} (in corso)</SectionLabel>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
-            <span style={{ fontFamily: FONTS.display, fontSize: 34, fontWeight: 600, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{cp.score != null ? cp.score.toFixed(1).replace(".", ",") : "—"}</span>
-            {cp.tier && <span style={{ fontSize: 13, color: CP.textSecondary }}>{cp.tier}</span>}
-          </div>
-          <p style={{ fontSize: 13, color: CP.textMuted, margin: "6px 0 0", lineHeight: 1.5 }}>
-            0-100: il tuo venduto per turno confrontato con chi lavora sulle tue stesse creator (70%) e con tutta l&apos;agenzia (30%). Il dettaglio per creator è nel <Link href="/profilo" style={{ color: CP.accent }}>tuo profilo</Link>.
-          </p>
-        </CpCard>
+      {/* I due numeri, affiancati: ognuno dice a cosa serve */}
+      {(cp || hasMestiere) && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", columnGap: 14 }}>
+          {cp && (
+            <HeroMetric
+              label={`Vendite · ${monthLabel(salesMonth)} (in corso)`}
+              value={cp.score != null ? fmtScore(cp.score) : "—"}
+              compare={cp.tier ? <span style={{ color: CP.textSecondary }}>{cp.tier}</span> : null}
+              hint={<>È quello delle revisioni mensili. 0-100: il tuo venduto per turno confrontato con chi lavora sulle tue stesse creator (70%) e con tutta l&apos;agenzia (30%). Il dettaglio per creator è nel <Link href="/profilo" style={link}>tuo profilo</Link>.</>}
+            />
+          )}
+          {hasMestiere && (
+            <HeroMetric
+              label={`Mestiere · ${monthLabel(data.period_id)}`}
+              value={fmtScore(data.score)}
+              compare={data.tier ? <span style={{ color: tierColor(data.tier) }}>{data.tier}</span> : null}
+              hint="È quello del percorso di carriera: misura come chatti."
+            >
+              <Metric label="La tua posizione" value={`meglio del ${data.percentile}%`} note={`dei ${data.scored_count} operatori valutati`} />
+            </HeroMetric>
+          )}
+        </div>
       )}
 
-      {isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
-      {data && !data.linked && !data.error && <NotLinked reason={data.reason} />}
-      {data?.error && <CpCard><p style={{ color: CP.textSecondary, fontSize: 14, margin: 0 }}>{data.error}</p></CpCard>}
+      {isLoading && <div style={{ ...card, padding: 16, color: CP.textMuted, fontSize: 14, marginBottom: 14 }}>Caricamento…</div>}
+      {error && <Notice danger>Non riesco a caricare il tuo score. Ricarica la pagina tra qualche minuto.</Notice>}
+      {data && !data.linked && !data.error && (
+        <Notice>
+          Il tuo account non è ancora collegato a un profilo operatore. Chiedi a un admin di collegare la tua email al tuo nome operatore
+          {data.reason === "ambiguous" ? " (la tua email corrisponde a più profili)" : ""}.
+        </Notice>
+      )}
+      {data?.error && <Notice danger>{data.error}</Notice>}
 
       {data?.linked && data.reason && (
-        <CpCard>
-          <p style={{ color: CP.textSecondary, fontSize: 14, margin: 0 }}>
-            {data.reason === "no_periods" && "Nessun periodo importato ancora."}
-            {data.reason === "no_data_for_period" && `Nessun dato per il periodo ${data.period_id}.`}
-            {data.reason === "not_in_period" && `Non risulti tra gli operatori valutati nel periodo${data.period_id ? ` ${data.period_id}` : ""} — normale se non hai lavorato turni chat quel mese.`}
-            {data.reason === "ambiguous_in_period" && "Il tuo nome corrisponde a più profili nel periodo: serve l'intervento di un admin."}
-            {data.reason === "no_history" && "Nessuno storico disponibile."}
-          </p>
-        </CpCard>
+        <Notice>
+          {data.reason === "no_periods" && "Nessun periodo importato ancora."}
+          {data.reason === "no_data_for_period" && `Nessun dato per il periodo ${monthLabel(data.period_id)}.`}
+          {data.reason === "not_in_period" && `Non risulti tra gli operatori valutati nel periodo${data.period_id ? ` ${monthLabel(data.period_id)}` : ""} — normale se non hai lavorato turni chat quel mese.`}
+          {data.reason === "ambiguous_in_period" && "Il tuo nome corrisponde a più profili nel periodo: serve l'intervento di un admin."}
+          {data.reason === "no_history" && "Nessuno storico disponibile."}
+        </Notice>
       )}
 
-      {data?.linked && data.score !== undefined && (
+      {hasMestiere && (
         <>
-          {/* Selettore periodo */}
+          {/* Selettore mese: vale per lo score mestiere */}
           {Array.isArray(data.available_periods) && data.available_periods.length > 1 && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "4px 0 18px" }}>
+              <span style={{ fontSize: 13, color: CP.textMuted, marginRight: 4 }}>Mestiere del mese</span>
               {data.available_periods.map((p) => (
-                <button key={p} onClick={() => setPeriodId(p)}
-                  style={{ padding: "5px 12px", borderRadius: 99, border: `1px solid ${p === data.period_id ? CP.accent : CP.border}`, background: p === data.period_id ? CP.accentSoft : "transparent", color: p === data.period_id ? CP.accent : CP.textMuted, fontSize: 12.5, cursor: "pointer", fontFamily: FONTS.body }}>
-                  {monthLabel(p)}
-                </button>
+                <FilterChip key={p} label={monthLabel(p)} active={p === data.period_id} onClick={() => setPeriodId(p)} />
               ))}
             </div>
           )}
-
-          {/* Headline: score, tier, percentile */}
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
-            <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, padding: "16px 22px", minWidth: 150 }}>
-              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: CP.textMuted, marginBottom: 4 }}>Mestiere · {monthLabel(data.period_id)}</div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                <span style={{ fontFamily: FONTS.display, fontSize: 34, fontWeight: 600, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{Number(data.score).toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
-              </div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: TIER_COLORS[data.tier] || CP.textSecondary }}>{data.tier}</div>
-            </div>
-            <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, padding: "16px 22px", minWidth: 150 }}>
-              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: CP.textMuted, marginBottom: 4 }}>La tua posizione</div>
-              <div style={{ fontFamily: FONTS.display, fontSize: 24, fontWeight: 600, color: CP.textPrimary }}>
-                meglio del {data.percentile}%
-              </div>
-              <div style={{ fontSize: 12, color: CP.textMuted }}>dei {data.scored_count} operatori valutati</div>
-            </div>
-          </div>
 
           {/* Composizione */}
-          <CpCard style={{ marginBottom: 16 }}>
-            <SectionLabel>Mestiere: come si compone (0–100 per voce × peso)</SectionLabel>
-            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-              {(data.composition || []).sort((a, b) => (b.weight || 0) - (a.weight || 0)).map((c) => (
-                <div key={c.kpi}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
-                    <span style={{ color: CP.textPrimary }}>{KPI_LABELS[c.kpi] || c.kpi.replace(/_/g, " ")}
-                      <span style={{ color: CP.textMuted }}> · peso {(c.weight * 100).toFixed(0)}%</span>
-                    </span>
-                    <span style={{ fontFamily: FONTS.mono, color: c.points >= 60 ? CP.accentGreen : c.points >= 40 ? CP.textSecondary : CP.accentRed }}>{c.points}</span>
-                  </div>
-                  {KPI_HELP[c.kpi] && <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 4 }}>{KPI_HELP[c.kpi]}</div>}
-                  <div style={{ height: 7, background: CP.surfaceAlt, borderRadius: 99, overflow: "hidden" }}>
-                    <div style={{ width: `${Math.max(2, Math.min(100, c.points))}%`, height: "100%", background: c.points >= 60 ? CP.accentGreen : c.points >= 40 ? CP.accent : CP.accentRed, borderRadius: 99 }} />
-                  </div>
-                </div>
-              ))}
+          <section style={{ marginBottom: 22 }}>
+            <SectionTitle aside="0–100 per voce × peso">Mestiere: come si compone</SectionTitle>
+            <div style={{ ...card, padding: "16px 18px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {composition.map((c) => {
+                  const low = c.points < 40;
+                  return (
+                    <div key={c.kpi}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 14, marginBottom: 2 }}>
+                        <span style={{ color: CP.textPrimary }}>
+                          {KPI_LABELS[c.kpi] || c.kpi.replace(/_/g, " ")}
+                          <span style={{ color: CP.textMuted }}> · peso {fmtPct(c.weight)}</span>
+                        </span>
+                        <span style={{ ...NUM, fontWeight: 500, color: c.points >= 60 ? CP.accentGreen : low ? CP.accentRed : CP.textSecondary }}>
+                          {Number(c.points).toLocaleString("it-IT")}
+                        </span>
+                      </div>
+                      {KPI_HELP[c.kpi] && <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 6 }}>{KPI_HELP[c.kpi]}</div>}
+                      <div style={{ height: 6, background: CP.surfaceAlt, borderRadius: 999, overflow: "hidden" }}>
+                        <div style={{ width: `${Math.max(2, Math.min(100, c.points))}%`, height: "100%", background: low ? CP.accentRed : CP.accent, borderRadius: 999 }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p style={{ fontSize: 13, color: CP.textMuted, margin: "16px 0 0", lineHeight: 1.55 }}>
+                {data.comparison === "language"
+                  ? `Il tuo gruppo è piccolo (${data.group_size ?? "meno di 5"} persone), quindi ogni barra confronta te con la media di tutti gli operatori della tua lingua: un confronto con 1-4 colleghi sarebbe troppo casuale. `
+                  : "Ogni barra è la tua posizione rispetto alla media del tuo gruppo su quella voce. "}
+                100 = molto sopra la media, 40 = appena sotto. Le barre rosse sono dove recuperi più punti: parlane col tuo team lead.
+              </p>
             </div>
-            <p style={{ fontSize: 12, color: CP.textMuted, margin: "14px 0 0", lineHeight: 1.5 }}>
-              {data.comparison === "language"
-                ? `Nel tuo gruppo siete in pochi (${data.group_size ?? "meno di 5"}), quindi ogni barra confronta te con la media di tutti gli operatori della tua lingua: un confronto con 1-4 colleghi sarebbe troppo casuale. `
-                : "Ogni barra è la tua posizione rispetto alla media del tuo gruppo su quella voce. "}
-              100 = molto sopra la media, 40 = appena sotto. Le barre rosse sono dove recuperi più punti: parlane col tuo team lead.
-            </p>
-          </CpCard>
+          </section>
 
           {/* Storico */}
-          {Array.isArray(data.history) && data.history.length > 1 && (
-            <CpCard>
-              <SectionLabel>Mestiere: il mio andamento</SectionLabel>
-              <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginTop: 14, height: 120, overflowX: "auto", paddingBottom: 4 }}>
-                {data.history.map((h) => (
-                  <div key={h.period_id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 52 }}>
-                    <span style={{ fontSize: 11.5, fontFamily: FONTS.mono, color: CP.textSecondary }}>{h.score != null ? Math.round(h.score) : "—"}</span>
-                    <div style={{ width: 26, height: `${Math.max(4, (h.score || 0) * 0.8)}px`, background: TIER_COLORS[h.tier] || CP.accent, borderRadius: 5, opacity: 0.85 }} />
-                    <span style={{ fontSize: 10, color: CP.textMuted }}>{String(h.period_id).slice(5)}</span>
-                  </div>
-                ))}
+          {history.length > 1 && (
+            <section style={{ marginBottom: 22 }}>
+              <SectionTitle aside="il mese che stai guardando è evidenziato">Mestiere: il mio andamento</SectionTitle>
+              <div style={{ ...card, padding: "16px 18px" }}>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 130, overflowX: "auto", paddingBottom: 4 }}>
+                  {history.map((h) => {
+                    const cur = h.period_id === data.period_id;
+                    return (
+                      <div key={h.period_id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 48 }}>
+                        <span style={{ fontSize: 12, color: cur ? CP.textPrimary : CP.textSecondary, ...NUM }}>{h.score != null ? Math.round(h.score) : "—"}</span>
+                        <div style={{ width: 24, height: `${Math.max(4, ((h.score || 0) / maxHist) * 80)}px`, background: cur ? CP.accent : CP.accentDim, borderRadius: 4 }} />
+                        <span style={{ fontSize: 11, color: CP.textMuted }}>{monthShort(h.period_id)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </CpCard>
+            </section>
           )}
 
-          <p style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 18, lineHeight: 1.6 }}>
-            Lo score mestiere viene dall&apos;export Infloww e si aggiorna quando il mese viene importato. Le fasce vanno da Critical (il 10% più basso) a Elite (il 10% più alto), tarate sui dati di quest&apos;anno.{data.formula?.hash ? ` Formula del mese ${data.formula.hash}, congelata all'import: il tuo storico non cambia in silenzio.` : ""}
-          </p>
-          <p style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 8, lineHeight: 1.6 }}>
-            Pensi che un numero sia sbagliato? <Link href="/me/contestazioni" style={{ color: CP.accent }}>Apri una contestazione</Link> — le correzioni vengono sempre tracciate, mai fatte in silenzio.
-          </p>
+          <div style={{ borderTop: `1px solid ${CP.borderSoft}`, paddingTop: 14 }}>
+            <p style={note}>
+              Lo score mestiere viene dall&apos;export Infloww e si aggiorna quando il mese viene importato. Le fasce vanno da Critical (il 10% più basso) a Elite (il 10% più alto), tarate sui dati di quest&apos;anno.{data.formula?.hash ? ` Formula del mese ${data.formula.hash}, congelata all'import: il tuo storico non cambia in silenzio.` : ""}
+            </p>
+            <p style={note}>
+              Pensi che un numero sia sbagliato? <Link href="/me/contestazioni" style={link}>Apri una contestazione</Link> — le correzioni vengono sempre tracciate, mai fatte in silenzio.
+            </p>
+          </div>
         </>
       )}
     </div>

@@ -1,76 +1,71 @@
 "use client";
 
 import Link from "next/link";
+import useSWR from "swr";
+import { canSee } from "@/lib/nav-access";
 import {
-  BarChart3, GraduationCap, Users,
-  ArrowRight, Sparkles, Trophy, Brain, Award,
-  LayoutDashboard, Layers,
+  BarChart3, GraduationCap, Users, Layers,
+  ArrowRight, Sparkles, LayoutDashboard,
 } from "lucide-react";
-import { CP, FONTS, alpha } from "@/lib/brand";
-import { SectionLabel, CpCard } from "@/components/cp-style";
+import { CP, FONTS } from "@/lib/brand";
+import { PageHead, SectionTitle, Notice, card } from "@/components/ds";
 
 /**
- * /welcome — Landing onboarding/demo per chi entra la prima volta.
+ * /welcome — Prima pagina per chi entra in HOC Pro (board, manager, operatori).
  *
- * Pensata per consulenti esterni / nuovi onboarding / demo: spiega
- * cosa fa HOC Pro in 30 secondi e mostra 4 moduli macro con CTA chiare.
- *
- * Per chi vuole "vedere tutto", c'è il link a /admin (Hub) e il toggle
- * "Advanced" in sidebar.
+ * Redesign 26/09/2026 sul design system: testata PageHead, un solo accento,
+ * moduli come card neutre. Spiega in 30 secondi cosa c'è nella console e porta
+ * alla guida dei due score (Vendite e Mestiere). Link e destinazioni invariati.
  */
 
 const MODULES = [
   {
     key: "performance",
     icon: BarChart3,
-    color: CP.accentGreen,
-    title: "Performance Analytics",
-    subtitle: "Quanto vendono i tuoi operatori e creator",
+    title: "Performance",
+    subtitle: "Quanto rendono operatori e creator",
     description:
-      "Tre leaderboard complementari: KPI Infloww (sales/h, fan CVR), score CreatorsPro (sales reali per shift), e classifica creator-first (chi rende di più su quale creator).",
+      "Tre viste che si completano: Sales CP (score Vendite, dalle vendite reali registrate in CreatorsPro), la classifica operativa (score Mestiere, dai dati di Infloww come vendite all'ora e quota di fan che comprano) e la vista per creator (chi rende di più su quale creator).",
     primaryCta: { href: "/leaderboard/sales-cp", label: "Apri Sales CP" },
     secondaryCtas: [
-      { href: "/leaderboard/operational", label: "Leaderboard Operativa" },
-      { href: "/leaderboard/creators", label: "Vista per Creator" },
+      { href: "/leaderboard/operational", label: "Classifica operativa" },
+      { href: "/leaderboard/creators", label: "Vista per creator" },
     ],
   },
   {
     key: "training",
     icon: GraduationCap,
-    color: CP.accentBlue,
     title: "Training Academy",
-    subtitle: "Allena i chatter con AI + valuta automaticamente",
+    subtitle: "Allenati in chat con un fan simulato",
     description:
-      "Academy con scenari training, valutazione AI 6-skill (naturalezza/esclusività/conversione…), playbook di esempi reali curati, sistema certificazioni per creator (L1/L2/L3).",
+      "Scenari di allenamento con un fan simulato dall'AI e una valutazione su 6 abilità (naturalezza, esclusività, conversione…), un playbook di esempi reali scelti a mano e le certificazioni per creator, dal livello L1 al L3.",
     primaryCta: { href: "/", label: "Apri Academy" },
     secondaryCtas: [
       { href: "/playbook", label: "Playbook" },
-      { href: "/profilo/certificazioni", label: "Badge Wall" },
+      { href: "/profilo/certificazioni", label: "Badge e certificazioni" },
     ],
   },
   {
     key: "comp",
     icon: Layers,
-    color: CP.accentSoftText,
     title: "Comp & Ben",
-    subtitle: "Compensation, scaglioni e margine per creator",
+    subtitle: "Compensi, scaglioni e margine per creator",
     description:
-      "P&L Live per creator (venduto × fee − costo operatori), scaglioni a confronto cross-creator, hot list anomalie compensation ed esame verticale di un creator su N mesi.",
-    primaryCta: { href: "/admin/pnl-live", label: "Apri P&L Live" },
+      "Il conto economico live di ogni creator (venduto × fee − costo degli operatori), gli scaglioni messi a confronto tra creator, la lista delle anomalie sui compensi e l'esame di una creator su più mesi.",
+    primaryCta: { href: "/admin/pnl-live", label: "Apri P&L live" },
     secondaryCtas: [
       { href: "/admin/profiles-compare", label: "Scaglioni a confronto" },
-      { href: "/admin/comp-review", label: "Comp Review" },
+      { href: "/admin/comp-review", label: "Comp review" },
     ],
   },
   {
     key: "team",
     icon: Users,
-    color: CP.accent,
-    title: "Team Management",
+    title: "Team",
     subtitle: "Organizzazione, ruoli, anagrafica, accessi",
     description:
-      "Team con team lead, anagrafica operatori + seniority auto-calcolata, ruoli predefiniti + custom multi-scope (own/team/all), gestione accessi admin via email.",
-    primaryCta: { href: "/admin/team", label: "Gestisci Team" },
+      "I team con i loro team lead, l'anagrafica degli operatori con l'anzianità calcolata in automatico, i ruoli (predefiniti o personalizzati, con visibilità su di sé, sul team o su tutti) e la gestione degli accessi admin via email.",
+    primaryCta: { href: "/admin/team", label: "Gestisci il team" },
     secondaryCtas: [
       { href: "/admin/employee-profiles", label: "Profili" },
       { href: "/admin/ruoli", label: "Membri" },
@@ -78,199 +73,88 @@ const MODULES = [
   },
 ];
 
-const HIGHLIGHTS = [
-  { icon: Trophy,    label: "1240+ shift CP tracciati / mese" },
-  { icon: Brain,     label: "60k+ messaggi Infloww analizzati" },
-  { icon: Award,     label: "Certificazioni creator L1→L3" },
-  { icon: Sparkles,  label: "AI scoring + match suggestions" },
-];
+const linkAccent = { color: CP.accentSoftText, fontSize: 14, fontWeight: 500, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 };
+const chip = { padding: "5px 10px", background: CP.surfaceAlt, color: CP.textSecondary, border: `1px solid ${CP.border}`, borderRadius: 6, fontSize: 12, textDecoration: "none" };
+const iconBox = { width: 36, height: 36, borderRadius: 8, background: CP.surfaceAlt, border: `1px solid ${CP.border}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
 
 export default function WelcomePage() {
+  const { data: me } = useSWR("/api/whoami", (u) => fetch(u).then((r) => r.json()), { revalidateOnFocus: false });
+  // Finché whoami non risponde si mostra tutto (come prima); poi solo ciò che il ruolo apre
+  const allowed = (href) => !me?.authenticated || canSee(href, me.capabilities, me.admin);
+  const modules = MODULES.filter((m) => allowed(m.primaryCta.href));
   return (
-    <div style={{ padding: "40px 32px 80px 32px", maxWidth: 1300, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
-      {/* HERO */}
-      <div style={{ marginBottom: 40 }}>
-        <SectionLabel>Benvenuto / Welcome</SectionLabel>
-        <h1 style={{
-          fontFamily: FONTS.display, fontSize: 48, fontWeight: 700,
-          margin: "12px 0 12px 0", letterSpacing: "-0.025em", lineHeight: 1.1,
-        }}>
-          HOC Pro — il sistema operativo di <span style={{ color: CP.accentGreen }}>House of Creators</span>
-        </h1>
-        <p style={{ color: CP.textSecondary, fontSize: 17, margin: 0, lineHeight: 1.6, maxWidth: 900 }}>
-          Performance analytics, training AI, compensation e team management — in un'unica console.
-          Connesso a <b style={{ color: CP.textPrimary }}>CreatorsPro</b> (sales reali) e <b style={{ color: CP.textPrimary }}>Infloww</b> (KPI chat).
-        </p>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body, color: CP.textPrimary }}>
+      <PageHead
+        title="HOC Pro, la console di House of Creators"
+        subtitle="Qui trovi i risultati del lavoro in chat, la formazione, i compensi e l'organizzazione del team. I dati arrivano da CreatorsPro (vendite reali) e da Infloww (attività in chat)."
+      />
 
-        {/* Highlights row */}
-        <div style={{ display: "flex", gap: 22, marginTop: 24, flexWrap: "wrap" }}>
-          {HIGHLIGHTS.map((h) => (
-            <div key={h.label} style={{ display: "flex", alignItems: "center", gap: 8, color: CP.textSecondary, fontSize: 13 }}>
-              <h.icon size={15} strokeWidth={1.8} color={CP.accentGreen} />
-              <span>{h.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 4 MODULE CARDS */}
-      <div style={{ marginBottom: 40 }}>
-        <SectionLabel style={{ marginBottom: 14, display: "block" }}>I 4 moduli principali</SectionLabel>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: 18 }}>
-          {MODULES.map((m) => (
-            <div
-              key={m.key}
-              style={{
-                background: CP.surface,
-                border: `1px solid ${CP.border}`,
-                borderRadius: 16,
-                padding: "26px 28px",
-                display: "flex", flexDirection: "column", gap: 18,
-                transition: "border-color 0.15s, transform 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = alpha(m.color, "66");
-                e.currentTarget.style.transform = "translateY(-2px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = CP.border;
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-                <div style={{
-                  width: 52, height: 52, borderRadius: 12,
-                  background: alpha(m.color, "22"),
-                  border: `1px solid ${alpha(m.color, "55")}`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0,
-                }}>
-                  <m.icon size={26} strokeWidth={1.8} color={m.color} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 19, fontWeight: 700, color: CP.textPrimary, fontFamily: FONTS.display, letterSpacing: "-0.01em" }}>
-                    {m.title}
-                  </div>
-                  <div style={{ color: m.color, fontSize: 12, fontWeight: 600, marginTop: 3, letterSpacing: "0.01em" }}>
-                    {m.subtitle}
-                  </div>
-                </div>
-              </div>
-
-              <p style={{ color: CP.textSecondary, fontSize: 14, lineHeight: 1.55, margin: 0, flex: 1 }}>
-                {m.description}
-              </p>
-
-              {/* CTAs */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <Link
-                  href={m.primaryCta.href}
-                  style={{
-                    display: "inline-flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "10px 14px",
-                    background: m.color,
-                    color: CP.accentInk,
-                    border: "none",
-                    borderRadius: 8,
-                    fontSize: 13,
-                    fontWeight: 700,
-                    textDecoration: "none",
-                  }}
-                >
-                  <span>{m.primaryCta.label}</span>
-                  <ArrowRight size={14} strokeWidth={2.2} />
-                </Link>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {m.secondaryCtas.map((c) => (
-                    <Link
-                      key={c.href}
-                      href={c.href}
-                      style={{
-                        padding: "5px 10px",
-                        background: CP.surfaceAlt,
-                        color: CP.textSecondary,
-                        border: `1px solid ${CP.border}`,
-                        borderRadius: 6,
-                        fontSize: 11,
-                        textDecoration: "none",
-                      }}
-                    >
-                      {c.label}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Score primer banner */}
+      {/* Da dove partire: i due score */}
       <Link
         href="/welcome/score-friendly"
-        style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "20px 24px",
-          marginBottom: 16,
-          background: CP.surface,
-          border: `1px solid ${alpha(CP.accentGreen, "44")}`,
-          borderRadius: 14,
-          color: CP.textPrimary,
-          textDecoration: "none",
-          gap: 16,
-        }}
+        style={{ ...card, display: "flex", alignItems: "center", gap: 16, padding: "18px 20px", marginBottom: 28, textDecoration: "none", color: CP.textPrimary, flexWrap: "wrap" }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 12,
-            background: alpha(CP.accentGreen, "22"),
-            border: `1px solid ${alpha(CP.accentGreen, "66")}`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            flexShrink: 0,
-          }}>
-            <Sparkles size={22} color={CP.accentGreen} />
-          </div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: CP.textPrimary }}>
-              Prima volta in HOC Pro? Capisci come funziona lo Score in 7 step
-            </div>
-            <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 4 }}>
-              Tutorial narrativo con esempi concreti e Q&amp;A interattivo. Puoi fare domande in qualsiasi punto.
-            </div>
+        <div style={{ ...iconBox, background: CP.accentSoft, border: "none" }}>
+          <Sparkles size={18} color={CP.accentSoftText} />
+        </div>
+        <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 500 }}>Prima volta qui? Parti dagli score</div>
+          <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 4, lineHeight: 1.5 }}>
+            Ci sono due score: Vendite e Mestiere. Una guida in 7 passi con un esempio concreto spiega come si calcola Vendite; in ogni passo puoi fare domande.
           </div>
         </div>
-        <span style={{ color: CP.accentGreen, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6 }}>
-          Apri guida <ArrowRight size={14} />
-        </span>
+        <span style={linkAccent}>Apri la guida <ArrowRight size={14} /></span>
       </Link>
 
-      {/* FOOTER hints */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <CpCard padding="20px 24px">
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-            <LayoutDashboard size={16} color={CP.accentGreen} />
-            <div style={{ fontWeight: 600, fontSize: 14 }}>Cerchi il control center?</div>
-          </div>
-          <p style={{ color: CP.textSecondary, fontSize: 13, margin: "0 0 12px 0", lineHeight: 1.5 }}>
-            L'Hub <code style={{ background: CP.surfaceAlt, padding: "1px 6px", borderRadius: 3 }}>/admin</code> raccoglie le stat live, le quick actions e gli shortcut a tutte le sezioni amministrative.
-          </p>
-          <Link href="/admin" style={{ color: CP.accentGreen, fontSize: 13, fontWeight: 600, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
-            Vai all'Hub Admin <ArrowRight size={13} />
-          </Link>
-        </CpCard>
+      <SectionTitle aside="Ognuno vede le parti che servono al suo ruolo">I quattro moduli</SectionTitle>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14, marginBottom: 14 }}>
+        {modules.map((m) => (
+          <section key={m.key} style={{ ...card, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+              <div style={iconBox}><m.icon size={18} strokeWidth={1.8} color={CP.textSecondary} /></div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h3 style={{ fontSize: 17, fontWeight: 500, margin: 0, color: CP.textPrimary }}>{m.title}</h3>
+                <div style={{ fontSize: 13, color: CP.textMuted, marginTop: 2 }}>{m.subtitle}</div>
+              </div>
+            </div>
+            <p style={{ color: CP.textSecondary, fontSize: 14, lineHeight: 1.55, margin: 0, flex: 1 }}>{m.description}</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <Link href={m.primaryCta.href} style={linkAccent}>{m.primaryCta.label} <ArrowRight size={14} /></Link>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {m.secondaryCtas.filter((c) => allowed(c.href)).map((c) => (
+                  <Link key={c.href} href={c.href} style={chip}>{c.label}</Link>
+                ))}
+              </div>
+            </div>
+          </section>
+        ))}
+      </div>
 
-        <CpCard padding="20px 24px">
+      {/* Solo le parti che il ruolo può aprire (prima: link a pagine che rispondevano "accesso negato") */}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
+        {allowed("/admin") && (
+        <section style={{ ...card, padding: "18px 20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-            <Layers size={16} color={CP.accentBlue} />
-            <div style={{ fontWeight: 600, fontSize: 14 }}>Hai bisogno di TUTTI gli strumenti?</div>
+            <LayoutDashboard size={16} color={CP.textMuted} />
+            <h3 style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>Cerchi il pannello di controllo?</h3>
           </div>
-          <p style={{ color: CP.textSecondary, fontSize: 13, margin: "0 0 12px 0", lineHeight: 1.5 }}>
-            La sidebar in alto a sinistra ha un toggle <b>Essential / Advanced</b>. In modalità Advanced compaiono tutte le voci di ogni sezione, incluse Insights e Data &amp; Integrations.
+          <p style={{ color: CP.textSecondary, fontSize: 13, margin: "0 0 12px", lineHeight: 1.5 }}>
+            L&apos;hub admin raccoglie i numeri aggiornati, le azioni rapide e le scorciatoie a tutte le sezioni di amministrazione.
           </p>
-          <span style={{ color: CP.textMuted, fontSize: 12, fontStyle: "italic" }}>
-            Click sull'icona <b>Layers</b> in sidebar per passare a Advanced.
-          </span>
-        </CpCard>
+          <Link href="/admin" style={{ ...linkAccent, fontSize: 13 }}>Vai all&apos;hub admin <ArrowRight size={13} /></Link>
+        </section>
+        )}
+
+        <section style={{ ...card, padding: "18px 20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+            <Layers size={16} color={CP.textMuted} />
+            <h3 style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>Ti servono tutti gli strumenti?</h3>
+          </div>
+          <p style={{ color: CP.textSecondary, fontSize: 13, margin: 0, lineHeight: 1.5 }}>
+            Nel menu a sinistra c&apos;è un selettore Essential / Advanced (icona a strati). In Advanced compaiono tutte le voci di ogni sezione, compresi Insights e Data &amp; Integrations.
+          </p>
+        </section>
       </div>
     </div>
   );
