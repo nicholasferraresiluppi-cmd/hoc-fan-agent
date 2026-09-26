@@ -100,7 +100,7 @@ export async function computeCityLive(periodId = monthOf()) {
 }
 
 export async function getCityLive(periodId = monthOf()) {
-  const key = `citta:live:v2:${periodId}`;
+  const key = `citta:live:v3:${periodId}`;
   const hit = await kv.get(key);
   if (hit && Date.now() - (hit.computed_at || 0) < TTL * 1000) return hit;
   const fresh = await computeCityLive(periodId);
@@ -109,7 +109,8 @@ export async function getCityLive(periodId = monthOf()) {
 }
 
 // ── fusione con la fotografia ClickUp (pura, testabile) ────────────────────────
-const usd = (v) => "$" + Math.round(v || 0).toLocaleString("it-IT");
+const grp = (n) => String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+const usd = (v) => "$" + grp(v);
 const pct = (v, d = 1) => (v * 100).toLocaleString("it-IT", { maximumFractionDigits: d }) + "%";
 const monthName = (pid) => MONTHS_IT[Number(String(pid).slice(5, 7)) - 1] || pid;
 
@@ -117,7 +118,7 @@ function salesArea(x, live) {
   if (!x || !x.sales) return { n: "Sales", s: "none", open: 0, late: 0, l: `Nessun venduto a ${monthName(live.period)} finora.`, src: "hoc" };
   const d = x.perShift != null && x.perShiftPrev ? x.perShift / x.perShiftPrev - 1 : null;
   const s = d != null && d <= SALES_DROP ? "wait" : "ok";
-  const l = `Venduto a ${monthName(live.period)}: ${usd(x.sales)} in ${Math.round(x.shifts).toLocaleString("it-IT")} turni, ${usd(x.perShift)} a turno` +
+  const l = `Venduto a ${monthName(live.period)}: ${usd(x.sales)} in ${grp(x.shifts)} turni, ${usd(x.perShift)} a turno` +
     (d != null ? ` (${d >= 0 ? "+" : "−"}${pct(Math.abs(d), 0)} rispetto a ${monthName(live.prev)}).` : ".");
   return { n: "Sales", s, open: 0, late: 0, l, src: "hoc" };
 }
