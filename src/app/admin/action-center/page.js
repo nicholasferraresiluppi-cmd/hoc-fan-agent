@@ -206,6 +206,16 @@ export default function ActionCenterPage() {
                       <td style={tdS}>
                         <Link href={`/leaderboard/operational/${encodeURIComponent(c.employee)}`} style={{ color: CP.textPrimary, textDecoration: "none", fontWeight: 500 }}>{c.employee}</Link>
                         {c.top_creator && <div style={{ fontSize: 12, color: CP.textMuted }}>soprattutto su {c.top_creator}</div>}
+                        {c.context && (c.context.vs_peers_pct != null || c.context.difficulty_band) && (
+                          <div style={{ fontSize: 12, color: CP.textSecondary, marginTop: 2 }}>
+                            {c.context.vs_peers_pct != null && <>{c.context.vs_peers_pct > 0 ? "+" : c.context.vs_peers_pct < 0 ? "−" : ""}{Math.abs(c.context.vs_peers_pct)}% per turno rispetto ai colleghi su di lei</>}
+                            {c.context.vs_peers_pct != null && c.context.difficulty_band ? " · " : ""}
+                            {c.context.difficulty_band && <>pubblico {c.context.difficulty_band}</>}
+                          </div>
+                        )}
+                        {c.context?.difficulty_band === "fredda" && c.context.vs_peers_pct != null && c.context.vs_peers_pct >= -10 && (
+                          <div style={{ fontSize: 12, color: CP.accentSoftText, marginTop: 2 }}>Rende come i colleghi su una creator fredda: valutare la creator prima della persona</div>
+                        )}
                       </td>
                       <td style={{ ...tdS, textAlign: "right" }}>
                         <span style={{ color: tierColor(c.tier), fontWeight: 500 }}>{sc(c.score)}</span>
@@ -243,7 +253,7 @@ export default function ActionCenterPage() {
           </div>
         )}
         <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 10 }}>
-          Criteri: score CP ≤ soglia con almeno 5 turni nel mese. {data.ignored_count ? `${data.ignored_count} operatori esclusi per sempre non compaiono. ` : ""}I sostituti suggeriti sono chi rende meglio sulle stesse creator (numero = compatibilità).
+          Sotto il nome: quanto rende per turno rispetto ai colleghi sulla stessa creator (lui escluso) e quanto è “fredda” la creator (profilo dal warehouse, <Link href="/admin/creator-difficulty" style={{ color: CP.accentSoftText }}>Difficoltà creator</Link>). Criteri: score CP ≤ soglia con almeno 5 turni nel mese. {data.ignored_count ? `${data.ignored_count} operatori esclusi per sempre non compaiono. ` : ""}I sostituti suggeriti sono chi rende meglio sulle stesse creator (numero = compatibilità).
         </div>
       </>)}
     </div>
