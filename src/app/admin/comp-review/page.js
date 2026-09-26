@@ -37,7 +37,8 @@ function monthOpts(n = 12) {
 const pct1 = (v) => fmtPct(v, 1);
 const monthName = (pid) => (pid ? `${MONTHS_IT[Number(pid.slice(5)) - 1]} ${pid.slice(0, 4)}` : "");
 const FEW_SHIFTS = 5; // sotto: la % del mese dipende da pochi turni
-const INTERVAL_IT = { Morning: "Mattino", Afternoon: "Pomeriggio", Evening: "Sera", Night: "Notte" };
+// fasce orarie CP (UTC, creatorspro-api bucketizeIntervalFromHour): "After" = 02-06, dopo la notte
+const INTERVAL_IT = { Morning: "Mattino", Afternoon: "Pomeriggio", Evening: "Sera", Night: "Notte", After: "Notte fonda" };
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 

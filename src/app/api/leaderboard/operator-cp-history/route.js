@@ -126,6 +126,7 @@ export async function GET(request) {
     employee,
     history,
     tenure_months_cp,
+    // NB: CreatorsPro registra in DOLLARI; il nome storico del campo dice "eur" (verificato 26/09): la UI lo mostra in $
     ltv_cp_eur: Math.round(ltv),
     first_seen_period: firstSeen,
     last_seen_period: lastSeen,

@@ -83,9 +83,9 @@ export default function MyProfilePage() {
   }, [firstSeen]);
 
   // Coaching assignment se esiste
-  const coachingUrl = periodId ? `/api/admin/coaching-center?period_id=${periodId}` : null;
-  const { data: coachingData } = useSWR(coachingUrl, fetcher, { revalidateOnFocus: false });
-  const myCoaching = employee && coachingData?.assignments?.[employee] ? coachingData.assignments[employee] : null;
+  // Lettura "own" (26/09): l'API admin rispondeva 403 agli operatori → blocco mai visibile
+  const { data: coachingData } = useSWR(employee ? "/api/me/coaching-assignment" : null, fetcher, { revalidateOnFocus: false });
+  const myCoaching = coachingData?.assignment || null;
 
   // Profilo-segnali comportamentale (metodo dal lavoro vero + percorso di training),
   // self-serve via match email — stessa diagnostica del cockpit turno.
