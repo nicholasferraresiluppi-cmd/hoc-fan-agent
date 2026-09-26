@@ -18,6 +18,7 @@ import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmt$, fmtInt, fmtDelta, MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, card, NUM } from "@/components/ds";
 
+import { tierLabel } from "@/lib/tier-label";
 const fetcher = async (url) => {
   const r = await fetch(url);
   const j = await r.json().catch(() => ({}));
@@ -31,7 +32,7 @@ const MOVE_PTS = 10;         // variazione che conta come crescita/calo
 // Fasce: il colore porta solo il segnale (verde = sopra, rosso = da guardare)
 function tierColor(t) {
   if (t === "Elite" || t === "Strong") return CP.accentGreen;
-  if (t === "Weak" || t === "Critical") return CP.accentRed;
+  // fasce basse mai rosse (26/09: il rosso = denaro negativo o allarme)
   return CP.textSecondary;
 }
 const fmtScore = (v) => (v == null ? "—" : v.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
@@ -161,12 +162,12 @@ export default function SalesCpLeaderboardPage() {
     ) },
     { key: "topCreator", label: "Creator principale", muted: true, render: (r) => r.topCreator ? <span>{r.topCreator}{r.otherCreators > 0 && <span style={{ color: CP.textMuted }}> +{r.otherCreators}</span>}</span> : "—" },
     { key: "score", label: "Score", align: "right", render: (r) => (
-      <span title={r.tier || ""} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <span title={tierLabel(r.tier) || ""} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
         <span style={{ width: 7, height: 7, borderRadius: 99, background: tierColor(r.tier) }} />
         <span style={{ fontWeight: 500 }}>{fmtScore(r.score)}</span>
       </span>
     ) },
-    { key: "tier", label: "Fascia", muted: true, sort: (r) => r.score, render: (r) => <span style={{ color: tierColor(r.tier) === CP.textSecondary ? CP.textSecondary : tierColor(r.tier) }}>{r.tier || "—"}</span> },
+    { key: "tier", label: "Fascia", muted: true, sort: (r) => r.score, render: (r) => <span style={{ color: tierColor(r.tier) === CP.textSecondary ? CP.textSecondary : tierColor(r.tier) }}>{tierLabel(r.tier) || "—"}</span> },
     { key: "delta", label: "Sul mese prima", align: "right", render: (r) => (
       <span style={{ color: r.delta == null ? CP.textMuted : r.delta <= -MOVE_PTS ? CP.accentRed : r.delta >= MOVE_PTS ? CP.accentGreen : CP.textSecondary }}>{r.delta == null ? "nuovo" : fmtPtsDelta(r.delta)}</span>
     ) },
@@ -227,7 +228,7 @@ export default function SalesCpLeaderboardPage() {
           <FilterChip label={`Tutti (${rows.length})`} active={view === "all"} onClick={() => setView("all")} />
           <FilterChip label={`Da rivedere (${counts.review})`} danger={counts.review > 0} active={view === "review"} disabled={!counts.review} onClick={() => setView(view === "review" ? "all" : "review")} />
           <FilterChip label={`In calo (${counts.down})`} active={view === "down"} disabled={!counts.down} onClick={() => setView(view === "down" ? "all" : "down")} />
-          <FilterChip label={`In crescita (${counts.up})`} active={view === "up"} disabled={!counts.up} onClick={() => setView(view === "up" ? "all" : "up")} />
+          <FilterChip label={`In miglioramento (${counts.up})`} active={view === "up"} disabled={!counts.up} onClick={() => setView(view === "up" ? "all" : "up")} />
           <FilterChip label={`Meno di ${MIN_SHIFTS} turni (${counts.thin})`} active={view === "thin"} disabled={!counts.thin} onClick={() => setView(view === "thin" ? "all" : "thin")} />
           <span style={{ flex: 1 }} />
           <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Categoria creator" style={selStyle}>

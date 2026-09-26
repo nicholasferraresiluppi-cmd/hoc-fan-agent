@@ -326,7 +326,7 @@ export default function LeaderboardSettingsPage() {
         <section style={{ ...card, padding: "16px 16px 8px", marginBottom: 16 }}>
           <SectionTitle>Fasce dello score{isCustom.tiers && customChip}</SectionTitle>
           <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 12px", lineHeight: 1.55 }}>
-            Da quale score parte ogni fascia (Critical, Weak, Average, Good, Strong, Elite). Le fasce devono essere attaccate una all&apos;altra e coprire da 0 a 100. Il colore è quello del bollino nella leaderboard.
+            Da quale score parte ogni fascia (Da costruire, In crescita, Nella media, Buona, Forte, Eccellente — nei dati restano Critical…Elite). Le fasce devono essere attaccate una all&apos;altra e coprire da 0 a 100. Il colore è quello del bollino nella leaderboard.
           </p>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: 520 }}>

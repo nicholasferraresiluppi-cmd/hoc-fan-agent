@@ -11,6 +11,7 @@ import SignalsStrip from "@/components/SignalsStrip";
 import { fmt$, fmtInt, MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, SectionTitle, DataTable, Notice, card, NUM } from "@/components/ds";
 
+import { tierLabel } from "@/lib/tier-label";
 // Ridisegno sul design system 26/09/2026: contenuti e logica del 25/09 invariati
 // (anzianità da tutte le fonti, score vendite con un decimale it-IT, hero che
 // sul telefono mette lo score in cima). Cambiano solo struttura e segni visivi.
@@ -106,7 +107,7 @@ export default function MyProfilePage() {
   const creatorCols = [
     { key: "creator", label: "Creator", render: (r) => <span style={{ fontWeight: 500 }}>{r.creator}</span> },
     { key: "score", label: "Score su questa creator", align: "right", render: (r) => dec1(r.score) },
-    { key: "tier", label: "Fascia", render: (r) => (r.tier ? <span style={tierChip}>{r.tier}</span> : <span style={{ color: CP.textMuted }}>—</span>) },
+    { key: "tier", label: "Fascia", render: (r) => (r.tier ? <span style={tierChip}>{tierLabel(r.tier)}</span> : <span style={{ color: CP.textMuted }}>—</span>) },
     { key: "sales_per_shift", label: "Venduto per turno", align: "right", render: (r) => fmt$(r.sales_per_shift) },
     { key: "shifts", label: "Turni", align: "right", render: (r) => fmtInt(r.shifts) },
     { key: "vs_cohort_pct", label: "Rispetto alla media della creator", align: "right",
@@ -155,7 +156,7 @@ export default function MyProfilePage() {
             <HeroMetric
               label={`Il tuo score vendite · ${formatPeriodLabel(periodId)}`}
               value={dec1(cp.score)}
-              compare={cp.tier ? `Fascia: ${cp.tier}` : null}
+              compare={cp.tier ? `Fascia: ${tierLabel(cp.tier)}` : null}
             >
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "16px 24px", flex: "1 1 420px" }}>
                 <Metric label="Venduto nel mese" value={fmt$(cp.total_sales)} />
@@ -228,7 +229,7 @@ function NextTierBlock({ cp, nextTier }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 4 }}>Prossimo obiettivo</div>
         <div style={{ fontSize: 16, color: CP.textPrimary, lineHeight: 1.4 }}>
-          Per salire alla fascia <span style={{ fontWeight: 500 }}>{nextTier.next}</span> ti servono circa <span style={{ fontWeight: 500, ...NUM }}>{fmtInt(ptsToGo)} punti</span> in più di score vendite.
+          Per salire alla fascia <span style={{ fontWeight: 500 }}>{tierLabel(nextTier.next)}</span> ti servono circa <span style={{ fontWeight: 500, ...NUM }}>{fmtInt(ptsToGo)} punti</span> in più di score vendite.
         </div>
         <div style={{ fontSize: 13, color: CP.textMuted, marginTop: 6, lineHeight: 1.5 }}>
           Lo score sale soprattutto con il venduto per turno, che pesa per l&apos;85%. Parti dalle creator dove sei sotto la media (ultima colonna della tabella qui sotto).

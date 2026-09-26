@@ -16,6 +16,7 @@ import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmt$, fmtInt, MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, FilterChip, Notice, card } from "@/components/ds";
 
+import { tierLabel } from "@/lib/tier-label";
 const fetcher = async (url) => {
   const r = await fetch(url);
   const j = await r.json().catch(() => ({}));
@@ -30,7 +31,8 @@ function monthOpts(n = 12) {
 }
 const prevOf = (pid) => { if (!pid) return null; const [y, m] = pid.split("-").map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 const sc = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
-const tierColor = (t) => (t === "Critical" || t === "Weak" ? CP.accentRed : CP.textSecondary);
+// persone sotto soglia mai in rosso (26/09): "una conversazione, non un giudizio"
+const tierColor = () => CP.textPrimary;
 const THRESHOLDS = [25, 35, 50];
 
 export default function ActionCenterPage() {
@@ -109,7 +111,7 @@ export default function ActionCenterPage() {
       ...readyForHr.map((e) => {
         const cand = all.find((c) => c.employee === e.employee);
         return [
-          e.employee, cand?.group || "", cand?.score ?? "", prevScore.get(e.employee) ?? "", cand?.tier ?? "",
+          e.employee, cand?.group || "", cand?.score ?? "", prevScore.get(e.employee) ?? "", tierLabel(cand?.tier) ?? "",
           cand?.cp_total_sales ?? "", cand?.cp_total_shifts ?? "",
           cand?.top_creator ?? "", e.swap_with || "",
           new Date(e.marked_at).toISOString().slice(0, 10), e.note || "",
@@ -172,7 +174,7 @@ export default function ActionCenterPage() {
           <FilterChip label={`Pronti per HR (${n("ready")})`} active={stage === "ready"} disabled={!n("ready")} onClick={() => setStage(stage === "ready" ? "all" : "ready")} />
           <span style={{ width: 12 }} />
           {tiers.map((t) => (
-            <FilterChip key={t} label={`${t} (${inThreshold.filter((c) => c.tier === t).length})`} active={tier === t} onClick={() => setTier(tier === t ? "" : t)} />
+            <FilterChip key={t} label={`${tierLabel(t)} (${inThreshold.filter((c) => c.tier === t).length})`} active={tier === t} onClick={() => setTier(tier === t ? "" : t)} />
           ))}
           <span style={{ flex: 1 }} />
           <select value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} aria-label="Soglia score" style={{ ...ctl, fontSize: 13 }}>
@@ -219,7 +221,7 @@ export default function ActionCenterPage() {
                       </td>
                       <td style={{ ...tdS, textAlign: "right" }}>
                         <span style={{ color: tierColor(c.tier), fontWeight: 500 }}>{sc(c.score)}</span>
-                        <div style={{ fontSize: 12, color: CP.textMuted }}>{c.tier}</div>
+                        <div style={{ fontSize: 12, color: CP.textMuted }}>{tierLabel(c.tier)}</div>
                       </td>
                       <td style={{ ...tdS, textAlign: "right" }}>
                         <span style={{ color: again ? CP.accentRed : CP.textSecondary }}>{ps == null ? "—" : sc(ps)}</span>
@@ -343,7 +345,7 @@ function SwapPicker({ candidate, swapTargets, onChange }) {
         <optgroup label={`Altri ${others.length}`}>
           {others.map((t) => (
             <option key={t.employee} value={t.employee} style={{ background: CP.surface }}>
-              {t.employee} ({t.tier}, {t.total_shifts} shift)
+              {t.employee} ({tierLabel(t.tier)}, {t.total_shifts} turni)
             </option>
           ))}
         </optgroup>

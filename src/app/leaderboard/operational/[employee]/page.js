@@ -21,6 +21,7 @@ import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmt$, fmtInt, MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, SectionTitle, DataTable, Notice, card } from "@/components/ds";
 
+import { tierLabel, tierColor } from "@/lib/tier-label";
 const fetcher = async (url) => {
   const r = await fetch(url);
   const j = await r.json().catch(() => ({}));
@@ -30,7 +31,7 @@ const REVIEW = 25;
 const sc = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
 const pts = (d) => (d == null ? "" : `${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.abs(d).toLocaleString("it-IT", { maximumFractionDigits: 1 })} punti`);
 const monthName = (pid) => (pid ? `${MONTHS_IT[Number(pid.slice(5)) - 1]} ${pid.slice(0, 4)}` : "");
-const tierColor = (t) => (t === "Critical" || t === "Weak" ? CP.accentRed : t === "Strong" || t === "Elite" ? CP.accentGreen : CP.textSecondary);
+// fasce basse mai rosse (26/09): colore solo per le fasce alte
 function monthsBetween(a, b) { const [ay, am] = a.split("-").map(Number); const [by, bm] = b.split("-").map(Number); return (by - ay) * 12 + (bm - am); }
 function fmtTenure(m) {
   if (m == null) return "—";
@@ -156,7 +157,7 @@ export default function EmployeeDrilldownPage({ params }) {
           <HeroMetric
             label={`Score vendite · ${monthName(periodId)}${isCurrent ? " (in corso)" : ""}`}
             value={<span style={{ color: tierColor(cp.tier) }}>{sc(cp.score)}</span>}
-            compare={[cp.tier, cp.rank_agency ? `${cp.rank_agency}º su ${cp.total_in_ranking}` : null, prevScore != null ? `${monthName(prevId)}: ${sc(prevScore)} (${pts(cp.score - prevScore)})` : null].filter(Boolean).join(" · ")}
+            compare={[tierLabel(cp.tier), cp.rank_agency ? `${cp.rank_agency}º su ${cp.total_in_ranking}` : null, prevScore != null ? `${monthName(prevId)}: ${sc(prevScore)} (${pts(cp.score - prevScore)})` : null].filter(Boolean).join(" · ")}
             hint="0-100: venduto per turno rispetto a chi lavora sulle stesse creator (70%) e a tutta l'agenzia (30%)."
           >
             <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>

@@ -6,6 +6,7 @@ import { Sparkles, Target, ArrowRight } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, SectionTitle, Notice, card, NUM } from "@/components/ds";
 
+import { tierLabel } from "@/lib/tier-label";
 /**
  * /welcome/score-explained — La formula dello score Vendite (score CP v3) con
  * un calcolatore interattivo.
@@ -38,7 +39,6 @@ function tierFromPercentile(p) {
 // Il colore porta solo il segnale: verde = sopra, rosso = da guardare.
 function colorForTier(t) {
   if (t === "Elite" || t === "Strong") return CP.accentGreen;
-  if (t === "Weak" || t === "Critical") return CP.accentRed;
   return CP.textSecondary;
 }
 const fmt1 = (v) => v.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -63,7 +63,7 @@ export default function ScoreExplainedPage() {
       />
 
       <Notice>
-        Questa pagina spiega lo score <b style={b}>Vendite</b>, usato nelle revisioni mensili. L&apos;altro score, <b style={b}>Mestiere</b>, misura come lavori in chat (dati Infloww) ed è quello del percorso di carriera: ha fasce proprie (Critical sotto 15, Weak 15–27, Average 27–44, Good 44–61, Strong 61–75, Elite da 75).
+        Questa pagina spiega lo score <b style={b}>Vendite</b>, usato nelle revisioni mensili. L&apos;altro score, <b style={b}>Mestiere</b>, misura come lavori in chat (dati Infloww) ed è quello del percorso di carriera: ha fasce proprie («Da costruire» sotto 15, «In crescita» 15–27, «Nella media» 27–44, «Buona» 44–61, «Forte» 61–75, «Eccellente» da 75).
       </Notice>
 
       {/* 1 — Cosa misura */}
@@ -80,7 +80,7 @@ export default function ScoreExplainedPage() {
           </div>
         </div>
         <p style={{ ...pBig, marginTop: 14 }}>
-          Le due risposte si combinano, <b style={b}>70% creator e 30% agenzia</b>, per evitare distorsioni: chi è il migliore di un team debole non arriva a Elite se in assoluto vende poco.
+          Le due risposte si combinano, <b style={b}>70% creator e 30% agenzia</b>, per evitare distorsioni: chi è il migliore di un team debole non arriva a «Eccellente» se in assoluto vende poco.
         </p>
       </Block>
 
@@ -141,7 +141,7 @@ export default function ScoreExplainedPage() {
             <span style={{ color: CP.textMuted, fontSize: 13 }}>Fascia:</span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 999, fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>
               <span style={{ width: 8, height: 8, borderRadius: 999, background: finalColor }} />
-              {finalTier}
+              {tierLabel(finalTier)}
             </span>
             <span style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>
               (score {TIER_BADGES.find((t) => t.tier === finalTier)?.range})
@@ -160,7 +160,7 @@ export default function ScoreExplainedPage() {
             <div key={t.tier} style={{ ...card, padding: "12px 14px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                 <span style={{ width: 8, height: 8, borderRadius: 999, background: colorForTier(t.tier), flexShrink: 0 }} />
-                <span style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary }}>{t.tier}</span>
+                <span style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary }}>{tierLabel(t.tier)}</span>
                 <span style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>{t.range}</span>
               </div>
               <p style={{ fontSize: 13, color: CP.textSecondary, margin: 0, lineHeight: 1.45 }}>{t.desc}</p>
@@ -183,7 +183,7 @@ export default function ScoreExplainedPage() {
         <p style={{ ...pBig, marginTop: 14 }}><b style={b}>Cosa vuol dire in pratica:</b></p>
         <ul style={{ ...ul, fontSize: 14 }}>
           <li>Le creator su cui fai più turni <b style={b}>pesano di più</b>.</li>
-          <li>Non puoi essere Elite in Sales CP se vai male sulle creator dove passi la maggior parte dei turni: pochi turni fortunati non bastano.</li>
+          <li>Non puoi essere «Eccellente» nello score Vendite se vai male sulle creator dove passi la maggior parte dei turni: pochi turni fortunati non bastano.</li>
           <li>Le creator con meno di 3 turni non entrano nel calcolo.</li>
           <li>Sales CP e la vista per creator raccontano la stessa storia: i numeri sono gli stessi.</li>
         </ul>

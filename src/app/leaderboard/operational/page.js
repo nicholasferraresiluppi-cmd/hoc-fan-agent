@@ -27,6 +27,7 @@ import { CP, FONTS, alpha } from "@/lib/brand";
 import { fmt$, fmtInt, fmtPct, MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Disclosure, DataTable, Notice, card, NUM } from "@/components/ds";
 
+import { tierLabel } from "@/lib/tier-label";
 const fetcher = async (url) => {
   const r = await fetch(url);
   const j = await r.json().catch(() => ({}));
@@ -74,7 +75,7 @@ const SIZE_OPTIONS = [3, 5, 7, 10];
 // Il colore porta solo il segnale: verde = fascia alta, rosso = da guardare.
 function tierColor(t) {
   if (t === "Elite" || t === "Strong") return CP.accentGreen;
-  if (t === "Weak" || t === "Critical") return CP.accentRed;
+  // fasce basse mai rosse (26/09)
   return CP.textSecondary;
 }
 const fmtScore = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
@@ -274,10 +275,10 @@ function TrendCard({ health, periodType, periodId }) {
           <div style={{ fontSize: 13, color: CP.textMuted, marginTop: 2 }}>Mestiere medio negli ultimi {history.length} {unit}. Passa sopra una barra per le fasce di quel periodo.</div>
         </div>
         {cur && (
-          <div title="Operatori in Elite o Strong meno operatori in Weak o Critical, nel periodo evidenziato">
+          <div title="Operatori in Eccellente o Forte meno operatori in Da costruire o In crescita, nel periodo evidenziato">
             <div style={{ fontSize: 13, color: CP.textSecondary }}>Fasce alte meno fasce basse</div>
             <div style={{ fontSize: 20, fontWeight: 500, color: CP.textPrimary, ...NUM }}>{fmtSignedInt(balance)}</div>
-            <div style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>{cur.elite_strong} in Elite o Strong · {cur.critical_weak} in Weak o Critical</div>
+            <div style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>{cur.elite_strong} in Eccellente o Forte · {cur.critical_weak} in Da costruire o In crescita</div>
           </div>
         )}
       </div>
@@ -290,8 +291,8 @@ function TrendCard({ health, periodType, periodId }) {
             `Periodo: ${h.period_id}`,
             `Mestiere medio: ${fmtScore(h.avg_score)} / 100`,
             `In classifica: ${h.eligible}`,
-            `Elite: ${tc.Elite || 0} · Strong: ${tc.Strong || 0} · Good: ${tc.Good || 0}`,
-            `Average: ${tc.Average || 0} · Weak: ${tc.Weak || 0} · Critical: ${tc.Critical || 0}`,
+            `Eccellente: ${tc.Elite || 0} · Forte: ${tc.Strong || 0} · Buona: ${tc.Good || 0}`,
+            `Nella media: ${tc.Average || 0} · In crescita: ${tc.Weak || 0} · Da costruire: ${tc.Critical || 0}`,
             `Fasce alte meno fasce basse: ${fmtSignedInt(q)}`,
           ].join("\n");
           const isCur = h.period_id === cur?.period_id;
@@ -354,14 +355,14 @@ function UnderperformersColumn({ language, label, periodType, periodId, size, on
             </Link>
             <div style={{ fontSize: 12, color: CP.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{op.group}</div>
           </div>
-          <div title={`Mestiere ${fmtScore(op.score)} · fascia ${op.tier || "—"}`} style={{ color: tierColor(op.tier), fontWeight: 500, minWidth: 36, textAlign: "right", ...NUM }}>
+          <div title={`Mestiere ${fmtScore(op.score)} · fascia ${tierLabel(op.tier) || "—"}`} style={{ color: tierColor(op.tier), fontWeight: 500, minWidth: 36, textAlign: "right", ...NUM }}>
             {fmtScore(op.score)}
           </div>
-          <div title={op.lookback_total > 0 ? `Sotto Average in ${op.chronic_count} degli ultimi ${op.lookback_total} periodi` : "Solo periodo corrente: storico non disponibile"}
+          <div title={op.lookback_total > 0 ? `Sotto «Nella media» in ${op.chronic_count} degli ultimi ${op.lookback_total} periodi` : "Solo periodo corrente: storico non disponibile"}
             style={{ display: "flex", gap: 3, minWidth: 30 }}>
             {op.history?.length > 0 ? op.history.map((h, i) => {
               const c = h.tier ? tierColor(h.tier) : CP.border;
-              return <span key={i} title={`${h.period_id}: ${h.tier || "—"}`} style={{ width: 10, height: 10, borderRadius: 2, background: alpha(c, "AA"), border: `1px solid ${c}` }} />;
+              return <span key={i} title={`${h.period_id}: ${tierLabel(h.tier) || "—"}`} style={{ width: 10, height: 10, borderRadius: 2, background: alpha(c, "AA"), border: `1px solid ${c}` }} />;
             }) : <span style={{ fontSize: 12, color: CP.textMuted }}>nuovo</span>}
           </div>
           <UnderperformersKebab employee={op.employee} onExcluded={onExcluded} onIgnored={onIgnored} />
@@ -434,7 +435,7 @@ function UnderperformersActionCenter({ periodType, periodId, canExclude, languag
     <section style={{ marginBottom: 22 }}>
       <SectionTitle aside="visibile solo agli admin">Da cambiare: sotto la media da più periodi</SectionTitle>
       <div style={{ fontSize: 13, color: CP.textSecondary, margin: "-4px 0 10px", maxWidth: 820, lineHeight: 1.5 }}>
-        I punteggi più bassi del periodo, tra chi era sotto Average (mestiere sotto {averageMin}) in almeno 2 dei 3 periodi precedenti: un mese storto non basta per finire qui.
+        I punteggi più bassi del periodo, tra chi era sotto «Nella media» (mestiere sotto {averageMin}) in almeno 2 dei 3 periodi precedenti: un mese storto non basta per finire qui.
         I quadratini sono le fasce degli ultimi 3 periodi. Da qui apri la scheda, oppure con il menu accanto al nome ignori o escludi.
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
@@ -503,7 +504,7 @@ function OperatorDetail({ op, canExclude, onExcluded, onClose }) {
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 13, color: CP.textSecondary }}>Mestiere</div>
           <div style={{ fontSize: 32, fontWeight: 500, lineHeight: 1.1, color: CP.textPrimary, ...NUM }}>{fmtScore(op.score)}</div>
-          <div style={{ fontSize: 13, color: tierColor(op.tier) }}>{op.tier || "—"}</div>
+          <div style={{ fontSize: 13, color: tierColor(op.tier) }}>{tierLabel(op.tier) || "—"}</div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <Link href={`/leaderboard/operational/${encodeURIComponent(op.employee)}`} style={{ ...btn, textDecoration: "none" }}>Apri la scheda →</Link>
@@ -706,12 +707,12 @@ export default function OperationalLeaderboardPage() {
       </div>
     ) },
     { key: "score", label: "Mestiere", align: "right", render: (r) => (
-      <span title={r.tier || ""} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <span title={tierLabel(r.tier) || ""} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
         <span style={{ width: 7, height: 7, borderRadius: 99, background: tierColor(r.tier) }} />
         <span style={{ fontWeight: 500 }}>{fmtScore(r.score)}</span>
       </span>
     ) },
-    { key: "tier", label: "Fascia", sort: (r) => r.score, render: (r) => <span style={{ color: tierColor(r.tier) }}>{r.tier || "—"}</span> },
+    { key: "tier", label: "Fascia", sort: (r) => r.score, render: (r) => <span style={{ color: tierColor(r.tier) }}>{tierLabel(r.tier) || "—"}</span> },
     { key: "fan_cvr", label: "Fan che pagano", align: "right", render: (r) => kpiCell(r.fan_cvr, r.means?.fan_cvr, pct2, basisOf(r)) },
     { key: "unlock_rate", label: "PPV aperti", align: "right", render: (r) => kpiCell(r.unlock_rate, r.means?.unlock_rate, pct2, basisOf(r)) },
     { key: "ppvs_unlocked", label: "PPV acquistati", align: "right", render: (r) => (
@@ -768,9 +769,9 @@ export default function OperationalLeaderboardPage() {
         >
           <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
             <Metric label="In classifica" value={fmtInt(data.eligible_total)} note={data.total > data.eligible_total ? `+${fmtInt(data.total - data.eligible_total)} senza score` : null} />
-            <Metric label="Elite o Strong" value={fmtInt((data.elite_count || 0) + (data.strong_count || 0))} note={`mestiere da ${strongMin} in su`} />
+            <Metric label="Eccellente o Forte" value={fmtInt((data.elite_count || 0) + (data.strong_count || 0))} note={`mestiere da ${strongMin} in su`} />
             <div>
-              <Metric label="Weak o Critical" value={fmtInt(counts.low)} danger={counts.low > 0} note={`sotto ${averageMin}`} />
+              <Metric label="Da costruire o In crescita" value={fmtInt(counts.low)} note={`sotto ${averageMin}`} />
               {counts.low > 0 && view !== "low" && <button onClick={() => setView("low")} style={{ ...linkBtn, marginTop: 2 }}>Mostrali →</button>}
             </div>
             {cpAvailable && data.cp_agency && (
@@ -795,7 +796,7 @@ export default function OperationalLeaderboardPage() {
         <SectionTitle aside={`${fmtInt(shown.length)} ${shown.length === 1 ? "operatore" : "operatori"}`}>Classifica</SectionTitle>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
           <FilterChip label={`Tutti (${rows.length})`} active={view === "all"} onClick={() => setView("all")} />
-          <FilterChip label={`Weak o Critical (${counts.low})`} danger={counts.low > 0} active={view === "low"} disabled={!counts.low} onClick={() => setView(view === "low" ? "all" : "low")} />
+          <FilterChip label={`Da costruire o In crescita (${counts.low})`} active={view === "low"} disabled={!counts.low} onClick={() => setView(view === "low" ? "all" : "low")} />
           {counts.small > 0 && (
             <FilterChip label={`Confrontati con la lingua (${counts.small})`} active={view === "small"} onClick={() => setView(view === "small" ? "all" : "small")} />
           )}

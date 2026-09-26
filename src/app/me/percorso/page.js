@@ -4,6 +4,7 @@ import useSWR from "swr";
 import { CheckCircle2, Circle, Lock } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHead, HeroMetric, SectionTitle, Notice, card, NUM } from "@/components/ds";
+import { tierLabel, tierColor } from "@/lib/tier-label";
 
 /**
  * /me/percorso — "Il mio percorso" (scope own, docs/VISIBILITY_POLICY.md).
@@ -19,8 +20,7 @@ const fetcher = (url) => fetch(url).then((r) => r.json());
 
 // Fascia come segnale sul dato (DESIGN.md §1): rosso solo per la più bassa,
 // verde per le tre alte, neutro in mezzo.
-const tierColor = (tier) =>
-  tier === "Critical" ? CP.accentRed : ["Good", "Strong", "Elite"].includes(tier) ? CP.accentGreen : CP.textSecondary;
+// colore fasce: lib/tier-label (basse mai rosse, 26/09)
 
 const MESI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
 const monthLabel = (pid) => (/^\d{4}-\d{2}$/.test(pid || "") ? `${MESI[Number(pid.slice(5)) - 1]} ${pid.slice(0, 4)}` : pid);
@@ -56,13 +56,13 @@ export default function MyLadderPage() {
             <HeroMetric
               label={`Ultimo mese valutato · ${monthLabel(data.current.period_id)}`}
               value={fmtScore(data.current.score)}
-              compare={data.current.tier ? <span style={{ color: tierColor(data.current.tier) }}>{data.current.tier}</span> : null}
+              compare={data.current.tier ? <span style={{ color: tierColor(data.current.tier) }}>{tierLabel(data.current.tier)}</span> : null}
               hint="Score mestiere: come chatti, rispetto al tuo gruppo."
             />
           )}
 
           <p style={{ fontSize: 14, color: CP.textSecondary, lineHeight: 1.6, margin: "4px 0 22px", maxWidth: 760 }}>
-            I passaggi di livello si basano sullo <span style={{ color: CP.textPrimary, fontWeight: 500 }}>score mestiere</span> (come chatti, rispetto al tuo gruppo). Per salire non basta un mese buono: serve stare sopra la soglia in più mesi. Le fasce vanno da Critical a Elite. I mesi in cui non hai lavorato non contano: non sono né sopra né sotto la soglia.
+            I passaggi di livello si basano sullo <span style={{ color: CP.textPrimary, fontWeight: 500 }}>score mestiere</span> (come chatti, rispetto al tuo gruppo). Per salire non basta un mese buono: serve stare sopra la soglia in più mesi. Le fasce vanno da «Da costruire» a «Eccellente». I mesi in cui non hai lavorato non contano: non sono né sopra né sotto la soglia.
           </p>
 
           <SectionTitle aside="un riquadro per ogni passaggio di livello">I passaggi</SectionTitle>
@@ -93,7 +93,7 @@ export default function MyLadderPage() {
                           style={{ width: 58, padding: "6px 0", borderRadius: 6, background: m.counts ? alpha(CP.accentGreen, "1c") : CP.surfaceAlt, border: `1px solid ${m.counts ? CP.accentGreen : m.below_floor ? CP.accentRed : CP.border}` }}>
                           <span style={{ fontSize: 13, color: CP.textPrimary, ...NUM }}>{fmtScore(m.score)}</span>
                         </div>
-                        <span style={{ fontSize: 11, color: CP.textMuted }}>{monthShort(m.period_id)}{m.tier ? ` · ${m.tier}` : ""}</span>
+                        <span style={{ fontSize: 11, color: CP.textMuted }}>{monthShort(m.period_id)}{m.tier ? ` · ${tierLabel(m.tier)}` : ""}</span>
                       </div>
                     ))}
                   </div>

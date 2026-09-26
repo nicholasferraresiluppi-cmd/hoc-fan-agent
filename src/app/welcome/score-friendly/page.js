@@ -9,6 +9,7 @@ import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Notice, card, NUM } from "@/components/ds";
 import InlineQA from "@/components/InlineQA";
 
+import { tierLabel } from "@/lib/tier-label";
 /**
  * /welcome/score-friendly — Guida narrativa allo score Vendite (score CP v3).
  *
@@ -34,7 +35,6 @@ const TIERS = [
 ];
 function tierColor(t) {
   if (t === "Elite" || t === "Strong") return CP.accentGreen;
-  if (t === "Weak" || t === "Critical") return CP.accentRed;
   return CP.textSecondary;
 }
 
@@ -153,7 +153,7 @@ export default function ScoreFriendlyPage() {
         <h3 style={h3}>Perché due confronti e non uno</h3>
         <p style={p}>Un solo confronto porta errori noti:</p>
         <ul style={ul}>
-          <li><b style={b}>Solo sulla creator:</b> se su Sara tutto il team vende poco, Marco potrebbe risultare Elite anche con $300 a turno. Lo score esagererebbe il suo merito.</li>
+          <li><b style={b}>Solo sulla creator:</b> se su Sara tutto il team vende poco, Marco potrebbe risultare «Eccellente» anche con $300 a turno. Lo score esagererebbe il suo merito.</li>
           <li><b style={b}>Solo con l&apos;agenzia:</b> se su Sara anche i migliori vendono poco, Marco verrebbe penalizzato anche lavorando bene per quel contesto.</li>
         </ul>
 
@@ -167,7 +167,7 @@ export default function ScoreFriendlyPage() {
           = <b style={b}>76,8</b>
         </Example>
         <p style={p}>
-          Il 70% dà più peso al confronto con chi fa lo stesso lavoro nelle stesse condizioni. Il 30% tiene un ancoraggio a tutta l&apos;agenzia, così nessuno risulta Elite solo perché è &quot;il meno peggio&quot; in un contesto debole.
+          Il 70% dà più peso al confronto con chi fa lo stesso lavoro nelle stesse condizioni. Il 30% tiene un ancoraggio a tutta l&apos;agenzia, così nessuno risulta «Eccellente» solo perché è &quot;il meno peggio&quot; in un contesto debole.
         </p>
 
         <InlineQA
@@ -192,9 +192,9 @@ export default function ScoreFriendlyPage() {
           <Formula>Score(Marco, Sara) = 85% × 76,8 + 15% × 92</Formula>
           <br />
           = 65,3 + 13,8<br />
-          = <b style={b}>79,1</b> → fascia <b style={b}>Strong</b>
+          = <b style={b}>79,1</b> → fascia <b style={b}>«Forte»</b>
         </Example>
-        <p style={p}>Su Sara Marco è in fascia <b style={b}>Strong</b> (75–89): sopra la media in modo netto.</p>
+        <p style={p}>Su Sara Marco è in fascia <b style={b}>«Forte»</b> (75–89): sopra la media in modo netto.</p>
 
         <h3 style={h3}>Le sei fasce</h3>
         <TierGrid />
@@ -218,12 +218,12 @@ export default function ScoreFriendlyPage() {
           • Percentile con l&apos;agenzia = <b style={b}>20</b><br />
           • Vendite per turno (score) = 70% × 38 + 30% × 20 = <b style={b}>32,6</b><br />
           • Regolarità 0,60 → 15% × 60 = <b style={b}>+9</b><br />
-          • <b style={b}>Score(Marco, Giulia) = 85% × 32,6 + 15% × 60 = 36,7</b> → fascia Average
+          • <b style={b}>Score(Marco, Giulia) = 85% × 32,6 + 15% × 60 = 36,7</b> → fascia «Nella media»
         </Example>
         <p style={p}>Ora Marco ha due score, uno per creator:</p>
         <ul style={ul}>
-          <li>Su Sara: <b style={b}>79,1 (Strong)</b>, in 10 turni</li>
-          <li>Su Giulia: <b style={b}>36,7 (Average)</b>, in 5 turni</li>
+          <li>Su Sara: <b style={b}>79,1 («Forte»)</b>, in 10 turni</li>
+          <li>Su Giulia: <b style={b}>36,7 («Nella media»)</b>, in 5 turni</li>
         </ul>
 
         <InlineQA
@@ -250,12 +250,12 @@ export default function ScoreFriendlyPage() {
           ≈ <b style={b}>65,0</b> → fascia <b style={b}>Good</b>
         </Example>
         <p style={p}>
-          Effetto pratico: <b style={b}>non si arriva a Elite in Sales CP andando male sulle creator dove si passa la maggior parte dei turni</b>. Pochi turni fortunati su una creator non bastano a coprire molti turni deboli su un&apos;altra.
+          Effetto pratico: <b style={b}>non si arriva a «Eccellente» nello score Vendite andando male sulle creator dove si passa la maggior parte dei turni</b>. Pochi turni fortunati su una creator non bastano a coprire molti turni deboli su un&apos;altra.
         </p>
 
         <h3 style={h3}>Le 5 regole da ricordare</h3>
         <ol style={ul}>
-          <li>Non si arriva a <b style={b}>Elite</b> con vendite basse in assoluto: il confronto con l&apos;agenzia fa da ancora.</li>
+          <li>Non si arriva a <b style={b}>«Eccellente»</b> con vendite basse in assoluto: il confronto con l&apos;agenzia fa da ancora.</li>
           <li>Non si viene penalizzati per lavorare su creator dove si vende meno: il confronto sulla creator dà il giusto merito.</li>
           <li>Le creator su cui fai più turni pesano di più nel numero finale.</li>
           <li>La regolarità viene premiata (15% del peso).</li>
@@ -265,10 +265,10 @@ export default function ScoreFriendlyPage() {
         <InlineQA
           sectionId="7-aggregato"
           presets={[
-            { q: "Perché pesate sui turni e non sui sales?", a: "Perché lo score deve riflettere dove passi il tempo di lavoro, non dove fai i soldi in pochi turni eccezionali. Esempio: chi fa $5.000 in 3 turni su una creator e $1.000 in 10 turni su un'altra non deve risultare Strong grazie ai 3 turni d'oro, se 10 turni su 13 sono andati male. Pesare sui turni (v3.1) dà a ogni turno lavorato lo stesso peso." },
+            { q: "Perché pesate sui turni e non sui sales?", a: "Perché lo score deve riflettere dove passi il tempo di lavoro, non dove fai i soldi in pochi turni eccezionali. Esempio: chi fa $5.000 in 3 turni su una creator e $1.000 in 10 turni su un'altra non deve risultare «Forte» grazie ai 3 turni d'oro, se 10 turni su 13 sono andati male. Pesare sui turni (v3.1) dà a ogni turno lavorato lo stesso peso." },
             { q: "Cosa succede se un operatore ha solo coppie sotto i 3 shift?", a: "Lo score aggregato risulta non calcolabile (= 'null' o '—'). Nella leaderboard Sales CP appare comunque per trasparenza, ma con score vuoto. Tipicamente è il caso di nuovi assunti o di chi ha lavorato pochissimo nel mese. Per essere valutati serve raggiungere almeno una coppia operatore × creator con ≥ 3 turni." },
             { q: "Il punteggio cambia molto da mese a mese?", a: "Sì, ed è per disegno. Lo score è calcolato sui dati del singolo periodo e ricalibrato ogni mese. Un operatore può oscillare tra tier in mesi diversi a seconda della sua performance reale. Per identificare pattern stabili (es. underperformer cronici) usiamo il pannello Action Center, che incrocia score correnti con storico dei mesi precedenti." },
-            { q: "Come si confronta con l'altro score, Mestiere?", a: "Mestiere viene dall'export di Infloww e misura come lavori in chat: quota di fan che comprano, PPV sbloccati, spesa per fan pagante, vendite all'ora e altre voci. Ogni voce è confrontata con la media del tuo gruppo; se nel gruppo siete meno di 5, con la media degli operatori della tua lingua. Le fasce sono: Critical sotto 15, Weak 15–27, Average 27–44, Good 44–61, Strong 61–75, Elite da 75. Vendite serve alle revisioni mensili, Mestiere al percorso di carriera. Quando divergono è informativo: Mestiere alto e Vendite basso indica un buon lavoro in chat che converte poco; il contrario può indicare vendite aiutate da creator forti." },
+            { q: "Come si confronta con l'altro score, Mestiere?", a: "Mestiere viene dall'export di Infloww e misura come lavori in chat: quota di fan che comprano, PPV sbloccati, spesa per fan pagante, vendite all'ora e altre voci. Ogni voce è confrontata con la media del tuo gruppo; se nel gruppo siete meno di 5, con la media degli operatori della tua lingua. Le fasce sono: «Da costruire» sotto 15, «In crescita» 15–27, «Nella media» 27–44, «Buona» 44–61, «Forte» 61–75, «Eccellente» da 75. Vendite serve alle revisioni mensili, Mestiere al percorso di carriera. Quando divergono è informativo: Mestiere alto e Vendite basso indica un buon lavoro in chat che converte poco; il contrario può indicare vendite aiutate da creator forti." },
           ]}
         />
       </Section>
@@ -347,7 +347,7 @@ function TierGrid() {
         <div key={t.tier} style={{ ...card, padding: "10px 14px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <span style={{ width: 8, height: 8, borderRadius: 999, background: tierColor(t.tier), flexShrink: 0 }} />
-            <span style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary }}>{t.tier}</span>
+            <span style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary }}>{tierLabel(t.tier)}</span>
             <span style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>{t.range}</span>
           </div>
           <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.45 }}>{t.desc}</div>

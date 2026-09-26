@@ -16,6 +16,7 @@ import CoachPanel from "@/components/CoachPanel";
 import SignalsPanel from "@/components/SignalsPanel";
 import { canSee } from "@/lib/nav-access";
 
+import { tierLabel } from "@/lib/tier-label";
 // Pick a random archetype weighted by difficulty (favor medium/common ones)
 function pickRandomArchetype() {
   const pool = FAN_ARCHETYPES;
@@ -595,7 +596,7 @@ export default function Home() {
                   <div style={{ fontSize: 13, color: CP.textSecondary }}>Il tuo lavoro · score mestiere del mese</div>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 2 }}>
                     <span style={{ fontSize: 28, fontWeight: 500, ...NUM }}>{myWorkScore.score.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
-                    {myWorkScore.tier && <span style={{ fontSize: 13, color: CP.textSecondary }}>{myWorkScore.tier}</span>}
+                    {myWorkScore.tier && <span style={{ fontSize: 13, color: CP.textSecondary }}>{tierLabel(myWorkScore.tier)}</span>}
                   </div>
                 </div>
                 <span style={{ fontSize: 13, color: CP.accent }}>Vedi Vendite e Mestiere →</span>
