@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;700&display=swap');
+/* Font caricati UNA volta sola da app/layout.js (prima anche qui: doppio download) */
 
 @tailwind base;
 @tailwind components;
@@ -56,3 +56,19 @@ p, a, span {
 .pulse-score {
   animation: pulse-score 2s ease-in-out infinite;
 }
+
+
+/* Guscio app: desktop / telefono deciso dal CSS già al primo disegno (26/09) */
+.hoc-desk { display: block; }
+.hoc-mob { display: none; }
+.hoc-main { margin-left: 248px; }
+@media (max-width: 899px) {
+  .hoc-desk { display: none; }
+  .hoc-mob { display: block; }
+  .hoc-main { margin-left: 0; }
+}
+
+/* Scheletro di caricamento tra una pagina e l'altra (app/loading.js) */
+@keyframes hoc-shimmer { 0% { opacity: .55 } 50% { opacity: 1 } 100% { opacity: .55 } }
+.hoc-sk { background: var(--cp-surfaceAlt); border-radius: 10px; animation: hoc-shimmer 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .hoc-sk { animation: none; opacity: .7; } }

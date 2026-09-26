@@ -15,7 +15,7 @@
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Menu, X } from "lucide-react";
-import Sidebar, { SIDEBAR_WIDTH } from "./Sidebar";
+import Sidebar from "./Sidebar";
 import ErrorBoundary from "./ErrorBoundary";
 import OnboardingNudge from "./OnboardingNudge";
 import WelcomeAttestato from "./WelcomeAttestato";
@@ -37,14 +37,9 @@ function isBareRoute(path) {
 export default function AppShell({ children }) {
   const pathname = usePathname() || "";
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 900);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
+  // Desktop/telefono deciso dal CSS (classi hoc-desk / hoc-mob / hoc-main in
+  // globals.css), non da JS dopo l'idratazione: prima il telefono disegnava il
+  // layout desktop (sidebar + margine 248px) e poi saltava (revisione 26/09).
 
   // Close drawer on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
@@ -68,15 +63,14 @@ export default function AppShell({ children }) {
   return (
     <div style={{ minHeight: "100vh", background: CP.bg }}>
       {/* Desktop: sidebar fissa — wrapped in silent ErrorBoundary */}
-      {!isMobile && (
+      <div className="hoc-desk">
         <ErrorBoundary silent label="Sidebar">
           <Sidebar />
         </ErrorBoundary>
-      )}
+      </div>
 
       {/* Mobile: drawer + backdrop */}
-      {isMobile && (
-        <>
+      <div className="hoc-mob">
           {/* Mobile header bar */}
           <div style={{
             position: "sticky", top: 0, zIndex: 40,
@@ -114,11 +108,9 @@ export default function AppShell({ children }) {
               </div>
             </>
           )}
-        </>
-      )}
+      </div>
 
-      <main style={{
-        marginLeft: isMobile ? 0 : SIDEBAR_WIDTH,
+      <main className="hoc-main" style={{
         minHeight: "100vh",
         background: CP.bg,
       }}>
