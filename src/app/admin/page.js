@@ -19,6 +19,7 @@ import {
   Wallet, Scale, ShieldCheck, History, FlaskConical, MessageSquareWarning,
   Signpost, Bell, ListTree, Inbox, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket,
   HandCoins, MessageCircle,
+  Snowflake,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee } from "@/lib/nav-access";
@@ -72,6 +73,7 @@ const SHORTCUT_GROUPS = [
       { href: "/admin/qa-reviews",        title: "QA conversazioni", desc: "Rubrica §8.1: review qualità che alimentano i gate ladder", icon: ClipboardCheck },
       { href: "/academy/vendere",         title: "Vendere in chat",  desc: "Per gli operatori: le quattro abitudini che fanno comprare chi non ha mai comprato, checklist, esercizi ed esempi approvati", icon: MessageCircle },
       { href: "/admin/academy-tapes",     title: "Game tape",        desc: "Estrai le migliori azioni di vendita reali dal warehouse e pubblicale in Academy", icon: Clapperboard },
+      { href: "/admin/creator-difficulty", title: "Difficoltà creator", desc: "Quanto è 'freddo' o 'caldo' il pubblico di ogni creator: il contesto prima di giudicare chi ci lavora", icon: Snowflake },
       { href: "/admin/academy-signals",   title: "Signals",          desc: "Quali comportamenti operatore correlano col revenue/ora, dai turni reali — informa il coaching", icon: TrendingUp },
       { href: "/admin/operator-signals",  title: "Profilo operatore", desc: "Dove ogni operatore è carente, dal suo lavoro vero (turni singoli): diagnosi per il coaching su misura", icon: UserSearch },
       { href: "/admin/activation",        title: "Attivazione",       desc: "L'aha moment dell'operatore (gap diagnosticato + allenato) come leading indicator: funnel, rate, latenza — strumentato, validato in avanti sui segnali reali", icon: Rocket },
