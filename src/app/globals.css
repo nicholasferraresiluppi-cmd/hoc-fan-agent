@@ -309,3 +309,5 @@ html.casa-intro[data-style="v3"]::after {
 /* Casa: la scheda d'azione principale non è un blocco avorio pieno ma un contorno oro */
 [data-style="v3"] .hoc-cta-card { background: rgba(217,180,106,.06) !important; border: 1px solid rgba(217,180,106,.5) !important; color: var(--cp-textPrimary) !important; }
 [data-style="v3"] .hoc-cta-card > div:nth-child(2) { font-family: var(--cp-display) !important; font-weight: 400 !important; font-size: 30px !important; }
+/* La città ha la sua regia: l'entrata delle pagine non tocca i suoi pezzi (accendeva la grana e apriva il pannello) */
+[data-style="v3"] .casa-page > .ct > * { animation: none !important; }
