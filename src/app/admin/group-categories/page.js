@@ -1,26 +1,19 @@
 "use client";
 
+// Categorie dei gruppi (Big / Medium / Small).
+// Ridisegno 26/09/2026 (design system): in testa quanti gruppi sono senza
+// categoria e quanti diversi dal suggerimento (le due cose su cui decidere),
+// filtri per vederli subito, tabella ordinabile, barra di salvataggio sempre
+// visibile con "modifiche non salvate". Colori delle categorie tolti (erano
+// decorazione). API, conferme e azioni invariate.
+
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
+import { FONTS, CP } from "@/lib/brand";
+import { PageHead, Notice, DataTable, FilterChip, card } from "@/components/ds";
+import { fmt$, fmtInt } from "@/lib/format";
 
 const CATEGORIES = ["Big", "Medium", "Small"];
-
-const CATEGORY_COLORS = {
-  Big: "#4F8CCB",
-  Medium: "#D4AF7A",
-  Small: "#8F8A82",
-};
-
-function fmtNum(v) {
-  if (v == null) return "—";
-  return Number(v).toLocaleString("it-IT");
-}
-function fmtCurrency(v) {
-  if (v == null) return "—";
-  return "$" + Math.round(v).toLocaleString("it-IT");
-}
 
 export default function GroupCategoriesPage() {
   const [loading, setLoading] = useState(true);
@@ -32,6 +25,8 @@ export default function GroupCategoriesPage() {
   const [suggestions, setSuggestions] = useState({});
   const [stats, setStats] = useState({});
   const [referencePeriod, setReferencePeriod] = useState(null);
+  const [saved, setSaved] = useState("{}");
+  const [view, setView] = useState("all");
 
   async function loadData() {
     setLoading(true);
@@ -45,6 +40,7 @@ export default function GroupCategoriesPage() {
         return;
       }
       setAssignments(data.assignments || {});
+      setSaved(JSON.stringify(data.assignments || {}));
       setSuggestions(data.suggestions || {});
       setStats(data.stats || {});
       setReferencePeriod(data.reference_period);
@@ -85,6 +81,7 @@ export default function GroupCategoriesPage() {
         setError(data.error || "Errore nel salvataggio.");
       } else {
         setMessage("Categorie salvate.");
+        setSaved(JSON.stringify(assignments));
       }
     } catch (e) {
       setError(String(e));
@@ -93,7 +90,7 @@ export default function GroupCategoriesPage() {
   }
 
   async function applySuggested() {
-    if (!confirm("Applicare i suggerimenti automatici a TUTTI i Group? Sovrascrive eventuali override manuali.")) return;
+    if (!confirm("Applicare i suggerimenti automatici a TUTTI i gruppi? Sovrascrive le scelte fatte a mano.")) return;
     setSaving(true);
     setError("");
     setMessage("");
@@ -109,6 +106,7 @@ export default function GroupCategoriesPage() {
       } else {
         setMessage(data.message || "Suggerimenti applicati.");
         setAssignments(data.assignments || {});
+        setSaved(JSON.stringify(data.assignments || {}));
       }
     } catch (e) {
       setError(String(e));
@@ -117,7 +115,7 @@ export default function GroupCategoriesPage() {
   }
 
   async function resetAll() {
-    if (!confirm("Cancellare TUTTE le assegnazioni? I Group resteranno senza categoria fino a nuovo override manuale o applicazione suggeriti.")) return;
+    if (!confirm("Cancellare TUTTE le assegnazioni? I gruppi resteranno senza categoria finché non li assegni a mano o applichi i suggerimenti.")) return;
     setSaving(true);
     setError("");
     setMessage("");
@@ -131,8 +129,9 @@ export default function GroupCategoriesPage() {
       if (!r.ok || data.error) {
         setError(data.error || "Errore.");
       } else {
-        setMessage(data.message || "Categorie resettate.");
+        setMessage(data.message || "Categorie cancellate.");
         setAssignments({});
+        setSaved("{}");
       }
     } catch (e) {
       setError(String(e));
@@ -152,266 +151,103 @@ export default function GroupCategoriesPage() {
 
   // Conteggio per categoria
   const counts = useMemo(() => {
-    const c = { Big: 0, Medium: 0, Small: 0, none: 0 };
+    const c = { Big: 0, Medium: 0, Small: 0, none: 0, differ: 0 };
     for (const g of groupList) {
       const cat = assignments[g];
       if (cat) c[cat] += 1;
       else c.none += 1;
+      if (cat && suggestions[g] && cat !== suggestions[g]) c.differ += 1;
     }
     return c;
-  }, [assignments, groupList]);
+  }, [assignments, groupList, suggestions]);
 
-  const styles = {
-    page: {
-      minHeight: "100vh",
-      background: COLORS.obsidian,
-      color: COLORS.alabaster,
-      fontFamily: FONTS.body,
-      padding: "32px 24px",
-    },
-    container: { maxWidth: 1200, margin: "0 auto" },
-    backLink: { color: COLORS.fog, fontSize: 13, textDecoration: "none", display: "inline-block", marginBottom: 14 },
-    title: {
-      fontFamily: FONTS.display, fontSize: 30, margin: "0 0 6px 0",
-      letterSpacing: "-0.01em", fontWeight: 500,
-    },
-    sub: { color: COLORS.fog, fontSize: 14, marginBottom: 22, maxWidth: 900, lineHeight: 1.55 },
-    card: {
-      background: COLORS.graphite,
-      border: `1px solid ${COLORS.charcoal}`,
-      borderRadius: 14,
-      padding: 22,
-      marginBottom: 18,
-    },
-    summary: {
-      display: "grid",
-      gridTemplateColumns: "repeat(4, 1fr)",
-      gap: 12,
-      marginBottom: 18,
-    },
-    statCard: (color) => ({
-      background: COLORS.graphite,
-      border: `1px solid ${alpha(color || COLORS.charcoal, "55")}`,
-      borderRadius: 12,
-      padding: "14px 16px",
-    }),
-    statLabel: { fontSize: 10, color: COLORS.fog, letterSpacing: "0.12em", marginBottom: 4 },
-    statValue: (color) => ({
-      fontFamily: FONTS.mono, fontWeight: 700, fontSize: 22,
-      color: color || COLORS.alabaster,
-    }),
-    table: {
-      width: "100%", borderCollapse: "collapse", fontSize: 13,
-    },
-    th: {
-      textAlign: "left", padding: "10px 12px",
-      color: COLORS.fog, fontSize: 10,
-      letterSpacing: "0.08em",
-      fontWeight: 500,
-      borderBottom: `1px solid ${COLORS.charcoal}`,
-    },
-    td: {
-      padding: "10px 12px",
-      borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`,
-    },
-    select: {
-      padding: "6px 10px",
-      background: COLORS.charcoal,
-      border: `1px solid ${COLORS.charcoal}`,
-      borderRadius: 7,
-      color: COLORS.alabaster,
-      fontSize: 13,
-      fontFamily: FONTS.body,
-      minWidth: 110,
-    },
-    badge: (color) => ({
-      display: "inline-block",
-      padding: "2px 9px",
-      borderRadius: 999,
-      fontSize: 10,
-      fontWeight: 600,
-      letterSpacing: "0.05em",
-      
-      background: alpha(color, "26"),
-      color: color,
-      border: `1px solid ${alpha(color, "55")}`,
-    }),
-    actions: {
-      display: "flex", gap: 10, marginTop: 18,
-      paddingTop: 18, borderTop: `1px solid ${COLORS.charcoal}`,
-      flexWrap: "wrap",
-    },
-    btnPrimary: {
-      padding: "11px 20px",
-      background: COLORS.champagne,
-      color: COLORS.obsidian,
-      border: "none",
-      borderRadius: 8,
-      fontFamily: FONTS.body,
-      fontSize: 13,
-      fontWeight: 600,
-      cursor: "pointer",
-    },
-    btnGhost: {
-      padding: "11px 20px",
-      background: "transparent",
-      color: COLORS.alabaster,
-      border: `1px solid ${COLORS.charcoal}`,
-      borderRadius: 8,
-      fontFamily: FONTS.body,
-      fontSize: 13,
-      cursor: "pointer",
-    },
-    alertError: { background: "#D4454520", color: "#D44545", padding: 12, borderRadius: 8, marginBottom: 14, fontSize: 13 },
-    alertOk: { background: "#3FB97E20", color: "#3FB97E", padding: 12, borderRadius: 8, marginBottom: 14, fontSize: 13 },
-    info: { background: "#4F8CCB15", color: COLORS.alabaster, padding: 14, borderRadius: 10, marginBottom: 18, fontSize: 13, lineHeight: 1.5, border: "1px solid #4F8CCB33" },
-  };
+  const dirty = JSON.stringify(assignments) !== saved;
+  const btn = (primary) => ({ padding: "9px 16px", borderRadius: 8, border: `1px solid ${primary ? CP.accent : CP.border}`, background: primary ? CP.accent : CP.surface, color: primary ? CP.accentInk : CP.textPrimary, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" });
+  const selectStyle = (cur) => ({ padding: "6px 10px", background: CP.bg, border: `1px solid ${cur ? CP.border : CP.accentRed}`, borderRadius: 8, color: cur ? CP.textPrimary : CP.textMuted, fontSize: 13, fontFamily: FONTS.body, minWidth: 110 });
+
+  const head = (
+    <PageHead
+      crumbs={[{ label: "Hub", href: "/admin" }, { label: "Dati" }, { label: "Categorie gruppi" }]}
+      title="Categorie dei gruppi"
+      subtitle="Dai a ogni gruppo (il team di una creator) una taglia: Big, Medium o Small. Serve solo come filtro nella leaderboard operativa, per confrontare operatori su pagine di dimensione simile: lo score non cambia."
+    />
+  );
 
   if (loading) {
     return (
-      <div style={styles.page}>
-        <div style={styles.container}>
-          <p style={{ color: COLORS.fog }}>Caricamento Group e statistiche…</p>
-        </div>
+      <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+        {head}
+        <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento gruppi e statistiche…</div>
       </div>
     );
   }
 
   if (groupList.length === 0) {
     return (
-      <div style={styles.page}>
-        <div style={styles.container}>
-          <PageHeader
-            breadcrumb={
-              <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-                <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-                <span style={{ color: CP.textMuted }}>›</span>
-                <span style={{ color: CP.textPrimary }}>Categorie Group</span>
-              </div>
-            }
-            section="Data · Config"
-            title="Categorie Group"
-          />
-          <div style={styles.info}>
-            Nessun dato disponibile. Importa prima un CSV su <Link href="/admin/leaderboard-import" style={{ color: CP.accentGreen }}>Import KPI Infloww</Link> per popolare i Group e calcolare i suggerimenti automatici.
-          </div>
-        </div>
+      <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+        {head}
+        {error ? <Notice danger>{error}</Notice> : (
+          <Notice>
+            Nessun gruppo ancora. I gruppi arrivano con l&apos;export Infloww: importalo in <Link href="/admin/leaderboard-import" style={{ color: CP.accentSoftText }}>Import KPI Infloww</Link> e qui compariranno con la taglia suggerita.
+          </Notice>
+        )}
       </div>
     );
   }
 
+  const rows = groupList
+    .filter((g) => view === "all" || (view === "none" ? !assignments[g] : assignments[g] && suggestions[g] && assignments[g] !== suggestions[g]))
+    .map((g) => ({ id: g, group: g, ...(stats[g] || {}), sug: suggestions[g] || null, cur: assignments[g] || "" }));
+
+  const columns = [
+    { key: "group", label: "Gruppo", sort: (r) => r.group.toLowerCase() },
+    { key: "paying_fans", label: "Fan paganti", align: "right", sort: (r) => r.paying_fans ?? null, render: (r) => fmtInt(r.paying_fans) },
+    { key: "sales", label: "Venduto", align: "right", sort: (r) => r.sales ?? null, render: (r) => fmt$(r.sales) },
+    { key: "operators_count", label: "Operatori", align: "right", sort: (r) => r.operators_count ?? null, render: (r) => fmtInt(r.operators_count) },
+    { key: "sug", label: "Suggerita", sort: (r) => r.sug || "", render: (r) => <span style={{ color: CP.textSecondary }}>{r.sug || "—"}</span> },
+    {
+      key: "cur", label: "Categoria", sort: (r) => r.cur || "",
+      render: (r) => (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <select value={r.cur} onChange={(e) => setCategory(r.group, e.target.value)} style={selectStyle(r.cur)} aria-label={`Categoria di ${r.group}`}>
+            <option value="">Nessuna</option>
+            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          {r.cur && r.sug && r.cur !== r.sug && <span style={{ fontSize: 12, color: CP.textMuted }}>scelta a mano</span>}
+        </span>
+      ),
+    },
+  ];
+
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <PageHeader
-          breadcrumb={
-            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-              <span style={{ color: CP.textMuted }}>›</span>
-              <span style={{ color: CP.textPrimary }}>Categorie Group</span>
-            </div>
-          }
-          section="Data · Config"
-          title="Categorie Group"
-          subtitle={<>Classifica ogni Group (team modella) come <b>Big</b>/<b>Medium</b>/<b>Small</b>. Usato come filtro nella Leaderboard Operativa. Lo Score resta calcolato sulla media del proprio Group specifico — la categoria è solo una vista per confrontare performer di scala simile.</>}
-        />
+    <div style={{ padding: "28px 24px 96px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      {head}
 
-        {error && <div style={styles.alertError}>{error}</div>}
-        {message && <div style={styles.alertOk}>{message}</div>}
+      {error && <Notice danger>{error}</Notice>}
+      {message && <Notice>{message}</Notice>}
 
-        <div style={styles.info}>
-          Suggerimenti automatici basati su <b>paying fans totali</b> nell'ultimo periodo importato
-          {referencePeriod ? ` (${referencePeriod})` : ""}: top 33% → Big, mid 33% → Medium, bottom 33% → Small.
-          Puoi override manualmente caso per caso.
-        </div>
+      <div style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 12px", lineHeight: 1.55 }}>
+        {groupList.length} gruppi: Big {counts.Big} · Medium {counts.Medium} · Small {counts.Small} · <span style={{ color: counts.none ? CP.accentRed : CP.textSecondary }}>senza categoria {counts.none}</span>.
+        {" "}La taglia suggerita viene dai fan paganti {referencePeriod ? `di ${String(referencePeriod).split(":").pop()}` : "dell'ultimo mese importato"}: il terzo più grande è Big, quello di mezzo Medium, il resto Small. Puoi cambiarla caso per caso.
+      </div>
 
-        <div style={styles.summary}>
-          <div style={styles.statCard()}>
-            <div style={styles.statLabel}>Group totali</div>
-            <div style={styles.statValue()}>{groupList.length}</div>
-          </div>
-          <div style={styles.statCard(CATEGORY_COLORS.Big)}>
-            <div style={styles.statLabel}>Big</div>
-            <div style={styles.statValue(CATEGORY_COLORS.Big)}>{counts.Big}</div>
-          </div>
-          <div style={styles.statCard(CATEGORY_COLORS.Medium)}>
-            <div style={styles.statLabel}>Medium</div>
-            <div style={styles.statValue(CATEGORY_COLORS.Medium)}>{counts.Medium}</div>
-          </div>
-          <div style={styles.statCard(CATEGORY_COLORS.Small)}>
-            <div style={styles.statLabel}>Small</div>
-            <div style={styles.statValue(CATEGORY_COLORS.Small)}>{counts.Small}</div>
-          </div>
-        </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+        <FilterChip label={`Tutti (${groupList.length})`} active={view === "all"} onClick={() => setView("all")} />
+        <FilterChip label={`Senza categoria (${counts.none})`} active={view === "none"} danger={counts.none > 0} disabled={!counts.none} onClick={() => setView(view === "none" ? "all" : "none")} />
+        <FilterChip label={`Diversa dal suggerimento (${counts.differ})`} active={view === "differ"} disabled={!counts.differ} onClick={() => setView(view === "differ" ? "all" : "differ")} />
+      </div>
 
-        <div style={styles.card}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Group</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>Paying fans</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>Sales</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>Operatori</th>
-                <th style={styles.th}>Suggerito</th>
-                <th style={styles.th}>Categoria</th>
-              </tr>
-            </thead>
-            <tbody>
-              {groupList.map((g) => {
-                const s = stats[g] || {};
-                const sug = suggestions[g];
-                const cur = assignments[g] || "";
-                return (
-                  <tr key={g}>
-                    <td style={{ ...styles.td, fontWeight: 500 }}>{g}</td>
-                    <td style={{ ...styles.td, textAlign: "right", fontFamily: FONTS.mono }}>{fmtNum(s.paying_fans)}</td>
-                    <td style={{ ...styles.td, textAlign: "right", fontFamily: FONTS.mono }}>{fmtCurrency(s.sales)}</td>
-                    <td style={{ ...styles.td, textAlign: "right", fontFamily: FONTS.mono }}>{fmtNum(s.operators_count)}</td>
-                    <td style={styles.td}>
-                      {sug ? (
-                        <span style={styles.badge(CATEGORY_COLORS[sug])}>{sug}</span>
-                      ) : (
-                        <span style={{ color: COLORS.mist, fontSize: 12 }}>—</span>
-                      )}
-                    </td>
-                    <td style={styles.td}>
-                      <select
-                        value={cur}
-                        onChange={(e) => setCategory(g, e.target.value)}
-                        style={{
-                          ...styles.select,
-                          color: cur ? CATEGORY_COLORS[cur] : COLORS.fog,
-                          borderColor: cur ? alpha(CATEGORY_COLORS[cur], "55") : COLORS.charcoal,
-                        }}
-                      >
-                        <option value="">Nessuna</option>
-                        {CATEGORIES.map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      <DataTable columns={columns} rows={rows} defaultSort={{ key: "paying_fans", dir: -1 }} minWidth={760} maxHeight={620} empty="Nessun gruppo in questa vista." />
 
-        <div style={styles.actions}>
-          <button style={styles.btnPrimary} onClick={saveAll} disabled={saving}>
-            {saving ? "Salvataggio…" : "Salva categorie"}
-          </button>
-          <button style={styles.btnGhost} onClick={loadData} disabled={saving}>
-            Annulla modifiche
-          </button>
-          <div style={{ flex: 1 }} />
-          <button style={styles.btnGhost} onClick={applySuggested} disabled={saving}>
-            Applica suggerimenti automatici
-          </button>
-          <button style={styles.btnGhost} onClick={resetAll} disabled={saving}>
-            Cancella tutte
-          </button>
-        </div>
+      <div style={{ position: "sticky", bottom: 12, zIndex: 5, marginTop: 14, ...card, padding: "10px 14px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <button style={{ ...btn(true), opacity: saving || !dirty ? 0.6 : 1 }} onClick={saveAll} disabled={saving}>
+          {saving ? "Salvataggio…" : "Salva categorie"}
+        </button>
+        <button style={btn(false)} onClick={loadData} disabled={saving}>Annulla modifiche</button>
+        <span style={{ fontSize: 12, color: dirty ? CP.accentSoftText : CP.textMuted }}>{dirty ? "Modifiche non salvate" : "Tutto salvato"}</span>
+        <div style={{ flex: 1 }} />
+        <button style={btn(false)} onClick={applySuggested} disabled={saving}>Applica tutti i suggerimenti</button>
+        <button style={{ ...btn(false), color: CP.accentRed }} onClick={resetAll} disabled={saving}>Cancella tutte</button>
       </div>
     </div>
   );

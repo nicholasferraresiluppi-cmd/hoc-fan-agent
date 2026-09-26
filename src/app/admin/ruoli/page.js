@@ -8,25 +8,38 @@
 //    custom, con i limiti anti-escalation di lib/invitations)
 // La pagina mostra solo le parti per cui l'API risponde: chi non ha nessuno dei
 // due vede un messaggio, non una tabella vuota.
+//
+// Ridisegno 26/09/2026 (design system): ordine per frequenza d'uso — invitare
+// (singolo in testata, in blocco subito sotto), inviti in attesa, elenco membri
+// come tabella ordinabile con il pannello ruoli sotto; in fondo le impostazioni
+// che si toccano di rado (attestato di benvenuto, verifica in due passaggi), con
+// lo stato visibile anche da chiuse. Funzioni, API e conferme invariate.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { CP } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
+import { Eye, UserPlus } from "lucide-react";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import { CAP_LABELS, SCOPE_LABELS } from "@/lib/capability-labels";
 import WelcomeCertificate, { certButton } from "@/components/WelcomeCertificate";
 import { WELCOME_FIELDS, composeWelcome, welcomeVars } from "@/lib/welcome-card";
+import { PageHead, SectionTitle, Disclosure, Notice, DataTable, card } from "@/components/ds";
 
 const btn = (primary) => ({
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
   padding: "8px 14px",
   borderRadius: 8,
   border: `1px solid ${primary ? CP.accent : CP.border}`,
-  background: primary ? CP.accent : "transparent",
-  color: primary ? CP.accentInk : CP.textSecondary,
+  background: primary ? CP.accent : CP.surface,
+  color: primary ? CP.accentInk : CP.textPrimary,
   fontSize: 13,
   fontWeight: 500,
+  fontFamily: FONTS.body,
   cursor: "pointer",
 });
+const smallBtn = { ...btn(false), padding: "5px 10px", fontSize: 12, fontWeight: 400 };
+const field = { padding: "8px 10px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.bg, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, boxSizing: "border-box" };
 
 const fmtDate = (ts) => (ts ? new Date(ts).toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" }) : "—");
 
@@ -46,6 +59,7 @@ export default function MembersPage() {
   const [busy, setBusy] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [msg, setMsg] = useState(null);
+  const editRef = useRef(null);
 
   const load = async () => {
     const [r, i] = await Promise.all([getJson("/api/admin/roles"), getJson("/api/admin/invitations")]);
@@ -95,75 +109,100 @@ export default function MembersPage() {
     load();
   };
 
-  const rows = (roles?.rows || []).filter((r) => {
+  const openEditor = (userId) => {
+    setEditing(editing === userId ? null : userId);
+    if (editing !== userId) setTimeout(() => editRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
+  };
+
+  const allRows = roles?.rows || [];
+  const rows = allRows.filter((r) => {
     if (!filter) return true;
     const f = filter.toLowerCase();
     return (r.name || "").toLowerCase().includes(f) || (r.email || "").toLowerCase().includes(f);
   });
   const allRoleIds = [...(roles?.predefined || []), ...(roles?.custom || []).map((c) => c.id)];
   const pending = invites?.pending || [];
+  const neverIn = allRows.filter((r) => !r.last_sign_in_at).length;
+  const editRow = allRows.find((r) => r.userId === editing) || null;
+
+  const columns = [
+    {
+      key: "name", label: "Persona", sort: (r) => (r.name || "").toLowerCase(),
+      render: (r) => (
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 14, color: CP.textPrimary }}>{r.name}</div>
+          <div style={{ fontSize: 12, color: CP.textMuted, overflow: "hidden", textOverflow: "ellipsis" }}>{r.email || "—"}</div>
+        </div>
+      ),
+    },
+    { key: "roles", label: "Ruoli", sort: (r) => (r.roles || []).map(roleLabel).join(", "), render: (r) => <RoleChips ids={r.roles} label={roleLabel} /> },
+    {
+      key: "last", label: "Ultimo accesso", sort: (r) => r.last_sign_in_at || 0,
+      render: (r) => (r.last_sign_in_at ? <span style={{ color: CP.textSecondary }}>{fmtDate(r.last_sign_in_at)}</span> : <span style={{ color: CP.textMuted }}>mai entrato</span>),
+    },
+    {
+      key: "actions", label: "", sortable: false, align: "right",
+      render: (r) => (
+        <div style={{ display: "inline-flex", gap: 6, flexWrap: "nowrap" }}>
+          <button style={smallBtn} onClick={() => viewAs({ userId: r.userId })} title="Guarda l'app con i suoi permessi (sola lettura)"><Eye size={13} /> Vedi come</button>
+          <button style={{ ...smallBtn, ...(editing === r.userId ? { borderColor: CP.accent, color: CP.accentSoftText } : {}) }} onClick={() => openEditor(r.userId)}>
+            {editing === r.userId ? "Chiudi" : "Ruoli e accessi"}
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div style={{ background: CP.bg, minHeight: "100vh", color: CP.textPrimary, padding: "32px 28px 64px", maxWidth: 1200, margin: "0 auto" }}>
-      <PageHeader
-        breadcrumb={
-          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <span style={{ color: CP.textPrimary }}>Membri</span>
-          </div>
-        }
-        section="People · Accessi"
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "People" }, { label: "Membri" }]}
         title="Membri"
-        subtitle="Chi può entrare in HOC Pro e cosa può fare. L'app è solo su invito: per dare accesso a una persona usa Aggiungi membro."
-        toolbar={
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {canManage && (
-              <select defaultValue="" onChange={(e) => e.target.value && viewAs({ roles: [e.target.value] })} style={{ ...btn(false), cursor: "pointer" }} title="Guarda l'app con i permessi di un ruolo">
-                <option value="" disabled>Vedi come un ruolo…</option>
-                {allRoleIds.map((rid) => <option key={rid} value={rid}>{roleLabel(rid)}</option>)}
-              </select>
-            )}
-            {canInvite && <button style={btn(true)} onClick={() => { setMsg(null); setShowAdd(true); }}>Aggiungi membro</button>}
-          </div>
-        }
+        subtitle="Chi può entrare in HOC Pro e cosa può fare. L'app è solo su invito: per dare accesso a una persona usa Aggiungi membro, per gli operatori usa l'invito in blocco qui sotto."
+        actions={<>
+          {canManage && (
+            <select defaultValue="" onChange={(e) => e.target.value && viewAs({ roles: [e.target.value] })} style={{ ...btn(false), fontWeight: 400 }} title="Guarda l'app con i permessi di un ruolo (sola lettura)" aria-label="Vedi l'app come un ruolo">
+              <option value="" disabled>Vedi come un ruolo…</option>
+              {allRoleIds.map((rid) => <option key={rid} value={rid}>{roleLabel(rid)}</option>)}
+            </select>
+          )}
+          {canInvite && <button style={btn(true)} onClick={() => { setMsg(null); setShowAdd(true); }}><UserPlus size={14} /> Aggiungi membro</button>}
+        </>}
       />
 
-      {msg && (
-        <div style={{ margin: "0 0 16px", padding: "10px 14px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, fontSize: 13, color: msg.type === "error" ? CP.accentRed : CP.accentGreen }}>
-          {msg.text}
-        </div>
-      )}
+      {msg && <Notice danger={msg.type === "error"}>{msg.text}</Notice>}
 
-      {loading && <p style={{ color: CP.textMuted }}>Caricamento…</p>}
+      {loading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
 
       {!loading && !canManage && !canInvite && (
-        <div style={{ padding: 20, borderRadius: 12, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textSecondary, fontSize: 14 }}>
-          Non hai i permessi per gestire i membri. Se ti serve, chiedi a un admin.
-        </div>
+        <Notice>Non hai i permessi per gestire i membri. Se ti serve, chiedi a un admin.</Notice>
       )}
 
-      {!loading && canManage && <AdminSecurityCard />}
-
-      {!loading && canInvite && <WelcomeEditor />}
+      {!loading && canManage && (
+        <div style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 16px" }}>
+          {allRows.length} {allRows.length === 1 ? "membro" : "membri"}
+          {canInvite && ` · ${pending.length} ${pending.length === 1 ? "invito in attesa" : "inviti in attesa"}`}
+          {` · ${neverIn} ${neverIn === 1 ? "non è mai entrato" : "non sono mai entrati"}`}
+        </div>
+      )}
 
       {!loading && canInvite && <OperatorInvites onSent={() => load()} />}
 
       {/* Inviti in attesa */}
       {!loading && canInvite && pending.length > 0 && (
-        <section style={{ marginBottom: 28 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 500, color: CP.textSecondary, margin: "0 0 10px" }}>Inviti in attesa · {pending.length}</h2>
-          <div style={{ border: `1px solid ${CP.border}`, borderRadius: 12, background: CP.surface }}>
+        <section style={{ marginBottom: 24 }}>
+          <SectionTitle aside="hanno ricevuto l'email ma non hanno ancora creato l'account">Inviti in attesa · {pending.length}</SectionTitle>
+          <div style={card}>
             {pending.map((inv, i) => (
               <div key={inv.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderTop: i ? `1px solid ${CP.borderSoft}` : "none", flexWrap: "wrap" }}>
                 <div style={{ flex: "1 1 240px", minWidth: 0 }}>
-                  <div style={{ fontSize: 14, overflow: "hidden", textOverflow: "ellipsis" }}>{inv.email}</div>
+                  <div style={{ fontSize: 14, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis" }}>{inv.email}</div>
                   <div style={{ fontSize: 12, color: CP.textMuted }}>
-                    Invitato il {fmtDate(inv.created_at)}{inv.invited_by ? ` da ${inv.invited_by}` : ""} · non ha ancora accettato
+                    Invitato il {fmtDate(inv.created_at)}{inv.invited_by ? ` da ${inv.invited_by}` : ""}
                   </div>
                 </div>
                 <RoleChips ids={inv.roles} label={roleLabel} />
-                <button style={btn(false)} disabled={busy === inv.id} onClick={() => revoke(inv)}>Annulla invito</button>
+                <button style={smallBtn} disabled={busy === inv.id} onClick={() => revoke(inv)}>Annulla invito</button>
               </div>
             ))}
           </div>
@@ -172,77 +211,81 @@ export default function MembersPage() {
 
       {/* Membri */}
       {!loading && canManage && (
-        <section>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 10px", flexWrap: "wrap" }}>
-            <h2 style={{ fontSize: 14, fontWeight: 500, color: CP.textSecondary, margin: 0 }}>Membri · {roles.rows?.length || 0}</h2>
+        <section style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+            <SectionTitle aside="clic sulle intestazioni per ordinare">Membri · {allRows.length}</SectionTitle>
             <input
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="Cerca per nome o email"
-              style={{ marginLeft: "auto", padding: "7px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, width: 260, maxWidth: "100%" }}
+              aria-label="Cerca membro"
+              style={{ ...field, marginLeft: "auto", fontSize: 13, width: 260, maxWidth: "100%", background: CP.surface }}
             />
           </div>
-          <div style={{ border: `1px solid ${CP.border}`, borderRadius: 12, background: CP.surface }}>
-            {rows.length === 0 && <div style={{ padding: 16, color: CP.textMuted, fontSize: 13 }}>Nessun membro trovato.</div>}
-            {rows.map((r, i) => (
-              <div key={r.userId} style={{ padding: "12px 16px", borderTop: i ? `1px solid ${CP.borderSoft}` : "none" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                  <div style={{ flex: "1 1 240px", minWidth: 0 }}>
-                    <div style={{ fontSize: 14 }}>{r.name}</div>
-                    <div style={{ fontSize: 12, color: CP.textMuted, overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {r.email || "—"} · {r.last_sign_in_at ? `ultimo accesso ${fmtDate(r.last_sign_in_at)}` : "mai entrato"}
-                    </div>
-                  </div>
-                  <RoleChips ids={r.roles} label={roleLabel} />
-                  <button style={btn(false)} onClick={() => viewAs({ userId: r.userId })} title="Guarda l'app con i suoi permessi (sola lettura)">Vedi come</button>
-                  <button style={btn(false)} onClick={() => setEditing(editing === r.userId ? null : r.userId)}>
-                    {editing === r.userId ? "Chiudi" : "Ruoli e accessi"}
-                  </button>
-                </div>
-                {editing === r.userId && (
-                  <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 8, background: CP.bg, border: `1px solid ${CP.borderSoft}` }}>
-                    <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 6 }}>Cosa può fare oggi</div>
-                    {Object.keys(r.caps || {}).length === 0 ? <div style={{ fontSize: 13, color: CP.textSecondary }}>Nessun permesso oltre all&apos;accesso di base.</div> : (
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "4px 16px" }}>
-                        {Object.entries(r.caps).sort().map(([cap, scope]) => (
-                          <div key={cap} style={{ fontSize: 13, color: CP.textSecondary }}>
-                            {CAP_LABELS[cap] || cap} <span style={{ color: CP.textMuted }}>· {SCOPE_LABELS[scope] || scope}</span>
-                          </div>
-                        ))}
+          <DataTable
+            columns={columns}
+            rows={rows.map((r) => ({ ...r, id: r.userId }))}
+            defaultSort={{ key: "name", dir: 1 }}
+            selected={(r) => r.userId === editing}
+            minWidth={720}
+            maxHeight={560}
+            empty="Nessun membro trovato."
+          />
+
+          {editRow && (
+            <div ref={editRef} style={{ ...card, padding: "14px 16px", marginTop: 12 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+                <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Ruoli e accessi di {editRow.name}</div>
+                <div style={{ fontSize: 12, color: CP.textMuted }}>{editRow.email}</div>
+                <button style={{ ...smallBtn, marginLeft: "auto" }} onClick={() => setEditing(null)}>Chiudi</button>
+              </div>
+              <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Ruoli: clic per aggiungere o togliere (si salva subito)</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+                {allRoleIds.map((rid) => {
+                  const on = (editRow.roles || []).includes(rid);
+                  return (
+                    <button
+                      key={rid}
+                      disabled={busy === editRow.userId}
+                      onClick={() => toggleRole(editRow.userId, editRow.roles, rid)}
+                      aria-pressed={on}
+                      style={{
+                        padding: "5px 11px", borderRadius: 999, fontSize: 13, fontFamily: FONTS.body, cursor: busy === editRow.userId ? "wait" : "pointer",
+                        border: `1px solid ${on ? CP.accent : CP.border}`,
+                        background: on ? CP.accentSoft : CP.surface,
+                        color: on ? CP.accentSoftText : CP.textSecondary,
+                      }}
+                    >
+                      {on ? "✓ " : "+ "}{roleLabel(rid)}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ padding: "10px 12px", borderRadius: 8, background: CP.bg, border: `1px solid ${CP.borderSoft}` }}>
+                <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 6 }}>Cosa può fare oggi (somma dei suoi ruoli)</div>
+                {Object.keys(editRow.caps || {}).length === 0 ? <div style={{ fontSize: 13, color: CP.textSecondary }}>Nessun permesso oltre all&apos;accesso di base.</div> : (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "4px 16px" }}>
+                    {Object.entries(editRow.caps).sort().map(([cap, scope]) => (
+                      <div key={cap} style={{ fontSize: 13, color: CP.textSecondary }}>
+                        {CAP_LABELS[cap] || cap} <span style={{ color: CP.textMuted }}>· {SCOPE_LABELS[scope] || scope}</span>
                       </div>
-                    )}
-                  </div>
-                )}
-                {editing === r.userId && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-                    {allRoleIds.map((rid) => {
-                      const on = (r.roles || []).includes(rid);
-                      return (
-                        <button
-                          key={rid}
-                          disabled={busy === r.userId}
-                          onClick={() => toggleRole(r.userId, r.roles, rid)}
-                          style={{
-                            padding: "5px 10px", borderRadius: 999, fontSize: 12, cursor: busy === r.userId ? "wait" : "pointer",
-                            border: `1px solid ${on ? CP.accent : CP.border}`,
-                            background: on ? CP.accentSoft : "transparent",
-                            color: on ? CP.accentSoftText : CP.textMuted,
-                          }}
-                        >
-                          {on ? "✓ " : "+ "}{roleLabel(rid)}
-                        </button>
-                      );
-                    })}
+                    ))}
                   </div>
                 )}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+
           <p style={{ fontSize: 12, color: CP.textMuted, marginTop: 10 }}>
-            Un membro può avere più ruoli: i permessi si sommano. I ruoli personalizzati si creano in <Link href="/admin/ruoli-custom" style={{ color: CP.accentSoftText }}>Ruoli custom</Link>.
+            Un membro può avere più ruoli: i permessi si sommano. «Vedi come» apre l&apos;app con i suoi permessi, in sola lettura. I ruoli personalizzati si creano in <Link href="/admin/ruoli-custom" style={{ color: CP.accentSoftText }}>Ruoli custom</Link>.
           </p>
         </section>
       )}
+
+      {/* Impostazioni: si toccano di rado */}
+      {!loading && (canInvite || canManage) && <SectionTitle>Impostazioni</SectionTitle>}
+      {!loading && canInvite && <WelcomeEditor />}
+      {!loading && canManage && <AdminSecurityCard />}
 
       {showAdd && (
         <AddMemberModal
@@ -260,7 +303,7 @@ function RoleChips({ ids, label }) {
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
       {ids.map((rid) => (
-        <span key={rid} style={{ padding: "3px 9px", borderRadius: 999, background: CP.accentSoft, color: CP.accentSoftText, fontSize: 12 }}>{label(rid)}</span>
+        <span key={rid} style={{ padding: "3px 9px", borderRadius: 999, background: CP.surfaceAlt, color: CP.textSecondary, fontSize: 12, whiteSpace: "nowrap" }}>{label(rid)}</span>
       ))}
     </div>
   );
@@ -295,31 +338,31 @@ function AddMemberModal({ assignable, onClose, onDone }) {
   };
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(5,7,10,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 100 }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: alpha(CP.bgSunken, "BF"), display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 100 }}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={send} role="dialog" aria-modal="true" aria-label="Aggiungi membro"
-        style={{ width: "100%", maxWidth: 460, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 14, padding: 22 }}>
-        <h3 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 500 }}>Aggiungi membro</h3>
-        <p style={{ margin: "0 0 18px", fontSize: 13, color: CP.textMuted }}>
-          La persona riceve un'email da HOC Pro con il link per registrarsi. Entra già con i ruoli che scegli qui.
+        style={{ width: "100%", maxWidth: 460, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, padding: 22, fontFamily: FONTS.body }}>
+        <h3 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 500, color: CP.textPrimary }}>Aggiungi membro</h3>
+        <p style={{ margin: "0 0 18px", fontSize: 13, color: CP.textMuted, lineHeight: 1.5 }}>
+          La persona riceve un&apos;email da HOC Pro con il link per registrarsi. Entra già con i ruoli che scegli qui.
         </p>
 
-        <label style={{ display: "block", fontSize: 12, color: CP.textSecondary, marginBottom: 6 }}>Email</label>
+        <label style={{ display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Email</label>
         <input
           type="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)}
           placeholder="nome@houseofcreators.com"
-          style={{ width: "100%", boxSizing: "border-box", padding: "9px 12px", background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, marginBottom: 16 }}
+          style={{ ...field, width: "100%", marginBottom: 16 }}
         />
 
-        <label style={{ display: "block", fontSize: 12, color: CP.textSecondary, marginBottom: 6 }}>Ruolo</label>
+        <label style={{ display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Ruolo</label>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 18 }}>
           {assignable.map((r) => {
             const on = picked.includes(r.id);
             return (
-              <button type="button" key={r.id} onClick={() => toggle(r.id)} style={{
-                padding: "6px 11px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+              <button type="button" key={r.id} onClick={() => toggle(r.id)} aria-pressed={on} style={{
+                padding: "6px 11px", borderRadius: 999, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body,
                 border: `1px solid ${on ? CP.accent : CP.border}`,
-                background: on ? CP.accentSoft : "transparent",
-                color: on ? CP.accentSoftText : CP.textMuted,
+                background: on ? CP.accentSoft : CP.surface,
+                color: on ? CP.accentSoftText : CP.textSecondary,
               }}>{on ? "✓ " : ""}{r.label}</button>
             );
           })}
@@ -340,14 +383,18 @@ function AddMemberModal({ assignable, onClose, onDone }) {
 
 
 // Verifica in due passaggi per gli admin: chi l'ha attivata + interruttore.
+// Chiusa di default, ma lo stato (obbligatoria/facoltativa, quanti l'hanno) si
+// legge nel riepilogo senza aprirla.
 function AdminSecurityCard() {
   const [d, setD] = useState(null);
   const [err, setErr] = useState(null);
+  const [open, setOpen] = useState(false);
   const load = () => fetch("/api/admin/security").then((r) => (r.ok ? r.json() : null)).then(setD).catch(() => {});
   useEffect(() => { load(); }, []);
   if (!d) return null;
   const exempt = d.admins.filter((a) => a.exempt);
   const without = d.admins.filter((a) => !a.mfa && !a.exempt);
+  const withMfa = d.admins.length - without.length;
   const toggle = async () => {
     setErr(null);
     const r = await fetch("/api/admin/security", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ required: !d.required }) });
@@ -355,26 +402,28 @@ function AdminSecurityCard() {
     if (!r.ok) return setErr(j.error || "Errore");
     load();
   };
+  const summary = `${d.required ? "obbligatoria" : "facoltativa"} · ${withMfa} admin su ${d.admins.length} l'hanno attivata`;
   return (
-    <section style={{ marginBottom: 28, border: `1px solid ${CP.border}`, borderRadius: 12, background: CP.surface, padding: "14px 16px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ flex: "1 1 320px" }}>
-          <div style={{ fontSize: 14, fontWeight: 500 }}>Verifica in due passaggi per gli admin {d.required ? "· obbligatoria" : "· facoltativa"}</div>
-          <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4 }}>
-            {d.admins.length - without.length} admin su {d.admins.length} l'hanno attivata.
-            {without.length ? ` Mancano: ${without.map((a) => a.name).join(", ")}.` : ""}
-            {exempt.length ? ` Esenti: ${exempt.map((a) => `${a.name} (${a.exempt})`).join("; ")}.` : ""}
-            {d.required ? " Chi non l'ha attivata non ha i poteri da admin finché non lo fa." : " Quando è obbligatoria, un admin senza verifica perde i poteri da admin finché non la attiva."}
+    <Disclosure open={open} onToggle={() => setOpen((v) => !v)} title="Verifica in due passaggi per gli admin" summary={summary}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 360px", fontSize: 13, color: CP.textSecondary, lineHeight: 1.55 }}>
+          <div style={{ marginBottom: 6 }}>
+            Oggi è <b style={{ fontWeight: 500, color: CP.textPrimary }}>{d.required ? "obbligatoria" : "facoltativa"}</b>. {withMfa} admin su {d.admins.length} l&apos;hanno attivata.
+          </div>
+          {without.length > 0 && <div style={{ marginBottom: 6 }}><span style={{ color: CP.textMuted }}>Senza verifica:</span> {without.map((a) => a.name).join(", ")}.</div>}
+          {exempt.length > 0 && <div style={{ marginBottom: 6 }}><span style={{ color: CP.textMuted }}>Esenti:</span> {exempt.map((a) => `${a.name} (${a.exempt})`).join("; ")}.</div>}
+          <div style={{ color: CP.textMuted }}>
+            {d.required ? "Chi non l'ha attivata non ha i poteri da admin finché non lo fa." : "Quando è obbligatoria, un admin senza verifica perde i poteri da admin finché non la attiva."}
           </div>
         </div>
         <button onClick={toggle} disabled={!d.required && !d.me_mfa} title={!d.required && !d.me_mfa ? "Prima attivala sul tuo account (in basso a sinistra: Account → Sicurezza)" : undefined}
-          style={{ ...btn(!d.required), opacity: !d.required && !d.me_mfa ? 0.5 : 1 }}>
+          style={{ ...btn(!d.required), opacity: !d.required && !d.me_mfa ? 0.5 : 1, cursor: !d.required && !d.me_mfa ? "not-allowed" : "pointer" }}>
           {d.required ? "Rendi facoltativa" : "Rendi obbligatoria"}
         </button>
       </div>
-      {!d.required && !d.me_mfa && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 8 }}>Per renderla obbligatoria devi prima attivarla sul tuo account, così non ti chiudi fuori.</div>}
-      {err && <div style={{ fontSize: 12, color: CP.accentRed, marginTop: 8 }}>{err}</div>}
-    </section>
+      {!d.required && !d.me_mfa && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 10 }}>Per renderla obbligatoria devi prima attivarla sul tuo account (in basso a sinistra: Account → Sicurezza), così non ti chiudi fuori.</div>}
+      {err && <div style={{ fontSize: 13, color: CP.accentRed, marginTop: 8 }}>{err}</div>}
+    </Disclosure>
   );
 }
 
@@ -420,48 +469,42 @@ function OperatorInvites({ onSent }) {
     await loadList(); onSent?.();
   };
   const label = { ready: "da invitare", invited: "invitato, in attesa", has_account: "ha già l'account", no_email: "senza email" };
+  const summary = data
+    ? `${data.counts.ready} da invitare · ${data.counts.invited} in attesa · ${data.counts.has_account} con account`
+    : "inviti in blocco agli operatori attivi: l'account si collega da solo al loro nome";
   return (
-    <section style={{ marginBottom: 28, border: `1px solid ${CP.border}`, borderRadius: 12, background: CP.surface }}>
-      <button onClick={() => setOpen((v) => !v)} style={{ width: "100%", textAlign: "left", padding: "14px 16px", background: "transparent", border: "none", cursor: "pointer", color: CP.textPrimary }}>
-        <span style={{ fontSize: 15, fontWeight: 500 }}>Porta gli operatori nell&apos;app</span>
-        <span style={{ fontSize: 13, color: CP.textMuted, marginLeft: 10 }}>
-          {data ? `${data.counts.ready} da invitare · ${data.counts.invited} in attesa · ${data.counts.has_account} con account` : "inviti in blocco agli operatori attivi, collegati da soli al loro nome"}
-        </span>
-      </button>
-      {open && (
-        <div style={{ padding: "0 16px 16px" }}>
-          {err && <div style={{ color: CP.accentRed, fontSize: 13, marginBottom: 8 }}>{err}</div>}
-          {!data && !err && <div style={{ color: CP.textMuted, fontSize: 13 }}>Caricamento…</div>}
-          {data && (<>
-            <p style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.55, margin: "0 0 10px" }}>
-              Operatori dell&apos;ultimo mese Infloww ({data.period_id}), con l&apos;email dell&apos;export. Ognuno riceve un invito come <b>operatore</b>: vede solo le sue pagine personali. Al primo accesso l&apos;account si collega da solo al suo nome, senza passare da un admin.
-            </p>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
-              <button style={btn(true)} disabled={busy || !chosen.length} onClick={send}>{busy ? "Invio in corso…" : `Invita ${chosen.length} operatori`}</button>
-              <button style={btn(false)} onClick={() => setSel(new Set(ready.map((o) => o.email)))}>Seleziona tutti da invitare ({ready.length})</button>
-              <button style={btn(false)} onClick={() => setSel(new Set())}>Nessuno</button>
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca nome o email" aria-label="Cerca operatore"
-                style={{ padding: "7px 10px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.bg, color: CP.textPrimary, fontSize: 13, width: 220 }} />
-            </div>
-            {result && (
-              <div style={{ fontSize: 13, marginBottom: 10, color: result.ko.length ? CP.accentRed : CP.accentGreen }}>
-                Inviti mandati: {result.ok}.{result.ko.length ? ` Non riusciti: ${result.ko.length} (${result.ko.slice(0, 3).map((x) => `${x.email || ""} ${x.error}`).join("; ")}).` : ""}
-              </div>
-            )}
-            <div style={{ maxHeight: 420, overflow: "auto", border: `1px solid ${CP.borderSoft}`, borderRadius: 8 }}>
-              {shown.map((o) => (
-                <label key={o.employee} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderTop: `1px solid ${CP.borderSoft}`, fontSize: 14, cursor: o.status === "ready" ? "pointer" : "default", opacity: o.status === "ready" ? 1 : 0.6 }}>
-                  <input type="checkbox" disabled={o.status !== "ready"} checked={sel.has(o.email)} onChange={() => toggle(o.email)} />
-                  <span style={{ flex: "1 1 180px", color: CP.textPrimary }}>{o.employee}</span>
-                  <span style={{ flex: "1 1 220px", color: CP.textMuted, fontSize: 13 }}>{o.email || "—"}</span>
-                  <span style={{ fontSize: 12, color: o.status === "has_account" ? CP.accentGreen : CP.textMuted, minWidth: 130, textAlign: "right" }}>{label[o.status]}</span>
-                </label>
-              ))}
-            </div>
-          </>)}
+    <Disclosure open={open} onToggle={() => setOpen((v) => !v)} title="Porta gli operatori nell'app" summary={summary}>
+      {err && <Notice danger>{err}</Notice>}
+      {!data && !err && <div style={{ color: CP.textMuted, fontSize: 13 }}>Caricamento…</div>}
+      {data && (<>
+        <p style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.55, margin: "0 0 12px" }}>
+          Operatori dell&apos;ultimo mese Infloww ({data.period_id}), con l&apos;email dell&apos;export. Ognuno riceve un invito come <b style={{ fontWeight: 500 }}>operatore</b>: vede solo le sue pagine personali. Al primo accesso l&apos;account si collega da solo al suo nome, senza passare da un admin. Prima dell&apos;invio ti chiediamo conferma.
+        </p>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+          <button style={{ ...btn(true), opacity: busy || !chosen.length ? 0.6 : 1 }} disabled={busy || !chosen.length} onClick={send}>{busy ? "Invio in corso…" : `Invita ${chosen.length} operatori`}</button>
+          <button style={btn(false)} onClick={() => setSel(new Set(ready.map((o) => o.email)))}>Seleziona tutti da invitare ({ready.length})</button>
+          <button style={btn(false)} onClick={() => setSel(new Set())}>Nessuno</button>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca nome o email" aria-label="Cerca operatore"
+            style={{ ...field, fontSize: 13, width: 220, maxWidth: "100%" }} />
         </div>
-      )}
-    </section>
+        {result && (
+          <Notice danger={result.ko.length > 0}>
+            Inviti mandati: {result.ok}.{result.ko.length ? ` Non riusciti: ${result.ko.length} (${result.ko.slice(0, 3).map((x) => `${x.email || ""} ${x.error}`).join("; ")}).` : ""}
+          </Notice>
+        )}
+        <div style={{ maxHeight: 420, overflow: "auto", border: `1px solid ${CP.borderSoft}`, borderRadius: 8 }}>
+          {shown.length === 0 && <div style={{ padding: 12, fontSize: 13, color: CP.textMuted }}>Nessun operatore trovato.</div>}
+          {shown.map((o, i) => (
+            <label key={o.employee} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderTop: i ? `1px solid ${CP.borderSoft}` : "none", fontSize: 14, cursor: o.status === "ready" ? "pointer" : "default", flexWrap: "wrap" }}>
+              <input type="checkbox" disabled={o.status !== "ready"} checked={sel.has(o.email)} onChange={() => toggle(o.email)} />
+              <span style={{ flex: "1 1 180px", color: o.status === "ready" ? CP.textPrimary : CP.textMuted }}>{o.employee}</span>
+              <span style={{ flex: "1 1 220px", color: CP.textMuted, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis" }}>{o.email || "—"}</span>
+              <span style={{ fontSize: 12, color: o.status === "no_email" ? CP.accentRed : CP.textMuted, minWidth: 130, textAlign: "right" }}>{label[o.status]}</span>
+            </label>
+          ))}
+        </div>
+      </>)}
+    </Disclosure>
   );
 }
 
@@ -469,6 +512,7 @@ function OperatorInvites({ onSent }) {
 // Attestato di benvenuto (26/09/2026): il messaggio che accoglie gli operatori
 // invitati, scritto qui. Anteprima dal vivo = esattamente ciò che arriva (email
 // quando il dominio è verificato, schermata al primo accesso sempre).
+// L'attestato (WelcomeCertificate) resta a colori FISSI by design: non si tocca.
 function WelcomeEditor() {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState(null);
@@ -483,7 +527,7 @@ function WelcomeEditor() {
     setData(j); setDraft(j.template);
   };
   useEffect(() => { if (open && !data) load(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
-  const card = useMemo(() => (draft ? composeWelcome(draft, welcomeVars({ employee: sample, creator: "Gaja ITA", number: 7 })) : null), [draft, sample]);
+  const preview = useMemo(() => (draft ? composeWelcome(draft, welcomeVars({ employee: sample, creator: "Gaja ITA", number: 7 })) : null), [draft, sample]);
   const dirty = data && draft && JSON.stringify(draft) !== JSON.stringify(data.template);
   const call = async (method, body, okText) => {
     setBusy(true); setMsg(null);
@@ -494,56 +538,52 @@ function WelcomeEditor() {
     if (j.template) { setData((d) => ({ ...d, template: j.template })); setDraft(j.template); }
     setMsg({ bad: false, text: okText(j) });
   };
-  const field = { width: "100%", padding: "8px 10px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.bg, color: CP.textPrimary, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box" };
+  const summary = data?.updated_at
+    ? `ultima modifica ${new Date(data.updated_at).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}${data.updated_by ? ` · ${data.updated_by}` : ""}`
+    : "l'attestato che accoglie chi inviti: lo scrivi qui";
   return (
-    <section style={{ marginBottom: 20, border: `1px solid ${CP.border}`, borderRadius: 12, background: CP.surface }}>
-      <button onClick={() => setOpen((v) => !v)} style={{ width: "100%", textAlign: "left", padding: "14px 16px", background: "transparent", border: "none", cursor: "pointer", color: CP.textPrimary }}>
-        <span style={{ fontSize: 15, fontWeight: 500 }}>Messaggio di benvenuto</span>
-        <span style={{ fontSize: 13, color: CP.textMuted, marginLeft: 10 }}>l&apos;attestato che accoglie chi inviti: lo scrivi qui</span>
-      </button>
-      {open && (
-        <div style={{ padding: "0 16px 16px" }}>
-          {!draft && !msg && <div style={{ color: CP.textMuted, fontSize: 13 }}>Caricamento…</div>}
-          {data && (
-            <div style={{ fontSize: 13, lineHeight: 1.55, color: CP.textSecondary, padding: "10px 12px", borderRadius: 8, background: CP.bg, border: `1px solid ${CP.borderSoft}`, marginBottom: 14 }}>
-              {data.mail.ready
-                ? <>L&apos;attestato parte <b>per email</b> con l&apos;invito (il link per entrare è dentro) e ricompare al primo accesso.</>
-                : <>Per ora l&apos;email d&apos;invito resta quella standard: {String(data.mail.reason || "").toLowerCase()}. L&apos;attestato compare comunque <b>al primo accesso</b> nell&apos;app. Appena il dominio è verificato, parte anche per email senza cambiare nulla qui.</>}
-              {" "}Puoi usare <code>{"{nome}"}</code>, <code>{"{nome_completo}"}</code>, <code>{"{creator}"}</code>, <code>{"{mese}"}</code>.
-              {data.updated_at && <> Ultima modifica {new Date(data.updated_at).toLocaleString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}{data.updated_by ? ` · ${data.updated_by}` : ""}.</>}
-            </div>
-          )}
-          {draft && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, alignItems: "start" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {WELCOME_FIELDS.map((f) => (
-                  <label key={f.key} style={{ fontSize: 12, color: CP.textMuted, display: "flex", flexDirection: "column", gap: 4 }}>
-                    {f.label}
-                    {f.multiline
-                      ? <textarea value={draft[f.key]} maxLength={f.max} rows={12} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} style={{ ...field, resize: "vertical", lineHeight: 1.5 }} />
-                      : <input value={draft[f.key]} maxLength={f.max} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} style={field} />}
-                  </label>
-                ))}
-                <div style={{ fontSize: 12, color: CP.textMuted }}>Nel messaggio, una riga vuota separa i paragrafi.</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
-                  <button style={btn(true)} disabled={busy || !dirty} onClick={() => call("PUT", { template: draft }, () => "Salvato: i prossimi inviti useranno questo testo.")}>Salva</button>
-                  <button style={btn(false)} disabled={busy || !dirty} onClick={() => setDraft(data.template)}>Annulla modifiche</button>
-                  <button style={btn(false)} disabled={busy} onClick={() => call("POST", { template: draft, sample }, (j) => `Prova mandata a ${j.to}.`)}>Mandami una prova</button>
-                  <button style={btn(false)} disabled={busy} onClick={() => window.confirm("Tornare al testo originale?") && call("PUT", { reset: true }, () => "Testo originale ripristinato.")}>Testo originale</button>
-                </div>
-                {msg && <div style={{ fontSize: 13, color: msg.bad ? CP.accentRed : CP.accentGreen }}>{msg.text}</div>}
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: CP.textMuted, display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
-                  Anteprima per
-                  <input value={sample} onChange={(e) => setSample(e.target.value)} style={{ ...field, width: 200 }} aria-label="Nome di esempio" />
-                </label>
-                <WelcomeCertificate card={card} compact cta={<span style={certButton}>{card.cta}</span>} />
-              </div>
-            </div>
-          )}
+    <Disclosure open={open} onToggle={() => setOpen((v) => !v)} title="Messaggio di benvenuto" summary={summary}>
+      {!draft && !msg && <div style={{ color: CP.textMuted, fontSize: 13 }}>Caricamento…</div>}
+      {!draft && msg && <Notice danger={msg.bad}>{msg.text}</Notice>}
+      {data && (
+        <div style={{ fontSize: 13, lineHeight: 1.55, color: CP.textSecondary, padding: "10px 12px", borderRadius: 8, background: CP.bg, border: `1px solid ${CP.borderSoft}`, marginBottom: 14 }}>
+          {data.mail.ready
+            ? <>L&apos;attestato parte <b style={{ fontWeight: 500 }}>per email</b> con l&apos;invito (il link per entrare è dentro) e ricompare al primo accesso.</>
+            : <>Per ora l&apos;email d&apos;invito resta quella standard: {String(data.mail.reason || "").toLowerCase()}. L&apos;attestato compare comunque <b style={{ fontWeight: 500 }}>al primo accesso</b> nell&apos;app. Appena il dominio è verificato, parte anche per email senza cambiare nulla qui.</>}
+          {" "}Puoi usare <code>{"{nome}"}</code>, <code>{"{nome_completo}"}</code>, <code>{"{creator}"}</code>, <code>{"{mese}"}</code>.
+          {data.updated_at && <> Ultima modifica {new Date(data.updated_at).toLocaleString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}{data.updated_by ? ` · ${data.updated_by}` : ""}.</>}
         </div>
       )}
-    </section>
+      {draft && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20, alignItems: "start" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
+            {WELCOME_FIELDS.map((f) => (
+              <label key={f.key} style={{ fontSize: 13, color: CP.textSecondary, display: "flex", flexDirection: "column", gap: 4 }}>
+                {f.label}
+                {f.multiline
+                  ? <textarea value={draft[f.key]} maxLength={f.max} rows={12} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} style={{ ...field, width: "100%", resize: "vertical", lineHeight: 1.5 }} />
+                  : <input value={draft[f.key]} maxLength={f.max} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} style={{ ...field, width: "100%" }} />}
+              </label>
+            ))}
+            <div style={{ fontSize: 12, color: CP.textMuted }}>Nel messaggio, una riga vuota separa i paragrafi.</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4, alignItems: "center" }}>
+              <button style={{ ...btn(true), opacity: busy || !dirty ? 0.6 : 1 }} disabled={busy || !dirty} onClick={() => call("PUT", { template: draft }, () => "Salvato: i prossimi inviti useranno questo testo.")}>Salva</button>
+              <button style={btn(false)} disabled={busy || !dirty} onClick={() => setDraft(data.template)}>Annulla modifiche</button>
+              <button style={btn(false)} disabled={busy} onClick={() => call("POST", { template: draft, sample }, (j) => `Prova mandata a ${j.to}.`)}>Mandami una prova</button>
+              <button style={btn(false)} disabled={busy} onClick={() => window.confirm("Tornare al testo originale?") && call("PUT", { reset: true }, () => "Testo originale ripristinato.")}>Testo originale</button>
+              {dirty && <span style={{ fontSize: 12, color: CP.accentSoftText }}>Modifiche non salvate</span>}
+            </div>
+            {msg && <div style={{ fontSize: 13, color: msg.bad ? CP.accentRed : CP.textSecondary }}>{msg.text}</div>}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <label style={{ fontSize: 13, color: CP.textSecondary, display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+              Anteprima per
+              <input value={sample} onChange={(e) => setSample(e.target.value)} style={{ ...field, width: 200, maxWidth: "100%" }} aria-label="Nome di esempio" />
+            </label>
+            <WelcomeCertificate card={preview} compact cta={<span style={certButton}>{preview.cta}</span>} />
+          </div>
+        </div>
+      )}
+    </Disclosure>
   );
 }

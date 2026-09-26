@@ -1,21 +1,29 @@
 "use client";
 
+// Impostazioni leaderboard operativa = la formula dello score Mestiere (Infloww).
+// Ridisegno 26/09/2026 (design system): KPI con nome in italiano e cosa misurano,
+// soglie spiegate come "% della media del gruppo", avviso esplicito che salvare
+// qui cambia SUBITO la formula attiva (anche sui mesi passati) senza backtest,
+// con rimando alle Bozze formula; barra di salvataggio sempre visibile con lo
+// stato "modifiche non salvate". API, validazioni e conferme invariate.
+
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
+import { FlaskConical, History } from "lucide-react";
+import { FONTS, CP } from "@/lib/brand";
+import { PageHead, SectionTitle, Notice, NUM, card } from "@/components/ds";
 
-// Etichette KPI in italiano per UI (replicano il foglio Sheets)
+// KPI: nome in italiano + cosa misura (il nome Infloww resta sotto, piccolo)
 const KPI_LABELS = {
-  fan_cvr: "Fan CVR",
-  unlock_rate: "Unlock Rate",
-  avg_earnings_per_paying_fan: "Avg Earnings / Paying Fan",
-  golden_ratio: "Golden Ratio",
-  sales_per_hour: "Sales / Hour",
-  avg_revenue_per_fan: "Avg Revenue / Fan",
-  avg_length_of_conversation: "Avg Length of Conv.",
-  input_per_message: "Input per Message",
-  messages_sent_per_hour: "Messages / Hour",
+  fan_cvr: { it: "Conversione fan", hint: "quota dei fan in chat che comprano", src: "Fan CVR" },
+  unlock_rate: { it: "Contenuti sbloccati", hint: "quota dei PPV mandati che vengono aperti a pagamento", src: "Unlock Rate" },
+  avg_earnings_per_paying_fan: { it: "Incasso per fan pagante", hint: "quanto spende in media chi compra", src: "Avg Earnings / Paying Fan" },
+  golden_ratio: { it: "Golden ratio", hint: "indice calcolato da Infloww", src: "Golden Ratio" },
+  sales_per_hour: { it: "Vendite all'ora", hint: "incasso diviso ore timbrate", src: "Sales / Hour" },
+  avg_revenue_per_fan: { it: "Incasso per fan", hint: "incasso diviso tutti i fan in chat", src: "Avg Revenue / Fan" },
+  avg_length_of_conversation: { it: "Lunghezza delle conversazioni", hint: "media per conversazione", src: "Avg Length of Conv." },
+  input_per_message: { it: "Input per messaggio", hint: "metrica Infloww", src: "Input per Message" },
+  messages_sent_per_hour: { it: "Messaggi all'ora", hint: "messaggi mandati diviso ore timbrate", src: "Messages / Hour" },
 };
 
 // Ordine canonico dei KPI nella tabella
@@ -34,6 +42,8 @@ const KPI_ORDER = [
 // Quali KPI sono "clock-in only" (non presenti in withoutClockIn)
 const CLOCK_IN_ONLY = new Set(["sales_per_hour", "messages_sent_per_hour"]);
 
+const nf = (v, d = 2) => (v == null || Number.isNaN(Number(v)) ? "—" : Number(v).toLocaleString("it-IT", { minimumFractionDigits: d, maximumFractionDigits: d }));
+
 export default function LeaderboardSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -44,6 +54,7 @@ export default function LeaderboardSettingsPage() {
   const [thresholds, setThresholds] = useState(null);
   const [tiers, setTiers] = useState(null);
   const [isCustom, setIsCustom] = useState({});
+  const [saved, setSaved] = useState(null); // ultima versione caricata/salvata, per "modifiche non salvate"
 
   async function loadSettings() {
     setLoading(true);
@@ -60,6 +71,7 @@ export default function LeaderboardSettingsPage() {
       setThresholds(deepCopy(data.thresholds));
       setTiers(deepCopy(data.tiers));
       setIsCustom(data.isCustom || {});
+      setSaved(JSON.stringify({ w: data.weights, t: data.thresholds, x: data.tiers }));
     } catch (e) {
       setError(String(e));
     }
@@ -92,8 +104,9 @@ export default function LeaderboardSettingsPage() {
       if (!r.ok || data.error) {
         setError(data.error || "Errore nel salvataggio.");
       } else {
-        setMessage("Settings salvati. La leaderboard userà i nuovi valori al prossimo refresh.");
+        setMessage("Salvato. La leaderboard usa i nuovi valori da adesso (ricarica la pagina della leaderboard).");
         setIsCustom(data.isCustom || {});
+        setSaved(JSON.stringify({ w: weights, t: thresholds, x: tiers }));
       }
     } catch (e) {
       setError(String(e));
@@ -102,7 +115,7 @@ export default function LeaderboardSettingsPage() {
   }
 
   async function resetAll() {
-    if (!confirm("Ripristinare tutti i settings ai default da codice? L'azione cancella gli override salvati.")) return;
+    if (!confirm("Ripristinare tutti i valori scritti nel codice?\n\nCancella pesi, soglie e fasce salvati (anche quelli pubblicati dalle Bozze formula; la regola dei gruppi piccoli resta): lo score torna ai valori di fabbrica, anche sui mesi passati.")) return;
     setSaving(true);
     setError("");
     setMessage("");
@@ -116,7 +129,7 @@ export default function LeaderboardSettingsPage() {
       if (!r.ok || data.error) {
         setError(data.error || "Errore nel reset.");
       } else {
-        setMessage(data.message || "Settings ripristinati ai default.");
+        setMessage(data.message || "Valori ripristinati.");
         await loadSettings();
       }
     } catch (e) {
@@ -162,161 +175,31 @@ export default function LeaderboardSettingsPage() {
     });
   }
 
-  /* =============== Styles =============== */
+  const page = { padding: "28px 24px 96px", maxWidth: 1080, margin: "0 auto", fontFamily: FONTS.body };
+  const input = { padding: "6px 10px", background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, width: 84, textAlign: "right", ...NUM };
+  const inputText = { ...input, textAlign: "left", width: 120 };
+  const th = { textAlign: "left", padding: "10px 12px", color: CP.textMuted, fontSize: 12, fontWeight: 500, borderBottom: `1px solid ${CP.border}`, whiteSpace: "nowrap" };
+  const td = { padding: "8px 12px", borderTop: `1px solid ${CP.borderSoft}`, verticalAlign: "middle" };
+  const chip = { display: "inline-block", marginLeft: 8, padding: "2px 9px", borderRadius: 999, fontSize: 12, fontWeight: 400, background: CP.surfaceAlt, color: CP.textSecondary, verticalAlign: "middle" };
+  const btn = (primary) => ({ padding: "9px 16px", borderRadius: 8, border: `1px solid ${primary ? CP.accent : CP.border}`, background: primary ? CP.accent : CP.surface, color: primary ? CP.accentInk : CP.textPrimary, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" });
 
-  const styles = {
-    page: {
-      minHeight: "100vh",
-      background: COLORS.obsidian,
-      color: COLORS.alabaster,
-      fontFamily: FONTS.body,
-      padding: "32px 24px",
-    },
-    container: { maxWidth: 1200, margin: "0 auto" },
-    backLink: {
-      color: COLORS.fog, fontSize: 13, textDecoration: "none",
-      display: "inline-block", marginBottom: 14,
-    },
-    title: {
-      fontFamily: FONTS.display, fontSize: 30, margin: "0 0 6px 0",
-      letterSpacing: "-0.01em", fontWeight: 500,
-    },
-    sub: { color: COLORS.fog, fontSize: 14, marginBottom: 22, maxWidth: 900, lineHeight: 1.55 },
-    section: {
-      background: COLORS.graphite,
-      border: `1px solid ${COLORS.charcoal}`,
-      borderRadius: 14,
-      padding: 22,
-      marginBottom: 18,
-    },
-    h2: {
-      fontFamily: FONTS.display, fontSize: 20, margin: "0 0 4px 0",
-      letterSpacing: "-0.01em", fontWeight: 500,
-    },
-    sectionDesc: { color: COLORS.fog, fontSize: 13, marginBottom: 18, lineHeight: 1.5 },
-    customBadge: {
-      display: "inline-block",
-      padding: "2px 9px",
-      borderRadius: 999,
-      fontSize: 10,
-      fontWeight: 600,
-      letterSpacing: "0.06em",
-      
-      background: alpha(COLORS.champagne, "26"),
-      color: COLORS.champagne,
-      border: `1px solid ${alpha(COLORS.champagne, "55")}`,
-      marginLeft: 8,
-      verticalAlign: "middle",
-    },
-    table: {
-      width: "100%", borderCollapse: "collapse", fontSize: 13,
-    },
-    th: {
-      textAlign: "left", padding: "10px 12px",
-      color: COLORS.fog, fontSize: 10,
-      letterSpacing: "0.08em",
-      fontWeight: 500,
-      borderBottom: `1px solid ${COLORS.charcoal}`,
-    },
-    td: {
-      padding: "10px 12px",
-      borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`,
-    },
-    input: {
-      padding: "7px 10px",
-      background: COLORS.charcoal,
-      border: `1px solid ${COLORS.charcoal}`,
-      borderRadius: 7,
-      color: COLORS.alabaster,
-      fontSize: 13,
-      fontFamily: FONTS.mono,
-      width: 90,
-      textAlign: "right",
-    },
-    inputText: {
-      padding: "7px 10px",
-      background: COLORS.charcoal,
-      border: `1px solid ${COLORS.charcoal}`,
-      borderRadius: 7,
-      color: COLORS.alabaster,
-      fontSize: 13,
-      fontFamily: FONTS.body,
-      width: 110,
-    },
-    inputColor: {
-      width: 36, height: 30, padding: 0,
-      background: COLORS.charcoal,
-      border: `1px solid ${COLORS.charcoal}`,
-      borderRadius: 6,
-      cursor: "pointer",
-    },
-    sumRow: (ok) => ({
-      padding: "10px 12px",
-      background: ok ? "#3FB97E15" : "#D4454515",
-      color: ok ? "#3FB97E" : "#D44545",
-      fontFamily: FONTS.mono,
-      fontSize: 13,
-      fontWeight: 600,
-      borderTop: `1px solid ${COLORS.charcoal}`,
-      display: "flex",
-      justifyContent: "space-between",
-    }),
-    actions: {
-      display: "flex", gap: 10, marginTop: 18,
-      paddingTop: 18, borderTop: `1px solid ${COLORS.charcoal}`,
-      flexWrap: "wrap",
-    },
-    btnPrimary: {
-      padding: "11px 20px",
-      background: COLORS.champagne,
-      color: COLORS.obsidian,
-      border: "none",
-      borderRadius: 8,
-      fontFamily: FONTS.body,
-      fontSize: 13,
-      fontWeight: 600,
-      cursor: "pointer",
-    },
-    btnGhost: {
-      padding: "11px 20px",
-      background: "transparent",
-      color: COLORS.alabaster,
-      border: `1px solid ${COLORS.charcoal}`,
-      borderRadius: 8,
-      fontFamily: FONTS.body,
-      fontSize: 13,
-      cursor: "pointer",
-    },
-    alertError: {
-      background: "#D4454520",
-      color: "#D44545",
-      padding: 12,
-      borderRadius: 8,
-      marginBottom: 14,
-      fontSize: 13,
-    },
-    alertOk: {
-      background: "#3FB97E20",
-      color: "#3FB97E",
-      padding: 12,
-      borderRadius: 8,
-      marginBottom: 14,
-      fontSize: 13,
-    },
-    hint: {
-      fontSize: 12,
-      color: COLORS.mist,
-      marginTop: 8,
-      lineHeight: 1.5,
-    },
-  };
+  const head = (
+    <PageHead
+      crumbs={[{ label: "Hub", href: "/admin" }, { label: "Dati" }, { label: "Impostazioni leaderboard" }]}
+      title="Impostazioni leaderboard operativa"
+      subtitle="La formula dello score Mestiere (dati Infloww): quanto pesa ogni KPI, come un KPI diventa punti e dove iniziano le fasce. Da qui la cambi direttamente."
+      actions={<>
+        <Link href="/admin/score-config-drafts" style={{ ...btn(false), textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}><FlaskConical size={14} /> Bozze formula</Link>
+        <Link href="/admin/score-config-history" style={{ ...btn(false), textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}><History size={14} /> Storico</Link>
+      </>}
+    />
+  );
 
   if (loading) {
     return (
-      <div style={styles.page}>
-        <div style={styles.container}>
-          <p style={{ color: COLORS.fog }}>Caricamento settings…</p>
-        </div>
+      <div style={page}>
+        {head}
+        <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento impostazioni…</div>
       </div>
     );
   }
@@ -326,247 +209,175 @@ export default function LeaderboardSettingsPage() {
   const sumWithout = sumOfWeights(weights?.withoutClockIn);
   const sumWithOk = Math.abs(sumWith - 1) < 0.001;
   const sumWithoutOk = Math.abs(sumWithout - 1) < 0.001;
+  const dirty = saved != null && weights && JSON.stringify({ w: weights, t: thresholds, x: tiers }) !== saved;
+  const customChip = <span style={chip}>modificato rispetto al codice</span>;
 
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <PageHeader
-          breadcrumb={
-            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-              <span style={{ color: CP.textMuted }}>›</span>
-              <span style={{ color: CP.textPrimary }}>Settings Leaderboard</span>
-            </div>
-          }
-          section="Data · Config"
-          title="Settings Leaderboard Operativa"
-          subtitle={'Pesi KPI, soglie di normalizzazione e cutoff tier — replica il foglio "Settings" dello Sheets HOC. Modifiche immediate. Ripristino default disponibile.'}
-        />
+    <div style={page}>
+      {head}
 
-        {error && <div style={styles.alertError}>{error}</div>}
-        {message && <div style={styles.alertOk}>{message}</div>}
+      <Notice danger>
+        Salvare qui cambia <b style={{ fontWeight: 500 }}>subito</b> lo score di tutti gli operatori, anche nei mesi passati (classifiche, pagine personali, percorso di carriera), senza prova prima. Per un cambio ragionato usa <Link href="/admin/score-config-drafts" style={{ color: CP.accentSoftText }}>Bozze formula</Link>: fai il backtest sui mesi veri e vedi chi sale e chi scende prima di pubblicare.
+      </Notice>
 
-        {/* ============ PESI KPI ============ */}
-        <div style={styles.section}>
-          <h2 style={styles.h2}>
-            Pesi KPI
-            {isCustom.weights && <span style={styles.customBadge}>Custom</span>}
-          </h2>
-          <p style={styles.sectionDesc}>
-            Quanto pesa ogni KPI nello Score finale (somma 1.00 per modalità). Modalità "with clock-in"
-            include Sales/h e Messages/h (richiede Clocked Hours valido), "without" usa 7 KPI con pesi
-            ribilanciati.
+      {error && <Notice danger>{error}</Notice>}
+      {message && <Notice>{message}</Notice>}
+
+      {/* ============ PESI KPI ============ */}
+      {weights && (
+        <section style={{ ...card, padding: "16px 16px 8px", marginBottom: 16 }}>
+          <SectionTitle>Quanto pesa ogni KPI{isCustom.weights && customChip}</SectionTitle>
+          <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 12px", lineHeight: 1.55 }}>
+            In ogni colonna i pesi devono sommare 1,00. «Con ore timbrate» vale quando Infloww ha le ore lavorate (Clocked Hours) valide; se mancano si usa l&apos;altra colonna, che non ha i due KPI all&apos;ora.
           </p>
-
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>KPI</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>With clock-in</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>Without clock-in</th>
-              </tr>
-            </thead>
-            <tbody>
-              {KPI_ORDER.map((kpi) => (
-                <tr key={kpi}>
-                  <td style={styles.td}>{KPI_LABELS[kpi] || kpi}</td>
-                  <td style={{ ...styles.td, textAlign: "right" }}>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="1"
-                      value={weights?.withClockIn?.[kpi] ?? ""}
-                      onChange={(e) => setWeight("withClockIn", kpi, e.target.value)}
-                      style={styles.input}
-                    />
-                  </td>
-                  <td style={{ ...styles.td, textAlign: "right" }}>
-                    {CLOCK_IN_ONLY.has(kpi) ? (
-                      <span style={{ color: COLORS.mist, fontSize: 12 }}>—</span>
-                    ) : (
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="1"
-                        value={weights?.withoutClockIn?.[kpi] ?? ""}
-                        onChange={(e) => setWeight("withoutClockIn", kpi, e.target.value)}
-                        style={styles.input}
-                      />
-                    )}
-                  </td>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: 520 }}>
+              <thead>
+                <tr>
+                  <th style={th}>KPI</th>
+                  <th style={{ ...th, textAlign: "right" }}>Con ore timbrate</th>
+                  <th style={{ ...th, textAlign: "right" }}>Senza ore timbrate</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div style={styles.sumRow(sumWithOk)}>
-            <span>Somma With clock-in</span>
-            <span>{sumWith.toFixed(4)} / 1.0000 {sumWithOk ? "✓" : "⚠"}</span>
+              </thead>
+              <tbody>
+                {KPI_ORDER.map((kpi) => {
+                  const k = KPI_LABELS[kpi] || { it: kpi };
+                  return (
+                    <tr key={kpi}>
+                      <td style={td}>
+                        <div style={{ color: CP.textPrimary }}>{k.it}</div>
+                        <div style={{ fontSize: 12, color: CP.textMuted }}>{k.hint}{k.src ? ` · ${k.src}` : ""}</div>
+                      </td>
+                      <td style={{ ...td, textAlign: "right" }}>
+                        <input type="number" step="0.01" min="0" max="1" aria-label={`${k.it}, con ore timbrate`}
+                          value={weights?.withClockIn?.[kpi] ?? ""}
+                          onChange={(e) => setWeight("withClockIn", kpi, e.target.value)}
+                          style={input} />
+                      </td>
+                      <td style={{ ...td, textAlign: "right" }}>
+                        {CLOCK_IN_ONLY.has(kpi) ? (
+                          <span style={{ color: CP.textMuted, fontSize: 12 }}>non usato</span>
+                        ) : (
+                          <input type="number" step="0.01" min="0" max="1" aria-label={`${k.it}, senza ore timbrate`}
+                            value={weights?.withoutClockIn?.[kpi] ?? ""}
+                            onChange={(e) => setWeight("withoutClockIn", kpi, e.target.value)}
+                            style={input} />
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr>
+                  <td style={{ ...td, color: CP.textSecondary }}>Somma (deve fare 1,00)</td>
+                  <td style={{ ...td, textAlign: "right", ...NUM, color: sumWithOk ? CP.textSecondary : CP.accentRed }}>{nf(sumWith, 2)} {sumWithOk ? "✓" : "≠ 1,00"}</td>
+                  <td style={{ ...td, textAlign: "right", ...NUM, color: sumWithoutOk ? CP.textSecondary : CP.accentRed }}>{nf(sumWithout, 2)} {sumWithoutOk ? "✓" : "≠ 1,00"}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <div style={styles.sumRow(sumWithoutOk)}>
-            <span>Somma Without clock-in</span>
-            <span>{sumWithout.toFixed(4)} / 1.0000 {sumWithoutOk ? "✓" : "⚠"}</span>
-          </div>
-        </div>
+        </section>
+      )}
 
-        {/* ============ SOGLIE NORMALIZZAZIONE ============ */}
-        <div style={styles.section}>
-          <h2 style={styles.h2}>
-            Soglie di normalizzazione
-            {isCustom.thresholds && <span style={styles.customBadge}>Custom</span>}
-          </h2>
-          <p style={styles.sectionDesc}>
-            Come trasformare un KPI grezzo in punti 0-100 in base allo scarto dalla media del Group
-            (team modella). Ogni riga: se valore &lt; media × multiplier → assegna i punti. Sopra
-            l'ultimo multiplier → 100 punti.
+      {/* ============ SOGLIE NORMALIZZAZIONE ============ */}
+      {thresholds && (
+        <section style={{ ...card, padding: "16px 16px 8px", marginBottom: 16 }}>
+          <SectionTitle>Come un KPI diventa punti{isCustom.thresholds && customChip}</SectionTitle>
+          <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 12px", lineHeight: 1.55 }}>
+            Ogni KPI dell&apos;operatore si confronta con la media del suo gruppo (il team della stessa creator). Si legge dall&apos;alto: la prima riga in cui l&apos;operatore sta sotto dà i punti. Sopra l&apos;ultima riga: 100 punti. Moltiplicatori e punti devono crescere riga dopo riga.
           </p>
-
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Step</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>Multiplier</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>Punti</th>
-                <th style={styles.th}>Significato</th>
-              </tr>
-            </thead>
-            <tbody>
-              {thresholds?.map((t, i) => (
-                <tr key={i}>
-                  <td style={styles.td}>#{i + 1}</td>
-                  <td style={{ ...styles.td, textAlign: "right" }}>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={t.multiplier}
-                      onChange={(e) => setThreshold(i, "multiplier", e.target.value)}
-                      style={styles.input}
-                    />
-                  </td>
-                  <td style={{ ...styles.td, textAlign: "right" }}>
-                    <input
-                      type="number"
-                      step="1"
-                      min="0"
-                      max="100"
-                      value={t.score}
-                      onChange={(e) => setThreshold(i, "score", e.target.value)}
-                      style={styles.input}
-                    />
-                  </td>
-                  <td style={{ ...styles.td, color: COLORS.mist, fontSize: 12 }}>
-                    valore &lt; media × {t.multiplier?.toFixed(2)} → {t.score} punti
-                  </td>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: 520 }}>
+              <thead>
+                <tr>
+                  <th style={th}>Riga</th>
+                  <th style={{ ...th, textAlign: "right" }}>Moltiplicatore della media</th>
+                  <th style={{ ...th, textAlign: "right" }}>Punti</th>
+                  <th style={th}>Si legge così</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <div style={styles.hint}>
-            Default: 0.75/0.90/1.00/1.10/1.25 → 0/20/40/60/80 punti, sopra → 100. Multiplier e punti
-            devono essere strettamente crescenti.
+              </thead>
+              <tbody>
+                {thresholds.map((t, i) => (
+                  <tr key={i}>
+                    <td style={{ ...td, color: CP.textMuted, ...NUM }}>{i + 1}</td>
+                    <td style={{ ...td, textAlign: "right" }}>
+                      <input type="number" step="0.01" value={t.multiplier} aria-label={`Moltiplicatore riga ${i + 1}`}
+                        onChange={(e) => setThreshold(i, "multiplier", e.target.value)} style={input} />
+                    </td>
+                    <td style={{ ...td, textAlign: "right" }}>
+                      <input type="number" step="1" min="0" max="100" value={t.score} aria-label={`Punti riga ${i + 1}`}
+                        onChange={(e) => setThreshold(i, "score", e.target.value)} style={input} />
+                    </td>
+                    <td style={{ ...td, color: CP.textSecondary, fontSize: 13, ...NUM }}>
+                      sotto il {Math.round((Number(t.multiplier) || 0) * 100)}% della media → {t.score} punti
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
+          <div style={{ fontSize: 12, color: CP.textMuted, margin: "8px 0" }}>
+            Valori di fabbrica: 0,75 / 0,90 / 1,00 / 1,10 / 1,25 → 0 / 20 / 40 / 60 / 80 punti, sopra → 100.
+          </div>
+        </section>
+      )}
 
-        {/* ============ TIER CUTOFFS ============ */}
-        <div style={styles.section}>
-          <h2 style={styles.h2}>
-            Soglie tier
-            {isCustom.tiers && <span style={styles.customBadge}>Custom</span>}
-          </h2>
-          <p style={styles.sectionDesc}>
-            Cutoff per assegnare il badge tier (Critical / Weak / Average / Good / Strong / Elite)
-            in base allo Score finale. I range devono essere contigui e coprire 0-100.
+      {/* ============ TIER CUTOFFS ============ */}
+      {tiers && (
+        <section style={{ ...card, padding: "16px 16px 8px", marginBottom: 16 }}>
+          <SectionTitle>Fasce dello score{isCustom.tiers && customChip}</SectionTitle>
+          <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 12px", lineHeight: 1.55 }}>
+            Da quale score parte ogni fascia (Critical, Weak, Average, Good, Strong, Elite). Le fasce devono essere attaccate una all&apos;altra e coprire da 0 a 100. Il colore è quello del bollino nella leaderboard.
           </p>
-
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Label</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>Min</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>Max</th>
-                <th style={styles.th}>Color</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tiers?.map((t, i) => (
-                <tr key={i}>
-                  <td style={styles.td}>
-                    <input
-                      type="text"
-                      value={t.label}
-                      onChange={(e) => setTier(i, "label", e.target.value)}
-                      style={styles.inputText}
-                    />
-                  </td>
-                  <td style={{ ...styles.td, textAlign: "right" }}>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={t.min}
-                      onChange={(e) => setTier(i, "min", e.target.value)}
-                      style={styles.input}
-                    />
-                  </td>
-                  <td style={{ ...styles.td, textAlign: "right" }}>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={t.max}
-                      onChange={(e) => setTier(i, "max", e.target.value)}
-                      style={styles.input}
-                    />
-                  </td>
-                  <td style={styles.td}>
-                    <input
-                      type="color"
-                      value={t.color}
-                      onChange={(e) => setTier(i, "color", e.target.value)}
-                      style={styles.inputColor}
-                    />
-                    <span style={{ marginLeft: 8, fontFamily: FONTS.mono, fontSize: 11, color: COLORS.mist }}>
-                      {t.color}
-                    </span>
-                  </td>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: 520 }}>
+              <thead>
+                <tr>
+                  <th style={th}>Nome</th>
+                  <th style={{ ...th, textAlign: "right" }}>Da</th>
+                  <th style={{ ...th, textAlign: "right" }}>A</th>
+                  <th style={th}>Colore</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {tiers.map((t, i) => (
+                  <tr key={i}>
+                    <td style={td}>
+                      <input type="text" value={t.label} aria-label={`Nome fascia ${i + 1}`} onChange={(e) => setTier(i, "label", e.target.value)} style={inputText} />
+                    </td>
+                    <td style={{ ...td, textAlign: "right" }}>
+                      <input type="number" min="0" max="100" value={t.min} aria-label={`${t.label}: da`} onChange={(e) => setTier(i, "min", e.target.value)} style={input} />
+                    </td>
+                    <td style={{ ...td, textAlign: "right" }}>
+                      <input type="number" min="0" max="100" value={t.max} aria-label={`${t.label}: a`} onChange={(e) => setTier(i, "max", e.target.value)} style={input} />
+                    </td>
+                    <td style={td}>
+                      <input type="color" value={t.color} aria-label={`${t.label}: colore`} onChange={(e) => setTier(i, "color", e.target.value)}
+                        style={{ width: 36, height: 28, padding: 0, background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 6, cursor: "pointer", verticalAlign: "middle" }} />
+                      <span style={{ marginLeft: 8, fontSize: 12, color: CP.textMuted }}>{t.color}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
-        {/* ============ ACTIONS ============ */}
-        <div style={styles.actions}>
-          <button
-            style={styles.btnPrimary}
-            onClick={saveAll}
-            disabled={saving || !sumWithOk || !sumWithoutOk}
-          >
-            {saving ? "Salvataggio…" : "Salva tutti i settings"}
-          </button>
-          <button
-            style={styles.btnGhost}
-            onClick={loadSettings}
-            disabled={saving}
-          >
-            Annulla modifiche
-          </button>
-          <div style={{ flex: 1 }} />
-          <button
-            style={styles.btnGhost}
-            onClick={resetAll}
-            disabled={saving}
-          >
-            Ripristina default
-          </button>
-        </div>
-
-        <div style={styles.hint}>
-          I valori salvati vengono applicati immediatamente al ricalcolo della Leaderboard Operativa
-          (refresh della pagina). Il ripristino cancella gli override e torna ai default da codice.
-        </div>
+      {/* ============ ACTIONS (sempre visibili) ============ */}
+      <div style={{ position: "sticky", bottom: 12, zIndex: 5, ...card, padding: "10px 14px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <button style={{ ...btn(true), opacity: saving || !sumWithOk || !sumWithoutOk ? 0.6 : 1 }} onClick={saveAll} disabled={saving || !sumWithOk || !sumWithoutOk}>
+          {saving ? "Salvataggio…" : "Salva e applica subito"}
+        </button>
+        <button style={btn(false)} onClick={loadSettings} disabled={saving}>
+          Annulla modifiche
+        </button>
+        <span style={{ fontSize: 12, color: !sumWithOk || !sumWithoutOk ? CP.accentRed : dirty ? CP.accentSoftText : CP.textMuted }}>
+          {!sumWithOk || !sumWithoutOk ? "I pesi non sommano 1,00: correggi prima di salvare" : dirty ? "Modifiche non salvate" : "Nessuna modifica"}
+        </span>
+        <div style={{ flex: 1 }} />
+        <button style={{ ...btn(false), color: CP.accentRed }} onClick={resetAll} disabled={saving}>
+          Ripristina valori di fabbrica
+        </button>
       </div>
     </div>
   );
