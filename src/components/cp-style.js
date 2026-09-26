@@ -14,6 +14,7 @@
  *
  * Usano i token brand.CP per palette / brand.FONTS per tipografia.
  */
+import { useEffect } from "react";
 import { CP, FONTS, creatorDotColor, alpha } from "@/lib/brand";
 
 export function SectionLabel({ children, color, size = 10, style }) {
@@ -314,5 +315,68 @@ export function PillTab({ active, onClick, children, icon, style }) {
       {icon && <span>{icon}</span>}
       <span>{children}</span>
     </button>
+  );
+}
+
+/**
+ * Modal — overlay generico riusabile (nessuno esisteva nel repo: i pannelli
+ * crea/modifica erano finora form inline collassabili). Chiusura su click
+ * overlay o Escape. Contenuto libero via children.
+ */
+export function Modal({ open, onClose, title, children, maxWidth = 480 }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(6,8,12,0.55)", // velo: funziona in entrambi i temi
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+        zIndex: 1000,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth,
+          maxHeight: "88vh",
+          overflowY: "auto",
+          background: CP.surface,
+          border: `1px solid ${CP.border}`,
+          borderRadius: 14,
+          padding: 22,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h2 style={{ fontFamily: FONTS.display, fontSize: 18, fontWeight: 500, color: CP.textPrimary, margin: 0 }}>
+            {title}
+          </h2>
+          <button
+            onClick={onClose}
+            aria-label="Chiudi"
+            style={{
+              background: "transparent", border: "none", color: CP.textMuted,
+              fontSize: 20, lineHeight: 1, cursor: "pointer", padding: 4,
+            }}
+          >
+            ×
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
   );
 }
