@@ -21,7 +21,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { canSee } from "@/lib/nav-access";
-import { useTheme } from "@/lib/theme-client";
+import { useTheme, useStyle } from "@/lib/theme-client";
 import { UserButton, SignedIn } from "@clerk/nextjs";
 import {
   Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown,
@@ -369,6 +369,7 @@ export default function Sidebar() {
   const { data: me } = useSWR("/api/whoami", silentFetcher, { revalidateOnFocus: false });
   const allowed = (href) => !me?.authenticated || canSee(href, me.capabilities, me.admin);
   const [theme, setTheme] = useTheme();
+  const [style, setStyle] = useStyle();
 
   // Toggle Essential / Advanced
   const [viewMode, setViewMode] = useState("essential");
@@ -513,6 +514,13 @@ export default function Sidebar() {
               {theme === "light" ? <Moon size={15} /> : <Sun size={15} />}
             </button>
           </div>
+          {/* Stile v3 "Notte / Carta" in ANTEPRIMA: solo admin, finché non è verificato su tutte le pagine */}
+          {me?.admin && (
+            <button onClick={() => setStyle(style === "v3" ? "v2" : "v3")} aria-pressed={style === "v3"}
+              style={{ marginTop: 10, width: "100%", padding: "7px 10px", borderRadius: 8, border: `1px solid ${style === "v3" ? CP.accent : CP.border}`, background: style === "v3" ? CP.accentSoft : "transparent", color: style === "v3" ? CP.accentSoftText : CP.textSecondary, fontSize: 12, cursor: "pointer", textAlign: "left", fontFamily: FONTS.body }}>
+              {style === "v3" ? "Stile nuovo attivo (anteprima) · torna al vecchio" : "Prova lo stile nuovo (anteprima)"}
+            </button>
+          )}
         </SignedIn>
       </div>
     </aside>

@@ -76,10 +76,13 @@ export const TIER = {
   },
 };
 
+// Caratteri come variabili: lo stile v3 ("Notte/Carta", anteprima 26/09) passa a
+// Instrument Sans senza toccare le pagine; lo stile attuale resta Inter.
 export const FONTS = {
-  display: "'Inter', system-ui, sans-serif",
-  body: "'Inter', system-ui, sans-serif",
-  mono: "'JetBrains Mono', ui-monospace, Menlo, monospace",
+  display: "var(--cp-font)",
+  body: "var(--cp-font)",
+  mono: "var(--cp-mono)",
+  signature: "var(--cp-sig)",
 };
 
 export const SPACE = { xs: 4, sm: 8, md: 12, base: 16, lg: 24, xl: 32, xxl: 48, xxxl: 64 };
@@ -126,6 +129,10 @@ export const CP_DARK = {
   logoFilter: "brightness(0) invert(1)",
   // Avvisi (fondo tenue rosso, testo leggibile in entrambi i temi)
   dangerSoft: "#2a1d1d",
+  // Token dello stile v3 (qui valori neutri per lo stile attuale)
+  gold: "#d9c29a", goldSoft: "rgba(217,194,154,.10)", track: "#2c3650", neu: "#8c95a8",
+  ruleData: "#5d6678", fieldBd: "#2c3650", sel: "rgba(139,124,246,.12)", hover: "rgba(255,255,255,.03)",
+  scrim: "rgba(0,0,0,.6)", cool: "#b9aef9", warm: "#4ade80", heroBg: "#151a22",
 };
 // Tema chiaro (25/09/2026): per tabelle dense di numeri il testo scuro su fondo
 // chiaro si legge meglio (Piepenbrock et al. 2013); scelto da 4 tester su 5 nel
@@ -137,6 +144,40 @@ export const CP_LIGHT = {
   accent: "#6353e0", accentInk: "#ffffff", accentSoft: "#ebe8fd", accentSoftText: "#4a3bc4", accentDim: "#c7c0f5",
   accentGreen: "#17803d", accentRed: "#c53030", accentBlue: "#4a3bc4",
   logoFilter: "brightness(0)", dangerSoft: "#fdecec",
+  gold: "#7a5f2c", goldSoft: "rgba(122,95,44,.07)", track: "#c9cdd6", neu: "#434a58",
+  ruleData: "#8a92a2", fieldBd: "#c9cdd6", sel: "rgba(99,83,224,.08)", hover: "rgba(20,23,31,.03)",
+  scrim: "rgba(20,23,31,.38)", cool: "#4a3bc4", warm: "#17803d", heroBg: "#ffffff",
+};
+
+// ── Stile v3 "Notte / Carta" (26/09/2026) ─────────────────────────────────────
+// Dalla revisione di 10 esperti sintetici su 3 prototipi (voto medio 6,5 → 7,6).
+// In ANTEPRIMA: si attiva con data-style="v3" su <html> (interruttore admin nel
+// menu, localStorage hoc:style). Stessi nomi dei token: le pagine non cambiano.
+// Rosso SOLO per denaro negativo e allarmi; champagne ("gold") solo per sigillo,
+// fascia Eccellente, "Pro" e traguardi (max 2 per schermata).
+export const CP_NOTTE = {
+  bgSunken: "#0e0d13", bg: "#0b0a0f", surface: "#16151c", surfaceAlt: "#1d1c24",
+  border: "rgba(255,255,255,.10)", borderSoft: "rgba(255,255,255,.07)", borderStrong: "rgba(255,255,255,.16)",
+  textPrimary: "#f2f1f6", textSecondary: "#c2c0cc", textMuted: "#9794a4", mutedIcons: "#75727f",
+  accent: "#7355f5", accentInk: "#ffffff", accentSoft: "rgba(115,85,245,.16)", accentSoftText: "#c4b8ff", accentDim: "#3b3470",
+  accentGreen: "#7fd3a8", accentRed: "#ff9aa6", accentBlue: "#c4b8ff",
+  logoFilter: "brightness(0) invert(1)", dangerSoft: "rgba(255,110,130,.12)",
+  gold: "#d9c29a", goldSoft: "rgba(217,194,154,.09)", track: "#6a6776", neu: "#c4c1ce",
+  ruleData: "#5c5968", fieldBd: "#75727f", sel: "rgba(115,85,245,.12)", hover: "rgba(255,255,255,.03)",
+  scrim: "rgba(5,4,8,.55)", cool: "#a9c1ee", warm: "#9fd8bb", heroBg: "#17161d",
+};
+// Carta: chiaro caldo, stesso mondo dell'attestato; grigi ricalcolati per AA sul
+// caldo (--muted #655f54 dalla revisione accessibilità), card staccate dal fondo.
+export const CP_CARTA = {
+  bgSunken: "#ece7dc", bg: "#f4f1ea", surface: "#fffefb", surfaceAlt: "#f2eee4",
+  border: "#ddd5c4", borderSoft: "#e7e1d4", borderStrong: "#cfc6b3",
+  textPrimary: "#1c1a15", textSecondary: "#46423a", textMuted: "#655f54", mutedIcons: "#8c877b",
+  accent: "#7355f5", accentInk: "#ffffff", accentSoft: "#efeafc", accentSoftText: "#5a3de0", accentDim: "#cbbff5",
+  accentGreen: "#1b6b49", accentRed: "#a61e33", accentBlue: "#5a3de0",
+  logoFilter: "brightness(0)", dangerSoft: "#fbeae8",
+  gold: "#7a5f2c", goldSoft: "rgba(122,95,44,.07)", track: "#8c877b", neu: "#3e3a33",
+  ruleData: "#9a9384", fieldBd: "#8c877b", sel: "rgba(115,85,245,.07)", hover: "rgba(40,30,10,.025)",
+  scrim: "rgba(28,24,16,.38)", cool: "#2a569f", warm: "#1b6b49", heroBg: "#fffefb",
 };
 
 // Scala per i DATI (sequenziale, separata dall'accento viola che è per ciò che si
@@ -158,7 +199,12 @@ export function alpha(color, hex) {
 /** CSS dei due temi (iniettato nel <head> da app/layout). */
 export function themeCss() {
   const vars = (o) => Object.entries(o).map(([k, v]) => `--cp-${k}:${v};`).join("");
-  return `:root{${vars(CP_DARK)}color-scheme:dark}:root[data-theme="light"]{${vars(CP_LIGHT)}color-scheme:light}`
+  const fontOld = `--cp-font:'Inter',system-ui,-apple-system,sans-serif;--cp-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;--cp-sig:Georgia,serif;`;
+  const fontV3 = `--cp-font:var(--f-sans),ui-sans-serif,system-ui,-apple-system,sans-serif;--cp-mono:ui-monospace,"SF Mono",Menlo,monospace;--cp-sig:var(--f-sig),Georgia,serif;`;
+  return `:root{${vars(CP_DARK)}${fontOld}color-scheme:dark}:root[data-theme="light"]{${vars(CP_LIGHT)}color-scheme:light}`
+    // stile v3 in anteprima (vince per specificità/ordine sui due temi attuali)
+    + `:root[data-style="v3"]{${vars(CP_NOTTE)}${fontV3}color-scheme:dark}`
+    + `:root[data-style="v3"][data-theme="light"]{${vars(CP_CARTA)}color-scheme:light}`
     // Segnaposto sempre tenue: nel tema scuro gli esempi sembravano dati inseriti
     + `::placeholder{color:var(--cp-textMuted);opacity:.65}`;
 }

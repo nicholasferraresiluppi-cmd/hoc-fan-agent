@@ -4,6 +4,13 @@ import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
 import "./globals.css";
 import { themeCss, CP } from "@/lib/brand";
+import { Instrument_Sans, Instrument_Serif } from "next/font/google";
+
+// Caratteri dello stile v3 (anteprima): serviti dal nostro dominio da next/font,
+// con misure di riserva calcolate (niente salto al caricamento). Usati solo
+// sotto data-style="v3" tramite --f-sans / --f-sig.
+const fSans = Instrument_Sans({ subsets: ["latin", "latin-ext"], display: "swap", variable: "--f-sans" });
+const fSig = Instrument_Serif({ subsets: ["latin"], weight: "400", style: "italic", display: "swap", preload: false, variable: "--f-sig" });
 
 export const metadata = {
   title: "HOC Pro",
@@ -26,7 +33,7 @@ export default function RootLayout({ children }) {
           colorText: CP.textPrimary,
           colorInputBackground: CP.surface,
           colorInputText: CP.textPrimary,
-          fontFamily: "Inter, system-ui, sans-serif",
+          fontFamily: "var(--cp-font)",
         },
         elements: {
           formButtonPrimary: "bg-[var(--cp-accent)] hover:bg-[var(--cp-accent)] text-[var(--cp-accentInk)]",
@@ -53,12 +60,12 @@ export default function RootLayout({ children }) {
         },
       }}
     >
-      <html lang="it" data-theme="light" suppressHydrationWarning>
+      <html lang="it" data-theme="light" className={`${fSans.variable} ${fSig.variable}`} suppressHydrationWarning>
         <head>
           {/* Tema chiaro/scuro: variabili dei due temi + scelta salvata applicata PRIMA
               del primo disegno (niente lampo del tema sbagliato). Default: scuro. */}
           <style dangerouslySetInnerHTML={{ __html: themeCss() }} />
-          <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem("hoc:theme")==="dark")document.documentElement.removeAttribute("data-theme")}catch(e){}` }} />
+          <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem("hoc:theme")==="dark")document.documentElement.removeAttribute("data-theme");if(localStorage.getItem("hoc:style")==="v3")document.documentElement.setAttribute("data-style","v3")}catch(e){}` }} />
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
           <link
@@ -66,7 +73,7 @@ export default function RootLayout({ children }) {
             rel="stylesheet"
           />
         </head>
-        <body style={{ background: "var(--cp-bg)", color: "var(--cp-textPrimary)", minHeight: "100vh", fontFamily: "Inter, system-ui, sans-serif" }}>
+        <body style={{ background: "var(--cp-bg)", color: "var(--cp-textPrimary)", minHeight: "100vh", fontFamily: "var(--cp-font)" }}>
           <Providers>
             <AppShell>{children}</AppShell>
           </Providers>
