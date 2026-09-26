@@ -1,21 +1,30 @@
 // Informativa privacy pubblica di HOC Pro. Serve anche come "Privacy policy
 // URL" della schermata di consenso Google OAuth (login "Continua con Google").
 // Testo base: da far rivedere al legale prima di usi diversi dal login interno.
-import { CP } from "@/lib/brand";
+// Redesign 26/09/2026: solo presentazione (testata PageHead del design system,
+// testo in una card). Il testo legale è invariato parola per parola.
+import { CP, FONTS } from "@/lib/brand";
+import { PageHead } from "@/components/ds";
 
 export const metadata = { title: "Privacy · HOC Pro" };
 
-const h2 = { fontSize: 17, fontWeight: 500, margin: "28px 0 8px", color: CP.textPrimary };
+const h2 = { fontSize: 16, fontWeight: 500, margin: "24px 0 8px", color: CP.textPrimary };
+// Stile card del DS ricopiato qui: da un modulo "use client" una pagina server
+// riceve solo i componenti, non gli oggetti (card sarebbe un riferimento vuoto).
+const card = { background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10 };
 const p = { fontSize: 14, lineHeight: 1.7, color: CP.textSecondary, margin: "0 0 10px" };
 
 export default function PrivacyPage() {
   return (
-    <main style={{ background: CP.bg, minHeight: "100vh", padding: "48px 16px 64px" }}>
-      <div style={{ maxWidth: 720, margin: "0 auto" }}>
-        <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 6 }}>HOC Pro · House of Creators</div>
-        <h1 style={{ fontSize: 28, fontWeight: 500, color: CP.textPrimary, margin: "0 0 6px" }}>Informativa privacy</h1>
-        <p style={{ ...p, color: CP.textMuted }}>Ultimo aggiornamento: 25 settembre 2026</p>
+    <main style={{ background: CP.bg, minHeight: "100vh", padding: "28px 16px 64px", fontFamily: FONTS.body }}>
+      <div style={{ maxWidth: 760, margin: "0 auto" }}>
+        <PageHead
+          crumbs={[{ label: "HOC Pro · House of Creators" }]}
+          title="Informativa privacy"
+          subtitle="Ultimo aggiornamento: 25 settembre 2026"
+        />
 
+        <article style={{ ...card, padding: "4px 24px 16px" }}>
         <h2 style={h2}>Cos'è HOC Pro</h2>
         <p style={p}>HOC Pro è lo strumento interno di House of Creators per la formazione, il coaching e l'organizzazione del lavoro del team. L'accesso è riservato alle persone invitate dall'azienda.</p>
 
@@ -34,6 +43,7 @@ export default function PrivacyPage() {
 
         <h2 style={h2}>I tuoi diritti</h2>
         <p style={p}>Puoi chiedere di vedere, correggere o cancellare i tuoi dati, o opporti al loro uso, scrivendo a House of Creators dall'indirizzo aziendale (i riferimenti sono nel tuo contratto o nella comunicazione di invito). Puoi anche rivolgerti al Garante per la protezione dei dati personali.</p>
+        </article>
       </div>
     </main>
   );

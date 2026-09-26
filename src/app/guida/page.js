@@ -15,7 +15,7 @@ import useSWR from "swr";
 import { useUser } from "@clerk/nextjs";
 import { Compass } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHeader, PillTab } from "@/components/cp-style";
+import { PageHead, FilterChip, Notice } from "@/components/ds";
 import { selectFunnels, getFunnel } from "@/lib/role-funnels";
 import RoleFunnelGuide from "@/components/RoleFunnelGuide";
 import RoleFunnelChecklist from "@/components/RoleFunnelChecklist";
@@ -23,7 +23,7 @@ import RoleFunnelChecklist from "@/components/RoleFunnelChecklist";
 export default function GuidaPage() {
   const { user, isLoaded } = useUser();
   const swrKey = isLoaded && user ? "/api/whoami" : null;
-  const { data: whoami } = useSWR(swrKey);
+  const { data: whoami, error: whoamiError } = useSWR(swrKey);
 
   const { visibleKeys, primaryKey } = useMemo(
     () => selectFunnels(whoami || {}),
@@ -40,32 +40,34 @@ export default function GuidaPage() {
   const { data: act } = useSWR(activeKey === "operator" ? "/api/me/activation" : null);
   const operatorChecklist = activeKey === "operator" && !(act && act.linked === false);
 
-  const loading = !isLoaded || (swrKey && !whoami);
+  const loading = !isLoaded || (swrKey && !whoami && !whoamiError);
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: "36px 28px 64px 28px" }}>
-      <PageHeader
-        section="Onboarding"
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: "28px 24px 64px", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Onboarding" }]}
         title="La guida agli strumenti"
-        subtitle="Ogni ruolo ha un percorso di strumenti nella console. Qui è reso esplicito: cosa apri, in che ordine, e perché. Non si impara dove sono i bottoni — si impara come si ragiona in HOC Pro."
+        subtitle="Il percorso del tuo ruolo dentro HOC Pro: cosa apri, in che ordine e perché. Non serve imparare dove sono i bottoni, ma come si ragiona qui dentro."
       />
 
       {loading ? (
-        <div style={{ color: CP.textMuted, fontSize: 14, fontFamily: FONTS.body, padding: "40px 0" }}>
+        <div style={{ color: CP.textMuted, fontSize: 14, padding: "40px 0" }}>
           Carico il tuo percorso…
         </div>
       ) : (
         <>
+          {whoamiError && (
+            <Notice>Non riesco a leggere il tuo ruolo in questo momento: ti mostro il percorso di base. Ricarica la pagina tra poco per vedere quello giusto.</Notice>
+          )}
+
           {/* Tab per ruolo (solo se più di uno visibile) */}
           {visibleKeys.length > 1 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 22 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
               {visibleKeys.map((k) => {
                 const f = getFunnel(k);
                 if (!f) return null;
                 return (
-                  <PillTab key={k} active={activeKey === k} onClick={() => setActive(k)}>
-                    {f.label}
-                  </PillTab>
+                  <FilterChip key={k} label={f.label} active={activeKey === k} onClick={() => setActive(k)} />
                 );
               })}
             </div>
@@ -76,13 +78,13 @@ export default function GuidaPage() {
             <div
               style={{
                 display: "flex", alignItems: "center", gap: 8,
-                marginBottom: 18, padding: "8px 12px",
-                background: CP.accentSoft, borderRadius: 8,
-                fontSize: 12.5, color: CP.accentSoftText, fontFamily: FONTS.body,
+                marginBottom: 18, padding: "10px 14px",
+                background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10,
+                fontSize: 13, color: CP.textSecondary, fontFamily: FONTS.body,
               }}
             >
-              <Compass size={14} aria-hidden="true" />
-              Stai guardando il percorso di un altro ruolo — utile per capire cosa vede il resto del team.
+              <Compass size={14} color={CP.textMuted} aria-hidden="true" style={{ flexShrink: 0 }} />
+              Stai guardando il percorso di un altro ruolo: serve a capire cosa vede il resto del team.
             </div>
           )}
 
