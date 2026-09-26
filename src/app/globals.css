@@ -116,3 +116,40 @@ h1, h2, h3, h4, h5, h6 {
   [data-style="v3"] .hoc-v3-tab { transition: none; }
   [data-style="v3"] .hoc-v3-tab:active { transform: none; }
 }
+
+/* ── Stile v3: componenti del design system (components/ds.js, passo 3) ──
+   Le classi ds-* non hanno regole fuori da [data-style="v3"] (salvo il focus da
+   tastiera della tabella, sotto): nello stile attuale valgono gli stili inline
+   di sempre. !important perché qui si sovrascrive lo stile inline. */
+[data-style="v3"] .ds-h1 { font-size: 32px !important; font-weight: 500 !important; letter-spacing: -.02em !important; line-height: 1.15; }
+[data-style="v3"] .ds-sect { font-size: 17px !important; font-weight: 500 !important; letter-spacing: -.01em; }
+[data-style="v3"] .ds-lbl { font-size: 12px !important; font-weight: 500 !important; letter-spacing: .01em; color: var(--cp-textMuted) !important; }
+/* card hero: fondo dedicato, bordo 1px, niente glow */
+[data-style="v3"] .ds-hero { background: var(--cp-heroBg) !important; border: 1px solid var(--cp-border) !important; border-radius: 16px !important; box-shadow: none !important; }
+/* numero protagonista: 80/56, 500, cifre proporzionali (decimali composti da NumText) */
+[data-style="v3"] .ds-hero-v { font-size: 80px !important; font-weight: 500 !important; line-height: .92 !important; letter-spacing: -.04em !important; font-variant-numeric: proportional-nums lining-nums !important; margin: 6px 0 4px; }
+/* KPI: 32/28, 500, tabellari */
+[data-style="v3"] .ds-metric-v { font-size: 32px !important; font-weight: 500 !important; line-height: 1.05 !important; letter-spacing: -.03em; font-variant-numeric: tabular-nums !important; margin-top: 2px; }
+[data-style="v3"] .ds-chip { font-weight: 500; }
+/* Notice neutro: solo bordo sinistro; rosso SOLO con danger */
+[data-style="v3"] .ds-notice { border: 0 !important; border-left: 2px solid var(--cp-textMuted) !important; border-radius: 0 10px 10px 0 !important; background: var(--cp-surfaceAlt) !important; }
+[data-style="v3"] .ds-notice[data-danger] { border-left-color: var(--cp-accentRed) !important; }
+/* Tabelle: righe 44px (compatta 34px), celle 13.5 tabellari, hover e selezione piatti */
+[data-style="v3"] .ds-tbl { font-size: 13.5px !important; font-variant-numeric: tabular-nums; }
+[data-style="v3"] .ds-tbl td { height: 44px; padding-top: 0 !important; padding-bottom: 0 !important; }
+[data-style="v3"] .ds-tbl[data-density="compact"] td { height: 34px; }
+[data-style="v3"] .ds-tr { background: transparent !important; }
+[data-style="v3"] .ds-tr:hover > td { background-image: linear-gradient(var(--cp-hover), var(--cp-hover)); }
+[data-style="v3"] .ds-tr[data-sel] > td { background-color: var(--cp-surface) !important; background-image: linear-gradient(var(--cp-sel), var(--cp-sel)); }
+/* Tastiera (entrambi gli stili, ma visibile SOLO da tastiera: :focus-visible) */
+.ds-tbl:focus { outline: none; }
+.ds-tbl:focus-visible { outline: 2px solid var(--cp-accent); outline-offset: -2px; }
+.ds-tbl:focus-visible .ds-tr[data-active] > td { background-image: linear-gradient(var(--cp-hover), var(--cp-hover)); box-shadow: inset 0 1px 0 var(--cp-accent), inset 0 -1px 0 var(--cp-accent); }
+.ds-tbl:focus-visible .ds-tr[data-active] > td:first-child { box-shadow: inset 2px 0 0 var(--cp-accent), inset 0 1px 0 var(--cp-accent), inset 0 -1px 0 var(--cp-accent); }
+@media (max-width: 899px) {
+  [data-style="v3"] .ds-h1 { font-size: 26px !important; }
+  [data-style="v3"] .ds-hero-v { font-size: 56px !important; }
+  [data-style="v3"] .ds-metric-v { font-size: 28px !important; }
+}
+/* ScoreChart (componente nuovo): sotto 520px solo le soglie vicine al valore */
+@media (max-width: 519px) { .ds-sc .ds-sc-far { display: none; } }

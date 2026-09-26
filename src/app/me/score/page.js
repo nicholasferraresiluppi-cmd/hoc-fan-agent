@@ -5,8 +5,9 @@ import useSWR from "swr";
 import Link from "next/link";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtPct } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, card, NUM } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, BandBar, ScoreChart, card, NUM } from "@/components/ds";
 import { tierLabel, tierColor } from "@/lib/tier-label";
+import { useStyle } from "@/lib/theme-client";
 
 /**
  * /me/score — "Il mio score, spiegato" (scope own, docs/VISIBILITY_POLICY.md).
@@ -75,6 +76,12 @@ export default function MyScorePage() {
   const composition = [...(data?.composition || [])].sort((a, b) => (b.weight || 0) - (a.weight || 0));
   const history = Array.isArray(data?.history) ? data.history : [];
   const maxHist = Math.max(100, ...history.map((h) => h.score || 0));
+  // Stile v3 in anteprima: barra delle fasce + grafico ScoreChart. Nello stile
+  // attuale la pagina resta com'era (barre verticali, nessuna barra fasce).
+  const [st] = useStyle();
+  const v3 = st === "v3";
+  const tiers = Array.isArray(data?.tiers) ? data.tiers : [];
+  const chartThresholds = tiers.filter((t) => t.min > 0).map((t) => ({ label: tierLabel(t.label), min: t.min }));
 
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
@@ -101,6 +108,7 @@ export default function MyScorePage() {
               value={fmtScore(data.score)}
               compare={data.tier ? <span style={{ color: tierColor(data.tier) }}>{tierLabel(data.tier)}</span> : null}
               hint="È quello del percorso di carriera: misura come chatti."
+              footer={v3 && tiers.length > 1 ? <BandBar value={data.score} tiers={tiers} label="Fascia del Mestiere" /> : null}
             >
               {/* Posizione tra i colleghi, mai il percentile su tutta l'agenzia (decisione 26/09) */}
               {data.peer_rank && (data.peer_rank.top_half
@@ -182,6 +190,15 @@ export default function MyScorePage() {
           {history.length > 1 && (
             <section style={{ marginBottom: 22 }}>
               <SectionTitle aside="il mese che stai guardando è evidenziato">Mestiere: il mio andamento</SectionTitle>
+              {v3 ? (
+                <div style={{ ...card, padding: "16px 18px" }}>
+                  <ScoreChart
+                    caption="Mestiere mese per mese"
+                    points={history.map((h) => ({ label: monthShort(h.period_id), value: h.score }))}
+                    thresholds={chartThresholds}
+                  />
+                </div>
+              ) : (
               <div style={{ ...card, padding: "16px 18px" }}>
                 <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 130, overflowX: "auto", paddingBottom: 4 }}>
                   {history.map((h) => {
@@ -198,6 +215,7 @@ export default function MyScorePage() {
                   })}
                 </div>
               </div>
+              )}
             </section>
           )}
 

@@ -145,6 +145,9 @@ export async function GET(request) {
       const nx = ts.find((t) => t.min > mine.score);
       return nx ? { tier: nx.label, gap: Number(Math.max(0.1, nx.min - mine.score).toFixed(1)) } : null;
     })(),
+    // Fasce della formula attiva (solo soglie, nessun dato di altri): servono
+    // alla barra delle fasce e al grafico dello stile v3 (26/09/2026).
+    tiers: (settings.tiers || []).map((t) => ({ label: t.label, min: t.min, max: t.max })).sort((a, b) => a.min - b.min),
     comparison: mine.comparison === "language" ? "language" : "group", // v13: gruppo piccolo → media della lingua
     group_size: mine.group_size ?? mine.group_means?._count ?? null,
     composition,
