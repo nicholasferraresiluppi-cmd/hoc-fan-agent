@@ -354,7 +354,7 @@ export function Modal({ open, onClose, title, children, maxWidth = 480 }) {
           maxWidth,
           maxHeight: "88vh",
           overflowY: "auto",
-          background: CP.surface,
+          background: CP.panel,
           border: `1px solid ${CP.border}`,
           borderRadius: 14,
           padding: 22,

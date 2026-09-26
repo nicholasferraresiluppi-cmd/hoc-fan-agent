@@ -7,6 +7,8 @@ const EVT = "hoc:theme-change";
 
 export function getTheme() {
   if (typeof document === "undefined") return "dark";
+  // Stile "Casa" (v3): esiste solo scuro, qualunque tema sia salvato
+  if (document.documentElement.getAttribute("data-style") === "v3") return "dark";
   return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
 }
 
@@ -25,12 +27,13 @@ export function useTheme() {
     set(getTheme());
     const on = () => set(getTheme());
     window.addEventListener(EVT, on);
-    return () => window.removeEventListener(EVT, on);
+    window.addEventListener("hoc:style-change", on);
+    return () => { window.removeEventListener(EVT, on); window.removeEventListener("hoc:style-change", on); };
   }, []);
   return [theme, setTheme];
 }
 
-// Stile v3 "Notte / Carta" in anteprima (26/09/2026): data-style="v3" su <html>.
+// Stile v3 "Casa" in anteprima (26/09/2026): data-style="v3" su <html>.
 const SKEY = "hoc:style";
 const SEVT = "hoc:style-change";
 export function getStyle() {

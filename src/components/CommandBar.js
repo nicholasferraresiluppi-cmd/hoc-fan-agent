@@ -118,7 +118,7 @@ export default function CommandBar({ open, onClose }) {
     <div className="hoc-v3-cmdk-wrap" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{ position: "fixed", inset: 0, zIndex: 120, background: CP.scrim, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "12vh 16px 16px" }}>
       <div role="dialog" aria-modal="true" aria-label="Cerca una pagina" className="hoc-v3-cmdk"
-        style={{ width: "min(620px, 100%)", maxHeight: "70vh", display: "flex", flexDirection: "column", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 16, boxShadow: "0 24px 64px rgba(0,0,0,.45)", overflow: "hidden", fontFamily: FONTS.body }}>
+        style={{ width: "min(620px, 100%)", maxHeight: "70vh", display: "flex", flexDirection: "column", background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 16, boxShadow: "0 24px 64px rgba(0,0,0,.45)", overflow: "hidden", fontFamily: FONTS.body }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 16px", borderBottom: `1px solid ${CP.border}` }}>
           <Search size={17} color={CP.textMuted} aria-hidden="true" />
           <input

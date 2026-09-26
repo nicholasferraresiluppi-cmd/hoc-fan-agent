@@ -17,6 +17,7 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Menu, X } from "lucide-react";
 import Sidebar from "./Sidebar";
+import SidebarCasa from "./SidebarCasa";
 import ErrorBoundary from "./ErrorBoundary";
 import OnboardingNudge from "./OnboardingNudge";
 import WelcomeAttestato from "./WelcomeAttestato";
@@ -96,11 +97,11 @@ export default function AppShell({ children }) {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: CP.bg }}>
+    <div className="hoc-root" style={{ minHeight: "100vh", background: CP.bg }}>
       {/* Desktop: sidebar fissa — wrapped in silent ErrorBoundary */}
       <div className="hoc-desk">
         <ErrorBoundary silent label="Sidebar">
-          <Sidebar />
+          {v3 ? <SidebarCasa /> : <Sidebar />}
         </ErrorBoundary>
       </div>
 
@@ -134,7 +135,7 @@ export default function AppShell({ children }) {
                 style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 49 }}
               />
               <div style={{ position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 50 }}>
-                <Sidebar />
+                {v3 ? <SidebarCasa /> : <Sidebar />}
                 <button
                   onClick={() => setMobileOpen(false)}
                   aria-label="Chiudi menu"
@@ -164,7 +165,8 @@ export default function AppShell({ children }) {
           <SecurityBanner />
         </ErrorBoundary>
         <ErrorBoundary label="Pagina">
-          {children}
+          {/* Stile Casa: la chiave per pagina fa ripartire l'entrata in scena a ogni navigazione */}
+          {v3 ? <div className="casa-page" key={pathname}>{children}</div> : children}
         </ErrorBoundary>
       </main>
 

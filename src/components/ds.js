@@ -27,9 +27,9 @@ export const card = { background: CP.surface, border: `1px solid ${CP.border}`, 
 
 export function PageHead({ crumbs = [], title, subtitle, actions }) {
   return (
-    <header style={{ marginBottom: 20 }}>
+    <header className="ds-head" style={{ marginBottom: 20 }}>
       {crumbs.length > 0 && (
-        <div style={{ display: "flex", gap: 8, fontSize: 13, color: CP.textSecondary, marginBottom: 6, flexWrap: "wrap" }}>
+        <div className="ds-crumbs" style={{ display: "flex", gap: 8, fontSize: 13, color: CP.textSecondary, marginBottom: 6, flexWrap: "wrap" }}>
           {crumbs.map((c, i) => (
             <span key={i} style={{ display: "inline-flex", gap: 8 }}>
               {i > 0 && <span style={{ color: CP.textMuted }}>›</span>}
@@ -41,7 +41,7 @@ export function PageHead({ crumbs = [], title, subtitle, actions }) {
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 420px" }}>
           <h1 className="ds-h1" style={{ fontSize: 28, fontWeight: 500, margin: "0 0 4px", letterSpacing: "-0.01em", color: CP.textPrimary }}>{title}</h1>
-          {subtitle && <p style={{ fontSize: 14, color: CP.textSecondary, margin: 0, maxWidth: 760, lineHeight: 1.5 }}>{subtitle}</p>}
+          {subtitle && <p className="ds-sub" style={{ fontSize: 14, color: CP.textSecondary, margin: 0, maxWidth: 760, lineHeight: 1.5 }}>{subtitle}</p>}
         </div>
         {actions && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{actions}</div>}
       </div>
@@ -56,7 +56,7 @@ export function HeroMetric({ label, value, compare, hint, children, footer }) {
     <section className="ds-hero" style={{ ...card, padding: "20px 22px", marginBottom: 14, display: "flex", gap: 32, flexWrap: "wrap", alignItems: "flex-end" }}>
       <div style={{ minWidth: 220 }}>
         <div className="ds-lbl" style={{ fontSize: 13, color: CP.textSecondary }}>{label}</div>
-        <div className="ds-hero-v" style={{ fontSize: 40, fontWeight: 500, letterSpacing: "-0.02em", lineHeight: 1.1, color: CP.textPrimary, ...NUM }}>{st === "v3" ? <NumText value={value} /> : value}</div>
+        <div className="ds-hero-v" style={{ fontSize: 40, fontWeight: 500, letterSpacing: "-0.02em", lineHeight: 1.1, color: CP.textPrimary, ...NUM }}>{st === "v3" ? <NumText value={value} count /> : value}</div>
         {compare && <div style={{ fontSize: 13, color: CP.textMuted, marginTop: 4 }}>{compare}</div>}
         {hint && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2 }}>{hint}</div>}
       </div>
@@ -87,8 +87,28 @@ export function parseDisplayNumber(value) {
   if (!dec && !sym) return null; // niente da comporre
   return { sign: sign || "", sym: sym || "", int, dec: dec || "", pct: pct || "", money: Boolean(sym) };
 }
-export function NumText({ value }) {
+/** Stile Casa: il numero protagonista conta fino al valore (1,4s), una volta per montaggio. */
+function useCount(intStr, on) {
+  const target = on && intStr ? Number(String(intStr).replace(/\./g, "")) : null;
+  const [shown, setShown] = useState(null);
+  useEffect(() => {
+    if (target == null || !Number.isFinite(target) || target > 1e12) return;
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    let raf; const t0 = performance.now();
+    const tick = (now) => {
+      const q = Math.min(1, (now - t0) / 1400);
+      setShown(Math.round(target * (1 - Math.pow(1 - q, 3))));
+      if (q < 1) raf = requestAnimationFrame(tick); else setShown(null);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+  return shown == null ? intStr : String(shown).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+export function NumText({ value, count = false }) {
   const p = parseDisplayNumber(value);
+  const int = useCount(p?.int, count && Boolean(p));
   if (!p) return value ?? null;
   const tone = p.money ? CP.textSecondary : "inherit";
   return (
@@ -96,7 +116,7 @@ export function NumText({ value }) {
       {p.sign}
       {/* vertical-align .57em (della taglia piccola) ≈ cima del simbolo all'altezza delle maiuscole */}
       {p.sym && <span style={{ fontSize: "0.55em", verticalAlign: "0.57em", letterSpacing: 0, marginRight: "0.04em", color: tone }}>{p.sym}</span>}
-      {p.int}
+      {int}
       {p.dec && <span style={{ fontSize: "0.55em", letterSpacing: "-0.02em", color: tone }}>{p.dec}{p.pct}</span>}
       {!p.dec && p.pct}
     </>

@@ -62,13 +62,13 @@ export function FeedbackButton() {
   return (
     <>
       <button onClick={() => setOpen(true)} data-track="Segnala o suggerisci" aria-label="Segnala o suggerisci"
-        className="hoc-fb" style={{ position: "fixed", right: 18, bottom: 18, zIndex: 60, display: "flex", alignItems: "center", gap: 6, padding: "9px 13px", borderRadius: 999, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textSecondary, fontSize: 12, cursor: "pointer", boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
+        className="hoc-fb" style={{ position: "fixed", right: 18, bottom: 18, zIndex: 60, display: "flex", alignItems: "center", gap: 6, padding: "9px 13px", borderRadius: 999, border: `1px solid ${CP.border}`, background: CP.panel, color: CP.textSecondary, fontSize: 12, cursor: "pointer", boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
         <MessageSquarePlus size={15} /> Segnala o suggerisci
       </button>
       {open && (
         <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(5,7,10,0.6)", display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 16 }}>
           <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Segnala o suggerisci"
-            style={{ width: "100%", maxWidth: 380, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 14, padding: 18 }}>
+            style={{ width: "100%", maxWidth: 380, background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 14, padding: 18 }}>
             <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontSize: 15, fontWeight: 500, flex: 1 }}>Segnala o suggerisci</div>
               <button onClick={() => setOpen(false)} aria-label="Chiudi" style={{ background: "transparent", border: "none", color: CP.textMuted, cursor: "pointer" }}><X size={16} /></button>
