@@ -2,55 +2,59 @@
 
 import { useState } from "react";
 import useSWR, { mutate } from "swr";
-import { Loader2, RefreshCw, Clock, Snowflake, ArrowRight } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
+import { fmt$, fmtInt } from "@/lib/format";
+import { PageHead, Metric, FilterChip, SectionTitle, Notice, DataTable, card } from "@/components/ds";
 
 /**
  * /admin/loop — "Loop azione→esito". Rende visibile il dataset proprietario che
  * si accumula: ogni giorno la coda "quale fan seguire" viene registrata, e a
  * 48h di distanza si misura se i fan flaggati hanno ricevuto risposta e comprato.
  * È la metà-moat del ciclo: nessuno lo accumula perché nessuno chiude il loop.
+ *
+ * Redesign DS (26/09/2026): percorso in 3 passi scritto a schermo (giorno →
+ * creator → esito; prima la pagina mostrava solo i giorni e sembrava vuota),
+ * creator in tabella, esito con parole al posto di "lift/fast/slow".
+ * API e cattura invariate.
  */
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
-const usd = (v) => "$" + Number(v || 0).toLocaleString("it-IT", { maximumFractionDigits: 0 });
+const fmtDay = (d) => new Date(d + "T12:00:00Z").toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
+const pct = (v) => (v == null ? "—" : `${Number(v).toLocaleString("it-IT", { maximumFractionDigits: 1 })}%`);
 
 function OutcomeView({ day, creatorId }) {
   const { data, isLoading } = useSWR(
     day && creatorId ? `/api/admin/loop?day=${day}&creator_id=${creatorId}` : null,
     fetcher, { revalidateOnFocus: false }
   );
-  if (isLoading) return <div style={{ color: CP.textMuted, fontSize: 13, padding: "12px 0" }}><Loader2 size={14} className="spin" /> Calcolo esito…</div>;
+  if (isLoading) return <div style={{ color: CP.textMuted, fontSize: 14, padding: "12px 0", display: "flex", gap: 8, alignItems: "center" }}><Loader2 size={14} className="spin" /> Calcolo l'esito…</div>;
   const s = data?.snapshot;
   if (!s) return null;
   if (!s.matured) {
     return (
-      <CpCard style={{ marginTop: 12 }}>
-        <p style={{ color: CP.textSecondary, fontSize: 13.5, margin: 0 }}>
-          Snapshot non ancora maturo: l'esito si misura a 48h dalla cattura
-          {s.matures_in_h != null ? ` (mancano ~${s.matures_in_h}h)` : ""}. Torna dopo — il dato si aggancia da solo.
-        </p>
-      </CpCard>
+      <Notice>
+        L'esito di questo giorno non è ancora pronto: si misura 48 ore dopo il salvataggio
+        {s.matures_in_h != null ? ` (mancano circa ${s.matures_in_h} ore)` : ""}. Non serve fare nulla: torna dopo e lo trovi qui.
+      </Notice>
     );
   }
   const o = s.outcomes;
-  const lift = o.slow.rev_per > 0 ? (o.fast.rev_per / o.slow.rev_per).toFixed(2) : "—";
+  const lift = o.slow.rev_per > 0 ? (o.fast.rev_per / o.slow.rev_per) : null;
   return (
-    <div style={{ marginTop: 12 }}>
-      <SectionLabel>Esito · {s.creator_name} · snapshot {s.day}</SectionLabel>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, margin: "10px 0 14px" }}>
-        <StatCard label="Fan flaggati" value={o.fast.n + o.slow.n} sub="waiting + cooling" />
-        <StatCard label="Risposti ≤30min" value={o.fast.n} sub={`${o.fast.bought_pct}% ha comprato · ${usd(o.fast.rev_per)}/fan`} color={CP.accentGreen} />
-        <StatCard label="Lenti / mai" value={o.slow.n} sub={`${o.slow.bought_pct}% ha comprato · ${usd(o.slow.rev_per)}/fan`} color={CP.textMuted} />
-        <StatCard label="Lift revenue" value={lift === "—" ? "—" : `${lift}×`} sub="fast vs lento, $/fan" accent={CP.accent} />
+    <section style={{ ...card, padding: "18px 20px", marginTop: 4 }}>
+      <SectionTitle aside={`lista del ${fmtDay(s.day)}`}>Esito per {s.creator_name}</SectionTitle>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 18, margin: "8px 0 16px" }}>
+        <Metric label="Fan nella lista" value={fmtInt(o.fast.n + o.slow.n)} note="in attesa + si raffreddano" />
+        <Metric label="Risposti entro 30 minuti" value={fmtInt(o.fast.n)} note={`${pct(o.fast.bought_pct)} ha comprato · ${fmt$(o.fast.rev_per)} a fan`} />
+        <Metric label="Risposti tardi o mai" value={fmtInt(o.slow.n)} note={`${pct(o.slow.bought_pct)} ha comprato · ${fmt$(o.slow.rev_per)} a fan`} />
+        <Metric label="Rispondere in fretta rende" value={lift == null ? "—" : `${lift.toLocaleString("it-IT", { maximumFractionDigits: 2 })} volte`} note="dollari a fan, veloci contro lenti" />
       </div>
-      <p style={{ fontSize: 11.5, color: CP.textMuted, lineHeight: 1.5 }}>
-        Direzionale, non contabile: chi viene risposto in fretta può essere un fan diverso (confondimento) e c'è
-        reverse-causality. Il valore che si accumula è la SERIE: giorno dopo giorno, la stessa raccomandazione
-        registrata e il suo esito misurato — è quel dataset, non la singola riga, a diventare il vantaggio.
+      <p style={{ fontSize: 12, color: CP.textMuted, lineHeight: 1.6, margin: 0 }}>
+        Da leggere come indicazione, non come prova: i fan a cui si risponde in fretta possono essere diversi da quelli lasciati indietro
+        (per esempio più attivi, o già intenzionati a comprare). Il valore sta nella serie: giorno dopo giorno la stessa lista salvata e il suo esito misurato.
       </p>
-    </div>
+    </section>
   );
 }
 
@@ -77,66 +81,71 @@ export default function LoopPage() {
     finally { setCapturing(false); }
   };
 
+  const columns = [
+    { key: "creator_name", label: "Creator" },
+    { key: "waiting", label: "In attesa di risposta", align: "right", render: (c) => fmtInt(c.waiting) },
+    { key: "cooling", label: "Si raffreddano", align: "right", render: (c) => fmtInt(c.cooling) },
+    { key: "go", label: "", sortable: false, render: (c) => <span style={{ color: creatorId === c.creator_id ? CP.accentSoftText : CP.textMuted, fontSize: 13, whiteSpace: "nowrap" }}>{creatorId === c.creator_id ? "Esito sotto ↓" : "Vedi esito"}</span> },
+  ];
+
   return (
-    <div style={{ padding: "32px 24px 64px", maxWidth: 940, margin: "0 auto" }}>
-      <PageHeader
-        section="Insights"
-        title="Loop azione→esito"
-        subtitle="Ogni giorno registra quale fan era da seguire (la coda) e, a 48h, misura se ha ricevuto risposta e comprato. È il dataset proprietario che si accumula solo facendo girare il loop — il vantaggio che nessuno può comprare."
-        toolbar={
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1080, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Insights" }, { label: "Loop azione → esito" }]}
+        title="Loop azione → esito"
+        subtitle="Ogni giorno salviamo la lista dei fan da seguire (quella della Priority queue) e, 48 ore dopo, misuriamo se hanno avuto risposta e se hanno comprato. Serve a vedere se seguire la lista porta davvero vendite."
+        actions={
           <button onClick={captureNow} disabled={capturing}
-            style={{ display: "inline-flex", alignItems: "center", gap: 7, background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 9, padding: "8px 14px", fontSize: 13, cursor: capturing ? "default" : "pointer", opacity: capturing ? 0.6 : 1 }}>
-            {capturing ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />} Cattura snapshot ora
+            style={{ display: "inline-flex", alignItems: "center", gap: 7, background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "8px 14px", fontSize: 13, cursor: capturing ? "default" : "pointer", opacity: capturing ? 0.6 : 1, fontFamily: FONTS.body }}>
+            {capturing ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />} Salva la lista di oggi
           </button>
         }
       />
 
-      {captureErr && <CpCard style={{ marginBottom: 12 }}><p style={{ color: CP.accentRed, fontSize: 13, margin: 0 }}>{captureErr}</p></CpCard>}
-      {denied && <CpCard><p style={{ color: CP.accentRed, fontSize: 13.5, margin: 0 }}>{datesData.error}</p></CpCard>}
+      {captureErr && <Notice danger>{captureErr}</Notice>}
+      {denied && <Notice danger>{datesData.error}</Notice>}
       {datesLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
 
       {!denied && dates.length === 0 && !datesLoading && (
-        <CpCard>
-          <p style={{ color: CP.textSecondary, fontSize: 14, margin: "0 0 6px" }}>Nessuno snapshot ancora.</p>
-          <p style={{ color: CP.textMuted, fontSize: 13, margin: 0 }}>Il cron gira una volta al giorno (dispatcher, 03:00 UTC). Premi "Cattura snapshot ora" per il primo. L'esito di ciascuno matura dopo 48h.</p>
-        </CpCard>
+        <div style={{ ...card, padding: "18px 20px", fontSize: 14, color: CP.textSecondary, lineHeight: 1.55 }}>
+          Nessuna lista salvata ancora. Il salvataggio automatico gira una volta al giorno (di notte); per partire subito premi «Salva la lista di oggi».
+          L'esito di ogni giorno si vede 48 ore dopo.
+        </div>
       )}
 
       {dates.length > 0 && (
         <>
-          <SectionLabel>Giorni catturati</SectionLabel>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "10px 0 20px" }}>
+          <SectionTitle aside="L'esito c'è solo per i giorni di almeno 48 ore fa.">1. Scegli un giorno</SectionTitle>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "0 0 24px" }}>
             {dates.map((d) => (
-              <button key={d.day} onClick={() => { setDay(d.day); setCreatorId(null); }}
-                style={{ background: day === d.day ? CP.accentSoft || CP.surface : CP.surface, color: day === d.day ? CP.accent : CP.text, border: `1px solid ${day === d.day ? CP.accent : CP.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 13, cursor: "pointer", fontFamily: FONTS.mono }}>
-                {d.day} <span style={{ color: CP.textMuted }}>· {d.creators} creator</span>
-              </button>
+              <FilterChip key={d.day} label={`${fmtDay(d.day)} · ${d.creators} creator`} active={day === d.day}
+                onClick={() => { setDay(d.day); setCreatorId(null); }} />
             ))}
           </div>
         </>
       )}
 
-      {day && !dayData && <div style={{ color: CP.textMuted, fontSize: 13 }}>Caricamento creator…</div>}
+      {day && !dayData && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento creator…</div>}
       {day && dayData && creators.length === 0 && (
-        <CpCard><p style={{ color: CP.textMuted, fontSize: 13, margin: 0 }}>Nessun creator con coda in questo snapshot.</p></CpCard>
+        <Notice>Nessuna creator aveva fan da seguire nella lista di questo giorno.</Notice>
       )}
       {day && creators.length > 0 && (
         <>
-          <SectionLabel>Creator nello snapshot {day} — scegli per vedere l'esito</SectionLabel>
-          <div style={{ marginTop: 10 }}>
-            {creators.map((c) => (
-              <button key={c.creator_id} onClick={() => setCreatorId(c.creator_id)}
-                style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", background: creatorId === c.creator_id ? CP.surface : "transparent", border: `1px solid ${creatorId === c.creator_id ? CP.accent : CP.border}`, borderRadius: 10, padding: "11px 16px", marginBottom: 8, cursor: "pointer" }}>
-                <span style={{ fontSize: 14, color: CP.textPrimary }}>{c.creator_name}</span>
-                <span style={{ fontSize: 12.5, color: CP.textMuted, display: "inline-flex", gap: 14, alignItems: "center" }}>
-                  <span style={{ display: "inline-flex", gap: 5, alignItems: "center" }}><Clock size={12} /> {c.waiting}</span>
-                  <span style={{ display: "inline-flex", gap: 5, alignItems: "center" }}><Snowflake size={12} /> {c.cooling}</span>
-                  <ArrowRight size={14} color={creatorId === c.creator_id ? CP.accent : CP.mutedIcons} />
-                </span>
-              </button>
-            ))}
+          <SectionTitle aside="Quanti fan c'erano nella lista, per stato.">2. Scegli una creator</SectionTitle>
+          <div style={{ marginBottom: 20 }}>
+            <DataTable
+              columns={columns}
+              rows={creators.map((c) => ({ ...c, id: c.creator_id }))}
+              onRowClick={(c) => setCreatorId(c.creator_id)}
+              selected={(c) => c.creator_id === creatorId}
+              minWidth={480}
+              maxHeight={420}
+            />
           </div>
-          {creatorId && <OutcomeView day={day} creatorId={creatorId} />}
+          {creatorId && (<>
+            <SectionTitle>3. L'esito</SectionTitle>
+            <OutcomeView day={day} creatorId={creatorId} />
+          </>)}
         </>
       )}
 

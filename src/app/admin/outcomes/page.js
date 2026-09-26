@@ -1,18 +1,14 @@
 "use client";
 
+// Risultati reali settimanali (redesign DS 26/09/2026). Inserimento a mano dei
+// risultati veri di un operatore in una settimana, per confrontarli un domani
+// col voto del simulatore. Etichette in italiano, modulo compatto a griglia,
+// storico in tabella ordinabile. API e campi inviati invariati.
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
-import Link from "next/link";
-import { CP, alpha } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
-
-const HOC_COLORS = {
-  bgDark: CP.bgSunken,
-  white: CP.textPrimary,
-  gray: CP.textMuted,
-  orange: CP.accent,
-  gradient: CP.accent,
-};
+import { CP, FONTS } from "@/lib/brand";
+import { fmt$, fmtInt } from "@/lib/format";
+import { PageHead, HeroMetric, SectionTitle, Notice, DataTable, card } from "@/components/ds";
 
 function currentISOWeek() {
   const d = new Date();
@@ -23,9 +19,14 @@ function currentISOWeek() {
   return `${year}-W${String(week).padStart(2, "0")}`;
 }
 
+const lbl = { display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 6 };
+const inp = { width: "100%", padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, boxSizing: "border-box" };
+const n = (v) => (v === "" || v == null ? null : Number(v));
+
 export default function OutcomesPage() {
   const { isLoaded } = useUser();
   const [outcomes, setOutcomes] = useState([]);
+  const [loaded, setLoaded] = useState(false);
   const [form, setForm] = useState({
     operatorId: "",
     week: currentISOWeek(),
@@ -44,6 +45,7 @@ export default function OutcomesPage() {
     const d = await r.json();
     setOutcomes(d.outcomes || []);
     if (d.error) setError(d.error);
+    setLoaded(true);
   }
 
   useEffect(() => {
@@ -73,74 +75,78 @@ export default function OutcomesPage() {
     }
   }
 
-  const input = (label, key, type = "text") => (
-    <div style={{ marginBottom: "0.75rem" }}>
-      <label style={{ display: "block", fontSize: "0.85rem", color: HOC_COLORS.gray, marginBottom: "0.25rem" }}>{label}</label>
-      <input
-        type={type}
-        value={form[key]}
-        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-        style={{ width: "100%", padding: "0.5rem", background: `${alpha(HOC_COLORS.white, "05")}`, border: `1px solid ${alpha(HOC_COLORS.white, "30")}`, borderRadius: "0.5rem", color: HOC_COLORS.white }}
-      />
+  const field = (label, key, type = "text", placeholder = "") => (
+    <div>
+      <label style={lbl} htmlFor={`oc-${key}`}>{label}</label>
+      <input id={`oc-${key}`} type={type} value={form[key]} placeholder={placeholder}
+        onChange={(e) => setForm({ ...form, [key]: e.target.value })} style={inp} />
     </div>
   );
 
+  const operators = new Set(outcomes.map((o) => o.operatorId)).size;
+
+  const columns = [
+    { key: "operatorId", label: "Operatore" },
+    { key: "week", label: "Settimana", render: (o) => <span style={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{o.week}</span> },
+    { key: "revenue", label: "Venduto", align: "right", sort: (o) => n(o.revenue), render: (o) => fmt$(n(o.revenue)) },
+    { key: "ppvCount", label: "PPV", align: "right", sort: (o) => n(o.ppvCount), render: (o) => fmtInt(n(o.ppvCount)) },
+    { key: "customCount", label: "Custom", align: "right", sort: (o) => n(o.customCount), render: (o) => fmtInt(n(o.customCount)) },
+    { key: "retentionRate", label: "Fan trattenuti", align: "right", sort: (o) => n(o.retentionRate), render: (o) => (n(o.retentionRate) == null ? "—" : `${o.retentionRate}%`) },
+    { key: "churnCount", label: "Fan persi", align: "right", sort: (o) => n(o.churnCount), render: (o) => fmtInt(n(o.churnCount)) },
+    { key: "notes", label: "Note", muted: true, sortable: false, render: (o) => <span style={{ fontSize: 13 }}>{o.notes || "—"}</span> },
+  ];
+
   return (
-    <div style={{ background: HOC_COLORS.bgDark, minHeight: "100vh", color: HOC_COLORS.white, padding: "32px 28px 64px 28px", maxWidth: 1400, margin: "0 auto" }}>
-      <PageHeader
-        breadcrumb={
-          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <span style={{ color: CP.textPrimary }}>Outcomes</span>
-          </div>
-        }
-        section="Training · Validation"
-        title="Outcome Tracking"
-        subtitle="Inserisci i risultati reali settimanali degli operatori. Questi dati chiudono il ciclo: confrontiamo il punteggio AI con la performance vera."
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Training" }, { label: "Risultati reali" }]}
+        title="Risultati reali degli operatori"
+        subtitle="Scrivi qui i risultati veri di un operatore in una settimana. Servono a verificare, più avanti, se chi prende voti alti nel simulatore vende davvero di più."
       />
 
-      {error && <p style={{ color: CP.accentRed }}>{error}</p>}
+      {error && <Notice danger>{String(error)}</Notice>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: "2rem", marginTop: "2rem" }}>
-        <form onSubmit={submit} style={{ background: `${alpha(HOC_COLORS.white, "05")}`, padding: "1.5rem", borderRadius: "0.75rem" }}>
-          <h2 style={{ fontSize: "1rem", marginTop: 0 }}>Nuovo record</h2>
-          {input("Operator ID (es. user_abc123 o alias)", "operatorId")}
-          {input("Settimana ISO (es. 2026-W15)", "week")}
-          {input("Revenue ($)", "revenue", "number")}
-          {input("N. PPV venduti", "ppvCount", "number")}
-          {input("N. custom venduti", "customCount", "number")}
-          {input("Retention rate %", "retentionRate", "number")}
-          {input("Churn count", "churnCount", "number")}
-          <div style={{ marginBottom: "0.75rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem", color: HOC_COLORS.gray, marginBottom: "0.25rem" }}>Note</label>
-            <textarea
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              style={{ width: "100%", minHeight: "60px", padding: "0.5rem", background: `${alpha(HOC_COLORS.white, "05")}`, border: `1px solid ${alpha(HOC_COLORS.white, "30")}`, borderRadius: "0.5rem", color: HOC_COLORS.white }}
-            />
+      {loaded && !error && (
+        <HeroMetric
+          label="Settimane registrate"
+          value={fmtInt(outcomes.length)}
+          compare={outcomes.length ? `${fmtInt(operators)} operatori diversi, tra le ultime 100 registrazioni.` : "Nessuna registrazione ancora."}
+          hint="Il confronto con il voto del simulatore ha senso solo con molte settimane per più operatori: finché sono poche, è un archivio."
+        />
+      )}
+
+      <section style={{ ...card, padding: "18px 20px", marginBottom: 24 }}>
+        <SectionTitle>Nuova settimana</SectionTitle>
+        <form onSubmit={submit}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, marginBottom: 14 }}>
+            {field("Operatore (id utente o nome)", "operatorId", "text", "Es. user_abc123 o Nome Cognome")}
+            {field("Settimana (anno-W-numero)", "week", "text", "Es. 2026-W15")}
+            {field("Venduto ($)", "revenue", "number")}
+            {field("PPV venduti", "ppvCount", "number")}
+            {field("Contenuti custom venduti", "customCount", "number")}
+            {field("Fan trattenuti (%)", "retentionRate", "number")}
+            {field("Fan persi (disdette)", "churnCount", "number")}
           </div>
-          <button type="submit" style={{ padding: "0.6rem 1.5rem", background: HOC_COLORS.gradient, border: "none", color: HOC_COLORS.bgDark, borderRadius: "0.5rem", fontWeight: 700, cursor: "pointer" }}>
-            Salva outcome
-          </button>
-          {saved && <p style={{ color: CP.accentGreen, marginTop: "0.5rem" }}>Salvato</p>}
+          <label style={lbl} htmlFor="oc-notes">Note</label>
+          <textarea id="oc-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            style={{ ...inp, minHeight: 60, resize: "vertical", lineHeight: 1.5 }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+            <button type="submit" style={{ padding: "8px 16px", background: CP.accent, border: `1px solid ${CP.accent}`, color: CP.accentInk, borderRadius: 8, fontWeight: 500, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body }}>
+              Salva la settimana
+            </button>
+            {saved && <span style={{ color: CP.textSecondary, fontSize: 13 }}>Salvata.</span>}
+          </div>
         </form>
+      </section>
 
-        <div>
-          <h2 style={{ fontSize: "1rem" }}>Storico ({outcomes.length})</h2>
-          <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
-            {outcomes.map((o) => (
-              <div key={`${o.operatorId}-${o.week}`} style={{ background: `${alpha(HOC_COLORS.white, "05")}`, padding: "0.75rem", borderRadius: "0.5rem", marginBottom: "0.5rem" }}>
-                <div style={{ fontWeight: 700 }}>{o.operatorId} — {o.week}</div>
-                <div style={{ fontSize: "0.85rem", color: HOC_COLORS.gray }}>
-                  ${o.revenue} • {o.ppvCount} PPV • {o.customCount} custom • retention {o.retentionRate}% • churn {o.churnCount}
-                </div>
-                {o.notes && <div style={{ fontSize: "0.8rem", marginTop: "0.25rem" }}>{o.notes}</div>}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <SectionTitle aside={outcomes.length ? `${fmtInt(outcomes.length)} righe` : null}>Storico</SectionTitle>
+      <DataTable
+        columns={columns}
+        rows={outcomes.map((o) => ({ ...o, id: `${o.operatorId}-${o.week}` }))}
+        minWidth={860}
+        maxHeight={600}
+        empty={loaded ? "Nessuna settimana registrata ancora: la prima la inserisci nel modulo qui sopra." : "Caricamento…"}
+      />
     </div>
   );
 }
