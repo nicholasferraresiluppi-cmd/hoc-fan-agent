@@ -31,6 +31,7 @@ import { buildCpLeaderboard } from "@/lib/creatorspro-score";
 import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
 import { loadGroupLanguages } from "@/app/api/admin/group-languages/route";
 import { detectLanguage } from "@/lib/leaderboard-calc";
+import { getCachedCreatorDifficulty } from "@/lib/creator-difficulty";
 
 const SWAP_KEY = (periodId) => `action_center:swaps:${periodId}`;
 const IGNORED_KEY = "underperformers:ignored";
@@ -98,6 +99,41 @@ export async function GET(request) {
     rawCandidates.map((r) => computeSwapSuggestions(r.employee, period_id, { limit: 5 }))
   );
 
+  // Contesto prima del giudizio (26/09/2026): per la creator principale di ogni
+  // candidato, (a) quanto rende rispetto ai COLLEGHI su di lei (leave-one-out:
+  // la sua quota esclusa dalla media), (b) quanto è "freddo" il suo pubblico
+  // (profilo difficoltà dal warehouse, solo cache — mai calcolo nel percorso UI).
+  // Serve a non sostituire chi rende come gli altri su una creator difficile.
+  const { matrix, creators: creatorAgg } = matrixResult || {};
+  let diffByName = new Map();
+  try {
+    const d = await getCachedCreatorDifficulty();
+    for (const p of d?.profiles || []) if (p.creator_name) diffByName.set(p.creator_name, p);
+  } catch {}
+  function contextFor(r) {
+    const cr = r.cp_breakdown?.top_creator;
+    if (!cr) return null;
+    const cell = matrix?.[r.employee]?.[cr];
+    const agg = creatorAgg?.[cr];
+    let vsPeers = null;
+    if (cell && agg && cell.shifts >= 3) {
+      const peerShifts = (agg.total_shifts || 0) - cell.shifts;
+      const peerSales = (agg.total_sales || 0) - cell.sales;
+      if (peerShifts >= 5 && peerSales > 0) {
+        const mine = cell.sales / cell.shifts, peers = peerSales / peerShifts;
+        vsPeers = Math.round(((mine - peers) / peers) * 100);
+      }
+    }
+    const prof = diffByName.get(cr);
+    const idx = prof && !prof.free_page && typeof prof.difficulty_index === "number" ? prof.difficulty_index : null;
+    return {
+      creator: cr,
+      vs_peers_pct: vsPeers,
+      difficulty_index: idx,
+      difficulty_band: idx == null ? null : idx >= 67 ? "fredda" : idx <= 33 ? "calda" : "nella media",
+    };
+  }
+
   const candidates = rawCandidates.map((r, i) => {
     const swapEntry = swapsObj[r.employee] || null;
     return {
@@ -116,6 +152,7 @@ export async function GET(request) {
       reliable_creators_count: r.cp_breakdown?.reliable_creators || 0,
       swap_entry: swapEntry,
       suggested_swaps: suggestionsArr[i] || [],
+      context: contextFor(r),
     };
   });
 
