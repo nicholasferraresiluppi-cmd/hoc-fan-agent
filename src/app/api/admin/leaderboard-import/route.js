@@ -177,6 +177,12 @@ export async function POST(request) {
       // Congela la formula score effettiva a questo import (drift detection, gate 0b).
       // Non-bloccante: uno snapshot fallito non deve invalidare un import riuscito.
       const snap = await snapshotScoreConfig({ period_type, period_id, ts: timestamp, source: "admin-import" });
+      try {
+        const { runChecks } = await import("@/lib/ops-alerts");
+        await runChecks({ trigger: "import", only: ["infloww-import-stale"] });
+      } catch (err) {
+        console.error("ops-alerts refresh after import failed:", err?.message || err);
+      }
       return Response.json({
         ...stats,
         mode: "save",

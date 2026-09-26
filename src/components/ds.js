@@ -103,25 +103,28 @@ export function NumText({ value }) {
   );
 }
 
-export function Metric({ label, value, delta, note, danger }) {
+/** Segnale d'attenzione su PERSONE (cella sotto soglia, calo): mai rosso in Couture → colore attn + sottolineato puntinato. */
+export const ATTN = { color: CP.attn, fontWeight: 600, textDecoration: "underline dotted", textUnderlineOffset: 3 };
+
+export function Metric({ label, value, delta, note, danger, attn }) {
   const [st] = useStyle();
   return (
     <div style={{ minWidth: 130 }}>
       <div className="ds-lbl" style={{ fontSize: 13, color: CP.textSecondary }}>{label}</div>
-      <div className="ds-metric-v" style={{ fontSize: 22, fontWeight: 500, lineHeight: 1.25, color: danger ? CP.accentRed : CP.textPrimary, ...NUM }}>{st === "v3" ? <NumText value={value} /> : value}</div>
+      <div className="ds-metric-v" style={{ fontSize: 22, fontWeight: 500, lineHeight: 1.25, color: danger ? CP.accentRed : attn ? CP.attn : CP.textPrimary, ...NUM }}>{st === "v3" ? <NumText value={value} /> : value}</div>
       {(delta || note) && <div style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>{[delta && `${delta} sul mese prima`, note].filter(Boolean).join(" · ")}</div>}
     </div>
   );
 }
 
-export function FilterChip({ label, active, danger, onClick, disabled, closable }) {
+export function FilterChip({ label, active, danger, attn, onClick, disabled, closable }) {
   return (
     <button className="ds-chip" onClick={onClick} disabled={disabled}
       style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 999, fontSize: 13, cursor: disabled ? "default" : "pointer", fontFamily: FONTS.body,
-        border: `1px solid ${active ? CP.accent : danger ? CP.accentRed : CP.border}`,
+        border: `1px solid ${active ? CP.accent : danger ? CP.accentRed : attn ? CP.attn : CP.border}`,
         background: active ? CP.accentSoft : CP.surface,
-        color: active ? CP.accentSoftText : danger ? CP.accentRed : disabled ? CP.textMuted : CP.textPrimary }}>
-      {danger && !active && <AlertTriangle size={13} />}{label}{closable && <X size={12} />}
+        color: active ? CP.accentSoftText : danger ? CP.accentRed : attn ? CP.attn : disabled ? CP.textMuted : CP.textPrimary }}>
+      {(danger || attn) && !active && <AlertTriangle size={13} />}{label}{closable && <X size={12} />}
     </button>
   );
 }

@@ -15,7 +15,7 @@ import { X } from "lucide-react";
 import PlayerCard from "@/components/PlayerCard";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, Notice, Disclosure, DataTable, SectionTitle, ActionRow, card } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, Notice, Disclosure, DataTable, SectionTitle, ActionRow, card, ATTN } from "@/components/ds";
 
 const SKILLS = [
   { key: "naturalezza", label: "Naturalezza" },
@@ -41,7 +41,7 @@ function Sparkline({ data, width = 90, height = 22 }) {
   );
 }
 
-const skillCell = (v) => (v == null ? <span style={{ color: CP.textMuted }}>—</span> : <span style={{ color: v < LOW ? CP.accentRed : CP.textPrimary }}>{v}</span>);
+const skillCell = (v) => (v == null ? <span style={{ color: CP.textMuted }}>—</span> : <span style={v < LOW ? ATTN : { color: CP.textPrimary }}>{v}</span>);
 const ago = (d) => (d == null ? "—" : d === 0 ? "oggi" : d === 1 ? "ieri" : `${d} giorni fa`);
 
 export default function SMDashboard() {
@@ -93,13 +93,13 @@ export default function SMDashboard() {
         </span>
       ),
     },
-    { key: "avgOverall", label: "Media", align: "right", render: (o) => <span style={{ color: o.avgOverall < 55 ? CP.accentRed : CP.textPrimary, fontWeight: 500 }}>{o.avgOverall}</span> },
+    { key: "avgOverall", label: "Media", align: "right", render: (o) => <span style={o.avgOverall < 55 ? ATTN : { color: CP.textPrimary, fontWeight: 500 }}>{o.avgOverall}</span> },
     { key: "totalSessions", label: "Sessioni", align: "right" },
     { key: "sessions7d", label: "Ultimi 7 gg", align: "right" },
     {
       key: "trend", label: "Rispetto ai 7 gg prima", align: "right", sort: (o) => o.trend,
       render: (o) => (o.trend == null ? <span style={{ color: CP.textMuted }}>—</span>
-        : <span style={{ color: o.trend <= -10 ? CP.accentRed : o.trend > 0 ? CP.accentGreen : CP.textPrimary }}>{o.trend > 0 ? "+" : o.trend < 0 ? "−" : ""}{Math.abs(o.trend)} punti</span>),
+        : <span style={o.trend <= -10 ? ATTN : { color: o.trend > 0 ? CP.accentGreen : CP.textPrimary }}>{o.trend > 0 ? "+" : o.trend < 0 ? "−" : ""}{Math.abs(o.trend)} punti</span>),
     },
     { key: "sparkline", label: "Ultimi 30 gg", sortable: false, render: (o) => <Sparkline data={o.sparkline} /> },
     ...SKILLS.map((s) => ({ key: s.key, label: s.label, align: "right", sort: (o) => o.skills?.[s.key], render: (o) => skillCell(o.skills?.[s.key]) })),
@@ -134,7 +134,7 @@ export default function SMDashboard() {
           >
             <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
               <Metric label="Allenati negli ultimi 7 giorni" value={`${fmtInt(active7)} su ${fmtInt(operators.length)}`} />
-              <Metric label="Molto sotto la media" value={fmtInt(signals.filter((a) => a.type === "sotto_media").length)} note="15+ punti sotto" danger={signals.some((a) => a.type === "sotto_media")} />
+              <Metric label="Molto sotto la media" value={fmtInt(signals.filter((a) => a.type === "sotto_media").length)} note="15+ punti sotto" attn={signals.some((a) => a.type === "sotto_media")} />
               <Metric label="In calo questa settimana" value={fmtInt(signals.filter((a) => a.type === "trend_negativo").length)} note="−10 punti o più" />
               <Metric label="Fermi da oltre 7 giorni" value={fmtInt(idle.length)} />
             </div>
@@ -173,7 +173,7 @@ export default function SMDashboard() {
             </Disclosure>
           )}
 
-          <SectionTitle aside={`clicca un operatore per la sua scheda · in rosso le abilità sotto ${LOW}`}>Operatori</SectionTitle>
+          <SectionTitle aside={`clicca un operatore per la sua scheda · sottolineate le abilità sotto ${LOW}`}>Operatori</SectionTitle>
           <div style={{ marginBottom: 20 }}>
             <DataTable columns={opColumns} rows={operators.map((o) => ({ ...o, id: o.userId }))} defaultSort={{ key: "avgOverall", dir: -1 }}
               onRowClick={setCardOp} minWidth={1180} maxHeight={620}

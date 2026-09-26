@@ -94,5 +94,13 @@ export async function importOpsKpiCsv({ csv, period_type, period_id, mode = "sav
   // Congela la formula score effettiva a questo import (drift detection, gate 0b).
   // Non-bloccante: uno snapshot fallito non deve invalidare un import riuscito.
   const snap = await snapshotScoreConfig({ period_type, period_id, ts, source: "ingest" });
+  // Chiude subito l'alert "Import Infloww fermo" invece di aspettare il run notturno.
+  // Import dinamico: ops-alerts tira dentro mezza app, qui serve solo a import riuscito.
+  try {
+    const { runChecks } = await import("@/lib/ops-alerts");
+    await runChecks({ trigger: "import", only: ["infloww-import-stale"] });
+  } catch (err) {
+    console.error("ops-alerts refresh after import failed:", err?.message || err);
+  }
   return { ok: true, status: 200, body: { ...stats, mode: "save", kv_key: key, saved_at: new Date(ts).toISOString(), score_config_hash: snap.hash || null } };
 }

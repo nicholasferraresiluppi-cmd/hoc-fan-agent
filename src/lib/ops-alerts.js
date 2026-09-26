@@ -15,6 +15,10 @@
  *   ops:alerts:log            LIST eventi append-only (cap 500)
  */
 import { kv } from "@vercel/kv";
+import { MONTHS_IT } from "@/lib/format";
+
+/** "2026-09" → "settembre" (i codici periodo grezzi non vanno a schermo). */
+const meseLabel = (pid) => MONTHS_IT[Number(String(pid).slice(5, 7)) - 1] || String(pid);
 import { buildOperatorsForCpLeaderboard, hasCpDataForPeriod } from "@/lib/creatorspro-data";
 import { buildCpLeaderboard } from "@/lib/creatorspro-score";
 import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
@@ -133,7 +137,7 @@ const CHECKS = [
       return [{
         fingerprint: "fee-config",
         title: "Fee % non configurate: P&L senza margine",
-        detail: `${effPeriod} · margine calcolabile solo per i creator con fee impostata`,
+        detail: `${meseLabel(effPeriod)} · margine calcolabile solo per i creator con fee impostata`,
         value: `${withFee}/${aliases.length} creator`,
         cta: { href: "/admin/pnl-live", label: "Apri P&L Live" },
       }];
@@ -153,7 +157,7 @@ const CHECKS = [
       return [{
         fingerprint: "infloww-import-stale",
         title: "Import Infloww fermo",
-        detail: `Ultimo import: ${String(last[0])}`,
+        detail: `Ultimo file caricato: ${meseLabel(String(last[0]).split(":")[1] || "")}`,
         value: `${age} giorni fa`,
         cta: { href: "/admin/leaderboard-import", label: "Carica file" },
       }];
@@ -190,7 +194,7 @@ const CHECKS = [
       return [{
         fingerprint: `underperformers:${period}`,
         title: "Operatori sotto soglia questo mese",
-        detail: `Score CP v3 ≤ ${UNDERPERF_SCORE_MAX} con ≥ ${UNDERPERF_MIN_SHIFTS} shift`,
+        detail: `Score vendite ≤ ${UNDERPERF_SCORE_MAX} con almeno ${UNDERPERF_MIN_SHIFTS} turni`,
         value: String(count),
         cta: { href: "/admin/action-center", label: "Apri Action Center" },
       }];
@@ -369,11 +373,12 @@ const CHECKS = [
       if (!w?.length) return [];
       const u = unmappedSales(w, mapping);
       if (u.share < 0.02 && u.unmapped < 5000) return [];
-      const pct = Math.round(u.share * 1000) / 10;
+      const pct = (Math.round(u.share * 1000) / 10).toLocaleString("it-IT");
+      const mese = meseLabel(m);
       return [{
         fingerprint: `cp-unmapped-sales:${m}`,
         severity: u.share >= 0.05 ? "critical" : "warning",
-        title: `${m}: $${Math.round(u.unmapped).toLocaleString("it-IT")} di venduto da ${u.people.length} persone non collegate a un operatore`,
+        title: `${mese[0].toUpperCase() + mese.slice(1)}: $${Math.round(u.unmapped).toLocaleString("it-IT")} di venduto da ${u.people.length} persone non collegate a un operatore`,
         detail: `${pct}% del venduto del mese non compare in Sales CP, Creator, Action e Coaching Center. I più grandi: ${u.people.slice(0, 5).map((p) => `${p.name} $${Math.round(p.sales).toLocaleString("it-IT")}`).join(" · ")}.`,
         value: `${pct}%`,
         cta: { href: "/admin/creatorspro-sync#collega", label: "Collega le persone" },
@@ -455,12 +460,15 @@ export async function ackAlert(fingerprint, { userId, name } = {}) {
  *   segnale non è segnale di rientro)
  * - resolved più vecchi di 90 giorni → prune
  */
-export async function runChecks({ trigger = "cron" } = {}) {
+export async function runChecks({ trigger = "cron", only = null } = {}) {
   const now = Date.now();
   const emitted = new Map(); // fingerprint → { finding, check }
   const checkResults = [];
+  // `only`: run parziale (es. dopo un import) — gli alert degli altri check non
+  // vengono toccati perché il loro checkId non è tra gli okCheckIds.
+  const checks = only ? CHECKS.filter((c) => only.includes(c.id)) : CHECKS;
 
-  for (const check of CHECKS) {
+  for (const check of checks) {
     try {
       const findings = await check.run();
       for (const f of findings) emitted.set(f.fingerprint, { finding: f, check });
@@ -527,6 +535,6 @@ export async function runChecks({ trigger = "cron" } = {}) {
   }
 
   const summary = { at: now, trigger, checks: checkResults, opened, updated, resolved, pruned };
-  await kv.set(LAST_RUN_KEY, summary);
+  if (!only) await kv.set(LAST_RUN_KEY, summary);
   return summary;
 }

@@ -180,3 +180,15 @@ h1, h2, h3, h4, h5, h6 {
 [data-style="v3"] .ds-hero-v { font-size: 64px !important; }
 @media (max-width: 899px) { [data-style="v3"] .ds-hero-v { font-size: 50px !important; } }
 [data-style="v3"] .ds-metric-v { font-family: var(--cp-display) !important; font-weight: 600 !important; font-variant-numeric: lining-nums tabular-nums !important; letter-spacing: 0 !important; }
+
+/* Couture — rifinitura menu: marchio "Pro" champagne, titoli di gruppo sobri, avatar neutro */
+[data-style="v3"] .hoc-brand-pro {
+  text-transform: none !important; font-family: var(--cp-display) !important; font-weight: 500 !important;
+  letter-spacing: 0 !important; font-size: 26px !important; color: var(--cp-gold) !important;
+}
+[data-style="v3"] .hoc-brand-sep { background: var(--cp-gold) !important; opacity: .35 !important; }
+[data-style="v3"] .hoc-grp {
+  font-family: var(--cp-font) !important; font-weight: 500 !important; font-size: 11.5px !important;
+  letter-spacing: .02em !important;
+}
+[data-style="v3"] .hoc-avatar img { filter: saturate(.12) brightness(.95); }

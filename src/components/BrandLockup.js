@@ -77,9 +77,11 @@ export default function BrandLockup({ variant = "primary", size = "md", showWord
           </div>
         )}
       </div>
-      <div style={{ width: 1, height: sepHeight, background: sepColor, opacity: 0.6 }} />
+      <div className="hoc-brand-sep" style={{ width: 1, height: sepHeight, background: sepColor, opacity: 0.6 }} />
       <div
+        className="hoc-brand-pro"
         style={{
+          textTransform: "uppercase",
           fontFamily: FONTS.display,
           fontWeight: 800,
           fontSize: proFs,
@@ -88,7 +90,7 @@ export default function BrandLockup({ variant = "primary", size = "md", showWord
           lineHeight: 1,
         }}
       >
-        PRO
+        Pro
       </div>
     </div>
   );
