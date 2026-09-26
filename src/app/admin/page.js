@@ -24,6 +24,7 @@ import {
 import { CP, FONTS } from "@/lib/brand";
 import { canSee } from "@/lib/nav-access";
 import { fmt$, fmtInt, fmtDelta, fmtAgo, MONTHS_IT } from "@/lib/format";
+import { useStyle } from "@/lib/theme-client";
 import { PageHead, HeroMetric, Metric, SectionTitle, ActionRow, card } from "@/components/ds";
 
 // Tollera 4xx/5xx: ritorna null invece di throware (le metriche mostrano "—")
@@ -186,6 +187,7 @@ export default function AdminHub() {
   const open = (alertsData?.alerts || []).filter((a) => a.status !== "resolved")
     .sort((a, b) => (a.severity === "critical" ? 0 : 1) - (b.severity === "critical" ? 0 : 1));
 
+  const [st] = useStyle();
   const allowed = (href) => !me?.authenticated || canSee(href, me.capabilities, me.admin);
   const needle = q.trim().toLowerCase();
   const groups = SHORTCUT_GROUPS.map((g) => ({
@@ -201,7 +203,7 @@ export default function AdminHub() {
       <PageHead
         title={`${greeting}${userName ? `, ${userName}` : ""}.`}
         line2={paceLine}
-        subtitle={`Come va l'agenzia a ${monthName} e cosa guardare oggi.`}
+        subtitle={paceLine && st === "v3" ? null : `Come va l'agenzia a ${monthName} e cosa guardare oggi.`}
       />
 
       <HeroMetric

@@ -294,3 +294,5 @@ html.casa-intro[data-style="v3"]::after {
 [data-style="v3"] .ds-arow:hover .ds-arow-go { color: var(--cp-textPrimary) !important; }
 [data-style="v3"] .hub-tool { background: transparent !important; border: 0 !important; border-top: 1px solid var(--cp-border) !important; border-radius: 0 !important; padding: 16px 4px !important; }
 [data-style="v3"] .hub-tool:hover { background: var(--cp-hover) !important; }
+/* la regola globale "* { font-family }" batteva i figli dei titoli: qui ereditano il serif */
+[data-style="v3"] .ds-h1 *, [data-style="v3"] .ds-hero-v *, [data-style="v3"] .ds-metric-v *, [data-style="v3"] .ds-sect * { font-family: inherit !important; }
