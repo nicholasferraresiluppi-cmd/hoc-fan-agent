@@ -311,3 +311,18 @@ html.casa-intro[data-style="v3"]::after {
 [data-style="v3"] .hoc-cta-card > div:nth-child(2) { font-family: var(--cp-display) !important; font-weight: 400 !important; font-size: 30px !important; }
 /* La città ha la sua regia: l'entrata delle pagine non tocca i suoi pezzi (accendeva la grana e apriva il pannello) */
 [data-style="v3"] .casa-page > .ct > * { animation: none !important; }
+
+/* ═══ Casa chiara ═══ stessa struttura, carta calda; il menu è chiaro anch'esso */
+[data-style="v3"][data-theme="light"] body { background: radial-gradient(120% 90% at 62% 8%, #fdfbf6 0%, #ebe6db 75%) fixed, #ebe6db !important; }
+[data-style="v3"][data-theme="light"] body::before { opacity: .035; }
+[data-style="v3"][data-theme="light"] .casa-side { background: rgba(251,249,244,.55); }
+@media (max-width: 899px) { [data-style="v3"][data-theme="light"] .casa-side { background: #f6f3ec; } }
+[data-style="v3"][data-theme="light"] .ds-stk, [data-style="v3"][data-theme="light"] .ds-tbl th { background-color: #f3efe7 !important; }
+[data-style="v3"][data-theme="light"] select option { background: #fbf9f4; color: #1a1917; }
+[data-style="v3"][data-theme="light"] .hoc-banner { background: rgba(26,25,23,.03) !important; }
+[data-style="v3"][data-theme="light"] .hoc-banner-va { background: rgba(148,112,47,.08) !important; border-bottom-color: rgba(148,112,47,.35) !important; }
+[data-style="v3"][data-theme="light"] .hoc-cta-card { background: rgba(148,112,47,.06) !important; border-color: rgba(148,112,47,.5) !important; }
+[data-style="v3"][data-theme="light"] ::selection { background: rgba(148,112,47,.22); }
+/* tasto chiaro/scuro nel menu Casa */
+[data-style="v3"] .casa-theme { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 999px; border: 1px solid var(--cp-border); background: transparent; color: var(--cp-textSecondary); cursor: pointer; flex: none; }
+[data-style="v3"] .casa-theme:hover { color: var(--cp-textPrimary); border-color: var(--cp-borderStrong); }

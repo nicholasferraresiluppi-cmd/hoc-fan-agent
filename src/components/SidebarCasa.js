@@ -14,7 +14,8 @@ import Link from "next/link";
 import useSWR from "swr";
 import { UserButton, SignedIn } from "@clerk/nextjs";
 import { canSee } from "@/lib/nav-access";
-import { useStyle } from "@/lib/theme-client";
+import { useStyle, useTheme } from "@/lib/theme-client";
+import { Sun, Moon } from "lucide-react";
 import { NAV_GROUPS, SIDEBAR_WIDTH } from "./Sidebar";
 
 const silentFetcher = async (url) => {
@@ -79,6 +80,7 @@ export default function SidebarCasa() {
   const { data: me } = useSWR("/api/whoami", silentFetcher, { revalidateOnFocus: false });
   const { data: alerts } = useSWR("/api/admin/ops-alerts", silentFetcher, { revalidateOnFocus: false, refreshInterval: 5 * 60 * 1000 });
   const [style, setStyle] = useStyle();
+  const [theme, setTheme] = useTheme();
   const [tools, setTools] = useState(false);
   const [today, setToday] = useState("");
 
@@ -146,6 +148,10 @@ export default function SidebarCasa() {
         <div className="casa-me">
           <span className="hoc-avatar"><UserButton afterSignOutUrl="/sign-in" /></span>
           <span className="n">{me?.name || "Account"}</span>
+          <button type="button" className="casa-theme" onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+            aria-label={theme === "light" ? "Passa al tema scuro" : "Passa al tema chiaro"} title={theme === "light" ? "Tema scuro" : "Tema chiaro"}>
+            {theme === "light" ? <Moon size={15} /> : <Sun size={15} />}
+          </button>
         </div>
         {me?.admin && (
           <button type="button" className="casa-style" onClick={() => setStyle(style === "v3" ? "v2" : "v3")}>

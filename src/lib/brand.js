@@ -204,6 +204,24 @@ export const CP_CARTA = {
   scale: "#8a6a32",
 };
 
+// "Casa" chiara (26/09 notte, richiesta di Nicholas): stessa struttura dello scuro —
+// carta calda appena velata, inchiostro, oro scuro solo per il merito. Il menu è chiaro anch'esso.
+export const CP_CASA_CHIARA = {
+  bgSunken: "#ebe6db", bg: "#f4f1ea", surface: "rgba(26,25,23,.028)", surfaceAlt: "rgba(26,25,23,.055)",
+  panel: "#fbf9f4",
+  border: "rgba(26,25,23,.11)", borderSoft: "rgba(26,25,23,.07)", borderStrong: "rgba(26,25,23,.2)",
+  textPrimary: "#1a1917", textSecondary: "rgba(26,25,23,.7)", textMuted: "rgba(26,25,23,.52)", mutedIcons: "rgba(26,25,23,.38)",
+  accent: "#1a1917", accentInk: "#f7f4ee", accentSoft: "rgba(26,25,23,.07)", accentSoftText: "#1a1917", accentDim: "rgba(26,25,23,.2)",
+  accentGreen: "#1e6b4e", accentRed: "#a3303a", accentBlue: "rgba(26,25,23,.7)",
+  logoFilter: "brightness(0)", dangerSoft: "rgba(163,48,58,.07)",
+  gold: "#94702f", goldSoft: "rgba(148,112,47,.08)", track: "rgba(26,25,23,.16)", neu: "rgba(26,25,23,.8)",
+  ruleData: "rgba(26,25,23,.22)", fieldBd: "rgba(26,25,23,.28)", sel: "rgba(26,25,23,.05)", hover: "rgba(26,25,23,.03)",
+  scrim: "rgba(20,18,14,.35)", cool: "#2f5a9e", warm: "#1e6b4e",
+  heroBg: "transparent",
+  tierTop: "#94702f", tierStrong: "#1a1917",
+  attn: "#1a1917", scale: "#94702f",
+};
+
 // Menu notte sotto Carta: stesso schema di CP_NOTTE ma col nero CALDO, così il
 // menu scuro appartiene al mondo della carta invece di sembrare un'altra app.
 export const CP_NOTTE_CALDA = {
@@ -237,9 +255,10 @@ export function themeCss() {
   return `:root{${vars(CP_DARK)}${fontOld}color-scheme:dark}:root[data-theme="light"]{${vars(CP_LIGHT)}color-scheme:light}`
     // stile v3 in anteprima (vince per specificità/ordine sui due temi attuali)
     + `:root[data-style="v3"]{${vars(CP_NOTTE)}${fontV3}color-scheme:dark}`
-    + `:root[data-style="v3"][data-theme="light"]{${vars(CP_NOTTE)}color-scheme:dark}`
+    + `:root[data-style="v3"][data-theme="light"]{${vars(CP_CASA_CHIARA)}color-scheme:light}`
     // Menu laterale v3: sempre notte, anche in Carta (dove il nero è CALDO)
     + `:root[data-style="v3"] .hoc-side{${vars(CP_NOTTE)}color-scheme:dark}`
+    + `:root[data-style="v3"][data-theme="light"] .hoc-side{${vars(CP_CASA_CHIARA)}color-scheme:light}`
         // Segnaposto sempre tenue: nel tema scuro gli esempi sembravano dati inseriti
     + `::placeholder{color:var(--cp-textMuted);opacity:.65}`;
 }
