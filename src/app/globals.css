@@ -74,3 +74,45 @@ h1, h2, h3, h4, h5, h6 {
 @keyframes hoc-shimmer { 0% { opacity: .55 } 50% { opacity: 1 } 100% { opacity: .55 } }
 .hoc-sk { background: var(--cp-surfaceAlt); border-radius: 10px; animation: hoc-shimmer 1.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .hoc-sk { animation: none; opacity: .7; } }
+
+/* ── Stile v3 "Notte / Carta" (anteprima): guscio — SOLO sotto [data-style="v3"] ──
+   Le classi hoc-v3-* esistono solo quando AppShell rende il guscio v3; qui si
+   decide desktop/telefono. Il menu notte (.hoc-side) è in themeCss() (brand.js). */
+.hoc-v3-top, .hoc-v3-mhead, .hoc-v3-tabbar { display: none; }
+[data-style="v3"] { -webkit-tap-highlight-color: transparent; }
+[data-style="v3"] .hoc-v3-top { display: flex; }
+[data-style="v3"] .hoc-v3-btn:hover, [data-style="v3"] .hoc-v3-chip:hover { background: var(--cp-surfaceAlt) !important; color: var(--cp-textPrimary) !important; }
+/* Focus: outline trasparente (resta visibile in contrasto elevato di Windows) + anello */
+[data-style="v3"] .hoc-v3-btn:focus-visible, [data-style="v3"] .hoc-v3-chip:focus-visible,
+[data-style="v3"] .hoc-v3-tab:focus-visible, [data-style="v3"] .hoc-side a:focus-visible,
+[data-style="v3"] .hoc-side button:focus-visible {
+  outline: 2px solid transparent; outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--cp-bg), 0 0 0 4px var(--cp-accent);
+}
+[data-style="v3"] .hoc-v3-cmdk-wrap { animation: hoc-v3-fade 140ms ease-out both; }
+[data-style="v3"] .hoc-v3-cmdk { animation: hoc-v3-in 180ms cubic-bezier(.2,.8,.2,1) both; }
+[data-style="v3"] .hoc-v3-tab { transition: transform 90ms, color .15s; }
+[data-style="v3"] .hoc-v3-tab:active { transform: scale(.94); }
+@keyframes hoc-v3-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes hoc-v3-in { from { opacity: 0; transform: translateY(-6px) scale(.985) } to { opacity: 1; transform: none } }
+
+@media (max-width: 899px) {
+  [data-style="v3"] .hoc-v3-top { display: none; }
+  [data-style="v3"] .hoc-mhead-v2 { display: none !important; }
+  [data-style="v3"] .hoc-v3-mhead { display: flex; }
+  /* barra in basso: fondo PIENO (niente trasparenza né backdrop-filter) */
+  [data-style="v3"] .hoc-v3-tabbar { display: grid; }
+  [data-style="v3"] .hoc-main { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+  [data-style="v3"] .hoc-fb { bottom: calc(80px + env(safe-area-inset-bottom)) !important; }
+  [data-style="v3"] .hoc-v3-cmdk-wrap { padding-top: 10vh !important; }
+  [data-style="v3"] .hoc-v3-cmdk-foot { display: none !important; }
+  /* target tattili 44px nel menu */
+  [data-style="v3"] .hoc-side nav a, [data-style="v3"] .hoc-side nav button { min-height: 44px; }
+  [data-style="v3"] .hoc-v3-mhead, [data-style="v3"] .hoc-v3-tabbar, [data-style="v3"] .hoc-side { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-style="v3"] .hoc-v3-cmdk-wrap, [data-style="v3"] .hoc-v3-cmdk { animation: none; }
+  [data-style="v3"] .hoc-v3-tab { transition: none; }
+  [data-style="v3"] .hoc-v3-tab:active { transform: none; }
+}

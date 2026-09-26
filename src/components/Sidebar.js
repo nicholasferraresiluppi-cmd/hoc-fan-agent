@@ -411,7 +411,7 @@ export default function Sidebar() {
   const toggleGroup = (label) => setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }));
 
   return (
-    <aside
+    <aside className="hoc-side"
       style={{
         position: "fixed",
         top: 0, left: 0, bottom: 0,
