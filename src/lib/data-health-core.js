@@ -69,3 +69,31 @@ export function unmappedSales(wages, mapping) {
   const people = [...byMember.values()].filter((p) => p.sales > 0).sort((a, b) => b.sales - a.sales);
   return { total, unmapped, share: total > 0 ? unmapped / total : 0, people };
 }
+
+/**
+ * Giorni "bucati" di un mese CP: venduto giornaliero < 30% della mediana del mese.
+ * Caso reale (set 2026): luglio aveva 20-26/07 quasi a zero e 5 giorni mancanti —
+ * il controllo sul NUMERO di wage non lo vedeva (le wage c'erano, i turni no).
+ * `lastFullDay` (YYYY-MM-DD) esclude oggi/ieri del mese in corso, che arrivano in ritardo.
+ */
+export function dayHoles(wages, periodId, { lastFullDay = null, minRatio = 0.3 } = {}) {
+  const days = {};
+  for (const w of wages || []) for (const s of w.shifts || []) {
+    const d = String(s?.started_at || "").slice(0, 10);
+    if (d.slice(0, 7) !== periodId) continue;
+    if (lastFullDay && d > lastFullDay) continue;
+    days[d] = (days[d] || 0) + (Number(s.total_attributed) || 0);
+  }
+  const [y, m] = periodId.split("-").map(Number);
+  const nDays = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const all = [];
+  for (let i = 1; i <= nDays; i++) {
+    const d = `${periodId}-${String(i).padStart(2, "0")}`;
+    if (lastFullDay && d > lastFullDay) break;
+    all.push([d, days[d] || 0]);
+  }
+  const vals = all.map(([, v]) => v).filter((v) => v > 0).sort((a, b) => a - b);
+  if (vals.length < 7) return [];
+  const med = vals[Math.floor(vals.length / 2)];
+  return all.filter(([, v]) => v < med * minRatio).map(([d, v]) => ({ day: d, sales: Math.round(v), median: Math.round(med) }));
+}
