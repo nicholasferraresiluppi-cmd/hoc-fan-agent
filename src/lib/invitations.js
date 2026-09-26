@@ -63,7 +63,7 @@ export async function listInvitations() {
   return { pending: arr(pending).map(shape), accepted: arr(accepted).map(shape) };
 }
 
-export async function createInvitation({ email, roles, inviterId, inviterName, origin }) {
+export async function createInvitation({ email, roles, inviterId, inviterName, origin, notify = true }) {
   const mail = String(email || "").trim().toLowerCase();
   if (!EMAIL_RE.test(mail)) throw new Error("Email non valida");
   const wanted = [...new Set((roles || []).map(String).filter(Boolean))];
@@ -87,13 +87,14 @@ export async function createInvitation({ email, roles, inviterId, inviterName, o
   const inv = await cc.invitations.createInvitation({
     emailAddress: mail,
     redirectUrl: `${origin}/sign-up`,
-    notify: true,
+    // notify:false = l'email la mandiamo noi (attestato di benvenuto) col link inv.url
+    notify,
     // re-invito che sostituisce un invito in attesa: solo admin (un non-admin
     // non deve poter riscrivere i ruoli di un invito fatto da un admin)
     ignoreExisting: admin,
     publicMetadata: { role: primary, roles: wanted, invited_by: inviterId, invited_by_name: inviterName || null },
   });
-  return shape(inv);
+  return { ...shape(inv), url: inv.url || null };
 }
 
 export async function revokeInvitation(id, actorId) {

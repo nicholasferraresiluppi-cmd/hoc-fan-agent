@@ -89,6 +89,8 @@ export async function resolveEmployeeForUser() {
     if (link?.employeeName) {
       await kv.set(USER_EMP_KEY(userId), { employeeName: link.employeeName, employeeId: null, source: "invite", linked_at: Date.now() });
       await kv.del(`invite_employee:${email.trim().toLowerCase()}`);
+      // attestato di benvenuto da mostrare al primo accesso (lib/welcome-store)
+      await kv.set(`welcome:pending:${userId}`, { employee: link.employeeName, creator: link.creator || null, number: link.number || null, invited_at: link.invited_at || null, at: Date.now() }, { ex: 60 * 60 * 24 * 120 }).catch(() => {});
       return { userId, employee: link.employeeName, employee_id: null, source: "override" };
     }
   } catch {}

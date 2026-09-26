@@ -18,6 +18,7 @@ import { Menu, X } from "lucide-react";
 import Sidebar, { SIDEBAR_WIDTH } from "./Sidebar";
 import ErrorBoundary from "./ErrorBoundary";
 import OnboardingNudge from "./OnboardingNudge";
+import WelcomeAttestato from "./WelcomeAttestato";
 import { SecurityBanner, FeedbackButton, ViewAsBanner } from "./AppHelpers";
 import { CP } from "@/lib/brand";
 import { uxPageChange } from "@/lib/ux-client";
@@ -139,6 +140,11 @@ export default function AppShell({ children }) {
       {/* Onboarding: modale primo-accesso col funnel di strumenti per ruolo */}
       <ErrorBoundary silent label="OnboardingNudge">
         <OnboardingNudge />
+      </ErrorBoundary>
+
+      {/* Attestato di benvenuto: primo accesso da invito operatore, sopra il resto */}
+      <ErrorBoundary silent label="WelcomeAttestato">
+        <WelcomeAttestato />
       </ErrorBoundary>
     </div>
   );
