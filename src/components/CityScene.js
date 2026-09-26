@@ -24,7 +24,7 @@ function mountCity(root,RAW,THREE,OrbitControls){
 
 const AREAS=['HR','Finance','Deal','Sales','Chatting','Contenuti'];
 let seed=7;const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280};
-const projects=RAW.projects.map(p=>({n:p.n,hq:false,areas:p.areas,total:p.total,other:p.other}));
+const projects=RAW.projects.map(p=>({n:p.n,hq:false,areas:p.areas,total:p.total,other:p.other,nospace:!!p.nospace}));
 const HQ={n:'Azienda',hq:true,areas:RAW.hq.areas,total:RAW.hq.total,other:RAW.hq.other};
 const HQMAP={HR:'Persone',Finance:'Finance',Deal:'Deal',Sales:'Sales',Chatting:'Chatting',Contenuti:'Social'};
 const COLc={ok:'var(--ok)',wait:'var(--wait)',stop:'var(--stop)',none:'rgba(242,238,230,.16)'},STT={ok:'In movimento',wait:'Qualcosa in ritardo',stop:'Ferma',none:'Nessuna attività'};
@@ -113,7 +113,7 @@ const panel=$id('panel'),pb=$id('pb');
 function selectTower(T){selT=T;hiSlab=null;flyUntil=performance.now()+2000;chime(T.hq?0:5,true);
   const c={ok:0,wait:0,stop:0,none:0};T.data.areas.forEach(a=>c[a.s]++);
   const sum=c.stop?`${c.stop===1?'Un\'area è ferma':c.stop+' aree sono ferme'} e ${c.wait} ${c.wait===1?'aspetta':'aspettano'} qualcosa.`:c.wait?`${c.wait===1?'Un\'area ha':c.wait+' aree hanno'} qualcosa in ritardo, il resto si muove.`:'Tutte le aree sono in movimento.';
-  pb.innerHTML=`<div class="k">${T.hq?'La sede · le aree di tutta l\'azienda':'Progetto creator'}</div><h2>${T.data.n}</h2><p class="sum">${sum}</p>`+T.data.areas.map((a,k)=>`<button class="row" data-k="${k}"><i style="background:${COLc[a.s]}"></i><b>${a.n}</b><span>${STT[a.s]}</span><small>${a.l}</small></button>`).join('')+`<p class="note">${T.data.total} attività aperte in ClickUp; ${T.data.other} non riconducibili a queste aree (restano fuori dai piani). Le aree sono stimate dal titolo di ogni attività: una stima, non un conteggio contabile. Dati del ${new Date(RAW.generated).toLocaleDateString('it-IT',{day:'numeric',month:'long'})}.</p>`;
+  pb.innerHTML=`<div class="k">${T.hq?'La sede · le aree di tutta l\'azienda':'Progetto creator'}</div><h2>${T.data.n}</h2><p class="sum">${sum}</p>`+T.data.areas.map((a,k)=>`<button class="row" data-k="${k}"><i style="background:${COLc[a.s]}"></i><b>${a.n}</b><span>${STT[a.s]}</span><small>${a.l}</small></button>`).join('')+`<p class="note">${T.data.nospace?'Nessuno spazio ClickUp per questa creator: le attività sono quelle che la nominano nel titolo, negli altri spazi (può includere omonimi). ':''}${T.data.total} attività aperte in ClickUp; ${T.data.other} non riconducibili a queste aree (restano fuori dai piani). Le aree sono stimate dal titolo di ogni attività: una stima, non un conteggio contabile. Dati del ${new Date(RAW.generated).toLocaleDateString('it-IT',{day:'numeric',month:'long'})}.</p>`;
   pb.querySelectorAll('.row').forEach(r=>r.onclick=()=>{const k=+r.dataset.k;hiSlab=hiSlab===T.slabs[k]?null:T.slabs[k];pb.querySelectorAll('.row').forEach(x=>x.classList.toggle('hi',hiSlab&&+x.dataset.k===k));chime(k,true)});
   panel.classList.add('on');$id('hero').style.opacity=0;chips.classList.add('hide')}
 function deselect(){selT=null;hiSlab=null;flyUntil=performance.now()+2000;panel.classList.remove('on');$id('hero').style.opacity=1;chips.classList.remove('hide')}
