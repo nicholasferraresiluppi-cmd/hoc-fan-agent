@@ -254,7 +254,7 @@ function CoachingBlock({ assignment }) {
         )}
         {assignment.note && <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 6 }}>“{assignment.note}”</div>}
       </div>
-      <Link href={`/academy?category=${assignment.training_category_id}`} style={btnPrimary}>
+      <Link href="/" /* /academy non esiste (404): l'Academy è la home */ style={btnPrimary}>
         Inizia <ArrowRight size={14} />
       </Link>
     </section>
@@ -263,7 +263,7 @@ function CoachingBlock({ assignment }) {
 
 function AcademyCard({ id, label, diff }) {
   return (
-    <Link href={`/academy?category=${id}`} style={{ ...card, padding: 16, textDecoration: "none", color: CP.textPrimary, display: "block" }}>
+    <Link href="/" style={{ ...card, padding: 16, textDecoration: "none", color: CP.textPrimary, display: "block" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: 12, color: CP.textMuted, ...NUM }}>
         <BookOpen size={15} color={CP.textMuted} /> Difficoltà {diff} su 5
       </div>
@@ -311,7 +311,6 @@ function NotMatchedBlock({ data }) {
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <Link href="/" style={btnGhost}>← Home</Link>
-        <Link href="/leaderboard/sales-cp" style={btnPrimary}>Apri la classifica vendite</Link>
       </div>
     </section>
   );

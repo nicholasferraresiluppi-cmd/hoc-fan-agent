@@ -716,7 +716,7 @@ export default function Home() {
                   const cat = TRAINING_CATEGORIES.find((c) => c.id === dailyDrill.drill.scenario.categoryId);
                   if (cat) {
                     setSelectedCategory(cat);
-                    setScreen("category-detail");
+                    setScreen("scenario-list"); // prima "category-detail": schermata inesistente → pagina bianca
                   }
                 }}
                 style={BTN_PRIMARY}
@@ -1578,10 +1578,7 @@ export default function Home() {
               Livello {operatorLevel} · {operatorXP} XP totali
             </div>
           </div>
-          <div>
-            <div style={{ color: CP.textSecondary, fontSize: 13 }}>Certificazione</div>
-            <div style={{ marginTop: 4, fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>Senior Operator</div>
-          </div>
+          {/* tolta "Certificazione: Senior Operator": era scritta fissa per tutti (dato falso) */}
         </section>
 
         {/* Competenze */}

@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import useSWR from "swr";
+import { canSee } from "@/lib/nav-access";
 import {
   BarChart3, GraduationCap, Users, Layers,
   ArrowRight, Sparkles, LayoutDashboard,
@@ -76,6 +78,10 @@ const chip = { padding: "5px 10px", background: CP.surfaceAlt, color: CP.textSec
 const iconBox = { width: 36, height: 36, borderRadius: 8, background: CP.surfaceAlt, border: `1px solid ${CP.border}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
 
 export default function WelcomePage() {
+  const { data: me } = useSWR("/api/whoami", (u) => fetch(u).then((r) => r.json()), { revalidateOnFocus: false });
+  // Finché whoami non risponde si mostra tutto (come prima); poi solo ciò che il ruolo apre
+  const allowed = (href) => !me?.authenticated || canSee(href, me.capabilities, me.admin);
+  const modules = MODULES.filter((m) => allowed(m.primaryCta.href));
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body, color: CP.textPrimary }}>
       <PageHead
@@ -102,7 +108,7 @@ export default function WelcomePage() {
 
       <SectionTitle aside="Ognuno vede le parti che servono al suo ruolo">I quattro moduli</SectionTitle>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14, marginBottom: 14 }}>
-        {MODULES.map((m) => (
+        {modules.map((m) => (
           <section key={m.key} style={{ ...card, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
               <div style={iconBox}><m.icon size={18} strokeWidth={1.8} color={CP.textSecondary} /></div>
@@ -115,7 +121,7 @@ export default function WelcomePage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <Link href={m.primaryCta.href} style={linkAccent}>{m.primaryCta.label} <ArrowRight size={14} /></Link>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {m.secondaryCtas.map((c) => (
+                {m.secondaryCtas.filter((c) => allowed(c.href)).map((c) => (
                   <Link key={c.href} href={c.href} style={chip}>{c.label}</Link>
                 ))}
               </div>
@@ -124,11 +130,10 @@ export default function WelcomePage() {
         ))}
       </div>
 
-      <Notice>
-        Alcune pagine sono riservate a chi gestisce team e compensi. Se una pagina ti dice che non hai accesso, è normale: non è un errore.
-      </Notice>
+      {/* Solo le parti che il ruolo può aprire (prima: link a pagine che rispondevano "accesso negato") */}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
+        {allowed("/admin") && (
         <section style={{ ...card, padding: "18px 20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
             <LayoutDashboard size={16} color={CP.textMuted} />
@@ -139,6 +144,7 @@ export default function WelcomePage() {
           </p>
           <Link href="/admin" style={{ ...linkAccent, fontSize: 13 }}>Vai all&apos;hub admin <ArrowRight size={13} /></Link>
         </section>
+        )}
 
         <section style={{ ...card, padding: "18px 20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
