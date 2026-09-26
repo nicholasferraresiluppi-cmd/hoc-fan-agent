@@ -140,7 +140,7 @@ export default function CreatorsLeaderboardPage() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
           <FilterChip label={`Tutte (${rows.length})`} active={view === "all"} onClick={() => setView("all")} />
           <FilterChip label={`In calo (${counts.down})`} danger={counts.down > 0} disabled={!counts.down} active={view === "down"} onClick={() => setView(view === "down" ? "all" : "down")} />
-          <FilterChip label={`In crescita (${counts.up})`} disabled={!counts.up} active={view === "up"} onClick={() => setView(view === "up" ? "all" : "up")} />
+          <FilterChip label={`In miglioramento (${counts.up})`} disabled={!counts.up} active={view === "up"} onClick={() => setView(view === "up" ? "all" : "up")} />
           <FilterChip label={`Nuove (${counts.fresh})`} disabled={!counts.fresh} active={view === "new"} onClick={() => setView(view === "new" ? "all" : "new")} />
           <span style={{ flex: 1 }} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca creator o operatore" aria-label="Cerca creator o operatore" style={{ ...ctl, width: 240 }} />

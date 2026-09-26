@@ -16,6 +16,7 @@ import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmtInt, MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, FilterChip, Notice, card } from "@/components/ds";
 
+import { tierLabel } from "@/lib/tier-label";
 const fetcher = async (url) => {
   const r = await fetch(url);
   const j = await r.json().catch(() => ({}));
@@ -145,7 +146,7 @@ function CandidateRow({ c, onAssign, onComplete, onReject, onDelete }) {
           <span style={{ display: "block", fontSize: 12, color: CP.textMuted }}>soprattutto su {c.top_creator || c.group || "—"}</span>
         </span>
         <span style={{ fontSize: 13, color: CP.textSecondary }}>{PATTERN_LABELS[c.pattern] || c.pattern}</span>
-        <span style={{ fontSize: 14, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{c.score.toFixed(1).replace(".", ",")}<span style={{ display: "block", fontSize: 12, color: CP.textMuted }}>{c.tier}</span></span>
+        <span style={{ fontSize: 14, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{c.score.toFixed(1).replace(".", ",")}<span style={{ display: "block", fontSize: 12, color: CP.textMuted }}>{tierLabel(c.tier)}</span></span>
         <span style={{ fontSize: 13, color: CP.textSecondary }}>{c.training?.categoryName}</span>
         <span style={{ fontSize: 12, color: isCompleted ? CP.accentGreen : isAssigned ? CP.accentSoftText : CP.textMuted }}>{isCompleted ? "completato" : isAssigned ? "assegnato" : isRejected ? "rifiutato" : "da assegnare"}</span>
         <ChevronDown size={16} color={CP.textMuted} style={{ transform: expanded ? "rotate(180deg)" : "none" }} />

@@ -14,6 +14,7 @@ import { CP, FONTS } from "@/lib/brand";
 import { fmt$, fmtInt, fmtDelta, fmtPct, MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, card } from "@/components/ds";
 
+import { tierLabel, tierColor } from "@/lib/tier-label";
 const fetcher = async (url) => {
   const r = await fetch(url);
   const j = await r.json().catch(() => ({}));
@@ -22,7 +23,7 @@ const fetcher = async (url) => {
 const currentMonthId = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 const prevOf = (pid) => { const [y, m] = pid.split("-").map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 const monthName = (pid) => `${MONTHS_IT[Number(pid.slice(5)) - 1]} ${pid.slice(0, 4)}`;
-const tierColor = (t) => (t === "Critical" || t === "Weak" ? CP.accentRed : t === "Strong" || t === "Elite" ? CP.accentGreen : CP.textSecondary);
+// fasce basse mai rosse (26/09)
 const sc = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
 
 // Fasce CP calcolate in UTC (creatorspro-api bucketizeIntervalFromHour): mostrate in ora italiana
@@ -74,7 +75,7 @@ export default function CreatorDrilldownPage({ params, searchParams }) {
     ) },
     { key: "score", label: "Score su di lei", align: "right", sort: (o) => (o.low_confidence ? -1 : o.score), render: (o) => o.low_confidence
       ? <span style={{ color: CP.textMuted }} title="Meno di 3 turni: score non affidabile">pochi turni</span>
-      : <span><span style={{ color: tierColor(o.tier), fontWeight: 500 }}>{sc(o.score)}</span> <span style={{ fontSize: 12, color: CP.textMuted }}>{o.tier}</span></span> },
+      : <span><span style={{ color: tierColor(o.tier), fontWeight: 500 }}>{sc(o.score)}</span> <span style={{ fontSize: 12, color: CP.textMuted }}>{tierLabel(o.tier)}</span></span> },
     { key: "sales_per_shift", label: "Per turno", align: "right", render: (o) => fmt$(o.sales_per_shift) },
     { key: "sales", label: "Venduto", align: "right", render: (o) => fmt$(o.sales) },
     { key: "sales_share_pct", label: "Quota", align: "right", muted: true, render: (o) => fmtPct(o.sales_share_pct != null ? o.sales_share_pct / 100 : null, 1) },

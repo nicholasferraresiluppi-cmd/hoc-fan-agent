@@ -12,12 +12,14 @@ import { CP, FONTS, alpha } from "@/lib/brand";
 import { fmt$, MONTHS_IT } from "@/lib/format";
 import { PageHead, Notice, card } from "@/components/ds";
 
+import { tierLabel } from "@/lib/tier-label";
 const fetcher = (url) => fetch(url).then((r) => r.json());
 const currentMonthId = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 const TIERS = ["Critical", "Weak", "Average", "Good", "Strong", "Elite"];
 // rosso → neutro → verde, sempre dai token (funziona nei due temi)
 const TIER_BG = {
-  Critical: alpha(CP.accentRed, "66"), Weak: alpha(CP.accentRed, "33"), Average: CP.surfaceAlt,
+  // fasce basse in grigio, mai rosso (26/09): il colore segnala chi rende bene
+  Critical: alpha(CP.textMuted, "55"), Weak: alpha(CP.textMuted, "30"), Average: CP.surfaceAlt,
   Good: alpha(CP.accentGreen, "26"), Strong: alpha(CP.accentGreen, "4d"), Elite: alpha(CP.accentGreen, "80"),
 };
 const sc = (v) => (v == null ? "" : Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 }));
@@ -107,7 +109,7 @@ export default function HeatmapPage({ searchParams }) {
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12, color: CP.textSecondary, marginBottom: 10, alignItems: "center" }}>
           {TIERS.map((t) => (
             <span key={t} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-              <span style={{ width: 14, height: 14, borderRadius: 3, background: TIER_BG[t], border: `1px solid ${CP.border}` }} />{t}
+              <span style={{ width: 14, height: 14, borderRadius: 3, background: TIER_BG[t], border: `1px solid ${CP.border}` }} />{tierLabel(t)}
             </span>
           ))}
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
@@ -142,7 +144,7 @@ export default function HeatmapPage({ searchParams }) {
                     const thin = cell?.low_confidence;
                     return (
                       <td key={c.alias}
-                        title={cell ? `${n} su ${c.alias}: ${thin ? "pochi turni" : `score ${sc(cell.score)} (${cell.tier})`} · ${fmt$(cell.sales)} in ${Math.round(cell.shifts)} turni` : "Non hanno lavorato insieme"}
+                        title={cell ? `${n} su ${c.alias}: ${thin ? "pochi turni" : `score ${sc(cell.score)} (${tierLabel(cell.tier)})`} · ${fmt$(cell.sales)} in ${Math.round(cell.shifts)} turni` : "Non hanno lavorato insieme"}
                         style={{ width: 36, minWidth: 36, height: 28, padding: 0, textAlign: "center", borderBottom: `1px solid ${CP.borderSoft}`,
                           background: cell && !thin ? TIER_BG[cell.tier] || CP.surfaceAlt : "transparent",
                           outline: thin ? `1px dashed ${CP.textMuted}` : "none", outlineOffset: -4,

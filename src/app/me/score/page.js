@@ -6,6 +6,7 @@ import Link from "next/link";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtPct } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, card, NUM } from "@/components/ds";
+import { tierLabel, tierColor } from "@/lib/tier-label";
 
 /**
  * /me/score — "Il mio score, spiegato" (scope own, docs/VISIBILITY_POLICY.md).
@@ -43,8 +44,7 @@ const KPI_HELP = {
 
 // Fascia come segnale sul dato, non come superficie: rosso solo per la fascia
 // più bassa, verde per le tre alte, neutro in mezzo (un solo accento, DESIGN.md §1).
-const tierColor = (tier) =>
-  tier === "Critical" ? CP.accentRed : ["Good", "Strong", "Elite"].includes(tier) ? CP.accentGreen : CP.textSecondary;
+// colore fasce: lib/tier-label (basse mai rosse, 26/09)
 
 // Due score, ognuno col suo nome (decisione Nicholas 25/09/2026, "strada 1"):
 //  - VENDITE (CreatorsPro): venduto per turno vs chi lavora sulle stesse creator;
@@ -91,7 +91,7 @@ export default function MyScorePage() {
             <HeroMetric
               label={`Vendite · ${monthLabel(salesMonth)} (in corso)`}
               value={cp.score != null ? fmtScore(cp.score) : "—"}
-              compare={cp.tier ? <span style={{ color: CP.textSecondary }}>{cp.tier}</span> : null}
+              compare={cp.tier ? <span style={{ color: CP.textSecondary }}>{tierLabel(cp.tier)}</span> : null}
               hint={<>È quello delle revisioni mensili. 0-100: il tuo venduto per turno confrontato con chi lavora sulle tue stesse creator (70%) e con tutta l&apos;agenzia (30%). Il dettaglio per creator è nel <Link href="/profilo" style={link}>tuo profilo</Link>.</>}
             />
           )}
@@ -99,7 +99,7 @@ export default function MyScorePage() {
             <HeroMetric
               label={`Mestiere · ${monthLabel(data.period_id)}`}
               value={fmtScore(data.score)}
-              compare={data.tier ? <span style={{ color: tierColor(data.tier) }}>{data.tier}</span> : null}
+              compare={data.tier ? <span style={{ color: tierColor(data.tier) }}>{tierLabel(data.tier)}</span> : null}
               hint="È quello del percorso di carriera: misura come chatti."
             >
               {/* Posizione tra i colleghi, mai il percentile su tutta l'agenzia (decisione 26/09) */}
@@ -203,7 +203,7 @@ export default function MyScorePage() {
 
           <div style={{ borderTop: `1px solid ${CP.borderSoft}`, paddingTop: 14 }}>
             <p style={note}>
-              Lo score mestiere viene dall&apos;export Infloww e si aggiorna quando il mese viene importato. Le fasce vanno da Critical a Elite, tarate sui dati reali di quest&apos;anno. I mesi senza turni lavorati non contano (trattino nel grafico).{data.formula?.hash ? ` Formula del mese ${data.formula.hash}, congelata all'import: il tuo storico non cambia in silenzio.` : ""}
+              Lo score mestiere viene dall&apos;export Infloww e si aggiorna quando il mese viene importato. Le fasce vanno da «Da costruire» a «Eccellente», tarate sui dati reali di quest&apos;anno. I mesi senza turni lavorati non contano (trattino nel grafico).{data.formula?.hash ? ` Formula del mese ${data.formula.hash}, congelata all'import: il tuo storico non cambia in silenzio.` : ""}
             </p>
             <p style={note}>
               Pensi che un numero sia sbagliato? <Link href="/me/contestazioni" style={link}>Apri una contestazione</Link> — le correzioni vengono sempre tracciate, mai fatte in silenzio.
