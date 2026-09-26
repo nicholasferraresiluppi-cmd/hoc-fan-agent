@@ -299,7 +299,7 @@ function TrendCard({ health, periodType, periodId }) {
           return (
             <div key={h.period_id} title={tip} style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", cursor: "help" }}>
               <div style={{ fontSize: 11, color: isCur ? CP.textPrimary : CP.textMuted, marginBottom: 2, ...NUM }}>{Math.round(h.avg_score || 0)}</div>
-              <div style={{ width: "100%", maxWidth: 48, height: px, background: isCur ? CP.accent : CP.accentDim, borderRadius: "3px 3px 0 0" }} />
+              <div style={{ width: "100%", maxWidth: 48, height: px, background: isCur ? CP.scale : CP.accentDim, borderRadius: "3px 3px 0 0" }} />
             </div>
           );
         })}
@@ -544,7 +544,7 @@ function OperatorDetail({ op, canExclude, onExcluded, onClose }) {
                 {it.estimated ? "~" : ""}{it.share_pct}%
               </div>
               <div style={{ height: 6, background: CP.borderSoft, borderRadius: 999, overflow: "hidden" }}>
-                <div style={{ height: "100%", background: CP.accent, width: `${Math.min(100, ((it.share_pct || 0) / maxPct) * 100)}%` }} />
+                <div style={{ height: "100%", background: CP.scale, width: `${Math.min(100, ((it.share_pct || 0) / maxPct) * 100)}%` }} />
               </div>
             </div>
           ))}

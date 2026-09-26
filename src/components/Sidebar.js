@@ -145,6 +145,7 @@ export const NAV_GROUPS = [
       { href: "/admin/fan-archetypes",           label: "Tipi di fan",  icon: Sparkles },
       { href: "/admin/creators",                 label: "Voce delle creator", icon: UserCog },
       { href: "/admin/loop",                     label: "Loop azione→esito", icon: RefreshCw },
+      { href: "/admin/citta",                    label: "La città",        icon: Building2 },
       { href: "/admin/roadmap",                  label: "Roadmap",         icon: Signpost },
     ],
   },

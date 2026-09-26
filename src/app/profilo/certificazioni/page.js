@@ -117,7 +117,7 @@ export default function CertificationsPage() {
                     </div>
                     <div role="progressbar" aria-valuenow={progressSess} aria-valuemin={0} aria-valuemax={100} aria-label="Sessioni verso il prossimo livello"
                       style={{ height: 6, background: CP.surfaceAlt, borderRadius: 3, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${progressSess}%`, background: CP.accent, transition: "width 0.3s" }} />
+                      <div style={{ height: "100%", width: `${progressSess}%`, background: CP.scale, transition: "width 0.3s" }} />
                     </div>
                   </div>
                 )}

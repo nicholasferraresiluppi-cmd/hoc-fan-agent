@@ -299,3 +299,13 @@ html.casa-intro[data-style="v3"]::after {
 /* colonna ferma delle tabelle: fondo PIENO (col velo trasparente si vedeva una banda) */
 [data-style="v3"] .ds-stk { background-color: #111217 !important; }
 [data-style="v3"] th.ds-stk, [data-style="v3"] .ds-tbl th { background-color: #111217 !important; }
+
+/* Casa: niente MAIUSCOLO nell'interfaccia (etichette vecchie con text-transform inline) */
+[data-style="v3"] [style*="text-transform: uppercase"] { text-transform: none !important; letter-spacing: .01em !important; }
+/* Casa: avvisi fissi in cima sobri — niente fascia rossa permanente né avorio pieno abbagliante */
+[data-style="v3"] .hoc-banner { background: rgba(242,238,230,.035) !important; border-bottom: 1px solid var(--cp-border) !important; color: var(--cp-textSecondary) !important; }
+[data-style="v3"] .hoc-banner-va { background: rgba(217,180,106,.08) !important; border-bottom: 1px solid rgba(217,180,106,.35) !important; color: var(--cp-textPrimary) !important; backdrop-filter: blur(12px); }
+[data-style="v3"] .hoc-banner-btn { background: transparent !important; color: var(--cp-gold) !important; border: 1px solid rgba(217,180,106,.45) !important; border-radius: 999px !important; }
+/* Casa: la scheda d'azione principale non è un blocco avorio pieno ma un contorno oro */
+[data-style="v3"] .hoc-cta-card { background: rgba(217,180,106,.06) !important; border: 1px solid rgba(217,180,106,.5) !important; color: var(--cp-textPrimary) !important; }
+[data-style="v3"] .hoc-cta-card > div:nth-child(2) { font-family: var(--cp-display) !important; font-weight: 400 !important; font-size: 30px !important; }

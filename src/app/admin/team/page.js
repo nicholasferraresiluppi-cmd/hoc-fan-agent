@@ -180,15 +180,15 @@ export default function TeamsAdminPage() {
             {unassigned.map((m) => (
               <div key={m.userId} style={{ ...card, display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", flexWrap: "wrap" }}>
                 <div style={{ flex: "1 1 120px", minWidth: 0 }}>
-                  <div style={{ fontSize: 14, color: CP.textPrimary }}>{m.name}</div>
-                  <div style={{ fontSize: 12, color: CP.textMuted }}>{m.role}{idTail(m)}</div>
+                  <div style={{ fontSize: 14, color: CP.textPrimary, overflowWrap: "anywhere" }}>{m.name}</div>
+                  <div style={{ fontSize: 12, color: CP.textMuted, overflowWrap: "anywhere" }}>{m.role}{idTail(m)}</div>
                 </div>
                 <select
                   onChange={(e) => { if (e.target.value) act("assign_member", { userId: m.userId, teamId: e.target.value }); }}
                   disabled={busy || teams.length === 0}
                   defaultValue=""
                   aria-label={`Assegna ${m.name} a un team`}
-                  style={{ ...ctl, fontSize: 12 }}
+                  style={{ ...ctl, fontSize: 12, flexShrink: 0, maxWidth: "100%" }}
                 >
                   <option value="">Assegna a…</option>
                   {teams.map((t) => (

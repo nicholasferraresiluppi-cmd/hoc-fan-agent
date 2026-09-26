@@ -84,7 +84,7 @@ export default function ProfilesComparePage() {
   const chipStyle = (pct, big) => {
     const i = pctScale.indexOf(pct);
     const a = i >= 0 ? TIER_ALPHA[Math.min(Math.round((i / Math.max(1, pctScale.length - 1)) * (TIER_ALPHA.length - 1)), TIER_ALPHA.length - 1)] : "10";
-    return { padding: big ? "2px 7px" : "1px 6px", borderRadius: 4, background: alpha(CP.accent, a), border: `1px solid ${alpha(CP.accent, "40")}`, color: CP.textPrimary, fontSize: big ? 12 : 11.5, fontWeight: 500, whiteSpace: "nowrap", ...NUM };
+    return { padding: big ? "2px 7px" : "1px 6px", borderRadius: 4, background: alpha(CP.scale, a), border: `1px solid ${alpha(CP.scale, "40")}`, color: CP.textPrimary, fontSize: big ? 12 : 11.5, fontWeight: 500, whiteSpace: "nowrap", ...NUM };
   };
 
   const missingPhaseB = data ? data.creators_count - data.phase_b_coverage : 0;

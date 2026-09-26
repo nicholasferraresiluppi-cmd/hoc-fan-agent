@@ -240,7 +240,7 @@ export default function CreatorsProSyncPage() {
             {syncProgress.total > 0 && <span style={{ color: CP.textMuted, ...NUM }}>· {fmtInt(syncProgress.current)} di {fmtInt(syncProgress.total)} righe paga</span>}
           </div>
           <div style={{ height: 6, borderRadius: 999, background: CP.surfaceAlt, marginTop: 10, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${syncProgress.total > 0 ? Math.max(3, (syncProgress.current / syncProgress.total) * 100) : 3}%`, background: CP.accent, transition: "width .3s" }} />
+            <div style={{ height: "100%", width: `${syncProgress.total > 0 ? Math.max(3, (syncProgress.current / syncProgress.total) * 100) : 3}%`, background: CP.scale, transition: "width .3s" }} />
           </div>
           <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 8 }}>Un mese richiede 3-5 minuti. Non chiudere questa scheda finché non finisce.</div>
         </section>

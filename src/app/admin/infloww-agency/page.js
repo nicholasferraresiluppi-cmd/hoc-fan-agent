@@ -197,7 +197,7 @@ export default function InflowwAgencyPage() {
         {syncing && (
           <>
             <div style={{ marginTop: 10, height: 6, borderRadius: 999, background: CP.surfaceAlt, overflow: "hidden" }}>
-              <div style={{ height: "100%", background: CP.accent, transition: "width .3s", width: syncProg && syncProg.total ? `${Math.round((syncProg.synced / syncProg.total) * 100)}%` : "8%" }} />
+              <div style={{ height: "100%", background: CP.scale, transition: "width .3s", width: syncProg && syncProg.total ? `${Math.round((syncProg.synced / syncProg.total) * 100)}%` : "8%" }} />
             </div>
             <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 6 }}>Dura qualche minuto. Puoi ricaricare la pagina: il lavoro riprende da dove era.</div>
           </>
@@ -272,7 +272,7 @@ export default function InflowwAgencyPage() {
                         <span style={{ color: CP.textPrimary, ...NUM }}>{fmt$(r.net)} <span style={{ color: CP.textMuted }}>· {Math.round(r.share)}%</span></span>
                       </div>
                       <div style={{ height: 6, borderRadius: 3, background: CP.surfaceAlt, overflow: "hidden" }}>
-                        <div style={{ width: `${r.share}%`, height: "100%", background: CP.accent, borderRadius: 3 }} />
+                        <div style={{ width: `${r.share}%`, height: "100%", background: CP.scale, borderRadius: 3 }} />
                       </div>
                     </div>
                   ))}
@@ -288,7 +288,7 @@ export default function InflowwAgencyPage() {
                 <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 120 }}>
                   {data.trend.map((x) => (
                     <div key={x.date} title={`${x.date}: ${fmt$(x.net_usd)}`}
-                      style={{ flex: 1, minWidth: 3, height: `${Math.max(2, (x.net_usd / maxDay) * 100)}%`, background: CP.accent, borderRadius: "2px 2px 0 0" }} />
+                      style={{ flex: 1, minWidth: 3, height: `${Math.max(2, (x.net_usd / maxDay) * 100)}%`, background: CP.scale, borderRadius: "2px 2px 0 0" }} />
                   ))}
                 </div>
               )}

@@ -327,7 +327,7 @@ export default function ShiftQualityPage() {
                     Analisi in corso · {num(job.done)} su {num(job.total)} conversazioni
                   </div>
                   <div style={{ height: 6, borderRadius: 3, background: CP.bgSunken, overflow: "hidden" }}>
-                    <div style={{ width: job.total ? `${(job.done / job.total) * 100}%` : 0, height: "100%", background: CP.accent }} />
+                    <div style={{ width: job.total ? `${(job.done / job.total) * 100}%` : 0, height: "100%", background: CP.scale }} />
                   </div>
                 </div>
               </div>

@@ -19,7 +19,7 @@ import {
   Wallet, Scale, ShieldCheck, History, FlaskConical, MessageSquareWarning,
   Signpost, Bell, ListTree, Inbox, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket,
   HandCoins, MessageCircle,
-  Snowflake, Megaphone, Share2, Shield,
+  Snowflake, Megaphone, Share2, Shield, Building2,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee } from "@/lib/nav-access";
@@ -90,6 +90,7 @@ const SHORTCUT_GROUPS = [
       { href: "/admin/fan-archetypes",     title: "Tipi di fan",    desc: "Whale, Lonely, Negoziatore + strategie ottimali", icon: Sparkles },
       { href: "/admin/creators",           title: "Voce delle creator", desc: "Tone card + ganci emotivi + vocabolario creator", icon: UserCog },
       { href: "/admin/loop",               title: "Loop azione→esito", desc: "La coda registrata giorno per giorno e l'esito 48h (risposta + acquisto): il dataset proprietario che si accumula", icon: RefreshCw },
+      { href: "/admin/citta",              title: "La città",          desc: "L'azienda come una città: un palazzo per ogni creator e area, altezza = cose aperte, luci = ritardi (da ClickUp)", icon: Building2 },
       { href: "/admin/roadmap",            title: "Roadmap",           desc: "Cosa è in corso, cosa viene dopo, cosa è parcheggiato e dietro quale gate", icon: Signpost },
     ],
   },

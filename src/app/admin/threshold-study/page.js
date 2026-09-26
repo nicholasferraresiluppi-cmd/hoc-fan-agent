@@ -246,7 +246,7 @@ function Histogram({ buckets = [], bucketWidth = 25, mid, top, totalShifts = 0 }
       )}
       {top != null && (
         <HoverTip tip={`Soglia top proposta: $${top.toLocaleString("it-IT")}`} style={{ position: "absolute", top: 0, bottom: 4, left: pos(top), width: 8, marginLeft: -3, display: "block", cursor: "default" }}>
-          <span style={{ display: "block", width: 2, height: "100%", margin: "0 auto", background: CP.accent, borderRadius: 1 }} />
+          <span style={{ display: "block", width: 2, height: "100%", margin: "0 auto", background: CP.scale, borderRadius: 1 }} />
         </HoverTip>
       )}
       <div style={{ position: "absolute", bottom: -6, left: 0, fontSize: 11, color: CP.textMuted }}>$0</div>

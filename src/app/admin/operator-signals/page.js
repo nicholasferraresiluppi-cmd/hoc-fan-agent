@@ -27,7 +27,7 @@ const fetcher = (url) =>
 const VERDICT = {
   forte: { color: CP.accentGreen, label: "forte" },
   ok: { color: CP.textMuted, label: "in linea" },
-  gap: { color: CP.accentRed, label: "da allenare" },
+  gap: { color: CP.attn, label: "da allenare" },
   "n/d": { color: CP.textMuted, label: "n/d" },
 };
 
@@ -38,7 +38,7 @@ const QUAD = {
   star: { color: CP.accentGreen, short: "Metodo e resa", hint: "abitudini giuste e vende sopra i colleghi: da replicare" },
   potential: { color: CP.accentSoftText, short: "Buone abitudini, resa sotto", hint: "fa le cose giuste ma vende meno: guarda creator e turni assegnati" },
   fragile: { color: CP.accent, short: "Rende senza metodo", hint: "vende sopra i colleghi senza le abitudini: regge finché regge il creator" },
-  coach: { color: CP.accentRed, short: "Da coachare", hint: "sotto sia sulle abitudini sia sul venduto" },
+  coach: { color: CP.attn, short: "Da coachare", hint: "sotto sia sulle abitudini sia sul venduto" },
 };
 const QUAD_ORDER = ["coach", "potential", "fragile", "star"];
 const revVsPeers = (idx) => {
@@ -72,7 +72,7 @@ function MetricChip({ m }) {
         gap: 2,
         padding: "6px 10px",
         background: CP.bgSunken,
-        border: `1px solid ${m.verdict === "gap" ? alpha(CP.accentRed, "55") : CP.borderSoft}`,
+        border: `1px solid ${m.verdict === "gap" ? alpha(CP.attn, "55") : CP.borderSoft}`,
         borderRadius: 8,
         minWidth: 110,
       }}
@@ -103,7 +103,7 @@ const fmtDateIt = (s) => {
 function duoVerdictColor(r) {
   if (r.verdict === "coerente") return CP.textMuted;
   if (r.key === "avg_ppv_price") return CP.accentSoftText; // informativo, non un giudizio
-  return r.verdict === "più domande in duo" ? CP.accentRed : CP.accentGreen;
+  return r.verdict === "più domande in duo" ? CP.attn : CP.accentGreen;
 }
 
 function DuoBlock({ duo, operator }) {
@@ -118,11 +118,11 @@ function DuoBlock({ duo, operator }) {
   const liveFlag = duo.flag && !duo.stale && duo.period_known;
   const flagNote = duo.stale ? " · export vecchio" : !duo.period_known ? " · periodo sconosciuto" : "";
   return (
-    <div style={{ marginTop: 12, padding: "10px 12px", background: CP.bgSunken, border: `1px solid ${liveFlag ? alpha(CP.accentRed, "55") : CP.borderSoft}`, borderRadius: 8 }}>
+    <div style={{ marginTop: 12, padding: "10px 12px", background: CP.bgSunken, border: `1px solid ${liveFlag ? alpha(CP.attn, "55") : CP.borderSoft}`, borderRadius: 8 }}>
       <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: duo.rows.length ? 6 : 0, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <span style={{ color: CP.textSecondary }}>Turni in coppia: da solo (warehouse) contro tutti i turni (export Infloww)</span>
         {duo.flag && (
-          <span style={{ color: liveFlag ? CP.accentRed : CP.textMuted }} title={liveFlag ? undefined : "confronto meno affidabile: verifica il periodo dell'export"}>
+          <span style={{ color: liveFlag ? CP.attn : CP.textMuted }} title={liveFlag ? undefined : "confronto meno affidabile: verifica il periodo dell'export"}>
             più domande in coppia{flagNote}
           </span>
         )}
@@ -233,7 +233,7 @@ function DuoCoverageSection({ dc }) {
       <div style={{ fontSize: 13, color: CP.textSecondary, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "baseline", ...NUM }}>
         <span style={{ color: CP.textPrimary, fontWeight: 500 }}>Turni in coppia (export Infloww)</span>
         <span>{dc.matched} con confronto</span>
-        {dc.diverging > 0 && <span style={{ color: CP.accentRed }}>{dc.diverging} fanno più domande in coppia</span>}
+        {dc.diverging > 0 && <span style={{ color: CP.attn }}>{dc.diverging} fanno più domande in coppia</span>}
         {dc.infloww_only.length > 0 && <span>{dc.infloww_only.length} solo da export</span>}
         {dc.warehouse_only > 0 && <span style={{ color: CP.textMuted }}>{dc.warehouse_only} senza export</span>}
         {dc.ambiguous > 0 && (
@@ -276,7 +276,7 @@ function OperatorDetail({ p, onClose }) {
         {p.shifts} turni da solo · {p.msgs.toLocaleString("it-IT")} messaggi
         {p.rev_per_h != null ? ` · $${p.rev_per_h.toLocaleString("it-IT")} venduti all'ora` : ""}
         {p.rev_index != null ? (
-          <span style={{ color: p.rev_index >= 1 ? CP.accentGreen : CP.accentRed }}>{` · ${revVsPeers(p.rev_index)} rispetto ai colleghi sugli stessi creator`}</span>
+          <span style={{ color: p.rev_index >= 1 ? CP.accentGreen : CP.attn }}>{` · ${revVsPeers(p.rev_index)} rispetto ai colleghi sugli stessi creator`}</span>
         ) : (
           ""
         )}
@@ -391,7 +391,7 @@ export default function OperatorSignalsPage() {
     { key: "top_gap", label: "Da allenare", sort: (p) => p.top_gap?.label || "~", render: (p) => (p.top_gap ? p.top_gap.label : <span style={{ color: CP.textMuted }}>—</span>) },
     {
       key: "rev_index", label: "Venduto vs colleghi", align: "right",
-      render: (p) => (p.rev_index == null ? <span style={{ color: CP.textMuted }}>—</span> : <span style={{ color: p.rev_index >= 1 ? CP.accentGreen : CP.accentRed }}>{revVsPeers(p.rev_index)}</span>),
+      render: (p) => (p.rev_index == null ? <span style={{ color: CP.textMuted }}>—</span> : <span style={{ color: p.rev_index >= 1 ? CP.accentGreen : CP.attn }}>{revVsPeers(p.rev_index)}</span>),
     },
     { key: "rev_per_h", label: "Venduto all'ora", align: "right", muted: true, render: (p) => (p.rev_per_h == null ? "—" : `$${p.rev_per_h.toLocaleString("it-IT")}`) },
     { key: "shifts", label: "Turni da solo", align: "right", muted: true },

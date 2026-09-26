@@ -120,7 +120,7 @@ export default function UsagePage() {
             <div style={{ fontSize: 14, color: CP.textPrimary, marginBottom: 12 }}>Persone attive al giorno</div>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 90 }}>
               {r.daily.map((d, i) => (
-                <div key={d.day} title={`${fmtDay(d.day)}: ${d.users} persone, ${d.views} pagine`} style={{ flex: 1, height: `${(d.users / maxDaily) * 100}%`, minHeight: d.users ? 3 : 1, background: !d.users ? CP.border : i === r.daily.length - 1 ? CP.accent : CP.accentDim, borderRadius: 2 }} />
+                <div key={d.day} title={`${fmtDay(d.day)}: ${d.users} persone, ${d.views} pagine`} style={{ flex: 1, height: `${(d.users / maxDaily) * 100}%`, minHeight: d.users ? 3 : 1, background: !d.users ? CP.border : i === r.daily.length - 1 ? CP.scale : CP.accentDim, borderRadius: 2 }} />
               ))}
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: CP.textMuted, marginTop: 6 }}>

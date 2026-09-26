@@ -92,7 +92,7 @@ export default function MyLadderPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
                   <h3 style={{ fontSize: 16, fontWeight: 500, color: CP.textPrimary, margin: 0 }}>{g.label}</h3>
                   {perf.performance_met ? (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: CP.accentGreen, border: `1px solid ${alpha(CP.accentGreen, "55")}`, borderRadius: 999, padding: "2px 10px" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: CP.tierTop, border: `1px solid ${alpha(CP.tierTop, "55")}`, borderRadius: 999, padding: "2px 10px" }}>
                       <CheckCircle2 size={13} /> performance raggiunta
                     </span>
                   ) : (
@@ -121,11 +121,11 @@ export default function MyLadderPage() {
                         <div key={m.period_id}
                           title={gap ? "Mese senza turni lavorati: non conta né a favore né contro" : m.counts ? "Conta per il passaggio" : m.below_floor ? "Sotto il minimo richiesto" : "Sotto la soglia di questo passaggio"}
                           style={{ padding: v3 ? "10px 12px" : "6px 8px", borderRadius: 8, textAlign: v3 ? "left" : "center",
-                            background: m.counts ? alpha(CP.accentGreen, "1c") : gap ? "transparent" : CP.surfaceAlt,
-                            border: `1px ${gap ? "dashed" : "solid"} ${m.counts ? CP.accentGreen : m.below_floor ? CP.textSecondary : CP.border}` }}>
+                            background: m.counts ? alpha(CP.tierTop, "1c") : gap ? "transparent" : CP.surfaceAlt,
+                            border: `1px ${gap ? "dashed" : "solid"} ${m.counts ? CP.tierTop : m.below_floor ? CP.textSecondary : CP.border}` }}>
                           <div style={{ fontSize: 12, color: CP.textMuted }}>{monthShort(m.period_id)}</div>
                           <div style={{ fontSize: v3 ? 22 : 14, fontWeight: 500, color: gap ? CP.textMuted : CP.textPrimary, lineHeight: 1.2, ...NUM }}>{gap ? "—" : fmtScore(m.score)}</div>
-                          <div style={{ fontSize: 11, color: m.counts ? CP.accentGreen : CP.textMuted }}>{monthStatus(m)}</div>
+                          <div style={{ fontSize: 11, color: m.counts ? CP.tierTop : CP.textMuted }}>{monthStatus(m)}</div>
                         </div>
                       );
                     })}
@@ -146,7 +146,7 @@ export default function MyLadderPage() {
                       const notMet = r.status === "not_met";
                       return (
                         <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: fail ? CP.accentRed : met ? CP.textSecondary : CP.textMuted, flexWrap: "wrap" }}>
-                          {met ? <CheckCircle2 size={13} color={CP.accentGreen} />
+                          {met ? <CheckCircle2 size={13} color={CP.tierTop} />
                             : fail ? <Lock size={13} color={CP.accentRed} />
                             : r.status === "not_tracked" ? <Lock size={13} color={CP.mutedIcons} />
                             : <Circle size={13} color={notMet ? CP.textMuted : CP.mutedIcons} />}
