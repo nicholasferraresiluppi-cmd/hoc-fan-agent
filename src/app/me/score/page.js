@@ -102,7 +102,10 @@ export default function MyScorePage() {
               compare={data.tier ? <span style={{ color: tierColor(data.tier) }}>{data.tier}</span> : null}
               hint="È quello del percorso di carriera: misura come chatti."
             >
-              <Metric label="La tua posizione" value={`meglio del ${data.percentile}%`} note={`dei ${data.scored_count} operatori valutati`} />
+              {/* Posizione tra i colleghi, mai il percentile su tutta l'agenzia (decisione 26/09) */}
+              {data.peer_rank && (data.peer_rank.top_half
+                ? <Metric label="Tra i tuoi colleghi" value={`${data.peer_rank.position}° su ${data.peer_rank.size}`} note={data.peer_rank.label ? `su ${data.peer_rank.label}` : null} />
+                : <Metric label="Tra i tuoi colleghi" value={`${fmtScore(data.peer_rank.gap_to_top_half)} punti`} note={`per entrare nella metà alta${data.peer_rank.label ? ` su ${data.peer_rank.label}` : ""} (${data.peer_rank.size} persone)`} />)}
             </HeroMetric>
           )}
         </div>
