@@ -2,15 +2,18 @@
 
 // Game tape — libreria delle azioni di vendita reali (solo tape pubblicati).
 // Pattern "call library": si studia la partita vera, non l'esempio inventato.
+// Redesign 26/09/2026 sul design system: testata PageHead, stati con Notice,
+// il totale non è più verde (non è un segnale, è il dato del tape).
 
 import { useState } from "react";
 import useSWR from "swr";
-import { CP, FONTS, alpha } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
+import { CP, FONTS } from "@/lib/brand";
+import { PageHead, Notice, card, NUM } from "@/components/ds";
 import TapeReplay from "@/components/TapeReplay";
+import { fmt$ } from "@/lib/format";
 
 const fetcher = (url) => fetch(url).then((r) => (r.ok ? r.json() : r.json().then((d) => Promise.reject(new Error(d.error || "Errore di caricamento")))));
-const usd = (n) => `$${Math.round(Number(n) || 0).toLocaleString("it-IT")}`;
+const usd = (n) => fmt$(Number(n) || 0);
 
 function TapeCard({ tape, open, onToggle }) {
   const title = tape.title || `${tape.creator_name} — ${usd(tape.total)} in ${tape.stats?.buildup_min ?? "?"} minuti`;
@@ -23,12 +26,7 @@ function TapeCard({ tape, open, onToggle }) {
 
   return (
     <div
-      style={{
-        background: CP.surface,
-        border: `1px solid ${open ? CP.accentDim : CP.border}`,
-        borderRadius: 12,
-        overflow: "hidden",
-      }}
+      style={{ ...card, borderColor: open ? CP.borderStrong : CP.border, overflow: "hidden" }}
     >
       <button
         onClick={onToggle}
@@ -40,21 +38,23 @@ function TapeCard({ tape, open, onToggle }) {
           padding: "16px 18px",
           cursor: "pointer",
         }}
+        aria-expanded={open}
       >
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline", flexWrap: "wrap" }}>
-          <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, fontFamily: FONTS.display }}>
+          <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, lineHeight: 1.4, flex: "1 1 240px" }}>
             {title}
           </div>
-          <div style={{ fontSize: 13, color: CP.accentGreen, fontWeight: 500 }}>{usd(tape.total)}</div>
+          <div style={{ fontSize: 15, color: CP.textPrimary, fontWeight: 500, ...NUM }}>{usd(tape.total)}</div>
         </div>
-        <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 10, fontSize: 12, color: CP.textMuted }}>
+        <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: "4px 12px", fontSize: 13, color: CP.textMuted }}>
           <span>{tape.creator_name}</span>
           <span>{opLabel}</span>
           <span>
             {tape.fan}
             {tape.stats?.new_fan === true ? " (nuovo)" : tape.stats?.new_fan === false ? " (abituale)" : ""}
           </span>
-          <span>{tape.buys?.length || 1} {tape.buys?.length === 1 ? "acquisto" : "acquisti"}</span>
+          <span style={NUM}>{tape.buys?.length || 1} {tape.buys?.length === 1 ? "acquisto" : "acquisti"}</span>
+          <span style={{ color: CP.accentSoftText, marginLeft: "auto" }}>{open ? "Chiudi" : "Guarda la conversazione"}</span>
         </div>
       </button>
       {open && (
@@ -72,47 +72,23 @@ export default function TapesPage() {
   const tapes = data?.tapes || [];
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: "32px 20px 64px" }}>
-      <PageHeader
-        section="Academy"
+    <div style={{ padding: "28px 24px 64px", maxWidth: 980, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Academy", href: "/" }, { label: "Game tape" }]}
         title="Game tape"
-        subtitle="Azioni di vendita reali, estratte dalle chat che hanno prodotto revenue. Si studia la partita vera: come si costruisce la tensione, quando si presenta il prezzo, cosa succede dopo lo sblocco."
+        subtitle="Vendite vere, riprese dalle chat che hanno portato incasso. Apri un tape e segui la partita: come cresce la tensione, quando arriva il prezzo, cosa succede dopo lo sblocco."
       />
 
       {error ? (
-        <div
-          style={{
-            padding: "20px 24px",
-            background: CP.surface,
-            border: `1px solid ${alpha(CP.accentRed, "55")}`,
-            borderRadius: 12,
-            color: CP.accentRed,
-            fontSize: 14,
-          }}
-        >
-          Non riesco a caricare la libreria: {error.message}. Riprova tra poco.
-        </div>
+        <Notice danger>Non riesco a caricare la libreria: {error.message}. Riprova tra poco.</Notice>
       ) : isLoading ? (
-        <div style={{ color: CP.textMuted, fontSize: 14 }}>Carico la libreria…</div>
+        <Notice>Carico la libreria…</Notice>
       ) : tapes.length === 0 ? (
-        <div
-          style={{
-            padding: "28px 24px",
-            background: CP.surface,
-            border: `1px solid ${CP.border}`,
-            borderRadius: 12,
-            color: CP.textSecondary,
-            fontSize: 14,
-            lineHeight: 1.6,
-          }}
-        >
-          <div style={{ fontWeight: 500, color: CP.textPrimary, marginBottom: 8 }}>
-            Nessun tape pubblicato per ora
-          </div>
-          I game tape sono conversazioni reali selezionate dal team: le migliori azioni di vendita del
-          periodo, con i momenti di acquisto in evidenza e le note del coach. Appena il primo tape viene
-          pubblicato lo trovi qui.
-        </div>
+        <Notice>
+          <div style={{ color: CP.textPrimary, marginBottom: 4 }}>Nessun tape pubblicato per ora</div>
+          I game tape sono conversazioni reali scelte dal team: le migliori vendite del periodo, con i momenti
+          di acquisto in evidenza e le note del coach. Appena ne viene pubblicato uno, lo trovi qui.
+        </Notice>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {tapes.map((t) => (

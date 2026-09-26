@@ -1,40 +1,25 @@
 "use client";
 
+// Ladder di allenamento (redesign 26/09/2026 sul design system).
+// Stessa API (/api/leaderboard?period&skill) e stessi dati: la propria
+// posizione, il podio, il resto dei primi 10. Tolti: medaglie emoji, colori
+// oro/argento/bronzo scritti a mano, bagliori animati e ombre (DESIGN.md: flat).
+// Il podio resta, piatto: 1°, 2°, 3° scritti, il primo col viola tenue.
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
-import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
-
-const C = {
-  bgDark: COLORS.obsidian,
-  orange: COLORS.champagne,
-  purple: COLORS.cobalt,
-  green: COLORS.verdant,
-  yellow: COLORS.champagneDeep,
-  red: COLORS.signal,
-  white: COLORS.alabaster,
-  gray: COLORS.mist,
-  gold: "#F2D488",
-  silver: "#DADEE6",
-  bronze: "#C87D46",
-};
-
-// Flat per DESIGN.md: superficie standard, identità del tier affidata ad
-// accent (bordo/testo) — stesso pattern di TIER in brand.js.
-const PODIUM_TIER = {
-  1: { grad: CP.surface, accent: "#F2D488", label: "CHAMPION", ink: "#FFF5D4" },
-  2: { grad: CP.surface, accent: "#DADEE6", label: "RUNNER-UP", ink: CP.textPrimary },
-  3: { grad: CP.surface, accent: "#C87D46", label: "THIRD", ink: "#FFE4C2" },
-};
+import { CP, FONTS } from "@/lib/brand";
+import { fmtInt } from "@/lib/format";
+import { PageHead, FilterChip, SectionTitle, DataTable, Notice, card, NUM } from "@/components/ds";
 
 const PERIODS = [
   { key: "week", label: "Settimana" },
   { key: "month", label: "Mese" },
-  { key: "all", label: "All-time" },
+  { key: "all", label: "Da sempre" },
 ];
 
 const SKILLS = [
-  { key: "overall", label: "Overall" },
+  { key: "overall", label: "Punteggio complessivo" },
   { key: "naturalezza", label: "Naturalezza" },
   { key: "esclusivita", label: "Esclusività" },
   { key: "dipendenza", label: "Dipendenza" },
@@ -43,97 +28,32 @@ const SKILLS = [
   { key: "gestione_obiezioni", label: "Gestione obiezioni" },
 ];
 
-function medalForRank(r) {
-  if (r === 1) return { emoji: "👑", color: C.gold };
-  if (r === 2) return { emoji: "🥈", color: C.silver };
-  if (r === 3) return { emoji: "🥉", color: C.bronze };
-  return null;
-}
+const sessLabel = (n) => `${fmtInt(n ?? 0)} ${n === 1 ? "sessione" : "sessioni"}`;
+const meTag = <span style={{ marginLeft: 8, color: CP.accentSoftText, fontSize: 12 }}>tu</span>;
 
 function PodiumCard({ entry, place }) {
-  const tier = PODIUM_TIER[place];
-  const heights = { 1: 170, 2: 130, 3: 100 };
-  const medals = { 1: "🥇", 2: "🥈", 3: "🥉" };
-  const isWinner = place === 1;
-  const glowKeyframes = isWinner ? {
-    animation: "hocGlow 2.4s ease-in-out infinite",
-  } : {};
+  const first = place === 1;
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.6rem", flex: 1, position: "relative" }}>
-      {isWinner && (
-        <div style={{ position: "absolute", top: -18, fontFamily: FONTS.mono, fontSize: 9, letterSpacing: "0.3em", color: tier.accent, fontWeight: 800 }}>
-          ★ {tier.label} ★
-        </div>
-      )}
-      {!isWinner && (
-        <div style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: "0.26em", color: tier.accent, fontWeight: 800, opacity: 0.75 }}>
-          {tier.label}
-        </div>
-      )}
-      <div style={{ fontSize: isWinner ? "2.2rem" : "1.7rem", filter: `drop-shadow(0 0 12px ${alpha(tier.accent, "88")})` }}>
-        {medals[place]}
+    <div style={{
+      ...card,
+      padding: "16px 18px",
+      background: first ? CP.accentSoft : CP.surface,
+      borderColor: entry?.isMe ? CP.accent : first ? CP.accentSoft : CP.border,
+      display: "flex", flexDirection: "column", gap: 4, minWidth: 0,
+    }}>
+      <div style={{ fontSize: 13, color: first ? CP.accentSoftText : CP.textMuted, display: "flex", justifyContent: "space-between", gap: 8 }}>
+        <span style={NUM}>{place}° posto</span>
+        {entry?.isMe && <span style={{ color: CP.accentSoftText }}>tu</span>}
       </div>
-      <div
-        style={{
-          width: "100%",
-          maxWidth: isWinner ? 200 : 170,
-          padding: isWinner ? "1rem 0.75rem" : "0.8rem 0.6rem",
-          background: tier.grad,
-          border: `1px solid ${alpha(tier.accent, "88")}`,
-          borderRadius: 12,
-          textAlign: "center",
-          position: "relative",
-          overflow: "hidden",
-          boxShadow: entry?.isMe
-            ? `0 0 0 2px ${C.orange}, 0 10px 30px rgba(0,0,0,0.45)`
-            : `0 10px 30px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.15)`,
-          ...glowKeyframes,
-        }}
-      >
-        <div style={{ fontFamily: FONTS.mono, fontSize: isWinner ? 48 : 38, fontWeight: 800, letterSpacing: "-0.02em", color: tier.ink, lineHeight: 1, textShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
-          {entry?.avg ?? "—"}
-        </div>
-        <div style={{ width: 24, height: 2, background: tier.ink, margin: "0.45rem auto 0.4rem", opacity: 0.55, borderRadius: 2 }} />
-        <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: isWinner ? "0.95rem" : "0.85rem", color: tier.ink, letterSpacing: "0.04em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {entry?.name || "—"}
-        </div>
-        <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: tier.ink, opacity: 0.7, marginTop: 4, letterSpacing: "0.14em" }}>
-          {entry?.sessions ?? 0} SESS
-        </div>
-        {entry?.isMe && (
-          <div style={{ position: "absolute", top: 6, right: 6, fontFamily: FONTS.mono, fontSize: 8, padding: "2px 5px", background: C.orange, color: C.bgDark, fontWeight: 800, letterSpacing: "0.14em", borderRadius: 2 }}>
-            TU
-          </div>
-        )}
-      </div>
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 200,
-          height: heights[place],
-          background: `${alpha(tier.accent, "18")}`,
-          borderTop: `4px solid ${tier.accent}`,
-          borderLeft: `1px solid ${alpha(tier.accent, "30")}`,
-          borderRight: `1px solid ${alpha(tier.accent, "30")}`,
-          borderRadius: "4px 4px 0 0",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: tier.accent,
-          fontFamily: FONTS.mono,
-          fontSize: isWinner ? "2.4rem" : "2rem",
-          fontWeight: 800,
-          textShadow: `0 0 20px ${alpha(tier.accent, "88")}`,
-        }}
-      >
-        {place}
-      </div>
+      <div style={{ fontSize: 32, fontWeight: 500, lineHeight: 1.15, color: CP.textPrimary, ...NUM }}>{entry?.avg ?? "—"}</div>
+      <div style={{ fontSize: 15, color: CP.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{entry?.name || "—"}</div>
+      <div style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>{sessLabel(entry?.sessions)}</div>
     </div>
   );
 }
 
 export default function LeaderboardPage() {
-  const { isLoaded, user } = useUser();
+  const { isLoaded } = useUser();
   const [period, setPeriod] = useState("week");
   const [skill, setSkill] = useState("overall");
   const [data, setData] = useState(null);
@@ -158,241 +78,107 @@ export default function LeaderboardPage() {
 
   const top10 = data?.top10 || [];
   const me = data?.me;
+  const hasPodium = top10.length >= 3;
   const podium = [top10[0], top10[1], top10[2]];
-  const rest = top10.slice(3);
+  const rest = hasPodium ? top10.slice(3) : top10;
+  const minSessions = data?.minSessions || 2;
 
-  const percentileBadge = (p) => {
-    if (p === null || p === undefined) return null;
-    const topX = 100 - p + 1;
-    let color = C.gray;
-    if (topX <= 10) color = C.gold;
-    else if (topX <= 25) color = C.green;
-    else if (topX <= 50) color = C.yellow;
-    else color = C.gray;
-    return (
-      <span
-        style={{
-          padding: "0.25rem 0.6rem",
-          background: `${alpha(color, "25")}`,
-          border: `1px solid ${color}`,
-          borderRadius: "0.4rem",
-          color,
-          fontWeight: 700,
-          fontSize: "0.8rem",
-        }}
-      >
-        Top {topX}%
-      </span>
-    );
-  };
+  const columns = [
+    { key: "rank", label: "#", align: "right", render: (e) => <span style={{ color: CP.textMuted }}>{e.rank}</span> },
+    { key: "name", label: "Operatore", render: (e) => <span>{e.name}{e.isMe && meTag}</span> },
+    { key: "sessions", label: "Sessioni", align: "right", muted: true },
+    { key: "avg", label: "Punteggio medio", align: "right", render: (e) => <span style={{ fontWeight: 500, color: e.avg >= 75 ? CP.accentGreen : CP.textPrimary }}>{e.avg}</span> },
+  ];
 
   return (
-    <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "2rem" }}>
-      <style>{`
-        @keyframes hocGlow {
-          0%, 100% { box-shadow: 0 0 0 2px rgba(242,212,136,0.35), 0 10px 30px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.15); }
-          50% { box-shadow: 0 0 0 4px rgba(242,212,136,0.55), 0 10px 40px rgba(242,212,136,0.35), inset 0 1px 0 rgba(255,255,255,0.25); }
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Academy", href: "/" }, { label: "Ladder" }]}
+        title="Ladder"
+        subtitle={`Chi si sta allenando meglio nel simulatore dell'Academy, per punteggio medio delle sessioni. Per entrare servono almeno ${minSessions} sessioni valutate nel periodo.`}
+        actions={
+          <Link href="/leaderboard/storico" style={{ color: CP.textPrimary, textDecoration: "none", fontSize: 13, padding: "7px 12px", border: `1px solid ${CP.border}`, borderRadius: 10, background: CP.surface }}>
+            Hall of Fame →
+          </Link>
         }
-        @keyframes hocRise {
-          from { transform: translateY(12px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        .hoc-podium-item { animation: hocRise 0.5s ease-out both; }
-      `}</style>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 28px 64px 28px" }}>
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16, marginBottom: 12 }}>
-            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-              <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>Academy</Link>
-              <span style={{ color: CP.textMuted }}>›</span>
-              <span style={{ color: CP.textPrimary }}>Ladder</span>
-            </div>
-            <Link href="/leaderboard/storico" style={{ color: CP.accent, textDecoration: "none", fontSize: 13, padding: "6px 12px", border: `1px solid ${alpha(CP.accent, "44")}`, borderRadius: 8 }}>
-              Hall of Fame →
-            </Link>
-          </div>
-          <span style={{ color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em" }}>Performance · Training</span>
-          <h1 style={{ fontFamily: FONTS.display, fontSize: 34, margin: "8px 0 6px 0", fontWeight: 700, letterSpacing: "-0.02em" }}>Ladder</h1>
-          <p style={{ color: CP.textSecondary, fontSize: 14, margin: 0, lineHeight: 1.5, maxWidth: 760 }}>
-            I migliori operatori per score medio nelle sessioni di training Academy. Minimo {data?.minSessions || 2} sessioni per qualificarsi.
-          </p>
-        </div>
+      />
 
-        {/* Filters */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginBottom: "1.5rem", alignItems: "center" }}>
-          <div style={{ display: "flex", gap: "0.4rem" }}>
-            {PERIODS.map((p) => (
-              <button
-                key={p.key}
-                onClick={() => setPeriod(p.key)}
-                style={{
-                  padding: "0.45rem 0.9rem",
-                  background: period === p.key ? C.orange : `${alpha(C.white, "08")}`,
-                  color: period === p.key ? C.bgDark : C.white,
-                  border: `1px solid ${period === p.key ? C.orange : alpha(C.purple, "40")}`,
-                  borderRadius: "0.5rem",
-                  fontSize: "0.85rem",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <select
-            value={skill}
-            onChange={(e) => setSkill(e.target.value)}
-            style={{
-              padding: "0.45rem 0.75rem",
-              background: `${alpha(C.white, "08")}`,
-              color: C.white,
-              border: `1px solid ${alpha(C.purple, "40")}`,
-              borderRadius: "0.5rem",
-              fontSize: "0.85rem",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            {SKILLS.map((s) => (
-              <option key={s.key} value={s.key} style={{ background: C.bgDark }}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-          <div style={{ color: C.gray, fontSize: "0.8rem", marginLeft: "auto" }}>
-            {data?.totalQualifying || 0} operatori qualificati
-          </div>
-        </div>
-
-        {loading && <div style={{ color: C.gray }}>Caricamento...</div>}
-        {error && !loading && <div style={{ color: C.red }}>Errore: {error}</div>}
-
-        {!loading && !error && (
-          <>
-            {/* Me card */}
-            {me && (
-              <div
-                style={{
-                  background: me.rank ? `${alpha(C.orange, "15")}` : `${alpha(C.white, "05")}`,
-                  border: `2px solid ${me.rank ? C.orange : alpha(C.purple, "40")}`,
-                  borderRadius: "0.85rem",
-                  padding: "1rem 1.25rem",
-                  marginBottom: "1.5rem",
-                  display: "flex",
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                  gap: "1rem",
-                  justifyContent: "space-between",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                  <div>
-                    <div style={{ fontSize: "0.75rem", color: C.orange, fontWeight: 700, letterSpacing: "0.5px" }}>
-                      La tua posizione
-                    </div>
-                    {me.rank ? (
-                      <div style={{ fontSize: "1.1rem", fontWeight: 700, marginTop: "0.2rem" }}>
-                        #{me.rank} su {me.totalOperators} — {me.avg}/100 · {me.sessions} sessioni
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: "0.95rem", color: C.gray, marginTop: "0.2rem" }}>
-                        Non qualificato. {me.reason}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {me.rank && percentileBadge(me.percentile)}
-              </div>
-            )}
-
-            {/* Podium */}
-            {top10.length >= 3 && (
-              <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", marginBottom: "2.5rem", padding: "1.5rem 0 0", justifyContent: "center" }}>
-                <div className="hoc-podium-item" style={{ flex: 1, animationDelay: "0.15s", maxWidth: 200 }}>
-                  <PodiumCard entry={podium[1]} place={2} />
-                </div>
-                <div className="hoc-podium-item" style={{ flex: 1, animationDelay: "0s", maxWidth: 220 }}>
-                  <PodiumCard entry={podium[0]} place={1} />
-                </div>
-                <div className="hoc-podium-item" style={{ flex: 1, animationDelay: "0.3s", maxWidth: 200 }}>
-                  <PodiumCard entry={podium[2]} place={3} />
-                </div>
-              </div>
-            )}
-
-            {/* Rest of top 10 */}
-            {rest.length > 0 && (
-              <div
-                style={{
-                  background: `${alpha(C.white, "05")}`,
-                  border: `1px solid ${alpha(C.purple, "30")}`,
-                  borderRadius: "0.75rem",
-                  overflow: "hidden",
-                }}
-              >
-                {rest.map((e) => (
-                  <div
-                    key={e.userId}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "1rem",
-                      padding: "0.75rem 1.25rem",
-                      borderTop: `1px solid ${alpha(C.purple, "20")}`,
-                      background: e.isMe ? `${alpha(C.orange, "15")}` : "transparent",
-                    }}
-                  >
-                    <div style={{ width: 32, textAlign: "center", color: C.gray, fontWeight: 700 }}>
-                      #{e.rank}
-                    </div>
-                    <div style={{ flex: 1, fontWeight: 700 }}>
-                      {e.name} {e.isMe && <span style={{ color: C.orange, fontSize: "0.75rem", marginLeft: "0.4rem" }}>(tu)</span>}
-                    </div>
-                    <div style={{ color: C.gray, fontSize: "0.8rem" }}>{e.sessions} sess.</div>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 800, color: e.avg >= 75 ? C.green : e.avg >= 60 ? C.yellow : C.white, minWidth: 50, textAlign: "right" }}>
-                      {e.avg}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {top10.length === 0 && (
-              <div style={{ padding: "2rem", textAlign: "center", color: C.gray, background: `${alpha(C.white, "05")}`, borderRadius: "0.75rem", border: `1px solid ${alpha(C.purple, "30")}` }}>
-                Nessun operatore qualificato in questo periodo. Servono almeno {data?.minSessions || 2} sessioni con valutazione.
-              </div>
-            )}
-
-            {top10.length > 0 && top10.length < 3 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                {top10.map((e) => {
-                  const medal = medalForRank(e.rank);
-                  return (
-                    <div
-                      key={e.userId}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "1rem",
-                        padding: "0.85rem 1.25rem",
-                        background: e.isMe ? `${alpha(C.orange, "15")}` : `${alpha(C.white, "05")}`,
-                        border: `2px solid ${alpha(medal?.color || C.purple, "40")}`,
-                        borderRadius: "0.75rem",
-                      }}
-                    >
-                      <div style={{ fontSize: "1.5rem" }}>{medal?.emoji}</div>
-                      <div style={{ flex: 1, fontWeight: 700 }}>{e.name} {e.isMe && <span style={{ color: C.orange, fontSize: "0.75rem" }}>(tu)</span>}</div>
-                      <div style={{ color: C.gray, fontSize: "0.8rem" }}>{e.sessions} sess.</div>
-                      <div style={{ fontSize: "1.25rem", fontWeight: 800, color: medal?.color || C.white }}>{e.avg}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        )}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18, alignItems: "center" }}>
+        {PERIODS.map((p) => (
+          <FilterChip key={p.key} label={p.label} active={period === p.key} onClick={() => setPeriod(p.key)} />
+        ))}
+        <select
+          value={skill}
+          onChange={(e) => setSkill(e.target.value)}
+          aria-label="Abilità"
+          style={{ padding: "7px 12px", background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 999, fontSize: 13, fontFamily: FONTS.body, cursor: "pointer" }}
+        >
+          {SKILLS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+        </select>
+        <span style={{ color: CP.textMuted, fontSize: 13, marginLeft: "auto", ...NUM }}>
+          {fmtInt(data?.totalQualifying || 0)} in classifica
+        </span>
       </div>
+
+      {loading && <Notice>Caricamento della classifica…</Notice>}
+      {error && !loading && <Notice danger>Non riesco a caricare la classifica: {error}</Notice>}
+
+      {!loading && !error && (
+        <>
+          {me && (
+            <section style={{ ...card, padding: "18px 22px", marginBottom: 18, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16, justifyContent: "space-between", borderColor: me.rank ? CP.accent : CP.border }}>
+              <div>
+                <div style={{ fontSize: 13, color: CP.textSecondary }}>La tua posizione</div>
+                {me.rank ? (
+                  <>
+                    <div style={{ fontSize: 28, fontWeight: 500, color: CP.textPrimary, lineHeight: 1.2, ...NUM }}>
+                      {me.rank}° su {fmtInt(me.totalOperators)}
+                    </div>
+                    <div style={{ fontSize: 13, color: CP.textMuted, ...NUM }}>
+                      punteggio medio {me.avg}/100 · {sessLabel(me.sessions)}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 15, color: CP.textPrimary, marginTop: 2 }}>
+                    Non ancora in classifica.{me.reason ? ` ${me.reason}` : ""}
+                  </div>
+                )}
+              </div>
+              {me.rank && me.percentile != null && (
+                <span style={{ padding: "5px 12px", background: CP.accentSoft, color: CP.accentSoftText, borderRadius: 999, fontSize: 13, ...NUM }}>
+                  Top {100 - me.percentile + 1}%
+                </span>
+              )}
+            </section>
+          )}
+
+          {hasPodium && (
+            <>
+              <SectionTitle>Podio</SectionTitle>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 12, marginBottom: 22 }}>
+                {podium.map((e, i) => <PodiumCard key={e?.userId || i} entry={e} place={i + 1} />)}
+              </div>
+            </>
+          )}
+
+          {rest.length > 0 && (
+            <>
+              {hasPodium && <SectionTitle>Gli altri dei primi 10</SectionTitle>}
+              <DataTable
+                columns={columns}
+                rows={rest.map((e) => ({ ...e, id: e.userId }))}
+                defaultSort={{ key: "rank", dir: 1 }}
+                selected={(e) => e.isMe}
+                minWidth={440}
+              />
+            </>
+          )}
+
+          {top10.length === 0 && (
+            <Notice>Nessuno in classifica in questo periodo. Servono almeno {minSessions} sessioni con valutazione.</Notice>
+          )}
+        </>
+      )}
     </div>
   );
 }

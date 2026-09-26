@@ -5,7 +5,8 @@ import Link from "next/link";
 import { TRAINING_SCENARIOS } from "@/lib/training-scenarios";
 import { CREATOR_PERSONAS } from "@/lib/creator-personas";
 import { FAN_ARCHETYPES } from "@/lib/fan-archetypes";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
+import { PageHead, Metric, FilterChip, Notice, SectionTitle, card, NUM } from "@/components/ds";
 import { analyzeConcurrentSession } from "@/lib/concurrent-sim";
 
 /**
@@ -13,6 +14,10 @@ import { analyzeConcurrentSession } from "@/lib/concurrent-sim";
  * L'operatore gestisce N fan in parallelo; alla fine ogni conversazione è
  * valutata con lo stesso scorer del single-sim e si misura il "punto di
  * degrado" (concurrent-sim.js). Riusa /api/chat e /api/score.
+ * Redesign 26/09/2026 sul design system: PageHead in ogni fase, colonne che
+ * vanno a capo su telefono, testo delle bolle più grande, niente arancio
+ * scritto a mano (l'attesa lunga resta rossa, quella media prende il viola
+ * tenue come negli avvisi), avatar con iniziale al posto dell'emoji.
  */
 
 const OPENERS = [
@@ -31,7 +36,7 @@ function pickDefaults(n) {
 
 function waitTone(seconds) {
   if (seconds >= 60) return CP.accentRed;
-  if (seconds >= 30) return "#d9a44a";
+  if (seconds >= 30) return CP.accentSoftText;
   return CP.textMuted;
 }
 
@@ -166,38 +171,27 @@ export default function MultiChatPage() {
     setPhase("results");
   }
 
+  const crumbs = [{ label: "Academy", href: "/" }, { label: "Chat in parallelo" }];
+
   // ---------------- SETUP ----------------
   if (phase === "setup") {
     return (
       <div style={wrap}>
-        <p style={eyebrow}>Academy · modalità avanzata</p>
-        <h1 style={h1}>Sim a chat concorrenti</h1>
-        <p style={{ ...lede, marginBottom: 26 }}>
-          La skill vera del mestiere: reggere più fan insieme senza che la qualità crolli.
-          Gestisci le conversazioni in parallelo — alla fine ognuna viene valutata e si misura
-          il tuo <b style={{ color: CP.textPrimary }}>punto di degrado</b>: dove la qualità inizia a cedere.
-        </p>
-        <div style={{ display: "flex", gap: 10, marginBottom: 22 }}>
-          {[2, 3, 4].map((n) => (
-            <button
-              key={n}
-              onClick={() => setFanCount(n)}
-              style={{
-                ...pill,
-                background: fanCount === n ? CP.accent : CP.surface,
-                color: fanCount === n ? CP.accentInk : CP.textSecondary,
-                borderColor: fanCount === n ? CP.accent : CP.border,
-              }}
-            >
-              {n} fan
-            </button>
-          ))}
-        </div>
-        {error && <p style={{ color: CP.accentRed, fontSize: 13 }}>{error}</p>}
-        <button onClick={start} style={{ ...cta, marginTop: 4 }}>Inizia con {fanCount} fan</button>
-        <p style={{ marginTop: 22, fontSize: 13 }}>
-          <Link href="/" style={{ color: CP.accent }}>← Torna all'Academy</Link>
-        </p>
+        <PageHead
+          crumbs={crumbs}
+          title="Chat in parallelo"
+          subtitle="Alleni la parte più difficile del mestiere: seguire più fan insieme senza che la qualità cali. Alla fine ogni conversazione viene valutata e vedi il tuo punto di degrado, cioè il punto in cui la qualità inizia a cedere."
+        />
+        <section style={{ ...card, padding: 20 }}>
+          <SectionTitle>Con quanti fan vuoi allenarti?</SectionTitle>
+          <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+            {[2, 3, 4].map((n) => (
+              <FilterChip key={n} label={`${n} fan`} active={fanCount === n} onClick={() => setFanCount(n)} />
+            ))}
+          </div>
+          {error && <Notice danger>{error}</Notice>}
+          <button onClick={start} style={cta}>Inizia con {fanCount} fan</button>
+        </section>
       </div>
     );
   }
@@ -205,51 +199,51 @@ export default function MultiChatPage() {
   // ---------------- RESULTS ----------------
   if (phase === "results" && analysis) {
     const s = analysis.summary;
-    const toneColor = (t) => (t === "good" ? CP.accentGreen : t === "warn" ? "#d9a44a" : CP.accentRed);
+    const toneColor = (t) => (t === "good" ? CP.accentGreen : t === "warn" ? CP.accentSoftText : CP.accentRed);
     return (
       <div style={wrap}>
-        <p style={eyebrow}>Risultati · {analysis.results.length} chat concorrenti</p>
-        <h1 style={h1}>Il tuo punto di degrado</h1>
+        <PageHead
+          crumbs={crumbs}
+          title="Il tuo punto di degrado"
+          subtitle={`Com'è andata la qualità su ${analysis.results.length} chat gestite insieme: la media, la chat migliore, la peggiore e quanto sono distanti.`}
+        />
 
         {s && (
-          <div
-            style={{
-              background: CP.surface,
-              border: `2px solid ${toneColor(s.verdict.tone)}`,
-              borderRadius: 14,
-              padding: "18px 22px",
-              margin: "6px 0 24px",
-            }}
-          >
-            <p style={{ margin: "0 0 6px", fontFamily: FONTS.display, fontSize: 21, fontWeight: 700, color: toneColor(s.verdict.tone) }}>
-              {s.verdict.label}
-            </p>
-            <p style={{ margin: "0 0 12px", color: CP.textSecondary, fontSize: 14 }}>{s.verdict.detail}</p>
-            <div style={{ display: "flex", gap: 22, flexWrap: "wrap", fontSize: 13, color: CP.textMuted }}>
-              <span>media <b style={{ color: CP.textPrimary }}>{s.avg}%</b></span>
-              <span>migliore <b style={{ color: CP.textPrimary }}>{s.best}%</b></span>
-              <span>peggiore <b style={{ color: CP.textPrimary }}>{s.worst}%</b></span>
-              <span>divario <b style={{ color: toneColor(s.verdict.tone) }}>{s.spread} punti</b></span>
+          <section style={{ ...card, padding: "20px 22px", marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 999, background: toneColor(s.verdict.tone), flexShrink: 0 }} />
+              <p style={{ margin: 0, fontSize: 22, fontWeight: 500, color: CP.textPrimary, lineHeight: 1.3 }}>{s.verdict.label}</p>
             </div>
-          </div>
+            <p style={{ margin: "0 0 16px", color: CP.textSecondary, fontSize: 14, lineHeight: 1.55 }}>{s.verdict.detail}</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 16 }}>
+              <Metric label="Media" value={`${s.avg}%`} />
+              <Metric label="Chat migliore" value={`${s.best}%`} />
+              <Metric label="Chat peggiore" value={`${s.worst}%`} />
+              <Metric label="Distanza" value={`${s.spread} punti`} note="tra migliore e peggiore" danger={s.verdict.tone === "bad"} />
+            </div>
+          </section>
         )}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {analysis.results.map((r) => (
-            <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 12, background: CP.surface, border: `1px solid ${r.compliance_fail ? CP.accentRed : CP.border}`, borderRadius: 10, padding: "12px 16px" }}>
-              <span style={{ fontSize: 20 }}>{r.emoji}</span>
-              <span style={{ flex: 1, color: CP.textSecondary, fontSize: 14 }}>{r.name}</span>
-              {r.compliance_fail && <span style={{ fontSize: 11.5, color: CP.accentRed, fontWeight: 700 }}>violazione compliance</span>}
-              <span style={{ fontFamily: FONTS.mono, fontSize: 18, fontWeight: 700, color: r.overall == null ? CP.textMuted : r.compliance_fail ? CP.accentRed : r.overall >= 60 ? CP.accentGreen : "#d9a44a" }}>
+        <SectionTitle>Chat per chat</SectionTitle>
+        <div style={{ ...card, overflow: "hidden" }}>
+          {analysis.results.map((r, i) => (
+            <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderTop: i ? `1px solid ${CP.borderSoft}` : "none", flexWrap: "wrap" }}>
+              <Avatar name={r.name} />
+              <span style={{ flex: "1 1 160px", color: CP.textPrimary, fontSize: 14 }}>{r.name}</span>
+              {r.compliance_fail && <span style={{ fontSize: 12, color: CP.accentRed }}>Violazione compliance</span>}
+              <span style={{ fontSize: 18, fontWeight: 500, ...NUM, color: r.overall == null ? CP.textMuted : r.compliance_fail ? CP.accentRed : r.overall >= 60 ? CP.accentGreen : CP.textPrimary }}>
                 {r.overall == null ? (r.skipped ? "—" : "n/d") : `${r.overall}%`}
               </span>
             </div>
           ))}
         </div>
+        {analysis.results.some((r) => r.skipped) && (
+          <p style={{ fontSize: 13, color: CP.textMuted, margin: "8px 0 0" }}>«—» vuol dire che a quel fan non hai mai risposto: senza uno scambio non c'è niente da valutare.</p>
+        )}
 
-        <div style={{ display: "flex", gap: 12, marginTop: 26 }}>
+        <div style={{ display: "flex", gap: 10, marginTop: 22, flexWrap: "wrap" }}>
           <button onClick={() => { setPhase("setup"); setAnalysis(null); }} style={cta}>Riprova</button>
-          <Link href="/" style={{ ...cta, background: CP.surface, color: CP.textSecondary, border: `1px solid ${CP.border}`, textDecoration: "none", display: "inline-flex", alignItems: "center" }}>Academy</Link>
+          <Link href="/" style={{ ...ctaGhost, textDecoration: "none", display: "inline-flex", alignItems: "center" }}>Torna all'Academy</Link>
         </div>
       </div>
     );
@@ -258,18 +252,19 @@ export default function MultiChatPage() {
   // ---------------- PLAYING ----------------
   const active = fans.find((f) => f.id === activeId);
   return (
-    <div style={{ ...wrap, maxWidth: 1120 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-        <div>
-          <p style={{ ...eyebrow, margin: "0 0 2px" }}>Modalità multi-chat · {fans.length} fan</p>
-          <p style={{ margin: 0, color: CP.textMuted, fontSize: 13 }}>Clicca una colonna per rispondere a quel fan. L'attesa che cresce è la pressione.</p>
-        </div>
-        <button onClick={terminate} disabled={scoring} style={{ ...cta, opacity: scoring ? 0.6 : 1 }}>
-          {scoring ? "Valutazione…" : "Termina e valuta"}
-        </button>
-      </div>
+    <div style={{ ...wrap, maxWidth: 1180 }}>
+      <PageHead
+        crumbs={crumbs}
+        title={`Chat in parallelo · ${fans.length} fan`}
+        subtitle="Tocca una colonna per rispondere a quel fan. Il tempo d'attesa che cresce è la pressione del turno vero."
+        actions={
+          <button onClick={terminate} disabled={scoring} style={{ ...cta, opacity: scoring ? 0.6 : 1 }}>
+            {scoring ? "Valutazione in corso…" : "Termina e valuta"}
+          </button>
+        }
+      />
 
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${fans.length}, 1fr)`, gap: 12, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 12, alignItems: "start" }}>
         {fans.map((f) => {
           const waiting = Math.floor((now - f.lastReplyAt) / 1000);
           const isActive = f.id === activeId;
@@ -278,9 +273,8 @@ export default function MultiChatPage() {
               key={f.id}
               onClick={() => { setActiveId(f.id); setTimeout(() => inputRef.current?.focus(), 30); }}
               style={{
-                background: CP.surface,
+                ...card,
                 border: `2px solid ${isActive ? CP.accent : CP.border}`,
-                borderRadius: 12,
                 display: "flex",
                 flexDirection: "column",
                 height: 460,
@@ -288,10 +282,10 @@ export default function MultiChatPage() {
                 overflow: "hidden",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: `1px solid ${CP.borderSoft}` }}>
-                <span style={{ fontSize: 17 }}>{f.emoji}</span>
-                <span style={{ flex: 1, fontSize: 13, color: CP.textSecondary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.name}</span>
-                <span style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: waitTone(waiting) }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: `1px solid ${CP.borderSoft}`, background: isActive ? alpha(CP.accent, "14") : "transparent" }}>
+                <Avatar name={f.name} />
+                <span style={{ flex: 1, fontSize: 14, color: CP.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.name}</span>
+                <span style={{ fontSize: 12, color: waitTone(waiting), ...NUM }}>
                   {f.busy ? "scrive…" : `attesa ${waiting}s`}
                 </span>
               </div>
@@ -301,13 +295,15 @@ export default function MultiChatPage() {
                     key={i}
                     style={{
                       alignSelf: m.role === "operator" ? "flex-end" : "flex-start",
-                      maxWidth: "85%",
+                      maxWidth: "88%",
                       background: m.role === "operator" ? CP.accentSoft : CP.surfaceAlt,
-                      color: m.role === "operator" ? CP.accentSoftText : CP.textSecondary,
-                      borderRadius: 10,
-                      padding: "6px 10px",
-                      fontSize: 12.5,
-                      lineHeight: 1.4,
+                      color: CP.textPrimary,
+                      borderRadius: 12,
+                      padding: "7px 11px",
+                      fontSize: 14,
+                      lineHeight: 1.5,
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
                     }}
                   >
                     {m.content}
@@ -328,12 +324,14 @@ export default function MultiChatPage() {
           placeholder={active ? `Rispondi a ${active.name}…` : "Scegli un fan"}
           style={{
             flex: 1,
+            minWidth: 0,
             padding: "12px 14px",
             background: CP.surface,
             border: `1px solid ${CP.border}`,
             borderRadius: 10,
             color: CP.textPrimary,
-            fontSize: 14,
+            fontSize: 15,
+            fontFamily: FONTS.body,
             outline: "none",
           }}
         />
@@ -345,10 +343,16 @@ export default function MultiChatPage() {
   );
 }
 
+// Avatar neutro con l'iniziale del profilo fan (al posto dell'emoji nel chrome).
+function Avatar({ name }) {
+  return (
+    <span style={{ width: 26, height: 26, borderRadius: 999, background: CP.surfaceAlt, color: CP.textSecondary, fontSize: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      {String(name || "?").trim().charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
 // ---- stili ----
-const wrap = { maxWidth: 760, margin: "0 auto", padding: "32px 22px 60px" };
-const eyebrow = { font: `500 12px ${FONTS.mono}`, textTransform: "uppercase", letterSpacing: ".12em", color: CP.accentSoftText, margin: "0 0 10px" };
-const h1 = { fontFamily: FONTS.display, fontSize: "clamp(26px,4vw,38px)", fontWeight: 600, color: CP.textPrimary, letterSpacing: "-.02em", margin: "0 0 14px" };
-const lede = { fontSize: 16, color: CP.textSecondary, lineHeight: 1.6, maxWidth: "62ch" };
-const pill = { padding: "8px 18px", borderRadius: 999, border: "1px solid", font: "500 14px inherit", cursor: "pointer" };
-const cta = { padding: "11px 22px", background: CP.accent, color: CP.accentInk, border: "none", borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: "pointer" };
+const wrap = { padding: "28px 24px 64px", maxWidth: 820, margin: "0 auto", fontFamily: FONTS.body };
+const cta = { padding: "10px 20px", background: CP.accent, color: CP.accentInk, border: "none", borderRadius: 10, fontWeight: 500, fontSize: 14, cursor: "pointer", fontFamily: FONTS.body };
+const ctaGhost = { ...cta, background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}` };

@@ -1,17 +1,23 @@
 "use client";
 
+// Dettaglio esempio del playbook (redesign 26/09/2026 sul design system).
+// La conversazione è il contenuto principale: bolle leggibili (testo pieno,
+// interlinea ampia), a fianco situazione → commento → passi → cosa ricordare.
+// I dati tecnici (id, profilo fan, tag) restano, dietro una sezione richiudibile.
+// Stessa API di prima (/api/playbook/[id]).
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
-import Link from "next/link";
-import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
+import { PageHead, SectionTitle, Disclosure, Notice, card, NUM } from "@/components/ds";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
 const CATEGORY_LABELS = {
   "le-basi-della-chat": "Basi della chat",
-  "custom-e-upsell": "Custom & PPV",
+  "custom-e-upsell": "Custom e PPV",
   "script-avanzati": "Script avanzati",
-  "recuperi-e-retention": "Recuperi & Retention",
+  "recuperi-e-retention": "Recuperi e retention",
 };
 
 const CREATOR_LABELS = {
@@ -20,35 +26,33 @@ const CREATOR_LABELS = {
   "giulia-vaneri": "Giulia Vaneri",
 };
 
+const tag = { fontSize: 12, padding: "3px 10px", borderRadius: 6, background: CP.surfaceAlt, color: CP.textSecondary };
+const label = { fontSize: 13, color: CP.textMuted, marginBottom: 6 };
+const body = { fontSize: 14, color: CP.textPrimary, lineHeight: 1.6 };
+const WRAP = { padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body };
+const CRUMBS = [{ label: "Academy", href: "/" }, { label: "Playbook", href: "/playbook" }];
+
 function MessageBubble({ msg }) {
   const isOperator = msg.role === "operator";
   return (
     <div style={{ display: "flex", justifyContent: isOperator ? "flex-end" : "flex-start", marginBottom: 10 }}>
       <div
         style={{
-          maxWidth: "78%",
-          background: isOperator ? COLORS.champagne : COLORS.charcoal,
-          color: isOperator ? COLORS.obsidian : COLORS.alabaster,
+          maxWidth: "85%",
+          background: isOperator ? CP.accentSoft : CP.surfaceAlt,
+          color: CP.textPrimary,
           padding: "10px 14px",
           borderRadius: 14,
-          borderBottomRightRadius: isOperator ? 2 : 14,
-          borderBottomLeftRadius: isOperator ? 14 : 2,
-          fontSize: 14,
+          borderBottomRightRadius: isOperator ? 4 : 14,
+          borderBottomLeftRadius: isOperator ? 14 : 4,
+          fontSize: 15,
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
-          lineHeight: 1.45,
+          lineHeight: 1.55,
         }}
       >
-        <div
-          style={{
-            fontSize: 10,
-            opacity: 0.7,
-            fontWeight: 600,
-            letterSpacing: "0.05em",
-            marginBottom: 3,
-          }}
-        >
-          {isOperator ? "OPERATORE" : "FAN"}
+        <div style={{ fontSize: 12, color: isOperator ? CP.accentSoftText : CP.textMuted, marginBottom: 3 }}>
+          {isOperator ? "Operatore" : "Fan"}
         </div>
         {msg.content}
       </div>
@@ -59,152 +63,116 @@ function MessageBubble({ msg }) {
 export default function PlaybookEntryPage() {
   const params = useParams();
   const id = params?.id;
-  const { data, error, isLoading } = useSWR(
-    id ? `/api/playbook/${id}` : null,
-    fetcher,
-    { revalidateOnFocus: false }
-  );
+  const [metaOpen, setMetaOpen] = useState(false);
+  const { data, error, isLoading } = useSWR(id ? `/api/playbook/${id}` : null, fetcher, { revalidateOnFocus: false });
 
-  const styles = {
-    page: { minHeight: "100vh", background: COLORS.obsidian, color: COLORS.alabaster, fontFamily: FONTS.body, padding: "32px 24px" },
-    container: { maxWidth: 1100, margin: "0 auto" },
-    backLink: { color: COLORS.fog, fontSize: 13, textDecoration: "none", display: "inline-block", marginBottom: 12 },
-    title: { fontFamily: FONTS.display, fontSize: 28, letterSpacing: "-0.01em", margin: "0 0 8px 0", lineHeight: 1.3 },
-    badges: { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 18, fontSize: 12 },
-    badge: { background: COLORS.charcoal, color: COLORS.fog, padding: "3px 10px", borderRadius: 10 },
-    badgeAccent: { background: COLORS.champagne, color: COLORS.obsidian, padding: "3px 10px", borderRadius: 10, fontWeight: 600 },
-    grid: { display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 22, marginTop: 18 },
-    card: { background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 12, padding: 20 },
-    h2: { fontFamily: FONTS.display, fontSize: 16, margin: "0 0 12px 0", color: COLORS.alabaster, fontWeight: 600 },
-    label: { fontSize: 11, color: COLORS.fog, letterSpacing: "0.06em", marginBottom: 6 },
-    body: { fontSize: 14, color: COLORS.alabaster, lineHeight: 1.6 },
-    takeaway: {
-      fontSize: 14,
-      color: COLORS.alabaster,
-      lineHeight: 1.6,
-      background: COLORS.charcoal,
-      padding: 14,
-      borderRadius: 8,
-      borderLeft: `3px solid ${COLORS.champagne}`,
-      fontStyle: "italic",
-    },
-    stepsList: { paddingLeft: 20, margin: "8px 0 0 0", fontSize: 14, lineHeight: 1.6, color: COLORS.alabaster },
-    note: { fontSize: 13, color: COLORS.fog, marginTop: 8, fontStyle: "italic" },
-    metaRow: { display: "flex", justifyContent: "space-between", fontSize: 13, color: COLORS.fog, marginBottom: 6 },
-  };
+  if (isLoading) return <div style={WRAP}><PageHead crumbs={CRUMBS} title="Esempio" /><Notice>Caricamento dell'esempio…</Notice></div>;
+  if (error) return <div style={WRAP}><PageHead crumbs={CRUMBS} title="Esempio" /><Notice danger>Errore di rete: riprova tra poco.</Notice></div>;
+  if (data?.error) return <div style={WRAP}><PageHead crumbs={CRUMBS} title="Esempio" /><Notice danger>{data.error}</Notice></div>;
 
-  if (isLoading) return <div style={styles.page}><div style={styles.container}><p style={{ color: COLORS.fog }}>Caricamento…</p></div></div>;
-  if (error) return <div style={styles.page}><div style={styles.container}><p style={{ color: COLORS.signal }}>Errore di rete.</p></div></div>;
-  if (data?.error) return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <Link href="/playbook" style={styles.backLink}>← Playbook</Link>
-        <p style={{ color: COLORS.signal }}>{data.error}</p>
+  const entry = data?.entry;
+  if (!entry) return <div style={WRAP}><PageHead crumbs={CRUMBS} title="Esempio" /><Notice>Esempio non trovato.</Notice></div>;
+
+  const isDedicated = entry.source === "dedicated";
+  const hasMeta = entry.operatorId || entry.fanProfile || entry.id || (entry.tags && entry.tags.length > 0);
+
+  return (
+    <div style={WRAP}>
+      <PageHead
+        crumbs={[...CRUMBS, { label: "Esempio" }]}
+        title={entry.title}
+        subtitle={isDedicated
+          ? "Leggi la conversazione, poi il commento: cosa è stato fatto, in che ordine e perché ha funzionato (o no)."
+          : "Esempio dal pool di taratura della valutazione automatica: utile da studiare, ma non da copiare parola per parola."}
+      />
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+        <span style={{ ...tag, background: isDedicated ? CP.accentSoft : CP.surfaceAlt, color: isDedicated ? CP.accentSoftText : CP.textSecondary }}>
+          {isDedicated ? "Curato per chi si allena" : "Pool di taratura AI"}
+        </span>
+        <span style={tag}>{CATEGORY_LABELS[entry.category] || entry.category}</span>
+        {entry.creator && <span style={tag}>{CREATOR_LABELS[entry.creator] || entry.creator}</span>}
+        {entry.benchmark && <span style={tag}>Benchmark: {entry.benchmark}</span>}
+        {entry.difficulty && <span style={tag}>{entry.difficulty}</span>}
+        {entry.outcome === "failure" && (
+          <span style={{ ...tag, background: alpha(CP.accentRed, "1f"), color: CP.accentRed }}>Esempio negativo: cosa non funziona</span>
+        )}
+      </div>
+
+      {!isDedicated && (
+        <Notice>
+          Questo esempio non è stato scritto per la formazione: viene dal pool che serve a tarare il giudice AI,
+          e il commento è scritto per il giudice. Leggilo con occhio critico.
+        </Notice>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))", gap: 14, alignItems: "start" }}>
+        <section style={{ ...card, padding: 18 }}>
+          <SectionTitle aside={entry.conversation?.length ? `${entry.conversation.length} messaggi` : null}>Conversazione</SectionTitle>
+          {entry.conversation && entry.conversation.length > 0 ? (
+            entry.conversation.map((m, i) => <MessageBubble key={i} msg={m} />)
+          ) : (
+            <p style={{ color: CP.textMuted, fontSize: 13, margin: 0 }}>Nessun messaggio salvato.</p>
+          )}
+        </section>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {entry.situation && (
+            <section style={{ ...card, padding: 18 }}>
+              <div style={label}>Situazione</div>
+              <div style={body}>{entry.situation}</div>
+            </section>
+          )}
+
+          <section style={{ ...card, padding: 18 }}>
+            <div style={label}>{isDedicated ? "Commento didattico" : "Commento del giudice AI"}</div>
+            <div style={body}>{entry.commentary}</div>
+          </section>
+
+          {entry.steps && entry.steps.length > 0 && (
+            <section style={{ ...card, padding: 18 }}>
+              <div style={label}>Passi concreti</div>
+              <ol style={{ ...body, paddingLeft: 20, margin: 0 }}>
+                {entry.steps.map((s, i) => <li key={i} style={{ marginBottom: 4 }}>{s}</li>)}
+              </ol>
+            </section>
+          )}
+
+          {entry.takeaway && (
+            <section style={{ ...card, padding: 18, borderLeft: `3px solid ${CP.accent}` }}>
+              <div style={label}>Da ricordare</div>
+              <div style={{ ...body, fontSize: 15 }}>{entry.takeaway}</div>
+            </section>
+          )}
+
+          {hasMeta && (
+            <Disclosure open={metaOpen} onToggle={() => setMetaOpen((o) => !o)} title="Dettagli tecnici" summary="operatore, profilo fan, id, tag">
+              <div style={{ fontSize: 13, color: CP.textSecondary }}>
+                {entry.operatorId && <MetaRow k="Operatore" v={entry.operatorId} />}
+                {entry.fanProfile && <MetaRow k="Profilo fan" v={entry.fanProfile} />}
+                <MetaRow k="Id" v={<span style={{ fontSize: 12, ...NUM }}>{entry.id}</span>} />
+                {entry.tags && entry.tags.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={label}>Tag</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {entry.tags.map((t, i) => <span key={i} style={tag}>{t}</span>)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Disclosure>
+          )}
+        </div>
       </div>
     </div>
   );
+}
 
-  const entry = data?.entry;
-  if (!entry) return null;
-
-  const isDedicated = entry.source === "dedicated";
-
+function MetaRow({ k, v }) {
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <div style={{ marginBottom: 18, display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-          <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>Academy</Link>
-          <span style={{ color: CP.textMuted }}>›</span>
-          <Link href="/playbook" style={{ color: "inherit", textDecoration: "none" }}>Playbook</Link>
-          <span style={{ color: CP.textMuted }}>›</span>
-          <span style={{ color: CP.textPrimary }}>Dettaglio</span>
-        </div>
-
-        <h1 style={styles.title}>{entry.title}</h1>
-
-        <div style={styles.badges}>
-          <span style={isDedicated ? styles.badgeAccent : styles.badge}>
-            {isDedicated ? "Curato per operatori" : "Pool di calibrazione AI"}
-          </span>
-          <span style={styles.badge}>{CATEGORY_LABELS[entry.category] || entry.category}</span>
-          {entry.creator && <span style={styles.badge}>{CREATOR_LABELS[entry.creator] || entry.creator}</span>}
-          {entry.benchmark && <span style={styles.badge}>benchmark: {entry.benchmark}</span>}
-          {entry.difficulty && <span style={styles.badge}>{entry.difficulty}</span>}
-          {entry.outcome === "failure" && (
-            <span style={{ ...styles.badge, background: alpha(COLORS.signal, "20"), color: COLORS.signal }}>
-              esempio negativo (cosa NON funziona)
-            </span>
-          )}
-        </div>
-
-        {!isDedicated && (
-          <div style={{ ...styles.card, background: COLORS.charcoal, marginBottom: 18, fontSize: 13, color: COLORS.fog }}>
-            ⚠ Questa voce viene dal <strong>pool di calibrazione del giudice AI</strong>, non
-            è stata curata specificamente per la formazione operatori. Il commentary tecnico è
-            scritto per il giudice. Da studiare con un occhio critico, non da copiare verbatim.
-          </div>
-        )}
-
-        <div style={styles.grid}>
-          {/* Conversazione */}
-          <div style={styles.card}>
-            <h2 style={styles.h2}>Conversazione</h2>
-            {entry.conversation && entry.conversation.length > 0 ? (
-              entry.conversation.map((m, i) => <MessageBubble key={i} msg={m} />)
-            ) : (
-              <p style={{ color: COLORS.fog, fontSize: 13 }}>Nessun messaggio salvato.</p>
-            )}
-          </div>
-
-          {/* Pannello laterale */}
-          <div>
-            {entry.situation && (
-              <div style={{ ...styles.card, marginBottom: 14 }}>
-                <div style={styles.label}>Situazione</div>
-                <div style={styles.body}>{entry.situation}</div>
-              </div>
-            )}
-
-            <div style={{ ...styles.card, marginBottom: 14 }}>
-              <div style={styles.label}>{isDedicated ? "Commentary didattico" : "Commentary del giudice AI"}</div>
-              <div style={styles.body}>{entry.commentary}</div>
-            </div>
-
-            {entry.steps && entry.steps.length > 0 && (
-              <div style={{ ...styles.card, marginBottom: 14 }}>
-                <div style={styles.label}>Step concreti</div>
-                <ol style={styles.stepsList}>
-                  {entry.steps.map((s, i) => <li key={i}>{s}</li>)}
-                </ol>
-              </div>
-            )}
-
-            {entry.takeaway && (
-              <div style={{ ...styles.card, marginBottom: 14 }}>
-                <div style={styles.label}>Takeaway</div>
-                <div style={styles.takeaway}>{entry.takeaway}</div>
-              </div>
-            )}
-
-            <div style={styles.card}>
-              <div style={styles.label}>Metadata</div>
-              {entry.operatorId && <div style={styles.metaRow}><span>Operatore</span><span>{entry.operatorId}</span></div>}
-              {entry.fanProfile && <div style={styles.metaRow}><span>Fan profile</span><span>{entry.fanProfile}</span></div>}
-              <div style={styles.metaRow}><span>ID</span><span style={{ fontFamily: FONTS.mono, fontSize: 11 }}>{entry.id}</span></div>
-              {entry.tags && entry.tags.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <div style={styles.label}>Tags</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    {entry.tags.map((t, i) => (
-                      <span key={i} style={{ ...styles.badge, fontSize: 11 }}>{t}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "5px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
+      <span style={{ color: CP.textMuted }}>{k}</span>
+      <span style={{ textAlign: "right", wordBreak: "break-all" }}>{v}</span>
     </div>
   );
 }
