@@ -12,6 +12,7 @@ import Link from "next/link";
 import { Info, Download } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
+import { Modal } from "@/components/cp-style";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmt$, fmtInt, MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, FilterChip, Notice, card } from "@/components/ds";
@@ -42,6 +43,10 @@ export default function ActionCenterPage() {
   const [tier, setTier] = useState("");
   const [threshold, setThreshold] = useState(25);
   const [q, setQ] = useState("");
+  const [bucket, setBucket] = useState("decide"); // decide | watch
+  const [hrFor, setHrFor] = useState(null);
+  const [hrForm, setHrForm] = useState({ colloquio_date: "", motivazione: "", voce_operatore: "" });
+  const [hrErr, setHrErr] = useState(null);
   const periodOptions = useMemo(() => monthOpts(), []);
   const prevId = prevOf(periodId);
 
@@ -57,7 +62,27 @@ export default function ActionCenterPage() {
   const prevScore = useMemo(() => new Map((prevRank?.ranking || []).filter((r) => r.score > 0).map((r) => [r.employee, r.score])), [prevRank]);
 
   const stageOf = (c) => c.swap_entry?.status === "ready_for_hr" ? "ready" : c.swap_entry?.swap_with ? "swap" : "todo";
-  const inThreshold = all.filter((c) => c.score <= threshold);
+  const inThresholdAll = all.filter((c) => c.score <= threshold);
+  // Tre condizioni per "Da decidere" (26/09, comitato esperti): la soglia è
+  // RELATIVA (una parte del gruppo ci finisce sempre), quindi da sola non basta.
+  // Serve anche: (2) rendere sotto il 75% dei colleghi sulla stessa creator e
+  // (3) una tendenza — sotto soglia anche il mese prima, o in calo di 5+ punti.
+  // Chi non le ha tutte è "Da osservare", con il motivo.
+  const evaluate = (c) => {
+    const ps = prevScore.get(c.employee);
+    const vp = c.context?.vs_peers_pct;
+    const peers = vp != null && vp <= -25;
+    const trend = ps != null && (ps <= threshold || c.score <= ps - 5);
+    const missing = [];
+    if (vp == null) missing.push("confronto coi colleghi non disponibile");
+    else if (!peers) missing.push(vp >= -10 ? "rende come i colleghi sulla stessa creator" : "sotto i colleghi, ma meno del 25%");
+    if (ps == null) missing.push("primo mese in classifica");
+    else if (!trend) missing.push("primo mese sotto soglia, senza calo");
+    return { decide: peers && trend, missing };
+  };
+  const inThreshold = inThresholdAll.filter((c) => (bucket === "decide") === evaluate(c).decide || c.swap_entry?.status === "ready_for_hr");
+  const nDecide = inThresholdAll.filter((c) => evaluate(c).decide).length;
+  const nWatch = inThresholdAll.length - nDecide;
   const needle = q.trim().toLowerCase();
   const rows = inThreshold.filter((c) => (!needle || `${c.employee} ${c.top_creator || ""}`.toLowerCase().includes(needle))
     && (stage === "all" || stageOf(c) === stage) && (!tier || c.tier === tier));
@@ -67,18 +92,24 @@ export default function ActionCenterPage() {
   const prevCount = prevAc && !prevAc.error ? (prevAc.candidates || []).filter((c) => c.score <= threshold).length : null;
   const prevName = prevId ? MONTHS_IT[Number(prevId.slice(5)) - 1] : "";
 
-  async function callAction(employee, action, swap_with = undefined, note = undefined) {
-    if (!periodId) return;
+  async function callAction(employee, action, swap_with = undefined, note = undefined, hr = undefined) {
+    if (!periodId) return false;
     try {
       const res = await fetch("/api/admin/action-center", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ period_id: periodId, employee, action, swap_with, note }),
+        body: JSON.stringify({ period_id: periodId, employee, action, swap_with, note, hr }),
       });
       const j = await res.json();
-      if (!res.ok) { alert(j.error || "Errore"); return; }
+      if (!res.ok) { if (hr) setHrErr(j.error || "Errore"); else alert(j.error || "Errore"); return false; }
       mutate(url);
-    } catch (e) { alert(e.message); }
+      return true;
+    } catch (e) { alert(e.message); return false; }
+  }
+  async function submitHr() {
+    setHrErr(null);
+    const okk = await callAction(hrFor, "set_ready", undefined, undefined, hrForm);
+    if (okk) { setHrFor(null); setHrForm({ colloquio_date: "", motivazione: "", voce_operatore: "" }); }
   }
   async function unmark(employee) {
     if (!periodId) return;
@@ -107,13 +138,14 @@ export default function ActionCenterPage() {
   function exportCsv() {
     if (readyForHr.length === 0) { alert("Nessun operatore pronto per HR."); return; }
     const rowsCsv = [
-      ["Employee", "Group", "Score", "Score mese prima", "Tier", "CP Sales", "CP Shifts", "Top Creator", "Swap with", "Marked at", "Note"],
+      ["Operatore", "Gruppo", "Score", "Score mese prima", "Fascia", "Venduto CP", "Turni CP", "Creator principale", "Per turno vs colleghi %", "Creator (pubblico)", "Sostituto", "Colloquio del", "Motivazione", "Cosa ha detto l'operatore", "Segnato il", "Nota"],
       ...readyForHr.map((e) => {
         const cand = all.find((c) => c.employee === e.employee);
         return [
           e.employee, cand?.group || "", cand?.score ?? "", prevScore.get(e.employee) ?? "", tierLabel(cand?.tier) ?? "",
           cand?.cp_total_sales ?? "", cand?.cp_total_shifts ?? "",
-          cand?.top_creator ?? "", e.swap_with || "",
+          cand?.top_creator ?? "", cand?.context?.vs_peers_pct ?? "", cand?.context?.difficulty_band ?? "", e.swap_with || "",
+          e.hr?.colloquio_date || "", e.hr?.motivazione || "", e.hr?.voce_operatore || "",
           new Date(e.marked_at).toISOString().slice(0, 10), e.note || "",
         ];
       }),
@@ -147,19 +179,19 @@ export default function ActionCenterPage() {
 
       {ok && (<>
         <HeroMetric
-          label={`Da rivedere · score ≤ ${threshold}, almeno 5 turni`}
-          value={fmtInt(inThreshold.length)}
+          label={`Da decidere · score ≤ ${threshold}, sotto i colleghi e in calo`}
+          value={fmtInt(nDecide)}
           compare={prevCount != null ? `${prevName}: ${prevCount}` : null}
           hint={`${repeat} ${repeat === 1 ? "era" : "erano"} sotto soglia anche a ${prevName}: un solo mese storto può essere contesto (creator, turni), due di fila no.`}
         >
           <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
-            <Metric label="Da decidere" value={fmtInt(n("todo"))} />
+            <Metric label="Da osservare" value={fmtInt(nWatch)} note="sotto soglia, ma non tutte le condizioni" />
             <Metric label="Sostituto scelto" value={fmtInt(n("swap"))} />
             <div>
               <Metric label="Pronti per HR" value={fmtInt(readyForHr.length)} />
               {readyForHr.length > 0 && (
                 <button onClick={exportCsv} style={{ marginTop: 4, display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: "none", background: CP.accent, color: CP.accentInk, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body }}>
-                  <Download size={13} /> Esporta per HR
+                  <Download size={13} /> Esporta i casi documentati
                 </button>
               )}
             </div>
@@ -167,7 +199,11 @@ export default function ActionCenterPage() {
           </div>
         </HeroMetric>
 
+        <Notice>La soglia è relativa: una parte del gruppo sarà sempre qui, anche se tutti migliorano. Per questo “Da decidere” richiede anche di rendere sotto i colleghi sulla stessa creator e una tendenza (due mesi o un calo). Conta la tendenza, non il singolo mese.</Notice>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+          <FilterChip label={`Da decidere (${nDecide})`} active={bucket === "decide"} onClick={() => setBucket("decide")} />
+          <FilterChip label={`Da osservare (${nWatch})`} active={bucket === "watch"} onClick={() => setBucket("watch")} />
+          <span style={{ width: 12 }} />
           <FilterChip label={`Tutti (${inThreshold.length})`} active={stage === "all"} onClick={() => setStage("all")} />
           <FilterChip label={`Da decidere (${n("todo")})`} active={stage === "todo"} disabled={!n("todo")} onClick={() => setStage(stage === "todo" ? "all" : "todo")} />
           <FilterChip label={`Sostituto scelto (${n("swap")})`} active={stage === "swap"} disabled={!n("swap")} onClick={() => setStage(stage === "swap" ? "all" : "swap")} />
@@ -183,7 +219,7 @@ export default function ActionCenterPage() {
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca operatore" aria-label="Cerca operatore" style={{ ...ctl, width: 200, fontSize: 13 }} />
         </div>
         <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 8 }}>
-          “Pronto per HR” si attiva dopo aver scelto un sostituto. “Togli” vale solo per questo mese; “Escludi sempre” lo toglie anche dai mesi futuri (resta in classifica).
+          “Pronto per HR” si attiva dopo aver scelto un sostituto e chiede il colloquio documentato (data, motivazione, cosa ha detto l'operatore). “Togli” vale solo per questo mese; “Escludi sempre” lo toglie anche dai mesi futuri (resta in classifica).
         </div>
 
         {rows.length === 0 ? (
@@ -215,6 +251,9 @@ export default function ActionCenterPage() {
                             {c.context.difficulty_band && <>pubblico {c.context.difficulty_band}</>}
                           </div>
                         )}
+                        {bucket === "watch" && evaluate(c).missing.length > 0 && (
+                          <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2 }}>Da osservare: {evaluate(c).missing.join(" · ")}</div>
+                        )}
                         {c.context?.difficulty_band === "fredda" && c.context.vs_peers_pct != null && c.context.vs_peers_pct >= -10 && (
                           <div style={{ fontSize: 12, color: CP.accentSoftText, marginTop: 2 }}>Rende come i colleghi su una creator fredda: valutare la creator prima della persona</div>
                         )}
@@ -224,7 +263,7 @@ export default function ActionCenterPage() {
                         <div style={{ fontSize: 12, color: CP.textMuted }}>{tierLabel(c.tier)}</div>
                       </td>
                       <td style={{ ...tdS, textAlign: "right" }}>
-                        <span style={{ color: again ? CP.accentRed : CP.textSecondary }}>{ps == null ? "—" : sc(ps)}</span>
+                        <span style={{ color: CP.textSecondary }}>{ps == null ? "—" : sc(ps)}</span>
                         <div style={{ fontSize: 12, color: CP.textMuted }}>{ps == null ? "non in classifica" : again ? "anche sotto soglia" : "sopra soglia"}</div>
                       </td>
                       <td style={{ ...tdS, textAlign: "right" }}>{fmt$(c.cp_total_sales)}</td>
@@ -234,7 +273,7 @@ export default function ActionCenterPage() {
                       </td>
                       <td style={{ ...tdS, whiteSpace: "nowrap", textAlign: "right" }}>
                         {st !== "ready" ? (
-                          <button onClick={() => callAction(c.employee, "set_ready")} disabled={!c.swap_entry?.swap_with}
+                          <button onClick={() => { setHrErr(null); setHrFor(c.employee); }} disabled={!c.swap_entry?.swap_with}
                             title={c.swap_entry?.swap_with ? "Aggiungi alla lista per HR" : "Scegli prima un sostituto"}
                             style={{ ...btn, background: c.swap_entry?.swap_with ? CP.accent : CP.surfaceAlt, color: c.swap_entry?.swap_with ? CP.accentInk : CP.textMuted, borderColor: "transparent", cursor: c.swap_entry?.swap_with ? "pointer" : "not-allowed" }}>
                             Pronto per HR
@@ -244,7 +283,7 @@ export default function ActionCenterPage() {
                         )}
                         <div style={{ marginTop: 6, display: "flex", gap: 12, justifyContent: "flex-end" }}>
                           <button onClick={() => unmark(c.employee)} style={linkBtn}>Togli</button>
-                          <button onClick={() => ignorePermanent(c.employee)} style={{ ...linkBtn, color: CP.accentRed }}>Escludi sempre</button>
+                          <button onClick={() => ignorePermanent(c.employee)} style={linkBtn}>Escludi sempre</button>
                         </div>
                       </td>
                     </tr>
@@ -255,8 +294,28 @@ export default function ActionCenterPage() {
           </div>
         )}
         <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 10 }}>
-          Sotto il nome: quanto rende per turno rispetto ai colleghi sulla stessa creator (lui escluso) e quanto è “fredda” la creator (profilo dal warehouse, <Link href="/admin/creator-difficulty" style={{ color: CP.accentSoftText }}>Difficoltà creator</Link>). Criteri: score CP ≤ soglia con almeno 5 turni nel mese. {data.ignored_count ? `${data.ignored_count} operatori esclusi per sempre non compaiono. ` : ""}I sostituti suggeriti sono chi rende meglio sulle stesse creator (numero = compatibilità).
+          Sotto il nome: quanto rende per turno rispetto ai colleghi sulla stessa creator (lui escluso) e quanto è “fredda” la creator (profilo dal warehouse, <Link href="/admin/creator-difficulty" style={{ color: CP.accentSoftText }}>Difficoltà creator</Link>). Criteri: score CP ≤ soglia con almeno 5 turni nel mese; “Da decidere” anche per turno sotto il 75% dei colleghi sulla stessa creator e sotto soglia il mese prima o in calo di almeno 5 punti. {data.ignored_count ? `${data.ignored_count} operatori esclusi per sempre non compaiono. ` : ""}I sostituti suggeriti sono chi rende meglio sulle stesse creator (numero = compatibilità).
         </div>
+        <Modal open={!!hrFor} onClose={() => setHrFor(null)} title={`Pronto per HR · ${hrFor || ""}`} maxWidth={560}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, fontSize: 14 }}>
+            <div style={{ color: CP.textSecondary, lineHeight: 1.5 }}>Verso HR si va solo dopo aver parlato con la persona. Quello che scrivi finisce nell&apos;export insieme al contesto (colleghi, creator, turni).</div>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, color: CP.textMuted, fontSize: 12 }}>Colloquio svolto il
+              <input type="date" value={hrForm.colloquio_date} onChange={(e) => setHrForm({ ...hrForm, colloquio_date: e.target.value })} style={{ ...ctl, fontSize: 14 }} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, color: CP.textMuted, fontSize: 12 }}>Motivazione (almeno 80 caratteri: {hrForm.motivazione.trim().length}/80)
+              <textarea rows={4} value={hrForm.motivazione} onChange={(e) => setHrForm({ ...hrForm, motivazione: e.target.value })} style={{ ...ctl, fontSize: 14, resize: "vertical" }} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, color: CP.textMuted, fontSize: 12 }}>Cosa ha detto l&apos;operatore
+              <textarea rows={3} value={hrForm.voce_operatore} onChange={(e) => setHrForm({ ...hrForm, voce_operatore: e.target.value })} style={{ ...ctl, fontSize: 14, resize: "vertical" }} />
+            </label>
+            {hrErr && <div style={{ color: CP.accentRed, fontSize: 13 }}>{hrErr}</div>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setHrFor(null)} style={btn}>Annulla</button>
+              <button onClick={submitHr} disabled={!hrForm.colloquio_date || hrForm.motivazione.trim().length < 80 || hrForm.voce_operatore.trim().length < 10}
+                style={{ ...btn, background: CP.accent, color: CP.accentInk, borderColor: "transparent" }}>Conferma: pronto per HR</button>
+            </div>
+          </div>
+        </Modal>
       </>)}
     </div>
   );
