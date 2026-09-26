@@ -9,8 +9,9 @@ import { CREATOR_PERSONAS } from "@/lib/creator-personas";
 import { FAN_ARCHETYPES, getFanArchetypeById } from "@/lib/fan-archetypes";
 import PlayerCard from "@/components/PlayerCard";
 import { PlayerCardSkeleton, XPBarSkeleton, GridSkeleton } from "@/components/Skeleton";
-import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
-import BrandLockup from "@/components/BrandLockup";
+import { FONTS, CP, alpha } from "@/lib/brand";
+import { PageHead, Notice, card, NUM } from "@/components/ds";
+import { ArrowLeft, Lock, Star } from "lucide-react";
 import CoachPanel from "@/components/CoachPanel";
 import SignalsPanel from "@/components/SignalsPanel";
 import { canSee } from "@/lib/nav-access";
@@ -26,62 +27,107 @@ function pickRandomArchetype() {
 // CONSTANTS & DATA
 // =========================================================
 
-// Dark SaaS rebrand — HOC_COLORS mappa ai token del design system (docs/DESIGN.md).
-// Le vecchie chiavi (orange/purple/ecc.) restano per retrocompat, ma puntano ai nuovi token.
-const HOC_COLORS = {
-  bgDark: COLORS.obsidian,      // #0a0d11 — bg-sunken
-  white: COLORS.alabaster,      // #f2f4f8 — text
-  orange: COLORS.champagne,     // #8b7cf6 — accent
-  purple: COLORS.cobalt,        // #b9aef9 — accent-soft-text
-  gray: COLORS.mist,            // #8c95a8 — muted
-  green: COLORS.verdant,        // #4ade80 — success
-  gradient: COLORS.champagne,   // flat: era un gradient accent, ora tinta unica (accent)
+// Competenze valutate dal coach AI. Una sola tinta per le barre (design system:
+// un solo accento): la differenza la fa l'etichetta, non il colore.
+const SKILL_DIMENSIONS = [
+  { key: "naturalezza", label: "Naturalezza" },
+  { key: "esclusivita", label: "Esclusività" },
+  { key: "dipendenza", label: "Dipendenza" },
+  { key: "conversione", label: "Conversione" },
+  { key: "tono", label: "Tono" },
+  { key: "gestione_obiezioni", label: "Gestione obiezioni" },
+];
+
+// Stili condivisi della pagina (solo token CP, seguono il tema chiaro/scuro).
+const WRAP = { padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body };
+const BTN = { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 18px", borderRadius: 8, fontSize: 14, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };
+const BTN_PRIMARY = { ...BTN, background: CP.accent, color: CP.accentInk, border: `1px solid ${CP.accent}` };
+const BTN_SECONDARY = { ...BTN, background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}` };
+const BTN_OFF = { ...BTN, background: CP.surfaceAlt, color: CP.textMuted, border: `1px solid ${CP.border}`, cursor: "not-allowed" };
+const CHIP = { display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 500, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textSecondary, textDecoration: "none", whiteSpace: "nowrap" };
+const CHIP_ACCENT = { ...CHIP, border: `1px solid ${alpha(CP.accent, "55")}`, background: CP.accentSoft, color: CP.accentSoftText };
+const INPUT = { background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, outline: "none" };
+// Card cliccabile: il bordo passa all'accento al passaggio del mouse.
+const CLICK_CARD = { ...card, padding: "18px 20px", cursor: "pointer", textAlign: "left", display: "block", width: "100%", fontFamily: FONTS.body, color: CP.textPrimary, textDecoration: "none", transition: "border-color .15s" };
+const hoverBorder = {
+  onMouseEnter: (e) => { e.currentTarget.style.borderColor = CP.accent; },
+  onMouseLeave: (e) => { e.currentTarget.style.borderColor = CP.border; },
 };
 
-const SKILL_DIMENSIONS = [
-  { key: "naturalezza", label: "Naturalezza", color: COLORS.verdant },
-  { key: "esclusivita", label: "Esclusività", color: COLORS.champagne },
-  { key: "dipendenza", label: "Dipendenza", color: COLORS.cobalt },
-  { key: "conversione", label: "Conversione", color: COLORS.champagneDeep },
-  { key: "tono", label: "Tono", color: COLORS.champagneLight },
-  { key: "gestione_obiezioni", label: "Gestione Obiezioni", color: COLORS.ember },
-];
+function BackButton({ onClick }) {
+  return (
+    <button onClick={onClick} style={BTN_SECONDARY}>
+      <ArrowLeft size={15} /> Indietro
+    </button>
+  );
+}
+
+// Valutazione a stelle (1-5): icone al posto delle emoji.
+function Stars({ value, size = 28 }) {
+  return (
+    <div style={{ display: "inline-flex", gap: 6 }} aria-label={`${value} stelle su 5`}>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Star key={i} size={size} color={i < value ? CP.accent : CP.border} fill={i < value ? CP.accent : "none"} />
+      ))}
+    </div>
+  );
+}
+
+// Riquadro di feedback con un segno di colore a sinistra (segnale, non superficie).
+function FeedbackBox({ title, tone, children }) {
+  const edge = tone === "good" ? CP.accentGreen : tone === "bad" ? CP.accentRed : CP.accent;
+  return (
+    <section style={{ ...card, borderLeft: `3px solid ${edge}`, padding: "16px 18px", marginBottom: 14, textAlign: "left" }}>
+      <h2 style={{ margin: "0 0 10px", fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function BulletList({ items, empty }) {
+  if (!items || items.length === 0) return <p style={{ margin: 0, fontSize: 14, color: CP.textMuted }}>{empty}</p>;
+  return (
+    <ul style={{ margin: 0, paddingLeft: 20, color: CP.textPrimary, fontSize: 14, lineHeight: 1.55 }}>
+      {items.map((s, i) => <li key={i} style={{ marginBottom: 6 }}>{s}</li>)}
+    </ul>
+  );
+}
 
 // Category metadata — scenarios counts are computed dynamically from TRAINING_SCENARIOS
 const TRAINING_CATEGORIES = [
   {
     id: "le-basi-della-chat",
-    name: "Le Basi",
+    name: "Le basi",
     icon: "",
-    description: "Opening conversations, no spam",
+    description: "Aprire la conversazione senza fare spam",
     difficulty: 1,
   },
   {
     id: "mass-e-conversione",
-    name: "Mass & Conversione",
+    name: "Messaggi di massa e conversione",
     icon: "",
-    description: "Convert mass messages to sales",
+    description: "Trasformare i messaggi di massa in vendite",
     difficulty: 2,
   },
   {
     id: "custom-e-upsell",
-    name: "Custom & Upsell",
+    name: "Custom e upsell",
     icon: "",
-    description: "Upselling and custom content",
+    description: "Proporre contenuti su misura e alzare la spesa",
     difficulty: 3,
   },
   {
     id: "recuperi-e-retention",
-    name: "Recuperi & Retention",
+    name: "Recuperi e retention",
     icon: "",
-    description: "Save cancellation-risk fans",
+    description: "Tenere i fan che stanno per disdire",
     difficulty: 4,
   },
   {
     id: "script-avanzati",
-    name: "Script Avanzati",
+    name: "Script avanzati",
     icon: "",
-    description: "Advanced closing patterns",
+    description: "Tecniche di chiusura avanzate",
     difficulty: 5,
   },
   {
@@ -127,7 +173,7 @@ export default function Home() {
 
   // SWR-cached fetches — stale-while-revalidate keeps navigation snappy
   const swrKey = isLoaded && user ? true : null;
-  const { data: meStatsRaw } = useSWR(swrKey ? "/api/me-stats" : null);
+  const { data: meStatsRaw, error: meStatsErr } = useSWR(swrKey ? "/api/me-stats" : null);
   const { data: whoamiRaw } = useSWR(swrKey ? "/api/whoami" : null);
   const { data: dailyDrillRaw } = useSWR(swrKey ? "/api/daily-drill" : null);
   const { data: profileRaw } = useSWR(swrKey ? "/api/profile" : null);
@@ -165,23 +211,7 @@ export default function Home() {
     }
   }, [profileRaw]);
 
-  const CERT_UI = {
-    0: { emoji: "", color: "#666" },
-    1: { emoji: "🥉", color: "#CD7F32" },
-    2: { emoji: "🥈", color: "#C0C0C0" },
-    3: { emoji: "🥇", color: "#FFD700" },
-  };
   const certByCreator = Object.fromEntries((certifications || []).map((c) => [c.creatorId, c]));
-
-  // Allineato a TIER in /src/lib/brand.js (color = accent)
-  const LEAGUE_UI = {
-    bronze: { emoji: "🥉", color: "#B08358" },
-    silver: { emoji: "🥈", color: "#B9BDC7" },
-    gold: { emoji: "🥇", color: COLORS.champagne },
-    platinum: { emoji: "💠", color: "#E5E4E2" },
-    diamond: { emoji: "💎", color: COLORS.cobalt },
-    unranked: { emoji: "⚪", color: COLORS.mist },
-  };
 
   // Chat State
   const [messages, setMessages] = useState([]);
@@ -216,6 +246,7 @@ export default function Home() {
   const [quickChallengeIndex, setQuickChallengeIndex] = useState(0);
   const [quickChallengeResponse, setQuickChallengeResponse] = useState("");
   const [quickChallengeEval, setQuickChallengeEval] = useState(null);
+  const [feedbackError, setFeedbackError] = useState(false);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -491,567 +522,294 @@ export default function Home() {
   // -------------------------------------------------------
 
   if (screen === "home" && isLoaded) {
+    const activeCerts = (certifications || []).filter((c) => c.level > 0);
+    const ROLE_LABEL = {
+      admin: "Admin",
+      sales_manager: "Sales manager",
+      qa_reviewer: "QA reviewer",
+      team_lead: "Team lead",
+      operator: "Operatore",
+    };
+    const nonOpRoles = (roleInfo?.roles || []).filter((r) => r !== "operator");
+    const shownRoles = nonOpRoles.slice(0, 2);
+    const extraRoles = nonOpRoles.length - shownRoles.length;
+    const TIER_LABEL = { junior: "Junior", senior: "Senior", master: "Master" };
+
+    const headChips = (
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+        {league?.tier && league.tier !== "unranked" && (
+          <Link href="/leaderboard/leghe"
+            title={`Lega ${league.tier} — stagione ${league.seasonKey}${league.rank ? ` • rank #${league.rank}` : ""}`}
+            style={CHIP}>
+            Lega {league.tier}
+          </Link>
+        )}
+        {seniority?.tier && (
+          <span title={`Livello ${seniority.tier} — ${seniority.stats?.totalSessions || 0} sessioni`}
+            style={seniority.tier === "master" ? CHIP_ACCENT : CHIP}>
+            {TIER_LABEL[seniority.tier] || seniority.tier}
+          </span>
+        )}
+        {activeCerts.length > 0 && (
+          <Link href="/profilo/certificazioni" title="Le tue certificazioni per creator" style={CHIP}>
+            Certificazioni <span style={NUM}>{activeCerts.slice(0, 3).map((c) => `L${c.level}`).join(" ")}</span>
+            <span style={{ ...NUM, color: CP.textPrimary }}>· {activeCerts.length}</span>
+          </Link>
+        )}
+        {shownRoles.map((r) => {
+          const isCustom = typeof r === "string" && r.startsWith("c:");
+          const label = isCustom ? r.slice(2) : ROLE_LABEL[r] || r;
+          return (
+            <span key={r} title={roleInfo?.team ? `Team: ${roleInfo.team}` : "Senza team"} style={CHIP}>
+              {label}
+            </span>
+          );
+        })}
+        {extraRoles > 0 && (
+          <span title={nonOpRoles.join(", ")} style={{ fontSize: 12, color: CP.textMuted }}>+{extraRoles}</span>
+        )}
+        {nonOpRoles.length > 0 && roleInfo?.team && (
+          <span style={{ fontSize: 12, color: CP.textMuted }}>· {roleInfo.team}</span>
+        )}
+      </div>
+    );
+
     return (
-      <div style={{ backgroundColor: HOC_COLORS.bgDark, minHeight: "100vh" }}>
-        {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "1.5rem 2rem",
-            borderBottom: `1px solid ${alpha(HOC_COLORS.purple, "20")}`,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <BrandLockup size="md" />
-            <span
-              style={{
-                fontFamily: FONTS.mono,
-                fontSize: "0.65rem",
-                letterSpacing: "0.18em",
-                color: COLORS.mist,
-                
-                paddingLeft: "0.75rem",
-                borderLeft: `1px solid ${COLORS.steel}`,
-              }}
-            >
-              Academy
-            </span>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "1rem",
-              cursor: "pointer",
-            }}
-          >
-            <span style={{ color: HOC_COLORS.gray, fontSize: "0.9rem" }}>
-              {operatorName}
-            </span>
-            {league?.tier && league.tier !== "unranked" && (
-              <Link href="/leaderboard/leghe"
-                title={`Lega ${league.tier} — stagione ${league.seasonKey}${league.rank ? ` • rank #${league.rank}` : ""}`}
-                style={{
-                  padding: "0.2rem 0.55rem",
-                  background: `${alpha(LEAGUE_UI[league.tier]?.color || "#666", "22")}`,
-                  border: `1px solid ${LEAGUE_UI[league.tier]?.color || "#666"}`,
-                  borderRadius: "0.4rem",
-                  color: LEAGUE_UI[league.tier]?.color || "#fff",
-                  fontSize: "0.7rem",
-                  fontWeight: 800,
-                  
-                  letterSpacing: "0.4px",
-                  textDecoration: "none",
-                }}
-              >
-                {LEAGUE_UI[league.tier]?.emoji} {league.tier}
-              </Link>
+      <div style={WRAP}>
+        <PageHead
+          title={`Ciao, ${operatorName}`}
+          subtitle="Qui ti alleni sulle chat: scenari guidati con un fan simulato, sfide veloci e l'allenamento del giorno."
+          actions={headChips}
+        />
+
+        {/* Hero: progresso + azioni principali (sx) · card giocatore (dx) */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 28, alignItems: "flex-start" }}>
+          <div style={{ flex: "1 1 420px", minWidth: 0, display: "flex", flexDirection: "column", gap: 14 }}>
+            {!meStats && !meStatsErr && !(meStatsRaw && !meStats) && (
+              <div style={{ ...card, padding: "16px 18px" }}>
+                <XPBarSkeleton />
+              </div>
             )}
-            {seniority?.tier && (
-              <span
-                title={`Tier ${seniority.tier} — ${seniority.stats?.totalSessions || 0} sessioni`}
-                style={{
-                  padding: "0.2rem 0.55rem",
-                  background:
-                    seniority.tier === "master"
-                      ? `${alpha(HOC_COLORS.purple, "25")}`
-                      : seniority.tier === "senior"
-                      ? `${alpha(HOC_COLORS.orange, "25")}`
-                      : `${alpha(COLORS.verdant, "25")}`,
-                  border: `1px solid ${
-                    seniority.tier === "master"
-                      ? HOC_COLORS.purple
-                      : seniority.tier === "senior"
-                      ? HOC_COLORS.orange
-                      : COLORS.verdant
-                  }`,
-                  borderRadius: "0.4rem",
-                  color:
-                    seniority.tier === "master"
-                      ? HOC_COLORS.purple
-                      : seniority.tier === "senior"
-                      ? HOC_COLORS.orange
-                      : COLORS.verdant,
-                  fontSize: "0.7rem",
-                  fontWeight: 800,
-                  
-                  letterSpacing: "0.4px",
-                }}
-              >
-                {seniority.tier === "master" ? "👑" : seniority.tier === "senior" ? "⭐" : "🌱"} {seniority.tier}
-              </span>
+            {!meStats && (meStatsErr || meStatsRaw) && (
+              <Notice>Non riesco a caricare i tuoi progressi in questo momento. Puoi comunque allenarti: i risultati vengono salvati.</Notice>
             )}
-            {certifications?.filter((c) => c.level > 0).length > 0 && (
-              <Link href="/profilo/certificazioni"
-                title="Le tue certificazioni per creator"
-                style={{
-                  display: "flex",
-                  gap: "0.2rem",
-                  alignItems: "center",
-                  padding: "0.2rem 0.45rem",
-                  background: "#FFD70018",
-                  border: "1px solid #FFD70055",
-                  borderRadius: "0.4rem",
-                  textDecoration: "none",
-                }}
-              >
-                {certifications.filter((c) => c.level > 0).slice(0, 3).map((c) => (
-                  <span key={c.creatorId} style={{ fontSize: "0.8rem" }}>
-                    {CERT_UI[c.level].emoji}
-                  </span>
-                ))}
-                <span style={{ fontSize: "0.7rem", color: "#FFD700", fontWeight: 800, marginLeft: 2 }}>
-                  {certifications.filter((c) => c.level > 0).length}
-                </span>
-              </Link>
-            )}
-            {roleInfo && (() => {
-              const RM = {
-                admin: { label: "Admin", emoji: "◆", color: COLORS.signal },
-                sales_manager: { label: "Sales Manager", emoji: "◇", color: COLORS.cobalt },
-                qa_reviewer: { label: "QA Reviewer", emoji: "◈", color: COLORS.champagneDeep },
-                team_lead: { label: "Team Lead", emoji: "★", color: COLORS.champagne },
-                operator: { label: "Operator", emoji: "◉", color: COLORS.verdant },
-              };
-              const nonOpRoles = (roleInfo.roles || []).filter((r) => r !== "operator");
-              if (nonOpRoles.length === 0) return null;
-              const shown = nonOpRoles.slice(0, 2);
-              const extra = nonOpRoles.length - shown.length;
+            {meStats && (() => {
+              const THRESHOLDS = { junior: 30, senior: 100 };
+              const NEXT = { junior: "Senior", senior: "Master", master: null };
+              const tier = seniority?.tier || "junior";
+              const sess = seniority?.stats?.totalSessions ?? meStats.totalSessions ?? 0;
+              const nextTier = NEXT[tier];
+              const isMax = !nextTier;
+              const target = tier === "junior" ? THRESHOLDS.junior : tier === "senior" ? THRESHOLDS.senior : sess;
+              const prev = tier === "junior" ? 0 : tier === "senior" ? THRESHOLDS.junior : THRESHOLDS.senior;
+              const pct = isMax ? 100 : Math.min(100, Math.max(0, Math.round(((sess - prev) / (target - prev)) * 100)));
+              const remaining = isMax ? 0 : Math.max(0, target - sess);
               return (
-                <div style={{ display: "flex", gap: "0.3rem", alignItems: "center", flexWrap: "wrap" }}>
-                  {shown.map((r) => {
-                    const isCustom = typeof r === "string" && r.startsWith("c:");
-                    const meta = isCustom
-                      ? { label: r.slice(2), emoji: "🎖️", color: "#64748B" }
-                      : RM[r] || { label: r, emoji: "?", color: "#888" };
-                    return (
-                      <div key={r}
-                        title={roleInfo.team ? `Team: ${roleInfo.team}` : "Senza team"}
-                        style={{
-                          display: "flex", alignItems: "center", gap: "0.3rem",
-                          padding: "0.3rem 0.55rem", borderRadius: "999px",
-                          background: `${alpha(meta.color, "22")}`, border: `1px solid ${meta.color}`, color: meta.color,
-                          fontSize: "0.72rem", fontWeight: 800,
-                        }}>
-                        <span>{meta.emoji}</span>
-                        <span>{meta.label}</span>
-                      </div>
-                    );
-                  })}
-                  {extra > 0 && (
-                    <span title={nonOpRoles.join(", ")} style={{ fontSize: "0.7rem", color: "#888", fontWeight: 700 }}>+{extra}</span>
-                  )}
-                  {roleInfo.team && (
-                    <span style={{ fontSize: "0.7rem", color: "#aaa", fontWeight: 600 }}>· {roleInfo.team}</span>
-                  )}
+                <div style={{ ...card, padding: "16px 18px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, fontSize: 13, gap: 12 }}>
+                    <span style={{ color: CP.textPrimary, fontWeight: 500 }}>Livello {TIER_LABEL[tier] || tier}</span>
+                    {!isMax && <span style={{ color: CP.textMuted }}>prossimo: {nextTier}</span>}
+                    {isMax && <span style={{ color: CP.accentSoftText }}>Livello massimo</span>}
+                  </div>
+                  <div style={{ position: "relative", height: 10, background: CP.surfaceAlt, borderRadius: 999, overflow: "hidden" }}>
+                    <div style={{ position: "absolute", inset: 0, width: `${pct}%`, background: CP.accent, transition: "width .5s ease" }} />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 8, fontSize: 12, gap: 12, ...NUM }}>
+                    <span style={{ color: CP.textSecondary }}>{sess}{!isMax ? `/${target}` : ""} sessioni</span>
+                    {!isMax && <span style={{ color: CP.textMuted }}>{remaining} al prossimo livello</span>}
+                  </div>
                 </div>
               );
             })()}
-            <UserButton
-              appearance={{
-                elements: {
-                  avatarBox: "w-9 h-9",
-                },
-              }}
-            />
+
+            {/* Azioni principali */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+              <button
+                onClick={() => setScreen("training-hub")}
+                style={{ ...card, background: CP.accent, border: `1px solid ${CP.accent}`, padding: "16px 18px", cursor: "pointer", textAlign: "left", color: CP.accentInk, fontFamily: FONTS.body }}
+              >
+                <div style={{ fontSize: 13, opacity: 0.85 }}>Entra in</div>
+                <div style={{ fontSize: 22, fontWeight: 500, letterSpacing: "-0.01em", marginTop: 2 }}>Allenamento</div>
+                <div style={{ fontSize: 13, marginTop: 4, opacity: 0.85 }}>Scenari guidati con coaching AI</div>
+              </button>
+              <button
+                onClick={() => {
+                  setQuickChallengeIndex(0);
+                  setQuickChallengeResponse("");
+                  setQuickChallengeEval(null);
+                  setScreen("quick-challenge");
+                }}
+                style={{ ...CLICK_CARD, padding: "16px 18px" }}
+                {...hoverBorder}
+              >
+                <div style={{ fontSize: 13, color: CP.accentSoftText }}>Sfida</div>
+                <div style={{ fontSize: 20, fontWeight: 500, marginTop: 2 }}>Veloce</div>
+                <div style={{ fontSize: 13, marginTop: 4, color: CP.textMuted }}>3 msg · 30s</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Card giocatore (scheletro finché meStats non è arrivato) */}
+          <div style={{ flex: "0 1 320px", minWidth: 0, display: "flex", justifyContent: "center", margin: "0 auto" }}>
+            {meStats ? (
+              (() => {
+                const POS = { operator: "OP", team_lead: "TL", sales_manager: "SM", qa_reviewer: "QA", admin: "AD" };
+                const primary = roleInfo?.roles?.find((r) => POS[r]) || roleInfo?.role || "operator";
+                const leagueTier = league?.tier || "unranked";
+                const seniorityTier = seniority?.tier || "junior";
+                return (
+                  <PlayerCard
+                    name={operatorName}
+                    position={POS[primary] || "OP"}
+                    overall={meStats.overall}
+                    skills={meStats.skills}
+                    league={leagueTier}
+                    seniority={seniorityTier}
+                    certifications={certifications}
+                    totalSessions={meStats.totalSessions}
+                    compact={true}
+                  />
+                );
+              })()
+            ) : (
+              !meStatsErr && !meStatsRaw && <PlayerCardSkeleton compact={true} />
+            )}
           </div>
         </div>
 
-        {/* Main Content */}
-        <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem" }}>
-          {/* Greeting */}
-          {/* ═══ HERO — 2-column: stats+CTA (left) · PlayerCard+Badge Wall (right) ═══ */}
-          <div
+        {/* Allenamento del giorno */}
+        {dailyDrill?.drill?.scenario && (
+          <section
             style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0, 1fr) minmax(0, 320px)",
-              gap: "2rem",
-              marginBottom: "2.5rem",
-              alignItems: "start",
+              ...card,
+              borderLeft: `3px solid ${dailyDrill.completed ? CP.accentGreen : CP.accent}`,
+              padding: "16px 18px",
+              marginBottom: 28,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 14,
             }}
           >
-            {/* LEFT — Greeting + XP bar + primary CTAs */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", minWidth: 0 }}>
-              <div>
-                <h2
-                  style={{
-                    fontFamily: FONTS.display,
-                    fontSize: "2.25rem",
-                    fontWeight: 800,
-                    letterSpacing: "-0.01em",
-                    color: HOC_COLORS.white,
-                    margin: "0 0 0.35rem 0",
-                  }}
-                >
-                  Ciao, {operatorName}.
-                </h2>
-                <p style={{ color: HOC_COLORS.gray, margin: 0, fontSize: "0.95rem" }}>
-                  Continua il tuo percorso di formazione
-                </p>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>Allenamento del giorno</h2>
+                {dailyDrill.mandatory && !dailyDrill.completed && <span style={CHIP_ACCENT}>Obbligatorio</span>}
+                {!dailyDrill.mandatory && !dailyDrill.completed && <span style={CHIP}>Opzionale</span>}
+                {dailyDrill.streak > 0 && (
+                  <span style={{ ...CHIP, ...NUM }}>{dailyDrill.streak} {dailyDrill.streak === 1 ? "giorno" : "giorni"} di fila</span>
+                )}
               </div>
-
-              {/* XP bar orizzontale larga */}
-              {!meStats && (
-                <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 12, padding: "1.1rem 1.25rem" }}>
-                  <XPBarSkeleton />
+              <div style={{ color: CP.textPrimary, fontSize: 14 }}>
+                {dailyDrill.completed ? "Completato per oggi, ottimo lavoro." : dailyDrill.drill.scenario.title}
+              </div>
+              {!dailyDrill.completed && (
+                <div style={{ color: CP.textMuted, fontSize: 13, marginTop: 4 }}>
+                  Completa lo scenario di oggi per non interrompere la serie.
                 </div>
               )}
-              {meStats && (() => {
-                const THRESHOLDS = { junior: 30, senior: 100 };
-                const NEXT = { junior: "SENIOR", senior: "MASTER", master: null };
-                const CUR_LABEL = { junior: "JUNIOR", senior: "SENIOR", master: "MASTER" };
-                const tier = seniority?.tier || "junior";
-                const sess = seniority?.stats?.totalSessions ?? meStats.totalSessions ?? 0;
-                const nextTier = NEXT[tier];
-                const isMax = !nextTier;
-                const target = tier === "junior" ? THRESHOLDS.junior : tier === "senior" ? THRESHOLDS.senior : sess;
-                const prev = tier === "junior" ? 0 : tier === "senior" ? THRESHOLDS.junior : THRESHOLDS.senior;
-                const pct = isMax ? 100 : Math.min(100, Math.max(0, Math.round(((sess - prev) / (target - prev)) * 100)));
-                const remaining = isMax ? 0 : Math.max(0, target - sess);
+            </div>
+            {!dailyDrill.completed && (
+              <button
+                onClick={() => {
+                  const cat = TRAINING_CATEGORIES.find((c) => c.id === dailyDrill.drill.scenario.categoryId);
+                  if (cat) {
+                    setSelectedCategory(cat);
+                    setScreen("category-detail");
+                  }
+                }}
+                style={BTN_PRIMARY}
+              >
+                Inizia ora →
+              </button>
+            )}
+          </section>
+        )}
+
+        {/* Certificazioni per creator */}
+        {CREATOR_PERSONAS?.length > 0 && (
+          <section style={{ marginBottom: 28 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, gap: 12, flexWrap: "wrap" }}>
+              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>Certificazioni per creator</h2>
+              <Link href="/profilo/certificazioni" style={{ fontSize: 13, color: CP.accentSoftText, textDecoration: "none" }}>
+                Vedi tutte →
+              </Link>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
+              {CREATOR_PERSONAS.map((cr) => {
+                const cert = certByCreator?.[cr.id];
+                const lvl = cert?.level || 0;
+                const unlocked = lvl > 0;
+                const levelLabel = unlocked ? (cert?.meta?.label || `L${lvl}`) : "Da sbloccare";
+                const sess = cert?.sessions || 0;
+                const avg = cert?.avgOverall || 0;
+                const NEXT_THRESH = { 0: { s: 10, a: 65, label: "L1" }, 1: { s: 25, a: 75, label: "L2" }, 2: { s: 50, a: 85, label: "L3" }, 3: null };
+                const next = NEXT_THRESH[lvl];
+                const progress = next ? Math.min(100, Math.round((sess / next.s) * 100)) : 100;
                 return (
-                  <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 12, padding: "1.1rem 1.25rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, fontFamily: FONTS.mono, fontSize: 11, letterSpacing: "0.18em" }}>
-                      <span style={{ color: COLORS.alabaster, fontWeight: 700 }}>{CUR_LABEL[tier]}</span>
-                      {!isMax && <span style={{ color: COLORS.mist }}>→ {nextTier}</span>}
-                      {isMax && <span style={{ color: COLORS.champagne }}>MAX TIER</span>}
+                  <div
+                    key={cr.id}
+                    style={{
+                      ...card,
+                      border: `1px solid ${unlocked ? alpha(CP.accent, "55") : CP.border}`,
+                      padding: "12px 14px",
+                      opacity: unlocked ? 1 : 0.8,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, gap: 8 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary, lineHeight: 1.3 }}>{cr.name}</div>
+                        <div style={{ fontSize: 12, color: unlocked ? CP.accentSoftText : CP.textMuted, marginTop: 2 }}>{levelLabel}</div>
+                      </div>
+                      {!unlocked && <Lock size={16} color={CP.textMuted} style={{ flexShrink: 0 }} />}
+                      {unlocked && <span style={{ ...CHIP_ACCENT, ...NUM }}>L{lvl}</span>}
                     </div>
-                    <div style={{ position: "relative", height: 12, background: COLORS.obsidian, border: `1px solid ${COLORS.charcoal}`, borderRadius: 6, overflow: "hidden" }}>
-                      <div style={{ position: "absolute", inset: 0, width: `${pct}%`, background: CP.accent, transition: "width .5s ease" }} />
+                    <div style={{ height: 6, background: CP.surfaceAlt, borderRadius: 999, overflow: "hidden", marginBottom: 6 }}>
+                      <div style={{ width: `${progress}%`, height: "100%", background: unlocked ? CP.accent : CP.textMuted, transition: "width .4s ease" }} />
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 8, fontFamily: FONTS.mono, fontSize: 11 }}>
-                      <span style={{ color: COLORS.fog }}>{sess}{!isMax ? `/${target}` : ""} sessioni</span>
-                      {!isMax && <span style={{ color: COLORS.mist }}>{remaining} al prossimo tier</span>}
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: CP.textMuted, ...NUM }}>
+                      <span>{sess} sessioni · media {avg || "—"}</span>
+                      <span>{next ? `→ ${next.label}` : "Massimo"}</span>
                     </div>
                   </div>
                 );
-              })()}
-
-              {/* CTA primari */}
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1rem" }}>
-                <button
-                  onClick={() => setScreen("training-hub")}
-                  style={{
-                    background: COLORS.champagne,
-                    border: "none",
-                    borderRadius: 12,
-                    padding: "1.1rem 1.25rem",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    color: COLORS.obsidian,
-                    transition: "transform 0.2s, box-shadow 0.2s",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 12px 28px ${alpha(COLORS.champagne, "40")}`; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
-                >
-                  <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: "0.22em", fontWeight: 800, opacity: 0.75 }}>ENTRA IN</div>
-                  <div style={{ fontFamily: FONTS.display, fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.01em", marginTop: 2 }}>Training</div>
-                  <div style={{ fontSize: "0.85rem", marginTop: 4, opacity: 0.75 }}>Scenari guidati con coaching AI</div>
-                </button>
-                <button
-                  onClick={() => {
-                    setQuickChallengeIndex(0);
-                    setQuickChallengeResponse("");
-                    setQuickChallengeEval(null);
-                    setScreen("quick-challenge");
-                  }}
-                  style={{
-                    background: "transparent",
-                    border: `1px solid ${COLORS.cobalt}`,
-                    borderRadius: 12,
-                    padding: "1.1rem 1.25rem",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    color: COLORS.alabaster,
-                    transition: "background 0.2s",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = `${alpha(COLORS.cobalt, "18")}`; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                >
-                  <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: "0.22em", fontWeight: 800, color: COLORS.cobalt }}>SFIDA</div>
-                  <div style={{ fontFamily: FONTS.display, fontSize: "1.25rem", fontWeight: 800, marginTop: 2 }}>Veloce</div>
-                  <div style={{ fontSize: "0.8rem", marginTop: 4, color: COLORS.mist }}>3 msg · 30s</div>
-                </button>
-              </div>
+              })}
             </div>
+          </section>
+        )}
 
-            {/* RIGHT — PlayerCard compact (skeleton finché meStats non è arrivato) */}
-            <div style={{ display: "flex", justifyContent: "center", minWidth: 0 }}>
-              {meStats ? (
-                (() => {
-                  const POS = { operator: "OP", team_lead: "TL", sales_manager: "SM", qa_reviewer: "QA", admin: "AD" };
-                  const primary = roleInfo?.roles?.find((r) => POS[r]) || roleInfo?.role || "operator";
-                  const leagueTier = league?.tier || "unranked";
-                  const seniorityTier = seniority?.tier || "junior";
-                  return (
-                    <PlayerCard
-                      name={operatorName}
-                      position={POS[primary] || "OP"}
-                      overall={meStats.overall}
-                      skills={meStats.skills}
-                      league={leagueTier}
-                      seniority={seniorityTier}
-                      certifications={certifications}
-                      totalSessions={meStats.totalSessions}
-                      compact={true}
-                    />
-                  );
-                })()
-              ) : (
-                <PlayerCardSkeleton compact={true} />
-              )}
-            </div>
-          </div>
+        {/* Altre sezioni */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginBottom: 28 }}>
+          <button onClick={() => setScreen("profile")} style={CLICK_CARD} {...hoverBorder}>
+            <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>La tua card</div>
+            <div style={{ fontSize: 13, color: CP.textMuted }}>Statistiche e progressi</div>
+          </button>
 
-          {/* Badge Wall — strip orizzontale sotto l'hero */}
-          {CREATOR_PERSONAS?.length > 0 && (
-            <div style={{ marginBottom: "2rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.75rem" }}>
-                <span style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: "0.22em", color: COLORS.alabaster, fontWeight: 700 }}>
-                  BADGE WALL
-                </span>
-                <Link href="/profilo/certificazioni" style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: "0.18em", color: COLORS.champagne, textDecoration: "none" }}>
-                  VEDI TUTTO →
-                </Link>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(220px, 1fr))`, gap: "0.75rem" }}>
-                {CREATOR_PERSONAS.map((cr) => {
-                  const cert = certByCreator?.[cr.id];
-                  const lvl = cert?.level || 0;
-                  const meta = cert?.meta || { label: "Locked", emoji: "🔒", color: COLORS.steel };
-                  const unlocked = lvl > 0;
-                  const sess = cert?.sessions || 0;
-                  const avg = cert?.avgOverall || 0;
-                  const NEXT_THRESH = { 0: { s: 10, a: 65, label: "L1" }, 1: { s: 25, a: 75, label: "L2" }, 2: { s: 50, a: 85, label: "L3" }, 3: null };
-                  const next = NEXT_THRESH[lvl];
-                  const progress = next ? Math.min(100, Math.round((sess / next.s) * 100)) : 100;
-                  const barColor = unlocked ? meta.color : COLORS.mist;
-                  return (
-                    <div
-                      key={cr.id}
-                      style={{
-                        background: unlocked ? `${alpha(meta.color, "10")}` : COLORS.graphite,
-                        border: `1px solid ${unlocked ? alpha(meta.color, "55") : COLORS.charcoal}`,
-                        borderRadius: 10,
-                        padding: "0.85rem 0.95rem",
-                        opacity: unlocked ? 1 : 0.7,
-                        filter: unlocked ? "none" : "grayscale(0.6)",
-                        position: "relative",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {unlocked && (
-                        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: meta.color }} />
-                      )}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.5rem" }}>
-                        <div>
-                          <div style={{ fontSize: "0.9rem", fontWeight: 800, color: COLORS.alabaster, lineHeight: 1.2 }}>
-                            {cr.name}
-                          </div>
-                          <div style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: "0.16em", color: unlocked ? meta.color : COLORS.mist, fontWeight: 700, marginTop: 2 }}>
-                            {unlocked ? meta.label : "LOCKED"}
-                          </div>
-                        </div>
-                        <div style={{ fontSize: "1.6rem", lineHeight: 1, filter: unlocked ? `drop-shadow(0 0 8px ${alpha(meta.color, "88")})` : "none" }}>
-                          {unlocked ? meta.emoji : "🔒"}
-                        </div>
-                      </div>
-                      <div style={{ height: 6, background: COLORS.charcoal, borderRadius: 3, overflow: "hidden", marginBottom: "0.35rem" }}>
-                        <div style={{ width: `${progress}%`, height: "100%", background: barColor, transition: "width .4s ease" }} />
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: FONTS.mono, fontSize: 9.5, color: COLORS.mist }}>
-                        <span>{sess} sess · {avg || "—"} avg</span>
-                        <span>{next ? `→ ${next.label}` : "MAX"}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Daily Drill banner */}
-          {dailyDrill?.drill?.scenario && (
-            <div
-              style={{
-                background: dailyDrill.completed ? CP.surface : CP.accentSoft,
-                border: `2px solid ${
-                  dailyDrill.completed
-                    ? COLORS.verdant
-                    : dailyDrill.mandatory
-                    ? HOC_COLORS.orange
-                    : HOC_COLORS.purple
-                }`,
-                borderRadius: "1rem",
-                padding: "1.25rem 1.5rem",
-                marginBottom: "2rem",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "1rem",
-              }}
-            >
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem", flexWrap: "wrap" }}>
-                  <h3 style={{ margin: 0, fontSize: "1.1rem", color: HOC_COLORS.white }}>
-                    Daily Drill
-                  </h3>
-                  {dailyDrill.mandatory && !dailyDrill.completed && (
-                    <span style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem", background: HOC_COLORS.orange, color: HOC_COLORS.bgDark, borderRadius: 4, fontWeight: 800 }}>
-                      Obbligatorio
-                    </span>
-                  )}
-                  {!dailyDrill.mandatory && !dailyDrill.completed && (
-                    <span style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem", background: `${alpha(HOC_COLORS.purple, "40")}`, color: HOC_COLORS.purple, borderRadius: 4, fontWeight: 700 }}>
-                      Opzionale
-                    </span>
-                  )}
-                  {dailyDrill.streak > 0 && (
-                    <span style={{ fontSize: "0.75rem", color: "#FFD700", fontWeight: 700 }}>
-                      🔥 streak {dailyDrill.streak}g
-                    </span>
-                  )}
-                </div>
-                <div style={{ color: HOC_COLORS.white, fontWeight: 600 }}>
-                  {dailyDrill.completed ? "Completato per oggi — ottimo lavoro!" : dailyDrill.drill.scenario.title}
-                </div>
-                {!dailyDrill.completed && (
-                  <div style={{ color: HOC_COLORS.gray, fontSize: "0.85rem", marginTop: 4 }}>
-                    Completa lo scenario di oggi per mantenere lo streak
-                  </div>
-                )}
-              </div>
-              {!dailyDrill.completed && (
-                <button
-                  onClick={() => {
-                    const cat = TRAINING_CATEGORIES.find((c) => c.id === dailyDrill.drill.scenario.categoryId);
-                    if (cat) {
-                      setSelectedCategory(cat);
-                      setScreen("category-detail");
-                    }
-                  }}
-                  style={{
-                    background: HOC_COLORS.orange,
-                    color: HOC_COLORS.bgDark,
-                    border: "none",
-                    padding: "0.7rem 1.4rem",
-                    borderRadius: "0.5rem",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                    fontSize: "0.9rem",
-                  }}
-                >
-                  Inizia ora →
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Secondary Sections — Training/SfidaVeloce ora sono CTA nell'hero */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-              gap: "2rem",
-              marginBottom: "3rem",
-            }}
-          >
-            {/* Profile */}
-            <div
-              onClick={() => setScreen("profile")}
-              style={{
-                background: `${alpha(HOC_COLORS.purple, "15")}`,
-                border: `5px solid ${HOC_COLORS.purple}`,
-                borderRadius: "1.5rem",
-                padding: "1.5rem",
-                cursor: "pointer",
-                transition: "transform 0.3s",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-4px)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
-            >
-              <h3
-                style={{
-                  margin: "0 0 0.5rem 0",
-                  fontSize: "1.25rem",
-                  fontWeight: 900,
-                  color: HOC_COLORS.purple,
-                }}
-              >
-                La tua Card
-              </h3>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "0.95rem",
-                  color: HOC_COLORS.gray,
-                }}
-              >
-                Statistiche e progressi
-              </p>
-            </div>
-
-            {/* Admin Area — solo per chi può aprire l'Hub (prima la vedevano anche gli operatori) */}
-            {canSee("/admin", whoamiRaw?.capabilities, !!whoamiRaw?.admin) && whoamiRaw?.authenticated && (<Link href="/admin"
-              style={{
-                background: `${alpha(HOC_COLORS.gray, "10")}`,
-                border: `2px dashed ${alpha(HOC_COLORS.gray, "60")}`,
-                borderRadius: "1.5rem",
-                padding: "1.5rem",
-                cursor: "pointer",
-                transition: "transform 0.3s, border-color 0.3s",
-                textDecoration: "none",
-                display: "block",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.borderColor = HOC_COLORS.orange; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${alpha(HOC_COLORS.gray, "60")}`; }}
-            >
-              <h3 style={{ margin: "0 0 0.5rem 0", fontSize: "1.1rem", fontWeight: 900, color: HOC_COLORS.white }}>
-                Area Admin
-              </h3>
-              <p style={{ margin: 0, fontSize: "0.85rem", color: HOC_COLORS.gray }}>
-                Accessi, seed demo, classifica, dashboard SM
-              </p>
-            </Link>)}
-                  {/* Playbook — libreria formativa visibile a tutti gli operatori */}
-            <Link href="/playbook"
-              style={{
-                background: `${alpha(HOC_COLORS.orange, "10")}`,
-                border: `2px solid ${alpha(HOC_COLORS.orange, "40")}`,
-                borderRadius: "1.5rem",
-                padding: "1.5rem",
-                cursor: "pointer",
-                transition: "transform 0.3s, border-color 0.3s",
-                textDecoration: "none",
-                display: "block",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.borderColor = HOC_COLORS.orange; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${alpha(HOC_COLORS.orange, "40")}`; }}
-            >
-              <h3 style={{ margin: "0 0 0.5rem 0", fontSize: "1.1rem", fontWeight: 900, color: HOC_COLORS.white }}>
-                Playbook
-              </h3>
-              <p style={{ margin: 0, fontSize: "0.85rem", color: HOC_COLORS.gray }}>
-                Libreria di esempi reali per la tua formazione
-              </p>
+          {/* Area admin — solo per chi può aprire l'Hub (prima la vedevano anche gli operatori) */}
+          {canSee("/admin", whoamiRaw?.capabilities, !!whoamiRaw?.admin) && whoamiRaw?.authenticated && (
+            <Link href="/admin" style={CLICK_CARD} {...hoverBorder}>
+              <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>Area admin</div>
+              <div style={{ fontSize: 13, color: CP.textMuted }}>Accessi, classifiche, dashboard dei sales manager</div>
             </Link>
-          </div>
+          )}
 
-          {/* Recent Activity */}
-          <div>
-            <h3
-              style={{
-                fontSize: "1.25rem",
-                fontWeight: 900,
-                color: HOC_COLORS.white,
-                marginBottom: "1rem",
-              }}
-            >
-              Attività Recente
-            </h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          {/* Playbook — libreria formativa visibile a tutti gli operatori */}
+          <Link href="/playbook" style={CLICK_CARD} {...hoverBorder}>
+            <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>Playbook</div>
+            <div style={{ fontSize: 13, color: CP.textMuted }}>Libreria di esempi reali per la tua formazione</div>
+          </Link>
+        </div>
+
+        {/* Attività recente (solo questa sessione del browser) */}
+        <section>
+          <h2 style={{ margin: "0 0 10px", fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>Attività recente</h2>
+          {recentScenarios.length === 0 ? (
+            <p style={{ margin: 0, fontSize: 13, color: CP.textMuted }}>
+              Qui compaiono gli scenari che completi mentre questa pagina è aperta.
+            </p>
+          ) : (
+            <div style={{ ...card, overflow: "hidden" }}>
               {recentScenarios.map((scenario, i) => (
                 <div
                   key={i}
@@ -1059,45 +817,24 @@ export default function Home() {
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    padding: "1rem",
-                    background: `${alpha(HOC_COLORS.white, "08")}`,
-                    border: `1px solid ${alpha(HOC_COLORS.white, "10")}`,
-                    borderRadius: "0.75rem",
+                    gap: 12,
+                    padding: "12px 16px",
+                    borderTop: i > 0 ? `1px solid ${CP.borderSoft}` : "none",
                   }}
                 >
-                  <div>
-                    <p
-                      style={{
-                        margin: "0 0 0.25rem 0",
-                        fontWeight: 600,
-                        color: HOC_COLORS.white,
-                      }}
-                    >
-                      {scenario.title}
-                    </p>
-                    <p style={{ margin: 0, color: HOC_COLORS.gray, fontSize: "0.85rem" }}>
-                      {scenario.date}
-                    </p>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, color: CP.textPrimary }}>{scenario.title}</div>
+                    <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2 }}>{scenario.date}</div>
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    <p
-                      style={{
-                        margin: "0 0 0.25rem 0",
-                        fontWeight: 700,
-                        color: HOC_COLORS.orange,
-                      }}
-                    >
-                      {scenario.score}%
-                    </p>
-                    <p style={{ margin: 0, color: HOC_COLORS.gray, fontSize: "0.85rem" }}>
-                      +{scenario.xp} XP
-                    </p>
+                  <div style={{ textAlign: "right", ...NUM }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary }}>{scenario.score}%</div>
+                    <div style={{ fontSize: 12, color: CP.textMuted }}>+{scenario.xp} XP</div>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        </div>
+          )}
+        </section>
       </div>
     );
   }
@@ -1108,148 +845,55 @@ export default function Home() {
 
   if (screen === "training-hub" && isLoaded) {
     return (
-      <div style={{ backgroundColor: HOC_COLORS.bgDark, minHeight: "100vh" }}>
-        {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "1.5rem 2rem",
-            borderBottom: `1px solid ${alpha(HOC_COLORS.purple, "20")}`,
-          }}
-        >
-          <div>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: "1.75rem",
-                fontWeight: 900,
-                color: HOC_COLORS.white,
-              }}
-            >
-              Training Hub
-            </h1>
-            <p style={{ color: HOC_COLORS.gray, margin: "0.5rem 0 0 0" }}>
-              Scegli una categoria per iniziare
-            </p>
-          </div>
-          <button
-            onClick={() => setScreen("home")}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: HOC_COLORS.gray,
-              fontSize: "1.2rem",
-              cursor: "pointer",
-              padding: "0.5rem 1rem",
-              transition: "color 0.3s",
-            }}
-            onMouseEnter={(e) => (e.target.style.color = HOC_COLORS.white)}
-            onMouseLeave={(e) => (e.target.style.color = HOC_COLORS.gray)}
-          >
-            ← Indietro
-          </button>
-        </div>
+      <div style={WRAP}>
+        <PageHead
+          title="Allenamento"
+          subtitle="Scegli una categoria: ognuna ha scenari di chat con un fan simulato, dal più semplice al più difficile."
+          actions={<BackButton onClick={() => setScreen("home")} />}
+        />
 
-        {/* Categories Grid */}
-        <div
-          style={{
-            maxWidth: "1200px",
-            margin: "0 auto",
-            padding: "2rem",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "1.5rem",
-          }}
-        >
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
           {TRAINING_CATEGORIES.map((cat) => (
-            <div
+            <button
               key={cat.id}
               onClick={() => {
                 setSelectedCategory(cat);
                 setScreen("scenario-list");
               }}
-              style={{
-                background: `${alpha(HOC_COLORS.white, "08")}`,
-                border: `5px solid ${HOC_COLORS.purple}`,
-                borderRadius: "1rem",
-                padding: "1.5rem",
-                cursor: "pointer",
-                transition: "all 0.3s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = HOC_COLORS.orange;
-                e.currentTarget.style.transform = "translateY(-4px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = HOC_COLORS.purple;
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
+              style={CLICK_CARD}
+              {...hoverBorder}
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  marginBottom: "1rem",
-                }}
-              >
-                <span style={{ fontSize: "2.5rem" }}>{cat.icon}</span>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "0.25rem",
-                  }}
-                >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 10 }}>
+                <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>{cat.name}</h2>
+                <div style={{ display: "flex", gap: 4, paddingTop: 6 }} aria-label={`Difficoltà ${cat.difficulty} su 5`}>
                   {Array.from({ length: 5 }).map((_, i) => (
                     <div
                       key={i}
                       style={{
-                        width: "8px",
-                        height: "8px",
+                        width: 8,
+                        height: 8,
                         borderRadius: "50%",
-                        background: i < cat.difficulty ? HOC_COLORS.orange : `${alpha(HOC_COLORS.white, "20")}`,
+                        background: i < cat.difficulty ? CP.accent : CP.border,
                       }}
                     />
                   ))}
                 </div>
               </div>
-              <h3
-                style={{
-                  margin: "0 0 0.5rem 0",
-                  fontSize: "1.1rem",
-                  fontWeight: 900,
-                  color: HOC_COLORS.white,
-                }}
-              >
-                {cat.name}
-              </h3>
-              <p
-                style={{
-                  margin: "0 0 1rem 0",
-                  color: HOC_COLORS.gray,
-                  fontSize: "0.9rem",
-                }}
-              >
-                {cat.description}
-              </p>
+              <p style={{ margin: "0 0 14px", color: CP.textSecondary, fontSize: 14, lineHeight: 1.5 }}>{cat.description}</p>
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  borderTop: `1px solid ${alpha(HOC_COLORS.white, "10")}`,
-                  paddingTop: "1rem",
+                  borderTop: `1px solid ${CP.borderSoft}`,
+                  paddingTop: 10,
+                  fontSize: 13,
+                  ...NUM,
                 }}
               >
-                <span style={{ color: HOC_COLORS.gray, fontSize: "0.85rem" }}>
-                  {getScenariosForCategory(cat.id).length} scenari
-                </span>
-                <span style={{ color: HOC_COLORS.orange, fontWeight: 700 }}>
-                  Difficoltà {cat.difficulty}/5
-                </span>
+                <span style={{ color: CP.textMuted }}>{getScenariosForCategory(cat.id).length} scenari</span>
+                <span style={{ color: CP.textSecondary }}>Difficoltà {cat.difficulty}/5</span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -1264,220 +908,109 @@ export default function Home() {
     const scenarioCards = getScenariosForCategory(selectedCategory.id);
 
     return (
-      <div style={{ backgroundColor: HOC_COLORS.bgDark, minHeight: "100vh" }}>
-        {/* Creator Picker Modal */}
+      <div style={WRAP}>
+        {/* Scelta della creator */}
         {pendingScenario && (
           <div
             onClick={() => setPendingScenario(null)}
             style={{
               position: "fixed",
               inset: 0,
-              background: "rgba(0,0,0,0.7)",
+              background: alpha(CP.bgSunken, "cc"),
               zIndex: 1000,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              padding: "2rem",
+              padding: 16,
             }}
           >
             <div
               onClick={(e) => e.stopPropagation()}
               style={{
-                background: HOC_COLORS.bgDark,
-                border: `2px solid ${HOC_COLORS.orange}`,
-                borderRadius: "1rem",
-                padding: "2rem",
-                maxWidth: "720px",
+                ...card,
+                padding: "22px 22px 18px",
+                maxWidth: 720,
                 width: "100%",
+                maxHeight: "90vh",
+                overflowY: "auto",
               }}
             >
-              <h2 style={{ margin: "0 0 0.25rem 0", color: HOC_COLORS.white, fontSize: "1.4rem" }}>
+              <h2 style={{ margin: "0 0 4px", color: CP.textPrimary, fontSize: 20, fontWeight: 500 }}>
                 Scegli la creator per questo scenario
               </h2>
-              <p style={{ margin: "0 0 1.5rem 0", color: HOC_COLORS.gray, fontSize: "0.9rem" }}>
-                "{pendingScenario.title}" — il tono che devi usare cambia in base alla creator.
+              <p style={{ margin: "0 0 18px", color: CP.textSecondary, fontSize: 14, lineHeight: 1.5 }}>
+                &ldquo;{pendingScenario.title}&rdquo;: il tono da usare cambia in base alla creator.
               </p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "1rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
                 {CREATOR_PERSONAS.map((c) => (
-                  <div
+                  <button
                     key={c.id}
                     onClick={() => startScenarioWithCreator(pendingScenario, c)}
-                    style={{
-                      background: `${alpha(HOC_COLORS.white, "08")}`,
-                      border: `2px solid ${alpha(HOC_COLORS.purple, "50")}`,
-                      borderRadius: "0.75rem",
-                      padding: "1.25rem",
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = HOC_COLORS.orange;
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = `${alpha(HOC_COLORS.purple, "50")}`;
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
+                    style={{ ...CLICK_CARD, padding: "14px 16px" }}
+                    {...hoverBorder}
                   >
-                    <div style={{ fontWeight: 900, color: HOC_COLORS.white, fontSize: "1.05rem", marginBottom: "0.25rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <div style={{ fontWeight: 500, color: CP.textPrimary, fontSize: 15, marginBottom: 4, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       {c.name}
                       {certByCreator[c.id]?.level > 0 && (
-                        <span
-                          title={`Certificazione ${certByCreator[c.id].meta?.label || ""}`}
-                          style={{
-                            fontSize: "0.7rem",
-                            padding: "0.1rem 0.35rem",
-                            borderRadius: 4,
-                            border: `1px solid ${CERT_UI[certByCreator[c.id].level].color}`,
-                            color: CERT_UI[certByCreator[c.id].level].color,
-                            background: `${CERT_UI[certByCreator[c.id].level].color}18`,
-                          }}
-                        >
-                          {CERT_UI[certByCreator[c.id].level].emoji} L{certByCreator[c.id].level}
+                        <span title={`Certificazione ${certByCreator[c.id].meta?.label || ""}`} style={{ ...CHIP_ACCENT, padding: "1px 8px", ...NUM }}>
+                          L{certByCreator[c.id].level}
                         </span>
                       )}
                     </div>
-                    <div style={{ color: HOC_COLORS.orange, fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.5px", marginBottom: "0.5rem" }}>
-                      {c.archetype}
-                    </div>
-                    <div style={{ color: HOC_COLORS.gray, fontSize: "0.8rem", lineHeight: 1.4 }}>
+                    <div style={{ color: CP.accentSoftText, fontSize: 12, marginBottom: 6 }}>{c.archetype}</div>
+                    <div style={{ color: CP.textMuted, fontSize: 13, lineHeight: 1.4 }}>
                       {c.shortDescription.substring(0, 90)}...
                     </div>
-                    <div style={{ marginTop: "0.75rem", fontSize: "1.2rem" }}>
+                    {/* Emoji tipiche della creator: contenuto didattico (come scrive lei), non decorazione */}
+                    <div style={{ marginTop: 8, fontSize: 16 }}>
                       {(c.emojis.primary || []).slice(0, 5).join(" ")}
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
-              <button
-                onClick={() => setPendingScenario(null)}
-                style={{
-                  marginTop: "1.5rem",
-                  padding: "0.5rem 1rem",
-                  background: "transparent",
-                  border: `1px solid ${HOC_COLORS.gray}`,
-                  color: HOC_COLORS.gray,
-                  borderRadius: "0.5rem",
-                  cursor: "pointer",
-                  fontSize: "0.85rem",
-                }}
-              >
+              <button onClick={() => setPendingScenario(null)} style={{ ...BTN_SECONDARY, marginTop: 16 }}>
                 Annulla
               </button>
             </div>
           </div>
         )}
-        {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "1.5rem 2rem",
-            borderBottom: `1px solid ${alpha(HOC_COLORS.purple, "20")}`,
-          }}
-        >
-          <div>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: "1.75rem",
-                fontWeight: 900,
-                color: HOC_COLORS.white,
-              }}
-            >
-              {selectedCategory.name}
-            </h1>
-            <p style={{ color: HOC_COLORS.gray, margin: "0.5rem 0 0 0" }}>
-              {selectedCategory.description}
-            </p>
-          </div>
-          <button
-            onClick={() => setScreen("training-hub")}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: HOC_COLORS.gray,
-              fontSize: "1.2rem",
-              cursor: "pointer",
-              padding: "0.5rem 1rem",
-              transition: "color 0.3s",
-            }}
-            onMouseEnter={(e) => (e.target.style.color = HOC_COLORS.white)}
-            onMouseLeave={(e) => (e.target.style.color = HOC_COLORS.gray)}
-          >
-            ← Indietro
-          </button>
-        </div>
 
-        {/* Scenario Cards */}
-        <div
-          style={{
-            maxWidth: "1200px",
-            margin: "0 auto",
-            padding: "2rem",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-            gap: "1.5rem",
-          }}
-        >
+        <PageHead
+          title={selectedCategory.name}
+          subtitle={`${selectedCategory.description}. Scegli uno scenario, poi la creator con cui giocarlo.`}
+          actions={<BackButton onClick={() => setScreen("training-hub")} />}
+        />
+
+        {scenarioCards.length === 0 && (
+          <Notice>Questa categoria non ha ancora scenari. Torna indietro e scegline un&apos;altra.</Notice>
+        )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
           {scenarioCards.map((scenario) => (
-            <div
+            <button
               key={scenario.id}
               onClick={() => {
                 setPendingScenario(scenario);
               }}
-              style={{
-                background: `${alpha(HOC_COLORS.white, "08")}`,
-                border: `2px solid ${HOC_COLORS.purple}`,
-                borderRadius: "1rem",
-                padding: "1.5rem",
-                cursor: "pointer",
-                transition: "all 0.3s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = HOC_COLORS.orange;
-                e.currentTarget.style.transform = "translateY(-4px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = HOC_COLORS.purple;
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
+              style={CLICK_CARD}
+              {...hoverBorder}
             >
-              <h3
-                style={{
-                  margin: "0 0 0.5rem 0",
-                  fontWeight: 900,
-                  color: HOC_COLORS.white,
-                }}
-              >
-                {scenario.title}
-              </h3>
-              <p
-                style={{
-                  margin: "0 0 1rem 0",
-                  color: HOC_COLORS.gray,
-                  fontSize: "0.9rem",
-                }}
-              >
-                {scenario.description}
-              </p>
+              <h2 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>{scenario.title}</h2>
+              <p style={{ margin: "0 0 14px", color: CP.textSecondary, fontSize: 14, lineHeight: 1.5 }}>{scenario.description}</p>
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  borderTop: `1px solid ${alpha(HOC_COLORS.white, "10")}`,
-                  paddingTop: "1rem",
+                  borderTop: `1px solid ${CP.borderSoft}`,
+                  paddingTop: 10,
+                  fontSize: 13,
+                  ...NUM,
                 }}
               >
-                <span style={{ color: HOC_COLORS.gray, fontSize: "0.85rem" }}>
-                  Difficoltà: {scenario.difficulty}/5
-                </span>
-                <span style={{ color: HOC_COLORS.orange, fontWeight: 700 }}>
-                  {scenario.maxMessages || 6} turni
-                </span>
+                <span style={{ color: CP.textMuted }}>Difficoltà {scenario.difficulty}/5</span>
+                <span style={{ color: CP.textSecondary }}>{scenario.maxMessages || 6} turni</span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -1489,109 +1022,74 @@ export default function Home() {
   // -------------------------------------------------------
 
   if (screen === "scenario-play" && selectedScenario && isLoaded) {
+    const irritated = (fanState.irritation || 0) > 0;
     return (
       <div
         style={{
-          backgroundColor: HOC_COLORS.bgDark,
+          background: CP.bg,
           height: "100vh",
           display: "flex",
           flexDirection: "column",
+          fontFamily: FONTS.body,
         }}
       >
-        {/* Top Bar */}
+        {/* Barra in alto */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            padding: "1rem 1.5rem",
-            borderBottom: `1px solid ${alpha(HOC_COLORS.purple, "20")}`,
+            gap: 12,
+            flexWrap: "wrap",
+            padding: "12px 20px",
+            borderBottom: `1px solid ${CP.border}`,
+            background: CP.surface,
           }}
         >
-          <div>
-            <h3
-              style={{
-                margin: 0,
-                fontWeight: 900,
-                color: HOC_COLORS.white,
-              }}
-            >
-              {selectedScenario.title}
-            </h3>
-          </div>
-          <div style={{ display: "flex", gap: "1.25rem", alignItems: "center", fontSize: "0.8rem" }}>
-            <span title="Interesse del fan" style={{ color: "#60A5FA" }}>
-              💙 {fanState.interest}
+          <h1 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>{selectedScenario.title}</h1>
+          <div style={{ display: "flex", gap: 14, alignItems: "center", fontSize: 13, flexWrap: "wrap" }}>
+            {/* Stato del fan: aggiornato dal simulatore a ogni risposta */}
+            <span title="Interesse del fan" style={{ color: CP.textMuted }}>
+              Interesse <span style={{ color: CP.textPrimary, fontWeight: 500, ...NUM }}>{fanState.interest}</span>
             </span>
-            <span title="Fiducia del fan" style={{ color: COLORS.verdant }}>
-              🤝 {fanState.trust}
+            <span title="Fiducia del fan" style={{ color: CP.textMuted }}>
+              Fiducia <span style={{ color: CP.textPrimary, fontWeight: 500, ...NUM }}>{fanState.trust}</span>
             </span>
-            <span title="Irritazione del fan" style={{ color: "#EF4444" }}>
-              😤 {fanState.irritation}
+            <span title="Irritazione del fan" style={{ color: CP.textMuted }}>
+              Irritazione <span style={{ color: irritated ? CP.accentRed : CP.textPrimary, fontWeight: 500, ...NUM }}>{fanState.irritation}</span>
             </span>
-            <span title="Attaccamento (leva esclusività + dipendenza)" style={{ color: "#F59E0B" }}>
-              🔗 {fanState.attachment ?? 3}
+            <span title="Attaccamento (leva esclusività + dipendenza)" style={{ color: CP.textMuted }}>
+              Attaccamento <span style={{ color: CP.textPrimary, fontWeight: 500, ...NUM }}>{fanState.attachment ?? 3}</span>
             </span>
-            {selectedCreator && (
-              <span style={{
-                padding: "0.25rem 0.6rem",
-                background: `${alpha(HOC_COLORS.orange, "20")}`,
-                border: `1px solid ${HOC_COLORS.orange}`,
-                borderRadius: "0.5rem",
-                color: HOC_COLORS.orange,
-                fontSize: "0.75rem",
-                fontWeight: 700,
-              }}>
-                {selectedCreator.name}
-              </span>
-            )}
+            {selectedCreator && <span style={CHIP_ACCENT}>{selectedCreator.name}</span>}
             {selectedArchetype && (
-              <span
-                title={`${selectedArchetype.name} — ${selectedArchetype.profile}`}
-                style={{
-                  padding: "0.25rem 0.6rem",
-                  background: `${alpha(HOC_COLORS.purple, "20")}`,
-                  border: `1px solid ${HOC_COLORS.purple}`,
-                  borderRadius: "0.5rem",
-                  color: HOC_COLORS.purple,
-                  fontSize: "0.75rem",
-                  fontWeight: 700,
-                }}
-              >
-                {selectedArchetype.emoji} {selectedArchetype.name}
+              <span title={`${selectedArchetype.name} — ${selectedArchetype.profile}`} style={CHIP}>
+                {selectedArchetype.name}
               </span>
             )}
-            <span style={{ color: HOC_COLORS.orange, fontWeight: 700 }}>
-              {messageCount} msg
+            <span style={{ color: CP.textSecondary, ...NUM }}>
+              {messageCount} {messageCount === 1 ? "messaggio" : "messaggi"}
             </span>
             <button
               onClick={endScenario}
               disabled={messageCount < 3}
-              style={{
-                background: messageCount < 3 ? `${alpha(HOC_COLORS.gray, "40")}` : HOC_COLORS.orange,
-                border: "none",
-                color: HOC_COLORS.bgDark,
-                padding: "0.6rem 1.2rem",
-                borderRadius: "0.5rem",
-                fontWeight: 700,
-                cursor: messageCount < 3 ? "not-allowed" : "pointer",
-                transition: "opacity 0.3s",
-              }}
+              title={messageCount < 3 ? "Servono almeno 3 messaggi per terminare" : undefined}
+              style={{ ...(messageCount < 3 ? BTN_OFF : BTN_PRIMARY), padding: "8px 16px" }}
             >
               Termina
             </button>
           </div>
         </div>
 
-        {/* Chat Area */}
+        {/* Conversazione */}
         <div
           style={{
             flex: 1,
             overflowY: "auto",
-            padding: "1.5rem",
+            padding: 20,
             display: "flex",
             flexDirection: "column",
-            gap: "1rem",
+            gap: 12,
           }}
         >
           {messages.map((msg, i) => (
@@ -1604,16 +1102,18 @@ export default function Home() {
             >
               <div
                 style={{
-                  maxWidth: "70%",
-                  padding: "1rem",
-                  borderRadius: "1rem",
-                  background:
-                    msg.role === "operator"
-                      ? HOC_COLORS.gradient
-                      : `${alpha(HOC_COLORS.white, "10")}`,
-                  color: HOC_COLORS.white,
-                  borderBottomRightRadius: msg.role === "operator" ? "0.25rem" : "1rem",
-                  borderBottomLeftRadius: msg.role === "operator" ? "1rem" : "0.25rem",
+                  maxWidth: "min(70%, 560px)",
+                  minWidth: 0,
+                  padding: "10px 14px",
+                  borderRadius: 14,
+                  fontSize: 14,
+                  lineHeight: 1.5,
+                  overflowWrap: "anywhere",
+                  background: msg.role === "operator" ? CP.accent : CP.surface,
+                  border: msg.role === "operator" ? `1px solid ${CP.accent}` : `1px solid ${CP.border}`,
+                  color: msg.role === "operator" ? CP.accentInk : CP.textPrimary,
+                  borderBottomRightRadius: msg.role === "operator" ? 4 : 14,
+                  borderBottomLeftRadius: msg.role === "operator" ? 14 : 4,
                 }}
               >
                 {msg.content}
@@ -1622,49 +1122,26 @@ export default function Home() {
           ))}
 
           {isTyping && (
-            <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
-              <div
-                style={{
-                  width: "8px",
-                  height: "8px",
-                  background: HOC_COLORS.orange,
-                  borderRadius: "50%",
-                  animation: "bounce 1.4s infinite",
-                }}
-              />
-              <div
-                style={{
-                  width: "8px",
-                  height: "8px",
-                  background: HOC_COLORS.orange,
-                  borderRadius: "50%",
-                  animation: "bounce 1.4s infinite 0.2s",
-                }}
-              />
-              <div
-                style={{
-                  width: "8px",
-                  height: "8px",
-                  background: HOC_COLORS.orange,
-                  borderRadius: "50%",
-                  animation: "bounce 1.4s infinite 0.4s",
-                }}
-              />
+            <div style={{ display: "flex", gap: 6, marginTop: 8 }} aria-label="Il fan sta scrivendo">
+              {[0, 0.2, 0.4].map((d) => (
+                <div
+                  key={d}
+                  style={{
+                    width: 8,
+                    height: 8,
+                    background: CP.textMuted,
+                    borderRadius: "50%",
+                    animation: `bounce 1.4s infinite ${d}s`,
+                  }}
+                />
+              ))}
             </div>
           )}
 
           {sessionScore && (
-            <div
-              style={{
-                background: `${alpha(HOC_COLORS.green, "20")}`,
-                border: `2px solid ${HOC_COLORS.green}`,
-                borderRadius: "1rem",
-                padding: "1.5rem",
-                marginTop: "1rem",
-              }}
-            >
-              <p style={{ margin: 0, fontWeight: 700, color: COLORS.verdant }}>
-                Scenario completato!
+            <div style={{ ...card, borderLeft: `3px solid ${CP.accentGreen}`, padding: "12px 16px", marginTop: 8 }}>
+              <p style={{ margin: 0, fontWeight: 500, color: CP.textPrimary, fontSize: 14 }}>
+                Scenario completato. Apri i risultati per vedere com&apos;è andata.
               </p>
             </div>
           )}
@@ -1672,10 +1149,10 @@ export default function Home() {
           <div ref={chatEndRef} />
         </div>
 
-        {/* Input Area */}
+        {/* Scrittura */}
         {!sessionScore && (
-          <div style={{ padding: "1.5rem", borderTop: `1px solid ${alpha(HOC_COLORS.purple, "20")}` }}>
-            <div style={{ display: "flex", gap: "1rem", marginBottom: "0.5rem" }}>
+          <div style={{ padding: "14px 20px", borderTop: `1px solid ${CP.border}`, background: CP.surface }}>
+            <div style={{ display: "flex", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
               <input
                 ref={inputRef}
                 type="text"
@@ -1689,30 +1166,12 @@ export default function Home() {
                   }
                 }}
                 autoFocus
-                style={{
-                  flex: 1,
-                  padding: "0.75rem 1rem",
-                  background: `${alpha(HOC_COLORS.white, "10")}`,
-                  border: `1px solid ${alpha(HOC_COLORS.purple, "30")}`,
-                  borderRadius: "0.5rem",
-                  color: HOC_COLORS.white,
-                  fontSize: "0.95rem",
-                  outline: "none",
-                }}
+                style={{ ...INPUT, flex: "1 1 220px", minWidth: 0, padding: "10px 14px" }}
               />
               <button
                 onClick={sendMessage}
                 disabled={!inputText.trim() || isTyping}
-                style={{
-                  padding: "0.75rem 1.5rem",
-                  background: !inputText.trim() ? `${alpha(HOC_COLORS.gray, "40")}` : HOC_COLORS.orange,
-                  border: "none",
-                  color: HOC_COLORS.bgDark,
-                  borderRadius: "0.5rem",
-                  fontWeight: 700,
-                  cursor: !inputText.trim() ? "not-allowed" : "pointer",
-                  transition: "opacity 0.3s",
-                }}
+                style={!inputText.trim() ? BTN_OFF : BTN_PRIMARY}
               >
                 Invia
               </button>
@@ -1720,32 +1179,23 @@ export default function Home() {
                 <button
                   onClick={sendNow}
                   title="Invia subito al fan senza aspettare il timer"
-                  style={{
-                    padding: "0.75rem 1rem",
-                    background: "transparent",
-                    border: `2px solid ${HOC_COLORS.orange}`,
-                    color: HOC_COLORS.orange,
-                    borderRadius: "0.5rem",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontSize: "0.85rem",
-                  }}
+                  style={{ ...BTN_SECONDARY, color: CP.accentSoftText, borderColor: alpha(CP.accent, "55") }}
                 >
                   Invia ora →
                 </button>
               )}
             </div>
             {pendingQueue.length > 0 && queueCountdown > 0 && !isTyping && (
-              <p style={{ margin: "0.5rem 0 0 0", color: HOC_COLORS.orange, fontSize: "0.85rem" }}>
+              <p style={{ margin: "6px 0 0", color: CP.accentSoftText, fontSize: 13, ...NUM }}>
                 {pendingQueue.length} {pendingQueue.length === 1 ? "messaggio in coda" : "messaggi in coda"} · il fan risponde tra {queueCountdown}s (scrivi ancora per aggiungerne un altro)
               </p>
             )}
             {messageCount >= 15 && pendingQueue.length === 0 && !isTyping && (
-              <p style={{ margin: "0.5rem 0 0 0", color: HOC_COLORS.gray, fontSize: "0.85rem" }}>
-                Conversazione lunga — quando vuoi, clicca "Termina" per vedere i risultati.
+              <p style={{ margin: "6px 0 0", color: CP.textMuted, fontSize: 13 }}>
+                Conversazione lunga: quando vuoi, clicca &ldquo;Termina&rdquo; per vedere i risultati.
               </p>
             )}
-<CoachPanel
+            <CoachPanel
               draft={inputText}
               scenarioId={selectedScenario?.id}
               creatorId={selectedCreator?.id}
@@ -1759,11 +1209,13 @@ export default function Home() {
         {sessionScore && (
           <div
             style={{
-              padding: "1.5rem",
-              borderTop: `1px solid ${alpha(HOC_COLORS.purple, "20")}`,
+              padding: "14px 20px",
+              borderTop: `1px solid ${CP.border}`,
+              background: CP.surface,
               display: "flex",
-              gap: "1rem",
+              gap: 10,
               justifyContent: "center",
+              flexWrap: "wrap",
             }}
           >
             <button
@@ -1778,31 +1230,12 @@ export default function Home() {
                 setSessionScore(null);
                 setInputText("");
               }}
-              style={{
-                padding: "0.75rem 1.5rem",
-                background: `${alpha(HOC_COLORS.white, "15")}`,
-                border: `2px solid ${alpha(HOC_COLORS.white, "30")}`,
-                color: HOC_COLORS.white,
-                borderRadius: "0.5rem",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
+              style={BTN_SECONDARY}
             >
               Riprova
             </button>
-            <button
-              onClick={() => setScreen("scenario-results")}
-              style={{
-                padding: "0.75rem 1.5rem",
-                background: HOC_COLORS.gradient,
-                border: "none",
-                color: HOC_COLORS.bgDark,
-                borderRadius: "0.5rem",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Vedi Risultati
+            <button onClick={() => setScreen("scenario-results")} style={BTN_PRIMARY}>
+              Vedi risultati
             </button>
           </div>
         )}
@@ -1824,287 +1257,159 @@ export default function Home() {
   if (screen === "scenario-results" && sessionScore && isLoaded) {
     const stars = sessionScore.stars || 3;
     return (
-      <div style={{ backgroundColor: HOC_COLORS.bgDark, minHeight: "100vh" }}>
-        <div
-          style={{
-            maxWidth: "800px",
-            margin: "0 auto",
-            padding: "3rem 2rem",
-            textAlign: "center",
-          }}
-        >
-          {/* Stars */}
-          <div style={{ fontSize: "3rem", marginBottom: "1.5rem" }}>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <span key={i}>{i < stars ? "⭐" : "☆"}</span>
-            ))}
-          </div>
+      <div style={{ ...WRAP, maxWidth: 800 }}>
+        <PageHead
+          title="Risultato dello scenario"
+          subtitle={selectedScenario?.title ? `${selectedScenario.title}: cosa è andato bene e cosa allenare la prossima volta.` : "Cosa è andato bene e cosa allenare la prossima volta."}
+        />
 
-          {/* Compliance fail — riga rossa violata: azzera il risultato */}
-          {sessionScore.compliance_fail && (
-            <div
-              style={{
-                background: `${alpha(CP.accentRed, "18")}`,
-                border: `2px solid ${CP.accentRed}`,
-                borderRadius: "1rem",
-                padding: "1.25rem 1.5rem",
-                marginBottom: "1.5rem",
-                textAlign: "left",
-              }}
-            >
-              <p style={{ margin: "0 0 6px", fontWeight: 800, color: CP.accentRed }}>
-                Violazione compliance — sessione azzerata
-              </p>
-              <p style={{ margin: "0 0 8px", color: HOC_COLORS.white, fontSize: "0.9rem", lineHeight: 1.5 }}>
-                Hai superato una riga rossa. Sul lavoro vero questo congela le promozioni: qui la sessione non dà XP, a prescindere da quanto è andata bene la chat.
-              </p>
-              {(sessionScore.compliance?.violations || []).length > 0 && (
-                <ul style={{ margin: 0, paddingLeft: "1.25rem", color: CP.accentRed, fontSize: "0.88rem" }}>
-                  {sessionScore.compliance.violations.map((v, i) => (
-                    <li key={i} style={{ marginBottom: "0.25rem" }}>{v}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-
-          {/* Score */}
-          <h1
-            style={{
-              fontSize: "3.5rem",
-              fontWeight: 900,
-              margin: "0 0 0.5rem 0",
-              background: HOC_COLORS.gradient,
-              backgroundClip: "text",
-              color: "transparent",
-            }}
-          >
+        {/* Punteggio */}
+        <section style={{ ...card, padding: "22px", marginBottom: 14, textAlign: "center" }}>
+          <Stars value={stars} />
+          <div style={{ fontSize: 56, fontWeight: 500, letterSpacing: "-0.02em", lineHeight: 1.1, color: CP.textPrimary, margin: "12px 0 6px", ...NUM }}>
             {sessionScore.score}%
-          </h1>
-          <p style={{ color: HOC_COLORS.gray, fontSize: "1.1rem", marginBottom: "2rem" }}>
-            Hai guadagnato <span style={{ color: HOC_COLORS.orange, fontWeight: 700 }}>
-              +{sessionScore.xp} XP
-            </span>
+          </div>
+          <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15 }}>
+            Hai guadagnato <span style={{ color: CP.accentSoftText, fontWeight: 500, ...NUM }}>+{sessionScore.xp} XP</span>
           </p>
+        </section>
 
-          {/* Feedback */}
-          {sessionFeedback && (
+        {/* Compliance fail — riga rossa violata: azzera il risultato */}
+        {sessionScore.compliance_fail && (
+          <FeedbackBox title="Violazione compliance: sessione azzerata" tone="bad">
+            <p style={{ margin: "0 0 8px", color: CP.textPrimary, fontSize: 14, lineHeight: 1.5 }}>
+              Hai superato una riga rossa. Sul lavoro vero questo congela le promozioni: qui la sessione non dà XP, a prescindere da quanto è andata bene la chat.
+            </p>
+            {(sessionScore.compliance?.violations || []).length > 0 && (
+              <ul style={{ margin: 0, paddingLeft: 20, color: CP.accentRed, fontSize: 14 }}>
+                {sessionScore.compliance.violations.map((v, i) => (
+                  <li key={i} style={{ marginBottom: 4 }}>{v}</li>
+                ))}
+              </ul>
+            )}
+          </FeedbackBox>
+        )}
+
+        {/* Feedback */}
+        {sessionFeedback && (
+          <>
+            <FeedbackBox title="Cosa hai fatto bene" tone="good">
+              <BulletList items={sessionFeedback.strengths} empty="Il coach non ha segnalato punti di forza in questa sessione." />
+            </FeedbackBox>
+            <FeedbackBox title="Dove migliorare">
+              <BulletList items={sessionFeedback.improvements} empty="Nessun punto da migliorare segnalato." />
+            </FeedbackBox>
+          </>
+        )}
+
+        {sessionScore?.signals && (
+          <div style={{ marginBottom: 14, textAlign: "left" }}>
+            <SignalsPanel data={sessionScore.signals} />
+          </div>
+        )}
+
+        {/* Feedback sulla valutazione AI */}
+        <section style={{ ...card, padding: "16px 18px", marginBottom: 20 }}>
+          <h2 style={{ margin: "0 0 4px", color: CP.textPrimary, fontSize: 16, fontWeight: 500 }}>
+            La valutazione ti sembra corretta?
+          </h2>
+          <p style={{ margin: "0 0 12px", color: CP.textMuted, fontSize: 13 }}>
+            Il tuo parere aiuta a migliorare il coach AI.
+          </p>
+          {feedbackSent ? (
+            <p style={{ color: CP.textPrimary, fontSize: 14, margin: 0 }}>Grazie per il feedback.</p>
+          ) : (
             <>
-              <div
-                style={{
-                  background: `${alpha(HOC_COLORS.white, "08")}`,
-                  border: `2px solid ${COLORS.verdant}`,
-                  borderRadius: "1rem",
-                  padding: "1.5rem",
-                  marginBottom: "1.5rem",
-                  textAlign: "left",
-                }}
-              >
-                <h3
+              <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                <button
+                  onClick={() => setFeedbackRating("up")}
+                  aria-pressed={feedbackRating === "up"}
                   style={{
-                    margin: "0 0 1rem 0",
-                    color: COLORS.verdant,
-                    fontWeight: 900,
+                    ...BTN_SECONDARY,
+                    padding: "8px 16px",
+                    background: feedbackRating === "up" ? alpha(CP.accentGreen, "22") : CP.surface,
+                    borderColor: feedbackRating === "up" ? CP.accentGreen : CP.border,
                   }}
                 >
-                  Cosa hai fatto bene
-                </h3>
-                <ul style={{ margin: 0, paddingLeft: "1.5rem", color: HOC_COLORS.white }}>
-                  {sessionFeedback.strengths.map((s, i) => (
-                    <li key={i} style={{ marginBottom: "0.5rem" }}>
-                      {s}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div
-                style={{
-                  background: `${alpha(HOC_COLORS.orange, "15")}`,
-                  border: `2px solid ${HOC_COLORS.orange}`,
-                  borderRadius: "1rem",
-                  padding: "1.5rem",
-                  marginBottom: "2rem",
-                  textAlign: "left",
-                }}
-              >
-                <h3
+                  Giusta
+                </button>
+                <button
+                  onClick={() => setFeedbackRating("down")}
+                  aria-pressed={feedbackRating === "down"}
                   style={{
-                    margin: "0 0 1rem 0",
-                    color: HOC_COLORS.orange,
-                    fontWeight: 900,
+                    ...BTN_SECONDARY,
+                    padding: "8px 16px",
+                    background: feedbackRating === "down" ? alpha(CP.accentRed, "22") : CP.surface,
+                    borderColor: feedbackRating === "down" ? CP.accentRed : CP.border,
                   }}
                 >
-                  Dove migliorare
-                </h3>
-                <ul style={{ margin: 0, paddingLeft: "1.5rem", color: HOC_COLORS.white }}>
-                  {sessionFeedback.improvements.map((imp, i) => (
-                    <li key={i} style={{ marginBottom: "0.5rem" }}>
-                      {imp}
-                    </li>
-                  ))}
-                </ul>
+                  Sbagliata
+                </button>
               </div>
+              {feedbackRating && (
+                <>
+                  <textarea
+                    value={feedbackComment}
+                    onChange={(e) => setFeedbackComment(e.target.value)}
+                    placeholder="Dicci perché (facoltativo, ma molto utile)..."
+                    style={{
+                      ...INPUT,
+                      width: "100%",
+                      boxSizing: "border-box",
+                      minHeight: 70,
+                      padding: 12,
+                      marginBottom: 10,
+                      resize: "vertical",
+                    }}
+                  />
+                  {feedbackError && (
+                    <Notice danger>Invio non riuscito: controlla la connessione e riprova.</Notice>
+                  )}
+                  <button
+                    onClick={async () => {
+                      try {
+                        setFeedbackError(false);
+                        await fetch("/api/evaluation-feedback", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            scenarioId: selectedScenario?.id,
+                            rating: feedbackRating,
+                            comment: feedbackComment,
+                            scoreSnapshot: sessionScore,
+                            messages,
+                          }),
+                        });
+                        setFeedbackSent(true);
+                      } catch (err) {
+                        console.error("Feedback error:", err);
+                        setFeedbackError(true);
+                      }
+                    }}
+                    style={{ ...BTN_PRIMARY, padding: "8px 18px" }}
+                  >
+                    Invia feedback
+                  </button>
+                </>
+              )}
             </>
           )}
+        </section>
 
-          {sessionScore?.signals && (
-            <div style={{ marginBottom: "2rem", textAlign: "left" }}>
-              <SignalsPanel data={sessionScore.signals} />
-            </div>
-          )}
-
-          {/* Feedback su valutazione AI */}
-          <div
-            style={{
-              background: `${alpha(HOC_COLORS.white, "08")}`,
-              border: `1px solid ${alpha(HOC_COLORS.white, "20")}`,
-              borderRadius: "1rem",
-              padding: "1.5rem",
-              marginBottom: "2rem",
-              textAlign: "left",
+        {/* Azioni */}
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+          <button onClick={() => setScreen("training-hub")} style={BTN_SECONDARY}>
+            Torna all&apos;allenamento
+          </button>
+          <button
+            onClick={() => {
+              setSelectedScenario(null);
+              setScreen("scenario-list");
             }}
+            style={BTN_PRIMARY}
           >
-            <h3 style={{ margin: "0 0 0.5rem 0", color: HOC_COLORS.white, fontSize: "1rem", fontWeight: 800 }}>
-              La valutazione ti sembra corretta?
-            </h3>
-            <p style={{ margin: "0 0 1rem 0", color: HOC_COLORS.gray, fontSize: "0.85rem" }}>
-              Il tuo feedback aiuta a migliorare il coach AI.
-            </p>
-            {feedbackSent ? (
-              <p style={{ color: COLORS.verdant, fontWeight: 700, margin: 0 }}>
-                Grazie per il feedback!
-              </p>
-            ) : (
-              <>
-                <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem" }}>
-                  <button
-                    onClick={() => setFeedbackRating("up")}
-                    style={{
-                      padding: "0.5rem 1rem",
-                      background: feedbackRating === "up" ? `${alpha(COLORS.verdant, "30")}` : `${alpha(HOC_COLORS.white, "10")}`,
-                      border: `2px solid ${feedbackRating === "up" ? COLORS.verdant : alpha(HOC_COLORS.white, "30")}`,
-                      color: HOC_COLORS.white,
-                      borderRadius: "0.5rem",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Giusta
-                  </button>
-                  <button
-                    onClick={() => setFeedbackRating("down")}
-                    style={{
-                      padding: "0.5rem 1rem",
-                      background: feedbackRating === "down" ? "#EF444430" : `${alpha(HOC_COLORS.white, "10")}`,
-                      border: `2px solid ${feedbackRating === "down" ? "#EF4444" : alpha(HOC_COLORS.white, "30")}`,
-                      color: HOC_COLORS.white,
-                      borderRadius: "0.5rem",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Sbagliata
-                  </button>
-                </div>
-                {feedbackRating && (
-                  <>
-                    <textarea
-                      value={feedbackComment}
-                      onChange={(e) => setFeedbackComment(e.target.value)}
-                      placeholder="Dicci perché (opzionale, ma utilissimo)..."
-                      style={{
-                        width: "100%",
-                        minHeight: "70px",
-                        padding: "0.75rem",
-                        background: `${alpha(HOC_COLORS.white, "05")}`,
-                        border: `1px solid ${alpha(HOC_COLORS.white, "30")}`,
-                        borderRadius: "0.5rem",
-                        color: HOC_COLORS.white,
-                        fontFamily: "inherit",
-                        fontSize: "0.9rem",
-                        marginBottom: "0.75rem",
-                        resize: "vertical",
-                      }}
-                    />
-                    <button
-                      onClick={async () => {
-                        try {
-                          await fetch("/api/evaluation-feedback", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              scenarioId: selectedScenario?.id,
-                              rating: feedbackRating,
-                              comment: feedbackComment,
-                              scoreSnapshot: sessionScore,
-                              messages,
-                            }),
-                          });
-                          setFeedbackSent(true);
-                        } catch (err) {
-                          console.error("Feedback error:", err);
-                        }
-                      }}
-                      style={{
-                        padding: "0.5rem 1.25rem",
-                        background: HOC_COLORS.gradient,
-                        border: "none",
-                        color: HOC_COLORS.bgDark,
-                        borderRadius: "0.5rem",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Invia feedback
-                    </button>
-                  </>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div
-            style={{
-              display: "flex",
-              gap: "1rem",
-              justifyContent: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <button
-              onClick={() => setScreen("training-hub")}
-              style={{
-                padding: "0.75rem 1.5rem",
-                background: `${alpha(HOC_COLORS.white, "15")}`,
-                border: `2px solid ${alpha(HOC_COLORS.white, "30")}`,
-                color: HOC_COLORS.white,
-                borderRadius: "0.5rem",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Torna al Training
-            </button>
-            <button
-              onClick={() => {
-                setSelectedScenario(null);
-                setScreen("scenario-list");
-              }}
-              style={{
-                padding: "0.75rem 1.5rem",
-                background: HOC_COLORS.gradient,
-                border: "none",
-                color: HOC_COLORS.bgDark,
-                borderRadius: "0.5rem",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Prossimo Scenario →
-            </button>
-          </div>
+            Prossimo scenario →
+          </button>
         </div>
       </div>
     );
@@ -2119,255 +1424,117 @@ export default function Home() {
     const currentChallenge = challenges[quickChallengeIndex % challenges.length];
 
     return (
-      <div style={{ backgroundColor: HOC_COLORS.bgDark, minHeight: "100vh" }}>
-        <div
-          style={{
-            maxWidth: "700px",
-            margin: "0 auto",
-            padding: "2rem",
-          }}
-        >
-          {/* Header */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "2rem",
-            }}
-          >
-            <h1
+      <div style={{ ...WRAP, maxWidth: 760 }}>
+        <PageHead
+          title="Sfida veloce"
+          subtitle="Una situazione e un messaggio del fan: scrivi la tua risposta e ricevi subito un giudizio con esempi."
+          actions={<BackButton onClick={() => setScreen("home")} />}
+        />
+
+        <p style={{ color: CP.textMuted, fontSize: 13, margin: "0 0 14px", ...NUM }}>
+          Sfida {quickChallengeIndex + 1} di 10
+        </p>
+
+        {!currentChallenge && (
+          <Notice>Nessuna sfida disponibile al momento.</Notice>
+        )}
+
+        {currentChallenge && !quickChallengeEval ? (
+          <>
+            {/* Situazione */}
+            <section style={{ ...card, padding: "16px 18px", marginBottom: 16 }}>
+              <div style={{ color: CP.textMuted, fontSize: 13, marginBottom: 6 }}>Situazione</div>
+              <p style={{ margin: 0, color: CP.textPrimary, fontSize: 16, fontWeight: 500, lineHeight: 1.5 }}>
+                {currentChallenge.situation}
+              </p>
+            </section>
+
+            {/* Messaggio del fan */}
+            <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 16 }}>
+              <div
+                style={{
+                  background: CP.surface,
+                  border: `1px solid ${CP.border}`,
+                  padding: "10px 14px",
+                  borderRadius: 14,
+                  borderBottomLeftRadius: 4,
+                  maxWidth: "min(80%, 520px)",
+                }}
+              >
+                <p style={{ margin: 0, color: CP.textPrimary, fontSize: 14, lineHeight: 1.5 }}>{currentChallenge.fanMessage}</p>
+              </div>
+            </div>
+
+            {/* Risposta */}
+            <textarea
+              placeholder="Scrivi la tua risposta..."
+              value={quickChallengeResponse}
+              onChange={(e) => setQuickChallengeResponse(e.target.value)}
               style={{
-                margin: 0,
-                fontSize: "1.75rem",
-                fontWeight: 900,
-                color: HOC_COLORS.white,
+                ...INPUT,
+                width: "100%",
+                boxSizing: "border-box",
+                padding: 14,
+                fontSize: 15,
+                resize: "vertical",
+                minHeight: 100,
+                marginBottom: 14,
               }}
-            >
-              Sfida Veloce
-            </h1>
+            />
+
             <button
-              onClick={() => setScreen("home")}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: HOC_COLORS.gray,
-                fontSize: "1rem",
-                cursor: "pointer",
-                padding: "0.5rem 1rem",
-              }}
+              onClick={submitQuickChallenge}
+              disabled={!quickChallengeResponse.trim() || isTyping}
+              style={{ ...(!quickChallengeResponse.trim() ? BTN_OFF : BTN_PRIMARY), width: "100%", padding: "12px 18px" }}
             >
-              ← Indietro
+              {isTyping ? "Valutazione in corso..." : "Valuta la risposta"}
             </button>
-          </div>
+          </>
+        ) : currentChallenge ? (
+          <>
+            <div style={{ marginBottom: 16, textAlign: "center" }}>
+              <Stars value={quickChallengeEval.stars} size={24} />
+            </div>
 
-          {/* Progress */}
-          <p
-            style={{
-              color: HOC_COLORS.gray,
-              fontSize: "0.9rem",
-              marginBottom: "2rem",
-            }}
-          >
-            {quickChallengeIndex + 1}/10 sfide completate
-          </p>
+            <FeedbackBox title="Cosa hai fatto bene" tone="good">
+              <p style={{ margin: 0, color: CP.textPrimary, fontSize: 14, lineHeight: 1.55 }}>{quickChallengeEval.good || "—"}</p>
+            </FeedbackBox>
 
-          {!quickChallengeEval ? (
-            <>
-              {/* Situation */}
-              <div
-                style={{
-                  background: `${alpha(HOC_COLORS.white, "08")}`,
-                  border: `2px solid ${HOC_COLORS.purple}`,
-                  borderRadius: "1rem",
-                  padding: "1.5rem",
-                  marginBottom: "2rem",
-                }}
-              >
-                <p
-                  style={{
-                    color: HOC_COLORS.gray,
-                    fontSize: "0.9rem",
-                    margin: "0 0 1rem 0",
-                    
-                  }}
-                >
-                  Situazione
-                </p>
-                <p
-                  style={{
-                    margin: 0,
-                    color: HOC_COLORS.white,
-                    fontSize: "1.1rem",
-                    fontWeight: 600,
-                  }}
-                >
-                  {currentChallenge.situation}
-                </p>
-              </div>
+            <FeedbackBox title="Cosa migliorare">
+              <p style={{ margin: 0, color: CP.textPrimary, fontSize: 14, lineHeight: 1.55 }}>{quickChallengeEval.improve}</p>
+            </FeedbackBox>
 
-              {/* Fan Message */}
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-start",
-                  marginBottom: "2rem",
-                }}
-              >
-                <div
-                  style={{
-                    background: `${alpha(HOC_COLORS.white, "10")}`,
-                    padding: "1rem",
-                    borderRadius: "1rem",
-                    borderBottomLeftRadius: "0.25rem",
-                    maxWidth: "60%",
-                  }}
-                >
-                  <p style={{ margin: 0, color: HOC_COLORS.white }}>
-                    {currentChallenge.fanMessage}
-                  </p>
-                </div>
-              </div>
-
-              {/* Response Input */}
-              <textarea
-                placeholder="Scrivi la tua risposta..."
-                value={quickChallengeResponse}
-                onChange={(e) => setQuickChallengeResponse(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "1rem",
-                  background: `${alpha(HOC_COLORS.white, "10")}`,
-                  border: `1px solid ${alpha(HOC_COLORS.purple, "30")}`,
-                  borderRadius: "0.75rem",
-                  color: HOC_COLORS.white,
-                  fontSize: "1rem",
-                  fontFamily: "'Poppins', sans-serif",
-                  resize: "vertical",
-                  minHeight: "100px",
-                  marginBottom: "1.5rem",
-                  outline: "none",
-                }}
-              />
-
-              {/* Submit Button */}
-              <button
-                onClick={submitQuickChallenge}
-                disabled={!quickChallengeResponse.trim() || isTyping}
-                style={{
-                  width: "100%",
-                  padding: "1rem",
-                  background: !quickChallengeResponse.trim()
-                    ? `${alpha(HOC_COLORS.gray, "40")}`
-                    : HOC_COLORS.gradient,
-                  border: "none",
-                  color: HOC_COLORS.bgDark,
-                  borderRadius: "0.75rem",
-                  fontWeight: 700,
-                  fontSize: "1rem",
-                  cursor: !quickChallengeResponse.trim() ? "not-allowed" : "pointer",
-                  transition: "opacity 0.3s",
-                }}
-              >
-                {isTyping ? "Valutazione in corso..." : "Valuta Risposta"}
-              </button>
-            </>
-          ) : (
-            <>
-              {/* Evaluation Results */}
-              <div style={{ marginBottom: "2rem" }}>
-                <div style={{ fontSize: "2rem", marginBottom: "1rem", textAlign: "center" }}>
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <span key={i}>{i < quickChallengeEval.stars ? "⭐" : "☆"}</span>
-                  ))}
-                </div>
-              </div>
-
-              <div
-                style={{
-                  background: `${alpha(COLORS.verdant, "20")}`,
-                  border: `2px solid ${COLORS.verdant}`,
-                  borderRadius: "1rem",
-                  padding: "1.5rem",
-                  marginBottom: "1.5rem",
-                }}
-              >
-                <p style={{ margin: "0 0 0.5rem 0", color: COLORS.verdant, fontWeight: 700 }}>
-                  Cosa hai fatto bene
-                </p>
-                <p style={{ margin: 0, color: HOC_COLORS.white }}>
-                  {quickChallengeEval.good}
-                </p>
-              </div>
-
-              <div
-                style={{
-                  background: `${alpha(HOC_COLORS.orange, "20")}`,
-                  border: `2px solid ${HOC_COLORS.orange}`,
-                  borderRadius: "1rem",
-                  padding: "1.5rem",
-                  marginBottom: "2rem",
-                }}
-              >
-                <p style={{ margin: "0 0 0.5rem 0", color: HOC_COLORS.orange, fontWeight: 700 }}>
-                  Cosa migliorare
-                </p>
-                <p style={{ margin: 0, color: HOC_COLORS.white }}>
-                  {quickChallengeEval.improve}
-                </p>
-              </div>
-
-              <div
-                style={{
-                  background: `${alpha(HOC_COLORS.purple, "20")}`,
-                  border: `2px solid ${HOC_COLORS.purple}`,
-                  borderRadius: "1rem",
-                  padding: "1.5rem",
-                  marginBottom: "2rem",
-                }}
-              >
-                <p style={{ margin: "0 0 1rem 0", color: HOC_COLORS.purple, fontWeight: 700 }}>
-                  Esempi di risposte ideali
-                </p>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            <section style={{ ...card, padding: "16px 18px", marginBottom: 20 }}>
+              <h2 style={{ margin: "0 0 10px", fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>Esempi di risposte ideali</h2>
+              {quickChallengeEval.examples.length === 0 ? (
+                <p style={{ margin: 0, fontSize: 14, color: CP.textMuted }}>Nessun esempio per questa sfida.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {quickChallengeEval.examples.map((ex, i) => (
                     <p
                       key={i}
                       style={{
                         margin: 0,
-                        padding: "0.75rem",
-                        background: `${alpha(HOC_COLORS.white, "05")}`,
-                        borderRadius: "0.5rem",
-                        color: HOC_COLORS.white,
-                        fontSize: "0.9rem",
+                        padding: "10px 12px",
+                        background: CP.surfaceAlt,
+                        borderRadius: 8,
+                        color: CP.textPrimary,
+                        fontSize: 14,
+                        lineHeight: 1.5,
                       }}
                     >
-                      "{ex}"
+                      &ldquo;{ex}&rdquo;
                     </p>
                   ))}
                 </div>
-              </div>
+              )}
+            </section>
 
-              {/* Next Challenge Button */}
-              <button
-                onClick={nextQuickChallenge}
-                style={{
-                  width: "100%",
-                  padding: "1rem",
-                  background: HOC_COLORS.gradient,
-                  border: "none",
-                  color: HOC_COLORS.bgDark,
-                  borderRadius: "0.75rem",
-                  fontWeight: 700,
-                  fontSize: "1rem",
-                  cursor: "pointer",
-                }}
-              >
-                Prossima Sfida →
-              </button>
-            </>
-          )}
-        </div>
+            <button onClick={nextQuickChallenge} style={{ ...BTN_PRIMARY, width: "100%", padding: "12px 18px" }}>
+              Prossima sfida →
+            </button>
+          </>
+        ) : null}
       </div>
     );
   }
@@ -2383,267 +1550,84 @@ export default function Home() {
       .map((d) => d.label);
 
     return (
-      <div style={{ backgroundColor: HOC_COLORS.bgDark, minHeight: "100vh" }}>
-        <div
+      <div style={{ ...WRAP, maxWidth: 1000 }}>
+        <PageHead
+          title="La tua card"
+          subtitle="Il tuo livello, i punti esperienza e le competenze valutate dal coach AI negli scenari."
+          actions={<BackButton onClick={() => setScreen("home")} />}
+        />
+
+        {/* Scheda */}
+        <section
           style={{
-            maxWidth: "1000px",
-            margin: "0 auto",
-            padding: "2rem",
+            ...card,
+            padding: "20px 22px",
+            marginBottom: 14,
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: 20,
+            alignItems: "center",
           }}
         >
-          {/* Header */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "2rem",
-            }}
-          >
-            <h1
-              style={{
-                margin: 0,
-                fontSize: "1.75rem",
-                fontWeight: 900,
-                color: HOC_COLORS.white,
-              }}
-            >
-              La tua Card
-            </h1>
-            <button
-              onClick={() => setScreen("home")}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: HOC_COLORS.gray,
-                fontSize: "1rem",
-                cursor: "pointer",
-                padding: "0.5rem 1rem",
-              }}
-            >
-              ← Indietro
-            </button>
-          </div>
-
-          {/* Profile Card */}
-          <div
-            style={{
-              background: CP.accentSoft,
-              border: `5px solid ${HOC_COLORS.orange}`,
-              borderRadius: "1.5rem",
-              padding: "2rem",
-              marginBottom: "2rem",
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "2rem",
-            }}
-          >
-            <div>
-              <p
-                style={{
-                  color: `${alpha(HOC_COLORS.white, "90")}`,
-                  fontSize: "0.9rem",
-                  margin: "0 0 0.5rem 0",
-                  
-                }}
-              >
-                Operatore
-              </p>
-              <h2
-                style={{
-                  margin: "0 0 1rem 0",
-                  fontSize: "2rem",
-                  fontWeight: 900,
-                  color: HOC_COLORS.white,
-                }}
-              >
-                {operatorName}
-              </h2>
-              <p
-                style={{
-                  color: `${alpha(HOC_COLORS.white, "80")}`,
-                  margin: 0,
-                }}
-              >
-                Livello {operatorLevel} • {operatorXP} XP totali
-              </p>
+          <div>
+            <div style={{ color: CP.textSecondary, fontSize: 13, marginBottom: 4 }}>Operatore</div>
+            <div style={{ margin: "0 0 6px", fontSize: 28, fontWeight: 500, color: CP.textPrimary, letterSpacing: "-0.01em" }}>
+              {operatorName}
             </div>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <p style={{ margin: 0, color: `${alpha(HOC_COLORS.white, "90")}`, fontSize: "0.9rem" }}>
-                Certificazione{" "}
-              </p>
-              <p style={{ margin: "0.5rem 0 0 0", fontWeight: 700, color: HOC_COLORS.white }}>
-                Senior Operator
-              </p>
+            <div style={{ color: CP.textSecondary, fontSize: 14, ...NUM }}>
+              Livello {operatorLevel} · {operatorXP} XP totali
             </div>
           </div>
+          <div>
+            <div style={{ color: CP.textSecondary, fontSize: 13 }}>Certificazione</div>
+            <div style={{ marginTop: 4, fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>Senior Operator</div>
+          </div>
+        </section>
 
-          {/* Skill Dimensions */}
-          <div
-            style={{
-              background: `${alpha(HOC_COLORS.white, "08")}`,
-              border: `2px solid ${HOC_COLORS.purple}`,
-              borderRadius: "1rem",
-              padding: "2rem",
-              marginBottom: "2rem",
-            }}
-          >
-            <h3
-              style={{
-                margin: "0 0 1.5rem 0",
-                fontSize: "1.25rem",
-                fontWeight: 900,
-                color: HOC_COLORS.white,
-              }}
-            >
-              Skill Dimensions
-            </h3>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-              {SKILL_DIMENSIONS.map((dim) => (
-                <div key={dim.key}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontWeight: 700,
-                        color: HOC_COLORS.white,
-                      }}
-                    >
-                      {dim.label}
-                    </span>
-                    <span style={{ color: dim.color, fontWeight: 700 }}>
-                      {skillDimensions[dim.key]}%
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      background: `${alpha(HOC_COLORS.white, "10")}`,
-                      borderRadius: "0.5rem",
-                      height: "10px",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: "100%",
-                        background: dim.color,
-                        width: `${skillDimensions[dim.key]}%`,
-                        transition: "width 0.5s ease",
-                      }}
-                    />
-                  </div>
+        {/* Competenze */}
+        <section style={{ ...card, padding: "18px 20px", marginBottom: 14 }}>
+          <h2 style={{ margin: "0 0 14px", fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>Competenze</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {SKILL_DIMENSIONS.map((dim) => (
+              <div key={dim.key}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 14 }}>
+                  <span style={{ color: CP.textPrimary }}>{dim.label}</span>
+                  <span style={{ color: CP.textPrimary, fontWeight: 500, ...NUM }}>{skillDimensions[dim.key]}%</span>
                 </div>
-              ))}
-            </div>
+                <div style={{ background: CP.surfaceAlt, borderRadius: 999, height: 8, overflow: "hidden" }}>
+                  <div
+                    style={{
+                      height: "100%",
+                      background: CP.accent,
+                      width: `${skillDimensions[dim.key]}%`,
+                      transition: "width 0.5s ease",
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
+        </section>
 
-          {/* Strengths & Improvements */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "1.5rem",
-              marginBottom: "2rem",
-            }}
-          >
-            <div
-              style={{
-                background: `${alpha(COLORS.verdant, "20")}`,
-                border: `2px solid ${COLORS.verdant}`,
-                borderRadius: "1rem",
-                padding: "1.5rem",
-              }}
-            >
-              <h3
-                style={{
-                  margin: "0 0 1rem 0",
-                  color: COLORS.verdant,
-                  fontWeight: 900,
-                }}
-              >
-                Punti di Forza
-              </h3>
-              <ul
-                style={{
-                  margin: 0,
-                  paddingLeft: "1.5rem",
-                  color: HOC_COLORS.white,
-                }}
-              >
-                {strengths.map((s, i) => (
-                  <li key={i} style={{ marginBottom: "0.5rem" }}>
-                    {s}
-                  </li>
-                ))}
-              </ul>
-            </div>
+        {/* Punti di forza e aree di miglioramento */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14, marginBottom: 14 }}>
+          <FeedbackBox title="Punti di forza" tone="good">
+            <BulletList items={strengths} empty="Nessuna competenza è ancora sopra 75: continua ad allenarti." />
+          </FeedbackBox>
+          <FeedbackBox title="Aree di miglioramento">
+            <BulletList items={improvements} empty="Tutte le competenze sono sopra 75." />
+          </FeedbackBox>
+        </div>
 
-            <div
-              style={{
-                background: `${alpha(HOC_COLORS.orange, "20")}`,
-                border: `2px solid ${HOC_COLORS.orange}`,
-                borderRadius: "1rem",
-                padding: "1.5rem",
-              }}
-            >
-              <h3
-                style={{
-                  margin: "0 0 1rem 0",
-                  color: HOC_COLORS.orange,
-                  fontWeight: 900,
-                }}
-              >
-                Aree di Miglioramento
-              </h3>
-              <ul
-                style={{
-                  margin: 0,
-                  paddingLeft: "1.5rem",
-                  color: HOC_COLORS.white,
-                }}
-              >
-                {improvements.map((imp, i) => (
-                  <li key={i} style={{ marginBottom: "0.5rem" }}>
-                    {imp}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          {/* Recent Activity */}
-          <div
-            style={{
-              background: `${alpha(HOC_COLORS.white, "08")}`,
-              border: `2px solid ${alpha(HOC_COLORS.white, "20")}`,
-              borderRadius: "1rem",
-              padding: "1.5rem",
-            }}
-          >
-            <h3
-              style={{
-                margin: "0 0 1rem 0",
-                fontSize: "1.1rem",
-                fontWeight: 900,
-                color: HOC_COLORS.white,
-              }}
-            >
-              Attività Recente
-            </h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+        {/* Attività recente */}
+        <section style={{ ...card, padding: "16px 18px" }}>
+          <h2 style={{ margin: "0 0 10px", fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>Attività recente</h2>
+          {recentScenarios.length === 0 ? (
+            <p style={{ margin: 0, fontSize: 13, color: CP.textMuted }}>
+              Qui compaiono gli scenari che completi mentre questa pagina è aperta.
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column" }}>
               {recentScenarios.map((scenario, i) => (
                 <div
                   key={i}
@@ -2651,51 +1635,41 @@ export default function Home() {
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    padding: "0.75rem",
-                    background: `${alpha(HOC_COLORS.white, "05")}`,
-                    borderRadius: "0.5rem",
+                    gap: 12,
+                    padding: "10px 0",
+                    borderTop: i > 0 ? `1px solid ${CP.borderSoft}` : "none",
                   }}
                 >
-                  <div>
-                    <p style={{ margin: 0, fontWeight: 600, color: HOC_COLORS.white }}>
-                      {scenario.title}
-                    </p>
-                    <p style={{ margin: "0.25rem 0 0 0", color: HOC_COLORS.gray, fontSize: "0.85rem" }}>
-                      {scenario.date}
-                    </p>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, color: CP.textPrimary }}>{scenario.title}</div>
+                    <div style={{ marginTop: 2, color: CP.textMuted, fontSize: 12 }}>{scenario.date}</div>
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    <p style={{ margin: 0, color: HOC_COLORS.orange, fontWeight: 700 }}>
-                      {scenario.score}%
-                    </p>
-                  </div>
+                  <div style={{ color: CP.textPrimary, fontWeight: 500, fontSize: 14, ...NUM }}>{scenario.score}%</div>
                 </div>
               ))}
             </div>
-          </div>
-        </div>
+          )}
+        </section>
       </div>
     );
   }
 
-  // Loading State
+  // Caricamento
   if (!isLoaded) {
     return (
-      <div
-        style={{
-          backgroundColor: HOC_COLORS.bgDark,
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <p style={{ color: HOC_COLORS.gray }}>Caricamento...</p>
-        </div>
+      <div style={WRAP}>
+        <p style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</p>
       </div>
     );
   }
 
-  return null;
+  // Schermata non riconosciuta (es. stato incoerente): mai pagina bianca.
+  return (
+    <div style={WRAP}>
+      <Notice>Questa schermata non è disponibile. Torna alla home per continuare ad allenarti.</Notice>
+      <button onClick={() => setScreen("home")} style={BTN_SECONDARY}>
+        <ArrowLeft size={15} /> Torna alla home
+      </button>
+    </div>
+  );
 }
