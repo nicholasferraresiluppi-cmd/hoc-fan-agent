@@ -3,19 +3,20 @@
 import { useMemo } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
+import { FONTS, CP } from "@/lib/brand";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { useUser } from "@clerk/nextjs";
-import { Sparkles, TrendingUp, GraduationCap, BookOpen, Mail, ArrowRight, Target, Award } from "lucide-react";
+import { Sparkles, TrendingUp, GraduationCap, BookOpen, Mail, ArrowRight, Award } from "lucide-react";
 import SignalsStrip from "@/components/SignalsStrip";
+import { fmt$, fmtInt, MONTHS_IT } from "@/lib/format";
+import { PageHead, HeroMetric, Metric, SectionTitle, DataTable, Notice, card, NUM } from "@/components/ds";
+
+// Ridisegno sul design system 26/09/2026: contenuti e logica del 25/09 invariati
+// (anzianità da tutte le fonti, score vendite con un decimale it-IT, hero che
+// sul telefono mette lo score in cima). Cambiano solo struttura e segni visivi.
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
-const TIER_COLORS = {
-  Critical: "#D44545", Weak: "#E76F51", Average: "#B89158",
-  Good: "#D4AF7A", Strong: "#3FB97E", Elite: "#4F8CCB",
-};
-const TIER_ORDER = ["Critical", "Weak", "Average", "Good", "Strong", "Elite"];
 const TIER_PERCENTILE_NEXT = {
   Critical: { next: "Weak", pct: 10 },
   Weak: { next: "Average", pct: 25 },
@@ -25,8 +26,17 @@ const TIER_PERCENTILE_NEXT = {
   Elite: { next: null, pct: 100 },
 };
 
-function fmtCurrency(v) { if (v == null) return "—"; return "$" + Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 }); }
-function fmtPctSign(v) { if (v == null) return "—"; return `${v > 0 ? "+" : ""}${v}%`; }
+// Percorsi Academy mostrati in fondo (id = categoria del simulatore)
+const ACADEMY_PATHS = [
+  { id: "le-basi-della-chat", label: "Le basi della chat", diff: 1 },
+  { id: "mass-e-conversione", label: "Mass e conversione", diff: 2 },
+  { id: "custom-e-upsell", label: "Custom e upsell", diff: 3 },
+  { id: "recuperi-e-retention", label: "Recuperi e retention", diff: 4 },
+  { id: "script-avanzati", label: "Script avanzati", diff: 5 },
+];
+
+const dec1 = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
+function fmtPctSign(v) { if (v == null) return "—"; return `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toLocaleString("it-IT")}%`; }
 function getInitials(name) {
   if (!name) return "?";
   const parts = name.trim().split(/\s+/);
@@ -35,12 +45,13 @@ function getInitials(name) {
 }
 function formatPeriodLabel(periodId) {
   const m = periodId?.match?.(/^(\d{4})-(\d{2})$/);
-  if (m) {
-    const names = ["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"];
-    return `${names[parseInt(m[2]) - 1]} ${m[1]}`;
-  }
+  if (m) return `${MONTHS_IT[parseInt(m[2]) - 1]} ${m[1]}`;
   return periodId;
 }
+
+const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", background: CP.accent, color: CP.accentInk, borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap" };
+const btnGhost = { display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap" };
+const tierChip = { display: "inline-block", padding: "2px 10px", borderRadius: 999, fontSize: 12, fontWeight: 500, background: CP.surfaceAlt, color: CP.textSecondary, border: `1px solid ${CP.border}` };
 
 export default function MyProfilePage() {
   const { user, isLoaded } = useUser();
@@ -80,7 +91,6 @@ export default function MyProfilePage() {
   const { data: sig } = useSWR("/api/me/signals", fetcher, { revalidateOnFocus: false });
 
   const cp = drill?.cp;
-  const tierColor = cp?.tier ? TIER_COLORS[cp.tier] : COLORS.champagne;
   const nextTier = cp?.tier ? TIER_PERCENTILE_NEXT[cp.tier] : null;
 
   const greeting = useMemo(() => {
@@ -92,252 +102,174 @@ export default function MyProfilePage() {
   }, []);
   const displayName = meEmp?.source === "view_as" ? employee?.split(" ")[0] : (user?.firstName || employee?.split(" ")[0] || "");
 
+  const creatorRows = (cp?.per_creator || []).map((r) => ({ ...r, id: r.creator }));
+  const creatorCols = [
+    { key: "creator", label: "Creator", render: (r) => <span style={{ fontWeight: 500 }}>{r.creator}</span> },
+    { key: "score", label: "Score su questa creator", align: "right", render: (r) => dec1(r.score) },
+    { key: "tier", label: "Fascia", render: (r) => (r.tier ? <span style={tierChip}>{r.tier}</span> : <span style={{ color: CP.textMuted }}>—</span>) },
+    { key: "sales_per_shift", label: "Venduto per turno", align: "right", render: (r) => fmt$(r.sales_per_shift) },
+    { key: "shifts", label: "Turni", align: "right", render: (r) => fmtInt(r.shifts) },
+    { key: "vs_cohort_pct", label: "Rispetto alla media della creator", align: "right",
+      render: (r) => <span style={{ color: r.vs_cohort_pct == null ? CP.textMuted : r.vs_cohort_pct > 0 ? CP.accentGreen : r.vs_cohort_pct < 0 ? CP.accentRed : CP.textPrimary }}>{fmtPctSign(r.vs_cohort_pct)}</span> },
+  ];
+
   return (
-    <div style={{ minHeight: "100vh", background: COLORS.obsidian, color: COLORS.alabaster, fontFamily: FONTS.body, padding: "32px 28px 80px" }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        {/* HEADER */}
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: CP.textMuted, letterSpacing: "0.12em", marginBottom: 4 }}>
-            Il mio profilo · {formatPeriodLabel(periodId)}
-          </div>
-          <h1 style={{ fontFamily: FONTS.display, fontSize: 36, margin: "4px 0 4px", fontWeight: 700, letterSpacing: "-0.02em" }}>
-            {greeting}{displayName ? `, ${displayName}` : ""}
-          </h1>
-        </div>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1100, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Il mio profilo" }, { label: formatPeriodLabel(periodId) || "…" }]}
+        title={`${greeting}${displayName ? `, ${displayName}` : ""}`}
+        subtitle="Come sta andando il tuo mese, cosa ti serve per salire di fascia e dove allenarti."
+      />
 
-        {/* Loading / Errore match */}
-        {(!isLoaded || meEmpLoading) && <p style={{ color: COLORS.fog }}>Caricamento profilo…</p>}
-        {meEmpError && <p style={{ color: COLORS.signal }}>Errore di rete: {String(meEmpError)}</p>}
+      {/* Loading / Errore match */}
+      {(!isLoaded || meEmpLoading) && <p style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento profilo…</p>}
+      {meEmpError && <Notice danger>Errore di rete: il profilo non si è caricato. Riprova tra poco.</Notice>}
 
-        {/* Email non matchata */}
-        {meEmp && !employee && (
-          <NotMatchedBlock data={meEmp} />
-        )}
+      {/* Email non matchata */}
+      {meEmp && !employee && <NotMatchedBlock data={meEmp} />}
 
-        {/* Employee matchato */}
-        {employee && (
-          <>
-            {meEmp.source !== "override" && meEmp.source !== "view_as" && (
-              <div style={{ marginBottom: 16, padding: "8px 14px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 10, fontSize: 12, color: COLORS.fog, display: "inline-flex", alignItems: "center", gap: 8 }}>
-                <Mail size={12} /> Account collegato a <strong style={{ color: COLORS.alabaster }}>{employee}</strong> via email{" "}
-                {meEmp.email && <span style={{ color: COLORS.mist }}>({meEmp.email})</span>}
-              </div>
-            )}
-
-            {/* HERO CARD */}
-            {cp ? (
-              <div style={{
-                background: CP.surface,
-                border: `1px solid ${alpha(tierColor, "55")}`,
-                borderRadius: 20, padding: "30px 32px", marginBottom: 24,
-                display: "flex", flexWrap: "wrap", gap: 24, alignItems: "center",
-                position: "relative", overflow: "hidden",
-              }} className="pf-hero">
-                {/* sul telefono: niente avatar, score sopra (prima usciva dallo schermo) */}
-                <style>{`@media (max-width: 640px){.pf-hero{padding:20px!important}.pf-avatar{display:none!important}.pf-score{order:-1;width:100%;text-align:left!important}}`}</style>
-                <div className="pf-avatar" style={{
-                  width: 100, height: 100, borderRadius: "50%", flexShrink: 0,
-                  background: COLORS.champagne,
-                  color: COLORS.obsidian,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontFamily: FONTS.display, fontWeight: 600, fontSize: 36,
-                  border: `3px solid ${COLORS.graphite}`,
-                  boxShadow: `0 0 0 3px ${COLORS.champagne}`,
-                }}>{getInitials(employee)}</div>
-
-                <div style={{ position: "relative", flex: "1 1 300px", minWidth: 0 }}>
-                  <div style={{ fontFamily: FONTS.display, fontSize: 28, fontWeight: 500, letterSpacing: "-0.01em", marginBottom: 4 }}>{employee}</div>
-                  {cp.top_creator && (
-                    <div style={{ color: COLORS.champagne, fontSize: 12, letterSpacing: "0.12em", marginBottom: 14 }}>
-                      Principale: {cp.top_creator}
-                    </div>
-                  )}
-                  <div style={{ display: "flex", gap: 22, flexWrap: "wrap", fontSize: 13 }}>
-                    <StatMini l="Sales mese" v={fmtCurrency(cp.total_sales)} color={CP.accentGreen} />
-                    <StatMini l="Shift" v={Math.round(cp.total_shifts || 0)} />
-                    <StatMini l="Creator attive" v={cp.per_creator?.length || 0} />
-                    {cp.rank_agency && <StatMini l="Posizione" v={`#${cp.rank_agency}`} sub={`su ${cp.total_in_ranking}`} />}
-                    {tenureMonths != null && <StatMini l="Sei in agency da" v={`${tenureMonths} ${tenureMonths === 1 ? "mese" : "mesi"}`} sub={`dal ${formatPeriodLabel(firstSeen)}`} />}
-                    {cpHist?.ltv_cp_eur != null && <StatMini l="Fatturato CP totale" v={fmtCurrency(cpHist.ltv_cp_eur)} sub={`${cpHist.periods_count} mesi`} color={CP.accentGreen} />}
-                  </div>
-                </div>
-
-                <div className="pf-score" style={{ textAlign: "right", position: "relative", marginLeft: "auto" }}>
-                  <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.15em" }}>Il tuo score vendite</div>
-                  <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 64, lineHeight: 1, color: tierColor }}>
-                    {cp.score != null ? cp.score.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "—"}
-                  </div>
-                  <span style={{ display: "inline-block", padding: "4px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", background: alpha(tierColor, "26"), color: tierColor, border: `1px solid ${alpha(tierColor, "55")}`, marginTop: 8, fontFamily: FONTS.body }}>
-                    {cp.tier}
+      {/* Employee matchato */}
+      {employee && (
+        <>
+          {/* Chi sei: nome, creator principale e (se automatico) come è stato fatto il collegamento */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
+            <span aria-hidden style={{ width: 40, height: 40, borderRadius: 999, background: CP.accentSoft, color: CP.accentSoftText, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 500, flexShrink: 0 }}>
+              {getInitials(employee)}
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>{employee}</div>
+              <div style={{ fontSize: 12, color: CP.textMuted, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                {cp?.top_creator && <span>Creator principale: {cp.top_creator}</span>}
+                {cp?.top_creator && meEmp.source !== "override" && meEmp.source !== "view_as" && <span>·</span>}
+                {meEmp.source !== "override" && meEmp.source !== "view_as" && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, overflowWrap: "anywhere" }}>
+                    <Mail size={12} /> Collegato tramite email{meEmp.email ? ` (${meEmp.email})` : ""}
                   </span>
-                </div>
+                )}
               </div>
-            ) : drill ? (
-              <NoDataBlock employee={employee} periodId={periodId} />
-            ) : (
-              <p style={{ color: COLORS.fog }}>Caricamento dati performance…</p>
-            )}
-
-            {/* COSA TI SERVE PER SALIRE */}
-            {cp && nextTier?.next && (
-              <NextTierBlock cp={cp} nextTier={nextTier} />
-            )}
-
-            {/* COACHING ASSEGNATO */}
-            {myCoaching && myCoaching.status === "assigned" && (
-              <CoachingBlock assignment={myCoaching} />
-            )}
-
-            {/* PROFILO-SEGNALI — metodo dal lavoro vero + percorso (self-serve, own) */}
-            <SignalsStrip sig={sig} />
-
-            {/* PERFORMANCE PER CREATOR */}
-            {cp?.per_creator?.length > 0 && (
-              <Section title="Le tue creator" subtitle="Dove stai andando forte, dove c'è margine. Lavora con il tuo Team Lead sui punti deboli.">
-                <div style={{ background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, overflow: "hidden" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.8fr 0.8fr 0.7fr 0.9fr 0.6fr 0.8fr", padding: "12px 20px", background: alpha(COLORS.obsidian, "80"), color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", fontWeight: 500, borderBottom: `1px solid ${COLORS.charcoal}` }}>
-                    <div>Creator</div><div>Score loc.</div><div>Tier</div><div>$/shift</div><div>Shift</div><div>vs cohort</div>
-                  </div>
-                  {cp.per_creator.map((row) => {
-                    const tCol = row.tier ? TIER_COLORS[row.tier] : COLORS.mist;
-                    const cohortColor = row.vs_cohort_pct == null ? COLORS.mist : row.vs_cohort_pct > 0 ? CP.accentGreen : CP.accentRed;
-                    return (
-                      <div key={row.creator} style={{ display: "grid", gridTemplateColumns: "1.8fr 0.8fr 0.7fr 0.9fr 0.6fr 0.8fr", padding: "12px 20px", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, alignItems: "center", fontSize: 13 }}>
-                        <div style={{ fontWeight: 500 }}>{row.creator}</div>
-                        <div style={{ fontFamily: FONTS.mono, fontWeight: 700, color: tCol }}>{row.score != null ? row.score.toFixed(1) : "—"}</div>
-                        <div>{row.tier ? <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 999, fontSize: 10, fontWeight: 600, background: alpha(tCol, "26"), color: tCol, border: `1px solid ${alpha(tCol, "55")}` }}>{row.tier}</span> : <span style={{ color: COLORS.mist }}>—</span>}</div>
-                        <div style={{ fontFamily: FONTS.mono }}>{fmtCurrency(row.sales_per_shift)}</div>
-                        <div style={{ fontFamily: FONTS.mono, color: COLORS.fog }}>{Math.round(row.shifts)}</div>
-                        <div style={{ fontFamily: FONTS.mono, fontWeight: 600, color: cohortColor }}>{fmtPctSign(row.vs_cohort_pct)}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </Section>
-            )}
-
-            {/* TRAINING CATEGORIES */}
-            <Section title="Cresci con l'Academy" subtitle="5 percorsi tematici dai basi agli script avanzati. Più sei nei tier alti, più valore conta lavorare sugli script avanzati.">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-                <AcademyCard id="le-basi-della-chat" label="Le Basi della Chat" diff={1} color="#10B981" />
-                <AcademyCard id="mass-e-conversione" label="Mass & Conversione" diff={2} color="#3B82F6" />
-                <AcademyCard id="custom-e-upsell" label="Custom & Upsell" diff={3} color="#F59E0B" />
-                <AcademyCard id="recuperi-e-retention" label="Recuperi & Retention" diff={4} color="#A855F7" />
-                <AcademyCard id="script-avanzati" label="Script Avanzati" diff={5} color="#EF4444" />
-              </div>
-            </Section>
-
-            {/* DEEPER LINK */}
-            <div style={{ marginTop: 32, padding: "18px 22px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-              <div>
-                <div style={{ fontSize: 13, color: COLORS.alabaster, fontWeight: 600 }}>Vuoi più dettagli?</div>
-                <div style={{ fontSize: 12, color: COLORS.fog, marginTop: 2 }}>Apri il drill-down completo per insight, peer compare e diagnosi automatica.</div>
-              </div>
-              <Link href={`/leaderboard/operational/${encodeURIComponent(employee)}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 16px", background: COLORS.champagne, color: COLORS.obsidian, borderRadius: 10, fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
-                Apri drill-down <ArrowRight size={14} />
-              </Link>
             </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
+          </div>
 
-function StatMini({ l, v, sub, color }) {
-  return (
-    <div>
-      <div style={{ fontSize: 10, color: COLORS.fog, letterSpacing: "0.1em" }}>{l}</div>
-      <div style={{ fontFamily: FONTS.mono, fontSize: 16, fontWeight: 600, marginTop: 2, color: color || COLORS.alabaster }}>{v}</div>
-      {sub && <div style={{ fontSize: 10, color: COLORS.mist, marginTop: 2 }}>{sub}</div>}
-    </div>
-  );
-}
+          {/* NUMERO PRINCIPALE: score vendite del mese */}
+          {cp ? (
+            <HeroMetric
+              label={`Il tuo score vendite · ${formatPeriodLabel(periodId)}`}
+              value={dec1(cp.score)}
+              compare={cp.tier ? `Fascia: ${cp.tier}` : null}
+            >
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "16px 24px", flex: "1 1 420px" }}>
+                <Metric label="Venduto nel mese" value={fmt$(cp.total_sales)} />
+                <Metric label="Turni" value={fmtInt(cp.total_shifts || 0)} />
+                <Metric label="Creator attive" value={fmtInt(cp.per_creator?.length || 0)} />
+                {cp.rank_agency && <Metric label="Posizione" value={`#${fmtInt(cp.rank_agency)}`} note={`su ${fmtInt(cp.total_in_ranking)}`} />}
+                {tenureMonths != null && <Metric label="In agenzia da" value={`${fmtInt(tenureMonths)} ${tenureMonths === 1 ? "mese" : "mesi"}`} note={`da ${formatPeriodLabel(firstSeen)}`} />}
+                {cpHist?.ltv_cp_eur != null && <Metric label="Fatturato CP totale" value={fmt$(cpHist.ltv_cp_eur)} note={`${fmtInt(cpHist.periods_count)} mesi`} />}
+              </div>
+            </HeroMetric>
+          ) : drill ? (
+            <NoDataBlock employee={employee} periodId={periodId} />
+          ) : (
+            <p style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento dati del mese…</p>
+          )}
 
-function Section({ title, subtitle, children }) {
-  return (
-    <div style={{ marginBottom: 28 }}>
-      <h2 style={{ fontFamily: FONTS.display, fontSize: 20, fontWeight: 500, letterSpacing: "-0.01em", marginBottom: 4 }}>{title}</h2>
-      {subtitle && <p style={{ color: COLORS.fog, fontSize: 13, marginBottom: 14, maxWidth: 900, lineHeight: 1.5 }}>{subtitle}</p>}
-      {children}
+          {/* COSA TI SERVE PER SALIRE */}
+          {cp && nextTier?.next && <NextTierBlock cp={cp} nextTier={nextTier} />}
+
+          {/* COACHING ASSEGNATO */}
+          {myCoaching && myCoaching.status === "assigned" && <CoachingBlock assignment={myCoaching} />}
+
+          {/* PROFILO-SEGNALI — metodo dal lavoro vero + percorso (self-serve, own) */}
+          <SignalsStrip sig={sig} />
+
+          {/* PERFORMANCE PER CREATOR */}
+          {creatorRows.length > 0 && (
+            <section style={{ margin: "24px 0 28px" }}>
+              <SectionTitle>Le tue creator</SectionTitle>
+              <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 12px", lineHeight: 1.5, maxWidth: 760 }}>
+                Dove stai andando forte e dove c&apos;è margine. L&apos;ultima colonna confronta il tuo venduto per turno con la media di tutti gli operatori su quella creator. Lavora con il tuo team lead dove sei sotto.
+              </p>
+              <DataTable columns={creatorCols} rows={creatorRows} minWidth={720} />
+            </section>
+          )}
+
+          {/* PERCORSI ACADEMY */}
+          <section style={{ marginBottom: 28 }}>
+            <SectionTitle>Cresci con l&apos;Academy</SectionTitle>
+            <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 12px", lineHeight: 1.5, maxWidth: 760 }}>
+              5 percorsi a tema, dalle basi agli script avanzati. Più sali di fascia, più conviene allenarsi sugli script avanzati.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+              {ACADEMY_PATHS.map((p) => <AcademyCard key={p.id} {...p} />)}
+            </div>
+          </section>
+
+          {/* SCHEDA COMPLETA */}
+          <section style={{ ...card, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 280px" }}>
+              <div style={{ fontSize: 14, color: CP.textPrimary, fontWeight: 500 }}>Vuoi più dettagli?</div>
+              <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 2 }}>La scheda completa ha il confronto con gli altri operatori e una diagnosi automatica.</div>
+            </div>
+            <Link href={`/leaderboard/operational/${encodeURIComponent(employee)}`} style={btnPrimary}>
+              Apri la scheda completa <ArrowRight size={14} />
+            </Link>
+          </section>
+        </>
+      )}
     </div>
   );
 }
 
 function NextTierBlock({ cp, nextTier }) {
-  const nextColor = TIER_COLORS[nextTier.next];
   const ptsToGo = Math.max(1, Math.ceil(nextTier.pct - cp.score));
   return (
-    <div style={{
-      padding: "20px 24px",
-      marginBottom: 24,
-      background: CP.surface,
-      border: `1px solid ${alpha(nextColor, "44")}`,
-      borderRadius: 14,
-      display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap",
-    }}>
-      <TrendingUp size={28} color={nextColor} />
-      <div style={{ flex: 1, minWidth: 220 }}>
-        <div style={{ fontSize: 12, color: COLORS.fog, letterSpacing: "0.12em", marginBottom: 4 }}>
-          Prossimo obiettivo
+    <section style={{ ...card, padding: "16px 20px", marginBottom: 14, display: "flex", alignItems: "flex-start", gap: 14 }}>
+      <TrendingUp size={20} color={CP.accent} style={{ flexShrink: 0, marginTop: 2 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 4 }}>Prossimo obiettivo</div>
+        <div style={{ fontSize: 16, color: CP.textPrimary, lineHeight: 1.4 }}>
+          Per salire alla fascia <span style={{ fontWeight: 500 }}>{nextTier.next}</span> ti servono circa <span style={{ fontWeight: 500, ...NUM }}>{fmtInt(ptsToGo)} punti</span> in più di score vendite.
         </div>
-        <div style={{ fontFamily: FONTS.display, fontSize: 18, color: COLORS.alabaster }}>
-          Sali al tier <strong style={{ color: nextColor }}>{nextTier.next}</strong>: ti servono ~<strong>{ptsToGo} punti</strong> in più di score CP
-        </div>
-        <div style={{ fontSize: 12, color: COLORS.mist, marginTop: 4 }}>
-          Lo score sale soprattutto su <strong>sales per shift</strong> (85% del peso). Lavora sulle creator dove il tuo cohort % è negativo.
+        <div style={{ fontSize: 13, color: CP.textMuted, marginTop: 6, lineHeight: 1.5 }}>
+          Lo score sale soprattutto con il venduto per turno, che pesa per l&apos;85%. Parti dalle creator dove sei sotto la media (ultima colonna della tabella qui sotto).
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
 function CoachingBlock({ assignment }) {
+  const path = ACADEMY_PATHS.find((p) => p.id === assignment.training_category_id);
   return (
-    <div style={{
-      padding: "20px 24px",
-      marginBottom: 24,
-      background: CP.accentSoft,
-      border: `1px solid ${CP.accentDim}`,
-      borderRadius: 14,
-      display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap",
-    }}>
-      <GraduationCap size={28} color={CP.accentSoftText} />
-      <div style={{ flex: 1, minWidth: 220 }}>
-        <div style={{ fontSize: 12, color: COLORS.fog, letterSpacing: "0.12em", marginBottom: 4 }}>
-          Hai un coaching assegnato
+    <section style={{ ...card, padding: "16px 20px", marginBottom: 14, borderLeft: `3px solid ${CP.accent}`, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+      <GraduationCap size={20} color={CP.accent} style={{ flexShrink: 0 }} />
+      <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+        <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 4 }}>Hai un percorso di coaching assegnato</div>
+        <div style={{ fontSize: 16, color: CP.textPrimary, marginBottom: 4 }}>
+          Percorso: <span style={{ fontWeight: 500 }}>{path?.label || assignment.training_category_id}</span>
         </div>
-        <div style={{ fontFamily: FONTS.display, fontSize: 18, color: COLORS.alabaster, marginBottom: 4 }}>
-          Categoria: <strong style={{ color: CP.accentSoftText }}>{assignment.training_category_id}</strong>
-        </div>
-        {assignment.owner && <div style={{ fontSize: 12, color: COLORS.fog }}>Owner: <strong>{assignment.owner}</strong>{assignment.deadline && ` · deadline ${assignment.deadline}`}</div>}
-        {assignment.note && <div style={{ fontSize: 12, color: COLORS.mist, marginTop: 6, fontStyle: "italic" }}>"{assignment.note}"</div>}
+        {assignment.owner && (
+          <div style={{ fontSize: 13, color: CP.textMuted }}>
+            Ti segue: {assignment.owner}{assignment.deadline && ` · da completare entro il ${assignment.deadline}`}
+          </div>
+        )}
+        {assignment.note && <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 6 }}>“{assignment.note}”</div>}
       </div>
-      <Link href={`/academy?category=${assignment.training_category_id}`} style={{ padding: "10px 16px", background: CP.accent, color: CP.accentInk, borderRadius: 10, fontSize: 13, fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <Link href={`/academy?category=${assignment.training_category_id}`} style={btnPrimary}>
         Inizia <ArrowRight size={14} />
       </Link>
-    </div>
+    </section>
   );
 }
 
-function AcademyCard({ id, label, diff, color }) {
+function AcademyCard({ id, label, diff }) {
   return (
-    <Link href={`/academy?category=${id}`} style={{
-      padding: 18,
-      background: COLORS.graphite,
-      border: `1px solid ${COLORS.charcoal}`,
-      borderRadius: 12,
-      textDecoration: "none", color: COLORS.alabaster,
-      transition: "border-color 0.15s, transform 0.15s",
-      display: "block",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <BookOpen size={16} color={color} />
-        <span style={{ fontFamily: FONTS.mono, fontSize: 10, color, fontWeight: 700, letterSpacing: "0.08em" }}>DIFF {diff}/5</span>
+    <Link href={`/academy?category=${id}`} style={{ ...card, padding: 16, textDecoration: "none", color: CP.textPrimary, display: "block" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: 12, color: CP.textMuted, ...NUM }}>
+        <BookOpen size={15} color={CP.textMuted} /> Difficoltà {diff} su 5
       </div>
-      <div style={{ fontFamily: FONTS.display, fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 11, color: COLORS.fog, display: "inline-flex", alignItems: "center", gap: 4 }}>
-        Apri categoria <ArrowRight size={11} />
+      <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 12, color: CP.accentSoftText, display: "inline-flex", alignItems: "center", gap: 4 }}>
+        Apri il percorso <ArrowRight size={12} />
       </div>
     </Link>
   );
@@ -345,41 +277,42 @@ function AcademyCard({ id, label, diff, color }) {
 
 function NoDataBlock({ employee, periodId }) {
   return (
-    <div style={{ padding: "32px 28px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, marginBottom: 24, textAlign: "center" }}>
-      <Award size={32} color={COLORS.champagne} style={{ opacity: 0.5, marginBottom: 10 }} />
-      <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Nessun dato per {formatPeriodLabel(periodId)}</div>
-      <div style={{ fontSize: 13, color: COLORS.fog, maxWidth: 480, margin: "0 auto" }}>
-        Per <strong style={{ color: COLORS.alabaster }}>{employee}</strong> non ci sono ancora dati CP sincronizzati nel periodo selezionato.
-        Se hai lavorato e non vedi i tuoi numeri, segnalalo all'admin.
+    <section style={{ ...card, padding: "28px 20px", marginBottom: 14, textAlign: "center" }}>
+      <Award size={28} color={CP.mutedIcons} style={{ marginBottom: 8 }} />
+      <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 6, color: CP.textPrimary }}>Nessun dato per {formatPeriodLabel(periodId)}</div>
+      <div style={{ fontSize: 13, color: CP.textSecondary, maxWidth: 480, margin: "0 auto", lineHeight: 1.55 }}>
+        Per <span style={{ fontWeight: 500, color: CP.textPrimary }}>{employee}</span> non ci sono ancora dati di CreatorsPro sincronizzati per questo mese.
+        Se hai lavorato e non vedi i tuoi numeri, segnalalo a un admin.
       </div>
-    </div>
+    </section>
   );
 }
 
 function NotMatchedBlock({ data }) {
   const candidates = data?.candidates || [];
+  const strong = { fontWeight: 500, color: CP.textPrimary };
   return (
-    <div style={{ padding: "32px 28px", background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14 }}>
-      <Sparkles size={32} color={COLORS.champagne} style={{ opacity: 0.5, marginBottom: 10 }} />
-      <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Account non collegato a un operatore</div>
-      <div style={{ fontSize: 13, color: COLORS.fog, lineHeight: 1.6, marginBottom: 14, maxWidth: 640 }}>
+    <section style={{ ...card, padding: "24px 22px" }}>
+      <Sparkles size={24} color={CP.mutedIcons} style={{ marginBottom: 8 }} />
+      <h2 style={{ fontSize: 17, fontWeight: 500, margin: "0 0 8px", color: CP.textPrimary }}>Account non collegato a un operatore</h2>
+      <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.6, marginBottom: 14, maxWidth: 640, overflowWrap: "anywhere" }}>
         {data?.reason === "ambiguous" && (
-          <>L'email <strong style={{ color: COLORS.alabaster }}>{data.email}</strong> matcha più nomi operatore: <strong>{candidates.join(", ")}</strong>. Chiedi all'admin di assegnarti il nome giusto via override manuale.</>
+          <>L&apos;email <span style={strong}>{data.email}</span> corrisponde a più nomi operatore: <span style={strong}>{candidates.join(", ")}</span>. Chiedi a un admin di assegnarti il nome giusto a mano.</>
         )}
         {data?.reason === "no_match" && (
-          <>L'email <strong style={{ color: COLORS.alabaster }}>{data.email}</strong> non matcha nessun operatore noto nel database CP. Se sei un operatore, chiedi all'admin di assegnare il tuo account.</>
+          <>L&apos;email <span style={strong}>{data.email}</span> non corrisponde a nessun operatore presente in CreatorsPro. Se lavori come operatore, chiedi a un admin di collegare il tuo account.</>
         )}
-        {data?.reason === "no_email" && <>Non riesco a leggere l'email del tuo account Clerk. Contatta l'admin.</>}
+        {data?.reason === "no_email" && <>Non riusciamo a leggere l&apos;email del tuo account. Contatta un admin.</>}
         {data?.reason === "needs_link" && (
-          <>Il tuo account (<strong style={{ color: COLORS.alabaster }}>{data.email}</strong>) va collegato al tuo nome operatore da un admin: per sicurezza il collegamento automatico vale solo per le email aziendali.</>
+          <>Il tuo account (<span style={strong}>{data.email}</span>) va collegato al tuo nome operatore da un admin: per sicurezza il collegamento automatico vale solo per le email aziendali.</>
         )}
         {data?.reason === "email_not_verified" && <>La tua email non risulta verificata. Esci e rientra con il codice che ti arriva via email.</>}
-        {data?.reason === "no_cp_data" && <>Non ci sono ancora dati CP sincronizzati nel sistema. Riprova dopo il prossimo sync.</>}
+        {data?.reason === "no_cp_data" && <>Non ci sono ancora dati di CreatorsPro sincronizzati nel sistema. Riprova dopo il prossimo aggiornamento.</>}
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <Link href="/" style={{ padding: "10px 16px", background: COLORS.charcoal, color: COLORS.alabaster, borderRadius: 10, fontSize: 13, fontWeight: 600, textDecoration: "none" }}>← Home</Link>
-        <Link href="/leaderboard/sales-cp" style={{ padding: "10px 16px", background: COLORS.champagne, color: COLORS.obsidian, borderRadius: 10, fontSize: 13, fontWeight: 700, textDecoration: "none" }}>Apri leaderboard pubblica</Link>
+        <Link href="/" style={btnGhost}>← Home</Link>
+        <Link href="/leaderboard/sales-cp" style={btnPrimary}>Apri la classifica vendite</Link>
       </div>
-    </div>
+    </section>
   );
 }
