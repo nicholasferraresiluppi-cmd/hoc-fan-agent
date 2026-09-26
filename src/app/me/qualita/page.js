@@ -97,8 +97,25 @@ export default function MyQaPage() {
                   <div style={{ display: "flex", gap: 8, marginTop: 6, paddingTop: 12, borderTop: `1px solid ${CP.borderSoft}` }}>
                     <ShieldAlert size={16} color={CP.textMuted} style={{ flexShrink: 0, marginTop: 2 }} />
                     <p style={{ fontSize: 13, color: CP.textMuted, margin: 0, lineHeight: 1.55 }}>
-                      La <span style={{ color: CP.textSecondary, fontWeight: 500 }}>compliance</span> oggi si misura solo sul lavoro vero: in Academy non c&apos;è ancora un esercizio dedicato. È la dimensione critica dei gate — trattala col massimo scrupolo sul turno.
+                      La <span style={{ color: CP.textSecondary, fontWeight: 500 }}>compliance</span> vuol dire rispettare le regole della chat. Conta tantissimo per passare di livello: una sola violazione pesa più di tanti messaggi ben fatti. Per ora si misura solo sul lavoro vero (in Academy non c&apos;è ancora un esercizio dedicato).
                     </p>
+                  </div>
+                )}
+                {VOCAB_GAPS.academyBlind.includes("compliance") && (
+                  // Esempio chiesto da Nicholas (26/09): solo regole che valgono per tutti
+                  // perché vengono dalle regole di OnlyFans. Le regole complete
+                  // dell'agenzia NON esistono ancora in app: tema aperto in /admin/roadmap
+                  // ("Regole di compliance + allenamento"). Non inventarne qui.
+                  <div style={{ marginTop: 10, padding: "12px 14px", borderRadius: 8, background: CP.bg, border: `1px solid ${CP.borderSoft}` }}>
+                    <div style={{ fontSize: 13, color: CP.textPrimary, fontWeight: 500, marginBottom: 6 }}>Qualche esempio (valgono sempre, sono regole di OnlyFans)</div>
+                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: CP.textSecondary, lineHeight: 1.6 }}>
+                      <li>Niente incontri dal vivo: non proporli e non accettarli, nemmeno per scherzo.</li>
+                      <li>Niente contatti o pagamenti fuori da OnlyFans: numero di telefono, altri social, altri siti di pagamento.</li>
+                      <li>Niente dati personali: né della creator né chiesti al fan (indirizzo, lavoro, documenti).</li>
+                      <li>Nessun gioco di ruolo che riguardi minorenni o situazioni senza consenso, in nessuna forma.</li>
+                      <li>Non promettere contenuti che la creator non ha o non farà.</li>
+                    </ul>
+                    <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 8 }}>Le regole complete dell&apos;agenzia arriveranno qui. Nel dubbio, prima di mandare chiedi al tuo team lead.</div>
                   </div>
                 )}
               </div>

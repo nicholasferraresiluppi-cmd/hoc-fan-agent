@@ -161,7 +161,8 @@ export default function MyProfilePage() {
                 <Metric label="Venduto nel mese" value={fmt$(cp.total_sales)} />
                 <Metric label="Turni" value={fmtInt(cp.total_shifts || 0)} />
                 <Metric label="Creator attive" value={fmtInt(cp.per_creator?.length || 0)} />
-                {cp.rank_agency && <Metric label="Posizione" value={`#${fmtInt(cp.rank_agency)}`} note={`su ${fmtInt(cp.total_in_ranking)}`} />}
+                {/* posizione sull'agenzia solo se nella metà alta (decisione 26/09: niente "sei in fondo") */}
+                {cp.rank_agency && cp.total_in_ranking && cp.rank_agency <= Math.ceil(cp.total_in_ranking / 2) && <Metric label="Posizione" value={`#${fmtInt(cp.rank_agency)}`} note={`su ${fmtInt(cp.total_in_ranking)}`} />}
                 {tenureMonths != null && <Metric label="In agenzia da" value={`${fmtInt(tenureMonths)} ${tenureMonths === 1 ? "mese" : "mesi"}`} note={`da ${formatPeriodLabel(firstSeen)}`} />}
                 {cpHist?.ltv_cp_eur != null && <Metric label="Fatturato CP totale" value={fmt$(cpHist.ltv_cp_eur)} note={`${fmtInt(cpHist.periods_count)} mesi`} />}
               </div>

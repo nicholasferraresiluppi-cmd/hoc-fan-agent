@@ -144,11 +144,7 @@ export default function LeaderboardPage() {
                   </div>
                 )}
               </div>
-              {me.rank && me.percentile != null && (
-                <span style={{ padding: "5px 12px", background: CP.accentSoft, color: CP.accentSoftText, borderRadius: 999, fontSize: 13, ...NUM }}>
-                  Top {100 - me.percentile + 1}%
-                </span>
-              )}
+              {/* tolto "Top X%": niente percentile all'operatore (decisione 26/09), la posizione basta */}
             </section>
           )}
 
