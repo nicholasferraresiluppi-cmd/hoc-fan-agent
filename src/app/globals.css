@@ -127,7 +127,7 @@ h1, h2, h3, h4, h5, h6 {
 /* card hero: fondo dedicato, bordo 1px, niente glow */
 [data-style="v3"] .ds-hero { background: var(--cp-heroBg) !important; border: 1px solid var(--cp-border) !important; border-radius: 16px !important; box-shadow: none !important; }
 /* numero protagonista: 80/56, 500, cifre proporzionali (decimali composti da NumText) */
-[data-style="v3"] .ds-hero-v { font-size: 80px !important; font-weight: 500 !important; line-height: .92 !important; letter-spacing: -.04em !important; font-variant-numeric: proportional-nums lining-nums !important; margin: 6px 0 4px; }
+[data-style="v3"] .ds-hero-v { font-size: 60px !important; font-weight: 500 !important; line-height: .95 !important; letter-spacing: -.025em !important; font-variant-numeric: proportional-nums lining-nums !important; margin: 6px 0 4px; }
 /* KPI: 32/28, 500, tabellari */
 [data-style="v3"] .ds-metric-v { font-size: 32px !important; font-weight: 500 !important; line-height: 1.05 !important; letter-spacing: -.03em; font-variant-numeric: tabular-nums !important; margin-top: 2px; }
 [data-style="v3"] .ds-chip { font-weight: 500; }
@@ -148,7 +148,7 @@ h1, h2, h3, h4, h5, h6 {
 .ds-tbl:focus-visible .ds-tr[data-active] > td:first-child { box-shadow: inset 2px 0 0 var(--cp-accent), inset 0 1px 0 var(--cp-accent), inset 0 -1px 0 var(--cp-accent); }
 @media (max-width: 899px) {
   [data-style="v3"] .ds-h1 { font-size: 26px !important; }
-  [data-style="v3"] .ds-hero-v { font-size: 56px !important; }
+  [data-style="v3"] .ds-hero-v { font-size: 46px !important; }
   [data-style="v3"] .ds-metric-v { font-size: 28px !important; }
 }
 /* ScoreChart (componente nuovo): sotto 520px solo le soglie vicine al valore */
