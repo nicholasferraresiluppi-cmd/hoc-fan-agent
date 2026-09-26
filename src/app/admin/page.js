@@ -172,6 +172,14 @@ export default function AdminHub() {
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const daysClosed = Math.max(1, now.getDate() - 1);
   const projection = soFar ? (soFar / daysClosed) * daysInMonth : null;
+  // Stile Casa: la frase sotto il saluto dice com'è andata, dalla stessa proiezione del numero
+  const prevName = MONTHS_IT[(now.getMonth() + 11) % 12];
+  const curName = monthName ? monthName[0].toUpperCase() + monthName.slice(1) : "";
+  const paceLine = projection && prevTotal
+    ? projection < prevTotal * 0.97 ? `${curName} corre un po' più piano di ${prevName}.`
+      : projection > prevTotal * 1.03 ? `${curName} corre più veloce di ${prevName}.`
+      : `${curName} va al passo di ${prevName}.`
+    : null;
   const lastSync = sync?.meta?.last_sync_at;
   const syncStale = !lastSync || Date.now() - lastSync > 36 * 3600 * 1000;
 
@@ -191,7 +199,8 @@ export default function AdminHub() {
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
-        title={`${greeting}${userName ? `, ${userName}` : ""}`}
+        title={`${greeting}${userName ? `, ${userName}` : ""}.`}
+        line2={paceLine}
         subtitle={`Come va l'agenzia a ${monthName} e cosa guardare oggi.`}
       />
 
@@ -210,8 +219,8 @@ export default function AdminHub() {
       </HeroMetric>
 
       {alertsData && (
-        <section style={{ ...card, marginBottom: 14 }}>
-          <div style={{ padding: "14px 16px 10px" }}>
+        <section className="ds-open" style={{ ...card, marginBottom: 14 }}>
+          <div className="ds-open-h" style={{ padding: "14px 16px 10px" }}>
             <SectionTitle aside={open.length ? `${open.length} aperti, i più gravi prima` : null}>Da guardare oggi</SectionTitle>
           </div>
           {open.length === 0 && (
@@ -225,7 +234,7 @@ export default function AdminHub() {
               detail={`aperto ${fmtAgo(a.firstSeen)} · ${a.status === "ack" ? `in carico a ${a.ackBy || "?"}` : "nessuno in carico"}`}
               href={a.cta?.href && allowed(a.cta.href.split("?")[0]) ? a.cta.href : null} cta={a.cta?.label} />
           ))}
-          <div style={{ padding: "10px 16px", borderTop: `1px solid ${CP.borderSoft}` }}>
+          <div className="ds-open-f" style={{ padding: "10px 16px", borderTop: `1px solid ${CP.borderSoft}` }}>
             <Link href="/admin/alerts" style={{ fontSize: 13, color: CP.accentSoftText, textDecoration: "none" }}>
               {open.length > 5 ? `Tutti gli alert (${open.length}) →` : "Alert e storico →"}
             </Link>
@@ -234,7 +243,7 @@ export default function AdminHub() {
       )}
 
       {loop && (
-        <section style={{ ...card, padding: "14px 16px", marginBottom: 24 }}>
+        <section className="ds-open" style={{ ...card, padding: "14px 16px", marginBottom: 24 }}>
           <SectionTitle aside="coaching e sostituzioni del mese scorso, misurati su questo">Le decisioni sulle persone funzionano?</SectionTitle>
           <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
             <Metric label="Migliorati dopo il coaching" value={loop.coaching?.rate != null ? `${loop.coaching.rate}%` : "—"}
@@ -248,7 +257,7 @@ export default function AdminHub() {
       )}
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
-        <h2 style={{ fontSize: 16, fontWeight: 500, margin: 0, color: CP.textPrimary, flex: "1 1 auto" }}>Strumenti</h2>
+        <h2 className="ds-sect" style={{ fontSize: 16, fontWeight: 500, margin: 0, color: CP.textPrimary, flex: "1 1 auto" }}>Strumenti</h2>
         <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", border: `1px solid ${CP.border}`, borderRadius: 8, background: CP.surface, flex: "0 1 320px" }}>
           <Search size={14} color={CP.textMuted} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca uno strumento…" aria-label="Cerca uno strumento"

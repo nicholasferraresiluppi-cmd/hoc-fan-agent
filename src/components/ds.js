@@ -25,7 +25,9 @@ import { tierLabel, TIER_ORDER } from "@/lib/tier-label";
 const NUM = { fontVariantNumeric: "tabular-nums" };
 export const card = { background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10 };
 
-export function PageHead({ crumbs = [], title, subtitle, actions }) {
+export function PageHead({ crumbs = [], title, line2, subtitle, actions }) {
+  // line2: seconda riga del titolo in corsivo, solo nello stile Casa (la frase che dice com'è andata)
+  const [st] = useStyle();
   return (
     <header className="ds-head" style={{ marginBottom: 20 }}>
       {crumbs.length > 0 && (
@@ -40,7 +42,7 @@ export function PageHead({ crumbs = [], title, subtitle, actions }) {
       )}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 420px" }}>
-          <h1 className="ds-h1" style={{ fontSize: 28, fontWeight: 500, margin: "0 0 4px", letterSpacing: "-0.01em", color: CP.textPrimary }}>{title}</h1>
+          <h1 className="ds-h1" style={{ fontSize: 28, fontWeight: 500, margin: "0 0 4px", letterSpacing: "-0.01em", color: CP.textPrimary }}>{title}{st === "v3" && line2 && <><br /><em className="ds-h1-em">{line2}</em></>}</h1>
           {subtitle && <p className="ds-sub" style={{ fontSize: 14, color: CP.textSecondary, margin: 0, maxWidth: 760, lineHeight: 1.5 }}>{subtitle}</p>}
         </div>
         {actions && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{actions}</div>}
@@ -264,13 +266,13 @@ export function DataTable({ columns, rows, defaultSort, onRowClick, selected, mi
 export function ActionRow({ severity = "info", title, detail, href, cta }) {
   const color = severity === "critical" ? CP.accentRed : severity === "warning" ? CP.accentSoftText : CP.textMuted;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderTop: `1px solid ${CP.borderSoft}`, flexWrap: "wrap" }}>
+    <div className="ds-arow" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderTop: `1px solid ${CP.borderSoft}`, flexWrap: "wrap" }}>
       <span style={{ width: 8, height: 8, borderRadius: 999, background: color, flexShrink: 0 }} />
       <div style={{ flex: "1 1 320px", minWidth: 0 }}>
-        <div style={{ fontSize: 14, color: CP.textPrimary }}>{title}</div>
+        <div className="ds-arow-t" style={{ fontSize: 14, color: CP.textPrimary }}>{title}</div>
         {detail && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2 }}>{detail}</div>}
       </div>
-      {href && <Link href={href} style={{ fontSize: 13, color: CP.accentSoftText, textDecoration: "none", whiteSpace: "nowrap" }}>{cta || "Apri"} →</Link>}
+      {href && <Link href={href} className="ds-arow-go" style={{ fontSize: 13, color: CP.accentSoftText, textDecoration: "none", whiteSpace: "nowrap" }}>{cta || "Apri"} →</Link>}
     </div>
   );
 }
