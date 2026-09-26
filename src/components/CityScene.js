@@ -19,7 +19,8 @@ const CSS = `
 .ct canvas{position:absolute;inset:0;width:100%;height:100%;display:block;outline:none;touch-action:none}
 .ct .ct-grain{position:absolute;inset:0;pointer-events:none;opacity:.05;z-index:8;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
 .ct button{font:inherit;color:inherit}
-.ct .ct-serif{font-family:var(--f-display),"Instrument Serif",Georgia,serif;font-weight:400}
+.ct .ct-serif,.ct .ct-serif *{font-family:var(--f-display),"Instrument Serif",Georgia,serif!important;font-weight:400}
+.ct,.ct button,.ct span,.ct small,.ct p,.ct li,.ct h3,.ct div{font-family:var(--f-sans),Manrope,system-ui,sans-serif}
 .ct .ct-top{position:absolute;top:26px;left:40px;right:40px;display:flex;justify-content:space-between;align-items:center;gap:16px;font-size:14px;color:var(--fg2);z-index:5;pointer-events:none}
 .ct .ct-top b{font-size:24px;color:#F2EEE6}
 .ct .ct-top .r{display:flex;align-items:center;gap:12px;pointer-events:auto}
@@ -283,7 +284,8 @@ function mountCity(root, RAW, THREE, OrbitControls) {
     const m = size().w < 760;
     if (focusIdx != null) { const b = B[focusIdx]; wantT.copy(b.s.pos).setY(b.top * 0.5); const d = Math.max(20, b.top * 3.4) * (m ? 1.5 : 1); wantP.set(b.s.pos.x + d * 0.42, wantT.y + d * 0.36, b.s.pos.z + d * 0.84); if (!m && panelOn()) { const off = d * 0.2; wantT.x += off; wantP.x += off; } if (m) wantT.y -= d * 0.12; return; }
     const c = centers[view]; const span = view === "all" ? sep + Math.max(gC.w, gS.w) : Math.max(view === "creator" ? gC.w : gS.w, 8);
-    const d = Math.max(26, span * (m ? 2.3 : view === "all" ? 1.2 : 1.9)); wantT.set(c.x, view === "all" ? 1.5 : 2.4, c.z); wantP.set(c.x + d * 0.42, d * 0.5, d * 0.78);
+    const { w: sw, h: sh } = size(); const aspectFix = Math.max(1, 1.55 / (sw / sh));
+    const d = Math.max(26, span * (m ? 2.3 : view === "all" ? 1.2 : 1.9)) * (m ? 1 : aspectFix); wantT.set(c.x, view === "all" ? 1.5 : 2.4, c.z); wantP.set(c.x + d * 0.42, d * 0.5, d * 0.78);
   }
   focusBuilding = (i) => { focusIdx = i; if (i != null && view !== "all" && view !== B[i].s.district) setView("all", true); framing(); animCam = 1; };
   function setView(v, keep) { view = v; if (root.classList.contains("show")) hero(v); root.querySelectorAll("[data-v]").forEach((b) => b.classList.toggle("on", b.dataset.v === v)); if (!keep) { focusIdx = null; if (panelOn()) deselect(); } framing(); animCam = 1; }
