@@ -282,3 +282,15 @@ html.casa-intro[data-style="v3"]::after {
   [data-style="v3"] .casa-page > * > * { animation: none; }
   html.casa-intro[data-style="v3"] body::after, html.casa-intro[data-style="v3"]::after { display: none; }
 }
+
+/* Casa: seconda riga del titolo in corsivo; sezioni "aperte" (niente riquadro, solo linee); righe d'azione ariose */
+[data-style="v3"] .ds-h1-em { font-style: italic; color: var(--cp-textSecondary); }
+[data-style="v3"] .ds-open { background: transparent !important; border: 0 !important; border-radius: 0 !important; padding: 0 !important; margin: 0 0 72px !important; }
+[data-style="v3"] .ds-open-h { padding: 0 0 18px !important; }
+[data-style="v3"] .ds-open-f { padding: 18px 0 0 !important; border-top: 1px solid var(--cp-border) !important; }
+[data-style="v3"] .ds-arow { padding: 22px 0 !important; border-top: 1px solid var(--cp-border) !important; gap: 18px !important; }
+[data-style="v3"] .ds-arow-t { font-size: 16.5px !important; line-height: 1.45; }
+[data-style="v3"] .ds-arow-go { color: var(--cp-textSecondary) !important; font-size: 14px !important; }
+[data-style="v3"] .ds-arow:hover .ds-arow-go { color: var(--cp-textPrimary) !important; }
+[data-style="v3"] .hub-tool { background: transparent !important; border: 0 !important; border-top: 1px solid var(--cp-border) !important; border-radius: 0 !important; padding: 16px 4px !important; }
+[data-style="v3"] .hub-tool:hover { background: var(--cp-hover) !important; }
