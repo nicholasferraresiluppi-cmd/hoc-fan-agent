@@ -20,7 +20,11 @@ import { detectLanguage } from "@/lib/leaderboard-calc";
 import { MONTHS_IT } from "@/lib/format";
 
 export const SALES_DROP = -0.15;
-export const COST_HIGH_PTS = 0.04;
+// pannello 26/09: +4 punti non scattava mai (range reale 9,8–13,9%): +1,5 punti sulla mediana
+export const COST_HIGH_PTS = 0.015;
+// Chatting grave solo se il problema è diffuso: ≥ 25% degli operatori sotto soglia o score medio < 35
+export const CHAT_SHARE = 0.25;
+export const CHAT_AVG_MIN = 35;
 export const UNDER_SCORE = 25;
 export const UNDER_MIN_SHIFTS = 5;
 const TTL = 3600;
@@ -61,9 +65,9 @@ async function chattingBy(periodId) {
   for (const r of ranking) {
     const n = personOf(r.cp_breakdown?.top_creator);
     if (!n || r.score == null) continue;
-    if (!chat[n]) chat[n] = { ops: 0, under: 0, scoreSum: 0 };
+    if (!chat[n]) chat[n] = { ops: 0, under: 0, scoreSum: 0, names: [] };
     chat[n].ops += 1; chat[n].scoreSum += r.score;
-    if (r.score > 0 && r.score <= UNDER_SCORE && (r.cp_aggregates?.total_shifts || 0) >= UNDER_MIN_SHIFTS) chat[n].under += 1;
+    if (r.score > 0 && r.score <= UNDER_SCORE && (r.cp_aggregates?.total_shifts || 0) >= UNDER_MIN_SHIFTS) { chat[n].under += 1; chat[n].names.push(String(r.employee || "").split(" ").slice(0, 2).join(" ")); }
   }
   return chat;
 }
@@ -91,7 +95,7 @@ export async function computeCityLive(periodId = monthOf()) {
       costPct: c.sales > 0 ? c.cost / c.sales : null,
       costPctPrev: costPrevBy[n]?.sales > 0 ? costPrevBy[n].cost / costPrevBy[n].sales : null,
       underPrev: chatPrev[n]?.under ?? null, topAlias: c.top || null,
-      ops: ch?.ops || 0, under: ch?.under || 0, avgScore: ch?.ops ? ch.scoreSum / ch.ops : null,
+      ops: ch?.ops || 0, under: ch?.under || 0, avgScore: ch?.ops ? ch.scoreSum / ch.ops : null, underNames: ch?.names || [],
     };
   }
   const sum = (o, k) => Object.values(o).reduce((s, x) => s + (x[k] || 0), 0);
@@ -104,11 +108,13 @@ export async function computeCityLive(periodId = monthOf()) {
   agency.perShiftPrev = agency.shiftsPrev ? agency.salesPrev / agency.shiftsPrev : null;
   agency.costPct = agency.sales > 0 ? agency.cost / agency.sales : null;
   agency.costPctPrev = agency.salesPrevWages > 0 ? agency.costPrev / agency.salesPrevWages : null;
-  return { period: periodId, prev: prevId, medianCostPct, people, agency, computed_at: Date.now() };
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const asOfDay = today.startsWith(periodId) ? Number(today.slice(8, 10)) : null;
+  return { period: periodId, prev: prevId, medianCostPct, people, agency, asOfDay, computed_at: Date.now() };
 }
 
 export async function getCityLive(periodId = monthOf()) {
-  const key = `citta:live:v4:${periodId}`;
+  const key = `citta:live:v5:${periodId}`;
   const hit = await kv.get(key);
   if (hit && Date.now() - (hit.computed_at || 0) < TTL * 1000) return hit;
   const fresh = await computeCityLive(periodId);
@@ -126,8 +132,9 @@ function salesArea(x, live) {
   if (!x || !x.sales) return { n: "Sales", s: "none", open: 0, late: 0, l: `Nessun venduto a ${monthName(live.period)} finora.`, src: "hoc" };
   const d = x.perShift != null && x.perShiftPrev ? x.perShift / x.perShiftPrev - 1 : null;
   const s = d != null && d <= SALES_DROP ? "wait" : "ok";
-  const l = `Venduto a ${monthName(live.period)}: ${usd(x.sales)} in ${grp(x.shifts)} turni, ${usd(x.perShift)} a turno` +
-    (d != null ? ` (${d >= 0 ? "+" : "−"}${pct(Math.abs(d), 0)} rispetto a ${monthName(live.prev)}).` : ".");
+  const when = live.asOfDay ? `${monthName(live.period)} fino al ${live.asOfDay}` : monthName(live.period);
+  const l = `Venduto a ${when}: ${usd(x.sales)} in ${grp(x.shifts)} turni. A turno ${usd(x.perShift)}` +
+    (d != null ? `, ${d >= 0 ? "+" : "−"}${pct(Math.abs(d), 0)} rispetto a ${monthName(live.prev)} (la freccia guarda il venduto a turno, non il totale).` : ".");
   const trend = d == null ? null : d >= 0.05 ? "up" : d <= -0.05 ? "down" : "flat";
   return { n: "Sales", s, open: 0, late: 0, l, src: "hoc", trend, link: x.topAlias ? `/leaderboard/creators/${encodeURIComponent(x.topAlias)}` : "/leaderboard/creators" };
 }
@@ -142,11 +149,14 @@ function financeArea(x, live) {
 function chattingArea(x) {
   if (!x || !x.ops) return { n: "Chatting", s: "none", open: 0, late: 0, l: "Nessun operatore ha questa creator come principale questo mese.", src: "hoc" };
   const avg = x.avgScore != null ? x.avgScore.toLocaleString("it-IT", { maximumFractionDigits: 1 }) : "—";
+  const share = x.ops ? x.under / x.ops : 0;
+  const grave = share >= CHAT_SHARE || (x.avgScore != null && x.avgScore < CHAT_AVG_MIN);
   const du = x.underPrev != null ? x.under - x.underPrev : null;
   const trend = du == null ? null : du < 0 ? "up" : du > 0 ? "down" : "flat";
-  return { n: "Chatting", s: x.under ? "wait" : "ok", open: 0, late: x.under, src: "hoc", trend, link: "/admin/action-center",
+  const who = x.underNames?.length ? ` (${x.underNames.slice(0, 4).join(", ")}${x.underNames.length > 4 ? "…" : ""})` : "";
+  return { n: "Chatting", s: grave ? "wait" : "ok", open: 0, late: x.under, src: "hoc", trend, link: "/admin/action-center",
     l: `${x.ops} ${x.ops === 1 ? "operatore lavora" : "operatori lavorano"} soprattutto qui, score vendite medio ${avg}` +
-      (x.under ? `; ${x.under} sotto soglia (score ≤ ${UNDER_SCORE}): vedi Action Center.` : "; nessuno sotto soglia.") };
+      (x.under ? `; ${x.under} sotto soglia${who}${grave ? "" : ": caso isolato, non un problema diffuso"}.` : "; nessuno sotto soglia.") };
 }
 
 /** Sostituisce Sales/Finance/Chatting con i dati di HOC Pro e aggiunge il venduto (altezza).
@@ -169,7 +179,18 @@ export function mergeCityLive(snap, live, { past = false, claims = {} } = {}) {
         trend: ag.underPrev == null ? null : ag.under < ag.underPrev ? "up" : ag.under > ag.underPrev ? "down" : "flat",
         l: `${ag.under} operatori sotto soglia (score ≤ ${UNDER_SCORE}, almeno ${UNDER_MIN_SHIFTS} turni) su ${ag.ops} in classifica.` },
     }) };
-  return { ...snap, projects, hq, live: { period: live.period, prev: live.prev, computed_at: live.computed_at, past, label: monthName(live.period) } };
+  // Da guardare: solo segnali MISURATI, pesati per gravità (le stime ClickUp non entrano in agenda)
+  const top = [];
+  for (const p of projects) {
+    const x = live.people[p.n]; if (!x) continue;
+    const d = x.perShift != null && x.perShiftPrev ? x.perShift / x.perShiftPrev - 1 : null;
+    if (d != null && d <= SALES_DROP) top.push({ tower: p.n, area: "Sales", score: -d * 100, text: `venduto a turno ${pct(d, 0).replace("-", "−")}` });
+    const share = x.ops ? x.under / x.ops : 0;
+    if (x.ops && (share >= CHAT_SHARE || (x.avgScore != null && x.avgScore < CHAT_AVG_MIN))) top.push({ tower: p.n, area: "Chatting", score: share * 100 + (x.avgScore < CHAT_AVG_MIN ? 15 : 0), text: `${x.under} su ${x.ops} operatori sotto soglia` });
+    if (x.costPct != null && live.medianCostPct != null && x.costPct >= live.medianCostPct + COST_HIGH_PTS) top.push({ tower: p.n, area: "Finance", score: (x.costPct - live.medianCostPct) * 1000, text: `costo operatori ${pct(x.costPct)} (mediana ${pct(live.medianCostPct)})` });
+  }
+  top.sort((a, b) => b.score - a.score);
+  return { ...snap, projects, hq, top: top.slice(0, 5), live: { asOfDay: live.asOfDay, period: live.period, prev: live.prev, computed_at: live.computed_at, past, label: monthName(live.period) } };
 }
 
 export const currentMonthId = () => monthOf();
