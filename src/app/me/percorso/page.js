@@ -5,6 +5,7 @@ import { CheckCircle2, Circle, Lock } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHead, HeroMetric, SectionTitle, Notice, card, NUM } from "@/components/ds";
 import { tierLabel, tierColor } from "@/lib/tier-label";
+import { useStyle } from "@/lib/theme-client";
 
 /**
  * /me/percorso — "Il mio percorso" (scope own, docs/VISIBILITY_POLICY.md).
@@ -18,17 +19,35 @@ import { tierLabel, tierColor } from "@/lib/tier-label";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
-// Fascia come segnale sul dato (DESIGN.md §1): rosso solo per la più bassa,
-// verde per le tre alte, neutro in mezzo.
 // colore fasce: lib/tier-label (basse mai rosse, 26/09)
 
 const MESI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
 const monthLabel = (pid) => (/^\d{4}-\d{2}$/.test(pid || "") ? `${MESI[Number(pid.slice(5)) - 1]} ${pid.slice(0, 4)}` : pid);
 const monthShort = (pid) => (/^\d{4}-\d{2}$/.test(pid || "") ? MESI[Number(pid.slice(5)) - 1] : String(pid || "").slice(5));
+/*
+ * Mesi della finestra di un passaggio IN ORDINE DI CALENDARIO, con i mesi non
+ * lavorati dentro come trattino. Solo lettura: il gate (api/me/ladder, evalGate)
+ * conta i soli mesi valutabili e resta com'è; qui si ricuciono i buchi dallo
+ * storico completo (`data.history`, che ha score null per i mesi senza turni)
+ * perché "non lavorato" si veda come vuoto e non sparisca.
+ */
+function windowMonths(perf, history) {
+  const used = perf.months || [];
+  if (!used.length) return [];
+  const byId = Object.fromEntries(used.map((m) => [m.period_id, m]));
+  const oldest = used.map((m) => m.period_id).sort()[0];
+  const all = (Array.isArray(history) ? history : []).filter((h) => String(h.period_id) >= oldest);
+  const rows = all.length ? all.map((h) => byId[h.period_id] || { period_id: h.period_id, score: null, gap: true }) : used;
+  return [...rows].sort((a, b) => String(a.period_id).localeCompare(String(b.period_id)));
+}
+const monthStatus = (m) => (m.gap || m.score == null ? "non lavorato" : m.counts ? "conta" : m.below_floor ? "sotto il minimo" : "sotto soglia");
+
 const fmtScore = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { maximumFractionDigits: 1 }));
 
 export default function MyLadderPage() {
   const { data, error, isLoading } = useSWR("/api/me/ladder", fetcher, { revalidateOnFocus: false });
+  const [st] = useStyle();
+  const v3 = st === "v3";
 
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
@@ -77,33 +96,45 @@ export default function MyLadderPage() {
                       <CheckCircle2 size={13} /> performance raggiunta
                     </span>
                   ) : (
-                    <span style={{ fontSize: 13, color: CP.textMuted, ...NUM }}>{perf.evaluable ? `${perf.hits} mesi su ${perf.needed} necessari${perf.below_floor ? ` · ${perf.below_floor} sotto il minimo` : ""}` : "servono ancora mesi di lavoro per valutarlo: non è un problema, è solo presto"}</span>
+                    <span style={{ fontSize: 13, color: CP.textMuted, ...NUM }}>{perf.evaluable && v3 ? <><span style={{ fontSize: 28, fontWeight: 500, color: CP.textPrimary, letterSpacing: "-0.02em" }}>{perf.hits}</span><span style={{ fontSize: 18 }}>/{perf.needed}</span> mesi che contano{perf.below_floor ? ` · ${perf.below_floor} sotto il minimo` : ""}</> : perf.evaluable ? `${perf.hits} mesi su ${perf.needed} necessari${perf.below_floor ? ` · ${perf.below_floor} sotto il minimo` : ""}` : "servono ancora mesi di lavoro per valutarlo: non è un problema, è solo presto"}</span>
                   )}
                 </div>
                 <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 12px", lineHeight: 1.55 }}>
                   Requisito performance: <span style={{ color: CP.textPrimary, fontWeight: 500 }}>{perf.requirement}</span> · Anzianità minima: {g.time_floor}
                 </p>
 
-                {/* Mesi della finestra */}
+                {/* Requisiti in numeri: quanti mesi mancano e quanto manca all'ultimo mese */}
+                {perf.evaluable && !perf.performance_met && perf.min_score != null && (
+                  <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 12px", lineHeight: 1.55, ...NUM }}>
+                    {perf.hits < perf.needed && <>Ti {perf.needed - perf.hits === 1 ? "manca" : "mancano"} <span style={{ color: CP.textPrimary, fontWeight: 500 }}>{perf.needed - perf.hits} {perf.needed - perf.hits === 1 ? "mese che conta" : "mesi che contano"}</span> (score ≥ {perf.min_score}). </>}
+                    {data.current?.score != null && data.current.score < perf.min_score && <>Nell&apos;ultimo mese valutato sei a {fmtScore(data.current.score)}: per contare servono {perf.min_score}, cioè <span style={{ color: CP.textPrimary, fontWeight: 500 }}>+{fmtScore(Math.max(0.1, perf.min_score - data.current.score))} punti</span>. </>}
+                    {perf.below_floor > 0 && perf.floor != null && <>{perf.below_floor === 1 ? "Un mese è" : `${perf.below_floor} mesi sono`} sotto il minimo di {perf.floor}: finché {perf.below_floor === 1 ? "resta" : "restano"} nella finestra il passaggio non scatta.</>}
+                  </p>
+                )}
+
+                {/* Mesi della finestra, in ordine di calendario; non lavorato = trattino */}
                 {(perf.months || []).length > 0 && (
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-                    {perf.months.map((m) => (
-                      <div key={m.period_id} style={{ textAlign: "center" }}>
-                        <div title={m.counts ? "Conta per il passaggio" : m.below_floor ? "Sotto il minimo richiesto" : "Sotto la soglia di questo passaggio"}
-                          style={{ width: 58, padding: "6px 0", borderRadius: 6, background: m.counts ? alpha(CP.accentGreen, "1c") : CP.surfaceAlt, border: `1px solid ${m.counts ? CP.accentGreen : m.below_floor ? CP.accentRed : CP.border}` }}>
-                          <span style={{ fontSize: 13, color: CP.textPrimary, ...NUM }}>{fmtScore(m.score)}</span>
+                  <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${v3 ? 104 : 64}px, 1fr))`, gap: 8, marginBottom: 12 }}>
+                    {windowMonths(perf, data.history).map((m) => {
+                      const gap = m.gap || m.score == null;
+                      return (
+                        <div key={m.period_id}
+                          title={gap ? "Mese senza turni lavorati: non conta né a favore né contro" : m.counts ? "Conta per il passaggio" : m.below_floor ? "Sotto il minimo richiesto" : "Sotto la soglia di questo passaggio"}
+                          style={{ padding: v3 ? "10px 12px" : "6px 8px", borderRadius: 8, textAlign: v3 ? "left" : "center",
+                            background: m.counts ? alpha(CP.accentGreen, "1c") : gap ? "transparent" : CP.surfaceAlt,
+                            border: `1px ${gap ? "dashed" : "solid"} ${m.counts ? CP.accentGreen : m.below_floor ? CP.textSecondary : CP.border}` }}>
+                          <div style={{ fontSize: 12, color: CP.textMuted }}>{monthShort(m.period_id)}</div>
+                          <div style={{ fontSize: v3 ? 22 : 14, fontWeight: 500, color: gap ? CP.textMuted : CP.textPrimary, lineHeight: 1.2, ...NUM }}>{gap ? "—" : fmtScore(m.score)}</div>
+                          <div style={{ fontSize: 11, color: m.counts ? CP.accentGreen : CP.textMuted }}>{monthStatus(m)}</div>
                         </div>
-                        <span style={{ fontSize: 11, color: CP.textMuted }}>{monthShort(m.period_id)}{m.tier ? ` · ${tierLabel(m.tier)}` : ""}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
                 {(perf.months || []).length > 0 && (
-                  <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12, color: CP.textMuted, marginBottom: 12 }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, border: `1px solid ${CP.accentGreen}`, background: alpha(CP.accentGreen, "1c") }} />conta per il passaggio</span>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, border: `1px solid ${CP.border}`, background: CP.surfaceAlt }} />sotto la soglia</span>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, border: `1px solid ${CP.accentRed}`, background: CP.surfaceAlt }} />sotto il minimo</span>
-                  </div>
+                  <p style={{ fontSize: 12, color: CP.textMuted, margin: "0 0 12px" }}>
+                    Un mese senza turni è un trattino, non uno zero: non conta né a favore né contro.
+                  </p>
                 )}
 
                 {/* Altri requisiti */}

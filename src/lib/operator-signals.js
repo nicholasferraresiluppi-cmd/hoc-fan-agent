@@ -369,4 +369,9 @@ export async function getOperatorSignalProfiles({ force = false, days, minShiftM
   return { ...payload, cached: false };
 }
 
+/** Solo cache (mai BigQuery): per le superfici UI che vogliono il profilo se c'è. */
+export async function getCachedOperatorSignalProfiles() {
+  try { return (await kv.get(CACHE_KEY)) || null; } catch { return null; }
+}
+
 export { bigQueryConfigured };

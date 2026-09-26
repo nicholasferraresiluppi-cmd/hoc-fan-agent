@@ -151,6 +151,10 @@ export async function GET(request) {
     comparison: mine.comparison === "language" ? "language" : "group", // v13: gruppo piccolo → media della lingua
     group_size: mine.group_size ?? mine.group_means?._count ?? null,
     composition,
+    // Scalini della normalizzazione (moltiplicatore della media → punti voce):
+    // servono a /me/score per dire "portare X da a a b = +c punti" con la
+    // STESSA regola del calcolo (normalizeKpi), senza stimarla (26/09/2026).
+    normalization: Array.isArray(settings.thresholds) ? settings.thresholds.map((t) => ({ multiplier: t.multiplier, score: t.score })) : null,
     formula: snapshot ? { hash: snapshot.hash, captured_at_iso: snapshot.captured_at_iso } : null,
     history,
   });

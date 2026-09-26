@@ -6,10 +6,10 @@
 // (da decidere / sostituto scelto / pronti per HR) e fascia → tabella con lo
 // score del MESE PRIMA accanto (un mese storto ≠ problema che si ripete) →
 // azioni con parole, non icone. API e azioni invariate.
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
-import { Info, Download } from "lucide-react";
+import { Info, Download, X, User } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
 import { Modal } from "@/components/cp-style";
@@ -47,6 +47,8 @@ export default function ActionCenterPage() {
   const [hrFor, setHrFor] = useState(null);
   const [hrForm, setHrForm] = useState({ colloquio_date: "", motivazione: "", voce_operatore: "" });
   const [hrErr, setHrErr] = useState(null);
+  const [sel, setSel] = useState(null);     // riga selezionata (mostra "Vista colloquio")
+  const [cvFor, setCvFor] = useState(null); // vista colloquio aperta su UNA persona
   const periodOptions = useMemo(() => monthOpts(), []);
   const prevId = prevOf(periodId);
 
@@ -91,6 +93,22 @@ export default function ActionCenterPage() {
   const tiers = ["Critical", "Weak", "Average"].filter((t) => inThreshold.some((c) => c.tier === t));
   const prevCount = prevAc && !prevAc.error ? (prevAc.candidates || []).filter((c) => c.score <= threshold).length : null;
   const prevName = prevId ? MONTHS_IT[Number(prevId.slice(5)) - 1] : "";
+  const minShifts = data?.config?.min_shifts || 5;
+  const monthName = periodId ? MONTHS_IT[Number(periodId.slice(5)) - 1] : "";
+  // Contesto in una frase leggibile (max 2 righe nella colonna larga): creator,
+  // confronto coi colleghi, temperatura del pubblico.
+  const contextLine = (c) => {
+    const parts = [];
+    if (c.top_creator) parts.push(`soprattutto su ${c.top_creator}`);
+    const vp = c.context?.vs_peers_pct;
+    if (vp != null) parts.push(vp === 0 ? "per turno come i colleghi su di lei" : `per turno ${vp > 0 ? "+" : "−"}${Math.abs(vp)}% rispetto ai colleghi su di lei`);
+    if (c.context?.difficulty_band) parts.push(`pubblico ${c.context.difficulty_band}`);
+    return parts.join(" · ");
+  };
+  const cvCand = cvFor ? all.find((c) => c.employee === cvFor) : null;
+  const hrCand = hrFor ? all.find((c) => c.employee === hrFor) : null;
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const hrVerify = hrCand?.swap_entry?.agreement?.verify_date;
 
   async function callAction(employee, action, swap_with = undefined, note = undefined, hr = undefined) {
     if (!periodId) return false;
@@ -105,6 +123,20 @@ export default function ActionCenterPage() {
       mutate(url);
       return true;
     } catch (e) { alert(e.message); return false; }
+  }
+  async function saveAgreement(employee, agreement) {
+    if (!periodId) return { ok: false, error: "Mese non scelto" };
+    try {
+      const res = await fetch("/api/admin/action-center", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ period_id: periodId, employee, action: "set_agreement", agreement }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: j.error || `Errore ${res.status}` };
+      mutate(url);
+      return { ok: true };
+    } catch (e) { return { ok: false, error: e.message }; }
   }
   async function submitHr() {
     setHrErr(null);
@@ -228,50 +260,66 @@ export default function ActionCenterPage() {
           </div>
         ) : (
           <div style={{ ...card, overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: 980 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: 1100, tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: 176 }} />
+                <col style={{ width: 64 }} />
+                <col />
+                <col style={{ width: 104 }} />
+                <col style={{ width: 84 }} />
+                <col style={{ width: 96 }} />
+                <col style={{ width: 220 }} />
+                <col style={{ width: 150 }} />
+              </colgroup>
               <thead><tr>
-                {["Operatore", "Score", "Mese prima", "Venduto", "Turni", "Sostituto (compatibilità)", ""].map((h, k) => (
-                  <th key={k} style={{ ...thS, textAlign: k >= 1 && k <= 4 ? "right" : "left" }}>{h}</th>
+                {[["Operatore", "left"], ["Turni", "right"], ["Contesto", "left"], ["Score", "right"], [prevName ? `A ${prevName}` : "Mese prima", "right"], ["Venduto", "right"], ["Sostituto (compatibilità)", "left"], ["", "right"]].map(([h, al], k) => (
+                  <th key={k} style={{ ...thS, textAlign: al }}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>
                 {rows.map((c) => {
                   const st = stageOf(c);
                   const ps = prevScore.get(c.employee);
-                  const again = ps != null && ps <= threshold;
+                  const few = (c.cp_total_shifts || 0) < minShifts;
+                  const ev = evaluate(c);
+                  const ctx = contextLine(c);
+                  const coldOk = c.context?.difficulty_band === "fredda" && c.context.vs_peers_pct != null && c.context.vs_peers_pct >= -10;
+                  const second = bucket === "watch" && ev.missing.length > 0
+                    ? `Manca: ${ev.missing.join("; ")}`
+                    : coldOk ? "Rende come i colleghi su una creator fredda: valutare la creator prima della persona" : "";
+                  const isSel = sel === c.employee;
                   return (
-                    <tr key={c.employee} style={{ borderTop: `1px solid ${CP.borderSoft}`, background: st === "ready" ? CP.accentSoft : "transparent" }}>
+                    <tr key={c.employee} className="ac-row" data-selected={isSel ? "true" : undefined}
+                      onClick={() => setSel(c.employee)}
+                      style={{ borderTop: `1px solid ${CP.borderSoft}`, background: st === "ready" ? CP.accentSoft : isSel ? CP.surfaceAlt : "transparent" }}>
                       <td style={tdS}>
-                        <Link href={`/leaderboard/operational/${encodeURIComponent(c.employee)}`} style={{ color: CP.textPrimary, textDecoration: "none", fontWeight: 500 }}>{c.employee}</Link>
-                        {c.top_creator && <div style={{ fontSize: 12, color: CP.textMuted }}>soprattutto su {c.top_creator}</div>}
-                        {c.context && (c.context.vs_peers_pct != null || c.context.difficulty_band) && (
-                          <div style={{ fontSize: 12, color: CP.textSecondary, marginTop: 2 }}>
-                            {c.context.vs_peers_pct != null && <>{c.context.vs_peers_pct > 0 ? "+" : c.context.vs_peers_pct < 0 ? "−" : ""}{Math.abs(c.context.vs_peers_pct)}% per turno rispetto ai colleghi su di lei</>}
-                            {c.context.vs_peers_pct != null && c.context.difficulty_band ? " · " : ""}
-                            {c.context.difficulty_band && <>pubblico {c.context.difficulty_band}</>}
-                          </div>
-                        )}
-                        {bucket === "watch" && evaluate(c).missing.length > 0 && (
-                          <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2 }}>Da osservare: {evaluate(c).missing.join(" · ")}</div>
-                        )}
-                        {c.context?.difficulty_band === "fredda" && c.context.vs_peers_pct != null && c.context.vs_peers_pct >= -10 && (
-                          <div style={{ fontSize: 12, color: CP.accentSoftText, marginTop: 2 }}>Rende come i colleghi su una creator fredda: valutare la creator prima della persona</div>
-                        )}
+                        <Link href={`/leaderboard/operational/${encodeURIComponent(c.employee)}`} style={{ color: CP.textPrimary, textDecoration: "none", fontWeight: 500, overflowWrap: "anywhere" }}>{c.employee}</Link>
+                        <div>
+                          <button type="button" className="ac-cv-btn" onClick={(e) => { e.stopPropagation(); setSel(c.employee); setCvFor(c.employee); }}
+                            style={{ ...linkBtn, marginTop: 4, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <User size={12} /> Vista colloquio
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ ...tdS, textAlign: "right" }}>{fmtInt(c.cp_total_shifts)}</td>
+                      <td style={tdS}>
+                        <div style={{ color: CP.textSecondary, lineHeight: 1.45 }}>{ctx || "—"}</div>
+                        {second && <div style={{ fontSize: 13, color: bucket === "watch" ? CP.textPrimary : CP.accentSoftText, lineHeight: 1.45, marginTop: 2 }}>{second}</div>}
                       </td>
                       <td style={{ ...tdS, textAlign: "right" }}>
-                        <span style={{ color: tierColor(c.tier), fontWeight: 500 }}>{sc(c.score)}</span>
-                        <div style={{ fontSize: 12, color: CP.textMuted }}>{tierLabel(c.tier)}</div>
+                        {few ? (
+                          <span style={{ fontSize: 12, color: CP.textMuted }}>pochi turni: aspetta fine mese</span>
+                        ) : (<>
+                          <span style={{ color: tierColor(c.tier), fontWeight: 500 }}>{sc(c.score)}</span>
+                          <div style={{ fontSize: 12, color: CP.textMuted }}>{tierLabel(c.tier)}</div>
+                        </>)}
                       </td>
-                      <td style={{ ...tdS, textAlign: "right" }}>
-                        <span style={{ color: CP.textSecondary }}>{ps == null ? "—" : sc(ps)}</span>
-                        <div style={{ fontSize: 12, color: CP.textMuted }}>{ps == null ? "non in classifica" : again ? "anche sotto soglia" : "sopra soglia"}</div>
-                      </td>
+                      <td style={{ ...tdS, textAlign: "right", color: CP.textSecondary }} title={ps == null ? "non in classifica" : undefined}>{ps == null ? "—" : sc(ps)}</td>
                       <td style={{ ...tdS, textAlign: "right" }}>{fmt$(c.cp_total_sales)}</td>
-                      <td style={{ ...tdS, textAlign: "right" }}>{c.cp_total_shifts}</td>
-                      <td style={{ ...tdS, width: 300 }}>
+                      <td style={tdS} onClick={(e) => e.stopPropagation()}>
                         <SwapPicker candidate={c} swapTargets={swapTargets} onChange={(v) => callAction(c.employee, "set_swap", v || null)} />
                       </td>
-                      <td style={{ ...tdS, whiteSpace: "nowrap", textAlign: "right" }}>
+                      <td style={{ ...tdS, textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
                         {st !== "ready" ? (
                           <button onClick={() => { setHrErr(null); setHrFor(c.employee); }} disabled={!c.swap_entry?.swap_with}
                             title={c.swap_entry?.swap_with ? "Aggiungi alla lista per HR" : "Scegli prima un sostituto"}
@@ -281,7 +329,7 @@ export default function ActionCenterPage() {
                         ) : (
                           <button onClick={() => callAction(c.employee, "set_pending")} style={btn}>Rimetti in attesa</button>
                         )}
-                        <div style={{ marginTop: 6, display: "flex", gap: 12, justifyContent: "flex-end" }}>
+                        <div style={{ marginTop: 6, display: "flex", gap: 12, justifyContent: "flex-end", flexWrap: "wrap" }}>
                           <button onClick={() => unmark(c.employee)} style={linkBtn}>Togli</button>
                           <button onClick={() => ignorePermanent(c.employee)} style={linkBtn}>Escludi sempre</button>
                         </div>
@@ -294,11 +342,14 @@ export default function ActionCenterPage() {
           </div>
         )}
         <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 10 }}>
-          Sotto il nome: quanto rende per turno rispetto ai colleghi sulla stessa creator (lui escluso) e quanto è “fredda” la creator (profilo dal warehouse, <Link href="/admin/creator-difficulty" style={{ color: CP.accentSoftText }}>Difficoltà creator</Link>). Criteri: score CP ≤ soglia con almeno 5 turni nel mese; “Da decidere” anche per turno sotto il 75% dei colleghi sulla stessa creator e sotto soglia il mese prima o in calo di almeno 5 punti. {data.ignored_count ? `${data.ignored_count} operatori esclusi per sempre non compaiono. ` : ""}I sostituti suggeriti sono chi rende meglio sulle stesse creator (numero = compatibilità).
+          Contesto: quanto rende per turno rispetto ai colleghi sulla stessa creator (lui escluso) e quanto è “fredda” la creator (profilo dal warehouse, <Link href="/admin/creator-difficulty" style={{ color: CP.accentSoftText }}>Difficoltà creator</Link>). Criteri: score CP ≤ soglia con almeno 5 turni nel mese; “Da decidere” anche per turno sotto il 75% dei colleghi sulla stessa creator e sotto soglia il mese prima o in calo di almeno 5 punti. {data.ignored_count ? `${data.ignored_count} operatori esclusi per sempre non compaiono. ` : ""}I sostituti suggeriti sono chi rende meglio sulle stesse creator (numero = compatibilità).
         </div>
         <Modal open={!!hrFor} onClose={() => setHrFor(null)} title={`Pronto per HR · ${hrFor || ""}`} maxWidth={560}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, fontSize: 14 }}>
             <div style={{ color: CP.textSecondary, lineHeight: 1.5 }}>Verso HR si va solo dopo aver parlato con la persona. Quello che scrivi finisce nell&apos;export insieme al contesto (colleghi, creator, turni).</div>
+            {hrVerify && hrVerify > todayIso && (
+              <Notice>C&apos;è una verifica concordata il {fmtDateIt(hrVerify)}: di solito si aspetta quella prima di passare a HR.</Notice>
+            )}
             <label style={{ display: "flex", flexDirection: "column", gap: 4, color: CP.textMuted, fontSize: 12 }}>Colloquio svolto il
               <input type="date" value={hrForm.colloquio_date} onChange={(e) => setHrForm({ ...hrForm, colloquio_date: e.target.value })} style={{ ...ctl, fontSize: 14 }} />
             </label>
@@ -316,10 +367,153 @@ export default function ActionCenterPage() {
             </div>
           </div>
         </Modal>
+        {cvCand && (
+          <ColloquioView key={cvCand.employee} c={cvCand} monthName={monthName} prevName={prevName} prevScore={prevScore.get(cvCand.employee)}
+            threshold={threshold} minShifts={minShifts} evaluation={evaluate(cvCand)}
+            onClose={() => setCvFor(null)} onSave={(ag) => saveAgreement(cvCand.employee, ag)} />
+        )}
       </>)}
     </div>
   );
 }
+
+/**
+ * Vista colloquio (26/09, revisione esperti): UNA sola persona a schermo intero,
+ * da mostrare in presenza — nessun altro nome visibile. Ordine: contesto →
+ * domande per aprire → cosa allenare → il numero (piccolo) → cosa concordiamo.
+ * <dialog> nativo con showModal(): focus trap ed Esc; alla chiusura il focus
+ * torna a chi l'aveva aperta.
+ */
+function ColloquioView({ c, monthName, prevName, prevScore, threshold, minShifts, evaluation, onClose, onSave }) {
+  const ref = useRef(null);
+  const ag0 = c.swap_entry?.agreement || null;
+  const [form, setForm] = useState({ next_step: ag0?.next_step || "", verify_date: ag0?.verify_date || "", operator_words: ag0?.operator_words || "" });
+  const [state, setState] = useState({ saving: false, msg: ag0?.at ? `Salvato il ${new Date(ag0.at).toLocaleDateString("it-IT")}` : "", err: null });
+
+  useEffect(() => {
+    const opener = document.activeElement;
+    const d = ref.current;
+    if (d && !d.open) { try { d.showModal(); } catch { d.setAttribute("open", ""); } }
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    d?.querySelector("#cv-title")?.focus();
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      if (opener && typeof opener.focus === "function") setTimeout(() => opener.focus(), 0);
+    };
+  }, []);
+
+  const creator = c.top_creator || c.context?.creator || null;
+  const vp = c.context?.vs_peers_pct;
+  const band = c.context?.difficulty_band;
+  const few = (c.cp_total_shifts || 0) < minShifts;
+  const bandTxt = band === "fredda" ? "creator fredda: pubblico che spende poco, il numero assoluto sarà basso per chiunque ci lavori"
+    : band === "calda" ? "creator calda: pubblico che spende, il margine è nel metodo"
+    : band === "nella media" ? "creator nella media" : null;
+  const trendTxt = prevScore == null ? "primo mese in classifica, non c'è ancora una tendenza"
+    : prevScore <= threshold ? `sotto soglia anche a ${prevName} (${sc(prevScore)})`
+    : c.score <= prevScore - 5 ? `in calo rispetto a ${prevName} (${sc(prevScore)})`
+    : `a ${prevName} era ${sc(prevScore)}: un mese solo, non ancora una tendenza`;
+  const co = c.coaching;
+  const tooLong = form.next_step.length > 2000 || form.operator_words.length > 2000;
+  const empty = !form.next_step.trim() && !form.verify_date && !form.operator_words.trim();
+  const strong = { color: CP.textPrimary, fontWeight: 500 };
+
+  async function save() {
+    setState({ saving: true, msg: "", err: null });
+    const r = await onSave({ next_step: form.next_step.trim(), verify_date: form.verify_date, operator_words: form.operator_words.trim() });
+    setState(r.ok ? { saving: false, msg: "Salvato", err: null } : { saving: false, msg: "", err: r.error });
+  }
+
+  return (
+    <dialog ref={ref} aria-modal="true" aria-labelledby="cv-title" className="ac-cv"
+      onCancel={(e) => { e.preventDefault(); onClose(); }}
+      style={{ position: "fixed", inset: 0, width: "100vw", maxWidth: "100vw", height: "100dvh", maxHeight: "100dvh", margin: 0, padding: 0, border: 0, background: CP.bg, color: CP.textPrimary, overflowY: "auto", overscrollBehavior: "contain", fontFamily: FONTS.body }}>
+      <div style={{ maxWidth: 1040, margin: "0 auto", padding: "24px 16px 56px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 24, fontSize: 13, color: CP.textMuted }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><User size={14} /> Vista colloquio · {monthName} · solo questa persona</span>
+          <button type="button" onClick={onClose} style={{ ...btn, display: "inline-flex", alignItems: "center", gap: 6 }}><X size={14} /> Chiudi</button>
+        </div>
+        <h2 id="cv-title" tabIndex={-1} style={{ fontFamily: FONTS.display, fontSize: 28, fontWeight: 500, margin: 0, outline: "none" }}>{c.employee}</h2>
+        <p style={{ margin: "4px 0 24px", color: CP.textSecondary, fontSize: 14 }}>{[c.group, `${fmtInt(c.cp_total_shifts)} turni a ${monthName}`].filter(Boolean).join(" · ")}</p>
+
+        <div className="ac-cv-grid">
+          <section style={cvCard}>
+            <h3 style={cvH}>Il contesto</h3>
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: 15, lineHeight: 1.5, color: CP.textSecondary }}>
+              {creator && <li style={cvLi}>Lavora soprattutto su <b style={strong}>{creator}</b>{bandTxt ? ` — ${bandTxt}` : ""}.</li>}
+              <li style={cvLi}>{vp == null ? "Confronto coi colleghi sulla stessa creator non disponibile (pochi turni in comune)." : vp === 0 ? "Per turno rende come i colleghi sulla stessa creator." : <>Per turno rende <b style={strong}>{vp > 0 ? "+" : "−"}{Math.abs(vp)}%</b> rispetto ai colleghi sulla stessa creator.</>}</li>
+              <li style={cvLi}>Campione: <b style={strong}>{fmtInt(c.cp_total_shifts)} turni</b>{few ? ", troppo pochi per decidere." : ", abbastanza per parlarne."}</li>
+              <li style={{ ...cvLi, borderBottom: "none" }}>Tendenza: {trendTxt}.</li>
+            </ul>
+          </section>
+          <section style={cvCard}>
+            <h3 style={cvH}>Domande per aprire</h3>
+            <ol style={{ margin: 0, paddingLeft: 20, fontSize: 15, lineHeight: 1.55, color: CP.textPrimary, display: "flex", flexDirection: "column", gap: 10 }}>
+              <li>Com&apos;è andato il mese{creator ? ` su ${creator}` : ""}, dal tuo punto di vista?</li>
+              <li>Qual è stato il turno migliore? Cosa è andato diversamente?</li>
+              <li>In quale momento dei turni hai trovato più difficoltà?</li>
+            </ol>
+          </section>
+          {co && (
+            <section style={{ ...cvCard, gridColumn: "1 / -1" }}>
+              <h3 style={cvH}>Cosa allenare</h3>
+              <div style={{ fontSize: 15, ...strong }}>{co.label}{co.display ? `: ${co.display}` : ""}</div>
+              {co.advice && <div style={{ fontSize: 14, color: CP.textSecondary, marginTop: 4, lineHeight: 1.5 }}>{co.advice}</div>}
+              {co.scenarios?.length > 0 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
+                  <span style={{ fontSize: 12, color: CP.textMuted, alignSelf: "center" }}>Scenari consigliati:</span>
+                  {co.scenarios.map((t) => <span key={t} style={{ fontSize: 12, padding: "3px 8px", borderRadius: 6, border: `1px solid ${CP.border}`, color: CP.textSecondary }}>{t}</span>)}
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 10 }}>
+                Dal profilo comportamentale sui turni in cui lavora da solo{co.window_days ? `, ultimi ${co.window_days} giorni` : ""}: finestra diversa dal mese dello score.
+              </div>
+            </section>
+          )}
+          <section style={{ ...cvCard, gridColumn: "1 / -1" }}>
+            <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 6 }}>Il numero del mese</div>
+            {few ? (
+              <div style={{ fontSize: 14, color: CP.textSecondary }}>Pochi turni: aspetta fine mese.</div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 24, ...strong }}>{sc(c.score)}</span>
+                <span style={{ fontSize: 13, padding: "2px 8px", borderRadius: 6, border: `1px solid ${CP.border}`, color: CP.textSecondary }}>{tierLabel(c.tier)}</span>
+                {prevScore != null && <span style={{ fontSize: 13, color: CP.textMuted }}>{prevName}: {sc(prevScore)}</span>}
+              </div>
+            )}
+          </section>
+          <section style={{ ...cvCard, gridColumn: "1 / -1" }}>
+            <h3 style={cvH}>Cosa concordiamo <small style={{ fontSize: 12, color: CP.textMuted, fontWeight: 400 }}>lo scrivete insieme, resta nel caso di questo mese</small></h3>
+            <div className="ac-cv-fields">
+              <label style={cvLbl}>Prossimo passo
+                <input value={form.next_step} maxLength={2000} onChange={(e) => setForm({ ...form, next_step: e.target.value })} placeholder="Es. tre sessioni sullo sblocco PPV entro venerdì" style={{ ...ctl, fontSize: 14 }} />
+              </label>
+              <label style={cvLbl}>Data di verifica
+                <input type="date" value={form.verify_date} onChange={(e) => setForm({ ...form, verify_date: e.target.value })} style={{ ...ctl, fontSize: 14 }} />
+              </label>
+              <label style={cvLbl}>Cosa ha detto l&apos;operatore
+                <input value={form.operator_words} maxLength={2000} onChange={(e) => setForm({ ...form, operator_words: e.target.value })} placeholder="Con le sue parole" style={{ ...ctl, fontSize: 14 }} />
+              </label>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+              {state.err && <span role="alert" style={{ fontSize: 13, color: CP.textPrimary }}>{state.err}</span>}
+              {state.msg && <span role="status" style={{ fontSize: 13, color: CP.textMuted }}>{state.msg}</span>}
+              <button type="button" onClick={save} disabled={state.saving || empty || tooLong}
+                style={{ ...btn, background: CP.accent, color: CP.accentInk, borderColor: "transparent", opacity: state.saving || empty || tooLong ? 0.6 : 1, cursor: state.saving || empty || tooLong ? "not-allowed" : "pointer" }}>
+                {state.saving ? "Salvataggio…" : "Salva l'accordo"}
+              </button>
+            </div>
+          </section>
+        </div>
+        {!evaluation.decide && evaluation.missing.length > 0 && (
+          <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 16 }}>Da osservare, non da decidere: {evaluation.missing.join("; ")}.</div>
+        )}
+      </div>
+    </dialog>
+  );
+}
+
 
 /**
  * SwapPicker — UI per scegliere un sostituto.
@@ -418,4 +612,9 @@ const ctl = { padding: "8px 12px", borderRadius: 8, border: `1px solid ${CP.bord
 const thS = { position: "sticky", top: 0, padding: "10px 12px", fontSize: 12, fontWeight: 500, color: CP.textMuted, background: CP.surface, borderBottom: `1px solid ${CP.border}`, whiteSpace: "nowrap" };
 const tdS = { padding: "10px 12px", verticalAlign: "top" };
 const btn = { padding: "6px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body };
+const fmtDateIt = (iso) => { if (!iso) return ""; const [y, m, d] = iso.split("-").map(Number); return `${d} ${MONTHS_IT[m - 1]} ${y}`; };
+const cvCard = { ...card, padding: 20 };
+const cvH = { fontFamily: FONTS.display, fontSize: 17, fontWeight: 500, color: CP.textPrimary, margin: "0 0 12px" };
+const cvLi = { padding: "8px 0", borderBottom: `1px solid ${CP.borderSoft}` };
+const cvLbl = { display: "flex", flexDirection: "column", gap: 4, color: CP.textMuted, fontSize: 12 };
 const linkBtn = { background: "none", border: "none", padding: 0, color: CP.accentSoftText, fontSize: 12, cursor: "pointer", fontFamily: FONTS.body };
