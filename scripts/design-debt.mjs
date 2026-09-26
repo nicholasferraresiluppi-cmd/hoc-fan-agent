@@ -33,8 +33,10 @@ function walk(dir, out = []) {
 }
 
 const count = (s, re) => (s.match(re) || []).length;
+// Pagine che fanno solo redirect: nessuna UI da portare sul design system
+const isRedirect = (f) => { const s = fs.readFileSync(f, "utf8"); return /\bredirect\(/.test(s) && !/<[A-Za-z]/.test(s); };
 const rows = walk(APP)
-  .filter((f) => !SKIP.some((re) => re.test(f)))
+  .filter((f) => !SKIP.some((re) => re.test(f)) && !isRedirect(f))
   .map((f) => {
     const s = fs.readFileSync(f, "utf8");
     const route = "/" + path.relative(APP, path.dirname(f)).split(path.sep).join("/");

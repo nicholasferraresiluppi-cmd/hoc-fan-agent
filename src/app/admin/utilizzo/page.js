@@ -4,24 +4,30 @@
 // Schema dei prodotti di analytics (PostHog/Amplitude): prima le cose da
 // sapere (insight che portano a una decisione), poi utenti attivi e abitudine,
 // poi pagine per UTENTI UNICI (non per visite) e persone. Solo admin.
+//
+// Ridisegno 26/09/2026 (design system): numero principale = persone attive su
+// quelle invitate; segnalazioni e "cose da sapere" come elenco con la gravità;
+// tabelle ordinabili con intestazione ferma (erano lunghe decine di righe);
+// la colonna "rispetto al periodo prima" compare solo quando esiste un periodo
+// prima (con dati parziali diceva "nessun dato" su ogni riga); voci mai aperte
+// chiuse in fondo. Dati e calcoli (usage-core) invariati.
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CP } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
+import { CP, FONTS } from "@/lib/brand";
 import { NAV_ITEMS } from "@/components/Sidebar";
 import { buildUsageReport, buildUxReport } from "@/lib/usage-core";
+import { PageHead, HeroMetric, Metric, SectionTitle, Notice, DataTable, FilterChip, Disclosure, ActionRow, NUM, card } from "@/components/ds";
+import { fmtInt } from "@/lib/format";
 
-const card = { border: `1px solid ${CP.border}`, borderRadius: 12, background: CP.surface };
-const th = { textAlign: "left", fontSize: 12, fontWeight: 500, color: CP.textMuted, padding: "10px 14px", borderBottom: `1px solid ${CP.border}` };
-const td = { fontSize: 13, color: CP.textSecondary, padding: "10px 14px", borderBottom: `1px solid ${CP.borderSoft}`, verticalAlign: "top" };
 const fmtDay = (d) => (d ? new Date(d + "T12:00:00Z").toLocaleDateString("it-IT", { day: "numeric", month: "short" }) : "—");
-const KIND = { warn: CP.accentRed, good: CP.accentGreen, info: CP.accentSoftText };
+const SEV = { warn: "critical", good: "info", info: "info" };
 
 export default function UsagePage() {
   const [raw, setRaw] = useState(null);
   const [err, setErr] = useState(null);
   const [win, setWin] = useState(30);
+  const [neverOpen, setNeverOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/usage")
@@ -37,180 +43,170 @@ export default function UsagePage() {
   const [uxPage, setUxPage] = useState(null);
   const sel = ux?.pages.find((p) => p.page === uxPage) || ux?.pages[0] || null;
 
+  const neverIn = r ? r.people.filter((p) => !p.last_day && !p.last_sign_in_at).length : 0;
+
+  const pageCols = r ? [
+    {
+      key: "page", label: "Pagina", sort: (p) => (p.label || p.page).toLowerCase(),
+      render: (p) => <div><div style={{ color: CP.textPrimary }}>{p.label || p.page}</div>{p.label && <div style={{ fontSize: 12, color: CP.textMuted }}>{p.group} · {p.page}</div>}</div>,
+    },
+    { key: "users", label: "Persone", align: "right" },
+    { key: "views", label: "Aperture", align: "right" },
+    ...(r.partial ? [] : [{
+      key: "diff", label: `Rispetto ai ${win} giorni prima`, align: "right", sort: (p) => p.users - p.prev_users,
+      render: (p) => { const diff = p.users - p.prev_users; return <span style={{ color: diff > 0 ? CP.accentGreen : diff < 0 ? CP.accentRed : CP.textMuted }}>{diff > 0 ? `+${diff} persone` : diff < 0 ? `−${Math.abs(diff)} persone` : "uguale"}</span>; },
+    }]),
+    { key: "last_day", label: "Ultimo uso", muted: true, sort: (p) => p.last_day || "", render: (p) => fmtDay(p.last_day) },
+  ] : [];
+
+  const peopleCols = [
+    { key: "name", label: "Persona", sort: (p) => (p.name || "").toLowerCase(), render: (p) => <div><div style={{ color: CP.textPrimary }}>{p.name}</div><div style={{ fontSize: 12, color: CP.textMuted }}>{p.email || ""}</div></div> },
+    { key: "active_days", label: "Giorni di uso", align: "right" },
+    { key: "views", label: "Aperture", align: "right" },
+    {
+      key: "last_day", label: "Ultima visita", sort: (p) => p.last_day || (p.last_sign_in_at ? "0" : ""),
+      render: (p) => (p.last_day ? fmtDay(p.last_day) : p.last_sign_in_at ? <span style={{ color: CP.textMuted }}>prima del tracciamento</span> : <span style={{ color: CP.accentRed }}>mai entrato</span>),
+    },
+    { key: "top", label: "Pagine più usate", sortable: false, muted: true, render: (p) => <span style={{ fontSize: 13 }}>{p.top_pages.join(", ") || "—"}</span> },
+  ];
+
   return (
-    <div style={{ background: CP.bg, minHeight: "100vh", color: CP.textPrimary, padding: "32px 28px 64px", maxWidth: 1200, margin: "0 auto" }}>
-      <PageHeader
-        breadcrumb={<div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}><Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link><span style={{ color: CP.textMuted }}>›</span><span style={{ color: CP.textPrimary }}>Utilizzo</span></div>}
-        section="Insights"
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Insights" }, { label: "Utilizzo" }]}
         title="Utilizzo dell'app"
-        subtitle="Chi usa HOC Pro, quali pagine servono davvero e quali nessuno apre. Si registra solo persona, pagina e giorno: nessun contenuto."
-        toolbar={
-          <div style={{ display: "flex", gap: 6 }}>
-            {[7, 30].map((n) => (
-              <button key={n} onClick={() => setWin(n)} style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: `1px solid ${win === n ? CP.accent : CP.border}`, background: win === n ? CP.accentSoft : "transparent", color: win === n ? CP.accentSoftText : CP.textSecondary }}>
-                Ultimi {n} giorni
-              </button>
-            ))}
-          </div>
-        }
+        subtitle="Chi usa HOC Pro, quali pagine servono davvero e quali nessuno apre: da qui decidi cosa migliorare, cosa spiegare e cosa togliere dal menu. Si registrano solo persona, pagina e giorno, mai i contenuti."
+        actions={<div style={{ display: "flex", gap: 6 }}>
+          {[7, 30].map((n) => <FilterChip key={n} label={`Ultimi ${n} giorni`} active={win === n} onClick={() => setWin(n)} />)}
+        </div>}
       />
 
-      {err && <div style={{ ...card, padding: 16, color: CP.accentRed, fontSize: 14 }}>{err}</div>}
-      {!r && !err && <p style={{ color: CP.textMuted }}>Caricamento…</p>}
+      {err && <Notice danger>{err}</Notice>}
+      {!r && !err && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
 
       {r && (
         <>
+          <HeroMetric
+            label="Persone attive negli ultimi 7 giorni"
+            value={`${fmtInt(r.kpi.active_7d)} su ${fmtInt(r.kpi.members)}`}
+            compare={`In ${win} giorni: ${r.kpi.active_30d} su ${r.kpi.members}`}
+            hint={r.partial ? `Dati dal ${fmtDay(r.since)} (${r.tracked_days} ${r.tracked_days === 1 ? "giorno" : "giorni"}): numeri parziali.` : "Su tutte le persone che hanno accesso."}
+          >
+            <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <Metric label="Giorni di uso a testa" value={r.tracked_days < 7 ? "—" : String(r.kpi.avg_active_days)} note={r.tracked_days < 7 ? "serve una settimana di dati" : `media su ${win} giorni`} />
+              <Metric label="Pagine aperte" value={fmtInt(r.kpi.views_30d)} note={`in ${win} giorni`} />
+              <Metric label="Mai entrati" value={fmtInt(neverIn)} note="invitati che non hanno mai aperto l'app" />
+            </div>
+          </HeroMetric>
+
           <FeedbackInbox />
 
           {/* Cose da sapere */}
-          <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginBottom: 24 }}>
-            {r.insights.map((i, k) => (
-              <div key={k} style={{ ...card, padding: "14px 16px", borderLeft: `3px solid ${KIND[i.kind] || CP.border}` }}>
-                <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 6 }}>{i.title}</div>
-                <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.55 }}>{i.text}</div>
+          {r.insights.length > 0 && (
+            <section style={{ marginBottom: 24 }}>
+              <SectionTitle>Cose da sapere</SectionTitle>
+              <div style={{ ...card, borderTop: "none", overflow: "hidden" }}>
+                {r.insights.map((i, k) => (
+                  <div key={k}>
+                    <ActionRow severity={SEV[i.kind] || "info"} title={i.title} detail={i.text} />
+                  </div>
+                ))}
               </div>
-            ))}
-          </section>
-
-          {/* KPI */}
-          <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 24 }}>
-            <Kpi label="Attivi negli ultimi 7 giorni" value={`${r.kpi.active_7d} / ${r.kpi.members}`} sub="persone con almeno una visita" />
-            <Kpi label={`Attivi in ${win} giorni`} value={`${r.kpi.active_30d} / ${r.kpi.members}`} sub={r.partial ? `dati dal ${fmtDay(r.since)}` : "sui membri totali"} />
-            <Kpi label="Giorni di uso a testa" value={r.tracked_days < 7 ? "—" : String(r.kpi.avg_active_days)} sub={r.tracked_days < 7 ? "serve almeno una settimana di dati" : `media su ${win} giorni: misura l'abitudine`} />
-            <Kpi label="Pagine aperte" value={String(r.kpi.views_30d)} sub={`in ${win} giorni`} />
-          </section>
+            </section>
+          )}
 
           {/* Attivi al giorno */}
           <section style={{ ...card, padding: "16px 16px 10px", marginBottom: 24 }}>
-            <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 12 }}>Persone attive al giorno</div>
+            <div style={{ fontSize: 14, color: CP.textPrimary, marginBottom: 12 }}>Persone attive al giorno</div>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 90 }}>
-              {r.daily.map((d) => (
-                <div key={d.day} title={`${fmtDay(d.day)}: ${d.users} persone, ${d.views} pagine`} style={{ flex: 1, height: `${(d.users / maxDaily) * 100}%`, minHeight: d.users ? 3 : 1, background: d.users ? CP.accent : CP.border, borderRadius: 2 }} />
+              {r.daily.map((d, i) => (
+                <div key={d.day} title={`${fmtDay(d.day)}: ${d.users} persone, ${d.views} pagine`} style={{ flex: 1, height: `${(d.users / maxDaily) * 100}%`, minHeight: d.users ? 3 : 1, background: !d.users ? CP.border : i === r.daily.length - 1 ? CP.accent : CP.accentDim, borderRadius: 2 }} />
               ))}
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: CP.textMuted, marginTop: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: CP.textMuted, marginTop: 6 }}>
               <span>{fmtDay(r.daily[0]?.day)}</span><span>oggi</span>
             </div>
           </section>
 
           {/* Pagine */}
-          <h2 style={{ fontSize: 15, fontWeight: 500, margin: "0 0 10px" }}>Pagine, per numero di persone che le usano</h2>
-          <div style={{ ...card, overflowX: "auto", marginBottom: 24 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 560 }}>
-              <thead><tr><th style={th}>Pagina</th><th style={th}>Persone</th><th style={th}>Aperture</th><th style={th}>{r.partial ? "Periodo prima" : `Rispetto ai ${win} giorni prima`}</th><th style={th}>Ultimo uso</th></tr></thead>
-              <tbody>
-                {r.pages.length === 0 && <tr><td style={td} colSpan={5}>Nessuna visita nel periodo.</td></tr>}
-                {r.pages.map((p) => {
-                  const diff = p.users - p.prev_users;
-                  return (
-                    <tr key={p.page}>
-                      <td style={td}><div style={{ color: CP.textPrimary }}>{p.label || p.page}</div>{p.label && <div style={{ fontSize: 11, color: CP.textMuted }}>{p.group} · {p.page}</div>}</td>
-                      <td style={td}>{p.users}</td>
-                      <td style={td}>{p.views}</td>
-                      <td style={{ ...td, color: r.partial ? CP.textMuted : diff > 0 ? CP.accentGreen : diff < 0 ? CP.accentRed : CP.textMuted }}>{r.partial ? "nessun dato" : diff > 0 ? `+${diff} persone` : diff < 0 ? `${diff} persone` : "uguale"}</td>
-                      <td style={td}>{fmtDay(p.last_day)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <section style={{ marginBottom: 24 }}>
+            <SectionTitle aside={r.partial ? "il confronto col periodo prima compare quando ci sono abbastanza giorni di dati" : null}>Pagine, per numero di persone che le usano</SectionTitle>
+            <DataTable columns={pageCols} rows={r.pages.map((p) => ({ ...p, id: p.page }))} defaultSort={{ key: "users", dir: -1 }} minWidth={600} maxHeight={480} empty="Nessuna visita nel periodo." />
+          </section>
 
           {/* Esperienza d'uso */}
-          <h2 style={{ fontSize: 15, fontWeight: 500, margin: "0 0 4px" }}>Come si usano le pagine</h2>
-          <p style={{ fontSize: 13, color: CP.textMuted, margin: "0 0 10px" }}>
-            Su cosa si clicca e dove sta nella pagina, dove qualcuno clicca più volte per frustrazione, fin dove si scorre, errori e lentezza. Ultimi 30 giorni, nessun contenuto registrato.
-          </p>
-          {ux && ux.insights.length > 0 && (
-            <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginBottom: 12 }}>
-              {ux.insights.slice(0, 6).map((i, k) => (
-                <div key={k} style={{ ...card, padding: "14px 16px", borderLeft: `3px solid ${KIND[i.kind] || CP.border}` }}>
-                  <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 6 }}>{i.title}</div>
-                  <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.55 }}>{i.text}</div>
-                </div>
-              ))}
-            </section>
-          )}
-          {(!ux || ux.pages.length === 0) ? (
-            <div style={{ ...card, padding: 14, fontSize: 13, color: CP.textMuted, marginBottom: 24 }}>Nessun segnale ancora: arrivano con le prossime visite.</div>
-          ) : (
-            <div style={{ ...card, padding: 14, marginBottom: 24 }}>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
-                <span style={{ fontSize: 13, color: CP.textSecondary }}>Pagina</span>
-                <select value={sel?.page || ""} onChange={(e) => setUxPage(e.target.value)} style={{ padding: "6px 9px", background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 6, color: CP.textPrimary, fontSize: 13, maxWidth: "100%" }}>
-                  {ux.pages.map((p) => <option key={p.page} value={p.page}>{(p.label || p.page) + ` · ${p.total_clicks} clic`}</option>)}
-                </select>
-                {sel && <span style={{ fontSize: 12, color: CP.textMuted }}>
-                  {sel.scroll_avg != null ? `scorrimento medio ${sel.scroll_avg}%` : "scorrimento: pochi dati"} · {sel.load_avg_ms != null ? `apertura ${(sel.load_avg_ms / 1000).toFixed(1)}s` : "tempo di apertura: pochi dati"}
-                </span>}
+          <section style={{ marginBottom: 24 }}>
+            <SectionTitle aside="ultimi 30 giorni, nessun contenuto registrato">Come si usano le pagine</SectionTitle>
+            <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 10px", lineHeight: 1.5 }}>
+              Su cosa si clicca e dove sta nella pagina, dove qualcuno clicca più volte di fila per frustrazione, fin dove si scorre, errori e lentezza. Serve a decidere dove mettere i tasti.
+            </p>
+            {ux && ux.insights.length > 0 && (
+              <div style={{ ...card, borderTop: "none", overflow: "hidden", marginBottom: 12 }}>
+                {ux.insights.slice(0, 6).map((i, k) => (
+                  <div key={k}>
+                    <ActionRow severity={SEV[i.kind] || "info"} title={i.title} detail={i.text} />
+                  </div>
+                ))}
               </div>
-              {sel && (
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead><tr><th style={th}>Elemento</th><th style={th}>Clic</th><th style={th}>Dove sta</th><th style={th}>Visibile all'apertura?</th></tr></thead>
-                  <tbody>
-                    {sel.clicks.slice(0, 12).map((c) => (
-                      <tr key={c.label}>
-                        <td style={td}>{c.label}</td>
-                        <td style={td}>{c.count}</td>
-                        <td style={td}>{c.zone}</td>
-                        <td style={{ ...td, color: c.below_share >= 0.6 ? CP.accentRed : CP.textSecondary }}>{c.below_share >= 0.6 ? "no, bisogna scorrere" : c.below_share > 0 ? "a volte" : "sì"}</td>
-                      </tr>
-                    ))}
-                    {sel.clicks.length === 0 && <tr><td style={td} colSpan={4}>Nessun clic registrato su questa pagina.</td></tr>}
-                  </tbody>
-                </table>
-              )}
-              {sel?.rage.length > 0 && <div style={{ fontSize: 12, color: CP.accentRed, marginTop: 10 }}>Clic di frustrazione: {sel.rage.map((g) => `${g.label} (${g.count})`).join(", ")}</div>}
-              {sel?.errors.length > 0 && <div style={{ fontSize: 12, color: CP.accentRed, marginTop: 6 }}>Errori: {sel.errors.map((g) => `${g.label} (${g.count})`).join(", ")}</div>}
-            </div>
-          )}
+            )}
+            {(!ux || ux.pages.length === 0) ? (
+              <div style={{ ...card, padding: 14, fontSize: 13, color: CP.textMuted }}>Nessun segnale ancora: arrivano con le prossime visite.</div>
+            ) : (
+              <div style={{ ...card, padding: 14 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+                  <span style={{ fontSize: 13, color: CP.textSecondary }}>Pagina</span>
+                  <select value={sel?.page || ""} onChange={(e) => setUxPage(e.target.value)} aria-label="Pagina da analizzare" style={{ padding: "6px 9px", background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, maxWidth: "100%" }}>
+                    {ux.pages.map((p) => <option key={p.page} value={p.page}>{(p.label || p.page) + ` · ${p.total_clicks} clic`}</option>)}
+                  </select>
+                  {sel && <span style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>
+                    {sel.scroll_avg != null ? `scorrimento medio ${sel.scroll_avg}%` : "scorrimento: pochi dati"} · {sel.load_avg_ms != null ? `apertura ${(sel.load_avg_ms / 1000).toLocaleString("it-IT", { maximumFractionDigits: 1 })} s` : "tempo di apertura: pochi dati"}
+                  </span>}
+                </div>
+                {sel && (
+                  <DataTable
+                    columns={[
+                      { key: "label", label: "Elemento", sort: (c) => String(c.label).toLowerCase() },
+                      { key: "count", label: "Clic", align: "right" },
+                      { key: "zone", label: "Dove sta", muted: true },
+                      { key: "below", label: "Visibile all'apertura?", sort: (c) => c.below_share, render: (c) => <span style={{ color: c.below_share >= 0.6 ? CP.accentRed : CP.textSecondary }}>{c.below_share >= 0.6 ? "no, bisogna scorrere" : c.below_share > 0 ? "a volte" : "sì"}</span> },
+                    ]}
+                    rows={sel.clicks.slice(0, 12).map((c) => ({ ...c, id: c.label }))}
+                    defaultSort={{ key: "count", dir: -1 }}
+                    minWidth={520}
+                    empty="Nessun clic registrato su questa pagina."
+                  />
+                )}
+                {sel?.rage.length > 0 && <div style={{ fontSize: 13, color: CP.accentRed, marginTop: 10 }}>Clic ripetuti per frustrazione: {sel.rage.map((g) => `${g.label} (${g.count})`).join(", ")}</div>}
+                {sel?.errors.length > 0 && <div style={{ fontSize: 13, color: CP.accentRed, marginTop: 6 }}>Errori: {sel.errors.map((g) => `${g.label} (${g.count})`).join(", ")}</div>}
+              </div>
+            )}
+          </section>
 
           {/* Persone */}
-          <h2 style={{ fontSize: 15, fontWeight: 500, margin: "0 0 10px" }}>Persone</h2>
-          <div style={{ ...card, overflowX: "auto", marginBottom: 24 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 620 }}>
-              <thead><tr><th style={th}>Persona</th><th style={th}>Giorni di uso</th><th style={th}>Aperture</th><th style={th}>Ultima visita</th><th style={th}>Pagine più usate</th></tr></thead>
-              <tbody>
-                {r.people.map((p) => (
-                  <tr key={p.userId}>
-                    <td style={td}><div style={{ color: CP.textPrimary }}>{p.name}</div><div style={{ fontSize: 11, color: CP.textMuted }}>{p.email || ""}</div></td>
-                    <td style={td}>{p.active_days}</td>
-                    <td style={td}>{p.views}</td>
-                    <td style={td}>{p.last_day ? fmtDay(p.last_day) : p.last_sign_in_at ? "prima del tracciamento" : <span style={{ color: CP.accentRed }}>mai entrato</span>}</td>
-                    <td style={td}>{p.top_pages.join(", ") || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <section style={{ marginBottom: 24 }}>
+            <SectionTitle aside={`${r.people.length} persone con accesso`}>Persone</SectionTitle>
+            <DataTable columns={peopleCols} rows={r.people.map((p) => ({ ...p, id: p.userId }))} defaultSort={{ key: "active_days", dir: -1 }} minWidth={680} maxHeight={480} empty="Nessuna persona." />
+          </section>
 
           {/* Mai aperte */}
-          <h2 style={{ fontSize: 15, fontWeight: 500, margin: "0 0 4px" }}>Voci di menu mai aperte · {r.never_opened.length}</h2>
-          <p style={{ fontSize: 13, color: CP.textMuted, margin: "0 0 10px" }}>
-            {r.tracked_days < 7
-              ? `Dati da ${r.tracked_days} ${r.tracked_days === 1 ? "giorno" : "giorni"}: per ora l'elenco dice solo cosa non è ancora stato aperto, non cosa è inutile.`
-              : "Candidate a finire in modalità Advanced o a essere tolte: meno voci, app più leggibile."}
-          </p>
-          <div style={{ ...card, padding: 14, display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {r.never_opened.length === 0 && <span style={{ fontSize: 13, color: CP.textMuted }}>Tutte le voci sono state aperte almeno una volta.</span>}
-            {r.never_opened.map((n) => (
-              <Link key={n.href} href={n.href} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, border: `1px solid ${CP.border}`, color: CP.textSecondary, textDecoration: "none" }}>
-                {n.label} <span style={{ color: CP.textMuted }}>· {n.group}</span>
-              </Link>
-            ))}
-          </div>
+          <Disclosure open={neverOpen} onToggle={() => setNeverOpen((v) => !v)} title={`Voci di menu mai aperte · ${r.never_opened.length}`}
+            summary={r.tracked_days < 7 ? "troppo presto per dire che non servono" : "candidate alla modalità Advanced o a essere tolte"}>
+            <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 10px", lineHeight: 1.5 }}>
+              {r.tracked_days < 7
+                ? `Dati da ${r.tracked_days} ${r.tracked_days === 1 ? "giorno" : "giorni"}: per ora l'elenco dice solo cosa non è ancora stato aperto, non cosa è inutile.`
+                : "Candidate a finire in modalità Advanced o a essere tolte: meno voci, app più leggibile."}
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {r.never_opened.length === 0 && <span style={{ fontSize: 13, color: CP.textMuted }}>Tutte le voci sono state aperte almeno una volta.</span>}
+              {r.never_opened.map((n) => (
+                <Link key={n.href} href={n.href} style={{ fontSize: 13, padding: "4px 10px", borderRadius: 999, border: `1px solid ${CP.border}`, color: CP.textSecondary, textDecoration: "none" }}>
+                  {n.label} <span style={{ color: CP.textMuted }}>· {n.group}</span>
+                </Link>
+              ))}
+            </div>
+          </Disclosure>
         </>
       )}
-    </div>
-  );
-}
-
-function Kpi({ label, value, sub }) {
-  return (
-    <div style={{ ...card, padding: "14px 16px" }}>
-      <div style={{ fontSize: 12, color: CP.textMuted }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 500, margin: "4px 0 2px" }}>{value}</div>
-      <div style={{ fontSize: 11, color: CP.textMuted }}>{sub}</div>
     </div>
   );
 }
@@ -231,11 +227,11 @@ function FeedbackInbox() {
   const shown = showDone ? items : open;
   return (
     <section style={{ marginBottom: 24 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-        <h2 style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>Segnalazioni ricevute · {open.length} aperte</h2>
-        <button onClick={() => setShowDone((v) => !v)} style={{ background: "transparent", border: "none", color: CP.accentSoftText, fontSize: 12, cursor: "pointer" }}>{showDone ? "Nascondi fatte" : "Mostra anche fatte"}</button>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+        <SectionTitle aside="la voce diretta di chi usa l'app">Segnalazioni ricevute · {open.length} aperte</SectionTitle>
+        <button onClick={() => setShowDone((v) => !v)} style={{ background: "transparent", border: "none", color: CP.accentSoftText, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body, padding: 0, marginBottom: 10 }}>{showDone ? "Nascondi quelle fatte" : "Mostra anche quelle fatte"}</button>
       </div>
-      <div style={{ ...card }}>
+      <div style={card}>
         {shown.length === 0 && <div style={{ padding: 14, fontSize: 13, color: CP.textMuted }}>Nessuna segnalazione {showDone ? "" : "aperta"}. Arrivano dal tasto «Segnala o suggerisci» in basso a destra di ogni pagina.</div>}
         {shown.map((i, k) => (
           <div key={i.id} style={{ padding: "12px 14px", borderTop: k ? `1px solid ${CP.borderSoft}` : "none" }}>
@@ -245,7 +241,7 @@ function FeedbackInbox() {
             <div style={{ fontSize: 14, color: CP.textPrimary, whiteSpace: "pre-wrap", marginBottom: 8 }}>{i.text}</div>
             <div style={{ display: "flex", gap: 6 }}>
               {STATUS.map(([st, l]) => (
-                <button key={st} onClick={() => setStatus(i.id, st)} style={{ padding: "3px 9px", borderRadius: 999, fontSize: 11, cursor: "pointer", border: `1px solid ${i.status === st ? CP.accent : CP.border}`, background: i.status === st ? CP.accentSoft : "transparent", color: i.status === st ? CP.accentSoftText : CP.textMuted }}>{l}</button>
+                <button key={st} onClick={() => setStatus(i.id, st)} aria-pressed={i.status === st} style={{ padding: "3px 10px", borderRadius: 999, fontSize: 12, cursor: "pointer", fontFamily: FONTS.body, border: `1px solid ${i.status === st ? CP.accent : CP.border}`, background: i.status === st ? CP.accentSoft : "transparent", color: i.status === st ? CP.accentSoftText : CP.textMuted }}>{l}</button>
               ))}
             </div>
           </div>

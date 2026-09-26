@@ -8,15 +8,18 @@
  * come SEGNALE per la scorecard HR — non è un gate automatico: la decisione
  * resta umana e va registrata (bridge V2: aggancio all'employee una volta
  * assunto → un domani si valida se lo score predice la resa reale).
+ *
+ * Redesign 26/09/2026 sul design system: stato vuoto che spiega il giro in 4
+ * passi; riepilogo con ciò che chiede un'azione (esiti da registrare, regole
+ * violate); tabella ordinabile (la griglia a 6 colonne si rompeva a 390px); il
+ * report si apre sotto la tabella per il candidato scelto. API invariate.
  */
 import { useState } from "react";
 import useSWR from "swr";
-import {
-  UserCheck, Plus, X, Copy, Check, Clock, CheckCircle2, XCircle,
-  ChevronDown, ChevronRight, ShieldAlert,
-} from "lucide-react";
+import { Plus, X, Copy, Check } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { SectionLabel } from "@/components/cp-style";
+import { fmtInt } from "@/lib/format";
+import { PageHead, Metric, Notice, DataTable, SectionTitle, card } from "@/components/ds";
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -35,16 +38,15 @@ function fmtDate(ts) {
 }
 
 const STATUS_META = {
-  invited: { label: "Invitato", color: CP.textMuted, Icon: Clock },
-  in_progress: { label: "In corso", color: CP.accentSoftText, Icon: Clock },
-  completed: { label: "Completato", color: CP.accentGreen, Icon: CheckCircle2 },
-  expired: { label: "Scaduto", color: CP.accentRed, Icon: XCircle },
+  invited: { label: "Link inviato", order: 1 },
+  in_progress: { label: "In corso", order: 2 },
+  completed: { label: "Completato", order: 3 },
+  expired: { label: "Scaduto", order: 0 },
 };
 
-const input = {
-  width: "100%", padding: "8px 10px", background: CP.surface, border: `1px solid ${CP.border}`,
-  borderRadius: 8, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none",
-};
+function outcomeLabel(d) {
+  return d === "hired" ? "Assunto" : d === "rejected" ? "Scartato" : d === "pending" ? "In valutazione" : null;
+}
 
 export default function CandidateAssessmentsPage() {
   const { data, error, isLoading, mutate } = useSWR("/api/admin/candidate-assessments", fetcher, { revalidateOnFocus: false });
@@ -84,156 +86,154 @@ export default function CandidateAssessmentsPage() {
     }
   };
 
-  if (error) {
-    return (
-      <div style={{ padding: 32, maxWidth: 900, margin: "0 auto" }}>
-        <SectionLabel>People</SectionLabel>
-        <h1 style={h1}>Assessment candidati</h1>
-        <div style={errBox}>
-          {error.status === 403
-            ? "Accesso riservato agli admin (capability SEED)."
-            : `Errore: ${error.message}`}
-        </div>
-      </div>
-    );
-  }
+  const running = items.filter((it) => it.status === "invited" || it.status === "in_progress").length;
+  const done = items.filter((it) => it.status === "completed");
+  const toDecide = done.filter((it) => !it.outcome?.decision || it.outcome.decision === "pending").length;
+  const violations = done.filter((it) => it.aggregate && !it.aggregate.compliance_pass).length;
+  const sel = items.find((it) => it.token === expanded) || null;
+
+  const columns = [
+    { key: "label", label: "Candidato", render: (it) => <span style={{ fontWeight: 500 }}>{it.label}</span> },
+    { key: "status", label: "Stato", sort: (it) => (STATUS_META[it.status] || STATUS_META.invited).order, render: (it) => <span style={{ color: it.status === "expired" ? CP.textMuted : CP.textPrimary }}>{(STATUS_META[it.status] || STATUS_META.invited).label}</span> },
+    { key: "progress", label: "Situazioni fatte", align: "right", sort: (it) => it.progress?.index ?? 0, render: (it) => `${it.progress?.index ?? 0} di ${it.progress?.total ?? "—"}` },
+    {
+      key: "score", label: "Punteggio medio", align: "right", sort: (it) => it.aggregate?.overall_avg ?? null,
+      render: (it) => !it.aggregate ? <span style={{ color: CP.textMuted }}>—</span> : (
+        <span>
+          {it.aggregate.overall_avg}/100
+          {!it.aggregate.compliance_pass && <div style={{ fontSize: 12, color: CP.accentRed }}>regole violate</div>}
+        </span>
+      ),
+    },
+    {
+      key: "outcome", label: "Esito", sort: (it) => outcomeLabel(it.outcome?.decision) || "",
+      render: (it) => outcomeLabel(it.outcome?.decision) || <span style={{ color: CP.textMuted }}>{it.status === "completed" ? "da registrare" : "—"}</span>,
+    },
+    { key: "createdAt", label: "Creato", align: "right", render: (it) => <span style={{ color: CP.textSecondary }}>{fmtDate(it.createdAt)}</span> },
+  ];
 
   return (
-    <div style={{ padding: "32px 32px 64px", maxWidth: 1100, margin: "0 auto" }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
-        <div>
-          <SectionLabel>People</SectionLabel>
-          <h1 style={{ ...h1, display: "flex", alignItems: "center", gap: 12 }}>
-            <UserCheck size={26} color={CP.accent} aria-hidden="true" />
-            Assessment candidati
-          </h1>
-          <p style={{ color: CP.textSecondary, fontSize: 13, margin: 0, lineHeight: 1.55, maxWidth: 720 }}>
-            Il simulatore Academy come test pre-assunzione. Crei un link monouso, lo mandi al candidato,
-            e leggi qui il report. È un <strong style={{ color: CP.textPrimary }}>segnale</strong> per la scorecard HR —
-            la decisione di assunzione resta umana. Registrando l&apos;esito (e chi viene assunto) costruisci
-            i dati che un domani diranno se lo score predice davvero la resa sul campo.
-          </p>
-        </div>
-        <button onClick={() => { setFormOpen(!formOpen); setCreated(null); }} style={{ ...btnPrimary, background: formOpen ? CP.surfaceAlt : CP.accent, color: formOpen ? CP.textSecondary : CP.accentInk, border: formOpen ? `1px solid ${CP.border}` : "1px solid transparent" }}>
-          {formOpen ? <X size={15} /> : <Plus size={15} />}
-          {formOpen ? "Chiudi" : "Nuovo link"}
-        </button>
-      </div>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "People" }, { label: "Assessment candidati" }]}
+        title="Assessment candidati"
+        subtitle="Una prova di chat simulata per chi si candida come operatore. Crei un link, lo mandi, e qui leggi com’è andata. Il risultato è un elemento in più per chi decide, non una decisione: l’esito lo scegli tu e lo registri qui."
+        actions={!error && (
+          <button onClick={() => { setFormOpen(!formOpen); setCreated(null); }} style={formOpen ? btnGhost : btnPrimary}>
+            {formOpen ? <X size={15} /> : <Plus size={15} />}
+            {formOpen ? "Chiudi" : "Nuovo link"}
+          </button>
+        )}
+      />
 
-      {/* Create form */}
-      {formOpen && (
-        <div style={panel}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1.4fr auto", gap: 12, alignItems: "end" }}>
+      {error && (
+        <Notice danger={error.status !== 403}>
+          {error.status === 403 ? "Pagina riservata agli admin." : `Non riesco a caricare gli assessment: ${error.message}`}
+        </Notice>
+      )}
+
+      {!error && formOpen && (
+        <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+          <SectionTitle>Nuovo link per un candidato</SectionTitle>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 12, alignItems: "end" }}>
             <label style={{ minWidth: 0 }}>
-              <span style={lbl}>Nome candidato (resta interno)</span>
+              <span style={lbl}>Nome del candidato (lo vedete solo voi)</span>
               <input style={input} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Es. Marco Rossi" />
             </label>
             <label style={{ minWidth: 0 }}>
-              <span style={lbl}>Suite</span>
+              <span style={lbl}>Prova</span>
               <select style={input} value={effectiveSuite} onChange={(e) => setSuiteId(e.target.value)}>
                 {suites.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} · {s.scenarioCount} scenari · ~{s.estMinutes}′</option>
+                  <option key={s.id} value={s.id}>{s.name} · {s.scenarioCount} situazioni · circa {s.estMinutes} min</option>
                 ))}
               </select>
             </label>
-            <button onClick={create} disabled={creating || !label.trim()} style={{ ...btnPrimary, opacity: creating || !label.trim() ? 0.5 : 1 }}>
-              {creating ? "Creo…" : "Genera link"}
-            </button>
+            <div>
+              <button onClick={create} disabled={creating || !label.trim()} style={{ ...btnPrimary, opacity: creating || !label.trim() ? 0.5 : 1 }}>
+                {creating ? "Creo…" : "Crea il link"}
+              </button>
+            </div>
           </div>
-          {feedback && <div style={{ color: CP.accentRed, fontSize: 12.5, marginTop: 10 }}>{feedback}</div>}
+          {feedback && <div style={{ color: CP.accentRed, fontSize: 13, marginTop: 10 }}>{feedback}</div>}
           {created && <CreatedLink created={created} />}
-          <p style={{ color: CP.textMuted, fontSize: 12, marginTop: 12, lineHeight: 1.5 }}>
-            Il link vale 14 giorni ed è monouso. Il candidato vede un&apos;informativa (uso dell&apos;AI, finalità,
-            revisione umana) prima di iniziare — obbligo di trasparenza già attivo in Italia.
+          <p style={{ color: CP.textMuted, fontSize: 13, margin: "12px 0 0", lineHeight: 1.5 }}>
+            Il link vale 14 giorni e si usa una volta sola. Prima di iniziare il candidato legge come usiamo l’AI e le sue risposte e deve dare il consenso: è un obbligo di trasparenza già in vigore in Italia.
           </p>
-        </div>
+        </section>
       )}
 
-      {/* List */}
-      {isLoading ? (
-        <div style={{ color: CP.textMuted, padding: 24 }}>Caricamento…</div>
-      ) : items.length === 0 ? (
-        <div style={{ ...panel, color: CP.textSecondary, textAlign: "center" }}>
-          Nessun assessment ancora. Crea il primo link col pulsante &ldquo;Nuovo link&rdquo;.
-        </div>
-      ) : (
-        <div style={{ border: `1px solid ${CP.border}`, borderRadius: 12, overflow: "hidden" }}>
-          <div style={{ ...rowGrid, background: CP.bgSunken, color: CP.textMuted, fontSize: 11.5, letterSpacing: 0.4, textTransform: "uppercase", padding: "10px 14px" }}>
-            <span></span>
-            <span>Candidato</span>
-            <span>Stato</span>
-            <span>Progresso</span>
-            <span>Esito</span>
-            <span>Creato</span>
-          </div>
-          {items.map((it) => (
-            <AssessmentRow
-              key={it.token}
-              it={it}
-              origin={origin}
-              expanded={expanded === it.token}
-              onToggle={() => setExpanded(expanded === it.token ? null : it.token)}
-              onOutcomeSaved={mutate}
-            />
-          ))}
-        </div>
+      {!error && isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
+
+      {!error && !isLoading && items.length === 0 && (
+        <section style={{ ...card, padding: "18px 20px" }}>
+          <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, marginBottom: 8 }}>Nessun assessment ancora. Come funziona:</div>
+          <ol style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: CP.textSecondary, lineHeight: 1.6 }}>
+            <li>“Nuovo link”: scrivi il nome del candidato e scegli la prova.</li>
+            <li>Copia il link e mandalo al candidato (vale 14 giorni, una volta sola).</li>
+            <li>Il candidato gestisce alcune chat con fan simulati, dal telefono o dal computer, senza account.</li>
+            <li>Qui trovi il punteggio e se ha rispettato le regole di piattaforma; dopo il colloquio registri l’esito.</li>
+          </ol>
+        </section>
+      )}
+
+      {!error && items.length > 0 && (
+        <>
+          <section style={{ ...card, padding: "16px 18px", marginBottom: 14, display: "flex", gap: 28, flexWrap: "wrap" }}>
+            <Metric label="Link creati" value={fmtInt(items.length)} />
+            <Metric label="In corso o da iniziare" value={fmtInt(running)} />
+            <Metric label="Completati" value={fmtInt(done.length)} />
+            <Metric label="Esito da registrare" value={fmtInt(toDecide)} note="tra i completati" />
+            <Metric label="Con regole violate" value={fmtInt(violations)} danger={violations > 0} note="da leggere prima del colloquio" />
+          </section>
+
+          <DataTable columns={columns} rows={items.map((it) => ({ ...it, id: it.token }))} defaultSort={{ key: "createdAt", dir: -1 }}
+            onRowClick={(it) => setExpanded(expanded === it.token ? null : it.token)} selected={(it) => it.token === expanded}
+            minWidth={760} maxHeight={520} />
+          <div style={{ fontSize: 12.5, color: CP.textMuted, margin: "8px 0 14px" }}>Clicca un candidato per aprire il suo report, copiare il link o registrare l’esito.</div>
+
+          {sel && (
+            <section style={{ ...card, padding: "16px 18px" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 4 }}>
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 500, color: CP.textPrimary }}>{sel.label}</h2>
+                <span style={{ fontSize: 13, color: CP.textMuted }}>{(STATUS_META[sel.status] || STATUS_META.invited).label} · creato il {fmtDate(sel.createdAt)}</span>
+                <button onClick={() => setExpanded(null)} style={{ ...btnGhost, marginLeft: "auto", padding: "5px 10px" }}><X size={13} /> Chiudi</button>
+              </div>
+              <AssessmentDetail key={sel.token} token={sel.token} origin={origin} onOutcomeSaved={mutate} />
+            </section>
+          )}
+        </>
       )}
     </div>
+  );
+}
+
+function CopyButton({ text, label = "Copia" }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button onClick={() => { navigator.clipboard?.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); }} style={{ ...btnGhost, whiteSpace: "nowrap" }}>
+      {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? "Copiato" : label}
+    </button>
+  );
+}
+
+function LinkBox({ link }) {
+  return (
+    <code style={{ flex: "1 1 240px", minWidth: 0, fontSize: 13, color: CP.textPrimary, background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "8px 10px", overflowX: "auto", whiteSpace: "nowrap", fontFamily: "inherit" }}>
+      {link}
+    </code>
   );
 }
 
 function CreatedLink({ created }) {
-  const [copied, setCopied] = useState(false);
   return (
-    <div style={{ marginTop: 14, background: CP.bgSunken, border: `1px solid ${CP.border}`, borderRadius: 10, padding: 14 }}>
-      <div style={{ fontSize: 12, color: CP.accentGreen, marginBottom: 6 }}>Link creato per {created.label}</div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <code style={{ flex: 1, fontFamily: FONTS.mono, fontSize: 12.5, color: CP.textPrimary, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "8px 10px", overflowX: "auto", whiteSpace: "nowrap" }}>
-          {created.link}
-        </code>
-        <button
-          onClick={() => { navigator.clipboard?.writeText(created.link); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
-          style={{ ...btnGhost, whiteSpace: "nowrap" }}
-        >
-          {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? "Copiato" : "Copia"}
-        </button>
+    <div style={{ marginTop: 14, padding: 14, borderRadius: 10, background: CP.surfaceAlt }}>
+      <div style={{ fontSize: 13, color: CP.textPrimary, marginBottom: 8 }}>Link pronto per {created.label}: copialo e mandalo al candidato.</div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <LinkBox link={created.link} />
+        <CopyButton text={created.link} />
       </div>
     </div>
   );
-}
-
-function AssessmentRow({ it, origin, expanded, onToggle, onOutcomeSaved }) {
-  const sm = STATUS_META[it.status] || STATUS_META.invited;
-  const agg = it.aggregate;
-  return (
-    <div style={{ borderTop: `1px solid ${CP.borderSoft}` }}>
-      <div style={{ ...rowGrid, padding: "12px 14px", cursor: "pointer", alignItems: "center" }} onClick={onToggle}>
-        <span style={{ color: CP.textMuted }}>{expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</span>
-        <span style={{ color: CP.textPrimary, fontSize: 13.5, fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.label}</span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: sm.color, fontSize: 12.5 }}>
-          <sm.Icon size={14} /> {sm.label}
-        </span>
-        <span style={{ color: CP.textSecondary, fontSize: 12.5 }}>
-          {it.progress.index}/{it.progress.total}
-          {agg && (
-            <span style={{ marginLeft: 8, color: agg.compliance_pass ? CP.textMuted : CP.accentRed }}>
-              · {agg.overall_avg}/100{!agg.compliance_pass && " · compliance!"}
-            </span>
-          )}
-        </span>
-        <span style={{ fontSize: 12.5, color: it.outcome?.decision ? CP.textSecondary : CP.textMuted }}>
-          {it.outcome?.decision ? outcomeLabel(it.outcome.decision) : "—"}
-        </span>
-        <span style={{ color: CP.textMuted, fontSize: 12.5 }}>{fmtDate(it.createdAt)}</span>
-      </div>
-      {expanded && <AssessmentDetail token={it.token} origin={origin} onOutcomeSaved={onOutcomeSaved} />}
-    </div>
-  );
-}
-
-function outcomeLabel(d) {
-  return d === "hired" ? "Assunto" : d === "rejected" ? "Scartato" : d === "pending" ? "In valutazione" : "—";
 }
 
 function AssessmentDetail({ token, origin, onOutcomeSaved }) {
@@ -243,7 +243,6 @@ function AssessmentDetail({ token, origin, onOutcomeSaved }) {
   const [employeeId, setEmployeeId] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   const link = `${origin}/assessment/${token}`;
 
@@ -261,81 +260,70 @@ function AssessmentDetail({ token, origin, onOutcomeSaved }) {
     }
   };
 
-  if (isLoading) return <div style={{ padding: "0 44px 16px", color: CP.textMuted, fontSize: 12.5 }}>Caricamento report…</div>;
-  if (!it) return <div style={{ padding: "0 44px 16px", color: CP.accentRed, fontSize: 12.5 }}>Report non disponibile.</div>;
+  if (isLoading) return <div style={{ color: CP.textMuted, fontSize: 13, paddingTop: 8 }}>Caricamento report…</div>;
+  if (!it) return <Notice danger>Report non disponibile. Riprova tra poco.</Notice>;
 
   const results = it.progress?.results || [];
   const o = it.outcome || {};
 
   return (
-    <div style={{ padding: "4px 44px 20px", background: CP.bgSunken, borderTop: `1px solid ${CP.borderSoft}` }}>
-      {/* Link */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "12px 0 16px" }}>
-        <code style={{ flex: 1, fontFamily: FONTS.mono, fontSize: 12, color: CP.textSecondary, overflowX: "auto", whiteSpace: "nowrap" }}>{link}</code>
-        <button onClick={() => { navigator.clipboard?.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1500); }} style={btnGhost}>
-          {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? "Copiato" : "Copia link"}
-        </button>
+    <div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "12px 0 16px" }}>
+        <LinkBox link={link} />
+        <CopyButton text={link} label="Copia link" />
       </div>
 
-      {/* Aggregate */}
       {it.aggregate ? (
-        <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 16 }}>
-          <Stat label="Media overall" value={`${it.aggregate.overall_avg}/100`} />
-          <Stat label="Stelle medie" value={`${it.aggregate.stars_avg}★`} />
-          <Stat label="Scenari" value={`${it.aggregate.scenarios_done}/${it.scenarioIds.length}`} />
-          <Stat
-            label="Compliance"
-            value={it.aggregate.compliance_pass ? "OK" : "Violata"}
-            color={it.aggregate.compliance_pass ? CP.accentGreen : CP.accentRed}
-          />
+        <div style={{ display: "flex", gap: 28, flexWrap: "wrap", marginBottom: 16 }}>
+          <Metric label="Punteggio medio" value={`${it.aggregate.overall_avg}/100`} />
+          <Metric label="Stelle medie" value={`${it.aggregate.stars_avg} su 5`} />
+          <Metric label="Situazioni completate" value={`${it.aggregate.scenarios_done} di ${it.scenarioIds.length}`} />
+          <Metric label="Regole di piattaforma" value={it.aggregate.compliance_pass ? "Rispettate" : "Violate"} danger={!it.aggregate.compliance_pass} />
         </div>
       ) : (
-        <div style={{ color: CP.textMuted, fontSize: 12.5, marginBottom: 16 }}>
-          Assessment non ancora completato — nessun report finale.
+        <div style={{ color: CP.textMuted, fontSize: 13.5, marginBottom: 16 }}>
+          Il candidato non ha ancora finito: il report completo compare quando conclude l’ultima situazione.
         </div>
       )}
 
-      {/* Compliance violations */}
       {it.aggregate && !it.aggregate.compliance_pass && (
-        <div style={{ background: "rgba(240,140,140,0.08)", border: `1px solid ${CP.accentRed}`, borderRadius: 10, padding: 12, marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, color: CP.accentRed, fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
-            <ShieldAlert size={15} /> Riga rossa di compliance violata
-          </div>
-          <ul style={{ margin: 0, paddingLeft: 18, color: CP.textSecondary, fontSize: 12.5, lineHeight: 1.5 }}>
+        <Notice danger>
+          <div style={{ color: CP.textPrimary, marginBottom: 4 }}>Ha violato una regola di piattaforma che non si può violare (per esempio: portare il pagamento fuori piattaforma). Leggi dove, prima di decidere:</div>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
             {it.aggregate.compliance_violations.map((v, i) => (
               <li key={i}><span style={{ color: CP.textMuted }}>{v.scenarioTitle}:</span> {v.violation}</li>
             ))}
           </ul>
-        </div>
+        </Notice>
       )}
 
-      {/* Per-scenario */}
       {results.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11.5, color: CP.textMuted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 8 }}>Dettaglio per scenario</div>
-          {results.map((r, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < results.length - 1 ? `1px solid ${CP.borderSoft}` : "none" }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ color: CP.textPrimary, fontSize: 13 }}>{r.scenarioTitle}</div>
-                {r.score?.signals?.headline && <div style={{ color: CP.textMuted, fontSize: 11.5 }}>{r.score.signals.headline}</div>}
+          <SectionTitle>Situazione per situazione</SectionTitle>
+          <div style={{ border: `1px solid ${CP.borderSoft}`, borderRadius: 8 }}>
+            {results.map((r, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "10px 12px", borderTop: i ? `1px solid ${CP.borderSoft}` : "none" }}>
+                <div style={{ minWidth: 0, flex: "1 1 240px" }}>
+                  <div style={{ color: CP.textPrimary, fontSize: 14 }}>{r.scenarioTitle}</div>
+                  {r.score?.signals?.headline && <div style={{ color: CP.textMuted, fontSize: 12.5 }}>{r.score.signals.headline}</div>}
+                </div>
+                <div style={{ display: "flex", gap: 14, alignItems: "center", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+                  {r.score?.compliance && !r.score.compliance.pass && <span style={{ color: CP.accentRed, fontSize: 12.5 }}>regola violata</span>}
+                  <span style={{ color: CP.textSecondary, fontSize: 13 }}>{r.score?.stars || 0} stelle</span>
+                  <span style={{ color: CP.textPrimary, fontSize: 14, fontWeight: 500, minWidth: 56, textAlign: "right" }}>{r.score?.overall ?? "—"}/100</span>
+                </div>
               </div>
-              <div style={{ display: "flex", gap: 14, alignItems: "center", flexShrink: 0 }}>
-                {r.score?.compliance && !r.score.compliance.pass && <span style={{ color: CP.accentRed, fontSize: 12 }}>compliance</span>}
-                <span style={{ color: CP.textSecondary, fontSize: 12.5 }}>{r.score?.stars || 0}★</span>
-                <span style={{ color: CP.textPrimary, fontSize: 13, fontWeight: 500, width: 52, textAlign: "right" }}>{r.score?.overall ?? "—"}/100</span>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Outcome (bridge V2) */}
-      <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, padding: 14 }}>
-        <div style={{ fontSize: 12.5, color: CP.textPrimary, fontWeight: 600, marginBottom: 4 }}>Esito della candidatura</div>
-        <div style={{ fontSize: 11.5, color: CP.textMuted, marginBottom: 12, lineHeight: 1.5 }}>
-          La decisione è umana. Se assumi, aggancia l&apos;employee id (Clerk userId o roster): serve a validare, un domani, se lo score predice la resa reale.
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+      <div style={{ padding: 14, borderRadius: 10, background: CP.surfaceAlt }}>
+        <SectionTitle aside={o.recordedAt ? `ultimo aggiornamento ${fmtDate(o.recordedAt)}` : null}>Esito della candidatura</SectionTitle>
+        <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 12px", lineHeight: 1.5 }}>
+          La decisione la prende una persona. Se assumi, indica anche chi è diventato (id dell’account o nome come in anagrafica): servirà a verificare, più avanti, se questa prova prevede davvero come lavorerà.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 10, marginBottom: 10 }}>
           <label>
             <span style={lbl}>Decisione</span>
             <select style={input} value={decision || o.decision || ""} onChange={(e) => setDecision(e.target.value)}>
@@ -346,36 +334,26 @@ function AssessmentDetail({ token, origin, onOutcomeSaved }) {
             </select>
           </label>
           <label>
-            <span style={lbl}>Employee id (se assunto)</span>
-            <input style={input} value={employeeId || o.employeeId || ""} onChange={(e) => setEmployeeId(e.target.value)} placeholder="user_… o nome roster" />
+            <span style={lbl}>Chi è diventato (se assunto)</span>
+            <input style={input} value={employeeId || o.employeeId || ""} onChange={(e) => setEmployeeId(e.target.value)} placeholder="user_… o nome in anagrafica" />
           </label>
         </div>
-        <label style={{ display: "block", marginBottom: 10 }}>
-          <span style={lbl}>Nota (opzionale)</span>
-          <input style={input} value={note || o.note || ""} onChange={(e) => setNote(e.target.value)} placeholder="Contesto della decisione" />
+        <label style={{ display: "block", marginBottom: 12 }}>
+          <span style={lbl}>Nota (facoltativa)</span>
+          <input style={input} value={note || o.note || ""} onChange={(e) => setNote(e.target.value)} placeholder="Perché questa decisione" />
         </label>
         <button onClick={saveOutcome} disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }}>
           {saving ? "Salvo…" : "Salva esito"}
         </button>
-        {o.recordedAt && <span style={{ marginLeft: 12, color: CP.textMuted, fontSize: 11.5 }}>Ultimo aggiornamento {fmtDate(o.recordedAt)}</span>}
       </div>
     </div>
   );
 }
 
-function Stat({ label, value, color }) {
-  return (
-    <div>
-      <div style={{ fontSize: 11, color: CP.textMuted, textTransform: "uppercase", letterSpacing: 0.4 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 600, color: color || CP.textPrimary, marginTop: 2 }}>{value}</div>
-    </div>
-  );
-}
-
-const h1 = { fontFamily: FONTS.display, fontSize: 32, margin: "8px 0 6px", fontWeight: 500, letterSpacing: "-0.02em", color: CP.textPrimary };
-const panel = { background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, padding: 18, marginBottom: 20 };
-const rowGrid = { display: "grid", gridTemplateColumns: "24px 1.6fr 1fr 1.3fr 1fr 0.8fr", gap: 10 };
-const lbl = { display: "block", fontSize: 11, color: CP.textMuted, marginBottom: 4 };
-const errBox = { background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, padding: 16, color: CP.textSecondary, marginTop: 16 };
-const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", background: CP.accent, color: CP.accentInk, border: "1px solid transparent", borderRadius: 8, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };
-const btnGhost = { display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", background: "transparent", color: CP.accentSoftText, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 12.5, fontWeight: 500, cursor: "pointer" };
+const lbl = { display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 4 };
+const input = {
+  width: "100%", boxSizing: "border-box", padding: "8px 10px", background: CP.surface, border: `1px solid ${CP.border}`,
+  borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, outline: "none",
+};
+const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", background: CP.accent, color: CP.accentInk, border: "1px solid transparent", borderRadius: 8, fontSize: 14, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };
+const btnGhost = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };

@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Loader2, AlertCircle, Radio, ArrowRight } from "lucide-react";
+import { Loader2, Radio } from "lucide-react";
 import { CP, FONTS, creatorDotColor } from "@/lib/brand";
-import { PageHeader, CpCard, StatCard, SectionLabel, RankedItem, PillTab } from "@/components/cp-style";
-import HowToRead from "@/components/HowToRead";
+import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Disclosure, Notice, DataTable, card, NUM } from "@/components/ds";
 
 /**
  * /admin/infloww-revenue — Ledger revenue fan-by-fan da Infloww API, LIVE.
@@ -38,6 +37,7 @@ export default function InflowwRevenuePage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [howOpen, setHowOpen] = useState(false);
 
   // Roster all'avvio + preselect da ?creatorId= (drill-down dalla vista agency)
   useEffect(() => {
@@ -77,179 +77,144 @@ export default function InflowwRevenuePage() {
   }, [byType]);
   const maxDay = useMemo(() => Math.max(1, ...(data?.trend || []).map((x) => x.net_usd)), [data]);
 
+  // Redesign 26/09/2026 (pannello tester BOARD/PAY/UX): prima si apriva su una
+  // pagina vuota con un avviso giallo pieno di gergo (ledger, loading, creatorId).
+  // Ora: si sceglie la creator anche con un clic sui nomi, il netto è il numero
+  // principale con la sua scomposizione, gli avvisi tecnici stanno in fondo.
+  const fans = (data?.top_fans || []).map((f, i) => ({ ...f, id: f.fanId, rank: i + 1 }));
+  const conc = t?.top10_share_pct;
+  const fanCols = [
+    { key: "rank", label: "#", align: "right", muted: true },
+    { key: "fanName", label: "Fan", render: (f) => (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
+        <span style={{ width: 9, height: 9, borderRadius: "50%", background: creatorDotColor(f.fanId), flexShrink: 0 }} />
+        {f.fanName || "—"}
+      </span>
+    ) },
+    { key: "count", label: "Transazioni", align: "right", muted: true, render: (f) => fmtN(f.count) },
+    { key: "net_usd", label: "Netto", align: "right", render: (f) => <span style={{ fontWeight: 500 }}>{fmt$(f.net_usd)}</span> },
+  ];
+
   return (
-    <div style={{ padding: "32px 28px 80px 28px", maxWidth: 1300, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
-      <PageHeader
-        breadcrumb={
-          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <span style={{ color: CP.textPrimary }}>Revenue live</span>
-          </div>
-        }
-        section="Data · Infloww (live)"
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Revenue agency", href: "/admin/infloww-agency" }, { label: "Revenue live" }]}
         title="Revenue live per creator"
-        subtitle="Il ledger vero, fan per fan, direttamente da Infloww: quanto ha incassato una creator nel periodo, da cosa (chat, mance, abbonamenti), da chi, al netto della trattenuta OnlyFans. Nessuna attesa della chiusura: è il dato di adesso."
-        toolbar={
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <Link href="/admin/infloww-agency" style={{ fontSize: 12, color: CP.accentSoftText, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}>
-              Vista agency <ArrowRight size={12} />
-            </Link>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: CP.accentGreen, fontFamily: FONTS.mono }}>
-              <Radio size={13} /> LIVE
-            </span>
-          </div>
-        }
+        subtitle="Quanto ha incassato una creator adesso, direttamente da Infloww: da cosa (chat, mance, abbonamenti), quanto è stato rimborsato e quanto dipende da pochi fan."
+        actions={<>
+          <select value={creatorId} onChange={(e) => setCreatorId(e.target.value)} style={{ ...ctl, minWidth: 240, cursor: "pointer" }} disabled={!creators} aria-label="Creator">
+            <option value="">{creators ? `Scegli la creator (${creators.length})` : "Carico l'elenco…"}</option>
+            {(creators || []).map((c) => (
+              <option key={c.id} value={c.id}>{c.name}{c.userName ? `  ·  ${c.userName}` : ""}</option>
+            ))}
+          </select>
+        </>}
       />
 
-      <HowToRead items={[
-        "Scegli una creator e la finestra temporale: la pagina interroga Infloww in tempo reale e ti mostra la revenue vera di quel periodo.",
-        "Netto = quello che entra DAVVERO dopo la trattenuta OnlyFans (20%). È il numero che conta, non il lordo.",
-        "Ogni creator ha profili separati per lingua (Laura ESP, Laura ENG, Laura Sommaruga sono TRE profili distinti): qui vedi un profilo alla volta, mai fusi.",
-        "IL numero da guardare: da COSA arriva il netto (mix per tipo). Se il 90% è 'Messaggi', la revenue la fanno gli operatori in chat — non gli abbonamenti.",
-        "Whale = i fan che spendono di più. Se pochi fan fanno gran parte del netto (concentrazione top-10 alta), c'è rischio: se se ne vanno, cala tutto.",
-      ]} />
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
+        {WINDOWS.map((w) => (
+          <FilterChip key={w.d} label={`Ultimi ${w.label}`} active={days === w.d} onClick={() => setDays(w.d)} />
+        ))}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: CP.textMuted, marginLeft: 4 }}>
+          <Radio size={14} /> dato di adesso (ritardo OnlyFans circa 1 ora)
+        </span>
+        {loading && <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: CP.textSecondary }}><Loader2 size={14} className="animate-spin" /> Leggo da Infloww…</span>}
+      </div>
 
-      <CpCard accent="#F59E0B" padding="12px 16px" style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.5 }}>
-          ⚠ <b>Dato live in $</b>, con ritardo di sync OnlyFans ~1h. Le transazioni in stato <i>loading</i> sono ancora in sincronizzazione (l'importo può salire). Il <b>netto</b> è già al netto del 20% OnlyFans, ma <b>lordo di</b> fee del deal, marketing e costo operatori: per il margine vero usa il P&L. Chiave su <code>creatorId</code>: profili di team diversi non vengono mai fusi.
-        </div>
-      </CpCard>
-
-      {/* Controlli */}
-      <CpCard padding="14px 18px" style={{ marginBottom: 18 }}>
-        <div style={{ display: "flex", gap: 16, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div>
-            <label style={lbl}>Creator {creators ? `(${creators.length})` : ""}</label>
-            <select
-              value={creatorId}
-              onChange={(e) => setCreatorId(e.target.value)}
-              style={{ ...input, minWidth: 280, cursor: "pointer" }}
-              disabled={!creators}
-            >
-              <option value="" style={{ background: CP.surface }}>{creators ? "scegli creator…" : "carico roster…"}</option>
-              {(creators || []).map((c) => (
-                <option key={c.id} value={c.id} style={{ background: CP.surface }}>
-                  {c.name}{c.userName ? `  ·  ${c.userName}` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label style={lbl}>Finestra</label>
-            <div style={{ display: "flex", gap: 6 }}>
-              {WINDOWS.map((w) => (
-                <PillTab key={w.d} active={days === w.d} onClick={() => setDays(w.d)}>{w.label}</PillTab>
-              ))}
-            </div>
-          </div>
-          {loading && <Loader2 size={16} className="animate-spin" style={{ color: CP.textSecondary, marginBottom: 8 }} />}
-        </div>
-      </CpCard>
-
-      {error && (
-        <CpCard accent={CP.accentRed} padding="14px 18px" style={{ marginBottom: 18 }}>
-          <div style={{ color: CP.accentRed, display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-            <AlertCircle size={16} /> {error}
-          </div>
-        </CpCard>
-      )}
+      {error && <Notice danger>Non riesco a leggere i dati da Infloww: {error}</Notice>}
 
       {!creatorId && !error && (
-        <div style={{ padding: "60px 20px", textAlign: "center", color: CP.textMuted, fontSize: 14 }}>
-          Scegli una creator per vedere il ledger live.
+        <section style={{ ...card, padding: "18px 18px", marginBottom: 14 }}>
+          <SectionTitle>Scegli una creator</SectionTitle>
+          <div style={{ fontSize: 13, color: CP.textSecondary, margin: "-4px 0 12px" }}>
+            Ogni profilo è separato (per esempio Laura ESP e Laura ENG sono due profili diversi): qui ne vedi uno alla volta. Per il confronto tra tutte usa <Link href="/admin/infloww-agency" style={{ color: CP.accentSoftText, textDecoration: "none" }}>Revenue agency</Link>.
+          </div>
+          {!creators ? (
+            <div style={{ fontSize: 13, color: CP.textMuted }}>Carico l&apos;elenco…</div>
+          ) : creators.length === 0 ? (
+            <div style={{ fontSize: 13, color: CP.textMuted }}>Nessuna creator nel roster Infloww.</div>
+          ) : (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {creators.map((c) => <FilterChip key={c.id} label={c.name} onClick={() => setCreatorId(c.id)} />)}
+            </div>
+          )}
+        </section>
+      )}
+
+      {creatorId && loading && !data && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, color: CP.textMuted, fontSize: 14, padding: "20px 0" }}>
+          <Loader2 size={16} className="animate-spin" /> Leggo le transazioni di {selected?.name || "questa creator"}…
         </div>
       )}
 
       {data && creatorId && (
         <>
-          {/* KPI */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(165px, 1fr))", gap: 12, marginBottom: 18 }}>
-            <StatCard label="Netto (post-OF)" value={fmt$(t.net_usd)} color={CP.accentGreen}
-              sub={`${fmtN(t.tx_count)} transazioni · ${fmtN(t.fan_count)} fan`} />
-            <StatCard label="Lordo" value={fmt$(t.gross_usd)} sub={`fee OnlyFans ${fmt$(t.fee_usd)}`} />
-            <StatCard label="Rimborsi" value={fmt$(data.refunds.total_usd)} color={data.refunds.total_usd > 0 ? CP.accentRed : CP.textMuted}
-              sub={`${fmtN(data.refunds.count)} chargeback`} />
-            <StatCard label="Netto − rimborsi" value={fmt$(data.refunds.net_after_refund_usd)} color={CP.textPrimary}
-              sub="la revenue che resta davvero" />
-            <StatCard label="Concentrazione" value={`${t.top10_share_pct}%`}
-              color={t.top10_share_pct >= 60 ? CP.accentRed : t.top10_share_pct >= 40 ? "#F59E0B" : CP.accentGreen}
-              sub="quota netto dai top-10 fan" tooltip="Se alta, la revenue dipende da pochi fan (rischio)." />
-          </div>
-
-          {(t.truncated || t.loading_count > 0) && (
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16, fontSize: 12, color: CP.textMuted }}>
-              {t.truncated && <span>⚠ Volume alto: mostrati i primi {fmtN(t.tx_count)} movimenti del periodo — restringi la finestra per il totale esatto.</span>}
-              {t.loading_count > 0 && <span>⏳ {fmtN(t.loading_count)} transazioni ancora in sync (<i>loading</i>): il netto può salire.</span>}
+          <HeroMetric
+            label={`Netto ${selected?.name ? `di ${selected.name} ` : ""}· ultimi ${days} giorni`}
+            value={fmt$(t.net_usd)}
+            compare={`Lordo ${fmt$(t.gross_usd)} meno ${fmt$(t.fee_usd)} di trattenuta OnlyFans (20%) · ${fmtN(t.tx_count)} transazioni da ${fmtN(t.fan_count)} fan`}
+            hint="Prima di fee del deal, marketing e costo operatori: per il margine vero usa il P&L.">
+            <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+              <Metric label="Rimborsi" value={fmt$(data.refunds.total_usd)} danger={data.refunds.total_usd > 0} note={`${fmtN(data.refunds.count)} tra rimborsi e chargeback`} />
+              <Metric label="Resta dopo i rimborsi" value={fmt$(data.refunds.net_after_refund_usd)} />
+              <Metric label="Quota dai 10 fan migliori" value={conc == null ? "—" : `${conc}%`} danger={conc >= 60} note={conc >= 60 ? "dipende da pochi fan: rischio" : conc >= 40 ? "da tenere d'occhio" : "incasso ben distribuito"} />
             </div>
-          )}
+          </HeroMetric>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16, alignItems: "start" }}>
-            {/* Mix per tipo */}
-            <CpCard padding="16px 18px">
-              <SectionLabel style={{ marginBottom: 4 }}>Da cosa arriva il netto</SectionLabel>
-              <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 14 }}>{selected?.name}</div>
+          {t.truncated && <Notice>Volume alto: ho letto solo i primi {fmtN(t.tx_count)} movimenti del periodo, quindi il totale è sottostimato. Scegli una finestra più corta per il numero esatto.</Notice>}
+          {t.loading_count > 0 && <Notice>{fmtN(t.loading_count)} transazioni sono ancora in arrivo da OnlyFans: il netto può salire nelle prossime ore.</Notice>}
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14, marginBottom: 18, alignItems: "start" }}>
+            <section style={{ ...card, padding: "16px 18px" }}>
+              <SectionTitle>Da cosa arriva il netto</SectionTitle>
+              <div style={{ fontSize: 12, color: CP.textMuted, margin: "-4px 0 12px", lineHeight: 1.5 }}>Se prevalgono i messaggi, la revenue la fanno gli operatori in chat; se prevalgono gli abbonamenti, la fa il pubblico.</div>
               {typeRows.length === 0 && <div style={{ color: CP.textMuted, fontSize: 13 }}>Nessun movimento nel periodo.</div>}
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {typeRows.map((r) => (
                   <div key={r.type}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 5 }}>
-                      <span style={{ color: CP.textSecondary }}>{TYPE_LABEL[r.type] || r.type} <span style={{ color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 11 }}>· {r.count}</span></span>
-                      <span style={{ fontFamily: FONTS.mono, color: CP.textPrimary }}>{fmt$(r.net_usd)} <span style={{ color: CP.textMuted }}>· {Math.round(r.share)}%</span></span>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 5, gap: 8 }}>
+                      <span style={{ color: CP.textSecondary }}>{TYPE_LABEL[r.type] || r.type} <span style={{ color: CP.textMuted, fontSize: 12, ...NUM }}>· {fmtN(r.count)}</span></span>
+                      <span style={{ color: CP.textPrimary, ...NUM }}>{fmt$(r.net_usd)} <span style={{ color: CP.textMuted }}>· {Math.round(r.share)}%</span></span>
                     </div>
-                    <div style={{ height: 6, borderRadius: 3, background: CP.borderSoft, overflow: "hidden" }}>
+                    <div style={{ height: 6, borderRadius: 3, background: CP.surfaceAlt, overflow: "hidden" }}>
                       <div style={{ width: `${r.share}%`, height: "100%", background: CP.accent, borderRadius: 3 }} />
                     </div>
                   </div>
                 ))}
               </div>
-            </CpCard>
+            </section>
 
-            {/* Trend giornaliero */}
-            <CpCard padding="16px 18px">
-              <SectionLabel style={{ marginBottom: 4 }}>Netto per giorno</SectionLabel>
-              <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 14 }}>ultimi {days} giorni · fuso Roma</div>
+            <section style={{ ...card, padding: "16px 18px" }}>
+              <SectionTitle aside="fuso Roma">Netto per giorno</SectionTitle>
               {(data.trend || []).length === 0 ? (
                 <div style={{ color: CP.textMuted, fontSize: 13 }}>Nessun movimento nel periodo.</div>
               ) : (
                 <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 120 }}>
                   {data.trend.map((x) => (
                     <div key={x.date} title={`${x.date}: ${fmt$(x.net_usd)}`}
-                      style={{ flex: 1, minWidth: 2, height: `${Math.max(2, (x.net_usd / maxDay) * 100)}%`, background: CP.accent, borderRadius: "2px 2px 0 0", opacity: 0.85 }} />
+                      style={{ flex: 1, minWidth: 2, height: `${Math.max(2, (x.net_usd / maxDay) * 100)}%`, background: CP.accent, borderRadius: "2px 2px 0 0" }} />
                   ))}
                 </div>
               )}
-            </CpCard>
+            </section>
           </div>
 
-          {/* Whale */}
-          <CpCard padding="0" style={{ overflow: "hidden" }}>
-            <div style={{ padding: "14px 18px", borderBottom: `1px solid ${CP.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <SectionLabel>Top fan per spesa (whale)</SectionLabel>
-              <span style={{ fontSize: 11, color: CP.textMuted }}>i top-10 fanno il {t.top10_share_pct}% del netto</span>
-            </div>
-            {data.top_fans.length === 0 ? (
-              <div style={{ padding: 30, textAlign: "center", color: CP.textMuted, fontSize: 13 }}>Nessun fan nel periodo.</div>
-            ) : (
-              data.top_fans.map((f, i) => (
-                <RankedItem
-                  key={f.fanId}
-                  rank={i + 1}
-                  dotColor={creatorDotColor(f.fanId)}
-                  name={f.fanName || "—"}
-                  cols={[
-                    { value: `${f.count} tx`, color: CP.textMuted, minWidth: 60 },
-                    { value: fmt$(f.net_usd), color: CP.accentGreen, minWidth: 80 },
-                  ]}
-                />
-              ))
-            )}
-          </CpCard>
+          <SectionTitle aside={conc != null ? `i primi 10 fanno il ${conc}% del netto` : null}>Fan che spendono di più</SectionTitle>
+          <DataTable columns={fanCols} rows={fans} minWidth={480} maxHeight={560} empty="Nessun fan nel periodo." />
+
+          <div style={{ height: 14 }} />
+          <Disclosure open={howOpen} onToggle={() => setHowOpen((v) => !v)} title="Come si legge questa pagina" summary="da dove vengono i numeri e cosa non includono">
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: CP.textSecondary, lineHeight: 1.6 }}>
+              <li>I numeri arrivano da Infloww al momento dell&apos;apertura, in dollari, con circa 1 ora di ritardo rispetto a OnlyFans. Le transazioni ancora in arrivo possono far salire il netto.</li>
+              <li>Netto = quello che entra davvero dopo la trattenuta OnlyFans (20%). Non toglie fee del deal, marketing e costo operatori: per il margine usa il P&amp;L.</li>
+              <li>Ogni profilo è tenuto separato per codice Infloww: profili di team o lingue diverse non vengono mai sommati.</li>
+              <li>Se pochi fan fanno gran parte del netto (quota dei primi 10 alta), l&apos;incasso è fragile: se quei fan se ne vanno, cala tutto.</li>
+            </ul>
+          </Disclosure>
         </>
       )}
     </div>
   );
 }
 
-const lbl = { display: "block", fontSize: 10, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
-const input = { padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
+const ctl = { padding: "8px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };

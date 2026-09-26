@@ -1,10 +1,16 @@
 "use client";
 
+// Dettaglio di una sessione del simulatore (redesign DS 26/09/2026).
+// Voto AI come numero principale, chat a sinistra, abilità e feedback a destra,
+// dati tecnici in fondo su richiesta. SignalsPanel invariato (componente
+// condiviso col simulatore). API e dati mostrati invariati.
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
 import Link from "next/link";
-import { COLORS, FONTS, CP } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
+import { CP, FONTS } from "@/lib/brand";
+import { fmtInt } from "@/lib/format";
+import { PageHead, HeroMetric, Metric, SectionTitle, Disclosure, Notice, card } from "@/components/ds";
 import SignalsPanel from "@/components/SignalsPanel";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
@@ -12,47 +18,27 @@ const fetcher = (url) => fetch(url).then((r) => r.json());
 function fmtDate(iso) {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleString("it-IT");
+    return new Date(iso).toLocaleString("it-IT", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
   } catch {
     return "—";
   }
 }
 
+const Wrap = ({ children }) => (
+  <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>{children}</div>
+);
+
 function SkillBar({ label, value }) {
   if (value === undefined || value === null) return null;
-  let bar = COLORS.signal;
-  if (value >= 70) bar = COLORS.verdant;
-  else if (value >= 50) bar = COLORS.champagne;
-  else if (value >= 30) bar = COLORS.ember;
+  const low = value < 50;
   return (
-    <div style={{ marginBottom: 8 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          fontSize: 12,
-          color: COLORS.fog,
-          marginBottom: 4,
-        }}
-      >
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: CP.textSecondary, marginBottom: 4 }}>
         <span>{label}</span>
-        <span style={{ color: COLORS.alabaster, fontWeight: 600 }}>{value}</span>
+        <span style={{ color: low ? CP.accentRed : CP.textPrimary, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{value}</span>
       </div>
-      <div
-        style={{
-          height: 6,
-          background: COLORS.charcoal,
-          borderRadius: 3,
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            width: `${Math.max(0, Math.min(100, value))}%`,
-            height: "100%",
-            background: bar,
-          }}
-        />
+      <div style={{ height: 6, background: CP.surfaceAlt, borderRadius: 3, overflow: "hidden" }}>
+        <div style={{ width: `${Math.max(0, Math.min(100, value))}%`, height: "100%", background: low ? CP.accentRed : CP.textMuted }} />
       </div>
     </div>
   );
@@ -61,37 +47,24 @@ function SkillBar({ label, value }) {
 function MessageBubble({ msg }) {
   const isOperator = msg.role === "operator";
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: isOperator ? "flex-end" : "flex-start",
-        marginBottom: 10,
-      }}
-    >
+    <div style={{ display: "flex", justifyContent: isOperator ? "flex-end" : "flex-start", marginBottom: 10 }}>
       <div
         style={{
-          maxWidth: "70%",
-          background: isOperator ? COLORS.champagne : COLORS.charcoal,
-          color: isOperator ? COLORS.obsidian : COLORS.alabaster,
-          padding: "10px 14px",
-          borderRadius: 14,
-          borderBottomRightRadius: isOperator ? 2 : 14,
-          borderBottomLeftRadius: isOperator ? 14 : 2,
+          maxWidth: "80%",
+          background: isOperator ? CP.accentSoft : CP.surfaceAlt,
+          color: CP.textPrimary,
+          padding: "9px 13px",
+          borderRadius: 12,
+          borderBottomRightRadius: isOperator ? 3 : 12,
+          borderBottomLeftRadius: isOperator ? 12 : 3,
           fontSize: 14,
+          lineHeight: 1.5,
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
         }}
       >
-        <div
-          style={{
-            fontSize: 10,
-            opacity: 0.7,
-            fontWeight: 600,
-            letterSpacing: "0.05em",
-            marginBottom: 3,
-          }}
-        >
-          {isOperator ? "OPERATORE" : "FAN"}
+        <div style={{ fontSize: 11, color: isOperator ? CP.accentSoftText : CP.textMuted, marginBottom: 2 }}>
+          {isOperator ? "Operatore" : "Fan"}
         </div>
         {msg.content}
       </div>
@@ -99,9 +72,19 @@ function MessageBubble({ msg }) {
   );
 }
 
+function FeedbackBlock({ title, children }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 4 }}>{title}</div>
+      <div style={{ fontSize: 14, color: CP.textPrimary, lineHeight: 1.55 }}>{children}</div>
+    </div>
+  );
+}
+
 export default function SessionDetailPage() {
   const params = useParams();
   const id = params?.id;
+  const [techOpen, setTechOpen] = useState(false);
   // Fetch da /api/admin/session-review/[id] (rotta nuova) — /api/admin/sessions/
   // ha un altro scopo nel codice esistente (eval feedback per /admin/review).
   const { data, error, isLoading } = useSWR(
@@ -110,259 +93,137 @@ export default function SessionDetailPage() {
     { revalidateOnFocus: false }
   );
 
-  const styles = {
-    page: {
-      minHeight: "100vh",
-      background: COLORS.obsidian,
-      color: COLORS.alabaster,
-      fontFamily: FONTS.body,
-      padding: "32px 24px",
-    },
-    container: { maxWidth: 1100, margin: "0 auto" },
-    title: {
-      fontFamily: FONTS.display,
-      fontSize: 24,
-      letterSpacing: "-0.01em",
-      margin: 0,
-    },
-    grid: {
-      display: "grid",
-      gridTemplateColumns: "1.4fr 1fr",
-      gap: 20,
-      marginTop: 20,
-    },
-    card: {
-      background: COLORS.graphite,
-      border: `1px solid ${COLORS.charcoal}`,
-      borderRadius: 12,
-      padding: 18,
-    },
-    label: {
-      fontSize: 11,
-      color: COLORS.fog,
-      
-      letterSpacing: "0.06em",
-      marginBottom: 4,
-    },
-    backLink: {
-      color: COLORS.fog,
-      fontSize: 13,
-      textDecoration: "none",
-      display: "inline-block",
-      marginBottom: 14,
-    },
-    section: { marginBottom: 18 },
-    h2: {
-      fontFamily: FONTS.display,
-      fontSize: 16,
-      margin: "0 0 10px 0",
-      color: COLORS.alabaster,
-    },
-    note: { fontSize: 13, color: COLORS.fog, marginBottom: 8 },
-    feedback: { fontSize: 13, color: COLORS.alabaster, lineHeight: 1.55 },
-  };
+  const crumbs = [{ label: "Hub", href: "/admin" }, { label: "Sessioni", href: "/admin/sessions" }, { label: "Dettaglio" }];
 
   if (isLoading) {
-    return (
-      <div style={styles.page}>
-        <div style={styles.container}>
-          <p style={{ color: COLORS.fog }}>Caricamento sessione…</p>
-        </div>
-      </div>
-    );
+    return <Wrap><div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento sessione…</div></Wrap>;
   }
 
   if (error) {
-    return (
-      <div style={styles.page}>
-        <div style={styles.container}>
-          <p style={{ color: COLORS.signal }}>Errore di rete: {String(error)}</p>
-        </div>
-      </div>
-    );
+    return <Wrap><PageHead crumbs={crumbs} title="Sessione" /><Notice danger>Errore di rete: {String(error)}</Notice></Wrap>;
   }
 
   if (data?.error) {
     return (
-      <div style={styles.page}>
-        <div style={styles.container}>
-          <Link href="/admin/sessions" style={styles.backLink}>
-            ← Lista sessioni
-          </Link>
-          <p style={{ color: COLORS.signal }}>
-            {data.error}. Probabilmente non hai i permessi per vedere questa sessione.
-          </p>
-        </div>
-      </div>
+      <Wrap>
+        <PageHead crumbs={crumbs} title="Sessione" />
+        <Notice danger>{data.error}. Probabilmente non hai i permessi per vedere questa sessione.</Notice>
+        <Link href="/admin/sessions" style={{ color: CP.accentSoftText, textDecoration: "none", fontSize: 14 }}>← Torna all'elenco delle sessioni</Link>
+      </Wrap>
     );
   }
 
   const session = data?.session;
   if (!session) {
     return (
-      <div style={styles.page}>
-        <div style={styles.container}>
-          <p style={{ color: COLORS.fog }}>Sessione non trovata.</p>
-        </div>
-      </div>
+      <Wrap>
+        <PageHead crumbs={crumbs} title="Sessione" />
+        <Notice>Sessione non trovata: potrebbe essere stata cancellata o il link non è completo.</Notice>
+        <Link href="/admin/sessions" style={{ color: CP.accentSoftText, textDecoration: "none", fontSize: 14 }}>← Torna all'elenco delle sessioni</Link>
+      </Wrap>
     );
   }
 
   const score = session.score || {};
   const skills = score.skills || {};
   const messages = session.messages || [];
+  const hasFeedback = score.strengths?.length || score.improvements?.length || score.tip || score.best_message || score.worst_message;
+  const msgCount = session.messageCount || messages.length;
 
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <PageHeader
-          breadcrumb={
-            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-              <span style={{ color: CP.textMuted }}>›</span>
-              <Link href="/admin/sessions" style={{ color: "inherit", textDecoration: "none" }}>Sessioni</Link>
-              <span style={{ color: CP.textMuted }}>›</span>
-              <span style={{ color: CP.textPrimary }}>Dettaglio</span>
+    <Wrap>
+      <PageHead
+        crumbs={crumbs}
+        title={`Sessione di ${data.ownerDisplay || session.operatorName || "operatore"}`}
+        subtitle={`${fmtDate(session.timestamp)} · scenario ${session.scenarioId || "—"} · fan ${session.fanName || session.fanProfileId || "—"} · ${session.mode || "—"} · ${fmtInt(msgCount)} messaggi`}
+      />
+
+      <HeroMetric
+        label="Voto dell'AI"
+        value={score.overall != null ? `${score.overall}%` : "—"}
+        compare={`${score.stars ?? "—"} stelle · ${fmtInt(score.xp ?? 0)} punti esperienza`}
+        hint="Il voto è una valutazione automatica della chat: leggila prima di usarla per il coaching."
+      >
+        <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+          <Metric label="Messaggi" value={fmtInt(msgCount)} />
+          <Metric label="Durata" value={session.duration ? `${Math.floor(session.duration / 60)} min ${Math.round(session.duration % 60)} s` : "—"} />
+        </div>
+      </HeroMetric>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16, alignItems: "start" }}>
+        {/* Conversazione */}
+        <section style={{ ...card, padding: "16px 18px" }}>
+          <SectionTitle aside={`${fmtInt(messages.length)} messaggi`}>La chat</SectionTitle>
+          {messages.length === 0 ? (
+            <p style={{ fontSize: 14, color: CP.textMuted, margin: 0 }}>Nessun messaggio salvato per questa sessione.</p>
+          ) : (
+            messages.map((m, i) => <MessageBubble key={i} msg={m} />)
+          )}
+        </section>
+
+        {/* Voto e feedback */}
+        <div>
+          <section style={{ ...card, padding: "16px 18px" }}>
+            <SectionTitle aside="da 0 a 100">Voto per abilità</SectionTitle>
+            <SkillBar label="Naturalezza" value={skills.naturalezza} />
+            <SkillBar label="Esclusività" value={skills.esclusivita} />
+            <SkillBar label="Dipendenza" value={skills.dipendenza} />
+            <SkillBar label="Conversione" value={skills.conversione} />
+            <SkillBar label="Tono" value={skills.tono} />
+            <SkillBar label="Gestione obiezioni" value={skills.gestione_obiezioni} />
+            {Object.keys(skills).length === 0 && <p style={{ fontSize: 13, color: CP.textMuted, margin: 0 }}>Nessun voto per abilità salvato.</p>}
+          </section>
+
+          {hasFeedback && (
+            <section style={{ ...card, padding: "16px 18px", marginTop: 14 }}>
+              <SectionTitle>Cosa dice l'AI</SectionTitle>
+
+              {score.strengths?.length > 0 && (
+                <FeedbackBlock title="Punti di forza">
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {score.strengths.map((s, i) => <li key={i}>{s}</li>)}
+                  </ul>
+                </FeedbackBlock>
+              )}
+
+              {score.improvements?.length > 0 && (
+                <FeedbackBlock title="Da migliorare">
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {score.improvements.map((s, i) => <li key={i}>{s}</li>)}
+                  </ul>
+                </FeedbackBlock>
+              )}
+
+              {score.best_message && <FeedbackBlock title="Messaggio migliore">{score.best_message}</FeedbackBlock>}
+              {score.worst_message && <FeedbackBlock title="Messaggio più debole">{score.worst_message}</FeedbackBlock>}
+
+              {score.tip && (
+                <FeedbackBlock title="Consiglio">
+                  <div style={{ background: CP.bg, padding: "10px 12px", borderRadius: 8, borderLeft: `3px solid ${CP.accent}` }}>{score.tip}</div>
+                </FeedbackBlock>
+              )}
+            </section>
+          )}
+
+          {score.signals && (
+            <div style={{ marginTop: 14 }}>
+              <SignalsPanel data={score.signals} />
             </div>
-          }
-          section="Training · Sessione"
-          title={`Sessione di ${data.ownerDisplay || session.operatorName || "operatore"}`}
-          subtitle={`${fmtDate(session.timestamp)} · scenario ${session.scenarioId || "—"} · fan ${session.fanName || session.fanProfileId || "—"} · ${session.mode} · ${session.messageCount || messages.length} msg`}
-        />
+          )}
 
-        <div style={styles.grid}>
-          {/* Conversazione */}
-          <div style={styles.card}>
-            <h2 style={styles.h2}>Conversazione</h2>
-            {messages.length === 0 ? (
-              <p style={styles.note}>Nessun messaggio salvato.</p>
-            ) : (
-              messages.map((m, i) => <MessageBubble key={i} msg={m} />)
-            )}
-          </div>
-
-          {/* Score & feedback */}
-          <div>
-            <div style={styles.card}>
-              <h2 style={styles.h2}>Punteggio</h2>
-              <div style={styles.section}>
-                <div style={styles.label}>Overall</div>
-                <div
-                  style={{
-                    fontSize: 32,
-                    fontFamily: FONTS.display,
-                    color: COLORS.champagne,
-                  }}
-                >
-                  {score.overall ?? "—"}%
-                </div>
-                <div style={{ fontSize: 12, color: COLORS.fog, marginTop: 4 }}>
-                  {score.stars ?? "—"} stelle · {score.xp ?? 0} XP
-                </div>
+          <div style={{ marginTop: 14 }}>
+            <Disclosure open={techOpen} onToggle={() => setTechOpen((v) => !v)} title="Dati tecnici" summary="id utente, profilo fan, creator, riferimento del voto">
+              <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 14px", fontSize: 13 }}>
+                <span style={{ color: CP.textMuted }}>Id utente</span><span style={{ color: CP.textSecondary, wordBreak: "break-all" }}>{session.userId}</span>
+                <span style={{ color: CP.textMuted }}>Profilo fan</span><span style={{ color: CP.textSecondary }}>{session.fanProfileId || "—"}</span>
+                <span style={{ color: CP.textMuted }}>Creator</span><span style={{ color: CP.textSecondary }}>{session.creatorName || score.creatorName || "—"}</span>
+                <span style={{ color: CP.textMuted }}>Operatore di riferimento del voto</span><span style={{ color: CP.textSecondary }}>{score.benchmarkOperator || "spagnuolo (default)"}</span>
+                <span style={{ color: CP.textMuted }}>Durata</span><span style={{ color: CP.textSecondary, fontVariantNumeric: "tabular-nums" }}>{session.duration || 0} s</span>
               </div>
-
-              <div style={styles.section}>
-                <div style={styles.label}>Skills</div>
-                <SkillBar label="Naturalezza" value={skills.naturalezza} />
-                <SkillBar label="Esclusività" value={skills.esclusivita} />
-                <SkillBar label="Dipendenza" value={skills.dipendenza} />
-                <SkillBar label="Conversione" value={skills.conversione} />
-                <SkillBar label="Tono" value={skills.tono} />
-                <SkillBar
-                  label="Gestione obiezioni"
-                  value={skills.gestione_obiezioni}
-                />
-              </div>
-            </div>
-
-            {(score.strengths?.length ||
-              score.improvements?.length ||
-              score.tip ||
-              score.best_message ||
-              score.worst_message) && (
-              <div style={{ ...styles.card, marginTop: 14 }}>
-                <h2 style={styles.h2}>Feedback</h2>
-
-                {score.strengths?.length > 0 && (
-                  <div style={styles.section}>
-                    <div style={styles.label}>Punti di forza</div>
-                    <ul style={{ margin: 0, paddingLeft: 18 }}>
-                      {score.strengths.map((s, i) => (
-                        <li key={i} style={styles.feedback}>
-                          {s}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {score.improvements?.length > 0 && (
-                  <div style={styles.section}>
-                    <div style={styles.label}>Da migliorare</div>
-                    <ul style={{ margin: 0, paddingLeft: 18 }}>
-                      {score.improvements.map((s, i) => (
-                        <li key={i} style={styles.feedback}>
-                          {s}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {score.best_message && (
-                  <div style={styles.section}>
-                    <div style={styles.label}>Messaggio migliore</div>
-                    <div style={styles.feedback}>{score.best_message}</div>
-                  </div>
-                )}
-
-                {score.worst_message && (
-                  <div style={styles.section}>
-                    <div style={styles.label}>Messaggio più debole</div>
-                    <div style={styles.feedback}>{score.worst_message}</div>
-                  </div>
-                )}
-
-                {score.tip && (
-                  <div style={styles.section}>
-                    <div style={styles.label}>Tip</div>
-                    <div
-                      style={{
-                        ...styles.feedback,
-                        background: COLORS.charcoal,
-                        padding: 10,
-                        borderRadius: 8,
-                        borderLeft: `3px solid ${COLORS.champagne}`,
-                      }}
-                    >
-                      {score.tip}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {score.signals && (
-              <div style={{ marginTop: 14 }}>
-                <SignalsPanel data={score.signals} />
-              </div>
-            )}
-
-            <div style={{ ...styles.card, marginTop: 14 }}>
-              <h2 style={styles.h2}>Metadata</h2>
-              <div style={styles.note}>userId: {session.userId}</div>
-              <div style={styles.note}>fanProfile: {session.fanProfileId || "—"}</div>
-              <div style={styles.note}>
-                creator: {session.creatorName || score.creatorName || "—"}
-              </div>
-              <div style={styles.note}>
-                benchmark: {score.benchmarkOperator || "spagnuolo (default)"}
-              </div>
-              <div style={styles.note}>durata: {session.duration || 0}s</div>
-            </div>
+            </Disclosure>
           </div>
         </div>
       </div>
-    </div>
+    </Wrap>
   );
 }

@@ -1,28 +1,26 @@
 "use client";
 
+// Dati demo dell'Academy.
+// Ridisegno 26/09/2026 (design system): avviso esplicito che i dati finti
+// finiscono nella classifica Academy VERA (la vedono anche gli operatori, che
+// entrano nell'app da questa settimana); azioni con parole al posto di emoji e
+// colori pieni; il resoconto tecnico dell'API resta disponibile ma chiuso.
+// API, azioni e conferme invariate.
+
 import { useState } from "react";
 import Link from "next/link";
-import { COLORS, CP, alpha } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
-
-const C = {
-  bgDark: COLORS.obsidian,
-  orange: COLORS.champagne,
-  purple: COLORS.cobalt,
-  green: COLORS.verdant,
-  red: COLORS.signal,
-  white: COLORS.alabaster,
-  gray: COLORS.mist,
-};
+import { CP, FONTS } from "@/lib/brand";
+import { PageHead, SectionTitle, Notice, Disclosure, card } from "@/components/ds";
 
 export default function SeedAdminPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [rawOpen, setRawOpen] = useState(false);
 
   const run = async (action) => {
-    if (action === "clear" && !confirm("Sicuro di voler cancellare tutti i dati seed?")) return;
-    if (action === "reseed" && !confirm("Questo cancella i seed esistenti e li ricrea. Confermi?")) return;
+    if (action === "clear" && !confirm("Sicuro di voler cancellare tutti i dati demo?")) return;
+    if (action === "reseed" && !confirm("Questo cancella i dati demo esistenti e li ricrea. Confermi?")) return;
     setLoading(true); setError(null); setResult(null);
     try {
       const res = await fetch("/api/admin/seed-leaderboard", {
@@ -37,73 +35,65 @@ export default function SeedAdminPage() {
     setLoading(false);
   };
 
-  const btn = (bg) => ({
-    padding: "0.75rem 1.5rem",
-    background: bg,
-    color: C.white,
-    border: "none",
-    borderRadius: "0.5rem",
-    fontSize: "0.95rem",
-    fontWeight: 700,
+  const btn = (primary, danger) => ({
+    padding: "9px 16px",
+    borderRadius: 8,
+    border: `1px solid ${primary ? CP.accent : CP.border}`,
+    background: primary ? CP.accent : CP.surface,
+    color: primary ? CP.accentInk : danger ? CP.accentRed : CP.textPrimary,
+    fontSize: 13,
+    fontWeight: 500,
+    fontFamily: FONTS.body,
     cursor: loading ? "wait" : "pointer",
     opacity: loading ? 0.6 : 1,
   });
+  const actionLabel = { seed: "Dati demo creati", reseed: "Dati demo ricreati", clear: "Dati demo cancellati" };
 
   return (
-    <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "32px 28px 64px 28px" }}>
-      <div style={{ maxWidth: 900, margin: "0 auto" }}>
-        <PageHeader
-          breadcrumb={
-            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-              <span style={{ color: CP.textMuted }}>›</span>
-              <span style={{ color: CP.textPrimary }}>Seed Demo Data</span>
-            </div>
-          }
-          section="Data · Demo"
-          title="Seed Demo Data"
-          subtitle={<>Popola la leaderboard con <strong>10 operatori fittizi</strong> e <strong>~60 giorni di sessioni</strong> con profili skill differenziati. Crea anche 3 snapshot storici per la Hall of Fame.</>}
-        />
+    <div style={{ padding: "28px 24px 64px", maxWidth: 900, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Dati" }, { label: "Dati demo" }]}
+        title="Dati demo dell'Academy"
+        subtitle="Riempie la classifica dell'Academy con 10 operatori finti e circa 60 giorni di sessioni di allenamento, più 3 settimane storiche nella Hall of Fame. Serve per mostrare l'Academy a qualcuno quando i dati veri sono pochi."
+      />
 
-        <div style={{ background: `${alpha(C.purple, "15")}`, border: `1px solid ${alpha(C.purple, "40")}`, borderRadius: "0.75rem", padding: "1rem", marginBottom: "1.5rem", fontSize: "0.85rem" }}>
-          <div style={{ color: C.purple, fontWeight: 700, marginBottom: "0.5rem" }}>📋 Profilo operatori:</div>
-          <div style={{ color: C.gray, lineHeight: 1.8 }}>
-            Giorgia (top: esclusività+dipendenza) · Martina (top: conversione) · Alessia (top: naturalezza) · Sara (top: dipendenza) · Elena · Chiara · Federica · Valentina · Ilaria · Roberta (meno attiva)
-          </div>
+      <Notice danger>
+        I dati finti entrano nella classifica Academy <b style={{ fontWeight: 500 }}>vera</b>, quella che vedono tutti, operatori compresi. Usali solo per una demo e poi cancellali con «Cancella i dati demo».
+      </Notice>
+
+      <section style={{ ...card, padding: "14px 16px", marginBottom: 16 }}>
+        <SectionTitle>Chi sono gli operatori finti</SectionTitle>
+        <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.7 }}>
+          Giorgia (forte su esclusività e dipendenza) · Martina (conversione) · Alessia (naturalezza) · Sara (dipendenza) · Elena · Chiara · Federica · Valentina · Ilaria · Roberta (meno attiva). I nomi finiscono con l&apos;iniziale del cognome (es. «Giorgia R.»).
         </div>
+      </section>
 
-        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-          <button onClick={() => run("seed")} disabled={loading} style={btn(C.green)}>
-            🌱 Seed (crea dati)
-          </button>
-          <button onClick={() => run("reseed")} disabled={loading} style={btn(C.orange)}>
-            🔄 Reseed (clear + crea)
-          </button>
-          <button onClick={() => run("clear")} disabled={loading} style={btn(C.red)}>
-            🗑️ Clear seed
-          </button>
-        </div>
-
-        {loading && <div style={{ marginTop: "1.5rem", color: C.gray }}>Esecuzione in corso... (può richiedere 10-30s)</div>}
-
-        {result && (
-          <div style={{ marginTop: "1.5rem", padding: "1rem", background: `${alpha(C.green, "15")}`, border: `1px solid ${C.green}`, borderRadius: "0.5rem" }}>
-            <div style={{ color: C.green, fontWeight: 700, marginBottom: "0.5rem" }}>✓ OK — action: {result.action}</div>
-            <pre style={{ color: C.white, fontSize: "0.8rem", margin: 0, whiteSpace: "pre-wrap" }}>{JSON.stringify(result, null, 2)}</pre>
-            <div style={{ marginTop: "0.75rem", display: "flex", gap: "1rem" }}>
-              <Link href="/leaderboard" style={{ color: C.orange }}>→ Classifica</Link>
-              <Link href="/leaderboard/storico" style={{ color: C.orange }}>→ Hall of Fame</Link>
-              <Link href="/admin/dashboard" style={{ color: C.orange }}>→ Dashboard SM</Link>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div style={{ marginTop: "1.5rem", padding: "1rem", background: `${alpha(C.red, "15")}`, border: `1px solid ${C.red}`, borderRadius: "0.5rem", color: C.red }}>
-            ✗ {error}
-          </div>
-        )}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <button onClick={() => run("seed")} disabled={loading} style={btn(true)}>Crea i dati demo</button>
+        <button onClick={() => run("reseed")} disabled={loading} style={btn(false)}>Ricrea da capo</button>
+        <button onClick={() => run("clear")} disabled={loading} style={btn(false, true)}>Cancella i dati demo</button>
       </div>
+      <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 8 }}>«Ricrea da capo» cancella i dati demo e li genera di nuovo. I dati veri non vengono toccati.</div>
+
+      {loading && <div style={{ marginTop: 16, color: CP.textMuted, fontSize: 14 }}>In corso… (può richiedere 10-30 secondi)</div>}
+
+      {error && <div style={{ marginTop: 16 }}><Notice danger>{error}</Notice></div>}
+
+      {result && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ ...card, padding: "14px 16px", marginBottom: 12 }}>
+            <div style={{ fontSize: 14, color: CP.textPrimary, marginBottom: 8 }}>{actionLabel[result.action] || `Fatto: ${result.action}`}.</div>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13 }}>
+              <Link href="/leaderboard" style={{ color: CP.accentSoftText }}>Classifica Academy →</Link>
+              <Link href="/leaderboard/storico" style={{ color: CP.accentSoftText }}>Hall of Fame →</Link>
+              <Link href="/admin/dashboard" style={{ color: CP.accentSoftText }}>Dashboard SM →</Link>
+            </div>
+          </div>
+          <Disclosure open={rawOpen} onToggle={() => setRawOpen((v) => !v)} title="Dettaglio tecnico" summary="la risposta completa del server">
+            <pre style={{ color: CP.textSecondary, fontSize: 12, margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{JSON.stringify(result, null, 2)}</pre>
+          </Disclosure>
+        </div>
+      )}
     </div>
   );
 }

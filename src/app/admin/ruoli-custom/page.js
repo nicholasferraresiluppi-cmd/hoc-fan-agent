@@ -1,16 +1,26 @@
 "use client";
 
-import { CAP_LABELS as CAP_LABELS_SHARED } from "@/lib/capability-labels";
+// Ruoli custom — ruoli su misura oltre ai 5 predefiniti.
+// Ridisegno 26/09/2026 (design system): prima i ruoli che esistono già (tabella
+// con Modifica/Elimina), poi l'editor. Gli scope own/team/all sono spiegati a
+// parole ("solo i propri dati", "il proprio team", "tutti"). API, validazione e
+// conferma di eliminazione invariate; i limiti anti-escalation stanno lato API.
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { CP, alpha } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
+import { CAP_LABELS as CAP_LABELS_SHARED, SCOPE_LABELS } from "@/lib/capability-labels";
+
+import { useEffect, useRef, useState } from "react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import { CP, FONTS } from "@/lib/brand";
+import { PageHead, SectionTitle, Notice, DataTable, card } from "@/components/ds";
 
 const CAP_LABELS = CAP_LABELS_SHARED;
 
-const SCOPE_LABEL = { own: "own (sé)", team: "team", all: "all" };
-const SCOPE_COLOR = { own: CP.accentGreen, team: CP.accentSoftText, all: CP.accent };
+const SCOPE_LABEL = { own: "Solo i propri", team: "Il suo team", all: "Tutti" };
+const SCOPE_HINT = {
+  own: "vede e usa solo i propri dati",
+  team: "vede i dati del proprio team",
+  all: "vede i dati di tutti",
+};
 
 const PALETTE = [CP.textMuted, CP.accentRed, CP.accent, CP.accentGreen, CP.accentSoftText, CP.accentSoftText, CP.textSecondary, CP.accentGreen];
 const EMOJIS = ["🎖️", "🛡️", "⚡", "🎯", "🚀", "🔧", "📊", "🧭", "🏆", "🕹️", "👔", "🧩"];
@@ -19,11 +29,17 @@ function emptyRole() {
   return { id: "", name: "", emoji: "🎖️", color: CP.textMuted, description: "", capabilities: {} };
 }
 
+const field = { width: "100%", boxSizing: "border-box", padding: "8px 10px", background: CP.bg, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 14, fontFamily: FONTS.body };
+const lbl = { display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 4 };
+const btn = (primary) => ({ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: `1px solid ${primary ? CP.accent : CP.border}`, background: primary ? CP.accent : CP.surface, color: primary ? CP.accentInk : CP.textPrimary, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" });
+const smallBtn = { ...btn(false), padding: "5px 10px", fontSize: 12, fontWeight: 400 };
+
 export default function CustomRolesPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState(emptyRole());
   const [busy, setBusy] = useState(false);
+  const editorRef = useRef(null);
 
   const load = async () => {
     setLoading(true);
@@ -37,7 +53,10 @@ export default function CustomRolesPage() {
   };
   useEffect(() => { load(); }, []);
 
-  const editRole = (r) => setDraft(JSON.parse(JSON.stringify(r)));
+  const editRole = (r) => {
+    setDraft(JSON.parse(JSON.stringify(r)));
+    setTimeout(() => editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
   const resetDraft = () => setDraft(emptyRole());
 
   const toggleCap = (cap) => {
@@ -51,7 +70,7 @@ export default function CustomRolesPage() {
   };
 
   const save = async () => {
-    if (!draft.id || !draft.name) { alert("id e name richiesti"); return; }
+    if (!draft.id || !draft.name) { alert("Servono un ID e un nome."); return; }
     setBusy(true);
     try {
       const res = await fetch("/api/admin/custom-roles", {
@@ -78,102 +97,145 @@ export default function CustomRolesPage() {
 
   const caps = data?.capabilities || [];
   const scopes = data?.scopes || ["own", "team", "all"];
+  const roles = data?.roles || [];
+  const editingExisting = draft.id?.startsWith("c:");
+  const activeCount = Object.keys(draft.capabilities || {}).length;
+
+  const columns = [
+    {
+      key: "name", label: "Ruolo", sort: (r) => (r.name || "").toLowerCase(),
+      render: (r) => (
+        <div>
+          <div style={{ color: CP.textPrimary }}>{r.emoji} {r.name}</div>
+          <div style={{ fontSize: 12, color: CP.textMuted }}>{r.id}</div>
+        </div>
+      ),
+    },
+    { key: "description", label: "A cosa serve", muted: true, sort: (r) => r.description || "", render: (r) => r.description || "—" },
+    {
+      key: "caps", label: "Permessi", sort: (r) => Object.keys(r.capabilities || {}).length,
+      render: (r) => {
+        const e = Object.entries(r.capabilities || {});
+        if (!e.length) return <span style={{ color: CP.textMuted }}>nessuno</span>;
+        return (
+          <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.5 }}>
+            {e.map(([c, s]) => (
+              <div key={c}>{CAP_LABELS[c] || c} <span style={{ color: CP.textMuted }}>· {SCOPE_LABELS[s] || s}</span></div>
+            ))}
+          </div>
+        );
+      },
+    },
+    {
+      key: "actions", label: "", sortable: false, align: "right",
+      render: (r) => (
+        <div style={{ display: "inline-flex", gap: 6 }}>
+          <button onClick={() => editRole(r)} style={smallBtn}><Pencil size={12} /> Modifica</button>
+          <button onClick={() => remove(r.id)} style={{ ...smallBtn, color: CP.accentRed }}><Trash2 size={12} /> Elimina</button>
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div style={{ background: CP.bg, minHeight: "100vh", color: CP.textPrimary, padding: "32px 28px 64px 28px", maxWidth: 1400, margin: "0 auto" }}>
-      <PageHeader
-        breadcrumb={
-          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <span style={{ color: CP.textPrimary }}>Ruoli custom</span>
-          </div>
-        }
-        section="People · Permissions"
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "People" }, { label: "Ruoli custom" }]}
         title="Ruoli custom"
-        subtitle={<>Crea ruoli personalizzati affiancati ai 5 predefiniti. Per ogni capability scegli lo scope: <b style={{ color: SCOPE_COLOR.own }}>own</b> · <b style={{ color: SCOPE_COLOR.team }}>team</b> · <b style={{ color: SCOPE_COLOR.all }}>all</b>.</>}
+        subtitle="Ruoli su misura, oltre ai 5 predefiniti. Per ogni permesso scegli fin dove arriva: solo i propri dati, il proprio team o tutti. Poi assegni il ruolo alle persone da Membri."
+        actions={<button style={btn(true)} onClick={() => { resetDraft(); setTimeout(() => editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}><Plus size={14} /> Nuovo ruolo</button>}
       />
 
+      {data?.error && <Notice danger>{data.error}</Notice>}
+
+      {/* Ruoli esistenti */}
+      <section style={{ marginBottom: 28 }}>
+        <SectionTitle aside={loading ? "caricamento…" : `${roles.length} ${roles.length === 1 ? "ruolo" : "ruoli"}`}>Ruoli custom esistenti</SectionTitle>
+        {!loading && roles.length === 0 && !data?.error ? (
+          <div style={{ ...card, padding: 16, fontSize: 14, color: CP.textSecondary }}>
+            Nessun ruolo custom. Servono quando un ruolo predefinito dà troppo o troppo poco (es. un team lead che può anche invitare persone): crealo qui sotto.
+          </div>
+        ) : (
+          <DataTable columns={columns} rows={roles} defaultSort={{ key: "name", dir: 1 }} minWidth={720} maxHeight={480} empty={loading ? "Caricamento…" : "Nessun ruolo."} />
+        )}
+      </section>
+
       {/* Editor */}
-      <div style={{ border: `1px solid ${CP.border}`, borderRadius: 10, padding: "1rem", background: CP.surface, marginBottom: "2rem" }}>
-        <h3 style={{ marginTop: 0 }}>{draft.id?.startsWith("c:") ? `Modifica ${draft.id}` : "Nuovo ruolo"}</h3>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
+      <section ref={editorRef} style={{ ...card, padding: "18px 18px 16px", scrollMarginTop: 16 }}>
+        <SectionTitle aside={editingExisting ? draft.id : "compila e salva"}>{editingExisting ? `Modifica: ${draft.name || draft.id}` : "Nuovo ruolo"}</SectionTitle>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12, marginBottom: 12 }}>
           <label>
-            <div style={{ fontSize: "0.72rem", color: CP.textMuted }}>ID (snake_case, univoco)</div>
+            <span style={lbl}>ID (minuscole e trattini bassi, unico)</span>
             <input
               value={draft.id.replace(/^c:/, "")}
               onChange={(e) => setDraft({ ...draft, id: e.target.value.replace(/[^a-z0-9_]/gi, "_").toLowerCase() })}
               placeholder="es. content_reviewer"
-              disabled={draft.id?.startsWith("c:")}
-              style={{ width: "100%", padding: "0.45rem", background: CP.bg, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 6 }}
+              disabled={editingExisting}
+              style={{ ...field, opacity: editingExisting ? 0.6 : 1 }}
             />
           </label>
           <label>
-            <div style={{ fontSize: "0.72rem", color: CP.textMuted }}>Nome</div>
-            <input
-              value={draft.name}
-              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              placeholder="es. Content Reviewer"
-              style={{ width: "100%", padding: "0.45rem", background: CP.bg, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 6 }}
-            />
+            <span style={lbl}>Nome</span>
+            <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="es. Content reviewer" style={field} />
           </label>
         </div>
 
-        <label style={{ display: "block", marginBottom: "0.75rem" }}>
-          <div style={{ fontSize: "0.72rem", color: CP.textMuted }}>Descrizione</div>
-          <input
-            value={draft.description}
-            onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-            placeholder="A cosa serve questo ruolo?"
-            style={{ width: "100%", padding: "0.45rem", background: CP.bg, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 6 }}
-          />
+        <label style={{ display: "block", marginBottom: 12 }}>
+          <span style={lbl}>Descrizione</span>
+          <input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="A cosa serve questo ruolo?" style={field} />
         </label>
 
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap" }}>
-          <span style={{ fontSize: "0.72rem", color: CP.textMuted }}>Emoji:</span>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13, color: CP.textSecondary }}>Simbolo</span>
           {EMOJIS.map((e) => (
-            <button key={e} onClick={() => setDraft({ ...draft, emoji: e })}
-              style={{ padding: "0.25rem 0.45rem", background: draft.emoji === e ? CP.border : "transparent", border: `1px solid ${CP.border}`, borderRadius: 6, cursor: "pointer" }}>
+            <button key={e} onClick={() => setDraft({ ...draft, emoji: e })} aria-pressed={draft.emoji === e}
+              style={{ padding: "3px 7px", background: draft.emoji === e ? CP.accentSoft : "transparent", border: `1px solid ${draft.emoji === e ? CP.accent : CP.border}`, borderRadius: 6, cursor: "pointer" }}>
               {e}
             </button>
           ))}
-          <span style={{ fontSize: "0.72rem", color: CP.textMuted, marginLeft: "1rem" }}>Colore:</span>
-          {PALETTE.map((c) => (
-            <button key={c} onClick={() => setDraft({ ...draft, color: c })}
-              style={{ width: 22, height: 22, background: c, border: draft.color === c ? `2px solid ${CP.textPrimary}` : `1px solid ${CP.border}`, borderRadius: 999, cursor: "pointer" }} />
+          <span style={{ fontSize: 13, color: CP.textSecondary, marginLeft: 8 }}>Colore</span>
+          {PALETTE.map((c, i) => (
+            <button key={`${c}-${i}`} onClick={() => setDraft({ ...draft, color: c })} aria-label={`Colore ${i + 1}`}
+              style={{ width: 20, height: 20, background: c, border: draft.color === c ? `2px solid ${CP.textPrimary}` : `1px solid ${CP.border}`, borderRadius: 999, cursor: "pointer" }} />
           ))}
         </div>
 
-        <h4 style={{ margin: "1rem 0 0.5rem" }}>Capabilities</h4>
+        <SectionTitle aside={`${activeCount} ${activeCount === 1 ? "attivo" : "attivi"} · spunta un permesso, poi scegli fin dove arriva`}>Permessi</SectionTitle>
         <div style={{ border: `1px solid ${CP.border}`, borderRadius: 8, overflow: "hidden" }}>
-          {caps.map((cap) => {
+          {caps.length === 0 && <div style={{ padding: 12, fontSize: 13, color: CP.textMuted }}>{loading ? "Caricamento…" : "Elenco dei permessi non disponibile."}</div>}
+          {caps.map((cap, i) => {
             const active = !!draft.capabilities?.[cap];
             const scope = draft.capabilities?.[cap];
             return (
-              <div key={cap} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.5rem 0.75rem", borderBottom: `1px solid ${CP.border}`, background: active ? "#101820" : "transparent" }}>
-                <input type="checkbox" checked={active} onChange={() => toggleCap(cap)} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600 }}>{CAP_LABELS[cap] || cap}</div>
-                  <div style={{ fontSize: "0.68rem", color: CP.textMuted }}>{cap}</div>
-                </div>
-                <div style={{ display: "flex", gap: "0.25rem" }}>
+              <div key={cap} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 12px", borderTop: i ? `1px solid ${CP.borderSoft}` : "none", background: active ? CP.surfaceAlt : "transparent", flexWrap: "wrap" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 10, flex: "1 1 260px", cursor: "pointer", minWidth: 0 }}>
+                  <input type="checkbox" checked={active} onChange={() => toggleCap(cap)} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 14, color: active ? CP.textPrimary : CP.textSecondary }}>{CAP_LABELS[cap] || cap}</span>
+                    <span style={{ display: "block", fontSize: 12, color: CP.textMuted }}>{cap}</span>
+                  </span>
+                </label>
+                <div style={{ display: "flex", gap: 4 }} role="group" aria-label={`Fin dove arriva: ${CAP_LABELS[cap] || cap}`}>
                   {scopes.map((s) => (
                     <button
                       key={s}
                       disabled={!active}
                       onClick={() => setCapScope(cap, s)}
+                      title={SCOPE_HINT[s]}
+                      aria-pressed={scope === s}
                       style={{
-                        padding: "0.2rem 0.55rem",
-                        fontSize: "0.7rem",
-                        fontWeight: 700,
-                        background: scope === s ? SCOPE_COLOR[s] : "transparent",
-                        color: scope === s ? CP.accentInk : active ? SCOPE_COLOR[s] : "#444",
-                        border: `1px solid ${active ? SCOPE_COLOR[s] : CP.border}`,
-                        borderRadius: 4,
+                        padding: "4px 10px",
+                        fontSize: 12,
+                        fontFamily: FONTS.body,
+                        background: scope === s ? CP.accentSoft : "transparent",
+                        color: scope === s ? CP.accentSoftText : active ? CP.textSecondary : CP.textMuted,
+                        border: `1px solid ${scope === s ? CP.accent : CP.border}`,
+                        borderRadius: 999,
                         cursor: active ? "pointer" : "not-allowed",
+                        opacity: active ? 1 : 0.5,
                       }}
                     >
-                      {SCOPE_LABEL[s]}
+                      {SCOPE_LABEL[s] || s}
                     </button>
                   ))}
                 </div>
@@ -182,46 +244,13 @@ export default function CustomRolesPage() {
           })}
         </div>
 
-        <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
-          <button onClick={save} disabled={busy}
-            style={{ padding: "0.5rem 1rem", background: CP.accentGreen, color: CP.accentInk, border: 0, borderRadius: 6, fontWeight: 800, cursor: "pointer" }}>
-            {busy ? "Salvo…" : "Salva ruolo"}
+        <div style={{ display: "flex", gap: 8, marginTop: 14, alignItems: "center", flexWrap: "wrap" }}>
+          <button onClick={save} disabled={busy} style={{ ...btn(true), opacity: busy ? 0.6 : 1 }}>
+            {busy ? "Salvo…" : editingExisting ? "Salva modifiche" : "Salva ruolo"}
           </button>
-          <button onClick={resetDraft}
-            style={{ padding: "0.5rem 1rem", background: "transparent", color: CP.textSecondary, border: `1px solid ${CP.border}`, borderRadius: 6, cursor: "pointer" }}>
-            Reset
-          </button>
+          <button onClick={resetDraft} style={btn(false)}>{editingExisting ? "Annulla e svuota" : "Svuota"}</button>
         </div>
-      </div>
-
-      {/* Lista esistenti */}
-      <h3>Ruoli custom esistenti</h3>
-      {loading && <p>Caricamento…</p>}
-      {!loading && (data?.roles || []).length === 0 && <p style={{ color: CP.textMuted }}>Nessun ruolo custom. Creane uno sopra.</p>}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.75rem" }}>
-        {(data?.roles || []).map((r) => (
-          <div key={r.id} style={{ border: `1px solid ${alpha(r.color, "55")}`, borderRadius: 10, padding: "0.75rem", background: `${alpha(r.color, "10")}` }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-              <div>
-                <div style={{ fontWeight: 800, color: r.color }}>{r.emoji} {r.name}</div>
-                <div style={{ fontSize: "0.7rem", color: CP.textMuted }}>{r.id}</div>
-              </div>
-              <div style={{ display: "flex", gap: "0.25rem" }}>
-                <button onClick={() => editRole(r)} style={{ padding: "0.2rem 0.5rem", background: "transparent", color: CP.textSecondary, border: `1px solid ${CP.border}`, borderRadius: 4, cursor: "pointer", fontSize: "0.7rem" }}>✎</button>
-                <button onClick={() => remove(r.id)} style={{ padding: "0.2rem 0.5rem", background: "transparent", color: CP.accentRed, border: `1px solid ${CP.accentRed}`, borderRadius: 4, cursor: "pointer", fontSize: "0.7rem" }}>×</button>
-              </div>
-            </div>
-            {r.description && <div style={{ fontSize: "0.75rem", color: CP.textSecondary, marginTop: "0.35rem" }}>{r.description}</div>}
-            <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
-              {Object.entries(r.capabilities || {}).map(([c, s]) => (
-                <span key={c} style={{ fontSize: "0.65rem", padding: "0.1rem 0.35rem", borderRadius: 4, background: `${alpha(SCOPE_COLOR[s], "22")}`, border: `1px solid ${SCOPE_COLOR[s]}`, color: SCOPE_COLOR[s] }}>
-                  {c}:{s}
-                </span>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+      </section>
     </div>
   );
 }

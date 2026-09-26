@@ -1,34 +1,38 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import { Search, AlertCircle, CheckCircle2, AlertTriangle, XCircle, HelpCircle, FileText, Loader2, Coins, Percent, Users } from "lucide-react";
-import { CP, FONTS, alpha } from "@/lib/brand";
-import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
-import CompNav from "@/components/CompNav";
-
 /**
- * /admin/comp-exam — Esame compensation per UN creator.
- * Input: nome creator + numero mesi
- * Output: tabella operatori con profilo attivo, % effettiva, verdetto +
- * sintesi narrativa con candidati da rivedere e profili OLD da pulire.
+ * /admin/comp-exam — Esame compensi per UNA creator.
+ * Input: nome creator + numero mesi.
+ * Output: quanto è costato il team sul venduto (numero principale), chi incassa
+ * fuori dalla media del team (verdetto), cosa fare, profili vecchi da pulire.
+ *
+ * Redesign 26/09/2026 (design system, pannello tester PAY/BOARD/SM/UX):
+ * - la pagina vuota ora spiega cosa si ottiene prima di avviare l'esame;
+ * - il numero principale è la % del venduto pagata al team, col margine HOC accanto;
+ * - verdetti in parole ("In linea", "Da rivedere", "Molto fuori media") con la
+ *   regola scritta (±15% / ±35% dalla media del team) invece di etichette in inglese;
+ * - "Sintesi narrativa" → "Cosa fare": prima l'azione, poi il dettaglio.
+ * API e calcoli invariati.
  */
 
-const VERDICT_STYLE = {
-  OK:           { color: "#3FB97E", icon: CheckCircle2, label: "OK" },
-  REVIEW:       { color: "#F59E0B", icon: AlertTriangle, label: "RIVEDIBILE" },
-  OUT_OF_SCALE: { color: "#D44545", icon: XCircle, label: "FUORI SCALA" },
-  UNKNOWN:      { color: "#8F8A82", icon: HelpCircle, label: "?" },
-};
+import { useState, useEffect } from "react";
+import { Search, AlertTriangle, CheckCircle2, XCircle, HelpCircle, Loader2 } from "lucide-react";
+import { CP, FONTS, DATA_SCALE } from "@/lib/brand";
+import { useTheme } from "@/lib/theme-client";
+import CompNav from "@/components/CompNav";
+import { fmt$, fmtInt, fmtPct } from "@/lib/format";
+import { PageHead, HeroMetric, Metric, SectionTitle, Notice, DataTable, card, NUM } from "@/components/ds";
 
-function fmtCurrency(n) {
-  if (n == null) return "—";
-  return `$${Math.round(n).toLocaleString("it-IT")}`;
-}
-function fmtPct(v, digits = 1) {
-  if (v == null) return "—";
-  return `${(v * 100).toFixed(digits)}%`;
-}
+// Verdetto: il rosso solo per "molto fuori media" (segnale su un dato).
+const VERDICT = {
+  OK:           { color: CP.textMuted, icon: CheckCircle2, label: "In linea" },
+  REVIEW:       { color: CP.accentSoftText, icon: AlertTriangle, label: "Da rivedere" },
+  OUT_OF_SCALE: { color: CP.accentRed, icon: XCircle, label: "Molto fuori media" },
+  UNKNOWN:      { color: CP.textMuted, icon: HelpCircle, label: "Senza dati" },
+};
+const VERDICT_RANK = { OUT_OF_SCALE: 3, REVIEW: 2, UNKNOWN: 1, OK: 0 };
+const pct1 = (v) => fmtPct(v, 1);
+const monthsLabel = (n) => `${n} mes${n === 1 ? "e" : "i"}`;
 
 export default function CompExamPage() {
   const [creator, setCreator] = useState("");
@@ -73,65 +77,58 @@ export default function CompExamPage() {
   }
 
   return (
-    <div style={{ padding: "32px 28px 80px 28px", maxWidth: 1500, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
-      <PageHeader
-        breadcrumb={
-          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <span style={{ color: CP.textPrimary }}>Esame compensation</span>
-          </div>
-        }
-        section="Data · Comp & Ben"
-        title="Esame compensation per creator"
-        subtitle="Per un creator scelta: chi ha lavorato, con che risultati, con che profilo pagamento, e se quel profilo è coerente con la performance. Tabella + sintesi narrativa."
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Comp & Ben" }, { label: "Esame creator" }]}
+        title="Esame compensi per creator"
+        subtitle="Scegli una creator: vedi quanto del venduto è andato agli operatori, chi incassa molto più o molto meno della media del team e quali profili di pagamento vanno sistemati in CreatorsPro."
       />
 
       <CompNav />
 
       {/* Form */}
-      <CpCard padding="18px 22px" style={{ marginBottom: 20 }}>
+      <section style={{ ...card, padding: "16px 18px", marginBottom: 16 }}>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 240 }}>
+          <div style={{ flex: "1 1 240px" }}>
             <label style={lbl}>Creator</label>
             <input
               value={creator}
               onChange={(e) => setCreator(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") run(); }}
               placeholder="es. Giulia Ottorini"
+              aria-label="Creator"
               style={input}
             />
           </div>
           <div>
-            <label style={lbl}>Mesi indietro</label>
-            <select value={months} onChange={(e) => setMonths(parseInt(e.target.value, 10))} style={{ ...input, minWidth: 110, cursor: "pointer" }}>
-              {[1, 2, 3, 4, 6, 9, 12].map((n) => <option key={n} value={n} style={{ background: CP.surface }}>{n} mes{n === 1 ? "e" : "i"}</option>)}
+            <label style={lbl}>Mesi chiusi da esaminare</label>
+            <select value={months} onChange={(e) => setMonths(parseInt(e.target.value, 10))} style={{ ...input, minWidth: 120, cursor: "pointer" }}>
+              {[1, 2, 3, 4, 6, 9, 12].map((n) => <option key={n} value={n}>{monthsLabel(n)}</option>)}
             </select>
           </div>
-          <button
-            onClick={() => run()}
-            disabled={loading || !creator.trim()}
-            style={primaryBtn(loading || !creator.trim())}
-          >
+          <button onClick={() => run()} disabled={loading || !creator.trim()} style={primaryBtn(loading || !creator.trim())}>
             {loading ? <><Loader2 size={14} className="animate-spin" /> Esamino…</> : <><Search size={14} /> Avvia esame</>}
           </button>
         </div>
-      </CpCard>
+      </section>
 
-      {error && (
-        <CpCard accent={CP.accentRed} padding="14px 18px" style={{ marginBottom: 20 }}>
-          <div style={{ color: CP.accentRed, display: "flex", alignItems: "flex-start", gap: 10, whiteSpace: "pre-wrap", fontSize: 13 }}>
-            <AlertCircle size={16} style={{ marginTop: 2, flexShrink: 0 }} /> {error}
-          </div>
-        </CpCard>
-      )}
+      {error && <Notice danger><span style={{ whiteSpace: "pre-wrap" }}>{error}</span></Notice>}
 
       {loading && (
-        <CpCard padding="20px 24px">
-          <div style={{ display: "flex", alignItems: "center", gap: 12, color: CP.textSecondary }}>
-            <Loader2 size={16} className="animate-spin" /> Carico {months} mes{months === 1 ? "e" : "i"} di dati + payment profiles + member mapping…
-          </div>
-        </CpCard>
+        <div style={{ ...card, padding: "18px 20px", display: "flex", alignItems: "center", gap: 10, color: CP.textSecondary, fontSize: 14 }}>
+          <Loader2 size={16} className="animate-spin" /> Carico {monthsLabel(months)} di turni, profili di pagamento e collegamenti operatore ↔ CreatorsPro…
+        </div>
+      )}
+
+      {!data && !loading && !error && (
+        <div style={{ ...card, padding: "18px 20px", fontSize: 14, color: CP.textSecondary, lineHeight: 1.6 }}>
+          Scrivi il nome di una creator e premi <b style={{ fontWeight: 500, color: CP.textPrimary }}>Avvia esame</b>. Otterrai:
+          <ul style={{ margin: "8px 0 0 18px", padding: 0 }}>
+            <li>quanto del venduto è andato agli operatori e quanto è rimasto a HOC;</li>
+            <li>per ogni operatore la percentuale incassata davvero, confrontata con la media del team;</li>
+            <li>chi è da rivedere (oltre il 15% sopra o sotto la media) e i profili di pagamento vecchi ancora collegati.</li>
+          </ul>
+        </div>
       )}
 
       {data && <Results data={data} />}
@@ -140,154 +137,134 @@ export default function CompExamPage() {
 }
 
 function Results({ data }) {
+  const [theme] = useTheme();
+  const S = DATA_SCALE[theme] || DATA_SCALE.light;
   const teamPct = data.team_avg_pct;
   const totalSales = data.total_team_sales || 0;
+  const nMonths = data.months_analyzed.length;
 
-  // Sintesi narrativa: identifica top REVIEW e OUT_OF_SCALE
   const reviewOps = data.operators.filter((o) => o.verdict === "REVIEW" || o.verdict === "OUT_OF_SCALE");
   const unknownOps = data.operators.filter((o) => o.verdict === "UNKNOWN" && o.totalSales > 0);
   const oldProfiles = data.old_profiles_on_creator || [];
+  const unmapped = data.operators.filter((o) => !o.member_matched).length;
+
+  const columns = [
+    { key: "operator", label: "Operatore", render: (o) => (
+      <div>
+        <div>{o.operator}</div>
+        {!o.member_matched && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2, display: "inline-flex", alignItems: "center", gap: 4 }}><AlertTriangle size={11} /> non collegato a CreatorsPro</div>}
+      </div>
+    ) },
+    { key: "totalShifts", label: "Turni", align: "right", render: (o) => o.totalShifts.toLocaleString("it-IT", { maximumFractionDigits: 1 }) },
+    { key: "totalSales", label: "Venduto", align: "right", render: (o) => fmt$(o.totalSales) },
+    { key: "mix_solo_pct", label: "Turni da solo", align: "right", render: (o) => (o.mix_solo_pct != null ? `${o.mix_solo_pct}%` : "—") },
+    { key: "totalEarnings", label: "Pagato", align: "right", render: (o) => fmt$(o.totalEarnings) },
+    { key: "pct_effective", label: "% incassata", align: "right", render: (o) => {
+      if (o.pct_effective == null) return "—";
+      const off = teamPct != null && Math.abs((o.pct_effective - teamPct) / teamPct) > 0.15;
+      return <span style={{ fontWeight: 500, color: off ? CP.accentSoftText : CP.textPrimary }}>{pct1(o.pct_effective)}</span>;
+    } },
+    { key: "mix", label: "Scaglioni pagati", sortable: false, render: (o) => <PctDistribution dist={o.pct_distribution} S={S} /> },
+    { key: "verdict", label: "Verdetto", sort: (o) => VERDICT_RANK[o.verdict] ?? 0, render: (o) => {
+      const v = VERDICT[o.verdict] || VERDICT.UNKNOWN;
+      const Icon = v.icon;
+      return (
+        <div>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: v.color, fontSize: 13 }}><Icon size={13} /> {v.label}</span>
+          {o.verdict_note && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2, maxWidth: 260 }}>{o.verdict_note}</div>}
+        </div>
+      );
+    } },
+  ];
 
   return (
     <>
-      {/* Stat header */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <StatCard label="Creator esaminata" value={data.creator.name} />
-        <StatCard label="Operatori attivi" value={data.operators_count} sub={`su ${data.months_analyzed.length} mes${data.months_analyzed.length === 1 ? "e" : "i"}`} />
-        <StatCard label="Sales team totale" value={fmtCurrency(totalSales)} color={CP.accentGreen} />
-        <StatCard label="Guadagno team totale" value={fmtCurrency(data.total_team_earnings)} color="#D4AF7A" />
-        <StatCard label="% media team incassata" value={fmtPct(teamPct)} color="#D4AF7A" sub="= guadagno / sales" />
-        <StatCard label="Profili linkati" value={data.total_profiles_on_creator} sub={oldProfiles.length > 0 ? `${oldProfiles.length} OLD da pulire` : null} color={oldProfiles.length > 0 ? "#F59E0B" : null} />
-      </div>
-
-      {/* Mesi analizzati */}
-      <div style={{ marginBottom: 14, fontSize: 12, color: CP.textSecondary }}>
-        Mesi: <code style={mono}>{data.months_analyzed.join(", ")}</code>
-        {data.months_errors?.length > 0 && (
-          <span style={{ marginLeft: 12, color: "#F59E0B" }}>⚠️ Errori su: {data.months_errors.map((e) => e.period_id).join(", ")}</span>
-        )}
-        {data.creator.matched_aliases?.length > 0 && (
-          <span style={{ marginLeft: 12, color: CP.textMuted }}>Alias creator nei dati: <code style={mono}>{data.creator.matched_aliases.join(", ")}</code></span>
-        )}
-      </div>
-
-      {/* Tabella principale */}
-      <SectionLabel style={{ display: "block", marginBottom: 10 }}>
-        Tabella operatori · ordinati per sales decrescente
-      </SectionLabel>
-      <CpCard padding="0" style={{ overflow: "hidden", marginBottom: 24 }}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: CP.surfaceAlt, borderBottom: `2px solid ${CP.border}` }}>
-                <Th>#</Th>
-                <Th>Operatore</Th>
-                <Th align="right">Turni</Th>
-                <Th align="right">Sales $</Th>
-                <Th align="right">Solo %</Th>
-                <Th align="right">Guadagno reale</Th>
-                <Th align="right">% effettiva</Th>
-                <Th>Mix scaglioni applicati</Th>
-                <Th>Verdetto</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.operators.map((o, i) => <OpRow key={o.operator} o={o} rank={i + 1} teamPct={teamPct} />)}
-              {data.operators.length === 0 && (
-                <tr><td colSpan={10} style={{ padding: "20px 16px", textAlign: "center", color: CP.textMuted, fontStyle: "italic" }}>
-                  Nessun operatore ha lavorato su questa creator nei mesi selezionati.
-                </td></tr>
-              )}
-            </tbody>
-          </table>
+      <HeroMetric
+        label={`Pagato agli operatori sul venduto · ${data.creator.name}`}
+        value={pct1(teamPct)}
+        compare={teamPct != null ? `A HOC resta ${fmt$(totalSales - data.total_team_earnings)} (${pct1(1 - teamPct)} del venduto)` : null}
+        hint={`${monthsLabel(nMonths)} chius${nMonths === 1 ? "o" : "i"}: ${data.months_analyzed.join(", ")}`}
+      >
+        <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <Metric label="Venduto" value={fmt$(totalSales)} />
+          <Metric label="Pagato agli operatori" value={fmt$(data.total_team_earnings)} />
+          <Metric label="Operatori" value={fmtInt(data.operators_count)} />
+          <Metric label="Da rivedere" value={fmtInt(reviewOps.length)} danger={data.operators.some((o) => o.verdict === "OUT_OF_SCALE")} />
+          <Metric label="Profili collegati" value={fmtInt(data.total_profiles_on_creator)} note={oldProfiles.length ? `${oldProfiles.length} vecchi da pulire` : null} />
         </div>
-      </CpCard>
+      </HeroMetric>
 
-      {/* Sintesi narrativa */}
-      <CpCard padding="20px 24px" style={{ marginBottom: 20 }}>
-        <SectionLabel style={{ display: "block", marginBottom: 12 }}>
-          <FileText size={13} style={{ verticalAlign: "middle", marginRight: 6 }} />
-          Sintesi narrativa
-        </SectionLabel>
-        <div style={{ fontSize: 13, color: CP.textPrimary, lineHeight: 1.7 }}>
-          <p>
-            <b>{data.creator.name}</b> — analisi su {data.months_analyzed.length} mes{data.months_analyzed.length === 1 ? "e" : "i"} chius{data.months_analyzed.length === 1 ? "o" : "i"} ({data.months_analyzed.join(", ")}).
-            Su questa creator hanno lavorato <b>{data.operators_count} operatori</b>, generando <b>{fmtCurrency(totalSales)}</b> di sales totali e
-            incassando <b>{fmtCurrency(data.total_team_earnings)}</b> di compensi.
-            La <b>% media REALE</b> incassata dal team è <b>{fmtPct(teamPct)}</b> (= guadagno / sales, dato CP).
-            Margine residuo HOC: <b>{fmtCurrency(totalSales - data.total_team_earnings)}</b> ({fmtPct(teamPct != null ? 1 - teamPct : null)}).
-          </p>
+      {data.months_errors?.length > 0 && (
+        <Notice danger>Non sono riuscito a leggere questi mesi: {data.months_errors.map((e) => e.period_id).join(", ")}. I numeri sopra non li includono.</Notice>
+      )}
 
-          {reviewOps.length > 0 && (
+      {/* Cosa fare: l'azione prima del dettaglio */}
+      <section style={{ ...card, padding: "16px 18px", marginBottom: 16 }}>
+        <SectionTitle>Cosa fare</SectionTitle>
+        <div style={{ fontSize: 14, color: CP.textSecondary, lineHeight: 1.6 }}>
+          {reviewOps.length > 0 ? (
             <>
-              <p style={{ marginTop: 12 }}><b>Operatori da rivedere ({reviewOps.length}):</b></p>
-              <ul style={{ marginLeft: 16, marginTop: 4 }}>
+              <p style={{ margin: "0 0 8px", color: CP.textPrimary }}>
+                Rivedi con HR {reviewOps.length === 1 ? "l'operatore" : `i ${reviewOps.length} operatori`} fuori dalla media del team. Chi incassa meno rischia di demotivarsi; chi incassa di più erode il margine HOC.
+              </p>
+              <ul style={{ margin: "0 0 0 18px", padding: 0 }}>
                 {reviewOps.slice(0, 5).map((o) => {
-                  const dir = o.pct_effective != null && teamPct != null
-                    ? (o.pct_effective > teamPct ? "sopra-pagato" : "sotto-pagato")
-                    : null;
+                  const dir = o.pct_effective != null && teamPct != null ? (o.pct_effective > teamPct ? "incassa più della media" : "incassa meno della media") : null;
                   return (
-                    <li key={o.operator} style={{ marginBottom: 6 }}>
-                      <b>{o.operator}</b> ({fmtCurrency(o.totalSales)} sales, {o.totalShifts.toFixed(1)} turni){" "}
-                      {dir && <>— {dir}: profilo "{o.active_profile?.name}" gli rende {fmtPct(o.pct_effective)} vs media team {fmtPct(teamPct)}.</>}
+                    <li key={o.operator} style={{ marginBottom: 4 }}>
+                      <span style={{ color: CP.textPrimary }}>{o.operator}</span> ({fmt$(o.totalSales)} venduti, {o.totalShifts.toLocaleString("it-IT", { maximumFractionDigits: 1 })} turni)
+                      {dir && <> — {dir}: con il profilo “{o.active_profile?.name}” prende {pct1(o.pct_effective)} contro {pct1(teamPct)} del team.</>}
                       {o.verdict_note && !dir && <> — {o.verdict_note}</>}
                     </li>
                   );
                 })}
               </ul>
             </>
+          ) : (
+            <p style={{ margin: 0 }}>Nessun operatore è oltre il 15% sopra o sotto la media del team: i compensi su questa creator sono coerenti. Nessuna azione per ora; ricontrolla il mese prossimo.</p>
           )}
-
           {unknownOps.length > 0 && (
-            <p style={{ marginTop: 12 }}>
-              <b>{unknownOps.length} operator{unknownOps.length === 1 ? "e" : "i"}</b> {unknownOps.length === 1 ? "ha" : "hanno"} lavorato su questa creator ma <b>non riusciamo ad attribuirgli un profilo pagamento</b>:
-              {" "}{unknownOps.slice(0, 5).map((o) => o.operator).join(", ")}
-              {unknownOps.length > 5 && ` (+${unknownOps.length - 5})`}.
-              {" "}Verificare il mapping CP member ↔ operatore Infloww in Debug Mapping.
+            <p style={{ margin: "10px 0 0" }}>
+              {unknownOps.length === 1 ? "1 operatore ha" : `${unknownOps.length} operatori hanno`} venduto su questa creator ma non riusciamo ad abbinarl{unknownOps.length === 1 ? "o" : "i"} a un profilo di pagamento: {unknownOps.slice(0, 5).map((o) => o.operator).join(", ")}{unknownOps.length > 5 && ` (+${unknownOps.length - 5})`}. Controlla il collegamento operatore ↔ CreatorsPro.
             </p>
           )}
-
           {oldProfiles.length > 0 && (
-            <p style={{ marginTop: 12 }}>
-              <b>{oldProfiles.length} profil{oldProfiles.length === 1 ? "o" : "i"} OLD/DISMESSO/TEST</b> ancora linkat{oldProfiles.length === 1 ? "o" : "i"} a questa creator — da pulire in CP:
-              {" "}{oldProfiles.map((p) => `"${p.name}"`).join(", ")}.
+            <p style={{ margin: "10px 0 0" }}>
+              {oldProfiles.length === 1 ? "1 profilo vecchio (dismesso o di prova) è" : `${oldProfiles.length} profili vecchi (dismessi o di prova) sono`} ancora collegat{oldProfiles.length === 1 ? "o" : "i"} a questa creator: da togliere in CreatorsPro (elenco sotto).
             </p>
           )}
-
-          <p style={{ marginTop: 14, padding: "10px 12px", background: CP.surfaceAlt, borderLeft: `3px solid ${CP.accentGreen}`, borderRadius: 4, fontSize: 12, color: CP.textSecondary }}>
-            <b>Suggerimento operativo:</b>{" "}
-            {reviewOps.length > 0
-              ? `Aprire una review con HR sui ${reviewOps.length} operatori "RIVEDIBILE/FUORI SCALA" sopra. Per i sotto-pagati il rischio è demotivazione; per i sopra-pagati il margine HOC è erosivo.`
-              : `Setup compensation coerente — no action immediata richiesta. Continuare a monitorare con questo strumento mese per mese.`}
-          </p>
         </div>
-      </CpCard>
+      </section>
 
-      {/* Profili OLD section */}
+      <SectionTitle aside={`Media del team ${pct1(teamPct)}. “Da rivedere” = oltre il 15% sopra o sotto la media; “Molto fuori media” = oltre il 35%.${unmapped ? ` ${unmapped} non collegati a CreatorsPro.` : ""}`}>
+        Operatori su questa creator
+      </SectionTitle>
+      <div style={{ marginBottom: 20 }}>
+        <DataTable columns={columns} rows={data.operators.map((o) => ({ ...o, id: o.operator }))} defaultSort={{ key: "totalSales", dir: -1 }} minWidth={960} maxHeight={640}
+          empty="Nessun operatore ha lavorato su questa creator nei mesi scelti. Prova ad allargare il periodo." />
+      </div>
+
       {oldProfiles.length > 0 && (
-        <>
-          <SectionLabel style={{ display: "block", marginBottom: 10, color: "#F59E0B" }}>
-            Profili OLD/DISMESSO/TEST ancora linkati alla creator
-          </SectionLabel>
-          <CpCard accent="#F59E0B" padding="14px 18px" style={{ marginBottom: 20 }}>
-            {oldProfiles.map((p) => (
-              <div key={p.id} style={{ padding: "8px 0", borderBottom: `1px solid ${CP.border}`, fontSize: 13 }}>
-                <div style={{ fontWeight: 600 }}>{p.name}</div>
-                {p.members_linked && p.members_linked.length > 0 && (
-                  <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 2 }}>
-                    Operatori linkati: {p.members_linked.join(", ")}
-                  </div>
-                )}
-              </div>
-            ))}
-          </CpCard>
-        </>
+        <section style={{ ...card, padding: "16px 18px", marginBottom: 16 }}>
+          <SectionTitle aside="Profili dismessi o di prova ancora collegati: vanno tolti in CreatorsPro">Profili vecchi da pulire</SectionTitle>
+          {oldProfiles.map((p) => (
+            <div key={p.id} style={{ padding: "8px 0", borderTop: `1px solid ${CP.borderSoft}`, fontSize: 14 }}>
+              <div>{p.name}</div>
+              {p.members_linked && p.members_linked.length > 0 && (
+                <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2 }}>Operatori collegati: {p.members_linked.join(", ")}</div>
+              )}
+            </div>
+          ))}
+        </section>
       )}
 
-      {/* Diagnostics */}
-      <details style={{ marginTop: 20, fontSize: 11, color: CP.textMuted }}>
-        <summary style={{ cursor: "pointer", fontFamily: FONTS.mono }}>Diagnostica</summary>
-        <pre style={{ marginTop: 8, padding: "8px 10px", background: CP.surfaceAlt, borderRadius: 4, fontSize: 10, overflow: "auto" }}>
+      {data.creator.matched_aliases?.length > 0 && (
+        <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 10 }}>Nomi della creator trovati nei dati: {data.creator.matched_aliases.join(", ")}</div>
+      )}
+
+      <details style={{ marginTop: 12, fontSize: 12, color: CP.textMuted }}>
+        <summary style={{ cursor: "pointer" }}>Dettagli tecnici (per chi fa manutenzione)</summary>
+        <pre style={{ marginTop: 8, padding: "8px 10px", background: CP.surfaceAlt, borderRadius: 6, fontSize: 11, overflow: "auto", color: CP.textSecondary }}>
           {JSON.stringify(data.diagnostics, null, 2)}
         </pre>
       </details>
@@ -295,102 +272,35 @@ function Results({ data }) {
   );
 }
 
-function OpRow({ o, rank, teamPct }) {
-  const v = VERDICT_STYLE[o.verdict] || VERDICT_STYLE.UNKNOWN;
-  const Icon = v.icon;
-  const showSplit = o.mix_solo_pct != null && o.mix_solo_pct < 100;
+// Scaglioni pagati: una tinta sola (scala dati), più scuro = scaglione più alto.
+function PctDistribution({ dist, S }) {
+  if (!dist || Object.keys(dist).length === 0) return <span style={{ color: CP.textMuted }}>—</span>;
+  const entries = Object.entries(dist).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]));
+  const totalShifts = entries.reduce((s, [, c]) => s + c, 0) || 1;
+  const step = (b) => { const v = parseFloat(b); return v < 0.09 ? 0 : v < 0.11 ? 1 : v < 0.13 ? 2 : 4; };
   return (
-    <tr style={{ borderBottom: `1px solid ${CP.border}`, fontSize: 13 }}>
-      <Td><span style={{ fontFamily: FONTS.mono, color: CP.textMuted, fontSize: 11 }}>{String(rank).padStart(2, "0")}</span></Td>
-      <Td>
-        <div style={{ fontWeight: 600 }}>{o.operator}</div>
-        {!o.member_matched && <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 1 }}>⚠ member CP non mappato</div>}
-      </Td>
-      <Td align="right" mono>{o.totalShifts.toFixed(1)}</Td>
-      <Td align="right" mono><span style={{ color: CP.accentGreen, fontWeight: 600 }}>{fmtCurrency(o.totalSales)}</span></Td>
-      <Td align="right" mono>
-        {o.mix_solo_pct != null ? (
-          <span style={{ color: o.mix_solo_pct >= 80 ? "#4F8CCB" : "#D4AF7A" }}>{o.mix_solo_pct}%</span>
-        ) : "—"}
-        {showSplit && <div style={{ fontSize: 9, color: CP.textMuted }}>{100 - o.mix_solo_pct}% split</div>}
-      </Td>
-      <Td align="right" mono>
-        <span style={{ color: "#D4AF7A", fontWeight: 600 }}>{fmtCurrency(o.totalEarnings)}</span>
-      </Td>
-      <Td align="right" mono>
-        {o.pct_effective != null ? (
-          <span style={{ color: teamPct != null && Math.abs((o.pct_effective - teamPct) / teamPct) > 0.15 ? "#F59E0B" : CP.textPrimary, fontWeight: 600 }}>
-            {fmtPct(o.pct_effective)}
-          </span>
-        ) : "—"}
-      </Td>
-      <Td>
-        <PctDistribution dist={o.pct_distribution} />
-      </Td>
-      <Td>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 8px", borderRadius: 4, background: alpha(v.color, "22"), color: v.color, fontSize: 11, fontWeight: 700 }}>
-          <Icon size={12} /> {v.label}
-        </div>
-        {o.verdict_note && <div style={{ fontSize: 10, color: CP.textMuted, marginTop: 3, maxWidth: 240 }}>{o.verdict_note}</div>}
-      </Td>
-    </tr>
-  );
-}
-
-function PctDistribution({ dist }) {
-  if (!dist || Object.keys(dist).length === 0) {
-    return <span style={{ color: CP.textMuted, fontStyle: "italic", fontSize: 11 }}>—</span>;
-  }
-  const entries = Object.entries(dist);
-  const totalShifts = entries.reduce((s, [, c]) => s + c, 0);
-  // Colore in base al bucket %: <0.10 rosso, 0.10-0.12 giallo, >=0.12 verde
-  const colorFor = (b) => {
-    const v = parseFloat(b);
-    if (v < 0.09) return "#D44545";
-    if (v < 0.11) return "#F59E0B";
-    if (v < 0.13) return "#D4AF7A";
-    return "#3FB97E";
-  };
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 110 }}>
-      {/* Mini-bar chart: una stripe per bucket, larghezza proporzionale al count */}
-      <div style={{ display: "flex", height: 6, borderRadius: 2, overflow: "hidden", background: CP.surfaceAlt }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 120 }}>
+      <div style={{ display: "flex", height: 8, borderRadius: 3, overflow: "hidden", border: `1px solid ${CP.border}` }}>
         {entries.map(([bucket, count]) => (
-          <div
-            key={bucket}
-            title={`${count} turn${count === 1 ? "o" : "i"} al ${(parseFloat(bucket) * 100).toFixed(1)}%`}
-            style={{ width: `${(count / totalShifts) * 100}%`, background: colorFor(bucket) }}
-          />
+          <div key={bucket} title={`${count} turn${count === 1 ? "o" : "i"} al ${fmtPct(parseFloat(bucket), 1)}`}
+            style={{ width: `${(count / totalShifts) * 100}%`, background: S.fill[step(bucket)] }} />
         ))}
       </div>
-      {/* Lista compatta */}
-      <div style={{ fontSize: 10, fontFamily: FONTS.mono, color: CP.textSecondary, lineHeight: 1.35 }}>
-        {entries.map(([bucket, count], i) => (
-          <span key={bucket} style={{ color: colorFor(bucket), marginRight: 6 }}>
-            {count}×{(parseFloat(bucket) * 100).toFixed(0)}%
-          </span>
-        ))}
+      <div style={{ fontSize: 12, color: CP.textSecondary, ...NUM }}>
+        {entries.map(([bucket, count]) => `${count}×${fmtPct(parseFloat(bucket))}`).join("  ")}
       </div>
     </div>
   );
 }
 
-function Th({ children, align }) {
-  return <th style={{ padding: "12px 14px", textAlign: align || "left", fontSize: 10, fontWeight: 700, color: CP.textMuted, letterSpacing: 0.6, fontFamily: FONTS.mono }}>{children}</th>;
-}
-function Td({ children, align, mono }) {
-  return <td style={{ padding: "11px 14px", textAlign: align || "left", fontFamily: mono ? FONTS.mono : FONTS.body, verticalAlign: "top" }}>{children}</td>;
-}
-
-const lbl = { display: "block", fontSize: 10, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
-const input = { width: "100%", padding: "10px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
+const lbl = { display: "block", fontSize: 12, color: CP.textSecondary, fontWeight: 500, marginBottom: 6 };
+const input = { width: "100%", padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, outline: "none", boxSizing: "border-box" };
 const primaryBtn = (disabled) => ({
   display: "inline-flex", alignItems: "center", gap: 8,
-  padding: "12px 20px",
+  padding: "10px 18px",
   background: disabled ? CP.surfaceAlt : CP.accent,
   color: disabled ? CP.textMuted : CP.accentInk,
   border: "none", borderRadius: 8,
-  fontSize: 13, fontWeight: 700, fontFamily: FONTS.body,
+  fontSize: 14, fontWeight: 500, fontFamily: FONTS.body,
   cursor: disabled ? "not-allowed" : "pointer",
 });
-const mono = { padding: "2px 6px", background: CP.bgSunken, borderRadius: 4, fontFamily: "ui-monospace, monospace", fontSize: 11, margin: "0 3px", color: "#f0f0f0" };

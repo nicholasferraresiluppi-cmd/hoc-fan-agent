@@ -6,12 +6,19 @@
 // vendere, il riferimento HOC (creator e operatori modello), i test in corso e
 // gli esempi reali da far studiare agli operatori (/academy/vendere).
 // Coaching, non score: l'indice serve a decidere chi affiancare a chi.
+//
+// Redesign 26/09/2026 (pannello tester SM/TL/UX, seconda passata): la pagina
+// era senza contenitore (attaccata al menu) → contenitore standard; il numero
+// principale (mai paganti che comprano) ha il suo confronto con le creator
+// modello e tutta HOC; schede come FilterChip; tabelle creator e operatori
+// ordinabili (DataTable, intestazione ferma). Tenuti: "pochi dati" sotto 30 PPV,
+// glossario, dichiarazioni su turni singoli e correlazioni.
 
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHeader, PillTab } from "@/components/cp-style";
+import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, NUM } from "@/components/ds";
 
 const fetcher = (url) =>
   fetch(url).then(async (r) => {
@@ -44,7 +51,6 @@ const card = { background: CP.surface, border: `1px solid ${CP.border}`, borderR
 const th = { position: "sticky", top: 0, zIndex: 1, textAlign: "right", padding: "8px 10px", fontSize: 11, color: CP.textMuted, fontWeight: 500, borderBottom: `1px solid ${CP.border}`, whiteSpace: "nowrap", background: CP.bgSunken };
 const td = { textAlign: "right", padding: "8px 10px", fontSize: 13, color: CP.textSecondary, borderBottom: `1px solid ${CP.borderSoft}`, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" };
 const tdL = { ...td, textAlign: "left", color: CP.textPrimary };
-const scrollBox = { overflow: "auto", maxHeight: "70vh", border: `1px solid ${CP.border}`, borderRadius: 10 };
 // Sotto questa soglia di PPV le percentuali di una creator sono rumore: "pochi dati", non un numero
 const MIN_ROW_PPV = 30;
 const few = (n) => <span title={`Solo ${n} PPV nel periodo: percentuale non affidabile`} style={{ color: CP.textMuted, fontSize: 12 }}>pochi dati</span>;
@@ -74,7 +80,7 @@ function Delta({ now, prev }) {
 function IndexCell({ v }) {
   if (v == null) return <span style={{ color: CP.textMuted }}>campione piccolo</span>;
   const c = v >= 1.1 ? CP.accentGreen : v <= 0.9 ? CP.accentRed : CP.textSecondary;
-  return <span style={{ color: c, fontFamily: FONTS.mono }}>{idx(v)}</span>;
+  return <span style={{ color: c, ...NUM }}>{idx(v)}</span>;
 }
 
 // sparkline della conversione settimanale (mai paganti)
@@ -93,18 +99,18 @@ function Spark({ series, w = 110, h = 26 }) {
   if (cur.length) segs.push(cur);
   const last = pts.map((v, i) => [v, i]).filter(([v]) => v != null).pop();
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" style={{ maxWidth: "100%", height: "auto" }}>
       {segs.map((s, i) => <polyline key={i} points={s.join(" ")} fill="none" stroke={CP.accentDim} strokeWidth="1.5" />)}
       {last && <circle cx={last[1] * step} cy={h - 3 - (last[0] / max) * (h - 6)} r="2.5" fill={CP.accent} />}
     </svg>
   );
 }
 
-function Kpi({ label, value, sub, accent }) {
+function Kpi({ label, value, sub }) {
   return (
     <div style={{ ...card, display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
-      <span style={{ fontSize: 11, color: CP.textMuted }}>{label}</span>
-      <span style={{ fontSize: 24, fontWeight: 500, color: accent ? CP.accent : CP.textPrimary, fontFamily: FONTS.mono }}>{value}</span>
+      <span style={{ fontSize: 13, color: CP.textSecondary }}>{label}</span>
+      <span style={{ fontSize: 22, fontWeight: 500, color: CP.textPrimary, ...NUM }}>{value}</span>
       {sub && <span style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.45 }}>{sub}</span>}
     </div>
   );
@@ -164,47 +170,66 @@ function SplitEditor({ names, allIds, split, onSaved, onCancel }) {
 }
 
 // ── Viste ────────────────────────────────────────────────────────────────────
+// Colonne delle tabelle ordinabili. Sotto MIN_ROW_PPV la percentuale è rumore:
+// si mostra "pochi dati" e in ordinamento la riga va in fondo (valore null).
+const thinVal = (p, v) => ((p.recent.chat_ppv || 0) < MIN_ROW_PPV ? null : v);
+function creatorCols(d) {
+  const cell = (p, v, fmt) => ((p.recent.chat_ppv || 0) < MIN_ROW_PPV ? few(p.recent.chat_ppv || 0) : fmt(v));
+  return [
+    { key: "creator", label: "Creator", sort: (p) => d.names[String(p.creator_id)] || String(p.creator_id), render: (p) => d.names[String(p.creator_id)] || p.creator_id },
+    { key: "net", label: "Incasso PPV", align: "right", sort: (p) => p.recent.net, render: (p) => usd(p.recent.net) },
+    { key: "chat_ppv", label: "PPV in chat", align: "right", sort: (p) => p.recent.chat_ppv || 0, render: (p) => (p.recent.chat_ppv || 0).toLocaleString("it-IT") },
+    { key: "conv_nonpayer", label: "% compra · mai paganti", align: "right", sort: (p) => thinVal(p, p.recent.conv_nonpayer),
+      render: (p) => ((p.recent.chat_ppv || 0) < MIN_ROW_PPV ? few(p.recent.chat_ppv || 0) : <>{pct(p.recent.conv_nonpayer)}<Delta now={p.recent.conv_nonpayer} prev={p.prev.conv_nonpayer} /></>) },
+    { key: "conv_payer", label: "% compra · già paganti", align: "right", muted: true, sort: (p) => thinVal(p, p.recent.conv_payer), render: (p) => cell(p, p.recent.conv_payer, pct) },
+    { key: "live_share", label: "PPV a chat viva", align: "right", muted: true, sort: (p) => thinVal(p, p.recent.live_share), render: (p) => cell(p, p.recent.live_share, (v) => pct(v, 0)) },
+    { key: "dead_share", label: "PPV a chat ferma", align: "right", muted: true, sort: (p) => thinVal(p, p.recent.dead_share), render: (p) => cell(p, p.recent.dead_share, (v) => pct(v, 0)) },
+    { key: "tech_share", label: "Bonus o prezzo di rif.", align: "right", muted: true, sort: (p) => thinVal(p, p.recent.tech_share), render: (p) => cell(p, p.recent.tech_share, (v) => pct(v, 0)) },
+    { key: "conv_welcome", label: "% compra · benvenuto", align: "right", muted: true, sort: (p) => p.recent.conv_welcome, render: (p) => pct(p.recent.conv_welcome) },
+  ];
+}
+function operatorCols(d) {
+  return [
+    { key: "op", label: "Operatore", render: (o) => <Link href={`/leaderboard/operational/${encodeURIComponent(o.op)}`} style={{ color: CP.textPrimary, textDecoration: "none" }}>{o.op}</Link> },
+    { key: "index_net", label: "Indice di resa", align: "right", render: (o) => <IndexCell v={o.index_net} /> },
+    { key: "ppv", label: "PPV in chat", align: "right", render: (o) => o.ppv.toLocaleString("it-IT") },
+    { key: "conv_nonpayer", label: "% compra · mai paganti", align: "right", render: (o) => pct(o.conv_nonpayer) },
+    { key: "live_share", label: "PPV a chat viva", align: "right", muted: true, render: (o) => pct(o.live_share, 0) },
+    { key: "dead_share", label: "PPV a chat ferma", align: "right", muted: true, render: (o) => pct(o.dead_share, 0) },
+    { key: "tech_share", label: "Bonus o prezzo di rif.", align: "right", muted: true, render: (o) => pct(o.tech_share, 0) },
+    { key: "creators", label: "Creator", muted: true, sortable: false, render: (o) => o.creators.slice(0, 3).map((c) => d.names[String(c.creator_id)] || c.creator_id).join(", ") },
+    { key: "series", label: "Andamento 8 settimane", align: "right", sortable: false, render: (o) => <Spark series={o.series} /> },
+  ];
+}
+
 function Panoramica({ d, name }) {
   const t = d.pages.total;
   const g = d.reference.goal;
   const org = d.reference.org;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
-        <Kpi label="% che compra in chat · fan mai paganti" value={pct(t.conv_nonpayer)} accent sub={`Creator modello ${pct(g?.conv_nonpayer)} · tutta HOC ${pct(org?.conv_nonpayer)}`} />
-        <Kpi label="PPV mandati a chat ferma" value={pct(t.dead_share)} sub={`Lì compra solo il ${pct(t.conv_dead)}. Creator modello: ${pct(g?.dead_share)} dei PPV`} />
-        <Kpi label="PPV con bonus o prezzo di riferimento" value={pct(t.tech_share)} sub={`Creator modello ${pct(g?.tech_share)}`} />
-        <Kpi label="% che compra in chat · fan già paganti" value={pct(t.conv_payer)} sub={`Creator modello ${pct(g?.conv_payer)}`} />
-      </div>
+      <HeroMetric
+        label={`Fan mai paganti che comprano il PPV in chat · ${name || "tutta HOC"}`}
+        value={pct(t.conv_nonpayer)}
+        compare={`creator modello ${pct(g?.conv_nonpayer)} · tutta HOC ${pct(org?.conv_nonpayer)}`}
+        hint="su 100 PPV mandati a mano a chi non ha mai comprato, quanti vengono comprati entro 72 ore"
+      >
+        <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+          <Metric label="PPV mandati a chat ferma" value={pct(t.dead_share)} note={`lì compra solo il ${pct(t.conv_dead)} · modello ${pct(g?.dead_share)}`} />
+          <Metric label="PPV con bonus o prezzo di rif." value={pct(t.tech_share)} note={`modello ${pct(g?.tech_share)}`} />
+          <Metric label="Fan già paganti che comprano" value={pct(t.conv_payer)} note={`modello ${pct(g?.conv_payer)}`} />
+        </div>
+      </HeroMetric>
       <div>
         <H2 sub={`Ultime ${d.meta.recent_n} settimane chiuse (${fmtDate(d.meta.recent_weeks[0])}–${fmtDate(d.meta.recent_weeks.at(-1))}), tra parentesi la variazione in punti rispetto alle ${d.meta.recent_n} precedenti. "In chat" esclude il messaggio di benvenuto automatico.`}>Tabella creator {name ? `· ${name}` : "· tutta HOC"}</H2>
-        <div style={scrollBox}>
-          <table style={{ borderCollapse: "collapse", width: "100%" }}>
-            <thead><tr>
-              <th style={{ ...th, textAlign: "left" }}>Creator</th><th style={th}>Incasso PPV</th><th style={th}>PPV in chat</th><th style={th}>% compra · mai paganti</th><th style={th}>% compra · già paganti</th><th style={th}>PPV a chat viva</th><th style={th}>PPV a chat ferma</th><th style={th}>Bonus o prezzo di rif.</th><th style={th}>% compra · benvenuto</th>
-            </tr></thead>
-            <tbody>
-              {d.pages.pages.map((p) => {
-                const n = p.recent.chat_ppv || 0;
-                const thin = n < MIN_ROW_PPV;
-                return (
-                <tr key={p.creator_id}>
-                  <td style={tdL}>{d.names[String(p.creator_id)] || p.creator_id}</td>
-                  <td style={td}>{usd(p.recent.net)}</td>
-                  <td style={td}>{n.toLocaleString("it-IT")}</td>
-                  <td style={{ ...td, color: CP.textPrimary }}>{thin ? few(n) : <>{pct(p.recent.conv_nonpayer)}<Delta now={p.recent.conv_nonpayer} prev={p.prev.conv_nonpayer} /></>}</td>
-                  <td style={td}>{thin ? few(n) : pct(p.recent.conv_payer)}</td>
-                  <td style={td}>{thin ? few(n) : pct(p.recent.live_share, 0)}</td>
-                  <td style={td}>{thin ? few(n) : pct(p.recent.dead_share, 0)}</td>
-                  <td style={td}>{thin ? few(n) : pct(p.recent.tech_share, 0)}</td>
-                  <td style={td}>{pct(p.recent.conv_welcome)}</td>
-                </tr>
-                );
-              })}
-              {!d.pages.pages.length && <tr><td style={{ ...tdL, color: CP.textMuted }} colSpan={9}>Nessun PPV su queste creator nel periodo. Controlla le creator dello split con "Modifica split".</td></tr>}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={creatorCols(d)}
+          rows={d.pages.pages.map((p) => ({ ...p, id: p.creator_id }))}
+          defaultSort={{ key: "net", dir: -1 }}
+          minWidth={1000}
+          maxHeight="70vh"
+          empty='Nessun PPV su queste creator nel periodo. Controlla le creator dello split con "Modifica split".'
+        />
       </div>
       <div style={{ ...card }}>
         <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
@@ -226,29 +251,14 @@ function Operatori({ d }) {
       <label style={{ fontSize: 12, color: CP.textSecondary, display: "flex", gap: 6, alignItems: "center" }}>
         <input type="checkbox" id="ops-all" checked={all} onChange={(e) => setAll(e.target.checked)} style={{ accentColor: CP.accent }} /> Mostra anche chi ha pochi PPV
       </label>
-      <div style={scrollBox}>
-        <table style={{ borderCollapse: "collapse", width: "100%" }}>
-          <thead><tr>
-            <th style={{ ...th, textAlign: "left" }}>Operatore</th><th style={th}>Indice di resa</th><th style={th}>PPV in chat</th><th style={th}>% compra · mai paganti</th><th style={th}>PPV a chat viva</th><th style={th}>PPV a chat ferma</th><th style={th}>Bonus o prezzo di rif.</th><th style={{ ...th, textAlign: "left" }}>Creator</th><th style={th}>Andamento 8 settimane</th>
-          </tr></thead>
-          <tbody>
-            {rows.map((o) => (
-              <tr key={o.op}>
-                <td style={tdL}><Link href={`/leaderboard/operational/${encodeURIComponent(o.op)}`} style={{ color: CP.textPrimary, textDecoration: "none" }}>{o.op}</Link></td>
-                <td style={td}><IndexCell v={o.index_net} /></td>
-                <td style={td}>{o.ppv.toLocaleString("it-IT")}</td>
-                <td style={td}>{pct(o.conv_nonpayer)}</td>
-                <td style={td}>{pct(o.live_share, 0)}</td>
-                <td style={td}>{pct(o.dead_share, 0)}</td>
-                <td style={td}>{pct(o.tech_share, 0)}</td>
-                <td style={{ ...td, textAlign: "left", color: CP.textMuted }}>{o.creators.slice(0, 3).map((c) => d.names[String(c.creator_id)] || c.creator_id).join(", ")}</td>
-                <td style={td}><Spark series={o.series} /></td>
-              </tr>
-            ))}
-            {!rows.length && <tr><td style={{ ...tdL, color: CP.textMuted }} colSpan={9}>Nessun operatore con abbastanza PPV in turno singolo nel periodo.</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={operatorCols(d)}
+        rows={rows.map((o) => ({ ...o, id: o.op }))}
+        defaultSort={{ key: "index_net", dir: -1 }}
+        minWidth={1000}
+        maxHeight="70vh"
+        empty="Nessun operatore con abbastanza PPV in turno singolo nel periodo."
+      />
     </div>
   );
 }
@@ -333,7 +343,7 @@ function Comportamenti({ d }) {
       {order.map((k) => {
         const o = d.lifts.org[k], s = d.lifts.split[k];
         return (
-          <div key={k} style={{ ...card, display: "grid", gridTemplateColumns: "minmax(200px, 1.3fr) 2fr", gap: 16, alignItems: "center" }}>
+          <div key={k} style={{ ...card, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(260px, 100%), 1fr))", gap: 16, alignItems: "center" }}>
             <div>
               <div style={{ fontSize: 13.5, color: CP.textPrimary }}>{d.lifts.labels[k]}</div>
               <div style={{ fontSize: 11.5, color: CP.textMuted, marginTop: 3 }}>usato nel {pct(s?.usage, 0)} dei PPV {d.split ? "dello split" : ""} · {pct(o?.usage, 0)} in HOC</div>
@@ -343,7 +353,7 @@ function Comportamenti({ d }) {
                 <div key={lab} style={{ display: "contents" }}>
                   <span style={{ color: CP.textMuted }}>{lab}</span>
                   <div style={{ display: "flex", flexDirection: "column", gap: 3 }}><Bar v={x?.with} max={max} strong /><Bar v={x?.without} max={max} /></div>
-                  <span style={{ fontFamily: FONTS.mono, color: CP.textSecondary, textAlign: "right" }}>{x?.with == null ? "pochi dati" : `${pct(x.with)} / ${pct(x.without)}`}</span>
+                  <span style={{ ...NUM, color: CP.textSecondary, textAlign: "right" }}>{x?.with == null ? "pochi dati" : `${pct(x.with)} / ${pct(x.without)}`}</span>
                 </div>
               ))}
             </div>
@@ -462,7 +472,7 @@ function ChatView({ messages }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
       {messages.map((m, i) => (
         <div key={i} style={{ alignSelf: m.from === "op" ? "flex-end" : "flex-start", maxWidth: "82%", background: m.from === "op" ? CP.accentSoft : CP.surfaceAlt, color: CP.textPrimary, borderRadius: 10, padding: "6px 10px", fontSize: 13, lineHeight: 1.45 }}>
-          {m.price ? <span style={{ fontFamily: FONTS.mono, fontSize: 11, color: CP.accentSoftText, marginRight: 6 }}>PPV ${m.price}</span> : null}
+          {m.price ? <span style={{ ...NUM, fontSize: 11, color: CP.accentSoftText, marginRight: 6 }}>PPV ${m.price}</span> : null}
           {m.text}
         </div>
       ))}
@@ -533,7 +543,7 @@ function Programma() {
       <H2 sub="Mandare un documento da leggere cambia poco: la formazione arriva sul lavoro quando il responsabile la sostiene e c'è subito occasione di praticarla (Blume et al. 2010, 89 studi). Funziona vedere esempi reali buoni e cattivi e poi provarli (Taylor et al. 2005, 117 studi), con un obiettivo specifico (Locke & Latham).">Come allenare il team</H2>
       {steps.map(([t, s], i) => (
         <div key={t} style={{ ...card, display: "grid", gridTemplateColumns: "30px 1fr", gap: 12 }}>
-          <span style={{ fontFamily: FONTS.mono, fontSize: 13, color: CP.accentSoftText, background: CP.accentSoft, borderRadius: 6, height: 26, display: "grid", placeItems: "center" }}>{i + 1}</span>
+          <span style={{ ...NUM, fontSize: 13, color: CP.accentSoftText, background: CP.accentSoft, borderRadius: 6, height: 26, display: "grid", placeItems: "center" }}>{i + 1}</span>
           <div><div style={{ fontSize: 14, color: CP.textPrimary, marginBottom: 3 }}>{t}</div><div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.5 }}>{s}</div></div>
         </div>
       ))}
@@ -558,9 +568,9 @@ const GLOSSARY = [
 ];
 
 function Glossary() {
+  const [open, setOpen] = useState(false);
   return (
-    <details style={{ ...card, padding: "10px 14px", marginBottom: 16 }}>
-      <summary style={{ cursor: "pointer", fontSize: 13, color: CP.textPrimary }}>Le parole usate in questa pagina</summary>
+    <Disclosure open={open} onToggle={() => setOpen(!open)} title="Le parole usate in questa pagina" summary="split, PPV in chat, fan mai pagante, chat viva o ferma, indice di resa…">
       <dl style={{ display: "grid", gridTemplateColumns: "minmax(140px, 220px) 1fr", gap: "6px 16px", margin: "12px 0 4px" }}>
         {GLOSSARY.map(([t, d]) => (
           <div key={t} style={{ display: "contents" }}>
@@ -569,7 +579,7 @@ function Glossary() {
           </div>
         ))}
       </dl>
-    </details>
+    </Disclosure>
   );
 }
 
@@ -617,21 +627,22 @@ export default function SalesCoachingPage() {
   }
 
   const header = (
-    <PageHeader
-      section="Performance · Coaching vendite"
+    <PageHead
+      crumbs={[{ label: "Performance" }, { label: "Coaching vendite" }]}
       title="Vendere in chat"
-      subtitle="Come vendono le creator del tuo split ai fan che non hanno mai pagato, chi lo fa meglio a parità di creator, cosa li fa comprare e come allenare il team. Aggiornato ogni notte."
+      subtitle="Come vendono le creator del tuo split ai fan che non hanno mai pagato, chi lo fa meglio a parità di creator e cosa allenare nel team. Serve a decidere chi affiancare a chi. Aggiornato ogni notte."
     />
   );
+  const wrap = { padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body };
 
-  if (error) return <div style={{ padding: "8px 0" }}>{header}<div style={{ ...card, color: CP.accentRed, fontSize: 13 }}>{String(error.message).includes("scope") || String(error.message).includes("capability") ? "Questa pagina è riservata a sales manager e admin." : error.message}</div></div>;
-  if (isLoading || !data) return <div>{header}<Note>Caricamento…</Note></div>;
-  if (data.bigquery === false) return <div>{header}<Note>Il collegamento al warehouse non è configurato.</Note></div>;
-  if (data.computing && !data.pages) return <div>{header}<div style={{ ...card, fontSize: 13, color: CP.textSecondary }}>Sto calcolando i dati di tutta HOC (circa 20 secondi). La pagina si aggiorna da sola.</div></div>;
+  if (error) return <div style={wrap}>{header}<Notice danger>{String(error.message).includes("scope") || String(error.message).includes("capability") ? "Questa pagina è riservata a sales manager e admin." : error.message}</Notice></div>;
+  if (isLoading || !data) return <div style={wrap}>{header}<Note>Caricamento…</Note></div>;
+  if (data.bigquery === false) return <div style={wrap}>{header}<Notice>Il collegamento al warehouse (BigQuery) non è configurato in questo ambiente.</Notice></div>;
+  if (data.computing && !data.pages) return <div style={wrap}>{header}<Notice>Sto calcolando i dati di tutta HOC (circa 20 secondi). La pagina si aggiorna da sola.</Notice></div>;
 
   const split = data.split;
   return (
-    <div>
+    <div style={wrap}>
       {header}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
         <label htmlFor="split-pick" style={{ fontSize: 12, color: CP.textMuted }}>Split</label>
@@ -647,7 +658,7 @@ export default function SalesCoachingPage() {
         </span>
         <button style={btn} disabled={recomputing || data.computing} onClick={recompute}>{recomputing || data.computing ? "Aggiorno…" : "Aggiorna ora"}</button>
       </div>
-      {splitId && !split && <Note style={{ marginBottom: 12, color: CP.accentRed }}>Lo split scelto non esiste più: stai vedendo tutta HOC.</Note>}
+      {splitId && !split && <Notice danger>Lo split scelto non esiste più: stai vedendo tutta HOC.</Notice>}
       {editing && (
         <SplitEditor
           names={data.names}
@@ -658,8 +669,8 @@ export default function SalesCoachingPage() {
         />
       )}
       <Glossary />
-      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 20, borderBottom: `1px solid ${CP.border}`, paddingBottom: 10 }}>
-        {TABS.map(([k, l]) => <PillTab key={k} active={tab === k} onClick={() => { setTab(k); try { window.history.replaceState(null, "", `#${k}`); } catch { /* ok */ } }}>{l}</PillTab>)}
+      <div role="tablist" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, borderBottom: `1px solid ${CP.border}`, paddingBottom: 12 }}>
+        {TABS.map(([k, l]) => <FilterChip key={k} label={l} active={tab === k} onClick={() => { setTab(k); try { window.history.replaceState(null, "", `#${k}`); } catch { /* ok */ } }} />)}
       </div>
       {tab === "panoramica" && <Panoramica d={data} name={split?.name} />}
       {tab === "operatori" && <Operatori d={data} />}

@@ -1,98 +1,56 @@
 "use client";
 
-import { useEffect, useState } from "react";
+// Allenamento operatori (ex "Dashboard SM") — redesign 26/09/2026 sul design system.
+// Sono i punteggi del SIMULATORE (training), non le vendite: prima il titolo non
+// lo diceva. Numero principale = media del gruppo con quante sessioni la reggono;
+// "da guardare" separa i segnali veri (sotto media, in calo) dagli "inattivi",
+// che prima riempivano un grande riquadro rosso (11 su 12 erano solo fermi da
+// mesi). Tabella ordinabile con le abilità per esteso; rosso solo sul dato
+// sotto 60. Tolto il "rombo" per riga: ripeteva le 6 abilità già in colonna (resta
+// nella scheda che si apre cliccando l'operatore). API invariata.
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
+import { X } from "lucide-react";
 import PlayerCard from "@/components/PlayerCard";
-import { COLORS, CP, alpha } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
-
-const C = {
-  bgDark: COLORS.obsidian,
-  orange: COLORS.champagne,
-  purple: COLORS.cobalt,
-  green: COLORS.verdant,
-  red: COLORS.signal,
-  yellow: COLORS.champagneDeep,
-  white: COLORS.alabaster,
-  gray: COLORS.mist,
-};
+import { CP, FONTS } from "@/lib/brand";
+import { fmtInt } from "@/lib/format";
+import { PageHead, HeroMetric, Metric, Notice, Disclosure, DataTable, SectionTitle, ActionRow, card } from "@/components/ds";
 
 const SKILLS = [
-  { key: "naturalezza", label: "Nat." },
-  { key: "esclusivita", label: "Escl." },
-  { key: "dipendenza", label: "Dip." },
-  { key: "conversione", label: "Conv." },
+  { key: "naturalezza", label: "Naturalezza" },
+  { key: "esclusivita", label: "Esclusività" },
+  { key: "dipendenza", label: "Dipendenza" },
+  { key: "conversione", label: "Conversione" },
   { key: "tono", label: "Tono" },
-  { key: "gestione_obiezioni", label: "Obiez." },
+  { key: "gestione_obiezioni", label: "Obiezioni" },
 ];
+const LOW = 60;
+const ROLE_LABEL = { team_lead: "team lead", qa_reviewer: "QA", sales_manager: "sales manager" };
 
-function MiniRadar({ skills, size = 56, color = C.orange }) {
-  const KEYS = ["naturalezza", "esclusivita", "dipendenza", "conversione", "tono", "gestione_obiezioni"];
-  const vals = KEYS.map((k) => (typeof skills?.[k] === "number" ? Math.max(0, Math.min(100, skills[k])) : 0));
-  const hasData = vals.some((v) => v > 0);
-  const cx = size / 2, cy = size / 2, r = size / 2 - 4;
-  const hex = (rad) => {
-    const pts = [];
-    for (let i = 0; i < 6; i++) {
-      const a = (Math.PI / 3) * i - Math.PI / 2;
-      pts.push([cx + rad * Math.cos(a), cy + rad * Math.sin(a)]);
-    }
-    return pts;
-  };
-  const outer = hex(r);
-  const data = vals.map((v, i) => {
-    const a = (Math.PI / 3) * i - Math.PI / 2;
-    const rr = (v / 100) * r;
-    return [cx + rr * Math.cos(a), cy + rr * Math.sin(a)];
-  });
-  if (!hasData) {
-    return (
-      <svg width={size} height={size} style={{ display: "block" }}>
-        <polygon points={outer.map((p) => p.join(",")).join(" ")} fill="none" stroke={`${alpha(C.gray, "40")}`} strokeWidth="1" />
-      </svg>
-    );
-  }
+function Sparkline({ data, width = 90, height = 22 }) {
+  if (!data || data.length === 0) return <span style={{ color: CP.textMuted }}>—</span>;
+  if (data.length === 1) return <span style={{ color: CP.textMuted, fontSize: 12 }}>1 giorno</span>;
+  const min = Math.min(...data), max = Math.max(...data), range = max - min || 1;
+  const step = width / (data.length - 1);
+  const points = data.map((v, i) => `${i * step},${height - ((v - min) / range) * height}`).join(" ");
   return (
-    <svg width={size} height={size} style={{ display: "block" }}>
-      <polygon points={outer.map((p) => p.join(",")).join(" ")} fill="none" stroke={`${alpha(color, "30")}`} strokeWidth="1" />
-      <polygon points={hex(r * 0.5).map((p) => p.join(",")).join(" ")} fill="none" stroke={`${alpha(color, "20")}`} strokeWidth="1" />
-      <polygon points={data.map((p) => p.join(",")).join(" ")} fill={`${alpha(color, "50")}`} stroke={color} strokeWidth="1.25" strokeLinejoin="round" />
+    <svg width={width} height={height} style={{ display: "block" }} aria-label={`Andamento: da ${data[0]} a ${data[data.length - 1]}`}>
+      <polyline points={points} fill="none" stroke={CP.accent} strokeWidth="1.5" />
     </svg>
   );
 }
 
-function Sparkline({ data, width = 100, height = 24, color = C.orange }) {
-  if (!data || data.length === 0) {
-    return <span style={{ color: C.gray, fontSize: "0.75rem" }}>—</span>;
-  }
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const step = width / Math.max(1, data.length - 1);
-  const points = data
-    .map((v, i) => `${i * step},${height - ((v - min) / range) * height}`)
-    .join(" ");
-  return (
-    <svg width={width} height={height} style={{ display: "block" }}>
-      <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" />
-    </svg>
-  );
-}
-
-function skillColor(v) {
-  if (v === null || v === undefined) return `${alpha(C.gray, "20")}`;
-  if (v >= 75) return `${alpha(C.green, "40")}`;
-  if (v >= 60) return `${alpha(C.yellow, "40")}`;
-  return `${alpha(C.red, "40")}`;
-}
+const skillCell = (v) => (v == null ? <span style={{ color: CP.textMuted }}>—</span> : <span style={{ color: v < LOW ? CP.accentRed : CP.textPrimary }}>{v}</span>);
+const ago = (d) => (d == null ? "—" : d === 0 ? "oggi" : d === 1 ? "ieri" : `${d} giorni fa`);
 
 export default function SMDashboard() {
-  const { isLoaded, user } = useUser();
+  const { isLoaded } = useUser();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [cardOp, setCardOp] = useState(null);
+  const [idleOpen, setIdleOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -109,292 +67,146 @@ export default function SMDashboard() {
       });
   }, [isLoaded]);
 
-  if (loading) {
-    return (
-      <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "2rem" }}>
-        Caricamento dashboard...
-      </div>
-    );
-  }
-
-  if (error && !data) {
-    return (
-      <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "2rem" }}>
-        <h1>Dashboard SM</h1>
-        <p style={{ color: C.red }}>Errore: {error}</p>
-      </div>
-    );
-  }
-
   const operators = data?.operators || [];
   const alerts = data?.alerts || [];
   const heatmap = data?.heatmap || [];
 
+  const signals = alerts.filter((a) => a.type !== "inattivo");
+  const idle = alerts.filter((a) => a.type === "inattivo");
+  const active7 = operators.filter((o) => o.sessions7d > 0).length;
+  const lastDays = useMemo(() => {
+    const v = operators.map((o) => o.lastActivityDaysAgo).filter((d) => d != null);
+    return v.length ? Math.min(...v) : null;
+  }, [operators]);
+
+  const opColumns = [
+    {
+      key: "name", label: "Operatore", sort: (o) => o.name,
+      render: (o) => (
+        <span>
+          <span style={{ fontWeight: 500 }}>{o.name}</span>
+          {(o.isTeamLead || ROLE_LABEL[o.role]) && (
+            <span style={{ marginLeft: 8, fontSize: 12, color: CP.textMuted }} title={o.teamId ? `Team ${o.teamId}` : undefined}>
+              {o.isTeamLead ? "team lead" : ROLE_LABEL[o.role]}
+            </span>
+          )}
+        </span>
+      ),
+    },
+    { key: "avgOverall", label: "Media", align: "right", render: (o) => <span style={{ color: o.avgOverall < 55 ? CP.accentRed : CP.textPrimary, fontWeight: 500 }}>{o.avgOverall}</span> },
+    { key: "totalSessions", label: "Sessioni", align: "right" },
+    { key: "sessions7d", label: "Ultimi 7 gg", align: "right" },
+    {
+      key: "trend", label: "Rispetto ai 7 gg prima", align: "right", sort: (o) => o.trend,
+      render: (o) => (o.trend == null ? <span style={{ color: CP.textMuted }}>—</span>
+        : <span style={{ color: o.trend <= -10 ? CP.accentRed : o.trend > 0 ? CP.accentGreen : CP.textPrimary }}>{o.trend > 0 ? "+" : o.trend < 0 ? "−" : ""}{Math.abs(o.trend)} punti</span>),
+    },
+    { key: "sparkline", label: "Ultimi 30 gg", sortable: false, render: (o) => <Sparkline data={o.sparkline} /> },
+    ...SKILLS.map((s) => ({ key: s.key, label: s.label, align: "right", sort: (o) => o.skills?.[s.key], render: (o) => skillCell(o.skills?.[s.key]) })),
+    { key: "lastActivityDaysAgo", label: "Ultima sessione", align: "right", sort: (o) => (o.lastActivityDaysAgo == null ? null : -o.lastActivityDaysAgo), render: (o) => <span style={{ color: CP.textSecondary }}>{ago(o.lastActivityDaysAgo)}</span> },
+  ];
+
+  const heatColumns = [
+    { key: "creatorName", label: "Creator", sort: (h) => h.creatorName || "", render: (h) => h.creatorName || <span style={{ color: CP.textMuted }} title={h.creatorId}>Creator senza nome ({String(h.creatorId).slice(0, 10)})</span> },
+    { key: "totalSessions", label: "Sessioni", align: "right" },
+    ...SKILLS.map((s) => ({ key: s.key, label: s.label, align: "right", sort: (h) => h.avg?.[s.key], render: (h) => skillCell(h.avg?.[s.key]) })),
+  ];
+
   return (
-    <div style={{ background: C.bgDark, minHeight: "100vh", color: C.white, padding: "32px 28px 64px 28px", maxWidth: 1400, margin: "0 auto" }}>
-      <PageHeader
-        breadcrumb={
-          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <span style={{ color: CP.textPrimary }}>Dashboard SM</span>
-          </div>
-        }
-        section="Insights · Training"
-        title="Dashboard SM"
-        subtitle={`${operators.length} operatori · ${data?.totalRecords || 0} sessioni · media cohort ${data?.cohortAvg || 0}/100`}
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Training" }, { label: "Allenamento operatori" }]}
+        title="Allenamento operatori"
+        subtitle="Come vanno gli operatori nel simulatore di chat (non nelle vendite reali): chi si allena, chi è rimasto indietro e su quali abilità conviene lavorare."
       />
 
-      {/* Alerts */}
-      {alerts.length > 0 && (
-        <div
-          style={{
-            background: `${alpha(C.red, "10")}`,
-            border: `1px solid ${C.red}`,
-            borderRadius: "0.75rem",
-            padding: "1rem 1.25rem",
-            marginBottom: "1.5rem",
-          }}
-        >
-          <h3 style={{ margin: "0 0 0.75rem 0", color: C.red, fontSize: "1rem" }}>
-            ⚠ Operatori a rischio ({alerts.length})
-          </h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {alerts.map((a, i) => (
-              <div key={i} style={{ fontSize: "0.88rem", display: "flex", gap: "0.75rem" }}>
-                <span style={{
-                  padding: "0.1rem 0.5rem",
-                  background: a.severity === "high" ? C.red : C.yellow,
-                  color: C.bgDark,
-                  borderRadius: "0.25rem",
-                  fontWeight: 700,
-                  fontSize: "0.7rem",
-                  
-                }}>
-                  {a.type.replace("_", " ")}
-                </span>
-                <span style={{ fontWeight: 700 }}>{a.name}</span>
-                <span style={{ color: C.gray }}>— {a.message}</span>
+      {loading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
+      {!loading && error && !data?.operators && <Notice danger>Non riesco a caricare i dati: {error}. Se il problema resta, apri Alert operativi o avvisa un admin.</Notice>}
+      {!loading && data?.error && data?.operators && <Notice danger>Dati parziali: {data.error}</Notice>}
+
+      {!loading && data?.operators && (
+        <>
+          <HeroMetric
+            label="Media del gruppo nel simulatore"
+            value={`${fmtInt(data.cohortAvg || 0)} / 100`}
+            compare={`${fmtInt(data.totalRecords || 0)} sessioni valutate di ${fmtInt(operators.length)} operatori`}
+            hint="Si considerano le ultime 500 sessioni valutate."
+          >
+            <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <Metric label="Allenati negli ultimi 7 giorni" value={`${fmtInt(active7)} su ${fmtInt(operators.length)}`} />
+              <Metric label="Molto sotto la media" value={fmtInt(signals.filter((a) => a.type === "sotto_media").length)} note="15+ punti sotto" danger={signals.some((a) => a.type === "sotto_media")} />
+              <Metric label="In calo questa settimana" value={fmtInt(signals.filter((a) => a.type === "trend_negativo").length)} note="−10 punti o più" />
+              <Metric label="Fermi da oltre 7 giorni" value={fmtInt(idle.length)} />
+            </div>
+          </HeroMetric>
+
+          {operators.length > 0 && active7 === 0 && (
+            <Notice>
+              Nessuno si è allenato negli ultimi 7 giorni{lastDays != null ? ` (ultima sessione: ${ago(lastDays)})` : ""}: i numeri qui sotto descrivono il passato, non come vanno oggi. Si aggiornano da soli quando gli operatori tornano nel simulatore.
+            </Notice>
+          )}
+
+          {signals.length > 0 && (
+            <section style={{ ...card, marginBottom: 14, overflow: "hidden" }}>
+              <div style={{ padding: "14px 16px 4px" }}>
+                <SectionTitle aside="apri la scheda per capire su cosa allenarli">Da guardare ({signals.length})</SectionTitle>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Operators table */}
-      <div
-        style={{
-          background: `${alpha(C.white, "05")}`,
-          border: `1px solid ${alpha(C.purple, "30")}`,
-          borderRadius: "0.75rem",
-          overflow: "hidden",
-          marginBottom: "1.5rem",
-        }}
-      >
-        <div style={{ padding: "1rem 1.25rem", borderBottom: `1px solid ${alpha(C.purple, "30")}` }}>
-          <h3 style={{ margin: 0, fontSize: "1rem" }}>Operatori</h3>
-        </div>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
-          <thead>
-            <tr style={{ background: `${alpha(C.white, "08")}`, textAlign: "left" }}>
-              <th style={{ padding: "0.6rem 1.25rem" }}>Nome</th>
-              <th style={{ padding: "0.6rem", textAlign: "center" }}>Rombo</th>
-              <th style={{ padding: "0.6rem" }}>Sess.</th>
-              <th style={{ padding: "0.6rem" }}>7g</th>
-              <th style={{ padding: "0.6rem" }}>Media</th>
-              <th style={{ padding: "0.6rem" }}>Trend 7/7</th>
-              <th style={{ padding: "0.6rem" }}>Sparkline 30g</th>
-              {SKILLS.map((s) => (
-                <th key={s.key} style={{ padding: "0.6rem", textAlign: "center" }}>
-                  {s.label}
-                </th>
+              {signals.map((a, i) => (
+                <ActionRow key={`${a.userId}-${a.type}-${i}`} severity="critical"
+                  title={`${a.name} · ${a.type === "sotto_media" ? "molto sotto la media" : "in calo"}`}
+                  detail={a.message} />
               ))}
-              <th style={{ padding: "0.6rem" }}>Ultima att.</th>
-            </tr>
-          </thead>
-          <tbody>
-            {operators.map((op) => (
-              <tr key={op.userId} onClick={() => setCardOp(op)} style={{ borderTop: `1px solid ${alpha(C.purple, "20")}`, cursor: "pointer" }} title="Click per vedere la card FIFA-style">
-                <td style={{ padding: "0.6rem 1.25rem", fontWeight: 700 }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
-                    {op.name}
-                    {op.isTeamLead && (
-                      <span
-                        title={op.teamId ? `Team Lead · ${op.teamId}` : "Team Lead"}
-                        style={{
-                          fontSize: "0.65rem",
-                          fontWeight: 800,
-                          padding: "0.1rem 0.4rem",
-                          borderRadius: "999px",
-                          background: `${alpha(COLORS.champagne, "22")}`,
-                          border: `1px solid ${COLORS.champagne}`,
-                          color: COLORS.champagne,
-                          letterSpacing: "0.03em",
-                        }}
-                      >
-                        ⭐ LEAD
-                      </span>
-                    )}
-                    {op.role === "qa_reviewer" && (
-                      <span
-                        title="QA Reviewer"
-                        style={{
-                          fontSize: "0.65rem",
-                          fontWeight: 800,
-                          padding: "0.1rem 0.4rem",
-                          borderRadius: "999px",
-                          background: `${alpha(COLORS.champagneDeep, "22")}`,
-                          border: `1px solid ${COLORS.champagneDeep}`,
-                          color: COLORS.champagneDeep,
-                        }}
-                      >
-                        🔍 QA
-                      </span>
-                    )}
-                    {op.role === "sales_manager" && (
-                      <span
-                        title="Sales Manager"
-                        style={{
-                          fontSize: "0.65rem",
-                          fontWeight: 800,
-                          padding: "0.1rem 0.4rem",
-                          borderRadius: "999px",
-                          background: `${alpha(COLORS.cobalt, "22")}`,
-                          border: `1px solid ${COLORS.cobalt}`,
-                          color: COLORS.cobalt,
-                        }}
-                      >
-                        📊 SM
-                      </span>
-                    )}
-                  </span>
-                </td>
-                <td style={{ padding: "0.3rem", textAlign: "center" }}>
-                  <div style={{ display: "inline-block" }}>
-                    <MiniRadar
-                      skills={op.skills || {}}
-                      color={op.avgOverall >= 70 ? C.green : op.avgOverall >= 55 ? C.yellow : C.red}
-                    />
+            </section>
+          )}
+
+          {idle.length > 0 && (
+            <Disclosure open={idleOpen} onToggle={() => setIdleOpen(!idleOpen)} title={`Fermi da oltre 7 giorni (${idle.length})`}
+              summary="non è un problema di bravura: non si allenano da un po’">
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13.5 }}>
+                {idle.map((a, i) => (
+                  <div key={`${a.userId}-${i}`} style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <span style={{ color: CP.textPrimary, minWidth: 180 }}>{a.name}</span>
+                    <span style={{ color: CP.textMuted }}>{a.message}</span>
                   </div>
-                </td>
-                <td style={{ padding: "0.6rem" }}>{op.totalSessions}</td>
-                <td style={{ padding: "0.6rem" }}>{op.sessions7d}</td>
-                <td style={{ padding: "0.6rem", fontWeight: 700, color: op.avgOverall >= 70 ? C.green : op.avgOverall >= 55 ? C.yellow : C.red }}>
-                  {op.avgOverall}
-                </td>
-                <td style={{ padding: "0.6rem", color: op.trend === null ? C.gray : op.trend >= 0 ? C.green : C.red }}>
-                  {op.trend === null ? "—" : `${op.trend > 0 ? "+" : ""}${op.trend}`}
-                </td>
-                <td style={{ padding: "0.6rem" }}>
-                  <Sparkline data={op.sparkline} color={op.trend === null ? C.gray : op.trend >= 0 ? C.green : C.red} />
-                </td>
-                {SKILLS.map((s) => (
-                  <td
-                    key={s.key}
-                    style={{
-                      padding: "0.4rem",
-                      textAlign: "center",
-                      background: skillColor(op.skills[s.key]),
-                    }}
-                  >
-                    {op.skills[s.key] ?? "—"}
-                  </td>
                 ))}
-                <td style={{ padding: "0.6rem", color: C.gray }}>
-                  {op.lastActivityDaysAgo === null ? "—" : op.lastActivityDaysAgo === 0 ? "oggi" : `${op.lastActivityDaysAgo}g fa`}
-                </td>
-              </tr>
-            ))}
-            {operators.length === 0 && (
-              <tr>
-                <td colSpan={11} style={{ padding: "2rem", textAlign: "center", color: C.gray }}>
-                  Nessuna sessione ancora registrata. Gli operatori devono completare scenari con valutazione.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              </div>
+            </Disclosure>
+          )}
 
-      {/* Heatmap skill x creator */}
-      {heatmap.length > 0 && (
-        <div
-          style={{
-            background: `${alpha(C.white, "05")}`,
-            border: `1px solid ${alpha(C.purple, "30")}`,
-            borderRadius: "0.75rem",
-            overflow: "hidden",
-          }}
-        >
-          <div style={{ padding: "1rem 1.25rem", borderBottom: `1px solid ${alpha(C.purple, "30")}` }}>
-            <h3 style={{ margin: 0, fontSize: "1rem" }}>Heatmap skill × creator</h3>
-            <p style={{ margin: "0.25rem 0 0 0", color: C.gray, fontSize: "0.8rem" }}>
-              Dove la cohort è più debole — individua training mirato per creator.
-            </p>
+          <SectionTitle aside={`clicca un operatore per la sua scheda · in rosso le abilità sotto ${LOW}`}>Operatori</SectionTitle>
+          <div style={{ marginBottom: 20 }}>
+            <DataTable columns={opColumns} rows={operators.map((o) => ({ ...o, id: o.userId }))} defaultSort={{ key: "avgOverall", dir: -1 }}
+              onRowClick={setCardOp} minWidth={1180} maxHeight={620}
+              empty="Nessuna sessione valutata ancora. La tabella si riempie quando gli operatori completano scenari nel simulatore." />
           </div>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
-            <thead>
-              <tr style={{ background: `${alpha(C.white, "08")}`, textAlign: "left" }}>
-                <th style={{ padding: "0.6rem 1.25rem" }}>Creator</th>
-                <th style={{ padding: "0.6rem" }}>Sess.</th>
-                {SKILLS.map((s) => (
-                  <th key={s.key} style={{ padding: "0.6rem", textAlign: "center" }}>{s.label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {heatmap.map((h) => (
-                <tr key={h.creatorId} style={{ borderTop: `1px solid ${alpha(C.purple, "20")}` }}>
-                  <td style={{ padding: "0.6rem 1.25rem", fontWeight: 700 }}>{h.creatorName}</td>
-                  <td style={{ padding: "0.6rem", color: C.gray }}>{h.totalSessions}</td>
-                  {SKILLS.map((s) => (
-                    <td
-                      key={s.key}
-                      style={{
-                        padding: "0.4rem",
-                        textAlign: "center",
-                        background: skillColor(h.avg[s.key]),
-                        fontWeight: 700,
-                      }}
-                    >
-                      {h.avg[s.key] ?? "—"}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+
+          {heatmap.length > 0 && (
+            <>
+              <SectionTitle aside="media di tutte le sessioni per creator: la cifra più bassa è dove fare training mirato">Abilità per creator</SectionTitle>
+              <div style={{ marginBottom: 20 }}>
+                <DataTable columns={heatColumns} rows={heatmap.map((h) => ({ ...h, id: h.creatorId }))} defaultSort={{ key: "totalSessions", dir: -1 }} minWidth={860} maxHeight={480} />
+              </div>
+            </>
+          )}
+
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap", fontSize: 13.5 }}>
+            <Link href="/admin/review" style={{ color: CP.accentSoftText, textDecoration: "none" }}>Rivedi le valutazioni →</Link>
+            <Link href="/admin/outcomes" style={{ color: CP.accentSoftText, textDecoration: "none" }}>Allenamento e vendite reali →</Link>
+            <Link href="/admin/creators" style={{ color: CP.accentSoftText, textDecoration: "none" }}>Voce delle creator →</Link>
+          </div>
+        </>
       )}
 
-      <div style={{ marginTop: "1.5rem", display: "flex", gap: "1rem" }}>
-        <Link href="/admin/review" style={{ color: C.orange, fontSize: "0.85rem", textDecoration: "none" }}>
-          → Review valutazioni
-        </Link>
-        <Link href="/admin/outcomes" style={{ color: C.orange, fontSize: "0.85rem", textDecoration: "none" }}>
-          → Outcomes revenue
-        </Link>
-        <Link href="/admin/creators" style={{ color: C.orange, fontSize: "0.85rem", textDecoration: "none" }}>
-          → Creator personas
-        </Link>
-      </div>
-
-      {/* Player Card Modal */}
       {cardOp && (() => {
         const POS = { operator: "OP", team_lead: "TL", sales_manager: "SM", qa_reviewer: "QA", admin: "AD" };
         const leagueByScore = cardOp.avgOverall >= 85 ? "diamond" : cardOp.avgOverall >= 75 ? "platinum" : cardOp.avgOverall >= 65 ? "gold" : cardOp.avgOverall >= 50 ? "silver" : "bronze";
         const pos = (cardOp.role && POS[cardOp.role]) ? POS[cardOp.role] : (cardOp.role?.startsWith("c:") ? "CR" : "OP");
         return (
-          <div onClick={() => setCardOp(null)} style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
-            display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
-          }}>
+          <div onClick={() => setCardOp(null)} style={{ position: "fixed", inset: 0, background: "rgba(6,8,12,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
             <div onClick={(e) => e.stopPropagation()} style={{ position: "relative" }}>
-              <button onClick={() => setCardOp(null)} style={{
-                position: "absolute", top: -38, right: 0,
-                background: "transparent", border: `1px solid ${alpha(C.white, "40")}`, color: C.white,
-                borderRadius: 8, padding: "0.25rem 0.6rem", cursor: "pointer", fontSize: "0.8rem",
-              }}>Chiudi ✕</button>
+              <button onClick={() => setCardOp(null)} style={{ position: "absolute", top: -42, right: 0, display: "inline-flex", alignItems: "center", gap: 6, background: CP.surface, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 13, fontFamily: FONTS.body }}>
+                <X size={14} /> Chiudi
+              </button>
               <PlayerCard
                 name={cardOp.name}
                 position={pos}

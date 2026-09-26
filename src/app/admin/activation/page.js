@@ -7,11 +7,17 @@
  * (src/lib/activation.js): funnel aha→attivato, activation rate, latenza.
  * SEED. Finché nessun operatore è onboardato la coorte è vuota: la pagina
  * dichiara cosa misura e resta in attesa di dati (onestà, non finta metrica).
+ *
+ * Redesign 26/09/2026: numero principale = attivati sulla coorte, con i passi
+ * del percorso accanto; gergo tradotto (aha, leading indicator, north-star,
+ * magic-number, Kirkpatrick); la riga senza nome ora dice perché; il "come si
+ * convalida" è su richiesta. Soglie sempre lette dal config, mai scritte a mano.
  */
+import { useState } from "react";
 import useSWR from "swr";
-import { Target, Signpost, TrendingUp, Timer } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHeader, CpCard, StatCard, SectionLabel } from "@/components/cp-style";
+import { fmtInt, fmtPct } from "@/lib/format";
+import { PageHead, HeroMetric, Metric, Notice, Disclosure, DataTable, SectionTitle, card } from "@/components/ds";
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -28,110 +34,87 @@ function fmtDate(ts) {
 function fmtLatency(ms) {
   if (ms == null) return "—";
   const h = ms / 3_600_000;
-  if (h < 24) return `${h.toFixed(1)}h`;
-  return `${(h / 24).toFixed(1)}g`;
+  if (h < 24) return `${h.toLocaleString("it-IT", { maximumFractionDigits: 1 })} ore`;
+  return `${(h / 24).toLocaleString("it-IT", { maximumFractionDigits: 1 })} giorni`;
 }
 
 export default function ActivationPage() {
   const { data, error, isLoading } = useSWR("/api/admin/activation", fetcher, { revalidateOnFocus: false });
+  const [whyOpen, setWhyOpen] = useState(false);
 
   const cfg = data?.config;
   const rate = data?.activationRate;
+  const cohort = data?.cohortSize ?? 0;
+  const members = data?.members || [];
+
+  const columns = [
+    { key: "employee", label: "Operatore", render: (m) => m.employee || <span style={{ color: CP.textMuted }} title="Ha usato l’app ma non ha ancora aperto una pagina che lo collega al suo nome operatore">Non ancora collegato a un operatore</span>, sort: (m) => m.employee || "" },
+    { key: "firstSeen", label: "Primo accesso", render: (m) => fmtDate(m.firstSeen), sort: (m) => m.firstSeen ?? 0 },
+    { key: "ahaReached", label: "Ha visto il suo punto debole", align: "right", render: (m) => m.ahaReached ? "sì" : <span style={{ color: CP.textMuted }}>non ancora</span>, sort: (m) => (m.ahaReached ? 1 : 0) },
+    { key: "gapScenariosInWindow", label: "Allenamenti su quel punto", align: "right", render: (m) => `${fmtInt(m.gapScenariosInWindow)} di ${cfg?.minGapScenarios ?? "…"}` },
+    { key: "activated", label: "Attivato", align: "right", render: (m) => m.activated ? <span style={{ color: CP.accentGreen }}>sì</span> : <span style={{ color: CP.textMuted }}>non ancora</span>, sort: (m) => (m.activated ? 1 : 0) },
+    { key: "latencyMs", label: "In quanto tempo", align: "right", render: (m) => fmtLatency(m.latencyMs), sort: (m) => m.latencyMs ?? null },
+  ];
 
   return (
-    <div style={{ maxWidth: 1000, margin: "0 auto", padding: "36px 28px 64px" }}>
-      <PageHeader
-        section="Onboarding operatore"
-        title="Attivazione operatore"
-        subtitle="Il primo risultato reale che predice se un operatore resterà e renderà: ha visto un gap vero sul suo lavoro e ha allenato proprio quello. È un leading indicator loggato in tempo reale — si valida in avanti contro il movimento reale del profilo-segnali, non si ottimizza da solo."
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Onboarding" }, { label: "Attivazione operatori" }]}
+        title="Attivazione operatori"
+        subtitle="Quanti operatori nuovi arrivano al primo risultato che conta: vedono il loro punto debole reale e lo allenano subito nel simulatore. È un segnale precoce di chi resterà e renderà; serve a capire se l’avvio in app funziona."
       />
 
-      {error && error.status === 403 && (
-        <CpCard><div style={{ color: CP.textMuted, fontSize: 14, fontFamily: FONTS.body }}>Serve un accesso admin (SEED) per questa vista.</div></CpCard>
-      )}
+      {error && error.status === 403 && <Notice>Serve un accesso admin per questa vista.</Notice>}
+      {error && error.status !== 403 && <Notice danger>Non riesco a caricare i dati: {error.message}. Riprova tra poco.</Notice>}
+      {data?.error && <Notice danger>{data.error} I numeri qui sotto potrebbero essere incompleti.</Notice>}
+      {isLoading && !data && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
 
-      {!error && (
+      {data && (
         <>
-          {/* Definizione + soglie (lette dal config, mai hardcodate nel copy) */}
-          <CpCard accent={CP.accent} style={{ marginBottom: 20 }}>
-            <SectionLabel color={CP.accentSoftText}>La definizione (v1)</SectionLabel>
-            <div style={{ fontSize: 14.5, color: CP.textPrimary, fontFamily: FONTS.body, lineHeight: 1.6, marginTop: 8 }}>
-              Un operatore è <b>attivo</b> quando, entro <b>{cfg?.windowDays ?? "…"} giorni</b> dall'aver visto un gap reale nel suo profilo-segnali,
-              completa <b>≥ {cfg?.minGapScenarios ?? "…"} scenari</b> Academy nelle categorie che allenano quel gap, con qualità <b>≥ {cfg?.minOverall ?? "…"}/100</b>.
+          <HeroMetric
+            label="Operatori attivati"
+            value={`${fmtInt(data.activatedCount ?? 0)} su ${fmtInt(cohort)}`}
+            compare={rate == null ? "Percentuale non ancora calcolabile: servono operatori che usano l’app" : `${fmtPct(rate)} di chi ha usato l’app`}
+            hint="Conta chi ha già usato l’app almeno una volta."
+          >
+            <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <Metric label="Hanno usato l’app" value={fmtInt(cohort)} note="almeno un’azione registrata" />
+              <Metric label="Hanno visto il punto debole" value={fmtInt(data.ahaCount ?? 0)} note="aperto il proprio profilo" />
+              <Metric label="Attivati" value={fmtInt(data.activatedCount ?? 0)} note="visto e allenato" />
             </div>
-            <div style={{ fontSize: 12.5, color: CP.textMuted, fontFamily: FONTS.body, marginTop: 10, lineHeight: 1.55 }}>
-              La soglia è un <b>placeholder</b> {cfg?.derived === false ? "(non ancora derivata dai dati)" : ""}: va derivata da una coorte reale col metodo magic-number, non fissata a priori.
-              La <b>north-star</b> di validazione è il movimento reale dei segnali warehouse (il verdetto del gap che passa da «gap» a «ok») — quella si misura, non si insegue.
-              {cfg?.version ? <span style={{ fontFamily: FONTS.mono, color: CP.mutedIcons }}> · {cfg.version}</span> : null}
-            </div>
-          </CpCard>
+          </HeroMetric>
 
-          {/* Stat */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 20 }}>
-            <StatCard label="Coorte strumentata" value={isLoading ? "…" : (data?.cohortSize ?? 0)} sub="operatori con ≥1 evento" />
-            <StatCard label="Hanno visto il gap" value={isLoading ? "…" : (data?.ahaCount ?? 0)} sub="aha raggiunto" />
-            <StatCard label="Attivati" value={isLoading ? "…" : (data?.activatedCount ?? 0)} sub="gap diagnosticato + allenato" accent={CP.accent} />
-            <StatCard label="Activation rate" value={rate == null ? "—" : `${Math.round(rate * 100)}%`} sub={rate == null ? "in attesa di coorte" : "della coorte"} />
-          </div>
+          <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+            <SectionTitle aside={cfg?.version ? `versione ${cfg.version}` : null}>Quando un operatore conta come attivato</SectionTitle>
+            <p style={{ margin: 0, fontSize: 14, color: CP.textPrimary, lineHeight: 1.6 }}>
+              Entro {cfg?.windowDays ?? "…"} giorni da quando vede nel suo profilo un punto debole reale, completa almeno {cfg?.minGapScenarios ?? "…"} scenari del simulatore che allenano proprio quel punto, con un punteggio di almeno {cfg?.minOverall ?? "…"} su 100.
+            </p>
+            <p style={{ margin: "8px 0 0", fontSize: 13, color: CP.textMuted, lineHeight: 1.55 }}>
+              Queste soglie sono provvisorie{cfg?.derived === false ? " (non ancora ricavate dai dati)" : ""}: quando ci saranno abbastanza operatori si sceglieranno quelle che separano meglio chi poi migliora davvero da chi no.
+            </p>
+          </section>
 
-          {/* Coorte o empty state onesto */}
-          {(data?.cohortSize ?? 0) === 0 ? (
-            <CpCard>
-              <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-                <div style={{ width: 38, height: 38, borderRadius: 9, background: CP.accentSoft, color: CP.accentSoftText, display: "grid", placeItems: "center", flex: "none" }}>
-                  <Signpost size={18} aria-hidden="true" />
-                </div>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, fontFamily: FONTS.body }}>Nessun operatore onboardato ancora — la superficie è strumentata, in attesa di dati.</div>
-                  <div style={{ fontSize: 13, color: CP.textMuted, fontFamily: FONTS.body, marginTop: 8, lineHeight: 1.6, maxWidth: 640 }}>
-                    Gli eventi si registrano già dal vivo su quattro punti reali: apertura del profilo-segnali (l'aha), scenario completato (per il gap-match), acknowledge del coaching, apertura del turno.
-                    Appena gli operatori entrano nell'app la coorte si popola qui — e dopo qualche settimana potremo <b>derivare la soglia dai dati</b> invece di indovinarla, e validare l'attivazione contro il miglioramento reale.
-                  </div>
-                </div>
-              </div>
-            </CpCard>
+          {cohort === 0 ? (
+            <Notice>
+              Nessun operatore ha ancora usato l’app, quindi qui non c’è nulla da contare. Il conteggio è già attivo: registra quando un operatore apre il suo profilo, completa uno scenario, conferma un coaching o apre il suo turno. Appena entrano i primi operatori la tabella si riempie da sola.
+            </Notice>
           ) : (
-            <CpCard padding="0">
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, fontFamily: FONTS.body, minWidth: 640 }}>
-                  <thead>
-                    <tr style={{ borderBottom: `1px solid ${CP.border}` }}>
-                      {["Operatore", "Primo accesso", "Ha visto il gap", "Scenari-gap", "Attivato", "Latenza"].map((h, i) => (
-                        <th key={h} style={{ textAlign: i > 1 ? "right" : "left", padding: "12px 16px", fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: CP.textMuted, fontWeight: 500 }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(data?.members || []).map((m, idx) => (
-                      <tr key={idx} style={{ borderBottom: `1px solid ${CP.borderSoft}` }}>
-                        <td style={{ padding: "11px 16px", color: CP.textPrimary }}>{m.employee || <span style={{ color: CP.mutedIcons }}>—</span>}</td>
-                        <td style={{ padding: "11px 16px", color: CP.textSecondary }}>{fmtDate(m.firstSeen)}</td>
-                        <td style={{ padding: "11px 16px", textAlign: "right", color: m.ahaReached ? CP.accentGreen : CP.textMuted }}>{m.ahaReached ? "sì" : "no"}</td>
-                        <td style={{ padding: "11px 16px", textAlign: "right", fontFamily: FONTS.mono, color: CP.textPrimary }}>{m.gapScenariosInWindow}</td>
-                        <td style={{ padding: "11px 16px", textAlign: "right", fontWeight: 500, color: m.activated ? CP.accentGreen : CP.textMuted }}>{m.activated ? "attivo" : "—"}</td>
-                        <td style={{ padding: "11px 16px", textAlign: "right", fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmtLatency(m.latencyMs)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <>
+              <SectionTitle aside={`${fmtInt(members.length)} operatori, dal più recente`}>Chi è a che punto</SectionTitle>
+              <div style={{ marginBottom: 14 }}>
+                <DataTable columns={columns} rows={members.map((m, i) => ({ ...m, id: `${m.employee || "anon"}-${i}` }))} minWidth={760} maxHeight={560} empty="Nessun operatore." />
               </div>
-            </CpCard>
+            </>
           )}
 
-          {/* Come si valida (forward) */}
-          <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 12 }}>
-            {[
-              { icon: Target, t: "Misura l'attivazione, non il tour", d: "Non conta «ha finito la guida»: conta se ha connesso un gap vero a pratica su quel comportamento." },
-              { icon: TrendingUp, t: "Si valida contro il campo", d: "Per gli attivati, il verdetto del gap si muove davvero nel profilo-segnali warehouse a 30-60gg? È il Kirkpatrick livello 3." },
-              { icon: Timer, t: "La soglia si deriva", d: "7gg / 2 scenari è un placeholder: la combinazione che separa meglio il miglioramento reale si trova sui dati, non a priori." },
-            ].map((x) => (
-              <CpCard key={x.t}>
-                <x.icon size={16} color={CP.textMuted} aria-hidden="true" />
-                <div style={{ fontSize: 13.5, fontWeight: 500, color: CP.textPrimary, fontFamily: FONTS.body, marginTop: 8 }}>{x.t}</div>
-                <div style={{ fontSize: 12.5, color: CP.textMuted, fontFamily: FONTS.body, marginTop: 4, lineHeight: 1.5 }}>{x.d}</div>
-              </CpCard>
-            ))}
-          </div>
+          <Disclosure open={whyOpen} onToggle={() => setWhyOpen(!whyOpen)} title="Perché questa misura e come si verifica" summary="non conta il tour, conta il primo allenamento mirato">
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, color: CP.textSecondary, lineHeight: 1.6, display: "flex", flexDirection: "column", gap: 8 }}>
+              <li><span style={{ color: CP.textPrimary }}>Si misura l’attivazione, non il tour.</span> Non conta “ha finito la guida”: conta se ha collegato un punto debole vero ad allenamento su quel comportamento.</li>
+              <li><span style={{ color: CP.textPrimary }}>Si verifica sul lavoro vero.</span> Per chi è attivato, controlliamo se dopo 30-60 giorni quel punto debole migliora davvero nelle chat reali. È quello il risultato che conta; questo numero serve solo ad accorgersene prima.</li>
+              <li><span style={{ color: CP.textPrimary }}>Non va “spinto”.</span> Se si forzassero gli operatori a fare scenari per far salire il numero, il numero salirebbe senza che nessuno migliori. Si legge, non si insegue.</li>
+              <li><span style={{ color: CP.textPrimary }}>Le soglie si ricavano dai dati.</span> {cfg?.windowDays ?? "…"} giorni e {cfg?.minGapScenarios ?? "…"} scenari sono un punto di partenza: la combinazione giusta si trova quando ci sono abbastanza operatori da confrontare.</li>
+            </ul>
+          </Disclosure>
         </>
       )}
     </div>

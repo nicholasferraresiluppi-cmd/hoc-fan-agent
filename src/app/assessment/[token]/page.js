@@ -8,11 +8,17 @@
  * che si difendono col token. Il report (score) NON viene mostrato al candidato
  * — è materiale per HR. Qui il candidato vede solo: informativa+consenso, la
  * chat scenario per scenario, e un ringraziamento finale neutro.
+ *
+ * Redesign 26/09/2026 sul design system: testata DS in ogni stato, firma
+ * "House of Creators" in sentence case (prima etichette MAIUSCOLE spaziate),
+ * consenso esplicito accanto al pulsante, suggerimento Invio/Maiusc+Invio,
+ * "sta scrivendo…" al posto dei tre puntini. Flusso, consenso e chiamate invariati.
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { CP } from "@/lib/brand";
+import { CP, FONTS } from "@/lib/brand";
+import { PageHead, NUM } from "@/components/ds";
 
 const SEED_CUE =
   "[Inizia la conversazione con il tuo primo messaggio da fan, come descritto nel tuo personaggio.]";
@@ -188,7 +194,7 @@ export default function AssessmentPage() {
   if (loading) {
     return (
       <Shell>
-        <div style={{ color: CP.textMuted, textAlign: "center", paddingTop: 80 }}>Caricamento…</div>
+        <div style={{ color: CP.textMuted, textAlign: "center", paddingTop: 80, width: "100%" }}>Caricamento…</div>
       </Shell>
     );
   }
@@ -197,10 +203,10 @@ export default function AssessmentPage() {
     return (
       <Shell>
         <Card>
-          <h1 style={h1}>Link non disponibile</h1>
-          <p style={{ color: CP.textSecondary, margin: 0 }}>{error}</p>
-          <p style={{ color: CP.textMuted, marginTop: 12, fontSize: 13 }}>
-            Se pensi sia un errore, scrivi alla persona di HOC che ti ha inviato il link.
+          <Brand />
+          <PageHead title="Link non disponibile" subtitle={error} />
+          <p style={{ color: CP.textSecondary, margin: 0, fontSize: 14, lineHeight: 1.6 }}>
+            Se pensi sia un errore, scrivi alla persona di House of Creators che ti ha mandato il link: te ne può preparare uno nuovo.
           </p>
         </Card>
       </Shell>
@@ -211,13 +217,11 @@ export default function AssessmentPage() {
     return (
       <Shell>
         <Card>
-          <div style={{ fontSize: 13, letterSpacing: 1, color: CP.accentSoftText, marginBottom: 8 }}>
-            ESERCIZIO COMPLETATO
-          </div>
-          <h1 style={h1}>Grazie, abbiamo ricevuto le tue risposte</h1>
-          <p style={{ color: CP.textSecondary, lineHeight: 1.6, margin: 0 }}>
-            Il team di House of Creators esaminerà l&apos;esercizio insieme al resto della tua
-            candidatura. Ti ricontatteranno con i prossimi passi. Puoi chiudere questa finestra.
+          <Brand>Esercizio completato</Brand>
+          <PageHead title="Grazie, abbiamo ricevuto le tue risposte" />
+          <p style={{ color: CP.textSecondary, lineHeight: 1.6, margin: 0, fontSize: 15 }}>
+            Il team di House of Creators leggerà l&apos;esercizio insieme al resto della tua
+            candidatura e ti ricontatterà per i prossimi passi. Puoi chiudere questa finestra.
           </p>
         </Card>
       </Shell>
@@ -228,18 +232,18 @@ export default function AssessmentPage() {
     return (
       <Shell>
         <Card>
-          <div style={{ fontSize: 13, letterSpacing: 1, color: CP.accentSoftText, marginBottom: 8 }}>
-            HOC · ESERCIZIO DI SELEZIONE
-          </div>
-          <h1 style={h1}>Una breve simulazione di chat</h1>
-          <p style={{ color: CP.textSecondary, lineHeight: 1.6 }}>
+          <Brand>Esercizio di selezione</Brand>
+          <PageHead
+            title="Una breve simulazione di chat"
+            subtitle={`${scenarios.length} situazioni, circa ${ctx.estMinutes || 20} minuti in tutto.`}
+          />
+          <p style={{ color: CP.textSecondary, lineHeight: 1.6, margin: 0, fontSize: 15 }}>
             Ti chiediamo di gestire alcune conversazioni simulate con dei &ldquo;fan&rdquo;
-            interpretati da un&apos;intelligenza artificiale. Sono {scenarios.length} situazioni,
-            circa {ctx.estMinutes || 20} minuti in tutto. Rispondi come faresti davvero: non ci sono
+            interpretati da un&apos;intelligenza artificiale. Rispondi come faresti davvero: non ci sono
             risposte &ldquo;perfette&rdquo;, ci interessa il tuo modo di gestire la relazione.
           </p>
           <div style={notice}>
-            <strong style={{ color: CP.textPrimary }}>Come vengono usate le tue risposte</strong>
+            <div style={{ color: CP.textPrimary, fontWeight: 500, fontSize: 15 }}>Come vengono usate le tue risposte</div>
             <ul style={{ margin: "8px 0 0", paddingLeft: 18, color: CP.textSecondary, lineHeight: 1.6, fontSize: 14 }}>
               <li>Le conversazioni sono simulate: l&apos;interlocutore è un&apos;AI, non una persona reale.</li>
               <li>
@@ -247,13 +251,16 @@ export default function AssessmentPage() {
                 conversazione e rispetto delle regole di piattaforma).
               </li>
               <li>
-                La valutazione è <strong style={{ color: CP.textPrimary }}>uno degli elementi</strong> che
+                La valutazione è <span style={{ color: CP.textPrimary, fontWeight: 500 }}>uno degli elementi</span> che
                 una persona del team considererà: la decisione sulla candidatura è sempre umana.
               </li>
               <li>Usiamo i dati solo per questa selezione; puoi chiedere accesso o cancellazione scrivendo a HOC.</li>
             </ul>
           </div>
-          <button onClick={acceptConsent} disabled={accepting} style={{ ...primaryBtn, marginTop: 20, opacity: accepting ? 0.6 : 1 }}>
+          <p style={{ color: CP.textMuted, fontSize: 13, lineHeight: 1.55, margin: "14px 0 0" }}>
+            Premendo il pulsante dai il consenso a questo uso e inizi l&apos;esercizio.
+          </p>
+          <button onClick={acceptConsent} disabled={accepting} style={{ ...primaryBtn, marginTop: 14, opacity: accepting ? 0.6 : 1 }}>
             {accepting ? "Avvio…" : "Ho capito, iniziamo"}
           </button>
         </Card>
@@ -264,28 +271,22 @@ export default function AssessmentPage() {
   // Play
   const max = currentScenario?.maxMessages || 8;
   const reachedMax = opCount >= max;
+  const isLast = stepIndex + 1 >= scenarios.length;
   return (
     <Shell wide>
       <div style={{ width: "100%", maxWidth: 760, margin: "0 auto", display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-        {/* Header */}
-        <div style={{ padding: "16px 4px 12px", borderBottom: `1px solid ${CP.borderSoft}` }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <span style={{ fontSize: 12, letterSpacing: 1, color: CP.textMuted }}>HOC · ESERCIZIO</span>
-            <span style={{ fontSize: 12, color: CP.textMuted }}>
+        {/* Testata: dove sei nell'esercizio + la situazione da gestire */}
+        <div style={{ padding: "16px 4px 4px", borderBottom: `1px solid ${CP.borderSoft}` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 8 }}>
+            <Brand inline>Esercizio di selezione</Brand>
+            <span style={{ fontSize: 13, color: CP.textSecondary, ...NUM }}>
               Situazione {stepIndex + 1} di {scenarios.length}
             </span>
           </div>
-          <div style={{ height: 3, background: CP.surface, borderRadius: 2, overflow: "hidden" }}>
+          <div style={{ height: 4, background: CP.surfaceAlt, borderRadius: 2, overflow: "hidden", marginBottom: 14 }} aria-hidden="true">
             <div style={{ width: `${(stepIndex / Math.max(1, scenarios.length)) * 100}%`, height: "100%", background: CP.accent, transition: "width .3s" }} />
           </div>
-          {currentScenario && (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ color: CP.textPrimary, fontWeight: 600, fontSize: 15 }}>{currentScenario.title}</div>
-              <div style={{ color: CP.textSecondary, fontSize: 13.5, marginTop: 4, lineHeight: 1.5 }}>
-                {currentScenario.description}
-              </div>
-            </div>
-          )}
+          {currentScenario && <PageHead title={currentScenario.title} subtitle={currentScenario.description} />}
         </div>
 
         {/* Chat */}
@@ -293,14 +294,14 @@ export default function AssessmentPage() {
           {messages.map((m, i) => (
             <Bubble key={i} role={m.role} content={m.content} />
           ))}
-          {isTyping && <Bubble role="fan" content="…" muted />}
+          {isTyping && <Bubble role="fan" content="sta scrivendo…" muted />}
         </div>
 
-        {/* Input */}
+        {/* Risposta */}
         <div style={{ padding: "12px 4px 20px", borderTop: `1px solid ${CP.borderSoft}` }}>
           {reachedMax && (
-            <div style={{ color: CP.textMuted, fontSize: 12.5, marginBottom: 8 }}>
-              Hai raggiunto il numero massimo di messaggi per questa situazione. Concludi quando vuoi.
+            <div style={{ color: CP.textSecondary, fontSize: 13.5, marginBottom: 8 }}>
+              Hai usato tutti i messaggi per questa situazione. Quando vuoi, premi &ldquo;{isLast ? "Concludi l'esercizio" : "Concludi e prosegui"}&rdquo;.
             </div>
           )}
           <div style={{ display: "flex", gap: 8 }}>
@@ -316,6 +317,7 @@ export default function AssessmentPage() {
                 }
               }}
               placeholder={reachedMax ? "Concludi la situazione →" : "Scrivi come risponderesti…"}
+              aria-label="La tua risposta"
               rows={2}
               disabled={isTyping || scoring || reachedMax}
               style={textarea}
@@ -324,12 +326,12 @@ export default function AssessmentPage() {
               Invia
             </button>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
-            <span style={{ fontSize: 12, color: CP.textMuted }}>
-              {opCount}/{max} messaggi
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+            <span style={{ fontSize: 12.5, color: CP.textMuted, ...NUM }}>
+              {opCount} di {max} messaggi · Invio per mandare, Maiusc+Invio per andare a capo
             </span>
             <button onClick={finishScenario} disabled={scoring || opCount === 0} style={{ ...ghostBtn, opacity: scoring || opCount === 0 ? 0.5 : 1 }}>
-              {scoring ? "Salvataggio…" : stepIndex + 1 < scenarios.length ? "Concludi e prosegui →" : "Concludi l'esercizio →"}
+              {scoring ? "Salvataggio…" : isLast ? "Concludi l'esercizio →" : "Concludi e prosegui →"}
             </button>
           </div>
         </div>
@@ -342,15 +344,24 @@ export default function AssessmentPage() {
 
 function Shell({ children, wide }) {
   return (
-    <div style={{ minHeight: "100vh", background: CP.bg, color: CP.textPrimary, display: "flex", justifyContent: "center", padding: wide ? "0 16px" : "24px 16px" }}>
-      {wide ? children : <div style={{ width: "100%", maxWidth: 560, display: "flex", alignItems: "center" }}>{children}</div>}
+    <div style={{ minHeight: "100vh", background: CP.bg, color: CP.textPrimary, fontFamily: FONTS.body, display: "flex", justifyContent: "center", padding: wide ? "0 16px" : "24px 16px" }}>
+      {wide ? children : <div style={{ width: "100%", maxWidth: 580, display: "flex", alignItems: "center" }}>{children}</div>}
+    </div>
+  );
+}
+
+/** Firma discreta: chi ti scrive e perché (sentence case, niente maiuscolo spaziato). */
+function Brand({ children, inline }) {
+  return (
+    <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: inline ? 0 : 14 }}>
+      House of Creators{children ? <span style={{ color: CP.textMuted }}> · {children}</span> : null}
     </div>
   );
 }
 
 function Card({ children }) {
   return (
-    <div style={{ width: "100%", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 14, padding: 28 }}>
+    <div style={{ width: "100%", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 14, padding: "26px 24px" }}>
       {children}
     </div>
   );
@@ -362,14 +373,15 @@ function Bubble({ role, content, muted }) {
     <div style={{ display: "flex", justifyContent: isOp ? "flex-end" : "flex-start" }}>
       <div
         style={{
-          maxWidth: "78%",
+          maxWidth: "80%",
           padding: "9px 13px",
           borderRadius: 14,
           borderBottomRightRadius: isOp ? 4 : 14,
           borderBottomLeftRadius: isOp ? 14 : 4,
           background: isOp ? CP.accent : CP.surfaceAlt,
           color: isOp ? CP.accentInk : muted ? CP.textMuted : CP.textPrimary,
-          fontSize: 14.5,
+          fontStyle: muted ? "italic" : "normal",
+          fontSize: 15,
           lineHeight: 1.45,
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
@@ -381,22 +393,21 @@ function Bubble({ role, content, muted }) {
   );
 }
 
-const h1 = { fontSize: 22, fontWeight: 600, margin: "0 0 12px", color: CP.textPrimary, lineHeight: 1.25 };
-const notice = { marginTop: 18, background: CP.bgSunken, border: `1px solid ${CP.border}`, borderRadius: 10, padding: 16 };
+const notice = { marginTop: 18, background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 10, padding: 16 };
 const primaryBtn = {
   width: "100%", padding: "12px 16px", background: CP.accent, color: CP.accentInk,
-  border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer",
+  border: "none", borderRadius: 10, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: FONTS.body,
 };
 const textarea = {
-  flex: 1, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10,
-  color: CP.textPrimary, padding: "10px 12px", fontSize: 14.5, resize: "none",
+  flex: 1, minWidth: 0, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10,
+  color: CP.textPrimary, padding: "10px 12px", fontSize: 15, resize: "none",
   fontFamily: "inherit", lineHeight: 1.4,
 };
 const sendBtn = {
   padding: "0 18px", background: CP.accent, color: CP.accentInk, border: "none",
-  borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer",
+  borderRadius: 10, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: FONTS.body,
 };
 const ghostBtn = {
-  padding: "8px 14px", background: "transparent", color: CP.accentSoftText,
-  border: `1px solid ${CP.border}`, borderRadius: 10, fontSize: 13.5, fontWeight: 500, cursor: "pointer",
+  padding: "8px 14px", background: CP.surface, color: CP.textPrimary,
+  border: `1px solid ${CP.border}`, borderRadius: 10, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: FONTS.body,
 };

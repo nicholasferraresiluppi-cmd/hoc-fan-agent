@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
-import { Loader2, AlertCircle, Radio, ArrowRight, RefreshCw, CheckCircle2 } from "lucide-react";
-import { CP, FONTS, creatorDotColor, alpha } from "@/lib/brand";
-import { PageHeader, CpCard, StatCard, SectionLabel, PillTab } from "@/components/cp-style";
-import HowToRead from "@/components/HowToRead";
+import { Loader2, Radio, ArrowRight, RefreshCw, CheckCircle2 } from "lucide-react";
+import { CP, FONTS, creatorDotColor } from "@/lib/brand";
+import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Disclosure, Notice, DataTable, card, NUM } from "@/components/ds";
 
 /**
  * /admin/infloww-agency — Revenue di TUTTE le creator (vista portfolio).
@@ -26,8 +25,9 @@ function relTime(ts) {
   if (min < 1) return "ora";
   if (min < 60) return `${min} min fa`;
   const h = Math.floor(min / 60);
-  if (h < 24) return `${h}h fa`;
-  return `${Math.floor(h / 24)}g fa`;
+  if (h < 24) return `${h} ${h === 1 ? "ora" : "ore"} fa`;
+  const g = Math.floor(h / 24);
+  return `${g} ${g === 1 ? "giorno" : "giorni"} fa`;
 }
 
 export default function InflowwAgencyPage() {
@@ -38,6 +38,7 @@ export default function InflowwAgencyPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncProg, setSyncProg] = useState(null);
   const drivingRef = useRef(false);
+  const [howOpen, setHowOpen] = useState(false);
 
   async function load(d = days) {
     setLoading(true); setError(null);
@@ -114,64 +115,74 @@ export default function InflowwAgencyPage() {
   }, [data]);
   const maxDay = useMemo(() => Math.max(1, ...(data?.trend || []).map((x) => x.net_usd)), [data]);
 
+  // Redesign 26/09/2026 (pannello tester BOARD/PAY/UX). Problema principale: con
+  // l'ultimo sync vecchio (es. 79 giorni) la pagina mostrava $0 ovunque come se
+  // l'agenzia non avesse incassato nulla. Ora l'età del dato è dichiarata e, se
+  // copre meno della finestra, lo si dice PRIMA dei numeri, con l'azione da fare.
+  const syncAgeDays = data?.last_sync_at ? (Date.now() - data.last_sync_at) / 86400000 : null;
+  const staleVsWindow = !isLive && data && !needsSync && syncAgeDays != null && syncAgeDays >= (data.window_days || days);
+  const staleSome = !isLive && data && !needsSync && syncAgeDays != null && syncAgeDays >= 2 && !staleVsWindow;
+  const creators = (data?.creators || []).map((c, i) => ({ ...c, rank: i + 1 }));
+  const active = creators.filter((c) => c.net > 0);
+  const topType = typeRows[0];
+
+  const columns = [
+    { key: "rank", label: "#", align: "right", muted: true },
+    { key: "name", label: "Creator", render: (c) => (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
+        <span style={{ width: 9, height: 9, borderRadius: "50%", background: creatorDotColor(c.name || c.id), flexShrink: 0 }} />
+        <span style={{ fontWeight: 500 }}>{c.name}</span>
+        {c.truncated && <span title="Volume alto: netto sottostimato in questa finestra" style={{ fontSize: 12, color: CP.textMuted }}>troncata</span>}
+        {c.error && <span title="Errore nel pull" style={{ fontSize: 12, color: CP.accentRed }}>errore</span>}
+      </span>
+    ) },
+    { key: "net", label: "Netto", align: "right", render: (c) => <span style={{ color: c.net > 0 ? CP.textPrimary : CP.textMuted, fontWeight: 500 }}>{fmt$(c.net)}</span> },
+    { key: "gross", label: "Lordo", align: "right", muted: true, render: (c) => fmt$(c.gross) },
+    { key: "tx", label: "Transazioni", align: "right", muted: true, render: (c) => fmtN(c.tx) },
+    { key: "topType", label: "Tipo prevalente", muted: true, render: (c) => (c.topType ? (TYPE_LABEL[c.topType] || c.topType) : "—") },
+    { key: "go", label: "", sortable: false, render: (c) => (
+      <Link href={`/admin/infloww-revenue?creatorId=${encodeURIComponent(c.id)}`}
+        style={{ display: "inline-flex", alignItems: "center", gap: 4, color: CP.accentSoftText, fontSize: 13, textDecoration: "none", whiteSpace: "nowrap" }}>
+        Dettaglio <ArrowRight size={12} />
+      </Link>
+    ) },
+  ];
+
   return (
-    <div style={{ padding: "32px 28px 80px 28px", maxWidth: 1300, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
-      <PageHeader
-        breadcrumb={
-          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <span style={{ color: CP.textPrimary }}>Revenue agency</span>
-          </div>
-        }
-        section="Data · Infloww"
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Revenue agency" }]}
         title="Revenue agency"
-        subtitle="Il portfolio: quanto sta incassando ogni creator del roster, da cosa, e chi tira di più. Dato esatto, sincronizzato: la pagina è immediata."
-        toolbar={
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <Link href="/admin/infloww-revenue" style={{ fontSize: 12, color: CP.accentSoftText, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}>
-              Dettaglio per creator <ArrowRight size={12} />
-            </Link>
-          </div>
-        }
+        subtitle="Quanto incassa ogni creator del roster, da cosa e chi porta di più. Serve a vedere il portafoglio in un colpo d'occhio; il dettaglio di una creator è in Revenue live."
+        actions={<>
+          <Link href="/admin/infloww-revenue" style={{ ...btnGhost, textDecoration: "none" }}>Revenue live per creator <ArrowRight size={13} /></Link>
+        </>}
       />
 
-      <HowToRead items={[
-        "Il dato è esatto e sincronizzato in KV: la pagina è immediata. 'Sincronizza' ripesca tutte le transazioni da Infloww e aggiorna gli aggregati (dura qualche minuto, sopravvive al reload).",
-        "Netto = incasso reale dopo la trattenuta OnlyFans (20%). La tabella è ordinata per netto: in cima chi porta di più nel periodo.",
-        "'Dato live' fa una lettura on-demand direttamente da Infloww (più fresca) ma tronca le creator ad alto volume: usalo per un check rapido, non per i totali.",
-        "IL numero da guardare: il mix per tipo dell'agenzia. Se il grosso è 'Messaggi', la revenue la fa la chat degli operatori; se è 'Abbonamenti', la fa l'audience.",
-      ]} />
-
-      {/* Barra sync + controlli */}
-      <CpCard padding="14px 18px" style={{ marginBottom: 18 }}>
-        <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-          <div>
-            <label style={lbl}>Finestra</label>
-            <div style={{ display: "flex", gap: 6 }}>
-              {WINDOWS.map((w) => (
-                <PillTab key={w.d} active={days === w.d} onClick={() => setDays(w.d)}>{w.label}</PillTab>
-              ))}
-            </div>
+      {/* Finestra + stato del dato + sync */}
+      <section style={{ ...card, padding: "12px 16px", marginBottom: 14 }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {WINDOWS.map((w) => (
+              <FilterChip key={w.d} label={`Ultimi ${w.label}`} active={days === w.d} onClick={() => setDays(w.d)} />
+            ))}
           </div>
-
           <div style={{ flex: 1 }} />
-
           {syncing ? (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: CP.textSecondary }}>
-              <Loader2 size={15} className="animate-spin" />
-              Sincronizzo… {syncProg ? `${syncProg.synced}/${syncProg.total} creator` : ""}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: CP.textSecondary }}>
+              <Loader2 size={15} className="animate-spin" color={CP.accent} />
+              Sincronizzo… {syncProg ? `${syncProg.synced} di ${syncProg.total} creator` : ""}
             </span>
           ) : (
             <>
               {!isLive && data && !needsSync && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: CP.textMuted }}>
-                  <CheckCircle2 size={13} color={CP.accentGreen} /> esatto · sync {relTime(data.last_sync_at)}
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: CP.textMuted }}>
+                  <CheckCircle2 size={14} color={staleVsWindow || staleSome ? CP.textMuted : CP.accentGreen} /> Ultimo sync {relTime(data.last_sync_at)}
                 </span>
               )}
               {isLive && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "#F59E0B" }}>
-                  <Radio size={13} /> dato live (big creator troncate)
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: CP.textSecondary }}>
+                  <Radio size={14} /> Dato live (creator grandi troncate)
                 </span>
               )}
               <button onClick={() => loadLive(days)} style={btnGhost} title="Lettura on-demand da Infloww, più fresca ma tronca le big creator">
@@ -184,142 +195,116 @@ export default function InflowwAgencyPage() {
           )}
         </div>
         {syncing && (
-          <div style={{ marginTop: 10, height: 5, borderRadius: 3, background: CP.borderSoft, overflow: "hidden" }}>
-            <div style={{ height: "100%", background: CP.accent, borderRadius: 3, transition: "width .3s", width: syncProg && syncProg.total ? `${Math.round((syncProg.synced / syncProg.total) * 100)}%` : "8%" }} />
-          </div>
+          <>
+            <div style={{ marginTop: 10, height: 6, borderRadius: 999, background: CP.surfaceAlt, overflow: "hidden" }}>
+              <div style={{ height: "100%", background: CP.accent, transition: "width .3s", width: syncProg && syncProg.total ? `${Math.round((syncProg.synced / syncProg.total) * 100)}%` : "8%" }} />
+            </div>
+            <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 6 }}>Dura qualche minuto. Puoi ricaricare la pagina: il lavoro riprende da dove era.</div>
+          </>
         )}
-      </CpCard>
+      </section>
 
-      {error && (
-        <CpCard accent={CP.accentRed} padding="14px 18px" style={{ marginBottom: 18 }}>
-          <div style={{ color: CP.accentRed, display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-            <AlertCircle size={16} /> {error}
-          </div>
-        </CpCard>
-      )}
+      {error && <Notice danger>Qualcosa non ha funzionato: {error}</Notice>}
 
       {loading && !data && (
-        <div style={{ padding: "50px", textAlign: "center", color: CP.textMuted }}>
-          <Loader2 size={22} className="animate-spin" style={{ color: CP.accent }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 8, color: CP.textMuted, fontSize: 14, padding: "20px 0" }}>
+          <Loader2 size={16} className="animate-spin" /> Carico gli incassi…
         </div>
       )}
 
       {needsSync && !syncing && (
-        <CpCard padding="30px" style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 15, color: CP.textPrimary, marginBottom: 8, fontWeight: 500 }}>Nessun dato ancora sincronizzato</div>
-          <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 18, maxWidth: 460, margin: "0 auto 18px" }}>
-            Lancia la prima sincronizzazione: pesca le transazioni delle ultime 4 settimane per tutte le creator. Dura qualche minuto e resta salvata — dopo la pagina è immediata.
+        <section style={{ ...card, padding: "24px 20px", marginBottom: 14 }}>
+          <div style={{ fontSize: 16, color: CP.textPrimary, marginBottom: 6, fontWeight: 500 }}>Nessun dato ancora sincronizzato</div>
+          <div style={{ fontSize: 14, color: CP.textSecondary, marginBottom: 16, maxWidth: 560, lineHeight: 1.5 }}>
+            Lancia la prima sincronizzazione: scarica le transazioni delle ultime 4 settimane per tutte le creator. Dura qualche minuto e resta salvata, poi la pagina si apre subito.
           </div>
-          <button onClick={runSync} style={{ ...btnPrimary, margin: "0 auto" }}>
-            <RefreshCw size={14} /> Sincronizza ora
-          </button>
-          <div style={{ marginTop: 14 }}>
-            <button onClick={() => loadLive(days)} style={{ ...btnGhost, margin: "0 auto" }}>
-              <Radio size={13} /> Oppure guarda il dato live adesso (lento, tronca le big)
-            </button>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button onClick={runSync} style={btnPrimary}><RefreshCw size={14} /> Sincronizza ora</button>
+            <button onClick={() => loadLive(days)} style={btnGhost}><Radio size={13} /> Guarda il dato live (lento, tronca le creator grandi)</button>
           </div>
-        </CpCard>
+        </section>
       )}
 
       {data && !needsSync && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(165px, 1fr))", gap: 12, marginBottom: 18 }}>
-            <StatCard label="Netto agenzia" value={fmt$(t.net_usd)} color={CP.accentGreen} sub={`${fmtN(t.tx_count)} transazioni · ${data.window_days}gg`} />
-            <StatCard label="Lordo" value={fmt$(t.gross_usd)} sub={`fee OnlyFans ${fmt$(t.fee_usd)}`} />
-            <StatCard label="Creator attive" value={fmtN((data.creators || []).filter((c) => c.net > 0).length)} sub={`su ${data.loaded} totali`} />
-            <StatCard label="Media / creator attiva" value={fmt$(avgActive(data.creators))} sub="netto medio nel periodo" />
-          </div>
-
+          {staleVsWindow && (
+            <Notice danger>
+              <span style={{ color: CP.textPrimary }}>I dati sono fermi a {relTime(data.last_sync_at)}</span>, prima dell&apos;inizio di questa finestra: i numeri qui sotto sono a zero perché mancano le transazioni, non perché le creator non hanno incassato. Premi “Sincronizza” per scaricarle (qualche minuto), oppure “Dato live” per un controllo veloce.
+            </Notice>
+          )}
+          {staleSome && (
+            <Notice>
+              Ultimo sync {relTime(data.last_sync_at)}: gli ultimi giorni della finestra non sono ancora qui. Sincronizza per averli.
+            </Notice>
+          )}
           {isLive && data.truncated_any && (
-            <div style={{ marginBottom: 12, fontSize: 12, color: "#F59E0B" }}>
-              ⚠ Dato live: alcune creator ad alto volume sono troncate (⚠ in tabella). Per i totali esatti usa Sincronizza.
-            </div>
+            <Notice>Dato live: alcune creator ad alto volume sono troncate (segnate “troncata” in tabella). Per i totali esatti usa Sincronizza.</Notice>
           )}
           {!isLive && data.failed_creators?.length > 0 && (
-            <div style={{ marginBottom: 12, fontSize: 12, color: CP.accentRed }}>
-              ⚠ {data.failed_creators.length} creator non sincronizzate nell'ultimo sync (errore lato Infloww): {data.failed_creators.slice(0, 5).join(", ")}{data.failed_creators.length > 5 ? "…" : ""}. Rilancia Sincronizza per recuperarle.
-            </div>
+            <Notice danger>
+              {data.failed_creators.length} creator non sincronizzate nell&apos;ultimo sync (errore lato Infloww): {data.failed_creators.slice(0, 5).join(", ")}{data.failed_creators.length > 5 ? "…" : ""}. Rilancia Sincronizza per recuperarle.
+            </Notice>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16, alignItems: "start" }}>
-            <CpCard padding="16px 18px">
-              <SectionLabel style={{ marginBottom: 14 }}>Da cosa arriva il netto (agenzia)</SectionLabel>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {typeRows.map((r) => (
-                  <div key={r.type}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 5 }}>
-                      <span style={{ color: CP.textSecondary }}>{TYPE_LABEL[r.type] || r.type}</span>
-                      <span style={{ fontFamily: FONTS.mono, color: CP.textPrimary }}>{fmt$(r.net)} <span style={{ color: CP.textMuted }}>· {Math.round(r.share)}%</span></span>
-                    </div>
-                    <div style={{ height: 6, borderRadius: 3, background: CP.borderSoft, overflow: "hidden" }}>
-                      <div style={{ width: `${r.share}%`, height: "100%", background: CP.accent, borderRadius: 3 }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CpCard>
+          <HeroMetric
+            label={`Netto agenzia · ultimi ${data.window_days} giorni`}
+            value={fmt$(t.net_usd)}
+            compare={`Lordo ${fmt$(t.gross_usd)} meno ${fmt$(t.fee_usd)} di trattenuta OnlyFans (20%) · ${fmtN(t.tx_count)} transazioni`}>
+            <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+              <Metric label="Creator che hanno incassato" value={fmtN(active.length)} note={`su ${fmtN(data.loaded)} nel roster`} />
+              <Metric label="Netto medio per creator attiva" value={fmt$(avgActive(data.creators))} />
+              {topType && t.net_usd > 0 && <Metric label="Prima fonte di incasso" value={TYPE_LABEL[topType.type] || topType.type} note={`${Math.round(topType.share)}% del netto`} />}
+            </div>
+          </HeroMetric>
 
-            <CpCard padding="16px 18px">
-              <SectionLabel style={{ marginBottom: 4 }}>Netto per giorno (agenzia)</SectionLabel>
-              <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 14 }}>ultimi {data.window_days} giorni · fuso Roma</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14, marginBottom: 18, alignItems: "start" }}>
+            <section style={{ ...card, padding: "16px 18px" }}>
+              <SectionTitle>Da cosa arriva il netto</SectionTitle>
+              <div style={{ fontSize: 12, color: CP.textMuted, margin: "-4px 0 12px", lineHeight: 1.5 }}>Se prevalgono i messaggi, la revenue la fa la chat degli operatori; se prevalgono gli abbonamenti, la fa il pubblico della creator.</div>
+              {typeRows.length === 0 || t.net_usd === 0 ? (
+                <div style={{ color: CP.textMuted, fontSize: 13 }}>Nessun incasso nella finestra.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {typeRows.map((r) => (
+                    <div key={r.type}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 5, gap: 8 }}>
+                        <span style={{ color: CP.textSecondary }}>{TYPE_LABEL[r.type] || r.type}</span>
+                        <span style={{ color: CP.textPrimary, ...NUM }}>{fmt$(r.net)} <span style={{ color: CP.textMuted }}>· {Math.round(r.share)}%</span></span>
+                      </div>
+                      <div style={{ height: 6, borderRadius: 3, background: CP.surfaceAlt, overflow: "hidden" }}>
+                        <div style={{ width: `${r.share}%`, height: "100%", background: CP.accent, borderRadius: 3 }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section style={{ ...card, padding: "16px 18px" }}>
+              <SectionTitle aside="fuso Roma">Netto per giorno</SectionTitle>
               {(data.trend || []).length === 0 ? (
-                <div style={{ color: CP.textMuted, fontSize: 13 }}>Nessun movimento.</div>
+                <div style={{ color: CP.textMuted, fontSize: 13 }}>Nessun movimento nella finestra.</div>
               ) : (
                 <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 120 }}>
                   {data.trend.map((x) => (
                     <div key={x.date} title={`${x.date}: ${fmt$(x.net_usd)}`}
-                      style={{ flex: 1, minWidth: 3, height: `${Math.max(2, (x.net_usd / maxDay) * 100)}%`, background: CP.accent, borderRadius: "2px 2px 0 0", opacity: 0.85 }} />
+                      style={{ flex: 1, minWidth: 3, height: `${Math.max(2, (x.net_usd / maxDay) * 100)}%`, background: CP.accent, borderRadius: "2px 2px 0 0" }} />
                   ))}
                 </div>
               )}
-            </CpCard>
+            </section>
           </div>
 
-          <CpCard padding="0" style={{ overflow: "hidden" }}>
-            <div style={{ padding: "14px 18px", borderBottom: `1px solid ${CP.border}` }}>
-              <SectionLabel>Creator per netto ({data.window_days}gg)</SectionLabel>
-            </div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-                <thead>
-                  <tr style={{ background: CP.surfaceAlt, borderBottom: `2px solid ${CP.border}` }}>
-                    <th style={th}>#</th>
-                    <th style={th}>Creator</th>
-                    <th style={{ ...th, textAlign: "right" }}>Netto</th>
-                    <th style={{ ...th, textAlign: "right" }}>Lordo</th>
-                    <th style={{ ...th, textAlign: "right" }}>Transazioni</th>
-                    <th style={th}>Tipo prevalente</th>
-                    <th style={th}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.creators.map((c, i) => (
-                    <tr key={c.id} style={{ borderBottom: `1px solid ${alpha(CP.border, "55")}` }}>
-                      <td style={{ ...td, color: CP.textMuted, fontFamily: FONTS.mono }}>{i + 1}</td>
-                      <td style={td}>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
-                          <span style={{ width: 9, height: 9, borderRadius: "50%", background: creatorDotColor(c.name || c.id), flexShrink: 0 }} />
-                          <span style={{ fontWeight: 500 }}>{c.name}</span>
-                          {c.truncated && <span title="Volume alto: netto sottostimato in questa finestra" style={{ color: "#F59E0B" }}>⚠</span>}
-                          {c.error && <span title="Errore nel pull" style={{ color: CP.accentRed }}>×</span>}
-                        </span>
-                      </td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: c.net > 0 ? CP.accentGreen : CP.textMuted, fontWeight: 600 }}>{fmt$(c.net)}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmt$(c.gross)}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.textSecondary }}>{fmtN(c.tx)}</td>
-                      <td style={{ ...td, color: CP.textSecondary }}>{c.topType ? (TYPE_LABEL[c.topType] || c.topType) : "—"}</td>
-                      <td style={td}>
-                        <Link href={`/admin/infloww-revenue?creatorId=${encodeURIComponent(c.id)}`}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 9px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 5, color: CP.accentSoftText, fontSize: 11, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}>
-                          Dettaglio <ArrowRight size={11} />
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CpCard>
+          <SectionTitle aside="in cima chi porta di più · clicca le colonne per riordinare">Creator per netto</SectionTitle>
+          <DataTable columns={columns} rows={creators} minWidth={760} maxHeight={640} empty="Nessuna creator nel roster." />
+
+          <Disclosure open={howOpen} onToggle={() => setHowOpen((v) => !v)} title="Come si legge questa pagina" summary="sync, dato live, netto e lordo">
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: CP.textSecondary, lineHeight: 1.6 }}>
+              <li>Il dato è salvato in HOC Pro: la pagina è immediata. “Sincronizza” riscarica tutte le transazioni da Infloww e aggiorna i totali (qualche minuto, sopravvive al ricaricamento della pagina).</li>
+              <li>Netto = incasso reale dopo la trattenuta OnlyFans (20%).</li>
+              <li>“Dato live” legge direttamente da Infloww (più fresco) ma tronca le creator ad alto volume: va bene per un controllo rapido, non per i totali.</li>
+            </ul>
+          </Disclosure>
         </>
       )}
     </div>
@@ -332,8 +317,5 @@ function avgActive(creators = []) {
   return Math.round(act.reduce((s, c) => s + c.net, 0) / act.length);
 }
 
-const lbl = { display: "block", fontSize: 10, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
-const th = { padding: "10px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: CP.textMuted, letterSpacing: 0.6, fontFamily: FONTS.mono, whiteSpace: "nowrap" };
-const td = { padding: "9px 12px", verticalAlign: "middle" };
-const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 14px", background: CP.accent, color: CP.accentInk, border: "none", borderRadius: 8, fontSize: 12.5, fontWeight: 600, fontFamily: FONTS.body, cursor: "pointer" };
-const btnGhost = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "transparent", color: CP.textSecondary, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 12, fontFamily: FONTS.body, cursor: "pointer" };
+const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 14px", background: CP.accent, color: CP.accentInk, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };
+const btnGhost = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "transparent", color: CP.textSecondary, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, fontFamily: FONTS.body, cursor: "pointer" };

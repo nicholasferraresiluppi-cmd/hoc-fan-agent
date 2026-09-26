@@ -3,11 +3,18 @@
 // Academy Signals — "quali comportamenti pagano da noi" (Tier 2).
 // Vista read-only, admin: correlazioni comportamento→revenue dal warehouse,
 // con consistenza e caveat espliciti. Informa il coaching, non lo score.
+//
+// Redesign 26/09/2026 (pannello tester SM/TL/UX): il numero "+0,36" non diceva
+// niente senza sapere cos'è una correlazione → legenda in parole in testa e
+// "legame" al posto di "corr"; la base (quanti turni) era nascosta in fondo →
+// accanto al titolo; i comportamenti SENZA legame restano visibili ma in una
+// sezione a parte (servono a non alimentare miti, non a decidere).
 
 import { useState } from "react";
 import useSWR from "swr";
-import { CP, FONTS, alpha } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
+import { CP, FONTS } from "@/lib/brand";
+import { PageHead, SectionTitle, Disclosure, Notice, card, NUM } from "@/components/ds";
+import { fmtInt } from "@/lib/format";
 import { ArrowUp, ArrowDown, Minus } from "lucide-react";
 
 const fetcher = (url) =>
@@ -22,67 +29,53 @@ const fmtCorr = (n) =>
     ? "—"
     : Number(n).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: "exceptZero" });
 
+const btn = { padding: "8px 14px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body };
+
 function DirectionIcon({ s }) {
   if (isNoSignal(s)) return <Minus size={16} color={CP.textMuted} />;
-  return s.direction === "up" ? (
-    <ArrowUp size={16} color={CP.accentGreen} />
-  ) : (
-    <ArrowDown size={16} color={CP.accentRed} />
-  );
+  return s.direction === "up" ? <ArrowUp size={16} color={CP.accentGreen} /> : <ArrowDown size={16} color={CP.accentRed} />;
 }
 
 function SignalCard({ s }) {
   const noSignal = isNoSignal(s);
-  const color = valueColor(s);
   return (
-    <div
-      style={{
-        background: CP.surface,
-        border: `1px solid ${CP.border}`,
-        borderLeft: `3px solid ${noSignal ? CP.borderSoft : color}`,
-        borderRadius: 12,
-        padding: "16px 18px",
-        opacity: noSignal ? 0.72 : 1,
-      }}
-    >
+    <div style={{ ...card, padding: "16px 18px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline", flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <DirectionIcon s={s} />
-          <span style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, fontFamily: FONTS.display }}>
-            {s.label}
-          </span>
+          <span style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>{s.label}</span>
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-          <span style={{ fontSize: 12, color: CP.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.strength}</span>
-          <span style={{ fontSize: 15, fontWeight: 500, color, minWidth: 52, textAlign: "right" }}>
-            {fmtCorr(s.mean_corr)}
-          </span>
+          <span style={{ fontSize: 13, color: CP.textMuted }}>{noSignal ? "nessun legame" : `legame ${s.strength}`}</span>
+          <span style={{ fontSize: 16, fontWeight: 500, color: valueColor(s), minWidth: 52, textAlign: "right", ...NUM }}>{fmtCorr(s.mean_corr)}</span>
         </div>
       </div>
 
-      <p style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.5, margin: "10px 0 0" }}>{s.measure}</p>
+      <p style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.5, margin: "8px 0 0" }}>{s.measure}</p>
 
       {!noSignal && s.coaching && (
-        <p style={{ fontSize: 13.5, color: CP.textPrimary, lineHeight: 1.5, margin: "8px 0 0" }}>
-          <span style={{ color: CP.accentSoftText }}>Coaching:</span> {s.coaching}
+        <p style={{ fontSize: 14, color: CP.textPrimary, lineHeight: 1.5, margin: "8px 0 0" }}>
+          <span style={{ color: CP.textMuted }}>Cosa allenare: </span>
+          {s.coaching}
         </p>
       )}
 
       {!noSignal && (
-        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", margin: "10px 0 0", fontSize: 12, color: CP.textMuted }}>
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", margin: "10px 0 0", fontSize: 12, color: CP.textMuted, ...NUM }}>
           <span>
-            Consistenza:{" "}
-            <span style={{ color: s.consistency >= 0.75 ? CP.accentGreen : CP.textSecondary }}>
-              {s.agree}/{s.creators} creator concordano
-            </span>
+            <span style={{ color: s.consistency >= 0.75 ? CP.textPrimary : CP.textSecondary }}>
+              {s.agree} creator su {s.creators}
+            </span>{" "}
+            vanno nella stessa direzione
           </span>
           <span>{s.direction === "up" ? "più è meglio" : "meno è meglio"}</span>
         </div>
       )}
 
       {s.caveat && (
-        <p style={{ fontSize: 12, color: CP.textMuted, lineHeight: 1.5, margin: "8px 0 0", fontStyle: "italic" }}>
-          ⚠ {s.caveat}
+        <p style={{ fontSize: 12, color: CP.textMuted, lineHeight: 1.5, margin: "8px 0 0" }}>
+          <span style={{ color: CP.textSecondary }}>Attenzione: </span>
+          {s.caveat}
         </p>
       )}
     </div>
@@ -95,6 +88,7 @@ export default function AcademySignalsPage() {
   });
   const [busy, setBusy] = useState(false);
   const [refreshErr, setRefreshErr] = useState(null);
+  const [showNone, setShowNone] = useState(false);
 
   async function refresh() {
     setBusy(true);
@@ -112,62 +106,74 @@ export default function AcademySignalsPage() {
   }
 
   const signals = data?.signals || [];
+  const withSignal = signals.filter((s) => !isNoSignal(s));
+  const noSignal = signals.filter(isNoSignal);
+  const updated = data?.generated_at
+    ? new Date(data.generated_at).toLocaleString("it-IT", { timeZone: "Europe/Rome", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+    : null;
 
   return (
-    <div style={{ maxWidth: 860, margin: "0 auto", padding: "32px 20px 64px" }}>
-      <PageHeader
-        section="Admin · Academy"
-        title="Signals — cosa paga da noi"
-        subtitle="Quali comportamenti degli operatori correlano col revenue/ora, calcolati sui turni a operatore singolo (attribuzione pulita) e DENTRO ogni creator (niente effetto creator ricco). Informa il coaching, non entra nello score."
-        toolbar={
-          <button
-            onClick={refresh}
-            disabled={busy || data?.bigquery === false}
-            style={{
-              background: CP.surfaceAlt,
-              color: CP.textPrimary,
-              border: `1px solid ${CP.border}`,
-              borderRadius: 8,
-              padding: "8px 16px",
-              fontSize: 13,
-              cursor: busy ? "wait" : "pointer",
-            }}
-          >
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Training" }, { label: "Signals" }]}
+        title="Cosa fa vendere da noi"
+        subtitle="Quali abitudini degli operatori vanno insieme a più venduto all'ora, misurate sui nostri turni veri. Serve a scegliere su cosa allenare il team: non entra nello score."
+        actions={
+          <button onClick={refresh} disabled={busy || data?.bigquery === false} style={{ ...btn, cursor: busy ? "wait" : "pointer" }}>
             {busy ? "Ricalcolo…" : "Ricalcola"}
           </button>
         }
       />
 
-      {refreshErr && (
-        <div style={{ padding: "12px 16px", marginBottom: 12, background: CP.surface, border: `1px solid ${alpha(CP.accentRed, "55")}`, borderRadius: 10, color: CP.accentRed, fontSize: 13 }}>
-          Ricalcolo fallito: {refreshErr}.
-        </div>
-      )}
+      {refreshErr && <Notice danger>Ricalcolo fallito: {refreshErr}.</Notice>}
 
       {error ? (
-        <div style={{ padding: "20px 24px", background: CP.surface, border: `1px solid ${alpha(CP.accentRed, "55")}`, borderRadius: 12, color: CP.accentRed, fontSize: 14 }}>
-          Non riesco a calcolare i signals: {error.message}.
-        </div>
+        <Notice danger>Non riesco a calcolare i segnali: {error.message}.</Notice>
       ) : data?.bigquery === false ? (
-        <div style={{ padding: "20px 24px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, color: CP.textSecondary, fontSize: 14 }}>
-          BigQuery non configurato in questo ambiente: i signals non sono calcolabili.
-        </div>
+        <Notice>Il collegamento al warehouse (BigQuery) non è configurato in questo ambiente: i segnali non sono calcolabili.</Notice>
       ) : isLoading ? (
         <div style={{ color: CP.textMuted, fontSize: 14 }}>Calcolo dai turni reali…</div>
+      ) : signals.length === 0 ? (
+        <Notice>Nessun segnale calcolato: non ci sono abbastanza turni con un solo operatore in chat nel periodo. Prova &quot;Ricalcola&quot; più tardi.</Notice>
       ) : (
         <>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {signals.map((s) => (
+          <Notice>
+            <strong style={{ fontWeight: 500, color: CP.textPrimary }}>Come leggere il numero.</strong> Va da −1 a +1 e dice quanto
+            un&apos;abitudine va insieme al venduto all&apos;ora. Qui contano anche valori piccoli: sotto 0,07 nessun legame, da 0,07 debole, da 0,15 moderato, da 0,3 forte (con i turni reali, pieni di altre variabili, 0,3 è già tanto). Il
+            segno dice la direzione: + vuol dire &quot;più ne fai, più vendi&quot;, − il contrario. È una correlazione: le due cose vanno
+            insieme, non è detto che una causi l&apos;altra. Contano solo i turni con un solo operatore in chat (così si sa chi ha scritto),
+            confrontati dentro la stessa creator (una creator ricca non gonfia il risultato).
+          </Notice>
+
+          <SectionTitle aside={data?.shifts_analyzed != null ? `${fmtInt(data.shifts_analyzed)} turni con un solo operatore · ${fmtInt(data.creators_analyzed)} creator · ultimi ${data?.params?.days} giorni` : null}>
+            Abitudini legate al venduto ({withSignal.length})
+          </SectionTitle>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+            {withSignal.map((s) => (
               <SignalCard key={s.key} s={s} />
             ))}
+            {withSignal.length === 0 && <Notice>Nessuna abitudine mostra un legame col venduto in questo periodo.</Notice>}
           </div>
 
-          <div style={{ marginTop: 20, fontSize: 12, color: CP.textMuted, lineHeight: 1.6 }}>
-            Base: {data?.shifts_analyzed?.toLocaleString("it-IT")} turni a operatore singolo su{" "}
-            {data?.creators_analyzed} creator, ultimi {data?.params?.days} giorni. Metodologia {data?.version}, correlazione
-            di Pearson within-creator (media delle correlazioni per creator). Aggiornato{" "}
-            {data?.generated_at ? new Date(data.generated_at).toLocaleString("it-IT", { timeZone: "Europe/Rome" }) : "—"}.
-            {data?.cached ? " (cache)" : ""}
+          {noSignal.length > 0 && (
+            <Disclosure
+              open={showNone}
+              onToggle={() => setShowNone(!showNone)}
+              title={`Senza legame con il venduto (${noSignal.length})`}
+              summary={`${noSignal.map((s) => s.label).join(", ")} — da noi non fanno differenza: non serve allenarle`}
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {noSignal.map((s) => (
+                  <SignalCard key={s.key} s={s} />
+                ))}
+              </div>
+            </Disclosure>
+          )}
+
+          <div style={{ marginTop: 8, fontSize: 12, color: CP.textMuted, lineHeight: 1.6 }}>
+            Metodo {data?.version}: correlazione di Pearson calcolata dentro ogni creator e poi mediata tra le creator.
+            {updated ? ` Aggiornato ${updated}.` : ""}
+            {data?.cached ? " (dati in cache)" : ""}
           </div>
         </>
       )}

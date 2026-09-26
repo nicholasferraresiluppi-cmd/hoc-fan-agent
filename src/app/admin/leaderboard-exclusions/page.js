@@ -1,39 +1,53 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+// Esclusioni dalla leaderboard operativa.
+// Ridisegno 26/09/2026 (design system): il modulo per escludere in alto e
+// compatto; l'elenco delle esclusioni manuali con ricerca; il controllo "chi non
+// compare" con filtri per motivo — gli account Mass automatici (~160) non
+// annegano più le esclusioni fatte a mano (~15), e l'elenco è ordinato per
+// venduto così salta all'occhio un "non fa chat" che in realtà vende. Motivi in
+// italiano, periodo scelto da menu. API, conferme e azioni invariate.
+
+import { useMemo, useRef, useState } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
-import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
+import { FONTS, CP } from "@/lib/brand";
+import { PageHead, SectionTitle, Notice, DataTable, FilterChip, card } from "@/components/ds";
+import { fmt$, fmtInt, MONTHS_IT } from "@/lib/format";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
 const REASONS = [
-  { value: "non_chatter", label: "Non-chatter", description: "SM, trainer, account servizio", color: "#4F8CCB" },
-  { value: "manual", label: "Manuale", description: "Esclusione amministrativa esplicita", color: "#D4AF7A" },
-  { value: "data_quality", label: "Data quality", description: "Dati incompleti o sospetti", color: "#E76F51" },
+  { value: "non_chatter", label: "Non fa chat", description: "Sales manager, trainer, account di servizio" },
+  { value: "manual", label: "Altro motivo", description: "Esclusione decisa a mano (scrivi il perché nella nota)" },
+  { value: "data_quality", label: "Dati sbagliati", description: "Dati incompleti o sospetti per questo operatore" },
 ];
 
 const REASON_LABEL = {
-  non_chatter: "Non-chatter",
-  manual: "Manuale",
-  data_quality: "Data quality",
-  mass_account: "Mass (auto)",
-  no_group_data: "No group data",
+  non_chatter: "Non fa chat",
+  manual: "Altro motivo",
+  data_quality: "Dati sbagliati",
+  mass_account: "Account Mass (automatico)",
+  no_group_data: "Gruppo senza dati",
 };
-
-const REASON_COLOR = {
-  non_chatter: "#4F8CCB",
-  manual: "#D4AF7A",
-  data_quality: "#E76F51",
-  mass_account: "#8F8A82",
-  no_group_data: "#6B7080",
-};
+const MANUAL = ["non_chatter", "manual", "data_quality"];
 
 function currentMonthId() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
+function monthOpts(n = 12) {
+  const now = new Date();
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    return { value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: `${MONTHS_IT[d.getMonth()]} ${d.getFullYear()}` };
+  });
+}
+
+const field = { width: "100%", boxSizing: "border-box", padding: "8px 12px", background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
+const lbl = { display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 4 };
+const smallBtn = { padding: "5px 10px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 12, fontFamily: FONTS.body, cursor: "pointer" };
+const badge = { display: "inline-block", padding: "2px 9px", borderRadius: 999, fontSize: 12, background: CP.surfaceAlt, color: CP.textSecondary, whiteSpace: "nowrap" };
 
 export default function LeaderboardExclusionsPage() {
   const [periodId, setPeriodId] = useState(currentMonthId());
@@ -42,6 +56,10 @@ export default function LeaderboardExclusionsPage() {
   const [formNote, setFormNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [q, setQ] = useState("");
+  const [auditFilter, setAuditFilter] = useState(null);
+  const formRef = useRef(null);
+  const periodOptions = useMemo(() => monthOpts(), []);
 
   const exclUrl = "/api/admin/leaderboard-exclusions";
   const auditUrl = `/api/leaderboard/operational?period_type=monthly&period_id=${periodId}&include_excluded=1&include_zero=1`;
@@ -115,223 +133,163 @@ export default function LeaderboardExclusionsPage() {
     }
   }
 
-  const styles = {
-    page: { minHeight: "100vh", background: COLORS.obsidian, color: COLORS.alabaster, fontFamily: FONTS.body, padding: "32px 24px" },
-    container: { maxWidth: 1300, margin: "0 auto" },
-    title: { fontFamily: FONTS.display, fontSize: 28, margin: "0 0 6px 0", letterSpacing: "-0.01em", fontWeight: 500 },
-    sub: { color: COLORS.fog, fontSize: 14, marginBottom: 24, maxWidth: 900, lineHeight: 1.55 },
-    card: { background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, padding: 22, marginBottom: 22 },
-    h2: { fontFamily: FONTS.display, fontSize: 18, margin: "0 0 14px 0", fontWeight: 500 },
-    label: { fontSize: 11, color: COLORS.fog, letterSpacing: "0.1em", marginBottom: 6, display: "block" },
-    input: { width: "100%", padding: "9px 14px", background: COLORS.charcoal, border: `1px solid ${COLORS.steel}`, borderRadius: 8, color: COLORS.alabaster, fontSize: 13, fontFamily: FONTS.body, marginBottom: 12, outline: "none" },
-    btn: { padding: "9px 18px", background: COLORS.champagne, color: COLORS.obsidian, border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 13, fontFamily: FONTS.body },
-    btnDanger: { padding: "5px 12px", background: "transparent", color: COLORS.signal, border: `1px solid ${alpha(COLORS.signal, "66")}`, borderRadius: 6, cursor: "pointer", fontSize: 11, fontFamily: FONTS.body },
-    error: { background: alpha(COLORS.signal, "20"), color: COLORS.signal, padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 },
-    reasonPill: (active, color) => ({
-      padding: "8px 14px",
-      background: active ? color : "transparent",
-      color: active ? COLORS.obsidian : COLORS.alabaster,
-      border: `1px solid ${active ? color : COLORS.steel}`,
-      borderRadius: 999,
-      cursor: "pointer",
-      fontSize: 12, fontWeight: active ? 600 : 500,
-      fontFamily: FONTS.body,
-      marginRight: 6,
-    }),
-    table: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
-    th: { textAlign: "left", padding: "10px 12px", color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", borderBottom: `1px solid ${COLORS.steel}` },
-    td: { padding: "10px 12px", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, verticalAlign: "middle" },
-    reasonBadge: (reason) => ({
-      display: "inline-block", padding: "2px 8px", borderRadius: 999,
-      fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", 
-      background: (REASON_COLOR[reason] || COLORS.mist) + "26",
-      color: REASON_COLOR[reason] || COLORS.mist,
-      border: `1px solid ${alpha(REASON_COLOR[reason] || COLORS.mist, "55")}`,
-    }),
+  // Filtri del controllo "chi non compare"
+  const counts = {
+    all: auditAll.length,
+    manual: auditAll.filter((r) => MANUAL.includes(r._excluded_reason)).length,
+    mass: auditAll.filter((r) => r._excluded_reason === "mass_account").length,
+    nogroup: auditAll.filter((r) => r._excluded_reason === "no_group_data").length,
   };
+  const af = auditFilter ?? (counts.manual > 0 ? "manual" : "all");
+  const auditRows = auditAll
+    .filter((r) => af === "all" || (af === "manual" ? MANUAL.includes(r._excluded_reason) : af === "mass" ? r._excluded_reason === "mass_account" : r._excluded_reason === "no_group_data"))
+    .map((r, i) => ({ ...r, id: `${r.employee}-${r.group}-${i}` }));
+
+  const needle = q.trim().toLowerCase();
+  const activeRows = exclusionEntries
+    .filter(([name, e]) => !needle || `${name} ${e.note || ""}`.toLowerCase().includes(needle))
+    .map(([name, entry]) => ({ id: name, name, ...entry }));
+
+  const activeCols = [
+    { key: "name", label: "Operatore", sort: (r) => r.name.toLowerCase() },
+    { key: "reason", label: "Motivo", sort: (r) => REASON_LABEL[r.reason] || r.reason, render: (r) => <span style={badge}>{REASON_LABEL[r.reason] || r.reason}</span> },
+    { key: "note", label: "Nota", muted: true, render: (r) => r.note || "—" },
+    {
+      key: "added_at", label: "Quando", sort: (r) => r.added_at || 0,
+      render: (r) => (
+        <div style={{ fontSize: 13, color: CP.textSecondary, whiteSpace: "nowrap" }}>
+          {r.added_at ? new Date(r.added_at).toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "2-digit" }) : "—"}
+          {r.added_by && <div style={{ fontSize: 11, color: CP.textMuted }}>da …{String(r.added_by).slice(-8)}</div>}
+        </div>
+      ),
+    },
+    { key: "actions", label: "", sortable: false, align: "right", render: (r) => <button style={{ ...smallBtn, color: CP.accentRed }} onClick={() => handleRemove(r.name)}>Rimuovi</button> },
+  ];
+
+  const auditCols = [
+    { key: "employee", label: "Operatore", sort: (r) => (r.employee || "").toLowerCase() },
+    { key: "group", label: "Gruppo", muted: true },
+    {
+      key: "reason", label: "Motivo", sort: (r) => REASON_LABEL[r._excluded_reason] || r._excluded_reason,
+      render: (r) => (
+        <div>
+          <span style={badge}>{REASON_LABEL[r._excluded_reason] || r._excluded_reason}</span>
+          {r._exclusion_note && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2 }}>{r._exclusion_note}</div>}
+        </div>
+      ),
+    },
+    { key: "sales", label: "Venduto", align: "right", sort: (r) => (r.sales == null ? null : Number(r.sales)), render: (r) => (r.sales != null ? fmt$(r.sales) : "—") },
+    { key: "msg", label: "Messaggi", align: "right", sort: (r) => r.direct_messages_sent ?? null, render: (r) => fmtInt(r.direct_messages_sent) },
+    {
+      key: "actions", label: "", sortable: false, align: "right",
+      render: (r) => MANUAL.includes(r._excluded_reason) ? (
+        <button style={{ ...smallBtn, color: CP.accentRed }} onClick={() => handleRemove(r.employee)}>Rimuovi</button>
+      ) : r._excluded_reason === "mass_account" ? (
+        <span style={{ fontSize: 12, color: CP.textMuted }}>automatico</span>
+      ) : (
+        <button style={smallBtn} onClick={() => { setFormEmployee(r.employee); formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
+          Escludi
+        </button>
+      ),
+    },
+  ];
 
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <PageHeader
-          breadcrumb={
-            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-              <span style={{ color: CP.textMuted }}>›</span>
-              <span style={{ color: CP.textPrimary }}>Esclusioni</span>
-            </div>
-          }
-          section="Data · Leaderboard"
-          title="Esclusioni Leaderboard Operativa"
-          subtitle={'Denylist degli operatori da escludere dalla classifica + vista di chi non vi compare (automatici "Mass", esclusi manuali, score zero, dati mancanti). Effetto immediato al successivo caricamento.'}
-        />
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Dati" }, { label: "Esclusioni" }]}
+        title="Esclusioni dalla leaderboard"
+        subtitle="Chi non deve comparire nella leaderboard operativa perché non fa chat o ha dati sbagliati. Chi escludi qui non riceve score né fascia; l'effetto si vede al prossimo caricamento della leaderboard."
+        actions={<Link href="/leaderboard/operational" style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 13, textDecoration: "none" }}>Vai alla leaderboard</Link>}
+      />
 
-        {/* Esclusioni attive */}
-        <div style={styles.card}>
-          <h2 style={styles.h2}>Esclusioni manuali attive ({exclusionEntries.length})</h2>
-          {exclErr && <div style={styles.error}>Errore caricamento: {String(exclErr)}</div>}
-          {exclData?.error && <div style={styles.error}>{exclData.error}</div>}
-          {exclusionEntries.length === 0 ? (
-            <p style={{ color: COLORS.fog, fontSize: 13 }}>Nessuna esclusione manuale. Account "Mass" sono filtrati automaticamente in pipeline.</p>
-          ) : (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Operatore</th>
-                  <th style={styles.th}>Reason</th>
-                  <th style={styles.th}>Nota</th>
-                  <th style={styles.th}>Aggiunto da</th>
-                  <th style={styles.th}>Quando</th>
-                  <th style={styles.th}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {exclusionEntries.map(([name, entry]) => (
-                  <tr key={name}>
-                    <td style={{ ...styles.td, fontWeight: 600 }}>{name}</td>
-                    <td style={styles.td}><span style={styles.reasonBadge(entry.reason)}>{REASON_LABEL[entry.reason] || entry.reason}</span></td>
-                    <td style={{ ...styles.td, color: COLORS.fog, fontSize: 12 }}>{entry.note || "—"}</td>
-                    <td style={{ ...styles.td, color: COLORS.mist, fontSize: 11, fontFamily: FONTS.mono }}>{(entry.added_by || "").slice(-8)}</td>
-                    <td style={{ ...styles.td, color: COLORS.mist, fontSize: 11 }}>
-                      {entry.added_at ? new Date(entry.added_at).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" }) : "—"}
-                    </td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>
-                      <button style={styles.btnDanger} onClick={() => handleRemove(name)}>Rimuovi</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {/* Form aggiunta */}
-        <div style={styles.card}>
-          <h2 style={styles.h2}>Aggiungi esclusione</h2>
-          {error && <div style={styles.error}>{error}</div>}
-          <form onSubmit={handleAdd}>
-            <label style={styles.label}>Nome operatore (esatto come in Infloww)</label>
-            <input
-              list="employees-list"
-              value={formEmployee}
-              onChange={(e) => setFormEmployee(e.target.value)}
-              placeholder="Es. Mario Rossi"
-              style={styles.input}
-            />
-            <datalist id="employees-list">
-              {allEmployeesInPeriod.map((n) => <option key={n} value={n} />)}
-            </datalist>
-            <p style={{ fontSize: 11, color: COLORS.mist, marginTop: -8, marginBottom: 14 }}>
-              {allEmployeesInPeriod.length} nomi disponibili dal periodo {periodId}. Cambia periodo sotto se non trovi l'operatore.
-            </p>
-
-            <label style={styles.label}>Reason</label>
-            <div style={{ marginBottom: 12 }}>
-              {REASONS.map((r) => (
-                <button
-                  key={r.value}
-                  type="button"
-                  style={styles.reasonPill(formReason === r.value, r.color)}
-                  onClick={() => setFormReason(r.value)}
-                  title={r.description}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-
-            <label style={styles.label}>Nota (opzionale)</label>
-            <input
-              value={formNote}
-              onChange={(e) => setFormNote(e.target.value)}
-              placeholder="Es. SM, non opera in chat"
-              style={styles.input}
-            />
-
-            <button type="submit" style={styles.btn} disabled={submitting}>
-              {submitting ? "Salvataggio…" : "✓ Aggiungi esclusione"}
-            </button>
-          </form>
-        </div>
-
-        {/* Audit — non in classifica */}
-        <div style={styles.card}>
-          <h2 style={styles.h2}>Audit: chi non compare in classifica</h2>
-          <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={styles.label}>Periodo:</span>
-            <input
-              value={periodId}
-              onChange={(e) => setPeriodId(e.target.value)}
-              placeholder="2026-05"
-              style={{ ...styles.input, width: 140, marginBottom: 0 }}
-            />
-            <Link href="/leaderboard/operational" style={{ color: COLORS.champagne, fontSize: 12, marginLeft: "auto" }}>
-              Vai alla leaderboard →
-            </Link>
+      {/* Aggiungi */}
+      <section ref={formRef} style={{ ...card, padding: "14px 16px", marginBottom: 20, scrollMarginTop: 16 }}>
+        <SectionTitle aside={`${allEmployeesInPeriod.length} nomi suggeriti da ${periodOptions.find((p) => p.value === periodId)?.label || periodId}`}>Escludi un operatore</SectionTitle>
+        {error && <Notice danger>{error}</Notice>}
+        <form onSubmit={handleAdd}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 12 }}>
+            <label>
+              <span style={lbl}>Nome operatore (esatto come in Infloww)</span>
+              <input list="employees-list" value={formEmployee} onChange={(e) => setFormEmployee(e.target.value)} placeholder="Es. Mario Rossi" style={field} />
+              <datalist id="employees-list">
+                {allEmployeesInPeriod.map((n) => <option key={n} value={n} />)}
+              </datalist>
+            </label>
+            <label>
+              <span style={lbl}>Nota (facoltativa)</span>
+              <input value={formNote} onChange={(e) => setFormNote(e.target.value)} placeholder="Es. sales manager, non opera in chat" style={field} />
+            </label>
           </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13, color: CP.textSecondary }}>Motivo</span>
+            {REASONS.map((r) => (
+              <FilterChip key={r.value} label={r.label} active={formReason === r.value} onClick={(e) => { e.preventDefault(); setFormReason(r.value); }} />
+            ))}
+            <span style={{ fontSize: 12, color: CP.textMuted }}>{REASONS.find((r) => r.value === formReason)?.description}</span>
+            <span style={{ flex: 1 }} />
+            <button type="submit" disabled={submitting} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: CP.accent, color: CP.accentInk, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer", opacity: submitting ? 0.6 : 1 }}>
+              {submitting ? "Salvataggio…" : "Escludi"}
+            </button>
+          </div>
+        </form>
+      </section>
 
-          {auditErr && <div style={styles.error}>Errore: {String(auditErr)}</div>}
-          {auditData?.error && <div style={styles.error}>{auditData.error}</div>}
-          {!auditData?.error && (
-            <>
-              <div style={{ display: "flex", gap: 14, marginBottom: 14, flexWrap: "wrap", fontSize: 12, color: COLORS.fog }}>
-                <span>Totale esclusi: <b style={{ color: COLORS.alabaster }}>{auditAll.length}</b></span>
-                <span>· Mass: <b style={{ color: COLORS.alabaster }}>{auditAll.filter(r => r._excluded_reason === "mass_account").length}</b></span>
-                <span>· Manuali: <b style={{ color: COLORS.alabaster }}>{auditAll.filter(r => ["non_chatter","manual","data_quality"].includes(r._excluded_reason)).length}</b></span>
-                <span>· No group data: <b style={{ color: COLORS.alabaster }}>{auditAll.filter(r => r._excluded_reason === "no_group_data").length}</b></span>
-              </div>
-
-              {auditAll.length === 0 ? (
-                <p style={{ color: COLORS.fog, fontSize: 13 }}>Nessun operatore escluso in questo periodo.</p>
-              ) : (
-                <table style={styles.table}>
-                  <thead>
-                    <tr>
-                      <th style={styles.th}>Operatore</th>
-                      <th style={styles.th}>Group</th>
-                      <th style={styles.th}>Reason</th>
-                      <th style={styles.th}>Sales</th>
-                      <th style={styles.th}>Msg</th>
-                      <th style={styles.th}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {auditAll.map((r, i) => {
-                      const isManual = ["non_chatter", "manual", "data_quality"].includes(r._excluded_reason);
-                      return (
-                        <tr key={`${r.employee}-${r.group}-${i}`}>
-                          <td style={{ ...styles.td, fontWeight: 600 }}>{r.employee}</td>
-                          <td style={{ ...styles.td, color: COLORS.fog, fontSize: 12 }}>{r.group}</td>
-                          <td style={styles.td}>
-                            <span style={styles.reasonBadge(r._excluded_reason)}>{REASON_LABEL[r._excluded_reason] || r._excluded_reason}</span>
-                            {r._exclusion_note && <span style={{ marginLeft: 6, color: COLORS.mist, fontSize: 11 }}>{r._exclusion_note}</span>}
-                          </td>
-                          <td style={{ ...styles.td, fontFamily: FONTS.mono }}>{r.sales != null ? `$${Number(r.sales).toLocaleString("it-IT", { maximumFractionDigits: 0 })}` : "—"}</td>
-                          <td style={{ ...styles.td, fontFamily: FONTS.mono }}>{r.direct_messages_sent ?? "—"}</td>
-                          <td style={{ ...styles.td, textAlign: "right" }}>
-                            {isManual ? (
-                              <button style={styles.btnDanger} onClick={() => handleRemove(r.employee)}>Rimuovi</button>
-                            ) : r._excluded_reason === "mass_account" ? (
-                              <span style={{ fontSize: 11, color: COLORS.mist }}>auto</span>
-                            ) : (
-                              <button
-                                style={{ ...styles.btnDanger, color: COLORS.fog, borderColor: COLORS.steel }}
-                                onClick={() => { setFormEmployee(r.employee); window.scrollTo({ top: 400, behavior: "smooth" }); }}
-                              >
-                                Aggiungi
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </>
-          )}
+      {/* Esclusioni attive */}
+      <section style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+          <SectionTitle aside="valgono per tutti i mesi finché non le togli">Esclusioni fatte a mano · {exclusionEntries.length}</SectionTitle>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca nome o nota" aria-label="Cerca esclusione" style={{ ...field, width: 240, maxWidth: "100%", marginLeft: "auto", fontSize: 13, background: CP.surface }} />
         </div>
-      </div>
+        {exclErr && <Notice danger>Errore nel caricamento: {String(exclErr)}</Notice>}
+        {exclData?.error && <Notice danger>{exclData.error}</Notice>}
+        {!exclData && !exclErr && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
+        {exclData && !exclData.error && (
+          <DataTable
+            columns={activeCols}
+            rows={activeRows}
+            defaultSort={{ key: "added_at", dir: -1 }}
+            minWidth={720}
+            maxHeight={420}
+            empty={exclusionEntries.length === 0 ? "Nessuna esclusione fatta a mano. Gli account «Mass» sono tolti in automatico." : "Nessuna esclusione con questo nome."}
+          />
+        )}
+      </section>
+
+      {/* Audit — non in classifica */}
+      <section>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+          <SectionTitle aside="per controllare che le esclusioni siano ancora giuste">Chi non compare nella leaderboard</SectionTitle>
+          <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} aria-label="Mese" style={{ ...field, width: "auto", marginLeft: "auto", fontSize: 13, background: CP.surface }}>
+            {periodOptions.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </select>
+        </div>
+
+        {auditErr && <Notice danger>Errore: {String(auditErr)}</Notice>}
+        {auditData?.error && <Notice danger>{auditData.error}</Notice>}
+        {!auditData && !auditErr && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
+        {auditData && !auditData.error && (
+          <>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+              <FilterChip label={`Esclusi a mano (${counts.manual})`} active={af === "manual"} disabled={!counts.manual} onClick={() => setAuditFilter("manual")} />
+              <FilterChip label={`Gruppo senza dati (${counts.nogroup})`} active={af === "nogroup"} disabled={!counts.nogroup} onClick={() => setAuditFilter("nogroup")} />
+              <FilterChip label={`Account Mass automatici (${counts.mass})`} active={af === "mass"} disabled={!counts.mass} onClick={() => setAuditFilter("mass")} />
+              <FilterChip label={`Tutti (${counts.all})`} active={af === "all"} onClick={() => setAuditFilter("all")} />
+            </div>
+            <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 8 }}>
+              Ordinati per venduto: se qualcuno escluso come «non fa chat» ha vendite alte, controlla che l&apos;esclusione sia ancora giusta. «Gruppo senza dati» = il suo gruppo non ha medie con cui confrontarlo; «Escludi» lo porta nel modulo in alto.
+            </div>
+            <DataTable
+              columns={auditCols}
+              rows={auditRows}
+              defaultSort={{ key: "sales", dir: -1 }}
+              minWidth={760}
+              maxHeight={560}
+              empty={auditAll.length === 0 ? "Nessun operatore escluso in questo mese." : "Nessuno in questa vista."}
+            />
+          </>
+        )}
+      </section>
     </div>
   );
 }

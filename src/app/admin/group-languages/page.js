@@ -1,34 +1,29 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+// Lingua dei gruppi (italiano / inglese).
+// Ridisegno 26/09/2026 (design system): si apre sui gruppi SENZA lingua (le
+// uniche righe su cui c'è da decidere) e spiega a cosa serve la lingua; niente
+// bandierine né sigle tecniche (regex/override) in vista. Salvataggio sempre
+// visibile con il numero di modifiche. API, conferme e logica invariate.
+
+import { useState, useMemo } from "react";
 import useSWR, { mutate } from "swr";
-import Link from "next/link";
-import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
+import { FONTS, CP } from "@/lib/brand";
+import { PageHead, Notice, DataTable, FilterChip, card } from "@/components/ds";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 const URL_API = "/api/admin/group-languages";
 
 const LANG_OPTIONS = [
-  { value: "", label: "—", color: COLORS.mist },
-  { value: "ita", label: "🇮🇹 ITA", color: "#3FB97E" },
-  { value: "eng", label: "🇬🇧 ENG", color: "#4F8CCB" },
+  { value: "", label: "—" },
+  { value: "ita", label: "Italiano" },
+  { value: "eng", label: "Inglese" },
 ];
-
-function LangBadge({ language }) {
-  const opt = LANG_OPTIONS.find((o) => o.value === language) || LANG_OPTIONS[0];
-  return (
-    <span style={{
-      display: "inline-block", padding: "2px 7px", borderRadius: 4,
-      fontSize: 10, fontWeight: 700, fontFamily: FONTS.mono,
-      background: alpha(opt.color, "20"), color: opt.color, border: `1px solid ${alpha(opt.color, "55")}`,
-    }}>{opt.label}</span>
-  );
-}
+const langName = (v) => LANG_OPTIONS.find((o) => o.value === v)?.label || "—";
 
 export default function GroupLanguagesPage() {
   const { data } = useSWR(URL_API, fetcher, { revalidateOnFocus: false });
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState(null);
   const [pendingOverrides, setPendingOverrides] = useState({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -53,16 +48,24 @@ export default function GroupLanguagesPage() {
     return out;
   }, [groups, auto, overrides, pendingOverrides]);
 
+  const counts = {
+    all: groups.length,
+    missing: groups.filter((g) => !display[g]?.effective).length,
+    auto: groups.filter((g) => display[g]?.effective && !display[g]?.hasOverride).length,
+    override: groups.filter((g) => display[g]?.hasOverride).length,
+  };
+  const f = filter ?? (counts.missing > 0 ? "missing" : "all");
+
   const filtered = useMemo(() => {
     return groups.filter((g) => {
       const d = display[g];
-      if (filter === "all") return true;
-      if (filter === "missing") return !d.effective;
-      if (filter === "auto") return d.effective && !d.hasOverride;
-      if (filter === "override") return d.hasOverride;
+      if (f === "all") return true;
+      if (f === "missing") return !d.effective;
+      if (f === "auto") return d.effective && !d.hasOverride;
+      if (f === "override") return d.hasOverride;
       return true;
     });
-  }, [groups, display, filter]);
+  }, [groups, display, f]);
 
   const pendingCount = Object.keys(pendingOverrides).filter((g) => pendingOverrides[g] !== overrides[g]).length;
 
@@ -88,162 +91,101 @@ export default function GroupLanguagesPage() {
       });
       const d = await res.json();
       if (!res.ok || d.error) {
-        setMessage(d.error || "Errore");
+        setMessage({ bad: true, text: d.error || "Errore" });
       } else {
-        setMessage(`✓ Salvati ${pendingCount} cambiamenti.`);
+        setMessage({ bad: false, text: `Salvate ${pendingCount} modifiche.` });
         setPendingOverrides({});
         await mutate(URL_API);
       }
     } catch (err) {
-      setMessage(String(err));
+      setMessage({ bad: true, text: String(err) });
     } finally {
       setSaving(false);
     }
   }
 
   async function resetAll() {
-    if (!confirm("Cancellare TUTTI gli override manuali? I Group torneranno alla detection automatica via regex.")) return;
+    if (!confirm("Cancellare TUTTE le lingue assegnate a mano? I gruppi torneranno alla lingua letta dal nome (e quelli senza «ITA»/«ENG» nel nome resteranno senza lingua).")) return;
     setSaving(true);
     try {
       const res = await fetch(URL_API, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reset" }) });
       const d = await res.json();
-      if (!res.ok || d.error) setMessage(d.error || "Errore");
+      if (!res.ok || d.error) setMessage({ bad: true, text: d.error || "Errore" });
       else {
-        setMessage("✓ Tutti gli override rimossi.");
+        setMessage({ bad: false, text: "Tutte le lingue assegnate a mano sono state tolte." });
         setPendingOverrides({});
         await mutate(URL_API);
       }
-    } catch (err) { setMessage(String(err)); }
+    } catch (err) { setMessage({ bad: true, text: String(err) }); }
     finally { setSaving(false); }
   }
 
-  const styles = {
-    page: { minHeight: "100vh", background: COLORS.obsidian, color: COLORS.alabaster, fontFamily: FONTS.body, padding: "32px 24px" },
-    container: { maxWidth: 1200, margin: "0 auto" },
-    title: { fontFamily: FONTS.display, fontSize: 28, margin: "0 0 6px 0", fontWeight: 500 },
-    sub: { color: COLORS.fog, fontSize: 14, marginBottom: 24, maxWidth: 900, lineHeight: 1.55 },
-    card: { background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, padding: 22, marginBottom: 22 },
-    table: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
-    th: { textAlign: "left", padding: "10px 12px", color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", borderBottom: `1px solid ${COLORS.steel}` },
-    td: { padding: "10px 12px", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, verticalAlign: "middle" },
-    filterPill: (active) => ({
-      padding: "6px 12px", marginRight: 6,
-      background: active ? COLORS.champagne : COLORS.graphite,
-      color: active ? COLORS.obsidian : COLORS.alabaster,
-      border: `1px solid ${active ? COLORS.champagne : COLORS.steel}`,
-      borderRadius: 999, cursor: "pointer", fontSize: 12, fontWeight: active ? 600 : 500,
-      fontFamily: FONTS.body,
-    }),
-    btn: { padding: "9px 18px", background: COLORS.champagne, color: COLORS.obsidian, border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 13 },
-    btnGhost: { padding: "9px 14px", background: "transparent", color: COLORS.alabaster, border: `1px solid ${COLORS.steel}`, borderRadius: 8, cursor: "pointer", fontSize: 13, marginLeft: 8 },
-    btnDanger: { padding: "9px 14px", background: "transparent", color: COLORS.signal, border: `1px solid ${alpha(COLORS.signal, "66")}`, borderRadius: 8, cursor: "pointer", fontSize: 12, marginLeft: 8 },
-    select: (value) => ({
-      padding: "5px 10px",
-      background: COLORS.charcoal,
-      color: COLORS.alabaster,
-      border: `1px solid ${COLORS.steel}`,
-      borderRadius: 6, fontSize: 12, fontFamily: FONTS.body, cursor: "pointer", outline: "none",
-    }),
-    success: { background: "#3FB97E20", color: "#3FB97E", padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 },
-    error: { background: alpha(COLORS.signal, "20"), color: COLORS.signal, padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 },
-  };
+  const btn = (primary) => ({ padding: "9px 16px", borderRadius: 8, border: `1px solid ${primary ? CP.accent : CP.border}`, background: primary ? CP.accent : CP.surface, color: primary ? CP.accentInk : CP.textPrimary, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" });
 
-  const counts = {
-    all: groups.length,
-    missing: groups.filter((g) => !display[g]?.effective).length,
-    auto: groups.filter((g) => display[g]?.effective && !display[g]?.hasOverride).length,
-    override: groups.filter((g) => display[g]?.hasOverride).length,
-  };
+  const columns = [
+    { key: "group", label: "Gruppo", sort: (r) => r.group.toLowerCase() },
+    { key: "auto", label: "Letta dal nome", sort: (r) => r.d.auto || "", render: (r) => <span style={{ color: r.d.auto ? CP.textSecondary : CP.textMuted }}>{r.d.auto ? langName(r.d.auto) : "non si capisce"}</span> },
+    {
+      key: "override", label: "Scelta a mano", sortable: false,
+      render: (r) => (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <select value={r.current} onChange={(e) => setOverride(r.group, e.target.value)} aria-label={`Lingua di ${r.group}`}
+            style={{ padding: "6px 10px", background: CP.bg, color: CP.textPrimary, border: `1px solid ${r.d.pending ? CP.accent : CP.border}`, borderRadius: 8, fontSize: 13, fontFamily: FONTS.body, cursor: "pointer" }}>
+            {LANG_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.value === "" ? "— nessuna —" : o.label}</option>
+            ))}
+          </select>
+          {r.d.pending && <span style={{ fontSize: 12, color: CP.accentSoftText }}>da salvare</span>}
+        </span>
+      ),
+    },
+    {
+      key: "effective", label: "Lingua usata", sort: (r) => r.d.effective || "",
+      render: (r) => r.d.effective
+        ? <span style={{ color: CP.textPrimary }}>{langName(r.d.effective)}{r.d.hasOverride && <span style={{ fontSize: 12, color: CP.textMuted }}> · a mano</span>}</span>
+        : <span style={{ color: CP.accentRed }}>nessuna</span>,
+    },
+  ];
+  const rows = filtered.map((g) => ({ id: g, group: g, d: display[g], current: pendingOverrides[g] !== undefined ? pendingOverrides[g] : (overrides[g] || "") }));
 
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <PageHeader
-          breadcrumb={
-            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-              <span style={{ color: CP.textMuted }}>›</span>
-              <span style={{ color: CP.textPrimary }}>Lingue Group</span>
-            </div>
-          }
-          section="Data · Config"
-          title="Lingue Group"
-          subtitle={<>La lingua di un Group viene rilevata <b>automaticamente</b> dal nome (regex ITA/ENG). Quando il nome non contiene il marker, qui puoi assegnare la lingua a mano. Gli override sopravvivono al re-import del CSV.</>}
-        />
+    <div style={{ padding: "28px 24px 96px", maxWidth: 1080, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Dati" }, { label: "Lingue gruppi" }]}
+        title="Lingua dei gruppi"
+        subtitle="La lingua di un gruppo si legge dal nome («ITA», «ENG»). Quando nel nome non c'è, la scegli qui. Serve per il filtro lingua della leaderboard e per confrontare i gruppi piccoli con la media della loro lingua. Le scelte fatte qui restano anche dopo un nuovo import."
+      />
 
-        {message && (
-          <div style={message.startsWith("✓") ? styles.success : styles.error}>{message}</div>
-        )}
+      {message && <Notice danger={message.bad}>{message.text}</Notice>}
+      {!data && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
+      {data?.error && <Notice danger>{data.error}</Notice>}
 
-        <div style={styles.card}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 12 }}>
-            <div>
-              {["all","missing","auto","override"].map((f) => (
-                <button key={f} style={styles.filterPill(filter === f)} onClick={() => setFilter(f)}>
-                  {f === "all" ? "Tutti" : f === "missing" ? "Senza lingua" : f === "auto" ? "Auto (regex)" : "Override manuale"}
-                  <span style={{ marginLeft: 6, opacity: 0.7, fontFamily: FONTS.mono, fontSize: 11 }}>({counts[f]})</span>
-                </button>
-              ))}
-            </div>
-            <div>
-              <button style={styles.btn} onClick={save} disabled={saving || pendingCount === 0}>
-                {saving ? "Salvataggio…" : pendingCount > 0 ? `✓ Salva ${pendingCount} modifiche` : "Salva"}
-              </button>
-              <button style={styles.btnDanger} onClick={resetAll} disabled={saving}>Reset override</button>
-            </div>
+      {data && !data.error && (
+        <>
+          {counts.missing > 0 && (
+            <Notice>
+              {counts.missing} {counts.missing === 1 ? "gruppo non ha" : "gruppi non hanno"} una lingua: nella leaderboard non compaiono sotto nessuna lingua e, se sono piccoli, vengono confrontati con la media di tutti invece che con quella della loro lingua.
+            </Notice>
+          )}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            <FilterChip label={`Senza lingua (${counts.missing})`} active={f === "missing"} danger={counts.missing > 0} disabled={!counts.missing} onClick={() => setFilter("missing")} />
+            <FilterChip label={`Letta dal nome (${counts.auto})`} active={f === "auto"} onClick={() => setFilter("auto")} />
+            <FilterChip label={`Scelta a mano (${counts.override})`} active={f === "override"} onClick={() => setFilter("override")} />
+            <FilterChip label={`Tutti (${counts.all})`} active={f === "all"} onClick={() => setFilter("all")} />
           </div>
+          <DataTable columns={columns} rows={rows} defaultSort={{ key: "group", dir: 1 }} minWidth={640} maxHeight={620} empty="Nessun gruppo in questa vista." />
 
-          {!data && <p style={{ color: COLORS.fog }}>Caricamento…</p>}
-          {data?.error && <p style={{ color: COLORS.signal }}>{data.error}</p>}
-
-          {data && !data.error && filtered.length === 0 && (
-            <p style={{ color: COLORS.fog, fontSize: 13 }}>Nessun Group corrispondente al filtro.</p>
-          )}
-
-          {filtered.length > 0 && (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Group</th>
-                  <th style={styles.th}>Auto (regex)</th>
-                  <th style={styles.th}>Override manuale</th>
-                  <th style={styles.th}>Effettiva</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((g) => {
-                  const d = display[g];
-                  const current = pendingOverrides[g] !== undefined ? pendingOverrides[g] : (overrides[g] || "");
-                  return (
-                    <tr key={g}>
-                      <td style={{ ...styles.td, fontWeight: 600 }}>{g}</td>
-                      <td style={styles.td}><LangBadge language={d.auto} /></td>
-                      <td style={styles.td}>
-                        <select
-                          value={current}
-                          onChange={(e) => setOverride(g, e.target.value)}
-                          style={styles.select(current)}
-                        >
-                          {LANG_OPTIONS.map((o) => (
-                            <option key={o.value} value={o.value} style={{ background: COLORS.charcoal }}>
-                              {o.value === "" ? "— nessuno —" : o.label}
-                            </option>
-                          ))}
-                        </select>
-                        {d.pending && <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.champagne, fontWeight: 600 }}>● modificato</span>}
-                      </td>
-                      <td style={styles.td}>
-                        <LangBadge language={d.effective} />
-                        {d.hasOverride && <span style={{ marginLeft: 6, fontSize: 9, color: COLORS.mist, fontFamily: FONTS.mono }}>OVERRIDE</span>}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+          <div style={{ position: "sticky", bottom: 12, zIndex: 5, marginTop: 14, ...card, padding: "10px 14px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <button style={{ ...btn(true), opacity: saving || pendingCount === 0 ? 0.6 : 1 }} onClick={save} disabled={saving || pendingCount === 0}>
+              {saving ? "Salvataggio…" : pendingCount > 0 ? `Salva ${pendingCount} ${pendingCount === 1 ? "modifica" : "modifiche"}` : "Salva"}
+            </button>
+            {pendingCount > 0 && <button style={btn(false)} onClick={() => setPendingOverrides({})} disabled={saving}>Annulla modifiche</button>}
+            <span style={{ fontSize: 12, color: pendingCount ? CP.accentSoftText : CP.textMuted }}>{pendingCount ? "Modifiche non salvate" : "Tutto salvato"}</span>
+            <div style={{ flex: 1 }} />
+            <button style={{ ...btn(false), color: CP.accentRed }} onClick={resetAll} disabled={saving}>Togli tutte le scelte a mano</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -3,236 +3,146 @@
 // Ads · Acquisizione — hub dell'area Ads. Primo contenuto: lo studio bio-funnel OF
 // (analisi + metodologia + template + classifica live delle 112 landing). Vista SEED.
 // Materiale di acquisizione: non entra in score/comp.
+//
+// Redesign 26/09/2026 sul design system: prima si leggeva il METODO e solo in fondo
+// cosa fare. Ora l'ordine è quello di chi decide: conclusione e modello per le nostre
+// creator → cosa funziona / cosa no → piattaforme → classifica completa (una tabella
+// ordinabile che scorre dentro di sé, al posto di "prime 20 + mostra tutte") →
+// metodo e criteri su richiesta. Punteggi senza la scala a 5 colori: rosso solo
+// sulle landing deboli. Avvertenza sul valore dello studio in testa, non in piccolo.
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import useSWR from "swr";
+import { ExternalLink } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
-import { ExternalLink, Megaphone, FlaskConical, Trophy, Target } from "lucide-react";
+import { fmtInt } from "@/lib/format";
+import { PageHead, Metric, Notice, Disclosure, DataTable, SectionTitle, card } from "@/components/ds";
 
 const fetcher = (url) =>
   fetch(url).then((r) => (r.ok ? r.json() : r.json().then((d) => Promise.reject(new Error(d.error || "Errore")))));
 
-function scoreColor(w) {
-  if (w >= 80) return CP.accentGreen;
-  if (w >= 68) return "#9bd67a";
-  if (w >= 52) return "#e8c069";
-  if (w >= 38) return "#e79a6a";
-  return CP.accentRed;
-}
-
-function Card({ children, style }) {
-  return (
-    <div
-      style={{
-        background: CP.surface,
-        border: `1px solid ${CP.border}`,
-        borderRadius: 12,
-        padding: "16px 18px",
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function SectionTitle({ icon: Icon, children }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "26px 0 12px" }}>
-      {Icon && <Icon size={17} strokeWidth={1.8} color={CP.accent} />}
-      <h2 style={{ margin: 0, fontSize: 16, color: CP.textPrimary, fontFamily: FONTS.display }}>{children}</h2>
-    </div>
-  );
-}
-
+const WEAK = 40;
 const dom = (u) => String(u).replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
+const n1 = (v) => Number(v).toLocaleString("it-IT", { maximumFractionDigits: 1 });
 
 export default function AdsPage() {
-  const { data, error, isLoading } = useSWR("/api/admin/ads/funnel-study", fetcher, {
-    revalidateOnFocus: false,
-  });
-  const [showAll, setShowAll] = useState(false);
+  const { data, error, isLoading } = useSWR("/api/admin/ads/funnel-study", fetcher, { revalidateOnFocus: false });
+  const [methodOpen, setMethodOpen] = useState(false);
 
   const scored = data?.scored || [];
-  const visible = useMemo(() => (showAll ? scored : scored.slice(0, 20)), [scored, showAll]);
+  const keyFinding = (data?.winning || []).find((w) => /fattore #1/i.test(w));
+  const median = scored.length ? [...scored].map((r) => r.weighted).sort((a, b) => a - b)[Math.floor(scored.length / 2)] : null;
+
+  const landingCols = [
+    { key: "rank", label: "#", align: "right", render: (r) => <span style={{ color: CP.textMuted }}>{r.rank}</span> },
+    {
+      key: "url", label: "Landing", sort: (r) => dom(r.url),
+      render: (r) => (
+        <a href={r.url} target="_blank" rel="noreferrer" style={{ color: CP.accentSoftText, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
+          {dom(r.url)} <ExternalLink size={12} />
+        </a>
+      ),
+    },
+    { key: "weighted", label: "Punteggio", align: "right", render: (r) => <span style={{ color: r.weighted < WEAK ? CP.accentRed : CP.textPrimary, fontWeight: 500 }}>{n1(r.weighted)}</span> },
+    { key: "verdict", label: "Giudizio", sortable: false, render: (r) => <div style={{ minWidth: 280, maxWidth: 420, fontSize: 13, color: CP.textSecondary, lineHeight: 1.45, whiteSpace: "normal" }}>{r.verdict}</div> },
+    { key: "topFix", label: "La prima cosa da correggere", sortable: false, render: (r) => <div style={{ minWidth: 240, maxWidth: 340, fontSize: 12.5, color: CP.textMuted, lineHeight: 1.45, whiteSpace: "normal" }}>{r.topFix}</div> },
+  ];
+  const platformCols = [
+    { key: "platform", label: "Piattaforma" },
+    { key: "avg", label: "Punteggio medio", align: "right", render: (p) => <span style={{ color: p.avg < WEAK ? CP.accentRed : CP.textPrimary }}>{fmtInt(p.avg)}</span> },
+    { key: "n", label: "Landing", align: "right" },
+  ];
 
   return (
-    <div style={{ maxWidth: 1080, margin: "0 auto", padding: "8px 4px 80px" }}>
-      <PageHeader
-        section="Ads · Acquisizione"
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Marketing" }, { label: "Studio bio-funnel" }]}
         title="Studio bio-funnel OnlyFans"
-        subtitle="Come lavorano gli altri sulla landing-ponte, e cosa (secondo i dati) converte meglio. Materiale di acquisizione — non entra in score/comp."
+        subtitle="Cosa convince chi arriva dalla bio di un social a iscriversi su OnlyFans, studiato su landing reali di altre creator. Serve a decidere come costruire la pagina-ponte delle nostre creator."
       />
 
-      {error && (
-        <Card style={{ borderColor: `${CP.accentRed}66`, marginTop: 14 }}>
-          <span style={{ color: CP.accentRed, fontSize: 13 }}>Errore: {String(error.message)} (serve accesso SEED).</span>
-        </Card>
-      )}
-      {isLoading && <div style={{ color: CP.textMuted, fontSize: 13, marginTop: 14 }}>Carico lo studio…</div>}
+      {error && <Notice danger>Non riesco a caricare lo studio: {String(error.message)}. La pagina è riservata agli admin.</Notice>}
+      {isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Carico lo studio…</div>}
 
       {data && (
         <>
-          {/* Intro + caveat onesto */}
-          <Card style={{ marginTop: 14, display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
-            <Megaphone size={22} strokeWidth={1.6} color={CP.accent} />
-            <div style={{ flex: "1 1 320px" }}>
-              <div style={{ color: CP.textSecondary, fontSize: 13.5, lineHeight: 1.5 }}>{data.meta.summary}</div>
-              <div style={{ color: CP.textMuted, fontSize: 12, marginTop: 6 }}>
-                <b style={{ color: CP.accentSoftText }}>Onestà:</b> {data.meta.caveat}
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 18 }}>
-              <Stat n={data.meta.count} label="landing" />
-              <Stat n={data.platforms.length} label="piattaforme" />
-              <Stat n={`${data.scored[0]?.weighted ?? "—"}`} label="top score" />
-            </div>
-          </Card>
+          <Notice>
+            Da leggere come giudizio esperto, non come misura: {data.meta.caveat} Prima di cambiare le landing delle nostre creator, conviene provare la modifica su una creator con un test A/B.
+          </Notice>
 
-          {/* Metodologia — come viene fatta */}
-          <SectionTitle icon={FlaskConical}>Come viene fatta la ricerca</SectionTitle>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12 }}>
-            {data.methodology.map((m) => (
-              <Card key={m.title}>
-                <div style={{ color: CP.textPrimary, fontSize: 13.5, fontWeight: 600, marginBottom: 6 }}>{m.title}</div>
-                <div style={{ color: CP.textMuted, fontSize: 12.5, lineHeight: 1.5 }}>{m.body}</div>
-              </Card>
-            ))}
-          </div>
+          <section style={{ ...card, padding: "18px 20px", marginBottom: 14 }}>
+            <div style={{ fontSize: 13, color: CP.textSecondary }}>La conclusione principale</div>
+            <div style={{ fontSize: 20, fontWeight: 500, color: CP.textPrimary, lineHeight: 1.35, margin: "4px 0 14px", maxWidth: 820 }}>
+              {keyFinding || data.meta.summary}
+            </div>
+            <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+              <Metric label="Landing analizzate" value={fmtInt(data.meta.count)} note={data.meta.capturedAt ? `raccolte il ${data.meta.capturedAt.split("-").reverse().join("/")}` : null} />
+              <Metric label="Piattaforme confrontate" value={fmtInt(data.platforms.length)} note="con almeno 3 landing" />
+              <Metric label="Punteggio migliore" value={`${n1(scored[0]?.weighted ?? 0)} / 100`} />
+              {median != null && <Metric label="Punteggio a metà classifica" value={`${n1(median)} / 100`} />}
+            </div>
+          </section>
 
-          {/* Anatomia: vincenti vs perdenti */}
-          <SectionTitle icon={Target}>Anatomia — cosa converte, cosa no</SectionTitle>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 12 }}>
-            <Card style={{ borderColor: `${CP.accentGreen}44` }}>
-              <div style={{ color: CP.accentGreen, fontWeight: 700, fontSize: 13, marginBottom: 8 }}>I tratti dei vincenti</div>
+          <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+            <SectionTitle aside="per le creator HOC, in ordine dall’alto della pagina">Il modello da seguire</SectionTitle>
+            <ol style={{ margin: 0, paddingLeft: 20, color: CP.textPrimary, fontSize: 14, lineHeight: 1.55, display: "flex", flexDirection: "column", gap: 6 }}>
+              {data.template.map((t, i) => <li key={i}>{t}</li>)}
+            </ol>
+          </section>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap: 14, marginBottom: 14 }}>
+            <section style={{ ...card, padding: "16px 18px" }}>
+              <SectionTitle>Cosa hanno le landing migliori</SectionTitle>
               <BulletList items={data.winning} />
-            </Card>
-            <Card style={{ borderColor: `${CP.accentRed}44` }}>
-              <div style={{ color: CP.accentRed, fontWeight: 700, fontSize: 13, marginBottom: 8 }}>I pattern perdenti</div>
+            </section>
+            <section style={{ ...card, padding: "16px 18px" }}>
+              <SectionTitle>Cosa hanno le peggiori</SectionTitle>
               <BulletList items={data.losing} />
-            </Card>
+            </section>
           </div>
 
-          {/* Classifica piattaforme + template */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 12, marginTop: 12 }}>
-            <div>
-              <SectionTitle icon={Trophy}>Classifica per piattaforma</SectionTitle>
-              <Card>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr>
-                      <Th>Piattaforma</Th>
-                      <Th align="right">Media</Th>
-                      <Th align="right">n</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.platforms.map((p) => (
-                      <tr key={p.platform}>
-                        <Td>{p.platform}</Td>
-                        <Td align="right" style={{ color: scoreColor(p.avg), fontWeight: 700 }}>{Math.round(p.avg)}</Td>
-                        <Td align="right" style={{ color: CP.textMuted }}>{p.n}</Td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div style={{ color: CP.textMuted, fontSize: 11.5, marginTop: 8, lineHeight: 1.45 }}>
-                  La piattaforma non fa il funnel, ma alcune lo ostacolano (link-dump) e altre lo abilitano (hero + CTA singola).
+          <SectionTitle aside="la piattaforma non fa il funnel, ma alcune lo ostacolano (elenchi di link tutti uguali) e altre lo aiutano (foto grande + un solo bottone)">Piattaforme a confronto</SectionTitle>
+          <div style={{ marginBottom: 20, maxWidth: 560 }}>
+            <DataTable columns={platformCols} rows={data.platforms.map((p) => ({ ...p, id: p.platform }))} defaultSort={{ key: "avg", dir: -1 }} minWidth={320} />
+          </div>
+
+          <SectionTitle aside={`punteggio 0-100, in rosso sotto ${WEAK} · clicca un’intestazione per ordinare`}>Tutte le {fmtInt(scored.length)} landing, dalla migliore</SectionTitle>
+          <div style={{ marginBottom: 20 }}>
+            <DataTable columns={landingCols} rows={scored.map((r) => ({ ...r, id: r.rank }))} defaultSort={{ key: "rank", dir: 1 }} minWidth={980} maxHeight={640} />
+          </div>
+
+          <Disclosure open={methodOpen} onToggle={() => setMethodOpen(!methodOpen)} title="Come è stata fatta la ricerca" summary="raccolta, foto, giudizio, sintesi · criteri e pesi">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 14 }}>
+              {data.methodology.map((m) => (
+                <div key={m.title}>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary, marginBottom: 4 }}>{m.title}</div>
+                  <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.5 }}>{m.body}</div>
                 </div>
-              </Card>
+              ))}
             </div>
-            <div>
-              <SectionTitle icon={Megaphone}>Template consigliato (creator HOC)</SectionTitle>
-              <Card>
-                <ol style={{ margin: 0, paddingLeft: 18, color: CP.textSecondary, fontSize: 12.5, lineHeight: 1.55 }}>
-                  {data.template.map((t, i) => (
-                    <li key={i} style={{ marginBottom: 5 }}>{t}</li>
+            {Array.isArray(data.rubric) && data.rubric.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 6 }}>Criteri del punteggio e quanto pesano</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {data.rubric.map((c) => (
+                    <span key={c.key} style={{ padding: "4px 10px", borderRadius: 6, background: CP.surfaceAlt, fontSize: 13, color: CP.textPrimary }}>
+                      {c.label} <span style={{ color: CP.textMuted }}>{Math.round(c.weight * 100)}%</span>
+                    </span>
                   ))}
-                </ol>
-              </Card>
-            </div>
-          </div>
-
-          {/* Classifica live delle landing */}
-          <SectionTitle icon={Trophy}>Le {scored.length} landing, dalla migliore alla peggiore</SectionTitle>
-          <Card style={{ padding: 0, overflow: "hidden" }}>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
-                <thead>
-                  <tr>
-                    <Th>#</Th>
-                    <Th align="right">Score</Th>
-                    <Th>Landing</Th>
-                    <Th>Verdetto</Th>
-                    <Th>Fix #1</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visible.map((r) => (
-                    <tr key={r.rank} style={{ borderTop: `1px solid ${CP.borderSoft}` }}>
-                      <Td style={{ color: CP.textMuted, whiteSpace: "nowrap" }}>{r.rank}</Td>
-                      <Td align="right">
-                        <span style={{ color: CP.accentInk, background: scoreColor(r.weighted), borderRadius: 6, padding: "1px 8px", fontWeight: 800, fontSize: 12.5 }}>
-                          {r.weighted}
-                        </span>
-                      </Td>
-                      <Td>
-                        <a href={r.url} target="_blank" rel="noreferrer" style={{ color: CP.accentSoftText, textDecoration: "none", fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
-                          {dom(r.url)} <ExternalLink size={12} />
-                        </a>
-                      </Td>
-                      <Td style={{ color: CP.textSecondary, fontSize: 12, maxWidth: 340, lineHeight: 1.4 }}>{r.verdict}</Td>
-                      <Td style={{ color: CP.textMuted, fontSize: 11.5, maxWidth: 260, lineHeight: 1.4 }}>{r.topFix}</Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {!showAll && scored.length > 20 && (
-              <button
-                onClick={() => setShowAll(true)}
-                style={{ width: "100%", padding: "11px", background: CP.surfaceAlt, color: CP.textSecondary, border: "none", borderTop: `1px solid ${CP.border}`, cursor: "pointer", fontSize: 12.5 }}
-              >
-                Mostra tutte le {scored.length}
-              </button>
+                </div>
+              </div>
             )}
-          </Card>
+          </Disclosure>
         </>
       )}
     </div>
   );
 }
 
-function Stat({ n, label }) {
-  return (
-    <div style={{ textAlign: "center" }}>
-      <div style={{ color: CP.textPrimary, fontSize: 20, fontWeight: 700, fontFamily: FONTS.mono }}>{n}</div>
-      <div style={{ color: CP.textMuted, fontSize: 11 }}>{label}</div>
-    </div>
-  );
-}
-
 function BulletList({ items }) {
   return (
-    <ul style={{ margin: 0, paddingLeft: 18, color: CP.textSecondary, fontSize: 12.5, lineHeight: 1.5 }}>
-      {items.map((it, i) => (
-        <li key={i} style={{ marginBottom: 5 }}>{it}</li>
-      ))}
+    <ul style={{ margin: 0, paddingLeft: 18, color: CP.textSecondary, fontSize: 13.5, lineHeight: 1.55, display: "flex", flexDirection: "column", gap: 6 }}>
+      {items.map((it, i) => <li key={i}>{it}</li>)}
     </ul>
-  );
-}
-
-function Th({ children, align }) {
-  return (
-    <th style={{ textAlign: align || "left", padding: "10px 12px", color: CP.textMuted, fontSize: 11, fontWeight: 600, borderBottom: `1px solid ${CP.border}`, whiteSpace: "nowrap" }}>
-      {children}
-    </th>
-  );
-}
-
-function Td({ children, align, style }) {
-  return (
-    <td style={{ textAlign: align || "left", padding: "9px 12px", verticalAlign: "top", ...style }}>{children}</td>
   );
 }

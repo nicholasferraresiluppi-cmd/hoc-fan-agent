@@ -2,9 +2,10 @@
 
 import { useState, useMemo } from "react";
 import useSWR, { mutate } from "swr";
-import Link from "next/link";
-import { COLORS, FONTS, CP, alpha } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
+import { RefreshCw, Link2, Loader2, CheckCircle2 } from "lucide-react";
+import { FONTS, CP, alpha } from "@/lib/brand";
+import { PageHead, HeroMetric, Metric, SectionTitle, Disclosure, Notice, DataTable, card, NUM } from "@/components/ds";
+import { fmt$, fmtInt, fmtPct, fmtAgo, MONTHS_IT } from "@/lib/format";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -138,6 +139,7 @@ export default function CreatorsProSyncPage() {
   const [mappedSearch, setMappedSearch] = useState("");
   const [showIdle, setShowIdle] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [mappedOpen, setMappedOpen] = useState(false);
 
   const filteredUnmapped = useMemo(() => {
     if (!unmappedSearch.trim()) return allUnmapped;
@@ -161,238 +163,214 @@ export default function CreatorsProSyncPage() {
     });
   }, [mappedEntries, mappedSearch, members]);
 
-  const styles = {
-    page: { minHeight: "100vh", background: COLORS.obsidian, color: COLORS.alabaster, fontFamily: FONTS.body, padding: "32px 24px" },
-    container: { maxWidth: 1200, margin: "0 auto" },
-    title: { fontFamily: FONTS.display, fontSize: 28, margin: "0 0 6px 0", fontWeight: 500 },
-    sub: { color: COLORS.fog, fontSize: 14, marginBottom: 24, maxWidth: 900, lineHeight: 1.55 },
-    card: { background: COLORS.graphite, border: `1px solid ${COLORS.charcoal}`, borderRadius: 14, padding: 22, marginBottom: 22 },
-    h2: { fontFamily: FONTS.display, fontSize: 18, margin: "0 0 14px 0", fontWeight: 500 },
-    btn: { padding: "10px 18px", background: COLORS.champagne, color: COLORS.obsidian, border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 13 },
-    select: { padding: "9px 14px", background: COLORS.charcoal, border: `1px solid ${COLORS.steel}`, borderRadius: 8, color: COLORS.alabaster, fontSize: 13, fontFamily: FONTS.body, marginRight: 10 },
-    success: { background: "#3FB97E20", color: "#3FB97E", padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 13 },
-    error: { background: alpha(COLORS.signal, "20"), color: COLORS.signal, padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 13 },
-    statRow: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 },
-    statBox: { background: COLORS.charcoal, padding: "10px 14px", borderRadius: 8 },
-    statLabel: { fontSize: 10, color: COLORS.fog, letterSpacing: "0.1em" },
-    statValue: { fontFamily: FONTS.mono, fontSize: 20, fontWeight: 700, marginTop: 4 },
-    table: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
-    th: { textAlign: "left", padding: "10px 12px", color: COLORS.fog, fontSize: 10, letterSpacing: "0.1em", borderBottom: `1px solid ${COLORS.steel}` },
-    td: { padding: "10px 12px", borderBottom: `1px solid ${alpha(COLORS.charcoal, "88")}`, verticalAlign: "middle" },
-    input: { padding: "5px 10px", background: COLORS.charcoal, border: `1px solid ${COLORS.steel}`, borderRadius: 6, color: COLORS.alabaster, fontSize: 12, fontFamily: FONTS.body, width: "100%", outline: "none" },
-  };
+  // Redesign 26/09/2026 (pannello tester BOARD/PAY/UX): il punto della pagina è
+  // "chi manca all'appello e quanto venduto sparisce dai report" → numero
+  // principale + proposte sicure in cima; il sync va in testata con lo stato del
+  // lavoro sempre visibile; i 300+ collegamenti esistenti scendono in una sezione
+  // chiusa. Logica di sync e di collegamento invariata.
+  const nameOf = (m) => (m.cp_name || `${m.firstName || ""} ${m.lastName || ""}`).trim();
+  const withSales = filteredUnmapped.filter((m) => (m.sales_cur || 0) + (m.sales_prev || 0) > 0);
+  const idle = filteredUnmapped.filter((m) => !((m.sales_cur || 0) + (m.sales_prev || 0) > 0));
+  const allWithSales = allUnmapped.filter((m) => (m.sales_cur || 0) + (m.sales_prev || 0) > 0);
+  const imp = mapData?.impact;
+  // Proposte SICURE: nome identico (a parte accenti/emoji/"HOC") a un
+  // operatore Infloww non ancora collegato a nessun'altra persona CP.
+  const taken = new Set((mapData?.taken_names || []).map(norm));
+  const safe = withSales.map((m) => ({ m, name: exactName(nameOf(m), inflowwNames) })).filter((x) => x.name && !taken.has(norm(x.name)));
+  const unmappedRows = (showIdle ? [...withSales, ...idle] : withSales).map((m) => ({ ...m, id: m.cp_id || m.id }));
+  const mappedRows = filteredMapped.map(([cpId, inflowwName]) => {
+    const m = members.find((x) => x.id === cpId);
+    return { id: cpId, cpName: m ? `${m.firstName} ${m.lastName}` : null, infloww: inflowwName };
+  });
+  const lastSyncTs = meta?.last_sync_at ? new Date(meta.last_sync_at).getTime() : null;
+  const loadingMap = !mapData;
+  const mapError = mapData?.error;
+
+  const unmappedCols = [
+    { key: "name", label: "Persona in CreatorsPro", sort: (m) => nameOf(m), render: (m) => (
+      <span>{nameOf(m)}{m.username ? <span style={{ color: CP.textMuted, fontSize: 12, marginLeft: 8 }}>@{m.username}</span> : null}</span>
+    ) },
+    { key: "sales_cur", label: imp?.period_id ? `Venduto ${monthLabel(imp.period_id)}` : "Venduto mese", align: "right", sort: (m) => m.sales_cur || 0, render: (m) => (m.sales_cur ? fmt$(m.sales_cur) : "—") },
+    { key: "sales_prev", label: "Mese prima", align: "right", muted: true, sort: (m) => m.sales_prev || 0, render: (m) => (m.sales_prev ? fmt$(m.sales_prev) : "—") },
+    { key: "link", label: "Collega a un operatore", sortable: false, render: (m) => {
+      const sug = suggestName(nameOf(m), inflowwNames);
+      return (
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <input list="cp-infloww-names" placeholder="Nome operatore" aria-label={`Operatore per ${nameOf(m)}`} defaultValue="" style={{ ...ctl, width: 190, padding: "6px 10px", fontSize: 13 }}
+            onBlur={(e) => { const v = e.target.value.trim(); if (v) setMapping(m.id, v); }} />
+          {sug && <button onClick={() => setMapping(m.id, sug)} style={linkBtn}>Collega a “{sug}”</button>}
+          <button onClick={() => setMapping(m.id, nameOf(m))} style={{ ...linkBtn, color: CP.textSecondary }}>Usa il nome CP</button>
+        </div>
+      );
+    } },
+  ];
+
+  const mappedCols = [
+    { key: "cpName", label: "Persona in CreatorsPro", sort: (r) => r.cpName || "", render: (r) => r.cpName || <span style={{ color: CP.textMuted }}>—</span> },
+    { key: "infloww", label: "Operatore in HOC Pro" },
+    { key: "id", label: "Codice CP", muted: true, render: (r) => <span style={{ fontSize: 12 }}>{r.id.slice(0, 8)}…</span> },
+    { key: "rm", label: "", align: "right", sortable: false, render: (r) => (
+      <button onClick={() => { if (confirm(`Rimuovere mapping per ${r.cpName || r.id}?`)) setMapping(r.id, null); }}
+        style={{ ...btn, padding: "4px 10px", fontSize: 12, color: CP.accentRed }}>Rimuovi</button>
+    ) },
+  ];
 
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <PageHeader
-          breadcrumb={
-            <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-              <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-              <span style={{ color: CP.textMuted }}>›</span>
-              <span style={{ color: CP.textPrimary }}>Sync CreatorsPro</span>
-            </div>
-          }
-          section="Data · Integration"
-          title="Sync CreatorsPro"
-          subtitle={'Sincronizza sales/shift da CreatorsPro nel KV di HOC. Una volta sync, la Leaderboard mostra "Sales/shift", "Fascia oraria top", e il drill-down avrà best/worst shift. Sync incrementale a chunk per stare sotto i 60s di Vercel Hobby.'}
-        />
-
-        {/* STATUS */}
-        <div style={styles.card}>
-          <h2 style={styles.h2}>Stato sync</h2>
-          {!meta ? (
-            <p style={{ color: COLORS.fog, fontSize: 13 }}>Nessun sync ancora effettuato. Esegui il primo sync sotto.</p>
-          ) : (
-            <>
-              <div style={styles.statRow}>
-                <div style={styles.statBox}>
-                  <div style={styles.statLabel}>Ultimo sync</div>
-                  <div style={{ ...styles.statValue, fontSize: 14 }}>{new Date(meta.last_sync_at).toLocaleString("it-IT")}</div>
-                </div>
-                <div style={styles.statBox}>
-                  <div style={styles.statLabel}>Periodo</div>
-                  <div style={styles.statValue}>{meta.last_sync_period}</div>
-                </div>
-                <div style={styles.statBox}>
-                  <div style={styles.statLabel}>Durata</div>
-                  <div style={styles.statValue}>{Math.round(meta.duration_ms / 1000)}s</div>
-                </div>
-                <div style={styles.statBox}>
-                  <div style={styles.statLabel}>Wages</div>
-                  <div style={styles.statValue}>{meta.counts?.wages_normalized || 0}</div>
-                </div>
-                <div style={styles.statBox}>
-                  <div style={styles.statLabel}>Shifts</div>
-                  <div style={styles.statValue}>{meta.counts?.shifts_total || 0}</div>
-                </div>
-                <div style={styles.statBox}>
-                  <div style={styles.statLabel}>Members</div>
-                  <div style={styles.statValue}>{meta.counts?.members || 0}</div>
-                </div>
-                <div style={styles.statBox}>
-                  <div style={styles.statLabel}>Mappati</div>
-                  <div style={styles.statValue}>{meta.counts?.mapping_total || 0}</div>
-                </div>
-                <div style={styles.statBox}>
-                  <div style={styles.statLabel}>Non mappati</div>
-                  <div style={{ ...styles.statValue, color: (meta.counts?.mapping_unmatched || 0) > 0 ? COLORS.signal : COLORS.alabaster }}>
-                    {meta.counts?.mapping_unmatched || 0}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* TRIGGER SYNC */}
-        <div style={styles.card}>
-          <h2 style={styles.h2}>Esegui sync</h2>
-          {syncError && <div style={styles.error}>{syncError}</div>}
-          {syncResult && (
-            <div style={styles.success}>
-              ✓ Sync completato in {Math.round((syncResult.meta?.duration_ms || 0) / 1000)}s.
-              {syncResult.meta?.counts?.wages_normalized} wage, {syncResult.meta?.counts?.shifts_total} shift,
-              {syncResult.meta?.counts?.mapping_unmatched} member non mappati automaticamente.
-            </div>
-          )}
-          <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} style={styles.select} disabled={syncing}>
-            {monthlyOpts.map((p) => <option key={p} value={p}>{p}</option>)}
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Sync CreatorsPro" }]}
+        title="Sync CreatorsPro"
+        subtitle="Porta in HOC Pro vendite e turni del mese da CreatorsPro, e collega ogni persona CP al suo operatore: chi non è collegato non compare in Sales CP, Creator, Action e Coaching Center."
+        actions={<>
+          <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} style={ctl} disabled={syncing} aria-label="Mese da sincronizzare">
+            {monthlyOpts.map((p) => <option key={p} value={p}>{monthLabel(p)}</option>)}
           </select>
-          <button style={styles.btn} onClick={runSync} disabled={syncing}>
-            {syncing ? `🔄 ${syncPhase || "Sync"}${syncProgress.total > 0 ? ` · ${syncProgress.current}/${syncProgress.total}` : ""}` : "🔄 Sincronizza periodo selezionato"}
+          <button style={{ ...btnPrimary, opacity: syncing ? 0.7 : 1, cursor: syncing ? "default" : "pointer" }} onClick={runSync} disabled={syncing}>
+            <RefreshCw size={14} /> {syncing ? "Sync in corso…" : "Sincronizza il mese"}
           </button>
-          <p style={{ marginTop: 10, fontSize: 11, color: COLORS.mist }}>
-            Sovrascrive i dati CP esistenti per il periodo. Non tocca i dati Infloww.
-          </p>
-        </div>
+        </>}
+      />
 
-        {/* PERSONE DA COLLEGARE (25/09/2026): ordinate per venduto — chi non è
-            collegato sparisce da Sales CP, Creator, Action/Coaching Center. */}
-        {allUnmapped.length > 0 && (() => {
-          const withSales = filteredUnmapped.filter((m) => (m.sales_cur || 0) + (m.sales_prev || 0) > 0);
-          const idle = filteredUnmapped.filter((m) => !((m.sales_cur || 0) + (m.sales_prev || 0) > 0));
-          const rows = showIdle ? [...withSales, ...idle] : withSales;
-          const nameOf = (m) => (m.cp_name || `${m.firstName || ""} ${m.lastName || ""}`).trim();
-          const imp = mapData?.impact;
-          return (
-          <div id="collega" style={styles.card}>
-            <h2 style={styles.h2}>Persone da collegare a un operatore ({withSales.length} con vendite)</h2>
-            <p style={{ color: COLORS.fog, fontSize: 13, marginBottom: 14, lineHeight: 1.5 }}>
-              {imp?.unmapped ? <>Nel mese {imp.period_id}: <b style={{ color: COLORS.alabaster }}>${imp.unmapped.toLocaleString("it-IT")}</b> ({(imp.share * 100).toLocaleString("it-IT", { maximumFractionDigits: 1 })}% del venduto) viene da persone non collegate, che quindi non compaiono in Sales CP, Creator, Action e Coaching Center. </> : null}
-              Scegli il nome dell&apos;operatore se esiste già (suggerito quando lo riconosco), altrimenti “Usa il nome CP”.
-            </p>
-            {(() => {
-              // Proposte SICURE: nome identico (a parte accenti/emoji/"HOC") a un
-              // operatore Infloww non ancora collegato a nessun'altra persona CP.
-              const taken = new Set((mapData?.taken_names || []).map(norm));
-              const safe = withSales.map((m) => ({ m, name: exactName(nameOf(m), inflowwNames) })).filter((x) => x.name && !taken.has(norm(x.name)));
-              if (!safe.length) return null;
-              return (
-                <div style={{ margin: "0 0 14px", padding: "12px 14px", borderRadius: 10, border: `1px solid ${COLORS.charcoal}` }}>
-                  <div style={{ fontSize: 14, color: COLORS.alabaster, marginBottom: 6 }}><b>{safe.length} proposte sicure</b>: stesso nome di un operatore esistente (a parte accenti, emoji, &quot;HOC&quot;).</div>
-                  <div style={{ fontSize: 12, color: COLORS.mist, marginBottom: 10 }}>{safe.map((x) => `${nameOf(x.m)} → ${x.name}`).join(" · ")}</div>
-                  <button disabled={bulkBusy} onClick={async () => {
-                    if (!confirm(`Collegare ${safe.length} persone al loro operatore?`)) return;
-                    setBulkBusy(true);
-                    for (const x of safe) await setMapping(x.m.cp_id || x.m.id, x.name);
-                    setBulkBusy(false);
-                  }} style={{ ...linkBtn, fontSize: 14, padding: "6px 12px", border: "1px solid var(--cp-accent)", borderRadius: 8 }}>
-                    {bulkBusy ? "Collego…" : `Collega le ${safe.length} proposte sicure`}
-                  </button>
-                </div>
-              );
-            })()}
-            <input type="text" placeholder="Cerca per nome CP o username…" value={unmappedSearch} onChange={(e) => setUnmappedSearch(e.target.value)} style={{ ...styles.input, marginBottom: 12 }} />
-            <datalist id="cp-infloww-names">{inflowwNames.map((n) => <option key={n} value={n} />)}</datalist>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Persona in CreatorsPro</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>Venduto mese</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>Mese prima</th>
-                  <th style={styles.th}>Operatore</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((m) => {
-                  const id = m.cp_id || m.id;
-                  const sug = suggestName(nameOf(m), inflowwNames);
-                  return (
-                    <tr key={id}>
-                      <td style={{ ...styles.td, fontWeight: 500 }}>{nameOf(m)}{m.username ? <span style={{ color: COLORS.mist, fontSize: 12, marginLeft: 8 }}>@{m.username}</span> : null}</td>
-                      <td style={{ ...styles.td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{m.sales_cur ? `$${m.sales_cur.toLocaleString("it-IT")}` : "—"}</td>
-                      <td style={{ ...styles.td, textAlign: "right", fontVariantNumeric: "tabular-nums", color: COLORS.mist }}>{m.sales_prev ? `$${m.sales_prev.toLocaleString("it-IT")}` : "—"}</td>
-                      <td style={styles.td}>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                          <input list="cp-infloww-names" placeholder="Nome operatore" defaultValue="" style={{ ...styles.input, width: 200 }}
-                            onBlur={(e) => { const v = e.target.value.trim(); if (v) setMapping(id, v); }} />
-                          {sug && <button onClick={() => setMapping(id, sug)} style={linkBtn}>Collega a “{sug}”</button>}
-                          <button onClick={() => setMapping(id, nameOf(m))} style={linkBtn}>Usa il nome CP</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            <p style={{ fontSize: 12, color: COLORS.mist, marginTop: 12 }}>
-              {idle.length > 0 && <button onClick={() => setShowIdle((v) => !v)} style={linkBtn}>{showIdle ? "Nascondi" : "Mostra anche"} le {idle.length} persone senza vendite negli ultimi 2 mesi</button>}
-              {" "}Il collegamento vale subito, anche per i mesi passati.
-            </p>
+      {/* Stato del lavoro: sempre in cima, visibile appena premi il bottone */}
+      {syncing && (
+        <section style={{ ...card, padding: "14px 16px", marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: CP.textPrimary, flexWrap: "wrap" }}>
+            <Loader2 size={15} className="animate-spin" color={CP.accent} />
+            Sync di {monthLabel(periodId)} in corso · {phaseLabel(syncPhase)}
+            {syncProgress.total > 0 && <span style={{ color: CP.textMuted, ...NUM }}>· {fmtInt(syncProgress.current)} di {fmtInt(syncProgress.total)} righe paga</span>}
           </div>
-          );
-        })()}
+          <div style={{ height: 6, borderRadius: 999, background: CP.surfaceAlt, marginTop: 10, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${syncProgress.total > 0 ? Math.max(3, (syncProgress.current / syncProgress.total) * 100) : 3}%`, background: CP.accent, transition: "width .3s" }} />
+          </div>
+          <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 8 }}>Un mese richiede 3-5 minuti. Non chiudere questa scheda finché non finisce.</div>
+        </section>
+      )}
+      {syncError && (
+        <Notice danger>
+          <span style={{ color: CP.textPrimary }}>Il sync si è fermato.</span> Rilancialo per lo stesso mese: riparte da capo.
+          <div style={{ marginTop: 4, fontSize: 12, color: CP.textMuted, wordBreak: "break-word" }}>Dettaglio tecnico: {syncError}</div>
+        </Notice>
+      )}
+      {syncResult && !syncing && (
+        <section style={{ ...card, padding: "12px 16px", marginBottom: 14, display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, color: CP.textSecondary, lineHeight: 1.5 }}>
+          <CheckCircle2 size={16} color={CP.accentGreen} style={{ flexShrink: 0, marginTop: 1 }} />
+          <div>
+            <span style={{ color: CP.textPrimary }}>Sync completato in {Math.round((syncResult.meta?.duration_ms || 0) / 1000)} secondi.</span>{" "}
+            {fmtInt(syncResult.meta?.counts?.wages_normalized)} righe paga, {fmtInt(syncResult.meta?.counts?.shifts_total)} turni, {fmtInt(syncResult.meta?.counts?.mapping_unmatched)} persone non collegate in automatico.
+          </div>
+        </section>
+      )}
 
-        {/* MAPPING ATTIVI */}
-        {Object.keys(mapping).length > 0 && (
-          <div style={styles.card}>
-            <h2 style={styles.h2}>Mapping attivi ({Object.keys(mapping).length})</h2>
-            <input
-              type="text"
-              placeholder="🔍 Cerca per nome CP, nome Infloww o cp_id..."
-              value={mappedSearch}
-              onChange={(e) => setMappedSearch(e.target.value)}
-              style={{ ...styles.input, marginBottom: 12 }}
-            />
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>CP Member ID</th>
-                  <th style={styles.th}>CP Nome</th>
-                  <th style={styles.th}>Mappato su Infloww</th>
-                  <th style={styles.th}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredMapped.map(([cpId, inflowwName]) => {
-                  const m = members.find((x) => x.id === cpId);
-                  return (
-                    <tr key={cpId}>
-                      <td style={{ ...styles.td, fontFamily: FONTS.mono, fontSize: 11, color: COLORS.mist }}>{cpId.slice(0, 8)}…</td>
-                      <td style={styles.td}>{m ? `${m.firstName} ${m.lastName}` : "—"}</td>
-                      <td style={{ ...styles.td, color: COLORS.champagne, fontWeight: 600 }}>{inflowwName}</td>
-                      <td style={{ ...styles.td, textAlign: "right" }}>
-                        <button
-                          onClick={() => { if (confirm(`Rimuovere mapping per ${m ? m.firstName + " " + m.lastName : cpId}?`)) setMapping(cpId, null); }}
-                          style={{ padding: "4px 10px", background: "transparent", color: COLORS.signal, border: `1px solid ${alpha(COLORS.signal, "66")}`, borderRadius: 6, cursor: "pointer", fontSize: 11 }}
-                        >Rimuovi</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            <p style={{ fontSize: 11, color: COLORS.mist, marginTop: 12 }}>
-              {mappedSearch ? `${filteredMapped.length} risultati su ${mappedEntries.length}` : `Mostrati tutti i ${mappedEntries.length}`}
-            </p>
+      {mapError && <Notice danger>Non riesco a leggere i collegamenti: {String(mapError)}</Notice>}
+      {loadingMap && <Notice>Carico persone e collegamenti…</Notice>}
+
+      {/* NUMERO PRINCIPALE: quanto venduto resta fuori dai report */}
+      {!loadingMap && !mapError && (allWithSales.length > 0 ? (
+        <HeroMetric
+          label={imp?.period_id ? `Venduto di persone non collegate · ${monthLabel(imp.period_id)}` : "Persone con vendite non collegate"}
+          value={imp?.unmapped ? fmt$(imp.unmapped) : fmtInt(allWithSales.length)}
+          compare={imp?.unmapped ? `${fmtPct(imp.share, 1)} del venduto del mese non compare nei report` : null}
+          hint="Collegarle aggiorna subito anche i mesi passati.">
+          <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+            <Metric label="Persone con vendite da collegare" value={fmtInt(allWithSales.length)} />
+            <Metric label="Proposte sicure" value={fmtInt(safe.length)} note="collegabili con un clic" />
+            <Metric label="Già collegate" value={fmtInt(mappedEntries.length)} />
+          </div>
+        </HeroMetric>
+      ) : (
+        <HeroMetric label="Persone con vendite da collegare" value="0" compare="Tutte le persone che vendono sono collegate a un operatore: i report sono completi.">
+          <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+            <Metric label="Già collegate" value={fmtInt(mappedEntries.length)} />
+            <Metric label="Ultimo sync" value={lastSyncTs ? fmtAgo(lastSyncTs) : "mai"} note={meta?.last_sync_period ? monthLabel(meta.last_sync_period) : null} />
+          </div>
+        </HeroMetric>
+      ))}
+
+      {/* PERSONE DA COLLEGARE (25/09/2026): ordinate per venduto — chi non è
+          collegato sparisce da Sales CP, Creator, Action/Coaching Center. */}
+      {allUnmapped.length > 0 && (
+        <section id="collega" style={{ marginBottom: 22 }}>
+          <SectionTitle aside={`${fmtInt(withSales.length)} con vendite negli ultimi 2 mesi`}>Persone da collegare a un operatore</SectionTitle>
+          {safe.length > 0 && (
+            <section style={{ ...card, padding: "14px 16px", marginBottom: 12, borderColor: alpha(CP.accent, "66") }}>
+              <div style={{ fontSize: 14, color: CP.textPrimary, marginBottom: 4 }}>{safe.length} proposte sicure: stesso nome di un operatore esistente</div>
+              <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 8 }}>Nome identico a parte accenti, emoji e &quot;HOC&quot;, e l&apos;operatore non è collegato a nessun altro. Controlla la lista e collega tutto insieme.</div>
+              <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 12, lineHeight: 1.6 }}>{safe.map((x) => `${nameOf(x.m)} → ${x.name}`).join(" · ")}</div>
+              <button disabled={bulkBusy} onClick={async () => {
+                if (!confirm(`Collegare ${safe.length} persone al loro operatore?`)) return;
+                setBulkBusy(true);
+                for (const x of safe) await setMapping(x.m.cp_id || x.m.id, x.name);
+                setBulkBusy(false);
+              }} style={{ ...btnPrimary, opacity: bulkBusy ? 0.7 : 1 }}>
+                {bulkBusy ? <><Loader2 size={14} className="animate-spin" /> Collego…</> : <><Link2 size={14} /> Collega le {safe.length} proposte sicure</>}
+              </button>
+            </section>
+          )}
+          <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 10px", lineHeight: 1.5 }}>
+            Per le altre: scrivi il nome dell&apos;operatore (ti suggerisco quelli esistenti), usa il collegamento proposto quando lo riconosco, oppure “Usa il nome CP” se in HOC Pro non esiste ancora.
+          </p>
+          <input type="text" placeholder="Cerca per nome CP o username…" aria-label="Cerca persona da collegare" value={unmappedSearch} onChange={(e) => setUnmappedSearch(e.target.value)} style={{ ...ctl, width: "100%", maxWidth: 360, marginBottom: 10, boxSizing: "border-box" }} />
+          <datalist id="cp-infloww-names">{inflowwNames.map((n) => <option key={n} value={n} />)}</datalist>
+          <DataTable columns={unmappedCols} rows={unmappedRows} minWidth={760} maxHeight={620}
+            empty={unmappedSearch ? "Nessuna persona trovata con questa ricerca." : "Nessuna persona con vendite da collegare."} />
+          <p style={{ fontSize: 12, color: CP.textMuted, marginTop: 10 }}>
+            {idle.length > 0 && <button onClick={() => setShowIdle((v) => !v)} style={linkBtn}>{showIdle ? "Nascondi" : "Mostra anche"} le {idle.length} persone senza vendite negli ultimi 2 mesi</button>}
+            {" "}Il collegamento vale subito, anche per i mesi passati.
+          </p>
+        </section>
+      )}
+
+      {/* ULTIMO SYNC: cosa è arrivato l'ultima volta */}
+      <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+        <SectionTitle aside={meta ? "Il sync sovrascrive i dati CP del mese scelto, non tocca i dati Infloww." : null}>Ultimo sync</SectionTitle>
+        {!status ? (
+          <div style={{ fontSize: 13, color: CP.textMuted }}>Carico lo stato…</div>
+        ) : !meta ? (
+          <div style={{ fontSize: 13, color: CP.textSecondary }}>Nessun sync ancora fatto. Scegli un mese in alto e premi “Sincronizza il mese”.</div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 16 }}>
+            <Metric label="Quando" value={fmtAgo(lastSyncTs)} note={new Date(meta.last_sync_at).toLocaleString("it-IT")} />
+            <Metric label="Mese" value={monthLabel(meta.last_sync_period)} note={`durata ${Math.round(meta.duration_ms / 1000)} s`} />
+            <Metric label="Righe paga" value={fmtInt(meta.counts?.wages_normalized || 0)} />
+            <Metric label="Turni" value={fmtInt(meta.counts?.shifts_total || 0)} />
+            <Metric label="Persone in CP" value={fmtInt(meta.counts?.members || 0)} />
+            <Metric label="Collegate" value={fmtInt(meta.counts?.mapping_total || 0)} note="al momento del sync" />
+            <Metric label="Non collegate" value={fmtInt(meta.counts?.mapping_unmatched || 0)} note="al momento del sync" />
           </div>
         )}
-      </div>
+      </section>
+
+      {/* MAPPING ATTIVI: consultazione/correzione, di rado */}
+      {Object.keys(mapping).length > 0 && (
+        <Disclosure open={mappedOpen} onToggle={() => setMappedOpen((v) => !v)}
+          title={`Persone già collegate (${fmtInt(mappedEntries.length)})`}
+          summary="Cerca un collegamento o rimuovilo se è sbagliato">
+          <input type="text" placeholder="Cerca per nome CP, nome operatore o codice CP…" aria-label="Cerca collegamento" value={mappedSearch} onChange={(e) => setMappedSearch(e.target.value)}
+            style={{ ...ctl, width: "100%", maxWidth: 360, marginBottom: 10, boxSizing: "border-box" }} />
+          <DataTable columns={mappedCols} rows={mappedRows} minWidth={620} maxHeight={520} defaultSort={{ key: "cpName", dir: 1 }} empty="Nessun collegamento trovato." />
+          <p style={{ fontSize: 12, color: CP.textMuted, marginTop: 10 }}>
+            {mappedSearch ? `${filteredMapped.length} risultati su ${mappedEntries.length}` : `Mostrati tutti i ${mappedEntries.length}`}
+          </p>
+        </Disclosure>
+      )}
     </div>
   );
 }
 
+// "2026-09" → "settembre 2026"
+function monthLabel(id) {
+  const [y, m] = String(id || "").split("-").map(Number);
+  return y && m ? `${MONTHS_IT[m - 1]} ${y}` : String(id || "—");
+}
+// Fase del sync in parole (i valori interni restano quelli della logica)
+function phaseLabel(p) {
+  if (!p || p === "refdata") return "scarico le anagrafiche";
+  if (p.startsWith("preparing page")) return `preparo l'elenco (pagina ${p.split(" ").pop()})`;
+  if (p.startsWith("batch")) return `scarico i dettagli (blocco ${p.split(" ").pop().replace("/", " di ")})`;
+  if (p === "finalizing") return "salvo i dati";
+  if (p === "nothing-to-sync") return "nessuna riga paga nel mese, chiudo";
+  return p;
+}
 
 // Nome operatore già esistente che corrisponde alla persona CP (senza "HOC",
 // emoji, maiuscole): "Erick Jhon HOC" → "Erick Jhon". Solo match esatti o
@@ -416,4 +394,7 @@ function suggestName(cpName, names) {
   const pre = names.filter((x) => { const k = norm(x); return k && ((two(n) && k.startsWith(n + " ")) || (two(k) && n.startsWith(k + " "))); });
   return pre.length === 1 ? pre[0] : null;
 }
-const linkBtn = { background: "none", border: "none", padding: 0, color: "var(--cp-accentSoftText)", fontSize: 13, cursor: "pointer" };
+const linkBtn = { background: "none", border: "none", padding: 0, color: CP.accentSoftText, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body };
+const ctl = { padding: "8px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
+const btn = { padding: "6px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body };
+const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 14px", background: CP.accent, color: CP.accentInk, border: "1px solid transparent", borderRadius: 8, fontSize: 14, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };

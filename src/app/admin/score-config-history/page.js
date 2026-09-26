@@ -3,9 +3,9 @@
 import { useState, useMemo } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { History, AlertTriangle, CheckCircle2, GitCompare, Sliders } from "lucide-react";
-import { CP, FONTS, alpha } from "@/lib/brand";
-import { PageHeader, CpCard, SectionLabel, PillTab } from "@/components/cp-style";
+import { FlaskConical, History, Sliders } from "lucide-react";
+import { CP, FONTS } from "@/lib/brand";
+import { PageHead, HeroMetric, Metric, SectionTitle, Notice, DataTable, FilterChip, NUM, card } from "@/components/ds";
 
 /**
  * /admin/score-config-history
@@ -13,6 +13,12 @@ import { PageHeader, CpCard, SectionLabel, PillTab } from "@/components/cp-style
  * Storico versionato della formula dello score operativo Infloww congelata a ogni
  * import. Rileva il drift: con quale formula (pesi/soglie/tier) ciascun periodo è
  * stato scorato. Prerequisito della policy dispute/retroattività (CAREER_LADDER §8.2).
+ *
+ * Ridisegno 26/09/2026 (design system): tabella ordinabile per mese; al posto del
+ * solo codice della formula, "cosa è cambiato" rispetto al mese prima (pesi,
+ * soglie, fasce, altro) calcolato confrontando le due fotografie; dettaglio del
+ * mese scelto sotto la tabella. Nota esplicita: la formula attiva ricalcola
+ * anche i mesi passati, la fotografia dice con quale formula era stato importato.
  */
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
@@ -23,11 +29,24 @@ const PERIOD_TYPES = [
   { key: "quarterly", label: "Trimestrale" },
 ];
 
+const KPI_IT = {
+  fan_cvr: "Conversione fan",
+  unlock_rate: "Contenuti sbloccati",
+  avg_earnings_per_paying_fan: "Incasso per fan pagante",
+  golden_ratio: "Golden ratio",
+  sales_per_hour: "Vendite all'ora",
+  avg_revenue_per_fan: "Incasso per fan",
+  avg_length_of_conversation: "Lunghezza conversazioni",
+  input_per_message: "Input per messaggio",
+  messages_sent_per_hour: "Messaggi all'ora",
+};
+const kpiName = (k) => KPI_IT[k] || k.replace(/_/g, " ");
+
 function fmtDate(iso) {
   if (!iso) return "—";
   try {
     return new Date(iso).toLocaleString("it-IT", {
-      day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+      day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
     });
   } catch {
     return iso;
@@ -40,15 +59,28 @@ function topWeights(weights) {
   return Object.entries(w)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
-    .map(([k, v]) => `${k.replace(/_/g, " ")} ${(v * 100).toFixed(0)}%`)
+    .map(([k, v]) => `${kpiName(k)} ${(v * 100).toFixed(0)}%`)
     .join(" · ");
+}
+
+// Cosa è cambiato rispetto alla fotografia del periodo prima (solo presentazione)
+function whatChanged(snap, prev) {
+  if (!snap.drift_vs_prev) return [];
+  if (!prev) return ["formula diversa"];
+  const eq = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  const out = [];
+  if (!eq(snap.weights, prev.weights)) out.push("pesi");
+  if (!eq(snap.thresholds, prev.thresholds)) out.push("soglie dei punti");
+  if (!eq(snap.tiers, prev.tiers)) out.push("fasce");
+  if (!out.length) out.push("altre regole (es. gruppi piccoli)");
+  return out;
 }
 
 export default function ScoreConfigHistoryPage() {
   const [periodType, setPeriodType] = useState("monthly");
   const [expanded, setExpanded] = useState(null);
 
-  const { data, error, isLoading, mutate } = useSWR(
+  const { data, error, isLoading } = useSWR(
     `/api/admin/score-config-history?period_type=${periodType}`,
     fetcher
   );
@@ -59,160 +91,135 @@ export default function ScoreConfigHistoryPage() {
     () => snapshots.filter((s) => s.drift_vs_prev).length,
     [snapshots]
   );
+  const byPeriod = useMemo(() => Object.fromEntries(snapshots.map((s) => [s.period_id, s])), [snapshots]);
+  const notActive = activeHash ? snapshots.filter((s) => s.hash !== activeHash).length : 0;
 
   const forbidden = data?.error && (String(data.error).toLowerCase().includes("permess") || String(data.error).toLowerCase().includes("forbidden") || String(data.error).toLowerCase().includes("unauthorized"));
+  const sel = snapshots.find((s) => s.period_id === expanded) || null;
+
+  const rows = snapshots.map((s) => ({ ...s, id: s.period_id, changes: whatChanged(s, byPeriod[s.prev_period_id]) }));
+  const columns = [
+    { key: "period_id", label: "Periodo", sort: (r) => r.period_id, render: (r) => <span style={{ color: CP.textPrimary, ...NUM }}>{r.period_id}</span> },
+    { key: "captured", label: "Fotografata il", muted: true, sort: (r) => r.captured_at_iso || "", render: (r) => fmtDate(r.captured_at_iso) },
+    {
+      key: "hash", label: "Versione", sort: (r) => r.hash || "",
+      render: (r) => (
+        <span style={{ whiteSpace: "nowrap" }}>
+          <span style={{ color: CP.textSecondary, ...NUM }}>{r.hash}</span>
+          {activeHash && r.hash === activeHash && <span style={{ marginLeft: 8, fontSize: 12, padding: "2px 8px", borderRadius: 999, background: CP.accentSoft, color: CP.accentSoftText }}>attiva oggi</span>}
+        </span>
+      ),
+    },
+    {
+      key: "changes", label: "Rispetto al periodo prima", sort: (r) => r.changes.length,
+      render: (r) => r.drift_vs_prev
+        ? <span style={{ color: CP.textPrimary }}>cambiati: {r.changes.join(", ")} <span style={{ color: CP.textMuted, fontSize: 12 }}>(vs {r.prev_period_id})</span></span>
+        : <span style={{ color: CP.textMuted }}>invariata</span>,
+    },
+    { key: "top", label: "KPI che pesano di più", sortable: false, muted: true, render: (r) => <span style={{ fontSize: 12 }}>{topWeights(r.weights)}</span> },
+  ];
+
+  const lnk = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, color: CP.textPrimary, fontFamily: FONTS.body, textDecoration: "none" };
 
   return (
-    <div style={{ padding: "32px 32px 64px 32px", maxWidth: 1180, margin: "0 auto" }}>
-      <PageHeader
-        section="Data & Integrations"
-        title="Storico formula score"
-        subtitle="Con quale formula (pesi KPI, soglie di normalizzazione, cutoff tier) è stato scorato ciascun periodo. La formula viene congelata automaticamente a ogni import CSV Infloww: se cambia tra un mese e l'altro, qui si vede il drift. È il prerequisito per correzioni e appelli difendibili (career ladder §8.2)."
-        toolbar={
-          <Link href="/admin/leaderboard-settings" style={{ textDecoration: "none" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 14px", background: CP.surfaceAlt, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, color: CP.textSecondary, fontFamily: FONTS.body }}>
-              <Sliders size={15} /> Modifica formula
-            </span>
-          </Link>
-        }
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Dati" }, { label: "Storico formula" }]}
+        title="Storico della formula score"
+        subtitle="Con quale formula (pesi dei KPI, soglie dei punti, fasce) era calcolato lo score Mestiere quando ogni periodo è stato importato. Serve a rispondere a una contestazione: «a luglio contava questo»."
+        actions={<>
+          <Link href="/admin/score-config-drafts" style={lnk}><FlaskConical size={14} /> Bozze formula</Link>
+          <Link href="/admin/leaderboard-settings" style={lnk}><Sliders size={14} /> Modifica formula</Link>
+        </>}
       />
 
       {/* Selettore tipo periodo */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         {PERIOD_TYPES.map((pt) => (
-          <PillTab key={pt.key} active={periodType === pt.key} onClick={() => { setPeriodType(pt.key); setExpanded(null); }}>
-            {pt.label}
-          </PillTab>
+          <FilterChip key={pt.key} label={pt.label} active={periodType === pt.key} onClick={() => { setPeriodType(pt.key); setExpanded(null); }} />
         ))}
       </div>
 
-      {forbidden && (
-        <CpCard accent={CP.accentRed} style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", color: CP.textSecondary, fontSize: 14 }}>
-            <AlertTriangle size={18} color={CP.accentRed} />
-            Accesso riservato agli admin (capability SEED). {String(data.error)}
+      {forbidden && <Notice danger>Pagina riservata agli admin. {String(data.error)}</Notice>}
+      {error && !forbidden && <Notice danger>Errore nel caricamento dello storico.</Notice>}
+      {isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
+
+      {!isLoading && !forbidden && snapshots.length > 0 && (
+        <HeroMetric
+          label="Cambi di formula tra un periodo e il successivo"
+          value={String(driftCount)}
+          compare={`su ${snapshots.length} periodi fotografati`}
+          hint={driftCount === 0 ? "La formula non è mai cambiata tra i periodi fotografati." : "Ogni cambio è una riga «cambiati: …» nella tabella."}
+        >
+          <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <Metric label="Versione attiva oggi" value={activeHash ? activeHash.slice(0, 8) : "—"} />
+            <Metric label="Periodi importati con un'altra versione" value={String(notActive)} note={notActive ? "oggi si vedono ricalcolati con quella attiva" : null} />
           </div>
-        </CpCard>
+        </HeroMetric>
       )}
 
-      {error && !forbidden && (
-        <CpCard accent={CP.accentRed} style={{ marginBottom: 16 }}>
-          <div style={{ color: CP.textSecondary, fontSize: 14 }}>Errore nel caricamento dello storico.</div>
-        </CpCard>
-      )}
-
-      {/* Riepilogo */}
-      {!isLoading && !forbidden && (
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-          <SummaryTile label="Periodi tracciati" value={snapshots.length} />
-          <SummaryTile
-            label="Cambi di formula"
-            value={driftCount}
-            accent={driftCount > 0 ? CP.accentBlue : CP.accentGreen}
-            icon={driftCount > 0 ? <GitCompare size={15} /> : <CheckCircle2 size={15} />}
-          />
-          <SummaryTile label="Formula attiva ora" value={activeHash ? activeHash.slice(0, 8) : "—"} mono />
-        </div>
-      )}
-
-      {isLoading && (
-        <div style={{ color: CP.textMuted, fontSize: 14, padding: "24px 0" }}>Caricamento…</div>
+      {!isLoading && !forbidden && snapshots.length > 0 && (
+        <Notice>
+          La formula attiva ricalcola anche i mesi passati: nelle classifiche di oggi ogni mese è calcolato con la versione attiva. Questa pagina dice con quale versione era stato importato, cioè cosa vedevano le persone in quel momento.
+        </Notice>
       )}
 
       {/* Empty state */}
-      {!isLoading && !forbidden && snapshots.length === 0 && (
-        <CpCard>
-          <div style={{ textAlign: "center", padding: "28px 16px" }}>
-            <History size={30} color={CP.mutedIcons} />
-            <p style={{ color: CP.textSecondary, fontSize: 14, margin: "12px 0 4px 0" }}>
-              Nessuno snapshot ancora per i periodi {PERIOD_TYPES.find((p) => p.key === periodType)?.label.toLowerCase()}.
-            </p>
-            <p style={{ color: CP.textMuted, fontSize: 13, margin: 0, lineHeight: 1.6, maxWidth: 560, marginLeft: "auto", marginRight: "auto" }}>
-              La formula viene congelata automaticamente al prossimo import CSV Infloww. Per creare subito un riferimento baseline della formula corrente su un periodo già importato, usa <Link href="/admin/leaderboard-import" style={{ color: CP.accent }}>Import Infloww</Link>.
-            </p>
-          </div>
-        </CpCard>
-      )}
-
-      {/* Lista snapshot */}
-      {!isLoading && snapshots.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {snapshots.map((snap) => {
-            const isOpen = expanded === snap.period_id;
-            const isActive = activeHash && snap.hash === activeHash;
-            return (
-              <CpCard
-                key={snap.period_id}
-                accent={snap.drift_vs_prev ? CP.accentBlue : undefined}
-                onClick={() => setExpanded(isOpen ? null : snap.period_id)}
-                style={{ cursor: "pointer" }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-                  <div style={{ minWidth: 96 }}>
-                    <div style={{ fontFamily: FONTS.display, fontSize: 17, fontWeight: 500, color: CP.textPrimary }}>{snap.period_id}</div>
-                    <div style={{ fontSize: 12, color: CP.textMuted }}>{fmtDate(snap.captured_at_iso)}</div>
-                  </div>
-
-                  <span style={{ fontFamily: FONTS.mono, fontSize: 12, color: CP.textSecondary, background: CP.surfaceAlt, border: `1px solid ${CP.borderSoft}`, borderRadius: 6, padding: "3px 8px" }}>
-                    {snap.hash}
-                  </span>
-
-                  {snap.drift_vs_prev ? (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: CP.accentBlue, background: alpha(CP.accentBlue, "18"), borderRadius: 999, padding: "3px 10px" }}>
-                      <GitCompare size={13} /> formula cambiata vs {snap.prev_period_id}
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: 12, color: CP.textMuted }}>invariata</span>
-                  )}
-
-                  {isActive && (
-                    <span style={{ fontSize: 12, fontWeight: 600, color: CP.accentGreen, background: alpha(CP.accentGreen, "18"), borderRadius: 999, padding: "3px 10px" }}>
-                      = formula attiva
-                    </span>
-                  )}
-
-                  <div style={{ marginLeft: "auto", fontSize: 12, color: CP.textMuted, maxWidth: 360, textAlign: "right", lineHeight: 1.4 }}>
-                    {topWeights(snap.weights)}
-                  </div>
-                </div>
-
-                {isOpen && (
-                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${CP.borderSoft}`, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
-                    <ConfigBlock title="Pesi KPI · con clock-in" data={snap.weights?.withClockIn} pct />
-                    <ConfigBlock title="Pesi KPI · senza clock-in" data={snap.weights?.withoutClockIn} pct />
-                    <div>
-                      <SectionLabel>Cutoff tier</SectionLabel>
-                      <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
-                        {(snap.tiers || []).map((t) => (
-                          <div key={t.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: CP.textSecondary }}>
-                            <span style={{ color: t.color || CP.textSecondary }}>{t.label}</span>
-                            <span style={{ fontFamily: FONTS.mono }}>{t.min}–{t.max}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{ marginTop: 12, fontSize: 12, color: CP.textMuted }}>
-                        Sorgente: <span style={{ fontFamily: FONTS.mono }}>{snap.source || "import"}</span>
-                        {snap.is_custom && (snap.is_custom.weights || snap.is_custom.thresholds || snap.is_custom.tiers) ? " · override attivo" : " · default"}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CpCard>
-            );
-          })}
+      {!isLoading && !forbidden && !error && snapshots.length === 0 && (
+        <div style={{ ...card, textAlign: "center", padding: "28px 16px" }}>
+          <History size={28} color={CP.mutedIcons} />
+          <p style={{ color: CP.textSecondary, fontSize: 14, margin: "12px 0 4px 0" }}>
+            Nessuna fotografia per i periodi {PERIOD_TYPES.find((p) => p.key === periodType)?.label.toLowerCase()}.
+          </p>
+          <p style={{ color: CP.textMuted, fontSize: 13, margin: "0 auto", lineHeight: 1.6, maxWidth: 560 }}>
+            La formula si fotografa da sola a ogni import dell&apos;export Infloww. Per avere subito un riferimento su un periodo già importato, reimportalo da <Link href="/admin/leaderboard-import" style={{ color: CP.accentSoftText }}>Import Infloww</Link>.
+          </p>
         </div>
       )}
-    </div>
-  );
-}
 
-function SummaryTile({ label, value, accent, icon, mono }) {
-  return (
-    <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, padding: "12px 18px", minWidth: 140 }}>
-      <div style={{ fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase", color: CP.textMuted, marginBottom: 4 }}>{label}</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: mono ? FONTS.mono : FONTS.display, fontSize: mono ? 16 : 22, fontWeight: 500, color: accent || CP.textPrimary }}>
-        {icon}{value}
-      </div>
+      {!isLoading && snapshots.length > 0 && (
+        <section>
+          <SectionTitle aside="clic su una riga per il dettaglio">Periodi fotografati · {snapshots.length}</SectionTitle>
+          <DataTable
+            columns={columns}
+            rows={rows}
+            defaultSort={{ key: "period_id", dir: -1 }}
+            onRowClick={(r) => setExpanded(expanded === r.period_id ? null : r.period_id)}
+            selected={(r) => r.period_id === expanded}
+            minWidth={820}
+            maxHeight={520}
+          />
+
+          {sel && (
+            <div style={{ ...card, padding: "14px 16px", marginTop: 12 }}>
+              <SectionTitle aside={`fotografata il ${fmtDate(sel.captured_at_iso)} · da ${sel.source === "import" || !sel.source ? "import" : sel.source} · ${sel.is_custom && (sel.is_custom.weights || sel.is_custom.thresholds || sel.is_custom.tiers) ? "valori modificati rispetto al codice" : "valori di fabbrica"}`}>
+                Formula di {sel.period_id} · versione {sel.hash}
+              </SectionTitle>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
+                <ConfigBlock title="Pesi · con ore timbrate" data={sel.weights?.withClockIn} pct />
+                <ConfigBlock title="Pesi · senza ore timbrate" data={sel.weights?.withoutClockIn} pct />
+                <div>
+                  <div style={{ fontSize: 13, color: CP.textPrimary, marginBottom: 6 }}>Fasce</div>
+                  {(sel.tiers || []).map((t) => (
+                    <div key={t.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: CP.textSecondary, padding: "2px 0" }}>
+                      <span>{t.label}</span>
+                      <span style={NUM}>{t.min}–{t.max}</span>
+                    </div>
+                  ))}
+                  {Array.isArray(sel.thresholds) && sel.thresholds.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 13, color: CP.textPrimary, margin: "12px 0 6px" }}>Soglie dei punti</div>
+                      {sel.thresholds.map((t, i) => (
+                        <div key={i} style={{ fontSize: 13, color: CP.textSecondary, padding: "2px 0", ...NUM }}>sotto il {Math.round((Number(t.multiplier) || 0) * 100)}% della media → {t.score}</div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }
@@ -221,15 +228,13 @@ function ConfigBlock({ title, data, pct }) {
   const entries = Object.entries(data || {}).sort((a, b) => b[1] - a[1]);
   return (
     <div>
-      <SectionLabel>{title}</SectionLabel>
-      <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
-        {entries.map(([k, v]) => (
-          <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: CP.textSecondary }}>
-            <span>{k.replace(/_/g, " ")}</span>
-            <span style={{ fontFamily: FONTS.mono }}>{pct ? `${(v * 100).toFixed(0)}%` : v}</span>
-          </div>
-        ))}
-      </div>
+      <div style={{ fontSize: 13, color: CP.textPrimary, marginBottom: 6 }}>{title}</div>
+      {entries.map(([k, v]) => (
+        <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: CP.textSecondary, padding: "2px 0" }}>
+          <span>{kpiName(k)}</span>
+          <span style={NUM}>{pct ? `${(v * 100).toFixed(0)}%` : v}</span>
+        </div>
+      ))}
     </div>
   );
 }

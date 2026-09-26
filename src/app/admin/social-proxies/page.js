@@ -7,12 +7,21 @@
  * Ogni account social ufficiale (Twitter/Reddit/Instagram/TikTok collegati
  * alle pagine dei creator) può usare un proxy dedicato per isolare le
  * connessioni — igiene/sicurezza dell'account, non evasione di rilevazione.
+ *
+ * Redesign 26/09/2026 sul design system: testata DS, filtri a chip, tabella
+ * ordinabile (la griglia a 7 colonne non stava a 390px), azioni con parole al
+ * posto delle sole icone ("Prova connessione" era un'icona wifi), motivo
+ * dell'errore visibile in riga (prima solo al passaggio del mouse), stato vuoto
+ * che distingue "nessun proxy" da "nessun proxy con questo filtro". Password mai
+ * mostrate; il test di connessione resta. Modal di cp-style, API invariate.
  */
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import useSWR from "swr";
-import { Shield, Plus, Wifi, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { SectionLabel, Modal } from "@/components/cp-style";
+import { Modal } from "@/components/cp-style";
+import { PageHead, FilterChip, Notice, DataTable, card } from "@/components/ds";
 
 const PROVIDERS = ["coronium", "proxycaro", "nsocks"];
 
@@ -28,27 +37,15 @@ const fetcher = async (url) => {
 };
 
 function fmtDateTime(ts) {
-  if (!ts) return "Mai";
+  if (!ts) return "mai";
   return new Date(ts).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 const STATUS_META = {
-  active: { label: "Attivo", color: CP.accentGreen },
-  inactive: { label: "Non testato", color: CP.textMuted },
-  error: { label: "Errore", color: CP.accentRed },
+  active: { label: "Funziona" },
+  inactive: { label: "Mai provato" },
+  error: { label: "Errore" },
 };
-
-function Badge({ label, color }) {
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", padding: "3px 9px",
-      background: color + "1c", color, borderRadius: 999,
-      fontSize: 11.5, fontWeight: 500, fontFamily: FONTS.body, whiteSpace: "nowrap",
-    }}>
-      {label}
-    </span>
-  );
-}
 
 export default function SocialProxiesPage() {
   const [statusFilter, setStatusFilter] = useState("");
@@ -67,6 +64,7 @@ export default function SocialProxiesPage() {
 
   const items = data?.items || [];
   const knownProviders = [...new Set([...PROVIDERS, ...items.map((p) => p.provider).filter(Boolean)])];
+  const filtered = !!(statusFilter || providerFilter);
 
   const openCreate = () => { setEditing(null); setModalOpen(true); };
   const openEdit = (p) => { setEditing(p); setModalOpen(true); };
@@ -87,7 +85,7 @@ export default function SocialProxiesPage() {
   };
 
   const runDelete = async (p) => {
-    if (!window.confirm(`Eliminare il proxy ${p.host}:${p.port}?`)) return;
+    if (!window.confirm(`Eliminare il proxy ${p.host}:${p.port}?\n\nNon si può eliminare se lo usa un account attivo; gli account non attivi che lo usano restano senza proxy.`)) return;
     setDeletingId(p.id);
     setRowError(null);
     try {
@@ -102,115 +100,105 @@ export default function SocialProxiesPage() {
     }
   };
 
-  if (error) {
-    return (
-      <div style={{ padding: 32, maxWidth: 1100, margin: "0 auto" }}>
-        <SectionLabel>Data & Integrations</SectionLabel>
-        <h1 style={h1}>Proxy account social</h1>
-        <div style={errBox}>
-          {error.status === 403 ? "Accesso riservato agli admin (capability SEED)." : `Errore: ${error.message}`}
+  const errProxy = rowError ? items.find((p) => p.id === rowError.id) : null;
+
+  const columns = [
+    { key: "host", label: "Indirizzo", sort: (p) => `${p.host}:${p.port}`, render: (p) => <span style={{ fontWeight: 500 }}>{p.host}:{p.port}</span> },
+    { key: "type", label: "Tipo", render: (p) => (p.type === "socks5" ? "SOCKS5" : "HTTP") },
+    { key: "provider", label: "Fornitore", muted: true, render: (p) => p.provider || "—" },
+    {
+      key: "status", label: "Stato", sort: (p) => (STATUS_META[p.status] || STATUS_META.inactive).label,
+      render: (p) => (
+        <div style={{ maxWidth: 260, whiteSpace: "normal" }}>
+          <span style={{ color: p.status === "error" ? CP.accentRed : p.status === "active" ? CP.textPrimary : CP.textMuted }}>{(STATUS_META[p.status] || STATUS_META.inactive).label}</span>
+          {p.status === "active" && p.lastLatencyMs != null && <span style={{ color: CP.textMuted, fontSize: 12 }}> · risponde in {p.lastLatencyMs} ms</span>}
+          {p.status === "error" && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2 }}>{p.lastError || "Errore sconosciuto"}</div>}
         </div>
-      </div>
-    );
-  }
+      ),
+    },
+    {
+      key: "accounts", label: "Usato da", sort: (p) => p.accounts?.length || 0,
+      render: (p) => p.accounts?.length ? (
+        <span style={{ display: "inline-block", maxWidth: 240, whiteSpace: "normal" }}>
+          {p.accounts.map((a, i) => (
+            <span key={a.id}>{i > 0 && ", "}<Link href={`/admin/social-accounts/${a.id}`} style={{ color: CP.accentSoftText, textDecoration: "none" }}>{a.name}</Link></span>
+          ))}
+        </span>
+      ) : <span style={{ color: CP.textMuted }}>Nessun account</span>,
+    },
+    { key: "lastCheckedAt", label: "Ultima prova", muted: true, render: (p) => fmtDateTime(p.lastCheckedAt), sort: (p) => p.lastCheckedAt ?? 0 },
+    {
+      key: "actions", label: "", sortable: false,
+      render: (p) => (
+        <span style={{ display: "flex", gap: 6, justifyContent: "flex-end", whiteSpace: "nowrap" }}>
+          <button onClick={() => runTest(p.id)} disabled={testingId === p.id} style={btnSmall}>
+            {testingId === p.id ? <><Loader2 size={13} className="animate-spin" /> Provo…</> : "Prova connessione"}
+          </button>
+          <button onClick={() => openEdit(p)} style={btnSmall}>Modifica</button>
+          <button onClick={() => runDelete(p)} disabled={deletingId === p.id} style={{ ...btnSmall, color: CP.accentRed }}>
+            {deletingId === p.id ? "Elimino…" : "Elimina"}
+          </button>
+        </span>
+      ),
+    },
+  ];
 
   return (
-    <div style={{ padding: "32px 32px 64px", maxWidth: 1200, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
-        <div>
-          <SectionLabel>Data & Integrations</SectionLabel>
-          <h1 style={{ ...h1, display: "flex", alignItems: "center", gap: 12 }}>
-            <Shield size={26} color={CP.accent} aria-hidden="true" />
-            Proxy account social
-          </h1>
-          <p style={{ color: CP.textSecondary, fontSize: 13, margin: 0, lineHeight: 1.55, maxWidth: 720 }}>
-            Un proxy SOCKS5/HTTP dedicato per ogni account social ufficiale, per isolare le connessioni.
-            Le credenziali sono cifrate a riposo.
-          </p>
-        </div>
-        <button onClick={openCreate} style={btnPrimary}>
-          <Plus size={15} /> Nuovo proxy
-        </button>
-      </div>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Marketing" }, { label: "Proxy account social" }]}
+        title="Proxy account social"
+        subtitle="I proxy da cui escono gli account social ufficiali, per tenere separate le loro connessioni. Un proxy viene assegnato agli account solo dopo che la prova di connessione è riuscita. Le password sono cifrate e non vengono mai mostrate."
+        actions={!error && (
+          <button onClick={openCreate} style={btnPrimary}>
+            <Plus size={15} /> Nuovo proxy
+          </button>
+        )}
+      />
 
-      {/* Filtri */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-        <select style={{ ...input, width: 160 }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">Tutti gli status</option>
-          <option value="active">Attivo</option>
-          <option value="inactive">Non testato</option>
-          <option value="error">Errore</option>
-        </select>
-        <select style={{ ...input, width: 180 }} value={providerFilter} onChange={(e) => setProviderFilter(e.target.value)}>
-          <option value="">Tutti i provider</option>
-          {knownProviders.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
-      </div>
+      {error && (
+        <Notice danger={error.status !== 403}>
+          {error.status === 403 ? "Pagina riservata agli admin." : `Non riesco a caricare i proxy: ${error.message}`}
+        </Notice>
+      )}
 
-      {isLoading ? (
-        <div style={{ color: CP.textMuted, padding: 24 }}>Caricamento…</div>
-      ) : items.length === 0 ? (
-        <div style={{ ...panel, color: CP.textSecondary, textAlign: "center" }}>
-          Nessun proxy ancora. Crea il primo col pulsante &ldquo;Nuovo proxy&rdquo;.
+      {!error && (items.length > 0 || filtered) && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+          <FilterChip label="Tutti" active={!statusFilter} onClick={() => setStatusFilter("")} />
+          <FilterChip label="Funzionano" active={statusFilter === "active"} onClick={() => setStatusFilter(statusFilter === "active" ? "" : "active")} />
+          <FilterChip label="Mai provati" active={statusFilter === "inactive"} onClick={() => setStatusFilter(statusFilter === "inactive" ? "" : "inactive")} />
+          <FilterChip label="Con errore" active={statusFilter === "error"} onClick={() => setStatusFilter(statusFilter === "error" ? "" : "error")} />
+          <span style={{ flex: 1 }} />
+          <select style={{ ...input, width: 200 }} value={providerFilter} onChange={(e) => setProviderFilter(e.target.value)} aria-label="Fornitore">
+            <option value="">Tutti i fornitori</option>
+            {knownProviders.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
         </div>
-      ) : (
-        <div style={{ border: `1px solid ${CP.border}`, borderRadius: 12, overflow: "hidden" }}>
-          <div style={{ ...rowGrid, background: CP.bgSunken, color: CP.textMuted, fontSize: 11, letterSpacing: 0.4, textTransform: "uppercase", padding: "10px 14px" }}>
-            <span>Host:porta</span>
-            <span>Tipo</span>
-            <span>Provider</span>
-            <span>Status</span>
-            <span>Account</span>
-            <span>Ultimo test</span>
-            <span></span>
-          </div>
-          {items.map((p) => {
-            const sm = STATUS_META[p.status] || STATUS_META.inactive;
-            const err = rowError?.id === p.id ? rowError.message : null;
-            return (
-              <div key={p.id} style={{ borderTop: `1px solid ${CP.borderSoft}` }}>
-                <div style={{ ...rowGrid, padding: "12px 14px", alignItems: "center" }}>
-                  <span style={{ fontFamily: FONTS.mono, fontSize: 13, color: CP.textPrimary }}>{p.host}:{p.port}</span>
-                  <span><Badge label={p.type === "socks5" ? "SOCKS5" : "HTTP"} color={CP.accentSoftText} /></span>
-                  <span style={{ fontSize: 12.5, color: CP.textSecondary }}>{p.provider || "—"}</span>
-                  <span title={p.status === "error" ? (p.lastError || "Errore sconosciuto") : ""}>
-                    <Badge label={sm.label} color={sm.color} />
-                  </span>
-                  <span style={{ fontSize: 12.5, color: CP.textSecondary, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {p.accounts?.length
-                      ? p.accounts.map((a, i) => (
-                          <span key={a.id}>
-                            {i > 0 && ", "}
-                            <a href={`/admin/social-accounts/${a.id}`} style={{ color: CP.accentSoftText, textDecoration: "none" }}>{a.name}</a>
-                          </span>
-                        ))
-                      : <span style={{ color: CP.textMuted }}>Nessuno</span>}
-                  </span>
-                  <span style={{ fontSize: 12, color: CP.textMuted }}>
-                    {fmtDateTime(p.lastCheckedAt)}
-                    {p.lastLatencyMs != null && p.status === "active" && (
-                      <span style={{ marginLeft: 6, color: CP.textSecondary }}>· {p.lastLatencyMs}ms</span>
-                    )}
-                  </span>
-                  <span style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                    <button onClick={() => runTest(p.id)} disabled={testingId === p.id} style={btnGhost} title="Test connessione">
-                      {testingId === p.id ? <Loader2 size={13} className="animate-spin" /> : <Wifi size={13} />}
-                    </button>
-                    <button onClick={() => openEdit(p)} style={btnGhost} title="Modifica">
-                      <Pencil size={13} />
-                    </button>
-                    <button onClick={() => runDelete(p)} disabled={deletingId === p.id} style={{ ...btnGhost, color: CP.accentRed }} title="Elimina">
-                      <Trash2 size={13} />
-                    </button>
-                  </span>
-                </div>
-                {err && (
-                  <div style={{ padding: "0 14px 10px", color: CP.accentRed, fontSize: 12 }}>{err}</div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+      )}
+
+      {rowError && (
+        <Notice danger>{errProxy ? `${errProxy.host}:${errProxy.port} — ` : ""}{rowError.message}</Notice>
+      )}
+
+      {!error && isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
+
+      {!error && !isLoading && items.length === 0 && (
+        filtered ? (
+          <Notice>Nessun proxy con questo filtro. <button onClick={() => { setStatusFilter(""); setProviderFilter(""); }} style={linkBtn}>Togli i filtri</button></Notice>
+        ) : (
+          <section style={{ ...card, padding: "18px 20px" }}>
+            <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, marginBottom: 8 }}>Nessun proxy ancora</div>
+            <ol style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: CP.textSecondary, lineHeight: 1.6 }}>
+              <li>Aggiungi un proxy con “Nuovo proxy” (indirizzo, porta e, se il fornitore le dà, utente e password).</li>
+              <li>Premi “Prova connessione”: se riesce diventa “Funziona” e può essere assegnato.</li>
+              <li>Poi crea gli account in <Link href="/admin/social-accounts" style={{ color: CP.accentSoftText, textDecoration: "none" }}>Account social</Link>: ognuno riceve da solo il proxy funzionante con meno account.</li>
+            </ol>
+          </section>
+        )
+      )}
+
+      {!error && items.length > 0 && (
+        <DataTable columns={columns} rows={items} defaultSort={{ key: "host", dir: 1 }} minWidth={1040} maxHeight={640} />
       )}
 
       <ProxyFormModal
@@ -255,7 +243,7 @@ function ProxyFormModal({ open, onClose, editing, knownProviders, onSaved }) {
 
   const submit = async () => {
     setFormError(null);
-    if (!host.trim() || !port) { setFormError("Host e porta sono richiesti."); return; }
+    if (!host.trim() || !port) { setFormError("Servono indirizzo e porta."); return; }
     setSaving(true);
     try {
       const body = {
@@ -284,27 +272,27 @@ function ProxyFormModal({ open, onClose, editing, knownProviders, onSaved }) {
 
   return (
     <Modal open={open} onClose={onClose} title={isEdit ? "Modifica proxy" : "Nuovo proxy"}>
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12, marginBottom: 12 }}>
-        <label>
-          <span style={lbl}>Host</span>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 12 }}>
+        <label style={{ gridColumn: "span 2", minWidth: 0 }}>
+          <span style={lbl}>Indirizzo (host)</span>
           <input style={input} value={host} onChange={(e) => setHost(e.target.value)} placeholder="proxy.provider.com" />
         </label>
-        <label>
+        <label style={{ minWidth: 0 }}>
           <span style={lbl}>Porta</span>
           <input style={input} type="number" min="1" max="65535" value={port} onChange={(e) => setPort(e.target.value)} placeholder="1080" />
         </label>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 12 }}>
         <label>
-          <span style={lbl}>Username (opzionale)</span>
+          <span style={lbl}>Utente (facoltativo)</span>
           <input style={input} value={username} onChange={(e) => setUsername(e.target.value)} />
         </label>
         <label>
-          <span style={lbl}>Password {isEdit ? "(lascia vuoto per non cambiarla)" : "(opzionale)"}</span>
+          <span style={lbl}>Password {isEdit ? "(vuota = resta quella salvata)" : "(facoltativa)"}</span>
           <input style={input} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
         </label>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 12 }}>
         <label>
           <span style={lbl}>Tipo</span>
           <select style={input} value={type} onChange={(e) => setType(e.target.value)}>
@@ -313,7 +301,7 @@ function ProxyFormModal({ open, onClose, editing, knownProviders, onSaved }) {
           </select>
         </label>
         <label>
-          <span style={lbl}>Provider</span>
+          <span style={lbl}>Fornitore</span>
           <select style={input} value={provider} onChange={(e) => setProvider(e.target.value)}>
             <option value="">—</option>
             {knownProviders.map((p) => <option key={p} value={p}>{p}</option>)}
@@ -323,11 +311,12 @@ function ProxyFormModal({ open, onClose, editing, knownProviders, onSaved }) {
       </div>
       {provider === "altro" && (
         <label style={{ display: "block", marginBottom: 12 }}>
-          <span style={lbl}>Nome provider</span>
-          <input style={input} value={customProvider} onChange={(e) => setCustomProvider(e.target.value)} placeholder="Nome provider" />
+          <span style={lbl}>Nome del fornitore</span>
+          <input style={input} value={customProvider} onChange={(e) => setCustomProvider(e.target.value)} placeholder="Nome fornitore" />
         </label>
       )}
-      {formError && <div style={{ color: CP.accentRed, fontSize: 12.5, marginBottom: 10 }}>{formError}</div>}
+      {!isEdit && <p style={{ margin: "0 0 12px", fontSize: 13, color: CP.textMuted, lineHeight: 1.5 }}>Dopo averlo creato, premi “Prova connessione”: finché la prova non riesce il proxy non viene assegnato agli account.</p>}
+      {formError && <div style={{ color: CP.accentRed, fontSize: 13, marginBottom: 10 }}>{formError}</div>}
       <button onClick={submit} disabled={saving} style={{ ...btnPrimary, width: "100%", justifyContent: "center", opacity: saving ? 0.6 : 1 }}>
         {saving ? "Salvo…" : isEdit ? "Salva modifiche" : "Crea proxy"}
       </button>
@@ -335,14 +324,11 @@ function ProxyFormModal({ open, onClose, editing, knownProviders, onSaved }) {
   );
 }
 
-const h1 = { fontFamily: FONTS.display, fontSize: 32, margin: "8px 0 6px", fontWeight: 500, letterSpacing: "-0.02em", color: CP.textPrimary };
-const panel = { background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, padding: 18, marginBottom: 20 };
-const rowGrid = { display: "grid", gridTemplateColumns: "1.3fr 0.8fr 0.9fr 0.9fr 1.3fr 1.1fr 1fr", gap: 10 };
-const lbl = { display: "block", fontSize: 11, color: CP.textMuted, marginBottom: 4 };
-const errBox = { background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, padding: 16, color: CP.textSecondary, marginTop: 16 };
+const lbl = { display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 4 };
 const input = {
-  width: "100%", padding: "8px 10px", background: CP.bg, border: `1px solid ${CP.border}`,
-  borderRadius: 8, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none",
+  width: "100%", boxSizing: "border-box", padding: "8px 10px", background: CP.surface, border: `1px solid ${CP.border}`,
+  borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, outline: "none",
 };
-const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", background: CP.accent, color: CP.accentInk, border: "1px solid transparent", borderRadius: 8, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };
-const btnGhost = { display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "6px 9px", background: "transparent", color: CP.textSecondary, border: `1px solid ${CP.border}`, borderRadius: 7, cursor: "pointer" };
+const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", background: CP.accent, color: CP.accentInk, border: "1px solid transparent", borderRadius: 8, fontSize: 14, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };
+const btnSmall = { display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 7, cursor: "pointer", fontSize: 12.5, fontFamily: FONTS.body };
+const linkBtn = { background: "none", border: "none", padding: 0, color: CP.accentSoftText, cursor: "pointer", fontSize: 13, fontFamily: FONTS.body };

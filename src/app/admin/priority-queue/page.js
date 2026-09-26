@@ -7,22 +7,23 @@
  * SI RAFFREDDA (whale silenzioso 3-21gg), ordinati per valore. Dati fan sensibili
  * (username + LTV) → pagina gated scope "all". Il deep-link a Infloww non esiste
  * (app desktop) → si copia lo @username e si incolla nella ricerca Infloww.
+ *
+ * Redesign DS (26/09/2026): numero principale = fan che aspettano una risposta,
+ * filtro per stato, tabella ordinabile con intestazione ferma, gergo tradotto
+ * (LTV → speso in tutto, txn → acquisti, SLA/whale spiegati). API invariata.
  */
 import { useEffect, useState, useCallback } from "react";
-import { Loader2, AlertCircle, Copy, Check, Clock, Snowflake } from "lucide-react";
+import { Loader2, Copy, Check, Clock, Snowflake } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
-import { PageHeader, CpCard, SectionLabel } from "@/components/cp-style";
+import { fmt$, fmtInt } from "@/lib/format";
+import { PageHead, HeroMetric, Metric, FilterChip, Notice, DataTable, card } from "@/components/ds";
 
-const usd = (v) => (v == null ? "—" : "$ " + Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 }));
-const num = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 }));
 function ago(hours) {
   if (hours == null) return "—";
-  if (hours < 48) return `${hours}h`;
-  return `${Math.round(hours / 24)}g`;
+  if (hours < 48) return `${hours} ${hours === 1 ? "ora" : "ore"}`;
+  const g = Math.round(hours / 24);
+  return `${g} ${g === 1 ? "giorno" : "giorni"}`;
 }
-
-const th = { padding: "10px 12px", textAlign: "right", fontSize: 10, color: CP.textMuted, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", whiteSpace: "nowrap" };
-const td = { padding: "9px 12px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 13, whiteSpace: "nowrap" };
 
 export default function PriorityQueuePage() {
   const [creators, setCreators] = useState([]);
@@ -31,6 +32,7 @@ export default function PriorityQueuePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(null);
+  const [filter, setFilter] = useState("all");
 
   // carica la lista creator una volta
   useEffect(() => {
@@ -78,18 +80,71 @@ export default function PriorityQueuePage() {
   const rows = data?.rows || [];
   const waiting = rows.filter((r) => r.state === "waiting");
   const cooling = rows.filter((r) => r.state === "cooling");
+  const visible = filter === "waiting" ? waiting : filter === "cooling" ? cooling : rows;
+  const waitingValue = waiting.reduce((s, r) => s + (Number(r.ltv_usd) || 0), 0);
+
+  const columns = [
+    { key: "username", label: "Fan", render: (r) => <span style={{ color: CP.textPrimary }}>@{r.username}</span> },
+    {
+      key: "state", label: "Stato", sort: (r) => (r.state === "waiting" ? 0 : 1),
+      render: (r) => {
+        const w = r.state === "waiting";
+        return (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: w ? CP.accentRed : CP.textSecondary, whiteSpace: "nowrap" }}>
+            {w ? <Clock size={13} /> : <Snowflake size={13} />}
+            {w ? "Aspetta risposta" : "Si raffredda"}
+          </span>
+        );
+      },
+    },
+    { key: "ltv_usd", label: "Speso in tutto", align: "right", sort: (r) => Number(r.ltv_usd), render: (r) => fmt$(r.ltv_usd) },
+    { key: "txns", label: "Acquisti", align: "right", sort: (r) => Number(r.txns), render: (r) => fmtInt(r.txns) },
+    {
+      key: "since", label: "Da quanto", align: "right",
+      sort: (r) => (r.state === "waiting" ? r.hrs_since_fan : r.hrs_since_active),
+      render: (r) => {
+        const w = r.state === "waiting";
+        return <span style={{ color: w ? CP.accentRed : CP.textSecondary, whiteSpace: "nowrap" }}>{ago(w ? r.hrs_since_fan : r.hrs_since_active)}</span>;
+      },
+    },
+    { key: "msgs_30d", label: "Messaggi in 30 giorni", align: "right", sort: (r) => Number(r.msgs_30d), render: (r) => <span style={{ color: CP.textSecondary }}>{fmtInt(r.msgs_30d)}</span> },
+    {
+      key: "copy", label: "", sortable: false,
+      render: (r) => {
+        const done = copied === r.username;
+        return (
+          <button
+            onClick={() => copyUser(r.username)}
+            title="Copia lo username per cercarlo in Infloww"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 8, cursor: "pointer",
+              background: done ? alpha(CP.accentGreen, "22") : CP.surface,
+              color: done ? CP.accentGreen : CP.textSecondary,
+              border: `1px solid ${CP.border}`, fontSize: 12, fontFamily: FONTS.body, whiteSpace: "nowrap",
+            }}
+          >
+            {done ? <Check size={13} /> : <Copy size={13} />}
+            {done ? "Copiato" : "Copia"}
+          </button>
+        );
+      },
+    },
+  ];
+
+  const creatorName = data?.creator_name || creators.find((c) => c.creator_id === creatorId)?.creator_name || "questa creator";
 
   return (
-    <div style={{ maxWidth: 1040, margin: "0 auto", padding: "32px 28px 80px" }}>
-      <PageHeader
-        section="People"
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "People" }, { label: "Priority queue" }]}
         title="Priority queue"
-        subtitle="Quale fan seguire ora, per creator: chi ha scritto e aspetta oltre lo SLA, e i whale che si stanno raffreddando. Ordinati per valore."
-        toolbar={
+        subtitle="Quale fan seguire adesso, creator per creator: chi ha scritto e aspetta ancora una risposta, e i fan che spendono tanto ma sono spariti da qualche giorno. In cima quelli che valgono di più."
+        actions={
           <select
             value={creatorId}
             onChange={(e) => setCreatorId(e.target.value)}
-            style={{ background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 13, fontFamily: FONTS.body, minWidth: 190 }}
+            aria-label="Creator"
+            style={{ background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 14, fontFamily: FONTS.body, minWidth: 200 }}
           >
             {creators.map((c) => (
               <option key={c.creator_id} value={c.creator_id}>{c.creator_name}</option>
@@ -98,107 +153,52 @@ export default function PriorityQueuePage() {
         }
       />
 
-      <CpCard padding="12px 16px" style={{ marginBottom: 20, display: "flex", gap: 10, alignItems: "flex-start" }}>
-        <AlertCircle size={15} style={{ color: CP.accentSoftText, marginTop: 2, flexShrink: 0 }} />
-        <div style={{ fontSize: 12.5, color: CP.textSecondary, lineHeight: 1.5 }}>
-          Dati fan riservati (accesso ristretto). Infloww non espone un link per conversazione: clicca <strong style={{ color: CP.textPrimary }}>copia</strong> sullo username e incollalo nella ricerca di Infloww. Advisory — decide sempre l'operatore.
-        </div>
-      </CpCard>
+      <Notice>
+        Dati dei fan riservati. Infloww non ha un link diretto alla conversazione: premi <b style={{ color: CP.textPrimary, fontWeight: 500 }}>Copia</b> accanto al fan e incolla il nome nella ricerca di Infloww.
+        È un suggerimento: chi sta al turno decide sempre.
+      </Notice>
 
-      {error && (
-        <CpCard accent={CP.accentRed} padding="14px 18px" style={{ marginBottom: 18 }}>
-          <div style={{ color: CP.accentRed, display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-            <AlertCircle size={16} /> {error}
-          </div>
-        </CpCard>
-      )}
+      {error && <Notice danger>{error}</Notice>}
 
       {loading && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, color: CP.textSecondary, fontSize: 13, padding: "24px 4px" }}>
-          <Loader2 size={16} className="animate-spin" /> Interrogazione del warehouse…
+        <div style={{ display: "flex", alignItems: "center", gap: 10, color: CP.textSecondary, fontSize: 14, padding: "16px 0" }}>
+          <Loader2 size={16} className="animate-spin" /> Carico la coda…
         </div>
       )}
 
-      {!loading && !error && rows.length === 0 && (
-        <CpCard padding="28px" style={{ textAlign: "center", color: CP.textMuted, fontSize: 13 }}>
-          Nessun fan di valore in attesa o in raffreddamento per {data?.creator_name || "questo creator"}.
-        </CpCard>
+      {!loading && !error && data && rows.length === 0 && (
+        <div style={{ ...card, padding: "22px 20px", color: CP.textSecondary, fontSize: 14 }}>
+          Per {creatorName} non c'è nessun fan di valore che aspetta una risposta o che si sta raffreddando. Niente da recuperare adesso.
+        </div>
       )}
 
       {!loading && !error && rows.length > 0 && (
         <>
-          <div style={{ display: "flex", gap: 18, marginBottom: 14, flexWrap: "wrap" }}>
-            <SectionLabel color={CP.accentRed}>{waiting.length} in attesa</SectionLabel>
-            <SectionLabel color={CP.textSecondary}>{cooling.length} si raffreddano</SectionLabel>
-            {data?.generated_at && (
-              <SectionLabel color={CP.textMuted}>
-                agg. {new Date(data.generated_at).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}{data.cached ? " · cache" : ""}
-              </SectionLabel>
-            )}
+          <HeroMetric
+            label="Fan che aspettano una risposta"
+            value={fmtInt(waiting.length)}
+            compare={waiting.length ? `Insieme hanno speso ${fmt$(waitingValue)}: sono i primi da riprendere.` : "Nessuno aspetta una risposta in questo momento."}
+            hint={data?.generated_at
+              ? `Aggiornato ${new Date(data.generated_at).toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}${data.cached ? " (dati salvati, non ricalcolati ora)" : ""}.`
+              : null}
+          >
+            <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+              <Metric label="Si stanno raffreddando" value={fmtInt(cooling.length)} />
+            </div>
+          </HeroMetric>
+
+          <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+            <FilterChip label={`Tutti · ${rows.length}`} active={filter === "all"} onClick={() => setFilter("all")} />
+            <FilterChip label={`Aspettano risposta · ${waiting.length}`} active={filter === "waiting"} onClick={() => setFilter("waiting")} />
+            <FilterChip label={`Si raffreddano · ${cooling.length}`} active={filter === "cooling"} onClick={() => setFilter("cooling")} />
           </div>
 
-          <CpCard padding="0" style={{ overflow: "hidden" }}>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ background: CP.surfaceAlt, borderBottom: `2px solid ${CP.border}` }}>
-                    <th style={{ ...th, textAlign: "left" }}>Fan</th>
-                    <th style={{ ...th, textAlign: "left" }}>Stato</th>
-                    <th style={th}>LTV</th>
-                    <th style={th}>Txn</th>
-                    <th style={th}>Da quanto</th>
-                    <th style={th}>Msg/30gg</th>
-                    <th style={{ ...th, textAlign: "center" }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => {
-                    const isWaiting = r.state === "waiting";
-                    const since = isWaiting ? r.hrs_since_fan : r.hrs_since_active;
-                    return (
-                      <tr key={r.username} style={{ borderBottom: `1px solid ${CP.borderSoft}` }}>
-                        <td style={{ padding: "9px 12px", textAlign: "left", fontFamily: FONTS.mono, fontSize: 13, color: CP.textPrimary }}>
-                          @{r.username}
-                        </td>
-                        <td style={{ padding: "9px 12px", textAlign: "left" }}>
-                          <span style={{
-                            display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 999, fontSize: 11, fontWeight: 600,
-                            background: (isWaiting ? CP.accentRed : CP.textMuted) + "1e",
-                            color: isWaiting ? CP.accentRed : CP.textSecondary,
-                          }}>
-                            {isWaiting ? <Clock size={12} /> : <Snowflake size={12} />}
-                            {isWaiting ? "In attesa" : "Si raffredda"}
-                          </span>
-                        </td>
-                        <td style={{ ...td, color: CP.accentGreen, fontWeight: 600 }}>{usd(r.ltv_usd)}</td>
-                        <td style={{ ...td, color: CP.textSecondary }}>{num(r.txns)}</td>
-                        <td style={{ ...td, color: isWaiting ? CP.accentRed : CP.textSecondary }}>{ago(since)}</td>
-                        <td style={{ ...td, color: CP.textMuted }}>{num(r.msgs_30d)}</td>
-                        <td style={{ padding: "9px 12px", textAlign: "center" }}>
-                          <button
-                            onClick={() => copyUser(r.username)}
-                            title="Copia lo username per la ricerca Infloww"
-                            style={{
-                              display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 7, cursor: "pointer",
-                              background: copied === r.username ? alpha(CP.accentGreen, "22") : CP.surfaceAlt,
-                              color: copied === r.username ? CP.accentGreen : CP.textSecondary,
-                              border: `1px solid ${CP.border}`, fontSize: 11.5, fontWeight: 600, fontFamily: FONTS.body,
-                            }}
-                          >
-                            {copied === r.username ? <Check size={13} /> : <Copy size={13} />}
-                            {copied === r.username ? "copiato" : "copia"}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CpCard>
+          <DataTable columns={columns} rows={visible.map((r) => ({ ...r, id: r.username }))} minWidth={780} maxHeight={640} />
 
-          <div style={{ marginTop: 12, fontSize: 11.5, color: CP.textMuted, lineHeight: 1.5 }}>
-            <span style={{ color: CP.accentRed }}>In attesa</span>: ha scritto, non risposto da 20 min a 48 h · <span style={{ color: CP.textSecondary }}>Si raffredda</span>: whale silenzioso da 3 a 21 giorni. LTV = spesa netta (riconciliata con le transazioni). Fonte: BigQuery <span style={{ fontFamily: FONTS.mono }}>ws_chat</span> + <span style={{ fontFamily: FONTS.mono }}>users_research</span>.
+          <div style={{ marginTop: 12, fontSize: 12, color: CP.textMuted, lineHeight: 1.6 }}>
+            <span style={{ color: CP.textSecondary }}>Aspetta risposta</span>: ha scritto e non ha avuto risposta da più di 20 minuti (fino a 48 ore).
+            {" "}<span style={{ color: CP.textSecondary }}>Si raffredda</span>: un fan che spende molto e non si fa sentire da 3 a 21 giorni.
+            {" "}Speso in tutto = spesa netta del fan, verificata sulle transazioni. Fonte: warehouse BigQuery (chat e anagrafica fan).
           </div>
         </>
       )}

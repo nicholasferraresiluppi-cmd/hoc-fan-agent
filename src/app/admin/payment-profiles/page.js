@@ -1,37 +1,31 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
-import useSWR from "swr";
-import { Search, Users, User, UsersRound, Tag, Layers, AlertCircle, Coins, Percent, Loader2 } from "lucide-react";
-import { CP, FONTS, alpha } from "@/lib/brand";
-import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
-
 /**
  * /admin/payment-profiles
  *
- * Vista aggregata di tutti i Payment Profiles attivi su CP.
- * Pensata per supportare l'esame degli scaglioni operatore: vedi a colpo
- * d'occhio quali profili esistono, raggruppati per "solo/coppia/triplo",
- * con scaglioni e creator collegati per ognuno.
+ * Elenco di tutti i profili di pagamento attivi su CreatorsPro: per ognuno
+ * quante persone lavorano nel turno, gli scaglioni (soglia → %) e le creator
+ * collegate. Serve per l'esame degli scaglioni operatore.
+ *
+ * Redesign 26/09/2026 (design system, pannello tester PAY/BOARD/SM/UX):
+ * - da ~350 card a UNA tabella ordinabile (tag, persone, scaglioni in riga):
+ *   si confrontano i profili senza scorrere decine di schermate;
+ * - "Creator coperti 0" sembrava un guasto: ora si dice perché è 0;
+ * - pannelli di debug in "Dettagli tecnici", chiusi.
+ * API e dati invariati.
  */
+
+import { useState, useMemo } from "react";
+import Link from "next/link";
+import useSWR from "swr";
+import { Search, Loader2 } from "lucide-react";
+import { CP, FONTS } from "@/lib/brand";
+import { fmt$, fmtInt, fmtPct } from "@/lib/format";
+import { PageHead, Metric, FilterChip, Disclosure, Notice, DataTable, card, NUM } from "@/components/ds";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
-const COSELLERS_LABEL = { 1: "Solo", 2: "Coppia", 3: "Triplo", 4: "Quartetto" };
-const COSELLERS_ICON = { 1: User, 2: UsersRound, 3: Users, 4: Users };
-// Famiglia viola-grigio per luminosità (DESIGN.md §4 Grafici) — 3 e 4 condividono l'accent (in UI sono aggregati "3+")
-const COSELLERS_COLOR = { 1: CP.textMuted, 2: CP.accentSoftText, 3: CP.accent, 4: CP.accent };
-
-function fmtPct(v) {
-  if (v == null) return "—";
-  // CP percentage sembra essere normalizzato 0..1 (es. 0.1 = 10%)
-  return `${(v * 100).toFixed(1)}%`;
-}
-function fmtCurrency(v) {
-  if (v == null) return "—";
-  return `$${Math.round(v).toLocaleString("it-IT")}`;
-}
+const COSELLERS_LABEL = { 1: "Da solo", 2: "In coppia", 3: "In tre", 4: "In quattro" };
 
 export default function PaymentProfilesPage() {
   const { data, error, isLoading, mutate } = useSWR("/api/admin/payment-profiles", fetcher, {
@@ -43,17 +37,18 @@ export default function PaymentProfilesPage() {
   const [cosellersFilter, setCosellersFilter] = useState("");
   const [tagFilter, setTagFilter] = useState("");
   const [showRaw, setShowRaw] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
 
   const profiles = data?.profiles || [];
 
-  // Tag distinct list per il dropdown
+  // Tag distinct list per il menu
   const allTags = useMemo(() => {
     const s = new Set();
     for (const p of profiles) if (p.tag) s.add(p.tag);
     return [...s].sort();
   }, [profiles]);
 
-  // Filtered list
+  // Filtered list (ordinata per tag, poi nome: resta l'ordine di partenza della tabella)
   const filtered = useMemo(() => {
     let list = profiles;
     if (search.trim()) {
@@ -69,7 +64,6 @@ export default function PaymentProfilesPage() {
       list = list.filter((p) => p.cosellersCount === n);
     }
     if (tagFilter) list = list.filter((p) => p.tag === tagFilter);
-    // sort: by tag, then name
     return [...list].sort((a, b) => {
       const t = (a.tag || "").localeCompare(b.tag || "");
       if (t !== 0) return t;
@@ -77,252 +71,156 @@ export default function PaymentProfilesPage() {
     });
   }, [profiles, search, cosellersFilter, tagFilter]);
 
-  // Group by tag for the visual grouping
-  const groupedByTag = useMemo(() => {
-    const groups = {};
-    for (const p of filtered) {
-      const k = p.tag || "(senza tag)";
-      (groups[k] = groups[k] || []).push(p);
-    }
-    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-  }, [filtered]);
+  const byC = data?.counts?.by_cosellers || {};
+  const n3plus = (byC["3"] ?? 0) + (byC["4"] ?? 0);
+  const creatorsCovered = data?.counts?.by_creator_count;
+
+  const columns = [
+    { key: "name", label: "Profilo", render: (p) => <span style={{ fontWeight: 500 }}>{p.name}</span> },
+    { key: "tag", label: "Tag", muted: true, render: (p) => p.tag || "senza tag" },
+    { key: "cosellersCount", label: "Persone nel turno", render: (p) => COSELLERS_LABEL[p.cosellersCount] || (p.cosellersCount != null ? `In ${p.cosellersCount}` : "—") },
+    { key: "thresholds", label: "Scaglioni (da $ → %)", sort: (p) => p.thresholds_count ?? 0, render: (p) => (
+      p.thresholds?.length ? (
+        <span style={{ ...NUM, whiteSpace: "nowrap" }}>
+          {p.thresholds.map((t, i) => (
+            <span key={t.id || i}>
+              {i > 0 && <span style={{ color: CP.textMuted }}> · </span>}
+              <span style={{ color: CP.textSecondary }}>{Number(t.threshold) > 0 ? `da ${fmt$(t.threshold)}` : "base"}</span> <span style={{ fontWeight: 500 }}>{fmtPct(t.percentage, 1)}</span>
+            </span>
+          ))}
+        </span>
+      ) : <span style={{ color: CP.textMuted }}>nessuno</span>
+    ) },
+    { key: "hourlyRate", label: "Paga oraria", align: "right", render: (p) => (p.hourlyRate > 0 ? `${fmt$(p.hourlyRate)}/h` : "—") },
+    { key: "links_count", label: "Creator collegate", sort: (p) => p.links_count ?? 0, render: (p) => {
+      const names = (p.links || []).map((l) => l.group?.name || (l.groupId ? `${String(l.groupId).slice(0, 8)}…` : "sconosciuta"));
+      if (!names.length) return <span style={{ color: CP.textMuted }}>—</span>;
+      const members = (p.links || []).map((l) => l.member?.name).filter(Boolean);
+      return (
+        <span title={(p.links || []).map((l) => `${l.group?.name || l.groupId || "?"}${l.member?.name ? ` · ${l.member.name}` : ""}`).join("\n")} style={{ fontSize: 13 }}>
+          {names.slice(0, 2).join(", ")}{names.length > 2 && <span style={{ color: CP.textMuted }}> +{names.length - 2}</span>}
+          {members.length > 0 && <div style={{ fontSize: 12, color: CP.textMuted }}>{members.slice(0, 2).join(", ")}{members.length > 2 ? ` +${members.length - 2}` : ""}</div>}
+        </span>
+      );
+    } },
+  ];
 
   return (
-    <div style={{ padding: "32px 28px 80px 28px", maxWidth: 1400, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
-      <PageHeader
-        breadcrumb={
-          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <span style={{ color: CP.textPrimary }}>Payment Profiles</span>
-          </div>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1400, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Comp & Ben" }, { label: "Profili di pagamento" }]}
+        title="Profili di pagamento"
+        subtitle="Tutti i profili di pagamento attivi su CreatorsPro, con i loro scaglioni: per vedere quali esistono, quali si somigliano e quali sono vecchi e vanno tolti."
+        actions={
+          <button onClick={() => mutate()} style={ghostBtn}>Ricarica da CreatorsPro</button>
         }
-        section="Data · Comp & Ben"
-        title="Profili Pagamento (CreatorsPro)"
-        subtitle="Vista aggregata di tutti i profili pagamento attivi su CP. Raggruppati per tag (= scenario operatore × creator), filtrabili per numerosità (solo/coppia/triplo). Per ogni profilo trovi scaglioni con soglia + percentuale e creator collegati."
       />
 
-      {/* Stat cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <StatCard label="Profili totali" value={isLoading ? "…" : (data?.total ?? "—")} />
-        <StatCard label="Solo (1 operatore)" value={data?.counts?.by_cosellers?.["1"] ?? "—"} color={COSELLERS_COLOR[1]} />
-        <StatCard label="Coppia (2 operatori)" value={data?.counts?.by_cosellers?.["2"] ?? "—"} color={COSELLERS_COLOR[2]} />
-        <StatCard label="3+ operatori" value={(data?.counts?.by_cosellers?.["3"] ?? 0) + (data?.counts?.by_cosellers?.["4"] ?? 0) || "—"} color={COSELLERS_COLOR[3]} />
-        <StatCard label="Tag distinti" value={data?.counts?.by_tag_count ?? "—"} />
-        <StatCard label="Creator coperti" value={data?.counts?.by_creator_count ?? "—"} sub={`su ${data?.groups_loaded ?? 0} groups CP`} />
-      </div>
-
-      {/* Filtri */}
-      <CpCard padding="16px 18px" style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <label style={lbl}>Cerca</label>
-            <div style={{ position: "relative" }}>
-              <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: CP.textMuted }} />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Nome profilo, tag o creator…"
-                style={{ ...input, paddingLeft: 32 }}
-              />
-            </div>
-          </div>
-          <div>
-            <label style={lbl}>Numerosità</label>
-            <select value={cosellersFilter} onChange={(e) => setCosellersFilter(e.target.value)} style={{ ...input, minWidth: 130, cursor: "pointer" }}>
-              <option value="" style={{ background: CP.surface }}>Tutte</option>
-              <option value="1" style={{ background: CP.surface }}>1 — Solo</option>
-              <option value="2" style={{ background: CP.surface }}>2 — Coppia</option>
-              <option value="3" style={{ background: CP.surface }}>3 — Triplo</option>
-              <option value="4" style={{ background: CP.surface }}>4 — Quartetto</option>
-            </select>
-          </div>
-          <div>
-            <label style={lbl}>Tag</label>
-            <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} style={{ ...input, minWidth: 200, cursor: "pointer" }}>
-              <option value="" style={{ background: CP.surface }}>Tutti ({allTags.length})</option>
-              {allTags.map((t) => <option key={t} value={t} style={{ background: CP.surface }}>{t}</option>)}
-            </select>
-          </div>
-          <button
-            onClick={() => mutate()}
-            style={{ padding: "9px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, cursor: "pointer" }}
-          >
-            Ricarica
-          </button>
-        </div>
-        <div style={{ marginTop: 10, fontSize: 12, color: CP.textMuted }}>
-          Mostrati <b style={{ color: CP.textPrimary }}>{filtered.length}</b> profili su {profiles.length}
-        </div>
-      </CpCard>
-
-      {error && (
-        <CpCard accent={CP.accentRed} padding="14px 18px" style={{ marginBottom: 20 }}>
-          <div style={{ color: CP.accentRed, display: "flex", alignItems: "center", gap: 10 }}>
-            <AlertCircle size={16} /> Errore caricamento: {String(error?.message || error)}
-          </div>
-        </CpCard>
-      )}
+      {(error || data?.error) && <Notice danger>Non riesco a leggere i profili da CreatorsPro: {String(data?.error || error?.message || error)}</Notice>}
 
       {isLoading && (
-        <CpCard padding="20px 24px">
-          <div style={{ display: "flex", alignItems: "center", gap: 12, color: CP.textSecondary, fontSize: 14 }}>
-            <Loader2 size={16} className="animate-spin" /> Carico tutti i payment profiles da CP…
-          </div>
-        </CpCard>
-      )}
-
-      {/* Lista raggruppata per tag */}
-      {!isLoading && groupedByTag.length === 0 && (
-        <CpCard padding="20px 24px">
-          <div style={{ color: CP.textMuted, fontSize: 13, fontStyle: "italic" }}>
-            Nessun profilo trovato con i filtri attuali.
-          </div>
-        </CpCard>
-      )}
-
-      {!isLoading && groupedByTag.map(([tag, items]) => (
-        <div key={tag} style={{ marginBottom: 28 }}>
-          <SectionLabel style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-            <Tag size={13} /> {tag}
-            <span style={{ color: CP.textMuted, fontSize: 11, fontFamily: FONTS.mono }}>· {items.length} profil{items.length === 1 ? "o" : "i"}</span>
-          </SectionLabel>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 12 }}>
-            {items.map((p) => <ProfileCard key={p.id} p={p} />)}
-          </div>
+        <div style={{ ...card, padding: "18px 20px", display: "flex", alignItems: "center", gap: 10, color: CP.textSecondary, fontSize: 14 }}>
+          <Loader2 size={16} className="animate-spin" /> Carico tutti i profili di pagamento da CreatorsPro…
         </div>
-      ))}
-
-      {/* DEBUG panel — vediamo se il link profilo→creator è popolato o no */}
-      {data?.debug && (
-        <CpCard accent="#F59E0B" padding="16px 20px" style={{ marginTop: 24, marginBottom: 20 }}>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: "#F59E0B", marginBottom: 10 }}>
-            🐛 Debug — perché "Creator coperti = 0"
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14, marginBottom: 14 }}>
-            <div>
-              <div style={{ fontSize: 11, color: CP.textMuted, marginBottom: 3 }}>Profili con creatorPaymentProfiles popolato</div>
-              <div style={{ fontFamily: FONTS.mono, fontSize: 18, color: data.debug.profiles_with_creatorPaymentProfiles_populated > 0 ? CP.accentGreen : CP.accentRed, fontWeight: 700 }}>
-                {data.debug.profiles_with_creatorPaymentProfiles_populated} / {data.total}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: CP.textMuted, marginBottom: 3 }}>Profili con array vuoto</div>
-              <div style={{ fontFamily: FONTS.mono, fontSize: 18, color: CP.textPrimary, fontWeight: 700 }}>
-                {data.debug.profiles_with_empty_creatorPaymentProfiles}
-              </div>
-            </div>
-          </div>
-          {data.debug.single_profile_probe && (
-            <details open>
-              <summary style={{ cursor: "pointer", color: CP.textSecondary, fontSize: 12, fontFamily: FONTS.mono }}>
-                Probe endpoint singolo profilo + varianti include/expand/with
-              </summary>
-              <div style={{ marginTop: 8 }}>
-                {data.debug.single_profile_probe.map((r) => (
-                  <div key={r.path} style={{ padding: "8px 10px", borderBottom: `1px solid ${CP.border}`, fontSize: 11, fontFamily: FONTS.mono }}>
-                    <div style={{ color: r.ok ? CP.accentGreen : CP.accentRed, display: "flex", justifyContent: "space-between" }}>
-                      <span>{r.path}</span>
-                      <span>HTTP {r.status ?? "ERR"}</span>
-                    </div>
-                    {r.sample && (
-                      <div style={{ marginTop: 4, color: CP.textSecondary, paddingLeft: 12, fontSize: 10 }}>
-                        keys: {r.sample.keys?.join(", ") || "—"}<br />
-                        cpp_count: <b style={{ color: r.sample.cpp_count > 0 ? CP.accentGreen : CP.textMuted }}>{r.sample.cpp_count ?? "—"}</b>
-                        {r.sample.cpp_first && (
-                          <pre style={{ marginTop: 6, padding: "6px 8px", background: CP.surfaceAlt, borderRadius: 4, fontSize: 10, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                            {JSON.stringify(r.sample.cpp_first, null, 2)}
-                          </pre>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
-        </CpCard>
       )}
 
-      {/* Validation panel: raw JSON dei primi 3 profili, per validare assunzioni */}
-      {data?.sample_first_3_profiles_raw && (
-        <CpCard padding="14px 18px" style={{ marginTop: 16 }}>
-          <button
-            onClick={() => setShowRaw((v) => !v)}
-            style={{ background: "transparent", border: "none", color: CP.textSecondary, cursor: "pointer", fontSize: 12, padding: 0, fontFamily: FONTS.mono }}
-          >
-            {showRaw ? "▼" : "▶"} Sample raw dei primi 3 profili (per debug/validazione)
-          </button>
-          {showRaw && (
-            <pre style={{ marginTop: 10, padding: "10px 12px", background: CP.surfaceAlt, borderRadius: 6, fontFamily: FONTS.mono, fontSize: 11, color: CP.textPrimary, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 480, overflow: "auto" }}>
-              {JSON.stringify(data.sample_first_3_profiles_raw, null, 2)}
-            </pre>
+      {data && !data.error && (
+        <>
+          <section style={{ ...card, padding: "16px 20px", marginBottom: 14, display: "flex", gap: 28, flexWrap: "wrap" }}>
+            <Metric label="Profili attivi" value={fmtInt(data.total)} />
+            <Metric label="Da solo" value={fmtInt(byC["1"] ?? 0)} />
+            <Metric label="In coppia" value={fmtInt(byC["2"] ?? 0)} />
+            <Metric label="In tre o più" value={fmtInt(n3plus)} />
+            <Metric label="Tag distinti" value={fmtInt(data.counts?.by_tag_count)} note="tag = scenario operatore × creator" />
+            <Metric label="Creator coperte" value={creatorsCovered ? fmtInt(creatorsCovered) : "n/d"} note={creatorsCovered ? `su ${fmtInt(data.groups_loaded ?? 0)} gruppi CreatorsPro` : "vedi nota sotto"} />
+          </section>
+
+          {!creatorsCovered && (
+            <Notice>
+              Il numero di creator coperte non è disponibile: CreatorsPro oggi non restituisce il collegamento profilo → creator per tutti i profili, quindi il conteggio risulterebbe 0 anche se i profili sono in uso. Le creator collegate si vedono comunque riga per riga, quando CreatorsPro le fornisce. I dettagli sono in “Dettagli tecnici” in fondo.
+            </Notice>
           )}
-        </CpCard>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+            <FilterChip label={`Tutti (${fmtInt(data.total)})`} active={cosellersFilter === ""} onClick={() => setCosellersFilter("")} />
+            {[1, 2, 3, 4].filter((n) => (byC[String(n)] ?? 0) > 0).map((n) => (
+              <FilterChip key={n} label={`${COSELLERS_LABEL[n]} (${byC[String(n)]})`} active={cosellersFilter === String(n)} onClick={() => setCosellersFilter(cosellersFilter === String(n) ? "" : String(n))} />
+            ))}
+            <span style={{ flex: 1 }} />
+            <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} aria-label="Tag" style={{ ...input, width: "auto", minWidth: 200, cursor: "pointer" }}>
+              <option value="">Tutti i tag ({allTags.length})</option>
+              {allTags.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <div style={{ position: "relative", flex: "0 1 280px", minWidth: 200 }}>
+              <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: CP.textMuted }} />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Profilo, tag o creator" aria-label="Cerca" style={{ ...input, paddingLeft: 32 }} />
+            </div>
+          </div>
+          <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 8 }}>
+            {fmtInt(filtered.length)} profili su {fmtInt(profiles.length)} · ordinati per tag e nome, clicca un'intestazione per riordinare · passa sulle creator per l'elenco completo
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <DataTable columns={columns} rows={filtered.map((p) => ({ ...p, id: p.id }))} minWidth={1040} maxHeight={720}
+              empty={profiles.length ? "Nessun profilo con questi filtri. Togli un filtro o cambia la ricerca." : "CreatorsPro non ha restituito profili di pagamento."} />
+          </div>
+
+          {(data.debug || data.sample_first_3_profiles_raw) && (
+            <Disclosure open={showDebug} onToggle={() => setShowDebug(!showDebug)} title="Dettagli tecnici" summary="Per chi fa manutenzione: collegamento profilo → creator e dati grezzi">
+              {data.debug && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ display: "flex", gap: 28, flexWrap: "wrap", marginBottom: 10 }}>
+                    <Metric label="Profili con creator collegate" value={`${fmtInt(data.debug.profiles_with_creatorPaymentProfiles_populated)} su ${fmtInt(data.total)}`} />
+                    <Metric label="Profili senza collegamento" value={fmtInt(data.debug.profiles_with_empty_creatorPaymentProfiles)} />
+                  </div>
+                  {data.debug.single_profile_probe && (
+                    <div style={{ fontSize: 12, color: CP.textSecondary }}>
+                      <div style={{ marginBottom: 6 }}>Prove sull'API del singolo profilo:</div>
+                      {data.debug.single_profile_probe.map((r) => (
+                        <div key={r.path} style={{ padding: "6px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                            <code style={{ wordBreak: "break-all" }}>{r.path}</code>
+                            <span style={{ color: r.ok ? CP.textSecondary : CP.accentRed, whiteSpace: "nowrap" }}>HTTP {r.status ?? "errore"}</span>
+                          </div>
+                          {r.sample && (
+                            <div style={{ marginTop: 4, color: CP.textMuted, paddingLeft: 12 }}>
+                              campi: {r.sample.keys?.join(", ") || "—"} · collegamenti: {r.sample.cpp_count ?? "—"}
+                              {r.sample.cpp_first && (
+                                <pre style={{ marginTop: 6, padding: "6px 8px", background: CP.surfaceAlt, borderRadius: 6, fontSize: 11, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                                  {JSON.stringify(r.sample.cpp_first, null, 2)}
+                                </pre>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {data.sample_first_3_profiles_raw && (
+                <>
+                  <button onClick={() => setShowRaw((v) => !v)} style={{ ...ghostBtn, padding: "6px 10px", fontSize: 12 }}>
+                    {showRaw ? "Nascondi" : "Mostra"} i dati grezzi dei primi 3 profili
+                  </button>
+                  {showRaw && (
+                    <pre style={{ marginTop: 10, padding: "10px 12px", background: CP.surfaceAlt, borderRadius: 6, fontSize: 11, color: CP.textPrimary, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 480, overflow: "auto" }}>
+                      {JSON.stringify(data.sample_first_3_profiles_raw, null, 2)}
+                    </pre>
+                  )}
+                </>
+              )}
+            </Disclosure>
+          )}
+
+          <div style={{ fontSize: 12, color: CP.textMuted }}>
+            Per vedere come questi scaglioni pesano sul venduto di ogni creator: <Link href="/admin/profiles-compare" style={{ color: CP.accentSoftText }}>Scaglioni a confronto</Link>.
+          </div>
+        </>
       )}
     </div>
   );
 }
 
-function ProfileCard({ p }) {
-  const Icon = COSELLERS_ICON[p.cosellersCount] || Users;
-  const color = COSELLERS_COLOR[p.cosellersCount] || CP.textMuted;
-  return (
-    <CpCard accent={color} padding="14px 16px">
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 8, background: alpha(color, "22"), display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <Icon size={18} color={color} />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: FONTS.display, fontSize: 14, fontWeight: 700, color: CP.textPrimary, lineHeight: 1.25 }}>{p.name}</div>
-          <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
-            <span style={badge(color)}>{COSELLERS_LABEL[p.cosellersCount] || `${p.cosellersCount} pers`}</span>
-            {p.hourlyRate > 0 && <span style={badge("#8F8A82")}><Coins size={9} style={{ marginRight: 3 }} />{fmtCurrency(p.hourlyRate)}/h</span>}
-            {p.thresholds_count > 0 && <span style={badge(CP.accentGreen)}><Layers size={9} style={{ marginRight: 3 }} />{p.thresholds_count} scaglion{p.thresholds_count === 1 ? "e" : "i"}</span>}
-            {p.links_count > 0 && <span style={badge(CP.accentSoftText)}>{p.links_count} link</span>}
-          </div>
-        </div>
-      </div>
-
-      {/* Scaglioni */}
-      {p.thresholds && p.thresholds.length > 0 && (
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 10, color: CP.textMuted, letterSpacing: 0.6, fontFamily: FONTS.mono, marginBottom: 6 }}>Scaglioni</div>
-          <div style={{ background: CP.surfaceAlt, borderRadius: 6, overflow: "hidden" }}>
-            {p.thresholds.map((t, i) => (
-              <div key={t.id || i} style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 10, padding: "6px 10px", borderBottom: i < p.thresholds.length - 1 ? `1px solid ${CP.border}` : "none", fontSize: 12 }}>
-                <span style={{ fontFamily: FONTS.mono, color: CP.textMuted, fontSize: 10 }}>#{i + 1}</span>
-                <span style={{ fontFamily: FONTS.mono, color: CP.textSecondary }}>da {fmtCurrency(t.threshold)}</span>
-                <span style={{ fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 3 }}>
-                  <Percent size={10} /> {fmtPct(t.percentage)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Creator collegati */}
-      {p.links && p.links.length > 0 && (
-        <details style={{ fontSize: 12 }}>
-          <summary style={{ cursor: "pointer", color: CP.textSecondary, fontSize: 11, fontFamily: FONTS.mono, letterSpacing: 0.6 }}>
-            Creator collegati ({p.links.length})
-          </summary>
-          <div style={{ marginTop: 6 }}>
-            {p.links.slice(0, 20).map((l, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: `1px solid ${CP.border}`, fontSize: 11 }}>
-                <span style={{ color: CP.textPrimary, fontWeight: 500 }}>{l.group?.name || (l.groupId ? <code style={{ fontFamily: FONTS.mono, color: CP.textMuted }}>{String(l.groupId).slice(0, 8)}…</code> : "(group unknown)")}</span>
-                {l.member?.name && <span style={{ color: CP.textMuted, fontFamily: FONTS.mono }}>{l.member.name}</span>}
-              </div>
-            ))}
-            {p.links.length > 20 && <div style={{ marginTop: 4, fontSize: 10, color: CP.textMuted, fontStyle: "italic" }}>+ altri {p.links.length - 20} non mostrati</div>}
-          </div>
-        </details>
-      )}
-    </CpCard>
-  );
-}
-
-const lbl = { display: "block", fontSize: 10, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
-const input = { width: "100%", padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
-const badge = (c) => ({ display: "inline-flex", alignItems: "center", padding: "2px 7px", borderRadius: 4, background: alpha(c, "22"), color: c, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, border: `1px solid ${alpha(c, "55")}` });
+const input = { width: "100%", padding: "8px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, outline: "none", boxSizing: "border-box" };
+const ghostBtn = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textSecondary, fontSize: 13, fontFamily: FONTS.body, cursor: "pointer" };
