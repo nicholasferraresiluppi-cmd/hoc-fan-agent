@@ -180,6 +180,14 @@ export const CP_CARTA = {
   scrim: "rgba(28,24,16,.38)", cool: "#2a569f", warm: "#1b6b49", heroBg: "#fffefb",
 };
 
+// Menu notte sotto Carta: stesso schema di CP_NOTTE ma col nero CALDO, così il
+// menu scuro appartiene al mondo della carta invece di sembrare un'altra app.
+export const CP_NOTTE_CALDA = {
+  ...CP_NOTTE,
+  bgSunken: "#1a1813", bg: "#1a1813", surface: "#221f19", surfaceAlt: "#2b2820", heroBg: "#221f19",
+  textMuted: "#a39d90", mutedIcons: "#807a6e", hover: "rgba(255,245,225,.04)",
+};
+
 // Scala per i DATI (sequenziale, separata dall'accento viola che è per ciò che si
 // clicca): chiaro = valore basso. Una tinta, 5 passi, per tema.
 export const DATA_SCALE = {
@@ -205,6 +213,9 @@ export function themeCss() {
     // stile v3 in anteprima (vince per specificità/ordine sui due temi attuali)
     + `:root[data-style="v3"]{${vars(CP_NOTTE)}${fontV3}color-scheme:dark}`
     + `:root[data-style="v3"][data-theme="light"]{${vars(CP_CARTA)}color-scheme:light}`
+    // Menu laterale v3: sempre notte, anche in Carta (dove il nero è CALDO)
+    + `:root[data-style="v3"] .hoc-side{${vars(CP_NOTTE)}color-scheme:dark}`
+    + `:root[data-style="v3"][data-theme="light"] .hoc-side{${vars(CP_NOTTE_CALDA)}}`
     // Segnaposto sempre tenue: nel tema scuro gli esempi sembravano dati inseriti
     + `::placeholder{color:var(--cp-textMuted);opacity:.65}`;
 }

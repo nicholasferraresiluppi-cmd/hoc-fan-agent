@@ -14,6 +14,7 @@
  */
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { Menu, X } from "lucide-react";
 import Sidebar from "./Sidebar";
 import ErrorBoundary from "./ErrorBoundary";
@@ -22,6 +23,11 @@ import WelcomeAttestato from "./WelcomeAttestato";
 import { SecurityBanner, FeedbackButton, ViewAsBanner } from "./AppHelpers";
 import { CP } from "@/lib/brand";
 import { uxPageChange } from "@/lib/ux-client";
+import { useStyle } from "@/lib/theme-client";
+import { V3TopBar, V3MobileHeader, V3TabBar } from "./ShellV3";
+
+// Command bar (stile v3): scaricata solo alla prima apertura
+const CommandBar = dynamic(() => import("./CommandBar"), { ssr: false });
 
 function isAuthRoute(path) {
   return path.startsWith("/sign-in") || path.startsWith("/sign-up");
@@ -37,6 +43,35 @@ function isBareRoute(path) {
 export default function AppShell({ children }) {
   const pathname = usePathname() || "";
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Stile v3 in anteprima: guscio nuovo (barra ⌘K + stato dati, barra da telefono).
+  // Senza data-style="v3" nulla di questo viene reso.
+  const [style] = useStyle();
+  const v3 = style === "v3";
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [cmdLoaded, setCmdLoaded] = useState(false);
+  const openCmd = () => { setCmdLoaded(true); setCmdOpen(true); setMobileOpen(false); };
+
+  // ⌘K / Ctrl+K globale, solo nello stile v3
+  useEffect(() => {
+    if (!v3) { setCmdOpen(false); return; }
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && String(e.key).toLowerCase() === "k") {
+        e.preventDefault();
+        setCmdLoaded(true);
+        setCmdOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [v3]);
+
+  // Esc chiude il drawer da telefono (solo v3: lo stile attuale resta com'è)
+  useEffect(() => {
+    if (!mobileOpen || !v3) return;
+    const onKey = (e) => { if (e.key === "Escape") setMobileOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileOpen, v3]);
   // Desktop/telefono deciso dal CSS (classi hoc-desk / hoc-mob / hoc-main in
   // globals.css), non da JS dopo l'idratazione: prima il telefono disegnava il
   // layout desktop (sidebar + margine 248px) e poi saltava (revisione 26/09).
@@ -71,8 +106,8 @@ export default function AppShell({ children }) {
 
       {/* Mobile: drawer + backdrop */}
       <div className="hoc-mob">
-          {/* Mobile header bar */}
-          <div style={{
+          {/* Mobile header bar (stile attuale; nascosta dal CSS sotto v3) */}
+          <div className="hoc-mhead-v2" style={{
             position: "sticky", top: 0, zIndex: 40,
             background: CP.bgSunken,
             borderBottom: `1px solid ${CP.border}`,
@@ -89,6 +124,8 @@ export default function AppShell({ children }) {
             <div style={{ color: CP.textPrimary, fontWeight: 700, fontSize: 14 }}>HOC Pro</div>
             <div style={{ width: 22 }} />
           </div>
+
+          {v3 && <ErrorBoundary silent label="V3MobileHeader"><V3MobileHeader onSearch={openCmd} onMenu={() => setMobileOpen(true)} /></ErrorBoundary>}
 
           {mobileOpen && (
             <>
@@ -108,12 +145,18 @@ export default function AppShell({ children }) {
               </div>
             </>
           )}
+          {v3 && <ErrorBoundary silent label="V3TabBar"><V3TabBar pathname={pathname} onMore={() => setMobileOpen(true)} moreOpen={mobileOpen} /></ErrorBoundary>}
       </div>
 
       <main className="hoc-main" style={{
         minHeight: "100vh",
         background: CP.bg,
       }}>
+        {v3 && (
+          <ErrorBoundary silent label="V3TopBar">
+            <V3TopBar onSearch={openCmd} />
+          </ErrorBoundary>
+        )}
         <ErrorBoundary silent label="ViewAsBanner">
           <ViewAsBanner />
         </ErrorBoundary>
@@ -124,6 +167,12 @@ export default function AppShell({ children }) {
           {children}
         </ErrorBoundary>
       </main>
+
+      {v3 && cmdLoaded && (
+        <ErrorBoundary silent label="CommandBar">
+          <CommandBar open={cmdOpen} onClose={() => setCmdOpen(false)} />
+        </ErrorBoundary>
+      )}
 
       <ErrorBoundary silent label="FeedbackButton">
         <FeedbackButton />
