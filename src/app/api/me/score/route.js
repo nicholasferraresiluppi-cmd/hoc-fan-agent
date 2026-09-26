@@ -84,7 +84,10 @@ export async function GET(request) {
   try {
     const h = await loadHistoryForEmployee({ employee: mine.employee, periodType: "monthly", limit: 12 });
     history = (h || [])
-      .map((x) => ({ period_id: x.period_id, score: x.score, tier: x.tier }))
+      // mese non lavorato (inattivo/escluso) = dato mancante, non uno 0 nel grafico (come /api/me/ladder)
+      .map((x) => (x.inactive || x.excluded_reason
+        ? { period_id: x.period_id, score: null, tier: null, no_data: true }
+        : { period_id: x.period_id, score: x.score, tier: x.tier }))
       .sort((a, b) => String(a.period_id).localeCompare(String(b.period_id))); // cronologico per il grafico
   } catch {}
 

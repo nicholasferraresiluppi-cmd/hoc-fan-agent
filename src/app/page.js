@@ -177,6 +177,10 @@ export default function Home() {
   const { data: whoamiRaw } = useSWR(swrKey ? "/api/whoami" : null);
   const { data: dailyDrillRaw } = useSWR(swrKey ? "/api/daily-drill" : null);
   const { data: profileRaw } = useSWR(swrKey ? "/api/profile" : null);
+  // Il lavoro vero prima dell'allenamento: se l'account è collegato a un operatore,
+  // la home mostra il suo score del mese (pannello 26/09: un'operatrice che vende
+  // bene vedeva solo "Junior 0/30 · unranked" del simulatore).
+  const { data: myWorkScore } = useSWR(swrKey ? "/api/me/score" : null);
 
   const meStats = meStatsRaw?.skills ? meStatsRaw : null;
   const dailyDrill = dailyDrillRaw || null;
@@ -585,6 +589,18 @@ export default function Home() {
         {/* Hero: progresso + azioni principali (sx) · card giocatore (dx) */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 28, alignItems: "flex-start" }}>
           <div style={{ flex: "1 1 420px", minWidth: 0, display: "flex", flexDirection: "column", gap: 14 }}>
+            {typeof myWorkScore?.score === "number" && (
+              <Link href="/me/score" style={{ ...card, padding: "16px 18px", textDecoration: "none", color: CP.textPrimary, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontSize: 13, color: CP.textSecondary }}>Il tuo lavoro · score mestiere del mese</div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 2 }}>
+                    <span style={{ fontSize: 28, fontWeight: 500, ...NUM }}>{myWorkScore.score.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
+                    {myWorkScore.tier && <span style={{ fontSize: 13, color: CP.textSecondary }}>{myWorkScore.tier}</span>}
+                  </div>
+                </div>
+                <span style={{ fontSize: 13, color: CP.accent }}>Vedi Vendite e Mestiere →</span>
+              </Link>
+            )}
             {!meStats && !meStatsErr && !(meStatsRaw && !meStats) && (
               <div style={{ ...card, padding: "16px 18px" }}>
                 <XPBarSkeleton />
@@ -604,6 +620,16 @@ export default function Home() {
               const prev = tier === "junior" ? 0 : tier === "senior" ? THRESHOLDS.junior : THRESHOLDS.senior;
               const pct = isMax ? 100 : Math.min(100, Math.max(0, Math.round(((sess - prev) / (target - prev)) * 100)));
               const remaining = isMax ? 0 : Math.max(0, target - sess);
+              if (sess === 0) {
+                return (
+                  <div style={{ ...card, padding: "16px 18px" }}>
+                    <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Il tuo primo allenamento</div>
+                    <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 4, lineHeight: 1.5 }}>
+                      Scegli uno scenario: chatti con un fan simulato per una decina di minuti e ricevi subito un riscontro su cosa ha funzionato. Qui non si vince né si perde niente: è palestra.
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div style={{ ...card, padding: "16px 18px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, fontSize: 13, gap: 12 }}>
@@ -651,7 +677,7 @@ export default function Home() {
 
           {/* Card giocatore (scheletro finché meStats non è arrivato) */}
           <div style={{ flex: "0 1 320px", minWidth: 0, display: "flex", justifyContent: "center", margin: "0 auto" }}>
-            {meStats ? (
+            {meStats && !(meStats.totalSessions > 0) ? null : meStats ? (
               (() => {
                 const POS = { operator: "OP", team_lead: "TL", sales_manager: "SM", qa_reviewer: "QA", admin: "AD" };
                 const primary = roleInfo?.roles?.find((r) => POS[r]) || roleInfo?.role || "operator";

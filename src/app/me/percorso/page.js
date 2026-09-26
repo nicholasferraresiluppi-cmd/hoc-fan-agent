@@ -62,7 +62,7 @@ export default function MyLadderPage() {
           )}
 
           <p style={{ fontSize: 14, color: CP.textSecondary, lineHeight: 1.6, margin: "4px 0 22px", maxWidth: 760 }}>
-            I passaggi di livello si basano sullo <span style={{ color: CP.textPrimary, fontWeight: 500 }}>score mestiere</span> (come chatti, rispetto al tuo gruppo). Per salire non basta un mese buono: serve stare sopra la soglia in più mesi. Le fasce vanno da Critical (il 10% più basso) a Elite (il 10% più alto).
+            I passaggi di livello si basano sullo <span style={{ color: CP.textPrimary, fontWeight: 500 }}>score mestiere</span> (come chatti, rispetto al tuo gruppo). Per salire non basta un mese buono: serve stare sopra la soglia in più mesi. Le fasce vanno da Critical a Elite. I mesi in cui non hai lavorato non contano: non sono né sopra né sotto la soglia.
           </p>
 
           <SectionTitle aside="un riquadro per ogni passaggio di livello">I passaggi</SectionTitle>
@@ -77,7 +77,7 @@ export default function MyLadderPage() {
                       <CheckCircle2 size={13} /> performance raggiunta
                     </span>
                   ) : (
-                    <span style={{ fontSize: 13, color: CP.textMuted, ...NUM }}>{perf.evaluable ? `${perf.hits} mesi su ${perf.needed} necessari${perf.below_floor ? ` · ${perf.below_floor} sotto il minimo` : ""}` : "storico non ancora sufficiente"}</span>
+                    <span style={{ fontSize: 13, color: CP.textMuted, ...NUM }}>{perf.evaluable ? `${perf.hits} mesi su ${perf.needed} necessari${perf.below_floor ? ` · ${perf.below_floor} sotto il minimo` : ""}` : "servono ancora mesi di lavoro per valutarlo: non è un problema, è solo presto"}</span>
                   )}
                 </div>
                 <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 12px", lineHeight: 1.55 }}>

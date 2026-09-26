@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Award } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
+import { CREATOR_PERSONAS } from "@/lib/creator-personas";
 import { PageHead, SectionTitle, Notice, card, NUM } from "@/components/ds";
 
 // Ridisegno sul design system 26/09/2026: stessa fonte (/api/profile), stessi
@@ -62,6 +63,12 @@ export default function CertificationsPage() {
       </section>
 
       {loading && <p style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</p>}
+      {/* Le certificazioni seguono le creator che hanno un personaggio nel simulatore
+          (lib/creator-personas). Senza questa nota un operatore vedeva
+          "creator che non sono le mie" e pensava a un errore (pannello tester 26/09). */}
+      <Notice>
+        Le certificazioni si ottengono nel simulatore, e oggi il simulatore ha i personaggi di {CREATOR_PERSONAS.length} creator: {CREATOR_PERSONAS.map((c) => c.name).join(", ")}. Se lavori su altre creator, allenarti su queste vale comunque: le tecniche sono le stesse. Le altre creator arriveranno.
+      </Notice>
       {!loading && failed && <Notice danger>Errore di rete: le certificazioni non si sono caricate. Riprova tra poco.</Notice>}
       {!loading && !failed && certs.length === 0 && (
         <div style={{ ...card, padding: "18px 20px", fontSize: 14, color: CP.textSecondary }}>

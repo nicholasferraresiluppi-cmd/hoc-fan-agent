@@ -149,6 +149,7 @@ export async function loadHistoryForEmployee({ employee, periodType, limit = 999
       language: r.language || null,
       creators: r.creators || [],
       excluded_reason: r._excluded_reason || null,
+      inactive: !!r._inactive,
     });
   }
   // oldest first per grafico timeline
