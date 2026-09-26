@@ -29,3 +29,28 @@ export function useTheme() {
   }, []);
   return [theme, setTheme];
 }
+
+// Stile v3 "Notte / Carta" in anteprima (26/09/2026): data-style="v3" su <html>.
+const SKEY = "hoc:style";
+const SEVT = "hoc:style-change";
+export function getStyle() {
+  if (typeof document === "undefined") return "v2";
+  return document.documentElement.getAttribute("data-style") === "v3" ? "v3" : "v2";
+}
+export function setStyle(v) {
+  const st = v === "v3" ? "v3" : "v2";
+  if (st === "v3") document.documentElement.setAttribute("data-style", "v3");
+  else document.documentElement.removeAttribute("data-style");
+  try { localStorage.setItem(SKEY, st); } catch {}
+  window.dispatchEvent(new CustomEvent(SEVT, { detail: st }));
+}
+export function useStyle() {
+  const [st, set] = useState("v2");
+  useEffect(() => {
+    set(getStyle());
+    const on = () => set(getStyle());
+    window.addEventListener(SEVT, on);
+    return () => window.removeEventListener(SEVT, on);
+  }, []);
+  return [st, setStyle];
+}

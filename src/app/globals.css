@@ -5,11 +5,11 @@
 @tailwind utilities;
 
 * {
-  font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--cp-font, 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif);
 }
 
 body {
-  font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--cp-font, 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif);
   background-color: var(--cp-bg);
   color: var(--cp-textPrimary);
 }
@@ -19,9 +19,11 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 500;
 }
 
-p, a, span {
+/* Solo stile attuale: nello stile v3 non si forza il peso degli span (rompeva i grassetti) */
+:root:not([data-style="v3"]) p, :root:not([data-style="v3"]) a, :root:not([data-style="v3"]) span {
   font-weight: 400;
 }
+
 
 .caption {
   font-weight: 300;
