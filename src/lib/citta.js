@@ -10,7 +10,7 @@ const MAX_SPACES = 200;
 const str = (v, n = 120) => String(v ?? "").slice(0, n);
 const int = (v) => Math.max(0, Math.min(1e6, Math.round(Number(v) || 0)));
 
-const STATES = new Set(["ok", "wait", "stop", "none"]);
+const STATES = new Set(["ok", "wait", "stop", "none", "old"]);
 const cleanArea = (a) => ({
   n: str(a?.n, 30),
   s: STATES.has(a?.s) ? a.s : "none",
