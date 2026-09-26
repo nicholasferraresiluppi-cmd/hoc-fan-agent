@@ -10,11 +10,20 @@
  * Vista 2 (supervisione attiva): team live con venduto vs soglie mid/top,
  * feed take (batch CP ~18 min — timestamp dichiarato), check profilo,
  * guadagni CM con override in SHADOW MODE (§10.3 docs/CAREER_LADDER.md).
+ *
+ * Redesign 26/09/2026 sul design system (superficie del team lead / CM, spesso
+ * da telefono): testata DS; apertura turno in passi numerati (fascia → chi
+ * segui → inizia) col motivo quando "Inizia" è spento; numero principale del
+ * turno = venduto del team con quanti sono sopra la soglia alta; gergo tradotto
+ * (wage-shift, take, mid/top, override in shadow mode, gate L2→L3); barre soglia
+ * piatte (niente gradienti); tabelle DS che scorrono dentro di sé a 390px.
+ * Logica, polling, chiamate e payload invariati.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, AlertCircle, Radio, Play, Square, RefreshCw, UserPlus, ShieldAlert } from "lucide-react";
+import { Loader2, Radio, Play, Square, RefreshCw, UserPlus, ShieldAlert, X } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
-import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
+import { fmt$ } from "@/lib/format";
+import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, DataTable, card, NUM } from "@/components/ds";
 
 const LIVE_POLL_MS = 120_000;
 const QUICK_TAGS = [
@@ -25,7 +34,6 @@ const QUICK_TAGS = [
   "Segnalato: profilo errato",
   "Ritardo/assenza",
 ];
-const fmt$ = (n) => (n == null ? "—" : `$${Number(n).toLocaleString("it-IT", { maximumFractionDigits: 0 })}`);
 const fmt$2 = (n) => (n == null ? "—" : `$${Number(n).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 // SEMPRE ora italiana esplicita (mai browser-local): un CM all'estero deve
 // vedere gli stessi orari di chi pianifica i turni. Etichetta in UI.
@@ -52,12 +60,12 @@ const coversNow = (r) => {
   return s <= now && now < e;
 };
 
-/* Barra venduto vs soglie mid/top (scala = top × 1.5, come mockup) */
+/* Barra venduto vs soglie intermedia/alta (scala = soglia alta × 1.5). Piatta. */
 function ThresholdBar({ venduto, thresholds }) {
   const top = thresholds?.top;
   const mid = thresholds?.mid;
   if (top == null || mid == null) {
-    return <div style={{ fontSize: 11, color: CP.textMuted }}>soglie n/d {thresholds?.band ? `(${thresholds.band})` : ""}</div>;
+    return <div style={{ fontSize: 12, color: CP.textMuted }}>soglie non disponibili{thresholds?.band ? ` (${thresholds.band})` : ""}</div>;
   }
   const scale = top * 1.5;
   const w = Math.min(100, ((venduto || 0) / scale) * 100);
@@ -66,30 +74,32 @@ function ThresholdBar({ venduto, thresholds }) {
   const over = (venduto || 0) >= top;
   return (
     <div style={{ minWidth: 170 }}>
-      <div style={{ position: "relative", height: 9, borderRadius: 99, background: CP.surfaceAlt, border: `1px solid ${CP.border}` }}>
-        <div style={{ position: "absolute", inset: "0 auto 0 0", width: `${w}%`, borderRadius: 99, background: over ? `linear-gradient(90deg, ${CP.accent}, ${CP.accentGreen})` : `linear-gradient(90deg, ${CP.accentDim}, ${CP.accent})` }} />
+      <div style={{ position: "relative", height: 8, borderRadius: 99, background: CP.surfaceAlt }}>
+        <div style={{ position: "absolute", inset: "0 auto 0 0", width: `${w}%`, borderRadius: 99, background: over ? CP.accent : alpha(CP.accent, "88") }} />
         <div style={{ position: "absolute", top: -3, bottom: -3, left: `${midPct}%`, width: 2, background: CP.textMuted }} />
-        <div style={{ position: "absolute", top: -3, bottom: -3, left: `${topPct}%`, width: 2, background: CP.textSecondary }} />
+        <div style={{ position: "absolute", top: -3, bottom: -3, left: `${topPct}%`, width: 2, background: CP.textPrimary }} />
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: CP.textMuted, marginTop: 4, fontFamily: FONTS.mono }}>
-        <span>mid {mid}</span><span>top {top}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: CP.textMuted, marginTop: 4, ...NUM }}>
+        <span>intermedia {fmt$(mid)}</span><span>alta {fmt$(top)}</span>
       </div>
     </div>
   );
 }
 
-function StatusPill({ op }) {
+function statusOf(op) {
   const t = op.thresholds;
-  const style = (color, bg, border) => ({
-    display: "inline-block", fontSize: 11, fontWeight: 600, borderRadius: 99,
-    padding: "2px 10px", color, background: bg, border: `1px solid ${border}`, whiteSpace: "nowrap",
-  });
-  if (op.off_schedule) return <span style={style(CP.accentRed, "rgba(240,140,140,0.08)", "rgba(240,140,140,0.4)")}>Fuori programma</span>;
-  if (!op.wage_shift_found) return <span style={style(CP.textMuted, CP.surface, CP.border)}>Nessun wage-shift</span>;
-  if (t?.top != null && op.venduto >= t.top) return <span style={style(CP.accentGreen, "rgba(74,222,128,0.07)", "rgba(74,222,128,0.35)")}>Sopra top · ecc. {fmt$(op.excess)}</span>;
-  if (t?.mid != null && op.venduto >= t.mid) return <span style={style(CP.accentSoftText, "rgba(139,124,246,0.08)", "rgba(139,124,246,0.4)")}>Verso top · −{fmt$((t.top ?? 0) - op.venduto)}</span>;
-  if (t?.mid != null) return <span style={style(CP.textMuted, CP.surface, CP.border)}>Sotto mid · −{fmt$(t.mid - (op.venduto || 0))}</span>;
-  return <span style={style(CP.textMuted, CP.surface, CP.border)}>—</span>;
+  if (op.off_schedule) return { label: "Fuori programma", tone: "danger" };
+  if (!op.wage_shift_found) return { label: "Turno non trovato in CP", tone: "muted" };
+  if (t?.top != null && op.venduto >= t.top) return { label: `Sopra la soglia alta · +${fmt$(op.excess)}`, tone: "good" };
+  if (t?.mid != null && op.venduto >= t.mid) return { label: `Mancano ${fmt$((t.top ?? 0) - op.venduto)} alla soglia alta`, tone: "accent" };
+  if (t?.mid != null) return { label: `Mancano ${fmt$(t.mid - (op.venduto || 0))} alla intermedia`, tone: "muted" };
+  return { label: "—", tone: "muted" };
+}
+
+function StatusPill({ op }) {
+  const s = statusOf(op);
+  const color = s.tone === "danger" ? CP.accentRed : s.tone === "good" ? CP.accentGreen : s.tone === "accent" ? CP.accentSoftText : CP.textMuted;
+  return <span style={{ fontSize: 13, color, whiteSpace: "nowrap" }}>{s.label}</span>;
 }
 
 export default function CmCockpitPage() {
@@ -325,206 +335,161 @@ export default function CmCockpitPage() {
   }, [live]);
 
   /* ---------- render ---------- */
-  const shell = (children) => (
-    <div style={{ padding: "32px 28px 80px 28px", maxWidth: 1200, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
-      <PageHeader
-        section="People · Supervisione"
+  const shell = (children, actions) => (
+    <div style={{ padding: "28px 24px 80px", maxWidth: 1180, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "People" }, { label: "Cockpit CM" }]}
         title="Cockpit CM"
-        subtitle="Turno di supervisione: team live, soglie, guadagni (override in shadow mode)."
+        subtitle="Il tuo turno di supervisione: scegli chi segui, guarda in diretta quanto vende ciascuno rispetto alle sue soglie e chiudi con una nota per persona. Qui vedi anche quanto hai maturato nel mese."
+        actions={actions}
       />
-      {error ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(240,140,140,0.08)", border: `1px solid rgba(240,140,140,0.4)`, borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: CP.accentRed }}>
-          <AlertCircle size={15} /> {error}
-        </div>
-      ) : null}
+      {error ? <Notice danger>{error}</Notice> : null}
       {children}
     </div>
   );
+  const spinner = (text) => (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", color: CP.textMuted, fontSize: 14 }}><Loader2 size={15} className="animate-spin" /> {text}</div>
+  );
 
-  if (phase === "loading") {
-    return shell(<div style={{ display: "flex", gap: 8, alignItems: "center", color: CP.textMuted, fontSize: 13 }}><Loader2 size={15} className="animate-spin" /> Carico…</div>);
-  }
+  if (phase === "loading") return shell(spinner("Carico…"));
   if (phase === "denied") {
-    return shell(<CpCard><div style={{ fontSize: 13, color: CP.textSecondary }}>Non hai accesso al cockpit. Serve il ruolo Team Lead (o superiore) — chiedi a un admin da <code>/admin/ruoli</code>.</div></CpCard>);
+    return shell(<Notice>Non hai accesso al cockpit: serve il ruolo Team Lead (o superiore). Chiedilo a un admin dalla pagina Membri.</Notice>);
   }
 
   /* ---------- Vista 1 + Vista 3 (tab) ---------- */
   if (phase === "open") {
     const selCount = fasciaRows.filter((r) => selected[r.shift_id]).length + offList.length;
     const tabsRow = (
-      <div style={{ display: "flex", gap: 6, marginBottom: 18, padding: 5, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, width: "fit-content" }}>
-        {[{ id: "turno", label: "Apri turno" }, { id: "guadagni", label: "I miei guadagni" }].map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            style={{ padding: "7px 15px", borderRadius: 7, fontSize: 12.5, cursor: "pointer", fontFamily: FONTS.body, background: tab === t.id ? CP.surfaceAlt : "transparent", border: `1px solid ${tab === t.id ? alpha(CP.accent, "66") : "transparent"}`, color: tab === t.id ? CP.textPrimary : CP.textSecondary, fontWeight: tab === t.id ? 500 : 400 }}>
-            {t.label}
-          </button>
-        ))}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <FilterChip label="Apri un turno" active={tab === "turno"} onClick={() => setTab("turno")} />
+        <FilterChip label="I miei guadagni" active={tab === "guadagni"} onClick={() => setTab("guadagni")} />
       </div>
     );
 
     if (tab === "guadagni") {
       const tot = earnings?.totals;
+      const shiftCols = [
+        { key: "opened_at", label: "Data", sort: (s) => Date.parse(s.opened_at) || 0, render: (s) => (s.opened_at ? new Date(s.opened_at).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", timeZone: "Europe/Rome" }) : "—") },
+        { key: "window", label: "Orario", sortable: false, muted: true, render: (s) => `${hhmm(s.window?.startedAt)}–${hhmm(s.window?.endedAt)}` },
+        { key: "operators_count", label: "Operatori", align: "right" },
+        { key: "sopra_soglia", label: "Sopra la soglia alta", align: "right", render: (s) => s.sopra_soglia ?? "—" },
+        { key: "excess_total", label: "Venduto oltre la soglia", align: "right", render: (s) => fmt$(s.excess_total) },
+        { key: "override_shadow_usd", label: "Il tuo 3% (simulato)", align: "right", render: (s) => fmt$2(s.override_shadow_usd) },
+        { key: "notes_count", label: "Note", align: "right" },
+      ];
       return shell(
         <>
           {tabsRow}
-          {earningsLoading && !earnings ? (
-            <div style={{ display: "flex", gap: 8, alignItems: "center", color: CP.textMuted, fontSize: 13 }}><Loader2 size={14} className="animate-spin" /> Carico lo storico…</div>
-          ) : (
+          {earningsLoading && !earnings ? spinner("Carico lo storico…") : (
             <>
-              <CpCard style={{ marginBottom: 16 }} accent>
-                <SectionLabel>Mese corrente {earnings?.month_id ? `(${earnings.month_id})` : ""} · shadow mode</SectionLabel>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 10 }}>
-                  <StatCard label="Turni supervisione" value={tot?.shifts_count ?? 0} />
-                  <StatCard label="Fisso maturato" value={`€${tot?.fixed_eur ?? 0}`} />
-                  <StatCard label="Override (shadow)" value={fmt$2(tot?.override_shadow_usd)} sub={`eccedenza ${fmt$(tot?.excess_total)}`} />
-                  <StatCard label="Note lasciate" value={tot?.notes_total ?? 0} />
+              <HeroMetric
+                label={`Maturato questo mese${earnings?.month_id ? ` (${earnings.month_id})` : ""}`}
+                value={`€${tot?.fixed_eur ?? 0} + ${fmt$2(tot?.override_shadow_usd)}`}
+                compare={`fisso per ${tot?.shifts_count ?? 0} turni di supervisione + 3% simulato sul venduto oltre la soglia alta (${fmt$(tot?.excess_total)})`}
+                hint="Il 3% è una simulazione: diventa reale dopo il primo mese di supervisioni registrate, con la percentuale confermata dal board. Il fisso (€28 a turno) è pagato fuori piattaforma: qui è solo contato."
+              >
+                <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
+                  <Metric label="Turni di supervisione" value={tot?.shifts_count ?? 0} />
+                  <Metric label="Note lasciate" value={tot?.notes_total ?? 0} />
                 </div>
-                <div style={{ fontSize: 11.5, color: CP.textMuted, marginTop: 12 }}>
-                  L&apos;override è simulato al 3% (§10.3 career ladder): diventa reale dopo il primo mese di supervisioni tracciate. Il fisso €28/turno resta pagato fuori piattaforma — qui è solo conteggiato.
-                </div>
-              </CpCard>
-              <CpCard>
-                <SectionLabel>Turni chiusi</SectionLabel>
-                {!earnings || earnings.shifts.length === 0 ? (
-                  <div style={{ color: CP.textMuted, fontSize: 13, marginTop: 10 }}>Nessun turno chiuso questo mese — apri il primo dalla tab &quot;Apri turno&quot;.</div>
-                ) : (
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
-                    <thead>
-                      <tr>
-                        {["Data", "Finestra", "Operatori", "Sopra soglia", "Eccedenza", "Override 3%", "Note"].map((h) => (
-                          <th key={h} style={{ textAlign: "left", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: CP.textMuted, fontWeight: 600, padding: "6px 8px", borderBottom: `1px solid ${CP.border}` }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {earnings.shifts.map((s) => (
-                        <tr key={s.id}>
-                          <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, color: CP.textPrimary }}>{s.opened_at ? new Date(s.opened_at).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", timeZone: "Europe/Rome" }) : "—"}</td>
-                          <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, color: CP.textSecondary, fontFamily: FONTS.mono, fontSize: 12 }}>{hhmm(s.window?.startedAt)}–{hhmm(s.window?.endedAt)}</td>
-                          <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, fontFamily: FONTS.mono }}>{s.operators_count}</td>
-                          <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, fontFamily: FONTS.mono }}>{s.sopra_soglia ?? "—"}</td>
-                          <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, fontFamily: FONTS.mono }}>{fmt$(s.excess_total)}</td>
-                          <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, fontFamily: FONTS.mono, color: CP.accentSoftText }}>{fmt$2(s.override_shadow_usd)}</td>
-                          <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, fontFamily: FONTS.mono }}>{s.notes_count}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </CpCard>
+              </HeroMetric>
+              <SectionTitle>Turni chiusi questo mese</SectionTitle>
+              {!earnings || earnings.shifts.length === 0 ? (
+                <Notice>Nessun turno chiuso questo mese. Aprine uno da “Apri un turno”: quando lo chiudi compare qui.</Notice>
+              ) : (
+                <DataTable columns={shiftCols} rows={earnings.shifts} defaultSort={{ key: "opened_at", dir: -1 }} minWidth={760} maxHeight={560} />
+              )}
             </>
           )}
         </>
       );
     }
 
+    const rosterCols = [
+      { key: "sel", label: "", sortable: false, render: (r) => <input type="checkbox" readOnly checked={!!selected[r.shift_id]} aria-label={`Seleziona ${r.member_name}`} style={{ accentColor: CP.accent, width: 16, height: 16 }} /> },
+      { key: "member_name", label: "Operatore", render: (r) => <span style={{ fontWeight: 500 }}>{r.member_name}</span> },
+      { key: "creator_alias", label: "Creator", muted: true, render: (r) => r.creator_alias || "—" },
+      {
+        key: "payment_profile", label: "Profilo di paga", muted: true, sort: (r) => r.payment_profile?.name || "",
+        render: (r) => (r.payment_profile ? `${r.payment_profile.name}${r.payment_profile.cosellers_count != null ? ` · ${r.payment_profile.cosellers_count} in turno` : ""}` : "—"),
+      },
+      {
+        key: "checkin", label: "Presenza", sort: (r) => (r.checkin && !r.checkin.ended_at ? 2 : r.checkin ? 1 : 0),
+        render: (r) => {
+          const checkedIn = r.checkin && !r.checkin.ended_at;
+          if (checkedIn) return <span style={{ color: CP.accentGreen, display: "inline-flex", alignItems: "center", gap: 5 }}><Radio size={12} /> entrato alle {hhmm(r.checkin.started_at)}</span>;
+          if (r.checkin) return <span style={{ color: CP.textMuted }}>uscito alle {hhmm(r.checkin.ended_at)}</span>;
+          return <span style={{ color: CP.textMuted }}>non ancora entrato</span>;
+        },
+      },
+      {
+        key: "started_at", label: "Turno", sort: (r) => Date.parse(r.started_at) || 0,
+        render: (r) => <span style={{ color: CP.textSecondary, ...NUM }}>{hhmm(r.started_at)}–{hhmm(slotEnd(r))}{r.slot_hours ? <span style={{ color: CP.textMuted }}> · {r.slot_hours} ore</span> : null}</span>,
+      },
+    ];
+
     return shell(
       <>
         {tabsRow}
-        <CpCard style={{ marginBottom: 16 }}>
-          <SectionLabel>Fascia</SectionLabel>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
-            {fasce.map((f) => {
-              const active = f.name === fascia;
-              return (
-                <button key={f.name} onClick={() => setFascia(f.name)}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 7, background: active ? CP.accentSoft : CP.surface, color: active ? CP.accentSoftText : CP.textSecondary, border: `1px solid ${active ? alpha(CP.accent, "66") : CP.border}`, borderRadius: 99, padding: "7px 15px", fontSize: 13, fontWeight: active ? 600 : 400, cursor: "pointer", fontFamily: FONTS.body }}>
-                  {f.name}
-                  <span style={{ fontFamily: FONTS.mono, fontSize: 11, color: active ? CP.accentSoftText : CP.textMuted }}>
-                    {f.minStart ? hhmm(new Date(f.minStart).toISOString()) : "—"}–{f.maxEnd ? hhmm(new Date(f.maxEnd).toISOString()) : "—"} · {f.rows.length}
-                  </span>
-                </button>
-              );
-            })}
-            <button onClick={loadRoster} disabled={rosterLoading}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, background: CP.surface, color: CP.textSecondary, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "8px 14px", fontSize: 13, cursor: "pointer", fontFamily: FONTS.body }}>
+        <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+          <SectionTitle aside="orari in ora italiana">1 · Scegli la fascia</SectionTitle>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            {fasce.map((f) => (
+              <FilterChip key={f.name} active={f.name === fascia} onClick={() => setFascia(f.name)}
+                label={`${f.name} · ${f.minStart ? hhmm(new Date(f.minStart).toISOString()) : "—"}–${f.maxEnd ? hhmm(new Date(f.maxEnd).toISOString()) : "—"} · ${f.rows.length} ${f.rows.length === 1 ? "turno" : "turni"}`} />
+            ))}
+            <button onClick={loadRoster} disabled={rosterLoading} style={btnSecondary}>
               {rosterLoading ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Aggiorna
             </button>
           </div>
-          <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 10 }}>
-            Tutti gli orari sono in <strong>ora italiana</strong>. Le fasce e le durate arrivano dagli slot reali della timeline CP: i profili ENG hanno turni da 6h, gli ITA da 5h — la finestra della supervisione si calcola dagli slot che selezioni, non è mai fissa.
+          <div style={{ fontSize: 13, color: CP.textMuted, marginTop: 10, lineHeight: 1.5 }}>
+            Fasce e durate arrivano dai turni pianificati in CreatorsPro: i profili inglesi fanno turni da 6 ore, quelli italiani da 5. L’orario della supervisione si calcola dai turni che selezioni.
           </div>
-        </CpCard>
+        </section>
 
-        <CpCard style={{ marginBottom: 16 }}>
-          <SectionLabel>Operatori in turno (da timeline CP)</SectionLabel>
-          {rosterLoading && !roster ? (
-            <div style={{ display: "flex", gap: 8, alignItems: "center", color: CP.textMuted, fontSize: 13, marginTop: 10 }}><Loader2 size={14} className="animate-spin" /> Leggo la timeline (30-40 creator)…</div>
-          ) : fasciaRows.length === 0 ? (
-            <div style={{ color: CP.textMuted, fontSize: 13, marginTop: 10 }}>
-              Nessun turno assegnato in timeline {fascia ? `per la fascia ${fascia}` : "in questa finestra"} — cambia fascia o usa &quot;Aggiorna&quot;.
+        <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+          <SectionTitle aside="dai turni pianificati in CreatorsPro · già selezionati quelli entrati">2 · Scegli chi segui</SectionTitle>
+          {rosterLoading && !roster ? spinner("Leggo i turni pianificati (30-40 creator, qualche secondo)…") : fasciaRows.length === 0 ? (
+            <div style={{ color: CP.textSecondary, fontSize: 14 }}>
+              Nessun turno pianificato {fascia ? `nella fascia ${fascia}` : "nelle prossime ore"}. Scegli un’altra fascia o premi “Aggiorna”.
             </div>
           ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
-              <thead>
-                <tr>
-                  {["", "Operatore", "Creator", "Profilo", "Check-in", "Slot"].map((h) => (
-                    <th key={h} style={{ textAlign: "left", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: CP.textMuted, fontWeight: 600, padding: "6px 8px", borderBottom: `1px solid ${CP.border}` }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {fasciaRows.map((r) => {
-                  const on = !!selected[r.shift_id];
-                  const checkedIn = r.checkin && !r.checkin.ended_at;
-                  return (
-                    <tr key={r.shift_id} onClick={() => setSelected((s) => ({ ...s, [r.shift_id]: !on }))} style={{ cursor: "pointer" }}>
-                      <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}` }}>
-                        <input type="checkbox" readOnly checked={on} style={{ accentColor: CP.accent }} />
-                      </td>
-                      <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, color: CP.textPrimary, fontWeight: 500 }}>{r.member_name}</td>
-                      <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, color: CP.textSecondary }}>{r.creator_alias || "—"}</td>
-                      <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, color: CP.textSecondary }}>
-                        {r.payment_profile ? `${r.payment_profile.name}${r.payment_profile.cosellers_count != null ? ` · ${r.payment_profile.cosellers_count}×` : ""}` : "—"}
-                      </td>
-                      <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}` }}>
-                        {checkedIn ? (
-                          <span style={{ color: CP.accentGreen, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}><Radio size={12} /> {hhmm(r.checkin.started_at)}</span>
-                        ) : r.checkin ? (
-                          <span style={{ color: CP.textMuted, fontSize: 12 }}>uscito {hhmm(r.checkin.ended_at)}</span>
-                        ) : (
-                          <span style={{ color: CP.textMuted, fontSize: 12 }}>non ancora</span>
-                        )}
-                      </td>
-                      <td style={{ padding: "8px", borderBottom: `1px solid ${CP.borderSoft}`, color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 12 }}>
-                        {hhmm(r.started_at)}–{hhmm(slotEnd(r))}
-                        {r.slot_hours ? (
-                          <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, color: CP.accentSoftText, background: CP.accentSoft, borderRadius: 99, padding: "1px 7px" }}>{r.slot_hours}h</span>
-                        ) : null}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <DataTable columns={rosterCols} rows={fasciaRows.map((r) => ({ ...r, id: r.shift_id }))}
+              onRowClick={(r) => setSelected((s) => ({ ...s, [r.shift_id]: !s[r.shift_id] }))} selected={(r) => !!selected[r.shift_id]}
+              minWidth={720} maxHeight={480} />
           )}
 
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14, flexWrap: "wrap" }}>
-            <UserPlus size={14} color={CP.mutedIcons} />
-            <input value={offName} onChange={(e) => setOffName(e.target.value)} placeholder="Fuori programma (nome operatore)…"
-              style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, padding: "7px 10px", fontSize: 13, fontFamily: FONTS.body, minWidth: 220 }} />
-            <button
-              onClick={() => { if (offName.trim()) { setOffList((l) => [...l, offName.trim()]); setOffName(""); } }}
-              style={{ background: CP.surface, color: CP.textSecondary, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "7px 12px", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body }}>
+            <UserPlus size={15} color={CP.textMuted} />
+            <input value={offName} onChange={(e) => setOffName(e.target.value)} placeholder="Nome di chi lavora fuori programma"
+              aria-label="Operatore fuori programma"
+              style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, padding: "8px 10px", fontSize: 14, fontFamily: FONTS.body, flex: "1 1 220px", minWidth: 0, maxWidth: 320 }} />
+            <button onClick={() => { if (offName.trim()) { setOffList((l) => [...l, offName.trim()]); setOffName(""); } }} style={btnSecondary}>
               Aggiungi
             </button>
-            {offList.map((n, i) => (
-              <span key={`${n}-${i}`} onClick={() => setOffList((l) => l.filter((_, j) => j !== i))}
-                style={{ fontSize: 11, fontWeight: 600, borderRadius: 99, padding: "3px 10px", color: CP.accentRed, background: "rgba(240,140,140,0.08)", border: "1px solid rgba(240,140,140,0.4)", cursor: "pointer" }}
-                title="Clicca per rimuovere">
-                {n} · fuori programma ✕
-              </span>
-            ))}
           </div>
-          <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 8 }}>
-            I fuori programma sono flaggati e visibili al Sales Manager (segnale di igiene scheduling). Non hanno pull dati CP.
+          {offList.length > 0 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+              {offList.map((n, i) => (
+                <button key={`${n}-${i}`} onClick={() => setOffList((l) => l.filter((_, j) => j !== i))} title="Togli"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, borderRadius: 99, padding: "4px 10px", color: CP.textPrimary, background: CP.surface, border: `1px solid ${CP.accentRed}`, cursor: "pointer", fontFamily: FONTS.body }}>
+                  {n} · fuori programma <X size={12} />
+                </button>
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: 13, color: CP.textMuted, marginTop: 8, lineHeight: 1.5 }}>
+            Chi lavora senza turno pianificato va aggiunto qui: il sales manager lo vede segnalato (serve a tenere in ordine i turni). Per queste persone non arrivano i dati di vendita da CreatorsPro.
           </div>
-        </CpCard>
+        </section>
 
-        <button onClick={openSupervision} disabled={opening || selCount === 0}
-          style={{ display: "inline-flex", alignItems: "center", gap: 8, background: selCount === 0 ? CP.surfaceAlt : CP.accent, color: selCount === 0 ? CP.textMuted : CP.accentInk, border: "none", borderRadius: 10, padding: "11px 22px", fontSize: 14, fontWeight: 700, cursor: selCount === 0 ? "default" : "pointer", fontFamily: FONTS.body }}>
-          {opening ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />} Inizia supervisione ({selCount})
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <button onClick={openSupervision} disabled={opening || selCount === 0}
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, background: selCount === 0 ? CP.surfaceAlt : CP.accent, color: selCount === 0 ? CP.textMuted : CP.accentInk, border: "none", borderRadius: 10, padding: "11px 22px", fontSize: 15, fontWeight: 500, cursor: selCount === 0 ? "default" : "pointer", fontFamily: FONTS.body }}>
+            {opening ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />} 3 · Inizia la supervisione ({selCount})
+          </button>
+          {selCount === 0 && <span style={{ fontSize: 13, color: CP.textMuted }}>Seleziona almeno un operatore o aggiungi un fuori programma.</span>}
+        </div>
       </>
     );
   }
@@ -532,162 +497,146 @@ export default function CmCockpitPage() {
   /* ---------- Vista 2 ---------- */
   const sup = live?.supervision;
   const earn = live?.earnings;
+  const ops = live?.operators || [];
+  const teamSold = ops.reduce((s, o) => s + (o.venduto || 0), 0);
+  const overTop = ops.filter((o) => o.thresholds?.top != null && o.venduto >= o.thresholds.top).length;
+  const closeBtn = (
+    <button onClick={() => setClosingOpen(true)} disabled={closing || closingOpen} style={{ ...btnSecondary, opacity: closingOpen ? 0.5 : 1 }}>
+      <Square size={12} /> Chiudi turno
+    </button>
+  );
+
+  const liveCols = [
+    {
+      key: "member_name", label: "Operatore",
+      render: (op) => (
+        <div style={{ minWidth: 180 }}>
+          <div style={{ fontWeight: 500, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+            {op.member_name}
+            {op.checkin && !op.checkin.ended_at ? <Radio size={11} color={CP.accentGreen} aria-label="In turno ora" /> : null}
+          </div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted }}>
+            {op.creator_alias || "—"}{op.thresholds ? ` · fascia ${String(op.thresholds.band).toUpperCase()}, ${op.thresholds.cls} in turno` : ""}
+            {op.payment_profile?.name ? ` · ${op.payment_profile.name}` : ""}
+          </div>
+          {op.profile_mismatch ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: CP.accentRed, marginTop: 2 }}>
+              <ShieldAlert size={12} /> Profilo per {op.profile_mismatch.declared} in turno, ma ne risultano {op.profile_mismatch.actual} attivi sul creator
+            </div>
+          ) : null}
+        </div>
+      ),
+    },
+    { key: "venduto", label: "Venduto", align: "right", render: (op) => (op.wage_shift_found ? fmt$(op.venduto) : "—") },
+    { key: "bar", label: "Rispetto alle soglie", sortable: false, render: (op) => <ThresholdBar venduto={op.venduto} thresholds={op.thresholds} /> },
+    { key: "stato", label: "Stato", sort: (op) => statusOf(op).label, render: (op) => <StatusPill op={op} /> },
+  ];
+
   return shell(
     <>
-      <CpCard style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-            <Radio size={14} color={CP.accentGreen} />
-            <strong style={{ color: CP.textPrimary }}>Turno {sup ? `${hhmm(sup.window.startedAt)} – ${hhmm(sup.window.endedAt)}` : ""}</strong>
-            <span>· {(live?.operators || []).length} operatori</span>
-            {liveLoading ? <Loader2 size={13} className="animate-spin" color={CP.mutedIcons} /> : null}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <span style={{ fontFamily: FONTS.mono, fontSize: 13, color: CP.textPrimary }}>
-              €28 + {fmt$2(earn?.override_shadow_usd)}{" "}
-              <span style={{ color: CP.accentSoftText, fontSize: 11 }}>override {earn?.override_pct ?? 3}% · shadow</span>
-            </span>
-            <button onClick={() => setClosingOpen(true)} disabled={closing || closingOpen}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, background: CP.surface, color: CP.textSecondary, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "8px 14px", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body }}>
-              <Square size={12} /> Chiudi turno
-            </button>
-          </div>
-        </div>
-      </CpCard>
-
-      {!live ? (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", color: CP.textMuted, fontSize: 13 }}><Loader2 size={14} className="animate-spin" /> Primo pull dati CP…</div>
-      ) : closingOpen ? (
+      {!live ? spinner("Primo caricamento dei dati da CreatorsPro…") : closingOpen ? (
         /* ---------- Vista 4: chiusura con note ---------- */
         <>
-          <CpCard style={{ marginBottom: 16 }}>
-            <SectionLabel>Riepilogo turno</SectionLabel>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginTop: 10 }}>
-              <StatCard label="Venduto team" value={fmt$((live.operators || []).reduce((s, o) => s + (o.venduto || 0), 0))} />
-              <StatCard label="Sopra soglia" value={`${(live.operators || []).filter((o) => o.thresholds?.top != null && o.venduto >= o.thresholds.top).length}/${(live.operators || []).length}`} />
-              <StatCard label="Override turno (shadow)" value={fmt$2(earn?.override_shadow_usd)} />
-            </div>
-          </CpCard>
-          <CpCard style={{ marginBottom: 16 }}>
-            <SectionLabel>Note per operatore <span style={{ textTransform: "none", letterSpacing: 0, color: CP.textMuted }}>— opzionali, 60 secondi</span></SectionLabel>
-            <div style={{ marginTop: 6 }}>
-              {(live.operators || []).map((op) => {
-                const key = opKey(op);
-                const d = noteDraft[key] || { tags: [], text: "" };
-                return (
-                  <div key={key} style={{ display: "grid", gridTemplateColumns: "170px 1fr", gap: 12, padding: "11px 0", borderBottom: `1px solid ${CP.borderSoft}`, alignItems: "start" }}>
-                    <div>
-                      <div style={{ color: CP.textPrimary, fontWeight: 600, fontSize: 13 }}>{op.member_name}</div>
-                      <div style={{ color: CP.textMuted, fontSize: 11.5 }}>{op.wage_shift_found ? fmt$(op.venduto) : "—"}{op.thresholds?.top != null && op.venduto >= op.thresholds.top ? " · sopra top" : ""}</div>
-                    </div>
-                    <div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {QUICK_TAGS.map((tag) => {
-                          const on = d.tags.includes(tag);
-                          return (
-                            <button key={tag} onClick={() => toggleTag(key, tag)}
-                              style={{ fontSize: 11, fontWeight: 600, borderRadius: 99, padding: "3px 10px", cursor: "pointer", fontFamily: FONTS.body, color: on ? CP.accentSoftText : CP.textMuted, background: on ? CP.accentSoft : CP.surface, border: `1px solid ${on ? alpha(CP.accent, "66") : CP.border}` }}>
-                              {tag}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <input value={d.text} onChange={(e) => setNoteDraft((nd) => ({ ...nd, [key]: { ...d, text: e.target.value } }))}
-                        placeholder="Nota libera (opzionale)…" maxLength={600}
-                        style={{ marginTop: 8, width: "100%", boxSizing: "border-box", background: CP.bgSunken, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, padding: "7px 10px", fontSize: 12.5, fontFamily: FONTS.body }} />
-                    </div>
+          <HeroMetric label="Venduto del team nel turno" value={fmt$(teamSold)} compare={`${overTop} su ${ops.length} sopra la soglia alta`}>
+            <Metric label="Il tuo 3% del turno (simulato)" value={fmt$2(earn?.override_shadow_usd)} />
+          </HeroMetric>
+          <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+            <SectionTitle aside="facoltative, un minuto in tutto">Una nota per ciascuno</SectionTitle>
+            {ops.map((op) => {
+              const key = opKey(op);
+              const d = noteDraft[key] || { tags: [], text: "" };
+              return (
+                <div key={key} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 170px), 1fr))", gap: 12, padding: "12px 0", borderTop: `1px solid ${CP.borderSoft}`, alignItems: "start" }}>
+                  <div>
+                    <div style={{ color: CP.textPrimary, fontWeight: 500, fontSize: 14 }}>{op.member_name}</div>
+                    <div style={{ color: CP.textMuted, fontSize: 12.5, ...NUM }}>{op.wage_shift_found ? fmt$(op.venduto) : "—"}{op.thresholds?.top != null && op.venduto >= op.thresholds.top ? " · sopra la soglia alta" : ""}</div>
                   </div>
-                );
-              })}
+                  <div style={{ gridColumn: "span 2", minWidth: 0 }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {QUICK_TAGS.map((tag) => {
+                        const on = d.tags.includes(tag);
+                        return (
+                          <button key={tag} onClick={() => toggleTag(key, tag)} aria-pressed={on}
+                            style={{ fontSize: 12.5, borderRadius: 99, padding: "4px 10px", cursor: "pointer", fontFamily: FONTS.body, color: on ? CP.accentSoftText : CP.textSecondary, background: on ? CP.accentSoft : CP.surface, border: `1px solid ${on ? CP.accent : CP.border}` }}>
+                            {tag}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <input value={d.text} onChange={(e) => setNoteDraft((nd) => ({ ...nd, [key]: { ...d, text: e.target.value } }))}
+                      placeholder="Nota libera (facoltativa)…" maxLength={600} aria-label={`Nota per ${op.member_name}`}
+                      style={{ marginTop: 8, width: "100%", boxSizing: "border-box", background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, padding: "8px 10px", fontSize: 14, fontFamily: FONTS.body }} />
+                  </div>
+                </div>
+              );
+            })}
+            <div style={{ fontSize: 13, color: CP.textMuted, marginTop: 10, lineHeight: 1.5 }}>
+              Le note vanno nella scheda dell’operatore (contano per il passaggio di livello, dove serve un affiancamento documentato) e nel tuo storico da CM (contano per il bonus sviluppo).
             </div>
-            <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 10 }}>
-              Le note entrano nel fascicolo dell&apos;operatore (gate L2→L3: mentoring osservabile) e nel tuo storico CM (bonus sviluppo).
-            </div>
-          </CpCard>
-          <div style={{ display: "flex", gap: 10 }}>
+          </section>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button onClick={confirmClose} disabled={closing}
-              style={{ display: "inline-flex", alignItems: "center", gap: 8, background: CP.accent, color: CP.accentInk, border: "none", borderRadius: 10, padding: "11px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.body }}>
+              style={{ display: "inline-flex", alignItems: "center", gap: 8, background: CP.accent, color: CP.accentInk, border: "none", borderRadius: 10, padding: "11px 22px", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: FONTS.body }}>
               {closing ? <Loader2 size={15} className="animate-spin" /> : <Square size={14} />} Conferma chiusura
             </button>
-            <button onClick={() => setClosingOpen(false)} disabled={closing}
-              style={{ background: CP.surface, color: CP.textSecondary, border: `1px solid ${CP.border}`, borderRadius: 10, padding: "11px 18px", fontSize: 13, cursor: "pointer", fontFamily: FONTS.body }}>
+            <button onClick={() => setClosingOpen(false)} disabled={closing} style={{ ...btnSecondary, padding: "11px 18px" }}>
               Continua il turno
             </button>
           </div>
         </>
       ) : (
         <>
-          <CpCard style={{ marginBottom: 16 }}>
-            <SectionLabel>Team in turno · soglie {live.thresholds_period ? `(mese ${live.thresholds_period})` : ""}</SectionLabel>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
-              <thead>
-                <tr>
-                  {["Operatore · Creator", "Venduto", "vs soglie", "Stato"].map((h) => (
-                    <th key={h} style={{ textAlign: "left", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: CP.textMuted, fontWeight: 600, padding: "6px 8px", borderBottom: `1px solid ${CP.border}` }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {(live.operators || []).map((op, i) => (
-                  <tr key={op.shift_id || `${op.member_name}-${i}`}>
-                    <td style={{ padding: "10px 8px", borderBottom: `1px solid ${CP.borderSoft}` }}>
-                      <div style={{ color: CP.textPrimary, fontWeight: 500, display: "flex", alignItems: "center", gap: 7 }}>
-                        {op.member_name}
-                        {op.checkin && !op.checkin.ended_at ? <Radio size={11} color={CP.accentGreen} title="Check-in aperto" /> : null}
-                        {op.profile_mismatch ? (
-                          <span title={`Profilo dichiara ${op.profile_mismatch.declared}× ma risultano ${op.profile_mismatch.actual} check-in attivi sul creator`}
-                            style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 700, color: CP.accentRed, background: "rgba(240,140,140,0.08)", border: "1px solid rgba(240,140,140,0.4)", borderRadius: 99, padding: "1px 8px" }}>
-                            <ShieldAlert size={11} /> profilo {op.profile_mismatch.declared}× / attivi {op.profile_mismatch.actual}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div style={{ fontSize: 11.5, color: CP.textMuted }}>
-                        {op.creator_alias || "—"}{op.thresholds ? ` — ${op.thresholds.band.toUpperCase()} · ${op.thresholds.cls}×` : ""}
-                        {op.payment_profile?.name ? ` · ${op.payment_profile.name}` : ""}
-                      </div>
-                    </td>
-                    <td style={{ padding: "10px 8px", borderBottom: `1px solid ${CP.borderSoft}`, fontFamily: FONTS.mono, color: CP.textPrimary }}>{op.wage_shift_found ? fmt$(op.venduto) : "—"}</td>
-                    <td style={{ padding: "10px 8px", borderBottom: `1px solid ${CP.borderSoft}` }}><ThresholdBar venduto={op.venduto} thresholds={op.thresholds} /></td>
-                    <td style={{ padding: "10px 8px", borderBottom: `1px solid ${CP.borderSoft}` }}><StatusPill op={op} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 10, fontFamily: FONTS.mono }}>
-              Dati CP · aggiornati {hhmm(live.pulled_at)} (ora italiana) · i take arrivano a blocchi (~15-20 min) · quadro completo a fine turno
+          <HeroMetric
+            label={`Venduto del team · turno ${sup ? `${hhmm(sup.window.startedAt)}–${hhmm(sup.window.endedAt)}` : ""}`}
+            value={fmt$(teamSold)}
+            compare={`${overTop} su ${ops.length} operatori sopra la soglia alta`}
+            hint={`Aggiornato alle ${hhmm(live.pulled_at)} (ora italiana). Le vendite arrivano da CreatorsPro a blocchi ogni 15-20 minuti: il quadro completo c’è a fine turno.`}
+          >
+            <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <Metric label="Il tuo guadagno del turno" value={`€28 + ${fmt$2(earn?.override_shadow_usd)}`} note={`${earn?.override_pct ?? 3}% simulato sul venduto oltre la soglia (${fmt$(earn?.excess_total)})`} />
+              {liveLoading ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: CP.textMuted }}><Loader2 size={13} className="animate-spin" /> aggiorno…</span> : null}
             </div>
-          </CpCard>
+          </HeroMetric>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-            <CpCard>
-              <SectionLabel>Take del turno</SectionLabel>
+          <SectionTitle aside={live.thresholds_period ? `soglie di ${live.thresholds_period}: la linea chiara è l’intermedia, quella scura l’alta` : "la linea chiara è la soglia intermedia, quella scura l’alta"}>Team in turno</SectionTitle>
+          <div style={{ marginBottom: 16 }}>
+            <DataTable columns={liveCols} rows={ops.map((op, i) => ({ ...op, id: op.shift_id || `${op.member_name}-${i}` }))} minWidth={720} empty="Nessun operatore in questa supervisione." />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", gap: 14 }}>
+            <section style={{ ...card, padding: "16px 18px" }}>
+              <SectionTitle aside="le più recenti in alto">Vendite del turno</SectionTitle>
               {allTakes.length === 0 ? (
-                <div style={{ color: CP.textMuted, fontSize: 13, marginTop: 10 }}>Ancora nessun take attribuito in questa finestra.</div>
+                <div style={{ color: CP.textMuted, fontSize: 14 }}>Ancora nessuna vendita attribuita in questo turno. Arrivano a blocchi ogni 15-20 minuti.</div>
               ) : (
-                <div style={{ marginTop: 8 }}>
+                <div>
                   {allTakes.map((t) => (
-                    <div key={t.key} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: 12.5, padding: "5px 0", color: CP.textSecondary, background: newTakeKeys.has(t.key) ? "rgba(139,124,246,0.07)" : "transparent", borderRadius: 6 }}>
-                      <span style={{ fontFamily: FONTS.mono, color: CP.textMuted, fontSize: 11.5, minWidth: 42 }}>{hhmm(t.transaction_at || t.created_at)}</span>
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.member_name} · {t.type || "take"} · {t.creator_alias || ""}</span>
-                      <span style={{ fontFamily: FONTS.mono, color: CP.accentGreen, marginLeft: "auto" }}>+{fmt$2(t.amount)}</span>
+                    <div key={t.key} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: 13.5, padding: "6px 6px", color: CP.textSecondary, background: newTakeKeys.has(t.key) ? CP.accentSoft : "transparent", borderRadius: 6 }}>
+                      <span style={{ color: CP.textMuted, fontSize: 12.5, minWidth: 42, ...NUM }}>{hhmm(t.transaction_at || t.created_at)}</span>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{t.member_name} · {t.type || "vendita"} · {t.creator_alias || ""}</span>
+                      <span style={{ color: CP.textPrimary, marginLeft: "auto", ...NUM }}>+{fmt$2(t.amount)}</span>
                     </div>
                   ))}
+                  {newTakeKeys.size > 0 && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 6 }}>Evidenziate: arrivate con l’ultimo aggiornamento.</div>}
                 </div>
               )}
-            </CpCard>
-            <CpCard accent>
-              <SectionLabel>Guadagno turno · shadow mode</SectionLabel>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
-                <StatCard label="Fisso supervisione" value="€28" />
-                <StatCard label={`Override ${earn?.override_pct ?? 3}% (shadow)`} value={fmt$2(earn?.override_shadow_usd)} sub={`eccedenza ${fmt$(earn?.excess_total)}`} />
+            </section>
+            <section style={{ ...card, padding: "16px 18px" }}>
+              <SectionTitle>Come si calcola il tuo guadagno</SectionTitle>
+              <div style={{ display: "flex", gap: 28, flexWrap: "wrap", marginBottom: 10 }}>
+                <Metric label="Fisso di supervisione" value="€28" />
+                <Metric label={`${earn?.override_pct ?? 3}% simulato`} value={fmt$2(earn?.override_shadow_usd)} note={`sul venduto oltre la soglia alta: ${fmt$(earn?.excess_total)}`} />
               </div>
-              <div style={{ fontSize: 11.5, color: CP.textMuted, marginTop: 12 }}>
-                L&apos;override è simulato: diventa reale dopo il primo mese di supervisioni tracciate, con la % confermata dal board (§10.3 career ladder).
+              <div style={{ fontSize: 13, color: CP.textMuted, lineHeight: 1.5 }}>
+                La percentuale è per ora solo simulata: diventa reale dopo il primo mese di supervisioni registrate, con la percentuale confermata dal board.
               </div>
-            </CpCard>
+            </section>
           </div>
         </>
       )}
-    </>
+    </>,
+    closingOpen ? null : closeBtn
   );
 }
+
+const btnSecondary = { display: "inline-flex", alignItems: "center", gap: 6, background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "8px 14px", fontSize: 13.5, cursor: "pointer", fontFamily: FONTS.body };

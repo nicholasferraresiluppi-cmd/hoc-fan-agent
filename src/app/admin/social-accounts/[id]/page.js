@@ -3,14 +3,27 @@
 /**
  * /admin/social-accounts/[id] — dettaglio account social: piattaforma, status,
  * proxy associato (con link) + selector per cambiarlo (SEED).
+ *
+ * Redesign 26/09/2026 sul design system: testata DS con percorso, scheda proxy
+ * con lo stato spiegato (cosa vuol dire "non testato" / "errore" e cosa fare),
+ * account attivo senza proxy segnalato. Cambio proxy nel Modal di cp-style.
+ * Le credenziali del proxy non sono mai mostrate. API invariate.
  */
 import { useState } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
 import useSWR from "swr";
-import { Share2, ArrowLeft, Shield, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { SectionLabel, Modal, CpCard } from "@/components/cp-style";
+import { Modal } from "@/components/cp-style";
+import { PageHead, Notice, SectionTitle, card } from "@/components/ds";
 
 const PLATFORM_LABEL = { twitter: "Twitter/X", reddit: "Reddit", instagram: "Instagram", tiktok: "TikTok", other: "Altro" };
+const PROXY_STATUS = {
+  active: { label: "Funziona", hint: "l’ultima prova di connessione è andata a buon fine" },
+  error: { label: "Errore", hint: "l’ultima prova non è riuscita: controllalo in Proxy account social" },
+  inactive: { label: "Mai provato", hint: "provalo da Proxy account social prima di contarci" },
+};
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -23,73 +36,67 @@ const fetcher = async (url) => {
   return j;
 };
 
-export default function SocialAccountDetailPage({ params }) {
-  const { id } = params;
-  const { data, error, isLoading, mutate } = useSWR(`/api/admin/social-accounts/${id}`, fetcher, { revalidateOnFocus: false });
+export default function SocialAccountDetailPage() {
+  const { id } = useParams();
+  const { data, error, isLoading, mutate } = useSWR(id ? `/api/admin/social-accounts/${id}` : null, fetcher, { revalidateOnFocus: false });
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const a = data?.account;
+  const crumbs = [{ label: "Hub", href: "/admin" }, { label: "Account social", href: "/admin/social-accounts" }, { label: a?.name || "Scheda" }];
 
-  if (error) {
+  if (error || isLoading || !a) {
     return (
-      <div style={{ padding: 32, maxWidth: 900, margin: "0 auto" }}>
-        <SectionLabel>Data & Integrations</SectionLabel>
-        <h1 style={h1}>Account social</h1>
-        <div style={errBox}>
-          {error.status === 403 ? "Accesso riservato agli admin (capability SEED)."
-            : error.status === 404 ? "Account non trovato."
-            : `Errore: ${error.message}`}
-        </div>
+      <div style={wrap}>
+        <PageHead crumbs={crumbs} title="Account social" />
+        {isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
+        {error && (
+          <Notice danger={error.status !== 403 && error.status !== 404}>
+            {error.status === 403 ? "Pagina riservata agli admin."
+              : error.status === 404 ? <>Questo account non esiste più (forse è stato eliminato). <Link href="/admin/social-accounts" style={{ color: CP.accentSoftText }}>Torna all’elenco →</Link></>
+              : `Non riesco a caricare l’account: ${error.message}`}
+          </Notice>
+        )}
       </div>
     );
   }
 
-  if (isLoading) return <div style={{ padding: 32, color: CP.textMuted }}>Caricamento…</div>;
-
-  const a = data?.account;
-  if (!a) return null;
+  const ps = a.proxy ? (PROXY_STATUS[a.proxy.status] || PROXY_STATUS.inactive) : null;
+  const isActive = a.status === "active";
 
   return (
-    <div style={{ padding: "32px 32px 64px", maxWidth: 800, margin: "0 auto" }}>
-      <a href="/admin/social-accounts" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: CP.textMuted, fontSize: 12.5, textDecoration: "none", marginBottom: 16 }}>
-        <ArrowLeft size={14} /> Account social
-      </a>
+    <div style={wrap}>
+      <PageHead
+        crumbs={crumbs}
+        title={a.name}
+        subtitle={`${PLATFORM_LABEL[a.platform] || a.platform}${a.handle ? ` · ${a.handle}` : ""} · ${isActive ? "attivo" : "non attivo"}. Da qui vedi da quale proxy esce l’account e puoi cambiarlo.`}
+      />
 
-      <SectionLabel>Data & Integrations</SectionLabel>
-      <h1 style={{ ...h1, display: "flex", alignItems: "center", gap: 12 }}>
-        <Share2 size={24} color={CP.accent} aria-hidden="true" />
-        {a.name}
-      </h1>
-      <p style={{ color: CP.textSecondary, fontSize: 13, margin: "0 0 24px" }}>
-        {PLATFORM_LABEL[a.platform] || a.platform}{a.handle ? ` · ${a.handle}` : ""} ·{" "}
-        <span style={{ color: a.status === "active" ? CP.accentGreen : CP.textMuted }}>
-          {a.status === "active" ? "Attivo" : "Inattivo"}
-        </span>
-      </p>
+      {isActive && !a.proxy && (
+        <Notice danger>Questo account è attivo ma non ha un proxy: le sue connessioni non sono separate dagli altri. Assegnagliene uno con “Cambia proxy”.</Notice>
+      )}
 
-      <CpCard style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: a.proxy ? 12 : 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, color: CP.textPrimary, fontSize: 14, fontWeight: 500 }}>
-            <Shield size={16} color={CP.accent} /> Proxy associato
-          </div>
+      <section style={{ ...card, padding: "16px 18px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+          <SectionTitle>Proxy</SectionTitle>
           <button onClick={() => setSelectorOpen(true)} style={btnGhost}>
             <RefreshCw size={13} /> Cambia proxy
           </button>
         </div>
         {a.proxy ? (
-          <div>
-            <a href="/admin/social-proxies" style={{ fontFamily: FONTS.mono, fontSize: 15, color: CP.accentSoftText, textDecoration: "none" }}>
-              {a.proxy.host}:{a.proxy.port}
-            </a>
-            <div style={{ marginTop: 6, fontSize: 12.5, color: CP.textSecondary }}>
-              {a.proxy.type === "socks5" ? "SOCKS5" : "HTTP"} · {a.proxy.provider || "provider non specificato"} ·{" "}
-              <span style={{ color: a.proxy.status === "active" ? CP.accentGreen : a.proxy.status === "error" ? CP.accentRed : CP.textMuted }}>
-                {a.proxy.status === "active" ? "Attivo" : a.proxy.status === "error" ? "Errore" : "Non testato"}
-              </span>
-            </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
+            <Field label="Indirizzo">
+              <Link href="/admin/social-proxies" style={{ color: CP.accentSoftText, textDecoration: "none", wordBreak: "break-all" }}>{a.proxy.host}:{a.proxy.port}</Link>
+            </Field>
+            <Field label="Tipo">{a.proxy.type === "socks5" ? "SOCKS5" : "HTTP"}</Field>
+            <Field label="Fornitore">{a.proxy.provider || <span style={{ color: CP.textMuted }}>non indicato</span>}</Field>
+            <Field label="Stato">
+              <span style={{ color: a.proxy.status === "error" ? CP.accentRed : CP.textPrimary }}>{ps.label}</span>
+              <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2 }}>{ps.hint}</div>
+            </Field>
           </div>
         ) : (
-          <div style={{ color: CP.textMuted, fontSize: 13 }}>Nessun proxy associato.</div>
+          <div style={{ color: CP.textMuted, fontSize: 14 }}>Nessun proxy associato.</div>
         )}
-      </CpCard>
+      </section>
 
       <ProxySelectorModal
         open={selectorOpen}
@@ -98,6 +105,15 @@ export default function SocialAccountDetailPage({ params }) {
         currentProxyId={a.proxyId}
         onChanged={async () => { setSelectorOpen(false); await mutate(); }}
       />
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: CP.textSecondary }}>{label}</div>
+      <div style={{ fontSize: 15, color: CP.textPrimary, marginTop: 2 }}>{children}</div>
     </div>
   );
 }
@@ -129,26 +145,21 @@ function ProxySelectorModal({ open, onClose, accountId, currentProxyId, onChange
 
   return (
     <Modal open={open} onClose={onClose} title="Cambia proxy">
-      {err && <div style={{ color: CP.accentRed, fontSize: 12.5, marginBottom: 10 }}>{err}</div>}
+      <p style={{ margin: "0 0 12px", fontSize: 13, color: CP.textMuted, lineHeight: 1.5 }}>Compaiono solo i proxy che funzionano (ultima prova riuscita). Accanto, quanti account usano già ciascuno.</p>
+      {err && <div style={{ color: CP.accentRed, fontSize: 13, marginBottom: 10 }}>{err}</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflowY: "auto" }}>
-        <button
-          onClick={() => choose(null)}
-          disabled={saving || currentProxyId == null}
-          style={{ ...proxyOption, opacity: currentProxyId == null ? 0.5 : 1 }}
-        >
-          Nessun proxy
+        <button onClick={() => choose(null)} disabled={saving || currentProxyId == null} style={{ ...proxyOption, opacity: currentProxyId == null ? 0.5 : 1 }}>
+          Nessun proxy{currentProxyId == null ? " (attuale)" : ""}
         </button>
-        {proxies.length === 0 && (
-          <div style={{ color: CP.textMuted, fontSize: 12.5, padding: "8px 2px" }}>Nessun proxy attivo disponibile.</div>
+        {data && proxies.length === 0 && (
+          <div style={{ color: CP.textMuted, fontSize: 13, padding: "8px 2px" }}>
+            Nessun proxy funzionante disponibile. Aggiungine o provane uno in <Link href="/admin/social-proxies" style={{ color: CP.accentSoftText }}>Proxy account social</Link>.
+          </div>
         )}
+        {!data && <div style={{ color: CP.textMuted, fontSize: 13, padding: "8px 2px" }}>Caricamento…</div>}
         {proxies.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => choose(p.id)}
-            disabled={saving || p.id === currentProxyId}
-            style={{ ...proxyOption, opacity: p.id === currentProxyId ? 0.5 : 1 }}
-          >
-            <span style={{ fontFamily: FONTS.mono }}>{p.host}:{p.port}</span>
+          <button key={p.id} onClick={() => choose(p.id)} disabled={saving || p.id === currentProxyId} style={{ ...proxyOption, opacity: p.id === currentProxyId ? 0.5 : 1 }}>
+            <span>{p.host}:{p.port}{p.id === currentProxyId ? " (attuale)" : ""}</span>
             <span style={{ color: CP.textMuted, marginLeft: 8 }}>{p.provider || "—"} · {p.accountCount} account</span>
           </button>
         ))}
@@ -157,10 +168,9 @@ function ProxySelectorModal({ open, onClose, accountId, currentProxyId, onChange
   );
 }
 
-const h1 = { fontFamily: FONTS.display, fontSize: 28, margin: "8px 0 6px", fontWeight: 500, letterSpacing: "-0.02em", color: CP.textPrimary };
-const errBox = { background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, padding: 16, color: CP.textSecondary, marginTop: 16 };
-const btnGhost = { display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", background: "transparent", color: CP.accentSoftText, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 12.5, fontWeight: 500, cursor: "pointer" };
+const wrap = { padding: "28px 24px 64px", maxWidth: 900, margin: "0 auto", fontFamily: FONTS.body };
+const btnGhost = { display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: FONTS.body };
 const proxyOption = {
-  textAlign: "left", padding: "9px 12px", background: CP.bg, border: `1px solid ${CP.border}`,
-  borderRadius: 8, color: CP.textPrimary, fontSize: 13, cursor: "pointer",
+  textAlign: "left", padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`,
+  borderRadius: 8, color: CP.textPrimary, fontSize: 13.5, cursor: "pointer", fontFamily: FONTS.body,
 };
