@@ -3,44 +3,59 @@
 // Operator Signal Profile — "dove sei carente", per operatore, dal lavoro vero.
 // Vista admin (SEED). Diagnosi di coaching dai turni singoli reali; non entra
 // in score/comp. Estende /admin/academy-signals (org-level) alla grana operatore.
+//
+// Redesign 26/09/2026 (pannello tester SM/TL/BOARD/UX): 168 card una sotto
+// l'altra, con "Da lavorare" in rosso su 134 → nessuno sapeva da chi partire e
+// il rosso non significava più niente. Ora: numero principale = operatori
+// "da coachare" (metodo e resa sotto i colleghi) con gli altri tre gruppi
+// spiegati accanto; filtri per gruppo; UNA tabella ordinabile (ogni abitudine
+// è una colonna, si ordina per trovare chi è più indietro su quella); il
+// dettaglio (percorso Academy, copertura duo, link al game film) si apre al
+// clic sulla riga. Tenute tutte le dichiarazioni: solo turni singoli, metodo e
+// resa affiancati mai fusi, prezzo PPV dipende dal mix, duo = invito a guardare.
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import useSWR from "swr";
 import Link from "next/link";
+import { X } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
-import { PageHeader } from "@/components/cp-style";
+import { PageHead, HeroMetric, Metric, FilterChip, DataTable, Notice, card, NUM } from "@/components/ds";
 
 const fetcher = (url) =>
   fetch(url).then((r) => (r.ok ? r.json() : r.json().then((d) => Promise.reject(new Error(d.error || "Errore")))));
 
 const VERDICT = {
   forte: { color: CP.accentGreen, label: "forte" },
-  ok: { color: CP.textSecondary, label: "in linea" },
-  gap: { color: CP.accentRed, label: "gap" },
+  ok: { color: CP.textMuted, label: "in linea" },
+  gap: { color: CP.accentRed, label: "da allenare" },
   "n/d": { color: CP.textMuted, label: "n/d" },
 };
 
-// Quadrante metodo × resa (dal lib). Colori: verde=bene, rosso=coach, blu/viola=le
-// diagonali interessanti (metodo ≠ resa).
+// Quadrante metodo × resa (dal lib). Colori: verde=bene, rosso=coach, viola=le
+// diagonali interessanti (metodo ≠ resa). Solo come puntino-segnale.
 // short DEVE combaciare con classifyQuadrant (lib) — stessa etichetta ovunque.
 const QUAD = {
-  star: { color: CP.accentGreen, short: "Metodo e resa" },
-  potential: { color: CP.accentBlue, short: "Buone abitudini, resa sotto" },
-  fragile: { color: CP.accent, short: "Rende senza metodo" },
-  coach: { color: CP.accentRed, short: "Da coachare" },
+  star: { color: CP.accentGreen, short: "Metodo e resa", hint: "abitudini giuste e vende sopra i colleghi: da replicare" },
+  potential: { color: CP.accentSoftText, short: "Buone abitudini, resa sotto", hint: "fa le cose giuste ma vende meno: guarda creator e turni assegnati" },
+  fragile: { color: CP.accent, short: "Rende senza metodo", hint: "vende sopra i colleghi senza le abitudini: regge finché regge il creator" },
+  coach: { color: CP.accentRed, short: "Da coachare", hint: "sotto sia sulle abitudini sia sul venduto" },
 };
-const QUAD_ORDER = ["star", "potential", "fragile", "coach"];
+const QUAD_ORDER = ["coach", "potential", "fragile", "star"];
 const revVsPeers = (idx) => {
   if (idx == null) return null;
   const d = Math.round((idx - 1) * 100);
-  return `${d < 0 ? "−" : "+"}${Math.abs(d)}% vs pari`; // − U+2212 come la legenda
+  return `${d < 0 ? "−" : "+"}${Math.abs(d)}%`; // − U+2212 come la legenda
 };
 
-function QuadrantBadge({ q }) {
-  if (!q) return null;
+const btn = { padding: "8px 14px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body };
+const Dot = ({ color }) => <span style={{ width: 8, height: 8, borderRadius: 999, background: color, flexShrink: 0, display: "inline-block" }} />;
+
+function QuadrantTag({ q }) {
+  if (!q) return <span style={{ color: CP.textMuted }}>—</span>;
   const c = QUAD[q.key] || QUAD.coach;
   return (
-    <span title={q.note} style={{ fontSize: 11, color: c.color, background: `${alpha(c.color, "1c")}`, border: `1px solid ${alpha(c.color, "55")}`, padding: "2px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>
+    <span title={q.note} style={{ display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", fontSize: 13, color: CP.textSecondary }}>
+      <Dot color={c.color} />
       {q.label}
     </span>
   );
@@ -57,17 +72,17 @@ function MetricChip({ m }) {
         gap: 2,
         padding: "6px 10px",
         background: CP.bgSunken,
-        border: `1px solid ${m.verdict === "gap" ? `${alpha(CP.accentRed, "55")}` : CP.borderSoft}`,
+        border: `1px solid ${m.verdict === "gap" ? alpha(CP.accentRed, "55") : CP.borderSoft}`,
         borderRadius: 8,
-        minWidth: 92,
+        minWidth: 110,
       }}
     >
-      <span style={{ fontSize: 10.5, color: CP.textMuted }}>
+      <span style={{ fontSize: 12, color: CP.textMuted }}>
         {m.label}
-        {m.caveat && <span style={{ color: CP.accentBlue }}> *</span>}
+        {m.caveat && <span style={{ color: CP.accentSoftText }}> *</span>}
       </span>
-      <span style={{ fontSize: 13, color: CP.textPrimary, fontWeight: 500 }}>
-        {m.display} <span style={{ fontSize: 10.5, color: v.color }}>{v.label}</span>
+      <span style={{ fontSize: 14, color: CP.textPrimary, fontWeight: 500, ...NUM }}>
+        {m.display} <span style={{ fontSize: 12, fontWeight: 400, color: v.color }}>{v.label}</span>
       </span>
     </div>
   );
@@ -87,7 +102,7 @@ const fmtDateIt = (s) => {
 };
 function duoVerdictColor(r) {
   if (r.verdict === "coerente") return CP.textMuted;
-  if (r.key === "avg_ppv_price") return CP.accentBlue; // informativo, non un giudizio
+  if (r.key === "avg_ppv_price") return CP.accentSoftText; // informativo, non un giudizio
   return r.verdict === "più domande in duo" ? CP.accentRed : CP.accentGreen;
 }
 
@@ -97,40 +112,40 @@ function DuoBlock({ duo, operator }) {
   // nome export mostrato solo se differisce dal nome warehouse: espone un
   // eventuale match dubbio (stessa normalizzazione, scrittura diversa).
   const nameDiffers = duo.operator_export && operator && duo.operator_export.trim().toLowerCase() !== operator.trim().toLowerCase();
-  const meta = [nameDiffers ? `export "${duo.operator_export}"` : null, duo.msgs != null ? `${duo.msgs.toLocaleString("it-IT")} msg` : null, periodTxt].filter(Boolean).join(" · ");
+  const meta = [nameDiffers ? `export "${duo.operator_export}"` : null, duo.msgs != null ? `${duo.msgs.toLocaleString("it-IT")} messaggi` : null, periodTxt].filter(Boolean).join(" · ");
   // il flag è "forte" (rosso, bordo acceso) solo se il periodo dell'export è noto e
   // recente: altrimenti il delta può venire dallo sfasamento temporale, non dai duo.
   const liveFlag = duo.flag && !duo.stale && duo.period_known;
   const flagNote = duo.stale ? " · export vecchio" : !duo.period_known ? " · periodo sconosciuto" : "";
   return (
-    <div style={{ marginTop: 10, padding: "8px 11px", background: CP.bgSunken, border: `1px solid ${liveFlag ? `${alpha(CP.accentRed, "55")}` : CP.borderSoft}`, borderRadius: 8 }}>
-      <div style={{ fontSize: 10.5, color: CP.textMuted, marginBottom: duo.rows.length ? 6 : 0, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <span>Copertura duo — singolo (warehouse) vs tutti i turni (export)</span>
+    <div style={{ marginTop: 12, padding: "10px 12px", background: CP.bgSunken, border: `1px solid ${liveFlag ? alpha(CP.accentRed, "55") : CP.borderSoft}`, borderRadius: 8 }}>
+      <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: duo.rows.length ? 6 : 0, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ color: CP.textSecondary }}>Turni in coppia: da solo (warehouse) contro tutti i turni (export Infloww)</span>
         {duo.flag && (
           <span style={{ color: liveFlag ? CP.accentRed : CP.textMuted }} title={liveFlag ? undefined : "confronto meno affidabile: verifica il periodo dell'export"}>
-            più domande in duo{flagNote}
+            più domande in coppia{flagNote}
           </span>
         )}
         {meta && <span style={{ marginLeft: "auto" }}>{meta}</span>}
       </div>
       {duo.rows.length === 0 ? (
-        <div style={{ fontSize: 11.5, color: CP.textMuted }}>Export presente ma nessun segnale confrontabile.</div>
+        <div style={{ fontSize: 12, color: CP.textMuted }}>Export presente ma nessun segnale confrontabile.</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {duo.rows.map((r) => (
-            <div key={r.key} style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: 12, flexWrap: "wrap" }}>
-              <span style={{ color: CP.textMuted, minWidth: 118 }}>
+            <div key={r.key} style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: 13, flexWrap: "wrap", ...NUM }}>
+              <span style={{ color: CP.textMuted, minWidth: 130 }}>
                 {r.label}
-                {r.caveat && <span style={{ color: CP.accentBlue }}> *</span>}
+                {r.caveat && <span style={{ color: CP.accentSoftText }}> *</span>}
               </span>
               <span style={{ color: CP.textSecondary }}>
-                {fmtDuoVal(r.key, r.single)} <span style={{ color: CP.textMuted }}>singolo</span>
+                {fmtDuoVal(r.key, r.single)} <span style={{ color: CP.textMuted }}>da solo</span>
               </span>
               <span style={{ color: CP.textMuted }}>→</span>
               <span style={{ color: CP.textPrimary }}>
-                {fmtDuoVal(r.key, r.all)} <span style={{ color: CP.textMuted }}>tutti</span>
+                {fmtDuoVal(r.key, r.all)} <span style={{ color: CP.textMuted }}>tutti i turni</span>
               </span>
-              <span style={{ color: duoVerdictColor(r), fontSize: 11 }}>{r.verdict}</span>
+              <span style={{ color: duoVerdictColor(r), fontSize: 12 }}>{r.verdict}</span>
             </div>
           ))}
         </div>
@@ -142,20 +157,21 @@ function DuoBlock({ duo, operator }) {
 function InflowwOnly({ list }) {
   return (
     <details style={{ marginTop: 8 }}>
-      <summary style={{ cursor: "pointer", fontSize: 12, color: CP.accentSoftText }}>
-        {list.length} operatori visibili solo dall&apos;export duo
+      <summary style={{ cursor: "pointer", fontSize: 13, color: CP.accentSoftText }}>
+        {list.length} operatori visibili solo dall&apos;export Infloww
       </summary>
       <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
         {list.map((o) => (
-          <div key={o.operator} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: 12, flexWrap: "wrap" }}>
-            <span style={{ color: CP.textPrimary, minWidth: 120, fontWeight: 500 }}>{o.operator}</span>
-            <span style={{ color: CP.textMuted }}>{o.msgs != null ? o.msgs.toLocaleString("it-IT") : "—"} msg</span>
+          <div key={o.operator} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: 13, flexWrap: "wrap", ...NUM }}>
+            <span style={{ color: CP.textPrimary, minWidth: 140, fontWeight: 500 }}>{o.operator}</span>
+            <span style={{ color: CP.textMuted }}>{o.msgs != null ? o.msgs.toLocaleString("it-IT") : "—"} messaggi</span>
             {o.question_rate != null && <span style={{ color: CP.textSecondary }}>domande {Math.round(o.question_rate * 100)}%</span>}
             {o.avg_ppv_price != null && <span style={{ color: CP.textSecondary }}>PPV ${Math.round(o.avg_ppv_price)}</span>}
           </div>
         ))}
-        <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 2 }}>
-          Nessun turno singolo sufficiente per un profilo warehouse — oppure il nome nell&apos;export non combacia. Solo segnali dell&apos;export, coaching.
+        <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2 }}>
+          Non hanno abbastanza turni da soli per un profilo dal warehouse, oppure il nome nell&apos;export non combacia. Solo segnali
+          dell&apos;export, per il coaching.
         </div>
       </div>
     </details>
@@ -169,12 +185,12 @@ function FilmQueueBanner() {
   const { data } = useSWR("/api/admin/operator-film/queue", fetcher, { revalidateOnFocus: false });
   if (!data || !data.rows?.length) return null;
   return (
-    <div style={{ padding: "12px 14px", marginBottom: 14, background: CP.surface, border: `1px solid ${data.nuovi > 0 ? `${alpha(CP.accent, "55")}` : CP.border}`, borderRadius: 10 }}>
-      <div style={{ fontSize: 12.5, color: CP.textSecondary, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "baseline" }}>
-        <span style={{ color: CP.textPrimary, fontWeight: 500 }}>Coda film</span>
+    <div style={{ ...card, padding: "12px 14px", marginBottom: 14, borderColor: data.nuovi > 0 ? alpha(CP.accent, "55") : CP.border }}>
+      <div style={{ fontSize: 13, color: CP.textSecondary, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "baseline", ...NUM }}>
+        <span style={{ color: CP.textPrimary, fontWeight: 500 }}>Coda del game film</span>
         <span>{data.operators} operatori seguiti</span>
         {data.nuovi > 0 ? (
-          <span style={{ color: CP.accent, fontWeight: 500 }}>{data.nuovi} momenti nuovi da giudicare</span>
+          <span style={{ color: CP.accentSoftText, fontWeight: 500 }}>{data.nuovi} momenti nuovi da giudicare</span>
         ) : (
           <span style={{ color: CP.textMuted }}>nessun momento nuovo</span>
         )}
@@ -188,9 +204,9 @@ function FilmQueueBanner() {
               <Link
                 key={r.operator}
                 href={`/admin/operator-signals/${encodeURIComponent(r.operator)}`}
-                style={{ fontSize: 11.5, color: CP.textSecondary, background: CP.surfaceAlt, border: `1px solid ${CP.borderSoft}`, padding: "3px 10px", borderRadius: 999, textDecoration: "none" }}
+                style={{ fontSize: 12, color: CP.textSecondary, background: CP.surfaceAlt, border: `1px solid ${CP.borderSoft}`, padding: "3px 10px", borderRadius: 999, textDecoration: "none", ...NUM }}
               >
-                {r.operator} · <span style={{ color: CP.accent }}>{r.counts.nuovi}</span>
+                {r.operator} · <span style={{ color: CP.accentSoftText }}>{r.counts.nuovi}</span>
               </Link>
             ))}
         </div>
@@ -204,20 +220,20 @@ function DuoCoverageSection({ dc }) {
   if (!dc) return null;
   if (!dc.store_count) {
     return (
-      <div style={{ padding: "12px 14px", marginBottom: 14, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, fontSize: 12.5, color: CP.textSecondary }}>
-        Copertura duo: nessun export Infloww ingerito. I turni in duo restano fuori dal profilo (il warehouse non attribuisce chi ha scritto).{" "}
+      <Notice>
+        Turni in coppia: nessun export Infloww caricato, quindi restano fuori dal profilo (il warehouse non sa chi ha scritto).{" "}
         <Link href="/admin/infloww-ingest" style={{ color: CP.accentSoftText, textDecoration: "none" }}>
           Carica un export →
         </Link>
-      </div>
+      </Notice>
     );
   }
   return (
-    <div style={{ padding: "12px 14px", marginBottom: 14, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10 }}>
-      <div style={{ fontSize: 12.5, color: CP.textSecondary, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "baseline" }}>
-        <span style={{ color: CP.textPrimary, fontWeight: 500 }}>Copertura duo</span>
+    <div style={{ ...card, padding: "12px 14px", marginBottom: 14 }}>
+      <div style={{ fontSize: 13, color: CP.textSecondary, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "baseline", ...NUM }}>
+        <span style={{ color: CP.textPrimary, fontWeight: 500 }}>Turni in coppia (export Infloww)</span>
         <span>{dc.matched} con confronto</span>
-        {dc.diverging > 0 && <span style={{ color: CP.accentRed }}>{dc.diverging} con più domande in duo</span>}
+        {dc.diverging > 0 && <span style={{ color: CP.accentRed }}>{dc.diverging} fanno più domande in coppia</span>}
         {dc.infloww_only.length > 0 && <span>{dc.infloww_only.length} solo da export</span>}
         {dc.warehouse_only > 0 && <span style={{ color: CP.textMuted }}>{dc.warehouse_only} senza export</span>}
         {dc.ambiguous > 0 && (
@@ -225,8 +241,8 @@ function DuoCoverageSection({ dc }) {
             {dc.ambiguous} {dc.ambiguous === 1 ? "nome ambiguo" : "nomi ambigui"}
           </span>
         )}
-        <span style={{ marginLeft: "auto", color: CP.textMuted, fontSize: 11.5 }}>
-          export agg. {dc.store_updated_at ? new Date(dc.store_updated_at).toLocaleDateString("it-IT") : "—"}
+        <span style={{ marginLeft: "auto", color: CP.textMuted, fontSize: 12 }}>
+          export aggiornato al {dc.store_updated_at ? new Date(dc.store_updated_at).toLocaleDateString("it-IT") : "—"}
         </span>
       </div>
       {dc.infloww_only.length > 0 && <InflowwOnly list={dc.infloww_only} />}
@@ -234,68 +250,71 @@ function DuoCoverageSection({ dc }) {
   );
 }
 
-function OperatorCard({ p }) {
+function OperatorDetail({ p, onClose }) {
+  const q = p.quadrant ? QUAD[p.quadrant.key] : null;
   return (
-    <div
-      style={{
-        background: CP.surface,
-        border: `1px solid ${p.top_gap ? `${alpha(CP.accentRed, "44")}` : CP.border}`,
-        borderRadius: 12,
-        padding: "14px 16px",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, fontFamily: FONTS.display }}>{p.operator}</span>
-          <QuadrantBadge q={p.quadrant} />
-          <Link
-            href={`/admin/operator-signals/${encodeURIComponent(p.operator)}`}
-            title="Vinte da studiare e occasioni scivolate, dalle sue conversazioni reali"
-            style={{ fontSize: 11.5, color: CP.accentSoftText, textDecoration: "none", whiteSpace: "nowrap" }}
-          >
-            game film →
-          </Link>
+    <div style={{ ...card, padding: "16px 18px", marginBottom: 12, borderColor: CP.accentDim }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 17, fontWeight: 500, color: CP.textPrimary }}>{p.operator}</span>
+            <QuadrantTag q={p.quadrant} />
+          </div>
+          {p.quadrant?.note && <div style={{ fontSize: 13, color: CP.textMuted, marginTop: 2 }}>{p.quadrant.note}</div>}
         </div>
-        <div style={{ fontSize: 12, color: CP.textMuted }}>
-          {p.shifts} turni singoli · {p.msgs.toLocaleString("it-IT")} messaggi
-          {p.rev_per_h != null ? ` · $${p.rev_per_h.toLocaleString("it-IT")}/h` : ""}
-          {p.rev_index != null ? <span style={{ color: p.rev_index >= 1 ? CP.accentGreen : CP.accentRed }}>{` · ${revVsPeers(p.rev_index)}`}</span> : ""}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <Link href={`/admin/operator-signals/${encodeURIComponent(p.operator)}`} style={{ ...btn, textDecoration: "none" }}>
+            Game film: vinte e occasioni scivolate →
+          </Link>
+          <button onClick={onClose} aria-label="Chiudi" style={{ ...btn, padding: "8px 10px", display: "inline-flex" }}>
+            <X size={14} />
+          </button>
         </div>
       </div>
 
+      <div style={{ fontSize: 13, color: CP.textMuted, marginTop: 8, ...NUM }}>
+        {p.shifts} turni da solo · {p.msgs.toLocaleString("it-IT")} messaggi
+        {p.rev_per_h != null ? ` · $${p.rev_per_h.toLocaleString("it-IT")} venduti all'ora` : ""}
+        {p.rev_index != null ? (
+          <span style={{ color: p.rev_index >= 1 ? CP.accentGreen : CP.accentRed }}>{` · ${revVsPeers(p.rev_index)} rispetto ai colleghi sugli stessi creator`}</span>
+        ) : (
+          ""
+        )}
+      </div>
+
       {p.top_gap ? (
-        <div style={{ margin: "8px 0 0" }}>
-          <div style={{ fontSize: 13, color: CP.textSecondary }}>
-            <span style={{ color: CP.accentRed }}>Da lavorare — {p.top_gap.label}:</span>{" "}
-            {p.top_gap.path?.focus || p.top_gap.coaching}
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 14, color: CP.textSecondary, lineHeight: 1.5 }}>
+            <span style={{ color: CP.textPrimary, fontWeight: 500 }}>Da allenare: {p.top_gap.label}.</span> {p.top_gap.path?.focus || p.top_gap.coaching}
           </div>
           {p.top_gap.path?.scenarios?.length > 0 && (
             <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-              <span style={{ fontSize: 11, color: CP.textMuted }}>Percorso:</span>
+              <span style={{ fontSize: 12, color: CP.textMuted }}>Scenari Academy consigliati:</span>
               {p.top_gap.path.scenarios.map((s) => (
                 <span
                   key={s.id}
                   title={`${s.title} · difficoltà ${s.difficulty}/5`}
-                  style={{ fontSize: 11.5, color: CP.textSecondary, background: CP.surfaceAlt, border: `1px solid ${CP.borderSoft}`, padding: "3px 9px", borderRadius: 999 }}
+                  style={{ fontSize: 12, color: CP.textSecondary, background: CP.surfaceAlt, border: `1px solid ${CP.borderSoft}`, padding: "3px 9px", borderRadius: 999 }}
                 >
                   {s.title.length > 46 ? s.title.slice(0, 44) + "…" : s.title}
                 </span>
               ))}
-              <Link href="/" style={{ fontSize: 11.5, color: CP.accentSoftText, textDecoration: "none" }}>
+              <Link href="/" style={{ fontSize: 12, color: CP.accentSoftText, textDecoration: "none" }}>
                 apri Academy →
               </Link>
             </div>
           )}
         </div>
       ) : p.top_strength ? (
-        <div style={{ margin: "8px 0 0", fontSize: 13, color: CP.textSecondary }}>
-          <span style={{ color: CP.accentGreen }}>Punto forte — {p.top_strength.label}.</span> Nessun gap marcato sui segnali misurati.
+        <div style={{ marginTop: 12, fontSize: 14, color: CP.textSecondary }}>
+          <span style={{ color: CP.textPrimary, fontWeight: 500 }}>Punto forte: {p.top_strength.label}.</span> Nessuna abitudine chiaramente sotto
+          gli altri.
         </div>
       ) : (
-        <div style={{ margin: "8px 0 0", fontSize: 13, color: CP.textMuted }}>Profilo in linea con l&apos;org.</div>
+        <div style={{ marginTop: 12, fontSize: 14, color: CP.textMuted }}>Profilo in linea con il resto dell&apos;organizzazione.</div>
       )}
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
         {p.metrics.map((m) => (
           <MetricChip key={m.key} m={m} />
         ))}
@@ -313,6 +332,8 @@ export default function OperatorSignalsPage() {
   const [q, setQ] = useState("");
   const [onlyGaps, setOnlyGaps] = useState(false);
   const [quadFilter, setQuadFilter] = useState(null);
+  const [sel, setSel] = useState(null);
+  const detailRef = useRef(null);
 
   async function refresh() {
     setBusy(true);
@@ -350,117 +371,159 @@ export default function OperatorSignalsPage() {
     for (const p of base) if (p.quadrant) c[p.quadrant.key] = (c[p.quadrant.key] || 0) + 1;
     return c;
   }, [profiles, q, onlyGaps]);
+  // conteggi globali per il numero principale (indipendenti dai filtri)
+  const quadAll = useMemo(() => {
+    const c = { star: 0, potential: 0, fragile: 0, coach: 0 };
+    for (const p of profiles) if (p.quadrant) c[p.quadrant.key] = (c[p.quadrant.key] || 0) + 1;
+    return c;
+  }, [profiles]);
 
-  const inputStyle = { background: CP.bgSunken, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, padding: "8px 10px", outline: "none" };
+  const selected = sel ? profiles.find((p) => p.operator === sel) : null;
+  useEffect(() => {
+    if (selected && detailRef.current) detailRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [selected]);
+
+  // una colonna per abitudine, nell'ordine del lib (stessa definizione ovunque)
+  const metricDefs = (profiles.find((p) => p.metrics?.length)?.metrics || []).map((m) => ({ key: m.key, label: m.label, caveat: m.caveat }));
+  const columns = [
+    { key: "operator", label: "Operatore", render: (p) => <span style={{ fontWeight: 500 }}>{p.operator}</span> },
+    { key: "quadrant", label: "Gruppo", sort: (p) => (p.quadrant ? QUAD_ORDER.indexOf(p.quadrant.key) : 9), render: (p) => <QuadrantTag q={p.quadrant} /> },
+    { key: "top_gap", label: "Da allenare", sort: (p) => p.top_gap?.label || "~", render: (p) => (p.top_gap ? p.top_gap.label : <span style={{ color: CP.textMuted }}>—</span>) },
+    {
+      key: "rev_index", label: "Venduto vs colleghi", align: "right",
+      render: (p) => (p.rev_index == null ? <span style={{ color: CP.textMuted }}>—</span> : <span style={{ color: p.rev_index >= 1 ? CP.accentGreen : CP.accentRed }}>{revVsPeers(p.rev_index)}</span>),
+    },
+    { key: "rev_per_h", label: "Venduto all'ora", align: "right", muted: true, render: (p) => (p.rev_per_h == null ? "—" : `$${p.rev_per_h.toLocaleString("it-IT")}`) },
+    { key: "shifts", label: "Turni da solo", align: "right", muted: true },
+    ...metricDefs.map((d) => ({
+      key: `m_${d.key}`,
+      label: d.caveat ? `${d.label} *` : d.label,
+      align: "right",
+      sort: (p) => p.metrics.find((m) => m.key === d.key)?.value ?? null,
+      render: (p) => {
+        const m = p.metrics.find((x) => x.key === d.key);
+        if (!m) return "—";
+        const v = VERDICT[m.verdict] || VERDICT["n/d"];
+        return (
+          <span style={{ whiteSpace: "nowrap" }}>
+            {m.display}
+            {m.verdict !== "ok" && m.verdict !== "n/d" && <span style={{ marginLeft: 6, fontSize: 12, color: v.color }}>{v.label}</span>}
+          </span>
+        );
+      },
+    })),
+  ];
+
+  const inputStyle = { background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 999, color: CP.textPrimary, fontSize: 13, padding: "7px 12px", outline: "none", fontFamily: FONTS.body };
 
   return (
-    <div style={{ maxWidth: 920, margin: "0 auto", padding: "32px 20px 64px" }}>
-      <PageHeader
-        section="Admin · Academy"
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Training" }, { label: "Profilo operatore" }]}
         title="Profilo segnali operatore"
-        subtitle="Per ogni operatore: quanto fa le mosse che pagano (metodo) e quanto rende rispetto ai pari sugli stessi creator (resa aggiustata per il mix). Due misure separate, confrontate — non fuse: le diagonali opposte (abitudini ok ma resa bassa, o viceversa) sono le più istruttive. Turni a operatore singolo. Coaching, non score."
-        toolbar={
-          <button
-            onClick={refresh}
-            disabled={busy || data?.bigquery === false}
-            style={{ background: CP.surfaceAlt, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "8px 16px", fontSize: 13, cursor: busy ? "wait" : "pointer" }}
-          >
+        subtitle="Chi allenare e su cosa: per ogni operatore, le abitudini che fanno vendere (metodo) accanto a quanto vende rispetto ai colleghi sugli stessi creator (resa). Serve al coaching, non è uno score."
+        actions={
+          <button onClick={refresh} disabled={busy || data?.bigquery === false} style={{ ...btn, cursor: busy ? "wait" : "pointer" }}>
             {busy ? "Ricalcolo…" : "Ricalcola"}
           </button>
         }
       />
 
-      {refreshErr && (
-        <div style={{ padding: "12px 16px", marginBottom: 12, background: CP.surface, border: `1px solid ${alpha(CP.accentRed, "55")}`, borderRadius: 10, color: CP.accentRed, fontSize: 13 }}>
-          Ricalcolo fallito: {refreshErr}.
-        </div>
-      )}
+      {refreshErr && <Notice danger>Ricalcolo fallito: {refreshErr}.</Notice>}
 
       {error ? (
-        <div style={{ padding: "20px 24px", background: CP.surface, border: `1px solid ${alpha(CP.accentRed, "55")}`, borderRadius: 12, color: CP.accentRed, fontSize: 14 }}>
-          Non riesco a calcolare i profili: {error.message}.
-        </div>
+        <Notice danger>Non riesco a calcolare i profili: {error.message}.</Notice>
       ) : data?.bigquery === false ? (
-        <div style={{ padding: "20px 24px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, color: CP.textSecondary, fontSize: 14 }}>
-          BigQuery non configurato in questo ambiente: i profili non sono calcolabili.
-        </div>
+        <Notice>Il collegamento al warehouse (BigQuery) non è configurato in questo ambiente: i profili non sono calcolabili.</Notice>
       ) : isLoading ? (
         <div style={{ color: CP.textMuted, fontSize: 14 }}>Calcolo dai turni reali…</div>
       ) : (
         <>
+          {profiles.length > 0 && (
+            <HeroMetric
+              label="Da coachare: sotto i colleghi sia sulle abitudini sia sul venduto"
+              value={quadAll.coach}
+              compare={`su ${profiles.length} operatori profilati · ${withGap} hanno almeno un'abitudine da allenare`}
+              hint={`turni con un solo operatore in chat, ultimi ${data?.params?.days} giorni, almeno ${data?.params?.minOpShifts} turni a testa`}
+            >
+              <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+                {["potential", "fragile", "star"].map((k) => (
+                  <div key={k} style={{ maxWidth: 220 }}>
+                    <Metric label={QUAD[k].short} value={quadAll[k]} note={QUAD[k].hint} />
+                  </div>
+                ))}
+              </div>
+            </HeroMetric>
+          )}
+
           <FilmQueueBanner />
           <DuoCoverageSection dc={data?.duo_coverage} />
 
-          {profiles.length > 0 && (
+          {profiles.length === 0 ? (
+            <Notice>
+              Nessun operatore con abbastanza turni da solo nel periodo. I turni in coppia non entrano (non si può sapere chi ha scritto): la
+              copertura si estende caricando l&apos;export Infloww.
+            </Notice>
+          ) : (
             <>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
-                <input placeholder="Cerca operatore…" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...inputStyle, minWidth: 200 }} />
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: CP.textSecondary, cursor: "pointer" }}>
-                  <input type="checkbox" checked={onlyGaps} onChange={(e) => setOnlyGaps(e.target.checked)} />
-                  solo con gap
-                </label>
-                <span style={{ fontSize: 13, color: CP.textMuted, marginLeft: "auto" }}>
-                  {profiles.length} operatori · {withGap} con un gap da coachare
-                </span>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+                <FilterChip label={`Tutti (${quadCounts.star + quadCounts.potential + quadCounts.fragile + quadCounts.coach})`} active={!quadFilter} onClick={() => setQuadFilter(null)} />
+                {QUAD_ORDER.map((k) => (
+                  <FilterChip
+                    key={k}
+                    label={`${QUAD[k].short} (${quadCounts[k] || 0})`}
+                    active={quadFilter === k}
+                    onClick={() => setQuadFilter(quadFilter === k ? null : k)}
+                    disabled={!quadCounts[k]}
+                  />
+                ))}
+                <FilterChip label="Solo con un'abitudine da allenare" active={onlyGaps} onClick={() => setOnlyGaps(!onlyGaps)} />
+                <input placeholder="Cerca operatore…" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...inputStyle, minWidth: 180, flex: "0 1 220px" }} aria-label="Cerca operatore" />
               </div>
 
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-                {QUAD_ORDER.map((k) => {
-                  const c = QUAD[k];
-                  const active = quadFilter === k;
-                  return (
-                    <button
-                      key={k}
-                      onClick={() => setQuadFilter(active ? null : k)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        background: active ? `${alpha(c.color, "22")}` : CP.surface,
-                        border: `1px solid ${active ? c.color : CP.border}`,
-                        borderRadius: 10,
-                        padding: "8px 12px",
-                        fontSize: 12.5,
-                        color: CP.textSecondary,
-                        cursor: "pointer",
-                      }}
-                    >
-                      <span style={{ width: 8, height: 8, borderRadius: 999, background: c.color, flexShrink: 0 }} />
-                      <span style={{ color: CP.textPrimary, fontWeight: 500 }}>{quadCounts[k] || 0}</span>
-                      {c.short}
-                    </button>
-                  );
-                })}
+              <div ref={detailRef}>{selected && <OperatorDetail p={selected} onClose={() => setSel(null)} />}</div>
+
+              <DataTable
+                columns={columns}
+                rows={shown.map((p) => ({ ...p, id: p.operator }))}
+                defaultSort={{ key: "rev_index", dir: -1 }}
+                onRowClick={(p) => setSel(sel === p.operator ? null : p.operator)}
+                selected={(p) => p.operator === sel}
+                minWidth={1250}
+                maxHeight="calc(100vh - 240px)"
+                empty="Nessun operatore con questi filtri."
+              />
+              <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 8 }}>
+                Clic su una riga per il percorso di allenamento, il confronto coi turni in coppia e il game film. Clic sulle intestazioni per
+                ordinare: su un&apos;abitudine trovi chi è più indietro.
               </div>
             </>
           )}
 
-          {profiles.length === 0 ? (
-            <div style={{ padding: "20px 24px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, color: CP.textSecondary, fontSize: 14 }}>
-              Nessun operatore con abbastanza turni a operatore singolo nel periodo. I turni in duo non entrano
-              (non si può attribuire chi ha scritto) — la copertura si estende col match dell&apos;export Infloww.
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {shown.map((p) => (
-                <OperatorCard key={p.operator} p={p} />
-              ))}
-              {shown.length === 0 && <div style={{ fontSize: 13, color: CP.textMuted }}>Nessun operatore con questi filtri.</div>}
-            </div>
-          )}
-
-          <div style={{ marginTop: 16, fontSize: 12, color: CP.textMuted }}>
-            <span style={{ color: CP.accentBlue }}>*</span> Prezzo PPV: dipende in parte dal mix di creator/fan seguiti, non solo dall&apos;operatore — leggilo insieme alla cadenza.
-          </div>
-
-          <div style={{ marginTop: 12, fontSize: 12, color: CP.textMuted, lineHeight: 1.6 }}>
-            Base: turni a operatore singolo degli ultimi {data?.params?.days} giorni, min {data?.params?.minOpShifts} turni per operatore.
-            <strong> Metodo</strong>: media dei segnali comportamentali vs la distribuzione org. <strong>Resa</strong>: venduto reale ÷ venduto
-            atteso dato il mix di creator che lavora (baseline = venduto/ora dei pari sullo stesso creator) → +% sopra i pari, −% sotto. Le due
-            misure sono <strong>affiancate, mai fuse</strong>. <strong>Copertura duo</strong>: dove esiste un export Infloww per l&apos;operatore, il
-            tasso domande e il prezzo PPV del solo turno singolo (warehouse) sono affiancati agli stessi segnali su <em>tutti</em> i turni (export,
-            inclusi i duo) — la differenza riguarda anche i turni in duo. Fonti separate, finestre e definizioni diverse: è un invito a guardare,
-            non un dato contabile. Metodologia {data?.version}. Aggiornato {data?.generated_at ? new Date(data.generated_at).toLocaleString("it-IT", { timeZone: "Europe/Rome" }) : "—"}.{data?.cached ? " (cache)" : ""}
+          <div style={{ marginTop: 16, fontSize: 12, color: CP.textMuted, lineHeight: 1.6 }}>
+            <p style={{ margin: "0 0 6px" }}>
+              <span style={{ color: CP.accentSoftText }}>*</span> Prezzo PPV: dipende in parte dal mix di creator e fan seguiti, non solo
+              dall&apos;operatore. Leggilo insieme alla cadenza.
+            </p>
+            <p style={{ margin: "0 0 6px" }}>
+              <strong style={{ fontWeight: 500, color: CP.textSecondary }}>Metodo</strong>: le abitudini dell&apos;operatore confrontate con
+              quelle di tutti gli altri. <strong style={{ fontWeight: 500, color: CP.textSecondary }}>Resa</strong>: venduto reale diviso il
+              venduto atteso sui creator che lavora (quanto vendono all&apos;ora i colleghi su quegli stessi creator); +% sopra i colleghi, −%
+              sotto. Le due misure sono <strong style={{ fontWeight: 500, color: CP.textSecondary }}>affiancate, mai fuse</strong>: le coppie
+              opposte (abitudini buone ma resa bassa, o il contrario) sono le più istruttive.
+            </p>
+            <p style={{ margin: "0 0 6px" }}>
+              Base: turni con un solo operatore in chat degli ultimi {data?.params?.days} giorni, almeno {data?.params?.minOpShifts} turni per
+              operatore. <strong style={{ fontWeight: 500, color: CP.textSecondary }}>Turni in coppia</strong>: dove esiste un export Infloww
+              dell&apos;operatore, tasso di domande e prezzo PPV dei soli turni da solo (warehouse) sono affiancati agli stessi segnali su{" "}
+              <em>tutti</em> i turni (export, coppie incluse). Fonti separate, periodi e definizioni diversi: è un invito a guardare, non un dato
+              contabile.
+            </p>
+            <p style={{ margin: 0 }}>
+              Metodo {data?.version}. Aggiornato{" "}
+              {data?.generated_at ? new Date(data.generated_at).toLocaleString("it-IT", { timeZone: "Europe/Rome" }) : "—"}.
+              {data?.cached ? " (dati in cache)" : ""}
+            </p>
           </div>
         </>
       )}

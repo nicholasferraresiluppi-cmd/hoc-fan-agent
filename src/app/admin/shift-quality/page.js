@@ -9,11 +9,17 @@
  *   3. VENDUTO    net attribuito alla finestra turno (attributed_transactions)
  * + layer CONTENUTO on-demand (LLM, admin): sentiment fan, tono chatter,
  *   obiezioni, flag onestà, evidenze — uso coaching, MAI input di score/comp.
+ *
+ * Redesign 26/09/2026 (pannello tester SM/TL/UX): la pagina vuota non diceva
+ * cosa si ottiene né da dove partire → stato iniziale che lo spiega; numero
+ * principale (venduto del giorno) con la quota attribuibile accanto; sigle
+ * tradotte ("PPV p→s", "Attrib.", "k=2", "pushy"); il riquadro finale in
+ * rosso monospazio con emoji è diventato un avviso normale.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, AlertCircle, MessagesSquare, ShieldAlert, Sparkles } from "lucide-react";
+import { Loader2, ShieldAlert, Sparkles } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHeader, CpCard, StatCard, SectionLabel } from "@/components/cp-style";
+import { PageHead, HeroMetric, Metric, SectionTitle, DataTable, Notice, card, NUM } from "@/components/ds";
 
 const num = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 }));
 const usd = (v) => (v == null ? "—" : "$" + Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 }));
@@ -34,21 +40,24 @@ function yesterdayUTC() {
   return d.toISOString().slice(0, 10);
 }
 
+// Colori SOLO come segnale sulla barra; le etichette sono dati del modello (chiavi fisse)
 const SENT_COLORS = { positivo: CP.accentGreen, neutro: CP.textMuted, frustrato: CP.accentRed };
-const TONE_COLORS = { warm: CP.accentGreen, neutro: CP.textSecondary, pushy: "#e6b450", ostile: CP.accentRed };
+const TONE_COLORS = { warm: CP.accentGreen, neutro: CP.textMuted, pushy: CP.accentSoftText, ostile: CP.accentRed };
+const TONE_LABELS = { warm: "caldo", neutro: "neutro", pushy: "insistente", ostile: "ostile" };
 
-function Bars({ data, colors, total }) {
+function Bars({ data, colors, labels, total }) {
   const entries = Object.entries(data || {});
   const tot = total ?? entries.reduce((a, [, v]) => a + v, 0);
+  if (!entries.length) return <div style={{ fontSize: 13, color: CP.textMuted }}>Nessun dato.</div>;
   return (
-    <div style={{ display: "grid", gap: 7 }}>
+    <div style={{ display: "grid", gap: 8 }}>
       {entries.map(([k, v]) => (
-        <div key={k} style={{ display: "grid", gridTemplateColumns: "76px 1fr 74px", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 12.5, color: CP.textSecondary, textTransform: "capitalize" }}>{k}</span>
+        <div key={k} style={{ display: "grid", gridTemplateColumns: "minmax(70px, 110px) 1fr 80px", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 13, color: CP.textSecondary }}>{labels?.[k] || k}</span>
           <div style={{ height: 8, borderRadius: 4, background: CP.bgSunken, overflow: "hidden" }}>
-            <div style={{ width: tot ? `${(v / tot) * 100}%` : 0, height: "100%", background: colors?.[k] || CP.accent, borderRadius: 4 }} />
+            <div style={{ width: tot ? `${(v / tot) * 100}%` : 0, height: "100%", background: colors?.[k] || CP.accentDim, borderRadius: 4 }} />
           </div>
-          <span style={{ fontSize: 12.5, fontFamily: FONTS.mono, color: CP.textSecondary, textAlign: "right" }}>
+          <span style={{ fontSize: 13, color: CP.textSecondary, textAlign: "right", ...NUM }}>
             {num(v)} · {pctOf(v, tot)}
           </span>
         </div>
@@ -58,17 +67,30 @@ function Bars({ data, colors, total }) {
 }
 
 function EvidenceList({ items, tint }) {
-  if (!items?.length) return <div style={{ fontSize: 12.5, color: CP.textMuted }}>Nessuna evidenza in questa giornata.</div>;
+  if (!items?.length) return <div style={{ fontSize: 13, color: CP.textMuted }}>Nessun caso in questa giornata.</div>;
   return (
     <div style={{ display: "grid", gap: 10 }}>
       {items.map((e, i) => (
         <div key={i} style={{ borderLeft: `2px solid ${tint}`, paddingLeft: 12 }}>
-          <div style={{ fontSize: 11, fontFamily: FONTS.mono, color: CP.textMuted, marginBottom: 2 }}>
-            fan {e.uid} · {e.sentiment} / {e.tono}{e.obiezione !== "nessuna" ? ` · obiezione: ${e.obiezione}` : ""}
+          <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 2 }}>
+            fan {e.uid} · {e.sentiment} / {TONE_LABELS[e.tono] || e.tono}
+            {e.obiezione !== "nessuna" ? ` · obiezione: ${e.obiezione}` : ""}
           </div>
           <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.45 }}>{e.sintesi}</div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function Panel({ title, icon, children }) {
+  return (
+    <div style={{ ...card, padding: "14px 16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 14, fontWeight: 500, color: CP.textPrimary }}>
+        {icon}
+        {title}
+      </div>
+      {children}
     </div>
   );
 }
@@ -152,240 +174,198 @@ export default function ShiftQualityPage() {
   const t = data?.totals;
   const analysis = data?.analysis;
   const selStyle = {
-    background: CP.surface, color: CP.text, border: `1px solid ${CP.border}`,
+    background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`,
     borderRadius: 8, padding: "8px 12px", fontSize: 13, fontFamily: FONTS.body,
   };
+  const frustratedShare = analysis ? (analysis.sentiment?.frustrato || 0) / Math.max(1, analysis.convs_labeled) : null;
+
+  const shiftRows = (data?.shifts || []).map((s, i) => ({ ...s, id: i }));
+  const shiftCols = [
+    {
+      key: "start", label: "Turno", sort: (s) => Date.parse(s.start),
+      render: (s) => (
+        <span style={{ whiteSpace: "nowrap", ...NUM }}>
+          {hhmm(s.start)}–{hhmm(s.end)}
+          {s.windows && s.windows !== "reale" ? <span title="check-in mancante: orario programmato, non reale" style={{ color: CP.textMuted }}> ~</span> : null}
+          {dayMark(s.start, day) ? <span title="il turno parte in un altro giorno (ora di Roma)" style={{ marginLeft: 6, fontSize: 11, color: CP.textMuted, border: `1px solid ${CP.border}`, borderRadius: 4, padding: "1px 4px" }}>{dayMark(s.start, day)}</span> : null}
+        </span>
+      ),
+    },
+    {
+      key: "operators", label: "Operatori", sort: (s) => s.operators.join(" "),
+      render: (s) => (
+        <span>
+          {s.operators.join(" + ")}
+          {(s.members || []).length > 1 || (s.members || []).some((mm) => Math.abs(Date.parse(mm.start) - Date.parse(s.start)) > 600000 || Math.abs(Date.parse(mm.end) - Date.parse(s.end)) > 600000) ? (
+            <div style={{ marginTop: 3, fontSize: 12, color: CP.textMuted, ...NUM }}>
+              {(s.members || []).map((mm, ii) => (
+                <span key={ii}>{ii > 0 ? " · " : ""}{mm.op} {hhmm(mm.start)}→{hhmm(mm.end)}{mm.real ? "" : " ~"}</span>
+              ))}
+            </div>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      key: "attribution", label: "Chi era in chat", sort: (s) => (s.attribution === "singolo" ? 1 : s.k || 2),
+      render: (s) => (s.attribution === "singolo"
+        ? <span style={{ color: CP.textPrimary }}>1 operatore</span>
+        : <span style={{ color: CP.textMuted }} title="In coppia non si sa chi ha scritto cosa: venduto e chat non sono attribuibili al singolo">{s.k} in coppia</span>),
+    },
+    { key: "active_fans", label: "Fan attivi", align: "right", render: (s) => num(s.active_fans) },
+    { key: "op_msgs", label: "Messaggi operatore", align: "right", render: (s) => num(s.op_msgs) },
+    { key: "ppv_proposed", label: "PPV proposti → sbloccati", align: "right", render: (s) => `${num(s.ppv_proposed)} → ${num(s.ppv_unlocked)}` },
+    { key: "net_usd", label: "Venduto", align: "right", render: (s) => <span style={{ fontWeight: 500, color: s.net_usd > 0 ? CP.textPrimary : CP.textMuted }}>{usd(s.net_usd)}</span> },
+  ];
+
+  const perShiftRows = (analysis?.per_shift || []).map((s, i) => ({ ...s, id: i }));
+  const aggr = (s) => (s.tono?.pushy || 0) + (s.tono?.ostile || 0);
+  const perShiftCols = [
+    { key: "start", label: "Turno", sort: (s) => Date.parse(s.start), render: (s) => <span style={{ whiteSpace: "nowrap", ...NUM }}>{hhmm(s.start)}–{hhmm(s.end)}</span> },
+    { key: "operators", label: "Operatori", muted: true, sort: (s) => s.operators.join(" "), render: (s) => `${s.operators.join(" + ")}${s.attribution === "duo" ? " · in coppia" : ""}` },
+    { key: "convs", label: "Conversazioni lette", align: "right", render: (s) => num(s.convs) },
+    {
+      key: "frustrati", label: "Fan frustrati", align: "right", sort: (s) => (s.sentiment?.frustrato || 0) / Math.max(1, s.convs),
+      render: (s) => { const fr = s.sentiment?.frustrato || 0; return <span style={{ color: fr / Math.max(1, s.convs) > 0.25 ? CP.accentRed : CP.textSecondary }}>{num(fr)} · {pctOf(fr, s.convs)}</span>; },
+    },
+    {
+      key: "aggr", label: "Tono insistente o ostile", align: "right", sort: (s) => aggr(s) / Math.max(1, s.convs),
+      render: (s) => <span style={{ color: aggr(s) / Math.max(1, s.convs) > 0.4 ? CP.accentRed : CP.textSecondary }}>{num(aggr(s))} · {pctOf(aggr(s), s.convs)}</span>,
+    },
+    { key: "flag_onesta", label: "Segnalazioni di onestà", align: "right", render: (s) => <span style={{ color: s.flag_onesta > 0 ? CP.accentRed : CP.textMuted }}>{num(s.flag_onesta)}</span> },
+  ];
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 24px 80px" }}>
-      <PageHeader
-        section="Performance"
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Performance" }, { label: "Qualità turni" }]}
         title="Qualità turni"
-        subtitle="Turno per turno: chi era in turno, conversazioni, funnel PPV e venduto — con attribuzione onesta (singolo vs duo). Analisi contenuto on-demand per il coaching."
-        toolbar={
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <select value={creatorId} onChange={(e) => setCreatorId(e.target.value)} style={selStyle}>
+        subtitle="Com'è andata una giornata su un creator, turno per turno: chi era in chat, quanti PPV sono stati proposti e comprati, quanto si è venduto. Parti da un giorno andato male per capire in quale turno si è perso."
+        actions={
+          <>
+            <select value={creatorId} onChange={(e) => setCreatorId(e.target.value)} style={selStyle} aria-label="Creator">
               <option value="">Scegli creator…</option>
               {(creators || []).map((c) => (
                 <option key={c.creator_id} value={c.creator_id}>{c.creator_name}</option>
               ))}
             </select>
-            <input type="date" value={day} max={new Date().toISOString().slice(0, 10)}
-              onChange={(e) => setDay(e.target.value)} style={selStyle} />
-          </div>
+            <input type="date" value={day} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setDay(e.target.value)} style={selStyle} aria-label="Giorno" />
+          </>
         }
       />
 
       {loading && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, color: CP.textMuted, padding: "40px 0" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, color: CP.textMuted, fontSize: 14, padding: "12px 0" }}>
           <Loader2 size={16} className="animate-spin" /> Caricamento…
         </div>
       )}
-      {error && (
-        <CpCard style={{ marginTop: 16 }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", color: CP.accentRed, fontSize: 13 }}>
-            <AlertCircle size={15} /> {error}
-          </div>
-        </CpCard>
-      )}
+      {error && <Notice danger>{error}</Notice>}
 
       {!loading && !error && !creatorId && (
-        <CpCard style={{ marginTop: 16 }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", color: CP.textMuted, fontSize: 13.5 }}>
-            <MessagesSquare size={15} /> Scegli un creator e un giorno per vedere i turni.
-          </div>
-        </CpCard>
+        <Notice>
+          Scegli un creator in alto a destra (il giorno parte da ieri). Vedrai i turni di quella giornata con chi era in chat, i PPV proposti e
+          comprati e il venduto; poi, se serve, puoi far leggere le chat a un modello AI per trovare fan frustrati, obiezioni e vendite mancate.
+        </Notice>
       )}
 
       {!loading && !error && data && creatorId && (
         <>
-          {/* Riga stat giornata */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 18 }}>
-            <StatCard label="Venduto (giorno)" value={usd(t?.net_usd)} sub={`${num(t?.txns)} transazioni`} />
-            <StatCard label="Attribuibile a 1 operatore" value={usd(t?.singolo_net)} sub={`vs ${usd(t?.duo_net)} in turni duo`} color={CP.accentGreen} />
-            <StatCard label="PPV proposti → sbloccati" value={`${num(t?.ppv_proposed)} → ${num(t?.ppv_unlocked)}`} sub={`${pctOf(t?.ppv_unlocked || 0, t?.ppv_proposed || 0)} sblocco`} />
-            <StatCard
-              label="Fan frustrati (analisi)"
-              value={analysis ? pctOf(analysis.sentiment?.frustrato || 0, analysis.convs_labeled || 0) : "—"}
-              sub={analysis ? `${num(analysis.convs_labeled)} conversazioni lette` : "analisi non eseguita"}
-              color={analysis && analysis.sentiment?.frustrato / Math.max(1, analysis.convs_labeled) > 0.2 ? CP.accentRed : undefined}
-            />
-          </div>
-
-          {/* Turni */}
-          <SectionLabel style={{ marginTop: 28 }}>Turni del giorno (finestre = check-in reali · orari Europe/Rome · giorno UTC)</SectionLabel>
-          <CpCard style={{ marginTop: 10, padding: 0 }}>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
-                <thead>
-                  <tr style={{ borderBottom: `1px solid ${CP.border}` }}>
-                    {["Turno", "Operatori", "Attrib.", "Fan attivi", "Msg op", "PPV p→s", "Venduto"].map((h, i) => (
-                      <th key={h} style={{
-                        padding: "10px 14px", fontSize: 10, color: CP.textMuted, fontWeight: 700,
-                        letterSpacing: "0.04em", textTransform: "uppercase", textAlign: i < 2 ? "left" : "right", whiteSpace: "nowrap",
-                      }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.shifts.map((s, i) => (
-                    <tr key={i} style={{ borderBottom: i < data.shifts.length - 1 ? `1px solid ${CP.borderSoft || CP.border}` : "none" }}>
-                      <td style={{ padding: "10px 14px", fontFamily: FONTS.mono, fontSize: 13, whiteSpace: "nowrap" }}>
-                        {hhmm(s.start)}–{hhmm(s.end)}
-                        {s.windows && s.windows !== "reale" ? <span title="check-in mancante: orario schedulato" style={{ color: CP.textMuted }}> ~</span> : null}
-                        {dayMark(s.start, day) ? <span style={{ marginLeft: 6, fontSize: 10.5, color: CP.textMuted, border: `1px solid ${CP.border}`, borderRadius: 4, padding: "1px 4px" }}>{dayMark(s.start, day)}</span> : null}
-                      </td>
-                      <td style={{ padding: "10px 14px", fontSize: 13, color: CP.textSecondary }}>{s.operators.join(" + ")}
-                        {(s.members || []).length > 1 || (s.members || []).some((mm) => Math.abs(Date.parse(mm.start) - Date.parse(s.start)) > 600000 || Math.abs(Date.parse(mm.end) - Date.parse(s.end)) > 600000) ? (
-                          <div style={{ marginTop: 3, fontSize: 11, color: CP.textMuted, fontFamily: FONTS.mono }}>
-                            {(s.members || []).map((mm, ii) => (
-                              <span key={ii}>{ii > 0 ? " · " : ""}{mm.op} {hhmm(mm.start)}→{hhmm(mm.end)}{mm.real ? "" : " ~"}</span>
-                            ))}
-                          </div>
-                        ) : null}</td>
-                      <td style={{ padding: "10px 14px", textAlign: "right" }}>
-                        <span style={{
-                          fontSize: 10.5, fontFamily: FONTS.mono, fontWeight: 700, letterSpacing: "0.03em",
-                          padding: "2px 8px", borderRadius: 5,
-                          color: s.attribution === "singolo" ? CP.accentGreen : "#e6b450",
-                          background: s.attribution === "singolo" ? "rgba(74,222,128,0.09)" : "rgba(230,180,80,0.09)",
-                        }}>
-                          {s.attribution === "singolo" ? "SINGOLO" : `DUO k=${s.k}`}
-                        </span>
-                      </td>
-                      <td style={{ padding: "10px 14px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 13 }}>{num(s.active_fans)}</td>
-                      <td style={{ padding: "10px 14px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 13 }}>{num(s.op_msgs)}</td>
-                      <td style={{ padding: "10px 14px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 13 }}>
-                        {num(s.ppv_proposed)} → {num(s.ppv_unlocked)}
-                      </td>
-                      <td style={{ padding: "10px 14px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 13.5, fontWeight: 600, color: s.net_usd > 0 ? CP.text : CP.textMuted }}>
-                        {usd(s.net_usd)}
-                      </td>
-                    </tr>
-                  ))}
-                  {!data.shifts.length && (
-                    <tr><td colSpan={7} style={{ padding: "18px 14px", fontSize: 13, color: CP.textMuted }}>
-                      Nessun turno CP su questo creator in questo giorno.
-                    </td></tr>
-                  )}
-                </tbody>
-              </table>
+          <HeroMetric
+            label="Venduto nella giornata"
+            value={usd(t?.net_usd)}
+            compare={`${num(t?.txns)} transazioni · attribuite alla finestra di ogni turno`}
+            hint="indicativo, non contabile"
+          >
+            <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+              <Metric label="Attribuibile a un solo operatore" value={usd(t?.singolo_net)} note={`${usd(t?.duo_net)} in turni in coppia`} />
+              <Metric label="PPV proposti → comprati" value={`${num(t?.ppv_proposed)} → ${num(t?.ppv_unlocked)}`} note={`${pctOf(t?.ppv_unlocked || 0, t?.ppv_proposed || 0)} comprati`} />
+              <Metric
+                label="Fan frustrati"
+                value={analysis ? pctOf(analysis.sentiment?.frustrato || 0, analysis.convs_labeled || 0) : "—"}
+                note={analysis ? `su ${num(analysis.convs_labeled)} conversazioni lette` : "serve l'analisi delle chat"}
+                danger={frustratedShare != null && frustratedShare > 0.2}
+              />
             </div>
-          </CpCard>
-          <div style={{ fontSize: 11.5, color: CP.textMuted, marginTop: 8, lineHeight: 1.5 }}>
-            Venduto = transazioni attribuite alla finestra del turno (direzionale, non contabile). Nei turni <b>duo</b> il
-            venduto e le chat NON sono attribuibili al singolo operatore: ws_chat non registra chi ha scritto.
+          </HeroMetric>
+
+          <div style={{ marginTop: 22 }}>
+            <SectionTitle aside="orari di Roma · ~ = orario programmato (manca il check-in)">Turni del giorno</SectionTitle>
+          </div>
+          <DataTable columns={shiftCols} rows={shiftRows} minWidth={820} empty="Nessun turno CreatorsPro su questo creator in questo giorno." />
+          <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 8, lineHeight: 1.55 }}>
+            Venduto = transazioni cadute nella finestra del turno: indicativo, non contabile. Nei turni in coppia il venduto e le chat NON sono
+            attribuibili al singolo operatore: il warehouse non registra chi ha scritto.
           </div>
 
-          {/* Analisi contenuto */}
-          <SectionLabel style={{ marginTop: 30 }}>Analisi contenuto (LLM · coaching)</SectionLabel>
+          <div style={{ marginTop: 28 }}>
+            <SectionTitle aside="letta da un modello AI · solo per il coaching">Analisi delle chat</SectionTitle>
+          </div>
           {!analysis && (!job || job.status === "missing" || job.status === "empty") && (
-            <CpCard style={{ marginTop: 10 }}>
+            <div style={{ ...card, padding: "14px 16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
                 <div style={{ fontSize: 13, color: CP.textSecondary, maxWidth: 640, lineHeight: 1.5 }}>
-                  Legge le conversazioni del giorno e le etichetta (sentiment fan, tono chatter, obiezioni, flag onestà).
-                  Solo admin · costa API · le etichette servono al coaching e <b>non entrano in nessuno score</b>.
+                  Un modello AI legge le conversazioni del giorno e segna com&apos;era il fan a fine chat, il tono dell&apos;operatore, le obiezioni e
+                  le possibili scorrettezze. Solo admin, ha un costo per ogni giornata analizzata; le etichette servono al coaching e{" "}
+                  <strong style={{ fontWeight: 500, color: CP.textPrimary }}>non entrano in nessuno score</strong>.
                 </div>
                 <button onClick={() => startAnalysis(false)} style={{
-                  display: "flex", alignItems: "center", gap: 8, background: CP.accent, color: CP.bgSunken,
-                  border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 8, background: CP.accent, color: CP.accentInk,
+                  border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: FONTS.body,
                 }}>
                   <Sparkles size={14} /> Analizza giornata
                 </button>
               </div>
-              {analysisErr && <div style={{ marginTop: 10, fontSize: 12.5, color: CP.accentRed }}>{analysisErr}</div>}
-            </CpCard>
+              {analysisErr && <div style={{ marginTop: 10, fontSize: 13, color: CP.accentRed }}>{analysisErr}</div>}
+            </div>
           )}
           {job?.status === "running" && (
-            <CpCard style={{ marginTop: 10 }}>
+            <div style={{ ...card, padding: "14px 16px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <Loader2 size={15} className="animate-spin" style={{ color: CP.accent }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>
-                    Analisi in corso · {num(job.done)} / {num(job.total)} conversazioni
+                  <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 6, ...NUM }}>
+                    Analisi in corso · {num(job.done)} su {num(job.total)} conversazioni
                   </div>
                   <div style={{ height: 6, borderRadius: 3, background: CP.bgSunken, overflow: "hidden" }}>
                     <div style={{ width: job.total ? `${(job.done / job.total) * 100}%` : 0, height: "100%", background: CP.accent }} />
                   </div>
                 </div>
               </div>
-              {analysisErr && <div style={{ marginTop: 10, fontSize: 12.5, color: CP.accentRed }}>{analysisErr} — ricarica la pagina per riprendere.</div>}
-            </CpCard>
+              {analysisErr && <div style={{ marginTop: 10, fontSize: 13, color: CP.accentRed }}>{analysisErr}: ricarica la pagina per riprendere.</div>}
+            </div>
           )}
           {analysis && (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12, marginTop: 10 }}>
-                <CpCard>
-                  <SectionLabel size={10}>Sentiment del fan (fine chat)</SectionLabel>
-                  <div style={{ marginTop: 12 }}><Bars data={analysis.sentiment} colors={SENT_COLORS} /></div>
-                </CpCard>
-                <CpCard>
-                  <SectionLabel size={10}>Tono / metodo del chatter</SectionLabel>
-                  <div style={{ marginTop: 12 }}><Bars data={analysis.tono} colors={TONE_COLORS} /></div>
-                </CpCard>
-                <CpCard>
-                  <SectionLabel size={10}>Obiezioni (perché il fan non compra)</SectionLabel>
-                  <div style={{ marginTop: 12 }}><Bars data={analysis.obiezioni} colors={{}} /></div>
-                </CpCard>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(300px, 100%), 1fr))", gap: 12 }}>
+                <Panel title="Com'era il fan a fine chat"><Bars data={analysis.sentiment} colors={SENT_COLORS} /></Panel>
+                <Panel title="Tono dell'operatore"><Bars data={analysis.tono} colors={TONE_COLORS} labels={TONE_LABELS} /></Panel>
+                <Panel title="Obiezioni (perché il fan non compra)"><Bars data={analysis.obiezioni} colors={{}} /></Panel>
               </div>
 
-              {/* Per turno */}
-              <CpCard style={{ marginTop: 12, padding: 0 }}>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 680 }}>
-                    <thead>
-                      <tr style={{ borderBottom: `1px solid ${CP.border}` }}>
-                        {["Turno", "Operatori", "Conv. lette", "Frustrati", "Pushy+ostile", "Flag onestà"].map((h, i) => (
-                          <th key={h} style={{ padding: "10px 14px", fontSize: 10, color: CP.textMuted, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", textAlign: i < 2 ? "left" : "right", whiteSpace: "nowrap" }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {analysis.per_shift.map((s, i) => {
-                        const aggr = (s.tono?.pushy || 0) + (s.tono?.ostile || 0);
-                        const fr = s.sentiment?.frustrato || 0;
-                        return (
-                          <tr key={i} style={{ borderBottom: i < analysis.per_shift.length - 1 ? `1px solid ${CP.borderSoft || CP.border}` : "none" }}>
-                            <td style={{ padding: "9px 14px", fontFamily: FONTS.mono, fontSize: 12.5, whiteSpace: "nowrap" }}>{hhmm(s.start)}–{hhmm(s.end)}</td>
-                            <td style={{ padding: "9px 14px", fontSize: 12.5, color: CP.textSecondary }}>{s.operators.join(" + ")}{s.attribution === "duo" ? " · duo" : ""}</td>
-                            <td style={{ padding: "9px 14px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 12.5 }}>{num(s.convs)}</td>
-                            <td style={{ padding: "9px 14px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 12.5, color: fr / Math.max(1, s.convs) > 0.25 ? CP.accentRed : CP.textSecondary }}>{num(fr)} · {pctOf(fr, s.convs)}</td>
-                            <td style={{ padding: "9px 14px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 12.5, color: aggr / Math.max(1, s.convs) > 0.4 ? "#e6b450" : CP.textSecondary }}>{num(aggr)} · {pctOf(aggr, s.convs)}</td>
-                            <td style={{ padding: "9px 14px", textAlign: "right", fontFamily: FONTS.mono, fontSize: 12.5, color: s.flag_onesta > 0 ? CP.accentRed : CP.textMuted }}>{num(s.flag_onesta)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </CpCard>
+              <div style={{ marginTop: 12 }}>
+                <DataTable columns={perShiftCols} rows={perShiftRows} minWidth={720} empty="Nessun turno analizzato." />
+              </div>
 
-              {/* Evidenze */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12, marginTop: 12 }}>
-                <CpCard>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                    <ShieldAlert size={14} style={{ color: CP.accentRed }} />
-                    <SectionLabel size={10} style={{ margin: 0 }}>Flag onestà · da attenzionare</SectionLabel>
-                  </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))", gap: 12, marginTop: 12 }}>
+                <Panel title="Possibili scorrettezze: da verificare" icon={<ShieldAlert size={14} color={CP.accentRed} />}>
                   <EvidenceList items={analysis.evidenze?.onesta} tint={CP.accentRed} />
-                </CpCard>
-                <CpCard>
-                  <SectionLabel size={10}>Opportunità non chiuse</SectionLabel>
-                  <div style={{ marginTop: 12 }}><EvidenceList items={analysis.evidenze?.opportunita} tint="#e6b450" /></div>
-                </CpCard>
-                <CpCard>
-                  <SectionLabel size={10}>Rischio churn (frustrati / trattati male)</SectionLabel>
-                  <div style={{ marginTop: 12 }}><EvidenceList items={analysis.evidenze?.churn} tint={CP.accentRed} /></div>
-                </CpCard>
+                </Panel>
+                <Panel title="Vendite non chiuse">
+                  <EvidenceList items={analysis.evidenze?.opportunita} tint={CP.accentSoftText} />
+                </Panel>
+                <Panel title="Fan a rischio abbandono (frustrati o trattati male)">
+                  <EvidenceList items={analysis.evidenze?.churn} tint={CP.accentRed} />
+                </Panel>
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
-                <div style={{ fontSize: 11.5, color: CP.textMuted }}>
-                  {num(analysis.convs_labeled)} conversazioni etichettate ({analysis.convs_failed ? `${analysis.convs_failed} fallite · ` : ""}modello {analysis.model}) · generata {new Date(analysis.generated_at).toLocaleString("it-IT", { timeZone: "Europe/Rome" })}
+                <div style={{ fontSize: 12, color: CP.textMuted }}>
+                  {num(analysis.convs_labeled)} conversazioni etichettate ({analysis.convs_failed ? `${analysis.convs_failed} non riuscite · ` : ""}modello {analysis.model}) · generata{" "}
+                  {new Date(analysis.generated_at).toLocaleString("it-IT", { timeZone: "Europe/Rome" })}
                 </div>
                 <button onClick={() => startAnalysis(true)} style={{
-                  background: "transparent", color: CP.textMuted, border: `1px solid ${CP.border}`,
-                  borderRadius: 7, padding: "6px 12px", fontSize: 12, cursor: "pointer",
+                  background: CP.surface, color: CP.textSecondary, border: `1px solid ${CP.border}`,
+                  borderRadius: 8, padding: "6px 12px", fontSize: 13, cursor: "pointer", fontFamily: FONTS.body,
                 }}>
                   Rianalizza
                 </button>
@@ -393,11 +373,8 @@ export default function ShiftQualityPage() {
             </>
           )}
 
-          <div style={{
-            marginTop: 26, padding: "10px 14px", borderRadius: 8, fontSize: 11.5, fontFamily: FONTS.mono,
-            color: CP.accentRed, background: "rgba(240,140,140,0.06)", border: "1px solid rgba(240,140,140,0.18)",
-          }}>
-            ⚠ Contenuto sensibile · uso interno HOC · le etichette contenuto non entrano in score o compensi
+          <div style={{ marginTop: 22 }}>
+            <Notice>Contenuto sensibile, solo per uso interno HOC. Le etichette sulle chat non entrano in score né compensi.</Notice>
           </div>
         </>
       )}
