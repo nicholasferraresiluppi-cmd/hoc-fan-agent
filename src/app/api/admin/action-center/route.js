@@ -238,6 +238,7 @@ export async function POST(request) {
     status: prev?.status || "marked",
     swap_with: prev?.swap_with || null,
     note: prev?.note || "",
+    hr: prev?.hr || null,
   };
 
   if (action === "mark") {
@@ -248,9 +249,21 @@ export async function POST(request) {
     }
     next.swap_with = swap_with === null ? null : swap_with.trim();
   } else if (action === "set_ready") {
+    // Decisione 26/09 (comitato esperti, delega di Nicholas): verso HR si va solo
+    // con un intervento umano documentato — colloquio svolto, motivazione scritta,
+    // voce dell'operatore. È anche la prova dell'intervento umano (GDPR art. 22).
+    const hr = body?.hr || {};
+    const date = String(hr.colloquio_date || "").trim();
+    const why = String(hr.motivazione || "").trim();
+    const voice = String(hr.voce_operatore || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return Response.json({ error: "Indica la data del colloquio" }, { status: 400 });
+    if (why.length < 80) return Response.json({ error: "La motivazione deve essere di almeno 80 caratteri" }, { status: 400 });
+    if (voice.length < 10) return Response.json({ error: "Scrivi cosa ha detto l'operatore nel colloquio" }, { status: 400 });
     next.status = "ready_for_hr";
+    next.hr = { colloquio_date: date, motivazione: why.slice(0, 2000), voce_operatore: voice.slice(0, 2000), by: az.userId, at: now };
   } else if (action === "set_pending") {
     next.status = "marked";
+    next.hr = null;
   }
 
   if (typeof note === "string") next.note = note.trim();
