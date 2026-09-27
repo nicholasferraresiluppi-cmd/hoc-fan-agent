@@ -27,6 +27,11 @@ export const CHAT_SHARE = 0.25;
 export const CHAT_AVG_MIN = 35;
 export const UNDER_SCORE = 25;
 export const UNDER_MIN_SHIFTS = 5;
+// giro 2 dei visionari (27/09): meno allarmi, più credibili — Sales ambra solo se va PEGGIO della città
+// di oltre 10 punti (se cala tutta l'agenzia non è un problema di quella creator); Chatting grave solo
+// con almeno 3 operatori principali (con 2, "1 su 2" è un caso, non un segnale)
+export const SALES_REL = 0.10;
+export const CHAT_MIN_OPS = 3;
 const TTL = 3600;
 
 /** "Fishball - IT" → "Fishball"; "Cubanita" → "Cubanita". Una persona può avere più pagine (IT/EN). */
@@ -128,10 +133,10 @@ const usd = (v) => "$" + grp(v);
 const pct = (v, d = 1) => (v * 100).toLocaleString("it-IT", { maximumFractionDigits: d }) + "%";
 const monthName = (pid) => MONTHS_IT[Number(String(pid).slice(5, 7)) - 1] || pid;
 
-function salesArea(x, live) {
+function salesArea(x, live, agD = null) {
   if (!x || !x.sales) return { n: "Sales", s: "none", open: 0, late: 0, l: `Nessun venduto a ${monthName(live.period)} finora.`, src: "hoc" };
   const d = x.perShift != null && x.perShiftPrev ? x.perShift / x.perShiftPrev - 1 : null;
-  const s = d != null && d <= SALES_DROP ? "wait" : "ok";
+  const s = d != null && d <= SALES_DROP && (agD == null || d <= agD - SALES_REL) ? "wait" : "ok";
   const when = live.asOfDay ? `${monthName(live.period)} fino al ${live.asOfDay}` : monthName(live.period);
   const l = `Venduto a ${when}: ${usd(x.sales)} in ${grp(x.shifts)} turni. A turno ${usd(x.perShift)}` +
     (d != null ? `, ${d >= 0 ? "+" : "−"}${pct(Math.abs(d), 0)} rispetto a ${monthName(live.prev)} (la freccia guarda il venduto a turno, non il totale).` : ".");
@@ -150,10 +155,10 @@ function chattingArea(x) {
   if (!x || !x.ops) return { n: "Chatting", s: "none", open: 0, late: 0, l: "Nessun operatore ha questa creator come principale questo mese.", src: "hoc" };
   const avg = x.avgScore != null ? x.avgScore.toLocaleString("it-IT", { maximumFractionDigits: 1 }) : "—";
   const share = x.ops ? x.under / x.ops : 0;
-  const grave = share >= CHAT_SHARE || (x.avgScore != null && x.avgScore < CHAT_AVG_MIN);
+  const grave = x.ops >= CHAT_MIN_OPS && (share >= CHAT_SHARE || (x.avgScore != null && x.avgScore < CHAT_AVG_MIN));
   const du = x.underPrev != null ? x.under - x.underPrev : null;
   const trend = du == null ? null : du < 0 ? "up" : du > 0 ? "down" : "flat";
-  const who = x.underNames?.length ? ` (${x.underNames.slice(0, 4).join(", ")}${x.underNames.length > 4 ? "…" : ""})` : "";
+  const who = x.ops < CHAT_MIN_OPS ? " (campione piccolo: meno di 3 operatori)" : "";
   return { n: "Chatting", s: grave ? "wait" : "ok", open: 0, late: x.under, src: "hoc", trend, link: "/admin/action-center", short: `${x.under}/${x.ops} sotto soglia`,
     l: `${x.ops} ${x.ops === 1 ? "operatore lavora" : "operatori lavorano"} soprattutto qui, score vendite medio ${avg}` +
       (x.under ? `; ${x.under} sotto soglia${who}${grave ? "" : ": caso isolato, non un problema diffuso"}.` : "; nessuno sotto soglia.") };
@@ -165,10 +170,15 @@ export function mergeCityLive(snap, live, { past = false, claims = {} } = {}) {
   if (!snap?.projects || !live) return snap;
   const noHist = (a) => ({ n: a.n, s: "none", open: 0, late: 0, src: "clickup", l: "Nessuno storico ClickUp per questo mese: la fotografia di ClickUp è di oggi." });
   const swapT = (tower, areas, map) => areas.map((a) => { const b = map[a.n] || (past ? noHist(a) : { ...a, src: "clickup" }); const c = claims[`${tower}|${a.n}`]; return c ? { ...b, claim: { by: c.by, at: c.at } } : b; });
+  const agD = live.agency?.perShift != null && live.agency?.perShiftPrev ? live.agency.perShift / live.agency.perShiftPrev - 1 : null;
   const projects = snap.projects.map((p) => {
     const x = live.people[p.n];
-    return { ...p, sales: x?.sales || 0, salesPrev: x?.salesPrev || 0,
-      areas: swapT(p.n, p.areas, { Sales: salesArea(x, live), Finance: financeArea(x, live), Chatting: chattingArea(x) }) };
+    // mese scorso ALLO STESSO GIORNO (stima proporzionale: il dato giornaliero di agosto non è qui) — giro 2 visionari
+    const [py, pm] = String(live.prev).split("-").map(Number);
+    const prevDays = new Date(Date.UTC(py, pm, 0)).getUTCDate();
+    const salesPrevToDate = !past && live.asOfDay ? Math.round((x?.salesPrev || 0) * Math.min(1, live.asOfDay / prevDays)) : null;
+    return { ...p, sales: x?.sales || 0, salesPrev: x?.salesPrev || 0, salesPrevToDate,
+      areas: swapT(p.n, p.areas, { Sales: salesArea(x, live, agD), Finance: financeArea(x, live), Chatting: chattingArea(x) }) };
   });
   const ag = live.agency;
   const hq = { ...snap.hq, sales: ag.sales,
@@ -180,19 +190,26 @@ export function mergeCityLive(snap, live, { past = false, claims = {} } = {}) {
         l: `${ag.under} operatori sotto soglia (score ≤ ${UNDER_SCORE}, almeno ${UNDER_MIN_SHIFTS} turni) su ${ag.ops} in classifica.` },
     }) };
   // Da guardare: solo segnali MISURATI, pesati per gravità (le stime ClickUp non entrano in agenda)
-  const top = [];
+  const topRaw = [];
+  const top = { push: (r) => topRaw.push(r) };
   for (const p of projects) {
     const x = live.people[p.n]; if (!x) continue;
     const d = x.perShift != null && x.perShiftPrev ? x.perShift / x.perShiftPrev - 1 : null;
-    if (d != null && d <= SALES_DROP) top.push({ tower: p.n, area: "Sales", score: -d * 100, text: `venduto a turno ${pct(d, 0).replace("-", "−")} vs ${monthName(live.prev)}` });
+    if (d != null && d <= SALES_DROP && (agD == null || d <= agD - SALES_REL)) top.push({ tower: p.n, area: "Sales", score: -d * 100, text: `venduto a turno ${pct(d, 0).replace("-", "−")} vs ${monthName(live.prev)}` });
     const share = x.ops ? x.under / x.ops : 0;
-    if (x.ops && (share >= CHAT_SHARE || (x.avgScore != null && x.avgScore < CHAT_AVG_MIN))) top.push({ tower: p.n, area: "Chatting", score: share * 100 + (x.avgScore < CHAT_AVG_MIN ? 15 : 0), text: `${x.under} su ${x.ops} operatori sotto soglia` });
+    if (x.ops >= CHAT_MIN_OPS && (share >= CHAT_SHARE || (x.avgScore != null && x.avgScore < CHAT_AVG_MIN))) top.push({ tower: p.n, area: "Chatting", score: share * 100 + (x.avgScore < CHAT_AVG_MIN ? 15 : 0), text: `${x.under} su ${x.ops} operatori sotto soglia` });
     if (x.costPct != null && live.medianCostPct != null && x.costPct >= live.medianCostPct + COST_HIGH_PTS) top.push({ tower: p.n, area: "Finance", score: (x.costPct - live.medianCostPct) * 1000, text: `costo operatori ${pct(x.costPct)} (mediana ${pct(live.medianCostPct)})` });
   }
-  top.sort((a, b) => b.score - a.score);
-  const grav = {}; for (const t of top) grav[t.tower] = (grav[t.tower] || 0) + t.score;
+  // una riga per creator, motivi raggruppati (Stormy compariva due volte)
+  const byTower = {};
+  for (const r of topRaw.sort((a, b) => b.score - a.score)) {
+    const t = (byTower[r.tower] ||= { tower: r.tower, area: r.area, areas: [], score: 0, texts: [] });
+    t.areas.push(r.area); t.score += r.score; t.texts.push(r.text);
+  }
+  const grouped = Object.values(byTower).map((t) => ({ tower: t.tower, area: t.area, areas: t.areas, score: t.score, text: t.texts.join(" · ") })).sort((a, b) => b.score - a.score);
+  const grav = {}; for (const t of grouped) grav[t.tower] = t.score;
   for (const p of projects) p.gravity = Math.round(grav[p.n] || 0);
-  return { ...snap, projects, hq, top: top.slice(0, 5), live: { asOfDay: live.asOfDay, period: live.period, prev: live.prev, computed_at: live.computed_at, past, label: monthName(live.period) } };
+  return { ...snap, projects, hq, top: grouped.slice(0, 5), topCount: grouped.length, live: { asOfDay: live.asOfDay, period: live.period, prev: live.prev, computed_at: live.computed_at, past, label: monthName(live.period) } };
 }
 
 export const currentMonthId = () => monthOf();
