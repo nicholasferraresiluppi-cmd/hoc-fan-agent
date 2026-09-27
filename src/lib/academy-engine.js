@@ -122,6 +122,21 @@ ISTRUZIONI AGGIUNTIVE:
 }
 
 /**
+ * Divide il prompt del fan in parte FISSA (personaggio, creator, regole: in cache) e parte che
+ * cambia a ogni turno (lo stato emotivo): se lo stato stesse nel blocco in cache, la cache
+ * verrebbe riscritta a ogni battuta, e riscriverla costa più che non averla.
+ */
+const STATE_MARKER = "\n\nSTATO EMOTIVO ATTUALE";
+function fanSystemBlocks(systemPrompt) {
+  const i = systemPrompt.indexOf(STATE_MARKER);
+  if (i < 0) return systemPrompt;
+  return [
+    { type: "text", text: systemPrompt.slice(0, i), cache_control: { type: "ephemeral" } },
+    { type: "text", text: systemPrompt.slice(i) },
+  ];
+}
+
+/**
  * Genera la risposta del fan simulato per un turno.
  * Assume scenario o fanProfile GIÀ risolto (le route validano ed emettono 400).
  *
@@ -165,7 +180,12 @@ export async function generateFanReply({ client, scenario, fanProfile, creator, 
     // 27/09: il modello "ragiona" prima di rispondere e il ragionamento conta nel limite:
     // con 500 la risposta del fan poteva arrivare vuota. Si paga solo ciò che si usa.
     max_tokens: 2000,
-    system: systemPrompt,
+    // Costi (27/09, misurati: il fan è ~2/3 del costo di una sessione):
+    // - il personaggio del fan (~1.900 token) è identico per tutta la chat → in cache, dal 2º turno costa il 10%;
+    // - per interpretare il fan non serve ragionare: sforzo minimo (il ragionamento si paga come output).
+    // Il giudice NON è toccato: cambiarne lo sforzo potrebbe cambiare i voti (governance formula).
+    system: fanSystemBlocks(systemPrompt),
+    output_config: { effort: "low" },
     messages: claudeMessages,
   });
 

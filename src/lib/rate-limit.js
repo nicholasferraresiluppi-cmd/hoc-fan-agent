@@ -15,8 +15,8 @@ import { kv } from "@vercel/kv";
 
 // name → [{ window: secondi, max }]
 export const LIMITS = {
-  llm_chat:      [{ window: 60, max: 30 },  { window: 86400, max: 1500 }],  // un messaggio del fan simulato
-  llm_eval:      [{ window: 3600, max: 40 }, { window: 86400, max: 200 }],  // valutazioni / coach / drill
+  llm_chat:      [{ window: 60, max: 30 },  { window: 86400, max: 250 }],   // un messaggio del fan simulato (27/09: da 1500 → ~25 sessioni al giorno)
+  llm_eval:      [{ window: 3600, max: 40 }, { window: 86400, max: 60 }],   // valutazioni / coach / drill (27/09: da 200)
   bq_user:       [{ window: 3600, max: 30 }, { window: 86400, max: 150 }],  // query warehouse lato operatore
   candidate_chat:[{ window: 60, max: 20 },  { window: 86400, max: 400 }],
   candidate_eval:[{ window: 3600, max: 20 }],
