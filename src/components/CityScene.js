@@ -20,13 +20,13 @@ function mountCity(root,RAW,THREE,OrbitControls){
   const $id=(id)=>root.querySelector('#'+id);
   const VW=()=>root.clientWidth||1,VH=()=>root.clientHeight||1;
   const toXY=(e)=>{const r=root.getBoundingClientRect();return [(e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1]};
-  root.innerHTML="<div class=\"intro\" id=\"intro\"><b>La citt\u00e0</b><i></i></div>\n<canvas id=\"c\" aria-label=\"La citt\u00e0 dell'azienda: un palazzo per ogni progetto, un piano per ogni area\"></canvas>\n<div class=\"top\"><b>La citt\u00e0</b><div class=\"r\"><span class=\"tag\" id=\"tag\">HOC Pro + ClickUp</span><button class=\"pill\" id=\"snd\" aria-pressed=\"false\">Suono spento</button></div></div>\n<div class=\"shade\"></div><div class=\"labels\" id=\"labels\"></div>\n<div class=\"hero\" id=\"hero\">\n  <h1 id=\"h1\">La citt\u00e0.<br><em>Una sola citt\u00e0.</em></h1>\n  <div id=\"top5\"></div><div id=\"since\"></div><p id=\"line\">Ogni palazzo \u00e8 una creator, alto quanto il suo venduto del mese; ogni piano \u00e8 un'area. Tocca un palazzo per entrarci, o scegli un'area qui sotto per vederla in tutta la citt\u00e0.</p>\n  <div class=\"stats\"><div><b id=\"s1\">0</b><span>creator</span></div><div><b id=\"s2\">0</b><span>segnali in ritardo</span></div><div><b id=\"s3\">0</b><span>stime ClickUp da verificare</span></div></div>\n</div>\n<nav class=\"chips\" id=\"chips\" aria-label=\"Guarda un'area in tutta la citt\u00e0\"></nav>\n<aside class=\"panel\" id=\"panel\" aria-live=\"polite\"><button class=\"x\" id=\"close\">Chiudi</button><div id=\"pb\"></div></aside>";
+  root.innerHTML="<div class=\"intro\" id=\"intro\"><b>La citt\u00e0</b><i></i></div>\n<canvas id=\"c\" aria-label=\"La citt\u00e0 dell'azienda: un palazzo per ogni progetto, un piano per ogni area\"></canvas>\n<div class=\"top\"><b>La citt\u00e0</b><div class=\"r\"><span class=\"tag\" id=\"tag\">HOC Pro + ClickUp</span><button class=\"pill\" id=\"snd\" aria-pressed=\"false\">Suono spento</button></div></div>\n<div class=\"shade\"></div><div class=\"labels\" id=\"labels\"></div>\n<div class=\"hero\" id=\"hero\">\n  <h1 id=\"h1\">La citt\u00e0.<br><em>Una sola citt\u00e0.</em></h1>\n  <div id=\"top5\"></div><div id=\"since\"></div><p id=\"line\">Ogni palazzo \u00e8 una creator, alto quanto il suo venduto del mese (la sagoma dorata \u00e8 il mese scorso intero); ogni piano \u00e8 un'area. Tocca un palazzo per entrarci, o scegli un'area qui sotto per vederla in tutta la citt\u00e0.</p>\n  <div class=\"stats\"><div><b id=\"s1\">0</b><span>creator</span></div><div><b id=\"s2\">0</b><span>segnali in ritardo</span></div><div><b id=\"s3\">0</b><span>stime ClickUp da verificare</span></div></div>\n</div>\n<nav class=\"chips\" id=\"chips\" aria-label=\"Guarda un'area in tutta la citt\u00e0\"></nav>\n<aside class=\"panel\" id=\"panel\" aria-live=\"polite\"><button class=\"x\" id=\"close\">Chiudi</button><div id=\"pb\"></div></aside>";
 
 const AREAS=['HR & People','Finance','Media Buying','Marketing','Sales','Chatting'];
 let seed=7;const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280};
-const projects=RAW.projects.map(p=>({n:p.n,hq:false,areas:p.areas,total:p.total,other:p.other,nospace:!!p.nospace,sales:p.sales||0}));
+const projects=RAW.projects.map(p=>({n:p.n,hq:false,areas:p.areas,total:p.total,other:p.other,nospace:!!p.nospace,sales:p.sales||0,salesPrev:p.salesPrev||0}));
 const HQ={n:'Azienda',hq:true,areas:RAW.hq.areas,total:RAW.hq.total,other:RAW.hq.other,sales:RAW.hq.sales||0};
-const MAXS=Math.max(1,...RAW.projects.map(p=>p.sales||0));
+const MAXS=Math.max(1,...RAW.projects.map(p=>Math.max(p.sales||0,RAW.live&&!RAW.live.past?(p.salesPrev||0):0)));
 const HQMAP={'HR & People':'HR & People',Finance:'Finance','Media Buying':'Media Buying',Marketing:'Marketing',Sales:'Sales',Chatting:'Chatting'};
 const COLc={ok:'var(--ok)',wait:'var(--wait)',stop:'var(--stop)',none:'rgba(242,238,230,.16)',old:'rgba(242,238,230,.3)'},STT={ok:'In movimento',wait:'Qualcosa in ritardo',stop:'Ferma',none:'Nessuna attività',old:'Da riordinare in ClickUp'};
 const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -71,7 +71,7 @@ const ROWS=Math.ceil((projects.length+1)/5),HQR=Math.floor((ROWS-1)/2);const cel
 let pi=0;
 cells.forEach(([c,r])=>{const isHQ=(c===2&&r===HQR);if(!isHQ&&pi>=projects.length)return;const data=isHQ?HQ:projects[pi++];const x=(c-2)*CW,z=(r-(ROWS-1)/2)*CD;
   const T={data,x,z,g:new THREE.Group(),slabs:[],hq:isHQ};T.g.position.set(x,0,z);scene.add(T.g);
-  const w=isHQ?2.5:1.8,d=isHQ?1.6:1.15,t=isHQ?.1:.08,n=data.areas.length;const gap=isHQ?.72:(RAW.live?.3+.42*Math.sqrt((data.sales||0)/MAXS):.5);
+  const w=isHQ?2.5:1.8,d=isHQ?1.6:1.15,t=isHQ?.1:.08,n=data.areas.length;const gap=isHQ?.72:(RAW.live?.14+.8*((data.sales||0)/MAXS):.5);
   const pl=new THREE.Mesh(slabGeo(w+1.1,d+1.0,.1,.4,.02),plinthMat);pl.position.y=.06;pl.receiveShadow=true;pl.castShadow=true;T.g.add(pl);
   const edge=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(rrect(w+1.14,d+1.04,.42).getPoints(48).map(p=>new THREE.Vector3(p.x,.125,p.y))),new THREE.LineBasicMaterial({color:0xD9B46A,transparent:true,opacity:isHQ?.9:.45}));T.g.add(edge);
   const gGlass=slabGeo(w,d,t,.18,.03),gMetal=slabGeo(w+.12,d+.1,.025,.22,.008),gCore=new THREE.BoxGeometry(w*.8,.035,.035);
@@ -82,6 +82,7 @@ cells.forEach(([c,r])=>{const isHQ=(c===2&&r===HQR);if(!isHQ&&pi>=projects.lengt
     S.sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:COL[a.s],transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0}));S.sp.scale.set(w*1.3,.36,1);S.g.add(S.sp);
     T.g.add(S.g);T.slabs.push(S);slabs.push(S)});
   T.top=.34+(n-1)*gap+.2;
+  if(RAW.live&&!RAW.live.past&&!isHQ&&data.salesPrev>0){const gp=.14+.8*(data.salesPrev/MAXS),H=.34+(n-1)*gp+.2;const gb=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w+.34,H,d+.3)),new THREE.LineBasicMaterial({color:0xD9B46A,transparent:true,opacity:.3,depthWrite:false}));gb.position.y=H/2;T.g.add(gb);T.ghost=gb;T.ghostH=H}
   T.rod=new THREE.Mesh(new THREE.CylinderGeometry(isHQ?.04:.03,isHQ?.04:.03,1,16),goldMat);T.g.add(T.rod);
   T.cap=new THREE.Mesh(new THREE.SphereGeometry(isHQ?.1:.07,24,24),goldMat);T.g.add(T.cap);
   T.dist=Math.hypot(x,z);towers.push(T)});
@@ -98,7 +99,7 @@ const dustN=300,dp=new Float32Array(dustN*3);for(let k=0;k<dustN;k++){dp[k*3]=(M
 const dg=new THREE.BufferGeometry();dg.setAttribute('position',new THREE.BufferAttribute(dp,3));scene.add(new THREE.Points(dg,new THREE.PointsMaterial({color:0xF2EEE6,size:.035,transparent:true,opacity:.3,depthWrite:false})));
 
 // ---------- UI ----------
-{const s=RAW.since;const el=$id('since');if(s&&el){const dd=d=>new Date(d).toLocaleDateString('it-IT',{day:'numeric',month:'long'});let h='';if(s.base){const w=s.worse||[],g=s.better||[];h=`Dal ${dd(s.base)}: <b class="w">${w.length} ${w.length===1?'nuovo ritardo':'nuovi ritardi'}</b>${w.length?` (${w.slice(0,3).map(esc).join(', ')}${w.length>3?'…':''})`:''}, <b class="g">${g.length} ${g.length===1?'risolto':'risolti'}</b>${g.length?` (${g.slice(0,3).map(esc).join(', ')}${g.length>3?'…':''})`:''}.`}else{h='Lo storico è partito il 26 settembre: il confronto con la settimana prima compare dal 29.'}if((s.staleClaims||[]).length)h+=` <b class="w">${s.staleClaims.length} prese in carico ferme da oltre 7 giorni</b> (${s.staleClaims.slice(0,2).map(esc).join(', ')}).`;el.innerHTML=`<div class="since">${h}</div>`}}
+{const s=RAW.since;const el=$id('since');if(s&&el){const dd=d=>new Date(d).toLocaleDateString('it-IT',{day:'numeric',month:'long'});let h='';if(s.base){const w=s.worse||[],g=s.better||[];h=`${s.mode==='visit'?'Dalla tua ultima visita, il '+dd(s.base):'Dal '+dd(s.base)}: <b class="w">${w.length} ${w.length===1?'nuovo ritardo':'nuovi ritardi'}</b>${w.length?` (${w.slice(0,3).map(esc).join(', ')}${w.length>3?'…':''})`:''}, <b class="g">${g.length} ${g.length===1?'risolto':'risolti'}</b>${g.length?` (${g.slice(0,3).map(esc).join(', ')}${g.length>3?'…':''})`:''}.`}else{h='Lo storico è partito il 26 settembre: il confronto con la settimana prima compare dal 29.'}if((s.staleClaims||[]).length)h+=` <b class="w">${s.staleClaims.length} prese in carico ferme da oltre 7 giorni</b> (${s.staleClaims.slice(0,2).map(esc).join(', ')}).`;el.innerHTML=`<div class="since">${h}</div>`}}
 if(RAW.live?.past)$id('tag').textContent=`${RAW.live.label[0].toUpperCase()+RAW.live.label.slice(1)} · solo dati HOC Pro`;
 {const n=projects.length;const lab=RAW.live?(RAW.live.asOfDay?`${RAW.live.label} fino al ${RAW.live.asOfDay}`:RAW.live.label):'';$id('h1').innerHTML=`${(NUMW[n]||n).replace(/^./,c=>c.toUpperCase())} creator e la sede.${lab?`<br><em>${lab.replace(/^./,c=>c.toUpperCase())}.</em>`:''}`;
  const top=RAW.top||[];const el=$id('top5');if(top.length){el.innerHTML=`<div class="top5"><div class="h">DA GUARDARE QUESTA SETTIMANA</div>${top.map((x,k)=>`<button data-t="${esc(x.tower)}" data-a="${esc(x.area)}"><i>${esc(x.area)}</i><b>${esc(x.tower)}</b><span>${esc(x.text)}</span></button>`).join('')}</div>`;el.querySelectorAll('button').forEach(b=>b.onclick=()=>{const T=towers.find(t=>t.data.n===b.dataset.t);if(!T)return;selectTower(T);const k=T.data.areas.findIndex(a=>a.n===b.dataset.a);if(k>=0){hiSlab=T.slabs[k];pb.querySelectorAll('.row').forEach(x=>x.classList.toggle('hi',+x.dataset.k===k))}})}}
@@ -190,7 +191,7 @@ let flyUntil=0;const home={t:new THREE.Vector3(),d:30};
 function homeFrame(){const m=VW()<=760;
   // inquadratura MISURATA: tutta la città nello spazio a destra del testo, a qualunque larghezza
   const H=Math.max(...towers.map(T=>T.top));const pts=[];
-  towers.forEach(T=>{const w=(T.hq?2.5:1.8)/2+.6,d=(T.hq?1.6:1.15)/2+.55;for(const x of[-w,w])for(const z of[-d,d])for(const y of[0,T.top+.5])pts.push(new THREE.Vector3(T.x+x,y,T.z+z))});
+  towers.forEach(T=>{const w=(T.hq?2.5:1.8)/2+.6,d=(T.hq?1.6:1.15)/2+.55;for(const x of[-w,w])for(const z of[-d,d])for(const y of[0,Math.max(T.top,T.ghostH||0)+.5])pts.push(new THREE.Vector3(T.x+x,y,T.z+z))});
   const hr=$id('hero')?$id('hero').getBoundingClientRect():null,rr=root.getBoundingClientRect();
   const x0=hr&&hr.width?Math.min(.56,Math.max(.3,(hr.right-rr.left+28)/VW())):.4;let X=[x0*2-1,.88],Y=[-.8,.76];
   // telefono: il testo sta sotto, la città nello spazio libero sopra
@@ -241,7 +242,7 @@ function loop(){const dt=Math.min(.05,clock.getDelta()),now=performance.now(),t=
       if((S.a.s==='ok'||S.a.s==='wait')&&S.a.src!=='clickup'){S.sp.material.opacity=Math.min(1,.75*kk);S.coreMat.color.copy(COL[S.a.s]).multiplyScalar(.06+.94*Math.min(1,kk))}
       else S.coreMat.color.copy(S.a.src==='clickup'?COL[S.a.s].clone().lerp(GREY,.6):COL[S.a.s]).multiplyScalar(dim<.5?.5:1);
       const gOp=(dim<.3?.16:.7)*(filter&&areaHit&&focusT?1.25:1);S.glass.material.opacity+=(Math.min(.9,gOp)-S.glass.material.opacity)*Math.min(1,dt*(reduce?60:5));S.metal.visible=S.glass.material.opacity>.3});
-    const topY=T.slabs[0].g.position.y+.2;T.rod.scale.y=Math.max(.01,topY-.1);T.rod.position.y=(topY+.1)/2;T.cap.position.y=topY+.06;T.cap.visible=topY<T.top+1;
+    if(T.ghost)T.ghost.material.opacity=selT?(selT===T?.45:.04):(filter?.1:.3);const topY=T.slabs[0].g.position.y+.2;T.rod.scale.y=Math.max(.01,topY-.1);T.rod.position.y=(topY+.1)/2;T.cap.position.y=topY+.06;T.cap.visible=topY<T.top+1;
     // label
     v.set(T.x,topY+(T.hq?.75:.55),T.z).project(cam);const inFront=v.z<1;
     T.lbl.style.transform=`translate(${(v.x*.5+.5)*VW()}px,${(-v.y*.5+.5)*VH()}px) translate(-50%,-100%)`;

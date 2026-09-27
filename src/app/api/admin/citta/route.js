@@ -7,7 +7,8 @@ export const maxDuration = 60;
 
 import { currentUser } from "@clerk/nextjs/server";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
-import { getCitySnapshot, saveCitySnapshot, getClaims, setClaim, citySince } from "@/lib/citta";
+import { kv } from "@vercel/kv";
+import { getCitySnapshot, saveCitySnapshot, getClaims, setClaim, citySince, romeDay } from "@/lib/citta";
 import { commentClaim } from "@/lib/citta-clickup";
 import { getCityLive, mergeCityLive, currentMonthId, previousMonthId, monthLabel } from "@/lib/citta-live";
 
@@ -21,7 +22,19 @@ export async function GET(request) {
   const month = asked === prev ? prev : cur;
   const months = [{ id: cur, label: monthLabel(cur) }, { id: prev, label: monthLabel(prev) }];
   try {
-    const [live, claims, since] = await Promise.all([getCityLive(month), getClaims(), month === cur ? citySince() : { base: null }]);
+    const [live, claims, weekly] = await Promise.all([getCityLive(month), getClaims(), month === cur ? citySince() : { base: null }]);
+    // striscia "cosa è cambiato": dalla TUA ultima visita (se c'è ed è di un altro giorno), altrimenti la settimana
+    let since = weekly;
+    if (month === cur) {
+      const seenKey = `citta:seen:${az.userId}`;
+      const seen = await kv.get(seenKey).catch(() => null);
+      const today = romeDay();
+      if (seen?.day && seen.day < today) {
+        const v = await citySince(new Date(), 7, { fromDay: seen.day });
+        if (v.base) since = { ...v, mode: "visit" };
+      }
+      await kv.set(seenKey, { day: today, at: Date.now() }, { ex: 90 * 864e2 }).catch(() => {});
+    }
     const merged = mergeCityLive(snap, live, { past: month !== cur, claims: month === cur ? claims : {} });
     // prese in carico ferme: piano ancora in ritardo dopo 7 giorni dalla presa in carico
     const staleClaims = [];
@@ -29,7 +42,7 @@ export async function GET(request) {
       if (a.claim && (a.s === "wait" || a.s === "stop") && Date.now() - a.claim.at > 7 * 864e5) staleClaims.push(`${t.n} · ${a.n} (${a.claim.by})`);
     }
     // luci credibili: lampeggia solo ciò che è tra le priorità misurate o è peggiorato di recente
-    const hot = new Set([...(merged.top || []).map((x) => `${x.tower} · ${x.area}`), ...(since.worse || [])]);
+    const hot = new Set([...(merged.top || []).map((x) => `${x.tower} · ${x.area}`), ...(weekly.worse || [])]);
     for (const t of [...merged.projects, merged.hq]) for (const a of t.areas) if (hot.has(`${t.n} · ${a.n}`)) a.hot = true;
     return Response.json({ ...merged, since: { ...since, staleClaims }, months, month, canClaim: month === cur });
   } catch (e) {
