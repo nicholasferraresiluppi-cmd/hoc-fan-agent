@@ -30,13 +30,16 @@ function pickRandomArchetype() {
 
 // Competenze valutate dal coach AI. Una sola tinta per le barre (design system:
 // un solo accento): la differenza la fa l'etichetta, non il colore.
+// Nomi e spiegazioni riscritti il 27/09 (laboratorio di formazione: gli operatori sintetici non
+// capivano "dipendenza", la differenza tra naturalezza e tono, e un voto sulle obiezioni in chat
+// dove obiezioni non ce n'erano). Le chiavi restano quelle del motore di valutazione.
 const SKILL_DIMENSIONS = [
-  { key: "naturalezza", label: "Naturalezza" },
-  { key: "esclusivita", label: "Esclusività" },
-  { key: "dipendenza", label: "Dipendenza" },
-  { key: "conversione", label: "Conversione" },
-  { key: "tono", label: "Tono" },
-  { key: "gestione_obiezioni", label: "Gestione obiezioni" },
+  { key: "naturalezza", label: "Sembri una persona vera", help: "Scrivi come si scrive in chat, non come un modello di risposta: riprendi quello che ha detto lui." },
+  { key: "esclusivita", label: "Lo fai sentire unico", help: "Il messaggio vale per lui e non per cento fan: dettagli suoi, attenzioni sue." },
+  { key: "dipendenza", label: "Gli dai un motivo per tornare", help: "Lasci un seguito vero (una cosa da finire, una novità promessa). Non vuol dire legarlo a te o farlo sentire in colpa." },
+  { key: "conversione", label: "Porti alla vendita", help: "Proponi presto, con un contenuto e un prezzo chiari, e sali a gradini quando compra." },
+  { key: "tono", label: "La voce della creator", help: "Lessico, emoji e carattere sono i suoi, dall'inizio alla fine." },
+  { key: "gestione_obiezioni", label: "Rispondi ai no", help: "Quando tratta, esita o rifiuta. Se in questa chat non ci sono state obiezioni, questo voto conta poco." },
 ];
 
 // Stili condivisi della pagina (solo token CP, seguono il tema chiaro/scuro).
@@ -81,6 +84,47 @@ function FeedbackBox({ title, tone, children }) {
     <section style={{ ...card, borderLeft: `3px solid ${edge}`, padding: "16px 18px", marginBottom: 14, textAlign: "left" }}>
       <h2 style={{ margin: "0 0 10px", fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>{title}</h2>
       {children}
+    </section>
+  );
+}
+
+function QuotedMsg({ label, msg }) {
+  const text = typeof msg === "object" && msg ? (msg.text || msg.message || msg.content || JSON.stringify(msg)) : String(msg);
+  const why = typeof msg === "object" && msg ? (msg.why || msg.reason || msg.motivo || null) : null;
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 14, color: CP.textPrimary, lineHeight: 1.5, padding: "8px 12px", borderRadius: 8, background: CP.surfaceAlt }}>{text}</div>
+      {why && <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 4, lineHeight: 1.45 }}>{why}</div>}
+    </div>
+  );
+}
+
+// Le lezioni da leggere SUBITO, scelte sulla situazione appena allenata (laboratorio 27/09: senza,
+// le lezioni restavano in un'altra pagina e nessuno le collegava alla chat appena fatta).
+function LessonsForScenario({ category }) {
+  const { data } = useSWR(`/api/playbook?category=${encodeURIComponent(category)}`, (u) => fetch(u).then((r) => r.json()), { revalidateOnFocus: false });
+  const list = (data?.entries || data?.items || (Array.isArray(data) ? data : [])).filter((e) => e.source === "dedicated").slice(0, 2);
+  const ppv = category === "custom-e-upsell" || category === "mass-e-conversione";
+  if (!list.length && !ppv) return null;
+  return (
+    <section style={{ ...card, padding: "16px 18px", marginBottom: 14, textAlign: "left" }}>
+      <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>Da leggere adesso</h2>
+      <p style={{ margin: "0 0 10px", fontSize: 13, color: CP.textMuted }}>Due minuti, sulla stessa situazione che hai appena allenato. Poi rifai lo scenario.</p>
+      <div style={{ display: "grid", gap: 8 }}>
+        {list.map((e) => (
+          <Link key={e.id} href={`/playbook/${e.id}`} style={{ display: "block", padding: "10px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surfaceAlt, textDecoration: "none" }}>
+            <div style={{ fontSize: 14.5, color: CP.textPrimary, fontWeight: 500 }}>{e.title} <span style={{ color: CP.accentSoftText }}>→</span></div>
+            {e.preview && <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 2, lineHeight: 1.45 }}>{e.preview}</div>}
+          </Link>
+        ))}
+        {ppv && (
+          <Link href="/academy/lezioni" style={{ display: "block", padding: "10px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surfaceAlt, textDecoration: "none" }}>
+            <div style={{ fontSize: 14.5, color: CP.textPrimary, fontWeight: 500 }}>Lezione dal reale: vendere a gradini <span style={{ color: CP.accentSoftText }}>→</span></div>
+            <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 2, lineHeight: 1.45 }}>Estratta da migliaia di vendite vere: come si parte basso e si sale, senza scontare.</div>
+          </Link>
+        )}
+      </div>
     </section>
   );
 }
@@ -1293,9 +1337,16 @@ export default function Home() {
         {/* Punteggio */}
         <section style={{ ...card, padding: "22px", marginBottom: 14, textAlign: "center" }}>
           <Stars value={stars} />
-          <div style={{ fontSize: 56, fontWeight: 500, letterSpacing: "-0.02em", lineHeight: 1.1, color: CP.textPrimary, margin: "12px 0 6px", ...NUM }}>
-            {sessionScore.score}%
-          </div>
+          {sessionScore.compliance_fail ? (
+            <div style={{ margin: "12px 0 6px" }}>
+              <div style={{ fontSize: 40, fontWeight: 500, color: CP.textPrimary, lineHeight: 1.1 }}>Non valida</div>
+              <div style={{ fontSize: 13, color: CP.textMuted, marginTop: 4, ...NUM }}>La chat da sola varrebbe {sessionScore.score}%, ma con una riga rossa superata la sessione non conta.</div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 56, fontWeight: 500, letterSpacing: "-0.02em", lineHeight: 1.1, color: CP.textPrimary, margin: "12px 0 6px", ...NUM }}>
+              {sessionScore.score}%
+            </div>
+          )}
           <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15 }}>
             Hai guadagnato <span style={{ color: CP.accentSoftText, fontWeight: 500, ...NUM }}>+{sessionScore.xp} XP</span>
           </p>
@@ -1328,6 +1379,40 @@ export default function Home() {
             </FeedbackBox>
           </>
         )}
+
+        {sessionFeedback && (sessionFeedback.worst_message || sessionFeedback.best_message || sessionFeedback.tip) && (
+          <FeedbackBox title="Il messaggio da rifare, e il consiglio">
+            {sessionFeedback.worst_message && <QuotedMsg label="Da rifare" msg={sessionFeedback.worst_message} />}
+            {sessionFeedback.best_message && <QuotedMsg label="Il tuo migliore" msg={sessionFeedback.best_message} />}
+            {sessionFeedback.tip && <p style={{ margin: "10px 0 0", fontSize: 14, color: CP.textPrimary, lineHeight: 1.55 }}><b style={{ fontWeight: 500 }}>Per la prossima chat:</b> {sessionFeedback.tip}</p>}
+          </FeedbackBox>
+        )}
+
+        {sessionScore?.skills && (
+          <section style={{ ...card, padding: "16px 18px", marginBottom: 14, textAlign: "left" }}>
+            <h2 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>In questa chat, abilità per abilità</h2>
+            <div style={{ display: "grid", gap: 12 }}>
+              {[...SKILL_DIMENSIONS].sort((a, b) => (sessionScore.skills[a.key] ?? 101) - (sessionScore.skills[b.key] ?? 101)).map((d) => {
+                const v = sessionScore.skills[d.key];
+                if (v == null) return null;
+                return (
+                  <div key={d.key}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 14 }}>
+                      <span style={{ color: CP.textPrimary }}>{d.label}</span>
+                      <span style={{ color: CP.textPrimary, fontWeight: 500, ...NUM }}>{v}</span>
+                    </div>
+                    <div style={{ fontSize: 12.5, color: CP.textMuted, margin: "2px 0 6px", lineHeight: 1.45 }}>{d.help}</div>
+                    <div style={{ background: CP.surfaceAlt, borderRadius: 999, height: 6, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${Math.max(2, Math.min(100, v))}%`, background: CP.accent }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {selectedScenario?.category && <LessonsForScenario category={selectedScenario.category} />}
 
         {sessionScore?.signals && (
           <div style={{ marginBottom: 14, textAlign: "left" }}>
