@@ -67,16 +67,17 @@ export function V3MobileHeader({ onSearch, onMenu }) {
   );
 }
 
+// stesse voci del menu dell'operatore (27/09/2026): Oggi, Come sto andando, Compenso, Come migliorare
 const OPERATOR_TABS = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/me/score", label: "I miei score", icon: Gauge },
+  { href: "/me/turno", label: "Oggi", icon: Home },
+  { href: "/me/score", label: "Andamento", icon: Gauge },
   { href: "/me/compenso", label: "Compenso", icon: Wallet },
-  { href: "/me/percorso", label: "Percorso", icon: Compass },
+  { href: "/me/coaching", label: "Migliorare", icon: Compass },
 ];
 const ADMIN_TABS = [
   { href: "/admin", label: "Hub", icon: LayoutDashboard },
   { href: "/leaderboard/sales-cp", label: "Classifica", icon: Trophy },
-  { href: "/admin/action-center", label: "Action Center", icon: Target },
+  { href: "/admin/action-center", label: "Da seguire", icon: Target },
   { href: "/admin/pnl-live", label: "P&L", icon: Wallet },
 ];
 
