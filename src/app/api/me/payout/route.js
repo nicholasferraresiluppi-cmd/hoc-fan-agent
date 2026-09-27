@@ -11,7 +11,7 @@
  */
 import { kv } from "@vercel/kv";
 import { resolveEmployeeForUser, findLatestWagePeriod, findOwnRecord } from "@/lib/me";
-import { calcCumulativeEarning } from "@/lib/wage-calc";
+import { calcTierEarning } from "@/lib/wage-calc";
 import { getWages } from "@/lib/cp-wages-store";
 import { startedShifts } from "@/lib/creatorspro-data";
 
@@ -45,15 +45,18 @@ export async function GET(request) {
   const shifts = startedShifts(mine.shifts)
     .map((s) => {
       const sold = Number(s.total_attributed) || 0;
-      const calc = calcCumulativeEarning(sold, s.thresholds || []);
+      // regola CP verificata sui dati: scaglione raggiunto su TUTTO il venduto del turno (28/09/2026)
+      const calc = calcTierEarning(sold, s.thresholds || []);
+      const earned = Number(s.total_earnings) || 0;
       return {
         started_at: s.started_at || null,
         ended_at: s.ended_at || null,
         worked_hours: s.worked_hours ?? null,
         creators: s.creator_aliases || [],
         sold,
-        earned: Number(s.total_earnings) || 0,
-        effective_pct: calc.effective_pct,
+        earned,
+        // quota VERA (pagato/venduto), non una ricostruzione: deve tornare coi conti dell'operatore
+        effective_pct: sold > 0 ? earned / sold : calc.effective_pct,
         profile: s.payment_profile ? { name: s.payment_profile.name, cosellers: s.payment_profile.cosellers_count ?? null } : null,
         thresholds: (s.thresholds || []).map((t) => ({ from: t.threshold ?? 0, pct: t.percentage ?? 0 })),
         breakdown: calc.breakdown,
