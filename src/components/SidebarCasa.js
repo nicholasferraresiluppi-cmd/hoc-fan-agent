@@ -64,8 +64,7 @@ const OPERATOR = [
     { href: "/me/coaching", label: "Come migliorare" },
   ] },
   { title: "Allenamento", items: [
-    { href: "/", label: "Simulatore", exact: true },
-    { href: "/academy/vendere", label: "Come si vende" },
+    { href: "/", label: "Allenarsi", exact: true },
   ] },
   { title: "Noi", items: [
     { href: "/cultura", label: "Come lavoriamo" },
@@ -110,7 +109,7 @@ export default function SidebarCasa() {
   const openAlerts = (alerts?.alerts || []).filter((a) => a.status !== "resolved").length;
   // una voce che apre un gruppo di schede (lib/page-groups) resta accesa su tutte le sue schede
   const grp = groupOf(pathname);
-  const isActive = (i) => (i.exact || i.href === "/" ? pathname === i.href : pathname === i.href || pathname.startsWith(i.href + "/") || (grp && grp.tabs[0][0] === i.href));
+  const isActive = (i) => (i.exact || i.href === "/" ? pathname === i.href : pathname === i.href || pathname.startsWith(i.href + "/")) || Boolean(grp && grp.tabs[0][0] === i.href);
 
   // Pagina corrente fuori dal menu corto → si apre l'elenco completo, così si vede dove si è
   const inShort = sections.some((s) => s.items.some(isActive));

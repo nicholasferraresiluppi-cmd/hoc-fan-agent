@@ -3,6 +3,10 @@
 // dove sono (indirizzi e link invariati): nel menu e nell'hub resta una sola voce (la prima),
 // e in cima a ogni pagina del gruppo compaiono le schede per passare dall'una all'altra.
 export const PAGE_GROUPS = [
+  // Academy (28/09/2026, pannello navigazione: 20 voci di Training = metà per l'operatore, metà laboratorio admin)
+  { label: "Allenarsi", tabs: [["/", "Simulatore"], ["/academy/multi", "Chat in parallelo"], ["/academy/vendere", "Come si vende"], ["/academy/tapes", "Conversazioni vere"], ["/playbook", "Playbook di vendita"]] },
+  { label: "Classifiche Academy", tabs: [["/leaderboard", "Classifica allenamento"], ["/leaderboard/leghe", "Leghe"], ["/leaderboard/storico", "Hall of Fame"]] },
+  { label: "Laboratorio Academy", tabs: [["/admin/sessions", "Sessioni"], ["/admin/review", "Revisione voti AI"], ["/admin/outcomes", "Risultati reali"], ["/admin/qa-reviews", "QA conversazioni"], ["/admin/academy-tapes", "Curatela tape"], ["/admin/academy-signals", "Cosa fa vendere"], ["/admin/activation", "Attivazione"], ["/admin/infloww-ingest", "Carica export"], ["/admin/dashboard", "Allenamento operatori"]] },
   // pagine personali dell'operatore (pannello 27/09: "tre posti per sapere come sto andando")
   { label: "Come sto andando", tabs: [["/me/score", "Score"], ["/profilo", "Il mio mese"], ["/me/percorso", "Percorso"], ["/profilo/certificazioni", "Certificazioni"]] },
   { label: "Come migliorare", tabs: [["/me/coaching", "Coaching"], ["/me/qualita", "Qualità delle chat"]] },
