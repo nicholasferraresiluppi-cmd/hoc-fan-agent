@@ -17,6 +17,7 @@ const cleanArea = (a) => ({
   open: int(a?.open),
   late: int(a?.late),
   l: str(a?.l, 220),
+  short: str(a?.short, 24),
   who: (Array.isArray(a?.who) ? a.who : []).slice(0, 3).map((w) => str(w, 30)),
   // solo link a ClickUp (attività in ritardo più vecchia): mai URL arbitrari nella pagina
   link: /^https:\/\/app\.clickup\.com\/t\/[A-Za-z0-9]+$/.test(a?.link || "") ? a.link : null,
@@ -89,4 +90,26 @@ export async function stuckAreas(days = 14, now = new Date()) {
   const first = rows[0].states;
   const stuck = Object.keys(first).filter((k) => rows.every((r) => r.states[k] === "wait"));
   return { complete: true, stuck };
+}
+
+/** Cosa è cambiato rispetto a ~7 giorni fa (o al giorno più vecchio disponibile, almeno 3 giorni prima). */
+export async function citySince(now = new Date(), days = 7) {
+  const today = await kv.get(dayKey(romeDay(now)));
+  if (!today) return { base: null };
+  let base = null;
+  for (let k = days; k >= 3 && !base; k--) {
+    const d = romeDay(new Date(now.getTime() - k * 864e5));
+    const row = await kv.get(dayKey(d));
+    if (row) base = row;
+  }
+  if (!base) return { base: null, firstDay: null };
+  const bad = (x) => x === "wait" || x === "stop";
+  const worse = [], better = [];
+  for (const [k, st] of Object.entries(today.states)) {
+    const was = base.states[k];
+    if (was == null) continue;
+    if (bad(st) && !bad(was)) worse.push(k.replace("|", " · "));
+    if (!bad(st) && bad(was) && st !== "old" && st !== "none") better.push(k.replace("|", " · "));
+  }
+  return { base: base.day, worse, better };
 }

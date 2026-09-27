@@ -136,14 +136,14 @@ function salesArea(x, live) {
   const l = `Venduto a ${when}: ${usd(x.sales)} in ${grp(x.shifts)} turni. A turno ${usd(x.perShift)}` +
     (d != null ? `, ${d >= 0 ? "+" : "−"}${pct(Math.abs(d), 0)} rispetto a ${monthName(live.prev)} (la freccia guarda il venduto a turno, non il totale).` : ".");
   const trend = d == null ? null : d >= 0.05 ? "up" : d <= -0.05 ? "down" : "flat";
-  return { n: "Sales", s, open: 0, late: 0, l, src: "hoc", trend, link: x.topAlias ? `/leaderboard/creators/${encodeURIComponent(x.topAlias)}` : "/leaderboard/creators" };
+  return { n: "Sales", s, open: 0, late: 0, l, src: "hoc", trend, short: d != null ? `${d >= 0 ? "+" : "−"}${pct(Math.abs(d), 0)} a turno` : usd(x.sales), link: x.topAlias ? `/leaderboard/creators/${encodeURIComponent(x.topAlias)}` : "/leaderboard/creators" };
 }
 function financeArea(x, live) {
   if (!x || x.costPct == null) return { n: "Finance", s: "none", open: 0, late: 0, l: "Nessun venduto: costo operatori non calcolabile.", src: "hoc" };
   const high = live.medianCostPct != null && x.costPct >= live.medianCostPct + COST_HIGH_PTS;
   const dc = x.costPctPrev != null ? x.costPct - x.costPctPrev : null;
   const trend = dc == null ? null : dc <= -0.01 ? "up" : dc >= 0.01 ? "down" : "flat";
-  return { n: "Finance", s: high ? "wait" : "ok", open: 0, late: 0, src: "hoc", trend, link: "/admin/pnl-live",
+  return { n: "Finance", s: high ? "wait" : "ok", open: 0, late: 0, src: "hoc", trend, link: "/admin/pnl-live", short: `costo ${pct(x.costPct)}`,
     l: `Costo operatori ${pct(x.costPct)} del venduto` + (live.medianCostPct != null ? ` (mediana delle creator ${pct(live.medianCostPct)}${high ? ": costo alto" : ""}).` : ".") };
 }
 function chattingArea(x) {
@@ -154,7 +154,7 @@ function chattingArea(x) {
   const du = x.underPrev != null ? x.under - x.underPrev : null;
   const trend = du == null ? null : du < 0 ? "up" : du > 0 ? "down" : "flat";
   const who = x.underNames?.length ? ` (${x.underNames.slice(0, 4).join(", ")}${x.underNames.length > 4 ? "…" : ""})` : "";
-  return { n: "Chatting", s: grave ? "wait" : "ok", open: 0, late: x.under, src: "hoc", trend, link: "/admin/action-center",
+  return { n: "Chatting", s: grave ? "wait" : "ok", open: 0, late: x.under, src: "hoc", trend, link: "/admin/action-center", short: `${x.under}/${x.ops} sotto soglia`,
     l: `${x.ops} ${x.ops === 1 ? "operatore lavora" : "operatori lavorano"} soprattutto qui, score vendite medio ${avg}` +
       (x.under ? `; ${x.under} sotto soglia${who}${grave ? "" : ": caso isolato, non un problema diffuso"}.` : "; nessuno sotto soglia.") };
 }
@@ -175,7 +175,7 @@ export function mergeCityLive(snap, live, { past = false, claims = {} } = {}) {
     areas: swapT(snap.hq.n, snap.hq.areas, {
       Sales: salesArea({ ...ag }, live),
       Finance: financeArea({ costPct: ag.costPct, costPctPrev: ag.costPctPrev }, { ...live, medianCostPct: null }),
-      Chatting: { n: "Chatting", s: ag.under ? "wait" : "ok", open: 0, late: ag.under, src: "hoc", link: "/admin/action-center",
+      Chatting: { n: "Chatting", s: ag.under ? "wait" : "ok", open: 0, late: ag.under, src: "hoc", link: "/admin/action-center", short: `${ag.under}/${ag.ops} sotto soglia`,
         trend: ag.underPrev == null ? null : ag.under < ag.underPrev ? "up" : ag.under > ag.underPrev ? "down" : "flat",
         l: `${ag.under} operatori sotto soglia (score ≤ ${UNDER_SCORE}, almeno ${UNDER_MIN_SHIFTS} turni) su ${ag.ops} in classifica.` },
     }) };
