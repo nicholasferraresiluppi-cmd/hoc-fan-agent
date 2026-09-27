@@ -37,17 +37,24 @@ export default function SettimanaPage() {
       e.reasons.push(reason);
       Object.assign(e, Object.fromEntries(Object.entries(extra).filter(([, v]) => v != null)));
     };
-    for (const c of ac?.candidates || []) add(c.employee, 100 - (c.score || 0), `sotto soglia (score ${dec(c.score)})`, { creator: c.cp_breakdown?.top_creator || c.group || null });
+    // creator principale dalla classifica (la lista dell'Action Center porta il GRUPPO, non la creator)
+    const creatorOf = Object.fromEntries((rank?.ranking || []).map((r) => [r.employee, r.cp_breakdown?.top_creator || null]));
+    // l'Action Center manda una lista più larga (fino a 50) e la pagina filtra alla soglia: qui lo stesso
+    const thr = ac?.config?.score_threshold_default_ui ?? 25, minSh = ac?.config?.min_shifts ?? 5;
+    for (const c of ac?.candidates || []) {
+      if (c.score == null || c.score > thr || (c.total_shifts ?? c.cp_aggregates?.total_shifts ?? minSh) < minSh) continue;
+      add(c.employee, 100 - (c.score || 0), `sotto soglia (score ${dec(c.score)})`, { creator: creatorOf[c.employee] || null });
+    }
     const prevBy = Object.fromEntries((rankPrev?.ranking || []).map((r) => [r.employee, r.score]));
     for (const r of rank?.ranking || []) {
       const p = prevBy[r.employee];
       if (r.score == null || p == null || (r.cp_aggregates?.total_shifts || 0) < 5) continue;
       const d = r.score - p;
-      if (d <= -15) add(r.employee, 60 + Math.abs(d), `in calo di ${dec(Math.abs(d))} punti sul mese scorso (${dec(p)} → ${dec(r.score)})`, { creator: r.cp_breakdown?.top_creator || null });
+      if (d <= -15) add(r.employee, 60 + Math.abs(d), `in calo di ${dec(Math.abs(d))} punti sul mese scorso (${dec(p)} → ${dec(r.score)})`, { creator: creatorOf[r.employee] || null });
     }
     for (const c of cc?.candidates || []) {
       if (c.assignment?.status === "completed") continue;
-      add(c.employee, 40 + (50 - (c.score || 50)), `da far crescere (score ${dec(c.score)})`, { creator: c.top_creator || null, training: c.training?.categoryName || null, why: c.training?.rationale || null, assigned: c.assignment?.status || null });
+      add(c.employee, 40 + (50 - (c.score || 50)), `da far crescere (score ${dec(c.score)})`, { creator: creatorOf[c.employee] || c.top_creator || null, training: c.training?.categoryName || null, why: c.training?.rationale || null, assigned: c.assignment?.status || null });
     }
     return Object.values(byName).sort((a, b) => b.pri - a.pri).slice(0, 5);
   }, [rank, rankPrev, ac, cc]);
