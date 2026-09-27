@@ -21,6 +21,7 @@ export async function GET() {
           email: u.emailAddresses?.[0]?.emailAddress || null,
           lastSignInAt: u.lastSignInAt || null,
           createdAt: u.createdAt || null,
+          banned: Boolean(u.banned),
         };
       });
       if (data.length < 100) break;
@@ -35,6 +36,7 @@ export async function GET() {
       email: nameMap[uid]?.email || null,
       last_sign_in_at: nameMap[uid]?.lastSignInAt || null,
       created_at: nameMap[uid]?.createdAt || null,
+      banned: nameMap[uid]?.banned || false,
       roles: await getUserRoles(uid),
       caps: await getEffectiveCapabilities(uid).catch(() => ({})),
     }))

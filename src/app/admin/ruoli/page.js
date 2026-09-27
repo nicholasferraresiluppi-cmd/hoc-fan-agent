@@ -109,6 +109,24 @@ export default function MembersPage() {
     load();
   };
 
+  // Accesso: sospendi (reversibile) / riattiva / elimina (definitivo, conferma con l'email)
+  const memberAction = async (row, action) => {
+    let confirmText = null;
+    if (action === "suspend" && !confirm(`Sospendere l'accesso di ${row.name}? Esce subito dall'app e non può più entrare. Ruoli e dati restano: puoi riattivarlo quando vuoi.`)) return;
+    if (action === "reactivate" && !confirm(`Riattivare l'accesso di ${row.name}? Rientra con i ruoli di prima.`)) return;
+    if (action === "delete") {
+      confirmText = prompt(`Eliminare DEFINITIVAMENTE l'account di ${row.name}? Non si può annullare (di solito basta sospendere).\n\nPer confermare scrivi la sua email: ${row.email || ""}`);
+      if (confirmText == null) return;
+    }
+    setBusy(row.userId);
+    const r = await fetch("/api/admin/members", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: row.userId, action, confirm: confirmText }) });
+    const j = await r.json().catch(() => ({}));
+    setMsg(r.ok ? { type: "ok", text: j.text } : { type: "error", text: j.error || "Operazione non riuscita" });
+    if (r.ok && action === "delete") setEditing(null);
+    setBusy(null);
+    load();
+  };
+
   const openEditor = (userId) => {
     setEditing(editing === userId ? null : userId);
     if (editing !== userId) setTimeout(() => editRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
@@ -123,6 +141,7 @@ export default function MembersPage() {
   const allRoleIds = [...(roles?.predefined || []), ...(roles?.custom || []).map((c) => c.id)];
   const pending = invites?.pending || [];
   const neverIn = allRows.filter((r) => !r.last_sign_in_at).length;
+  const suspended = allRows.filter((r) => r.banned).length;
   const editRow = allRows.find((r) => r.userId === editing) || null;
 
   const columns = [
@@ -130,7 +149,7 @@ export default function MembersPage() {
       key: "name", label: "Persona", sort: (r) => (r.name || "").toLowerCase(),
       render: (r) => (
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 14, color: CP.textPrimary }}>{r.name}</div>
+          <div style={{ fontSize: 14, color: r.banned ? CP.textMuted : CP.textPrimary }}>{r.name}{r.banned && <span style={{ marginLeft: 8, fontSize: 11.5, padding: "1px 7px", borderRadius: 999, border: `1px solid ${CP.border}`, color: CP.textSecondary }}>accesso sospeso</span>}</div>
           <div style={{ fontSize: 12, color: CP.textMuted, overflow: "hidden", textOverflow: "ellipsis" }}>{r.email || "—"}</div>
         </div>
       ),
@@ -183,6 +202,7 @@ export default function MembersPage() {
           {allRows.length} {allRows.length === 1 ? "membro" : "membri"}
           {canInvite && ` · ${pending.length} ${pending.length === 1 ? "invito in attesa" : "inviti in attesa"}`}
           {` · ${neverIn} ${neverIn === 1 ? "non è mai entrato" : "non sono mai entrati"}`}
+          {suspended > 0 && ` · ${suspended} ${suspended === 1 ? "sospeso" : "sospesi"}`}
         </div>
       )}
 
@@ -272,6 +292,16 @@ export default function MembersPage() {
                     ))}
                   </div>
                 )}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 14, paddingTop: 12, borderTop: `1px solid ${CP.borderSoft}` }}>
+                <div style={{ fontSize: 13, color: CP.textSecondary, marginRight: "auto" }}>
+                  Accesso: {editRow.banned ? <b style={{ fontWeight: 500, color: CP.textPrimary }}>sospeso</b> : "attivo"}
+                  <span style={{ color: CP.textMuted }}> · sospendere è reversibile (ruoli e dati restano); eliminare no</span>
+                </div>
+                {editRow.banned
+                  ? <button style={smallBtn} disabled={busy === editRow.userId} onClick={() => memberAction(editRow, "reactivate")}>Riattiva accesso</button>
+                  : <button style={smallBtn} disabled={busy === editRow.userId} onClick={() => memberAction(editRow, "suspend")}>Sospendi accesso</button>}
+                <button style={{ ...smallBtn, color: CP.accentRed, borderColor: alpha(CP.accentRed, "55") }} disabled={busy === editRow.userId} onClick={() => memberAction(editRow, "delete")}>Elimina account…</button>
               </div>
             </div>
           )}
