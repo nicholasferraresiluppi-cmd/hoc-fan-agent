@@ -17,7 +17,8 @@
  *   { ranking[], groupMeansCp, total, eligible_total, no_cp_count,
  *     cp_available, agency_stats, categories, language_counts, category_counts }
  */
-import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
+import { CAPABILITIES } from "@/lib/rbac";
+import { authorizeScoped, allowsCreator, scopeSummary } from "@/lib/creator-scope";
 import { kv } from "@vercel/kv";
 import { buildOperatorsForCpLeaderboard, hasCpDataForPeriod } from "@/lib/creatorspro-data";
 import { buildCpLeaderboard } from "@/lib/creatorspro-score";
@@ -29,7 +30,7 @@ const VALID_CATEGORIES = ["Big", "Medium", "Small", "Uncategorized"];
 const VALID_LANGUAGES = ["eng", "ita", "none"];
 
 export async function GET(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeScoped(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);
@@ -75,7 +76,10 @@ export async function GET(request) {
     });
 
   // Build score (v3: deriva da creator-matrix con percentile blending)
-  const { ranking: scored, groupMeansCp } = await buildCpLeaderboard(decorated, period_id);
+  const { ranking: scoredAll, groupMeansCp } = await buildCpLeaderboard(decorated, period_id);
+  // visibilità per creator: lo score resta calcolato su tutti (percentili veri), si mostrano
+  // solo gli operatori la cui creator PRINCIPALE è tra quelle assegnate
+  const scored = az.creatorScope.all ? scoredAll : scoredAll.filter((r) => allowsCreator(az.creatorScope, r.cp_breakdown?.top_creator));
 
   // Filtri di vista (post-score per non perdere counts globali)
   let view = scored;
@@ -127,7 +131,8 @@ export async function GET(request) {
     period_id,
     cp_available: true,
     ranking: view,
-    groupMeansCp,
+    groupMeansCp: az.creatorScope.all ? groupMeansCp : Object.fromEntries(Object.entries(groupMeansCp || {}).filter(([g]) => allowsCreator(az.creatorScope, g))),
+    visibility: scopeSummary(az.creatorScope),
     groups: Array.from(eligibleGroups).sort(),
     total: view.length,
     eligible_total: eligibleView.length,

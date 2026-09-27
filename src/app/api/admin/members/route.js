@@ -10,6 +10,21 @@
 import { clerkClient } from "@clerk/nextjs/server";
 import { authorizeAdmin, auditAccess, setUserRoles } from "@/lib/rbac";
 import { isUserIdAdminRaw } from "@/lib/admin";
+import { setAssignedCreators, personOf } from "@/lib/creator-scope";
+import { buildCreatorMatrix } from "@/lib/creator-aggregates";
+
+// GET: le creator assegnabili (persone con turni nel mese corrente o nel precedente)
+export async function GET() {
+  const a = await authorizeAdmin();
+  if (!a.ok) return Response.json({ error: a.message }, { status: a.status });
+  const now = new Date();
+  const ids = [0, 1].map((k) => { const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - k, 1)); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`; });
+  const set = new Set();
+  for (const pid of ids) {
+    try { const { creators } = await buildCreatorMatrix(pid); for (const alias of Object.keys(creators || {})) set.add(personOf(alias)); } catch {}
+  }
+  return Response.json({ creators: [...set].filter(Boolean).sort((x, y) => x.localeCompare(y)) });
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +37,12 @@ export async function POST(request) {
   const userId = String(body?.userId || "").slice(0, 80);
   const action = body?.action;
   if (!/^user_[A-Za-z0-9]+$/.test(userId)) return Response.json({ error: "Membro non valido." }, { status: 400 });
-  if (!["suspend", "reactivate", "delete"].includes(action)) return Response.json({ error: "Azione non valida." }, { status: 400 });
+  if (!["suspend", "reactivate", "delete", "creators"].includes(action)) return Response.json({ error: "Azione non valida." }, { status: 400 });
+  if (action === "creators") {
+    const s = await setAssignedCreators(userId, body?.all ? { all: true } : { creators: body?.creators || [] }, a.userId);
+    await auditAccess(a.userId, "member_creators", { target: userId, all: s.all, creators: s.creators });
+    return Response.json({ ok: true, creators: s, text: s.all ? "Ora vede tutte le creator." : s.creators.length ? `Ora vede ${s.creators.length} creator.` : "Nessuna creator: non vede dati di vendita." });
+  }
   if (userId === a.userId) return Response.json({ error: "Non puoi farlo sul tuo account." }, { status: 400 });
 
   const cc = await clerkClient();

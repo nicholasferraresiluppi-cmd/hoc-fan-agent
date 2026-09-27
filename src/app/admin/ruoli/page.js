@@ -59,12 +59,14 @@ export default function MembersPage() {
   const [busy, setBusy] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [creatorList, setCreatorList] = useState([]);
   const editRef = useRef(null);
 
   const load = async () => {
     const [r, i] = await Promise.all([getJson("/api/admin/roles"), getJson("/api/admin/invitations")]);
     setRoles(r.ok ? r.data : { denied: true, error: r.data?.error });
     setInvites(i.ok ? i.data : { denied: true, error: i.data?.error });
+    getJson("/api/admin/members").then((c) => c.ok && setCreatorList(c.data?.creators || []));
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -139,6 +141,15 @@ export default function MembersPage() {
     load();
   };
 
+  const saveCreators = async (row, value) => {
+    setBusy(row.userId);
+    const r = await fetch("/api/admin/members", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: row.userId, action: "creators", all: value.all, creators: value.creators }) });
+    const j = await r.json().catch(() => ({}));
+    setMsg(r.ok ? { type: "ok", text: `${row.name}: ${j.text}` } : { type: "error", text: j.error || "Salvataggio non riuscito" });
+    setBusy(null);
+    load();
+  };
+
   const openEditor = (userId) => {
     setEditing(editing === userId ? null : userId);
     if (editing !== userId) setTimeout(() => editRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
@@ -173,6 +184,13 @@ export default function MembersPage() {
         <RoleChips ids={r.roles} label={roleLabel} />
       </div>
     ) },
+    {
+      key: "vis", label: "Creator visibili", sort: (r) => (r.admin || r.creators?.all ? 999 : r.creators?.creators?.length || 0),
+      render: (r) => (r.admin ? <span style={{ color: CP.textSecondary }}>tutte (admin)</span>
+        : r.creators?.all ? <span style={{ color: CP.textSecondary }}>tutte</span>
+        : r.creators?.creators?.length ? <span title={r.creators.creators.join(", ")} style={{ color: CP.textSecondary }}>{r.creators.creators.length === 1 ? r.creators.creators[0] : `${r.creators.creators.length} creator`}</span>
+        : <span style={{ color: CP.textMuted }}>nessuna</span>),
+    },
     {
       key: "last", label: "Ultimo accesso", sort: (r) => r.last_sign_in_at || 0,
       render: (r) => (r.last_sign_in_at ? <span style={{ color: CP.textSecondary }}>{fmtDate(r.last_sign_in_at)}</span> : <span style={{ color: CP.textMuted }}>mai entrato</span>),
@@ -287,6 +305,13 @@ export default function MembersPage() {
                   ? <span style={{ fontSize: 12, color: CP.textMuted }}>fisso: si toglie dalle impostazioni di Vercel</span>
                   : <button style={smallBtn} disabled={busy === editRow.userId} onClick={() => toggleAdmin(editRow)}>{editRow.admin ? "Togli da admin" : "Rendi admin"}</button>}
               </div>
+              {!editRow.admin && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Creator visibili: vede classifiche, creator, Action e Coaching Center solo di queste (si salva subito)</div>
+                  <CreatorPicker list={creatorList} value={editRow.creators || { all: false, creators: [] }} disabled={busy === editRow.userId} onChange={(v) => saveCreators(editRow, v)} />
+                  {!editRow.creators?.all && !editRow.creators?.creators?.length && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 6 }}>Nessuna creator: non vede dati di vendita (le sue pagine personali restano).</div>}
+                </div>
+              )}
               <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Ruoli: clic per aggiungere o togliere (si salva subito)</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
                 {allRoleIds.map((rid) => {
@@ -348,6 +373,7 @@ export default function MembersPage() {
       {showAdd && (
         <AddMemberModal
           assignable={invites?.assignable || []}
+          creatorList={creatorList}
           onClose={() => setShowAdd(false)}
           onDone={(text) => { setShowAdd(false); setMsg({ type: "ok", text }); load(); }}
         />
@@ -367,8 +393,24 @@ function RoleChips({ ids, label }) {
   );
 }
 
-function AddMemberModal({ assignable, onClose, onDone }) {
+// Scelta delle creator visibili: "Tutte" oppure un sottoinsieme (vale per persona, tutte le sue pagine)
+function CreatorPicker({ list, value, onChange, disabled }) {
+  const sel = new Set(value?.creators || []);
+  const chip = (on) => ({ padding: "5px 11px", borderRadius: 999, fontSize: 13, fontFamily: FONTS.body, cursor: disabled ? "wait" : "pointer", border: `1px solid ${on ? CP.accent : CP.border}`, background: on ? CP.accentSoft : CP.surface, color: on ? CP.accentSoftText : CP.textSecondary });
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      <button type="button" disabled={disabled} aria-pressed={!!value?.all} style={chip(!!value?.all)} onClick={() => onChange(value?.all ? { all: false, creators: [] } : { all: true, creators: [] })}>{value?.all ? "✓ " : ""}Tutte</button>
+      {!value?.all && list.map((c) => {
+        const on = sel.has(c);
+        return <button type="button" key={c} disabled={disabled} aria-pressed={on} style={chip(on)} onClick={() => { const n = new Set(sel); on ? n.delete(c) : n.add(c); onChange({ all: false, creators: [...n].sort() }); }}>{on ? "✓ " : ""}{c}</button>;
+      })}
+    </div>
+  );
+}
+
+function AddMemberModal({ assignable, creatorList = [], onClose, onDone }) {
   const [email, setEmail] = useState("");
+  const [vis, setVis] = useState({ all: false, creators: [] });
   const [picked, setPicked] = useState(assignable.some((r) => r.id === "operator") ? ["operator"] : []);
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState(null);
@@ -387,7 +429,7 @@ function AddMemberModal({ assignable, onClose, onDone }) {
     const r = await fetch("/api/admin/invitations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, roles: picked }),
+      body: JSON.stringify({ email, roles: picked, creators: vis.all ? "*" : vis.creators }),
     });
     const j = await r.json().catch(() => ({}));
     setSending(false);
@@ -426,6 +468,13 @@ function AddMemberModal({ assignable, onClose, onDone }) {
           })}
         </div>
 
+        {creatorList.length > 0 && !picked.every((r) => r === "operator") && (
+          <>
+            <label style={{ display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Creator visibili</label>
+            <div style={{ marginBottom: 6 }}><CreatorPicker list={creatorList} value={vis} onChange={setVis} /></div>
+            <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 16 }}>Vedrà classifiche e dati solo di queste creator. Si cambia quando vuoi da Membri.</div>
+          </>
+        )}
         {err && <div style={{ fontSize: 13, color: CP.accentRed, marginBottom: 14 }}>{err}</div>}
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>

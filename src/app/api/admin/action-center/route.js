@@ -25,7 +25,8 @@
  * DELETE ?period_id=YYYY-MM&employee=N → rimuove entry (unmark)
  */
 import { kv } from "@vercel/kv";
-import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { CAPABILITIES } from "@/lib/rbac";
+import { authorizeScoped, allowsCreator, canActOnEmployee, scopeSummary } from "@/lib/creator-scope";
 import { logAuditAction } from "@/lib/audit-log";
 import { buildCreatorMatrix, computeSwapSuggestions } from "@/lib/creator-aggregates";
 import { buildOperatorsForCpLeaderboard, hasCpDataForPeriod } from "@/lib/creatorspro-data";
@@ -50,7 +51,8 @@ const TOP_N = 200;                     // Max candidati ritornati (cap di sicure
 function isValidPeriod(p) { return typeof p === "string" && /^\d{4}-\d{2}$/.test(p); }
 
 export async function GET(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  // 27/09/2026: da solo admin a chi guida una squadra (sales manager, team lead), limitato alle sue creator
+  const az = await authorizeScoped(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);
@@ -73,7 +75,7 @@ export async function GET(request) {
     loadGroupCategories(),
     loadGroupLanguages(),
   ]);
-  const swapsObj = swaps || {};
+  const swapsAll = swaps || {};
   const ignoredObj = ignored || {};
 
   // Decora ogni operator con language (override > regex) e category
@@ -84,6 +86,9 @@ export async function GET(request) {
 
   // Calcola score con buildCpLeaderboard (deriva da matrix v3)
   const { ranking } = await buildCpLeaderboard(operatorsDecorated, period_id);
+  // decisioni già prese: solo sugli operatori delle creator visibili
+  const visibleEmp = new Set(ranking.filter((r) => allowsCreator(az.creatorScope, r.cp_breakdown?.top_creator)).map((r) => r.employee));
+  const swapsObj = az.creatorScope.all ? swapsAll : Object.fromEntries(Object.entries(swapsAll).filter(([e]) => visibleEmp.has(e)));
 
   // Filtra underperformers (allargato a SCORE_MAX_BACKEND, UI poi filtra con slider)
   const rawCandidates = ranking
@@ -93,7 +98,7 @@ export async function GET(request) {
       const totalShifts = r.cp_aggregates?.total_shifts || 0;
       if (totalShifts < UNDERPERFORMER_MIN_SHIFTS) return false;
       if (ignoredObj[r.employee]) return false;
-      return true;
+      return allowsCreator(az.creatorScope, r.cp_breakdown?.top_creator);
     })
     .sort((a, b) => a.score - b.score) // peggiore primo
     .slice(0, TOP_N);
@@ -198,6 +203,7 @@ export async function GET(request) {
   // Lista candidati per swap (operatori "buoni" non in underperformer list)
   const swapTargets = ranking
     .filter((r) => r.score != null && r.score >= 50) // Good+
+    .filter((r) => allowsCreator(az.creatorScope, r.cp_breakdown?.top_creator))
     .filter((r) => (r.cp_aggregates?.total_shifts || 0) >= 3)
     .sort((a, b) => b.score - a.score)
     .map((r) => ({
@@ -237,6 +243,7 @@ export async function GET(request) {
     ignored_count: Object.keys(ignoredObj).length,
     ready_for_hr: readyForHr,
     swaps: swapsObj,
+    visibility: scopeSummary(az.creatorScope),
     filter_counts: {
       languages: langCounts,
       tiers: tierCounts,
@@ -251,7 +258,7 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorizeScoped(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   let body;
@@ -264,6 +271,7 @@ export async function POST(request) {
   const validActions = ["mark", "set_swap", "set_ready", "set_pending", "set_agreement"];
   if (!validActions.includes(action)) return Response.json({ error: `action must be ${validActions.join("|")}` }, { status: 400 });
 
+  if (!(await canActOnEmployee(az.creatorScope, employee, period_id))) return Response.json({ error: "Questo operatore non lavora sulle creator assegnate a te." }, { status: 403 });
   const key = SWAP_KEY(period_id);
   const swaps = (await kv.get(key)) || {};
   const prev = swaps[employee] || null;
@@ -333,13 +341,14 @@ export async function POST(request) {
 }
 
 export async function DELETE(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorizeScoped(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);
   const period_id = url.searchParams.get("period_id");
   const employee = url.searchParams.get("employee");
   if (!isValidPeriod(period_id)) return Response.json({ error: "period_id YYYY-MM required" }, { status: 400 });
+  if (employee && !(await canActOnEmployee(az.creatorScope, employee, period_id))) return Response.json({ error: "Questo operatore non lavora sulle creator assegnate a te." }, { status: 403 });
   if (!employee) return Response.json({ error: "?employee=NAME required" }, { status: 400 });
 
   const key = SWAP_KEY(period_id);

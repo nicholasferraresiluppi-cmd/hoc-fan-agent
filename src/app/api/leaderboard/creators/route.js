@@ -10,12 +10,13 @@
  *
  * Response: { period_id, creators[], suggestions[]?, total_sales_agency }
  */
-import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
+import { CAPABILITIES } from "@/lib/rbac";
+import { authorizeScoped, allowsCreator, scopeSummary } from "@/lib/creator-scope";
 import { buildCreatorMatrix, computeMatchSuggestions } from "@/lib/creator-aggregates";
 import { hasCpDataForPeriod } from "@/lib/creatorspro-data";
 
 export async function GET(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeScoped(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);
@@ -34,7 +35,7 @@ export async function GET(request) {
   }
 
   const { creators, operators } = await buildCreatorMatrix(period_id);
-  const list = Object.values(creators).sort((a, b) => b.total_sales - a.total_sales);
+  const list = Object.values(creators).filter((c) => allowsCreator(az.creatorScope, c.alias)).sort((a, b) => b.total_sales - a.total_sales);
   // Aggiungi rank
   list.forEach((c, i) => { c.rank = i + 1; });
 
@@ -43,7 +44,7 @@ export async function GET(request) {
   const avgPerShift = totalShifts > 0 ? Math.round((totalAgency / totalShifts) * 100) / 100 : 0;
 
   let suggestions = null;
-  if (includeSuggestions) {
+  if (includeSuggestions && az.creatorScope.all) {
     suggestions = await computeMatchSuggestions(period_id);
   }
 
@@ -51,12 +52,13 @@ export async function GET(request) {
     period_id,
     cp_available: true,
     creators: list,
+    visibility: scopeSummary(az.creatorScope),
     creators_count: list.length,
     total_sales_agency: totalAgency,
     total_shifts: totalShifts,
     avg_sales_per_shift_agency: avgPerShift,
     avg_sales_per_creator: list.length > 0 ? Math.round(totalAgency / list.length) : 0,
     suggestions,
-    operators_count: Object.keys(operators).length,
+    operators_count: az.creatorScope.all ? Object.keys(operators).length : null,
   });
 }
