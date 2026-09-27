@@ -3,11 +3,12 @@
  * Body: { fingerprint, name? } (name = display name, l'identità vera è az.userId).
  * Stato globale di team: chiunque con SCORES_VIEW "all" vede chi l'ha in carico.
  */
+import { authorizeAllCreators } from "@/lib/creator-scope";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { ackAlert } from "@/lib/ops-alerts";
 
 export async function POST(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   let body = {};

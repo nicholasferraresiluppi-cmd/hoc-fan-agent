@@ -3,6 +3,7 @@ import { viewAsFor } from "@/lib/view-as";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { isUserIdAdmin, isUserIdAdminRaw, userHasMfa, adminMfaRequired } from "@/lib/admin";
 import { getUserRole, getUserRoles, getUserTeam, getEffectiveCapabilities } from "@/lib/rbac";
+import { getCreatorScope } from "@/lib/creator-scope";
 
 export async function GET() {
   try {
@@ -13,7 +14,10 @@ export async function GET() {
     const role = await getUserRole(userId); // primario (retrocompat)
     const roles = await getUserRoles(userId); // multi
     const team = await getUserTeam(userId);
-    const capabilities = await getEffectiveCapabilities(userId); // unione
+    const capabilities = { ...(await getEffectiveCapabilities(userId)) }; // unione
+    // visibilità per creator (27/09/2026): per il MENU, "vede tutte le creator" come pseudo-permesso
+    const cs = await getCreatorScope(userId).catch(() => null);
+    if (cs?.all) capabilities["creators.all"] = "all";
     const adminRaw = admin || (await isUserIdAdminRaw(userId));
     // appena attivata la 2FA la cache del controllo si aggiorna subito
     if (adminRaw && user?.twoFactorEnabled) await kv.set(`mfa:ok:${userId}`, 1, { ex: 600 }).catch(() => {});

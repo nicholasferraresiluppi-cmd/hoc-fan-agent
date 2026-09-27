@@ -26,6 +26,7 @@
  *      I totali per creator sono calcolati su TUTTI gli operatori eligible del
  *      periodo (ignorando i filtri di vista) per non far cambiare la % col filtro.
  */
+import { authorizeAllCreators } from "@/lib/creator-scope";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { kv } from "@vercel/kv";
 import { buildLeaderboard } from "@/lib/leaderboard-calc";
@@ -118,7 +119,7 @@ function decorateCreatorImpact(op, aggregates) {
 }
 
 export async function GET(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);

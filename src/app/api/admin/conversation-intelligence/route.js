@@ -1,6 +1,7 @@
 // Conversation Intelligence · Tier-1 — presidio chat per creator (metadata-only da BigQuery).
 // Dati denaro/performance → gate scope "all".
 
+import { authorizeAllCreators } from "@/lib/creator-scope";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { getConversationIntelligence, bigQueryConfigured } from "@/lib/conversation-intelligence";
 
@@ -8,7 +9,7 @@ export const runtime = "nodejs"; // il client BigQuery usa crypto → no Edge
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   if (!bigQueryConfigured()) {

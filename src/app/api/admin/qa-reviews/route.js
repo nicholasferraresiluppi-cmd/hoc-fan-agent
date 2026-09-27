@@ -13,11 +13,12 @@
  * Le review sono definitive: niente PUT/DELETE. Un errore di valutazione si
  * corregge con una nuova review e una nota — mai riscrivendo la storia.
  */
+import { authorizeAllCreators } from "@/lib/creator-scope";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { createReview, listAllReviews, listReviewsForEmployee, QA_DIMENSIONS } from "@/lib/qa-reviews";
 
 export async function GET(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const { searchParams } = new URL(request.url);
@@ -27,7 +28,7 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   let body;
