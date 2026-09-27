@@ -195,7 +195,7 @@ export default function SalesCpLeaderboardPage() {
       />
       {tutorialOpen && <ScoreTutorialModal onClose={() => setTutorialOpen(false)} />}
 
-      {isLoading && !data && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
+      {(isLoading || !url) && !data && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
       {data?.error && (
         <Notice danger>{data.error} <Link href="/admin/creatorspro-sync" style={{ color: CP.accentSoftText }}>Vai al sync CP →</Link></Notice>
       )}
