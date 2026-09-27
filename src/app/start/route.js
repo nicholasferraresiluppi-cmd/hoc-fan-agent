@@ -1,5 +1,5 @@
 // Atterraggio dopo il login: chi gestisce (vede i dati di tutta l'org: admin,
-// sales manager, QA) va all'Hub, gli operatori all'Academy ("/").
+// sales manager, QA) va all'Hub; chi fa i turni (pilota) al suo turno; gli altri all'Academy ("/").
 // Usato come fallbackRedirectUrl di <SignIn>/<SignUp> e dal middleware quando
 // un utente non loggato apre la radice: un link profondo (es. /admin/sales-coaching)
 // resta invece rispettato, perché Clerk usa il redirect_url quando c'è.
@@ -15,6 +15,8 @@ export async function GET(request) {
   let dest = "/";
   try {
     if ((await getScope(userId, CAPABILITIES.SCORES_VIEW)) === "all") dest = "/admin";
+    // operatrice del pilota: è venuta per il turno o i soldi, non per allenarsi (pannello 27/09)
+    else if (await getScope(userId, CAPABILITIES.COPILOT_PILOT)) dest = "/me/turno";
   } catch {
     /* in dubbio, Academy: è la pagina che tutti possono aprire */
   }
