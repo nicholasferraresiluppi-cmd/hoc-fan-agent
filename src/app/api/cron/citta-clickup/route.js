@@ -11,6 +11,14 @@ import { recordCityDay, getCitySnapshot } from "@/lib/citta";
 import { getCityLive, mergeCityLive } from "@/lib/citta-live";
 import { refreshCityFromClickup } from "@/lib/citta-clickup";
 
+async function recordAndSettle(merged) {
+  const n = await recordCityDay(merged);
+  const { settleClaims, trackTop } = await import("@/lib/citta");
+  await settleClaims(merged).catch(() => {});
+  await trackTop(merged).catch(() => {});
+  return n;
+}
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -24,7 +32,7 @@ async function run(request) {
   const t0 = Date.now();
   try {
     const r = await refreshCityFromClickup();
-    await recordCityDay(mergeCityLive(await getCitySnapshot(), await getCityLive())).catch(() => {});
+    await recordAndSettle(mergeCityLive(await getCitySnapshot(), await getCityLive())).catch(() => {});
     await kv.set("cron:heartbeat:citta-clickup", { at: Date.now(), via: viaCron ? "cron" : "session", ms: Date.now() - t0, ...r }, { ex: 40 * 24 * 3600 }).catch(() => {});
     return Response.json({ ok: true, ms: Date.now() - t0, ...r });
   } catch (e) {

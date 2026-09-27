@@ -90,6 +90,7 @@ function CityTable({ data, bar }) {
 export default function CittaPage() {
   const [month, setMonth] = useState(null);
   const [view, setView] = useState("city");
+  const [mineOnly, setMineOnly] = useState(false);
   // link diretto alla tabella: /admin/citta?vista=tabella
   useEffect(() => { try { if (new URLSearchParams(window.location.search).get("vista") === "tabella") setView("table"); } catch {} }, []);
   const { data, isLoading } = useSWR(`/api/admin/citta${month ? `?month=${month}` : ""}`, fetcher, { revalidateOnFocus: false });
@@ -102,18 +103,18 @@ export default function CittaPage() {
   if (isLoading && !data) return msg("Sto costruendo la città…");
   if (data?.error) return msg(data.error);
   if (!data?.projects?.length) return msg("Non c'è ancora una fotografia di ClickUp da mostrare.");
-  const scene = { ...data, api: "/api/admin/citta", base: "", noIntro: !!month || view !== "city" };
-  const bar = <Bar view={view} setView={setView} data={data} setMonth={setMonth} fixed={view === "city"} />;
+  const scene = { ...data, api: "/api/admin/citta", base: "", noIntro: !!month || view !== "city" || mineOnly, mineOnly: mineOnly && data.mine?.length ? data.mine : null };
+  const bar = <Bar view={view} setView={setView} data={data} setMonth={setMonth} fixed={view === "city"} mineOnly={mineOnly} setMineOnly={setMineOnly} />;
   return (
     <>
-      {view === "city" ? <CityScene key={data.month || "cur"} data={scene} /> : <CityTable data={data} bar={bar} />}
+      {view === "city" ? <CityScene key={`${data.month || "cur"}-${mineOnly ? "mine" : "all"}`} data={scene} /> : <CityTable data={data} bar={bar} />}
       {view === "city" && bar}
       <style>{`.ct-bar.ct-fixed{position:fixed;top:24px;left:calc(248px + (100vw - 248px)/2);transform:translateX(-50%);z-index:35}`}</style>
     </>
   );
 }
 
-function Bar({ view, setView, data, setMonth, fixed }) {
+function Bar({ view, setView, data, setMonth, fixed, mineOnly, setMineOnly }) {
   return (
     <>
       <div className={`ct-bar${fixed ? " ct-fixed" : ""}`}>
@@ -122,6 +123,13 @@ function Bar({ view, setView, data, setMonth, fixed }) {
             <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)}>{l}</button>
           ))}
         </div>
+        {data.mine?.length > 0 && (
+          <div className="ct-seg" role="group" aria-label="Quali palazzi">
+            {[[false, "Tutti"], [true, `I miei · ${data.mine.length}`]].map(([v, l]) => (
+              <button key={String(v)} type="button" aria-pressed={mineOnly === v} onClick={() => setMineOnly(v)}>{l}</button>
+            ))}
+          </div>
+        )}
         <div className="ct-seg"><a href="/admin/citta/persone" className="ct-lnk">Persone</a></div>
         {data.months?.length > 1 && (
           <div className="ct-seg" role="group" aria-label="Mese">

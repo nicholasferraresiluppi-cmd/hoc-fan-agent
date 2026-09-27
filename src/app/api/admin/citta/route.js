@@ -5,10 +5,10 @@
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser, clerkClient } from "@clerk/nextjs/server";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { kv } from "@vercel/kv";
-import { getCitySnapshot, saveCitySnapshot, getClaims, setClaim, citySince, romeDay } from "@/lib/citta";
+import { getCitySnapshot, saveCitySnapshot, getClaims, setClaim, citySince, romeDay, getCustodians, setCustodian, recentRelit } from "@/lib/citta";
 import { commentClaim } from "@/lib/citta-clickup";
 import { getCityLive, mergeCityLive, currentMonthId, previousMonthId, monthLabel } from "@/lib/citta-live";
 
@@ -44,7 +44,11 @@ export async function GET(request) {
     // luci credibili: lampeggia solo ciò che è tra le priorità misurate o è peggiorato di recente
     const hot = new Set([...(merged.top || []).map((x) => `${x.tower} · ${x.area}`), ...(weekly.worse || [])]);
     for (const t of [...merged.projects, merged.hq]) for (const a of t.areas) if (hot.has(`${t.n} · ${a.n}`)) a.hot = true;
-    return Response.json({ ...merged, since: { ...since, staleClaims }, months, month, canClaim: month === cur });
+    // Fase 3: responsabili dei palazzi, "i miei palazzi", piani riaccesi di recente
+    const [custodians, relit] = await Promise.all([getCustodians(), month === cur ? recentRelit(7) : []]);
+    for (const t of [...merged.projects, merged.hq]) if (custodians[t.n]) t.custodian = { name: custodians[t.n].name, userId: custodians[t.n].userId };
+    const mine = Object.entries(custodians).filter(([, c]) => c.userId === az.userId).map(([t]) => t);
+    return Response.json({ ...merged, since: { ...since, staleClaims, relit: relit.map((r) => `${r.tower} · ${r.area} (${r.by})`) }, months, month, canClaim: month === cur, mine });
   } catch (e) {
     return Response.json({ ...snap, months, month, live_error: String(e?.message || e) });
   }
@@ -57,6 +61,19 @@ export async function POST(request) {
   if (len > 1_000_000) return Response.json({ error: "Fotografia troppo grande (max 1 MB)." }, { status: 413 });
   let body;
   try { body = await request.json(); } catch { return Response.json({ error: "JSON non valido." }, { status: 400 }); }
+  if (body?.action === "custodian") {
+    if (!body.tower) return Response.json({ error: "tower richiesto" }, { status: 400 });
+    let who = null;
+    if (body.userId) {
+      try {
+        const cc = await clerkClient();
+        const u = await cc.users.getUser(String(body.userId).slice(0, 80));
+        who = { userId: u.id, name: [u.firstName, u.lastName].filter(Boolean).join(" ") || u.emailAddresses?.[0]?.emailAddress || u.id };
+      } catch { return Response.json({ error: "Membro non trovato." }, { status: 404 }); }
+    }
+    const all = await setCustodian(body.tower, who);
+    return Response.json({ ok: true, custodian: all[body.tower] || null });
+  }
   if (body?.action === "claim" || body?.action === "release") {
     if (!body.tower || !body.area) return Response.json({ error: "tower e area richiesti" }, { status: 400 });
     const me = await currentUser().catch(() => null);

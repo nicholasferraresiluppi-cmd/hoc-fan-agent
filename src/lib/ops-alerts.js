@@ -183,6 +183,24 @@ const CHECKS = [
     },
   },
   {
+    // Fase 3 della città: una priorità misurata ("Da guardare") senza nessuno che la prenda in carico da 48 ore
+    id: "citta-unclaimed",
+    severity: "warning",
+    label: "Priorità della città senza responsabile",
+    async run() {
+      const { unclaimedTop } = await import("@/lib/citta");
+      const keys = await unclaimedTop(48);
+      if (!keys.length) return [];
+      return [{
+        fingerprint: "citta-unclaimed",
+        title: "Priorità della città senza nessuno da 48 ore",
+        detail: keys.slice(0, 6).map((k) => k.replace("|", " · ")).join(" — ") + " · aprila e premi «Prendi in carico»",
+        value: String(keys.length),
+        cta: { href: "/admin/citta", label: "Apri la città" },
+      }];
+    },
+  },
+  {
     id: "underperformers",
     severity: "warning",
     label: "Operatori sotto soglia",

@@ -14,6 +14,8 @@ import { TEAMS_KEY } from "@/lib/citta-clickup";
 import { freeBusyNow, calendarConfigured } from "@/lib/google-calendar";
 
 export const PEOPLE_KEY = "citta:people";
+// Spark (playbook HOC): figura di riferimento NON gerarchica di un'area, "abilita, non dirige"
+export const SPARK_AREAS = ["HR & People", "Finance", "Media Buying", "Marketing", "Sales", "Chatting"];
 export const ROLES = ["Account manager", "Sales manager", "Social media manager", "Editor", "Videomaker / fotografo", "Content manager", "Project manager", "Chatting manager", "Altro"];
 const HQ = "Azienda";
 
@@ -33,6 +35,7 @@ export function cleanPerson(raw, towers = []) {
     // null = segui ClickUp; lista = decido io su quali palazzi lavora
     projects: Array.isArray(raw?.projects) ? raw.projects.map((t) => str(t, 60)).filter((t) => towers.includes(t)) : null,
     hidden: Boolean(raw?.hidden),
+    spark: Array.isArray(raw?.spark) ? raw.spark.filter((a) => SPARK_AREAS.includes(a)) : [],
   };
   if (!p.name && !p.email) throw new Error("Serve almeno nome o email");
   return p;
@@ -116,8 +119,8 @@ const firstTwo = (s) => String(s || "").split(" ").slice(0, 2).join(" ");
 
 /** L'ufficio di un palazzo: team chat + team progetto + presenza. */
 export async function buildOffice(tower, periodId = currentMonthId()) {
-  const [matrix, live, teams, people, comp] = await Promise.all([
-    buildCreatorMatrix(periodId), getCityLive(periodId), kv.get(TEAMS_KEY), getPeople(), kv.get("citta:comp"),
+  const [matrix, live, teams, people, comp, custodians] = await Promise.all([
+    buildCreatorMatrix(periodId), getCityLive(periodId), kv.get(TEAMS_KEY), getPeople(), kv.get("citta:comp"), kv.get("citta:custodians"),
   ]);
   const towers = (comp?.projects || []).map((p) => p.n);
   if (tower !== HQ && !towers.includes(tower)) throw new Error("Palazzo sconosciuto");
@@ -148,7 +151,7 @@ export async function buildOffice(tower, periodId = currentMonthId()) {
     const nProj = Math.max(1, d.projects.filter((t) => t !== HQ).length || 1);
     const cost = d.card?.cost ?? null;
     return {
-      key: d.key, name: d.name, email: d.email, role: d.card?.role || "", deal: d.card?.deal || "", phone: d.card?.phone || "",
+      key: d.key, name: d.name, email: d.email, role: d.card?.role || "", deal: d.card?.deal || "", phone: d.card?.phone || "", spark: d.card?.spark || [],
       cost, costHere: cost != null ? Math.round(tower === HQ ? cost : cost / nProj) : null, projectsCount: nProj,
       fromClickup: Boolean(d.clickup[tower]), open: d.clickup[tower]?.open || 0, late: d.clickup[tower]?.late || 0, areas: d.clickup[tower]?.areas || [],
       pinned: Array.isArray(d.card?.projects),
@@ -173,5 +176,6 @@ export async function buildOffice(tower, periodId = currentMonthId()) {
     chatters, chatCost: chatters.reduce((s, c) => s + c.cost, 0),
     members, teamCost, missingCost: members.filter((m) => m.cost == null).length,
     calendar, clickupAt: teams?.at || null, towers: [...towers, HQ],
+    custodian: custodians?.[tower] || null, sparkAreas: SPARK_AREAS,
   };
 }
