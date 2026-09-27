@@ -123,3 +123,58 @@ export async function citySince(now = new Date(), days = 7, { fromDay = null } =
   }
   return { base: base.day, worse, better };
 }
+
+// ── Fase 3, responsabilità (27/09/2026) ────────────────────────────────────────
+// Responsabile di un palazzo (una persona del board): { [tower]: { userId, name, at } }
+export const CUSTODIANS_KEY = "citta:custodians";
+export async function getCustodians() { return (await kv.get(CUSTODIANS_KEY)) || {}; }
+export async function setCustodian(tower, who) {
+  const all = await getCustodians();
+  const t = str(tower, 60);
+  if (who?.userId) all[t] = { userId: str(who.userId, 60), name: str(who.name || "?", 60), at: Date.now() };
+  else delete all[t];
+  await kv.set(CUSTODIANS_KEY, all);
+  return all;
+}
+
+// Piani riaccesi: una presa in carico il cui piano non è più in ritardo si chiude da sola e resta
+// nel registro "riaccesi" (si vede chi l'ha riacceso). { tower, area, by, since, at } — ultimi 60.
+export const RELIT_KEY = "citta:relit";
+const bad = (s) => s === "wait" || s === "stop";
+export async function settleClaims(merged, now = Date.now()) {
+  if (!merged?.projects) return 0;
+  const claims = await getClaims();
+  const state = {};
+  for (const t of [...merged.projects, merged.hq]) for (const a of t.areas || []) state[`${t.n}|${a.n}`] = a.s;
+  const relit = [];
+  for (const [k, c] of Object.entries(claims)) {
+    const s = state[k];
+    if (s == null || bad(s) || s === "old") continue; // "da riordinare" non è un problema risolto
+    const [tower, area] = k.split("|");
+    relit.push({ tower, area, by: c.by, since: c.at, at: now });
+    delete claims[k];
+  }
+  if (!relit.length) return 0;
+  await kv.set(CLAIMS_KEY, claims);
+  const log = ((await kv.get(RELIT_KEY)) || []).concat(relit).slice(-60);
+  await kv.set(RELIT_KEY, log);
+  return relit.length;
+}
+export async function recentRelit(days = 7, now = Date.now()) {
+  return ((await kv.get(RELIT_KEY)) || []).filter((r) => now - r.at < days * 864e5).reverse();
+}
+
+// Priorità senza nessuno: da quando una priorità misurata ("Da guardare") è aperta senza presa in carico.
+export const TOPSEEN_KEY = "citta:topseen";
+export async function trackTop(merged, now = Date.now()) {
+  const seen = (await kv.get(TOPSEEN_KEY)) || {};
+  const cur = new Set((merged?.top || []).map((x) => `${x.tower}|${x.area}`));
+  const next = {};
+  for (const k of cur) next[k] = seen[k] || now;
+  await kv.set(TOPSEEN_KEY, next);
+  return next;
+}
+export async function unclaimedTop(hours = 48, now = Date.now()) {
+  const [seen, claims] = await Promise.all([kv.get(TOPSEEN_KEY), getClaims()]);
+  return Object.entries(seen || {}).filter(([k, at]) => !claims[k] && now - at > hours * 36e5).map(([k]) => k);
+}

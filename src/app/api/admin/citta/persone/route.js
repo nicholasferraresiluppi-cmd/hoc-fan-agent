@@ -7,7 +7,7 @@ import { kv } from "@vercel/kv";
 import { currentUser } from "@clerk/nextjs/server";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { TEAMS_KEY } from "@/lib/citta-clickup";
-import { ROLES, getPeople, savePerson, deletePerson, directory } from "@/lib/citta-people";
+import { ROLES, SPARK_AREAS, getPeople, savePerson, deletePerson, directory } from "@/lib/citta-people";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ export async function GET() {
   const dir = directory(teams, people, tw.filter((t) => t !== "Azienda"));
   const hidden = Object.entries(people).filter(([, c]) => c.hidden).map(([key, c]) => ({ key, name: c.name, email: c.email }));
   dir.sort((a, b) => Number(Boolean(b.card?.role)) - Number(Boolean(a.card?.role)) || Object.keys(b.clickup).length - Object.keys(a.clickup).length || a.name.localeCompare(b.name));
-  return Response.json({ people: dir, hidden, roles: ROLES, towers: tw, clickupAt: teams?.at || null });
+  return Response.json({ people: dir, hidden, roles: ROLES, sparkAreas: SPARK_AREAS, towers: tw, clickupAt: teams?.at || null });
 }
 
 export async function POST(request) {

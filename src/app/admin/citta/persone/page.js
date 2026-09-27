@@ -20,19 +20,19 @@ const fetcher = async (url) => {
 const inp = { width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
 const lbl = { display: "block", fontSize: 12.5, color: CP.textSecondary, margin: "12px 0 5px" };
 
-function Editor({ person, roles, towers, onClose, onSaved }) {
+function Editor({ person, roles, towers, sparkAreas, onClose, onSaved }) {
   const c = person.card || {};
   const cuTowers = Object.keys(person.clickup || {});
   const [f, setF] = useState({
     name: c.name || person.name || "", email: c.email || person.email || "", phone: c.phone || "", role: c.role || "",
-    cost: c.cost ?? "", deal: c.deal || "", follow: !Array.isArray(c.projects), projects: c.projects || cuTowers, hidden: Boolean(c.hidden),
+    cost: c.cost ?? "", deal: c.deal || "", follow: !Array.isArray(c.projects), projects: c.projects || cuTowers, hidden: Boolean(c.hidden), spark: c.spark || [],
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
   const save = async (extra = {}) => {
     setBusy(true); setErr(null);
-    const body = { person: { key: person.key, cuId: person.cuId, name: f.name, email: f.email, phone: f.phone, role: f.role, cost: f.cost === "" ? null : f.cost, deal: f.deal, projects: f.follow ? null : f.projects, hidden: f.hidden, ...extra } };
+    const body = { person: { key: person.key, cuId: person.cuId, name: f.name, email: f.email, phone: f.phone, role: f.role, cost: f.cost === "" ? null : f.cost, deal: f.deal, projects: f.follow ? null : f.projects, hidden: f.hidden, spark: f.spark, ...extra } };
     const r = await fetch("/api/admin/citta/persone", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
     setBusy(false);
@@ -52,6 +52,10 @@ function Editor({ person, roles, towers, onClose, onSaved }) {
         <div><label style={lbl}>Costo totale (€ al mese)</label><input style={inp} inputMode="numeric" value={f.cost} onChange={set("cost")} placeholder="es. 1800" /></div>
       </div>
       <label style={lbl}>Accordo (com'è pagato)</label><input style={inp} value={f.deal} onChange={set("deal")} placeholder="es. fisso 1.500 € + 2% sul venduto delle sue creator" />
+      <label style={lbl}>Spark di (riferimento non gerarchico dell'area: «abilita, non dirige»)</label>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {(sparkAreas || []).map((a) => <FilterChip key={a} label={a} active={f.spark.includes(a)} onClick={() => setF({ ...f, spark: f.spark.includes(a) ? f.spark.filter((x) => x !== a) : [...f.spark, a] })} />)}
+      </div>
       <label style={lbl}>Palazzi su cui lavora</label>
       <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13.5, color: CP.textPrimary, marginBottom: 8 }}>
         <input type="checkbox" checked={f.follow} onChange={set("follow")} /> Segui ClickUp {cuTowers.length ? `(oggi: ${cuTowers.join(", ")})` : "(nessuna attività assegnata)"}
@@ -110,7 +114,7 @@ function People() {
       </div>
       <DataTable columns={cols} rows={rows} onRowClick={(p) => setEdit(p)} defaultSort={{ key: "open", dir: -1 }} empty="Nessuna persona." minWidth={720} />
       {data.hidden?.length > 0 && <p style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 12 }}>Nascoste dagli uffici: {data.hidden.map((h) => h.name || h.email).join(", ")}.</p>}
-      {edit && <Editor person={edit} roles={data.roles} towers={data.towers} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); mutate(); }} />}
+      {edit && <Editor person={edit} roles={data.roles} towers={data.towers} sparkAreas={data.sparkAreas} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); mutate(); }} />}
     </>
   );
 }

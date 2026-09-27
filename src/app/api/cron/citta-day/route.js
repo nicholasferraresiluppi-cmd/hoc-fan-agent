@@ -9,6 +9,14 @@ import { isCronAuthorized } from "@/lib/cron-auth";
 import { getCitySnapshot, recordCityDay } from "@/lib/citta";
 import { getCityLive, mergeCityLive } from "@/lib/citta-live";
 
+async function recordAndSettle(merged) {
+  const n = await recordCityDay(merged);
+  const { settleClaims, trackTop } = await import("@/lib/citta");
+  await settleClaims(merged).catch(() => {});
+  await trackTop(merged).catch(() => {});
+  return n;
+}
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -22,7 +30,7 @@ async function run(request) {
   const snap = await getCitySnapshot();
   if (!snap?.projects?.length) return Response.json({ ok: true, skipped: "nessuna fotografia" });
   try {
-    const n = await recordCityDay(mergeCityLive(snap, await getCityLive()));
+    const n = await recordAndSettle(mergeCityLive(snap, await getCityLive()));
     await kv.set("cron:heartbeat:citta-day", { at: Date.now(), via: viaCron ? "cron" : "session", areas: n }, { ex: 40 * 24 * 3600 }).catch(() => {});
     return Response.json({ ok: true, areas: n });
   } catch (e) {

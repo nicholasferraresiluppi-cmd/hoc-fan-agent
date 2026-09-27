@@ -5,7 +5,7 @@
  * Team progetto (ClickUp + anagrafica, con ruolo, costo, peso e "è in call?") e team chat
  * (operatori dai turni). /admin/citta/ufficio?t=<palazzo>
  */
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
@@ -44,6 +44,7 @@ function Member({ m, configured, offHours }) {
         <div style={{ fontSize: 16, fontWeight: 500, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name || m.email}</div>
         {m.weight != null && <div style={{ fontSize: 13, color: CP.textSecondary, whiteSpace: "nowrap" }} title="Quota del costo del team progetto di questo palazzo">pesa {fmtPct(m.weight)}</div>}
       </div>
+      {m.spark?.length > 0 && <div style={{ fontSize: 12, color: CP.gold }}>Spark di {m.spark.join(", ")}</div>}
       <div style={{ fontSize: 13, color: m.role ? CP.textSecondary : CP.textMuted }}>
         {m.role || "Ruolo da indicare"}{m.areas?.length ? ` · in ClickUp: ${m.areas.join(", ")}` : ""}
       </div>
@@ -63,11 +64,33 @@ function Member({ m, configured, offHours }) {
   );
 }
 
+// Responsabile del palazzo (una persona del board): chi risponde quando un piano è ambra
+function Custodian({ tower, current, onSaved }) {
+  const { data } = useSWR("/api/admin/roles", fetcher, { revalidateOnFocus: false });
+  const [busy, setBusy] = useState(false);
+  const rows = (data?.rows || []).filter((r) => !r.banned);
+  const save = async (userId) => {
+    setBusy(true);
+    await fetch("/api/admin/citta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "custodian", tower, userId: userId || null }) });
+    setBusy(false); onSaved();
+  };
+  return (
+    <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13.5, color: CP.textSecondary }}>
+      Responsabile
+      <select disabled={busy || !rows.length} value={current?.userId || ""} onChange={(e) => save(e.target.value)}
+        style={{ padding: "7px 10px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 13.5, fontFamily: FONTS.body }}>
+        <option value="">— nessuno —</option>
+        {rows.map((r) => <option key={r.userId} value={r.userId}>{r.name}</option>)}
+      </select>
+    </label>
+  );
+}
+
 function Office() {
   const sp = useSearchParams();
   const router = useRouter();
   const t = sp.get("t") || "";
-  const { data, isLoading } = useSWR(t ? `/api/admin/citta/ufficio?t=${encodeURIComponent(t)}` : null, fetcher, { revalidateOnFocus: false, refreshInterval: 120000 });
+  const { data, isLoading, mutate } = useSWR(t ? `/api/admin/citta/ufficio?t=${encodeURIComponent(t)}` : null, fetcher, { revalidateOnFocus: false, refreshInterval: 120000 });
   const crumbs = [{ label: "La città", href: "/admin/citta" }, { label: t || "Uffici" }];
   if (!t) return <PageHead crumbs={crumbs} title="Gli uffici" subtitle="Apri un palazzo dalla città o dalla tabella per vedere chi ci lavora." />;
   if (isLoading && !data) return <PageHead crumbs={crumbs} title={`L'ufficio di ${t}`} subtitle="Sto chiamando a raccolta le persone…" />;
@@ -87,7 +110,7 @@ function Office() {
       <PageHead crumbs={crumbs} title={`L'ufficio di ${t}`}
         line2={data.members.length ? `${data.members.length} nel team progetto${hq ? "" : `, ${data.chatters.length} in chat`}` : null}
         subtitle={`Chi lavora ${hq ? "in sede" : "a questa creator"}. Team progetto da ClickUp (assegnatari delle attività aperte) e dall'anagrafica; team chat dai turni del mese.`}
-        actions={<Link href="/admin/citta/persone" style={{ fontSize: 13.5, color: CP.accentSoftText, textDecoration: "none", padding: "8px 2px" }}>Anagrafica persone →</Link>} />
+        actions={<><Custodian tower={t} current={data.custodian} onSaved={() => mutate()} /><Link href="/admin/citta/persone" style={{ fontSize: 13.5, color: CP.accentSoftText, textDecoration: "none", padding: "8px 2px" }}>Anagrafica persone →</Link></>} />
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
         {data.towers.map((n) => <FilterChip key={n} label={n} active={n === t} onClick={() => router.replace(`/admin/citta/ufficio?t=${encodeURIComponent(n)}`)} />)}
