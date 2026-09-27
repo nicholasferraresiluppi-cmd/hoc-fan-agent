@@ -191,7 +191,7 @@ function homeFrame(){const m=VW()<=760;
   const H=Math.max(...towers.map(T=>T.top));const pts=[];
   towers.forEach(T=>{const w=(T.hq?2.5:1.8)/2+.6,d=(T.hq?1.6:1.15)/2+.55;for(const x of[-w,w])for(const z of[-d,d])for(const y of[0,T.top+.5])pts.push(new THREE.Vector3(T.x+x,y,T.z+z))});
   const hr=$id('hero')?$id('hero').getBoundingClientRect():null,rr=root.getBoundingClientRect();
-  const x0=hr&&hr.width?Math.min(.56,Math.max(.3,(hr.right-rr.left+28)/VW())):.4;let X=[x0*2-1,.95],Y=[-.8,.78];
+  const x0=hr&&hr.width?Math.min(.56,Math.max(.3,(hr.right-rr.left+28)/VW())):.4;let X=[x0*2-1,.88],Y=[-.8,.76];
   // telefono: il testo sta sotto, la città nello spazio libero sopra
   if(m){const y0=hr&&hr.height?1-2*Math.max(.3,Math.min(.8,(hr.top-rr.top-12)/VH())):-.1;X=[-.94,.94];Y=[y0,.72]}
   const save={p:cam.position.clone(),q:cam.quaternion.clone()};let d=30;const t=new THREE.Vector3(0,H*.3,0);
