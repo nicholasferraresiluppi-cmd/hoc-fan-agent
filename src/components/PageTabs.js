@@ -1,17 +1,27 @@
 "use client";
-// Schede in cima alle pagine unite in un gruppo (lib/page-groups).
+// Schede in cima alle pagine unite in un gruppo (lib/page-groups). Mostra solo le schede che chi
+// guarda può aprire (stessa regola del menu: lib/nav-access).
 import Link from "next/link";
+import useSWR from "swr";
 import { CP, FONTS } from "@/lib/brand";
-import { groupOf } from "@/lib/page-groups";
+import { groupMatch } from "@/lib/page-groups";
+import { canSee } from "@/lib/nav-access";
+
+const fetcher = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null);
 
 export default function PageTabs({ pathname }) {
-  const g = groupOf(pathname);
-  if (!g) return null;
+  const m = groupMatch(pathname);
+  const { data: who } = useSWR(m ? "/api/whoami" : null, fetcher, { revalidateOnFocus: false });
+  if (!m) return null;
   const cur = String(pathname).replace(/\/$/, "");
+  const tabs = m.group.tabs
+    .map(([href, label]) => [href.replace(":e", m.param || ""), label, href.replace("/:e", "")])
+    .filter(([, , base]) => !who || canSee(base, who.capabilities, who.admin));
+  if (tabs.length < 2) return null;
   return (
-    <nav aria-label={g.label} style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", padding: "18px 24px 0", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
-      <span style={{ fontSize: 12.5, color: CP.textMuted, marginRight: 10 }}>{g.label}</span>
-      {g.tabs.map(([href, label]) => {
+    <nav aria-label={m.group.label} style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", padding: "18px 24px 0", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <span style={{ fontSize: 12.5, color: CP.textMuted, marginRight: 10 }}>{m.group.label}</span>
+      {tabs.map(([href, label]) => {
         const on = href === cur;
         return (
           <Link key={href} href={href} aria-current={on ? "page" : undefined}
