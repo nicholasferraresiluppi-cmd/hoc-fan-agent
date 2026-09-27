@@ -1,3 +1,4 @@
+import { noteAiError } from "@/lib/ai-health";
 import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
 import { FAN_PROFILES } from "@/lib/fan-profiles";
@@ -60,6 +61,9 @@ export async function POST(request) {
     return Response.json({ reply, fanState: newState });
   } catch (error) {
     console.error("Chat API error:", error);
+    if (await noteAiError(error, "simulatore")) {
+      return Response.json({ error: "Il simulatore è fermo: il credito dell'AI è esaurito. Gli admin sono stati avvisati." }, { status: 503 });
+    }
     if (error?.status === 401) {
       return Response.json(
         { error: "API key Anthropic non valida. Contatta l'admin." },

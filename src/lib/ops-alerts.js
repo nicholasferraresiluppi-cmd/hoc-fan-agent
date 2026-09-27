@@ -68,6 +68,24 @@ const h0 = (holes) => holes[0]?.median || 0;
 
 const CHECKS = [
   {
+    id: "ai-credit",
+    severity: "critical",
+    label: "AI senza credito",
+    async run() {
+      const { probeAi } = await import("@/lib/ai-health");
+      const p = await probeAi();
+      if (p.ok) return [];
+      const seen = await kv.get("ai:credit:error").catch(() => null);
+      return [{
+        fingerprint: "ai-credit",
+        title: p.credit ? "Credito Anthropic esaurito: simulatore e funzioni AI fermi" : "L'AI non risponde",
+        detail: `${p.credit ? "Il simulatore degli operatori, la valutazione delle sessioni e la classificazione della città non funzionano finché non si ricarica il credito (console Anthropic → Plans & Billing)." : p.message}${seen?.first_at ? ` · primo errore visto il ${new Date(seen.first_at).toLocaleString("it-IT", { timeZone: "Europe/Rome" })}` : ""}`,
+        value: p.credit ? "credito" : "errore",
+        cta: { href: "https://console.anthropic.com/settings/billing", label: "Apri la fatturazione Anthropic" },
+      }];
+    },
+  },
+  {
     id: "wage-gap",
     severity: "critical",
     label: "Wage mancanti nel sync CP",
