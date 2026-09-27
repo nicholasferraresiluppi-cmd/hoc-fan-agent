@@ -62,7 +62,7 @@ export default function AccessPage() {
     const res = await fetch("/api/admin/access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "remove", userId }) });
     const data = await res.json();
     if (data.error) setMsg({ type: "error", text: data.error });
-    else { setMsg({ type: data.warning ? "warning" : "success", text: data.warning || `Rimosso: ${userId}` }); load(); }
+    else { setMsg({ type: data.warning ? "warning" : "success", text: data.warning || "Tolto dagli admin, anche su Clerk. Per impedirgli di entrare del tutto: Membri → Ruoli e accessi → Sospendi accesso (o Elimina account: rientra solo con un nuovo invito)." }); load(); }
   };
 
   const copy = (s) => navigator.clipboard.writeText(s).then(() => setMsg({ type: "success", text: "Copiato" }));
