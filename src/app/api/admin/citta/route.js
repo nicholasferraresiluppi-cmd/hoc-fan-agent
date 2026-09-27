@@ -42,7 +42,17 @@ export async function GET(request) {
       if (a.claim && (a.s === "wait" || a.s === "stop") && Date.now() - a.claim.at > 7 * 864e5) staleClaims.push(`${t.n} · ${a.n} (${a.claim.by})`);
     }
     // luci credibili: lampeggia solo ciò che è tra le priorità misurate o è peggiorato di recente
-    const hot = new Set([...(merged.top || []).map((x) => `${x.tower} · ${x.area}`), ...(weekly.worse || [])]);
+    const hot = new Set([...(merged.top || []).flatMap((x) => (x.areas || [x.area]).map((a) => `${x.tower} · ${a}`)), ...(weekly.worse || [])]);
+    // "Da guardare": chi la segue, o da quanto nessuno (per il "Prendi in carico" sulla riga)
+    if (month === cur) {
+      const seen = (await kv.get("citta:topseen").catch(() => null)) || {};
+      for (const x of merged.top || []) {
+        const keys = (x.areas || [x.area]).map((a) => `${x.tower}|${a}`);
+        const c = keys.map((k) => claims[k]).find(Boolean);
+        if (c) x.claim = { by: c.by, at: c.at };
+        else { const first = Math.min(...keys.map((k) => seen[k] || Date.now())); x.openHours = Math.floor((Date.now() - first) / 36e5); }
+      }
+    }
     for (const t of [...merged.projects, merged.hq]) for (const a of t.areas) if (hot.has(`${t.n} · ${a.n}`)) a.hot = true;
     // Fase 3: responsabili dei palazzi, "i miei palazzi", piani riaccesi di recente
     const [custodians, relit] = await Promise.all([getCustodians(), month === cur ? recentRelit(7) : []]);

@@ -26,9 +26,9 @@ const presText=m=>{const p=m.presence;if(!p)return 'Calendario non visibile';ret
 function makeFig(color){const g=new THREE.Group();const mat=new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.6,roughness:.45,metalness:.1});
   const b=new THREE.Mesh(figGeo.body,mat);b.position.y=.065;const h=new THREE.Mesh(figGeo.head,mat);h.position.y=.17;b.castShadow=h.castShadow=true;g.add(b,h);g.visible=false;return {g,mat,hit:[b,h]}}
 function slabFor(T,area){if(!area)return null;const n=T.hq&&HQA2[area]?HQA2[area]:area;return T.slabs.find(S=>S.a.n===n)||null}
-function placeTeam(T,d){if(T.figs)return;T.figs=[];const by=new Map();const push=(S,f)=>{if(!by.has(S))by.set(S,[]);by.get(S).push(f)};
-  d.members.forEach((m,i)=>{const f=makeFig(TEAMC[presState(m)]);f.m=m;f.idx=i;f.kind='team';push(slabFor(T,(m.areas||[])[0]),f)});
-  const cs=slabFor(T,'Chatting');(d.chatters||[]).filter(c=>c.shifts>=1).slice(0,10).forEach(c=>{const f=makeFig(c.under?0xFFB54A:0x9DB0D6);f.c=c;f.kind='chat';push(cs,f)});
+function placeTeam(T,d){if(T.figs)return;T.figs=[];T.teamData=d;const by=new Map();const push=(S,f)=>{if(!by.has(S))by.set(S,[]);by.get(S).push(f)};
+  if(!T.hq)d.members.forEach((m,i)=>{const f=makeFig(TEAMC[presState(m)]);f.m=m;f.idx=i;f.kind='team';push(slabFor(T,(m.areas||[])[0]),f)});
+  const cs=slabFor(T,'Chatting');((T.data.onShift&&T.data.onShift.on)||[]).slice(0,10).forEach(c=>{const f=makeFig(0x9DB0D6);f.c=c;f.kind='chat';push(cs,f)});
   const w=T.hq?2.5:1.8,dd=T.hq?1.6:1.15,th=T.hq?.1:.08;
   by.forEach((list,S)=>list.forEach((f,i)=>{const per=S?8:9,cols=Math.min(list.length-Math.floor(i/per)*per,per),col=i%per,row=Math.floor(i/per);const x=(col-(cols-1)/2)*(w*.86/per);
     if(S){f.g.position.set(x,th/2+.004,dd*.5-.12-row*.22);S.g.add(f.g)}else{f.g.position.set(x,.12,dd/2+.38+row*.24);T.g.add(f.g)}
@@ -42,20 +42,24 @@ async function loadTeam(T){const el=pb.querySelector('.team');if(!RAW.api||!el)r
     if(selT!==T)return;OFFH=!!(d.calendar&&d.calendar.offHours);placeTeam(T,d);showTeam(T,true);renderTeam(T,d,el)}catch(e){el.innerHTML=`<p class="tm-note">Squadra non disponibile: ${esc(e.message)}</p>`}}
 function renderTeam(T,d,el){const off=(RAW.base||'')+'/admin/citta/ufficio?t='+encodeURIComponent(T.data.n);const cal=d.calendar&&d.calendar.configured&&!d.calendar.error;
   const busy=d.members.filter(m=>m.presence&&m.presence.busy).length,ch=d.chatters||[],under=ch.filter(c=>c.under).length;
-  const ppl=d.members.map((m,i)=>`<button class="tm" data-i="${i}"><i class="${presState(m)}"></i><b>${esc(m.name||m.email)}</b><span>${esc(m.role||(m.areas||[]).join(', ')||'Ruolo da indicare')}</span>${cal?`<small>${presText(m)}</small>`:''}</button>`).join('');
-  el.innerHTML=`<div class="tm-h">Chi ci lavora<span>${d.members.length} nel team${cal?` · ${busy} in un impegno ora`:''}</span></div>${ppl||'<p class="tm-note">Nessuno assegnato in ClickUp.</p>'}`+
-    (T.hq?'':`<div class="tm-h">In chat<span>${ch.length} con turni qui questo mese${under?` · ${under} sotto soglia`:''}</span></div><p class="tm-note">${ch.slice(0,8).map(c=>esc(c.name)+(c.under?' <em>sotto soglia</em>':'')).join(', ')}${ch.length>8?'…':''}</p>`)+
-    `<p class="tm-note">Le figure nel palazzo sono le persone, sul piano del reparto dove hanno più attività ClickUp${cal?'. Ambra = in un impegno adesso (Google Calendar); nessun impegno non vuol dire raggiungibile':''}. I chatter stanno sul piano Chatting.</p><div class="act"><a href="${off}">Apri l'ufficio →</a></div>`;
+  const ppl=d.members.map((m,i)=>`<button class="tm" data-i="${i}"><i class="${presState(m)}"></i><b>${esc(m.name||m.email)}</b><span>${esc(m.role||(m.areas||[]).join(', ')||'Ruolo da indicare')}</span>${cal&&!OFFH?`<small>${presText(m)}</small>`:''}</button>`).join('');
+  el.innerHTML=`<div class="tm-h">Chi ci lavora<span>${d.members.length} nel team${cal?(OFFH?' · fuori orario':` · ${busy} in un impegno ora`):''}</span></div>${ppl||'<p class="tm-note">Nessuno assegnato in ClickUp.</p>'}`+
+    (T.hq?'':`<div class="tm-h">In chat<span>${ch.length} con turni qui questo mese</span></div><p class="tm-note">Chi è in difficoltà lo trovi in «Da seguire», non qui: la città parla dei reparti, non delle singole persone.</p>`)+
+    `<p class="tm-note">Le figure nel palazzo sono le persone, sul piano del reparto dove hanno più attività ClickUp${cal?'. Ambra = in un impegno adesso (Google Calendar); nessun impegno non vuol dire raggiungibile':''}. Sul piano Chatting, in azzurro, solo chi è in turno adesso.</p><div class="act"><a href="${off}">Apri l'ufficio →</a></div>`;
   el.querySelectorAll('.tm').forEach(b=>{b.onmouseenter=()=>hiFig(T,+b.dataset.i);b.onmouseleave=()=>{hiF=null};b.onfocus=b.onmouseenter;b.onblur=b.onmouseleave})}
 const tipEl=document.createElement('div');tipEl.className='tm-tip';root.appendChild(tipEl);
 function figAt(e){if(!selT||!selT.figs)return null;mouse.set(...toXY(e));ray.setFromCamera(mouse,cam);const h=ray.intersectObjects(selT.figs.filter(f=>f.g.visible).flatMap(f=>f.hit))[0];return h?h.object.userData.F:null}
 on(cv,'pointermove',e=>{const f=figAt(e);hovF=f;if(!f){tipEl.style.opacity=0;return}cv.style.cursor='pointer';const r=root.getBoundingClientRect();
-  tipEl.innerHTML=f.kind==='team'?`<b>${esc(f.m.name||f.m.email)}</b><span>${esc(f.m.role||(f.m.areas||[]).join(', ')||'Ruolo da indicare')}</span><small>${presText(f.m)}</small>`:`<b>${esc(f.c.name)}</b><span>In chat · ${String(f.c.shifts).replace('.',',')} turni · $${Math.round(f.c.sales).toLocaleString('it-IT')}</span>${f.c.under?'<small>Sotto soglia</small>':''}`;
+  tipEl.innerHTML=f.kind==='team'?`<b>${esc(f.m.name||f.m.email)}</b><span>${esc(f.m.role||(f.m.areas||[]).join(', ')||'Ruolo da indicare')}</span><small>${presText(f.m)}</small>`:`<b>${esc(f.c.name)}</b><span>In turno fino alle ${hm(f.c.until)}</span>`;
   tipEl.style.transform=`translate(${Math.min(e.clientX-r.left+14,r.width-270)}px,${e.clientY-r.top+14}px)`;tipEl.style.opacity=1});
 
 '''
 
 TEAM_CSS = r'''
+.ct .tl .dots{display:none}
+.ct .tm-fl b.st{font-weight:500;font-size:11px;margin-left:6px}.ct .tm-fl b.st.wait{color:#FFB54A}.ct .tm-fl b.st.stop{color:rgba(242,238,230,.5)}.ct .tm-fl b.st.est{font-style:italic;opacity:.75}
+.ct .top5 em.own{display:block;font-style:normal;font-size:11.5px;color:rgba(242,238,230,.5);margin-top:2px}
+@media (max-width:760px){.ct #line{display:none}}
 .ct .tm-fl em{font-style:normal;color:#E8CB8A;font-size:11px}
 .ct .tm-fl{position:absolute;top:0;left:0;z-index:20;pointer-events:none;font-size:12px;letter-spacing:.04em;color:rgba(242,238,230,.72);white-space:nowrap;padding-right:6px;display:flex;gap:6px;align-items:baseline}.ct .tm-fl span{color:#E8CB8A;font-size:11px}
 .ct .team{margin:2px 0 14px}
@@ -76,17 +80,17 @@ def patch_body(body):
     assert a in body; body=body.replace(a,b,1)
     a='<span>aree ferme</span>';b='<span>stime ClickUp da verificare</span>'
     assert a in body; body=body.replace(a,b,1)
-    a='alto quanto il suo venduto del mese;';b='alto quanto il suo venduto del mese (la sagoma dorata è il mese scorso intero);'
+    a='alto quanto il suo venduto del mese;';b='alto quanto il suo venduto del mese (la cornice dorata è il mese scorso allo stesso giorno, stima proporzionale);'
     assert a in body; return body.replace(a,b,1)
 
 def apply(R, js_getter):
     # FASE 2 — il tempo (27/09): altezza proporzionale al venduto (prima radice quadrata: 147k e 13k sembravano uguali),
     # scala comune col mese scorso; sagoma dorata del mese scorso intero; striscia "dalla tua ultima visita"
     R("nospace:!!p.nospace,sales:p.sales||0}));", "nospace:!!p.nospace,sales:p.sales||0,salesPrev:p.salesPrev||0}));")
-    R("const MAXS=Math.max(1,...RAW.projects.map(p=>p.sales||0));", "const MAXS=Math.max(1,...RAW.projects.map(p=>Math.max(p.sales||0,RAW.live&&!RAW.live.past?(p.salesPrev||0):0)));")
+    R("const MAXS=Math.max(1,...RAW.projects.map(p=>p.sales||0));", "const MAXS=Math.max(1,...RAW.projects.map(p=>Math.max(p.sales||0,RAW.live&&!RAW.live.past?(p.salesPrevToDate||p.salesPrev||0):0)));")
     R(".3+.42*Math.sqrt((data.sales||0)/MAXS)", ".14+.8*((data.sales||0)/MAXS)")
-    R("  T.top=.34+(n-1)*gap+.2;", "  T.top=.34+(n-1)*gap+.2;\n  if(RAW.live&&!RAW.live.past&&!isHQ&&data.salesPrev>0){const gp=.14+.8*(data.salesPrev/MAXS),H=.34+(n-1)*gp+.2;const gb=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w+.34,H,d+.3)),new THREE.LineBasicMaterial({color:0xD9B46A,transparent:true,opacity:.3,depthWrite:false}));gb.position.y=H/2;T.g.add(gb);T.ghost=gb;T.ghostH=H}")
-    R("const topY=T.slabs[0].g.position.y+.2;", "if(T.ghost)T.ghost.material.opacity=selT?(selT===T?.45:.04):(filter?.1:.3);const topY=T.slabs[0].g.position.y+.2;")
+    R("  T.top=.34+(n-1)*gap+.2;", "  T.top=.34+(n-1)*gap+.2;\n  if(RAW.live&&!RAW.live.past&&!isHQ&&data.salesPrev>0){const gp=.14+.8*((data.salesPrevToDate||data.salesPrev)/MAXS),H=.34+(n-1)*gp+.2;const gb=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w+.34,H,d+.3)),new THREE.LineBasicMaterial({color:0xE8C27A,transparent:true,opacity:.55,depthWrite:false}));gb.position.y=H/2;T.g.add(gb);T.ghost=gb;T.ghostH=H}")
+    R("const topY=T.slabs[0].g.position.y+.2;", "if(T.ghost)T.ghost.material.opacity=selT?(selT===T?.7:.05):(filter?.12:.55);const topY=T.slabs[0].g.position.y+.2;")
     R("h=`Dal ${dd(s.base)}:", "h=`${s.mode==='visit'?'Dalla tua ultima visita, il '+dd(s.base):'Dal '+dd(s.base)}:")
     # piani = aree ufficiali del playbook (27/09): HR & People, Finance, Media Buying, Marketing, OnlyFans (Sales + Chatting)
     R("const AREAS=['HR','Finance','Deal','Sales','Chatting','Contenuti'];", "const AREAS=['HR & People','Finance','Media Buying','Marketing','Sales','Chatting'];")
@@ -121,9 +125,9 @@ def apply(R, js_getter):
     # FASE 3 — responsabilità (27/09): "i miei palazzi", responsabile nel pannello, Spark e presa in carico
     # sulle etichette dei piani, bandierina sui piani presi in carico, piani riaccesi nella striscia
     R("const focusT=selT?selT===T:true;T.open=", "const focusT=selT?selT===T:(RAW.mineOnly?(RAW.mineOnly.includes(T.data.n)||T.hq):true);T.open=")
-    R("salesPrev:p.salesPrev||0}));", "salesPrev:p.salesPrev||0,custodian:p.custodian||null}));")
+    R("salesPrev:p.salesPrev||0}));", "salesPrev:p.salesPrev||0,salesPrevToDate:p.salesPrevToDate||0,custodian:p.custodian||null}));")
     R(r"""<p class="sum">${sum}</p>${RAW.api?'<div class="team">""", r"""<p class="sum">${sum}</p>${RAW.api&&!T.hq?(T.data.custodian?`<p class="tm-note">Responsabile: <b>${esc(T.data.custodian.name)}</b></p>`:'<p class="tm-note">Nessun responsabile: si sceglie nell&#39;ufficio.</p>'):''}${RAW.api?'<div class="team">""")
-    R("e.innerHTML=esc(DISP(S.a.n))+(n?'<span>'+n+'</span>':'');", "const sp=T.figs.find(f=>f.kind==='team'&&(f.m.spark||[]).includes(S.a.n));e.innerHTML=esc(DISP(S.a.n))+(n?'<span>'+n+'</span>':'')+(sp?'<em>Spark '+esc((sp.m.name||'').split(' ')[0])+'</em>':'')+(S.a.claim?'<em>in carico a '+esc(S.a.claim.by.split(' ')[0])+'</em>':'');")
+    R("e.innerHTML=esc(DISP(S.a.n))+(n?'<span>'+n+'</span>':'');", "const nn=T.hq&&T.teamData?T.teamData.members.filter(m=>(m.areas||[])[0]===S.a.n).length:n;const stt=(S.a.s==='wait'||S.a.s==='stop')?'<b class=\"st '+S.a.s+(S.a.src==='clickup'?' est':'')+'\">'+esc(S.a.short||'')+'</b>':'';const sp=T.figs.find(f=>f.kind==='team'&&(f.m.spark||[]).includes(S.a.n));e.innerHTML=esc(DISP(S.a.n))+(nn?'<span>'+nn+'</span>':'')+stt+(sp?'<em>Spark '+esc((sp.m.name||'').split(' ')[0])+'</em>':'')+(S.a.claim?'<em>in carico a '+esc(S.a.claim.by.split(' ')[0])+'</em>':'');")
     R("if((s.staleClaims||[]).length)", "if((s.relit||[]).length)h+=` <b class=\"g\">Riaccesi: ${s.relit.slice(0,3).map(esc).join(', ')}${s.relit.length>3?'…':''}</b>.`;if((s.staleClaims||[]).length)")
     R("// camera\nconst DIR=", "const flagMat=new THREE.MeshStandardMaterial({color:0xD9B46A,emissive:0xD9B46A,emissiveIntensity:.5,side:THREE.DoubleSide});\ntowers.forEach(T=>T.slabs.forEach(S=>{if(!S.a.claim)return;const w=T.hq?2.5:1.8,d=T.hq?1.6:1.15;const g=new THREE.Group();const pole=new THREE.Mesh(new THREE.CylinderGeometry(.008,.008,.26,6),flagMat);pole.position.y=.13;const sh=new THREE.Shape();sh.moveTo(0,0);sh.lineTo(.16,-.045);sh.lineTo(0,-.09);const fl=new THREE.Mesh(new THREE.ShapeGeometry(sh),flagMat);fl.position.y=.26;g.add(pole,fl);g.position.set(w/2-.12,.05,d/2-.1);S.g.add(g)}));\n// camera\nconst DIR=")
     # FASE 4 — la vita (27/09): finestre accese = chatter in turno adesso (programma CP), strade = persone condivise
@@ -135,3 +139,7 @@ const roadObjs=[];{const byN=new Map(towers.map(T=>[T.data.n,T]));(RAW.roads||[]
 // camera
 const DIR=""")
     R("  controls.update();renderer.render(scene,cam);raf=", "  roadObjs.forEach(o=>{const t=selT?(o.A===selT||o.B===selT?.65:.02):(filter?.05:.2);o.tube.material.opacity+=(t-o.tube.material.opacity)*Math.min(1,dt*5)});\n  controls.update();renderer.render(scene,cam);raf=")
+
+    # GIRO 2 dei visionari (27/09 notte): "Da guardare" collegata alla mappa e con chi la segue
+    R("<i>${esc(x.area)}</i><b>${esc(x.tower)}</b><span>${esc(x.text)}</span></button>", "<i>${esc((x.areas||[x.area]).map(a=>a==='Sales'||a==='Chatting'?'OnlyFans · '+a:a).join(' · '))}</i><b>${esc(x.tower)}</b><span>${esc(x.text)}</span><em class=\"own\">${x.claim?'in carico a '+esc(x.claim.by.split(' ')[0]):(x.openHours!=null?'nessuno la segue'+(x.openHours>=1?' da '+(x.openHours<48?x.openHours+' ore':Math.floor(x.openHours/24)+' giorni'):''):'')}</em></button>")
+    R("el.querySelectorAll('button').forEach(b=>b.onclick=()=>{", "el.querySelectorAll('button').forEach(b=>{b.onmouseenter=()=>{hoverT=towers.find(t=>t.data.n===b.dataset.t)||null};b.onmouseleave=()=>{hoverT=null}});el.querySelectorAll('button').forEach(b=>b.onclick=()=>{")

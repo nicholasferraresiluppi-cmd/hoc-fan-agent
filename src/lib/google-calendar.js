@@ -69,7 +69,10 @@ export async function freeBusyNow(emails, now = Date.now()) {
   const out = {};
   for (const [email, c] of replies.flatMap((x) => Object.entries(x))) {
     if (c.errors?.length) continue;
-    const slots = (c.busy || []).map((b) => [Date.parse(b.start), Date.parse(b.end)]).filter(([s, e]) => e > now).sort((a, b) => a[0] - b[0]);
+    // niente eventi di tutto il giorno / notturni / iniziati da più di 12 ore: non sono "in una call adesso"
+    // (giro 2 dei visionari: domenica sera risultava "in un impegno fino alle 10:00")
+    const slots = (c.busy || []).map((b) => [Date.parse(b.start), Date.parse(b.end)])
+      .filter(([s, e]) => e > now && e - s <= 12 * 36e5 && now - s <= 12 * 36e5).sort((a, b) => a[0] - b[0]);
     const cur = slots.find(([s, e]) => s <= now && e > now);
     let until = cur ? cur[1] : null;
     if (cur) for (const [s, e] of slots) if (s <= until && e > until) until = e; // impegni attaccati

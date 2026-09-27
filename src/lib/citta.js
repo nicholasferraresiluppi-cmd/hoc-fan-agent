@@ -168,7 +168,7 @@ export async function recentRelit(days = 7, now = Date.now()) {
 export const TOPSEEN_KEY = "citta:topseen";
 export async function trackTop(merged, now = Date.now()) {
   const seen = (await kv.get(TOPSEEN_KEY)) || {};
-  const cur = new Set((merged?.top || []).map((x) => `${x.tower}|${x.area}`));
+  const cur = new Set((merged?.top || []).flatMap((x) => (x.areas || [x.area]).map((a) => `${x.tower}|${a}`)));
   const next = {};
   for (const k of cur) next[k] = seen[k] || now;
   await kv.set(TOPSEEN_KEY, next);
