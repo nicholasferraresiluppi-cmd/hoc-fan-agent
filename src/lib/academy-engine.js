@@ -162,7 +162,9 @@ export async function generateFanReply({ client, scenario, fanProfile, creator, 
 
   const response = await client.messages.create({
     model: "claude-sonnet-5",
-    max_tokens: 500,
+    // 27/09: il modello "ragiona" prima di rispondere e il ragionamento conta nel limite:
+    // con 500 la risposta del fan poteva arrivare vuota. Si paga solo ciò che si usa.
+    max_tokens: 2000,
     system: systemPrompt,
     messages: claudeMessages,
   });
@@ -332,7 +334,10 @@ Rispondi SOLO col JSON, nessun testo prima o dopo.`;
 
   const response = await client.messages.create({
     model: "claude-sonnet-5",
-    max_tokens: 3000,
+    // 27/09: misurato 2.200-2.800 token usati su 3.000 (1.100-1.850 di solo ragionamento) →
+    // il JSON arrivava troncato ("Errore nel parsing della valutazione"). Stesso prompt e
+    // stesso modello: i voti non cambiano, cambia solo che arrivano interi.
+    max_tokens: 8000,
     system: systemPrompt,
     messages: [
       {

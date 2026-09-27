@@ -169,7 +169,7 @@ export async function POST(request) {
 
       const response = await client.messages.create({
         model: "claude-sonnet-5",
-        max_tokens: 3000,
+        max_tokens: 8000, // 27/09: il ragionamento del modello conta nel limite, a 3000 il JSON arrivava troncato
         system: `Sei un analista esperto di performance per operatori di chatting su OnlyFans.
 Valuta la performance in una conversazione simulata con un fan.
 

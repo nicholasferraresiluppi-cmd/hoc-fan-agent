@@ -60,7 +60,7 @@ Sii onesto. Non inflazionare il punteggio. Cita parole specifiche dalla risposta
 
     const response = await client.messages.create({
       model: "claude-sonnet-5",
-      max_tokens: 1200,
+      max_tokens: 4000, // 27/09: il ragionamento del modello conta nel limite (vedi academy-engine)
       system: systemPrompt,
       messages: [
         {
