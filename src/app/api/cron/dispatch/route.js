@@ -101,6 +101,20 @@ export async function POST(request) {
     out.operator_signals = "err:" + (e?.message || "unknown");
   }
 
+  // Transfer measurement (traiettoria comportamentale per operatore, mese×mese).
+  try {
+    const { getTransferTrajectories } = await import("@/lib/transfer-measurement");
+    const { bigQueryConfigured } = await import("@/lib/operator-signals");
+    if (bigQueryConfigured()) {
+      await getTransferTrajectories({ force: true });
+      out.transfer = "ok";
+    } else {
+      out.transfer = "skip:no-bq";
+    }
+  } catch (e) {
+    out.transfer = "err:" + (e?.message || "unknown");
+  }
+
   // Esito dei kick nel heartbeat: un 401 dei figli deve lasciare traccia
   // (per 2 mesi sono falliti tutti senza che nessuno lo vedesse).
   const failed = Object.entries(out).filter(([, v]) => v && typeof v === "object" && (v.kicked === false || v.ok === false)).map(([k, v]) => `${k}:${v.status || v.error || "err"}`);

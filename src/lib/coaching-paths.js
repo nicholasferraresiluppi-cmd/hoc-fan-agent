@@ -10,6 +10,7 @@
 // categorie Academy (PATTERN_TO_TRAINING). Deterministico, dal catalogo scenari statico.
 
 import { TRAINING_SCENARIOS } from "@/lib/training-scenarios";
+import { recommendLessonsForGap } from "@/lib/lesson-cards";
 
 // Nomi categoria coerenti con coaching-center.js.
 const CATEGORY_NAME = {
@@ -62,7 +63,7 @@ function scenariosByCategory() {
 /**
  * @param {string} gapKey una key di GAP_TO_PATH (top_gap.key del profilo-segnali)
  * @param {number} [max=3] quanti scenari suggerire
- * @returns {{focus:string, categories:{id,name}[], scenarios:{id,title,categoryId,difficulty}[]}|null}
+ * @returns {{focus:string, categories:{id,name}[], scenarios:{id,title,categoryId,difficulty}[], lessons:{id,title,status,primary}[]}|null}
  */
 export function recommendPathForGap(gapKey, max = 3) {
   const spec = GAP_TO_PATH[gapKey];
@@ -83,7 +84,10 @@ export function recommendPathForGap(gapKey, max = 3) {
     if (arr.length) scenarios.push(arr.shift());
     i++;
   }
-  return { focus: spec.focus, categories, scenarios };
+  // Additivo (non rompe i consumer che leggono solo categories/scenarios, es.
+  // activation.js): le carte-lezione dal reale che allenano proprio questo gap.
+  const lessons = recommendLessonsForGap(gapKey);
+  return { focus: spec.focus, categories, scenarios, lessons };
 }
 
 /** Arricchisce i profili-segnali (in place, oggetto già deserializzato) col percorso per il gap. */

@@ -26,7 +26,7 @@ import { useTheme, useStyle } from "@/lib/theme-client";
 import { UserButton, SignedIn } from "@clerk/nextjs";
 import {
   Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown,
-  GraduationCap, BookOpen, ClipboardCheck, Target, Brain, Award,
+  GraduationCap, BookOpen, BookMarked, ClipboardCheck, Target, Brain, Award,
   LayoutDashboard, UserCog, Sparkles, Radar,
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Gauge, MessageSquareWarning,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
@@ -121,6 +121,7 @@ const NAV_GROUPS_RAW = [
       { href: "/academy/tapes",                  label: "Game tape",    icon: Film },
       { href: "/academy/vendere",                label: "Vendere in chat", icon: MessageCircle },
       { href: "/playbook",                       label: "Playbook",     icon: BookOpen },
+      { href: "/academy/lezioni",                label: "Lezioni",      icon: BookMarked },
       { href: "/leaderboard",                    label: "Classifica allenamento", icon: Trophy },
       { href: "/leaderboard/leghe",              label: "Leghe",        icon: Swords },
       { href: "/leaderboard/storico",            label: "Hall of Fame", icon: Crown },
@@ -132,6 +133,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/academy-signals",          label: "Cosa fa vendere",       icon: TrendingUp },
       { href: "/admin/creator-difficulty",       label: "Difficoltà creator", icon: Snowflake },
       { href: "/admin/operator-signals",         label: "Profilo operatore", icon: UserSearch },
+      { href: "/admin/transfer",                 label: "Transfer",     icon: Activity },
       { href: "/admin/activation",               label: "Attivazione",   icon: Rocket },
       { href: "/admin/infloww-ingest",           label: "Carica export Infloww",  icon: Upload },
       { href: "/profilo/certificazioni",         label: "Certificazioni",   icon: Award },

@@ -1,5 +1,7 @@
 [
  "/",
+ "/academy/lezioni",
+ "/academy/lezioni/[id]",
  "/academy/multi",
  "/academy/tapes",
  "/academy/vendere",
@@ -70,6 +72,7 @@
  "/admin/social-proxies",
  "/admin/team",
  "/admin/threshold-study",
+ "/admin/transfer",
  "/admin/user-mapping",
  "/admin/utilizzo",
  "/admin/wage-audit",
