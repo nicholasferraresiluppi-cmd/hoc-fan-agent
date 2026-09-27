@@ -18,6 +18,7 @@ export async function GET() {
     // visibilità per creator (27/09/2026): per il MENU, "vede tutte le creator" come pseudo-permesso
     const cs = await getCreatorScope(userId).catch(() => null);
     if (cs?.all) capabilities["creators.all"] = "all";
+    const creators = cs ? { all: cs.all, count: cs.creators?.size || 0, source: cs.source } : null;
     const adminRaw = admin || (await isUserIdAdminRaw(userId));
     // appena attivata la 2FA la cache del controllo si aggiorna subito
     if (adminRaw && user?.twoFactorEnabled) await kv.set(`mfa:ok:${userId}`, 1, { ex: 600 }).catch(() => {});
@@ -32,6 +33,7 @@ export async function GET() {
       roles,
       team,
       capabilities,
+      creators,
       security,
       view_as: adminRaw ? await viewAsFor(userId).then((v) => (v ? { label: v.label, roles: v.roles, exp: v.exp, employee: v.employee || null } : null)).catch(() => null) : null,
       email: user?.emailAddresses?.[0]?.emailAddress,

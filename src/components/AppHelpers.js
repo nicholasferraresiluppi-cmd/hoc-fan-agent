@@ -97,6 +97,20 @@ export function FeedbackButton() {
 }
 
 // Barra "Vedi come…": sempre visibile mentre l'anteprima è attiva (lib/view-as).
+// Chi guida una squadra ma non ha creator assegnate: le pagine di squadra restano vuote → dirlo
+// (27/09/2026, pannello pilota: il team lead vedeva "0" senza spiegazione).
+export function CreatorsBanner() {
+  const { data } = useSWR("/api/whoami", fetcher);
+  const sv = data?.capabilities?.["scores.view"];
+  if (!data?.authenticated || data.admin || !(sv === "team" || sv === "all") || !data.creators || data.creators.all || data.creators.count > 0) return null;
+  return (
+    <div className="hoc-banner" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: CP.surface, borderBottom: `1px solid ${CP.border}`, color: CP.textSecondary, fontSize: 13, flexWrap: "wrap" }}>
+      <Eye size={16} />
+      <span style={{ flex: "1 1 300px" }}>Non hai ancora creator assegnate: classifiche e pagine di squadra restano vuote finché un admin non te le assegna (Membri → Creator visibili).</span>
+    </div>
+  );
+}
+
 export function ViewAsBanner() {
   const { data } = useSWR("/api/whoami", fetcher);
   const va = data?.view_as;

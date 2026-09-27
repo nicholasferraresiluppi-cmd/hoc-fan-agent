@@ -22,7 +22,7 @@ import SidebarCasa from "./SidebarCasa";
 import ErrorBoundary from "./ErrorBoundary";
 import OnboardingNudge from "./OnboardingNudge";
 import WelcomeAttestato from "./WelcomeAttestato";
-import { SecurityBanner, FeedbackButton, ViewAsBanner } from "./AppHelpers";
+import { SecurityBanner, FeedbackButton, ViewAsBanner, CreatorsBanner } from "./AppHelpers";
 import { CP } from "@/lib/brand";
 import { uxPageChange } from "@/lib/ux-client";
 import { useStyle } from "@/lib/theme-client";
@@ -161,6 +161,9 @@ export default function AppShell({ children }) {
         )}
         <ErrorBoundary silent label="ViewAsBanner">
           <ViewAsBanner />
+        </ErrorBoundary>
+        <ErrorBoundary silent label="CreatorsBanner">
+          <CreatorsBanner />
         </ErrorBoundary>
         <ErrorBoundary silent label="SecurityBanner">
           <SecurityBanner />
