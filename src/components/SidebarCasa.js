@@ -8,6 +8,7 @@
  * nav-access). Niente icone, niente riquadri: testo, linea oro sulla voce attiva.
  * Nello stile attuale non viene mai reso (vedi AppShell).
  */
+import { groupOf } from "@/lib/page-groups";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -38,7 +39,7 @@ const MANAGER = [
   { title: "Agenzia", items: [
     { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
     { href: "/leaderboard/creators", label: "Creator" },
-    { href: "/admin/action-center", label: "Action Center" },
+    { href: "/admin/action-center", label: "Da seguire" },
     { href: "/admin/sales-coaching", label: "Coaching vendite" },
     { href: "/admin/pnl-live", label: "P&L" },
   ] },
@@ -56,11 +57,9 @@ const OPERATOR = [
     { href: "/me/turno", label: "Oggi" },
   ] },
   { title: "Il mio quadro", items: [
-    { href: "/me/score", label: "I miei score" },
+    { href: "/me/score", label: "Come sto andando" },
     { href: "/me/compenso", label: "Il mio compenso" },
-    { href: "/me/percorso", label: "Il mio percorso" },
-    { href: "/me/coaching", label: "Il mio coaching" },
-    { href: "/profilo", label: "Il mio profilo" },
+    { href: "/me/coaching", label: "Come migliorare" },
   ] },
   { title: "Allenamento", items: [
     { href: "/", label: "Simulatore", exact: true },
@@ -105,7 +104,9 @@ export default function SidebarCasa() {
     .map((s) => ({ ...s, items: s.items.filter((i) => allowed(i.href)) }))
     .filter((s) => s.items.length);
   const openAlerts = (alerts?.alerts || []).filter((a) => a.status !== "resolved").length;
-  const isActive = (i) => (i.exact || i.href === "/" ? pathname === i.href : pathname === i.href || pathname.startsWith(i.href + "/"));
+  // una voce che apre un gruppo di schede (lib/page-groups) resta accesa su tutte le sue schede
+  const grp = groupOf(pathname);
+  const isActive = (i) => (i.exact || i.href === "/" ? pathname === i.href : pathname === i.href || pathname.startsWith(i.href + "/") || (grp && grp.tabs[0][0] === i.href));
 
   // Pagina corrente fuori dal menu corto → si apre l'elenco completo, così si vede dove si è
   const inShort = sections.some((s) => s.items.some(isActive));
