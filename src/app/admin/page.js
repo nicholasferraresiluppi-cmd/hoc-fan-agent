@@ -5,6 +5,7 @@
 // Numero principale col confronto → cosa guardare (alert aperti) → il ciclo
 // coaching funziona? → strumenti, filtrati per ciò che il ruolo può aprire
 // (nav-access) e cercabili. Tolti i banner e le "azioni rapide" doppioni.
+import { collapseItems } from "@/lib/page-groups";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -42,7 +43,7 @@ function monthId(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-const SHORTCUT_GROUPS = [
+const SHORTCUT_GROUPS_RAW = [
   {
     label: "Compensi e margini",
     items: [
@@ -143,6 +144,8 @@ const SHORTCUT_GROUPS = [
     ],
   },
 ];
+// pagine dello stesso compito unite come schede (lib/page-groups): una sola voce per gruppo
+const SHORTCUT_GROUPS = SHORTCUT_GROUPS_RAW.map((g) => ({ ...g, items: collapseItems(g.items, "title") }));
 
 export default function AdminHub() {
   const { user } = useUser();

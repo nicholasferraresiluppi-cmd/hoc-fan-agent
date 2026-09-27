@@ -16,6 +16,7 @@
  *
  * Tutti gli URL identici a prima.
  */
+import { collapseItems } from "@/lib/page-groups";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -68,7 +69,7 @@ const ESSENTIAL_HREFS = new Set([
   "/admin/roadmap",
 ]);
 
-export const NAV_GROUPS = [
+const NAV_GROUPS_RAW = [
   {
     label: "Il mio quadro",
     defaultOpen: true,
@@ -200,6 +201,8 @@ export const NAV_GROUPS = [
     ],
   },
 ];
+// pagine dello stesso compito unite come schede (lib/page-groups): una sola voce per gruppo
+export const NAV_GROUPS = NAV_GROUPS_RAW.map((g) => ({ ...g, items: collapseItems(g.items, "label") }));
 
 export const SIDEBAR_WIDTH = 248;
 
