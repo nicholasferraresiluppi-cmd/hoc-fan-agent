@@ -81,6 +81,7 @@
  "/content-pipeline/queue",
  "/content-pipeline/queue/[id]",
  "/content-pipeline/settings",
+ "/cultura",
  "/guida",
  "/leaderboard",
  "/leaderboard/creators",

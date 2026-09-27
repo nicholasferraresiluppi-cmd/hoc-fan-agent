@@ -68,6 +68,7 @@ const SHORTCUT_GROUPS_RAW = [
   {
     label: "Training & Quality",
     items: [
+      { href: "/cultura",                 title: "Come lavoriamo",   desc: "Cinque pratiche, feedback e Spark: la cultura di HOC, come invito", icon: Users },
       { href: "/guida",                   title: "Guida strumenti",  desc: "Il funnel degli strumenti per ruolo (operatore, manager, leadership, HR) — onboarding e reference", icon: Signpost },
       { href: "/admin/review",            title: "Revisione voti AI",  desc: "Valuta + correggi score AI sulle conversazioni", icon: ClipboardCheck },
       { href: "/admin/outcomes",          title: "Risultati reali",   desc: "Revenue/PPV/retention per validare AI", icon: Target },

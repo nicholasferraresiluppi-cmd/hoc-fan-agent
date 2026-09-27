@@ -466,6 +466,7 @@ export default function Sidebar() {
       <div style={{ padding: "10px 0 4px 0", borderBottom: `1px solid ${CP.border}` }}>
         <NavItem href="/welcome" label="Benvenuto" icon={Compass} isActive={pathname === "/welcome"} />
         <NavItem href="/guida" label="Guida strumenti" icon={Signpost} isActive={pathname === "/guida"} />
+        <NavItem href="/cultura" label="Come lavoriamo" icon={Compass} isActive={pathname === "/cultura"} />
         {allowed("/admin") && <NavItem href="/admin" label="Hub" icon={LayoutDashboard} isActive={pathname === "/admin"} />}
         {allowed("/admin/alerts") && <NavItem href="/admin/alerts" label="Alert operativi" icon={Bell} isActive={pathname.startsWith("/admin/alerts")} badge={criticalCount} />}
       </div>

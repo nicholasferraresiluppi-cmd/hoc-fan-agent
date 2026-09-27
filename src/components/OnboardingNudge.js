@@ -166,6 +166,9 @@ export default function OnboardingNudge() {
           >
             Ho capito
           </button>
+          <Link href="/cultura" onClick={markSeen} style={{ fontSize: 13, color: CP.accentSoftText, textDecoration: "none", fontFamily: FONTS.body }}>
+            Come lavoriamo insieme
+          </Link>
           <Link
             href="/guida"
             onClick={markSeen}
