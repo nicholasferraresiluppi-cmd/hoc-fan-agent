@@ -91,7 +91,7 @@ function Office() {
 
       <section style={{ ...card, padding: "18px 22px", marginBottom: 18, display: "flex", gap: 32, flexWrap: "wrap" }}>
         <Metric label="Venduto del mese" value={fmt$(data.sales)} />
-        <Metric label="Team progetto" value={eur(data.teamCost)} note={data.missingCost ? `${data.missingCost} senza costo indicato` : "€ al mese"} />
+        <Metric label="Team progetto" value={data.missingCost === data.members.length ? "—" : eur(data.teamCost)} note={data.missingCost ? `${data.missingCost} senza costo indicato` : "€ al mese"} />
         {!hq && <Metric label="Compensi chat" value={fmt$(data.chatCost)} note={data.sales ? `${fmtPct(data.chatCost / data.sales, 1)} del venduto` : null} />}
         {data.calendar.configured && !data.calendar.error && <Metric label="Adesso in un impegno" value={`${inCall} su ${data.members.filter((m) => m.presence).length}`} />}
       </section>

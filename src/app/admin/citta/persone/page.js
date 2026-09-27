@@ -91,7 +91,7 @@ function People() {
     .filter((p) => !q || `${p.name} ${p.email}`.toLowerCase().includes(q.toLowerCase()));
   const cols = [
     { key: "name", label: "Persona", render: (p) => <span>{p.name || p.email}<div style={{ fontSize: 12, color: CP.textMuted }}>{p.email || "email da indicare"}</div></span> },
-    { key: "role", label: "Ruolo", sort: (p) => p.card?.role || "", render: (p) => p.card?.role || <span style={{ color: CP.textMuted }}>da indicare</span> },
+    { key: "role", label: "Ruolo", sort: (p) => p.card?.role || "", render: (p) => <span style={{ whiteSpace: "nowrap", color: p.card?.role ? undefined : CP.textMuted }}>{p.card?.role || "da indicare"}</span> },
     { key: "cost", label: "€/mese", align: "right", sort: (p) => p.card?.cost ?? -1, render: (p) => (p.card?.cost != null ? `€${fmtInt(p.card.cost)}` : <span style={{ color: CP.textMuted }}>—</span>) },
     { key: "projects", label: "Palazzi", sortable: false, render: (p) => <span style={{ fontSize: 13, color: CP.textSecondary }}>{p.projects.join(", ") || "—"}{Array.isArray(p.card?.projects) ? "" : p.projects.length ? " · da ClickUp" : ""}</span> },
     { key: "open", label: "Attività aperte", align: "right", sort: (p) => Object.values(p.clickup).reduce((s, x) => s + x.open, 0), render: (p) => fmtInt(Object.values(p.clickup).reduce((s, x) => s + x.open, 0)) },
