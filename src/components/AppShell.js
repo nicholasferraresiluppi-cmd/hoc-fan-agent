@@ -12,6 +12,7 @@
  *
  * Su mobile (<900px) la sidebar diventa drawer toggleable da hamburger button.
  */
+import PageTabs from "@/components/PageTabs";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
@@ -163,6 +164,9 @@ export default function AppShell({ children }) {
         </ErrorBoundary>
         <ErrorBoundary silent label="SecurityBanner">
           <SecurityBanner />
+        </ErrorBoundary>
+        <ErrorBoundary silent label="PageTabs">
+          <PageTabs pathname={pathname} />
         </ErrorBoundary>
         <ErrorBoundary label="Pagina">
           {/* Stile Casa: la chiave per pagina fa ripartire l'entrata in scena a ogni navigazione */}
