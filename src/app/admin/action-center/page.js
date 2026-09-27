@@ -129,6 +129,9 @@ export default function ActionCenterPage() {
     ) : (
       <button onClick={() => callAction(c.employee, "set_pending")} style={btn}>Rimetti in attesa</button>
     )}
+    {st !== "ready" && !c.swap_entry?.swap_with && (
+      <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4, textAlign: align }}>Prima scegli chi lo affianca o sostituisce{isAll ? "" : "; poi serve il colloquio già fatto"}.</div>
+    )}
     <div style={{ marginTop: 6, display: "flex", gap: 12, justifyContent: align === "right" ? "flex-end" : "flex-start", flexWrap: "wrap" }}>
       <button onClick={() => unmark(c.employee)} style={linkBtn}>Togli</button>
       {isAll && <button onClick={() => ignorePermanent(c.employee)} style={linkBtn}>Escludi sempre</button>}
@@ -270,7 +273,7 @@ export default function ActionCenterPage() {
           <FilterChip label={`Da osservare (${nWatch})`} active={bucket === "watch"} onClick={() => setBucket("watch")} />
           <button type="button" className="ac-filter-btn" onClick={() => setMoreOpen(!moreOpen)} aria-expanded={moreOpen}
             style={{ ...ctl, display: "none", fontSize: 13, cursor: "pointer" }}>{moreOpen ? "Meno filtri" : `Altri filtri${stage !== "all" || tier || threshold !== 25 ? " (attivi)" : ""}`}</button>
-          <input className="ac-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca operatore" aria-label="Cerca operatore" style={{ ...ctl, width: 200, fontSize: 13 }} />
+          {inThreshold.length > 8 && <input className="ac-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca operatore" aria-label="Cerca operatore" style={{ ...ctl, width: 200, fontSize: 13 }} />}
         </div>
         <div className="ac-more" data-open={moreOpen ? "true" : "false"} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
           <FilterChip label={`Tutti (${inThreshold.length})`} active={stage === "all"} onClick={() => setStage("all")} />
