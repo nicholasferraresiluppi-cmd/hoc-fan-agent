@@ -209,7 +209,8 @@ export default function ActionCenterPage() {
       {isLoading && !data && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
       {data?.error && <Notice danger>{data.error} <Link href="/admin/creatorspro-sync" style={{ color: CP.accentSoftText }}>Sync CP →</Link></Notice>}
 
-      {ok && (<>
+      {(data?.visibility && !data.visibility.all && !(data.visibility.creators || []).length) && <Notice>Non hai ancora creator assegnate, quindi qui non c&apos;è niente da mostrare: non vuol dire che la squadra vada bene o male. Chiedi a un admin di assegnarti le tue creator.</Notice>}
+      {ok && !(data?.visibility && !data.visibility.all && !(data.visibility.creators || []).length) && (<>
         <HeroMetric
           label={`Da decidere · score ≤ ${threshold}, sotto i colleghi e in calo`}
           value={fmtInt(nDecide)}

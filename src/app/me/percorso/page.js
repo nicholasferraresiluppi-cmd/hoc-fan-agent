@@ -40,7 +40,9 @@ function windowMonths(perf, history) {
   const rows = all.length ? all.map((h) => byId[h.period_id] || { period_id: h.period_id, score: null, gap: true }) : used;
   return [...rows].sort((a, b) => String(a.period_id).localeCompare(String(b.period_id)));
 }
-const monthStatus = (m) => (m.gap || m.score == null ? "non lavorato" : m.counts ? "conta" : m.below_floor ? "sotto il minimo" : "sotto soglia");
+// il mese in corso non è ancora "sotto soglia": è in corso (pannello pilota 27/09)
+const curMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+const monthStatus = (m) => (m.gap || m.score == null ? "non lavorato" : m.counts ? "conta" : m.period_id === curMonth() ? "in corso" : m.below_floor ? "sotto il minimo" : "sotto soglia");
 
 const fmtScore = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { maximumFractionDigits: 1 }));
 
@@ -71,6 +73,7 @@ export default function MyLadderPage() {
 
       {data?.linked && Array.isArray(data.gates) && data.gates.length > 0 && (
         <>
+          <p style={{ fontSize: 13, color: CP.textMuted, margin: "0 0 12px", lineHeight: 1.55, maxWidth: 760 }}>Il percorso di carriera guarda lo score <b style={{ fontWeight: 500, color: CP.textSecondary }}>Mestiere</b> (come lavori in chat). Le <b style={{ fontWeight: 500, color: CP.textSecondary }}>Vendite</b> contano per il compenso e per le revisioni mensili: sono due misure diverse, non una contro l&apos;altra.</p>
           {data.current && (
             <HeroMetric
               label={`Ultimo mese valutato · ${monthLabel(data.current.period_id)}`}

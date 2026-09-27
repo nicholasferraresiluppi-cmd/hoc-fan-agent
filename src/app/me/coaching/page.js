@@ -1,5 +1,6 @@
 "use client";
 
+import SignalsStrip from "@/components/SignalsStrip";
 import { useState } from "react";
 import useSWR from "swr";
 import { HelpCircle, CheckCircle2, Clock } from "lucide-react";
@@ -38,6 +39,8 @@ function StatusChip({ status }) {
 
 export default function MyCoachingPage() {
   const { data, error, mutate, isLoading } = useSWR("/api/me/coaching", fetcher, { revalidateOnFocus: false });
+  // senza sessioni la pagina non resta vuota: mostra cosa allenare (stessi segnali di «Il mio turno»)
+  const { data: sig } = useSWR("/api/me/signals", fetcher, { revalidateOnFocus: false });
   const [ackId, setAckId] = useState(null);
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
@@ -85,7 +88,10 @@ export default function MyCoachingPage() {
       {data?.linked && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {sessions.length === 0 && (
-            <div style={{ ...card, padding: "18px 20px", fontSize: 14, color: CP.textSecondary }}>Nessuna sessione di coaching per ora. Quando ne riceverai una, la troverai qui.</div>
+            <>
+              <div style={{ ...card, padding: "18px 20px", fontSize: 14, color: CP.textSecondary, marginBottom: 14 }}>Nessuna sessione di coaching per ora: quando ne riceverai una, la troverai qui. Intanto, ecco cosa conviene allenare dai tuoi turni.</div>
+              <SignalsStrip sig={sig} />
+            </>
           )}
           {sessions.map((s) => (
             <article key={s.id} style={{ ...card, padding: "16px 18px", ...(s.status === "sent" ? { borderLeft: `3px solid ${CP.accent}` } : {}) }}>

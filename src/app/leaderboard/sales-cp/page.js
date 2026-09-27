@@ -200,9 +200,10 @@ export default function SalesCpLeaderboardPage() {
         <Notice danger>{data.error} <Link href="/admin/creatorspro-sync" style={{ color: CP.accentSoftText }}>Vai al sync CP →</Link></Notice>
       )}
 
-      {data && !data.error && (<>
+      {(data?.visibility && !data.visibility.all && !(data.visibility.creators || []).length) && <Notice>Non hai ancora creator assegnate, quindi qui non c&apos;è niente da mostrare: non vuol dire che la squadra vada bene o male. Chiedi a un admin di assegnarti le tue creator.</Notice>}
+      {data && !data.error && !(data?.visibility && !data.visibility.all && !(data.visibility.creators || []).length) && (<>
         <HeroMetric
-          label={`Score medio agenzia · ${monthLabel}`}
+          label={`${data.visibility && !data.visibility.all ? "Score medio delle tue creator" : "Score medio agenzia"} · ${monthLabel}`}
           value={fmtScore(data.avg_score)}
           compare={prev?.avg_score ? `${prevLabel}: ${fmtScore(prev.avg_score)} (${fmtPtsDelta(data.avg_score - prev.avg_score)} punti)` : null}
           hint="Media degli operatori in classifica. Lo score è relativo: la media resta vicina a 50 per costruzione, conta chi si sposta."
