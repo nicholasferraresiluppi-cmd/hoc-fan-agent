@@ -93,10 +93,20 @@ export async function stuckAreas(days = 14, now = new Date()) {
 }
 
 /** Cosa è cambiato rispetto a ~7 giorni fa (o al giorno più vecchio disponibile, almeno 3 giorni prima). */
-export async function citySince(now = new Date(), days = 7) {
+export async function citySince(now = new Date(), days = 7, { fromDay = null } = {}) {
   const today = await kv.get(dayKey(romeDay(now)));
   if (!today) return { base: null };
   let base = null;
+  // "dalla tua ultima visita": il primo giorno salvato a partire da quel giorno (mai oggi)
+  if (fromDay) {
+    for (let k = 0; k < 40 && !base; k++) {
+      const d = romeDay(new Date(new Date(`${fromDay}T12:00:00Z`).getTime() + k * 864e5));
+      if (d >= romeDay(now)) break;
+      const row = await kv.get(dayKey(d));
+      if (row) base = row;
+    }
+    if (!base) return { base: null };
+  }
   for (let k = days; k >= 3 && !base; k--) {
     const d = romeDay(new Date(now.getTime() - k * 864e5));
     const row = await kv.get(dayKey(d));
