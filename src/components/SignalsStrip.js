@@ -22,7 +22,7 @@ export default function SignalsStrip({ sig }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <Target size={14} color={CP.accent} />
         <span style={{ fontSize: 12, color: CP.textMuted, textTransform: "uppercase", letterSpacing: 0.4 }}>
-          Il tuo profilo · dal tuo lavoro vero{shifts ? ` (${shifts} turni singoli)` : ""}
+          Il tuo profilo · dal tuo lavoro vero{shifts ? ` (${shifts} turni in cui eri da solo in chat: nei turni in coppia non si sa chi ha scritto cosa)` : ""}
         </span>
       </div>
       <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>

@@ -56,7 +56,7 @@ export default function MyLadderPage() {
       <PageHead
         crumbs={[{ label: "Il mio quadro" }, { label: "Il mio percorso" }]}
         title="Il mio percorso"
-        subtitle="La career ladder è pubblica: qui vedi i criteri di passaggio e a che punto sei sulla componente performance. Niente 'fai i numeri e vedremo' — i requisiti sono scritti."
+        subtitle="Il percorso di carriera è pubblico: qui vedi i criteri di passaggio e a che punto sei sulla componente performance. Niente 'fai i numeri e vedremo' — i requisiti sono scritti."
       />
 
       {isLoading && <div style={{ ...card, padding: 16, color: CP.textMuted, fontSize: 14, marginBottom: 14 }}>Caricamento…</div>}
@@ -76,7 +76,7 @@ export default function MyLadderPage() {
           <p style={{ fontSize: 13, color: CP.textMuted, margin: "0 0 12px", lineHeight: 1.55, maxWidth: 760 }}>Il percorso di carriera guarda lo score <b style={{ fontWeight: 500, color: CP.textSecondary }}>Mestiere</b> (come lavori in chat). Le <b style={{ fontWeight: 500, color: CP.textSecondary }}>Vendite</b> contano per il compenso e per le revisioni mensili: sono due misure diverse, non una contro l&apos;altra.</p>
           {data.current && (
             <HeroMetric
-              label={`Ultimo mese valutato · ${monthLabel(data.current.period_id)}`}
+              label={`${data.current.period_id === curMonth() ? "Mese in corso (non ancora valutato)" : "Ultimo mese valutato"} · ${monthLabel(data.current.period_id)}`}
               value={fmtScore(data.current.score)}
               compare={data.current.tier ? <span style={{ color: tierColor(data.current.tier) }}>{tierLabel(data.current.tier)}</span> : null}
               hint="Score mestiere: come chatti, rispetto al tuo gruppo."
