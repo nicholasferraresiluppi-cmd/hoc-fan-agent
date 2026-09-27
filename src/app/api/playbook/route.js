@@ -75,6 +75,8 @@ function dedicatedToEntry(d) {
     conversation: d.conversation || [],
     steps: d.steps || null,
     takeaway: d.takeaway || null,
+    examples: d.examples || null,
+    evidence: d.evidence || null,
     outcome: null,
     operatorId: null,
     tags: d.tags || [],

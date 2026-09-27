@@ -138,6 +138,18 @@ export default function PlaybookEntryPage() {
             </section>
           )}
 
+          {Array.isArray(entry.examples) && entry.examples.length > 0 && (
+            <section style={{ ...card, padding: 18 }}>
+              <div style={label}>Frasi d&apos;esempio</div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {entry.examples.map((x, i) => (
+                  <div key={i} style={{ ...body, padding: "8px 12px", borderRadius: 8, background: CP.surfaceAlt }}>{x}</div>
+                ))}
+              </div>
+              <div style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 8 }}>Da adattare alla voce della creator e a quello che ha detto il fan: non da copiare parola per parola.</div>
+            </section>
+          )}
+
           {entry.takeaway && (
             <section style={{ ...card, padding: 18, borderLeft: `3px solid ${CP.accent}` }}>
               <div style={label}>Da ricordare</div>
