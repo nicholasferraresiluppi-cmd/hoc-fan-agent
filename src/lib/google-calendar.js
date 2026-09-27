@@ -47,21 +47,27 @@ async function token() {
  * Email sconosciute o calendari non visibili → assenti dal risultato (mai "libero" inventato).
  */
 export async function freeBusyNow(emails, now = Date.now()) {
-  const list = [...new Set((emails || []).map((e) => String(e || "").trim().toLowerCase()).filter((e) => /^[^@\s]+@[^@\s]+$/.test(e)))].slice(0, 50);
+  const list = [...new Set((emails || []).map((e) => String(e || "").trim().toLowerCase()).filter((e) => /^[^@\s]+@[^@\s]+$/.test(e)))].slice(0, 80);
   if (!list.length || !calendarConfigured()) return {};
   const ck = `citta:fb:${crypto.createHash("sha1").update(list.sort().join(",")).digest("hex").slice(0, 16)}`;
   const hit = await kv.get(ck).catch(() => null);
   if (hit && now - hit.at < CACHE_S * 1000) return hit.out;
   const end = now + 10 * 3600 * 1000;
-  const r = await fetch("https://www.googleapis.com/calendar/v3/freeBusy", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${await token()}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ timeMin: new Date(now).toISOString(), timeMax: new Date(end).toISOString(), items: list.map((id) => ({ id })) }),
-  });
-  if (!r.ok) throw new Error(`Google Calendar ${r.status}`);
-  const d = await r.json();
+  const bearer = await token();
+  // Google risponde "tooManyCalendarsRequested" oltre 20 calendari per richiesta: gruppi da 20
+  const groups = [];
+  for (let i = 0; i < list.length; i += 20) groups.push(list.slice(i, i + 20));
+  const replies = await Promise.all(groups.map(async (g) => {
+    const r = await fetch("https://www.googleapis.com/calendar/v3/freeBusy", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${bearer}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ timeMin: new Date(now).toISOString(), timeMax: new Date(end).toISOString(), items: g.map((id) => ({ id })) }),
+    });
+    if (!r.ok) throw new Error(`Google Calendar ${r.status}`);
+    return (await r.json()).calendars || {};
+  }));
   const out = {};
-  for (const [email, c] of Object.entries(d.calendars || {})) {
+  for (const [email, c] of replies.flatMap((x) => Object.entries(x))) {
     if (c.errors?.length) continue;
     const slots = (c.busy || []).map((b) => [Date.parse(b.start), Date.parse(b.end)]).filter(([s, e]) => e > now).sort((a, b) => a[0] - b[0]);
     const cur = slots.find(([s, e]) => s <= now && e > now);
