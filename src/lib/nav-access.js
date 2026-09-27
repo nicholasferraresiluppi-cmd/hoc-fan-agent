@@ -11,16 +11,18 @@ const all = (cap) => ({ type: "cap", cap, scope: "all" });
 const any = (cap) => ({ type: "cap", cap, scope: "any" });
 const SEED = any("seed");
 const team = (cap) => ({ type: "cap", cap, scope: "team" });
+// pagine con dati di TUTTA l'agenzia: in più serve vedere tutte le creator (lib/creator-scope)
+const allC = (cap) => ({ type: "cap", cap, scope: "all", creatorsAll: true });
 
 export const NAV_ACCESS = {
   "/admin": all("scores.view"),
-  "/admin/alerts": all("scores.view"),
+  "/admin/alerts": allC("scores.view"),
   "/me/turno": any("copilot.pilot"),
   // 27/09/2026: pagine di squadra aperte a chi guida una squadra (scope team), dati filtrati per creator assegnate
-  "/leaderboard/sales-cp": team("scores.view"), "/leaderboard/creators": team("scores.view"), "/leaderboard/creators/heatmap": all("scores.view"),
-  "/admin/conversation-intelligence": all("scores.view"), "/admin/shift-quality": all("scores.view"), "/admin/sales-coaching": all("scores.view"),
-  "/admin/payout-tree": all("scores.view"), "/admin/qa-reviews": all("scores.view"), "/admin/loop": all("scores.view"),
-  "/admin/priority-queue": all("scores.view"), "/admin/disputes": all("scores.view"),
+  "/leaderboard/sales-cp": team("scores.view"), "/leaderboard/creators": team("scores.view"), "/leaderboard/creators/heatmap": allC("scores.view"),
+  "/admin/conversation-intelligence": allC("scores.view"), "/admin/shift-quality": allC("scores.view"), "/admin/sales-coaching": allC("scores.view"),
+  "/admin/payout-tree": allC("scores.view"), "/admin/qa-reviews": allC("scores.view"), "/admin/loop": allC("scores.view"),
+  "/admin/priority-queue": allC("scores.view"), "/admin/disputes": allC("scores.view"),
   "/admin/pnl-live": SEED, "/admin/profiles-compare": SEED, "/admin/comp-calendar": SEED, "/admin/threshold-study": SEED,
   "/admin/comp-review": SEED, "/admin/comp-exam": SEED, "/admin/payment-profiles": SEED, "/admin/shift-research": SEED,
   "/admin/academy-tapes": SEED, "/admin/academy-signals": SEED, "/admin/creator-difficulty": SEED, "/admin/citta": SEED, "/admin/citta/ufficio": SEED, "/admin/citta/persone": SEED, "/admin/ads": SEED, "/admin/social-accounts": SEED, "/admin/social-proxies": SEED, "/admin/operator-signals": SEED, "/admin/activation": SEED,
@@ -48,6 +50,7 @@ export function canSee(href, caps, isAdmin) {
   if (req.type === "admin") return false;
   const scope = caps?.[req.cap];
   if (!scope) return false;
+  if (req.creatorsAll && !caps?.["creators.all"]) return false;
   if (req.scope === "any") return true;
   return (SCOPE_RANK[scope] || 0) >= (SCOPE_RANK[req.scope] || 0);
 }

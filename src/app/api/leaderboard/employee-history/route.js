@@ -23,7 +23,8 @@
  * dal primo period_id visto in KV (fallback approssimato, segnalato da
  * `tenure_inferred: true`).
  */
-import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
+import { CAPABILITIES } from "@/lib/rbac";
+import { authorizeEmployee } from "@/lib/creator-scope";
 import { kv } from "@vercel/kv";
 import { loadHistoryForEmployee, computeEmployeeLTV } from "@/lib/leaderboard-history";
 import { getEmployeeHistory as getCpHistory } from "@/lib/creatorspro-data";
@@ -58,11 +59,10 @@ function monthsBetweenPeriodIds(firstPeriod, periodType) {
 }
 
 export async function GET(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
-  if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
-
   const url = new URL(request.url);
   const employee = url.searchParams.get("employee");
+  const az = await authorizeEmployee(CAPABILITIES.SCORES_VIEW, employee, null);
+  if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const period_type = url.searchParams.get("period_type") || "monthly";
 
   if (!employee) return Response.json({ error: "employee required" }, { status: 400 });

@@ -7,6 +7,7 @@
  * Gate: authorizeAll(SCORES_VIEW) in lettura (scope "all", come le altre route
  * con venduto/LTV), SEED per la cattura. Tenant HOC by construction.
  */
+import { authorizeAllCreators } from "@/lib/creator-scope";
 import { authorize, authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import {
   listSnapshotDates, snapshotCreators, readSnapshot, computeOutcomes, captureAllSnapshots, bigQueryConfigured,
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   if (!bigQueryConfigured()) return Response.json({ error: "BigQuery non configurato" }, { status: 503 });
 

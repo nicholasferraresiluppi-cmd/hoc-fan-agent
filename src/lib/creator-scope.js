@@ -89,3 +89,29 @@ export async function canActOnEmployee(scope, employee, periodId) {
   const { matrix } = await buildCreatorMatrix(periodId);
   return allowsCreator(scope, principalAlias(matrix, employee));
 }
+
+/** Mese corrente (UTC) "YYYY-MM": per decidere la creator principale di un operatore. */
+export const currentPeriod = () => { const d = new Date(); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`; };
+
+/**
+ * Scheda di UN operatore: chi guida una squadra (scope team|all) la apre se l'operatore lavora
+ * soprattutto su una creator che vede. Ritorna az (ok/403) — gli operatori per sé stessi passano
+ * dal ramo "own" delle singole route.
+ */
+export async function authorizeEmployee(capability, employee, periodId) {
+  const az = await authorizeScoped(capability);
+  if (!az.ok) return az;
+  if (az.creatorScope.all) return az;
+  if (employee && (await canActOnEmployee(az.creatorScope, employee, periodId || currentPeriod()))) return az;
+  return { ok: false, status: 403, message: "Questo operatore non lavora sulle creator assegnate a te." };
+}
+
+/** Pagine con dati di TUTTA l'agenzia (liste, alert, payout…): serve la vista su tutte le creator. */
+export async function authorizeAllCreators(capability) {
+  const { authorizeAll } = await import("@/lib/rbac");
+  const az = await authorizeAll(capability);
+  if (!az.ok) return az;
+  const scope = await getCreatorScope(az.userId);
+  if (!scope.all) return { ok: false, status: 403, message: "Questa pagina mostra dati di tutte le creator: serve la vista su tutte (Membri → Creator visibili)." };
+  return { ...az, creatorScope: scope };
+}

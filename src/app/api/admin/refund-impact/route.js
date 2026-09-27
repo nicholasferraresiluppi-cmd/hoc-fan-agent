@@ -13,6 +13,7 @@
  * è MARGINALE (v2, metodo di Nicholas): ricalcolo degli scaglioni del turno
  * senza il venduto rimborsato, differenza = comp risparmiata. Marcata ~STIMA.
  */
+import { authorizeAllCreators } from "@/lib/creator-scope";
 import { kv } from "@vercel/kv";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { buildAliasIndex } from "@/lib/creator-match";
@@ -71,7 +72,7 @@ function marginalLeak(shift, alreadyRefunded, amountUsd) {
 }
 
 export async function GET(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);

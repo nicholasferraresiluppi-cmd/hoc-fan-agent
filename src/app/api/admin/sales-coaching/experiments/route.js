@@ -2,11 +2,12 @@
 // Gate: authorizeAll(SCORES_VIEW).
 export const runtime = "nodejs";
 
+import { authorizeAllCreators } from "@/lib/creator-scope";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { saveExperiment, deleteExperiment } from "@/lib/sales-coaching";
 
 export async function POST(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   try {
     const body = await request.json();
@@ -18,7 +19,7 @@ export async function POST(request) {
 }
 
 export async function DELETE(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const id = new URL(request.url).searchParams.get("id");
   if (!id) return Response.json({ error: "id mancante" }, { status: 400 });

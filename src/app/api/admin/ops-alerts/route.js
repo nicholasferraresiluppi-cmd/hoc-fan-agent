@@ -3,11 +3,12 @@
  * Lista alert operativi + esito ultimo run (ADR: docs/ALERT_OPERATIVI.md).
  * authorizeAll(SCORES_VIEW): i finding espongono dati denaro (wage, fee, score).
  */
+import { authorizeAllCreators } from "@/lib/creator-scope";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { listAlerts } from "@/lib/ops-alerts";
 
 export async function GET() {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const { alerts, last_run } = await listAlerts();

@@ -10,6 +10,7 @@
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
+import { authorizeAllCreators } from "@/lib/creator-scope";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import {
   bigQueryConfigured, getSalesCoachingData, computeSalesCoachingOnce, isComputing, isStale,
@@ -48,7 +49,7 @@ function buildView(data, split, experiments, approved, hidden) {
 }
 
 export async function GET(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   if (!bigQueryConfigured()) return Response.json({ bigquery: false });
   const splitId = new URL(request.url).searchParams.get("split");
@@ -70,7 +71,7 @@ export async function GET(request) {
 }
 
 export async function POST() {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   if (!bigQueryConfigured()) return Response.json({ error: "BigQuery non configurato" }, { status: 503 });
   try {

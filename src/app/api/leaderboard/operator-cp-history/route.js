@@ -18,7 +18,8 @@
  *
  * Auth: qualsiasi utente loggato.
  */
-import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
+import { CAPABILITIES } from "@/lib/rbac";
+import { authorizeEmployee } from "@/lib/creator-scope";
 import { resolveEmployeeForUser, normalizeName } from "@/lib/me";
 import { kv } from "@vercel/kv";
 import { buildCreatorMatrix } from "@/lib/creator-aggregates";
@@ -47,7 +48,8 @@ export async function GET(request) {
   // Chi vede tutta l'agenzia: qualsiasi operatore. Un operatore: SOLO se stesso
   // (identità risolta dal server, mai dal client). Prima (lug 2026, #24) l'API
   // era solo scope "all" e /profilo mostrava "nessun dato" a TUTTI gli operatori.
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  // 27/09/2026: chi guida una squadra apre la scheda degli operatori delle SUE creator
+  const az = await authorizeEmployee(CAPABILITIES.SCORES_VIEW, employee, null);
   let ownOnly = false;
   if (!az.ok) {
     const who = await resolveEmployeeForUser();

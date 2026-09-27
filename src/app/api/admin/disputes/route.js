@@ -13,11 +13,12 @@
  *      fatta coi flussi tracciati (re-import / sync) — mai edit silenziosi:
  *      questa API registra l'esito, non riscrive i numeri.
  */
+import { authorizeAllCreators } from "@/lib/creator-scope";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { getDispute, saveDispute, listAllDisputes, CLOSED_STATUSES, OPEN_STATUS } from "@/lib/disputes";
 
 export async function GET(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const { searchParams } = new URL(request.url);
@@ -30,7 +31,7 @@ export async function GET(request) {
 }
 
 export async function PUT(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   let body;
