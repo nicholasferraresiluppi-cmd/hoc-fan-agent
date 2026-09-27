@@ -1,6 +1,7 @@
 "use client";
 
 import Glossario from "@/components/Glossario";
+import PrimoMese, { PRIMO_MESE_TURNI } from "@/components/PrimoMese";
 import { useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
@@ -123,6 +124,10 @@ export default function MyScorePage() {
   const { data: sales } = useSWR(meEmp?.employee ? `/api/leaderboard/operator-drilldown?employee=${encodeURIComponent(meEmp.employee)}&period_id=${salesMonth}` : null, fetcher, { revalidateOnFocus: false });
   const cp = sales?.cp;
   const hasMestiere = data?.linked && data.score !== undefined;
+  // Operatore nuovo: nessun Mestiere mai calcolato e meno di 5 turni nel mese → "Il tuo primo mese"
+  // al posto dell'avviso tecnico "non risulti tra gli operatori valutati".
+  const everScored = (Array.isArray(data?.history) && data.history.some((h) => h.score != null)) || hasMestiere;
+  const firstMonth = data?.linked && !everScored && meEmp && (!meEmp.employee || sales !== undefined) && (cp?.total_shifts || 0) < PRIMO_MESE_TURNI;
   const composition = [...(data?.composition || [])].sort((a, b) => (b.weight || 0) - (a.weight || 0));
   const history = Array.isArray(data?.history) ? data.history : [];
   const maxHist = Math.max(100, ...history.map((h) => h.score || 0));
@@ -192,7 +197,8 @@ export default function MyScorePage() {
       )}
       {data?.error && <Notice danger>{data.error}</Notice>}
 
-      {data?.linked && data.reason && (
+      {firstMonth && <PrimoMese shifts={cp?.total_shifts || 0} />}
+      {data?.linked && data.reason && !firstMonth && (
         <Notice>
           {data.reason === "no_periods" && "Nessun periodo importato ancora."}
           {data.reason === "no_data_for_period" && `Nessun dato per il periodo ${monthLabel(data.period_id)}.`}

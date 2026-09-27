@@ -47,7 +47,8 @@ export default function ActionCenterPage() {
   const [hrFor, setHrFor] = useState(null);
   const [hrForm, setHrForm] = useState({ colloquio_date: "", motivazione: "", voce_operatore: "" });
   const [hrErr, setHrErr] = useState(null);
-  const [sel, setSel] = useState(null);     // riga selezionata (mostra "Vista colloquio")
+  const [sel, setSel] = useState(null);
+  const [moreOpen, setMoreOpen] = useState(false); // filtri secondari, chiusi su telefono     // riga selezionata (mostra "Vista colloquio")
   const [cvFor, setCvFor] = useState(null); // vista colloquio aperta su UNA persona
   const periodOptions = useMemo(() => monthOpts(), []);
   const prevId = prevOf(periodId);
@@ -58,6 +59,11 @@ export default function ActionCenterPage() {
   const { data: prevAc } = useSWR(prevId ? `/api/admin/action-center?period_id=${prevId}` : null, fetcher, { revalidateOnFocus: false });
 
   const ok = data && !data.error;
+  // Chi vede tutta l'agenzia (admin/people) decide verso HR; il team lead vede la sua squadra e
+  // PASSA il caso alla direzione dopo il colloquio (pilota 27/09: "sembra uno strumento per licenziare").
+  const isAll = data?.visibility ? !!data.visibility.all : true;
+  const hrOne = isAll ? "Pronto per HR" : "Passa alla direzione";
+  const hrMany = isAll ? "Pronti per HR" : "Passati alla direzione";
   const all = ok ? data.candidates || [] : [];
   const swapTargets = data?.swap_targets || [];
   const readyForHr = data?.ready_for_hr || [];
@@ -105,6 +111,29 @@ export default function ActionCenterPage() {
     if (c.context?.difficulty_band) parts.push(`pubblico ${c.context.difficulty_band}`);
     return parts.join(" · ");
   };
+  const secondLine = (c) => {
+    const ev = evaluate(c);
+    const coldOk = c.context?.difficulty_band === "fredda" && c.context.vs_peers_pct != null && c.context.vs_peers_pct >= -10;
+    return bucket === "watch" && ev.missing.length > 0
+      ? `Manca: ${ev.missing.join("; ")}`
+      : coldOk ? "Rende come i colleghi su una creator fredda: valutare la creator prima della persona" : "";
+  };
+  // Azioni di riga, uguali in tabella (desktop) e nelle schede (telefono).
+  const rowActions = (c, st, align) => (<>
+    {st !== "ready" ? (
+      <button onClick={() => { setHrErr(null); setHrFor(c.employee); }} disabled={!c.swap_entry?.swap_with}
+        title={c.swap_entry?.swap_with ? (isAll ? "Aggiungi alla lista per HR" : "Passa il caso alla direzione") : "Scegli prima un sostituto"}
+        style={{ ...btn, background: c.swap_entry?.swap_with ? CP.accent : CP.surfaceAlt, color: c.swap_entry?.swap_with ? CP.accentInk : CP.textMuted, borderColor: "transparent", cursor: c.swap_entry?.swap_with ? "pointer" : "not-allowed" }}>
+        {hrOne}
+      </button>
+    ) : (
+      <button onClick={() => callAction(c.employee, "set_pending")} style={btn}>Rimetti in attesa</button>
+    )}
+    <div style={{ marginTop: 6, display: "flex", gap: 12, justifyContent: align === "right" ? "flex-end" : "flex-start", flexWrap: "wrap" }}>
+      <button onClick={() => unmark(c.employee)} style={linkBtn}>Togli</button>
+      {isAll && <button onClick={() => ignorePermanent(c.employee)} style={linkBtn}>Escludi sempre</button>}
+    </div>
+  </>);
   const cvCand = cvFor ? all.find((c) => c.employee === cvFor) : null;
   const hrCand = hrFor ? all.find((c) => c.employee === hrFor) : null;
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -197,7 +226,9 @@ export default function ActionCenterPage() {
       <PageHead
         crumbs={[{ label: "People" }, { label: "Action Center" }]}
         title="Action Center"
-        subtitle="Gli operatori sotto soglia del mese. Per ognuno: scegli un sostituto e segnalo pronto per HR, oppure toglilo se non va cambiato. Alla fine esporti la lista per HR."
+        subtitle={isAll
+          ? "Gli operatori sotto soglia del mese. Per ognuno: scegli un sostituto e segnalo pronto per HR, oppure toglilo se non va cambiato. Alla fine esporti la lista per HR."
+          : "Chi della tua squadra fa più fatica questo mese. Si parte sempre da una conversazione: apri la vista colloquio, concordate un passo e una data di verifica. Solo se dopo la verifica non cambia niente, passi il caso alla direzione."}
         actions={<>
           <select value={periodId || ""} onChange={(e) => setPeriodId(e.target.value)} aria-label="Mese" style={ctl}>
             {periodOptions.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
@@ -221,8 +252,8 @@ export default function ActionCenterPage() {
             <Metric label="Da osservare" value={fmtInt(nWatch)} note="sotto soglia, ma non tutte le condizioni" />
             <Metric label="Sostituto scelto" value={fmtInt(n("swap"))} />
             <div>
-              <Metric label="Pronti per HR" value={fmtInt(readyForHr.length)} />
-              {readyForHr.length > 0 && (
+              <Metric label={hrMany} value={fmtInt(readyForHr.length)} />
+              {isAll && readyForHr.length > 0 && (
                 <button onClick={exportCsv} style={{ marginTop: 4, display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: "none", background: CP.accent, color: CP.accentInk, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body }}>
                   <Download size={13} /> Esporta i casi documentati
                 </button>
@@ -233,26 +264,31 @@ export default function ActionCenterPage() {
         </HeroMetric>
 
         <Notice>La soglia è relativa: una parte del gruppo sarà sempre qui, anche se tutti migliorano. Per questo “Da decidere” richiede anche di rendere sotto i colleghi sulla stessa creator e una tendenza (due mesi o un calo). Conta la tendenza, non il singolo mese.</Notice>
+        <style>{`@media (max-width: 760px){.ac-more{display:none!important}.ac-more[data-open="true"]{display:flex!important}.ac-filter-btn{display:inline-flex!important}.ac-table{display:none}.ac-cards{display:grid!important}.ac-search{width:100%!important}}`}</style>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
           <FilterChip label={`Da decidere (${nDecide})`} active={bucket === "decide"} onClick={() => setBucket("decide")} />
           <FilterChip label={`Da osservare (${nWatch})`} active={bucket === "watch"} onClick={() => setBucket("watch")} />
-          <span style={{ width: 12 }} />
+          <button type="button" className="ac-filter-btn" onClick={() => setMoreOpen(!moreOpen)} aria-expanded={moreOpen}
+            style={{ ...ctl, display: "none", fontSize: 13, cursor: "pointer" }}>{moreOpen ? "Meno filtri" : `Altri filtri${stage !== "all" || tier || threshold !== 25 ? " (attivi)" : ""}`}</button>
+          <input className="ac-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca operatore" aria-label="Cerca operatore" style={{ ...ctl, width: 200, fontSize: 13 }} />
+        </div>
+        <div className="ac-more" data-open={moreOpen ? "true" : "false"} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
           <FilterChip label={`Tutti (${inThreshold.length})`} active={stage === "all"} onClick={() => setStage("all")} />
           <FilterChip label={`Senza sostituto (${n("todo")})`} active={stage === "todo"} disabled={!n("todo")} onClick={() => setStage(stage === "todo" ? "all" : "todo")} />
           <FilterChip label={`Sostituto scelto (${n("swap")})`} active={stage === "swap"} disabled={!n("swap")} onClick={() => setStage(stage === "swap" ? "all" : "swap")} />
-          <FilterChip label={`Pronti per HR (${n("ready")})`} active={stage === "ready"} disabled={!n("ready")} onClick={() => setStage(stage === "ready" ? "all" : "ready")} />
+          <FilterChip label={`${hrMany} (${n("ready")})`} active={stage === "ready"} disabled={!n("ready")} onClick={() => setStage(stage === "ready" ? "all" : "ready")} />
           <span style={{ width: 12 }} />
           {tiers.map((t) => (
             <FilterChip key={t} label={`${tierLabel(t)} (${inThreshold.filter((c) => c.tier === t).length})`} active={tier === t} onClick={() => setTier(tier === t ? "" : t)} />
           ))}
-          <span style={{ flex: 1 }} />
           <select value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} aria-label="Soglia score" style={{ ...ctl, fontSize: 13 }}>
             {THRESHOLDS.map((t) => <option key={t} value={t}>{t === 25 ? "Soglia score ≤ 25 (standard)" : `Soglia score ≤ ${t} (più ampia)`}</option>)}
           </select>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca operatore" aria-label="Cerca operatore" style={{ ...ctl, width: 200, fontSize: 13 }} />
         </div>
         <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 8 }}>
-          “Pronto per HR” si attiva dopo aver scelto un sostituto e chiede il colloquio documentato (data, motivazione, cosa ha detto l'operatore). “Togli” vale solo per questo mese; “Escludi sempre” lo toglie anche dai mesi futuri (resta in classifica).
+          {isAll
+            ? "“Pronto per HR” si attiva dopo aver scelto un sostituto e chiede il colloquio documentato (data, motivazione, cosa ha detto l'operatore). “Togli” vale solo per questo mese; “Escludi sempre” lo toglie anche dai mesi futuri (resta in classifica)."
+            : "“Passa alla direzione” si attiva dopo aver scelto chi lo affianca o sostituisce sulla creator, e chiede il colloquio già fatto (data, motivazione, cosa ha detto l'operatore). “Togli” lo leva da questa lista solo per questo mese."}
         </div>
 
         {rows.length === 0 ? (
@@ -260,7 +296,36 @@ export default function ActionCenterPage() {
             {inThreshold.length === 0 ? "Nessun operatore sotto soglia questo mese." : "Nessun operatore in questa vista."}
           </div>
         ) : (
-          <div style={{ ...card, overflowX: "auto" }}>
+          <>
+          <div className="ac-cards" style={{ display: "none", gap: 10 }}>
+            {rows.map((c) => {
+              const st = stageOf(c);
+              const ps = prevScore.get(c.employee);
+              const few = (c.cp_total_shifts || 0) < minShifts;
+              const second = secondLine(c);
+              return (
+                <div key={c.employee} style={{ ...card, padding: "14px 16px", background: st === "ready" ? CP.accentSoft : card.background }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
+                    <Link href={`/leaderboard/operational/${encodeURIComponent(c.employee)}`} style={{ color: CP.textPrimary, textDecoration: "none", fontWeight: 500, fontSize: 15, overflowWrap: "anywhere" }}>{c.employee}</Link>
+                    <span style={{ fontSize: 15, fontWeight: 500, whiteSpace: "nowrap" }}>{few ? <span style={{ fontSize: 12, color: CP.textMuted }}>pochi turni</span> : sc(c.score)}</span>
+                  </div>
+                  <div style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 2 }}>
+                    {fmtInt(c.cp_total_shifts)} turni · {prevName ? `a ${prevName}` : "mese prima"} {ps == null ? "—" : sc(ps)}{!few && c.tier ? ` · ${tierLabel(c.tier)}` : ""}
+                  </div>
+                  <div style={{ fontSize: 13.5, color: CP.textSecondary, lineHeight: 1.45, marginTop: 8 }}>{contextLine(c) || "—"}</div>
+                  {second && <div style={{ fontSize: 13, color: bucket === "watch" ? CP.textPrimary : CP.accentSoftText, lineHeight: 1.45, marginTop: 2 }}>{second}</div>}
+                  <button type="button" onClick={() => { setSel(c.employee); setCvFor(c.employee); }} style={{ ...btn, marginTop: 10, width: "100%", display: "inline-flex", justifyContent: "center", alignItems: "center", gap: 6 }}>
+                    <User size={13} /> Apri la vista colloquio
+                  </button>
+                  <div style={{ marginTop: 10 }}>
+                    <SwapPicker candidate={c} swapTargets={swapTargets} onChange={(v) => callAction(c.employee, "set_swap", v || null)} />
+                  </div>
+                  <div style={{ marginTop: 10 }}>{rowActions(c, st, "left")}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="ac-table" style={{ ...card, overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: 1100, tableLayout: "fixed" }}>
               <colgroup>
                 <col style={{ width: 176 }} />
@@ -282,12 +347,8 @@ export default function ActionCenterPage() {
                   const st = stageOf(c);
                   const ps = prevScore.get(c.employee);
                   const few = (c.cp_total_shifts || 0) < minShifts;
-                  const ev = evaluate(c);
                   const ctx = contextLine(c);
-                  const coldOk = c.context?.difficulty_band === "fredda" && c.context.vs_peers_pct != null && c.context.vs_peers_pct >= -10;
-                  const second = bucket === "watch" && ev.missing.length > 0
-                    ? `Manca: ${ev.missing.join("; ")}`
-                    : coldOk ? "Rende come i colleghi su una creator fredda: valutare la creator prima della persona" : "";
+                  const second = secondLine(c);
                   const isSel = sel === c.employee;
                   return (
                     <tr key={c.employee} className="ac-row" data-selected={isSel ? "true" : undefined}
@@ -321,19 +382,7 @@ export default function ActionCenterPage() {
                         <SwapPicker candidate={c} swapTargets={swapTargets} onChange={(v) => callAction(c.employee, "set_swap", v || null)} />
                       </td>
                       <td style={{ ...tdS, textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
-                        {st !== "ready" ? (
-                          <button onClick={() => { setHrErr(null); setHrFor(c.employee); }} disabled={!c.swap_entry?.swap_with}
-                            title={c.swap_entry?.swap_with ? "Aggiungi alla lista per HR" : "Scegli prima un sostituto"}
-                            style={{ ...btn, background: c.swap_entry?.swap_with ? CP.accent : CP.surfaceAlt, color: c.swap_entry?.swap_with ? CP.accentInk : CP.textMuted, borderColor: "transparent", cursor: c.swap_entry?.swap_with ? "pointer" : "not-allowed" }}>
-                            Pronto per HR
-                          </button>
-                        ) : (
-                          <button onClick={() => callAction(c.employee, "set_pending")} style={btn}>Rimetti in attesa</button>
-                        )}
-                        <div style={{ marginTop: 6, display: "flex", gap: 12, justifyContent: "flex-end", flexWrap: "wrap" }}>
-                          <button onClick={() => unmark(c.employee)} style={linkBtn}>Togli</button>
-                          <button onClick={() => ignorePermanent(c.employee)} style={linkBtn}>Escludi sempre</button>
-                        </div>
+                        {rowActions(c, st, "right")}
                       </td>
                     </tr>
                   );
@@ -341,13 +390,16 @@ export default function ActionCenterPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
         <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 10 }}>
           Contesto: quanto rende per turno rispetto ai colleghi sulla stessa creator (lui escluso) e quanto è “fredda” la creator (profilo dal warehouse, <Link href="/admin/creator-difficulty" style={{ color: CP.accentSoftText }}>Difficoltà creator</Link>). Criteri: score CP ≤ soglia con almeno 5 turni nel mese; “Da decidere” anche per turno sotto il 75% dei colleghi sulla stessa creator e sotto soglia il mese prima o in calo di almeno 5 punti. {data.ignored_count ? `${data.ignored_count} operatori esclusi per sempre non compaiono. ` : ""}I sostituti suggeriti sono chi rende meglio sulle stesse creator (numero = compatibilità).
         </div>
-        <Modal open={!!hrFor} onClose={() => setHrFor(null)} title={`Pronto per HR · ${hrFor || ""}`} maxWidth={560}>
+        <Modal open={!!hrFor} onClose={() => setHrFor(null)} title={`${hrOne} · ${hrFor || ""}`} maxWidth={560}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, fontSize: 14 }}>
-            <div style={{ color: CP.textSecondary, lineHeight: 1.5 }}>Verso HR si va solo dopo aver parlato con la persona. Quello che scrivi finisce nell&apos;export insieme al contesto (colleghi, creator, turni).</div>
+            <div style={{ color: CP.textSecondary, lineHeight: 1.5 }}>{isAll
+              ? "Verso HR si va solo dopo aver parlato con la persona. Quello che scrivi finisce nell'export insieme al contesto (colleghi, creator, turni)."
+              : "Alla direzione si passa solo dopo aver parlato con la persona. Quello che scrivi lo legge chi decide, insieme al contesto (colleghi, creator, turni): scrivi i fatti, non i giudizi."}</div>
             {hrVerify && hrVerify > todayIso && (
               <Notice>C&apos;è una verifica concordata il {fmtDateIt(hrVerify)}: di solito si aspetta quella prima di passare a HR.</Notice>
             )}
@@ -364,7 +416,7 @@ export default function ActionCenterPage() {
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <button onClick={() => setHrFor(null)} style={btn}>Annulla</button>
               <button onClick={submitHr} disabled={!hrForm.colloquio_date || hrForm.motivazione.trim().length < 80 || hrForm.voce_operatore.trim().length < 10}
-                style={{ ...btn, background: CP.accent, color: CP.accentInk, borderColor: "transparent" }}>Conferma: pronto per HR</button>
+                style={{ ...btn, background: CP.accent, color: CP.accentInk, borderColor: "transparent" }}>{isAll ? "Conferma: pronto per HR" : "Conferma: passa alla direzione"}</button>
             </div>
           </div>
         </Modal>
