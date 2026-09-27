@@ -18,6 +18,8 @@ const CATEGORY_LABELS = {
   "custom-e-upsell": "Custom e PPV",
   "script-avanzati": "Script avanzati",
   "recuperi-e-retention": "Recuperi e retention",
+  "mass-e-conversione": "Messaggi di massa",
+  "righe-rosse-compliance": "Le regole (righe rosse)",
 };
 
 const CREATOR_LABELS = {
