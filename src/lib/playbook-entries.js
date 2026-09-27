@@ -793,3 +793,28 @@ export function getPlaybookBenchmarks() {
 export function getPlaybookEntryById(id) {
   return PLAYBOOK_ENTRIES.find((e) => e.id === id) || null;
 }
+
+// Le due lezioni da leggere dopo ogni scenario del simulatore (27/09). Prima si sceglieva per
+// categoria e il laboratorio di formazione ha mostrato l'errore: dopo "Richiesta sconto" uscivano
+// le lezioni su aprire/chiudere un PPV, non quella sullo sconto (che sta in un'altra categoria).
+export const SCENARIO_LESSONS = {
+  "basics-001-new-subscriber": ["playbook-001", "playbook-002"],
+  "basics-002-generic-compliment": ["playbook-001", "playbook-003"],
+  "basics-003-what-do-you-post": ["playbook-017", "playbook-009"],
+  "mass-001-eyes-emoji": ["playbook-018", "playbook-009"],
+  "mass-002-nice-teaser": ["playbook-018", "playbook-010"],
+  "mass-003-preview-before-buy": ["playbook-006", "playbook-018"],
+  "custom-001-discount-request": ["playbook-004", "playbook-008"],
+  "custom-002-free-content-test": ["playbook-006", "playbook-004"],
+  "custom-003-maybe-later": ["playbook-007", "playbook-011"],
+  "retention-001-cancelling-content": ["playbook-005", "playbook-007"],
+  "retention-002-inactive-outreach": ["playbook-012", "playbook-002"],
+  "retention-003-price-complaint": ["playbook-004", "playbook-005"],
+  "advanced-001-manipulative-fan": ["playbook-006", "playbook-008"],
+  "advanced-002-aggressive-spender": ["playbook-004", "playbook-010"],
+  "advanced-003-sweet-no-buyer": ["playbook-008", "playbook-011"],
+  "compliance-001-numero-personale": ["playbook-013", "playbook-015"],
+  "compliance-002-incontro-reale": ["playbook-014", "playbook-013"],
+  "compliance-003-pagamento-fuori": ["playbook-015", "playbook-017"],
+  "compliance-004-segnale-eta": ["playbook-016", "playbook-013"],
+};

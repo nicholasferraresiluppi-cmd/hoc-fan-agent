@@ -102,8 +102,8 @@ function QuotedMsg({ label, msg }) {
 
 // Le lezioni da leggere SUBITO, scelte sulla situazione appena allenata (laboratorio 27/09: senza,
 // le lezioni restavano in un'altra pagina e nessuno le collegava alla chat appena fatta).
-function LessonsForScenario({ category }) {
-  const { data } = useSWR(`/api/playbook?category=${encodeURIComponent(category)}`, (u) => fetch(u).then((r) => r.json()), { revalidateOnFocus: false });
+function LessonsForScenario({ scenarioId, category }) {
+  const { data } = useSWR(`/api/playbook?scenario=${encodeURIComponent(scenarioId)}`, (u) => fetch(u).then((r) => r.json()), { revalidateOnFocus: false });
   const list = (data?.entries || data?.items || (Array.isArray(data) ? data : [])).filter((e) => e.source === "dedicated").slice(0, 2);
   const ppv = category === "custom-e-upsell" || category === "mass-e-conversione";
   if (!list.length && !ppv) return null;
@@ -1412,7 +1412,7 @@ export default function Home() {
           </section>
         )}
 
-        {selectedScenario?.category && <LessonsForScenario category={selectedScenario.category} />}
+        {selectedScenario?.id && <LessonsForScenario scenarioId={selectedScenario.id} category={selectedScenario.category} />}
 
         {sessionScore?.signals && (
           <div style={{ marginBottom: 14, textAlign: "left" }}>
