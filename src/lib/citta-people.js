@@ -54,6 +54,9 @@ export async function deletePerson(key) {
   await kv.set(PEOPLE_KEY, all);
 }
 
+// nomi mostrati: solo il nome, mai le note/soprannomi che qualcuno ha scritto tra parentesi nel
+// profilo ClickUp (visto: un soprannome inappropriato finito in anagrafica e nella città)
+export const cleanName = (s) => String(s || "").replace(/\s*[([{][^)\]}]*[)\]}]/g, "").replace(/\s+/g, " ").trim();
 const normName = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 // quale dei due doppioni tenere: scheda compilata > email aziendale > più attività
 const rank = (d) => (d.card ? 4 : 0) + (d.email && !/@(gmail|hotmail|yahoo|icloud|outlook|libero)\./.test(d.email) ? 2 : 0) + Object.values(d.clickup).reduce((s, x) => s + x.open, 0) / 1e4;
@@ -65,14 +68,14 @@ export function directory(teams, people, towers) {
   for (const [tower, list] of Object.entries(teams?.towers || {})) {
     for (const m of list || []) {
       const k = personKey(m);
-      ensure(k, m).clickup[tower] = { open: m.open, late: m.late, areas: m.areas || [] };
-      if (!dir[k].name) dir[k].name = m.name;
+      ensure(k, { ...m, name: cleanName(m.name) }).clickup[tower] = { open: m.open, late: m.late, areas: m.areas || [] };
+      if (!dir[k].name) dir[k].name = cleanName(m.name);
     }
   }
   for (const [k, c] of Object.entries(people || {})) {
     const d = ensure(k, c);
     d.card = c;
-    if (c.name) d.name = c.name;
+    if (c.name) d.name = cleanName(c.name);
     if (c.email) d.email = c.email;
   }
   // stessa persona con due account ClickUp (email aziendale + gmail): si uniscono per nome,
