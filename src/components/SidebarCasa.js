@@ -40,6 +40,7 @@ const MANAGER = [
     { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
     { href: "/leaderboard/creators", label: "Creator" },
     { href: "/admin/action-center", label: "Da seguire" },
+    { href: "/cm-cockpit", label: "Cockpit turno" },
     { href: "/admin/sales-coaching", label: "Coaching vendite" },
     { href: "/admin/pnl-live", label: "P&L" },
   ] },
@@ -99,7 +100,8 @@ export default function SidebarCasa() {
   });
 
   const allowed = (href) => !me?.authenticated || canSee(href, me.capabilities, me.admin);
-  const manager = me?.authenticated && canSee("/admin", me.capabilities, me.admin);
+  const manager = me?.authenticated && (canSee("/admin", me.capabilities, me.admin) || canSee("/admin/action-center", me.capabilities, me.admin));
+  const home = me && canSee("/admin", me.capabilities, me.admin) ? "/admin" : manager ? "/admin/action-center" : "/me/turno";
   const sections = (manager ? MANAGER : OPERATOR)
     .map((s) => ({ ...s, items: s.items.filter((i) => allowed(i.href)) }))
     .filter((s) => s.items.length);
@@ -114,7 +116,7 @@ export default function SidebarCasa() {
 
   return (
     <aside className="hoc-side casa-side" style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: SIDEBAR_WIDTH, zIndex: 50 }}>
-      <Link href={manager ? "/admin" : "/me/turno"} className="casa-brand">
+      <Link href={home} className="casa-brand">
         House of Creators <em>Pro</em>
         <small>{today}</small>
       </Link>
