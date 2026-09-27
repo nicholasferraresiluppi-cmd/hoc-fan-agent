@@ -467,6 +467,7 @@ export default function Sidebar() {
         <NavItem href="/welcome" label="Benvenuto" icon={Compass} isActive={pathname === "/welcome"} />
         <NavItem href="/guida" label="Guida strumenti" icon={Signpost} isActive={pathname === "/guida"} />
         <NavItem href="/cultura" label="Come lavoriamo" icon={Compass} isActive={pathname === "/cultura"} />
+        <NavItem href="/grazie" label="Dire grazie" icon={Compass} isActive={pathname === "/grazie"} />
         {allowed("/admin") && <NavItem href="/admin" label="Hub" icon={LayoutDashboard} isActive={pathname === "/admin"} />}
         {allowed("/admin/alerts") && <NavItem href="/admin/alerts" label="Alert operativi" icon={Bell} isActive={pathname.startsWith("/admin/alerts")} badge={criticalCount} />}
       </div>

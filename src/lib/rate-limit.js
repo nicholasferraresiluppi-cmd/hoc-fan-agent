@@ -21,6 +21,7 @@ export const LIMITS = {
   candidate_chat:[{ window: 60, max: 20 },  { window: 86400, max: 400 }],
   candidate_eval:[{ window: 3600, max: 20 }],
   feedback:      [{ window: 86400, max: 30 }],
+  thanks:        [{ window: 86400, max: 20 }],  // "grazie" tra colleghi
 };
 
 /**

@@ -14,6 +14,7 @@
  * Aperta a tutti gli utenti. Nessun dato, nessuna misura: la cultura non entra in score o classifiche.
  */
 import Link from "next/link";
+import useSWR from "swr";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, SectionTitle, card } from "@/components/ds";
 
@@ -65,6 +66,22 @@ function Esempio({ prima, dopo }) {
   );
 }
 
+function Condivisi() {
+  const { data } = useSWR("/api/grazie?shared=1", (u) => fetch(u).then((r) => r.json()), { revalidateOnFocus: false });
+  const list = data?.shared || [];
+  return (
+    <>
+      <SectionTitle aside="mostrati da chi li ha ricevuti">Grazie di recente</SectionTitle>
+      <div style={{ ...card, padding: "14px 20px", marginBottom: 28, fontSize: 14, color: CP.textSecondary, lineHeight: 1.55 }}>
+        {list.length ? list.map((t) => (
+          <p key={t.id} style={{ margin: "0 0 10px" }}>«{t.text}» <span style={{ color: CP.textMuted, fontSize: 12.5 }}>— {t.from} a {t.to}</span></p>
+        )) : <p style={{ margin: 0 }}>Ancora nessuno. Il primo puoi mandarlo tu.</p>}
+        <Link href="/grazie" style={{ fontSize: 13.5, color: CP.accentSoftText }}>Dire grazie a un collega →</Link>
+      </div>
+    </>
+  );
+}
+
 export default function CulturaPage() {
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 880, margin: "0 auto", fontFamily: FONTS.body }}>
@@ -102,6 +119,8 @@ export default function CulturaPage() {
         <Esempio prima="Sei stato troppo lento oggi." dopo="Ieri sera tre fan hanno aspettato più di mezz'ora (cosa) e due non hanno comprato (effetto). Cosa ti ha rallentato? (domanda)" />
         <p style={{ margin: "12px 0 0" }}>Per ringraziare vale lo stesso: specifico e sul comportamento. «Grazie per il riepilogo della call: mi ha evitato di rileggere tutto» vale più di «bravo».</p>
       </div>
+
+      <Condivisi />
 
       <SectionTitle>La leadership da noi: lo Spark</SectionTitle>
       <div style={{ ...card, padding: "16px 20px", marginBottom: 28, fontSize: 14, color: CP.textSecondary, lineHeight: 1.6 }}>

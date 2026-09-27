@@ -51,6 +51,7 @@ const MANAGER = [
   ] },
   { title: "Noi", items: [
     { href: "/cultura", label: "Come lavoriamo" },
+    { href: "/grazie", label: "Dire grazie" },
   ] },
 ];
 const OPERATOR = [
@@ -68,6 +69,7 @@ const OPERATOR = [
   ] },
   { title: "Noi", items: [
     { href: "/cultura", label: "Come lavoriamo" },
+    { href: "/grazie", label: "Dire grazie" },
   ] },
 ];
 
