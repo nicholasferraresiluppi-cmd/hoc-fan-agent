@@ -190,6 +190,8 @@ export function mergeCityLive(snap, live, { past = false, claims = {} } = {}) {
     if (x.costPct != null && live.medianCostPct != null && x.costPct >= live.medianCostPct + COST_HIGH_PTS) top.push({ tower: p.n, area: "Finance", score: (x.costPct - live.medianCostPct) * 1000, text: `costo operatori ${pct(x.costPct)} (mediana ${pct(live.medianCostPct)})` });
   }
   top.sort((a, b) => b.score - a.score);
+  const grav = {}; for (const t of top) grav[t.tower] = (grav[t.tower] || 0) + t.score;
+  for (const p of projects) p.gravity = Math.round(grav[p.n] || 0);
   return { ...snap, projects, hq, top: top.slice(0, 5), live: { asOfDay: live.asOfDay, period: live.period, prev: live.prev, computed_at: live.computed_at, past, label: monthName(live.period) } };
 }
 
