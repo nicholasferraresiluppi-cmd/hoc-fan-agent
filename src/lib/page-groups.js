@@ -12,7 +12,7 @@ export const PAGE_GROUPS = [
   { label: "Come migliorare", tabs: [["/me/coaching", "Coaching"], ["/me/qualita", "Qualità delle chat"]] },
   { label: "Il mio compenso", tabs: [["/me/compenso", "Compenso"], ["/me/contestazioni", "Contestazioni"]] },
   // chi guida una squadra: chi è sotto soglia, chi far crescere, le sessioni
-  { label: "Da seguire", tabs: [["/admin/action-center", "Sotto soglia"], ["/admin/coaching-center", "Da far crescere"], ["/admin/coaching-sessions", "Sessioni"]] },
+  { label: "Da seguire", tabs: [["/admin/settimana", "Questa settimana"], ["/admin/action-center", "Sotto soglia"], ["/admin/coaching-center", "Da far crescere"], ["/admin/coaching-sessions", "Sessioni"]] },
   // scheda dell'operatore: stesse persone, più viste (":e" = nome operatore nell'indirizzo)
   { label: "Scheda operatore", tabs: [["/leaderboard/operational/:e", "Scheda"], ["/admin/operator-signals/:e", "Segnali e game film"]] },
   { label: "Membri e ruoli", tabs: [["/admin/ruoli", "Membri"], ["/admin/ruoli-custom", "Ruoli personalizzati"], ["/admin/team", "Team"]] },

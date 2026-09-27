@@ -77,7 +77,7 @@ const OPERATOR_TABS = [
 const ADMIN_TABS = [
   { href: "/admin", label: "Hub", icon: LayoutDashboard },
   { href: "/leaderboard/sales-cp", label: "Classifica", icon: Trophy },
-  { href: "/admin/action-center", label: "Da seguire", icon: Target },
+  { href: "/admin/settimana", label: "Da seguire", icon: Target },
   { href: "/admin/pnl-live", label: "P&L", icon: Wallet },
 ];
 
@@ -97,7 +97,7 @@ export function V3TabBar({ pathname, onMore, moreOpen }) {
   const isAdmin = !!me?.admin;
   // Chi guarda i dati di tutta l'org (Hub) ha la barra "manager", gli altri quella personale
   // team lead (vede «Da seguire») = barra di squadra, filtrata dai permessi (pannello pilota 28/09)
-  const manager = me?.authenticated && (canSee("/admin", caps, isAdmin) || canSee("/admin/action-center", caps, isAdmin));
+  const manager = me?.authenticated && (canSee("/admin", caps, isAdmin) || canSee("/admin/settimana", caps, isAdmin));
   const squad = ADMIN_TABS.filter((t) => canSee(t.href, caps, isAdmin));
   // team lead: Hub e P&L non li vede → completa con Cockpit turno e il suo andamento
   const tabs = manager ? (squad.length < 4 ? [...squad, ...[{ href: "/cm-cockpit", label: "Turno", icon: Target }, { href: "/me/score", label: "Andamento", icon: Gauge }].filter((t) => canSee(t.href, caps, isAdmin))].slice(0, 4) : squad) : OPERATOR_TABS;
