@@ -1,3 +1,4 @@
+import { noteAiError } from "@/lib/ai-health";
 import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
 import { FAN_PROFILES, getBenchmarkPatterns } from "@/lib/fan-profiles";
@@ -209,6 +210,9 @@ Rispondi SOLO in JSON valido:
     return Response.json({ error: "Devi specificare scenarioId o fanProfileId." }, { status: 400 });
   } catch (error) {
     console.error("Score API error:", error);
+    if (await noteAiError(error, "valutazione")) {
+      return Response.json({ error: "La valutazione è ferma: il credito dell'AI è esaurito. Gli admin sono stati avvisati." }, { status: 503 });
+    }
     return Response.json({ error: "Errore nella valutazione. Riprova." }, { status: 500 });
   }
 }
