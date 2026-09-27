@@ -18,7 +18,7 @@ import { kv } from "@vercel/kv";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { buildAliasIndex } from "@/lib/creator-match";
 import { getLedgerMeta, getLedgerPeriods, getLedgerActivity, readRefunds, romePeriod, periodBounds } from "@/lib/payout-ledger";
-import { calcCumulativeEarning } from "@/lib/wage-calc";
+import { calcTierEarning as calcCumulativeEarning } from "@/lib/wage-calc"; // regola CP verificata 28/09/2026: scaglione raggiunto su tutto il venduto
 import { getWages } from "@/lib/cp-wages-store";
 
 export const maxDuration = 60;
@@ -32,7 +32,7 @@ const shiftPeriod = (pp, delta) => {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 };
 
-/** effective_pct del turno: scaglioni cumulativi se presenti, altrimenti rapporto reale. */
+/** effective_pct del turno: scaglione raggiunto (regola CP) se presente, altrimenti rapporto reale. */
 function shiftEffPct(shift) {
   const salesTotal = Number(shift.total_attributed) || (shift.takes || []).reduce((a, t) => a + (Number(t.amount) || 0), 0);
   const ths = Array.isArray(shift.thresholds) ? shift.thresholds.filter((t) => t.percentage != null) : [];

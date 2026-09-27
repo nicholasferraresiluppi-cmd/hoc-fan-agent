@@ -32,15 +32,15 @@ const fmtSoglia = (v) => (Number.isInteger(Number(v)) ? "$" + Number(v).toLocale
 /*
  * Scaglione raggiunto nel turno, in chiaro: "10% · superata la soglia di $400".
  * Solo lettura di dati già calcolati dall'API (thresholds del profilo di
- * pagamento + breakdown di calcCumulativeEarning): nessuna logica di compenso
- * nuova. Gli scaglioni sono cumulativi, quindi la percentuale raggiunta vale
- * sulla parte sopra la soglia: la quota sull'intero turno resta nella colonna
- * "Quota riconosciuta".
+ * pagamento + breakdown di calcTierEarning): nessuna logica di compenso
+ * nuova. Regola CP verificata sui dati (28/09/2026): la percentuale dello
+ * scaglione raggiunto vale su TUTTO il venduto del turno, quindi coincide
+ * con la "Quota riconosciuta" (pagato/venduto).
  */
 function tierReached(s) {
   const th = [...(s.thresholds || [])].sort((a, b) => (a.from ?? 0) - (b.from ?? 0));
   if (!th.length) return null;
-  const top = (s.breakdown || [])[s.breakdown.length - 1] || null;
+  const top = (s.breakdown || []).find((b) => b.reached) || (s.breakdown || [])[s.breakdown.length - 1] || null;
   const cur = top ? th.find((t) => (t.from ?? 0) === top.from) || { from: top.from, pct: top.pct } : th[0];
   const next = th.find((t) => (t.from ?? 0) > (cur.from ?? 0));
   const why = (cur.from ?? 0) > 0
@@ -81,8 +81,8 @@ const SHIFT_COLUMNS = [
 const TIER_COLUMNS = [
   { key: "band", label: "Fascia di venduto", sortable: false, render: (b) => `${fmtUsd(b.from)}${b.to != null ? ` → ${fmtUsd(b.to)}` : " in su"}` },
   { key: "pct", label: "Percentuale", align: "right", sortable: false, render: (b) => fmtPct(b.pct) },
-  { key: "tier_sales", label: "Venduto in questa fascia", align: "right", sortable: false, render: (b) => fmtUsd(b.tier_sales) },
-  { key: "tier_earning", label: "Riconosciuto", align: "right", sortable: false, render: (b) => <span style={{ fontWeight: 500 }}>{fmtUsd(b.tier_earning)}</span> },
+  { key: "tier_sales", label: "Si applica a", align: "right", sortable: false, render: (b) => (b.reached ? `tutto il venduto (${fmtUsd(b.tier_sales)})` : <span style={{ color: CP.textMuted }}>—</span>) },
+  { key: "tier_earning", label: "Riconosciuto", align: "right", sortable: false, render: (b) => (b.reached ? <span style={{ fontWeight: 500 }}>{fmtUsd(b.tier_earning)}</span> : <span style={{ color: CP.textMuted }}>—</span>) },
 ];
 
 export default function MyPayoutPage() {
@@ -189,7 +189,7 @@ export default function MyPayoutPage() {
               )}
               {!(sel.sold > 0) && <p style={{ fontSize: 13, color: CP.textMuted, margin: "0 0 12px" }}>Turno senza vendite registrate. Se l&apos;hai lavorato e hai venduto, contestalo qui sotto: può essere un turno programmato e poi cambiato, o una vendita non attribuita.</p>}
               {(sel.breakdown || []).length > 0 ? (
-                <DataTable columns={TIER_COLUMNS} rows={sel.breakdown} minWidth={520} />
+                <DataTable columns={TIER_COLUMNS} rows={sel.breakdown} minWidth={520} selected={(b) => b.reached} />
               ) : (
                 <p style={{ fontSize: 13, color: CP.textMuted, margin: 0 }}>Nessuno scaglione registrato per questo turno.</p>
               )}
@@ -201,7 +201,7 @@ export default function MyPayoutPage() {
 
           <div style={{ marginTop: 18 }}><Glossario /></div>
           <p style={{ fontSize: 13, color: CP.textMuted, marginTop: 18, lineHeight: 1.6 }}>
-            Gli scaglioni sono cumulativi: ogni fascia si applica solo alla parte di venduto che ci cade dentro. Un numero non ti torna? <Link href="/me/contestazioni" style={{ color: CP.accentSoftText }}>Apri una contestazione</Link> — ogni correzione viene tracciata.
+            Come calcola CreatorsPro: lo scaglione raggiunto nel turno si applica a tutto il venduto del turno (esempio: $1.000 venduti con scaglione 15% = $150). Il compenso è in corso finché il mese non è chiuso. Un numero non ti torna? <Link href="/me/contestazioni" style={{ color: CP.accentSoftText }}>Apri una contestazione</Link> — ogni correzione viene tracciata.
           </p>
         </>
       )}
