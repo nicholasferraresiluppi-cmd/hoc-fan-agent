@@ -39,7 +39,7 @@ const MANAGER = [
   { title: "Agenzia", items: [
     { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
     { href: "/leaderboard/creators", label: "Creator" },
-    { href: "/admin/action-center", label: "Da seguire" },
+    { href: "/admin/settimana", label: "Da seguire" },
     { href: "/cm-cockpit", label: "Cockpit turno" },
     { href: "/admin/sales-coaching", label: "Coaching vendite" },
     { href: "/admin/pnl-live", label: "P&L" },
@@ -101,8 +101,8 @@ export default function SidebarCasa() {
   });
 
   const allowed = (href) => !me?.authenticated || canSee(href, me.capabilities, me.admin);
-  const manager = me?.authenticated && (canSee("/admin", me.capabilities, me.admin) || canSee("/admin/action-center", me.capabilities, me.admin));
-  const home = me && canSee("/admin", me.capabilities, me.admin) ? "/admin" : manager ? "/admin/action-center" : "/me/turno";
+  const manager = me?.authenticated && (canSee("/admin", me.capabilities, me.admin) || canSee("/admin/settimana", me.capabilities, me.admin));
+  const home = me && canSee("/admin", me.capabilities, me.admin) ? "/admin" : manager ? "/admin/settimana" : "/me/turno";
   const sections = (manager ? MANAGER : OPERATOR)
     .map((s) => ({ ...s, items: s.items.filter((i) => allowed(i.href)) }))
     .filter((s) => s.items.length);

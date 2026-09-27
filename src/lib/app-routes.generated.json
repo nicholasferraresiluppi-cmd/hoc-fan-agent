@@ -62,6 +62,7 @@
  "/admin/seniority",
  "/admin/sessions",
  "/admin/sessions/[id]",
+ "/admin/settimana",
  "/admin/shift-quality",
  "/admin/shift-research",
  "/admin/social-accounts",

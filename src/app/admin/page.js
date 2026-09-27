@@ -110,7 +110,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/cm-cockpit",              title: "Cockpit CM",    desc: "Turno di supervisione: team live, soglie, override shadow", icon: Gauge },
       { href: "/admin/candidate-assessments", title: "Assessment candidati", desc: "Simulatore Academy come test pre-assunzione: crea link, leggi il report (segnale per HR, non gate), registra l'esito", icon: UserCheck },
       { href: "/admin/priority-queue",    title: "Fan da seguire ora", desc: "Quale fan seguire ora per creator: whale in attesa o in raffreddamento, ordinati per valore", icon: Inbox },
-      { href: "/admin/action-center",     title: "Action Center", desc: "Lista underperformers + swap + export HR", icon: Target },
+      { href: "/admin/settimana",          title: "Da seguire", desc: "Chi seguire questa settimana: sotto soglia, cali forti, chi può crescere", icon: Target },
       { href: "/admin/coaching-center",   title: "Coaching Center", desc: "Operatori con margini di crescita + training mirato", icon: GraduationCap },
       { href: "/admin/coaching-sessions", title: "Sessioni coaching", desc: "Sessioni strutturate: evidenze, impegni, conferma operatore", icon: GraduationCap },
       { href: "/admin/disputes",          title: "Contestazioni", desc: "Coda dispute score/compensi + risoluzione motivata", icon: MessageSquareWarning },
