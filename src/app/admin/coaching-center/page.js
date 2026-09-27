@@ -85,7 +85,7 @@ export default function CoachingCenterPage() {
         </>}
       />
 
-      {isLoading && !data && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
+      {(isLoading || !url) && !data && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
       {data?.error && <Notice danger>{data.error}</Notice>}
 
       {data && !data.error && (<>
