@@ -61,7 +61,7 @@ function CityTable({ data, bar }) {
       <div style={{ marginBottom: 28 }}>{bar}</div>
       <h1 className="ds-h1" style={{ fontSize: 28, fontWeight: 500, color: CP.textPrimary, margin: "0 0 6px" }}>La città, in tabella</h1>
       <p className="ds-sub" style={{ margin: "0 0 20px", color: CP.textSecondary, fontSize: 14, lineHeight: 1.5 }}>
-        {label}. Le creator più in difficoltà in alto. Sales, Finance e Chatting vengono da HOC Pro; HR, Deal e Contenuti sono stime dai titoli di ClickUp (cerchio tratteggiato = ClickUp da riordinare). * = creator senza spazio ClickUp. Clic su una cella per aprire la pagina o l'attività.
+        {label}. Le creator più in difficoltà in alto. Sales, Finance e Chatting vengono da HOC Pro; HR, Deal e Contenuti sono stime dai titoli di ClickUp (cerchio tratteggiato = ClickUp da riordinare). * = creator senza spazio ClickUp. Clic su una cella per aprire la pagina o l'attività, sul nome per vedere chi ci lavora.
       </p>
       <div style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 860 }}>
@@ -69,13 +69,13 @@ function CityTable({ data, bar }) {
           <tbody>
             {rows.map((t) => (
               <tr key={t.n}>
-                <td style={{ ...td, color: CP.textPrimary, fontWeight: 500, whiteSpace: "nowrap" }} title={t.nospace ? "Senza spazio ClickUp: attività trovate per nome" : undefined}>{t.n}{t.nospace && <span style={{ marginLeft: 4, color: CP.textMuted, fontWeight: 400 }}>*</span>}</td>
+                <td style={{ ...td, color: CP.textPrimary, fontWeight: 500, whiteSpace: "nowrap" }} title={t.nospace ? "Senza spazio ClickUp: attività trovate per nome" : undefined}><a href={`/admin/citta/ufficio?t=${encodeURIComponent(t.n)}`} style={{ color: "inherit", textDecoration: "none" }}>{t.n}</a>{t.nospace && <span style={{ marginLeft: 4, color: CP.textMuted, fontWeight: 400 }}>*</span>}</td>
                 <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", color: CP.textSecondary }}>{usd(t.sales)}</td>
                 {AREAS.map((n) => <Cell key={n} a={find(t, n)} />)}
               </tr>
             ))}
             <tr>
-              <td style={{ ...td, color: CP.gold, fontWeight: 500 }}>Azienda</td>
+              <td style={{ ...td, color: CP.gold, fontWeight: 500 }}><a href="/admin/citta/ufficio?t=Azienda" style={{ color: "inherit", textDecoration: "none" }}>Azienda</a></td>
               <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", color: CP.textSecondary }}>{usd(data.hq.sales)}</td>
               {AREAS.map((n) => <Cell key={n} a={find(data.hq, n)} />)}
             </tr>
@@ -121,6 +121,7 @@ function Bar({ view, setView, data, setMonth, fixed }) {
             <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)}>{l}</button>
           ))}
         </div>
+        <div className="ct-seg"><a href="/admin/citta/persone" className="ct-lnk">Persone</a></div>
         {data.months?.length > 1 && (
           <div className="ct-seg" role="group" aria-label="Mese">
             {data.months.map((m) => (
@@ -132,6 +133,7 @@ function Bar({ view, setView, data, setMonth, fixed }) {
       <style>{`.ct-bar{display:inline-flex;gap:8px}
 .ct-seg{display:flex;gap:4px;padding:4px;border-radius:999px;background:rgba(22,23,29,.72);border:1px solid rgba(242,238,230,.12);backdrop-filter:blur(14px)}
 .ct-seg button{font:inherit;font-family:var(--f-sans),Manrope,sans-serif;font-size:13.5px;color:rgba(242,238,230,.6);background:none;border:0;border-radius:999px;padding:7px 14px;cursor:pointer}
+.ct-seg .ct-lnk{font-family:var(--f-sans),Manrope,sans-serif;font-size:13.5px;color:rgba(242,238,230,.6);text-decoration:none;padding:7px 14px}
 .ct-seg button[aria-pressed="true"]{background:#F2EEE6;color:#111}
 @media (max-width:899px){.ct-bar.ct-fixed{left:50%;top:66px}}`}</style>
     </>

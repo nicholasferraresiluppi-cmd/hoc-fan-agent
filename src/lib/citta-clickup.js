@@ -11,6 +11,8 @@ import { saveCitySnapshot, romeDay } from "@/lib/citta";
 const API = "https://api.clickup.com/api/v2";
 export const LABELS_KEY = "citta:labels";
 export const COMP_KEY = "citta:comp";
+// chi lavora a ogni palazzo secondo ClickUp (assegnatari delle attività aperte): base del "team progetto"
+export const TEAMS_KEY = "citta:teams";
 const AREAS = ["HR", "Finance", "Deal", "Sales", "Chatting", "Contenuti"];
 const HQA = [["Direzione", "Direzione"], ["Deal", "Deal"], ["Finance", "Finance"], ["Persone", "HR"], ["Chatting", "Chatting"], ["Social", "Contenuti"], ["Sales", "Sales"], ["Creator", "Creator"]];
 const ALL_AREAS = ["Direzione", "HR", "Finance", "Deal", "Sales", "Chatting", "Contenuti", "Creator", "Altro"];
@@ -36,6 +38,7 @@ async function spaceTasks(team, spaceId) {
         id: t.id, space: spaceId, name: String(t.name || "").trim(), list: String(t.list?.name || "").trim(), status,
         due: t.due_date ? Number(t.due_date) : null, upd: t.date_updated ? Number(t.date_updated) : null,
         who: (t.assignees || []).map((a) => String(a.username || "").split("@")[0].split(" ")[0]).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)),
+        people: (t.assignees || []).map((a) => ({ id: String(a.id || ""), name: String(a.username || "").trim(), email: String(a.email || "").trim().toLowerCase() })).filter((a) => a.email || a.id),
       });
     }
     if (d.last_page || !(d.tasks || []).length) break;
@@ -153,6 +156,27 @@ export async function refreshCityFromClickup(now = Date.now()) {
     n: "Azienda", total: sede.length, other: (bys.Altro || []).length,
     areas: HQA.map(([n, src]) => ({ n, ...summarize([...(bys[src] || []), ...(n === "Creator" ? creatorRel : [])], now) })),
   };
+  // team da ClickUp: assegnatari per palazzo, con quante cose aperte / in ritardo hanno lì
+  const teamOf = (ts) => {
+    const m = {};
+    for (const t of ts) for (const a of t.people || []) {
+      const k = a.email || `cu:${a.id}`;
+      if (!m[k]) m[k] = { name: a.name, email: a.email, cuId: a.id, open: 0, late: 0, areas: {} };
+      m[k].open += 1; if (t.due && t.due < now) m[k].late += 1;
+      const ar = area(t); m[k].areas[ar] = (m[k].areas[ar] || 0) + 1;
+    }
+    return Object.values(m).sort((x, y) => y.open - x.open).slice(0, 40)
+      .map((x) => ({ ...x, areas: Object.entries(x.areas).sort((a, b) => b[1] - a[1]).map(([a]) => a).filter((a) => a !== "Altro").slice(0, 3) }));
+  };
+  const teams = { at: now, towers: {} };
+  for (const p of comp.projects) {
+    const first = p.n.split(" ")[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const rx = new RegExp(`\\b${first}\\b`, "i");
+    teams.towers[p.n] = teamOf(p.space ? all.filter((t) => t.space === p.space) : all.filter((t) => rx.test(t.name)));
+  }
+  teams.towers.Azienda = teamOf(sede);
+  await kv.set(TEAMS_KEY, teams);
+
   const coverage = all.length ? all.filter((t) => area(t) !== "Altro").length / all.length : 0;
   const snap = await saveCitySnapshot({ generated: romeDay(new Date(now)), projects, hq, coverage });
   return { tasks: all.length, spaces: spaces.length, newLabels: Object.keys(fresh).length, unknownLeft: Math.max(0, unknown.length + unknownLists.length - Object.keys(fresh).length), projects: snap.projects.length };
