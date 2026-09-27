@@ -7,7 +7,7 @@ export const maxDuration = 60;
 
 import { currentUser } from "@clerk/nextjs/server";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
-import { getCitySnapshot, saveCitySnapshot, getClaims, setClaim } from "@/lib/citta";
+import { getCitySnapshot, saveCitySnapshot, getClaims, setClaim, citySince } from "@/lib/citta";
 import { getCityLive, mergeCityLive, currentMonthId, previousMonthId, monthLabel } from "@/lib/citta-live";
 
 export async function GET(request) {
@@ -20,8 +20,14 @@ export async function GET(request) {
   const month = asked === prev ? prev : cur;
   const months = [{ id: cur, label: monthLabel(cur) }, { id: prev, label: monthLabel(prev) }];
   try {
-    const [live, claims] = await Promise.all([getCityLive(month), getClaims()]);
-    return Response.json({ ...mergeCityLive(snap, live, { past: month !== cur, claims: month === cur ? claims : {} }), months, month, canClaim: month === cur });
+    const [live, claims, since] = await Promise.all([getCityLive(month), getClaims(), month === cur ? citySince() : { base: null }]);
+    const merged = mergeCityLive(snap, live, { past: month !== cur, claims: month === cur ? claims : {} });
+    // prese in carico ferme: piano ancora in ritardo dopo 7 giorni dalla presa in carico
+    const staleClaims = [];
+    for (const t of [...merged.projects, merged.hq]) for (const a of t.areas) {
+      if (a.claim && (a.s === "wait" || a.s === "stop") && Date.now() - a.claim.at > 7 * 864e5) staleClaims.push(`${t.n} · ${a.n} (${a.claim.by})`);
+    }
+    return Response.json({ ...merged, since: { ...since, staleClaims }, months, month, canClaim: month === cur });
   } catch (e) {
     return Response.json({ ...snap, months, month, live_error: String(e?.message || e) });
   }
