@@ -46,10 +46,10 @@ export default function PrimoMese({ shifts = 0 }) {
       <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
         {STEPS.map((s, i) => (
           <li key={s.href}>
-            <Link href={s.href} style={{ display: "grid", gridTemplateColumns: "22px 1fr", gap: 10, padding: "10px 12px", borderRadius: 8, border: `1px solid ${CP.borderSoft}`, textDecoration: "none" }}>
+            <Link href={s.href} style={{ display: "grid", gridTemplateColumns: "22px 1fr", gap: 10, padding: "10px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surfaceAlt, textDecoration: "none" }}>
               <span style={{ fontSize: 13, color: CP.textMuted }}>{i + 1}</span>
               <span>
-                <span style={{ display: "block", fontSize: 14.5, color: CP.textPrimary, fontWeight: 500 }}>{s.t} →</span>
+                <span style={{ display: "block", fontSize: 14.5, color: CP.textPrimary, fontWeight: 500 }}>{s.t} <span style={{ color: CP.accentSoftText }}>→</span></span>
                 <span style={{ display: "block", fontSize: 13, color: CP.textSecondary, lineHeight: 1.45, marginTop: 2 }}>{s.d}</span>
               </span>
             </Link>
