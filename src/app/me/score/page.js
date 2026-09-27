@@ -166,7 +166,9 @@ export default function MyScorePage() {
             <HeroMetric
               label={`Vendite · ${monthLabel(salesMonth)} (in corso)`}
               value={cp.score != null ? fmtScore(cp.score) : "—"}
-              compare={cp.tier ? <span style={{ color: CP.textSecondary }}>{tierLabel(cp.tier)}</span> : null}
+              compare={(cp.total_shifts || 0) < PRIMO_MESE_TURNI && cp.score != null
+                ? <span style={{ color: CP.textSecondary }}>solo {cp.total_shifts} {cp.total_shifts === 1 ? "turno" : "turni"}: ancora instabile</span>
+                : cp.tier ? <span style={{ color: CP.textSecondary }}>{tierLabel(cp.tier)}</span> : null}
               hint={<>È quello delle revisioni mensili. 0-100: il tuo venduto per turno confrontato con chi lavora sulle tue stesse creator (70%) e con tutta l&apos;agenzia (30%). Il dettaglio per creator è nel <Link href="/profilo" style={link}>tuo profilo</Link>.</>}
             />
           )}

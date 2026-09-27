@@ -38,7 +38,7 @@ export default function PrimoMese({ shifts = 0 }) {
           <span style={{ fontSize: 14, color: CP.textPrimary, marginLeft: 6 }}>{n > 0 ? `${n} di ${PRIMO_MESE_TURNI}` : "si parte dal primo"}</span>
         </div>
         <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.5 }}>
-          Dopo {PRIMO_MESE_TURNI} turni nel mese esce il tuo score Vendite. Prima, nelle revisioni mensili non si guarda nessuno. Il Mestiere (come chatti) arriva a fine mese.
+          Con pochi turni lo score Vendite si muove molto da un giorno all&apos;altro: per questo nelle revisioni mensili si guarda solo da {PRIMO_MESE_TURNI} turni in su. Il Mestiere (come chatti) arriva a fine mese.
         </div>
       </div>
 
