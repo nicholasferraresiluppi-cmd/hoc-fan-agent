@@ -22,12 +22,12 @@ function mountCity(root,RAW,THREE,OrbitControls){
   const toXY=(e)=>{const r=root.getBoundingClientRect();return [(e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1]};
   root.innerHTML="<div class=\"intro\" id=\"intro\"><b>La citt\u00e0</b><i></i></div>\n<canvas id=\"c\" aria-label=\"La citt\u00e0 dell'azienda: un palazzo per ogni progetto, un piano per ogni area\"></canvas>\n<div class=\"top\"><b>La citt\u00e0</b><div class=\"r\"><span class=\"tag\" id=\"tag\">HOC Pro + ClickUp</span><button class=\"pill\" id=\"snd\" aria-pressed=\"false\">Suono spento</button></div></div>\n<div class=\"shade\"></div><div class=\"labels\" id=\"labels\"></div>\n<div class=\"hero\" id=\"hero\">\n  <h1 id=\"h1\">La citt\u00e0.<br><em>Una sola citt\u00e0.</em></h1>\n  <div id=\"top5\"></div><div id=\"since\"></div><p id=\"line\">Ogni palazzo \u00e8 una creator, alto quanto il suo venduto del mese; ogni piano \u00e8 un'area. Tocca un palazzo per entrarci, o scegli un'area qui sotto per vederla in tutta la citt\u00e0.</p>\n  <div class=\"stats\"><div><b id=\"s1\">0</b><span>creator</span></div><div><b id=\"s2\">0</b><span>segnali in ritardo</span></div><div><b id=\"s3\">0</b><span>stime ClickUp da verificare</span></div></div>\n</div>\n<nav class=\"chips\" id=\"chips\" aria-label=\"Guarda un'area in tutta la citt\u00e0\"></nav>\n<aside class=\"panel\" id=\"panel\" aria-live=\"polite\"><button class=\"x\" id=\"close\">Chiudi</button><div id=\"pb\"></div></aside>";
 
-const AREAS=['HR','Finance','Deal','Sales','Chatting','Contenuti'];
+const AREAS=['HR & People','Finance','Media Buying','Marketing','Sales','Chatting'];
 let seed=7;const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280};
 const projects=RAW.projects.map(p=>({n:p.n,hq:false,areas:p.areas,total:p.total,other:p.other,nospace:!!p.nospace,sales:p.sales||0}));
 const HQ={n:'Azienda',hq:true,areas:RAW.hq.areas,total:RAW.hq.total,other:RAW.hq.other,sales:RAW.hq.sales||0};
 const MAXS=Math.max(1,...RAW.projects.map(p=>p.sales||0));
-const HQMAP={HR:'Persone',Finance:'Finance',Deal:'Deal',Sales:'Sales',Chatting:'Chatting',Contenuti:'Social'};
+const HQMAP={'HR & People':'HR & People',Finance:'Finance','Media Buying':'Media Buying',Marketing:'Marketing',Sales:'Sales',Chatting:'Chatting'};
 const COLc={ok:'var(--ok)',wait:'var(--wait)',stop:'var(--stop)',none:'rgba(242,238,230,.16)',old:'rgba(242,238,230,.3)'},STT={ok:'In movimento',wait:'Qualcosa in ritardo',stop:'Ferma',none:'Nessuna attività',old:'Da riordinare in ClickUp'};
 const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const NUMW=['zero','uno','due','tre','quattro','cinque','sei','sette','otto','nove','dieci','undici','dodici','tredici','quattordici','quindici','sedici','diciassette','diciotto','diciannove','venti'];
@@ -106,7 +106,7 @@ const labelsEl=$id('labels');
 towers.forEach(T=>{const b=document.createElement('button');b.className='tl'+(T.hq?' hq':'');b.innerHTML=`<b>${T.data.n}</b><span class="dots">${T.data.areas.map(a=>a.src==='clickup'?`<i style="background:transparent;box-shadow:inset 0 0 0 1px ${COLc[a.s]==='transparent'?'rgba(242,238,230,.3)':COLc[a.s]}"></i>`:`<i style="background:${COLc[a.s]}"></i>`).join('')}</span>`;b.onclick=()=>selectTower(T);labelsEl.appendChild(b);T.lbl=b;T.dots=[...b.querySelectorAll('i')]});
 let filter=null,selT=null,hoverT=null,hiSlab=null;
 const chips=$id('chips');
-chips.innerHTML='<span class="lab">Guarda un\'area</span>'+['Tutte',...AREAS].map((a,k)=>`<button data-k="${k-1}" aria-pressed="${k===0}">${a}</button>`).join('');
+chips.innerHTML='<span class="lab">Guarda un\'area</span>'+['Tutte',...AREAS].map((a,k)=>`<button data-k="${k-1}" aria-pressed="${k===0}">${a==='Sales'||a==='Chatting'?'OnlyFans · '+a:a}</button>`).join('');
 chips.querySelectorAll('button').forEach(b=>b.onclick=()=>setFilter(+b.dataset.k<0?null:AREAS[+b.dataset.k]));
 const lineEl=$id('line'),defLine=lineEl.textContent;
 function areaOf(T,name){return T.hq?T.data.areas.find(a=>a.n===HQMAP[name]):T.data.areas.find(a=>a.n===name)}
@@ -125,7 +125,7 @@ async function claimArea(T,area,on){try{const r=await fetch(RAW.api||'/api/admin
 function selectTower(T){selT=T;hiSlab=null;flyUntil=performance.now()+2000;chime(T.hq?0:5,true);
   const c={ok:0,wait:0,stop:0,none:0,old:0};T.data.areas.forEach(a=>c[a.s]++);
   const sum=c.stop?`${c.stop===1?'Un\'area è ferma':c.stop+' aree sono ferme'} e ${c.wait} ${c.wait===1?'aspetta':'aspettano'} qualcosa.`:c.wait?`${c.wait===1?'Un\'area ha':c.wait+' aree hanno'} qualcosa in ritardo, il resto si muove.`:'Tutte le aree sono in movimento.';
-  pb.innerHTML=`<div class="k">${T.hq?'La sede · le aree di tutta l\'azienda':'Progetto creator'}</div><h2>${T.data.n}</h2><p class="sum">${sum}</p>${RAW.api?'<div class="team"><p class="tm-note">Carico la squadra…</p></div>':''}`+T.data.areas.map((a,k)=>`<button class="row" data-k="${k}"><i style="background:${COLc[a.s]}"></i><b>${esc(a.n)}</b><span>${STT[a.s]}${a.trend?` <em class="tr ${a.trend}" title="${TRT[a.trend]}">${ARW[a.trend]}</em>`:''}</span><small>${a.src==='clickup'?'<b class="est">Stima ClickUp</b> · ':''}${esc(a.l)}</small></button>${actRow(T,a)}`).join('')+`<p class="note">${T.data.nospace?'Nessuno spazio ClickUp per questa creator: le attività sono quelle che la nominano nel titolo, negli altri spazi (può includere omonimi). ':''}${RAW.live?'Sales, Finance e Chatting vengono da HOC Pro (P&L e Classifica vendite); l\'altezza del palazzo è il venduto del mese. HR, Deal e Contenuti sono stimati dal titolo delle attività ClickUp: ':'Le aree sono stimate dal titolo delle attività ClickUp: '}${T.data.total} attività aperte, ${T.data.other} non riconducibili a un'area. Dati del ${new Date(RAW.generated).toLocaleDateString('it-IT',{day:'numeric',month:'long'})}.</p>`;
+  pb.innerHTML=`<div class="k">${T.hq?'La sede · le aree di tutta l\'azienda':'Progetto creator'}</div><h2>${T.data.n}</h2><p class="sum">${sum}</p>${RAW.api?'<div class="team"><p class="tm-note">Carico la squadra…</p></div>':''}`+T.data.areas.map((a,k)=>`<button class="row" data-k="${k}"><i style="background:${COLc[a.s]}"></i><b>${esc(DISP(a.n))}</b><span>${STT[a.s]}${a.trend?` <em class="tr ${a.trend}" title="${TRT[a.trend]}">${ARW[a.trend]}</em>`:''}</span><small>${a.src==='clickup'?'<b class="est">Stima ClickUp</b> · ':''}${esc(a.l)}</small></button>${actRow(T,a)}`).join('')+`<p class="note">${T.data.nospace?'Nessuno spazio ClickUp per questa creator: le attività sono quelle che la nominano nel titolo, negli altri spazi (può includere omonimi). ':''}${RAW.live?'Sales, Finance e Chatting vengono da HOC Pro (P&L e Classifica vendite); l\'altezza del palazzo è il venduto del mese. HR, Deal e Contenuti sono stimati dal titolo delle attività ClickUp: ':'Le aree sono stimate dal titolo delle attività ClickUp: '}${T.data.total} attività aperte, ${T.data.other} non riconducibili a un'area. Dati del ${new Date(RAW.generated).toLocaleDateString('it-IT',{day:'numeric',month:'long'})}.</p>`;
   pb.querySelectorAll('[data-cl]').forEach(b=>b.onclick=()=>claimArea(T,b.dataset.cl,true));pb.querySelectorAll('[data-rel]').forEach(b=>b.onclick=()=>claimArea(T,b.dataset.rel,false));
   pb.querySelectorAll('.row').forEach(r=>r.onclick=()=>{const k=+r.dataset.k;hiSlab=hiSlab===T.slabs[k]?null:T.slabs[k];pb.querySelectorAll('.row').forEach(x=>x.classList.toggle('hi',hiSlab&&+x.dataset.k===k));chime(k,true)});
   panel.classList.add('on');$id('hero').style.opacity=0;chips.classList.add('hide');hiF=null;towers.forEach(X=>{if(X!==T)showTeam(X,false)});loadTeam(T)}
@@ -149,7 +149,7 @@ on(cv,'pointerup',e=>{if(!downAt)return;const mv=Math.hypot(e.clientX-downAt[0],
 // ---------- la squadra dentro il palazzo (solo in app: dati da /ufficio) ----------
 const OPEN=.4;const TEAMC={busy:0xFFB54A,none:0xCFC9BD,off:0x77736C};let OFFH=false;const GREY=new THREE.Color(0x4A4C55);const teamCache={};let hiF=null,hovF=null;
 const figGeo={body:new THREE.CylinderGeometry(.034,.05,.13,14),head:new THREE.SphereGeometry(.042,16,12)};
-const HQA2={HR:'Persone',Contenuti:'Social'};
+const HQA2={};const DISP=n=>n==='Sales'||n==='Chatting'?'OnlyFans · '+n:n;
 const presState=m=>m.presence&&m.presence.busy?'busy':OFFH?'off':'none';
 const hm=ts=>new Date(ts).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Rome'});
 const rd=ts=>new Date(ts).toLocaleDateString('it-IT',{timeZone:'Europe/Rome'});const when=ts=>rd(ts)===rd(Date.now())?hm(ts):new Date(ts).toLocaleDateString('it-IT',{weekday:'short',timeZone:'Europe/Rome'})+' '+hm(ts);
@@ -165,7 +165,7 @@ function placeTeam(T,d){if(T.figs)return;T.figs=[];const by=new Map();const push
     if(S){f.g.position.set(x,th/2+.004,dd*.5-.12-row*.22);S.g.add(f.g)}else{f.g.position.set(x,.12,dd/2+.38+row*.24);T.g.add(f.g)}
     f.base=f.kind==='chat'?1.05:1.45;f.g.scale.setScalar(f.base);f.hit.forEach(h=>h.userData.F=f);T.figs.push(f)}))}
 function showTeam(T,on){(T.figs||[]).forEach(f=>f.g.visible=on);
-  if(on&&!T.fls){T.fls=T.slabs.map(S=>{const e=document.createElement('div');e.className='tm-fl';const n=T.figs.filter(f=>f.g.parent===S.g).length;e.innerHTML=esc(S.a.n)+(n?'<span>'+n+'</span>':'');root.appendChild(e);return e})}
+  if(on&&!T.fls){T.fls=T.slabs.map(S=>{const e=document.createElement('div');e.className='tm-fl';const n=T.figs.filter(f=>f.g.parent===S.g).length;e.innerHTML=esc(DISP(S.a.n))+(n?'<span>'+n+'</span>':'');root.appendChild(e);return e})}
   (T.fls||[]).forEach(e=>e.style.display=on?'':'none')}
 function hiFig(T,i){hiF=(T.figs||[]).find(f=>f.kind==='team'&&f.idx===i)||null}
 async function loadTeam(T){const el=pb.querySelector('.team');if(!RAW.api||!el)return;
