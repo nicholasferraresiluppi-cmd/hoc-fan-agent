@@ -1,6 +1,6 @@
 // La città, dati vivi (26/09/2026): i piani Sales, Finance e Chatting e l'altezza dei palazzi
 // vengono dagli STESSI calcoli delle pagine di HOC Pro (P&L live, Classifica vendite / Action
-// Center), non da ClickUp. HR, Deal e Contenuti restano la stima dai titoli ClickUp.
+// Center), non da ClickUp. HR & People, Media Buying e Marketing restano la stima dai titoli ClickUp.
 //
 //   Sales    — venduto e venduto per turno dalla matrice della pagina Creator (turni a quota, solo turni iniziati);
 //              calo per turno ≥ 15% sul mese prima = ambra (stessa soglia "In calo")

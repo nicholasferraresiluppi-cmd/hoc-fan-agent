@@ -19,8 +19,9 @@ const fetcher = async (url) => {
   return r.ok ? j : { ...j, error: j.error || `Errore ${r.status}` };
 };
 
-const AREAS = ["HR", "Finance", "Deal", "Sales", "Chatting", "Contenuti"];
-const HQ_OF = { HR: "Persone", Contenuti: "Social" };
+const AREAS = ["HR & People", "Finance", "Media Buying", "Marketing", "Sales", "Chatting"];
+const HQ_OF = {};
+const LABEL_OF = { Sales: "OnlyFans · Sales", Chatting: "OnlyFans · Chatting" };
 const DOT = { ok: "#7FE0B8", wait: "#FFB54A", stop: "#6B6D75", none: "transparent", old: "transparent" };
 const LABEL = { ok: "In movimento", wait: "Qualcosa in ritardo", stop: "Ferma", none: "Nessuna attività", old: "Da riordinare in ClickUp" };
 const bad = (s) => s === "wait" || s === "stop";
@@ -61,11 +62,11 @@ function CityTable({ data, bar }) {
       <div style={{ marginBottom: 28 }}>{bar}</div>
       <h1 className="ds-h1" style={{ fontSize: 28, fontWeight: 500, color: CP.textPrimary, margin: "0 0 6px" }}>La città, in tabella</h1>
       <p className="ds-sub" style={{ margin: "0 0 20px", color: CP.textSecondary, fontSize: 14, lineHeight: 1.5 }}>
-        {label}. Le creator più in difficoltà in alto. Sales, Finance e Chatting vengono da HOC Pro; HR, Deal e Contenuti sono stime dai titoli di ClickUp (cerchio tratteggiato = ClickUp da riordinare). * = creator senza spazio ClickUp. Clic su una cella per aprire la pagina o l'attività, sul nome per vedere chi ci lavora.
+        {label}. Le creator più in difficoltà in alto. Sales, Finance e Chatting (area OnlyFans) vengono da HOC Pro; HR & People, Media Buying e Marketing sono stime dai titoli di ClickUp (cerchio tratteggiato = ClickUp da riordinare). * = creator senza spazio ClickUp. Clic su una cella per aprire la pagina o l'attività, sul nome per vedere chi ci lavora.
       </p>
       <div style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 860 }}>
-          <thead><tr><th style={th}>Creator</th><th style={{ ...th, textAlign: "right" }}>Venduto</th>{AREAS.map((a) => <th key={a} style={th}>{a}</th>)}</tr></thead>
+          <thead><tr><th style={th}>Creator</th><th style={{ ...th, textAlign: "right" }}>Venduto</th>{AREAS.map((a) => <th key={a} style={th}>{LABEL_OF[a] || a}</th>)}</tr></thead>
           <tbody>
             {rows.map((t) => (
               <tr key={t.n}>

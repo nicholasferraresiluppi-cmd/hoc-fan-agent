@@ -13,9 +13,12 @@ export const LABELS_KEY = "citta:labels";
 export const COMP_KEY = "citta:comp";
 // chi lavora a ogni palazzo secondo ClickUp (assegnatari delle attività aperte): base del "team progetto"
 export const TEAMS_KEY = "citta:teams";
-const AREAS = ["HR", "Finance", "Deal", "Sales", "Chatting", "Contenuti"];
-const HQA = [["Direzione", "Direzione"], ["Deal", "Deal"], ["Finance", "Finance"], ["Persone", "HR"], ["Chatting", "Chatting"], ["Social", "Contenuti"], ["Sales", "Sales"], ["Creator", "Creator"]];
-const ALL_AREAS = ["Direzione", "HR", "Finance", "Deal", "Sales", "Chatting", "Contenuti", "Creator", "Altro"];
+// Piani = aree ufficiali del playbook HOC (27/09/2026, Nicholas): HR & People (assorbe i Deal), Finance,
+// Media Buying, Marketing (organic social: SMM, editor, publisher), OnlyFans = Sales + Chatting.
+// Tech e Scrum Master non sono piani (Tech oggi non esiste; Scrum Master è trasversale).
+export const AREAS = ["HR & People", "Finance", "Media Buying", "Marketing", "Sales", "Chatting"];
+const HQA = [["Direzione", "Direzione"], ["HR & People", "HR & People"], ["Finance", "Finance"], ["Media Buying", "Media Buying"], ["Marketing", "Marketing"], ["Sales", "Sales"], ["Chatting", "Chatting"], ["Creator", "Creator"]];
+const ALL_AREAS = ["Direzione", "HR & People", "Finance", "Media Buying", "Marketing", "Sales", "Chatting", "Creator", "Altro"];
 const DONE = /^(done|complete|completed|closed|fatto|completat[oa]|deprecated|cancel+ed|annullat[oa]|archiviat[oa]|published|interrott[oa]|rimborsata|deleted|signed|consegnato all'utente|rimoss[oa]|conclus[oa])$/i;
 const DAY = 864e5;
 
@@ -54,12 +57,12 @@ async function pool(items, n, fn) {
 
 const RULES = `Aree (una sola per titolo):
 - Direzione: decisioni, strategia, riunioni di board, pianificazione generale, obiettivi
-- HR: persone del team: colloqui, assunzioni, onboarding, formazione del personale, 1to1, feedback, turni del personale, offboarding
+- HR & People: persone e accordi: colloqui, assunzioni, onboarding, formazione del personale, 1to1, feedback, turni del personale, offboarding, ruoli; accordi e contratti con creator o partner, proposte, percentuali, firme, rinnovi, trattative
 - Finance: pagamenti, fatture, prelievi, ricevute, spese, acquisti, costi, conti, IVA, commercialista, payout, budget
-- Deal: accordi e contratti con creator o partner, proposte, percentuali, firme, rinnovi, trattative
-- Sales: vendite e crescita: promo, campagne, prezzi, bundle, traffico, ads, funnel, link, profili da far crescere, abbonati, analisi revenue
-- Chatting: chat con i fan: chatter/operatori in chat, script di chat, PPV, custom, mass message, messaggi ai fan, turni chat, Infloww
-- Contenuti: produzione e pubblicazione di contenuti: shooting, foto, video, reel, storie, post, piano editoriale, editing, caricare contenuti, vestiti/oggetti per shooting
+- Media Buying: traffico a pagamento: ads (Meta, TikTok, Reddit…), campagne pubblicitarie, media buyer, budget ads, funnel e landing delle ads, farming, crescite/followers acquistati, tracking link delle campagne
+- Marketing: contenuti organici sui social: shooting, foto, video, reel, storie, post, caroselli, piano editoriale, editing, publisher, social media manager, localizzazione, caricare contenuti, trend, alterego, vestiti/oggetti per shooting
+- Sales: vendite su OnlyFans: promo OF, prezzi, bundle, abbonamenti e rinnovi, strategia PPV, analisi revenue OF, link OF, profilo OF
+- Chatting: chat con i fan: chatter/operatori in chat, script di chat, PPV in chat, custom, mass message, messaggi ai fan, turni chat, Infloww
 - Creator: relazione e gestione della creator come persona: call con la creator, sua agenda, benessere, viaggi
 - Altro: non capibile o generico (un nome, una data, un link)`;
 
