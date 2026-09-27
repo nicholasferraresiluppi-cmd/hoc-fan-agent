@@ -127,6 +127,18 @@ export default function MembersPage() {
     load();
   };
 
+  // Admin (ex pagina Accessi): rendere/togliere admin. La revoca toglie anche Clerk e ruoli (API access).
+  const toggleAdmin = async (row) => {
+    const on = !row.admin;
+    if (!confirm(on ? `Rendere ${row.name} amministratore? Vedrà i dati di tutti e potrà cambiare impostazioni e accessi.` : `Togliere ${row.name} dagli amministratori?`)) return;
+    setBusy(row.userId);
+    const r = await fetch("/api/admin/access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: on ? "add" : "remove", userId: row.userId }) });
+    const j = await r.json().catch(() => ({}));
+    setMsg(!r.ok || j.error ? { type: "error", text: j.error || "Operazione non riuscita" } : { type: j.warning ? "error" : "ok", text: j.warning || (on ? `${row.name} ora è admin.` : `${row.name} non è più admin (anche su Clerk).`) });
+    setBusy(null);
+    load();
+  };
+
   const openEditor = (userId) => {
     setEditing(editing === userId ? null : userId);
     if (editing !== userId) setTimeout(() => editRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
@@ -142,6 +154,7 @@ export default function MembersPage() {
   const pending = invites?.pending || [];
   const neverIn = allRows.filter((r) => !r.last_sign_in_at).length;
   const suspended = allRows.filter((r) => r.banned).length;
+  const admins = allRows.filter((r) => r.admin).length;
   const editRow = allRows.find((r) => r.userId === editing) || null;
 
   const columns = [
@@ -154,7 +167,12 @@ export default function MembersPage() {
         </div>
       ),
     },
-    { key: "roles", label: "Ruoli", sort: (r) => (r.roles || []).map(roleLabel).join(", "), render: (r) => <RoleChips ids={r.roles} label={roleLabel} /> },
+    { key: "roles", label: "Ruoli", sort: (r) => (r.admin ? "0" : "1") + (r.roles || []).map(roleLabel).join(", "), render: (r) => (
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        {r.admin && <span title="Amministratore: vede i dati di tutti e cambia le impostazioni" style={{ fontSize: 12, padding: "2px 9px", borderRadius: 999, background: CP.accentSoft, color: CP.accentSoftText, border: `1px solid ${CP.accent}` }}>Admin</span>}
+        <RoleChips ids={r.roles} label={roleLabel} />
+      </div>
+    ) },
     {
       key: "last", label: "Ultimo accesso", sort: (r) => r.last_sign_in_at || 0,
       render: (r) => (r.last_sign_in_at ? <span style={{ color: CP.textSecondary }}>{fmtDate(r.last_sign_in_at)}</span> : <span style={{ color: CP.textMuted }}>mai entrato</span>),
@@ -177,7 +195,7 @@ export default function MembersPage() {
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "People" }, { label: "Membri" }]}
         title="Membri"
-        subtitle="Chi può entrare in HOC Pro e cosa può fare. L'app è solo su invito: per dare accesso a una persona usa Aggiungi membro, per gli operatori usa l'invito in blocco qui sotto."
+        subtitle="Chi può entrare in HOC Pro, chi è admin e cosa può fare. L'app è solo su invito: per dare accesso a una persona usa Aggiungi membro, per gli operatori usa l'invito in blocco qui sotto."
         actions={<>
           {canManage && (
             <select defaultValue="" onChange={(e) => e.target.value && viewAs({ roles: [e.target.value] })} style={{ ...btn(false), fontWeight: 400 }} title="Guarda l'app con i permessi di un ruolo (sola lettura)" aria-label="Vedi l'app come un ruolo">
@@ -203,6 +221,7 @@ export default function MembersPage() {
           {canInvite && ` · ${pending.length} ${pending.length === 1 ? "invito in attesa" : "inviti in attesa"}`}
           {` · ${neverIn} ${neverIn === 1 ? "non è mai entrato" : "non sono mai entrati"}`}
           {suspended > 0 && ` · ${suspended} ${suspended === 1 ? "sospeso" : "sospesi"}`}
+          {` · ${admins} admin`}
         </div>
       )}
 
@@ -258,6 +277,15 @@ export default function MembersPage() {
                 <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Ruoli e accessi di {editRow.name}</div>
                 <div style={{ fontSize: 12, color: CP.textMuted }}>{editRow.email}</div>
                 <button style={{ ...smallBtn, marginLeft: "auto" }} onClick={() => setEditing(null)}>Chiudi</button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12, padding: "10px 12px", borderRadius: 8, border: `1px solid ${CP.borderSoft}` }}>
+                <div style={{ fontSize: 13, color: CP.textSecondary, marginRight: "auto" }}>
+                  Amministratore: <b style={{ fontWeight: 500, color: CP.textPrimary }}>{editRow.admin ? "sì" : "no"}</b>
+                  <span style={{ color: CP.textMuted }}> · vede i dati di tutti, cambia impostazioni e accessi</span>
+                </div>
+                {editRow.admin?.sources?.length === 1 && editRow.admin.sources[0] === "env"
+                  ? <span style={{ fontSize: 12, color: CP.textMuted }}>fisso: si toglie dalle impostazioni di Vercel</span>
+                  : <button style={smallBtn} disabled={busy === editRow.userId} onClick={() => toggleAdmin(editRow)}>{editRow.admin ? "Togli da admin" : "Rendi admin"}</button>}
               </div>
               <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Ruoli: clic per aggiungere o togliere (si salva subito)</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
