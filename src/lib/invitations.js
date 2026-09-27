@@ -63,7 +63,7 @@ export async function listInvitations() {
   return { pending: arr(pending).map(shape), accepted: arr(accepted).map(shape) };
 }
 
-export async function createInvitation({ email, roles, inviterId, inviterName, origin, notify = true }) {
+export async function createInvitation({ email, roles, creators, inviterId, inviterName, origin, notify = true }) {
   const mail = String(email || "").trim().toLowerCase();
   if (!EMAIL_RE.test(mail)) throw new Error("Email non valida");
   const wanted = [...new Set((roles || []).map(String).filter(Boolean))];
@@ -72,6 +72,23 @@ export async function createInvitation({ email, roles, inviterId, inviterName, o
   const allowedIds = new Set(allowed.map((r) => r.id));
   const bad = wanted.filter((r) => !allowedIds.has(r));
   if (bad.length) throw new Error(`Non puoi assegnare: ${bad.join(", ")}`);
+
+  // Creator visibili (27/09/2026): "*" = tutte, lista = solo quelle. Un non-admin può dare
+  // solo creator che vede lui (anti-escalation, come per i ruoli).
+  let creatorsMeta = null;
+  if (creators === "*" || (Array.isArray(creators) && creators.length)) {
+    const { getCreatorScope, cleanScope } = await import("@/lib/creator-scope");
+    const mine = admin ? { all: true } : await getCreatorScope(inviterId);
+    if (creators === "*") {
+      if (!mine.all) throw new Error("Non puoi dare la vista su tutte le creator");
+      creatorsMeta = "*";
+    } else {
+      const wantedC = cleanScope({ creators }).creators;
+      const badC = mine.all ? [] : wantedC.filter((c) => !mine.creators.has(c));
+      if (badC.length) throw new Error(`Non puoi assegnare: ${badC.join(", ")}`);
+      creatorsMeta = wantedC;
+    }
+  }
 
   const cc = await clerkClient();
   // Se la persona è già registrata l'invito non serve: si cambia il ruolo da Membri
@@ -92,7 +109,7 @@ export async function createInvitation({ email, roles, inviterId, inviterName, o
     // re-invito che sostituisce un invito in attesa: solo admin (un non-admin
     // non deve poter riscrivere i ruoli di un invito fatto da un admin)
     ignoreExisting: admin,
-    publicMetadata: { role: primary, roles: wanted, invited_by: inviterId, invited_by_name: inviterName || null },
+    publicMetadata: { role: primary, roles: wanted, invited_by: inviterId, invited_by_name: inviterName || null, ...(creatorsMeta ? { creators: creatorsMeta } : {}) },
   });
   return { ...shape(inv), url: inv.url || null };
 }

@@ -1,6 +1,7 @@
 import { authorize, authorizeAdmin, auditAccess, CAPABILITIES, getUserRoles, getEffectiveCapabilities, setUserRoles, ROLES, ROLE_META, listCustomRoles } from "@/lib/rbac";
 import { clerkClient } from "@clerk/nextjs/server";
 import { listAdmins } from "@/lib/admin";
+import { getAssignedCreators } from "@/lib/creator-scope";
 
 // GET /api/admin/roles — lista utenti con ruoli correnti + meta ruoli predefiniti + custom
 export async function GET() {
@@ -42,6 +43,7 @@ export async function GET() {
       created_at: nameMap[uid]?.createdAt || null,
       banned: nameMap[uid]?.banned || false,
       admin: adminMap[uid] ? { sources: adminMap[uid] } : null,
+      creators: await getAssignedCreators(uid).catch(() => null),
       roles: await getUserRoles(uid),
       caps: await getEffectiveCapabilities(uid).catch(() => ({})),
     }))

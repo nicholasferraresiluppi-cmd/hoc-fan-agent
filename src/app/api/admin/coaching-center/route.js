@@ -26,7 +26,8 @@
  * DELETE ?period_id=YYYY-MM&employee=N → rimuove entry
  */
 import { kv } from "@vercel/kv";
-import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { CAPABILITIES } from "@/lib/rbac";
+import { authorizeScoped, allowsCreator, canActOnEmployee, scopeSummary } from "@/lib/creator-scope";
 import { logAuditAction } from "@/lib/audit-log";
 import { hasCpDataForPeriod } from "@/lib/creatorspro-data";
 import { buildCoachingCandidates } from "@/lib/coaching-center";
@@ -43,7 +44,8 @@ const VALID_STATUS = ["suggested", "assigned", "completed", "rejected"];
 function isValidPeriod(p) { return typeof p === "string" && /^\d{4}-\d{2}$/.test(p); }
 
 export async function GET(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  // 27/09/2026: da solo admin a chi guida una squadra (sales manager, team lead), limitato alle sue creator
+  const az = await authorizeScoped(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);
@@ -74,10 +76,13 @@ export async function GET(request) {
     loadGroupCategories(),
     loadGroupLanguages(),
   ]);
-  const assignmentsObj = assignments || {};
+  const assignmentsAll = assignments || {};
 
   // Decora candidati con language/category dedotto dal group principale
-  const decorated = candidates.map((c) => {
+  const visible = candidates.filter((c) => allowsCreator(az.creatorScope, c.top_creator));
+  const visibleEmp = new Set(visible.map((c) => c.employee));
+  const assignmentsObj = az.creatorScope.all ? assignmentsAll : Object.fromEntries(Object.entries(assignmentsAll).filter(([e]) => visibleEmp.has(e)));
+  const decorated = visible.map((c) => {
     const lang = langOverrides?.[c.top_creator] || detectLanguage(c.top_creator || "");
     return {
       ...c,
@@ -105,11 +110,12 @@ export async function GET(request) {
     assignments: assignmentsObj,
     counts,
     total: decorated.length,
+    visibility: scopeSummary(az.creatorScope),
   });
 }
 
 export async function POST(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorizeScoped(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   let body;
@@ -120,6 +126,7 @@ export async function POST(request) {
   if (!employee) return Response.json({ error: "employee required" }, { status: 400 });
   if (!VALID_ACTIONS.includes(action)) return Response.json({ error: `action invalid (${VALID_ACTIONS.join("|")})` }, { status: 400 });
 
+  if (!(await canActOnEmployee(az.creatorScope, employee, period_id))) return Response.json({ error: "Questo operatore non lavora sulle creator assegnate a te." }, { status: 403 });
   const key = ASSIGN_KEY(period_id);
   const assignments = (await kv.get(key)) || {};
   const existing = assignments[employee] || {};
@@ -164,13 +171,14 @@ export async function POST(request) {
 }
 
 export async function DELETE(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorizeScoped(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);
   const period_id = url.searchParams.get("period_id");
   const employee = url.searchParams.get("employee");
   if (!isValidPeriod(period_id)) return Response.json({ error: "period_id YYYY-MM required" }, { status: 400 });
+  if (employee && !(await canActOnEmployee(az.creatorScope, employee, period_id))) return Response.json({ error: "Questo operatore non lavora sulle creator assegnate a te." }, { status: 403 });
   if (!employee) return Response.json({ error: "employee required" }, { status: 400 });
 
   const key = ASSIGN_KEY(period_id);

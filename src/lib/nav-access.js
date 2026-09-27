@@ -10,20 +10,22 @@ const SCOPE_RANK = { own: 1, team: 2, all: 3 };
 const all = (cap) => ({ type: "cap", cap, scope: "all" });
 const any = (cap) => ({ type: "cap", cap, scope: "any" });
 const SEED = any("seed");
+const team = (cap) => ({ type: "cap", cap, scope: "team" });
 
 export const NAV_ACCESS = {
   "/admin": all("scores.view"),
   "/admin/alerts": all("scores.view"),
   "/me/turno": any("copilot.pilot"),
-  "/leaderboard/sales-cp": all("scores.view"), "/leaderboard/creators": all("scores.view"), "/leaderboard/creators/heatmap": all("scores.view"),
+  // 27/09/2026: pagine di squadra aperte a chi guida una squadra (scope team), dati filtrati per creator assegnate
+  "/leaderboard/sales-cp": team("scores.view"), "/leaderboard/creators": team("scores.view"), "/leaderboard/creators/heatmap": all("scores.view"),
   "/admin/conversation-intelligence": all("scores.view"), "/admin/shift-quality": all("scores.view"), "/admin/sales-coaching": all("scores.view"),
   "/admin/payout-tree": all("scores.view"), "/admin/qa-reviews": all("scores.view"), "/admin/loop": all("scores.view"),
   "/admin/priority-queue": all("scores.view"), "/admin/disputes": all("scores.view"),
   "/admin/pnl-live": SEED, "/admin/profiles-compare": SEED, "/admin/comp-calendar": SEED, "/admin/threshold-study": SEED,
   "/admin/comp-review": SEED, "/admin/comp-exam": SEED, "/admin/payment-profiles": SEED, "/admin/shift-research": SEED,
   "/admin/academy-tapes": SEED, "/admin/academy-signals": SEED, "/admin/creator-difficulty": SEED, "/admin/citta": SEED, "/admin/citta/ufficio": SEED, "/admin/citta/persone": SEED, "/admin/ads": SEED, "/admin/social-accounts": SEED, "/admin/social-proxies": SEED, "/admin/operator-signals": SEED, "/admin/activation": SEED,
-  "/admin/infloww-ingest": SEED, "/admin/roadmap": SEED, "/admin/candidate-assessments": SEED, "/admin/action-center": SEED,
-  "/admin/coaching-center": SEED, "/admin/employee-profiles": SEED, "/admin/creatorspro-sync": SEED, "/admin/wage-audit": SEED,
+  "/admin/infloww-ingest": SEED, "/admin/roadmap": SEED, "/admin/candidate-assessments": SEED, "/admin/action-center": team("scores.view"),
+  "/admin/coaching-center": team("scores.view"), "/admin/employee-profiles": SEED, "/admin/creatorspro-sync": SEED, "/admin/wage-audit": SEED,
   "/admin/creatorspro-sync-history": SEED, "/admin/infloww-agency": SEED, "/admin/infloww-revenue": SEED, "/admin/infloww-reconcile": SEED,
   "/admin/debug-mapping": SEED, "/admin/user-mapping": SEED, "/admin/leaderboard-exclusions": SEED, "/admin/group-languages": SEED,
   "/admin/group-categories": SEED, "/admin/leaderboard-import": SEED, "/admin/leaderboard-settings": SEED,
