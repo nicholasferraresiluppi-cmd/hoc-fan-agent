@@ -105,6 +105,13 @@ export function directory(teams, people, towers) {
   return Object.values(dir).filter((d) => !d.card?.hidden);
 }
 
+// fuori orario = sera, notte e fine settimana (ora di Roma): "nessun impegno" non vuol dire reperibile
+export function isOffHours(now = new Date()) {
+  const p = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Rome", weekday: "short", hour: "2-digit", hour12: false }).formatToParts(now);
+  const wd = p.find((x) => x.type === "weekday")?.value, h = Number(p.find((x) => x.type === "hour")?.value);
+  return wd === "Sat" || wd === "Sun" || h < 9 || h >= 19;
+}
+
 const firstTwo = (s) => String(s || "").split(" ").slice(0, 2).join(" ");
 
 /** L'ufficio di un palazzo: team chat + team progetto + presenza. */
@@ -128,7 +135,8 @@ export async function buildOffice(tower, periodId = currentMonthId()) {
         sales += c.sales; shifts += c.shifts || 0; cost += c.earnings || 0; pages.push(alias);
       }
       if (shifts <= 0) continue;
-      chatters.push({ name: op, shifts: Math.round(shifts * 10) / 10, sales: Math.round(sales), cost: Math.round(cost), perShift: shifts ? Math.round(sales / shifts) : null, pages, under: under.has(firstTwo(op)) });
+      // sotto 1 turno la media a turno è rumore (visto: 0,2 turni → "$356 a turno")
+      chatters.push({ name: op, shifts: Math.round(shifts * 10) / 10, sales: Math.round(sales), cost: Math.round(cost), perShift: shifts >= 1 ? Math.round(sales / shifts) : null, few: shifts < 3, pages, under: under.has(firstTwo(op)) });
     }
     const tot = chatters.reduce((s, c) => s + c.sales, 0);
     chatters = chatters.map((c) => ({ ...c, share: tot ? c.sales / tot : 0 })).sort((a, b) => b.sales - a.sales);
@@ -152,7 +160,7 @@ export async function buildOffice(tower, periodId = currentMonthId()) {
   members.sort((a, b) => Number(Boolean(b.role)) - Number(Boolean(a.role)) || (b.costHere || 0) - (a.costHere || 0) || b.open - a.open);
 
   // ── presenza
-  const calendar = { configured: calendarConfigured(), error: null };
+  const calendar = { configured: calendarConfigured(), error: null, offHours: isOffHours() };
   if (calendar.configured) {
     try {
       const fb = await freeBusyNow(members.map((m) => m.email));

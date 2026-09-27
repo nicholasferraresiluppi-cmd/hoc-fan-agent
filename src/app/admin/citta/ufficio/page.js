@@ -20,20 +20,24 @@ const fetcher = async (url) => {
 };
 const eur = (v) => (v == null ? "—" : `€${fmtInt(v)}`);
 const hm = (ts) => new Date(ts).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
+const romeDate = (ts) => new Date(ts).toLocaleDateString("it-IT", { timeZone: "Europe/Rome" });
+// "lun 09:00" se non è oggi: un orario senza giorno inganna (visto di domenica)
+const when = (ts) => (romeDate(ts) === romeDate(Date.now()) ? hm(ts) : `${new Date(ts).toLocaleDateString("it-IT", { weekday: "short", timeZone: "Europe/Rome" })} ${hm(ts)}`);
 
-function Presence({ p, configured }) {
+// Solo ciò che il calendario dice davvero: "in un impegno". Nessun impegno ≠ disponibile,
+// quindi niente "Libero" verde; fuori orario si dice (sera, notte, fine settimana).
+function Presence({ p, configured, offHours }) {
   if (!configured) return null;
   if (!p) return <span style={{ fontSize: 12.5, color: CP.textMuted }}>Calendario non visibile</span>;
-  const busy = p.busy;
-  const txt = busy ? `In un impegno fino alle ${hm(p.until)}` : p.next ? `Libero · prossimo impegno alle ${hm(p.next)}` : "Libero per il resto della giornata";
+  const txt = p.busy ? `In un impegno fino alle ${when(p.until)}` : offHours ? "Fuori orario" : p.next ? `Nessun impegno ora · prossimo ${when(p.next)}` : "Nessun impegno in calendario oggi";
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, color: busy ? CP.textPrimary : CP.textSecondary }}>
-      <i aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 99, background: busy ? "#FFB54A" : "#7FE0B8", flex: "none" }} />{txt}
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, color: p.busy ? CP.textPrimary : CP.textMuted }}>
+      <i aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 99, flex: "none", background: p.busy ? "#FFB54A" : "transparent", border: p.busy ? "none" : `1px solid ${CP.textMuted}` }} />{txt}
     </span>
   );
 }
 
-function Member({ m, configured }) {
+function Member({ m, configured, offHours }) {
   return (
     <div style={{ ...card, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
@@ -43,7 +47,7 @@ function Member({ m, configured }) {
       <div style={{ fontSize: 13, color: m.role ? CP.textSecondary : CP.textMuted }}>
         {m.role || "Ruolo da indicare"}{m.areas?.length ? ` · in ClickUp: ${m.areas.join(", ")}` : ""}
       </div>
-      <Presence p={m.presence} configured={configured} />
+      <Presence p={m.presence} configured={configured} offHours={offHours} />
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 13, color: CP.textSecondary }}>
         {m.fromClickup && <span>{m.open} aperte{m.late ? <span style={{ color: CP.attn }}> · {m.late} in ritardo</span> : ""}</span>}
         <span>{m.costHere != null ? `${eur(m.costHere)}/mese qui${m.projectsCount > 1 ? ` (1/${m.projectsCount} di ${eur(m.cost)})` : ""}` : "Costo da indicare"}</span>
@@ -74,7 +78,7 @@ function Office() {
     { key: "name", label: "Operatore", render: (r) => <Link href={`/leaderboard/operational/${encodeURIComponent(r.name)}`} style={{ color: "inherit", textDecoration: "none" }}>{r.name}{r.under && <span style={{ marginLeft: 8, fontSize: 12, color: CP.attn }}>sotto soglia</span>}</Link> },
     { key: "shifts", label: "Turni", align: "right", render: (r) => r.shifts.toLocaleString("it-IT") },
     { key: "sales", label: "Venduto", align: "right", render: (r) => fmt$(r.sales) },
-    { key: "perShift", label: "A turno", align: "right", render: (r) => fmt$(r.perShift) },
+    { key: "perShift", label: "A turno", align: "right", render: (r) => (r.perShift == null ? <span title="Meno di un turno: la media non dice niente" style={{ color: CP.textMuted }}>—</span> : <span style={{ color: r.few ? CP.textMuted : undefined }} title={r.few ? "Meno di 3 turni: media poco affidabile" : undefined}>{fmt$(r.perShift)}</span>) },
     { key: "cost", label: "Compenso", align: "right", render: (r) => fmt$(r.cost) },
     { key: "share", label: "Quota del venduto", align: "right", render: (r) => fmtPct(r.share) },
   ];
@@ -104,7 +108,7 @@ function Office() {
       <SectionTitle aside={data.members.some((m) => m.weight != null) ? "«pesa» = quota del costo del team progetto di questo palazzo; chi segue più palazzi è diviso in parti uguali" : null}>Team progetto</SectionTitle>
       {data.members.length ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))", gap: 12, marginBottom: 26 }}>
-          {data.members.map((m) => <Member key={m.key} m={m} configured={data.calendar.configured && !data.calendar.error} />)}
+          {data.members.map((m) => <Member key={m.key} m={m} configured={data.calendar.configured && !data.calendar.error} offHours={data.calendar.offHours} />)}
         </div>
       ) : (
         <Notice>Nessuno risulta assegnato ad attività aperte di questo palazzo in ClickUp. Aggiungi le persone dall'anagrafica.</Notice>
@@ -112,7 +116,7 @@ function Office() {
 
       {!hq && (
         <>
-          <SectionTitle aside="turni a quota: chi lavora su più pagine nello stesso turno è diviso tra loro">Team chat</SectionTitle>
+          <SectionTitle aside="chi ha fatto turni qui questo mese (turni a quota tra le pagine dello stesso turno); a turno in grigio sotto 3 turni, «—» sotto 1">Team chat</SectionTitle>
           <DataTable columns={chatCols} rows={data.chatters.map((c) => ({ ...c, key: c.name }))} defaultSort={{ key: "sales", dir: -1 }} empty="Nessun turno su queste pagine questo mese." minWidth={640} />
         </>
       )}

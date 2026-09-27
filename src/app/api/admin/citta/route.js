@@ -28,6 +28,9 @@ export async function GET(request) {
     for (const t of [...merged.projects, merged.hq]) for (const a of t.areas) {
       if (a.claim && (a.s === "wait" || a.s === "stop") && Date.now() - a.claim.at > 7 * 864e5) staleClaims.push(`${t.n} · ${a.n} (${a.claim.by})`);
     }
+    // luci credibili: lampeggia solo ciò che è tra le priorità misurate o è peggiorato di recente
+    const hot = new Set([...(merged.top || []).map((x) => `${x.tower} · ${x.area}`), ...(since.worse || [])]);
+    for (const t of [...merged.projects, merged.hq]) for (const a of t.areas) if (hot.has(`${t.n} · ${a.n}`)) a.hot = true;
     return Response.json({ ...merged, since: { ...since, staleClaims }, months, month, canClaim: month === cur });
   } catch (e) {
     return Response.json({ ...snap, months, month, live_error: String(e?.message || e) });

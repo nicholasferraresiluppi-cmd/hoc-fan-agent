@@ -136,7 +136,7 @@ function salesArea(x, live) {
   const l = `Venduto a ${when}: ${usd(x.sales)} in ${grp(x.shifts)} turni. A turno ${usd(x.perShift)}` +
     (d != null ? `, ${d >= 0 ? "+" : "−"}${pct(Math.abs(d), 0)} rispetto a ${monthName(live.prev)} (la freccia guarda il venduto a turno, non il totale).` : ".");
   const trend = d == null ? null : d >= 0.05 ? "up" : d <= -0.05 ? "down" : "flat";
-  return { n: "Sales", s, open: 0, late: 0, l, src: "hoc", trend, short: d != null ? `${d >= 0 ? "+" : "−"}${pct(Math.abs(d), 0)} a turno` : usd(x.sales), link: x.topAlias ? `/leaderboard/creators/${encodeURIComponent(x.topAlias)}` : "/leaderboard/creators" };
+  return { n: "Sales", s, open: 0, late: 0, l, src: "hoc", trend, short: d != null ? `${d >= 0 ? "+" : "−"}${pct(Math.abs(d), 0)} a turno vs ${monthName(live.prev).slice(0, 3)}` : usd(x.sales), link: x.topAlias ? `/leaderboard/creators/${encodeURIComponent(x.topAlias)}` : "/leaderboard/creators" };
 }
 function financeArea(x, live) {
   if (!x || x.costPct == null) return { n: "Finance", s: "none", open: 0, late: 0, l: "Nessun venduto: costo operatori non calcolabile.", src: "hoc" };
@@ -184,7 +184,7 @@ export function mergeCityLive(snap, live, { past = false, claims = {} } = {}) {
   for (const p of projects) {
     const x = live.people[p.n]; if (!x) continue;
     const d = x.perShift != null && x.perShiftPrev ? x.perShift / x.perShiftPrev - 1 : null;
-    if (d != null && d <= SALES_DROP) top.push({ tower: p.n, area: "Sales", score: -d * 100, text: `venduto a turno ${pct(d, 0).replace("-", "−")}` });
+    if (d != null && d <= SALES_DROP) top.push({ tower: p.n, area: "Sales", score: -d * 100, text: `venduto a turno ${pct(d, 0).replace("-", "−")} vs ${monthName(live.prev)}` });
     const share = x.ops ? x.under / x.ops : 0;
     if (x.ops && (share >= CHAT_SHARE || (x.avgScore != null && x.avgScore < CHAT_AVG_MIN))) top.push({ tower: p.n, area: "Chatting", score: share * 100 + (x.avgScore < CHAT_AVG_MIN ? 15 : 0), text: `${x.under} su ${x.ops} operatori sotto soglia` });
     if (x.costPct != null && live.medianCostPct != null && x.costPct >= live.medianCostPct + COST_HIGH_PTS) top.push({ tower: p.n, area: "Finance", score: (x.costPct - live.medianCostPct) * 1000, text: `costo operatori ${pct(x.costPct)} (mediana ${pct(live.medianCostPct)})` });
