@@ -15,11 +15,24 @@
  *   ops:alerts:log            LIST eventi append-only (cap 500)
  */
 import { kv } from "@vercel/kv";
+import { MONTHS_IT } from "@/lib/format";
+
+/** "2026-09" → "settembre" (i codici periodo grezzi non vanno a schermo). */
+const meseLabel = (pid) => MONTHS_IT[Number(String(pid).slice(5, 7)) - 1] || String(pid);
 import { buildOperatorsForCpLeaderboard, hasCpDataForPeriod } from "@/lib/creatorspro-data";
 import { buildCpLeaderboard } from "@/lib/creatorspro-score";
 import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
 import { loadGroupLanguages } from "@/app/api/admin/group-languages/route";
 import { detectLanguage } from "@/lib/leaderboard-calc";
+import { getWages } from "@/lib/cp-wages-store";
+import { shiftsByCreator, creatorDrops, monthShrink, unmappedSales, dayHoles } from "@/lib/data-health-core";
+import { getEndedCreators } from "@/lib/creators-ended";
+
+const monthOffset = (id, n) => {
+  const [y, m] = id.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+};
 
 const INDEX_KEY = "ops:alerts:index";
 const LAST_RUN_KEY = "ops:alerts:last_run";
@@ -45,6 +58,8 @@ function currentMonthId() {
 }
 
 const daysAgo = (ts) => Math.floor((Date.now() - ts) / 86400000);
+
+const h0 = (holes) => holes[0]?.median || 0;
 
 /* ------------------------------------------------------------------ */
 /* Check registry — ogni check emette SOLO le condizioni fallite.      */
@@ -79,16 +94,19 @@ const CHECKS = [
       // Stessa aggregazione di /api/admin/pnl-live: creator del mese = alias
       // con sales > 0 nelle wages CP; fee dalla mappa pnl:deal_fees.
       const period = currentMonthId();
-      const [wagesCur, fees, meta] = await Promise.all([
-        kv.get(`cp:wages:${period}`),
+      const [wagesCur, fees, meta, defaultFee] = await Promise.all([
+        getWages(period),
         kv.get("pnl:deal_fees"),
         kv.get("cp:_meta"),
+        kv.get("pnl:deal_fee_default"),
       ]);
+      // con una fee standard impostata ogni creator ha una fee: niente buco
+      if (typeof defaultFee === "number") return [];
       let wages = wagesCur;
       let effPeriod = period;
       if ((!Array.isArray(wages) || wages.length === 0) && meta?.last_sync_period) {
         effPeriod = meta.last_sync_period;
-        wages = await kv.get(`cp:wages:${effPeriod}`);
+        wages = await getWages(effPeriod);
       }
       if (!Array.isArray(wages) || wages.length === 0) return [];
       const feeMap = fees && typeof fees === "object" ? fees : {};
@@ -119,7 +137,7 @@ const CHECKS = [
       return [{
         fingerprint: "fee-config",
         title: "Fee % non configurate: P&L senza margine",
-        detail: `${effPeriod} · margine calcolabile solo per i creator con fee impostata`,
+        detail: `${meseLabel(effPeriod)} · margine calcolabile solo per i creator con fee impostata`,
         value: `${withFee}/${aliases.length} creator`,
         cta: { href: "/admin/pnl-live", label: "Apri P&L Live" },
       }];
@@ -139,9 +157,46 @@ const CHECKS = [
       return [{
         fingerprint: "infloww-import-stale",
         title: "Import Infloww fermo",
-        detail: `Ultimo import: ${String(last[0])}`,
+        detail: `Ultimo file caricato: ${meseLabel(String(last[0]).split(":")[1] || "")}`,
         value: `${age} giorni fa`,
         cta: { href: "/admin/leaderboard-import", label: "Carica file" },
+      }];
+    },
+  },
+  {
+    // La città: un piano in ritardo per 14 giorni di fila non è più un incidente, è un problema
+    // che nessuno sta risolvendo. Serve lo storico completo (citta:day:*, scritto ogni notte).
+    id: "citta-stuck",
+    severity: "warning",
+    label: "Piani della città in ritardo da due settimane",
+    async run() {
+      const { stuckAreas } = await import("@/lib/citta");
+      const { complete, stuck } = await stuckAreas(14);
+      if (!complete || stuck.length === 0) return [];
+      return [{
+        fingerprint: "citta-stuck",
+        title: "Piani della città in ritardo da due settimane",
+        detail: stuck.slice(0, 8).map((k) => k.replace("|", " · ")).join(" — ") + (stuck.length > 8 ? ` e altri ${stuck.length - 8}` : ""),
+        value: String(stuck.length),
+        cta: { href: "/admin/citta", label: "Apri la città" },
+      }];
+    },
+  },
+  {
+    // Fase 3 della città: una priorità misurata ("Da guardare") senza nessuno che la prenda in carico da 48 ore
+    id: "citta-unclaimed",
+    severity: "warning",
+    label: "Priorità della città senza responsabile",
+    async run() {
+      const { unclaimedTop } = await import("@/lib/citta");
+      const keys = await unclaimedTop(48);
+      if (!keys.length) return [];
+      return [{
+        fingerprint: "citta-unclaimed",
+        title: "Priorità della città senza nessuno da 48 ore",
+        detail: keys.slice(0, 6).map((k) => k.replace("|", " · ")).join(" — ") + " · aprila e premi «Prendi in carico»",
+        value: String(keys.length),
+        cta: { href: "/admin/citta", label: "Apri la città" },
       }];
     },
   },
@@ -176,7 +231,7 @@ const CHECKS = [
       return [{
         fingerprint: `underperformers:${period}`,
         title: "Operatori sotto soglia questo mese",
-        detail: `Score CP v3 ≤ ${UNDERPERF_SCORE_MAX} con ≥ ${UNDERPERF_MIN_SHIFTS} shift`,
+        detail: `Score vendite ≤ ${UNDERPERF_SCORE_MAX} con almeno ${UNDERPERF_MIN_SHIFTS} turni`,
         value: String(count),
         cta: { href: "/admin/action-center", label: "Apri Action Center" },
       }];
@@ -197,6 +252,197 @@ const CHECKS = [
         title: "Sync CreatorsPro obsoleto",
         detail: `Ultimo sync: ${meta.last_sync_period || "?"}`,
         value: `${age} giorni fa`,
+        cta: { href: "/admin/creatorspro-sync", label: "Apri sync CP" },
+      }];
+    },
+  },
+  {
+    // Sanità dati (25/09/2026, caso Sparagno): la ricostruzione notturna non è
+    // stata pubblicata perché molto più piccola della versione precedente.
+    id: "cp-promotion-blocked",
+    severity: "critical",
+    label: "Sync CP non pubblicata",
+    async run() {
+      const meta = await kv.get("cp:_meta");
+      if (meta?.promotion !== "blocked_shrink") return [];
+      return [{
+        fingerprint: `cp-promotion-blocked:${meta.last_sync_period}`,
+        title: `Sync CreatorsPro di ${meta.last_sync_period} scartata: dati molto più scarsi del solito`,
+        detail: `Ricostruite ${meta.staged_count} wage contro ${meta.counts?.wages_normalized} già pubblicate: si continua a mostrare la versione precedente. Probabile errore di scaricamento da CreatorsPro.`,
+        value: String(meta.staged_count ?? "?"),
+        cta: { href: "/admin/wage-audit", label: "Apri Sync & Audit CP" },
+      }];
+    },
+  },
+  {
+    id: "cp-month-shrink",
+    severity: "critical",
+    label: "Mese CP incompleto",
+    async run() {
+      const cur = currentMonthId();
+      const out = [];
+      const pairs = [[monthOffset(cur, -1), monthOffset(cur, -2)]];
+      if (new Date().getUTCDate() >= 7) pairs.unshift([cur, monthOffset(cur, -1)]);
+      for (const [m, prevM] of pairs) {
+        const [w, pw] = await Promise.all([getWages(m), getWages(prevM)]);
+        const hit = monthShrink({ currentCount: (w || []).length, previousCount: (pw || []).length });
+        if (!hit) continue;
+        out.push({
+          fingerprint: `cp-month-shrink:${m}`,
+          title: `${m}: operatori pagati molto meno del mese prima`,
+          detail: `${hit.currentCount} wage contro ${hit.previousCount} di ${prevM} (${Math.round(hit.ratio * 100)}%). Di solito è un sync incompleto, non un calo vero: controlla prima di usare i numeri del mese.`,
+          value: `${Math.round(hit.ratio * 100)}%`,
+          cta: { href: "/admin/wage-audit", label: "Verifica il mese" },
+        });
+      }
+      return out;
+    },
+  },
+  {
+    id: "creator-activity-drop",
+    severity: "warning",
+    label: "Creator con turni crollati",
+    async run() {
+      const now = new Date();
+      const cur = currentMonthId();
+      const out = [];
+      const checks = [{ m: monthOffset(cur, -1), prevM: monthOffset(cur, -2), isCurrentMonth: false }];
+      if (now.getUTCDate() >= 7) checks.unshift({ m: cur, prevM: monthOffset(cur, -1), isCurrentMonth: true });
+      for (const c of checks) {
+        const [w, pw] = await Promise.all([getWages(c.m), getWages(c.prevM)]);
+        if (!w?.length || !pw?.length) continue;
+        const [y, mm] = c.m.split("-").map(Number);
+        const drops = creatorDrops({
+          current: shiftsByCreator(w), previous: shiftsByCreator(pw),
+          isCurrentMonth: c.isCurrentMonth, dayOfMonth: now.getUTCDate(), daysInMonth: new Date(Date.UTC(y, mm, 0)).getUTCDate(),
+        });
+        // creator che hanno smesso (segnate da un admin) prima del mese: calo atteso
+        const ended = await getEndedCreators();
+        const monthStart = `${c.m}-01`;
+        const real = drops.filter((d) => !(ended[d.creator]?.ended_on && ended[d.creator].ended_on < monthStart));
+        if (!real.length) continue;
+        drops.length = 0; drops.push(...real);
+        out.push({
+          fingerprint: `creator-activity-drop:${c.m}`,
+          title: `${c.m}: ${drops.length} ${drops.length === 1 ? "creator ha" : "creator hanno"} molti meno turni del previsto`,
+          detail: drops.slice(0, 6).map((d) => `${d.creator}: ${d.current} turni (attesi ~${d.expected})`).join(" · ") + ". Può essere reale (creator in pausa o che ha smesso: segnala in Alert → Creator terminate) o un buco di dati: guarda prima di usare quei numeri.",
+          value: String(drops.length),
+          cta: { href: "/leaderboard/creators", label: "Apri Creator" },
+        });
+      }
+      return out;
+    },
+  },
+  {
+    // Giorni bucati nei dati CP (set 2026: luglio con 20-26/07 quasi a zero e 5
+    // giorni mancanti, invisibile al controllo sul numero di wage). Mese in corso
+    // (fino a 2 giorni fa) + i due precedenti.
+    id: "cp-day-holes",
+    severity: "critical",
+    label: "Giorni mancanti nei dati CP",
+    async run() {
+      const cur = currentMonthId();
+      const lastFull = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+      const out = [];
+      for (const m of [cur, monthOffset(cur, -1), monthOffset(cur, -2)]) {
+        const w = await getWages(m);
+        if (!w?.length) continue;
+        const holes = dayHoles(w, m, { lastFullDay: m === cur ? lastFull : null });
+        if (!holes.length) continue;
+        out.push({
+          fingerprint: `cp-day-holes:${m}`,
+          title: `${m}: ${holes.length} ${holes.length === 1 ? "giorno" : "giorni"} con vendite CP quasi a zero`,
+          detail: `${holes.slice(0, 8).map((h) => h.day.slice(8)).join(", ")} (sotto il 30% di un giorno tipico, $${h0(holes).toLocaleString("it-IT")}). Quasi sempre è una sincronizzazione incompleta: rilancia il sync del mese prima di usarne i numeri.`,
+          value: String(holes.length),
+          cta: { href: "/admin/wage-audit", label: "Verifica e ripara il mese" },
+        });
+      }
+      return out;
+    },
+  },
+  {
+    // Ricavi agenzia Infloww (Revenue agency, Controllo dati CP) non aggiornati:
+    // il sync era solo a bottone ed è rimasto fermo dall'8/07 al 26/09 senza che
+    // nessuno se ne accorgesse (le pagine mostravano $0). Ora gira ogni notte:
+    // questo controllo dice se la catena si è fermata. Severità per finding.
+    id: "infloww-agency-stale",
+    severity: "warning",
+    label: "Ricavi Infloww non aggiornati",
+    async run() {
+      const meta = await kv.get("infloww:sync:meta").catch(() => null);
+      const age = meta?.last_sync_at ? (Date.now() - meta.last_sync_at) / 86400000 : Infinity;
+      const failedN = meta?.failed_creators?.length || 0;
+      const total = meta?.creators_total || 0;
+      if (age <= 3 && !(total && failedN >= total / 2)) return [];
+      if (age <= 3) {
+        // fresco ma a metà: più di metà delle creator non scaricate nell'ultimo giro
+        return [{
+          fingerprint: "infloww-agency-stale",
+          severity: "warning",
+          title: `Ricavi Infloww: ${failedN} creator su ${total} non scaricate nell'ultimo giro`,
+          detail: `I totali di Revenue agency sono incompleti.${meta.last_error ? ` Errore: ${meta.last_error}.` : ""} Il giro si ripete ogni notte; se resta così, va guardato l'accesso all'API Infloww.`,
+          value: `${failedN}/${total}`,
+          cta: { href: "/admin/infloww-agency", label: "Apri Revenue agency" },
+        }];
+      }
+      const days = Number.isFinite(age) ? Math.floor(age) : null;
+      return [{
+        fingerprint: "infloww-agency-stale",
+        severity: age > 7 ? "critical" : "warning",
+        title: days != null ? `Ricavi Infloww fermi da ${days} giorni` : "Ricavi Infloww mai sincronizzati",
+        detail: `Revenue agency e Controllo dati CP leggono una copia dei ricavi Infloww che si aggiorna ogni notte. ${days != null ? `L'ultimo aggiornamento è del ${new Date(meta.last_sync_at).toLocaleDateString("it-IT")}` : "Non risulta nessun aggiornamento"}: finché non riparte quelle pagine mostrano numeri vecchi o a zero.${meta?.failed_creators?.length ? ` Ultimo giro: ${meta.failed_creators.length} creator non scaricate${meta.last_error ? ` (${meta.last_error})` : ""}.` : ""}`,
+        value: days != null ? `${days}g` : "mai",
+        cta: { href: "/admin/infloww-agency", label: "Apri Revenue agency e rilancia" },
+      }];
+    },
+  },
+  {
+    // Venduto di persone CP non collegate a un operatore: spariscono da tutte
+    // le viste performance (set 2026: 168 persone, $126k = 7% del mese, visto
+    // solo confrontando i totali di Sales CP / Creator / P&L).
+    id: "cp-unmapped-sales",
+    severity: "warning",
+    label: "Venduto di persone non collegate",
+    async run() {
+      const cur = currentMonthId();
+      const m = new Date().getUTCDate() >= 5 ? cur : monthOffset(cur, -1);
+      const [w, mapping] = await Promise.all([getWages(m), kv.get("cp:member_mapping")]);
+      if (!w?.length) return [];
+      const u = unmappedSales(w, mapping);
+      if (u.share < 0.02 && u.unmapped < 5000) return [];
+      const pct = (Math.round(u.share * 1000) / 10).toLocaleString("it-IT");
+      const mese = meseLabel(m);
+      return [{
+        fingerprint: `cp-unmapped-sales:${m}`,
+        severity: u.share >= 0.05 ? "critical" : "warning",
+        title: `${mese[0].toUpperCase() + mese.slice(1)}: $${Math.round(u.unmapped).toLocaleString("it-IT")} di venduto da ${u.people.length} persone non collegate a un operatore`,
+        detail: `${pct}% del venduto del mese non compare in Sales CP, Creator, Action e Coaching Center. I più grandi: ${u.people.slice(0, 5).map((p) => `${p.name} $${Math.round(p.sales).toLocaleString("it-IT")}`).join(" · ")}.`,
+        value: `${pct}%`,
+        cta: { href: "/admin/creatorspro-sync#collega", label: "Collega le persone" },
+      }];
+    },
+  },
+  {
+    // Watchdog della catena notturna: dal 20/07 al 25/09/2026 i lavori smistati
+    // dal dispatcher prendevano 401 dalla Deployment Protection Vercel e nessuno
+    // se n'è accorto (il dispatcher scriveva "kicked"). Qui si guarda la PROVA
+    // di esecuzione: il heartbeat dei figli, non l'esito dichiarato dal padre.
+    id: "cron-chain-broken",
+    severity: "critical",
+    label: "Lavori notturni fermi",
+    async run() {
+      const dispatch = await kv.get("cron:heartbeat:dispatch");
+      if (!dispatch?.at) return [];
+      const children = ["cp-wages", "payout-ledger", "infloww-agency"];
+      const beats = await Promise.all(children.map((c) => kv.get(`cron:heartbeat:${c}`).catch(() => null)));
+      const stale = children.filter((c, i) => !beats[i]?.at || Date.now() - beats[i].at > 30 * 3600 * 1000);
+      const failed = dispatch.failed_kicks || [];
+      if (!stale.length && !failed.length) return [];
+      return [{
+        fingerprint: "cron-chain-broken",
+        title: "Lavori notturni non partiti",
+        detail: [stale.length ? `Senza esecuzione da oltre 30h: ${stale.join(", ")}` : null, failed.length ? `Kick falliti: ${failed.join(", ")}` : null].filter(Boolean).join(" · "),
+        value: String(stale.length + failed.length),
         cta: { href: "/admin/creatorspro-sync", label: "Apri sync CP" },
       }];
     },
@@ -251,12 +497,15 @@ export async function ackAlert(fingerprint, { userId, name } = {}) {
  *   segnale non è segnale di rientro)
  * - resolved più vecchi di 90 giorni → prune
  */
-export async function runChecks({ trigger = "cron" } = {}) {
+export async function runChecks({ trigger = "cron", only = null } = {}) {
   const now = Date.now();
   const emitted = new Map(); // fingerprint → { finding, check }
   const checkResults = [];
+  // `only`: run parziale (es. dopo un import) — gli alert degli altri check non
+  // vengono toccati perché il loro checkId non è tra gli okCheckIds.
+  const checks = only ? CHECKS.filter((c) => only.includes(c.id)) : CHECKS;
 
-  for (const check of CHECKS) {
+  for (const check of checks) {
     try {
       const findings = await check.run();
       for (const f of findings) emitted.set(f.fingerprint, { finding: f, check });
@@ -284,6 +533,7 @@ export async function runChecks({ trigger = "cron" } = {}) {
       const next = {
         ...prev,
         title: finding.title, detail: finding.detail, value: finding.value, cta: finding.cta,
+        severity: finding.severity || check.severity,
         lastSeen: now, runCount: (prev.runCount || 1) + 1,
       };
       await kv.set(alertKey(fp), next);
@@ -291,7 +541,7 @@ export async function runChecks({ trigger = "cron" } = {}) {
     } else {
       // nuovo, o ri-fallito dopo una risoluzione: riparte da open
       const next = {
-        fingerprint: fp, checkId: check.id, severity: check.severity,
+        fingerprint: fp, checkId: check.id, severity: finding.severity || check.severity,
         title: finding.title, detail: finding.detail, value: finding.value, cta: finding.cta,
         status: "open", firstSeen: now, lastSeen: now, runCount: 1,
         ackBy: null, ackByUserId: null, ackAt: null, resolvedAt: null,
@@ -322,6 +572,6 @@ export async function runChecks({ trigger = "cron" } = {}) {
   }
 
   const summary = { at: now, trigger, checks: checkResults, opened, updated, resolved, pruned };
-  await kv.set(LAST_RUN_KEY, summary);
+  if (!only) await kv.set(LAST_RUN_KEY, summary);
   return summary;
 }

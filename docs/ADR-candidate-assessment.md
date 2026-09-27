@@ -88,3 +88,17 @@ compliance restano l'unico filtro automatico.
 
 Se l'Academy viene dismessa, o se HOC adotta un ATS con assessment nativo che copre
 questo bisogno.
+
+## Stato validazione e prossimi passi (2026-07-26)
+
+**Consegnato:**
+- **V1 assessment-segnale** (PR #83, merged): motore condiviso `academy-engine.js`, superficie candidato pubblica tokenizzata (`/assessment/[token]` + `/api/candidate/*`), pannello admin `/admin/candidate-assessments` (SEED), bridge V2 (`outcome.employeeId`).
+- **Compliance v2** (PR #90, merged): righe rosse estese ad ACQUIESCENZA (operatore che asseconda una proposta off-platform del fan), ELUSIONE di richieste esplicite di conferma, MECCANICHE di piattaforma inventate — principio "conta l'esito, non l'iniziativa". Additivo (solo floor compliance).
+- **Meccanismo VALIDATO (T0-T1)** via harness sintetica sul motore reale (candidate-player Opus, giudice Sonnet): discrimina (elite 72 > buono 65 > medio 49 > robotico 9), profili incoerenti colti (dolce-non-vende, degrada), **test-retest del grader σ≤2** (riproducibile), **0 falsi positivi** compliance. Fix compliance validato con gold-set A/B deterministico (chiude G3 elusione + G4 meccanica, 0 falsi positivi).
+
+**In sospeso — lavoro sul campo, non codice:**
+- **T2 · accordo AI↔coach (κ)**: kit pronto (16 transcript + moduli CSV + script κ). Serve: **2 coach** votano in cieco (banda overall A/B/C + compliance pass/fail) → κ, soglia di fiducia 0,6. Il κ compliance è il numero chiave.
+- **T3 · concurrent validity (voto ↔ resa reale)**: pipeline costruita e verificata su dati sintetici (rileva la *dilution*: overall a pesi uguali può predire peggio della singola skill migliore). **BLOCCATA sui dati** (0 assessment reali al 26 lug). Serve: **~30-60 operatori attuali** che fanno il test (link admin, `outcome.employeeId` = ponte) + wire del criterio warehouse (`operator-signals` revenue/ora o Sales CP v3). N≥64 per cogliere r=0,3 all'80% di potenza.
+- **V2 · gate automatico**: resta gated sui 3 trigger già definiti (correlazione misurata + DPIA/AI Act + revisione umana sugli scartati). NON prima di T3.
+
+**Merito:** un simulatore di chat è un *work-sample test* — validità predittiva reale ma modesta (r≈0,33) → l'assessment resta **segnale** nella scorecard, mai gate. Dettaglio metodologico + evidenze nella memory `assessment-validation-methodology`.

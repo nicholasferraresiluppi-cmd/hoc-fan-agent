@@ -14,7 +14,8 @@
  *
  * Usano i token brand.CP per palette / brand.FONTS per tipografia.
  */
-import { CP, FONTS, creatorDotColor } from "@/lib/brand";
+import { useEffect } from "react";
+import { CP, FONTS, creatorDotColor, alpha } from "@/lib/brand";
 
 export function SectionLabel({ children, color, size = 10, style }) {
   return (
@@ -39,7 +40,7 @@ export function CpCard({ children, style, accent, padding = "20px 22px", onClick
       onClick={onClick}
       style={{
         background: CP.surface,
-        border: `1px solid ${accent ? accent + "55" : CP.border}`,
+        border: `1px solid ${accent ? alpha(accent, "55") : CP.border}`,
         borderRadius: 10,
         padding,
         cursor: onClick ? "pointer" : "default",
@@ -57,7 +58,7 @@ export function StatCard({ label, value, sub, color, tooltip, accent }) {
       title={tooltip || ""}
       style={{
         background: CP.surface,
-        border: `1px solid ${accent ? accent + "55" : CP.border}`,
+        border: `1px solid ${accent ? alpha(accent, "55") : CP.border}`,
         borderRadius: 10,
         padding: "18px 22px",
         cursor: tooltip ? "help" : "default",
@@ -121,7 +122,7 @@ export function TrendPill({ value, suffix = "%", size = "md", neutralAt0 = true 
         alignItems: "center",
         gap: 4,
         padding,
-        background: color + "18",
+        background: alpha(color, "18"),
         color,
         borderRadius: 999,
         fontFamily: FONTS.mono,
@@ -221,7 +222,7 @@ export function RankedItem({ rank, dotAlias, dotColor, name, badge, cols = [], h
       <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
         <span style={{ fontWeight: 500, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
         {badge && (
-          <span style={{ padding: "2px 8px", background: CP.accentGreen + "22", color: CP.accentGreen, fontSize: 10, fontWeight: 500, borderRadius: 4, letterSpacing: "0.04em" }}>
+          <span style={{ padding: "2px 8px", background: alpha(CP.accentGreen, "22"), color: CP.accentGreen, fontSize: 10, fontWeight: 500, borderRadius: 4, letterSpacing: "0.04em" }}>
             {badge}
           </span>
         )}
@@ -314,5 +315,68 @@ export function PillTab({ active, onClick, children, icon, style }) {
       {icon && <span>{icon}</span>}
       <span>{children}</span>
     </button>
+  );
+}
+
+/**
+ * Modal — overlay generico riusabile (nessuno esisteva nel repo: i pannelli
+ * crea/modifica erano finora form inline collassabili). Chiusura su click
+ * overlay o Escape. Contenuto libero via children.
+ */
+export function Modal({ open, onClose, title, children, maxWidth = 480 }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(6,8,12,0.55)", // velo: funziona in entrambi i temi
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+        zIndex: 1000,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth,
+          maxHeight: "88vh",
+          overflowY: "auto",
+          background: CP.panel,
+          border: `1px solid ${CP.border}`,
+          borderRadius: 14,
+          padding: 22,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h2 style={{ fontFamily: FONTS.display, fontSize: 18, fontWeight: 500, color: CP.textPrimary, margin: 0 }}>
+            {title}
+          </h2>
+          <button
+            onClick={onClose}
+            aria-label="Chiudi"
+            style={{
+              background: "transparent", border: "none", color: CP.textMuted,
+              fontSize: 20, lineHeight: 1, cursor: "pointer", padding: 4,
+            }}
+          >
+            ×
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
   );
 }

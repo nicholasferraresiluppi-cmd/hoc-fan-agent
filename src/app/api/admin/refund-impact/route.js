@@ -13,11 +13,13 @@
  * è MARGINALE (v2, metodo di Nicholas): ricalcolo degli scaglioni del turno
  * senza il venduto rimborsato, differenza = comp risparmiata. Marcata ~STIMA.
  */
+import { authorizeAllCreators } from "@/lib/creator-scope";
 import { kv } from "@vercel/kv";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { buildAliasIndex } from "@/lib/creator-match";
 import { getLedgerMeta, getLedgerPeriods, getLedgerActivity, readRefunds, romePeriod, periodBounds } from "@/lib/payout-ledger";
-import { calcCumulativeEarning } from "@/lib/wage-calc";
+import { calcTierEarning as calcCumulativeEarning } from "@/lib/wage-calc"; // regola CP verificata 28/09/2026: scaglione raggiunto su tutto il venduto
+import { getWages } from "@/lib/cp-wages-store";
 
 export const maxDuration = 60;
 
@@ -30,7 +32,7 @@ const shiftPeriod = (pp, delta) => {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 };
 
-/** effective_pct del turno: scaglioni cumulativi se presenti, altrimenti rapporto reale. */
+/** effective_pct del turno: scaglione raggiunto (regola CP) se presente, altrimenti rapporto reale. */
 function shiftEffPct(shift) {
   const salesTotal = Number(shift.total_attributed) || (shift.takes || []).reduce((a, t) => a + (Number(t.amount) || 0), 0);
   const ths = Array.isArray(shift.thresholds) ? shift.thresholds.filter((t) => t.percentage != null) : [];
@@ -70,7 +72,7 @@ function marginalLeak(shift, alreadyRefunded, amountUsd) {
 }
 
 export async function GET(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);
@@ -103,7 +105,7 @@ export async function GET(request) {
   const wagesMissing = [];
   const ledgerPeriods = await getLedgerPeriods();
   for (const [payPeriod, list] of [...byPayPeriod.entries()].sort()) {
-    const wages = await kv.get(`cp:wages:${payPeriod}`);
+    const wages = await getWages(payPeriod);
     if (!Array.isArray(wages) || wages.length === 0) {
       wagesMissing.push(payPeriod);
       for (const r of list) {
@@ -132,11 +134,11 @@ export async function GET(request) {
       const needPrev = list.some((r) => r.pt && r.pt - pStart < H12);
       const needNext = list.some((r) => r.pt && pEnd - r.pt < H12);
       if (needPrev) {
-        const wPrev = await kv.get(`cp:wages:${shiftPeriod(payPeriod, -1)}`);
+        const wPrev = await getWages(shiftPeriod(payPeriod, -1));
         if (Array.isArray(wPrev)) scanWages = [...wPrev, ...scanWages];
       }
       if (needNext) {
-        const wNext = await kv.get(`cp:wages:${shiftPeriod(payPeriod, 1)}`);
+        const wNext = await getWages(shiftPeriod(payPeriod, 1));
         if (Array.isArray(wNext)) scanWages = [...scanWages, ...wNext];
       }
     } catch { /* confini non calcolabili: si scansiona solo il mese */ }

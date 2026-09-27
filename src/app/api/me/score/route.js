@@ -46,17 +46,18 @@ export async function GET(request) {
     return Response.json({ linked: true, employee, period_id: periodId, reason: "no_data_for_period", available_periods: periods.slice(0, 12) });
   }
 
-  const [settings, exclusions, snapshot] = await Promise.all([
+  const [settings, exclusions, snapshot, groupLanguages] = await Promise.all([
     loadSettings(),
     kv.get("leaderboard:exclusions").catch(() => ({})),
     kv.get(`ops_kpi:score_snapshot:monthly:${periodId}`).catch(() => null),
+    kv.get("group_languages").catch(() => ({})),
   ]);
 
   // Stesso default della vista operational (?clock_in default "no"): la modalità
   // senza clock-in è quella pubblicata; teniamo la stessa per coerenza di numeri.
   const mode = "withoutClockIn";
 
-  const { ranking } = buildLeaderboard(records, mode, settings, exclusions || {});
+  const { ranking } = buildLeaderboard(records, mode, { ...settings, group_languages: groupLanguages || {} }, exclusions || {});
   const scored = ranking.filter((r) => r.score !== null);
 
   const target = normalizeName(employee);
@@ -73,9 +74,36 @@ export async function GET(request) {
   }
   const mine = mineMatches[0];
 
-  // Percentile nel gruppo dei valutati (aggregato non nominativo, policy-safe).
-  const better = scored.filter((r) => r.score > mine.score).length;
-  const percentile = scored.length > 1 ? Math.round((1 - better / scored.length) * 100) : 100;
+  // Posizione tra i COLLEGHI (decisione Nicholas 26/09): niente percentile su
+  // tutta l'agenzia ("meglio del 12% di 326" dice ogni mese a metà persone che
+  // sono in fondo). Si confronta col gruppo che l'operatore conosce — chi lavora
+  // sulla stessa creator (~20); gruppi sotto 5 → stessa lingua, come lo score.
+  // Metà alta: posizione ("4° su 21"). Metà bassa: il gradino successivo (punti
+  // che mancano per entrare nella metà alta), mai la posizione in fondo.
+  // Solo aggregati: nessun nome o score altrui esce da qui.
+  const langOfGroup = (g) => (groupLanguages || {})[g] || null;
+  let peers = scored.filter((r) => r.group && r.group === mine.group);
+  let peerLabel = mine.group || null;
+  if (peers.length < 5) {
+    const lang = langOfGroup(mine.group);
+    const byLang = lang ? scored.filter((r) => langOfGroup(r.group) === lang) : [];
+    if (byLang.length >= 5) { peers = byLang; peerLabel = `operatori in ${lang.toUpperCase()}`; }
+  }
+  let peer_rank = null;
+  if (peers.length >= 5) {
+    const sortedPeers = [...peers].sort((a, b) => b.score - a.score);
+    const position = sortedPeers.filter((r) => r.score > mine.score).length + 1;
+    const half = Math.ceil(sortedPeers.length / 2);
+    const top_half = position <= half;
+    const halfScore = sortedPeers[half - 1]?.score;
+    peer_rank = {
+      size: sortedPeers.length,
+      label: peerLabel,
+      top_half,
+      position: top_half ? position : null,
+      gap_to_top_half: top_half || halfScore == null ? null : Number(Math.max(0.1, halfScore - mine.score + 0.1).toFixed(1)),
+    };
+  }
 
   // Storico own (via lib, non via route gated). La lib ritorna oldest-first:
   // qui lo teniamo così com'è (serve al grafico timeline sinistra→destra).
@@ -83,7 +111,10 @@ export async function GET(request) {
   try {
     const h = await loadHistoryForEmployee({ employee: mine.employee, periodType: "monthly", limit: 12 });
     history = (h || [])
-      .map((x) => ({ period_id: x.period_id, score: x.score, tier: x.tier }))
+      // mese non lavorato (inattivo/escluso) = dato mancante, non uno 0 nel grafico (come /api/me/ladder)
+      .map((x) => (x.inactive || x.excluded_reason
+        ? { period_id: x.period_id, score: null, tier: null, no_data: true }
+        : { period_id: x.period_id, score: x.score, tier: x.tier }))
       .sort((a, b) => String(a.period_id).localeCompare(String(b.period_id))); // cronologico per il grafico
   } catch {}
 
@@ -105,9 +136,25 @@ export async function GET(request) {
     mode,
     score: Number(mine.score.toFixed(1)),
     tier: mine.tier,
-    percentile,
-    scored_count: scored.length,
+    peer_rank,
+    // Traguardo raggiungibile da tutti (26/09, comitato esperti): per la metà
+    // bassa il riferimento è la FASCIA SUCCESSIVA (assoluta), non "la metà alta"
+    // che per definizione metà del gruppo non può raggiungere.
+    next_tier: (() => {
+      const ts = (settings.tiers || []).slice().sort((a, b) => a.min - b.min);
+      const nx = ts.find((t) => t.min > mine.score);
+      return nx ? { tier: nx.label, gap: Number(Math.max(0.1, nx.min - mine.score).toFixed(1)) } : null;
+    })(),
+    // Fasce della formula attiva (solo soglie, nessun dato di altri): servono
+    // alla barra delle fasce e al grafico dello stile v3 (26/09/2026).
+    tiers: (settings.tiers || []).map((t) => ({ label: t.label, min: t.min, max: t.max })).sort((a, b) => a.min - b.min),
+    comparison: mine.comparison === "language" ? "language" : "group", // v13: gruppo piccolo → media della lingua
+    group_size: mine.group_size ?? mine.group_means?._count ?? null,
     composition,
+    // Scalini della normalizzazione (moltiplicatore della media → punti voce):
+    // servono a /me/score per dire "portare X da a a b = +c punti" con la
+    // STESSA regola del calcolo (normalizeKpi), senza stimarla (26/09/2026).
+    normalization: Array.isArray(settings.thresholds) ? settings.thresholds.map((t) => ({ multiplier: t.multiplier, score: t.score })) : null,
     formula: snapshot ? { hash: snapshot.hash, captured_at_iso: snapshot.captured_at_iso } : null,
     history,
   });

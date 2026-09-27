@@ -2,6 +2,9 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
 import { buildCreatorMatrix } from "@/lib/creator-aggregates";
 import { rosterMatchForEmail, nameForEmployeeId } from "@/lib/infloww-roster";
+import { getWages } from "@/lib/cp-wages-store";
+import { viewAsFor } from "@/lib/view-as";
+import { isUserIdAdminRaw } from "@/lib/admin";
 
 /**
  * Risoluzione identità per la superficie operatore (scope own).
@@ -24,7 +27,7 @@ export async function findLatestWagePeriod() {
   for (let i = 0; i < 24; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const pid = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const wages = await kv.get(`cp:wages:${pid}`);
+    const wages = await getWages(pid);
     if (Array.isArray(wages) && wages.length > 0) return pid;
   }
   return null;
@@ -49,6 +52,12 @@ export async function resolveEmployeeForUser() {
   const { userId } = await auth();
   if (!userId) return { userId: null, employee: null, reason: "unauthenticated" };
 
+  // 0. "Vedi come operatore": solo per admin veri, in sola lettura (middleware).
+  const va = await viewAsFor(userId);
+  if (va?.employee && (await isUserIdAdminRaw(userId))) {
+    return { userId, employee: va.employee, employee_id: va.employee_id || null, source: "view_as" };
+  }
+
   // 1. Override esplicito (gestito da admin)
   const override = await kv.get(USER_EMP_KEY(userId));
   if (override) {
@@ -65,8 +74,35 @@ export async function resolveEmployeeForUser() {
   }
 
   const user = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress || null;
+  // Email PRIMARIA e VERIFICATA (non emailAddresses[0]).
+  const primary = user?.emailAddresses?.find((e) => e.id === user.primaryEmailAddressId) || user?.emailAddresses?.[0];
+  const email = primary?.emailAddress || null;
   if (!email) return { userId, employee: null, email: null, reason: "no_email" };
+  if (primary?.verification?.status !== "verified") return { userId, employee: null, email, reason: "email_not_verified" };
+
+  // Collegamento da INVITO operatore (lib/operator-invites, 25/09/2026): l'admin
+  // ha invitato questa email come operatore X; l'email è primaria e verificata
+  // (il link d'invito arriva solo a quella casella) → diventa override definitivo,
+  // come se l'avesse impostato un admin a mano. Una volta sola.
+  try {
+    const link = await kv.get(`invite_employee:${email.trim().toLowerCase()}`);
+    if (link?.employeeName) {
+      await kv.set(USER_EMP_KEY(userId), { employeeName: link.employeeName, employeeId: null, source: "invite", linked_at: Date.now() });
+      await kv.del(`invite_employee:${email.trim().toLowerCase()}`);
+      // attestato di benvenuto da mostrare al primo accesso (lib/welcome-store)
+      await kv.set(`welcome:pending:${userId}`, { employee: link.employeeName, creator: link.creator || null, number: link.number || null, invited_at: link.invited_at || null, at: Date.now() }, { ex: 60 * 60 * 24 * 120 }).catch(() => {});
+      return { userId, employee: link.employeeName, employee_id: null, source: "override" };
+    }
+  } catch {}
+
+  // L'abbinamento automatico usa il NOME prima della @: vale solo sui domini
+  // aziendali. Con un dominio qualsiasi, "mario.rossi@gmail.com" di chiunque
+  // diventava l'operatore Mario Rossi e ne vedeva compenso e score (audit set
+  // 2026). Fuori dominio → collegamento esplicito di un admin (/admin/user-mapping).
+  const domains = (process.env.HOC_EMPLOYEE_EMAIL_DOMAINS || "houseofcreators.com")
+    .split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
+  const domain = email.split("@")[1]?.toLowerCase() || "";
+  if (!domains.includes(domain)) return { userId, employee: null, email, reason: "needs_link" };
 
   // 2. Roster Infloww ufficiale (MASS-filtrato). Non-bloccante: se vuoto, si scende al CP.
   try {

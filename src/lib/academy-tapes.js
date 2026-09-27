@@ -52,7 +52,9 @@ function tapeSecret() {
     "academy-tape-dev-only"
   );
 }
-function fanHmac(creatorId, userId) {
+// Esportata: id/chiavi derivate dal fan (game film) devono usare più entropia
+// dei 4 hex del display alias (16 bit collidono tra fan dello stesso turno).
+export function fanHmac(creatorId, userId) {
   return crypto.createHmac("sha256", tapeSecret()).update(`${creatorId}:${userId}`).digest("hex");
 }
 // Esportata: unica implementazione della pseudonimizzazione fan (stesso segreto,

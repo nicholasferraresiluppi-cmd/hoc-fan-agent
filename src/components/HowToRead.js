@@ -12,7 +12,8 @@ import { useState } from "react";
 import { HelpCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 
-export default function HowToRead({ items = [], title = "Come si legge questa pagina" }) {
+export default function HowToRead({ items = [], title = "Come si legge questa pagina" , palette }) {
+  const P = palette || CP; // palette alternativa (tema chiaro del pilota)
   const [open, setOpen] = useState(false);
   if (items.length === 0) return null;
   return (
@@ -22,22 +23,22 @@ export default function HowToRead({ items = [], title = "Come si legge questa pa
         style={{
           display: "inline-flex", alignItems: "center", gap: 7,
           padding: "6px 12px",
-          background: open ? CP.surfaceAlt : CP.surface,
-          border: `1px solid ${CP.border}`,
+          background: open ? P.surfaceAlt : P.surface,
+          border: `1px solid ${P.border}`,
           borderRadius: open ? "8px 8px 0 0" : 8,
-          color: CP.textSecondary,
+          color: P.textSecondary,
           fontSize: 12, fontWeight: 500, fontFamily: FONTS.body,
           cursor: "pointer",
         }}
       >
-        <HelpCircle size={13} color={CP.mutedIcons} />
+        <HelpCircle size={13} color={P.mutedIcons} />
         {title}
         {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
       </button>
       {open && (
         <div style={{
-          background: CP.surface,
-          border: `1px solid ${CP.border}`,
+          background: P.surface,
+          border: `1px solid ${P.border}`,
           borderTop: "none",
           borderRadius: "0 8px 8px 8px",
           padding: "12px 16px",
@@ -45,7 +46,7 @@ export default function HowToRead({ items = [], title = "Come si legge questa pa
         }}>
           <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 }}>
             {items.map((it, i) => (
-              <li key={i} style={{ fontSize: 12.5, color: CP.textSecondary, lineHeight: 1.55 }}>{it}</li>
+              <li key={i} style={{ fontSize: 12.5, color: P.textSecondary, lineHeight: 1.55 }}>{it}</li>
             ))}
           </ul>
         </div>

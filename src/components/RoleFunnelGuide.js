@@ -17,7 +17,7 @@ import {
   Users, UserSearch, Target, RefreshCw, DollarSign, LayoutDashboard,
   Wallet, Activity, Medal, Contact, MessageSquareWarning, ArrowRight,
 } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
 
 // Mappa stringa → componente icona (le icone stanno come stringhe nel dato puro).
 const ICONS = {
@@ -44,7 +44,7 @@ function StepRow({ step, index, onNavigate }) {
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = CP.surfaceAlt;
-        e.currentTarget.style.borderColor = CP.accent + "55";
+        e.currentTarget.style.borderColor = alpha(CP.accent, "55");
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = CP.surface;

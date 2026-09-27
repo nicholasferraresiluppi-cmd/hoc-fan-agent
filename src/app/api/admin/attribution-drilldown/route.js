@@ -18,6 +18,7 @@
  */
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { getWages } from "@/lib/cp-wages-store";
 
 export const maxDuration = 30;
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -43,7 +44,7 @@ export async function GET(request) {
   if (!/^\d{4}-\d{2}$/.test(periodId)) return Response.json({ error: "period_id YYYY-MM richiesto" }, { status: 400 });
   if (!alias) return Response.json({ error: "alias richiesto" }, { status: 400 });
 
-  const wages = await kv.get(`cp:wages:${periodId}`);
+  const wages = await getWages(periodId);
   if (!Array.isArray(wages) || wages.length === 0) {
     return Response.json({ error: `Nessuna busta in archivio per ${periodId}: sincronizza il mese da Sync & Audit CP.` }, { status: 404 });
   }

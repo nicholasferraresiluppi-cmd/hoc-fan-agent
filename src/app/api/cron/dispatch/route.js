@@ -15,10 +15,10 @@
  * (sensibile al confine settimana, resta alle 00:05 del lunedì) e questo
  * dispatcher (03:00 UTC ogni giorno), che esegue il resto in SEQUENZA
  * deterministica in base al giorno:
- *   - sempre:            tick cp-wages e payout-ledger (auto-concatenanti)
+ *   - sempre:            tick cp-wages, payout-ledger e infloww-agency (auto-concatenanti)
  *                        + snapshot coda del loop azione→esito (queue-snapshot)
- *   - lunedì:            run alert operativi + digest email (in sequenza:
- *                        il digest legge i findings scritti dal run)
+ *   - sempre:            run alert operativi (watchdog catena incluso)
+ *   - lunedì:            + digest email (dopo il run: legge i suoi findings)
  *   - giorno 1 del mese: snapshot leghe (chiusura stagione)
  *
  * Gli endpoint smistati restano invocabili singolarmente (UI/manuale).
@@ -44,16 +44,34 @@ export async function POST(request) {
   };
   await kv.set("cron:heartbeat:dispatch", { at: Date.now(), via: viaCron ? "cron" : "session" }, { ex: 40 * 24 * 3600 }).catch(() => {});
 
+  // Alert ogni notte (prima solo il lunedì): il check "lavori notturni fermi"
+  // deve accendersi entro un giorno, non entro una settimana. Il digest email
+  // resta del lunedì.
+  // stato dei piani della città PRIMA degli alert (l'avviso "ambra da 14 giorni" legge lo storico)
+  // ClickUp → fotografia della città (lungo: parte da solo e registra anche lo stato del giorno)
+  out.citta_clickup = await kickEndpoint(request, "/api/cron/citta-clickup");
+  out.citta_day = await kickEndpoint(request, "/api/cron/citta-day", { awaitResponse: true });
+  out.alerts_run = await kickEndpoint(request, "/api/admin/ops-alerts/run", { awaitResponse: true });
   if (out.monday) {
-    out.alerts_run = await kickEndpoint(request, "/api/admin/ops-alerts/run", { awaitResponse: true });
     out.alerts_digest = await kickEndpoint(request, "/api/admin/ops-alerts/digest", { awaitResponse: true });
+    // il lunedì della città: priorità senza nessuno, piani riaccesi, nuovi ritardi
+    out.citta_lunedi = await kickEndpoint(request, "/api/cron/citta-lunedi", { awaitResponse: true });
   }
   if (out.first_of_month) {
     out.leagues_snapshot = await kickEndpoint(request, "/api/leagues/snapshot", { awaitResponse: true });
   }
   out.cp_wages = await kickEndpoint(request, "/api/cron/cp-wages");
   out.payout_ledger = await kickEndpoint(request, "/api/cron/payout-ledger");
+  // ricavi agenzia Infloww (Revenue agency / Controllo dati CP): prima solo a
+  // bottone, fermo dall'8 luglio senza che nessuno se ne accorgesse (26/09)
+  out.infloww_agency = await kickEndpoint(request, "/api/cron/infloww-agency");
   out.queue_snapshot = await kickEndpoint(request, "/api/cron/queue-snapshot");
+  // librerie game film: rinfresca le 2 più stantie → momenti nuovi in coda
+  // ogni notte senza che un coach debba aprire la pagina (blueprint 26 lug)
+  out.film_refresh = await kickEndpoint(request, "/api/cron/film-refresh");
+  // coaching vendite (split / operatori / test): gira nella SUA route (budget
+  // proprio), ricalcola solo se la cache ha più di 20h
+  out.sales_coaching = await kickEndpoint(request, "/api/cron/sales-coaching");
 
   // Riscalda la cache degli Academy Signals (query analitica pesante): così la
   // GET admin legge sempre dalla cache invece di calcolare inline. Best-effort:
@@ -97,9 +115,30 @@ export async function POST(request) {
     out.transfer = "err:" + (e?.message || "unknown");
   }
 
+  // Esito dei kick nel heartbeat: un 401 dei figli deve lasciare traccia
+  // (per 2 mesi sono falliti tutti senza che nessuno lo vedesse).
+  const failed = Object.entries(out).filter(([, v]) => v && typeof v === "object" && (v.kicked === false || v.ok === false)).map(([k, v]) => `${k}:${v.status || v.error || "err"}`);
+  out.failed_kicks = failed;
+  await kv.set("cron:heartbeat:dispatch", { at: Date.now(), via: viaCron ? "cron" : "session", failed_kicks: failed }, { ex: 40 * 24 * 3600 }).catch(() => {});
+
+  // Profilo di difficoltà del pubblico per creator (/admin/creator-difficulty).
+  // ULTIMO di proposito (review 30/07): ricalcolo SETTIMANALE (warmCreatorDifficulty
+  // ricalcola solo se il dato ha più di ~6 giorni) e nessun consumatore a valle qui:
+  // se il budget dei 60s finisce si sacrifica da solo. Portato in produzione il 26/09
+  // (era rimasto non pubblicato nella cartella locale, vedi ramo rescue/).
+  try {
+    const { warmCreatorDifficulty, bigQueryConfigured } = await import("@/lib/creator-difficulty");
+    out.creator_difficulty = bigQueryConfigured() ? await warmCreatorDifficulty() : "skip:no-bq";
+  } catch (e) {
+    out.creator_difficulty = "err:" + (e?.message || "unknown");
+  }
+
   return Response.json(out);
 }
 
 export async function GET(request) {
+  // GET solo per il cron (Bearer): con la sessione basta un link cliccato
+  // da un admin per far partire il lavoro (CSRF). La UI usa POST.
+  if (!isCronAuthorized(request)) return Response.json({ error: "unauthorized" }, { status: 401 });
   return POST(request);
 }

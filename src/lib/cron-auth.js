@@ -19,9 +19,20 @@
  * Le route mantengono il loro fallback a sessione (capability SEED) per il
  * trigger manuale dalla UI.
  */
+import { timingSafeEqual } from "crypto";
+
+/** Confronto a tempo costante (niente timing attack sul secret). */
+export function safeEqual(a, b) {
+  const x = Buffer.from(String(a || ""));
+  const y = Buffer.from(String(b || ""));
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+// Senza CRON_SECRET si RIFIUTA (fail-closed, set 2026): l'header x-vercel-cron
+// è falsificabile da chiunque su una route pubblica. In production il secret
+// c'è; su preview/locale i cron semplicemente non girano.
 export function isCronAuthorized(request) {
   const secret = process.env.CRON_SECRET;
-  const authHeader = request.headers.get("authorization") || "";
-  if (secret) return authHeader === `Bearer ${secret}`;
-  return Boolean(request.headers.get("x-vercel-cron"));
+  if (!secret) return false;
+  return safeEqual(request.headers.get("authorization") || "", `Bearer ${secret}`);
 }

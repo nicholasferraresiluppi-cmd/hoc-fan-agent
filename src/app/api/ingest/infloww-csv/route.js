@@ -9,6 +9,7 @@
  * Header: x-ingest-secret: <INFLOWW_INGEST_SECRET>
  */
 import { importOpsKpiCsv } from "@/lib/ops-kpi-import";
+import { safeEqual } from "@/lib/cron-auth";
 
 export const maxDuration = 30;
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request) {
   const secret = process.env.INFLOWW_INGEST_SECRET;
   if (!secret) return Response.json({ error: "Ingest non configurato (INFLOWW_INGEST_SECRET mancante)." }, { status: 503 });
-  if (request.headers.get("x-ingest-secret") !== secret) {
+  if (!safeEqual(request.headers.get("x-ingest-secret"), secret)) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 

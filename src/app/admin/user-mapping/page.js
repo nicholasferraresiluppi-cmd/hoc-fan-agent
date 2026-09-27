@@ -3,9 +3,10 @@
 import { useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { Link2, AlertTriangle, CheckCircle2, Sparkles, Unlink, RefreshCw } from "lucide-react";
+import { Link2, CheckCircle2, Sparkles, Unlink, RefreshCw, Loader2, Search } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHeader, CpCard, SectionLabel } from "@/components/cp-style";
+import { PageHead, HeroMetric, Metric, FilterChip, Notice, DataTable, NUM } from "@/components/ds";
+import { fmtInt } from "@/lib/format";
 
 /**
  * /admin/user-mapping — collega gli utenti Clerk al loro operatore.
@@ -55,122 +56,123 @@ export default function UserMappingPage() {
     }
   }
 
-  return (
-    <div style={{ padding: "32px 32px 64px", maxWidth: 1080, margin: "0 auto" }}>
-      <PageHeader
-        section="Data & Integrations"
-        title="Collega utenti a operatori"
-        subtitle="Chi ha un account HOC Pro e a quale operatore corrisponde. Il collegamento si ancora all'employeeId ufficiale Infloww (sopravvive a refusi e cambi nome). L'auto-collegamento avviene solo su match esatto di email: tutti gli altri li colleghi qui, con un click sul suggerimento."
-        toolbar={
-          <>
-            <Link href="/admin/debug-mapping" style={{ textDecoration: "none" }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 14px", background: CP.surfaceAlt, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, color: CP.textSecondary, fontFamily: FONTS.body }}>
-                <Link2 size={15} /> Debug mapping CP
-              </span>
-            </Link>
-            <button onClick={() => mutate()} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 14px", background: CP.surfaceAlt, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, color: CP.textSecondary, cursor: "pointer" }}>
-              <RefreshCw size={15} /> Ricarica
+  // Redesign 26/09/2026 (pannello tester BOARD/UX): con 12 su 13 "non collegati"
+  // e "nessun match roster" su ogni riga la pagina sembrava rotta. In realtà chi
+  // non ha un suggerimento di solito non è un operatore (board, admin, account di
+  // servizio) e non va collegato. Ora le righe si dividono per cosa c'è da fare:
+  // prima chi ha un suggerimento (un clic), poi i collegati, poi il resto.
+  const [filter, setFilter] = useState("all");
+  const withSug = users.filter((u) => u.mapping.status === "none" && u.suggestion?.employee);
+  const linked = users.filter((u) => u.mapping.status !== "none");
+  const ambiguous = users.filter((u) => u.mapping.status === "none" && u.suggestion?.ambiguous);
+  const noMatch = users.filter((u) => u.mapping.status === "none" && !u.suggestion?.employee && !u.suggestion?.ambiguous);
+  const legacy = users.filter((u) => u.mapping.status === "override_legacy");
+  const byFilter = { all: users, todo: withSug, linked, none: [...ambiguous, ...noMatch] };
+  const rank = (u) => (u.mapping.status === "none" && u.suggestion?.employee ? 0 : u.mapping.status === "none" && u.suggestion?.ambiguous ? 1 : u.mapping.status !== "none" ? 2 : 3);
+  const rows = (byFilter[filter] || users).map((u) => ({ ...u, id: u.userId, _rank: rank(u) }));
+
+  const columns = [
+    { key: "name", label: "Utente", render: (u) => (
+      <span>
+        <span style={{ fontWeight: 500 }}>{u.name}</span>
+        <div style={{ fontSize: 12, color: CP.textMuted }}>{u.email || "—"}</div>
+      </span>
+    ) },
+    { key: "_rank", label: "Operatore collegato", sort: (u) => u._rank, render: (u) => {
+      const m = u.mapping;
+      if (m.status === "override_anchored") return (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <CheckCircle2 size={14} color={CP.accentGreen} /> {m.employee}
+          <span style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>#{m.employee_id}</span>
+        </span>
+      );
+      if (m.status === "override_legacy") return <span>{m.employee} <span style={{ fontSize: 12, color: CP.textMuted }}>(collegato per nome, non per codice)</span></span>;
+      return <span style={{ color: CP.textMuted }}>non collegato</span>;
+    } },
+    { key: "sug", label: "Suggerimento", sortable: false, render: (u) => {
+      const s = u.suggestion;
+      if (s?.employee) return (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: CP.accentSoftText }}>
+          <Sparkles size={13} /> {s.employee}
+          <span style={{ fontSize: 12, color: CP.textMuted }}>{s.match === "exact" ? "email identica" : s.match}</span>
+        </span>
+      );
+      if (s?.ambiguous) return <span style={{ fontSize: 13, color: CP.textSecondary }}>più operatori possibili: {s.candidates.join(", ")}</span>;
+      if (u.mapping.status === "none") return <span style={{ fontSize: 13, color: CP.textMuted }}>nessun operatore con questa email</span>;
+      return null;
+    } },
+    { key: "act", label: "", align: "right", sortable: false, render: (u) => {
+      const s = u.suggestion, m = u.mapping;
+      return (
+        <span style={{ display: "inline-flex", gap: 6, whiteSpace: "nowrap" }}>
+          {s?.employee && (
+            <button onClick={() => link(u, s.employee, s.employee_id)} disabled={busy === u.userId}
+              style={{ ...btnPrimary, opacity: busy === u.userId ? 0.6 : 1 }}>
+              {busy === u.userId ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />} Collega
             </button>
-          </>
-        }
+          )}
+          {m.status !== "none" && (
+            <button onClick={() => unlink(u)} disabled={busy === u.userId} style={{ ...btnGhost, color: CP.accentRed }}>
+              <Unlink size={12} /> Scollega
+            </button>
+          )}
+        </span>
+      );
+    } },
+  ];
+
+  return (
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Collega utenti" }]}
+        title="Collega utenti a operatori"
+        subtitle="Quale operatore è ogni persona con un account HOC Pro: serve perché l'operatore veda le sue pagine personali (profilo, score, compenso). Il collegamento usa il codice Infloww dell'operatore, quindi regge a refusi e cambi di nome."
+        actions={<>
+          <Link href="/admin/debug-mapping" style={{ ...btnGhost, textDecoration: "none" }}><Search size={14} /> Debug mapping CP</Link>
+          <button onClick={() => mutate()} style={btnGhost}><RefreshCw size={14} /> Ricarica</button>
+        </>}
       />
 
-      {forbidden && (
-        <CpCard accent={CP.accentRed} style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", color: CP.textSecondary, fontSize: 14 }}>
-            <AlertTriangle size={18} color={CP.accentRed} /> {String(forbidden)} {data?.reason ? `(${data.reason})` : ""}
+      {forbidden && <Notice danger>{String(forbidden)} {data?.reason ? `(${data.reason})` : ""}</Notice>}
+      {pageErr && <Notice danger>Operazione non riuscita: {pageErr}</Notice>}
+      {isLoading && <div style={{ display: "flex", alignItems: "center", gap: 8, color: CP.textMuted, fontSize: 14 }}><Loader2 size={15} className="animate-spin" /> Carico utenti e roster…</div>}
+
+      {!isLoading && !forbidden && (
+        <>
+          <HeroMetric
+            label="Da collegare con un clic"
+            value={fmtInt(withSug.length)}
+            compare={withSug.length > 0 ? "utenti non collegati per cui il roster Infloww ha un operatore con la stessa email" : "nessun collegamento pronto da fare"}>
+            <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+              <Metric label="Utenti con account" value={fmtInt(users.length)} />
+              <Metric label="Già collegati" value={fmtInt(linked.length)} note={legacy.length ? `${legacy.length} solo per nome` : null} />
+              <Metric label="Senza operatore corrispondente" value={fmtInt(noMatch.length + ambiguous.length)} note="di solito board, admin o account di servizio" />
+            </div>
+          </HeroMetric>
+
+          {noMatch.length > 0 && withSug.length === 0 && linked.length === 0 && (
+            <Notice>Nessun utente ha un operatore con la stessa email nel roster Infloww. È normale se oggi gli account sono solo del board e degli admin: gli operatori compariranno qui quando accetteranno l&apos;invito.</Notice>
+          )}
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            <FilterChip label={`Tutti (${users.length})`} active={filter === "all"} onClick={() => setFilter("all")} />
+            <FilterChip label={`Da collegare (${withSug.length})`} active={filter === "todo"} onClick={() => setFilter("todo")} disabled={!withSug.length} />
+            <FilterChip label={`Collegati (${linked.length})`} active={filter === "linked"} onClick={() => setFilter("linked")} disabled={!linked.length} />
+            <FilterChip label={`Senza corrispondenza (${noMatch.length + ambiguous.length})`} active={filter === "none"} onClick={() => setFilter("none")} disabled={!(noMatch.length + ambiguous.length)} />
           </div>
-        </CpCard>
-      )}
-      {pageErr && (
-        <CpCard accent={CP.accentRed} style={{ marginBottom: 16 }}>
-          <div style={{ color: CP.textSecondary, fontSize: 14 }}>{pageErr}</div>
-        </CpCard>
+
+          <DataTable columns={columns} rows={rows} defaultSort={{ key: "_rank", dir: 1 }} minWidth={760} maxHeight={640} empty="Nessun utente in questo filtro." />
+        </>
       )}
 
-      {!isLoading && !forbidden && (
-        <div style={{ display: "flex", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
-          <Tile label="Utenti" value={users.length} />
-          <Tile label="Non collegati" value={unmapped} accent={unmapped > 0 ? CP.accentBlue : CP.accentGreen} />
-        </div>
-      )}
-
-      {isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
-
-      {!isLoading && !forbidden && (
-        <div style={{ overflowX: "auto", border: `1px solid ${CP.border}`, borderRadius: 12, background: CP.surface }}>
-          <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 780, fontSize: 13.5, fontFamily: FONTS.body }}>
-            <thead>
-              <tr>
-                {["Utente", "Email", "Operatore collegato", "Suggerimento", ""].map((h) => (
-                  <th key={h} style={{ textAlign: "left", padding: "10px 14px", borderBottom: `1px solid ${CP.border}`, color: CP.textMuted, fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", fontWeight: 600 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => {
-                const m = u.mapping;
-                const s = u.suggestion;
-                return (
-                  <tr key={u.userId}>
-                    <td style={{ padding: "10px 14px", borderBottom: `1px solid ${CP.borderSoft}`, color: CP.textPrimary }}>{u.name}</td>
-                    <td style={{ padding: "10px 14px", borderBottom: `1px solid ${CP.borderSoft}`, color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 12 }}>{u.email || "—"}</td>
-                    <td style={{ padding: "10px 14px", borderBottom: `1px solid ${CP.borderSoft}` }}>
-                      {m.status === "none" && <span style={{ color: CP.textMuted }}>— non collegato</span>}
-                      {m.status === "override_anchored" && (
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: CP.accentGreen }}>
-                          <CheckCircle2 size={13} /> {m.employee}
-                          <span style={{ fontFamily: FONTS.mono, fontSize: 11, color: CP.textMuted }}>#{m.employee_id}</span>
-                        </span>
-                      )}
-                      {m.status === "override_legacy" && (
-                        <span style={{ color: CP.textSecondary }}>{m.employee} <span style={{ fontSize: 11, color: "#d9a44a" }}>(nome, non ancorato)</span></span>
-                      )}
-                    </td>
-                    <td style={{ padding: "10px 14px", borderBottom: `1px solid ${CP.borderSoft}` }}>
-                      {s?.employee && (
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: CP.accent }}>
-                          <Sparkles size={13} /> {s.employee}
-                          <span style={{ fontSize: 11, color: CP.textMuted }}>{s.match === "exact" ? "esatto" : s.match}</span>
-                        </span>
-                      )}
-                      {s?.ambiguous && <span style={{ fontSize: 12, color: "#d9a44a" }}>ambiguo: {s.candidates.join(", ")}</span>}
-                      {!s && m.status === "none" && <span style={{ color: CP.textMuted, fontSize: 12 }}>nessun match roster</span>}
-                    </td>
-                    <td style={{ padding: "10px 14px", borderBottom: `1px solid ${CP.borderSoft}`, whiteSpace: "nowrap" }}>
-                      {s?.employee && (
-                        <button onClick={() => link(u, s.employee, s.employee_id)} disabled={busy === u.userId}
-                          style={{ padding: "5px 12px", background: CP.accent, border: "none", borderRadius: 8, fontSize: 12.5, fontWeight: 500, color: CP.accentInk, cursor: "pointer", marginRight: 6 }}>
-                          Collega
-                        </button>
-                      )}
-                      {m.status !== "none" && (
-                        <button onClick={() => unlink(u)} disabled={busy === u.userId}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "transparent", border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 12, color: CP.accentRed, cursor: "pointer" }}>
-                          <Unlink size={12} /> Scollega
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <p style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 16, lineHeight: 1.6 }}>
-        Gli account "<b>nome MASS</b>" (mass-messaging) sono esclusi dal roster: non compaiono mai come suggerimento. Per collegare a un operatore non suggerito, usa Debug mapping o l'API con l'employeeId dal roster.
+      <p style={{ fontSize: 12, color: CP.textMuted, marginTop: 14, lineHeight: 1.6 }}>
+        Il collegamento automatico avviene solo quando l&apos;email coincide esattamente; gli altri si collegano da qui con un clic sul suggerimento.
+        Gli account “MASS” (invii di massa) sono esclusi dal roster e non compaiono mai come suggerimento.
+        Per collegare un operatore che non viene suggerito serve l&apos;API con il suo codice Infloww (employeeId) dal roster.
       </p>
     </div>
   );
 }
 
-function Tile({ label, value, accent }) {
-  return (
-    <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, padding: "12px 18px", minWidth: 130 }}>
-      <div style={{ fontSize: 11, letterSpacing: ".04em", textTransform: "uppercase", color: CP.textMuted, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontFamily: FONTS.display, fontSize: 22, fontWeight: 600, color: accent || CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{value}</div>
-    </div>
-  );
-}
+const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", background: CP.accent, border: "1px solid transparent", borderRadius: 8, fontSize: 13, fontWeight: 500, color: CP.accentInk, cursor: "pointer", fontFamily: FONTS.body };
+const btnGhost = { display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, color: CP.textSecondary, cursor: "pointer", fontFamily: FONTS.body };

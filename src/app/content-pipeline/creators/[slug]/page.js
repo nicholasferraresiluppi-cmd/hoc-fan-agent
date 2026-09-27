@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -9,7 +9,8 @@ import { PageHeader } from "@/components/cp-style";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
-export default function CreatorDetailPage({ params }) {
+export default function CreatorDetailPage(props) {
+  const params = use(props.params);
   const { slug } = params;
   const router = useRouter();
   const { data, error, isLoading, mutate } = useSWR(

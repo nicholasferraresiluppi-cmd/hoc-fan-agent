@@ -16,6 +16,7 @@
  */
 import { kv } from "@vercel/kv";
 import { buildLeaderboard } from "./leaderboard-calc";
+import { loadSettings } from "@/app/api/admin/leaderboard-settings/route";
 
 const TTL_MS = 5 * 60 * 1000;
 const TTL_SEC = TTL_MS / 1000;
@@ -98,14 +99,17 @@ async function loadLanguageOverrides() {
 /**
  * Costruisce la classifica di un periodo (con cache).
  */
-async function buildRankingForPeriod(periodType, periodId) {
+export async function buildRankingForPeriod(periodType, periodId) {
   const key = `_ranking:${periodType}:${periodId}`;
   const cached = await cacheGet(key);
   if (cached) return cached;
   const records = await loadPeriodRecords(periodType, periodId);
   if (!records || records.length === 0) return cacheSet(key, { ranking: [], groupAverages: {} });
-  const [exclusions, langOverrides] = await Promise.all([loadExclusions(), loadLanguageOverrides()]);
-  const result = buildLeaderboard(records, "withoutClockIn", {}, exclusions);
+  const [exclusions, langOverrides, active] = await Promise.all([loadExclusions(), loadLanguageOverrides(), loadSettings().catch(() => ({}))]);
+  // Formula ATTIVA (prima: {} = impostazioni di fabbrica → le pagine operatore
+  // e i gate della ladder ignoravano una formula pubblicata dalle bozze).
+  const settings = { weights: active.weights, thresholds: active.thresholds, tiers: active.tiers, ...(active.small_group ? { small_group: active.small_group } : {}), group_languages: langOverrides || {} };
+  const result = buildLeaderboard(records, "withoutClockIn", settings, exclusions);
   // Applica override lingua manuali (KV group_languages) — sovrascrive la
   // detection regex automatica per i Group senza marker nel nome.
   if (langOverrides && Object.keys(langOverrides).length > 0) {
@@ -145,6 +149,7 @@ export async function loadHistoryForEmployee({ employee, periodType, limit = 999
       language: r.language || null,
       creators: r.creators || [],
       excluded_reason: r._excluded_reason || null,
+      inactive: !!r._inactive,
     });
   }
   // oldest first per grafico timeline
@@ -203,7 +208,9 @@ export async function loadGlobalHealthHistory({ periodType, limit = 12 }) {
  * che sono stati sotto tier "Average" per almeno minChronic dei lookback
  * periodi precedenti. Vuoto se manca lo storico.
  */
-const BAD_TIERS = new Set(["Critical", "Weak", "Average"]);
+// v12: le fasce sono state rinominate (leaderboard-config): "sotto Good v11" = score < 71.
+// Soglia numerica per non cambiare chi risulta cronicamente sotto.
+const CHRONIC_BELOW = 71;
 
 export async function computeUnderperformers({ periodType, currentPeriodId, lookback = 3, minChronic = 2, limit = 10, languageFilter = null, ignoredSet = null }) {
   const { ranking } = await buildRankingForPeriod(periodType, currentPeriodId);
@@ -240,7 +247,7 @@ export async function computeUnderperformers({ periodType, currentPeriodId, look
     const history = [];
     for (const pid of lookbackPeriods) {
       const r = (lookbackRankings[pid] || []).find((x) => x.employee === candidate.employee);
-      if (r && r.tier && BAD_TIERS.has(r.tier)) chronic += 1;
+      if (r && typeof r.score === "number" && r.score < CHRONIC_BELOW) chronic += 1;
       history.push({ period_id: pid, score: r?.score ?? null, tier: r?.tier ?? null });
     }
     // Se non c'è storico, includiamo tutti i bottom score. Se c'è storico,

@@ -205,6 +205,33 @@ export function isActionable(a) {
   return !!a && a.status !== ASSESSMENT_STATUS.COMPLETED && !isExpired(a);
 }
 
+/**
+ * True se può ricevere turni: azionabile E con consenso registrato
+ * (Decreto Trasparenza / L.132: senza informativa accettata niente valutazione).
+ */
+export function canInteract(a) {
+  return isActionable(a) && !!a.consentAt;
+}
+
+/* ------------------------------------------------------------------ */
+/* Transcript lato server (audit set 2026)                             */
+/* ------------------------------------------------------------------ */
+// Prima il transcript da valutare arrivava INTERO dal browser del candidato:
+// poteva inventare le battute del fan o iniettare istruzioni al valutatore e
+// ottenere un report HR falsato. Ora il server tiene la conversazione vera
+// (turno per turno, come generata) e la valutazione legge SOLO quella.
+export const MAX_OPERATOR_TURNS = 30;
+export const MAX_MESSAGE_CHARS = 1200;
+const txKey = (token, scenarioId) => `candidate:tx:${token}:${scenarioId}`;
+
+export async function getTranscript(token, scenarioId) {
+  return (await kv.get(txKey(token, scenarioId))) || { messages: [], fanState: null, operatorTurns: 0 };
+}
+
+export async function saveTranscript(token, scenarioId, tx) {
+  await kv.set(txKey(token, scenarioId), tx, { ex: DEFAULT_TTL_DAYS * 24 * 3600 + 7 * 24 * 3600 });
+}
+
 /** Lo scenario id atteso al passo corrente (o null se finito/non attivo). */
 export function currentScenarioId(a) {
   if (!a || !Array.isArray(a.scenarioIds)) return null;

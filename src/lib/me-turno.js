@@ -16,6 +16,7 @@ import { kv } from "@vercel/kv";
 import { bqQuery, bigQueryConfigured, hocCreatorScopeSQL } from "@/lib/bigquery-api";
 import { resolveEmployeeForUser, normalizeName } from "@/lib/me";
 import { getCreators } from "@/lib/priority-queue";
+import { getWages } from "@/lib/cp-wages-store";
 
 const DATA = () => process.env.BIGQUERY_DATA_PROJECT || "house-of-creators-358213";
 const QUEUE_TTL = 900;              // 15 min: è una worklist "adesso"
@@ -37,7 +38,7 @@ export async function getMyShiftNow() {
   // (dominio ignorato) → spoofabile aggiungendo un'email al profilo Clerk. Le
   // altre /me espongono solo dati PROPRI; qui ci sono LTV fan → per il pilota
   // vale SOLO il collegamento esplicito impostato da un admin (user_employee:*).
-  if (who.source !== "override") {
+  if (who.source !== "override" && who.source !== "view_as") { // view_as: anteprima admin in sola lettura
     return { employee: null, reason: "pilot_link_required" };
   }
 
@@ -48,7 +49,7 @@ export async function getMyShiftNow() {
     new Date(now - 2 * 86400_000).toISOString().slice(0, 7),
     new Date(now + 12 * 3600_000).toISOString().slice(0, 7), // upcoming oltre il cambio mese
   ]);
-  const wageSets = await Promise.all([...months].map((m) => kv.get(`cp:wages:${m}`)));
+  const wageSets = await Promise.all([...months].map((m) => getWages(m)));
   const wanted = normalizeName(who.employee);
 
   let active = null;

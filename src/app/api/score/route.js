@@ -8,10 +8,13 @@ import { applyScoreToProfile } from "@/lib/operator-profile";
 import { findScenarioById, evaluateScenarioTranscript } from "@/lib/academy-engine";
 import { recordActivationEvent, EVENT } from "@/lib/activation";
 import { kv } from "@vercel/kv";
+import { checkRateLimit, tooMany } from "@/lib/rate-limit";
 
 export async function POST(request) {
   try {
     const { userId } = await auth();
+    // tetto anti-abuso sui costi LLM (lib/rate-limit)
+    if (userId) { const rl = await checkRateLimit("llm_eval", userId); if (!rl.ok) return tooMany(rl.retryAfter); }
     if (!userId) {
       return Response.json({ error: "Non autenticato." }, { status: 401 });
     }

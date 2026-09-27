@@ -1,789 +1,695 @@
 "use client";
 
+/**
+ * /admin/comp-calendar — Calendario compensi (creator × mese).
+ *
+ * v3 (25/09/2026, pilota leggibilità v2) — ridisegnata dopo un test d'uso con 5
+ * utenti simulati (sales manager, board, paghe, coordinatrice turni, esperto UX).
+ * Cosa è cambiato e perché:
+ *  - UNA domanda in cima ("quanto ci costano gli operatori su questa creator?")
+ *    con il confronto col mese prima: un numero senza termine di paragone non dice
+ *    se il mese è andato bene.
+ *  - Anomalie come filtro ("8 da controllare" → la griglia mostra solo quelle).
+ *  - Tabella per operatore SUBITO dopo, ordinabile, con venduto per turno: prima
+ *    chi faceva più turni sembrava il più bravo.
+ *  - Griglia a caselle colorate per scaglione (colore su un'AREA: su una barretta
+ *    di 3px l'occhio non distingue le tinte), venduto una volta per coppia,
+ *    fasce scoperte evidenti, clic su un operatore = evidenzia i suoi turni.
+ *  - Scala dati SEPARATA dall'accento viola (il viola è per ciò che si clicca).
+ *  - Profili e simulatore chiusi di default.
+ *  - SIMULATORE CORRETTO: prima usava un profilo per classe (solo/coppia/tre)
+ *    mentre i turni hanno profili diversi (es. "Mattino" 350/700) e confrontava
+ *    col pagato reale, che include voci non a scaglione → con le soglie reali dava
+ *    −$313. Ora: soglie PER PROFILO e confronto scaglioni-nuovi vs
+ *    scaglioni-attuali sugli stessi turni → differenza 0 per costruzione.
+ *  - Numeri in un solo formato it-IT (separatore migliaia sempre, virgola decimale).
+ *  - Tema chiaro/scuro (preferenza salvata): per tabelle dense di numeri la
+ *    letteratura favorisce il testo scuro su chiaro (Piepenbrock et al. 2013).
+ */
+
 import { useState, useMemo, useEffect } from "react";
-import Link from "next/link";
-import { Loader2, AlertCircle, CalendarDays, AlertTriangle, Download, FlaskConical, RotateCcw, Plus, X } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
-import { PageHeader, CpCard, SectionLabel, StatCard } from "@/components/cp-style";
+import { Loader2, AlertTriangle, Download, FlaskConical, RotateCcw, Plus, X, Sun, Moon, ArrowUp, ArrowDown } from "lucide-react";
+import { CP, FONTS, DATA_SCALE } from "@/lib/brand";
+import { useTheme, setTheme as setAppTheme } from "@/lib/theme-client";
 import CompNav from "@/components/CompNav";
 import HowToRead from "@/components/HowToRead";
 import CreatorPicker from "@/components/CreatorPicker";
+import { fmt$, fmtSigned$, fmtPct, fmtPts, fmtInt, fmtDelta } from "@/lib/format";
+import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Disclosure, Notice, card, NUM } from "@/components/ds";
 
-/**
- * /admin/comp-calendar — Griglia calendario compensation per creator × mese.
- * v2: autocomplete creator (alias reali dal mese), stat cards costo operatori,
- * simulatore scaglioni alternativi (real vs sim, per operatore e totale),
- * design compatto.
- */
+/* ------------------------------------------------------------------ */
+/* Palette e formati                                                   */
+/* ------------------------------------------------------------------ */
 
 const MONTH_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const DAYS_IT = ["Dom","Lun","Mar","Mer","Gio","Ven","Sab"];
+const MIN_SHIFTS = 5; // sotto: resa per turno non affidabile
+
 function monthOpts(n = 12) {
   const out = [];
   const now = new Date();
-  for (let i = 1; i <= n; i++) {
+  for (let i = 0; i <= n; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    out.push({ value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: `${MONTH_IT[d.getMonth()]} ${d.getFullYear()}` });
+    out.push({ value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: `${MONTH_IT[d.getMonth()]} ${d.getFullYear()}${i === 0 ? " (in corso)" : ""}` });
   }
   return out;
 }
-const fmt$ = (n) => n == null ? "—" : `$${Number(n).toLocaleString("it-IT", { maximumFractionDigits: 0 })}`;
-const fmtPct = (v, d = 0) => v == null ? "—" : `${(v * 100).toFixed(d)}%`;
+const prevMonth = (pid) => {
+  const [y, m] = pid.split("-").map(Number);
+  const d = new Date(y, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
 
-const TIER_COLORS = ["#D44545", "#F59E0B", "#3FB97E", "#4F8CCB", CP.accent];
-
-// % vincente con formula bracket su intero importo (confermata dalla ricerca)
+// % vincente: scaglione il cui minimo è ≤ venduto del turno (formula bracket su intero importo)
 function bracketPct(total, thresholds) {
   const valid = (thresholds || []).filter((t) => t.percentage != null && t.percentage !== "");
-  if (valid.length === 0) return null;
+  if (!valid.length) return null;
   const sorted = [...valid].sort((a, b) => (Number(a.threshold) || 0) - (Number(b.threshold) || 0));
-  let winning = sorted[0];
-  for (const t of sorted) if ((Number(t.threshold) || 0) <= total) winning = t;
-  return Number(winning.percentage);
+  let w = sorted[0];
+  for (const t of sorted) if ((Number(t.threshold) || 0) <= total) w = t;
+  return Number(w.percentage);
 }
+
+async function getResearch(creator, pid) {
+  const res = await fetch(`/api/admin/shift-research?creator=${encodeURIComponent(creator)}&period_id=${pid}`);
+  const j = await res.json().catch(() => ({}));
+  return { ok: res.ok, j };
+}
+
+/* ------------------------------------------------------------------ */
 
 export default function CompCalendarPage() {
   const periods = useMemo(() => monthOpts(), []);
+  const [theme] = useTheme(); // tema dell'app (menu laterale → sole/luna)
   const [creator, setCreator] = useState("");
-  const [periodId, setPeriodId] = useState(periods[0]?.value || "");
+  const [periodId, setPeriodId] = useState(periods[1]?.value || periods[0]?.value || "");
   const [aliases, setAliases] = useState([]);
   const [data, setData] = useState(null);
+  const [prev, setPrev] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  // Alias candidati quando la ricerca è ambigua (es. "Laura" → IT + ESP):
-  // mai fondere team diversi, l'utente sceglie quello esatto
   const [candidates, setCandidates] = useState(null);
-  // Simulatore PER CLASSE cosellers: un creator non ha un solo profilo —
-  // Solo/Coppia/Triplo hanno profili propri con scaglioni potenzialmente
-  // diversi. simByClass = { 1: tiers[], 2: tiers[], 3: tiers[] }.
-  const [simByClass, setSimByClass] = useState(null);
-  const [showOnlyChanged, setShowOnlyChanged] = useState(false);
+  const [focus, setFocus] = useState(null); // null | "issues" | "gaps" | { operator }
+  const [sort, setSort] = useState({ key: "per_shift", dir: -1 });
+  const [showProfiles, setShowProfiles] = useState(false);
+  const [showSim, setShowSim] = useState(false);
+  const [showShifts, setShowShifts] = useState(false);
+  const [simByProfile, setSimByProfile] = useState(null);
+  const [onlyChanged, setOnlyChanged] = useState(true);
 
-  async function fetchResearch(c, p) {
-    setLoading(true); setError(null); setData(null); setCandidates(null);
+  const P = CP; // i token seguono il tema (CSS variables)
+  const S = DATA_SCALE[theme];
+
+  // ?theme=light|dark (foto e test automatici) imposta il tema dell'app
+  useEffect(() => {
     try {
-      const res = await fetch(`/api/admin/shift-research?creator=${encodeURIComponent(c)}&period_id=${p}`);
-      const j = await res.json();
-      if (!res.ok) {
-        if (j?.ambiguous && j?.candidates?.length) {
-          setCandidates(j.candidates);
-          setError(j.error);
-          return;
-        }
-        throw new Error(j?.error || `HTTP ${res.status}`);
+      const q = new URLSearchParams(window.location.search).get("theme");
+      if (q === "light" || q === "dark") setAppTheme(q);
+    } catch {}
+  }, []);
+  const toggleTheme = () => setAppTheme(theme === "light" ? "dark" : "light");
+
+  async function load(c, p) {
+    setLoading(true); setError(null); setData(null); setPrev(null); setCandidates(null); setFocus(null);
+    try {
+      const [cur, before] = await Promise.all([getResearch(c, p), getResearch(c, prevMonth(p))]);
+      if (!cur.ok) {
+        if (cur.j?.ambiguous && cur.j?.candidates?.length) { setCandidates(cur.j.candidates); setError(cur.j.error); return; }
+        throw new Error(cur.j?.error || "Errore di caricamento");
       }
-      setData(j);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+      setData(cur.j);
+      setPrev(before.ok ? before.j : null);
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
   }
 
-  // Deep-link: ?creator=X&period_id=YYYY-MM precompila e genera da solo
-  // (es. arrivo da /admin/profiles-compare)
+  // deep-link ?creator=&period_id= (es. da Scaglioni a confronto)
   useEffect(() => {
-    if (typeof window === "undefined") return;
     const sp = new URLSearchParams(window.location.search);
-    const c = sp.get("creator");
-    const p = sp.get("period_id");
-    if (p && /^\d{4}-\d{2}$/.test(p)) setPeriodId(p);
-    if (c) {
-      setCreator(c);
-      setTimeout(() => fetchResearch(c, p && /^\d{4}-\d{2}$/.test(p) ? p : periodId), 0);
-    }
+    const c = sp.get("creator"), p = sp.get("period_id");
+    const pid = p && /^\d{4}-\d{2}$/.test(p) ? p : periodId;
+    if (p) setPeriodId(pid);
+    if (c) { setCreator(c); load(c, pid); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Autocomplete: alias reali del mese selezionato
   useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/admin/creator-aliases?period_id=${periodId}`)
-      .then((r) => r.json())
-      .then((j) => { if (!cancelled && j.aliases) setAliases(j.aliases); })
-      .catch(() => {});
-    return () => { cancelled = true; };
+    let off = false;
+    fetch(`/api/admin/creator-aliases?period_id=${periodId}`).then((r) => r.json()).then((j) => { if (!off && j.aliases) setAliases(j.aliases); }).catch(() => {});
+    return () => { off = true; };
   }, [periodId]);
 
-  // Scaglioni REALI per classe cosellers (dall'inventario profili):
-  // per ogni classe presente nei turni, il profilo più usato di quella classe
-  const origByClass = useMemo(() => {
-    if (!data?.rows?.length) return null;
-    const classes = [...new Set(data.rows.map((r) => r.profile_cosellers ?? 1))].sort((a, b) => a - b);
-    const inv = data.profiles_inventory || [];
-    const byClass = {};
-    for (const cls of classes) {
-      const prof = inv
-        .filter((p) => (p.cosellers_count ?? 1) === cls && p.thresholds?.length)
-        .sort((a, b) => b.shifts - a.shifts)[0];
-      const ths = prof?.thresholds?.length ? prof.thresholds : (data.thresholds_common || []);
-      if (ths.length) byClass[cls] = ths.map((t) => ({ threshold: t.threshold ?? 0, percentage: t.percentage ?? 0 }));
-    }
-    return Object.keys(byClass).length ? byClass : null;
+  const pick = (alias) => { setCreator(alias); load(alias, periodId); };
+  const changeMonth = (pid) => { setPeriodId(pid); if (creator) load(creator, pid); };
+
+  /* ---------------- aggregati ---------------- */
+  const agg = useMemo(() => (data?.rows?.length ? aggregate(data) : null), [data]);
+  const aggPrev = useMemo(() => (prev?.rows?.length ? aggregate(prev) : null), [prev]);
+
+  // soglie reali per profilo (dall'inventario) → punto di partenza del simulatore
+  const realByProfile = useMemo(() => {
+    if (!data) return null;
+    const out = {};
+    for (const p of data.profiles_inventory || []) if (p.thresholds?.length) out[p.name] = p.thresholds.map((t) => ({ threshold: t.threshold ?? 0, percentage: t.percentage ?? 0 }));
+    return Object.keys(out).length ? out : null;
   }, [data]);
+  useEffect(() => { setSimByProfile(realByProfile ? JSON.parse(JSON.stringify(realByProfile)) : null); }, [realByProfile]);
+  const simChanged = useMemo(() => !!simByProfile && JSON.stringify(simByProfile) !== JSON.stringify(realByProfile), [simByProfile, realByProfile]);
 
-  // Inizializza il simulatore dagli scaglioni reali per classe
-  useEffect(() => {
-    setSimByClass(origByClass ? JSON.parse(JSON.stringify(origByClass)) : null);
-  }, [origByClass]);
-
-  async function run(overrideCreator) {
-    const c = (typeof overrideCreator === "string" ? overrideCreator : creator).trim();
-    if (!c || !periodId) return;
-    if (typeof overrideCreator === "string") setCreator(overrideCreator);
-    await fetchResearch(c, periodId);
-  }
-
-  // ===== Griglia + aggregati (con attribuzione earnings al creator) =====
-  const grid = useMemo(() => {
-    if (!data?.rows?.length) return null;
-    const rows = data.rows.map((r) => {
-      const share = r.sales_total_shift > 0 ? r.sales_on_creator / r.sales_total_shift : (r.mono ? 1 : 0);
-      return { ...r, earnings_attr: Math.round(r.earnings * share * 100) / 100 };
-    });
-
-    const slotCounts = {};
-    for (const r of rows) {
-      const k = `${r.start}–${r.end}`;
-      slotCounts[k] = (slotCounts[k] || 0) + 1;
-    }
-    const mainSlots = Object.entries(slotCounts).filter(([, c]) => c >= 3).map(([k]) => k).sort((a, b) => a.localeCompare(b));
-    const hasAltri = Object.entries(slotCounts).some(([, c]) => c < 3);
-    const columns = [...mainSlots, ...(hasAltri ? ["Altri"] : [])];
-
-    const pcts = [...new Set(rows.map((r) => r.expected_pct).filter((p) => p != null))].sort((a, b) => a - b);
-    const colorOf = (pct) => {
-      if (pct == null) return CP.textMuted;
-      const i = pcts.indexOf(pct);
-      if (i >= 0) return TIER_COLORS[Math.min(i, TIER_COLORS.length - 1)];
-      // pct simulato non presente nella scala reale: scala per posizione relativa
-      const below = pcts.filter((p) => p < pct).length;
-      return TIER_COLORS[Math.min(below, TIER_COLORS.length - 1)];
-    };
-
-    const [y, m] = (data.period_id || "").split("-").map(Number);
-    const daysInMonth = new Date(y, m, 0).getDate();
-    const days = [];
-    for (let d = 1; d <= daysInMonth; d++) {
-      const date = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      days.push({ date, dow: DAYS_IT[new Date(y, m - 1, d).getDay()], dayNum: d });
-    }
-    // Turni che col fuso italiano scivolano fuori dal mese (es. 31/5 23:30 ITA
-    // sincronizzato nel wage di maggio ma datato 1/6): aggiungi i giorni extra
-    // in coda invece di perderli.
-    const monthDates = new Set(days.map((d) => d.date));
-    const extraDates = [...new Set(rows.map((r) => r.date))].filter((dt) => dt && !monthDates.has(dt)).sort();
-    for (const date of extraDates) {
-      const [ey, em, ed] = date.split("-").map(Number);
-      days.push({ date, dow: DAYS_IT[new Date(ey, em - 1, ed).getDay()], dayNum: ed, overflow: true });
-    }
-
-    const cellMap = {};
-    for (const r of rows) {
-      const slotKey = mainSlots.includes(`${r.start}–${r.end}`) ? `${r.start}–${r.end}` : "Altri";
-      (cellMap[`${r.date}|${slotKey}`] = cellMap[`${r.date}|${slotKey}`] || []).push(r);
-    }
-
-    const groupSize = {};
-    for (const r of rows) {
-      const gk = `${r.date}|${r.start}|${r.end}`;
-      groupSize[gk] = (groupSize[gk] || 0) + 1;
-    }
-    const cosellerFlags = new Set();
-    for (const r of rows) {
-      if (r.profile_cosellers == null) continue;
-      if (groupSize[`${r.date}|${r.start}|${r.end}`] !== r.profile_cosellers) cosellerFlags.add(r.shift_id);
-    }
-
-    const creatorTokens = (data.matched_aliases || []).flatMap((a) =>
-      a.toLowerCase().split(/[\s\-_]+/).filter((t) => t.length >= 3)
-    );
-    const wrongCreatorFlags = new Set();
-    for (const r of rows) {
-      if (!r.profile_name) continue;
-      if (!creatorTokens.some((t) => r.profile_name.toLowerCase().includes(t))) wrongCreatorFlags.add(r.shift_id);
-    }
-
-    const colTotals = {};
-    for (const c of columns) colTotals[c] = { sales: 0, count: 0 };
-    const dayTotals = {};
-    let totSales = 0, totEarn = 0, emptyCells = 0;
-    for (const r of rows) {
-      const slotKey = mainSlots.includes(`${r.start}–${r.end}`) ? `${r.start}–${r.end}` : "Altri";
-      colTotals[slotKey].sales += r.sales_on_creator;
-      colTotals[slotKey].count += 1;
-      dayTotals[r.date] = dayTotals[r.date] || { sales: 0, count: 0 };
-      dayTotals[r.date].sales += r.sales_on_creator;
-      dayTotals[r.date].count += 1;
-      totSales += r.sales_on_creator;
-      totEarn += r.earnings_attr;
-    }
-    for (const d of days) for (const c of mainSlots) if (!cellMap[`${d.date}|${c}`]) emptyCells++;
-
-    const opAgg = {};
-    for (const r of rows) {
-      const o = (opAgg[r.operator] = opAgg[r.operator] || { turni: 0, sales: 0, earn: 0, byPct: {} });
-      o.turni += 1;
-      o.sales += r.sales_on_creator;
-      o.earn += r.earnings_attr;
-      if (r.expected_pct != null) {
-        const k = r.expected_pct.toFixed(2);
-        o.byPct[k] = (o.byPct[k] || 0) + 1;
-      }
-    }
-    const operators = Object.entries(opAgg)
-      .map(([name, o]) => ({ name, ...o }))
-      .sort((a, b) => b.sales - a.sales);
-
-    return { rows, columns, mainSlots, days, cellMap, colTotals, dayTotals, colorOf, pcts, cosellerFlags, wrongCreatorFlags, operators, totSales, totEarn, emptyCells };
-  }, [data]);
-
-  // ===== Simulazione scaglioni alternativi (PER CLASSE cosellers) =====
+  // Simulatore: stessi turni, scaglioni attuali vs scaglioni nuovi (delta 0 se invariati)
   const sim = useMemo(() => {
-    if (!grid || !simByClass) return null;
-    const classKeys = Object.keys(simByClass).map(Number).sort((a, b) => a - b);
-    if (classKeys.length === 0) return null;
-    let simTot = 0;
-    const opSim = {};
-    const byPctSim = {};
-    const simRows = [];
-    for (const r of grid.rows) {
-      const cls = r.profile_cosellers ?? 1;
-      const tiers = simByClass[cls] || simByClass[classKeys[0]];
-      const valid = (tiers || []).filter((t) => t.percentage !== "" && t.percentage != null);
-      const pct = bracketPct(r.sales_total_shift, valid);
-      if (pct == null) continue;
-      const e = pct * r.sales_on_creator;
-      simTot += e;
-      opSim[r.operator] = (opSim[r.operator] || 0) + e;
-      const k = pct.toFixed(3);
-      byPctSim[k] = (byPctSim[k] || 0) + 1;
-      const realPct = r.expected_pct ?? r.eff_pct;
-      simRows.push({
-        ...r,
-        sim_class: cls,
-        sim_pct: pct,
-        sim_earn: Math.round(e * 100) / 100,
-        row_delta: Math.round((e - r.earnings_attr) * 100) / 100,
-        bracket_changed: realPct != null && Math.abs(pct - realPct) > 0.0001,
-      });
+    if (!agg || !simByProfile || !realByProfile) return null;
+    let base = 0, next = 0;
+    const byOp = {};
+    const rows = [];
+    for (const r of agg.rows) {
+      const real = realByProfile[r.profile_name];
+      const neu = simByProfile[r.profile_name];
+      if (!real || !neu) continue;
+      const pBase = bracketPct(r.sales_total_shift, real);
+      const pNew = bracketPct(r.sales_total_shift, neu);
+      if (pBase == null || pNew == null) continue;
+      const eBase = pBase * r.sales_on_creator, eNew = pNew * r.sales_on_creator;
+      base += eBase; next += eNew;
+      const o = (byOp[r.operator] ||= { base: 0, next: 0 });
+      o.base += eBase; o.next += eNew;
+      rows.push({ ...r, pBase, pNew, eBase, eNew, delta: eNew - eBase, changed: Math.abs(pNew - pBase) > 1e-6 });
     }
-    return {
-      total: Math.round(simTot),
-      delta: Math.round(simTot - grid.totEarn),
-      opSim,
-      byPctSim: Object.entries(byPctSim).map(([p, c]) => ({ pct: parseFloat(p), count: c })).sort((a, b) => a.pct - b.pct),
-      simRows,
-      changedCount: simRows.filter((r) => r.bracket_changed).length,
-    };
-  }, [grid, simByClass]);
+    return { base, next, delta: next - base, byOp, rows, changedCount: rows.filter((x) => x.changed).length };
+  }, [agg, simByProfile, realByProfile]);
 
-  const simChanged = useMemo(() => {
-    if (!simByClass || !origByClass) return false;
-    return JSON.stringify(simByClass) !== JSON.stringify(origByClass);
-  }, [simByClass, origByClass]);
+  const operatorsSorted = useMemo(() => {
+    if (!agg) return [];
+    const arr = agg.operators.map((o) => ({ ...o, per_shift: o.turni ? o.sales / o.turni : 0, cost_pct: o.sales ? o.earn / o.sales : null }));
+    const k = sort.key;
+    // Chi ha pochi turni in fondo quando si ordina per resa: un turno solo non dice
+    // chi è bravo (con 1 turno da $8.000 si finiva in cima).
+    const few = (o) => (["per_shift", "cost_pct"].includes(k) && o.turni < MIN_SHIFTS ? 1 : 0);
+    return arr.sort((a, b) => few(a) - few(b) || (typeof a[k] === "string" ? a[k].localeCompare(b[k]) * sort.dir : ((a[k] ?? 0) - (b[k] ?? 0)) * sort.dir));
+  }, [agg, sort]);
 
-  // Vista griglia simulata: quando modifichi gli scaglioni, la TIMELINE si
-  // ricolora coi tier simulati → vedi a colpo d'occhio se le soglie sono
-  // calibrate (mix di colori) o troppo alte (tutto rosso = nessuno le supera)
-  const [gridSim, setGridSim] = useState(false);
-  useEffect(() => { setGridSim(simChanged); }, [simChanged]);
+  /* ---------------- stili (dipendono dal tema) ---------------- */
+  const st = styles(P);
+  const tier = (pct) => {
+    if (pct == null || !agg) return { fill: "transparent", text: P.textSecondary };
+    const i = agg.pcts.indexOf(pct);
+    const n = agg.pcts.length;
+    const idx = i < 0 ? agg.pcts.filter((x) => x < pct).length : i;
+    const pos = n <= 1 ? 2 : Math.round((Math.min(idx, n - 1) / (n - 1)) * 4);
+    return { fill: S.fill[pos], text: S.text[pos] };
+  };
 
-  const simPctById = useMemo(() => {
-    if (!sim?.simRows) return null;
-    const m = new Map();
-    for (const r of sim.simRows) m.set(r.shift_id, r.sim_pct);
-    return m;
-  }, [sim]);
+  const costPct = agg && agg.totSales > 0 ? agg.totEarn / agg.totSales : null;
+  const costPrev = aggPrev && aggPrev.totSales > 0 ? aggPrev.totEarn / aggPrev.totSales : null;
+  const issuesCount = agg ? agg.issueIds.size : 0;
 
-  // Distribuzione turni per scaglione: reale → simulato (il check calibrazione)
-  const tierDist = useMemo(() => {
-    if (!grid) return null;
-    const real = {};
-    for (const r of grid.rows) if (r.expected_pct != null) {
-      const k = r.expected_pct.toFixed(3);
-      real[k] = (real[k] || 0) + 1;
-    }
-    const simD = {};
-    if (sim) for (const sr of sim.simRows) {
-      const k = sr.sim_pct.toFixed(3);
-      simD[k] = (simD[k] || 0) + 1;
-    }
-    const keys = [...new Set([...Object.keys(real), ...Object.keys(simD)])].sort((a, b) => parseFloat(a) - parseFloat(b));
-    return keys.map((k) => ({ pct: parseFloat(k), real: real[k] || 0, sim: simD[k] || 0 }));
-  }, [grid, sim]);
+  const prevName = MONTH_IT[Number(prevMonth(periodId).slice(5)) - 1].toLowerCase();
+  const dl = (cur, prv) => (prv != null ? fmtDelta(cur, prv) : null);
 
   return (
-    <div style={{ padding: "32px 28px 80px 28px", maxWidth: 1500, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
-      <PageHeader
-        breadcrumb={
-          <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>
-            <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>Hub</Link>
-            <span style={{ color: CP.textMuted }}>›</span>
-            <span style={{ color: CP.textPrimary }}>Comp Calendar</span>
-          </div>
-        }
-        section="Data · Comp & Ben"
-        title="Comp Calendar — turni × scaglioni"
-        subtitle="Giorni × fasce orarie con scaglioni applicati, costo operatori attribuito al creator, e simulatore di profili pagamento alternativi sui turni chiusi."
-      />
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1400, margin: "0 auto", fontFamily: FONTS.body, color: P.textPrimary }}>
+        <PageHead
+          crumbs={[{ label: "Hub", href: "/admin" }, { label: "Comp & Ben" }, { label: "Calendario compensi" }]}
+          title="Calendario compensi"
+          subtitle="Quanto ci costano gli operatori su una creator, chi rende e dove, e cosa succederebbe cambiando gli scaglioni."
+          actions={<button onClick={toggleTheme} style={{ ...st.ghostBtn, padding: "6px 10px" }} title="Cambia tema">
+            {theme === "light" ? <Moon size={14} /> : <Sun size={14} />} {theme === "light" ? "Tema scuro" : "Tema chiaro"}
+          </button>}
+        />
 
-      <CompNav />
+        <CompNav palette={P} />
 
-      <HowToRead items={[
-        "Ogni riga è un giorno del mese, ogni colonna una fascia oraria. Dentro ogni casella: chi ha lavorato, quanto ha venduto e che scaglione gli è stato applicato.",
-        "Il colore dice lo scaglione: più caldo (rosso) = scaglione basso, più freddo/acceso = scaglione alto. Una casella col puntino = nessun turno coperto.",
-        "Il triangolino ⚠ segnala qualcosa da controllare: pagamento fuori scaglione, numero di persone diverso dal profilo, o profilo di un'altra creator. Passa il mouse per i dettagli.",
-        "Nel simulatore in basso puoi cambiare le soglie e vedere subito: quanto sarebbe costato il mese, chi ci guadagnava e chi ci perdeva, turno per turno.",
-        "Quando modifichi le soglie, la griglia si ricolora con lo scenario simulato: se diventa quasi tutta di un colore, le soglie sono da ricalibrare.",
-      ]} />
-
-      {/* Form con autocomplete */}
-      <CpCard padding="16px 20px" style={{ marginBottom: 18 }}>
-        <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 280 }}>
-            <label style={lbl}>Creator · {aliases.length} disponibili nel mese</label>
-            <CreatorPicker
-              aliases={aliases}
-              value={creator}
-              onSelect={(alias) => run(alias)}
-            />
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 14 }}>
+          <div style={{ flex: "1 1 320px", maxWidth: 520 }}>
+            <label style={st.lbl}>Creator</label>
+            <CreatorPicker aliases={aliases} value={creator} onSelect={pick} palette={P} />
           </div>
           <div>
-            <label style={lbl}>Mese</label>
-            <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} style={{ ...input, minWidth: 150, cursor: "pointer" }}>
-              {periods.map((p) => <option key={p.value} value={p.value} style={{ background: CP.surface }}>{p.label}</option>)}
+            <label style={st.lbl}>Mese</label>
+            <select value={periodId} onChange={(e) => changeMonth(e.target.value)} style={{ ...st.input, minWidth: 190, cursor: "pointer" }}>
+              {periods.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
           </div>
-          <button onClick={run} disabled={loading || !creator.trim()} style={primaryBtn(loading || !creator.trim())}>
-            {loading ? <><Loader2 size={14} className="animate-spin" /> Carico…</> : <><CalendarDays size={14} /> Genera</>}
-          </button>
-          {data?.csv_url && (
-            <a href={data.csv_url} style={{ ...primaryBtn(false), background: CP.surface, color: CP.accentGreen, border: `1px solid ${CP.border}`, textDecoration: "none" }}>
-              <Download size={14} /> CSV
-            </a>
-          )}
+          {data?.csv_url && <a href={data.csv_url} style={st.ghostBtn}><Download size={14} /> Scarica CSV</a>}
+          {loading && <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: P.textMuted, fontSize: 13, paddingBottom: 10 }}><Loader2 size={14} className="animate-spin" /> Carico…</span>}
         </div>
-      </CpCard>
+        <HowToRead palette={P} items={[
+          "In cima: quanto costano gli operatori su questa creator, confrontato col mese prima.",
+          "“Da controllare” e “Fasce scoperte” sono filtri: cliccali e la griglia mostra solo quei turni. Clicca un operatore nella tabella per vedere solo i suoi turni.",
+          "Nella griglia il colore della casella è lo scaglione pagato: più scuro = scaglione più alto. Il rosso è solo per ciò che va controllato.",
+          "Il simulatore (in fondo, da aprire) confronta gli scaglioni attuali con quelli che provi tu, sugli stessi turni.",
+        ]} />
 
-      {error && (
-        <CpCard accent={candidates ? "#F59E0B" : CP.accentRed} padding="14px 18px" style={{ marginBottom: 18 }}>
-          <div style={{ color: candidates ? "#F59E0B" : CP.accentRed, display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-            <AlertCircle size={16} /> {error}
-          </div>
-          {candidates && (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-              {candidates.map((a) => (
-                <button
-                  key={a}
-                  onClick={() => run(a)}
-                  style={{ padding: "7px 14px", background: CP.surface, border: `1px solid ${CP.accentGreen}66`, borderRadius: 7, color: CP.accentGreen, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.body }}
-                >
-                  {a}
-                </button>
-              ))}
-            </div>
-          )}
-        </CpCard>
-      )}
+        {error && (
+          <Notice danger={!candidates}>
+            <div>{error}</div>
+            {candidates && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>{candidates.map((a) => <button key={a} onClick={() => pick(a)} style={st.ghostBtn}>{a}</button>)}</div>}
+          </Notice>
+        )}
+        {!data && !loading && !error && <div style={{ ...card, padding: 24, color: P.textMuted, fontSize: 14 }}>Scegli una creator per vedere il mese: in cima trovi quanto sono costati gli operatori sul venduto, poi chi ha reso di più e i turni giorno per giorno.</div>}
+        {data && !agg && !loading && <Notice>Nessun turno registrato per questa creator nel mese scelto. Se il mese è appena finito, la sincronizzazione con CreatorsPro potrebbe non essere ancora completa: prova il mese prima.</Notice>}
 
-      {data && grid && (
-        <>
-          {/* Stat cards: venduto / pagato / % / coverage */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 18 }}>
-            <StatCard label="Venduto (creator)" value={fmt$(grid.totSales)} color={CP.accentGreen} sub={`${grid.rows.length} turni`} />
-            <StatCard label="Pagato operatori (attr.)" value={fmt$(grid.totEarn)} color="#b9aef9" sub="quota attribuita a questa creator" />
-            <StatCard label="% costo su venduto" value={grid.totSales > 0 ? fmtPct(grid.totEarn / grid.totSales, 1) : "—"} />
-            <StatCard label="Operatori attivi" value={grid.operators.length} />
-            <StatCard label="Slot vuoti (coverage)" value={grid.emptyCells} color={grid.emptyCells > 0 ? "#F59E0B" : CP.accentGreen} sub={`su ${grid.days.length * grid.mainSlots.length} slot`} />
-          </div>
-
-          {/* Data quality: venduto non attribuito (takes mancanti in CP) */}
-          {data.takes_quality && data.takes_quality.rows_no_sales > data.takes_quality.rows_total * 0.3 && (
-            <CpCard accent="#F59E0B" padding="12px 16px" style={{ marginBottom: 14 }}>
-              <div style={{ color: "#F59E0B", fontSize: 12, lineHeight: 1.55 }}>
-                ⚠ <b>{data.takes_quality.rows_no_sales} turni su {data.takes_quality.rows_total} senza venduto attribuito</b>
-                {" "}({data.takes_quality.rows_no_takes} senza alcun take registrato in CP).
-                Il pagato e gli scaglioni restano corretti — è il venduto per turno che manca alla fonte:
-                per questo team i takes non vengono registrati (tipico dei team condivisi, es. "laura esp + elisa").
-                Da sistemare in CP lato manager, non è un errore della webapp.
+        {agg && (
+          <>
+            {/* 1. La risposta: un numero principale, col confronto */}
+            <HeroMetric
+              label="Costo operatori sul venduto"
+              value={fmtPct(costPct, 1)}
+              compare={costPrev != null ? <>era {fmtPct(costPrev, 1)} a {prevName} ({fmtPts(costPct - costPrev)})</> : "nessun dato del mese prima"}
+            >
+              <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <Metric label="Venduto" value={fmt$(agg.totSales)} delta={dl(agg.totSales, aggPrev?.totSales)} />
+                <Metric label="Pagato agli operatori" value={fmt$(agg.totEarn)} delta={dl(agg.totEarn, aggPrev?.totEarn)} />
+                <Metric label="Turni" value={fmtInt(agg.rows.length)} delta={dl(agg.rows.length, aggPrev?.rows.length)} />
+                <Metric label="Operatori" value={fmtInt(agg.operators.length)} delta={dl(agg.operators.length, aggPrev?.operators.length)} />
               </div>
-            </CpCard>
-          )}
+            </HeroMetric>
 
-          {/* Inventario profili: OGNI profilo usato sul creator coi SUOI scaglioni */}
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
-              <SectionLabel>Profili usati nel mese:</SectionLabel>
-              <span style={{ fontSize: 11, color: CP.textMuted }}>
-                {data.phase_b?.mismatches === 0 ? `✓ 0 mismatch` : `⚠ ${data.phase_b?.mismatches} fuori scaglione`}
-                {grid.cosellerFlags.size > 0 && ` · ⚠ ${grid.cosellerFlags.size} cosellers incoerenti`}
-                {grid.wrongCreatorFlags.size > 0 && ` · ⚠ ${grid.wrongCreatorFlags.size} profili di altro creator`}
-              </span>
+            {/* 2. Cosa guardare: filtri */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 22 }}>
+              <FilterChip active={focus === "issues"} danger={issuesCount > 0} onClick={() => setFocus(focus === "issues" ? null : "issues")}
+                label={issuesCount ? `${issuesCount} turni da controllare` : "Nessun turno da controllare"} disabled={!issuesCount} />
+              <FilterChip active={focus === "gaps"} onClick={() => setFocus(focus === "gaps" ? null : "gaps")}
+                label={`${agg.emptyCells} fasce scoperte su ${agg.days.length * agg.mainSlots.length}`} disabled={!agg.emptyCells} />
+              {focus && typeof focus === "object" && (
+                <FilterChip active onClick={() => setFocus(null)} label={`Solo ${focus.operator}`} closable />
+              )}
+              {focus === "issues" && <span style={{ fontSize: 13, color: P.textSecondary }}>{agg.issueSummary}</span>}
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {(data.profiles_inventory || []).map((p) => (
-                <div key={p.name} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "5px 10px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 11 }}>
-                  <b style={{ whiteSpace: "nowrap" }}>{p.name}</b>
-                  <span style={{ fontSize: 9, color: CP.textMuted, fontFamily: FONTS.mono }}>{p.cosellers_count ?? "?"}× · {p.shifts}t · {fmt$(p.sales)}</span>
-                  <span style={{ display: "inline-flex", gap: 4 }}>
-                    {(p.thresholds || []).map((t, i) => (
-                      <span key={i} style={{ padding: "1px 6px", borderRadius: 4, background: grid.colorOf(t.percentage) + "22", border: `1px solid ${grid.colorOf(t.percentage)}55`, color: grid.colorOf(t.percentage), fontSize: 10, fontWeight: 700, fontFamily: FONTS.mono, whiteSpace: "nowrap" }}>
-                        {t.threshold > 0 ? `≥${fmt$(t.threshold)}` : "base"}→{fmtPct(t.percentage)}
-                      </span>
-                    ))}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Griglia */}
-          {/* Calibrazione: toggle vista reale/simulata + distribuzione per scaglione */}
-          {tierDist && (
-            <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
-              {sim && simChanged && (
-                <div style={{ display: "flex", gap: 4, padding: 3, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8 }}>
-                  {[["real", "Scaglioni reali"], ["sim", "Simulati"]].map(([v, lab]) => (
-                    <button
-                      key={v}
-                      onClick={() => setGridSim(v === "sim")}
-                      style={{
-                        padding: "5px 12px", borderRadius: 6, border: "none", cursor: "pointer",
-                        background: (gridSim ? "sim" : "real") === v ? CP.surfaceAlt : "transparent",
-                        color: (gridSim ? "sim" : "real") === v ? (v === "sim" ? CP.accent : CP.textPrimary) : CP.textMuted,
-                        fontSize: 12, fontWeight: 500, fontFamily: FONTS.body,
-                      }}
-                    >
-                      {lab}
-                    </button>
+            {/* 3. Chi rende: per operatore, ordinabile */}
+            <SectionTitle aside="Clicca un operatore per vedere solo i suoi turni. Chi ha meno di 5 turni va in fondo quando ordini per resa.">Operatori su questa creator</SectionTitle>
+            <div style={{ ...st.card, overflowX: "auto", marginBottom: 26 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: 680 }}>
+                <thead><tr>
+                  {[["name", "Operatore", "left"], ["turni", "Turni"], ["sales", "Venduto"], ["per_shift", "Venduto per turno"], ["earn", "Pagato"], ["cost_pct", "Costo sul venduto"]].map(([k, l, al]) => (
+                    <th key={k} style={{ ...st.th, textAlign: al || "right", cursor: "pointer", userSelect: "none" }} onClick={() => setSort({ key: k, dir: sort.key === k ? -sort.dir : (k === "name" ? 1 : -1) })}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>{l}{sort.key === k && (sort.dir < 0 ? <ArrowDown size={12} /> : <ArrowUp size={12} />)}</span>
+                    </th>
                   ))}
-                </div>
-              )}
-              <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                <span style={{ fontSize: 11, color: CP.textMuted }}>Turni per scaglione{simChanged ? " (reale → sim)" : ""}:</span>
-                {tierDist.map(({ pct, real, sim: simCount }) => {
-                  const col = grid.colorOf(pct);
-                  const delta = simCount - real;
-                  return (
-                    <span key={pct} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", background: col + "16", border: `1px solid ${col}50`, borderRadius: 6, fontSize: 11, fontFamily: FONTS.mono }}>
-                      <span style={{ width: 7, height: 7, borderRadius: 2, background: col }} />
-                      <b style={{ color: col }}>{fmtPct(pct)}</b>
-                      <span style={{ color: CP.textSecondary }}>{real}t</span>
-                      {simChanged && (
-                        <>
-                          <span style={{ color: CP.textMuted }}>→</span>
-                          <b style={{ color: col }}>{simCount}t</b>
-                          {delta !== 0 && <span style={{ color: delta > 0 ? CP.accentGreen : CP.accentRed, fontSize: 10 }}>({delta > 0 ? "+" : ""}{delta})</span>}
-                        </>
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-              {gridSim && (
-                <span style={{ fontSize: 11, color: CP.accent, fontStyle: "italic" }}>
-                  La griglia mostra i colori SIMULATI — tutto su un colore solo = soglie da ricalibrare
-                </span>
-              )}
-            </div>
-          )}
-
-          <CpCard padding="0" style={{ overflow: "hidden", marginBottom: 22, border: gridSim ? `1px solid ${CP.accent}55` : undefined }}>
-            <div style={{ overflowX: "auto", maxHeight: 600, overflowY: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-                <thead>
-                  <tr style={{ position: "sticky", top: 0, zIndex: 3 }}>
-                    <th style={{ ...th, position: "sticky", left: 0, zIndex: 4, minWidth: 64 }}>Giorno</th>
-                    {grid.columns.map((c) => <th key={c} style={{ ...th, minWidth: 138 }}>{c}</th>)}
-                    <th style={{ ...th, textAlign: "right", minWidth: 78 }}>Tot</th>
-                  </tr>
-                </thead>
+                  <th style={st.th}>Scaglioni pagati</th>
+                </tr></thead>
                 <tbody>
-                  {grid.days.map((d) => {
-                    const dt = grid.dayTotals[d.date];
-                    const weekend = d.dow === "Sab" || d.dow === "Dom";
+                  {operatorsSorted.map((o) => {
+                    const sel = focus && typeof focus === "object" && focus.operator === o.name;
                     return (
-                      <tr key={d.date} style={{ borderBottom: `1px solid ${CP.border}55`, background: weekend ? CP.surfaceAlt + "44" : "transparent" }}>
-                        <td style={{ ...td, position: "sticky", left: 0, background: CP.surface, fontFamily: FONTS.mono, fontSize: 10, whiteSpace: "nowrap", color: weekend ? "#b9aef9" : CP.textSecondary, zIndex: 1 }}>
-                          {d.dow} {d.dayNum}
-                        </td>
-                        {grid.columns.map((c) => {
-                          const cell = grid.cellMap[`${d.date}|${c}`] || [];
-                          if (cell.length === 0) return <td key={c} style={{ ...td, color: CP.border, textAlign: "center", fontSize: 9 }}>·</td>;
-                          return (
-                            <td key={c} style={{ ...td, padding: "3px 5px" }}>
-                              {cell.map((r) => {
-                                // Vista simulata: il chip si colora col tier SIMULATO del turno
-                                const simPct = gridSim && simPctById ? simPctById.get(r.shift_id) : null;
-                                const dispPct = simPct ?? r.expected_pct;
-                                const tierChanged = simPct != null && r.expected_pct != null && Math.abs(simPct - r.expected_pct) > 0.0001;
-                                const col = grid.colorOf(dispPct);
-                                const mismatch = !gridSim && r.delta_pct != null && Math.abs(r.delta_pct) > 0.005;
-                                const flag = mismatch || (!gridSim && (grid.cosellerFlags.has(r.shift_id) || grid.wrongCreatorFlags.has(r.shift_id)));
-                                return (
-                                  <div
-                                    key={r.shift_id}
-                                    title={`${r.operator} · ${r.start}–${r.end}\nVenduto ${fmt$(r.sales_on_creator)} · pagato ${fmt$(r.earnings_attr)} (${fmtPct(r.eff_pct, 1)})\nProfilo "${r.profile_name || "?"}" (${r.profile_cosellers ?? "?"} cos.)${simPct != null ? `\nSim: ${fmtPct(simPct)} (reale ${fmtPct(r.expected_pct)})${tierChanged ? " — CAMBIA SCAGLIONE" : ""}` : ""}${mismatch ? "\n⚠ FUORI SCAGLIONE" : ""}${grid.cosellerFlags.has(r.shift_id) ? "\n⚠ cosellers incoerenti" : ""}${grid.wrongCreatorFlags.has(r.shift_id) ? "\n⚠ profilo di altro creator" : ""}`}
-                                    style={{
-                                      display: "flex", justifyContent: "space-between", alignItems: "center", gap: 4,
-                                      padding: "2px 6px", marginBottom: 2, borderRadius: 4,
-                                      background: mismatch ? CP.accentRed + "30" : col + "16",
-                                      border: `1px ${tierChanged ? "dashed" : "solid"} ${mismatch ? CP.accentRed : col}${tierChanged ? "" : "50"}`,
-                                      fontSize: 10, cursor: "default",
-                                    }}
-                                  >
-                                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 70 }}>
-                                      {flag && <AlertTriangle size={8} style={{ display: "inline", marginRight: 2, color: CP.accentRed }} />}
-                                      {r.operator.split(" ")[0]}
-                                    </span>
-                                    <span style={{ fontFamily: FONTS.mono, fontWeight: 500, color: col, whiteSpace: "nowrap", fontSize: 9.5 }}>
-                                      {fmt$(r.sales_on_creator)}·{fmtPct(dispPct)}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </td>
-                          );
-                        })}
-                        <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 600, fontSize: 10, color: dt ? CP.accentGreen : CP.border }}>
-                          {dt ? fmt$(dt.sales) : "·"}
-                        </td>
+                      <tr key={o.name} onClick={() => setFocus(sel ? null : { operator: o.name })} style={{ borderTop: `1px solid ${P.borderSoft}`, cursor: "pointer", background: sel ? P.accentSoft : "transparent" }} title="Clicca per vedere solo i suoi turni nella griglia">
+                        <td style={{ ...st.td, color: P.textPrimary }}>{o.name}{o.turni < MIN_SHIFTS && <span style={{ fontSize: 12, color: P.textMuted, marginLeft: 8 }}>pochi turni</span>}</td>
+                        <td style={{ ...st.td, ...NUM, textAlign: "right", color: P.textSecondary }}>{o.turni}</td>
+                        <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmt$(o.sales)}</td>
+                        <td style={{ ...st.td, ...NUM, textAlign: "right", fontWeight: 500, color: o.turni < MIN_SHIFTS ? P.textMuted : P.textPrimary }}>{fmt$(o.per_shift)}</td>
+                        <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmt$(o.earn)}</td>
+                        <td style={{ ...st.td, ...NUM, textAlign: "right", color: P.textSecondary }}>{fmtPct(o.cost_pct, 1)}</td>
+                        <td style={st.td}><TierBar byPct={o.byPct} tier={tier} P={P} /></td>
                       </tr>
                     );
                   })}
                 </tbody>
-                <tfoot>
-                  <tr style={{ borderTop: `2px solid ${CP.border}`, background: CP.surfaceAlt, position: "sticky", bottom: 0 }}>
-                    <td style={{ ...td, fontFamily: FONTS.mono, fontWeight: 700, fontSize: 10, position: "sticky", left: 0, background: CP.surfaceAlt }}>TOT</td>
-                    {grid.columns.map((c) => {
-                      const t = grid.colTotals[c];
-                      return (
-                        <td key={c} style={{ ...td, fontFamily: FONTS.mono, fontSize: 10 }}>
-                          <span style={{ color: CP.accentGreen, fontWeight: 700 }}>{fmt$(t.sales)}</span>
-                          <span style={{ color: CP.textMuted }}> ·{t.count}t</span>
-                        </td>
-                      );
-                    })}
-                    <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, fontSize: 10, color: CP.accentGreen }}>
-                      {fmt$(grid.totSales)}
-                    </td>
-                  </tr>
-                </tfoot>
               </table>
             </div>
-          </CpCard>
 
-          {/* ===== Simulatore ===== */}
-          <SectionLabel style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <FlaskConical size={13} /> Simulatore — profilo pagamento alternativo sui turni chiusi
-          </SectionLabel>
-          <CpCard accent={simChanged ? CP.accent : undefined} padding="18px 22px" style={{ marginBottom: 22 }}>
-            {simByClass && (
-              <>
-                {/* Un set di scaglioni PER OGNI classe cosellers — il match vero:
-                    Solo/Coppia/Triplo hanno profili propri, si simulano separati */}
-                {Object.keys(simByClass).map(Number).sort((a, b) => a - b).map((cls) => {
-                  const tiers = simByClass[cls];
-                  const setTiers = (next) => setSimByClass({ ...simByClass, [cls]: next });
-                  const clsLabel = cls === 1 ? "Solo (1×)" : cls === 2 ? "Coppia (2×)" : cls === 3 ? "Triplo (3×)" : `${cls}×`;
-                  return (
-                    <div key={cls} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 12, paddingBottom: 12, borderBottom: `1px dashed ${CP.border}` }}>
-                      <div style={{ minWidth: 92, fontSize: 12, fontWeight: 700, color: CP.accent, paddingBottom: 9, fontFamily: FONTS.mono }}>{clsLabel}</div>
-                      {tiers.map((t, i) => (
-                        <div key={i} style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
-                          <div>
-                            <label style={lbl}>{i === 0 ? "Base (da $)" : `Soglia ${i + 1}`}</label>
-                            <input
-                              type="number"
-                              value={t.threshold}
-                              disabled={i === 0}
-                              onChange={(e) => setTiers(tiers.map((x, j) => j === i ? { ...x, threshold: e.target.value === "" ? "" : Number(e.target.value) } : x))}
-                              style={{ ...input, width: 92, opacity: i === 0 ? 0.5 : 1 }}
-                            />
-                          </div>
-                          <div>
-                            <label style={lbl}>%</label>
-                            <input
-                              type="number" step="0.5"
-                              value={t.percentage === "" ? "" : Math.round(Number(t.percentage) * 1000) / 10}
-                              onChange={(e) => setTiers(tiers.map((x, j) => j === i ? { ...x, percentage: e.target.value === "" ? "" : Number(e.target.value) / 100 } : x))}
-                              style={{ ...input, width: 66 }}
-                            />
-                          </div>
-                          {i > 0 && (
-                            <button onClick={() => setTiers(tiers.filter((_, j) => j !== i))} title="Rimuovi scaglione" style={iconBtn}>
-                              <X size={13} />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                      <button
-                        onClick={() => setTiers([...tiers, { threshold: (Number(tiers[tiers.length - 1]?.threshold) || 0) + 500, percentage: (Number(tiers[tiers.length - 1]?.percentage) || 0.1) + 0.02 }])}
-                        title="Aggiungi scaglione" style={iconBtn}
-                      >
-                        <Plus size={13} />
-                      </button>
-                    </div>
-                  );
-                })}
-                <div style={{ marginBottom: 14 }}>
-                  <button
-                    onClick={() => setSimByClass(origByClass ? JSON.parse(JSON.stringify(origByClass)) : null)}
-                    title="Reset agli scaglioni reali" style={{ ...iconBtn, color: CP.textSecondary }}
-                  >
-                    <RotateCcw size={13} /> <span style={{ marginLeft: 6, fontSize: 12 }}>Reset ai profili reali</span>
-                  </button>
-                </div>
-
-                {sim && (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-                    <StatCard label="Pagato REALE" value={fmt$(grid.totEarn)} color="#b9aef9" />
-                    <StatCard label="Pagato SIMULATO" value={fmt$(sim.total)} color={CP.accent} />
-                    <StatCard
-                      label="Δ per gli operatori"
-                      value={`${sim.delta >= 0 ? "+" : ""}${fmt$(sim.delta)}`}
-                      color={sim.delta > 0 ? CP.accentRed : CP.accentGreen}
-                      sub={grid.totEarn > 0 ? `${sim.delta >= 0 ? "+" : ""}${(100 * sim.delta / grid.totEarn).toFixed(1)}% vs reale` : null}
-                    />
-                    <StatCard
-                      label="Margine creator post-sim"
-                      value={grid.totSales > 0 ? fmtPct((grid.totSales - sim.total) / grid.totSales, 1) : "—"}
-                      sub={`reale: ${grid.totSales > 0 ? fmtPct((grid.totSales - grid.totEarn) / grid.totSales, 1) : "—"}`}
-                    />
-                  </div>
-                )}
-                {!simChanged && (
-                  <div style={{ marginTop: 10, fontSize: 11, color: CP.textMuted, fontStyle: "italic" }}>
-                    Scaglioni = quelli reali del creator. Modifica soglie o % qui sopra per simulare un profilo diverso — il confronto si aggiorna in tempo reale sui {grid.rows.length} turni chiusi del mese.
-                  </div>
-                )}
-
-                {/* Dettaglio turno per turno: reale vs simulato */}
-                {sim && (
-                  <div style={{ marginTop: 18 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
-                      <SectionLabel>Tutti i turni · reale vs simulato ({sim.simRows.length})</SectionLabel>
-                      <label style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12, color: CP.textSecondary, cursor: "pointer" }}>
-                        <input
-                          type="checkbox"
-                          checked={showOnlyChanged}
-                          onChange={(e) => setShowOnlyChanged(e.target.checked)}
-                          style={{ accentColor: CP.accent }}
-                        />
-                        Solo turni che cambiano scaglione ({sim.changedCount})
-                      </label>
-                    </div>
-                    <div style={{ overflowX: "auto", maxHeight: 420, overflowY: "auto", border: `1px solid ${CP.border}`, borderRadius: 8 }}>
-                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-                        <thead>
-                          <tr style={{ position: "sticky", top: 0, zIndex: 1 }}>
-                            <th style={th}>Data</th>
-                            <th style={th}>Orario</th>
-                            <th style={th}>Operatore</th>
-                            <th style={{ ...th, textAlign: "right" }}>Venduto</th>
-                            <th style={{ ...th, textAlign: "right" }}>% reale</th>
-                            <th style={{ ...th, textAlign: "right" }}>Pagato reale</th>
-                            <th style={{ ...th, textAlign: "right" }}>% sim</th>
-                            <th style={{ ...th, textAlign: "right" }}>Pagato sim</th>
-                            <th style={{ ...th, textAlign: "right" }}>Δ turno</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sim.simRows
-                            .filter((r) => !showOnlyChanged || r.bracket_changed)
-                            .map((r) => (
-                              <tr key={r.shift_id} style={{ borderBottom: `1px solid ${CP.border}44`, background: r.bracket_changed ? "#8b7cf618" : "transparent" }}>
-                                <td style={{ ...td, fontFamily: FONTS.mono }}>{r.date.slice(5)}</td>
-                                <td style={{ ...td, fontFamily: FONTS.mono, color: CP.textSecondary }}>{r.start}–{r.end}</td>
-                                <td style={td}>{r.operator}</td>
-                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmt$(r.sales_on_creator)}</td>
-                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: grid.colorOf(r.expected_pct) }}>{fmtPct(r.expected_pct ?? r.eff_pct)}</td>
-                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#b9aef9" }}>{fmt$(r.earnings_attr)}</td>
-                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: r.bracket_changed ? CP.accent : CP.textSecondary }}>{fmtPct(r.sim_pct)}</td>
-                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accent }}>{fmt$(r.sim_earn)}</td>
-                                <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: Math.abs(r.row_delta) < 0.5 ? CP.textMuted : r.row_delta > 0 ? CP.accentRed : CP.accentGreen }}>
-                                  {Math.abs(r.row_delta) < 0.5 ? "=" : `${r.row_delta > 0 ? "+" : ""}${fmt$(r.row_delta)}`}
+            {/* 4. Dove: la griglia */}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", marginBottom: 8 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 500, margin: 0, color: P.textPrimary }}>Giorno per giorno</h2>
+              <span style={{ display: "inline-flex", gap: 12, fontSize: 13, color: P.textSecondary, flexWrap: "wrap" }}>
+                {agg.pcts.map((p) => (
+                  <span key={p} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 14, height: 14, borderRadius: 3, background: tier(p).fill, border: `1px solid ${P.border}` }} />
+                    scaglione {fmtPct(p)} · {agg.tierCounts[p] || 0} turni
+                  </span>
+                ))}
+              </span>
+            </div>
+            <div style={{ ...st.card, marginBottom: 26, overflow: "hidden" }}>
+              <div style={{ overflowX: "auto", maxHeight: 680, overflowY: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }}>
+                  <thead><tr style={{ position: "sticky", top: 0, zIndex: 3 }}>
+                    <th style={{ ...st.th, position: "sticky", left: 0, zIndex: 4, minWidth: 74 }}>Giorno</th>
+                    {agg.columns.map((c) => <th key={c} style={{ ...st.th, minWidth: 148 }}>{c.replace("–", " – ")}</th>)}
+                    <th style={{ ...st.th, textAlign: "right", minWidth: 92, position: "sticky", right: 0, zIndex: 4, boxShadow: `-1px 0 0 ${P.border}` }}>Totale giorno</th>
+                  </tr></thead>
+                  <tbody>
+                    {agg.days.map((d) => {
+                      const weekend = d.dow === "Sab" || d.dow === "Dom";
+                      const dt = agg.dayTotals[d.date];
+                      return (
+                        <tr key={d.date}>
+                          <td style={{ ...st.gridTd, position: "sticky", left: 0, zIndex: 1, background: weekend ? P.surfaceAlt : P.surface, color: weekend ? P.textPrimary : P.textSecondary, whiteSpace: "nowrap" }}>
+                            {d.dow} <span style={NUM}>{d.dayNum}</span>
+                          </td>
+                          {agg.columns.map((c) => {
+                            const cell = agg.cellMap[`${d.date}|${c}`] || [];
+                            const isMain = c !== "Altri";
+                            if (!cell.length) {
+                              const hl = focus === "gaps" && isMain;
+                              return (
+                                <td key={c} style={{ ...st.gridTd, background: weekend ? P.surfaceAlt : P.surface }}>
+                                  {isMain && <div style={{ border: `1px dashed ${hl ? P.textPrimary : P.border}`, borderRadius: 6, padding: "6px 8px", fontSize: 12, color: hl ? P.textPrimary : P.textMuted, textAlign: "center" }}>scoperta</div>}
                                 </td>
+                              );
+                            }
+                            return (
+                              <td key={c} style={{ ...st.gridTd, background: weekend ? P.surfaceAlt : P.surface }}>
+                                {groupCell(cell).map((g) => {
+                                  const t = tier(g.pct);
+                                  const hasIssue = g.rows.some((r) => agg.issueIds.has(r.shift_id));
+                                  const opSel = focus && typeof focus === "object";
+                                  const matches = opSel ? g.rows.some((r) => r.operator === focus.operator) : focus === "issues" ? hasIssue : focus === "gaps" ? false : true;
+                                  return (
+                                    <div key={g.key}
+                                      title={g.rows.map((r) => `${r.operator} · ${r.start}–${r.end} · venduto ${fmt$(r.sales_on_creator)} · pagato ${fmt$(r.earnings_attr)} (${fmtPct(r.eff_pct, 1)}) · profilo "${r.profile_name || "?"}"${agg.issueText[r.shift_id] ? ` · ${agg.issueText[r.shift_id]}` : ""}`).join("\n")}
+                                      style={{ background: t.fill, color: t.text, borderRadius: 6, padding: "5px 8px", marginBottom: 4, boxShadow: theme === "dark" ? `inset 0 0 0 1px ${P.borderStrong}` : "none", opacity: matches ? 1 : 0.22, outline: hasIssue ? `2px solid ${P.accentRed}` : "none", outlineOffset: -2, transition: "opacity .15s" }}>
+                                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
+                                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                          {hasIssue && <AlertTriangle size={12} style={{ display: "inline", marginRight: 4, verticalAlign: "-1px", color: P.accentRed }} />}
+                                          {g.rows.map((r) => r.operator.split(" ")[0]).join(" + ")}
+                                        </span>
+                                        <span style={{ ...NUM, fontWeight: 500, whiteSpace: "nowrap" }}>{fmt$(g.sales)}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </td>
+                            );
+                          })}
+                          <td style={{ ...st.gridTd, ...NUM, textAlign: "right", position: "sticky", right: 0, zIndex: 1, boxShadow: `-1px 0 0 ${P.border}`, background: weekend ? P.surfaceAlt : P.surface, color: dt ? P.textPrimary : P.textMuted, fontWeight: 500 }}>{dt ? fmt$(dt.sales) : "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot><tr style={{ position: "sticky", bottom: 0, zIndex: 3 }}>
+                    <td style={{ ...st.footTd, position: "sticky", left: 0, zIndex: 4 }}>Totale mese</td>
+                    {agg.columns.map((c) => (
+                      <td key={c} style={{ ...st.footTd, ...NUM }}>{fmt$(agg.colTotals[c].sales)}<div style={{ color: P.textMuted, fontWeight: 400, fontSize: 12 }}>{agg.colTotals[c].count} turni · {fmt$(agg.colTotals[c].count ? agg.colTotals[c].sales / agg.colTotals[c].count : 0)} a turno</div></td>
+                    ))}
+                    <td style={{ ...st.footTd, ...NUM, textAlign: "right", position: "sticky", right: 0, zIndex: 4, boxShadow: `-1px 0 0 ${P.border}` }}>{fmt$(agg.totSales)}</td>
+                  </tr></tfoot>
+                </table>
+              </div>
+            </div>
+
+            {/* 5. Turni uno per uno: per rispondere alle contestazioni senza passare il mouse */}
+            <Disclosure open={showShifts || (focus && typeof focus === "object") || focus === "issues"} onToggle={() => setShowShifts(!showShifts)}
+              title={`Turni uno per uno${focus && typeof focus === "object" ? ` · ${focus.operator}` : focus === "issues" ? " · da controllare" : ""}`}
+              summary="Data, orario, profilo, percentuale pagata e dovuta, motivo delle anomalie">
+              <div style={{ overflowX: "auto", maxHeight: 460, overflowY: "auto", border: `1px solid ${P.border}`, borderRadius: 8 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead><tr>{["Data", "Orario", "Operatore", "Profilo", "Venduto nel turno", "Venduto sulla creator", "% pagata", "% dovuta", "Pagato", "Nota"].map((h, i) => <th key={h} style={{ ...st.th, textAlign: i >= 4 && i <= 8 ? "right" : "left", position: "sticky", top: 0 }}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {agg.rows.filter((r) => (focus && typeof focus === "object" ? r.operator === focus.operator : focus === "issues" ? agg.issueIds.has(r.shift_id) : true)).map((r) => {
+                      const issue = agg.issueText[r.shift_id];
+                      return (
+                        <tr key={r.shift_id} style={{ borderTop: `1px solid ${P.borderSoft}` }}>
+                          <td style={{ ...st.td, ...NUM, color: P.textSecondary, whiteSpace: "nowrap" }}>{r.date.slice(8)}/{r.date.slice(5, 7)}</td>
+                          <td style={{ ...st.td, ...NUM, color: P.textSecondary, whiteSpace: "nowrap" }}>{r.start}–{r.end}</td>
+                          <td style={{ ...st.td, whiteSpace: "nowrap" }}>{r.operator}</td>
+                          <td style={{ ...st.td, color: P.textSecondary, whiteSpace: "nowrap" }}>{profileLabel((data.profiles_inventory || []).find((x) => x.name === r.profile_name) || { name: r.profile_name, cosellers_count: r.profile_cosellers })}</td>
+                          <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmt$(r.sales_total_shift)}</td>
+                          <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmt$(r.sales_on_creator)}</td>
+                          <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmtPct(r.eff_pct, 1)}</td>
+                          <td style={{ ...st.td, ...NUM, textAlign: "right", color: P.textSecondary }}>{fmtPct(r.expected_pct)}</td>
+                          <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmt$(r.earnings_attr)}</td>
+                          <td style={{ ...st.td, color: issue ? P.accentRed : P.textMuted, fontSize: 12 }}>{issue || "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Disclosure>
+
+            {/* 6. Su richiesta: profili */}
+            <Disclosure open={showProfiles} onToggle={() => setShowProfiles(!showProfiles)}
+              title="Profili di pagamento del mese" summary={profilesSummary(data.profiles_inventory || [])}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                <thead><tr><th style={st.th}>Profilo</th><th style={{ ...st.th, textAlign: "right" }}>Persone nel turno</th><th style={{ ...st.th, textAlign: "right" }}>Turni</th><th style={{ ...st.th, textAlign: "right" }}>Venduto</th><th style={st.th}>Scaglioni</th></tr></thead>
+                <tbody>{(data.profiles_inventory || []).map((p) => (
+                  <tr key={p.name} style={{ borderTop: `1px solid ${P.borderSoft}` }}>
+                    <td style={st.td}>{profileLabel(p)}<div style={{ fontSize: 12, color: P.textMuted }}>{p.name}</div></td>
+                    <td style={{ ...st.td, ...NUM, textAlign: "right", color: P.textSecondary }}>{p.cosellers_count ?? "?"}</td>
+                    <td style={{ ...st.td, ...NUM, textAlign: "right", color: P.textSecondary }}>{p.shifts}</td>
+                    <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmt$(p.sales)}</td>
+                    <td style={{ ...st.td, ...NUM, color: P.textSecondary }}>{thresholdsText(p.thresholds)}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </Disclosure>
+
+            {/* 6. Su richiesta: simulatore */}
+            <Disclosure open={showSim} onToggle={() => setShowSim(!showSim)} icon={<FlaskConical size={15} />}
+              title="Simulatore: e se gli scaglioni fossero diversi?"
+              summary={sim && simChanged ? `Con le soglie provate: ${fmtSigned$(sim.delta)} agli operatori in un mese (${sim.changedCount} turni cambiano scaglione)` : "Prova soglie diverse sui turni di questo mese"}>
+              {simByProfile && (
+                <>
+                  <div style={{ fontSize: 13, color: P.textSecondary, marginBottom: 12 }}>Una riga per profilo di pagamento. Il confronto è tra gli scaglioni di oggi e quelli che scrivi qui, sugli stessi turni: se non cambi niente, la differenza è zero.</div>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ borderCollapse: "collapse", fontSize: 14 }}>
+                      <thead><tr><th style={st.th}>Profilo</th><th style={st.th}>Scaglioni (da $ → %)</th><th style={st.th}></th></tr></thead>
+                      <tbody>
+                        {Object.keys(simByProfile).map((name) => {
+                          const tiers = simByProfile[name];
+                          const setTiers = (next) => setSimByProfile({ ...simByProfile, [name]: next });
+                          return (
+                            <tr key={name} style={{ borderTop: `1px solid ${P.borderSoft}` }}>
+                              <td style={{ ...st.td, whiteSpace: "nowrap" }}>{profileLabel((data.profiles_inventory || []).find((x) => x.name === name) || { name })}<div style={{ fontSize: 12, color: P.textMuted }}>{name}</div></td>
+                              <td style={st.td}>
+                                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                                  {tiers.map((t, i) => (
+                                    <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                      <span style={{ color: P.textMuted, fontSize: 12 }}>{i === 0 ? "base" : "da $"}</span>
+                                      {i > 0 && <SimInput P={P} st={st} value={t.threshold} was={realByProfile?.[name]?.[i]?.threshold} label={`Soglia ${i + 1} ${name}`} width={76}
+                                        onChange={(v) => setTiers(tiers.map((x, j) => (j === i ? { ...x, threshold: v === "" ? "" : Number(v) } : x)))} />}
+                                      <span style={{ color: P.textMuted }}>→</span>
+                                      <SimInput P={P} st={st} step="0.5" value={t.percentage === "" ? "" : Math.round(Number(t.percentage) * 1000) / 10}
+                                        was={realByProfile?.[name]?.[i]?.percentage != null ? Math.round(realByProfile[name][i].percentage * 1000) / 10 : undefined} label={`Percentuale ${i + 1} ${name}`} width={60}
+                                        onChange={(v) => setTiers(tiers.map((x, j) => (j === i ? { ...x, percentage: v === "" ? "" : Number(v) / 100 } : x)))} />
+                                      <span style={{ color: P.textMuted, fontSize: 12 }}>%</span>
+                                      {i > 0 && <button onClick={() => setTiers(tiers.filter((_, j) => j !== i))} aria-label="Togli scaglione" style={{ ...st.iconBtn, padding: 5 }}><X size={12} /></button>}
+                                      {i < tiers.length - 1 && <span style={{ color: P.border, margin: "0 2px" }}>|</span>}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td style={st.td}><button onClick={() => setTiers([...tiers, { threshold: (Number(tiers[tiers.length - 1]?.threshold) || 0) + 500, percentage: (Number(tiers[tiers.length - 1]?.percentage) || 0.1) + 0.02 }])} aria-label="Aggiungi scaglione" style={{ ...st.iconBtn, padding: 5 }}><Plus size={12} /></button></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ display: "flex", gap: 10, margin: "12px 0 16px", flexWrap: "wrap" }}>
+                    <button onClick={() => setSimByProfile(JSON.parse(JSON.stringify(realByProfile)))} style={st.ghostBtn} disabled={!simChanged}><RotateCcw size={13} /> Torna agli scaglioni di oggi</button>
+                  </div>
+                  {sim && (
+                    <>
+                      {/* Risultato ancorato al pagato REALE: si applica solo la differenza dovuta agli
+                          scaglioni (prima c'erano due totali quasi uguali, $18.615 e $18.616: confondeva) */}
+                      <div style={{ display: "flex", gap: 32, flexWrap: "wrap", marginBottom: 6 }}>
+                        <div>
+                          <div style={{ fontSize: 13, color: P.textSecondary }}>Costo operatori sul venduto</div>
+                          <div style={{ fontSize: 22, fontWeight: 500, ...NUM }}>{fmtPct(costPct, 1)} → {fmtPct(agg.totSales ? (agg.totEarn + sim.delta) / agg.totSales : null, 1)}</div>
+                          <div style={{ fontSize: 12, color: P.textMuted }}>{fmtPts(agg.totSales ? sim.delta / agg.totSales : 0)}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 13, color: P.textSecondary }}>Pagato agli operatori nel mese</div>
+                          <div style={{ fontSize: 22, fontWeight: 500, ...NUM }}>{fmt$(agg.totEarn)} → {fmt$(agg.totEarn + sim.delta)}</div>
+                          <div style={{ fontSize: 12, color: P.textMuted }}>{fmtSigned$(sim.delta)} · {sim.delta > 0 ? "gli operatori guadagnerebbero di più" : sim.delta < 0 ? "gli operatori guadagnerebbero di meno" : "nessun cambiamento"}</div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 12, color: P.textMuted, marginBottom: 14 }}>Cambia solo la parte che dipende dallo scaglione; il resto del pagato resta com'è.</div>
+                      {simChanged && (
+                        <>
+                          <h3 style={{ fontSize: 14, fontWeight: 500, margin: "4px 0 8px" }}>Chi ci guadagna e chi ci perde</h3>
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, marginBottom: 14 }}>
+                            <thead><tr><th style={st.th}>Operatore</th><th style={{ ...st.th, textAlign: "right" }}>Oggi</th><th style={{ ...st.th, textAlign: "right" }}>Provato</th><th style={{ ...st.th, textAlign: "right" }}>Differenza</th></tr></thead>
+                            <tbody>{Object.entries(sim.byOp).sort((a, b) => (a[1].next - a[1].base) - (b[1].next - b[1].base)).map(([name, o]) => (
+                              <tr key={name} style={{ borderTop: `1px solid ${P.borderSoft}` }}>
+                                <td style={st.td}>{name}</td>
+                                <td style={{ ...st.td, ...NUM, textAlign: "right", color: P.textSecondary }}>{fmt$(o.base)}</td>
+                                <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmt$(o.next)}</td>
+                                <td style={{ ...st.td, ...NUM, textAlign: "right", fontWeight: 500 }}>{fmtSigned$(o.next - o.base)}</td>
+                              </tr>
+                            ))}</tbody>
+                          </table>
+                        </>
+                      )}
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, color: P.textSecondary, cursor: "pointer", marginBottom: 8 }}>
+                        <input type="checkbox" checked={onlyChanged} onChange={(e) => setOnlyChanged(e.target.checked)} style={{ accentColor: P.accent }} />
+                        Mostra solo i turni che cambiano scaglione ({sim.changedCount})
+                      </label>
+                      <div style={{ overflowX: "auto", maxHeight: 380, overflowY: "auto", border: `1px solid ${P.border}`, borderRadius: 8 }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                          <thead><tr>{["Data", "Orario", "Operatore", "Venduto nel turno", "Oggi", "Provato", "Differenza"].map((h, i) => <th key={h} style={{ ...st.th, textAlign: i >= 3 ? "right" : "left", position: "sticky", top: 0 }}>{h}</th>)}</tr></thead>
+                          <tbody>
+                            {sim.rows.filter((r) => !onlyChanged || r.changed).map((r) => (
+                              <tr key={r.shift_id} style={{ borderTop: `1px solid ${P.borderSoft}` }}>
+                                <td style={{ ...st.td, ...NUM, color: P.textSecondary }}>{r.date.slice(8)}/{r.date.slice(5, 7)}</td>
+                                <td style={{ ...st.td, ...NUM, color: P.textSecondary }}>{r.start}–{r.end}</td>
+                                <td style={st.td}>{r.operator}</td>
+                                <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmt$(r.sales_total_shift)}</td>
+                                <td style={{ ...st.td, ...NUM, textAlign: "right", color: P.textSecondary }}>{fmtPct(r.pBase)} · {fmt$(r.eBase)}</td>
+                                <td style={{ ...st.td, ...NUM, textAlign: "right" }}>{fmtPct(r.pNew)} · {fmt$(r.eNew)}</td>
+                                <td style={{ ...st.td, ...NUM, textAlign: "right", fontWeight: 500 }}>{Math.abs(r.delta) < 0.5 ? "—" : fmtSigned$(r.delta)}</td>
                               </tr>
                             ))}
-                          {showOnlyChanged && sim.changedCount === 0 && (
-                            <tr><td colSpan={9} style={{ ...td, textAlign: "center", color: CP.textMuted, fontStyle: "italic", padding: 18 }}>
-                              Nessun turno cambia scaglione con queste soglie.
-                            </td></tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </CpCard>
-
-          {/* Per operatore: reale + simulato */}
-          <SectionLabel style={{ display: "block", marginBottom: 10 }}>Per operatore · pagato reale {simChanged ? "vs simulato" : ""}</SectionLabel>
-          <CpCard padding="0" style={{ overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-              <thead>
-                <tr style={{ background: CP.surfaceAlt, borderBottom: `2px solid ${CP.border}` }}>
-                  <th style={th}>Operatore</th>
-                  <th style={{ ...th, textAlign: "right" }}>Turni</th>
-                  <th style={{ ...th, textAlign: "right" }}>Venduto</th>
-                  <th style={{ ...th, textAlign: "right" }}>Pagato (attr.)</th>
-                  {simChanged && <th style={{ ...th, textAlign: "right" }}>Simulato</th>}
-                  {simChanged && <th style={{ ...th, textAlign: "right" }}>Δ</th>}
-                  <th style={th}>Mix scaglioni</th>
-                </tr>
-              </thead>
-              <tbody>
-                {grid.operators.map((o) => {
-                  const simEarn = sim?.opSim?.[o.name];
-                  const delta = simEarn != null ? simEarn - o.earn : null;
-                  return (
-                    <tr key={o.name} style={{ borderBottom: `1px solid ${CP.border}55` }}>
-                      <td style={{ ...td, fontWeight: 600 }}>{o.name}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono }}>{o.turni}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accentGreen, fontWeight: 600 }}>{fmt$(o.sales)}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: "#b9aef9" }}>{fmt$(o.earn)}</td>
-                      {simChanged && <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, color: CP.accent }}>{simEarn != null ? fmt$(simEarn) : "—"}</td>}
-                      {simChanged && (
-                        <td style={{ ...td, textAlign: "right", fontFamily: FONTS.mono, fontWeight: 700, color: delta == null ? CP.textMuted : delta > 0 ? CP.accentRed : CP.accentGreen }}>
-                          {delta != null ? `${delta >= 0 ? "+" : ""}${fmt$(delta)}` : "—"}
-                        </td>
-                      )}
-                      <td style={td}>
-                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                          {Object.entries(o.byPct).sort(([a], [b]) => parseFloat(a) - parseFloat(b)).map(([pct, count]) => (
-                            <span key={pct} style={{ padding: "1px 6px", borderRadius: 4, background: grid.colorOf(parseFloat(pct)) + "22", color: grid.colorOf(parseFloat(pct)), fontSize: 10, fontWeight: 700, fontFamily: FONTS.mono }}>
-                              {count}×{fmtPct(parseFloat(pct))}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </CpCard>
-        </>
-      )}
+                            {onlyChanged && sim.changedCount === 0 && <tr><td colSpan={7} style={{ ...st.td, textAlign: "center", color: P.textMuted, padding: 16 }}>Nessun turno cambia scaglione: modifica una soglia qui sopra.</td></tr>}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </Disclosure>
+          </>
+        )}
     </div>
   );
 }
 
-const lbl = { display: "block", fontSize: 10, color: CP.textMuted, letterSpacing: "0.08em", fontWeight: 700, marginBottom: 5, fontFamily: FONTS.mono };
-const input = { width: "100%", padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
-const th = { padding: "8px 9px", textAlign: "left", fontSize: 9.5, fontWeight: 700, color: CP.textMuted, letterSpacing: 0.5, fontFamily: FONTS.mono, whiteSpace: "nowrap", background: CP.surfaceAlt };
-const td = { padding: "5px 8px", verticalAlign: "top" };
-const iconBtn = { padding: "9px 10px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 7, color: CP.textPrimary, cursor: "pointer", display: "inline-flex", alignItems: "center" };
-const primaryBtn = (disabled) => ({
-  display: "inline-flex", alignItems: "center", gap: 8,
-  padding: "10px 16px",
-  background: disabled ? CP.surfaceAlt : CP.accent,
-  color: disabled ? CP.textMuted : CP.accentInk,
-  border: "none", borderRadius: 8,
-  fontSize: 13, fontWeight: 700, fontFamily: FONTS.body,
-  cursor: disabled ? "not-allowed" : "pointer",
-});
+/* ------------------------------------------------------------------ */
+/* Aggregazione (logica invariata rispetto alla v2, + anomalie leggibili) */
+/* ------------------------------------------------------------------ */
+function aggregate(data) {
+  const rows = data.rows.map((r) => {
+    const share = r.sales_total_shift > 0 ? r.sales_on_creator / r.sales_total_shift : (r.mono ? 1 : 0);
+    return { ...r, earnings_attr: Math.round(r.earnings * share * 100) / 100 };
+  });
+  const slotCounts = {};
+  for (const r of rows) slotCounts[`${r.start}–${r.end}`] = (slotCounts[`${r.start}–${r.end}`] || 0) + 1;
+  const mainSlots = Object.entries(slotCounts).filter(([, c]) => c >= 3).map(([k]) => k).sort((a, b) => a.localeCompare(b));
+  const columns = [...mainSlots, ...(Object.values(slotCounts).some((c) => c < 3) ? ["Altri"] : [])];
+  const pcts = [...new Set(rows.map((r) => r.expected_pct).filter((p) => p != null))].sort((a, b) => a - b);
+
+  const [y, m] = (data.period_id || "").split("-").map(Number);
+  const days = [];
+  for (let d = 1; d <= new Date(y, m, 0).getDate(); d++) {
+    const date = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    days.push({ date, dow: DAYS_IT[new Date(y, m - 1, d).getDay()], dayNum: d });
+  }
+  const monthDates = new Set(days.map((d) => d.date));
+  for (const date of [...new Set(rows.map((r) => r.date))].filter((dt) => dt && !monthDates.has(dt)).sort()) {
+    const [ey, em, ed] = date.split("-").map(Number);
+    days.push({ date, dow: DAYS_IT[new Date(ey, em - 1, ed).getDay()], dayNum: ed, overflow: true });
+  }
+  const cellMap = {};
+  const slotOf = (r) => (mainSlots.includes(`${r.start}–${r.end}`) ? `${r.start}–${r.end}` : "Altri");
+  for (const r of rows) (cellMap[`${r.date}|${slotOf(r)}`] ||= []).push(r);
+
+  // anomalie (stesse regole di prima) con spiegazione leggibile
+  const groupSize = {};
+  for (const r of rows) groupSize[`${r.date}|${r.start}|${r.end}`] = (groupSize[`${r.date}|${r.start}|${r.end}`] || 0) + 1;
+  const tokens = (data.matched_aliases || []).flatMap((a) => a.toLowerCase().split(/[\s\-_]+/).filter((t) => t.length >= 3));
+  const issueIds = new Set();
+  const issueText = {};
+  const counts = { out: 0, cos: 0, wrong: 0 };
+  for (const r of rows) {
+    const why = [];
+    if (r.delta_pct != null && Math.abs(r.delta_pct) > 0.005) { why.push("pagato fuori scaglione"); counts.out++; }
+    if (r.profile_cosellers != null && groupSize[`${r.date}|${r.start}|${r.end}`] !== r.profile_cosellers) { why.push(`profilo per ${r.profile_cosellers} persone, nel turno erano ${groupSize[`${r.date}|${r.start}|${r.end}`]}`); counts.cos++; }
+    if (r.profile_name && !tokens.some((t) => r.profile_name.toLowerCase().includes(t))) { why.push("profilo di un'altra creator"); counts.wrong++; }
+    if (why.length) { issueIds.add(r.shift_id); issueText[r.shift_id] = why.join("; "); }
+  }
+  const issueSummary = [
+    counts.out ? `${counts.out} pagati fuori scaglione` : null,
+    counts.cos ? `${counts.cos} con un profilo per un numero di persone diverso da chi ha lavorato` : null,
+    counts.wrong ? `${counts.wrong} con il profilo di un'altra creator` : null,
+  ].filter(Boolean).join(" · ");
+
+  const colTotals = Object.fromEntries(columns.map((c) => [c, { sales: 0, count: 0 }]));
+  const dayTotals = {};
+  let totSales = 0, totEarn = 0, emptyCells = 0;
+  const tierCounts = {};
+  for (const r of rows) {
+    const k = slotOf(r);
+    colTotals[k].sales += r.sales_on_creator; colTotals[k].count += 1;
+    (dayTotals[r.date] ||= { sales: 0, count: 0 }).sales += r.sales_on_creator;
+    dayTotals[r.date].count += 1;
+    totSales += r.sales_on_creator; totEarn += r.earnings_attr;
+    if (r.expected_pct != null) tierCounts[r.expected_pct] = (tierCounts[r.expected_pct] || 0) + 1;
+  }
+  for (const d of days) for (const c of mainSlots) if (!cellMap[`${d.date}|${c}`]) emptyCells++;
+
+  const opAgg = {};
+  for (const r of rows) {
+    const o = (opAgg[r.operator] ||= { turni: 0, sales: 0, earn: 0, byPct: {} });
+    o.turni += 1; o.sales += r.sales_on_creator; o.earn += r.earnings_attr;
+    if (r.expected_pct != null) o.byPct[r.expected_pct] = (o.byPct[r.expected_pct] || 0) + 1;
+  }
+  const operators = Object.entries(opAgg).map(([name, o]) => ({ name, ...o })).sort((a, b) => b.sales - a.sales);
+  return { rows, columns, mainSlots, days, cellMap, colTotals, dayTotals, pcts, tierCounts, issueIds, issueText, issueSummary, operators, totSales, totEarn, emptyCells };
+}
+
+// In un turno condiviso il venduto è lo stesso per tutti: lo si mostra UNA volta.
+function groupCell(cell) {
+  const groups = new Map();
+  for (const r of cell) {
+    const key = `${r.start}|${r.end}|${Math.round(r.sales_on_creator)}|${r.expected_pct}`;
+    const g = groups.get(key) || { key, rows: [], sales: r.sales_on_creator, pct: r.expected_pct };
+    g.rows.push(r); groups.set(key, g);
+  }
+  return [...groups.values()];
+}
+
+// "2 Giulia Ottorini Mattino" → "In coppia · mattino": il nome interno di CreatorsPro
+// non dice niente a chi legge; persone nel turno + variante sì.
+function profileLabel(p) {
+  const n = p?.cosellers_count;
+  const who = n === 1 ? "Da solo" : n === 2 ? "In coppia" : n === 3 ? "In tre" : n ? `In ${n}` : "Profilo";
+  const variant = (String(p?.name || "").match(/mattin\w*|notturn\w*|serale|serata|weekend|condivis\w*/gi) || []).map((x) => x.toLowerCase());
+  return variant.length ? `${who} · ${variant.join(" · ")}` : who;
+}
+function thresholdsText(ths) {
+  return (ths || []).map((t) => `${t.threshold > 0 ? `da ${fmt$(t.threshold)}` : "base"} ${fmtPct(t.percentage)}`).join(" · ");
+}
+function profilesSummary(inv) {
+  if (!inv.length) return "Nessun profilo";
+  const byTh = {};
+  for (const p of inv) (byTh[thresholdsText(p.thresholds)] ||= []).push(profileLabel(p));
+  const groups = Object.entries(byTh).sort((a, b) => b[1].length - a[1].length);
+  if (groups.length === 1) return `${inv.length} profili, tutti con ${groups[0][0]}`;
+  return groups.map(([th, labels]) => `${[...new Set(labels)].join(", ")}: ${th}`).join("  —  ");
+}
+
+/* ------------------------------------------------------------------ */
+/* Componenti locali                                                   */
+/* ------------------------------------------------------------------ */
+// Campo del simulatore: se il valore è diverso da quello reale si vede (bordo + "era X")
+function SimInput({ P, st, value, was, onChange, label, width, step }) {
+  const changed = was !== undefined && String(value) !== String(was);
+  return (
+    <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-start" }}>
+      <input type="number" step={step} value={value} aria-label={label} onChange={(e) => onChange(e.target.value)}
+        style={{ ...st.input, width, padding: "6px 8px", fontVariantNumeric: "tabular-nums", borderColor: changed ? P.accent : P.border, boxShadow: changed ? `0 0 0 1px ${P.accent}` : "none" }} />
+      <span style={{ fontSize: 11, color: P.accentSoftText, height: 14 }}>{changed ? `era ${was}` : ""}</span>
+    </span>
+  );
+}
+
+function TierBar({ byPct, tier, P }) {
+  const entries = Object.entries(byPct).map(([p, c]) => [Number(p), c]).sort((a, b) => a[0] - b[0]);
+  const tot = entries.reduce((a, [, c]) => a + c, 0) || 1;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ display: "flex", width: 120, height: 10, borderRadius: 3, overflow: "hidden", border: `1px solid ${P.border}` }}>
+        {entries.map(([p, c]) => <div key={p} style={{ width: `${(c / tot) * 100}%`, background: tier(p).fill }} title={`${c} turni a ${fmtPct(p)}`} />)}
+      </div>
+      <span style={{ fontSize: 12, color: P.textMuted, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{entries.map(([p, c]) => `${c}×${fmtPct(p)}`).join(" ")}</span>
+    </div>
+  );
+}
+
+function styles(P) {
+  return {
+    card: { background: P.surface, border: `1px solid ${P.border}`, borderRadius: 10 },
+    h2: { fontSize: 16, fontWeight: 500, margin: "0 0 10px", color: P.textPrimary },
+    lbl: { display: "block", fontSize: 12, color: P.textSecondary, fontWeight: 500, marginBottom: 6 },
+    input: { width: "100%", padding: "9px 12px", background: P.surface, border: `1px solid ${P.border}`, borderRadius: 8, color: P.textPrimary, fontSize: 14, fontFamily: FONTS.body, outline: "none", boxSizing: "border-box" },
+    th: { padding: "10px 12px", textAlign: "left", fontSize: 12, fontWeight: 500, color: P.textMuted, whiteSpace: "nowrap", background: P.surface, borderBottom: `1px solid ${P.border}` },
+    td: { padding: "9px 12px", verticalAlign: "middle" },
+    gridTd: { padding: "5px 6px", verticalAlign: "top", borderTop: `1px solid ${P.borderSoft}` },
+    footTd: { padding: "10px 12px", fontWeight: 500, background: P.surfaceAlt, borderTop: `1px solid ${P.border}`, whiteSpace: "nowrap" },
+    iconBtn: { padding: "8px 9px", background: "transparent", border: `1px solid ${P.border}`, borderRadius: 7, color: P.textSecondary, cursor: "pointer", display: "inline-flex", alignItems: "center" },
+    ghostBtn: { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 14px", background: P.surface, border: `1px solid ${P.border}`, borderRadius: 8, color: P.textSecondary, fontSize: 13, fontFamily: FONTS.body, cursor: "pointer", textDecoration: "none" },
+  };
+}

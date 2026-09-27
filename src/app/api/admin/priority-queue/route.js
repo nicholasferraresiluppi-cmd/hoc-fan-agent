@@ -1,6 +1,7 @@
 // Priority Queue · Fase 0 — worklist fan per creator (metadata chat + valore da BigQuery).
 // Dati fan sensibili (username + LTV) → gate scope "all".
 
+import { authorizeAllCreators } from "@/lib/creator-scope";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { getCreators, getPriorityQueue, bigQueryConfigured } from "@/lib/priority-queue";
 
@@ -8,7 +9,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   if (!bigQueryConfigured()) {

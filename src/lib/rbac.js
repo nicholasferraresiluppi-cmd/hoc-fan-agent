@@ -1,6 +1,7 @@
 import { kv } from "@vercel/kv";
 import { auth, clerkClient } from "@clerk/nextjs/server";
-import { isUserIdAdmin } from "@/lib/admin";
+import { isUserIdAdmin, isUserIdAdminRaw, adminMfaOk } from "@/lib/admin";
+import { viewAsFor } from "@/lib/view-as";
 
 /**
  * RBAC — Role-Based Access Control.
@@ -48,6 +49,7 @@ export const CAPABILITIES = {
   LEADERBOARD_SNAPSHOT: "leaderboard.snapshot", // forzare snapshot classifica
   CM_COCKPIT: "cm.cockpit",                   // cockpit turno di supervisione CM
   COPILOT_PILOT: "copilot.pilot",             // scheda-fan "Il mio turno" (aperto a tutta HOC; espone LTV fan del PROPRIO turno)
+  USERS_INVITE: "users.invite",               // invitare persone in HOC Pro (accesso solo su invito dal 25/09/2026)
 };
 
 // "all" = tutta l'org | "team" = solo proprio team | "own" = solo sé stesso | "none" = nessun accesso
@@ -95,6 +97,7 @@ export const ROLE_CAPABILITIES = {
     [CAPABILITIES.CREATORS_MANAGE]: "all",
     [CAPABILITIES.SEED]: "all",
     [CAPABILITIES.ACCESS_MGMT]: "all",
+    [CAPABILITIES.USERS_INVITE]: "all",
     [CAPABILITIES.SENIORITY_OVERRIDE]: "all",
     [CAPABILITIES.LEAGUES_SNAPSHOT]: "all",
     [CAPABILITIES.LEADERBOARD_SNAPSHOT]: "all",
@@ -173,21 +176,37 @@ export async function deleteCustomRole(id) {
 
 export async function getUserRoles(userId) {
   if (!userId) return ["operator"];
+  // "Vedi come…" (lib/view-as): solo per un admin vero e solo sulla sua sessione
+  try {
+    const va = await viewAsFor(userId);
+    if (va && (await isUserIdAdminRaw(userId))) return va.roles.length ? va.roles : ["operator"];
+  } catch {}
   try {
     if (await isUserIdAdmin(userId)) return ["admin"];
   } catch {}
+  // Il ruolo "admin" scritto nei ruoli vale solo se passa la verifica 2FA
+  // (quando richiesta): stessa regola di isUserIdAdmin.
+  const gate = async (roles) => {
+    if (!roles.includes("admin") || (await adminMfaOk(userId))) return roles;
+    const rest = roles.filter((r) => r !== "admin");
+    return rest.length ? rest : ["operator"];
+  };
   // Multi-ruolo
   const set = (await kv.smembers(`roles:${userId}`)) || [];
-  if (set.length) return set;
+  if (set.length) return gate(set);
   // Legacy single-role
   const legacy = await kv.get(`role:${userId}`);
-  if (legacy) return [legacy];
+  if (legacy) return gate([legacy]);
   // Fallback Clerk
   try {
     const cc = await clerkClient();
     const u = await cc.users.getUser(userId);
+    // `roles` (array, anche ruoli custom "c:…") arriva dagli inviti fatti in app;
+    // `role` è il ruolo primario predefinito (legacy / mirror di setUserRoles)
+    const clerkRoles = u?.publicMetadata?.roles;
+    if (Array.isArray(clerkRoles) && clerkRoles.length) return gate(clerkRoles.map(String));
     const clerkRole = u?.publicMetadata?.role;
-    if (clerkRole) return [clerkRole];
+    if (clerkRole) return gate([clerkRole]);
   } catch {}
   return ["operator"];
 }
@@ -205,7 +224,9 @@ export async function setUserRoles(userId, roles) {
     await kv.set(`role:${userId}`, primaryPredef);
     try {
       const cc = await clerkClient();
-      await cc.users.updateUser(userId, { publicMetadata: { role: primaryPredef } });
+      // updateUserMetadata fa MERGE: updateUser sovrascriveva tutto publicMetadata
+      // (perdendo contentPipeline, invited_by, …)
+      await cc.users.updateUserMetadata(userId, { publicMetadata: { role: primaryPredef, roles: arr } });
     } catch {}
   }
   return { userId, roles: arr };
@@ -263,7 +284,7 @@ export async function setUserRole(userId, role) {
   // Mirror su Clerk
   try {
     const cc = await clerkClient();
-    await cc.users.updateUser(userId, { publicMetadata: { role } });
+    await cc.users.updateUserMetadata(userId, { publicMetadata: { role } });
   } catch (e) {
     console.warn("clerk role mirror failed:", e?.message);
   }
@@ -347,8 +368,7 @@ export async function authorize(capability) {
   if (!userId) return { ok: false, status: 401, message: "unauthenticated" };
   const scope = await getScope(userId, capability);
   if (!scope) {
-    const role = await getUserRole(userId);
-    return { ok: false, status: 403, message: `missing capability ${capability} (role: ${role})` };
+    return { ok: false, status: 403, message: "Non hai il permesso per questa azione" };
   }
   const role = await getUserRole(userId);
   return { ok: true, userId, role, scope };
@@ -361,11 +381,34 @@ export async function authorize(capability) {
  * team-filtered si implementa il filtro nell'endpoint, non si allarga lo
  * scope qui. (Gating pass lug 2026, pre-onboarding CM pilota.)
  */
+/**
+ * Solo admin veri (env / Clerk role=admin / admins:set), a prescindere dalle
+ * capability. Per le azioni che creano poteri: nominare admin, assegnare
+ * ruoli, creare ruoli custom. Prima bastava ACCESS_MGMT, che un ruolo custom
+ * può concedere → chi lo riceveva poteva darsi admin da solo (audit set 2026).
+ */
+export async function authorizeAdmin() {
+  const { userId } = await auth();
+  if (!userId) return { ok: false, status: 401, message: "unauthenticated" };
+  if (!(await isUserIdAdmin(userId).catch(() => false))) {
+    return { ok: false, status: 403, message: "Serve un admin" };
+  }
+  return { ok: true, userId, role: "admin", scope: "all" };
+}
+
+/** Registro dei cambi di accesso (chi ha dato cosa a chi). Cap 1000. */
+export async function auditAccess(actorId, action, detail = {}) {
+  try {
+    await kv.lpush("audit:access", JSON.stringify({ at: Date.now(), actor: actorId, action, ...detail }));
+    await kv.ltrim("audit:access", 0, 999);
+  } catch {}
+}
+
 export async function authorizeAll(capability) {
   const az = await authorize(capability);
   if (!az.ok) return az;
   if (az.scope !== "all") {
-    return { ok: false, status: 403, message: `capability ${capability} richiede scope "all" (role: ${az.role}, scope: ${az.scope})` };
+    return { ok: false, status: 403, message: "Non hai il permesso per questa azione" };
   }
   return az;
 }

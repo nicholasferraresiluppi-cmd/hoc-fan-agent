@@ -17,15 +17,19 @@ import {
   X, ChevronLeft, ChevronRight, Target, Activity, Users, Award,
   Calculator, ArrowRight, Sparkles,
 } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { CP, FONTS, alpha } from "@/lib/brand";
+import { tierLabel } from "@/lib/tier-label";
 
+// Fasce dello score Vendite: soglie FISSE sullo score (tierFromPercentile in
+// creator-aggregates.js), nomi italiani (26/09). Prima diceva "Elite = sempre il
+// top 10%", falso: sono soglie sullo score, non quote fisse di persone.
 const TIER_BADGES = [
-  { tier: "Elite",    range: "top 10%",  color: "#A855F7" },
-  { tier: "Strong",   range: "top 25%",  color: "#3B82F6" },
-  { tier: "Good",     range: "top 50%",  color: "#10B981" },
-  { tier: "Average",  range: "top 75%",  color: "#9CA3AF" },
-  { tier: "Weak",     range: "top 90%",  color: "#F59E0B" },
-  { tier: "Critical", range: "bottom 10%", color: "#EF4444" },
+  { tier: "Elite",    range: "90–100" },
+  { tier: "Strong",   range: "75–89" },
+  { tier: "Good",     range: "50–74" },
+  { tier: "Average",  range: "25–49" },
+  { tier: "Weak",     range: "10–24" },
+  { tier: "Critical", range: "0–9" },
 ];
 
 const STEPS = [
@@ -56,7 +60,7 @@ const STEPS = [
           </div>
         </div>
         <p style={p}>
-          Le due risposte vengono <b>combinate</b> per evitare distorsioni: chi è top di un team debole non vince "Elite" se in assoluto è mediocre.
+          Le due risposte vengono <b>combinate</b> per evitare distorsioni: chi è top di un team debole non arriva a «Eccellente» se in assoluto è mediocre.
         </p>
       </div>
     ),
@@ -130,29 +134,29 @@ const STEPS = [
               <td style={td}>Top di creator piccola</td>
               <td style={td}>95</td>
               <td style={td}>30</td>
-              <td style={{ ...td, color: "#10B981", fontWeight: 700 }}>76</td>
+              <td style={{ ...td, color: CP.textPrimary, fontWeight: 500 }}>76</td>
               <td style={td}>Bravo lì, ma medio in assoluto</td>
             </tr>
             <tr>
               <td style={td}>Medio su creator forte</td>
               <td style={td}>50</td>
               <td style={td}>90</td>
-              <td style={{ ...td, color: "#10B981", fontWeight: 700 }}>62</td>
+              <td style={{ ...td, color: CP.textPrimary, fontWeight: 500 }}>62</td>
               <td style={td}>Vende molto in assoluto</td>
             </tr>
             <tr>
               <td style={td}>Top su creator forte</td>
               <td style={td}>95</td>
               <td style={td}>90</td>
-              <td style={{ ...td, color: "#A855F7", fontWeight: 700 }}>94</td>
-              <td style={td}>Elite vero, top ovunque</td>
+              <td style={{ ...td, color: CP.accentGreen, fontWeight: 500 }}>94</td>
+              <td style={td}>«Eccellente» vero, in alto ovunque</td>
             </tr>
             <tr>
               <td style={td}>Bottom su creator debole</td>
               <td style={td}>10</td>
               <td style={td}>15</td>
-              <td style={{ ...td, color: "#EF4444", fontWeight: 700 }}>11</td>
-              <td style={td}>Critical reale</td>
+              <td style={{ ...td, color: CP.textPrimary, fontWeight: 500 }}>11</td>
+              <td style={td}>«Da costruire» reale</td>
             </tr>
           </tbody>
         </table>
@@ -161,24 +165,24 @@ const STEPS = [
   },
   {
     id: "tiers",
-    title: "I 6 tier di classificazione",
+    title: "Le 6 fasce",
     icon: Award,
     accent: CP.accent,
     body: () => (
       <div>
         <p style={p}>
-          I tier sono <b>percentile-based</b>: gli "Elite" sono sempre il top 10% (non una soglia hardcoded). Stabili nel tempo, calibrati sui tuoi dati reali del mese.
+          Le fasce sono soglie fisse sullo score: per esempio da 90 in su si è nella fascia «Eccellente». Lo score è fatto di confronti con i colleghi, ricalcolati ogni mese: per questo le fasce mantengono lo stesso significato anche se le vendite dell&apos;agenzia salgono o scendono.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginTop: 16 }}>
           {TIER_BADGES.map((t) => (
             <div key={t.tier} style={{
               display: "flex", alignItems: "center", gap: 10,
               padding: "10px 14px",
-              background: `${t.color}15`, border: `1px solid ${t.color}55`,
+              background: CP.surfaceAlt, border: `1px solid ${CP.border}`,
               borderRadius: 10,
             }}>
-              <span style={{ padding: "3px 10px", background: t.color, color: "#0a0a0a", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: "0.04em" }}>
-                {t.tier.toUpperCase()}
+              <span style={{ fontSize: 13, fontWeight: 500, color: CP.textPrimary }}>
+                {tierLabel(t.tier)}
               </span>
               <span style={{ fontSize: 12, color: CP.textSecondary }}>{t.range}</span>
             </div>
@@ -209,7 +213,7 @@ const STEPS = [
           Le creator dove l'operatore vende di più <b>pesano di più</b>. Effetto pratico:
         </p>
         <ul style={{ color: CP.textSecondary, fontSize: 13, lineHeight: 1.7, paddingLeft: 20 }}>
-          <li>Non puoi essere <span style={{ color: "#A855F7", fontWeight: 700 }}>Elite</span> a Sales CP se sei mediocre sulle creator dove fai il 70% del fatturato.</li>
+          <li>Non puoi essere <b>«Eccellente»</b> nello score Vendite se vai male sulle creator dove passi la maggior parte dei turni.</li>
           <li>Le creator marginali (1-2 shift, sales bassissime) contano poco.</li>
           <li>Coerenza garantita tra le viste Sales CP e Creator.</li>
         </ul>
@@ -283,8 +287,8 @@ export default function ScoreTutorialModal({ onClose }) {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{
               width: 36, height: 36, borderRadius: 10,
-              background: `${current.accent}22`,
-              border: `1px solid ${current.accent}66`,
+              background: `${alpha(current.accent, "22")}`,
+              border: `1px solid ${alpha(current.accent, "66")}`,
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               <Icon size={18} color={current.accent} strokeWidth={2} />
@@ -355,16 +359,16 @@ export default function ScoreTutorialModal({ onClose }) {
 const p = { color: CP.textSecondary, fontSize: 14, lineHeight: 1.55, margin: "0 0 12px 0" };
 const closeBtn = { background: "transparent", border: `1px solid ${CP.border}`, color: CP.textSecondary, borderRadius: 8, cursor: "pointer", padding: 6, display: "flex", alignItems: "center", justifyContent: "center" };
 const navBtn = { padding: "8px 14px", background: CP.surfaceAlt, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontFamily: FONTS.body };
-const miniCard = (col) => ({ padding: "14px 16px", background: `${col}10`, border: `1px solid ${col}44`, borderRadius: 10 });
+const miniCard = (col) => ({ padding: "14px 16px", background: `${alpha(col, "10")}`, border: `1px solid ${alpha(col, "44")}`, borderRadius: 10 });
 const miniHeader = { display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: CP.textSecondary, marginBottom: 6, fontFamily: FONTS.mono };
 const miniBody = { fontSize: 13, color: CP.textPrimary, margin: 0, lineHeight: 1.5 };
 const formulaBlock = { padding: "18px 16px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12 };
 const formulaLine = { display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap", fontFamily: FONTS.mono, fontSize: 13 };
 const kpi = { padding: "5px 10px", background: CP.surfaceAlt, border: `1px solid ${CP.border}`, borderRadius: 6, color: CP.textPrimary, fontWeight: 600 };
-const weight = { padding: "5px 8px", background: CP.accentGreen + "22", color: CP.accentGreen, borderRadius: 6, fontWeight: 700 };
+const weight = { padding: "5px 8px", background: alpha(CP.accentGreen, "22"), color: CP.accentGreen, borderRadius: 6, fontWeight: 700 };
 const op = { color: CP.textMuted, fontSize: 14 };
 const pillBlue = { padding: "5px 10px", background: CP.accentSoft, color: CP.accentSoftText, border: `1px solid ${CP.accentDim}`, borderRadius: 6, fontWeight: 600 };
-const pillGreen = { padding: "5px 10px", background: CP.accentGreen + "22", color: CP.accentGreen, border: `1px solid ${CP.accentGreen}44`, borderRadius: 6, fontWeight: 600 };
+const pillGreen = { padding: "5px 10px", background: alpha(CP.accentGreen, "22"), color: CP.accentGreen, border: `1px solid ${alpha(CP.accentGreen, "44")}`, borderRadius: 6, fontWeight: 600 };
 const tbl = { width: "100%", borderCollapse: "collapse", fontSize: 12, marginTop: 14, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, overflow: "hidden" };
 const th = { padding: "9px 10px", textAlign: "left", color: CP.textMuted, fontSize: 10, letterSpacing: "0.08em", borderBottom: `1px solid ${CP.borderStrong}`, fontFamily: FONTS.mono, fontWeight: 700 };
 const td = { padding: "10px", borderBottom: `1px solid ${CP.border}`, color: CP.textPrimary, fontFamily: FONTS.mono, fontSize: 12 };

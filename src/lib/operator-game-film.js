@@ -23,7 +23,8 @@
 
 import { kv } from "@vercel/kv";
 import { bqQuery, bigQueryConfigured, HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
-import { fanAlias } from "@/lib/academy-tapes";
+import { fanAlias, fanHmac } from "@/lib/academy-tapes";
+import { upsertFromFilm } from "@/lib/film-library";
 import {
   GAME_FILM_VERSION,
   classifyMoments,
@@ -57,7 +58,34 @@ function sqlStr(s) {
 // codice, non solo nei commenti — con creator_id accanto, l'id grezzo sarebbe
 // joinabile a qualsiasi tabella fan-level e l'HMAC diventerebbe decorativo).
 function safeKey(m) {
-  return `${m.shift_id}:${fanAlias(m.creator_id, m.user_id)}`;
+  // 12 hex (48 bit) di HMAC: id PERSISTENTE del registro giudizi — i 4 hex
+  // dell'alias display colliderebbero tra fan dello stesso turno (16 bit).
+  return `${m.shift_id}:${fanHmac(m.creator_id, m.user_id).slice(0, 12)}`;
+}
+
+// Meta per la LIBRERIA persistente (film-library): tutti i momenti classificati,
+// non solo i top del payload. Porta user_id e finestra turno per il transcript
+// on-demand — SOLO record server-side, mai in risposta (stripMomentMeta).
+function toLibMeta(m) {
+  return {
+    key: safeKey(m),
+    film_version: GAME_FILM_VERSION, // soglie con cui è stato classificato (bump → il momento resta leggibile per ciò che era)
+    kind: m.kind,
+    reason: m.reason || null,
+    day: m.day,
+    creator_id: m.creator_id,
+    shift_id: m.shift_id,
+    shift_start: Number(m.shift_start),
+    shift_end: Number(m.shift_end),
+    user_id: m.user_id,
+    fan: fanAlias(m.creator_id, m.user_id),
+    fan_msgs: Number(m.fan_msgs) || 0,
+    op_msgs: Number(m.op_msgs) || 0,
+    ppv_sent: Number(m.ppv_sent) || 0,
+    max_ppv: m.max_ppv == null ? null : Number(m.max_ppv),
+    bought: Number(m.bought) || 0,
+    buys: Array.isArray(m.buys) ? m.buys.map((b) => ({ ts: Number(b.ts), amount: Number(b.amount) })) : [],
+  };
 }
 
 // Feature per-(turno,fan) sui turni SINGOLI dell'operatore + acquisti in finestra.
@@ -198,6 +226,16 @@ export async function getOperatorGameFilm({ operator, days, maxWins, maxLosses, 
 
   const shiftIds = new Set(rows.map((r) => r.shift_id));
   const { wins, losses } = classifyMoments(rows);
+
+  // LIBRERIA: accumula TUTTI i momenti classificati (id stabili, giudizi
+  // preservati dal merge) — è ciò che rende raggiungibili anche i momenti
+  // fuori dal top del payload. Best-effort: mai fatale per il film.
+  try {
+    await upsertFromFilm(op, [...wins, ...losses].map(toLibMeta));
+  } catch {
+    /* la libreria non deve mai rompere il film */
+  }
+
   const selWins = wins.slice(0, nWins);
   const selLosses = losses.slice(0, nLosses);
   // le gemelle si accoppiano SOLO tra le vinte selezionate: twin_key deve
@@ -236,6 +274,49 @@ export async function getOperatorGameFilm({ operator, days, maxWins, maxLosses, 
   };
   if (usingDefaults) await kv.set(cacheKey(op, nDays), payload, { ex: CACHE_TTL });
   return { ...payload, cached: false };
+}
+
+/**
+ * Transcript on-demand di UN momento della libreria (per i momenti fuori dal
+ * top del payload: "come arrivo alle altre 22"). Una query sola, finestra del
+ * turno di quel fan. Ritorna la card nello stesso formato di toMoment (mai
+ * user_id in risposta). `meta` viene dalla libreria (record server-side).
+ */
+export async function getMomentCard(meta) {
+  if (!meta || !meta.creator_id || !meta.user_id || !Number.isFinite(Number(meta.shift_start))) {
+    throw new Error("Momento senza dati sufficienti per il transcript");
+  }
+  const org = HOC_ORGANIZATION_ID;
+  const D = DATA();
+  const sql = `
+SELECT UNIX_MILLIS(created_at) AS ts,
+  IF(sender_id = creator_id, 'op', 'fan') AS who,
+  CAST(price AS FLOAT64) AS price, SUBSTR(text, 1, 400) AS text
+FROM \`${D}.onlyfans.chat\`
+WHERE creator_id = ${Number(meta.creator_id)}
+  AND organization_id = '${org}'
+  AND user_id = ${Number(meta.user_id)}
+  AND created_at BETWEEN TIMESTAMP_MILLIS(${Number(meta.shift_start)}) AND TIMESTAMP_MILLIS(${Number(meta.shift_end)})
+ORDER BY created_at`;
+  const { rows } = await bqQuery(sql, { maxBytesBilled: CAP });
+  const transcript = (rows || []).map((m) => ({ at: Number(m.ts), who: m.who, price: m.price, text: m.text }));
+  return toMoment(
+    {
+      shift_id: meta.shift_id,
+      creator_id: meta.creator_id,
+      user_id: meta.user_id,
+      day: meta.day,
+      fan_msgs: meta.fan_msgs,
+      op_msgs: meta.op_msgs,
+      ppv_sent: meta.ppv_sent,
+      max_ppv: meta.max_ppv,
+      bought: meta.bought,
+      buys: meta.buys,
+      reason: meta.reason || null,
+    },
+    transcript,
+    meta.kind
+  );
 }
 
 export { bigQueryConfigured, GAME_FILM_VERSION };

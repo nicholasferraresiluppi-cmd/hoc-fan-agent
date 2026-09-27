@@ -22,7 +22,7 @@ import { isCronAuthorized } from "@/lib/cron-auth";
 
 export const maxDuration = 30;
 
-const APP_URL = "https://hoc-fan-agent.vercel.app";
+const APP_URL = "https://houseofcreators.app";
 
 // Auth cron centralizzata in lib/cron-auth (fix 20 lug 2026: i path cron sono
 // ora pubblici nel middleware → l'header x-vercel-cron da solo non è più prova
@@ -104,5 +104,8 @@ export async function POST(request) {
 }
 
 export async function GET(request) {
+  // GET solo per il cron (Bearer): con la sessione basta un link cliccato
+  // da un admin per far partire il lavoro (CSRF). La UI usa POST.
+  if (!isCronAuthorized(request)) return Response.json({ error: "unauthorized" }, { status: 401 });
   return POST(request);
 }

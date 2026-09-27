@@ -207,12 +207,13 @@ export function aggregateByEmployeeGroup(records) {
   });
 }
 
-export function calculateGroupAverages(records) {
+export function calculateGroupAverages(records, keyOf = (r) => r.group) {
   const eligible = records.filter((r) => !r.is_mass);
   const byGroup = new Map();
   for (const r of eligible) {
-    if (!byGroup.has(r.group)) byGroup.set(r.group, []);
-    byGroup.get(r.group).push(r);
+    const key = keyOf(r);
+    if (!byGroup.has(key)) byGroup.set(key, []);
+    byGroup.get(key).push(r);
   }
   const out = {};
   const kpiKeys = [
@@ -261,6 +262,23 @@ export function calculateScores(records, mode = "withoutClockIn", settings = {},
   }
   const groupAvg = calculateGroupAverages(records);
 
+  // v13 (25/09/2026, approvato da Nicholas — docs/CAREER_LADDER.md v0.6, "C1"):
+  // gruppi PICCOLI → confronto con la media degli operatori della stessa LINGUA.
+  // Con 1-4 colleghi il confronto era rumore (ago 2026: Andrea Terranova 27,6
+  // confrontato con 2 persone sulla creator migliore; Andrei HOC 83,6 in un
+  // gruppo di 3). Opzionale: attiva SOLO se settings.small_group.min_size è
+  // impostato (formula pubblicata dalle bozze con backtest). Limite dichiarato:
+  // per queste persone rientra un po' di effetto creator (la lingua non
+  // neutralizza la creator come il gruppo). Lingua = override KV group_languages
+  // (settings.group_languages, runtime) o detectLanguage del nome gruppo.
+  const smallMin = Number(settings.small_group?.min_size) || 0;
+  let langAvg = null;
+  const langOf = (g) => settings.group_languages?.[g] || detectLanguage(g) || "_all";
+  if (smallMin > 1) {
+    langAvg = calculateGroupAverages(records, (r) => langOf(r.group));
+    langAvg._all = calculateGroupAverages(records, () => "_all")._all;
+  }
+
   const scored = records.map((r) => {
     const manual = r.employee ? manualExclusions[r.employee] : null;
     if (manual) {
@@ -269,7 +287,12 @@ export function calculateScores(records, mode = "withoutClockIn", settings = {},
     if (r.is_mass) {
       return { ...r, score: null, tier: null, _excluded_reason: "mass_account" };
     }
-    const groupMeans = groupAvg[r.group];
+    let groupMeans = groupAvg[r.group];
+    let comparison = "group";
+    if (langAvg && groupMeans && groupMeans._count < smallMin) {
+      groupMeans = langAvg[langOf(r.group)] || langAvg._all;
+      comparison = "language";
+    }
     if (!groupMeans) {
       return { ...r, score: 0, tier: assignTier(0, tiers), _excluded_reason: "no_group_data" };
     }
@@ -295,6 +318,7 @@ export function calculateScores(records, mode = "withoutClockIn", settings = {},
       tier: assignTier(score, tiers),
       points_breakdown: points,
       group_means: groupMeans,
+      ...(comparison === "language" ? { comparison, group_size: groupAvg[r.group]?._count ?? null } : {}),
     };
   });
 

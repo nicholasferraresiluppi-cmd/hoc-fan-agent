@@ -18,6 +18,7 @@
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { fetchWages } from "@/lib/creatorspro-api";
+import { getWages } from "@/lib/cp-wages-store";
 
 function norm(s) { return String(s || "").trim().toLowerCase(); }
 function containsCI(haystack, needle) {
@@ -37,7 +38,7 @@ export async function GET(request) {
   const [mapping, members, wages, infloww] = await Promise.all([
     kv.get("cp:member_mapping"),
     kv.get("cp:members"),
-    kv.get(`cp:wages:${period_id}`),
+    getWages(period_id),
     kv.get(`ops_kpi:monthly:${period_id}`),
   ]);
   const mappingObj = mapping || {};

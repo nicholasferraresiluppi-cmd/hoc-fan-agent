@@ -18,6 +18,7 @@
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { fetchWageDetail } from "@/lib/creatorspro-api";
+import { getWages } from "@/lib/cp-wages-store";
 
 export const maxDuration = 60;
 
@@ -70,7 +71,7 @@ export async function GET(request) {
 
   try {
     // 1. Wages normalizzate del mese da KV (percorso provato del sync)
-    const wages = (await kv.get(`cp:wages:${periodId}`)) || [];
+    const wages = (await getWages(periodId)) || [];
     if (!Array.isArray(wages) || wages.length === 0) {
       return Response.json({
         error: `Nessuna wage in KV per ${periodId}. Il mese è stato sincronizzato? Vai su /admin/wage-audit.`,

@@ -43,14 +43,16 @@ const BATCH_SIZE = 30;
 // Un mese pieno: ~10 link di prepare + ~25-30 batch (2-5 per tick) + code.
 const MAX_CHAIN = 60;
 
-function targets() {
+// Mese corrente + precedente nei primi 3 giorni (chiusura), OPPURE finché il
+// precedente non ha mai completato un giro: se la catena è rimasta ferma per un
+// mese intero (lug→set 2026) quel mese non si recupererebbe più da solo.
+async function targets() {
   const now = new Date();
   const cur = now.toISOString().slice(0, 7);
   const out = [cur];
-  if (now.getUTCDate() <= 3) {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-    out.push(d.toISOString().slice(0, 7));
-  }
+  const prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)).toISOString().slice(0, 7);
+  const prevProg = await kv.get(progKey(prev)).catch(() => null);
+  if (now.getUTCDate() <= 3 || prevProg?.phase !== "done") out.push(prev);
   return out;
 }
 
@@ -115,7 +117,9 @@ async function tickPeriod(period, chain) {
     }
     return { action: "step", period, phase: prog.phase, page: prog.page, offset: prog.offset };
   } catch (e) {
-    const msg = String(e?.message || e);
+    // Tronco: l'errore Upstash "max request size" riporta il COMANDO intero
+    // (MB di JSON) → salvarlo nel progress faceva esplodere anche quello.
+    const msg = String(e?.message || e).slice(0, 500);
     // Stato dell'orchestrazione scaduto (TTL 6h): riparti pulito al prossimo
     // tick invece di ribattere per sempre sulla stessa fase.
     if (/Nessuno stato sync/i.test(msg)) prog = { phase: "refdata", page: 1, offset: 0, repair_rounds: 0, started_at: Date.now(), updated_at: 0 };
@@ -126,7 +130,7 @@ async function tickPeriod(period, chain) {
 }
 
 async function tick(chain) {
-  for (const period of targets()) {
+  for (const period of await targets()) {
     const out = await tickPeriod(period, chain);
     if (out) return out; // primo periodo con lavoro (o skip/errore); i freschi si saltano
   }
@@ -160,5 +164,8 @@ export async function POST(request) {
 }
 
 export async function GET(request) {
+  // GET solo per il cron (Bearer): con la sessione basta un link cliccato
+  // da un admin per far partire il lavoro (CSRF). La UI usa POST.
+  if (!isCronAuthorized(request)) return Response.json({ error: "unauthorized" }, { status: 401 });
   return POST(request);
 }

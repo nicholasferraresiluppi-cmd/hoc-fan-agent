@@ -20,25 +20,29 @@ import { loadHistoryForEmployee } from "@/lib/leaderboard-history";
 import { listReviewsForEmployee, qaStatusForGate } from "@/lib/qa-reviews";
 import { getUserCertifications } from "@/lib/certifications";
 
-const TIER_ORDER = ["Critical", "Weak", "Average", "Good", "Strong", "Elite"];
-const rank = (tier) => TIER_ORDER.indexOf(tier);
-
-/** Valuta "tier >= minTier in almeno needed degli ultimi window mesi valutabili". */
-function evalGate(history, { minTier, needed, window, noCritical = false }) {
-  const usable = history.filter((h) => h.tier).slice(0, window); // history è desc
-  const hits = usable.filter((h) => rank(h.tier) >= rank(minTier)).length;
-  const criticals = usable.filter((h) => h.tier === "Critical").length;
-  const months = usable.map((h) => ({ period_id: h.period_id, tier: h.tier, counts: rank(h.tier) >= rank(minTier) }));
+// Gate in NUMERI (v0.6, 25/09/2026): le fasce sono state rinominate sulla
+// distribuzione reale, i gate NO — sono gli stessi valori di prima scritti come
+// score (Average v11 = 61, Good v11 = 71, "nessun Critical" v11 = mai sotto 51),
+// quindi passano esattamente le stesse persone.
+/** "score ≥ minScore in almeno needed degli ultimi window mesi valutabili (e mai sotto floor)". */
+function evalGate(history, { minScore, needed, window, floor = null }) {
+  const usable = history.filter((h) => typeof h.score === "number").slice(0, window); // history è desc
+  const hits = usable.filter((h) => h.score >= minScore).length;
+  const belowFloor = floor == null ? 0 : usable.filter((h) => h.score < floor).length;
+  const months = usable.map((h) => ({ period_id: h.period_id, tier: h.tier, score: h.score, counts: h.score >= minScore, below_floor: floor != null && h.score < floor }));
   const evaluable = usable.length >= Math.min(needed, window);
-  const passedPerf = evaluable && hits >= needed && (!noCritical || criticals === 0);
+  const passedPerf = evaluable && hits >= needed && belowFloor === 0;
   return {
-    requirement: `tier ≥ ${minTier} in ${needed} degli ultimi ${window} mesi${noCritical ? ", nessun mese Critical" : ""}`,
+    requirement: `score mestiere ≥ ${minScore} in ${needed} degli ultimi ${window} mesi${floor != null ? `, mai sotto ${floor}` : ""}`,
+    // soglie in numeri per la pagina (solo lettura: la regola resta quella sopra)
+    min_score: minScore,
+    floor,
     evaluable,
     months_available: usable.length,
     hits,
     needed,
     window,
-    criticals,
+    below_floor: belowFloor,
     performance_met: passedPerf,
     months,
   };
@@ -62,7 +66,14 @@ export async function GET() {
     // I gate valutano gli ULTIMI mesi di CALENDARIO: ordina per period_id desc
     // (la lib segue l'ordine di import, non cronologico).
     history = (h || [])
-      .map((x) => ({ period_id: x.period_id, score: x.score, tier: x.tier }))
+      // Mese non lavorato (tutti i KPI a zero → "inattivo", o escluso dal calcolo)
+      // = dato mancante, non un mese andato male: fuori dai gate. Prima entrava
+      // come score 0 "Critical" e contava come "sotto il minimo" (pannello 26/09:
+      // il mese di assunzione di un'operatrice nuova appariva in rosso).
+      // Stessa regola non punitiva del motore di progresso (operator-progress).
+      .map((x) => (x.inactive || x.excluded_reason
+        ? { period_id: x.period_id, score: null, tier: null, no_data: true }
+        : { period_id: x.period_id, score: x.score, tier: x.tier }))
       .sort((a, b) => String(b.period_id).localeCompare(String(a.period_id)));
   } catch {}
 
@@ -112,23 +123,23 @@ export async function GET() {
     {
       id: "L1_L2",
       label: "Sales Operator I → II",
-      time_floor: "≥ 6 mesi in L1",
-      performance: evalGate(history, { minTier: "Average", needed: 3, window: 4, noCritical: true }),
+      time_floor: "almeno 6 mesi nel livello I",
+      performance: evalGate(history, { minScore: 61, needed: 3, window: 4, floor: 51 }),
       other_requirements: [
-        qaReq(qa3, "QA trimestrale pass"),
+        qaReq(qa3, "Controllo qualità del trimestre superato"),
         certReq,
-        { label: "Time floor (tenure nel livello)", status: "not_tracked" },
+        { label: "Tempo minimo nel livello", status: "not_tracked" },
       ],
     },
     {
       id: "L2_L3",
       label: "Sales Operator II → III (Senior)",
-      time_floor: "≥ 10 mesi in L2",
-      performance: evalGate(history, { minTier: "Good", needed: 4, window: 6 }),
+      time_floor: "almeno 10 mesi nel livello II",
+      performance: evalGate(history, { minScore: 71, needed: 4, window: 6 }),
       other_requirements: [
-        qaReq(qa6, "QA pass, zero violazioni compliance 6 mesi"),
+        qaReq(qa6, "Controllo qualità superato e nessuna violazione delle regole in 6 mesi"),
         { label: "Mentoring di ≥ 2 nuovi ingressi", status: "not_tracked" },
-        { label: "Time floor (tenure nel livello)", status: "not_tracked" },
+        { label: "Tempo minimo nel livello", status: "not_tracked" },
       ],
     },
   ];
@@ -136,7 +147,7 @@ export async function GET() {
   return Response.json({
     linked: true,
     employee: who.employee,
-    current: history[0] || null,
+    current: history.find((h) => typeof h.score === "number") || null,
     history,
     gates,
     formal_level: null, // arriverà col piazzamento data-driven (ladder, decisione #5)

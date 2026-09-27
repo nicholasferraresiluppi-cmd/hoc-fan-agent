@@ -1,5 +1,6 @@
 "use client";
 
+import { uxReportError } from "@/lib/ux-client";
 import { Component } from "react";
 
 /**
@@ -27,6 +28,7 @@ export default class ErrorBoundary extends Component {
     this.setState({ info });
     // eslint-disable-next-line no-console
     console.error("[ErrorBoundary]", error, info);
+    try { uxReportError(error); } catch {}
   }
 
   render() {

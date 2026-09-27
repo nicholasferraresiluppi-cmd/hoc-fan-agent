@@ -1,7 +1,7 @@
 import { kv } from "@vercel/kv";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { listAdmins } from "@/lib/admin";
-import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { authorize, authorizeAdmin, auditAccess, CAPABILITIES, getUserRoles, setUserRoles } from "@/lib/rbac";
 
 export async function GET() {
   const a = await authorize(CAPABILITIES.ACCESS_MGMT);
@@ -17,7 +17,7 @@ export async function GET() {
 // POST { action: "add" | "remove", userId?: string, email?: string }
 // Permette di aggiungere/rimuovere admin via userId o via email (risolta da Clerk).
 export async function POST(request) {
-  const a = await authorize(CAPABILITIES.ACCESS_MGMT);
+  const a = await authorizeAdmin();
   if (!a.ok) return Response.json({ error: a.message }, { status: a.status });
   try {
     const body = await request.json().catch(() => ({}));
@@ -41,6 +41,7 @@ export async function POST(request) {
 
     if (action === "add") {
       await kv.sadd("admins:set", targetId);
+      await auditAccess(a.userId, "admin_add", { target: targetId });
       return Response.json({ ok: true, action, userId: targetId });
     }
     if (action === "remove") {
@@ -52,20 +53,28 @@ export async function POST(request) {
         }, { status: 400 });
       }
       // Rimuovi dal set KV
+      if (targetId === a.userId) return Response.json({ error: "Non puoi rimuovere te stesso dagli admin: chiedilo a un altro admin." }, { status: 400 });
       await kv.srem("admins:set", targetId);
-      // Se ha role=admin via Clerk metadata, mostra avviso
+      await auditAccess(a.userId, "admin_remove", { target: targetId });
+      // Revoca COMPLETA (27/09/2026, Nicholas): l'admin può venire anche dai metadata Clerk
+      // (role / roles) e dai ruoli in KV. Prima si toglieva solo dal set KV e restava admin via Clerk.
+      try {
+        const roles = await getUserRoles(targetId);
+        if (roles.includes("admin")) await setUserRoles(targetId, roles.filter((r) => r !== "admin"));
+      } catch { /* ruoli KV: best-effort */ }
       try {
         const cc = await clerkClient();
         const u = await cc.users.getUser(targetId);
-        if (u?.publicMetadata?.role === "admin" || u?.privateMetadata?.role === "admin") {
-          return Response.json({
-            ok: true,
-            action,
-            userId: targetId,
-            warning: "Rimosso da KV, ma ha ancora role=admin nei metadata Clerk. Rimuovi anche da Clerk dashboard se vuoi revocare completamente.",
-          });
+        const pub = { ...(u?.publicMetadata || {}) }, priv = { ...(u?.privateMetadata || {}) };
+        let changed = false;
+        for (const m of [pub, priv]) {
+          if (m.role === "admin") { delete m.role; changed = true; }
+          if (Array.isArray(m.roles) && m.roles.includes("admin")) { m.roles = m.roles.filter((r) => r !== "admin"); changed = true; }
         }
-      } catch { /* silent */ }
+        if (changed) await cc.users.updateUserMetadata(targetId, { publicMetadata: { role: pub.role ?? null, roles: pub.roles ?? null }, privateMetadata: { role: priv.role ?? null, roles: priv.roles ?? null } });
+      } catch (e) {
+        return Response.json({ ok: true, action, userId: targetId, warning: `Tolto dagli admin di HOC Pro, ma non sono riuscito ad aggiornare Clerk (${e?.message || "errore"}): riprova.` });
+      }
       return Response.json({ ok: true, action, userId: targetId });
     }
 

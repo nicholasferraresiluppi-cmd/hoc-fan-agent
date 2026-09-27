@@ -32,6 +32,7 @@ import { fetchSocialTalentRevenue } from "@/lib/creatorspro-api";
 // Matching identità Infloww↔CP: estratto in lib condivisa (lug 2026) perché
 // serve anche all'albero payout — stessa logica qui e là, un solo posto.
 import { parseInfloww, parseCp, firstCompat, matchScore } from "@/lib/creator-match";
+import { getWages } from "@/lib/cp-wages-store";
 
 export const maxDuration = 30;
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -79,7 +80,7 @@ export async function GET(request) {
   const coveragePartial = coverageFrom > monthStart || coverageTo < expectedEnd;
 
   // ── CP: venduto per alias, SOLO shift dentro [coverageFrom, coverageTo] ──
-  const wages = await kv.get(`cp:wages:${periodId}`);
+  const wages = await getWages(periodId);
   const cpAvailable = Array.isArray(wages) && wages.length > 0;
   if (!cpAvailable) {
     return Response.json({ period_id: periodId, needs_sync: "cp", coverage_from: coverageFrom, coverage_to: coverageTo, last_sync_at: inf.last_sync_at });

@@ -224,7 +224,7 @@ export async function stepLedgerJob() {
     while (job.cursor < job.creators.length && (Date.now() - start) < STEP_BUDGET_MS) {
       const batch = job.creators.slice(job.cursor, job.cursor + CONC);
       const res = await Promise.all(batch.map((c) =>
-        syncCreatorPeriod(c, periodId, startIso, endEff).then(() => null).catch(() => c)
+        syncCreatorPeriod(c, periodId, startIso, endEff).then(() => null).catch((e) => ({ ...c, error: String(e?.message || e).slice(0, 200) }))
       ));
       const failed = res.filter(Boolean);
       if (failed.length) {

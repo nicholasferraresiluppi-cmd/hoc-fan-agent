@@ -8,7 +8,7 @@ export default function SignUpPage() {
         <div className="mb-5 flex justify-center"><BrandLockup size="lg" /></div>
         <p className="text-gray-400 mt-1">Crea il tuo account</p>
       </div>
-      <SignUp afterSignUpUrl="/" />
+      <SignUp fallbackRedirectUrl="/start" signInFallbackRedirectUrl="/start" />
     </div>
   );
 }

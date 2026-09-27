@@ -16,6 +16,7 @@
 import { kv } from "@vercel/kv";
 import { bqQuery, bigQueryConfigured, HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
 import { getCreators } from "@/lib/priority-queue";
+import { getWages } from "@/lib/cp-wages-store";
 
 const DATA = () => process.env.BIGQUERY_DATA_PROJECT || "house-of-creators-358213";
 const DAY_TTL = 1800; // 30 min: il giorno corrente cambia, i passati riusano la cache
@@ -44,7 +45,7 @@ export async function loadShiftsForDay(creatorIds, day) {
   const months = new Set([day.slice(0, 7)]);
   const prev = new Date(dayStart - 86400_000);
   months.add(prev.toISOString().slice(0, 7));
-  const wageSets = await Promise.all([...months].map((m) => kv.get(`cp:wages:${m}`)));
+  const wageSets = await Promise.all([...months].map((m) => getWages(m)));
 
   // 1) un entry per operatore×turno, con l'id turno CP per il join check-in
   const entries = [];

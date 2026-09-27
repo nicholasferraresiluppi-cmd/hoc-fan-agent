@@ -27,18 +27,27 @@ export async function GET() {
     const list = await cc.users.getUserList({ limit: 200 });
     (list?.data || []).forEach((u) => userIds.add(u.id));
   } catch {}
-  const ids = Array.from(userIds);
+  const allIds = Array.from(userIds);
 
+  // Solo utenti che ESISTONO su Clerk production (26/09): lb:overall conserva anche
+  // id della vecchia installazione (pre-migrazione) → comparivano come "doppioni".
+  // A parità di nome si mostra anche l'email, così due account veri si distinguono.
   let nameMap = {};
+  let emailMap = {};
   try {
     const cc = await clerkClient();
-    if (ids.length) {
-      const list = await cc.users.getUserList({ userId: ids.slice(0, 100), limit: 100 });
+    for (let i = 0; i < allIds.length; i += 100) {
+      const list = await cc.users.getUserList({ userId: allIds.slice(i, i + 100), limit: 100 });
       (list?.data || []).forEach((u) => {
         nameMap[u.id] = [u.firstName, u.lastName].filter(Boolean).join(" ") || u.emailAddresses?.[0]?.emailAddress || u.id;
+        emailMap[u.id] = u.emailAddresses?.find((e) => e.id === u.primaryEmailAddressId)?.emailAddress || u.emailAddresses?.[0]?.emailAddress || null;
       });
     }
   } catch {}
+  const ids = allIds.filter((id) => nameMap[id]);
+  const nameCount = {};
+  for (const id of ids) nameCount[nameMap[id]] = (nameCount[nameMap[id]] || 0) + 1;
+  for (const id of ids) if (nameCount[nameMap[id]] > 1 && emailMap[id]) nameMap[id] = `${nameMap[id]} (${emailMap[id]})`;
 
   const enriched = await Promise.all(
     ids.map(async (uid) => ({

@@ -11,7 +11,9 @@
  */
 import { kv } from "@vercel/kv";
 import { resolveEmployeeForUser, findLatestWagePeriod, findOwnRecord } from "@/lib/me";
-import { calcCumulativeEarning } from "@/lib/wage-calc";
+import { calcTierEarning } from "@/lib/wage-calc";
+import { getWages } from "@/lib/cp-wages-store";
+import { startedShifts } from "@/lib/creatorspro-data";
 
 export async function GET(request) {
   const who = await resolveEmployeeForUser();
@@ -31,25 +33,30 @@ export async function GET(request) {
 
   let wages = [];
   try {
-    wages = (await kv.get(`cp:wages:${periodId}`)) || [];
+    wages = (await getWages(periodId)) || [];
   } catch {}
   const mine = findOwnRecord(wages, who.employee, "member_name");
   if (!mine) {
     return Response.json({ linked: true, employee: who.employee, period_id: periodId, reason: "not_in_period" });
   }
 
-  const shifts = (mine.shifts || [])
+  // Solo turni già iniziati: CP mette in calendario anche quelli futuri, a $0
+  // (a set 2026 l'operatore vedeva "27 set · venduto $0" e il conteggio turni gonfiato).
+  const shifts = startedShifts(mine.shifts)
     .map((s) => {
       const sold = Number(s.total_attributed) || 0;
-      const calc = calcCumulativeEarning(sold, s.thresholds || []);
+      // regola CP verificata sui dati: scaglione raggiunto su TUTTO il venduto del turno (28/09/2026)
+      const calc = calcTierEarning(sold, s.thresholds || []);
+      const earned = Number(s.total_earnings) || 0;
       return {
         started_at: s.started_at || null,
         ended_at: s.ended_at || null,
         worked_hours: s.worked_hours ?? null,
         creators: s.creator_aliases || [],
         sold,
-        earned: Number(s.total_earnings) || 0,
-        effective_pct: calc.effective_pct,
+        earned,
+        // quota VERA (pagato/venduto), non una ricostruzione: deve tornare coi conti dell'operatore
+        effective_pct: sold > 0 ? earned / sold : calc.effective_pct,
         profile: s.payment_profile ? { name: s.payment_profile.name, cosellers: s.payment_profile.cosellers_count ?? null } : null,
         thresholds: (s.thresholds || []).map((t) => ({ from: t.threshold ?? 0, pct: t.percentage ?? 0 })),
         breakdown: calc.breakdown,
@@ -65,7 +72,7 @@ export async function GET(request) {
       wage: Number(mine.total_wage) || 0,
       from_takes: Number(mine.total_earnings_from_takes) || 0,
       from_hours: Number(mine.total_earnings_from_hours) || 0,
-      shifts: mine.total_worked_shifts ?? shifts.length,
+      shifts: shifts.length,
       hours: mine.total_worked_hours ?? null,
     },
     shifts,

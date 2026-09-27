@@ -27,8 +27,10 @@ const SNAP_INDEX = "ops_kpi:score_snapshots";
  * dall'ordine delle chiavi. Serve solo come etichetta e per il confronto drift,
  * non per sicurezza — djb2, nessuna dipendenza crypto (edge-safe).
  */
-export function configHash({ weights, thresholds, tiers }) {
-  const stable = canonical({ weights, thresholds, tiers });
+export function configHash({ weights, thresholds, tiers, small_group }) {
+  // small_group entra nell'impronta SOLO se attivo: le formule senza la regola
+  // mantengono lo stesso hash di prima (niente falsi "drift" sui mesi passati).
+  const stable = canonical(small_group?.min_size ? { weights, thresholds, tiers, small_group } : { weights, thresholds, tiers });
   let h = 5381;
   for (let i = 0; i < stable.length; i++) {
     h = ((h << 5) + h + stable.charCodeAt(i)) & 0xffffffff;

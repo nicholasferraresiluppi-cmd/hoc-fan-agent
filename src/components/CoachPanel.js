@@ -21,7 +21,7 @@
  *   />
  */
 import { useEffect, useRef, useState } from "react";
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, alpha } from "@/lib/brand";
 
 const DEBOUNCE_MS = 2000;
 // Soglia di "novità" della bozza: se la bozza è cambiata oltre questa soglia
@@ -66,7 +66,7 @@ function ScoreCircle({ value }) {
         width: 64,
         height: 64,
         borderRadius: "50%",
-        background: `${color}25`,
+        background: `${alpha(color, "25")}`,
         border: `3px solid ${color}`,
         display: "flex",
         alignItems: "center",
@@ -223,7 +223,7 @@ export default function CoachPanel({
     },
     title: { fontSize: 12, color: COLORS.fog, letterSpacing: "0.06em", fontWeight: 600 },
     pauseBtn: {
-      background: paused ? COLORS.signal + "20" : COLORS.charcoal,
+      background: paused ? alpha(COLORS.signal, "20") : COLORS.charcoal,
       color: paused ? COLORS.signal : COLORS.fog,
       border: `1px solid ${paused ? COLORS.signal : COLORS.charcoal}`,
       borderRadius: 6,

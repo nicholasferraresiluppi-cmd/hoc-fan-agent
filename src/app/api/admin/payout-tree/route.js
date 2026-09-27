@@ -11,18 +11,20 @@
  * dichiara la confidenza per ogni riga. Dati denaro di tutti gli operatori →
  * authorizeAll(SCORES_VIEW), stessa classe delle route leaderboard denaro.
  */
+import { authorizeAllCreators } from "@/lib/creator-scope";
 import { kv } from "@vercel/kv";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { buildAliasIndex } from "@/lib/creator-match";
 import { getLedgerMeta, getLedgerPeriods, getLedgerActivity, readLedgerTxns, readRefunds } from "@/lib/payout-ledger";
 import { matchOperatorPeriod } from "@/lib/payout-match";
+import { getWages } from "@/lib/cp-wages-store";
 
 export const maxDuration = 30;
 
 const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[^a-z0-9]/g, "");
 
 export async function GET(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);
@@ -33,7 +35,7 @@ export async function GET(request) {
   }
 
   const [wages, ledgerMeta] = await Promise.all([
-    kv.get(`cp:wages:${periodId}`),
+    getWages(periodId),
     getLedgerMeta(periodId),
   ]);
   if (!Array.isArray(wages) || wages.length === 0) {

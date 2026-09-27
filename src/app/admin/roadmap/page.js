@@ -7,21 +7,28 @@
  * placeholder in navigazione (regola anti-polverone). Quattro colonne:
  * in corso / prossime / più avanti / parcheggiate (con gate esplicito).
  * Admin-only: il contenuto è strategia interna di prodotto.
+ *
+ * Ridisegno 26/09/2026 (design system): testata DS; le voci "in corso" ferme da
+ * più di 30 giorni lo dicono ("ferma da N giorni: è ancora in corso?"), perché
+ * una roadmap vecchia racconta un piano che non c'è più; etichette d'area
+ * neutre (l'accento viola resta al tasto principale). API e azioni invariate.
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import useSWR from "swr";
 import {
-  Signpost, Plus, Trash2, ExternalLink, Pencil, Lock, X,
+  Plus, Trash2, ExternalLink, Pencil, Lock, X,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { SectionLabel } from "@/components/cp-style";
+import { PageHead, Notice, NUM } from "@/components/ds";
 
 const COLUMNS = [
   { key: "now",    label: "In corso",     hint: "Ci stiamo lavorando adesso" },
   { key: "next",   label: "Prossime",     hint: "Le prossime in coda" },
   { key: "later",  label: "Più avanti",   hint: "Decise ma non urgenti" },
-  { key: "parked", label: "Parcheggiate", hint: "Ferme dietro un gate esplicito" },
+  { key: "parked", label: "Parcheggiate", hint: "Ferme finché non succede una cosa precisa" },
 ];
+const STALE_DAYS = 30;
+const daysSince = (ts) => (ts ? Math.floor((Date.now() - ts) / 86400000) : null);
 
 const EMPTY_FORM = { id: "", title: "", desc: "", status: "later", area: "", gate: "", link: "", source: "" };
 
@@ -48,15 +55,15 @@ const inputStyle = {
   border: `1px solid ${CP.border}`,
   borderRadius: 8,
   color: CP.textPrimary,
-  fontSize: 12,
+  fontSize: 13,
   fontFamily: FONTS.body,
-  outline: "none",
+  boxSizing: "border-box",
 };
 
 function Field({ label, children }) {
   return (
     <label style={{ display: "block", minWidth: 0 }}>
-      <span style={{ display: "block", fontSize: 11, color: CP.textMuted, marginBottom: 4 }}>{label}</span>
+      <span style={{ display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 4 }}>{label}</span>
       {children}
     </label>
   );
@@ -67,6 +74,7 @@ export default function RoadmapPage() {
   const [form, setForm] = useState(null); // null = chiuso, oggetto = form aperto
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const formRef = useRef(null);
 
   const items = data?.items ? Object.values(data.items) : [];
 
@@ -108,40 +116,33 @@ export default function RoadmapPage() {
   };
 
   return (
-    <div style={{ padding: "32px 32px 64px 32px", maxWidth: 1500, margin: "0 auto" }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
-        <div>
-          <SectionLabel>Prodotto</SectionLabel>
-          <h1 style={{ fontFamily: FONTS.display, fontSize: 34, margin: "8px 0 4px 0", fontWeight: 500, letterSpacing: "-0.02em", color: CP.textPrimary, display: "flex", alignItems: "center", gap: 12 }}>
-            <Signpost size={28} color={CP.accent} aria-hidden="true" />
-            Roadmap
-          </h1>
-          <p style={{ color: CP.textSecondary, fontSize: 13, margin: 0, lineHeight: 1.5, maxWidth: 640 }}>
-            Le idee future di HOC Pro vivono qui, visibili — niente pagine placeholder in navigazione.
-            Le voci parcheggiate riportano il gate che le sblocca.
-          </p>
-        </div>
-        <button
-          onClick={() => setForm(form ? null : { ...EMPTY_FORM })}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 7,
-            padding: "8px 14px",
-            background: form ? CP.surfaceAlt : CP.accent,
-            color: form ? CP.textSecondary : CP.accentInk,
-            border: form ? `1px solid ${CP.border}` : "1px solid transparent",
-            borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer",
-          }}
-        >
-          {form ? <X size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
-          {form ? "Chiudi" : "Nuova voce"}
-        </button>
-      </div>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1400, margin: "0 auto", fontFamily: FONTS.body }}>
+      <PageHead
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Prodotto" }, { label: "Roadmap" }]}
+        title="Roadmap"
+        subtitle="Cosa stiamo costruendo in HOC Pro, cosa viene dopo e cosa è fermo. Le idee nuove si scrivono qui invece di diventare pagine vuote nel menu; quelle parcheggiate dicono cosa le sblocca."
+        actions={
+          <button
+            onClick={() => setForm(form ? null : { ...EMPTY_FORM })}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 7,
+              padding: "8px 14px",
+              background: form ? CP.surface : CP.accent,
+              color: form ? CP.textPrimary : CP.accentInk,
+              border: `1px solid ${form ? CP.border : CP.accent}`,
+              borderRadius: 8, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer",
+            }}
+          >
+            {form ? <X size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
+            {form ? "Chiudi" : "Nuova voce"}
+          </button>
+        }
+      />
 
       {/* Form nuova voce / modifica */}
       {form && (
-        <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, padding: 16, marginBottom: 24 }}>
-          <div style={{ fontSize: 13, color: CP.textPrimary, fontWeight: 500, marginBottom: 12 }}>
+        <div ref={formRef} style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, padding: 16, marginBottom: 24, scrollMarginTop: 16 }}>
+          <div style={{ fontSize: 15, color: CP.textPrimary, fontWeight: 500, marginBottom: 12 }}>
             {form.id ? "Modifica voce" : "Nuova voce"}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 12 }}>
@@ -163,7 +164,7 @@ export default function RoadmapPage() {
             </Field>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 14 }}>
-            <Field label="Gate (cosa la sblocca, per le parcheggiate)">
+            <Field label="Cosa la sblocca (per le parcheggiate)">
               <input style={inputStyle} value={form.gate} onChange={(e) => setForm({ ...form, gate: e.target.value })} placeholder="Es. decisione board su risk appetite" />
             </Field>
             <Field label="Link dossier / doc">
@@ -179,33 +180,30 @@ export default function RoadmapPage() {
               disabled={saving || !form.title.trim()}
               style={{
                 padding: "8px 16px", background: CP.accent, color: CP.accentInk,
-                border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500,
+                border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500,
                 fontFamily: FONTS.body, cursor: saving ? "wait" : "pointer",
                 opacity: saving || !form.title.trim() ? 0.6 : 1,
               }}
             >
               {saving ? "Salvataggio…" : "Salva"}
             </button>
-            {feedback && <span style={{ fontSize: 12, color: CP.accentRed }}>{feedback}</span>}
+            {feedback && <span style={{ fontSize: 13, color: CP.accentRed }}>{feedback}</span>}
           </div>
         </div>
       )}
 
-      {feedback && !form && (
-        <div style={{ fontSize: 12, color: CP.accentRed, marginBottom: 14 }}>{feedback}</div>
-      )}
+      {feedback && !form && <Notice danger>{feedback}</Notice>}
 
       {/* Stati di caricamento / errore */}
       {isLoading && (
-        <div style={{ color: CP.textMuted, fontSize: 13, padding: "40px 0" }}>Caricamento roadmap…</div>
+        <div style={{ color: CP.textMuted, fontSize: 14, padding: "24px 0" }}>Caricamento roadmap…</div>
       )}
       {error && (
-        <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, padding: 24, color: CP.textSecondary, fontSize: 13, display: "flex", alignItems: "center", gap: 10 }}>
-          <Lock size={16} color={CP.textMuted} aria-hidden="true" />
+        <Notice danger={error.status !== 403}>
           {error.status === 403
-            ? "Vista riservata agli admin: il tuo account non ha la capability necessaria."
+            ? "Pagina riservata agli admin: il tuo account non ha il permesso necessario."
             : `Errore nel caricamento: ${error.message}`}
-        </div>
+        </Notice>
       )}
 
       {/* Colonne */}
@@ -216,40 +214,43 @@ export default function RoadmapPage() {
               .filter((it) => it.status === col.key)
               .sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0));
             return (
-              <div key={col.key} style={{ background: CP.bgSunken, border: `1px solid ${CP.borderSoft}`, borderRadius: 12, padding: 10 }}>
+              <div key={col.key} style={{ background: CP.bgSunken, border: `1px solid ${CP.borderSoft}`, borderRadius: 10, padding: 10 }}>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", padding: "6px 8px 10px 8px" }}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: CP.textPrimary }}>{col.label}</div>
-                    <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 2 }}>{col.hint}</div>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary }}>{col.label}</div>
+                    <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2 }}>{col.hint}</div>
                   </div>
-                  <span style={{ fontSize: 11, color: CP.textMuted, fontFamily: FONTS.mono }}>{colItems.length}</span>
+                  <span style={{ fontSize: 13, color: CP.textMuted, ...NUM }}>{colItems.length}</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {colItems.length === 0 && (
-                    <div style={{ fontSize: 12, color: CP.mutedIcons, padding: "14px 8px 18px 8px" }}>
+                    <div style={{ fontSize: 13, color: CP.textMuted, padding: "14px 8px 18px 8px" }}>
                       Niente qui.
                     </div>
                   )}
                   {colItems.map((item) => (
                     <div key={item.id} style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, padding: "12px 12px 10px 12px" }}>
                       {item.area && (
-                        <span style={{ display: "inline-block", background: CP.accentSoft, color: CP.accentSoftText, borderRadius: 6, fontSize: 11, padding: "2px 6px", marginBottom: 7 }}>
+                        <span style={{ display: "inline-block", background: CP.surfaceAlt, color: CP.textSecondary, borderRadius: 6, fontSize: 12, padding: "2px 7px", marginBottom: 7 }}>
                           {item.area}
                         </span>
                       )}
-                      <div style={{ fontSize: 13, fontWeight: 500, color: CP.textPrimary, lineHeight: 1.35 }}>{item.title}</div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary, lineHeight: 1.35 }}>{item.title}</div>
+                      {col.key === "now" && daysSince(item.updated_at) > STALE_DAYS && (
+                        <div style={{ fontSize: 12, color: CP.accentRed, marginTop: 4 }}>Ferma da {daysSince(item.updated_at)} giorni: è ancora in corso?</div>
+                      )}
                       {item.desc && (
-                        <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.45, marginTop: 4 }}>{item.desc}</div>
+                        <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.45, marginTop: 4 }}>{item.desc}</div>
                       )}
                       {item.gate && (
-                        <div style={{ fontSize: 11, color: CP.textMuted, marginTop: 7, display: "flex", gap: 5, alignItems: "flex-start", lineHeight: 1.4 }}>
-                          <Lock size={11} style={{ flexShrink: 0, marginTop: 1 }} aria-hidden="true" />
-                          <span>Gate: {item.gate}</span>
+                        <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 7, display: "flex", gap: 5, alignItems: "flex-start", lineHeight: 1.4 }}>
+                          <Lock size={12} style={{ flexShrink: 0, marginTop: 1 }} aria-hidden="true" />
+                          <span>Si sblocca quando: {item.gate}</span>
                         </div>
                       )}
                       {item.link && (
-                        <a href={item.link} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: CP.accentSoftText, textDecoration: "none", marginTop: 7 }}>
-                          <ExternalLink size={11} aria-hidden="true" /> Dossier
+                        <a href={item.link} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: CP.accentSoftText, textDecoration: "none", marginTop: 7 }}>
+                          <ExternalLink size={12} aria-hidden="true" /> Documento
                         </a>
                       )}
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, paddingTop: 8, borderTop: `1px solid ${CP.borderSoft}` }}>
@@ -257,15 +258,15 @@ export default function RoadmapPage() {
                           value={item.status}
                           onChange={(e) => moveTo(item, e.target.value)}
                           aria-label={`Sposta "${item.title}"`}
-                          style={{ ...inputStyle, width: "auto", padding: "4px 6px", fontSize: 11, color: CP.textSecondary }}
+                          style={{ ...inputStyle, width: "auto", padding: "4px 6px", fontSize: 12, color: CP.textSecondary }}
                         >
                           {COLUMNS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
                         </select>
-                        <span style={{ flex: 1, fontSize: 10, color: CP.mutedIcons, textAlign: "right" }} title={item.source ? `Fonte: ${item.source}` : ""}>
-                          {fmtDate(item.updated_at)}
+                        <span style={{ flex: 1, fontSize: 12, color: CP.textMuted, textAlign: "right", ...NUM }} title={item.source ? `Fonte: ${item.source}` : ""}>
+                          agg. {fmtDate(item.updated_at)}
                         </span>
                         <button
-                          onClick={() => { setForm({ ...EMPTY_FORM, ...item }); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                          onClick={() => { setForm({ ...EMPTY_FORM, ...item }); setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
                           aria-label={`Modifica ${item.title}`}
                           style={{ background: "transparent", border: "none", color: CP.mutedIcons, cursor: "pointer", padding: 3, display: "flex" }}
                           onMouseEnter={(e) => (e.currentTarget.style.color = CP.textSecondary)}

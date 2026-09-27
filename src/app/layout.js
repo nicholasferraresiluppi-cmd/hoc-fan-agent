@@ -3,6 +3,16 @@ import { itIT } from "@clerk/localizations";
 import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
 import "./globals.css";
+import { themeCss, CP } from "@/lib/brand";
+import { Manrope, Instrument_Serif } from "next/font/google";
+
+// Caratteri dello stile v3 "Casa" (anteprima): serviti dal nostro dominio da
+// next/font, con misure di riserva calcolate (niente salto al caricamento).
+// Usati solo sotto data-style="v3" tramite --f-sans / --f-display.
+// Manrope per l'interfaccia, Instrument Serif per titoli e numeri protagonisti
+// (mai nelle tabelle). Gli stessi di "La casa" (26/09 notte).
+const fSans = Manrope({ subsets: ["latin", "latin-ext"], weight: ["400", "500", "600"], display: "swap", variable: "--f-sans" });
+const fSig = Instrument_Serif({ subsets: ["latin", "latin-ext"], weight: "400", style: ["normal", "italic"], display: "swap", variable: "--f-display" });
 
 export const metadata = {
   title: "HOC Pro",
@@ -10,45 +20,54 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
+  // `dynamic` (Clerk 6): ripristina il comportamento di Clerk 5 — stato auth
+  // letto a ogni richiesta e nessuna pagina prerenderizzata statica. Senza,
+  // Next 15 prova a prerenderizzare le pagine client (useSearchParams senza
+  // Suspense → build rotta) e il primo paint non conosce l'utente.
   return (
     <ClerkProvider
+      dynamic
       localization={itIT}
       appearance={{
         variables: {
-          colorPrimary: "#8b7cf6",
-          colorBackground: "#0c0f14",
-          colorText: "#f2f4f8",
-          colorInputBackground: "#151a22",
-          colorInputText: "#f2f4f8",
-          fontFamily: "Inter, system-ui, sans-serif",
+          colorPrimary: CP.accent,
+          colorBackground: CP.bg,
+          colorText: CP.textPrimary,
+          colorInputBackground: CP.surface,
+          colorInputText: CP.textPrimary,
+          fontFamily: "var(--cp-font)",
         },
         elements: {
-          formButtonPrimary: "bg-[#8b7cf6] hover:bg-[#7a6ae0] text-[#14101f]",
-          card: "bg-[#151a22] border border-[#232b3a]",
-          headerTitle: "text-[#f2f4f8]",
-          headerSubtitle: "text-[#8c95a8]",
-          socialButtonsBlockButton: "bg-[#151a22] border-[#232b3a] text-[#f2f4f8]",
-          formFieldLabel: "text-[#cdd3de]",
-          formFieldInput: "bg-[#151a22] border-[#232b3a] text-[#f2f4f8]",
-          footerActionLink: "text-[#8b7cf6] hover:text-[#b9aef9]",
+          formButtonPrimary: "bg-[var(--cp-accent)] hover:bg-[var(--cp-accent)] text-[var(--cp-accentInk)]",
+          card: "bg-[var(--cp-surface)] border border-[var(--cp-border)]",
+          headerTitle: "text-[var(--cp-textPrimary)]",
+          headerSubtitle: "text-[var(--cp-textMuted)]",
+          socialButtonsBlockButton: "bg-[var(--cp-surface)] border-[var(--cp-border)] text-[var(--cp-textPrimary)]",
+          formFieldLabel: "text-[var(--cp-textSecondary)]",
+          formFieldInput: "bg-[var(--cp-surface)] border-[var(--cp-border)] text-[var(--cp-textPrimary)]",
+          footerActionLink: "text-[var(--cp-accent)] hover:text-[var(--cp-accentSoftText)]",
           // UserButton popover (account menu)
-          userButtonPopoverCard: "bg-[#151a22] border border-[#232b3a]",
-          userButtonPopoverMain: "bg-[#151a22]",
-          userButtonPopoverActions: "bg-[#151a22]",
-          userButtonPopoverActionButton: "text-[#f2f4f8] hover:bg-[#20283a]",
-          userButtonPopoverActionButtonText: "text-[#f2f4f8]",
-          userButtonPopoverActionButtonIcon: "text-[#8b7cf6]",
-          userButtonPopoverFooter: "bg-[#0a0d11] border-t border-[#1d2430]",
-          userPreviewMainIdentifier: "text-[#f2f4f8]",
-          userPreviewSecondaryIdentifier: "text-[#cdd3de]",
+          userButtonPopoverCard: "bg-[var(--cp-surface)] border border-[var(--cp-border)]",
+          userButtonPopoverMain: "bg-[var(--cp-surface)]",
+          userButtonPopoverActions: "bg-[var(--cp-surface)]",
+          userButtonPopoverActionButton: "text-[var(--cp-textPrimary)] hover:bg-[var(--cp-surfaceAlt)]",
+          userButtonPopoverActionButtonText: "text-[var(--cp-textPrimary)]",
+          userButtonPopoverActionButtonIcon: "text-[var(--cp-accent)]",
+          userButtonPopoverFooter: "bg-[var(--cp-bgSunken)] border-t border-[var(--cp-borderSoft)]",
+          userPreviewMainIdentifier: "text-[var(--cp-textPrimary)]",
+          userPreviewSecondaryIdentifier: "text-[var(--cp-textSecondary)]",
           // Generic menu items (covers org switcher etc.)
-          menuItem: "text-[#f2f4f8] hover:bg-[#20283a]",
-          menuList: "bg-[#151a22]",
+          menuItem: "text-[var(--cp-textPrimary)] hover:bg-[var(--cp-surfaceAlt)]",
+          menuList: "bg-[var(--cp-surface)]",
         },
       }}
     >
-      <html lang="it">
+      <html lang="it" data-theme="light" className={`${fSans.variable} ${fSig.variable}`} suppressHydrationWarning>
         <head>
+          {/* Tema chiaro/scuro: variabili dei due temi + scelta salvata applicata PRIMA
+              del primo disegno (niente lampo del tema sbagliato). Default: scuro. */}
+          <style dangerouslySetInnerHTML={{ __html: themeCss() }} />
+          <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem("hoc:theme")==="dark")document.documentElement.removeAttribute("data-theme");if(localStorage.getItem("hoc:style")==="v3"){document.documentElement.setAttribute("data-style","v3");if(!sessionStorage.getItem("hoc:intro")&&!matchMedia("(prefers-reduced-motion: reduce)").matches){document.documentElement.classList.add("casa-intro");sessionStorage.setItem("hoc:intro","1")}}}catch(e){}` }} />
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
           <link
@@ -56,7 +75,7 @@ export default function RootLayout({ children }) {
             rel="stylesheet"
           />
         </head>
-        <body style={{ background: "#0c0f14", color: "#f2f4f8", minHeight: "100vh", fontFamily: "Inter, system-ui, sans-serif" }}>
+        <body style={{ background: "var(--cp-bg)", color: "var(--cp-textPrimary)", minHeight: "100vh", fontFamily: "var(--cp-font)" }}>
           <Providers>
             <AppShell>{children}</AppShell>
           </Providers>

@@ -4,10 +4,13 @@ import { FAN_PROFILES } from "@/lib/fan-profiles";
 import { getCreatorById } from "@/lib/creator-personas";
 import { getFanArchetypeById } from "@/lib/fan-archetypes";
 import { findScenarioById, generateFanReply } from "@/lib/academy-engine";
+import { checkRateLimit, tooMany } from "@/lib/rate-limit";
 
 export async function POST(request) {
   try {
     const { userId } = await auth();
+    // tetto anti-abuso sui costi LLM (lib/rate-limit)
+    if (userId) { const rl = await checkRateLimit("llm_chat", userId); if (!rl.ok) return tooMany(rl.retryAfter); }
     if (!userId) {
       return Response.json({ error: "Non autenticato." }, { status: 401 });
     }

@@ -19,7 +19,7 @@
  *   inverse  — icona nera + wordmark nero + PRO champagne-deep su chiaro
  *   mono     — tutto champagne
  */
-import { COLORS, FONTS } from "@/lib/brand";
+import { COLORS, FONTS, CP } from "@/lib/brand";
 
 export default function BrandLockup({ variant = "primary", size = "md", showWordmark = true }) {
   const scale = size === "sm" ? 0.75 : size === "lg" ? 1.3 : 1;
@@ -51,7 +51,7 @@ export default function BrandLockup({ variant = "primary", size = "md", showWord
       ? "none"
       : variant === "mono"
       ? "brightness(0) saturate(100%) invert(79%) sepia(18%) saturate(664%) hue-rotate(354deg) brightness(92%) contrast(88%)"
-      : "brightness(0) invert(1)";
+      : CP.logoFilter; // bianca sullo scuro, nera sul chiaro
 
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap }}>
@@ -77,9 +77,11 @@ export default function BrandLockup({ variant = "primary", size = "md", showWord
           </div>
         )}
       </div>
-      <div style={{ width: 1, height: sepHeight, background: sepColor, opacity: 0.6 }} />
+      <div className="hoc-brand-sep" style={{ width: 1, height: sepHeight, background: sepColor, opacity: 0.6 }} />
       <div
+        className="hoc-brand-pro"
         style={{
+          textTransform: "uppercase",
           fontFamily: FONTS.display,
           fontWeight: 800,
           fontSize: proFs,
@@ -88,7 +90,7 @@ export default function BrandLockup({ variant = "primary", size = "md", showWord
           lineHeight: 1,
         }}
       >
-        PRO
+        Pro
       </div>
     </div>
   );

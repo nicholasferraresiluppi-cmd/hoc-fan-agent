@@ -12,6 +12,8 @@ import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { logAuditAction } from "@/lib/audit-log";
 import { setMemberMapping } from "@/lib/creatorspro-sync";
+import { getWages } from "@/lib/cp-wages-store";
+import { unmappedSales } from "@/lib/data-health-core";
 
 export async function GET() {
   const az = await authorize(CAPABILITIES.SEED);
@@ -25,21 +27,47 @@ export async function GET() {
   const members = Object.values(membersMap || {});
   const unmapped = members.filter((mb) => !m[mb.id]);
 
-  // Suggerimenti Infloww — leggi i nomi disponibili dal periodo più recente
+  // Nomi operatore Infloww: gli ultimi DUE mesi per data del periodo (non per
+  // data di import: il 26/09 l'ultimo importato era luglio, ricaricato dopo
+  // settembre). + nomi già collegati a un'altra persona CP (non riproporli).
   let inflowwNames = [];
   try {
-    const periodsRaw = (await kv.zrange("ops_kpi:imports", 0, 0, { rev: true })) || [];
-    if (periodsRaw.length > 0 && typeof periodsRaw[0] === "string") {
-      const recs = (await kv.get(`ops_kpi:${periodsRaw[0]}`)) || [];
-      const set = new Set();
-      for (const r of recs) if (r.employee) set.add(r.employee.trim());
-      inflowwNames = Array.from(set).sort();
-    }
+    const all = (await kv.zrange("ops_kpi:imports", 0, -1)) || [];
+    const months = all.filter((x) => typeof x === "string" && x.startsWith("monthly:")).sort().slice(-2);
+    const set = new Set();
+    for (const key of months) for (const r of (await kv.get(`ops_kpi:${key}`)) || []) if (r.employee && !r.is_mass) set.add(r.employee.trim());
+    inflowwNames = Array.from(set).sort();
   } catch {}
+  const takenNames = Array.from(new Set(Object.values(m)));
+
+  // Venduto dei non collegati negli ultimi 2 mesi: si collega prima chi pesa
+  // (le persone senza collegamento spariscono dalle viste performance).
+  const now = new Date();
+  const mid = (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  const months = [mid(now), mid(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)))];
+  const salesById = {};
+  let impact = null;
+  try {
+    const ws = await Promise.all(months.map((p) => getWages(p)));
+    ws.forEach((w, i) => {
+      const u = unmappedSales(w || [], m);
+      if (i === 0) impact = { period_id: months[0], unmapped: Math.round(u.unmapped), share: u.share, people: u.people.length };
+      for (const p of u.people) {
+        const cur = salesById[p.member_id] || { cur: 0, prev: 0, name: p.name };
+        cur[i === 0 ? "cur" : "prev"] += Math.round(p.sales);
+        salesById[p.member_id] = cur;
+      }
+    });
+  } catch {}
+  for (const mb of unmapped) {
+    const s = salesById[mb.id];
+    mb.sales_cur = s?.cur || 0;
+    mb.sales_prev = s?.prev || 0;
+  }
 
   // v2: ritorno TUTTI gli unmapped (era limit 50). Per ~200 record è leggero.
   // Mantengo unmapped_sample come alias retrocompat per la UI vecchia.
-  const sortedUnmapped = unmapped.sort((a, b) => (a.cp_name || "").localeCompare(b.cp_name || ""));
+  const sortedUnmapped = unmapped.sort((a, b) => (b.sales_cur + b.sales_prev) - (a.sales_cur + a.sales_prev) || (a.cp_name || "").localeCompare(b.cp_name || ""));
   return Response.json({
     mapping: m,
     members: members.sort((a, b) => `${a.firstName || ""} ${a.lastName || ""}`.localeCompare(`${b.firstName || ""} ${b.lastName || ""}`)),
@@ -47,6 +75,8 @@ export async function GET() {
     unmapped: sortedUnmapped,
     unmapped_sample: sortedUnmapped, // alias retrocompat
     infloww_names: inflowwNames,
+    taken_names: takenNames,
+    impact,
   });
 }
 

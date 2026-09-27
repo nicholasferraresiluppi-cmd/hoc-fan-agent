@@ -8,6 +8,7 @@
  * potenzialmente molte volte per request (per ogni record del ranking).
  */
 import { kv } from "@vercel/kv";
+import { getWages } from "@/lib/cp-wages-store";
 
 const TTL_MS = 5 * 60 * 1000;
 const _cache = new Map();
@@ -24,7 +25,7 @@ async function loadWages(periodId) {
   const k = `_wages:${periodId}`;
   const c = cacheGet(k);
   if (c !== null) return c;
-  const w = (await kv.get(`cp:wages:${periodId}`)) || [];
+  const w = (await getWages(periodId)) || [];
   return cacheSet(k, w);
 }
 
@@ -39,6 +40,11 @@ async function loadMapping() {
  * Indicizza i wage CP per nome Infloww (via mapping). Ritorna mappa
  * { infloww_name: cp_wage_normalized }. I member CP senza mapping sono ignorati.
  */
+/** Turni con inizio nel passato (esclude quelli programmati e non ancora partiti). */
+export function startedShifts(shifts, now = Date.now()) {
+  return (shifts || []).filter((x) => { const t = Date.parse(x?.started_at); return !Number.isFinite(t) || t <= now; });
+}
+
 export async function indexWagesByInflowwName(periodId) {
   const k = `_idx:${periodId}`;
   const c = cacheGet(k);
@@ -70,7 +76,12 @@ export async function indexWagesByInflowwName(periodId) {
     agg.total_wage += w.total_wage || 0;
     agg.total_shifts += w.total_worked_shifts || 0;
     agg.total_hours += w.total_worked_hours || 0;
-    agg.shifts.push(...(w.shifts || []));
+    // Solo turni GIÀ INIZIATI (fix 25/09/2026): nel mese in corso CP include i
+    // turni programmati fino a fine mese, a $0 (502 a settembre). Contati come
+    // lavorati deprimevano il venduto a turno e le celle della matrice dello
+    // score del mese in corso (chi aveva più turni in calendario sembrava rendere
+    // meno). Formula invariata; i mesi chiusi non cambiano (tutti i turni passati).
+    agg.shifts.push(...startedShifts(w.shifts));
     agg.wage_ids.push(w.id);
   }
   // Decora con KPI derivati

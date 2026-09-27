@@ -16,6 +16,7 @@
  */
 import { kv } from "@vercel/kv";
 import { buildCreatorMatrix } from "./creator-aggregates";
+import { getWages } from "@/lib/cp-wages-store";
 
 function prevPeriod(periodId) {
   const [y, m] = periodId.split("-").map(Number);
@@ -24,7 +25,7 @@ function prevPeriod(periodId) {
 }
 
 async function hasCpDataForPeriod(periodId) {
-  const wages = await kv.get(`cp:wages:${periodId}`);
+  const wages = await getWages(periodId);
   return Array.isArray(wages) && wages.length > 0;
 }
 

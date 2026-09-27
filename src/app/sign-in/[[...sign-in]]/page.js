@@ -8,7 +8,7 @@ export default function SignInPage() {
         <div className="mb-5 flex justify-center"><BrandLockup size="lg" /></div>
         <p className="text-gray-400 mt-1">Accedi per iniziare</p>
       </div>
-      <SignIn afterSignInUrl="/" />
+      <SignIn fallbackRedirectUrl="/start" signUpFallbackRedirectUrl="/start" />
     </div>
   );
 }

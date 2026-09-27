@@ -1,17 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;700&display=swap');
+/* Font caricati UNA volta sola da app/layout.js (prima anche qui: doppio download) */
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 * {
-  font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--cp-font, 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif);
 }
 
 body {
-  font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
-  background-color: #0c0f14;
-  color: #f2f4f8;
+  font-family: var(--cp-font, 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif);
+  background-color: var(--cp-bg);
+  color: var(--cp-textPrimary);
 }
 
 /* Design system: due pesi soltanto (400/500), mai 600+ */
@@ -19,9 +19,11 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 500;
 }
 
-p, a, span {
+/* Solo stile attuale: nello stile v3 non si forza il peso degli span (rompeva i grassetti) */
+:root:not([data-style="v3"]) p, :root:not([data-style="v3"]) a, :root:not([data-style="v3"]) span {
   font-weight: 400;
 }
+
 
 .caption {
   font-weight: 300;
@@ -56,3 +58,271 @@ p, a, span {
 .pulse-score {
   animation: pulse-score 2s ease-in-out infinite;
 }
+
+
+/* Guscio app: desktop / telefono deciso dal CSS già al primo disegno (26/09) */
+.hoc-desk { display: block; }
+.hoc-mob { display: none; }
+.hoc-main { margin-left: 248px; }
+@media (max-width: 899px) {
+  .hoc-desk { display: none; }
+  .hoc-mob { display: block; }
+  .hoc-main { margin-left: 0; }
+}
+
+/* Scheletro di caricamento tra una pagina e l'altra (app/loading.js) */
+@keyframes hoc-shimmer { 0% { opacity: .55 } 50% { opacity: 1 } 100% { opacity: .55 } }
+.hoc-sk { background: var(--cp-surfaceAlt); border-radius: 10px; animation: hoc-shimmer 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .hoc-sk { animation: none; opacity: .7; } }
+
+/* ── Stile v3 "Notte / Carta" (anteprima): guscio — SOLO sotto [data-style="v3"] ──
+   Le classi hoc-v3-* esistono solo quando AppShell rende il guscio v3; qui si
+   decide desktop/telefono. Il menu notte (.hoc-side) è in themeCss() (brand.js). */
+.hoc-v3-top, .hoc-v3-mhead, .hoc-v3-tabbar { display: none; }
+[data-style="v3"] { -webkit-tap-highlight-color: transparent; }
+[data-style="v3"] .hoc-v3-top { display: flex; }
+[data-style="v3"] .hoc-v3-btn:hover, [data-style="v3"] .hoc-v3-chip:hover { background: var(--cp-surfaceAlt) !important; color: var(--cp-textPrimary) !important; }
+/* Focus: outline trasparente (resta visibile in contrasto elevato di Windows) + anello */
+[data-style="v3"] .hoc-v3-btn:focus-visible, [data-style="v3"] .hoc-v3-chip:focus-visible,
+[data-style="v3"] .hoc-v3-tab:focus-visible, [data-style="v3"] .hoc-side a:focus-visible,
+[data-style="v3"] .hoc-side button:focus-visible {
+  outline: 2px solid transparent; outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--cp-bg), 0 0 0 4px var(--cp-accent);
+}
+[data-style="v3"] .hoc-v3-cmdk-wrap { animation: hoc-v3-fade 140ms ease-out both; }
+[data-style="v3"] .hoc-v3-cmdk { animation: hoc-v3-in 180ms cubic-bezier(.2,.8,.2,1) both; }
+[data-style="v3"] .hoc-v3-tab { transition: transform 90ms, color .15s; }
+[data-style="v3"] .hoc-v3-tab:active { transform: scale(.94); }
+@keyframes hoc-v3-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes hoc-v3-in { from { opacity: 0; transform: translateY(-6px) scale(.985) } to { opacity: 1; transform: none } }
+
+@media (max-width: 899px) {
+  [data-style="v3"] .hoc-v3-top { display: none; }
+  [data-style="v3"] .hoc-mhead-v2 { display: none !important; }
+  [data-style="v3"] .hoc-v3-mhead { display: flex; }
+  /* barra in basso: fondo PIENO (niente trasparenza né backdrop-filter) */
+  [data-style="v3"] .hoc-v3-tabbar { display: grid; }
+  [data-style="v3"] .hoc-main { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+  [data-style="v3"] .hoc-fb { bottom: calc(80px + env(safe-area-inset-bottom)) !important; }
+  [data-style="v3"] .hoc-v3-cmdk-wrap { padding-top: 10vh !important; }
+  [data-style="v3"] .hoc-v3-cmdk-foot { display: none !important; }
+  /* target tattili 44px nel menu */
+  [data-style="v3"] .hoc-side nav a, [data-style="v3"] .hoc-side nav button { min-height: 44px; }
+  [data-style="v3"] .hoc-v3-mhead, [data-style="v3"] .hoc-v3-tabbar, [data-style="v3"] .hoc-side { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-style="v3"] .hoc-v3-cmdk-wrap, [data-style="v3"] .hoc-v3-cmdk { animation: none; }
+  [data-style="v3"] .hoc-v3-tab { transition: none; }
+  [data-style="v3"] .hoc-v3-tab:active { transform: none; }
+}
+
+/* ── Stile v3: componenti del design system (components/ds.js, passo 3) ──
+   Le classi ds-* non hanno regole fuori da [data-style="v3"] (salvo il focus da
+   tastiera della tabella, sotto): nello stile attuale valgono gli stili inline
+   di sempre. !important perché qui si sovrascrive lo stile inline. */
+[data-style="v3"] .ds-h1 { font-size: 32px !important; font-weight: 500 !important; letter-spacing: -.02em !important; line-height: 1.15; }
+[data-style="v3"] .ds-sect { font-size: 17px !important; font-weight: 500 !important; letter-spacing: -.01em; }
+[data-style="v3"] .ds-lbl { font-size: 12px !important; font-weight: 500 !important; letter-spacing: .01em; color: var(--cp-textMuted) !important; }
+/* card hero: fondo dedicato, bordo 1px, niente glow */
+[data-style="v3"] .ds-hero { background: var(--cp-heroBg) !important; border: 1px solid var(--cp-border) !important; border-radius: 6px !important; box-shadow: none !important; }
+/* numero protagonista: 80/56, 500, cifre proporzionali (decimali composti da NumText) */
+[data-style="v3"] .ds-hero-v { font-size: 60px !important; font-weight: 500 !important; line-height: .95 !important; letter-spacing: -.025em !important; font-variant-numeric: proportional-nums lining-nums !important; margin: 6px 0 4px; }
+/* KPI: 32/28, 500, tabellari */
+[data-style="v3"] .ds-metric-v { font-size: 32px !important; font-weight: 500 !important; line-height: 1.05 !important; letter-spacing: -.03em; font-variant-numeric: tabular-nums !important; margin-top: 2px; }
+[data-style="v3"] .ds-chip { font-weight: 500; }
+/* Notice neutro: solo bordo sinistro; rosso SOLO con danger */
+[data-style="v3"] .ds-notice { border: 0 !important; border-left: 2px solid var(--cp-textMuted) !important; border-radius: 0 10px 10px 0 !important; background: var(--cp-surfaceAlt) !important; }
+[data-style="v3"] .ds-notice[data-danger] { border-left-color: var(--cp-accentRed) !important; }
+/* Tabelle: righe 44px (compatta 34px), celle 13.5 tabellari, hover e selezione piatti */
+[data-style="v3"] .ds-tbl { font-size: 13.5px !important; font-variant-numeric: tabular-nums; }
+[data-style="v3"] .ds-tbl td { height: 44px; padding-top: 0 !important; padding-bottom: 0 !important; }
+[data-style="v3"] .ds-tbl[data-density="compact"] td { height: 34px; }
+[data-style="v3"] .ds-tr { background: transparent !important; }
+[data-style="v3"] .ds-tr:hover > td { background-image: linear-gradient(var(--cp-hover), var(--cp-hover)); }
+[data-style="v3"] .ds-tr[data-sel] > td { background-color: var(--cp-surface) !important; background-image: linear-gradient(var(--cp-sel), var(--cp-sel)); }
+/* Tastiera (entrambi gli stili, ma visibile SOLO da tastiera: :focus-visible) */
+.ds-tbl:focus { outline: none; }
+.ds-tbl:focus-visible { outline: 2px solid var(--cp-accent); outline-offset: -2px; }
+.ds-tbl:focus-visible .ds-tr[data-active] > td { background-image: linear-gradient(var(--cp-hover), var(--cp-hover)); box-shadow: inset 0 1px 0 var(--cp-accent), inset 0 -1px 0 var(--cp-accent); }
+.ds-tbl:focus-visible .ds-tr[data-active] > td:first-child { box-shadow: inset 2px 0 0 var(--cp-accent), inset 0 1px 0 var(--cp-accent), inset 0 -1px 0 var(--cp-accent); }
+@media (max-width: 899px) {
+  [data-style="v3"] .ds-h1 { font-size: 26px !important; }
+  [data-style="v3"] .ds-hero-v { font-size: 46px !important; }
+  [data-style="v3"] .ds-metric-v { font-size: 28px !important; }
+}
+/* ScoreChart (componente nuovo): sotto 520px solo le soglie vicine al valore */
+@media (max-width: 519px) { .ds-sc .ds-sc-far { display: none; } }
+
+/* /me/compenso: "Contesta" discreto nella riga — visibile su hover, focus o riga
+   selezionata/attiva; mai un bottone primario (passo 4a, 26/09/2026) */
+.ds-tr .me-contest { opacity: 0; transition: opacity .12s; }
+.ds-tr:hover .me-contest, .ds-tr:focus-within .me-contest, .ds-tr[data-sel] .me-contest, .ds-tr[data-active] .me-contest, .me-contest:focus-visible { opacity: 1; }
+/* Telefono: il dettaglio del turno è un pannello dal basso */
+@media (max-width: 699px) {
+  .me-shift-sheet { position: fixed !important; left: 8px; right: 8px; bottom: 8px; z-index: 60; max-height: 80vh; overflow: auto; margin: 0 !important; box-shadow: 0 -12px 40px rgba(0,0,0,.35); }
+}
+/* senza hover (tablet): 'Contesta' sempre visibile */
+@media (hover: none) { .ds-tr .me-contest { opacity: 1; } }
+/* Action Center (26/09): "Vista colloquio" per riga visibile su hover/focus/
+   selezione; sui dispositivi touch o stretti sempre. Vale in entrambi gli stili. */
+.ac-row .ac-cv-btn { opacity: 0; transition: opacity .12s; }
+.ac-row:hover .ac-cv-btn, .ac-row:focus-within .ac-cv-btn, .ac-row[data-selected="true"] .ac-cv-btn { opacity: 1; }
+@media (hover: none), (max-width: 760px) { .ac-row .ac-cv-btn { opacity: 1; } }
+.ac-cv::backdrop { background: var(--cp-bg); }
+.ac-cv-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.ac-cv-fields { display: grid; grid-template-columns: 2fr 1fr 2fr; gap: 12px; }
+@media (max-width: 760px) { .ac-cv-grid, .ac-cv-fields { grid-template-columns: 1fr; } }
+
+/* Couture — rifinitura menu: marchio "Pro" champagne, titoli di gruppo sobri, avatar neutro */
+[data-style="v3"] .hoc-brand-pro {
+  text-transform: none !important; font-family: var(--cp-display) !important; font-weight: 500 !important;
+  letter-spacing: 0 !important; font-size: 26px !important; color: var(--cp-gold) !important;
+}
+[data-style="v3"] .hoc-brand-sep { background: var(--cp-gold) !important; opacity: .35 !important; }
+[data-style="v3"] .hoc-grp {
+  font-family: var(--cp-font) !important; font-weight: 500 !important; font-size: 11.5px !important;
+  letter-spacing: .02em !important;
+}
+[data-style="v3"] .hoc-avatar img { filter: saturate(.12) brightness(.95); }
+
+
+/* ═══ Stile "Casa" (v3, anteprima — 26/09/2026 notte) ═══════════════════════
+   Dal prototipo "La casa": fondo quasi nero con luce morbida e grana, testo
+   avorio, niente riquadri (superfici velate, linee sottili), Instrument Serif
+   grande per titoli e numeri protagonisti, entrata in scena a ogni pagina.
+   Tutto SOLO sotto [data-style="v3"]: lo stile attuale non cambia. */
+[data-style="v3"] body { background: radial-gradient(120% 90% at 62% 8%, #1b1c22 0%, #08090c 72%) fixed, #08090c !important; }
+[data-style="v3"] .hoc-root, [data-style="v3"] .hoc-main { background: transparent !important; }
+[data-style="v3"] body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 9998; opacity: .05;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+[data-style="v3"] ::selection { background: rgba(217,180,106,.28); }
+
+/* Titoli e numeri */
+[data-style="v3"] .ds-head { margin-bottom: 44px !important; }
+[data-style="v3"] .ds-crumbs { font-size: 13px !important; color: var(--cp-textMuted) !important; margin-bottom: 14px !important; }
+[data-style="v3"] .ds-h1 { font-family: var(--cp-display) !important; font-weight: 400 !important; font-size: clamp(42px, 4.6vw, 66px) !important; line-height: 1 !important; letter-spacing: -.012em !important; margin: 0 0 16px !important; }
+[data-style="v3"] .ds-sub { font-size: 15.5px !important; line-height: 1.6 !important; color: var(--cp-textSecondary) !important; max-width: 720px !important; }
+[data-style="v3"] .ds-sect { font-family: var(--cp-display) !important; font-weight: 400 !important; font-size: 30px !important; letter-spacing: -.005em !important; line-height: 1.1; }
+[data-style="v3"] .ds-lbl { font-size: 13.5px !important; font-weight: 400 !important; letter-spacing: 0 !important; color: var(--cp-textMuted) !important; }
+[data-style="v3"] .ds-hero {
+  background: transparent !important; border: 0 !important; border-bottom: 1px solid var(--cp-border) !important;
+  border-radius: 0 !important; padding: 8px 0 44px !important; margin-bottom: 44px !important; gap: 36px 56px !important;
+}
+[data-style="v3"] .ds-hero-v {
+  font-family: var(--cp-display) !important; font-weight: 400 !important; font-size: clamp(68px, 8.4vw, 124px) !important;
+  line-height: .9 !important; letter-spacing: -.02em !important; margin: 14px 0 14px !important;
+  font-variant-numeric: lining-nums proportional-nums !important;
+}
+[data-style="v3"] .ds-metric-v { font-family: var(--cp-display) !important; font-weight: 400 !important; font-size: 42px !important; line-height: 1 !important; letter-spacing: 0 !important; margin: 8px 0 6px !important; font-variant-numeric: lining-nums !important; }
+[data-style="v3"] .ds-chip { background: transparent !important; font-weight: 400 !important; }
+[data-style="v3"] .ds-notice { border: 0 !important; border-left: 1px solid var(--cp-borderStrong) !important; border-radius: 0 !important; background: transparent !important; padding: 4px 0 4px 16px !important; }
+[data-style="v3"] .ds-notice[data-danger] { border-left-color: var(--cp-accentRed) !important; }
+[data-style="v3"] .ds-tbl { font-size: 14px !important; }
+[data-style="v3"] .ds-tbl td { height: 48px; }
+[data-style="v3"] .ds-tbl[data-density="compact"] td { height: 36px; }
+[data-style="v3"] input, [data-style="v3"] select, [data-style="v3"] textarea { color-scheme: dark; }
+[data-style="v3"] select option { background: #15161c; color: #f2eee6; }
+@media (max-width: 899px) {
+  [data-style="v3"] .ds-h1 { font-size: 40px !important; }
+  [data-style="v3"] .ds-hero-v { font-size: 64px !important; }
+  [data-style="v3"] .ds-metric-v { font-size: 34px !important; }
+  [data-style="v3"] .ds-head { margin-bottom: 32px !important; }
+}
+
+/* Entrata in scena: i blocchi della pagina salgono uno dopo l'altro */
+@keyframes casa-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+[data-style="v3"] .casa-page > * > * { animation: casa-rise .8s cubic-bezier(.2,.8,.2,1) both; }
+[data-style="v3"] .casa-page > * > *:nth-child(2) { animation-delay: .08s; }
+[data-style="v3"] .casa-page > * > *:nth-child(3) { animation-delay: .16s; }
+[data-style="v3"] .casa-page > * > *:nth-child(4) { animation-delay: .24s; }
+[data-style="v3"] .casa-page > * > *:nth-child(5) { animation-delay: .32s; }
+[data-style="v3"] .casa-page > * > *:nth-child(n+6) { animation-delay: .4s; }
+
+/* Apertura (una volta per sessione, decisa dallo script in layout prima del primo disegno) */
+@keyframes casa-intro { 0% { opacity: 1; color: transparent; } 25% { color: #f2eee6; } 72% { opacity: 1; color: #f2eee6; } 100% { opacity: 0; visibility: hidden; color: #f2eee6; } }
+@keyframes casa-line { 0% { transform: translateX(-50%) scaleX(0); opacity: 1; } 55% { transform: translateX(-50%) scaleX(1); opacity: 1; } 72% { opacity: 1; } 100% { transform: translateX(-50%) scaleX(1); opacity: 0; visibility: hidden; } }
+html.casa-intro[data-style="v3"] body::after {
+  content: "House of Creators"; position: fixed; inset: 0; z-index: 10000; pointer-events: none;
+  display: flex; align-items: center; justify-content: center; background: #07080b;
+  font-family: var(--f-display), Georgia, serif; font-size: clamp(40px, 5vw, 72px); letter-spacing: .01em;
+  animation: casa-intro 2.1s ease forwards;
+}
+html.casa-intro[data-style="v3"]::after {
+  content: ""; position: fixed; left: 50%; top: calc(50% + 50px); z-index: 10001; pointer-events: none;
+  width: min(320px, 60vw); height: 1px; background: linear-gradient(90deg, transparent, #d9b46a, transparent);
+  animation: casa-line 2.1s cubic-bezier(.2,.8,.2,1) forwards;
+}
+
+/* Menu */
+[data-style="v3"] .casa-side { display: flex; flex-direction: column; gap: 26px; padding: 30px 22px 18px 24px; background: rgba(8,9,12,.55); border-right: 1px solid var(--cp-border); font-family: var(--cp-font); }
+@media (max-width: 899px) { [data-style="v3"] .casa-side { background: #0a0b0f; } }
+[data-style="v3"] .casa-brand { display: block; text-decoration: none; color: var(--cp-textPrimary); font-family: var(--cp-display); font-size: 23px; line-height: 1.05; }
+[data-style="v3"] .casa-brand em { font-style: normal; color: var(--cp-gold); }
+[data-style="v3"] .casa-brand small { display: block; font-family: var(--cp-font); font-size: 12.5px; color: var(--cp-textMuted); margin-top: 7px; }
+[data-style="v3"] .casa-nav { flex: 1; overflow-y: auto; scrollbar-width: none; margin-right: -8px; padding-right: 8px; }
+[data-style="v3"] .casa-nav::-webkit-scrollbar { display: none; }
+[data-style="v3"] .casa-nav h4 { font-size: 12px; font-weight: 500; color: var(--cp-textMuted); margin: 20px 0 6px; letter-spacing: .03em; }
+[data-style="v3"] .casa-nav a { position: relative; display: flex; justify-content: space-between; padding: 7px 0 7px 16px; color: var(--cp-textSecondary); text-decoration: none; font-size: 14.5px; transition: color .25s; }
+[data-style="v3"] .casa-nav a:hover, [data-style="v3"] .casa-nav a.on { color: var(--cp-textPrimary); }
+[data-style="v3"] .casa-nav a.on::before { content: ""; position: absolute; left: 0; top: 50%; width: 8px; height: 1px; background: var(--cp-gold); }
+[data-style="v3"] .casa-nav a .b { font-size: 12px; color: var(--cp-gold); }
+[data-style="v3"] .casa-tools { display: flex; justify-content: space-between; width: 100%; margin-top: 24px; padding: 8px 0; background: none; border: 0; border-top: 1px solid var(--cp-border); color: var(--cp-textMuted); font-size: 13px; cursor: pointer; font-family: var(--cp-font); }
+[data-style="v3"] .casa-tools:hover { color: var(--cp-textPrimary); }
+[data-style="v3"] .casa-all a { font-size: 13.5px; padding: 5px 0 5px 16px; }
+[data-style="v3"] .casa-me { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--cp-textSecondary); }
+[data-style="v3"] .casa-me .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-style="v3"] .casa-style { margin-top: -12px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--cp-border); background: transparent; color: var(--cp-textMuted); font-size: 12px; cursor: pointer; text-align: left; font-family: var(--cp-font); }
+[data-style="v3"] .casa-style:hover { color: var(--cp-textPrimary); border-color: var(--cp-borderStrong); }
+@media (max-width: 899px) { [data-style="v3"] .casa-nav a { min-height: 44px; align-items: center; } }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-style="v3"] .casa-page > * > * { animation: none; }
+  html.casa-intro[data-style="v3"] body::after, html.casa-intro[data-style="v3"]::after { display: none; }
+}
+
+/* Casa: seconda riga del titolo in corsivo; sezioni "aperte" (niente riquadro, solo linee); righe d'azione ariose */
+[data-style="v3"] .ds-h1-em { font-style: italic; color: var(--cp-textSecondary); }
+[data-style="v3"] .ds-open { background: transparent !important; border: 0 !important; border-radius: 0 !important; padding: 0 !important; margin: 0 0 72px !important; }
+[data-style="v3"] .ds-open-h { padding: 0 0 18px !important; }
+[data-style="v3"] .ds-open-f { padding: 18px 0 0 !important; border-top: 1px solid var(--cp-border) !important; }
+[data-style="v3"] .ds-arow { padding: 22px 0 !important; border-top: 1px solid var(--cp-border) !important; gap: 18px !important; }
+[data-style="v3"] .ds-arow-t { font-size: 16.5px !important; line-height: 1.45; }
+[data-style="v3"] .ds-arow-go { color: var(--cp-textSecondary) !important; font-size: 14px !important; }
+[data-style="v3"] .ds-arow:hover .ds-arow-go { color: var(--cp-textPrimary) !important; }
+[data-style="v3"] .hub-tool { background: transparent !important; border: 0 !important; border-top: 1px solid var(--cp-border) !important; border-radius: 0 !important; padding: 16px 4px !important; }
+[data-style="v3"] .hub-tool:hover { background: var(--cp-hover) !important; }
+/* la regola globale "* { font-family }" batteva i figli dei titoli: qui ereditano il serif */
+[data-style="v3"] .ds-h1 *, [data-style="v3"] .ds-hero-v *, [data-style="v3"] .ds-metric-v *, [data-style="v3"] .ds-sect * { font-family: inherit !important; }
+/* colonna ferma delle tabelle: fondo PIENO (col velo trasparente si vedeva una banda) */
+[data-style="v3"] .ds-stk { background-color: #111217 !important; }
+[data-style="v3"] th.ds-stk, [data-style="v3"] .ds-tbl th { background-color: #111217 !important; }
+
+/* Casa: niente MAIUSCOLO nell'interfaccia (etichette vecchie con text-transform inline) */
+[data-style="v3"] [style*="text-transform: uppercase"] { text-transform: none !important; letter-spacing: .01em !important; }
+/* Casa: avvisi fissi in cima sobri — niente fascia rossa permanente né avorio pieno abbagliante */
+[data-style="v3"] .hoc-banner { background: rgba(242,238,230,.035) !important; border-bottom: 1px solid var(--cp-border) !important; color: var(--cp-textSecondary) !important; }
+[data-style="v3"] .hoc-banner-va { background: rgba(217,180,106,.08) !important; border-bottom: 1px solid rgba(217,180,106,.35) !important; color: var(--cp-textPrimary) !important; backdrop-filter: blur(12px); }
+[data-style="v3"] .hoc-banner-btn { background: transparent !important; color: var(--cp-gold) !important; border: 1px solid rgba(217,180,106,.45) !important; border-radius: 999px !important; }
+/* Casa: la scheda d'azione principale non è un blocco avorio pieno ma un contorno oro */
+[data-style="v3"] .hoc-cta-card { background: rgba(217,180,106,.06) !important; border: 1px solid rgba(217,180,106,.5) !important; color: var(--cp-textPrimary) !important; }
+[data-style="v3"] .hoc-cta-card > div:nth-child(2) { font-family: var(--cp-display) !important; font-weight: 400 !important; font-size: 30px !important; }
+/* La città ha la sua regia: l'entrata delle pagine non tocca i suoi pezzi (accendeva la grana e apriva il pannello) */
+[data-style="v3"] .casa-page > .ct > * { animation: none !important; }
+
+/* ═══ Casa chiara ═══ stessa struttura, carta calda; il menu è chiaro anch'esso */
+[data-style="v3"][data-theme="light"] body { background: radial-gradient(120% 90% at 62% 8%, #fdfbf6 0%, #ebe6db 75%) fixed, #ebe6db !important; }
+[data-style="v3"][data-theme="light"] body::before { opacity: .035; }
+[data-style="v3"][data-theme="light"] .casa-side { background: rgba(251,249,244,.55); }
+@media (max-width: 899px) { [data-style="v3"][data-theme="light"] .casa-side { background: #f6f3ec; } }
+[data-style="v3"][data-theme="light"] .ds-stk, [data-style="v3"][data-theme="light"] .ds-tbl th { background-color: #f3efe7 !important; }
+[data-style="v3"][data-theme="light"] select option { background: #fbf9f4; color: #1a1917; }
+[data-style="v3"][data-theme="light"] .hoc-banner { background: rgba(26,25,23,.03) !important; }
+[data-style="v3"][data-theme="light"] .hoc-banner-va { background: rgba(148,112,47,.08) !important; border-bottom-color: rgba(148,112,47,.35) !important; }
+[data-style="v3"][data-theme="light"] .hoc-cta-card { background: rgba(148,112,47,.06) !important; border-color: rgba(148,112,47,.5) !important; }
+[data-style="v3"][data-theme="light"] ::selection { background: rgba(148,112,47,.22); }
+/* tasto chiaro/scuro nel menu Casa */
+[data-style="v3"] .casa-theme { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 999px; border: 1px solid var(--cp-border); background: transparent; color: var(--cp-textSecondary); cursor: pointer; flex: none; }
+[data-style="v3"] .casa-theme:hover { color: var(--cp-textPrimary); border-color: var(--cp-borderStrong); }

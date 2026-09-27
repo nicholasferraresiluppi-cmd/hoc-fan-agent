@@ -1,6 +1,7 @@
 // Qualità turni · GET — vista turno×operatore per creator×giorno.
 // Dati denaro (venduto per turno) → gate scope "all" come le altre viste money.
 
+import { authorizeAllCreators } from "@/lib/creator-scope";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { getCreators, getShiftQualityDay, isHocCreator, bigQueryConfigured } from "@/lib/shift-quality";
 import { readAnalysis } from "@/lib/shift-quality-llm";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+  const az = await authorizeAllCreators(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   if (!bigQueryConfigured()) return Response.json({ error: "BigQuery non configurato" }, { status: 503 });
 

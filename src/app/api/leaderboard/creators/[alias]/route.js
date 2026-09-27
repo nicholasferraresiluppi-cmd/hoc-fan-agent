@@ -7,12 +7,14 @@
  * Path param: alias = nome creator (es. "Bianca Rossi") — URL-encoded.
  * Query: ?period_id=YYYY-MM (required)
  */
-import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
+import { CAPABILITIES } from "@/lib/rbac";
+import { authorizeScoped, allowsCreator } from "@/lib/creator-scope";
 import { getCreatorDrilldown } from "@/lib/creator-aggregates";
 import { hasCpDataForPeriod } from "@/lib/creatorspro-data";
 
-export async function GET(request, { params }) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
+export async function GET(request, props) {
+  const params = await props.params;
+  const az = await authorizeScoped(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const resolved = typeof params?.then === "function" ? await params : params;
@@ -26,6 +28,7 @@ export async function GET(request, { params }) {
     return Response.json({ error: "period_id YYYY-MM richiesto" }, { status: 400 });
   }
   if (!alias) return Response.json({ error: "creator alias richiesto" }, { status: 400 });
+  if (!allowsCreator(az.creatorScope, alias)) return Response.json({ error: "Questa creator non è tra quelle assegnate a te." }, { status: 403 });
 
   const cpAvail = await hasCpDataForPeriod(period_id);
   if (!cpAvail) {

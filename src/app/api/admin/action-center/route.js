@@ -19,11 +19,14 @@
  *
  * GET    ?period_id=YYYY-MM             → ritorna swaps + lista underperformers
  * POST   body { period_id, employee, action, swap_with?, note?, status? }
- *         → upsert entry (action="mark", "set_swap", "set_ready", "set_pending")
+ *         → upsert entry (action="mark", "set_swap", "set_ready", "set_pending", "set_agreement")
+ *         set_agreement: body.agreement { next_step, verify_date (YYYY-MM-DD), operator_words }
+ *         → entry.agreement (cosa si è concordato nel colloquio, con by/at)
  * DELETE ?period_id=YYYY-MM&employee=N → rimuove entry (unmark)
  */
 import { kv } from "@vercel/kv";
-import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { CAPABILITIES } from "@/lib/rbac";
+import { authorizeScoped, allowsCreator, canActOnEmployee, scopeSummary } from "@/lib/creator-scope";
 import { logAuditAction } from "@/lib/audit-log";
 import { buildCreatorMatrix, computeSwapSuggestions } from "@/lib/creator-aggregates";
 import { buildOperatorsForCpLeaderboard, hasCpDataForPeriod } from "@/lib/creatorspro-data";
@@ -31,6 +34,9 @@ import { buildCpLeaderboard } from "@/lib/creatorspro-score";
 import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
 import { loadGroupLanguages } from "@/app/api/admin/group-languages/route";
 import { detectLanguage } from "@/lib/leaderboard-calc";
+import { getCachedCreatorDifficulty } from "@/lib/creator-difficulty";
+import { getCachedOperatorSignalProfiles } from "@/lib/operator-signals";
+import { recommendPathForGap } from "@/lib/coaching-paths";
 
 const SWAP_KEY = (periodId) => `action_center:swaps:${periodId}`;
 const IGNORED_KEY = "underperformers:ignored";
@@ -45,7 +51,8 @@ const TOP_N = 200;                     // Max candidati ritornati (cap di sicure
 function isValidPeriod(p) { return typeof p === "string" && /^\d{4}-\d{2}$/.test(p); }
 
 export async function GET(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  // 27/09/2026: da solo admin a chi guida una squadra (sales manager, team lead), limitato alle sue creator
+  const az = await authorizeScoped(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);
@@ -68,7 +75,7 @@ export async function GET(request) {
     loadGroupCategories(),
     loadGroupLanguages(),
   ]);
-  const swapsObj = swaps || {};
+  const swapsAll = swaps || {};
   const ignoredObj = ignored || {};
 
   // Decora ogni operator con language (override > regex) e category
@@ -79,6 +86,9 @@ export async function GET(request) {
 
   // Calcola score con buildCpLeaderboard (deriva da matrix v3)
   const { ranking } = await buildCpLeaderboard(operatorsDecorated, period_id);
+  // decisioni già prese: solo sugli operatori delle creator visibili
+  const visibleEmp = new Set(ranking.filter((r) => allowsCreator(az.creatorScope, r.cp_breakdown?.top_creator)).map((r) => r.employee));
+  const swapsObj = az.creatorScope.all ? swapsAll : Object.fromEntries(Object.entries(swapsAll).filter(([e]) => visibleEmp.has(e)));
 
   // Filtra underperformers (allargato a SCORE_MAX_BACKEND, UI poi filtra con slider)
   const rawCandidates = ranking
@@ -88,7 +98,7 @@ export async function GET(request) {
       const totalShifts = r.cp_aggregates?.total_shifts || 0;
       if (totalShifts < UNDERPERFORMER_MIN_SHIFTS) return false;
       if (ignoredObj[r.employee]) return false;
-      return true;
+      return allowsCreator(az.creatorScope, r.cp_breakdown?.top_creator);
     })
     .sort((a, b) => a.score - b.score) // peggiore primo
     .slice(0, TOP_N);
@@ -97,6 +107,75 @@ export async function GET(request) {
   const suggestionsArr = await Promise.all(
     rawCandidates.map((r) => computeSwapSuggestions(r.employee, period_id, { limit: 5 }))
   );
+
+  // Contesto prima del giudizio (26/09/2026): per la creator principale di ogni
+  // candidato, (a) quanto rende rispetto ai COLLEGHI su di lei (leave-one-out:
+  // la sua quota esclusa dalla media), (b) quanto è "freddo" il suo pubblico
+  // (profilo difficoltà dal warehouse, solo cache — mai calcolo nel percorso UI).
+  // Serve a non sostituire chi rende come gli altri su una creator difficile.
+  const { matrix, creators: creatorAgg } = matrixResult || {};
+  let diffByName = new Map();
+  try {
+    const d = await getCachedCreatorDifficulty();
+    for (const p of d?.profiles || []) if (p.creator_name) diffByName.set(p.creator_name, p);
+  } catch {}
+  function contextFor(r) {
+    const cr = r.cp_breakdown?.top_creator;
+    if (!cr) return null;
+    const cell = matrix?.[r.employee]?.[cr];
+    const agg = creatorAgg?.[cr];
+    let vsPeers = null;
+    if (cell && agg && cell.shifts >= 3) {
+      const peerShifts = (agg.total_shifts || 0) - cell.shifts;
+      const peerSales = (agg.total_sales || 0) - cell.sales;
+      if (peerShifts >= 5 && peerSales > 0) {
+        const mine = cell.sales / cell.shifts, peers = peerSales / peerShifts;
+        vsPeers = Math.round(((mine - peers) / peers) * 100);
+      }
+    }
+    const prof = diffByName.get(cr);
+    const idx = prof && !prof.free_page && typeof prof.difficulty_index === "number" ? prof.difficulty_index : null;
+    return {
+      creator: cr,
+      vs_peers_pct: vsPeers,
+      difficulty_index: idx,
+      difficulty_band: idx == null ? null : idx >= 67 ? "fredda" : idx <= 33 ? "calda" : "nella media",
+    };
+  }
+
+  // Cosa allenare (vista colloquio, 26/09): dal profilo-segnali in CACHE (mai
+  // BigQuery qui). Abbinamento per nome esatto normalizzato; nomi ambigui (due
+  // profili che normalizzano uguale) NON abbinati: meglio niente che il dato di
+  // un altro. Finestra diversa dal mese CP (ultimi giorni, turni singoli): la UI
+  // lo dichiara. Coaching, non score.
+  const norm = (x) => String(x || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const sigByName = new Map();
+  let sigMeta = null;
+  try {
+    const sig = await getCachedOperatorSignalProfiles();
+    if (sig?.profiles) {
+      sigMeta = { days: sig.params?.days ?? null, generated_at: sig.generated_at || null };
+      const seen = new Map();
+      for (const p of sig.profiles) { const k = norm(p.operator); seen.set(k, (seen.get(k) || 0) + 1); }
+      for (const p of sig.profiles) { const k = norm(p.operator); if (seen.get(k) === 1) sigByName.set(k, p); }
+    }
+  } catch {}
+  function coachingFor(employee) {
+    const p = sigByName.get(norm(employee));
+    const g = p?.top_gap;
+    if (!g?.key) return null;
+    const m = (p.metrics || []).find((x) => x.key === g.key);
+    const path = recommendPathForGap(g.key);
+    return {
+      label: g.label,
+      display: m?.display ?? null,
+      org_median: m?.org_median ?? null,
+      advice: g.coaching || null,
+      focus: path?.focus || null,
+      scenarios: (path?.scenarios || []).map((s) => s.title).filter(Boolean),
+      window_days: sigMeta?.days ?? null,
+    };
+  }
 
   const candidates = rawCandidates.map((r, i) => {
     const swapEntry = swapsObj[r.employee] || null;
@@ -116,12 +195,15 @@ export async function GET(request) {
       reliable_creators_count: r.cp_breakdown?.reliable_creators || 0,
       swap_entry: swapEntry,
       suggested_swaps: suggestionsArr[i] || [],
+      context: contextFor(r),
+      coaching: coachingFor(r.employee),
     };
   });
 
   // Lista candidati per swap (operatori "buoni" non in underperformer list)
   const swapTargets = ranking
     .filter((r) => r.score != null && r.score >= 50) // Good+
+    .filter((r) => allowsCreator(az.creatorScope, r.cp_breakdown?.top_creator))
     .filter((r) => (r.cp_aggregates?.total_shifts || 0) >= 3)
     .sort((a, b) => b.score - a.score)
     .map((r) => ({
@@ -161,6 +243,7 @@ export async function GET(request) {
     ignored_count: Object.keys(ignoredObj).length,
     ready_for_hr: readyForHr,
     swaps: swapsObj,
+    visibility: scopeSummary(az.creatorScope),
     filter_counts: {
       languages: langCounts,
       tiers: tierCounts,
@@ -175,7 +258,7 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorizeScoped(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   let body;
@@ -185,9 +268,10 @@ export async function POST(request) {
   if (!isValidPeriod(period_id)) return Response.json({ error: "period_id YYYY-MM required" }, { status: 400 });
   if (!employee || typeof employee !== "string") return Response.json({ error: "employee (string) required" }, { status: 400 });
 
-  const validActions = ["mark", "set_swap", "set_ready", "set_pending"];
+  const validActions = ["mark", "set_swap", "set_ready", "set_pending", "set_agreement"];
   if (!validActions.includes(action)) return Response.json({ error: `action must be ${validActions.join("|")}` }, { status: 400 });
 
+  if (!(await canActOnEmployee(az.creatorScope, employee, period_id))) return Response.json({ error: "Questo operatore non lavora sulle creator assegnate a te." }, { status: 403 });
   const key = SWAP_KEY(period_id);
   const swaps = (await kv.get(key)) || {};
   const prev = swaps[employee] || null;
@@ -201,6 +285,8 @@ export async function POST(request) {
     status: prev?.status || "marked",
     swap_with: prev?.swap_with || null,
     note: prev?.note || "",
+    hr: prev?.hr || null,
+    agreement: prev?.agreement || null,
   };
 
   if (action === "mark") {
@@ -211,9 +297,32 @@ export async function POST(request) {
     }
     next.swap_with = swap_with === null ? null : swap_with.trim();
   } else if (action === "set_ready") {
+    // Decisione 26/09 (comitato esperti, delega di Nicholas): verso HR si va solo
+    // con un intervento umano documentato — colloquio svolto, motivazione scritta,
+    // voce dell'operatore. È anche la prova dell'intervento umano (GDPR art. 22).
+    const hr = body?.hr || {};
+    const date = String(hr.colloquio_date || "").trim();
+    const why = String(hr.motivazione || "").trim();
+    const voice = String(hr.voce_operatore || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return Response.json({ error: "Indica la data del colloquio" }, { status: 400 });
+    if (why.length < 80) return Response.json({ error: "La motivazione deve essere di almeno 80 caratteri" }, { status: 400 });
+    if (voice.length < 10) return Response.json({ error: "Scrivi cosa ha detto l'operatore nel colloquio" }, { status: 400 });
     next.status = "ready_for_hr";
+    next.hr = { colloquio_date: date, motivazione: why.slice(0, 2000), voce_operatore: voice.slice(0, 2000), by: az.userId, at: now };
+  } else if (action === "set_agreement") {
+    // Vista colloquio (26/09): cosa si è concordato con la persona. Non cambia lo
+    // stato del caso: è memoria del colloquio, non una decisione.
+    const ag = body?.agreement || {};
+    const nextStep = String(ag.next_step || "").trim();
+    const verify = String(ag.verify_date || "").trim();
+    const words = String(ag.operator_words || "").trim();
+    if (verify && !/^\d{4}-\d{2}-\d{2}$/.test(verify)) return Response.json({ error: "Data di verifica non valida (AAAA-MM-GG)" }, { status: 400 });
+    if (nextStep.length > 2000 || words.length > 2000) return Response.json({ error: "Testo troppo lungo (massimo 2000 caratteri)" }, { status: 400 });
+    if (!nextStep && !verify && !words) return Response.json({ error: "Scrivi almeno il prossimo passo o la data di verifica" }, { status: 400 });
+    next.agreement = { next_step: nextStep, verify_date: verify || null, operator_words: words, by: az.userId, at: now };
   } else if (action === "set_pending") {
     next.status = "marked";
+    next.hr = null;
   }
 
   if (typeof note === "string") next.note = note.trim();
@@ -232,13 +341,14 @@ export async function POST(request) {
 }
 
 export async function DELETE(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorizeScoped(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
 
   const url = new URL(request.url);
   const period_id = url.searchParams.get("period_id");
   const employee = url.searchParams.get("employee");
   if (!isValidPeriod(period_id)) return Response.json({ error: "period_id YYYY-MM required" }, { status: 400 });
+  if (employee && !(await canActOnEmployee(az.creatorScope, employee, period_id))) return Response.json({ error: "Questo operatore non lavora sulle creator assegnate a te." }, { status: 403 });
   if (!employee) return Response.json({ error: "?employee=NAME required" }, { status: 400 });
 
   const key = SWAP_KEY(period_id);

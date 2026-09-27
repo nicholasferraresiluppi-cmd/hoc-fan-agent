@@ -29,6 +29,7 @@ const ACTIVE_KEYS = {
   weights: "ops_kpi:settings:weights",
   thresholds: "ops_kpi:settings:thresholds",
   tiers: "ops_kpi:settings:tiers",
+  small_group: "ops_kpi:settings:small_group",
 };
 
 export async function listDrafts() {
@@ -77,10 +78,10 @@ export async function createDraft({ name, note = "", fromDraftId = null, created
   if (fromDraftId) {
     const src = await getDraft(fromDraftId);
     if (!src) throw new Error(`Bozza sorgente "${fromDraftId}" non trovata.`);
-    base = { weights: src.weights, thresholds: src.thresholds, tiers: src.tiers };
+    base = { weights: src.weights, thresholds: src.thresholds, tiers: src.tiers, small_group: src.small_group || null };
   } else {
     const active = await loadSettings();
-    base = { weights: active.weights, thresholds: active.thresholds, tiers: active.tiers };
+    base = { weights: active.weights, thresholds: active.thresholds, tiers: active.tiers, small_group: active.small_group || null };
   }
   const ts = Date.now();
   const draft = {
@@ -94,6 +95,7 @@ export async function createDraft({ name, note = "", fromDraftId = null, created
     weights: base.weights,
     thresholds: base.thresholds,
     tiers: base.tiers,
+    small_group: base.small_group,
     backtest: null,
   };
   return saveDraft(draft);
@@ -105,11 +107,16 @@ export async function createDraft({ name, note = "", fromDraftId = null, created
  */
 export async function runBacktest({ draft, period_type = "monthly", mode = "withoutClockIn", limit = 6 }) {
   const active = await loadSettings();
-  const draftSettings = { weights: draft.weights, thresholds: draft.thresholds, tiers: draft.tiers };
+  const draftSettings = { weights: draft.weights, thresholds: draft.thresholds, tiers: draft.tiers, ...(draft.small_group?.min_size ? { small_group: draft.small_group } : {}) };
 
   let exclusions = {};
   try {
     exclusions = (await kv.get("leaderboard:exclusions")) || {};
+  } catch {}
+  // lingua dei gruppi (override manuali) per la regola dei gruppi piccoli
+  let group_languages = {};
+  try {
+    group_languages = (await kv.get("group_languages")) || {};
   } catch {}
 
   const periodIds = ((await listAvailablePeriods(period_type)) || []).slice(0, limit);
@@ -122,8 +129,8 @@ export async function runBacktest({ draft, period_type = "monthly", mode = "with
     } catch {}
     if (!records.length) continue;
 
-    const cur = buildLeaderboard(records, mode, active, exclusions);
-    const prop = buildLeaderboard(records, mode, draftSettings, exclusions);
+    const cur = buildLeaderboard(records, mode, { ...active, group_languages }, exclusions);
+    const prop = buildLeaderboard(records, mode, { ...draftSettings, group_languages }, exclusions);
 
     // score === null ⇒ escluso (manuale o mass account); score 0 resta in classifica.
     const curScored = cur.ranking.filter((r) => r.score !== null);
@@ -200,6 +207,7 @@ export async function publishDraft(id, { publishedBy = "" } = {}) {
     weights: active.weights,
     thresholds: active.thresholds,
     tiers: active.tiers,
+    small_group: active.small_group || null,
     backtest: null,
   };
   await saveDraft(archived);
@@ -209,6 +217,7 @@ export async function publishDraft(id, { publishedBy = "" } = {}) {
     kv.set(ACTIVE_KEYS.weights, draft.weights),
     kv.set(ACTIVE_KEYS.thresholds, draft.thresholds),
     kv.set(ACTIVE_KEYS.tiers, draft.tiers),
+    draft.small_group?.min_size ? kv.set(ACTIVE_KEYS.small_group, draft.small_group) : kv.del(ACTIVE_KEYS.small_group),
   ]);
 
   // 3. Stato bozza → published.

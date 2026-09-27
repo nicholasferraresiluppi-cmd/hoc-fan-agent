@@ -18,9 +18,12 @@
  *
  * Auth: qualsiasi utente loggato.
  */
-import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
+import { CAPABILITIES } from "@/lib/rbac";
+import { authorizeEmployee } from "@/lib/creator-scope";
+import { resolveEmployeeForUser, normalizeName } from "@/lib/me";
 import { kv } from "@vercel/kv";
 import { buildCreatorMatrix } from "@/lib/creator-aggregates";
+import { getWages } from "@/lib/cp-wages-store";
 
 function lastMonthIds(n) {
   const out = [];
@@ -40,18 +43,28 @@ function monthsBetween(startId, endId) {
 }
 
 export async function GET(request) {
-  const az = await authorizeAll(CAPABILITIES.SCORES_VIEW);
-  if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
-
   const url = new URL(request.url);
   const employee = url.searchParams.get("employee");
+  // Chi vede tutta l'agenzia: qualsiasi operatore. Un operatore: SOLO se stesso
+  // (identità risolta dal server, mai dal client). Prima (lug 2026, #24) l'API
+  // era solo scope "all" e /profilo mostrava "nessun dato" a TUTTI gli operatori.
+  // 27/09/2026: chi guida una squadra apre la scheda degli operatori delle SUE creator
+  const az = await authorizeEmployee(CAPABILITIES.SCORES_VIEW, employee, null);
+  let ownOnly = false;
+  if (!az.ok) {
+    const who = await resolveEmployeeForUser();
+    if (!who?.employee || !employee || normalizeName(who.employee) !== normalizeName(employee)) {
+      return Response.json({ error: az.message }, { status: az.status });
+    }
+    ownOnly = true;
+  }
   const lastN = Math.max(1, Math.min(24, parseInt(url.searchParams.get("last_n") || "12", 10)));
   if (!employee) return Response.json({ error: "employee required" }, { status: 400 });
 
   const periodIds = lastMonthIds(lastN);
 
   // 1. Quali mesi hanno dati CP (parallelo, leggero)
-  const wagesCheck = await Promise.all(periodIds.map((pid) => kv.get(`cp:wages:${pid}`)));
+  const wagesCheck = await Promise.all(periodIds.map((pid) => getWages(pid)));
   const syncedPeriods = periodIds.filter((_, i) => Array.isArray(wagesCheck[i]) && wagesCheck[i].length > 0);
 
   if (syncedPeriods.length === 0) {
@@ -115,6 +128,7 @@ export async function GET(request) {
     employee,
     history,
     tenure_months_cp,
+    // NB: CreatorsPro registra in DOLLARI; il nome storico del campo dice "eur" (verificato 26/09): la UI lo mostra in $
     ltv_cp_eur: Math.round(ltv),
     first_seen_period: firstSeen,
     last_seen_period: lastSeen,

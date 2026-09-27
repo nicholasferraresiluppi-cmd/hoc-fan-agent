@@ -64,7 +64,7 @@ export async function PUT(request) {
   } catch {
     return Response.json({ error: "Invalid JSON body." }, { status: 400 });
   }
-  const { id, name, note, weights, thresholds, tiers } = body || {};
+  const { id, name, note, weights, thresholds, tiers, small_group } = body || {};
   const draft = await getDraft(id);
   if (!draft) return Response.json({ error: `Bozza "${id}" non trovata.` }, { status: 404 });
   if (draft.status !== "draft") {
@@ -86,11 +86,20 @@ export async function PUT(request) {
     if (err) return Response.json({ error: `Tiers non valido: ${err}` }, { status: 400 });
     draft.tiers = tiers;
   }
+  if (small_group !== undefined) {
+    // null = regola spenta; { min_size: 2..20 } = gruppi sotto min_size confrontati con la lingua
+    if (small_group === null) draft.small_group = null;
+    else {
+      const n = Number(small_group?.min_size);
+      if (!Number.isInteger(n) || n < 2 || n > 20) return Response.json({ error: "small_group.min_size deve essere un intero tra 2 e 20" }, { status: 400 });
+      draft.small_group = { min_size: n, fallback: "language" };
+    }
+  }
   if (name !== undefined) draft.name = String(name).slice(0, 80);
   if (note !== undefined) draft.note = String(note).slice(0, 500);
 
   // La formula è cambiata: un eventuale backtest precedente non è più valido.
-  if (weights !== undefined || thresholds !== undefined || tiers !== undefined) {
+  if (weights !== undefined || thresholds !== undefined || tiers !== undefined || small_group !== undefined) {
     draft.backtest = null;
   }
   draft.updated_at = Date.now();

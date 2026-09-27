@@ -1,10 +1,12 @@
 "use client";
+import { use } from "react";
 
 import Link from "next/link";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader, CpCard } from "@/components/cp-style";
 
-export default function DraftDetailPage({ params }) {
+export default function DraftDetailPage(props) {
+  const params = use(props.params);
   return (
     <div style={{ padding: "32px 28px 64px 28px", maxWidth: 1400, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
       <PageHeader
