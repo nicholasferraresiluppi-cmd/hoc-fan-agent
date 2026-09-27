@@ -1,5 +1,6 @@
 "use client";
 
+import Glossario from "@/components/Glossario";
 import useSWR from "swr";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -88,6 +89,7 @@ export default function MyPayoutPage() {
   const { data, error, isLoading } = useSWR("/api/me/payout", fetcher, { revalidateOnFocus: false });
   const [open, setOpen] = useState(null);
   const shifts = useMemo(() => (data?.shifts || []).map((s, i) => ({ ...s, key: i })), [data]);
+  const soldTotal = shifts.reduce((a, s) => a + (Number(s.sold) || 0), 0);
   const sel = open != null ? shifts.find((s) => s.key === open) : null;
   const canHover = useCanHover();
   const detailRef = useRef(null);
@@ -127,28 +129,46 @@ export default function MyPayoutPage() {
       {data?.linked && data.totals && (
         <>
           <HeroMetric
-            label={`Totale · ${monthLabel(data.period_id)}`}
+            label={`Il tuo compenso · ${monthLabel(data.period_id)}`}
             value={fmtUsd(data.totals.wage)}
             compare={`${data.totals.shifts} turni${data.totals.hours ? ` · ${Math.round(data.totals.hours)}h` : ""}`}
           >
-            <Metric
-              label="Da scaglioni sul venduto"
-              value={fmtUsd(data.totals.from_takes)}
-              note={data.totals.from_hours > 0 ? `+ ${fmtUsd(data.totals.from_hours)} da ore` : null}
-            />
+            {/* pannello pilota: prima una seconda riga con lo stesso numero ("Da scaglioni") confondeva */}
+            <Metric label="Il tuo venduto" value={fmtUsd(soldTotal)} note={soldTotal > 0 ? `quota media ${fmtPct(data.totals.wage / soldTotal, 1)}` : null} />
+            {data.totals.from_hours > 0 && <Metric label="Di cui da ore" value={fmtUsd(data.totals.from_hours)} />}
           </HeroMetric>
+          <p style={{ fontSize: 12.5, color: CP.textMuted, margin: "-4px 0 0" }}>Importi in dollari, come in CreatorsPro.</p>
 
           <section style={{ marginTop: 22, marginBottom: 14 }}>
             <SectionTitle aside="dal più recente · apri un turno per il dettaglio">I miei turni</SectionTitle>
-            <DataTable
-              columns={columns}
-              rows={shifts}
-              minWidth={820}
-              maxHeight={440}
-              onRowClick={(s) => setOpen(open === s.key ? null : s.key)}
-              selected={(s) => s.key === open}
-              empty="Nessun turno in questo periodo."
-            />
+            <div className="me-shift-table">
+              <DataTable
+                columns={columns}
+                rows={shifts}
+                minWidth={820}
+                maxHeight={440}
+                onRowClick={(s) => setOpen(open === s.key ? null : s.key)}
+                selected={(s) => s.key === open}
+                empty="Nessun turno in questo periodo."
+              />
+            </div>
+            {/* telefono: un turno per riga, leggibile senza scorrere di lato */}
+            <div className="me-shift-cards" style={{ display: "none", ...card }}>
+              {shifts.map((s, i) => (
+                <button key={s.key} type="button" onClick={() => setOpen(open === s.key ? null : s.key)}
+                  style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 2, width: "100%", textAlign: "left", background: s.key === open ? CP.accentSoft : "transparent", border: "none", borderTop: i ? `1px solid ${CP.borderSoft}` : "none", padding: "11px 14px", cursor: "pointer", color: CP.textPrimary, fontFamily: "inherit" }}>
+                  <span style={{ fontSize: 14 }}>{fmtDate(s.started_at)}</span>
+                  <span style={{ fontSize: 14, fontWeight: 500, textAlign: "right", ...NUM }}>{fmtUsd(s.earned)}</span>
+                  <span style={{ fontSize: 12.5, color: CP.textMuted }}>{(s.creators || []).join(", ") || "—"}</span>
+                  <span style={{ fontSize: 12.5, color: CP.textMuted, textAlign: "right", ...NUM }}>{s.sold > 0 ? `venduto ${fmtUsd(s.sold)}${s.effective_pct != null ? ` · ${fmtPct(s.effective_pct, 1)}` : ""}` : "nessuna vendita"}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", padding: "10px 4px 0", fontSize: 13.5, color: CP.textSecondary, ...NUM }}>
+              <span>Totale {shifts.length} turni</span>
+              <span>venduto <b style={{ fontWeight: 500, color: CP.textPrimary }}>{fmtUsd(soldTotal)}</b> · compenso <b style={{ fontWeight: 500, color: CP.textPrimary }}>{fmtUsd(shifts.reduce((a, s) => a + (s.earned || 0), 0))}</b></span>
+            </div>
+            <style>{`@media (max-width: 700px){.me-shift-table{display:none}.me-shift-cards{display:block!important}}`}</style>
           </section>
 
           {sel && (
@@ -167,6 +187,7 @@ export default function MyPayoutPage() {
                   Profilo: {sel.profile.name}{sel.profile.cosellers ? ` · ${sel.profile.cosellers} coseller` : ""}{sel.worked_hours ? ` · ${sel.worked_hours}h lavorate` : ""}
                 </p>
               )}
+              {!(sel.sold > 0) && <p style={{ fontSize: 13, color: CP.textMuted, margin: "0 0 12px" }}>Turno senza vendite registrate. Se l&apos;hai lavorato e hai venduto, contestalo qui sotto: può essere un turno programmato e poi cambiato, o una vendita non attribuita.</p>}
               {(sel.breakdown || []).length > 0 ? (
                 <DataTable columns={TIER_COLUMNS} rows={sel.breakdown} minWidth={520} />
               ) : (
@@ -178,6 +199,7 @@ export default function MyPayoutPage() {
             </section>
           )}
 
+          <div style={{ marginTop: 18 }}><Glossario /></div>
           <p style={{ fontSize: 13, color: CP.textMuted, marginTop: 18, lineHeight: 1.6 }}>
             Gli scaglioni sono cumulativi: ogni fascia si applica solo alla parte di venduto che ci cade dentro. Un numero non ti torna? <Link href="/me/contestazioni" style={{ color: CP.accentSoftText }}>Apri una contestazione</Link> — ogni correzione viene tracciata.
           </p>

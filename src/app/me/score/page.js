@@ -1,5 +1,6 @@
 "use client";
 
+import Glossario from "@/components/Glossario";
 import { useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
@@ -25,8 +26,8 @@ const KPI_LABELS = {
   golden_ratio: "Golden ratio (PPV/messaggi)",
   sales_per_hour: "Vendite per ora",
   avg_revenue_per_fan: "Ricavo medio per fan",
-  avg_length_of_conversation: "Lunghezza conversazioni",
-  input_per_message: "Cura dei messaggi",
+  avg_length_of_conversation: "Lunghezza dei messaggi",
+  input_per_message: "Lunghezza dei messaggi (2ª voce)",
   messages_sent_per_hour: "Messaggi per ora",
 };
 
@@ -39,8 +40,8 @@ const KPI_HELP = {
   golden_ratio: "Quanti PPV mandi rispetto ai messaggi: se proponi abbastanza, o chatti senza vendere.",
   sales_per_hour: "Quanto vendi per ogni ora di turno.",
   avg_revenue_per_fan: "Quanto rende in media ogni fan con cui chatti.",
-  avg_length_of_conversation: "Quanto durano le conversazioni.",
-  input_per_message: "Quanto scrivi in ogni messaggio (messaggi curati, non monosillabi).",
+  avg_length_of_conversation: "Quanti caratteri scrivi in media per messaggio.",
+  input_per_message: "Oggi è la stessa misura della voce sopra: nella formula conta due volte. È in revisione.",
   messages_sent_per_hour: "Quanti messaggi mandi per ora.",
 };
 
@@ -313,6 +314,7 @@ export default function MyScorePage() {
           </div>
         </>
       )}
+      <div style={{ marginTop: 24 }}><Glossario /></div>
     </div>
   );
 }

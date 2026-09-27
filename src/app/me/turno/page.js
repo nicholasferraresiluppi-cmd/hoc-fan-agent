@@ -1,5 +1,6 @@
 "use client";
 
+import Glossario from "@/components/Glossario";
 import { useCallback, useEffect, useState } from "react";
 import useSWR from "swr";
 import { Copy, Check, Clock, Snowflake, HelpCircle, Compass } from "lucide-react";
@@ -203,6 +204,7 @@ export default function MyShiftPage() {
           non entrano in nessuno score. Per trovare un fan, incolla l&apos;@username nella ricerca di Infloww.
         </p>
       )}
+      <div style={{ marginTop: 24 }}><Glossario /></div>
     </div>
   );
 }
