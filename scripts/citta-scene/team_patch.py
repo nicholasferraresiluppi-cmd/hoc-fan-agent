@@ -70,7 +70,7 @@ TEAM_CSS = r'''
 .ct .tl .dots{display:none}
 .ct .tm-fl b.st{font-weight:500;font-size:11px;margin-left:6px}.ct .tm-fl b.st.wait{color:#FFB54A}.ct .tm-fl b.st.stop{color:rgba(242,238,230,.5)}.ct .tm-fl b.st.est{font-style:italic;opacity:.75}
 .ct .top5 em.own{display:block;font-style:normal;font-size:11.5px;color:rgba(242,238,230,.5);margin-top:2px}
-@media (max-width:760px){.ct #line{display:none}}
+@media (max-width:760px){.ct #line{display:none}.ct #since{display:none}.ct .top5 button>span,.ct .top5 em.own{display:none}.ct .top5 button{padding:6px 0}}
 .ct .tm-fl em{font-style:normal;color:#E8CB8A;font-size:11px}
 .ct .tm-fl{position:absolute;top:0;left:0;z-index:20;pointer-events:none;font-size:12px;letter-spacing:.04em;color:rgba(242,238,230,.72);white-space:nowrap;padding-right:6px;display:flex;gap:6px;align-items:baseline}.ct .tm-fl span{color:#E8CB8A;font-size:11px}
 .ct .team{margin:2px 0 14px}
