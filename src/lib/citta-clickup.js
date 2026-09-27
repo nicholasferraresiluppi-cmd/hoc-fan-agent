@@ -38,7 +38,7 @@ async function spaceTasks(team, spaceId) {
         id: t.id, space: spaceId, name: String(t.name || "").trim(), list: String(t.list?.name || "").trim(), status,
         due: t.due_date ? Number(t.due_date) : null, upd: t.date_updated ? Number(t.date_updated) : null,
         who: (t.assignees || []).map((a) => String(a.username || "").split("@")[0].split(" ")[0]).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)),
-        people: (t.assignees || []).map((a) => ({ id: String(a.id || ""), name: String(a.username || "").trim(), email: String(a.email || "").trim().toLowerCase() })).filter((a) => a.email || a.id),
+        people: (t.assignees || []).map((a) => ({ id: String(a.id || ""), name: String(a.username || "").replace(/\s*[([{][^)\]}]*[)\]}]/g, "").replace(/\s+/g, " ").trim(), email: String(a.email || "").trim().toLowerCase() })).filter((a) => a.email || a.id),
       });
     }
     if (d.last_page || !(d.tasks || []).length) break;
