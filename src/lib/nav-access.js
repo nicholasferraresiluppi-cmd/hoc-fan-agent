@@ -34,6 +34,8 @@ export const NAV_ACCESS = {
   "/admin/team": any("access.mgmt"), "/admin/access": any("access.mgmt"), "/admin/ruoli": any("access.mgmt"), "/admin/ruoli-custom": any("access.mgmt"),
   "/admin/seniority": any("seniority.override"),
   "/admin/utilizzo": { type: "admin" },
+  // report Looker aziendale: serve un account Google HOC con accesso al report (non gli operatori)
+  "/admin/reports": all("scores.view"),
 };
 
 /** La voce `href` funziona per chi ha queste capability? */
