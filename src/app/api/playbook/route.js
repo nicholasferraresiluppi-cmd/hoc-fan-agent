@@ -22,7 +22,7 @@
  */
 import { auth } from "@clerk/nextjs/server";
 import { GOLDEN_EXAMPLES } from "@/lib/golden-examples";
-import { PLAYBOOK_ENTRIES } from "@/lib/playbook-entries";
+import { PLAYBOOK_ENTRIES, SCENARIO_LESSONS } from "@/lib/playbook-entries";
 
 /**
  * Trasforma una entry golden nel formato unificato della libreria.
@@ -103,6 +103,13 @@ export async function GET(request) {
 
   // Applica filtri (AND)
   let filtered = all;
+
+  // ?scenario=<id>: le lezioni abbinate a quello scenario, nell'ordine dell'abbinamento
+  const scenario = url.searchParams.get("scenario");
+  if (scenario && SCENARIO_LESSONS[scenario]) {
+    const ids = SCENARIO_LESSONS[scenario];
+    filtered = ids.map((id) => filtered.find((e) => e.id === id)).filter(Boolean);
+  }
 
   if (category) {
     filtered = filtered.filter((e) => e.category === category);
