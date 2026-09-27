@@ -48,6 +48,15 @@ export async function GET(request) {
     const [custodians, relit] = await Promise.all([getCustodians(), month === cur ? recentRelit(7) : []]);
     for (const t of [...merged.projects, merged.hq]) if (custodians[t.n]) t.custodian = { name: custodians[t.n].name, userId: custodians[t.n].userId };
     const mine = Object.entries(custodians).filter(([, c]) => c.userId === az.userId).map(([t]) => t);
+    // Fase 4: chi è in turno adesso (programma CP) e strade delle persone condivise
+    if (month === cur) {
+      try {
+        const { shiftsNow, sharedRoads } = await import("@/lib/citta-vita");
+        const [on, roads] = await Promise.all([shiftsNow(), sharedRoads(merged.projects.map((p) => p.n))]);
+        for (const t of merged.projects) if (on[t.n]) t.onShift = on[t.n];
+        merged.roads = roads;
+      } catch { /* la vita è un di più: se manca, la città resta */ }
+    }
     return Response.json({ ...merged, since: { ...since, staleClaims, relit: relit.map((r) => `${r.tower} · ${r.area} (${r.by})`) }, months, month, canClaim: month === cur, mine });
   } catch (e) {
     return Response.json({ ...snap, months, month, live_error: String(e?.message || e) });
