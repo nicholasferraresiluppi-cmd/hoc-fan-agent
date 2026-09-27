@@ -123,23 +123,23 @@ export async function GET() {
     {
       id: "L1_L2",
       label: "Sales Operator I → II",
-      time_floor: "≥ 6 mesi in L1",
+      time_floor: "almeno 6 mesi nel livello I",
       performance: evalGate(history, { minScore: 61, needed: 3, window: 4, floor: 51 }),
       other_requirements: [
-        qaReq(qa3, "QA trimestrale pass"),
+        qaReq(qa3, "Controllo qualità del trimestre superato"),
         certReq,
-        { label: "Time floor (tenure nel livello)", status: "not_tracked" },
+        { label: "Tempo minimo nel livello", status: "not_tracked" },
       ],
     },
     {
       id: "L2_L3",
       label: "Sales Operator II → III (Senior)",
-      time_floor: "≥ 10 mesi in L2",
+      time_floor: "almeno 10 mesi nel livello II",
       performance: evalGate(history, { minScore: 71, needed: 4, window: 6 }),
       other_requirements: [
-        qaReq(qa6, "QA pass, zero violazioni compliance 6 mesi"),
+        qaReq(qa6, "Controllo qualità superato e nessuna violazione delle regole in 6 mesi"),
         { label: "Mentoring di ≥ 2 nuovi ingressi", status: "not_tracked" },
-        { label: "Time floor (tenure nel livello)", status: "not_tracked" },
+        { label: "Tempo minimo nel livello", status: "not_tracked" },
       ],
     },
   ];

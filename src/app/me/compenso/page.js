@@ -21,7 +21,7 @@ const fetcher = (url) => fetch(url).then((r) => r.json());
 const fmtUsd = (v) => (v == null ? "—" : "$" + Number(v).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" }));
 const fmtDate = (iso) => {
   if (!iso) return "—";
-  try { return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }); } catch { return iso; }
+  try { const d = new Date(iso); return `${d.toLocaleDateString("it-IT", { day: "2-digit", month: "short", timeZone: "Europe/Rome" })} · ${d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" })}`; } catch { return iso; }
 };
 const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
 const monthLabel = (pid) => (/^\d{4}-\d{2}$/.test(pid || "") ? `${MESI[Number(pid.slice(5)) - 1]} ${pid.slice(0, 4)}` : pid);
