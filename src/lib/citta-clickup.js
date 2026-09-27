@@ -33,7 +33,7 @@ async function spaceTasks(team, spaceId) {
       const status = t.status?.status || "";
       if (DONE.test(status.trim())) continue;
       out.push({
-        id: t.id, space: spaceId, name: String(t.name || "").trim(), status,
+        id: t.id, space: spaceId, name: String(t.name || "").trim(), list: String(t.list?.name || "").trim(), status,
         due: t.due_date ? Number(t.due_date) : null, upd: t.date_updated ? Number(t.date_updated) : null,
         who: (t.assignees || []).map((a) => String(a.username || "").split("@")[0].split(" ")[0]).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)),
       });
@@ -71,7 +71,7 @@ async function classifyNew(titles, limit = 400) {
     const msg = await anthropic.messages.create({
       model: process.env.CITTA_LABEL_MODEL || "claude-haiku-4-5-20251001",
       max_tokens: 4000,
-      messages: [{ role: "user", content: `Agenzia che gestisce creator OnlyFans (chat con i fan fatte da operatori, contenuti, vendite, accordi). Classifica ogni titolo di attività ClickUp.\n${RULES}\nRispondi SOLO con JSON {"<numero>": "<area>"}.\n\n${chunk.map((t, i) => `${i}: ${t.slice(0, 140)}`).join("\n")}` }],
+      messages: [{ role: "user", content: `Agenzia che gestisce creator OnlyFans (chat con i fan fatte da operatori, contenuti, vendite, accordi). Classifica ogni titolo di attività (o nome di lista) ClickUp.\n${RULES}\nRispondi SOLO con JSON {"<numero>": "<area>"}.\n\n${chunk.map((t, i) => `${i}: ${t.slice(0, 140)}`).join("\n")}` }],
     });
     const txt = msg.content?.map((c) => c.text || "").join("") || "";
     const m = txt.match(/\{[\s\S]*\}/);
@@ -116,10 +116,21 @@ export async function refreshCityFromClickup(now = Date.now()) {
 
   const labels = (await kv.get(LABELS_KEY)) || {};
   const key = (t) => t.name.slice(0, 140);
+  // il nome della LISTA aiuta quando il titolo da solo non dice nulla (sotto-attività che sono
+  // solo un nome di persona dentro "Colloqui", ecc.): chiave "lista:<nome>" nella stessa mappa
+  const lkey = (t) => (t.list ? `lista:${t.list.slice(0, 120)}` : null);
+  const unknownLists = [...new Set(all.map(lkey).filter((k) => k && !labels[k]))];
   const unknown = [...new Set(all.map(key).filter((k) => !labels[k]))];
+  const freshLists = await classifyNew(unknownLists.map((k) => k.slice(6)), 200);
   const fresh = await classifyNew(unknown);
+  for (const [k, v] of Object.entries(freshLists)) fresh[`lista:${k}`] = v;
   if (Object.keys(fresh).length) { Object.assign(labels, fresh); await kv.set(LABELS_KEY, labels); }
-  const area = (t) => labels[key(t)] || "Altro";
+  const area = (t) => {
+    const a = labels[key(t)];
+    if (a && a !== "Altro") return a;
+    const l = lkey(t) && labels[lkey(t)];
+    return l && l !== "Direzione" && l !== "Creator" ? l : a || "Altro";
+  };
 
   const creatorSpaces = new Set(comp.projects.map((p) => p.space).filter(Boolean));
   const projects = comp.projects.map((p) => {
@@ -144,7 +155,7 @@ export async function refreshCityFromClickup(now = Date.now()) {
   };
   const coverage = all.length ? all.filter((t) => area(t) !== "Altro").length / all.length : 0;
   const snap = await saveCitySnapshot({ generated: romeDay(new Date(now)), projects, hq, coverage });
-  return { tasks: all.length, spaces: spaces.length, newLabels: Object.keys(fresh).length, unknownLeft: Math.max(0, unknown.length - Object.keys(fresh).length), projects: snap.projects.length };
+  return { tasks: all.length, spaces: spaces.length, newLabels: Object.keys(fresh).length, unknownLeft: Math.max(0, unknown.length + unknownLists.length - Object.keys(fresh).length), projects: snap.projects.length };
 }
 
 /** Commento sull'attività ClickUp quando qualcuno prende in carico un piano (best-effort). */
