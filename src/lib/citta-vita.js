@@ -55,3 +55,22 @@ export async function sharedRoads(towers) {
   }
   return Object.values(roads).sort((x, y) => y.n - x.n).slice(0, 40);
 }
+
+/**
+ * Previsione di fine mese per creator (giro 2 visionari, "livello 3 di Endsley"):
+ * turni ANCORA IN PROGRAMMA da adesso a fine mese (programma CP sincronizzato di notte), a quota
+ * tra le pagine dello stesso turno. La previsione = venduto finora + venduto a turno × turni rimasti.
+ * È una stima al ritmo attuale, dichiarata come tale.
+ */
+export async function remainingShifts(now = Date.now()) {
+  const d = new Date(now);
+  const wages = await getWages(monthOf(d));
+  const out = {};
+  for (const w of wages || []) for (const s of w.shifts || []) {
+    const a = Date.parse(s.started_at);
+    if (!Number.isFinite(a) || a <= now) continue;
+    const aliases = s.creator_aliases || [];
+    for (const alias of aliases) { const p = personOf(alias); out[p] = (out[p] || 0) + 1 / Math.max(1, aliases.length); }
+  }
+  return out;
+}
