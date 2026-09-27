@@ -48,6 +48,8 @@ export async function POST(request) {
   // deve accendersi entro un giorno, non entro una settimana. Il digest email
   // resta del lunedì.
   // stato dei piani della città PRIMA degli alert (l'avviso "ambra da 14 giorni" legge lo storico)
+  // ClickUp → fotografia della città (lungo: parte da solo e registra anche lo stato del giorno)
+  out.citta_clickup = await kickEndpoint(request, "/api/cron/citta-clickup");
   out.citta_day = await kickEndpoint(request, "/api/cron/citta-day", { awaitResponse: true });
   out.alerts_run = await kickEndpoint(request, "/api/admin/ops-alerts/run", { awaitResponse: true });
   if (out.monday) {
