@@ -266,7 +266,7 @@ function loop(){const dt=Math.min(.05,clock.getDelta()),now=performance.now(),t=
     T.dots.forEach((d,j)=>d.classList.toggle('hi',!!filter&&T.data.areas[j]===areaOf(T,filter)));
   });
   // keep labels readable: nearer towers win, overlapping ones fade out (they come back on hover)
-  {const ui=[...root.querySelectorAll('.top,.chips'),...(selT?[]:[$id('hero')])].map(e=>e.getBoundingClientRect());
+  {const ui=[...root.querySelectorAll('.top,.chips'),...(selT?[]:[$id('hero')])].map(e=>{const r=e.getBoundingClientRect(),o=root.getBoundingClientRect();return {left:r.left-o.left,right:r.right-o.left,top:r.top-o.top,bottom:r.bottom-o.top}});
    const placed=[];towers.map(T=>{const x=T._x,y=T._y,w=T._w||(T._w=T.lbl.offsetWidth),h=T._h||(T._h=T.lbl.offsetHeight);return {T,r:{left:x-w/2,right:x+w/2,top:y-h,bottom:y}}})
    .sort((a,b)=>(b.T===selT)-(a.T===selT)||b.T.hq-a.T.hq||b.r.bottom-a.r.bottom)
    .forEach(o=>{const ov=(a,b)=>a.left<b.right+6&&a.right>b.left-6&&a.top<b.bottom+2&&a.bottom>b.top-2;const hit=placed.some(p=>ov(o.r,p))||ui.some(u=>ov(o.r,u))||o.r.left<4||o.r.right>VW()-4;
