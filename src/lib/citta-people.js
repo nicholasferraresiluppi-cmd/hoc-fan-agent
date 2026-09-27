@@ -54,6 +54,10 @@ export async function deletePerson(key) {
   await kv.set(PEOPLE_KEY, all);
 }
 
+const normName = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+// quale dei due doppioni tenere: scheda compilata > email aziendale > più attività
+const rank = (d) => (d.card ? 4 : 0) + (d.email && !/@(gmail|hotmail|yahoo|icloud|outlook|libero)\./.test(d.email) ? 2 : 0) + Object.values(d.clickup).reduce((s, x) => s + x.open, 0) / 1e4;
+
 /** Tutte le persone note (ClickUp + anagrafica), con i palazzi su cui lavorano. Pura sui dati passati. */
 export function directory(teams, people, towers) {
   const dir = {};
@@ -71,7 +75,27 @@ export function directory(teams, people, towers) {
     if (c.name) d.name = c.name;
     if (c.email) d.email = c.email;
   }
+  // stessa persona con due account ClickUp (email aziendale + gmail): si uniscono per nome,
+  // tenendo l'email aziendale (serve alla presenza). Mai unire due schede compilate a mano.
+  const byName = {};
   for (const d of Object.values(dir)) {
+    const n = normName(d.name);
+    if (!n) continue;
+    const other = byName[n];
+    if (!other) { byName[n] = d; continue; }
+    if (other.card && d.card) continue;
+    const [keep, drop] = rank(d) > rank(other) ? [d, other] : [other, d];
+    for (const [t, v] of Object.entries(drop.clickup)) {
+      const k = keep.clickup[t];
+      keep.clickup[t] = k ? { open: k.open + v.open, late: k.late + v.late, areas: [...new Set([...k.areas, ...v.areas])].slice(0, 3) } : v;
+    }
+    keep.card ||= drop.card;
+    keep.aliases = [...(keep.aliases || []), drop.key];
+    delete dir[drop.key];
+    byName[n] = keep;
+  }
+  for (const d of Object.values(dir)) {
+    if (d.name && d.name === d.name.toLowerCase()) d.name = d.name.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
     const fromCu = Object.keys(d.clickup);
     d.projects = (d.card?.projects ?? fromCu).filter((t) => t === HQ || towers.includes(t));
   }
