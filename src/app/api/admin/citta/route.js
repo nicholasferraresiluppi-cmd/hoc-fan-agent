@@ -62,8 +62,15 @@ export async function GET(request) {
     if (month === cur) {
       try {
         const { shiftsNow, sharedRoads } = await import("@/lib/citta-vita");
-        const [on, roads] = await Promise.all([shiftsNow(), sharedRoads(merged.projects.map((p) => p.n))]);
-        for (const t of merged.projects) if (on[t.n]) t.onShift = on[t.n];
+        const { remainingShifts } = await import("@/lib/citta-vita");
+        const [on, roads, rest] = await Promise.all([shiftsNow(), sharedRoads(merged.projects.map((p) => p.n)), remainingShifts()]);
+        for (const t of merged.projects) {
+          if (on[t.n]) t.onShift = on[t.n];
+          // previsione di fine mese al ritmo attuale: venduto + venduto a turno × turni ancora in programma
+          const x = live.people[t.n];
+          if (x?.perShift && rest[t.n] != null) t.projection = Math.round((x.sales || 0) + x.perShift * rest[t.n]);
+          else if (x?.sales) t.projection = Math.round(x.sales);
+        }
         merged.roads = roads;
       } catch { /* la vita è un di più: se manca, la città resta */ }
     }

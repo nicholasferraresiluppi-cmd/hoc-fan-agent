@@ -54,6 +54,8 @@ export async function POST(request) {
   out.alerts_run = await kickEndpoint(request, "/api/admin/ops-alerts/run", { awaitResponse: true });
   if (out.monday) {
     out.alerts_digest = await kickEndpoint(request, "/api/admin/ops-alerts/digest", { awaitResponse: true });
+    // il lunedì della città: priorità senza nessuno, piani riaccesi, nuovi ritardi
+    out.citta_lunedi = await kickEndpoint(request, "/api/cron/citta-lunedi", { awaitResponse: true });
   }
   if (out.first_of_month) {
     out.leagues_snapshot = await kickEndpoint(request, "/api/leagues/snapshot", { awaitResponse: true });

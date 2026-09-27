@@ -3,7 +3,7 @@ HOME_OLD = "function homeFrame(){const m=VW()<=760;home.d=(m?52:(VW()<1100?32:25
 HOME_NEW = r'''function homeFrame(){const m=VW()<=760;
   // inquadratura MISURATA: tutta la città nello spazio a destra del testo, a qualunque larghezza
   const H=Math.max(...towers.map(T=>T.top));const pts=[];
-  towers.forEach(T=>{const w=(T.hq?2.5:1.8)/2+.6,d=(T.hq?1.6:1.15)/2+.55;for(const x of[-w,w])for(const z of[-d,d])for(const y of[0,Math.max(T.top,T.ghostH||0)+.5])pts.push(new THREE.Vector3(T.x+x,y,T.z+z))});
+  towers.forEach(T=>{const w=(T.hq?2.5:1.8)/2+.6,d=(T.hq?1.6:1.15)/2+.55;for(const x of[-w,w])for(const z of[-d,d])for(const y of[0,Math.max(T.top,T.ghostH||0,T.projH||0)+.5])pts.push(new THREE.Vector3(T.x+x,y,T.z+z))});
   const hr=$id('hero')?$id('hero').getBoundingClientRect():null,rr=root.getBoundingClientRect();
   const x0=hr&&hr.width?Math.min(.56,Math.max(.3,(hr.right-rr.left+28)/VW())):.4;let X=[x0*2-1,.88],Y=[-.8,.76];
   // telefono: il testo sta sotto, la città nello spazio libero sopra
@@ -48,14 +48,25 @@ function renderTeam(T,d,el){const off=(RAW.base||'')+'/admin/citta/ufficio?t='+e
     `<p class="tm-note">Le figure nel palazzo sono le persone, sul piano del reparto dove hanno più attività ClickUp${cal?'. Ambra = in un impegno adesso (Google Calendar); nessun impegno non vuol dire raggiungibile':''}. Sul piano Chatting, in azzurro, solo chi è in turno adesso.</p><div class="act"><a href="${off}">Apri l'ufficio →</a></div>`;
   el.querySelectorAll('.tm').forEach(b=>{b.onmouseenter=()=>hiFig(T,+b.dataset.i);b.onmouseleave=()=>{hiF=null};b.onfocus=b.onmouseenter;b.onblur=b.onmouseleave})}
 const tipEl=document.createElement('div');tipEl.className='tm-tip';root.appendChild(tipEl);
+let tipPinned=false;
+function pinFig(f,e){const T=selT;if(!T||f.kind!=='team')return;const S=T.slabs.find(x=>x.g===f.g.parent);const ctx=T.data.n+(S?' · '+DISP(S.a.n)+': '+(S.a.short||S.a.l||''):'');const r=root.getBoundingClientRect();const m=f.m;
+  const mail=m.email?'mailto:'+m.email+'?subject='+encodeURIComponent('HOC · '+ctx.slice(0,80))+'&body='+encodeURIComponent('Ciao '+(m.name||'').split(' ')[0]+',\n\n'+ctx+'\n\n'):null;
+  const cal=m.email?'https://calendar.google.com/calendar/u/0/r/eventedit?add='+encodeURIComponent(m.email)+'&text='+encodeURIComponent('HOC · '+T.data.n+(S?' · '+DISP(S.a.n):''))+'&details='+encodeURIComponent(ctx):null;
+  tipEl.innerHTML=`<b>${esc(m.name||m.email)}</b><span>${esc(m.role||(m.areas||[]).join(', ')||'Ruolo da indicare')}</span><small>${presText(m)}</small><span class="tm-acts">${mail?`<a href="${mail}">Scrivi</a>`:''}${cal?`<a href="${cal}" target="_blank" rel="noopener">Fissa una call</a>`:''}</span>`;
+  tipEl.style.transform=`translate(${Math.min(e.clientX-r.left+14,r.width-270)}px,${e.clientY-r.top+14}px)`;tipEl.style.opacity=1;tipEl.classList.add('pin');tipPinned=true}
+function unpin(){tipPinned=false;tipEl.classList.remove('pin');tipEl.style.opacity=0}
+on(cv,'pointerdown',()=>{if(tipPinned)unpin()});
+on(cv,'pointerup',e=>{const f=figAt(e);if(f)pinFig(f,e)});
 function figAt(e){if(!selT||!selT.figs)return null;mouse.set(...toXY(e));ray.setFromCamera(mouse,cam);const h=ray.intersectObjects(selT.figs.filter(f=>f.g.visible).flatMap(f=>f.hit))[0];return h?h.object.userData.F:null}
-on(cv,'pointermove',e=>{const f=figAt(e);hovF=f;if(!f){tipEl.style.opacity=0;return}cv.style.cursor='pointer';const r=root.getBoundingClientRect();
+on(cv,'pointermove',e=>{if(tipPinned)return;const f=figAt(e);hovF=f;if(!f){tipEl.style.opacity=0;return}cv.style.cursor='pointer';const r=root.getBoundingClientRect();
   tipEl.innerHTML=f.kind==='team'?`<b>${esc(f.m.name||f.m.email)}</b><span>${esc(f.m.role||(f.m.areas||[]).join(', ')||'Ruolo da indicare')}</span><small>${presText(f.m)}</small>`:`<b>${esc(f.c.name)}</b><span>In turno fino alle ${hm(f.c.until)}</span>`;
   tipEl.style.transform=`translate(${Math.min(e.clientX-r.left+14,r.width-270)}px,${e.clientY-r.top+14}px)`;tipEl.style.opacity=1});
 
 '''
 
 TEAM_CSS = r'''
+.ct .tm-tip.pin{pointer-events:auto}.ct .tm-tip .tm-acts{display:flex;gap:10px;margin-top:6px}.ct .tm-tip .tm-acts a{color:#E8CB8A;text-decoration:none;font-size:12.5px}
+.ct .tl .sn{display:none}@media (max-width:760px){.ct .tl .fn{display:none}.ct .tl .sn{display:inline}}
 .ct .tl .dots{display:none}
 .ct .tm-fl b.st{font-weight:500;font-size:11px;margin-left:6px}.ct .tm-fl b.st.wait{color:#FFB54A}.ct .tm-fl b.st.stop{color:rgba(242,238,230,.5)}.ct .tm-fl b.st.est{font-style:italic;opacity:.75}
 .ct .top5 em.own{display:block;font-style:normal;font-size:11.5px;color:rgba(242,238,230,.5);margin-top:2px}
@@ -80,17 +91,17 @@ def patch_body(body):
     assert a in body; body=body.replace(a,b,1)
     a='<span>aree ferme</span>';b='<span>stime ClickUp da verificare</span>'
     assert a in body; body=body.replace(a,b,1)
-    a='alto quanto il suo venduto del mese;';b='alto quanto il suo venduto del mese (la cornice dorata è il mese scorso allo stesso giorno, stima proporzionale);'
+    a='alto quanto il suo venduto del mese;';b='alto quanto il suo venduto del mese (cornice dorata: il mese scorso allo stesso giorno; tratteggiata: dove arriverà a fine mese al ritmo attuale);'
     assert a in body; return body.replace(a,b,1)
 
 def apply(R, js_getter):
     # FASE 2 — il tempo (27/09): altezza proporzionale al venduto (prima radice quadrata: 147k e 13k sembravano uguali),
     # scala comune col mese scorso; sagoma dorata del mese scorso intero; striscia "dalla tua ultima visita"
     R("nospace:!!p.nospace,sales:p.sales||0}));", "nospace:!!p.nospace,sales:p.sales||0,salesPrev:p.salesPrev||0}));")
-    R("const MAXS=Math.max(1,...RAW.projects.map(p=>p.sales||0));", "const MAXS=Math.max(1,...RAW.projects.map(p=>Math.max(p.sales||0,RAW.live&&!RAW.live.past?(p.salesPrevToDate||p.salesPrev||0):0)));")
+    R("const MAXS=Math.max(1,...RAW.projects.map(p=>p.sales||0));", "const MAXS=Math.max(1,...RAW.projects.map(p=>Math.max(p.sales||0,p.projection||0,RAW.live&&!RAW.live.past?(p.salesPrevToDate||p.salesPrev||0):0)));")
     R(".3+.42*Math.sqrt((data.sales||0)/MAXS)", ".14+.8*((data.sales||0)/MAXS)")
     R("  T.top=.34+(n-1)*gap+.2;", "  T.top=.34+(n-1)*gap+.2;\n  if(RAW.live&&!RAW.live.past&&!isHQ&&data.salesPrev>0){const gp=.14+.8*((data.salesPrevToDate||data.salesPrev)/MAXS),H=.34+(n-1)*gp+.2;const gb=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w+.34,H,d+.3)),new THREE.LineBasicMaterial({color:0xE8C27A,transparent:true,opacity:.55,depthWrite:false}));gb.position.y=H/2;T.g.add(gb);T.ghost=gb;T.ghostH=H}")
-    R("const topY=T.slabs[0].g.position.y+.2;", "if(T.ghost)T.ghost.material.opacity=selT?(selT===T?.7:.05):(filter?.12:.55);const topY=T.slabs[0].g.position.y+.2;")
+    R("const topY=T.slabs[0].g.position.y+.2;", "if(T.ghost)T.ghost.material.opacity=selT?(selT===T?.7:.05):(filter?.12:.55);if(T.proj)T.proj.material.opacity=selT?(selT===T?.6:.03):(filter?.08:.35);const topY=T.slabs[0].g.position.y+.2;")
     R("h=`Dal ${dd(s.base)}:", "h=`${s.mode==='visit'?'Dalla tua ultima visita, il '+dd(s.base):'Dal '+dd(s.base)}:")
     # piani = aree ufficiali del playbook (27/09): HR & People, Finance, Media Buying, Marketing, OnlyFans (Sales + Chatting)
     R("const AREAS=['HR','Finance','Deal','Sales','Chatting','Contenuti'];", "const AREAS=['HR & People','Finance','Media Buying','Marketing','Sales','Chatting'];")
@@ -143,3 +154,9 @@ const DIR=""")
     # GIRO 2 dei visionari (27/09 notte): "Da guardare" collegata alla mappa e con chi la segue
     R("<i>${esc(x.area)}</i><b>${esc(x.tower)}</b><span>${esc(x.text)}</span></button>", "<i>${esc((x.areas||[x.area]).map(a=>a==='Sales'||a==='Chatting'?'OnlyFans · '+a:a).join(' · '))}</i><b>${esc(x.tower)}</b><span>${esc(x.text)}</span><em class=\"own\">${x.claim?'in carico a '+esc(x.claim.by.split(' ')[0]):(x.openHours!=null?'nessuno la segue'+(x.openHours>=1?' da '+(x.openHours<48?x.openHours+' ore':Math.floor(x.openHours/24)+' giorni'):''):'')}</em></button>")
     R("el.querySelectorAll('button').forEach(b=>b.onclick=()=>{", "el.querySelectorAll('button').forEach(b=>{b.onmouseenter=()=>{hoverT=towers.find(t=>t.data.n===b.dataset.t)||null};b.onmouseleave=()=>{hoverT=null}});el.querySelectorAll('button').forEach(b=>b.onclick=()=>{")
+
+    # GIRO 3 (28/09): previsione di fine mese (cornice tratteggiata) + nomi brevi al telefono
+    R("custodian:p.custodian||null,onShift:p.onShift||null}));", "custodian:p.custodian||null,onShift:p.onShift||null,projection:p.projection||0}));")
+    R("T.ghost=gb;T.ghostH=H}", "T.ghost=gb;T.ghostH=H}\n  if(RAW.live&&!RAW.live.past&&!isHQ&&data.projection>(data.sales||0)){const gp2=.14+.8*(data.projection/MAXS),H2=.34+(n-1)*gp2+.2;const pg=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w+.52,H2,d+.46)),new THREE.LineDashedMaterial({color:0x9DB0D6,dashSize:.12,gapSize:.09,transparent:true,opacity:.35,depthWrite:false}));pg.computeLineDistances();pg.position.y=H2/2;T.g.add(pg);T.proj=pg;T.projH=H2}")
+    R(r"""${(RAW.roads||[]).filter(r=>r.a===T.data.n||r.b===T.data.n).length?""", r"""${T.data.projection&&!T.hq&&RAW.live&&!RAW.live.past?`<p class="tm-note">A questo ritmo chiude il mese a <b>$${Math.round(T.data.projection).toLocaleString('it-IT')}</b>${T.data.salesPrev?` (${T.data.projection>=T.data.salesPrev?'+':'−'}${Math.abs(Math.round((T.data.projection/T.data.salesPrev-1)*100))}% sul mese scorso)`:''}: stima con i turni ancora in programma, cornice tratteggiata.</p>`:''}${(RAW.roads||[]).filter(r=>r.a===T.data.n||r.b===T.data.n).length?""")
+    R("b.innerHTML=`<b>${T.data.n}</b>", "b.innerHTML=`<b><span class=\"fn\">${T.data.n}</span><span class=\"sn\">${T.hq?T.data.n:T.data.n.split(' ').slice(-1)[0]}</span></b>")
