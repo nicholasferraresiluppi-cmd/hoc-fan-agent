@@ -6,7 +6,7 @@
  * "Azienda". "Guarda un'area" la accende in tutta la città. Le aree sono STIMATE dal
  * titolo delle attività ClickUp (dichiarato in pagina) finché ClickUp non avrà un campo "Area".
  *
- * GENERATO dal suo prototipo (scratchpad citta2/gen_scene2.py): three.js caricato SOLO
+ * GENERATO dal suo prototipo (scripts/citta-scene/gen_scene.py): three.js caricato SOLO
  * qui (import dinamico); tutto il DOM vive dentro `root` (.ct) e si smonta all'uscita.
  */
 /* eslint-disable */
