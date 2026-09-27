@@ -47,6 +47,9 @@ const MANAGER = [
     { href: "/me/compenso", label: "Il mio compenso" },
     { href: "/me/percorso", label: "Il mio percorso" },
   ] },
+  { title: "Noi", items: [
+    { href: "/cultura", label: "Come lavoriamo" },
+  ] },
 ];
 const OPERATOR = [
   { title: null, items: [
@@ -62,6 +65,9 @@ const OPERATOR = [
   { title: "Allenamento", items: [
     { href: "/", label: "Simulatore", exact: true },
     { href: "/academy/vendere", label: "Come si vende" },
+  ] },
+  { title: "Noi", items: [
+    { href: "/cultura", label: "Come lavoriamo" },
   ] },
 ];
 
