@@ -172,7 +172,6 @@ export const NAV_GROUPS = [
       { href: "/admin/team",                     label: "Team",         icon: UserCircle2 },
       { href: "/admin/employee-profiles",        label: "Profili",      icon: Contact },
       { href: "/admin/seniority",                label: "Seniority",    icon: Medal },
-      { href: "/admin/access",                   label: "Accessi",      icon: Key },
       { href: "/admin/ruoli",                    label: "Membri",       icon: Lock },
       { href: "/admin/ruoli-custom",             label: "Ruoli custom", icon: Wrench },
     ],

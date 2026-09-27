@@ -1,5 +1,6 @@
 import { authorize, authorizeAdmin, auditAccess, CAPABILITIES, getUserRoles, getEffectiveCapabilities, setUserRoles, ROLES, ROLE_META, listCustomRoles } from "@/lib/rbac";
 import { clerkClient } from "@clerk/nextjs/server";
+import { listAdmins } from "@/lib/admin";
 
 // GET /api/admin/roles — lista utenti con ruoli correnti + meta ruoli predefiniti + custom
 export async function GET() {
@@ -28,6 +29,9 @@ export async function GET() {
     }
   } catch {}
   const ids = Object.keys(nameMap);
+  // Accessi è confluita in Membri (27/09/2026): lo stato admin viaggia con la riga del membro
+  const adminMap = {};
+  try { for (const x of await listAdmins()) adminMap[x.userId] = x.sources || []; } catch {}
 
   const rows = await Promise.all(
     ids.map(async (uid) => ({
@@ -37,6 +41,7 @@ export async function GET() {
       last_sign_in_at: nameMap[uid]?.lastSignInAt || null,
       created_at: nameMap[uid]?.createdAt || null,
       banned: nameMap[uid]?.banned || false,
+      admin: adminMap[uid] ? { sources: adminMap[uid] } : null,
       roles: await getUserRoles(uid),
       caps: await getEffectiveCapabilities(uid).catch(() => ({})),
     }))
