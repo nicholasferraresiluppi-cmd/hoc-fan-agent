@@ -8,6 +8,7 @@ export const maxDuration = 60;
 import { currentUser } from "@clerk/nextjs/server";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { getCitySnapshot, saveCitySnapshot, getClaims, setClaim, citySince } from "@/lib/citta";
+import { commentClaim } from "@/lib/citta-clickup";
 import { getCityLive, mergeCityLive, currentMonthId, previousMonthId, monthLabel } from "@/lib/citta-live";
 
 export async function GET(request) {
@@ -45,7 +46,18 @@ export async function POST(request) {
     const me = await currentUser().catch(() => null);
     const name = [me?.firstName, me?.lastName].filter(Boolean).join(" ") || me?.emailAddresses?.[0]?.emailAddress || "Admin";
     const claims = await setClaim(body.tower, body.area, body.action === "claim" ? { name, userId: me?.id } : null);
-    return Response.json({ ok: true, claim: claims[`${body.tower}|${body.area}`] || null });
+    // Presa in carico → commento sull'attività ClickUp del piano (il link lo prende il server
+    // dalla fotografia, mai dal browser). Best-effort: se ClickUp non risponde la presa resta.
+    let clickup = false;
+    if (body.action === "claim") {
+      try {
+        const snap = await getCitySnapshot();
+        const tower = snap?.hq?.n === body.tower ? snap.hq : snap?.projects?.find((p) => p.n === body.tower);
+        const link = tower?.areas?.find((a) => a.n === body.area)?.link;
+        if (link) clickup = await commentClaim(link, `${name} ha preso in carico ${body.area} · ${body.tower} da HOC Pro (La città).`);
+      } catch { clickup = false; }
+    }
+    return Response.json({ ok: true, clickup, claim: claims[`${body.tower}|${body.area}`] || null });
   }
   try {
     const snap = await saveCitySnapshot(body);
