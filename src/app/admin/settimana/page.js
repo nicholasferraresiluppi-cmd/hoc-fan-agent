@@ -43,7 +43,7 @@ export default function SettimanaPage() {
     const thr = ac?.config?.score_threshold_default_ui ?? 25, minSh = ac?.config?.min_shifts ?? 5;
     for (const c of ac?.candidates || []) {
       if (c.score == null || c.score > thr || (c.total_shifts ?? c.cp_aggregates?.total_shifts ?? minSh) < minSh) continue;
-      add(c.employee, 100 - (c.score || 0), `sotto soglia (score ${dec(c.score)})`, { creator: creatorOf[c.employee] || null });
+      add(c.employee, 200 - (c.score || 0), `sotto soglia (score ${dec(c.score)})`, { creator: creatorOf[c.employee] || null });
     }
     const prevBy = Object.fromEntries((rankPrev?.ranking || []).map((r) => [r.employee, r.score]));
     for (const r of rank?.ranking || []) {
