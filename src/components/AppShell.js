@@ -37,9 +37,10 @@ function isAuthRoute(path) {
 
 // Superfici full-screen SENZA chrome interno (sidebar/nav): l'assessment
 // candidati è rivolto a persone ESTERNE (non dipendenti Clerk) → mai esporre
-// la navigazione interna dell'app.
+// la navigazione interna dell'app. Stesso motivo per il modulo HR da link
+// (/hr/modulo/[token]): lo compila chi magari non ha ancora un account.
 function isBareRoute(path) {
-  return path.startsWith("/assessment") || path === "/privacy";
+  return path.startsWith("/assessment") || path.startsWith("/hr/modulo") || path === "/privacy";
 }
 
 export default function AppShell({ children }) {

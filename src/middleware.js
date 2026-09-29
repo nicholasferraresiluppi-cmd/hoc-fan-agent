@@ -12,12 +12,18 @@ import { NextResponse } from 'next/server';
 // scadenza, stato, sequenza) — mai aggiungere qui un path senza quella difesa
 // nella route stessa. I dati candidato vivono nel namespace KV candidate:*,
 // isolato da operatori/leghe/denaro.
+// Centro HR (29/09/2026): il modulo "i miei dati" (/hr/modulo/[token] +
+// /api/hr/modulo/*) si difende col token monouso a scadenza (lib/hr-people);
+// il webhook ClickUp (/api/hr/clickup-webhook) con la firma HMAC X-Signature
+// + webhook_id registrato. Solo QUESTI due path: il resto di /api/hr resta
+// dietro Clerk.
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)', '/sign-up(.*)', '/privacy', '/api/health', '/api/ingest/(.*)',
   '/api/cron/(.*)',
   '/api/admin/ops-alerts/run', '/api/admin/ops-alerts/digest',
   '/api/leaderboard/snapshot', '/api/leagues/snapshot',
   '/assessment/(.*)', '/api/candidate/(.*)',
+  '/hr/modulo/(.*)', '/api/hr/modulo/(.*)', '/api/hr/clickup-webhook',
 ]);
 const isApiRoute = createRouteMatcher(['/api/(.*)']);
 

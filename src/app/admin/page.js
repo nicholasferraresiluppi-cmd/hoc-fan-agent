@@ -20,7 +20,7 @@ import {
   Wallet, Scale, ShieldCheck, History, FlaskConical, MessageSquareWarning,
   Signpost, Bell, ListTree, Inbox, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket,
   HandCoins, MessageCircle,
-  Snowflake, Megaphone, Share2, Shield, Building2,
+  Snowflake, Megaphone, Share2, Shield, Building2, BookUser,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee } from "@/lib/nav-access";
@@ -109,6 +109,8 @@ const SHORTCUT_GROUPS_RAW = [
     label: "People & Access",
     items: [
       { href: "/cm-cockpit",              title: "Cockpit CM",    desc: "Turno di supervisione: team live, soglie, override shadow", icon: Gauge },
+      { href: "/admin/hr",                title: "Persone HR",    desc: "CRM persone (HOC Pro è il master): anagrafica, rapporto, contratto, documenti e storico, sincronizzato con la lista HR di ClickUp; link di compilazione per la persona", icon: BookUser },
+      { href: "/admin/hr/sync",           title: "Sincronizzazione ClickUp", desc: "Lista configurata, webhook, ultimo import, conflitti: import completo e registrazione webhook", icon: RefreshCw },
       { href: "/admin/candidate-assessments", title: "Assessment candidati", desc: "Simulatore Academy come test pre-assunzione: crea link, leggi il report (segnale per HR, non gate), registra l'esito", icon: UserCheck },
       { href: "/admin/priority-queue",    title: "Fan da seguire ora", desc: "Quale fan seguire ora per creator: whale in attesa o in raffreddamento, ordinati per valore", icon: Inbox },
       { href: "/admin/settimana",          title: "Da seguire", desc: "Chi seguire questa settimana: sotto soglia, cali forti, chi può crescere", icon: Target },

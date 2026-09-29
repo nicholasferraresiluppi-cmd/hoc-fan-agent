@@ -15,6 +15,8 @@ export const PAGE_GROUPS = [
   { label: "Da seguire", tabs: [["/admin/settimana", "Questa settimana"], ["/admin/action-center", "Sotto soglia"], ["/admin/coaching-center", "Da far crescere"], ["/admin/coaching-sessions", "Sessioni"]] },
   // scheda dell'operatore: stesse persone, più viste (":e" = nome operatore nell'indirizzo)
   { label: "Scheda operatore", tabs: [["/leaderboard/operational/:e", "Scheda"], ["/admin/operator-signals/:e", "Segnali e game film"]] },
+  // Centro HR (29/09/2026): CRM persone + stato della sync con ClickUp
+  { label: "Persone HR", tabs: [["/admin/hr", "Persone"], ["/admin/hr/sync", "Sincronizzazione ClickUp"]] },
   { label: "Membri e ruoli", tabs: [["/admin/ruoli", "Membri"], ["/admin/ruoli-custom", "Ruoli personalizzati"], ["/admin/team", "Team"]] },
   { label: "Dati CreatorsPro", tabs: [["/admin/creatorspro-sync", "Sincronizzazione"], ["/admin/wage-audit", "Controllo"], ["/admin/creatorspro-sync-history", "Storico"]] },
   { label: "Formula score", tabs: [["/admin/leaderboard-settings", "Impostazioni"], ["/admin/score-config-drafts", "Bozze"], ["/admin/score-config-history", "Storico"]] },

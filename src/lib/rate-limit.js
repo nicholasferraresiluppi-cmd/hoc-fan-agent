@@ -22,6 +22,11 @@ export const LIMITS = {
   candidate_eval:[{ window: 3600, max: 20 }],
   feedback:      [{ window: 86400, max: 30 }],
   thanks:        [{ window: 86400, max: 20 }],  // "grazie" tra colleghi
+  // Centro HR (29/09/2026): modulo pubblico da link, upload documenti, webhook ClickUp
+  hr_form:       [{ window: 60, max: 20 },  { window: 86400, max: 200 }],  // per token
+  hr_form_ip:    [{ window: 60, max: 40 },  { window: 86400, max: 600 }],  // per IP
+  hr_upload:     [{ window: 3600, max: 10 }],                             // per token
+  hr_webhook:    [{ window: 60, max: 300 }],                              // per IP (ClickUp)
 };
 
 /**
