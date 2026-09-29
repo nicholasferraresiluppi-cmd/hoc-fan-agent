@@ -20,6 +20,8 @@
  *   - sempre:            run alert operativi (watchdog catena incluso)
  *   - lunedì:            + digest email (dopo il run: legge i suoi findings)
  *   - giorno 1 del mese: snapshot leghe (chiusura stagione)
+ *   - sempre, in fondo:  riconciliazione Centro HR ↔ ClickUp (solo con HR_CLICKUP_LIST_ID)
+ *                        — poi creator_difficulty, che resta ULTIMO
  *
  * Gli endpoint smistati restano invocabili singolarmente (UI/manuale).
  * Auth: Bearer CRON_SECRET o sessione SEED; path pubblico nel middleware.
@@ -113,6 +115,15 @@ export async function POST(request) {
     }
   } catch (e) {
     out.transfer = "err:" + (e?.message || "unknown");
+  }
+
+  // Centro HR (29/09/2026): riconciliazione notturna con la lista ClickUp HR,
+  // nella SUA funzione (budget proprio). Solo se HR_CLICKUP_LIST_ID è impostato:
+  // senza, la sync è spenta e non si chiama nemmeno la route.
+  if (String(process.env.HR_CLICKUP_LIST_ID || "").trim()) {
+    out.hr_clickup = await kickEndpoint(request, "/api/cron/hr-clickup");
+  } else {
+    out.hr_clickup = "skip:no-list";
   }
 
   // Esito dei kick nel heartbeat: un 401 dei figli deve lasciare traccia
