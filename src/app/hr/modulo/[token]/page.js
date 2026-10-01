@@ -21,7 +21,7 @@ const GROUPS = [
   { title: "Il tuo lavoro", keys: ["currentJob", "partitaIva", "spokenLanguages", "timeSlots", "personalInterests"] },
 ];
 const LABELS = {
-  firstName: "Nome", surname: "Cognome", location: "Città in cui vivi", currentJob: "Che cosa fai oggi (mansione)",
+  firstName: "Nome", surname: "Cognome", location: "Città in cui vivi", currentJob: "Che cosa fai oggi (mansione)", nationality: "Nazionalità", spokenLanguages: "Lingue che parli",
   partitaIva: "Hai una partita IVA?", timeSlots: "Fasce orarie in cui sei disponibile", personalInterests: "Interessi (facoltativo)",
   linkedin: "Profilo LinkedIn (facoltativo)",
 };

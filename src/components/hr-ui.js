@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
+import { NationalityInput, JobInput, LanguagesInput } from "@/components/hr-inputs";
 
 export const lbl = { display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 4 };
 export const input = {
@@ -63,6 +64,10 @@ export function displayValue(field, v) {
  */
 export function FieldInput({ field, value, onChange, options, id, disabled }) {
   const common = { id, disabled, style: { ...input, opacity: disabled ? 0.6 : 1 } };
+  // controlli su misura (01/10): nazionalità da tendina, mansione Chatter/Altro, lingue con livello
+  if (field.key === "nationality") return <NationalityInput id={id} value={value} onChange={onChange} disabled={disabled} />;
+  if (field.key === "currentJob") return <JobInput id={id} value={value} onChange={onChange} disabled={disabled} />;
+  if (field.key === "spokenLanguages") return <LanguagesInput id={id} value={value} onChange={onChange} disabled={disabled} />;
   switch (field.type) {
     case "date":
       return <input type="date" {...common} value={value || ""} onChange={(e) => onChange(e.target.value || null)} />;
