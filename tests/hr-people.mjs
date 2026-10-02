@@ -270,3 +270,28 @@ ok(hrCryptoConfigured(), "chiave di test valida");
 }
 
 console.log(`hr-people: ${n} asserzioni OK`);
+
+// ── 02/10: comuni ISTAT, coerenza codice fiscale, competenze ──────────────────
+{
+  const { decodeCf, cfCoherence, searchComuni } = await import("../src/lib/hr-comuni.js");
+  const { normalizeSkillMap } = await import("../src/lib/hr-skills.js");
+  const { readFileSync } = await import("node:fs");
+  const list = JSON.parse(readFileSync(new URL("../public/data/comuni-istat.json", import.meta.url)));
+  const ok2 = (c, m) => { if (!c) { console.error("FAIL", m); process.exit(1); } };
+  // RSSMRA85T10A562S = Mario Rossi, 10/12/1985, M, San Giuliano Terme (A562) — esempio classico
+  const d = decodeCf("RSSMRA85T10A562S");
+  ok2(d && d.yy === 85 && d.mm === 12 && d.dd === 10 && !d.female && d.place === "A562", "decodeCf base");
+  ok2(cfCoherence("RSSMRA85T10A562S", { dob: "1985-12-10", gender: "Male", birth: { abroad: false, code: "A562" } }).length === 0, "coerente");
+  ok2(cfCoherence("RSSMRA85T10A562S", { dob: "1985-12-11" }).length === 1, "data diversa");
+  ok2(cfCoherence("RSSMRA85T10A562S", { gender: "Female" }).length === 1, "genere diverso");
+  ok2(cfCoherence("RSSMRA85T10A562S", { birth: { abroad: false, code: "H501" } }).length === 1, "comune diverso");
+  ok2(cfCoherence("RSSMRA85T10A562S", { birth: { abroad: true, country: "Romania" } }).length === 1, "estero ma CF italiano");
+  ok2(decodeCf("RSSMRA85T50A562S").female === true, "donna +40");
+  ok2(list.length > 7800, "elenco ISTAT caricato");
+  const roma = searchComuni(list, "roma");
+  ok2(roma[0] && roma[0].name === "Roma" && roma[0].code === "H501" && roma[0].prov === "RM", "Roma H501 RM");
+  ok2(searchComuni(list, "s.giuliano").length >= 0 && searchComuni(list, "x").length === 0, "ricerca corta vuota");
+  const sm = normalizeSkillMap({ "OF Messaging": "Esperto", "Inventata": "Base", "Copywriting": "Mago" });
+  ok2(Object.keys(sm).length === 1 && sm["OF Messaging"] === "Esperto", "skill map pulita");
+  console.log("hr-comuni/competenze: OK");
+}

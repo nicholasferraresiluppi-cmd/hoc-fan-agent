@@ -10,6 +10,7 @@
  * drop_down (value = orderindex OPPURE option id), labels (array di option id
  * o di oggetti), location, users, attachment, checkbox.
  */
+import { SKILL_NAME } from "./hr-skills.js";
 import { FIELDS, FIELD_BY_KEY, isEmptyValue, maskCf } from "./hr-people-core.js";
 
 export const HOC_BLOCK_START = "— Dati HOC Pro —";
@@ -156,6 +157,13 @@ export function hocBlockLines(person, byName, { cfPlain } = {}) {
   if (!byName.has(lc("Partita IVA"))) lines.push(`Partita IVA: ${f.partitaIva === true ? "sì" : f.partitaIva === false ? "no" : "—"}`);
   if (!byName.has(lc("Codice fiscale")) && (cfPlain || person.cfEnc)) lines.push(`Codice fiscale: ${cfPlain ? maskCf(cfPlain) : "presente"} (completo in HOC Pro)`);
   if (f.idDocument?.at) lines.push(`Documento d'identità: allegato il ${fmtItDate(f.idDocument.at)} (${s(f.idDocument.title)})`);
+  // campi solo-app (02/10): luogo di nascita, comune/CAP di residenza, competenze con livello
+  const bp = f.birthPlace;
+  if (bp) lines.push(`Luogo di nascita: ${bp.abroad ? bp.country : `${s(bp.name)}${bp.prov ? ` (${s(bp.prov)})` : ""}`}`);
+  if (f.residenceComune?.name) lines.push(`Comune di residenza: ${s(f.residenceComune.name)}${f.residenceComune.prov ? ` (${s(f.residenceComune.prov)})` : ""}${f.residenceCap ? ` · CAP ${s(f.residenceCap)}` : ""}`);
+  const sl = f.skillLevels && typeof f.skillLevels === "object" ? Object.entries(f.skillLevels) : [];
+  if (sl.length) lines.push(`Livelli competenze: ${sl.map(([k, v]) => `${s(SKILL_NAME[k] || k)} (${v})`).join(", ")}`);
+  if (Array.isArray(f.learnWish) && f.learnWish.length) lines.push(`Vorrebbe imparare: ${f.learnWish.map((k) => SKILL_NAME[k] || k).join(", ")}`);
   // Location senza coordinate: ClickUp la rifiuta, il testo va nel blocco
   const loc = f.location;
   if (loc?.address && (loc.lat == null || loc.lng == null)) lines.push(`Dove vive (testo): ${s(loc.address)}`);

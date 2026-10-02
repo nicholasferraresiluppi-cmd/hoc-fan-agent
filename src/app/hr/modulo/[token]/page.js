@@ -14,16 +14,21 @@ import { useParams } from "next/navigation";
 import { CP, FONTS } from "@/lib/brand";
 import { FIELD_BY_KEY, FORM_KEYS, validateCodiceFiscale } from "@/lib/hr-fields";
 import { lbl, btnPrimary, btnGhost, FieldInput, fmtDate } from "@/components/hr-ui";
+import { cfCoherence } from "@/lib/hr-comuni";
 
 const GROUPS = [
-  { title: "Chi sei", keys: ["firstName", "surname", "dateOfBirth", "nationality", "gender", "location", "codiceFiscale"] },
+  { title: "Chi sei", keys: ["firstName", "surname", "dateOfBirth", "gender", "nationality", "birthPlace", "codiceFiscale"] },
+  { title: "Dove vivi", keys: ["residenceComune", "location", "residenceCap"] },
   { title: "Come contattarti", keys: ["personalEmail", "personalPhone", "linkedin"] },
-  { title: "Il tuo lavoro", keys: ["currentJob", "partitaIva", "spokenLanguages", "timeSlots", "personalInterests"] },
+  { title: "Il tuo lavoro", keys: ["currentJob", "partitaIva", "spokenLanguages", "timeSlots"] },
+  { title: "Le tue competenze", keys: ["skillLevels", "learnWish", "personalInterests"] },
 ];
 const LABELS = {
   firstName: "Nome", surname: "Cognome", location: "Città in cui vivi", currentJob: "Che cosa fai oggi (mansione)", nationality: "Nazionalità", spokenLanguages: "Lingue che parli",
   partitaIva: "Hai una partita IVA?", timeSlots: "Fasce orarie in cui sei disponibile", personalInterests: "Interessi (facoltativo)",
-  linkedin: "Profilo LinkedIn (facoltativo)",
+  linkedin: "Profilo LinkedIn (facoltativo)", birthPlace: "Dove sei nato/a", residenceComune: "Comune in cui vivi",
+  location: "Indirizzo (via e numero civico)", residenceCap: "CAP", skillLevels: "Cosa sai fare, e a che livello",
+  learnWish: "Cosa ti piacerebbe imparare (facoltativo)", gender: "Genere",
 };
 
 const page = { minHeight: "100vh", background: CP.bg, color: CP.textPrimary, fontFamily: FONTS.body, padding: "32px 16px 64px" };
@@ -51,6 +56,7 @@ export default function HrFormPage() {
   const [err, setErr] = useState(null);
   const [step, setStep] = useState("form"); // form → files → done
   const [cfNote, setCfNote] = useState(null);
+  const [cfWarn, setCfWarn] = useState(null); // avvisi di coerenza CF ↔ data/genere/luogo (non bloccanti)
 
   useEffect(() => {
     let alive = true;
@@ -72,6 +78,10 @@ export default function HrFormPage() {
     if (data.codiceFiscale) {
       const r = validateCodiceFiscale(data.codiceFiscale);
       if (!r.ok) { setErr(`Codice fiscale: ${r.error}`); return; }
+    }
+    if (data.codiceFiscale && !cfWarn) {
+      const w = cfCoherence(data.codiceFiscale, { dob: data.dateOfBirth, gender: data.gender, birth: data.birthPlace });
+      if (w.length) { setCfWarn(w); return; }
     }
     if (!consent) { setErr("Per inviare serve il consenso all'informativa privacy."); return; }
     setBusy(true);
@@ -119,7 +129,7 @@ export default function HrFormPage() {
                     {cfOff ? (
                       <span style={{ fontSize: 13, color: CP.textMuted }}>Al momento non possiamo raccogliere il codice fiscale da qui: te lo chiederemo a parte.</span>
                     ) : (
-                      <FieldInput id={`f-${k}`} field={f} value={data[k]} options={ctx.options?.[k]} onChange={(v) => setData({ ...data, [k]: v })} />
+                      <FieldInput id={`f-${k}`} field={f} value={data[k]} options={ctx.options?.[k]} onChange={(v) => { setData({ ...data, [k]: v }); if (["codiceFiscale", "dateOfBirth", "gender", "birthPlace"].includes(k)) setCfWarn(null); }} />
                     )}
                     {k === "codiceFiscale" && ctx.cfPresent && !cfOff && <span style={{ fontSize: 12, color: CP.textMuted }}>Lo abbiamo già: lascia vuoto per non cambiarlo.</span>}
                     {k === "codiceFiscale" && !cfOff && <span style={{ display: "block", fontSize: 12, color: CP.textMuted }}>Lo conserviamo cifrato.</span>}
@@ -141,6 +151,17 @@ export default function HrFormPage() {
           </label>
         </section>
 
+        {cfWarn && (
+          <div role="alert" style={{ ...box, borderColor: CP.accent }}>
+            <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 6 }}>Controlla il codice fiscale</div>
+            <ul style={{ margin: "0 0 10px", paddingLeft: 18, fontSize: 14, color: CP.textSecondary, lineHeight: 1.5 }}>{cfWarn.map((w) => <li key={w}>{w[0].toUpperCase() + w.slice(1)}.</li>)}</ul>
+            <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 10 }}>A volte dipende da un comune che nel frattempo è stato unito a un altro. Se i dati sono giusti, puoi inviare lo stesso.</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button type="button" onClick={() => setCfWarn(null)} style={btnGhost}>Correggo</button>
+              <button type="submit" style={btnPrimary}>Sono giusti, invia</button>
+            </div>
+          </div>
+        )}
         {err && <div role="alert" style={{ color: CP.accentRed, fontSize: 14, margin: "0 0 12px" }}>{err}</div>}
         <button type="submit" disabled={busy} style={{ ...btnPrimary, opacity: busy ? 0.5 : 1 }}>{busy ? "Invio…" : "Invia i miei dati"}</button>
       </form>
