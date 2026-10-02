@@ -24,6 +24,8 @@ const isPublicRoute = createRouteMatcher([
   '/api/leaderboard/snapshot', '/api/leagues/snapshot',
   '/assessment/(.*)', '/api/candidate/(.*)',
   '/hr/modulo/(.*)', '/api/hr/modulo/(.*)', '/api/hr/clickup-webhook',
+  // elenco ufficiale ISTAT dei comuni (dato pubblico) usato dal modulo HR, che si apre senza account
+  '/data/comuni-istat.json',
 ]);
 const isApiRoute = createRouteMatcher(['/api/(.*)']);
 
