@@ -170,7 +170,7 @@ export function SkillsInput({ id, value, onChange, disabled }) {
           <div key={a.area} style={{ border: `1px solid ${CP.border}`, borderRadius: 10 }}>
             <button type="button" onClick={() => setOpenArea(isOpen ? null : a.area)} aria-expanded={isOpen}
               style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "10px 12px", background: "transparent", border: "none", color: CP.textPrimary, fontSize: 14, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" }}>
-              <span>{a.area}</span><span style={{ color: n ? CP.accentSoftText : CP.textMuted, fontWeight: 400, fontSize: 13 }}>{n ? `${n} indicate` : "apri"}</span>
+              <span>{a.area}</span><span style={{ color: n ? CP.accentSoftText : CP.textMuted, fontWeight: 400, fontSize: 13 }}>{n ? `${n} indicate` : ""}{n ? " · " : ""}{isOpen ? "chiudi" : "apri"}</span>
             </button>
             {isOpen && (
               <div style={{ display: "grid", gap: 10, padding: "0 12px 12px" }}>
