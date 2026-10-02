@@ -10,6 +10,7 @@
  * non per scheda — due persone che toccano due campi diversi non si
  * cancellano a vicenda.
  */
+import { normalizeSkillMap, SKILL_NAME } from "./hr-skills.js";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { FIELDS, FIELD_BY_KEY, EDITABLE_KEYS, validateCodiceFiscale } from "./hr-fields.js";
 
@@ -177,6 +178,28 @@ export function normalizePersonInput(input = {}, allowed = EDITABLE_KEYS) {
         const lat = typeof raw === "object" && raw && Number.isFinite(Number(raw.lat)) && raw.lat !== null && raw.lat !== "" ? Number(raw.lat) : null;
         const lng = typeof raw === "object" && raw && Number.isFinite(Number(raw.lng)) && raw.lng !== null && raw.lng !== "" ? Number(raw.lng) : null;
         values[key] = addr || lat != null ? { address: addr.slice(0, 300), lat, lng } : null;
+        break;
+      }
+      case "comune": {
+        const o = raw && typeof raw === "object" ? raw : null;
+        values[key] = o && s(o.name) ? { name: s(o.name).slice(0, 80), prov: s(o.prov).slice(0, 4), code: s(o.code).slice(0, 4), region: s(o.region).slice(0, 40) } : null;
+        break;
+      }
+      case "birth": {
+        const o = raw && typeof raw === "object" ? raw : null;
+        if (!o) { values[key] = null; break; }
+        values[key] = o.abroad
+          ? (s(o.country) ? { abroad: true, country: s(o.country).slice(0, 60) } : null)
+          : (s(o.name) ? { abroad: false, name: s(o.name).slice(0, 80), prov: s(o.prov).slice(0, 4), code: s(o.code).slice(0, 4) } : null);
+        break;
+      }
+      case "skillmap": {
+        values[key] = normalizeSkillMap(raw);
+        if (!("skills" in input)) values.skills = Object.keys(values[key]);
+        break;
+      }
+      case "learn": {
+        values[key] = asList(raw).filter((x) => SKILL_NAME[x]).slice(0, 3);
         break;
       }
       case "cf": {

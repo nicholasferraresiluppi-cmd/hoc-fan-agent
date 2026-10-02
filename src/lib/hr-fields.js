@@ -22,7 +22,10 @@ export const FIELDS = [
   { key: "dateOfBirth", label: "Data di nascita", section: "anagrafica", type: "date", cu: "Date Of Birth" },
   { key: "nationality", label: "Nazionalità", section: "anagrafica", type: "text", cu: "Nationality" },
   { key: "gender", label: "Genere", section: "anagrafica", type: "option", cu: "Gender", options: GENDERS },
-  { key: "location", label: "Dove vive", section: "anagrafica", type: "location", cu: "Location" },
+  { key: "birthPlace", label: "Luogo di nascita", section: "anagrafica", type: "birth", appOnly: true },
+  { key: "residenceComune", label: "Comune di residenza", section: "anagrafica", type: "comune", appOnly: true },
+  { key: "location", label: "Indirizzo", section: "anagrafica", type: "location", cu: "Location" },
+  { key: "residenceCap", label: "CAP", section: "anagrafica", type: "text", appOnly: true },
   { key: "codiceFiscale", label: "Codice fiscale", section: "anagrafica", type: "cf", cu: "Codice fiscale", extra: true, sensitive: true },
   { key: "personalEmail", label: "Email personale", section: "anagrafica", type: "email", cu: "Personal Email" },
   { key: "personalPhone", label: "Telefono personale", section: "anagrafica", type: "phone", cu: "Personal Phone Number" },
@@ -39,6 +42,8 @@ export const FIELDS = [
   { key: "project", label: "Progetto / creator", section: "rapporto", type: "labels", cu: "Project" },
   { key: "seniority", label: "Seniority", section: "rapporto", type: "option", cu: "Seniority" },
   { key: "skills", label: "Competenze", section: "rapporto", type: "labels", cu: "Skills" },
+  { key: "skillLevels", label: "Competenze e livello", section: "rapporto", type: "skillmap", appOnly: true },
+  { key: "learnWish", label: "Vorrebbe imparare", section: "rapporto", type: "learn", appOnly: true },
   { key: "timeSlots", label: "Fasce orarie", section: "rapporto", type: "labels", cu: "Time Slots" },
   { key: "startDate", label: "Inizio collaborazione", section: "rapporto", type: "date", cu: "Start of Collaboration" },
   { key: "endDate", label: "Fine collaborazione", section: "rapporto", type: "date", cu: "End of Collaboration" },
@@ -66,7 +71,8 @@ export const SECTIONS = [
 ];
 // Campi che la persona può compilare dal modulo pubblico (i SUOI dati)
 export const FORM_KEYS = [
-  "firstName", "surname", "dateOfBirth", "nationality", "gender", "location", "personalEmail", "personalPhone",
+  "firstName", "surname", "dateOfBirth", "nationality", "gender", "birthPlace", "residenceComune", "location", "residenceCap", "personalEmail", "personalPhone",
+  "skillLevels", "learnWish",
   "spokenLanguages", "timeSlots", "currentJob", "partitaIva", "codiceFiscale", "personalInterests", "linkedin",
 ];
 // Campi che l'admin può modificare dalla scheda

@@ -6,6 +6,10 @@
  * così la sincronizzazione non cambia.
  */
 import { CP, FONTS } from "@/lib/brand";
+import { useEffect, useState } from "react";
+import { searchComuni } from "@/lib/hr-comuni";
+import { SKILL_AREAS, SKILL_LEVELS, SKILL_NAME } from "@/lib/hr-skills";
+
 
 const field = { width: "100%", boxSizing: "border-box", padding: "8px 10px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
 
@@ -82,3 +86,125 @@ export function LanguagesInput({ id, value, onChange, disabled }) {
     </div>
   );
 }
+
+// ── Comuni (elenco ISTAT, caricato una volta sola) ────────────────────────────
+let COMUNI = null, COMUNI_P = null;
+function useComuni() {
+  const [list, setList] = useState(COMUNI);
+  useEffect(() => {
+    if (COMUNI) return;
+    COMUNI_P = COMUNI_P || fetch("/data/comuni-istat.json").then((r) => r.json()).then((j) => (COMUNI = j));
+    COMUNI_P.then(setList).catch(() => {});
+  }, []);
+  return list;
+}
+
+export function ComuneInput({ id, value, onChange, disabled, placeholder = "Scrivi il comune" }) {
+  const list = useComuni();
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const hits = open ? searchComuni(list, q) : [];
+  if (value?.name && !open) {
+    return (
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div id={id} style={{ ...field, display: "flex", justifyContent: "space-between" }}>
+          <span>{value.name}{value.prov ? ` (${value.prov})` : ""}</span>
+          <span style={{ color: CP.textMuted, fontSize: 13 }}>{value.region || ""}</span>
+        </div>
+        {!disabled && <button type="button" onClick={() => { setQ(""); setOpen(true); }} style={{ ...seg(false), whiteSpace: "nowrap" }}>Cambia</button>}
+      </div>
+    );
+  }
+  return (
+    <div style={{ position: "relative" }}>
+      <input id={id} disabled={disabled} style={field} autoComplete="off" placeholder={list ? placeholder : "Carico l'elenco dei comuni…"}
+        value={q} onChange={(e) => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} aria-autocomplete="list" />
+      {hits.length > 0 && (
+        <div role="listbox" style={{ position: "absolute", zIndex: 5, left: 0, right: 0, top: "100%", marginTop: 4, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, overflow: "hidden", boxShadow: "0 8px 24px rgba(0,0,0,.18)" }}>
+          {hits.map((c) => (
+            <button key={c.code} type="button" role="option" onClick={() => { onChange(c); setOpen(false); setQ(""); }}
+              style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "9px 12px", background: "transparent", border: "none", borderBottom: `1px solid ${CP.border}`, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, cursor: "pointer", textAlign: "left" }}>
+              <span>{c.name} ({c.prov})</span><span style={{ color: CP.textMuted, fontSize: 12 }}>{c.region}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {open && q.trim().length >= 2 && list && hits.length === 0 && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4 }}>Nessun comune trovato con questo nome.</div>}
+    </div>
+  );
+}
+
+export function BirthInput({ id, value, onChange, disabled }) {
+  const abroad = Boolean(value?.abroad);
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      <div style={{ display: "flex", gap: 6 }}>
+        <button type="button" disabled={disabled} aria-pressed={!abroad} onClick={() => onChange(abroad ? null : value)} style={seg(!abroad)}>In Italia</button>
+        <button type="button" disabled={disabled} aria-pressed={abroad} onClick={() => onChange(abroad ? value : { abroad: true, country: "" })} style={seg(abroad)}>All'estero</button>
+      </div>
+      {abroad ? (
+        <select id={id} disabled={disabled} style={field} value={value?.country || ""} onChange={(e) => onChange({ abroad: true, country: e.target.value })}>
+          <option value="">Scegli il paese</option>
+          {ALL.filter((p) => p !== "Italia").map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+      ) : (
+        <ComuneInput id={id} disabled={disabled} placeholder="Comune di nascita" value={value && !value.abroad ? value : null}
+          onChange={(c) => onChange({ abroad: false, name: c.name, prov: c.prov, code: c.code })} />
+      )}
+    </div>
+  );
+}
+
+// ── Competenze con livello ───────────────────────────────────────────────────
+export function SkillsInput({ id, value, onChange, disabled }) {
+  const cur = value && typeof value === "object" ? value : {};
+  const [openArea, setOpenArea] = useState(null);
+  const setLevel = (k, lvl) => { const n = { ...cur }; if (lvl) n[k] = lvl; else delete n[k]; onChange(n); };
+  return (
+    <div id={id} style={{ display: "grid", gap: 8 }}>
+      <div style={{ fontSize: 12.5, color: CP.textMuted, lineHeight: 1.45 }}>Apri le aree che ti riguardano e indica il tuo livello solo dove ce l&apos;hai. «Posso insegnarla» vuol dire che potresti formare un collega.</div>
+      {SKILL_AREAS.map((a) => {
+        const n = a.skills.filter(([k]) => cur[k]).length;
+        const isOpen = openArea === a.area;
+        return (
+          <div key={a.area} style={{ border: `1px solid ${CP.border}`, borderRadius: 10 }}>
+            <button type="button" onClick={() => setOpenArea(isOpen ? null : a.area)} aria-expanded={isOpen}
+              style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "10px 12px", background: "transparent", border: "none", color: CP.textPrimary, fontSize: 14, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" }}>
+              <span>{a.area}</span><span style={{ color: n ? CP.accentSoftText : CP.textMuted, fontWeight: 400, fontSize: 13 }}>{n ? `${n} indicate` : "apri"}</span>
+            </button>
+            {isOpen && (
+              <div style={{ display: "grid", gap: 10, padding: "0 12px 12px" }}>
+                {a.skills.map(([k, name]) => (
+                  <div key={k}>
+                    <div style={{ fontSize: 13.5, color: CP.textPrimary, marginBottom: 4 }}>{name}</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      <button type="button" disabled={disabled} aria-pressed={!cur[k]} onClick={() => setLevel(k, null)} style={seg(!cur[k])}>No</button>
+                      {SKILL_LEVELS.map((l) => <button key={l} type="button" disabled={disabled} aria-pressed={cur[k] === l} onClick={() => setLevel(k, l)} style={seg(cur[k] === l)}>{l}</button>)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function LearnInput({ id, value, onChange, disabled }) {
+  const cur = Array.isArray(value) ? value : [];
+  const opts = SKILL_AREAS.flatMap((a) => a.skills.map(([k, name]) => ({ k, name, area: a.area })));
+  const setAt = (i, k) => { const n = [...cur]; if (k) n[i] = k; else n.splice(i, 1); onChange([...new Set(n.filter(Boolean))]); };
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      {[0, 1].map((i) => (
+        <select key={i} id={i === 0 ? id : undefined} disabled={disabled || (i === 1 && !cur[0])} style={field} value={cur[i] || ""} onChange={(e) => setAt(i, e.target.value)}>
+          <option value="">{i === 0 ? "Scegli una competenza" : "Una seconda (facoltativa)"}</option>
+          {SKILL_AREAS.map((a) => <optgroup key={a.area} label={a.area}>{a.skills.map(([k, name]) => <option key={k} value={k}>{name}</option>)}</optgroup>)}
+        </select>
+      ))}
+    </div>
+  );
+}
+export { SKILL_NAME };
