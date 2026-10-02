@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { NationalityInput, JobInput, LanguagesInput, ComuneInput, BirthInput, SkillsInput, LearnInput, SKILL_NAME } from "@/components/hr-inputs";
+import { NationalityInput, JobInput, LanguagesInput, ComuneInput, ResidenceInput, BirthInput, SkillsInput, LearnInput, SKILL_NAME } from "@/components/hr-inputs";
 
 export const lbl = { display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 4 };
 export const input = {
@@ -45,7 +45,7 @@ export const SYNC_LABEL = {
 export function displayValue(field, v) {
   if (v == null || v === "" || (Array.isArray(v) && !v.length)) return <span style={{ color: CP.textMuted }}>—</span>;
   switch (field.type) {
-    case "comune": return `${v.name}${v.prov ? ` (${v.prov})` : ""}`;
+    case "comune": return v.abroad ? `${v.city ? `${v.city}, ` : ""}${v.country}` : `${v.name}${v.prov ? ` (${v.prov})` : ""}`;
     case "birth": return v.abroad ? v.country : `${v.name}${v.prov ? ` (${v.prov})` : ""}`;
     case "skillmap": { const e = Object.entries(v || {}); return e.length ? <span>{e.map(([k, l]) => <span key={k} style={chip}>{SKILL_NAME[k] || k} · {l}</span>)}</span> : <span style={{ color: CP.textMuted }}>—</span>; }
     case "learn": return <span>{v.map((k) => <span key={k} style={chip}>{SKILL_NAME[k] || k}</span>)}</span>;
@@ -72,7 +72,7 @@ export function FieldInput({ field, value, onChange, options, id, disabled }) {
   if (field.key === "nationality") return <NationalityInput id={id} value={value} onChange={onChange} disabled={disabled} />;
   if (field.key === "currentJob") return <JobInput id={id} value={value} onChange={onChange} disabled={disabled} />;
   if (field.key === "spokenLanguages") return <LanguagesInput id={id} value={value} onChange={onChange} disabled={disabled} />;
-  if (field.type === "comune") return <ComuneInput id={id} value={value} onChange={onChange} disabled={disabled} />;
+  if (field.type === "comune") return <ResidenceInput id={id} value={value} onChange={onChange} disabled={disabled} />;
   if (field.type === "birth") return <BirthInput id={id} value={value} onChange={onChange} disabled={disabled} />;
   if (field.type === "skillmap") return <SkillsInput id={id} value={value} onChange={onChange} disabled={disabled} />;
   if (field.type === "learn") return <LearnInput id={id} value={value} onChange={onChange} disabled={disabled} />;

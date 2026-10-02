@@ -160,7 +160,9 @@ export function hocBlockLines(person, byName, { cfPlain } = {}) {
   // campi solo-app (02/10): luogo di nascita, comune/CAP di residenza, competenze con livello
   const bp = f.birthPlace;
   if (bp) lines.push(`Luogo di nascita: ${bp.abroad ? bp.country : `${s(bp.name)}${bp.prov ? ` (${s(bp.prov)})` : ""}`}`);
-  if (f.residenceComune?.name) lines.push(`Comune di residenza: ${s(f.residenceComune.name)}${f.residenceComune.prov ? ` (${s(f.residenceComune.prov)})` : ""}${f.residenceCap ? ` · CAP ${s(f.residenceCap)}` : ""}`);
+  const rc = f.residenceComune;
+  if (rc?.abroad && rc.country) lines.push(`Residenza: ${s(rc.city) ? `${s(rc.city)}, ` : ""}${s(rc.country)}${f.residenceCap ? ` · codice postale ${s(f.residenceCap)}` : ""}`);
+  else if (rc?.name) lines.push(`Comune di residenza: ${s(rc.name)}${rc.prov ? ` (${s(rc.prov)})` : ""}${f.residenceCap ? ` · CAP ${s(f.residenceCap)}` : ""}`);
   const sl = f.skillLevels && typeof f.skillLevels === "object" ? Object.entries(f.skillLevels) : [];
   if (sl.length) lines.push(`Livelli competenze: ${sl.map(([k, v]) => `${s(SKILL_NAME[k] || k)} (${v})`).join(", ")}`);
   if (Array.isArray(f.learnWish) && f.learnWish.length) lines.push(`Vorrebbe imparare: ${f.learnWish.map((k) => SKILL_NAME[k] || k).join(", ")}`);

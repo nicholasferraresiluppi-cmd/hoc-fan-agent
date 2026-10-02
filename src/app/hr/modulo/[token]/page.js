@@ -26,8 +26,8 @@ const GROUPS = [
 const LABELS = {
   firstName: "Nome", surname: "Cognome", location: "Città in cui vivi", currentJob: "Che cosa fai oggi (mansione)", nationality: "Nazionalità", spokenLanguages: "Lingue che parli",
   partitaIva: "Hai una partita IVA?", timeSlots: "Fasce orarie in cui sei disponibile", personalInterests: "Interessi (facoltativo)",
-  linkedin: "Profilo LinkedIn (facoltativo)", birthPlace: "Dove sei nato/a", residenceComune: "Comune in cui vivi",
-  location: "Indirizzo (via e numero civico)", residenceCap: "CAP", skillLevels: "Cosa sai fare, e a che livello",
+  linkedin: "Profilo LinkedIn (facoltativo)", birthPlace: "Dove sei nato/a", 
+  location: "Indirizzo (via e numero civico)", residenceCap: "CAP / codice postale", residenceComune: "Dove vivi", skillLevels: "Cosa sai fare, e a che livello",
   learnWish: "Cosa ti piacerebbe imparare (facoltativo)", gender: "Genere",
 };
 

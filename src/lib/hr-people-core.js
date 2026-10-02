@@ -182,6 +182,7 @@ export function normalizePersonInput(input = {}, allowed = EDITABLE_KEYS) {
       }
       case "comune": {
         const o = raw && typeof raw === "object" ? raw : null;
+        if (o?.abroad) { values[key] = s(o.country) ? { abroad: true, country: s(o.country).slice(0, 60), city: s(o.city).slice(0, 80) } : null; break; }
         values[key] = o && s(o.name) ? { name: s(o.name).slice(0, 80), prov: s(o.prov).slice(0, 4), code: s(o.code).slice(0, 4), region: s(o.region).slice(0, 40) } : null;
         break;
       }

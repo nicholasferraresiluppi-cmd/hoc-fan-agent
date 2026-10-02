@@ -208,3 +208,26 @@ export function LearnInput({ id, value, onChange, disabled }) {
   );
 }
 export { SKILL_NAME };
+
+export function ResidenceInput({ id, value, onChange, disabled }) {
+  const abroad = Boolean(value?.abroad);
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      <div style={{ display: "flex", gap: 6 }}>
+        <button type="button" disabled={disabled} aria-pressed={!abroad} onClick={() => onChange(abroad ? null : value)} style={seg(!abroad)}>In Italia</button>
+        <button type="button" disabled={disabled} aria-pressed={abroad} onClick={() => onChange(abroad ? value : { abroad: true, country: "", city: "" })} style={seg(abroad)}>All'estero</button>
+      </div>
+      {abroad ? (
+        <>
+          <select id={id} disabled={disabled} style={field} value={value?.country || ""} onChange={(e) => onChange({ ...value, abroad: true, country: e.target.value })}>
+            <option value="">Scegli il paese</option>
+            {ALL.filter((p) => p !== "Italia").map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <input disabled={disabled} style={field} placeholder="Città" value={value?.city || ""} onChange={(e) => onChange({ ...value, abroad: true, city: e.target.value })} aria-label="Città" />
+        </>
+      ) : (
+        <ComuneInput id={id} disabled={disabled} value={value && !value.abroad ? value : null} onChange={onChange} />
+      )}
+    </div>
+  );
+}
