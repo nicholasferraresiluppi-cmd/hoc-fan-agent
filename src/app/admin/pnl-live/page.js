@@ -169,7 +169,7 @@ export default function PnlLivePage() {
           <span>Margine <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmt$(t.margin)}</b></span>
         </div>
         <div style={{ fontSize: 12, color: CP.textMuted }}>
-          Venduto di tutte le creator, compresi i turni di operatori fuori dalla classifica Sales CP (per questo il totale è più alto di quello di Sales CP).
+          Venduto di tutte le creator, compresi i turni di operatori fuori dalla Classifica vendite (per questo il totale è più alto di quello di Classifica vendite).
           {data.last_sync_at ? ` Dati CreatorsPro aggiornati ${fmtAgo(data.last_sync_at)}.` : ""}
         </div>
       </>)}

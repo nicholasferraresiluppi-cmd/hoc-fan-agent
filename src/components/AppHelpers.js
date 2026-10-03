@@ -22,6 +22,8 @@ export function SecurityBanner() {
   const [snoozed, setSnoozed] = useState(() => { try { return Date.now() < Number(localStorage.getItem("hoc:mfa-snooze") || 0); } catch { return false; } });
   if (!sec?.admin_raw || sec.mfa_enabled) return null;
   if (snoozed && !sec.mfa_required) return null;
+  // in "Vedi come…" si guarda l'app di un altro: il promemoria dell'admin confonderebbe l'anteprima
+  if (data?.view_as && !sec.mfa_required) return null;
   return (
     <div className="hoc-banner" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: CP.dangerSoft, borderBottom: `1px solid ${CP.border}`, fontSize: 13, color: CP.textPrimary, flexWrap: "wrap" }}>
       <ShieldAlert size={16} color={CP.accentRed} />

@@ -173,9 +173,9 @@ export default function ScoreExplainedPage() {
       </Block>
 
       {/* 5 — Aggregato */}
-      <Block title="5. Il numero unico di Sales CP">
+      <Block title="5. Il numero unico di Classifica vendite">
         <p style={pBig}>
-          Lo score che vedi in <b style={b}>Sales CP</b> per un operatore è la <b style={b}>media degli score per creator, pesata sui turni</b>:
+          Lo score che vedi in <b style={b}>Classifica vendite</b> per un operatore è la <b style={b}>media degli score per creator, pesata sui turni</b>:
         </p>
         <div style={{ ...card, marginTop: 10, padding: "14px 16px", textAlign: "center", fontSize: 14, color: CP.textPrimary, ...NUM }}>
           score(operatore) = Σ ( score(operatore, creator) × turni(operatore, creator) ) / turni totali
@@ -185,7 +185,7 @@ export default function ScoreExplainedPage() {
           <li>Le creator su cui fai più turni <b style={b}>pesano di più</b>.</li>
           <li>Non puoi essere «Eccellente» nello score Vendite se vai male sulle creator dove passi la maggior parte dei turni: pochi turni fortunati non bastano.</li>
           <li>Le creator con meno di 3 turni non entrano nel calcolo.</li>
-          <li>Sales CP e la vista per creator raccontano la stessa storia: i numeri sono gli stessi.</li>
+          <li>Classifica vendite e la vista per creator raccontano la stessa storia: i numeri sono gli stessi.</li>
         </ul>
       </Block>
 
@@ -195,7 +195,7 @@ export default function ScoreExplainedPage() {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Sparkles size={18} color={CP.textMuted} />
             <div>
-              <div style={{ fontWeight: 500, fontSize: 15 }}>Vai a Sales CP</div>
+              <div style={{ fontWeight: 500, fontSize: 15 }}>Vai a Classifica vendite</div>
               <div style={{ fontSize: 12, color: CP.textSecondary }}>Gli score reali del mese in corso</div>
             </div>
           </div>
@@ -205,7 +205,7 @@ export default function ScoreExplainedPage() {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Target size={18} color={CP.textMuted} />
             <div>
-              <div style={{ fontWeight: 500, fontSize: 15 }}>Action Center</div>
+              <div style={{ fontWeight: 500, fontSize: 15 }}>Sotto soglia</div>
               <div style={{ fontSize: 12, color: CP.textSecondary }}>Chi rivedere questo mese e cosa fare (per chi gestisce il team)</div>
             </div>
           </div>

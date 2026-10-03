@@ -25,8 +25,8 @@ const MODULES = [
     title: "Performance",
     subtitle: "Quanto rendono operatori e creator",
     description:
-      "Tre viste che si completano: Sales CP (score Vendite, dalle vendite reali registrate in CreatorsPro), la classifica operativa (score Mestiere, dai dati di Infloww come vendite all'ora e quota di fan che comprano) e la vista per creator (chi rende di più su quale creator).",
-    primaryCta: { href: "/leaderboard/sales-cp", label: "Apri Sales CP" },
+      "Tre viste che si completano: Classifica vendite (score Vendite, dalle vendite reali registrate in CreatorsPro), la classifica operativa (score Mestiere, dai dati di Infloww come vendite all'ora e quota di fan che comprano) e la vista per creator (chi rende di più su quale creator).",
+    primaryCta: { href: "/leaderboard/sales-cp", label: "Apri Classifica vendite" },
     secondaryCtas: [
       { href: "/leaderboard/operational", label: "Classifica operativa" },
       { href: "/leaderboard/creators", label: "Vista per creator" },

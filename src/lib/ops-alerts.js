@@ -251,7 +251,7 @@ const CHECKS = [
         title: "Operatori sotto soglia questo mese",
         detail: `Score vendite ≤ ${UNDERPERF_SCORE_MAX} con almeno ${UNDERPERF_MIN_SHIFTS} turni`,
         value: String(count),
-        cta: { href: "/admin/action-center", label: "Apri Action Center" },
+        cta: { href: "/admin/action-center", label: "Apri Sotto soglia" },
       }];
     },
   },
@@ -398,9 +398,9 @@ const CHECKS = [
           fingerprint: "infloww-agency-stale",
           severity: "warning",
           title: `Ricavi Infloww: ${failedN} creator su ${total} non scaricate nell'ultimo giro`,
-          detail: `I totali di Revenue agency sono incompleti.${meta.last_error ? ` Errore: ${meta.last_error}.` : ""} Il giro si ripete ogni notte; se resta così, va guardato l'accesso all'API Infloww.`,
+          detail: `I totali di Incassi Infloww sono incompleti.${meta.last_error ? ` Errore: ${meta.last_error}.` : ""} Il giro si ripete ogni notte; se resta così, va guardato l'accesso all'API Infloww.`,
           value: `${failedN}/${total}`,
-          cta: { href: "/admin/infloww-agency", label: "Apri Revenue agency" },
+          cta: { href: "/admin/infloww-agency", label: "Apri Incassi Infloww" },
         }];
       }
       const days = Number.isFinite(age) ? Math.floor(age) : null;
@@ -408,9 +408,9 @@ const CHECKS = [
         fingerprint: "infloww-agency-stale",
         severity: age > 7 ? "critical" : "warning",
         title: days != null ? `Ricavi Infloww fermi da ${days} giorni` : "Ricavi Infloww mai sincronizzati",
-        detail: `Revenue agency e Controllo dati CP leggono una copia dei ricavi Infloww che si aggiorna ogni notte. ${days != null ? `L'ultimo aggiornamento è del ${new Date(meta.last_sync_at).toLocaleDateString("it-IT")}` : "Non risulta nessun aggiornamento"}: finché non riparte quelle pagine mostrano numeri vecchi o a zero.${meta?.failed_creators?.length ? ` Ultimo giro: ${meta.failed_creators.length} creator non scaricate${meta.last_error ? ` (${meta.last_error})` : ""}.` : ""}`,
+        detail: `Incassi Infloww e Controllo dati CP leggono una copia dei ricavi Infloww che si aggiorna ogni notte. ${days != null ? `L'ultimo aggiornamento è del ${new Date(meta.last_sync_at).toLocaleDateString("it-IT")}` : "Non risulta nessun aggiornamento"}: finché non riparte quelle pagine mostrano numeri vecchi o a zero.${meta?.failed_creators?.length ? ` Ultimo giro: ${meta.failed_creators.length} creator non scaricate${meta.last_error ? ` (${meta.last_error})` : ""}.` : ""}`,
         value: days != null ? `${days}g` : "mai",
-        cta: { href: "/admin/infloww-agency", label: "Apri Revenue agency e rilancia" },
+        cta: { href: "/admin/infloww-agency", label: "Apri Incassi Infloww e rilancia" },
       }];
     },
   },
@@ -434,7 +434,7 @@ const CHECKS = [
         fingerprint: `cp-unmapped-sales:${m}`,
         severity: u.share >= 0.05 ? "critical" : "warning",
         title: `${mese[0].toUpperCase() + mese.slice(1)}: $${Math.round(u.unmapped).toLocaleString("it-IT")} di venduto da ${u.people.length} persone non collegate a un operatore`,
-        detail: `${pct}% del venduto del mese non compare in Sales CP, Creator, Action e Coaching Center. I più grandi: ${u.people.slice(0, 5).map((p) => `${p.name} $${Math.round(p.sales).toLocaleString("it-IT")}`).join(" · ")}.`,
+        detail: `${pct}% del venduto del mese non compare in Classifica vendite, Creator, Sotto soglia e Da far crescere. I più grandi: ${u.people.slice(0, 5).map((p) => `${p.name} $${Math.round(p.sales).toLocaleString("it-IT")}`).join(" · ")}.`,
         value: `${pct}%`,
         cta: { href: "/admin/creatorspro-sync#collega", label: "Collega le persone" },
       }];

@@ -121,6 +121,13 @@ export default function CreatorsLeaderboardPage() {
 
       {isLoading && !data && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
       {data?.error && <Notice danger>{data.error} <Link href="/admin/creatorspro-sync" style={{ color: CP.accentSoftText }}>Sync CP →</Link></Notice>}
+      {data?.visibility && !data.visibility.all && (
+        <Notice>
+          {(data.visibility.creators || []).length
+            ? `Vedi le ${data.visibility.creators.length} creator assegnate a te.`
+            : "Non hai ancora creator assegnate, quindi qui non c'è niente da mostrare. Chiedi a un admin di assegnartele in Membri e ruoli."}
+        </Notice>
+      )}
 
       {ok && (<>
         <HeroMetric

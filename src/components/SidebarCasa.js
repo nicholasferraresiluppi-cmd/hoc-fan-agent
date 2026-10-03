@@ -18,6 +18,8 @@ import { canSee } from "@/lib/nav-access";
 import { useStyle, useTheme } from "@/lib/theme-client";
 import { Sun, Moon } from "lucide-react";
 import { NAV_GROUPS, SIDEBAR_WIDTH } from "./Sidebar";
+import WorkspaceSwitch from "@/components/WorkspaceSwitch";
+import { WORKSPACES, workspaceSections } from "@/lib/workspaces";
 
 const silentFetcher = async (url) => {
   try {
@@ -102,8 +104,12 @@ export default function SidebarCasa() {
 
   const allowed = (href) => !me?.authenticated || canSee(href, me.capabilities, me.admin);
   const manager = me?.authenticated && (canSee("/admin", me.capabilities, me.admin) || canSee("/admin/settimana", me.capabilities, me.admin));
-  const home = me && canSee("/admin", me.capabilities, me.admin) ? "/admin" : manager ? "/admin/settimana" : "/me/turno";
-  const sections = (manager ? MANAGER : OPERATOR)
+  // Mansione (lib/workspaces): Board / Sales Manager / HR hanno il loro menu corto; "Tutti gli strumenti" = quello di sempre
+  const ws = me?.workspace?.id;
+  const wsOn = ws && ws !== "all";
+  const home = wsOn && allowed(WORKSPACES[ws].home) ? WORKSPACES[ws].home
+    : me && canSee("/admin", me.capabilities, me.admin) ? "/admin" : manager ? "/admin/settimana" : "/me/turno";
+  const sections = wsOn ? workspaceSections(ws, allowed) : (manager ? MANAGER : OPERATOR)
     .map((s) => ({ ...s, items: s.items.filter((i) => allowed(i.href)) }))
     .filter((s) => s.items.length);
   const openAlerts = (alerts?.alerts || []).filter((a) => a.status !== "resolved").length;
@@ -121,6 +127,8 @@ export default function SidebarCasa() {
         House of Creators <em>Pro</em>
         <small>{today}</small>
       </Link>
+
+      <WorkspaceSwitch me={me} style={{ margin: "0 0 14px 0" }} />
 
       <nav className="casa-nav" aria-label="Menu">
         {sections.map((s, si) => (

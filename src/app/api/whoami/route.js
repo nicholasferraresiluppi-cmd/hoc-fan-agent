@@ -4,6 +4,8 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { isUserIdAdmin, isUserIdAdminRaw, userHasMfa, adminMfaRequired } from "@/lib/admin";
 import { getUserRole, getUserRoles, getUserTeam, getEffectiveCapabilities } from "@/lib/rbac";
 import { getCreatorScope } from "@/lib/creator-scope";
+import { resolveWorkspace } from "@/lib/workspace-store";
+import { defaultWorkspace } from "@/lib/workspaces";
 
 export async function GET() {
   try {
@@ -20,6 +22,11 @@ export async function GET() {
     if (cs?.all) capabilities["creators.all"] = "all";
     const creators = cs ? { all: cs.all, count: cs.creators?.size || 0, source: cs.source } : null;
     const adminRaw = admin || (await isUserIdAdminRaw(userId));
+    // mansione (03/10/2026): menu e hub per il lavoro della persona; in "Vedi come" quella del membro/ruolo guardato
+    const va = adminRaw ? await viewAsFor(userId).catch(() => null) : null;
+    const workspace = va
+      ? (va.target ? await resolveWorkspace(va.target, { admin: false, roles }) : { id: defaultWorkspace({ admin: false, roles }), source: "ruolo" })
+      : await resolveWorkspace(userId, { admin, roles }).catch(() => ({ id: defaultWorkspace({ admin, roles }), source: "ruolo" }));
     // appena attivata la 2FA la cache del controllo si aggiorna subito
     if (adminRaw && user?.twoFactorEnabled) await kv.set(`mfa:ok:${userId}`, 1, { ex: 600 }).catch(() => {});
     const security = adminRaw
@@ -35,7 +42,8 @@ export async function GET() {
       capabilities,
       creators,
       security,
-      view_as: adminRaw ? await viewAsFor(userId).then((v) => (v ? { label: v.label, roles: v.roles, exp: v.exp, employee: v.employee || null } : null)).catch(() => null) : null,
+      workspace,
+      view_as: va ? { label: va.label, roles: va.roles, exp: va.exp, employee: va.employee || null } : null,
       email: user?.emailAddresses?.[0]?.emailAddress,
       name: `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || null,
     });

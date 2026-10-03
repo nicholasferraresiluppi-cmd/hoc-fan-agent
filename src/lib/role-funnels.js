@@ -122,7 +122,7 @@ export const ROLE_FUNNELS = [
     steps: [
       {
         phase: "Diagnostica il team",
-        title: "Creator-first",
+        title: "Creator",
         href: "/leaderboard/creators",
         icon: "Users",
         why: "La foto della performance per creator: chi rende e chi no nel tuo perimetro.",
@@ -138,7 +138,7 @@ export const ROLE_FUNNELS = [
       },
       {
         phase: "Agisci",
-        title: "Coaching Center",
+        title: "Da far crescere",
         href: "/admin/coaching-center",
         icon: "GraduationCap",
         why: "Assegni i percorsi di training alla persona giusta, sul gap giusto.",
@@ -146,7 +146,7 @@ export const ROLE_FUNNELS = [
       },
       {
         phase: "Agisci",
-        title: "Action Center",
+        title: "Sotto soglia",
         href: "/admin/action-center",
         icon: "Target",
         why: "Gli underperformer del periodo, pronti da gestire fino all'export per HR.",
@@ -179,7 +179,7 @@ export const ROLE_FUNNELS = [
     steps: [
       {
         phase: "Leggi la performance",
-        title: "Sales CP",
+        title: "Classifica vendite",
         href: "/leaderboard/sales-cp",
         icon: "DollarSign",
         why: "La leaderboard autorevole (score CP v3): il riferimento per le decisioni HR sui chatter.",
@@ -203,7 +203,7 @@ export const ROLE_FUNNELS = [
       },
       {
         phase: "Decidi e agisci",
-        title: "Action Center",
+        title: "Sotto soglia",
         href: "/admin/action-center",
         icon: "Target",
         why: "Gli underperformer del periodo, con l'export pronto per HR.",
@@ -211,7 +211,7 @@ export const ROLE_FUNNELS = [
       },
       {
         phase: "Decidi e agisci",
-        title: "Coaching Center",
+        title: "Da far crescere",
         href: "/admin/coaching-center",
         icon: "GraduationCap",
         why: "Le assegnazioni formali di training per periodo, per persona.",
@@ -244,7 +244,7 @@ export const ROLE_FUNNELS = [
     steps: [
       {
         phase: "Diagnosi persone",
-        title: "Action Center",
+        title: "Sotto soglia",
         href: "/admin/action-center",
         icon: "Target",
         why: "Gli underperformer del periodo, con l'export HR già pronto. È il punto d'ingresso people.",
@@ -260,7 +260,7 @@ export const ROLE_FUNNELS = [
       },
       {
         phase: "Sviluppo",
-        title: "Coaching Center",
+        title: "Da far crescere",
         href: "/admin/coaching-center",
         icon: "GraduationCap",
         why: "Il piano di sviluppo per persona e periodo: dal gap al percorso di training.",

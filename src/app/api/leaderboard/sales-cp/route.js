@@ -50,6 +50,17 @@ export async function GET(request) {
     return Response.json({ error: `language invalid: ${language_filter}` }, { status: 400 });
   }
 
+  // Nessuna creator assegnata: niente da mostrare, si risponde subito invece di calcolare tutta
+  // l'agenzia per poi filtrarla a zero (prova d'uso 03/10: la pagina restava su "Caricamento…")
+  if (!az.creatorScope.all && !az.creatorScope.creators?.size) {
+    return Response.json({
+      period_id, cp_available: true, ranking: [], groupMeansCp: {}, visibility: scopeSummary(az.creatorScope),
+      groups: [], total: 0, eligible_total: 0, no_cp_count: 0, avg_score: 0, elite_count: 0, strong_count: 0,
+      tier_counts: {}, category_counts: { Big: 0, Medium: 0, Small: 0, Uncategorized: 0 }, language_counts: { eng: 0, ita: 0, unknown: 0 },
+      agency: { total_sales: 0, total_shifts: 0, avg_sales_per_shift: 0 },
+    });
+  }
+
   const cpAvailable = await hasCpDataForPeriod(period_id);
   if (!cpAvailable) {
     return Response.json({

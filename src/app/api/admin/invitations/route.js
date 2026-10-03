@@ -28,8 +28,8 @@ export async function POST(request) {
     const inviterName = [me?.firstName, me?.lastName].filter(Boolean).join(" ") || me?.emailAddresses?.[0]?.emailAddress || null;
     // origin fisso (dominio pubblico), non l'host della richiesta
     const origin = internalOrigin(request);
-    const invitation = await createInvitation({ email: body?.email, roles: body?.roles, creators: body?.creators, inviterId: az.userId, inviterName, origin });
-    await auditAccess(az.userId, "invite", { email: invitation.email, roles: invitation.roles });
+    const invitation = await createInvitation({ email: body?.email, roles: body?.roles, creators: body?.creators, workspace: body?.workspace, inviterId: az.userId, inviterName, origin });
+    await auditAccess(az.userId, "invite", { email: invitation.email, roles: invitation.roles, workspace: invitation.workspace });
     return Response.json({ ok: true, invitation });
   } catch (e) {
     const msg = e?.errors?.[0]?.longMessage || e?.errors?.[0]?.message || e.message || "Invito non riuscito";

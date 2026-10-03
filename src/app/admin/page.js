@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee } from "@/lib/nav-access";
+import { WORKSPACES, workspaceSections } from "@/lib/workspaces";
 import { fmt$, fmtInt, fmtDelta, fmtAgo, MONTHS_IT } from "@/lib/format";
 import { useStyle } from "@/lib/theme-client";
 import { PageHead, HeroMetric, Metric, SectionTitle, ActionRow, card } from "@/components/ds";
@@ -57,7 +58,7 @@ const SHORTCUT_GROUPS_RAW = [
     items: [
       { href: "/leaderboard",                  title: "Classifica allenamento",        desc: "Classifica principale operatori", icon: Trophy },
       { href: "/leaderboard/sales-cp",         title: "Classifica vendite", desc: "Score 0-100 da CreatorsPro", icon: DollarSign },
-      { href: "/leaderboard/creators",         title: "Creator-first", desc: "Quanto rende ogni creator + team interno", icon: Users },
+      { href: "/leaderboard/creators",         title: "Creator", desc: "Quanto rende ogni creator + team interno", icon: Users },
       { href: "/leaderboard/creators/heatmap", title: "Mappa operatore×creator",      desc: "Score operatore × creator a colpo d'occhio", icon: Flame },
       { href: "/admin/conversation-intelligence", title: "Presidio chat", desc: "Latenza risposta, % entro 5 min e response rate per creator (dai transcript, solo metadati)", icon: Activity },
       { href: "/admin/sales-coaching", title: "Coaching vendite", desc: "Per split: quanto comprano in chat i fan mai paganti, chi vende meglio a parità di pagina, cosa fa vendere, pagine e operatori modello di HOC, test in corso ed esempi da far studiare", icon: HandCoins },
@@ -114,11 +115,11 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/admin/candidate-assessments", title: "Assessment candidati", desc: "Simulatore Academy come test pre-assunzione: crea link, leggi il report (segnale per HR, non gate), registra l'esito", icon: UserCheck },
       { href: "/admin/priority-queue",    title: "Fan da seguire ora", desc: "Quale fan seguire ora per creator: whale in attesa o in raffreddamento, ordinati per valore", icon: Inbox },
       { href: "/admin/settimana",          title: "Da seguire", desc: "Chi seguire questa settimana: sotto soglia, cali forti, chi può crescere", icon: Target },
-      { href: "/admin/coaching-center",   title: "Coaching Center", desc: "Operatori con margini di crescita + training mirato", icon: GraduationCap },
+      { href: "/admin/coaching-center",   title: "Da far crescere", desc: "Operatori con margini di crescita + training mirato", icon: GraduationCap },
       { href: "/admin/coaching-sessions", title: "Sessioni coaching", desc: "Sessioni strutturate: evidenze, impegni, conferma operatore", icon: GraduationCap },
       { href: "/admin/disputes",          title: "Contestazioni", desc: "Coda dispute score/compensi + risoluzione motivata", icon: MessageSquareWarning },
       { href: "/admin/team",              title: "Team",          desc: "Crea team + assegna operatori + nomina lead", icon: UserCircle2 },
-      { href: "/admin/employee-profiles", title: "Profili",       desc: "Anagrafica completa + override KPI", icon: Contact },
+      { href: "/admin/employee-profiles", title: "Profili operatori",       desc: "Anagrafica completa + override KPI", icon: Contact },
       { href: "/admin/seniority",         title: "Seniority",     desc: "Tier Junior/Senior/Master + override manuale", icon: Medal },
       { href: "/admin/ruoli",             title: "Membri",        desc: "Chi ha accesso, chi è admin, con che ruolo + Aggiungi membro", icon: Lock },
       { href: "/admin/ruoli-custom",      title: "Ruoli custom",  desc: "Crea ruoli personalizzati con scope", icon: Wrench },
@@ -134,7 +135,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/admin/debug-mapping",          title: "Operatori senza dati CP",  desc: "Perché un operatore risulta senza dati CP", icon: Link2 },
       { href: "/admin/user-mapping",           title: "Collega utenti", desc: "Utenti Clerk → operatore via roster Infloww (employeeId)", icon: Link2 },
       { href: "/admin/reports",                title: "Report Looker",      desc: "Report Looker Studio dell'agency", icon: BarChart3 },
-      { href: "/admin/infloww-agency",         title: "Revenue agency", desc: "Portfolio live: netto di tutte le creator, ranking", icon: Activity },
+      { href: "/admin/infloww-agency",         title: "Incassi Infloww", desc: "Portfolio live: netto di tutte le creator, ranking", icon: Activity },
       { href: "/admin/infloww-revenue",        title: "Revenue live",   desc: "Ledger fan-by-fan di una creator, tempo reale", icon: Activity },
       { href: "/admin/infloww-reconcile",      title: "Controllo dati CP", desc: "Il venduto CP è completo? Confronto col reale Infloww", icon: ShieldCheck },
       { href: "/admin/payout-tree",            title: "Albero payout",  desc: "Turno → take CP → transazione fan + refund impact", icon: ListTree },
@@ -150,6 +151,8 @@ const SHORTCUT_GROUPS_RAW = [
 ];
 // pagine dello stesso compito unite come schede (lib/page-groups): una sola voce per gruppo
 const SHORTCUT_GROUPS = SHORTCUT_GROUPS_RAW.map((g) => ({ ...g, items: collapseItems(g.items, "title") }));
+// descrizione e icona di ogni strumento (anche quelli raccolti in schede), per "I tuoi strumenti" della mansione
+const TOOL_BY_HREF = new Map(SHORTCUT_GROUPS_RAW.flatMap((g) => g.items.map((i) => [i.href, i])));
 
 export default function AdminHub() {
   const { user } = useUser();
@@ -160,11 +163,20 @@ export default function AdminHub() {
   const monthName = MONTHS_IT[now.getMonth()];
 
   const { data: me } = useSWR("/api/whoami", fetcher, { revalidateOnFocus: false });
-  const { data: sales } = useSWR(`/api/leaderboard/sales-cp?period_id=${periodId}`, fetcher);
-  const { data: salesPrev } = useSWR(`/api/leaderboard/sales-cp?period_id=${prevId}`, fetcher);
-  const { data: creators } = useSWR(`/api/leaderboard/creators?period_id=${periodId}`, fetcher);
+  // Mansione (lib/workspaces): HR non ha bisogno del venduto; chi vede solo alcune creator vede i LORO numeri
+  const ws = me?.workspace?.id;
+  const wsOn = Boolean(ws && ws !== "all");
+  const isHr = ws === "hr";
+  const partial = Boolean(me?.creators && !me.creators.all);
+  const noCreators = partial && !me.creators.count;
+  const wantSales = Boolean(me) && !isHr && !noCreators;
+  const { data: sales } = useSWR(wantSales ? `/api/leaderboard/sales-cp?period_id=${periodId}` : null, fetcher);
+  const { data: salesPrev } = useSWR(wantSales ? `/api/leaderboard/sales-cp?period_id=${prevId}` : null, fetcher);
+  const { data: creators } = useSWR(wantSales ? `/api/leaderboard/creators?period_id=${periodId}` : null, fetcher);
   const { data: sync } = useSWR(`/api/admin/creatorspro-sync`, fetcher);
-  const { data: loop } = useSWR(`/api/admin/closed-loop-metrics?period_id=${periodId}`, fetcher);
+  // il ciclo coaching/sostituzioni è di tutta l'agenzia: solo per chi vede tutte le creator
+  const { data: loop } = useSWR(me && !isHr && !partial ? `/api/admin/closed-loop-metrics?period_id=${periodId}` : null, fetcher);
+  const [showAll, setShowAll] = useState(false);
   const { data: alertsData } = useSWR(`/api/admin/ops-alerts`, fetcher);
 
   const greeting = useMemo(() => {
@@ -202,6 +214,15 @@ export default function AdminHub() {
     items: g.items.filter((it) => allowed(it.href) && (!needle || `${it.title} ${it.desc}`.toLowerCase().includes(needle))),
   })).filter((g) => g.items.length);
 
+  // "I tuoi strumenti": le voci della mansione per prime, il resto dietro "Tutti gli strumenti"
+  const mine = wsOn ? workspaceSections(ws, allowed).flatMap((x) => x.items)
+    .filter((i) => i.href !== "/admin")
+    .map((i) => ({ href: i.href, title: i.label, desc: TOOL_BY_HREF.get(i.href)?.desc || "", icon: TOOL_BY_HREF.get(i.href)?.icon || LayoutDashboard }))
+    .filter((it) => !needle || `${it.title} ${it.desc}`.toLowerCase().includes(needle)) : [];
+  const mineHrefs = new Set(mine.map((i) => i.href));
+  const others = groups.map((g) => ({ ...g, items: g.items.filter((it) => !mineHrefs.has(it.href)) })).filter((g) => g.items.length);
+  const othersOpen = !wsOn || showAll || Boolean(needle);
+
   const trend = loop?.trend;
   const loopNote = (x, fallback) => x?.reason === "no_history" ? "servono 2 mesi di dati" : x?.reason ? fallback : null;
 
@@ -209,12 +230,22 @@ export default function AdminHub() {
     <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         title={`${greeting}${userName ? `, ${userName}` : ""}.`}
-        line2={paceLine}
-        subtitle={paceLine && st === "v3" ? null : `Come va l'agenzia a ${monthName} e cosa guardare oggi.`}
+        line2={isHr ? null : paceLine}
+        subtitle={isHr ? "Persone, accessi e contestazioni: da qui parti per il lavoro di oggi."
+          : paceLine && st === "v3" ? null : `Come va ${partial ? "il tuo perimetro" : "l'agenzia"} a ${monthName} e cosa guardare oggi.`}
       />
 
-      <HeroMetric
-        label={`Venduto agenzia · ${monthName} finora`}
+      {noCreators && !isHr && (
+        <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+          <SectionTitle>Non hai ancora creator assegnate</SectionTitle>
+          <div style={{ fontSize: 14, color: CP.textSecondary, lineHeight: 1.55 }}>
+            Le pagine di vendita mostrano solo le creator che segui. Finché un admin non te le assegna (Membri e ruoli → la tua scheda → Creator visibili), qui e nelle classifiche non vedrai numeri.
+          </div>
+        </section>
+      )}
+
+      {!isHr && !noCreators && <HeroMetric
+        label={`${partial ? `Venduto delle tue ${me.creators.count} creator` : "Venduto agenzia"} · ${monthName} finora`}
         value={fmt$(soFar)}
         compare={projection && prevTotal ? `A questo ritmo ~${fmt$(projection)} a fine mese · ${MONTHS_IT[(now.getMonth() + 11) % 12]} intero: ${fmt$(prevTotal)} (${fmtDelta(projection, prevTotal)})` : prevTotal ? `${MONTHS_IT[(now.getMonth() + 11) % 12]} intero: ${fmt$(prevTotal)}` : null}
         hint={sync ? `Dati CreatorsPro aggiornati ${fmtAgo(lastSync)}${syncStale ? " — più vecchi del solito, controlla il sync" : ""}` : null}
@@ -225,9 +256,9 @@ export default function AdminHub() {
           <Metric label="Turni" value={fmtInt(sales?.agency?.total_shifts)} />
           <Metric label="Venduto per turno" value={fmt$(sales?.agency?.avg_sales_per_shift)} delta={fmtDelta(sales?.agency?.avg_sales_per_shift, salesPrev?.agency?.avg_sales_per_shift)} />
         </div>
-      </HeroMetric>
+      </HeroMetric>}
 
-      {alertsData && (
+      {alertsData && !isHr && (
         <section className="ds-open" style={{ ...card, marginBottom: 14 }}>
           <div className="ds-open-h" style={{ padding: "14px 16px 10px" }}>
             <SectionTitle aside={open.length ? `${open.length} aperti, i più gravi prima` : null}>Da guardare oggi</SectionTitle>
@@ -273,25 +304,44 @@ export default function AdminHub() {
             style={{ border: "none", outline: "none", background: "transparent", color: CP.textPrimary, fontSize: 14, width: "100%", fontFamily: FONTS.body }} />
         </label>
       </div>
-      {groups.length === 0 && <div style={{ fontSize: 14, color: CP.textMuted }}>Nessuno strumento corrisponde a “{q}”.</div>}
-      {groups.map((g) => (
+      {groups.length === 0 && mine.length === 0 && <div style={{ fontSize: 14, color: CP.textMuted }}>Nessuno strumento corrisponde a “{q}”.</div>}
+      {mine.length > 0 && (
+        <section style={{ marginBottom: 22 }}>
+          <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 8 }}>I tuoi strumenti · {WORKSPACES[ws]?.label}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8 }}>
+            {mine.map((it) => <ToolCard key={it.href} it={it} />)}
+          </div>
+        </section>
+      )}
+      {wsOn && !needle && (
+        <button type="button" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll}
+          style={{ display: "block", margin: "4px 0 18px", padding: "8px 14px", background: "transparent", border: `1px dashed ${CP.border}`, borderRadius: 8, color: CP.textSecondary, fontSize: 13, fontFamily: FONTS.body, cursor: "pointer" }}>
+          {showAll ? "Nascondi gli altri strumenti" : `Tutti gli strumenti (${others.reduce((n, g) => n + g.items.length, 0)})`}
+        </button>
+      )}
+      {othersOpen && others.map((g) => (
         <section key={g.label} style={{ marginBottom: 22 }}>
           <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 8 }}>{g.label}</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8 }}>
-            {g.items.map((it) => (
-              <Link key={it.href} href={it.href} className="hub-tool"
-                style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px", ...card, textDecoration: "none", color: CP.textPrimary }}>
-                <it.icon size={16} color={CP.textMuted} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 2 }} />
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500 }}>{it.title}</div>
-                  <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.45, marginTop: 2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.desc}</div>
-                </div>
-              </Link>
-            ))}
+            {g.items.map((it) => <ToolCard key={it.href} it={it} />)}
           </div>
         </section>
       ))}
       <style>{`.hub-tool:hover{background:${CP.surfaceAlt} !important}`}</style>
     </div>
+  );
+}
+
+function ToolCard({ it }) {
+  const Icon = it.icon;
+  return (
+    <Link href={it.href} className="hub-tool"
+      style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px", ...card, textDecoration: "none", color: CP.textPrimary }}>
+      <Icon size={16} color={CP.textMuted} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 2 }} />
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 500 }}>{it.title}</div>
+        {it.desc && <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.45, marginTop: 2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.desc}</div>}
+      </div>
+    </Link>
   );
 }

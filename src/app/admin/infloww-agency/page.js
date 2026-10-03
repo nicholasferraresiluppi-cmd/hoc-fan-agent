@@ -151,8 +151,8 @@ export default function InflowwAgencyPage() {
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
-        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Revenue agency" }]}
-        title="Revenue agency"
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Incassi Infloww" }]}
+        title="Incassi Infloww"
         subtitle="Quanto incassa ogni creator del roster, da cosa e chi porta di più. Serve a vedere il portafoglio in un colpo d'occhio; il dettaglio di una creator è in Revenue live."
         actions={<>
           <Link href="/admin/infloww-revenue" style={{ ...btnGhost, textDecoration: "none" }}>Revenue live per creator <ArrowRight size={13} /></Link>

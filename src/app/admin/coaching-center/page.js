@@ -74,14 +74,14 @@ export default function CoachingCenterPage() {
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
-        crumbs={[{ label: "People" }, { label: "Coaching Center" }]}
-        title="Coaching Center"
-        subtitle="Operatori con score tra 25 e 50: non da sostituire, ma con margine di crescita. Per ognuno il motivo e il training suggerito; assegnalo e segna quando è fatto. Chi è sotto 25 sta nell'Action Center."
+        crumbs={[{ label: "People" }, { label: "Da far crescere" }]}
+        title="Da far crescere"
+        subtitle="Operatori con score tra 25 e 50: non da sostituire, ma con margine di crescita. Per ognuno il motivo e il training suggerito; assegnalo e segna quando è fatto. Chi è sotto 25 sta in Sotto soglia."
         actions={<>
           <select value={periodId || ""} onChange={(e) => setPeriodId(e.target.value)} aria-label="Mese" style={ctl}>
             {periodOptions.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
-          <Link href={`/admin/action-center?period_id=${periodId}`} style={{ ...ctl, textDecoration: "none" }}>Action Center</Link>
+          <Link href={`/admin/action-center?period_id=${periodId}`} style={{ ...ctl, textDecoration: "none" }}>Sotto soglia</Link>
         </>}
       />
 
