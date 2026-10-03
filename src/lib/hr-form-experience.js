@@ -163,9 +163,9 @@ export function safeRemove(key, s = store()) {
 }
 
 // ── 5. Il messaggio della Casa, sotto la tessera finale ───────────────────────
-// Testo PROPOSTO (03/10/2026), da rivedere con Nicholas: si cambia solo qui.
+// Testo approvato 03/10/2026; firma "House of Creators" (decisione Nicholas, non una persona). Si cambia solo qui.
 export const HOUSE_LETTER = {
   text: "Da oggi fai parte di House of Creators. Qui si cresce insieme: ogni progetto, ogni creator, ogni risultato passa da persone come te.",
-  signature: "Nicholas",
-  org: "House of Creators",
+  signature: "House of Creators",
+  org: "",
 };

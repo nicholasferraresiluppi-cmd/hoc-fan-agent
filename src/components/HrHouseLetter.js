@@ -17,7 +17,7 @@ export default function HrHouseLetter() {
       </blockquote>
       <figcaption style={{ marginTop: 14, display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
         <span style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 24, color: "#f2eee6" }}>— {HOUSE_LETTER.signature}</span>
-        <span style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(242,238,230,.5)" }}>{HOUSE_LETTER.org}</span>
+        {HOUSE_LETTER.org ? <span style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(242,238,230,.5)" }}>{HOUSE_LETTER.org}</span> : null}
       </figcaption>
     </figure>
   );
