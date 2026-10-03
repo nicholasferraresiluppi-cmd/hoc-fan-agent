@@ -84,8 +84,10 @@ export function displayValue(field, v) {
  * Controllo di modifica per tipo. `options` = elenco scelte (drop_down /
  * labels) — per le etichette senza opzioni si scrive separato da virgole.
  */
-export function FieldInput({ field, value, onChange, options, id, disabled }) {
-  const common = { id, disabled, style: { ...input, opacity: disabled ? 0.6 : 1 } };
+export function FieldInput({ field, value, onChange, options, id, disabled, extra }) {
+  // extra: attributi in più per i campi nativi (autoComplete, inputMode, enterKeyHint, aria-*),
+  // passati dal modulo pubblico; in scheda admin non si usano (l'autocompletamento sarebbe dell'admin)
+  const common = { id, disabled, ...(extra || {}), style: { ...input, opacity: disabled ? 0.6 : 1 } };
   // controlli su misura (01/10): nazionalità da tendina, mansione Chatter/Altro, lingue con livello
   if (field.key === "nationality") return <NationalityInput id={id} value={value} onChange={onChange} disabled={disabled} />;
   if (field.key === "currentJob") return <JobInput id={id} value={value} onChange={onChange} disabled={disabled} />;

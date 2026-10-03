@@ -110,6 +110,85 @@ export function cardStats(data = {}) {
   return [...first, ...areas.slice(3, 3 + Math.max(0, room)), ...langs, ...cityStat].slice(0, 6);
 }
 
+// ── Tessera D1 "da club" (03/10/2026, forma scelta da Nicholas) ─────────────────
+// Fronte: nome completo + "Ruolo · Città · dal anno". Retro: righe leggibili
+// ("OnlyFans · Esperta", "Inglese · B2", "Città · Milano"). Mai voti, mai numero di membro,
+// mai email/telefono/codice fiscale.
+
+/** Nome completo sulla tessera: "Giulia Rossi" (iniziali maiuscole se scritto tutto minuscolo). */
+export function tesseraName({ firstName, surname } = {}) {
+  const cap = (x) => { const t = String(x || "").trim().replace(/\s+/g, " "); return t && t === t.toLowerCase() ? t.replace(/(^|[\s'-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()) : t; };
+  return [cap(firstName), cap(surname)].filter(Boolean).join(" ");
+}
+
+/** Ruolo sul fronte: "Chatter" per i chatter, altrimenti la mansione abbreviata (max ~22 caratteri, a parola intera). */
+export function roleLabel(currentJob, max = 22) {
+  const s = String(currentJob || "").trim().replace(/\s+/g, " ");
+  if (!s) return "";
+  if (/^chatter/i.test(s)) return "Chatter";
+  const clean = s.replace(/\s*\(.*?\)\s*/g, " ").trim() || s;
+  const up = clean[0].toUpperCase() + clean.slice(1);
+  if (up.length <= max) return up;
+  const cut = up.slice(0, max + 1).replace(/\s+\S*$/, "");
+  return `${cut || up.slice(0, max)}…`;
+}
+
+/** "Chatter · Milano · dal 2026" — solo le parti dichiarate. */
+export function tesseraLine(data = {}, at = Date.now()) {
+  const year = new Date(at).getFullYear();
+  return [roleLabel(data.currentJob), cityOf(data.residenceComune), `dal ${year}`].filter(Boolean).join(" · ");
+}
+
+const AREA_SHORT = { of: "OnlyFans", ads: "Media buying", social: "Social", content: "Contenuti", ai: "Intelligenza artificiale", tech: "Tecnologia", mgmt: "Gestione" };
+const LANG_FULL = { ITA: "Italiano", ENG: "Inglese", SPA: "Spagnolo", TED: "Tedesco", FR: "Francese" };
+const LANG_LEVEL_WORD = { Native: "Madrelingua", Professional: "Lavorativo", Basic: "Base" };
+
+/**
+ * Livello per la riga del retro, concordato col genere DICHIARATO; senza genere si
+ * accorda con "livello" (forma neutra rispetto alla persona).
+ */
+export function levelWord(level, gender) {
+  const form = genderForm(gender);
+  if (level === "Posso insegnarla") return "Può insegnarla";
+  if (level === "Base") return form ? "Base" : "Livello base";
+  if (level === "Autonomo") return form === "f" ? "Autonoma" : form === "m" ? "Autonomo" : "Livello autonomo";
+  if (level === "Esperto") return form === "f" ? "Esperta" : form === "m" ? "Esperto" : "Livello esperto";
+  return String(level || "");
+}
+
+/**
+ * Righe del retro (fino a 6): aree più forti col livello (fino a 3, poi altre se avanza
+ * posto), lingue (prima le straniere, fino a 2), città. Solo dati dichiarati.
+ */
+export function tesseraRows(data = {}) {
+  const areas = strongestAreas(data.skillLevels).map((a) => ({ kind: "area", label: AREA_SHORT[a.area] || a.label, value: levelWord(a.level, data.gender) }));
+  const langs = (Array.isArray(data.spokenLanguages) ? data.spokenLanguages : [])
+    .map((l) => String(l || "").split(" - ").map((x) => x.trim()))
+    .filter(([code]) => code)
+    .sort((a, b) => (a[0] === "ITA") - (b[0] === "ITA"))
+    .slice(0, 2)
+    .map(([code, lvl]) => ({ kind: "lang", label: LANG_FULL[code] || code, value: lvl ? (LANG_LEVEL_WORD[lvl] || lvl) : "" }));
+  const city = cityOf(data.residenceComune);
+  const cityRow = city ? [{ kind: "city", label: "Città", value: city }] : [];
+  const first = areas.slice(0, 3);
+  const room = 6 - first.length - langs.length - cityRow.length;
+  return [...first, ...areas.slice(3, 3 + Math.max(0, room)), ...langs, ...cityRow].slice(0, 6);
+}
+
+/**
+ * Quali "pezzi" della tessera sono comparsi rispetto a prima (per il riflesso dorato
+ * durante il modulo): nome, ruolo, città, prima competenza, prima lingua.
+ */
+export function tesseraMilestones(data = {}) {
+  const out = [];
+  if (String(data.firstName || "").trim()) out.push("name");
+  if (roleLabel(data.currentJob)) out.push("role");
+  if (cityOf(data.residenceComune)) out.push("city");
+  if (strongestAreas(data.skillLevels).length) out.push("skill");
+  if (Array.isArray(data.spokenLanguages) && data.spokenLanguages.length) out.push("lang");
+  return out;
+}
+
 /** "House of Creators · ottobre 2026" (mese e anno dell'invio). */
 export function memberSince(at = Date.now()) {
   const d = new Date(at);
