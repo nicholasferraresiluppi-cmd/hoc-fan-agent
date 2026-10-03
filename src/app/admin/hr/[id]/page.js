@@ -12,12 +12,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
-import { ExternalLink, Link2, RefreshCw, Eye, Pencil } from "lucide-react";
+import { ExternalLink, RefreshCw, Eye, Pencil } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Notice, DataTable, SectionTitle, Disclosure, card } from "@/components/ds";
 import { FIELDS, SECTIONS, FIELD_BY_KEY } from "@/lib/hr-fields";
 import { lbl, btnPrimary, btnGhost, SYNC_LABEL, displayValue, FieldInput, fmtDateTime, fetcher, postJson } from "@/components/hr-ui";
-import HrFormLinkModal from "@/components/HrFormLinkModal";
 
 const ACTION_LABEL = {
   create: "Scheda creata", update: "Modifica", conflict: "Conflitto con ClickUp", cf_revealed: "Codice fiscale mostrato",
@@ -30,7 +29,6 @@ const who = (by) => (!by ? "—" : String(by).startsWith("user_") ? `utente …$
 export default function HrPersonPage() {
   const { id } = useParams();
   const { data, error, isLoading, mutate } = useSWR(id ? `/api/admin/hr/people/${id}` : null, fetcher, { revalidateOnFocus: false });
-  const [linkOpen, setLinkOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [notice, setNotice] = useState(null);
   const [logOpen, setLogOpen] = useState(true);
@@ -62,7 +60,6 @@ export default function HrPersonPage() {
         subtitle={p ? [p.fields?.currentJob, p.fields?.collaborationStatus].filter(Boolean).join(" · ") || null : null}
         actions={p && (
           <>
-            <button type="button" onClick={() => setLinkOpen(true)} style={btnGhost}><Link2 size={14} /> Link di compilazione</button>
             {p.clickupUrl && p.clickupTaskId && <a href={p.clickupUrl} target="_blank" rel="noopener noreferrer" style={btnGhost}><ExternalLink size={14} /> Apri su ClickUp</a>}
             {data.sync?.enabled && <button type="button" onClick={syncNow} disabled={syncing} style={{ ...btnGhost, opacity: syncing ? 0.5 : 1 }}><RefreshCw size={14} /> {syncing ? "Sincronizzo…" : "Sincronizza ora"}</button>}
           </>
@@ -96,7 +93,6 @@ export default function HrPersonPage() {
         </>
       )}
 
-      {p && <HrFormLinkModal target={linkOpen ? { personId: p.id, name: p.name } : null} onClose={() => setLinkOpen(false)} onCreated={() => mutate()} />}
     </div>
   );
 }

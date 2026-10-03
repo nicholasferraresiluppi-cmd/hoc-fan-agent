@@ -26,6 +26,10 @@ export const LIMITS = {
   hr_form:       [{ window: 60, max: 20 },  { window: 86400, max: 200 }],  // per token
   hr_form_ip:    [{ window: 60, max: 40 },  { window: 86400, max: 600 }],  // per IP
   hr_upload:     [{ window: 3600, max: 10 }],                             // per token
+  // Link condiviso (03/10/2026): un solo link per tutti → il tetto per token di hr_form
+  // diventerebbe un tetto per l'intera azienda. Richieste larghe, INVII stretti.
+  hr_form_shared:        [{ window: 60, max: 120 }, { window: 86400, max: 5000 }], // richieste per token condiviso
+  hr_form_shared_submit: [{ window: 86400, max: 300 }],                            // invii al giorno dal link condiviso
   hr_webhook:    [{ window: 60, max: 300 }],                              // per IP (ClickUp)
 };
 

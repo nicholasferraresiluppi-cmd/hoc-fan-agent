@@ -6,21 +6,23 @@
  * HOC Pro è il master; ClickUp (lista HR_CLICKUP_LIST_ID) è lo specchio
  * sincronizzato. Qui: filtri per stato/reparto/creator/tipo rapporto,
  * ricerca, badge "da ripulire" (doppioni probabili e schede spazzatura:
- * segnalati, mai cancellati), link di compilazione da copiare (nessuna email).
+ * segnalati, mai cancellati), il link UNICO del modulo da copiare (nessuna email).
+ *
+ * 03/10/2026: un solo link, uguale per tutti (decisione del titolare). I link
+ * personali già mandati funzionano finché scadono, ma da qui non se ne creano più.
  */
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { Plus, Link2 } from "lucide-react";
+import { Plus, Link2, RefreshCw, Power } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
 import { PageHead, Metric, Notice, DataTable, FilterChip, Disclosure, card } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
 import { COLLAB_STATUSES } from "@/lib/hr-fields";
 import { SKILL_AREAS, SKILL_LEVELS, PAST_ROLES, normalizeSkillMap, normalizePastRoles, hasSkillAtLeast, pastRoleText } from "@/lib/hr-skills";
-import { lbl, input, btnPrimary, btnGhost, chip, SYNC_LABEL, fetcher, postJson } from "@/components/hr-ui";
-import HrFormLinkModal from "@/components/HrFormLinkModal";
+import { lbl, input, btnPrimary, btnGhost, chip, SYNC_LABEL, fetcher, postJson, CopyLink, fmtDateTime } from "@/components/hr-ui";
 
 const NONE = "__none__";
 
@@ -48,7 +50,6 @@ export default function HrPeoplePage() {
   const [minLevel, setMinLevel] = useState("");
   const [pastRole, setPastRole] = useState("");
   const [newOpen, setNewOpen] = useState(false);
-  const [linkFor, setLinkFor] = useState(null); // { personId|null, name }
   const [cleanupOpen, setCleanupOpen] = useState(false);
 
   const items = data?.items || [];
@@ -124,10 +125,6 @@ export default function HrPeoplePage() {
     ...(skill ? [{ key: "lvl", label: "Livello", sort: (p) => SKILL_LEVELS.indexOf(normalizeSkillMap(p.fields?.skillLevels)[skill]), render: (p) => normalizeSkillMap(p.fields?.skillLevels)[skill] || "—" }] : []),
     ...(pastRole ? [{ key: "prole", label: "Ruolo passato", sortable: false, render: (p) => pastRoleText(normalizePastRoles(p.fields?.pastRoles).find((r) => r.role === pastRole)), muted: true }] : []),
     { key: "sync", label: "ClickUp", sort: (p) => p.sync?.status || "", render: (p) => <span style={{ fontSize: 13, color: ["error", "deleted", "missing"].includes(p.sync?.status) ? CP.accentRed : CP.textSecondary }}>{SYNC_LABEL[p.sync?.status] || "—"}</span> },
-    {
-      key: "link", label: "", sortable: false, align: "right",
-      render: (p) => <button type="button" onClick={(e) => { e.stopPropagation(); setLinkFor({ personId: p.id, name: p.name }); }} style={{ ...btnGhost, padding: "5px 9px", fontSize: 12 }}><Link2 size={13} /> Link di compilazione</button>,
-    },
   ];
 
   return (
@@ -135,16 +132,15 @@ export default function HrPeoplePage() {
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "People" }, { label: "Persone HR" }]}
         title="Persone HR"
-        subtitle="L'anagrafica di chi lavora con noi. HOC Pro è la fonte principale: ogni modifica fatta qui arriva su ClickUp, e quelle fatte su ClickUp tornano qui. I dati li può compilare anche la persona, da un link."
+        subtitle="L'anagrafica di chi lavora con noi. HOC Pro è la fonte principale: ogni modifica fatta qui arriva su ClickUp, e quelle fatte su ClickUp tornano qui. I dati li può compilare anche la persona, dal link del modulo."
         actions={!error && (
-          <>
-            <button type="button" onClick={() => setLinkFor({ personId: null, name: "" })} style={btnGhost}><Link2 size={14} /> Link per una persona nuova</button>
-            <button type="button" onClick={() => setNewOpen(true)} style={btnPrimary}><Plus size={15} /> Nuova persona</button>
-          </>
+          <button type="button" onClick={() => setNewOpen(true)} style={btnPrimary}><Plus size={15} /> Nuova persona</button>
         )}
       />
 
       {error && <Notice danger={error.status !== 403}>{error.status === 403 ? "Pagina riservata agli admin." : `Non riesco a caricare le persone: ${error.message}`}</Notice>}
+
+      {data && <SharedLinkBox onChanged={() => mutate()} />}
 
       {data && !data.sync?.enabled && (
         <Notice>
@@ -162,7 +158,7 @@ export default function HrPeoplePage() {
           <ol style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: CP.textSecondary, lineHeight: 1.6 }}>
             <li>se la lista ClickUp è configurata, <Link href="/admin/hr/sync" style={{ color: CP.accentSoftText }}>importa le persone da ClickUp</Link>;</li>
             <li>oppure crea una scheda con “Nuova persona”;</li>
-            <li>oppure manda a qualcuno un “Link per una persona nuova”: compila lui i suoi dati.</li>
+            <li>oppure manda il link del modulo qui sopra: ognuno compila i suoi dati.</li>
           </ol>
         </section>
       )}
@@ -248,8 +244,57 @@ export default function HrPeoplePage() {
       )}
 
       <NewPersonModal open={newOpen} onClose={() => setNewOpen(false)} onCreated={(p) => { setNewOpen(false); mutate(); router.push(`/admin/hr/${p.id}`); }} />
-      <HrFormLinkModal target={linkFor} onClose={() => setLinkFor(null)} onCreated={() => mutate()} />
     </div>
+  );
+}
+
+/**
+ * Il link UNICO del modulo: uguale per tutti, senza scadenza. Copia, disattiva,
+ * rigenera (il vecchio smette subito di funzionare). Ogni invio crea una scheda
+ * nuova: chi è già in elenco comparirà come doppione in "Da ripulire".
+ */
+function SharedLinkBox({ onChanged }) {
+  const { data, error, mutate } = useSWR("/api/admin/hr/form-links/shared", fetcher, { revalidateOnFocus: false });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const link = data?.link || null;
+  const act = async (action) => {
+    if (action === "regenerate" && link && !confirm("Rigenero il link? Quello di adesso smette subito di funzionare: chi lo ha ricevuto e non ha ancora compilato dovrà avere quello nuovo.")) return;
+    if (action === "disable" && !confirm("Disattivo il link? Nessuno potrà più compilare il modulo finché non ne crei uno nuovo.")) return;
+    setBusy(true); setErr(null);
+    try {
+      const j = await postJson("/api/admin/hr/form-links/shared", { action });
+      await mutate({ ok: true, link: j.link }, { revalidate: false });
+      onChanged?.();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  };
+  if (error) return error.status === 403 ? null : <Notice danger>Non riesco a leggere il link del modulo: {error.message}</Notice>;
+  if (!data) return null;
+  const url = link && typeof window !== "undefined" ? `${window.location.origin}${link.path}` : "";
+  return (
+    <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }} aria-labelledby="hr-shared-link">
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <Link2 size={15} color={CP.textMuted} />
+        <h2 id="hr-shared-link" style={{ margin: 0, fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Link del modulo</h2>
+        <span style={{ fontSize: 12, color: link ? CP.textSecondary : CP.textMuted }}>{link ? "· attivo" : "· nessun link attivo"}</span>
+      </div>
+      <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 12px", lineHeight: 1.5 }}>
+        Un solo link, uguale per tutti: lo mandi tu (non parte nessuna email). Non scade. Chi lo apre trova il modulo vuoto e ogni invio crea una scheda nuova.
+        Se la persona era già in elenco, la vedrai tra i doppioni in “Da ripulire”.
+      </p>
+      {link ? (
+        <div style={{ display: "grid", gap: 10 }}>
+          <CopyLink link={url} note={link.createdAt ? `Creato il ${fmtDateTime(link.createdAt)}.` : null} />
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" onClick={() => act("regenerate")} disabled={busy} style={{ ...btnGhost, opacity: busy ? 0.5 : 1 }}><RefreshCw size={14} /> Rigenera</button>
+            <button type="button" onClick={() => act("disable")} disabled={busy} style={{ ...btnGhost, opacity: busy ? 0.5 : 1 }}><Power size={14} /> Disattiva</button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" onClick={() => act("regenerate")} disabled={busy} style={{ ...btnPrimary, opacity: busy ? 0.5 : 1 }}><Link2 size={14} /> {busy ? "Creo…" : "Crea il link"}</button>
+      )}
+      {err && <div role="alert" style={{ color: CP.accentRed, fontSize: 13, marginTop: 8 }}>{err}</div>}
+    </section>
   );
 }
 

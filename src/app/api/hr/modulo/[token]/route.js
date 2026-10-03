@@ -3,14 +3,19 @@
  *
  * GET  → contesto per /hr/modulo/[token]: stato del link, valori già noti
  *        (MAI il codice fiscale: solo "già inserito sì/no"), opzioni.
- * POST → invio del modulo { data, consent: true }. Monouso: dopo l'invio il
- *        link resta aperto solo per caricare i file (1 ora), poi si chiude.
+ *        Col link CONDIVISO (03/10/2026) mai dati di persone: niente prefill.
+ * POST → invio del modulo { data, consent: true }.
+ *        Link personale: monouso, dopo l'invio resta aperto solo per i file (1 ora).
+ *        Link condiviso: ogni invio crea una scheda nuova e il link resta aperto;
+ *        la risposta porta `uploadToken` (token figlio, 1 ora) per i file.
  *
- * Nessuna auth Clerk: il token (24 byte casuali, 14 giorni) È l'auth, come
+ * Nessuna auth Clerk: il token (24 byte casuali) È l'auth, come
  * /api/candidate/[token]. Difesa qui e in lib/hr-people (validità, scadenza,
- * stato); tetto di richieste per token e per IP (lib/rate-limit).
+ * stato); tetto di richieste per token e per IP (lib/rate-limit). Il link
+ * condiviso lo usano tutti: tetto per token più largo (`hr_form_shared`) e
+ * tetto giornaliero di INVII in lib/hr-people (`hr_form_shared_submit`).
  */
-import { getFormContext, submitForm } from "@/lib/hr-people";
+import { getFormContext, submitForm, isSharedFormToken } from "@/lib/hr-people";
 import { checkRateLimit, tooMany } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -21,10 +26,11 @@ function ipOf(request) {
 }
 
 async function limited(request, token) {
-  const a = await checkRateLimit("hr_form", String(token || "").slice(0, 64));
-  if (!a.ok) return tooMany(a.retryAfter);
   const b = await checkRateLimit("hr_form_ip", ipOf(request));
   if (!b.ok) return tooMany(b.retryAfter);
+  const shared = await isSharedFormToken(token).catch(() => false);
+  const a = await checkRateLimit(shared ? "hr_form_shared" : "hr_form", String(token || "").slice(0, 64));
+  if (!a.ok) return tooMany(a.retryAfter);
   return null;
 }
 

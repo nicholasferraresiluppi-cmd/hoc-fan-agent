@@ -400,9 +400,17 @@ export function computeCleanup(people = []) {
 export const FORM_TTL_DAYS = 14;
 export const FORM_UPLOAD_GRACE_MS = 60 * 60 * 1000; // dopo l'invio, 1h per caricare i file
 
-/** Stato di un token del modulo a un certo istante. */
+/**
+ * Stato di un token del modulo a un certo istante.
+ *  - "invalid"  inesistente
+ *  - "disabled" link condiviso disattivato o sostituito da uno nuovo
+ *  - "open"     si può compilare (il link condiviso resta SEMPRE open: ogni invio crea una scheda nuova)
+ *  - "submitted" inviato, finestra di 1h per i file · "closed" poi chiuso · "expired" scaduto (link personale)
+ */
 export function formTokenState(rec, now) {
   if (!rec) return "invalid";
+  if (rec.disabledAt) return "disabled";
+  if (rec.shared) return "open";
   if (rec.submittedAt) return now - rec.submittedAt <= FORM_UPLOAD_GRACE_MS ? "submitted" : "closed";
   if (now > Number(rec.expiresAt || 0)) return "expired";
   return "open";

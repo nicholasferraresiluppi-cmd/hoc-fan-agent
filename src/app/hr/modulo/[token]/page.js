@@ -14,6 +14,11 @@
  * persona risponde. NIENTE numero di membro: non si dichiara quanti siamo.
  * Il nome arriva dal link: è generato dalla scheda della persona (prefill);
  * per una persona nuova la tessera resta senza nome finché non lo scrive.
+ *
+ * 03/10/2026: link UNICO uguale per tutti (`ctx.shared`): nessun dato
+ * precompilato, ogni invio crea una scheda nuova, i file si caricano col token
+ * figlio restituito dall'invio (`uploadToken`). Il finale è la "carta della
+ * Casa" che si gira (components/HrWelcomeCard).
  */
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -22,6 +27,7 @@ import { FIELD_BY_KEY, FORM_KEYS, validateCodiceFiscale } from "@/lib/hr-fields"
 import { lbl, FieldInput, fmtDate } from "@/components/hr-ui";
 import { cfCoherence } from "@/lib/hr-comuni";
 import { normalizeSkillMap, levelRank, skillName } from "@/lib/hr-skills";
+import HrWelcomeCard from "@/components/HrWelcomeCard";
 
 const STEPS = [
   { title: "Chi sei", sub: "partiamo dalle basi", keys: ["firstName", "surname", "dateOfBirth", "gender", "nationality", "birthPlace", "codiceFiscale"] },
@@ -158,6 +164,8 @@ export default function HrFormPage() {
   const [stage, setStage] = useState("intro"); // intro → form → files → done
   const [step, setStep] = useState(0);
   const [cfNote, setCfNote] = useState(null);
+  const [uploadToken, setUploadToken] = useState(null); // col link condiviso: token figlio per i file
+  const [sentAt, setSentAt] = useState(null);
   const [cfWarn, setCfWarn] = useState(null); // avvisi di coerenza CF ↔ data/genere/luogo (non bloccanti)
 
   useEffect(() => {
@@ -207,6 +215,8 @@ export default function HrFormPage() {
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.ok) throw new Error(j.error || `Invio non riuscito (${r.status}).`);
       setCfNote(j.cfNote || null);
+      setUploadToken(j.uploadToken || token);
+      setSentAt(Date.now());
       setStage(j.uploadsEnabled ? "files" : "done");
       try { window.scrollTo({ top: 0 }); } catch { /* */ }
     } catch (e2) { setErr(e2.message); } finally { setBusy(false); }
@@ -218,30 +228,35 @@ export default function HrFormPage() {
   if (stage === "done") {
     return (
       <Shell>
-        <div className="hrf-fade" style={{ display: "grid", gap: 28, paddingTop: 20 }}>
-          <Tessera data={data} final />
-          <Headline title="Eccola." sub="È la tua." size={46} />
-          <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15.5, lineHeight: 1.55 }}>
-            Abbiamo ricevuto tutto. Se devi correggere qualcosa, chiedi a chi ti ha mandato il link di mandartene uno nuovo.
-          </p>
-          {cfNote && <p style={{ margin: 0, color: CP.textSecondary, fontSize: 14 }}>Il codice fiscale non è stato registrato per un problema tecnico nostro: te lo richiederemo.</p>}
-          <div style={{ fontSize: 12.5, color: CP.textMuted, textAlign: "center", marginTop: 12 }}>Puoi chiudere questa pagina.</div>
+        <div style={{ display: "grid", gap: 22, paddingTop: 12 }}>
+          <HrWelcomeCard data={data} at={sentAt || Date.now()}>
+            <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15.5, lineHeight: 1.55, maxWidth: 460 }}>
+              Questa è la tua carta. Abbiamo ricevuto tutto.{" "}
+              {ctx.shared
+                ? "Se devi correggere qualcosa, scrivi a chi ti ha mandato il link: non serve compilare di nuovo."
+                : "Se devi correggere qualcosa, chiedi a chi ti ha mandato il link di mandartene uno nuovo."}
+            </p>
+            {cfNote && <p style={{ margin: 0, color: CP.textSecondary, fontSize: 14, maxWidth: 460 }}>Il codice fiscale non è stato registrato per un problema tecnico nostro: te lo richiederemo.</p>}
+          </HrWelcomeCard>
+          <div style={{ fontSize: 12.5, color: CP.textMuted, textAlign: "center", marginTop: 4 }}>Puoi chiudere questa pagina.</div>
         </div>
       </Shell>
     );
   }
 
-  if (stage === "files") return <Shell><FilesStep token={token} max={ctx.maxUploadBytes} data={data} onDone={() => setStage("done")} /></Shell>;
+  if (stage === "files") return <Shell><FilesStep token={uploadToken || token} max={ctx.maxUploadBytes} data={data} onDone={() => setStage("done")} /></Shell>;
 
   if (stage === "intro") {
-    const first = String(ctx.prefill?.firstName || "").trim();
+    // col link condiviso il nome non lo sappiamo: niente saluto personale
+    const first = ctx.shared ? "" : String(ctx.prefill?.firstName || "").trim();
     return (
       <Shell>
         <div className="hrf-fade" style={{ display: "grid", gap: 26 }}>
           <Tessera data={data} />
           <Headline title={first ? `Ciao ${first},` : "La tua tessera"} sub={first ? "la tua tessera prende forma." : "prende forma."} size={42} />
           <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15.5, lineHeight: 1.55 }}>
-            Sette brevi capitoli: ogni risposta la completa. Ci vogliono circa cinque minuti. Il link vale fino al {fmtDate(ctx.expiresAt)} e si usa una volta sola. Non ti chiediamo l'IBAN.
+            Sette brevi capitoli: ogni risposta la completa. Ci vogliono circa cinque minuti.
+            {ctx.shared ? " Compilalo una volta sola." : ` Il link vale fino al ${fmtDate(ctx.expiresAt)} e si usa una volta sola.`} Non ti chiediamo l'IBAN.
           </p>
           <button type="button" className="hrf-pill" onClick={() => setStage("form")} style={{ ...pill(true), width: "100%" }}>Cominciamo</button>
           <div style={{ fontSize: 12.5, color: CP.textMuted, textAlign: "center" }}>I tuoi dati restano riservati. Il codice fiscale lo conserviamo cifrato.</div>

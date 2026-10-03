@@ -420,3 +420,137 @@ console.log(`hr-people: ${n} asserzioni OK`);
   n += m;
   console.log(`campi specchio: ${m} asserzioni OK`);
 }
+
+// ── 03/10: link UNICO del modulo (condiviso) + carta di benvenuto ─────────────
+// hr-people.js parla col KV: qui @vercel/kv è sostituito da un KV in memoria
+// (hook di risoluzione dei moduli). Nessuna chiamata di rete, nessun dato reale.
+{
+  const { registerHooks } = await import("node:module");
+  const store = new Map();
+  const clone = (v) => (v === undefined ? null : JSON.parse(JSON.stringify(v)));
+  globalThis.__hrFakeKv = {
+    async get(k) { return store.has(k) ? clone(store.get(k)) : null; },
+    async set(k, v) { store.set(k, clone(v)); return "OK"; },
+    async del(k) { store.delete(k); return 1; },
+    async mget(...ks) { return ks.map((k) => (store.has(k) ? clone(store.get(k)) : null)); },
+    async sadd(k, ...mm) { const s = new Set(store.get(k) || []); mm.forEach((x) => s.add(x)); store.set(k, [...s]); return mm.length; },
+    async smembers(k) { return [...(store.get(k) || [])]; },
+    async lpush(k, ...v) { store.set(k, [...v.reverse(), ...(store.get(k) || [])]); return store.get(k).length; },
+    async ltrim(k, a, b) { store.set(k, (store.get(k) || []).slice(a, b + 1)); return "OK"; },
+    async lrange(k, a, b) { return (store.get(k) || []).slice(a, b + 1); },
+    async incr(k) { const v = Number(store.get(k) || 0) + 1; store.set(k, v); return v; },
+    async expire() { return 1; },
+  };
+  registerHooks({
+    resolve(specifier, context, next) {
+      if (specifier === "@vercel/kv") return { url: "data:text/javascript,export const kv = globalThis.__hrFakeKv;", shortCircuit: true };
+      return next(specifier, context);
+    },
+  });
+  delete process.env.HR_CLICKUP_LIST_ID; // sync spenta: nessuna chiamata a ClickUp
+  const H = await import("../src/lib/hr-people.js");
+  const fake = globalThis.__hrFakeKv;
+  let m = 0;
+  const t = (c, msg) => { assert.ok(c, msg); m++; };
+
+  // una persona già in CRM (come da import ClickUp), con CF
+  const existing = await H.savePerson({ input: { firstName: "Giulia", surname: "Rossi", personalEmail: "giulia@example.com", codiceFiscale: "RSSMRA85T10A562S" }, actor: "test", sync: false });
+  t(existing.ok, "persona esistente creata");
+
+  // creazione del link condiviso
+  t((await H.getSharedFormLink()) === null, "all'inizio nessun link condiviso");
+  const a = await H.regenerateSharedFormLink({ actor: "admin" });
+  t(a.ok && /^\/hr\/modulo\/[A-Za-z0-9_-]{20,64}$/.test(a.path) && !a.replaced, "link condiviso creato");
+  t((await H.getSharedFormLink())?.token === a.token, "il link attivo è quello appena creato");
+  t(await H.isSharedFormToken(a.token), "riconosciuto come condiviso");
+
+  // mai dati precompilati, anche se la scheda esiste
+  const ctx = await H.getFormContext(a.token);
+  t(ctx.ok && ctx.shared === true && ctx.state === "open" && !ctx.done, "contesto del link condiviso aperto");
+  t(Object.keys(ctx.prefill).length === 0, "nessun prefill col link condiviso");
+  t(ctx.cfPresent === false, "cfPresent sempre false col link condiviso");
+  t(ctx.expiresAt === null, "nessuna scadenza");
+  t(!JSON.stringify(ctx).includes("giulia@example.com") && !JSON.stringify(ctx).includes(existing.person.id), "nessun dato di persone nel contesto");
+
+  // ogni invio crea una scheda NUOVA (anche con la stessa email di una scheda esistente)
+  const before = (await H.listPeople()).length;
+  const s1 = await H.submitForm(a.token, { consent: true, data: { firstName: "Giulia", surname: "Rossi", personalEmail: "giulia@example.com", gender: "Female" } });
+  t(s1.ok && typeof s1.uploadToken === "string" && s1.uploadToken !== a.token, "invio ok, token figlio restituito");
+  const s2 = await H.submitForm(a.token, { consent: true, data: { firstName: "Marco" } });
+  t(s2.ok && s2.uploadToken !== s1.uploadToken, "secondo invio ok, token figlio diverso");
+  t((await H.listPeople()).length === before + 2, "due invii = due schede nuove");
+  const unchanged = await H.getPerson(existing.person.id);
+  t(unchanged.fields.firstName === "Giulia" && !unchanged.consent && !unchanged.formLink, "la scheda esistente NON è stata toccata");
+  const child1 = await fake.get(`hr:form:${s1.uploadToken}`);
+  const created1 = await H.getPerson(child1.personId);
+  t(created1 && created1.id !== existing.person.id && created1.source === "modulo" && created1.consent?.version, "il figlio punta alla scheda nuova, con consenso");
+  t(child1.child === true && child1.submittedAt && child1.expiresAt - child1.submittedAt === 3600 * 1000, "figlio: già inviato, 1 ora");
+  t((await H.getFormContext(a.token)).state === "open", "il link condiviso resta aperto dopo l'invio");
+  t(!(await H.submitForm(a.token, { data: { firstName: "X" } })).ok, "senza consenso: rifiutato");
+
+  // token figlio: solo file, mai dati
+  const cctx = await H.getFormContext(s1.uploadToken);
+  t(cctx.ok && cctx.done === true && !cctx.prefill, "il token figlio non restituisce dati della scheda");
+  t((await H.submitForm(s1.uploadToken, { consent: true, data: { firstName: "Y" } })).status === 409, "il token figlio non accetta un secondo invio");
+
+  // upload rifiutato sul token condiviso (prima di qualunque altro controllo)
+  const pdf = Buffer.from("%PDF-1.4 test");
+  const up = await H.uploadFormFile(a.token, { kind: "document", bytes: pdf, declaredType: "application/pdf" });
+  t(!up.ok && up.status === 403, "upload sul token condiviso rifiutato");
+  const upChild = await H.uploadFormFile(s1.uploadToken, { kind: "document", bytes: pdf, declaredType: "application/pdf" });
+  t(!upChild.ok && upChild.status === 503, "sul figlio si arriva fino al controllo sync (spenta in test)");
+
+  // tetto giornaliero di invii
+  const bucket = Math.floor(Math.floor(Date.now() / 1000) / 86400);
+  await fake.set(`rl:hr_form_shared_submit:86400:${a.token.slice(0, 64)}:${bucket}`, 300);
+  const capped = await H.submitForm(a.token, { consent: true, data: { firstName: "Luca" } });
+  t(!capped.ok && capped.status === 429, "oltre 300 invii al giorno: rifiutato");
+  t((await H.listPeople()).length === before + 2, "l'invio oltre il tetto non crea schede");
+
+  // rigenerazione: il vecchio smette di funzionare
+  const b = await H.regenerateSharedFormLink({ actor: "admin" });
+  t(b.replaced && b.token !== a.token, "link rigenerato");
+  const oldCtx = await H.getFormContext(a.token);
+  t(!oldCtx.ok && oldCtx.status === 410, "il vecchio link non è più valido");
+  t((await H.submitForm(a.token, { consent: true, data: { firstName: "Z" } })).status === 410, "il vecchio link non accetta invii");
+  t(!(await H.isSharedFormToken(a.token)) && (await H.isSharedFormToken(b.token)), "solo il nuovo è il condiviso");
+  t((await H.getFormContext(b.token)).ok, "il nuovo funziona");
+  // record vecchio ancora "attivo" ma non più puntato (rigenerazione interrotta a metà) → comunque spento
+  await fake.set(`hr:form:${a.token}`, { token: a.token, shared: true, createdAt: 1 });
+  t(!(await H.getFormContext(a.token)).ok, "un condiviso non puntato da hr:form:shared non funziona");
+
+  // disattivazione
+  await H.disableSharedFormLink({ actor: "admin" });
+  t((await H.getSharedFormLink()) === null && !(await H.getFormContext(b.token)).ok, "disattivato: nessun link attivo");
+
+  // i link personali già mandati continuano a funzionare
+  const p = await H.createFormLink({ personId: existing.person.id, actor: "admin" });
+  const pctx = await H.getFormContext(p.token);
+  t(pctx.ok && pctx.prefill.firstName === "Giulia" && pctx.cfPresent === true && !pctx.shared, "link personale: prefill come prima");
+  const ps = await H.submitForm(p.token, { consent: true, data: { firstName: "Giulia", surname: "Rossi" } });
+  t(ps.ok && ps.uploadToken === p.token, "link personale: i file restano sul suo token");
+
+  // carta di benvenuto
+  const W = await import("../src/lib/hr-welcome-card.js");
+  t(W.welcomeTitle({ firstName: "Giulia", gender: "Female" }) === "Benvenuta nella Casa, Giulia.", "titolo femminile");
+  t(W.welcomeTitle({ firstName: "Marco", gender: "Male" }) === "Benvenuto nella Casa, Marco.", "titolo maschile");
+  t(W.welcomeTitle({ firstName: "Andrea", gender: "Non-Binary" }) === "Ti diamo il benvenuto nella Casa, Andrea.", "altra opzione: neutro");
+  t(W.welcomeTitle({ firstName: "Giulia" }) === "Ti diamo il benvenuto nella Casa, Giulia.", "genere non indicato: neutro (mai dedotto dal nome)");
+  t(W.welcomeTitle({ gender: "I prefer not to declare it" }) === "Ti diamo il benvenuto nella Casa.", "senza nome: niente nome");
+  t(W.welcomeTitle({ gender: "Female" }) === "Benvenuta nella Casa.", "senza nome, genere indicato");
+  t(W.cardInitials({ firstName: "giulia", surname: "rossi" }) === "GR" && W.cardInitials({ firstName: "Marco" }) === "M", "iniziali");
+  t(W.roleAbbr("Chatter") === "CHAT" && W.roleAbbr("Media buyer") === "MEDIA" && W.roleAbbr("") === "", "ruolo abbreviato");
+  t(W.cardName({ firstName: "Giulia", surname: "rossi" }) === "Giulia R.", "nome nella banda");
+  const st = W.cardStats({
+    skillLevels: { of_chat: "Esperto", of_account: "Base", ai_coding: "Autonomo", soc_instagram: "Base" },
+    spokenLanguages: ["ITA - Native", "ENG - B2"],
+    residenceComune: { name: "Milano", prov: "MI" },
+  });
+  t(st.map((s) => `${s.label} · ${s.value}`).join(" | ") === "ONLY · ESP | AI · AUT | SOCIAL · BASE | ENG · B2 | ITA · MADRE | CITTÀ · MILANO", "statistiche: aree più forti, lingue, città");
+  t(W.cardStats({}).length === 0, "senza dati: nessuna riga finta");
+  t(W.cardStats({ skillLevels: { of_chat: "Base" } }).length === 1, "pochi dati: poche righe");
+  t(W.memberSince(new Date(2026, 9, 3).getTime()) === "Membro della Casa · ottobre 2026", "mese e anno, senza numero di membro");
+
+  n += m;
+  console.log(`link condiviso + carta: ${m} asserzioni OK`);
+}
