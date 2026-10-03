@@ -27,7 +27,7 @@ const isPublicRoute = createRouteMatcher([
   // elenco ufficiale ISTAT dei comuni (dato pubblico) usato dal modulo HR, che si apre senza account
   '/data/comuni-istat.json',
   // link corto del modulo HR (03/10/2026): solo redirect al link condiviso attivo, nessun dato
-  '/tessera',
+  '/tessera', '/hr/privacy',
 ]);
 const isApiRoute = createRouteMatcher(['/api/(.*)']);
 

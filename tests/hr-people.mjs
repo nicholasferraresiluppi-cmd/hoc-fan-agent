@@ -609,12 +609,12 @@ console.log(`hr-people: ${n} asserzioni OK`);
 
   // carta di benvenuto
   const W = await import("../src/lib/hr-welcome-card.js");
-  t(W.welcomeTitle({ firstName: "Giulia", gender: "Female" }) === "Benvenuta nella Casa, Giulia.", "titolo femminile");
-  t(W.welcomeTitle({ firstName: "Marco", gender: "Male" }) === "Benvenuto nella Casa, Marco.", "titolo maschile");
-  t(W.welcomeTitle({ firstName: "Andrea", gender: "Non-Binary" }) === "Ti diamo il benvenuto nella Casa, Andrea.", "altra opzione: neutro");
-  t(W.welcomeTitle({ firstName: "Giulia" }) === "Ti diamo il benvenuto nella Casa, Giulia.", "genere non indicato: neutro (mai dedotto dal nome)");
-  t(W.welcomeTitle({ gender: "I prefer not to declare it" }) === "Ti diamo il benvenuto nella Casa.", "senza nome: niente nome");
-  t(W.welcomeTitle({ gender: "Female" }) === "Benvenuta nella Casa.", "senza nome, genere indicato");
+  t(W.welcomeTitle({ firstName: "Giulia", gender: "Female" }) === "Benvenuta in House of Creators, Giulia.", "titolo femminile");
+  t(W.welcomeTitle({ firstName: "Marco", gender: "Male" }) === "Benvenuto in House of Creators, Marco.", "titolo maschile");
+  t(W.welcomeTitle({ firstName: "Andrea", gender: "Non-Binary" }) === "Ti diamo il benvenuto in House of Creators, Andrea.", "altra opzione: neutro");
+  t(W.welcomeTitle({ firstName: "Giulia" }) === "Ti diamo il benvenuto in House of Creators, Giulia.", "genere non indicato: neutro (mai dedotto dal nome)");
+  t(W.welcomeTitle({ gender: "I prefer not to declare it" }) === "Ti diamo il benvenuto in House of Creators.", "senza nome: niente nome");
+  t(W.welcomeTitle({ gender: "Female" }) === "Benvenuta in House of Creators.", "senza nome, genere indicato");
   t(W.cardInitials({ firstName: "giulia", surname: "rossi" }) === "GR" && W.cardInitials({ firstName: "Marco" }) === "M", "iniziali");
   t(W.roleAbbr("Chatter") === "CHAT" && W.roleAbbr("Media buyer") === "MEDIA" && W.roleAbbr("") === "", "ruolo abbreviato");
   t(W.cardName({ firstName: "Giulia", surname: "rossi" }) === "Giulia R.", "nome nella banda");
@@ -626,7 +626,7 @@ console.log(`hr-people: ${n} asserzioni OK`);
   t(st.map((s) => `${s.label} · ${s.value}`).join(" | ") === "ONLY · ESP | AI · AUT | SOCIAL · BASE | ENG · B2 | ITA · MADRE | CITTÀ · MILANO", "statistiche: aree più forti, lingue, città");
   t(W.cardStats({}).length === 0, "senza dati: nessuna riga finta");
   t(W.cardStats({ skillLevels: { of_chat: "Base" } }).length === 1, "pochi dati: poche righe");
-  t(W.memberSince(new Date(2026, 9, 3).getTime()) === "Membro della Casa · ottobre 2026", "mese e anno, senza numero di membro");
+  t(W.memberSince(new Date(2026, 9, 3).getTime()) === "House of Creators · ottobre 2026", "mese e anno, senza numero di membro");
 
   n += m;
   console.log(`link condiviso + carta: ${m} asserzioni OK`);

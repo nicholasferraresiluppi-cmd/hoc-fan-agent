@@ -130,7 +130,7 @@ function Tessera({ data, final = false }) {
         background: final ? "linear-gradient(135deg,#24211a 0%,#141418 50%,#2a2316 100%)" : "linear-gradient(135deg,#1b1a1f 0%,#121216 55%,#1d1912 100%)",
         border: `1px solid rgba(217,180,106,${glow})`, boxShadow: final ? "0 30px 60px rgba(0,0,0,.45)" : "0 14px 30px rgba(0,0,0,.25)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 10.5, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD }}>Membro della Casa</span>
+        <span style={{ fontSize: 10.5, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD }}>House of Creators</span>
         <span aria-hidden="true" style={{ width: 34, height: 26, borderRadius: 5, background: "linear-gradient(135deg,#e3cd9c,#8f7646)" }} />
       </div>
       <div style={{ display: "grid", gap: 5, minWidth: 0 }}>
@@ -216,7 +216,7 @@ export default function HrFormPage() {
     if (step < STEPS.length - 1) { goTo(step + 1); return; }
     const m = checkFirst();
     if (m && m !== "warn") { setErr(m); goTo(0); return; }
-    if (!consent) { setErr("Per inviare serve il consenso all'informativa privacy."); return; }
+    if (!consent) { setErr("Per inviare, conferma di aver letto l'informativa privacy."); return; }
     setBusy(true);
     try {
       const r = await fetch(`/api/hr/modulo/${token}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data, consent: true }) });
@@ -267,7 +267,7 @@ export default function HrFormPage() {
             {ctx.shared ? " Compilalo una volta sola." : ` Il link vale fino al ${fmtDate(ctx.expiresAt)} e si usa una volta sola.`} Non ti chiediamo l'IBAN.
           </p>
           <button type="button" className="hrf-pill" onClick={() => setStage("form")} style={{ ...pill(true), width: "100%" }}>Cominciamo</button>
-          <div style={{ fontSize: 12.5, color: CP.textMuted, textAlign: "center" }}>I tuoi dati restano riservati. Il codice fiscale lo conserviamo cifrato.</div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted, textAlign: "center" }}>I tuoi dati restano riservati: li vede solo chi gestisce il personale.</div>
         </div>
       </Shell>
     );
@@ -303,7 +303,7 @@ export default function HrFormPage() {
                   <FieldInput id={`f-${k}`} field={f} value={data[k]} options={ctx.options?.[k]} onChange={(v) => { setData((d) => ({ ...d, [k]: v })); if (["codiceFiscale", "dateOfBirth", "gender", "birthPlace"].includes(k)) setCfWarn(null); }} />
                 )}
                 {k === "codiceFiscale" && ctx.cfPresent && !cfOff && <span style={{ fontSize: 12, color: CP.textMuted }}>Lo abbiamo già: lascia vuoto per non cambiarlo.</span>}
-                {k === "codiceFiscale" && !cfOff && <span style={{ display: "block", fontSize: 12, color: CP.textMuted }}>Lo conserviamo cifrato.</span>}
+                {k === "codiceFiscale" && !cfOff && <span style={{ display: "block", fontSize: 12, color: CP.textMuted }}>Lo vede solo chi gestisce il personale.</span>}
               </div>
             );
           })}
@@ -311,11 +311,14 @@ export default function HrFormPage() {
           {last && (
             <div style={{ display: "grid", gap: 14 }}>
               <div style={{ fontSize: 14, color: CP.textSecondary, lineHeight: 1.55, padding: "12px 14px", border: `1px solid ${CP.border}`, borderRadius: 12 }}>
-                Informativa privacy (in revisione legale). Il testo definitivo sarà pubblicato qui prima dell'uso con le persone.
+                <div style={{ fontSize: 12, letterSpacing: "0.12em", textTransform: "uppercase", color: CP.textMuted, marginBottom: 6 }}>Privacy, in breve</div>
+                Usiamo i tuoi dati per gestire la collaborazione con House of Creators: contratto, pagamenti, adempimenti di legge e organizzazione del lavoro.
+                Li vede solo chi gestisce il personale, non li vendiamo e non li cediamo a nessuno. Puoi chiedere in ogni momento di vederli, correggerli o cancellarli.{" "}
+                <a href="/hr/privacy" target="_blank" rel="noopener noreferrer" style={{ color: GOLD }}>Leggi l'informativa completa</a>
               </div>
               <label style={{ display: "flex", gap: 12, alignItems: "flex-start", fontSize: 14.5, color: CP.textPrimary, cursor: "pointer", lineHeight: 1.5 }}>
                 <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 4, width: 18, height: 18, accentColor: GOLD }} required />
-                <span>Ho letto l'informativa privacy e acconsento al trattamento dei miei dati per la gestione del rapporto di collaborazione.</span>
+                <span>Ho letto l'informativa privacy.</span>
               </label>
             </div>
           )}

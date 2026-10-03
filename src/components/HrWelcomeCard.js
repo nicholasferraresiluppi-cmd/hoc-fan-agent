@@ -116,7 +116,7 @@ function Back() {
 
 /**
  * @param data dati dichiarati nel modulo (firstName, surname, gender, currentJob, skillLevels, spokenLanguages, residenceComune)
- * @param at   istante dell'invio (per "Membro della Casa · mese anno")
+ * @param at   istante dell'invio (per "House of Creators · mese anno")
  */
 /**
  * preview: carta d'ESEMPIO per la prima schermata del modulo (03/10/2026, feedback Nicholas:
@@ -153,7 +153,7 @@ export default function HrWelcomeCard({ data = {}, at, children, preview = false
   const title = welcomeTitle(data);
   const stats = cardStats(data);
   const name = cardName(data);
-  const label = ["La tua carta della Casa", name, roleAbbr(data.currentJob), ...stats.map((s) => `${s.label} ${s.value}`.trim()), memberSince(at)].filter(Boolean).join(", ");
+  const label = ["La tua card di House of Creators", name, roleAbbr(data.currentJob), ...stats.map((s) => `${s.label} ${s.value}`.trim()), memberSince(at)].filter(Boolean).join(", ");
 
   return (
     <div style={{ display: "grid", gap: 26, justifyItems: "center", textAlign: "center" }}>
