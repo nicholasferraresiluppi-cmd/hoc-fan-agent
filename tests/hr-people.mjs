@@ -772,6 +772,16 @@ console.log(`hr-people: ${n} asserzioni OK`);
   t(s3.fields.skills.includes("Instagram") && cu.tasks.get(taskId).values["f-skills"]?.includes("o-ig"), "le etichette Skills seguono le competenze (anche su ClickUp)");
   t((await logOf(sara.id)).some((e) => e.action === "update" && e.field === "birthPlace" && e.source === "clickup"), "storico: modifica da ClickUp");
 
+  // 3b) due campi cambiati INSIEME su ClickUp, due webhook separati (caso reale 03/10):
+  // il primo non deve "consumare" il secondo
+  editOnClickup(taskId, "CAP", "73031");
+  editOnClickup(taskId, "Vorrebbe imparare", "TikTok Ads");
+  await webhook(taskId, ["CAP"]);
+  const r3b = await webhook(taskId, ["Vorrebbe imparare"]);
+  const s3b = await H.getPerson(sara.id);
+  t(s3b.fields.residenceCap === "73031", "due modifiche insieme: la prima arriva");
+  t(r3b.kind === "updated" && valuesEqual(s3b.fields.learnWish, ["ads_tiktok"]), "due modifiche insieme: anche la seconda arriva");
+
   // 4) testo illeggibile → si tiene l'app, avviso nello storico, al push successivo si riscrive
   editOnClickup(taskId, "Ruoli già ricoperti", "Astronauta (1-3 anni)");
   await webhook(taskId, ["Ruoli già ricoperti"]);

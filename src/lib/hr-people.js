@@ -339,9 +339,13 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
   // campi specchio: impronta del testo (anche di quelli che non si sono potuti leggere)
   const mirrors = m.mirrors || {};
   const prints = Object.fromEntries(Object.entries(mirrors).map(([k, x]) => [k, x.print]));
-  // nuova base = valori ClickUp visti ora (tutti, anche quelli fuori dall'evento)
-  const nextBase = Object.fromEntries(Object.entries(incomingAll).filter(([k]) => !readOnlyKeys.includes(k)).map(([k, v]) => [k, prints[k] ?? valueHash(v)]));
-  Object.assign(nextBase, prints);
+  // nuova base = valori ClickUp visti ora, SOLO per i campi di questo evento (fix 03/10/2026).
+  // Prima la base si aggiornava per TUTTI i campi: se due campi cambiavano quasi insieme su
+  // ClickUp, il webhook del primo scaricava il task con entrambe le modifiche, applicava solo
+  // il suo campo e segnava come "già visto" anche il secondo → il webhook del secondo (e la
+  // riconciliazione) lo scartavano come invariato e la modifica andava persa.
+  const nextBase = Object.fromEntries(Object.entries(incomingAll).filter(([k]) => !readOnlyKeys.includes(k) && inScope(k)).map(([k, v]) => [k, prints[k] ?? valueHash(v)]));
+  for (const [k, pr] of Object.entries(prints)) if (inScope(k)) nextBase[k] = pr;
 
   let personId = (await kv.get(K.task(m.clickupTaskId))) || null;
   if (!personId && m.hocPersonId) {
