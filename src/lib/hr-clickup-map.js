@@ -12,6 +12,7 @@
  */
 import { normalizeSkillMap, normalizeLearnList, normalizePastRoles, skillName, pastRoleText, oneLine, SKILL_AREAS } from "./hr-skills.js";
 import { FIELDS, FIELD_BY_KEY, isEmptyValue, maskCf } from "./hr-people-core.js";
+import { mirrorText, parseMirror, mirrorPrint } from "./hr-mirror.js";
 
 export const HOC_BLOCK_START = "— Dati HOC Pro —";
 const HOC_BLOCK_NOTE = "(blocco scritto da HOC Pro: qui si leggono solo Mansione attuale e Partita IVA; il resto si modifica in app)";
@@ -184,34 +185,27 @@ export function hocBlockLines(person, byName, { cfPlain } = {}) {
 }
 
 // ── Campi "specchio" (03/10/2026): dati strutturati dell'app scritti come TESTO
-// in un campo ClickUp dedicato, se la lista ce l'ha. Sola andata: chi li modifica
-// lo fa in app (su ClickUp un testo libero non si rilegge in modo affidabile).
-const place = (v) => (v?.abroad ? [oneLine(v.city, 120), s(v.country)].filter(Boolean).join(", ") : v?.name ? `${s(v.name)}${v.prov ? ` (${s(v.prov)})` : ""}` : "");
-export function mirrorText(key, f = {}) {
-  switch (key) {
-    case "birthPlace": return f.birthPlace?.abroad ? s(f.birthPlace.country) : place(f.birthPlace);
-    case "residenceComune": return place(f.residenceComune);
-    case "residenceCap": return oneLine(f.residenceCap, 20);
-    case "skillLevels": {
-      const sm = normalizeSkillMap(f.skillLevels);
-      return SKILL_AREAS.map((a) => {
-        const got = a.skills.filter((x) => sm[x.key]);
-        return got.length ? `${a.area}: ${got.map((x) => `${x.name} (${sm[x.key]})`).join(", ")}` : null;
-      }).filter(Boolean).join("\n");
-    }
-    case "pastRoles": return normalizePastRoles(f.pastRoles).map(pastRoleText).join(", ");
-    case "learnWish": return normalizeLearnList(f.learnWish).map(skillName).join(", ");
-    case "otherSkills": return oneLine(f.otherSkills, 500);
-    default: return "";
-  }
-}
+// in un campo ClickUp dedicato, se la lista ce l'ha. A DUE VIE: il testo
+// corretto su ClickUp si rilegge (parser e regole di onestà in hr-mirror.js).
+export { mirrorText, parseMirror, mirrorPrint };
 
 // ── Task → persona ───────────────────────────────────────────────────────────
+/** Testo di un campo specchio così come sta su ClickUp (short_text / text; altri tipi letti come testo). */
+export function mirrorFieldText(cf) {
+  const v = cf?.value;
+  if (v == null) return "";
+  if (typeof v === "object") return "";
+  return String(v);
+}
+
 /**
- * @returns {{ fields: object, clickupTaskId, clickupUrl, clickupStatus, dateUpdated, nameIncludesSurname, hocPersonId }}
+ * @param opts.comuni elenco ISTAT [[nome, sigla, codice, regione]] per leggere i luoghi (null = non disponibile)
+ * @returns {{ fields: object, mirrors: object, clickupTaskId, clickupUrl, clickupStatus, dateUpdated, nameIncludesSurname, hocPersonId }}
  *   fields contiene SOLO le chiavi presenti sulla lista (assenti = undefined → ignorate a valle).
+ *   Campi specchio: in `fields` solo se il testo si legge TUTTO; `mirrors[key]` = { text, print, ok, unknown, reason }
+ *   per tutti i campi specchio presenti sulla lista (anche quelli non riconosciuti).
  */
-export function taskToPerson(task) {
+export function taskToPerson(task, { comuni = null } = {}) {
   const byName = fieldsByName(task?.custom_fields || []);
   const fields = {};
   for (const f of FIELDS) {
@@ -222,6 +216,16 @@ export function taskToPerson(task) {
     let v = decodeCustomField(cf, appType);
     if (f.type === "cf" && v) v = s(v).toUpperCase();
     if (Array.isArray(v) || v !== undefined) fields[f.key] = v;
+  }
+  const mirrors = {};
+  for (const f of FIELDS) {
+    if (!f.mirror) continue;
+    const cf = byName.get(lc(f.mirror));
+    if (!cf) continue;
+    const text = mirrorFieldText(cf);
+    const r = parseMirror(f.key, text, { comuni });
+    mirrors[f.key] = { text, print: mirrorPrint(text), ok: r.ok, unknown: r.unknown, ...(r.reason ? { reason: r.reason } : {}) };
+    if (r.ok) fields[f.key] = r.value;
   }
   // Nome del task = nome; se il task ha già "Nome Cognome" lo si separa
   const taskName = s(task?.name);
@@ -241,6 +245,7 @@ export function taskToPerson(task) {
   }
   return {
     fields,
+    mirrors,
     clickupTaskId: s(task?.id) || null,
     clickupUrl: s(task?.url) || (task?.id ? `https://app.clickup.com/t/${task.id}` : null),
     clickupStatus: s(task?.status?.status) || null,
@@ -350,7 +355,9 @@ export function personToClickup(person, fieldsMeta, { keys, cfPlain, statuses, c
     if (!meta) continue; // senza campo dedicato resta la riga nel blocco in descrizione
     const text = mirrorText(f.key, person.fields || {});
     const effective = person.fields?.[f.key] ?? null;
-    fieldOps.push(text ? { key: f.key, fieldId: meta.id, body: { value: text }, effective } : { key: f.key, fieldId: meta.id, remove: true, effective });
+    // print = impronta del TESTO scritto: per i campi specchio eco e base si confrontano sul testo
+    const print = mirrorPrint(text);
+    fieldOps.push(text ? { key: f.key, fieldId: meta.id, body: { value: text }, effective, print } : { key: f.key, fieldId: meta.id, remove: true, effective, print });
   }
   const description = withHocBlock(currentDescription || "", hocBlockLines(person, byName, { cfPlain }));
   const status = statusForCollaboration(statuses, person.fields?.collaborationStatus);
@@ -372,7 +379,11 @@ export function createTaskPayload(plan) {
 
 /** Nomi dei campi ClickUp che la mappa usa (per la pagina di stato). */
 export function expectedFieldNames() {
-  return FIELDS.filter((f) => f.cu).map((f) => ({ key: f.key, name: f.cu, extra: Boolean(f.extra) }));
+  return [
+    ...FIELDS.filter((f) => f.cu).map((f) => ({ key: f.key, name: f.cu, extra: Boolean(f.extra) })),
+    // campi specchio: se mancano, il dato va nel blocco in descrizione (sola lettura lì)
+    ...FIELDS.filter((f) => f.mirror).map((f) => ({ key: f.key, name: f.mirror, extra: true, mirror: true })),
+  ];
 }
 
 /** Da un history_item del webhook alla chiave app (o null). */
@@ -383,7 +394,8 @@ export function historyItemKey(item, fieldsMeta = []) {
   const cfId = s(item.custom_field?.id || (item.field === "custom_field" ? item.custom_field_id : ""));
   const name = s(item.custom_field?.name) || s((fieldsMeta || []).find((m) => s(m.id) === cfId)?.name);
   if (!name) return null;
-  const f = FIELDS.find((x) => x.cu && lc(x.cu) === lc(name));
+  // campi ClickUp "veri" e campi specchio (03/10: anche questi si modificano da ClickUp)
+  const f = FIELDS.find((x) => x.cu && lc(x.cu) === lc(name)) || FIELDS.find((x) => x.mirror && lc(x.mirror) === lc(name));
   return f ? f.key : null;
 }
 

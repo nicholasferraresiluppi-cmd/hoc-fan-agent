@@ -40,6 +40,7 @@ export const SYNC_LABEL = {
   off: "Sincronizzazione spenta",
   deleted: "Task cancellato su ClickUp",
   missing: "Task non più nella lista",
+  archived: "Archiviata (non si sincronizza)",
 };
 
 /** Valore leggibile di un campo (sola lettura). */

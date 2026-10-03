@@ -14,6 +14,7 @@ export async function POST(request, props) {
   const { id } = await props.params;
   const p = await getPerson(id);
   if (!p) return Response.json({ error: "Persona non trovata." }, { status: 404 });
+  if (p.archived) return Response.json({ error: "Scheda archiviata: non si sincronizza. Ripristinala prima." }, { status: 409 });
   const r = await pushPersonSafe(p, null, { actor: az.userId });
   return Response.json({ ok: r.status === "ok" || r.status === "partial", status: r.status, message: r.message, errors: r.errors, skipped: r.skipped, person: publicPerson(r.person, { withCfMask: true }) });
 }

@@ -10,7 +10,12 @@
 // key = nome in app · cu = nome del campo ClickUp (risolto a runtime per NOME,
 // mai per id) · type = tipo in app · extra = campo nuovo deciso dal titolare
 // (se la lista non ha un campo con quel nome finisce nel blocco in descrizione)
-// · readOnly = in app si legge soltanto (lo scrive ClickUp o un upload).
+// · readOnly = in app si legge soltanto (lo scrive ClickUp o un upload)
+// · appOnly + mirror = dato strutturato dell'app che su ClickUp vive come TESTO nel
+//   campo dedicato `mirror` (se la lista ce l'ha; altrimenti riga nel blocco in
+//   descrizione, lì in sola lettura). Dal 03/10/2026 a DUE VIE: si modifica in app
+//   o su ClickUp; il testo si rilegge con hr-mirror.js e, se non si capisce, vale
+//   il valore dell'app (evento nello storico della scheda).
 export const COLLAB_STATUSES = ["Onboarding", "Active", "Reassigning", "Outboarding", "Decommissioned", "Needs Review"];
 export const GENDERS = ["Female", "Male", "Non-Binary", "I prefer not to declare it"];
 export const HV_CONTRACT_STATUSES = ["To Do", "Drafted Shared", "Signature Requested", "Signed"];

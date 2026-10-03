@@ -436,6 +436,7 @@ console.log(`hr-people: ${n} asserzioni OK`);
     async mget(...ks) { return ks.map((k) => (store.has(k) ? clone(store.get(k)) : null)); },
     async sadd(k, ...mm) { const s = new Set(store.get(k) || []); mm.forEach((x) => s.add(x)); store.set(k, [...s]); return mm.length; },
     async smembers(k) { return [...(store.get(k) || [])]; },
+    async srem(k, ...mm) { const s = new Set(store.get(k) || []); let c = 0; mm.forEach((x) => { if (s.delete(x)) c++; }); store.set(k, [...s]); return c; },
     async lpush(k, ...v) { store.set(k, [...v.reverse(), ...(store.get(k) || [])]); return store.get(k).length; },
     async ltrim(k, a, b) { store.set(k, (store.get(k) || []).slice(a, b + 1)); return "OK"; },
     async lrange(k, a, b) { return (store.get(k) || []).slice(a, b + 1); },
@@ -555,3 +556,331 @@ console.log(`hr-people: ${n} asserzioni OK`);
   n += m;
   console.log(`link condiviso + carta: ${m} asserzioni OK`);
 }
+
+// ── 03/10: campi specchio a DUE VIE — lettura del testo ClickUp ────────────────
+{
+  const { readFileSync } = await import("node:fs");
+  const { parseMirror, mirrorText, mirrorPrint, splitTop } = await import("../src/lib/hr-mirror.js");
+  const comuni = JSON.parse(readFileSync(new URL("../public/data/comuni-istat.json", import.meta.url), "utf8"));
+  let m = 0;
+  const t = (c, msg) => { assert.ok(c, msg); m++; };
+  const same = (a, b, msg) => { assert.deepEqual(a, b, msg); m++; };
+  const P = (k, text) => parseMirror(k, text, { comuni });
+
+  // competenze
+  same(P("skillLevels", "OnlyFans: Chat e vendita (Esperto), Gestione account (Base)").value, { of_chat: "Esperto", of_account: "Base" }, "competenze: formato standard");
+  same(P("skillLevels", "  onlyfans :  chat E VENDITA ( esperto ) ;gestione account").value, { of_chat: "Esperto", of_account: "Base" }, "competenze: maiuscole, spazi, ; e voce senza livello = Base");
+  same(P("skillLevels", "Instagram (Autonomo)\nOF Messaging (posso insegnarla)").value, { soc_instagram: "Autonomo", of_chat: "Posso insegnarla" }, "competenze: senza area, a capo, vecchia etichetta ClickUp");
+  same(P("skillLevels", "Contenuti: Reels, Shorts e TikTok (Esperto), Grafica (Photoshop, Illustrator, Figma, Canva) (Base)").value, { cnt_short: "Esperto", cnt_graphic: "Base" }, "competenze: virgole dentro i nomi");
+  same(P("skillLevels", "Social: Instagram (Base)").value, { soc_instagram: "Base" }, "competenze: area abbreviata accettata");
+  same(P("skillLevels", "Instagram (Base), Instagram (Esperto)").value, { soc_instagram: "Esperto" }, "competenze: doppione → livello più alto");
+  t(!P("skillLevels", "Instagram (Base), Astrofisica (Esperto)").ok, "competenze: voce sconosciuta → non riconosciuto (niente perdite)");
+  t(P("skillLevels", "Instagram (Base), Astrofisica (Esperto)").unknown.includes("Astrofisica (Esperto)"), "competenze: la voce sconosciuta è nominata");
+  t(!P("skillLevels", "Instagram (bravissimo)").ok, "competenze: livello sconosciuto → non riconosciuto");
+  t(!P("skillLevels", "Cose varie: Instagram (Base)").ok, "competenze: intestazione che non è un'area → non riconosciuto");
+  same(P("skillLevels", "").value, {}, "competenze: testo vuoto = svuotate");
+  t(P("skillLevels", " — \n , ").ok, "competenze: sola punteggiatura = ignorabile");
+  // ruoli
+  same(P("pastRoles", "Media buyer (1-3 anni), venditore; Altro: fotografo, videomaker (meno di 1 anno)").value,
+    [{ role: "media_buyer", duration: "1to3" }, { role: "sales", duration: null }, { role: "other", duration: "lt1", other: "fotografo, videomaker" }], "ruoli: durate, durata assente = null, Altro con virgola");
+  same(P("pastRoles", "PRODUCT MANAGER (oltre 5 anni)").value, [{ role: "product_manager", duration: "gt5" }], "ruoli: maiuscole");
+  t(!P("pastRoles", "Astronauta (1-3 anni)").ok, "ruoli: ruolo sconosciuto → non riconosciuto");
+  t(!P("pastRoles", "Media buyer (2 anni)").ok, "ruoli: durata sconosciuta → non riconosciuto");
+  same(P("pastRoles", "").value, [], "ruoli: vuoto");
+  // vorrebbe imparare
+  same(P("learnWish", "instagram, Reels, Shorts e TikTok").value, ["soc_instagram", "cnt_short"], "imparare: nomi, virgola nel nome");
+  same(P("learnWish", "Google Ads").value, ["ads_google"], "imparare: una voce");
+  t(!P("learnWish", "Instagram, TikTok, SEO").ok, "imparare: più di 2 → non riconosciuto (non si tagliano dati)");
+  t(!P("learnWish", "Instagram, Volare").ok, "imparare: voce sconosciuta");
+  same(P("learnWish", "").value, [], "imparare: vuoto");
+  // luoghi
+  same(P("birthPlace", "Roma (RM)").value, { abroad: false, name: "Roma", prov: "RM", code: "H501" }, "nascita: comune con sigla");
+  same(P("birthPlace", "roma, rm").value, { abroad: false, name: "Roma", prov: "RM", code: "H501" }, "nascita: minuscolo con virgola e sigla");
+  same(P("birthPlace", "Roma").value?.code, "H501", "nascita: solo il nome");
+  same(P("birthPlace", "Spagna").value, { abroad: true, country: "Spagna" }, "nascita: paese estero");
+  same(P("birthPlace", "Madrid, Spagna").value, { abroad: true, country: "Spagna" }, "nascita: città, paese → paese");
+  t(!P("birthPlace", "Rmoa").ok, "nascita: refuso → non riconosciuto");
+  same(P("birthPlace", "").value, null, "nascita: vuoto");
+  t(!P("residenceComune", "Castro").ok && /sigla/.test(P("residenceComune", "Castro").reason), "comune ambiguo senza sigla → non riconosciuto, chiede la sigla");
+  same(P("residenceComune", "Castro (LE)").value?.prov, "LE", "comune ambiguo con sigla → la sigla decide");
+  same(P("residenceComune", "castro, bg").value?.prov, "BG", "comune ambiguo con ', sigla'");
+  t(!P("residenceComune", "Roma (MI)").ok, "comune con sigla sbagliata → non riconosciuto");
+  same(P("residenceComune", "Madrid, Spagna").value, { abroad: true, country: "Spagna", city: "Madrid" }, "residenza estera: città, paese");
+  same(P("residenceComune", "Lione, Borgogna, Francia").value, { abroad: true, country: "Francia", city: "Lione, Borgogna" }, "residenza estera: ultimo pezzo = paese, il resto = città");
+  same(P("residenceComune", "Bolzano").value?.code, "A952", "nome bilingue (Bolzano/Bozen) riconosciuto");
+  t(!parseMirror("residenceComune", "Roma", { comuni: null }).ok, "senza elenco comuni: non riconosciuto (mai indovinare)");
+  // testo semplice
+  same(P("residenceCap", " 00185 ").value, "00185", "CAP: spazi tolti");
+  same(P("residenceCap", "").value, null, "CAP vuoto = svuotato");
+  same(P("otherSkills", "x".repeat(800)).value.length, 500, "altro: stesso limite dell'app (500)");
+
+  // giro completo app → testo → app = stesso valore
+  const app = {
+    birthPlace: { abroad: false, name: "Napoli", prov: "NA", code: "F839" },
+    residenceComune: { name: "Castro", prov: "LE", code: "M261", region: "Puglia" },
+    residenceCap: "73030",
+    skillLevels: { of_chat: "Esperto", cnt_short: "Autonomo", cnt_graphic: "Base", ai_coding: "Posso insegnarla" },
+    pastRoles: [{ role: "media_buyer", duration: "1to3" }, { role: "other", duration: null, other: "fotografo, videomaker" }],
+    learnWish: ["ads_google", "cnt_short"],
+    otherSkills: "Suono il pianoforte",
+  };
+  for (const k of Object.keys(app)) {
+    const r = P(k, mirrorText(k, app));
+    t(r.ok && valuesEqual(r.value, app[k]), `giro completo ${k}: ${mirrorText(k, app)}`);
+  }
+  const abroad = { birthPlace: { abroad: true, country: "Romania" }, residenceComune: { abroad: true, country: "Spagna", city: "Madrid" } };
+  for (const k of Object.keys(abroad)) t(valuesEqual(P(k, mirrorText(k, abroad)).value, abroad[k]), `giro completo estero ${k}`);
+  t(mirrorPrint("Roma (RM)") === mirrorPrint("  roma   (rm) \n"), "impronta del testo: spazi e maiuscole non contano");
+  t(mirrorPrint("Roma (RM)") !== mirrorPrint("Milano (MI)"), "impronta del testo: testi diversi");
+  same(splitTop("a (b, c), d"), ["a (b, c)", "d"], "split fuori dalle parentesi");
+
+  // mapping: taskToPerson legge i campi specchio, historyItemKey li riconosce per nome
+  const { historyItemKey: hik } = await import("../src/lib/hr-clickup-map.js");
+  const task = { id: "t1", name: "Giulia", custom_fields: [
+    { id: "m-bp", name: "Luogo di nascita", type: "short_text", value: "Roma (RM)" },
+    { id: "m-sk", name: "Competenze e livello", type: "text", value: "Astrofisica (Esperto)" },
+    { id: "m-cap", name: "CAP", type: "short_text" },
+  ] };
+  const tp = taskToPerson(task, { comuni });
+  t(tp.fields.birthPlace?.code === "H501" && tp.mirrors.birthPlace.ok, "taskToPerson: luogo letto");
+  t(!("skillLevels" in tp.fields) && tp.mirrors.skillLevels.ok === false, "taskToPerson: testo illeggibile NON entra nei campi");
+  t(tp.fields.residenceCap === null && tp.mirrors.residenceCap.text === "", "taskToPerson: campo vuoto = valore vuoto");
+  t(hik({ field: "custom_field", custom_field: { id: "m-bp", name: "Luogo di nascita" } }) === "birthPlace", "historyItemKey: campo specchio per nome");
+  t(hik({ field: "custom_field", custom_field_id: "m-cap" }, [{ id: "m-cap", name: "CAP" }]) === "residenceCap", "historyItemKey: campo specchio per id via metadati");
+  t(incomingTimestamps([{ field: "custom_field", custom_field: { name: "Vorrebbe imparare" }, date: "123" }], []).learnWish === 123, "incomingTimestamps: data per il campo specchio");
+  // base/eco sul testo
+  const prints = { birthPlace: mirrorPrint("Roma (RM)") };
+  t(dropUnchangedSinceBase({ birthPlace: { name: "x" } }, { birthPlace: mirrorPrint("roma (rm)") }, prints).unchanged.includes("birthPlace"), "base: confronto sul testo, non sull'oggetto");
+  t(isOwnEcho({ birthPlace: { h: mirrorPrint("Roma (RM)"), at: 1000 } }, "birthPlace", { anything: 1 }, 2000, undefined, prints.birthPlace), "eco: confronto sul testo");
+
+  n += m;
+  console.log(`campi specchio a due vie: ${m} asserzioni OK`);
+}
+
+// ── 03/10: giro completo con KV finto + ClickUp FINTO (fetch sostituito) ───────
+// Specchio a due vie (eco = nessun cambiamento, modifica vera, testo illeggibile,
+// testo vuoto) e archivio (taskDeleted, nessun task ricreato, Elimina con ClickUp
+// giù, Ripristina, pulizia dopo 30 giorni). Nessuna chiamata di rete vera.
+{
+  const fake = globalThis.__hrFakeKv;
+  const H = await import("../src/lib/hr-people.js");
+  const { mirrorText } = await import("../src/lib/hr-mirror.js");
+  let m = 0;
+  const t = (c, msg) => { assert.ok(c, msg); m++; };
+
+  // ClickUp finto: una lista, i campi per nome, task in memoria
+  const LIST = "lista-prova";
+  const FIELDS_META = [
+    { id: "f-sur", name: "Surname", type: "short_text" },
+    { id: "f-skills", name: "Skills", type: "labels", type_config: { options: [{ id: "o-ofm", label: "OF Messaging" }, { id: "o-ig", label: "Instagram" }] } },
+    ...["Luogo di nascita", "Comune di residenza", "CAP", "Competenze e livello", "Ruoli già ricoperti", "Vorrebbe imparare", "Altro che sa fare"]
+      .map((name, i) => ({ id: `f-m${i}`, name, type: name === "Competenze e livello" ? "text" : "short_text" })),
+  ];
+  const byFieldName = (n) => FIELDS_META.find((f) => f.name === n);
+  const cu = { tasks: new Map(), seq: 0, deleteDown: false, calls: [] };
+  const json = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => JSON.stringify(body) });
+  const notFound = () => json(404, { err: "Task not found", ECODE: "ITEM_015" });
+  const taskView = (tk) => ({
+    ...tk, list: { id: LIST }, status: { status: "to do" },
+    custom_fields: FIELDS_META.map((f) => ({ ...f, value: tk.values[f.id] })),
+  });
+  globalThis.fetch = async (url, init = {}) => {
+    const u = new URL(url);
+    const p = u.pathname.replace(/^\/api\/v2/, "");
+    const method = init.method || "GET";
+    const body = init.body ? JSON.parse(init.body) : null;
+    cu.calls.push(`${method} ${p}`);
+    let mm;
+    if (method === "GET" && p === `/list/${LIST}/field`) return json(200, { fields: FIELDS_META });
+    if (method === "GET" && p === `/list/${LIST}`) return json(200, { id: LIST, name: "Prova HR", statuses: [] });
+    if (method === "GET" && p === `/list/${LIST}/task`) return json(200, { tasks: [...cu.tasks.values()].map(taskView), last_page: true });
+    if (method === "POST" && p === `/list/${LIST}/task`) {
+      const id = `t${++cu.seq}`;
+      const values = {};
+      for (const cf of body.custom_fields || []) values[cf.id] = cf.value;
+      cu.tasks.set(id, { id, name: body.name, description: body.description, values, date_updated: String(Date.now()) });
+      return json(200, { id, url: `https://app.clickup.com/t/${id}` });
+    }
+    if ((mm = /^\/task\/([^/]+)\/field\/([^/]+)$/.exec(p))) {
+      const tk = cu.tasks.get(mm[1]);
+      if (!tk) return notFound();
+      if (method === "POST") tk.values[mm[2]] = body.value; else delete tk.values[mm[2]];
+      return json(200, {});
+    }
+    if ((mm = /^\/task\/([^/]+)$/.exec(p))) {
+      const tk = cu.tasks.get(mm[1]);
+      if (method === "DELETE") {
+        if (cu.deleteDown) return json(503, { err: "giù" });
+        if (!tk) return notFound();
+        cu.tasks.delete(mm[1]);
+        return json(200, {});
+      }
+      if (!tk) return notFound();
+      if (method === "PUT") { Object.assign(tk, body); return json(200, {}); }
+      return json(200, taskView(tk));
+    }
+    return json(500, { err: `rotta non prevista nel finto: ${method} ${p}` });
+  };
+  process.env.HR_CLICKUP_LIST_ID = LIST;
+  process.env.CLICKUP_API_TOKEN = "pk_test_finto";
+  // sul ClickUp finto: un utente cambia il testo di un campo specchio (e la data del task)
+  const editOnClickup = (taskId, fieldName, value) => {
+    const tk = cu.tasks.get(taskId);
+    const f = byFieldName(fieldName);
+    if (value == null) delete tk.values[f.id]; else tk.values[f.id] = value;
+    tk.date_updated = String(Date.now() + 1000);
+    return f;
+  };
+  const webhook = (taskId, fieldNames) => H.handleWebhookEvent({
+    event: "taskUpdated", task_id: taskId,
+    history_items: fieldNames.map((n) => ({ field: "custom_field", custom_field: { id: byFieldName(n).id, name: n }, date: String(Date.now() + 1000), user: { username: "hr-clickup" } })),
+  });
+  const logOf = async (id) => H.getLog(id, 500);
+
+  // 1) creazione in app → task su ClickUp coi testi specchio
+  const created = await H.savePerson({ input: {
+    firstName: "Sara", surname: "Bianchi",
+    birthPlace: { abroad: false, name: "Napoli", prov: "NA", code: "F839" },
+    residenceComune: { name: "Castro", prov: "LE", code: "M261", region: "Puglia" }, residenceCap: "73030",
+    skillLevels: { of_chat: "Esperto" }, pastRoles: [{ role: "media_buyer", duration: "1to3" }], learnWish: ["ads_google"], otherSkills: "Pianoforte",
+  }, actor: "admin", source: "app" });
+  t(created.ok && created.sync?.status === "ok", "scheda creata e portata su ClickUp");
+  const sara = await H.getPerson(created.person.id);
+  const taskId = sara.clickupTaskId;
+  const tk = cu.tasks.get(taskId);
+  t(tk.values[byFieldName("Luogo di nascita").id] === "Napoli (NA)" && tk.values[byFieldName("Comune di residenza").id] === "Castro (LE)", "testi specchio scritti su ClickUp");
+  t(tk.values[byFieldName("Competenze e livello").id] === "OnlyFans: Chat e vendita (Esperto)", "competenze scritte una riga per area");
+
+  // 2) eco: il webhook rimanda indietro i NOSTRI testi → nessun cambiamento
+  const logBefore = (await logOf(sara.id)).length;
+  const echoRes = await webhook(taskId, ["Luogo di nascita", "Comune di residenza", "Competenze e livello", "Ruoli già ricoperti", "Vorrebbe imparare", "Altro che sa fare", "CAP"]);
+  const afterEcho = await H.getPerson(sara.id);
+  t(echoRes.kind === "unchanged", "eco dei campi specchio = nessun cambiamento");
+  t(valuesEqual(afterEcho.fields.residenceComune, sara.fields.residenceComune) && afterEcho.fields.residenceComune.region === "Puglia", "eco: il comune resta quello dell'app (con regione)");
+  t(!(await logOf(sara.id)).slice(0, (await logOf(sara.id)).length - logBefore).some((e) => e.action === "update" || e.action === "mirror_unrecognized"), "eco: nessuna modifica né avviso nello storico");
+  // anche la riconciliazione notturna non vede cambiamenti
+  const rec0 = await H.importFromClickup({ mode: "reconcile", by: "test" });
+  t(rec0.ok && rec0.updated === 0 && rec0.created === 0, "riconciliazione senza modifiche: niente da aggiornare");
+
+  // 3) modifica vera su ClickUp → l'app si aggiorna (anche le etichette Skills seguono)
+  editOnClickup(taskId, "Luogo di nascita", "milano, mi");
+  editOnClickup(taskId, "Competenze e livello", "OnlyFans: Chat e vendita (Esperto)\nSocial organico: Instagram (Autonomo)");
+  const r3 = await webhook(taskId, ["Luogo di nascita", "Competenze e livello"]);
+  const s3 = await H.getPerson(sara.id);
+  t(r3.kind === "updated" && s3.fields.birthPlace?.name === "Milano" && s3.fields.birthPlace?.prov === "MI", "modifica su ClickUp: luogo di nascita aggiornato in app");
+  t(s3.fields.skillLevels.soc_instagram === "Autonomo" && s3.fields.skillLevels.of_chat === "Esperto", "modifica su ClickUp: competenze aggiornate in app");
+  t(s3.fields.skills.includes("Instagram") && cu.tasks.get(taskId).values["f-skills"]?.includes("o-ig"), "le etichette Skills seguono le competenze (anche su ClickUp)");
+  t((await logOf(sara.id)).some((e) => e.action === "update" && e.field === "birthPlace" && e.source === "clickup"), "storico: modifica da ClickUp");
+
+  // 4) testo illeggibile → si tiene l'app, avviso nello storico, al push successivo si riscrive
+  editOnClickup(taskId, "Ruoli già ricoperti", "Astronauta (1-3 anni)");
+  await webhook(taskId, ["Ruoli già ricoperti"]);
+  const s4 = await H.getPerson(sara.id);
+  t(valuesEqual(s4.fields.pastRoles, [{ role: "media_buyer", duration: "1to3" }]), "testo illeggibile: tenuto il valore di HOC Pro");
+  const warn = (await logOf(sara.id)).find((e) => e.action === "mirror_unrecognized" && e.field === "pastRoles");
+  t(warn && /«Astronauta \(1-3 anni\)» non è stato riconosciuto/.test(warn.to) && /tenuto il valore di HOC Pro/.test(warn.to), "storico: avviso leggibile");
+  t(s4.mirrorStale?.includes("pastRoles"), "segnato da riscrivere");
+  // stesso testo di nuovo (riconciliazione): nessun avviso ripetuto
+  const nWarn = (await logOf(sara.id)).filter((e) => e.action === "mirror_unrecognized").length;
+  await H.importFromClickup({ mode: "reconcile", by: "test" });
+  t((await logOf(sara.id)).filter((e) => e.action === "mirror_unrecognized").length === nWarn, "nessun avviso ripetuto ogni notte");
+  t(cu.tasks.get(taskId).values[byFieldName("Ruoli già ricoperti").id] === "Media buyer (1-3 anni)", "la riconciliazione ha riscritto il testo dell'app su ClickUp");
+  t(!(await H.getPerson(sara.id)).mirrorStale?.length, "niente più da riscrivere");
+
+  // 5) testo vuoto su ClickUp = campo svuotato in app
+  editOnClickup(taskId, "Altro che sa fare", null);
+  await webhook(taskId, ["Altro che sa fare"]);
+  t((await H.getPerson(sara.id)).fields.otherSkills === null, "testo vuoto su ClickUp: campo svuotato in app");
+
+  // 6) modifica in app → testo nuovo su ClickUp, e la sua eco non cambia niente
+  await H.savePerson({ id: sara.id, input: { residenceComune: { abroad: true, country: "Spagna", city: "Madrid" } }, actor: "admin", source: "app" });
+  t(cu.tasks.get(taskId).values[byFieldName("Comune di residenza").id] === "Madrid, Spagna", "modifica in app: testo aggiornato su ClickUp");
+  const r6 = await webhook(taskId, ["Comune di residenza"]);
+  t(r6.kind === "unchanged", "la sua eco non cambia niente");
+
+  // 6b) base vecchia (impronta dell'oggetto, prima del 03/10) e testo uguale a quello che l'app scriverebbe:
+  // nessun cambiamento, anche se il task è più recente (gli a capo dell'app non si perdono)
+  await H.savePerson({ id: sara.id, input: { otherSkills: "riga uno\nriga due" }, actor: "admin", source: "app" });
+  const s6 = await H.getPerson(sara.id);
+  await fake.set(`hr:person:${sara.id}`, { ...s6, cuBase: { ...s6.cuBase, otherSkills: valueHash(s6.fields.otherSkills) } });
+  cu.tasks.get(taskId).date_updated = String(Date.now() + 60_000);
+  await H.importFromClickup({ mode: "reconcile", by: "test" });
+  t((await H.getPerson(sara.id)).fields.otherSkills === "riga uno\nriga due", "base vecchia + testo identico: il valore dell'app non cambia");
+
+  // 7) archivio da taskDeleted: niente task ricreato
+  const del = await H.handleWebhookEvent({ event: "taskDeleted", task_id: taskId, history_items: [{ user: { username: "hr-clickup" } }] });
+  cu.tasks.delete(taskId);
+  const s7 = await H.getPerson(sara.id);
+  t(del.archived && s7.archived?.source === "clickup" && !s7.clickupTaskId, "taskDeleted: scheda archiviata");
+  t(!(await H.listPeople()).some((p) => p.id === sara.id) && (await H.listPeople({ archived: "only" })).some((p) => p.id === sara.id), "archiviata fuori dall'elenco normale, dentro le Archiviate");
+  const tasksBefore = cu.tasks.size;
+  const push7 = await H.pushPersonSafe(s7, null);
+  t(push7.status === "archived" && cu.tasks.size === tasksBefore, "push di un'archiviata: nessun task ricreato");
+  t((await H.savePerson({ id: sara.id, input: { surname: "X" }, actor: "admin", source: "app" })).status === 409, "un'archiviata non si modifica dalla scheda");
+  await H.importFromClickup({ mode: "reconcile", by: "test" });
+  t(cu.tasks.size === tasksBefore, "la riconciliazione non ricrea il task di un'archiviata");
+  t((await logOf(sara.id)).some((e) => e.action === "archived" && e.source === "clickup"), "storico: archiviata, da ClickUp");
+
+  // 8) un task che sparisce senza webhook → archiviato dalla riconciliazione (404 vero)
+  const luca = (await H.savePerson({ input: { firstName: "Luca", surname: "Verdi" }, actor: "admin" })).person;
+  cu.tasks.delete(luca.clickupTaskId);
+  const rec8 = await H.importFromClickup({ mode: "reconcile", by: "test" });
+  t(rec8.archived >= 1 && (await H.getPerson(luca.id)).archived?.reason === "Il task collegato non esiste più su ClickUp", "riconciliazione: task inesistente → archiviata");
+
+  // 9) "Elimina" con ClickUp giù → archivio subito, cancellazione in coda, ritentata di notte
+  const anna = (await H.savePerson({ input: { firstName: "Anna", surname: "Neri", personalEmail: "anna@example.com" }, actor: "admin" })).person;
+  const annaTask = anna.clickupTaskId;
+  cu.deleteDown = true;
+  const a9 = await H.archivePerson(anna.id, "admin-1");
+  t(a9.ok && a9.task === "queued" && (await H.getPerson(anna.id)).archived?.pendingTaskDelete === annaTask, "Elimina con ClickUp giù: archiviata, cancellazione in coda");
+  t(cu.tasks.has(annaTask), "il task c'è ancora");
+  // nel frattempo qualcuno tocca il task su ClickUp: l'archiviata non riceve niente e non nasce una scheda nuova
+  const peopleCount = (await H.listPeople({ archived: "include" })).length;
+  editOnClickup(annaTask, "CAP", "00100");
+  const w9 = await webhook(annaTask, ["CAP"]);
+  t(w9.kind === "ignored" && (await H.listPeople({ archived: "include" })).length === peopleCount, "webhook del task di un'archiviata: ignorato");
+  cu.deleteDown = false;
+  const rec9 = await H.importFromClickup({ mode: "reconcile", by: "test" });
+  t(rec9.trashed === 1 && !cu.tasks.has(annaTask), "riconciliazione: task cestinato dalla coda");
+  t((await H.getPerson(anna.id)).archived?.taskDeletedAt && !(await H.getPerson(anna.id)).archived?.pendingTaskDelete, "scheda aggiornata: task cestinato");
+  t((await logOf(anna.id)).some((e) => e.action === "archived" && e.by === "admin-1" && e.source === "app"), "storico: chi ha eliminato, da dove");
+  t((await logOf(anna.id)).some((e) => e.action === "task_delete_queued") && (await logOf(anna.id)).some((e) => e.action === "task_trashed"), "storico: coda e cestino");
+
+  // 10) Elimina con ClickUp su → task subito nel cestino
+  const bea = (await H.savePerson({ input: { firstName: "Bea" }, actor: "admin" })).person;
+  const a10 = await H.archivePerson(bea.id, "admin-1");
+  t(a10.task === "trashed" && !cu.tasks.has(bea.clickupTaskId), "Elimina: task nel cestino di ClickUp");
+  const conf = await H.handleWebhookEvent({ event: "taskDeleted", task_id: bea.clickupTaskId, history_items: [] });
+  t(conf.ignored || conf.already, "il taskDeleted della nostra cancellazione non fa danni");
+
+  // 11) Ripristina → torna attiva e crea un task NUOVO
+  const r11 = await H.restorePerson(sara.id, "admin-2");
+  const s11 = await H.getPerson(sara.id);
+  t(r11.ok && !s11.archived && s11.clickupTaskId && s11.clickupTaskId !== taskId && cu.tasks.has(s11.clickupTaskId), "Ripristina: attiva, task nuovo su ClickUp");
+  t(cu.tasks.get(s11.clickupTaskId).values[byFieldName("Luogo di nascita").id] === "Milano (MI)", "il task nuovo ha i dati dell'app");
+  t((await logOf(sara.id)).some((e) => e.action === "restored" && e.by === "admin-2"), "storico: ripristinata");
+
+  // 12) esclusioni: le archiviate non contano nei doppioni
+  const dupe = (await H.savePerson({ input: { firstName: "Anna", surname: "Neri", personalEmail: "anna@example.com" }, actor: "admin" })).person;
+  const cl = H.computeCleanup(await H.listPeople({ archived: "include" }));
+  t(!cl.byId[dupe.id] && !cl.byId[anna.id], "un'archiviata non fa doppione con una scheda attiva");
+
+  // 13) Elimina definitivamente: solo archiviate; pulizia automatica dopo 30 giorni
+  t((await H.purgePerson(dupe.id, { actor: "admin" })).status === 409, "una scheda attiva non si elimina per sempre");
+  const pl = await H.purgePerson(bea.id, { actor: "admin-1" });
+  t(pl.ok && !(await H.getPerson(bea.id)) && (await logOf(bea.id)).length === 0 && !(await fake.smembers("hr:people:index")).includes(bea.id), "Elimina definitivamente: scheda, storico e indice");
+  const old = await H.getPerson(anna.id);
+  await fake.set(`hr:person:${anna.id}`, { ...old, archived: { ...old.archived, at: Date.now() - 31 * 24 * 3600 * 1000 } });
+  const luca2 = await H.getPerson(luca.id); // archiviata da poco: resta
+  const pr = await H.purgeExpiredArchived({});
+  t(pr.purged === 1 && !(await H.getPerson(anna.id)) && (await H.getPerson(luca2.id))?.archived, "pulizia: via solo le archiviate da più di 30 giorni");
+  const plog = await fake.lrange("hr:purge:log", 0, 10);
+  t(plog.length === 2 && plog.every((x) => !/Anna|Bea|example/.test(x)), "traccia delle cancellazioni senza dati della persona");
+  t(mirrorText("birthPlace", s11.fields) === "Milano (MI)", "sanity");
+
+  delete process.env.HR_CLICKUP_LIST_ID;
+  n += m;
+  console.log(`archivio + specchio con ClickUp finto: ${m} asserzioni OK`);
+}
+
+console.log(`totale: ${n} asserzioni`);

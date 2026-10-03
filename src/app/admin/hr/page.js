@@ -10,8 +10,11 @@
  *
  * 03/10/2026: un solo link, uguale per tutti (decisione del titolare). I link
  * personali già mandati funzionano finché scadono, ma da qui non se ne creano più.
+ * 03/10/2026: vista "Archiviate" (task cancellato su ClickUp o "Elimina" dalla
+ * scheda): fuori da elenco, doppioni e numeri; si ripristinano o si eliminano per
+ * sempre, e dopo 30 giorni si cancellano da sole.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
@@ -23,6 +26,7 @@ import { Modal } from "@/components/cp-style";
 import { COLLAB_STATUSES } from "@/lib/hr-fields";
 import { SKILL_AREAS, SKILL_LEVELS, PAST_ROLES, normalizeSkillMap, normalizePastRoles, hasSkillAtLeast, pastRoleText } from "@/lib/hr-skills";
 import { lbl, input, btnPrimary, btnGhost, chip, SYNC_LABEL, fetcher, postJson, CopyLink, fmtDateTime } from "@/components/hr-ui";
+import { RestoreButton, PurgeButton, archiveDeleteDay } from "@/components/hr-archive";
 
 const NONE = "__none__";
 
@@ -51,8 +55,15 @@ export default function HrPeoplePage() {
   const [pastRole, setPastRole] = useState("");
   const [newOpen, setNewOpen] = useState(false);
   const [cleanupOpen, setCleanupOpen] = useState(false);
+  const [view, setView] = useState("attive");
+  const [archNotice, setArchNotice] = useState(null);
+  // ?vista=archiviate (arrivo da "Elimina definitivamente" nella scheda)
+  useEffect(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("vista") === "archiviate") setView("archiviate");
+  }, []);
 
   const items = data?.items || [];
+  const archivedItems = data?.archived || [];
   const flags = data?.cleanup?.byId || {};
   const byId = useMemo(() => Object.fromEntries(items.map((p) => [p.id, p])), [items]);
 
@@ -152,7 +163,18 @@ export default function HrPeoplePage() {
 
       {!error && isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
 
-      {data && items.length === 0 && (
+      {data && (archivedItems.length > 0 || view === "archiviate") && (
+        <div role="group" aria-label="Quale elenco" style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+          <FilterChip label={`Persone · ${items.length}`} active={view === "attive"} onClick={() => setView("attive")} />
+          <FilterChip label={`Archiviate · ${archivedItems.length}`} active={view === "archiviate"} onClick={() => setView("archiviate")} />
+        </div>
+      )}
+
+      {data && view === "archiviate" && (
+        <ArchivedView rows={archivedItems} notice={archNotice} onChanged={(text) => { setArchNotice(text); mutate(); }} />
+      )}
+
+      {data && view === "attive" && items.length === 0 && (
         <section style={{ ...card, padding: "18px 20px" }}>
           <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, marginBottom: 8 }}>Nessuna persona ancora. Per iniziare:</div>
           <ol style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: CP.textSecondary, lineHeight: 1.6 }}>
@@ -163,7 +185,7 @@ export default function HrPeoplePage() {
         </section>
       )}
 
-      {items.length > 0 && (
+      {view === "attive" && items.length > 0 && (
         <>
           <section style={{ ...card, padding: "16px 18px", marginBottom: 14, display: "flex", gap: 28, flexWrap: "wrap" }}>
             <Metric label="Persone" value={fmtInt(items.length)} />
@@ -223,7 +245,7 @@ export default function HrPeoplePage() {
               <Disclosure open={cleanupOpen} onToggle={() => setCleanupOpen(!cleanupOpen)} title="Da ripulire"
                 summary={`${data.cleanup.duplicates.length} gruppi di doppioni probabili · ${data.cleanup.junk.length} schede quasi vuote`}>
                 <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 10px", lineHeight: 1.5 }}>
-                  Niente viene cancellato da solo. Apri le schede, decidi quale tenere e sistema su ClickUp (unisci o archivia il task): alla prossima sincronizzazione l'elenco si aggiorna.
+                  Niente viene cancellato da solo. Apri le schede e decidi quale tenere: quella in più la elimini dalla sua scheda con «Elimina» (va tra le Archiviate e il suo task nel cestino di ClickUp).
                 </p>
                 {data.cleanup.duplicates.map((g) => (
                   <div key={g.ids.join()} style={{ padding: "8px 0", borderTop: `1px solid ${CP.borderSoft}`, fontSize: 14 }}>
@@ -245,6 +267,40 @@ export default function HrPeoplePage() {
 
       <NewPersonModal open={newOpen} onClose={() => setNewOpen(false)} onCreated={(p) => { setNewOpen(false); mutate(); router.push(`/admin/hr/${p.id}`); }} />
     </div>
+  );
+}
+
+/**
+ * Vista "Archiviate": schede con il task cancellato su ClickUp o eliminate dalla
+ * scheda. Non si sincronizzano e non contano nei numeri; dopo 30 giorni si
+ * cancellano da sole.
+ */
+function ArchivedView({ rows, notice, onChanged }) {
+  const SOURCE = { app: "HOC Pro", clickup: "ClickUp", sistema: "Sistema" };
+  const columns = [
+    { key: "name", label: "Persona", sort: (p) => p.name.toLowerCase(), render: (p) => <Link href={`/admin/hr/${p.id}`} style={{ color: CP.textPrimary, textDecoration: "none", fontWeight: 500 }}>{p.name}</Link> },
+    { key: "at", label: "Archiviata il", sort: (p) => p.archived?.at || 0, render: (p) => <span style={{ whiteSpace: "nowrap" }}>{fmtDateTime(p.archived?.at)}</span> },
+    { key: "why", label: "Perché", sortable: false, render: (p) => <span>{p.archived?.reason || "—"} <span style={{ color: CP.textMuted, fontSize: 12 }}>· {SOURCE[p.archived?.source] || p.archived?.source}</span>{p.archived?.pendingTaskDelete && !p.archived?.taskDeletedAt ? <div style={{ fontSize: 12, color: CP.attn }}>task ClickUp ancora da cestinare (ci riprova stanotte)</div> : null}</span> },
+    { key: "exp", label: "Si cancella il", sort: (p) => p.archiveExpiresAt || 0, render: (p) => archiveDeleteDay(p), muted: true },
+    {
+      key: "act", label: "", sortable: false,
+      render: (p) => (
+        <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
+          <RestoreButton compact person={p} onDone={() => onChanged(`${p.name}: scheda ripristinata.`)} />
+          <PurgeButton compact person={p} onDone={() => onChanged(`${p.name}: scheda eliminata per sempre.`)} />
+        </span>
+      ),
+    },
+  ];
+  return (
+    <section aria-label="Schede archiviate">
+      <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 10px", lineHeight: 1.5 }}>
+        Schede il cui task è stato cancellato su ClickUp o che hai eliminato dalla scheda. Non si sincronizzano e non contano nei numeri né nei doppioni.
+        Dopo 30 giorni si cancellano da sole, storico compreso. Ripristinando una scheda, su ClickUp si crea un task nuovo: quello nel cestino di ClickUp non viene recuperato.
+      </p>
+      {notice && <Notice>{notice}</Notice>}
+      <DataTable columns={columns} rows={rows} defaultSort={{ key: "at", dir: -1 }} minWidth={820} maxHeight={620} empty="Nessuna scheda archiviata." />
+    </section>
   );
 }
 

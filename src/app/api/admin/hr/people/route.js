@@ -1,7 +1,7 @@
 /**
  * /api/admin/hr/people — elenco e creazione persone (Centro HR, SEED).
  *
- * GET  → { items (senza CF), cleanup { byId, duplicates, junk }, sync }
+ * GET  → { items (attive, senza CF), archived (schede archiviate), cleanup { byId, duplicates, junk } (solo attive), sync }
  * POST → crea una persona { ...campi } → salva in app e la porta su ClickUp
  *        (se la sync è accesa). La risposta dice com'è andata la sync.
  */
@@ -15,11 +15,15 @@ export const maxDuration = 60;
 export async function GET() {
   const az = await authorize(CAPABILITIES.SEED);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
-  const people = await listPeople();
+  const all = await listPeople({ archived: "include" });
+  // archiviate a parte: fuori da elenco, doppioni e statistiche
+  const people = all.filter((p) => !p.archived);
   const cleanup = computeCleanup(people);
-  const items = people.map((p) => publicPerson(p)).sort((a, b) => a.name.localeCompare(b.name, "it"));
+  const byName = (a, b) => a.name.localeCompare(b.name, "it");
+  const items = people.map((p) => publicPerson(p)).sort(byName);
+  const archived = all.filter((p) => p.archived).map((p) => publicPerson(p)).sort((a, b) => (b.archived?.at || 0) - (a.archived?.at || 0));
   const cfg = hrSyncConfig();
-  return Response.json({ items, cleanup, sync: { enabled: cfg.enabled, listId: cfg.listId, isRealList: cfg.isRealList }, crypto: hrCryptoConfigured() });
+  return Response.json({ items, archived, cleanup, sync: { enabled: cfg.enabled, listId: cfg.listId, isRealList: cfg.isRealList }, crypto: hrCryptoConfigured() });
 }
 
 export async function POST(request) {

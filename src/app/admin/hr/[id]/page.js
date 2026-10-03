@@ -7,27 +7,36 @@
  * Ogni sezione si modifica da sola e salva SOLO i campi cambiati (così su
  * ClickUp si toccano solo quelli). Codice fiscale mascherato: "Mostra" lo
  * legge in chiaro e resta scritto nello storico chi l'ha fatto e quando.
+ *
+ * 03/10/2026: "Elimina" manda la scheda tra le archiviate (e il task ClickUp nel
+ * cestino); una scheda archiviata si legge soltanto, si ripristina o si elimina
+ * per sempre. I campi di testo (luogo, comune, CAP, competenze, ruoli, vorrebbe
+ * imparare, altro) si modificano qui o su ClickUp.
  */
 import { useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import useSWR from "swr";
 import { ExternalLink, RefreshCw, Eye, Pencil } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Notice, DataTable, SectionTitle, Disclosure, card } from "@/components/ds";
 import { FIELDS, SECTIONS, FIELD_BY_KEY } from "@/lib/hr-fields";
 import { lbl, btnPrimary, btnGhost, SYNC_LABEL, displayValue, FieldInput, fmtDateTime, fetcher, postJson } from "@/components/hr-ui";
+import { ArchiveButton, RestoreButton, PurgeButton, archivedSummary, archiveDeleteDay } from "@/components/hr-archive";
 
 const ACTION_LABEL = {
   create: "Scheda creata", update: "Modifica", conflict: "Conflitto con ClickUp", cf_revealed: "Codice fiscale mostrato",
   form_link: "Link di compilazione creato", consent: "Consenso privacy", upload: "File caricato", sync_error: "Errore di sincronizzazione",
   clickup_deleted: "Task cancellato su ClickUp", echo_ignored: "Eco di una nostra scrittura (ignorata)", cf_skipped: "Codice fiscale non importato",
+  archived: "Scheda archiviata", restored: "Scheda ripristinata", task_trashed: "Task nel cestino di ClickUp",
+  task_delete_queued: "Cancellazione del task in coda", mirror_unrecognized: "Testo di ClickUp non riconosciuto",
 };
 const SOURCE_LABEL = { app: "HOC Pro", clickup: "ClickUp", modulo: "Modulo della persona", sistema: "Sistema" };
 const who = (by) => (!by ? "—" : String(by).startsWith("user_") ? `utente …${String(by).slice(-6)}` : by);
 
 export default function HrPersonPage() {
   const { id } = useParams();
+  const router = useRouter();
   const { data, error, isLoading, mutate } = useSWR(id ? `/api/admin/hr/people/${id}` : null, fetcher, { revalidateOnFocus: false });
   const [syncing, setSyncing] = useState(false);
   const [notice, setNotice] = useState(null);
@@ -58,10 +67,14 @@ export default function HrPersonPage() {
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Persone HR", href: "/admin/hr" }, { label: p?.name || "Scheda" }]}
         title={p?.name || (isLoading ? "Caricamento…" : "Scheda")}
         subtitle={p ? [p.fields?.currentJob, p.fields?.collaborationStatus].filter(Boolean).join(" · ") || null : null}
-        actions={p && (
+        actions={p && !p.archived && (
           <>
             {p.clickupUrl && p.clickupTaskId && <a href={p.clickupUrl} target="_blank" rel="noopener noreferrer" style={btnGhost}><ExternalLink size={14} /> Apri su ClickUp</a>}
             {data.sync?.enabled && <button type="button" onClick={syncNow} disabled={syncing} style={{ ...btnGhost, opacity: syncing ? 0.5 : 1 }}><RefreshCw size={14} /> {syncing ? "Sincronizzo…" : "Sincronizza ora"}</button>}
+            <ArchiveButton person={p} syncEnabled={data.sync?.enabled} onDone={(j) => {
+              setNotice({ ok: j.task !== "queued", text: j.task === "queued" ? "Scheda archiviata. ClickUp non ha risposto: il task verrà messo nel cestino stanotte." : j.task === "trashed" ? "Scheda archiviata e task ClickUp nel cestino." : "Scheda archiviata." });
+              mutate();
+            }} />
           </>
         )}
       />
@@ -69,21 +82,36 @@ export default function HrPersonPage() {
       {error && <Notice danger={error.status !== 403}>{error.status === 403 ? "Pagina riservata agli admin." : error.status === 404 ? <>Scheda non trovata. <Link href="/admin/hr" style={{ color: CP.accentSoftText }}>Torna all'elenco</Link></> : `Non riesco a caricare la scheda: ${error.message}`}</Notice>}
       {notice && <Notice danger={!notice.ok}>{notice.text}</Notice>}
 
+      {p?.archived && (
+        <section style={{ ...card, padding: "14px 16px", marginBottom: 14, borderLeft: `3px solid ${CP.attn}` }} aria-labelledby="hr-archived-h">
+          <h2 id="hr-archived-h" style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Scheda archiviata</h2>
+          <p style={{ margin: "0 0 4px", fontSize: 14, color: CP.textSecondary }}>{archivedSummary(p)}.</p>
+          <p style={{ margin: "0 0 12px", fontSize: 13, color: CP.textMuted, lineHeight: 1.5 }}>
+            Non si sincronizza con ClickUp e qui si legge soltanto. Se non la ripristini si cancella da sola, storico compreso, il {archiveDeleteDay(p)}.
+            {p.archived.pendingTaskDelete && !p.archived.taskDeletedAt ? " Il task su ClickUp non è ancora nel cestino: ci riprova la sincronizzazione della notte." : ""}
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <RestoreButton person={p} onDone={(j) => { setNotice({ ok: true, text: j.sync?.status === "ok" ? "Scheda ripristinata e riportata su ClickUp." : `Scheda ripristinata. ${j.sync?.message || ""}`.trim() }); mutate(); }} />
+            <PurgeButton person={p} onDone={() => router.push("/admin/hr?vista=archiviate")} />
+          </div>
+        </section>
+      )}
+
       {p && (
         <>
-          <SyncCard p={p} enabled={data.sync?.enabled} />
+          {!p.archived && <SyncCard p={p} enabled={data.sync?.enabled} />}
 
-          {data.flags?.includes("spazzatura") && <Notice>Scheda quasi vuota (nome di 1-2 lettere, nessuna email): probabilmente da archiviare su ClickUp. Qui non si cancella niente.</Notice>}
+          {data.flags?.includes("spazzatura") && <Notice>Scheda quasi vuota (nome di 1-2 lettere, nessuna email): se non serve, eliminala con «Elimina» (va tra le archiviate, si può ripristinare).</Notice>}
           {data.duplicates && (
             <Notice>
               Possibile doppione (stesso {data.duplicates.reasons.join(" + ")}) di{" "}
               {data.duplicates.others.map((o, i) => <span key={o.id}>{i > 0 && ", "}<Link href={`/admin/hr/${o.id}`} style={{ color: CP.accentSoftText }}>{o.name}</Link></span>)}.
-              Decidi quale tenere e sistema su ClickUp.
+              Decidi quale tenere: quella in più la elimini con «Elimina».
             </Notice>
           )}
 
           {SECTIONS.map((s) => (
-            <Section key={s.key} section={s} person={p} options={data.options || {}} crypto={data.crypto} onSaved={(j) => { mutate(); setNotice(j.notice); }} />
+            <Section key={s.key} section={s} person={p} options={data.options || {}} crypto={data.crypto} locked={Boolean(p.archived)} onSaved={(j) => { mutate(); setNotice(j.notice); }} />
           ))}
 
           <Disclosure open={logOpen} onToggle={() => setLogOpen(!logOpen)} title="Storico modifiche" summary={`${logRows.length} voci`}>
@@ -122,9 +150,9 @@ function SyncCard({ p, enabled }) {
   );
 }
 
-function Section({ section, person, options, crypto, onSaved }) {
+function Section({ section, person, options, crypto, onSaved, locked }) {
   const fields = FIELDS.filter((f) => f.section === section.key);
-  const editable = fields.filter((f) => !f.readOnly);
+  const editable = locked ? [] : fields.filter((f) => !f.readOnly);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({});
   const [busy, setBusy] = useState(false);
@@ -168,7 +196,7 @@ function Section({ section, person, options, crypto, onSaved }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "12px 18px" }}>
         {fields.map((f) => (
           <div key={f.key} style={{ minWidth: 0, gridColumn: ["labels", "longtext", "skillmap", "roles"].includes(f.type) ? "1 / -1" : undefined }}>
-            <span id={`hr-${f.key}-l`} style={lbl}>{f.label}{f.readOnly && f.cu ? <span style={{ color: CP.textMuted }}> · da ClickUp</span> : null}</span>
+            <span id={`hr-${f.key}-l`} style={lbl}>{f.label}{f.readOnly && f.cu ? <span style={{ color: CP.textMuted }}> · da ClickUp</span> : null}{person.mirrorStale?.includes(f.key) ? <span style={{ color: CP.attn }}> · su ClickUp c'è un testo non riconosciuto</span> : null}</span>
             {editing && !f.readOnly ? (
               f.type === "cf" && !crypto ? <span style={{ fontSize: 13, color: CP.textMuted }}>Non modificabile: manca la chiave di cifratura.</span> : (
                 <>
