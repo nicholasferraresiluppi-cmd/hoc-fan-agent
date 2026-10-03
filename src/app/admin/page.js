@@ -13,7 +13,7 @@ import { useUser } from "@clerk/nextjs";
 import {
   Trophy, BarChart3, DollarSign, Users, Flame, Swords,
   GraduationCap, ClipboardCheck, Target, Brain, Award,
-  LayoutDashboard, UserCog, Sparkles,
+  LayoutDashboard, UserCog, Sparkles, Bot,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders,
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Link2, Gauge,
   Calendar, Activity, MessagesSquare, Search,
@@ -63,6 +63,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/leaderboard/creators/heatmap", title: "Mappa operatore×creator",      desc: "Score operatore × creator a colpo d'occhio", icon: Flame },
       { href: "/admin/conversation-intelligence", title: "Presidio chat", desc: "Latenza risposta, % entro 5 min e response rate per creator (dai transcript, solo metadati)", icon: Activity },
       { href: "/admin/sales-coaching", title: "Coaching vendite", desc: "Per split: quanto comprano in chat i fan mai paganti, chi vende meglio a parità di pagina, cosa fa vendere, pagine e operatori modello di HOC, test in corso ed esempi da far studiare", icon: HandCoins },
+      { href: "/admin/sales-ai", title: "Sales manager AI", desc: "Ogni notte: due manager AI leggono i turni del giorno prima, un arbitro scrive il feedback, il Garante blocca gli errori. Li rivedi qui prima che arrivino agli operatori", icon: Bot },
       { href: "/admin/shift-quality", title: "Qualità turni", desc: "Turno×operatore: conversazioni, funnel PPV, venduto e analisi contenuto — attribuzione onesta singolo/duo", icon: MessagesSquare },
       { href: "/leaderboard/leghe",            title: "Leghe",         desc: "Tornei mensili + tier promozione/retrocessione", icon: Swords },
     ],

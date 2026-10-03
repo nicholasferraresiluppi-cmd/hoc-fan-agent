@@ -27,7 +27,7 @@ import { UserButton, SignedIn } from "@clerk/nextjs";
 import {
   Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown,
   GraduationCap, BookOpen, BookMarked, ClipboardCheck, Target, Brain, Award,
-  LayoutDashboard, UserCog, Sparkles, Radar,
+  LayoutDashboard, UserCog, Sparkles, Radar, Bot,
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Gauge, MessageSquareWarning,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
@@ -52,6 +52,7 @@ const ESSENTIAL_HREFS = new Set([
   "/me/qualita",
   "/me/turno",
   "/me/coaching",
+  "/me/allenatore",
   "/admin",
   "/admin/alerts",
   "/leaderboard/sales-cp",
@@ -82,6 +83,7 @@ const NAV_GROUPS_RAW = [
       { href: "/me/percorso", label: "Il mio percorso", icon: Compass },
       { href: "/me/qualita", label: "La mia qualità", icon: ClipboardCheck },
       { href: "/me/coaching", label: "Il mio coaching", icon: GraduationCap },
+      { href: "/me/allenatore", label: "Il mio allenatore", icon: Sparkles },
       { href: "/me/contestazioni", label: "Le mie contestazioni", icon: MessageSquareWarning },
       { href: "/me/turno", label: "Il mio turno", icon: Radar },
     ],
@@ -96,6 +98,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/conversation-intelligence", label: "Presidio chat", icon: Activity },
       { href: "/admin/shift-quality",            label: "Qualità turni", icon: MessagesSquare },
       { href: "/admin/sales-coaching",           label: "Coaching vendite", icon: HandCoins },
+      { href: "/admin/sales-ai",                 label: "Sales manager AI", icon: Bot },
     ],
   },
   {

@@ -75,6 +75,10 @@ export async function POST(request) {
   // proprio), ricalcola solo se la cache ha più di 20h
   out.sales_coaching = await kickEndpoint(request, "/api/cron/sales-coaching");
 
+  // sales manager AI: la notte degli uffici sui turni di ieri (catena propria,
+  // aspetta i batch AI; tetto di spesa giornaliero in KV smai:config)
+  out.sales_ai = await kickEndpoint(request, "/api/cron/sales-ai");
+
   // Riscalda la cache degli Academy Signals (query analitica pesante): così la
   // GET admin legge sempre dalla cache invece di calcolare inline. Best-effort:
   // un errore qui non deve far fallire il dispatcher.
