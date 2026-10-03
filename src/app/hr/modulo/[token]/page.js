@@ -39,6 +39,7 @@ import { cfCoherence } from "@/lib/hr-comuni";
 import HrWelcomeCard from "@/components/HrWelcomeCard";
 import HrTessera from "@/components/HrTessera";
 import HrPalmaLoader from "@/components/HrPalmaLoader";
+import HocLogo from "@/components/HocLogo";
 import HrHouseLetter from "@/components/HrHouseLetter";
 import { uploadHrFile } from "@/lib/hr-upload-client";
 import {
@@ -124,6 +125,9 @@ const CSS = `
 .hrf-splash-word{opacity:0;animation:hrfWord 1.2s ease .9s forwards}
 @keyframes hrfWord{from{opacity:0;letter-spacing:.5em}to{opacity:1;letter-spacing:.32em}}
 @media (prefers-reduced-motion:reduce){.hrf-splash-word{animation:none;opacity:1}}
+.hrf-splash-logo{opacity:0;animation:hrfLogo 1.4s cubic-bezier(.2,.7,.2,1) .2s forwards}
+@keyframes hrfLogo{from{opacity:0;transform:translateY(6px);letter-spacing:.24em}to{opacity:1;transform:none;letter-spacing:.16em}}
+@media (prefers-reduced-motion:reduce){.hrf-splash-logo{animation:none;opacity:1}}
 .hrf-splash{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:radial-gradient(120% 60% at 50% 0%, #17161c 0%, #0b0c10 55%);opacity:1;transition:opacity 1.1s cubic-bezier(.4,0,.2,1)}
 .hrf-splash-inner{transition:transform 1.1s cubic-bezier(.4,0,.2,1),opacity .8s ease}
 .hrf-splash.is-leaving{opacity:0;pointer-events:none}
@@ -151,8 +155,8 @@ function SplashOverlay() {
   return (
     <div className={`hrf-splash${phase === "leaving" ? " is-leaving" : ""}`} aria-hidden={phase === "leaving"}>
       <div className="hrf-splash-inner" style={{ display: "grid", justifyItems: "center", gap: 22 }}>
-        <HrPalmaLoader width={150} label="Apro il modulo" />
-        <div className="hrf-splash-word" style={{ fontSize: 13, letterSpacing: "0.32em", textTransform: "uppercase", color: "rgba(242,238,230,.78)" }}>House of Creators</div>
+        <HocLogo size={22} color="#f2eee6" className="hrf-splash-logo" />
+        <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Apro il modulo</span>
       </div>
     </div>
   );
