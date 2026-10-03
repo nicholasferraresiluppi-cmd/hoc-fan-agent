@@ -92,10 +92,10 @@ export default function HrSyncPage() {
         <>
           {!c.enabled && (
             <Notice>
-              La sincronizzazione è <b>spenta</b>. Per accenderla in simulazione: duplica la lista HR su ClickUp, poi imposta nelle variabili d'ambiente <code>HR_CLICKUP_LIST_ID</code> con l'id della lista di PROVA (non c'è nessun valore predefinito: senza, niente parte verso ClickUp) e verifica che <code>CLICKUP_API_TOKEN</code> ci sia.
+              La sincronizzazione è <b>spenta</b>. Per accenderla imposta nelle variabili d'ambiente <code>HR_CLICKUP_LIST_ID</code> con l'id della lista «✅ New CRM» (901222719267; non c'è nessun valore predefinito: senza, niente parte verso ClickUp) e verifica che <code>CLICKUP_API_TOKEN</code> ci sia.
             </Notice>
           )}
-          {c.isRealList && <Notice danger>La lista configurata è quella <b>reale</b> (901212383318): ogni salvataggio e ogni import toccano i task veri.</Notice>}
+          {c.isRealList && <Notice danger>La lista configurata è il <b>CRM vecchio</b> (901212383318), non «✅ New CRM»: dal 03/10/2026 il CRM attivo è New CRM e il vecchio resta solo come archivio. Ogni salvataggio e ogni import toccherebbero i task del vecchio.</Notice>}
 
           <section style={{ ...card, padding: "6px 16px 8px", marginBottom: 14 }}>
             <Row ok={Boolean(c.listId)} label="Lista ClickUp">

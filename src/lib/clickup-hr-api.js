@@ -14,7 +14,9 @@
 import { kv } from "@vercel/kv";
 
 const API = "https://api.clickup.com/api/v2";
-export const REAL_LIST_ID = "901212383318"; // solo per avvisare in UI, MAI come default
+// Dal 03/10/2026 il CRM attivo è «✅ New CRM» (901222719267, ex lista di prova, ripartito da zero);
+// 901212383318 è il CRM VECCHIO, tenuto come archivio: se la variabile punta lì la UI avvisa.
+export const REAL_LIST_ID = "901212383318"; // CRM vecchio: solo per avvisare in UI, MAI come default
 const FIELDS_TTL = 3600;
 const MIN_SPACING_MS = 300;
 const MAX_TRIES = 3;
