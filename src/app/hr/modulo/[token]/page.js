@@ -370,10 +370,9 @@ export default function HrFormPage() {
           <HrTessera key="esempio" data={SAMPLE_CARD} at={Date.now()} sample autoFlip />
           <Headline title={first ? `Ciao ${first},` : "Compila il modulo"} sub="e sblocca la tua tessera." size={40} />
           <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15.5, lineHeight: 1.55 }}>
-            Questa è una tessera d&apos;esempio: la tua prende forma con le tue risposte, in sette brevi capitoli. {timeEstimateText()}
-            {" "}Alla fine, se vuoi, puoi caricare documento d&apos;identità e curriculum: tienili a portata di mano.
-            {ctx.shared ? " Compilalo una volta sola." : ` Il link vale fino al ${fmtDate(ctx.expiresAt)} e si usa una volta sola.`}
-            {canSave ? " Se ti fermi a metà, riaprendo il link da questo dispositivo riprendi da dove eri rimasto." : ""}
+            Questa è una tessera d&apos;esempio: la tua prende forma con le tue risposte. Sette brevi capitoli, {timeEstimateText().replace(/^Ci vogliono /, "").replace(/\.$/, "")}.
+            {" "}Tieni a portata di mano un documento d&apos;identità.
+            {ctx.shared ? "" : ` Il link vale fino al ${fmtDate(ctx.expiresAt)}.`}
           </p>
           <button type="button" className="hrf-pill" onClick={() => { setDir("next"); setStage("form"); }} style={{ ...pill(true), width: "100%" }}>Cominciamo</button>
           <div style={{ fontSize: 12.5, color: CP.textMuted, textAlign: "center" }}>I tuoi dati restano riservati: li vede solo chi gestisce il personale.</div>
