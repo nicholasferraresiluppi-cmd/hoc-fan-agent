@@ -25,7 +25,8 @@ export const SKILL_LEVEL_HINT = {
   "Posso insegnarla": "l'hai già spiegato a un collega",
 };
 
-const sk = (key, name, cu = null) => ({ key, name, cu: cu == null ? [] : [].concat(cu) });
+// senza etichetta ClickUp storica la voce usa il suo nome italiano come etichetta (opzioni aggiunte al campo Skills il 03/10/2026)
+const sk = (key, name, cu = null) => ({ key, name, cu: cu == null ? [name] : [].concat(cu) });
 
 export const SKILL_AREAS = [
   {
