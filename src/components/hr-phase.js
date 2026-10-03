@@ -24,19 +24,22 @@ export function ExitButton({ person, onDone }) {
   const [date, setDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
-  const openModal = () => { setErr(null); setDate(current || todayRome()); setOpen(true); };
+  const [after, setAfter] = useState(null); // esito: checklist del dopo-uscita
+  const openModal = () => { setErr(null); setAfter(null); setDate(current || todayRome()); setOpen(true); };
   const go = async () => {
     setBusy(true); setErr(null);
     try {
       const j = await postJson(`/api/admin/hr/people/${person.id}/phase`, { action: "exit", endDate: date || null });
-      setOpen(false);
-      onDone?.(j);
+      // la scheda si ricarica solo alla chiusura: ricaricando subito il pulsante sparirebbe (la persona è già
+      // "Uscita") e con lui la checklist del dopo-uscita
+      setAfter(j);
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
   return (
     <>
       <button type="button" onClick={openModal} style={btnGhost}><LogOut size={14} /> Segna come uscita</button>
-      <Modal open={open} onClose={() => !busy && setOpen(false)} title={`Segnare ${person.name} come uscita?`}>
+      <Modal open={open} onClose={() => { if (busy) return; setOpen(false); if (after) onDone?.(after); }} title={after ? `${person.name}: uscita registrata` : `Segnare ${person.name} come uscita?`}>
+        {after ? <AfterExit access={after.access} onClose={() => { setOpen(false); onDone?.(after); }} /> : (
         <div style={{ display: "grid", gap: 10, fontSize: 14, color: CP.textSecondary, lineHeight: 1.55 }}>
           <p style={{ margin: 0 }}>
             La fase diventa <b>{PHASE_EXITED}</b> e si salva la data di fine collaborazione. La scheda resta nel CRM con tutto il suo storico
@@ -55,8 +58,35 @@ export function ExitButton({ person, onDone }) {
             <button type="button" onClick={() => setOpen(false)} disabled={busy} style={btnGhost}>Annulla</button>
           </div>
         </div>
+        )}
       </Modal>
     </>
+  );
+}
+
+/** Dopo l'uscita: cosa resta da fare, con i link. L'accesso non si toglie da solo: lo decide chi gestisce Membri. */
+function AfterExit({ access, onClose }) {
+  const live = (access?.members || []).filter((m) => !m.banned);
+  const teams = (access?.members || []).filter((m) => m.team);
+  const row = (done, text, href, cta) => (
+    <li style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+      <span aria-hidden="true" style={{ color: done ? CP.textMuted : CP.accentSoftText }}>{done ? "✓" : "→"}</span>
+      <span>{text}{href && <> · <a href={href} style={{ color: CP.accentSoftText }}>{cta}</a></>}</span>
+    </li>
+  );
+  return (
+    <div style={{ display: "grid", gap: 12, fontSize: 14, color: CP.textSecondary, lineHeight: 1.55 }}>
+      <p style={{ margin: 0 }}>Fase e data salvate, anche su ClickUp. Restano da chiudere:</p>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+        {access == null ? row(false, "Accesso a HOC Pro: non sono riuscito a controllarlo. Verifica in Membri e ruoli", "/admin/ruoli", "Apri")
+          : !access.emails?.length ? row(false, "Accesso a HOC Pro: la scheda non ha email, controlla a mano in Membri e ruoli", "/admin/ruoli", "Apri")
+          : live.length ? live.map((m) => <span key={m.userId}>{row(false, `Ha ancora accesso a HOC Pro (${m.email})`, `/admin/ruoli?q=${encodeURIComponent(m.email || "")}`, "Togli l'accesso")}</span>)
+          : row(true, "Nessun accesso attivo a HOC Pro con le sue email")}
+        {teams.length ? teams.map((m) => <span key={`t-${m.userId}`}>{row(false, `È ancora nel team «${m.team}»`, "/admin/team", "Toglilo dal team")}</span>) : access?.members?.length ? row(true, "Non è in nessun team") : null}
+        {row(false, "Contratto e documenti di chiusura: aggiornali nella scheda (sezione Contratto)")}
+      </ul>
+      <div><button type="button" onClick={onClose} style={btnGhost}>Fatto</button></div>
+    </div>
   );
 }
 

@@ -9,18 +9,22 @@
  *   - da far crescere (Coaching Center: 25-50, con il training suggerito)
  * Coaching, non giudizio: nessuna classifica nuova, solo chi seguire e perché.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { isEarlyMonth } from "@/lib/use-smart-period";
 import Link from "next/link";
 import useSWR from "swr";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, Notice, card } from "@/components/ds";
+import { PageHead, Notice, EarlyMonthNote, card } from "@/components/ds";
 
 const fetcher = (u) => fetch(u).then((r) => r.json()).catch(() => null);
 const month = (k = 0) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - k); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 const dec = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { maximumFractionDigits: 1 }));
 
 export default function SettimanaPage() {
-  const cur = month(0), prev = month(1);
+  // inizio mese: il mese in corso ha 2-3 turni a testa → si parte dal mese chiuso (lib/use-smart-period)
+  const [forceCurrent, setForceCurrent] = useState(false);
+  const early = isEarlyMonth() && !forceCurrent;
+  const cur = month(early ? 1 : 0), prev = month(early ? 2 : 1);
   const { data: rank } = useSWR(`/api/leaderboard/sales-cp?period_id=${cur}&include_no_cp=0`, fetcher, { revalidateOnFocus: false });
   const { data: rankPrev } = useSWR(`/api/leaderboard/sales-cp?period_id=${prev}&include_no_cp=0`, fetcher, { revalidateOnFocus: false });
   const { data: ac } = useSWR(`/api/admin/action-center?period_id=${cur}`, fetcher, { revalidateOnFocus: false });
@@ -63,6 +67,7 @@ export default function SettimanaPage() {
     <div style={{ padding: "28px 24px 64px", maxWidth: 900, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead title="Questa settimana" line2="Chi seguire, e perché."
         subtitle="Al massimo cinque persone della tua squadra, in ordine: prima chi è sotto soglia, poi chi cala forte rispetto al mese scorso (anche se è sopra soglia), poi chi può crescere. Non è una classifica: è da dove cominciare." />
+      <EarlyMonthNote info={{ early, current: month(0) }} periodId={cur} onSwitch={() => setForceCurrent(true)} />
       {noCreators && <Notice>Non hai ancora creator assegnate: chiedi a un admin di assegnarti le tue creator.</Notice>}
       {loading && !noCreators && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
       {!loading && !noCreators && list.length === 0 && <Notice>Questa settimana nessuno ha bisogno di attenzione particolare. Buon segno: usa il tempo per chi può crescere.</Notice>}

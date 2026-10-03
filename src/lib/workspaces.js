@@ -29,7 +29,7 @@ export const WORKSPACES = {
         { href: "/admin/pnl-live", label: "P&L Live" },
         { href: "/admin/infloww-agency", label: "Incassi Infloww" },
         { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
-        { href: "/admin/comp-review", label: "Anomalie compensi" },
+        { href: "/admin/comp-review", label: "Anomalie compensi", desc: "Chi incassa molto più o molto meno della media del team sulla stessa creator, per dollari in gioco" },
       ] },
       { title: "Persone e decisioni", items: [
         { href: "/admin/hr", label: "Persone HR" },

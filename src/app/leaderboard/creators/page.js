@@ -15,7 +15,7 @@ import { CP, FONTS } from "@/lib/brand";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmt$, fmtInt, fmtPct, fmtDelta, MONTHS_IT } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, EarlyMonthNote } from "@/components/ds";
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -35,7 +35,7 @@ const prevOf = (pid) => { if (!pid) return null; const [y, m] = pid.split("-").m
 const num1 = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { maximumFractionDigits: 1 }));
 
 export default function CreatorsLeaderboardPage() {
-  const [periodId, setPeriodId] = useSmartPeriod();
+  const [periodId, setPeriodId, periodInfo] = useSmartPeriod();
   const [view, setView] = useState("all");
   const [q, setQ] = useState("");
   const [tutorialOpen, setTutorialOpen] = useState(false);
@@ -46,6 +46,8 @@ export default function CreatorsLeaderboardPage() {
 
   const { data, isLoading } = useSWR(periodId ? `/api/leaderboard/creators?period_id=${periodId}&include_suggestions=1` : null, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
   const { data: prev } = useSWR(prevId ? `/api/leaderboard/creators?period_id=${prevId}` : null, fetcher, { revalidateOnFocus: false });
+  // il venduto ufficiale (tutti i turni CP, = hub e P&L) per dire quanta parte è qui
+  const { data: official } = useSWR(periodId ? `/api/leaderboard/agency-sales?period_id=${periodId}` : null, fetcher, { revalidateOnFocus: false });
 
   const ok = data && !data.error;
   const total = data?.total_sales_agency || 0;
@@ -118,6 +120,7 @@ export default function CreatorsLeaderboardPage() {
           <button onClick={() => setTutorialOpen(true)} style={{ ...ctl, display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}><Info size={14} /> Lo score</button>
         </>}
       />
+      <EarlyMonthNote info={periodInfo} periodId={periodId} onSwitch={setPeriodId} />
 
       {isLoading && !data && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
       {data?.error && <Notice danger>{data.error} <Link href="/admin/creatorspro-sync" style={{ color: CP.accentSoftText }}>Sync CP →</Link></Notice>}
@@ -133,8 +136,8 @@ export default function CreatorsLeaderboardPage() {
         <HeroMetric
           label={`Venduto delle creator · ${monthLabel}${isCurrent ? " finora" : ""}`}
           value={fmt$(total)}
-          compare={prev?.total_sales_agency ? (isCurrent ? `${prevName} intero: ${fmt$(prev.total_sales_agency)}` : `${prevName}: ${fmt$(prev.total_sales_agency)} (${fmtDelta(total, prev.total_sales_agency)})`) : null}
-          hint="Solo i turni di operatori collegati: le persone CreatorsPro non collegate restano fuori (vedi Alert)."
+          compare={prev?.total_sales_agency ? (isCurrent ? `${prevName} intero: ${fmt$(prev.total_sales_agency)} · il confronto allo stesso giorno è nell'hub` : `${prevName}: ${fmt$(prev.total_sales_agency)} (${fmtDelta(total, prev.total_sales_agency)})`) : null}
+          hint={official?.current?.sales ? `Venduto ufficiale ${official.visibility?.all === false ? "delle tue creator" : "dell'agenzia"} (hub e P&L): ${fmt$(official.current.sales)}. Qui solo i turni di operatori collegati: ${fmt$(Math.max(0, official.current.sales - total))} restano fuori (vedi Alert).` : "Solo i turni di operatori collegati: le persone CreatorsPro non collegate restano fuori (vedi Alert)."}
         >
           <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
             <Metric label="Creator attive" value={fmtInt(data.creators_count)} note={prev?.creators_count ? `${prevName}: ${prev.creators_count}` : null} />

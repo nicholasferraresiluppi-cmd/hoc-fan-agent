@@ -16,7 +16,7 @@ import { CP, FONTS } from "@/lib/brand";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmt$, fmtInt, fmtDelta, MONTHS_IT } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, card, NUM, ATTN } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, card, NUM, ATTN, EarlyMonthNote } from "@/components/ds";
 
 import { tierLabel, tierColor } from "@/lib/tier-label";
 const fetcher = async (url) => {
@@ -47,7 +47,7 @@ function prevMonthId(pid) {
 }
 
 export default function SalesCpLeaderboardPage() {
-  const [periodId, setPeriodId] = useSmartPeriod();
+  const [periodId, setPeriodId, periodInfo] = useSmartPeriod();
   const [view, setView] = useState("all");
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
@@ -69,6 +69,7 @@ export default function SalesCpLeaderboardPage() {
   const url = periodId ? `/api/leaderboard/sales-cp?${qs(periodId)}` : null;
   const { data, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
   const { data: prev } = useSWR(prevId ? `/api/leaderboard/sales-cp?${qs(prevId)}` : null, fetcher, { revalidateOnFocus: false });
+  const { data: official } = useSWR(periodId ? `/api/leaderboard/agency-sales?period_id=${periodId}` : null, fetcher, { revalidateOnFocus: false });
   const { data: infw } = useSWR(periodId ? `/api/leaderboard/operational?period_type=monthly&period_id=${periodId}` : null, fetcher, { revalidateOnFocus: false });
 
   const ranking = data?.ranking || [];
@@ -193,6 +194,7 @@ export default function SalesCpLeaderboardPage() {
           </button>
         </>}
       />
+      <EarlyMonthNote info={periodInfo} periodId={periodId} onSwitch={setPeriodId} />
       {tutorialOpen && <ScoreTutorialModal onClose={() => setTutorialOpen(false)} />}
 
       {(isLoading || !url) && !data && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
@@ -210,7 +212,7 @@ export default function SalesCpLeaderboardPage() {
         >
           <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
             <Metric label="In classifica" value={fmtInt(data.eligible_total)} delta={fmtDelta(data.eligible_total, prev?.eligible_total)} />
-            <Metric label="Venduto" value={fmt$(agency?.total_sales)} note={`${fmtInt(agency?.total_shifts)} turni`} />
+            <Metric label="Venduto in classifica" value={fmt$(agency?.total_sales)} note={official?.current?.sales ? `di ${fmt$(official.current.sales)} ufficiali · ${fmtInt(agency?.total_shifts)} turni` : `${fmtInt(agency?.total_shifts)} turni`} />
             <Metric label="Venduto per turno" value={fmt$(agency?.avg_sales_per_shift)} delta={fmtDelta(agency?.avg_sales_per_shift, prev?.agency?.avg_sales_per_shift)} />
             <div>
               <Metric label="Da rivedere" value={fmtInt(counts.review)} attn={counts.review > 0} note={`score ≤ ${REVIEW_SCORE}, almeno ${MIN_SHIFTS} turni`} />

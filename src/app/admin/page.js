@@ -170,9 +170,8 @@ export default function AdminHub() {
   const partial = Boolean(me?.creators && !me.creators.all);
   const noCreators = partial && !me.creators.count;
   const wantSales = Boolean(me) && !isHr && !noCreators;
-  const { data: sales } = useSWR(wantSales ? `/api/leaderboard/sales-cp?period_id=${periodId}` : null, fetcher);
-  const { data: salesPrev } = useSWR(wantSales ? `/api/leaderboard/sales-cp?period_id=${prevId}` : null, fetcher);
-  const { data: creators } = useSWR(wantSales ? `/api/leaderboard/creators?period_id=${periodId}` : null, fetcher);
+  // venduto UFFICIALE (tutti i turni CP, = P&L Live) e confronto allo stesso giorno del mese prima (lib/agency-sales-core)
+  const { data: agency } = useSWR(wantSales ? `/api/leaderboard/agency-sales?period_id=${periodId}` : null, fetcher);
   const { data: sync } = useSWR(`/api/admin/creatorspro-sync`, fetcher);
   // il ciclo coaching/sostituzioni è di tutta l'agenzia: solo per chi vede tutte le creator
   const { data: loop } = useSWR(me && !isHr && !partial ? `/api/admin/closed-loop-metrics?period_id=${periodId}` : null, fetcher);
@@ -185,21 +184,27 @@ export default function AdminHub() {
   }, [now]);
   const userName = user?.firstName || (me?.email || "").split("@")[0] || "";
 
-  // Numero principale: venduto del mese + ritmo. Il mese scorso è intero, questo
-  // no: il confronto onesto è la PROIEZIONE al ritmo dei giorni chiusi (stima).
-  const soFar = sales?.agency?.total_sales;
-  const prevTotal = salesPrev?.agency?.total_sales;
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const daysClosed = Math.max(1, now.getDate() - 1);
-  const projection = soFar ? (soFar / daysClosed) * daysInMonth : null;
-  // Stile Casa: la frase sotto il saluto dice com'è andata, dalla stessa proiezione del numero
+  // Numero principale: il venduto ufficiale del mese finora. Il confronto onesto è con lo STESSO numero di
+  // giorni chiusi del mese prima (prova d'uso 03/10: "2 giorni contro settembre intero" dava un −37% falso).
   const prevName = MONTHS_IT[(now.getMonth() + 11) % 12];
   const curName = monthName ? monthName[0].toUpperCase() + monthName.slice(1) : "";
-  const paceLine = projection && prevTotal
-    ? projection < prevTotal * 0.97 ? `${curName} corre un po' più piano di ${prevName}.`
-      : projection > prevTotal * 1.03 ? `${curName} corre più veloce di ${prevName}.`
+  const cmp = agency?.compare;
+  const dSales = cmp?.delta_pct?.sales;
+  const fmtPct = (v) => (v == null ? null : `${v > 0 ? "+" : v < 0 ? "−" : ""}${String(Math.abs(v)).replace(".", ",")}%`);
+  const paceLine = cmp?.until_day && dSales != null
+    ? dSales < -3 ? `${curName} corre più piano di ${prevName}, allo stesso giorno.`
+      : dSales > 3 ? `${curName} corre più veloce di ${prevName}, allo stesso giorno.`
       : `${curName} va al passo di ${prevName}.`
     : null;
+  const compareLine = !agency?.current ? null
+    : cmp && cmp.until_day === 0 ? `Oggi è il primo giorno chiuso che manca: il confronto con ${prevName} parte da domani · ${prevName} intero: ${fmt$(agency.prev_full?.sales)}`
+    : cmp ? `Fino al ${cmp.until_day} ${monthName}: ${fmt$(cmp.current.sales)} · ${prevName} allo stesso giorno: ${fmt$(cmp.prev.sales)} (${fmtPct(dSales) || "—"})`
+    : `${prevName} intero: ${fmt$(agency.prev_full?.sales)}`;
+  // metriche sulla stessa base del confronto (giorni chiusi), o sul mese intero se il mese è passato
+  const base = cmp?.until_day ? cmp.current : agency?.current;
+  const basePrev = cmp?.until_day ? cmp.prev : agency?.prev_full;
+  const perShift = (x) => (x?.shifts ? x.sales / x.shifts : null);
+  const dl = cmp?.until_day ? `su ${prevName}, stessi giorni` : "sul mese prima";
   const lastSync = sync?.meta?.last_sync_at;
   const syncStale = !lastSync || Date.now() - lastSync > 36 * 3600 * 1000;
 
@@ -217,7 +222,7 @@ export default function AdminHub() {
   // "I tuoi strumenti": le voci della mansione per prime, il resto dietro "Tutti gli strumenti"
   const mine = wsOn ? workspaceSections(ws, allowed).flatMap((x) => x.items)
     .filter((i) => i.href !== "/admin")
-    .map((i) => ({ href: i.href, title: i.label, desc: TOOL_BY_HREF.get(i.href)?.desc || "", icon: TOOL_BY_HREF.get(i.href)?.icon || LayoutDashboard }))
+    .map((i) => ({ href: i.href, title: i.label, desc: TOOL_BY_HREF.get(i.href)?.desc || i.desc || "", icon: TOOL_BY_HREF.get(i.href)?.icon || LayoutDashboard }))
     .filter((it) => !needle || `${it.title} ${it.desc}`.toLowerCase().includes(needle)) : [];
   const mineHrefs = new Set(mine.map((i) => i.href));
   const others = groups.map((g) => ({ ...g, items: g.items.filter((it) => !mineHrefs.has(it.href)) })).filter((g) => g.items.length);
@@ -246,15 +251,23 @@ export default function AdminHub() {
 
       {!isHr && !noCreators && <HeroMetric
         label={`${partial ? `Venduto delle tue ${me.creators.count} creator` : "Venduto agenzia"} · ${monthName} finora`}
-        value={fmt$(soFar)}
-        compare={projection && prevTotal ? `A questo ritmo ~${fmt$(projection)} a fine mese · ${MONTHS_IT[(now.getMonth() + 11) % 12]} intero: ${fmt$(prevTotal)} (${fmtDelta(projection, prevTotal)})` : prevTotal ? `${MONTHS_IT[(now.getMonth() + 11) % 12]} intero: ${fmt$(prevTotal)}` : null}
-        hint={sync ? `Dati CreatorsPro aggiornati ${fmtAgo(lastSync)}${syncStale ? " — più vecchi del solito, controlla il sync" : ""}` : null}
+        value={fmt$(agency?.current?.sales)}
+        compare={compareLine}
+        hint={<>
+          {agency?.incomplete && (
+            <Link href={agency.warnings?.[0]?.href || "/admin/alerts"} style={{ display: "inline-block", marginRight: 8, padding: "1px 8px", borderRadius: 999, border: `1px solid ${CP.border}`, color: CP.textSecondary, textDecoration: "none", fontSize: 12 }}
+              title={(agency.warnings || []).map((w) => w.title).join(" · ") || "Ci sono controlli aperti sui dati di vendita"}>
+              Dati incompleti
+            </Link>
+          )}
+          {sync ? `Tutti i turni CreatorsPro, come il P&L · aggiornati ${fmtAgo(lastSync)}${syncStale ? " — più vecchi del solito, controlla il sync" : ""}` : "Tutti i turni CreatorsPro, come il P&L"}
+        </>}
       >
         <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
-          <Metric label="Operatori attivi" value={fmtInt(sales?.eligible_total)} delta={fmtDelta(sales?.eligible_total, salesPrev?.eligible_total)} />
-          <Metric label="Creator" value={fmtInt(creators?.creators_count)} />
-          <Metric label="Turni" value={fmtInt(sales?.agency?.total_shifts)} />
-          <Metric label="Venduto per turno" value={fmt$(sales?.agency?.avg_sales_per_shift)} delta={fmtDelta(sales?.agency?.avg_sales_per_shift, salesPrev?.agency?.avg_sales_per_shift)} />
+          <Metric label="Operatori attivi" value={fmtInt(base?.operators)} delta={fmtDelta(base?.operators, basePrev?.operators)} deltaLabel={dl} />
+          <Metric label="Creator" value={fmtInt(base?.creators)} />
+          <Metric label="Turni" value={fmtInt(base?.shifts)} delta={fmtDelta(base?.shifts, basePrev?.shifts)} deltaLabel={dl} />
+          <Metric label="Venduto per turno" value={fmt$(perShift(base))} delta={fmtDelta(perShift(base), perShift(basePrev))} deltaLabel={dl} />
         </div>
       </HeroMetric>}
 
