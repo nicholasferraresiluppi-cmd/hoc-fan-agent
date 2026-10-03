@@ -8,10 +8,15 @@
  * codice fiscale o altro (la funzione riceve i dati del modulo ma ne legge solo
  * quelli, via tesseraName/tesseraLine).
  *
+ * Stessa materia della tessera a schermo (03/10/2026, versione C): trama guilloché
+ * (stessi tracciati, da tessera-material.js), grana, palma in lamina oro, nome inciso,
+ * bordo metallico e chip con i contatti; la luce è fissata in alto a sinistra.
+ *
  * Solo browser: importarla lato client (usa document, canvas, navigator).
  */
 import { HOC_PALMA_PATH, HOC_PALMA_W } from "@/components/HocPalma";
 import { tesseraName, tesseraLine } from "@/lib/hr-welcome-card";
+import { guillochePaths } from "@/lib/tessera-material";
 
 export const PNG_W = 1080;
 export const PNG_H = 680;
@@ -74,15 +79,46 @@ export async function drawTesseraCanvas(data = {}, at = Date.now()) {
   const ctx = c.getContext("2d");
   const R = 16 * s;
 
-  // sfondo + bordo
-  const g = ctx.createLinearGradient(0, 0, PNG_W, PNG_H);
-  g.addColorStop(0, "#1c1a17"); g.addColorStop(0.45, "#0e0e10"); g.addColorStop(1, "#1a1712");
+  // sfondo (stesso radiale della tessera a schermo) + bordo
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, PNG_W * 1.4);
+  g.addColorStop(0, "#24211c"); g.addColorStop(0.5, "#121214"); g.addColorStop(1, "#0b0b0d");
   roundRect(ctx, 0, 0, PNG_W, PNG_H, R);
   ctx.fillStyle = g;
   ctx.fill();
   ctx.save();
   roundRect(ctx, 0, 0, PNG_W, PNG_H, R);
   ctx.clip();
+  // trama guilloché (gli stessi tracciati della tessera a schermo, scalati)
+  try {
+    ctx.save();
+    ctx.scale(s, s);
+    ctx.lineWidth = 0.5;
+    for (const p of guillochePaths()) {
+      ctx.strokeStyle = `rgba(217,180,106,${(p.alpha * 0.75).toFixed(3)})`;
+      ctx.stroke(new Path2D(p.d));
+    }
+    ctx.restore();
+  } catch { /* Path2D assente: niente trama */ }
+  // grana leggera
+  try {
+    const tile = document.createElement("canvas");
+    tile.width = tile.height = 160;
+    const tx = tile.getContext("2d");
+    const img = tx.createImageData(160, 160);
+    for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+    tx.putImageData(img, 0, 0);
+    ctx.save();
+    ctx.globalAlpha = 0.06;
+    ctx.globalCompositeOperation = "overlay";
+    ctx.fillStyle = ctx.createPattern(tile, "repeat");
+    ctx.fillRect(0, 0, PNG_W, PNG_H);
+    ctx.restore();
+  } catch { /* niente grana */ }
+  // riflesso della luce in alto a sinistra
+  const spec = ctx.createRadialGradient(PNG_W * 0.3, PNG_H * 0.22, 0, PNG_W * 0.3, PNG_H * 0.22, 260 * s);
+  spec.addColorStop(0, "rgba(255,236,196,.15)"); spec.addColorStop(0.4, "rgba(255,236,196,.04)"); spec.addColorStop(0.66, "rgba(255,236,196,0)");
+  ctx.fillStyle = spec;
+  ctx.fillRect(0, 0, PNG_W, PNG_H);
   // riflesso interno in alto
   ctx.fillStyle = "rgba(255,240,210,.12)";
   ctx.fillRect(0, s, PNG_W, s);
@@ -93,7 +129,9 @@ export async function drawTesseraCanvas(data = {}, at = Date.now()) {
   ctx.fillRect(0, 0, PNG_W, PNG_H);
   ctx.restore();
   roundRect(ctx, s / 2, s / 2, PNG_W - s, PNG_H - s, R - s / 2);
-  ctx.strokeStyle = "rgba(217,180,106,.55)";
+  const rim = ctx.createLinearGradient(0, 0, PNG_W, PNG_H);
+  rim.addColorStop(0, "rgba(255,230,170,.9)"); rim.addColorStop(0.3, "rgba(150,115,55,.38)"); rim.addColorStop(0.55, "rgba(90,70,35,.22)"); rim.addColorStop(1, "rgba(255,230,170,.75)");
+  ctx.strokeStyle = rim;
   ctx.lineWidth = s;
   ctx.stroke();
 
@@ -104,7 +142,13 @@ export async function drawTesseraCanvas(data = {}, at = Date.now()) {
     ctx.translate(20 * s, 20 * s);
     const k = (78 * s) / HOC_PALMA_W;
     ctx.scale(k, k);
-    ctx.fillStyle = "#d9b46a";
+    const foil = ctx.createLinearGradient(0, 0, HOC_PALMA_W, 168);
+    [[0, "#f6e3b2"], [0.35, "#c9a35d"], [0.55, "#8a6c37"], [0.8, "#e8cf96"], [1, "#a98446"]].forEach(([o, col]) => foil.addColorStop(o, col));
+    ctx.translate(0, 1 / k * s); // ombra d'incisione: 1px sotto
+    ctx.fillStyle = "rgba(0,0,0,.7)";
+    ctx.fill(p);
+    ctx.translate(0, -1 / k * s);
+    ctx.fillStyle = foil;
     ctx.fill(p);
     ctx.restore();
   } catch { /* Path2D assente: tessera senza palma, il resto c'è */ }
@@ -118,10 +162,22 @@ export async function drawTesseraCanvas(data = {}, at = Date.now()) {
   // chip metallico in basso a destra
   const cx = PNG_W - 20 * s - 34 * s, cy = PNG_H - 22 * s - 26 * s;
   const cg = ctx.createLinearGradient(cx, cy, cx + 34 * s, cy + 26 * s);
-  cg.addColorStop(0, "#e3cd9c"); cg.addColorStop(1, "#8f7646");
+  cg.addColorStop(0, "#f3e2b8"); cg.addColorStop(0.45, "#b8975c"); cg.addColorStop(0.7, "#7d6436"); cg.addColorStop(1, "#e9d3a0");
   roundRect(ctx, cx, cy, 34 * s, 26 * s, 5 * s);
   ctx.fillStyle = cg;
   ctx.fill();
+  ctx.save();
+  roundRect(ctx, cx, cy, 34 * s, 26 * s, 5 * s);
+  ctx.clip();
+  ctx.fillStyle = "rgba(60,45,20,.45)";
+  ctx.fillRect(cx, cy + 8 * s, 34 * s, s); ctx.fillRect(cx, cy + 17 * s, 34 * s, s);
+  ctx.fillRect(cx + 11 * s, cy, s, 26 * s); ctx.fillRect(cx + 22 * s, cy, s, 26 * s);
+  const pad = ctx.createLinearGradient(cx + 9 * s, cy + 6 * s, cx + 25 * s, cy + 20 * s);
+  pad.addColorStop(0, "#f0dcae"); pad.addColorStop(1, "#b0925a");
+  roundRect(ctx, cx + 9 * s, cy + 6 * s, 16 * s, 14 * s, 3 * s);
+  ctx.fillStyle = pad;
+  ctx.fill();
+  ctx.restore();
 
   // nome e riga in basso a sinistra
   const maxW = PNG_W - 40 * s - 70 * s;
@@ -133,9 +189,14 @@ export async function drawTesseraCanvas(data = {}, at = Date.now()) {
   const lineY = PNG_H - 20 * s - 2 * s;
   ctx.fillText(ellipsize(ctx, line, maxW), 20 * s, lineY);
   if (name) {
-    ctx.fillStyle = "#f2eee6";
     ctx.font = `400 ${(name.length > 20 ? 23 : 28) * s}px ${serif}`;
-    ctx.fillText(ellipsize(ctx, name, maxW), 20 * s, lineY - 18 * s);
+    const shown = ellipsize(ctx, name, maxW);
+    ctx.fillStyle = "rgba(0,0,0,.75)"; // incisione: ombra sotto, filo di luce sopra
+    ctx.fillText(shown, 20 * s, lineY - 18 * s + s);
+    ctx.fillStyle = "rgba(255,245,225,.10)";
+    ctx.fillText(shown, 20 * s, lineY - 18 * s - s);
+    ctx.fillStyle = "#f2eee6";
+    ctx.fillText(shown, 20 * s, lineY - 18 * s);
   }
   return c;
 }
