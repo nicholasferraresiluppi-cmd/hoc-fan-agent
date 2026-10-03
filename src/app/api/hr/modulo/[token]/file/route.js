@@ -16,7 +16,7 @@ import { receiveUpload, transferDeferred, drainHrBackground } from "@/lib/hr-upl
 import { checkRateLimit, tooMany } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300; // copia di file fino a 50 MB verso ClickUp (in after()): margine ampio
 
 const ipOf = (request) => (request.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "n/d";
 

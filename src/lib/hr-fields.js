@@ -208,5 +208,5 @@ export function maskCf(cf) {
 // ── Modulo pubblico e file ──────────────────────────────────────────────────
 // testo in /hr/privacy (03/10/2026): informativa art. 13 GDPR per i dati della collaborazione
 export const PRIVACY_VERSION = "2026-10-03.2"; // .2: frase sullo spazio temporaneo dei documenti
-// 20 MB (03/10/2026): i file vanno diretti sul Blob privato, non più nel corpo della funzione (~4,5 MB)
-export const UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
+// 50 MB (03/10/2026, alzato da 20 su richiesta di Nicholas): i file vanno diretti sul Blob privato, non più nel corpo della funzione (~4,5 MB)
+export const UPLOAD_MAX_BYTES = 50 * 1024 * 1024;

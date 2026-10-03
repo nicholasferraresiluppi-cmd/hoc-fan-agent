@@ -14,7 +14,7 @@ export function blobConfigured() {
   return Boolean(globalThis.__hrFakeBlob || process.env.BLOB_READ_WRITE_TOKEN);
 }
 
-/** Byte del blob privato, o null se non esiste. Lancia sopra i 20 MB. */
+/** Byte del blob privato, o null se non esiste. Lancia sopra i 50 MB. */
 export async function readUploadBlob(pathname) {
   const { get } = await sdk();
   const r = await get(pathname, { access: "private", useCache: false });
