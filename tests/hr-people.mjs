@@ -627,7 +627,7 @@ console.log(`hr-people: ${n} asserzioni OK`);
     spokenLanguages: ["ITA - Native", "ENG - B2"],
     residenceComune: { name: "Milano", prov: "MI" },
   });
-  t(st.map((s) => `${s.label} · ${s.value}`).join(" | ") === "ONLY · ESP | AI · AUT | SOCIAL · BASE | ENG · B2 | ITA · MADRE | CITTÀ · MILANO", "statistiche: aree più forti, lingue, città");
+  t(st.map((s) => `${s.label} · ${s.value}`).join(" | ") === "ONLY · ESP | AI · AUT | SOCIAL · BASE | ENG · B2 | ITA · MADRE", "statistiche: aree più forti, lingue (niente città)");
   t(W.cardStats({}).length === 0, "senza dati: nessuna riga finta");
   t(W.cardStats({ skillLevels: { of_chat: "Base" } }).length === 1, "pochi dati: poche righe");
   t(W.memberSince(new Date(2026, 9, 3).getTime()) === "House of Creators · ottobre 2026", "mese e anno, senza numero di membro");
@@ -696,14 +696,14 @@ console.log(`hr-people: ${n} asserzioni OK`);
   t(W.tesseraName({ firstName: "giulia", surname: "de rossi" }) === "Giulia De Rossi" && W.tesseraName({ firstName: "Anna Maria" }) === "Anna Maria", "nome completo sulla tessera");
   t(W.roleLabel("Chatter (operatore di chat)") === "Chatter" && W.roleLabel("") === "", "ruolo chatter");
   t(W.roleLabel("responsabile della comunicazione digitale") === "Responsabile della…", "mansione lunga abbreviata a parola intera");
-  t(W.tesseraLine({ currentJob: "Chatter (operatore di chat)", residenceComune: { name: "Milano", prov: "MI" } }, new Date(2026, 9, 3).getTime()) === "Chatter · Milano · dal 2026", "riga ruolo · città · anno");
-  t(W.tesseraLine({}, new Date(2026, 9, 3).getTime()) === "dal 2026", "senza dati: solo l'anno");
-  const rows = W.tesseraRows({ gender: "Female", skillLevels: { of_chat: "Esperto", ai_coding: "Autonomo" }, spokenLanguages: ["ITA - Native", "ENG - B2"], residenceComune: { abroad: true, country: "Spagna", city: "Madrid" } });
-  t(rows.map((r) => `${r.label} · ${r.value}`).join(" | ") === "OnlyFans · Esperta | Intelligenza artificiale · Autonoma | Inglese · B2 | Italiano · Madrelingua | Città · Madrid", "retro: righe pulite, genere dichiarato");
+  t(W.tesseraLine({ currentJob: "Chatter (operatore di chat)", residenceComune: { name: "Milano", prov: "MI" } }, new Date(2026, 9, 3).getTime()) === "Chatter · Membro da ottobre 2026", "riga ruolo · membro da (niente città)");
+  t(W.tesseraLine({}, new Date(2026, 9, 3).getTime()) === "Membro da ottobre 2026", "senza dati: solo membro da");
+  const rows = W.tesseraRows({ gender: "Female", skillLevels: { of_chat: "Esperto", ai_coding: "Autonomo" }, spokenLanguages: ["ITA - Native", "ENG - B2"], residenceComune: { abroad: true, country: "Spagna", city: "Madrid" }, timeSlots: ["17:00 - 22:00", "22:00 - 03:00"] });
+  t(rows.map((r) => `${r.label} · ${r.value}`).join(" | ") === "OnlyFans · Esperta | Intelligenza artificiale · Autonoma | Inglese · B2 | Italiano · Madrelingua | Disponibilità · Sera · Notte", "retro: righe pulite, genere dichiarato, disponibilità, niente città");
   t(W.tesseraRows({ skillLevels: { of_chat: "Esperto" } })[0].value === "Livello esperto", "genere non indicato: forma neutra");
   t(W.tesseraRows({ gender: "Male", skillLevels: { of_chat: "Posso insegnarla" } })[0].value === "Può insegnarla", "posso insegnarla");
   t(W.tesseraRows({}).length === 0, "retro senza dati: nessuna riga finta");
-  t(W.tesseraMilestones({ firstName: "G", residenceComune: { name: "Roma" } }).join() === "name,city", "pezzi comparsi per il riflesso");
+  t(W.tesseraMilestones({ firstName: "G", residenceComune: { name: "Roma" }, timeSlots: ["7:00 - 12:00"] }).join() === "name,slots", "pezzi comparsi per il riflesso (niente città)");
 
   // testi visibili: "tessera", mai "card"
   const page = fs.readFileSync(new URL("../src/app/hr/modulo/[token]/page.js", import.meta.url), "utf8");

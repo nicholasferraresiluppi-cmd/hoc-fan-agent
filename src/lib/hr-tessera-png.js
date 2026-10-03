@@ -4,7 +4,7 @@
  * condivide (telefono: foglio di condivisione → su iPhone "Salva immagine" in Foto)
  * o lo scarica.
  *
- * Solo i dati della tessera: nome, ruolo, città, anno. MAI email, telefono,
+ * Solo i dati della tessera: nome, ruolo, "membro da". Niente città. MAI email, telefono,
  * codice fiscale o altro (la funzione riceve i dati del modulo ma ne legge solo
  * quelli, via tesseraName/tesseraLine).
  *

@@ -103,16 +103,15 @@ export function cardStats(data = {}) {
     // prima le lingue non italiane (dicono di più), poi l'italiano
     .sort((a, b) => (a.label === "ITA") - (b.label === "ITA"))
     .slice(0, 2).map((l) => ({ kind: "lang", ...l }));
-  const city = cityOf(data.residenceComune);
-  const cityStat = city ? [{ kind: "city", label: "CITTÀ", value: city.toUpperCase() }] : [];
+  const cityStat = []; // niente città sulla tessera (03/10/2026)
   const first = areas.slice(0, 3);
   const room = 6 - first.length - langs.length - cityStat.length;
   return [...first, ...areas.slice(3, 3 + Math.max(0, room)), ...langs, ...cityStat].slice(0, 6);
 }
 
 // ── Tessera D1 "da club" (03/10/2026, forma scelta da Nicholas) ─────────────────
-// Fronte: nome completo + "Ruolo · Città · dal anno". Retro: righe leggibili
-// ("OnlyFans · Esperta", "Inglese · B2", "Città · Milano"). Mai voti, mai numero di membro,
+// Fronte: nome completo + "Ruolo · Membro da mese anno". Retro: righe leggibili
+// ("OnlyFans · Esperta", "Inglese · B2", "Disponibilità · Sera"). Mai voti, mai numero di membro,
 // mai email/telefono/codice fiscale.
 
 /** Nome completo sulla tessera: "Giulia Rossi" (iniziali maiuscole se scritto tutto minuscolo). */
@@ -133,10 +132,23 @@ export function roleLabel(currentJob, max = 22) {
   return `${cut || up.slice(0, max)}…`;
 }
 
-/** "Chatter · Milano · dal 2026" — solo le parti dichiarate. */
+const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+
+/**
+ * "Chatter · Membro da ottobre 2026". Niente città (03/10/2026, Nicholas: su una tessera
+ * non si scrive la residenza; è anche un dato personale su un'immagine condivisibile).
+ */
 export function tesseraLine(data = {}, at = Date.now()) {
-  const year = new Date(at).getFullYear();
-  return [roleLabel(data.currentJob), cityOf(data.residenceComune), `dal ${year}`].filter(Boolean).join(" · ");
+  const d = new Date(at);
+  return [roleLabel(data.currentJob), `Membro da ${MESI[d.getMonth()]} ${d.getFullYear()}`].filter(Boolean).join(" · ");
+}
+
+// Fasce orarie → parole (le compilano quasi tutti: il retro non resta mai vuoto)
+const SLOT_WORD = { "7:00 - 12:00": "Mattina", "12:00 - 17:00": "Pomeriggio", "17:00 - 22:00": "Sera", "22:00 - 03:00": "Notte", "03:00 - 07:00": "Notte fonda" };
+export function availabilityText(timeSlots) {
+  const words = (Array.isArray(timeSlots) ? timeSlots : []).map((t) => SLOT_WORD[String(t).trim()]).filter(Boolean);
+  if (!words.length) return "";
+  return words.length > 2 ? `${words.slice(0, 2).join(" · ")} +${words.length - 2}` : words.join(" · ");
 }
 
 const AREA_SHORT = { of: "OnlyFans", ads: "Media buying", social: "Social", content: "Contenuti", ai: "Intelligenza artificiale", tech: "Tecnologia", mgmt: "Gestione" };
@@ -158,7 +170,7 @@ export function levelWord(level, gender) {
 
 /**
  * Righe del retro (fino a 6): aree più forti col livello (fino a 3, poi altre se avanza
- * posto), lingue (prima le straniere, fino a 2), città. Solo dati dichiarati.
+ * posto), lingue (prima le straniere, fino a 2), disponibilità. Niente città. Solo dati dichiarati.
  */
 export function tesseraRows(data = {}) {
   const areas = strongestAreas(data.skillLevels).map((a) => ({ kind: "area", label: AREA_SHORT[a.area] || a.label, value: levelWord(a.level, data.gender) }));
@@ -168,11 +180,11 @@ export function tesseraRows(data = {}) {
     .sort((a, b) => (a[0] === "ITA") - (b[0] === "ITA"))
     .slice(0, 2)
     .map(([code, lvl]) => ({ kind: "lang", label: LANG_FULL[code] || code, value: lvl ? (LANG_LEVEL_WORD[lvl] || lvl) : "" }));
-  const city = cityOf(data.residenceComune);
-  const cityRow = city ? [{ kind: "city", label: "Città", value: city }] : [];
+  const avail = availabilityText(data.timeSlots);
+  const availRow = avail ? [{ kind: "slots", label: "Disponibilità", value: avail }] : [];
   const first = areas.slice(0, 3);
-  const room = 6 - first.length - langs.length - cityRow.length;
-  return [...first, ...areas.slice(3, 3 + Math.max(0, room)), ...langs, ...cityRow].slice(0, 6);
+  const room = 6 - first.length - langs.length - availRow.length;
+  return [...first, ...areas.slice(3, 3 + Math.max(0, room)), ...langs, ...availRow].slice(0, 6);
 }
 
 /**
@@ -183,7 +195,7 @@ export function tesseraMilestones(data = {}) {
   const out = [];
   if (String(data.firstName || "").trim()) out.push("name");
   if (roleLabel(data.currentJob)) out.push("role");
-  if (cityOf(data.residenceComune)) out.push("city");
+  if (availabilityText(data.timeSlots)) out.push("slots");
   if (strongestAreas(data.skillLevels).length) out.push("skill");
   if (Array.isArray(data.spokenLanguages) && data.spokenLanguages.length) out.push("lang");
   return out;

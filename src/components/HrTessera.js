@@ -5,13 +5,13 @@
  *
  * Orizzontale, proporzioni da carta di credito (340×214 a misura piena), angoli 16px.
  * Fronte: palma oro in alto a sinistra, "Membro" in alto a destra, nome completo in
- * Instrument Serif e "Ruolo · Città · dal anno" in basso, chip metallico in basso a destra.
- * Retro: le righe dichiarate (aree più forti col livello, lingue, città) sotto
+ * Instrument Serif e "Ruolo · Membro da mese anno" in basso, chip metallico in basso a destra.
+ * Retro: le righe dichiarate (aree più forti col livello, lingue, disponibilità) sotto
  * "House of Creators · mese anno". Niente voti né numero di membro.
  *
  * Si gira toccandola (e con Invio/Spazio). Opzioni:
  *  - small: versione piccola in cima ai capitoli (si riempie dal vivo);
- *  - live: riflesso dorato quando compare un dato per la prima volta (nome, città…);
+ *  - live: riflesso dorato quando compare un dato per la prima volta (nome, ruolo…);
  *  - sample + autoFlip: tessera d'esempio dell'intro, che ogni tanto si gira da sola;
  *  - flipped/onFlip/covered/glow/glintKey: controllo dall'esterno (la rivelazione finale
  *    di HrWelcomeCard: parte coperta, si gira, poi il retro diventa quello delle righe).
@@ -91,7 +91,12 @@ function Back({ data, at }) {
           </div>
         )) : (
           <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 17, lineHeight: 1.35, color: "rgba(242,238,230,.38)", paddingTop: 18 }}>
-            Le tue aree, le lingue e la città compariranno qui.
+            Le tue competenze e le lingue compariranno qui.
+          </div>
+        )}
+        {rows.length > 0 && rows.length < 4 && (
+          <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 13.5, lineHeight: 1.35, color: "rgba(242,238,230,.42)", paddingTop: 10 }}>
+            Le prossime competenze si aggiungeranno qui.
           </div>
         )}
       </div>
