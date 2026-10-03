@@ -17,18 +17,34 @@
  *
  * 03/10/2026: link UNICO uguale per tutti (`ctx.shared`): nessun dato
  * precompilato, ogni invio crea una scheda nuova, i file si caricano col token
- * figlio restituito dall'invio (`uploadToken`). Il finale è la "carta della
- * Casa" che si gira (components/HrWelcomeCard).
+ * figlio restituito dall'invio (`uploadToken`). Il finale è la rivelazione
+ * della tessera (components/HrWelcomeCard), forma "D1 · Tessera da club"
+ * (components/HrTessera): la stessa tessera è d'esempio nell'intro e piccola,
+ * dal vivo, in cima a ogni capitolo.
  */
-import { useEffect, useState } from "react";
+/*
+ * 03/10/2026 sera, "esperienza" (richiesta di Nicholas): sempre "tessera", mai
+ * "card"; bozza nel browser (risposte + capitolo, MAI il codice fiscale) con
+ * "Ricomincia da capo"; caricamenti con la palma del logo; avanzamento a parole;
+ * errori gentili sotto il campo con scorrimento e fuoco sul primo; tastiere e
+ * autocompletamento giusti su telefono; messaggio della Casa sotto la tessera
+ * finale. Logica pura in lib/hr-form-experience.js.
+ */
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { CP, CP_NOTTE } from "@/lib/brand";
-import { FIELD_BY_KEY, FORM_KEYS, validateCodiceFiscale } from "@/lib/hr-fields";
+import { FIELD_BY_KEY, FORM_KEYS } from "@/lib/hr-fields";
 import { lbl, FieldInput, fmtDate } from "@/components/hr-ui";
 import { cfCoherence } from "@/lib/hr-comuni";
-import { normalizeSkillMap, levelRank, skillName } from "@/lib/hr-skills";
 import HrWelcomeCard from "@/components/HrWelcomeCard";
+import HrTessera from "@/components/HrTessera";
+import HrPalmaLoader from "@/components/HrPalmaLoader";
+import HrHouseLetter from "@/components/HrHouseLetter";
 import { uploadHrFile } from "@/lib/hr-upload-client";
+import {
+  progressWords, timeEstimateText, fieldErrors, fieldErrorsFromServer, firstStepWithError,
+  draftKey, serializeDraft, parseDraft, draftWorthSaving, safeGet, safeSet, safeRemove,
+} from "@/lib/hr-form-experience";
 
 // carta d'esempio della prima schermata: dati FINTI, dichiarati come esempio a schermo
 const SAMPLE_CARD = {
@@ -63,11 +79,35 @@ const SANS = "var(--f-sans), Manrope, ui-sans-serif, system-ui, sans-serif";
 const GOLD = "#d9b46a";
 // etichetta solo per i lettori di schermo (il titolo del capitolo dice già la stessa cosa)
 const SR_ONLY = { position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" };
+const ERR_COLOR = "#e9a99f"; // rosa tenue: segnala senza allarmare (toni gentili)
+
+// Tastiere e autocompletamento giusti su telefono (solo campi nativi; quelli su misura li gestiscono da sé).
+// enterKeyHint "next": Invio porta al campo dopo (gestito in onKeyDown del form), non invia il capitolo.
+const KEYBOARD = {
+  firstName: { autoComplete: "given-name", autoCapitalize: "words", enterKeyHint: "next" },
+  surname: { autoComplete: "family-name", autoCapitalize: "words", enterKeyHint: "next" },
+  dateOfBirth: { autoComplete: "bday" },
+  codiceFiscale: { autoCapitalize: "characters", enterKeyHint: "next" },
+  location: { autoComplete: "street-address", enterKeyHint: "next" },
+  residenceCap: { autoComplete: "postal-code", inputMode: "numeric", enterKeyHint: "next" },
+  personalEmail: { autoComplete: "email", inputMode: "email", autoCapitalize: "none", spellCheck: false, enterKeyHint: "next" },
+  personalPhone: { autoComplete: "tel", inputMode: "tel", enterKeyHint: "next" },
+  linkedin: { autoComplete: "url", inputMode: "url", autoCapitalize: "none", spellCheck: false, enterKeyHint: "next" },
+};
+function keyboardFor(k, data) {
+  const kb = KEYBOARD[k];
+  // CAP estero (es. UK "SW1A 1AA") può avere lettere: tastiera numerica solo per l'Italia
+  if (k === "residenceCap" && data.residenceComune?.abroad) return { ...kb, inputMode: "text" };
+  return kb;
+}
+
+const reducedMotion = () => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } };
 
 const CSS = `
 .hrf span,.hrf label,.hrf button,.hrf input,.hrf select,.hrf textarea{font-family:inherit}
 .hrf input,.hrf select,.hrf textarea{font-size:16px!important}
 .hrf select option{background:#15161c;color:#f2eee6}
+.hrf [aria-invalid="true"]{border-color:${ERR_COLOR}!important}
 .hrf .hrf-pill{transition:transform .15s ease,opacity .15s ease}
 .hrf .hrf-pill:active{transform:scale(.98)}
 .hrf-card{position:relative;overflow:hidden;transition:border-color .6s ease,box-shadow .6s ease}
@@ -76,7 +116,14 @@ const CSS = `
 @keyframes hrfShine{to{transform:translateX(120%)}}
 .hrf-fade{animation:hrfFade .35s ease both}
 @keyframes hrfFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.hrf-card.shine::after,.hrf-fade{animation:none}}
+.hrf-next,.hrf-prev{animation:hrfStep .42s cubic-bezier(.2,.7,.2,1) both}
+.hrf-next{--hrf-dx:18px}.hrf-prev{--hrf-dx:-18px}
+@keyframes hrfStep{from{opacity:0;transform:translateX(var(--hrf-dx))}to{opacity:1;transform:none}}
+.hrf-bar{transition:background-color .5s ease}
+.hrf-loader-in{animation:hrfFade .6s ease .25s both}
+.hrf-letter{animation:hrfFade 1s ease 2.2s both}
+.hrf-err{animation:hrfFade .25s ease both}
+@media (prefers-reduced-motion:reduce){.hrf-card.shine::after,.hrf-fade,.hrf-next,.hrf-prev,.hrf-loader-in,.hrf-letter,.hrf-err{animation:none}.hrf-bar{transition:none}}
 `;
 
 const pill = (primary) => ({
@@ -98,68 +145,17 @@ function Shell({ children }) {
   );
 }
 
-// ── La tessera ────────────────────────────────────────────────────────────────
-const LANG_NAME = { ITA: "Italiano", ENG: "Inglese", SPA: "Spagnolo", TED: "Tedesco", FR: "Francese" };
-const LANG_LEVEL = { Native: "madrelingua", Basic: "base", Professional: "lavorativo" };
-function langText(label) {
-  const [p, l] = String(label).split(" - ");
-  const name = LANG_NAME[p] || p;
-  if (p === "ITA") return name;
-  return l ? `${name} ${LANG_LEVEL[l] || l}` : name;
-}
-function cardData(d) {
-  const first = String(d.firstName || "").trim();
-  const last = String(d.surname || "").trim();
-  const name = first ? `${first}${last ? ` ${last[0].toUpperCase()}.` : ""}` : "";
-  const jobRaw = String(d.currentJob || "").trim();
-  const job = /^chatter/i.test(jobRaw) ? "Chatter" : jobRaw;
-  const rc = d.residenceComune;
-  const place = rc?.abroad ? (String(rc.city || "").trim() || rc.country || "") : rc?.name ? `${rc.name}${rc.prov ? ` (${rc.prov})` : ""}` : "";
-  const langs = (Array.isArray(d.spokenLanguages) ? d.spokenLanguages : []).map(langText);
-  const sm = normalizeSkillMap(d.skillLevels);
-  const skills = Object.entries(sm).sort((a, b) => levelRank(b[1]) - levelRank(a[1])).slice(0, 2).map(([k, l]) => `${skillName(k)} · ${l}`);
-  const filled = [name, job || place, langs.length, skills.length].filter(Boolean).length;
-  return { name, line: [job, place].filter(Boolean).join(" · "), langs, skills, filled };
-}
-
-function Tessera({ data, final = false }) {
-  const c = cardData(data);
-  const glow = final ? 0.6 : 0.22 + c.filled * 0.08;
-  return (
-    <div className={`hrf-card${final ? " shine" : ""}`} aria-label="La tua tessera"
-      style={{ borderRadius: 18, padding: "18px 20px", minHeight: final ? 210 : 178, boxSizing: "border-box", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 14,
-        background: final ? "linear-gradient(135deg,#24211a 0%,#141418 50%,#2a2316 100%)" : "linear-gradient(135deg,#1b1a1f 0%,#121216 55%,#1d1912 100%)",
-        border: `1px solid rgba(217,180,106,${glow})`, boxShadow: final ? "0 30px 60px rgba(0,0,0,.45)" : "0 14px 30px rgba(0,0,0,.25)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 10.5, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD }}>House of Creators</span>
-        <span aria-hidden="true" style={{ width: 34, height: 26, borderRadius: 5, background: "linear-gradient(135deg,#e3cd9c,#8f7646)" }} />
-      </div>
-      <div style={{ display: "grid", gap: 5, minWidth: 0 }}>
-        {c.name
-          ? <div style={{ fontFamily: SERIF, fontSize: final ? 34 : 30, lineHeight: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
-          : <div style={{ fontFamily: SERIF, fontSize: 26, lineHeight: 1, color: "rgba(242,238,230,.28)", fontStyle: "italic" }}>Il tuo nome</div>}
-        <div style={{ fontSize: 13, color: CP.textSecondary, minHeight: 18, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {c.line || <span style={{ color: "rgba(242,238,230,.28)" }}>Cosa fai · dove vivi</span>}
-        </div>
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 10, minWidth: 0 }}>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
-          {c.skills.length ? c.skills.map((s, i) => (
-            <span key={s} style={{ fontSize: 11, padding: "4px 8px", borderRadius: 999, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: `1px solid ${i === 0 ? "rgba(217,180,106,.55)" : "rgba(242,238,230,.2)"}`, color: i === 0 ? "#e3cd9c" : CP.textSecondary }}>{s}</span>
-          )) : <span style={{ fontSize: 11, color: CP.textMuted }}>{c.langs.length ? c.langs.join(" · ") : "si compila con te"}</span>}
-        </div>
-        {c.skills.length > 0 && c.langs.length > 0 && <span style={{ fontSize: 11, color: CP.textMuted, whiteSpace: "nowrap" }}>{c.langs.slice(0, 2).join(" · ")}</span>}
-      </div>
-    </div>
-  );
-}
-
 function Headline({ title, sub, size = 40 }) {
   return (
     <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 400, fontSize: size, lineHeight: 1.02, letterSpacing: "-0.005em" }}>
       {title}<br /><span style={{ fontStyle: "italic", color: CP.textSecondary }}>{sub}</span>
     </h1>
   );
+}
+
+function FieldError({ id, msg }) {
+  if (!msg) return null;
+  return <div id={id} className="hrf-err" style={{ marginTop: 7, fontSize: 13.5, lineHeight: 1.45, color: ERR_COLOR }}>{msg}</div>;
 }
 
 export default function HrFormPage() {
@@ -169,13 +165,20 @@ export default function HrFormPage() {
   const [data, setData] = useState({});
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState(null);
+  const [err, setErr] = useState(null); // messaggio generale, vicino ai bottoni
+  const [fieldErrs, setFieldErrs] = useState({}); // { chiave: messaggio } sotto i campi
+  const [focusKey, setFocusKey] = useState(null); // primo campo con errore: si scorre lì e si mette a fuoco
   const [stage, setStage] = useState("intro"); // intro → form → files → done
   const [step, setStep] = useState(0);
+  const [dir, setDir] = useState("next"); // verso della transizione tra capitoli
   const [cfNote, setCfNote] = useState(null);
   const [uploadToken, setUploadToken] = useState(null); // col link condiviso: token figlio per i file
   const [sentAt, setSentAt] = useState(null);
   const [cfWarn, setCfWarn] = useState(null); // avvisi di coerenza CF ↔ data/genere/luogo (non bloccanti)
+  const [resumed, setResumed] = useState(false); // bozza ripresa dal browser: avviso discreto
+  const [confirmRestart, setConfirmRestart] = useState(false);
+  const [canSave, setCanSave] = useState(false); // il browser può tenere la bozza? (in privata può non riuscire)
+  const formRef = useRef(null);
 
   useEffect(() => {
     let alive = true;
@@ -183,46 +186,140 @@ export default function HrFormPage() {
       const j = await r.json().catch(() => ({}));
       if (!alive) return;
       if (!r.ok || !j.ok) { setLoadErr(j.error || "Link non valido."); return; }
+      const key = draftKey(token);
+      const okSave = safeSet(`${key}:prova`, "1");
+      safeRemove(`${key}:prova`);
+      setCanSave(okSave);
+      if (j.done) {
+        safeRemove(key);
+        setData({ ...j.prefill });
+        setStage("done");
+      } else {
+        // bozza di questo browser: riprende risposte e capitolo (mai il codice fiscale)
+        const dr = parseDraft(safeGet(key), { steps: STEPS.length });
+        if (dr) {
+          setData({ ...j.prefill, ...dr.data });
+          setStep(dr.step);
+          setStage("form");
+          setResumed(true);
+        } else {
+          if (safeGet(key)) safeRemove(key); // rotta o scaduta
+          setData({ ...j.prefill });
+        }
+      }
       setCtx(j);
-      if (j.done) setStage("done");
-      setData({ ...j.prefill });
     }).catch(() => alive && setLoadErr("Connessione non riuscita. Riprova tra poco."));
     return () => { alive = false; };
   }, [token]);
 
-  const goTo = (n) => { setErr(null); setStep(n); try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* vecchi browser */ } };
+  // salva la bozza mentre si compila (piccolo ritardo: niente scritture a ogni tasto)
+  useEffect(() => {
+    if (!ctx || stage !== "form") return undefined;
+    const id = setTimeout(() => {
+      if (draftWorthSaving({ data, step })) safeSet(draftKey(token), serializeDraft({ data, step, stage }));
+    }, 300);
+    return () => clearTimeout(id);
+  }, [ctx, data, step, stage, token]);
 
-  // controlli del primo capitolo (nome obbligatorio, codice fiscale valido e coerente)
-  const checkFirst = () => {
-    if (!String(data.firstName || "").trim()) return "Scrivi il tuo nome.";
-    if (data.codiceFiscale) {
-      const r = validateCodiceFiscale(data.codiceFiscale);
-      if (!r.ok) return `Codice fiscale: ${r.error}`;
-      if (!cfWarn) {
-        const w = cfCoherence(data.codiceFiscale, { dob: data.dateOfBirth, gender: data.gender, birth: data.birthPlace });
-        if (w.length) { setCfWarn(w); return "warn"; }
-      }
-    }
-    return null;
+  // primo campo con errore: scorre lì e lo mette a fuoco (dopo il render del capitolo giusto)
+  useEffect(() => {
+    if (!focusKey) return undefined;
+    const raf = requestAnimationFrame(() => {
+      const wrap = document.getElementById(`w-${focusKey}`);
+      if (!wrap) return;
+      try { wrap.scrollIntoView({ block: "center", behavior: reducedMotion() ? "auto" : "smooth" }); } catch { wrap.scrollIntoView(); }
+      const el = wrap.querySelector("input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),button:not([disabled])");
+      try { el?.focus({ preventScroll: true }); } catch { el?.focus(); }
+      setFocusKey(null);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [focusKey, step]);
+
+  const goTo = (n, opts = {}) => {
+    setErr(null);
+    if (!opts.keepErrors) setFieldErrs({});
+    setResumed(false);
+    setConfirmRestart(false);
+    setDir(n >= step ? "next" : "prev");
+    setStep(n);
+    if (!opts.noScroll) { try { window.scrollTo({ top: 0, behavior: reducedMotion() ? "auto" : "smooth" }); } catch { /* vecchi browser */ } }
+  };
+
+  const showErrors = (errs, general) => {
+    const at = firstStepWithError(STEPS, errs);
+    const target = at >= 0 ? at : step;
+    const firstKey = STEPS[target].keys.find((k) => errs[k]) || Object.keys(errs)[0];
+    if (target !== step) goTo(target, { keepErrors: true, noScroll: true });
+    setFieldErrs(errs);
+    setErr(general || "C'è qualcosa da sistemare: te l'abbiamo segnato qui sopra.");
+    setFocusKey(firstKey);
+  };
+
+  const restart = () => {
+    safeRemove(draftKey(token));
+    setData({ ...(ctx?.prefill || {}) });
+    setConsent(false);
+    setCfWarn(null);
+    setFieldErrs({});
+    setErr(null);
+    setResumed(false);
+    setConfirmRestart(false);
+    setDir("prev");
+    setStep(0);
+    setStage("intro");
+    try { window.scrollTo({ top: 0 }); } catch { /* */ }
+  };
+
+  const setField = (k, v) => {
+    setData((d) => ({ ...d, [k]: v }));
+    if (fieldErrs[k]) setFieldErrs((e) => { const n = { ...e }; delete n[k]; return n; });
+    if (["codiceFiscale", "dateOfBirth", "gender", "birthPlace"].includes(k)) setCfWarn(null);
+  };
+
+  // Invio su un campo di testo: va al campo dopo (enterKeyHint "next"), invia solo dall'ultimo
+  const onKeyDown = (e) => {
+    if (e.key !== "Enter" || e.isComposing) return;
+    const t = e.target;
+    if (t.tagName !== "INPUT" || ["checkbox", "radio", "file", "submit", "button"].includes(t.type)) return;
+    const all = [...(formRef.current?.querySelectorAll("input:not([disabled]):not([type=hidden]):not([type=checkbox]):not([type=file]),select:not([disabled]),textarea:not([disabled])") || [])];
+    const next = all[all.indexOf(t) + 1];
+    if (next) { e.preventDefault(); next.focus(); }
   };
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setErr(null);
-    if (step === 0) {
-      const m = checkFirst();
-      if (m === "warn") return;
-      if (m) { setErr(m); return; }
+    const cfEnabled = Boolean(ctx.cfEnabled);
+    if (step < STEPS.length - 1) {
+      const fe = fieldErrors(data, STEPS[step].keys, { cfEnabled });
+      if (Object.keys(fe).length) { showErrors(fe); return; }
+      // codice fiscale valido ma non coerente con data/genere/luogo: avviso, si può andare avanti
+      if (step === 0 && cfEnabled && data.codiceFiscale && !cfWarn) {
+        const w = cfCoherence(data.codiceFiscale, { dob: data.dateOfBirth, gender: data.gender, birth: data.birthPlace });
+        if (w.length) { setCfWarn(w); return; }
+      }
+      goTo(step + 1);
+      return;
     }
-    if (step < STEPS.length - 1) { goTo(step + 1); return; }
-    const m = checkFirst();
-    if (m && m !== "warn") { setErr(m); goTo(0); return; }
-    if (!consent) { setErr("Per inviare, conferma di aver letto l'informativa privacy."); return; }
+    const all = fieldErrors(data, FORM_KEYS, { cfEnabled });
+    if (Object.keys(all).length) { showErrors(all); return; }
+    if (!consent) {
+      setFieldErrs({ consent: "Per inviare, spunta la casella: ci serve sapere che hai letto l'informativa." });
+      setErr(null);
+      setFocusKey("consent");
+      return;
+    }
     setBusy(true);
     try {
       const r = await fetch(`/api/hr/modulo/${token}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data, consent: true }) });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.ok) throw new Error(j.error || `Invio non riuscito (${r.status}).`);
+      if (!r.ok || !j.ok) {
+        // errori del server che riguardano un campo: si torna lì, sotto il campo
+        const { errors, rest } = fieldErrorsFromServer(j.error);
+        if (Object.keys(errors).length) { showErrors(errors, rest || undefined); return; }
+        throw new Error(j.error || `Invio non riuscito (${r.status}). Riprova tra poco: le risposte restano qui.`);
+      }
+      safeRemove(draftKey(token)); // inviato: la bozza non serve più
       setCfNote(j.cfNote || null);
       setUploadToken(j.uploadToken || token);
       setSentAt(Date.now());
@@ -232,7 +329,15 @@ export default function HrFormPage() {
   };
 
   if (loadErr) return <Shell><Headline title="Link non disponibile" sub="" size={34} /><p style={{ color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>{loadErr}</p></Shell>;
-  if (!ctx) return <Shell><p style={{ color: CP.textMuted }}>Caricamento…</p></Shell>;
+  if (!ctx) {
+    return (
+      <Shell>
+        <div className="hrf-loader-in" style={{ minHeight: "62vh", display: "grid", placeItems: "center" }}>
+          <HrPalmaLoader width={128} label="Apro il modulo" showLabel />
+        </div>
+      </Shell>
+    );
+  }
 
   if (stage === "done") {
     return (
@@ -240,13 +345,14 @@ export default function HrFormPage() {
         <div style={{ display: "grid", gap: 22, paddingTop: 12 }}>
           <HrWelcomeCard data={data} at={sentAt || Date.now()}>
             <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15.5, lineHeight: 1.55, maxWidth: 460 }}>
-              Questa è la tua carta. Abbiamo ricevuto tutto.{" "}
+              Questa è la tua tessera. Abbiamo ricevuto tutto.{" "}
               {ctx.shared
                 ? "Se devi correggere qualcosa, scrivi a chi ti ha mandato il link: non serve compilare di nuovo."
                 : "Se devi correggere qualcosa, chiedi a chi ti ha mandato il link di mandartene uno nuovo."}
             </p>
             {cfNote && <p style={{ margin: 0, color: CP.textSecondary, fontSize: 14, maxWidth: 460 }}>Il codice fiscale non è stato registrato per un problema tecnico nostro: te lo richiederemo.</p>}
           </HrWelcomeCard>
+          <HrHouseLetter />
           <div style={{ fontSize: 12.5, color: CP.textMuted, textAlign: "center", marginTop: 4 }}>Puoi chiudere questa pagina.</div>
         </div>
       </Shell>
@@ -261,13 +367,15 @@ export default function HrFormPage() {
     return (
       <Shell>
         <div className="hrf-fade" style={{ display: "grid", gap: 26 }}>
-          <HrWelcomeCard preview data={SAMPLE_CARD} at={Date.now()} />
-          <Headline title={first ? `Ciao ${first},` : "Compila il modulo"} sub="e sblocca la tua card." size={40} />
+          <HrTessera key="esempio" data={SAMPLE_CARD} at={Date.now()} sample autoFlip />
+          <Headline title={first ? `Ciao ${first},` : "Compila il modulo"} sub="e sblocca la tua tessera." size={40} />
           <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15.5, lineHeight: 1.55 }}>
-            Questa è una card d'esempio: la tua prende forma con le tue risposte, in sette brevi capitoli. Ci vogliono circa cinque minuti.
+            Questa è una tessera d&apos;esempio: la tua prende forma con le tue risposte, in sette brevi capitoli. {timeEstimateText()}
+            {" "}Alla fine, se vuoi, puoi caricare documento d&apos;identità e curriculum: tienili a portata di mano.
             {ctx.shared ? " Compilalo una volta sola." : ` Il link vale fino al ${fmtDate(ctx.expiresAt)} e si usa una volta sola.`}
+            {canSave ? " Se ti fermi a metà, riaprendo il link da questo dispositivo riprendi da dove eri rimasto." : ""}
           </p>
-          <button type="button" className="hrf-pill" onClick={() => setStage("form")} style={{ ...pill(true), width: "100%" }}>Cominciamo</button>
+          <button type="button" className="hrf-pill" onClick={() => { setDir("next"); setStage("form"); }} style={{ ...pill(true), width: "100%" }}>Cominciamo</button>
           <div style={{ fontSize: 12.5, color: CP.textMuted, textAlign: "center" }}>I tuoi dati restano riservati: li vede solo chi gestisce il personale.</div>
         </div>
       </Shell>
@@ -279,32 +387,51 @@ export default function HrFormPage() {
   return (
     <Shell>
       <div style={{ display: "grid", gap: 22 }}>
-        <Tessera data={data} />
+        <HrTessera key="dal-vivo" data={data} at={Date.now()} small live />
         <div style={{ display: "grid", gap: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", color: CP.textMuted }}>
-            <span>{s.title}</span><span>{step + 1} di {STEPS.length}</span>
+            <span style={{ color: last ? GOLD : CP.textSecondary }}>{progressWords(step, STEPS.length)}</span><span>{step + 1} di {STEPS.length}</span>
           </div>
-          <div style={{ display: "flex", gap: 4 }} aria-hidden="true">
-            {STEPS.map((_, i) => <div key={i} style={{ flex: 1, height: 2, borderRadius: 2, background: i < step ? GOLD : i === step ? "rgba(217,180,106,.55)" : "rgba(242,238,230,.10)" }} />)}
+          <div style={{ display: "flex", gap: 4 }} role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} aria-valuetext={`Capitolo ${step + 1} di ${STEPS.length}: ${s.title}`}>
+            {STEPS.map((_, i) => <div key={i} className="hrf-bar" style={{ flex: 1, height: 2, borderRadius: 2, background: i < step ? GOLD : i === step ? "rgba(217,180,106,.55)" : "rgba(242,238,230,.10)" }} />)}
           </div>
+          {resumed && (
+            <div role="status" style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: "4px 12px", marginTop: 6, fontSize: 13, color: CP.textSecondary }}>
+              <span>
+                Ti abbiamo riportato dov&apos;eri rimasto.
+                {ctx.cfEnabled ? <span style={{ color: CP.textMuted }}> Il codice fiscale non lo teniamo sul dispositivo: se l&apos;avevi scritto, va riscritto.</span> : null}
+              </span>
+              {confirmRestart ? (
+                <span style={{ display: "inline-flex", gap: 12 }}>
+                  <button type="button" onClick={restart} style={{ background: "none", border: 0, padding: 0, color: GOLD, fontSize: 13, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}>Sì, cancella le risposte</button>
+                  <button type="button" onClick={() => setConfirmRestart(false)} style={{ background: "none", border: 0, padding: 0, color: CP.textMuted, fontSize: 13, cursor: "pointer" }}>No</button>
+                </span>
+              ) : (
+                <button type="button" onClick={() => setConfirmRestart(true)} style={{ background: "none", border: 0, padding: 0, color: GOLD, fontSize: 13, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}>Ricomincia da capo</button>
+              )}
+            </div>
+          )}
         </div>
 
-        <form key={step} className="hrf-fade" onSubmit={onSubmit} noValidate style={{ display: "grid", gap: 20 }}>
+        <form ref={formRef} key={step} className={dir === "prev" ? "hrf-prev" : "hrf-next"} onSubmit={onSubmit} onKeyDown={onKeyDown} noValidate style={{ display: "grid", gap: 20 }}>
           <Headline title={s.title} sub={s.sub} size={36} />
 
           {s.keys.filter((k) => FORM_KEYS.includes(k)).map((k) => {
             const f = FIELD_BY_KEY[k];
             const cfOff = k === "codiceFiscale" && !ctx.cfEnabled;
+            const fe = fieldErrs[k];
+            const extra = { ...(keyboardFor(k, data) || {}), ...(fe ? { "aria-invalid": true, "aria-describedby": `f-${k}-err` } : {}) };
             return (
-              <div key={k}>
+              <div key={k} id={`w-${k}`} style={{ scrollMarginTop: 24 }}>
                 <label id={`f-${k}-l`} htmlFor={`f-${k}`} style={k === "skillLevels" ? SR_ONLY : { ...lbl, fontSize: 13.5, marginBottom: 6 }}>{LABELS[k] || f.label}{k === "firstName" ? " *" : ""}</label>
                 {cfOff ? (
                   <span style={{ fontSize: 13, color: CP.textMuted }}>Al momento non possiamo raccogliere il codice fiscale da qui: te lo chiederemo a parte.</span>
                 ) : (
-                  <FieldInput id={`f-${k}`} field={f} value={data[k]} options={ctx.options?.[k]} onChange={(v) => { setData((d) => ({ ...d, [k]: v })); if (["codiceFiscale", "dateOfBirth", "gender", "birthPlace"].includes(k)) setCfWarn(null); }} />
+                  <FieldInput id={`f-${k}`} field={f} value={data[k]} options={ctx.options?.[k]} extra={extra} onChange={(v) => setField(k, v)} />
                 )}
+                <FieldError id={`f-${k}-err`} msg={fe} />
                 {k === "codiceFiscale" && ctx.cfPresent && !cfOff && <span style={{ fontSize: 12, color: CP.textMuted }}>Lo abbiamo già: lascia vuoto per non cambiarlo.</span>}
-                {k === "codiceFiscale" && !cfOff && <span style={{ display: "block", fontSize: 12, color: CP.textMuted }}>Lo vede solo chi gestisce il personale.</span>}
+                {k === "codiceFiscale" && !cfOff && <span style={{ display: "block", fontSize: 12, color: CP.textMuted }}>Lo vede solo chi gestisce il personale. Non lo salviamo sul tuo dispositivo.</span>}
               </div>
             );
           })}
@@ -315,12 +442,17 @@ export default function HrFormPage() {
                 <div style={{ fontSize: 12, letterSpacing: "0.12em", textTransform: "uppercase", color: CP.textMuted, marginBottom: 6 }}>Privacy, in breve</div>
                 Usiamo i tuoi dati per gestire la collaborazione con House of Creators: contratto, pagamenti, adempimenti di legge e organizzazione del lavoro.
                 Li vede solo chi gestisce il personale, non li vendiamo e non li cediamo a nessuno. Puoi chiedere in ogni momento di vederli, correggerli o cancellarli.{" "}
-                <a href="/hr/privacy" target="_blank" rel="noopener noreferrer" style={{ color: GOLD }}>Leggi l'informativa completa</a>
+                <a href="/hr/privacy" target="_blank" rel="noopener noreferrer" style={{ color: GOLD }}>Leggi l&apos;informativa completa</a>
               </div>
-              <label style={{ display: "flex", gap: 12, alignItems: "flex-start", fontSize: 14.5, color: CP.textPrimary, cursor: "pointer", lineHeight: 1.5 }}>
-                <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 4, width: 18, height: 18, accentColor: GOLD }} required />
-                <span>Ho letto l'informativa privacy.</span>
-              </label>
+              <div id="w-consent" style={{ scrollMarginTop: 24 }}>
+                <label style={{ display: "flex", gap: 12, alignItems: "flex-start", fontSize: 14.5, color: CP.textPrimary, cursor: "pointer", lineHeight: 1.5 }}>
+                  <input type="checkbox" checked={consent} onChange={(e) => { setConsent(e.target.checked); if (fieldErrs.consent) setFieldErrs((x) => { const n = { ...x }; delete n.consent; return n; }); }}
+                    aria-invalid={fieldErrs.consent ? true : undefined} aria-describedby={fieldErrs.consent ? "f-consent-err" : undefined}
+                    style={{ marginTop: 4, width: 18, height: 18, accentColor: GOLD }} required />
+                  <span>Ho letto l&apos;informativa privacy.</span>
+                </label>
+                <FieldError id="f-consent-err" msg={fieldErrs.consent} />
+              </div>
             </div>
           )}
 
@@ -330,19 +462,19 @@ export default function HrFormPage() {
               <ul style={{ margin: "0 0 10px", paddingLeft: 18, fontSize: 14, color: CP.textSecondary, lineHeight: 1.5 }}>{cfWarn.map((w) => <li key={w}>{w[0].toUpperCase() + w.slice(1)}.</li>)}</ul>
               <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 12 }}>A volte dipende da un comune che nel frattempo è stato unito a un altro. Se i dati sono giusti, puoi andare avanti lo stesso.</div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button type="button" className="hrf-pill" onClick={() => setCfWarn(null)} style={{ ...pill(false), height: 44 }}>Correggo</button>
+                <button type="button" className="hrf-pill" onClick={() => { setCfWarn(null); setFocusKey("codiceFiscale"); }} style={{ ...pill(false), height: 44 }}>Correggo</button>
                 <button type="submit" className="hrf-pill" style={{ ...pill(true), height: 44 }}>Sono giusti, avanti</button>
               </div>
             </div>
           )}
-          {err && <div role="alert" style={{ color: CP.accentRed, fontSize: 14 }}>{err}</div>}
+          {err && <div role="alert" style={{ color: ERR_COLOR, fontSize: 14, lineHeight: 1.5 }}>{err}</div>}
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 8 }}>
             {step > 0
-              ? <button type="button" className="hrf-pill" onClick={() => goTo(step - 1)} style={pill(false)}>Indietro</button>
-              : <button type="button" className="hrf-pill" onClick={() => setStage("intro")} style={pill(false)}>Indietro</button>}
-            <button type="submit" className="hrf-pill" disabled={busy} style={{ ...pill(true), opacity: busy ? 0.5 : 1, flex: 1, maxWidth: 260 }}>
-              {busy ? "Invio…" : last ? "Invia i miei dati" : "Avanti"}
+              ? <button type="button" className="hrf-pill" onClick={() => goTo(step - 1)} disabled={busy} style={pill(false)}>Indietro</button>
+              : <button type="button" className="hrf-pill" onClick={() => { setResumed(false); setStage("intro"); }} disabled={busy} style={pill(false)}>Indietro</button>}
+            <button type="submit" className="hrf-pill" disabled={busy} aria-busy={busy} style={{ ...pill(true), gap: 10, flex: 1, maxWidth: 260, cursor: busy ? "default" : "pointer" }}>
+              {busy ? <><HrPalmaLoader width={38} tone="ink" label="Invio in corso" /><span>Invio in corso</span></> : last ? "Invia i miei dati" : "Avanti"}
             </button>
           </div>
         </form>
@@ -370,6 +502,7 @@ function FilesStep({ token, data, onDone }) {
   const Item = ({ kind, title, hint }) => {
     const st = state[kind];
     const busy = st && typeof st === "object";
+    const text = busy ? (st.busy === "riduco" ? "Preparo il file…" : st.busy === "salvo" ? "Quasi fatto…" : `Carico… ${st.pct || 0}%`) : "";
     return (
       <div style={{ padding: "16px 0", borderTop: `1px solid ${CP.border}` }}>
         <div style={{ fontSize: 15.5, marginBottom: 4 }}>{title}</div>
@@ -378,16 +511,17 @@ function FilesStep({ token, data, onDone }) {
           <>
             <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" disabled={busy} onChange={(e) => up(kind, e.target.files?.[0])} style={{ fontSize: 14, color: CP.textSecondary, maxWidth: "100%" }} aria-label={title} />
             {busy && (
-              <div role="status" aria-live="polite" style={{ fontSize: 13, color: CP.textMuted, marginTop: 8 }}>
-                {st.busy === "riduco" ? "Preparo il file…" : st.busy === "salvo" ? "Quasi fatto…" : `Carico… ${st.pct || 0}%`}
-                {st.busy === "carico" && (
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 12 }}>
+                <HrPalmaLoader width={44} tone="gold" label={text} />
+                <div aria-hidden="true" style={{ flex: 1, minWidth: 0, fontSize: 13, color: CP.textMuted }}>
+                  {text}
                   <div style={{ height: 3, background: CP.border, borderRadius: 2, marginTop: 6, maxWidth: 280 }}>
-                    <div style={{ height: 3, width: `${st.pct || 0}%`, background: GOLD, borderRadius: 2, transition: "width .2s" }} />
+                    <div style={{ height: 3, width: `${st.busy === "salvo" ? 100 : st.busy === "carico" ? st.pct || 0 : 0}%`, background: GOLD, borderRadius: 2, transition: "width .2s" }} />
                   </div>
-                )}
+                </div>
               </div>
             )}
-            {typeof st === "string" && st !== "ok" && <div role="alert" style={{ fontSize: 13, color: CP.accentRed, marginTop: 6 }}>{st}</div>}
+            {typeof st === "string" && st !== "ok" && <div role="alert" style={{ fontSize: 13, color: ERR_COLOR, marginTop: 6 }}>{st}</div>}
           </>
         )}
       </div>
@@ -395,9 +529,9 @@ function FilesStep({ token, data, onDone }) {
   };
   return (
     <div className="hrf-fade" style={{ display: "grid", gap: 22 }}>
-      <Tessera data={data} />
+      <HrTessera key="documenti" data={data} at={Date.now()} small />
       <Headline title="Quasi fatto." sub="Ultimo passo: i documenti." size={36} />
-      <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>Facoltativo ma utile. PDF, JPG o PNG, fino a 50 MB. Le foto le riduciamo noi. Hai un'ora di tempo.</p>
+      <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>Facoltativo ma utile. PDF, JPG o PNG, fino a 50 MB. Le foto le riduciamo noi. Hai un&apos;ora di tempo.</p>
       <div style={{ borderBottom: `1px solid ${CP.border}` }}>
         <Item kind="document" title="Documento d'identità" hint="Fronte e retro nello stesso file, se puoi." />
         <Item kind="cv" title="Curriculum (CV)" hint="L'ultima versione che hai." />

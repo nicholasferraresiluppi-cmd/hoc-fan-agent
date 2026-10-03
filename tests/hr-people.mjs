@@ -636,6 +636,88 @@ console.log(`hr-people: ${n} asserzioni OK`);
   console.log(`link condiviso + carta: ${m} asserzioni OK`);
 }
 
+// ── 03/10 sera: esperienza del modulo (bozza, avanzamento, errori) + tessera D1 ──
+{
+  let m = 0; const t = (c, msg) => { assert.ok(c, msg); m++; };
+  const X = await import("../src/lib/hr-form-experience.js");
+  const W = await import("../src/lib/hr-welcome-card.js");
+  const fs = await import("node:fs");
+
+  // avanzamento a parole
+  t(X.progressWords(4, 7) === "Ancora 3 capitoli", "5 di 7 → ancora 3 (compreso questo)");
+  t(X.progressWords(5, 7) === "Ancora 2 capitoli", "penultimo");
+  t(X.progressWords(6, 7) === "Ultimo capitolo", "ultimo");
+  t(X.progressWords(0, 7) === "Ancora 7 capitoli", "primo");
+  t(X.timeEstimateText() === "Ci vogliono tra 6 e 10 minuti.", "stima in intervallo, non un numero tondo");
+  t(X.timeEstimateText([[2, 2]]) === "Ci vogliono circa 2 minuti.", "stima unica");
+
+  // errori per campo, gentili
+  const e0 = X.fieldErrors({}, ["firstName", "surname"]);
+  t(Object.keys(e0).join() === "firstName" && /nome/.test(e0.firstName), "nome mancante → errore sotto il nome");
+  t(!X.fieldErrors({ firstName: "Giulia" }, ["firstName"]).firstName, "nome presente → niente errore");
+  t(/codice fiscale/i.test(X.fieldErrors({ firstName: "G", codiceFiscale: "RSSMRA85T10A562T" }, ["firstName", "codiceFiscale"]).codiceFiscale || ""), "CF sbagliato → errore sotto il CF");
+  t(!X.fieldErrors({ codiceFiscale: "RSSMRA85T10A562S" }, ["codiceFiscale"]).codiceFiscale, "CF giusto → niente errore");
+  t(!X.fieldErrors({ codiceFiscale: "XX" }, ["codiceFiscale"], { cfEnabled: false }).codiceFiscale, "CF spento → non si controlla");
+  t(X.fieldErrors({ personalEmail: "giulia@" }, ["personalEmail"]).personalEmail, "email incompleta");
+  t(!X.fieldErrors({ personalEmail: "giulia@ex.it" }, ["personalEmail"]).personalEmail, "email giusta");
+  t(X.fieldErrors({ personalPhone: "+39 12" }, ["personalPhone"]).personalPhone && !X.fieldErrors({ personalPhone: "+39 333 1234567" }, ["personalPhone"]).personalPhone, "telefono troppo corto");
+  t(!X.fieldErrors({}, ["personalEmail"]).firstName, "solo i campi del capitolo");
+  const srv = X.fieldErrorsFromServer("Email personale: indirizzo non valido. Telefono personale: numero troppo corto. Altro problema.");
+  t(srv.errors.personalEmail && srv.errors.personalPhone && srv.rest === "Altro problema.", "errori del server → sotto i campi, il resto in generale");
+  t(X.fieldErrorsFromServer("Nome: obbligatorio.").errors.firstName === "Ci serve questo dato: scrivilo qui.", "obbligatorio → frase gentile");
+  t(X.firstStepWithError([{ keys: ["firstName"] }, { keys: ["personalEmail"] }], { personalEmail: "x" }) === 1, "si torna al capitolo del primo errore");
+
+  // bozza nel browser: mai il codice fiscale
+  const raw = X.serializeDraft({ data: { firstName: "Giulia", codiceFiscale: "RSSMRA85T10A562S", hacker: 1 }, step: 3 }, 1000);
+  t(!raw.includes("RSSMRA") && !raw.includes("codiceFiscale"), "il codice fiscale NON si salva nel browser");
+  t(!raw.includes("hacker"), "solo i campi del modulo");
+  const back = X.parseDraft(raw, { steps: 7, now: 2000 });
+  t(back && back.step === 3 && back.data.firstName === "Giulia" && !("codiceFiscale" in back.data), "bozza ripresa: capitolo e risposte");
+  t(X.parseDraft(raw, { steps: 7, now: 1000 + X.DRAFT_MAX_AGE_MS + 1 }) === null, "bozza troppo vecchia → ignorata");
+  t(X.parseDraft(raw, { steps: 3, now: 2000 }) === null, "capitolo fuori dai capitoli → ignorata");
+  t(X.parseDraft("{rotto", { steps: 7 }) === null && X.parseDraft(null) === null, "bozza rotta o assente → null");
+  t(X.parseDraft(JSON.stringify({ v: 1, savedAt: 1000, stage: "form", step: 0, data: { codiceFiscale: "RSSMRA85T10A562S" } }), { steps: 7, now: 2000 }).data.codiceFiscale === undefined, "CF scritto a mano nella bozza → scartato in lettura");
+  t(!X.draftWorthSaving({ data: {}, step: 0 }) && X.draftWorthSaving({ data: { firstName: "G" }, step: 0 }) && X.draftWorthSaving({ data: {}, step: 2 }), "si salva solo se c'è qualcosa");
+  t(!X.draftWorthSaving({ data: { codiceFiscale: "X" }, step: 0 }), "solo il CF non vale una bozza");
+  t(X.draftKey("abc") === "hoc:hr-modulo:abc", "chiave legata al token");
+  // localStorage che lancia (navigazione privata): il modulo va avanti
+  const boom = { getItem() { throw new Error("SecurityError"); }, setItem() { throw new Error("QuotaExceeded"); }, removeItem() { throw new Error("x"); } };
+  t(X.safeGet("k", boom) === null && X.safeSet("k", "v", boom) === false, "storage che lancia → nessun errore");
+  X.safeRemove("k", boom);
+  const mem = new Map();
+  const ok = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v), removeItem: (k) => mem.delete(k) };
+  t(X.safeSet("k", "v", ok) === true && X.safeGet("k", ok) === "v", "storage normale");
+  X.safeRemove("k", ok);
+  t(X.safeGet("k", ok) === null, "rimozione dopo l'invio");
+  t(X.safeGet("k", null) === null && X.safeSet("k", "v", null) === false, "nessuno storage (server)");
+  t(/House of Creators/.test(X.HOUSE_LETTER.text) && X.HOUSE_LETTER.signature === "Nicholas", "messaggio della Casa in una costante");
+
+  // tessera D1: fronte e retro
+  t(W.tesseraName({ firstName: "giulia", surname: "de rossi" }) === "Giulia De Rossi" && W.tesseraName({ firstName: "Anna Maria" }) === "Anna Maria", "nome completo sulla tessera");
+  t(W.roleLabel("Chatter (operatore di chat)") === "Chatter" && W.roleLabel("") === "", "ruolo chatter");
+  t(W.roleLabel("responsabile della comunicazione digitale") === "Responsabile della…", "mansione lunga abbreviata a parola intera");
+  t(W.tesseraLine({ currentJob: "Chatter (operatore di chat)", residenceComune: { name: "Milano", prov: "MI" } }, new Date(2026, 9, 3).getTime()) === "Chatter · Milano · dal 2026", "riga ruolo · città · anno");
+  t(W.tesseraLine({}, new Date(2026, 9, 3).getTime()) === "dal 2026", "senza dati: solo l'anno");
+  const rows = W.tesseraRows({ gender: "Female", skillLevels: { of_chat: "Esperto", ai_coding: "Autonomo" }, spokenLanguages: ["ITA - Native", "ENG - B2"], residenceComune: { abroad: true, country: "Spagna", city: "Madrid" } });
+  t(rows.map((r) => `${r.label} · ${r.value}`).join(" | ") === "OnlyFans · Esperta | Intelligenza artificiale · Autonoma | Inglese · B2 | Italiano · Madrelingua | Città · Madrid", "retro: righe pulite, genere dichiarato");
+  t(W.tesseraRows({ skillLevels: { of_chat: "Esperto" } })[0].value === "Livello esperto", "genere non indicato: forma neutra");
+  t(W.tesseraRows({ gender: "Male", skillLevels: { of_chat: "Posso insegnarla" } })[0].value === "Può insegnarla", "posso insegnarla");
+  t(W.tesseraRows({}).length === 0, "retro senza dati: nessuna riga finta");
+  t(W.tesseraMilestones({ firstName: "G", residenceComune: { name: "Roma" } }).join() === "name,city", "pezzi comparsi per il riflesso");
+
+  // testi visibili: "tessera", mai "card"
+  const page = fs.readFileSync(new URL("../src/app/hr/modulo/[token]/page.js", import.meta.url), "utf8");
+  const reveal = fs.readFileSync(new URL("../src/components/HrWelcomeCard.js", import.meta.url), "utf8");
+  t(page.includes("e sblocca la tua tessera.") && page.includes("Questa è una tessera d&apos;esempio") && page.includes("Questa è la tua tessera."), "testi del modulo con «tessera»");
+  t(!/(sblocca la tua|una|la tua|Questa è la tua) card\b/i.test(page + reveal), "nessuna «card» nei testi visibili");
+  t(reveal.includes("Salva la tua tessera") && reveal.includes("Rivedi"), "finale: salva e rivedi");
+  const png = fs.readFileSync(new URL("../src/lib/hr-tessera-png.js", import.meta.url), "utf8");
+  t(!/personalEmail|personalPhone|codiceFiscale/.test(png.replace(/\/\*[\s\S]*?\*\//g, "")), "il PNG non legge email, telefono o CF");
+
+  n += m;
+  console.log(`esperienza modulo + tessera D1: ${m} asserzioni OK`);
+}
+
 // ── 03/10: campi specchio a DUE VIE — lettura del testo ClickUp ────────────────
 {
   const { readFileSync } = await import("node:fs");
