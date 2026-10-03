@@ -206,5 +206,6 @@ export function maskCf(cf) {
 }
 
 // ── Modulo pubblico e file ──────────────────────────────────────────────────
-export const PRIVACY_VERSION = "bozza-2026-09-29";
+// testo in /hr/privacy (03/10/2026): informativa art. 13 GDPR per i dati della collaborazione
+export const PRIVACY_VERSION = "2026-10-03";
 export const UPLOAD_MAX_BYTES = 10 * 1024 * 1024;

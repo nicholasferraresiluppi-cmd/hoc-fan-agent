@@ -26,14 +26,14 @@ export function genderForm(gender) {
   return null;
 }
 
-/** "Benvenuta nella Casa, Giulia." / "Benvenuto nella Casa, Marco." / "Ti diamo il benvenuto nella Casa, Giulia." */
+/** "Benvenuta in House of Creators, Giulia." / "Benvenuto in …" / "Ti diamo il benvenuto in …" (testi scelti da Nicholas 03/10) */
 export function welcomeTitle({ firstName, gender } = {}) {
   const name = String(firstName || "").trim();
   const tail = name ? `, ${name}.` : ".";
   const form = genderForm(gender);
-  if (form === "f") return `Benvenuta nella Casa${tail}`;
-  if (form === "m") return `Benvenuto nella Casa${tail}`;
-  return `Ti diamo il benvenuto nella Casa${tail}`;
+  if (form === "f") return `Benvenuta in House of Creators${tail}`;
+  if (form === "m") return `Benvenuto in House of Creators${tail}`;
+  return `Ti diamo il benvenuto in House of Creators${tail}`;
 }
 
 /** Iniziali (al posto del punteggio FIFA): nome + cognome, oppure solo il nome. */
@@ -110,9 +110,9 @@ export function cardStats(data = {}) {
   return [...first, ...areas.slice(3, 3 + Math.max(0, room)), ...langs, ...cityStat].slice(0, 6);
 }
 
-/** "Membro della Casa · ottobre 2026" (mese e anno dell'invio). */
+/** "House of Creators · ottobre 2026" (mese e anno dell'invio). */
 export function memberSince(at = Date.now()) {
   const d = new Date(at);
   const MONTHS = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
-  return `Membro della Casa · ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  return `House of Creators · ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
