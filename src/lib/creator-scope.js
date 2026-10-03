@@ -9,6 +9,7 @@
 import { kv } from "@vercel/kv";
 import { clerkClient } from "@clerk/nextjs/server";
 import { isUserIdAdmin } from "@/lib/admin";
+import { viewAsFor } from "@/lib/view-as";
 
 const KEY = (userId) => `member:creators:${userId}`;
 
@@ -51,7 +52,10 @@ export async function setAssignedCreators(userId, raw, by) {
  */
 export async function getCreatorScope(userId) {
   if (await isUserIdAdmin(userId).catch(() => false)) return { all: true, creators: new Set(), source: "admin" };
-  const a = await getAssignedCreators(userId);
+  // "Vedi come <membro>" (03/10/2026): le creator di QUEL membro, non quelle di chi guarda — prima l'anteprima
+  // leggeva l'assegnazione dell'admin (di solito nessuna) e mostrava pagine vuote che il membro non vede.
+  const va = await viewAsFor(userId).catch(() => null);
+  const a = await getAssignedCreators(va?.target || userId);
   if (!a) return { all: false, creators: new Set(), source: "none" };
   return { all: a.all, creators: new Set(a.creators), source: "assigned" };
 }

@@ -114,8 +114,8 @@ export default function CompReviewPage() {
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1400, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
       <PageHead
-        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Comp & Ben" }, { label: "Review compensi" }]}
-        title="Review compensi"
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Comp & Ben" }, { label: "Anomalie compensi" }]}
+        title="Anomalie compensi"
         subtitle="Le coppie operatore × creator in cui l'operatore incassa oltre il 15% più o meno della media del team su quella creator, ordinate per dollari in gioco. Da qui scegli chi rivedere con HR."
         actions={
           <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} aria-label="Mese" style={{ ...input, minWidth: 170, cursor: "pointer" }}>

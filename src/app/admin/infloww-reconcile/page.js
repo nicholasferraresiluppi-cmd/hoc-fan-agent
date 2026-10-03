@@ -222,7 +222,7 @@ export default function InflowwReconcilePage() {
         {data?.last_sync_at != null && (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
             <ShieldCheck size={14} /> Dati Infloww aggiornati {fmtAgo(data.last_sync_at)} ·{" "}
-            <Link href="/admin/infloww-agency" style={{ color: CP.accentSoftText, textDecoration: "none" }}>aggiorna da Revenue agency</Link>
+            <Link href="/admin/infloww-agency" style={{ color: CP.accentSoftText, textDecoration: "none" }}>aggiorna da Incassi Infloww</Link>
           </span>
         )}
         {loading && <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: CP.textSecondary }}><Loader2 size={14} className="animate-spin" /> Confronto le due fonti…</span>}
@@ -244,7 +244,7 @@ export default function InflowwReconcilePage() {
               : "Per confrontare serve prima sincronizzare la revenue reale da Infloww."}
             {" "}Nessun verdetto non vuol dire che è tutto a posto.
           </div>
-          <Link href="/admin/infloww-agency" style={btnLink}><RefreshCw size={14} /> Vai a Revenue agency e sincronizza</Link>
+          <Link href="/admin/infloww-agency" style={btnLink}><RefreshCw size={14} /> Vai a Incassi Infloww e sincronizza</Link>
         </section>
       )}
       {data?.needs_sync === "cp" && (

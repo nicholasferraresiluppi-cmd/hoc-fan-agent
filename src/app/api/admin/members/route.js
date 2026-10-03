@@ -12,6 +12,8 @@ import { authorizeAdmin, auditAccess, setUserRoles } from "@/lib/rbac";
 import { isUserIdAdminRaw } from "@/lib/admin";
 import { setAssignedCreators, personOf } from "@/lib/creator-scope";
 import { buildCreatorMatrix } from "@/lib/creator-aggregates";
+import { setSavedWorkspace } from "@/lib/workspace-store";
+import { WORKSPACES } from "@/lib/workspaces";
 
 // GET: le creator assegnabili (persone con turni nel mese corrente o nel precedente)
 export async function GET() {
@@ -37,11 +39,18 @@ export async function POST(request) {
   const userId = String(body?.userId || "").slice(0, 80);
   const action = body?.action;
   if (!/^user_[A-Za-z0-9]+$/.test(userId)) return Response.json({ error: "Membro non valido." }, { status: 400 });
-  if (!["suspend", "reactivate", "delete", "creators"].includes(action)) return Response.json({ error: "Azione non valida." }, { status: 400 });
+  if (!["suspend", "reactivate", "delete", "creators", "workspace"].includes(action)) return Response.json({ error: "Azione non valida." }, { status: 400 });
   if (action === "creators") {
     const s = await setAssignedCreators(userId, body?.all ? { all: true } : { creators: body?.creators || [] }, a.userId);
     await auditAccess(a.userId, "member_creators", { target: userId, all: s.all, creators: s.creators });
     return Response.json({ ok: true, creators: s, text: s.all ? "Ora vede tutte le creator." : s.creators.length ? `Ora vede ${s.creators.length} creator.` : "Nessuna creator: non vede dati di vendita." });
+  }
+  // mansione (03/10/2026): menu e hub per il suo lavoro; "" = torna a quella del ruolo. Vale anche su sé stessi.
+  if (action === "workspace") {
+    let id;
+    try { id = await setSavedWorkspace(userId, String(body?.workspace || ""), a.userId); } catch (e) { return Response.json({ error: e.message }, { status: 400 }); }
+    await auditAccess(a.userId, "member_workspace", { target: userId, workspace: id });
+    return Response.json({ ok: true, workspace: id, text: id ? `Mansione: ${WORKSPACES[id].label}.` : "Mansione dal ruolo." });
   }
   if (userId === a.userId) return Response.json({ error: "Non puoi farlo sul tuo account." }, { status: 400 });
 

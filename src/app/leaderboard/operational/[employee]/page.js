@@ -134,7 +134,7 @@ export default function EmployeeDrilldownPage({ params }) {
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
-        crumbs={[{ label: "Performance" }, { label: "Sales CP", href: "/leaderboard/sales-cp" }, { label: employee }]}
+        crumbs={[{ label: "Performance" }, { label: "Classifica vendite", href: "/leaderboard/sales-cp" }, { label: employee }]}
         title={employee}
         subtitle={[cp?.top_creator ? `Lavora soprattutto su ${cp.top_creator}${cp.specialization_pct ? ` (${cp.specialization_pct}% del suo venduto)` : ""}` : null, tenure ? `in agenzia da ${fmtTenure(tenure.months)}` : null].filter(Boolean).join(" · ")}
         actions={<>

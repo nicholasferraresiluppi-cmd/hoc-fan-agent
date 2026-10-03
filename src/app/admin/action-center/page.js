@@ -227,8 +227,8 @@ export default function ActionCenterPage() {
     <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
       {tutorialOpen && <ScoreTutorialModal onClose={() => setTutorialOpen(false)} />}
       <PageHead
-        crumbs={[{ label: "People" }, { label: "Action Center" }]}
-        title="Action Center"
+        crumbs={[{ label: "People" }, { label: "Sotto soglia" }]}
+        title="Sotto soglia"
         subtitle={isAll
           ? "Gli operatori sotto soglia del mese. Per ognuno: scegli un sostituto e segnalo pronto per HR, oppure toglilo se non va cambiato. Alla fine esporti la lista per HR."
           : "Chi della tua squadra fa più fatica questo mese. Si parte sempre da una conversazione: apri la vista colloquio, concordate un passo e una data di verifica. Solo se dopo la verifica non cambia niente, passi il caso alla direzione."}

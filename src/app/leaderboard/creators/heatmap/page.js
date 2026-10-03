@@ -115,7 +115,7 @@ export default function HeatmapPage({ searchParams }) {
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
             <span style={{ width: 14, height: 14, borderRadius: 3, background: "transparent", border: `1px dashed ${CP.textMuted}` }} />pochi turni (score non affidabile)
           </span>
-          <span style={{ color: CP.textMuted }}>· vuoto = non hanno lavorato insieme · fasce come in Sales CP</span>
+          <span style={{ color: CP.textMuted }}>· vuoto = non hanno lavorato insieme · fasce come in Classifica vendite</span>
         </div>
         <div style={{ ...card, overflow: "auto", maxHeight: "calc(100vh - 220px)" }}>
           <table style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 12 }}>

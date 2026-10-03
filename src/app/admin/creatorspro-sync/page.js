@@ -220,7 +220,7 @@ export default function CreatorsProSyncPage() {
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Sync CreatorsPro" }]}
         title="Sync CreatorsPro"
-        subtitle="Porta in HOC Pro vendite e turni del mese da CreatorsPro, e collega ogni persona CP al suo operatore: chi non è collegato non compare in Sales CP, Creator, Action e Coaching Center."
+        subtitle="Porta in HOC Pro vendite e turni del mese da CreatorsPro, e collega ogni persona CP al suo operatore: chi non è collegato non compare in Classifica vendite, Creator, Sotto soglia e Da far crescere."
         actions={<>
           <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} style={ctl} disabled={syncing} aria-label="Mese da sincronizzare">
             {monthlyOpts.map((p) => <option key={p} value={p}>{monthLabel(p)}</option>)}

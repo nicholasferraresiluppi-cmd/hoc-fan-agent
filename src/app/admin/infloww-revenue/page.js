@@ -98,7 +98,7 @@ export default function InflowwRevenuePage() {
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
-        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Revenue agency", href: "/admin/infloww-agency" }, { label: "Revenue live" }]}
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Incassi Infloww", href: "/admin/infloww-agency" }, { label: "Revenue live" }]}
         title="Revenue live per creator"
         subtitle="Quanto ha incassato una creator adesso, direttamente da Infloww: da cosa (chat, mance, abbonamenti), quanto è stato rimborsato e quanto dipende da pochi fan."
         actions={<>
