@@ -47,6 +47,9 @@ function shape(inv) {
     email: inv.emailAddress,
     status: inv.status,
     roles: inv.publicMetadata?.roles || (inv.publicMetadata?.role ? [inv.publicMetadata.role] : []),
+    // 03/10/2026: negli inviti in attesa si vede anche cosa vedrà la persona
+    creators: inv.publicMetadata?.creators || null,
+    workspace: inv.publicMetadata?.workspace || null,
     invited_by: inv.publicMetadata?.invited_by_name || null,
     created_at: inv.createdAt,
     updated_at: inv.updatedAt,
@@ -63,7 +66,7 @@ export async function listInvitations() {
   return { pending: arr(pending).map(shape), accepted: arr(accepted).map(shape) };
 }
 
-export async function createInvitation({ email, roles, creators, inviterId, inviterName, origin, notify = true }) {
+export async function createInvitation({ email, roles, creators, workspace, inviterId, inviterName, origin, notify = true }) {
   const mail = String(email || "").trim().toLowerCase();
   if (!EMAIL_RE.test(mail)) throw new Error("Email non valida");
   const wanted = [...new Set((roles || []).map(String).filter(Boolean))];
@@ -90,6 +93,15 @@ export async function createInvitation({ email, roles, creators, inviterId, invi
     }
   }
 
+  // 03/10/2026 (prova d'uso, Sales Manager il primo giorno vedeva tutto vuoto): chi guida vendite o squadre
+  // senza creator assegnate non vede nessun dato. Gli admin vedono tutto e non ne hanno bisogno.
+  const LEADS = ["sales_manager", "team_lead", "qa_reviewer"];
+  if (!wanted.includes("admin") && wanted.some((r) => LEADS.includes(r)) && !creatorsMeta) {
+    throw new Error("Scegli le creator che vedrà (oppure «Tutte»): senza, le sue pagine restano vuote.");
+  }
+  const { isWorkspaceId } = await import("@/lib/workspaces");
+  const workspaceMeta = isWorkspaceId(workspace) ? workspace : null;
+
   const cc = await clerkClient();
   // Se la persona è già registrata l'invito non serve: si cambia il ruolo da Membri
   const existing = await cc.users.getUserList({ emailAddress: [mail] });
@@ -109,7 +121,7 @@ export async function createInvitation({ email, roles, creators, inviterId, invi
     // re-invito che sostituisce un invito in attesa: solo admin (un non-admin
     // non deve poter riscrivere i ruoli di un invito fatto da un admin)
     ignoreExisting: admin,
-    publicMetadata: { role: primary, roles: wanted, invited_by: inviterId, invited_by_name: inviterName || null, ...(creatorsMeta ? { creators: creatorsMeta } : {}) },
+    publicMetadata: { role: primary, roles: wanted, invited_by: inviterId, invited_by_name: inviterName || null, ...(creatorsMeta ? { creators: creatorsMeta } : {}), ...(workspaceMeta ? { workspace: workspaceMeta } : {}) },
   });
   return { ...shape(inv), url: inv.url || null };
 }

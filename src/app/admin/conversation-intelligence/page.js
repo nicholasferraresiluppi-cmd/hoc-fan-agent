@@ -88,8 +88,15 @@ export default function ConversationIntelligencePage() {
       />
 
       {error && <Notice danger>{error}</Notice>}
+      {data?.visibility && !data.visibility.all && (
+        <Notice>
+          {data.visibility.creators.length
+            ? `Vedi le ${data.visibility.creators.length} creator assegnate a te.${data.unmatched ? ` ${data.unmatched} non compaiono: nessuna conversazione nel periodo o nome diverso nel warehouse (segnalalo a un admin).` : ""}`
+            : "Non hai ancora creator assegnate: chiedi a un admin di assegnartele in Membri e ruoli."}
+        </Notice>
+      )}
       {loading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento dal warehouse…</div>}
-      {!loading && !error && rows.length === 0 && <Notice>Nessuna creator con conversazioni nel periodo.</Notice>}
+      {!loading && !error && rows.length === 0 && data?.visibility?.all !== false && <Notice>Nessuna creator con conversazioni nel periodo.</Notice>}
 
       {!loading && !error && rows.length > 0 && (<>
         <HeroMetric

@@ -37,6 +37,8 @@ Megaphone, Share2, Shield, BookUser,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
+import WorkspaceSwitch from "@/components/WorkspaceSwitch";
+import { workspaceSections } from "@/lib/workspaces";
 
 // Voci "essential" (mostrate sempre): core per primo accesso / demo.
 const ESSENTIAL_HREFS = new Set([
@@ -104,7 +106,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/profiles-compare",         label: "Scaglioni a confronto", icon: Scale },
       { href: "/admin/comp-calendar",            label: "Calendario compensi",   icon: CalendarDays },
       { href: "/admin/threshold-study",          label: "Studio soglie",         icon: Ruler },
-      { href: "/admin/comp-review",              label: "Review compensi",           icon: Activity },
+      { href: "/admin/comp-review",              label: "Anomalie compensi",           icon: Activity },
       { href: "/admin/comp-exam",                label: "Esame creator",         icon: Search },
       { href: "/admin/payout-tree",              label: "Albero payout",         icon: ListTree },
       { href: "/admin/payment-profiles",         label: "Profili di pagamento",      icon: Layers },
@@ -171,11 +173,11 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/candidate-assessments",    label: "Assessment candidati", icon: UserCheck },
       { href: "/admin/priority-queue",           label: "Fan da seguire ora", icon: Inbox },
       { href: "/admin/settimana",                 label: "Da seguire", icon: Target },
-      { href: "/admin/coaching-center",          label: "Coaching Center", icon: GraduationCap },
+      { href: "/admin/coaching-center",          label: "Da far crescere", icon: GraduationCap },
       { href: "/admin/coaching-sessions",        label: "Sessioni coaching", icon: GraduationCap },
       { href: "/admin/disputes",                 label: "Contestazioni", icon: MessageSquareWarning },
       { href: "/admin/team",                     label: "Team",         icon: UserCircle2 },
-      { href: "/admin/employee-profiles",        label: "Profili",      icon: Contact },
+      { href: "/admin/employee-profiles",        label: "Profili operatori",      icon: Contact },
       { href: "/admin/seniority",                label: "Seniority",    icon: Medal },
       { href: "/admin/ruoli",                    label: "Membri",       icon: Lock },
       { href: "/admin/ruoli-custom",             label: "Ruoli custom", icon: Wrench },
@@ -188,7 +190,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/creatorspro-sync",         label: "Sync CP",         icon: RefreshCw },
       { href: "/admin/wage-audit",               label: "Sync & Audit CP", icon: ShieldCheck },
       { href: "/admin/creatorspro-sync-history", label: "Storico sync CP", icon: History },
-      { href: "/admin/infloww-agency",           label: "Revenue agency",  icon: Gauge },
+      { href: "/admin/infloww-agency",           label: "Incassi Infloww",  icon: Gauge },
       { href: "/admin/infloww-revenue",          label: "Revenue live",    icon: BarChart3 },
       { href: "/admin/infloww-reconcile",        label: "Controllo dati CP", icon: Link2 },
       { href: "/admin/debug-mapping",            label: "Operatori senza dati CP",   icon: Link2 },
@@ -209,6 +211,13 @@ const NAV_GROUPS_RAW = [
 export const NAV_GROUPS = NAV_GROUPS_RAW.map((g) => ({ ...g, items: collapseItems(g.items, "label") }));
 
 export const SIDEBAR_WIDTH = 248;
+
+// icona di ogni pagina (anche quelle nascoste dal raggruppamento a schede), per il menu per mansione
+const ICON_BY_HREF = new Map([
+  ...NAV_GROUPS_RAW.flatMap((g) => g.items.map((i) => [i.href, i.icon])),
+  ["/admin", LayoutDashboard], ["/admin/alerts", Bell], ["/admin/action-center", Target],
+]);
+export const iconFor = (href) => ICON_BY_HREF.get(href) || Compass;
 
 /** Voci di menu piatte { href, label, group } — per l'analytics d'uso. */
 export const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label, group: g.label })));
@@ -416,6 +425,18 @@ export default function Sidebar() {
   };
 
   const isEssential = viewMode === "essential";
+
+  // Mansione (03/10/2026, lib/workspaces): Board / Sales Manager / HR hanno un menu corto col loro lavoro;
+  // "Tutti gli strumenti" (o nessuna mansione) = il menu di sempre. Solo ordine: i permessi non cambiano.
+  const ws = me?.workspace?.id;
+  const wsSections = ws && ws !== "all" ? workspaceSections(ws, allowed) : null;
+  const wsHrefs = new Set((wsSections || []).flatMap((x) => x.items.map((i) => i.href)));
+  const inWs = (wsSections || []).some((x) => x.items.some((i) => (i.exact ? pathname === i.href : pathname === i.href || pathname.startsWith(i.href + "/"))));
+  const [allTools, setAllTools] = useState(false);
+  useEffect(() => { try { setAllTools(localStorage.getItem("hoc:sidebar:allTools") === "1"); } catch {} }, []);
+  const toggleAllTools = () => setAllTools((t) => { try { localStorage.setItem("hoc:sidebar:allTools", t ? "0" : "1"); } catch {} return !t; });
+  // pagina corrente fuori dalla mansione → l'elenco completo si apre da solo, così si vede dove si è
+  const showAll = !wsSections || allTools || !inWs;
   const toggleGroup = (label) => setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }));
 
   return (
@@ -463,10 +484,18 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* View mode toggle */}
-      <ViewToggle mode={viewMode} onChange={setViewMode} />
+      {/* Mansione: "La mia vista" (solo chi ne ha una; gli operatori restano sul menu personale) */}
+      <WorkspaceSwitch me={me} style={{ margin: "10px 16px 0 16px" }} />
 
-      {/* Welcome link (always visible, both modes) */}
+      {/* View mode toggle (menu completo) */}
+      {!wsSections && <ViewToggle mode={viewMode} onChange={setViewMode} />}
+
+      {/* Welcome link (always visible, both modes) — con una mansione resta solo la Guida */}
+      {wsSections ? (
+        <div style={{ padding: "10px 0 4px 0", borderBottom: `1px solid ${CP.border}` }}>
+          <NavItem href="/guida" label="Guida strumenti" icon={Signpost} isActive={pathname === "/guida"} />
+        </div>
+      ) : (
       <div style={{ padding: "10px 0 4px 0", borderBottom: `1px solid ${CP.border}` }}>
         <NavItem href="/welcome" label="Benvenuto" icon={Compass} isActive={pathname === "/welcome"} />
         <NavItem href="/guida" label="Guida strumenti" icon={Signpost} isActive={pathname === "/guida"} />
@@ -475,13 +504,32 @@ export default function Sidebar() {
         {allowed("/admin") && <NavItem href="/admin" label="Hub" icon={LayoutDashboard} isActive={pathname === "/admin"} />}
         {allowed("/admin/alerts") && <NavItem href="/admin/alerts" label="Alert operativi" icon={Bell} isActive={pathname.startsWith("/admin/alerts")} badge={criticalCount} />}
       </div>
+      )}
 
       {/* Nav groups */}
       <nav style={{ flex: 1, overflowY: "auto", padding: "4px 0 16px 0", scrollbarWidth: "thin" }}>
-        {NAV_GROUPS.map((group) => {
-          const visibleItems = (isEssential
+        {wsSections && wsSections.map((sec, si) => (
+          <div key={`ws-${si}`}>
+            {sec.title && (
+              <div style={{ margin: "12px 8px 4px 8px", padding: "0 12px", color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em" }}>{sec.title}</div>
+            )}
+            {sec.items.map((item) => (
+              <NavItem key={item.href} href={item.href} label={item.label} icon={iconFor(item.href)}
+                isActive={item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + "/")}
+                badge={item.badge ? criticalCount : 0} />
+            ))}
+          </div>
+        ))}
+        {wsSections && (
+          <button type="button" onClick={toggleAllTools} aria-expanded={showAll} className="hoc-grp"
+            style={{ display: "flex", alignItems: "center", gap: 6, width: "calc(100% - 16px)", margin: "16px 8px 4px 8px", padding: "8px 12px", background: "transparent", border: `1px dashed ${CP.border}`, borderRadius: 8, color: CP.textSecondary, fontFamily: FONTS.body, fontSize: 12.5, cursor: "pointer" }}>
+            {showAll ? <ChevronDown size={13} /> : <ChevronRight size={13} />} Tutti gli strumenti
+          </button>
+        )}
+        {showAll && NAV_GROUPS.map((group) => {
+          const visibleItems = (isEssential && !wsSections
             ? group.items.filter((it) => ESSENTIAL_HREFS.has(it.href))
-            : group.items).filter((it) => allowed(it.href));
+            : group.items).filter((it) => allowed(it.href) && !wsHrefs.has(it.href));
           if (visibleItems.length === 0) return null;
           const isOpen = openGroups[group.label];
           return (

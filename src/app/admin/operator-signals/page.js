@@ -435,7 +435,7 @@ export default function OperatorSignalsPage() {
     <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Training" }, { label: "Profilo operatore" }]}
-        title="Profilo segnali operatore"
+        title="Profilo operatore"
         subtitle="Chi allenare e su cosa: per ogni operatore, le abitudini che fanno vendere (metodo) accanto a quanto vende rispetto ai colleghi sugli stessi creator (resa). Serve al coaching, non è uno score."
         actions={
           <button onClick={refresh} disabled={busy || data?.bigquery === false} style={{ ...btn, cursor: busy ? "wait" : "pointer" }}>

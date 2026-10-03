@@ -23,6 +23,7 @@ import { CAP_LABELS, SCOPE_LABELS } from "@/lib/capability-labels";
 import WelcomeCertificate, { certButton } from "@/components/WelcomeCertificate";
 import { WELCOME_FIELDS, composeWelcome, welcomeVars } from "@/lib/welcome-card";
 import { PageHead, SectionTitle, Disclosure, Notice, DataTable, card } from "@/components/ds";
+import { WORKSPACES, WORKSPACE_IDS, defaultWorkspace } from "@/lib/workspaces";
 
 const btn = (primary) => ({
   display: "inline-flex",
@@ -150,6 +151,17 @@ export default function MembersPage() {
     load();
   };
 
+  const saveWorkspace = async (row, id) => {
+    setBusy(row.userId);
+    const r = await fetch("/api/admin/members", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: row.userId, action: "workspace", workspace: id }) });
+    const j = await r.json().catch(() => ({}));
+    setMsg(r.ok ? { type: "ok", text: `${row.name}: ${j.text}` } : { type: "error", text: j.error || "Salvataggio non riuscito" });
+    setBusy(null);
+    load();
+  };
+  // mansione mostrata: la scelta salvata, altrimenti quella che il ruolo dà di partenza
+  const wsOf = (r) => r.workspace || defaultWorkspace({ admin: Boolean(r.admin), roles: r.roles });
+
   const openEditor = (userId) => {
     setEditing(editing === userId ? null : userId);
     if (editing !== userId) setTimeout(() => editRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
@@ -190,6 +202,12 @@ export default function MembersPage() {
         : r.creators?.all ? <span style={{ color: CP.textSecondary }}>tutte</span>
         : r.creators?.creators?.length ? <span title={r.creators.creators.join(", ")} style={{ color: CP.textSecondary }}>{r.creators.creators.length === 1 ? r.creators.creators[0] : `${r.creators.creators.length} creator`}</span>
         : <span style={{ color: CP.textMuted }}>nessuna</span>),
+    },
+    {
+      key: "ws", label: "Mansione", sort: (r) => WORKSPACES[wsOf(r)]?.label || "~",
+      render: (r) => (wsOf(r)
+        ? <span style={{ color: CP.textSecondary }} title={r.workspace ? "scelta" : "dal ruolo"}>{WORKSPACES[wsOf(r)].label}{!r.workspace && <span style={{ color: CP.textMuted }}> · dal ruolo</span>}</span>
+        : <span style={{ color: CP.textMuted }}>menu personale</span>),
     },
     {
       key: "last", label: "Ultimo accesso", sort: (r) => r.last_sign_in_at || 0,
@@ -259,6 +277,11 @@ export default function MembersPage() {
                   </div>
                 </div>
                 <RoleChips ids={inv.roles} label={roleLabel} />
+                {(inv.workspace || inv.creators) && (
+                  <span style={{ fontSize: 12, color: CP.textMuted }}>
+                    {[inv.workspace && WORKSPACES[inv.workspace]?.label, inv.creators === "*" ? "tutte le creator" : Array.isArray(inv.creators) && inv.creators.length ? `${inv.creators.length} creator` : null].filter(Boolean).join(" · ")}
+                  </span>
+                )}
                 <button style={smallBtn} disabled={busy === inv.id} onClick={() => revoke(inv)}>Annulla invito</button>
               </div>
             ))}
@@ -305,9 +328,14 @@ export default function MembersPage() {
                   ? <span style={{ fontSize: 12, color: CP.textMuted }}>fisso: si toglie dalle impostazioni di Vercel</span>
                   : <button style={smallBtn} disabled={busy === editRow.userId} onClick={() => toggleAdmin(editRow)}>{editRow.admin ? "Togli da admin" : "Rendi admin"}</button>}
               </div>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Mansione: decide menu e pagina iniziale, non i permessi (si salva subito)</div>
+                <WorkspacePicker value={editRow.workspace || ""} fallback={defaultWorkspace({ admin: Boolean(editRow.admin), roles: editRow.roles })}
+                  disabled={busy === editRow.userId} onChange={(id) => saveWorkspace(editRow, id)} />
+              </div>
               {!editRow.admin && (
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Creator visibili: vede classifiche, creator, Action e Coaching Center solo di queste (si salva subito)</div>
+                  <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Creator visibili: vede classifiche, creator, Sotto soglia e Da far crescere solo di queste (si salva subito)</div>
                   <CreatorPicker list={creatorList} value={editRow.creators || { all: false, creators: [] }} disabled={busy === editRow.userId} onChange={(v) => saveCreators(editRow, v)} />
                   {!editRow.creators?.all && !editRow.creators?.creators?.length && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 6 }}>Nessuna creator: non vede dati di vendita (le sue pagine personali restano).</div>}
                 </div>
@@ -408,9 +436,25 @@ function CreatorPicker({ list, value, onChange, disabled }) {
   );
 }
 
+function WorkspacePicker({ value, fallback, onChange, disabled }) {
+  const chip = (on) => ({ padding: "5px 11px", borderRadius: 999, fontSize: 13, fontFamily: FONTS.body, cursor: disabled ? "wait" : "pointer", border: `1px solid ${on ? CP.accent : CP.border}`, background: on ? CP.accentSoft : CP.surface, color: on ? CP.accentSoftText : CP.textSecondary });
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      <button type="button" disabled={disabled} aria-pressed={!value} style={chip(!value)} onClick={() => onChange("")}
+        title="La mansione che il ruolo dà di partenza">{!value ? "✓ " : ""}Dal ruolo{fallback ? ` (${WORKSPACES[fallback].label})` : " (menu personale)"}</button>
+      {WORKSPACE_IDS.map((id) => (
+        <button type="button" key={id} disabled={disabled} aria-pressed={value === id} style={chip(value === id)} onClick={() => onChange(id)} title={WORKSPACES[id].hint}>
+          {value === id ? "✓ " : ""}{WORKSPACES[id].label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function AddMemberModal({ assignable, creatorList = [], onClose, onDone }) {
   const [email, setEmail] = useState("");
   const [vis, setVis] = useState({ all: false, creators: [] });
+  const [ws, setWs] = useState("");
   const [picked, setPicked] = useState(assignable.some((r) => r.id === "operator") ? ["operator"] : []);
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState(null);
@@ -421,6 +465,9 @@ function AddMemberModal({ assignable, creatorList = [], onClose, onDone }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // chi guida vendite o squadre senza creator assegnate apre pagine vuote (prova d'uso 03/10): obbligatorio
+  const needsCreators = !picked.includes("admin") && picked.some((r) => ["sales_manager", "team_lead", "qa_reviewer"].includes(r));
+  const missingCreators = needsCreators && !vis.all && !vis.creators.length;
   const toggle = (id) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
   const send = async (e) => {
@@ -429,7 +476,7 @@ function AddMemberModal({ assignable, creatorList = [], onClose, onDone }) {
     const r = await fetch("/api/admin/invitations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, roles: picked, creators: vis.all ? "*" : vis.creators }),
+      body: JSON.stringify({ email, roles: picked, creators: vis.all ? "*" : vis.creators, workspace: ws || undefined }),
     });
     const j = await r.json().catch(() => ({}));
     setSending(false);
@@ -468,18 +515,28 @@ function AddMemberModal({ assignable, creatorList = [], onClose, onDone }) {
           })}
         </div>
 
+        {!picked.every((r) => r === "operator") && (
+          <>
+            <label style={{ display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Mansione</label>
+            <div style={{ marginBottom: 6 }}><WorkspacePicker value={ws} fallback={defaultWorkspace({ admin: picked.includes("admin"), roles: picked })} onChange={setWs} /></div>
+            <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 16 }}>Il menu e la pagina iniziale che vedrà. I permessi restano quelli del ruolo.</div>
+          </>
+        )}
         {creatorList.length > 0 && !picked.every((r) => r === "operator") && (
           <>
-            <label style={{ display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Creator visibili</label>
+            <label style={{ display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>
+              Creator visibili{needsCreators && <span style={{ color: CP.textMuted }}> · obbligatorio per questo ruolo</span>}
+            </label>
             <div style={{ marginBottom: 6 }}><CreatorPicker list={creatorList} value={vis} onChange={setVis} /></div>
-            <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 16 }}>Vedrà classifiche e dati solo di queste creator. Si cambia quando vuoi da Membri.</div>
+            <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 16 }}>Vedrà classifiche e dati solo di queste creator. Senza, le sue pagine di vendita restano vuote. Si cambia quando vuoi da Membri.</div>
           </>
         )}
         {err && <div style={{ fontSize: 13, color: CP.accentRed, marginBottom: 14 }}>{err}</div>}
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button type="button" style={btn(false)} onClick={onClose}>Annulla</button>
-          <button type="submit" style={{ ...btn(true), opacity: sending || !picked.length ? 0.6 : 1 }} disabled={sending || !picked.length}>
+          <button type="submit" title={missingCreators ? "Scegli le creator che vedrà (oppure «Tutte»)" : undefined}
+            style={{ ...btn(true), opacity: sending || !picked.length || missingCreators ? 0.6 : 1 }} disabled={sending || !picked.length || missingCreators}>
             {sending ? "Invio…" : "Manda invito"}
           </button>
         </div>

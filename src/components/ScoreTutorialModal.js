@@ -202,7 +202,7 @@ const STEPS = [
     body: () => (
       <div>
         <p style={p}>
-          Lo score che vedi su "<b>Sales CP</b>" è la <b>media pesata su sales</b> degli score per creator:
+          Lo score che vedi su "<b>Classifica vendite</b>" è la <b>media pesata su sales</b> degli score per creator:
         </p>
         <div style={{ ...formulaBlock, textAlign: "center" }}>
           <div style={{ fontFamily: FONTS.mono, fontSize: 14, color: CP.textPrimary, fontWeight: 600 }}>
@@ -215,7 +215,7 @@ const STEPS = [
         <ul style={{ color: CP.textSecondary, fontSize: 13, lineHeight: 1.7, paddingLeft: 20 }}>
           <li>Non puoi essere <b>«Eccellente»</b> nello score Vendite se vai male sulle creator dove passi la maggior parte dei turni.</li>
           <li>Le creator marginali (1-2 shift, sales bassissime) contano poco.</li>
-          <li>Coerenza garantita tra le viste Sales CP e Creator.</li>
+          <li>Coerenza garantita tra le viste Classifica vendite e Creator.</li>
         </ul>
         <div style={{ marginTop: 18, padding: "14px 16px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

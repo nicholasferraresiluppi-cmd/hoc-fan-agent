@@ -182,7 +182,7 @@ export default function DebugMappingPage() {
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Sync CP", href: "/admin/creatorspro-sync" }, { label: "Debug mapping" }]}
         title="Perché un operatore non ha dati CP"
-        subtitle="Per chi in Sales CP compare senza dati CreatorsPro: cerca il nome e ottieni la causa (non collegato, sync incompleto, nome scritto diverso) e dove si risolve."
+        subtitle="Per chi in Classifica vendite compare senza dati CreatorsPro: cerca il nome e ottieni la causa (non collegato, sync incompleto, nome scritto diverso) e dove si risolve."
       />
 
       {/* Ricerca */}
@@ -226,11 +226,11 @@ export default function DebugMappingPage() {
           )}
           {candidates && candidates.length > 0 && (
             <>
-              <SectionTitle aside={<Link href="/leaderboard/sales-cp" style={{ color: CP.accentSoftText, textDecoration: "none" }}>Vedi in Sales CP →</Link>}>
+              <SectionTitle aside={<Link href="/leaderboard/sales-cp" style={{ color: CP.accentSoftText, textDecoration: "none" }}>Vedi in Classifica vendite →</Link>}>
                 {candidates.length} operatori senza dati CP · {periodLabel}
               </SectionTitle>
               <div style={{ fontSize: 13, color: CP.textSecondary, margin: "-4px 0 10px", lineHeight: 1.5 }}>
-                In Sales CP compaiono senza score: o non sono collegati a una persona CreatorsPro, o il sync ha perso le loro buste. Clicca una riga per la diagnosi.
+                In Classifica vendite compaiono senza score: o non sono collegati a una persona CreatorsPro, o il sync ha perso le loro buste. Clicca una riga per la diagnosi.
                 {" "}Il modo più veloce per collegarli è la sezione <Link href="/admin/creatorspro-sync#collega" style={{ color: CP.accentSoftText, textDecoration: "none" }}>Persone da collegare</Link> in Sync CreatorsPro.
               </div>
               <DataTable columns={candCols} rows={candRows} onRowClick={(op) => pickCandidate(op.employee)}
