@@ -330,8 +330,9 @@ console.log(`hr-people: ${n} asserzioni OK`);
   te(S.normalizeSkillMap(["OF Messaging"]), {}, "array → vuoto");
 
   // etichette ClickUp da scrivere: solo voci con equivalente, una per voce
-  te(S.clickupSkillLabels({ tech_automation: "Base", ads_meta: "Esperto", of_chat: "Base", soc_seo: "Base" }), ["Automations", "OF Messaging", "SEO / SEM"], "solo voci con etichetta (Google/Meta Ads no)");
-  t(!S.clickupSkillLabels({ ads_google: "Esperto" }).length, "Google Ads non diventa SEO / SEM");
+  te(S.clickupSkillLabels({ tech_automation: "Base", ads_meta: "Esperto", of_chat: "Base", soc_seo: "Base" }), ["Automations", "Meta Ads (Facebook e Instagram)", "OF Messaging", "SEO / SEM"], "voci senza etichetta storica: il nome italiano (03/10)");
+  te(S.clickupSkillLabels({ ads_google: "Esperto" }), ["Google Ads"], "Google Ads non diventa SEO / SEM: ha la sua etichetta");
+  t(S.resolveSkillKey("Google Ads") === "ads_google", "etichetta italiana letta indietro da ClickUp");
 
   // aree e filtro "almeno livello"
   te(S.areasOfSkillMap({ "OF Messaging": "Base", ai_coding: "Base" }), ["of", "ai"], "aree dalle competenze");
@@ -354,7 +355,7 @@ console.log(`hr-people: ${n} asserzioni OK`);
   // normalizePersonInput: skillLevels → skills ClickUp; learnWish max 2; pastRoles; otherSkills max 500
   const r = normalizePersonInput({ skillLevels: { "OF Messaging": "Esperto", ads_meta: "Base", Zapier: "Autonomo" }, learnWish: ["Copywriting", "ai_coding", "ads_meta"], pastRoles: [{ role: "team_lead", duration: "3to5" }], otherSkills: "x".repeat(800) });
   te(r.values.skillLevels, { of_chat: "Esperto", ads_meta: "Base", tech_automation: "Autonomo" }, "skillLevels nel formato nuovo");
-  te(r.values.skills, ["OF Messaging", "Automations"], "Skills ClickUp = solo le voci con etichetta");
+  te(r.values.skills, ["OF Messaging", "Meta Ads (Facebook e Instagram)", "Automations"], "Skills ClickUp = tutte le voci, nome italiano se senza etichetta storica");
   te(r.values.learnWish, ["soc_copy", "ai_coding"], "learnWish max 2");
   te(r.values.pastRoles, [{ role: "team_lead", duration: "3to5" }], "pastRoles");
   t(r.values.otherSkills.length === 500, "otherSkills tagliato a 500");
