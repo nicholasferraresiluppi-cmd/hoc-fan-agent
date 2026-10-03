@@ -1,40 +1,38 @@
 /**
- * POST /api/hr/modulo/[token]/file?kind=document|cv — un file dal modulo pubblico.
+ * POST /api/hr/modulo/[token]/file — "ho caricato il file" (03/10/2026).
  *
- * multipart con campo "file". PDF/JPG/PNG (tipo verificato sui primi byte, non
- * sull'estensione), massimo 10 MB, massimo 4 file per link, solo nell'ora dopo
- * l'invio del modulo. Il file va DIRETTO come allegato del task ClickUp: in KV
- * resta solo il riferimento (titolo, id allegato, data).
+ * Corpo JSON { kind: "document"|"cv", pathname }: il riferimento al blob appena
+ * caricato sul Blob privato (vedi …/upload), MAI i byte (prima passavano di qui e
+ * sopra ~4,5 MB Vercel rispondeva 413). Il server legge il blob, verifica il tipo
+ * vero sui primi byte, lo allega al task ClickUp e cancella subito il blob. In
+ * app resta solo il riferimento. Se ClickUp non risponde (429/5xx) o il task non
+ * esiste ancora: il blob resta, un elemento va in coda e alla persona si dice
+ * "ricevuto" (lib/hr-uploads). La coda riparte dopo la risposta (`after()`).
  *
- * Nota piattaforma: su Vercel il corpo di una funzione è limitato a ~4,5 MB;
- * sopra quella soglia la richiesta non arriva qui (413 dal bordo) e il client
- * lo spiega. Per arrivare davvero a 10 MB serve un upload diretto (fase 2).
+ * Pubblica (middleware) e difesa da sola: lo slot del blob è legato al token.
  */
-import { uploadFormFile } from "@/lib/hr-people";
+import { after } from "next/server";
+import { receiveUpload, transferDeferred, drainHrBackground } from "@/lib/hr-uploads";
 import { checkRateLimit, tooMany } from "@/lib/rate-limit";
-import { UPLOAD_MAX_BYTES } from "@/lib/hr-people-core";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+const ipOf = (request) => (request.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "n/d";
+
 export async function POST(request, props) {
   const { token } = await props.params;
+  const ip = await checkRateLimit("hr_upload_ip", ipOf(request));
+  if (!ip.ok) return tooMany(ip.retryAfter);
   const rl = await checkRateLimit("hr_upload", String(token || "").slice(0, 64));
   if (!rl.ok) return tooMany(rl.retryAfter);
-  const kind = new URL(request.url).searchParams.get("kind");
-  const len = Number(request.headers.get("content-length") || 0);
-  if (len > UPLOAD_MAX_BYTES + 64 * 1024) return Response.json({ ok: false, error: "File troppo grande (massimo 10 MB)." }, { status: 413 });
-  let form;
-  try {
-    form = await request.formData();
-  } catch {
-    return Response.json({ ok: false, error: "Richiesta non valida." }, { status: 400 });
-  }
-  const file = form.get("file");
-  if (!file || typeof file === "string") return Response.json({ ok: false, error: "Nessun file." }, { status: 400 });
-  if (file.size > UPLOAD_MAX_BYTES) return Response.json({ ok: false, error: "File troppo grande (massimo 10 MB)." }, { status: 413 });
-  const bytes = Buffer.from(await file.arrayBuffer());
-  const res = await uploadFormFile(token, { kind, bytes, declaredType: file.type || null });
+  let body;
+  try { body = await request.json(); } catch { return Response.json({ ok: false, error: "Richiesta non valida." }, { status: 400 }); }
+  const res = await receiveUpload(token, { kind: body?.kind, pathname: body?.pathname }, { defer: true });
+  after(async () => {
+    if (res.deferred) await transferDeferred(res.deferred).catch(() => {});
+    await drainHrBackground({ budgetMs: 6000 }).catch(() => {});
+  });
   if (!res.ok) return Response.json({ ok: false, error: res.error }, { status: res.status });
-  return Response.json(res);
+  return Response.json({ ok: true, received: true });
 }

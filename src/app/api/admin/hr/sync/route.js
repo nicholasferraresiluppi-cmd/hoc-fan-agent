@@ -11,6 +11,7 @@
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { getSyncStatus, importFromClickup, registerWebhook } from "@/lib/hr-people";
 import { internalOrigin } from "@/lib/cron-chain";
+import { uploadQueueStatus } from "@/lib/hr-uploads";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -22,8 +23,8 @@ function webhookEndpoint(request) {
 export async function GET(request) {
   const az = await authorize(CAPABILITIES.SEED);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
-  const status = await getSyncStatus();
-  return Response.json({ ...status, webhookEndpoint: webhookEndpoint(request) });
+  const [status, uploads] = await Promise.all([getSyncStatus(), uploadQueueStatus().catch(() => null)]);
+  return Response.json({ ...status, uploads, webhookEndpoint: webhookEndpoint(request) });
 }
 
 export async function POST(request) {

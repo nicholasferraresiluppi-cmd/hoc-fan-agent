@@ -10,6 +10,7 @@
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { getPerson, getLog, publicPerson, savePerson, listPeople, computeCleanup, hrSyncConfig, fieldOptions } from "@/lib/hr-people";
 import { hrCryptoConfigured } from "@/lib/hr-crypto";
+import { pendingUploadsFor } from "@/lib/hr-uploads";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,7 +21,7 @@ export async function GET(request, props) {
   const { id } = await props.params;
   const p = await getPerson(id);
   if (!p) return Response.json({ error: "Persona non trovata." }, { status: 404 });
-  const [log, people, options] = await Promise.all([getLog(id), listPeople(), fieldOptions()]); // people = solo attive
+  const [log, people, options, incoming] = await Promise.all([getLog(id), listPeople(), fieldOptions(), pendingUploadsFor(id).catch(() => [])]); // people = solo attive
   const cleanup = computeCleanup(people);
   const dupGroup = cleanup.duplicates.find((g) => g.ids.includes(id));
   const byId = Object.fromEntries(people.map((x) => [x.id, x]));
@@ -33,6 +34,7 @@ export async function GET(request, props) {
     options,
     sync: { enabled: cfg.enabled },
     crypto: hrCryptoConfigured(),
+    incoming, // file arrivati dal modulo e in coda verso ClickUp ("Documento in arrivo")
   });
 }
 

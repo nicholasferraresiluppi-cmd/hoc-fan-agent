@@ -44,6 +44,35 @@ function PhaseStatusesRow({ statuses }) {
   );
 }
 
+// Documenti dal modulo (03/10/2026): in transito sul Blob privato, poi su ClickUp.
+const KIND_LABEL = { document: "Documento d'identità", cv: "CV" };
+function UploadsBlock({ u }) {
+  return (
+    <>
+      {u.failed?.length > 0 && (
+        <Notice danger>
+          {u.failed.length === 1 ? "Un documento caricato dal modulo non è arrivato" : `${u.failed.length} documenti caricati dal modulo non sono arrivati`} su ClickUp negli ultimi 30 giorni. Chiedi alla persona di ricaricarlo (il file non è più nel transito).
+          <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+            {u.failed.slice(0, 10).map((f, i) => (
+              <li key={`${f.at}-${i}`}>
+                {KIND_LABEL[f.kind] || "File"} · {fmtDateTime(f.at)} · <Link href={`/admin/hr/${f.personId}`} style={{ color: CP.accentSoftText }}>apri la scheda</Link> · {f.reason}
+              </li>
+            ))}
+          </ul>
+        </Notice>
+      )}
+      <section style={{ ...card, padding: "16px 18px", marginBottom: 14, display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <Metric label="Documenti in arrivo" value={fmtInt(u.pending || 0)} note={u.oldestAt ? `il più vecchio dal ${fmtDateTime(u.oldestAt)}` : "nessuno in coda"} danger={Boolean(u.oldestAt && Date.now() - u.oldestAt > 24 * 3600 * 1000)} />
+        <span style={{ fontSize: 13, color: CP.textMuted, maxWidth: 520 }}>
+          {u.blob
+            ? "I file del modulo passano per pochi istanti da uno spazio temporaneo privato (Vercel Blob, Europa) e si cancellano appena arrivano su ClickUp. Se ClickUp non risponde restano in coda e si riprovano; di notte si cancellano i file abbandonati da più di 24 ore."
+            : "Spazio temporaneo per i documenti non configurato (BLOB_READ_WRITE_TOKEN): il caricamento dei documenti dal modulo è spento."}
+        </span>
+      </section>
+    </>
+  );
+}
+
 export default function HrSyncPage() {
   const { data, error, isLoading, mutate } = useSWR("/api/admin/hr/sync", fetcher, { revalidateOnFocus: false });
   const [busy, setBusy] = useState(null);
@@ -131,6 +160,8 @@ export default function HrSyncPage() {
               {Object.entries(data.people.bySync).map(([k, n]) => `${SYNC_LABEL[k] || k}: ${n}`).join(" · ")} · <Link href="/admin/hr" style={{ color: CP.accentSoftText }}>vai all'elenco</Link>
             </p>
           )}
+
+          {data.uploads && <UploadsBlock u={data.uploads} />}
 
           {data.fields && (
             <Disclosure open={fieldsOpen} onToggle={() => setFieldsOpen(!fieldsOpen)} title="Campi della lista"

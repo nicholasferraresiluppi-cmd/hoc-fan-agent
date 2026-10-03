@@ -14,8 +14,16 @@
  * stato); tetto di richieste per token e per IP (lib/rate-limit). Il link
  * condiviso lo usano tutti: tetto per token più largo (`hr_form_shared`) e
  * tetto giornaliero di INVII in lib/hr-people (`hr_form_shared_submit`).
+ *
+ * 03/10/2026 (300 persone, anche tutte insieme): l'invio salva la scheda e
+ * risponde SUBITO; la scrittura su ClickUp (creazione del task) avviene dopo la
+ * risposta con `after()`, insieme a una piccola ripresa delle scritture e dei
+ * file rimasti in sospeso. Sotto un picco i 429 di ClickUp non fanno aspettare
+ * la persona e il salvataggio in app non fallisce mai per ClickUp.
  */
-import { getFormContext, submitForm, isSharedFormToken } from "@/lib/hr-people";
+import { after } from "next/server";
+import { getFormContext, submitForm, isSharedFormToken, pushPersonSafe, getPerson } from "@/lib/hr-people";
+import { drainHrBackground } from "@/lib/hr-uploads";
 import { checkRateLimit, tooMany } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -53,7 +61,15 @@ export async function POST(request, props) {
   } catch {
     return Response.json({ ok: false, error: "Richiesta non valida." }, { status: 400 });
   }
-  const res = await submitForm(token, body || {});
+  const res = await submitForm(token, body || {}, { deferSync: true });
   if (!res.ok) return Response.json({ ok: false, error: res.error }, { status: res.status });
-  return Response.json(res);
+  const { personId, ...out } = res; // l'id della scheda non esce verso il browser
+  after(async () => {
+    try {
+      const p = personId ? await getPerson(personId) : null;
+      if (p) await pushPersonSafe(p, p.clickupTaskId ? p.pendingKeys || [] : null, { actor: "modulo" });
+    } catch { /* resta in hr:sync:retry: la riprende il giro dopo o la notte */ }
+    await drainHrBackground({ budgetMs: 8000 }).catch(() => {});
+  });
+  return Response.json(out);
 }

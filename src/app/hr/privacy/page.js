@@ -59,6 +59,7 @@ export default function HrPrivacyPage() {
 
         <h2 style={h2}>Sicurezza</h2>
         <p style={p}>Il collegamento è cifrato. Nella nostra applicazione il codice fiscale è conservato cifrato e l'accesso ai dati è limitato alle persone autorizzate.</p>
+        <p style={p}>I documenti che carichi (documento d'identità e curriculum) passano per pochi istanti da uno spazio temporaneo privato di Vercel in Europa e vengono cancellati subito dopo il trasferimento nella tua scheda. Se il trasferimento non riesce al primo tentativo, restano lì solo il tempo necessario per riprovare.</p>
       </article>
     </main>
   );

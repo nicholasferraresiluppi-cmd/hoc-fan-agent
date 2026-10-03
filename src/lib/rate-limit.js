@@ -22,14 +22,27 @@ export const LIMITS = {
   candidate_eval:[{ window: 3600, max: 20 }],
   feedback:      [{ window: 86400, max: 30 }],
   thanks:        [{ window: 86400, max: 20 }],  // "grazie" tra colleghi
-  // Centro HR (29/09/2026): modulo pubblico da link, upload documenti, webhook ClickUp
-  hr_form:       [{ window: 60, max: 20 },  { window: 86400, max: 200 }],  // per token
-  hr_form_ip:    [{ window: 60, max: 40 },  { window: 86400, max: 600 }],  // per IP
-  hr_upload:     [{ window: 3600, max: 10 }],                             // per token
+  // Centro HR (29/09/2026): modulo pubblico da link, upload documenti, webhook ClickUp.
+  // Rivisti il 03/10/2026 per 300 persone, anche tutte insieme (link mandato a tutti):
+  //  - per IP: in ufficio molte persone escono dallo STESSO IP. Una persona fa ~3-5
+  //    richieste al modulo in pochi minuti; 300 al minuto = ~60-100 persone nello
+  //    stesso minuto dallo stesso IP. Il giorno: 300 persone × ~10 + errori = 5000.
+  //    La vera difesa anti-abuso non è l'IP ma il tetto di INVII e i token monouso.
+  //  - upload per token: ogni file = 3 richieste (slot, token Blob, copia su ClickUp),
+  //    2 file + qualche ripetizione dopo un errore → 30 all'ora per token figlio.
+  //    È per token (cioè per persona), quindi l'IP condiviso non conta.
+  hr_form:       [{ window: 60, max: 20 },  { window: 86400, max: 200 }],  // per token personale
+  hr_form_ip:    [{ window: 60, max: 300 }, { window: 86400, max: 5000 }], // per IP (uffici: IP condiviso)
+  hr_upload:     [{ window: 3600, max: 30 }],                             // per token (persona)
+  hr_upload_ip:  [{ window: 60, max: 300 }],                              // per IP, solo freno ai loop
   // Link condiviso (03/10/2026): un solo link per tutti → il tetto per token di hr_form
-  // diventerebbe un tetto per l'intera azienda. Richieste larghe, INVII stretti.
-  hr_form_shared:        [{ window: 60, max: 120 }, { window: 86400, max: 5000 }], // richieste per token condiviso
-  hr_form_shared_submit: [{ window: 86400, max: 300 }],                            // invii al giorno dal link condiviso
+  // diventerebbe un tetto per l'intera azienda. Richieste larghe, INVII contati.
+  // Invii: 2000 al giorno (300 persone + reinvii dopo errori + margine ampio), con un
+  // freno al minuto (150) che regge il picco vero (50-100 invii nello stesso minuto)
+  // ma ferma uno script che crea schede in loop. Le schede spazzatura finiscono
+  // comunque nella vista "Da ripulire".
+  hr_form_shared:        [{ window: 60, max: 600 }, { window: 86400, max: 20000 }], // richieste per token condiviso
+  hr_form_shared_submit: [{ window: 60, max: 150 }, { window: 86400, max: 2000 }],  // invii dal link condiviso
   hr_webhook:    [{ window: 60, max: 300 }],                              // per IP (ClickUp)
 };
 
