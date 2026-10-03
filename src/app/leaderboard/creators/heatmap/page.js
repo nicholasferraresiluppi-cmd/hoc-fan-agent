@@ -5,6 +5,7 @@
 // <70 Critical" mentre le celle mostrano lo score 0-100 di oggi → operatori al
 // vertice (89-90) apparivano rossi "Weak/Critical". Ora il colore è la FASCIA dello
 // score su quella creator (stessa di Sales CP), celle a pochi turni in grigio.
+import { isEarlyMonth } from "@/lib/use-smart-period";
 import { use, useMemo, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
@@ -15,6 +16,7 @@ import { PageHead, Notice, card } from "@/components/ds";
 import { tierLabel } from "@/lib/tier-label";
 const fetcher = (url) => fetch(url).then((r) => r.json());
 const currentMonthId = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+const prevMonthOf = (id) => { const [y, m] = id.split("-").map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 const TIERS = ["Critical", "Weak", "Average", "Good", "Strong", "Elite"];
 // rosso → neutro → verde, sempre dai token (funziona nei due temi)
 const TIER_BG = {
@@ -26,7 +28,8 @@ const sc = (v) => (v == null ? "" : Number(v).toLocaleString("it-IT", { maximumF
 
 export default function HeatmapPage({ searchParams }) {
   const resolved = typeof searchParams?.then === "function" ? use(searchParams) : searchParams;
-  const periodId = resolved?.period_id || currentMonthId();
+  // inizio mese: il mese chiuso, come Creator e Classifica (prima la Mappa apriva ottobre e il resto settembre)
+  const periodId = resolved?.period_id || (isEarlyMonth() ? prevMonthOf(currentMonthId()) : currentMonthId());
   const [minSales, setMinSales] = useState(500);
   const [q, setQ] = useState("");
   const { data } = useSWR(`/api/leaderboard/creators?period_id=${periodId}`, fetcher, { revalidateOnFocus: false });
@@ -95,8 +98,8 @@ export default function HeatmapPage({ searchParams }) {
           {[
             ["Operatori", allNames.length],
             ["Coppie con dati affidabili", summary.cells],
-            ["Rendono bene (Strong/Elite)", summary.strong],
-            ["Rendono poco (Critical/Weak)", summary.weak],
+            ["Rendono bene (Forte, Eccellente)", summary.strong],
+            ["Rendono poco (Da costruire, Da rafforzare)", summary.weak],
           ].map(([l, v]) => (
             <div key={l}>
               <div style={{ fontSize: 12, color: CP.textSecondary }}>{l}</div>

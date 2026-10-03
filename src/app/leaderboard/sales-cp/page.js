@@ -215,15 +215,15 @@ export default function SalesCpLeaderboardPage() {
             <Metric label="Venduto in classifica" value={fmt$(agency?.total_sales)} note={official?.current?.sales ? `di ${fmt$(official.current.sales)} ufficiali · ${fmtInt(agency?.total_shifts)} turni` : `${fmtInt(agency?.total_shifts)} turni`} />
             <Metric label="Venduto per turno" value={fmt$(agency?.avg_sales_per_shift)} delta={fmtDelta(agency?.avg_sales_per_shift, prev?.agency?.avg_sales_per_shift)} />
             <div>
-              <Metric label="Da rivedere" value={fmtInt(counts.review)} attn={counts.review > 0} note={`score ≤ ${REVIEW_SCORE}, almeno ${MIN_SHIFTS} turni`} />
-              {counts.review > 0 && <Link href={`/admin/action-center?period_id=${periodId}`} style={{ fontSize: 13, color: CP.accentSoftText, textDecoration: "none" }}>Apri Action Center →</Link>}
+              <Metric label="Sotto soglia" value={fmtInt(counts.review)} attn={counts.review > 0} note={`score ≤ ${REVIEW_SCORE}, almeno ${MIN_SHIFTS} turni`} />
+              {counts.review > 0 && <Link href={`/admin/action-center?period_id=${periodId}`} style={{ fontSize: 13, color: CP.accentSoftText, textDecoration: "none" }}>Apri Sotto soglia →</Link>}
             </div>
           </div>
         </HeroMetric>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
           <FilterChip label={`Tutti (${rows.length})`} active={view === "all"} onClick={() => setView("all")} />
-          <FilterChip label={`Da rivedere (${counts.review})`} attn={counts.review > 0} active={view === "review"} disabled={!counts.review} onClick={() => setView(view === "review" ? "all" : "review")} />
+          <FilterChip label={`Sotto soglia (${counts.review})`} attn={counts.review > 0} active={view === "review"} disabled={!counts.review} onClick={() => setView(view === "review" ? "all" : "review")} />
           <FilterChip label={`In calo (${counts.down})`} active={view === "down"} disabled={!counts.down} onClick={() => setView(view === "down" ? "all" : "down")} />
           <FilterChip label={`In miglioramento (${counts.up})`} active={view === "up"} disabled={!counts.up} onClick={() => setView(view === "up" ? "all" : "up")} />
           <FilterChip label={`Meno di ${MIN_SHIFTS} turni (${counts.thin})`} active={view === "thin"} disabled={!counts.thin} onClick={() => setView(view === "thin" ? "all" : "thin")} />

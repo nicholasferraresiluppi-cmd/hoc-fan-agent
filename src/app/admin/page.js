@@ -28,6 +28,7 @@ import { WORKSPACES, workspaceSections } from "@/lib/workspaces";
 import { fmt$, fmtInt, fmtDelta, fmtAgo, MONTHS_IT } from "@/lib/format";
 import { useStyle } from "@/lib/theme-client";
 import { PageHead, HeroMetric, Metric, SectionTitle, ActionRow, card } from "@/components/ds";
+import { isEarlyMonth } from "@/lib/use-smart-period";
 
 // Tollera 4xx/5xx: ritorna null invece di throware (le metriche mostrano "—")
 const fetcher = async (url) => {
@@ -174,7 +175,13 @@ export default function AdminHub() {
   const { data: agency } = useSWR(wantSales ? `/api/leaderboard/agency-sales?period_id=${periodId}` : null, fetcher);
   const { data: sync } = useSWR(`/api/admin/creatorspro-sync`, fetcher);
   // il ciclo coaching/sostituzioni è di tutta l'agenzia: solo per chi vede tutte le creator
-  const { data: loop } = useSWR(me && !isHr && !partial ? `/api/admin/closed-loop-metrics?period_id=${periodId}` : null, fetcher);
+  // a inizio mese il ciclo si legge sul mese chiuso, come la Classifica (prima: 51,1 qui e 47,4 lì, due mesi diversi)
+  const loopPeriod = isEarlyMonth(now) ? prevId : periodId;
+  const { data: loop } = useSWR(me && !isHr && !partial ? `/api/admin/closed-loop-metrics?period_id=${loopPeriod}` : null, fetcher);
+  // Decisioni in attesa (prova d'uso Board, 3ª: "per sapere cosa aspetta me devo scorrere 53 schede"): le voci
+  // "Da decidere" della Roadmap, le più vecchie prima. Solo per le viste Board e Tutti (la Roadmap è admin).
+  const wantDecisions = ws === "board" || ws === "all";
+  const { data: roadmap } = useSWR(wantDecisions ? "/api/admin/roadmap" : null, fetcher, { revalidateOnFocus: false });
   const [showAll, setShowAll] = useState(false);
   const { data: alertsData } = useSWR(`/api/admin/ops-alerts`, fetcher);
 
@@ -191,15 +198,22 @@ export default function AdminHub() {
   const cmp = agency?.compare;
   const dSales = cmp?.delta_pct?.sales;
   const fmtPct = (v) => (v == null ? null : `${v > 0 ? "+" : v < 0 ? "−" : ""}${String(Math.abs(v)).replace(".", ",")}%`);
-  const paceLine = cmp?.until_day && dSales != null
-    ? dSales < -3 ? `${curName} corre più piano di ${prevName}, allo stesso giorno.`
-      : dSales > 3 ? `${curName} corre più veloce di ${prevName}, allo stesso giorno.`
-      : `${curName} va al passo di ${prevName}.`
-    : null;
+  // Verdetto in una riga (prova d'uso Board: "mi dai −16% e lasci a me il giudizio"): prima l'affidabilità
+  // del dato, poi la direzione. Sotto i 5 giorni chiusi il confronto è dichiarato provvisorio.
+  const FEW_DAYS = 5;
+  const dir = dSales == null ? null : dSales < -3 ? "sotto" : dSales > 3 ? "sopra" : "in linea con";
+  const paceLine = !cmp || !cmp.until_day || dir == null ? null
+    : agency?.incomplete ? `Dato da verificare: ci sono controlli aperti sui dati di vendita (vedi "Dati incompleti").`
+    : cmp.until_day < FEW_DAYS ? `Per ora ${dir} ${prevName}, ma con ${cmp.until_day} ${cmp.until_day === 1 ? "giorno chiuso" : "giorni chiusi"} è un'indicazione, non un giudizio.`
+    : `${curName} è ${dir} ${prevName} allo stesso giorno (${fmtPct(dSales)}).`;
   const compareLine = !agency?.current ? null
-    : cmp && cmp.until_day === 0 ? `Oggi è il primo giorno chiuso che manca: il confronto con ${prevName} parte da domani · ${prevName} intero: ${fmt$(agency.prev_full?.sales)}`
-    : cmp ? `Fino al ${cmp.until_day} ${monthName}: ${fmt$(cmp.current.sales)} · ${prevName} allo stesso giorno: ${fmt$(cmp.prev.sales)} (${fmtPct(dSales) || "—"})`
+    : cmp && cmp.until_day === 0 ? `Il confronto con ${prevName} parte da domani, col primo giorno chiuso · ${prevName} intero: ${fmt$(agency.prev_full?.sales)}`
+    : cmp ? `Allo stesso giorno: ${fmtPct(dSales) || "—"} su ${prevName} (1-${cmp.until_day} ${monthName}: ${fmt$(cmp.current.sales)} contro ${fmt$(cmp.prev.sales)})`
     : `${prevName} intero: ${fmt$(agency.prev_full?.sales)}`;
+  const decisions = Object.values(roadmap?.items || {})
+    .filter((i) => /decidere/i.test(i.area || "") && (i.status === "now" || i.status === "next"))
+    .sort((a, b) => (a.status === b.status ? (a.added_at || 0) - (b.added_at || 0) : a.status === "now" ? -1 : 1));
+  const daysAgo = (t) => (t ? Math.max(0, Math.floor((Date.now() - t) / 86400000)) : null);
   // metriche sulla stessa base del confronto (giorni chiusi), o sul mese intero se il mese è passato
   const base = cmp?.until_day ? cmp.current : agency?.current;
   const basePrev = cmp?.until_day ? cmp.prev : agency?.prev_full;
@@ -237,7 +251,7 @@ export default function AdminHub() {
         title={`${greeting}${userName ? `, ${userName}` : ""}.`}
         line2={isHr ? null : paceLine}
         subtitle={isHr ? "Persone, accessi e contestazioni: da qui parti per il lavoro di oggi."
-          : paceLine && st === "v3" ? null : `Come va ${partial ? "il tuo perimetro" : "l'agenzia"} a ${monthName} e cosa guardare oggi.`}
+          : paceLine ? (st === "v3" ? null : paceLine) : `Come va ${partial ? "il tuo perimetro" : "l'agenzia"} a ${monthName} e cosa guardare oggi.`}
       />
 
       {noCreators && !isHr && (
@@ -295,9 +309,28 @@ export default function AdminHub() {
         </section>
       )}
 
+      {wantDecisions && decisions.length > 0 && (
+        <section className="ds-open" style={{ ...card, marginBottom: 14 }}>
+          <div className="ds-open-h" style={{ padding: "14px 16px 10px" }}>
+            <SectionTitle aside={`${decisions.length} in attesa, le più vecchie prima`}>Decisioni che aspettano</SectionTitle>
+          </div>
+          {decisions.slice(0, 5).map((d) => (
+            <ActionRow key={d.id} severity={d.status === "now" ? "warning" : "info"}
+              title={d.title}
+              detail={[daysAgo(d.added_at) != null && `da ${daysAgo(d.added_at)} ${daysAgo(d.added_at) === 1 ? "giorno" : "giorni"}`, d.gate && d.gate !== "—" && `serve: ${d.gate}`].filter(Boolean).join(" · ")}
+              href="/admin/roadmap" cta="Apri" />
+          ))}
+          <div className="ds-open-f" style={{ padding: "10px 16px", borderTop: `1px solid ${CP.borderSoft}` }}>
+            <Link href="/admin/roadmap" style={{ fontSize: 13, color: CP.accentSoftText, textDecoration: "none" }}>
+              {decisions.length > 5 ? `Tutte le decisioni (${decisions.length}) →` : "Roadmap →"}
+            </Link>
+          </div>
+        </section>
+      )}
+
       {loop && (
         <section className="ds-open" style={{ ...card, padding: "14px 16px", marginBottom: 24 }}>
-          <SectionTitle aside="coaching e sostituzioni del mese scorso, misurati su questo">Le decisioni sulle persone funzionano?</SectionTitle>
+          <SectionTitle aside={loopPeriod === prevId ? `${prevName}: il mese appena chiuso, come la Classifica` : "coaching e sostituzioni del mese scorso, misurati su questo"}>Le decisioni sulle persone funzionano?</SectionTitle>
           <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
             <Metric label="Migliorati dopo il coaching" value={loop.coaching?.rate != null ? `${loop.coaching.rate}%` : "—"}
               note={loop.coaching?.total ? `${loop.coaching.improved} su ${loop.coaching.total}, almeno +5 punti` : loopNote(loop.coaching, "nessun coaching completato")} />

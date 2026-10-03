@@ -141,7 +141,7 @@ export default function EmployeeDrilldownPage({ params }) {
           <select value={periodId || ""} onChange={(e) => setPeriodId(e.target.value)} aria-label="Mese" style={ctl}>
             {months.map((m, i) => <option key={m} value={m}>{monthName(m)}{i === 0 ? " (in corso)" : ""}</option>)}
           </select>
-          {cp?.score != null && cp.score <= REVIEW && <Link href={`/admin/action-center?period_id=${periodId}`} style={{ ...ctl, textDecoration: "none" }}>Action Center</Link>}
+          {cp?.score != null && cp.score <= REVIEW && <Link href={`/admin/action-center?period_id=${periodId}`} style={{ ...ctl, textDecoration: "none" }}>Sotto soglia</Link>}
           <Link href="/admin/employee-profiles" style={{ ...ctl, textDecoration: "none" }}>Anagrafica e note</Link>
           {me?.admin && <button onClick={previewAsOperator} style={{ ...ctl, cursor: "pointer" }} title="Apre le sue pagine personali come le vede lui, in sola lettura">Vedi le sue pagine</button>}
         </>}
