@@ -44,6 +44,13 @@ function uniq(items, get) {
   }
   return [...m.entries()].sort((a, b) => (a[0] === NONE ? 1 : b[0] === NONE ? -1 : a[0].localeCompare(b[0], "it")));
 }
+// "Da fare": filtri pronti per le domande ricorrenti dell'HR (prova d'uso 03/10/2026). Logica sui soli campi.
+const thisMonth = () => new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Rome" }).slice(0, 7);
+const TODO = {
+  contratto: { label: "Contratto da chiudere", attn: true, test: (f) => ["In ingresso", "Attiva"].includes(f.collaborationStatus) && [].concat(f.hvContractStatus || []).filter(Boolean)[0] !== "Firmato" },
+  entrati: { label: "Entrati questo mese", test: (f) => String(f.startDate || "").slice(0, 7) === thisMonth() },
+  uscita: { label: "Escono a breve", status: "In uscita", test: (f) => f.collaborationStatus === "In uscita" },
+};
 const has = (vals, want) => (want === NONE ? ![].concat(vals ?? []).filter(Boolean).length : [].concat(vals ?? []).includes(want));
 
 export default function HrPeoplePage() {
@@ -59,6 +66,9 @@ export default function HrPeoplePage() {
   const [skill, setSkill] = useState("");
   const [minLevel, setMinLevel] = useState("");
   const [pastRole, setPastRole] = useState("");
+  const [lang, setLang] = useState("");
+  // "Da fare" (prova d'uso 03/10): le domande ricorrenti dell'HR come filtri pronti, con il conteggio
+  const [todo, setTodo] = useState("");
   const [newOpen, setNewOpen] = useState(false);
   const [cleanupOpen, setCleanupOpen] = useState(false);
   const [view, setView] = useState("attive");
@@ -91,6 +101,7 @@ export default function HrPeoplePage() {
     return got.sort((a, b) => order(a[0]) - order(b[0]));
   }, [items]);
   const depts = useMemo(() => uniq(items, (p) => p.fields?.department), [items]);
+  const langs = useMemo(() => uniq(items, (p) => p.fields?.spokenLanguages), [items]);
   const projects = useMemo(() => uniq(items, (p) => p.fields?.project), [items]);
   const emps = useMemo(() => uniq(items, (p) => p.fields?.employmentType), [items]);
   const cleanupCount = Object.keys(flags).length;
@@ -110,6 +121,8 @@ export default function HrPeoplePage() {
     const needle = q.trim().toLowerCase();
     return items.filter((p) => {
       const f = p.fields || {};
+      if (todo && !TODO[todo].test(f)) return false;
+      if (lang && !has(f.spokenLanguages, lang)) return false;
       if (!status && f.collaborationStatus === PHASE_EXITED) return false;
       if (status && status !== ALL_PHASES && (status === NONE ? f.collaborationStatus : f.collaborationStatus !== status)) return false;
       if (contract && !has(f.hvContractStatus, contract)) return false;
@@ -125,10 +138,11 @@ export default function HrPeoplePage() {
       }
       return true;
     });
-  }, [items, q, status, contract, dept, project, emp, onlyCleanup, flags, skill, minLevel, pastRole]);
+  }, [items, q, status, contract, dept, project, emp, onlyCleanup, flags, skill, minLevel, pastRole, lang, todo]);
+  const todoCounts = useMemo(() => Object.fromEntries(Object.entries(TODO).map(([k, t]) => [k, items.filter((p) => t.test(p.fields || {})).length])), [items]);
 
-  const filtered = Boolean(q || status || contract || dept || project || emp || onlyCleanup || skill || pastRole);
-  const reset = () => { setQ(""); setStatus(""); setContract(""); setDept(""); setProject(""); setEmp(""); setOnlyCleanup(false); setSkill(""); setMinLevel(""); setPastRole(""); };
+  const filtered = Boolean(q || status || contract || dept || project || emp || onlyCleanup || skill || pastRole || lang || todo);
+  const reset = () => { setQ(""); setStatus(""); setContract(""); setDept(""); setProject(""); setEmp(""); setOnlyCleanup(false); setSkill(""); setMinLevel(""); setPastRole(""); setLang(""); setTodo(""); };
   const shownBase = statusCounts[""]; // l'elenco di base: tutti tranne le uscite
   // fasi fuori dalle 5 (es. "Da verificare" arrivato da ClickUp, o un'opzione sconosciuta)
   const otherPhases = Object.keys(statusCounts).filter((s) => s && s !== NONE && s !== ALL_PHASES && !PHASE_LABELS.includes(s));
@@ -217,6 +231,13 @@ export default function HrPeoplePage() {
             <Metric label="Problemi con ClickUp" value={fmtInt(syncErrors)} danger={syncErrors > 0} />
           </section>
 
+          <div role="group" aria-label="Da fare" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+            <span style={{ fontSize: 13, color: CP.textMuted, marginRight: 2 }}>Da fare</span>
+            {Object.entries(TODO).map(([k, t]) => (
+              <FilterChip key={k} label={`${t.label} · ${todoCounts[k]}`} attn={todoCounts[k] > 0 && t.attn} active={todo === k} disabled={!todoCounts[k] && todo !== k}
+                onClick={() => { setTodo(todo === k ? "" : k); if (todo !== k) setStatus(t.status || ""); }} />
+            ))}
+          </div>
           <div role="group" aria-label="Filtra per fase" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
             <FilterChip label={`Tutti tranne le uscite · ${statusCounts[""]}`} active={!status} onClick={() => setStatus("")} />
             {PHASE_LABELS.map((s) => <FilterChip key={s} label={`${s} · ${statusCounts[s] || 0}`} active={status === s} onClick={() => setStatus(status === s ? "" : s)} />)}
@@ -231,6 +252,7 @@ export default function HrPeoplePage() {
             <FilterSelect label="Reparto" value={dept} onChange={setDept} options={depts} />
             <FilterSelect label="Creator / progetto" value={project} onChange={setProject} options={projects} />
             <FilterSelect label="Tipo di rapporto" value={emp} onChange={setEmp} options={emps} />
+            <FilterSelect label="Lingue parlate" value={lang} onChange={setLang} options={langs} />
             <label>
               <span style={lbl}>Ha la competenza</span>
               <select style={input} value={skill} onChange={(e) => { setSkill(e.target.value); if (!e.target.value) setMinLevel(""); }}>

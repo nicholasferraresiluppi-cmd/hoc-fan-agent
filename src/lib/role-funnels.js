@@ -333,5 +333,9 @@ export function selectFunnels(whoami) {
   if (hasAllScores) primaryKey = "leadership";
   else if (hasTeamScores) primaryKey = "manager";
 
+  // la mansione scelta (lib/workspaces) decide la scheda di partenza, se quella scheda si può vedere
+  const byWs = { hr: "people", board: "leadership", sales: hasAllScores ? "leadership" : "manager" }[whoami?.workspace?.id];
+  if (byWs && visibleKeys.includes(byWs)) primaryKey = byWs;
+
   return { visibleKeys, primaryKey };
 }

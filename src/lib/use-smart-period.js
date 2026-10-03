@@ -21,6 +21,19 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 const STORAGE_KEY = "hoc:selected_period";
+// Inizio mese (03/10/2026, prova d'uso): nei primi giorni il mese in corso ha 2-3 turni a testa e
+// "Eccellente con 2 turni" o "in calo di 27 punti" sono rumore. Senza una scelta esplicita in questa
+// sessione si apre il mese CHIUSO precedente, con un avviso e un link per passare al mese in corso.
+export const EARLY_MONTH_DAYS = 7;
+const EXPLICIT_KEY = "hoc:period-explicit";
+
+function prevMonthId(id) {
+  const [y, m] = id.split("-").map(Number);
+  const d = new Date(y, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+/** true nei primi EARLY_MONTH_DAYS giorni del mese. */
+export const isEarlyMonth = (d = new Date()) => d.getDate() <= EARLY_MONTH_DAYS;
 
 function currentMonthId() {
   const d = new Date();
@@ -73,6 +86,12 @@ export function useSmartPeriod() {
       }
 
       if (!resolved) resolved = currentMonthId();
+      let explicit = false;
+      try { explicit = sessionStorage.getItem(EXPLICIT_KEY) === "1"; } catch {}
+      if (!explicit && resolved === currentMonthId() && isEarlyMonth()) {
+        resolved = prevMonthId(resolved);
+        if (!cancelled) setEarly(true);
+      }
 
       if (!cancelled) setPeriodIdState(resolved);
     })();
@@ -80,6 +99,8 @@ export function useSmartPeriod() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const [early, setEarly] = useState(false);
 
   // Se l'URL cambia (es. user click link), sincronizza state
   useEffect(() => {
@@ -93,12 +114,14 @@ export function useSmartPeriod() {
   const setPeriod = useCallback((newPeriod) => {
     if (!isValidPeriod(newPeriod)) return;
     setPeriodIdState(newPeriod);
-    try { localStorage.setItem(STORAGE_KEY, newPeriod); } catch {}
+    setEarly(false);
+    try { localStorage.setItem(STORAGE_KEY, newPeriod); sessionStorage.setItem(EXPLICIT_KEY, "1"); } catch {}
     // Aggiorna URL preservando gli altri searchParams
     const params = new URLSearchParams(searchParams.toString());
     params.set("period_id", newPeriod);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }, [router, pathname, searchParams]);
 
-  return [periodId, setPeriod];
+  // terzo valore: { early, current } → la pagina mostra <EarlyMonthNote> (componente in components/ds)
+  return [periodId, setPeriod, { early, current: currentMonthId() }];
 }

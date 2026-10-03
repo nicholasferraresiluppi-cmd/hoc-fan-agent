@@ -118,7 +118,7 @@ export default function SidebarCasa() {
   const isActive = (i) => (i.exact || i.href === "/" ? pathname === i.href : pathname === i.href || pathname.startsWith(i.href + "/")) || Boolean(grp && grp.tabs[0][0] === i.href);
 
   // Pagina corrente fuori dal menu corto → si apre l'elenco completo, così si vede dove si è
-  const inShort = sections.some((s) => s.items.some(isActive));
+  const inShort = (wsOn && pathname === "/admin") || sections.some((s) => s.items.some(isActive));
   const shortHrefs = new Set(sections.flatMap((s) => s.items.map((i) => i.href)));
 
   return (

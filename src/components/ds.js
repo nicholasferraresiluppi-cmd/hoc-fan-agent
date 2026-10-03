@@ -128,13 +128,13 @@ export function NumText({ value, count = false }) {
 /** Segnale d'attenzione su PERSONE (cella sotto soglia, calo): mai rosso in Couture → colore attn + sottolineato puntinato. */
 export const ATTN = { color: CP.attn, fontWeight: 600, textDecoration: "underline dotted", textUnderlineOffset: 3 };
 
-export function Metric({ label, value, delta, note, danger, attn }) {
+export function Metric({ label, value, delta, deltaLabel = "sul mese prima", note, danger, attn }) {
   const [st] = useStyle();
   return (
     <div style={{ minWidth: 130 }}>
       <div className="ds-lbl" style={{ fontSize: 13, color: CP.textSecondary }}>{label}</div>
       <div className="ds-metric-v" style={{ fontSize: 22, fontWeight: 500, lineHeight: 1.25, color: danger ? CP.accentRed : attn ? CP.attn : CP.textPrimary, ...NUM }}>{st === "v3" ? <NumText value={value} /> : value}</div>
-      {(delta || note) && <div style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>{[delta && `${delta} sul mese prima`, note].filter(Boolean).join(" · ")}</div>}
+      {(delta || note) && <div style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>{[delta && `${delta} ${deltaLabel}`, note].filter(Boolean).join(" · ")}</div>}
     </div>
   );
 }
@@ -181,6 +181,24 @@ export function Notice({ children, danger }) {
       <AlertTriangle size={15} color={danger ? CP.accentRed : CP.textMuted} style={{ flexShrink: 0, marginTop: 2 }} />
       <div>{children}</div>
     </div>
+  );
+}
+
+/**
+ * Avviso di inizio mese (lib/use-smart-period): la pagina mostra il mese chiuso perché quello in corso
+ * ha ancora pochi turni a testa. Un clic e si passa al mese in corso.
+ */
+const MONTHS = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+export function EarlyMonthNote({ info, periodId, onSwitch }) {
+  if (!info?.early || !periodId || periodId === info.current) return null;
+  const name = (id) => MONTHS[Number(id.slice(5, 7)) - 1];
+  return (
+    <Notice>
+      Ti mostro <b style={{ fontWeight: 500, color: CP.textPrimary }}>{name(periodId)}</b>, l&apos;ultimo mese chiuso: {name(info.current)} è appena iniziato e con 2-3 turni a testa i giudizi sono rumore.{" "}
+      <button type="button" onClick={() => onSwitch(info.current)} style={{ background: "none", border: "none", padding: 0, color: CP.accentSoftText, cursor: "pointer", font: "inherit" }}>
+        Vedi {name(info.current)} (provvisorio) →
+      </button>
+    </Notice>
   );
 }
 

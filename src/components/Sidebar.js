@@ -431,7 +431,7 @@ export default function Sidebar() {
   const ws = me?.workspace?.id;
   const wsSections = ws && ws !== "all" ? workspaceSections(ws, allowed) : null;
   const wsHrefs = new Set((wsSections || []).flatMap((x) => x.items.map((i) => i.href)));
-  const inWs = (wsSections || []).some((x) => x.items.some((i) => (i.exact ? pathname === i.href : pathname === i.href || pathname.startsWith(i.href + "/"))));
+  const inWs = pathname === "/admin" || (wsSections || []).some((x) => x.items.some((i) => (i.exact ? pathname === i.href : pathname === i.href || pathname.startsWith(i.href + "/"))));
   const [allTools, setAllTools] = useState(false);
   useEffect(() => { try { setAllTools(localStorage.getItem("hoc:sidebar:allTools") === "1"); } catch {} }, []);
   const toggleAllTools = () => setAllTools((t) => { try { localStorage.setItem("hoc:sidebar:allTools", t ? "0" : "1"); } catch {} return !t; });

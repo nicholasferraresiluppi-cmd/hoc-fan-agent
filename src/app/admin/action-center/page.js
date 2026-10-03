@@ -15,7 +15,7 @@ import ScoreTutorialModal from "@/components/ScoreTutorialModal";
 import { Modal } from "@/components/cp-style";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmt$, fmtInt, MONTHS_IT } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, Notice, card } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, Notice, card, EarlyMonthNote } from "@/components/ds";
 
 import { tierLabel } from "@/lib/tier-label";
 const fetcher = async (url) => {
@@ -37,7 +37,7 @@ const tierColor = () => CP.textPrimary;
 const THRESHOLDS = [25, 35, 50];
 
 export default function ActionCenterPage() {
-  const [periodId, setPeriodId] = useSmartPeriod();
+  const [periodId, setPeriodId, periodInfo] = useSmartPeriod();
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [stage, setStage] = useState("all");
   const [tier, setTier] = useState("");
@@ -239,6 +239,7 @@ export default function ActionCenterPage() {
           <button onClick={() => setTutorialOpen(true)} style={{ ...ctl, display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}><Info size={14} /> Lo score</button>
         </>}
       />
+      <EarlyMonthNote info={periodInfo} periodId={periodId} onSwitch={setPeriodId} />
 
       {(isLoading || !url) && !data && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
       {data?.error && <Notice danger>{data.error} <Link href="/admin/creatorspro-sync" style={{ color: CP.accentSoftText }}>Sync CP →</Link></Notice>}
@@ -248,8 +249,10 @@ export default function ActionCenterPage() {
         <HeroMetric
           label={`Da decidere · score ≤ ${threshold}, sotto i colleghi e in calo`}
           value={fmtInt(nDecide)}
-          compare={prevCount != null ? `${prevName}: ${prevCount}` : null}
-          hint={`${repeat} ${repeat === 1 ? "era" : "erano"} sotto soglia anche a ${prevName}: un solo mese storto può essere contesto (creator, turni), due di fila no.`}
+          compare={prevCount != null ? `A ${prevName} erano sotto soglia in ${prevCount}` : null}
+          hint={nDecide + nWatch > 0
+            ? `Di quelli sotto soglia ora, ${repeat} ${repeat === 1 ? "lo era" : "lo erano"} anche a ${prevName}: un solo mese storto può essere contesto (creator, turni), due di fila no.`
+            : null}
         >
           <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
             <Metric label="Da osservare" value={fmtInt(nWatch)} note="sotto soglia, ma non tutte le condizioni" />

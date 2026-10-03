@@ -55,7 +55,9 @@ export default function MembersPage() {
   const [roles, setRoles] = useState(null);      // /api/admin/roles (o {denied})
   const [invites, setInvites] = useState(null);  // /api/admin/invitations (o {denied})
   const [loading, setLoading] = useState(true);
+  // ?q=email (es. dal dopo-uscita in Persone HR): la persona da trovare è già filtrata
   const [filter, setFilter] = useState("");
+  useEffect(() => { try { const q = new URLSearchParams(window.location.search).get("q"); if (q) setFilter(q); } catch {} }, []);
   const [editing, setEditing] = useState(null);
   const [busy, setBusy] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
