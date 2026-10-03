@@ -41,6 +41,9 @@ import HrTessera from "@/components/HrTessera";
 import HrPalmaLoader from "@/components/HrPalmaLoader";
 import HocLogo from "@/components/HocLogo";
 import HrHouseLetter from "@/components/HrHouseLetter";
+import { PlayCircle } from "lucide-react";
+import { TutorialVideoButton } from "@/components/TutorialVideo";
+import { fmtDuration } from "@/lib/tutorial-videos";
 import { uploadHrFile } from "@/lib/hr-upload-client";
 import { GRAIN_DATA_URI } from "@/lib/tessera-material";
 import {
@@ -421,6 +424,11 @@ export default function HrFormPage() {
             {ctx.shared ? "" : ` Il link vale fino al ${fmtDate(ctx.expiresAt)}.`}
           </p>
           <button type="button" className="hrf-pill" onClick={() => { setDir("next"); setStage("form"); }} style={{ ...pill(true), width: "100%" }}>Cominciamo</button>
+          <TutorialVideoButton id="modulo-collaboratori" render={(open, v) => (
+            <button type="button" onClick={open} style={{ ...pill(false), width: "100%", gap: 8, marginTop: -12 }}>
+              <PlayCircle size={18} /> Guarda come funziona ({fmtDuration(v.durationSec)})
+            </button>
+          )} />
           <div style={{ fontSize: 12.5, color: CP.textMuted, textAlign: "center" }}>I tuoi dati restano riservati: li vede solo chi gestisce il personale.</div>
         </div>
       </Shell>

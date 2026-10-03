@@ -30,6 +30,7 @@ import { PHASE_LABELS, PHASE_EXITED, CONTRACT_LABELS } from "@/lib/hr-fields";
 import { SKILL_AREAS, SKILL_LEVELS, PAST_ROLES, normalizeSkillMap, normalizePastRoles, hasSkillAtLeast, pastRoleText } from "@/lib/hr-skills";
 import { lbl, input, btnPrimary, btnGhost, chip, SYNC_LABEL, fetcher, postJson, CopyLink, fmtDateTime } from "@/components/hr-ui";
 import { RestoreButton } from "@/components/hr-archive";
+import { TutorialVideoButton } from "@/components/TutorialVideo";
 
 const NONE = "__none__";
 const ALL_PHASES = "__all__"; // filtro "tutte, anche le uscite"
@@ -163,7 +164,10 @@ export default function HrPeoplePage() {
         title="Persone HR"
         subtitle="L'anagrafica di chi lavora con noi. HOC Pro è la fonte principale: ogni modifica fatta qui arriva su ClickUp, e quelle fatte su ClickUp tornano qui. I dati li può compilare anche la persona, dal link del modulo."
         actions={!error && (
-          <button type="button" onClick={() => setNewOpen(true)} style={btnPrimary}><Plus size={15} /> Nuova persona</button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <TutorialVideoButton id="persone-hr" />
+            <button type="button" onClick={() => setNewOpen(true)} style={btnPrimary}><Plus size={15} /> Nuova persona</button>
+          </div>
         )}
       />
 
