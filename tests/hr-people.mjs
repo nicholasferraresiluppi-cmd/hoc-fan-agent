@@ -390,3 +390,33 @@ console.log(`hr-people: ${n} asserzioni OK`);
   n += m;
   console.log(`competenze v2: ${m} asserzioni OK`);
 }
+
+// ── campi specchio su ClickUp (03/10) ────────────────────────────────────────
+{
+  const { mirrorText } = await import("../src/lib/hr-clickup-map.js");
+  let m = 0;
+  const t = (c, msg) => { assert.ok(c, msg); m++; };
+  const person = { id: "p_x", fields: {
+    firstName: "Giulia", birthPlace: { name: "Roma", prov: "RM", code: "H501" },
+    residenceComune: { abroad: true, country: "Spagna", city: "Madrid\nPartita IVA: sì" }, residenceCap: "28001",
+    skillLevels: { of_chat: "Esperto" }, otherSkills: "riga1\nriga2",
+  } };
+  const metaAll = ["Luogo di nascita", "Comune di residenza", "CAP", "Competenze e livello", "Ruoli già ricoperti", "Vorrebbe imparare", "Altro che sa fare"]
+    .map((name, i) => ({ id: `m${i}`, name, type: name === "Competenze e livello" ? "text" : "short_text" }));
+  const plan = personToClickup(person, metaAll, {});
+  const byKey = Object.fromEntries(plan.fieldOps.map((o) => [o.key, o]));
+  t(byKey.birthPlace?.body?.value === "Roma (RM)", "luogo di nascita nel campo dedicato");
+  t(byKey.residenceComune?.body?.value === "Madrid Partita IVA: sì, Spagna", "città estera su una riga");
+  t(byKey.residenceCap?.body?.value === "28001", "CAP nel campo dedicato");
+  t(byKey.pastRoles?.remove === true, "campo vuoto → rimosso su ClickUp");
+  t(!/\n/.test(byKey.otherSkills?.body?.value || "x\n"), "altro che sa fare su una riga");
+  t(!plan.description.includes("Luogo di nascita:") && !plan.description.includes("Altro che sa fare:"), "niente doppione nel blocco");
+  const planNo = personToClickup(person, [], {});
+  t(planNo.description.includes("Luogo di nascita: Roma (RM)"), "senza campo dedicato resta nel blocco");
+  t(!planNo.fieldOps.some((o) => o.key === "birthPlace"), "senza campo dedicato nessuna scrittura");
+  const planKeys = personToClickup(person, metaAll, { keys: ["residenceComune"] });
+  t(planKeys.fieldOps.some((o) => o.key === "residenceCap"), "cambio comune riscrive anche il CAP");
+  t(mirrorText("learnWish", {}) === "", "vuoto = stringa vuota");
+  n += m;
+  console.log(`campi specchio: ${m} asserzioni OK`);
+}
