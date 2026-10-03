@@ -1331,3 +1331,19 @@ console.log(`hr-people: ${n} asserzioni OK`);
 }
 
 console.log(`totale: ${n} asserzioni`);
+
+// ── scritture concorrenti: un campo scritto da altri non si perde (03/10, test di carico) ──
+{
+  const { keepNewerFields } = await import("../src/lib/hr-people.js");
+  let m = 0; const t = (c, msg) => { assert.ok(c, msg); m++; };
+  const snap = { fields: { firstName: "Luca" }, fieldUpdatedAt: { firstName: 100 }, updatedAt: 100 };
+  const cur = { fields: { firstName: "Luca", idDocument: { title: "doc.jpg" } }, fieldUpdatedAt: { firstName: 100, idDocument: 200 }, updatedAt: 200 };
+  const next = { fields: { firstName: "Luca", surname: "Rossi" }, fieldUpdatedAt: { firstName: 100, surname: 150 }, updatedAt: 150 };
+  const out = keepNewerFields(next, snap, cur);
+  t(out.fields.idDocument?.title === "doc.jpg", "il documento scritto nel frattempo resta");
+  t(out.fields.surname === "Rossi", "il nostro campo resta");
+  t(out.updatedAt === 200, "updatedAt più recente");
+  const ours = keepNewerFields({ fields: { idDocument: { title: "nuovo.jpg" } }, fieldUpdatedAt: { idDocument: 300 } }, snap, cur);
+  t(ours.fields.idDocument.title === "nuovo.jpg", "se il campo l'abbiamo cambiato noi, vince il nostro");
+  n += m; console.log(`scritture concorrenti: ${m} asserzioni OK`);
+}

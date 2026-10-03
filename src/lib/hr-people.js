@@ -138,6 +138,38 @@ async function putPerson(p) {
   if (p.clickupTaskId) await kv.set(K.task(p.clickupTaskId), p.id);
 }
 
+// ── Scritture concorrenti sulla stessa scheda (fix 03/10/2026, test di carico) ──
+// Il webhook di ClickUp (scatta anche quando alleghiamo un file), il push verso
+// ClickUp e il riferimento al documento arrivano nello stesso istante: chi aveva
+// letto la scheda un attimo prima la riscriveva intera e cancellava il campo
+// appena scritto dall'altro (visto: 2 documenti su 30 senza riferimento in app,
+// file regolarmente su ClickUp). Ora la lettura-fusione-scrittura finale passa
+// da un lucchetto breve per scheda, e i campi cambiati da altri dopo la nostra
+// lettura (fieldUpdatedAt più recente) si conservano.
+async function withPersonWriteLock(id, fn) {
+  const key = `hr:person:wlock:${id}`;
+  const until = Date.now() + 5000;
+  let got = null;
+  while (!got) {
+    got = await kv.set(key, Date.now(), { nx: true, ex: 10 }).catch(() => "OK");
+    if (got || Date.now() > until) break;
+    await new Promise((r) => setTimeout(r, 60 + Math.random() * 60));
+  }
+  try { return await fn(); } finally { if (got) await kv.del(key).catch(() => {}); }
+}
+/** Campi cambiati da altri dopo `readSnap` (letto all'inizio) e non toccati da `next`: si tengono quelli di `cur`. */
+export function keepNewerFields(next, readSnap, cur) {
+  if (!cur || !readSnap) return next;
+  const out = { ...next, fields: { ...next.fields }, fieldUpdatedAt: { ...(next.fieldUpdatedAt || {}) } };
+  for (const [k, t] of Object.entries(cur.fieldUpdatedAt || {})) {
+    const seen = Number(readSnap.fieldUpdatedAt?.[k] || 0);
+    const ours = Number(next.fieldUpdatedAt?.[k] || 0);
+    if (Number(t) > seen && ours <= seen) { out.fields[k] = cur.fields?.[k]; out.fieldUpdatedAt[k] = t; }
+  }
+  if (Number(cur.updatedAt || 0) > Number(out.updatedAt || 0)) out.updatedAt = cur.updatedAt;
+  return out;
+}
+
 export async function appendLog(id, entries) {
   if (!entries?.length) return;
   await kv.lpush(K.log(id), ...entries.map((e) => JSON.stringify(e)));
@@ -358,15 +390,19 @@ async function pushPerson(person, keys, cfg) {
   // Mentre scrivevamo su ClickUp la scheda può essere cambiata (es. un documento appena
   // arrivato dal modulo): si riprende quella in KV e si aggiornano SOLO i dati di sync.
   // Un campo cambiato dopo l'inizio del push resta in sospeso anche se l'abbiamo spinto.
-  const cur = await getPerson(p.id);
-  if (cur && cur.updatedAt !== person.updatedAt) {
-    p = {
-      ...cur,
-      clickupTaskId: p.clickupTaskId, clickupUrl: p.clickupUrl, cuBase: p.cuBase, mirrorStale: p.mirrorStale, sync: p.sync,
-      pendingKeys: (cur.pendingKeys || []).filter((k) => !done.has(k) || failed.has(k) || Number(cur.fieldUpdatedAt?.[k] || 0) > Number(person.updatedAt || 0)),
-    };
-  }
-  await putPerson(p);
+  p = await withPersonWriteLock(p.id, async () => {
+    const cur = await getPerson(p.id);
+    let out = p;
+    if (cur && cur.updatedAt !== person.updatedAt) {
+      out = {
+        ...cur,
+        clickupTaskId: p.clickupTaskId, clickupUrl: p.clickupUrl, cuBase: p.cuBase, mirrorStale: p.mirrorStale, sync: p.sync,
+        pendingKeys: (cur.pendingKeys || []).filter((k) => !done.has(k) || failed.has(k) || Number(cur.fieldUpdatedAt?.[k] || 0) > Number(person.updatedAt || 0)),
+      };
+    }
+    await putPerson(out);
+    return out;
+  });
   return { status: p.sync.status, person: p, errors: errors.map((e) => `${FIELD_BY_KEY[e.key]?.label || e.key}: ${e.error}`), skipped: plan.skipped, message: p.sync.message };
 }
 
@@ -486,7 +522,7 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
   // archiviata: non riceve più niente da ClickUp (il suo task è cancellato o in attesa di cancellazione)
   if (person.archived) return { kind: "ignored", personId, pushBack: [] };
   const cfPrev = readCf(person);
-  const current = { fields: { ...person.fields }, fieldUpdatedAt: person.fieldUpdatedAt || {} };
+  const current = { fields: { ...person.fields }, fieldUpdatedAt: { ...(person.fieldUpdatedAt || {}) } };
   const inc = { ...incoming };
   if (cfIncoming !== undefined && canCf && cfPrev !== undefined) { inc.codiceFiscale = cfIncoming || null; current.fields.codiceFiscale = cfPrev; }
 
@@ -574,7 +610,12 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
   person.cuBase = { ...(person.cuBase || {}), ...nextBase };
   person.mirrorStale = [...stale];
   const changedAny = r.changed.length || "codiceFiscale" in apply;
-  await putPerson(person);
+  const readSnap = current;
+  person = await withPersonWriteLock(person.id, async () => {
+    const merged = keepNewerFields(person, readSnap, await getPerson(person.id));
+    await putPerson(merged);
+    return merged;
+  });
   if (log.length) await appendLog(person.id, log);
   if (conflicts.length) {
     await kv.lpush(K.conflicts, ...conflicts.map((c) => JSON.stringify(c)));
@@ -1054,12 +1095,20 @@ export const UPLOAD_KIND = {
  */
 export async function setPersonFileRef(personId, kind, { title, attachmentId, at = Date.now(), via = "modulo" }) {
   const spec = UPLOAD_KIND[kind];
-  let person = await getPerson(personId);
-  if (!spec || !person) return null;
+  if (!spec) return null;
   const ref = { title, attachmentId: String(attachmentId || ""), at, via };
-  const prev = person.fields?.[spec.key];
-  person = { ...person, fields: { ...person.fields, [spec.key]: ref }, fieldUpdatedAt: { ...person.fieldUpdatedAt, [spec.key]: at }, updatedAt: at };
-  await putPerson(person);
+  let prev;
+  const person = await withPersonWriteLock(personId, async () => {
+    const cur = await getPerson(personId);
+    if (!cur) return null;
+    prev = cur.fields?.[spec.key];
+    // fieldUpdatedAt = adesso (non `at`): deve risultare più recente di qualsiasi lettura in corso
+    const now = Math.max(Date.now(), Number(at) || 0);
+    const next = { ...cur, fields: { ...cur.fields, [spec.key]: ref }, fieldUpdatedAt: { ...cur.fieldUpdatedAt, [spec.key]: now }, updatedAt: now };
+    await putPerson(next);
+    return next;
+  });
+  if (!person) return null;
   await appendLog(person.id, [{ at, by: via, source: "modulo", action: "upload", field: spec.key, from: logValue(spec.key, prev), to: title }]);
   if (kind === "document") await pushPersonSafe(person, [spec.key], { actor: "modulo" });
   return ref;
