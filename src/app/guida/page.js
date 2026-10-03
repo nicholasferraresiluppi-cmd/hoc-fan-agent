@@ -65,7 +65,8 @@ export default function GuidaPage() {
           {/* Video tutorial: prima i video, poi il percorso scritto (03/10/2026). Quelli su pagine
               riservate agli admin li vede solo chi le può aprire: pertinenza, non difesa. */}
           {(() => {
-            const vids = TUTORIAL_VIDEOS.filter((v) => !v.adminOnly || whoami?.admin);
+            const lead = whoami?.admin || ["team", "all"].includes(whoami?.capabilities?.["scores.view"]);
+            const vids = TUTORIAL_VIDEOS.filter((v) => (!v.adminOnly || whoami?.admin) && (!v.leadsOnly || lead));
             if (!vids.length) return null;
             return (
               <section aria-label="Video tutorial" style={{ marginBottom: 28 }}>

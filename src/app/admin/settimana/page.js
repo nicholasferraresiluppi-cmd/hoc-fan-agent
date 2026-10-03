@@ -15,6 +15,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Notice, EarlyMonthNote, card } from "@/components/ds";
+import { TutorialVideoButton } from "@/components/TutorialVideo";
 
 const fetcher = (u) => fetch(u).then((r) => r.json()).catch(() => null);
 const month = (k = 0) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - k); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
@@ -65,7 +66,7 @@ export default function SettimanaPage() {
 
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 900, margin: "0 auto", fontFamily: FONTS.body }}>
-      <PageHead title="Questa settimana" line2="Chi seguire, e perché."
+      <PageHead title="Questa settimana" line2="Chi seguire, e perché." actions={<TutorialVideoButton id="sales-manager" />}
         subtitle="Al massimo cinque persone della tua squadra, in ordine: prima chi è sotto soglia, poi chi cala forte rispetto al mese scorso (anche se è sopra soglia), poi chi può crescere. Non è una classifica: è da dove cominciare." />
       <EarlyMonthNote info={{ early, current: month(0) }} periodId={cur} onSwitch={() => setForceCurrent(true)} />
       {noCreators && <Notice>Non hai ancora creator assegnate: chiedi a un admin di assegnarti le tue creator.</Notice>}
