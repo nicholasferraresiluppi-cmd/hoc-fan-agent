@@ -690,7 +690,7 @@ console.log(`hr-people: ${n} asserzioni OK`);
   X.safeRemove("k", ok);
   t(X.safeGet("k", ok) === null, "rimozione dopo l'invio");
   t(X.safeGet("k", null) === null && X.safeSet("k", "v", null) === false, "nessuno storage (server)");
-  t(/House of Creators/.test(X.HOUSE_LETTER.text) && X.HOUSE_LETTER.signature === "Nicholas", "messaggio della Casa in una costante");
+  t(/House of Creators/.test(X.HOUSE_LETTER.text) && X.HOUSE_LETTER.signature === "House of Creators", "messaggio della Casa in una costante");
 
   // tessera D1: fronte e retro
   t(W.tesseraName({ firstName: "giulia", surname: "de rossi" }) === "Giulia De Rossi" && W.tesseraName({ firstName: "Anna Maria" }) === "Anna Maria", "nome completo sulla tessera");
