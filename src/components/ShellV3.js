@@ -11,6 +11,7 @@
  * Visibilità desktop/telefono decisa dal CSS (globals.css, classi hoc-v3-*),
  * come il resto del guscio: niente salto dopo l'idratazione.
  */
+import HocPalma from "@/components/HocPalma";
 import Link from "next/link";
 import useSWR from "swr";
 import { Search, Menu, Home, Gauge, Wallet, Compass, MoreHorizontal, LayoutDashboard, Trophy, Target } from "lucide-react";
@@ -58,7 +59,7 @@ export function V3MobileHeader({ onSearch, onMenu }) {
       background: CP.bg, borderBottom: `1px solid ${CP.border}`,
     }}>
       <Link href="/welcome" aria-label="HOC Pro, pagina iniziale" className="hoc-v3-btn" style={{ ...iconBtn, marginRight: "auto" }}>
-        <img src="/hoc-logo.svg" alt="" style={{ height: 26, width: "auto", filter: CP.logoFilter, display: "block" }} />
+        <HocPalma width={68} title="House of Creators" style={{ display: "block", color: CP.gold }} />
       </Link>
       <button type="button" className="hoc-v3-btn" onClick={onSearch} aria-label="Cerca una pagina" style={iconBtn}><Search size={20} /></button>
       <DataStatus compact />
