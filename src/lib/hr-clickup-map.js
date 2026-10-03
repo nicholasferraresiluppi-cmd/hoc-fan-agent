@@ -158,27 +158,52 @@ export function hocBlockLines(person, byName, { cfPlain } = {}) {
   if (!byName.has(lc("Codice fiscale")) && (cfPlain || person.cfEnc)) lines.push(`Codice fiscale: ${cfPlain ? maskCf(cfPlain) : "presente"} (completo in HOC Pro)`);
   if (f.idDocument?.at) lines.push(`Documento d'identità: allegato il ${fmtItDate(f.idDocument.at)} (${s(f.idDocument.title)})`);
   // campi solo-app (02/10): luogo di nascita, comune/CAP di residenza, competenze con livello
+  const has = (n) => byName.has(lc(n));
   const bp = f.birthPlace;
-  if (bp) lines.push(`Luogo di nascita: ${bp.abroad ? bp.country : `${s(bp.name)}${bp.prov ? ` (${s(bp.prov)})` : ""}`}`);
+  if (bp && !has("Luogo di nascita")) lines.push(`Luogo di nascita: ${bp.abroad ? bp.country : `${s(bp.name)}${bp.prov ? ` (${s(bp.prov)})` : ""}`}`);
   const rc = f.residenceComune;
-  if (rc?.abroad && rc.country) lines.push(`Residenza: ${s(rc.city) ? `${oneLine(rc.city, 120)}, ` : ""}${s(rc.country)}${f.residenceCap ? ` · codice postale ${s(f.residenceCap)}` : ""}`);
+  if (has("Comune di residenza")) { if (f.residenceCap && !has("CAP")) lines.push(`CAP: ${oneLine(f.residenceCap, 20)}`); }
+  else if (rc?.abroad && rc.country) lines.push(`Residenza: ${s(rc.city) ? `${oneLine(rc.city, 120)}, ` : ""}${s(rc.country)}${f.residenceCap ? ` · codice postale ${s(f.residenceCap)}` : ""}`);
   else if (rc?.name) lines.push(`Comune di residenza: ${s(rc.name)}${rc.prov ? ` (${s(rc.prov)})` : ""}${f.residenceCap ? ` · CAP ${s(f.residenceCap)}` : ""}`);
   // competenze v2 (03/10): una riga per area, voci con livello (anche quelle senza etichetta ClickUp)
   const sm = normalizeSkillMap(f.skillLevels);
-  for (const a of SKILL_AREAS) {
+  if (!has("Competenze e livello")) for (const a of SKILL_AREAS) {
     const got = a.skills.filter((x) => sm[x.key]);
     if (got.length) lines.push(`Competenze · ${a.area}: ${got.map((x) => `${x.name} (${sm[x.key]})`).join(", ")}`);
   }
   const roles = normalizePastRoles(f.pastRoles);
-  if (roles.length) lines.push(`Ruoli già ricoperti: ${roles.map(pastRoleText).join(", ")}`);
+  if (roles.length && !has("Ruoli già ricoperti")) lines.push(`Ruoli già ricoperti: ${roles.map(pastRoleText).join(", ")}`);
   // testo libero su UNA riga: un a-capo scritto dalla persona non deve poter aggiungere righe lette da parseHocBlock
-  if (s(f.otherSkills)) lines.push(`Altro che sa fare: ${oneLine(f.otherSkills, 500)}`);
+  if (s(f.otherSkills) && !has("Altro che sa fare")) lines.push(`Altro che sa fare: ${oneLine(f.otherSkills, 500)}`);
   const learn = normalizeLearnList(f.learnWish);
-  if (learn.length) lines.push(`Vorrebbe imparare: ${learn.map(skillName).join(", ")}`);
+  if (learn.length && !has("Vorrebbe imparare")) lines.push(`Vorrebbe imparare: ${learn.map(skillName).join(", ")}`);
   // Location senza coordinate: ClickUp la rifiuta, il testo va nel blocco
   const loc = f.location;
   if (loc?.address && (loc.lat == null || loc.lng == null)) lines.push(`Dove vive (testo): ${s(loc.address)}`);
   return lines;
+}
+
+// ── Campi "specchio" (03/10/2026): dati strutturati dell'app scritti come TESTO
+// in un campo ClickUp dedicato, se la lista ce l'ha. Sola andata: chi li modifica
+// lo fa in app (su ClickUp un testo libero non si rilegge in modo affidabile).
+const place = (v) => (v?.abroad ? [oneLine(v.city, 120), s(v.country)].filter(Boolean).join(", ") : v?.name ? `${s(v.name)}${v.prov ? ` (${s(v.prov)})` : ""}` : "");
+export function mirrorText(key, f = {}) {
+  switch (key) {
+    case "birthPlace": return f.birthPlace?.abroad ? s(f.birthPlace.country) : place(f.birthPlace);
+    case "residenceComune": return place(f.residenceComune);
+    case "residenceCap": return oneLine(f.residenceCap, 20);
+    case "skillLevels": {
+      const sm = normalizeSkillMap(f.skillLevels);
+      return SKILL_AREAS.map((a) => {
+        const got = a.skills.filter((x) => sm[x.key]);
+        return got.length ? `${a.area}: ${got.map((x) => `${x.name} (${sm[x.key]})`).join(", ")}` : null;
+      }).filter(Boolean).join("\n");
+    }
+    case "pastRoles": return normalizePastRoles(f.pastRoles).map(pastRoleText).join(", ");
+    case "learnWish": return normalizeLearnList(f.learnWish).map(skillName).join(", ");
+    case "otherSkills": return oneLine(f.otherSkills, 500);
+    default: return "";
+  }
 }
 
 // ── Task → persona ───────────────────────────────────────────────────────────
@@ -317,6 +342,15 @@ export function personToClickup(person, fieldsMeta, { keys, cfPlain, statuses, c
     // effective = il valore che ClickUp terrà davvero dopo la scrittura (base anti-ritorno)
     const effective = enc.remove ? null : enc.missing?.length ? value.filter((x) => !enc.missing.includes(x)) : value;
     fieldOps.push(enc.remove ? { key: f.key, fieldId: meta.id, remove: true, effective } : { key: f.key, fieldId: meta.id, body: enc.body, effective });
+  }
+  for (const f of FIELDS) {
+    if (!f.mirror) continue;
+    if (want && !want.has(f.key) && !(f.key === "residenceCap" && want.has("residenceComune"))) continue;
+    const meta = byName.get(lc(f.mirror));
+    if (!meta) continue; // senza campo dedicato resta la riga nel blocco in descrizione
+    const text = mirrorText(f.key, person.fields || {});
+    const effective = person.fields?.[f.key] ?? null;
+    fieldOps.push(text ? { key: f.key, fieldId: meta.id, body: { value: text }, effective } : { key: f.key, fieldId: meta.id, remove: true, effective });
   }
   const description = withHocBlock(currentDescription || "", hocBlockLines(person, byName, { cfPlain }));
   const status = statusForCollaboration(statuses, person.fields?.collaborationStatus);
