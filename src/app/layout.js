@@ -16,7 +16,7 @@ import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
 import "./globals.css";
 import { themeCss, CP } from "@/lib/brand";
-import { Manrope, Instrument_Serif } from "next/font/google";
+import { Manrope, Instrument_Serif, Cinzel } from "next/font/google";
 
 // Caratteri dello stile v3 "Casa" (anteprima): serviti dal nostro dominio da
 // next/font, con misure di riserva calcolate (niente salto al caricamento).
@@ -25,6 +25,8 @@ import { Manrope, Instrument_Serif } from "next/font/google";
 // (mai nelle tabelle). Gli stessi di "La casa" (26/09 notte).
 const fSans = Manrope({ subsets: ["latin", "latin-ext"], weight: ["400", "500", "600"], display: "swap", variable: "--f-sans" });
 const fSig = Instrument_Serif({ subsets: ["latin", "latin-ext"], weight: "400", style: ["normal", "italic"], display: "swap", variable: "--f-display" });
+// Carattere del logo (03/10/2026, scelta "E" del board): Cinzel, solo per la scritta del marchio.
+const fBrand = Cinzel({ subsets: ["latin"], weight: ["500"], display: "swap", variable: "--f-brand" });
 
 export const metadata = {
   title: "HOC Pro",
@@ -74,7 +76,7 @@ export default function RootLayout({ children }) {
         },
       }}
     >
-      <html lang="it" data-theme="light" className={`${fSans.variable} ${fSig.variable}`} suppressHydrationWarning>
+      <html lang="it" data-theme="light" className={`${fSans.variable} ${fSig.variable} ${fBrand.variable}`} suppressHydrationWarning>
         <head>
           {/* Tema chiaro/scuro: variabili dei due temi + scelta salvata applicata PRIMA
               del primo disegno (niente lampo del tema sbagliato). Default: scuro. */}
