@@ -27,7 +27,7 @@ import { drainHrBackground } from "@/lib/hr-uploads";
 import { checkRateLimit, tooMany } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300; // copia di file fino a 50 MB verso ClickUp (in after()): margine ampio
 
 function ipOf(request) {
   return (request.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "n/d";

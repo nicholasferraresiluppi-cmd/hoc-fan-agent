@@ -126,7 +126,7 @@ export async function receiveUpload(token, { kind, pathname } = {}, { now = Date
   try {
     bytes = await readUploadBlob(pathname);
   } catch (e) {
-    if (e?.tooBig) { await deleteUploadBlob(pathname).catch(() => {}); return { ok: false, status: 413, error: "File troppo grande (massimo 20 MB)." }; }
+    if (e?.tooBig) { await deleteUploadBlob(pathname).catch(() => {}); return { ok: false, status: 413, error: "File troppo grande (massimo 50 MB)." }; }
     return { ok: false, status: 502, error: "Non riesco a leggere il file appena caricato. Riprova tra poco." };
   }
   if (!bytes?.length) return { ok: false, status: 404, error: "Il file non è arrivato: riprova a caricarlo." };

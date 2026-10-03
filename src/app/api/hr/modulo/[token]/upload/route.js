@@ -6,7 +6,7 @@
  *     (casuale, senza dati personali) e lo lega a questo token e a questa scheda;
  *  2. il corpo di `upload()` di `@vercel/blob/client` (handleUpload): il token di
  *     upload si genera SOLO per uno slot di questo token, entro la finestra dei file,
- *     coi tipi ammessi e al massimo 20 MB (lib/hr-uploads → authorizeBlobUpload).
+ *     coi tipi ammessi e al massimo 50 MB (lib/hr-uploads → authorizeBlobUpload).
  * In produzione Vercel Blob richiama questa route a upload finito
  * (`onUploadCompleted`): è solo una RETE DI SICUREZZA se il browser si chiude
  * prima di chiamare /file. Non scatta in locale ed è asincrono: il meccanismo
@@ -22,7 +22,7 @@ import { checkRateLimit, tooMany } from "@/lib/rate-limit";
 import { internalOrigin } from "@/lib/cron-chain";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300; // copia di file fino a 50 MB verso ClickUp (in after()): margine ampio
 
 const ipOf = (request) => (request.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "n/d";
 

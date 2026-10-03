@@ -12,7 +12,7 @@
 
 import { UPLOAD_MAX_BYTES } from "./hr-fields.js";
 
-export const UPLOAD_MAX_BYTES_V2 = UPLOAD_MAX_BYTES; // 20 MB, stesso valore nel browser e lato server
+export const UPLOAD_MAX_BYTES_V2 = UPLOAD_MAX_BYTES; // 50 MB, stesso valore nel browser e lato server
 export const UPLOAD_TYPES = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png" };
 export const UPLOAD_PREFIX = "hr-upload/";
 export const UPLOAD_SLOT_TTL_S = 2 * 3600;     // uno slot vale 2 ore (la finestra file è 1 ora)
@@ -42,7 +42,7 @@ export function checkUploadRequest({ kind, contentType, size }, kinds) {
   if (!UPLOAD_TYPES[contentType]) return { status: 415, error: "Formato non ammesso: solo PDF, JPG o PNG." };
   const n = Number(size);
   if (!Number.isFinite(n) || n <= 0) return { status: 400, error: "File vuoto." };
-  if (n > UPLOAD_MAX_BYTES_V2) return { status: 413, error: "File troppo grande (massimo 20 MB)." };
+  if (n > UPLOAD_MAX_BYTES_V2) return { status: 413, error: "File troppo grande (massimo 50 MB)." };
   return null;
 }
 

@@ -397,7 +397,7 @@ function FilesStep({ token, data, onDone }) {
     <div className="hrf-fade" style={{ display: "grid", gap: 22 }}>
       <Tessera data={data} />
       <Headline title="Quasi fatto." sub="Ultimo passo: i documenti." size={36} />
-      <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>Facoltativo ma utile. PDF, JPG o PNG, fino a 20 MB. Le foto le riduciamo noi. Hai un'ora di tempo.</p>
+      <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>Facoltativo ma utile. PDF, JPG o PNG, fino a 50 MB. Le foto le riduciamo noi. Hai un'ora di tempo.</p>
       <div style={{ borderBottom: `1px solid ${CP.border}` }}>
         <Item kind="document" title="Documento d'identità" hint="Fronte e retro nello stesso file, se puoi." />
         <Item kind="cv" title="Curriculum (CV)" hint="L'ultima versione che hai." />

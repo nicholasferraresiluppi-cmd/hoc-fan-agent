@@ -7,7 +7,7 @@
  * 2. Il file va DIRETTO sul Blob privato (`@vercel/blob/client`, importato solo
  *    al momento del caricamento): il pathname lo decide il server (slot).
  * 3. Il server lo copia su ClickUp e lo cancella dal Blob (route /file).
- * Limite 20 MB per file, controllato qui e lato server.
+ * Limite 50 MB per file, controllato qui e lato server.
  */
 import { UPLOAD_MAX_BYTES } from "./hr-fields.js";
 
@@ -84,7 +84,7 @@ export async function uploadHrFile(token, kind, original, { onStage, onProgress 
   if (!ALLOWED_TYPES.includes(original?.type)) throw new Error("Formato non ammesso: solo PDF, JPG o PNG.");
   onStage?.("riduco");
   const file = await shrinkImage(original);
-  if (file.size > UPLOAD_MAX_BYTES) throw new Error("File troppo grande: massimo 20 MB.");
+  if (file.size > UPLOAD_MAX_BYTES) throw new Error("File troppo grande: massimo 50 MB.");
   const base = `/api/hr/modulo/${encodeURIComponent(token)}`;
   const slot = await postJson(`${base}/upload`, { type: "slot", kind, contentType: file.type, size: file.size });
   onStage?.("carico");
@@ -99,7 +99,7 @@ export async function uploadHrFile(token, kind, original, { onStage, onProgress 
     });
   } catch (e) {
     const m = String(e?.message || "");
-    if (/too large|size/i.test(m)) throw new Error("File troppo grande: massimo 20 MB.");
+    if (/too large|size/i.test(m)) throw new Error("File troppo grande: massimo 50 MB.");
     if (/content type|contentType/i.test(m)) throw new Error("Formato non ammesso: solo PDF, JPG o PNG.");
     throw new Error("Caricamento interrotto. Controlla la connessione e riprova.");
   }
