@@ -42,6 +42,7 @@ import HrPalmaLoader from "@/components/HrPalmaLoader";
 import HocLogo from "@/components/HocLogo";
 import HrHouseLetter from "@/components/HrHouseLetter";
 import { uploadHrFile } from "@/lib/hr-upload-client";
+import { GRAIN_DATA_URI } from "@/lib/tessera-material";
 import {
   progressWords, timeEstimateText, fieldErrors, fieldErrorsFromServer, firstStepWithError,
   draftKey, serializeDraft, parseDraft, draftWorthSaving, safeGet, safeSet, safeRemove,
@@ -105,10 +106,17 @@ function keyboardFor(k, data) {
 const reducedMotion = () => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } };
 
 const CSS = `
+.hrf{position:relative;isolation:isolate}
+.hrf::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:url("${GRAIN_DATA_URI}");background-size:160px 160px;mix-blend-mode:overlay;opacity:.12}
+.hrf-sheet{padding:24px 20px;border-radius:18px;background:linear-gradient(180deg,rgba(242,238,230,.05),rgba(242,238,230,.018));border:1px solid rgba(242,238,230,.08);box-shadow:0 22px 48px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,245,225,.07)}
+@media (max-width:420px){.hrf-sheet{padding:20px 16px}}
+.hrf input,.hrf select,.hrf textarea{background:rgba(0,0,0,.28)!important;border-color:rgba(242,238,230,.13)!important;box-shadow:inset 0 2px 4px rgba(0,0,0,.4);transition:border-color .2s ease,box-shadow .2s ease}
+.hrf input:focus,.hrf select:focus,.hrf textarea:focus{border-color:rgba(217,180,106,.7)!important;box-shadow:inset 0 2px 4px rgba(0,0,0,.4),0 0 0 4px rgba(217,180,106,.12)}
+.hrf input[type=checkbox],.hrf input[type=radio]{box-shadow:none}
 .hrf span,.hrf label,.hrf button,.hrf input,.hrf select,.hrf textarea{font-family:inherit}
 .hrf input,.hrf select,.hrf textarea{font-size:16px!important}
 .hrf select option{background:#15161c;color:#f2eee6}
-.hrf [aria-invalid="true"]{border-color:${ERR_COLOR}!important}
+.hrf [aria-invalid="true"],.hrf [aria-invalid="true"]:focus{border-color:${ERR_COLOR}!important}
 .hrf .hrf-pill{transition:transform .15s ease,opacity .15s ease}
 .hrf .hrf-pill:active{transform:scale(.98)}
 .hrf-card{position:relative;overflow:hidden;transition:border-color .6s ease,box-shadow .6s ease}
@@ -450,7 +458,7 @@ export default function HrFormPage() {
           )}
         </div>
 
-        <form ref={formRef} key={step} className={dir === "prev" ? "hrf-prev" : "hrf-next"} onSubmit={onSubmit} onKeyDown={onKeyDown} noValidate style={{ display: "grid", gap: 20 }}>
+        <form ref={formRef} key={step} className={`hrf-sheet ${dir === "prev" ? "hrf-prev" : "hrf-next"}`} onSubmit={onSubmit} onKeyDown={onKeyDown} noValidate style={{ display: "grid", gap: 20 }}>
           <Headline title={s.title} sub={s.sub} size={36} />
 
           {s.keys.filter((k) => FORM_KEYS.includes(k)).map((k) => {
