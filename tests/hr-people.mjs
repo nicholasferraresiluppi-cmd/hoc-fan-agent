@@ -190,6 +190,17 @@ eq(stripHocBlock(withHocBlock("A", ["x: 1"])), "A", "blocco rimovibile");
   ok(normalizePersonInput({ collaborationStatus: "Boh" }).errors.length === 1, "input: fase inesistente rifiutata");
   eq(normalizePersonInput({ collaborationStatus: "" }).values.collaborationStatus, null, "input: fase svuotata");
   ok(!F.FORM_KEYS.includes("hvContractStatus") && !F.FORM_KEYS.includes("collaborationStatus"), "contratto e fase NON sono nel modulo pubblico");
+  ok(F.FORM_KEYS.includes("source") && F.FORM_KEYS.includes("referredBy"), "provenienza e reference sono nel modulo");
+  ok(F.SOURCES[0] === F.SOURCE_REFERRAL && F.FIELD_BY_KEY.source.cu === "Provenienza" && F.FIELD_BY_KEY.referredBy.cu === "Segnalato da", "provenienza: prima voce = reference, campi ClickUp per nome");
+  {
+    const C2 = await import("../src/lib/hr-people-core.js");
+    const r1 = C2.normalizePersonInput({ source: F.SOURCE_REFERRAL, referredBy: " Marta Rossi " });
+    ok(r1.values.source === F.SOURCE_REFERRAL && r1.values.referredBy === "Marta Rossi" && !r1.errors.length, "reference: si tiene chi ha segnalato");
+    const r2 = C2.normalizePersonInput({ source: "Ho visto un annuncio", referredBy: "Marta Rossi" });
+    ok(r2.values.referredBy === null, "annuncio: il nome di chi segnala si scarta");
+    const r3 = C2.normalizePersonInput({ source: "Passaparola" });
+    ok(r3.errors.length === 1, "provenienza fuori elenco: rifiutata");
+  }
   // ClickUp → app, tendina in inglese e (domani) in italiano
   const csEn = { id: "f-cs", name: "Collaboration Status", type: "drop_down", type_config: { options: [{ id: "en-o", name: "Onboarding", orderindex: 0 }, { id: "en-a", name: "Active", orderindex: 1 }, { id: "en-d", name: "Decommissioned", orderindex: 2 }, { id: "en-nr", name: "Needs Review", orderindex: 3 }] } };
   const csIt = { id: "f-cs", name: "Collaboration Status", type: "drop_down", type_config: { options: [{ id: "it-i", name: "In ingresso", orderindex: 0 }, { id: "it-a", name: "Attiva", orderindex: 1 }, { id: "it-u", name: "Uscita", orderindex: 2 }] } };

@@ -33,7 +33,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { CP, CP_NOTTE } from "@/lib/brand";
-import { FIELD_BY_KEY, FORM_KEYS } from "@/lib/hr-fields";
+import { FIELD_BY_KEY, FORM_KEYS, SOURCE_REFERRAL } from "@/lib/hr-fields";
 import { lbl, FieldInput, fmtDate } from "@/components/hr-ui";
 import { cfCoherence } from "@/lib/hr-comuni";
 import HrWelcomeCard from "@/components/HrWelcomeCard";
@@ -65,7 +65,7 @@ const STEPS = [
   { title: "Come contattarti", sub: "solo per lavoro", keys: ["personalEmail", "personalPhone", "linkedin"] },
   { title: "Il tuo lavoro", sub: "cosa fai e quando ci sei", keys: ["currentJob", "partitaIva", "spokenLanguages", "timeSlots"] },
   { title: "Le tue competenze", sub: "cosa sai fare, e a che livello", keys: ["skillLevels", "otherSkills", "learnWish"] },
-  { title: "La tua esperienza", sub: "da dove arrivi", keys: ["pastRoles", "personalInterests"] },
+  { title: "La tua esperienza", sub: "da dove arrivi", keys: ["pastRoles", "personalInterests", "source", "referredBy"] },
   { title: "Ultimo passo", sub: "privacy e invio", keys: [] },
 ];
 const LABELS = {
@@ -74,7 +74,8 @@ const LABELS = {
   linkedin: "Profilo LinkedIn (facoltativo)", birthPlace: "Dove sei nato/a",
   location: "Indirizzo (via e numero civico)", residenceCap: "CAP / codice postale", residenceComune: "Dove vivi", skillLevels: "Cosa sai fare, e a che livello",
   learnWish: "Cosa ti piacerebbe imparare (facoltativo, al massimo 2)", gender: "Genere",
-  otherSkills: "Cos'altro sai fare che qui non c'è (facoltativo)", pastRoles: "Ruoli che hai già ricoperto (facoltativo)",
+  otherSkills: "Cos'altro sai fare che qui non c'è (facoltativo)",
+  source: "Come ci hai conosciuto?", referredBy: "Chi ti ha segnalato? Nome e cognome", pastRoles: "Ruoli che hai già ricoperto (facoltativo)",
 };
 
 // Palette Casa solo per questa pagina: le variabili --cp-* sovrascritte qui valgono per tutti i figli.
@@ -326,7 +327,8 @@ export default function HrFormPage() {
   };
 
   const setField = (k, v) => {
-    setData((d) => ({ ...d, [k]: v }));
+    // "Chi ti ha segnalato" vale solo per chi è arrivato da una reference
+    setData((d) => ({ ...d, [k]: v, ...(k === "source" && v !== SOURCE_REFERRAL ? { referredBy: "" } : {}) }));
     if (fieldErrs[k]) setFieldErrs((e) => { const n = { ...e }; delete n[k]; return n; });
     if (["codiceFiscale", "dateOfBirth", "gender", "birthPlace"].includes(k)) setCfWarn(null);
   };
@@ -469,7 +471,7 @@ export default function HrFormPage() {
         <form ref={formRef} key={step} className={`hrf-sheet ${dir === "prev" ? "hrf-prev" : "hrf-next"}`} onSubmit={onSubmit} onKeyDown={onKeyDown} noValidate style={{ display: "grid", gap: 20 }}>
           <Headline title={s.title} sub={s.sub} size={36} />
 
-          {s.keys.filter((k) => FORM_KEYS.includes(k)).map((k) => {
+          {s.keys.filter((k) => FORM_KEYS.includes(k) && (k !== "referredBy" || data.source === SOURCE_REFERRAL)).map((k) => {
             const f = FIELD_BY_KEY[k];
             const cfOff = k === "codiceFiscale" && !ctx.cfEnabled;
             const fe = fieldErrs[k];
