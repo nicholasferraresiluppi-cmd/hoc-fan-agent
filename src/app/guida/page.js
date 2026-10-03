@@ -19,6 +19,8 @@ import { PageHead, FilterChip, Notice } from "@/components/ds";
 import { selectFunnels, getFunnel } from "@/lib/role-funnels";
 import RoleFunnelGuide from "@/components/RoleFunnelGuide";
 import RoleFunnelChecklist from "@/components/RoleFunnelChecklist";
+import { TutorialVideoCard } from "@/components/TutorialVideo";
+import { TUTORIAL_VIDEOS } from "@/lib/tutorial-videos";
 
 export default function GuidaPage() {
   const { user, isLoaded } = useUser();
@@ -59,6 +61,21 @@ export default function GuidaPage() {
           {whoamiError && (
             <Notice>Non riesco a leggere il tuo ruolo in questo momento: ti mostro il percorso di base. Ricarica la pagina tra poco per vedere quello giusto.</Notice>
           )}
+
+          {/* Video tutorial: prima i video, poi il percorso scritto (03/10/2026). Quelli su pagine
+              riservate agli admin li vede solo chi le può aprire: pertinenza, non difesa. */}
+          {(() => {
+            const vids = TUTORIAL_VIDEOS.filter((v) => !v.adminOnly || whoami?.admin);
+            if (!vids.length) return null;
+            return (
+              <section aria-label="Video tutorial" style={{ marginBottom: 28 }}>
+                <h2 style={{ fontFamily: FONTS.body, fontSize: 13, fontWeight: 500, letterSpacing: ".08em", textTransform: "uppercase", color: CP.textMuted, margin: "0 0 10px" }}>Video tutorial</h2>
+                <div style={{ display: "grid", gap: 10 }}>
+                  {vids.map((v) => <TutorialVideoCard key={v.id} video={v} />)}
+                </div>
+              </section>
+            );
+          })()}
 
           {/* Tab per ruolo (solo se più di uno visibile) */}
           {visibleKeys.length > 1 && (

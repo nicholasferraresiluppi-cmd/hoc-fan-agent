@@ -62,8 +62,11 @@ export default clerkMiddleware(async (auth, request) => {
 });
 
 export const config = {
+  // 03/10/2026: .mp4/.webm esclusi come gli altri file statici. Sono i tutorial video di public/video/,
+  // che devono aprirsi anche dal modulo pubblico /hr/modulo (chi lo compila non ha un account Clerk).
+  // Solo file statici di public/: nessuna route né API diventa pubblica.
   matcher: [
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|mp4|webm)).*)',
     '/(api|trpc)(.*)',
   ],
 };
