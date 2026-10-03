@@ -261,9 +261,9 @@ export default function HrFormPage() {
       <Shell>
         <div className="hrf-fade" style={{ display: "grid", gap: 26 }}>
           <HrWelcomeCard preview data={SAMPLE_CARD} at={Date.now()} />
-          <Headline title={first ? `Ciao ${first},` : "Compila il modulo"} sub="e avrai la tua tessera della Casa." size={40} />
+          <Headline title={first ? `Ciao ${first},` : "Compila il modulo"} sub="e sblocca la tua card." size={40} />
           <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15.5, lineHeight: 1.55 }}>
-            Questa è una tessera d'esempio: la tua si compone con le tue risposte, in sette brevi capitoli. Ci vogliono circa cinque minuti.
+            Questa è una card d'esempio: la tua prende forma con le tue risposte, in sette brevi capitoli. Ci vogliono circa cinque minuti.
             {ctx.shared ? " Compilalo una volta sola." : ` Il link vale fino al ${fmtDate(ctx.expiresAt)} e si usa una volta sola.`} Non ti chiediamo l'IBAN.
           </p>
           <button type="button" className="hrf-pill" onClick={() => setStage("form")} style={{ ...pill(true), width: "100%" }}>Cominciamo</button>
