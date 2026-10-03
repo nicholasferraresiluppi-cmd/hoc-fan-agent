@@ -10,7 +10,7 @@
  * drop_down (value = orderindex OPPURE option id), labels (array di option id
  * o di oggetti), location, users, attachment, checkbox.
  */
-import { SKILL_NAME } from "./hr-skills.js";
+import { normalizeSkillMap, normalizeLearnList, normalizePastRoles, skillName, pastRoleText, oneLine, SKILL_AREAS } from "./hr-skills.js";
 import { FIELDS, FIELD_BY_KEY, isEmptyValue, maskCf } from "./hr-people-core.js";
 
 export const HOC_BLOCK_START = "— Dati HOC Pro —";
@@ -163,9 +163,18 @@ export function hocBlockLines(person, byName, { cfPlain } = {}) {
   const rc = f.residenceComune;
   if (rc?.abroad && rc.country) lines.push(`Residenza: ${s(rc.city) ? `${s(rc.city)}, ` : ""}${s(rc.country)}${f.residenceCap ? ` · codice postale ${s(f.residenceCap)}` : ""}`);
   else if (rc?.name) lines.push(`Comune di residenza: ${s(rc.name)}${rc.prov ? ` (${s(rc.prov)})` : ""}${f.residenceCap ? ` · CAP ${s(f.residenceCap)}` : ""}`);
-  const sl = f.skillLevels && typeof f.skillLevels === "object" ? Object.entries(f.skillLevels) : [];
-  if (sl.length) lines.push(`Livelli competenze: ${sl.map(([k, v]) => `${s(SKILL_NAME[k] || k)} (${v})`).join(", ")}`);
-  if (Array.isArray(f.learnWish) && f.learnWish.length) lines.push(`Vorrebbe imparare: ${f.learnWish.map((k) => SKILL_NAME[k] || k).join(", ")}`);
+  // competenze v2 (03/10): una riga per area, voci con livello (anche quelle senza etichetta ClickUp)
+  const sm = normalizeSkillMap(f.skillLevels);
+  for (const a of SKILL_AREAS) {
+    const got = a.skills.filter((x) => sm[x.key]);
+    if (got.length) lines.push(`Competenze · ${a.area}: ${got.map((x) => `${x.name} (${sm[x.key]})`).join(", ")}`);
+  }
+  const roles = normalizePastRoles(f.pastRoles);
+  if (roles.length) lines.push(`Ruoli già ricoperti: ${roles.map(pastRoleText).join(", ")}`);
+  // testo libero su UNA riga: un a-capo scritto dalla persona non deve poter aggiungere righe lette da parseHocBlock
+  if (s(f.otherSkills)) lines.push(`Altro che sa fare: ${oneLine(f.otherSkills, 500)}`);
+  const learn = normalizeLearnList(f.learnWish);
+  if (learn.length) lines.push(`Vorrebbe imparare: ${learn.map(skillName).join(", ")}`);
   // Location senza coordinate: ClickUp la rifiuta, il testo va nel blocco
   const loc = f.location;
   if (loc?.address && (loc.lat == null || loc.lng == null)) lines.push(`Dove vive (testo): ${s(loc.address)}`);

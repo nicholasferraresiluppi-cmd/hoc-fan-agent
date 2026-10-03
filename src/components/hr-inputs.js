@@ -8,7 +8,7 @@
 import { CP, FONTS } from "@/lib/brand";
 import { useEffect, useState } from "react";
 import { searchComuni } from "@/lib/hr-comuni";
-import { SKILL_AREAS, SKILL_LEVELS, SKILL_NAME } from "@/lib/hr-skills";
+import { SKILL_AREAS, SKILL_LEVELS, SKILL_LEVEL_HINT, SKILL_NAME, AREA_BY_KEY, PAST_ROLES, PAST_ROLE_NAME, ROLE_DURATIONS, normalizeSkillMap, normalizeLearnList, normalizePastRoles, areasOfSkillMap, skillName, pastRoleText } from "@/lib/hr-skills";
 
 
 const field = { width: "100%", boxSizing: "border-box", padding: "8px 10px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
@@ -155,36 +155,67 @@ export function BirthInput({ id, value, onChange, disabled }) {
   );
 }
 
-// ── Competenze con livello ───────────────────────────────────────────────────
-export function SkillsInput({ id, value, onChange, disabled }) {
-  const cur = value && typeof value === "object" ? value : {};
-  const [openArea, setOpenArea] = useState(null);
-  const setLevel = (k, lvl) => { const n = { ...cur }; if (lvl) n[k] = lvl; else delete n[k]; onChange(n); };
+// ── Competenze con livello (v2, 03/10) ──────────────────────────────────────
+// Prima le aree («In quali aree hai esperienza?»), poi si aprono SOLO quelle scelte.
+const box = { border: `1px solid ${CP.border}`, borderRadius: 10, padding: "10px 12px" };
+const hint = { fontSize: 12.5, color: CP.textMuted, lineHeight: 1.45 };
+
+export function LevelLegend() {
   return (
-    <div id={id} style={{ display: "grid", gap: 8 }}>
-      <div style={{ fontSize: 12.5, color: CP.textMuted, lineHeight: 1.45 }}>Apri le aree che ti riguardano e indica il tuo livello solo dove ce l&apos;hai. «Posso insegnarla» vuol dire che potresti formare un collega.</div>
-      {SKILL_AREAS.map((a) => {
-        const n = a.skills.filter(([k]) => cur[k]).length;
-        const isOpen = openArea === a.area;
+    <div style={{ ...hint, display: "grid", gap: 2 }}>
+      {SKILL_LEVELS.map((l) => <div key={l}><span style={{ color: CP.textSecondary }}>{l}</span> = {SKILL_LEVEL_HINT[l]}</div>)}
+    </div>
+  );
+}
+
+export function SkillsInput({ id, value, onChange, disabled }) {
+  const cur = normalizeSkillMap(value);
+  const [areas, setAreas] = useState(() => areasOfSkillMap(value));
+  const setLevel = (k, lvl) => { const n = { ...cur }; if (lvl) n[k] = lvl; else delete n[k]; onChange(n); };
+  const toggleArea = (key) => {
+    if (areas.includes(key)) {
+      setAreas(areas.filter((a) => a !== key));
+      // chiudere un'area toglie anche i livelli indicati lì dentro
+      const inArea = AREA_BY_KEY[key].skills.map((x) => x.key);
+      if (inArea.some((k) => cur[k])) onChange(Object.fromEntries(Object.entries(cur).filter(([k]) => !inArea.includes(k))));
+    } else setAreas([...areas, key]);
+  };
+  const shown = SKILL_AREAS.filter((a) => areas.includes(a.key));
+  return (
+    <div id={id} style={{ display: "grid", gap: 10 }}>
+      <div style={{ fontSize: 14, color: CP.textPrimary }}>In quali aree hai esperienza?</div>
+      <div role="group" aria-label="Aree di esperienza" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {SKILL_AREAS.map((a) => {
+          const on = areas.includes(a.key);
+          return <button key={a.key} type="button" disabled={disabled} aria-pressed={on} onClick={() => toggleArea(a.key)} style={seg(on)}>{a.area}</button>;
+        })}
+      </div>
+      {shown.length === 0 && <div style={hint}>Scegli una o più aree: si apriranno le voci per indicare il tuo livello.</div>}
+      {shown.length > 0 && (
+        <>
+          <div style={{ ...hint, paddingTop: 2 }}>Indica il livello solo dove ce l&apos;hai. I livelli vogliono dire:</div>
+          <LevelLegend />
+        </>
+      )}
+      {shown.map((a) => {
+        const n = a.skills.filter((x) => cur[x.key]).length;
         return (
-          <div key={a.area} style={{ border: `1px solid ${CP.border}`, borderRadius: 10 }}>
-            <button type="button" onClick={() => setOpenArea(isOpen ? null : a.area)} aria-expanded={isOpen}
-              style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "10px 12px", background: "transparent", border: "none", color: CP.textPrimary, fontSize: 14, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" }}>
-              <span>{a.area}</span><span style={{ color: n ? CP.accentSoftText : CP.textMuted, fontWeight: 400, fontSize: 13 }}>{n ? `${n} indicate` : ""}{n ? " · " : ""}{isOpen ? "chiudi" : "apri"}</span>
-            </button>
-            {isOpen && (
-              <div style={{ display: "grid", gap: 10, padding: "0 12px 12px" }}>
-                {a.skills.map(([k, name]) => (
-                  <div key={k}>
-                    <div style={{ fontSize: 13.5, color: CP.textPrimary, marginBottom: 4 }}>{name}</div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      <button type="button" disabled={disabled} aria-pressed={!cur[k]} onClick={() => setLevel(k, null)} style={seg(!cur[k])}>No</button>
-                      {SKILL_LEVELS.map((l) => <button key={l} type="button" disabled={disabled} aria-pressed={cur[k] === l} onClick={() => setLevel(k, l)} style={seg(cur[k] === l)}>{l}</button>)}
-                    </div>
+          <div key={a.key} style={box}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary }}>{a.area}</span>
+              <span style={{ fontSize: 13, color: n ? CP.accentSoftText : CP.textMuted }}>{n ? `${n} indicate` : "nessuna indicata"}</span>
+            </div>
+            <div style={{ display: "grid", gap: 10 }}>
+              {a.skills.map((x) => (
+                <div key={x.key}>
+                  <div style={{ fontSize: 13.5, color: CP.textPrimary, marginBottom: 4 }}>{x.name}</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    <button type="button" disabled={disabled} aria-pressed={!cur[x.key]} onClick={() => setLevel(x.key, null)} style={seg(!cur[x.key])}>No</button>
+                    {SKILL_LEVELS.map((l) => <button key={l} type="button" disabled={disabled} title={SKILL_LEVEL_HINT[l]} aria-pressed={cur[x.key] === l} onClick={() => setLevel(x.key, l)} style={seg(cur[x.key] === l)}>{l}</button>)}
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              ))}
+            </div>
           </div>
         );
       })}
@@ -193,21 +224,47 @@ export function SkillsInput({ id, value, onChange, disabled }) {
 }
 
 export function LearnInput({ id, value, onChange, disabled }) {
-  const cur = Array.isArray(value) ? value : [];
-  const opts = SKILL_AREAS.flatMap((a) => a.skills.map(([k, name]) => ({ k, name, area: a.area })));
+  const cur = normalizeLearnList(value);
   const setAt = (i, k) => { const n = [...cur]; if (k) n[i] = k; else n.splice(i, 1); onChange([...new Set(n.filter(Boolean))]); };
   return (
     <div style={{ display: "grid", gap: 8 }}>
       {[0, 1].map((i) => (
         <select key={i} id={i === 0 ? id : undefined} disabled={disabled || (i === 1 && !cur[0])} style={field} value={cur[i] || ""} onChange={(e) => setAt(i, e.target.value)}>
           <option value="">{i === 0 ? "Scegli una competenza" : "Una seconda (facoltativa)"}</option>
-          {SKILL_AREAS.map((a) => <optgroup key={a.area} label={a.area}>{a.skills.map(([k, name]) => <option key={k} value={k}>{name}</option>)}</optgroup>)}
+          {SKILL_AREAS.map((a) => <optgroup key={a.key} label={a.area}>{a.skills.map((x) => <option key={x.key} value={x.key}>{x.name}</option>)}</optgroup>)}
         </select>
       ))}
     </div>
   );
 }
-export { SKILL_NAME };
+
+// ── Ruoli già ricoperti, con durata ──────────────────────────────────────────
+export function PastRolesInput({ id, value, onChange, disabled }) {
+  const cur = normalizePastRoles(value);
+  const byRole = Object.fromEntries(cur.map((r) => [r.role, r]));
+  const toggle = (role) => onChange(byRole[role] ? cur.filter((r) => r.role !== role) : [...cur, role === "other" ? { role, duration: null, other: "" } : { role, duration: null }]);
+  const patch = (role, p) => onChange(cur.map((r) => (r.role === role ? { ...r, ...p } : r)));
+  return (
+    <div id={id} style={{ display: "grid", gap: 10 }}>
+      <div role="group" aria-label="Ruoli" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {PAST_ROLES.map(([k, name]) => <button key={k} type="button" disabled={disabled} aria-pressed={Boolean(byRole[k])} onClick={() => toggle(k)} style={seg(Boolean(byRole[k]))}>{name}</button>)}
+      </div>
+      {cur.length > 0 && <div style={hint}>Per ognuno, quanto è durato in tutto?</div>}
+      {cur.map((r) => (
+        <div key={r.role} style={{ ...box, display: "grid", gap: 6 }}>
+          <div style={{ fontSize: 13.5, color: CP.textPrimary }}>{PAST_ROLE_NAME[r.role]}</div>
+          {r.role === "other" && (
+            <input disabled={disabled} style={field} maxLength={80} placeholder="Che ruolo era?" value={r.other || ""} onChange={(e) => patch("other", { other: e.target.value })} aria-label="Altro ruolo" />
+          )}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {ROLE_DURATIONS.map(([k, name]) => <button key={k} type="button" disabled={disabled} aria-pressed={r.duration === k} onClick={() => patch(r.role, { duration: k })} style={seg(r.duration === k)}>{name}</button>)}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+export { SKILL_NAME, skillName, pastRoleText };
 
 export function ResidenceInput({ id, value, onChange, disabled }) {
   const abroad = Boolean(value?.abroad);

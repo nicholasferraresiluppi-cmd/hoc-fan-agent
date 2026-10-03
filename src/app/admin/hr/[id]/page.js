@@ -171,7 +171,7 @@ function Section({ section, person, options, crypto, onSaved }) {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "12px 18px" }}>
         {fields.map((f) => (
-          <div key={f.key} style={{ minWidth: 0, gridColumn: f.type === "labels" || f.type === "longtext" ? "1 / -1" : undefined }}>
+          <div key={f.key} style={{ minWidth: 0, gridColumn: ["labels", "longtext", "skillmap", "roles"].includes(f.type) ? "1 / -1" : undefined }}>
             <span id={`hr-${f.key}-l`} style={lbl}>{f.label}{f.readOnly && f.cu ? <span style={{ color: CP.textMuted }}> · da ClickUp</span> : null}</span>
             {editing && !f.readOnly ? (
               f.type === "cf" && !crypto ? <span style={{ fontSize: 13, color: CP.textMuted }}>Non modificabile: manca la chiave di cifratura.</span> : (
