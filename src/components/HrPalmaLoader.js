@@ -42,7 +42,7 @@ export default function HrPalmaLoader({ width = 96, tone = "ivory", label = "Car
   return (
     <span role="status" aria-live="polite" style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 14, ...style }}>
       <style>{CSS}</style>
-      <span className="hpl" aria-hidden="true" style={{ width, height: (width * 168) / 441, color: t.color }}>
+      <span className="hpl" aria-hidden="true" style={{ width, height: (width * 168) / 476, color: t.color }}>
         <span className="hpl-base" style={{ display: "block" }}><HocPalma width={width} title="" /></span>
         <span className="hpl-sheen" style={{ backgroundImage: t.sheen }} />
       </span>
