@@ -8,7 +8,10 @@
  *   hr:person:{id}:log      LIST storico (chi/cosa/quando/da dove), cap 500
  *   hr:task2person:{taskId} task ClickUp → id persona
  *   hr:echo:{taskId}        le nostre ultime scritture verso ClickUp (anti-loop, TTL 60s)
- *   hr:form:{token}         link del modulo pubblico (monouso, 14 giorni)
+ *   hr:form:{token}         link del modulo pubblico: personale (monouso, 14 giorni),
+ *                           condiviso (`shared: true`, senza scadenza) o figlio del
+ *                           condiviso (`child: true`, solo per i file, 1 ora)
+ *   hr:form:shared          token dell'UNICO link condiviso attivo (03/10/2026)
  *   hr:webhook              { id, secret, endpoint, … } del webhook registrato
  *   hr:import:last          esito dell'ultimo import/riconciliazione
  *   hr:conflicts            LIST degli ultimi conflitti (cap 200)
@@ -27,6 +30,7 @@ import {
   FIELDS, FIELD_BY_KEY, FORM_KEYS, EDITABLE_KEYS, FORM_TTL_DAYS, PRIVACY_VERSION, UPLOAD_MAX_BYTES,
   normalizePersonInput, applyChanges, resolveFieldConflicts, filterEchoes, recordEcho, computeCleanup,
   valuesEqual, maskCf, logValue, formTokenState, sniffFileType, fullName, valueHash, dropUnchangedSinceBase,
+  FORM_UPLOAD_GRACE_MS,
 } from "./hr-people-core.js";
 import { taskToPerson, personToClickup, createTaskPayload, incomingTimestamps, expectedFieldNames, fieldsByName } from "./hr-clickup-map.js";
 import {
@@ -34,6 +38,7 @@ import {
   uploadAttachment, resolveTeamId, createWebhook, deleteWebhook, ClickupError,
 } from "./clickup-hr-api.js";
 import { hrCryptoConfigured, encryptHr, decryptHr } from "./hr-crypto.js";
+import { checkRateLimit } from "./rate-limit.js";
 
 const K = {
   person: (id) => `hr:person:${id}`,
@@ -42,6 +47,7 @@ const K = {
   task: (tid) => `hr:task2person:${tid}`,
   echo: (tid) => `hr:echo:${tid}`,
   form: (t) => `hr:form:${t}`,
+  sharedForm: "hr:form:shared",
   webhook: "hr:webhook",
   lastImport: "hr:import:last",
   conflicts: "hr:conflicts",
@@ -499,9 +505,67 @@ export async function createFormLink({ personId = null, label = "", actor }) {
   return { ok: true, token, path: `/hr/modulo/${token}`, expiresAt: rec.expiresAt };
 }
 
+const validTokenShape = (token) => typeof token === "string" && /^[A-Za-z0-9_-]{20,64}$/.test(token);
+
 async function getFormRec(token) {
-  if (!token || typeof token !== "string" || !/^[A-Za-z0-9_-]{20,64}$/.test(token)) return null;
-  return (await kv.get(K.form(token))) || null;
+  if (!validTokenShape(token)) return null;
+  const rec = (await kv.get(K.form(token))) || null;
+  // il link condiviso vale solo se è ANCORA quello puntato da hr:form:shared
+  // (difesa se una rigenerazione si è fermata a metà: mai due link condivisi attivi)
+  if (rec?.shared && !rec.disabledAt && (await kv.get(K.sharedForm)) !== token) return { ...rec, disabledAt: rec.createdAt || 1 };
+  return rec;
+}
+
+// ── Link condiviso (03/10/2026) ──────────────────────────────────────────────
+// Decisione del titolare: UN solo link per il modulo, uguale per tutti. Niente
+// scadenza: vale finché un admin non lo disattiva o lo rigenera (il vecchio
+// smette subito di funzionare). Mai dati precompilati: chiunque abbia il link
+// lo apre. Ogni invio crea una scheda NUOVA (mai abbinata in automatico per
+// email/telefono: chiunque potrebbe scrivere l'email di un altro e sovrascriverne
+// i dati); i doppioni li segnala la vista "Da ripulire".
+
+const sharedPath = (token) => `/hr/modulo/${token}`;
+
+/** Il link condiviso attivo, o null. */
+export async function getSharedFormLink() {
+  const token = await kv.get(K.sharedForm);
+  if (!validTokenShape(token)) return null;
+  const rec = await kv.get(K.form(token));
+  if (!rec?.shared || rec.disabledAt) return null;
+  return { token, path: sharedPath(token), createdAt: rec.createdAt, createdBy: rec.createdBy || null };
+}
+
+/** È il token del link condiviso attivo? (per scegliere i tetti di richieste nella route) */
+export async function isSharedFormToken(token) {
+  if (!validTokenShape(token)) return false;
+  return (await kv.get(K.sharedForm)) === token;
+}
+
+// il vecchio record resta 30 giorni marcato "disattivato": chi apre il vecchio link legge un messaggio chiaro
+async function retireSharedToken(token, actor, now) {
+  if (!validTokenShape(token)) return;
+  const old = await kv.get(K.form(token));
+  if (old) await kv.set(K.form(token), { ...old, disabledAt: now, disabledBy: actor || null }, { ex: 30 * 24 * 3600 });
+}
+
+/** Crea (o rigenera) il link condiviso: il precedente smette di funzionare. */
+export async function regenerateSharedFormLink({ actor }) {
+  const now = Date.now();
+  const prev = await kv.get(K.sharedForm);
+  const token = randomBytes(24).toString("base64url");
+  await kv.set(K.form(token), { token, shared: true, personId: null, createdAt: now, createdBy: actor || null, expiresAt: null });
+  await kv.set(K.sharedForm, token);
+  if (prev && prev !== token) await retireSharedToken(prev, actor, now);
+  return { ok: true, token, path: sharedPath(token), createdAt: now, replaced: Boolean(prev) };
+}
+
+/** Disattiva il link condiviso (nessun link attivo finché non se ne crea uno nuovo). */
+export async function disableSharedFormLink({ actor }) {
+  const prev = await kv.get(K.sharedForm);
+  if (!prev) return { ok: true, disabled: false };
+  await retireSharedToken(prev, actor, Date.now());
+  await kv.del(K.sharedForm);
+  return { ok: true, disabled: true };
 }
 
 /**
@@ -532,8 +596,25 @@ export async function getFormContext(token) {
   const now = Date.now();
   const state = formTokenState(rec, now);
   if (state === "invalid") return { ok: false, status: 404, error: "Link non valido." };
+  if (state === "disabled") return { ok: false, status: 410, error: "Questo link non è più attivo. Chiedi a HR quello nuovo." };
   if (state === "expired") return { ok: false, status: 410, error: "Questo link è scaduto. Chiedi a HR un link nuovo." };
   if (state === "closed") return { ok: true, state, done: true };
+  // token figlio (solo file): niente dati della scheda, nemmeno a chi l'ha appena inviata
+  if (rec.child) return { ok: true, state, done: true };
+  if (rec.shared) {
+    // link uguale per tutti: MAI dati di persone (niente prefill, cfPresent sempre false)
+    return {
+      ok: true, state: "open", done: false, shared: true,
+      uploadsEnabled: hrSyncConfig().enabled,
+      cfEnabled: hrCryptoConfigured(),
+      cfPresent: false,
+      prefill: {},
+      options: await formOptions(),
+      privacyVersion: PRIVACY_VERSION,
+      expiresAt: null,
+      maxUploadBytes: UPLOAD_MAX_BYTES,
+    };
+  }
   const person = rec.personId ? await getPerson(rec.personId) : null;
   const prefill = {};
   for (const k of FORM_KEYS) if (k !== "codiceFiscale" && person?.fields?.[k] != null) prefill[k] = person.fields[k];
@@ -555,9 +636,11 @@ export async function submitForm(token, body) {
   const now = Date.now();
   const state = formTokenState(rec, now);
   if (state === "invalid") return { ok: false, status: 404, error: "Link non valido." };
+  if (state === "disabled") return { ok: false, status: 410, error: "Questo link non è più attivo. Chiedi a HR quello nuovo." };
   if (state === "expired") return { ok: false, status: 410, error: "Questo link è scaduto." };
   if (state !== "open") return { ok: false, status: 409, error: "Questo modulo è già stato inviato." };
   if (body?.consent !== true) return { ok: false, status: 400, error: "Serve il consenso all'informativa privacy." };
+  if (rec.shared) return submitShared(token, rec, body, now);
   const input = {};
   for (const k of FORM_KEYS) if (k in (body?.data || {})) input[k] = body.data[k];
   // il CF vuoto dal modulo non cancella quello già inserito
@@ -571,7 +654,34 @@ export async function submitForm(token, body) {
   await appendLog(res.person.id, [{ at: now, by: "modulo", source: "modulo", action: "consent", field: null, to: `consenso privacy (versione ${PRIVACY_VERSION})` }]);
   const ttl = Math.max(60, Math.ceil((rec.expiresAt - now) / 1000));
   await kv.set(K.form(token), { ...rec, personId: res.person.id, submittedAt: now }, { ex: ttl });
-  return { ok: true, cfNote: res.cfNote, uploadsEnabled: hrSyncConfig().enabled };
+  return { ok: true, cfNote: res.cfNote, uploadsEnabled: hrSyncConfig().enabled, uploadToken: token };
+}
+
+/**
+ * Invio dal link condiviso: SEMPRE una scheda nuova (id null). Il link resta
+ * aperto; per i file nasce un token figlio monouso legato solo a questa scheda
+ * (già "inviato", 1 ora), che la pagina usa per il passo documenti.
+ */
+async function submitShared(token, rec, body, now) {
+  // tetto giornaliero di invii sul link condiviso (oltre ai limiti per IP della route)
+  const cap = await checkRateLimit("hr_form_shared_submit", token.slice(0, 64));
+  if (!cap.ok) return { ok: false, status: 429, error: "Oggi il modulo ha ricevuto troppi invii. Riprova domani o scrivi a chi ti ha mandato il link." };
+  const input = {};
+  for (const k of FORM_KEYS) if (k in (body?.data || {})) input[k] = body.data[k];
+  if (!String(input.codiceFiscale || "").trim()) delete input.codiceFiscale;
+  const consent = { at: now, version: PRIVACY_VERSION, via: "modulo" };
+  const res = await savePerson({
+    id: null, input, allowed: FORM_KEYS, actor: "modulo", source: "modulo",
+    extra: () => ({ consent, formLink: { shared: true, createdAt: rec.createdAt, expiresAt: null, submittedAt: now } }),
+  });
+  if (!res.ok) return { ok: false, status: res.status, error: res.errors.join(" ") };
+  await appendLog(res.person.id, [{ at: now, by: "modulo", source: "modulo", action: "consent", field: null, to: `consenso privacy (versione ${PRIVACY_VERSION}), dal link condiviso` }]);
+  const child = randomBytes(24).toString("base64url");
+  await kv.set(K.form(child), {
+    token: child, child: true, personId: res.person.id, createdAt: now, createdBy: "modulo",
+    expiresAt: now + FORM_UPLOAD_GRACE_MS, submittedAt: now, uploads: 0,
+  }, { ex: Math.ceil(FORM_UPLOAD_GRACE_MS / 1000) + 60 });
+  return { ok: true, cfNote: res.cfNote, uploadsEnabled: hrSyncConfig().enabled, uploadToken: child };
 }
 
 const UPLOAD_KIND = {
@@ -584,6 +694,8 @@ export async function uploadFormFile(token, { kind, bytes, declaredType }) {
   const spec = UPLOAD_KIND[kind];
   if (!spec) return { ok: false, status: 400, error: "Tipo di documento non previsto." };
   const rec = await getFormRec(token);
+  // il link condiviso non porta a nessuna scheda: i file passano solo dal token figlio
+  if (rec?.shared) return { ok: false, status: 403, error: "Con questo link i documenti si caricano subito dopo l'invio del modulo." };
   const state = formTokenState(rec, Date.now());
   if (state !== "submitted") return { ok: false, status: state === "open" ? 409 : 410, error: state === "open" ? "Prima invia il modulo, poi i file." : "Il tempo per caricare i file è scaduto." };
   if ((rec.uploads || 0) >= 4) return { ok: false, status: 429, error: "Hai già caricato il numero massimo di file." };
