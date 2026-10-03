@@ -8,21 +8,24 @@
  * ClickUp si toccano solo quelli). Codice fiscale mascherato: "Mostra" lo
  * legge in chiaro e resta scritto nello storico chi l'ha fatto e quando.
  *
- * 03/10/2026: "Elimina" manda la scheda tra le archiviate (e il task ClickUp nel
- * cestino); una scheda archiviata si legge soltanto, si ripristina o si elimina
- * per sempre. I campi di testo (luogo, comune, CAP, competenze, ruoli, vorrebbe
+ * 03/10/2026: da procedura non si elimina mai una persona. Al posto di "Elimina"
+ * c'è "Segna come uscita" (fase "Uscita" + fine collaborazione) e, per chi è
+ * uscito, "Riattiva". Fase e stato del contratto stanno in cima alla scheda.
+ * Una scheda archiviata (task cancellato su ClickUp) si legge soltanto e si
+ * ripristina. I campi di testo (luogo, comune, CAP, competenze, ruoli, vorrebbe
  * imparare, altro) si modificano qui o su ClickUp.
  */
 import { useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import useSWR from "swr";
 import { ExternalLink, RefreshCw, Eye, Pencil } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Notice, DataTable, SectionTitle, Disclosure, card } from "@/components/ds";
-import { FIELDS, SECTIONS, FIELD_BY_KEY } from "@/lib/hr-fields";
-import { lbl, btnPrimary, btnGhost, SYNC_LABEL, displayValue, FieldInput, fmtDateTime, fetcher, postJson } from "@/components/hr-ui";
-import { ArchiveButton, RestoreButton, PurgeButton, archivedSummary, archiveDeleteDay } from "@/components/hr-archive";
+import { FIELDS, SECTIONS, FIELD_BY_KEY, PHASE_EXITED } from "@/lib/hr-fields";
+import { lbl, btnPrimary, btnGhost, SYNC_LABEL, displayValue, FieldInput, fmtDate, fmtDateTime, fetcher, postJson } from "@/components/hr-ui";
+import { RestoreButton, archivedSummary } from "@/components/hr-archive";
+import { ExitButton, ReactivateButton } from "@/components/hr-phase";
 
 const ACTION_LABEL = {
   create: "Scheda creata", update: "Modifica", conflict: "Conflitto con ClickUp", cf_revealed: "Codice fiscale mostrato",
@@ -36,7 +39,6 @@ const who = (by) => (!by ? "—" : String(by).startsWith("user_") ? `utente …$
 
 export default function HrPersonPage() {
   const { id } = useParams();
-  const router = useRouter();
   const { data, error, isLoading, mutate } = useSWR(id ? `/api/admin/hr/people/${id}` : null, fetcher, { revalidateOnFocus: false });
   const [syncing, setSyncing] = useState(false);
   const [notice, setNotice] = useState(null);
@@ -71,10 +73,9 @@ export default function HrPersonPage() {
           <>
             {p.clickupUrl && p.clickupTaskId && <a href={p.clickupUrl} target="_blank" rel="noopener noreferrer" style={btnGhost}><ExternalLink size={14} /> Apri su ClickUp</a>}
             {data.sync?.enabled && <button type="button" onClick={syncNow} disabled={syncing} style={{ ...btnGhost, opacity: syncing ? 0.5 : 1 }}><RefreshCw size={14} /> {syncing ? "Sincronizzo…" : "Sincronizza ora"}</button>}
-            <ArchiveButton person={p} syncEnabled={data.sync?.enabled} onDone={(j) => {
-              setNotice({ ok: j.task !== "queued", text: j.task === "queued" ? "Scheda archiviata. ClickUp non ha risposto: il task verrà messo nel cestino stanotte." : j.task === "trashed" ? "Scheda archiviata e task ClickUp nel cestino." : "Scheda archiviata." });
-              mutate();
-            }} />
+            {p.fields?.collaborationStatus === PHASE_EXITED
+              ? <ReactivateButton person={p} onDone={(j) => { setNotice(phaseNotice(j, "Fase riportata ad Attiva.")); mutate(); }} />
+              : <ExitButton person={p} onDone={(j) => { setNotice(phaseNotice(j, `Segnata come uscita, fine collaborazione il ${fmtDate(j.person?.fields?.endDate)}.`)); mutate(); }} />}
           </>
         )}
       />
@@ -87,26 +88,26 @@ export default function HrPersonPage() {
           <h2 id="hr-archived-h" style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Scheda archiviata</h2>
           <p style={{ margin: "0 0 4px", fontSize: 14, color: CP.textSecondary }}>{archivedSummary(p)}.</p>
           <p style={{ margin: "0 0 12px", fontSize: 13, color: CP.textMuted, lineHeight: 1.5 }}>
-            Non si sincronizza con ClickUp e qui si legge soltanto. Se non la ripristini si cancella da sola, storico compreso, il {archiveDeleteDay(p)}.
-            {p.archived.pendingTaskDelete && !p.archived.taskDeletedAt ? " Il task su ClickUp non è ancora nel cestino: ci riprova la sincronizzazione della notte." : ""}
+            Il suo task su ClickUp è stato cancellato: la scheda non si sincronizza e qui si legge soltanto. Non si cancella mai: la tieni così o la ripristini.
+            Da procedura chi va via non si elimina, si segna «{PHASE_EXITED}».
           </p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <RestoreButton person={p} onDone={(j) => { setNotice({ ok: true, text: j.sync?.status === "ok" ? "Scheda ripristinata e riportata su ClickUp." : `Scheda ripristinata. ${j.sync?.message || ""}`.trim() }); mutate(); }} />
-            <PurgeButton person={p} onDone={() => router.push("/admin/hr?vista=archiviate")} />
           </div>
         </section>
       )}
 
       {p && (
         <>
+          <PhaseCard p={p} />
           {!p.archived && <SyncCard p={p} enabled={data.sync?.enabled} />}
 
-          {data.flags?.includes("spazzatura") && <Notice>Scheda quasi vuota (nome di 1-2 lettere, nessuna email): se non serve, eliminala con «Elimina» (va tra le archiviate, si può ripristinare).</Notice>}
+          {data.flags?.includes("spazzatura") && <Notice>Scheda quasi vuota (nome di 1-2 lettere, nessuna email). In HOC Pro non si elimina: se è un task di prova o sbagliato, sistemalo su ClickUp (se cancelli il task, qui la scheda va tra le Archiviate).</Notice>}
           {data.duplicates && (
             <Notice>
               Possibile doppione (stesso {data.duplicates.reasons.join(" + ")}) di{" "}
               {data.duplicates.others.map((o, i) => <span key={o.id}>{i > 0 && ", "}<Link href={`/admin/hr/${o.id}`} style={{ color: CP.accentSoftText }}>{o.name}</Link></span>)}.
-              Decidi quale tenere: quella in più la elimini con «Elimina».
+              Decidi quale tenere e sistema il doppione su ClickUp: se cancelli lì il task in più, qui la sua scheda va tra le Archiviate.
             </Notice>
           )}
 
@@ -122,6 +123,34 @@ export default function HrPersonPage() {
       )}
 
     </div>
+  );
+}
+
+/** Esito di "Segna come uscita" / "Riattiva", con quello che è successo su ClickUp. */
+function phaseNotice(j, okText) {
+  const s = j?.sync;
+  if (s?.status === "error") return { ok: false, text: `${okText} Su ClickUp non è arrivato: ${s.message}` };
+  if (s?.status === "partial") return { ok: false, text: `${okText} Su ClickUp in parte: ${(s.errors || []).join("; ")}` };
+  return { ok: true, text: okText };
+}
+
+/** Fase della persona e stato del contratto: due assi separati, affiancati. */
+function PhaseCard({ p }) {
+  const phase = p.fields?.collaborationStatus;
+  const contract = p.fields?.hvContractStatus;
+  const exited = phase === PHASE_EXITED;
+  const item = (label, value, note) => (
+    <div style={{ minWidth: 160 }}>
+      <div style={{ fontSize: 13, color: CP.textSecondary }}>{label}</div>
+      <div style={{ fontSize: 17, fontWeight: 500, color: value ? CP.textPrimary : CP.textMuted }}>{value || "Non indicato"}</div>
+      {note && <div style={{ fontSize: 12, color: CP.textMuted }}>{note}</div>}
+    </div>
+  );
+  return (
+    <section aria-label="Fase e contratto" style={{ ...card, padding: "14px 16px", marginBottom: 14, display: "flex", gap: 32, flexWrap: "wrap" }}>
+      {item("Fase", phase, phase === "Da verificare" ? "arrivata da ClickUp: scegli una fase nella sezione Rapporto" : exited && p.fields?.endDate ? `fine collaborazione il ${fmtDate(p.fields.endDate)}` : null)}
+      {item("Stato del contratto", contract, null)}
+    </section>
   );
 }
 

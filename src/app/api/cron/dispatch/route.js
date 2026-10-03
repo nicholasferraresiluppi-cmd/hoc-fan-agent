@@ -20,7 +20,7 @@
  *   - sempre:            run alert operativi (watchdog catena incluso)
  *   - lunedì:            + digest email (dopo il run: legge i suoi findings)
  *   - giorno 1 del mese: snapshot leghe (chiusura stagione)
- *   - sempre, in fondo:  Centro HR: pulizia archiviate >30gg + riconciliazione con ClickUp (solo con HR_CLICKUP_LIST_ID)
+ *   - sempre, in fondo:  Centro HR: riconciliazione con ClickUp (solo con HR_CLICKUP_LIST_ID)
  *                        — poi creator_difficulty, che resta ULTIMO
  *
  * Gli endpoint smistati restano invocabili singolarmente (UI/manuale).
@@ -118,9 +118,9 @@ export async function POST(request) {
   }
 
   // Centro HR (29/09/2026): riconciliazione notturna con la lista ClickUp HR,
-  // nella SUA funzione (budget proprio). Dal 03/10/2026 si chiama SEMPRE: anche a
-  // sync spenta la route cancella le schede archiviate da più di 30 giorni (e poi
-  // salta la riconciliazione).
+  // nella SUA funzione (budget proprio). Si chiama sempre: a sync spenta la route
+  // lascia solo il heartbeat (nessuna pulizia delle archiviate dal 03/10/2026:
+  // da procedura non si elimina mai una persona).
   out.hr_clickup = await kickEndpoint(request, "/api/cron/hr-clickup");
 
   // Esito dei kick nel heartbeat: un 401 dei figli deve lasciare traccia

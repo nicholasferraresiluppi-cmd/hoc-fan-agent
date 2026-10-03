@@ -16,9 +16,72 @@
 //   descrizione, lì in sola lettura). Dal 03/10/2026 a DUE VIE: si modifica in app
 //   o su ClickUp; il testo si rilegge con hr-mirror.js e, se non si capisce, vale
 //   il valore dell'app (evento nello storico della scheda).
-export const COLLAB_STATUSES = ["Onboarding", "Active", "Reassigning", "Outboarding", "Decommissioned", "Needs Review"];
 export const GENDERS = ["Female", "Male", "Non-Binary", "I prefer not to declare it"];
-export const HV_CONTRACT_STATUSES = ["To Do", "Drafted Shared", "Signature Requested", "Signed"];
+
+// ── Fasi della persona e stato del contratto (03/10/2026, decisioni del titolare) ──
+// UNICA tabella di corrispondenza: due assi separati, fase e contratto. Per ogni voce
+//   label  = nome in app (italiano): è anche il valore salvato in HOC Pro
+//   cu     = opzione della tendina ClickUp (oggi in inglese: la tendina è condivisa
+//            col CRM vero, per ora resta così e l'app traduce)
+//   status = stato del task nella lista HR di ClickUp (solo per le fasi)
+// Il confronto con ClickUp accetta SIA il nome inglese SIA quello italiano, senza
+// badare alle maiuscole: quando la tendina verrà tradotta su ClickUp il codice
+// continua a funzionare così com'è.
+// `selectable: false` = valore che può arrivare da ClickUp e si mostra in sola
+// lettura, ma non si offre nei menu ("Needs Review" non è più una fase).
+// Da procedura non si elimina mai una persona: chi va via resta con la fase "Uscita".
+export const PERSON_PHASES = [
+  { label: "In ingresso", cu: "Onboarding", status: "In ingresso" },
+  { label: "Attiva", cu: "Active", status: "Attiva" },
+  { label: "In riassegnazione", cu: "Reassigning", status: "In riassegnazione" },
+  { label: "In uscita", cu: "Outboarding", status: "In uscita" },
+  { label: "Uscita", cu: "Decommissioned", status: "Uscita" },
+  { label: "Da verificare", cu: "Needs Review", status: null, selectable: false },
+];
+export const PHASE_ENTRY = "In ingresso";
+export const PHASE_ACTIVE = "Attiva";
+export const PHASE_EXITED = "Uscita";
+/** Le 5 fasi che si possono scegliere, in ordine. */
+export const PHASE_LABELS = PERSON_PHASES.filter((p) => p.selectable !== false).map((p) => p.label);
+
+export const CONTRACT_STATUSES = [
+  { label: "Da preparare", cu: "To Do" },
+  { label: "Bozza condivisa", cu: "Drafted Shared" },
+  { label: "Firma richiesta", cu: "Signature Requested" },
+  { label: "Firmato", cu: "Signed" },
+];
+export const CONTRACT_LABELS = CONTRACT_STATUSES.map((c) => c.label);
+
+const lcTrim = (v) => (v == null ? "" : String(v)).trim().toLowerCase();
+/** Voce della tabella per un nome (italiano o ClickUp, maiuscole indifferenti), o null. */
+export function findChoice(choices, name) {
+  const n = lcTrim(name);
+  if (!n) return null;
+  return (choices || []).find((c) => lcTrim(c.label) === n || lcTrim(c.cu) === n) || null;
+}
+/**
+ * Valore app per un nome qualunque: l'etichetta italiana se si riconosce,
+ * altrimenti il testo com'è (un'opzione sconosciuta non fa crash: si mostra e basta).
+ */
+export function choiceLabel(choices, name) {
+  const hit = findChoice(choices, name);
+  if (hit) return hit.label;
+  const raw = name == null ? "" : String(name).trim();
+  return raw || null;
+}
+/** Fase che corrisponde a uno stato del task ClickUp (italiano o inglese), o null se è uno stato estraneo (es. "to do"). */
+export function phaseFromTaskStatus(status) {
+  const n = lcTrim(status);
+  if (!n) return null;
+  const hit = PERSON_PHASES.find((p) => p.status && [p.status, p.label, p.cu].some((x) => lcTrim(x) === n));
+  return hit ? hit.label : null;
+}
+/** Nomi accettati per lo stato del task di una fase (per trovarlo tra gli stati della lista). */
+export function taskStatusNamesFor(phase) {
+  const p = findChoice(PERSON_PHASES, phase);
+  if (!p || !p.status) return [];
+  return [...new Set([p.status, p.label, p.cu])];
+}
 
 export const FIELDS = [
   // Anagrafica
@@ -38,7 +101,8 @@ export const FIELDS = [
   { key: "personalInterests", label: "Interessi personali", section: "anagrafica", type: "longtext", cu: "Personal Interests" },
   { key: "linkedin", label: "LinkedIn", section: "anagrafica", type: "url", cu: "LinkedIn" },
   // Rapporto
-  { key: "collaborationStatus", label: "Stato collaborazione", section: "rapporto", type: "option", cu: "Collaboration Status", options: COLLAB_STATUSES },
+  // fase della persona: tendina "Collaboration Status" + stato del task (tabella PERSON_PHASES)
+  { key: "collaborationStatus", label: "Fase", section: "rapporto", type: "option", cu: "Collaboration Status", choices: PERSON_PHASES, options: PHASE_LABELS },
   { key: "employmentType", label: "Tipo di rapporto", section: "rapporto", type: "option", cu: "Type of Employment" },
   { key: "role", label: "Ruolo", section: "rapporto", type: "labels", cu: "Role" },
   { key: "additionalRole", label: "Ruolo aggiuntivo", section: "rapporto", type: "labels", cu: "Additional Role" },
@@ -61,7 +125,9 @@ export const FIELDS = [
   { key: "redWarnings", label: "Richiami rossi", section: "rapporto", type: "number", cu: "Red Warnings" },
   // Contratto
   { key: "agreementWith", label: "Accordo con", section: "contratto", type: "labels", cu: "Agreement with" },
-  { key: "hvContractStatus", label: "Stato contratto", section: "contratto", type: "option", cu: "HV Contract Status", options: HV_CONTRACT_STATUSES },
+  // stato del contratto: asse separato dalla fase (tendina "HV Contract Status", tabella CONTRACT_STATUSES).
+  // La chiave resta hvContractStatus (esisteva già: rinominarla avrebbe staccato i dati salvati). Non è nel modulo pubblico.
+  { key: "hvContractStatus", label: "Stato del contratto", section: "contratto", type: "option", cu: "HV Contract Status", choices: CONTRACT_STATUSES, options: CONTRACT_LABELS },
   { key: "partitaIva", label: "Partita IVA", section: "contratto", type: "bool", cu: "Partita IVA", extra: true },
   // Documenti (in app solo riferimenti: i file stanno su ClickUp)
   { key: "idDocument", label: "Documento d'identità", section: "documenti", type: "fileRef", cu: "Documento d'identità", extra: true, readOnly: true },
@@ -84,6 +150,23 @@ export const FORM_KEYS = [
 ];
 // Campi che l'admin può modificare dalla scheda
 export const EDITABLE_KEYS = FIELDS.filter((f) => !f.readOnly).map((f) => f.key);
+
+/**
+ * Riporta i campi "a tabella" (fase, contratto) all'etichetta italiana: le schede
+ * salvate prima del 03/10/2026 hanno l'opzione ClickUp ("Active", "Needs Review"…).
+ * Cambia solo la forma del valore, mai il significato: chi è "Onboarding" diventa
+ * "In ingresso", anche se lavora da mesi (lo si sistema a mano, decisione del titolare).
+ */
+export function normalizeChoiceFields(fields) {
+  if (!fields) return fields;
+  let out = fields;
+  for (const f of FIELDS) {
+    if (!f.choices || fields[f.key] == null) continue;
+    const v = choiceLabel(f.choices, fields[f.key]);
+    if (v !== fields[f.key]) out = { ...out, [f.key]: v };
+  }
+  return out;
+}
 
 const s = (v) => (v == null ? "" : String(v)).trim();
 

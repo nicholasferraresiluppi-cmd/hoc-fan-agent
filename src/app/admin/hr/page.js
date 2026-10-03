@@ -10,9 +10,12 @@
  *
  * 03/10/2026: un solo link, uguale per tutti (decisione del titolare). I link
  * personali già mandati funzionano finché scadono, ma da qui non se ne creano più.
- * 03/10/2026: vista "Archiviate" (task cancellato su ClickUp o "Elimina" dalla
- * scheda): fuori da elenco, doppioni e numeri; si ripristinano o si eliminano per
- * sempre, e dopo 30 giorni si cancellano da sole.
+ * 03/10/2026: fasi della persona (In ingresso, Attiva, In riassegnazione, In
+ * uscita, Uscita) e stato del contratto, due assi separati. Di base l'elenco
+ * mostra tutti tranne chi è "Uscita"; filtro per fase con i conteggi; i numeri in
+ * alto ragionano per fase. Da procedura non si elimina mai una persona.
+ * Vista "Archiviate" = rete di sicurezza per i task cancellati su ClickUp: fuori
+ * da elenco, doppioni e numeri; si ripristinano, non si cancellano mai.
  */
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -23,12 +26,13 @@ import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
 import { PageHead, Metric, Notice, DataTable, FilterChip, Disclosure, card } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
-import { COLLAB_STATUSES } from "@/lib/hr-fields";
+import { PHASE_LABELS, PHASE_EXITED, CONTRACT_LABELS } from "@/lib/hr-fields";
 import { SKILL_AREAS, SKILL_LEVELS, PAST_ROLES, normalizeSkillMap, normalizePastRoles, hasSkillAtLeast, pastRoleText } from "@/lib/hr-skills";
 import { lbl, input, btnPrimary, btnGhost, chip, SYNC_LABEL, fetcher, postJson, CopyLink, fmtDateTime } from "@/components/hr-ui";
-import { RestoreButton, PurgeButton, archiveDeleteDay } from "@/components/hr-archive";
+import { RestoreButton } from "@/components/hr-archive";
 
 const NONE = "__none__";
+const ALL_PHASES = "__all__"; // filtro "tutte, anche le uscite"
 
 function uniq(items, get) {
   const m = new Map();
@@ -49,6 +53,7 @@ export default function HrPeoplePage() {
   const [dept, setDept] = useState("");
   const [project, setProject] = useState("");
   const [emp, setEmp] = useState("");
+  const [contract, setContract] = useState("");
   const [onlyCleanup, setOnlyCleanup] = useState(false);
   const [skill, setSkill] = useState("");
   const [minLevel, setMinLevel] = useState("");
@@ -57,7 +62,7 @@ export default function HrPeoplePage() {
   const [cleanupOpen, setCleanupOpen] = useState(false);
   const [view, setView] = useState("attive");
   const [archNotice, setArchNotice] = useState(null);
-  // ?vista=archiviate (arrivo da "Elimina definitivamente" nella scheda)
+  // ?vista=archiviate (link diretto alla vista)
   useEffect(() => {
     if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("vista") === "archiviate") setView("archiviate");
   }, []);
@@ -67,15 +72,22 @@ export default function HrPeoplePage() {
   const flags = data?.cleanup?.byId || {};
   const byId = useMemo(() => Object.fromEntries(items.map((p) => [p.id, p])), [items]);
 
-  // conteggi calcolati sull'elenco INTERO (le pill non cambiano coi filtri)
+  // conteggi per fase calcolati sull'elenco INTERO (le pill non cambiano coi filtri).
+  // "" = di base: tutti tranne chi è "Uscita"
   const statusCounts = useMemo(() => {
-    const m = { "": items.length, [NONE]: 0 };
-    for (const s of COLLAB_STATUSES) m[s] = 0;
+    const m = { "": 0, [ALL_PHASES]: items.length, [NONE]: 0 };
+    for (const s of PHASE_LABELS) m[s] = 0;
     for (const p of items) {
       const s = p.fields?.collaborationStatus;
+      if (s !== PHASE_EXITED) m[""] += 1;
       if (s && s in m) m[s] += 1; else if (s) m[s] = (m[s] || 0) + 1; else m[NONE] += 1;
     }
     return m;
+  }, [items]);
+  const contracts = useMemo(() => {
+    const got = uniq(items, (p) => p.fields?.hvContractStatus);
+    const order = (v) => (v === NONE ? 99 : CONTRACT_LABELS.includes(v) ? CONTRACT_LABELS.indexOf(v) : 50);
+    return got.sort((a, b) => order(a[0]) - order(b[0]));
   }, [items]);
   const depts = useMemo(() => uniq(items, (p) => p.fields?.department), [items]);
   const projects = useMemo(() => uniq(items, (p) => p.fields?.project), [items]);
@@ -97,7 +109,9 @@ export default function HrPeoplePage() {
     const needle = q.trim().toLowerCase();
     return items.filter((p) => {
       const f = p.fields || {};
-      if (status && (status === NONE ? f.collaborationStatus : f.collaborationStatus !== status)) return false;
+      if (!status && f.collaborationStatus === PHASE_EXITED) return false;
+      if (status && status !== ALL_PHASES && (status === NONE ? f.collaborationStatus : f.collaborationStatus !== status)) return false;
+      if (contract && !has(f.hvContractStatus, contract)) return false;
       if (dept && !has(f.department, dept)) return false;
       if (project && !has(f.project, project)) return false;
       if (emp && !has(f.employmentType, emp)) return false;
@@ -110,12 +124,15 @@ export default function HrPeoplePage() {
       }
       return true;
     });
-  }, [items, q, status, dept, project, emp, onlyCleanup, flags, skill, minLevel, pastRole]);
+  }, [items, q, status, contract, dept, project, emp, onlyCleanup, flags, skill, minLevel, pastRole]);
 
-  const filtered = Boolean(q || status || dept || project || emp || onlyCleanup || skill || pastRole);
-  const reset = () => { setQ(""); setStatus(""); setDept(""); setProject(""); setEmp(""); setOnlyCleanup(false); setSkill(""); setMinLevel(""); setPastRole(""); };
+  const filtered = Boolean(q || status || contract || dept || project || emp || onlyCleanup || skill || pastRole);
+  const reset = () => { setQ(""); setStatus(""); setContract(""); setDept(""); setProject(""); setEmp(""); setOnlyCleanup(false); setSkill(""); setMinLevel(""); setPastRole(""); };
+  const shownBase = statusCounts[""]; // l'elenco di base: tutti tranne le uscite
+  // fasi fuori dalle 5 (es. "Da verificare" arrivato da ClickUp, o un'opzione sconosciuta)
+  const otherPhases = Object.keys(statusCounts).filter((s) => s && s !== NONE && s !== ALL_PHASES && !PHASE_LABELS.includes(s));
+  const toFix = statusCounts[NONE] + otherPhases.reduce((a, s) => a + statusCounts[s], 0);
 
-  const active = statusCounts.Active || 0;
   const syncErrors = items.filter((p) => ["error", "partial", "deleted", "missing"].includes(p.sync?.status)).length;
 
   const columns = [
@@ -129,7 +146,8 @@ export default function HrPeoplePage() {
         </span>
       ),
     },
-    { key: "status", label: "Stato", sort: (p) => p.fields?.collaborationStatus || "", render: (p) => p.fields?.collaborationStatus || <span style={{ color: CP.textMuted }}>—</span> },
+    { key: "status", label: "Fase", sort: (p) => { const i = PHASE_LABELS.indexOf(p.fields?.collaborationStatus); return i < 0 ? 99 : i; }, render: (p) => p.fields?.collaborationStatus || <span style={{ color: CP.textMuted }}>—</span> },
+    { key: "contract", label: "Contratto", sort: (p) => { const i = CONTRACT_LABELS.indexOf(p.fields?.hvContractStatus); return i < 0 ? 99 : i; }, render: (p) => p.fields?.hvContractStatus || <span style={{ color: CP.textMuted }}>—</span>, muted: true },
     { key: "dept", label: "Reparto", sort: (p) => (p.fields?.department || []).join(","), render: (p) => (p.fields?.department || []).join(", ") || <span style={{ color: CP.textMuted }}>—</span>, muted: true },
     { key: "project", label: "Creator / progetto", sortable: false, render: (p) => (p.fields?.project || []).slice(0, 3).map((x) => <span key={x} style={chip}>{x.replace(/^Model - /, "")}</span>).concat((p.fields?.project || []).length > 3 ? [<span key="more" style={{ fontSize: 12, color: CP.textMuted }}>+{p.fields.project.length - 3}</span>] : []) },
     { key: "emp", label: "Rapporto", sort: (p) => p.fields?.employmentType || "", render: (p) => p.fields?.employmentType || <span style={{ color: CP.textMuted }}>—</span>, muted: true },
@@ -187,22 +205,25 @@ export default function HrPeoplePage() {
 
       {view === "attive" && items.length > 0 && (
         <>
-          <section style={{ ...card, padding: "16px 18px", marginBottom: 14, display: "flex", gap: 28, flexWrap: "wrap" }}>
-            <Metric label="Persone" value={fmtInt(items.length)} />
-            <Metric label="Attive" value={fmtInt(active)} note="stato Active" />
+          <section style={{ ...card, padding: "16px 18px", marginBottom: 14, display: "flex", gap: 28, flexWrap: "wrap" }} aria-label="Persone per fase">
+            <Metric label="Con noi" value={fmtInt(shownBase)} note="tutti tranne le uscite" />
+            {PHASE_LABELS.map((ph) => <Metric key={ph} label={ph} value={fmtInt(statusCounts[ph] || 0)} />)}
+            {toFix > 0 && <Metric label="Fase da sistemare" attn value={fmtInt(toFix)} note="senza fase o da verificare" />}
             <Metric label="Da ripulire" value={fmtInt(cleanupCount)} attn={cleanupCount > 0} note="doppioni o schede vuote" />
             <Metric label="Problemi con ClickUp" value={fmtInt(syncErrors)} danger={syncErrors > 0} />
           </section>
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-            <FilterChip label={`Tutti · ${statusCounts[""]}`} active={!status} onClick={() => setStatus("")} />
-            {COLLAB_STATUSES.map((s) => <FilterChip key={s} label={`${s} · ${statusCounts[s] || 0}`} active={status === s} onClick={() => setStatus(status === s ? "" : s)} />)}
-            {Object.keys(statusCounts).filter((s) => s && s !== NONE && !COLLAB_STATUSES.includes(s)).map((s) => <FilterChip key={s} label={`${s} · ${statusCounts[s]}`} active={status === s} onClick={() => setStatus(status === s ? "" : s)} />)}
-            <FilterChip label={`Senza stato · ${statusCounts[NONE]}`} active={status === NONE} onClick={() => setStatus(status === NONE ? "" : NONE)} />
+          <div role="group" aria-label="Filtra per fase" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            <FilterChip label={`Tutti tranne le uscite · ${statusCounts[""]}`} active={!status} onClick={() => setStatus("")} />
+            {PHASE_LABELS.map((s) => <FilterChip key={s} label={`${s} · ${statusCounts[s] || 0}`} active={status === s} onClick={() => setStatus(status === s ? "" : s)} />)}
+            {otherPhases.map((s) => <FilterChip key={s} attn label={`${s} · ${statusCounts[s]}`} active={status === s} onClick={() => setStatus(status === s ? "" : s)} />)}
+            <FilterChip label={`Senza fase · ${statusCounts[NONE]}`} active={status === NONE} onClick={() => setStatus(status === NONE ? "" : NONE)} />
+            <FilterChip label={`Tutte le fasi · ${statusCounts[ALL_PHASES]}`} active={status === ALL_PHASES} onClick={() => setStatus(status === ALL_PHASES ? "" : ALL_PHASES)} />
             <FilterChip label={`Da ripulire · ${cleanupCount}`} attn={cleanupCount > 0} active={onlyCleanup} onClick={() => setOnlyCleanup(!onlyCleanup)} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 10, marginBottom: 12 }}>
             <label><span style={lbl}>Cerca</span><input style={{ ...input, borderRadius: 999 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nome, email, telefono, mansione…" /></label>
+            <FilterSelect label="Stato del contratto" value={contract} onChange={setContract} options={contracts} />
             <FilterSelect label="Reparto" value={dept} onChange={setDept} options={depts} />
             <FilterSelect label="Creator / progetto" value={project} onChange={setProject} options={projects} />
             <FilterSelect label="Tipo di rapporto" value={emp} onChange={setEmp} options={emps} />
@@ -234,7 +255,7 @@ export default function HrPeoplePage() {
           </div>
           {filtered && (
             <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 8 }}>
-              {rows.length} su {items.length} · <button type="button" onClick={reset} style={{ background: "none", border: "none", padding: 0, color: CP.accentSoftText, cursor: "pointer", fontSize: 13 }}>togli i filtri</button>
+              {rows.length} su {status ? items.length : shownBase} · <button type="button" onClick={reset} style={{ background: "none", border: "none", padding: 0, color: CP.accentSoftText, cursor: "pointer", fontSize: 13 }}>togli i filtri</button>
             </div>
           )}
           <DataTable columns={columns} rows={rows} defaultSort={{ key: "name", dir: 1 }} onRowClick={(p) => router.push(`/admin/hr/${p.id}`)} minWidth={900} maxHeight={620}
@@ -245,7 +266,7 @@ export default function HrPeoplePage() {
               <Disclosure open={cleanupOpen} onToggle={() => setCleanupOpen(!cleanupOpen)} title="Da ripulire"
                 summary={`${data.cleanup.duplicates.length} gruppi di doppioni probabili · ${data.cleanup.junk.length} schede quasi vuote`}>
                 <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 10px", lineHeight: 1.5 }}>
-                  Niente viene cancellato da solo. Apri le schede e decidi quale tenere: quella in più la elimini dalla sua scheda con «Elimina» (va tra le Archiviate e il suo task nel cestino di ClickUp).
+                  Niente viene cancellato: in HOC Pro le schede non si eliminano. Apri le schede e decidi quale tenere; il doppione si sistema su ClickUp (se cancelli lì il task in più, qui la sua scheda va tra le Archiviate).
                 </p>
                 {data.cleanup.duplicates.map((g) => (
                   <div key={g.ids.join()} style={{ padding: "8px 0", borderTop: `1px solid ${CP.borderSoft}`, fontSize: 14 }}>
@@ -271,23 +292,21 @@ export default function HrPeoplePage() {
 }
 
 /**
- * Vista "Archiviate": schede con il task cancellato su ClickUp o eliminate dalla
- * scheda. Non si sincronizzano e non contano nei numeri; dopo 30 giorni si
- * cancellano da sole.
+ * Vista "Archiviate": rete di sicurezza per i task cancellati su ClickUp (anche
+ * per errore). Non si sincronizzano e non contano nei numeri; non si cancellano
+ * mai, si ripristinano.
  */
 function ArchivedView({ rows, notice, onChanged }) {
   const SOURCE = { app: "HOC Pro", clickup: "ClickUp", sistema: "Sistema" };
   const columns = [
     { key: "name", label: "Persona", sort: (p) => p.name.toLowerCase(), render: (p) => <Link href={`/admin/hr/${p.id}`} style={{ color: CP.textPrimary, textDecoration: "none", fontWeight: 500 }}>{p.name}</Link> },
     { key: "at", label: "Archiviata il", sort: (p) => p.archived?.at || 0, render: (p) => <span style={{ whiteSpace: "nowrap" }}>{fmtDateTime(p.archived?.at)}</span> },
-    { key: "why", label: "Perché", sortable: false, render: (p) => <span>{p.archived?.reason || "—"} <span style={{ color: CP.textMuted, fontSize: 12 }}>· {SOURCE[p.archived?.source] || p.archived?.source}</span>{p.archived?.pendingTaskDelete && !p.archived?.taskDeletedAt ? <div style={{ fontSize: 12, color: CP.attn }}>task ClickUp ancora da cestinare (ci riprova stanotte)</div> : null}</span> },
-    { key: "exp", label: "Si cancella il", sort: (p) => p.archiveExpiresAt || 0, render: (p) => archiveDeleteDay(p), muted: true },
+    { key: "why", label: "Perché", sortable: false, render: (p) => <span>{p.archived?.reason || "—"} <span style={{ color: CP.textMuted, fontSize: 12 }}>· {SOURCE[p.archived?.source] || p.archived?.source}</span>{p.archived?.pendingTaskDelete && !p.archived?.taskDeletedAt ? <div style={{ fontSize: 12, color: CP.textMuted }}>il suo task su ClickUp c'è ancora: ripristinando si ricollega a quello</div> : null}</span> },
     {
       key: "act", label: "", sortable: false,
       render: (p) => (
         <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
           <RestoreButton compact person={p} onDone={() => onChanged(`${p.name}: scheda ripristinata.`)} />
-          <PurgeButton compact person={p} onDone={() => onChanged(`${p.name}: scheda eliminata per sempre.`)} />
         </span>
       ),
     },
@@ -295,8 +314,9 @@ function ArchivedView({ rows, notice, onChanged }) {
   return (
     <section aria-label="Schede archiviate">
       <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 10px", lineHeight: 1.5 }}>
-        Schede il cui task è stato cancellato su ClickUp o che hai eliminato dalla scheda. Non si sincronizzano e non contano nei numeri né nei doppioni.
-        Dopo 30 giorni si cancellano da sole, storico compreso. Ripristinando una scheda, su ClickUp si crea un task nuovo: quello nel cestino di ClickUp non viene recuperato.
+        Da procedura non si elimina nessuno: chi va via si segna «{PHASE_EXITED}» e resta nell'elenco con quella fase.
+        Qui finiscono solo le schede il cui task è stato cancellato su ClickUp, anche per errore: non si sincronizzano, non contano nei numeri né nei doppioni e non si cancellano mai.
+        Ripristinando una scheda, su ClickUp si crea un task nuovo: quello cancellato non viene recuperato.
       </p>
       {notice && <Notice>{notice}</Notice>}
       <DataTable columns={columns} rows={rows} defaultSort={{ key: "at", dir: -1 }} minWidth={820} maxHeight={620} empty="Nessuna scheda archiviata." />

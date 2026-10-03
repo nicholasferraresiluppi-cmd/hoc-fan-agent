@@ -4,10 +4,11 @@
  * GET   → { person (CF solo mascherato), log, cleanup (flag di questa scheda) }
  * PATCH → modifica campi; salva in app, poi spinge su ClickUp SOLO i campi cambiati.
  *          Scheda archiviata → 409 (prima si ripristina).
- * DELETE → elimina PER SEMPRE una scheda archiviata e il suo storico. Corpo { confirm: true }.
+ * Niente DELETE (03/10/2026): da procedura non si elimina mai una persona; chi va
+ * via si segna "Uscita" (…/[id]/phase).
  */
 import { authorize, CAPABILITIES } from "@/lib/rbac";
-import { getPerson, getLog, publicPerson, savePerson, listPeople, computeCleanup, hrSyncConfig, fieldOptions, purgePerson } from "@/lib/hr-people";
+import { getPerson, getLog, publicPerson, savePerson, listPeople, computeCleanup, hrSyncConfig, fieldOptions } from "@/lib/hr-people";
 import { hrCryptoConfigured } from "@/lib/hr-crypto";
 
 export const runtime = "nodejs";
@@ -44,16 +45,4 @@ export async function PATCH(request, props) {
   const res = await savePerson({ id, input: body || {}, actor: az.userId, source: "app" });
   if (!res.ok) return Response.json({ error: res.errors.join(" ") }, { status: res.status });
   return Response.json({ ok: true, person: publicPerson(res.person, { withCfMask: true }), changed: res.changed, cfNote: res.cfNote, sync: res.sync });
-}
-
-export async function DELETE(request, props) {
-  const az = await authorize(CAPABILITIES.SEED);
-  if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
-  const { id } = await props.params;
-  let body = null;
-  try { body = await request.json(); } catch { /* corpo assente → niente conferma */ }
-  if (body?.confirm !== true) return Response.json({ error: "Serve la conferma esplicita." }, { status: 400 });
-  const r = await purgePerson(id, { actor: az.userId, reason: "eliminata definitivamente da un admin" });
-  if (!r.ok) return Response.json({ error: r.error }, { status: r.status });
-  return Response.json({ ok: true, id: r.id });
 }
