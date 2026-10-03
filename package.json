@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.30.0",
     "@clerk/localizations": "^3.37.9",
     "@clerk/nextjs": "^6.39.7",
+    "@vercel/blob": "^2.8.0",
     "@vercel/kv": "^2.0.0",
     "https-proxy-agent": "^9.1.0",
     "lucide-react": "^0.395.0",

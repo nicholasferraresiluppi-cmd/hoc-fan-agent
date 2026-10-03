@@ -28,6 +28,7 @@ import { lbl, FieldInput, fmtDate } from "@/components/hr-ui";
 import { cfCoherence } from "@/lib/hr-comuni";
 import { normalizeSkillMap, levelRank, skillName } from "@/lib/hr-skills";
 import HrWelcomeCard from "@/components/HrWelcomeCard";
+import { uploadHrFile } from "@/lib/hr-upload-client";
 
 // carta d'esempio della prima schermata: dati FINTI, dichiarati come esempio a schermo
 const SAMPLE_CARD = {
@@ -252,7 +253,7 @@ export default function HrFormPage() {
     );
   }
 
-  if (stage === "files") return <Shell><FilesStep token={uploadToken || token} max={ctx.maxUploadBytes} data={data} onDone={() => setStage("done")} /></Shell>;
+  if (stage === "files") return <Shell><FilesStep token={uploadToken || token} data={data} onDone={() => setStage("done")} /></Shell>;
 
   if (stage === "intro") {
     // col link condiviso il nome non lo sappiamo: niente saluto personale
@@ -350,34 +351,43 @@ export default function HrFormPage() {
   );
 }
 
-function FilesStep({ token, max, data, onDone }) {
-  const [state, setState] = useState({ document: null, cv: null }); // null | "busy" | "ok" | "errore…"
+function FilesStep({ token, data, onDone }) {
+  // stato per file: null | { busy: "riduco"|"carico"|"salvo", pct } | "ok" | "messaggio di errore"
+  const [state, setState] = useState({ document: null, cv: null });
   const up = async (kind, file) => {
     if (!file) return;
-    if (file.size > max) { setState((s) => ({ ...s, [kind]: "File troppo grande: massimo 10 MB." })); return; }
-    if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) { setState((s) => ({ ...s, [kind]: "Formato non ammesso: solo PDF, JPG o PNG." })); return; }
-    setState((s) => ({ ...s, [kind]: "busy" }));
+    const set = (v) => setState((s) => ({ ...s, [kind]: v }));
+    set({ busy: "riduco", pct: 0 });
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const r = await fetch(`/api/hr/modulo/${token}/file?kind=${kind}`, { method: "POST", body: fd });
-      const j = await r.json().catch(() => null);
-      if (r.status === 413) throw new Error("Il file è troppo pesante per il caricamento: prova con un PDF compresso o una foto più leggera (meglio sotto i 4 MB).");
-      if (!r.ok || !j?.ok) throw new Error(j?.error || `Caricamento non riuscito (${r.status}).`);
-      setState((s) => ({ ...s, [kind]: "ok" }));
-    } catch (e) { setState((s) => ({ ...s, [kind]: e.message })); }
+      await uploadHrFile(token, kind, file, {
+        onStage: (busy) => setState((s) => ({ ...s, [kind]: { ...(s[kind] && typeof s[kind] === "object" ? s[kind] : {}), busy } })),
+        onProgress: (pct) => setState((s) => ({ ...s, [kind]: { busy: "carico", pct } })),
+      });
+      set("ok");
+    } catch (e) { set(e?.message || "Caricamento non riuscito. Riprova."); }
   };
+  const anyBusy = Object.values(state).some((v) => v && typeof v === "object");
   const Item = ({ kind, title, hint }) => {
     const st = state[kind];
+    const busy = st && typeof st === "object";
     return (
       <div style={{ padding: "16px 0", borderTop: `1px solid ${CP.border}` }}>
         <div style={{ fontSize: 15.5, marginBottom: 4 }}>{title}</div>
         <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 10 }}>{hint}</div>
-        {st === "ok" ? <span style={{ fontSize: 14, color: GOLD }}>Caricato</span> : (
+        {st === "ok" ? <span style={{ fontSize: 14, color: GOLD }}>Ricevuto</span> : (
           <>
-            <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" disabled={st === "busy"} onChange={(e) => up(kind, e.target.files?.[0])} style={{ fontSize: 14, color: CP.textSecondary, maxWidth: "100%" }} aria-label={title} />
-            {st === "busy" && <span style={{ fontSize: 13, color: CP.textMuted, marginLeft: 8 }}>Carico…</span>}
-            {st && st !== "busy" && <div role="alert" style={{ fontSize: 13, color: CP.accentRed, marginTop: 6 }}>{st}</div>}
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" disabled={busy} onChange={(e) => up(kind, e.target.files?.[0])} style={{ fontSize: 14, color: CP.textSecondary, maxWidth: "100%" }} aria-label={title} />
+            {busy && (
+              <div role="status" aria-live="polite" style={{ fontSize: 13, color: CP.textMuted, marginTop: 8 }}>
+                {st.busy === "riduco" ? "Preparo il file…" : st.busy === "salvo" ? "Quasi fatto…" : `Carico… ${st.pct || 0}%`}
+                {st.busy === "carico" && (
+                  <div style={{ height: 3, background: CP.border, borderRadius: 2, marginTop: 6, maxWidth: 280 }}>
+                    <div style={{ height: 3, width: `${st.pct || 0}%`, background: GOLD, borderRadius: 2, transition: "width .2s" }} />
+                  </div>
+                )}
+              </div>
+            )}
+            {typeof st === "string" && st !== "ok" && <div role="alert" style={{ fontSize: 13, color: CP.accentRed, marginTop: 6 }}>{st}</div>}
           </>
         )}
       </div>
@@ -387,13 +397,13 @@ function FilesStep({ token, max, data, onDone }) {
     <div className="hrf-fade" style={{ display: "grid", gap: 22 }}>
       <Tessera data={data} />
       <Headline title="Quasi fatto." sub="Ultimo passo: i documenti." size={36} />
-      <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>Facoltativo ma utile. PDF, JPG o PNG, massimo 10 MB ciascuno. Hai un'ora di tempo.</p>
+      <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>Facoltativo ma utile. PDF, JPG o PNG, fino a 20 MB. Le foto le riduciamo noi. Hai un'ora di tempo.</p>
       <div style={{ borderBottom: `1px solid ${CP.border}` }}>
         <Item kind="document" title="Documento d'identità" hint="Fronte e retro nello stesso file, se puoi." />
         <Item kind="cv" title="Curriculum (CV)" hint="L'ultima versione che hai." />
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button type="button" className="hrf-pill" onClick={onDone} style={{ ...pill(true), flex: 1 }}>Ho finito</button>
+        <button type="button" className="hrf-pill" onClick={onDone} disabled={anyBusy} style={{ ...pill(true), flex: 1, opacity: anyBusy ? 0.5 : 1 }}>{anyBusy ? "Attendi la fine del caricamento" : "Ho finito"}</button>
         {!state.document && !state.cv && <button type="button" className="hrf-pill" onClick={onDone} style={pill(false)}>Salta per ora</button>}
       </div>
     </div>

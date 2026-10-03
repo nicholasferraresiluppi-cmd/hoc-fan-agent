@@ -112,7 +112,7 @@ export default function HrPersonPage() {
           )}
 
           {SECTIONS.map((s) => (
-            <Section key={s.key} section={s} person={p} options={data.options || {}} crypto={data.crypto} locked={Boolean(p.archived)} onSaved={(j) => { mutate(); setNotice(j.notice); }} />
+            <Section key={s.key} section={s} person={p} options={data.options || {}} crypto={data.crypto} incoming={data.incoming || []} locked={Boolean(p.archived)} onSaved={(j) => { mutate(); setNotice(j.notice); }} />
           ))}
 
           <Disclosure open={logOpen} onToggle={() => setLogOpen(!logOpen)} title="Storico modifiche" summary={`${logRows.length} voci`}>
@@ -179,7 +179,7 @@ function SyncCard({ p, enabled }) {
   );
 }
 
-function Section({ section, person, options, crypto, onSaved, locked }) {
+function Section({ section, person, options, crypto, onSaved, locked, incoming = [] }) {
   const fields = FIELDS.filter((f) => f.section === section.key);
   const editable = locked ? [] : fields.filter((f) => !f.readOnly);
   const [editing, setEditing] = useState(false);
@@ -239,7 +239,14 @@ function Section({ section, person, options, crypto, onSaved, locked }) {
                 {person.hasCf && !cf && crypto && <button type="button" onClick={reveal} style={{ ...btnGhost, padding: "3px 8px", fontSize: 12 }}><Eye size={12} /> Mostra</button>}
               </span>
             ) : (
-              <span style={{ fontSize: 14, color: CP.textPrimary }}>{displayValue(f, person.fields?.[f.key])}</span>
+              <span style={{ fontSize: 14, color: CP.textPrimary }}>
+                {displayValue(f, person.fields?.[f.key])}
+                {f.type === "fileRef" && incoming.some((x) => x.key === f.key) && (
+                  <span style={{ display: "block", fontSize: 12, color: CP.textSecondary, marginTop: 2 }}>
+                    {f.key === "idDocument" ? "Documento in arrivo" : "File in arrivo"}: ricevuto dal modulo, in attesa di arrivare su ClickUp
+                  </span>
+                )}
+              </span>
             )}
           </div>
         ))}

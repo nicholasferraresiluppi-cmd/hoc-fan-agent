@@ -497,8 +497,12 @@ console.log(`hr-people: ${n} asserzioni OK`);
   const clone = (v) => (v === undefined ? null : JSON.parse(JSON.stringify(v)));
   globalThis.__hrFakeKv = {
     async get(k) { return store.has(k) ? clone(store.get(k)) : null; },
-    async set(k, v) { store.set(k, clone(v)); return "OK"; },
-    async del(k) { store.delete(k); return 1; },
+    async set(k, v, o = {}) { if (o?.nx && store.has(k)) return null; store.set(k, clone(v)); return "OK"; },
+    async del(...ks) { let c = 0; for (const k of ks.flat()) if (store.delete(k)) c++; return c; },
+    async hset(k, obj) { const h = { ...(store.get(k) || {}) }; Object.assign(h, clone(obj)); store.set(k, h); return Object.keys(obj).length; },
+    async hget(k, f) { const h = store.get(k) || {}; return f in h ? clone(h[f]) : null; },
+    async hgetall(k) { const h = store.get(k); return h && Object.keys(h).length ? clone(h) : null; },
+    async hdel(k, ...fs) { const h = { ...(store.get(k) || {}) }; let c = 0; fs.forEach((f) => { if (f in h) { delete h[f]; c++; } }); store.set(k, h); return c; },
     async mget(...ks) { return ks.map((k) => (store.has(k) ? clone(store.get(k)) : null)); },
     async sadd(k, ...mm) { const s = new Set(store.get(k) || []); mm.forEach((x) => s.add(x)); store.set(k, [...s]); return mm.length; },
     async smembers(k) { return [...(store.get(k) || [])]; },
@@ -564,17 +568,17 @@ console.log(`hr-people: ${n} asserzioni OK`);
   t((await H.submitForm(s1.uploadToken, { consent: true, data: { firstName: "Y" } })).status === 409, "il token figlio non accetta un secondo invio");
 
   // upload rifiutato sul token condiviso (prima di qualunque altro controllo)
-  const pdf = Buffer.from("%PDF-1.4 test");
-  const up = await H.uploadFormFile(a.token, { kind: "document", bytes: pdf, declaredType: "application/pdf" });
+  const U = await import("../src/lib/hr-uploads.js");
+  const up = await U.requestUploadSlot(a.token, { kind: "document", contentType: "application/pdf", size: 1000 });
   t(!up.ok && up.status === 403, "upload sul token condiviso rifiutato");
-  const upChild = await H.uploadFormFile(s1.uploadToken, { kind: "document", bytes: pdf, declaredType: "application/pdf" });
+  const upChild = await U.requestUploadSlot(s1.uploadToken, { kind: "document", contentType: "application/pdf", size: 1000 });
   t(!upChild.ok && upChild.status === 503, "sul figlio si arriva fino al controllo sync (spenta in test)");
 
   // tetto giornaliero di invii
   const bucket = Math.floor(Math.floor(Date.now() / 1000) / 86400);
-  await fake.set(`rl:hr_form_shared_submit:86400:${a.token.slice(0, 64)}:${bucket}`, 300);
+  await fake.set(`rl:hr_form_shared_submit:86400:${a.token.slice(0, 64)}:${bucket}`, 2000);
   const capped = await H.submitForm(a.token, { consent: true, data: { firstName: "Luca" } });
-  t(!capped.ok && capped.status === 429, "oltre 300 invii al giorno: rifiutato");
+  t(!capped.ok && capped.status === 429, "oltre 2000 invii al giorno: rifiutato");
   t((await H.listPeople()).length === before + 2, "l'invio oltre il tetto non crea schede");
 
   // rigenerazione: il vecchio smette di funzionare
@@ -1120,6 +1124,210 @@ console.log(`hr-people: ${n} asserzioni OK`);
   delete process.env.HR_CLICKUP_LIST_ID;
   n += m;
   console.log(`fasi + contratto con ClickUp finto: ${m} asserzioni OK`);
+}
+
+// ── 03/10: upload DIRETTO sul Blob privato + coda verso ClickUp (KV, Blob e ClickUp finti) ──
+// Nessuna chiamata di rete vera, nessun file vero: Blob = Map in memoria, ClickUp = fetch sostituito.
+{
+  const fake = globalThis.__hrFakeKv;
+  let m = 0;
+  const t = (c, msg) => { assert.ok(c, msg); m++; };
+  const C = await import("../src/lib/hr-uploads-core.js");
+  const { LIMITS } = await import("../src/lib/rate-limit.js");
+
+  // logica pura
+  const hex = "a".repeat(32);
+  t(C.newUploadPathname(hex, "application/pdf") === `hr-upload/${hex}.pdf` && C.newUploadPathname(hex, "image/gif") === null, "pathname dal server: solo tipi ammessi");
+  t(C.isUploadPathname(`hr-upload/${hex}.png`) && !C.isUploadPathname(`hr-upload/Mario-Rossi.pdf`) && !C.isUploadPathname(`altro/${hex}.pdf`), "pathname riconosciuto solo se casuale e nella cartella upload");
+  const kinds = { document: {}, cv: {} };
+  t(C.checkUploadRequest({ kind: "document", contentType: "image/gif", size: 10 }, kinds)?.status === 415, "tipo sbagliato → 415");
+  t(C.checkUploadRequest({ kind: "document", contentType: "application/pdf", size: 20 * 1024 * 1024 + 1 }, kinds)?.status === 413, "oltre 20 MB → 413");
+  t(C.checkUploadRequest({ kind: "document", contentType: "application/pdf", size: 20 * 1024 * 1024 }, kinds) === null, "20 MB esatti ammessi");
+  t(C.checkUploadRequest({ kind: "foto", contentType: "application/pdf", size: 10 }, kinds)?.status === 400, "tipo di documento sconosciuto → 400");
+  t(C.nextAttemptDelayMs(1) === 60_000 && C.nextAttemptDelayMs(4) === 8 * 60_000 && C.nextAttemptDelayMs(30) === 360 * 60_000, "attese crescenti 1, 2, 4… minuti, massimo 6 ore");
+  const now0 = Date.now();
+  t(C.shouldGiveUp({ attempts: 12, firstAt: now0 }, now0) && C.shouldGiveUp({ attempts: 1, firstAt: now0 - 8 * 86400_000 }, now0) && !C.shouldGiveUp({ attempts: 3, firstAt: now0 }, now0), "si abbandona dopo 12 tentativi o 7 giorni");
+  const blobsList = [
+    { pathname: `hr-upload/${"1".repeat(32)}.pdf`, uploadedAt: new Date(now0 - 25 * 3600_000) },
+    { pathname: `hr-upload/${"2".repeat(32)}.pdf`, uploadedAt: new Date(now0 - 25 * 3600_000) },
+    { pathname: `hr-upload/${"3".repeat(32)}.pdf`, uploadedAt: new Date(now0 - 3600_000) },
+    { pathname: `altro/${"4".repeat(32)}.pdf`, uploadedAt: new Date(now0 - 99 * 3600_000) },
+  ];
+  t(JSON.stringify(C.orphanBlobs(blobsList, [blobsList[1].pathname], now0)) === JSON.stringify([blobsList[0].pathname]), "orfani: solo i vecchi >24h, non in coda, nella cartella upload");
+
+  // nuovi tetti
+  const lim = (name, w) => LIMITS[name].find((r) => r.window === w)?.max;
+  t(lim("hr_form_shared_submit", 86400) === 2000 && lim("hr_form_shared_submit", 60) >= 100, "invii dal link condiviso: 2000 al giorno, freno al minuto ≥100");
+  t(lim("hr_form_ip", 60) >= 300 && lim("hr_form_ip", 86400) >= 5000, "per IP: regge un ufficio intero dallo stesso IP");
+  t(lim("hr_upload", 3600) >= 30 && lim("hr_form_shared", 60) >= 600, "upload per persona e richieste sul link condiviso larghi abbastanza");
+
+  // Blob finto
+  const blobs = new Map();
+  globalThis.__hrFakeBlob = {
+    async get(p) {
+      const b = blobs.get(p);
+      if (!b) return null;
+      return { statusCode: 200, blob: { size: b.bytes.length }, stream: new Blob([b.bytes]).stream() };
+    },
+    async del(list) { for (const p of [].concat(list)) blobs.delete(p); },
+    async list() { return { blobs: [...blobs.entries()].map(([pathname, b]) => ({ pathname, uploadedAt: b.uploadedAt })), hasMore: false }; },
+  };
+  const putBlob = (p, bytes, ageMs = 0) => blobs.set(p, { bytes: Buffer.from(bytes), uploadedAt: new Date(Date.now() - ageMs) });
+
+  // ClickUp finto (con interruttore "giù" per gli allegati)
+  const LIST = "lista-upload";
+  const cu = { tasks: new Map(), seq: 0, down: false, attachments: [] };
+  const json = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => JSON.stringify(body) });
+  globalThis.fetch = async (url, init = {}) => {
+    const p = new URL(url).pathname.replace(/^\/api\/v2/, "");
+    const method = init.method || "GET";
+    const body = typeof init.body === "string" ? JSON.parse(init.body) : null;
+    let mm;
+    if (method === "GET" && p === `/list/${LIST}/field`) return json(200, { fields: [] });
+    if (method === "GET" && p === `/list/${LIST}`) return json(200, { id: LIST, name: "Prova upload", statuses: [] });
+    if (method === "POST" && p === `/list/${LIST}/task`) {
+      const id = `u${++cu.seq}`;
+      cu.tasks.set(id, { id, name: body.name, description: body.description, date_updated: String(Date.now()) });
+      return json(200, { id, url: `https://app.clickup.com/t/${id}` });
+    }
+    if ((mm = /^\/task\/([^/]+)\/attachment$/.exec(p))) {
+      if (cu.down) return json(503, { err: "giù" });
+      const file = init.body.get("attachment");
+      cu.attachments.push({ taskId: mm[1], name: file.name, size: file.size });
+      return json(200, { id: `att${cu.attachments.length}` });
+    }
+    if ((mm = /^\/task\/([^/]+)$/.exec(p))) {
+      const tk = cu.tasks.get(mm[1]);
+      if (!tk) return json(404, { err: "Task not found", ECODE: "ITEM_015" });
+      if (method === "PUT") { Object.assign(tk, body); return json(200, {}); }
+      return json(200, { ...tk, list: { id: LIST }, status: { status: "to do" }, custom_fields: [] });
+    }
+    return json(500, { err: `rotta non prevista: ${method} ${p}` });
+  };
+  process.env.HR_CLICKUP_LIST_ID = LIST;
+  process.env.CLICKUP_API_TOKEN = "pk_test_finto";
+
+  const H = await import("../src/lib/hr-people.js");
+  const U = await import("../src/lib/hr-uploads.js");
+  const PDF = "%PDF-1.4 documento finto";
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+  const qItem = async (p) => { const v = await fake.hget("hr:upload:pending", p); return typeof v === "string" ? JSON.parse(v) : v; };
+  const makeDue = async (p) => { const it = await qItem(p); await fake.hset("hr:upload:pending", { [p]: JSON.stringify({ ...it, nextAt: 0 }) }); };
+
+  const link = await H.regenerateSharedFormLink({ actor: "admin" });
+  const s1 = await H.submitForm(link.token, { consent: true, data: { firstName: "Ilaria", surname: "Verdi" } });
+  t(s1.ok && s1.uploadsEnabled === true, "con ClickUp e Blob configurati il caricamento è attivo");
+  const child1 = await fake.get(`hr:form:${s1.uploadToken}`);
+  t(Boolean((await H.getPerson(child1.personId)).clickupTaskId), "invio senza differimento: task creato");
+
+  // generazione del token di upload
+  const shared = await U.requestUploadSlot(link.token, { kind: "document", contentType: "application/pdf", size: 1000 });
+  t(!shared.ok && shared.status === 403, "slot rifiutato sul link condiviso");
+  t((await U.requestUploadSlot(s1.uploadToken, { kind: "document", contentType: "image/gif", size: 1000 })).status === 415, "slot rifiutato: tipo sbagliato");
+  t((await U.requestUploadSlot(s1.uploadToken, { kind: "document", contentType: "application/pdf", size: 25 * 1024 * 1024 })).status === 413, "slot rifiutato: file troppo grande");
+  const slot = await U.requestUploadSlot(s1.uploadToken, { kind: "document", contentType: "application/pdf", size: PDF.length });
+  t(slot.ok && C.isUploadPathname(slot.pathname) && !/ilaria|verdi/i.test(slot.pathname), "slot concesso: pathname casuale, senza dati personali");
+  const auth = await U.authorizeBlobUpload(s1.uploadToken, slot.pathname);
+  t(auth.options && auth.options.maximumSizeInBytes === 20 * 1024 * 1024 && auth.options.allowedContentTypes.join() === "application/pdf" && auth.options.addRandomSuffix === false && auth.options.allowOverwrite === false, "token di upload: tipo, 20 MB, niente sovrascritture");
+  t((await U.authorizeBlobUpload(link.token, slot.pathname)).error?.status === 403, "token di upload rifiutato al link condiviso");
+  const s2 = await H.submitForm(link.token, { consent: true, data: { firstName: "Altra" } });
+  t((await U.authorizeBlobUpload(s2.uploadToken, slot.pathname)).error?.status === 403, "token di upload rifiutato per lo slot di un'altra persona");
+  t((await U.authorizeBlobUpload(s1.uploadToken, `hr-upload/${"b".repeat(32)}.pdf`)).error?.status === 403, "token di upload rifiutato per un pathname senza slot");
+  // finestra dei file scaduta
+  const s3 = await H.submitForm(link.token, { consent: true, data: { firstName: "Tarda" } });
+  const slot3 = await U.requestUploadSlot(s3.uploadToken, { kind: "cv", contentType: "application/pdf", size: 100 });
+  const rec3 = await fake.get(`hr:form:${s3.uploadToken}`);
+  await fake.set(`hr:form:${s3.uploadToken}`, { ...rec3, submittedAt: Date.now() - 2 * 3600_000 });
+  t((await U.requestUploadSlot(s3.uploadToken, { kind: "cv", contentType: "application/pdf", size: 100 })).status === 410, "slot rifiutato: finestra scaduta");
+  t((await U.authorizeBlobUpload(s3.uploadToken, slot3.pathname)).error?.status === 410, "token di upload rifiutato: finestra scaduta");
+
+  // copia riuscita: allegato su ClickUp, blob cancellato, riferimento in scheda
+  putBlob(slot.pathname, PDF);
+  const r1 = await U.receiveUpload(s1.uploadToken, { kind: "document", pathname: slot.pathname });
+  const ilaria = await H.getPerson(child1.personId);
+  t(r1.ok && r1.received && !r1.queued, "copia riuscita");
+  t(!blobs.has(slot.pathname), "blob cancellato subito dopo la copia");
+  t(cu.attachments.length === 1 && cu.attachments[0].taskId === ilaria.clickupTaskId && /Ilaria Verdi\.pdf$/.test(cu.attachments[0].name), "allegato sul task giusto, col nome della persona solo su ClickUp");
+  t(ilaria.fields.idDocument?.attachmentId === "att1" && !("bytes" in ilaria.fields.idDocument), "in scheda solo il riferimento");
+  t((await U.receiveUpload(s1.uploadToken, { kind: "document", pathname: slot.pathname })).ok && cu.attachments.length === 1, "seconda chiamata uguale: nessun allegato doppio");
+  t((await U.receiveUpload(s2.uploadToken, { kind: "document", pathname: slot.pathname })).status === 404, "un altro token non può prendere il file di questo");
+
+  // byte che non sono PDF/JPG/PNG → rifiutato e blob cancellato
+  const slotBad = await U.requestUploadSlot(s1.uploadToken, { kind: "cv", contentType: "image/png", size: 5 });
+  putBlob(slotBad.pathname, "ciao!");
+  t((await U.receiveUpload(s1.uploadToken, { kind: "cv", pathname: slotBad.pathname })).status === 415 && !blobs.has(slotBad.pathname), "byte veri non ammessi: 415 e blob cancellato");
+
+  // ClickUp giù: in coda, blob tenuto, "ricevuto"; poi svuotato al giro dopo
+  const slotCv = await U.requestUploadSlot(s1.uploadToken, { kind: "cv", contentType: "image/png", size: PNG.length });
+  putBlob(slotCv.pathname, PNG);
+  cu.down = true;
+  const r2 = await U.receiveUpload(s1.uploadToken, { kind: "cv", pathname: slotCv.pathname });
+  t(r2.ok && r2.received && r2.queued, "ClickUp giù: alla persona «ricevuto»");
+  t(blobs.has(slotCv.pathname) && (await qItem(slotCv.pathname))?.attempts === 1, "ClickUp giù: blob tenuto, elemento in coda");
+  t((await U.pendingUploadsFor(child1.personId)).some((x) => x.key === "cvUpload"), "scheda: file «in arrivo»");
+  t((await U.uploadQueueStatus()).pending === 1, "stato sync: 1 documento in arrivo");
+  t((await U.drainUploadQueue({ budgetMs: 5000 })).done === 0, "prima dell'attesa non si riprova");
+  cu.down = false;
+  await makeDue(slotCv.pathname);
+  const d1 = await U.drainUploadQueue({ budgetMs: 5000 });
+  t(d1.done === 1 && !blobs.has(slotCv.pathname) && !(await qItem(slotCv.pathname)), "giro dopo: arrivato, blob cancellato, coda vuota");
+  t((await H.getPerson(child1.personId)).fields.cvUpload?.attachmentId, "riferimento al CV in scheda");
+
+  // task non ancora creato (invio differito): il file aspetta, la ripresa crea il task e poi lo allega
+  const s4 = await H.submitForm(link.token, { consent: true, data: { firstName: "Bruno", surname: "Neri" } }, { deferSync: true });
+  const child4 = await fake.get(`hr:form:${s4.uploadToken}`);
+  t(!(await H.getPerson(child4.personId)).clickupTaskId && (await H.listSyncRetry()).includes(child4.personId), "invio differito: scheda salvata, task da creare, in «da riprovare»");
+  const slot4 = await U.requestUploadSlot(s4.uploadToken, { kind: "document", contentType: "application/pdf", size: PDF.length });
+  putBlob(slot4.pathname, PDF);
+  const r4 = await U.receiveUpload(s4.uploadToken, { kind: "document", pathname: slot4.pathname });
+  t(r4.queued && blobs.has(slot4.pathname), "task non ancora creato: file in coda, blob tenuto");
+  const bg = await U.drainHrBackground({ budgetMs: 8000 });
+  const bruno = await H.getPerson(child4.personId);
+  t(bg.people?.pushed >= 1 && bruno.clickupTaskId && !(await H.listSyncRetry()).includes(bruno.id), "ripresa: task creato, scheda fuori da «da riprovare»");
+  await makeDue(slot4.pathname);
+  await U.drainHrBackground({ budgetMs: 8000 });
+  t(!blobs.has(slot4.pathname) && (await H.getPerson(bruno.id)).fields.idDocument?.attachmentId, "ripresa successiva: documento allegato, blob cancellato");
+
+  // differito con deferSync: la route copia dopo la risposta
+  const slot5 = await U.requestUploadSlot(s4.uploadToken, { kind: "cv", contentType: "application/pdf", size: PDF.length });
+  putBlob(slot5.pathname, PDF);
+  const r5 = await U.receiveUpload(s4.uploadToken, { kind: "cv", pathname: slot5.pathname }, { defer: true });
+  t(r5.deferred && (await qItem(slot5.pathname)), "copia dopo la risposta: prima in coda (nessun file perso se il giro non parte)");
+  t((await U.transferDeferred(r5.deferred)) === "done" && !blobs.has(slot5.pathname) && !(await qItem(slot5.pathname)), "copia dopo la risposta: arrivato e tolto dalla coda");
+
+  // abbandono dopo troppi tentativi: storico + avviso, blob cancellato
+  const slot6 = await U.requestUploadSlot(s2.uploadToken, { kind: "document", contentType: "application/pdf", size: PDF.length });
+  putBlob(slot6.pathname, PDF);
+  const child2 = await fake.get(`hr:form:${s2.uploadToken}`);
+  await fake.hset("hr:upload:pending", { [slot6.pathname]: JSON.stringify({ pathname: slot6.pathname, personId: child2.personId, kind: "document", ext: "pdf", contentType: "application/pdf", attempts: 12, firstAt: Date.now() - 86400_000, nextAt: 0, lastError: "ClickUp 503" }) });
+  const d2 = await U.drainUploadQueue({ budgetMs: 5000 });
+  const st = await U.uploadQueueStatus();
+  t(d2.failed === 1 && !blobs.has(slot6.pathname) && st.failed.length === 1 && st.failed[0].personId === child2.personId, "abbandonato: avviso in /admin/hr/sync, blob cancellato");
+  t((await H.getLog(child2.personId, 50)).some((e) => e.action === "upload_failed"), "abbandonato: segnalato nello storico della scheda");
+
+  // pulizia notturna degli orfani
+  const orphan = `hr-upload/${"c".repeat(32)}.pdf`;
+  const queuedOld = `hr-upload/${"d".repeat(32)}.pdf`;
+  const fresh = `hr-upload/${"e".repeat(32)}.pdf`;
+  putBlob(orphan, PDF, 25 * 3600_000);
+  putBlob(queuedOld, PDF, 25 * 3600_000);
+  putBlob(fresh, PDF, 3600_000);
+  await fake.hset("hr:upload:pending", { [queuedOld]: JSON.stringify({ pathname: queuedOld, personId: child2.personId, kind: "cv", attempts: 1, firstAt: Date.now(), nextAt: Date.now() + 3600_000 }) });
+  const cl = await U.cleanupOrphanUploads();
+  t(cl.deleted === 1 && !blobs.has(orphan) && blobs.has(queuedOld) && blobs.has(fresh), "pulizia: cancellato solo l'orfano >24h; in coda e recente restano");
+
+  // lucchetto per persona: due push insieme non creano due task
+  const lone = await H.savePerson({ input: { firstName: "Solo" }, actor: "test", sync: false });
+  await fake.set(`hr:push:lock:${lone.person.id}`, 1);
+  const tasksBefore = cu.tasks.size;
+  const busy = await H.pushPersonSafe(lone.person, null);
+  t(busy.status === "busy" && cu.tasks.size === tasksBefore && !(await H.getPerson(lone.person.id)).clickupTaskId && (await H.listSyncRetry()).includes(lone.person.id), "push già in corso: nessun task nuovo, scheda in «da riprovare»");
+  await fake.del(`hr:push:lock:${lone.person.id}`);
+
+  delete globalThis.__hrFakeBlob;
+  delete process.env.HR_CLICKUP_LIST_ID;
+  n += m;
+  console.log(`upload diretto + coda: ${m} asserzioni OK`);
 }
 
 console.log(`totale: ${n} asserzioni`);

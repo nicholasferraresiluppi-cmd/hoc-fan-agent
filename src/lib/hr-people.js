@@ -15,6 +15,10 @@
  *   hr:webhook              { id, secret, endpoint, … } del webhook registrato
  *   hr:import:last          esito dell'ultimo import/riconciliazione
  *   hr:conflicts            LIST degli ultimi conflitti (cap 200)
+ *   hr:push:lock:{id}       un push verso ClickUp alla volta per scheda (03/10/2026)
+ *   hr:sync:retry           SET di schede con scritture verso ClickUp da riprovare (ripresa in
+ *                           background con after() e riconciliazione notturna)
+ *   (documenti dal modulo: chiavi hr:upload:* in hr-uploads.js)
  *   (hr:clickup:delete-queue e hr:purge:log: chiavi del vecchio "Elimina" del 03/10 mattina,
  *    non più scritte; dalla coda si toglie solo il task di una scheda ripristinata)
  *
@@ -42,7 +46,7 @@ import path from "node:path";
 import {
   FIELDS, FIELD_BY_KEY, FORM_KEYS, EDITABLE_KEYS, FORM_TTL_DAYS, PRIVACY_VERSION, UPLOAD_MAX_BYTES,
   normalizePersonInput, applyChanges, resolveFieldConflicts, filterEchoes, recordEcho, computeCleanup,
-  valuesEqual, maskCf, logValue, formTokenState, sniffFileType, fullName, valueHash, dropUnchangedSinceBase,
+  valuesEqual, maskCf, logValue, formTokenState, fullName, valueHash, dropUnchangedSinceBase,
   FORM_UPLOAD_GRACE_MS, isOwnEcho, isEmptyValue, normalizeChoiceFields, PHASE_ENTRY, PHASE_ACTIVE, PHASE_EXITED,
   isIsoDate,
 } from "./hr-people-core.js";
@@ -51,10 +55,11 @@ import { mirrorIssueText, mirrorText, mirrorPrint } from "./hr-mirror.js";
 import { clickupSkillLabels } from "./hr-skills.js";
 import {
   hrSyncConfig, getListFields, getListInfo, listAllTasks, getTask, createTask, updateTask, setField, removeField,
-  uploadAttachment, resolveTeamId, createWebhook, deleteWebhook, isTaskGone, ClickupError, HR_WEBHOOK_EVENTS,
+  resolveTeamId, createWebhook, deleteWebhook, isTaskGone, ClickupError, HR_WEBHOOK_EVENTS,
 } from "./clickup-hr-api.js";
 import { hrCryptoConfigured, encryptHr, decryptHr } from "./hr-crypto.js";
 import { checkRateLimit } from "./rate-limit.js";
+import { blobConfigured } from "./hr-blob.js";
 
 const K = {
   person: (id) => `hr:person:${id}`,
@@ -69,6 +74,8 @@ const K = {
   conflicts: "hr:conflicts",
   lock: "hr:import:lock",
   legacyDeleteQueue: "hr:clickup:delete-queue", // solo per ripulirla al ripristino (non si scrive più)
+  pushLock: (id) => `hr:push:lock:${id}`,        // un push alla volta per persona (03/10/2026)
+  syncRetry: "hr:sync:retry",                    // SET di schede con scritture verso ClickUp da riprovare
 };
 /** Pseudo-chiave di eco/base per lo STATO del task (porta la fase, non è un campo). */
 const STATUS_KEY = "_status";
@@ -76,6 +83,8 @@ const LOG_CAP = 500;
 const DAY = 24 * 3600 * 1000;
 
 export { hrSyncConfig };
+/** Caricamento documenti attivo: serve la sync ClickUp (destinazione) e il Blob (transito). */
+export const uploadsEnabled = () => hrSyncConfig().enabled && blobConfigured();
 export const newPersonId = () => "p_" + randomBytes(8).toString("hex");
 
 // ── Lettura / scrittura ─────────────────────────────────────────────────────
@@ -220,23 +229,55 @@ export async function savePerson({ id = null, input = {}, allowed = EDITABLE_KEY
  */
 export async function pushPersonSafe(person, keys, { actor = "sistema" } = {}) {
   // archiviata: non si sincronizza (e soprattutto non si ricrea il task)
-  if (person?.archived) return { status: "archived", person, errors: [], skipped: [], message: "Scheda archiviata: non si sincronizza con ClickUp." };
+  if (person?.archived) {
+    await kv.srem(K.syncRetry, person.id).catch(() => {});
+    return { status: "archived", person, errors: [], skipped: [], message: "Scheda archiviata: non si sincronizza con ClickUp." };
+  }
   const cfg = hrSyncConfig();
   if (!cfg.enabled) {
     const p = { ...person, sync: { status: "off", at: Date.now(), message: "Sincronizzazione spenta (HR_CLICKUP_LIST_ID o token mancante)." } };
     await kv.set(K.person(p.id), p);
     return { status: "off", person: p, errors: [], skipped: [], message: p.sync.message };
   }
+  // Un push alla volta per persona (03/10/2026, carico da 300 persone): l'invio del
+  // modulo, la coda e la riconciliazione possono arrivare insieme; due push sulla
+  // stessa scheda senza task creerebbero DUE task. Chi trova il lucchetto lascia
+  // i campi in sospeso e la scheda nell'insieme "da riprovare".
+  const lockKey = K.pushLock(person.id);
+  const got = await kv.set(lockKey, Date.now(), { nx: true, ex: 90 }).catch(() => "OK");
+  if (!got) {
+    await kv.sadd(K.syncRetry, person.id).catch(() => {});
+    return { status: "busy", person, errors: [], skipped: [], message: "Sincronizzazione già in corso: riprovo tra poco." };
+  }
+  let res;
   try {
-    return await pushPerson(person, keys, cfg);
+    // la scheda potrebbe essere cambiata mentre aspettavamo (es. task appena creato da un altro push)
+    const fresh = (await getPerson(person.id)) || person;
+    res = await pushPerson(fresh, keys, cfg);
   } catch (e) {
     const at = Date.now();
     const message = e instanceof ClickupError || e?.message ? e.message : "errore sconosciuto";
-    const p = { ...person, sync: { status: "error", at, message } };
+    const cur = (await getPerson(person.id).catch(() => null)) || person;
+    const p = { ...cur, sync: { status: "error", at, message } };
     await kv.set(K.person(p.id), p);
     await appendLog(p.id, [{ at, by: actor, source: "sistema", action: "sync_error", field: null, to: message.slice(0, 300) }]);
-    return { status: "error", person: p, errors: [message], skipped: [], message };
+    res = { status: "error", person: p, errors: [message], skipped: [], message };
+  } finally {
+    await kv.del(lockKey).catch(() => {});
   }
+  const p = res.person;
+  const needsRetry = !p?.archived && (res.status === "error" || res.status === "partial" || !p?.clickupTaskId || (p?.pendingKeys || []).length > 0);
+  if (needsRetry) await kv.sadd(K.syncRetry, person.id).catch(() => {});
+  else await kv.srem(K.syncRetry, person.id).catch(() => {});
+  return res;
+}
+
+/** Schede con scritture verso ClickUp ancora da fare (svuotate dalla coda e di notte). */
+export async function listSyncRetry() {
+  return ((await kv.smembers(K.syncRetry)) || []).filter((id) => /^p_[a-f0-9]{16}$/.test(id));
+}
+export async function markSyncRetry(id) {
+  await kv.sadd(K.syncRetry, id).catch(() => {});
 }
 
 async function pushPerson(person, keys, cfg) {
@@ -314,6 +355,17 @@ async function pushPerson(person, keys, cfg) {
     message: errors.length ? `${errors.length} campi non aggiornati su ClickUp` : null,
     errors: errors.slice(0, 20), skipped: plan.skipped.slice(0, 30),
   };
+  // Mentre scrivevamo su ClickUp la scheda può essere cambiata (es. un documento appena
+  // arrivato dal modulo): si riprende quella in KV e si aggiornano SOLO i dati di sync.
+  // Un campo cambiato dopo l'inizio del push resta in sospeso anche se l'abbiamo spinto.
+  const cur = await getPerson(p.id);
+  if (cur && cur.updatedAt !== person.updatedAt) {
+    p = {
+      ...cur,
+      clickupTaskId: p.clickupTaskId, clickupUrl: p.clickupUrl, cuBase: p.cuBase, mirrorStale: p.mirrorStale, sync: p.sync,
+      pendingKeys: (cur.pendingKeys || []).filter((k) => !done.has(k) || failed.has(k) || Number(cur.fieldUpdatedAt?.[k] || 0) > Number(person.updatedAt || 0)),
+    };
+  }
   await putPerson(p);
   return { status: p.sync.status, person: p, errors: errors.map((e) => `${FIELD_BY_KEY[e.key]?.label || e.key}: ${e.error}`), skipped: plan.skipped, message: p.sync.message };
 }
@@ -801,6 +853,9 @@ export async function createFormLink({ personId = null, label = "", actor }) {
 
 const validTokenShape = (token) => typeof token === "string" && /^[A-Za-z0-9_-]{20,64}$/.test(token);
 
+export async function getFormRecord(token) {
+  return getFormRec(token);
+}
 async function getFormRec(token) {
   if (!validTokenShape(token)) return null;
   const rec = (await kv.get(K.form(token))) || null;
@@ -900,7 +955,7 @@ export async function getFormContext(token) {
     // link uguale per tutti: MAI dati di persone (niente prefill, cfPresent sempre false)
     return {
       ok: true, state: "open", done: false, shared: true,
-      uploadsEnabled: hrSyncConfig().enabled,
+      uploadsEnabled: uploadsEnabled(),
       cfEnabled: hrCryptoConfigured(),
       cfPresent: false,
       prefill: {},
@@ -915,7 +970,7 @@ export async function getFormContext(token) {
   for (const k of FORM_KEYS) if (k !== "codiceFiscale" && person?.fields?.[k] != null) prefill[k] = person.fields[k];
   return {
     ok: true, state, done: state === "submitted",
-    uploadsEnabled: hrSyncConfig().enabled,
+    uploadsEnabled: uploadsEnabled(),
     cfEnabled: hrCryptoConfigured(),
     cfPresent: Boolean(person?.cfEnc),
     prefill,
@@ -926,7 +981,13 @@ export async function getFormContext(token) {
   };
 }
 
-export async function submitForm(token, body) {
+/**
+ * @param opts.deferSync true = salva subito e NON scrive su ClickUp nella richiesta: la
+ *   route lo fa dopo la risposta (`after()`), così sotto un picco (link mandato a tutti)
+ *   la persona non aspetta i 429 di ClickUp. La scheda entra in `hr:sync:retry`: se il
+ *   giro dopo la risposta non riesce, la ripresa successiva o la notte la portano su ClickUp.
+ */
+export async function submitForm(token, body, { deferSync = false } = {}) {
   const rec = await getFormRec(token);
   const now = Date.now();
   const state = formTokenState(rec, now);
@@ -935,21 +996,22 @@ export async function submitForm(token, body) {
   if (state === "expired") return { ok: false, status: 410, error: "Questo link è scaduto." };
   if (state !== "open") return { ok: false, status: 409, error: "Questo modulo è già stato inviato." };
   if (body?.consent !== true) return { ok: false, status: 400, error: "Serve il consenso all'informativa privacy." };
-  if (rec.shared) return submitShared(token, rec, body, now);
+  if (rec.shared) return submitShared(token, rec, body, now, deferSync);
   const input = {};
   for (const k of FORM_KEYS) if (k in (body?.data || {})) input[k] = body.data[k];
   // il CF vuoto dal modulo non cancella quello già inserito
   if (!String(input.codiceFiscale || "").trim()) delete input.codiceFiscale;
   const consent = { at: now, version: PRIVACY_VERSION, via: "modulo" };
   const res = await savePerson({
-    id: rec.personId, input, allowed: FORM_KEYS, actor: "modulo", source: "modulo",
+    id: rec.personId, input, allowed: FORM_KEYS, actor: "modulo", source: "modulo", sync: !deferSync,
     extra: () => ({ consent, formLink: { createdAt: rec.createdAt, expiresAt: rec.expiresAt, submittedAt: now } }),
   });
   if (!res.ok) return { ok: false, status: res.status, error: res.errors.join(" ") };
+  if (deferSync) await markSyncRetry(res.person.id);
   await appendLog(res.person.id, [{ at: now, by: "modulo", source: "modulo", action: "consent", field: null, to: `consenso privacy (versione ${PRIVACY_VERSION})` }]);
   const ttl = Math.max(60, Math.ceil((rec.expiresAt - now) / 1000));
   await kv.set(K.form(token), { ...rec, personId: res.person.id, submittedAt: now }, { ex: ttl });
-  return { ok: true, cfNote: res.cfNote, uploadsEnabled: hrSyncConfig().enabled, uploadToken: token };
+  return { ok: true, cfNote: res.cfNote, uploadsEnabled: uploadsEnabled(), uploadToken: token, personId: res.person.id };
 }
 
 /**
@@ -957,7 +1019,7 @@ export async function submitForm(token, body) {
  * aperto; per i file nasce un token figlio monouso legato solo a questa scheda
  * (già "inviato", 1 ora), che la pagina usa per il passo documenti.
  */
-async function submitShared(token, rec, body, now) {
+async function submitShared(token, rec, body, now, deferSync = false) {
   // tetto giornaliero di invii sul link condiviso (oltre ai limiti per IP della route)
   const cap = await checkRateLimit("hr_form_shared_submit", token.slice(0, 64));
   if (!cap.ok) return { ok: false, status: 429, error: "Oggi il modulo ha ricevuto troppi invii. Riprova domani o scrivi a chi ti ha mandato il link." };
@@ -966,71 +1028,48 @@ async function submitShared(token, rec, body, now) {
   if (!String(input.codiceFiscale || "").trim()) delete input.codiceFiscale;
   const consent = { at: now, version: PRIVACY_VERSION, via: "modulo" };
   const res = await savePerson({
-    id: null, input, allowed: FORM_KEYS, actor: "modulo", source: "modulo",
+    id: null, input, allowed: FORM_KEYS, actor: "modulo", source: "modulo", sync: !deferSync,
     extra: () => ({ consent, formLink: { shared: true, createdAt: rec.createdAt, expiresAt: null, submittedAt: now } }),
   });
   if (!res.ok) return { ok: false, status: res.status, error: res.errors.join(" ") };
+  if (deferSync) await markSyncRetry(res.person.id);
   await appendLog(res.person.id, [{ at: now, by: "modulo", source: "modulo", action: "consent", field: null, to: `consenso privacy (versione ${PRIVACY_VERSION}), dal link condiviso` }]);
   const child = randomBytes(24).toString("base64url");
   await kv.set(K.form(child), {
     token: child, child: true, personId: res.person.id, createdAt: now, createdBy: "modulo",
     expiresAt: now + FORM_UPLOAD_GRACE_MS, submittedAt: now, uploads: 0,
   }, { ex: Math.ceil(FORM_UPLOAD_GRACE_MS / 1000) + 60 });
-  return { ok: true, cfNote: res.cfNote, uploadsEnabled: hrSyncConfig().enabled, uploadToken: child };
+  return { ok: true, cfNote: res.cfNote, uploadsEnabled: uploadsEnabled(), uploadToken: child, personId: res.person.id };
 }
 
-const UPLOAD_KIND = {
+export const UPLOAD_KIND = {
   document: { key: "idDocument", title: "Documento d'identità" },
   cv: { key: "cvUpload", title: "CV" },
 };
 
-/** Un file dal modulo → allegato del task ClickUp. In app solo il riferimento. */
-export async function uploadFormFile(token, { kind, bytes, declaredType }) {
+/**
+ * Riferimento al file sulla scheda, dopo che è arrivato su ClickUp (in app SOLO il
+ * riferimento: titolo, id allegato, data). Legge la scheda fresca dal KV (il push
+ * può essere in corso) e aggiorna il blocco in descrizione per il documento.
+ */
+export async function setPersonFileRef(personId, kind, { title, attachmentId, at = Date.now(), via = "modulo" }) {
   const spec = UPLOAD_KIND[kind];
-  if (!spec) return { ok: false, status: 400, error: "Tipo di documento non previsto." };
-  const rec = await getFormRec(token);
-  // il link condiviso non porta a nessuna scheda: i file passano solo dal token figlio
-  if (rec?.shared) return { ok: false, status: 403, error: "Con questo link i documenti si caricano subito dopo l'invio del modulo." };
-  const state = formTokenState(rec, Date.now());
-  if (state !== "submitted") return { ok: false, status: state === "open" ? 409 : 410, error: state === "open" ? "Prima invia il modulo, poi i file." : "Il tempo per caricare i file è scaduto." };
-  if ((rec.uploads || 0) >= 4) return { ok: false, status: 429, error: "Hai già caricato il numero massimo di file." };
-  if (!bytes?.length) return { ok: false, status: 400, error: "File vuoto." };
-  if (bytes.length > UPLOAD_MAX_BYTES) return { ok: false, status: 413, error: "File troppo grande (massimo 10 MB)." };
-  const sniff = sniffFileType(bytes);
-  if (!sniff) return { ok: false, status: 415, error: "Formato non ammesso: solo PDF, JPG o PNG." };
-  if (declaredType && !["application/pdf", "image/jpeg", "image/png"].includes(declaredType)) return { ok: false, status: 415, error: "Formato non ammesso: solo PDF, JPG o PNG." };
-  const cfg = hrSyncConfig();
-  if (!cfg.enabled) return { ok: false, status: 503, error: "Il caricamento dei documenti non è attivo in questo momento." };
-  let person = await getPerson(rec.personId);
-  if (!person) return { ok: false, status: 404, error: "Scheda non trovata." };
-  if (!person.clickupTaskId) {
-    const r = await pushPersonSafe(person, null, { actor: "modulo" });
-    person = r.person;
-    if (!person.clickupTaskId) return { ok: false, status: 502, error: "Non riesco a preparare la cartella per i documenti. Riprova tra poco." };
-  }
-  const safeName = (fullName(person.fields) || "persona").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9 ]+/g, "").trim().slice(0, 60);
-  const filename = `${spec.title.replace(/'/g, "")} - ${safeName}.${sniff.ext}`;
-  let res;
-  try {
-    res = await uploadAttachment(person.clickupTaskId, { filename, bytes, contentType: sniff.type });
-  } catch (e) {
-    return { ok: false, status: 502, error: "Caricamento non riuscito. Riprova tra poco." };
-  }
-  const now = Date.now();
-  await kv.set(K.form(token), { ...rec, uploads: (rec.uploads || 0) + 1 }, { ex: 3600 });
-  const ref = { title: filename, attachmentId: String(res?.id || ""), at: now, via: "modulo" };
+  let person = await getPerson(personId);
+  if (!spec || !person) return null;
+  const ref = { title, attachmentId: String(attachmentId || ""), at, via };
   const prev = person.fields?.[spec.key];
-  person = {
-    ...person,
-    fields: { ...person.fields, [spec.key]: ref },
-    fieldUpdatedAt: { ...person.fieldUpdatedAt, [spec.key]: now },
-    updatedAt: now,
-  };
+  person = { ...person, fields: { ...person.fields, [spec.key]: ref }, fieldUpdatedAt: { ...person.fieldUpdatedAt, [spec.key]: at }, updatedAt: at };
   await putPerson(person);
-  await appendLog(person.id, [{ at: now, by: "modulo", source: "modulo", action: "upload", field: spec.key, from: logValue(spec.key, prev), to: filename }]);
-  // aggiorna il blocco in descrizione ("Documento d'identità: allegato il …")
+  await appendLog(person.id, [{ at, by: via, source: "modulo", action: "upload", field: spec.key, from: logValue(spec.key, prev), to: title }]);
   if (kind === "document") await pushPersonSafe(person, [spec.key], { actor: "modulo" });
-  return { ok: true, title: filename };
+  return ref;
+}
+
+/** Nome dell'allegato su ClickUp (il nome della persona sta su ClickUp, MAI nel Blob). */
+export function attachmentName(person, kind, ext) {
+  const spec = UPLOAD_KIND[kind];
+  const safeName = (fullName(person?.fields) || "persona").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9 ]+/g, "").trim().slice(0, 60);
+  return `${spec.title.replace(/'/g, "")} - ${safeName}.${ext}`;
 }
 
 // ── Stato della sincronizzazione (pagina /admin/hr/sync) ─────────────────────
