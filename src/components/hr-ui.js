@@ -125,7 +125,8 @@ export function FieldInput({ field, value, onChange, options, id, disabled }) {
       return (
         <select {...common} value={value || ""} onChange={(e) => onChange(e.target.value || null)}>
           <option value="">—</option>
-          {value && !opts.includes(value) && <option value={value}>{value}</option>}
+          {/* valore arrivato da ClickUp e fuori elenco (es. fase "Da verificare"): si mostra, ma con la tabella non si sceglie */}
+          {value && !opts.includes(value) && <option value={value} disabled={Boolean(field.choices)}>{value}{field.choices ? " (scegli una voce)" : ""}</option>}
           {opts.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
       );

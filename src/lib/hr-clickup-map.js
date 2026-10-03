@@ -9,9 +9,14 @@
  * Tipi ClickUp gestiti: short_text, text, email, url, phone, number, date,
  * drop_down (value = orderindex OPPURE option id), labels (array di option id
  * o di oggetti), location, users, attachment, checkbox.
+ *
+ * Fase e contratto (03/10/2026): tendine con la tabella di corrispondenza in
+ * hr-fields.js (PERSON_PHASES, CONTRACT_STATUSES). In app si salva il nome
+ * italiano; verso ClickUp si cerca l'opzione col nome inglese O italiano. La fase
+ * vive anche nello STATO DEL TASK (taskToPerson → statusPhase, personToClickup → status).
  */
 import { normalizeSkillMap, normalizeLearnList, normalizePastRoles, skillName, pastRoleText, oneLine, SKILL_AREAS } from "./hr-skills.js";
-import { FIELDS, FIELD_BY_KEY, isEmptyValue, maskCf } from "./hr-people-core.js";
+import { FIELDS, FIELD_BY_KEY, isEmptyValue, maskCf, findChoice, choiceLabel, phaseFromTaskStatus, taskStatusNamesFor } from "./hr-people-core.js";
 import { mirrorText, parseMirror, mirrorPrint } from "./hr-mirror.js";
 
 export const HOC_BLOCK_START = "— Dati HOC Pro —";
@@ -215,6 +220,8 @@ export function taskToPerson(task, { comuni = null } = {}) {
     const appType = f.type === "cf" ? "text" : f.type;
     let v = decodeCustomField(cf, appType);
     if (f.type === "cf" && v) v = s(v).toUpperCase();
+    // fase / contratto: opzione ClickUp (inglese o italiana) → nome italiano dell'app
+    if (f.choices && v != null) v = choiceLabel(f.choices, v);
     if (Array.isArray(v) || v !== undefined) fields[f.key] = v;
   }
   const mirrors = {};
@@ -249,6 +256,8 @@ export function taskToPerson(task, { comuni = null } = {}) {
     clickupTaskId: s(task?.id) || null,
     clickupUrl: s(task?.url) || (task?.id ? `https://app.clickup.com/t/${task.id}` : null),
     clickupStatus: s(task?.status?.status) || null,
+    // fase letta dallo stato del task; null = stato estraneo alle 5 fasi (es. "to do"): non tocca la fase
+    statusPhase: phaseFromTaskStatus(task?.status?.status),
     dateUpdated: Number(task?.date_updated) || null,
     nameIncludesSurname,
     hocPersonId: block?.personId || null,
@@ -260,7 +269,7 @@ export function taskToPerson(task, { comuni = null } = {}) {
  * Corpo per POST /task/{id}/field/{field_id}.
  * @returns {{ body } | { remove: true } | { skip: string }}
  */
-export function encodeFieldValue(meta, appType, value) {
+export function encodeFieldValue(meta, appType, value, choices = null) {
   if (appType === "users" || appType === "attachment" || appType === "fileRef") return { skip: "sola lettura" };
   const t = meta?.type;
   if (appType === "bool") {
@@ -275,7 +284,10 @@ export function encodeFieldValue(meta, appType, value) {
   if (isEmptyValue(value)) return { remove: true };
   switch (t) {
     case "drop_down": {
-      const o = optionsOf(meta).find((x) => lc(optName(x)) === lc(value));
+      // con la tabella (fase, contratto) va bene l'opzione col nome inglese O italiano
+      const c = choices ? findChoice(choices, value) : null;
+      const names = (c ? [c.label, c.cu] : [value]).map(lc);
+      const o = optionsOf(meta).find((x) => names.includes(lc(optName(x))));
       return o ? { body: { value: o.id } } : { skip: `"${s(value)}" non è tra le opzioni ClickUp` };
     }
     case "labels": {
@@ -304,10 +316,15 @@ export function encodeFieldValue(meta, appType, value) {
   }
 }
 
-/** Nome dello status della lista che corrisponde allo stato di collaborazione, o null. */
-export function statusForCollaboration(statuses = [], collab) {
-  if (!collab) return null;
-  const hit = (statuses || []).find((st) => lc(st?.status) === lc(collab));
+/**
+ * Nome dello stato della lista che corrisponde alla fase, o null (la lista non ha
+ * quello stato: lo stato del task non si tocca). Accetta lo stato in italiano o in
+ * inglese ("Attiva" o "active").
+ */
+export function statusForCollaboration(statuses = [], phase) {
+  const names = taskStatusNamesFor(phase).map(lc);
+  if (!names.length) return null;
+  const hit = (statuses || []).find((st) => names.includes(lc(st?.status)));
   return hit ? hit.status : null;
 }
 
@@ -341,7 +358,7 @@ export function personToClickup(person, fieldsMeta, { keys, cfPlain, statuses, c
     if (!meta) continue; // campo nuovo senza omonimo → va nel blocco in descrizione
     const value = f.type === "cf" ? (cfPlain === undefined ? undefined : cfPlain) : person.fields?.[f.key];
     if (value === undefined && f.type === "cf") { skipped.push({ key: f.key, reason: "chiave di cifratura assente" }); continue; }
-    const enc = encodeFieldValue(meta, f.type === "cf" ? "text" : f.type, value);
+    const enc = encodeFieldValue(meta, f.type === "cf" ? "text" : f.type, value, f.choices || null);
     if (enc.skip) { skipped.push({ key: f.key, reason: enc.skip }); continue; }
     if (enc.missing?.length) skipped.push({ key: f.key, reason: `ignorati (non tra le opzioni ClickUp): ${enc.missing.join(", ")}` });
     // effective = il valore che ClickUp terrà davvero dopo la scrittura (base anti-ritorno)
@@ -391,6 +408,8 @@ export function historyItemKey(item, fieldsMeta = []) {
   if (!item) return null;
   if (item.field === "name") return "firstName";
   if (item.field === "content") return "_description";
+  // stato del task (evento taskStatusUpdated): porta la fase
+  if (item.field === "status") return "_status";
   const cfId = s(item.custom_field?.id || (item.field === "custom_field" ? item.custom_field_id : ""));
   const name = s(item.custom_field?.name) || s((fieldsMeta || []).find((m) => s(m.id) === cfId)?.name);
   if (!name) return null;

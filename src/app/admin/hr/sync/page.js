@@ -15,7 +15,7 @@ import { RefreshCw, Webhook } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
 import { PageHead, Notice, DataTable, SectionTitle, Disclosure, Metric, card } from "@/components/ds";
-import { FIELD_BY_KEY } from "@/lib/hr-fields";
+import { FIELD_BY_KEY, PHASE_LABELS, taskStatusNamesFor } from "@/lib/hr-fields";
 import { btnPrimary, btnGhost, SYNC_LABEL, fmtDateTime, fetcher, postJson } from "@/components/hr-ui";
 
 function Row({ ok, label, children }) {
@@ -25,6 +25,22 @@ function Row({ ok, label, children }) {
       <span style={{ width: 190, flexShrink: 0, fontSize: 14, color: CP.textPrimary }}>{label}</span>
       <span style={{ flex: "1 1 300px", fontSize: 14, color: CP.textSecondary, lineHeight: 1.5 }}>{children}</span>
     </div>
+  );
+}
+
+/** Quali fasi hanno uno stato del task sulla lista (nome italiano o inglese). Senza, lo stato del task non si tocca. */
+function PhaseStatusesRow({ statuses }) {
+  const have = new Set(statuses.map((x) => String(x).trim().toLowerCase()));
+  const found = PHASE_LABELS.filter((ph) => taskStatusNamesFor(ph).some((n) => have.has(n.toLowerCase())));
+  const missing = PHASE_LABELS.filter((ph) => !found.includes(ph));
+  return (
+    <Row ok={missing.length === 0 ? true : found.length ? false : null} label="Stati del task">
+      {missing.length === 0
+        ? "la lista ha uno stato per ognuna delle 5 fasi: fase e stato del task restano allineati"
+        : found.length
+          ? <>mancano gli stati per: {missing.join(", ")}. Per queste fasi lo stato del task non si aggiorna (vale la tendina).</>
+          : "la lista non ha stati con i nomi delle fasi: la fase si legge e si scrive solo dalla tendina «Collaboration Status»"}
+    </Row>
   );
 }
 
@@ -87,9 +103,9 @@ export default function HrSyncPage() {
             </Row>
             <Row ok={c.token} label="Token ClickUp">{c.token ? "presente (CLICKUP_API_TOKEN)" : "assente (CLICKUP_API_TOKEN)"}</Row>
             <Row ok={data.crypto} label="Chiave codice fiscale">{data.crypto ? "presente: i codici fiscali si salvano cifrati" : "assente (HR_ENCRYPTION_KEY): i codici fiscali non si salvano, il resto sì"}</Row>
-            <Row ok={data.webhook ? data.webhook.sameList : c.enabled ? false : null} label="Webhook">
+            <Row ok={data.webhook ? data.webhook.sameList && !(data.webhook.missingEvents || []).length : c.enabled ? false : null} label="Webhook">
               {data.webhook ? (
-                <>registrato il {fmtDateTime(data.webhook.at)} verso <code>{data.webhook.endpoint}</code>{!data.webhook.sameList && <span style={{ color: CP.accentRed }}> · è su un'altra lista ({data.webhook.listId}): registralo di nuovo</span>}</>
+                <>registrato il {fmtDateTime(data.webhook.at)} verso <code>{data.webhook.endpoint}</code>{!data.webhook.sameList && <span style={{ color: CP.accentRed }}> · è su un'altra lista ({data.webhook.listId}): registralo di nuovo</span>}{data.webhook.sameList && (data.webhook.missingEvents || []).length > 0 && <span style={{ color: CP.accentRed }}> · registrato prima che l'app seguisse lo stato del task: i cambi di stato fatti su ClickUp arrivano solo di notte. Registralo di nuovo</span>}</>
               ) : (
                 <>non registrato: le modifiche fatte su ClickUp arrivano solo con l'import (a mano o di notte). Verrà registrato verso <code>{data.webhookEndpoint}</code>.</>
               )}
@@ -99,6 +115,7 @@ export default function HrSyncPage() {
                 <>{fmtDateTime(li.at)} ({li.mode === "reconcile" ? "notturno" : "a mano"}) · {li.tasks} task · {li.created} nuove · {li.updated} aggiornate · {li.pushedBack} campi rimandati · {li.missingOnClickup} task spariti{li.fatal ? <span style={{ color: CP.accentRed }}> · fermato: {li.fatal}</span> : null}{li.errors?.length ? <span style={{ color: CP.accentRed }}> · {li.errors.length} errori</span> : null}</>
               ) : "mai eseguito"}
             </Row>
+            {data.list && <PhaseStatusesRow statuses={data.list.statuses || []} />}
             <Row ok={null} label="Riconciliazione notturna">{c.enabled ? "ogni notte dal dispatcher (03:00 UTC): import completo + campi rimasti in sospeso" : "spenta finché la lista non è impostata"}</Row>
           </section>
 

@@ -134,8 +134,7 @@ export const createTask = (listId, payload) => cu(`/list/${listId}/task`, { meth
 export const updateTask = (taskId, payload) => cu(`/task/${encodeURIComponent(taskId)}`, { method: "PUT", json: payload });
 export const setField = (taskId, fieldId, body) => cu(`/task/${encodeURIComponent(taskId)}/field/${fieldId}`, { method: "POST", json: body });
 export const removeField = (taskId, fieldId) => cu(`/task/${encodeURIComponent(taskId)}/field/${fieldId}`, { method: "DELETE" });
-/** Cancella il task: su ClickUp finisce nel cestino (recuperabile per 30 giorni). */
-export const deleteTask = (taskId) => cu(`/task/${encodeURIComponent(taskId)}`, { method: "DELETE" });
+// Niente deleteTask (03/10/2026): da procedura HOC Pro non cancella mai un task HR.
 
 /** Allegato al task (multipart, campo "attachment"). Il file non passa da KV. */
 export async function uploadAttachment(taskId, { filename, bytes, contentType }) {
@@ -156,7 +155,9 @@ export async function resolveTeamId() {
   throw new ClickupError(`Il token vede ${teams.length} workspace: imposta HR_CLICKUP_TEAM_ID`, 0);
 }
 
-export const HR_WEBHOOK_EVENTS = ["taskCreated", "taskUpdated", "taskDeleted"];
+// taskStatusUpdated (03/10/2026): lo stato del task porta la fase della persona. Un webhook
+// registrato prima non lo riceve: va registrato di nuovo da /admin/hr/sync.
+export const HR_WEBHOOK_EVENTS = ["taskCreated", "taskUpdated", "taskStatusUpdated", "taskDeleted"];
 
 export async function createWebhook(teamId, { endpoint, listId }) {
   return cu(`/team/${teamId}/webhook`, { method: "POST", json: { endpoint, events: HR_WEBHOOK_EVENTS, list_id: Number(listId) || listId } });

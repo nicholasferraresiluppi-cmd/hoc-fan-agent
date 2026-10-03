@@ -95,7 +95,8 @@ const task = {
   eq(m.fields.firstName, "Anna", "nome del task senza cognome");
   ok(m.nameIncludesSurname, "ricorda che il task aveva nome+cognome");
   eq(m.fields.gender, "Female", "dropdown nel task (orderindex 0)");
-  eq(m.fields.collaborationStatus, "Active", "dropdown nel task (option id)");
+  eq(m.fields.collaborationStatus, "Attiva", "dropdown nel task (option id), tradotto in italiano");
+  eq(m.statusPhase, "Attiva", "stato del task «active» (vecchio nome inglese) letto come fase");
   eq(m.fields.spokenLanguages, ["Italiano", "Inglese"], "labels nel task");
   eq(m.fields.dateOfBirth, "1998-03-04", "data nel task");
   eq(m.fields.yellowWarnings, null, "number vuoto → null");
@@ -150,6 +151,71 @@ eq(encodeFieldValue({ type: "location" }, "location", { address: "Milano", lat: 
 eq(statusForCollaboration([{ status: "to do" }], "Active"), null, "nessuno status omonimo → status invariato");
 eq(parseHocBlock("niente blocco"), null, "descrizione senza blocco");
 eq(stripHocBlock(withHocBlock("A", ["x: 1"])), "A", "blocco rimovibile");
+
+// ── 03/10: fasi della persona e stato del contratto (tabella unica, due lingue) ──
+{
+  const F = await import("../src/lib/hr-fields.js");
+  const { historyItemKey } = await import("../src/lib/hr-clickup-map.js");
+  eq(F.PHASE_LABELS, ["In ingresso", "Attiva", "In riassegnazione", "In uscita", "Uscita"], "le 5 fasi, in ordine (Needs Review non è una fase)");
+  const pairs = [["In ingresso", "Onboarding"], ["Attiva", "Active"], ["In riassegnazione", "Reassigning"], ["In uscita", "Outboarding"], ["Uscita", "Decommissioned"]];
+  for (const [it, en] of pairs) {
+    eq(F.choiceLabel(F.PERSON_PHASES, en), it, `fase: ${en} → ${it}`);
+    eq(F.choiceLabel(F.PERSON_PHASES, it), it, `fase: ${it} resta ${it}`);
+    eq(F.choiceLabel(F.PERSON_PHASES, en.toUpperCase()), it, `fase: maiuscole indifferenti (${en.toUpperCase()})`);
+    eq(F.choiceLabel(F.PERSON_PHASES, ` ${it.toLowerCase()} `), it, `fase: italiano minuscolo con spazi (${it})`);
+  }
+  eq(F.choiceLabel(F.PERSON_PHASES, "Needs Review"), "Da verificare", "Needs Review → Da verificare");
+  eq(F.findChoice(F.PERSON_PHASES, "needs review").selectable, false, "Da verificare non selezionabile");
+  eq(F.choiceLabel(F.PERSON_PHASES, "Qualcosa di nuovo"), "Qualcosa di nuovo", "opzione sconosciuta: si mostra com'è, nessun crash");
+  eq(F.choiceLabel(F.PERSON_PHASES, null), null, "vuoto → null");
+  const cpairs = [["Da preparare", "To Do"], ["Bozza condivisa", "Drafted Shared"], ["Firma richiesta", "Signature Requested"], ["Firmato", "Signed"]];
+  for (const [it, en] of cpairs) {
+    eq(F.choiceLabel(F.CONTRACT_STATUSES, en.toLowerCase()), it, `contratto: ${en} → ${it}`);
+    eq(F.choiceLabel(F.CONTRACT_STATUSES, it), it, `contratto: ${it}`);
+  }
+  // stato del task → fase
+  eq(F.phaseFromTaskStatus("In uscita"), "In uscita", "stato italiano → fase");
+  eq(F.phaseFromTaskStatus("USCITA"), "Uscita", "stato in maiuscolo → fase");
+  eq(F.phaseFromTaskStatus("outboarding"), "In uscita", "stato col nome inglese → fase");
+  eq(F.phaseFromTaskStatus("to do"), null, "stato estraneo (to do) → nessuna fase");
+  eq(F.phaseFromTaskStatus("needs review"), null, "Needs Review non è uno stato di fase");
+  eq(F.phaseFromTaskStatus(""), null, "stato vuoto → nessuna fase");
+  // normalizzazione delle schede vecchie (forma, mai significato)
+  eq(F.normalizeChoiceFields({ collaborationStatus: "Onboarding", hvContractStatus: "Signed", x: 1 }), { collaborationStatus: "In ingresso", hvContractStatus: "Firmato", x: 1 }, "schede vecchie: opzioni ClickUp → italiano");
+  const same = { collaborationStatus: "Attiva" };
+  ok(F.normalizeChoiceFields(same) === same, "già in italiano: stesso oggetto");
+  // input dalla scheda o dalle API
+  eq(normalizePersonInput({ collaborationStatus: "active", hvContractStatus: "Signature Requested" }).values, { collaborationStatus: "Attiva", hvContractStatus: "Firma richiesta" }, "input: nomi inglesi accettati, salvato l'italiano");
+  ok(normalizePersonInput({ collaborationStatus: "Needs Review" }).errors.length === 1, "input: Da verificare non si sceglie");
+  ok(normalizePersonInput({ collaborationStatus: "Boh" }).errors.length === 1, "input: fase inesistente rifiutata");
+  eq(normalizePersonInput({ collaborationStatus: "" }).values.collaborationStatus, null, "input: fase svuotata");
+  ok(!F.FORM_KEYS.includes("hvContractStatus") && !F.FORM_KEYS.includes("collaborationStatus"), "contratto e fase NON sono nel modulo pubblico");
+  // ClickUp → app, tendina in inglese e (domani) in italiano
+  const csEn = { id: "f-cs", name: "Collaboration Status", type: "drop_down", type_config: { options: [{ id: "en-o", name: "Onboarding", orderindex: 0 }, { id: "en-a", name: "Active", orderindex: 1 }, { id: "en-d", name: "Decommissioned", orderindex: 2 }, { id: "en-nr", name: "Needs Review", orderindex: 3 }] } };
+  const csIt = { id: "f-cs", name: "Collaboration Status", type: "drop_down", type_config: { options: [{ id: "it-i", name: "In ingresso", orderindex: 0 }, { id: "it-a", name: "Attiva", orderindex: 1 }, { id: "it-u", name: "Uscita", orderindex: 2 }] } };
+  const hv = { id: "f-hv", name: "HV Contract Status", type: "drop_down", type_config: { options: [{ id: "c-td", name: "To Do", orderindex: 0 }, { id: "c-sr", name: "Signature Requested", orderindex: 1 }, { id: "c-s", name: "Signed", orderindex: 2 }] } };
+  const tk = (cs, csVal, status, hvVal) => ({ id: "t1", name: "Ada", status: { status }, custom_fields: [{ ...cs, value: csVal }, { ...hv, value: hvVal }] });
+  eq(taskToPerson(tk(csEn, "en-d", "to do", "c-s")).fields.collaborationStatus, "Uscita", "tendina inglese Decommissioned → Uscita");
+  eq(taskToPerson(tk(csIt, 1, "to do", null)).fields.collaborationStatus, "Attiva", "tendina già tradotta (Attiva) → Attiva");
+  eq(taskToPerson(tk(csEn, "en-nr", "to do", null)).fields.collaborationStatus, "Da verificare", "Needs Review da ClickUp → Da verificare (nessun crash)");
+  eq(taskToPerson(tk(csEn, "en-d", "to do", "c-s")).fields.hvContractStatus, "Firmato", "contratto Signed → Firmato");
+  eq(taskToPerson(tk(csEn, null, "In riassegnazione", null)).statusPhase, "In riassegnazione", "stato del task → statusPhase");
+  eq(taskToPerson(tk(csEn, null, "to do", null)).statusPhase, null, "stato estraneo → statusPhase null");
+  // app → ClickUp: opzione per nome inglese O italiano, stato del task per nome italiano O inglese
+  const itStatuses = [{ status: "In ingresso" }, { status: "Attiva" }, { status: "In riassegnazione" }, { status: "In uscita" }, { status: "Uscita" }];
+  const person = { id: "p_00000000000000aa", fields: { firstName: "Ada", collaborationStatus: "Uscita", hvContractStatus: "Firma richiesta" } };
+  const planEn = personToClickup(person, [csEn, hv], { statuses: itStatuses });
+  eq(planEn.fieldOps.find((o) => o.key === "collaborationStatus").body, { value: "en-d" }, "fase Uscita → opzione inglese Decommissioned");
+  eq(planEn.fieldOps.find((o) => o.key === "hvContractStatus").body, { value: "c-sr" }, "contratto Firma richiesta → Signature Requested");
+  eq(planEn.status, "Uscita", "fase Uscita → stato del task Uscita");
+  const planIt = personToClickup(person, [csIt, hv], { statuses: [{ status: "uscita" }] });
+  eq(planIt.fieldOps.find((o) => o.key === "collaborationStatus").body, { value: "it-u" }, "tendina tradotta: fase → opzione italiana");
+  eq(planIt.status, "uscita", "stato del task cercato senza badare alle maiuscole");
+  eq(statusForCollaboration([{ status: "decommissioned" }], "Uscita"), "decommissioned", "stato col vecchio nome inglese ancora riconosciuto");
+  eq(statusForCollaboration(itStatuses, "Da verificare"), null, "Da verificare non ha uno stato del task");
+  eq(statusForCollaboration([{ status: "to do" }], "Attiva"), null, "lista senza stati di fase → stato invariato");
+  eq(historyItemKey({ field: "status" }), "_status", "history item di stato → _status");
+}
 
 // ── Doppioni e spazzatura ───────────────────────────────────────────────────
 {
@@ -487,6 +553,8 @@ console.log(`hr-people: ${n} asserzioni OK`);
   const created1 = await H.getPerson(child1.personId);
   t(created1 && created1.id !== existing.person.id && created1.source === "modulo" && created1.consent?.version, "il figlio punta alla scheda nuova, con consenso");
   t(child1.child === true && child1.submittedAt && child1.expiresAt - child1.submittedAt === 3600 * 1000, "figlio: già inviato, 1 ora");
+  t(created1.fields.collaborationStatus === "In ingresso", "modulo (link condiviso): persona nuova in fase «In ingresso»");
+  t(!unchanged.fields.collaborationStatus, "la scheda esistente non riceve una fase");
   t((await H.getFormContext(a.token)).state === "open", "il link condiviso resta aperto dopo l'invio");
   t(!(await H.submitForm(a.token, { data: { firstName: "X" } })).ok, "senza consenso: rifiutato");
 
@@ -531,6 +599,13 @@ console.log(`hr-people: ${n} asserzioni OK`);
   t(pctx.ok && pctx.prefill.firstName === "Giulia" && pctx.cfPresent === true && !pctx.shared, "link personale: prefill come prima");
   const ps = await H.submitForm(p.token, { consent: true, data: { firstName: "Giulia", surname: "Rossi" } });
   t(ps.ok && ps.uploadToken === p.token, "link personale: i file restano sul suo token");
+  t(!(await H.getPerson(existing.person.id)).fields.collaborationStatus, "link personale su scheda esistente: la fase non si tocca");
+  const pNew = await H.createFormLink({ actor: "admin" });
+  const psNew = await H.submitForm(pNew.token, { consent: true, data: { firstName: "Nuova" } });
+  const recNew = await fake.get(`hr:form:${pNew.token}`);
+  t(psNew.ok && (await H.getPerson(recNew.personId)).fields.collaborationStatus === "In ingresso", "link personale senza scheda: persona nuova «In ingresso»");
+  const pIndicated = await H.savePerson({ input: { firstName: "Con fase", collaborationStatus: "Attiva" }, allowed: ["firstName", "collaborationStatus"], actor: "modulo", source: "modulo", sync: false });
+  t(pIndicated.person.fields.collaborationStatus === "Attiva", "fase indicata: il default non la sovrascrive");
 
   // carta di benvenuto
   const W = await import("../src/lib/hr-welcome-card.js");
@@ -659,8 +734,8 @@ console.log(`hr-people: ${n} asserzioni OK`);
 
 // ── 03/10: giro completo con KV finto + ClickUp FINTO (fetch sostituito) ───────
 // Specchio a due vie (eco = nessun cambiamento, modifica vera, testo illeggibile,
-// testo vuoto) e archivio (taskDeleted, nessun task ricreato, Elimina con ClickUp
-// giù, Ripristina, pulizia dopo 30 giorni). Nessuna chiamata di rete vera.
+// testo vuoto) e archivio come rete di sicurezza (taskDeleted, nessun task ricreato,
+// nessuna pulizia, Ripristina; dal 03/10 niente "Elimina"). Nessuna chiamata di rete vera.
 {
   const fake = globalThis.__hrFakeKv;
   const H = await import("../src/lib/hr-people.js");
@@ -837,60 +912,214 @@ console.log(`hr-people: ${n} asserzioni OK`);
   const rec8 = await H.importFromClickup({ mode: "reconcile", by: "test" });
   t(rec8.archived >= 1 && (await H.getPerson(luca.id)).archived?.reason === "Il task collegato non esiste più su ClickUp", "riconciliazione: task inesistente → archiviata");
 
-  // 9) "Elimina" con ClickUp giù → archivio subito, cancellazione in coda, ritentata di notte
-  const anna = (await H.savePerson({ input: { firstName: "Anna", surname: "Neri", personalEmail: "anna@example.com" }, actor: "admin" })).person;
-  const annaTask = anna.clickupTaskId;
-  cu.deleteDown = true;
-  const a9 = await H.archivePerson(anna.id, "admin-1");
-  t(a9.ok && a9.task === "queued" && (await H.getPerson(anna.id)).archived?.pendingTaskDelete === annaTask, "Elimina con ClickUp giù: archiviata, cancellazione in coda");
-  t(cu.tasks.has(annaTask), "il task c'è ancora");
-  // nel frattempo qualcuno tocca il task su ClickUp: l'archiviata non riceve niente e non nasce una scheda nuova
+  // 9) niente più cancellazioni (03/10/2026): nessuna funzione per eliminare o ripulire
+  t(H.archivePerson === undefined && H.purgePerson === undefined && H.purgeExpiredArchived === undefined, "nessuna funzione di eliminazione o di pulizia");
+  // un'archiviata vecchia di 60 giorni NON sparisce: la riconciliazione notturna la lascia dov'è
+  const old = await H.getPerson(luca.id);
+  await fake.set(`hr:person:${luca.id}`, { ...old, archived: { ...old.archived, at: Date.now() - 60 * 24 * 3600 * 1000 } });
+  await H.importFromClickup({ mode: "reconcile", by: "test" });
+  const luca9 = await H.getPerson(luca.id);
+  t(luca9?.archived && (await H.listPeople({ archived: "only" })).some((p) => p.id === luca.id), "archiviata da 60 giorni: ancora lì, nessuna pulizia");
+  t((await logOf(luca.id)).length > 0, "il suo storico resta");
+  t(!/si cancella/.test((await logOf(luca.id)).find((e) => e.action === "archived")?.to || ""), "lo storico non promette più una cancellazione");
+  // il webhook del task di un'archiviata è ignorato e non crea schede nuove
   const peopleCount = (await H.listPeople({ archived: "include" })).length;
-  editOnClickup(annaTask, "CAP", "00100");
-  const w9 = await webhook(annaTask, ["CAP"]);
-  t(w9.kind === "ignored" && (await H.listPeople({ archived: "include" })).length === peopleCount, "webhook del task di un'archiviata: ignorato");
-  cu.deleteDown = false;
-  const rec9 = await H.importFromClickup({ mode: "reconcile", by: "test" });
-  t(rec9.trashed === 1 && !cu.tasks.has(annaTask), "riconciliazione: task cestinato dalla coda");
-  t((await H.getPerson(anna.id)).archived?.taskDeletedAt && !(await H.getPerson(anna.id)).archived?.pendingTaskDelete, "scheda aggiornata: task cestinato");
-  t((await logOf(anna.id)).some((e) => e.action === "archived" && e.by === "admin-1" && e.source === "app"), "storico: chi ha eliminato, da dove");
-  t((await logOf(anna.id)).some((e) => e.action === "task_delete_queued") && (await logOf(anna.id)).some((e) => e.action === "task_trashed"), "storico: coda e cestino");
+  const w9 = await H.handleWebhookEvent({ event: "taskDeleted", task_id: luca.clickupTaskId || "t-nessuno", history_items: [] });
+  t(w9.ignored && (await H.listPeople({ archived: "include" })).length === peopleCount, "taskDeleted su un task già sparito: nessun effetto");
 
-  // 10) Elimina con ClickUp su → task subito nel cestino
-  const bea = (await H.savePerson({ input: { firstName: "Bea" }, actor: "admin" })).person;
-  const a10 = await H.archivePerson(bea.id, "admin-1");
-  t(a10.task === "trashed" && !cu.tasks.has(bea.clickupTaskId), "Elimina: task nel cestino di ClickUp");
-  const conf = await H.handleWebhookEvent({ event: "taskDeleted", task_id: bea.clickupTaskId, history_items: [] });
-  t(conf.ignored || conf.already, "il taskDeleted della nostra cancellazione non fa danni");
+  // 10) esclusioni: le archiviate non contano nei doppioni
+  const dupe = (await H.savePerson({ input: { firstName: "Luca", surname: "Verdi" }, actor: "admin" })).person;
+  const cl = H.computeCleanup(await H.listPeople({ archived: "include" }));
+  t(!cl.byId[dupe.id] && !cl.byId[luca.id], "un'archiviata non fa doppione con una scheda attiva");
 
-  // 11) Ripristina → torna attiva e crea un task NUOVO
+  // 11) Ripristina → torna attiva e crea un task NUOVO (anche quella vecchia di 60 giorni)
   const r11 = await H.restorePerson(sara.id, "admin-2");
   const s11 = await H.getPerson(sara.id);
   t(r11.ok && !s11.archived && s11.clickupTaskId && s11.clickupTaskId !== taskId && cu.tasks.has(s11.clickupTaskId), "Ripristina: attiva, task nuovo su ClickUp");
   t(cu.tasks.get(s11.clickupTaskId).values[byFieldName("Luogo di nascita").id] === "Milano (MI)", "il task nuovo ha i dati dell'app");
   t((await logOf(sara.id)).some((e) => e.action === "restored" && e.by === "admin-2"), "storico: ripristinata");
+  const r11b = await H.restorePerson(luca.id, "admin-2");
+  t(r11b.ok && !(await H.getPerson(luca.id)).archived, "anche l'archiviata da 60 giorni si ripristina");
+  t(H.computeCleanup(await H.listPeople()).byId[dupe.id]?.includes("doppione"), "ripristinata: torna a contare nei doppioni");
 
-  // 12) esclusioni: le archiviate non contano nei doppioni
-  const dupe = (await H.savePerson({ input: { firstName: "Anna", surname: "Neri", personalEmail: "anna@example.com" }, actor: "admin" })).person;
-  const cl = H.computeCleanup(await H.listPeople({ archived: "include" }));
-  t(!cl.byId[dupe.id] && !cl.byId[anna.id], "un'archiviata non fa doppione con una scheda attiva");
-
-  // 13) Elimina definitivamente: solo archiviate; pulizia automatica dopo 30 giorni
-  t((await H.purgePerson(dupe.id, { actor: "admin" })).status === 409, "una scheda attiva non si elimina per sempre");
-  const pl = await H.purgePerson(bea.id, { actor: "admin-1" });
-  t(pl.ok && !(await H.getPerson(bea.id)) && (await logOf(bea.id)).length === 0 && !(await fake.smembers("hr:people:index")).includes(bea.id), "Elimina definitivamente: scheda, storico e indice");
-  const old = await H.getPerson(anna.id);
-  await fake.set(`hr:person:${anna.id}`, { ...old, archived: { ...old.archived, at: Date.now() - 31 * 24 * 3600 * 1000 } });
-  const luca2 = await H.getPerson(luca.id); // archiviata da poco: resta
-  const pr = await H.purgeExpiredArchived({});
-  t(pr.purged === 1 && !(await H.getPerson(anna.id)) && (await H.getPerson(luca2.id))?.archived, "pulizia: via solo le archiviate da più di 30 giorni");
-  const plog = await fake.lrange("hr:purge:log", 0, 10);
-  t(plog.length === 2 && plog.every((x) => !/Anna|Bea|example/.test(x)), "traccia delle cancellazioni senza dati della persona");
+  // 12) in tutto il giro HOC Pro non ha mai cancellato un task su ClickUp
+  t(!cu.calls.some((c) => /^DELETE \/task\/[^/]+$/.test(c)), "nessuna DELETE di task verso ClickUp");
   t(mirrorText("birthPlace", s11.fields) === "Milano (MI)", "sanity");
 
   delete process.env.HR_CLICKUP_LIST_ID;
   n += m;
   console.log(`archivio + specchio con ClickUp finto: ${m} asserzioni OK`);
+}
+
+// ── 03/10: fasi della persona e contratto con ClickUp FINTO ──────────────────
+// Lista con gli stati del task in italiano (come quella di prova rinominata a mano)
+// + "to do" (stato estraneo), tendine "Collaboration Status" e "HV Contract Status"
+// con le opzioni in inglese. Nessuna chiamata di rete vera, nessun KV vero.
+{
+  const fake = globalThis.__hrFakeKv;
+  const H = await import("../src/lib/hr-people.js");
+  let m = 0;
+  const t = (c, msg) => { assert.ok(c, msg); m++; };
+
+  const LIST = "lista-fasi";
+  const opt = (pairs) => ({ options: pairs.map(([id, name], i) => ({ id, name, orderindex: i })) });
+  const FIELDS_META = [
+    { id: "f-sur", name: "Surname", type: "short_text" },
+    { id: "f-cs", name: "Collaboration Status", type: "drop_down", type_config: opt([["o-on", "Onboarding"], ["o-ac", "Active"], ["o-re", "Reassigning"], ["o-ou", "Outboarding"], ["o-de", "Decommissioned"], ["o-nr", "Needs Review"]]) },
+    { id: "f-hv", name: "HV Contract Status", type: "drop_down", type_config: opt([["c-td", "To Do"], ["c-ds", "Drafted Shared"], ["c-sr", "Signature Requested"], ["c-si", "Signed"]]) },
+    { id: "f-end", name: "End of Collaboration", type: "date" },
+  ];
+  const STATUSES = ["to do", "In ingresso", "Attiva", "In riassegnazione", "In uscita", "Uscita"].map((status, i) => ({ status, type: status === "Uscita" ? "closed" : "custom", orderindex: i }));
+  const cu = { tasks: new Map(), seq: 0, calls: [] };
+  const json = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => JSON.stringify(body) });
+  const taskView = (tk) => ({ ...tk, list: { id: LIST }, status: { status: tk.status }, custom_fields: FIELDS_META.map((f) => ({ ...f, value: tk.values[f.id] })) });
+  globalThis.fetch = async (url, init = {}) => {
+    const p = new URL(url).pathname.replace(/^\/api\/v2/, "");
+    const method = init.method || "GET";
+    const body = init.body ? JSON.parse(init.body) : null;
+    cu.calls.push(`${method} ${p}`);
+    let mm;
+    if (method === "GET" && p === `/list/${LIST}/field`) return json(200, { fields: FIELDS_META });
+    if (method === "GET" && p === `/list/${LIST}`) return json(200, { id: LIST, name: "Prova fasi", statuses: STATUSES });
+    if (method === "GET" && p === `/list/${LIST}/task`) return json(200, { tasks: [...cu.tasks.values()].map(taskView), last_page: true });
+    if (method === "POST" && p === `/list/${LIST}/task`) {
+      const id = `f${++cu.seq}`;
+      const values = {};
+      for (const c of body.custom_fields || []) values[c.id] = c.value;
+      cu.tasks.set(id, { id, name: body.name, description: body.description, values, status: body.status || "to do", date_updated: String(Date.now()) });
+      return json(200, { id, url: `https://app.clickup.com/t/${id}` });
+    }
+    if ((mm = /^\/task\/([^/]+)\/field\/([^/]+)$/.exec(p))) {
+      const tk = cu.tasks.get(mm[1]);
+      if (method === "POST") tk.values[mm[2]] = body.value; else delete tk.values[mm[2]];
+      return json(200, {});
+    }
+    if ((mm = /^\/task\/([^/]+)$/.exec(p))) {
+      const tk = cu.tasks.get(mm[1]);
+      if (!tk) return json(404, { err: "Task not found", ECODE: "ITEM_015" });
+      if (method === "PUT") { Object.assign(tk, body); return json(200, {}); }
+      return json(200, taskView(tk));
+    }
+    return json(500, { err: `rotta non prevista nel finto: ${method} ${p}` });
+  };
+  process.env.HR_CLICKUP_LIST_ID = LIST;
+  process.env.CLICKUP_API_TOKEN = "pk_test_finto";
+  const later = () => String(Date.now() + 1000);
+  const setStatusOnClickup = (taskId, status) => { const tk = cu.tasks.get(taskId); tk.status = status; tk.date_updated = later(); };
+  const setDropdownOnClickup = (taskId, fieldId, optionId) => { const tk = cu.tasks.get(taskId); tk.values[fieldId] = optionId; tk.date_updated = later(); };
+  const statusWebhook = (taskId, after) => H.handleWebhookEvent({ event: "taskStatusUpdated", task_id: taskId, history_items: [{ field: "status", after: { status: after }, date: later(), user: { username: "hr-clickup" } }] });
+  const fieldWebhook = (taskId, fieldId, name) => H.handleWebhookEvent({ event: "taskUpdated", task_id: taskId, history_items: [{ field: "custom_field", custom_field: { id: fieldId, name }, date: later(), user: { username: "hr-clickup" } }] });
+  const phaseOf = async (id) => (await H.getPerson(id)).fields.collaborationStatus;
+
+  // a) fase scelta in app → tendina (opzione inglese) + stato del task (italiano)
+  const ada = (await H.savePerson({ input: { firstName: "Ada", surname: "Lovelace", collaborationStatus: "In ingresso", hvContractStatus: "Da preparare" }, actor: "admin", source: "app" })).person;
+  const adaTask = ada.clickupTaskId;
+  t(cu.tasks.get(adaTask).status === "In ingresso" && cu.tasks.get(adaTask).values["f-cs"] === "o-on", "creazione: stato del task «In ingresso» e tendina Onboarding");
+  t(cu.tasks.get(adaTask).values["f-hv"] === "c-td", "creazione: contratto Da preparare → To Do");
+  const r1 = await H.savePerson({ id: ada.id, input: { collaborationStatus: "Attiva" }, actor: "admin", source: "app" });
+  t(r1.sync?.status === "ok" && cu.tasks.get(adaTask).status === "Attiva" && cu.tasks.get(adaTask).values["f-cs"] === "o-ac", "fase cambiata in app: tendina Active + stato del task «Attiva»");
+  // le eco (stato e tendina) non cambiano niente
+  const e1 = await statusWebhook(adaTask, "Attiva");
+  const e2 = await fieldWebhook(adaTask, "f-cs", "Collaboration Status");
+  t(e1.kind === "unchanged" && e2.kind === "unchanged" && (await phaseOf(ada.id)) === "Attiva", "eco di stato e tendina: nessun cambiamento");
+  // una modifica di un altro campo NON riporta indietro lo stato del task
+  setStatusOnClickup(adaTask, "In uscita"); // cambio su ClickUp il cui webhook non è ancora arrivato
+  await H.savePerson({ id: ada.id, input: { surname: "King" }, actor: "admin", source: "app" });
+  t(cu.tasks.get(adaTask).status === "In uscita", "push di altri campi: lo stato appena cambiato su ClickUp non viene riportato indietro");
+
+  // b) stato del task cambiato su ClickUp (webhook taskStatusUpdated) → fase in app + tendina
+  setStatusOnClickup(adaTask, "In riassegnazione");
+  const b1 = await statusWebhook(adaTask, "In riassegnazione");
+  t(b1.kind === "updated" && (await phaseOf(ada.id)) === "In riassegnazione", "stato del task da ClickUp → fase in app");
+  t(cu.tasks.get(adaTask).values["f-cs"] === "o-re", "…e la tendina segue (Reassigning)");
+  t((await H.getLog(ada.id, 50)).some((e) => e.action === "update" && e.field === "collaborationStatus" && e.source === "clickup" && e.to === "In riassegnazione"), "storico: cambio di fase da ClickUp");
+  // la sua eco (scrittura della tendina) non cambia niente
+  t((await fieldWebhook(adaTask, "f-cs", "Collaboration Status")).kind === "unchanged", "eco della tendina riscritta: nessun cambiamento");
+
+  // c) stato cambiato su ClickUp senza webhook → lo riprende la riconciliazione notturna
+  setStatusOnClickup(adaTask, "In uscita");
+  const rc = await H.importFromClickup({ mode: "reconcile", by: "test" });
+  t(rc.ok && (await phaseOf(ada.id)) === "In uscita" && cu.tasks.get(adaTask).values["f-cs"] === "o-ou", "riconciliazione: stato del task → fase + tendina (Outboarding)");
+  const rc2 = await H.importFromClickup({ mode: "reconcile", by: "test" });
+  t(rc2.updated === 0, "riconciliazione successiva: niente da aggiornare");
+
+  // d) tendina cambiata su ClickUp → fase in app + stato del task
+  setDropdownOnClickup(adaTask, "f-cs", "o-ac");
+  const d1 = await fieldWebhook(adaTask, "f-cs", "Collaboration Status");
+  t(d1.kind === "updated" && (await phaseOf(ada.id)) === "Attiva" && cu.tasks.get(adaTask).status === "Attiva", "tendina da ClickUp → fase in app + stato del task «Attiva»");
+  t((await statusWebhook(adaTask, "Attiva")).kind === "unchanged", "eco del nostro cambio di stato: ignorata");
+
+  // e) stato estraneo alle 5 fasi ("to do") → la fase NON si tocca, né via webhook né di notte
+  setStatusOnClickup(adaTask, "to do");
+  const e3 = await statusWebhook(adaTask, "to do");
+  t(e3.kind === "unchanged" && (await phaseOf(ada.id)) === "Attiva", "stato «to do»: fase invariata");
+  await H.importFromClickup({ mode: "reconcile", by: "test" });
+  t((await phaseOf(ada.id)) === "Attiva" && cu.tasks.get(adaTask).status === "to do", "stato «to do» di notte: fase invariata, stato non forzato");
+  // dallo stato estraneo si torna a una fase: è un cambio vero
+  setStatusOnClickup(adaTask, "In riassegnazione");
+  await statusWebhook(adaTask, "In riassegnazione");
+  t((await phaseOf(ada.id)) === "In riassegnazione", "da «to do» a una fase: la fase cambia");
+
+  // f) "Needs Review" dalla tendina → "Da verificare", nessun crash, lo stato non si tocca
+  setDropdownOnClickup(adaTask, "f-cs", "o-nr");
+  const f1 = await fieldWebhook(adaTask, "f-cs", "Collaboration Status");
+  t(f1.ok && (await phaseOf(ada.id)) === "Da verificare" && cu.tasks.get(adaTask).status === "In riassegnazione", "Needs Review → «Da verificare» in sola lettura, stato del task invariato");
+  t((await H.savePerson({ id: ada.id, input: { collaborationStatus: "Needs Review" }, actor: "admin", source: "app" })).status === 400, "«Da verificare» non si sceglie dall'app");
+
+  // g) "Segna come uscita": fase Uscita + fine collaborazione = oggi se vuota
+  const x1 = await H.markPersonExited(ada.id, { actor: "admin" });
+  const adaX = await H.getPerson(ada.id);
+  t(x1.ok && adaX.fields.collaborationStatus === "Uscita" && adaX.fields.endDate === H.todayRome(), "Segna come uscita: fase Uscita, fine = oggi");
+  t(cu.tasks.get(adaTask).status === "Uscita" && cu.tasks.get(adaTask).values["f-cs"] === "o-de" && cu.tasks.get(adaTask).values["f-end"] === Date.parse(`${H.todayRome()}T12:00:00Z`), "su ClickUp: stato Uscita (chiuso), Decommissioned, data di fine");
+  t(!adaX.archived && (await H.listPeople()).some((p) => p.id === ada.id), "la scheda resta (non archiviata, non eliminata)");
+  // con la data scelta nella conferma
+  const bob = (await H.savePerson({ input: { firstName: "Bob", collaborationStatus: "Attiva" }, actor: "admin" })).person;
+  await H.markPersonExited(bob.id, { endDate: "2026-09-30", actor: "admin" });
+  t((await H.getPerson(bob.id)).fields.endDate === "2026-09-30", "Segna come uscita con la data scelta");
+  // data già in scheda e nessuna data passata: resta quella
+  const cleo = (await H.savePerson({ input: { firstName: "Cleo", collaborationStatus: "In uscita", endDate: "2026-10-15" }, actor: "admin" })).person;
+  await H.markPersonExited(cleo.id, { actor: "admin" });
+  t((await H.getPerson(cleo.id)).fields.endDate === "2026-10-15", "fine già indicata: non si sovrascrive con oggi");
+  t((await H.markPersonExited(cleo.id, { endDate: "30/09/2026", actor: "admin" })).status === 400, "data non valida rifiutata");
+  // il task chiuso ("Uscita") continua a essere letto: la riconciliazione non lo dà per sparito
+  const rx = await H.importFromClickup({ mode: "reconcile", by: "test" });
+  t(rx.missingOnClickup === 0 && (await phaseOf(ada.id)) === "Uscita", "riconciliazione: le uscite restano allineate");
+  // "Riattiva"
+  const ra = await H.reactivatePerson(ada.id, { actor: "admin" });
+  t(ra.ok && (await phaseOf(ada.id)) === "Attiva" && cu.tasks.get(adaTask).status === "Attiva" && cu.tasks.get(adaTask).values["f-cs"] === "o-ac", "Riattiva: fase Attiva, anche su ClickUp");
+
+  // h) contratto nei due sensi (etichetta italiana in app, opzione inglese su ClickUp)
+  await H.savePerson({ id: ada.id, input: { hvContractStatus: "Firma richiesta" }, actor: "admin", source: "app" });
+  t(cu.tasks.get(adaTask).values["f-hv"] === "c-sr", "contratto in app → Signature Requested su ClickUp");
+  setDropdownOnClickup(adaTask, "f-hv", "c-si");
+  const h1 = await fieldWebhook(adaTask, "f-hv", "HV Contract Status");
+  t(h1.kind === "updated" && (await H.getPerson(ada.id)).fields.hvContractStatus === "Firmato", "contratto da ClickUp (Signed) → «Firmato» in app");
+  t((await phaseOf(ada.id)) === "Attiva", "il contratto non tocca la fase (assi separati)");
+
+  // i) modulo: persona nuova → "In ingresso", anche su ClickUp
+  const link = await H.regenerateSharedFormLink({ actor: "admin" });
+  const sub = await H.submitForm(link.token, { consent: true, data: { firstName: "Dora", surname: "Nuova" } });
+  const child = await fake.get(`hr:form:${sub.uploadToken}`);
+  const dora = await H.getPerson(child.personId);
+  t(sub.ok && dora.fields.collaborationStatus === "In ingresso", "modulo: persona nuova in fase «In ingresso»");
+  t(cu.tasks.get(dora.clickupTaskId)?.status === "In ingresso" && cu.tasks.get(dora.clickupTaskId)?.values["f-cs"] === "o-on", "modulo: su ClickUp stato «In ingresso» e Onboarding");
+
+  // j) task creato su ClickUp con solo lo stato → fase dallo stato, tendina allineata
+  cu.tasks.set("f-manuale", { id: "f-manuale", name: "Elio", values: {}, status: "Attiva", date_updated: String(Date.now()) });
+  const j1 = await H.handleWebhookEvent({ event: "taskCreated", task_id: "f-manuale", history_items: [] });
+  t(j1.kind === "created" && (await phaseOf(j1.personId)) === "Attiva" && cu.tasks.get("f-manuale").values["f-cs"] === "o-ac", "task nuovo da ClickUp: fase dallo stato, tendina scritta");
+
+  // k) scheda salvata prima del 03/10 con l'opzione inglese: letta in italiano, nessuna modifica fantasma
+  const old = await fake.get(`hr:person:${bob.id}`);
+  await fake.set(`hr:person:${bob.id}`, { ...old, fields: { ...old.fields, collaborationStatus: "Decommissioned" } });
+  t((await phaseOf(bob.id)) === "Uscita", "scheda vecchia: «Decommissioned» letto come «Uscita»");
+  const logLen = (await H.getLog(bob.id, 500)).length;
+  await H.importFromClickup({ mode: "reconcile", by: "test" });
+  t(!(await H.getLog(bob.id, 500)).slice(0, (await H.getLog(bob.id, 500)).length - logLen).some((e) => e.field === "collaborationStatus"), "scheda vecchia: nessun cambio di fase nello storico");
+
+  delete process.env.HR_CLICKUP_LIST_ID;
+  n += m;
+  console.log(`fasi + contratto con ClickUp finto: ${m} asserzioni OK`);
 }
 
 console.log(`totale: ${n} asserzioni`);

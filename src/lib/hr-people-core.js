@@ -12,7 +12,7 @@
  */
 import { normalizeSkillMap, normalizeLearnList, normalizePastRoles, clickupSkillLabels, skillName, pastRoleText } from "./hr-skills.js";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { FIELDS, FIELD_BY_KEY, EDITABLE_KEYS, validateCodiceFiscale } from "./hr-fields.js";
+import { FIELDS, FIELD_BY_KEY, EDITABLE_KEYS, validateCodiceFiscale, findChoice } from "./hr-fields.js";
 
 // Schema e codice fiscale vivono in hr-fields.js (senza dipendenze Node: li
 // importano anche le pagine client). Qui si riesportano per comodità.
@@ -168,6 +168,15 @@ export function normalizePersonInput(input = {}, allowed = EDITABLE_KEYS) {
         break;
       }
       case "option": {
+        if (f.choices) {
+          // fase / contratto: si accetta il nome italiano o l'opzione ClickUp, si salva l'italiano;
+          // le voci non selezionabili ("Da verificare") non si scelgono
+          if (!s(raw)) { values[key] = null; break; }
+          const c = findChoice(f.choices, raw);
+          if (!c || c.selectable === false) errors.push(`${f.label}: valore non previsto.`);
+          else values[key] = c.label;
+          break;
+        }
         const v = s(raw);
         if (v && f.options && !f.options.includes(v)) errors.push(`${f.label}: valore non previsto.`);
         else values[key] = v || null;
@@ -401,22 +410,6 @@ export function computeCleanup(all = []) {
   for (const g of duplicates) for (const id of g.ids) (byId[id] ||= []).push("doppione");
   for (const id of junk) (byId[id] ||= []).push("spazzatura");
   return { byId, duplicates, junk };
-}
-
-// ── Archivio (03/10/2026) ───────────────────────────────────────────────────
-// Una scheda archiviata (task cancellato su ClickUp o "Elimina" in app) non si
-// sincronizza più, non conta in doppioni/statistiche e dopo 30 giorni la
-// riconciliazione notturna la cancella davvero (scheda + storico).
-export const ARCHIVE_RETENTION_DAYS = 30;
-const ARCHIVE_RETENTION_MS = ARCHIVE_RETENTION_DAYS * 24 * 3600 * 1000;
-/** Quando la scheda archiviata verrà cancellata per sempre (ms), o null. */
-export function archiveExpiresAt(person) {
-  const at = Number(person?.archived?.at || 0);
-  return at ? at + ARCHIVE_RETENTION_MS : null;
-}
-export function isArchiveExpired(person, now = Date.now()) {
-  const exp = archiveExpiresAt(person);
-  return Boolean(exp) && now >= exp;
 }
 
 // ── Modulo pubblico: token ──────────────────────────────────────────────────
