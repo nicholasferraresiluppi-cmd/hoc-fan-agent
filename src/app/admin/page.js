@@ -210,10 +210,12 @@ export default function AdminHub() {
     : cmp && cmp.until_day === 0 ? `Il confronto con ${prevName} parte da domani, col primo giorno chiuso · ${prevName} intero: ${fmt$(agency.prev_full?.sales)}`
     : cmp ? `Allo stesso giorno: ${fmtPct(dSales) || "—"} su ${prevName} (1-${cmp.until_day} ${monthName}: ${fmt$(cmp.current.sales)} contro ${fmt$(cmp.prev.sales)})`
     : `${prevName} intero: ${fmt$(agency.prev_full?.sales)}`;
+  // added_at in KV è una data ISO (stringa), non un numero
+  const ts = (v) => (typeof v === "number" ? v : Date.parse(v || "") || 0);
   const decisions = Object.values(roadmap?.items || {})
     .filter((i) => /decidere/i.test(i.area || "") && (i.status === "now" || i.status === "next"))
-    .sort((a, b) => (a.status === b.status ? (a.added_at || 0) - (b.added_at || 0) : a.status === "now" ? -1 : 1));
-  const daysAgo = (t) => (t ? Math.max(0, Math.floor((Date.now() - t) / 86400000)) : null);
+    .sort((a, b) => (a.status === b.status ? ts(a.added_at) - ts(b.added_at) : a.status === "now" ? -1 : 1));
+  const daysAgo = (t) => (ts(t) ? Math.max(0, Math.floor((Date.now() - ts(t)) / 86400000)) : null);
   // metriche sulla stessa base del confronto (giorni chiusi), o sul mese intero se il mese è passato
   const base = cmp?.until_day ? cmp.current : agency?.current;
   const basePrev = cmp?.until_day ? cmp.prev : agency?.prev_full;

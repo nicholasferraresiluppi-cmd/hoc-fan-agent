@@ -10,6 +10,7 @@
  *  - orientation: "portrait" (9:16, pensato per il telefono) | "landscape" (16:9, desktop)
  *  - audience: a chi serve; adminOnly: true se mostra pagine riservate agli admin (in /guida
  *    lo vede solo chi ha accesso a quelle pagine — non è una difesa, è solo pertinenza)
+ *  - leadsOnly: true se serve solo a chi guida una squadra (stessa logica di pertinenza)
  *  - asOf: data della versione dell'interfaccia mostrata: se la pagina cambia molto, il video va rifatto
  */
 export const TUTORIAL_VIDEOS = [
@@ -35,6 +36,19 @@ export const TUTORIAL_VIDEOS = [
     durationSec: 50,
     audience: "Collaboratori",
     adminOnly: false,
+    asOf: "2026-10-03",
+  },
+  {
+    id: "sales-manager",
+    title: "La settimana del Sales Manager",
+    summary: "Da dove cominciare il lunedì: Da seguire, Sotto soglia con contesto e sostituti, Da far crescere, Classifica vendite, Creator e Presidio chat.",
+    src: "/video/tutorial-sales-manager.mp4",
+    poster: "/video/tutorial-sales-manager.jpg",
+    orientation: "landscape",
+    durationSec: 82,
+    audience: "Sales Manager e team lead",
+    adminOnly: false,
+    leadsOnly: true, // in /guida solo a chi guida una squadra (scores.view team o all): agli operatori non serve
     asOf: "2026-10-03",
   },
 ];
