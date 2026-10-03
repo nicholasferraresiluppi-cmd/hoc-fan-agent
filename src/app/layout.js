@@ -1,5 +1,17 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { itIT } from "@clerk/localizations";
+
+// Testi di accesso (03/10/2026): il nome dell'applicazione su Clerk è ancora quello storico
+// ("HOC Fan Agent"), quindi il sottotitolo si scrive qui; avvisi di accesso negato in italiano.
+const LOCALE = {
+  ...itIT,
+  signIn: { ...itIT.signIn, start: { ...itIT.signIn?.start, title: "Accedi", subtitle: "a HOC Pro, con il tuo account aziendale" } },
+  unstable__errors: {
+    ...itIT.unstable__errors,
+    not_allowed_access: "Questo account non è stato invitato. Entra con l'account a cui è arrivato l'invito, oppure chiedi un invito a chi gestisce HOC Pro.",
+    sign_up_restricted: "Questo account non è stato invitato. Entra con l'account a cui è arrivato l'invito, oppure chiedi un invito a chi gestisce HOC Pro.",
+  },
+};
 import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
 import "./globals.css";
@@ -27,7 +39,7 @@ export default function RootLayout({ children }) {
   return (
     <ClerkProvider
       dynamic
-      localization={itIT}
+      localization={LOCALE}
       appearance={{
         variables: {
           colorPrimary: CP.accent,
