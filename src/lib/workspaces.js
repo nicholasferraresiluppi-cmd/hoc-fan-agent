@@ -58,6 +58,7 @@ export const WORKSPACES = {
       ] },
       { title: "Chat e turni", items: [
         { href: "/admin/conversation-intelligence", label: "Presidio chat" },
+        { href: "/admin/sales-ai", label: "Sales manager AI" },
         { href: "/admin/shift-quality", label: "Qualità turni" },
         { href: "/cm-cockpit", label: "Cockpit CM" },
         { href: "/admin/operator-signals", label: "Profilo operatore" },
