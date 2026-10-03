@@ -30,7 +30,7 @@
  * autocompletamento giusti su telefono; messaggio della Casa sotto la tessera
  * finale. Logica pura in lib/hr-form-experience.js.
  */
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { CP, CP_NOTTE } from "@/lib/brand";
 import { FIELD_BY_KEY, FORM_KEYS } from "@/lib/hr-fields";
@@ -124,6 +124,11 @@ const CSS = `
 .hrf-splash-word{opacity:0;animation:hrfWord 1.2s ease .9s forwards}
 @keyframes hrfWord{from{opacity:0;letter-spacing:.5em}to{opacity:1;letter-spacing:.32em}}
 @media (prefers-reduced-motion:reduce){.hrf-splash-word{animation:none;opacity:1}}
+.hrf-splash{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:radial-gradient(120% 60% at 50% 0%, #17161c 0%, #0b0c10 55%);opacity:1;transition:opacity 1.1s cubic-bezier(.4,0,.2,1)}
+.hrf-splash-inner{transition:transform 1.1s cubic-bezier(.4,0,.2,1),opacity .8s ease}
+.hrf-splash.is-leaving{opacity:0;pointer-events:none}
+.hrf-splash.is-leaving .hrf-splash-inner{transform:translateY(-14px) scale(1.04);opacity:.6}
+@media (prefers-reduced-motion:reduce){.hrf-splash,.hrf-splash-inner{transition:none}}
 .hrf-letter{animation:hrfFade 1s ease 2.2s both}
 .hrf-err{animation:hrfFade .25s ease both}
 @media (prefers-reduced-motion:reduce){.hrf-card.shine::after,.hrf-fade,.hrf-next,.hrf-prev,.hrf-loader-in,.hrf-letter,.hrf-err{animation:none}.hrf-bar{transition:none}}
@@ -136,6 +141,23 @@ const pill = (primary) => ({
   background: primary ? "#f2eee6" : "transparent", color: primary ? "#0b0c10" : CP.textSecondary,
 });
 
+// Apertura: il logo è uno strato SOPRA la pagina che sfuma via (niente taglio netto tra
+// logo e prima pagina — feedback Nicholas 03/10/2026). Fasi: show → leaving → gone.
+const SplashCtx = createContext("gone");
+
+function SplashOverlay() {
+  const phase = useContext(SplashCtx);
+  if (phase === "gone") return null;
+  return (
+    <div className={`hrf-splash${phase === "leaving" ? " is-leaving" : ""}`} aria-hidden={phase === "leaving"}>
+      <div className="hrf-splash-inner" style={{ display: "grid", justifyItems: "center", gap: 22 }}>
+        <HrPalmaLoader width={150} label="Apro il modulo" />
+        <div className="hrf-splash-word" style={{ fontSize: 13, letterSpacing: "0.32em", textTransform: "uppercase", color: "rgba(242,238,230,.78)" }}>House of Creators</div>
+      </div>
+    </div>
+  );
+}
+
 function Shell({ children }) {
   return (
     <main className="hrf" style={{ ...CASA_VARS, colorScheme: "dark", minHeight: "100vh", background: "radial-gradient(120% 60% at 50% 0%, #17161c 0%, #0b0c10 55%)", color: "#f2eee6", fontFamily: SANS, padding: "28px 16px 64px" }}>
@@ -144,6 +166,7 @@ function Shell({ children }) {
         <div style={{ fontSize: 11.5, letterSpacing: "0.18em", textTransform: "uppercase", color: CP.textMuted, marginBottom: 18 }}>House of Creators</div>
         {children}
       </div>
+      <SplashOverlay />
     </main>
   );
 }
@@ -164,14 +187,21 @@ function FieldError({ id, msg }) {
 export default function HrFormPage() {
   const { token } = useParams();
   const [ctx, setCtx] = useState(null);
-  const [splashDone, setSplashDone] = useState(false);
+  const [splashTimeUp, setSplashTimeUp] = useState(false);
+  const [splashPhase, setSplashPhase] = useState("show");
+  const reducedRef = useRef(false);
   useEffect(() => {
-    let reduced = false;
-    try { reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* */ }
-    const t = setTimeout(() => setSplashDone(true), reduced ? 900 : 2400);
+    try { reducedRef.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* */ }
+    const t = setTimeout(() => setSplashTimeUp(true), reducedRef.current ? 900 : 2400);
     return () => clearTimeout(t);
   }, []);
   const [loadErr, setLoadErr] = useState(null);
+  useEffect(() => {
+    if (splashPhase !== "show" || !splashTimeUp || !(ctx || loadErr)) return;
+    setSplashPhase("leaving");
+    const t = setTimeout(() => setSplashPhase("gone"), reducedRef.current ? 50 : 1100);
+    return () => clearTimeout(t);
+  }, [splashPhase, splashTimeUp, ctx, loadErr]);
   const [data, setData] = useState({});
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -338,22 +368,11 @@ export default function HrFormPage() {
     } catch (e2) { setErr(e2.message); } finally { setBusy(false); }
   };
 
-  if (loadErr) return <Shell><Headline title="Link non disponibile" sub="" size={34} /><p style={{ color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>{loadErr}</p></Shell>;
-  if (!ctx || !splashDone) {
-    // Apertura (03/10/2026, Nicholas: "andrei più lento, dargli il tempo di vedere il logo"):
-    // la palma resta almeno ~2,4 s, la scritta compare piano sotto, poi entra la prima pagina.
-    return (
-      <Shell>
-        <div className="hrf-loader-in" style={{ minHeight: "66vh", display: "grid", placeItems: "center" }}>
-          <div style={{ display: "grid", justifyItems: "center", gap: 22 }}>
-            <HrPalmaLoader width={150} label="Apro il modulo" />
-            <div className="hrf-splash-word" style={{ fontSize: 13, letterSpacing: "0.32em", textTransform: "uppercase", color: "rgba(242,238,230,.78)" }}>House of Creators</div>
-          </div>
-        </div>
-      </Shell>
-    );
-  }
+  if (loadErr) return <SplashCtx.Provider value={splashPhase}><Shell><Headline title="Link non disponibile" sub="" size={34} /><p style={{ color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>{loadErr}</p></Shell></SplashCtx.Provider>;
+  if (!ctx) return <SplashCtx.Provider value={splashPhase}><Shell>{null}</Shell></SplashCtx.Provider>;
+  return <SplashCtx.Provider value={splashPhase}>{renderStage()}</SplashCtx.Provider>;
 
+  function renderStage() {
   if (stage === "done") {
     return (
       <Shell>
@@ -495,6 +514,7 @@ export default function HrFormPage() {
       </div>
     </Shell>
   );
+  }
 }
 
 function FilesStep({ token, data, onDone }) {
