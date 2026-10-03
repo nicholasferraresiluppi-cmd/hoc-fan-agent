@@ -265,7 +265,7 @@ export default function HrFormPage() {
           <Headline title={first ? `Ciao ${first},` : "Compila il modulo"} sub="e sblocca la tua card." size={40} />
           <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15.5, lineHeight: 1.55 }}>
             Questa è una card d'esempio: la tua prende forma con le tue risposte, in sette brevi capitoli. Ci vogliono circa cinque minuti.
-            {ctx.shared ? " Compilalo una volta sola." : ` Il link vale fino al ${fmtDate(ctx.expiresAt)} e si usa una volta sola.`} Non ti chiediamo l'IBAN.
+            {ctx.shared ? " Compilalo una volta sola." : ` Il link vale fino al ${fmtDate(ctx.expiresAt)} e si usa una volta sola.`}
           </p>
           <button type="button" className="hrf-pill" onClick={() => setStage("form")} style={{ ...pill(true), width: "100%" }}>Cominciamo</button>
           <div style={{ fontSize: 12.5, color: CP.textMuted, textAlign: "center" }}>I tuoi dati restano riservati: li vede solo chi gestisce il personale.</div>
