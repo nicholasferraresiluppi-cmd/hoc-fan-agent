@@ -9,8 +9,17 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
 
+// Elenco ISTAT dei comuni letto con fs lato server (campi specchio del Centro HR,
+// 03/10/2026): lo si porta esplicitamente nelle funzioni che rileggono ClickUp.
+const COMUNI_JSON = ["./public/data/comuni-istat.json"];
+
 const nextConfig = {
   reactStrictMode: true,
+  outputFileTracingIncludes: {
+    "/api/hr/clickup-webhook": COMUNI_JSON,
+    "/api/cron/hr-clickup": COMUNI_JSON,
+    "/api/admin/hr/**/*": COMUNI_JSON,
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

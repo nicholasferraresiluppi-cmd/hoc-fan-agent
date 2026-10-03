@@ -8,14 +8,15 @@
 import { CP, FONTS } from "@/lib/brand";
 import { useEffect, useState } from "react";
 import { searchComuni } from "@/lib/hr-comuni";
+import { TOP_COUNTRIES, COUNTRIES } from "@/lib/hr-countries";
 import { SKILL_AREAS, SKILL_LEVELS, SKILL_LEVEL_HINT, SKILL_NAME, AREA_BY_KEY, PAST_ROLES, PAST_ROLE_NAME, ROLE_DURATIONS, normalizeSkillMap, normalizeLearnList, normalizePastRoles, areasOfSkillMap, skillName, pastRoleText } from "@/lib/hr-skills";
 
 
 const field = { width: "100%", boxSizing: "border-box", padding: "8px 10px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
 
-// Paesi in italiano: i più frequenti in cima, poi tutti in ordine alfabetico.
-const TOP = ["Italia", "Albania", "Romania", "Filippine", "Spagna", "Francia", "Germania", "Regno Unito", "Svizzera", "Brasile", "Argentina", "Marocco", "Ucraina", "Moldavia"];
-const ALL = ["Afghanistan","Albania","Algeria","Andorra","Angola","Arabia Saudita","Argentina","Armenia","Australia","Austria","Azerbaigian","Bahamas","Bahrein","Bangladesh","Belgio","Bielorussia","Bolivia","Bosnia ed Erzegovina","Brasile","Bulgaria","Camerun","Canada","Capo Verde","Cile","Cina","Cipro","Colombia","Corea del Sud","Costa d'Avorio","Costa Rica","Croazia","Cuba","Danimarca","Ecuador","Egitto","El Salvador","Emirati Arabi Uniti","Eritrea","Estonia","Etiopia","Filippine","Finlandia","Francia","Georgia","Germania","Ghana","Giamaica","Giappone","Giordania","Grecia","Guatemala","Honduras","India","Indonesia","Iran","Iraq","Irlanda","Islanda","Israele","Kazakistan","Kenya","Kosovo","Kuwait","Lettonia","Libano","Libia","Liechtenstein","Lituania","Lussemburgo","Macedonia del Nord","Malta","Marocco","Messico","Moldavia","Monaco","Montenegro","Nepal","Nicaragua","Nigeria","Norvegia","Nuova Zelanda","Paesi Bassi","Pakistan","Panama","Paraguay","Perù","Polonia","Portogallo","Qatar","Regno Unito","Repubblica Ceca","Repubblica Dominicana","Romania","Russia","San Marino","Senegal","Serbia","Singapore","Siria","Slovacchia","Slovenia","Spagna","Sri Lanka","Stati Uniti","Sudafrica","Svezia","Svizzera","Thailandia","Tunisia","Turchia","Ucraina","Ungheria","Uruguay","Venezuela","Vietnam"];
+// Paesi in italiano: i più frequenti in cima, poi tutti in ordine alfabetico (elenco in lib/hr-countries.js).
+const TOP = TOP_COUNTRIES;
+const ALL = COUNTRIES;
 
 export function NationalityInput({ id, value, onChange, disabled }) {
   const rest = ALL.filter((p) => !TOP.includes(p));

@@ -107,6 +107,7 @@ export default function HrSyncPage() {
             <Metric label="Allineate" value={fmtInt(data.people.bySync.ok || 0)} />
             <Metric label="Con campi in sospeso" value={fmtInt(data.people.pending)} note="riprovati di notte" />
             <Metric label="Con problemi" value={fmtInt((data.people.bySync.error || 0) + (data.people.bySync.partial || 0) + (data.people.bySync.deleted || 0) + (data.people.bySync.missing || 0))} danger={Boolean(data.people.bySync.error || data.people.bySync.missing)} />
+            <Metric label="Archiviate" value={fmtInt(data.people.archived || 0)} note="non si sincronizzano" />
           </section>
           {Object.keys(data.people.bySync).length > 0 && (
             <p style={{ fontSize: 13, color: CP.textMuted, margin: "-6px 0 14px" }}>
@@ -119,6 +120,7 @@ export default function HrSyncPage() {
               summary={missingFields.length ? `${missingFields.length} campi attesi non trovati sulla lista` : "tutti i campi attesi ci sono"}>
               <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 10px", lineHeight: 1.5 }}>
                 I campi si riconoscono per NOME. I quattro campi nuovi (codice fiscale, documento, partita IVA, mansione attuale) se mancano sulla lista finiscono in fondo alla descrizione del task, nel blocco «— Dati HOC Pro —» (il codice fiscale lì solo mascherato).
+                I sette campi di testo (luogo di nascita, comune, CAP, competenze e livello, ruoli già ricoperti, vorrebbe imparare, altro che sa fare) si modificano da tutte e due le parti: se su ClickUp un testo non si riesce a leggere, HOC Pro tiene il suo valore e lo scrive nello storico della scheda.
               </p>
               <DataTable minWidth={520} rows={fieldRows} columns={[
                 { key: "name", label: "Campo ClickUp" },

@@ -15,27 +15,39 @@
  *   hr:webhook              { id, secret, endpoint, … } del webhook registrato
  *   hr:import:last          esito dell'ultimo import/riconciliazione
  *   hr:conflicts            LIST degli ultimi conflitti (cap 200)
+ *   hr:clickup:delete-queue SET dei task ClickUp da mettere nel cestino (Elimina in app
+ *                           con ClickUp che non rispondeva): ritentati di notte
+ *   hr:purge:log            LIST delle schede eliminate per sempre: solo id/chi/quando/perché (cap 200)
  *
  * Regole:
  *  - salvare in app non fallisce MAI per colpa di ClickUp: la sync è best-effort,
  *    l'esito resta sulla scheda (`sync`) e i campi non spinti in `pendingKeys`
  *    (la riconciliazione notturna li riprova e NON li sovrascrive da ClickUp).
  *  - conflitto = vince l'ultima modifica per campo (resolveFieldConflicts).
- *  - nessuna cancellazione: un task cancellato su ClickUp stacca la scheda, non
- *    la elimina; doppioni e schede spazzatura si segnalano e basta.
+ *  - archivio (03/10/2026, approvato dal titolare): un task cancellato su ClickUp
+ *    (webhook o riconciliazione) e il pulsante "Elimina" in app mettono la scheda
+ *    tra le ARCHIVIATE: non si sincronizza più (nessun task ricreato), non conta in
+ *    doppioni e statistiche, si ripristina o si elimina per sempre dall'elenco
+ *    "Archiviate"; dopo 30 giorni la riconciliazione notturna la cancella davvero.
+ *    Doppioni e schede spazzatura invece si segnalano e basta.
+ *  - campi specchio (03/10/2026): a due vie, letti dal testo ClickUp (hr-mirror.js).
  */
 import { kv } from "@vercel/kv";
 import { randomBytes } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import {
   FIELDS, FIELD_BY_KEY, FORM_KEYS, EDITABLE_KEYS, FORM_TTL_DAYS, PRIVACY_VERSION, UPLOAD_MAX_BYTES,
   normalizePersonInput, applyChanges, resolveFieldConflicts, filterEchoes, recordEcho, computeCleanup,
   valuesEqual, maskCf, logValue, formTokenState, sniffFileType, fullName, valueHash, dropUnchangedSinceBase,
-  FORM_UPLOAD_GRACE_MS,
+  FORM_UPLOAD_GRACE_MS, isOwnEcho, isEmptyValue, archiveExpiresAt, isArchiveExpired, ARCHIVE_RETENTION_DAYS,
 } from "./hr-people-core.js";
 import { taskToPerson, personToClickup, createTaskPayload, incomingTimestamps, expectedFieldNames, fieldsByName } from "./hr-clickup-map.js";
+import { mirrorIssueText, mirrorText, mirrorPrint } from "./hr-mirror.js";
+import { clickupSkillLabels } from "./hr-skills.js";
 import {
   hrSyncConfig, getListFields, getListInfo, listAllTasks, getTask, createTask, updateTask, setField, removeField,
-  uploadAttachment, resolveTeamId, createWebhook, deleteWebhook, ClickupError,
+  uploadAttachment, resolveTeamId, createWebhook, deleteWebhook, deleteTask, isTaskGone, ClickupError,
 } from "./clickup-hr-api.js";
 import { hrCryptoConfigured, encryptHr, decryptHr } from "./hr-crypto.js";
 import { checkRateLimit } from "./rate-limit.js";
@@ -52,6 +64,8 @@ const K = {
   lastImport: "hr:import:last",
   conflicts: "hr:conflicts",
   lock: "hr:import:lock",
+  deleteQueue: "hr:clickup:delete-queue",
+  purgeLog: "hr:purge:log",
 };
 const LOG_CAP = 500;
 const DAY = 24 * 3600 * 1000;
@@ -65,7 +79,11 @@ export async function getPerson(id) {
   return (await kv.get(K.person(id))) || null;
 }
 
-export async function listPeople() {
+/**
+ * Schede in KV. `archived`: "exclude" (default: l'elenco normale, statistiche,
+ * doppioni) · "only" (vista Archiviate) · "include" (tutte, per la riconciliazione).
+ */
+export async function listPeople({ archived = "exclude" } = {}) {
   const ids = (await kv.smembers(K.index)) || [];
   const out = [];
   for (let i = 0; i < ids.length; i += 100) {
@@ -73,7 +91,24 @@ export async function listPeople() {
     const recs = chunk.length ? await kv.mget(...chunk.map(K.person)) : [];
     out.push(...recs.filter(Boolean));
   }
-  return out;
+  if (archived === "include") return out;
+  return out.filter((p) => (archived === "only" ? Boolean(p.archived) : !p.archived));
+}
+
+// ── Elenco ISTAT dei comuni (lato server, per leggere i campi specchio) ─────────
+// Letto con fs da public/data/comuni-istat.json (mai importato: finirebbe nel
+// bundle) e tenuto in memoria per la vita della funzione. Se manca → null: i
+// luoghi scritti su ClickUp non si riconoscono e vale il valore di HOC Pro.
+let comuniCache = null;
+let comuniPromise = null;
+export async function loadComuni() {
+  if (comuniCache) return comuniCache;
+  if (!comuniPromise) {
+    comuniPromise = readFile(path.join(process.cwd(), "public", "data", "comuni-istat.json"), "utf8")
+      .then((txt) => { const list = JSON.parse(txt); comuniCache = Array.isArray(list) ? list : null; return comuniCache; })
+      .catch(() => { comuniPromise = null; return null; });
+  }
+  return comuniPromise;
 }
 
 async function putPerson(p) {
@@ -104,6 +139,7 @@ export function publicPerson(p, { withCfMask = false } = {}) {
   if (!p) return null;
   const { cfEnc, cuBase, ...rest } = p;
   const out = { ...rest, hasCf: Boolean(cfEnc), name: fullName(p.fields) || "Senza nome" };
+  if (p.archived) out.archiveExpiresAt = archiveExpiresAt(p);
   if (withCfMask && cfEnc) {
     const cf = readCf(p);
     out.cfMasked = cf ? maskCf(cf) : null;
@@ -125,6 +161,8 @@ export async function savePerson({ id = null, input = {}, allowed = EDITABLE_KEY
   const { values, cf, errors } = normalizePersonInput(input, allowed);
   let person = id ? await getPerson(id) : null;
   if (id && !person) return { ok: false, status: 404, errors: ["Persona non trovata."] };
+  // un'archiviata non si modifica dalla scheda (prima si ripristina); dal modulo si salva ma non si sincronizza
+  if (person?.archived && source === "app") return { ok: false, status: 409, errors: ["Scheda archiviata: ripristinala per modificarla."] };
   const creating = !person;
   if (creating && !values.firstName) errors.push("Nome: obbligatorio.");
   if (errors.length) return { ok: false, status: 400, errors: [...new Set(errors)] };
@@ -155,7 +193,7 @@ export async function savePerson({ id = null, input = {}, allowed = EDITABLE_KEY
   await putPerson(person);
   await appendLog(person.id, log);
   let syncRes = null;
-  if (sync) {
+  if (sync && !person.archived) {
     syncRes = await pushPersonSafe(person, creating ? null : changed, { actor });
     person = syncRes.person || person;
   }
@@ -168,6 +206,8 @@ export async function savePerson({ id = null, input = {}, allowed = EDITABLE_KEY
  * spingere (null = tutti). Non lancia: l'esito finisce sulla scheda.
  */
 export async function pushPersonSafe(person, keys, { actor = "sistema" } = {}) {
+  // archiviata: non si sincronizza (e soprattutto non si ricrea il task)
+  if (person?.archived) return { status: "archived", person, errors: [], skipped: [], message: "Scheda archiviata: non si sincronizza con ClickUp." };
   const cfg = hrSyncConfig();
   if (!cfg.enabled) {
     const p = { ...person, sync: { status: "off", at: Date.now(), message: "Sincronizzazione spenta (HR_CLICKUP_LIST_ID o token mancante)." } };
@@ -193,15 +233,22 @@ async function pushPerson(person, keys, cfg) {
   if (person.clickupTaskId) {
     try {
       task = await getTask(person.clickupTaskId);
+      if (task?.deleted === true) throw Object.assign(new Error("task nel cestino"), { status: 404 });
     } catch (e) {
-      if (e?.status !== 404 && e?.status !== 401) throw e;
-      // task sparito su ClickUp: l'app è master → si ricrea
-      await kv.del(K.task(person.clickupTaskId)).catch(() => {});
-      task = null;
+      if (!isTaskGone(e)) throw e;
+      // task cancellato su ClickUp (03/10/2026): la scheda va in archivio, il task NON si ricrea
+      const archived = await archiveRecord(person, {
+        by: "sistema", source: "sistema", taskId: person.clickupTaskId, taskGone: true,
+        reason: "Il task collegato non esiste più su ClickUp",
+      });
+      return { status: "archived", person: archived, errors: [], skipped: [], message: archived.sync.message };
     }
   }
+  // campi specchio che su ClickUp hanno un testo non riconosciuto: al primo push si riscrive il testo dell'app
+  const stale = (person.mirrorStale || []).filter((k) => FIELD_BY_KEY[k]?.mirror);
+  const pushKeys = task && keys ? [...new Set([...keys, ...stale])] : null;
   const plan = personToClickup(person, fieldsMeta, {
-    keys: task ? keys : null, cfPlain, statuses: info.statuses, currentDescription: task?.description || "",
+    keys: pushKeys, cfPlain, statuses: info.statuses, currentDescription: task?.description || "",
   });
   const at = Date.now();
   const errors = [];
@@ -209,16 +256,17 @@ async function pushPerson(person, keys, cfg) {
   // Eco registrata PRIMA di scrivere (il webhook può arrivare mentre scriviamo),
   // coi valori che ClickUp terrà DAVVERO (etichette sconosciute già tolte)
   const pushedValues = {};
-  for (const op of plan.fieldOps) pushedValues[op.key] = op.effective;
+  const pushedPrints = {}; // campi specchio: impronta del TESTO scritto (non dell'oggetto)
+  for (const op of plan.fieldOps) { pushedValues[op.key] = op.effective; if (op.print) pushedPrints[op.key] = op.print; }
   for (const k of plan.blockKeys) pushedValues[k] = p.fields?.[k] ?? null;
   if (!task) {
     const created = await createTask(cfg.listId, createTaskPayload(plan));
     p.clickupTaskId = String(created.id);
     p.clickupUrl = created.url || `https://app.clickup.com/t/${created.id}`;
-    await kv.set(K.echo(p.clickupTaskId), recordEcho({}, pushedValues, at), { ex: 60 });
+    await kv.set(K.echo(p.clickupTaskId), recordEcho({}, pushedValues, at, pushedPrints), { ex: 60 });
   } else {
     const echo = (await kv.get(K.echo(task.id)).catch(() => null)) || {};
-    await kv.set(K.echo(task.id), recordEcho(echo, pushedValues, at), { ex: 60 });
+    await kv.set(K.echo(task.id), recordEcho(echo, pushedValues, at, pushedPrints), { ex: 60 });
     const upd = {};
     if (String(task.name || "") !== plan.name && (!keys || keys.includes("firstName") || keys.includes("surname"))) upd.name = plan.name;
     if (String(task.description || "").trim() !== plan.description.trim()) upd.description = plan.description;
@@ -235,12 +283,14 @@ async function pushPerson(person, keys, cfg) {
     p.clickupUrl = task.url || p.clickupUrl || `https://app.clickup.com/t/${task.id}`;
   }
   const failed = new Set(errors.map((e) => e.key));
-  const done = new Set(task ? (keys || FIELDS.map((f) => f.key)) : FIELDS.map((f) => f.key));
+  const done = new Set(task ? (pushKeys || FIELDS.map((f) => f.key)) : FIELDS.map((f) => f.key));
   p.pendingKeys = (p.pendingKeys || []).filter((k) => !done.has(k) || failed.has(k));
   // base = ciò che ora c'è su ClickUp per i campi scritti (mai il CF: niente impronta del dato sensibile)
   const cuBase = { ...(p.cuBase || {}) };
-  for (const [k, v] of Object.entries(pushedValues)) if (k !== "codiceFiscale" && !failed.has(k)) cuBase[k] = valueHash(v);
+  for (const [k, v] of Object.entries(pushedValues)) if (k !== "codiceFiscale" && !failed.has(k)) cuBase[k] = pushedPrints[k] ?? valueHash(v);
   p.cuBase = cuBase;
+  // testo riscritto (o campo dedicato assente sulla lista): resta "da riscrivere" solo ciò che è fallito
+  if ((p.mirrorStale || []).length) p.mirrorStale = p.mirrorStale.filter((k) => failed.has(k));
   p.sync = {
     status: errors.length ? "partial" : "ok", at,
     message: errors.length ? `${errors.length} campi non aggiornati su ClickUp` : null,
@@ -254,13 +304,29 @@ async function pushPerson(person, keys, cfg) {
 /**
  * Porta un task nella scheda (crea se nuovo). `incomingAt` = timestamp per
  * campo (webhook) o numero unico (import: date_updated del task).
- * @returns {{ kind: "created"|"updated"|"unchanged", personId, pushBack: string[] }}
+ *
+ * Campi specchio (03/10/2026) — perché eco e base si confrontano sul TESTO:
+ * il valore dell'app è spesso più ricco del testo che ne scriviamo (il comune ha
+ * codice e regione, "Altro che sa fare" perde gli a capo, il CAP si taglia a 20,
+ * le chiavi vecchie delle competenze si riscrivono col nome nuovo). Confrontando
+ * l'oggetto riletto dal NOSTRO testo con quello dell'app si vedrebbero differenze
+ * che nessuno ha fatto, e l'eco finirebbe per cancellare dati veri. Un testo che
+ * non si riesce a leggere, poi, non ha proprio un oggetto, ma ha comunque bisogno
+ * di una base, altrimenti ogni notte ricomparirebbe come "modifica nuova". Quindi:
+ * impronta del testo normalizzato (mirrorPrint) sia nell'eco sia in cuBase; il
+ * testo si interpreta SOLO quando è davvero cambiato rispetto a ciò che abbiamo
+ * scritto o visto l'ultima volta.
+ *
+ * @param opts.comuni elenco ISTAT (default: letto dal server; null = non disponibile)
+ * @returns {{ kind: "created"|"updated"|"unchanged"|"ignored", personId, pushBack: string[] }}
  */
-export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = false, allowPushBack = true, onlyKeys = null, now = Date.now() } = {}) {
-  const m = taskToPerson(task);
+export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = false, allowPushBack = true, onlyKeys = null, now = Date.now(), comuni } = {}) {
+  const list = comuni !== undefined ? comuni : await loadComuni();
+  const m = taskToPerson(task, { comuni: list });
   const { codiceFiscale: cfIncomingRaw, ...incomingAll } = m.fields;
   // webhook: si guardano SOLO i campi che l'evento dice cambiati
-  const cfIncoming = onlyKeys && !onlyKeys.includes("codiceFiscale") ? undefined : cfIncomingRaw;
+  const inScope = (k) => !onlyKeys || onlyKeys.includes(k);
+  const cfIncoming = inScope("codiceFiscale") ? cfIncomingRaw : undefined;
   const canCf = hrCryptoConfigured();
   const at = now;
   const readOnlyKeys = FIELDS.filter((f) => f.readOnly && f.cu).map((f) => f.key);
@@ -268,16 +334,21 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
   const incomingRo = {};
   for (const [k, v] of Object.entries(incomingAll)) {
     if (readOnlyKeys.includes(k)) incomingRo[k] = v;
-    else if (!onlyKeys || onlyKeys.includes(k)) incoming[k] = v;
+    else if (inScope(k)) incoming[k] = v;
   }
+  // campi specchio: impronta del testo (anche di quelli che non si sono potuti leggere)
+  const mirrors = m.mirrors || {};
+  const prints = Object.fromEntries(Object.entries(mirrors).map(([k, x]) => [k, x.print]));
   // nuova base = valori ClickUp visti ora (tutti, anche quelli fuori dall'evento)
-  const nextBase = Object.fromEntries(Object.entries(incomingAll).filter(([k]) => !readOnlyKeys.includes(k)).map(([k, v]) => [k, valueHash(v)]));
+  const nextBase = Object.fromEntries(Object.entries(incomingAll).filter(([k]) => !readOnlyKeys.includes(k)).map(([k, v]) => [k, prints[k] ?? valueHash(v)]));
+  Object.assign(nextBase, prints);
 
   let personId = (await kv.get(K.task(m.clickupTaskId))) || null;
   if (!personId && m.hocPersonId) {
     const byBlock = await getPerson(m.hocPersonId);
     // stesso id HOC su un task diverso = task duplicato su ClickUp → scheda nuova
-    if (byBlock && (!byBlock.clickupTaskId || byBlock.clickupTaskId === m.clickupTaskId)) personId = byBlock.id;
+    // (un'archiviata invece si riconosce sempre: mai una scheda nuova dal suo task)
+    if (byBlock && (byBlock.archived || !byBlock.clickupTaskId || byBlock.clickupTaskId === m.clickupTaskId)) personId = byBlock.id;
   }
   const clickupMeta = { nameIncludesSurname: m.nameIncludesSurname, status: m.clickupStatus, pulledAt: at, dateUpdated: m.dateUpdated };
 
@@ -294,6 +365,10 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
     const log = [{ at, by, source: "clickup", action: "create", field: null, to: "importata da ClickUp" }];
     if (cfIncoming && canCf) { person.cfEnc = encryptHr(cfIncoming); fieldUpdatedAt.codiceFiscale = ts; }
     else if (cfIncoming) log.push({ at, by: "sistema", source: "sistema", action: "cf_skipped", field: "codiceFiscale", to: "manca HR_ENCRYPTION_KEY: codice fiscale non importato" });
+    // testo specchio illeggibile su una scheda nuova: il campo resta vuoto in app (il testo resta su ClickUp), lo si dice nello storico
+    for (const [k, x] of Object.entries(mirrors)) {
+      if (!x.ok && inScope(k)) log.push({ at, by: "sistema", source: "sistema", action: "mirror_unrecognized", field: k, from: null, to: mirrorIssueText(x.text, x).replace("tenuto il valore di HOC Pro", "campo lasciato vuoto in HOC Pro") });
+    }
     await putPerson(person);
     await appendLog(person.id, log);
     return { kind: "created", personId: person.id, pushBack: [] };
@@ -301,27 +376,58 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
 
   let person = await getPerson(personId);
   if (!person) return { kind: "unchanged", personId, pushBack: [] };
+  // archiviata: non riceve più niente da ClickUp (il suo task è cancellato o in attesa di cancellazione)
+  if (person.archived) return { kind: "ignored", personId, pushBack: [] };
   const cfPrev = readCf(person);
   const current = { fields: { ...person.fields }, fieldUpdatedAt: person.fieldUpdatedAt || {} };
   const inc = { ...incoming };
   if (cfIncoming !== undefined && canCf && cfPrev !== undefined) { inc.codiceFiscale = cfIncoming || null; current.fields.codiceFiscale = cfPrev; }
 
   // campi che su ClickUp non sono cambiati dall'ultima sincronizzazione: non toccano l'app
-  let { incoming: fresh } = dropUnchangedSinceBase(inc, person.cuBase || {});
+  const base = person.cuBase || {};
+  let { incoming: fresh } = dropUnchangedSinceBase(inc, base, prints);
   let echoes = [];
+  let echo = {};
   if (useEcho) {
-    const echo = (await kv.get(K.echo(m.clickupTaskId)).catch(() => null)) || {};
-    ({ incoming: fresh, echoes } = filterEchoes(current.fields, fresh, echo, at));
+    echo = (await kv.get(K.echo(m.clickupTaskId)).catch(() => null)) || {};
+    ({ incoming: fresh, echoes } = filterEchoes(current.fields, fresh, echo, at, undefined, prints));
   }
   // campi con scrittura verso ClickUp ancora in sospeso: l'app resta la fonte
   const pending = new Set(person.pendingKeys || []);
   for (const k of Object.keys(fresh)) if (pending.has(k)) delete fresh[k];
+
+  // campi specchio: testo cambiato ma non leggibile → si tiene l'app, lo si scrive nello storico
+  // e al push successivo si riscrive il testo dell'app (mirrorStale)
+  const log = [];
+  const stale = new Set(person.mirrorStale || []);
+  for (const [k, x] of Object.entries(mirrors)) {
+    if (!inScope(k) || pending.has(k)) continue;
+    const changed = base[k] !== x.print && !(useEcho && isOwnEcho(echo, k, null, at, undefined, x.print));
+    if (!changed) continue;
+    // il testo su ClickUp è proprio quello che l'app scriverebbe adesso → niente da fare
+    // (copre anche le basi vecchie, impronte dell'oggetto scritte prima del 03/10)
+    if (mirrorPrint(mirrorText(k, current.fields)) === x.print) { delete fresh[k]; stale.delete(k); continue; }
+    if (!x.ok) {
+      log.push({ at, by, source: "clickup", action: "mirror_unrecognized", field: k, from: logValue(k, current.fields[k]), to: mirrorIssueText(x.text, x) });
+      stale.add(k);
+      continue;
+    }
+    stale.delete(k); // testo di nuovo leggibile
+    // campo dedicato mai scritto né visto (base assente) e vuoto su ClickUp: non svuota l'app, ci si scrive il testo dell'app
+    if (base[k] === undefined && k in fresh && isEmptyValue(fresh[k]) && !isEmptyValue(current.fields[k])) { delete fresh[k]; stale.add(k); }
+  }
   const { apply, keepApp } = resolveFieldConflicts(current, fresh, incomingAt ?? m.dateUpdated ?? at);
 
   const { codiceFiscale: cfApply, ...applyRest } = apply;
+  // competenze cambiate da ClickUp: le etichette "Skills" seguono, come quando si salva in app
+  const derivedPush = [];
+  if ("skillLevels" in applyRest && !("skills" in fresh)) {
+    const labels = clickupSkillLabels(applyRest.skillLevels);
+    if (!valuesEqual(current.fields.skills, labels)) { applyRest.skills = labels; derivedPush.push("skills"); }
+  }
   const r = applyChanges(person, { ...applyRest, ...incomingRo }, { at, by, source: "clickup" });
   person = r.person;
-  const log = [...r.log];
+  log.unshift(...r.log);
   // timestamp del campo = quello della modifica su ClickUp, non dell'import
   for (const k of r.changed) {
     const tIn = typeof incomingAt === "number" ? incomingAt : Number(incomingAt?.[k] ?? incomingAt?._default ?? at);
@@ -339,6 +445,7 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
   person.clickupUrl = m.clickupUrl || person.clickupUrl;
   person.clickup = { ...(person.clickup || {}), ...clickupMeta };
   person.cuBase = { ...(person.cuBase || {}), ...nextBase };
+  person.mirrorStale = [...stale];
   const changedAny = r.changed.length || "codiceFiscale" in apply;
   await putPerson(person);
   if (log.length) await appendLog(person.id, log);
@@ -346,12 +453,13 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
     await kv.lpush(K.conflicts, ...conflicts.map((c) => JSON.stringify(c)));
     await kv.ltrim(K.conflicts, 0, 199);
   }
-  if (keepApp.length && allowPushBack) await pushPersonSafe(person, keepApp, { actor: "sistema" });
-  else if (keepApp.length) {
-    person.pendingKeys = [...new Set([...(person.pendingKeys || []), ...keepApp])];
+  const pushBack = [...new Set([...keepApp, ...derivedPush])];
+  if (pushBack.length && allowPushBack) await pushPersonSafe(person, pushBack, { actor: "sistema" });
+  else if (pushBack.length) {
+    person.pendingKeys = [...new Set([...(person.pendingKeys || []), ...pushBack])];
     await kv.set(K.person(person.id), person);
   }
-  return { kind: changedAny ? "updated" : "unchanged", personId: person.id, pushBack: keepApp };
+  return { kind: changedAny ? "updated" : "unchanged", personId: person.id, pushBack };
 }
 
 // ── Import completo / riconciliazione ───────────────────────────────────────
@@ -367,7 +475,7 @@ export async function importFromClickup({ mode = "import", by = "sistema", budge
   if (!got) return { ok: false, busy: true, reason: "Un import è già in corso: riprova tra un paio di minuti." };
   const start = Date.now();
   const deadline = start + budgetMs;
-  const stats = { mode, at: start, by, tasks: 0, created: 0, updated: 0, unchanged: 0, pushedBack: 0, createdOnClickup: 0, missingOnClickup: 0, deferred: 0, errors: [] };
+  const stats = { mode, at: start, by, tasks: 0, created: 0, updated: 0, unchanged: 0, ignored: 0, pushedBack: 0, createdOnClickup: 0, missingOnClickup: 0, archived: 0, trashed: 0, deferred: 0, errors: [] };
   try {
     await getListFields(cfg.listId, { force: true });
     await getListInfo(cfg.listId, { force: true });
@@ -384,10 +492,32 @@ export async function importFromClickup({ mode = "import", by = "sistema", budge
         stats.errors.push({ taskId: String(t.id), error: e?.message || "errore" });
       }
     }
-    // Schede in app: task spariti dalla lista, persone mai portate su ClickUp, push in sospeso
+    // Schede in app: task spariti dalla lista, persone mai portate su ClickUp, push in sospeso.
+    // Le archiviate non si sincronizzano (e non fanno ricreare il task).
     const people = await listPeople();
     for (const p of people) {
+      // schede "task cancellato" di prima del 03/10 (regola vecchia: si ricreava il task) → archivio, come vuole la regola nuova
+      if (!p.clickupTaskId && p.sync?.status === "deleted") {
+        await archiveRecord(p, { by: "riconciliazione notturna", source: "sistema", reason: "Task cancellato su ClickUp (prima dell'archivio)", taskId: null });
+        stats.archived += 1;
+        continue;
+      }
       if (p.clickupTaskId && !seen.has(String(p.clickupTaskId))) {
+        // fuori dalla lista: cancellato (→ archivio) o spostato/archiviato su ClickUp (→ solo segnalato)?
+        if (Date.now() >= deadline) { stats.deferred += 1; continue; }
+        let gone = false;
+        try {
+          const t = await getTask(p.clickupTaskId);
+          gone = t?.deleted === true;
+        } catch (e) {
+          if (isTaskGone(e)) gone = true;
+          else { stats.errors.push({ taskId: String(p.clickupTaskId), error: e?.message || "errore" }); continue; }
+        }
+        if (gone) {
+          await archiveRecord(p, { by: "riconciliazione notturna", source: "sistema", taskId: p.clickupTaskId, taskGone: true, reason: "Il task collegato non esiste più su ClickUp" });
+          stats.archived += 1;
+          continue;
+        }
         stats.missingOnClickup += 1;
         if (p.sync?.status !== "missing") {
           await kv.set(K.person(p.id), { ...p, sync: { status: "missing", at: Date.now(), message: "Il task non è più nella lista ClickUp configurata." } });
@@ -395,12 +525,17 @@ export async function importFromClickup({ mode = "import", by = "sistema", budge
         continue;
       }
       const needsCreate = !p.clickupTaskId;
-      const needsPush = (p.pendingKeys || []).length > 0;
+      const needsPush = (p.pendingKeys || []).length > 0 || (p.mirrorStale || []).length > 0;
       if (!needsCreate && !needsPush) continue;
       if (Date.now() >= deadline) { stats.deferred += 1; continue; }
-      const r = await pushPersonSafe(p, needsCreate ? null : p.pendingKeys, { actor: "sistema" });
+      const r = await pushPersonSafe(p, needsCreate ? null : (p.pendingKeys || []), { actor: "sistema" });
       if (needsCreate && r.person?.clickupTaskId) stats.createdOnClickup += 1;
     }
+    // task da mettere nel cestino rimasti in coda ("Elimina" con ClickUp che non rispondeva)
+    const r = await drainDeleteQueue({ deadline });
+    stats.trashed = r.trashed;
+    stats.deferred += r.deferred;
+    stats.errors.push(...r.errors);
     const cleanup = computeCleanup(await listPeople());
     stats.duplicates = cleanup.duplicates.length;
     stats.junk = cleanup.junk.length;
@@ -415,6 +550,153 @@ export async function importFromClickup({ mode = "import", by = "sistema", budge
   } finally {
     await kv.del(K.lock).catch(() => {});
   }
+}
+
+// ── Archivio: cancellazioni sincronizzate (03/10/2026, approvato dal titolare) ──
+// Stato `archived` = { at, by, source, reason, taskId, taskDeletedAt?, pendingTaskDelete? }.
+// Un'archiviata: fuori dall'elenco normale, dai doppioni e dalle statistiche; non
+// si sincronizza (pushPersonSafe non fa nulla) e non riceve dati dai webhook del
+// suo vecchio task (ingestTask la ignora). Si ripristina o si elimina per sempre;
+// dopo ARCHIVE_RETENTION_DAYS la riconciliazione notturna la cancella davvero.
+
+/**
+ * Mette la scheda in archivio (interno: chiamato dal webhook, dalla riconciliazione,
+ * dal push che trova il task sparito e da "Elimina").
+ * @param opts.taskGone true = il task su ClickUp non c'è già più (niente da cancellare)
+ */
+async function archiveRecord(person, { by, source, reason, taskId = null, taskGone = false, at = Date.now() }) {
+  const tid = taskId ? String(taskId) : null;
+  const archived = { at, by: by || null, source, reason, taskId: tid };
+  if (tid && taskGone) archived.taskDeletedAt = at;
+  const message = source === "app" ? "Scheda archiviata (eliminata in HOC Pro): non si sincronizza più con ClickUp." : "Scheda archiviata: il task su ClickUp è stato cancellato. Non si sincronizza più.";
+  const p = { ...person, archived, clickupTaskId: null, pendingKeys: [], mirrorStale: [], sync: { status: "archived", at, message } };
+  await kv.set(K.person(p.id), p);
+  // il collegamento task → scheda resta finché il task esiste (così i suoi webhook vengono riconosciuti e ignorati)
+  if (tid && taskGone) await kv.del(K.task(tid)).catch(() => {});
+  await appendLog(p.id, [{ at, by: by || "sistema", source, action: "archived", field: null, to: `${reason}${tid ? ` (task ${tid})` : ""}. Scheda tra le archiviate: si cancella per sempre tra ${ARCHIVE_RETENTION_DAYS} giorni.` }]);
+  return p;
+}
+
+/** Cestino ClickUp per un task: { ok } | { ok:false, error }. Un task che non c'è più vale come cestinato. */
+async function trashTask(taskId) {
+  try {
+    await deleteTask(taskId);
+    return { ok: true };
+  } catch (e) {
+    if (isTaskGone(e)) return { ok: true, alreadyGone: true };
+    return { ok: false, error: e?.message || "errore" };
+  }
+}
+
+async function markTaskTrashed(personId, taskId, { at, by, source, note }) {
+  await kv.srem(K.deleteQueue, String(taskId)).catch(() => {});
+  if ((await kv.get(K.task(taskId))) === personId) await kv.del(K.task(taskId)).catch(() => {});
+  const p = await getPerson(personId);
+  if (!p?.archived || String(p.archived.taskId || "") !== String(taskId)) return;
+  const { pendingTaskDelete: _p, ...rest } = p.archived;
+  await kv.set(K.person(p.id), { ...p, archived: { ...rest, taskDeletedAt: at } });
+  await appendLog(p.id, [{ at, by, source, action: "task_trashed", field: null, to: note }]);
+}
+
+/**
+ * "Elimina" dalla scheda: archivio + task ClickUp nel cestino (recuperabile 30
+ * giorni su ClickUp). Se ClickUp non risponde la scheda va comunque in archivio
+ * e la cancellazione resta in coda per la riconciliazione notturna.
+ */
+export async function archivePerson(id, actor) {
+  const person = await getPerson(id);
+  if (!person) return { ok: false, status: 404, error: "Persona non trovata." };
+  if (person.archived) return { ok: true, already: true, person };
+  const at = Date.now();
+  const taskId = person.clickupTaskId ? String(person.clickupTaskId) : null;
+  let p = await archiveRecord(person, { by: actor, source: "app", reason: "Eliminata in HOC Pro", taskId, at });
+  if (!taskId) return { ok: true, person: p, task: "none" };
+  const cfg = hrSyncConfig();
+  const res = cfg.enabled ? await trashTask(taskId) : { ok: false, error: "sincronizzazione spenta" };
+  if (res.ok) {
+    await markTaskTrashed(p.id, taskId, { at: Date.now(), by: actor, source: "app", note: res.alreadyGone ? `il task ${taskId} su ClickUp non c'era già più` : `task ${taskId} messo nel cestino di ClickUp (recuperabile per 30 giorni da ClickUp)` });
+    return { ok: true, person: await getPerson(p.id), task: "trashed" };
+  }
+  await kv.sadd(K.deleteQueue, taskId);
+  p = { ...p, archived: { ...p.archived, pendingTaskDelete: taskId } };
+  await kv.set(K.person(p.id), p);
+  await appendLog(p.id, [{ at: Date.now(), by: "sistema", source: "sistema", action: "task_delete_queued", field: null, to: `ClickUp non ha risposto (${String(res.error).slice(0, 160)}): il task ${taskId} verrà messo nel cestino dalla riconciliazione notturna` }]);
+  return { ok: true, person: p, task: "queued", error: res.error };
+}
+
+/** Riprova le cancellazioni in coda (riconciliazione notturna). */
+async function drainDeleteQueue({ deadline }) {
+  const out = { trashed: 0, deferred: 0, errors: [] };
+  const queue = ((await kv.smembers(K.deleteQueue)) || []).map(String);
+  for (const taskId of queue) {
+    if (Date.now() >= deadline) { out.deferred += 1; continue; }
+    const pid = await kv.get(K.task(taskId));
+    const p = pid ? await getPerson(pid) : null;
+    // ripristinata nel frattempo (ha ripreso questo task): non si cancella più
+    if (p && !p.archived) { await kv.srem(K.deleteQueue, taskId); continue; }
+    const res = await trashTask(taskId);
+    if (!res.ok) { out.errors.push({ taskId, error: res.error }); continue; }
+    out.trashed += 1;
+    if (p) await markTaskTrashed(p.id, taskId, { at: Date.now(), by: "riconciliazione notturna", source: "sistema", note: `task ${taskId} messo nel cestino di ClickUp (era in coda)` });
+    else { await kv.srem(K.deleteQueue, taskId); await kv.del(K.task(taskId)).catch(() => {}); }
+  }
+  return out;
+}
+
+/**
+ * "Ripristina": la scheda torna attiva. Se il suo task non era ancora stato
+ * cancellato lo riprende; altrimenti alla prima sincronizzazione ne crea uno
+ * NUOVO (quello nel cestino di ClickUp non si recupera da qui).
+ */
+export async function restorePerson(id, actor) {
+  const person = await getPerson(id);
+  if (!person) return { ok: false, status: 404, error: "Persona non trovata." };
+  if (!person.archived) return { ok: false, status: 409, error: "La scheda non è archiviata." };
+  const at = Date.now();
+  const { archived, ...rest } = person;
+  const keepTask = archived.pendingTaskDelete && !archived.taskDeletedAt ? String(archived.pendingTaskDelete) : null;
+  if (keepTask) await kv.srem(K.deleteQueue, keepTask);
+  let p = {
+    ...rest, updatedAt: at, restoredAt: at,
+    clickupTaskId: keepTask, cuBase: keepTask ? person.cuBase || {} : {}, pendingKeys: [], mirrorStale: [],
+    sync: { status: "pending", at, message: keepTask ? "Ripristinata: si riallinea il task ClickUp di prima." : "Ripristinata: alla prima sincronizzazione si crea un task nuovo su ClickUp." },
+  };
+  await putPerson(p);
+  await appendLog(p.id, [{ at, by: actor, source: "app", action: "restored", field: null, to: keepTask ? `scheda ripristinata, di nuovo collegata al task ${keepTask}` : "scheda ripristinata: su ClickUp si crea un task nuovo (quello nel cestino di ClickUp non viene recuperato)" }]);
+  const sync = await pushPersonSafe(p, null, { actor });
+  p = sync.person || p;
+  return { ok: true, person: p, sync: { status: sync.status, message: sync.message } };
+}
+
+/** Cancella per sempre una scheda ARCHIVIATA e il suo storico. */
+export async function purgePerson(id, { actor, reason = "eliminata definitivamente" } = {}) {
+  const person = await getPerson(id);
+  if (!person) return { ok: false, status: 404, error: "Persona non trovata." };
+  if (!person.archived) return { ok: false, status: 409, error: "Si eliminano per sempre solo le schede archiviate." };
+  const tid = person.archived.taskId;
+  // la coda di cancellazione del task NON si tocca: se il task era ancora da cestinare, lo farà la riconciliazione
+  if (tid && (await kv.get(K.task(tid))) === id && !(person.archived.pendingTaskDelete)) await kv.del(K.task(tid)).catch(() => {});
+  await kv.del(K.person(id));
+  await kv.del(K.log(id));
+  await kv.srem(K.index, id);
+  // traccia minima della cancellazione (nessun dato della persona: solo id, chi, quando, perché)
+  const entry = { id, at: Date.now(), by: actor || null, reason };
+  await kv.lpush(K.purgeLog, JSON.stringify(entry));
+  await kv.ltrim(K.purgeLog, 0, 199);
+  return { ok: true, ...entry };
+}
+
+/** Pulizia automatica: archiviate da più di ARCHIVE_RETENTION_DAYS giorni (dal cron notturno). */
+export async function purgeExpiredArchived({ budgetMs = 5_000, now = Date.now() } = {}) {
+  const deadline = Date.now() + budgetMs;
+  const out = { purged: 0, deferred: 0 };
+  for (const p of await listPeople({ archived: "only" })) {
+    if (!isArchiveExpired(p, now)) continue;
+    if (Date.now() >= deadline) { out.deferred += 1; continue; }
+    const r = await purgePerson(p.id, { actor: "pulizia automatica", reason: `archiviata da più di ${ARCHIVE_RETENTION_DAYS} giorni` });
+    if (r.ok) out.purged += 1;
+  }
+  return out;
 }
 
 // ── Webhook ─────────────────────────────────────────────────────────────────
@@ -434,15 +716,19 @@ export async function handleWebhookEvent(payload) {
   const by = first?.user?.username ? `clickup: ${String(first.user.username).slice(0, 80)}` : "clickup";
 
   if (event === "taskDeleted") {
+    // 03/10/2026: task cancellato su ClickUp = scheda in ARCHIVIO (non si ricrea più il task)
     const pid = await kv.get(K.task(taskId));
     if (!pid) return { ignored: "task non collegato" };
     const p = await getPerson(pid);
-    if (p) {
-      await kv.set(K.person(pid), { ...p, clickupTaskId: null, sync: { status: "deleted", at, message: "Task cancellato su ClickUp: la scheda resta in HOC Pro. Al prossimo salvataggio si ricrea." } });
-      await appendLog(pid, [{ at, by, source: "clickup", action: "clickup_deleted", field: null, to: `task ${taskId} cancellato` }]);
+    if (!p) { await kv.del(K.task(taskId)); return { ignored: "scheda non trovata" }; }
+    if (p.archived) {
+      // già archiviata (di solito: "Elimina" in app che ha appena cestinato il task) → conferma
+      await markTaskTrashed(p.id, taskId, { at, by, source: "clickup", note: `ClickUp conferma: task ${taskId} cancellato` });
+      return { ok: true, event, personId: pid, already: true };
     }
-    await kv.del(K.task(taskId));
-    return { ok: true, event, personId: pid };
+    if (String(p.clickupTaskId || "") !== taskId) { await kv.del(K.task(taskId)); return { ignored: "collegamento vecchio" }; }
+    await archiveRecord(p, { by, source: "clickup", reason: "Task cancellato su ClickUp", taskId, taskGone: true, at });
+    return { ok: true, event, personId: pid, archived: true };
   }
   if (event !== "taskCreated" && event !== "taskUpdated") return { ignored: `evento ${event}` };
 
@@ -741,9 +1027,12 @@ export async function uploadFormFile(token, { kind, bytes, declaredType }) {
 // ── Stato della sincronizzazione (pagina /admin/hr/sync) ─────────────────────
 export async function getSyncStatus() {
   const cfg = hrSyncConfig();
-  const [webhook, lastImport, conflictsRaw, people] = await Promise.all([
-    getWebhookRecord(), kv.get(K.lastImport), kv.lrange(K.conflicts, 0, 49), listPeople(),
+  const [webhook, lastImport, conflictsRaw, all] = await Promise.all([
+    getWebhookRecord(), kv.get(K.lastImport), kv.lrange(K.conflicts, 0, 49), listPeople({ archived: "include" }),
   ]);
+  // le archiviate non contano nelle statistiche: solo il loro numero
+  const archivedCount = all.filter((p) => p.archived).length;
+  const people = all.filter((p) => !p.archived);
   let list = null;
   let fields = null;
   let listError = null;
@@ -769,7 +1058,7 @@ export async function getSyncStatus() {
     lastImport: lastImport || null,
     conflicts,
     list, fields, listError,
-    people: { total: people.length, bySync, pending: people.filter((p) => (p.pendingKeys || []).length).length },
+    people: { total: people.length, bySync, pending: people.filter((p) => (p.pendingKeys || []).length).length, archived: archivedCount },
   };
 }
 

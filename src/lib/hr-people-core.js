@@ -92,14 +92,17 @@ export function valueHash(v) {
  * Serve per i valori che ClickUp non sa tenere (etichetta non tra le opzioni,
  * posizione senza coordinate): senza base tornerebbero indietro e
  * cancellerebbero il valore più ricco dell'app.
+ * `prints` (facoltativo) = { key: impronta } da usare al posto di valueHash(valore).
  * @returns {{ incoming: object, unchanged: string[] }}
  */
-export function dropUnchangedSinceBase(incoming = {}, base = {}) {
+export function dropUnchangedSinceBase(incoming = {}, base = {}, prints = {}) {
   const out = {};
   const unchanged = [];
   for (const [k, v] of Object.entries(incoming)) {
     if (v === undefined) continue;
-    if (base && base[k] !== undefined && base[k] === valueHash(v)) { unchanged.push(k); continue; }
+    // prints[k] = impronta già calcolata (campi specchio: impronta del TESTO, vedi hr-mirror.js)
+    const h = prints && prints[k] !== undefined ? prints[k] : valueHash(v);
+    if (base && base[k] !== undefined && base[k] === h) { unchanged.push(k); continue; }
     out[k] = v;
   }
   return { incoming: out, unchanged };
@@ -292,10 +295,13 @@ export function resolveFieldConflicts(current, incoming, incomingAt) {
 // ── Anti-loop del webhook ───────────────────────────────────────────────────
 export const ECHO_WINDOW_MS = 20_000;
 
-/** Registra le scritture fatte da HOC Pro verso ClickUp: { key: { h, at } }. */
-export function recordEcho(echo = {}, values = {}, at) {
+/**
+ * Registra le scritture fatte da HOC Pro verso ClickUp: { key: { h, at } }.
+ * `prints` (facoltativo) = impronte già calcolate (campi specchio: il TESTO scritto).
+ */
+export function recordEcho(echo = {}, values = {}, at, prints = {}) {
   const out = { ...echo };
-  for (const [k, v] of Object.entries(values)) out[k] = { h: valueHash(v), at };
+  for (const [k, v] of Object.entries(values)) out[k] = { h: prints && prints[k] !== undefined ? prints[k] : valueHash(v), at };
   return out;
 }
 
@@ -303,11 +309,11 @@ export function recordEcho(echo = {}, values = {}, at) {
  * Un valore in arrivo da ClickUp è l'eco di una NOSTRA scrittura recente?
  * Sì se nella finestra abbiamo scritto proprio quel valore su quel campo.
  */
-export function isOwnEcho(echo, key, incomingValue, now, windowMs = ECHO_WINDOW_MS) {
+export function isOwnEcho(echo, key, incomingValue, now, windowMs = ECHO_WINDOW_MS, print) {
   const e = echo?.[key];
   if (!e) return false;
   if (now - Number(e.at || 0) > windowMs) return false;
-  return e.h === valueHash(incomingValue);
+  return e.h === (print !== undefined ? print : valueHash(incomingValue));
 }
 
 /**
@@ -315,13 +321,13 @@ export function isOwnEcho(echo, key, incomingValue, now, windowMs = ECHO_WINDOW_
  * fare) e quelli che sono l'eco di una nostra scrittura (anti-loop).
  * @returns {{ incoming: object, echoes: string[] }}
  */
-export function filterEchoes(currentFields, incoming, echo, now, windowMs = ECHO_WINDOW_MS) {
+export function filterEchoes(currentFields, incoming, echo, now, windowMs = ECHO_WINDOW_MS, prints = {}) {
   const out = {};
   const echoes = [];
   for (const [k, v] of Object.entries(incoming || {})) {
     if (v === undefined) continue;
     if (valuesEqual(currentFields?.[k], v)) continue;
-    if (isOwnEcho(echo, k, v, now, windowMs)) { echoes.push(k); continue; }
+    if (isOwnEcho(echo, k, v, now, windowMs, prints?.[k])) { echoes.push(k); continue; }
     out[k] = v;
   }
   return { incoming: out, echoes };
@@ -386,14 +392,31 @@ export function detectDuplicates(people = []) {
   return [...groups.values()].filter((g) => g.ids.length > 1).map((g) => ({ ids: g.ids.sort(), reasons: [...g.reasons].sort() }));
 }
 
-/** Vista "Da ripulire": { byId: { id: ['doppione'|'spazzatura'] }, duplicates, junk } */
-export function computeCleanup(people = []) {
+/** Vista "Da ripulire": { byId: { id: ['doppione'|'spazzatura'] }, duplicates, junk }. Le archiviate non contano. */
+export function computeCleanup(all = []) {
+  const people = all.filter((p) => p && !p.archived);
   const duplicates = detectDuplicates(people);
   const junk = people.filter(isJunk).map((p) => p.id);
   const byId = {};
   for (const g of duplicates) for (const id of g.ids) (byId[id] ||= []).push("doppione");
   for (const id of junk) (byId[id] ||= []).push("spazzatura");
   return { byId, duplicates, junk };
+}
+
+// ── Archivio (03/10/2026) ───────────────────────────────────────────────────
+// Una scheda archiviata (task cancellato su ClickUp o "Elimina" in app) non si
+// sincronizza più, non conta in doppioni/statistiche e dopo 30 giorni la
+// riconciliazione notturna la cancella davvero (scheda + storico).
+export const ARCHIVE_RETENTION_DAYS = 30;
+const ARCHIVE_RETENTION_MS = ARCHIVE_RETENTION_DAYS * 24 * 3600 * 1000;
+/** Quando la scheda archiviata verrà cancellata per sempre (ms), o null. */
+export function archiveExpiresAt(person) {
+  const at = Number(person?.archived?.at || 0);
+  return at ? at + ARCHIVE_RETENTION_MS : null;
+}
+export function isArchiveExpired(person, now = Date.now()) {
+  const exp = archiveExpiresAt(person);
+  return Boolean(exp) && now >= exp;
 }
 
 // ── Modulo pubblico: token ──────────────────────────────────────────────────

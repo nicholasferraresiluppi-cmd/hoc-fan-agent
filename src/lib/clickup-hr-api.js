@@ -29,7 +29,19 @@ let lastCall = 0;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export class ClickupError extends Error {
-  constructor(message, status) { super(message); this.status = status; }
+  constructor(message, status, code = null) { super(message); this.status = status; this.code = code; }
+}
+
+/**
+ * Il task non esiste più (cancellato o mai esistito)? 404, oppure gli errori
+ * "ITEM_…" con cui ClickUp risponde per un task che non trova. Un 401 generico
+ * (token revocato, permessi) NON conta: archiviare tutte le schede per un token
+ * scaduto sarebbe il guaio peggiore.
+ */
+export function isTaskGone(e) {
+  if (!e) return false;
+  if (e.status === 404) return true;
+  return /^ITEM_/.test(String(e.code || ""));
 }
 
 async function cu(path, { method = "GET", json, form } = {}) {
@@ -60,8 +72,9 @@ async function cu(path, { method = "GET", json, form } = {}) {
     }
     const body = await res.text().catch(() => "");
     let detail = "";
-    try { detail = JSON.parse(body)?.err || ""; } catch {}
-    lastErr = new ClickupError(`ClickUp ${res.status} su ${method} ${path.split("?")[0]}${detail ? `: ${detail}` : ""}`, res.status);
+    let code = null;
+    try { const j = JSON.parse(body); detail = j?.err || ""; code = j?.ECODE || null; } catch {}
+    lastErr = new ClickupError(`ClickUp ${res.status} su ${method} ${path.split("?")[0]}${detail ? `: ${detail}` : ""}`, res.status, code);
     if (res.status === 429) {
       const reset = Number(res.headers.get("x-ratelimit-reset")) * 1000;
       const ms = reset ? Math.min(10_000, Math.max(1000, reset - Date.now())) : 2000 * attempt;
@@ -121,6 +134,8 @@ export const createTask = (listId, payload) => cu(`/list/${listId}/task`, { meth
 export const updateTask = (taskId, payload) => cu(`/task/${encodeURIComponent(taskId)}`, { method: "PUT", json: payload });
 export const setField = (taskId, fieldId, body) => cu(`/task/${encodeURIComponent(taskId)}/field/${fieldId}`, { method: "POST", json: body });
 export const removeField = (taskId, fieldId) => cu(`/task/${encodeURIComponent(taskId)}/field/${fieldId}`, { method: "DELETE" });
+/** Cancella il task: su ClickUp finisce nel cestino (recuperabile per 30 giorni). */
+export const deleteTask = (taskId) => cu(`/task/${encodeURIComponent(taskId)}`, { method: "DELETE" });
 
 /** Allegato al task (multipart, campo "attachment"). Il file non passa da KV. */
 export async function uploadAttachment(taskId, { filename, bytes, contentType }) {
