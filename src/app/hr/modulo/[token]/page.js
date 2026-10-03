@@ -121,6 +121,9 @@ const CSS = `
 @keyframes hrfStep{from{opacity:0;transform:translateX(var(--hrf-dx))}to{opacity:1;transform:none}}
 .hrf-bar{transition:background-color .5s ease}
 .hrf-loader-in{animation:hrfFade .6s ease .25s both}
+.hrf-splash-word{opacity:0;animation:hrfWord 1.2s ease .9s forwards}
+@keyframes hrfWord{from{opacity:0;letter-spacing:.5em}to{opacity:1;letter-spacing:.32em}}
+@media (prefers-reduced-motion:reduce){.hrf-splash-word{animation:none;opacity:1}}
 .hrf-letter{animation:hrfFade 1s ease 2.2s both}
 .hrf-err{animation:hrfFade .25s ease both}
 @media (prefers-reduced-motion:reduce){.hrf-card.shine::after,.hrf-fade,.hrf-next,.hrf-prev,.hrf-loader-in,.hrf-letter,.hrf-err{animation:none}.hrf-bar{transition:none}}
@@ -161,6 +164,13 @@ function FieldError({ id, msg }) {
 export default function HrFormPage() {
   const { token } = useParams();
   const [ctx, setCtx] = useState(null);
+  const [splashDone, setSplashDone] = useState(false);
+  useEffect(() => {
+    let reduced = false;
+    try { reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* */ }
+    const t = setTimeout(() => setSplashDone(true), reduced ? 900 : 2400);
+    return () => clearTimeout(t);
+  }, []);
   const [loadErr, setLoadErr] = useState(null);
   const [data, setData] = useState({});
   const [consent, setConsent] = useState(false);
@@ -329,11 +339,16 @@ export default function HrFormPage() {
   };
 
   if (loadErr) return <Shell><Headline title="Link non disponibile" sub="" size={34} /><p style={{ color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>{loadErr}</p></Shell>;
-  if (!ctx) {
+  if (!ctx || !splashDone) {
+    // Apertura (03/10/2026, Nicholas: "andrei più lento, dargli il tempo di vedere il logo"):
+    // la palma resta almeno ~2,4 s, la scritta compare piano sotto, poi entra la prima pagina.
     return (
       <Shell>
-        <div className="hrf-loader-in" style={{ minHeight: "62vh", display: "grid", placeItems: "center" }}>
-          <HrPalmaLoader width={128} label="Apro il modulo" showLabel />
+        <div className="hrf-loader-in" style={{ minHeight: "66vh", display: "grid", placeItems: "center" }}>
+          <div style={{ display: "grid", justifyItems: "center", gap: 22 }}>
+            <HrPalmaLoader width={150} label="Apro il modulo" />
+            <div className="hrf-splash-word" style={{ fontSize: 13, letterSpacing: "0.32em", textTransform: "uppercase", color: "rgba(242,238,230,.78)" }}>House of Creators</div>
+          </div>
         </div>
       </Shell>
     );
