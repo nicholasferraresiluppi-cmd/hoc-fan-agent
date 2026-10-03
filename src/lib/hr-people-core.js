@@ -12,7 +12,7 @@
  */
 import { normalizeSkillMap, normalizeLearnList, normalizePastRoles, clickupSkillLabels, skillName, pastRoleText } from "./hr-skills.js";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { FIELDS, FIELD_BY_KEY, EDITABLE_KEYS, validateCodiceFiscale, findChoice } from "./hr-fields.js";
+import { FIELDS, FIELD_BY_KEY, EDITABLE_KEYS, validateCodiceFiscale, findChoice, SOURCE_REFERRAL } from "./hr-fields.js";
 
 // Schema e codice fiscale vivono in hr-fields.js (senza dipendenze Node: li
 // importano anche le pagine client). Qui si riesportano per comodità.
@@ -233,6 +233,9 @@ export function normalizePersonInput(input = {}, allowed = EDITABLE_KEYS) {
     }
   }
   if ("firstName" in values && !values.firstName) errors.push("Nome: obbligatorio.");
+  // "Segnalato da" ha senso solo per chi è arrivato da una reference: se nello stesso
+  // invio la provenienza è un'altra, il nome si scarta (resta il dato coerente).
+  if ("source" in values && values.source !== SOURCE_REFERRAL && "referredBy" in values) values.referredBy = null;
   return { values, cf, errors };
 }
 

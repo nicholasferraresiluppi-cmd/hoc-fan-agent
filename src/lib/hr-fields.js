@@ -17,6 +17,11 @@
 //   o su ClickUp; il testo si rilegge con hr-mirror.js e, se non si capisce, vale
 //   il valore dell'app (evento nello storico della scheda).
 export const GENDERS = ["Female", "Male", "Non-Binary", "I prefer not to declare it"];
+// Come la persona è arrivata da noi (03/10/2026, decisione del titolare): serve a tenere
+// vivo il confronto reference ↔ annunci e a riconoscere il premio reference (100 € a 30
+// turni). La prima voce apre la domanda "Chi ti ha segnalato?".
+export const SOURCE_REFERRAL = "Me l'ha consigliato qualcuno";
+export const SOURCES = [SOURCE_REFERRAL, "Ho visto un annuncio", "Dai social", "Altro"];
 
 // ── Fasi della persona e stato del contratto (03/10/2026, decisioni del titolare) ──
 // UNICA tabella di corrispondenza: due assi separati, fase e contratto. Per ogni voce
@@ -116,6 +121,8 @@ export const FIELDS = [
   { key: "pastRoles", label: "Ruoli già ricoperti", section: "rapporto", type: "roles", appOnly: true, mirror: "Ruoli già ricoperti" },
   { key: "otherSkills", label: "Altro che sa fare", section: "rapporto", type: "longtext", appOnly: true, mirror: "Altro che sa fare", max: 500 },
   { key: "timeSlots", label: "Fasce orarie", section: "rapporto", type: "labels", cu: "Time Slots" },
+  { key: "source", label: "Come ci ha conosciuto", section: "rapporto", type: "option", cu: "Provenienza", extra: true, options: SOURCES },
+  { key: "referredBy", label: "Segnalato da", section: "rapporto", type: "text", cu: "Segnalato da", extra: true },
   { key: "startDate", label: "Inizio collaborazione", section: "rapporto", type: "date", cu: "Start of Collaboration" },
   { key: "endDate", label: "Fine collaborazione", section: "rapporto", type: "date", cu: "End of Collaboration" },
   { key: "referent", label: "Referente", section: "rapporto", type: "users", cu: "Referent", readOnly: true },
@@ -147,6 +154,7 @@ export const FORM_KEYS = [
   "firstName", "surname", "dateOfBirth", "nationality", "gender", "birthPlace", "residenceComune", "location", "residenceCap", "personalEmail", "personalPhone",
   "skillLevels", "otherSkills", "pastRoles", "learnWish",
   "spokenLanguages", "timeSlots", "currentJob", "partitaIva", "codiceFiscale", "personalInterests", "linkedin",
+  "source", "referredBy",
 ];
 // Campi che l'admin può modificare dalla scheda
 export const EDITABLE_KEYS = FIELDS.filter((f) => !f.readOnly).map((f) => f.key);
