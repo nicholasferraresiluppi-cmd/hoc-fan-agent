@@ -153,7 +153,7 @@ const fmtItDate = (ms) => {
 export function hocBlockLines(person, byName, { cfPlain } = {}) {
   const f = person.fields || {};
   const lines = [`ID HOC Pro: ${person.id}`];
-  if (!byName.has(lc("Mansione attuale"))) lines.push(`Mansione attuale: ${s(f.currentJob) || "—"}`);
+  if (!byName.has(lc("Mansione attuale"))) lines.push(`Mansione attuale: ${oneLine(f.currentJob, 300) || "—"}`);
   if (!byName.has(lc("Partita IVA"))) lines.push(`Partita IVA: ${f.partitaIva === true ? "sì" : f.partitaIva === false ? "no" : "—"}`);
   if (!byName.has(lc("Codice fiscale")) && (cfPlain || person.cfEnc)) lines.push(`Codice fiscale: ${cfPlain ? maskCf(cfPlain) : "presente"} (completo in HOC Pro)`);
   if (f.idDocument?.at) lines.push(`Documento d'identità: allegato il ${fmtItDate(f.idDocument.at)} (${s(f.idDocument.title)})`);
@@ -161,7 +161,7 @@ export function hocBlockLines(person, byName, { cfPlain } = {}) {
   const bp = f.birthPlace;
   if (bp) lines.push(`Luogo di nascita: ${bp.abroad ? bp.country : `${s(bp.name)}${bp.prov ? ` (${s(bp.prov)})` : ""}`}`);
   const rc = f.residenceComune;
-  if (rc?.abroad && rc.country) lines.push(`Residenza: ${s(rc.city) ? `${s(rc.city)}, ` : ""}${s(rc.country)}${f.residenceCap ? ` · codice postale ${s(f.residenceCap)}` : ""}`);
+  if (rc?.abroad && rc.country) lines.push(`Residenza: ${s(rc.city) ? `${oneLine(rc.city, 120)}, ` : ""}${s(rc.country)}${f.residenceCap ? ` · codice postale ${s(f.residenceCap)}` : ""}`);
   else if (rc?.name) lines.push(`Comune di residenza: ${s(rc.name)}${rc.prov ? ` (${s(rc.prov)})` : ""}${f.residenceCap ? ` · CAP ${s(f.residenceCap)}` : ""}`);
   // competenze v2 (03/10): una riga per area, voci con livello (anche quelle senza etichetta ClickUp)
   const sm = normalizeSkillMap(f.skillLevels);
