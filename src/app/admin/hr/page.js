@@ -347,6 +347,7 @@ function SharedLinkBox({ onChanged }) {
   if (error) return error.status === 403 ? null : <Notice danger>Non riesco a leggere il link del modulo: {error.message}</Notice>;
   if (!data) return null;
   const url = link && typeof window !== "undefined" ? `${window.location.origin}${link.path}` : "";
+  const shortUrl = link && typeof window !== "undefined" ? `${window.location.origin}/tessera` : "";
   return (
     <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }} aria-labelledby="hr-shared-link">
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -360,7 +361,11 @@ function SharedLinkBox({ onChanged }) {
       </p>
       {link ? (
         <div style={{ display: "grid", gap: 10 }}>
-          <CopyLink link={url} note={link.createdAt ? `Creato il ${fmtDateTime(link.createdAt)}.` : null} />
+          <CopyLink link={shortUrl} note="Il link da mandare: corto e sempre aggiornato (se rigeneri, punta da solo a quello nuovo)." />
+          <details style={{ fontSize: 12.5, color: CP.textMuted }}>
+            <summary style={{ cursor: "pointer" }}>Link completo{link.createdAt ? ` · creato il ${fmtDateTime(link.createdAt)}` : ""}</summary>
+            <div style={{ marginTop: 8 }}><CopyLink link={url} /></div>
+          </details>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" onClick={() => act("regenerate")} disabled={busy} style={{ ...btnGhost, opacity: busy ? 0.5 : 1 }}><RefreshCw size={14} /> Rigenera</button>
             <button type="button" onClick={() => act("disable")} disabled={busy} style={{ ...btnGhost, opacity: busy ? 0.5 : 1 }}><Power size={14} /> Disattiva</button>

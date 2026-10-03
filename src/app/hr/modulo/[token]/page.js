@@ -29,6 +29,14 @@ import { cfCoherence } from "@/lib/hr-comuni";
 import { normalizeSkillMap, levelRank, skillName } from "@/lib/hr-skills";
 import HrWelcomeCard from "@/components/HrWelcomeCard";
 
+// carta d'esempio della prima schermata: dati FINTI, dichiarati come esempio a schermo
+const SAMPLE_CARD = {
+  firstName: "Giulia", surname: "Rossi", gender: "Female", currentJob: "Chatter (operatore di chat)",
+  skillLevels: { of_chat: "Esperto", ai_prompting: "Autonomo", soc_instagram: "Base" },
+  spokenLanguages: ["ITA - Native", "ENG - B2"],
+  residenceComune: { name: "Milano", prov: "MI" },
+};
+
 const STEPS = [
   { title: "Chi sei", sub: "partiamo dalle basi", keys: ["firstName", "surname", "dateOfBirth", "gender", "nationality", "birthPlace", "codiceFiscale"] },
   { title: "Dove vivi", sub: "ci serve per i documenti", keys: ["residenceComune", "location", "residenceCap"] },
@@ -252,10 +260,10 @@ export default function HrFormPage() {
     return (
       <Shell>
         <div className="hrf-fade" style={{ display: "grid", gap: 26 }}>
-          <Tessera data={data} />
-          <Headline title={first ? `Ciao ${first},` : "La tua tessera"} sub={first ? "la tua tessera prende forma." : "prende forma."} size={42} />
+          <HrWelcomeCard preview data={SAMPLE_CARD} at={Date.now()} />
+          <Headline title={first ? `Ciao ${first},` : "Compila il modulo"} sub="e avrai la tua tessera della Casa." size={40} />
           <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15.5, lineHeight: 1.55 }}>
-            Sette brevi capitoli: ogni risposta la completa. Ci vogliono circa cinque minuti.
+            Questa è una tessera d'esempio: la tua si compone con le tue risposte, in sette brevi capitoli. Ci vogliono circa cinque minuti.
             {ctx.shared ? " Compilalo una volta sola." : ` Il link vale fino al ${fmtDate(ctx.expiresAt)} e si usa una volta sola.`} Non ti chiediamo l'IBAN.
           </p>
           <button type="button" className="hrf-pill" onClick={() => setStage("form")} style={{ ...pill(true), width: "100%" }}>Cominciamo</button>

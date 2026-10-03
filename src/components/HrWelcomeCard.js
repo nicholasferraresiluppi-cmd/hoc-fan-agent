@@ -118,7 +118,12 @@ function Back() {
  * @param data dati dichiarati nel modulo (firstName, surname, gender, currentJob, skillLevels, spokenLanguages, residenceComune)
  * @param at   istante dell'invio (per "Membro della Casa · mese anno")
  */
-export default function HrWelcomeCard({ data = {}, at, children }) {
+/**
+ * preview: carta d'ESEMPIO per la prima schermata del modulo (03/10/2026, feedback Nicholas:
+ * la tessera vuota con "Il tuo nome" sembrava un campo da compilare). Niente titolo né
+ * "Rivedi", etichetta "Esempio" ben visibile: è il premio che si ottiene compilando.
+ */
+export default function HrWelcomeCard({ data = {}, at, children, preview = false }) {
   const [front, setFront] = useState(false);
   const [titleOn, setTitleOn] = useState(false);
   const [reset, setReset] = useState(false);
@@ -153,21 +158,26 @@ export default function HrWelcomeCard({ data = {}, at, children }) {
   return (
     <div style={{ display: "grid", gap: 26, justifyItems: "center", textAlign: "center" }}>
       <style>{CSS}</style>
-      <div className={`hwc-scene${front ? " is-front" : ""}${reset ? " is-reset" : ""}`} role="img" aria-label={label}>
+      <div style={preview ? { zoom: 0.72 } : undefined}>
+      <div className={`hwc-scene${front ? " is-front" : ""}${reset ? " is-reset" : ""}`} role="img" aria-label={preview ? `Esempio: ${label}` : label}>
         <div className="hwc-glow" />
         <div className="hwc-inner">
           <Front data={data} at={at} />
           <Back />
         </div>
       </div>
-      <h1 className={`hwc-title${titleOn ? " is-on" : ""}`} style={{ margin: 0, fontFamily: SERIF, fontWeight: 400, fontSize: 40, lineHeight: 1.05, color: IVORY, maxWidth: 480 }}>
+      </div>
+      {preview && (
+        <span style={{ marginTop: -10, fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: GOLD, border: `1px solid rgba(217,180,106,.45)`, borderRadius: 999, padding: "5px 12px" }}>Esempio</span>
+      )}
+      {!preview && <h1 className={`hwc-title${titleOn ? " is-on" : ""}`} style={{ margin: 0, fontFamily: SERIF, fontWeight: 400, fontSize: 40, lineHeight: 1.05, color: IVORY, maxWidth: 480 }}>
         {title}
-      </h1>
+      </h1>}
       {children}
-      <button type="button" onClick={play}
+      {!preview && <button type="button" onClick={play}
         style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: 44, padding: "0 22px", borderRadius: 999, fontFamily: SANS, fontSize: 14.5, fontWeight: 600, cursor: "pointer", border: "1px solid rgba(242,238,230,.28)", background: "transparent", color: IVORY }}>
         Rivedi
-      </button>
+      </button>}
     </div>
   );
 }
