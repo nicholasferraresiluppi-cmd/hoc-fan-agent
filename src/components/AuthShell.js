@@ -76,12 +76,9 @@ export default function AuthShell({ children }) {
           <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 400, fontSize: "clamp(40px, 6vw, 64px)", lineHeight: 1, letterSpacing: "-0.01em" }}>
             La console<br /><span style={{ fontStyle: "italic", color: "rgba(242,238,230,.62)", fontFamily: SERIF }}>della Casa.</span>
           </h1>
-          <p className="auth-lead" style={{ margin: 0, maxWidth: 420, fontSize: 16, lineHeight: 1.6, color: "rgba(242,238,230,.62)" }}>
-            Persone, vendite, compensi e formazione di House of Creators, in un solo posto.
-          </p>
           <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: GOLD }}>
             <span style={{ width: 28, height: 1, background: GOLD, display: "inline-block" }} />
-            <span>Accesso solo su invito</span>
+            <span>Accesso riservato</span>
           </div>
         </div>
         <div className="auth-fade" style={{ animationDelay: ".12s" }}>{children}</div>
