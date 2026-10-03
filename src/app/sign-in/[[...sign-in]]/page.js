@@ -1,14 +1,10 @@
 import { SignIn } from "@clerk/nextjs";
-import BrandLockup from "@/components/BrandLockup";
+import AuthShell, { AUTH_APPEARANCE } from "@/components/AuthShell";
 
 export default function SignInPage() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6">
-      <div className="mb-8 text-center">
-        <div className="mb-5 flex justify-center"><BrandLockup size="lg" /></div>
-        <p className="text-gray-400 mt-1">Accedi per iniziare</p>
-      </div>
-      <SignIn fallbackRedirectUrl="/start" signUpFallbackRedirectUrl="/start" />
-    </div>
+    <AuthShell>
+      <SignIn fallbackRedirectUrl="/start" signUpFallbackRedirectUrl="/start" appearance={AUTH_APPEARANCE} />
+    </AuthShell>
   );
 }
