@@ -10,7 +10,7 @@
  * non per scheda — due persone che toccano due campi diversi non si
  * cancellano a vicenda.
  */
-import { normalizeSkillMap, SKILL_NAME } from "./hr-skills.js";
+import { normalizeSkillMap, normalizeLearnList, normalizePastRoles, clickupSkillLabels, skillName, pastRoleText } from "./hr-skills.js";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { FIELDS, FIELD_BY_KEY, EDITABLE_KEYS, validateCodiceFiscale } from "./hr-fields.js";
 
@@ -65,7 +65,8 @@ export function isEmptyValue(v) {
 export function canonical(v) {
   if (isEmptyValue(v)) return null;
   if (Array.isArray(v)) {
-    return v.map((x) => (x && typeof x === "object" ? s(x.id || x.title || x.name) : s(x))).filter(Boolean).sort();
+    // oggetti senza id/titolo/nome (es. ruoli passati {role, duration}): si confronta tutto il contenuto
+    return v.map((x) => (x && typeof x === "object" ? s(x.id || x.title || x.name) || JSON.stringify(Object.keys(x).sort().map((k) => [k, x[k]])) : s(x))).filter(Boolean).sort();
   }
   if (typeof v === "object") {
     if ("address" in v) return { address: s(v.address), lat: v.lat ?? null, lng: v.lng ?? null };
@@ -124,7 +125,7 @@ export function normalizePersonInput(input = {}, allowed = EDITABLE_KEYS) {
     const raw = input[key];
     switch (f.type) {
       case "text": case "longtext": {
-        const v = s(raw).slice(0, f.type === "longtext" ? 4000 : 300);
+        const v = s(raw).slice(0, f.max || (f.type === "longtext" ? 4000 : 300));
         values[key] = v || null;
         break;
       }
@@ -196,11 +197,16 @@ export function normalizePersonInput(input = {}, allowed = EDITABLE_KEYS) {
       }
       case "skillmap": {
         values[key] = normalizeSkillMap(raw);
-        if (!("skills" in input)) values.skills = Object.keys(values[key]);
+        // il campo "Skills" di ClickUp segue: solo le voci che hanno un'etichetta equivalente
+        if (!("skills" in input)) values.skills = clickupSkillLabels(values[key]);
         break;
       }
       case "learn": {
-        values[key] = asList(raw).filter((x) => SKILL_NAME[x]).slice(0, 3);
+        values[key] = normalizeLearnList(raw, 2);
+        break;
+      }
+      case "roles": {
+        values[key] = normalizePastRoles(raw);
         break;
       }
       case "cf": {
@@ -228,6 +234,10 @@ export function diffKeys(current = {}, next = {}) {
 export function logValue(key, v) {
   if (FIELD_BY_KEY[key]?.sensitive) return v == null || v === "" ? null : "••• (cifrato)";
   if (isEmptyValue(v)) return null;
+  const type = FIELD_BY_KEY[key]?.type;
+  if (type === "skillmap" && typeof v === "object") return Object.entries(normalizeSkillMap(v)).map(([k, l]) => `${skillName(k)} (${l})`).join(", ").slice(0, 300) || null;
+  if (type === "learn" && Array.isArray(v)) return v.map(skillName).join(", ").slice(0, 300);
+  if (type === "roles" && Array.isArray(v)) return v.map(pastRoleText).join(", ").slice(0, 300);
   if (Array.isArray(v)) return v.map((x) => (x && typeof x === "object" ? x.name || x.title || x.id : x)).join(", ").slice(0, 300);
   if (typeof v === "object") return s(v.address || v.title || JSON.stringify(v)).slice(0, 300);
   return s(v).slice(0, 300);

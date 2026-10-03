@@ -41,9 +41,11 @@ export const FIELDS = [
   { key: "department", label: "Reparto", section: "rapporto", type: "labels", cu: "Department" },
   { key: "project", label: "Progetto / creator", section: "rapporto", type: "labels", cu: "Project" },
   { key: "seniority", label: "Seniority", section: "rapporto", type: "option", cu: "Seniority" },
-  { key: "skills", label: "Competenze", section: "rapporto", type: "labels", cu: "Skills" },
+  { key: "skills", label: "Competenze (etichette ClickUp)", section: "rapporto", type: "labels", cu: "Skills" },
   { key: "skillLevels", label: "Competenze e livello", section: "rapporto", type: "skillmap", appOnly: true },
   { key: "learnWish", label: "Vorrebbe imparare", section: "rapporto", type: "learn", appOnly: true },
+  { key: "pastRoles", label: "Ruoli già ricoperti", section: "rapporto", type: "roles", appOnly: true },
+  { key: "otherSkills", label: "Altro che sa fare", section: "rapporto", type: "longtext", appOnly: true, max: 500 },
   { key: "timeSlots", label: "Fasce orarie", section: "rapporto", type: "labels", cu: "Time Slots" },
   { key: "startDate", label: "Inizio collaborazione", section: "rapporto", type: "date", cu: "Start of Collaboration" },
   { key: "endDate", label: "Fine collaborazione", section: "rapporto", type: "date", cu: "End of Collaboration" },
@@ -72,7 +74,7 @@ export const SECTIONS = [
 // Campi che la persona può compilare dal modulo pubblico (i SUOI dati)
 export const FORM_KEYS = [
   "firstName", "surname", "dateOfBirth", "nationality", "gender", "birthPlace", "residenceComune", "location", "residenceCap", "personalEmail", "personalPhone",
-  "skillLevels", "learnWish",
+  "skillLevels", "otherSkills", "pastRoles", "learnWish",
   "spokenLanguages", "timeSlots", "currentJob", "partitaIva", "codiceFiscale", "personalInterests", "linkedin",
 ];
 // Campi che l'admin può modificare dalla scheda

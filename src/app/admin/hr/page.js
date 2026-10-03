@@ -18,6 +18,7 @@ import { fmtInt } from "@/lib/format";
 import { PageHead, Metric, Notice, DataTable, FilterChip, Disclosure, card } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
 import { COLLAB_STATUSES } from "@/lib/hr-fields";
+import { SKILL_AREAS, SKILL_LEVELS, PAST_ROLES, normalizeSkillMap, normalizePastRoles, hasSkillAtLeast, pastRoleText } from "@/lib/hr-skills";
 import { lbl, input, btnPrimary, btnGhost, chip, SYNC_LABEL, fetcher, postJson } from "@/components/hr-ui";
 import HrFormLinkModal from "@/components/HrFormLinkModal";
 
@@ -43,6 +44,9 @@ export default function HrPeoplePage() {
   const [project, setProject] = useState("");
   const [emp, setEmp] = useState("");
   const [onlyCleanup, setOnlyCleanup] = useState(false);
+  const [skill, setSkill] = useState("");
+  const [minLevel, setMinLevel] = useState("");
+  const [pastRole, setPastRole] = useState("");
   const [newOpen, setNewOpen] = useState(false);
   const [linkFor, setLinkFor] = useState(null); // { personId|null, name }
   const [cleanupOpen, setCleanupOpen] = useState(false);
@@ -65,6 +69,17 @@ export default function HrPeoplePage() {
   const projects = useMemo(() => uniq(items, (p) => p.fields?.project), [items]);
   const emps = useMemo(() => uniq(items, (p) => p.fields?.employmentType), [items]);
   const cleanupCount = Object.keys(flags).length;
+  // competenze e ruoli passati: conteggi sull'elenco intero (chiavi vecchie già tradotte)
+  const skillCounts = useMemo(() => {
+    const m = {};
+    for (const p of items) for (const k of Object.keys(normalizeSkillMap(p.fields?.skillLevels))) m[k] = (m[k] || 0) + 1;
+    return m;
+  }, [items]);
+  const roleCounts = useMemo(() => {
+    const m = {};
+    for (const p of items) for (const r of normalizePastRoles(p.fields?.pastRoles)) m[r.role] = (m[r.role] || 0) + 1;
+    return m;
+  }, [items]);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -75,16 +90,18 @@ export default function HrPeoplePage() {
       if (project && !has(f.project, project)) return false;
       if (emp && !has(f.employmentType, emp)) return false;
       if (onlyCleanup && !flags[p.id]) return false;
+      if (skill && !hasSkillAtLeast(f.skillLevels, skill, minLevel)) return false;
+      if (pastRole && !normalizePastRoles(f.pastRoles).some((r) => r.role === pastRole)) return false;
       if (needle) {
         const hay = [p.name, f.personalEmail, f.companyEmail, f.personalPhone, f.currentJob, ...(f.project || []), ...(f.role || [])].filter(Boolean).join(" ").toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
     });
-  }, [items, q, status, dept, project, emp, onlyCleanup, flags]);
+  }, [items, q, status, dept, project, emp, onlyCleanup, flags, skill, minLevel, pastRole]);
 
-  const filtered = Boolean(q || status || dept || project || emp || onlyCleanup);
-  const reset = () => { setQ(""); setStatus(""); setDept(""); setProject(""); setEmp(""); setOnlyCleanup(false); };
+  const filtered = Boolean(q || status || dept || project || emp || onlyCleanup || skill || pastRole);
+  const reset = () => { setQ(""); setStatus(""); setDept(""); setProject(""); setEmp(""); setOnlyCleanup(false); setSkill(""); setMinLevel(""); setPastRole(""); };
 
   const active = statusCounts.Active || 0;
   const syncErrors = items.filter((p) => ["error", "partial", "deleted", "missing"].includes(p.sync?.status)).length;
@@ -104,6 +121,8 @@ export default function HrPeoplePage() {
     { key: "dept", label: "Reparto", sort: (p) => (p.fields?.department || []).join(","), render: (p) => (p.fields?.department || []).join(", ") || <span style={{ color: CP.textMuted }}>—</span>, muted: true },
     { key: "project", label: "Creator / progetto", sortable: false, render: (p) => (p.fields?.project || []).slice(0, 3).map((x) => <span key={x} style={chip}>{x.replace(/^Model - /, "")}</span>).concat((p.fields?.project || []).length > 3 ? [<span key="more" style={{ fontSize: 12, color: CP.textMuted }}>+{p.fields.project.length - 3}</span>] : []) },
     { key: "emp", label: "Rapporto", sort: (p) => p.fields?.employmentType || "", render: (p) => p.fields?.employmentType || <span style={{ color: CP.textMuted }}>—</span>, muted: true },
+    ...(skill ? [{ key: "lvl", label: "Livello", sort: (p) => SKILL_LEVELS.indexOf(normalizeSkillMap(p.fields?.skillLevels)[skill]), render: (p) => normalizeSkillMap(p.fields?.skillLevels)[skill] || "—" }] : []),
+    ...(pastRole ? [{ key: "prole", label: "Ruolo passato", sortable: false, render: (p) => pastRoleText(normalizePastRoles(p.fields?.pastRoles).find((r) => r.role === pastRole)), muted: true }] : []),
     { key: "sync", label: "ClickUp", sort: (p) => p.sync?.status || "", render: (p) => <span style={{ fontSize: 13, color: ["error", "deleted", "missing"].includes(p.sync?.status) ? CP.accentRed : CP.textSecondary }}>{SYNC_LABEL[p.sync?.status] || "—"}</span> },
     {
       key: "link", label: "", sortable: false, align: "right",
@@ -169,6 +188,31 @@ export default function HrPeoplePage() {
             <FilterSelect label="Reparto" value={dept} onChange={setDept} options={depts} />
             <FilterSelect label="Creator / progetto" value={project} onChange={setProject} options={projects} />
             <FilterSelect label="Tipo di rapporto" value={emp} onChange={setEmp} options={emps} />
+            <label>
+              <span style={lbl}>Ha la competenza</span>
+              <select style={input} value={skill} onChange={(e) => { setSkill(e.target.value); if (!e.target.value) setMinLevel(""); }}>
+                <option value="">Qualunque</option>
+                {SKILL_AREAS.map((a) => (
+                  <optgroup key={a.key} label={a.area}>
+                    {a.skills.map((x) => <option key={x.key} value={x.key}>{x.name} · {skillCounts[x.key] || 0}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span style={lbl}>Livello minimo</span>
+              <select style={{ ...input, opacity: skill ? 1 : 0.6 }} disabled={!skill} value={minLevel} onChange={(e) => setMinLevel(e.target.value)}>
+                <option value="">Qualunque livello</option>
+                {SKILL_LEVELS.slice(1).map((l) => <option key={l} value={l}>Almeno {l}</option>)}
+              </select>
+            </label>
+            <label>
+              <span style={lbl}>Ha ricoperto il ruolo</span>
+              <select style={input} value={pastRole} onChange={(e) => setPastRole(e.target.value)}>
+                <option value="">Qualunque</option>
+                {PAST_ROLES.map(([k, name]) => <option key={k} value={k}>{name} · {roleCounts[k] || 0}</option>)}
+              </select>
+            </label>
           </div>
           {filtered && (
             <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 8 }}>

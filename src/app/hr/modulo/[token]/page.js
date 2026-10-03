@@ -21,14 +21,16 @@ const GROUPS = [
   { title: "Dove vivi", keys: ["residenceComune", "location", "residenceCap"] },
   { title: "Come contattarti", keys: ["personalEmail", "personalPhone", "linkedin"] },
   { title: "Il tuo lavoro", keys: ["currentJob", "partitaIva", "spokenLanguages", "timeSlots"] },
-  { title: "Le tue competenze", keys: ["skillLevels", "learnWish", "personalInterests"] },
+  { title: "Le tue competenze", keys: ["skillLevels", "otherSkills", "learnWish"] },
+  { title: "La tua esperienza", keys: ["pastRoles", "personalInterests"] },
 ];
 const LABELS = {
   firstName: "Nome", surname: "Cognome", location: "Città in cui vivi", currentJob: "Che cosa fai oggi (mansione)", nationality: "Nazionalità", spokenLanguages: "Lingue che parli",
   partitaIva: "Hai una partita IVA?", timeSlots: "Fasce orarie in cui sei disponibile", personalInterests: "Interessi (facoltativo)",
   linkedin: "Profilo LinkedIn (facoltativo)", birthPlace: "Dove sei nato/a", 
   location: "Indirizzo (via e numero civico)", residenceCap: "CAP / codice postale", residenceComune: "Dove vivi", skillLevels: "Cosa sai fare, e a che livello",
-  learnWish: "Cosa ti piacerebbe imparare (facoltativo)", gender: "Genere",
+  learnWish: "Cosa ti piacerebbe imparare (facoltativo, al massimo 2)", gender: "Genere",
+  otherSkills: "Cos'altro sai fare che qui non c'è (facoltativo)", pastRoles: "Ruoli che hai già ricoperto (facoltativo)",
 };
 
 const page = { minHeight: "100vh", background: CP.bg, color: CP.textPrimary, fontFamily: FONTS.body, padding: "32px 16px 64px" };

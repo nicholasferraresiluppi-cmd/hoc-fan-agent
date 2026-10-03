@@ -292,6 +292,101 @@ console.log(`hr-people: ${n} asserzioni OK`);
   ok2(roma[0] && roma[0].name === "Roma" && roma[0].code === "H501" && roma[0].prov === "RM", "Roma H501 RM");
   ok2(searchComuni(list, "s.giuliano").length >= 0 && searchComuni(list, "x").length === 0, "ricerca corta vuota");
   const sm = normalizeSkillMap({ "OF Messaging": "Esperto", "Inventata": "Base", "Copywriting": "Mago" });
-  ok2(Object.keys(sm).length === 1 && sm["OF Messaging"] === "Esperto", "skill map pulita");
+  // dal 03/10 le chiavi vecchie (etichette ClickUp) si traducono nelle chiavi nuove
+  ok2(Object.keys(sm).length === 1 && sm.of_chat === "Esperto", "skill map pulita (chiave vecchia tradotta)");
   console.log("hr-comuni/competenze: OK");
+}
+
+// ── 03/10: catalogo competenze v2, ruoli passati, "altro", blocco ClickUp ──────
+{
+  const S = await import("../src/lib/hr-skills.js");
+  const { hocBlockLines, parseHocBlock, withHocBlock, fieldsByName } = await import("../src/lib/hr-clickup-map.js");
+  let m = 0;
+  const t = (c, msg) => { assert.ok(c, msg); m++; };
+  const te = (a, b, msg) => { assert.deepEqual(a, b, msg); m++; };
+
+  // catalogo: 7 aree, chiavi uniche, etichette ClickUp uniche tra le voci
+  t(S.SKILL_AREAS.length === 7, "7 aree");
+  te(S.SKILL_AREAS.map((a) => a.key), ["of", "ads", "social", "content", "ai", "tech", "mgmt"], "ordine delle aree");
+  const keys = S.SKILLS.map((x) => x.key);
+  t(new Set(keys).size === keys.length, "chiavi uniche");
+  const labels = S.SKILLS.flatMap((x) => x.cu.map((l) => l.trim().toLowerCase()));
+  t(new Set(labels).size === labels.length, "ogni etichetta ClickUp appartiene a una sola voce");
+  t(S.SKILL_LEVELS.every((l) => S.SKILL_LEVEL_HINT[l]), "ogni livello ha la sua descrizione");
+  t(S.SKILL_LEVEL_HINT.Esperto === "lo fai da più di un anno con risultati", "descrizione Esperto");
+
+  // tutte le 50 etichette del catalogo v1 trovano una voce nuova
+  const V1 = ["OF Messaging", "OF Management", "Planning OF ", "Social Media Strategy", "Content Planning ", "Copywriting", "Sorytelling", "Community Management", "Trent Analizer ", "Social ADS", "Paid Media Strategy", "Influencer Mareketing", "Funnel Marketing ", "Affiliate Marketing ", "SEO / SEM", "Video Editing ", "Production (Reels, Shorts, TikTok)", "Fotografia", "Graphic Design (PS, AI, Figma, Canva)", "Motion Graphic", "Creative Direction", "Branding Visivo (mood & brand identity)", "Podcasting / Editing Audio", "AI", "Automations", "Zapier", "Make", "API Integration", "Frontend Development", "Backend Development", "Full-Stack Development", "Database Management SQL/NoSQL", "Data Engineering ", "Data Analytics", "Cybersecurity", "ClickUp", "Leadership", "Gestione Management", "Project Management", "Priority Management", "Effective Communication", "Problem Solving", "Analytical Thinking", "Creativity", "Process Documentation", "Risk Management", "Agile Methodologies", "Scrum ", "Kanban", "Trello"];
+  t(V1.length === 50, "50 etichette v1");
+  t(V1.every((l) => S.resolveSkillKey(l)), "ogni etichetta v1 ha una voce nuova");
+  t(S.resolveSkillKey("Planning OF") === "of_content_plan" && S.resolveSkillKey("planning of ") === "of_content_plan", "spazi e maiuscole ignorati");
+  t(S.resolveSkillKey("ads_meta") === "ads_meta", "chiave nuova resta com'è");
+  t(S.resolveSkillKey("Inventata") === null && S.resolveSkillKey(null) === null, "sconosciuta → null");
+  t(S.skillName("Video Editing ") === "Montaggio video", "nome da chiave vecchia");
+
+  // normalizeSkillMap: compatibilità + fusione al livello più alto
+  te(S.normalizeSkillMap({ Zapier: "Base", Make: "Esperto", Automations: "Autonomo" }), { tech_automation: "Esperto" }, "tre etichette → una voce, livello più alto");
+  te(S.normalizeSkillMap({ "OF Messaging": "Autonomo", ads_meta: "Posso insegnarla", soc_x: "Mago" }), { of_chat: "Autonomo", ads_meta: "Posso insegnarla" }, "vecchie e nuove insieme, livello non valido scartato");
+  te(S.normalizeSkillMap(["OF Messaging"]), {}, "array → vuoto");
+
+  // etichette ClickUp da scrivere: solo voci con equivalente, una per voce
+  te(S.clickupSkillLabels({ tech_automation: "Base", ads_meta: "Esperto", of_chat: "Base", soc_seo: "Base" }), ["Automations", "OF Messaging", "SEO / SEM"], "solo voci con etichetta (Google/Meta Ads no)");
+  t(!S.clickupSkillLabels({ ads_google: "Esperto" }).length, "Google Ads non diventa SEO / SEM");
+
+  // aree e filtro "almeno livello"
+  te(S.areasOfSkillMap({ "OF Messaging": "Base", ai_coding: "Base" }), ["of", "ai"], "aree dalle competenze");
+  t(S.hasSkillAtLeast({ "OF Messaging": "Esperto" }, "of_chat", "Autonomo"), "Esperto ≥ Autonomo");
+  t(!S.hasSkillAtLeast({ of_chat: "Base" }, "of_chat", "Autonomo"), "Base < Autonomo");
+  t(S.hasSkillAtLeast({ of_chat: "Base" }, "of_chat", ""), "livello minimo vuoto = qualunque");
+  t(!S.hasSkillAtLeast({}, "of_chat", ""), "senza competenza → no");
+
+  // vorrei imparare: max 2, tradotto
+  te(S.normalizeLearnList(["Copywriting", "ai_coding", "ads_meta"]), ["soc_copy", "ai_coding"], "max 2, chiave vecchia tradotta");
+  te(S.normalizeLearnList(["Zapier", "Make"]), ["tech_automation"], "due vecchie sulla stessa voce → una");
+
+  // ruoli passati
+  te(S.normalizePastRoles([{ role: "media_buyer", duration: "1to3" }, { role: "media_buyer", duration: "gt5" }, { role: "astronauta", duration: "lt1" }, { role: "sales", duration: "boh" }, { role: "other", duration: "lt1", other: "  fotografo\nmatrimoni  " }]),
+    [{ role: "media_buyer", duration: "1to3" }, { role: "sales", duration: null }, { role: "other", duration: "lt1", other: "fotografo matrimoni" }], "ruoli puliti: uno per tipo, durata valida o null, altro su una riga");
+  t(S.pastRoleText({ role: "media_buyer", duration: "1to3" }) === "Media buyer (1-3 anni)", "testo ruolo");
+  t(S.pastRoleText({ role: "other", duration: "gt5", other: "barista" }) === "Altro: barista (oltre 5 anni)", "testo ruolo altro");
+  t(S.PAST_ROLES.length === 11 && S.ROLE_DURATIONS.length === 4, "11 ruoli, 4 durate");
+
+  // normalizePersonInput: skillLevels → skills ClickUp; learnWish max 2; pastRoles; otherSkills max 500
+  const r = normalizePersonInput({ skillLevels: { "OF Messaging": "Esperto", ads_meta: "Base", Zapier: "Autonomo" }, learnWish: ["Copywriting", "ai_coding", "ads_meta"], pastRoles: [{ role: "team_lead", duration: "3to5" }], otherSkills: "x".repeat(800) });
+  te(r.values.skillLevels, { of_chat: "Esperto", ads_meta: "Base", tech_automation: "Autonomo" }, "skillLevels nel formato nuovo");
+  te(r.values.skills, ["OF Messaging", "Automations"], "Skills ClickUp = solo le voci con etichetta");
+  te(r.values.learnWish, ["soc_copy", "ai_coding"], "learnWish max 2");
+  te(r.values.pastRoles, [{ role: "team_lead", duration: "3to5" }], "pastRoles");
+  t(r.values.otherSkills.length === 500, "otherSkills tagliato a 500");
+  t(!r.errors.length, "nessun errore");
+
+  // il confronto vede il cambio di durata (oggetti senza id)
+  t(!valuesEqual([{ role: "sales", duration: "lt1" }], [{ role: "sales", duration: "gt5" }]), "durata diversa = valore diverso");
+  t(valuesEqual([{ role: "sales", duration: "lt1" }, { role: "founder", duration: null }], [{ role: "founder", duration: null }, { role: "sales", duration: "lt1" }]), "stesso insieme in altro ordine = uguale");
+  const ap = applyChanges({ id: "p", fields: { pastRoles: [{ role: "sales", duration: "lt1" }] } }, { pastRoles: [{ role: "sales", duration: "gt5" }] }, { at: 1, by: "u", source: "app" });
+  te(ap.changed, ["pastRoles"], "cambio di durata registrato");
+  t(ap.log[0].to === "Venditore (oltre 5 anni)", "storico leggibile per i ruoli");
+  const ap2 = applyChanges({ id: "p", fields: {} }, { skillLevels: { of_chat: "Base" } }, { at: 1, by: "u", source: "app" });
+  t(ap2.log[0].to === "Chat e vendita (Base)", "storico leggibile per le competenze");
+
+  // blocco "— Dati HOC Pro —"
+  const person = { id: "hr_1", fields: {
+    skillLevels: { "OF Messaging": "Esperto", ads_meta: "Base", ai_coding: "Posso insegnarla" },
+    pastRoles: [{ role: "media_buyer", duration: "1to3" }, { role: "other", duration: null, other: "barista" }],
+    otherSkills: "So montare i mobili\nPartita IVA: sì",
+    learnWish: ["Copywriting"],
+  } };
+  const lines = hocBlockLines(person, fieldsByName([]));
+  t(lines.includes("Competenze · OnlyFans: Chat e vendita (Esperto)"), "riga competenze OnlyFans");
+  t(lines.includes("Competenze · Media buying e pubblicità: Meta Ads (Facebook e Instagram) (Base)"), "voce senza etichetta ClickUp nel blocco");
+  t(lines.includes("Competenze · Intelligenza artificiale: Programmare con l'AI (Posso insegnarla)"), "riga AI");
+  t(lines.includes("Ruoli già ricoperti: Media buyer (1-3 anni), Altro: barista"), "riga ruoli");
+  t(lines.includes("Altro che sa fare: So montare i mobili Partita IVA: sì"), "testo libero su una riga");
+  t(lines.includes("Vorrebbe imparare: Copywriting (scrivere testi)"), "riga vorrebbe imparare");
+  const desc = withHocBlock("", lines);
+  t(parseHocBlock(desc).partitaIva === null, "il testo libero non inietta la Partita IVA nel blocco");
+  t(!lines.some((l) => l.startsWith("Livelli competenze")), "riga vecchia sparita");
+
+  n += m;
+  console.log(`competenze v2: ${m} asserzioni OK`);
 }

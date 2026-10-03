@@ -8,7 +8,8 @@
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { NationalityInput, JobInput, LanguagesInput, ComuneInput, ResidenceInput, BirthInput, SkillsInput, LearnInput, SKILL_NAME } from "@/components/hr-inputs";
+import { NationalityInput, JobInput, LanguagesInput, ComuneInput, ResidenceInput, BirthInput, SkillsInput, LearnInput, PastRolesInput } from "@/components/hr-inputs";
+import { SKILL_AREAS, normalizeSkillMap, normalizeLearnList, normalizePastRoles, skillName, pastRoleText } from "@/lib/hr-skills";
 
 export const lbl = { display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 4 };
 export const input = {
@@ -47,8 +48,24 @@ export function displayValue(field, v) {
   switch (field.type) {
     case "comune": return v.abroad ? `${v.city ? `${v.city}, ` : ""}${v.country}` : `${v.name}${v.prov ? ` (${v.prov})` : ""}`;
     case "birth": return v.abroad ? v.country : `${v.name}${v.prov ? ` (${v.prov})` : ""}`;
-    case "skillmap": { const e = Object.entries(v || {}); return e.length ? <span>{e.map(([k, l]) => <span key={k} style={chip}>{SKILL_NAME[k] || k} · {l}</span>)}</span> : <span style={{ color: CP.textMuted }}>—</span>; }
-    case "learn": return <span>{v.map((k) => <span key={k} style={chip}>{SKILL_NAME[k] || k}</span>)}</span>;
+    case "skillmap": {
+      // per area, con livello (le chiavi vecchie = etichette ClickUp si leggono già nel formato nuovo)
+      const m = normalizeSkillMap(v);
+      const groups = SKILL_AREAS.map((a) => [a, a.skills.filter((x) => m[x.key])]).filter(([, xs]) => xs.length);
+      if (!groups.length) return <span style={{ color: CP.textMuted }}>—</span>;
+      return (
+        <span style={{ display: "grid", gap: 6 }}>
+          {groups.map(([a, xs]) => (
+            <span key={a.key} style={{ display: "block" }}>
+              <span style={{ display: "block", fontSize: 12, color: CP.textMuted, marginBottom: 2 }}>{a.area}</span>
+              {xs.map((x) => <span key={x.key} style={chip}>{x.name} · <span style={{ color: CP.textPrimary }}>{m[x.key]}</span></span>)}
+            </span>
+          ))}
+        </span>
+      );
+    }
+    case "learn": { const l = normalizeLearnList(v); return l.length ? <span>{l.map((k) => <span key={k} style={chip}>{skillName(k)}</span>)}</span> : <span style={{ color: CP.textMuted }}>—</span>; }
+    case "roles": { const r = normalizePastRoles(v); return r.length ? <span>{r.map((x) => <span key={x.role} style={chip}>{pastRoleText(x)}</span>)}</span> : <span style={{ color: CP.textMuted }}>—</span>; }
     case "date": return fmtDate(v);
     case "bool": return v ? "Sì" : "No";
     case "labels": return <span>{v.map((x) => <span key={x} style={chip}>{x}</span>)}</span>;
@@ -76,6 +93,7 @@ export function FieldInput({ field, value, onChange, options, id, disabled }) {
   if (field.type === "birth") return <BirthInput id={id} value={value} onChange={onChange} disabled={disabled} />;
   if (field.type === "skillmap") return <SkillsInput id={id} value={value} onChange={onChange} disabled={disabled} />;
   if (field.type === "learn") return <LearnInput id={id} value={value} onChange={onChange} disabled={disabled} />;
+  if (field.type === "roles") return <PastRolesInput id={id} value={value} onChange={onChange} disabled={disabled} />;
   switch (field.type) {
     case "date":
       return <input type="date" {...common} value={value || ""} onChange={(e) => onChange(e.target.value || null)} />;
@@ -86,7 +104,12 @@ export function FieldInput({ field, value, onChange, options, id, disabled }) {
     case "phone":
       return <input type="tel" autoComplete="tel" placeholder="+39 …" {...common} value={value || ""} onChange={(e) => onChange(e.target.value)} />;
     case "longtext":
-      return <textarea rows={3} {...common} style={{ ...common.style, resize: "vertical" }} value={value || ""} onChange={(e) => onChange(e.target.value)} />;
+      return (
+        <>
+          <textarea rows={3} maxLength={field.max || undefined} {...common} style={{ ...common.style, resize: "vertical" }} value={value || ""} onChange={(e) => onChange(e.target.value)} />
+          {field.max ? <span style={{ display: "block", fontSize: 12, color: CP.textMuted, textAlign: "right" }}>{String(value || "").length}/{field.max}</span> : null}
+        </>
+      );
     case "bool":
       return (
         <select {...common} value={value === true ? "true" : value === false ? "false" : ""} onChange={(e) => onChange(e.target.value === "" ? null : e.target.value === "true")}>
