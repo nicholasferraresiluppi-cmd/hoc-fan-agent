@@ -15,6 +15,7 @@ import { PageHead, Notice, card, SectionTitle, FilterChip } from "@/components/d
  */
 
 const SedeScene = dynamic(() => import("@/components/SedeScene"), { ssr: false });
+const SedeSala = dynamic(() => import("@/components/SedeSala"), { ssr: false });
 import SedePianta from "@/components/SedePianta";
 
 const fetcher = (u) => fetch(u, { cache: "no-store" }).then(async (r) => { const j = await r.json().catch(() => ({ error: "Risposta non valida" })); return r.ok ? j : { error: j.error || `Errore ${r.status}` }; });
@@ -54,7 +55,8 @@ export default function Sede() {
   const [sel, setSel] = useState(null);
   // la pianta (tutti sullo stesso piano, con i fattorini) è la vista principale: nell'edificio 3D
   // non si capiva chi lavora per chi (Nicholas, 4/10). L'edificio resta come seconda vista.
-  const [view, setView] = useState("pianta");
+  // la SALA (open space come nel reel di riferimento) è la vista principale; pianta ed edificio restano
+  const [view, setView] = useState("sala");
   const toPianta = useCallback(() => setView("pianta"), []);
 
   const buchi = useMemo(() => {
@@ -68,6 +70,7 @@ export default function Sede() {
   if (data.error) return <Wrap><Notice danger>{data.error}</Notice></Wrap>;
 
   if (view === "edificio") return <SedeScene data={data} onPianta={toPianta} />;
+  if (view === "sala") return <SedeSala data={data} onView={setView} />;
 
   const t = data.totali;
   const visibili = (o) => !filtro || o.buchi.some((b) => b.tipo === filtro);
@@ -77,7 +80,7 @@ export default function Sede() {
       <PageHead
         crumbs={[{ label: "Direzione" }, { label: "La Sede" }]}
         title="La Sede"
-        actions={<button onClick={() => setView("edificio")} style={{ padding: "8px 14px", background: CP.accent, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, color: CP.accentInk, cursor: "pointer", fontFamily: FONTS.body }}>Vedi l'edificio</button>}
+        actions={<span style={{ display: "inline-flex", gap: 8 }}><button onClick={() => setView("sala")} style={{ padding: "8px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, fontWeight: 500, color: CP.textPrimary, cursor: "pointer", fontFamily: FONTS.body }}>Vedi la sala</button><button onClick={() => setView("edificio")} style={{ padding: "8px 14px", background: CP.accent, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, color: CP.accentInk, cursor: "pointer", fontFamily: FONTS.body }}>Vedi l'edificio</button></span>}
         subtitle="L'azienda come uffici (persone, agenti AI, programmi) che si passano il lavoro. Un ufficio lavora bene quando ha un solo compito, un risultato misurabile, qualcuno che controlla il suo lavoro e una persona che ne risponde."
       />
 

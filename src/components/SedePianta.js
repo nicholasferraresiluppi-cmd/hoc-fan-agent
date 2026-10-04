@@ -282,12 +282,12 @@ function Scheda({ o, data, onClose }) {
         <button onClick={onClose} style={{ marginLeft: "auto", background: "none", border: `1px solid ${CP.border}`, borderRadius: 999, color: CP.textSecondary, padding: "3px 10px", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body }}>Chiudi</button>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 6, fontSize: 12.5 }}>
-        <span style={{ width: 8, height: 8, borderRadius: 8, background: statoColore(o) }} />{TIPO[o.tipo]?.one} · {statoTesto(o)}
+        <span style={{ width: 8, height: 8, borderRadius: 8, background: statoColore(o) }} />{o.tipo === "persona" ? "persona" : `${TIPO[o.tipo]?.one} · ${statoTesto(o)}`}
       </div>
       <p style={{ margin: "10px 0 0", color: CP.textPrimary }}>{o.compito}</p>
       <Row k="Riceve il fascicolo da">{nomi(da)}</Row>
       <Row k="Consegna">{o.risultato}</Row>
-      <Row k="A">{nomi(a)}</Row>
+      {a.length > 0 && <Row k="A">{nomi(a)}</Row>}
       {o.tipo !== "persona" && <Row k="Chi controlla il suo lavoro">{o.controllore || <span style={{ color: CP.accentRed }}>nessuno</span>}</Row>}
       {o.tipo !== "persona" && <Row k="Chi ne risponde">{o.owner || <span style={{ color: CP.accentRed }}>nessuno</span>}</Row>}
       {o.link && <div style={{ marginTop: 14 }}><Link href={o.link} style={{ color: CP.accentSoftText, textDecoration: "none", fontSize: 13.5 }}>Apri l'ufficio →</Link></div>}
