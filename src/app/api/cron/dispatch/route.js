@@ -63,6 +63,16 @@ export async function POST(request) {
     out.alerts_digest = await kickEndpoint(request, "/api/admin/ops-alerts/digest", { awaitResponse: true });
     // il lunedì della città: priorità senza nessuno, piani riaccesi, nuovi ritardi
     out.citta_lunedi = await kickEndpoint(request, "/api/cron/citta-lunedi", { awaitResponse: true });
+    // Manuale vendite: misura le prove in corso (settimane complete; una query per creator, pochi centesimi)
+    try {
+      const { listProve, measureProva } = await import("@/lib/manuale/store");
+      const attive = (await listProve()).filter((p) => Date.now() - p.start < 70 * 86400e3);
+      for (const p of attive) await measureProva(p.id);
+      out.manuale_prove = `ok:${attive.length}`;
+    } catch (e) {
+      out.manuale_prove = "err:" + (e?.message || "unknown");
+    }
+    await beat("manuale-prove", out.manuale_prove);
   }
   if (out.first_of_month) {
     out.leagues_snapshot = await kickEndpoint(request, "/api/leagues/snapshot", { awaitResponse: true });

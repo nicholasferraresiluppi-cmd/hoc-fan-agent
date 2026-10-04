@@ -99,6 +99,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/shift-quality",            label: "Qualità turni", icon: MessagesSquare },
       { href: "/admin/sales-coaching",           label: "Coaching vendite", icon: HandCoins },
       { href: "/admin/sales-ai",                 label: "Sales manager AI", icon: Bot },
+      { href: "/admin/manuale-vendite",          label: "Manuale vendite", icon: BookMarked },
     ],
   },
   {
