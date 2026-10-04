@@ -15,6 +15,7 @@ import { PageHead, Notice, card, SectionTitle, FilterChip } from "@/components/d
  */
 
 const SedeScene = dynamic(() => import("@/components/SedeScene"), { ssr: false });
+import SedePianta from "@/components/SedePianta";
 
 const fetcher = (u) => fetch(u, { cache: "no-store" }).then(async (r) => { const j = await r.json().catch(() => ({ error: "Risposta non valida" })); return r.ok ? j : { error: j.error || `Errore ${r.status}` }; });
 
@@ -51,7 +52,9 @@ export default function Sede() {
   const { data, error, mutate } = useSWR("/api/admin/sede", fetcher, { refreshInterval: 60000, revalidateOnFocus: false });
   const [filtro, setFiltro] = useState(null);
   const [sel, setSel] = useState(null);
-  const [view, setView] = useState("edificio");
+  // la pianta (tutti sullo stesso piano, con i fattorini) è la vista principale: nell'edificio 3D
+  // non si capiva chi lavora per chi (Nicholas, 4/10). L'edificio resta come seconda vista.
+  const [view, setView] = useState("pianta");
   const toPianta = useCallback(() => setView("pianta"), []);
 
   const buchi = useMemo(() => {
@@ -75,8 +78,11 @@ export default function Sede() {
         crumbs={[{ label: "Direzione" }, { label: "La Sede" }]}
         title="La Sede"
         actions={<button onClick={() => setView("edificio")} style={{ padding: "8px 14px", background: CP.accent, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, color: CP.accentInk, cursor: "pointer", fontFamily: FONTS.body }}>Vedi l'edificio</button>}
-        subtitle="L'azienda vista come uffici (persone, codice, AI) che si passano il lavoro. Un ufficio lavora bene quando ha un solo compito, un risultato misurabile, qualcuno che controlla il suo lavoro e una persona che ne risponde. Qui vedi chi ha lavorato davvero e dove manca un pezzo."
+        subtitle="L'azienda come uffici (persone, agenti AI, programmi) che si passano il lavoro. Un ufficio lavora bene quando ha un solo compito, un risultato misurabile, qualcuno che controlla il suo lavoro e una persona che ne risponde."
       />
+
+      <SedePianta data={data} />
+      <div style={{ height: 22 }} />
 
       {/* il colpo d'occhio */}
       <div style={{ ...card, padding: "16px 20px", marginBottom: 14, display: "flex", gap: 34, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -102,8 +108,6 @@ export default function Sede() {
         </Notice>
       ) : null}
 
-      {/* flusso */}
-      <Flusso data={data} sel={sel} onSel={setSel} />
 
       {/* la pianta, piano per piano */}
       {data.floors.map((f) => {
@@ -194,52 +198,5 @@ function Room({ o, sel, onSel, onSaved, all }) {
   );
 }
 
-/* Il flusso del lavoro: fonti → lavoro → controllo → persone. Linee tra uffici. */
-function Flusso({ data, sel, onSel }) {
-  const COLS = [
-    { id: "dati", label: "Fonti dei dati", piani: ["dati"] },
-    { id: "lavoro", label: "Lavoro", piani: ["vendite", "formazione", "persone"] },
-    { id: "controllo", label: "Controllo", piani: ["controllo"] },
-    { id: "direzione", label: "Persone che rispondono", piani: ["direzione"] },
-  ];
-  const W = 1100, colW = W / COLS.length, rowH = 30, top = 40;
-  const pos = {};
-  let maxRows = 0;
-  COLS.forEach((c, ci) => {
-    const list = data.offices.filter((o) => c.piani.includes(o.piano));
-    maxRows = Math.max(maxRows, list.length);
-    list.forEach((o, i) => { pos[o.id] = { x: ci * colW + 14, y: top + i * rowH, w: colW - 40, o }; });
-  });
-  const H = top + maxRows * rowH + 10;
-  const hot = (id) => !sel || id === sel || data.edges.some((e) => (e.from === sel && e.to === id) || (e.to === sel && e.from === id));
-  return (
-    <section style={{ ...card, padding: "14px 16px", marginTop: 6, overflowX: "auto" }}>
-      <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Chi passa il lavoro a chi. Clicca un ufficio per vedere i suoi collegamenti.</div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", minWidth: 760, height: "auto", display: "block" }} role="img" aria-label="Flusso del lavoro tra gli uffici">
-        {COLS.map((c, ci) => <text key={c.id} x={ci * colW + 14} y={20} fontSize="12" fill={CP.textMuted} fontFamily="inherit">{c.label}</text>)}
-        {data.edges.map((e, i) => {
-          const a = pos[e.from], b = pos[e.to];
-          if (!a || !b) return null;
-          const x1 = a.x + a.w, y1 = a.y + 10, x2 = b.x, y2 = b.y + 10;
-          const back = x2 <= x1;
-          const d = back ? `M ${a.x + a.w / 2} ${a.y + 20} C ${a.x + a.w / 2} ${a.y + 60}, ${b.x + b.w / 2} ${b.y + 60}, ${b.x + b.w / 2} ${b.y + 20}` : `M ${x1} ${y1} C ${x1 + 40} ${y1}, ${x2 - 40} ${y2}, ${x2} ${y2}`;
-          const on = !sel || e.from === sel || e.to === sel;
-          return <path key={i} d={d} fill="none" stroke={on ? CP.accent : CP.border} strokeOpacity={on ? (sel ? 0.9 : 0.35) : 0.25} strokeWidth={on && sel ? 1.8 : 1} />;
-        })}
-        {Object.values(pos).map(({ x, y, w, o }) => {
-          const st = STATO[o.stato] || STATO.senza_prova;
-          return (
-            <g key={o.id} onClick={() => onSel(sel === o.id ? null : o.id)} style={{ cursor: "pointer" }} opacity={hot(o.id) ? 1 : 0.35}>
-              <rect x={x} y={y} width={w} height={22} rx={6} fill={sel === o.id ? CP.accentSoft : CP.surfaceAlt} stroke={o.buchi.length ? alpha(CP.accentRed, "88") : CP.border} />
-              <circle cx={x + 11} cy={y + 11} r={4} fill={st.color()} />
-              <text x={x + 21} y={y + 15} fontSize="11.5" fill={CP.textPrimary} fontFamily="inherit">{o.nome}</text>
-            </g>
-          );
-        })}
-      </svg>
-    </section>
-  );
-}
-
 const mini = { background: "none", border: "none", padding: 0, color: CP.textMuted, cursor: "pointer", fontSize: 12, fontFamily: FONTS.body, textDecoration: "underline" };
-const Wrap = ({ children }) => <div style={{ padding: "28px 24px 64px", maxWidth: 1200, margin: "0 auto", fontFamily: FONTS.body }}>{children}</div>;
+const Wrap = ({ children }) => <div style={{ padding: "28px 24px 64px", maxWidth: 1640, margin: "0 auto", fontFamily: FONTS.body }}>{children}</div>;
