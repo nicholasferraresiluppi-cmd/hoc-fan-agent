@@ -5,6 +5,7 @@
 import { kv } from "@vercel/kv";
 import { clerkClient } from "@clerk/nextjs/server";
 import { isWorkspaceId, defaultWorkspace } from "@/lib/workspaces";
+import { getClerkUser } from "@/lib/clerk-user";
 
 const KEY = (userId) => `member:workspace:${userId}`;
 
@@ -20,8 +21,7 @@ export async function getSavedWorkspace(userId) {
   const hit = await kv.get(KEY(userId)).catch(() => null);
   if (hit && isWorkspaceId(hit.id)) return hit.id;
   try {
-    const cc = await clerkClient();
-    const u = await cc.users.getUser(userId);
+    const u = await getClerkUser(userId);
     const meta = u?.publicMetadata?.workspace;
     if (isWorkspaceId(meta)) {
       await kv.set(KEY(userId), { id: meta, updated_at: Date.now(), by: "invito" }).catch(() => {});

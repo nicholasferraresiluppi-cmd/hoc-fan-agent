@@ -1,6 +1,7 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
 import { viewAsFor } from "@/lib/view-as";
+import { getClerkUser } from "@/lib/clerk-user";
 
 /**
  * Admin gate unificato. Un utente è admin se:
@@ -29,8 +30,7 @@ export async function isUserIdAdminRaw(userId) {
   // Clerk metadata check: ruolo principale O lista ruoli (gli inviti in app scrivono
   // `roles`; prima si guardava solo `role` e un invitato "admin + altri" non era admin)
   try {
-    const cc = await clerkClient();
-    const u = await cc.users.getUser(userId);
+    const u = await getClerkUser(userId);
     const pm = u?.publicMetadata || {};
     if (pm.role === "admin" || u?.privateMetadata?.role === "admin") return true;
     if (Array.isArray(pm.roles) && pm.roles.includes("admin")) return true;
@@ -60,8 +60,7 @@ export async function userHasMfa(userId) {
   if (cached === 1 || cached === 0) return cached === 1;
   let ok = false;
   try {
-    const cc = await clerkClient();
-    const u = await cc.users.getUser(userId);
+    const u = await getClerkUser(userId);
     ok = !!u?.twoFactorEnabled;
   } catch { return false; }
   await kv.set(ck, ok ? 1 : 0, { ex: 600 }).catch(() => {});

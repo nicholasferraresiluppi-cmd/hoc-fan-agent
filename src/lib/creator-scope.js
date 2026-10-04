@@ -10,6 +10,7 @@ import { kv } from "@vercel/kv";
 import { clerkClient } from "@clerk/nextjs/server";
 import { isUserIdAdmin } from "@/lib/admin";
 import { viewAsFor } from "@/lib/view-as";
+import { getClerkUser } from "@/lib/clerk-user";
 
 const KEY = (userId) => `member:creators:${userId}`;
 
@@ -28,8 +29,7 @@ export async function getAssignedCreators(userId) {
   const hit = await kv.get(KEY(userId)).catch(() => null);
   if (hit) return cleanScope(hit);
   try {
-    const cc = await clerkClient();
-    const u = await cc.users.getUser(userId);
+    const u = await getClerkUser(userId);
     const meta = u?.publicMetadata?.creators;
     if (meta) {
       const s = cleanScope(meta === "*" ? { all: true } : { creators: meta });
