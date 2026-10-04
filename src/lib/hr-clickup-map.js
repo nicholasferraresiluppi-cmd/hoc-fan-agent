@@ -16,7 +16,7 @@
  * vive anche nello STATO DEL TASK (taskToPerson → statusPhase, personToClickup → status).
  */
 import { normalizeSkillMap, normalizeLearnList, normalizePastRoles, skillName, pastRoleText, oneLine, SKILL_AREAS } from "./hr-skills.js";
-import { FIELDS, FIELD_BY_KEY, isEmptyValue, maskCf, findChoice, choiceLabel, phaseFromTaskStatus, taskStatusNamesFor, toE164 } from "./hr-people-core.js";
+import { FIELDS, FIELD_BY_KEY, isEmptyValue, maskCf, findChoice, choiceLabel, phaseFromTaskStatus, taskStatusNamesFor, toE164, canonical } from "./hr-people-core.js";
 import { mirrorText, parseMirror, mirrorPrint } from "./hr-mirror.js";
 
 export const HOC_BLOCK_START = "— Dati HOC Pro —";
@@ -335,6 +335,40 @@ export function statusForCollaboration(statuses = [], phase) {
   if (!names.length) return null;
   const hit = (statuses || []).find((st) => names.includes(lc(st?.status)));
   return hit ? hit.status : null;
+}
+
+/**
+ * Controllo di parità (04/10/2026, Nicholas: "tutto quello che si vede sulla web app si
+ * deve vedere anche su ClickUp, non devo accorgermene io"). Confronta la scheda dell'app col
+ * task, campo per campo, e restituisce le chiavi che su ClickUp NON sono come in app.
+ * Solo i campi che la lista ha davvero; esclusi: sola lettura, file, codice fiscale (cifrato
+ * in app), indirizzo su mappa (ClickUp vuole lat/lng: il testo va nel blocco).
+ * Telefoni ed email confrontati normalizzati; campi specchio sull'impronta del testo.
+ */
+export function clickupDrift(person, task, fieldsMeta = null) {
+  const list = fieldsByName(fieldsMeta && fieldsMeta.length ? fieldsMeta : task?.custom_fields || []);
+  const fromTask = taskToPerson(task);
+  const app = person?.fields || {};
+  const norm = (f, v) => {
+    if (isEmptyValue(v)) return null;
+    if (f.type === "phone") return toE164(v) || s(v);
+    if (f.type === "email") return lc(v);
+    return canonical(v);
+  };
+  const out = [];
+  for (const f of FIELDS) {
+    if (!f.cu || f.appOnly || f.readOnly || f.type === "fileRef" || f.type === "cf" || f.type === "location") continue;
+    if (!list.has(lc(f.cu))) continue;
+    if (JSON.stringify(norm(f, app[f.key])) !== JSON.stringify(norm(f, fromTask.fields[f.key]))) out.push(f.key);
+  }
+  for (const f of FIELDS) {
+    if (!f.mirror || !list.has(lc(f.mirror))) continue;
+    const a = mirrorPrint(mirrorText(f.key, app) || "");
+    const b = fromTask.mirrors[f.key]?.print ?? mirrorPrint("");
+    if (a !== b) out.push(f.key);
+  }
+  if (s(app.firstName) && lc(taskNameFor(person)) !== lc(s(task?.name))) out.push("firstName");
+  return out;
 }
 
 /** Nome del task: il nome; "Nome Cognome" se il task lo aveva già così. */

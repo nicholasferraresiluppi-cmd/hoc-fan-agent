@@ -148,7 +148,7 @@ export default function HrPeoplePage() {
   const otherPhases = Object.keys(statusCounts).filter((s) => s && s !== NONE && s !== ALL_PHASES && !PHASE_LABELS.includes(s));
   const toFix = statusCounts[NONE] + otherPhases.reduce((a, s) => a + statusCounts[s], 0);
 
-  const syncErrors = items.filter((p) => ["error", "partial", "deleted", "missing"].includes(p.sync?.status)).length;
+  const syncErrors = items.filter((p) => ["error", "partial", "deleted", "missing", "drift"].includes(p.sync?.status)).length;
 
   const columns = [
     {
@@ -168,7 +168,7 @@ export default function HrPeoplePage() {
     { key: "emp", label: "Rapporto", sort: (p) => p.fields?.employmentType || "", render: (p) => p.fields?.employmentType || <span style={{ color: CP.textMuted }}>—</span>, muted: true },
     ...(skill ? [{ key: "lvl", label: "Livello", sort: (p) => SKILL_LEVELS.indexOf(normalizeSkillMap(p.fields?.skillLevels)[skill]), render: (p) => normalizeSkillMap(p.fields?.skillLevels)[skill] || "—" }] : []),
     ...(pastRole ? [{ key: "prole", label: "Ruolo passato", sortable: false, render: (p) => pastRoleText(normalizePastRoles(p.fields?.pastRoles).find((r) => r.role === pastRole)), muted: true }] : []),
-    { key: "sync", label: "ClickUp", sort: (p) => p.sync?.status || "", render: (p) => <span style={{ fontSize: 13, color: ["error", "deleted", "missing"].includes(p.sync?.status) ? CP.accentRed : CP.textSecondary }}>{SYNC_LABEL[p.sync?.status] || "—"}</span> },
+    { key: "sync", label: "ClickUp", sort: (p) => p.sync?.status || "", render: (p) => <span style={{ fontSize: 13, color: ["error", "deleted", "missing", "drift"].includes(p.sync?.status) ? CP.accentRed : CP.textSecondary }}>{SYNC_LABEL[p.sync?.status] || "—"}</span> },
   ];
 
   return (

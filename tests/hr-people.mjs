@@ -216,6 +216,21 @@ eq(stripHocBlock(withHocBlock("A", ["x: 1"])), "A", "blocco rimovibile");
     ok(Boolean(M4.encodeFieldValue({ type: "phone" }, "phone", "12345").skip), "ClickUp: numero non accettabile = solo il campo saltato, la scheda parte");
     const lines = M4.hocBlockLines({ id: "p1", fields: { source: "Me l'ha consigliato qualcuno", referredBy: "Marta Rossi" } }, new Map());
     ok(lines.includes("Come ci ha conosciuto: Me l'ha consigliato qualcuno") && lines.includes("Segnalato da: Marta Rossi"), "provenienza e reference nel blocco se la lista non ha i campi");
+    // controllo di parità app ↔ ClickUp
+    const meta = [
+      { id: "s1", name: "Surname", type: "short_text" },
+      { id: "p1", name: "Personal Phone Number", type: "phone" },
+      { id: "l1", name: "Spoken Languages", type: "labels", type_config: { options: [{ id: "o1", label: "ITA - Native" }, { id: "o2", label: "ENG - Advanced" }] } },
+    ];
+    const task = (phone, langs, name = "Clizia") => ({ id: "t1", name, custom_fields: [
+      { ...meta[0], value: "Rossi" }, { ...meta[1], value: phone }, { ...meta[2], value: langs },
+    ] });
+    const person = { id: "p", fields: { firstName: "Clizia", surname: "Rossi", personalPhone: "+39 333 1234567", spokenLanguages: ["ITA - Native", "ENG - Advanced"] } };
+    ok(M4.clickupDrift(person, task("+393331234567", ["o2", "o1"]), meta).length === 0, "parità: uguale (telefono con spazi, etichette in altro ordine)");
+    ok(M4.clickupDrift(person, task(null, ["o1", "o2"]), meta).join() === "personalPhone", "parità: telefono mancante su ClickUp");
+    ok(M4.clickupDrift(person, task("+393331234567", ["o1"]), meta).join() === "spokenLanguages", "parità: una lingua in meno su ClickUp");
+    ok(M4.clickupDrift(person, task("+393331234567", ["o1", "o2"], "Clizia R."), meta).join() === "firstName", "parità: nome del task diverso");
+    ok(M4.clickupDrift({ ...person, fields: { ...person.fields, source: "Altro" } }, task("+393331234567", ["o1", "o2"]), meta).length === 0, "parità: campi che la lista non ha non contano (vanno nel blocco)");
   }
   ok(F.langsUnanswered(["ITA - Native", "ENG - No"]).join() === "SPA,TED,FR", "lingue: si sa a quali non ha ancora risposto");
   ok(F.langsUnanswered(["ITA - Native", "ENG - B2", "SPA - No", "TED - No", "FR - No"]).length === 0, "lingue: tutte risposte (anche con No)");

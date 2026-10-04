@@ -50,7 +50,8 @@ import {
   FORM_UPLOAD_GRACE_MS, isOwnEcho, isEmptyValue, normalizeChoiceFields, PHASE_ENTRY, PHASE_ACTIVE, PHASE_EXITED,
   isIsoDate,
 } from "./hr-people-core.js";
-import { taskToPerson, personToClickup, createTaskPayload, incomingTimestamps, expectedFieldNames, fieldsByName, msToIsoDate, statusForCollaboration } from "./hr-clickup-map.js";
+import { taskToPerson, personToClickup, createTaskPayload, incomingTimestamps, expectedFieldNames, fieldsByName, msToIsoDate, statusForCollaboration, clickupDrift } from "./hr-clickup-map.js";
+import { notifyWhatsApp } from "./whatsapp-notify.js";
 import { mirrorIssueText, mirrorText, mirrorPrint } from "./hr-mirror.js";
 import { clickupSkillLabels } from "./hr-skills.js";
 import {
@@ -637,6 +638,52 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
  * (notturna). Rispetta un tempo massimo: ciò che non entra resta in
  * `pendingKeys` e passa alla prossima esecuzione.
  */
+async function checkParity({ tasks, touched, stats, deadline, listId }) {
+  const fieldsMeta = await getListFields(listId);
+  const byTask = new Map(tasks.map((t) => [String(t.id), t]));
+  stats.drift = [];
+  stats.parityChecked = 0;
+  stats.parityRepaired = 0;
+  for (const p of await listPeople()) {
+    if (!p.clickupTaskId || (p.pendingKeys || []).length) continue;
+    const t = byTask.get(String(p.clickupTaskId));
+    if (!t || touched.has(String(p.clickupTaskId))) continue;
+    stats.parityChecked += 1;
+    const keys = clickupDrift(p, t, fieldsMeta);
+    if (!keys.length) {
+      if (p.sync?.status === "drift") await kv.set(K.person(p.id), { ...p, sync: { status: "ok", at: Date.now(), message: null } });
+      continue;
+    }
+    if (Date.now() >= deadline) { stats.deferred += 1; continue; }
+    const r = await pushPersonSafe(p, keys, { actor: "sistema (controllo parità)" });
+    let after = keys;
+    try { after = clickupDrift(r.person || p, await getTask(p.clickupTaskId), fieldsMeta); } catch { /* resta "keys" */ }
+    if (!after.length) { stats.parityRepaired += 1; continue; }
+    const fresh = (await getPerson(p.id)) || p;
+    const labels = after.map((k) => FIELD_BY_KEY[k]?.label || k);
+    await kv.set(K.person(p.id), { ...fresh, sync: { ...(fresh.sync || {}), status: "drift", at: Date.now(), message: `Su ClickUp diverso da HOC Pro: ${labels.join(", ")}.`, drift: after } });
+    stats.drift.push({ id: p.id, name: [fresh.fields?.firstName, fresh.fields?.surname].filter(Boolean).join(" "), fields: labels });
+  }
+  // campi che l'app usa e la lista non ha (escluse le voci in sola lettura)
+  const byName = fieldsByName(fieldsMeta);
+  stats.missingFields = [...new Set(expectedFieldNames()
+    .filter((f) => !FIELD_BY_KEY[f.key]?.readOnly && FIELD_BY_KEY[f.key]?.type !== "fileRef" && !byName.has(String(f.name).toLowerCase().trim()))
+    .map((f) => f.name))];
+  if (stats.drift.length || stats.missingFields.length) {
+    const lines = ["HOC Pro · Centro HR: ClickUp non è allineato."];
+    if (stats.drift.length) lines.push(`Schede diverse (${stats.drift.length}): ${stats.drift.slice(0, 5).map((d) => `${d.name} (${d.fields.join(", ")})`).join("; ")}`);
+    if (stats.missingFields.length) lines.push(`Campi da creare su ClickUp: ${stats.missingFields.join(", ")}`);
+    lines.push("Dettagli: https://houseofcreators.app/admin/hr/sync");
+    // un avviso al giorno al massimo
+    const day = new Date().toISOString().slice(0, 10);
+    const last = await kv.get("hr:parity:notified").catch(() => null);
+    if (last !== day) {
+      await kv.set("hr:parity:notified", day, { ex: 3 * 24 * 3600 }).catch(() => {});
+      await notifyWhatsApp(lines.join("\n")).catch(() => {});
+    }
+  }
+}
+
 export async function importFromClickup({ mode = "import", by = "sistema", budgetMs = 45_000 } = {}) {
   const cfg = hrSyncConfig();
   if (!cfg.enabled) return { ok: false, skipped: true, reason: "Sincronizzazione spenta: imposta HR_CLICKUP_LIST_ID e CLICKUP_API_TOKEN." };
@@ -651,12 +698,14 @@ export async function importFromClickup({ mode = "import", by = "sistema", budge
     const tasks = await listAllTasks(cfg.listId);
     stats.tasks = tasks.length;
     const seen = new Set();
+    const touched = new Set(); // task appena modificati da questo giro: il confronto li salta
     for (const t of tasks) {
       seen.add(String(t.id));
       try {
         const r = await ingestTask(t, { incomingAt: Number(t.date_updated) || start, by: `clickup (${mode === "import" ? "import" : "riconciliazione"})`, allowPushBack: Date.now() < deadline });
         stats[r.kind] += 1;
         stats.pushedBack += r.pushBack.length;
+        if (r.pushBack.length) touched.add(String(t.id));
       } catch (e) {
         stats.errors.push({ taskId: String(t.id), error: e?.message || "errore" });
       }
@@ -699,7 +748,12 @@ export async function importFromClickup({ mode = "import", by = "sistema", budge
       if (Date.now() >= deadline) { stats.deferred += 1; continue; }
       const r = await pushPersonSafe(p, needsCreate ? null : (p.pendingKeys || []), { actor: "sistema" });
       if (needsCreate && r.person?.clickupTaskId) stats.createdOnClickup += 1;
+      if (p.clickupTaskId) touched.add(String(p.clickupTaskId));
     }
+    // ── Controllo di parità app ↔ ClickUp (04/10/2026) ──────────────────────
+    // Ogni scheda con task: campo per campo, ClickUp deve mostrare quello che mostra l'app.
+    // Differenza → si riscrive su ClickUp; se resta → stato "Diversa su ClickUp" + avviso.
+    await checkParity({ tasks, touched, stats, deadline, listId: cfg.listId });
     const cleanup = computeCleanup(await listPeople());
     stats.duplicates = cleanup.duplicates.length;
     stats.junk = cleanup.junk.length;
