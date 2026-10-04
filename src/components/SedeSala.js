@@ -42,7 +42,7 @@ const THEMES = {
     leaf: 0x86b49a, pot: 0xffffff, sofa: 0xc9ccd2, lounge: [196, 188, 176], sky: ["#cfe0f2", "#f3f6fb"], towers: ["#b9c6d8", "#a8b7cc", "#c9d3e2", "#9fb0c6"], lit: "rgba(255,255,255,.5)",
     chart: ["#18324a", "#0f2234", "#9fd3ff"], hemi: [0xffffff, 0xbfc4cc, 1.45], sun: [0xfff6ea, 2.1], exposure: 1.0, lamp: 0xfff0d0, logo: "rgba(60,90,120,.16)",
     ui: { sign: "#ffffff", signBorder: "#2b3a55", signText: "#1f2a3c", text: "#1d1b18", glass: "rgba(255,255,255,.78)" },
-    env: { layout: "rooms", floor: "carpet", walls: "plain", windows: "tall", glassRooms: true },
+    env: { layout: "rooms", floor: "carpet", walls: "plain", windows: "tall", room: { wall: "glass", frame: 0xffffff, glass: 0xdfe9f2, op: .22, floor: "light", back: 0xf3f3f1 } },
   },
   attico: {
     label: "Attico", bg: 0x121110, floor: [30, 40, 2], wall: 0x1b1a18, desk: 0x3a2a20, metal: 0xb89a62, chair: 0x1a1816, monFrame: 0x0d0c0b,
@@ -61,11 +61,25 @@ const THEMES = {
     env: { layout: "tiers", floor: "speck", walls: "plain", windows: "tall", screen: "giant" },
   },
 };
-const THEME_ORDER = ["trading", "loft", "vetro", "attico", "regia"];
+THEMES.legno = {
+  label: "Vetro e legno", bg: 0xe8e1d6, floor: [196, 208, -6], wall: 0xfaf6ef, desk: 0xf6f2ea, metal: 0x8b7355, chair: 0x3a2e26, monFrame: 0x1e1c1a,
+  shirt: 0xffffff, vest: { persona: 0x2f3a4f, AI: 0x4b3fa0, codice: 0x4a5240, robot: 0x4a5240 }, tie: { persona: 0xc08a3e, AI: 0x8b7cf6, codice: 0x9a7a4a, robot: 0x9a7a4a },
+  leaf: 0x7fa77f, pot: 0xc0704a, sofa: 0xb9a487, lounge: [170, 130, 92], sky: ["#cfe0f2", "#f7f3ec"], towers: ["#c9c3b8", "#b9b2a6", "#d6d0c4", "#aaa396"], lit: "rgba(255,255,255,.45)",
+  chart: ["#2a2218", "#1a140e", "#f0c890"], hemi: [0xfff4e6, 0xbfae98, 1.4], sun: [0xfff0d8, 2.0], exposure: 1.0, lamp: 0xffe2b0, logo: "rgba(139,107,72,.18)",
+  ui: { sign: "#fbf7f0", signBorder: "#8b6b48", signText: "#3a2a1c", text: "#1d1b18", glass: "rgba(255,252,246,.8)" },
+  env: { layout: "rooms", floor: "carpet", walls: "plain", windows: "tall", room: { wall: "half", frame: 0x8b6b48, glass: 0xf0ece4, op: .2, floor: "oak", back: 0xe9e0d2 } },
+};
+THEMES.executive = {
+  ...THEMES.attico, label: "Executive",
+  env: { layout: "rooms", floor: "marble", walls: "plain", windows: "tall", room: { wall: "dark", frame: 0xd9b46a, glass: 0x2a2620, op: .42, floor: "walnut", back: 0x1b1a18 } },
+};
+const THEME_ORDER = ["trading", "vetro", "legno", "executive"];
+// colore d'accento per area: filo sulla porta e bordo dell'insegna (riconosci la stanza a colpo d'occhio)
+const ACCENT = { dati: "#6fb3ff", vendite: "#4fbf78", formazione: "#f0b060", persone: "#e07aa8", controllo: "#b9aef9", direzione: "#d9b46a" };
 // disposizioni: centro di ogni area [x, z] e angolo relax
 const LAYOUTS = {
   islands: { isle: { dati: [-15, -6.5], vendite: [-3.5, -7], formazione: [9, -1.5], persone: [-15, 4.5], controllo: [-3.5, 3.5], direzione: [3.5, 10.5] }, lounge: [15.5, 10.2], lanes: [-1.2, 8.6] },
-  rooms: { isle: { dati: [-14, -6.2], vendite: [0, -6.2], formazione: [14, -6.2], persone: [-14, 5.6], controllo: [0, 5.6], direzione: [10.5, 5.6] }, lounge: [17, 11.5], lanes: [0] },
+  rooms: { isle: { dati: [-14, -6.6], vendite: [0, -6.6], formazione: [14, -6.6], persone: [-14, 6.2], controllo: [0, 6.2], direzione: [8, 6.2] }, lounge: [16.6, 11], lanes: [0] },
   tiers: { isle: { dati: [-3, -11], vendite: [-3, -6.8], formazione: [-3, -2.6], persone: [-3, 1.6], controllo: [-3, 5.8], direzione: [-3, 10] }, lounge: [15.5, 10.2], aisle: 8 },
 };
 const GO_LABEL = { dati: "Dati", vendite: "Vendite", formazione: "Formazione", persone: "Persone", controllo: "Controllo", direzione: "Direzione" };
@@ -293,7 +307,51 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
   };
   const occ = (list) => { const n = {}; list.forEach((o) => (n[o.tipo] = (n[o.tipo] || 0) + 1)); return Object.entries(n).map(([t, c]) => `${c} ${c === 1 ? TIPO[t] : TIPI[t]}`).join(" · "); };
   const SP = 2.05; // passo tra le scrivanie: largo abbastanza perché i nomi non si accavallino
-  const glassM = E.glassRooms ? M(0xdfe9f2, { transparent: true, opacity: .28, roughness: .1, metalness: .1 }) : null, frameM = M(0x2b3a55, { metalness: .3, roughness: .4 });
+  // STANZE (Nicholas, 4/10: "delineare meglio gli uffici, tipo le stanze in vetro"): pareti alte con montanti,
+  // parete di fondo piena con lo schermo dell'area, porta scorrevole sul corridoio, insegna sopra la porta,
+  // pavimento proprio, una pianta, filo colorato dell'area sulla porta.
+  const R = E.room, WH = 2.3;
+  const glassM = R ? M(R.glass, { transparent: true, opacity: R.op, roughness: .08, metalness: .1, depthWrite: false }) : null;
+  const frameM = R ? M(R.frame, { metalness: R.wall === "dark" ? .7 : .2, roughness: .35 }) : null;
+  const panelM = R ? M(R.wall === "half" ? 0xb8925f : R.back, { roughness: .6 }) : null;
+  const backM = R ? M(R.back, { roughness: .85 }) : null;
+  const plankTex = (base) => { const t = tex(512, 512, (x, w, h) => { const [r, g, b] = base; x.fillStyle = `rgb(${r - 18},${g - 18},${b - 18})`; x.fillRect(0, 0, w, h); for (let i = 0; i < 12; i++) for (let j = -1; j < 4; j++) { const v = Math.random() * 16; x.fillStyle = `rgb(${(r + v) | 0},${(g + v) | 0},${(b + v) | 0})`; x.fillRect(j * w / 3 + ((i % 2) * w / 6), i * h / 12, w / 3 - 2, h / 12 - 2); } }); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 2); return t; };
+  const roomFloorM = R ? M(0xffffff, { map: plankTex(R.floor === "walnut" ? [86, 60, 44] : R.floor === "oak" ? [196, 158, 112] : [228, 220, 206]), roughness: .65 }) : null;
+  const plaque = (text, sub, x, y, z, accent) => { const o = tag(`<div class="sign" style="border-color:${accent}"><b>${esc(text)}</b><span>${esc(sub)}</span></div>`, y); o.position.x = x; o.position.z = z; scene.add(o); };
+  const roomScreen = (w, label, list) => tex(1024, 320, (x, W2, H2) => { x.fillStyle = R.wall === "dark" ? "#0f0e0c" : "#14181d"; x.fillRect(0, 0, W2, H2);
+    const lav = list.filter((o) => stato(o) === "lavora").length, fer = list.filter((o) => stato(o) === "fermo").length;
+    x.fillStyle = "#e9e6df"; x.font = "bold 54px Helvetica, Arial"; x.fillText(label, 40, 80);
+    x.font = "600 34px Helvetica, Arial"; x.fillStyle = "#9fdcb4"; x.fillText(`${lav} al lavoro`, 40, 140); x.fillStyle = fer ? "#ff9a8a" : "#8a8780"; x.fillText(`${fer} ${fer === 1 ? "fermo" : "fermi"}`, 300, 140);
+    list.forEach((o, i) => { const st = stato(o); x.fillStyle = st === "lavora" ? "#4fbf78" : st === "fermo" ? "#d8584a" : "#55534e"; x.fillRect(40 + i * 64, 190, 52, 90); }); });
+  const buildRoom = (cx, cz, rw, rd, area, list, opts = {}) => {
+    const hw = rw / 2, doorSide = cz < 0 ? 1 : -1, door = 1.7, fz = cz + doorSide * rd / 2, bz = cz - doorSide * rd / 2, accent = ACCENT[area] || "#d9b46a";
+    const fl = mesh(new THREE.PlaneGeometry(rw, rd), roomFloorM, false); fl.rotation.x = -Math.PI / 2; fl.position.set(cx, .009, cz); scene.add(fl);
+    // parete di fondo piena + schermo dell'area
+    // la parete piena va solo sul lato lontano dalla camera, altrimenti nasconde la stanza
+    const solidBack = doorSide === 1;
+    if (solidBack) { const back = B(rw, WH, .14, backM); back.position.set(cx, WH / 2, bz); scene.add(back); }
+    if (solidBack && !opts.relax) { const scr = mesh(new THREE.PlaneGeometry(Math.min(3.6, rw - 1), 1.1), basic(roomScreen(rw, AREE[area] || "", list)), false); scr.position.set(cx, 1.5, bz + doorSide * .08); if (doorSide < 0) scr.rotation.y = Math.PI; scene.add(scr); }
+    // pareti di vetro con montanti (laterali e fronte con porta)
+    const glassWall = (w, x, z, rotY) => {
+      const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rotY; scene.add(g);
+      const low = R.wall === "half" ? .95 : 0;
+      if (low) { const pn = B(w, low, .08, panelM); pn.position.y = low / 2; g.add(pn); }
+      const gl = B(w, WH - low, .03, glassM); gl.position.y = low + (WH - low) / 2; gl.castShadow = false; g.add(gl);
+      for (const y of [low || .02, WH]) { const r = B(w, .06, .09, frameM); r.position.y = y; g.add(r); }
+      const n = Math.max(1, Math.round(w / 1.3)); for (let k = 0; k <= n; k++) { const m = B(.05, WH, .09, frameM); m.position.set(-w / 2 + k * w / n, WH / 2, 0); g.add(m); }
+    };
+    glassWall(rd, cx - hw, cz, Math.PI / 2); glassWall(rd, cx + hw, cz, Math.PI / 2);
+    if (!solidBack) glassWall(rw, cx, bz, 0);
+    const side = (rw - door) / 2; glassWall(side, cx - hw + side / 2, fz, 0); glassWall(side, cx + hw - side / 2, fz, 0);
+    // porta scorrevole socchiusa + architrave col filo colorato dell'area
+    const dp = B(door * .9, WH - .05, .03, glassM); dp.position.set(cx + door * .55, WH / 2, fz + doorSide * .07); dp.castShadow = false; scene.add(dp);
+    const lintel = B(door + .1, .12, .1, frameM); lintel.position.set(cx, WH, fz); scene.add(lintel);
+    const stripe = B(door + .1, .04, .11, M(parseInt(accent.slice(1), 16), { emissive: parseInt(accent.slice(1), 16), emissiveIntensity: .6 })); stripe.position.set(cx, WH - .1, fz); scene.add(stripe);
+    // pianta in un angolo
+    if (!opts.relax) plant(cx - hw + .55, bz + doorSide * .55, .85);
+    plaque(opts.title || AREE[area], opts.sub || `${list.length} uffici · ${occ(list)}`, cx, WH + .55, fz, accent);
+    return { cx, inZ: fz - doorSide * .6, doorZ: fz, outZ: fz + doorSide * .8 };
+  };
   const rugM = E.rugs ? M(0x5a2f2a, { roughness: .95 }) : null, rugBorder = E.rugs ? M(0xb08a52, { roughness: .9 }) : null;
   for (const [p, [cx, cz]] of Object.entries(ISLE)) {
     const list = OFF.filter((o) => o.piano === p); if (!list.length) continue;
@@ -305,17 +363,9 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
       sign(AREE[p], `${n} uffici · ${occ(list)}`, cx - hw - 1.9, cz + .6, .35);
       continue;
     }
-    const cols = Math.ceil(list.length / 2), rw = Math.max(2, cols) * SP + 1.7, rd = 4.4, hw = rw / 2;
+    const cols = Math.ceil(list.length / 2), rw = Math.max(2, cols) * SP + 1.7, rd = R ? 5.2 : 4.4, hw = rw / 2;
     let room = null;
-    if (E.glassRooms) { // stanza a vetri con la porta verso il corridoio
-      const doorSide = cz < 0 ? 1 : -1, door = 2.2, fz = cz + doorSide * rd / 2;
-      room = { cx, inZ: fz - doorSide * .55, doorZ: fz, outZ: fz + doorSide * .7 };
-      const wall = (w, x, z, rotY) => { const g = B(w, 1.3, .05, glassM); g.position.set(x, .65, z); g.rotation.y = rotY; g.castShadow = false; scene.add(g); const f = B(w, .06, .08, frameM); f.position.set(x, 1.32, z); f.rotation.y = rotY; scene.add(f); };
-      wall(rw, cx, cz - doorSide * rd / 2, 0);
-      wall(rd, cx - hw, cz, Math.PI / 2); wall(rd, cx + hw, cz, Math.PI / 2);
-      const side = (rw - door) / 2; wall(side, cx - hw + side / 2, fz, 0); wall(side, cx + hw - side / 2, fz, 0);
-      const inner = mesh(new THREE.PlaneGeometry(rw, rd), M(0xf4f5f7, { roughness: .6 }), false); inner.rotation.x = -Math.PI / 2; inner.position.set(cx, .008, cz); scene.add(inner);
-    }
+    if (R) { room = buildRoom(cx, cz, rw, rd, p, list); }
     if (E.rugs) { const r = RB(rw + .4, .02, rd + .2, .3, rugBorder); r.position.set(cx, .003, cz); scene.add(r); const r2 = RB(rw, .025, rd - .2, .25, rugM); r2.position.set(cx, .006, cz); scene.add(r2); }
     if (E.pendants) for (let k = 0; k < cols; k++) { const lx = cx + (k - (cols - 1) / 2) * SP; const cord = mesh(new THREE.CylinderGeometry(.01, .01, 1.6, 6), M(0x111111), false); cord.position.set(lx, 3.8, cz); scene.add(cord);
       const shade = mesh(new THREE.ConeGeometry(.32, .34, 24, 1, true), M(0x1d1d1f, { side: THREE.DoubleSide, metalness: .4, roughness: .5 })); shade.position.set(lx, 2.9, cz); scene.add(shade);
@@ -323,7 +373,11 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
       const pl = new THREE.PointLight(T.lamp, 5, 6, 1.7); pl.position.set(lx, 2.7, cz); scene.add(pl); }
     meta = { cx, hw: hw + .1, room };
     list.forEach((o, i) => { const row = i % 2, col = Math.floor(i / 2); desk(o, cx + (col - (cols - 1) / 2) * SP, cz + (row ? .6 : -.6), row ? 0 : Math.PI); });
-    sign(AREE[p], `${list.length} uffici · ${occ(list)}`, cx - hw - 1.1, cz + (E.glassRooms ? (cz < 0 ? rd / 2 + 1.1 : -rd / 2 - .3) : 1.9), .35);
+    if (!R) sign(AREE[p], `${list.length} uffici · ${occ(list)}`, cx - hw - 1.1, cz + 1.9, .35);
+  }
+  if (R) { // corridoio + stanza relax
+    const run = mesh(new THREE.PlaneGeometry(FW - 6, 2.2), M(R.wall === "dark" ? 0x2a2420 : R.wall === "half" ? 0xd8cbb4 : 0xffffff, { roughness: .9 }), false); run.rotation.x = -Math.PI / 2; run.position.set(0, .007, LY.lanes[0]); scene.add(run);
+    buildRoom(LOUNGE[0], LOUNGE[1], 10.4, 7.6, "relax", [], { relax: true, title: "RELAX", sub: "chi è fermo aspetta qui" });
   }
   // chi è fermo va sul divano, col cartellino rosso
   const SEATS = [[LX - 2.8, LZ - 1.75], [LX - 1.8, LZ - 1.75], [LX + 1.6, LZ - 1.75], [LX + 2.6, LZ - 1.75], [LX + 3.75, LZ + .3, -Math.PI / 2], [LX + 3.75, LZ + 1.3, -Math.PI / 2]];
@@ -467,7 +521,7 @@ export default function SedeSala({ data, onView }) {
   const ref = useRef(null);
   const [theme, setTheme] = useState("trading");
   const [err, setErr] = useState(false);
-  useEffect(() => { try { const t = localStorage.getItem("hoc:sede-ufficio"); if (t && THEMES[t]) setTheme(t); } catch { /* */ } }, []);
+  useEffect(() => { try { const t = localStorage.getItem("hoc:sede-ufficio"); if (t && THEME_ORDER.includes(t)) setTheme(t); } catch { /* */ } }, []);
   const pick = (t) => { setTheme(t); try { localStorage.setItem("hoc:sede-ufficio", t); } catch { /* */ } };
   useEffect(() => {
     if (!data?.offices || !ref.current) return;
