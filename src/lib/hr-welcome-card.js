@@ -135,12 +135,13 @@ export function roleLabel(currentJob, max = 22) {
 const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
 
 /**
- * "Chatter · Membro da ottobre 2026". Niente città (03/10/2026, Nicholas: su una tessera
+ * Riga sotto il nome: oggi vuota. Niente città (03/10/2026, Nicholas: su una tessera
  * non si scrive la residenza; è anche un dato personale su un'immagine condivisibile).
  */
-export function tesseraLine(data = {}, at = Date.now()) {
-  const d = new Date(at);
-  return [roleLabel(data.currentJob), `Membro da ${MESI[d.getMonth()]} ${d.getFullYear()}`].filter(Boolean).join(" · ");
+export function tesseraLine() {
+  // 04/10/2026 (Nicholas): niente ruolo (non è detto che sia chat: al modulo il ruolo in
+  // Casa non è ancora deciso) e niente "Membro da": sul fronte resta solo il nome.
+  return "";
 }
 
 // Fasce orarie → parole (le compilano quasi tutti: il retro non resta mai vuoto)
@@ -201,9 +202,7 @@ export function tesseraMilestones(data = {}) {
   return out;
 }
 
-/** "House of Creators · ottobre 2026" (mese e anno dell'invio). */
-export function memberSince(at = Date.now()) {
-  const d = new Date(at);
-  const MONTHS = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
-  return `House of Creators · ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+/** Intestazione del retro: solo "House of Creators" (04/10/2026: niente data sulla tessera). */
+export function memberSince() {
+  return "House of Creators";
 }

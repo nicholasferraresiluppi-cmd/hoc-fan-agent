@@ -16,6 +16,21 @@ import {
 } from "../src/lib/hr-clickup-map.js";
 import { encryptHr, decryptHr, hrCryptoConfigured } from "../src/lib/hr-crypto.js";
 
+// Modulo: dal 04/10/2026 i campi principali sono obbligatori. Le prove di invio partono
+// da risposte complete (email/telefono diversi a ogni chiamata, per non creare doppioni).
+let REQ_N = 0;
+const req = () => {
+  REQ_N += 1;
+  return {
+    surname: "Prova", dateOfBirth: "1995-01-01", gender: "Female", nationality: "Italy",
+    birthPlace: { abroad: false, name: "Roma", prov: "RM", code: "H501" },
+    residenceComune: { abroad: true, country: "Spagna" }, location: "Calle Mayor 1", residenceCap: "28013",
+    personalEmail: `req${REQ_N}@example.com`, personalPhone: `+39 333 000 ${String(1000 + REQ_N)}`,
+    partitaIva: false, spokenLanguages: ["Italiano"], timeSlots: ["17:00 - 22:00"],
+    skillLevels: { of_chat: "Base" }, source: "Altro",
+  };
+};
+
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
 const eq = (a, b, m) => { assert.deepEqual(a, b, m); n++; };
@@ -557,9 +572,9 @@ console.log(`hr-people: ${n} asserzioni OK`);
 
   // ogni invio crea una scheda NUOVA (anche con la stessa email di una scheda esistente)
   const before = (await H.listPeople()).length;
-  const s1 = await H.submitForm(a.token, { consent: true, data: { firstName: "Giulia", surname: "Rossi", personalEmail: "giulia@example.com", gender: "Female" } });
+  const s1 = await H.submitForm(a.token, { consent: true, data: { ...req(), firstName: "Giulia", surname: "Rossi", personalEmail: "giulia@example.com", gender: "Female" } });
   t(s1.ok && typeof s1.uploadToken === "string" && s1.uploadToken !== a.token, "invio ok, token figlio restituito");
-  const s2 = await H.submitForm(a.token, { consent: true, data: { firstName: "Marco" } });
+  const s2 = await H.submitForm(a.token, { consent: true, data: { ...req(), firstName: "Marco" } });
   t(s2.ok && s2.uploadToken !== s1.uploadToken, "secondo invio ok, token figlio diverso");
   t((await H.listPeople()).length === before + 2, "due invii = due schede nuove");
   const unchanged = await H.getPerson(existing.person.id);
@@ -571,12 +586,12 @@ console.log(`hr-people: ${n} asserzioni OK`);
   t(created1.fields.collaborationStatus === "In ingresso", "modulo (link condiviso): persona nuova in fase «In ingresso»");
   t(!unchanged.fields.collaborationStatus, "la scheda esistente non riceve una fase");
   t((await H.getFormContext(a.token)).state === "open", "il link condiviso resta aperto dopo l'invio");
-  t(!(await H.submitForm(a.token, { data: { firstName: "X" } })).ok, "senza consenso: rifiutato");
+  t(!(await H.submitForm(a.token, { data: { ...req(), firstName: "X" } })).ok, "senza consenso: rifiutato");
 
   // token figlio: solo file, mai dati
   const cctx = await H.getFormContext(s1.uploadToken);
   t(cctx.ok && cctx.done === true && !cctx.prefill, "il token figlio non restituisce dati della scheda");
-  t((await H.submitForm(s1.uploadToken, { consent: true, data: { firstName: "Y" } })).status === 409, "il token figlio non accetta un secondo invio");
+  t((await H.submitForm(s1.uploadToken, { consent: true, data: { ...req(), firstName: "Y" } })).status === 409, "il token figlio non accetta un secondo invio");
 
   // upload rifiutato sul token condiviso (prima di qualunque altro controllo)
   const U = await import("../src/lib/hr-uploads.js");
@@ -588,7 +603,7 @@ console.log(`hr-people: ${n} asserzioni OK`);
   // tetto giornaliero di invii
   const bucket = Math.floor(Math.floor(Date.now() / 1000) / 86400);
   await fake.set(`rl:hr_form_shared_submit:86400:${a.token.slice(0, 64)}:${bucket}`, 2000);
-  const capped = await H.submitForm(a.token, { consent: true, data: { firstName: "Luca" } });
+  const capped = await H.submitForm(a.token, { consent: true, data: { ...req(), firstName: "Luca" } });
   t(!capped.ok && capped.status === 429, "oltre 2000 invii al giorno: rifiutato");
   t((await H.listPeople()).length === before + 2, "l'invio oltre il tetto non crea schede");
 
@@ -597,7 +612,7 @@ console.log(`hr-people: ${n} asserzioni OK`);
   t(b.replaced && b.token !== a.token, "link rigenerato");
   const oldCtx = await H.getFormContext(a.token);
   t(!oldCtx.ok && oldCtx.status === 410, "il vecchio link non è più valido");
-  t((await H.submitForm(a.token, { consent: true, data: { firstName: "Z" } })).status === 410, "il vecchio link non accetta invii");
+  t((await H.submitForm(a.token, { consent: true, data: { ...req(), firstName: "Z" } })).status === 410, "il vecchio link non accetta invii");
   t(!(await H.isSharedFormToken(a.token)) && (await H.isSharedFormToken(b.token)), "solo il nuovo è il condiviso");
   t((await H.getFormContext(b.token)).ok, "il nuovo funziona");
   // record vecchio ancora "attivo" ma non più puntato (rigenerazione interrotta a metà) → comunque spento
@@ -612,11 +627,11 @@ console.log(`hr-people: ${n} asserzioni OK`);
   const p = await H.createFormLink({ personId: existing.person.id, actor: "admin" });
   const pctx = await H.getFormContext(p.token);
   t(pctx.ok && pctx.prefill.firstName === "Giulia" && pctx.cfPresent === true && !pctx.shared, "link personale: prefill come prima");
-  const ps = await H.submitForm(p.token, { consent: true, data: { firstName: "Giulia", surname: "Rossi" } });
+  const ps = await H.submitForm(p.token, { consent: true, data: { ...req(), firstName: "Giulia", surname: "Rossi" } });
   t(ps.ok && ps.uploadToken === p.token, "link personale: i file restano sul suo token");
   t(!(await H.getPerson(existing.person.id)).fields.collaborationStatus, "link personale su scheda esistente: la fase non si tocca");
   const pNew = await H.createFormLink({ actor: "admin" });
-  const psNew = await H.submitForm(pNew.token, { consent: true, data: { firstName: "Nuova" } });
+  const psNew = await H.submitForm(pNew.token, { consent: true, data: { ...req(), firstName: "Nuova" } });
   const recNew = await fake.get(`hr:form:${pNew.token}`);
   t(psNew.ok && (await H.getPerson(recNew.personId)).fields.collaborationStatus === "In ingresso", "link personale senza scheda: persona nuova «In ingresso»");
   const pIndicated = await H.savePerson({ input: { firstName: "Con fase", collaborationStatus: "Attiva" }, allowed: ["firstName", "collaborationStatus"], actor: "modulo", source: "modulo", sync: false });
@@ -641,7 +656,7 @@ console.log(`hr-people: ${n} asserzioni OK`);
   t(st.map((s) => `${s.label} · ${s.value}`).join(" | ") === "ONLY · ESP | AI · AUT | SOCIAL · BASE | ENG · B2 | ITA · MADRE", "statistiche: aree più forti, lingue (niente città)");
   t(W.cardStats({}).length === 0, "senza dati: nessuna riga finta");
   t(W.cardStats({ skillLevels: { of_chat: "Base" } }).length === 1, "pochi dati: poche righe");
-  t(W.memberSince(new Date(2026, 9, 3).getTime()) === "House of Creators · ottobre 2026", "mese e anno, senza numero di membro");
+  t(W.memberSince(new Date(2026, 9, 3).getTime()) === "House of Creators", "intestazione del retro: solo la Casa, niente data né numero di membro");
 
   n += m;
   console.log(`link condiviso + carta: ${m} asserzioni OK`);
@@ -664,7 +679,14 @@ console.log(`hr-people: ${n} asserzioni OK`);
 
   // errori per campo, gentili
   const e0 = X.fieldErrors({}, ["firstName", "surname"]);
-  t(Object.keys(e0).join() === "firstName" && /nome/.test(e0.firstName), "nome mancante → errore sotto il nome");
+  t(Object.keys(e0).sort().join() === "firstName,surname" && /nome/.test(e0.firstName) && /Ci serve/.test(e0.surname), "nome e cognome mancanti → errore sotto ciascuno");
+  t(!X.fieldErrors({}, ["linkedin", "personalInterests", "currentJob", "otherSkills"]).linkedin, "i facoltativi restano facoltativi");
+  t(X.missingRequired({ residenceComune: { abroad: true, country: "Spagna" } }).includes("codiceFiscale") === false, "chi vive all'estero: CF non obbligatorio");
+  t(X.missingRequired({ residenceComune: { name: "Milano" } }).includes("codiceFiscale"), "chi vive in Italia: CF obbligatorio");
+  t(!X.missingRequired({}, { cfEnabled: false }).includes("codiceFiscale"), "CF spento: non si pretende");
+  t(X.missingRequired({ source: "Me l'ha consigliato qualcuno" }).includes("referredBy") && !X.missingRequired({ source: "Altro" }).includes("referredBy"), "chi ti ha segnalato: solo per le reference");
+  t(!X.missingRequired({ partitaIva: false }).includes("partitaIva"), "partita IVA «no» è una risposta");
+  t(X.isBlank({ abroad: false, name: "" }) && !X.isBlank({ abroad: false, name: "Roma" }) && X.isBlank([]) && X.isBlank({}), "vuoto: oggetti e liste");
   t(!X.fieldErrors({ firstName: "Giulia" }, ["firstName"]).firstName, "nome presente → niente errore");
   t(/codice fiscale/i.test(X.fieldErrors({ firstName: "G", codiceFiscale: "RSSMRA85T10A562T" }, ["firstName", "codiceFiscale"]).codiceFiscale || ""), "CF sbagliato → errore sotto il CF");
   t(!X.fieldErrors({ codiceFiscale: "RSSMRA85T10A562S" }, ["codiceFiscale"]).codiceFiscale, "CF giusto → niente errore");
@@ -707,8 +729,7 @@ console.log(`hr-people: ${n} asserzioni OK`);
   t(W.tesseraName({ firstName: "giulia", surname: "de rossi" }) === "Giulia De Rossi" && W.tesseraName({ firstName: "Anna Maria" }) === "Anna Maria", "nome completo sulla tessera");
   t(W.roleLabel("Chatter (operatore di chat)") === "Chatter" && W.roleLabel("") === "", "ruolo chatter");
   t(W.roleLabel("responsabile della comunicazione digitale") === "Responsabile della…", "mansione lunga abbreviata a parola intera");
-  t(W.tesseraLine({ currentJob: "Chatter (operatore di chat)", residenceComune: { name: "Milano", prov: "MI" } }, new Date(2026, 9, 3).getTime()) === "Chatter · Membro da ottobre 2026", "riga ruolo · membro da (niente città)");
-  t(W.tesseraLine({}, new Date(2026, 9, 3).getTime()) === "Membro da ottobre 2026", "senza dati: solo membro da");
+  t(W.tesseraLine({ currentJob: "Chatter (operatore di chat)", residenceComune: { name: "Milano", prov: "MI" } }, new Date(2026, 9, 3).getTime()) === "", "fronte: niente ruolo, niente «membro da», niente città (04/10)");
   const rows = W.tesseraRows({ gender: "Female", skillLevels: { of_chat: "Esperto", ai_coding: "Autonomo" }, spokenLanguages: ["ITA - Native", "ENG - B2"], residenceComune: { abroad: true, country: "Spagna", city: "Madrid" }, timeSlots: ["17:00 - 22:00", "22:00 - 03:00"] });
   t(rows.map((r) => `${r.label} · ${r.value}`).join(" | ") === "OnlyFans · Esperta | Intelligenza artificiale · Autonoma | Inglese · B2 | Italiano · Madrelingua | Disponibilità · Sera · Notte", "retro: righe pulite, genere dichiarato, disponibilità, niente città");
   t(W.tesseraRows({ skillLevels: { of_chat: "Esperto" } })[0].value === "Livello esperto", "genere non indicato: forma neutra");
@@ -1195,7 +1216,7 @@ console.log(`hr-people: ${n} asserzioni OK`);
 
   // i) modulo: persona nuova → "In ingresso", anche su ClickUp
   const link = await H.regenerateSharedFormLink({ actor: "admin" });
-  const sub = await H.submitForm(link.token, { consent: true, data: { firstName: "Dora", surname: "Nuova" } });
+  const sub = await H.submitForm(link.token, { consent: true, data: { ...req(), firstName: "Dora", surname: "Nuova" } });
   const child = await fake.get(`hr:form:${sub.uploadToken}`);
   const dora = await H.getPerson(child.personId);
   t(sub.ok && dora.fields.collaborationStatus === "In ingresso", "modulo: persona nuova in fase «In ingresso»");
@@ -1308,7 +1329,7 @@ console.log(`hr-people: ${n} asserzioni OK`);
   const makeDue = async (p) => { const it = await qItem(p); await fake.hset("hr:upload:pending", { [p]: JSON.stringify({ ...it, nextAt: 0 }) }); };
 
   const link = await H.regenerateSharedFormLink({ actor: "admin" });
-  const s1 = await H.submitForm(link.token, { consent: true, data: { firstName: "Ilaria", surname: "Verdi" } });
+  const s1 = await H.submitForm(link.token, { consent: true, data: { ...req(), firstName: "Ilaria", surname: "Verdi" } });
   t(s1.ok && s1.uploadsEnabled === true, "con ClickUp e Blob configurati il caricamento è attivo");
   const child1 = await fake.get(`hr:form:${s1.uploadToken}`);
   t(Boolean((await H.getPerson(child1.personId)).clickupTaskId), "invio senza differimento: task creato");
@@ -1323,11 +1344,11 @@ console.log(`hr-people: ${n} asserzioni OK`);
   const auth = await U.authorizeBlobUpload(s1.uploadToken, slot.pathname);
   t(auth.options && auth.options.maximumSizeInBytes === 50 * 1024 * 1024 && auth.options.allowedContentTypes.join() === "application/pdf" && auth.options.addRandomSuffix === false && auth.options.allowOverwrite === false, "token di upload: tipo, 50 MB, niente sovrascritture");
   t((await U.authorizeBlobUpload(link.token, slot.pathname)).error?.status === 403, "token di upload rifiutato al link condiviso");
-  const s2 = await H.submitForm(link.token, { consent: true, data: { firstName: "Altra" } });
+  const s2 = await H.submitForm(link.token, { consent: true, data: { ...req(), firstName: "Altra" } });
   t((await U.authorizeBlobUpload(s2.uploadToken, slot.pathname)).error?.status === 403, "token di upload rifiutato per lo slot di un'altra persona");
   t((await U.authorizeBlobUpload(s1.uploadToken, `hr-upload/${"b".repeat(32)}.pdf`)).error?.status === 403, "token di upload rifiutato per un pathname senza slot");
   // finestra dei file scaduta
-  const s3 = await H.submitForm(link.token, { consent: true, data: { firstName: "Tarda" } });
+  const s3 = await H.submitForm(link.token, { consent: true, data: { ...req(), firstName: "Tarda" } });
   const slot3 = await U.requestUploadSlot(s3.uploadToken, { kind: "cv", contentType: "application/pdf", size: 100 });
   const rec3 = await fake.get(`hr:form:${s3.uploadToken}`);
   await fake.set(`hr:form:${s3.uploadToken}`, { ...rec3, submittedAt: Date.now() - 2 * 3600_000 });
@@ -1367,7 +1388,7 @@ console.log(`hr-people: ${n} asserzioni OK`);
   t((await H.getPerson(child1.personId)).fields.cvUpload?.attachmentId, "riferimento al CV in scheda");
 
   // task non ancora creato (invio differito): il file aspetta, la ripresa crea il task e poi lo allega
-  const s4 = await H.submitForm(link.token, { consent: true, data: { firstName: "Bruno", surname: "Neri" } }, { deferSync: true });
+  const s4 = await H.submitForm(link.token, { consent: true, data: { ...req(), firstName: "Bruno", surname: "Neri" } }, { deferSync: true });
   const child4 = await fake.get(`hr:form:${s4.uploadToken}`);
   t(!(await H.getPerson(child4.personId)).clickupTaskId && (await H.listSyncRetry()).includes(child4.personId), "invio differito: scheda salvata, task da creare, in «da riprovare»");
   const slot4 = await U.requestUploadSlot(s4.uploadToken, { kind: "document", contentType: "application/pdf", size: PDF.length });

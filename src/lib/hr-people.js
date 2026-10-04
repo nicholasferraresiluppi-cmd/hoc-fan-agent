@@ -59,6 +59,7 @@ import {
 } from "./clickup-hr-api.js";
 import { hrCryptoConfigured, encryptHr, decryptHr } from "./hr-crypto.js";
 import { checkRateLimit } from "./rate-limit.js";
+import { missingRequired } from "./hr-form-experience.js";
 import { blobConfigured } from "./hr-blob.js";
 
 const K = {
@@ -1028,6 +1029,17 @@ export async function getFormContext(token) {
  *   la persona non aspetta i 429 di ClickUp. La scheda entra in `hr:sync:retry`: se il
  *   giro dopo la risposta non riesce, la ripresa successiva o la notte la portano su ClickUp.
  */
+/** Le risposte del modulo, solo i campi ammessi. */
+function pickForm(body) {
+  const out = {};
+  for (const k of FORM_KEYS) if (k in (body?.data || {})) out[k] = body.data[k];
+  return out;
+}
+/** "Cognome: obbligatorio. Data di nascita: obbligatorio." — la pagina lo mette sotto i campi. */
+function requiredError(keys) {
+  return keys.map((k) => `${FIELD_BY_KEY[k]?.label || k}: obbligatorio.`).join(" ");
+}
+
 export async function submitForm(token, body, { deferSync = false } = {}) {
   const rec = await getFormRec(token);
   const now = Date.now();
@@ -1039,6 +1051,11 @@ export async function submitForm(token, body, { deferSync = false } = {}) {
   if (body?.consent !== true) return { ok: false, status: 400, error: "Serve il consenso all'informativa privacy." };
   if (rec.shared) return submitShared(token, rec, body, now, deferSync);
   const input = {};
+  {
+    // link personali (vecchi): il CF può essere già in scheda, quindi non si pretende
+    const missing = missingRequired(pickForm(body), { cfEnabled: hrCryptoConfigured(), cfPresent: true });
+    if (missing.length) return { ok: false, status: 400, error: requiredError(missing) };
+  }
   for (const k of FORM_KEYS) if (k in (body?.data || {})) input[k] = body.data[k];
   // il CF vuoto dal modulo non cancella quello già inserito
   if (!String(input.codiceFiscale || "").trim()) delete input.codiceFiscale;
@@ -1064,6 +1081,10 @@ async function submitShared(token, rec, body, now, deferSync = false) {
   // tetto giornaliero di invii sul link condiviso (oltre ai limiti per IP della route)
   const cap = await checkRateLimit("hr_form_shared_submit", token.slice(0, 64));
   if (!cap.ok) return { ok: false, status: 429, error: "Oggi il modulo ha ricevuto troppi invii. Riprova domani o scrivi a chi ti ha mandato il link." };
+  {
+    const missing = missingRequired(pickForm(body), { cfEnabled: hrCryptoConfigured() });
+    if (missing.length) return { ok: false, status: 400, error: requiredError(missing) };
+  }
   const input = {};
   for (const k of FORM_KEYS) if (k in (body?.data || {})) input[k] = body.data[k];
   if (!String(input.codiceFiscale || "").trim()) delete input.codiceFiscale;

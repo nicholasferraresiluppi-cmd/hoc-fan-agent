@@ -12,7 +12,42 @@
  *  4. accesso a localStorage sempre protetto (in navigazione privata può
  *     lanciare: il modulo deve funzionare lo stesso).
  */
-import { FIELD_BY_KEY, FORM_KEYS, validateCodiceFiscale } from "./hr-fields.js";
+import { FIELD_BY_KEY, FORM_KEYS, validateCodiceFiscale, SOURCE_REFERRAL } from "./hr-fields.js";
+
+// ── 0. Campi obbligatori (04/10/2026, decisione del titolare) ────────────────
+// Servono tutti i dati per contratto e documenti; restano facoltativi solo quelli
+// "in più" (CV, LinkedIn, interessi, mansione attuale, cos'altro sai fare, cosa
+// vorresti imparare, ruoli passati). Il codice fiscale è obbligatorio per chi vive
+// in Italia (chi vive all'estero può non averlo) e solo se l'app può salvarlo;
+// "Chi ti ha segnalato" solo per chi è arrivato da una reference.
+export const REQUIRED_FORM_KEYS = [
+  "firstName", "surname", "dateOfBirth", "gender", "nationality", "birthPlace",
+  "residenceComune", "location", "residenceCap", "personalEmail", "personalPhone",
+  "partitaIva", "spokenLanguages", "timeSlots", "skillLevels", "source",
+];
+
+/** Vuoto per il modulo: stringa vuota, lista vuota, oggetto senza testo (i sì/no contano come risposta). */
+export function isBlank(v) {
+  if (v == null) return true;
+  if (typeof v === "boolean" || typeof v === "number") return false;
+  if (typeof v === "string") return !v.trim();
+  if (Array.isArray(v)) return v.every(isBlank);
+  if (typeof v === "object") return !Object.values(v).some((x) => typeof x !== "boolean" && !isBlank(x));
+  return false;
+}
+
+/** Le chiavi obbligatorie per QUESTE risposte. */
+export function requiredKeysFor(data = {}, { cfEnabled = true, cfPresent = false } = {}) {
+  const keys = [...REQUIRED_FORM_KEYS];
+  if (cfEnabled && !cfPresent && !data.residenceComune?.abroad) keys.push("codiceFiscale");
+  if (data.source === SOURCE_REFERRAL) keys.push("referredBy");
+  return keys;
+}
+
+/** Chiavi obbligatorie rimaste vuote (in ordine di modulo). */
+export function missingRequired(data = {}, opts = {}) {
+  return requiredKeysFor(data, opts).filter((k) => isBlank(data[k]));
+}
 
 // ── 1. Avanzamento ────────────────────────────────────────────────────────────
 
@@ -42,9 +77,12 @@ export function timeEstimateText(minutes = CHAPTER_MINUTES) {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Messaggi gentili, uno per campo. Solo i campi in `keys` (quelli del capitolo). */
-export function fieldErrors(data = {}, keys = FORM_KEYS, { cfEnabled = true } = {}) {
+export function fieldErrors(data = {}, keys = FORM_KEYS, { cfEnabled = true, cfPresent = false } = {}) {
   const out = {};
   const has = (k) => keys.includes(k);
+  for (const k of missingRequired(data, { cfEnabled, cfPresent })) {
+    if (has(k) && k !== "firstName") out[k] = "Ci serve questo dato: compilalo qui.";
+  }
   if (has("firstName") && !String(data.firstName || "").trim()) {
     out.firstName = "Ci serve almeno il tuo nome: scrivilo qui.";
   }
