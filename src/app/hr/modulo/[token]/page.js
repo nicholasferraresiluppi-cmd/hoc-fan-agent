@@ -227,7 +227,6 @@ function Shell({ children }) {
         <div style={{ fontSize: 11.5, letterSpacing: "0.18em", textTransform: "uppercase", color: CP.textMuted, marginBottom: 18 }}>House of Creators</div>
         {children}
       </div>
-      <SplashOverlay />
     </main>
   );
 }
@@ -443,9 +442,18 @@ export default function HrFormPage() {
     } catch (e2) { setErr(e2.message); } finally { setBusy(false); }
   };
 
-  if (loadErr) return <SplashCtx.Provider value={splashPhase}><Shell><Headline title="Link non disponibile" sub="" size={34} /><p style={{ color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>{loadErr}</p></Shell></SplashCtx.Provider>;
-  if (!ctx) return <SplashCtx.Provider value={splashPhase}><Shell>{null}</Shell></SplashCtx.Provider>;
-  return <SplashCtx.Provider value={splashPhase}>{renderStage()}</SplashCtx.Provider>;
+  // L'apertura sta FUORI dalla pagina e sempre nella stessa posizione (key fissa): prima stava
+  // dentro Shell e, quando arrivavano i dati del modulo, React la ricreava → le animazioni CSS
+  // ripartivano da capo mentre il timer d'uscita continuava → la tessera non si vedeva mai (04/10).
+  const page = loadErr
+    ? <Shell><Headline title="Link non disponibile" sub="" size={34} /><p style={{ color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>{loadErr}</p></Shell>
+    : !ctx ? <Shell>{null}</Shell> : renderStage();
+  return (
+    <SplashCtx.Provider value={splashPhase}>
+      <div key="page">{page}</div>
+      <SplashOverlay key="splash" />
+    </SplashCtx.Provider>
+  );
 
   function renderStage() {
   if (stage === "done") {
