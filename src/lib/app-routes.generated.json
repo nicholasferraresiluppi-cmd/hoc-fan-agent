@@ -46,6 +46,7 @@
  "/admin/leaderboard-import",
  "/admin/leaderboard-settings",
  "/admin/loop",
+ "/admin/manuale-vendite",
  "/admin/operator-signals",
  "/admin/operator-signals/[operator]",
  "/admin/outcomes",

@@ -21,6 +21,7 @@ import {
   Signpost, Bell, ListTree, Inbox, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket,
   HandCoins, MessageCircle,
   Snowflake, Megaphone, Share2, Shield, Building2, BookUser,
+  BookMarked,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee } from "@/lib/nav-access";
@@ -64,6 +65,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/admin/conversation-intelligence", title: "Presidio chat", desc: "Latenza risposta, % entro 5 min e response rate per creator (dai transcript, solo metadati)", icon: Activity },
       { href: "/admin/sales-coaching", title: "Coaching vendite", desc: "Per split: quanto comprano in chat i fan mai paganti, chi vende meglio a parità di pagina, cosa fa vendere, pagine e operatori modello di HOC, test in corso ed esempi da far studiare", icon: HandCoins },
       { href: "/admin/sales-ai", title: "Sales manager AI", desc: "Ogni notte: due manager AI leggono i turni del giorno prima, un arbitro scrive il feedback, il Garante blocca gli errori. Li rivedi qui prima che arrivino agli operatori", icon: Bot },
+      { href: "/admin/manuale-vendite", title: "Manuale vendite", desc: "Cosa fa vendere davvero, su 26 mesi di chat: capitoli del manuale, guide di profilo con le risposte da provare e prove sul campo misurate ogni lunedì", icon: BookMarked },
       { href: "/admin/shift-quality", title: "Qualità turni", desc: "Turno×operatore: conversazioni, funnel PPV, venduto e analisi contenuto — attribuzione onesta singolo/duo", icon: MessagesSquare },
       { href: "/leaderboard/leghe",            title: "Leghe",         desc: "Tornei mensili + tier promozione/retrocessione", icon: Swords },
     ],
