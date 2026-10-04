@@ -45,7 +45,8 @@ import { PlayCircle } from "lucide-react";
 import { TutorialVideoButton } from "@/components/TutorialVideo";
 import { fmtDuration } from "@/lib/tutorial-videos";
 import { uploadHrFile } from "@/lib/hr-upload-client";
-import { GRAIN_DATA_URI } from "@/lib/tessera-material";
+import { GRAIN_DATA_URI, guillocheDataUri } from "@/lib/tessera-material";
+import HocPalma from "@/components/HocPalma";
 import {
   progressWords, timeEstimateText, fieldErrors, fieldErrorsFromServer, firstStepWithError,
   draftKey, serializeDraft, parseDraft, draftWorthSaving, safeGet, safeSet, safeRemove,
@@ -146,6 +147,27 @@ const CSS = `
 @media (prefers-reduced-motion:reduce){.hrf-splash-light::after{display:none}}
 @keyframes hrfLogo{from{opacity:0;transform:translateY(6px);letter-spacing:.24em}to{opacity:1;transform:none;letter-spacing:.16em}}
 @media (prefers-reduced-motion:reduce){.hrf-splash-logo{animation:none;opacity:1}}
+/* Apertura "alba" (04/10/2026, scelta A di Nicholas): luce calda dietro, lettere che si
+   accendono una a una da sinistra, poi la palma; il logo esce e arriva la tessera coperta
+   che gira e mostra il fronte; all'uscita sale verso la pagina. Tempi da quando la pagina
+   si disegna (CSS), non da quando il JS è pronto. */
+.hrf-sun{position:absolute;left:50%;top:50%;width:380px;height:380px;margin:-190px 0 0 -190px;border-radius:50%;background:radial-gradient(closest-side,rgba(217,180,106,.26),rgba(217,180,106,.07) 45%,transparent 70%);opacity:0;animation:hrfSun 3.6s ease .2s forwards;pointer-events:none}
+@keyframes hrfSun{0%{opacity:0;transform:scale(.6)}40%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(1.05)}}
+.hrf-alba{animation:hrfLogoOut .5s ease 3.3s forwards}
+@keyframes hrfLogoOut{to{opacity:0;transform:scale(.92) translateY(-8px)}}
+.hrf-alba .hl-ch{opacity:.07;animation:hrfCh 1.1s ease calc(.5s + var(--i) * .12s) forwards}
+@keyframes hrfCh{0%{opacity:.07;text-shadow:0 0 0 rgba(255,226,170,0)}45%{opacity:1;text-shadow:0 0 18px rgba(255,226,170,.6)}100%{opacity:1;text-shadow:0 0 0 rgba(255,226,170,0)}}
+.hrf-alba .hl-palm{opacity:.08;animation:hrfPalm 1s ease 2.3s forwards}
+@keyframes hrfPalm{to{opacity:1}}
+.hrf-scene{position:absolute;inset:0;display:grid;place-items:center;perspective:1000px;pointer-events:none}
+.hrf-scard{position:relative;width:300px;height:189px;transform-style:preserve-3d;opacity:0;animation:hrfCardIn 1.6s cubic-bezier(.45,.05,.35,1) 3.85s forwards;transition:transform 1.1s cubic-bezier(.4,0,.2,1)}
+@keyframes hrfCardIn{0%{opacity:0;transform:rotateY(180deg) scale(.85)}20%{opacity:1}100%{opacity:1;transform:rotateY(360deg) scale(1)}}
+.hrf-splash.is-leaving .hrf-scard{transform:translateY(-26vh) scale(.92)}
+.hrf-sface{position:absolute;inset:0;border-radius:15px;overflow:hidden;background:radial-gradient(140% 100% at 0% 0%,#24211c 0%,#121214 50%,#0b0b0d 100%);box-shadow:0 30px 60px rgba(0,0,0,.55),inset 0 0 0 1px rgba(217,180,106,.5);transform:translateZ(1px)}
+.hrf-sface.back{transform:rotateY(180deg) translateZ(1px);display:grid;place-items:center}
+/* il retro non deve trasparire durante il giro (Safari ignora backface sui figli SVG senza questo) */
+.hrf-sface,.hrf-sface *{-webkit-backface-visibility:hidden;backface-visibility:hidden}
+@media (prefers-reduced-motion:reduce){.hrf-alba{animation:hrfLogoOutStill .5s ease 3.3s forwards}@keyframes hrfLogoOutStill{to{opacity:0}}.hrf-scard{animation:hrfCardFade .8s ease 3.85s forwards}@keyframes hrfCardFade{to{opacity:1;transform:none}}.hrf-splash.is-leaving .hrf-scard{transform:none}}
 .hrf-splash{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:radial-gradient(120% 60% at 50% 0%, #17161c 0%, #0b0c10 55%);opacity:1;transition:opacity 1.1s cubic-bezier(.4,0,.2,1)}
 .hrf-splash-inner{transition:transform 1.1s cubic-bezier(.4,0,.2,1),opacity .8s ease}
 .hrf-splash.is-leaving{opacity:0;pointer-events:none}
@@ -170,11 +192,28 @@ const SplashCtx = createContext("gone");
 function SplashOverlay() {
   const phase = useContext(SplashCtx);
   if (phase === "gone") return null;
+  const guil = { position: "absolute", inset: 0, background: `url("${guillocheDataUri()}") 0 0/100% 100% no-repeat`, opacity: 0.75 };
   return (
     <div className={`hrf-splash${phase === "leaving" ? " is-leaving" : ""}`} aria-hidden={phase === "leaving"}>
+      <div className="hrf-sun" />
       <div className="hrf-splash-inner" style={{ display: "grid", justifyItems: "center", gap: 22 }}>
-        <span className="hrf-splash-light"><HocLogo size={22} color="#f2eee6" /></span>
+        <HocLogo size={22} color="#f2eee6" letters className="hrf-alba" />
         <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Apro il modulo</span>
+      </div>
+      <div className="hrf-scene" aria-hidden="true">
+        <div className="hrf-scard">
+          <div className="hrf-sface">
+            <div style={guil} />
+            <div style={{ position: "absolute", left: 18, top: 18, color: GOLD, lineHeight: 0 }}><HocPalma width={70} title="" /></div>
+            <div style={{ position: "absolute", right: 18, top: 20, fontSize: 9, letterSpacing: "0.22em", color: GOLD, fontFamily: SANS }}>MEMBRO</div>
+            <div style={{ position: "absolute", left: 18, bottom: 20, fontFamily: SERIF, fontStyle: "italic", fontSize: 25, color: "rgba(242,238,230,.35)" }}>Il tuo nome</div>
+            <span style={{ position: "absolute", right: 18, bottom: 20, width: 32, height: 24, borderRadius: 5, background: "linear-gradient(135deg,#f3e2b8,#b8975c 45%,#7d6436 70%,#e9d3a0)" }} />
+          </div>
+          <div className="hrf-sface back">
+            <div style={guil} />
+            <div style={{ position: "relative", color: GOLD, lineHeight: 0 }}><HocPalma width={140} title="" /></div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -217,7 +256,11 @@ export default function HrFormPage() {
     // 04/10/2026: il logo si deve vedere accendersi anche con "Riduci movimento" attivo
     // (iPhone): accendersi è un cambio di luce, non un movimento. Prima con quell'opzione
     // l'apertura durava 0,9 s senza luce: era quello che si vedeva dal telefono.
-    const t = setTimeout(() => setSplashTimeUp(true), 3600);
+    // la sequenza (CSS) parte quando la pagina si disegna e finisce a ~5,5 s: si conta da
+    // lì (performance.now ≈ dall'apertura), con un minimo per non tagliare la tessera
+    let wait = 5600;
+    try { wait = Math.max(1200, 5600 - performance.now()); } catch { /* */ }
+    const t = setTimeout(() => setSplashTimeUp(true), wait);
     return () => clearTimeout(t);
   }, []);
   const [loadErr, setLoadErr] = useState(null);
