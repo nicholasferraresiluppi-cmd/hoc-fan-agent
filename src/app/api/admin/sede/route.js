@@ -45,18 +45,22 @@ export async function GET() {
     feedback = { day, da_rivedere: fbs.filter((f) => f && ["in_revisione", "bloccato"].includes(f.status)).length };
   }
 
+  const ctrlIds = OFFICES.filter((o) => o.ctrl).map((o) => o.id);
+  const ctrlVals = ctrlIds.length ? await safe(kv.mget(...ctrlIds.map((id) => `sede:ctrl:${id}`))) : [];
+  const ctrl = Object.fromEntries(ctrlIds.map((id, i) => [id, parse(ctrlVals?.[i])]));
   const own = owners || {};
   const offices = OFFICES.map((o) => {
     const beat = o.beat ? beats[o.beat] : null;
     const status = statusOf(o, beat, now);
     const owner = own[o.id] || o.responsabile_default || null;
+    const controllo = ctrl[o.id] ? { at: ctrl[o.id].at, ok: ctrl[o.id].ok, problemi: ctrl[o.id].problemi || [] } : null;
     const coda = o.coda === "decisioni" ? { n: decisioni, label: "decisioni in attesa" } : o.coda === "feedback" && feedback ? { n: feedback.da_rivedere, label: `feedback da rivedere (${feedback.day})` } : null;
     return {
       id: o.id, piano: o.piano, nome: o.nome, tipo: o.tipo, compito: o.compito, risultato: o.risultato,
       controllore: o.controllore, cadenza: CADENCE[o.cadenza]?.label, link: o.link, esterno: o.esterno || null,
       owner, owner_confermato: !!own[o.id], passa_a: o.passa_a,
       stato: status.stato, at: status.at || null, ultimo: lastWork(o, beat),
-      buchi: gapsOf(o, { owner, status }), coda,
+      buchi: gapsOf(o, { owner, status, controllo }), coda, controllo,
     };
   });
   const totali = {
@@ -66,6 +70,7 @@ export async function GET() {
     senza_controllore: offices.filter((o) => o.buchi.some((b) => b.tipo === "controllore")).length,
     senza_responsabile: offices.filter((o) => o.buchi.some((b) => b.tipo === "responsabile")).length,
     fermi: offices.filter((o) => ["in_ritardo", "mai", "errore"].includes(o.stato)).length,
+    sospetti: offices.filter((o) => o.controllo && !o.controllo.ok).length,
   };
   return Response.json({ floors: FLOORS, offices, edges: edges(), totali, now });
 }

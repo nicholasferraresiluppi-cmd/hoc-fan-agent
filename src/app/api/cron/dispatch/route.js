@@ -31,7 +31,10 @@ import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { isCronAuthorized } from "@/lib/cron-auth";
 import { kickEndpoint } from "@/lib/cron-chain";
 
-export const maxDuration = 60;
+// 300s (Vercel Pro): il 4/10/2026 il centralino chiudeva in 58s su 60 e la
+// "Misura del progresso" riparata aggiunge ~16s di BigQuery → i lavori in fondo
+// (difficoltà creator) sarebbero stati tagliati in silenzio.
+export const maxDuration = 300;
 
 export async function POST(request) {
   const viaCron = isCronAuthorized(request);
