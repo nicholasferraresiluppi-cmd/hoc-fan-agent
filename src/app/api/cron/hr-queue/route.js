@@ -19,6 +19,8 @@ async function handle(request) {
     const az = await authorize(CAPABILITIES.SEED);
     if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   }
+  // battito a OGNI giro (anche a coda vuota): senza, «tutto tranquillo» e «fermo» non si distinguevano (Sede, 04/10/2026)
+  await kv.set("cron:alive:hr-queue", { at: Date.now() }, { ex: 2 * 24 * 3600 }).catch(() => {});
   if (!hrSyncConfig().enabled) return Response.json({ result: "skip:sync-off" });
   const [people, files] = await Promise.all([
     kv.scard("hr:sync:retry").catch(() => 0),

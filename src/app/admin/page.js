@@ -96,6 +96,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/admin/fan-archetypes",     title: "Tipi di fan",    desc: "Whale, Lonely, Negoziatore + strategie ottimali", icon: Sparkles },
       { href: "/admin/creators",           title: "Voce delle creator", desc: "Tone card + ganci emotivi + vocabolario creator", icon: UserCog },
       { href: "/admin/loop",               title: "Loop azione→esito", desc: "La coda registrata giorno per giorno e l'esito 48h (risposta + acquisto): il dataset proprietario che si accumula", icon: RefreshCw },
+      { href: "/admin/sede",               title: "La Sede",           desc: "L'azienda come uffici (persone, codice, AI): chi ha lavorato davvero, chi controlla chi, chi ne risponde e dove manca un pezzo", icon: Building2 },
       { href: "/admin/citta",              title: "La città",          desc: "L'azienda come una città: un palazzo per ogni creator e area, altezza = cose aperte, luci = ritardi (da ClickUp)", icon: Building2 },
       { href: "/admin/roadmap",            title: "Roadmap",           desc: "Cosa è in corso, cosa viene dopo, cosa è parcheggiato e dietro quale gate", icon: Signpost },
     ],
