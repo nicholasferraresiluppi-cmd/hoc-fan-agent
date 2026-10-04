@@ -12,7 +12,7 @@
  */
 import { normalizeSkillMap, normalizeLearnList, normalizePastRoles, clickupSkillLabels, skillName, pastRoleText } from "./hr-skills.js";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { FIELDS, FIELD_BY_KEY, EDITABLE_KEYS, validateCodiceFiscale, findChoice, SOURCE_REFERRAL } from "./hr-fields.js";
+import { FIELDS, FIELD_BY_KEY, EDITABLE_KEYS, validateCodiceFiscale, findChoice, SOURCE_REFERRAL, isLangNo } from "./hr-fields.js";
 
 // Schema e codice fiscale vivono in hr-fields.js (senza dipendenze Node: li
 // importano anche le pagine client). Qui si riesportano per comodità.
@@ -183,7 +183,8 @@ export function normalizePersonInput(input = {}, allowed = EDITABLE_KEYS) {
         break;
       }
       case "labels": {
-        values[key] = [...new Set(asList(raw))].slice(0, 40);
+        // "ENG - No" = la persona ha risposto "non la parlo": non è un'etichetta, non si salva
+        values[key] = [...new Set(asList(raw))].filter((x) => key !== "spokenLanguages" || !isLangNo(x)).slice(0, 40);
         break;
       }
       case "location": {

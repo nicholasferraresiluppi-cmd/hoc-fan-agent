@@ -12,7 +12,7 @@
  *  4. accesso a localStorage sempre protetto (in navigazione privata può
  *     lanciare: il modulo deve funzionare lo stesso).
  */
-import { FIELD_BY_KEY, FORM_KEYS, validateCodiceFiscale, SOURCE_REFERRAL } from "./hr-fields.js";
+import { FIELD_BY_KEY, FORM_KEYS, validateCodiceFiscale, SOURCE_REFERRAL, langsUnanswered, stripLangNo } from "./hr-fields.js";
 
 // ── 0. Campi obbligatori (04/10/2026, decisione del titolare) ────────────────
 // Servono tutti i dati per contratto e documenti; restano facoltativi solo quelli
@@ -46,7 +46,7 @@ export function requiredKeysFor(data = {}, { cfEnabled = true, cfPresent = false
 
 /** Chiavi obbligatorie rimaste vuote (in ordine di modulo). */
 export function missingRequired(data = {}, opts = {}) {
-  return requiredKeysFor(data, opts).filter((k) => isBlank(data[k]));
+  return requiredKeysFor(data, opts).filter((k) => isBlank(k === "spokenLanguages" ? stripLangNo(data[k]) : data[k]));
 }
 
 // ── 1. Avanzamento ────────────────────────────────────────────────────────────
@@ -82,6 +82,9 @@ export function fieldErrors(data = {}, keys = FORM_KEYS, { cfEnabled = true, cfP
   const has = (k) => keys.includes(k);
   for (const k of missingRequired(data, { cfEnabled, cfPresent })) {
     if (has(k) && k !== "firstName") out[k] = "Ci serve questo dato: compilalo qui.";
+  }
+  if (has("spokenLanguages") && langsUnanswered(data.spokenLanguages).length) {
+    out.spokenLanguages = "Rispondi per ogni lingua: scegli il livello, oppure «No» se non la parli.";
   }
   if (has("firstName") && !String(data.firstName || "").trim()) {
     out.firstName = "Ci serve almeno il tuo nome: scrivilo qui.";

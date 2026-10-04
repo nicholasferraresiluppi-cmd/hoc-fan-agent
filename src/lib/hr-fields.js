@@ -16,6 +16,18 @@
 //   descrizione, lì in sola lettura). Dal 03/10/2026 a DUE VIE: si modifica in app
 //   o su ClickUp; il testo si rilegge con hr-mirror.js e, se non si capisce, vale
 //   il valore dell'app (evento nello storico della scheda).
+// Lingue del modulo (04/10/2026): per OGNUNA delle cinque la persona deve rispondere,
+// anche "No". Il "No" viaggia come etichetta-sentinella "ENG - No" solo nel browser
+// (bozza compresa); il server la toglie prima di salvare e non arriva mai a ClickUp.
+export const LANG_CODES = ["ITA", "ENG", "SPA", "TED", "FR"];
+export const langNo = (code) => `${code} - No`;
+export const isLangNo = (label) => / - No$/.test(String(label || "").trim());
+export const stripLangNo = (list) => (Array.isArray(list) ? list.filter((x) => !isLangNo(x)) : list);
+/** Codici delle lingue a cui non si è ancora risposto (né livello né "No"). */
+export function langsUnanswered(list) {
+  const cur = Array.isArray(list) ? list.map((x) => String(x || "").trim()) : [];
+  return LANG_CODES.filter((c) => !cur.some((x) => x.startsWith(`${c} - `)));
+}
 export const GENDERS = ["Female", "Male", "Non-Binary", "I prefer not to declare it"];
 // Come la persona è arrivata da noi (03/10/2026, decisione del titolare): serve a tenere
 // vivo il confronto reference ↔ annunci e a riconoscere il premio reference (100 € a 30

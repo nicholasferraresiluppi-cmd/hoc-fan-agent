@@ -99,6 +99,7 @@ export function cityOf(residenceComune) {
 export function cardStats(data = {}) {
   const areas = strongestAreas(data.skillLevels).map((a) => ({ kind: "area", label: a.label, value: a.value }));
   const langs = (Array.isArray(data.spokenLanguages) ? data.spokenLanguages : [])
+    .filter((l) => !/ - No$/.test(String(l || "").trim()))
     .map(languageStat).filter(Boolean)
     // prima le lingue non italiane (dicono di più), poi l'italiano
     .sort((a, b) => (a.label === "ITA") - (b.label === "ITA"))
@@ -177,7 +178,7 @@ export function tesseraRows(data = {}) {
   const areas = strongestAreas(data.skillLevels).map((a) => ({ kind: "area", label: AREA_SHORT[a.area] || a.label, value: levelWord(a.level, data.gender) }));
   const langs = (Array.isArray(data.spokenLanguages) ? data.spokenLanguages : [])
     .map((l) => String(l || "").split(" - ").map((x) => x.trim()))
-    .filter(([code]) => code)
+    .filter(([code, lvl]) => code && lvl !== "No")
     .sort((a, b) => (a[0] === "ITA") - (b[0] === "ITA"))
     .slice(0, 2)
     .map(([code, lvl]) => ({ kind: "lang", label: LANG_FULL[code] || code, value: lvl ? (LANG_LEVEL_WORD[lvl] || lvl) : "" }));
@@ -198,7 +199,7 @@ export function tesseraMilestones(data = {}) {
   if (roleLabel(data.currentJob)) out.push("role");
   if (availabilityText(data.timeSlots)) out.push("slots");
   if (strongestAreas(data.skillLevels).length) out.push("skill");
-  if (Array.isArray(data.spokenLanguages) && data.spokenLanguages.length) out.push("lang");
+  if (Array.isArray(data.spokenLanguages) && data.spokenLanguages.some((l) => !/ - No$/.test(String(l || "").trim()))) out.push("lang");
   return out;
 }
 
