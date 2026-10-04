@@ -56,6 +56,7 @@ export function JobInput({ id, value, onChange, disabled }) {
 // Advanced/Native" (aggiunte al campo "Spoken Languages" lo stesso giorno). Le etichette
 // vecchie (ENG A1…C2, "Professional") restano valide nelle schede: si mostrano sul livello
 // equivalente e si sostituiscono appena qualcuno sceglie un livello nuovo.
+const seg = (on) => ({ padding: "6px 11px", borderRadius: 999, fontSize: 13, fontFamily: FONTS.body, cursor: "pointer", border: `1px solid ${on ? CP.accent : CP.border}`, background: on ? CP.accentSoft : CP.surface, color: on ? CP.accentSoftText : CP.textSecondary });
 const LEVELS = [["Base", "Basic"], ["Intermedio", "Intermediate"], ["Avanzato", "Advanced"], ["Madrelingua", "Native"]];
 const LANGS = [["Italiano", "ITA"], ["Inglese", "ENG"], ["Spagnolo", "SPA"], ["Tedesco", "TED"], ["Francese", "FR"]]
   .map(([name, code]) => ({ name, code, levels: LEVELS.map(([lab, lvl]) => [lab, `${code} - ${lvl}`]) }));
