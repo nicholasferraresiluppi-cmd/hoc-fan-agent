@@ -16,7 +16,7 @@
  * vive anche nello STATO DEL TASK (taskToPerson → statusPhase, personToClickup → status).
  */
 import { normalizeSkillMap, normalizeLearnList, normalizePastRoles, skillName, pastRoleText, oneLine, SKILL_AREAS } from "./hr-skills.js";
-import { FIELDS, FIELD_BY_KEY, isEmptyValue, maskCf, findChoice, choiceLabel, phaseFromTaskStatus, taskStatusNamesFor } from "./hr-people-core.js";
+import { FIELDS, FIELD_BY_KEY, isEmptyValue, maskCf, findChoice, choiceLabel, phaseFromTaskStatus, taskStatusNamesFor, toE164 } from "./hr-people-core.js";
 import { mirrorText, parseMirror, mirrorPrint } from "./hr-mirror.js";
 
 export const HOC_BLOCK_START = "— Dati HOC Pro —";
@@ -306,6 +306,11 @@ export function encodeFieldValue(meta, appType, value, choices = null) {
       return ms ? { body: { value: ms, value_options: { time: false } } } : { skip: "data non valida" };
     }
     case "number": case "currency": return { body: { value: Number(value) } };
+    case "phone": {
+      // un numero che ClickUp non accetta NON deve bloccare tutta la scheda: si salta solo il campo
+      const e = toE164(value);
+      return e ? { body: { value: e } } : { skip: "numero senza prefisso internazionale (+…): ClickUp non lo accetta" };
+    }
     case "location": {
       if (value.lat == null || value.lng == null) return { skip: "manca la posizione su mappa (lat/lng): testo nel blocco in descrizione" };
       return { body: { value: { location: { lat: Number(value.lat), lng: Number(value.lng) }, formatted_address: s(value.address) } } };
