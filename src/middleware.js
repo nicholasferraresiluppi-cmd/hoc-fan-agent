@@ -28,6 +28,8 @@ const isPublicRoute = createRouteMatcher([
   '/data/comuni-istat.json',
   // link corto del modulo HR (03/10/2026): solo redirect al link condiviso attivo, nessun dato
   '/tessera', '/hr/privacy',
+  // tessera condivisa (05/10/2026): solo nome, competenze e lingue, id casuale (lib/hr-tessera-link)
+  '/t/(.*)',
 ]);
 const isApiRoute = createRouteMatcher(['/api/(.*)']);
 

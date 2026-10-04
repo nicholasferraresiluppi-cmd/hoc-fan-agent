@@ -40,7 +40,7 @@ function isAuthRoute(path) {
 // la navigazione interna dell'app. Stesso motivo per il modulo HR da link
 // (/hr/modulo/[token]): lo compila chi magari non ha ancora un account.
 function isBareRoute(path) {
-  return path.startsWith("/assessment") || path.startsWith("/hr/modulo") || path === "/hr/privacy" || path === "/privacy";
+  return path.startsWith("/assessment") || path.startsWith("/hr/modulo") || path.startsWith("/t/") || path === "/hr/privacy" || path === "/privacy";
 }
 
 export default function AppShell({ children }) {

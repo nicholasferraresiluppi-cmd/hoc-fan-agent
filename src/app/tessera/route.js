@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   const link = await getSharedFormLink().catch(() => null);
-  if (link?.path) return Response.redirect(new URL(link.path, request.url), 307);
+  // la query passa (es. ?prova=documenti per provare una sezione senza compilare tutto)
+  if (link?.path) { const u = new URL(link.path, request.url); u.search = new URL(request.url).search; return Response.redirect(u, 307); }
   const html = `<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>House of Creators</title></head>
 <body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0c10;color:#f2eee6;font-family:system-ui,sans-serif;padding:24px;text-align:center">
 <div><div style="font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:rgba(242,238,230,.5)">House of Creators</div>
