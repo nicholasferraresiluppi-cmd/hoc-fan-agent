@@ -39,10 +39,10 @@ const THEMES = {
     ui: { sign: "#1f2a24", signBorder: "#7a9a6e", signText: "#e4f1e2", text: "#1d1b18", glass: "rgba(255,253,248,.75)" },
   },
   notte: {
-    label: "Notte in città", bg: 0x0b1020, floor: [22, 30, 10], wall: 0x111829, desk: 0xdfe3ea, metal: 0x5b6378, chair: 0x161a26, monFrame: 0x0a0d14,
+    label: "Notte in città", bg: 0x0b1020, floor: [22, 30, 10], wall: 0x111829, desk: 0xd8d2c6, metal: 0x5b6378, chair: 0x161a26, monFrame: 0x0a0d14,
     shirt: 0xe8ecf4, vest: { persona: 0x1b2236, AI: 0x2d2463, codice: 0x1b2236, robot: 0x1b2236 }, tie: { persona: 0xffc773, AI: 0x9d8cff, codice: 0x6fd1ff, robot: 0x6fd1ff },
     leaf: 0x6f9a8a, pot: 0xcfd5e0, sofa: 0x3a4258, lounge: [52, 44, 58], sky: ["#0a0f24", "#1b2550"], towers: ["#121a36", "#18224a", "#0f1630", "#1e2a58"], lit: "rgba(255,206,120,.85)",
-    chart: ["#0d1734", "#070c1f", "#6fd1ff"], hemi: [0x8aa0ff, 0x0a0c16, .55], sun: [0xb8c6ff, .9], exposure: 1.1, lamp: 0xffc773, logo: "rgba(111,209,255,.35)",
+    chart: ["#0d1734", "#070c1f", "#6fd1ff"], hemi: [0xc9d2ff, 0x0a0c16, .75], sun: [0xffe2b8, 1.0], exposure: 1.1, lamp: 0xffc773, logo: "rgba(111,209,255,.35)",
     ui: { sign: "#0c1226", signBorder: "#6fd1ff", signText: "#bfeaff", text: "#eef2ff", glass: "rgba(10,14,30,.65)" },
   },
   plastico: {
@@ -71,15 +71,15 @@ const CSS = `.ss{position:fixed;top:0;right:0;bottom:0;left:248px;z-index:30;ove
 .ss .top{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;gap:12px;padding:16px 20px;pointer-events:none;flex-wrap:wrap}
 .ss .top h1{font:400 30px var(--f-display),"Instrument Serif",Georgia,serif;margin:0;color:var(--t);text-shadow:0 2px 14px rgba(0,0,0,.25)}
 .ss .seg{display:flex;gap:4px;pointer-events:auto;background:var(--g);backdrop-filter:blur(10px);padding:4px;border-radius:999px;border:1px solid rgba(127,127,127,.25)}
-.ss .seg button{font:600 12.5px inherit;font-family:inherit;color:var(--t);opacity:.75;background:none;border:0;padding:7px 13px;border-radius:999px;cursor:pointer}
+.ss .seg button{font-weight:600;font-size:12.5px;font-family:inherit;color:var(--t);opacity:.75;background:none;border:0;padding:7px 13px;border-radius:999px;cursor:pointer}
 .ss .seg button.on{background:var(--t);color:var(--bgc);opacity:1}
 .ss .r{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
-.ss .cap{position:absolute;left:50%;bottom:8%;transform:translateX(-50%);z-index:5;font:800 30px inherit;font-family:inherit;color:#fff;text-shadow:0 3px 0 rgba(0,0,0,.35),0 0 24px rgba(0,0,0,.55);white-space:nowrap;pointer-events:none;transition:opacity .4s}
-.ss .pill{font:800 12.5px inherit;font-family:inherit;padding:3px 9px;border-radius:7px;white-space:nowrap;pointer-events:none;border:1.5px solid}
+.ss .cap{position:absolute;left:50%;bottom:8%;transform:translateX(-50%);z-index:5;font-weight:800;font-size:30px;font-family:inherit;color:#fff;text-shadow:0 3px 0 rgba(0,0,0,.35),0 0 24px rgba(0,0,0,.55);white-space:nowrap;pointer-events:none;transition:opacity .4s}
+.ss .pill{font-weight:800;font-size:12.5px;font-family:inherit;padding:3px 9px;border-radius:7px;white-space:nowrap;pointer-events:none;border:1.5px solid}
 .ss .pill.ok{color:#8ff0b0;background:rgba(14,40,24,.88);border-color:#4fbf78}
 .ss .pill.ko{color:#ff9a8a;background:rgba(48,14,12,.9);border-color:#d8584a}
 .ss .pill.idle{color:#d6d3cc;background:rgba(28,28,32,.85);border-color:#6b6a70}
-.ss .bub{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;border:3px solid;box-shadow:0 3px 10px rgba(0,0,0,.3);font:800 13px inherit;font-family:inherit;pointer-events:none;position:relative}
+.ss .bub{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;border:3px solid;box-shadow:0 3px 10px rgba(0,0,0,.3);font-weight:800;font-size:13px;font-family:inherit;pointer-events:none;position:relative}
 .ss .bub:after{content:"";position:absolute;bottom:-8px;left:50%;margin-left:-6px;border:6px solid transparent;border-top-color:inherit}
 .ss .bub.ai{background:#2a2353;color:#cfc6ff;border-color:#8b7cf6}
 .ss .bub.gold{background:#1d1b18;color:#d9b46a;border-color:#d9b46a}
@@ -87,8 +87,8 @@ const CSS = `.ss{position:fixed;top:0;right:0;bottom:0;left:248px;z-index:30;ove
 .ss .bub.small{width:28px;height:28px;border-width:2px}
 .ss .bub svg{width:18px;height:18px}
 .ss .sign{background:var(--sb);border:2px solid var(--sbd);border-radius:6px;padding:7px 12px;pointer-events:none;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.3)}
-.ss .sign b{display:block;font:900 16px inherit;font-family:inherit;color:var(--st);letter-spacing:.02em}
-.ss .sign span{display:block;font:600 11.5px inherit;font-family:inherit;color:var(--st);opacity:.75;margin-top:2px}
+.ss .sign b{display:block;font-weight:900;font-size:16px;font-family:inherit;color:var(--st);letter-spacing:.02em}
+.ss .sign span{display:block;font-weight:600;font-size:11.5px;font-family:inherit;color:var(--st);opacity:.75;margin-top:2px}
 .ss .card{position:absolute;right:18px;bottom:18px;z-index:6;width:min(340px,calc(100% - 36px));background:rgba(14,15,19,.94);color:#f2eee6;border:1px solid rgba(217,180,106,.4);border-radius:16px;padding:16px 18px;font-size:13px;line-height:1.5;display:none}
 .ss .card h3{font:400 24px var(--f-display),"Instrument Serif",serif;margin:0 0 4px}
 .ss .card .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#a7a39b;margin-top:9px}
@@ -106,7 +106,13 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
 
   const host = root.querySelector(".stage");
   const W = () => host.clientWidth || 800, H = () => host.clientHeight || 600;
+  // three 0.147 (versione del progetto): colori e luci "legacy" di default → scena slavata rispetto al
+  // prototipo (r160). Si allinea per la sola sala e si ripristina allo smontaggio (edificio e città restano com'erano).
+  const CM = THREE.ColorManagement, prevLegacy = CM && "legacyMode" in CM ? CM.legacyMode : undefined;
+  if (prevLegacy !== undefined) CM.legacyMode = false;
   const renderer = new THREE.WebGLRenderer({ antialias: true });
+  if ("physicallyCorrectLights" in renderer) renderer.physicallyCorrectLights = true;
+  if ("outputColorSpace" in renderer) renderer.outputColorSpace = "srgb"; else renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = T.exposure;
@@ -120,7 +126,7 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
   const B = (w, h, d, m) => mesh(new THREE.BoxGeometry(w, h, d), m);
   const RB = (w, h, d, r, m) => { const s = new THREE.Shape(); const x = -w / 2, y = -d / 2; s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + d - r); s.quadraticCurveTo(x + w, y + d, x + w - r, y + d); s.lineTo(x + r, y + d); s.quadraticCurveTo(x, y + d, x, y + d - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); const g = new THREE.ExtrudeGeometry(s, { depth: h, bevelEnabled: false }); g.rotateX(-Math.PI / 2); return mesh(g, m); };
   const tag = (html, y) => { const d = document.createElement("div"); d.innerHTML = html; const o = new CSS2DObject(d); o.position.y = y; return o; };
-  const tex = (w, h, draw) => { const c = document.createElement("canvas"); c.width = w; c.height = h; draw(c.getContext("2d"), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; disposables.push(t); return t; };
+  const tex = (w, h, draw) => { const c = document.createElement("canvas"); c.width = w; c.height = h; draw(c.getContext("2d"), w, h); const t = new THREE.CanvasTexture(c); if ("colorSpace" in t) t.colorSpace = "srgb"; else t.encoding = THREE.sRGBEncoding; t.anisotropy = 8; disposables.push(t); return t; };
   const basic = (map, o = {}) => { const m = new THREE.MeshBasicMaterial({ map, ...o }); disposables.push(m); return m; };
 
   // luci
@@ -346,6 +352,7 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
     renderer.domElement.removeEventListener("pointerdown", stopTour); renderer.domElement.removeEventListener("pointerdown", onDown); renderer.domElement.removeEventListener("pointerup", onUp);
     for (const d of disposables) d.dispose?.();
     renderer.dispose(); host.innerHTML = "";
+    if (prevLegacy !== undefined) CM.legacyMode = prevLegacy;
   };
 }
 
