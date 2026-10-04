@@ -95,7 +95,7 @@ export default function HrPersonPage() {
   const phone = toE164(f.personalPhone) || f.personalPhone;
   const syncBad = p && ["error", "partial", "deleted", "missing", "drift"].includes(p.sync?.status);
   const since = f.startDate ? fmtDate(f.startDate) : p?.createdAt ? fmtDate(p.createdAt) : null;
-  const subtitle = p ? [f.currentJob, since ? `con noi dal ${since}` : null, f.referredBy ? `segnalata/o da ${f.referredBy}` : null].filter(Boolean).join(" · ") : null;
+  const subtitle = p ? [f.currentJob, since ? `con noi dal ${since}` : null, f.referredBy ? `su segnalazione di ${f.referredBy}` : null].filter(Boolean).join(" · ") : null;
 
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1100, margin: "0 auto", fontFamily: FONTS.body }}>
