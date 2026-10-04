@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import useSWR from "swr";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHead, Notice, card, SectionTitle, FilterChip } from "@/components/ds";
@@ -12,6 +13,8 @@ import { PageHead, Notice, card, SectionTitle, FilterChip } from "@/components/d
  * (prova nel database), chi controlla il suo lavoro, chi ne risponde, a chi
  * passa il lavoro. In alto i BUCHI: dove manca una delle quattro regole.
  */
+
+const SedeScene = dynamic(() => import("@/components/SedeScene"), { ssr: false });
 
 const fetcher = (u) => fetch(u, { cache: "no-store" }).then(async (r) => { const j = await r.json().catch(() => ({ error: "Risposta non valida" })); return r.ok ? j : { error: j.error || `Errore ${r.status}` }; });
 
@@ -48,6 +51,8 @@ export default function Sede() {
   const { data, error, mutate } = useSWR("/api/admin/sede", fetcher, { refreshInterval: 60000, revalidateOnFocus: false });
   const [filtro, setFiltro] = useState(null);
   const [sel, setSel] = useState(null);
+  const [view, setView] = useState("edificio");
+  const toPianta = useCallback(() => setView("pianta"), []);
 
   const buchi = useMemo(() => {
     const m = {};
@@ -59,6 +64,8 @@ export default function Sede() {
   if (!data) return <Wrap><div style={{ color: CP.textMuted }}>Caricamento…</div></Wrap>;
   if (data.error) return <Wrap><Notice danger>{data.error}</Notice></Wrap>;
 
+  if (view === "edificio") return <SedeScene data={data} onPianta={toPianta} />;
+
   const t = data.totali;
   const visibili = (o) => !filtro || o.buchi.some((b) => b.tipo === filtro);
 
@@ -67,6 +74,7 @@ export default function Sede() {
       <PageHead
         crumbs={[{ label: "Direzione" }, { label: "La Sede" }]}
         title="La Sede"
+        actions={<button onClick={() => setView("edificio")} style={{ padding: "8px 14px", background: CP.accent, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, color: CP.accentInk, cursor: "pointer", fontFamily: FONTS.body }}>Vedi l'edificio</button>}
         subtitle="L'azienda vista come uffici (persone, codice, AI) che si passano il lavoro. Un ufficio lavora bene quando ha un solo compito, un risultato misurabile, qualcuno che controlla il suo lavoro e una persona che ne risponde. Qui vedi chi ha lavorato davvero e dove manca un pezzo."
       />
 

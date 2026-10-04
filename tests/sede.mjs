@@ -24,7 +24,11 @@ t("stato: lavora / in ritardo / errore / mai / persona / senza prova", () => {
   assert.equal(statusOf(cp, { at: now - 3600e3, error: true }, now).stato, "errore");
   assert.equal(statusOf(cp, null, now).stato, "mai");
   assert.equal(statusOf(officeById("nicholas"), null, now).stato, "persona");
-  assert.equal(statusOf(officeById("controllo-mattutino"), null, now).stato, "senza_prova");
+  const noBeat = { ...officeById("controllo-mattutino"), beat: null };
+  assert.equal(statusOf(noBeat, null, now).stato, "senza_prova");
+  // i task locali ora lasciano il battito: senza, sono "mai" (un buco vero)
+  assert.equal(statusOf(officeById("controllo-mattutino"), null, now).stato, "mai");
+  assert.equal(statusOf(officeById("pannello-tester"), { at: now - 3 * 86400e3 }, now).stato, "lavora");
 });
 t("coda ogni 5 minuti: in ritardo dopo mezz'ora", () => {
   const q = officeById("hr-queue");
@@ -41,7 +45,8 @@ t("buchi: controllore, responsabile, prova, ritardo, uscita", () => {
   const g = gapsOf(o, { owner: null, status: { stato: "in_ritardo" }, controllo: { ok: false, problemi: ["vuoto"] } }).map((x) => x.tipo);
   assert.deepEqual(g.sort(), ["controllore", "responsabile", "ritardo", "uscita"].sort());
   assert.ok(OFFICES.filter((x) => x.tipo !== "persona").every((x) => x.controllore), "ogni ufficio ha un controllore");
-  assert.ok(gapsOf(officeById("controllo-mattutino"), { owner: "Nicholas" }).some((x) => x.tipo === "prova"));
+  assert.ok(gapsOf({ ...officeById("controllo-mattutino"), beat: null }, { owner: "Nicholas" }).some((x) => x.tipo === "prova"));
+  assert.ok(!gapsOf(officeById("controllo-mattutino"), { owner: "Nicholas" }).some((x) => x.tipo === "prova"));
   assert.deepEqual(gapsOf(officeById("nicholas"), {}), []);
 });
 t("ultimo lavoro leggibile", () => {
