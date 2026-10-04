@@ -211,6 +211,21 @@ export async function getUserRoles(userId) {
   return ["operator"];
 }
 
+/**
+ * Ruoli SALVATI della persona, così come sono scritti (senza "Vedi come", senza
+ * ridurre un admin a ["admin"], senza gate 2FA). Serve a chi li modifica:
+ * getUserRoles dà i ruoli EFFETTIVI e per un admin restituisce solo ["admin"],
+ * quindi in Membri i ruoli aggiunti a un admin non comparivano mai selezionati
+ * e "Togli da admin" cancellava gli altri ruoli (ott 2026).
+ */
+export async function getStoredRoles(userId) {
+  if (!userId) return [];
+  const set = (await kv.smembers(`roles:${userId}`)) || [];
+  if (set.length) return set.map(String);
+  const legacy = await kv.get(`role:${userId}`);
+  return legacy ? [String(legacy)] : [];
+}
+
 export async function setUserRoles(userId, roles) {
   if (!userId) throw new Error("userId required");
   const arr = Array.isArray(roles) ? roles.filter(Boolean) : [];

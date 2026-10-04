@@ -1,7 +1,7 @@
 import { kv } from "@vercel/kv";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { listAdmins } from "@/lib/admin";
-import { authorize, authorizeAdmin, auditAccess, CAPABILITIES, getUserRoles, setUserRoles } from "@/lib/rbac";
+import { authorize, authorizeAdmin, auditAccess, CAPABILITIES, getStoredRoles, setUserRoles } from "@/lib/rbac";
 
 export async function GET() {
   const a = await authorize(CAPABILITIES.ACCESS_MGMT);
@@ -59,7 +59,8 @@ export async function POST(request) {
       // Revoca COMPLETA (27/09/2026, Nicholas): l'admin può venire anche dai metadata Clerk
       // (role / roles) e dai ruoli in KV. Prima si toglieva solo dal set KV e restava admin via Clerk.
       try {
-        const roles = await getUserRoles(targetId);
+        // ruoli SALVATI: getUserRoles per un admin dà solo ["admin"] e il filtro cancellava gli altri ruoli
+        const roles = await getStoredRoles(targetId);
         if (roles.includes("admin")) await setUserRoles(targetId, roles.filter((r) => r !== "admin"));
       } catch { /* ruoli KV: best-effort */ }
       try {
