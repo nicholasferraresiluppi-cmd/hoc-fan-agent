@@ -12,51 +12,64 @@
  * - i FATTORINI: dagli uffici che hanno lavorato un omino porta il fascicolo dorato all'ufficio dopo
  *   (il `passa_a` del registro), lo consegna (anello) e torna indietro a mani vuote;
  * - niente cifre sopra le persone (nel reel i bot hanno guadagni in testa: su persone vere = classifica).
- * Cinque stili ("rebranding") da confrontare, scelta ricordata nel browser. three.js con import dinamico.
+ * Cinque stili di ufficio (trading floor, loft, stanze di vetro, attico, sala regia), scelta ricordata nel browser.
+ * Si naviga come una mappa (trascina = scorri), "Vai a" per area, da lontano restano solo i cartelli delle aree.
  */
 import { useEffect, useRef, useState } from "react";
 
+// Stili di UFFICIO (Nicholas, 4/10: "mi piace l'omino e la scrivania, proponimi altri stili di ufficio"):
+// stessa gente e stesse scrivanie, architettura diversa. `env` = disposizione e arredi; il resto è palette.
 const THEMES = {
-  reel: {
-    label: "Reel", bg: 0x2b2c31, floor: [52, 64, 6], wall: 0xf3f2ef, desk: 0xf6f5f2, metal: 0x8c9099, chair: 0x2a2b30, monFrame: 0x1c1d21,
+  trading: {
+    label: "Trading floor", bg: 0x2b2c31, floor: [52, 64, 6], wall: 0xf3f2ef, desk: 0xf6f5f2, metal: 0x8c9099, chair: 0x2a2b30, monFrame: 0x1c1d21,
     shirt: 0xf6f5f2, vest: { persona: 0x2b2620, AI: 0x3a2f7a, codice: 0x23262f, robot: 0x23262f }, tie: { persona: 0xd9b46a, AI: 0x8b7cf6, codice: 0x4fbf78, robot: 0x4fbf78 },
     leaf: 0x9fd6b4, pot: 0xe9e2d6, sofa: 0x8f939d, lounge: [96, 78, 72], sky: ["#9fb8e6", "#dfe8f7"], towers: ["#5d74b8", "#4a63a8", "#7a8fc8", "#3e5597"], lit: "rgba(220,232,255,.55)",
     chart: ["#0e3b2c", "#082219", "#8ff0b0"], hemi: [0xffffff, 0x3a3a40, 1.25], sun: [0xfff4e6, 2.1], exposure: 1.05, lamp: 0xffe7c0, logo: "rgba(196,236,214,.85)",
     ui: { sign: "#16181c", signBorder: "#4fbf78", signText: "#8ff0b0", text: "#f2eee6", glass: "rgba(20,21,25,.6)" },
+    env: { layout: "islands", floor: "speck", walls: "plain", windows: "tall" },
   },
-  casa: {
-    label: "Casa", bg: 0x121110, floor: [26, 34, 3], wall: 0x1b1a18, desk: 0x5a4434, metal: 0xb89a62, chair: 0x1a1816, monFrame: 0x0d0c0b,
+  loft: {
+    label: "Loft industriale", bg: 0x1c1916, floor: [104, 120, 0], wall: 0x8a4b36, desk: 0x8a6442, metal: 0x26262a, chair: 0x4a2e22, monFrame: 0x121212,
+    shirt: 0xf4f1ea, vest: { persona: 0x2a3550, AI: 0x3a2f7a, codice: 0x3b3f46, robot: 0x3b3f46 }, tie: { persona: 0xf0b060, AI: 0xb9aef9, codice: 0xf0b060, robot: 0xf0b060 },
+    leaf: 0x7fa07a, pot: 0x2b2b2b, sofa: 0x7a4630, lounge: [104, 78, 58], sky: ["#f2b880", "#7a8fb8"], towers: ["#4a3a36", "#5a4640", "#3a2e2c", "#6a5248"], lit: "rgba(255,210,140,.75)",
+    chart: ["#2a1e14", "#1a120c", "#f0b060"], hemi: [0xffe8cc, 0x2a2018, .95], sun: [0xffd6a0, 1.7], exposure: 1.0, lamp: 0xffc070, logo: "rgba(240,176,96,.3)",
+    ui: { sign: "#1a1410", signBorder: "#f0b060", signText: "#ffd9a8", text: "#f2eee6", glass: "rgba(26,20,16,.6)" },
+    env: { layout: "islands", floor: "concrete", walls: "brick", windows: "factory", pendants: true },
+  },
+  vetro: {
+    label: "Stanze di vetro", bg: 0xe2e5e9, floor: [208, 222, 3], wall: 0xffffff, desk: 0xffffff, metal: 0xb7bcc4, chair: 0x2f3540, monFrame: 0x22262c,
+    shirt: 0xffffff, vest: { persona: 0x2b3a55, AI: 0x4b3fa0, codice: 0x3a4656, robot: 0x3a4656 }, tie: { persona: 0xc8963e, AI: 0x8b7cf6, codice: 0x3fa37a, robot: 0x3fa37a },
+    leaf: 0x86b49a, pot: 0xffffff, sofa: 0xc9ccd2, lounge: [196, 188, 176], sky: ["#cfe0f2", "#f3f6fb"], towers: ["#b9c6d8", "#a8b7cc", "#c9d3e2", "#9fb0c6"], lit: "rgba(255,255,255,.5)",
+    chart: ["#18324a", "#0f2234", "#9fd3ff"], hemi: [0xffffff, 0xbfc4cc, 1.45], sun: [0xfff6ea, 2.1], exposure: 1.0, lamp: 0xfff0d0, logo: "rgba(60,90,120,.16)",
+    ui: { sign: "#ffffff", signBorder: "#2b3a55", signText: "#1f2a3c", text: "#1d1b18", glass: "rgba(255,255,255,.78)" },
+    env: { layout: "rooms", floor: "carpet", walls: "plain", windows: "tall", glassRooms: true },
+  },
+  attico: {
+    label: "Attico", bg: 0x121110, floor: [30, 40, 2], wall: 0x1b1a18, desk: 0x3a2a20, metal: 0xb89a62, chair: 0x1a1816, monFrame: 0x0d0c0b,
     shirt: 0xf2eee6, vest: { persona: 0x1a1816, AI: 0x2a2236, codice: 0x23211e, robot: 0x23211e }, tie: { persona: 0xd9b46a, AI: 0xb9aef9, codice: 0xd9b46a, robot: 0xd9b46a },
-    leaf: 0x7f9c7c, pot: 0xd8cbb3, sofa: 0x6b5a48, lounge: [70, 52, 40], sky: ["#2a2420", "#4a3a2c"], towers: ["#1c1916", "#26211c", "#2f2923", "#15130f"], lit: "rgba(255,214,150,.6)",
-    chart: ["#1b1712", "#0f0d0a", "#d9b46a"], hemi: [0xffe9cc, 0x1a1512, .9], sun: [0xffdcae, 1.5], exposure: 1.0, lamp: 0xffd08a, logo: "rgba(217,180,106,.55)",
+    leaf: 0x7f9c7c, pot: 0xd8cbb3, sofa: 0x6b5a48, lounge: [70, 52, 40], sky: ["#f4a868", "#5a3a5c"], towers: ["#2a1e2a", "#3a2836", "#24182a", "#46303e"], lit: "rgba(255,214,150,.75)",
+    chart: ["#1b1712", "#0f0d0a", "#d9b46a"], hemi: [0xffe9cc, 0x1a1512, .95], sun: [0xffcf98, 1.7], exposure: 1.0, lamp: 0xffd08a, logo: "rgba(217,180,106,.45)",
     ui: { sign: "#14120f", signBorder: "#d9b46a", signText: "#e3cd9c", text: "#f2eee6", glass: "rgba(20,18,15,.6)" },
+    env: { layout: "islands", floor: "marble", walls: "plain", windows: "tall", rugs: true },
   },
-  giorno: {
-    label: "Giorno", bg: 0xe9e3d8, floor: [206, 222, -4], wall: 0xfbf9f5, desk: 0xc9a77e, metal: 0x9a8f80, chair: 0x4a4540, monFrame: 0x2a2826,
-    shirt: 0xffffff, vest: { persona: 0x3c4a5c, AI: 0x6a5fb0, codice: 0x5b6b5c, robot: 0x5b6b5c }, tie: { persona: 0xc08a3e, AI: 0x8b7cf6, codice: 0x7a9a6e, robot: 0x7a9a6e },
-    leaf: 0x8fb08a, pot: 0xffffff, sofa: 0xcbbfae, lounge: [186, 160, 132], sky: ["#cfe0f2", "#f3f6fb"], towers: ["#b9c6d8", "#a8b7cc", "#c9d3e2", "#9fb0c6"], lit: "rgba(255,255,255,.5)",
-    chart: ["#24402f", "#18301f", "#cfeedd"], hemi: [0xffffff, 0xc9bca8, 1.5], sun: [0xfff5e2, 2.3], exposure: 1.0, lamp: 0xfff0d0, logo: "rgba(120,150,120,.45)",
-    ui: { sign: "#1f2a24", signBorder: "#7a9a6e", signText: "#e4f1e2", text: "#1d1b18", glass: "rgba(255,253,248,.75)" },
-  },
-  notte: {
-    label: "Notte in città", bg: 0x0b1020, floor: [22, 30, 10], wall: 0x111829, desk: 0xd8d2c6, metal: 0x5b6378, chair: 0x161a26, monFrame: 0x0a0d14,
+  regia: {
+    label: "Sala regia", bg: 0x0b1020, floor: [22, 30, 10], wall: 0x111829, desk: 0xd8d2c6, metal: 0x5b6378, chair: 0x161a26, monFrame: 0x0a0d14,
     shirt: 0xe8ecf4, vest: { persona: 0x1b2236, AI: 0x2d2463, codice: 0x1b2236, robot: 0x1b2236 }, tie: { persona: 0xffc773, AI: 0x9d8cff, codice: 0x6fd1ff, robot: 0x6fd1ff },
     leaf: 0x6f9a8a, pot: 0xcfd5e0, sofa: 0x3a4258, lounge: [52, 44, 58], sky: ["#0a0f24", "#1b2550"], towers: ["#121a36", "#18224a", "#0f1630", "#1e2a58"], lit: "rgba(255,206,120,.85)",
-    chart: ["#0d1734", "#070c1f", "#6fd1ff"], hemi: [0xc9d2ff, 0x0a0c16, .75], sun: [0xffe2b8, 1.0], exposure: 1.1, lamp: 0xffc773, logo: "rgba(111,209,255,.35)",
+    chart: ["#0d1734", "#070c1f", "#6fd1ff"], hemi: [0xc9d2ff, 0x0a0c16, .8], sun: [0xffe2b8, 1.0], exposure: 1.1, lamp: 0xffc773, logo: "rgba(111,209,255,.3)",
     ui: { sign: "#0c1226", signBorder: "#6fd1ff", signText: "#bfeaff", text: "#eef2ff", glass: "rgba(10,14,30,.65)" },
-  },
-  plastico: {
-    label: "Plastico", bg: 0xdedcd8, floor: [232, 240, 0], wall: 0xf7f6f4, desk: 0xfbfaf8, metal: 0xd9d6d0, chair: 0xe9e6e1, monFrame: 0xe4e1dc,
-    shirt: 0xfbfaf8, vest: { persona: 0xfbfaf8, AI: 0xfbfaf8, codice: 0xfbfaf8, robot: 0xfbfaf8 }, tie: { persona: 0xd9b46a, AI: 0x8b7cf6, codice: 0xbdbab4, robot: 0xbdbab4 },
-    leaf: 0xf3f1ee, pot: 0xffffff, sofa: 0xf1efeb, lounge: [226, 222, 214], sky: ["#f4f3f1", "#ffffff"], towers: ["#e6e4e0", "#dedbd6", "#ebe9e5", "#d6d3ce"], lit: "rgba(255,255,255,0)",
-    chart: ["#f4f3f1", "#ebe9e5", "#2b2a28"], hemi: [0xffffff, 0xb9b5ae, 1.6], sun: [0xffffff, 2.2], exposure: .95, lamp: 0xffffff, logo: "rgba(0,0,0,.08)", mono: true,
-    ui: { sign: "#ffffff", signBorder: "#2b2a28", signText: "#2b2a28", text: "#1d1b18", glass: "rgba(255,255,255,.8)" },
+    env: { layout: "tiers", floor: "speck", walls: "plain", windows: "tall", screen: "giant" },
   },
 };
-const THEME_ORDER = ["reel", "casa", "giorno", "notte", "plastico"];
+const THEME_ORDER = ["trading", "loft", "vetro", "attico", "regia"];
+// disposizioni: centro di ogni area [x, z] e angolo relax
+const LAYOUTS = {
+  islands: { isle: { dati: [-15, -6.5], vendite: [-3.5, -7], formazione: [9, -1.5], persone: [-15, 4.5], controllo: [-3.5, 3.5], direzione: [3.5, 10.5] }, lounge: [15.5, 10.2], lanes: [-1.2, 8.6] },
+  rooms: { isle: { dati: [-14, -6.2], vendite: [0, -6.2], formazione: [14, -6.2], persone: [-14, 5.6], controllo: [0, 5.6], direzione: [10.5, 5.6] }, lounge: [17, 11.5], lanes: [0] },
+  tiers: { isle: { dati: [-3, -11], vendite: [-3, -6.8], formazione: [-3, -2.6], persone: [-3, 1.6], controllo: [-3, 5.8], direzione: [-3, 10] }, lounge: [15.5, 10.2], aisle: 8 },
+};
+const GO_LABEL = { dati: "Dati", vendite: "Vendite", formazione: "Formazione", persone: "Persone", controllo: "Controllo", direzione: "Direzione" };
 const AREE = { dati: "FONTI DEI DATI", vendite: "VENDITE E COACHING", formazione: "FORMAZIONE VENDITE", persone: "PERSONE", controllo: "CONTROLLO", direzione: "DIREZIONE" };
-const ISLE = { dati: [-15, -6.5], vendite: [-3.5, -7], formazione: [8.5, -1.5], persone: [-15, 4.5], controllo: [-3.5, 3.5], direzione: [3.5, 10.5] };
-const LOUNGE = [15.5, 10.2];
 const TIPO = { persona: "persona", AI: "agente AI", codice: "programma", robot: "robot" };
 const TIPI = { persona: "persone", AI: "agenti AI", codice: "programmi", robot: "robot" };
 const FERMI = ["in_ritardo", "mai", "errore"];
@@ -94,10 +107,19 @@ const CSS = `.ss{position:fixed;top:0;right:0;bottom:0;left:248px;z-index:30;ove
 .ss .card .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#a7a39b;margin-top:9px}
 .ss .card a{color:#d9b46a;text-decoration:none;display:inline-block;margin-top:12px}
 .ss .card button{position:absolute;top:12px;right:12px;background:none;border:1px solid rgba(242,238,230,.2);color:#c9c6bf;border-radius:999px;padding:2px 10px;cursor:pointer;font-family:inherit;font-size:12px}
-@media (max-width:760px){.ss .cap{font-size:20px}.ss .top h1{font-size:24px}}`;
+.ss .pill,.ss .bub{transition:opacity .25s}
+.ss.far .pill,.ss.far .bub{opacity:0}
+.ss .sign{transition:transform .25s;transform-origin:center bottom}
+.ss.far .sign{transform:scale(1.45)}
+.ss .go{display:flex;gap:4px;pointer-events:auto;background:var(--g);backdrop-filter:blur(10px);padding:4px;border-radius:999px;border:1px solid rgba(127,127,127,.25);align-items:center}
+.ss .go span{font-size:11.5px;color:var(--t);opacity:.6;padding:0 6px 0 10px}
+.ss .go button{font-weight:600;font-size:12px;font-family:inherit;color:var(--t);opacity:.8;background:none;border:0;padding:6px 10px;border-radius:999px;cursor:pointer}
+.ss .go button:hover{opacity:1;background:rgba(127,127,127,.18)}
+.ss .hint{position:absolute;left:20px;bottom:16px;z-index:5;font-size:12px;color:var(--t);opacity:.65;pointer-events:none}
+@media (max-width:760px){.ss .cap{font-size:20px}.ss .top h1{font-size:24px}.ss .hint{display:none}}`;
 
 function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObject) {
-  const T = THEMES[theme] || THEMES.reel;
+  const T = THEMES[theme] || THEMES.trading, E = T.env, LY = LAYOUTS[E.layout], ISLE = LY.isle, LOUNGE = LY.lounge;
   const OFF = D.offices.filter((o) => ISLE[o.piano]);
   const byId = Object.fromEntries(OFF.map((o) => [o.id, o]));
   const edges = (D.edges || []).filter((e) => byId[e.from] && byId[e.to]);
@@ -136,26 +158,45 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
 
   // pavimento, pareti, vetrate, schermo, logo
   const FW = 44, FD = 30;
-  const floorTex = tex(1024, 1024, (x, w, h) => { const [a, b, blue] = T.floor; x.fillStyle = `rgb(${a},${a + 1},${a + blue})`; x.fillRect(0, 0, w, h); for (let i = 0; i < 26000; i++) { const v = a + Math.random() * (b - a); x.fillStyle = `rgb(${v | 0},${(v + 1) | 0},${(v + blue) | 0})`; x.fillRect(Math.random() * w, Math.random() * h, 2, 2); } });
+  const floorTex = tex(1024, 1024, (x, w, h) => {
+    const [a, b, blue] = T.floor; const rnd = (v) => `rgb(${v | 0},${(v + 1) | 0},${(v + blue) | 0})`;
+    x.fillStyle = rnd(a); x.fillRect(0, 0, w, h);
+    if (E.floor === "marble") { // marmo scuro con venature calde
+      for (let i = 0; i < 9000; i++) { x.fillStyle = rnd(a + Math.random() * (b - a)); x.fillRect(Math.random() * w, Math.random() * h, 3, 3); }
+      x.strokeStyle = "rgba(217,180,106,.22)"; for (let i = 0; i < 14; i++) { x.lineWidth = .6 + Math.random() * 1.6; x.beginPath(); let px = Math.random() * w, py = 0; x.moveTo(px, py); while (py < h) { px += -30 + Math.random() * 60; py += 20 + Math.random() * 40; x.lineTo(px, py); } x.stroke(); }
+      x.strokeStyle = "rgba(0,0,0,.35)"; x.lineWidth = 2; for (let i = 1; i < 4; i++) { x.beginPath(); x.moveTo(i * w / 4, 0); x.lineTo(i * w / 4, h); x.stroke(); x.beginPath(); x.moveTo(0, i * h / 4); x.lineTo(w, i * h / 4); x.stroke(); }
+    } else if (E.floor === "concrete") { // cemento: macchie larghe e qualche crepa
+      for (let i = 0; i < 260; i++) { const r = 20 + Math.random() * 90; const g = x.createRadialGradient(0, 0, 0, 0, 0, r); const v = a + Math.random() * (b - a); g.addColorStop(0, `rgba(${v | 0},${v | 0},${(v + blue) | 0},.35)`); g.addColorStop(1, "rgba(0,0,0,0)"); x.save(); x.translate(Math.random() * w, Math.random() * h); x.fillStyle = g; x.fillRect(-r, -r, 2 * r, 2 * r); x.restore(); }
+      for (let i = 0; i < 20000; i++) { x.fillStyle = rnd(a - 8 + Math.random() * 24); x.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5); }
+      x.strokeStyle = "rgba(0,0,0,.18)"; x.lineWidth = 2; for (let i = 1; i < 3; i++) { x.beginPath(); x.moveTo(i * w / 3, 0); x.lineTo(i * w / 3, h); x.stroke(); x.beginPath(); x.moveTo(0, i * h / 3); x.lineTo(w, i * h / 3); x.stroke(); }
+    } else if (E.floor === "carpet") { for (let i = 0; i < 60000; i++) { x.fillStyle = rnd(a + Math.random() * (b - a)); x.fillRect(Math.random() * w, Math.random() * h, 1, 1); } }
+    else { for (let i = 0; i < 26000; i++) { x.fillStyle = rnd(a + Math.random() * (b - a)); x.fillRect(Math.random() * w, Math.random() * h, 2, 2); } }
+  });
   floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping; floorTex.repeat.set(5, 4);
   const floor = mesh(new THREE.PlaneGeometry(FW, FD), M(0xffffff, { map: floorTex }), false); floor.rotation.x = -Math.PI / 2; scene.add(floor);
-  const wallM = M(T.wall);
+  let wallM = M(T.wall);
+  if (E.walls === "brick") {
+    const brick = tex(512, 512, (x, w, h) => { x.fillStyle = "#4a2a20"; x.fillRect(0, 0, w, h); const bw = 64, bh = 24; for (let r = 0; r < h / bh; r++) for (let c = -1; c < w / bw + 1; c++) { const v = 120 + Math.random() * 40; x.fillStyle = `rgb(${v},${v * .48 | 0},${v * .36 | 0})`; x.fillRect(c * bw + (r % 2) * bw / 2 + 2, r * bh + 2, bw - 4, bh - 4); } });
+    brick.wrapS = brick.wrapT = THREE.RepeatWrapping; brick.repeat.set(10, 1.2); wallM = M(0xffffff, { map: brick });
+  }
   const wb = B(FW, 4.2, .35, wallM); wb.position.set(0, 2.1, -FD / 2); scene.add(wb);
   const wl = B(.35, 4.2, FD, wallM); wl.position.set(-FW / 2, 2.1, 0); scene.add(wl);
   const city = tex(2048, 512, (x, w, h) => { const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, T.sky[0]); g.addColorStop(1, T.sky[1]); x.fillStyle = g; x.fillRect(0, 0, w, h);
     for (let i = 0; i < 70; i++) { const bw = 40 + Math.random() * 90, bh = 120 + Math.random() * 360, bx = Math.random() * w; x.fillStyle = T.towers[i % 4]; x.fillRect(bx, h - bh, bw, bh); x.fillStyle = T.lit; for (let yy = h - bh + 10; yy < h - 8; yy += 16) for (let xx = bx + 6; xx < bx + bw - 6; xx += 12) if (Math.random() > .35) x.fillRect(xx, yy, 6, 8); } });
   const win = mesh(new THREE.PlaneGeometry(FD - 4, 3.2), basic(city), false); win.position.set(-FW / 2 + .19, 2.25, 0); win.rotation.y = Math.PI / 2; scene.add(win);
-  const mull = M(T.mono ? 0xe4e1dc : 0x5b5d66, { metalness: .4, roughness: .4 });
-  for (let z = -FD / 2 + 2; z <= FD / 2 - 2; z += 2.6) { const m = B(.12, 3.3, .12, mull); m.position.set(-FW / 2 + .25, 2.25, z); scene.add(m); }
+  const mull = M(E.windows === "factory" ? 0x1a1a1c : 0x5b5d66, { metalness: .4, roughness: .4 });
+  for (let z = -FD / 2 + 2; z <= FD / 2 - 2; z += E.windows === "factory" ? 1.3 : 2.6) { const m = B(.12, 3.3, .12, mull); m.position.set(-FW / 2 + .25, 2.25, z); scene.add(m); }
+  if (E.windows === "factory") for (const y of [1.2, 2.25, 3.3]) { const r = B(.1, .09, FD - 4, mull); r.position.set(-FW / 2 + .25, y, 0); scene.add(r); }
   const lavorano = OFF.filter((o) => stato(o) === "lavora").length, fermi = OFF.filter((o) => stato(o) === "fermo").length;
   const chart = tex(2048, 640, (x, w, h) => { const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, T.chart[0]); g.addColorStop(1, T.chart[1]); x.fillStyle = g; x.fillRect(0, 0, w, h);
     x.globalAlpha = .14; x.strokeStyle = T.chart[2]; x.lineWidth = 2; for (let i = 0; i < 12; i++) { x.beginPath(); x.moveTo(i * w / 12, 0); x.lineTo(i * w / 12, h); x.stroke(); } x.globalAlpha = 1;
     x.fillStyle = T.chart[2]; x.font = "900 46px Helvetica, Arial"; x.fillText("LA SEDE · OGGI", 60, 84); x.font = "600 32px Helvetica, Arial"; x.globalAlpha = .75; x.fillText(`${lavorano} uffici al lavoro · ${fermi} ${fermi === 1 ? "fermo" : "fermi"} · ${edges.length} collegamenti`, 60, 134); x.globalAlpha = 1;
     x.strokeStyle = T.chart[2]; x.lineWidth = 6; x.beginPath(); let y = h * .75; for (let i = 0; i <= 120; i++) { y = Math.max(h * .3, Math.min(h * .88, y - 7 + Math.random() * 12)); i ? x.lineTo(i * w / 120, y) : x.moveTo(0, y); } x.stroke(); });
-  const big = mesh(new THREE.PlaneGeometry(16, 5), basic(chart), false); big.position.set(6, 2.3, -FD / 2 + .19); scene.add(big);
-  const bf = B(16.3, 5.3, .1, M(T.monFrame)); bf.position.set(6, 2.3, -FD / 2 + .1); scene.add(bf);
+  const [SW, SX] = E.screen === "giant" ? [26, -3] : [16, 6];
+  const big = mesh(new THREE.PlaneGeometry(SW, E.screen === "giant" ? 3.6 : 5), basic(chart), false); big.position.set(SX, E.screen === "giant" ? 2.25 : 2.3, -FD / 2 + .19); scene.add(big);
+  const bf = B(SW + .3, E.screen === "giant" ? 3.9 : 5.3, .1, M(T.monFrame)); bf.position.set(SX, E.screen === "giant" ? 2.25 : 2.3, -FD / 2 + .1); scene.add(bf);
   const logo = tex(1024, 512, (x, w) => { x.fillStyle = T.logo; x.font = "400 300px Georgia, serif"; x.textAlign = "center"; x.fillText("HOC", w / 2, 360); });
-  const lg = mesh(new THREE.PlaneGeometry(9, 4.5), basic(logo, { transparent: true, depthWrite: false }), false); lg.rotation.x = -Math.PI / 2; lg.rotation.z = Math.PI / 4; lg.position.set(-3, .012, 9.5); scene.add(lg);
+  const lg = mesh(new THREE.PlaneGeometry(9, 4.5), basic(logo, { transparent: true, depthWrite: false }), false); lg.rotation.x = -Math.PI / 2; lg.rotation.z = Math.PI / 4; lg.position.set(E.layout === "tiers" ? 8 : -3, .012, E.layout === "rooms" ? 0 : 9.5); if (E.layout !== "rooms") scene.add(lg);
 
   // arredi
   const leafM = M(T.leaf, { roughness: .9 }), potM = M(T.pot), metal = M(T.metal, { metalness: T.mono ? 0 : .55, roughness: .35 });
@@ -173,7 +214,7 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
   const parquet = tex(512, 512, (x, w, h) => { const [r, g, b] = T.lounge; x.fillStyle = `rgb(${r - 20},${g - 20},${b - 20})`; x.fillRect(0, 0, w, h); for (let i = 0; i < 16; i++) for (let j = -1; j < 4; j++) { const v = Math.random() * 18; x.fillStyle = `rgb(${(r + v) | 0},${(g + v) | 0},${(b + v) | 0})`; x.fillRect(j * w / 4 + ((i % 2) * w / 8), i * h / 16, w / 4 - 3, h / 16 - 3); } });
   parquet.wrapS = parquet.wrapT = THREE.RepeatWrapping; parquet.repeat.set(3, 3);
   const lounge = mesh(new THREE.PlaneGeometry(11, 8.5), M(0xffffff, { map: parquet, roughness: .7 }), false); lounge.rotation.x = -Math.PI / 2; lounge.position.set(LOUNGE[0], .01, LOUNGE[1]); scene.add(lounge);
-  sofa(13.2, 8.3, 0); sofa(17.6, 8.3, 0); sofa(19.4, 11, -Math.PI / 2); lamp(11.2, 7.4); lamp(20.4, 7.6); pool(14.4, 12.2);
+  const [LX, LZ] = LOUNGE; sofa(LX - 2.3, LZ - 1.9, 0); sofa(LX + 2.1, LZ - 1.9, 0); sofa(LX + 3.9, LZ + .8, -Math.PI / 2); lamp(LX - 4.3, LZ - 2.8); lamp(LX + 4.9, LZ - 2.6); pool(LX - 1.1, LZ + 2);
   for (const [x, z, s] of [[-20, -13, 1.2], [20, -13, 1.1], [-20, 13, 1.2], [10.5, 13.5, 1], [-8, -13.3, .9], [0, 13.6, 1]]) plant(x, z, s);
 
   // persone
@@ -239,8 +280,9 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
     const hit = mesh(new THREE.BoxGeometry(1.8, 2, 1.9), new THREE.MeshBasicMaterial({ visible: false }), false); hit.position.set(0, 1, .4); hit.userData.o = o; g.add(hit); hits.push(hit);
     g.position.set(x, 0, z); g.rotation.y = facing; scene.add(g);
     const front = new THREE.Vector3(0, 0, 1.25).applyAxisAngle(new THREE.Vector3(0, 1, 0), facing);
-    pos[o.id] = { x: x + front.x, z: z + front.z };
+    pos[o.id] = { x: x + front.x, z: z + front.z, ...meta };
   };
+  let meta = {};
   const sign = (text, sub, x, z, rot) => {
     const g = new THREE.Group();
     const board = B(2.5, .85, .06, M(parseInt(T.ui.sign.slice(1), 16))); board.position.y = 1.45; board.rotation.x = -.15; g.add(board);
@@ -250,29 +292,71 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
     g.position.set(x, 0, z); g.rotation.y = rot; scene.add(g);
   };
   const occ = (list) => { const n = {}; list.forEach((o) => (n[o.tipo] = (n[o.tipo] || 0) + 1)); return Object.entries(n).map(([t, c]) => `${c} ${c === 1 ? TIPO[t] : TIPI[t]}`).join(" · "); };
+  const SP = 2.05; // passo tra le scrivanie: largo abbastanza perché i nomi non si accavallino
+  const glassM = E.glassRooms ? M(0xdfe9f2, { transparent: true, opacity: .28, roughness: .1, metalness: .1 }) : null, frameM = M(0x2b3a55, { metalness: .3, roughness: .4 });
+  const rugM = E.rugs ? M(0x5a2f2a, { roughness: .95 }) : null, rugBorder = E.rugs ? M(0xb08a52, { roughness: .9 }) : null;
   for (const [p, [cx, cz]] of Object.entries(ISLE)) {
-    const list = OFF.filter((o) => o.piano === p); if (!list.length) continue; const cols = Math.ceil(list.length / 2);
-    list.forEach((o, i) => { const row = i % 2, col = Math.floor(i / 2); desk(o, cx + (col - (cols - 1) / 2) * 1.75, cz + (row ? .55 : -.55), row ? 0 : Math.PI); });
-    sign(AREE[p], `${list.length} uffici · ${occ(list)}`, cx - cols * .875 - 1.4, cz + 1.9, .35);
+    const list = OFF.filter((o) => o.piano === p); if (!list.length) continue;
+    if (E.layout === "tiers") { // una fila per area, tutti rivolti allo schermo grande
+      const n = list.length, hw = n * SP / 2;
+      const plat = B(n * SP + 1.4, .12, 2.6, M(T.wall)); plat.position.set(cx, .06, cz + .5); scene.add(plat);
+      meta = { cx, hw, room: null, row: cz };
+      list.forEach((o, i) => desk(o, cx + (i - (n - 1) / 2) * SP, cz, 0));
+      sign(AREE[p], `${n} uffici · ${occ(list)}`, cx - hw - 1.9, cz + .6, .35);
+      continue;
+    }
+    const cols = Math.ceil(list.length / 2), rw = Math.max(2, cols) * SP + 1.7, rd = 4.4, hw = rw / 2;
+    let room = null;
+    if (E.glassRooms) { // stanza a vetri con la porta verso il corridoio
+      const doorSide = cz < 0 ? 1 : -1, door = 2.2, fz = cz + doorSide * rd / 2;
+      room = { cx, inZ: fz - doorSide * .55, doorZ: fz, outZ: fz + doorSide * .7 };
+      const wall = (w, x, z, rotY) => { const g = B(w, 1.3, .05, glassM); g.position.set(x, .65, z); g.rotation.y = rotY; g.castShadow = false; scene.add(g); const f = B(w, .06, .08, frameM); f.position.set(x, 1.32, z); f.rotation.y = rotY; scene.add(f); };
+      wall(rw, cx, cz - doorSide * rd / 2, 0);
+      wall(rd, cx - hw, cz, Math.PI / 2); wall(rd, cx + hw, cz, Math.PI / 2);
+      const side = (rw - door) / 2; wall(side, cx - hw + side / 2, fz, 0); wall(side, cx + hw - side / 2, fz, 0);
+      const inner = mesh(new THREE.PlaneGeometry(rw, rd), M(0xf4f5f7, { roughness: .6 }), false); inner.rotation.x = -Math.PI / 2; inner.position.set(cx, .008, cz); scene.add(inner);
+    }
+    if (E.rugs) { const r = RB(rw + .4, .02, rd + .2, .3, rugBorder); r.position.set(cx, .003, cz); scene.add(r); const r2 = RB(rw, .025, rd - .2, .25, rugM); r2.position.set(cx, .006, cz); scene.add(r2); }
+    if (E.pendants) for (let k = 0; k < cols; k++) { const lx = cx + (k - (cols - 1) / 2) * SP; const cord = mesh(new THREE.CylinderGeometry(.01, .01, 1.6, 6), M(0x111111), false); cord.position.set(lx, 3.8, cz); scene.add(cord);
+      const shade = mesh(new THREE.ConeGeometry(.32, .34, 24, 1, true), M(0x1d1d1f, { side: THREE.DoubleSide, metalness: .4, roughness: .5 })); shade.position.set(lx, 2.9, cz); scene.add(shade);
+      const bulb = mesh(new THREE.SphereGeometry(.08, 12, 10), M(0xfff1d0, { emissive: T.lamp, emissiveIntensity: 2 }), false); bulb.position.set(lx, 2.78, cz); scene.add(bulb);
+      const pl = new THREE.PointLight(T.lamp, 5, 6, 1.7); pl.position.set(lx, 2.7, cz); scene.add(pl); }
+    meta = { cx, hw: hw + .1, room };
+    list.forEach((o, i) => { const row = i % 2, col = Math.floor(i / 2); desk(o, cx + (col - (cols - 1) / 2) * SP, cz + (row ? .6 : -.6), row ? 0 : Math.PI); });
+    sign(AREE[p], `${list.length} uffici · ${occ(list)}`, cx - hw - 1.1, cz + (E.glassRooms ? (cz < 0 ? rd / 2 + 1.1 : -rd / 2 - .3) : 1.9), .35);
   }
   // chi è fermo va sul divano, col cartellino rosso
-  const SEATS = [[12.7, 8.45], [13.7, 8.45], [17.1, 8.45], [18.1, 8.45], [19.25, 10.5, -Math.PI / 2], [19.25, 11.5, -Math.PI / 2]];
+  const SEATS = [[LX - 2.8, LZ - 1.75], [LX - 1.8, LZ - 1.75], [LX + 1.6, LZ - 1.75], [LX + 2.6, LZ - 1.75], [LX + 3.75, LZ + .3, -Math.PI / 2], [LX + 3.75, LZ + 1.3, -Math.PI / 2]];
   OFF.filter((o) => stato(o) === "fermo").slice(0, SEATS.length).forEach((o, i) => {
     const [x, z, r = 0] = SEATS[i]; const p = person(o.tipo, 7 + i); p.position.set(x, 0, z); p.rotation.y = r; scene.add(p); pose(p, "lounge", 0);
     p.add(tag(`<div class="pill ko">${esc(o.nome)} · fermo${o.at ? " da " + ago(o.at).replace(" fa", "") : ""}</div>`, 2.15));
-    pos[o.id] ||= { x, z: z + .8 };
+    pos[o.id] ||= { x, z: z + .8, cx: x, hw: 0, room: null };
     const hit = mesh(new THREE.BoxGeometry(.9, 1.6, .9), new THREE.MeshBasicMaterial({ visible: false }), false); hit.position.set(x, .8, z); hit.userData.o = o; scene.add(hit); hits.push(hit);
   });
 
   // fattorini: dagli uffici che hanno lavorato, il fascicolo va all'ufficio dopo e il fattorino torna
-  const couriers = []; let ci = 0; const CORR = [-1.2, 8.6];
+  const couriers = []; let ci = 0;
   const folderM = M(0xd9b46a, { emissive: 0xb08a3a, emissiveIntensity: .35, metalness: .2, roughness: .4 });
   const segs = (path) => { let L = 0; const s = []; for (let i = 1; i < path.length; i++) { const [x0, z0] = path[i - 1], [x1, z1] = path[i]; const l = Math.hypot(x1 - x0, z1 - z0); if (l < .01) continue; s.push({ x0, z0, x1, z1, l, L }); L += l; } s.total = L; return s; };
   const at = (seg, d) => { for (const s of seg) if (d <= s.L + s.l) { const k = (d - s.L) / s.l; return [s.x0 + (s.x1 - s.x0) * k, s.z0 + (s.z1 - s.z0) * k, Math.atan2(s.x1 - s.x0, s.z1 - s.z0)]; } const e = seg[seg.length - 1]; return [e.x1, e.z1, Math.atan2(e.x1 - e.x0, e.z1 - e.z0)]; };
+  // dalla scrivania si esce di lato (mai attraverso l'isola), poi corridoio, poi si entra di lato
+  const side = (m) => m.cx + (m.x >= m.cx ? 1 : -1) * (m.hw + .55);
+  const route = (a, b, k) => {
+    const off = (k % 3 - 1) * .45;
+    if (E.layout === "tiers") { const ax = LY.aisle + off; return [[a.x, a.z], [ax, a.z], [ax, b.z], [b.x, b.z]]; }
+    if (E.layout === "rooms") {
+      const out = (m) => m.room ? [[side(m), m.z], [side(m), m.room.inZ], [m.room.cx, m.room.inZ], [m.room.cx, m.room.outZ]] : [];
+      const lane = LY.lanes[0] + off, A = out(a), Bp = out(b).reverse();
+      const ax = a.room ? a.room.cx : a.x, bx = b.room ? b.room.cx : b.x;
+      return [[a.x, a.z], ...A, [ax, lane], [bx, lane], ...Bp, [b.x, b.z]];
+    }
+    const L = LY.lanes, lane = L[(Math.abs(a.z - L[0]) + Math.abs(b.z - L[0])) < (Math.abs(a.z - L[1]) + Math.abs(b.z - L[1])) ? 0 : 1] + off;
+    const sa = a.hw ? side(a) : a.x, sb = b.hw ? side(b) : b.x;
+    return [[a.x, a.z], [sa, a.z], [sa, lane], [sb, lane], [sb, b.z], [b.x, b.z]];
+  };
   for (const e of edges) {
     const o = byId[e.from]; if (stato(o) !== "lavora") continue; const a = pos[e.from], b = pos[e.to]; if (!a || !b) continue;
-    const lane = CORR[(Math.abs(a.z - CORR[0]) + Math.abs(b.z - CORR[0])) < (Math.abs(a.z - CORR[1]) + Math.abs(b.z - CORR[1])) ? 0 : 1] + (ci % 3 - 1) * .5;
-    const seg = segs([[a.x, a.z], [a.x, lane], [b.x, lane], [b.x, b.z]]); if (!seg.length) continue;
+    const seg = segs(route(a, b, ci)); if (!seg.length) continue;
     const p = person(o.tipo === "persona" ? "persona" : "codice", 11 + ci); scene.add(p);
     const folder = B(.32, .04, .24, folderM); folder.position.set(0, 1.08, .34); p.add(folder);
     p.add(tag(`<div class="bub gold small"><svg viewBox="0 0 24 24" fill="#d9b46a"><path d="M3 6a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>`, 2.35));
@@ -285,15 +369,26 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
   const size = 6.5, aspect = () => W() / H();
   const camera = new THREE.OrthographicCamera(-size * aspect(), size * aspect(), size, -size, -100, 200);
   const ISO = new THREE.Vector3(14, 17, 14);
-  const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.maxPolarAngle = 1.2; controls.minZoom = .35; controls.maxZoom = 2.5;
+  const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.dampingFactor = .12;
+  // come una mappa: trascini col sinistro e la sala scorre; destro = ruota; rotella/pizzico = zoom
+  controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+  controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
+  controls.screenSpacePanning = false; controls.minPolarAngle = .55; controls.maxPolarAngle = 1.1; controls.minZoom = .5; controls.maxZoom = 2.2;
+  const clampTarget = () => { const t = controls.target, cx = Math.max(-20, Math.min(20, t.x)), cz = Math.max(-13, Math.min(13, t.z)); if (cx !== t.x || cz !== t.z) { const dx = cx - t.x, dz = cz - t.z; t.x = cx; t.z = cz; camera.position.x += dx; camera.position.z += dz; } };
+  controls.addEventListener("change", clampTarget);
   const STOPS = Object.entries(ISLE).filter(([p]) => OFF.some((o) => o.piano === p)).map(([p, at]) => ({ at, cap: { dati: "i dati entrano ogni notte", vendite: "vendite e coaching al lavoro", formazione: "la formazione vendite", persone: "persone e organizzazione", controllo: "il controllo verifica tutto", direzione: "il fascicolo arriva alla direzione" }[p] }));
   if (fermi) STOPS.push({ at: LOUNGE, cap: fermi === 1 ? "chi è fermo è in pausa" : `${fermi} uffici fermi, in pausa` });
   let tour = true, stopI = 0, stopT = 0; const camTarget = new THREE.Vector3(STOPS[0].at[0], 0, STOPS[0].at[1]);
   controls.target.copy(camTarget); camera.position.copy(camTarget).add(ISO);
   const capEl = root.querySelector(".cap"), bTour = root.querySelector('[data-cam="tour"]'), bAll = root.querySelector('[data-cam="all"]');
-  const setTour = (on) => { tour = on; bTour.classList.toggle("on", on); bAll.classList.toggle("on", !on); camera.zoom = on ? 1 : .42; camera.updateProjectionMatrix(); stopT = 0; if (!on) { camTarget.set(0, 0, 0); capEl.style.opacity = 0; } };
+  let fly = null; // volo verso un'area: { x, z, zoom }
+  const setTour = (on) => { tour = on; bTour.classList.toggle("on", on); bAll.classList.toggle("on", !on); stopT = 0; if (on) fly = { zoom: 1 }; else { fly = { x: 0, z: 0, zoom: .55 }; capEl.style.opacity = 0; } };
+  root.querySelectorAll("[data-go]").forEach((b) => { b.onclick = () => { const at = b.dataset.go === "relax" ? LOUNGE : ISLE[b.dataset.go]; if (!at) return; tour = false; bTour.classList.remove("on"); bAll.classList.remove("on"); capEl.style.opacity = 0; fly = { x: at[0], z: at[1], zoom: 1.15 }; }; });
+  const keys = new Set();
+  const onKey = (e) => { if (e.target.closest && e.target.closest("input,textarea,select")) return; const k = e.key.toLowerCase(); if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(k)) { if (e.type === "keydown") { keys.add(k); tour = false; fly = null; bTour.classList.remove("on"); capEl.style.opacity = 0; } else keys.delete(k); e.preventDefault(); } };
+  window.addEventListener("keydown", onKey); window.addEventListener("keyup", onKey);
   bTour.onclick = () => setTour(true); bAll.onclick = () => setTour(false);
-  const stopTour = () => { if (tour) { tour = false; bTour.classList.remove("on"); capEl.style.opacity = 0; } };
+  const stopTour = () => { fly = null; if (tour) { tour = false; bTour.classList.remove("on"); capEl.style.opacity = 0; } };
   renderer.domElement.addEventListener("pointerdown", stopTour);
   renderer.domElement.addEventListener("wheel", stopTour, { passive: true });
 
@@ -340,15 +435,27 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
     if (tour && !reduce) {
       stopT += dt; if (stopT > 6.5) { stopT = 0; stopI = (stopI + 1) % STOPS.length; }
       const s = STOPS[stopI]; camTarget.set(s.at[0], 0, s.at[1]); capEl.textContent = s.cap; capEl.style.opacity = stopT < .4 ? stopT / .4 : stopT > 6 ? (6.5 - stopT) / .5 : 1;
-      controls.target.lerp(camTarget, .035); camera.position.lerp(controls.target.clone().add(ISO), .035);
-    } else if (!tour && camera.zoom < .5) controls.target.lerp(camTarget, .05);
+      const d = camTarget.clone().sub(controls.target).multiplyScalar(.035); controls.target.add(d); camera.position.add(d);
+      if (fly?.zoom) { camera.zoom += (fly.zoom - camera.zoom) * .06; camera.updateProjectionMatrix(); }
+    } else if (fly) {
+      if (fly.x !== undefined) { const d = new THREE.Vector3(fly.x - controls.target.x, 0, fly.z - controls.target.z).multiplyScalar(.08); controls.target.add(d); camera.position.add(d); }
+      camera.zoom += (fly.zoom - camera.zoom) * .08; camera.updateProjectionMatrix();
+      if (Math.abs(fly.zoom - camera.zoom) < .01 && (fly.x === undefined || Math.hypot(fly.x - controls.target.x, fly.z - controls.target.z) < .05)) fly = null;
+    }
+    if (keys.size) { // frecce/WASD: muovono la vista sul pavimento, nella direzione dello schermo
+      const f = new THREE.Vector3(); camera.getWorldDirection(f); f.y = 0; f.normalize(); const r = new THREE.Vector3(-f.z, 0, f.x); const v = new THREE.Vector3(), sp = 14 * dt / camera.zoom;
+      if (keys.has("arrowup") || keys.has("w")) v.add(f); if (keys.has("arrowdown") || keys.has("s")) v.sub(f); if (keys.has("arrowright") || keys.has("d")) v.add(r); if (keys.has("arrowleft") || keys.has("a")) v.sub(r);
+      v.multiplyScalar(sp); controls.target.add(v); camera.position.add(v); clampTarget();
+    }
+    // livelli di dettaglio: da lontano solo i cartelli delle aree (grandi), da vicino nomi e bollini
+    const far = camera.zoom < .8; if (far !== root.classList.contains("far")) root.classList.toggle("far", far);
     controls.update(); renderer.render(scene, camera); css.render(scene, camera); raf = requestAnimationFrame(frame);
   };
   const resize = () => { renderer.setSize(W(), H()); css.setSize(W(), H()); camera.left = -size * aspect(); camera.right = size * aspect(); camera.top = size; camera.bottom = -size; camera.updateProjectionMatrix(); };
   const ro = new ResizeObserver(resize); ro.observe(host); resize(); raf = requestAnimationFrame(frame);
 
   return () => {
-    cancelAnimationFrame(raf); ro.disconnect(); controls.dispose();
+    cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); window.removeEventListener("keydown", onKey); window.removeEventListener("keyup", onKey); root.classList.remove("far");
     renderer.domElement.removeEventListener("pointerdown", stopTour); renderer.domElement.removeEventListener("pointerdown", onDown); renderer.domElement.removeEventListener("pointerup", onUp);
     for (const d of disposables) d.dispose?.();
     renderer.dispose(); host.innerHTML = "";
@@ -358,10 +465,10 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
 
 export default function SedeSala({ data, onView }) {
   const ref = useRef(null);
-  const [theme, setTheme] = useState("reel");
+  const [theme, setTheme] = useState("trading");
   const [err, setErr] = useState(false);
-  useEffect(() => { try { const t = localStorage.getItem("hoc:sede-sala-theme"); if (t && THEMES[t]) setTheme(t); } catch { /* */ } }, []);
-  const pick = (t) => { setTheme(t); try { localStorage.setItem("hoc:sede-sala-theme", t); } catch { /* */ } };
+  useEffect(() => { try { const t = localStorage.getItem("hoc:sede-ufficio"); if (t && THEMES[t]) setTheme(t); } catch { /* */ } }, []);
+  const pick = (t) => { setTheme(t); try { localStorage.setItem("hoc:sede-ufficio", t); } catch { /* */ } };
   useEffect(() => {
     if (!data?.offices || !ref.current) return;
     let unmount = null, dead = false;
@@ -388,6 +495,10 @@ export default function SedeSala({ data, onView }) {
             <div className="seg"><button onClick={() => onView?.("pianta")}>Pianta e dettagli</button><button onClick={() => onView?.("edificio")}>Edificio</button></div>
           </div>
         </div>
+        <div className="top" style={{ top: 58 }}>
+          <div className="go" role="group" aria-label="Vai a"><span>Vai a</span>{Object.keys(GO_LABEL).filter((p) => data?.offices?.some((o) => o.piano === p)).map((p) => <button key={p} data-go={p}>{GO_LABEL[p]}</button>)}<button data-go="relax">Relax</button></div>
+        </div>
+        <div className="hint">Trascina per muoverti · rotella per avvicinarti · tasto destro per girare · frecce o WASD</div>
         <div className="cap" />
         <div className="card" />
         {err && <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#c9c6bf" }}>La sala non si è caricata. Ricarica la pagina.</div>}
