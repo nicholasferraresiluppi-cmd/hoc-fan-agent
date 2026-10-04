@@ -31,7 +31,17 @@ export function normPhone(v) {
   if (!raw) return null;
   const digits = raw.replace(/[^\d]/g, "");
   if (!digits) return null;
-  return (raw.startsWith("+") || raw.startsWith("00") ? "+" : "") + digits.replace(/^00/, "");
+  const intl = raw.startsWith("+") || raw.startsWith("00");
+  // 04/10/2026: numero italiano scritto senza prefisso (cellulare 3xx, fisso 0x) → +39.
+  // Senza prefisso ClickUp rifiuta il campo telefono e, con lui, la creazione del task.
+  if (!intl && /^(3\d{8,9}|0\d{5,10})$/.test(digits)) return `+39${digits}`;
+  return (intl ? "+" : "") + digits.replace(/^00/, "");
+}
+
+/** Numero in formato internazionale (+cifre) o null: ClickUp accetta solo questo. */
+export function toE164(v) {
+  const n = normPhone(v);
+  return n && /^\+\d{8,15}$/.test(n) ? n : null;
 }
 /** Chiave di confronto del telefono: ultime 9 cifre (ignora prefisso internazionale). */
 export function phoneKey(v) {
