@@ -6,8 +6,11 @@
  * Forma "D1 · Tessera da club" (components/HrTessera, scelta da Nicholas al posto
  * della carta in stile FIFA). Regia invariata: la tessera appare coperta (dorso con
  * la palma), dopo ~0,6 s si gira con un bagliore oro e un riflesso che la attraversa,
- * poi compare il titolo di benvenuto (genere solo se dichiarato). "Rivedi" la fa
- * rigirare; toccandola si vede il retro con le righe dichiarate. "Salva la tua
+ * poi compare il titolo di benvenuto (genere solo se dichiarato). Toccandola si vede
+ * il retro con le righe dichiarate.
+ * 05/10/2026 (Nicholas): tolto "Rivedi" (non serviva e non funzionava); la rivelazione
+ * mostra la tessera DA TUTTI E DUE I LATI — fronte, retro con le righe, di nuovo fronte —
+ * e solo alla fine la illumina col riflesso. "Salva la tua
  * tessera" ne fa un PNG (lib/hr-tessera-png.js) da condividere o scaricare.
  * Con prefers-reduced-motion: niente animazioni, tessera già girata e titolo visibile.
  *
@@ -44,7 +47,7 @@ export default function HrWelcomeCard({ data = {}, at, children }) {
   const [glow, setGlow] = useState(false);
   const [glint, setGlint] = useState(0);
   const [titleOn, setTitleOn] = useState(false);
-  const [reset, setReset] = useState(false);
+  const [playing, setPlaying] = useState(true);
   const [saving, setSaving] = useState(null); // null | "busy" | "shared" | "downloaded" | messaggio d'errore
   const timers = useRef([]);
 
@@ -52,27 +55,28 @@ export default function HrWelcomeCard({ data = {}, at, children }) {
     timers.current.forEach(clearTimeout);
     let reduced = false;
     try { reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* vecchi browser */ }
-    if (reduced) { setFlipped(false); setCovered(false); setGlow(true); setTitleOn(true); return; }
-    // "Rivedi": torna coperta SUBITO (senza animazione), poi la rivelazione riparte
-    setReset(true);
-    setCovered(true);
-    setFlipped(true);
-    setGlow(false);
-    setTitleOn(false);
+    if (reduced) { setFlipped(false); setCovered(false); setGlow(true); setTitleOn(true); setPlaying(false); return; }
     timers.current = [
-      setTimeout(() => setReset(false), 60),
-      setTimeout(() => { setFlipped(false); setGlow(true); }, 600),
-      setTimeout(() => setGlint((g) => g + 1), 1350),
-      setTimeout(() => setTitleOn(true), 1500),
-      // a rivelazione finita il dorso diventa il retro con le righe (toccandola si vede)
-      setTimeout(() => setCovered(false), 1700),
+      // coperta (palma) → fronte col nome
+      setTimeout(() => setFlipped(false), 600),
+      // mentre si vede il fronte, il dorso diventa il retro con le righe dichiarate
+      setTimeout(() => setCovered(false), 1500),
+      // giro sul retro…
+      setTimeout(() => setFlipped(true), 2300),
+      // …e di nuovo sul fronte
+      setTimeout(() => setFlipped(false), 4100),
+      // solo ora la luce: alone d'oro e riflesso che la attraversa, poi il titolo
+      setTimeout(() => setGlow(true), 4900),
+      setTimeout(() => setGlint((g) => g + 1), 5200),
+      setTimeout(() => setTitleOn(true), 5600),
+      setTimeout(() => setPlaying(false), 5600),
     ];
   };
 
   useEffect(() => {
     play();
     return () => timers.current.forEach(clearTimeout);
-  }, []); // solo al primo montaggio: "Rivedi" richiama play()
+  }, []); // solo al primo montaggio
 
   const save = async () => {
     setSaving("busy");
@@ -86,7 +90,7 @@ export default function HrWelcomeCard({ data = {}, at, children }) {
   };
 
   const onFlip = (next) => {
-    if (covered) return; // durante la rivelazione non si gira
+    if (covered || playing) return; // durante la rivelazione non si gira
     setFlipped(next);
   };
 
@@ -94,7 +98,7 @@ export default function HrWelcomeCard({ data = {}, at, children }) {
     <div style={{ display: "grid", gap: 24, justifyItems: "center", textAlign: "center" }}>
       <style>{CSS}</style>
       <div style={{ width: "100%", paddingTop: 18 }}>
-        <HrTessera data={data} at={at} flipped={flipped} onFlip={onFlip} covered={covered} glow={glow} glintKey={glint} reset={reset} />
+        <HrTessera data={data} at={at} flipped={flipped} onFlip={onFlip} covered={covered} glow={glow} glintKey={glint} />
       </div>
       <h1 className={`hwc-title${titleOn ? " is-on" : ""}`} style={{ margin: "8px 0 0", fontFamily: SERIF, fontWeight: 400, fontSize: 40, lineHeight: 1.05, color: IVORY, maxWidth: 480 }}>
         {welcomeTitle(data)}
@@ -104,7 +108,6 @@ export default function HrWelcomeCard({ data = {}, at, children }) {
         <button type="button" onClick={save} disabled={saving === "busy"} style={{ ...btn(true), opacity: saving === "busy" ? 0.6 : 1 }}>
           {saving === "busy" ? "Preparo l'immagine…" : "Salva la tua tessera"}
         </button>
-        <button type="button" onClick={play} style={btn(false)}>Rivedi</button>
       </div>
       {(saving === "shared" || saving === "downloaded") && <div role="status" style={{ fontSize: 13, color: "rgba(242,238,230,.6)" }}>{saving === "downloaded" ? "Fatto: trovi l'immagine tra i download." : "Fatto."}</div>}
       {saving && !["shared", "downloaded", "busy"].includes(saving) && <div role="alert" style={{ fontSize: 13, color: "#e9a99f" }}>{saving}</div>}

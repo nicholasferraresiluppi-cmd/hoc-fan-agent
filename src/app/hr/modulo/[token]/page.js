@@ -68,7 +68,7 @@ const STEPS = [
   { title: "Il tuo lavoro", sub: "partita IVA e lingue", keys: ["partitaIva", "spokenLanguages"] },
   { title: "Le tue competenze", sub: "cosa sai fare, e a che livello", keys: ["skillLevels", "otherSkills", "learnWish"] },
   { title: "La tua esperienza", sub: "da dove arrivi", keys: ["pastRoles", "personalInterests", "source", "referredBy"] },
-  { title: "Ultimo passo", sub: "privacy e invio", keys: [] },
+  { title: "La privacy", sub: "leggi e conferma", keys: [] },
 ];
 const LABELS = {
   firstName: "Nome", surname: "Cognome", currentJob: "Che cosa fai oggi (facoltativo)", nationality: "Nazionalità", spokenLanguages: "Lingue che parli",
@@ -112,7 +112,12 @@ function keyboardFor(k, data) {
 const reducedMotion = () => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } };
 
 const CSS = `
-.hrf{position:relative;isolation:isolate}
+.hrf{position:relative;isolation:isolate;overflow-x:clip}
+/* 05/10/2026 (Nicholas dal telefono): il capitolo che entra di lato allargava la pagina di 18px e su iPhone
+   si poteva scorrere in orizzontale (bordo tagliato + striscia chiara). E l'elenco dei comuni era
+   trasparente: i campi sotto si leggevano attraverso. */
+html,body{overflow-x:hidden;background:#0b0c10}
+.hrf [role=listbox]{background:#16161b!important;z-index:30!important;box-shadow:0 18px 40px rgba(0,0,0,.6)!important}
 .hrf::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:url("${GRAIN_DATA_URI}");background-size:160px 160px;mix-blend-mode:overlay;opacity:.12}
 .hrf-sheet{padding:24px 20px;border-radius:18px;background:linear-gradient(180deg,rgba(242,238,230,.05),rgba(242,238,230,.018));border:1px solid rgba(242,238,230,.08);box-shadow:0 22px 48px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,245,225,.07)}
 @media (max-width:420px){.hrf-sheet{padding:20px 16px}}
@@ -537,7 +542,7 @@ export default function HrFormPage() {
     );
   }
 
-  if (stage === "files") return <Shell><FilesStep token={uploadToken || token} data={data} onDone={() => setStage("done")} /></Shell>;
+  if (stage === "files") return <Shell><FilesStep token={uploadToken || token} data={data} total={STEPS.length + 1} onDone={() => setStage("done")} /></Shell>;
 
   if (stage === "intro") {
     // col link condiviso il nome non lo sappiamo: niente saluto personale
@@ -548,7 +553,7 @@ export default function HrFormPage() {
           <div id="hrf-sample" style={{ opacity: ["show", "logoUp", "dock"].includes(splashPhase) ? 0 : 1 }}><HrTessera key="esempio" data={SAMPLE_CARD} at={Date.now()} sample autoFlip={splashPhase === "gone"} /></div>
           <div className="hrf-compose" style={{ "--d": "300ms" }}><Headline title={first ? `Ciao ${first},` : "Compila il modulo"} sub="e sblocca la tua tessera." size={40} /></div>
           <p className="hrf-compose" style={{ "--d": "450ms", margin: 0, color: CP.textSecondary, fontSize: 15.5, lineHeight: 1.55 }}>
-            Questa è una tessera d&apos;esempio: la tua prende forma con le tue risposte. Sette brevi capitoli, {timeEstimateText().replace(/^Ci vogliono /, "").replace(/\.$/, "")}.
+            Questa è una tessera d&apos;esempio: la tua prende forma con le tue risposte. Sette brevi capitoli e poi il documento d&apos;identità, {timeEstimateText().replace(/^Ci vogliono /, "").replace(/\.$/, "")}.
             {" "}Tieni a portata di mano un documento d&apos;identità.
             {ctx.shared ? "" : ` Il link vale fino al ${fmtDate(ctx.expiresAt)}.`}
           </p>
@@ -567,16 +572,21 @@ export default function HrFormPage() {
   const s = STEPS[step];
   const required = new Set(requiredKeysFor(data, { cfEnabled: Boolean(ctx?.cfEnabled), cfPresent: Boolean(ctx?.cfPresent) }));
   const last = step === STEPS.length - 1;
+  // i documenti sono un capitolo vero: contano nell'avanzamento, così l'ultimo capitolo dei dati
+  // non sembra la fine (05/10/2026: chi inviava pensava di aver finito e saltava il documento)
+  const withDocs = Boolean(ctx?.uploadsEnabled);
+  const total = STEPS.length + (withDocs ? 1 : 0);
+  const reallyLast = last && !withDocs;
   return (
     <Shell>
       <div style={{ display: "grid", gap: 22 }}>
         <HrTessera key="dal-vivo" data={data} at={Date.now()} small live />
         <div style={{ display: "grid", gap: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", color: CP.textMuted }}>
-            <span style={{ color: last ? GOLD : CP.textSecondary }}>{progressWords(step, STEPS.length)}</span><span>{step + 1} di {STEPS.length}</span>
+            <span style={{ color: reallyLast ? GOLD : CP.textSecondary }}>{progressWords(step, total)}</span><span>{step + 1} di {total}</span>
           </div>
-          <div style={{ display: "flex", gap: 4 }} role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} aria-valuetext={`Capitolo ${step + 1} di ${STEPS.length}: ${s.title}`}>
-            {STEPS.map((_, i) => <div key={i} className="hrf-bar" style={{ flex: 1, height: 2, borderRadius: 2, background: i < step ? GOLD : i === step ? "rgba(217,180,106,.55)" : "rgba(242,238,230,.10)" }} />)}
+          <div style={{ display: "flex", gap: 4 }} role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={step + 1} aria-valuetext={`Capitolo ${step + 1} di ${total}: ${s.title}`}>
+            {Array.from({ length: total }, (_, i) => <div key={i} className="hrf-bar" style={{ flex: 1, height: 2, borderRadius: 2, background: i < step ? GOLD : i === step ? "rgba(217,180,106,.55)" : "rgba(242,238,230,.10)" }} />)}
           </div>
           {resumed && (
             <div role="status" style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: "4px 12px", marginTop: 6, fontSize: 13, color: CP.textSecondary }}>
@@ -658,7 +668,7 @@ export default function HrFormPage() {
               ? <button type="button" className="hrf-pill" onClick={() => goTo(step - 1)} disabled={busy} style={pill(false)}>Indietro</button>
               : <button type="button" className="hrf-pill" onClick={() => { setResumed(false); setStage("intro"); }} disabled={busy} style={pill(false)}>Indietro</button>}
             <button type="submit" className="hrf-pill" disabled={busy} aria-busy={busy} style={{ ...pill(true), gap: 10, flex: 1, maxWidth: 260, cursor: busy ? "default" : "pointer" }}>
-              {busy ? <><HrPalmaLoader width={38} tone="ink" label="Invio in corso" /><span>Invio in corso</span></> : last ? "Invia i miei dati" : "Avanti"}
+              {busy ? <><HrPalmaLoader width={38} tone="ink" label="Invio in corso" /><span>Invio in corso</span></> : last ? (withDocs ? "Avanti: il documento" : "Invia i miei dati") : "Avanti"}
             </button>
           </div>
         </form>
@@ -668,70 +678,142 @@ export default function HrFormPage() {
   }
 }
 
-function FilesStep({ token, data, onDone }) {
-  // stato per file: null | { busy: "riduco"|"carico"|"salvo", pct } | "ok" | "messaggio di errore"
-  const [state, setState] = useState({ document: null, cv: null });
-  const up = async (kind, file) => {
+// Esempi disegnati (mai documenti veri): fanno capire COSA fotografare.
+function DocSample({ part }) {
+  const stroke = "rgba(217,180,106,.75)", soft = "rgba(242,238,230,.22)";
+  const W = part === "passaporto" ? 104 : 112, H = part === "passaporto" ? 74 : 70;
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden="true" style={{ flex: "none" }}>
+      <rect x="1" y="1" width={W - 2} height={H - 2} rx="7" fill="rgba(242,238,230,.04)" stroke={stroke} />
+      {part === "fronte" && <>
+        <rect x="9" y="14" width="26" height="34" rx="3" fill={soft} /><circle cx="22" cy="26" r="6" fill="rgba(242,238,230,.35)" /><path d="M13 44c2-7 16-7 18 0" fill="rgba(242,238,230,.35)" />
+        {[16, 24, 32, 40].map((y) => <rect key={y} x="42" y={y} width={y === 16 ? 52 : 40} height="3.5" rx="1.75" fill={soft} />)}
+        <text x="9" y="62" fontSize="7" fill={stroke} fontFamily="sans-serif">FRONTE · con la foto</text>
+      </>}
+      {part === "retro" && <>
+        {[12, 20, 28].map((y) => <rect key={y} x="9" y={y} width={y === 12 ? 70 : 56} height="3.5" rx="1.75" fill={soft} />)}
+        {[40, 46, 52].map((y) => <rect key={y} x="9" y={y} width="94" height="3" rx="1.5" fill="rgba(242,238,230,.32)" />)}
+        <text x="9" y="64" fontSize="7" fill={stroke} fontFamily="sans-serif">RETRO</text>
+      </>}
+      {part === "passaporto" && <>
+        <rect x="8" y="10" width="24" height="31" rx="3" fill={soft} /><circle cx="20" cy="21" r="5.5" fill="rgba(242,238,230,.35)" /><path d="M12 38c2-6 14-6 16 0" fill="rgba(242,238,230,.35)" />
+        {[12, 19, 26, 33].map((y) => <rect key={y} x="38" y={y} width={y === 12 ? 56 : 44} height="3.5" rx="1.75" fill={soft} />)}
+        {[52, 58].map((y) => <rect key={y} x="8" y={y} width="88" height="3" rx="1.5" fill="rgba(242,238,230,.32)" />)}
+        <text x="8" y="69" fontSize="6.5" fill={stroke} fontFamily="sans-serif">PAGINA CON LA FOTO</text>
+      </>}
+    </svg>
+  );
+}
+
+const DOC_TYPES = {
+  carta: { label: "Carta d'identità", parts: [
+    { id: "fronte", title: "Fronte *", hint: "Il lato con la tua foto, tutto intero e leggibile." },
+    { id: "retro", title: "Retro *", hint: "L'altro lato. Hai un solo PDF con i due lati? Caricalo anche qui." },
+  ] },
+  passaporto: { label: "Passaporto", parts: [
+    { id: "passaporto", title: "Pagina con la foto *", hint: "Aperto sulla pagina con foto e dati, tutta inquadrata." },
+  ] },
+};
+
+function FilesStep({ token, data, total, onDone }) {
+  // 05/10/2026 (Nicholas): si sceglie il documento. Carta = fronte + retro (due caricamenti, anche lo
+  // stesso PDF due volte), passaporto = una foto. Con un esempio disegnato per ciascun lato.
+  const [docType, setDocType] = useState(null);
+  // stato per parte: null | { busy: "riduco"|"carico"|"salvo", pct } | "ok" | "messaggio di errore"
+  const [state, setState] = useState({});
+  const up = async (slot, kind, part, file) => {
     if (!file) return;
-    const set = (v) => setState((s) => ({ ...s, [kind]: v }));
+    const set = (v) => setState((s) => ({ ...s, [slot]: v }));
     set({ busy: "riduco", pct: 0 });
     try {
       await uploadHrFile(token, kind, file, {
-        onStage: (busy) => setState((s) => ({ ...s, [kind]: { ...(s[kind] && typeof s[kind] === "object" ? s[kind] : {}), busy } })),
-        onProgress: (pct) => setState((s) => ({ ...s, [kind]: { busy: "carico", pct } })),
+        part,
+        onStage: (busy) => setState((s) => ({ ...s, [slot]: { ...(s[slot] && typeof s[slot] === "object" ? s[slot] : {}), busy } })),
+        onProgress: (pct) => setState((s) => ({ ...s, [slot]: { busy: "carico", pct } })),
       });
       set("ok");
     } catch (e) { set(e?.message || "Caricamento non riuscito. Riprova."); }
   };
   const anyBusy = Object.values(state).some((v) => v && typeof v === "object");
-  const docOk = state.document === "ok";
-  const docFailed = typeof state.document === "string" && state.document !== "ok";
-  const Item = ({ kind, title, hint }) => {
-    const st = state[kind];
+  const parts = docType ? DOC_TYPES[docType].parts : [];
+  const docOk = parts.length > 0 && parts.every((p) => state[p.id] === "ok");
+  const docFailed = parts.some((p) => typeof state[p.id] === "string" && state[p.id] !== "ok");
+  const Item = ({ slot, kind, part, title, hint }) => {
+    const st = state[slot];
     const busy = st && typeof st === "object";
     const text = busy ? (st.busy === "riduco" ? "Preparo il file…" : st.busy === "salvo" ? "Quasi fatto…" : `Carico… ${st.pct || 0}%`) : "";
     return (
       <div style={{ padding: "16px 0", borderTop: `1px solid ${CP.border}` }}>
-        <div style={{ fontSize: 15.5, marginBottom: 4 }}>{title}</div>
-        <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 10 }}>{hint}</div>
-        {st === "ok" ? <span style={{ fontSize: 14, color: GOLD }}>Ricevuto</span> : (
-          <>
-            <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" disabled={busy} onChange={(e) => up(kind, e.target.files?.[0])} style={{ fontSize: 14, color: CP.textSecondary, maxWidth: "100%" }} aria-label={title} />
-            {busy && (
-              <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 12 }}>
-                <HrPalmaLoader width={44} tone="gold" label={text} />
-                <div aria-hidden="true" style={{ flex: 1, minWidth: 0, fontSize: 13, color: CP.textMuted }}>
-                  {text}
-                  <div style={{ height: 3, background: CP.border, borderRadius: 2, marginTop: 6, maxWidth: 280 }}>
-                    <div style={{ height: 3, width: `${st.busy === "salvo" ? 100 : st.busy === "carico" ? st.pct || 0 : 0}%`, background: GOLD, borderRadius: 2, transition: "width .2s" }} />
+        <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+          {part ? <DocSample part={part} /> : null}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 15.5, marginBottom: 4 }}>{title}</div>
+            <div style={{ fontSize: 13, color: CP.textMuted, lineHeight: 1.45 }}>{hint}</div>
+          </div>
+        </div>
+        <div style={{ marginTop: 10 }}>
+          {st === "ok" ? <span style={{ fontSize: 14, color: GOLD }}>Ricevuto</span> : (
+            <>
+              {!busy && (
+                <label style={{ ...pill(false), width: "100%", boxSizing: "border-box", height: 46, fontSize: 14.5, cursor: "pointer" }}>
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={(e) => up(slot, kind, part, e.target.files?.[0])} style={SR_ONLY} aria-label={title} />
+                  {typeof st === "string" ? "Riprova" : part === "retro" ? "Carica il retro" : part === "fronte" ? "Carica il fronte" : part === "passaporto" ? "Carica la pagina con la foto" : "Carica il curriculum"}
+                </label>
+              )}
+              {busy && (
+                <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 12 }}>
+                  <HrPalmaLoader width={44} tone="gold" label={text} />
+                  <div aria-hidden="true" style={{ flex: 1, minWidth: 0, fontSize: 13, color: CP.textMuted }}>
+                    {text}
+                    <div style={{ height: 3, background: CP.border, borderRadius: 2, marginTop: 6, maxWidth: 280 }}>
+                      <div style={{ height: 3, width: `${st.busy === "salvo" ? 100 : st.busy === "carico" ? st.pct || 0 : 0}%`, background: GOLD, borderRadius: 2, transition: "width .2s" }} />
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-            {typeof st === "string" && st !== "ok" && <div role="alert" style={{ fontSize: 13, color: ERR_COLOR, marginTop: 6 }}>{st}</div>}
-          </>
-        )}
+              )}
+              {typeof st === "string" && st !== "ok" && <div role="alert" style={{ fontSize: 13, color: ERR_COLOR, marginTop: 6 }}>{st}</div>}
+            </>
+          )}
+        </div>
       </div>
     );
   };
+  const chooser = (id) => {
+    const on = docType === id;
+    // si cambia tipo solo se non c'è un caricamento in corso
+    return <button key={id} type="button" aria-pressed={on} disabled={anyBusy} onClick={() => setDocType(id)} style={{ ...pill(on), flex: 1, padding: "12px 10px" }}>{DOC_TYPES[id].label}</button>;
+  };
   return (
-    <div className="hrf-fade" style={{ display: "grid", gap: 22 }}>
+    <div className="hrf-fade" style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 22 }}>
       <HrTessera key="documenti" data={data} at={Date.now()} small />
-      <Headline title="Quasi fatto." sub="Ultimo passo: i documenti." size={36} />
-      <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>Il documento d&apos;identità è obbligatorio, il curriculum no. PDF, JPG o PNG, fino a 50 MB. Le foto le riduciamo noi. Hai un&apos;ora di tempo.</p>
-      <div style={{ borderBottom: `1px solid ${CP.border}` }}>
-        <Item kind="document" title="Documento d'identità *" hint="Fronte e retro nello stesso file, se puoi." />
-        <Item kind="cv" title="Curriculum (facoltativo)" hint="L'ultima versione che hai." />
+      <div style={{ display: "grid", gap: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", color: CP.textMuted }}>
+          <span style={{ color: GOLD }}>Ultimo capitolo</span><span>{total} di {total}</span>
+        </div>
+        <div style={{ display: "flex", gap: 4 }} role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={total} aria-valuetext={`Capitolo ${total} di ${total}: il documento`}>
+          {Array.from({ length: total }, (_, i) => <div key={i} style={{ flex: 1, height: 2, borderRadius: 2, background: i < total - 1 ? GOLD : "rgba(217,180,106,.55)" }} />)}
+        </div>
       </div>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button type="button" className="hrf-pill" onClick={onDone} disabled={anyBusy || !docOk} style={{ ...pill(true), flex: 1, opacity: anyBusy || !docOk ? 0.5 : 1 }}>{anyBusy ? "Attendi la fine del caricamento" : docOk ? "Ho finito" : "Carica il documento per finire"}</button>
-      </div>
-      {/* via d'uscita SOLO se il caricamento è fallito: la scheda c'è già, HR sa che il documento manca */}
-      {docFailed && (
-        <button type="button" onClick={onDone} style={{ background: "none", border: 0, padding: 0, color: CP.textMuted, fontSize: 13, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, justifySelf: "start" }}>
-          Non riesco a caricarlo adesso: lo mando a HR
+      <div className="hrf-sheet" style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 18 }}>
+        <Headline title="Il tuo documento" sub="senza, il modulo non è completo." size={34} />
+        <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>I tuoi dati li abbiamo. Manca solo il documento d&apos;identità: scegli quale hai sotto mano. PDF, JPG o PNG, fino a 50 MB; le foto le riduciamo noi. Hai un&apos;ora di tempo.</p>
+        <div style={{ display: "flex", gap: 10 }}>{chooser("carta")}{chooser("passaporto")}</div>
+        {docType && (
+          <div style={{ borderBottom: `1px solid ${CP.border}` }}>
+            {parts.map((p) => <Item key={p.id} slot={p.id} kind="document" part={p.id} title={p.title} hint={p.hint} />)}
+            <Item slot="cv" kind="cv" part={null} title="Curriculum (facoltativo)" hint="L'ultima versione che hai." />
+          </div>
+        )}
+        <button type="button" className="hrf-pill" onClick={onDone} disabled={anyBusy || !docOk} style={{ ...pill(true), width: "100%", opacity: anyBusy || !docOk ? 0.5 : 1 }}>
+          {anyBusy ? "Attendi la fine del caricamento" : docOk ? "Ho finito: mostrami la tessera" : !docType ? "Scegli il documento" : docType === "carta" ? "Carica fronte e retro per finire" : "Carica la pagina con la foto per finire"}
         </button>
-      )}
+        {/* via d'uscita SOLO se il caricamento è fallito: la scheda c'è già, HR sa che il documento manca */}
+        {docFailed && (
+          <button type="button" onClick={onDone} style={{ background: "none", border: 0, padding: 0, color: CP.textMuted, fontSize: 13, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, justifySelf: "start" }}>
+            Non riesco a caricarlo adesso: lo mando a HR
+          </button>
+        )}
+      </div>
     </div>
   );
 }

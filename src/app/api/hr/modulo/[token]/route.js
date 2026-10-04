@@ -23,7 +23,7 @@
  */
 import { after } from "next/server";
 import { getFormContext, submitForm, isSharedFormToken, pushPersonSafe, getPerson } from "@/lib/hr-people";
-import { notifyWhatsApp, newFormMessage } from "@/lib/whatsapp-notify";
+import { formSubmitted } from "@/lib/hr-form-notify";
 import { drainHrBackground } from "@/lib/hr-uploads";
 import { checkRateLimit, tooMany } from "@/lib/rate-limit";
 
@@ -68,8 +68,9 @@ export async function POST(request, props) {
   after(async () => {
     try {
       const p = personId ? await getPerson(personId) : null;
-      // avviso WhatsApp a Nicholas: "Antonio Marucci ha compilato il modulo HR" (mai bloccante)
-      if (p) await notifyWhatsApp(newFormMessage(p)).catch(() => {});
+      // avviso WhatsApp a Nicholas: col passo documenti parte quando arriva il documento
+      // (o dopo 45 minuti senza), non all'invio dei dati (lib/hr-form-notify, mai bloccante)
+      if (p) await formSubmitted(p.id, { waitForDocument: Boolean(out.uploadsEnabled) }).catch(() => {});
       if (p) await pushPersonSafe(p, p.clickupTaskId ? p.pendingKeys || [] : null, { actor: "modulo" });
     } catch { /* resta in hr:sync:retry: la riprende il giro dopo o la notte */ }
     await drainHrBackground({ budgetMs: 8000 }).catch(() => {});

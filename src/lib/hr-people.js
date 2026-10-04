@@ -1205,10 +1205,10 @@ export async function setPersonFileRef(personId, kind, { title, attachmentId, at
 }
 
 /** Nome dell'allegato su ClickUp (il nome della persona sta su ClickUp, MAI nel Blob). */
-export function attachmentName(person, kind, ext) {
+export function attachmentName(person, kind, ext, part = null) {
   const spec = UPLOAD_KIND[kind];
   const safeName = (fullName(person?.fields) || "persona").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9 ]+/g, "").trim().slice(0, 60);
-  return `${spec.title.replace(/'/g, "")} - ${safeName}.${ext}`;
+  return `${spec.title.replace(/'/g, "")}${part ? ` (${part})` : ""} - ${safeName}.${ext}`;
 }
 
 // ── Stato della sincronizzazione (pagina /admin/hr/sync) ─────────────────────

@@ -13,6 +13,7 @@ import { isCronAuthorized } from "@/lib/cron-auth";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { hrSyncConfig } from "@/lib/hr-people";
 import { drainHrBackground } from "@/lib/hr-uploads";
+import { flushMissingDocuments } from "@/lib/hr-form-notify";
 
 async function handle(request) {
   if (!isCronAuthorized(request)) {
@@ -21,6 +22,8 @@ async function handle(request) {
   }
   // battito a OGNI giro (anche a coda vuota): senza, «tutto tranquillo» e «fermo» non si distinguevano (Sede, 04/10/2026)
   await kv.set("cron:alive:hr-queue", { at: Date.now() }, { ex: 2 * 24 * 3600 }).catch(() => {});
+  // moduli inviati senza documento da 45 minuti: avviso WhatsApp «documento mancante»
+  await flushMissingDocuments().catch(() => 0);
   if (!hrSyncConfig().enabled) return Response.json({ result: "skip:sync-off" });
   const [people, files] = await Promise.all([
     kv.scard("hr:sync:retry").catch(() => 0),

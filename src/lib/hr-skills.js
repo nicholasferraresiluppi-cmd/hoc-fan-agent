@@ -54,7 +54,8 @@ export const SKILL_AREAS = [
     ],
   },
   {
-    key: "social", area: "Social organico", skills: [
+    // 05/10/2026: «Social organico» → «SMM · Social media manager» (Nicholas); il nome vecchio resta riconosciuto nel testo su ClickUp
+    key: "social", area: "SMM · Social media manager", aliases: ["Social organico"], skills: [
       sk("soc_instagram", "Instagram"),
       sk("soc_tiktok", "TikTok"),
       sk("soc_reddit", "Reddit"),

@@ -24,10 +24,16 @@ export async function notifyWhatsApp(text, { timeoutMs = 10000 } = {}) {
   }
 }
 
-/** "Antonio Marucci ha compilato il modulo HR." + link alla scheda. */
-export function newFormMessage(person, origin = "https://houseofcreators.app") {
+/**
+ * "Antonio Marucci ha compilato il modulo HR." + link alla scheda.
+ * doc: "caricato" (modulo completo col documento) | "manca" (dati inviati, documento non arrivato) | null
+ */
+export function newFormMessage(person, origin = "https://houseofcreators.app", { doc = null } = {}) {
   const f = person?.fields || {};
   const name = [f.firstName, f.surname].map((x) => String(x || "").trim()).filter(Boolean).join(" ") || "Una persona";
   const via = f.source === "Me l'ha consigliato qualcuno" && f.referredBy ? `\nSegnalato da: ${String(f.referredBy).trim()}` : "";
-  return `${name} ha compilato il modulo HR.${via}\n${origin}/admin/hr/${encodeURIComponent(person?.id || "")}`;
+  const what = doc === "caricato" ? "ha completato il modulo HR (documento caricato)."
+    : doc === "manca" ? "ha inviato i dati del modulo HR ma NON ha completato il documento d'identità."
+    : "ha compilato il modulo HR.";
+  return `${name} ${what}${via}\n${origin}/admin/hr/${encodeURIComponent(person?.id || "")}`;
 }
