@@ -165,6 +165,10 @@ export function hocBlockLines(person, byName, { cfPlain } = {}) {
   if (f.idDocument?.at) lines.push(`Documento d'identità: allegato il ${fmtItDate(f.idDocument.at)} (${s(f.idDocument.title)})`);
   // campi solo-app (02/10): luogo di nascita, comune/CAP di residenza, competenze con livello
   const has = (n) => byName.has(lc(n));
+  // provenienza e reference (04/10): se la lista non ha i campi "Provenienza"/"Segnalato da"
+  // restano visibili qui (prima andavano persi: nessun campo e nessuna riga)
+  if (s(f.source) && !has("Provenienza")) lines.push(`Come ci ha conosciuto: ${oneLine(f.source, 80)}`);
+  if (s(f.referredBy) && !has("Segnalato da")) lines.push(`Segnalato da: ${oneLine(f.referredBy, 120)}`);
   const bp = f.birthPlace;
   if (bp && !has("Luogo di nascita")) lines.push(`Luogo di nascita: ${bp.abroad ? bp.country : `${s(bp.name)}${bp.prov ? ` (${s(bp.prov)})` : ""}`}`);
   const rc = f.residenceComune;

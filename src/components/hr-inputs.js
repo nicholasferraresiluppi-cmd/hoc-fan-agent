@@ -51,46 +51,95 @@ export function JobInput({ id, value, onChange, disabled }) {
   );
 }
 
-// Lingue: livelli leggibili → etichette ClickUp esistenti.
-const LANGS = [
-  { name: "Italiano", levels: [["Madrelingua", "ITA - Native"]] },
-  { name: "Inglese", levels: [["Base", "ENG - A1"], ["Elementare", "ENG - A2"], ["Intermedio", "ENG - B1"], ["Buono", "ENG - B2"], ["Avanzato", "ENG - C1"], ["Ottimo", "ENG - C2"], ["Madrelingua", "ENG - Native"]], hint: "Base A1 · Elementare A2 · Intermedio B1 · Buono B2 · Avanzato C1 · Ottimo C2" },
-  { name: "Spagnolo", levels: [["Base", "SPA - Basic"], ["Lavorativo", "SPA - Professional"], ["Madrelingua", "SPA - Native"]] },
-  { name: "Tedesco", levels: [["Base", "TED - Basic"], ["Lavorativo", "TED - Professional"], ["Madrelingua", "TED - Native"]] },
-  { name: "Francese", levels: [["Base", "FR - Basic"], ["Lavorativo", "FR - Professional"], ["Madrelingua", "FR - Native"]] },
-];
-const seg = (on) => ({ padding: "6px 11px", borderRadius: 999, fontSize: 13, fontFamily: FONTS.body, cursor: "pointer", border: `1px solid ${on ? CP.accent : CP.border}`, background: on ? CP.accentSoft : CP.surface, color: on ? CP.accentSoftText : CP.textSecondary });
+// Lingue (04/10/2026, decisione del titolare): quattro livelli UGUALI per tutte le lingue —
+// Base, Intermedio, Avanzato, Madrelingua — su etichette ClickUp "XXX - Basic/Intermediate/
+// Advanced/Native" (aggiunte al campo "Spoken Languages" lo stesso giorno). Le etichette
+// vecchie (ENG A1…C2, "Professional") restano valide nelle schede: si mostrano sul livello
+// equivalente e si sostituiscono appena qualcuno sceglie un livello nuovo.
+const LEVELS = [["Base", "Basic"], ["Intermedio", "Intermediate"], ["Avanzato", "Advanced"], ["Madrelingua", "Native"]];
+const LANGS = [["Italiano", "ITA"], ["Inglese", "ENG"], ["Spagnolo", "SPA"], ["Tedesco", "TED"], ["Francese", "FR"]]
+  .map(([name, code]) => ({ name, code, levels: LEVELS.map(([lab, lvl]) => [lab, `${code} - ${lvl}`]) }));
+const LEGACY_LEVEL = { A1: "Basic", A2: "Basic", B1: "Intermediate", B2: "Intermediate", C1: "Advanced", C2: "Advanced", Professional: "Intermediate" };
+const LEVEL_HINT = "Base: capisci e scrivi frasi semplici · Intermedio: ti fai capire senza problemi · Avanzato: scrivi in modo fluido e naturale, come al lavoro · Madrelingua: è la tua lingua.";
+
+/** Livello attuale di una lingua (anche da etichetta vecchia) → etichetta nuova, o null. */
+function currentLevel(cur, code) {
+  for (const x of cur) {
+    const [c, lvl] = String(x || "").split(" - ").map((t) => t.trim());
+    if (c !== code || !lvl || lvl === "No") continue;
+    const norm = LEGACY_LEVEL[lvl] || lvl;
+    return `${code} - ${norm}`;
+  }
+  return null;
+}
 
 // explicit (modulo pubblico, 04/10/2026): nessuna risposta già scelta; "No" si salva come
 // "ENG - No" (il server lo toglie) così si sa che la persona ha risposto per ogni lingua.
 export function LanguagesInput({ id, value, onChange, disabled, explicit = false }) {
   const cur = Array.isArray(value) ? value : [];
-  const codeOf = (lang) => lang.levels[0][1].split(" - ")[0];
   const set = (lang, label) => {
-    const no = langNo(codeOf(lang));
-    const mine = [...lang.levels.map((l) => l[1]), no];
-    const others = cur.filter((x) => !mine.includes(x));
-    onChange(label ? [...others, label] : explicit ? [...others, no] : others);
+    const others = cur.filter((x) => !String(x || "").trim().startsWith(`${lang.code} - `));
+    onChange(label ? [...others, label] : explicit ? [...others, langNo(lang.code)] : others);
   };
   return (
     <div id={id} role="group" style={{ display: "grid", gap: 10 }}>
+      <div style={{ fontSize: 12, color: CP.textMuted, lineHeight: 1.45 }}>{LEVEL_HINT}</div>
       {LANGS.map((lang) => {
-        const lvl = lang.levels.find((l) => cur.includes(l[1]))?.[1] || null;
-        const saidNo = !lvl && (!explicit || cur.includes(langNo(codeOf(lang))));
-        const sel = lvl;
+        const sel = currentLevel(cur, lang.code);
+        const saidNo = !sel && (!explicit || cur.includes(langNo(lang.code)));
         return (
           <div key={lang.name} style={{ display: "grid", gap: 6, padding: "10px 12px", border: `1px solid ${CP.borderSoft || CP.border}`, borderRadius: 10 }}>
             <div style={{ fontSize: 14, color: CP.textPrimary, fontWeight: 500 }}>{lang.name}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              <button type="button" disabled={disabled} aria-pressed={saidNo} onClick={() => set(lang, null)} style={seg(saidNo)}>{lang.name === "Italiano" ? "Non madrelingua" : "No"}</button>
+              <button type="button" disabled={disabled} aria-pressed={saidNo} onClick={() => set(lang, null)} style={seg(saidNo)}>No</button>
               {lang.levels.map(([lab, val]) => (
                 <button key={val} type="button" disabled={disabled} aria-pressed={sel === val} onClick={() => set(lang, val)} style={seg(sel === val)}>{lab}</button>
               ))}
             </div>
-            {lang.hint && sel && sel !== "ENG - Native" && <div style={{ fontSize: 12, color: CP.textMuted }}>{lang.hint}</div>}
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ── Telefono con prefisso (04/10/2026) ────────────────────────────────────────
+// Prefisso da tendina (Italia di base) + numero: si salva "+39 333…" → ClickUp lo accetta.
+export const PHONE_PREFIXES = [
+  ["Italia", "+39"], ["Svizzera", "+41"], ["San Marino", "+378"], ["Spagna", "+34"], ["Francia", "+33"], ["Germania", "+49"],
+  ["Austria", "+43"], ["Regno Unito", "+44"], ["Romania", "+40"], ["Albania", "+355"], ["Portogallo", "+351"], ["Belgio", "+32"],
+  ["Paesi Bassi", "+31"], ["Polonia", "+48"], ["Grecia", "+30"], ["Croazia", "+385"], ["Ucraina", "+380"], ["Moldavia", "+373"],
+  ["Brasile", "+55"], ["Argentina", "+54"], ["Stati Uniti / Canada", "+1"],
+];
+/** "+41 79 123…" → { prefix: "+41", rest: "79 123…" }; senza + → Italia. */
+export function splitPhone(v) {
+  const raw = String(v || "").trim();
+  if (!raw.startsWith("+")) return { prefix: "+39", rest: raw };
+  // scritto dalla tendina: "+41 79 123…" (lo spazio separa il prefisso, si tengono gli spazi del numero)
+  const typed = PHONE_PREFIXES.find(([, p]) => raw.startsWith(`${p} `));
+  if (typed) return { prefix: typed[1], rest: raw.slice(typed[1].length + 1) };
+  const digits = raw.replace(/[^\d+]/g, "");
+  const hit = [...PHONE_PREFIXES].sort((a, b) => b[1].length - a[1].length).find(([, p]) => digits.startsWith(p));
+  if (hit) return { prefix: hit[1], rest: digits.slice(hit[1].length) };
+  return { prefix: "altro", rest: raw };
+}
+export function PhoneInput({ id, value, onChange, disabled, extra }) {
+  const { prefix, rest } = splitPhone(value);
+  const [pre, setPre] = useState(prefix);
+  useEffect(() => { if (value) setPre(splitPhone(value).prefix); }, [value]);
+  const emit = (p, r) => {
+    const num = String(r || "").trim();
+    if (!num) return onChange("");
+    onChange(p === "altro" ? (num.startsWith("+") ? num : `+${num}`) : `${p} ${num}`);
+  };
+  const box = { boxSizing: "border-box", padding: "8px 10px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, outline: "none" };
+  return (
+    <div style={{ display: "flex", gap: 8, minWidth: 0, maxWidth: "100%" }}>
+      <select aria-label="Prefisso" disabled={disabled} value={pre} onChange={(e) => { setPre(e.target.value); emit(e.target.value, rest); }} style={{ ...box, flex: "0 0 128px", width: 128, minWidth: 0 }}>
+        {PHONE_PREFIXES.map(([n, p]) => <option key={p + n} value={p}>{p} {n}</option>)}
+        <option value="altro">Altro (scrivi +…)</option>
+      </select>
+      <input id={id} type="tel" disabled={disabled} {...(extra || {})} value={rest} placeholder={pre === "altro" ? "+…" : "333 123 4567"} onChange={(e) => emit(pre, e.target.value)} style={{ ...box, flex: 1, minWidth: 0 }} />
     </div>
   );
 }

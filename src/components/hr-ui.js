@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { NationalityInput, JobInput, LanguagesInput, ComuneInput, ResidenceInput, BirthInput, SkillsInput, LearnInput, PastRolesInput } from "@/components/hr-inputs";
+import { NationalityInput, JobInput, LanguagesInput, PhoneInput, ComuneInput, ResidenceInput, BirthInput, SkillsInput, LearnInput, PastRolesInput } from "@/components/hr-inputs";
 import { SKILL_AREAS, normalizeSkillMap, normalizeLearnList, normalizePastRoles, skillName, pastRoleText } from "@/lib/hr-skills";
 
 export const lbl = { display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 4 };
@@ -91,6 +91,7 @@ export function FieldInput({ field, value, onChange, options, id, disabled, extr
   // controlli su misura (01/10): nazionalità da tendina, mansione Chatter/Altro, lingue con livello
   if (field.key === "nationality") return <NationalityInput id={id} value={value} onChange={onChange} disabled={disabled} />;
   if (field.key === "currentJob") return <JobInput id={id} value={value} onChange={onChange} disabled={disabled} />;
+  if (field.type === "phone") return <PhoneInput id={id} value={value} onChange={onChange} disabled={disabled} extra={extra} />;
   if (field.key === "spokenLanguages") return <LanguagesInput id={id} value={value} onChange={onChange} disabled={disabled} explicit={Boolean(extra?.explicitLanguages)} />;
   if (field.type === "comune") return <ResidenceInput id={id} value={value} onChange={onChange} disabled={disabled} />;
   if (field.type === "birth") return <BirthInput id={id} value={value} onChange={onChange} disabled={disabled} />;

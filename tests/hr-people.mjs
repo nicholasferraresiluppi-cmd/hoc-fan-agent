@@ -214,6 +214,8 @@ eq(stripHocBlock(withHocBlock("A", ["x: 1"])), "A", "blocco rimovibile");
     ok(C4.toE164("12345") === null, "numero non valido → null");
     ok(M4.encodeFieldValue({ type: "phone" }, "phone", "3331234567").body.value === "+393331234567", "ClickUp: numero vecchio senza prefisso corretto all'invio");
     ok(Boolean(M4.encodeFieldValue({ type: "phone" }, "phone", "12345").skip), "ClickUp: numero non accettabile = solo il campo saltato, la scheda parte");
+    const lines = M4.hocBlockLines({ id: "p1", fields: { source: "Me l'ha consigliato qualcuno", referredBy: "Marta Rossi" } }, new Map());
+    ok(lines.includes("Come ci ha conosciuto: Me l'ha consigliato qualcuno") && lines.includes("Segnalato da: Marta Rossi"), "provenienza e reference nel blocco se la lista non ha i campi");
   }
   ok(F.langsUnanswered(["ITA - Native", "ENG - No"]).join() === "SPA,TED,FR", "lingue: si sa a quali non ha ancora risposto");
   ok(F.langsUnanswered(["ITA - Native", "ENG - B2", "SPA - No", "TED - No", "FR - No"]).length === 0, "lingue: tutte risposte (anche con No)");
