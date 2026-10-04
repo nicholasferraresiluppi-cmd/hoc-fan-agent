@@ -53,7 +53,27 @@ export const TUTORIAL_VIDEOS = [
   },
 ];
 
-export const getTutorial = (id) => TUTORIAL_VIDEOS.find((v) => v.id === id) || null;
+/**
+ * Serie di formazione vendite «Il percorso di una vendita» (04/10/2026): 6 episodi, la coach Vera
+ * (senza volto) segue un fan, Marco, dal primo messaggio al giorno dopo. Numeri dallo studio delle
+ * chat (26 mesi). TENUTA FUORI da TUTORIAL_VIDEOS di proposito: /guida la mostrerebbe a tutti, e agli
+ * operatori arriva solo quando la direzione vendite la approva. Per ora vive nel Manuale vendite.
+ */
+const ep = (n, slug, title, summary, durationSec) => ({
+  id: `vendita-${slug}`, title: `${n}. ${title}`, summary,
+  src: `/video/vendita-${slug}.mp4`, poster: `/video/vendita-${slug}.jpg`,
+  orientation: "portrait", durationSec, audience: "Operatori (dopo l'approvazione)", asOf: "2026-10-04",
+});
+export const VENDITA_SERIE = [
+  ep(1, "e1-il-fan-arriva", "Il fan arriva", "Chi scrive entro un'ora è un fan caldo: prima lo fai parlare, poi un contenuto gratis porta la conversazione verso una scena.", 78),
+  ep(2, "e2-il-si", "Il sì", "Il momento giusto te lo dice il fan. Prima del contenuto a pagamento serve un sì: la domanda va nel messaggio che lo prepara.", 56),
+  ep(3, "e3-la-proposta", "La proposta", "Il messaggio a pagamento è una frase della scena, senza domande. Il primo gradino è basso: dopo un anno il fan vale lo stesso.", 51),
+  ep(4, "e4-dopo-acquisto", "Dopo l'acquisto", "Il momento più caldo: prima il calore e un piccolo regalo, poi il gradino dopo, appena più su. La mancia è il segnale più forte.", 50),
+  ep(5, "e5-il-no", "Il no", "I gradini salgono col sì e scendono col no. Dopo un «basta per stasera» si smette di vendere, non di parlare.", 51),
+  ep(6, "e6-il-giorno-dopo", "Il giorno dopo", "A un fan che non scrive non si manda subito il pagamento: prima si riaccende la conversazione. Sei passi, sempre uguali.", 42),
+];
+
+export const getTutorial = (id) => TUTORIAL_VIDEOS.find((v) => v.id === id) || VENDITA_SERIE.find((v) => v.id === id) || null;
 
 export function fmtDuration(sec) {
   const m = Math.floor(sec / 60), s = Math.round(sec % 60);

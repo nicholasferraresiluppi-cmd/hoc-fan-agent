@@ -4,6 +4,8 @@ import { useState } from "react";
 import useSWR from "swr";
 import { CP, alpha } from "@/lib/brand";
 import { PageHead, Notice, card, SectionTitle } from "@/components/ds";
+import { TutorialVideoCard } from "@/components/TutorialVideo";
+import { VENDITA_SERIE } from "@/lib/tutorial-videos";
 
 /**
  * /admin/manuale-vendite — il manuale di vendita per la direzione vendite.
@@ -100,6 +102,12 @@ export default function ManualeVendite() {
             <div style={{ fontSize: 12, color: CP.textMuted }}>Aggiornato {fmtDate(d.updated_at)} · si apre in una scheda nuova</div>
           </a>
         ))}
+      </div>
+
+      <SectionTitle aside="6 episodi · circa 5 minuti in tutto · si guardano in ordine">Video · Il percorso di una vendita</SectionTitle>
+      <p style={{ color: CP.textSecondary, fontSize: 13.5, margin: "-4px 0 12px", maxWidth: 760 }}>Una coach, Vera, segue un fan dal primo messaggio al giorno dopo l'acquisto: ogni episodio è un passo e riprende la domanda lasciata da quello prima. Chat ricostruite, numeri dallo studio. Per ora li vede solo la direzione vendite: agli operatori arrivano dopo la vostra approvazione.</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 12, marginBottom: 28 }}>
+        {VENDITA_SERIE.map((v) => <TutorialVideoCard key={v.id} video={v} />)}
       </div>
 
       <SectionTitle>Prove sul campo</SectionTitle>
