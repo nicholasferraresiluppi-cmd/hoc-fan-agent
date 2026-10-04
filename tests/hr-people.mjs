@@ -993,6 +993,16 @@ console.log(`hr-people: ${n} asserzioni OK`);
   const rec0 = await H.importFromClickup({ mode: "reconcile", by: "test" });
   t(rec0.ok && rec0.updated === 0 && rec0.created === 0, "riconciliazione senza modifiche: niente da aggiornare");
 
+  // 2b) incidente 04/10: un campo creato DOPO su ClickUp (vuoto) non deve svuotare l'app,
+  //     e il controllo di parità lo riempie con il valore dell'app
+  await H.savePerson({ id: sara.id, input: { source: "Altro" }, actor: "admin", source: "app" });
+  FIELDS_META.push({ id: "f-prov", name: "Provenienza", type: "drop_down", type_config: { options: [{ id: "o-ref", name: "Me l'ha consigliato qualcuno", orderindex: 0 }, { id: "o-alt", name: "Altro", orderindex: 3 }] } });
+  const recNew = await H.importFromClickup({ mode: "import", by: "test" });
+  const sNew = await H.getPerson(sara.id);
+  t(sNew.fields.source === "Altro", "campo nuovo e vuoto su ClickUp: il valore dell'app resta");
+  t(recNew.parityChecked >= 1 && recNew.drift.length === 0 && cu.tasks.get(taskId).values["f-prov"] === "o-alt", "parità: il campo nuovo su ClickUp viene riempito dall'app");
+  FIELDS_META.pop();
+
   // 3) modifica vera su ClickUp → l'app si aggiorna (anche le etichette Skills seguono)
   editOnClickup(taskId, "Luogo di nascita", "milano, mi");
   editOnClickup(taskId, "Competenze e livello", "OnlyFans: Chat e vendita (Esperto)\nSocial organico: Instagram (Autonomo)");
