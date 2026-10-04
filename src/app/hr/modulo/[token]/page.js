@@ -153,8 +153,6 @@ const CSS = `
    si disegna (CSS), non da quando il JS è pronto. */
 .hrf-sun{position:absolute;left:50%;top:50%;width:380px;height:380px;margin:-190px 0 0 -190px;border-radius:50%;background:radial-gradient(closest-side,rgba(217,180,106,.26),rgba(217,180,106,.07) 45%,transparent 70%);opacity:0;animation:hrfSun 3.6s ease .2s forwards;pointer-events:none}
 @keyframes hrfSun{0%{opacity:0;transform:scale(.6)}40%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(1.05)}}
-.hrf-alba{animation:hrfLogoOut .5s ease 3.3s forwards}
-@keyframes hrfLogoOut{to{opacity:0;transform:scale(.92) translateY(-8px)}}
 .hrf-alba .hl-ch{opacity:.07;animation:hrfCh 1.1s ease calc(.5s + var(--i) * .12s) forwards}
 @keyframes hrfCh{0%{opacity:.07;text-shadow:0 0 0 rgba(255,226,170,0)}45%{opacity:1;text-shadow:0 0 18px rgba(255,226,170,.6)}100%{opacity:1;text-shadow:0 0 0 rgba(255,226,170,0)}}
 .hrf-alba .hl-palm{opacity:.08;animation:hrfPalm 1s ease 2.3s forwards}
@@ -162,7 +160,17 @@ const CSS = `
 .hrf-scene{position:absolute;inset:0;display:grid;place-items:center;perspective:1000px;pointer-events:none}
 .hrf-scard{position:relative;width:300px;height:189px;transform-style:preserve-3d;opacity:0;animation:hrfCardIn 1.6s cubic-bezier(.45,.05,.35,1) 3.85s forwards;transition:transform 1.1s cubic-bezier(.4,0,.2,1)}
 @keyframes hrfCardIn{0%{opacity:0;transform:rotateY(180deg) scale(.85)}20%{opacity:1}100%{opacity:1;transform:rotateY(360deg) scale(1)}}
-.hrf-splash.is-leaving .hrf-scard{transform:translateY(-26vh) scale(.92)}
+/* 05/10/2026 sera (Nicholas: «la pagina si deve comporre, niente stacco»): il logo SALE fino
+   all'intestazione, la tessera arriva al centro, brilla e SALE al posto della tessera
+   d'esempio; poi titolo, testo e pulsanti compaiono uno alla volta. Spostamenti calcolati in
+   JS sulle posizioni vere (SplashOverlay); qui solo le uscite. */
+.hrf-cardwrap{position:relative;width:300px;height:189px}
+.hrf-splash.is-dock .hrf-halo,.hrf-splash.is-compose .hrf-halo{opacity:0!important;transition:opacity .5s ease}
+.hrf-splash.is-compose{opacity:0;transition:opacity .35s ease;pointer-events:none}
+.hrf[data-compose="wait"] .hrf-compose{opacity:0}
+.hrf[data-compose="go"] .hrf-compose{animation:hrfComp .6s cubic-bezier(.2,.7,.2,1) var(--d,0ms) both}
+@keyframes hrfComp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+#hrf-brand{transition:opacity .35s ease}
 /* 05/10/2026 (Nicholas: «non è effetto wow»): alone d'oro dietro la tessera e riflesso di luce
    sulla faccia dopo il giro. Sono cambi di LUCE: restano anche con «Riduci movimento». */
 .hrf-halo{position:absolute;left:50%;top:50%;width:520px;height:340px;margin:-170px 0 0 -260px;border-radius:50%;background:radial-gradient(closest-side,rgba(217,180,106,.42),rgba(217,180,106,.12) 50%,transparent 75%);opacity:0;filter:blur(6px);animation:hrfHalo 2.6s ease 4.1s forwards;pointer-events:none}
@@ -175,12 +183,9 @@ const CSS = `
 .hrf-sface.back{transform:rotateY(180deg) translateZ(1px);display:grid;place-items:center}
 /* il retro non deve trasparire durante il giro (Safari ignora backface sui figli SVG senza questo) */
 .hrf-sface,.hrf-sface *{-webkit-backface-visibility:hidden;backface-visibility:hidden}
-@media (prefers-reduced-motion:reduce){.hrf-alba{animation:hrfLogoOutStill .5s ease 3.3s forwards}@keyframes hrfLogoOutStill{to{opacity:0}}.hrf-scard{animation:hrfCardFade .9s ease 3.85s forwards}@keyframes hrfCardFade{to{opacity:1;transform:none}}.hrf-halo{animation:hrfHaloStill 2.4s ease 3.9s forwards}@keyframes hrfHaloStill{0%{opacity:0}45%{opacity:1}100%{opacity:.75}}.hrf-sheen{transform:none;opacity:0;animation:hrfSheenStill 1.4s ease 5.2s forwards}@keyframes hrfSheenStill{0%{opacity:0}40%{opacity:.9}100%{opacity:0}}.hrf-splash.is-leaving .hrf-scard{transform:none}}
+@media (prefers-reduced-motion:reduce){.hrf[data-compose="go"] .hrf-compose{animation:hrfCompStill .5s ease var(--d,0ms) both}@keyframes hrfCompStill{from{opacity:0}to{opacity:1}}.hrf-scard{animation:hrfCardFade .9s ease 3.85s forwards}@keyframes hrfCardFade{to{opacity:1;transform:none}}.hrf-halo{animation:hrfHaloStill 2.4s ease 3.9s forwards}@keyframes hrfHaloStill{0%{opacity:0}45%{opacity:1}100%{opacity:.75}}.hrf-sheen{transform:none;opacity:0;animation:hrfSheenStill 1.4s ease 5.2s forwards}@keyframes hrfSheenStill{0%{opacity:0}40%{opacity:.9}100%{opacity:0}}}
 .hrf-splash{position:fixed;inset:0;z-index:60;overflow:hidden;display:grid;place-items:center;background:radial-gradient(120% 60% at 50% 0%, #17161c 0%, #0b0c10 55%);opacity:1;transition:opacity 1.1s cubic-bezier(.4,0,.2,1)}
 .hrf-splash-inner{transition:transform 1.1s cubic-bezier(.4,0,.2,1),opacity .8s ease}
-.hrf-splash.is-leaving{opacity:0;pointer-events:none}
-.hrf-splash.is-leaving .hrf-splash-inner{transform:translateY(-14px) scale(1.04);opacity:.6}
-@media (prefers-reduced-motion:reduce){.hrf-splash.is-leaving .hrf-splash-inner{transform:none}}
 .hrf-letter{animation:hrfFade 1s ease 2.2s both}
 .hrf-err{animation:hrfFade .25s ease both}
 @media (prefers-reduced-motion:reduce){.hrf-card.shine::after,.hrf-fade,.hrf-next,.hrf-prev,.hrf-loader-in,.hrf-letter,.hrf-err{animation:none}.hrf-bar{transition:none}}
@@ -194,23 +199,47 @@ const pill = (primary) => ({
 });
 
 // Apertura: il logo è uno strato SOPRA la pagina che sfuma via (niente taglio netto tra
-// logo e prima pagina — feedback Nicholas 03/10/2026). Fasi: show → leaving → gone.
+// logo e prima pagina — feedback Nicholas 03/10/2026). Fasi: show → logoUp → dock → compose → gone (il logo sale nell'intestazione, la tessera si posa sull'esempio, poi si compone la pagina).
 const SplashCtx = createContext("gone");
 
 function SplashOverlay() {
   const phase = useContext(SplashCtx);
+  const innerRef = useRef(null);
+  const wrapRef = useRef(null);
+  // sposta un elemento dello strato sopra il suo "gemello" nella pagina (stesso centro, stessa larghezza)
+  const glide = (el, target, ms) => {
+    if (!el || !target) return false;
+    const a = el.getBoundingClientRect(); const b = target.getBoundingClientRect();
+    if (!a.width || !b.width) return false;
+    el.style.transition = `transform ${ms}ms cubic-bezier(.4,0,.2,1)`;
+    el.style.transform = `translate(${b.left + b.width / 2 - (a.left + a.width / 2)}px, ${b.top + b.height / 2 - (a.top + a.height / 2)}px) scale(${b.width / a.width})`;
+    return true;
+  };
+  useEffect(() => {
+    let reduced = false;
+    try { reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* */ }
+    if (phase === "logoUp" && innerRef.current) {
+      const el = innerRef.current;
+      if (reduced || !glide(el, document.getElementById("hrf-brand"), 900)) { el.style.transition = "opacity .6s ease"; el.style.opacity = "0"; }
+    }
+    if (phase === "dock" && wrapRef.current) {
+      const el = wrapRef.current;
+      if (reduced || !glide(el, document.querySelector("#hrf-sample > div > div"), 900)) { el.style.transition = "opacity .5s ease"; el.style.opacity = "0"; }
+    }
+  }, [phase]);
   if (phase === "gone") return null;
   const guil = { position: "absolute", inset: 0, background: `url("${guillocheDataUri()}") 0 0/100% 100% no-repeat`, opacity: 0.75 };
   return (
-    <div className={`hrf-splash${phase === "leaving" ? " is-leaving" : ""}`} aria-hidden={phase === "leaving"}>
+    <div className={`hrf-splash${phase === "dock" ? " is-dock" : ""}${phase === "compose" ? " is-compose" : ""}`} aria-hidden={phase === "compose"}>
       {/* istante in cui l'apertura è stata letta dal browser = inizio delle animazioni CSS */}
       <script dangerouslySetInnerHTML={{ __html: "window.__hrfT0=window.__hrfT0||performance.now()" }} />
       <div className="hrf-sun" />
-      <div className="hrf-splash-inner" style={{ display: "grid", justifyItems: "center", gap: 22 }}>
+      <div ref={innerRef} className="hrf-splash-inner" style={{ display: "grid", justifyItems: "center", gap: 22 }}>
         <HocLogo size={22} color="#f2eee6" letters className="hrf-alba" />
         <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Apro il modulo</span>
       </div>
       <div className="hrf-scene" aria-hidden="true">
+        <div ref={wrapRef} className="hrf-cardwrap">
         <div className="hrf-halo" />
         <div className="hrf-scard">
           <span className="hrf-pulse" />
@@ -230,17 +259,22 @@ function SplashOverlay() {
             <div style={{ position: "relative", color: GOLD, lineHeight: 0 }}><HocPalma width={140} title="" /></div>
           </div>
         </div>
+        </div>
       </div>
     </div>
   );
 }
 
 function Shell({ children }) {
+  const phase = useContext(SplashCtx);
+  const waiting = ["show", "logoUp", "dock"].includes(phase);
   return (
-    <main className="hrf" style={{ ...CASA_VARS, colorScheme: "dark", minHeight: "100vh", background: "radial-gradient(120% 60% at 50% 0%, #17161c 0%, #0b0c10 55%)", color: "#f2eee6", fontFamily: SANS, padding: "28px 16px 64px" }}>
+    <main className="hrf" data-compose={waiting ? "wait" : "go"} style={{ ...CASA_VARS, colorScheme: "dark", minHeight: "100vh", background: "radial-gradient(120% 60% at 50% 0%, #17161c 0%, #0b0c10 55%)", color: "#f2eee6", fontFamily: SANS, padding: "28px 16px 64px" }}>
       <style>{CSS}</style>
       <div style={{ maxWidth: 560, margin: "0 auto" }}>
-        <div style={{ fontSize: 11.5, letterSpacing: "0.18em", textTransform: "uppercase", color: CP.textMuted, marginBottom: 18 }}>House of Creators</div>
+        <div style={{ marginBottom: 18, lineHeight: 0 }}>
+          <span id="hrf-brand" style={{ display: "inline-block", opacity: waiting ? 0 : 1 }}><HocLogo size={11} color="rgba(242,238,230,.62)" /></span>
+        </div>
         {children}
       </div>
     </main>
@@ -263,41 +297,27 @@ function FieldError({ id, msg }) {
 export default function HrFormPage() {
   const { token } = useParams();
   const [ctx, setCtx] = useState(null);
-  const [splashTimeUp, setSplashTimeUp] = useState(false);
+  // Apertura composta (05/10/2026 sera): show → logoUp → dock → compose → gone.
+  // Tempi contati da quando la pagina è stata disegnata (__hrfT0), non dalla navigazione.
   const [splashPhase, setSplashPhase] = useState("show");
+  const [tLogo, setTLogo] = useState(false);
+  const [tDock, setTDock] = useState(false);
   const reducedRef = useRef(false);
   useEffect(() => {
     try { reducedRef.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* */ }
-    // 04/10/2026: il logo si deve vedere accendersi anche con "Riduci movimento" attivo
-    // (iPhone): accendersi è un cambio di luce, non un movimento. Prima con quell'opzione
-    // l'apertura durava 0,9 s senza luce: era quello che si vedeva dal telefono.
-    // la sequenza (CSS) parte quando la pagina si disegna e finisce a ~5,5 s: si conta da
-    // lì (performance.now ≈ dall'apertura), con un minimo per non tagliare la tessera
-    // 05/10/2026 (telefono, link aperto da WhatsApp): si conta da quando la pagina è stata
-    // DISEGNATA (__hrfT0, scritto da uno script dentro l'apertura mentre il browser legge
-    // l'HTML), non dall'inizio della navigazione: sul telefono tra il tocco e il primo
-    // disegno passa più di un secondo e la tessera si vedeva solo per mezzo secondo.
-    let wait = 6800;
-    try {
-      const t0 = typeof window.__hrfT0 === "number" ? window.__hrfT0
-        : (performance.getEntriesByName("first-contentful-paint")[0]?.startTime ?? 0);
-      wait = Math.max(1200, t0 + 6800 - performance.now());
-    } catch { /* */ }
-    const t = setTimeout(() => setSplashTimeUp(true), wait);
-    return () => clearTimeout(t);
+    let t0 = 0;
+    try { t0 = typeof window.__hrfT0 === "number" ? window.__hrfT0 : (performance.getEntriesByName("first-contentful-paint")[0]?.startTime ?? 0); } catch { /* */ }
+    const now = typeof performance !== "undefined" ? performance.now() : 0;
+    const a = setTimeout(() => setTLogo(true), Math.max(300, t0 + 3000 - now));
+    const b = setTimeout(() => setTDock(true), Math.max(1500, t0 + 6300 - now));
+    return () => { clearTimeout(a); clearTimeout(b); };
   }, []);
   const [loadErr, setLoadErr] = useState(null);
+  useEffect(() => { if (splashPhase === "show" && tLogo) setSplashPhase("logoUp"); }, [splashPhase, tLogo]);
   useEffect(() => {
-    if (splashPhase !== "show" || !splashTimeUp || !(ctx || loadErr)) return;
-    setSplashPhase("leaving");
-  }, [splashPhase, splashTimeUp, ctx, loadErr]);
-  // 04/10/2026: prima il passaggio a "gone" stava nello stesso effetto e il suo timer veniva
-  // annullato dal cambio di fase → lo strato restava nella pagina (invisibile) e su telefono
-  // la allargava. Ora l'uscita ha il suo effetto.
-  useEffect(() => {
-    if (splashPhase !== "leaving") return undefined;
-    const t = setTimeout(() => setSplashPhase("gone"), 1100);
-    return () => clearTimeout(t);
+    if (splashPhase === "dock") { const t = setTimeout(() => setSplashPhase("compose"), 950); return () => clearTimeout(t); }
+    if (splashPhase === "compose") { const t = setTimeout(() => setSplashPhase("gone"), 400); return () => clearTimeout(t); }
+    return undefined;
   }, [splashPhase]);
   const [data, setData] = useState({});
   const [consent, setConsent] = useState(false);
@@ -306,6 +326,11 @@ export default function HrFormPage() {
   const [fieldErrs, setFieldErrs] = useState({}); // { chiave: messaggio } sotto i campi
   const [focusKey, setFocusKey] = useState(null); // primo campo con errore: si scorre lì e si mette a fuoco
   const [stage, setStage] = useState("intro"); // intro → form → files → done
+  // la tessera atterra su quella d'esempio solo se la prima pagina è l'introduzione
+  useEffect(() => {
+    if (splashPhase !== "logoUp" || !tDock || !(ctx || loadErr)) return;
+    setSplashPhase(ctx && !loadErr && stage === "intro" ? "dock" : "compose");
+  }, [splashPhase, tDock, ctx, loadErr, stage]);
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState("next"); // verso della transizione tra capitoli
   const [cfNote, setCfNote] = useState(null);
@@ -508,20 +533,20 @@ export default function HrFormPage() {
     return (
       <Shell>
         <div className="hrf-fade" style={{ display: "grid", gap: 26 }}>
-          <HrTessera key="esempio" data={SAMPLE_CARD} at={Date.now()} sample autoFlip />
-          <Headline title={first ? `Ciao ${first},` : "Compila il modulo"} sub="e sblocca la tua tessera." size={40} />
-          <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15.5, lineHeight: 1.55 }}>
+          <div id="hrf-sample"><HrTessera key="esempio" data={SAMPLE_CARD} at={Date.now()} sample autoFlip={splashPhase === "gone"} /></div>
+          <div className="hrf-compose" style={{ "--d": "0ms" }}><Headline title={first ? `Ciao ${first},` : "Compila il modulo"} sub="e sblocca la tua tessera." size={40} /></div>
+          <p className="hrf-compose" style={{ "--d": "140ms", margin: 0, color: CP.textSecondary, fontSize: 15.5, lineHeight: 1.55 }}>
             Questa è una tessera d&apos;esempio: la tua prende forma con le tue risposte. Sette brevi capitoli, {timeEstimateText().replace(/^Ci vogliono /, "").replace(/\.$/, "")}.
             {" "}Tieni a portata di mano un documento d&apos;identità.
             {ctx.shared ? "" : ` Il link vale fino al ${fmtDate(ctx.expiresAt)}.`}
           </p>
-          <button type="button" className="hrf-pill" onClick={() => { setDir("next"); setStage("form"); }} style={{ ...pill(true), width: "100%" }}>Cominciamo</button>
+          <button type="button" className="hrf-pill hrf-compose" onClick={() => { setDir("next"); setStage("form"); }} style={{ ...pill(true), width: "100%", "--d": "280ms" }}>Cominciamo</button>
           <TutorialVideoButton id="modulo-collaboratori" render={(open, v) => (
-            <button type="button" onClick={open} style={{ ...pill(false), width: "100%", gap: 8, marginTop: -12 }}>
+            <button type="button" onClick={open} className="hrf-compose" style={{ ...pill(false), width: "100%", gap: 8, marginTop: -12, "--d": "380ms" }}>
               <PlayCircle size={18} /> Guarda come funziona ({fmtDuration(v.durationSec)})
             </button>
           )} />
-          <div style={{ fontSize: 12.5, color: CP.textMuted, textAlign: "center" }}>I tuoi dati restano riservati: li vede solo chi gestisce il personale.</div>
+          <div className="hrf-compose" style={{ "--d": "460ms", fontSize: 12.5, color: CP.textMuted, textAlign: "center" }}>I tuoi dati restano riservati: li vede solo chi gestisce il personale.</div>
         </div>
       </Shell>
     );
