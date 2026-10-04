@@ -198,7 +198,7 @@ function Room({ o, sel, onSel, onSaved, all }) {
 function Flusso({ data, sel, onSel }) {
   const COLS = [
     { id: "dati", label: "Fonti dei dati", piani: ["dati"] },
-    { id: "lavoro", label: "Lavoro", piani: ["vendite", "persone"] },
+    { id: "lavoro", label: "Lavoro", piani: ["vendite", "formazione", "persone"] },
     { id: "controllo", label: "Controllo", piani: ["controllo"] },
     { id: "direzione", label: "Persone che rispondono", piani: ["direzione"] },
   ];
