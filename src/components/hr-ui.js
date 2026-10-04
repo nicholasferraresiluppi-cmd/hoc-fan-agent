@@ -36,6 +36,7 @@ export const SYNC_LABEL = {
   ok: "Allineata",
   partial: "Allineata in parte",
   error: "Errore di sincronizzazione",
+  drift: "Diversa su ClickUp",
   pending: "Da sincronizzare",
   off: "Sincronizzazione spenta",
   deleted: "Task cancellato su ClickUp",
