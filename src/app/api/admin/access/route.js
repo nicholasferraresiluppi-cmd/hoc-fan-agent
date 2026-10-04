@@ -2,6 +2,7 @@ import { kv } from "@vercel/kv";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { listAdmins } from "@/lib/admin";
 import { authorize, authorizeAdmin, auditAccess, CAPABILITIES, getStoredRoles, setUserRoles } from "@/lib/rbac";
+import { forgetClerkUser } from "@/lib/clerk-user";
 
 export async function GET() {
   const a = await authorize(CAPABILITIES.ACCESS_MGMT);
@@ -73,6 +74,7 @@ export async function POST(request) {
           if (Array.isArray(m.roles) && m.roles.includes("admin")) { m.roles = m.roles.filter((r) => r !== "admin"); changed = true; }
         }
         if (changed) await cc.users.updateUserMetadata(targetId, { publicMetadata: { role: pub.role ?? null, roles: pub.roles ?? null }, privateMetadata: { role: priv.role ?? null, roles: priv.roles ?? null } });
+        await forgetClerkUser(targetId); // la revoca vale subito, non dopo la cache del profilo
       } catch (e) {
         return Response.json({ ok: true, action, userId: targetId, warning: `Tolto dagli admin di HOC Pro, ma non sono riuscito ad aggiornare Clerk (${e?.message || "errore"}): riprova.` });
       }

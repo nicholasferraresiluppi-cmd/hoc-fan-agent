@@ -2,6 +2,7 @@ import { kv } from "@vercel/kv";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { isUserIdAdmin, isUserIdAdminRaw, adminMfaOk } from "@/lib/admin";
 import { viewAsFor } from "@/lib/view-as";
+import { getClerkUser, forgetClerkUser } from "@/lib/clerk-user";
 
 /**
  * RBAC — Role-Based Access Control.
@@ -199,8 +200,7 @@ export async function getUserRoles(userId) {
   if (legacy) return gate([legacy]);
   // Fallback Clerk
   try {
-    const cc = await clerkClient();
-    const u = await cc.users.getUser(userId);
+    const u = await getClerkUser(userId);
     // `roles` (array, anche ruoli custom "c:…") arriva dagli inviti fatti in app;
     // `role` è il ruolo primario predefinito (legacy / mirror di setUserRoles)
     const clerkRoles = u?.publicMetadata?.roles;
@@ -242,6 +242,7 @@ export async function setUserRoles(userId, roles) {
       // updateUserMetadata fa MERGE: updateUser sovrascriveva tutto publicMetadata
       // (perdendo contentPipeline, invited_by, …)
       await cc.users.updateUserMetadata(userId, { publicMetadata: { role: primaryPredef, roles: arr } });
+      await forgetClerkUser(userId);
     } catch {}
   }
   return { userId, roles: arr };
@@ -283,8 +284,7 @@ export async function getUserRole(userId) {
 
   // Fallback Clerk
   try {
-    const cc = await clerkClient();
-    const u = await cc.users.getUser(userId);
+    const u = await getClerkUser(userId);
     const clerkRole = u?.publicMetadata?.role;
     if (clerkRole && ROLES.includes(clerkRole)) return clerkRole;
   } catch {}
@@ -300,6 +300,7 @@ export async function setUserRole(userId, role) {
   try {
     const cc = await clerkClient();
     await cc.users.updateUserMetadata(userId, { publicMetadata: { role } });
+    await forgetClerkUser(userId);
   } catch (e) {
     console.warn("clerk role mirror failed:", e?.message);
   }
