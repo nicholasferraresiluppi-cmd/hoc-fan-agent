@@ -136,9 +136,12 @@ html,body{overflow-x:hidden;background:#0b0c10}
 @keyframes hrfShine{to{transform:translateX(120%)}}
 .hrf-fade{animation:hrfFade .35s ease both}
 @keyframes hrfFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.hrf-next,.hrf-prev{animation:hrfStep .42s cubic-bezier(.2,.7,.2,1) both}
+/* 05/10/2026 (Nicholas: «va nero, dà fastidio agli occhi»): il foglio non sparisce più. Prima partiva
+   da opacità 0 (foglio e fondo spariti per un istante = lampo nero) e scivolava di lato; ora resta
+   quasi pieno e sale di pochi pixel, e lo scorrimento in cima è istantaneo. */
+.hrf-next,.hrf-prev{animation:hrfStep .26s ease-out both}
 .hrf-next{--hrf-dx:18px}.hrf-prev{--hrf-dx:-18px}
-@keyframes hrfStep{from{opacity:0;transform:translateX(var(--hrf-dx))}to{opacity:1;transform:none}}
+@keyframes hrfStep{from{opacity:.6;transform:translateY(6px)}to{opacity:1;transform:none}}
 .hrf-bar{transition:background-color .5s ease}
 .hrf-loader-in{animation:hrfFade .6s ease .25s both}
 .hrf-splash-word{opacity:0;animation:hrfWord 1.2s ease .9s forwards}
@@ -421,7 +424,7 @@ export default function HrFormPage() {
     setConfirmRestart(false);
     setDir(n >= step ? "next" : "prev");
     setStep(n);
-    if (!opts.noScroll) { try { window.scrollTo({ top: 0, behavior: reducedMotion() ? "auto" : "smooth" }); } catch { /* vecchi browser */ } }
+    if (!opts.noScroll) { try { window.scrollTo({ top: 0, behavior: "auto" }); } catch { /* vecchi browser */ } }
   };
 
   const showErrors = (errs, general) => {
@@ -542,7 +545,7 @@ export default function HrFormPage() {
     );
   }
 
-  if (stage === "files") return <Shell><FilesStep token={uploadToken || token} data={data} total={STEPS.length + 1} onDone={() => setStage("done")} /></Shell>;
+  if (stage === "files") return <Shell><FilesStep token={uploadToken || token} data={data} total={STEPS.length + 1} onDone={() => { try { window.scrollTo({ top: 0, behavior: "auto" }); } catch { /* */ } setStage("done"); }} /></Shell>;
 
   if (stage === "intro") {
     // col link condiviso il nome non lo sappiamo: niente saluto personale
@@ -579,7 +582,7 @@ export default function HrFormPage() {
   const reallyLast = last && !withDocs;
   return (
     <Shell>
-      <div style={{ display: "grid", gap: 22 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 22 }}>
         <HrTessera key="dal-vivo" data={data} at={Date.now()} small live />
         <div style={{ display: "grid", gap: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", color: CP.textMuted }}>
@@ -606,7 +609,7 @@ export default function HrFormPage() {
           )}
         </div>
 
-        <form ref={formRef} key={step} className={`hrf-sheet ${dir === "prev" ? "hrf-prev" : "hrf-next"}`} onSubmit={onSubmit} onKeyDown={onKeyDown} noValidate style={{ display: "grid", gap: 20 }}>
+        <form ref={formRef} key={step} className={`hrf-sheet ${dir === "prev" ? "hrf-prev" : "hrf-next"}`} onSubmit={onSubmit} onKeyDown={onKeyDown} noValidate style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 20 }}>
           <Headline title={s.title} sub={s.sub} size={36} />
           {s.keys.some((k) => required.has(k)) && <div style={{ fontSize: 12.5, color: CP.textMuted, marginTop: -8 }}>I campi con * sono obbligatori.</div>}
 

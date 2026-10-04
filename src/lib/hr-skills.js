@@ -225,6 +225,8 @@ export const PAST_ROLES = [
   ["chatter_agency", "Chatter in un'altra agenzia"],
   ["founder", "Imprenditore o fondatore"],
   ["other", "Altro"],
+  // 05/10/2026 (Nicholas): senza questa voce sembrava che per forza si dovesse aver fatto qualcosa
+  ["none", "Nessuna esperienza"],
 ];
 export const PAST_ROLE_NAME = Object.fromEntries(PAST_ROLES);
 export const ROLE_DURATIONS = [
@@ -243,11 +245,12 @@ export function normalizePastRoles(raw) {
   for (const r of raw) {
     if (!r || typeof r !== "object" || !PAST_ROLE_NAME[r.role]) continue;
     if (out.some((x) => x.role === r.role)) continue;
-    const item = { role: r.role, duration: ROLE_DURATION_NAME[r.duration] ? r.duration : null };
+    const item = { role: r.role, duration: r.role !== "none" && ROLE_DURATION_NAME[r.duration] ? r.duration : null };
     if (r.role === "other") item.other = ONE_LINE(r.other, 80);
     out.push(item);
   }
-  return out;
+  // "Nessuna esperienza" esclude gli altri ruoli
+  return out.some((x) => x.role !== "none") ? out.filter((x) => x.role !== "none") : out;
 }
 /** "Media buyer (1-3 anni)" / "Altro: fotografo (meno di 1 anno)". */
 export function pastRoleText(r) {

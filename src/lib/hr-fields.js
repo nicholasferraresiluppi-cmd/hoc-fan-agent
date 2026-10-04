@@ -33,11 +33,13 @@ export const GENDERS = ["Female", "Male", "Non-Binary", "I prefer not to declare
 // vivo il confronto reference ↔ annunci e a riconoscere il premio reference (100 € a 30
 // turni). La prima voce apre la domanda "Chi ti ha segnalato?".
 export const SOURCE_REFERRAL = "Me l'ha consigliato qualcuno";
-export const SOURCE_AD = "Ho visto un annuncio";
+export const SOURCE_AD = "Ho visto un annuncio o un post sui social";
 // 05/10/2026 (Nicholas): o reference o annuncio. «Dai social» e «Altro» confluiscono nell'annuncio
 // (le schede vecchie si leggono già così e la parità riallinea ClickUp da sola).
 export const SOURCES = [SOURCE_REFERRAL, SOURCE_AD];
-const LEGACY_SOURCES = new Set(["Dai social", "Altro"]);
+const LEGACY_SOURCES = new Set(["Dai social", "Altro", "Ho visto un annuncio"]);
+/** Provenienza nella forma attuale (bozze nel browser, ClickUp e schede vecchie). */
+export const canonicalSource = (v) => (LEGACY_SOURCES.has(v) ? SOURCE_AD : v);
 
 // ── Fasi della persona e stato del contratto (03/10/2026, decisioni del titolare) ──
 // UNICA tabella di corrispondenza: due assi separati, fase e contratto. Per ogni voce

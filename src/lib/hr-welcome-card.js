@@ -153,7 +153,7 @@ export function availabilityText(timeSlots) {
   return words.length > 2 ? `${words.slice(0, 2).join(" · ")} +${words.length - 2}` : words.join(" · ");
 }
 
-const AREA_SHORT = { of: "OnlyFans", ads: "Media buying", social: "Social", content: "Contenuti", ai: "Intelligenza artificiale", tech: "Tecnologia", mgmt: "Gestione" };
+const AREA_SHORT = { of: "OnlyFans", ads: "Media buying", social: "SMM", content: "Contenuti", ai: "Intelligenza artificiale", tech: "Tecnologia", mgmt: "Gestione" };
 const LANG_FULL = { ITA: "Italiano", ENG: "Inglese", SPA: "Spagnolo", TED: "Tedesco", FR: "Francese" };
 const LANG_LEVEL_WORD = { Native: "Madrelingua", Professional: "Lavorativo", Basic: "Base", Intermediate: "Intermedio", Advanced: "Avanzato" };
 

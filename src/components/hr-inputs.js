@@ -328,15 +328,21 @@ export function LearnInput({ id, value, onChange, disabled }) {
 export function PastRolesInput({ id, value, onChange, disabled }) {
   const cur = normalizePastRoles(value);
   const byRole = Object.fromEntries(cur.map((r) => [r.role, r]));
-  const toggle = (role) => onChange(byRole[role] ? cur.filter((r) => r.role !== role) : [...cur, role === "other" ? { role, duration: null, other: "" } : { role, duration: null }]);
+  const toggle = (role) => {
+    if (byRole[role]) return onChange(cur.filter((r) => r.role !== role));
+    // "Nessuna esperienza" e i ruoli si escludono a vicenda
+    if (role === "none") return onChange([{ role, duration: null }]);
+    return onChange([...cur.filter((r) => r.role !== "none"), role === "other" ? { role, duration: null, other: "" } : { role, duration: null }]);
+  };
+  const withDuration = cur.filter((r) => r.role !== "none");
   const patch = (role, p) => onChange(cur.map((r) => (r.role === role ? { ...r, ...p } : r)));
   return (
     <div id={id} style={{ display: "grid", gap: 10 }}>
       <div role="group" aria-label="Ruoli" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {PAST_ROLES.map(([k, name]) => <button key={k} type="button" disabled={disabled} aria-pressed={Boolean(byRole[k])} onClick={() => toggle(k)} style={seg(Boolean(byRole[k]))}>{name}</button>)}
       </div>
-      {cur.length > 0 && <div style={hint}>Per ognuno, quanto è durato in tutto?</div>}
-      {cur.map((r) => (
+      {withDuration.length > 0 && <div style={hint}>Per ognuno, quanto è durato in tutto?</div>}
+      {withDuration.map((r) => (
         <div key={r.role} style={{ ...box, display: "grid", gap: 6 }}>
           <div style={{ fontSize: 13.5, color: CP.textPrimary }}>{PAST_ROLE_NAME[r.role]}</div>
           {r.role === "other" && (
