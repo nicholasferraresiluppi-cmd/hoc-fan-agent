@@ -163,11 +163,19 @@ const CSS = `
 .hrf-scard{position:relative;width:300px;height:189px;transform-style:preserve-3d;opacity:0;animation:hrfCardIn 1.6s cubic-bezier(.45,.05,.35,1) 3.85s forwards;transition:transform 1.1s cubic-bezier(.4,0,.2,1)}
 @keyframes hrfCardIn{0%{opacity:0;transform:rotateY(180deg) scale(.85)}20%{opacity:1}100%{opacity:1;transform:rotateY(360deg) scale(1)}}
 .hrf-splash.is-leaving .hrf-scard{transform:translateY(-26vh) scale(.92)}
+/* 05/10/2026 (Nicholas: «non è effetto wow»): alone d'oro dietro la tessera e riflesso di luce
+   sulla faccia dopo il giro. Sono cambi di LUCE: restano anche con «Riduci movimento». */
+.hrf-halo{position:absolute;left:50%;top:50%;width:520px;height:340px;margin:-170px 0 0 -260px;border-radius:50%;background:radial-gradient(closest-side,rgba(217,180,106,.42),rgba(217,180,106,.12) 50%,transparent 75%);opacity:0;filter:blur(6px);animation:hrfHalo 2.6s ease 4.1s forwards;pointer-events:none}
+@keyframes hrfHalo{0%{opacity:0;transform:scale(.7)}45%{opacity:1;transform:scale(1.05)}100%{opacity:.75;transform:scale(1)}}
+.hrf-sheen{position:absolute;inset:0;border-radius:15px;pointer-events:none;background:linear-gradient(105deg,transparent 30%,rgba(255,236,190,.55) 47%,rgba(255,255,255,.12) 52%,transparent 66%);transform:translateX(-130%);animation:hrfSheenGo 1.2s ease 5.5s forwards}
+@keyframes hrfSheenGo{to{transform:translateX(130%)}}
+.hrf-scard .hrf-pulse{position:absolute;inset:-2px;border-radius:16px;box-shadow:0 0 0 1px rgba(217,180,106,.9),0 0 34px rgba(217,180,106,.55);opacity:0;animation:hrfPulse 1.6s ease 5.45s forwards;pointer-events:none}
+@keyframes hrfPulse{0%{opacity:0}35%{opacity:1}100%{opacity:.25}}
 .hrf-sface{position:absolute;inset:0;border-radius:15px;overflow:hidden;background:radial-gradient(140% 100% at 0% 0%,#24211c 0%,#121214 50%,#0b0b0d 100%);box-shadow:0 30px 60px rgba(0,0,0,.55),inset 0 0 0 1px rgba(217,180,106,.5);transform:translateZ(1px)}
 .hrf-sface.back{transform:rotateY(180deg) translateZ(1px);display:grid;place-items:center}
 /* il retro non deve trasparire durante il giro (Safari ignora backface sui figli SVG senza questo) */
 .hrf-sface,.hrf-sface *{-webkit-backface-visibility:hidden;backface-visibility:hidden}
-@media (prefers-reduced-motion:reduce){.hrf-alba{animation:hrfLogoOutStill .5s ease 3.3s forwards}@keyframes hrfLogoOutStill{to{opacity:0}}.hrf-scard{animation:hrfCardFade .8s ease 3.85s forwards}@keyframes hrfCardFade{to{opacity:1;transform:none}}.hrf-splash.is-leaving .hrf-scard{transform:none}}
+@media (prefers-reduced-motion:reduce){.hrf-alba{animation:hrfLogoOutStill .5s ease 3.3s forwards}@keyframes hrfLogoOutStill{to{opacity:0}}.hrf-scard{animation:hrfCardFade .9s ease 3.85s forwards}@keyframes hrfCardFade{to{opacity:1;transform:none}}.hrf-halo{animation:hrfHaloStill 2.4s ease 3.9s forwards}@keyframes hrfHaloStill{0%{opacity:0}45%{opacity:1}100%{opacity:.75}}.hrf-sheen{transform:none;opacity:0;animation:hrfSheenStill 1.4s ease 5.2s forwards}@keyframes hrfSheenStill{0%{opacity:0}40%{opacity:.9}100%{opacity:0}}.hrf-splash.is-leaving .hrf-scard{transform:none}}
 .hrf-splash{position:fixed;inset:0;z-index:60;overflow:hidden;display:grid;place-items:center;background:radial-gradient(120% 60% at 50% 0%, #17161c 0%, #0b0c10 55%);opacity:1;transition:opacity 1.1s cubic-bezier(.4,0,.2,1)}
 .hrf-splash-inner{transition:transform 1.1s cubic-bezier(.4,0,.2,1),opacity .8s ease}
 .hrf-splash.is-leaving{opacity:0;pointer-events:none}
@@ -203,13 +211,19 @@ function SplashOverlay() {
         <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Apro il modulo</span>
       </div>
       <div className="hrf-scene" aria-hidden="true">
+        <div className="hrf-halo" />
         <div className="hrf-scard">
+          <span className="hrf-pulse" />
           <div className="hrf-sface">
             <div style={guil} />
             <div style={{ position: "absolute", left: 18, top: 18, color: GOLD, lineHeight: 0 }}><HocPalma width={70} title="" /></div>
             <div style={{ position: "absolute", right: 18, top: 20, fontSize: 9, letterSpacing: "0.22em", color: GOLD, fontFamily: SANS }}>MEMBRO</div>
-            <div style={{ position: "absolute", left: 18, bottom: 20, fontFamily: SERIF, fontStyle: "italic", fontSize: 25, color: "rgba(242,238,230,.35)" }}>Il tuo nome</div>
+            <div style={{ position: "absolute", left: 18, bottom: 18, display: "grid", gap: 2 }}>
+              <span style={{ fontFamily: SERIF, fontSize: 24, lineHeight: 1.05, color: "#f2eee6" }}>La tua tessera</span>
+              <span style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 17, color: "rgba(242,238,230,.55)" }}>ti aspetta</span>
+            </div>
             <span style={{ position: "absolute", right: 18, bottom: 20, width: 32, height: 24, borderRadius: 5, background: "linear-gradient(135deg,#f3e2b8,#b8975c 45%,#7d6436 70%,#e9d3a0)" }} />
+            <span className="hrf-sheen" />
           </div>
           <div className="hrf-sface back">
             <div style={guil} />
@@ -263,11 +277,11 @@ export default function HrFormPage() {
     // DISEGNATA (__hrfT0, scritto da uno script dentro l'apertura mentre il browser legge
     // l'HTML), non dall'inizio della navigazione: sul telefono tra il tocco e il primo
     // disegno passa più di un secondo e la tessera si vedeva solo per mezzo secondo.
-    let wait = 5600;
+    let wait = 6800;
     try {
       const t0 = typeof window.__hrfT0 === "number" ? window.__hrfT0
         : (performance.getEntriesByName("first-contentful-paint")[0]?.startTime ?? 0);
-      wait = Math.max(1200, t0 + 5600 - performance.now());
+      wait = Math.max(1200, t0 + 6800 - performance.now());
     } catch { /* */ }
     const t = setTimeout(() => setSplashTimeUp(true), wait);
     return () => clearTimeout(t);
