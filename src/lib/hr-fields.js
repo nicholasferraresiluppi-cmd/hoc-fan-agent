@@ -137,7 +137,7 @@ export const FIELDS = [
   { key: "referredBy", label: "Segnalato da", section: "rapporto", type: "text", cu: "Segnalato da", extra: true },
   { key: "startDate", label: "Inizio collaborazione", section: "rapporto", type: "date", cu: "Start of Collaboration" },
   { key: "endDate", label: "Fine collaborazione", section: "rapporto", type: "date", cu: "End of Collaboration" },
-  { key: "referent", label: "Referente", section: "rapporto", type: "users", cu: "Referent", readOnly: true },
+  { key: "referent", label: "Referente", section: "rapporto", type: "users", cu: "Referent" },
   { key: "companyEmail", label: "Email aziendale", section: "rapporto", type: "email", cu: "Company Email" },
   { key: "companyPhone", label: "Telefono aziendale", section: "rapporto", type: "phone", cu: "Company Phone Number" },
   { key: "yellowWarnings", label: "Richiami gialli", section: "rapporto", type: "number", cu: "Yellow Warnings" },
@@ -162,12 +162,12 @@ export const SECTIONS = [
   { key: "documenti", label: "Documenti" },
 ];
 // Campi che la persona può compilare dal modulo pubblico (i SUOI dati)
-// 04/10/2026: le fasce orarie NON si chiedono più nel modulo (decisione del titolare);
-// il campo resta in scheda e su ClickUp, lo compila HR.
+// 04/10/2026: le fasce orarie e la mansione NON si chiedono più nel modulo (decisione del
+// titolare); restano in scheda e su ClickUp, le compila HR.
 export const FORM_KEYS = [
   "firstName", "surname", "dateOfBirth", "nationality", "gender", "birthPlace", "residenceComune", "location", "residenceCap", "personalEmail", "personalPhone",
   "skillLevels", "otherSkills", "pastRoles", "learnWish",
-  "spokenLanguages", "currentJob", "partitaIva", "codiceFiscale", "personalInterests", "linkedin",
+  "spokenLanguages", "partitaIva", "codiceFiscale", "personalInterests", "linkedin",
   "source", "referredBy",
 ];
 // Campi che l'admin può modificare dalla scheda

@@ -65,7 +65,7 @@ const STEPS = [
   { title: "Chi sei", sub: "partiamo dalle basi", keys: ["firstName", "surname", "dateOfBirth", "gender", "nationality", "birthPlace", "codiceFiscale"] },
   { title: "Dove vivi", sub: "ci serve per i documenti", keys: ["residenceComune", "location", "residenceCap"] },
   { title: "Come contattarti", sub: "solo per lavoro", keys: ["personalEmail", "personalPhone", "linkedin"] },
-  { title: "Il tuo lavoro", sub: "cosa fai e che lingue parli", keys: ["currentJob", "partitaIva", "spokenLanguages"] },
+  { title: "Il tuo lavoro", sub: "partita IVA e lingue", keys: ["partitaIva", "spokenLanguages"] },
   { title: "Le tue competenze", sub: "cosa sai fare, e a che livello", keys: ["skillLevels", "otherSkills", "learnWish"] },
   { title: "La tua esperienza", sub: "da dove arrivi", keys: ["pastRoles", "personalInterests", "source", "referredBy"] },
   { title: "Ultimo passo", sub: "privacy e invio", keys: [] },

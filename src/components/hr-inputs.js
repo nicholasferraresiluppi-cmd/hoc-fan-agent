@@ -103,6 +103,34 @@ export function LanguagesInput({ id, value, onChange, disabled, explicit = false
   );
 }
 
+// ── Referente (04/10/2026): persone della lista ClickUp, si aggiungono e si tolgono ──
+export function UsersInput({ id, value, onChange, options = [], disabled }) {
+  const cur = Array.isArray(value) ? value : [];
+  const ids = new Set(cur.map((u) => String(u.id)));
+  const free = (Array.isArray(options) ? options : []).filter((m) => !ids.has(String(m.id)));
+  const chipS = { display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 999, fontSize: 13, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary };
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      {cur.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {cur.map((u) => (
+            <span key={u.id} style={chipS}>
+              {u.name || u.email}
+              <button type="button" disabled={disabled} aria-label={`Togli ${u.name || u.email}`} onClick={() => onChange(cur.filter((x) => String(x.id) !== String(u.id)))}
+                style={{ background: "none", border: 0, padding: 0, cursor: "pointer", color: CP.textMuted, fontSize: 15, lineHeight: 1 }}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+      <select id={id} disabled={disabled || !free.length} value="" onChange={(e) => { const m = free.find((x) => String(x.id) === e.target.value); if (m) onChange([...cur, m]); }}
+        style={{ boxSizing: "border-box", padding: "8px 10px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body }}>
+        <option value="">{free.length ? "Aggiungi un referente…" : "Nessun'altra persona disponibile su ClickUp"}</option>
+        {free.map((m) => <option key={m.id} value={m.id}>{m.name}{m.email ? ` · ${m.email}` : ""}</option>)}
+      </select>
+    </div>
+  );
+}
+
 // ── Telefono con prefisso (04/10/2026) ────────────────────────────────────────
 // Prefisso da tendina (Italia di base) + numero: si salva "+39 333…" → ClickUp lo accetta.
 export const PHONE_PREFIXES = [
