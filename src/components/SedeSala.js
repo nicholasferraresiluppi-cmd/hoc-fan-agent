@@ -234,23 +234,63 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
   // persone
   const SKIN = [0xf1cfae, 0xe2b48c, 0xc68b5e, 0x8d5a3b, 0xf4d9c0], HAIR = [0x2a2420, 0x5a3a22, 0xd9c08a, 0x1b1b1f, 0xa55a33, 0x7a7a80];
   const shoeM = M(T.mono ? 0xe4e1dc : 0x16171a);
-  const person = (kind, seed = 0) => {
+  // Omini per TIPO (Nicholas: "tipologie di omini diversi"): persona = giacca e cravatta oro; programma = felpa
+  // col cappuccio; agente AI = occhiali luminosi e anello viola; robot = metallo con antenna; fattorino =
+  // cappellino e borsa a tracolla. Capelli e carnagione variano col seed.
+  const person = (kind, seed = 0, role = "desk") => {
     const g = new THREE.Group();
-    const skin = M(T.mono ? 0xfbfaf8 : SKIN[seed % SKIN.length], { roughness: .7 });
-    const shirt = kind === "AI" && !T.mono ? M(T.shirt, { emissive: 0x6b5ce0, emissiveIntensity: .18 }) : M(T.shirt);
-    const vest = M(T.vest[kind] ?? T.vest.codice, { roughness: .75 });
-    const pants = M(T.mono ? 0xf1efeb : kind === "robot" ? 0x8e96a3 : [0x2b3550, 0x2a2c33, 0x6b6f78, 0x1f2230][seed % 4]);
-    const legs = [-1, 1].map((s) => { const p = new THREE.Group(); p.position.set(s * .1, .9, 0); const l = mesh(new THREE.CapsuleGeometry(.075, .62, 6, 12), pants); l.position.y = -.39; p.add(l); const f = mesh(new THREE.BoxGeometry(.13, .08, .24), shoeM); f.position.set(0, -.82, .05); p.add(f); g.add(p); return p; });
-    const torso = mesh(new THREE.CapsuleGeometry(.19, .34, 6, 16), shirt); torso.position.y = 1.2; torso.scale.z = .78; g.add(torso);
-    const v = mesh(new THREE.CapsuleGeometry(.195, .26, 6, 16), vest); v.position.y = 1.16; v.scale.set(1.02, 1, .8); g.add(v);
-    const tie = B(.04, .22, .02, M(T.tie[kind] ?? T.tie.codice)); tie.position.set(0, 1.3, .16); g.add(tie);
-    const arms = [-1, 1].map((s) => { const p = new THREE.Group(); p.position.set(s * .25, 1.43, 0); const a = mesh(new THREE.CapsuleGeometry(.058, .46, 6, 12), shirt); a.position.y = -.27; p.add(a); const hnd = mesh(new THREE.SphereGeometry(.065, 12, 10), skin); hnd.position.y = -.56; p.add(hnd); p.rotation.z = s * .08; g.add(p); return p; });
-    const head = mesh(new THREE.SphereGeometry(.17, 24, 18), kind === "robot" ? M(T.mono ? 0xfbfaf8 : 0xb9c0cb, { metalness: T.mono ? 0 : .5, roughness: .35 }) : skin); head.position.y = 1.72; g.add(head);
-    if (kind !== "robot") { const hair = mesh(new THREE.SphereGeometry(.18, 24, 18, 0, Math.PI * 2, 0, Math.PI * .55), M(T.mono ? 0xebe9e5 : HAIR[seed % HAIR.length], { roughness: .9 })); hair.position.y = 1.74; hair.rotation.x = -.25; g.add(hair);
-      if (seed % 5 === 2) { const bun = mesh(new THREE.SphereGeometry(.08, 14, 10), M(T.mono ? 0xebe9e5 : HAIR[seed % HAIR.length])); bun.position.set(0, 1.92, -.06); g.add(bun); } }
-    else { const vis = B(.22, .05, .02, M(0x8ff0b0, { emissive: 0x8ff0b0, emissiveIntensity: 1.4 })); vis.position.set(0, 1.74, .165); g.add(vis); }
-    for (const s of [-1, 1]) { const e = mesh(new THREE.SphereGeometry(.018, 8, 6), M(0x1b1b1f), false); e.position.set(s * .06, 1.74, .155); g.add(e); }
-    g.userData = { legs, arms };
+    const robot = kind === "robot";
+    const skin = M(SKIN[seed % SKIN.length], { roughness: .7 });
+    const hairM = M(HAIR[(seed * 7 + 3) % HAIR.length], { roughness: .9 });
+    const metalM = M(0xb9c0cb, { metalness: .75, roughness: .28 }), darkMetal = M(0x4a505c, { metalness: .6, roughness: .4 });
+    const top = robot ? metalM
+      : role === "courier" ? M(0xefe8d8, { roughness: .85 })
+      : kind === "codice" ? M([0x3d4a5c, 0x5a6b5a, 0x6b4f6b, 0x2f3540][seed % 4], { roughness: .95 })
+      : kind === "AI" ? M(0xf1efff, { emissive: 0x6b5ce0, emissiveIntensity: .16 }) : M(T.shirt);
+    const sleeve = top;
+    const pants = M(robot ? 0x6b7280 : role === "courier" ? 0x2b2f38 : [0x2b3550, 0x2a2c33, 0x6b6f78, 0x1f2230, 0x4a3a2c][seed % 5]);
+    const shoeM2 = robot ? darkMetal : shoeM;
+    const legs = [-1, 1].map((s2) => { const p = new THREE.Group(); p.position.set(s2 * .1, .9, 0); const l = mesh(robot ? new THREE.CylinderGeometry(.07, .07, .74, 12) : new THREE.CapsuleGeometry(.075, .62, 6, 12), pants); l.position.y = -.39; p.add(l); const f = mesh(new THREE.BoxGeometry(.13, .08, .24), shoeM2); f.position.set(0, -.82, .05); p.add(f); g.add(p); return p; });
+    if (robot) { const body = RB(.46, .5, .34, .08, metalM); body.position.y = .95; g.add(body); const chest = B(.22, .14, .02, M(0x8ff0b0, { emissive: 0x8ff0b0, emissiveIntensity: .9 })); chest.position.set(0, 1.22, .18); g.add(chest); }
+    else {
+      const torso = mesh(new THREE.CapsuleGeometry(.19, .34, 6, 16), top); torso.position.y = 1.2; torso.scale.z = .78; g.add(torso);
+      if (kind === "persona" && role !== "courier") { // giacca aperta + cravatta
+        const jacket = mesh(new THREE.CapsuleGeometry(.205, .3, 6, 16), M(T.vest.persona, { roughness: .7 })); jacket.position.set(0, 1.17, -.02); jacket.scale.set(1.04, 1, .8); g.add(jacket);
+        const shirtV = B(.12, .26, .02, M(T.shirt)); shirtV.position.set(0, 1.29, .165); g.add(shirtV);
+        const tie = B(.045, .24, .02, M(T.tie.persona)); tie.position.set(0, 1.27, .178); g.add(tie);
+      } else if (kind === "codice" && role !== "courier") { // felpa: cappuccio dietro + tasca
+        const hood = mesh(new THREE.TorusGeometry(.13, .055, 8, 16), top); hood.position.set(0, 1.5, -.1); hood.rotation.x = -.5; g.add(hood);
+        const pocket = B(.24, .1, .02, M(0x000000, { transparent: true, opacity: .18 })); pocket.position.set(0, 1.06, .15); g.add(pocket);
+      } else if (kind === "AI") {
+        const v = mesh(new THREE.CapsuleGeometry(.195, .26, 6, 16), M(T.vest.AI, { roughness: .6 })); v.position.y = 1.16; v.scale.set(1.02, 1, .8); g.add(v);
+      } else if (role === "courier") { // borsa a tracolla
+        const strap = B(.04, .62, .03, M(0x5a3a22)); strap.position.set(0, 1.22, .155); strap.rotation.z = .7; g.add(strap);
+        const bag = RB(.3, .22, .1, .03, M(0x6b4423, { roughness: .8 })); bag.position.set(.22, .92, .1); g.add(bag);
+      } else { const v = mesh(new THREE.CapsuleGeometry(.195, .26, 6, 16), M(T.vest.codice, { roughness: .75 })); v.position.y = 1.16; v.scale.set(1.02, 1, .8); g.add(v); }
+    }
+    const arms = [-1, 1].map((s2) => { const p = new THREE.Group(); p.position.set(s2 * (robot ? .28 : .25), 1.43, 0); const a = mesh(robot ? new THREE.CylinderGeometry(.05, .05, .46, 10) : new THREE.CapsuleGeometry(.058, .46, 6, 12), sleeve); a.position.y = -.27; p.add(a); const hnd = mesh(new THREE.SphereGeometry(.065, 12, 10), robot ? darkMetal : skin); hnd.position.y = -.56; p.add(hnd); p.rotation.z = s2 * .08; g.add(p); return p; });
+    if (robot) {
+      const head = RB(.34, .28, .3, .06, metalM); head.position.y = 1.6; g.add(head);
+      const visor = B(.26, .07, .02, M(0x8ff0b0, { emissive: 0x8ff0b0, emissiveIntensity: 1.4 })); visor.position.set(0, 1.76, .155); g.add(visor);
+      const ant = mesh(new THREE.CylinderGeometry(.012, .012, .2, 6), darkMetal); ant.position.y = 1.98; g.add(ant);
+      const tip = mesh(new THREE.SphereGeometry(.035, 10, 8), M(0xff6f61, { emissive: 0xff6f61, emissiveIntensity: 1.2 })); tip.position.y = 2.09; g.add(tip);
+    } else {
+      const head = mesh(new THREE.SphereGeometry(.17, 24, 18), skin); head.position.y = 1.72; g.add(head);
+      for (const s2 of [-1, 1]) { const e = mesh(new THREE.SphereGeometry(.018, 8, 6), M(0x1b1b1f), false); e.position.set(s2 * .06, 1.74, .155); g.add(e); }
+      const style = role === "courier" ? "cap" : ["short", "long", "bun", "pony", "curly", "bald", "short", "long"][seed % 8];
+      const cap = (y) => { const c = mesh(new THREE.SphereGeometry(.18, 24, 18, 0, Math.PI * 2, 0, Math.PI * .55), hairM); c.position.y = y; c.rotation.x = -.25; g.add(c); };
+      if (style === "short") cap(1.74);
+      if (style === "long") { cap(1.74); const back = RB(.32, .42, .12, .05, hairM); back.position.set(0, 1.4, -.12); g.add(back); }
+      if (style === "bun") { cap(1.74); const bun = mesh(new THREE.SphereGeometry(.08, 14, 10), hairM); bun.position.set(0, 1.93, -.07); g.add(bun); }
+      if (style === "pony") { cap(1.74); const pony = mesh(new THREE.CapsuleGeometry(.05, .22, 4, 8), hairM); pony.position.set(0, 1.58, -.2); pony.rotation.x = .35; g.add(pony); }
+      if (style === "curly") for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2; const c = mesh(new THREE.SphereGeometry(.075, 10, 8), hairM); c.position.set(Math.cos(a) * .13, 1.84 + (i % 2) * .03, Math.sin(a) * .11 - .03); g.add(c); }
+      if (style === "cap") { const capM = M(0xd9b46a, { roughness: .7 }); const c = mesh(new THREE.SphereGeometry(.175, 20, 14, 0, Math.PI * 2, 0, Math.PI * .36), capM); c.position.y = 1.77; g.add(c); const visor = mesh(new THREE.CylinderGeometry(.14, .14, .02, 18, 1, false, 0, Math.PI), capM); visor.position.set(0, 1.78, .1); visor.rotation.y = Math.PI / 2; g.add(visor); }
+      if (kind === "AI") { // occhiali luminosi + anello che gira sopra la testa
+        const gl = B(.26, .05, .02, M(0xb9aef9, { emissive: 0x8b7cf6, emissiveIntensity: 1.3 })); gl.position.set(0, 1.75, .16); g.add(gl);
+        const halo = mesh(new THREE.TorusGeometry(.17, .016, 8, 40), M(0xb9aef9, { emissive: 0x8b7cf6, emissiveIntensity: 1.6 }), false); halo.rotation.x = Math.PI / 2; halo.position.y = 2.02; g.add(halo); g.userData.halo = halo;
+      }
+    }
+    g.userData = { ...g.userData, legs, arms };
     return g;
   };
   const pose = (p, mode, t, ph = 0) => {
@@ -350,7 +390,7 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
     // pianta in un angolo
     if (!opts.relax) plant(cx - hw + .55, bz + doorSide * .55, .85);
     plaque(opts.title || AREE[area], opts.sub || `${list.length} uffici · ${occ(list)}`, cx, WH + .55, fz, accent);
-    return { cx, inZ: fz - doorSide * .6, doorZ: fz, outZ: fz + doorSide * .8 };
+    return { cx, inZ: fz - doorSide * .6, doorZ: fz, outZ: fz + doorSide * .8, ix: opts.relax ? 0 : hw - .45 };
   };
   const rugM = E.rugs ? M(0x5a2f2a, { roughness: .95 }) : null, rugBorder = E.rugs ? M(0xb08a52, { roughness: .9 }) : null;
   for (const [p, [cx, cz]] of Object.entries(ISLE)) {
@@ -375,16 +415,17 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
     list.forEach((o, i) => { const row = i % 2, col = Math.floor(i / 2); desk(o, cx + (col - (cols - 1) / 2) * SP, cz + (row ? .6 : -.6), row ? 0 : Math.PI); });
     if (!R) sign(AREE[p], `${list.length} uffici · ${occ(list)}`, cx - hw - 1.1, cz + 1.9, .35);
   }
+  let relaxRoom = null;
   if (R) { // corridoio + stanza relax
     const run = mesh(new THREE.PlaneGeometry(FW - 6, 2.2), M(R.wall === "dark" ? 0x2a2420 : R.wall === "half" ? 0xd8cbb4 : 0xffffff, { roughness: .9 }), false); run.rotation.x = -Math.PI / 2; run.position.set(0, .007, LY.lanes[0]); scene.add(run);
-    buildRoom(LOUNGE[0], LOUNGE[1], 10.4, 7.6, "relax", [], { relax: true, title: "RELAX", sub: "chi è fermo aspetta qui" });
+    relaxRoom = buildRoom(LOUNGE[0], LOUNGE[1], 10.4, 7.6, "relax", [], { relax: true, title: "RELAX", sub: "chi è fermo aspetta qui" });
   }
   // chi è fermo va sul divano, col cartellino rosso
   const SEATS = [[LX - 2.8, LZ - 1.75], [LX - 1.8, LZ - 1.75], [LX + 1.6, LZ - 1.75], [LX + 2.6, LZ - 1.75], [LX + 3.75, LZ + .3, -Math.PI / 2], [LX + 3.75, LZ + 1.3, -Math.PI / 2]];
   OFF.filter((o) => stato(o) === "fermo").slice(0, SEATS.length).forEach((o, i) => {
     const [x, z, r = 0] = SEATS[i]; const p = person(o.tipo, 7 + i); p.position.set(x, 0, z); p.rotation.y = r; scene.add(p); pose(p, "lounge", 0);
     p.add(tag(`<div class="pill ko">${esc(o.nome)} · fermo${o.at ? " da " + ago(o.at).replace(" fa", "") : ""}</div>`, 2.15));
-    pos[o.id] ||= { x, z: z + .8, cx: x, hw: 0, room: null };
+    pos[o.id] ||= relaxRoom ? { x, z: relaxRoom.inZ, cx: x, hw: 0, room: relaxRoom } : { x, z: z + .8, cx: x, hw: 0, room: null };
     const hit = mesh(new THREE.BoxGeometry(.9, 1.6, .9), new THREE.MeshBasicMaterial({ visible: false }), false); hit.position.set(x, .8, z); hit.userData.o = o; scene.add(hit); hits.push(hit);
   });
 
@@ -399,7 +440,9 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
     const off = (k % 3 - 1) * .45;
     if (E.layout === "tiers") { const ax = LY.aisle + off; return [[a.x, a.z], [ax, a.z], [ax, b.z], [b.x, b.z]]; }
     if (E.layout === "rooms") {
-      const out = (m) => m.room ? [[side(m), m.z], [side(m), m.room.inZ], [m.room.cx, m.room.inZ], [m.room.cx, m.room.outZ]] : [];
+      // dentro la stanza: corsia interna lungo la parete (mai attraverso il vetro), poi la porta
+      const inner = (m) => m.room.ix ? m.room.cx + (m.x >= m.room.cx ? 1 : -1) * m.room.ix : m.x;
+      const out = (m) => m.room ? [[inner(m), m.z], [inner(m), m.room.inZ], [m.room.cx, m.room.inZ], [m.room.cx, m.room.doorZ], [m.room.cx, m.room.outZ]] : [];
       const lane = LY.lanes[0] + off, A = out(a), Bp = out(b).reverse();
       const ax = a.room ? a.room.cx : a.x, bx = b.room ? b.room.cx : b.x;
       return [[a.x, a.z], ...A, [ax, lane], [bx, lane], ...Bp, [b.x, b.z]];
@@ -411,7 +454,7 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
   for (const e of edges) {
     const o = byId[e.from]; if (stato(o) !== "lavora") continue; const a = pos[e.from], b = pos[e.to]; if (!a || !b) continue;
     const seg = segs(route(a, b, ci)); if (!seg.length) continue;
-    const p = person(o.tipo === "persona" ? "persona" : "codice", 11 + ci); scene.add(p);
+    const p = person("codice", 11 + ci, "courier"); scene.add(p);
     const folder = B(.32, .04, .24, folderM); folder.position.set(0, 1.08, .34); p.add(folder);
     p.add(tag(`<div class="bub gold small"><svg viewBox="0 0 24 24" fill="#d9b46a"><path d="M3 6a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>`, 2.35));
     const ringM = new THREE.MeshBasicMaterial({ color: 0xd9b46a, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }); disposables.push(ringM);
@@ -474,7 +517,7 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
   const t0 = performance.now(); let last = t0, raf = 0;
   const frame = (now) => {
     const t = reduce ? 0 : (now - t0) / 1000, dt = Math.min(.05, (now - last) / 1000); last = now;
-    for (const w of workers) pose(w.p, w.mode, t, w.ph);
+    for (const w of workers) { pose(w.p, w.mode, t, w.ph); if (w.p.userData.halo) w.p.userData.halo.rotation.z = t * 1.4; }
     for (const c of couriers) {
       if (reduce) { c.p.visible = false; continue; }
       const go = c.seg.total / c.speed, wait = 1.1, cyc = go * 2 + wait + c.rest, ph = (t + c.off) % cyc;
