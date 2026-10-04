@@ -42,6 +42,10 @@ const LOG_CAP = 500;
 // Soglie v1 — versionate qui, non sparse nei check.
 // STALE_DAYS 8: cadenza attesa settimanale (import CSV e sync CP), +1 di grazia.
 const STALE_DAYS = 8;
+// Import Infloww: dal 29/07/2026 lo carica il ROBOT ogni mattina (non più a mano a
+// settimana). Con 8 giorni un robot fermo dal 27/09 non era ancora segnalato il
+// 4/10 (trovato dalla Sede). 3 giorni = margine per un weekend col Mac spento.
+const INFLOWW_STALE_DAYS = 3;
 // Specchiano il filtro underperformers della leaderboard Sales CP
 // (src/app/leaderboard/sales-cp/page.js — score ≤25 = tier Average boundary).
 const UNDERPERF_SCORE_MAX = 25;
@@ -171,11 +175,11 @@ const CHECKS = [
       const ts = Number(last[1]) || 0;
       if (!ts) return [];
       const age = daysAgo(ts);
-      if (age < STALE_DAYS) return [];
+      if (age < INFLOWW_STALE_DAYS) return [];
       return [{
         fingerprint: "infloww-import-stale",
         title: "Import Infloww fermo",
-        detail: `Ultimo file caricato: ${meseLabel(String(last[0]).split(":")[1] || "")}`,
+        detail: `Ultimo file caricato: ${meseLabel(String(last[0]).split(":")[1] || "")}. Lo carica il robot ogni mattina alle 8 dal Mac di Nicholas: serve il Mac acceso e sbloccato, con Infloww aperto in primo piano (verifica: bash ~/infloww-daily/verify.sh).`,
         value: `${age} giorni fa`,
         cta: { href: "/admin/leaderboard-import", label: "Carica file" },
       }];

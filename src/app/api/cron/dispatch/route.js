@@ -40,6 +40,8 @@ export async function POST(request) {
     if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   }
   const now = new Date();
+  // battito dei lavori che girano DENTRO il centralino (prima non lasciavano traccia: Sede, 04/10/2026)
+  const beat = (name, result) => kv.set(`cron:heartbeat:${name}`, { at: Date.now(), via: viaCron ? "cron" : "session", result: String(result).slice(0, 200), ...(String(result).startsWith("err") ? { error: true } : {}) }, { ex: 40 * 24 * 3600 }).catch(() => {});
   const out = {
     monday: now.getUTCDay() === 1,
     first_of_month: now.getUTCDate() === 1,
@@ -93,6 +95,7 @@ export async function POST(request) {
   } catch (e) {
     out.academy_signals = "err:" + (e?.message || "unknown");
   }
+  await beat("academy-signals", out.academy_signals);
 
   // Stessa logica per i profili-segnali per operatore (query analitica).
   try {
@@ -106,6 +109,7 @@ export async function POST(request) {
   } catch (e) {
     out.operator_signals = "err:" + (e?.message || "unknown");
   }
+  await beat("operator-signals", out.operator_signals);
 
   // Transfer measurement (traiettoria comportamentale per operatore, mese×mese).
   try {
@@ -120,6 +124,7 @@ export async function POST(request) {
   } catch (e) {
     out.transfer = "err:" + (e?.message || "unknown");
   }
+  await beat("transfer", out.transfer);
 
   // Centro HR (29/09/2026): riconciliazione notturna con la lista ClickUp HR,
   // nella SUA funzione (budget proprio). Si chiama sempre: a sync spenta la route
@@ -144,6 +149,7 @@ export async function POST(request) {
   } catch (e) {
     out.creator_difficulty = "err:" + (e?.message || "unknown");
   }
+  await beat("creator-difficulty", typeof out.creator_difficulty === "string" ? out.creator_difficulty : "ok");
 
   return Response.json(out);
 }
