@@ -555,6 +555,16 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
   // campi con scrittura verso ClickUp ancora in sospeso: l'app resta la fonte
   const pending = new Set(person.pendingKeys || []);
   for (const k of Object.keys(fresh)) if (pending.has(k)) delete fresh[k];
+  // Un campo VUOTO su ClickUp non svuota l'app (04/10/2026, incidente): (a) se l'app non ha mai
+  // visto quel campo su ClickUp (nessuna base: campo appena creato sulla lista, o mai scritto),
+  // (b) se l'app non riesce a scriverlo lì (es. indirizzo senza posizione su mappa: ClickUp resta
+  // vuoto per forza). Prima un "Importa ora" dopo la creazione di due campi aveva cancellato
+  // provenienza, reference e indirizzo su 7 schede vere.
+  const skippedKeys = new Set((person.sync?.skipped || []).map((x) => x.key));
+  for (const k of Object.keys(fresh)) {
+    if (!isEmptyValue(fresh[k]) || isEmptyValue(current.fields[k])) continue;
+    if (base[k] === undefined || skippedKeys.has(k) || k === "location") delete fresh[k];
+  }
 
   // campi specchio: testo cambiato ma non leggibile → si tiene l'app, lo si scrive nello storico
   // e al push successivo si riscrive il testo dell'app (mirrorStale)
