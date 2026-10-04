@@ -78,8 +78,8 @@ const THEME_ORDER = ["trading", "vetro", "legno", "executive"];
 const ACCENT = { dati: "#6fb3ff", vendite: "#4fbf78", formazione: "#f0b060", persone: "#e07aa8", controllo: "#b9aef9", direzione: "#d9b46a" };
 // disposizioni: centro di ogni area [x, z] e angolo relax
 const LAYOUTS = {
-  islands: { isle: { dati: [-15, -6.5], vendite: [-3.5, -7], formazione: [9, -1.5], persone: [-15, 4.5], controllo: [-3.5, 3.5], direzione: [3.5, 10.5] }, lounge: [15.5, 10.2], lanes: [-1.2, 8.6] },
-  rooms: { isle: { dati: [-14, -6.6], vendite: [0, -6.6], formazione: [14, -6.6], persone: [-14, 6.2], controllo: [0, 6.2], direzione: [8, 6.2] }, lounge: [16.6, 11], lanes: [0] },
+  islands: { meeting: [16, -9.6, 6.6, 5], reception: [19.6, 1.4], isle: { dati: [-15, -6.5], vendite: [-3.5, -7], formazione: [9, -1.5], persone: [-15, 4.5], controllo: [-3.5, 3.5], direzione: [3.5, 10.5] }, lounge: [15.5, 10.2], lanes: [-1.2, 8.6] },
+  rooms: { meeting: [-8, -6.6, 5.4, 5.2], reception: [19.6, 0], isle: { dati: [-15.2, -6.6], vendite: [0, -6.6], formazione: [14, -6.6], persone: [-14, 6.2], controllo: [0, 6.2], direzione: [8, 6.2] }, lounge: [16.6, 11], lanes: [0] },
   tiers: { isle: { dati: [-3, -11], vendite: [-3, -6.8], formazione: [-3, -2.6], persone: [-3, 1.6], controllo: [-3, 5.8], direzione: [-3, 10] }, lounge: [15.5, 10.2], aisle: 8 },
 };
 const GO_LABEL = { dati: "Dati", vendite: "Vendite", formazione: "Formazione", persone: "Persone", controllo: "Controllo", direzione: "Direzione" };
@@ -350,15 +350,15 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
   // STANZE (Nicholas, 4/10: "delineare meglio gli uffici, tipo le stanze in vetro"): pareti alte con montanti,
   // parete di fondo piena con lo schermo dell'area, porta scorrevole sul corridoio, insegna sopra la porta,
   // pavimento proprio, una pianta, filo colorato dell'area sulla porta.
-  const R = E.room, WH = 2.3;
-  const glassM = R ? M(R.glass, { transparent: true, opacity: R.op, roughness: .08, metalness: .1, depthWrite: false }) : null;
-  const frameM = R ? M(R.frame, { metalness: R.wall === "dark" ? .7 : .2, roughness: .35 }) : null;
-  const panelM = R ? M(R.wall === "half" ? 0xb8925f : R.back, { roughness: .6 }) : null;
-  const backM = R ? M(R.back, { roughness: .85 }) : null;
+  const R = E.room, RR = R || { wall: "glass", frame: 0x9aa0aa, glass: 0xdfe9f2, op: .2, floor: "light", back: T.wall }, WH = 2.3;
+  const glassM = M(RR.glass, { transparent: true, opacity: RR.op, roughness: .08, metalness: .1, depthWrite: false });
+  const frameM = M(RR.frame, { metalness: RR.wall === "dark" ? .7 : .2, roughness: .35 });
+  const panelM = M(RR.wall === "half" ? 0xb8925f : RR.back, { roughness: .6 });
+  const backM = M(RR.back, { roughness: .85 });
   const plankTex = (base) => { const t = tex(512, 512, (x, w, h) => { const [r, g, b] = base; x.fillStyle = `rgb(${r - 18},${g - 18},${b - 18})`; x.fillRect(0, 0, w, h); for (let i = 0; i < 12; i++) for (let j = -1; j < 4; j++) { const v = Math.random() * 16; x.fillStyle = `rgb(${(r + v) | 0},${(g + v) | 0},${(b + v) | 0})`; x.fillRect(j * w / 3 + ((i % 2) * w / 6), i * h / 12, w / 3 - 2, h / 12 - 2); } }); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 2); return t; };
-  const roomFloorM = R ? M(0xffffff, { map: plankTex(R.floor === "walnut" ? [86, 60, 44] : R.floor === "oak" ? [196, 158, 112] : [228, 220, 206]), roughness: .65 }) : null;
+  const roomFloorM = M(0xffffff, { map: plankTex(RR.floor === "walnut" ? [86, 60, 44] : RR.floor === "oak" ? [196, 158, 112] : [228, 220, 206]), roughness: .65 });
   const plaque = (text, sub, x, y, z, accent) => { const o = tag(`<div class="sign" style="border-color:${accent}"><b>${esc(text)}</b><span>${esc(sub)}</span></div>`, y); o.position.x = x; o.position.z = z; scene.add(o); };
-  const roomScreen = (w, label, list) => tex(1024, 320, (x, W2, H2) => { x.fillStyle = R.wall === "dark" ? "#0f0e0c" : "#14181d"; x.fillRect(0, 0, W2, H2);
+  const roomScreen = (w, label, list) => tex(1024, 320, (x, W2, H2) => { x.fillStyle = RR.wall === "dark" ? "#0f0e0c" : "#14181d"; x.fillRect(0, 0, W2, H2);
     const lav = list.filter((o) => stato(o) === "lavora").length, fer = list.filter((o) => stato(o) === "fermo").length;
     x.fillStyle = "#e9e6df"; x.font = "bold 54px Helvetica, Arial"; x.fillText(label, 40, 80);
     x.font = "600 34px Helvetica, Arial"; x.fillStyle = "#9fdcb4"; x.fillText(`${lav} al lavoro`, 40, 140); x.fillStyle = fer ? "#ff9a8a" : "#8a8780"; x.fillText(`${fer} ${fer === 1 ? "fermo" : "fermi"}`, 300, 140);
@@ -370,11 +370,11 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
     // la parete piena va solo sul lato lontano dalla camera, altrimenti nasconde la stanza
     const solidBack = doorSide === 1;
     if (solidBack) { const back = B(rw, WH, .14, backM); back.position.set(cx, WH / 2, bz); scene.add(back); }
-    if (solidBack && !opts.relax) { const scr = mesh(new THREE.PlaneGeometry(Math.min(3.6, rw - 1), 1.1), basic(roomScreen(rw, AREE[area] || "", list)), false); scr.position.set(cx, 1.5, bz + doorSide * .08); if (doorSide < 0) scr.rotation.y = Math.PI; scene.add(scr); }
+    if (solidBack && !opts.relax) { const scr = mesh(new THREE.PlaneGeometry(Math.min(3.6, rw - 1), 1.1), basic(opts.screen || roomScreen(rw, AREE[area] || "", list)), false); scr.position.set(cx, 1.5, bz + doorSide * .08); if (doorSide < 0) scr.rotation.y = Math.PI; scene.add(scr); }
     // pareti di vetro con montanti (laterali e fronte con porta)
     const glassWall = (w, x, z, rotY) => {
       const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rotY; scene.add(g);
-      const low = R.wall === "half" ? .95 : 0;
+      const low = RR.wall === "half" ? .95 : 0;
       if (low) { const pn = B(w, low, .08, panelM); pn.position.y = low / 2; g.add(pn); }
       const gl = B(w, WH - low, .03, glassM); gl.position.y = low + (WH - low) / 2; gl.castShadow = false; g.add(gl);
       for (const y of [low || .02, WH]) { const r = B(w, .06, .09, frameM); r.position.y = y; g.add(r); }
@@ -388,7 +388,7 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
     const lintel = B(door + .1, .12, .1, frameM); lintel.position.set(cx, WH, fz); scene.add(lintel);
     const stripe = B(door + .1, .04, .11, M(parseInt(accent.slice(1), 16), { emissive: parseInt(accent.slice(1), 16), emissiveIntensity: .6 })); stripe.position.set(cx, WH - .1, fz); scene.add(stripe);
     // pianta in un angolo
-    if (!opts.relax) plant(cx - hw + .55, bz + doorSide * .55, .85);
+    if (!opts.relax && !opts.noPlant) plant(cx - hw + .55, bz + doorSide * .55, .85);
     plaque(opts.title || AREE[area], opts.sub || `${list.length} uffici · ${occ(list)}`, cx, WH + .55, fz, accent);
     return { cx, inZ: fz - doorSide * .6, doorZ: fz, outZ: fz + doorSide * .8, ix: opts.relax ? 0 : hw - .45 };
   };
@@ -419,6 +419,42 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
   if (R) { // corridoio + stanza relax
     const run = mesh(new THREE.PlaneGeometry(FW - 6, 2.2), M(R.wall === "dark" ? 0x2a2420 : R.wall === "half" ? 0xd8cbb4 : 0xffffff, { roughness: .9 }), false); run.rotation.x = -Math.PI / 2; run.position.set(0, .007, LY.lanes[0]); scene.add(run);
     relaxRoom = buildRoom(LOUNGE[0], LOUNGE[1], 10.4, 7.6, "relax", [], { relax: true, title: "RELAX", sub: "chi è fermo aspetta qui" });
+  }
+  // SALA RIUNIONI: l'ordine del giorno è la Sede stessa (dati veri: fermi, buchi, senza controllore)
+  if (LY.meeting) {
+    const [mx, mz, mw, md] = LY.meeting, tot = D.totali || {};
+    const agenda = tex(1024, 320, (x, W2, H2) => { x.fillStyle = RR.wall === "dark" ? "#0f0e0c" : "#14181d"; x.fillRect(0, 0, W2, H2);
+      x.fillStyle = "#e9e6df"; x.font = "bold 48px Helvetica, Arial"; x.fillText("ORDINE DEL GIORNO", 40, 72);
+      const righe = [[`${tot.fermi ?? 0} uffici fermi o in ritardo`, (tot.fermi ?? 0) > 0], [`${tot.buchi ?? 0} buchi da chiudere`, (tot.buchi ?? 0) > 0], [`${tot.senza_controllore ?? 0} uffici senza controllore`, (tot.senza_controllore ?? 0) > 0]];
+      x.font = "600 34px Helvetica, Arial"; righe.forEach(([t, bad], i) => { x.fillStyle = bad ? "#ff9a8a" : "#9fdcb4"; x.fillRect(40, 112 + i * 64, 14, 14); x.fillStyle = "#e9e6df"; x.fillText(t, 72, 128 + i * 64); }); });
+    buildRoom(mx, mz, mw, md, "riunioni", [], { title: "SALA RIUNIONI", sub: "l'ordine del giorno è la Sede", screen: agenda });
+    const tableM = M(RR.floor === "walnut" ? 0x2a1d16 : RR.floor === "oak" ? 0x8a6442 : 0xf3f2ef, { roughness: .5 });
+    const tbl = RB(3.4, .07, 1.25, .25, tableM); tbl.position.set(mx, .74, mz); scene.add(tbl);
+    for (const [lx, lz] of [[-1.3, 0], [1.3, 0]]) { const leg = B(.12, .74, .7, metal); leg.position.set(mx + lx, .37, mz + lz); scene.add(leg); }
+    const seats = [[-1.1, -1], [0, -1], [1.1, -1], [-1.1, 1], [0, 1], [1.1, 1]];
+    for (const [sx, sz] of seats) { const c = chair(); c.position.set(mx + sx, 0, mz + sz); c.rotation.y = sz < 0 ? 0 : Math.PI; scene.add(c); }
+    for (const sx of [-2.05, 2.05]) { const c = chair(); c.position.set(mx + sx, 0, mz); c.rotation.y = sx < 0 ? -Math.PI / 2 : Math.PI / 2; scene.add(c); }
+    const pad = B(.5, .01, .35, padM); pad.position.set(mx - .6, .78, mz + .2); scene.add(pad);
+    const lap = B(.36, .02, .25, monM); lap.position.set(mx + .7, .79, mz - .25); scene.add(lap);
+  }
+  // RECEPTION all'ingresso: bancone, receptionist, parete col logo, tappeto e attesa
+  if (LY.reception) {
+    const [rx, rz] = LY.reception, g = new THREE.Group(); g.position.set(rx, 0, rz); g.rotation.y = Math.PI / 2; scene.add(g); // bancone verso il bordo della sala (l'ingresso), logo verso l'interno
+    const counterM = M(RR.wall === "dark" ? 0x1a1816 : RR.wall === "half" ? 0x8a6442 : 0xf6f5f2, { roughness: .45 }), topM = M(RR.wall === "dark" ? 0xd9b46a : 0x2b2b2e, { roughness: .3, metalness: RR.wall === "dark" ? .6 : .1 });
+    const front = RB(3.2, 1.05, .55, .12, counterM); front.position.set(0, 0, .2); g.add(front);
+    const slab = RB(3.4, .06, .75, .14, topM); slab.position.set(0, 1.05, .15); g.add(slab);
+    for (const sx of [-1.75, 1.75]) { const wing = RB(.5, 1.05, 1.5, .1, counterM); wing.position.set(sx, 0, -.4); g.add(wing); }
+    const accentM = M(0xd9b46a, { emissive: 0xd9b46a, emissiveIntensity: .5 }); const strip = B(3.2, .04, .02, accentM); strip.position.set(0, .55, .48); g.add(strip);
+    const mon = B(.5, .32, .03, monM); mon.position.set(.6, 1.28, -.05); g.add(mon);
+    const rec = person("persona", 21); rec.position.set(-.2, 0, -.6); g.add(rec); pose(rec, "idle", 0);
+    // parete col logo dietro il bancone
+    const logoTex = tex(1024, 512, (x, W2, H2) => { x.fillStyle = RR.wall === "dark" ? "#14120f" : "#1d1d20"; x.fillRect(0, 0, W2, H2); x.fillStyle = "#d9b46a"; x.textAlign = "center"; x.font = "500 92px Georgia, serif"; x.fillText("HOUSE OF CREATORS", W2 / 2, 270); x.font = "600 34px Helvetica, Arial"; x.fillStyle = "rgba(242,238,230,.75)"; x.fillText("Benvenuti in sede", W2 / 2, 350); });
+    const wall = B(4.4, 2.5, .16, M(RR.wall === "dark" ? 0x14120f : 0x1d1d20)); wall.position.set(0, 1.25, -1.6); g.add(wall);
+    const lp = mesh(new THREE.PlaneGeometry(4.0, 2.0), basic(logoTex), false); lp.position.set(0, 1.3, -1.51); g.add(lp);
+    const mat = RB(2.6, .015, 1.4, .1, M(0x2a2622, { roughness: 1 })); mat.position.set(0, .004, 1.5); g.add(mat);
+    plant(rx - .2, rz - 3, 1); plant(rx - .2, rz + 3, 1);
+    const wait = new THREE.Group(); scene.add(wait); for (const k of [-1, 1]) { const c = chair(); c.position.set(rx + 1.2, 0, rz + k * 2.7); c.rotation.y = k < 0 ? 0 : Math.PI; wait.add(c); }
+    plaque("RECEPTION", "benvenuti in House of Creators", rx, 3.1, rz, "#d9b46a");
   }
   // chi è fermo va sul divano, col cartellino rosso
   const SEATS = [[LX - 2.8, LZ - 1.75], [LX - 1.8, LZ - 1.75], [LX + 1.6, LZ - 1.75], [LX + 2.6, LZ - 1.75], [LX + 3.75, LZ + .3, -Math.PI / 2], [LX + 3.75, LZ + 1.3, -Math.PI / 2]];
@@ -480,7 +516,7 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
   const capEl = root.querySelector(".cap"), bTour = root.querySelector('[data-cam="tour"]'), bAll = root.querySelector('[data-cam="all"]');
   let fly = null; // volo verso un'area: { x, z, zoom }
   const setTour = (on) => { tour = on; bTour.classList.toggle("on", on); bAll.classList.toggle("on", !on); stopT = 0; if (on) fly = { zoom: 1 }; else { fly = { x: 0, z: 0, zoom: .55 }; capEl.style.opacity = 0; } };
-  root.querySelectorAll("[data-go]").forEach((b) => { b.onclick = () => { const at = b.dataset.go === "relax" ? LOUNGE : ISLE[b.dataset.go]; if (!at) return; tour = false; bTour.classList.remove("on"); bAll.classList.remove("on"); capEl.style.opacity = 0; fly = { x: at[0], z: at[1], zoom: 1.15 }; }; });
+  root.querySelectorAll("[data-go]").forEach((b) => { b.onclick = () => { const SPECIAL = { relax: LOUNGE, riunioni: LY.meeting, reception: LY.reception }; const at = SPECIAL[b.dataset.go] || ISLE[b.dataset.go]; if (!at) return; tour = false; bTour.classList.remove("on"); bAll.classList.remove("on"); capEl.style.opacity = 0; fly = { x: at[0], z: at[1], zoom: 1.15 }; }; });
   const keys = new Set();
   const onKey = (e) => { if (e.target.closest && e.target.closest("input,textarea,select")) return; const k = e.key.toLowerCase(); if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(k)) { if (e.type === "keydown") { keys.add(k); tour = false; fly = null; bTour.classList.remove("on"); capEl.style.opacity = 0; } else keys.delete(k); e.preventDefault(); } };
   window.addEventListener("keydown", onKey); window.addEventListener("keyup", onKey);
@@ -593,7 +629,7 @@ export default function SedeSala({ data, onView }) {
           </div>
         </div>
         <div className="top" style={{ top: 58 }}>
-          <div className="go" role="group" aria-label="Vai a"><span>Vai a</span>{Object.keys(GO_LABEL).filter((p) => data?.offices?.some((o) => o.piano === p)).map((p) => <button key={p} data-go={p}>{GO_LABEL[p]}</button>)}<button data-go="relax">Relax</button></div>
+          <div className="go" role="group" aria-label="Vai a"><span>Vai a</span>{Object.keys(GO_LABEL).filter((p) => data?.offices?.some((o) => o.piano === p)).map((p) => <button key={p} data-go={p}>{GO_LABEL[p]}</button>)}<button data-go="riunioni">Riunioni</button><button data-go="reception">Reception</button><button data-go="relax">Relax</button></div>
         </div>
         <div className="hint">Trascina per muoverti · rotella per avvicinarti · tasto destro per girare · frecce o WASD</div>
         <div className="cap" />
