@@ -486,7 +486,7 @@ export default function HrFormPage() {
             const f = FIELD_BY_KEY[k];
             const cfOff = k === "codiceFiscale" && !ctx.cfEnabled;
             const fe = fieldErrs[k];
-            const extra = { ...(keyboardFor(k, data) || {}), ...(fe ? { "aria-invalid": true, "aria-describedby": `f-${k}-err` } : {}) };
+            const extra = { ...(keyboardFor(k, data) || {}), ...(k === "spokenLanguages" ? { explicitLanguages: true } : {}), ...(fe ? { "aria-invalid": true, "aria-describedby": `f-${k}-err` } : {}) };
             return (
               <div key={k} id={`w-${k}`} style={{ scrollMarginTop: 24 }}>
                 <label id={`f-${k}-l`} htmlFor={`f-${k}`} style={k === "skillLevels" ? SR_ONLY : { ...lbl, fontSize: 13.5, marginBottom: 6 }}>{LABELS[k] || f.label}{required.has(k) ? " *" : ""}</label>

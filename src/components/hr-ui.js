@@ -91,7 +91,7 @@ export function FieldInput({ field, value, onChange, options, id, disabled, extr
   // controlli su misura (01/10): nazionalità da tendina, mansione Chatter/Altro, lingue con livello
   if (field.key === "nationality") return <NationalityInput id={id} value={value} onChange={onChange} disabled={disabled} />;
   if (field.key === "currentJob") return <JobInput id={id} value={value} onChange={onChange} disabled={disabled} />;
-  if (field.key === "spokenLanguages") return <LanguagesInput id={id} value={value} onChange={onChange} disabled={disabled} />;
+  if (field.key === "spokenLanguages") return <LanguagesInput id={id} value={value} onChange={onChange} disabled={disabled} explicit={Boolean(extra?.explicitLanguages)} />;
   if (field.type === "comune") return <ResidenceInput id={id} value={value} onChange={onChange} disabled={disabled} />;
   if (field.type === "birth") return <BirthInput id={id} value={value} onChange={onChange} disabled={disabled} />;
   if (field.type === "skillmap") return <SkillsInput id={id} value={value} onChange={onChange} disabled={disabled} />;

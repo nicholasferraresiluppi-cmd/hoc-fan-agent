@@ -8,6 +8,7 @@
 import { CP, FONTS } from "@/lib/brand";
 import { useEffect, useState } from "react";
 import { searchComuni } from "@/lib/hr-comuni";
+import { langNo } from "@/lib/hr-fields";
 import { TOP_COUNTRIES, COUNTRIES } from "@/lib/hr-countries";
 import { SKILL_AREAS, SKILL_LEVELS, SKILL_LEVEL_HINT, SKILL_NAME, AREA_BY_KEY, PAST_ROLES, PAST_ROLE_NAME, ROLE_DURATIONS, normalizeSkillMap, normalizeLearnList, normalizePastRoles, areasOfSkillMap, skillName, pastRoleText } from "@/lib/hr-skills";
 
@@ -60,22 +61,28 @@ const LANGS = [
 ];
 const seg = (on) => ({ padding: "6px 11px", borderRadius: 999, fontSize: 13, fontFamily: FONTS.body, cursor: "pointer", border: `1px solid ${on ? CP.accent : CP.border}`, background: on ? CP.accentSoft : CP.surface, color: on ? CP.accentSoftText : CP.textSecondary });
 
-export function LanguagesInput({ id, value, onChange, disabled }) {
+// explicit (modulo pubblico, 04/10/2026): nessuna risposta già scelta; "No" si salva come
+// "ENG - No" (il server lo toglie) così si sa che la persona ha risposto per ogni lingua.
+export function LanguagesInput({ id, value, onChange, disabled, explicit = false }) {
   const cur = Array.isArray(value) ? value : [];
+  const codeOf = (lang) => lang.levels[0][1].split(" - ")[0];
   const set = (lang, label) => {
-    const mine = lang.levels.map((l) => l[1]);
+    const no = langNo(codeOf(lang));
+    const mine = [...lang.levels.map((l) => l[1]), no];
     const others = cur.filter((x) => !mine.includes(x));
-    onChange(label ? [...others, label] : others);
+    onChange(label ? [...others, label] : explicit ? [...others, no] : others);
   };
   return (
     <div id={id} role="group" style={{ display: "grid", gap: 10 }}>
       {LANGS.map((lang) => {
-        const sel = lang.levels.find((l) => cur.includes(l[1]))?.[1] || null;
+        const lvl = lang.levels.find((l) => cur.includes(l[1]))?.[1] || null;
+        const saidNo = !lvl && (!explicit || cur.includes(langNo(codeOf(lang))));
+        const sel = lvl;
         return (
           <div key={lang.name} style={{ display: "grid", gap: 6, padding: "10px 12px", border: `1px solid ${CP.borderSoft || CP.border}`, borderRadius: 10 }}>
             <div style={{ fontSize: 14, color: CP.textPrimary, fontWeight: 500 }}>{lang.name}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              <button type="button" disabled={disabled} aria-pressed={!sel} onClick={() => set(lang, null)} style={seg(!sel)}>{lang.name === "Italiano" ? "Non madrelingua" : "No"}</button>
+              <button type="button" disabled={disabled} aria-pressed={saidNo} onClick={() => set(lang, null)} style={seg(saidNo)}>{lang.name === "Italiano" ? "Non madrelingua" : "No"}</button>
               {lang.levels.map(([lab, val]) => (
                 <button key={val} type="button" disabled={disabled} aria-pressed={sel === val} onClick={() => set(lang, val)} style={seg(sel === val)}>{lab}</button>
               ))}

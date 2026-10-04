@@ -206,6 +206,17 @@ eq(stripHocBlock(withHocBlock("A", ["x: 1"])), "A", "blocco rimovibile");
   eq(normalizePersonInput({ collaborationStatus: "" }).values.collaborationStatus, null, "input: fase svuotata");
   ok(!F.FORM_KEYS.includes("hvContractStatus") && !F.FORM_KEYS.includes("collaborationStatus"), "contratto e fase NON sono nel modulo pubblico");
   ok(!F.FORM_KEYS.includes("timeSlots"), "fasce orarie fuori dal modulo (04/10)");
+  ok(F.langsUnanswered(["ITA - Native", "ENG - No"]).join() === "SPA,TED,FR", "lingue: si sa a quali non ha ancora risposto");
+  ok(F.langsUnanswered(["ITA - Native", "ENG - B2", "SPA - No", "TED - No", "FR - No"]).length === 0, "lingue: tutte risposte (anche con No)");
+  {
+    const C3 = await import("../src/lib/hr-people-core.js");
+    ok(C3.normalizePersonInput({ spokenLanguages: ["ITA - Native", "ENG - No", "SPA - Basic"] }).values.spokenLanguages.join() === "ITA - Native,SPA - Basic", "i «No» non si salvano come lingue");
+    const X3 = await import("../src/lib/hr-form-experience.js");
+    ok(/ogni lingua/.test(X3.fieldErrors({ spokenLanguages: ["ITA - Native"] }, ["spokenLanguages"]).spokenLanguages || ""), "modulo: errore se manca una risposta per lingua");
+    ok(X3.missingRequired({ spokenLanguages: ["ITA - No", "ENG - No"] }).includes("spokenLanguages"), "solo «No»: nessuna lingua parlata, resta obbligatorio");
+    const W3 = await import("../src/lib/hr-welcome-card.js");
+    ok(W3.tesseraRows({ spokenLanguages: ["ENG - No", "SPA - Basic"] }).every((r) => r.label !== "ENG"), "tessera: niente righe per le lingue col «No»");
+  }
   ok(F.FORM_KEYS.includes("source") && F.FORM_KEYS.includes("referredBy"), "provenienza e reference sono nel modulo");
   ok(F.SOURCES[0] === F.SOURCE_REFERRAL && F.FIELD_BY_KEY.source.cu === "Provenienza" && F.FIELD_BY_KEY.referredBy.cu === "Segnalato da", "provenienza: prima voce = reference, campi ClickUp per nome");
   {

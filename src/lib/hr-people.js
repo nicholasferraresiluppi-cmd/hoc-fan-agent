@@ -44,7 +44,7 @@ import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
-  FIELDS, FIELD_BY_KEY, FORM_KEYS, EDITABLE_KEYS, FORM_TTL_DAYS, PRIVACY_VERSION, UPLOAD_MAX_BYTES,
+  FIELDS, FIELD_BY_KEY, FORM_KEYS, EDITABLE_KEYS, stripLangNo, FORM_TTL_DAYS, PRIVACY_VERSION, UPLOAD_MAX_BYTES,
   normalizePersonInput, applyChanges, resolveFieldConflicts, filterEchoes, recordEcho, computeCleanup,
   valuesEqual, maskCf, logValue, formTokenState, fullName, valueHash, dropUnchangedSinceBase,
   FORM_UPLOAD_GRACE_MS, isOwnEcho, isEmptyValue, normalizeChoiceFields, PHASE_ENTRY, PHASE_ACTIVE, PHASE_EXITED,
@@ -1033,6 +1033,7 @@ export async function getFormContext(token) {
 function pickForm(body) {
   const out = {};
   for (const k of FORM_KEYS) if (k in (body?.data || {})) out[k] = body.data[k];
+  out.spokenLanguages = stripLangNo(out.spokenLanguages); // i "No" non contano come lingua parlata
   return out;
 }
 /** "Cognome: obbligatorio. Data di nascita: obbligatorio." — la pagina lo mette sotto i campi. */
