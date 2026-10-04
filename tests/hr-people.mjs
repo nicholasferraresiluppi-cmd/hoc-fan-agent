@@ -27,7 +27,7 @@ const req = () => {
     residenceComune: { abroad: true, country: "Spagna" }, location: "Calle Mayor 1", residenceCap: "28013",
     personalEmail: `req${REQ_N}@example.com`, personalPhone: `+39 333 000 ${String(1000 + REQ_N)}`,
     partitaIva: false, spokenLanguages: ["Italiano"],
-    skillLevels: { of_chat: "Base" }, source: "Altro",
+    skillLevels: { of_chat: "Base" }, source: "Ho visto un annuncio",
   };
 };
 
@@ -265,6 +265,7 @@ eq(stripHocBlock(withHocBlock("A", ["x: 1"])), "A", "blocco rimovibile");
     ok(W3.tesseraRows({ spokenLanguages: ["ENG - No", "SPA - Basic"] }).every((r) => r.label !== "ENG"), "tessera: niente righe per le lingue col «No»");
   }
   ok(F.FORM_KEYS.includes("source") && F.FORM_KEYS.includes("referredBy"), "provenienza e reference sono nel modulo");
+  ok(F.SOURCES.length === 2 && F.normalizeChoiceFields({ source: "Dai social" }).source === F.SOURCE_AD && F.normalizeChoiceFields({ source: "Altro" }).source === F.SOURCE_AD && F.normalizeChoiceFields({ source: F.SOURCE_REFERRAL }).source === F.SOURCE_REFERRAL, "provenienza: o reference o annuncio, le voci vecchie confluiscono nell'annuncio");
   ok(F.SOURCES[0] === F.SOURCE_REFERRAL && F.FIELD_BY_KEY.source.cu === "Provenienza" && F.FIELD_BY_KEY.referredBy.cu === "Segnalato da", "provenienza: prima voce = reference, campi ClickUp per nome");
   {
     const C2 = await import("../src/lib/hr-people-core.js");
@@ -1016,11 +1017,11 @@ console.log(`hr-people: ${n} asserzioni OK`);
 
   // 2b) incidente 04/10: un campo creato DOPO su ClickUp (vuoto) non deve svuotare l'app,
   //     e il controllo di parità lo riempie con il valore dell'app
-  await H.savePerson({ id: sara.id, input: { source: "Altro" }, actor: "admin", source: "app" });
-  FIELDS_META.push({ id: "f-prov", name: "Provenienza", type: "drop_down", type_config: { options: [{ id: "o-ref", name: "Me l'ha consigliato qualcuno", orderindex: 0 }, { id: "o-alt", name: "Altro", orderindex: 3 }] } });
+  await H.savePerson({ id: sara.id, input: { source: "Ho visto un annuncio" }, actor: "admin", source: "app" });
+  FIELDS_META.push({ id: "f-prov", name: "Provenienza", type: "drop_down", type_config: { options: [{ id: "o-ref", name: "Me l'ha consigliato qualcuno", orderindex: 0 }, { id: "o-alt", name: "Ho visto un annuncio", orderindex: 1 }] } });
   const recNew = await H.importFromClickup({ mode: "import", by: "test" });
   const sNew = await H.getPerson(sara.id);
-  t(sNew.fields.source === "Altro", "campo nuovo e vuoto su ClickUp: il valore dell'app resta");
+  t(sNew.fields.source === "Ho visto un annuncio", "campo nuovo e vuoto su ClickUp: il valore dell'app resta");
   t(recNew.parityChecked >= 1 && recNew.drift.length === 0 && cu.tasks.get(taskId).values["f-prov"] === "o-alt", "parità: il campo nuovo su ClickUp viene riempito dall'app");
   FIELDS_META.pop();
 

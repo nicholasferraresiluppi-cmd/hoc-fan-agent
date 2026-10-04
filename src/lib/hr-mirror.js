@@ -143,13 +143,13 @@ export function parseSkillItem(raw) {
 }
 
 const AREA_BY_NORM = new Map();
-for (const a of SKILL_AREAS) { AREA_BY_NORM.set(normKey(a.area), a.key); AREA_BY_NORM.set(normKey(a.key), a.key); }
+for (const a of SKILL_AREAS) { AREA_BY_NORM.set(normKey(a.area), a.key); AREA_BY_NORM.set(normKey(a.key), a.key); for (const al of a.aliases || []) AREA_BY_NORM.set(normKey(al), a.key); }
 function isAreaHeader(h) {
   const k = normKey(h);
   if (!k) return false;
   if (AREA_BY_NORM.has(k)) return true;
   // abbreviazione dell'area ("Social" → "Social organico", "Media buying" → "Media buying e pubblicità")
-  return k.length >= 4 && SKILL_AREAS.some((a) => normKey(a.area).startsWith(`${k} `));
+  return k.length >= 4 && SKILL_AREAS.some((a) => [a.area, ...(a.aliases || [])].some((n) => normKey(n).startsWith(`${k} `)));
 }
 
 function parseSkillLevels(text) {

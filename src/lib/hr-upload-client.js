@@ -80,13 +80,13 @@ async function postJson(url, body) {
  * Carica un documento. `onStage("riduco"|"carico"|"salvo")`, `onProgress(0-100)`.
  * @returns {Promise<{ok: true}>} o lancia un Error col messaggio per la persona
  */
-export async function uploadHrFile(token, kind, original, { onStage, onProgress } = {}) {
+export async function uploadHrFile(token, kind, original, { onStage, onProgress, part = null } = {}) {
   if (!ALLOWED_TYPES.includes(original?.type)) throw new Error("Formato non ammesso: solo PDF, JPG o PNG.");
   onStage?.("riduco");
   const file = await shrinkImage(original);
   if (file.size > UPLOAD_MAX_BYTES) throw new Error("File troppo grande: massimo 50 MB.");
   const base = `/api/hr/modulo/${encodeURIComponent(token)}`;
-  const slot = await postJson(`${base}/upload`, { type: "slot", kind, contentType: file.type, size: file.size });
+  const slot = await postJson(`${base}/upload`, { type: "slot", kind, part, contentType: file.type, size: file.size });
   onStage?.("carico");
   const { upload } = await import("@vercel/blob/client");
   try {

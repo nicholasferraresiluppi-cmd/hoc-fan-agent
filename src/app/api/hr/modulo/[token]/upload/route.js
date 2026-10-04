@@ -56,7 +56,7 @@ export async function POST(request, props) {
   if (!rl.ok) return tooMany(rl.retryAfter);
 
   if (body?.type === "slot") {
-    const res = await requestUploadSlot(token, { kind: body.kind, contentType: body.contentType, size: body.size });
+    const res = await requestUploadSlot(token, { kind: body.kind, part: body.part, contentType: body.contentType, size: body.size });
     if (!res.ok) return Response.json({ ok: false, error: res.error }, { status: res.status });
     return Response.json(res, { headers: { "Cache-Control": "no-store" } });
   }

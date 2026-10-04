@@ -16,8 +16,8 @@ export const UPLOAD_MAX_BYTES_V2 = UPLOAD_MAX_BYTES; // 50 MB, stesso valore nel
 export const UPLOAD_TYPES = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png" };
 export const UPLOAD_PREFIX = "hr-upload/";
 export const UPLOAD_SLOT_TTL_S = 2 * 3600;     // uno slot vale 2 ore (la finestra file è 1 ora)
-export const MAX_SLOTS_PER_TOKEN = 8;          // slot chiesti (anche upload ripetuti dopo errori)
-export const MAX_FILES_PER_TOKEN = 4;          // file arrivati davvero (come prima)
+export const MAX_SLOTS_PER_TOKEN = 10;          // slot chiesti (anche upload ripetuti dopo errori)
+export const MAX_FILES_PER_TOKEN = 5;          // file arrivati davvero (come prima)
 export const ORPHAN_MAX_AGE_MS = 24 * 3600 * 1000;
 export const QUEUE_MAX_ATTEMPTS = 12;          // con le attese crescenti ≈ un giorno e mezzo
 export const QUEUE_MAX_AGE_MS = 7 * 24 * 3600 * 1000;
@@ -37,6 +37,10 @@ export function isUploadPathname(p) {
  * Controlli della richiesta di slot (oltre allo stato del token, fatto da chi chiama).
  * @returns {null | {status, error}}
  */
+/** Parti del documento d'identità (05/10/2026): carta = fronte + retro, passaporto = pagina con la foto. */
+export const DOC_PARTS = ["fronte", "retro", "passaporto"];
+export const docPart = (kind, part) => (kind === "document" && DOC_PARTS.includes(part) ? part : null);
+
 export function checkUploadRequest({ kind, contentType, size }, kinds) {
   if (!kinds[kind]) return { status: 400, error: "Tipo di documento non previsto." };
   if (!UPLOAD_TYPES[contentType]) return { status: 415, error: "Formato non ammesso: solo PDF, JPG o PNG." };

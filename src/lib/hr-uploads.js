@@ -31,8 +31,9 @@ import { sniffFileType } from "./hr-people-core.js";
 import {
   UPLOAD_MAX_BYTES_V2, UPLOAD_SLOT_TTL_S, MAX_SLOTS_PER_TOKEN, MAX_FILES_PER_TOKEN,
   newUploadPathname, isUploadPathname, checkUploadRequest, nextAttemptDelayMs, isRetryableUploadError,
-  shouldGiveUp, dueItems, orphanBlobs,
+  shouldGiveUp, dueItems, orphanBlobs, docPart,
 } from "./hr-uploads-core.js";
+import { documentReceived } from "./hr-form-notify.js";
 import { blobConfigured, readUploadBlob, deleteUploadBlob, listUploadBlobs } from "./hr-blob.js";
 import {
   getFormRecord, getPerson, appendLog, pushPersonSafe, listSyncRetry, markSyncRetry, setPersonFileRef,
@@ -70,7 +71,7 @@ async function uploadableRecord(token, now) {
  * Passo 1: il browser chiede dove caricare. Il server decide il pathname (casuale)
  * e lo lega a questo token, a questa scheda e a questo tipo di documento.
  */
-export async function requestUploadSlot(token, { kind, contentType, size } = {}, { now = Date.now() } = {}) {
+export async function requestUploadSlot(token, { kind, contentType, size, part } = {}, { now = Date.now() } = {}) {
   const bad = checkUploadRequest({ kind, contentType, size }, UPLOAD_KIND);
   if (bad) return { ok: false, ...bad };
   const { rec, error } = await uploadableRecord(token, now);
@@ -82,7 +83,7 @@ export async function requestUploadSlot(token, { kind, contentType, size } = {},
   if (n === 1) await kv.expire(K.slots(token), UPLOAD_SLOT_TTL_S);
   if (n > MAX_SLOTS_PER_TOKEN) return { ok: false, status: 429, error: "Troppi tentativi di caricamento. Scrivi a chi ti ha mandato il link." };
   const pathname = newUploadPathname(randomBytes(16).toString("hex"), contentType);
-  await kv.set(K.slot(pathname), { token, personId: rec.personId, kind, contentType, size: Number(size), at: now }, { ex: UPLOAD_SLOT_TTL_S });
+  await kv.set(K.slot(pathname), { token, personId: rec.personId, kind, part: docPart(kind, part), contentType, size: Number(size), at: now }, { ex: UPLOAD_SLOT_TTL_S });
   return { ok: true, pathname, maxBytes: UPLOAD_MAX_BYTES_V2 };
 }
 
@@ -144,7 +145,9 @@ export async function receiveUpload(token, { kind, pathname } = {}, { now = Date
     await deleteUploadBlob(pathname).catch(() => {});
     return { ok: false, status: 429, error: "Hai già caricato il numero massimo di file." };
   }
-  const item = { pathname, personId: slot.personId, kind, ext: sniff.ext, contentType: sniff.type, size: bytes.length, attempts: 0, firstAt: now, nextAt: now };
+  // avviso WhatsApp quando il documento è completo (fronte+retro o passaporto), mai bloccante
+  if (kind === "document") await documentReceived(slot.personId, slot.part || null).catch(() => {});
+  const item = { pathname, personId: slot.personId, kind, part: slot.part || null, ext: sniff.ext, contentType: sniff.type, size: bytes.length, attempts: 0, firstAt: now, nextAt: now };
   if (defer) {
     // la route risponde subito "ricevuto" e copia dopo la risposta (after): l'elemento è
     // già in coda, quindi se il giro dopo la risposta non avviene lo riprende la coda
@@ -184,13 +187,13 @@ async function transferItem(item, bytes, { now = Date.now() } = {}) {
   }
   let res;
   try {
-    res = await uploadAttachment(person.clickupTaskId, { filename: attachmentName(person, item.kind, item.ext), bytes, contentType: item.contentType });
+    res = await uploadAttachment(person.clickupTaskId, { filename: attachmentName(person, item.kind, item.ext, item.part), bytes, contentType: item.contentType });
   } catch (e) {
     if (isTaskGone(e)) return giveUp(item, "il task ClickUp non esiste più", { now });
     if (isRetryableUploadError(e)) return requeue(item, e?.message || "ClickUp non raggiungibile", { now });
     return giveUp(item, e?.message || "ClickUp ha rifiutato il file", { now });
   }
-  await setPersonFileRef(person.id, item.kind, { title: attachmentName(person, item.kind, item.ext), attachmentId: res?.id, at: Date.now() });
+  await setPersonFileRef(person.id, item.kind, { title: attachmentName(person, item.kind, item.ext, item.part), attachmentId: res?.id, at: Date.now() });
   await kv.hdel(K.queue, item.pathname).catch(() => {});
   // se la cancellazione fallisce, la pulizia notturna lo toglie (non è più in coda)
   await deleteUploadBlob(item.pathname).catch(() => {});
