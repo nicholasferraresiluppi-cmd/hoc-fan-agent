@@ -157,9 +157,12 @@ const CSS = `
 @keyframes hrfCh{0%{opacity:.07;text-shadow:0 0 0 rgba(255,226,170,0)}45%{opacity:1;text-shadow:0 0 18px rgba(255,226,170,.6)}100%{opacity:1;text-shadow:0 0 0 rgba(255,226,170,0)}}
 .hrf-alba .hl-palm{opacity:.08;animation:hrfPalm 1s ease 2.3s forwards}
 @keyframes hrfPalm{to{opacity:1}}
-.hrf-scene{position:absolute;inset:0;display:grid;place-items:center;perspective:1000px;pointer-events:none}
-.hrf-scard{position:relative;width:300px;height:189px;transform-style:preserve-3d;opacity:0;animation:hrfCardIn 1.6s cubic-bezier(.45,.05,.35,1) 3.85s forwards;transition:transform 1.1s cubic-bezier(.4,0,.2,1)}
-@keyframes hrfCardIn{0%{opacity:0;transform:rotateY(180deg) scale(.85)}20%{opacity:1}100%{opacity:1;transform:rotateY(360deg) scale(1)}}
+.hrf-scene{position:absolute;inset:0;display:grid;place-items:center;perspective:1000px;pointer-events:none;opacity:0;animation:hrfSceneIn .45s ease 2.9s forwards}
+@keyframes hrfSceneIn{to{opacity:1}}
+.hrf-scard{position:relative;width:300px;height:189px;transform-style:preserve-3d;animation:hrfCardIn 1.6s cubic-bezier(.45,.05,.35,1) 2.9s forwards;transition:transform 1.1s cubic-bezier(.4,0,.2,1)}
+/* la dissolvenza sta sulla scena, non sulla tessera: un'opacità sulla tessera 3D la appiattisce
+   e durante il giro si vedeva il fronte a specchio invece del retro */
+@keyframes hrfCardIn{0%{transform:rotateY(180deg) scale(.85)}100%{transform:rotateY(360deg) scale(1)}}
 /* 05/10/2026 sera (Nicholas: «la pagina si deve comporre, niente stacco»): il logo SALE fino
    all'intestazione, la tessera arriva al centro, brilla e SALE al posto della tessera
    d'esempio; poi titolo, testo e pulsanti compaiono uno alla volta. Spostamenti calcolati in
@@ -167,24 +170,30 @@ const CSS = `
 .hrf-cardwrap{position:relative;width:300px;height:189px}
 .hrf-splash.is-dock .hrf-halo,.hrf-splash.is-compose .hrf-halo{opacity:0!important;transition:opacity .5s ease}
 .hrf-splash.is-compose{opacity:0;transition:opacity .35s ease;pointer-events:none}
+/* 05/10 notte (Nicholas: «un frame dopo l'altro, poi tutto nero»): niente pause vuote. Il fondo
+   dello strato è uno strato a sé che si scioglie MENTRE la tessera vola, così la pagina compare
+   intorno a lei; tessera, testo e logo si sovrappongono nel tempo invece di darsi il cambio. */
+.hrf-splash-bg{position:absolute;inset:0;background:radial-gradient(120% 60% at 50% 0%, #17161c 0%, #0b0c10 55%);transition:opacity .9s ease}
+.hrf-splash.is-dock .hrf-splash-bg,.hrf-splash.is-compose .hrf-splash-bg{opacity:0}
+#hrf-sample{transition:opacity .35s ease}
 .hrf[data-compose="wait"] .hrf-compose{opacity:0}
 .hrf[data-compose="go"] .hrf-compose{animation:hrfComp .6s cubic-bezier(.2,.7,.2,1) var(--d,0ms) both}
 @keyframes hrfComp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 #hrf-brand{transition:opacity .35s ease}
 /* 05/10/2026 (Nicholas: «non è effetto wow»): alone d'oro dietro la tessera e riflesso di luce
    sulla faccia dopo il giro. Sono cambi di LUCE: restano anche con «Riduci movimento». */
-.hrf-halo{position:absolute;left:50%;top:50%;width:520px;height:340px;margin:-170px 0 0 -260px;border-radius:50%;background:radial-gradient(closest-side,rgba(217,180,106,.42),rgba(217,180,106,.12) 50%,transparent 75%);opacity:0;filter:blur(6px);animation:hrfHalo 2.6s ease 4.1s forwards;pointer-events:none}
+.hrf-halo{position:absolute;left:50%;top:50%;width:520px;height:340px;margin:-170px 0 0 -260px;border-radius:50%;background:radial-gradient(closest-side,rgba(217,180,106,.42),rgba(217,180,106,.12) 50%,transparent 75%);opacity:0;filter:blur(6px);animation:hrfHalo 2.4s ease 3.05s forwards;pointer-events:none}
 @keyframes hrfHalo{0%{opacity:0;transform:scale(.7)}45%{opacity:1;transform:scale(1.05)}100%{opacity:.75;transform:scale(1)}}
-.hrf-sheen{position:absolute;inset:0;border-radius:15px;pointer-events:none;background:linear-gradient(105deg,transparent 30%,rgba(255,236,190,.55) 47%,rgba(255,255,255,.12) 52%,transparent 66%);transform:translateX(-130%);animation:hrfSheenGo 1.2s ease 5.5s forwards}
+.hrf-sheen{position:absolute;inset:0;border-radius:15px;pointer-events:none;background:linear-gradient(105deg,transparent 30%,rgba(255,236,190,.55) 47%,rgba(255,255,255,.12) 52%,transparent 66%);transform:translateX(-130%);animation:hrfSheenGo 1.1s ease 4.45s forwards}
 @keyframes hrfSheenGo{to{transform:translateX(130%)}}
-.hrf-scard .hrf-pulse{position:absolute;inset:-2px;border-radius:16px;box-shadow:0 0 0 1px rgba(217,180,106,.9),0 0 34px rgba(217,180,106,.55);opacity:0;animation:hrfPulse 1.6s ease 5.45s forwards;pointer-events:none}
+.hrf-scard .hrf-pulse{position:absolute;inset:-2px;border-radius:16px;box-shadow:0 0 0 1px rgba(217,180,106,.9),0 0 34px rgba(217,180,106,.55);opacity:0;animation:hrfPulse 1.4s ease 4.4s forwards;pointer-events:none}
 @keyframes hrfPulse{0%{opacity:0}35%{opacity:1}100%{opacity:.25}}
 .hrf-sface{position:absolute;inset:0;border-radius:15px;overflow:hidden;background:radial-gradient(140% 100% at 0% 0%,#24211c 0%,#121214 50%,#0b0b0d 100%);box-shadow:0 30px 60px rgba(0,0,0,.55),inset 0 0 0 1px rgba(217,180,106,.5);transform:translateZ(1px)}
 .hrf-sface.back{transform:rotateY(180deg) translateZ(1px);display:grid;place-items:center}
 /* il retro non deve trasparire durante il giro (Safari ignora backface sui figli SVG senza questo) */
 .hrf-sface,.hrf-sface *{-webkit-backface-visibility:hidden;backface-visibility:hidden}
-@media (prefers-reduced-motion:reduce){.hrf[data-compose="go"] .hrf-compose{animation:hrfCompStill .5s ease var(--d,0ms) both}@keyframes hrfCompStill{from{opacity:0}to{opacity:1}}.hrf-scard{animation:hrfCardFade .9s ease 3.85s forwards}@keyframes hrfCardFade{to{opacity:1;transform:none}}.hrf-halo{animation:hrfHaloStill 2.4s ease 3.9s forwards}@keyframes hrfHaloStill{0%{opacity:0}45%{opacity:1}100%{opacity:.75}}.hrf-sheen{transform:none;opacity:0;animation:hrfSheenStill 1.4s ease 5.2s forwards}@keyframes hrfSheenStill{0%{opacity:0}40%{opacity:.9}100%{opacity:0}}}
-.hrf-splash{position:fixed;inset:0;z-index:60;overflow:hidden;display:grid;place-items:center;background:radial-gradient(120% 60% at 50% 0%, #17161c 0%, #0b0c10 55%);opacity:1;transition:opacity 1.1s cubic-bezier(.4,0,.2,1)}
+@media (prefers-reduced-motion:reduce){.hrf[data-compose="go"] .hrf-compose{animation:hrfCompStill .5s ease var(--d,0ms) both}@keyframes hrfCompStill{from{opacity:0}to{opacity:1}}.hrf-scard{animation:none}.hrf-scene{animation-duration:.9s}.hrf-halo{animation:hrfHaloStill 2.4s ease 3.1s forwards}@keyframes hrfHaloStill{0%{opacity:0}45%{opacity:1}100%{opacity:.75}}.hrf-sheen{transform:none;opacity:0;animation:hrfSheenStill 1.4s ease 4.4s forwards}@keyframes hrfSheenStill{0%{opacity:0}40%{opacity:.9}100%{opacity:0}}}
+.hrf-splash{position:fixed;inset:0;z-index:60;overflow:hidden;display:grid;place-items:center;opacity:1;transition:opacity 1.1s cubic-bezier(.4,0,.2,1)}
 .hrf-splash-inner{transition:transform 1.1s cubic-bezier(.4,0,.2,1),opacity .8s ease}
 .hrf-letter{animation:hrfFade 1s ease 2.2s both}
 .hrf-err{animation:hrfFade .25s ease both}
@@ -220,11 +229,12 @@ function SplashOverlay() {
     try { reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* */ }
     if (phase === "logoUp" && innerRef.current) {
       const el = innerRef.current;
-      if (reduced || !glide(el, document.getElementById("hrf-brand"), 900)) { el.style.transition = "opacity .6s ease"; el.style.opacity = "0"; }
+      if (reduced || !glide(el, document.getElementById("hrf-brand"), 1100)) { el.style.transition = "opacity .6s ease"; el.style.opacity = "0"; }
     }
+    if (phase === "dock" && innerRef.current) { innerRef.current.style.transition = "opacity .35s ease"; innerRef.current.style.opacity = "0"; }
     if (phase === "dock" && wrapRef.current) {
       const el = wrapRef.current;
-      if (reduced || !glide(el, document.querySelector("#hrf-sample > div > div"), 900)) { el.style.transition = "opacity .5s ease"; el.style.opacity = "0"; }
+      if (reduced || !glide(el, document.querySelector("#hrf-sample > div > div"), 1000)) { el.style.transition = "opacity .5s ease"; el.style.opacity = "0"; }
     }
   }, [phase]);
   if (phase === "gone") return null;
@@ -233,6 +243,7 @@ function SplashOverlay() {
     <div className={`hrf-splash${phase === "dock" ? " is-dock" : ""}${phase === "compose" ? " is-compose" : ""}`} aria-hidden={phase === "compose"}>
       {/* istante in cui l'apertura è stata letta dal browser = inizio delle animazioni CSS */}
       <script dangerouslySetInnerHTML={{ __html: "window.__hrfT0=window.__hrfT0||performance.now()" }} />
+      <div className="hrf-splash-bg" />
       <div className="hrf-sun" />
       <div ref={innerRef} className="hrf-splash-inner" style={{ display: "grid", justifyItems: "center", gap: 22 }}>
         <HocLogo size={22} color="#f2eee6" letters className="hrf-alba" />
@@ -267,7 +278,8 @@ function SplashOverlay() {
 
 function Shell({ children }) {
   const phase = useContext(SplashCtx);
-  const waiting = ["show", "logoUp", "dock"].includes(phase);
+  // il testo entra già mentre la tessera vola (dock): niente schermo vuoto tra le due cose
+  const waiting = ["show", "logoUp"].includes(phase);
   return (
     <main className="hrf" data-compose={waiting ? "wait" : "go"} style={{ ...CASA_VARS, colorScheme: "dark", minHeight: "100vh", background: "radial-gradient(120% 60% at 50% 0%, #17161c 0%, #0b0c10 55%)", color: "#f2eee6", fontFamily: SANS, padding: "28px 16px 64px" }}>
       <style>{CSS}</style>
@@ -308,14 +320,14 @@ export default function HrFormPage() {
     let t0 = 0;
     try { t0 = typeof window.__hrfT0 === "number" ? window.__hrfT0 : (performance.getEntriesByName("first-contentful-paint")[0]?.startTime ?? 0); } catch { /* */ }
     const now = typeof performance !== "undefined" ? performance.now() : 0;
-    const a = setTimeout(() => setTLogo(true), Math.max(300, t0 + 3000 - now));
-    const b = setTimeout(() => setTDock(true), Math.max(1500, t0 + 6300 - now));
+    const a = setTimeout(() => setTLogo(true), Math.max(300, t0 + 2700 - now));
+    const b = setTimeout(() => setTDock(true), Math.max(1500, t0 + 5300 - now));
     return () => { clearTimeout(a); clearTimeout(b); };
   }, []);
   const [loadErr, setLoadErr] = useState(null);
   useEffect(() => { if (splashPhase === "show" && tLogo) setSplashPhase("logoUp"); }, [splashPhase, tLogo]);
   useEffect(() => {
-    if (splashPhase === "dock") { const t = setTimeout(() => setSplashPhase("compose"), 950); return () => clearTimeout(t); }
+    if (splashPhase === "dock") { const t = setTimeout(() => setSplashPhase("compose"), 1000); return () => clearTimeout(t); }
     if (splashPhase === "compose") { const t = setTimeout(() => setSplashPhase("gone"), 400); return () => clearTimeout(t); }
     return undefined;
   }, [splashPhase]);
@@ -533,20 +545,20 @@ export default function HrFormPage() {
     return (
       <Shell>
         <div className="hrf-fade" style={{ display: "grid", gap: 26 }}>
-          <div id="hrf-sample"><HrTessera key="esempio" data={SAMPLE_CARD} at={Date.now()} sample autoFlip={splashPhase === "gone"} /></div>
-          <div className="hrf-compose" style={{ "--d": "0ms" }}><Headline title={first ? `Ciao ${first},` : "Compila il modulo"} sub="e sblocca la tua tessera." size={40} /></div>
-          <p className="hrf-compose" style={{ "--d": "140ms", margin: 0, color: CP.textSecondary, fontSize: 15.5, lineHeight: 1.55 }}>
+          <div id="hrf-sample" style={{ opacity: ["show", "logoUp", "dock"].includes(splashPhase) ? 0 : 1 }}><HrTessera key="esempio" data={SAMPLE_CARD} at={Date.now()} sample autoFlip={splashPhase === "gone"} /></div>
+          <div className="hrf-compose" style={{ "--d": "300ms" }}><Headline title={first ? `Ciao ${first},` : "Compila il modulo"} sub="e sblocca la tua tessera." size={40} /></div>
+          <p className="hrf-compose" style={{ "--d": "450ms", margin: 0, color: CP.textSecondary, fontSize: 15.5, lineHeight: 1.55 }}>
             Questa è una tessera d&apos;esempio: la tua prende forma con le tue risposte. Sette brevi capitoli, {timeEstimateText().replace(/^Ci vogliono /, "").replace(/\.$/, "")}.
             {" "}Tieni a portata di mano un documento d&apos;identità.
             {ctx.shared ? "" : ` Il link vale fino al ${fmtDate(ctx.expiresAt)}.`}
           </p>
-          <button type="button" className="hrf-pill hrf-compose" onClick={() => { setDir("next"); setStage("form"); }} style={{ ...pill(true), width: "100%", "--d": "280ms" }}>Cominciamo</button>
+          <button type="button" className="hrf-pill hrf-compose" onClick={() => { setDir("next"); setStage("form"); }} style={{ ...pill(true), width: "100%", "--d": "600ms" }}>Cominciamo</button>
           <TutorialVideoButton id="modulo-collaboratori" render={(open, v) => (
-            <button type="button" onClick={open} className="hrf-compose" style={{ ...pill(false), width: "100%", gap: 8, marginTop: -12, "--d": "380ms" }}>
+            <button type="button" onClick={open} className="hrf-compose" style={{ ...pill(false), width: "100%", gap: 8, marginTop: -12, "--d": "700ms" }}>
               <PlayCircle size={18} /> Guarda come funziona ({fmtDuration(v.durationSec)})
             </button>
           )} />
-          <div className="hrf-compose" style={{ "--d": "460ms", fontSize: 12.5, color: CP.textMuted, textAlign: "center" }}>I tuoi dati restano riservati: li vede solo chi gestisce il personale.</div>
+          <div className="hrf-compose" style={{ "--d": "780ms", fontSize: 12.5, color: CP.textMuted, textAlign: "center" }}>I tuoi dati restano riservati: li vede solo chi gestisce il personale.</div>
         </div>
       </Shell>
     );
