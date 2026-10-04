@@ -36,10 +36,11 @@ t("battito appena introdotto: in attesa fino alla prima notte, poi 'mai' è un b
   assert.equal(statusOf(o, null, now).stato, "attesa");
   assert.equal(statusOf(o, null, Date.parse("2026-10-06T10:00:00Z")).stato, "mai");
 });
-t("buchi: controllore, responsabile, prova, ritardo", () => {
-  const o = officeById("operator-signals");
-  const g = gapsOf(o, { owner: null, status: { stato: "in_ritardo" } }).map((x) => x.tipo);
-  assert.deepEqual(g.sort(), ["controllore", "responsabile", "ritardo"].sort());
+t("buchi: controllore, responsabile, prova, ritardo, uscita", () => {
+  const o = { ...officeById("operator-signals"), controllore: null };
+  const g = gapsOf(o, { owner: null, status: { stato: "in_ritardo" }, controllo: { ok: false, problemi: ["vuoto"] } }).map((x) => x.tipo);
+  assert.deepEqual(g.sort(), ["controllore", "responsabile", "ritardo", "uscita"].sort());
+  assert.ok(OFFICES.filter((x) => x.tipo !== "persona").every((x) => x.controllore), "ogni ufficio ha un controllore");
   assert.ok(gapsOf(officeById("controllo-mattutino"), { owner: "Nicholas" }).some((x) => x.tipo === "prova"));
   assert.deepEqual(gapsOf(officeById("nicholas"), {}), []);
 });

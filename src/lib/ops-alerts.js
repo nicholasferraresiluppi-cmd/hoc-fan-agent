@@ -445,6 +445,29 @@ const CHECKS = [
     },
   },
   {
+    // Controllo delle uscite (Sede, 04/10/2026): /api/cron/controllori scrive ogni
+    // mattina l'esito per ufficio in sede:ctrl:{id}; qui diventa un alert per ogni
+    // ufficio il cui RISULTATO non è credibile (vuoto, vecchio, crollato, contraddice lo studio).
+    id: "uscite-sospette",
+    severity: "warning",
+    label: "Risultati non credibili",
+    async run() {
+      const { CONTROLLI } = await import("@/lib/sede-controllori");
+      const recs = await Promise.all(CONTROLLI.map((c) => kv.get(`sede:ctrl:${c.id}`).catch(() => null)));
+      return CONTROLLI.flatMap((c, i) => {
+        const r = recs[i];
+        if (!r || r.ok) return [];
+        return [{
+          fingerprint: `uscita-sospetta:${c.id}`,
+          title: `${c.label}: risultato non credibile`,
+          detail: (r.problemi || []).join(" · "),
+          value: String((r.problemi || []).length),
+          cta: { href: "/admin/sede", label: "Apri la Sede" },
+        }];
+      });
+    },
+  },
+  {
     // Watchdog della catena notturna: dal 20/07 al 25/09/2026 i lavori smistati
     // dal dispatcher prendevano 401 dalla Deployment Protection Vercel e nessuno
     // se n'è accorto (il dispatcher scriveva "kicked"). Qui si guarda la PROVA

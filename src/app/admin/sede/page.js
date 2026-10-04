@@ -30,6 +30,7 @@ const BUCO = {
   responsabile: "Senza responsabile",
   prova: "Senza prova di lavoro",
   ritardo: "Fermo o in ritardo",
+  uscita: "Risultato non credibile",
   errore: "In errore",
 };
 
@@ -73,6 +74,7 @@ export default function Sede() {
       <div style={{ ...card, padding: "16px 20px", marginBottom: 14, display: "flex", gap: 34, flexWrap: "wrap", alignItems: "flex-end" }}>
         <Big label="Uffici al lavoro" value={`${t.lavorano} su ${t.uffici}`} />
         <Big label="Fermi o in ritardo" value={t.fermi} danger={t.fermi > 0} />
+        <Big label="Risultati non credibili" value={t.sospetti ?? 0} danger={(t.sospetti ?? 0) > 0} />
         <Big label="Senza controllore" value={t.senza_controllore} danger={t.senza_controllore > 0} />
         <Big label="Senza responsabile" value={t.senza_responsabile} danger={t.senza_responsabile > 0} />
         <span style={{ fontSize: 12.5, color: CP.textMuted, marginLeft: "auto" }}>Aggiornato {ago(data.now)} · si aggiorna da solo</span>
@@ -83,12 +85,12 @@ export default function Sede() {
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
         <FilterChip label={`Tutti gli uffici (${data.offices.length})`} active={!filtro} onClick={() => setFiltro(null)} />
         {Object.keys(BUCO).filter((k) => buchi[k]?.length).map((k) => (
-          <FilterChip key={k} label={`${BUCO[k]} (${buchi[k].length})`} active={filtro === k} danger={k === "ritardo" || k === "errore"} onClick={() => setFiltro(filtro === k ? null : k)} />
+          <FilterChip key={k} label={`${BUCO[k]} (${buchi[k].length})`} active={filtro === k} danger={k === "ritardo" || k === "errore" || k === "uscita"} onClick={() => setFiltro(filtro === k ? null : k)} />
         ))}
       </div>
-      {(buchi.ritardo?.length || buchi.errore?.length) ? (
+      {(buchi.ritardo?.length || buchi.errore?.length || buchi.uscita?.length) ? (
         <Notice danger>
-          {[...(buchi.ritardo || []), ...(buchi.errore || [])].map(({ o, b }) => <div key={o.id + b.tipo}><b style={{ fontWeight: 500, color: CP.textPrimary }}>{o.nome}</b>: {b.testo}{o.at ? ` · ultimo lavoro ${ago(o.at)}` : ""}</div>)}
+          {[...(buchi.ritardo || []), ...(buchi.errore || []), ...(buchi.uscita || [])].map(({ o, b }) => <div key={o.id + b.tipo}><b style={{ fontWeight: 500, color: CP.textPrimary }}>{o.nome}</b>: {b.testo}{o.at ? ` · ultimo lavoro ${ago(o.at)}` : ""}</div>)}
         </Notice>
       ) : null}
 
@@ -152,7 +154,7 @@ function Room({ o, sel, onSel, onSaved, all }) {
 
       <dl style={{ margin: "10px 0 0", fontSize: 12, lineHeight: 1.5, display: "grid", gridTemplateColumns: "92px 1fr", rowGap: 3 }}>
         <dt style={{ color: CP.textMuted }}>Risultato</dt><dd style={{ margin: 0, color: CP.textSecondary }}>{o.risultato}</dd>
-        {o.tipo !== "persona" && <><dt style={{ color: CP.textMuted }}>Controllore</dt><dd style={{ margin: 0, color: o.controllore ? CP.textSecondary : CP.accentRed }}>{o.controllore || "nessuno"}</dd></>}
+        {o.tipo !== "persona" && <><dt style={{ color: CP.textMuted }}>Controllore</dt><dd style={{ margin: 0, color: o.controllore ? CP.textSecondary : CP.accentRed }}>{o.controllore || "nessuno"}{o.controllo && <span style={{ color: o.controllo.ok ? CP.accentGreen : CP.accentRed }}> · {o.controllo.ok ? "ultimo risultato credibile" : "risultato non credibile"} ({ago(o.controllo.at)})</span>}</dd></>}
         {o.tipo !== "persona" && (
           <>
             <dt style={{ color: CP.textMuted }}>Responsabile</dt>
@@ -174,9 +176,9 @@ function Room({ o, sel, onSel, onSaved, all }) {
         {o.passa_a?.length > 0 && <><dt style={{ color: CP.textMuted }}>Passa a</dt><dd style={{ margin: 0, color: CP.textSecondary }}>{nomi(o.passa_a).join(", ")}</dd></>}
       </dl>
 
-      {o.buchi.filter((b) => b.tipo !== "ritardo").length > 0 && (
+      {o.buchi.filter((b) => b.tipo !== "ritardo" && b.tipo !== "uscita").length > 0 && (
         <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {o.buchi.filter((b) => b.tipo !== "ritardo").map((b) => <span key={b.tipo} title={b.testo} style={{ fontSize: 11, color: CP.accentRed, background: alpha(CP.accentRed, "14"), borderRadius: 999, padding: "2px 8px" }}>{BUCO[b.tipo]}</span>)}
+          {o.buchi.filter((b) => b.tipo !== "ritardo" && b.tipo !== "uscita").map((b) => <span key={b.tipo} title={b.testo} style={{ fontSize: 11, color: CP.accentRed, background: alpha(CP.accentRed, "14"), borderRadius: 999, padding: "2px 8px" }}>{BUCO[b.tipo]}</span>)}
         </div>
       )}
       {o.link && <div style={{ marginTop: 8 }} onClick={(e) => e.stopPropagation()}><Link href={o.link} style={{ fontSize: 12.5, color: CP.accentSoftText, textDecoration: "none" }}>Apri →</Link></div>}

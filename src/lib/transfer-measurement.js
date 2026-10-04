@@ -141,8 +141,13 @@ export async function getTransferTrajectories({ force = false } = {}) {
     if (cached) return cached;
   }
 
-  const CAP = 8 * 1024 * 1024 * 1024;
-  const rows = await bqQuery(trajectorySQL(), { maxBytesBilled: CAP });
+  // Fusibile 16 GB (era 8): a ott 2026 la query legge ~10,5 GB e veniva RIFIUTATA
+  // ogni notte senza che nessuno lo vedesse (scoperto dal Controllo delle uscite
+  // della Sede, 04/10/2026). ~0,07 $ a notte.
+  const CAP = 16 * 1024 * 1024 * 1024;
+  // bqQuery restituisce { rows, totalBytesProcessed, cacheHit }: prima qui si
+  // iterava l'oggetto intero come se fosse l'elenco delle righe.
+  const { rows } = await bqQuery(trajectorySQL(), { maxBytesBilled: CAP });
 
   // eventi di coaching (non fatale se KV vuoto o assente)
   let sessions = [];
