@@ -206,6 +206,13 @@ eq(stripHocBlock(withHocBlock("A", ["x: 1"])), "A", "blocco rimovibile");
   eq(normalizePersonInput({ collaborationStatus: "" }).values.collaborationStatus, null, "input: fase svuotata");
   ok(!F.FORM_KEYS.includes("hvContractStatus") && !F.FORM_KEYS.includes("collaborationStatus"), "contratto e fase NON sono nel modulo pubblico");
   ok(!F.FORM_KEYS.includes("timeSlots"), "fasce orarie fuori dal modulo (04/10)");
+  {
+    const R = await import("../src/lib/hr-readiness.js");
+    const full = { idDocument: { at: 1 }, hvContractStatus: "Firmato", referent: [{ id: "1" }], project: ["Model - Eva"], currentJob: "Chatter" };
+    ok(R.readiness(full).done === 5 && R.readiness({}).missing.length === 5, "pronta: 5 su 5 / niente");
+    ok(R.readiness({ ...full, hvContractStatus: "Bozza condivisa" }).missing.map((x) => x.key).join() === "contract", "pronta: contratto non firmato = manca");
+    ok(R.initials("Salvatore Marco Bove") === "SB" && R.avatarColor("a") === R.avatarColor("a"), "avatar: iniziali e colore stabile");
+  }
   ok(!F.FORM_KEYS.includes("currentJob") && !F.FIELD_BY_KEY.referent.readOnly, "mansione fuori dal modulo; referente modificabile in app");
   {
     const C5 = await import("../src/lib/hr-people-core.js");

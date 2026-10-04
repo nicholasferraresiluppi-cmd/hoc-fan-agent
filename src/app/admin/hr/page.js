@@ -21,19 +21,17 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { Plus, Link2, RefreshCw, Power } from "lucide-react";
+import { Plus, Link2, RefreshCw, Power, SlidersHorizontal } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { fmtInt } from "@/lib/format";
-import { PageHead, Metric, Notice, DataTable, FilterChip, Disclosure, card } from "@/components/ds";
+import { PageHead, Notice, DataTable, card } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
 import { PHASE_LABELS, PHASE_EXITED, CONTRACT_LABELS } from "@/lib/hr-fields";
 import { SKILL_AREAS, SKILL_LEVELS, PAST_ROLES, normalizeSkillMap, normalizePastRoles, hasSkillAtLeast, pastRoleText } from "@/lib/hr-skills";
 import { lbl, input, btnPrimary, btnGhost, chip, SYNC_LABEL, fetcher, postJson, CopyLink, fmtDateTime } from "@/components/hr-ui";
 import { RestoreButton } from "@/components/hr-archive";
-import { TutorialVideoButton } from "@/components/TutorialVideo";
+import { readiness, initials, avatarColor } from "@/lib/hr-readiness";
 
 const NONE = "__none__";
-const ALL_PHASES = "__all__"; // filtro "tutte, anche le uscite"
 
 function uniq(items, get) {
   const m = new Map();
@@ -44,57 +42,37 @@ function uniq(items, get) {
   }
   return [...m.entries()].sort((a, b) => (a[0] === NONE ? 1 : b[0] === NONE ? -1 : a[0].localeCompare(b[0], "it")));
 }
-// "Da fare": filtri pronti per le domande ricorrenti dell'HR (prova d'uso 03/10/2026). Logica sui soli campi.
-const thisMonth = () => new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Rome" }).slice(0, 7);
-const TODO = {
-  contratto: { label: "Contratto da chiudere", attn: true, test: (f) => ["In ingresso", "Attiva"].includes(f.collaborationStatus) && [].concat(f.hvContractStatus || []).filter(Boolean)[0] !== "Firmato" },
-  entrati: { label: "Entrati questo mese", test: (f) => String(f.startDate || "").slice(0, 7) === thisMonth() },
-  uscita: { label: "Escono a breve", status: "In uscita", test: (f) => f.collaborationStatus === "In uscita" },
-};
 const has = (vals, want) => (want === NONE ? ![].concat(vals ?? []).filter(Boolean).length : [].concat(vals ?? []).includes(want));
 
 export default function HrPeoplePage() {
   const router = useRouter();
   const { data, error, isLoading, mutate } = useSWR("/api/admin/hr/people", fetcher, { revalidateOnFocus: false });
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState("");
+  const [tab, setTab] = useState("con-noi");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [dept, setDept] = useState("");
   const [project, setProject] = useState("");
   const [emp, setEmp] = useState("");
   const [contract, setContract] = useState("");
-  const [onlyCleanup, setOnlyCleanup] = useState(false);
   const [skill, setSkill] = useState("");
   const [minLevel, setMinLevel] = useState("");
   const [pastRole, setPastRole] = useState("");
   const [lang, setLang] = useState("");
-  // "Da fare" (prova d'uso 03/10): le domande ricorrenti dell'HR come filtri pronti, con il conteggio
-  const [todo, setTodo] = useState("");
+  const [source, setSource] = useState("");
   const [newOpen, setNewOpen] = useState(false);
-  const [cleanupOpen, setCleanupOpen] = useState(false);
-  const [view, setView] = useState("attive");
+  const [linkOpen, setLinkOpen] = useState(false);
   const [archNotice, setArchNotice] = useState(null);
   // ?vista=archiviate (link diretto alla vista)
   useEffect(() => {
-    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("vista") === "archiviate") setView("archiviate");
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("vista") === "archiviate") setTab("archiviate");
   }, []);
 
   const items = data?.items || [];
   const archivedItems = data?.archived || [];
   const flags = data?.cleanup?.byId || {};
   const byId = useMemo(() => Object.fromEntries(items.map((p) => [p.id, p])), [items]);
+  const ready = useMemo(() => Object.fromEntries(items.map((p) => [p.id, readiness(p.fields)])), [items]);
 
-  // conteggi per fase calcolati sull'elenco INTERO (le pill non cambiano coi filtri).
-  // "" = di base: tutti tranne chi è "Uscita"
-  const statusCounts = useMemo(() => {
-    const m = { "": 0, [ALL_PHASES]: items.length, [NONE]: 0 };
-    for (const s of PHASE_LABELS) m[s] = 0;
-    for (const p of items) {
-      const s = p.fields?.collaborationStatus;
-      if (s !== PHASE_EXITED) m[""] += 1;
-      if (s && s in m) m[s] += 1; else if (s) m[s] = (m[s] || 0) + 1; else m[NONE] += 1;
-    }
-    return m;
-  }, [items]);
   const contracts = useMemo(() => {
     const got = uniq(items, (p) => p.fields?.hvContractStatus);
     const order = (v) => (v === NONE ? 99 : CONTRACT_LABELS.includes(v) ? CONTRACT_LABELS.indexOf(v) : 50);
@@ -104,8 +82,7 @@ export default function HrPeoplePage() {
   const langs = useMemo(() => uniq(items, (p) => p.fields?.spokenLanguages), [items]);
   const projects = useMemo(() => uniq(items, (p) => p.fields?.project), [items]);
   const emps = useMemo(() => uniq(items, (p) => p.fields?.employmentType), [items]);
-  const cleanupCount = Object.keys(flags).length;
-  // competenze e ruoli passati: conteggi sull'elenco intero (chiavi vecchie già tradotte)
+  const sources = useMemo(() => uniq(items, (p) => p.fields?.source), [items]);
   const skillCounts = useMemo(() => {
     const m = {};
     for (const p of items) for (const k of Object.keys(normalizeSkillMap(p.fields?.skillLevels))) m[k] = (m[k] || 0) + 1;
@@ -117,204 +94,222 @@ export default function HrPeoplePage() {
     return m;
   }, [items]);
 
+  // Viste (05/10/2026, redesign): le domande di tutti i giorni come schede in alto, con il conteggio.
+  const phase = (p) => p.fields?.collaborationStatus || "";
+  const TABS = useMemo(() => [
+    { key: "con-noi", label: "Con noi", test: (p) => phase(p) !== PHASE_EXITED },
+    { key: "da-completare", label: "Da completare", test: (p) => phase(p) !== PHASE_EXITED && ready[p.id]?.missing.length > 0 },
+    { key: "ingresso", label: "In ingresso", test: (p) => phase(p) === "In ingresso" },
+    { key: "attive", label: "Attive", test: (p) => phase(p) === "Attiva" },
+    { key: "cambio", label: "In riassegnazione o in uscita", test: (p) => ["In riassegnazione", "In uscita"].includes(phase(p)) },
+    { key: "uscite", label: "Uscite", test: (p) => phase(p) === PHASE_EXITED },
+    { key: "senza-fase", label: "Fase da sistemare", attn: true, hideEmpty: true, test: (p) => !PHASE_LABELS.includes(phase(p)) },
+    { key: "ripulire", label: "Da ripulire", attn: true, hideEmpty: true, test: (p) => Boolean(flags[p.id]) },
+  ], [ready, flags]);
+  const tabCounts = useMemo(() => Object.fromEntries(TABS.map((t) => [t.key, items.filter(t.test).length])), [TABS, items]);
+  const curTab = TABS.find((t) => t.key === tab);
+
+  const activeFilters = [contract, dept, project, emp, lang, skill, pastRole, source].filter(Boolean).length;
   const rows = useMemo(() => {
+    if (!curTab) return [];
     const needle = q.trim().toLowerCase();
     return items.filter((p) => {
       const f = p.fields || {};
-      if (todo && !TODO[todo].test(f)) return false;
+      if (!curTab.test(p)) return false;
       if (lang && !has(f.spokenLanguages, lang)) return false;
-      if (!status && f.collaborationStatus === PHASE_EXITED) return false;
-      if (status && status !== ALL_PHASES && (status === NONE ? f.collaborationStatus : f.collaborationStatus !== status)) return false;
       if (contract && !has(f.hvContractStatus, contract)) return false;
       if (dept && !has(f.department, dept)) return false;
       if (project && !has(f.project, project)) return false;
       if (emp && !has(f.employmentType, emp)) return false;
-      if (onlyCleanup && !flags[p.id]) return false;
+      if (source && !has(f.source, source)) return false;
       if (skill && !hasSkillAtLeast(f.skillLevels, skill, minLevel)) return false;
       if (pastRole && !normalizePastRoles(f.pastRoles).some((r) => r.role === pastRole)) return false;
       if (needle) {
-        const hay = [p.name, f.personalEmail, f.companyEmail, f.personalPhone, f.currentJob, ...(f.project || []), ...(f.role || [])].filter(Boolean).join(" ").toLowerCase();
+        const hay = [p.name, f.personalEmail, f.companyEmail, f.personalPhone, f.currentJob, f.referredBy, ...(f.project || []), ...(f.role || []), ...(f.referent || []).map((u) => u.name)].filter(Boolean).join(" ").toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
     });
-  }, [items, q, status, contract, dept, project, emp, onlyCleanup, flags, skill, minLevel, pastRole, lang, todo]);
-  const todoCounts = useMemo(() => Object.fromEntries(Object.entries(TODO).map(([k, t]) => [k, items.filter((p) => t.test(p.fields || {})).length])), [items]);
+  }, [items, curTab, q, contract, dept, project, emp, lang, source, skill, minLevel, pastRole]);
+  const resetFilters = () => { setContract(""); setDept(""); setProject(""); setEmp(""); setLang(""); setSkill(""); setMinLevel(""); setPastRole(""); setSource(""); };
 
-  const filtered = Boolean(q || status || contract || dept || project || emp || onlyCleanup || skill || pastRole || lang || todo);
-  const reset = () => { setQ(""); setStatus(""); setContract(""); setDept(""); setProject(""); setEmp(""); setOnlyCleanup(false); setSkill(""); setMinLevel(""); setPastRole(""); setLang(""); setTodo(""); };
-  const shownBase = statusCounts[""]; // l'elenco di base: tutti tranne le uscite
-  // fasi fuori dalle 5 (es. "Da verificare" arrivato da ClickUp, o un'opzione sconosciuta)
-  const otherPhases = Object.keys(statusCounts).filter((s) => s && s !== NONE && s !== ALL_PHASES && !PHASE_LABELS.includes(s));
-  const toFix = statusCounts[NONE] + otherPhases.reduce((a, s) => a + statusCounts[s], 0);
-
-  const syncErrors = items.filter((p) => ["error", "partial", "deleted", "missing", "drift"].includes(p.sync?.status)).length;
+  const syncProblems = items.filter((p) => ["error", "partial", "deleted", "missing", "drift"].includes(p.sync?.status));
 
   const columns = [
     {
       key: "name", label: "Persona", sort: (p) => p.name.toLowerCase(),
-      render: (p) => (
-        <span>
-          <Link href={`/admin/hr/${p.id}`} onClick={(e) => e.stopPropagation()} style={{ color: CP.textPrimary, textDecoration: "none", fontWeight: 500 }}>{p.name}</Link>
-          {(flags[p.id] || []).map((f) => <span key={f} style={{ ...chip, marginLeft: 6, color: CP.attn }}>{f === "doppione" ? "doppione?" : "da ripulire"}</span>)}
-          {p.fields?.currentJob && <div style={{ fontSize: 12, color: CP.textMuted }}>{p.fields.currentJob}</div>}
-        </span>
-      ),
+      render: (p) => {
+        const bad = ["error", "partial", "deleted", "missing", "drift"].includes(p.sync?.status);
+        const sub = [p.fields?.currentJob, ...(p.fields?.role || [])].filter(Boolean)[0];
+        return (
+          <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+            <span aria-hidden="true" style={{ width: 30, height: 30, borderRadius: "50%", background: avatarColor(p.id), color: "#fff", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 600, flex: "0 0 auto" }}>{initials(p.name)}</span>
+            <span style={{ minWidth: 0 }}>
+              <Link href={`/admin/hr/${p.id}`} onClick={(e) => e.stopPropagation()} style={{ color: CP.textPrimary, textDecoration: "none", fontWeight: 500 }}>{p.name}</Link>
+              {bad && <span title={`ClickUp: ${SYNC_LABEL[p.sync?.status] || p.sync?.status}`} style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: CP.accentRed, marginLeft: 6, verticalAlign: "middle" }} />}
+              {(flags[p.id] || []).map((f) => <span key={f} style={{ ...chip, marginLeft: 6, color: CP.attn }}>{f === "doppione" ? "doppione?" : "da ripulire"}</span>)}
+              {sub && <div style={{ fontSize: 12, color: CP.textMuted }}>{sub}</div>}
+            </span>
+          </span>
+        );
+      },
     },
-    { key: "status", label: "Fase", sort: (p) => { const i = PHASE_LABELS.indexOf(p.fields?.collaborationStatus); return i < 0 ? 99 : i; }, render: (p) => p.fields?.collaborationStatus || <span style={{ color: CP.textMuted }}>—</span> },
-    { key: "contract", label: "Contratto", sort: (p) => { const i = CONTRACT_LABELS.indexOf(p.fields?.hvContractStatus); return i < 0 ? 99 : i; }, render: (p) => p.fields?.hvContractStatus || <span style={{ color: CP.textMuted }}>—</span>, muted: true },
-    { key: "dept", label: "Reparto", sort: (p) => (p.fields?.department || []).join(","), render: (p) => (p.fields?.department || []).join(", ") || <span style={{ color: CP.textMuted }}>—</span>, muted: true },
-    { key: "project", label: "Creator / progetto", sortable: false, render: (p) => (p.fields?.project || []).slice(0, 3).map((x) => <span key={x} style={chip}>{x.replace(/^Model - /, "")}</span>).concat((p.fields?.project || []).length > 3 ? [<span key="more" style={{ fontSize: 12, color: CP.textMuted }}>+{p.fields.project.length - 3}</span>] : []) },
-    { key: "emp", label: "Rapporto", sort: (p) => p.fields?.employmentType || "", render: (p) => p.fields?.employmentType || <span style={{ color: CP.textMuted }}>—</span>, muted: true },
+    { key: "status", label: "Fase", sort: (p) => { const i = PHASE_LABELS.indexOf(phase(p)); return i < 0 ? 99 : i; }, render: (p) => <PhasePill phase={phase(p)} /> },
+    { key: "project", label: "Progetto", sortable: false, render: (p) => (p.fields?.project || []).length ? (p.fields.project.slice(0, 2).map((x) => x.replace(/^Model ?- ?/, "")).join(", ") + (p.fields.project.length > 2 ? ` +${p.fields.project.length - 2}` : "")) : <span style={{ color: CP.textMuted }}>—</span> },
+    { key: "referent", label: "Referente", sort: (p) => (p.fields?.referent || [])[0]?.name || "", render: (p) => (p.fields?.referent || []).map((u) => u.name).join(", ") || <span style={{ color: CP.textMuted }}>—</span> },
+    {
+      key: "ready", label: "Pronta", sort: (p) => ready[p.id]?.done ?? 0,
+      render: (p) => { const r = ready[p.id]; return (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}>
+          <span style={{ width: 56, height: 6, borderRadius: 3, background: CP.borderSoft || CP.border, overflow: "hidden" }}><span style={{ display: "block", height: "100%", width: `${(r.done / r.total) * 100}%`, background: r.done === r.total ? CP.accentGreen : CP.scale || CP.accent }} /></span>
+          <span style={{ fontSize: 12.5, color: CP.textSecondary }}>{r.done}/{r.total}</span>
+        </span>
+      ); },
+    },
+    { key: "missing", label: "Manca", sortable: false, render: (p) => { const m = ready[p.id]?.missing || []; return m.length ? <span style={{ fontSize: 12.5, color: CP.attn }}>{m.map((x) => x.label).join(" · ")}</span> : <span style={{ fontSize: 12.5, color: CP.accentGreen }}>tutto pronto</span>; } },
     ...(skill ? [{ key: "lvl", label: "Livello", sort: (p) => SKILL_LEVELS.indexOf(normalizeSkillMap(p.fields?.skillLevels)[skill]), render: (p) => normalizeSkillMap(p.fields?.skillLevels)[skill] || "—" }] : []),
     ...(pastRole ? [{ key: "prole", label: "Ruolo passato", sortable: false, render: (p) => pastRoleText(normalizePastRoles(p.fields?.pastRoles).find((r) => r.role === pastRole)), muted: true }] : []),
-    { key: "sync", label: "ClickUp", sort: (p) => p.sync?.status || "", render: (p) => <span style={{ fontSize: 13, color: ["error", "deleted", "missing", "drift"].includes(p.sync?.status) ? CP.accentRed : CP.textSecondary }}>{SYNC_LABEL[p.sync?.status] || "—"}</span> },
   ];
+
+  const tabBtn = (key, label, count, attn) => (
+    <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
+      style={{ background: "none", border: 0, borderBottom: `2px solid ${tab === key ? CP.accent : "transparent"}`, padding: "9px 12px", marginBottom: -1, cursor: "pointer", fontFamily: FONTS.body, fontSize: 14, whiteSpace: "nowrap",
+        color: tab === key ? CP.textPrimary : CP.textSecondary, fontWeight: tab === key ? 500 : 400 }}>
+      {label} <span style={{ color: attn && count ? CP.attn : CP.textMuted, fontSize: 12.5 }}>{count}</span>
+    </button>
+  );
 
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1240, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
-        crumbs={[{ label: "Hub", href: "/admin" }, { label: "People" }, { label: "Persone HR" }]}
-        title="Persone HR"
-        subtitle="L'anagrafica di chi lavora con noi. HOC Pro è la fonte principale: ogni modifica fatta qui arriva su ClickUp, e quelle fatte su ClickUp tornano qui. I dati li può compilare anche la persona, dal link del modulo."
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "People" }, { label: "Persone" }]}
+        title="Persone"
+        subtitle="Chi lavora con noi. Si aggiorna da sola con ClickUp."
         actions={!error && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <TutorialVideoButton id="persone-hr" />
+            <button type="button" onClick={() => setLinkOpen(true)} style={btnGhost}><Link2 size={15} /> Link del modulo</button>
             <button type="button" onClick={() => setNewOpen(true)} style={btnPrimary}><Plus size={15} /> Nuova persona</button>
           </div>
         )}
       />
 
       {error && <Notice danger={error.status !== 403}>{error.status === 403 ? "Pagina riservata agli admin." : `Non riesco a caricare le persone: ${error.message}`}</Notice>}
-
-      {data && <SharedLinkBox onChanged={() => mutate()} />}
-
       {data && !data.sync?.enabled && (
-        <Notice>
-          Sincronizzazione con ClickUp <b>spenta</b>: manca la lista (<code>HR_CLICKUP_LIST_ID</code>) o il token. Le schede si salvano comunque in HOC Pro e verranno portate su ClickUp quando la sync si accende. <Link href="/admin/hr/sync" style={{ color: CP.accentSoftText }}>Stato della sincronizzazione →</Link>
-        </Notice>
+        <Notice>Sincronizzazione con ClickUp <b>spenta</b>: le schede si salvano comunque qui. <Link href="/admin/hr/sync" style={{ color: CP.accentSoftText }}>Dettagli →</Link></Notice>
       )}
       {data?.sync?.isRealList && <Notice danger>La lista configurata è quella <b>reale</b> del CRM HR: ogni salvataggio modifica i task veri.</Notice>}
-      {data && !data.crypto && <Notice>Chiave di cifratura (<code>HR_ENCRYPTION_KEY</code>) assente: i codici fiscali non si possono salvare né leggere. Il resto funziona.</Notice>}
+      {data && !data.crypto && <Notice>Chiave di cifratura assente: i codici fiscali non si possono salvare né leggere. Il resto funziona.</Notice>}
+      {syncProblems.length > 0 && (
+        <Notice danger>{syncProblems.length === 1 ? "1 scheda non è" : `${syncProblems.length} schede non sono`} allineate con ClickUp ({syncProblems.slice(0, 3).map((p) => p.name).join(", ")}{syncProblems.length > 3 ? "…" : ""}). Il sistema riprova da solo; il pallino rosso le segna nell'elenco. <Link href="/admin/hr/sync" style={{ color: CP.accentSoftText }}>Dettagli →</Link></Notice>
+      )}
 
       {!error && isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
 
-      {data && (archivedItems.length > 0 || view === "archiviate") && (
-        <div role="group" aria-label="Quale elenco" style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-          <FilterChip label={`Persone · ${items.length}`} active={view === "attive"} onClick={() => setView("attive")} />
-          <FilterChip label={`Archiviate · ${archivedItems.length}`} active={view === "archiviate"} onClick={() => setView("archiviate")} />
-        </div>
-      )}
-
-      {data && view === "archiviate" && (
-        <ArchivedView rows={archivedItems} notice={archNotice} onChanged={(text) => { setArchNotice(text); mutate(); }} />
-      )}
-
-      {data && view === "attive" && items.length === 0 && (
+      {data && items.length === 0 && archivedItems.length === 0 && (
         <section style={{ ...card, padding: "18px 20px" }}>
-          <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, marginBottom: 8 }}>Nessuna persona ancora. Per iniziare:</div>
-          <ol style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: CP.textSecondary, lineHeight: 1.6 }}>
-            <li>se la lista ClickUp è configurata, <Link href="/admin/hr/sync" style={{ color: CP.accentSoftText }}>importa le persone da ClickUp</Link>;</li>
-            <li>oppure crea una scheda con “Nuova persona”;</li>
-            <li>oppure manda il link del modulo qui sopra: ognuno compila i suoi dati.</li>
-          </ol>
+          <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, marginBottom: 8 }}>Nessuna persona ancora.</div>
+          <p style={{ margin: 0, fontSize: 14, color: CP.textSecondary, lineHeight: 1.6 }}>Manda il <button type="button" onClick={() => setLinkOpen(true)} style={{ background: "none", border: 0, padding: 0, color: CP.accentSoftText, cursor: "pointer", fontSize: 14 }}>link del modulo</button> a chi entra, oppure crea una scheda con «Nuova persona».</p>
         </section>
       )}
 
-      {view === "attive" && items.length > 0 && (
+      {data && (items.length > 0 || archivedItems.length > 0) && (
         <>
-          <section style={{ ...card, padding: "16px 18px", marginBottom: 14, display: "flex", gap: 28, flexWrap: "wrap" }} aria-label="Persone per fase">
-            <Metric label="Con noi" value={fmtInt(shownBase)} note="tutti tranne le uscite" />
-            {PHASE_LABELS.map((ph) => <Metric key={ph} label={ph} value={fmtInt(statusCounts[ph] || 0)} />)}
-            {toFix > 0 && <Metric label="Fase da sistemare" attn value={fmtInt(toFix)} note="senza fase o da verificare" />}
-            <Metric label="Da ripulire" value={fmtInt(cleanupCount)} attn={cleanupCount > 0} note="doppioni o schede vuote" />
-            <Metric label="Problemi con ClickUp" value={fmtInt(syncErrors)} danger={syncErrors > 0} />
-          </section>
+          <div role="tablist" aria-label="Viste" style={{ display: "flex", gap: 2, borderBottom: `1px solid ${CP.border}`, overflowX: "auto", marginBottom: 12 }}>
+            {TABS.filter((t) => !t.hideEmpty || tabCounts[t.key] > 0 || tab === t.key).map((t) => tabBtn(t.key, t.label, tabCounts[t.key], t.attn))}
+            {(archivedItems.length > 0 || tab === "archiviate") && tabBtn("archiviate", "Archiviate", archivedItems.length, false)}
+          </div>
 
-          <div role="group" aria-label="Da fare" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
-            <span style={{ fontSize: 13, color: CP.textMuted, marginRight: 2 }}>Da fare</span>
-            {Object.entries(TODO).map(([k, t]) => (
-              <FilterChip key={k} label={`${t.label} · ${todoCounts[k]}`} attn={todoCounts[k] > 0 && t.attn} active={todo === k} disabled={!todoCounts[k] && todo !== k}
-                onClick={() => { setTodo(todo === k ? "" : k); if (todo !== k) setStatus(t.status || ""); }} />
-            ))}
-          </div>
-          <div role="group" aria-label="Filtra per fase" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-            <FilterChip label={`Tutti tranne le uscite · ${statusCounts[""]}`} active={!status} onClick={() => setStatus("")} />
-            {PHASE_LABELS.map((s) => <FilterChip key={s} label={`${s} · ${statusCounts[s] || 0}`} active={status === s} onClick={() => setStatus(status === s ? "" : s)} />)}
-            {otherPhases.map((s) => <FilterChip key={s} attn label={`${s} · ${statusCounts[s]}`} active={status === s} onClick={() => setStatus(status === s ? "" : s)} />)}
-            <FilterChip label={`Senza fase · ${statusCounts[NONE]}`} active={status === NONE} onClick={() => setStatus(status === NONE ? "" : NONE)} />
-            <FilterChip label={`Tutte le fasi · ${statusCounts[ALL_PHASES]}`} active={status === ALL_PHASES} onClick={() => setStatus(status === ALL_PHASES ? "" : ALL_PHASES)} />
-            <FilterChip label={`Da ripulire · ${cleanupCount}`} attn={cleanupCount > 0} active={onlyCleanup} onClick={() => setOnlyCleanup(!onlyCleanup)} />
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 10, marginBottom: 12 }}>
-            <label><span style={lbl}>Cerca</span><input style={{ ...input, borderRadius: 999 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nome, email, telefono, mansione…" /></label>
-            <FilterSelect label="Stato del contratto" value={contract} onChange={setContract} options={contracts} />
-            <FilterSelect label="Reparto" value={dept} onChange={setDept} options={depts} />
-            <FilterSelect label="Creator / progetto" value={project} onChange={setProject} options={projects} />
-            <FilterSelect label="Tipo di rapporto" value={emp} onChange={setEmp} options={emps} />
-            <FilterSelect label="Lingue parlate" value={lang} onChange={setLang} options={langs} />
-            <label>
-              <span style={lbl}>Ha la competenza</span>
-              <select style={input} value={skill} onChange={(e) => { setSkill(e.target.value); if (!e.target.value) setMinLevel(""); }}>
-                <option value="">Qualunque</option>
-                {SKILL_AREAS.map((a) => (
-                  <optgroup key={a.key} label={a.area}>
-                    {a.skills.map((x) => <option key={x.key} value={x.key}>{x.name} · {skillCounts[x.key] || 0}</option>)}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span style={lbl}>Livello minimo</span>
-              <select style={{ ...input, opacity: skill ? 1 : 0.6 }} disabled={!skill} value={minLevel} onChange={(e) => setMinLevel(e.target.value)}>
-                <option value="">Qualunque livello</option>
-                {SKILL_LEVELS.slice(1).map((l) => <option key={l} value={l}>Almeno {l}</option>)}
-              </select>
-            </label>
-            <label>
-              <span style={lbl}>Ha ricoperto il ruolo</span>
-              <select style={input} value={pastRole} onChange={(e) => setPastRole(e.target.value)}>
-                <option value="">Qualunque</option>
-                {PAST_ROLES.map(([k, name]) => <option key={k} value={k}>{name} · {roleCounts[k] || 0}</option>)}
-              </select>
-            </label>
-          </div>
-          {filtered && (
-            <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 8 }}>
-              {rows.length} su {status ? items.length : shownBase} · <button type="button" onClick={reset} style={{ background: "none", border: "none", padding: 0, color: CP.accentSoftText, cursor: "pointer", fontSize: 13 }}>togli i filtri</button>
-            </div>
-          )}
-          <DataTable columns={columns} rows={rows} defaultSort={{ key: "name", dir: 1 }} onRowClick={(p) => router.push(`/admin/hr/${p.id}`)} minWidth={900} maxHeight={620}
-            empty={<span>Nessuna persona con questi filtri. <button type="button" onClick={reset} style={{ background: "none", border: "none", padding: 0, color: CP.accentSoftText, cursor: "pointer" }}>Togli i filtri</button></span>} />
+          {tab === "archiviate" ? (
+            <ArchivedView rows={archivedItems} notice={archNotice} onChanged={(text) => { setArchNotice(text); mutate(); }} />
+          ) : (
+            <>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+                <input aria-label="Cerca" style={{ ...input, flex: "1 1 260px", borderRadius: 999 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca per nome, email, telefono, progetto, referente…" />
+                <button type="button" onClick={() => setFiltersOpen(!filtersOpen)} aria-expanded={filtersOpen} style={{ ...btnGhost, borderColor: activeFilters ? CP.accent : undefined }}>
+                  <SlidersHorizontal size={14} /> Filtri{activeFilters ? ` · ${activeFilters}` : ""}
+                </button>
+                {activeFilters > 0 && <button type="button" onClick={resetFilters} style={{ background: "none", border: 0, padding: 0, color: CP.accentSoftText, cursor: "pointer", fontSize: 13 }}>Togli i filtri</button>}
+              </div>
+              {filtersOpen && (
+                <section style={{ ...card, padding: "14px 16px", marginBottom: 12, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 10 }} aria-label="Filtri">
+                  <FilterSelect label="Progetto / creator" value={project} onChange={setProject} options={projects} />
+                  <FilterSelect label="Stato del contratto" value={contract} onChange={setContract} options={contracts} />
+                  <FilterSelect label="Reparto" value={dept} onChange={setDept} options={depts} />
+                  <FilterSelect label="Tipo di rapporto" value={emp} onChange={setEmp} options={emps} />
+                  <FilterSelect label="Lingue" value={lang} onChange={setLang} options={langs} />
+                  <FilterSelect label="Come ci ha conosciuto" value={source} onChange={setSource} options={sources} />
+                  <label>
+                    <span style={lbl}>Ha la competenza</span>
+                    <select style={input} value={skill} onChange={(e) => { setSkill(e.target.value); if (!e.target.value) setMinLevel(""); }}>
+                      <option value="">Qualunque</option>
+                      {SKILL_AREAS.map((a) => (
+                        <optgroup key={a.key} label={a.area}>
+                          {a.skills.map((x) => <option key={x.key} value={x.key}>{x.name} · {skillCounts[x.key] || 0}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </label>
+                  {skill && (
+                    <label>
+                      <span style={lbl}>Livello minimo</span>
+                      <select style={input} value={minLevel} onChange={(e) => setMinLevel(e.target.value)}>
+                        <option value="">Qualunque livello</option>
+                        {SKILL_LEVELS.slice(1).map((l) => <option key={l} value={l}>Almeno {l}</option>)}
+                      </select>
+                    </label>
+                  )}
+                  <label>
+                    <span style={lbl}>Ha ricoperto il ruolo</span>
+                    <select style={input} value={pastRole} onChange={(e) => setPastRole(e.target.value)}>
+                      <option value="">Qualunque</option>
+                      {PAST_ROLES.map(([k, name]) => <option key={k} value={k}>{name} · {roleCounts[k] || 0}</option>)}
+                    </select>
+                  </label>
+                </section>
+              )}
 
-          {cleanupCount > 0 && (
-            <div style={{ marginTop: 14 }}>
-              <Disclosure open={cleanupOpen} onToggle={() => setCleanupOpen(!cleanupOpen)} title="Da ripulire"
-                summary={`${data.cleanup.duplicates.length} gruppi di doppioni probabili · ${data.cleanup.junk.length} schede quasi vuote`}>
-                <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 10px", lineHeight: 1.5 }}>
-                  Niente viene cancellato: in HOC Pro le schede non si eliminano. Apri le schede e decidi quale tenere; il doppione si sistema su ClickUp (se cancelli lì il task in più, qui la sua scheda va tra le Archiviate).
-                </p>
-                {data.cleanup.duplicates.map((g) => (
-                  <div key={g.ids.join()} style={{ padding: "8px 0", borderTop: `1px solid ${CP.borderSoft}`, fontSize: 14 }}>
-                    <span style={{ color: CP.textMuted, fontSize: 12, marginRight: 8 }}>stesso {g.reasons.join(" + ")}</span>
-                    {g.ids.map((id, i) => <span key={id}>{i > 0 && " · "}<Link href={`/admin/hr/${id}`} style={{ color: CP.textPrimary }}>{byId[id]?.name || id}</Link></span>)}
-                  </div>
-                ))}
-                {data.cleanup.junk.length > 0 && (
-                  <div style={{ padding: "8px 0", borderTop: `1px solid ${CP.borderSoft}`, fontSize: 14 }}>
-                    <span style={{ color: CP.textMuted, fontSize: 12, marginRight: 8 }}>nome di 1-2 lettere e nessuna email</span>
-                    {data.cleanup.junk.map((id, i) => <span key={id}>{i > 0 && " · "}<Link href={`/admin/hr/${id}`} style={{ color: CP.textPrimary }}>{byId[id]?.name || "(vuota)"}</Link></span>)}
-                  </div>
-                )}
-              </Disclosure>
-            </div>
+              <DataTable columns={columns} rows={rows} defaultSort={{ key: "name", dir: 1 }} onRowClick={(p) => router.push(`/admin/hr/${p.id}`)} minWidth={860} maxHeight={680}
+                empty={<span>Nessuna persona qui{activeFilters || q ? " con questi filtri" : ""}.{(activeFilters || q) ? <> <button type="button" onClick={() => { resetFilters(); setQ(""); }} style={{ background: "none", border: "none", padding: 0, color: CP.accentSoftText, cursor: "pointer" }}>Togli i filtri</button></> : null}</span>} />
+
+              {tab === "ripulire" && data.cleanup && (
+                <section style={{ ...card, padding: "14px 16px", marginTop: 12 }}>
+                  <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 8px", lineHeight: 1.5 }}>
+                    Niente viene cancellato. Apri le schede e decidi quale tenere; quella in più la porti in «Uscita» (o la sistemi su ClickUp).
+                  </p>
+                  {data.cleanup.duplicates.map((g) => (
+                    <div key={g.ids.join()} style={{ padding: "8px 0", borderTop: `1px solid ${CP.borderSoft}`, fontSize: 14 }}>
+                      <span style={{ color: CP.textMuted, fontSize: 12, marginRight: 8 }}>stesso {g.reasons.join(" + ")}</span>
+                      {g.ids.map((id, i) => <span key={id}>{i > 0 && " · "}<Link href={`/admin/hr/${id}`} style={{ color: CP.textPrimary }}>{byId[id]?.name || id}</Link></span>)}
+                    </div>
+                  ))}
+                  {data.cleanup.junk.length > 0 && (
+                    <div style={{ padding: "8px 0", borderTop: `1px solid ${CP.borderSoft}`, fontSize: 14 }}>
+                      <span style={{ color: CP.textMuted, fontSize: 12, marginRight: 8 }}>nome di 1-2 lettere e nessuna email</span>
+                      {data.cleanup.junk.map((id, i) => <span key={id}>{i > 0 && " · "}<Link href={`/admin/hr/${id}`} style={{ color: CP.textPrimary }}>{byId[id]?.name || "(vuota)"}</Link></span>)}
+                    </div>
+                  )}
+                </section>
+              )}
+            </>
           )}
         </>
       )}
 
+      <Modal open={linkOpen} onClose={() => setLinkOpen(false)} title="Link del modulo">
+        <SharedLinkBox onChanged={() => mutate()} />
+      </Modal>
       <NewPersonModal open={newOpen} onClose={() => setNewOpen(false)} onCreated={(p) => { setNewOpen(false); mutate(); router.push(`/admin/hr/${p.id}`); }} />
     </div>
   );
+}
+
+/** Fase come etichetta colorata (stesso colore ovunque). */
+function PhasePill({ phase }) {
+  const tone = phase === "Attiva" ? [CP.accentGreen, "rgba(30,122,82,.10)"]
+    : phase === "In ingresso" ? [CP.accentSoftText || CP.accent, CP.accentSoft]
+    : phase === "Uscita" ? [CP.textMuted, CP.surfaceAlt]
+    : PHASE_LABELS.includes(phase) ? [CP.attn, CP.surfaceAlt] : [CP.textMuted, "transparent"];
+  return <span style={{ display: "inline-block", fontSize: 12.5, padding: "2px 9px", borderRadius: 999, color: tone[0], background: tone[1], whiteSpace: "nowrap" }}>{phase || "senza fase"}</span>;
 }
 
 /**
