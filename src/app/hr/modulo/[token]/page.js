@@ -49,11 +49,12 @@ import { GRAIN_DATA_URI } from "@/lib/tessera-material";
 import {
   progressWords, timeEstimateText, fieldErrors, fieldErrorsFromServer, firstStepWithError,
   draftKey, serializeDraft, parseDraft, draftWorthSaving, safeGet, safeSet, safeRemove,
+  requiredKeysFor,
 } from "@/lib/hr-form-experience";
 
 // carta d'esempio della prima schermata: dati FINTI, dichiarati come esempio a schermo
 const SAMPLE_CARD = {
-  firstName: "Giulia", surname: "Rossi", gender: "Female", currentJob: "Chatter (operatore di chat)",
+  firstName: "Giulia", surname: "Rossi", gender: "Female",
   skillLevels: { of_chat: "Esperto", ai_prompting: "Autonomo", soc_instagram: "Base" },
   spokenLanguages: ["ITA - Native", "ENG - B2"],
   residenceComune: { name: "Milano", prov: "MI" },
@@ -69,7 +70,7 @@ const STEPS = [
   { title: "Ultimo passo", sub: "privacy e invio", keys: [] },
 ];
 const LABELS = {
-  firstName: "Nome", surname: "Cognome", currentJob: "Che cosa fai oggi (mansione)", nationality: "Nazionalità", spokenLanguages: "Lingue che parli",
+  firstName: "Nome", surname: "Cognome", currentJob: "Che cosa fai oggi (facoltativo)", nationality: "Nazionalità", spokenLanguages: "Lingue che parli",
   partitaIva: "Hai una partita IVA?", timeSlots: "Fasce orarie in cui sei disponibile", personalInterests: "Interessi (facoltativo)",
   linkedin: "Profilo LinkedIn (facoltativo)", birthPlace: "Dove sei nato/a",
   location: "Indirizzo (via e numero civico)", residenceCap: "CAP / codice postale", residenceComune: "Dove vivi", skillLevels: "Cosa sai fare, e a che livello",
@@ -138,6 +139,11 @@ const CSS = `
 @keyframes hrfWord{from{opacity:0;letter-spacing:.5em}to{opacity:1;letter-spacing:.32em}}
 @media (prefers-reduced-motion:reduce){.hrf-splash-word{animation:none;opacity:1}}
 .hrf-splash-logo{opacity:0;animation:hrfLogo 1.4s cubic-bezier(.2,.7,.2,1) .2s forwards}
+.hrf-splash-light{display:inline-block;position:relative;-webkit-mask-image:linear-gradient(90deg,#000 40%,rgba(0,0,0,.08) 60%);mask-image:linear-gradient(90deg,#000 40%,rgba(0,0,0,.08) 60%);-webkit-mask-size:260% 100%;mask-size:260% 100%;-webkit-mask-position:100% 0;mask-position:100% 0;animation:hrfLight 2.5s cubic-bezier(.45,.05,.35,1) .3s forwards}
+@keyframes hrfLight{to{-webkit-mask-position:0 0;mask-position:0 0}}
+.hrf-splash-light::after{content:"";position:absolute;inset:-10% -4%;background:linear-gradient(100deg,transparent 35%,rgba(255,236,190,.55) 50%,transparent 65%);mix-blend-mode:overlay;transform:translateX(-110%);animation:hrfSweep 1.4s ease 2.6s forwards;pointer-events:none}
+@keyframes hrfSweep{to{transform:translateX(110%)}}
+@media (prefers-reduced-motion:reduce){.hrf-splash-light{animation:none;-webkit-mask-image:none;mask-image:none}.hrf-splash-light::after{display:none}}
 @keyframes hrfLogo{from{opacity:0;transform:translateY(6px);letter-spacing:.24em}to{opacity:1;transform:none;letter-spacing:.16em}}
 @media (prefers-reduced-motion:reduce){.hrf-splash-logo{animation:none;opacity:1}}
 .hrf-splash{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:radial-gradient(120% 60% at 50% 0%, #17161c 0%, #0b0c10 55%);opacity:1;transition:opacity 1.1s cubic-bezier(.4,0,.2,1)}
@@ -167,7 +173,7 @@ function SplashOverlay() {
   return (
     <div className={`hrf-splash${phase === "leaving" ? " is-leaving" : ""}`} aria-hidden={phase === "leaving"}>
       <div className="hrf-splash-inner" style={{ display: "grid", justifyItems: "center", gap: 22 }}>
-        <HocLogo size={22} color="#f2eee6" className="hrf-splash-logo" />
+        <span className="hrf-splash-light"><HocLogo size={22} color="#f2eee6" /></span>
         <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Apro il modulo</span>
       </div>
     </div>
@@ -208,7 +214,7 @@ export default function HrFormPage() {
   const reducedRef = useRef(false);
   useEffect(() => {
     try { reducedRef.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* */ }
-    const t = setTimeout(() => setSplashTimeUp(true), reducedRef.current ? 900 : 2400);
+    const t = setTimeout(() => setSplashTimeUp(true), reducedRef.current ? 900 : 3600);
     return () => clearTimeout(t);
   }, []);
   const [loadErr, setLoadErr] = useState(null);
@@ -348,7 +354,7 @@ export default function HrFormPage() {
     setErr(null);
     const cfEnabled = Boolean(ctx.cfEnabled);
     if (step < STEPS.length - 1) {
-      const fe = fieldErrors(data, STEPS[step].keys, { cfEnabled });
+      const fe = fieldErrors(data, STEPS[step].keys, { cfEnabled, cfPresent: Boolean(ctx.cfPresent) });
       if (Object.keys(fe).length) { showErrors(fe); return; }
       // codice fiscale valido ma non coerente con data/genere/luogo: avviso, si può andare avanti
       if (step === 0 && cfEnabled && data.codiceFiscale && !cfWarn) {
@@ -358,7 +364,7 @@ export default function HrFormPage() {
       goTo(step + 1);
       return;
     }
-    const all = fieldErrors(data, FORM_KEYS, { cfEnabled });
+    const all = fieldErrors(data, FORM_KEYS, { cfEnabled, cfPresent: Boolean(ctx.cfPresent) });
     if (Object.keys(all).length) { showErrors(all); return; }
     if (!consent) {
       setFieldErrs({ consent: "Per inviare, spunta la casella: ci serve sapere che hai letto l'informativa." });
@@ -438,6 +444,7 @@ export default function HrFormPage() {
   }
 
   const s = STEPS[step];
+  const required = new Set(requiredKeysFor(data, { cfEnabled: Boolean(ctx?.cfEnabled), cfPresent: Boolean(ctx?.cfPresent) }));
   const last = step === STEPS.length - 1;
   return (
     <Shell>
@@ -470,6 +477,7 @@ export default function HrFormPage() {
 
         <form ref={formRef} key={step} className={`hrf-sheet ${dir === "prev" ? "hrf-prev" : "hrf-next"}`} onSubmit={onSubmit} onKeyDown={onKeyDown} noValidate style={{ display: "grid", gap: 20 }}>
           <Headline title={s.title} sub={s.sub} size={36} />
+          {s.keys.some((k) => required.has(k)) && <div style={{ fontSize: 12.5, color: CP.textMuted, marginTop: -8 }}>I campi con * sono obbligatori.</div>}
 
           {s.keys.filter((k) => FORM_KEYS.includes(k) && (k !== "referredBy" || data.source === SOURCE_REFERRAL)).map((k) => {
             const f = FIELD_BY_KEY[k];
@@ -478,7 +486,7 @@ export default function HrFormPage() {
             const extra = { ...(keyboardFor(k, data) || {}), ...(fe ? { "aria-invalid": true, "aria-describedby": `f-${k}-err` } : {}) };
             return (
               <div key={k} id={`w-${k}`} style={{ scrollMarginTop: 24 }}>
-                <label id={`f-${k}-l`} htmlFor={`f-${k}`} style={k === "skillLevels" ? SR_ONLY : { ...lbl, fontSize: 13.5, marginBottom: 6 }}>{LABELS[k] || f.label}{k === "firstName" ? " *" : ""}</label>
+                <label id={`f-${k}-l`} htmlFor={`f-${k}`} style={k === "skillLevels" ? SR_ONLY : { ...lbl, fontSize: 13.5, marginBottom: 6 }}>{LABELS[k] || f.label}{required.has(k) ? " *" : ""}</label>
                 {cfOff ? (
                   <span style={{ fontSize: 13, color: CP.textMuted }}>Al momento non possiamo raccogliere il codice fiscale da qui: te lo chiederemo a parte.</span>
                 ) : (
@@ -555,6 +563,8 @@ function FilesStep({ token, data, onDone }) {
     } catch (e) { set(e?.message || "Caricamento non riuscito. Riprova."); }
   };
   const anyBusy = Object.values(state).some((v) => v && typeof v === "object");
+  const docOk = state.document === "ok";
+  const docFailed = typeof state.document === "string" && state.document !== "ok";
   const Item = ({ kind, title, hint }) => {
     const st = state[kind];
     const busy = st && typeof st === "object";
@@ -587,15 +597,20 @@ function FilesStep({ token, data, onDone }) {
     <div className="hrf-fade" style={{ display: "grid", gap: 22 }}>
       <HrTessera key="documenti" data={data} at={Date.now()} small />
       <Headline title="Quasi fatto." sub="Ultimo passo: i documenti." size={36} />
-      <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>Facoltativo ma utile. PDF, JPG o PNG, fino a 50 MB. Le foto le riduciamo noi. Hai un&apos;ora di tempo.</p>
+      <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>Il documento d&apos;identità è obbligatorio, il curriculum no. PDF, JPG o PNG, fino a 50 MB. Le foto le riduciamo noi. Hai un&apos;ora di tempo.</p>
       <div style={{ borderBottom: `1px solid ${CP.border}` }}>
-        <Item kind="document" title="Documento d'identità" hint="Fronte e retro nello stesso file, se puoi." />
-        <Item kind="cv" title="Curriculum (CV)" hint="L'ultima versione che hai." />
+        <Item kind="document" title="Documento d'identità *" hint="Fronte e retro nello stesso file, se puoi." />
+        <Item kind="cv" title="Curriculum (facoltativo)" hint="L'ultima versione che hai." />
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button type="button" className="hrf-pill" onClick={onDone} disabled={anyBusy} style={{ ...pill(true), flex: 1, opacity: anyBusy ? 0.5 : 1 }}>{anyBusy ? "Attendi la fine del caricamento" : "Ho finito"}</button>
-        {!state.document && !state.cv && <button type="button" className="hrf-pill" onClick={onDone} style={pill(false)}>Salta per ora</button>}
+        <button type="button" className="hrf-pill" onClick={onDone} disabled={anyBusy || !docOk} style={{ ...pill(true), flex: 1, opacity: anyBusy || !docOk ? 0.5 : 1 }}>{anyBusy ? "Attendi la fine del caricamento" : docOk ? "Ho finito" : "Carica il documento per finire"}</button>
       </div>
+      {/* via d'uscita SOLO se il caricamento è fallito: la scheda c'è già, HR sa che il documento manca */}
+      {docFailed && (
+        <button type="button" onClick={onDone} style={{ background: "none", border: 0, padding: 0, color: CP.textMuted, fontSize: 13, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, justifySelf: "start" }}>
+          Non riesco a caricarlo adesso: lo mando a HR
+        </button>
+      )}
     </div>
   );
 }

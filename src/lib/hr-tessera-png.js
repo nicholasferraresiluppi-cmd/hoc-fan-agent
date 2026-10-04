@@ -192,11 +192,12 @@ export async function drawTesseraCanvas(data = {}, at = Date.now()) {
     ctx.font = `400 ${(name.length > 20 ? 23 : 28) * s}px ${serif}`;
     const shown = ellipsize(ctx, name, maxW);
     ctx.fillStyle = "rgba(0,0,0,.75)"; // incisione: ombra sotto, filo di luce sopra
-    ctx.fillText(shown, 20 * s, lineY - 18 * s + s);
+    const nameY = line ? lineY - 18 * s : lineY; // senza riga sotto, il nome scende al suo posto
+    ctx.fillText(shown, 20 * s, nameY + s);
     ctx.fillStyle = "rgba(255,245,225,.10)";
-    ctx.fillText(shown, 20 * s, lineY - 18 * s - s);
+    ctx.fillText(shown, 20 * s, nameY - s);
     ctx.fillStyle = "#f2eee6";
-    ctx.fillText(shown, 20 * s, lineY - 18 * s);
+    ctx.fillText(shown, 20 * s, nameY);
   }
   return c;
 }
