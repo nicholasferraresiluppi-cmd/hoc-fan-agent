@@ -18,6 +18,8 @@ const CSS = `.sd{position:fixed;top:0;right:0;bottom:0;left:248px;z-index:30;ove
 .sd *{box-sizing:border-box;font-family:inherit}
 .sd canvas{position:absolute;inset:0;width:100%;height:100%;display:block;outline:none}
 .sd .serif{font-family:var(--f-display),"Instrument Serif",Georgia,serif;font-weight:400}
+/* lo stile Casa anima i nipoti di .casa-page (casa-rise, fill both): l'animazione resta a opacity 1 e vinceva su .gone/hero → intro mai sparita (ott 2026) */
+.sd>*{animation:none!important}
 .sd .intro{position:absolute;inset:0;z-index:9;background:#07080B;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;transition:opacity 1.1s ease}
 .sd .intro.gone{opacity:0;pointer-events:none}
 .sd .intro b{font-family:var(--f-display),"Instrument Serif",Georgia,serif;font-weight:400;font-size:clamp(44px,6vw,84px);opacity:0;transform:translateY(8px);transition:opacity 1.1s ease,transform 1.1s ease}
