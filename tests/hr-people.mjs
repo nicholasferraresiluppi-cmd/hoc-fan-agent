@@ -266,6 +266,7 @@ eq(stripHocBlock(withHocBlock("A", ["x: 1"])), "A", "blocco rimovibile");
   }
   ok(F.FORM_KEYS.includes("source") && F.FORM_KEYS.includes("referredBy"), "provenienza e reference sono nel modulo");
   ok(F.SOURCES.length === 2 && F.normalizeChoiceFields({ source: "Dai social" }).source === F.SOURCE_AD && F.normalizeChoiceFields({ source: "Altro" }).source === F.SOURCE_AD && F.normalizeChoiceFields({ source: F.SOURCE_REFERRAL }).source === F.SOURCE_REFERRAL, "provenienza: o reference o annuncio, le voci vecchie confluiscono nell'annuncio");
+  ok(F.normalizeChoiceFields({ source: "Ho visto un annuncio" }).source === F.SOURCE_AD && (await import("../src/lib/hr-people-core.js")).normalizePersonInput({ source: "Dai social" }).values.source === F.SOURCE_AD, "provenienza: «Ho visto un annuncio» e «Dai social» (bozze, ClickUp) diventano annuncio o social");
   ok(F.SOURCES[0] === F.SOURCE_REFERRAL && F.FIELD_BY_KEY.source.cu === "Provenienza" && F.FIELD_BY_KEY.referredBy.cu === "Segnalato da", "provenienza: prima voce = reference, campi ClickUp per nome");
   {
     const C2 = await import("../src/lib/hr-people-core.js");
@@ -502,7 +503,9 @@ console.log(`hr-people: ${n} asserzioni OK`);
     [{ role: "media_buyer", duration: "1to3" }, { role: "sales", duration: null }, { role: "other", duration: "lt1", other: "fotografo matrimoni" }], "ruoli puliti: uno per tipo, durata valida o null, altro su una riga");
   t(S.pastRoleText({ role: "media_buyer", duration: "1to3" }) === "Media buyer (1-3 anni)", "testo ruolo");
   t(S.pastRoleText({ role: "other", duration: "gt5", other: "barista" }) === "Altro: barista (oltre 5 anni)", "testo ruolo altro");
-  t(S.PAST_ROLES.length === 11 && S.ROLE_DURATIONS.length === 4, "11 ruoli, 4 durate");
+  t(S.PAST_ROLES.length === 12 && S.ROLE_DURATIONS.length === 4, "12 ruoli (con «Nessuna esperienza»), 4 durate");
+  t(S.normalizePastRoles([{ role: "none", duration: "gt5" }]).length === 1 && S.normalizePastRoles([{ role: "none" }])[0].duration === null, "nessuna esperienza: senza durata");
+  t(S.normalizePastRoles([{ role: "none" }, { role: "sales", duration: "lt1" }]).map((r) => r.role).join() === "sales", "nessuna esperienza esclusa se c'è un ruolo");
 
   // normalizePersonInput: skillLevels → skills ClickUp; learnWish max 2; pastRoles; otherSkills max 500
   const r = normalizePersonInput({ skillLevels: { "OF Messaging": "Esperto", ads_meta: "Base", Zapier: "Autonomo" }, learnWish: ["Copywriting", "ai_coding", "ads_meta"], pastRoles: [{ role: "team_lead", duration: "3to5" }], otherSkills: "x".repeat(800) });
@@ -1017,11 +1020,11 @@ console.log(`hr-people: ${n} asserzioni OK`);
 
   // 2b) incidente 04/10: un campo creato DOPO su ClickUp (vuoto) non deve svuotare l'app,
   //     e il controllo di parità lo riempie con il valore dell'app
-  await H.savePerson({ id: sara.id, input: { source: "Ho visto un annuncio" }, actor: "admin", source: "app" });
-  FIELDS_META.push({ id: "f-prov", name: "Provenienza", type: "drop_down", type_config: { options: [{ id: "o-ref", name: "Me l'ha consigliato qualcuno", orderindex: 0 }, { id: "o-alt", name: "Ho visto un annuncio", orderindex: 1 }] } });
+  await H.savePerson({ id: sara.id, input: { source: "Ho visto un annuncio o un post sui social" }, actor: "admin", source: "app" });
+  FIELDS_META.push({ id: "f-prov", name: "Provenienza", type: "drop_down", type_config: { options: [{ id: "o-ref", name: "Me l'ha consigliato qualcuno", orderindex: 0 }, { id: "o-alt", name: "Ho visto un annuncio o un post sui social", orderindex: 1 }] } });
   const recNew = await H.importFromClickup({ mode: "import", by: "test" });
   const sNew = await H.getPerson(sara.id);
-  t(sNew.fields.source === "Ho visto un annuncio", "campo nuovo e vuoto su ClickUp: il valore dell'app resta");
+  t(sNew.fields.source === "Ho visto un annuncio o un post sui social", "campo nuovo e vuoto su ClickUp: il valore dell'app resta");
   t(recNew.parityChecked >= 1 && recNew.drift.length === 0 && cu.tasks.get(taskId).values["f-prov"] === "o-alt", "parità: il campo nuovo su ClickUp viene riempito dall'app");
   FIELDS_META.pop();
 

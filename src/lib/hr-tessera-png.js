@@ -1,6 +1,8 @@
 /**
- * "Salva la tua tessera" (03/10/2026): disegna il FRONTE della tessera D1 in un PNG
- * 1080×680 con Canvas 2D (nessuna libreria, nessuna cattura dello schermo) e lo
+ * "Salva la tua tessera" (03/10/2026): disegna la tessera D1 con Canvas 2D.
+ * 05/10/2026 (Nicholas: «si salva solo il fronte»): l'immagine salvata ha FRONTE e RETRO
+ * uno sotto l'altro (1200×1640), così nella galleria c'è la tessera intera. Prima era un PNG
+ * 1080×680 del solo fronte (nessuna libreria, nessuna cattura dello schermo) e lo
  * condivide (telefono: foglio di condivisione → su iPhone "Salva immagine" in Foto)
  * o lo scarica.
  *
@@ -15,7 +17,7 @@
  * Solo browser: importarla lato client (usa document, canvas, navigator).
  */
 import { HOC_PALMA_PATH, HOC_PALMA_W } from "@/components/HocPalma";
-import { tesseraName, tesseraLine } from "@/lib/hr-welcome-card";
+import { tesseraName, tesseraLine, tesseraRows, memberSince } from "@/lib/hr-welcome-card";
 import { guillochePaths } from "@/lib/tessera-material";
 
 export const PNG_W = 1080;
@@ -67,16 +69,8 @@ function ellipsize(ctx, text, max) {
 }
 
 /** Disegna la tessera e restituisce il canvas. */
-export async function drawTesseraCanvas(data = {}, at = Date.now()) {
-  const serif = cssFamily("--f-display", "'Instrument Serif', Georgia, 'Times New Roman', serif");
-  const sans = cssFamily("--f-sans", "Manrope, 'Helvetica Neue', Arial, sans-serif");
-  const s = PNG_W / BASE_W;
-  await fontsReady([`${Math.round(28 * s)}px ${serif}`, `500 ${Math.round(11 * s)}px ${sans}`]);
-
-  const c = document.createElement("canvas");
-  c.width = PNG_W;
-  c.height = PNG_H;
-  const ctx = c.getContext("2d");
+/** Fondo comune alle due facce: radiale, trama guilloché (guil = intensità), grana, luce, bordo. */
+function drawMaterial(ctx, s, guil) {
   const R = 16 * s;
 
   // sfondo (stesso radiale della tessera a schermo) + bordo
@@ -94,7 +88,7 @@ export async function drawTesseraCanvas(data = {}, at = Date.now()) {
     ctx.scale(s, s);
     ctx.lineWidth = 0.5;
     for (const p of guillochePaths()) {
-      ctx.strokeStyle = `rgba(217,180,106,${(p.alpha * 0.75).toFixed(3)})`;
+      ctx.strokeStyle = `rgba(217,180,106,${(p.alpha * guil).toFixed(3)})`;
       ctx.stroke(new Path2D(p.d));
     }
     ctx.restore();
@@ -134,6 +128,20 @@ export async function drawTesseraCanvas(data = {}, at = Date.now()) {
   ctx.strokeStyle = rim;
   ctx.lineWidth = s;
   ctx.stroke();
+
+}
+
+export async function drawTesseraCanvas(data = {}, at = Date.now()) {
+  const serif = cssFamily("--f-display", "'Instrument Serif', Georgia, 'Times New Roman', serif");
+  const sans = cssFamily("--f-sans", "Manrope, 'Helvetica Neue', Arial, sans-serif");
+  const s = PNG_W / BASE_W;
+  await fontsReady([`${Math.round(28 * s)}px ${serif}`, `500 ${Math.round(11 * s)}px ${sans}`]);
+
+  const c = document.createElement("canvas");
+  c.width = PNG_W;
+  c.height = PNG_H;
+  const ctx = c.getContext("2d");
+  drawMaterial(ctx, s, 0.75);
 
   // palma oro in alto a sinistra (78px a misura schermo)
   try {
@@ -202,6 +210,85 @@ export async function drawTesseraCanvas(data = {}, at = Date.now()) {
   return c;
 }
 
+/** Retro: intestazione, righe dichiarate (competenze più forti e lingue), come a schermo. */
+export async function drawTesseraBackCanvas(data = {}, at = Date.now()) {
+  const serif = cssFamily("--f-display", "'Instrument Serif', Georgia, 'Times New Roman', serif");
+  const sans = cssFamily("--f-sans", "Manrope, 'Helvetica Neue', Arial, sans-serif");
+  const s = PNG_W / BASE_W;
+  await fontsReady([`italic ${Math.round(17 * s)}px ${serif}`, `400 ${Math.round(12.5 * s)}px ${sans}`]);
+  const c = document.createElement("canvas");
+  c.width = PNG_W;
+  c.height = PNG_H;
+  const ctx = c.getContext("2d");
+  drawMaterial(ctx, s, 0.32);
+  // intestazione: "House of Creators" a sinistra, piccola palma a destra
+  ctx.fillStyle = "#d9b46a";
+  ctx.textBaseline = "top";
+  ctx.font = `500 ${9.5 * s}px ${sans}`;
+  spacedText(ctx, String(memberSince(at)).toUpperCase(), 20 * s, 20 * s, 0.2 * 9.5 * s);
+  try {
+    const p = new Path2D(HOC_PALMA_PATH);
+    ctx.save();
+    const k = (30 * s) / HOC_PALMA_W;
+    ctx.translate(PNG_W - 20 * s - 30 * s, 16 * s);
+    ctx.scale(k, k);
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = "#d9b46a";
+    ctx.fill(p);
+    ctx.restore();
+  } catch { /* niente palma */ }
+  const rows = tesseraRows(data);
+  const left = 20 * s, right = PNG_W - 20 * s;
+  let y = 44 * s;
+  ctx.textBaseline = "middle";
+  if (!rows.length) {
+    ctx.fillStyle = "rgba(242,238,230,.38)";
+    ctx.font = `italic 400 ${17 * s}px ${serif}`;
+    ctx.fillText("Le tue competenze e le lingue compariranno qui.", left, y + 30 * s);
+  }
+  const rowH = 25 * s;
+  rows.forEach((row, i) => {
+    if (i) { ctx.fillStyle = "rgba(217,180,106,.14)"; ctx.fillRect(left, y, right - left, Math.max(1, s / 2)); }
+    const mid = y + rowH / 2;
+    ctx.font = `400 ${12.5 * s}px ${sans}`;
+    let valueW = 0;
+    if (row.value) {
+      ctx.fillStyle = "#e3cd9c";
+      ctx.textAlign = "right";
+      ctx.fillText(row.value, right, mid);
+      valueW = ctx.measureText(row.value).width + 12 * s;
+      ctx.textAlign = "left";
+    }
+    ctx.fillStyle = "#f2eee6";
+    ctx.fillText(ellipsize(ctx, row.label, right - left - valueW), left, mid);
+    y += rowH;
+  });
+  return c;
+}
+
+/** Un'immagine sola con fronte e retro, uno sotto l'altro, su fondo scuro. */
+export async function drawTesseraSheet(data = {}, at = Date.now()) {
+  const [front, back] = await Promise.all([drawTesseraCanvas(data, at), drawTesseraBackCanvas(data, at)]);
+  const pad = 60, gap = 60;
+  const c = document.createElement("canvas");
+  c.width = PNG_W + pad * 2;
+  c.height = PNG_H * 2 + pad * 2 + gap;
+  const ctx = c.getContext("2d");
+  const bg = ctx.createRadialGradient(c.width / 2, 0, 0, c.width / 2, 0, c.height);
+  bg.addColorStop(0, "#17161c"); bg.addColorStop(0.55, "#0b0c10"); bg.addColorStop(1, "#0b0c10");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, c.width, c.height);
+  for (const [img, y] of [[front, pad], [back, pad + PNG_H + gap]]) {
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,.55)";
+    ctx.shadowBlur = 40;
+    ctx.shadowOffsetY = 18;
+    ctx.drawImage(img, pad, y);
+    ctx.restore();
+  }
+  return c;
+}
+
 function fileName(data) {
   const n = tesseraName(data).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   return `tessera-house-of-creators${n ? `-${n}` : ""}.png`;
@@ -212,7 +299,7 @@ function fileName(data) {
  * altrimenti download. Restituisce "shared" | "downloaded" | "cancelled".
  */
 export async function saveTesseraPng(data = {}, at = Date.now()) {
-  const canvas = await drawTesseraCanvas(data, at);
+  const canvas = await drawTesseraSheet(data, at);
   const blob = await new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error("Immagine non creata."))), "image/png"));
   const name = fileName(data);
   let coarse = false;

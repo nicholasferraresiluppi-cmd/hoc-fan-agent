@@ -12,7 +12,7 @@
  */
 import { normalizeSkillMap, normalizeLearnList, normalizePastRoles, clickupSkillLabels, skillName, pastRoleText } from "./hr-skills.js";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { FIELDS, FIELD_BY_KEY, EDITABLE_KEYS, validateCodiceFiscale, findChoice, SOURCE_REFERRAL, isLangNo } from "./hr-fields.js";
+import { FIELDS, FIELD_BY_KEY, EDITABLE_KEYS, validateCodiceFiscale, findChoice, SOURCE_REFERRAL, isLangNo, canonicalSource } from "./hr-fields.js";
 
 // Schema e codice fiscale vivono in hr-fields.js (senza dipendenze Node: li
 // importano anche le pagine client). Qui si riesportano per comodità.
@@ -128,6 +128,7 @@ const asList = (v) => (Array.isArray(v) ? v : s(v) ? s(v).split(",") : []).map(s
  * @returns {{ values: object, cf: string|null|undefined, errors: string[] }}
  */
 export function normalizePersonInput(input = {}, allowed = EDITABLE_KEYS) {
+  if (input && "source" in input) input = { ...input, source: canonicalSource(input.source) };
   const values = {};
   const errors = [];
   let cf;
