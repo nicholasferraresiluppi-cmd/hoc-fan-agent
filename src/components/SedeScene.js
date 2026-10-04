@@ -77,7 +77,7 @@ const STATE = {
   persona: { c: 0xd9b46a, css: "var(--gold)", t: "Persona" },
 };
 const TIPO = { persona: "Persona", AI: "Agente AI", codice: "Programma", robot: "Robot" };
-const FLOOR_ORDER = ["dati", "vendite", "persone", "controllo", "direzione"];
+const FLOOR_ORDER = ["dati", "vendite", "formazione", "persone", "controllo", "direzione"];
 const FILTERS = [
   { k: null, l: "Tutto l'edificio" },
   { k: "fermi", l: "Fermi o in ritardo" },
@@ -136,7 +136,7 @@ function mountSede(root, D, THREE, OrbitControls) {
 
   // ── edificio
   const floors = FLOOR_ORDER.map((id) => D.floors.find((f) => f.id === id)).filter(Boolean);
-  const FH = 2.5, BW = 16, BD = 9;
+  const FH = 3.4, BW = 16, BD = 9;
   const glass = new THREE.MeshStandardMaterial({ color: 0x1c1d24, transparent: true, opacity: 0.55, roughness: 0.25, metalness: 0.2 });
   const edgeMat = new THREE.LineBasicMaterial({ color: 0xd9b46a, transparent: true, opacity: 0.28 });
   const slabGeo = new THREE.BoxGeometry(BW + 1.2, 0.14, BD + 1.2);
@@ -146,7 +146,7 @@ function mountSede(root, D, THREE, OrbitControls) {
     const slab = new THREE.Mesh(slabGeo, glass); slab.position.set(0, y, 0); scene.add(slab);
     const se = new THREE.LineSegments(new THREE.EdgesGeometry(slabGeo), edgeMat); se.position.copy(slab.position); scene.add(se);
     const fl = document.createElement("div"); fl.className = "fl"; fl.textContent = f.nome; labels.appendChild(fl);
-    floorLabels.push({ el: fl, pos: new THREE.Vector3(-BW / 2 - 0.6, y + 0.9, BD / 2 + 0.6) });
+    floorLabels.push({ el: fl, pos: new THREE.Vector3(-BW / 2 - 0.6, y + 0.25, BD / 2 + 0.6) });
     const list = D.offices.filter((o) => o.piano === f.id);
     const cols = Math.min(4, Math.max(1, list.length)), rows = Math.ceil(list.length / cols);
     const cw = BW / cols, cd = BD / rows;
@@ -173,7 +173,7 @@ function mountSede(root, D, THREE, OrbitControls) {
       const lb = document.createElement("div"); lb.className = "lb";
       lb.innerHTML = `<b>${esc(o.nome)}</b>` + (isBad(o) ? `<div class="bub warn">${esc((o.buchi.find((b) => b.tipo === "uscita" || b.tipo === "ritardo") || {}).testo || STATE[o.stato]?.t || "")}</div>` : "");
       labels.appendChild(lb);
-      const R = { o, g, box, boxMat, edges, floorLight, pl, lb, pos: new THREE.Vector3(x, y + rh + 0.35, z), center: new THREE.Vector3(x, y + 0.9, z), base: st.c };
+      const R = { o, g, box, boxMat, edges, floorLight, pl, lb, pos: new THREE.Vector3(x, y + 0.35, z + rd / 2), center: new THREE.Vector3(x, y + 0.9, z), base: st.c };
       box.userData.R = R; rooms.push(R); roomById[o.id] = R;
     });
   });
