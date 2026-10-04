@@ -73,7 +73,7 @@ THEMES.executive = {
   ...THEMES.attico, label: "Executive",
   env: { layout: "rooms", floor: "marble", walls: "plain", windows: "tall", room: { wall: "dark", frame: 0xd9b46a, glass: 0x2a2620, op: .42, floor: "walnut", back: 0x1b1a18 } },
 };
-const THEME_ORDER = ["trading", "vetro", "legno", "executive"];
+const THEME_ORDER = ["vetro", "legno", "executive", "trading"];
 // colore d'accento per area: filo sulla porta e bordo dell'insegna (riconosci la stanza a colpo d'occhio)
 const ACCENT = { dati: "#6fb3ff", vendite: "#4fbf78", formazione: "#f0b060", persone: "#e07aa8", controllo: "#b9aef9", direzione: "#d9b46a" };
 // disposizioni: centro di ogni area [x, z] e angolo relax
@@ -598,7 +598,7 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
 
 export default function SedeSala({ data, onView }) {
   const ref = useRef(null);
-  const [theme, setTheme] = useState("trading");
+  const [theme, setTheme] = useState("vetro"); // si parte dalle stanze (Nicholas, 4/10); il Trading floor resta come alternativa
   const [err, setErr] = useState(false);
   useEffect(() => { try { const t = localStorage.getItem("hoc:sede-ufficio"); if (t && THEME_ORDER.includes(t)) setTheme(t); } catch { /* */ } }, []);
   const pick = (t) => { setTheme(t); try { localStorage.setItem("hoc:sede-ufficio", t); } catch { /* */ } };
