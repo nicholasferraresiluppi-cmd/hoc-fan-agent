@@ -26,7 +26,7 @@ const req = () => {
     birthPlace: { abroad: false, name: "Roma", prov: "RM", code: "H501" },
     residenceComune: { abroad: true, country: "Spagna" }, location: "Calle Mayor 1", residenceCap: "28013",
     personalEmail: `req${REQ_N}@example.com`, personalPhone: `+39 333 000 ${String(1000 + REQ_N)}`,
-    partitaIva: false, spokenLanguages: ["Italiano"], timeSlots: ["17:00 - 22:00"],
+    partitaIva: false, spokenLanguages: ["Italiano"],
     skillLevels: { of_chat: "Base" }, source: "Altro",
   };
 };
@@ -205,6 +205,7 @@ eq(stripHocBlock(withHocBlock("A", ["x: 1"])), "A", "blocco rimovibile");
   ok(normalizePersonInput({ collaborationStatus: "Boh" }).errors.length === 1, "input: fase inesistente rifiutata");
   eq(normalizePersonInput({ collaborationStatus: "" }).values.collaborationStatus, null, "input: fase svuotata");
   ok(!F.FORM_KEYS.includes("hvContractStatus") && !F.FORM_KEYS.includes("collaborationStatus"), "contratto e fase NON sono nel modulo pubblico");
+  ok(!F.FORM_KEYS.includes("timeSlots"), "fasce orarie fuori dal modulo (04/10)");
   ok(F.FORM_KEYS.includes("source") && F.FORM_KEYS.includes("referredBy"), "provenienza e reference sono nel modulo");
   ok(F.SOURCES[0] === F.SOURCE_REFERRAL && F.FIELD_BY_KEY.source.cu === "Provenienza" && F.FIELD_BY_KEY.referredBy.cu === "Segnalato da", "provenienza: prima voce = reference, campi ClickUp per nome");
   {
