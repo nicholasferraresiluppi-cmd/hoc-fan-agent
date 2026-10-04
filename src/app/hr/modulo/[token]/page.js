@@ -195,6 +195,8 @@ function SplashOverlay() {
   const guil = { position: "absolute", inset: 0, background: `url("${guillocheDataUri()}") 0 0/100% 100% no-repeat`, opacity: 0.75 };
   return (
     <div className={`hrf-splash${phase === "leaving" ? " is-leaving" : ""}`} aria-hidden={phase === "leaving"}>
+      {/* istante in cui l'apertura è stata letta dal browser = inizio delle animazioni CSS */}
+      <script dangerouslySetInnerHTML={{ __html: "window.__hrfT0=window.__hrfT0||performance.now()" }} />
       <div className="hrf-sun" />
       <div className="hrf-splash-inner" style={{ display: "grid", justifyItems: "center", gap: 22 }}>
         <HocLogo size={22} color="#f2eee6" letters className="hrf-alba" />
@@ -257,8 +259,16 @@ export default function HrFormPage() {
     // l'apertura durava 0,9 s senza luce: era quello che si vedeva dal telefono.
     // la sequenza (CSS) parte quando la pagina si disegna e finisce a ~5,5 s: si conta da
     // lì (performance.now ≈ dall'apertura), con un minimo per non tagliare la tessera
+    // 05/10/2026 (telefono, link aperto da WhatsApp): si conta da quando la pagina è stata
+    // DISEGNATA (__hrfT0, scritto da uno script dentro l'apertura mentre il browser legge
+    // l'HTML), non dall'inizio della navigazione: sul telefono tra il tocco e il primo
+    // disegno passa più di un secondo e la tessera si vedeva solo per mezzo secondo.
     let wait = 5600;
-    try { wait = Math.max(1200, 5600 - performance.now()); } catch { /* */ }
+    try {
+      const t0 = typeof window.__hrfT0 === "number" ? window.__hrfT0
+        : (performance.getEntriesByName("first-contentful-paint")[0]?.startTime ?? 0);
+      wait = Math.max(1200, t0 + 5600 - performance.now());
+    } catch { /* */ }
     const t = setTimeout(() => setSplashTimeUp(true), wait);
     return () => clearTimeout(t);
   }, []);
