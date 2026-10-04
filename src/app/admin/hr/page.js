@@ -387,6 +387,14 @@ function SharedLinkBox({ onChanged }) {
             <summary style={{ cursor: "pointer" }}>Link completo{link.createdAt ? ` · creato il ${fmtDateTime(link.createdAt)}` : ""}</summary>
             <div style={{ marginTop: 8 }}><CopyLink link={url} /></div>
           </details>
+          {/* 05/10/2026: provare una sola parte del modulo senza compilarlo tutto (dati finti, non si invia nulla) */}
+          <div style={{ fontSize: 12.5, color: CP.textMuted }}>
+            Prova una sezione (dati finti, non si invia nulla):{" "}
+            {[["inizio", "apertura"], ["3", "contatti"], ["6", "esperienza"], ["documenti", "documento"], ["fine", "tessera finale"]].map(([k, n], i) => (
+              <span key={k}>{i ? " · " : ""}<a href={`/tessera?prova=${k}`} target="_blank" rel="noreferrer" style={{ color: CP.accent }}>{n}</a></span>
+            ))}
+            {" "}· dentro la prova puoi passare a qualsiasi sezione.
+          </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" onClick={() => act("regenerate")} disabled={busy} style={{ ...btnGhost, opacity: busy ? 0.5 : 1 }}><RefreshCw size={14} /> Rigenera</button>
             <button type="button" onClick={() => act("disable")} disabled={busy} style={{ ...btnGhost, opacity: busy ? 0.5 : 1 }}><Power size={14} /> Disattiva</button>

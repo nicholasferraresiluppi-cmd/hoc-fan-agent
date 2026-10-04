@@ -61,6 +61,40 @@ const SAMPLE_CARD = {
   residenceComune: { name: "Milano", prov: "MI" },
 };
 
+// «Prova una sezione» (05/10/2026, Nicholas: «non devo rifarmi tutto il modulo»): con ?prova=...
+// il modulo si apre già compilato con dati finti sulla sezione scelta e NON invia, NON salva
+// bozze, NON carica file (il caricamento è simulato). Innocuo anche se qualcuno apre il
+// parametro a mano: nessuna scrittura parte da qui.
+const PROVA_SECTIONS = [
+  ["inizio", "Apertura"], ["1", "1 · Chi sei"], ["2", "2 · Dove vivi"], ["3", "3 · Contatti"], ["4", "4 · Lavoro e lingue"],
+  ["5", "5 · Competenze"], ["6", "6 · Esperienza"], ["7", "7 · Privacy"], ["documenti", "8 · Documento"], ["fine", "Tessera finale"],
+];
+const PROVA_DATA = {
+  firstName: "Giulia", surname: "Rossi", dateOfBirth: "1998-05-12", gender: "Female", nationality: "Italy",
+  birthPlace: { abroad: false, name: "Roma", prov: "RM", code: "H501", region: "Lazio" },
+  residenceComune: { abroad: false, name: "Milano", prov: "MI", code: "F205", region: "Lombardia" },
+  location: "Via Roma 1", residenceCap: "20121", personalEmail: "giulia.rossi@example.com", personalPhone: "+39 333 1234567",
+  partitaIva: false, spokenLanguages: ["ITA - Native", "ENG - Advanced", "SPA - No", "TED - No", "FR - Basic"],
+  skillLevels: { of_chat: "Esperto", soc_instagram: "Autonomo" }, pastRoles: [{ role: "sales", duration: "1to3" }],
+  source: "Me l'ha consigliato qualcuno", referredBy: "Marta Bianchi",
+};
+function provaParam() {
+  try { const v = new URLSearchParams(window.location.search).get("prova"); return PROVA_SECTIONS.some(([k]) => k === v) ? v : null; } catch { return null; }
+}
+
+function ProvaBar({ current }) {
+  return (
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 70, padding: "8px 16px", background: "rgba(217,180,106,.14)", borderBottom: "1px solid rgba(217,180,106,.35)", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", fontSize: 12.5, color: "#f2eee6", backdropFilter: "blur(6px)" }}>
+      <span style={{ color: GOLD, fontWeight: 600 }}>Prova</span>
+      <span style={{ color: "rgba(242,238,230,.7)" }}>dati finti, niente si invia</span>
+      <select aria-label="Sezione da provare" value={current} onChange={(e) => { const u = new URL(window.location.href); u.searchParams.set("prova", e.target.value); window.location.assign(u.toString()); }}
+        style={{ marginLeft: "auto", background: "#16161b", color: "#f2eee6", border: "1px solid rgba(242,238,230,.25)", borderRadius: 8, padding: "4px 8px", fontSize: 12.5 }}>
+        {PROVA_SECTIONS.map(([k, n]) => <option key={k} value={k}>{n}</option>)}
+      </select>
+    </div>
+  );
+}
+
 const STEPS = [
   { title: "Chi sei", sub: "partiamo dalle basi", keys: ["firstName", "surname", "dateOfBirth", "gender", "nationality", "birthPlace", "codiceFiscale"] },
   { title: "Dove vivi", sub: "ci serve per i documenti", keys: ["residenceComune", "location", "residenceCap"] },
@@ -361,13 +395,27 @@ export default function HrFormPage() {
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [canSave, setCanSave] = useState(false); // il browser può tenere la bozza? (in privata può non riuscire)
   const formRef = useRef(null);
+  const [prova, setProva] = useState(null);
 
   useEffect(() => {
     let alive = true;
+    const pv = provaParam();
     fetch(`/api/hr/modulo/${token}`).then(async (r) => {
       const j = await r.json().catch(() => ({}));
       if (!alive) return;
       if (!r.ok || !j.ok) { setLoadErr(j.error || "Link non valido."); return; }
+      if (pv) {
+        // prova: niente bozze, niente codice fiscale richiesto, documenti simulati
+        setProva(pv);
+        setData({ ...PROVA_DATA });
+        setConsent(pv === "7");
+        if (/^[1-7]$/.test(pv)) { setStep(Number(pv) - 1); setStage("form"); }
+        else if (pv === "documenti") setStage("files");
+        else if (pv === "fine") { setSentAt(Date.now()); setStage("done"); }
+        if (pv !== "inizio") setSplashPhase("gone");
+        setCtx({ ...j, done: false, shared: true, cfEnabled: false, cfPresent: false, uploadsEnabled: true, prefill: {} });
+        return;
+      }
       const key = draftKey(token);
       const okSave = safeSet(`${key}:prova`, "1");
       safeRemove(`${key}:prova`);
@@ -396,7 +444,7 @@ export default function HrFormPage() {
 
   // salva la bozza mentre si compila (piccolo ritardo: niente scritture a ogni tasto)
   useEffect(() => {
-    if (!ctx || stage !== "form") return undefined;
+    if (!ctx || stage !== "form" || prova) return undefined;
     const id = setTimeout(() => {
       if (draftWorthSaving({ data, step })) safeSet(draftKey(token), serializeDraft({ data, step, stage }));
     }, 300);
@@ -492,6 +540,7 @@ export default function HrFormPage() {
       setFocusKey("consent");
       return;
     }
+    if (prova) { setSentAt(Date.now()); setStage("files"); try { window.scrollTo({ top: 0 }); } catch { /* */ } return; }
     setBusy(true);
     try {
       const r = await fetch(`/api/hr/modulo/${token}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data, consent: true }) });
@@ -519,6 +568,8 @@ export default function HrFormPage() {
     : !ctx ? <Shell>{null}</Shell> : renderStage();
   return (
     <SplashCtx.Provider value={splashPhase}>
+      {prova && <ProvaBar current={prova} />}
+      {prova && <div style={{ height: 40, background: "#0b0c10" }} />}
       <div key="page">{page}</div>
       <SplashOverlay key="splash" />
     </SplashCtx.Provider>
@@ -529,7 +580,7 @@ export default function HrFormPage() {
     return (
       <Shell>
         <div style={{ display: "grid", gap: 22, paddingTop: 12 }}>
-          <HrWelcomeCard data={data} at={sentAt || Date.now()}>
+          <HrWelcomeCard data={data} at={sentAt || Date.now()} extra={<TesseraLinkButton token={uploadToken || token} prova={Boolean(prova)} />}>
             <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15.5, lineHeight: 1.55, maxWidth: 460 }}>
               Questa è la tua tessera. Abbiamo ricevuto tutto.{" "}
               {ctx.shared
@@ -545,7 +596,7 @@ export default function HrFormPage() {
     );
   }
 
-  if (stage === "files") return <Shell><FilesStep token={uploadToken || token} data={data} total={STEPS.length + 1} onDone={() => { try { window.scrollTo({ top: 0, behavior: "auto" }); } catch { /* */ } setStage("done"); }} /></Shell>;
+  if (stage === "files") return <Shell><FilesStep token={uploadToken || token} data={data} prova={Boolean(prova)} total={STEPS.length + 1} onDone={() => { try { window.scrollTo({ top: 0, behavior: "auto" }); } catch { /* */ } setStage("done"); }} /></Shell>;
 
   if (stage === "intro") {
     // col link condiviso il nome non lo sappiamo: niente saluto personale
@@ -718,7 +769,47 @@ const DOC_TYPES = {
   ] },
 };
 
-function FilesStep({ token, data, total, onDone }) {
+// «Il link della tua tessera» (05/10/2026): una pagina aperta con la tessera che gira e si
+// illumina, da tenere o mandare. Il link si chiede al server (dati salvati, non quelli del browser).
+function TesseraLinkButton({ token, prova }) {
+  const [state, setState] = useState(null); // null | "busy" | { url } | "messaggio d'errore"
+  const getUrl = async () => {
+    if (prova) return `${window.location.origin}/t/esempio`;
+    const r = await fetch(`/api/hr/modulo/${encodeURIComponent(token)}/tessera-link`, { method: "POST" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || "Non riesco a creare il link. Riprova tra poco.");
+    return `${window.location.origin}${j.path}`;
+  };
+  const go = async () => {
+    setState("busy");
+    try {
+      const url = typeof state === "object" && state?.url ? state.url : await getUrl();
+      let coarse = false;
+      try { coarse = window.matchMedia("(pointer: coarse)").matches; } catch { /* */ }
+      if (coarse && navigator.share) {
+        try { await navigator.share({ title: "La mia tessera di House of Creators", url }); setState({ url, done: "condiviso" }); return; }
+        catch (e) { if (e?.name === "AbortError") { setState({ url }); return; } }
+      }
+      try { await navigator.clipboard.writeText(url); setState({ url, done: "copiato" }); } catch { setState({ url }); }
+    } catch (e) { setState(e.message); }
+  };
+  return (
+    <div style={{ display: "grid", gap: 6, justifyItems: "center" }}>
+      <button type="button" onClick={go} disabled={state === "busy"} style={{ ...pill(false), height: 44, fontSize: 14.5, opacity: state === "busy" ? 0.6 : 1 }}>
+        {state === "busy" ? "Preparo il link…" : "Il link della tua tessera"}
+      </button>
+      {state && typeof state === "object" && (
+        <div style={{ fontSize: 12.5, color: "rgba(242,238,230,.6)", maxWidth: 320, overflowWrap: "anywhere" }}>
+          {state.done === "copiato" ? "Link copiato: " : state.done === "condiviso" ? "Fatto: " : ""}
+          <a href={state.url} target="_blank" rel="noreferrer" style={{ color: GOLD }}>{state.url.replace(/^https?:\/\//, "")}</a>
+        </div>
+      )}
+      {typeof state === "string" && state !== "busy" && <div role="alert" style={{ fontSize: 13, color: ERR_COLOR }}>{state}</div>}
+    </div>
+  );
+}
+
+function FilesStep({ token, data, total, onDone, prova = false }) {
   // 05/10/2026 (Nicholas): si sceglie il documento. Carta = fronte + retro (due caricamenti, anche lo
   // stesso PDF due volte), passaporto = una foto. Con un esempio disegnato per ciascun lato.
   const [docType, setDocType] = useState(null);
@@ -728,6 +819,12 @@ function FilesStep({ token, data, total, onDone }) {
     if (!file) return;
     const set = (v) => setState((s) => ({ ...s, [slot]: v }));
     set({ busy: "riduco", pct: 0 });
+    if (prova) {
+      // prova: caricamento simulato, il file non lascia il telefono
+      for (const pct of [20, 55, 85, 100]) { await new Promise((res) => setTimeout(res, 250)); set({ busy: "carico", pct }); }
+      set("ok");
+      return;
+    }
     try {
       await uploadHrFile(token, kind, file, {
         part,

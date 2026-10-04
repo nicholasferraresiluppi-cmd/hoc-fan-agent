@@ -41,7 +41,7 @@ const btn = (primary) => ({
  * @param data dati dichiarati nel modulo (firstName, surname, gender, currentJob, skillLevels, spokenLanguages, residenceComune)
  * @param at   istante dell'invio (per "dal anno" e "House of Creators · mese anno")
  */
-export default function HrWelcomeCard({ data = {}, at, children }) {
+export default function HrWelcomeCard({ data = {}, at, children, title = null, extra = null }) {
   const [flipped, setFlipped] = useState(true); // true = si vede il dorso (coperta)
   const [covered, setCovered] = useState(true);
   const [glow, setGlow] = useState(false);
@@ -101,7 +101,7 @@ export default function HrWelcomeCard({ data = {}, at, children }) {
         <HrTessera data={data} at={at} flipped={flipped} onFlip={onFlip} covered={covered} glow={glow} glintKey={glint} />
       </div>
       <h1 className={`hwc-title${titleOn ? " is-on" : ""}`} style={{ margin: "8px 0 0", fontFamily: SERIF, fontWeight: 400, fontSize: 40, lineHeight: 1.05, color: IVORY, maxWidth: 480 }}>
-        {welcomeTitle(data)}
+        {title || welcomeTitle(data)}
       </h1>
       {children}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
@@ -109,6 +109,7 @@ export default function HrWelcomeCard({ data = {}, at, children }) {
           {saving === "busy" ? "Preparo l'immagine…" : "Salva la tua tessera"}
         </button>
       </div>
+      {extra}
       {(saving === "shared" || saving === "downloaded") && <div role="status" style={{ fontSize: 13, color: "rgba(242,238,230,.6)" }}>{saving === "downloaded" ? "Fatto: trovi l'immagine tra i download." : "Fatto."}</div>}
       {saving && !["shared", "downloaded", "busy"].includes(saving) && <div role="alert" style={{ fontSize: 13, color: "#e9a99f" }}>{saving}</div>}
       <div style={{ fontSize: 12, color: "rgba(242,238,230,.45)", marginTop: -8 }}>Tocca la tessera per vedere il retro.</div>
