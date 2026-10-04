@@ -15,14 +15,16 @@
  * ripristina. I campi di testo (luogo, comune, CAP, competenze, ruoli, vorrebbe
  * imparare, altro) si modificano qui o su ClickUp.
  */
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
-import { ExternalLink, RefreshCw, Eye, Pencil } from "lucide-react";
+import { ExternalLink, Eye, Pencil, Phone, Mail, MessageCircle } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, Notice, DataTable, SectionTitle, Disclosure, card } from "@/components/ds";
-import { FIELDS, SECTIONS, FIELD_BY_KEY, PHASE_EXITED } from "@/lib/hr-fields";
+import { Notice, DataTable, SectionTitle, card } from "@/components/ds";
+import { FIELDS, FIELD_BY_KEY, PHASE_EXITED } from "@/lib/hr-fields";
+import { readiness, READINESS, initials, avatarColor } from "@/lib/hr-readiness";
+import { normalizeSkillMap, skillName } from "@/lib/hr-skills";
 import { lbl, btnPrimary, btnGhost, SYNC_LABEL, displayValue, FieldInput, fmtDate, fmtDateTime, fetcher, postJson } from "@/components/hr-ui";
 import { RestoreButton, archivedSummary } from "@/components/hr-archive";
 import { ExitButton, ReactivateButton } from "@/components/hr-phase";
@@ -37,13 +39,37 @@ const ACTION_LABEL = {
 const SOURCE_LABEL = { app: "HOC Pro", clickup: "ClickUp", modulo: "Modulo della persona", sistema: "Sistema" };
 const who = (by) => (!by ? "—" : String(by).startsWith("user_") ? `utente …${String(by).slice(-6)}` : by);
 
+// telefono in formato internazionale per WhatsApp (hr-people-core usa node:crypto: qui non si importa)
+const toE164 = (v) => {
+  const raw = String(v || "").trim();
+  const d = raw.replace(/\D/g, "");
+  if (!d) return null;
+  if (raw.startsWith("+")) return `+${d}`;
+  if (raw.startsWith("00")) return `+${d.slice(2)}`;
+  if (/^(3\d{8,9}|0\d{5,10})$/.test(d)) return `+39${d}`;
+  return null;
+};
+
+// Schede della persona (05/10/2026, redesign): ogni dato in un posto solo.
+const SKILL_KEYS = ["skillLevels", "learnWish", "pastRoles", "otherSkills"];
+const TABS = [
+  { key: "panoramica", label: "Panoramica" },
+  { key: "anagrafica", label: "Anagrafica", keys: FIELDS.filter((f) => f.section === "anagrafica").map((f) => f.key) },
+  { key: "lavoro", label: "Lavoro e contratto", keys: FIELDS.filter((f) => (f.section === "rapporto" || f.section === "contratto") && !SKILL_KEYS.includes(f.key) && f.key !== "skills").map((f) => f.key) },
+  { key: "competenze", label: "Competenze", keys: SKILL_KEYS },
+  { key: "documenti", label: "Documenti", keys: FIELDS.filter((f) => f.section === "documenti").map((f) => f.key) },
+  { key: "storico", label: "Storico" },
+];
+
 export default function HrPersonPage() {
   const { id } = useParams();
   const { data, error, isLoading, mutate } = useSWR(id ? `/api/admin/hr/people/${id}` : null, fetcher, { revalidateOnFocus: false });
   const [syncing, setSyncing] = useState(false);
   const [notice, setNotice] = useState(null);
-  const [logOpen, setLogOpen] = useState(true);
+  const [tab, setTab] = useState("panoramica");
+  const [copied, setCopied] = useState(null);
   const p = data?.person;
+  const f = p?.fields || {};
 
   const syncNow = async () => {
     setSyncing(true); setNotice(null);
@@ -52,6 +78,9 @@ export default function HrPersonPage() {
       setNotice({ ok: j.ok, text: j.ok ? "Scheda riportata su ClickUp." : `Sincronizzazione non riuscita: ${j.message || j.status}` });
       await mutate();
     } catch (e) { setNotice({ ok: false, text: e.message }); } finally { setSyncing(false); }
+  };
+  const copy = async (what, text) => {
+    try { await navigator.clipboard.writeText(text); setCopied(what); setTimeout(() => setCopied(null), 1500); } catch { /* niente */ }
   };
 
   const logRows = (data?.log || []).map((r, i) => ({ ...r, id: `${r.at}-${i}` }));
@@ -63,67 +92,140 @@ export default function HrPersonPage() {
     { key: "change", label: "Da → a", sortable: false, render: (r) => (r.from == null && r.to == null ? "" : <span style={{ fontSize: 13 }}><span style={{ color: CP.textMuted }}>{r.from ?? "vuoto"}</span> → {r.to ?? "vuoto"}</span>) },
   ];
 
+  const phone = toE164(f.personalPhone) || f.personalPhone;
+  const syncBad = p && ["error", "partial", "deleted", "missing", "drift"].includes(p.sync?.status);
+  const since = f.startDate ? fmtDate(f.startDate) : p?.createdAt ? fmtDate(p.createdAt) : null;
+  const subtitle = p ? [f.currentJob, since ? `con noi dal ${since}` : null, f.referredBy ? `segnalata/o da ${f.referredBy}` : null].filter(Boolean).join(" · ") : null;
+
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1100, margin: "0 auto", fontFamily: FONTS.body }}>
-      <PageHead
-        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Persone HR", href: "/admin/hr" }, { label: p?.name || "Scheda" }]}
-        title={p?.name || (isLoading ? "Caricamento…" : "Scheda")}
-        subtitle={p ? [p.fields?.currentJob, p.fields?.collaborationStatus].filter(Boolean).join(" · ") || null : null}
-        actions={p && !p.archived && (
-          <>
-            {p.clickupUrl && p.clickupTaskId && <a href={p.clickupUrl} target="_blank" rel="noopener noreferrer" style={btnGhost}><ExternalLink size={14} /> Apri su ClickUp</a>}
-            {data.sync?.enabled && <button type="button" onClick={syncNow} disabled={syncing} style={{ ...btnGhost, opacity: syncing ? 0.5 : 1 }}><RefreshCw size={14} /> {syncing ? "Sincronizzo…" : "Sincronizza ora"}</button>}
-            {p.fields?.collaborationStatus === PHASE_EXITED
-              ? <ReactivateButton person={p} onDone={(j) => { setNotice(phaseNotice(j, "Fase riportata ad Attiva.")); mutate(); }} />
-              : <ExitButton person={p} onDone={(j) => { setNotice(phaseNotice(j, `Segnata come uscita, fine collaborazione il ${fmtDate(j.person?.fields?.endDate)}.`)); mutate(); }} />}
-          </>
-        )}
-      />
+      <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 10 }}><Link href="/admin/hr" style={{ color: CP.textSecondary, textDecoration: "none" }}>← Persone</Link></div>
 
       {error && <Notice danger={error.status !== 403}>{error.status === 403 ? "Pagina riservata agli admin." : error.status === 404 ? <>Scheda non trovata. <Link href="/admin/hr" style={{ color: CP.accentSoftText }}>Torna all'elenco</Link></> : `Non riesco a caricare la scheda: ${error.message}`}</Notice>}
-      {notice && <Notice danger={!notice.ok}>{notice.text}</Notice>}
-
-      {p?.archived && (
-        <section style={{ ...card, padding: "14px 16px", marginBottom: 14, borderLeft: `3px solid ${CP.attn}` }} aria-labelledby="hr-archived-h">
-          <h2 id="hr-archived-h" style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Scheda archiviata</h2>
-          <p style={{ margin: "0 0 4px", fontSize: 14, color: CP.textSecondary }}>{archivedSummary(p)}.</p>
-          <p style={{ margin: "0 0 12px", fontSize: 13, color: CP.textMuted, lineHeight: 1.5 }}>
-            Il suo task su ClickUp è stato cancellato: la scheda non si sincronizza e qui si legge soltanto. Non si cancella mai: la tieni così o la ripristini.
-            Da procedura chi va via non si elimina, si segna «{PHASE_EXITED}».
-          </p>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <RestoreButton person={p} onDone={(j) => { setNotice({ ok: true, text: j.sync?.status === "ok" ? "Scheda ripristinata e riportata su ClickUp." : `Scheda ripristinata. ${j.sync?.message || ""}`.trim() }); mutate(); }} />
-          </div>
-        </section>
-      )}
+      {!p && isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
 
       {p && (
         <>
-          <PhaseCard p={p} />
-          {!p.archived && <SyncCard p={p} enabled={data.sync?.enabled} />}
+          <header style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap", marginBottom: 14 }}>
+            <span aria-hidden="true" style={{ width: 52, height: 52, borderRadius: "50%", background: avatarColor(p.id), color: "#fff", display: "grid", placeItems: "center", fontSize: 18, fontWeight: 600, flex: "0 0 auto" }}>{initials(p.name)}</span>
+            <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+              <h1 style={{ margin: 0, fontSize: 28, fontWeight: 600, color: CP.textPrimary, lineHeight: 1.15 }}>{p.name}</h1>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 6 }}>
+                <PhasePill phase={f.collaborationStatus} />
+                {f.hvContractStatus && <span style={{ fontSize: 12.5, color: CP.textSecondary }}>contratto: {f.hvContractStatus}</span>}
+                {subtitle && <span style={{ fontSize: 13, color: CP.textMuted }}>{subtitle}</span>}
+              </div>
+            </div>
+            {!p.archived && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {phone && <button type="button" onClick={() => copy("tel", phone)} style={btnGhost}><Phone size={14} /> {copied === "tel" ? "Copiato" : "Copia telefono"}</button>}
+                {phone && String(phone).startsWith("+") && <a href={`https://wa.me/${String(phone).replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" style={btnGhost}><MessageCircle size={14} /> WhatsApp</a>}
+                {f.personalEmail && <button type="button" onClick={() => copy("mail", f.personalEmail)} style={btnGhost}><Mail size={14} /> {copied === "mail" ? "Copiata" : "Copia email"}</button>}
+                {p.clickupUrl && p.clickupTaskId && <a href={p.clickupUrl} target="_blank" rel="noopener noreferrer" style={btnGhost}><ExternalLink size={14} /> ClickUp</a>}
+                {f.collaborationStatus === PHASE_EXITED
+                  ? <ReactivateButton person={p} onDone={(j) => { setNotice(phaseNotice(j, "Fase riportata ad Attiva.")); mutate(); }} />
+                  : <ExitButton person={p} onDone={(j) => { setNotice(phaseNotice(j, `Segnata come uscita, fine collaborazione il ${fmtDate(j.person?.fields?.endDate)}.`)); mutate(); }} />}
+              </div>
+            )}
+          </header>
 
-          {data.flags?.includes("spazzatura") && <Notice>Scheda quasi vuota (nome di 1-2 lettere, nessuna email). In HOC Pro non si elimina: se è un task di prova o sbagliato, sistemalo su ClickUp (se cancelli il task, qui la scheda va tra le Archiviate).</Notice>}
+          {notice && <Notice danger={!notice.ok}>{notice.text}</Notice>}
+          {syncBad && (
+            <Notice danger>
+              ClickUp: {SYNC_LABEL[p.sync?.status] || p.sync?.status}{p.sync?.message ? ` — ${p.sync.message}` : ""}. Il sistema riprova da solo.{" "}
+              {data.sync?.enabled && <button type="button" onClick={syncNow} disabled={syncing} style={{ background: "none", border: 0, padding: 0, color: CP.accentSoftText, cursor: "pointer", fontSize: 14 }}>{syncing ? "Riprovo…" : "Riprova adesso"}</button>}
+            </Notice>
+          )}
+
+          {p.archived && (
+            <section style={{ ...card, padding: "14px 16px", marginBottom: 14, borderLeft: `3px solid ${CP.attn}` }} aria-labelledby="hr-archived-h">
+              <h2 id="hr-archived-h" style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Scheda archiviata</h2>
+              <p style={{ margin: "0 0 4px", fontSize: 14, color: CP.textSecondary }}>{archivedSummary(p)}.</p>
+              <p style={{ margin: "0 0 12px", fontSize: 13, color: CP.textMuted, lineHeight: 1.5 }}>
+                Il suo task su ClickUp è stato cancellato: la scheda non si sincronizza e qui si legge soltanto. Non si cancella mai: la tieni così o la ripristini.
+              </p>
+              <RestoreButton person={p} onDone={(j) => { setNotice({ ok: true, text: j.sync?.status === "ok" ? "Scheda ripristinata e riportata su ClickUp." : `Scheda ripristinata. ${j.sync?.message || ""}`.trim() }); mutate(); }} />
+            </section>
+          )}
+          {data.flags?.includes("spazzatura") && <Notice>Scheda quasi vuota (nome di 1-2 lettere, nessuna email). Se è una prova o un errore, portala in «Uscita».</Notice>}
           {data.duplicates && (
             <Notice>
               Possibile doppione (stesso {data.duplicates.reasons.join(" + ")}) di{" "}
               {data.duplicates.others.map((o, i) => <span key={o.id}>{i > 0 && ", "}<Link href={`/admin/hr/${o.id}`} style={{ color: CP.accentSoftText }}>{o.name}</Link></span>)}.
-              Decidi quale tenere e sistema il doppione su ClickUp: se cancelli lì il task in più, qui la sua scheda va tra le Archiviate.
+              Decidi quale tenere; quella in più la porti in «Uscita».
             </Notice>
           )}
 
-          {SECTIONS.map((s) => (
-            <Section key={s.key} section={s} person={p} options={data.options || {}} crypto={data.crypto} incoming={data.incoming || []} locked={Boolean(p.archived)} onSaved={(j) => { mutate(); setNotice(j.notice); }} />
-          ))}
+          <div role="tablist" aria-label="Sezioni della scheda" style={{ display: "flex", gap: 2, borderBottom: `1px solid ${CP.border}`, overflowX: "auto", marginBottom: 14 }}>
+            {TABS.map((t) => (
+              <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}
+                style={{ background: "none", border: 0, borderBottom: `2px solid ${tab === t.key ? CP.accent : "transparent"}`, padding: "9px 12px", marginBottom: -1, cursor: "pointer", fontFamily: FONTS.body, fontSize: 14, whiteSpace: "nowrap", color: tab === t.key ? CP.textPrimary : CP.textSecondary, fontWeight: tab === t.key ? 500 : 400 }}>
+                {t.label}{t.key === "storico" ? <span style={{ color: CP.textMuted, fontSize: 12.5 }}> {logRows.length}</span> : null}
+              </button>
+            ))}
+          </div>
 
-          <Disclosure open={logOpen} onToggle={() => setLogOpen(!logOpen)} title="Storico modifiche" summary={`${logRows.length} voci`}>
-            <DataTable columns={logCols} rows={logRows} defaultSort={{ key: "at", dir: -1 }} minWidth={720} maxHeight={480} empty="Nessuna modifica registrata." />
-            <p style={{ fontSize: 12, color: CP.textMuted, margin: "8px 0 0" }}>Il codice fiscale non compare mai in chiaro nello storico. Si tengono le ultime 500 voci.</p>
-          </Disclosure>
+          {tab === "panoramica" && <Overview p={p} onGo={setTab} />}
+          {TABS.filter((t) => t.keys && t.key === tab).map((t) => (
+            <Section key={t.key} title={t.label} keys={t.keys} person={p} options={data.options || {}} crypto={data.crypto} incoming={data.incoming || []} locked={Boolean(p.archived)} onSaved={(j) => { mutate(); setNotice(j.notice); }} />
+          ))}
+          {tab === "storico" && (
+            <section style={{ ...card, padding: "14px 16px" }}>
+              <DataTable columns={logCols} rows={logRows} defaultSort={{ key: "at", dir: -1 }} minWidth={720} maxHeight={560} empty="Nessuna modifica registrata." />
+              <p style={{ fontSize: 12, color: CP.textMuted, margin: "8px 0 0" }}>Il codice fiscale non compare mai in chiaro nello storico. Si tengono le ultime 500 voci.</p>
+            </section>
+          )}
         </>
       )}
-
     </div>
   );
+}
+
+/** Panoramica: cosa manca nei dati + l'essenziale. */
+function Overview({ p, onGo }) {
+  const f = p.fields || {};
+  const r = readiness(f);
+  const GO = { document: "documenti", contract: "lavoro", referent: "lavoro", project: "lavoro", job: "lavoro" };
+  const langs = (f.spokenLanguages || []).map((x) => String(x).replace(" - ", " ")).join(", ");
+  const skills = Object.entries(normalizeSkillMap(f.skillLevels)).filter(([, lv]) => ["Esperto", "Posso insegnarla"].includes(lv)).map(([k]) => skillName(k)).slice(0, 4);
+  const rows = [
+    ["Telefono", f.personalPhone], ["Email", f.personalEmail],
+    ["Vive a", f.residenceComune?.abroad ? [f.residenceComune.city, f.residenceComune.country].filter(Boolean).join(", ") : f.residenceComune?.name],
+    ["Lingue", langs], ["Punti forti", skills.join(", ")], ["Partita IVA", f.partitaIva === true ? "Sì" : f.partitaIva === false ? "No" : null],
+    ["Progetto", (f.project || []).join(", ")], ["Referente", (f.referent || []).map((u) => u.name).join(", ")],
+    ["Come ci ha conosciuto", f.source], ["Privacy", p.consent?.at ? `consenso il ${fmtDate(p.consent.at)}` : null],
+  ].filter(([, v]) => v);
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap: 14 }}>
+      <section style={{ ...card, padding: "14px 16px" }}>
+        <h2 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>{r.missing.length ? `Scheda completa per ${r.done} su ${r.total}` : "Scheda completa"}</h2>
+        {READINESS.map((x) => {
+          const ok = x.test(f);
+          return (
+            <div key={x.key} style={{ display: "flex", gap: 10, alignItems: "center", padding: "7px 0", borderTop: `1px solid ${CP.borderSoft || CP.border}`, fontSize: 14 }}>
+              <span aria-hidden="true" style={{ width: 18, height: 18, borderRadius: 5, display: "grid", placeItems: "center", fontSize: 12, background: ok ? CP.accentGreen : "transparent", border: ok ? 0 : `1.5px solid ${CP.borderStrong || CP.border}`, color: "#fff" }}>{ok ? "✓" : ""}</span>
+              <span style={{ flex: 1, color: ok ? CP.textSecondary : CP.textPrimary }}>{x.label.charAt(0).toUpperCase() + x.label.slice(1)}</span>
+              {!ok && <button type="button" onClick={() => onGo(GO[x.key])} style={{ background: "none", border: 0, padding: 0, color: CP.accentSoftText, cursor: "pointer", fontSize: 13 }}>Aggiungi →</button>}
+            </div>
+          );
+        })}
+        <p style={{ fontSize: 12, color: CP.textMuted, margin: "10px 0 0" }}>Solo i dati della scheda: le procedure d'ingresso restano su ClickUp.</p>
+      </section>
+      <section style={{ ...card, padding: "14px 16px" }}>
+        <h2 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>In breve</h2>
+        <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "7px 14px", margin: 0, fontSize: 14 }}>
+          {rows.map(([k, v]) => <Fragment key={k}><dt style={{ color: CP.textMuted }}>{k}</dt><dd style={{ margin: 0, color: CP.textPrimary, minWidth: 0, overflowWrap: "anywhere" }}>{v}</dd></Fragment>)}
+        </dl>
+      </section>
+    </div>
+  );
+}
+
+function PhasePill({ phase }) {
+  const tone = phase === "Attiva" ? [CP.accentGreen, "rgba(30,122,82,.10)"]
+    : phase === "In ingresso" ? [CP.accentSoftText || CP.accent, CP.accentSoft]
+    : phase === PHASE_EXITED ? [CP.textMuted, CP.surfaceAlt] : [CP.attn, CP.surfaceAlt];
+  return <span style={{ display: "inline-block", fontSize: 12.5, padding: "2px 9px", borderRadius: 999, color: tone[0], background: tone[1], whiteSpace: "nowrap" }}>{phase || "senza fase"}</span>;
 }
 
 /** Esito di "Segna come uscita" / "Riattiva", con quello che è successo su ClickUp. */
@@ -134,54 +236,12 @@ function phaseNotice(j, okText) {
   return { ok: true, text: okText };
 }
 
-/** Fase della persona e stato del contratto: due assi separati, affiancati. */
-function PhaseCard({ p }) {
-  const phase = p.fields?.collaborationStatus;
-  const contract = p.fields?.hvContractStatus;
-  const exited = phase === PHASE_EXITED;
-  const item = (label, value, note) => (
-    <div style={{ minWidth: 160 }}>
-      <div style={{ fontSize: 13, color: CP.textSecondary }}>{label}</div>
-      <div style={{ fontSize: 17, fontWeight: 500, color: value ? CP.textPrimary : CP.textMuted }}>{value || "Non indicato"}</div>
-      {note && <div style={{ fontSize: 12, color: CP.textMuted }}>{note}</div>}
-    </div>
-  );
-  return (
-    <section aria-label="Fase e contratto" style={{ ...card, padding: "14px 16px", marginBottom: 14, display: "flex", gap: 32, flexWrap: "wrap" }}>
-      {item("Fase", phase, phase === "Da verificare" ? "arrivata da ClickUp: scegli una fase nella sezione Rapporto" : exited && p.fields?.endDate ? `fine collaborazione il ${fmtDate(p.fields.endDate)}` : null)}
-      {item("Stato del contratto", contract, null)}
-    </section>
-  );
-}
-
-function SyncCard({ p, enabled }) {
-  const st = p.sync?.status || "pending";
-  const bad = ["error", "deleted", "missing"].includes(st);
-  return (
-    <section style={{ ...card, padding: "12px 16px", marginBottom: 14, display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center", fontSize: 14 }}>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-        <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 999, background: st === "ok" ? CP.accentGreen : bad ? CP.accentRed : CP.textMuted }} />
-        <span style={{ color: CP.textPrimary }}>ClickUp: {SYNC_LABEL[st] || st}</span>
-      </span>
-      {p.sync?.at && <span style={{ color: CP.textMuted }}>ultimo tentativo {fmtDateTime(p.sync.at)}</span>}
-      {p.sync?.message && <span style={{ color: bad ? CP.accentRed : CP.textSecondary }}>{p.sync.message}</span>}
-      {(p.pendingKeys || []).length > 0 && enabled && <span style={{ color: CP.textSecondary }}>{p.pendingKeys.length} campi in attesa di arrivare su ClickUp</span>}
-      {p.consent?.at && <span style={{ color: CP.textMuted }}>consenso privacy il {fmtDateTime(p.consent.at)} (v. {p.consent.version})</span>}
-      {(p.sync?.skipped || []).length > 0 && (
-        <details style={{ flexBasis: "100%", fontSize: 13, color: CP.textSecondary }}>
-          <summary style={{ cursor: "pointer" }}>{p.sync.skipped.length} campi non scritti su ClickUp e perché</summary>
-          <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
-            {p.sync.skipped.map((x, i) => <li key={i}>{FIELD_BY_KEY[x.key]?.label || x.key}: {x.reason}</li>)}
-          </ul>
-        </details>
-      )}
-    </section>
-  );
-}
-
-function Section({ section, person, options, crypto, onSaved, locked, incoming = [] }) {
-  const fields = FIELDS.filter((f) => f.section === section.key);
-  const editable = locked ? [] : fields.filter((f) => !f.readOnly);
+function Section({ title, keys, person, options, crypto, onSaved, locked, incoming = [] }) {
+  const all = keys.map((k) => FIELD_BY_KEY[k]).filter(Boolean);
+  const [showEmpty, setShowEmpty] = useState(false);
+  const isEmpty = (f) => { const v = person.fields?.[f.key]; if (f.type === "cf") return !person.hasCf; return v == null || v === "" || (Array.isArray(v) && !v.length) || (typeof v === "object" && !Array.isArray(v) && !Object.keys(v).length); };
+  const emptyCount = all.filter(isEmpty).length;
+  const editable = locked ? [] : all.filter((f) => !f.readOnly);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({});
   const [busy, setBusy] = useState(false);
@@ -217,13 +277,13 @@ function Section({ section, person, options, crypto, onSaved, locked, incoming =
   return (
     <section style={{ ...card, padding: "14px 16px", marginBottom: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-        <SectionTitle aside={section.key === "documenti" ? "i file stanno su ClickUp, qui solo i riferimenti" : null}>{section.label}</SectionTitle>
+        <SectionTitle aside={keys.includes("idDocument") ? "i file stanno su ClickUp, qui solo i riferimenti" : null}>{title}</SectionTitle>
         {!editing && editable.length > 0 && (
           <button type="button" onClick={start} style={{ ...btnGhost, padding: "5px 10px", fontSize: 12, flexShrink: 0 }}><Pencil size={13} /> Modifica</button>
         )}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "12px 18px" }}>
-        {fields.map((f) => (
+        {(editing || showEmpty ? all : all.filter((f) => !isEmpty(f))).map((f) => (
           <div key={f.key} style={{ minWidth: 0, gridColumn: ["labels", "longtext", "skillmap", "roles"].includes(f.type) ? "1 / -1" : undefined }}>
             <span id={`hr-${f.key}-l`} style={lbl}>{f.label}{f.readOnly && f.cu ? <span style={{ color: CP.textMuted }}> · da ClickUp</span> : null}{person.mirrorStale?.includes(f.key) ? <span style={{ color: CP.attn }}> · su ClickUp c'è un testo non riconosciuto</span> : null}</span>
             {editing && !f.readOnly ? (
@@ -251,7 +311,12 @@ function Section({ section, person, options, crypto, onSaved, locked, incoming =
           </div>
         ))}
       </div>
-      {section.key === "anagrafica" && cf && <p style={{ fontSize: 12, color: CP.textMuted, margin: "10px 0 0" }}>Hai visto il codice fiscale in chiaro: è registrato nello storico.</p>}
+      {!editing && emptyCount > 0 && (
+        <button type="button" onClick={() => setShowEmpty(!showEmpty)} style={{ background: "none", border: 0, padding: 0, marginTop: 12, color: CP.accentSoftText, cursor: "pointer", fontSize: 13 }}>
+          {showEmpty ? "Nascondi i campi vuoti" : `Mostra i campi vuoti (${emptyCount})`}
+        </button>
+      )}
+      {keys.includes("codiceFiscale") && cf && <p style={{ fontSize: 12, color: CP.textMuted, margin: "10px 0 0" }}>Hai visto il codice fiscale in chiaro: è registrato nello storico.</p>}
       {editing && (
         <div style={{ display: "flex", gap: 8, marginTop: 14, alignItems: "center", flexWrap: "wrap" }}>
           <button type="button" onClick={save} disabled={busy} style={{ ...btnPrimary, opacity: busy ? 0.5 : 1 }}>{busy ? "Salvo…" : "Salva"}</button>

@@ -166,7 +166,7 @@ export default function HrPeoplePage() {
         </span>
       ); },
     },
-    { key: "missing", label: "Manca", sortable: false, render: (p) => { const m = ready[p.id]?.missing || []; return m.length ? <span style={{ fontSize: 12.5, color: CP.attn }}>{m.map((x) => x.label).join(" · ")}</span> : <span style={{ fontSize: 12.5, color: CP.accentGreen }}>tutto pronto</span>; } },
+    { key: "missing", label: "Manca", sortable: false, render: (p) => { const m = ready[p.id]?.missing || []; return m.length ? <span style={{ fontSize: 12.5, color: CP.textSecondary }}>{m.map((x) => x.label).join(" · ")}</span> : <span style={{ fontSize: 12.5, color: CP.accentGreen }}>tutto pronto</span>; } },
     ...(skill ? [{ key: "lvl", label: "Livello", sort: (p) => SKILL_LEVELS.indexOf(normalizeSkillMap(p.fields?.skillLevels)[skill]), render: (p) => normalizeSkillMap(p.fields?.skillLevels)[skill] || "—" }] : []),
     ...(pastRole ? [{ key: "prole", label: "Ruolo passato", sortable: false, render: (p) => pastRoleText(normalizePastRoles(p.fields?.pastRoles).find((r) => r.role === pastRole)), muted: true }] : []),
   ];
