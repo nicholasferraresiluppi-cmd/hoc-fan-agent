@@ -168,7 +168,7 @@ const CSS = `
 /* il retro non deve trasparire durante il giro (Safari ignora backface sui figli SVG senza questo) */
 .hrf-sface,.hrf-sface *{-webkit-backface-visibility:hidden;backface-visibility:hidden}
 @media (prefers-reduced-motion:reduce){.hrf-alba{animation:hrfLogoOutStill .5s ease 3.3s forwards}@keyframes hrfLogoOutStill{to{opacity:0}}.hrf-scard{animation:hrfCardFade .8s ease 3.85s forwards}@keyframes hrfCardFade{to{opacity:1;transform:none}}.hrf-splash.is-leaving .hrf-scard{transform:none}}
-.hrf-splash{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:radial-gradient(120% 60% at 50% 0%, #17161c 0%, #0b0c10 55%);opacity:1;transition:opacity 1.1s cubic-bezier(.4,0,.2,1)}
+.hrf-splash{position:fixed;inset:0;z-index:60;overflow:hidden;display:grid;place-items:center;background:radial-gradient(120% 60% at 50% 0%, #17161c 0%, #0b0c10 55%);opacity:1;transition:opacity 1.1s cubic-bezier(.4,0,.2,1)}
 .hrf-splash-inner{transition:transform 1.1s cubic-bezier(.4,0,.2,1),opacity .8s ease}
 .hrf-splash.is-leaving{opacity:0;pointer-events:none}
 .hrf-splash.is-leaving .hrf-splash-inner{transform:translateY(-14px) scale(1.04);opacity:.6}
@@ -267,9 +267,15 @@ export default function HrFormPage() {
   useEffect(() => {
     if (splashPhase !== "show" || !splashTimeUp || !(ctx || loadErr)) return;
     setSplashPhase("leaving");
+  }, [splashPhase, splashTimeUp, ctx, loadErr]);
+  // 04/10/2026: prima il passaggio a "gone" stava nello stesso effetto e il suo timer veniva
+  // annullato dal cambio di fase → lo strato restava nella pagina (invisibile) e su telefono
+  // la allargava. Ora l'uscita ha il suo effetto.
+  useEffect(() => {
+    if (splashPhase !== "leaving") return undefined;
     const t = setTimeout(() => setSplashPhase("gone"), 1100);
     return () => clearTimeout(t);
-  }, [splashPhase, splashTimeUp, ctx, loadErr]);
+  }, [splashPhase]);
   const [data, setData] = useState({});
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);

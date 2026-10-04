@@ -62,7 +62,7 @@ export function cardName({ firstName, surname } = {}) {
 
 const AREA_ABBR = { of: "ONLY", ads: "ADS", social: "SOCIAL", content: "CONT", ai: "AI", tech: "TECH", mgmt: "GEST" };
 const LEVEL_ABBR = { Base: "BASE", Autonomo: "AUT", Esperto: "ESP", "Posso insegnarla": "INS" };
-const LANG_LEVEL_ABBR = { Native: "MADRE", Professional: "PRO", Basic: "BASE" };
+const LANG_LEVEL_ABBR = { Native: "MADRE", Professional: "PRO", Basic: "BASE", Intermediate: "INTER", Advanced: "AVANZ" };
 
 /** Aree dichiarate, ordinate dalla più forte: livello massimo nell'area, poi numero di voci. */
 export function strongestAreas(skillLevels) {
@@ -155,7 +155,7 @@ export function availabilityText(timeSlots) {
 
 const AREA_SHORT = { of: "OnlyFans", ads: "Media buying", social: "Social", content: "Contenuti", ai: "Intelligenza artificiale", tech: "Tecnologia", mgmt: "Gestione" };
 const LANG_FULL = { ITA: "Italiano", ENG: "Inglese", SPA: "Spagnolo", TED: "Tedesco", FR: "Francese" };
-const LANG_LEVEL_WORD = { Native: "Madrelingua", Professional: "Lavorativo", Basic: "Base" };
+const LANG_LEVEL_WORD = { Native: "Madrelingua", Professional: "Lavorativo", Basic: "Base", Intermediate: "Intermedio", Advanced: "Avanzato" };
 
 /**
  * Livello per la riga del retro, concordato col genere DICHIARATO; senza genere si
