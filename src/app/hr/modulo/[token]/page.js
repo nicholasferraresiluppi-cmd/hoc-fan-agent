@@ -143,14 +143,14 @@ const CSS = `
 @keyframes hrfLight{to{-webkit-mask-position:0 0;mask-position:0 0}}
 .hrf-splash-light::after{content:"";position:absolute;inset:-10% -4%;background:linear-gradient(100deg,transparent 35%,rgba(255,236,190,.55) 50%,transparent 65%);mix-blend-mode:overlay;transform:translateX(-110%);animation:hrfSweep 1.4s ease 2.6s forwards;pointer-events:none}
 @keyframes hrfSweep{to{transform:translateX(110%)}}
-@media (prefers-reduced-motion:reduce){.hrf-splash-light{animation:none;-webkit-mask-image:none;mask-image:none}.hrf-splash-light::after{display:none}}
+@media (prefers-reduced-motion:reduce){.hrf-splash-light::after{display:none}}
 @keyframes hrfLogo{from{opacity:0;transform:translateY(6px);letter-spacing:.24em}to{opacity:1;transform:none;letter-spacing:.16em}}
 @media (prefers-reduced-motion:reduce){.hrf-splash-logo{animation:none;opacity:1}}
 .hrf-splash{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:radial-gradient(120% 60% at 50% 0%, #17161c 0%, #0b0c10 55%);opacity:1;transition:opacity 1.1s cubic-bezier(.4,0,.2,1)}
 .hrf-splash-inner{transition:transform 1.1s cubic-bezier(.4,0,.2,1),opacity .8s ease}
 .hrf-splash.is-leaving{opacity:0;pointer-events:none}
 .hrf-splash.is-leaving .hrf-splash-inner{transform:translateY(-14px) scale(1.04);opacity:.6}
-@media (prefers-reduced-motion:reduce){.hrf-splash,.hrf-splash-inner{transition:none}}
+@media (prefers-reduced-motion:reduce){.hrf-splash.is-leaving .hrf-splash-inner{transform:none}}
 .hrf-letter{animation:hrfFade 1s ease 2.2s both}
 .hrf-err{animation:hrfFade .25s ease both}
 @media (prefers-reduced-motion:reduce){.hrf-card.shine::after,.hrf-fade,.hrf-next,.hrf-prev,.hrf-loader-in,.hrf-letter,.hrf-err{animation:none}.hrf-bar{transition:none}}
@@ -214,14 +214,17 @@ export default function HrFormPage() {
   const reducedRef = useRef(false);
   useEffect(() => {
     try { reducedRef.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* */ }
-    const t = setTimeout(() => setSplashTimeUp(true), reducedRef.current ? 900 : 3600);
+    // 04/10/2026: il logo si deve vedere accendersi anche con "Riduci movimento" attivo
+    // (iPhone): accendersi è un cambio di luce, non un movimento. Prima con quell'opzione
+    // l'apertura durava 0,9 s senza luce: era quello che si vedeva dal telefono.
+    const t = setTimeout(() => setSplashTimeUp(true), 3600);
     return () => clearTimeout(t);
   }, []);
   const [loadErr, setLoadErr] = useState(null);
   useEffect(() => {
     if (splashPhase !== "show" || !splashTimeUp || !(ctx || loadErr)) return;
     setSplashPhase("leaving");
-    const t = setTimeout(() => setSplashPhase("gone"), reducedRef.current ? 50 : 1100);
+    const t = setTimeout(() => setSplashPhase("gone"), 1100);
     return () => clearTimeout(t);
   }, [splashPhase, splashTimeUp, ctx, loadErr]);
   const [data, setData] = useState({});
