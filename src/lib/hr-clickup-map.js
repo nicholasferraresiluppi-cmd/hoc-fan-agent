@@ -389,7 +389,7 @@ export function taskNameFor(person) {
  * @param opts.currentDescription descrizione attuale del task (per non perdere il testo sopra il blocco)
  * @returns {{ name, description, status, fieldOps: Array, skipped: Array }}
  */
-export function personToClickup(person, fieldsMeta, { keys, cfPlain, statuses, currentDescription } = {}) {
+export function personToClickup(person, fieldsMeta, { keys, cfPlain, statuses, currentDescription, currentTask = null } = {}) {
   const byName = fieldsByName(fieldsMeta);
   const want = keys ? new Set(keys) : null;
   const fieldOps = [];
@@ -401,6 +401,17 @@ export function personToClickup(person, fieldsMeta, { keys, cfPlain, statuses, c
     if (!meta) continue; // campo nuovo senza omonimo → va nel blocco in descrizione
     const value = f.type === "cf" ? (cfPlain === undefined ? undefined : cfPlain) : person.fields?.[f.key];
     if (value === undefined && f.type === "cf") { skipped.push({ key: f.key, reason: "chiave di cifratura assente" }); continue; }
+    if (f.type === "users") {
+      // ClickUp vuole { add, rem } rispetto a chi c'è già sul task
+      const want = (Array.isArray(value) ? value : []).map((u) => s(u.id)).filter(Boolean);
+      const curF = (currentTask?.custom_fields || []).find((x) => x.id === meta.id);
+      const have = (Array.isArray(curF?.value) ? curF.value : []).map((u) => s(u.id)).filter(Boolean);
+      const add = want.filter((x) => !have.includes(x));
+      const rem = have.filter((x) => !want.includes(x));
+      if (!add.length && !rem.length) continue;
+      fieldOps.push({ key: f.key, fieldId: meta.id, body: { value: { add: add.map(Number), rem: rem.map(Number) } }, effective: Array.isArray(value) ? value : [] });
+      continue;
+    }
     const enc = encodeFieldValue(meta, f.type === "cf" ? "text" : f.type, value, f.choices || null);
     if (enc.skip) { skipped.push({ key: f.key, reason: enc.skip }); continue; }
     if (enc.missing?.length) skipped.push({ key: f.key, reason: `ignorati (non tra le opzioni ClickUp): ${enc.missing.join(", ")}` });

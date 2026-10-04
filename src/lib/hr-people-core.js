@@ -197,6 +197,14 @@ export function normalizePersonInput(input = {}, allowed = EDITABLE_KEYS) {
         values[key] = [...new Set(asList(raw))].filter((x) => key !== "spokenLanguages" || !isLangNo(x)).slice(0, 40);
         break;
       }
+      case "users": {
+        // referente (04/10/2026): [{ id, name, email }] scelti dai membri della lista ClickUp
+        const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+        const seen = new Set();
+        values[key] = list.map((u) => (u && typeof u === "object" ? { id: s(u.id), name: s(u.name).slice(0, 80), email: s(u.email).toLowerCase() || null } : null))
+          .filter((u) => u && /^\d+$/.test(u.id) && !seen.has(u.id) && seen.add(u.id)).slice(0, 10);
+        break;
+      }
       case "location": {
         const addr = typeof raw === "object" && raw ? s(raw.address) : s(raw);
         const lat = typeof raw === "object" && raw && Number.isFinite(Number(raw.lat)) && raw.lat !== null && raw.lat !== "" ? Number(raw.lat) : null;

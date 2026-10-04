@@ -103,6 +103,20 @@ export async function getListFields(listId, { force = false } = {}) {
   return fields;
 }
 
+/** Persone che possono stare nel campo "Referent" (membri con accesso alla lista), cache KV 1h. */
+export async function getListMembers(listId, { force = false } = {}) {
+  const key = `hr:clickup:members:${listId}`;
+  if (!force) {
+    const hit = await kv.get(key).catch(() => null);
+    if (hit?.members) return hit.members;
+  }
+  const d = await cu(`/list/${listId}/member`);
+  const members = (d.members || []).map((m) => ({ id: String(m.id), name: String(m.username || m.email || ""), email: String(m.email || "").toLowerCase() || null }))
+    .filter((m) => m.id && m.name).sort((a, b) => a.name.localeCompare(b.name, "it"));
+  await kv.set(key, { at: Date.now(), members }, { ex: FIELDS_TTL }).catch(() => {});
+  return members;
+}
+
 /** Lista (nome, status), cache KV 1h. */
 export async function getListInfo(listId, { force = false } = {}) {
   const key = `hr:clickup:list:${listId}`;

@@ -55,7 +55,7 @@ import { notifyWhatsApp } from "./whatsapp-notify.js";
 import { mirrorIssueText, mirrorText, mirrorPrint } from "./hr-mirror.js";
 import { clickupSkillLabels } from "./hr-skills.js";
 import {
-  hrSyncConfig, getListFields, getListInfo, listAllTasks, getTask, createTask, updateTask, setField, removeField,
+  hrSyncConfig, getListFields, getListInfo, getListMembers, listAllTasks, getTask, createTask, updateTask, setField, removeField,
   resolveTeamId, createWebhook, deleteWebhook, isTaskGone, ClickupError, HR_WEBHOOK_EVENTS,
 } from "./clickup-hr-api.js";
 import { hrCryptoConfigured, encryptHr, decryptHr } from "./hr-crypto.js";
@@ -336,7 +336,7 @@ async function pushPerson(person, keys, cfg) {
   const stale = (person.mirrorStale || []).filter((k) => FIELD_BY_KEY[k]?.mirror);
   const pushKeys = task && keys ? [...new Set([...keys, ...stale])] : null;
   const plan = personToClickup(person, fieldsMeta, {
-    keys: pushKeys, cfPlain, statuses: info.statuses, currentDescription: task?.description || "",
+    keys: pushKeys, cfPlain, statuses: info.statuses, currentDescription: task?.description || "", currentTask: task,
   });
   const at = Date.now();
   const errors = [];
@@ -1043,6 +1043,10 @@ export async function fieldOptions(keys = null) {
       if (opts.length) out[f.key] = opts;
     }
   } catch { /* senza opzioni ClickUp restano quelle note / testo libero */ }
+  // referente (04/10/2026): le persone della lista su ClickUp, da scegliere in scheda
+  if (!keys || keys.includes("referent")) {
+    try { out.referent = await getListMembers(cfg.listId); } catch { out.referent = []; }
+  }
   return out;
 }
 const formOptions = () => fieldOptions(FORM_KEYS);

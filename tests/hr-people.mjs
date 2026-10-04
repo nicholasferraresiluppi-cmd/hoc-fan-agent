@@ -63,7 +63,7 @@ eq(maskCf("RSSMRA85T10A562S"), "RSS••••••••••••S", "masc
   eq(r.values.spokenLanguages, ["Italiano", "Inglese"], "labels da stringa");
   ok(normalizePersonInput({ gender: "Altro" }).errors.length === 1, "genere fuori elenco → errore");
   ok(normalizePersonInput({ codiceFiscale: "XXX" }).errors.length === 1, "CF invalido → errore");
-  eq(normalizePersonInput({ referent: [{ id: 1 }] }).values, {}, "campo sola lettura ignorato");
+  eq(normalizePersonInput({ cvFiles: [{ id: 1 }] }).values, {}, "campo sola lettura ignorato");
   eq(normalizePersonInput({ codiceFiscale: "RSSMRA85T10A562S" }, ["firstName"]).cf, undefined, "chiavi non ammesse ignorate (modulo)");
 }
 
@@ -206,6 +206,20 @@ eq(stripHocBlock(withHocBlock("A", ["x: 1"])), "A", "blocco rimovibile");
   eq(normalizePersonInput({ collaborationStatus: "" }).values.collaborationStatus, null, "input: fase svuotata");
   ok(!F.FORM_KEYS.includes("hvContractStatus") && !F.FORM_KEYS.includes("collaborationStatus"), "contratto e fase NON sono nel modulo pubblico");
   ok(!F.FORM_KEYS.includes("timeSlots"), "fasce orarie fuori dal modulo (04/10)");
+  ok(!F.FORM_KEYS.includes("currentJob") && !F.FIELD_BY_KEY.referent.readOnly, "mansione fuori dal modulo; referente modificabile in app");
+  {
+    const C5 = await import("../src/lib/hr-people-core.js");
+    const M5 = await import("../src/lib/hr-clickup-map.js");
+    const r = C5.normalizePersonInput({ referent: [{ id: "123", name: "Antonio", email: "A@x.it" }, { id: "123", name: "doppio" }, { id: "abc", name: "non valido" }] });
+    ok(r.values.referent.length === 1 && r.values.referent[0].email === "a@x.it", "referente: id numerici, niente doppioni");
+    const meta = [{ id: "ref", name: "Referent", type: "users" }];
+    const person = { id: "p", fields: { firstName: "X", referent: [{ id: "2", name: "B" }, { id: "3", name: "C" }] } };
+    const task = { id: "t", custom_fields: [{ id: "ref", name: "Referent", type: "users", value: [{ id: 1, username: "A" }, { id: 2, username: "B" }] }] };
+    const op = M5.personToClickup(person, meta, { currentTask: task }).fieldOps.find((o) => o.key === "referent");
+    ok(op && JSON.stringify(op.body.value) === JSON.stringify({ add: [3], rem: [1] }), "referente verso ClickUp: aggiunge chi manca e toglie chi non c'è più");
+    ok(!M5.personToClickup({ ...person, fields: { ...person.fields, referent: [{ id: "1" }, { id: "2" }] } }, meta, { currentTask: task }).fieldOps.some((o) => o.key === "referent"), "referente già uguale: nessuna scrittura");
+    ok(M5.clickupDrift(person, { ...task, name: "X" }, meta).includes("referent") && !M5.clickupDrift({ ...person, fields: { firstName: "X", referent: [{ id: "1" }, { id: "2" }] } }, { ...task, name: "X" }, meta).includes("referent"), "parità: anche il referente");
+  }
   {
     const C4 = await import("../src/lib/hr-people-core.js");
     const M4 = await import("../src/lib/hr-clickup-map.js");
