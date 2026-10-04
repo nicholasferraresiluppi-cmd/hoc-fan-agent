@@ -23,7 +23,7 @@ import { FIELD_BY_KEY, FORM_KEYS, validateCodiceFiscale, SOURCE_REFERRAL } from 
 export const REQUIRED_FORM_KEYS = [
   "firstName", "surname", "dateOfBirth", "gender", "nationality", "birthPlace",
   "residenceComune", "location", "residenceCap", "personalEmail", "personalPhone",
-  "partitaIva", "spokenLanguages", "timeSlots", "skillLevels", "source",
+  "partitaIva", "spokenLanguages", "skillLevels", "source",
 ];
 
 /** Vuoto per il modulo: stringa vuota, lista vuota, oggetto senza testo (i sì/no contano come risposta). */

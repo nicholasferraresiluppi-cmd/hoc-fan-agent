@@ -150,10 +150,12 @@ export const SECTIONS = [
   { key: "documenti", label: "Documenti" },
 ];
 // Campi che la persona può compilare dal modulo pubblico (i SUOI dati)
+// 04/10/2026: le fasce orarie NON si chiedono più nel modulo (decisione del titolare);
+// il campo resta in scheda e su ClickUp, lo compila HR.
 export const FORM_KEYS = [
   "firstName", "surname", "dateOfBirth", "nationality", "gender", "birthPlace", "residenceComune", "location", "residenceCap", "personalEmail", "personalPhone",
   "skillLevels", "otherSkills", "pastRoles", "learnWish",
-  "spokenLanguages", "timeSlots", "currentJob", "partitaIva", "codiceFiscale", "personalInterests", "linkedin",
+  "spokenLanguages", "currentJob", "partitaIva", "codiceFiscale", "personalInterests", "linkedin",
   "source", "referredBy",
 ];
 // Campi che l'admin può modificare dalla scheda
