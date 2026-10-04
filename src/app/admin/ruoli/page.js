@@ -62,6 +62,9 @@ export default function MembersPage() {
   const [busy, setBusy] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [msg, setMsg] = useState(null);
+  // esito del clic su un ruolo, mostrato ACCANTO ai ruoli (il Notice in cima resta fuori vista)
+  const [roleNote, setRoleNote] = useState(null); // { userId, text, bad }
+  const [optimistic, setOptimistic] = useState({}); // userId -> ruoli salvati appena cliccati
   const [creatorList, setCreatorList] = useState([]);
   const editRef = useRef(null);
 
@@ -81,19 +84,36 @@ export default function MembersPage() {
   const roleLabel = (rid) => roles?.meta?.[rid]?.label || customMap[rid]?.name
     || (invites?.assignable || []).find((r) => r.id === rid)?.label || rid;
 
+  // Clic su un ruolo: si vede SUBITO selezionato (ottimistico), poi conferma o errore accanto ai ruoli.
+  // Lavora sui ruoli SALVATI: per un admin i ruoli effettivi sono solo ["admin"] e i clic sembravano non prendere.
   const toggleRole = async (userId, current, rid) => {
     const set = new Set(current || []);
-    set.has(rid) ? set.delete(rid) : set.add(rid);
+    const adding = !set.has(rid);
+    adding ? set.add(rid) : set.delete(rid);
+    const next = Array.from(set);
+    setOptimistic((o) => ({ ...o, [userId]: next }));
+    setRoleNote({ userId, text: "Salvataggio…" });
     setBusy(userId);
     try {
       const r = await fetch("/api/admin/roles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, roles: Array.from(set) }),
+        body: JSON.stringify({ userId, roles: next }),
       });
-      if (!r.ok) setMsg({ type: "error", text: (await r.json().catch(() => ({}))).error || "Modifica non riuscita" });
+      if (!r.ok) {
+        setOptimistic((o) => ({ ...o, [userId]: current || [] }));
+        setRoleNote({ userId, bad: true, text: (await r.json().catch(() => ({}))).error || "Modifica non riuscita: il ruolo non è cambiato." });
+      } else {
+        setRoleNote({ userId, text: `Salvato: ${roleLabel(rid)} ${adding ? "aggiunto" : "tolto"}.` });
+      }
       await load();
-    } finally { setBusy(null); }
+    } catch {
+      setOptimistic((o) => ({ ...o, [userId]: current || [] }));
+      setRoleNote({ userId, bad: true, text: "Connessione persa: il ruolo non è cambiato." });
+    } finally {
+      setOptimistic((o) => { const c = { ...o }; delete c[userId]; return c; });
+      setBusy(null);
+    }
   };
 
   // "Vedi come…": anteprima dell'app con i permessi di un membro o di un ruolo (sola lettura)
@@ -176,6 +196,9 @@ export default function MembersPage() {
     return (r.name || "").toLowerCase().includes(f) || (r.email || "").toLowerCase().includes(f);
   });
   const allRoleIds = [...(roles?.predefined || []), ...(roles?.custom || []).map((c) => c.id)];
+  // "Admin" non è un ruolo tra gli altri: si dà e si toglie solo da "Amministratore" (prima c'erano due admin diversi)
+  const pickableRoleIds = allRoleIds.filter((rid) => rid !== "admin");
+  const storedOf = (r) => optimistic[r.userId] || r.stored_roles || r.roles || [];
   const pending = invites?.pending || [];
   const neverIn = allRows.filter((r) => !r.last_sign_in_at).length;
   const suspended = allRows.filter((r) => r.banned).length;
@@ -192,10 +215,10 @@ export default function MembersPage() {
         </div>
       ),
     },
-    { key: "roles", label: "Ruoli", sort: (r) => (r.admin ? "0" : "1") + (r.roles || []).map(roleLabel).join(", "), render: (r) => (
+    { key: "roles", label: "Ruoli", sort: (r) => (r.admin ? "0" : "1") + storedOf(r).filter((x) => x !== "admin").map(roleLabel).join(", "), render: (r) => (
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
         {r.admin && <span title="Amministratore: vede i dati di tutti e cambia le impostazioni" style={{ fontSize: 12, padding: "2px 9px", borderRadius: 999, background: CP.accentSoft, color: CP.accentSoftText, border: `1px solid ${CP.accent}` }}>Admin</span>}
-        <RoleChips ids={r.roles} label={roleLabel} />
+        <RoleChips ids={storedOf(r).filter((x) => x !== "admin")} label={roleLabel} />
       </div>
     ) },
     {
@@ -343,26 +366,32 @@ export default function MembersPage() {
                 </div>
               )}
               <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Ruoli: clic per aggiungere o togliere (si salva subito)</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
-                {allRoleIds.map((rid) => {
-                  const on = (editRow.roles || []).includes(rid);
+              {editRow.admin && <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 6 }}>È amministratore, quindi può già fare tutto: i ruoli qui sotto contano se un giorno gli togli admin.</div>}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6, alignItems: "center" }}>
+                {pickableRoleIds.map((rid) => {
+                  const cur = storedOf(editRow);
+                  const on = cur.includes(rid);
                   return (
                     <button
                       key={rid}
                       disabled={busy === editRow.userId}
-                      onClick={() => toggleRole(editRow.userId, editRow.roles, rid)}
+                      onClick={() => toggleRole(editRow.userId, cur, rid)}
                       aria-pressed={on}
                       style={{
                         padding: "5px 11px", borderRadius: 999, fontSize: 13, fontFamily: FONTS.body, cursor: busy === editRow.userId ? "wait" : "pointer",
                         border: `1px solid ${on ? CP.accent : CP.border}`,
                         background: on ? CP.accentSoft : CP.surface,
                         color: on ? CP.accentSoftText : CP.textSecondary,
+                        fontWeight: on ? 500 : 400,
                       }}
                     >
                       {on ? "✓ " : "+ "}{roleLabel(rid)}
                     </button>
                   );
                 })}
+              </div>
+              <div role="status" aria-live="polite" style={{ minHeight: 18, fontSize: 12.5, marginBottom: 10, color: roleNote?.userId === editRow.userId && roleNote.bad ? CP.accentRed : CP.textSecondary }}>
+                {roleNote?.userId === editRow.userId ? roleNote.text : ""}
               </div>
               <div style={{ padding: "10px 12px", borderRadius: 8, background: CP.bg, border: `1px solid ${CP.borderSoft}` }}>
                 <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 6 }}>Cosa può fare oggi (somma dei suoi ruoli)</div>

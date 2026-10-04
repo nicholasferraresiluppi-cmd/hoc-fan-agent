@@ -1,4 +1,4 @@
-import { authorize, authorizeAdmin, auditAccess, CAPABILITIES, getUserRoles, getEffectiveCapabilities, setUserRoles, ROLES, ROLE_META, listCustomRoles } from "@/lib/rbac";
+import { authorize, authorizeAdmin, auditAccess, CAPABILITIES, getUserRoles, getStoredRoles, getEffectiveCapabilities, setUserRoles, ROLES, ROLE_META, listCustomRoles } from "@/lib/rbac";
 import { clerkClient } from "@clerk/nextjs/server";
 import { listAdmins } from "@/lib/admin";
 import { getAssignedCreators } from "@/lib/creator-scope";
@@ -25,6 +25,8 @@ export async function GET() {
           lastSignInAt: u.lastSignInAt || null,
           createdAt: u.createdAt || null,
           banned: Boolean(u.banned),
+          // stesse regole di isUserIdAdminRaw: anche la lista `roles` su Clerk rende admin
+          clerkAdmin: u.publicMetadata?.role === "admin" || u.privateMetadata?.role === "admin" || (Array.isArray(u.publicMetadata?.roles) && u.publicMetadata.roles.includes("admin")),
         };
       });
       if (data.length < 100) break;
@@ -35,20 +37,36 @@ export async function GET() {
   const adminMap = {};
   try { for (const x of await listAdmins()) adminMap[x.userId] = x.sources || []; } catch {}
 
+  // Righe in parallelo (prima ogni riga aspettava 4 letture una dopo l'altra)
   const rows = await Promise.all(
-    ids.map(async (uid) => ({
-      userId: uid,
-      name: nameMap[uid]?.name || uid,
-      email: nameMap[uid]?.email || null,
-      last_sign_in_at: nameMap[uid]?.lastSignInAt || null,
-      created_at: nameMap[uid]?.createdAt || null,
-      banned: nameMap[uid]?.banned || false,
-      admin: adminMap[uid] ? { sources: adminMap[uid] } : null,
-      creators: await getAssignedCreators(uid).catch(() => null),
-      workspace: await peekSavedWorkspace(uid), // null = dal ruolo
-      roles: await getUserRoles(uid),
-      caps: await getEffectiveCapabilities(uid).catch(() => ({})),
-    }))
+    ids.map(async (uid) => {
+      const [creators, workspace, roles, stored, caps] = await Promise.all([
+        getAssignedCreators(uid).catch(() => null),
+        peekSavedWorkspace(uid), // null = dal ruolo
+        getUserRoles(uid),
+        getStoredRoles(uid).catch(() => []),
+        getEffectiveCapabilities(uid).catch(() => ({})),
+      ]);
+      // "Amministratore" coerente con isUserIdAdminRaw: oltre a env/KV/metadata conta
+      // anche il ruolo "admin" salvato. Prima la riga diceva "no" a chi lo era di fatto.
+      const sources = [...(adminMap[uid] || [])];
+      if (stored.includes("admin") && !sources.includes("ruolo")) sources.push("ruolo");
+      if (nameMap[uid]?.clerkAdmin && !sources.includes("clerk_metadata")) sources.push("clerk_metadata");
+      return {
+        userId: uid,
+        name: nameMap[uid]?.name || uid,
+        email: nameMap[uid]?.email || null,
+        last_sign_in_at: nameMap[uid]?.lastSignInAt || null,
+        created_at: nameMap[uid]?.createdAt || null,
+        banned: nameMap[uid]?.banned || false,
+        admin: sources.length ? { sources } : null,
+        creators,
+        workspace,
+        roles, // effettivi (per un admin: ["admin"])
+        stored_roles: stored, // quelli salvati: sono quelli che si modificano
+        caps,
+      };
+    })
   );
   rows.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
@@ -80,7 +98,7 @@ export async function POST(req) {
     const customIds = new Set(custom.map((c) => c.id));
     const invalid = roles.filter((r) => !ROLES.includes(r) && !customIds.has(r));
     if (invalid.length) return Response.json({ error: `invalid roles: ${invalid.join(", ")}` }, { status: 400 });
-    const before = await getUserRoles(userId);
+    const before = await getStoredRoles(userId);
     await setUserRoles(userId, roles);
     await auditAccess(a.userId, "roles_set", { target: userId, before, after: roles });
     return Response.json({ ok: true, userId, roles });
