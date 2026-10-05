@@ -56,7 +56,7 @@ import { mirrorIssueText, mirrorText, mirrorPrint } from "./hr-mirror.js";
 import { clickupSkillLabels } from "./hr-skills.js";
 import {
   hrSyncConfig, getListFields, getListInfo, getListMembers, listAllTasks, getTask, createTask, updateTask, setField, removeField,
-  resolveTeamId, createWebhook, deleteWebhook, isTaskGone, ClickupError, HR_WEBHOOK_EVENTS,
+  resolveTeamId, createWebhook, deleteWebhook, isTaskGone, ClickupError, HR_WEBHOOK_EVENTS, listWebhooks,
 } from "./clickup-hr-api.js";
 import { hrCryptoConfigured, encryptHr, decryptHr } from "./hr-crypto.js";
 import { checkRateLimit } from "./rate-limit.js";
@@ -925,6 +925,32 @@ export async function registerWebhook({ endpoint, actor }) {
   await kv.set(K.webhook, rec);
   const { secret: _s, ...pub } = rec;
   return { ok: true, webhook: pub };
+}
+
+/**
+ * Salute del webhook (05/10/2026). ClickUp aveva sospeso il webhook senza che nessuno se ne
+ * accorgesse: cancellazioni e modifiche fatte su ClickUp arrivavano all'app solo con la
+ * riconciliazione notturna o con «Importa ora». Al massimo una volta l'ora (dalla coda HR ogni
+ * 5 minuti) si chiede a ClickUp lo stato: se il webhook non c'è più o non è «active» si
+ * registra di nuovo e si avvisa Nicholas su WhatsApp.
+ */
+export async function ensureWebhookHealthy({ force = false } = {}) {
+  const cfg = hrSyncConfig();
+  if (!cfg.enabled) return { skipped: "sync spenta" };
+  const rec = await getWebhookRecord();
+  if (!rec?.id || !rec.endpoint) return { skipped: "webhook mai registrato" };
+  if (!force) {
+    const first = await kv.set("hr:webhook:checked", Date.now(), { nx: true, ex: 3600 }).catch(() => "OK");
+    if (!first) return { skipped: "già controllato nell'ultima ora" };
+  }
+  const teamId = rec.teamId || (await resolveTeamId());
+  const hooks = await listWebhooks(teamId);
+  const mine = hooks.find((w) => String(w.id) === String(rec.id));
+  const status = mine ? String(mine.health?.status || "active") : "assente";
+  if (mine && status === "active") return { ok: true, status };
+  const res = await registerWebhook({ endpoint: rec.endpoint, actor: "controllo automatico" });
+  await notifyWhatsApp(`Webhook ClickUp del CRM HR: era «${status}»${mine?.health?.fail_count ? ` (${mine.health.fail_count} errori)` : ""}. ${res.ok ? "Riattivato da solo." : `Non sono riuscito a riattivarlo: ${res.error}`}\nhttps://houseofcreators.app/admin/hr/sync`).catch(() => {});
+  return { ok: Boolean(res.ok), status, reregistered: Boolean(res.ok) };
 }
 
 // ── Codice fiscale: "mostra" (loggato) ──────────────────────────────────────

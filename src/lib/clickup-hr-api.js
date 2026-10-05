@@ -179,3 +179,8 @@ export async function createWebhook(teamId, { endpoint, listId }) {
   return cu(`/team/${teamId}/webhook`, { method: "POST", json: { endpoint, events: HR_WEBHOOK_EVENTS, list_id: Number(listId) || listId } });
 }
 export const deleteWebhook = (webhookId) => cu(`/webhook/${webhookId}`, { method: "DELETE" });
+/** Webhook del workspace, ognuno con `health: { status: "active"|"failing"|"suspended", fail_count }`. */
+export async function listWebhooks(teamId) {
+  const r = await cu(`/team/${teamId}/webhook`);
+  return r?.webhooks || [];
+}
