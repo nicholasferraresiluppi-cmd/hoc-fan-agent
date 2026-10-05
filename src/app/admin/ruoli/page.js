@@ -124,6 +124,19 @@ export default function MembersPage() {
     window.location.href = "/";
   };
 
+  const [resent, setResent] = useState(null); // { id, email, url } dopo «Rimanda invito»
+  const resend = async (inv) => {
+    setBusy(inv.id);
+    const r = await fetch("/api/admin/invitations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "resend", id: inv.id }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.invitation) {
+      setResent({ id: j.invitation.id, email: j.invitation.email, url: j.invitation.url });
+      setMsg({ type: "ok", text: `Invito rimandato a ${j.invitation.email}: è partita una nuova email${j.invitation.url ? " e qui sotto c'è il link da girare" : ""}.` });
+    } else setMsg({ type: "error", text: j.error || "Invio non riuscito" });
+    setBusy(null);
+    load();
+  };
+
   const revoke = async (inv) => {
     if (!confirm(`Annullare l'invito a ${inv.email}? Il link nell'email smetterà di funzionare.`)) return;
     setBusy(inv.id);
@@ -269,6 +282,14 @@ export default function MembersPage() {
       />
 
       {msg && <Notice danger={msg.type === "error"}>{msg.text}</Notice>}
+      {/* 05/10/2026: l'esito compare anche in basso, sempre visibile: chi agiva dal pannello in fondo
+          alla pagina non vedeva l'avviso in cima e pensava che il pulsante non funzionasse */}
+      {msg && (
+        <div role="status" style={{ position: "fixed", left: "50%", bottom: 20, transform: "translateX(-50%)", zIndex: 80, maxWidth: "min(560px, calc(100vw - 32px))", display: "flex", gap: 12, alignItems: "center", padding: "10px 14px", borderRadius: 10, background: CP.bg, border: `1px solid ${msg.type === "error" ? CP.accentRed : CP.borderStrong}`, boxShadow: "0 12px 32px rgba(0,0,0,.35)", fontSize: 13.5, color: msg.type === "error" ? CP.accentRed : CP.textPrimary }}>
+          <span style={{ flex: 1 }}>{msg.text}</span>
+          <button type="button" onClick={() => setMsg(null)} style={{ background: "none", border: 0, color: CP.textMuted, cursor: "pointer", fontSize: 13 }}>Chiudi</button>
+        </div>
+      )}
 
       {loading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
 
@@ -292,6 +313,16 @@ export default function MembersPage() {
       {!loading && canInvite && pending.length > 0 && (
         <section style={{ marginBottom: 24 }}>
           <SectionTitle aside="hanno ricevuto l'email ma non hanno ancora creato l'account">Inviti in attesa · {pending.length}</SectionTitle>
+          {resent?.url && (
+            <div style={{ ...card, padding: "12px 16px", marginBottom: 10, display: "grid", gap: 8 }}>
+              <div style={{ fontSize: 13, color: CP.textSecondary }}>Link d'invito per <b style={{ color: CP.textPrimary }}>{resent.email}</b>: puoi girarlo anche su WhatsApp. Vale solo per quella email.</div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <code style={{ flex: "1 1 280px", minWidth: 0, overflowWrap: "anywhere", fontSize: 12, color: CP.textPrimary, background: CP.bgSunken, padding: "6px 8px", borderRadius: 6 }}>{resent.url}</code>
+                <button style={smallBtn} onClick={() => { try { navigator.clipboard.writeText(resent.url); setMsg({ type: "ok", text: "Link copiato." }); } catch { /* */ } }}>Copia link</button>
+                <button style={smallBtn} onClick={() => setResent(null)}>Chiudi</button>
+              </div>
+            </div>
+          )}
           <div style={card}>
             {pending.map((inv, i) => (
               <div key={inv.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderTop: i ? `1px solid ${CP.borderSoft}` : "none", flexWrap: "wrap" }}>
@@ -307,6 +338,7 @@ export default function MembersPage() {
                     {[inv.workspace && WORKSPACES[inv.workspace]?.label, inv.creators === "*" ? "tutte le creator" : Array.isArray(inv.creators) && inv.creators.length ? `${inv.creators.length} creator` : null].filter(Boolean).join(" · ")}
                   </span>
                 )}
+                <button style={smallBtn} disabled={busy === inv.id} onClick={() => resend(inv)}>{busy === inv.id ? "Invio…" : "Rimanda invito"}</button>
                 <button style={smallBtn} disabled={busy === inv.id} onClick={() => revoke(inv)}>Annulla invito</button>
               </div>
             ))}
