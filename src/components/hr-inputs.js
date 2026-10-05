@@ -194,11 +194,28 @@ function useComuni() {
   return list;
 }
 
-export function ComuneInput({ id, value, onChange, disabled, placeholder = "Scrivi il comune" }) {
+// 05/10/2026: chi è nato o vive all'estero scriveva il paese nella ricerca dei comuni italiani
+// («Filippine» → «Nessun comune trovato») senza vedere il pulsante «All'estero». Se quello che
+// scrive è un paese, gli proponiamo di passare all'estero con quel paese già scelto.
+const norm = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+const COUNTRY_ALIASES = { philippines: "Filippine", pilipinas: "Filippine", "united kingdom": "Regno Unito", uk: "Regno Unito", england: "Regno Unito", usa: "Stati Uniti", "united states": "Stati Uniti", germany: "Germania", spain: "Spagna", france: "Francia", switzerland: "Svizzera", romania: "Romania", brazil: "Brasile", ukraine: "Ucraina", morocco: "Marocco", albania: "Albania", moldova: "Moldavia", india: "India", china: "Cina", poland: "Polonia", portugal: "Portogallo", netherlands: "Paesi Bassi", belgium: "Belgio", austria: "Austria", greece: "Grecia", argentina: "Argentina", colombia: "Colombia", peru: "Perù", nigeria: "Nigeria", egypt: "Egitto", tunisia: "Tunisia", senegal: "Senegal", "sri lanka": "Sri Lanka", bangladesh: "Bangladesh", pakistan: "Pakistan", russia: "Russia", croatia: "Croazia", serbia: "Serbia", bulgaria: "Bulgaria", hungary: "Ungheria", mexico: "Messico", venezuela: "Venezuela", ecuador: "Ecuador", thailand: "Thailandia", vietnam: "Vietnam", indonesia: "Indonesia", japan: "Giappone" };
+export function countryFromText(t) {
+  const k = norm(t);
+  if (k.length < 3) return null;
+  if (COUNTRY_ALIASES[k]) return COUNTRY_ALIASES[k];
+  const exact = COUNTRIES.find((c) => norm(c) === k);
+  if (exact) return exact;
+  const pre = COUNTRIES.filter((c) => norm(c).startsWith(k));
+  return pre.length === 1 ? pre[0] : null;
+}
+
+export function ComuneInput({ id, value, onChange, disabled, placeholder = "Scrivi il comune", onAbroad = null }) {
   const list = useComuni();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const hits = open ? searchComuni(list, q) : [];
+  const country = open && onAbroad ? countryFromText(q) : null;
+  const abroadHit = country && country !== "Italia" ? country : null;
   if (value?.name && !open) {
     return (
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -214,6 +231,12 @@ export function ComuneInput({ id, value, onChange, disabled, placeholder = "Scri
     <div style={{ position: "relative" }}>
       <input id={id} disabled={disabled} style={field} autoComplete="off" placeholder={list ? placeholder : "Carico l'elenco dei comuni…"}
         value={q} onChange={(e) => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} aria-autocomplete="list" />
+      {abroadHit && (
+        <button type="button" onClick={() => { onAbroad(abroadHit); setOpen(false); setQ(""); }}
+          style={{ ...seg(true), width: "100%", marginTop: 6, justifyContent: "flex-start", textAlign: "left" }}>
+          È all'estero: {abroadHit}
+        </button>
+      )}
       {hits.length > 0 && (
         <div role="listbox" style={{ position: "absolute", zIndex: 5, left: 0, right: 0, top: "100%", marginTop: 4, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, overflow: "hidden", boxShadow: "0 8px 24px rgba(0,0,0,.18)" }}>
           {hits.map((c) => (
@@ -224,7 +247,7 @@ export function ComuneInput({ id, value, onChange, disabled, placeholder = "Scri
           ))}
         </div>
       )}
-      {open && q.trim().length >= 2 && list && hits.length === 0 && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4 }}>Nessun comune trovato con questo nome.</div>}
+      {open && q.trim().length >= 2 && list && hits.length === 0 && !abroadHit && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4 }}>Nessun comune italiano con questo nome. Se è all'estero, tocca «All'estero» qui sopra.</div>}
     </div>
   );
 }
@@ -244,7 +267,8 @@ export function BirthInput({ id, value, onChange, disabled }) {
         </select>
       ) : (
         <ComuneInput id={id} disabled={disabled} placeholder="Comune di nascita" value={value && !value.abroad ? value : null}
-          onChange={(c) => onChange({ abroad: false, name: c.name, prov: c.prov, code: c.code })} />
+          onChange={(c) => onChange({ abroad: false, name: c.name, prov: c.prov, code: c.code })}
+          onAbroad={(country) => onChange({ abroad: true, country })} />
       )}
     </div>
   );
@@ -384,7 +408,8 @@ export function ResidenceInput({ id, value, onChange, disabled }) {
           <input disabled={disabled} style={field} placeholder="Città" value={value?.city || ""} onChange={(e) => onChange({ ...value, abroad: true, city: e.target.value })} aria-label="Città" />
         </>
       ) : (
-        <ComuneInput id={id} disabled={disabled} value={value && !value.abroad ? value : null} onChange={onChange} />
+        <ComuneInput id={id} disabled={disabled} value={value && !value.abroad ? value : null} onChange={onChange}
+          onAbroad={(country) => onChange({ abroad: true, country, city: "" })} />
       )}
     </div>
   );

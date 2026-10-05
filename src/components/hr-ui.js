@@ -47,6 +47,7 @@ export const SYNC_LABEL = {
 /** Valore leggibile di un campo (sola lettura). */
 export function displayValue(field, v) {
   if (v == null || v === "" || (Array.isArray(v) && !v.length)) return <span style={{ color: CP.textMuted }}>—</span>;
+  if (field.labels && typeof v === "string" && field.labels[v]) return field.labels[v];
   switch (field.type) {
     case "comune": return v.abroad ? `${v.city ? `${v.city}, ` : ""}${v.country}` : `${v.name}${v.prov ? ` (${v.prov})` : ""}`;
     case "birth": return v.abroad ? v.country : `${v.name}${v.prov ? ` (${v.prov})` : ""}`;
@@ -132,7 +133,7 @@ export function FieldInput({ field, value, onChange, options, id, disabled, extr
           <option value="">—</option>
           {/* valore arrivato da ClickUp e fuori elenco (es. fase "Da verificare"): si mostra, ma con la tabella non si sceglie */}
           {value && !opts.includes(value) && <option value={value} disabled={Boolean(field.choices)}>{value}{field.choices ? " (scegli una voce)" : ""}</option>}
-          {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+          {opts.map((o) => <option key={o} value={o}>{field.labels?.[o] || o}</option>)}
         </select>
       );
     }

@@ -70,7 +70,7 @@ const PROVA_SECTIONS = [
   ["5", "5 · Competenze"], ["6", "6 · Esperienza"], ["7", "7 · Privacy"], ["documenti", "8 · Documento"], ["fine", "Tessera finale"],
 ];
 const PROVA_DATA = {
-  firstName: "Giulia", surname: "Rossi", dateOfBirth: "1998-05-12", gender: "Female", nationality: "Italy",
+  firstName: "Giulia", surname: "Rossi", dateOfBirth: "1998-05-12", gender: "Female", nationality: "Italia",
   birthPlace: { abroad: false, name: "Roma", prov: "RM", code: "H501", region: "Lazio" },
   residenceComune: { abroad: false, name: "Milano", prov: "MI", code: "F205", region: "Lombardia" },
   location: "Via Roma 1", residenceCap: "20121", personalEmail: "giulia.rossi@example.com", personalPhone: "+39 333 1234567",
