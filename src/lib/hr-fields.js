@@ -29,6 +29,9 @@ export function langsUnanswered(list) {
   return LANG_CODES.filter((c) => !cur.some((x) => x.startsWith(`${c} - `)));
 }
 export const GENDERS = ["Female", "Male", "Non-Binary", "I prefer not to declare it"];
+// 05/10/2026: nel modulo il genere usciva in inglese (sono le opzioni del campo ClickUp). Il valore
+// salvato resta quello di ClickUp, a schermo si legge in italiano.
+export const GENDER_LABELS = { Female: "Donna", Male: "Uomo", "Non-Binary": "Non binario", "I prefer not to declare it": "Preferisco non dirlo" };
 // Come la persona è arrivata da noi (03/10/2026, decisione del titolare): serve a tenere
 // vivo il confronto reference ↔ annunci e a riconoscere il premio reference (100 € a 30
 // turni). La prima voce apre la domanda "Chi ti ha segnalato?".
@@ -112,7 +115,7 @@ export const FIELDS = [
   { key: "surname", label: "Cognome", section: "anagrafica", type: "text", cu: "Surname" },
   { key: "dateOfBirth", label: "Data di nascita", section: "anagrafica", type: "date", cu: "Date Of Birth" },
   { key: "nationality", label: "Nazionalità", section: "anagrafica", type: "text", cu: "Nationality" },
-  { key: "gender", label: "Genere", section: "anagrafica", type: "option", cu: "Gender", options: GENDERS },
+  { key: "gender", label: "Genere", section: "anagrafica", type: "option", cu: "Gender", options: GENDERS, labels: GENDER_LABELS },
   { key: "birthPlace", label: "Luogo di nascita", section: "anagrafica", type: "birth", appOnly: true, mirror: "Luogo di nascita" },
   { key: "residenceComune", label: "Comune di residenza", section: "anagrafica", type: "comune", appOnly: true, mirror: "Comune di residenza" },
   { key: "location", label: "Indirizzo", section: "anagrafica", type: "location", cu: "Location" },
