@@ -9,7 +9,7 @@ import { CP, FONTS } from "@/lib/brand";
 import { useEffect, useState } from "react";
 import { searchComuni } from "@/lib/hr-comuni";
 import { langNo } from "@/lib/hr-fields";
-import { TOP_COUNTRIES, COUNTRIES } from "@/lib/hr-countries";
+import { TOP_COUNTRIES, COUNTRIES, CALLING_CODES } from "@/lib/hr-countries";
 import { SKILL_AREAS, SKILL_LEVELS, SKILL_LEVEL_HINT, SKILL_NAME, AREA_BY_KEY, PAST_ROLES, PAST_ROLE_NAME, ROLE_DURATIONS, normalizeSkillMap, normalizeLearnList, normalizePastRoles, areasOfSkillMap, skillName, pastRoleText } from "@/lib/hr-skills";
 
 
@@ -134,12 +134,20 @@ export function UsersInput({ id, value, onChange, options = [], disabled }) {
 
 // ── Telefono con prefisso (04/10/2026) ────────────────────────────────────────
 // Prefisso da tendina (Italia di base) + numero: si salva "+39 333…" → ClickUp lo accetta.
-export const PHONE_PREFIXES = [
-  ["Italia", "+39"], ["Svizzera", "+41"], ["San Marino", "+378"], ["Spagna", "+34"], ["Francia", "+33"], ["Germania", "+49"],
-  ["Austria", "+43"], ["Regno Unito", "+44"], ["Romania", "+40"], ["Albania", "+355"], ["Portogallo", "+351"], ["Belgio", "+32"],
-  ["Paesi Bassi", "+31"], ["Polonia", "+48"], ["Grecia", "+30"], ["Croazia", "+385"], ["Ucraina", "+380"], ["Moldavia", "+373"],
-  ["Brasile", "+55"], ["Argentina", "+54"], ["Stati Uniti / Canada", "+1"],
-];
+// Prefissi: i più frequenti in cima, poi tutti i paesi in ordine alfabetico (05/10/2026: mancavano
+// le Filippine). Un prefisso condiviso (+1, +7) compare una volta sola, con i paesi nel nome.
+const PHONE_TOP = ["Italia", "Filippine", "Svizzera", "San Marino", "Spagna", "Francia", "Germania", "Regno Unito", "Romania", "Albania", "Ucraina", "Moldavia", "Brasile", "Argentina"];
+export const PHONE_PREFIXES = (() => {
+  const byCode = new Map();
+  for (const n of [...PHONE_TOP, ...COUNTRIES.filter((c) => !PHONE_TOP.includes(c))]) {
+    const code = CALLING_CODES[n];
+    if (!code) continue;
+    if (byCode.has(code)) byCode.get(code).push(n); else byCode.set(code, [n]);
+  }
+  const label = (names) => (names.length > 2 ? `${names.slice(0, 2).join(", ")} e altri` : names.join(" / "));
+  return [...byCode].map(([code, names]) => [label(names), code]);
+})();
+export const PHONE_TOP_COUNT = PHONE_TOP.length;
 /** "+41 79 123…" → { prefix: "+41", rest: "79 123…" }; senza + → Italia. */
 export function splitPhone(v) {
   const raw = String(v || "").trim();
@@ -165,7 +173,8 @@ export function PhoneInput({ id, value, onChange, disabled, extra }) {
   return (
     <div style={{ display: "flex", gap: 8, minWidth: 0, maxWidth: "100%" }}>
       <select aria-label="Prefisso" disabled={disabled} value={pre} onChange={(e) => { setPre(e.target.value); emit(e.target.value, rest); }} style={{ ...box, flex: "0 0 128px", width: 128, minWidth: 0 }}>
-        {PHONE_PREFIXES.map(([n, p]) => <option key={p + n} value={p}>{p} {n}</option>)}
+        <optgroup label="Più frequenti">{PHONE_PREFIXES.slice(0, PHONE_TOP_COUNT).map(([n, p]) => <option key={p + n} value={p}>{p} {n}</option>)}</optgroup>
+        <optgroup label="Tutti i paesi">{PHONE_PREFIXES.slice(PHONE_TOP_COUNT).map(([n, p]) => <option key={p + n} value={p}>{p} {n}</option>)}</optgroup>
         <option value="altro">Altro (scrivi +…)</option>
       </select>
       <input id={id} type="tel" disabled={disabled} {...(extra || {})} value={rest} placeholder={pre === "altro" ? "+…" : "333 123 4567"} onChange={(e) => emit(pre, e.target.value)} style={{ ...box, flex: 1, minWidth: 0 }} />
