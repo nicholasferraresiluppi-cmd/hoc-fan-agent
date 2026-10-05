@@ -42,6 +42,8 @@ function uniq(items, get) {
   }
   return [...m.entries()].sort((a, b) => (a[0] === NONE ? 1 : b[0] === NONE ? -1 : a[0].localeCompare(b[0], "it")));
 }
+// partita IVA: nella scheda è sì/no (booleano), nel filtro una parola
+const pivaWord = (p) => (p.fields?.partitaIva === true ? "Sì" : p.fields?.partitaIva === false ? "No" : null);
 const has = (vals, want) => (want === NONE ? ![].concat(vals ?? []).filter(Boolean).length : [].concat(vals ?? []).includes(want));
 
 export default function HrPeoplePage() {
@@ -59,6 +61,7 @@ export default function HrPeoplePage() {
   const [pastRole, setPastRole] = useState("");
   const [lang, setLang] = useState("");
   const [source, setSource] = useState("");
+  const [piva, setPiva] = useState("");
   const [newOpen, setNewOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [archNotice, setArchNotice] = useState(null);
@@ -83,6 +86,7 @@ export default function HrPeoplePage() {
   const projects = useMemo(() => uniq(items, (p) => p.fields?.project), [items]);
   const emps = useMemo(() => uniq(items, (p) => p.fields?.employmentType), [items]);
   const sources = useMemo(() => uniq(items, (p) => p.fields?.source), [items]);
+  const pivas = useMemo(() => uniq(items, pivaWord), [items]);
   const skillCounts = useMemo(() => {
     const m = {};
     for (const p of items) for (const k of Object.keys(normalizeSkillMap(p.fields?.skillLevels))) m[k] = (m[k] || 0) + 1;
@@ -109,7 +113,7 @@ export default function HrPeoplePage() {
   const tabCounts = useMemo(() => Object.fromEntries(TABS.map((t) => [t.key, items.filter(t.test).length])), [TABS, items]);
   const curTab = TABS.find((t) => t.key === tab);
 
-  const activeFilters = [contract, dept, project, emp, lang, skill, pastRole, source].filter(Boolean).length;
+  const activeFilters = [contract, dept, project, emp, lang, skill, pastRole, source, piva].filter(Boolean).length;
   const rows = useMemo(() => {
     if (!curTab) return [];
     const needle = q.trim().toLowerCase();
@@ -122,6 +126,7 @@ export default function HrPeoplePage() {
       if (project && !has(f.project, project)) return false;
       if (emp && !has(f.employmentType, emp)) return false;
       if (source && !has(f.source, source)) return false;
+      if (piva && !has(pivaWord(p), piva)) return false;
       if (skill && !hasSkillAtLeast(f.skillLevels, skill, minLevel)) return false;
       if (pastRole && !normalizePastRoles(f.pastRoles).some((r) => r.role === pastRole)) return false;
       if (needle) {
@@ -130,8 +135,8 @@ export default function HrPeoplePage() {
       }
       return true;
     });
-  }, [items, curTab, q, contract, dept, project, emp, lang, source, skill, minLevel, pastRole]);
-  const resetFilters = () => { setContract(""); setDept(""); setProject(""); setEmp(""); setLang(""); setSkill(""); setMinLevel(""); setPastRole(""); setSource(""); };
+  }, [items, curTab, q, contract, dept, project, emp, lang, source, piva, skill, minLevel, pastRole]);
+  const resetFilters = () => { setContract(""); setDept(""); setProject(""); setEmp(""); setLang(""); setSkill(""); setMinLevel(""); setPastRole(""); setSource(""); setPiva(""); };
 
   const syncProblems = items.filter((p) => ["error", "partial", "deleted", "missing", "drift"].includes(p.sync?.status));
 
@@ -238,6 +243,7 @@ export default function HrPeoplePage() {
                   <FilterSelect label="Tipo di rapporto" value={emp} onChange={setEmp} options={emps} />
                   <FilterSelect label="Lingue" value={lang} onChange={setLang} options={langs} />
                   <FilterSelect label="Come ci ha conosciuto" value={source} onChange={setSource} options={sources} />
+                  <FilterSelect label="Partita IVA" value={piva} onChange={setPiva} options={pivas} />
                   <label>
                     <span style={lbl}>Ha la competenza</span>
                     <select style={input} value={skill} onChange={(e) => { setSkill(e.target.value); if (!e.target.value) setMinLevel(""); }}>
