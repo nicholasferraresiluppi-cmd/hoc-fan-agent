@@ -126,6 +126,33 @@ export async function createInvitation({ email, roles, creators, workspace, invi
   return { ...shape(inv), url: inv.url || null };
 }
 
+/**
+ * Rimanda un invito in attesa (05/10/2026, richiesta Nicholas: «girare di nuovo il link»).
+ * Clerk non rimanda un invito: se ne crea uno NUOVO con la stessa email e gli stessi ruoli,
+ * creator e mansione (nessun permesso in più: l'invito è identico), poi si annulla il vecchio.
+ * Chi non è admin può rimandare solo i propri inviti. Restituisce anche il link, da girare
+ * su WhatsApp se l'email non arriva.
+ */
+export async function resendInvitation(id, actorId, origin) {
+  if (!/^inv_[A-Za-z0-9]+$/.test(String(id || ""))) throw new Error("Invito non valido");
+  const cc = await clerkClient();
+  const list = await cc.invitations.getInvitationList({ status: "pending", limit: 100 }).then((x) => (Array.isArray(x) ? x : x?.data || []));
+  const old = list.find((x) => x.id === id);
+  if (!old) throw new Error("Invito non trovato: forse è già stato usato o annullato");
+  const admin = await isUserIdAdmin(actorId).catch(() => false);
+  if (!admin && old.publicMetadata?.invited_by !== actorId) throw new Error("Puoi rimandare solo gli inviti che hai mandato tu");
+  const redirectUrl = origin ? `${origin}/sign-up` : null;
+  const inv = await cc.invitations.createInvitation({
+    emailAddress: old.emailAddress,
+    ...(redirectUrl ? { redirectUrl } : {}),
+    notify: true,
+    ignoreExisting: true,
+    publicMetadata: old.publicMetadata || {},
+  });
+  await cc.invitations.revokeInvitation(id).catch(() => {});
+  return { ...shape(inv), url: inv.url || null };
+}
+
 export async function revokeInvitation(id, actorId) {
   if (!/^inv_[A-Za-z0-9]+$/.test(String(id || ""))) throw new Error("Invito non valido");
   const cc = await clerkClient();

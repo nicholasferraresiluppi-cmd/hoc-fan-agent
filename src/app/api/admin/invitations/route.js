@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 import { currentUser } from "@clerk/nextjs/server";
 import { authorize, auditAccess, CAPABILITIES } from "@/lib/rbac";
 import { internalOrigin } from "@/lib/cron-chain";
-import { listInvitations, createInvitation, revokeInvitation, assignableRoles } from "@/lib/invitations";
+import { listInvitations, createInvitation, revokeInvitation, resendInvitation, assignableRoles } from "@/lib/invitations";
 
 export async function GET() {
   const az = await authorize(CAPABILITIES.USERS_INVITE);
@@ -23,6 +23,17 @@ export async function POST(request) {
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   let body;
   try { body = await request.json(); } catch { return Response.json({ error: "Richiesta non valida" }, { status: 400 }); }
+  // rimanda un invito in attesa: invito nuovo identico + link da copiare
+  if (body?.action === "resend") {
+    try {
+      const invitation = await resendInvitation(body.id, az.userId, internalOrigin(request));
+      await auditAccess(az.userId, "invite_resend", { email: invitation.email });
+      return Response.json({ ok: true, invitation });
+    } catch (e) {
+      const msg = e?.errors?.[0]?.longMessage || e?.errors?.[0]?.message || e.message || "Invio non riuscito";
+      return Response.json({ error: msg }, { status: 400 });
+    }
+  }
   try {
     const me = await currentUser().catch(() => null);
     const inviterName = [me?.firstName, me?.lastName].filter(Boolean).join(" ") || me?.emailAddresses?.[0]?.emailAddress || null;
