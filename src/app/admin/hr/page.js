@@ -84,7 +84,7 @@ export default function HrPeoplePage() {
   }, [items]);
   const depts = useMemo(() => uniq(items, (p) => p.fields?.department), [items]);
   const langs = useMemo(() => uniq(items, (p) => p.fields?.spokenLanguages), [items]);
-  const projects = useMemo(() => uniq(items, (p) => p.fields?.project), [items]);
+  const projects = useMemo(() => uniq(items, (p) => p.fields?.progetto), [items]);
   const emps = useMemo(() => uniq(items, (p) => p.fields?.employmentType), [items]);
   const sources = useMemo(() => uniq(items, (p) => p.fields?.source), [items]);
   const pivas = useMemo(() => uniq(items, pivaWord), [items]);
@@ -125,7 +125,7 @@ export default function HrPeoplePage() {
       if (lang && !has(f.spokenLanguages, lang)) return false;
       if (contract && !has(f.hvContractStatus, contract)) return false;
       if (dept && !has(f.department, dept)) return false;
-      if (project && !has(f.project, project)) return false;
+      if (project && !has(f.progetto, project)) return false;
       if (emp && !has(f.employmentType, emp)) return false;
       if (source && !has(f.source, source)) return false;
       if (piva && !has(pivaWord(p), piva)) return false;
@@ -133,7 +133,7 @@ export default function HrPeoplePage() {
       if (skill && !hasSkillAtLeast(f.skillLevels, skill, minLevel)) return false;
       if (pastRole && !normalizePastRoles(f.pastRoles).some((r) => r.role === pastRole)) return false;
       if (needle) {
-        const hay = [p.name, f.personalEmail, f.companyEmail, f.personalPhone, ...(f.mansioni || []), f.currentJob, f.referredBy, ...(f.project || []), ...(f.role || []), ...(f.referent || []).map((u) => u.name)].filter(Boolean).join(" ").toLowerCase();
+        const hay = [p.name, f.personalEmail, f.companyEmail, f.personalPhone, ...(f.mansioni || []), f.currentJob, f.referredBy, ...(f.progetto || []), ...(f.project || []), ...(f.role || []), ...(f.referent || []).map((u) => u.name)].filter(Boolean).join(" ").toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
@@ -164,7 +164,7 @@ export default function HrPeoplePage() {
     },
     { key: "status", label: "Fase", sort: (p) => { const i = PHASE_LABELS.indexOf(phase(p)); return i < 0 ? 99 : i; }, render: (p) => <PhasePill phase={phase(p)} /> },
     { key: "mansioni", label: "Mansione", sortable: false, render: (p) => (p.fields?.mansioni || []).join(", ") || <span style={{ color: CP.textMuted }}>—</span> },
-    { key: "project", label: "Progetto", sortable: false, render: (p) => (p.fields?.project || []).length ? (p.fields.project.slice(0, 2).map((x) => x.replace(/^Model ?- ?/, "")).join(", ") + (p.fields.project.length > 2 ? ` +${p.fields.project.length - 2}` : "")) : <span style={{ color: CP.textMuted }}>—</span> },
+    { key: "project", label: "Progetto", sortable: false, render: (p) => (p.fields?.progetto || []).length ? (p.fields.progetto.slice(0, 2).join(", ") + (p.fields.progetto.length > 2 ? ` +${p.fields.progetto.length - 2}` : "")) : <span style={{ color: CP.textMuted }}>—</span> },
     { key: "referent", label: "Referente", sort: (p) => (p.fields?.referent || [])[0]?.name || "", render: (p) => (p.fields?.referent || []).map((u) => u.name).join(", ") || <span style={{ color: CP.textMuted }}>—</span> },
     {
       key: "ready", label: "Pronta", sort: (p) => ready[p.id]?.done ?? 0,

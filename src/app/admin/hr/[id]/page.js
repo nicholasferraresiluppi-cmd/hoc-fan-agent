@@ -192,7 +192,7 @@ function Overview({ p, onGo }) {
     ["Telefono", f.personalPhone], ["Email", f.personalEmail],
     ["Vive a", f.residenceComune?.abroad ? [f.residenceComune.city, f.residenceComune.country].filter(Boolean).join(", ") : f.residenceComune?.name],
     ["Lingue", langs], ["Punti forti", skills.join(", ")], ["Partita IVA", f.partitaIva === true ? "Sì" : f.partitaIva === false ? "No" : null],
-    ["Progetto", (f.project || []).join(", ")], ["Referente", (f.referent || []).map((u) => u.name).join(", ")],
+    ["Progetto", (f.progetto || []).join(", ") || (f.project || []).join(", ")], ["Referente", (f.referent || []).map((u) => u.name).join(", ")],
     ["Come ci ha conosciuto", f.source], ["Privacy", p.consent?.at ? `consenso il ${fmtDate(p.consent.at)}` : null],
   ].filter(([, v]) => v);
   return (

@@ -41,8 +41,9 @@ export async function POST(request) {
     if (body?.action === "view_columns") {
       const viewId = String(body.viewId || "").replace(/[^A-Za-z0-9-]/g, "").slice(0, 40);
       const names = (Array.isArray(body.fields) ? body.fields : []).map((x) => String(x).slice(0, 80)).slice(0, 20);
-      if (!viewId || !names.length) return Response.json({ ok: false, error: "viewId e fields obbligatori." }, { status: 400 });
-      const r = await showViewColumns(viewId, names);
+      if (!viewId || (!names.length && !(Array.isArray(body.hide) && body.hide.length))) return Response.json({ ok: false, error: "viewId e fields obbligatori." }, { status: 400 });
+      const hide = (Array.isArray(body.hide) ? body.hide : []).map((x) => String(x).slice(0, 80)).slice(0, 20);
+      const r = await showViewColumns(viewId, names, hide);
       return Response.json(r, { status: r.ok ? 200 : 400 });
     }
     if (body?.action === "register_webhook") {

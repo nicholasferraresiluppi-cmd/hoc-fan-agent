@@ -942,7 +942,7 @@ export async function registerWebhook({ endpoint, actor }) {
  * colonna «Mansione» nella vista «Persone» non restava salvata). Solo AGGIUNGE colonne visibili:
  * le altre impostazioni della vista restano come sono.
  */
-export async function showViewColumns(viewId, fieldNames = []) {
+export async function showViewColumns(viewId, fieldNames = [], hideNames = []) {
   const cfg = hrSyncConfig();
   if (!cfg.enabled) return { ok: false, error: "Sincronizzazione spenta." };
   const meta = await getListFields(cfg.listId);
@@ -960,10 +960,16 @@ export async function showViewColumns(viewId, fieldNames = []) {
     if (cur) cur.hidden = false; else fields.push({ field: key, hidden: false });
     added.push(name);
   }
-  if (!added.length) return { ok: true, added, missing };
+  const hidden = [];
+  for (const name of hideNames) {
+    const f = meta.find((m) => m.name === name);
+    const cur = f && fields.find((c) => c.field === `cf_${f.id}`);
+    if (cur && !cur.hidden) { cur.hidden = true; hidden.push(name); }
+  }
+  if (!added.length && !hidden.length) return { ok: true, added, hidden, missing };
   const { id, date_created, creator, visibility, protected: _p, protected_note, protected_by, date_protected, orderindex, ...rest } = view;
   await updateView(viewId, { ...rest, columns: { ...(view.columns || {}), fields } });
-  return { ok: true, added, missing };
+  return { ok: true, added, hidden, missing };
 }
 
 /**
