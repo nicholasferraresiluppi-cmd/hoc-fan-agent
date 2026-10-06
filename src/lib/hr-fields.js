@@ -237,10 +237,21 @@ export function cfControlChar(first15) {
 }
 
 /** @returns {{ok:true, value:string} | {ok:false, error:string}} */
+// 06/10/2026 (Nicholas): chi viene da fuori (es. Filippine: TIN di 9-12 cifre, «123-456-789-000»)
+// non ha il codice fiscale italiano di 16 caratteri. Si accetta anche il numero fiscale del proprio
+// paese: 5-20 caratteri tra lettere, cifre, trattini, punti e barre, con almeno 5 cifre. Un testo che
+// INIZIA come un codice fiscale italiano (6 lettere + 2 cifre) resta controllato alla lettera: così un
+// codice italiano scritto a metà non passa per «estero».
+const CF_IT_START = /^[A-Z]{6}[0-9LMNPQRSTUV]{2}/;
+const FOREIGN_TAX_RE = /^[A-Z0-9][A-Z0-9./-]{3,18}[A-Z0-9]$/;
+export function isForeignTaxId(v) {
+  return FOREIGN_TAX_RE.test(v) && (v.match(/\d/g) || []).length >= 5 && !CF_IT_START.test(v);
+}
 export function validateCodiceFiscale(input) {
   const v = s(input).toUpperCase().replace(/\s+/g, "");
   if (!v) return { ok: false, error: "Codice fiscale vuoto." };
-  if (v.length !== 16) return { ok: false, error: "Il codice fiscale ha 16 caratteri." };
+  if (isForeignTaxId(v)) return { ok: true, value: v, foreign: true };
+  if (v.length !== 16) return { ok: false, error: "Il codice fiscale italiano ha 16 caratteri. Se non ce l'hai, scrivi il numero fiscale del tuo paese." };
   if (!CF_RE.test(v)) return { ok: false, error: "Formato del codice fiscale non valido." };
   if (cfControlChar(v.slice(0, 15)) !== v[15]) return { ok: false, error: "Il carattere di controllo non torna: controlla di averlo scritto bene." };
   return { ok: true, value: v };
