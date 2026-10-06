@@ -10,7 +10,7 @@ export const READINESS = [
   { key: "contract", label: "contratto firmato", test: (f) => f.hvContractStatus === "Firmato" },
   { key: "referent", label: "referente", test: (f) => Array.isArray(f.referent) && f.referent.length > 0 },
   { key: "project", label: "progetto", test: (f) => Array.isArray(f.project) && f.project.length > 0 },
-  { key: "job", label: "mansione", test: (f) => Boolean(String(f.currentJob || "").trim()) },
+  { key: "job", label: "mansione", test: (f) => (Array.isArray(f.mansioni) && f.mansioni.length > 0) || Boolean(String(f.currentJob || "").trim()) },
 ];
 
 /** { done, total, missing: [{key,label}] } per una scheda. */

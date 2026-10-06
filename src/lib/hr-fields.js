@@ -28,6 +28,9 @@ export function langsUnanswered(list) {
   const cur = Array.isArray(list) ? list.map((x) => String(x || "").trim()) : [];
   return LANG_CODES.filter((c) => !cur.some((x) => x.startsWith(`${c} - `)));
 }
+// Mansione (06/10/2026, Nicholas): la mettono HR/coordinamento a mano, non il modulo. Più voci
+// insieme se la persona ne copre più d'una. Su ClickUp = campo etichette «Mansione».
+export const MANSIONI = ["Chatter", "Sales Manager", "PO", "Social Media Manager", "Editor", "Publisher"];
 export const GENDERS = ["Female", "Male", "Non-Binary", "I prefer not to declare it"];
 // 05/10/2026: nel modulo il genere usciva in inglese (sono le opzioni del campo ClickUp). Il valore
 // salvato resta quello di ClickUp, a schermo si legge in italiano.
@@ -132,7 +135,8 @@ export const FIELDS = [
   { key: "employmentType", label: "Tipo di rapporto", section: "rapporto", type: "option", cu: "Type of Employment" },
   { key: "role", label: "Ruolo", section: "rapporto", type: "labels", cu: "Role" },
   { key: "additionalRole", label: "Ruolo aggiuntivo", section: "rapporto", type: "labels", cu: "Additional Role" },
-  { key: "currentJob", label: "Mansione attuale", section: "rapporto", type: "text", cu: "Mansione attuale", extra: true },
+  { key: "mansioni", label: "Mansione", section: "rapporto", type: "labels", cu: "Mansione", options: MANSIONI },
+  { key: "currentJob", label: "Mansione (testo, vecchio)", section: "rapporto", type: "text", cu: "Mansione attuale", extra: true },
   { key: "department", label: "Reparto", section: "rapporto", type: "labels", cu: "Department" },
   { key: "project", label: "Progetto / creator", section: "rapporto", type: "labels", cu: "Project" },
   { key: "seniority", label: "Seniority", section: "rapporto", type: "option", cu: "Seniority" },

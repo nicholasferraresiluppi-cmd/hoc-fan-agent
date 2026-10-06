@@ -40,8 +40,10 @@ export async function documentReceived(personId, part = null) {
   const parts = new Set((await kv.smembers(key).catch(() => [])) || []);
   const complete = parts.has("intero") || parts.has("passaporto") || (parts.has("fronte") && parts.has("retro"));
   if (!complete) return;
-  const removed = await kv.zrem(PENDING, personId).catch(() => 0);
-  if (removed) await send(personId, "caricato");
+  await kv.zrem(PENDING, personId).catch(() => 0);
+  // un avviso «documento caricato» per scheda, anche se arriva dopo quello «manca» (si può caricare per 48 ore)
+  const first = await kv.set(`hr:notify:docdone:${personId}`, 1, { nx: true, ex: 7 * 24 * 3600 }).catch(() => "OK");
+  if (first) await send(personId, "caricato");
 }
 
 /** Schede in attesa da troppo: avviso «documento mancante». */

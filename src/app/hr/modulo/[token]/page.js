@@ -393,7 +393,8 @@ export default function HrFormPage() {
   const [cfWarn, setCfWarn] = useState(null); // avvisi di coerenza CF ↔ data/genere/luogo (non bloccanti)
   const [resumed, setResumed] = useState(false); // bozza ripresa dal browser: avviso discreto
   const [confirmRestart, setConfirmRestart] = useState(false);
-  const [canSave, setCanSave] = useState(false); // il browser può tenere la bozza? (in privata può non riuscire)
+  const [canSave, setCanSave] = useState(false);
+  const [resumedDocs, setResumedDocs] = useState(false); // ripreso al passo documenti dopo un invio // il browser può tenere la bozza? (in privata può non riuscire)
   const formRef = useRef(null);
   const [prova, setProva] = useState(null);
 
@@ -420,6 +421,18 @@ export default function HrFormPage() {
       const okSave = safeSet(`${key}:prova`, "1");
       safeRemove(`${key}:prova`);
       setCanSave(okSave);
+      // 06/10/2026: dati già inviati da questo telefono ma documento non ancora caricato → si torna
+      // al documento invece di ricominciare il modulo (che creava una seconda scheda)
+      const sent = parseSent(safeGet(`${key}:inviato`));
+      if (sent && !j.done) {
+        setData({ ...j.prefill, ...sent.data });
+        setUploadToken(sent.uploadToken);
+        setSentAt(sent.sentAt);
+        setResumedDocs(true);
+        setStage("files");
+        setCtx(j);
+        return;
+      }
       if (j.done) {
         safeRemove(key);
         setData({ ...j.prefill });
@@ -552,6 +565,8 @@ export default function HrFormPage() {
         throw new Error(j.error || `Invio non riuscito (${r.status}). Riprova tra poco: le risposte restano qui.`);
       }
       safeRemove(draftKey(token)); // inviato: la bozza non serve più
+      // segno che i dati sono partiti: se la persona chiude ora e riapre il link, torna al documento
+      if (j.uploadsEnabled) safeSet(`${draftKey(token)}:inviato`, JSON.stringify({ v: 1, uploadToken: j.uploadToken || token, sentAt: Date.now(), data: { firstName: data.firstName, surname: data.surname, gender: data.gender, skillLevels: data.skillLevels, spokenLanguages: data.spokenLanguages } }));
       setCfNote(j.cfNote || null);
       setUploadToken(j.uploadToken || token);
       setSentAt(Date.now());
@@ -596,7 +611,9 @@ export default function HrFormPage() {
     );
   }
 
-  if (stage === "files") return <Shell><FilesStep token={uploadToken || token} data={data} prova={Boolean(prova)} total={STEPS.length + 1} onDone={() => { try { window.scrollTo({ top: 0, behavior: "auto" }); } catch { /* */ } setStage("done"); }} /></Shell>;
+  if (stage === "files") return <Shell><FilesStep token={uploadToken || token} data={data} prova={Boolean(prova)} total={STEPS.length + 1} resumed={resumedDocs}
+    onRestart={() => { safeRemove(`${draftKey(token)}:inviato`); window.location.reload(); }}
+    onDone={() => { safeRemove(`${draftKey(token)}:inviato`); try { window.scrollTo({ top: 0, behavior: "auto" }); } catch { /* */ } setStage("done"); }} /></Shell>;
 
   if (stage === "intro") {
     // col link condiviso il nome non lo sappiamo: niente saluto personale
@@ -809,7 +826,15 @@ function TesseraLinkButton({ token, prova }) {
   );
 }
 
-function FilesStep({ token, data, total, onDone, prova = false }) {
+function parseSent(raw) {
+  try {
+    const d = JSON.parse(raw || "null");
+    if (!d || d.v !== 1 || !d.uploadToken || !(Date.now() - d.sentAt < 47 * 3600_000)) return null;
+    return d;
+  } catch { return null; }
+}
+
+function FilesStep({ token, data, total, onDone, onRestart, resumed = false, prova = false }) {
   // 05/10/2026 (Nicholas): si sceglie il documento. Carta = fronte + retro (due caricamenti, anche lo
   // stesso PDF due volte), passaporto = una foto. Con un esempio disegnato per ciascun lato.
   const [docType, setDocType] = useState(null);
@@ -896,7 +921,13 @@ function FilesStep({ token, data, total, onDone, prova = false }) {
       </div>
       <div className="hrf-sheet" style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 18 }}>
         <Headline title="Il tuo documento" sub="senza, il modulo non è completo." size={34} />
-        <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>I tuoi dati li abbiamo. Manca solo il documento d&apos;identità: scegli quale hai sotto mano. PDF, JPG o PNG, fino a 50 MB; le foto le riduciamo noi. Hai un&apos;ora di tempo.</p>
+        {resumed && (
+          <div role="status" style={{ fontSize: 13.5, lineHeight: 1.5, color: CP.textSecondary }}>
+            I tuoi dati li abbiamo già ricevuti: non serve compilare di nuovo. Manca solo il documento.{" "}
+            <button type="button" onClick={onRestart} style={{ background: "none", border: 0, padding: 0, color: GOLD, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, fontSize: 13.5 }}>Non sei tu? Compila un modulo nuovo</button>
+          </div>
+        )}
+        <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15, lineHeight: 1.55 }}>I tuoi dati li abbiamo. Manca solo il documento d&apos;identità: scegli quale hai sotto mano. PDF, JPG o PNG, fino a 50 MB; le foto le riduciamo noi. Se ora non l&apos;hai sotto mano, riapri questo link entro due giorni: ripartirai da qui.</p>
         <div style={{ display: "flex", gap: 10 }}>{chooser("carta")}{chooser("passaporto")}</div>
         {docType && (
           <div style={{ borderBottom: `1px solid ${CP.border}` }}>

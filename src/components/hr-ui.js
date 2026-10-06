@@ -139,6 +139,7 @@ export function FieldInput({ field, value, onChange, options, id, disabled, extr
     }
     case "labels": {
       const cur = Array.isArray(value) ? value : [];
+      if (!options?.length && field.options?.length) options = field.options;
       if (!options?.length) {
         return <input {...common} placeholder="separati da virgola" value={cur.join(", ")} onChange={(e) => onChange(e.target.value.split(",").map((x) => x.trim()).filter(Boolean))} />;
       }

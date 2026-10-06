@@ -645,7 +645,7 @@ console.log(`hr-people: ${n} asserzioni OK`);
   const child1 = await fake.get(`hr:form:${s1.uploadToken}`);
   const created1 = await H.getPerson(child1.personId);
   t(created1 && created1.id !== existing.person.id && created1.source === "modulo" && created1.consent?.version, "il figlio punta alla scheda nuova, con consenso");
-  t(child1.child === true && child1.submittedAt && child1.expiresAt - child1.submittedAt === 3600 * 1000, "figlio: già inviato, 1 ora");
+  t(child1.child === true && child1.submittedAt && child1.expiresAt - child1.submittedAt === 48 * 3600 * 1000, "figlio: già inviato, 48 ore per i documenti");
   t(created1.fields.collaborationStatus === "In ingresso", "modulo (link condiviso): persona nuova in fase «In ingresso»");
   t(!unchanged.fields.collaborationStatus, "la scheda esistente non riceve una fase");
   t((await H.getFormContext(a.token)).state === "open", "il link condiviso resta aperto dopo l'invio");
@@ -1424,7 +1424,7 @@ console.log(`hr-people: ${n} asserzioni OK`);
   const s3 = await H.submitForm(link.token, { consent: true, data: { ...req(), firstName: "Tarda" } });
   const slot3 = await U.requestUploadSlot(s3.uploadToken, { kind: "cv", contentType: "application/pdf", size: 100 });
   const rec3 = await fake.get(`hr:form:${s3.uploadToken}`);
-  await fake.set(`hr:form:${s3.uploadToken}`, { ...rec3, submittedAt: Date.now() - 2 * 3600_000 });
+  await fake.set(`hr:form:${s3.uploadToken}`, { ...rec3, submittedAt: Date.now() - 49 * 3600_000 });
   t((await U.requestUploadSlot(s3.uploadToken, { kind: "cv", contentType: "application/pdf", size: 100 })).status === 410, "slot rifiutato: finestra scaduta");
   t((await U.authorizeBlobUpload(s3.uploadToken, slot3.pathname)).error?.status === 410, "token di upload rifiutato: finestra scaduta");
 

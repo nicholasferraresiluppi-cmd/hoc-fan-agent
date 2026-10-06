@@ -353,7 +353,17 @@ async function pushPerson(person, keys, cfg) {
   const statusWanted = Boolean(plan.status) && (!task || !pushKeys || pushKeys.includes("collaborationStatus"));
   if (statusWanted) pushedValues[STATUS_KEY] = p.fields?.collaborationStatus ?? null;
   if (!task) {
-    const created = await createTask(cfg.listId, createTaskPayload(plan));
+    let created;
+    try {
+      created = await createTask(cfg.listId, createTaskPayload(plan));
+    } catch (e) {
+      // 06/10/2026: ClickUp rifiuta TUTTO il task per un telefono che giudica non valido (il nostro
+      // controllo è più largo del suo). Si riprova senza i telefoni: la scheda nasce, il numero resta
+      // in app e il campo risulta «non scritto» come gli altri saltati.
+      if (!(e?.status === 400 && /phone/i.test(String(e?.message || "")))) throw e;
+      const phoneKeys = new Set(["personalPhone", "companyPhone"]);
+      created = await createTask(cfg.listId, createTaskPayload({ ...plan, fieldOps: plan.fieldOps.filter((o) => !phoneKeys.has(o.key)) }));
+    }
     p.clickupTaskId = String(created.id);
     p.clickupUrl = created.url || `https://app.clickup.com/t/${created.id}`;
     await kv.set(K.echo(p.clickupTaskId), recordEcho({}, pushedValues, at, pushedPrints), { ex: 60 });
@@ -951,6 +961,24 @@ export async function ensureWebhookHealthy({ force = false } = {}) {
   const res = await registerWebhook({ endpoint: rec.endpoint, actor: "controllo automatico" });
   await notifyWhatsApp(`Webhook ClickUp del CRM HR: era «${status}»${mine?.health?.fail_count ? ` (${mine.health.fail_count} errori)` : ""}. ${res.ok ? "Riattivato da solo." : `Non sono riuscito a riattivarlo: ${res.error}`}\nhttps://houseofcreators.app/admin/hr/sync`).catch(() => {});
   return { ok: Boolean(res.ok), status, reregistered: Boolean(res.ok) };
+}
+
+/**
+ * Schede che da più di un'ora non riescono ad arrivare su ClickUp (06/10/2026: una persona è
+ * rimasta 20 ore senza task, con i documenti fermi in coda, perché ClickUp rifiutava il telefono;
+ * l'errore si ripeteva ogni 5 minuti senza che nessuno lo vedesse). Un WhatsApp al giorno al massimo.
+ */
+export async function notifyStuckSync({ now = Date.now() } = {}) {
+  const people = await listPeople();
+  const stuck = people.filter((p) => p.sync?.status === "error" && (now - (Number(p.createdAt) || now)) > 3600_000);
+  if (!stuck.length) return { stuck: 0 };
+  const day = new Date(now).toISOString().slice(0, 10);
+  const first = await kv.set("hr:syncerr:notified", day, { nx: true, ex: 24 * 3600 }).catch(() => "OK");
+  if (first) {
+    const lines = stuck.slice(0, 8).map((p) => `• ${fullName(p.fields) || p.id}: ${String(p.sync?.message || "errore").slice(0, 120)}`);
+    await notifyWhatsApp(`CRM HR: ${stuck.length} ${stuck.length === 1 ? "scheda non arriva" : "schede non arrivano"} su ClickUp da più di un'ora.\n${lines.join("\n")}\nhttps://houseofcreators.app/admin/hr/sync`).catch(() => {});
+  }
+  return { stuck: stuck.length, notified: Boolean(first) };
 }
 
 // ── Codice fiscale: "mostra" (loggato) ──────────────────────────────────────
