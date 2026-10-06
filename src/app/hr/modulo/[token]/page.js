@@ -696,6 +696,7 @@ export default function HrFormPage() {
                 )}
                 <FieldError id={`f-${k}-err`} msg={fe} />
                 {k === "codiceFiscale" && ctx.cfPresent && !cfOff && <span style={{ fontSize: 12, color: CP.textMuted }}>Lo abbiamo già: lascia vuoto per non cambiarlo.</span>}
+                {k === "codiceFiscale" && !cfOff && <span style={{ display: "block", fontSize: 12, color: CP.textMuted }}>Non hai il codice fiscale italiano? Scrivi il numero fiscale del tuo paese (per esempio, nelle Filippine, il TIN).</span>}
                 {k === "codiceFiscale" && !cfOff && <span style={{ display: "block", fontSize: 12, color: CP.textMuted }}>Lo vede solo chi gestisce il personale. Non lo salviamo sul tuo dispositivo.</span>}
               </div>
             );

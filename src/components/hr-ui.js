@@ -161,7 +161,7 @@ export function FieldInput({ field, value, onChange, options, id, disabled, extr
     case "location":
       return <input {...common} placeholder={field.key === "location" ? "Via e numero civico" : "Città, paese"} value={value?.address || ""} onChange={(e) => onChange({ address: e.target.value, lat: value?.lat ?? null, lng: value?.lng ?? null })} />;
     case "cf":
-      return <input {...common} autoComplete="off" spellCheck={false} maxLength={16} placeholder="16 caratteri" value={value || ""} onChange={(e) => onChange(e.target.value.toUpperCase())} />;
+      return <input {...common} autoComplete="off" spellCheck={false} maxLength={24} placeholder="16 caratteri, o il numero fiscale del tuo paese" value={value || ""} onChange={(e) => onChange(e.target.value.toUpperCase())} />;
     default:
       return <input {...common} value={value || ""} onChange={(e) => onChange(e.target.value)} />;
   }

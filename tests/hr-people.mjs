@@ -40,6 +40,13 @@ ok(validateCodiceFiscale("RSSMRA85T10A562S").ok, "CF noto valido");
 eq(validateCodiceFiscale(" rssmra85t10a562s ").value, "RSSMRA85T10A562S", "minuscolo e spazi normalizzati");
 ok(!validateCodiceFiscale("RSSMRA85T10A562T").ok, "carattere di controllo sbagliato");
 ok(/controllo/.test(validateCodiceFiscale("RSSMRA85T10A562T").error), "errore parla del controllo");
+// numero fiscale estero (06/10/2026: Filippine, TIN 9-12 cifre)
+eq(validateCodiceFiscale("123-456-789-000").value, "123-456-789-000", "TIN filippino con trattini accettato");
+ok(validateCodiceFiscale("123456789").foreign, "TIN a 9 cifre accettato come estero");
+ok(validateCodiceFiscale("X1234567L").ok, "NIE spagnolo accettato");
+ok(!validateCodiceFiscale("RSSMRA85T10A562").ok, "CF italiano a metà (15) NON passa per estero");
+ok(!validateCodiceFiscale("1234").ok, "troppo corto rifiutato");
+ok(!validateCodiceFiscale("ABCDEFGH").ok, "senza cifre rifiutato");
 ok(!validateCodiceFiscale("RSSMRA85T10A562").ok, "15 caratteri → invalido");
 ok(!validateCodiceFiscale("RSSMRA85Z10A562S").ok, "mese Z inesistente → formato invalido");
 ok(!validateCodiceFiscale("").ok, "vuoto → invalido");
