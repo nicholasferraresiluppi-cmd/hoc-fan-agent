@@ -31,15 +31,14 @@ export function langsUnanswered(list) {
 // Mansione (06/10/2026, Nicholas): la mettono HR/coordinamento a mano, non il modulo. Più voci
 // insieme se la persona ne copre più d'una. Su ClickUp = campo etichette «Mansione».
 export const MANSIONI = ["Chatter", "Sales Manager", "PO", "Social Media Manager", "Editor", "Publisher", "HR", "Finance"];
-// Progetto (06/10/2026, Nicholas): campo NUOVO con le creator dello split di adesso (attive a ottobre
-// 2026 su CreatorsPro, varianti di lingua unite) più i reparti interni. Il vecchio «Project» di
-// ClickUp aveva anche le modelle dello split precedente: resta leggibile come campo vecchio.
+// Progetto (06/10/2026, Nicholas): campo NUOVO con le creator del NOSTRO split (foglio dello split,
+// varianti di lingua unite; Chiara Stefane non ancora partita) più «Interno» per chi lavora in
+// azienda senza una creator. HR e Finance stanno solo in Mansione (cosa fai), non qui (su chi lavori).
+// Il vecchio «Project» di ClickUp aveva le modelle dello split precedente: resta leggibile come campo vecchio.
 export const PROGETTI = [
-  "Fishball", "Gaja Bertolin", "Elisa Esposito", "Giulia Ottorini", "Sara Sfamurri", "Laura Sommaruga", "Claudia Surace",
-  "Iri", "Debora Martini", "Atena Gentile", "Cubanita", "Camilla Stelluti", "Alessandra Sparagno", "Christina Bertevello",
-  "Michela Mucciante", "Elisa Vimercati", "Martina Scavo", "Francesca Mon Cherie", "Rebecca Bardaro", "Chiara Stefane",
-  "Alice Cappella", "Vittoria Sbanca", "Stormy", "Anastasia Policardi", "Anita Morselli", "Giulia Amici", "Eva Rizzoli", "Ella",
-  "HR", "Finance",
+  "Fishball", "Rebecca Bardaro", "Alessandra Sparagno", "Anastasia Policardi", "Chiara Stefane", "Christina Bertevello",
+  "Cubanita", "Elisa Vimercati", "Giulia Ottorini", "Martina Scavo", "Michela Mucciante", "Stormy", "Giulia Amici",
+  "Interno",
 ];
 export const GENDERS = ["Female", "Male", "Non-Binary", "I prefer not to declare it"];
 // 05/10/2026: nel modulo il genere usciva in inglese (sono le opzioni del campo ClickUp). Il valore
