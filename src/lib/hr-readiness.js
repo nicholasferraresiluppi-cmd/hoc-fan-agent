@@ -9,7 +9,7 @@ export const READINESS = [
   { key: "document", label: "documento", test: (f) => Boolean(f.idDocument?.at || f.idDocument?.title) },
   { key: "contract", label: "contratto firmato", test: (f) => f.hvContractStatus === "Firmato" },
   { key: "referent", label: "referente", test: (f) => Array.isArray(f.referent) && f.referent.length > 0 },
-  { key: "project", label: "progetto", test: (f) => Array.isArray(f.project) && f.project.length > 0 },
+  { key: "project", label: "progetto", test: (f) => (Array.isArray(f.progetto) && f.progetto.length > 0) || (Array.isArray(f.project) && f.project.length > 0) },
   { key: "job", label: "mansione", test: (f) => (Array.isArray(f.mansioni) && f.mansioni.length > 0) || Boolean(String(f.currentJob || "").trim()) },
 ];
 
