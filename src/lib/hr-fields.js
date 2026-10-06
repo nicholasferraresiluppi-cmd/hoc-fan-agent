@@ -30,7 +30,7 @@ export function langsUnanswered(list) {
 }
 // Mansione (06/10/2026, Nicholas): la mettono HR/coordinamento a mano, non il modulo. Più voci
 // insieme se la persona ne copre più d'una. Su ClickUp = campo etichette «Mansione».
-export const MANSIONI = ["Chatter", "Sales Manager", "PO", "Social Media Manager", "Editor", "Publisher"];
+export const MANSIONI = ["Chatter", "Sales Manager", "PO", "Social Media Manager", "Editor", "Publisher", "HR", "Finance"];
 export const GENDERS = ["Female", "Male", "Non-Binary", "I prefer not to declare it"];
 // 05/10/2026: nel modulo il genere usciva in inglese (sono le opzioni del campo ClickUp). Il valore
 // salvato resta quello di ClickUp, a schermo si legge in italiano.
