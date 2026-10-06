@@ -70,7 +70,7 @@ const PROVA_SECTIONS = [
   ["5", "5 · Competenze"], ["6", "6 · Esperienza"], ["7", "7 · Privacy"], ["documenti", "8 · Documento"], ["fine", "Tessera finale"],
 ];
 const PROVA_DATA = {
-  firstName: "Giulia", surname: "Rossi", dateOfBirth: "1998-05-12", gender: "Female", nationality: "Italia",
+  firstName: "Giulia", surname: "Rossi", dateOfBirth: "1998-05-12", gender: "Female", nationality: "Italia", codiceFiscale: "RSSGLI98E52H501U",
   birthPlace: { abroad: false, name: "Roma", prov: "RM", code: "H501", region: "Lazio" },
   residenceComune: { abroad: false, name: "Milano", prov: "MI", code: "F205", region: "Lombardia" },
   location: "Via Roma 1", residenceCap: "20121", personalEmail: "giulia.rossi@example.com", personalPhone: "+39 333 1234567",
@@ -406,7 +406,7 @@ export default function HrFormPage() {
       if (!alive) return;
       if (!r.ok || !j.ok) { setLoadErr(j.error || "Link non valido."); return; }
       if (pv) {
-        // prova: niente bozze, niente codice fiscale richiesto, documenti simulati
+        // prova: niente bozze, documenti simulati; il codice fiscale si può provare (la prova non invia nulla)
         setProva(pv);
         setData({ ...PROVA_DATA });
         setConsent(pv === "7");
@@ -414,7 +414,7 @@ export default function HrFormPage() {
         else if (pv === "documenti") setStage("files");
         else if (pv === "fine") { setSentAt(Date.now()); setStage("done"); }
         if (pv !== "inizio") setSplashPhase("gone");
-        setCtx({ ...j, done: false, shared: true, cfEnabled: false, cfPresent: false, uploadsEnabled: true, prefill: {} });
+        setCtx({ ...j, done: false, shared: true, cfEnabled: Boolean(j.cfEnabled), cfPresent: false, uploadsEnabled: true, prefill: {} });
         return;
       }
       const key = draftKey(token);
