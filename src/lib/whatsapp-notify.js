@@ -33,7 +33,7 @@ export function newFormMessage(person, origin = "https://houseofcreators.app", {
   const name = [f.firstName, f.surname].map((x) => String(x || "").trim()).filter(Boolean).join(" ") || "Una persona";
   const via = f.source === "Me l'ha consigliato qualcuno" && f.referredBy ? `\nSegnalato da: ${String(f.referredBy).trim()}` : "";
   const what = doc === "caricato" ? "ha completato il modulo HR (documento caricato)."
-    : doc === "manca" ? "ha inviato i dati del modulo HR ma NON ha completato il documento d'identità."
+    : doc === "manca" ? "ha inviato i dati del modulo HR ma non ha ancora caricato il documento d'identità (può farlo entro 2 giorni dallo stesso link)."
     : "ha compilato il modulo HR.";
   return `${name} ${what}${via}\n${origin}/admin/hr/${encodeURIComponent(person?.id || "")}`;
 }

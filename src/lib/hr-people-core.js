@@ -35,7 +35,11 @@ export function normPhone(v) {
   // 04/10/2026: numero italiano scritto senza prefisso (cellulare 3xx, fisso 0x) → +39.
   // Senza prefisso ClickUp rifiuta il campo telefono e, con lui, la creazione del task.
   if (!intl && /^(3\d{8,9}|0\d{5,10})$/.test(digits)) return `+39${digits}`;
-  return (intl ? "+" : "") + digits.replace(/^00/, "");
+  const out = (intl ? "+" : "") + digits.replace(/^00/, "");
+  // 06/10/2026 (caso reale): prefisso +39 scelto dalla tendina e numero scritto con «39» davanti
+  // → «+39393…»: ClickUp lo rifiuta e con lui tutta la scheda. Il 39 in più si toglie.
+  if (/^\+3939\d{9,10}$/.test(out) && /^3\d{8,9}$/.test(out.slice(5))) return `+39${out.slice(5)}`;
+  return out;
 }
 
 /** Numero in formato internazionale (+cifre) o null: ClickUp accetta solo questo. */
@@ -437,7 +441,9 @@ export function computeCleanup(all = []) {
 
 // ── Modulo pubblico: token ──────────────────────────────────────────────────
 export const FORM_TTL_DAYS = 14;
-export const FORM_UPLOAD_GRACE_MS = 60 * 60 * 1000; // dopo l'invio, 1h per caricare i file
+// dopo l'invio, 48 ore per caricare i file (06/10/2026: con 1 ora chi non aveva il documento sotto
+// mano ricompilava tutto il modulo e nasceva una scheda doppia)
+export const FORM_UPLOAD_GRACE_MS = 48 * 60 * 60 * 1000;
 
 /**
  * Stato di un token del modulo a un certo istante.

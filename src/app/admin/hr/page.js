@@ -62,6 +62,7 @@ export default function HrPeoplePage() {
   const [lang, setLang] = useState("");
   const [source, setSource] = useState("");
   const [piva, setPiva] = useState("");
+  const [mans, setMans] = useState("");
   const [newOpen, setNewOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [archNotice, setArchNotice] = useState(null);
@@ -87,6 +88,7 @@ export default function HrPeoplePage() {
   const emps = useMemo(() => uniq(items, (p) => p.fields?.employmentType), [items]);
   const sources = useMemo(() => uniq(items, (p) => p.fields?.source), [items]);
   const pivas = useMemo(() => uniq(items, pivaWord), [items]);
+  const mansList = useMemo(() => uniq(items, (p) => p.fields?.mansioni), [items]);
   const skillCounts = useMemo(() => {
     const m = {};
     for (const p of items) for (const k of Object.keys(normalizeSkillMap(p.fields?.skillLevels))) m[k] = (m[k] || 0) + 1;
@@ -113,7 +115,7 @@ export default function HrPeoplePage() {
   const tabCounts = useMemo(() => Object.fromEntries(TABS.map((t) => [t.key, items.filter(t.test).length])), [TABS, items]);
   const curTab = TABS.find((t) => t.key === tab);
 
-  const activeFilters = [contract, dept, project, emp, lang, skill, pastRole, source, piva].filter(Boolean).length;
+  const activeFilters = [contract, dept, project, emp, lang, skill, pastRole, source, piva, mans].filter(Boolean).length;
   const rows = useMemo(() => {
     if (!curTab) return [];
     const needle = q.trim().toLowerCase();
@@ -127,16 +129,17 @@ export default function HrPeoplePage() {
       if (emp && !has(f.employmentType, emp)) return false;
       if (source && !has(f.source, source)) return false;
       if (piva && !has(pivaWord(p), piva)) return false;
+      if (mans && !has(f.mansioni, mans)) return false;
       if (skill && !hasSkillAtLeast(f.skillLevels, skill, minLevel)) return false;
       if (pastRole && !normalizePastRoles(f.pastRoles).some((r) => r.role === pastRole)) return false;
       if (needle) {
-        const hay = [p.name, f.personalEmail, f.companyEmail, f.personalPhone, f.currentJob, f.referredBy, ...(f.project || []), ...(f.role || []), ...(f.referent || []).map((u) => u.name)].filter(Boolean).join(" ").toLowerCase();
+        const hay = [p.name, f.personalEmail, f.companyEmail, f.personalPhone, ...(f.mansioni || []), f.currentJob, f.referredBy, ...(f.project || []), ...(f.role || []), ...(f.referent || []).map((u) => u.name)].filter(Boolean).join(" ").toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
     });
-  }, [items, curTab, q, contract, dept, project, emp, lang, source, piva, skill, minLevel, pastRole]);
-  const resetFilters = () => { setContract(""); setDept(""); setProject(""); setEmp(""); setLang(""); setSkill(""); setMinLevel(""); setPastRole(""); setSource(""); setPiva(""); };
+  }, [items, curTab, q, contract, dept, project, emp, lang, source, piva, mans, skill, minLevel, pastRole]);
+  const resetFilters = () => { setContract(""); setDept(""); setProject(""); setEmp(""); setLang(""); setSkill(""); setMinLevel(""); setPastRole(""); setSource(""); setPiva(""); setMans(""); };
 
   const syncProblems = items.filter((p) => ["error", "partial", "deleted", "missing", "drift"].includes(p.sync?.status));
 
@@ -145,7 +148,7 @@ export default function HrPeoplePage() {
       key: "name", label: "Persona", sort: (p) => p.name.toLowerCase(),
       render: (p) => {
         const bad = ["error", "partial", "deleted", "missing", "drift"].includes(p.sync?.status);
-        const sub = [p.fields?.currentJob, ...(p.fields?.role || [])].filter(Boolean)[0];
+        const sub = [(p.fields?.mansioni || []).join(", "), p.fields?.currentJob, ...(p.fields?.role || [])].filter(Boolean)[0];
         return (
           <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
             <span aria-hidden="true" style={{ width: 30, height: 30, borderRadius: "50%", background: avatarColor(p.id), color: "#fff", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 600, flex: "0 0 auto" }}>{initials(p.name)}</span>
@@ -160,6 +163,7 @@ export default function HrPeoplePage() {
       },
     },
     { key: "status", label: "Fase", sort: (p) => { const i = PHASE_LABELS.indexOf(phase(p)); return i < 0 ? 99 : i; }, render: (p) => <PhasePill phase={phase(p)} /> },
+    { key: "mansioni", label: "Mansione", sortable: false, render: (p) => (p.fields?.mansioni || []).join(", ") || <span style={{ color: CP.textMuted }}>—</span> },
     { key: "project", label: "Progetto", sortable: false, render: (p) => (p.fields?.project || []).length ? (p.fields.project.slice(0, 2).map((x) => x.replace(/^Model ?- ?/, "")).join(", ") + (p.fields.project.length > 2 ? ` +${p.fields.project.length - 2}` : "")) : <span style={{ color: CP.textMuted }}>—</span> },
     { key: "referent", label: "Referente", sort: (p) => (p.fields?.referent || [])[0]?.name || "", render: (p) => (p.fields?.referent || []).map((u) => u.name).join(", ") || <span style={{ color: CP.textMuted }}>—</span> },
     {
@@ -237,6 +241,7 @@ export default function HrPeoplePage() {
               </div>
               {filtersOpen && (
                 <section style={{ ...card, padding: "14px 16px", marginBottom: 12, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 10 }} aria-label="Filtri">
+                  <FilterSelect label="Mansione" value={mans} onChange={setMans} options={mansList} />
                   <FilterSelect label="Progetto / creator" value={project} onChange={setProject} options={projects} />
                   <FilterSelect label="Stato del contratto" value={contract} onChange={setContract} options={contracts} />
                   <FilterSelect label="Reparto" value={dept} onChange={setDept} options={depts} />

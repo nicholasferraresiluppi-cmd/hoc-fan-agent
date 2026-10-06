@@ -11,7 +11,7 @@ export const maxDuration = 60;
 import { kv } from "@vercel/kv";
 import { isCronAuthorized } from "@/lib/cron-auth";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
-import { hrSyncConfig, ensureWebhookHealthy } from "@/lib/hr-people";
+import { hrSyncConfig, ensureWebhookHealthy, notifyStuckSync } from "@/lib/hr-people";
 import { drainHrBackground } from "@/lib/hr-uploads";
 import { flushMissingDocuments } from "@/lib/hr-form-notify";
 
@@ -27,6 +27,8 @@ async function handle(request) {
   if (!hrSyncConfig().enabled) return Response.json({ result: "skip:sync-off" });
   // una volta l'ora: il webhook di ClickUp è ancora attivo? (se no si riattiva e avvisa)
   const webhook = await ensureWebhookHealthy().catch((e) => ({ error: String(e?.message || e).slice(0, 200) }));
+  // schede che da più di un'ora non arrivano su ClickUp: WhatsApp (al massimo uno al giorno)
+  await notifyStuckSync().catch(() => null);
   if (webhook?.reregistered || webhook?.error) await kv.set("cron:heartbeat:hr-webhook", { at: Date.now(), ...webhook }, { ex: 7 * 24 * 3600 }).catch(() => {});
   const [people, files] = await Promise.all([
     kv.scard("hr:sync:retry").catch(() => 0),
