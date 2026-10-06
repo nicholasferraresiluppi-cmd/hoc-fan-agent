@@ -56,7 +56,7 @@ import { mirrorIssueText, mirrorText, mirrorPrint } from "./hr-mirror.js";
 import { clickupSkillLabels } from "./hr-skills.js";
 import {
   hrSyncConfig, getListFields, getListInfo, getListMembers, listAllTasks, getTask, createTask, updateTask, setField, removeField,
-  resolveTeamId, createWebhook, deleteWebhook, isTaskGone, ClickupError, HR_WEBHOOK_EVENTS, listWebhooks,
+  resolveTeamId, createWebhook, deleteWebhook, isTaskGone, ClickupError, HR_WEBHOOK_EVENTS, listWebhooks, getView, updateView,
 } from "./clickup-hr-api.js";
 import { hrCryptoConfigured, encryptHr, decryptHr } from "./hr-crypto.js";
 import { checkRateLimit } from "./rate-limit.js";
@@ -935,6 +935,35 @@ export async function registerWebhook({ endpoint, actor }) {
   await kv.set(K.webhook, rec);
   const { secret: _s, ...pub } = rec;
   return { ok: true, webhook: pub };
+}
+
+/**
+ * Mostra dei campi come colonne in una vista ClickUp (06/10/2026: dall'interfaccia di ClickUp la
+ * colonna «Mansione» nella vista «Persone» non restava salvata). Solo AGGIUNGE colonne visibili:
+ * le altre impostazioni della vista restano come sono.
+ */
+export async function showViewColumns(viewId, fieldNames = []) {
+  const cfg = hrSyncConfig();
+  if (!cfg.enabled) return { ok: false, error: "Sincronizzazione spenta." };
+  const meta = await getListFields(cfg.listId);
+  const view = await getView(viewId);
+  if (!view?.id) return { ok: false, error: "Vista non trovata." };
+  const fields = Array.isArray(view.columns?.fields) ? [...view.columns.fields] : [];
+  const added = [];
+  const missing = [];
+  for (const name of fieldNames) {
+    const f = meta.find((m) => m.name === name);
+    if (!f) { missing.push(name); continue; }
+    const key = `cf_${f.id}`;
+    const cur = fields.find((c) => c.field === key);
+    if (cur && !cur.hidden) continue;
+    if (cur) cur.hidden = false; else fields.push({ field: key, hidden: false });
+    added.push(name);
+  }
+  if (!added.length) return { ok: true, added, missing };
+  const { id, date_created, creator, visibility, protected: _p, protected_note, protected_by, date_protected, orderindex, ...rest } = view;
+  await updateView(viewId, { ...rest, columns: { ...(view.columns || {}), fields } });
+  return { ok: true, added, missing };
 }
 
 /**

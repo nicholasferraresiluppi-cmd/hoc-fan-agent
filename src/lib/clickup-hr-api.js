@@ -179,6 +179,13 @@ export async function createWebhook(teamId, { endpoint, listId }) {
   return cu(`/team/${teamId}/webhook`, { method: "POST", json: { endpoint, events: HR_WEBHOOK_EVENTS, list_id: Number(listId) || listId } });
 }
 export const deleteWebhook = (webhookId) => cu(`/webhook/${webhookId}`, { method: "DELETE" });
+/** Una vista ClickUp (colonne comprese) e il suo aggiornamento (PUT vuole la vista intera). */
+export async function getView(viewId) {
+  const r = await cu(`/view/${encodeURIComponent(viewId)}`);
+  return r?.view || r;
+}
+export const updateView = (viewId, view) => cu(`/view/${encodeURIComponent(viewId)}`, { method: "PUT", json: view });
+
 /** Webhook del workspace, ognuno con `health: { status: "active"|"failing"|"suspended", fail_count }`. */
 export async function listWebhooks(teamId) {
   const r = await cu(`/team/${teamId}/webhook`);

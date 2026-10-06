@@ -9,7 +9,7 @@
  *        verso localhost: ClickUp deve poterlo raggiungere.
  */
 import { authorize, CAPABILITIES } from "@/lib/rbac";
-import { getSyncStatus, importFromClickup, registerWebhook } from "@/lib/hr-people";
+import { getSyncStatus, importFromClickup, registerWebhook, showViewColumns } from "@/lib/hr-people";
 import { internalOrigin } from "@/lib/cron-chain";
 import { uploadQueueStatus } from "@/lib/hr-uploads";
 
@@ -36,6 +36,14 @@ export async function POST(request) {
     if (body?.action === "import") {
       const r = await importFromClickup({ mode: "import", by: az.userId });
       return Response.json(r, { status: r.ok || r.skipped ? 200 : r.busy ? 409 : 502 });
+    }
+    // colonne visibili in una vista ClickUp (es. «Mansione» nella vista «Persone»)
+    if (body?.action === "view_columns") {
+      const viewId = String(body.viewId || "").replace(/[^A-Za-z0-9-]/g, "").slice(0, 40);
+      const names = (Array.isArray(body.fields) ? body.fields : []).map((x) => String(x).slice(0, 80)).slice(0, 20);
+      if (!viewId || !names.length) return Response.json({ ok: false, error: "viewId e fields obbligatori." }, { status: 400 });
+      const r = await showViewColumns(viewId, names);
+      return Response.json(r, { status: r.ok ? 200 : 400 });
     }
     if (body?.action === "register_webhook") {
       const endpoint = webhookEndpoint(request);
