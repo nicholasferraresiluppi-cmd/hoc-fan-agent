@@ -59,6 +59,20 @@ export function normName(v) {
 export function fullName(fields = {}) {
   return [s(fields.firstName), s(fields.surname)].filter(Boolean).join(" ");
 }
+// Assegnazioni in attesa (07/10/2026): operatori già al lavoro (creator, fase, mansione note da
+// CreatorsPro/foglio dei team) che non hanno ancora compilato il modulo. Quando arriva la scheda
+// con quel nome, i dati si applicano da soli. Abbinamento PRUDENTE: tutte le parole del nome in
+// attesa (almeno 2: nome e cognome) devono comparire in nome+cognome della scheda, e una sola
+// voce in attesa deve corrispondere (con due voci possibili non si sceglie a caso).
+export function matchPendingAssignment(fields = {}, pending = []) {
+  const words = new Set(normName(fullName(fields)).split(" ").filter(Boolean));
+  if (words.size < 2) return null;
+  const hits = (pending || []).filter((a) => {
+    const t = normName(a?.name).split(" ").filter(Boolean);
+    return t.length >= 2 && t.every((w) => words.has(w));
+  });
+  return hits.length === 1 ? hits[0] : null;
+}
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export function isIsoDate(v) {
   if (!DATE_RE.test(s(v))) return false;

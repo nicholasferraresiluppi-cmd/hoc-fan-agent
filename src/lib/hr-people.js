@@ -48,7 +48,7 @@ import {
   normalizePersonInput, applyChanges, resolveFieldConflicts, filterEchoes, recordEcho, computeCleanup,
   valuesEqual, maskCf, logValue, formTokenState, fullName, valueHash, dropUnchangedSinceBase,
   FORM_UPLOAD_GRACE_MS, isOwnEcho, isEmptyValue, normalizeChoiceFields, PHASE_ENTRY, PHASE_ACTIVE, PHASE_EXITED,
-  isIsoDate,
+  isIsoDate, matchPendingAssignment,
 } from "./hr-people-core.js";
 import { taskToPerson, personToClickup, createTaskPayload, incomingTimestamps, expectedFieldNames, fieldsByName, msToIsoDate, statusForCollaboration, clickupDrift } from "./hr-clickup-map.js";
 import { notifyWhatsApp } from "./whatsapp-notify.js";
@@ -64,6 +64,7 @@ import { missingRequired } from "./hr-form-experience.js";
 import { blobConfigured } from "./hr-blob.js";
 
 const K = {
+  pendingAssign: "hr:assign:pending",
   person: (id) => `hr:person:${id}`,
   log: (id) => `hr:person:${id}:log`,
   index: "hr:people:index",
@@ -1198,6 +1199,58 @@ function requiredError(keys) {
   return keys.map((k) => `${FIELD_BY_KEY[k]?.label || k}: obbligatorio.`).join(" ");
 }
 
+// ── Assegnazioni in attesa (07/10/2026) ─────────────────────────────────────
+// Operatori già al lavoro che non hanno ancora la scheda: creator (Progetto), fase e mansione
+// si applicano da soli quando arriva la loro scheda (abbinamento per nome, vedi
+// matchPendingAssignment). Una voce applicata esce dall'elenco.
+const ASSIGN_KEYS = ["progetto", "collaborationStatus", "mansioni"];
+
+function cleanAssignment(a) {
+  const name = String(a?.name || "").trim().slice(0, 120);
+  if (!name) return null;
+  const out = { name, note: String(a?.note || "").slice(0, 300) || null };
+  if (Array.isArray(a?.progetto)) out.progetto = a.progetto.map(String).slice(0, 10);
+  if (a?.collaborationStatus) out.collaborationStatus = String(a.collaborationStatus);
+  if (Array.isArray(a?.mansioni)) out.mansioni = a.mansioni.map(String).slice(0, 10);
+  return out;
+}
+
+export async function getPendingAssignments() {
+  const v = await kv.get(K.pendingAssign);
+  return Array.isArray(v) ? v : [];
+}
+
+/** Applica (se c'è) l'assegnazione in attesa che corrisponde a questa scheda. Mai bloccante per chi chiama. */
+export async function applyPendingAssignment(personId, { sync = true } = {}) {
+  const pending = await getPendingAssignments();
+  if (!pending.length) return null;
+  const person = await getPerson(personId);
+  if (!person || person.archived) return null;
+  const hit = matchPendingAssignment(person.fields || {}, pending);
+  if (!hit) return null;
+  const input = {};
+  for (const k of ASSIGN_KEYS) if (hit[k] != null) input[k] = hit[k];
+  const res = await savePerson({ id: personId, input, allowed: ASSIGN_KEYS, actor: "assegnazione automatica", source: "app", sync });
+  if (!res.ok) return { ok: false, name: hit.name, errors: res.errors };
+  await kv.set(K.pendingAssign, pending.filter((a) => a !== hit && a.name !== hit.name));
+  return { ok: true, name: hit.name, personId, applied: Object.keys(input) };
+}
+
+/** Sostituisce l'elenco e lo prova subito sulle schede che esistono già. */
+export async function setPendingAssignments(items = []) {
+  const list = (Array.isArray(items) ? items : []).map(cleanAssignment).filter(Boolean).slice(0, 200);
+  await kv.set(K.pendingAssign, list);
+  const applied = [];
+  if (list.length) {
+    const people = await listPeople();
+    for (const p of people) {
+      const r = await applyPendingAssignment(p.id).catch(() => null);
+      if (r) applied.push(r);
+    }
+  }
+  return { ok: true, pending: await getPendingAssignments(), applied };
+}
+
 export async function submitForm(token, body, { deferSync = false } = {}) {
   const rec = await getFormRec(token);
   const now = Date.now();
@@ -1223,6 +1276,7 @@ export async function submitForm(token, body, { deferSync = false } = {}) {
     extra: () => ({ consent, formLink: { createdAt: rec.createdAt, expiresAt: rec.expiresAt, submittedAt: now } }),
   });
   if (!res.ok) return { ok: false, status: res.status, error: res.errors.join(" ") };
+  await applyPendingAssignment(res.person.id, { sync: !deferSync }).catch(() => null);
   if (deferSync) await markSyncRetry(res.person.id);
   await appendLog(res.person.id, [{ at: now, by: "modulo", source: "modulo", action: "consent", field: null, to: `consenso privacy (versione ${PRIVACY_VERSION})` }]);
   const ttl = Math.max(60, Math.ceil((rec.expiresAt - now) / 1000));
@@ -1252,6 +1306,7 @@ async function submitShared(token, rec, body, now, deferSync = false) {
     extra: () => ({ consent, formLink: { shared: true, createdAt: rec.createdAt, expiresAt: null, submittedAt: now } }),
   });
   if (!res.ok) return { ok: false, status: res.status, error: res.errors.join(" ") };
+  await applyPendingAssignment(res.person.id, { sync: !deferSync }).catch(() => null);
   if (deferSync) await markSyncRetry(res.person.id);
   await appendLog(res.person.id, [{ at: now, by: "modulo", source: "modulo", action: "consent", field: null, to: `consenso privacy (versione ${PRIVACY_VERSION}), dal link condiviso` }]);
   const child = randomBytes(24).toString("base64url");

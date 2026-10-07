@@ -32,11 +32,11 @@ export function langsUnanswered(list) {
 // insieme se la persona ne copre più d'una. Su ClickUp = campo etichette «Mansione».
 export const MANSIONI = ["Chatter", "Sales Manager", "PO", "Social Media Manager", "Editor", "Publisher", "HR", "Finance"];
 // Progetto (06/10/2026, Nicholas): campo NUOVO con le creator del NOSTRO split (foglio dello split,
-// varianti di lingua unite; Chiara Stefane non ancora partita) più «Interno» per chi lavora in
+// varianti di lingua unite tranne Fishball, che ha due squadre ITA/ENG; Chiara Stefane non ancora partita) più «Interno» per chi lavora in
 // azienda senza una creator. HR e Finance stanno solo in Mansione (cosa fai), non qui (su chi lavori).
 // Il vecchio «Project» di ClickUp aveva le modelle dello split precedente: resta leggibile come campo vecchio.
 export const PROGETTI = [
-  "Fishball", "Rebecca Bardaro", "Alessandra Sparagno", "Anastasia Policardi", "Chiara Stefane", "Christina Bertevello",
+  "Fishball ITA", "Fishball ENG", "Rebecca Bardaro", "Alessandra Sparagno", "Anastasia Policardi", "Chiara Stefane", "Christina Bertevello",
   "Cubanita", "Elisa Vimercati", "Giulia Ottorini", "Martina Scavo", "Michela Mucciante", "Stormy", "Giulia Amici",
   "Interno",
 ];
