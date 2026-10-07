@@ -4,12 +4,14 @@
  * GET  → configurazione (lista impostata? token? chiave CF?), webhook registrato,
  *        ultimo import, conflitti recenti, campi attesi vs presenti sulla lista.
  * POST { action: "import" }           → import completo adesso
+ * POST { action: "pending_assign", items? } → assegnazioni in attesa (creator/fase/mansione per chi
+ *        non ha ancora la scheda): con `items` sostituisce l'elenco e lo prova sulle schede esistenti
  * POST { action: "register_webhook" } → registra (o sostituisce) il webhook
  *        verso l'URL di produzione (APP_BASE_URL o il dominio custom), mai
  *        verso localhost: ClickUp deve poterlo raggiungere.
  */
 import { authorize, CAPABILITIES } from "@/lib/rbac";
-import { getSyncStatus, importFromClickup, registerWebhook, showViewColumns } from "@/lib/hr-people";
+import { getSyncStatus, importFromClickup, registerWebhook, showViewColumns, getPendingAssignments, setPendingAssignments } from "@/lib/hr-people";
 import { internalOrigin } from "@/lib/cron-chain";
 import { uploadQueueStatus } from "@/lib/hr-uploads";
 
@@ -45,6 +47,10 @@ export async function POST(request) {
       const hide = (Array.isArray(body.hide) ? body.hide : []).map((x) => String(x).slice(0, 80)).slice(0, 20);
       const r = await showViewColumns(viewId, names, hide);
       return Response.json(r, { status: r.ok ? 200 : 400 });
+    }
+    if (body?.action === "pending_assign") {
+      if (!Array.isArray(body.items)) return Response.json({ ok: true, pending: await getPendingAssignments() });
+      return Response.json(await setPendingAssignments(body.items));
     }
     if (body?.action === "register_webhook") {
       const endpoint = webhookEndpoint(request);

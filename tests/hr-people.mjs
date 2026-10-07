@@ -7,7 +7,7 @@ import {
   validateCodiceFiscale, cfControlChar, maskCf, normalizePersonInput, applyChanges, resolveFieldConflicts,
   filterEchoes, recordEcho, isOwnEcho, detectDuplicates, isJunk, computeCleanup, signClickupBody,
   verifyClickupSignature, formTokenState, sniffFileType, valuesEqual, FORM_UPLOAD_GRACE_MS, ECHO_WINDOW_MS,
-  valueHash, dropUnchangedSinceBase,
+  valueHash, dropUnchangedSinceBase, matchPendingAssignment,
 } from "../src/lib/hr-people-core.js";
 import {
   decodeDropdown, decodeLabels, decodeCustomField, msToIsoDate, isoDateToMs, taskToPerson, personToClickup,
@@ -40,6 +40,18 @@ ok(validateCodiceFiscale("RSSMRA85T10A562S").ok, "CF noto valido");
 eq(validateCodiceFiscale(" rssmra85t10a562s ").value, "RSSMRA85T10A562S", "minuscolo e spazi normalizzati");
 ok(!validateCodiceFiscale("RSSMRA85T10A562T").ok, "carattere di controllo sbagliato");
 ok(/controllo/.test(validateCodiceFiscale("RSSMRA85T10A562T").error), "errore parla del controllo");
+// assegnazioni in attesa (07/10/2026)
+{
+  const P = [{ name: "Mattia Tripodi", progetto: ["Stormy"] }, { name: "Akain Di Natale" }, { name: "Marialuna Mitrotta" }];
+  eq(matchPendingAssignment({ firstName: "Mattia", surname: "Tripodi" }, P)?.name, "Mattia Tripodi", "nome e cognome uguali");
+  eq(matchPendingAssignment({ firstName: "mattia", surname: "TRIPODI" }, P)?.name, "Mattia Tripodi", "maiuscole/minuscole");
+  eq(matchPendingAssignment({ firstName: "Akain", surname: "Di Natale" }, P)?.name, "Akain Di Natale", "cognome composto");
+  eq(matchPendingAssignment({ firstName: "Jessica", surname: "Di Natale" }, P), null, "stesso cognome, nome diverso: niente");
+  eq(matchPendingAssignment({ firstName: "Simone", surname: "Tripodi" }, P), null, "omonimo di cognome: niente");
+  eq(matchPendingAssignment({ firstName: "Marialuna", surname: "Mitrotta Rossi" }, P)?.name, "Marialuna Mitrotta", "secondo cognome in più: abbinata");
+  eq(matchPendingAssignment({ firstName: "Mattia", surname: "Tripodi" }, [...P, { name: "Mattia Tripodi " }]), null, "due voci possibili: non si sceglie");
+  eq(matchPendingAssignment({ firstName: "Mattia" }, P), null, "solo nome: niente");
+}
 // numero fiscale estero (06/10/2026: Filippine, TIN 9-12 cifre)
 eq(validateCodiceFiscale("123-456-789-000").value, "123-456-789-000", "TIN filippino con trattini accettato");
 ok(validateCodiceFiscale("123456789").foreign, "TIN a 9 cifre accettato come estero");
