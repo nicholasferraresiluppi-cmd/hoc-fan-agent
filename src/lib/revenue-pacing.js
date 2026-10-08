@@ -19,11 +19,11 @@ import { eomProjectionSQL } from "@/lib/revenue-pacing-sql";
 export { bigQueryConfigured };
 
 const P = () => process.env.BIGQUERY_DATA_PROJECT || "house-of-creators-358213";
-const CACHE_KEY = "revenue:pacing:v2";
+const CACHE_KEY = "revenue:pacing:v3";
 const LOCK_KEY = "revenue:pacing:lock";
 const GOALS_KEY = "revenue:goals";
 const FRESH_MS = 15 * 60 * 1000;
-const TREND_DAYS = 75;
+const TREND_DAYS = 95; // 30gg + 30gg precedenti per il confronto periodi, e il mese scorso intero
 
 // Gli stessi 3 account delle viste (un account OF per mercato).
 export const COUNTRIES = ["IT", "EN", "ES"];
