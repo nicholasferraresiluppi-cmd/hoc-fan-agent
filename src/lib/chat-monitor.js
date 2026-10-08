@@ -1,4 +1,4 @@
-// Laura Chat Monitor — orchestrazione e cache. Ricostruzione di chat.hoc.tools
+// Chat Monitor per creator — orchestrazione e cache (una cache per creator e scheda). Ricostruzione di chat.hoc.tools
 // (vedi chat-monitor-sql.js per fonti e definizioni).
 //
 // Costi e freschezza (misurati 8/10/2026):
@@ -25,8 +25,8 @@ const TABS = {
   daily: { ttl: 6 * 3600 * 1000, kvTtl: 26 * 3600 },
   trend: { ttl: 6 * 3600 * 1000, kvTtl: 26 * 3600 },
 };
-const key = (tab) => `chatmon:${tab}:v2`;
-const lockKey = (tab) => `chatmon:${tab}:lock`;
+const key = (slug, tab) => `chatmon:${slug}:${tab}:v3`;
+const lockKey = (slug, tab) => `chatmon:${slug}:${tab}:lock`;
 
 // TIMESTAMP via REST = secondi epoch (anche in notazione 1.7E9) → ISO
 function iso(v) {
@@ -37,13 +37,14 @@ function iso(v) {
 const n = (v) => (v == null || v === "" ? null : Number(v));
 const parseRows = (rows) => rows.map((r) => ({ kind: r.kind, country: r.country, d: r.d, ...JSON.parse(r.payload || "{}") }));
 
-async function computeLive() {
+async function computeLive(creator) {
   const p = P();
+  const A = creator.accounts;
   const [b, today, lists, unlocks] = await Promise.all([
-    bqQuery(boundarySQL(p), { maxBytesBilled: 1 * GB }),
-    bqQuery(liveTodaySQL(p), { maxBytesBilled: 4 * GB }),
-    bqQuery(liveListsSQL(p), { maxBytesBilled: 5 * GB }),
-    bqQuery(liveUnlocksSQL(p), { maxBytesBilled: 2 * GB }),
+    bqQuery(boundarySQL(p, A), { maxBytesBilled: 1 * GB }),
+    bqQuery(liveTodaySQL(p, A), { maxBytesBilled: 4 * GB }),
+    bqQuery(liveListsSQL(p, A), { maxBytesBilled: 5 * GB }),
+    bqQuery(liveUnlocksSQL(p, A), { maxBytesBilled: 2 * GB }),
   ]);
   const br = b.rows[0] || {};
   const mapList = (r) => ({
@@ -68,12 +69,13 @@ async function computeLive() {
   };
 }
 
-async function computeDaily() {
+async function computeDaily(creator) {
   const p = P();
+  const A = creator.accounts;
   const [chat, money, ch] = await Promise.all([
-    bqQuery(dailyChatSQL(p), { maxBytesBilled: 18 * GB }),
-    bqQuery(dailyMoneySQL(p), { maxBytesBilled: 2 * GB }),
-    bqQuery(chattersSQL(p), { maxBytesBilled: 1 * GB }),
+    bqQuery(dailyChatSQL(p, A), { maxBytesBilled: 18 * GB }),
+    bqQuery(dailyMoneySQL(p, A), { maxBytesBilled: 2 * GB }),
+    bqQuery(chattersSQL(p, A), { maxBytesBilled: 1 * GB }),
   ]);
   const rows = [...parseRows(chat.rows), ...parseRows(money.rows), ...parseRows(ch.rows)];
   const by = (k) => rows.filter((r) => r.kind === k);
@@ -85,11 +87,12 @@ async function computeDaily() {
   };
 }
 
-async function computeTrend() {
+async function computeTrend(creator) {
   const p = P();
+  const A = creator.accounts;
   const [w, l] = await Promise.all([
-    bqQuery(weeklySQL(p), { maxBytesBilled: 8 * GB }),
-    bqQuery(ltvSQL(p), { maxBytesBilled: 2 * GB }),
+    bqQuery(weeklySQL(p, A), { maxBytesBilled: 8 * GB }),
+    bqQuery(ltvSQL(p, A), { maxBytesBilled: 2 * GB }),
   ]);
   const num = (r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, ["country", "settimana", "kind", "wk"].includes(k) ? v : typeof v === "boolean" ? v : n(v)]));
   return {
@@ -104,28 +107,28 @@ async function computeTrend() {
 const COMPUTE = { live: computeLive, daily: computeDaily, trend: computeTrend };
 
 /** Dati di una scheda (live | daily | trend) dalla cache, o ricalcolati se scaduti / `force`. */
-export async function getChatMonitor(tab, { force = false } = {}) {
+export async function getChatMonitor(creator, tab, { force = false } = {}) {
   const cfg = TABS[tab];
   if (!cfg) throw new Error("Scheda non valida");
-  const cached = await kv.get(key(tab)).catch(() => null);
+  const cached = await kv.get(key(creator.slug, tab)).catch(() => null);
   const fresh = cached && Date.now() - new Date(cached.generated_at).getTime() < cfg.ttl;
   if (cached && fresh && !force) return { ...cached, cached: true };
 
-  const got = await kv.set(lockKey(tab), Date.now(), { nx: true, ex: 120 }).catch(() => "OK");
+  const got = await kv.set(lockKey(creator.slug, tab), Date.now(), { nx: true, ex: 120 }).catch(() => "OK");
   if (!got) {
     if (cached) return { ...cached, cached: true, refreshing: true };
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 2000));
-      const c = await kv.get(key(tab)).catch(() => null);
+      const c = await kv.get(key(creator.slug, tab)).catch(() => null);
       if (c) return { ...c, cached: true };
     }
     throw new Error("Calcolo già in corso — riprova tra qualche secondo");
   }
   try {
-    const out = { ...(await COMPUTE[tab]()), generated_at: new Date().toISOString() };
-    await kv.set(key(tab), out, { ex: cfg.kvTtl });
+    const out = { ...(await COMPUTE[tab](creator)), generated_at: new Date().toISOString() };
+    await kv.set(key(creator.slug, tab), out, { ex: cfg.kvTtl });
     return { ...out, cached: false };
   } finally {
-    await kv.del(lockKey(tab)).catch(() => {});
+    await kv.del(lockKey(creator.slug, tab)).catch(() => {});
   }
 }

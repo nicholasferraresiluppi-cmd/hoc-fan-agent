@@ -27,7 +27,7 @@ export const WORKSPACES = {
       ] },
       { title: "Andamento", items: [
         { href: "/admin/pnl-live", label: "P&L Live" },
-        { href: "/admin/revenue-pacing", label: "Laura" },
+        { href: "/admin/revenue-pacing", label: "Revenue e chat" },
         { href: "/admin/infloww-agency", label: "Incassi Infloww" },
         { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
         { href: "/admin/comp-review", label: "Anomalie compensi", desc: "Chi incassa molto più o molto meno della media del team sulla stessa creator, per dollari in gioco" },
@@ -55,7 +55,7 @@ export const WORKSPACES = {
       { title: "Vendite", items: [
         { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
         { href: "/leaderboard/creators", label: "Creator" },
-        { href: "/admin/revenue-pacing", label: "Laura", desc: "Revenue e chat di Laura per paese: proiezione di fine mese, obiettivo, benvenuto, fan senza risposta, latenza, PPV" },
+        { href: "/admin/revenue-pacing", label: "Revenue e chat", desc: "Giulia Amici, Martina Scavo, Rebecca: proiezione di fine mese, obiettivo, benvenuto, fan senza risposta, latenza, PPV" },
         { href: "/leaderboard/creators/heatmap", label: "Mappa operatore×creator" },
         { href: "/admin/creator-difficulty", label: "Difficoltà creator" },
       ] },

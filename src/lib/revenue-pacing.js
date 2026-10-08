@@ -1,5 +1,6 @@
-// Revenue Laura — proiezione di fine mese per paese (IT/EN/ES), ricostruzione di
-// revenue.hoc.tools ("Laura · Revenue Analytics"), spento a ottobre 2026.
+// Revenue per creator — proiezione di fine mese per account/paese, ricostruzione di
+// revenue.hoc.tools ("Revenue Analytics"), spento a ottobre 2026. Creator e account
+// in live-creators.js (strumento dei progetti di Antonio Marucci).
 //
 // STESSI NUMERI DEL SITO ORIGINALE: il vecchio sito leggeva le viste BigQuery del
 // dataset `hoc` (v_eom_projection e le 4 viste sotto), che appartengono all'altro
@@ -19,25 +20,21 @@ import { eomProjectionSQL } from "@/lib/revenue-pacing-sql";
 export { bigQueryConfigured };
 
 const P = () => process.env.BIGQUERY_DATA_PROJECT || "house-of-creators-358213";
-const CACHE_KEY = "revenue:pacing:v3";
-const LOCK_KEY = "revenue:pacing:lock";
-const GOALS_KEY = "revenue:goals";
+const CACHE_KEY = (slug) => `revenue:pacing:v4:${slug}`;
+const LOCK_KEY = (slug) => `revenue:pacing:lock:${slug}`;
+const GOALS_KEY = (slug) => `revenue:goals:${slug}`;
 const FRESH_MS = 15 * 60 * 1000;
 const TREND_DAYS = 95; // 30gg + 30gg precedenti per il confronto periodi, e il mese scorso intero
 
-// Gli stessi 3 account delle viste (un account OF per mercato).
-export const COUNTRIES = ["IT", "EN", "ES"];
-const COUNTRY_SQL = (col = "creator_id") =>
-  `CASE ${col} WHEN 250167499 THEN 'IT' WHEN 411251447 THEN 'EN' WHEN 1000000344 THEN 'ES' END`;
-const IDS = "(250167499, 411251447, 1000000344)";
-
-// Obiettivi che il vecchio sito aveva salvati (ultima risposta, 3 ott 2026):
-// semina iniziale, poi si modificano dalla pagina.
-const SEED_GOALS = {
-  IT: { "2026-06": 90000, "2026-07": 75000, "2026-08": 75000, "2026-09": 70000 },
-  EN: { "2026-06": 100000, "2026-07": 100000, "2026-08": 105000, "2026-09": 105000 },
-  ES: { "2026-06": 6000, "2026-07": 8000, "2026-08": 6000, "2026-09": 10000 },
-};
+// Account della creator → frammenti SQL (id dal nostro registro, mai input utente).
+function accountSQL(creator) {
+  const acc = creator.accounts.map((a) => ({ id: Number(a.creator_id), country: String(a.country).replace(/[^A-Z]/g, "") }));
+  return {
+    countries: acc.map((a) => a.country),
+    COUNTRY_SQL: (col = "creator_id") => `CASE ${col} ${acc.map((a) => `WHEN ${a.id} THEN '${a.country}'`).join(" ")} END`,
+    IDS: `(${acc.map((a) => a.id).join(", ")})`,
+  };
+}
 
 const num = (v) => (v == null || v === "" ? null : Number(v));
 const NUMERIC_FIELDS = [
@@ -58,10 +55,11 @@ function toDateStr(v) {
   return String(v);
 }
 
-async function compute() {
+async function compute(creator) {
   const p = P();
+  const { countries: COUNTRIES, COUNTRY_SQL, IDS } = accountSQL(creator);
   const [proj, trend, fresh] = await Promise.all([
-    bqQuery(eomProjectionSQL(p)),
+    bqQuery(eomProjectionSQL(p, creator.accounts)),
     bqQuery(`
       WITH rev AS (
         SELECT DATE(created_at) AS date, ${COUNTRY_SQL()} AS country, SUM(net) AS daily_revenue
@@ -102,6 +100,7 @@ async function compute() {
   for (const r of fresh.rows) freshness[`${r.src}_live_${r.country}`] = toDateStr(r.ts);
 
   return {
+    countries: COUNTRIES,
     data,
     trend: trend.rows.map((r) => ({ date: r.date, country: r.country, daily_revenue: num(r.daily_revenue), daily_new_subs: num(r.daily_new_subs) })),
     freshness,
@@ -111,52 +110,53 @@ async function compute() {
 }
 
 /** Dati della pagina: cache KV 15 min; `force` ricalcola. Single-flight sul ricalcolo. */
-export async function getRevenuePacing({ force = false } = {}) {
-  const cached = await kv.get(CACHE_KEY).catch(() => null);
+export async function getRevenuePacing(creator, { force = false } = {}) {
+  const ck = CACHE_KEY(creator.slug), lk = LOCK_KEY(creator.slug);
+  const cached = await kv.get(ck).catch(() => null);
   const fresh = cached && Date.now() - new Date(cached.updated_at).getTime() < FRESH_MS;
   if (cached && fresh && !force) return { ...cached, cached: true };
 
-  const gotLock = await kv.set(LOCK_KEY, Date.now(), { nx: true, ex: 90 }).catch(() => "OK");
+  const gotLock = await kv.set(lk, Date.now(), { nx: true, ex: 90 }).catch(() => "OK");
   if (!gotLock) {
     // Qualcun altro sta già ricalcolando: meglio il dato di pochi minuti fa che una seconda query.
     if (cached) return { ...cached, cached: true, refreshing: true };
     for (let i = 0; i < 20; i++) {
       await new Promise((r) => setTimeout(r, 2000));
-      const c = await kv.get(CACHE_KEY).catch(() => null);
+      const c = await kv.get(ck).catch(() => null);
       if (c && c.updated_at !== cached?.updated_at) return { ...c, cached: true };
     }
     throw new Error("Calcolo già in corso — riprova tra qualche secondo");
   }
   try {
-    const out = await compute();
-    await kv.set(CACHE_KEY, out, { ex: 7 * 24 * 3600 });
+    const out = await compute(creator);
+    await kv.set(ck, out, { ex: 7 * 24 * 3600 });
     return { ...out, cached: false };
   } finally {
-    await kv.del(LOCK_KEY).catch(() => {});
+    await kv.del(lk).catch(() => {});
   }
 }
 
 // ─── Obiettivi mensili per paese ────────────────────────────────────────────
 // { IT: { "2026-10": 70000, ... }, EN: {...}, ES: {...} } + chi/quando ha cambiato.
 
-export async function getGoals() {
-  const g = await kv.get(GOALS_KEY).catch(() => null);
+export async function getGoals(creator) {
+  const g = await kv.get(GOALS_KEY(creator.slug)).catch(() => null);
   if (g?.goals) return g;
-  return { goals: SEED_GOALS, history: [] };
+  return { goals: {}, history: [] };
 }
 
-export async function setGoal({ country, month, value, by }) {
-  if (!COUNTRIES.includes(country)) throw new Error("Paese non valido");
+export async function setGoal(creator, { country, month, value, by }) {
+  if (!creator.accounts.some((a) => a.country === country)) throw new Error("Paese non valido");
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month || "")) throw new Error("Mese non valido (AAAA-MM)");
   const v = value === null || value === "" ? null : Number(value);
   if (v !== null && (!Number.isFinite(v) || v < 0 || v > 10_000_000)) throw new Error("Obiettivo non valido");
-  const cur = await getGoals();
+  const cur = await getGoals(creator);
   const goals = { ...cur.goals, [country]: { ...(cur.goals[country] || {}) } };
   const prev = goals[country][month] ?? null;
   if (v === null) delete goals[country][month];
   else goals[country][month] = Math.round(v);
   const history = [{ country, month, from: prev, to: v, by, at: new Date().toISOString() }, ...(cur.history || [])].slice(0, 100);
   const next = { goals, history };
-  await kv.set(GOALS_KEY, next);
+  await kv.set(GOALS_KEY(creator.slug), next);
   return next;
 }

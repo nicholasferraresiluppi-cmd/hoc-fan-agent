@@ -7,7 +7,8 @@
 //   v_eom_projection        → query finale
 // Copiata nel nostro codice (8 ott 2026) perché quelle viste sono dell'altro
 // split: se le cancellano, questa pagina continua a funzionare leggendo solo le
-// tabelle grezze `onlyfans.*`. Verificata riga per riga contro la vista originale
+// tabelle grezze `onlyfans.*` (generalizzata a più creator l'8/10: stessa logica, account
+// presi dal registro). Verificata riga per riga contro la vista originale
 // (stesso output su tutti i 28 campi, 3 paesi). Non cambiare il calcolo senza
 // dichiararlo: è il numero che il sales conosce.
 //
@@ -22,16 +23,18 @@
 //   - revenue atteso dai nuovi = nuovi proiettati × conversione storica × spesa
 //     media storica per convertito.
 
-const CASE_COUNTRY = (col) =>
-  `CASE WHEN ${col} = 411251447 THEN 'EN' WHEN ${col} = 250167499 THEN 'IT' WHEN ${col} = 1000000344 THEN 'ES' END`;
-const IDS = "(411251447, 250167499, 1000000344)";
 const TIER = `CASE
       WHEN DATE_DIFF(DATE_TRUNC(CURRENT_DATE(), MONTH), month, MONTH) <= 3 THEN 3.0
       WHEN DATE_DIFF(DATE_TRUNC(CURRENT_DATE(), MONTH), month, MONTH) <= 6 THEN 2.0
       ELSE 1.0
     END`;
 
-export function eomProjectionSQL(p) {
+// accounts = [{ creator_id, country }] della creator (vedi live-creators.js). Gli id sono
+// numeri del nostro registro, mai input dell'utente: interpolarli è sicuro.
+export function eomProjectionSQL(p, accounts) {
+  const acc = accounts.map((a) => ({ id: Number(a.creator_id), country: String(a.country).replace(/[^A-Z]/g, "") }));
+  const CASE_COUNTRY = (col) => `CASE ${acc.map((a) => `WHEN ${col} = ${a.id} THEN '${a.country}'`).join(" ")} END`;
+  const IDS = `(${acc.map((a) => a.id).join(", ")})`;
   const tx = `\`${p}.onlyfans.attributed_transactions\``;
   const subs = `\`${p}.onlyfans.organic_subscriptions\``;
   const PROJ = (mtd, ew, tw) => `CASE
@@ -238,7 +241,7 @@ closed_months AS (
   SELECT country, COUNT(DISTINCT month) AS n_closed
   FROM daily_rev WHERE month < (SELECT current_month FROM date_info) GROUP BY 1
 ),
-all_countries AS (SELECT 'EN' AS country UNION ALL SELECT 'IT' UNION ALL SELECT 'ES')
+all_countries AS (${acc.map((a) => `SELECT '${a.country}' AS country`).join(" UNION ALL ")})
 
 SELECT
   ac.country,
