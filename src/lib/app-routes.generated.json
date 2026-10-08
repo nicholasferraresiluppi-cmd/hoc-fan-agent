@@ -57,6 +57,7 @@
  "/admin/profiles-compare",
  "/admin/qa-reviews",
  "/admin/reports",
+ "/admin/revenue-pacing",
  "/admin/review",
  "/admin/roadmap",
  "/admin/ruoli",
@@ -120,6 +121,7 @@
  "/profilo/certificazioni",
  "/sign-in/[[...sign-in]]",
  "/sign-up/[[...sign-up]]",
+ "/t/[id]",
  "/welcome",
  "/welcome/score-explained",
  "/welcome/score-friendly"
