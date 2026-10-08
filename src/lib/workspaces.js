@@ -56,6 +56,7 @@ export const WORKSPACES = {
         { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
         { href: "/leaderboard/creators", label: "Creator" },
         { href: "/admin/revenue-pacing", label: "Revenue Laura", desc: "Proiezione di fine mese per paese contro obiettivo e media storica" },
+        { href: "/admin/chat-monitor", label: "Laura Chat Monitor", desc: "Chat di Laura dal vivo: benvenuto, fan senza risposta, latenza, PPV, coda e soglie del giorno" },
         { href: "/leaderboard/creators/heatmap", label: "Mappa operatore×creator" },
         { href: "/admin/creator-difficulty", label: "Difficoltà creator" },
       ] },

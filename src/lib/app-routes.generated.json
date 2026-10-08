@@ -15,6 +15,7 @@
  "/admin/alerts",
  "/admin/attribution-drilldown",
  "/admin/candidate-assessments",
+ "/admin/chat-monitor",
  "/admin/citta",
  "/admin/citta/persone",
  "/admin/citta/ufficio",
