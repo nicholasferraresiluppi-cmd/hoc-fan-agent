@@ -42,6 +42,7 @@ const MANAGER = [
     { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
     { href: "/leaderboard/creators", label: "Creator" },
     { href: "/admin/revenue-pacing", label: "Revenue Laura" },
+    { href: "/admin/chat-monitor", label: "Laura Chat Monitor" },
     { href: "/admin/settimana", label: "Da seguire" },
     { href: "/cm-cockpit", label: "Cockpit turno" },
     { href: "/admin/sales-coaching", label: "Coaching vendite" },

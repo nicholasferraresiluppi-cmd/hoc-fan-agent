@@ -8,20 +8,10 @@ export const runtime = "nodejs"; // bigquery-api usa crypto nativo
 export const maxDuration = 60;
 
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { CAPABILITIES } from "@/lib/rbac";
-import { authorizeScoped } from "@/lib/creator-scope";
+import { authorizeLaura } from "@/lib/laura-access";
 import { getRevenuePacing, getGoals, setGoal, bigQueryConfigured } from "@/lib/revenue-pacing";
 
-// Laura in CreatorsPro/Infloww compare come "Laura", "Laura ENG", "Laura Sommaruga - IT"…:
-// basta che una creator assegnata sia una "Laura".
-const seesLaura = (scope) => Boolean(scope?.all || [...(scope?.creators || [])].some((c) => /^laura\b/i.test(String(c).trim())));
-
-async function gate() {
-  const az = await authorizeScoped(CAPABILITIES.SCORES_VIEW);
-  if (!az.ok) return az;
-  if (!seesLaura(az.creatorScope)) return { ok: false, status: 403, message: "Laura non è tra le creator che ti sono assegnate" };
-  return az;
-}
+const gate = authorizeLaura;
 
 export async function GET(request) {
   const az = await gate();

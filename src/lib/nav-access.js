@@ -21,7 +21,7 @@ export const NAV_ACCESS = {
   // 27/09/2026: pagine di squadra aperte a chi guida una squadra (scope team), dati filtrati per creator assegnate
   "/leaderboard/sales-cp": team("scores.view"), "/leaderboard/creators": team("scores.view"), "/leaderboard/creators/heatmap": allC("scores.view"),
   "/admin/conversation-intelligence": team("scores.view"), "/admin/shift-quality": allC("scores.view"), "/admin/sales-coaching": allC("scores.view"), "/admin/sales-ai": allC("scores.view"), "/admin/manuale-vendite": allC("scores.view"), "/me/allenatore": any("copilot.pilot"),
-  "/admin/payout-tree": allC("scores.view"), "/admin/revenue-pacing": team("scores.view"), "/admin/qa-reviews": allC("scores.view"), "/admin/loop": allC("scores.view"),
+  "/admin/payout-tree": allC("scores.view"), "/admin/revenue-pacing": team("scores.view"), "/admin/chat-monitor": team("scores.view"), "/admin/qa-reviews": allC("scores.view"), "/admin/loop": allC("scores.view"),
   "/admin/priority-queue": allC("scores.view"), "/admin/disputes": allC("scores.view"),
   "/admin/pnl-live": SEED, "/admin/profiles-compare": SEED, "/admin/comp-calendar": SEED, "/admin/threshold-study": SEED,
   "/admin/comp-review": SEED, "/admin/comp-exam": SEED, "/admin/payment-profiles": SEED, "/admin/shift-research": SEED,
