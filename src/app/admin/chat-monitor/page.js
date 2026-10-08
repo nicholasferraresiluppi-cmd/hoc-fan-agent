@@ -1,6 +1,6 @@
 "use client";
 
-// Laura Chat Monitor — ricostruzione di chat.hoc.tools ("Laura Chat Monitor · Live"),
+// Chat Monitor per creator — ricostruzione di chat.hoc.tools ("Laura Chat Monitor · Live"),
 // spento con lo split a ottobre 2026. Struttura, schede, riquadri ed etichette dal
 // sito originale (letto il 20 e 22/07/2026). Dati: src/lib/chat-monitor*.js.
 
@@ -9,16 +9,12 @@ import useSWR from "swr";
 import { RefreshCw } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Notice, card } from "@/components/ds";
-import { COUNTRIES, hm, ago, ymdRome } from "./ui";
+import { hm, ago, ymdRome } from "./ui";
+import { COUNTRY_NAMES } from "@/lib/live-creators";
+import { useLiveCreator, CreatorPills, liveFetcher } from "@/components/LiveCreatorPicker";
 import LiveTab from "./LiveTab";
 import DailyTab from "./DailyTab";
 import TrendTab from "./TrendTab";
-
-const errText = (status) =>
-  status === 401 || status === 403 ? "Non hai il permesso per vedere questi dati." :
-  status >= 500 ? "Calcolo fallito o troppo lungo — riprova." : "Errore.";
-const fetcher = (url) =>
-  fetch(url).then((r) => (r.ok ? r.json() : r.json().catch(() => ({})).then((d) => Promise.reject(new Error(d.error || errText(r.status))))));
 
 const TABS = [
   { id: "live", label: "Live chat" },
@@ -27,17 +23,27 @@ const TABS = [
 ];
 
 export default function ChatMonitorPage() {
-  const [country, setCountryState] = useState("IT");
-  // Paese condiviso con la scheda Revenue ("Totale" là non esiste qui: resta l'ultimo paese scelto)
-  useEffect(() => { try { const v = localStorage.getItem("hoc:laura:paese"); if (["IT", "EN", "ES"].includes(v)) setCountryState(v); } catch {} }, []);
-  const setCountry = (c) => { setCountryState(c); try { localStorage.setItem("hoc:laura:paese", c); } catch {} };
+  const [slug, setSlug] = useLiveCreator();
+  const [countryPick, setCountryState] = useState(null);
+  // Paese condiviso con la scheda Revenue ("Totale" qui non esiste: resta il primo paese)
+  useEffect(() => { try { const v = localStorage.getItem("hoc:live:paese"); if (v) setCountryState(v); } catch {} }, []);
+  const setCountry = (c) => { setCountryState(c); try { localStorage.setItem("hoc:live:paese", c); } catch {} };
   const [tab, setTab] = useState("live");
   const [refreshing, setRefreshing] = useState(false);
   const opts = { revalidateOnFocus: false };
+  const url = (t, extra = "") => (slug == null ? null : `/api/admin/chat-monitor?tab=${t}${slug ? `&creator=${encodeURIComponent(slug)}` : ""}${extra}`);
   // La Live serve a tutte le schede (coda adesso); daily serve a dettaglio e trend.
-  const live = useSWR("/api/admin/chat-monitor?tab=live", fetcher, { ...opts, refreshInterval: 15 * 60 * 1000 });
-  const daily = useSWR(tab !== "live" ? "/api/admin/chat-monitor?tab=daily" : null, fetcher, opts);
-  const trend = useSWR(tab === "trend" ? "/api/admin/chat-monitor?tab=trend" : null, fetcher, opts);
+  const live = useSWR(url("live"), liveFetcher, { ...opts, refreshInterval: 15 * 60 * 1000 });
+  const daily = useSWR(tab !== "live" ? url("daily") : null, liveFetcher, opts);
+  const trend = useSWR(tab === "trend" ? url("trend") : null, liveFetcher, opts);
+  // Creator salvata che non è più tra le tue (403 con l'elenco): si passa alla prima visibile.
+  useEffect(() => {
+    const e = live.error;
+    if (e?.creators?.length && !e.creators.some((c) => c.slug === slug)) setSlug(e.creators[0].slug);
+  }, [live.error, slug]);
+  const countries = live.data?.countries || [];
+  const country = countries.includes(countryPick) ? countryPick : countries[0];
+  const creatorName = (live.data?.creators || []).find((c) => c.slug === live.data?.creator)?.short || "";
 
   const current = tab === "live" ? live : tab === "daily" ? daily : trend;
   const err = current.error || (tab !== "live" && daily.error) || live.error;
@@ -49,13 +55,13 @@ export default function ChatMonitorPage() {
   const refresh = async () => {
     setRefreshing(true);
     try {
-      const fresh = await fetcher("/api/admin/chat-monitor?tab=live&refresh=1");
+      const fresh = await liveFetcher(url("live", "&refresh=1"));
       await live.mutate(fresh, { revalidate: false });
       if (tab !== "live" && daily.data && Date.now() - new Date(daily.data.generated_at).getTime() > 3600_000) {
-        await daily.mutate(await fetcher("/api/admin/chat-monitor?tab=daily&refresh=1"), { revalidate: false });
+        await daily.mutate(await liveFetcher(url("daily", "&refresh=1")), { revalidate: false });
       }
       if (tab === "trend" && trend.data && Date.now() - new Date(trend.data.generated_at).getTime() > 3600_000) {
-        await trend.mutate(await fetcher("/api/admin/chat-monitor?tab=trend&refresh=1"), { revalidate: false });
+        await trend.mutate(await liveFetcher(url("trend", "&refresh=1")), { revalidate: false });
       }
     } catch (e) {
       alert(e.message);
@@ -68,7 +74,7 @@ export default function ChatMonitorPage() {
     <div style={{ maxWidth: 1180, margin: "0 auto", padding: "20px 16px 60px", fontFamily: FONTS.body }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, color: CP.textPrimary }}>Laura Chat Monitor <span style={{ fontSize: 14, color: CP.textMuted, fontWeight: 400 }}>· Live</span></h1>
+          <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, color: CP.textPrimary }}>{creatorName ? `${creatorName} · ` : ""}Chat Monitor <span style={{ fontSize: 14, color: CP.textMuted, fontWeight: 400 }}>· Live</span></h1>
           <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 4 }}>Segnali comportamentali da chat + transazioni · aggiornamento da BigQuery</div>
         </div>
         {current.data?.generated_at && (
@@ -76,9 +82,10 @@ export default function ChatMonitorPage() {
         )}
       </header>
 
+      <CreatorPills creators={live.data?.creators || live.error?.creators} current={live.data?.creator || slug} onChange={setSlug} />
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-        {COUNTRIES.map((c) => (
-          <button key={c.id} onClick={() => setCountry(c.id)} style={pill(country === c.id)}>{c.label}</button>
+        {countries.map((c) => (
+          <button key={c} onClick={() => setCountry(c)} style={pill(country === c)}>{COUNTRY_NAMES[c] || c}</button>
         ))}
       </div>
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", borderBottom: `1px solid ${CP.border}`, marginBottom: 14 }}>

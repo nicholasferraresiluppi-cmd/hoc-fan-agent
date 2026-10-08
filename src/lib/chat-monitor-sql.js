@@ -21,20 +21,23 @@
 //
 // Giorni e ore in Europe/Rome (come l'originale, che mostrava ore italiane).
 
-export const LAURA_ACCOUNTS = [
-  { creator_id: 250167499, country: "IT" },
-  { creator_id: 411251447, country: "EN" },
-  { creator_id: 1000000344, country: "ES" },
-];
-const IDS = `(${LAURA_ACCOUNTS.map((a) => a.creator_id).join(", ")})`;
-const IDS_CTE = `ids AS (${LAURA_ACCOUNTS.map((a) => `SELECT ${a.creator_id} AS creator_id, '${a.country}' AS country`).join(" UNION ALL ")})`;
+// Account della creator scelta (live-creators.js): id dal nostro registro, mai input
+// dell'utente → interpolarli nella query è sicuro (e sono comunque forzati a numero).
+function ids(accounts) {
+  const acc = accounts.map((a) => ({ id: Number(a.creator_id), country: String(a.country).replace(/[^A-Z]/g, "") }));
+  return {
+    IDS: `(${acc.map((a) => a.id).join(", ")})`,
+    IDS_CTE: `ids AS (${acc.map((a) => `SELECT ${a.id} AS creator_id, '${a.country}' AS country`).join(" UNION ALL ")})`,
+    FIRST: acc[0].id,
+  };
+}
 const TODAY = "CURRENT_DATE('Europe/Rome')";
 const TODAY_START = `TIMESTAMP(${TODAY}, 'Europe/Rome')`;
 const SLA_CAP_S = 6 * 3600; // risposta oltre 6h = non risposta (come la replica di luglio)
 const strip = (col) => `TRIM(REGEXP_REPLACE(REGEXP_REPLACE(${col}, r'<[^>]+>', ' '), r'\\s+', ' '))`;
 
 // Messaggi deduplicati di ws_chat in una finestra (stringa SQL di condizione su created_at).
-const wsMsgs = (p, cond) => `
+const wsMsgs = (p, cond, IDS) => `
   SELECT
     w.id,
     ANY_VALUE(w.creator_id) AS creator_id,
@@ -54,9 +57,9 @@ const wsMsgs = (p, cond) => `
 // ─── LIVE ────────────────────────────────────────────────────────────────────
 // Base comune: messaggi delle ultime 7 giornate (consolidato fino a 30h fa +
 // tempo reale dopo), iscrizioni di oggi, transazioni.
-const liveBase = (p) => `
+const liveBase = (p, IDS, IDS_CTE) => `
 ${IDS_CTE},
-ws AS (${wsMsgs(p, `w.created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 HOUR)`)}),
+ws AS (${wsMsgs(p, `w.created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 HOUR)`, IDS)}),
 msgs AS (
   SELECT i.country, m.user_id, m.is_fan, m.ts, m.price, m.media_count, m.opened, m.text
   FROM ws m JOIN ids i USING (creator_id)
@@ -83,9 +86,10 @@ first_out AS (
   GROUP BY 1, 2, 3, 4, 5
 )`;
 
-export function liveTodaySQL(p) {
+export function liveTodaySQL(p, accounts) {
+  const { IDS, IDS_CTE, FIRST } = ids(accounts);
   return `
-WITH ${liveBase(p)},
+WITH ${liveBase(p, IDS, IDS_CTE)},
 today_msgs AS (SELECT * FROM msgs WHERE ts >= ${TODAY_START}),
 seq AS (
   SELECT country, user_id, is_fan, ts,
@@ -187,9 +191,10 @@ ORDER BY i.country`;
 
 // Fan di oggi (hanno scritto o pagato oggi) + coda (ultimo messaggio dal fan,
 // ultimi 7 giorni) + iscritti senza benvenuto + sblocchi di oggi.
-export function liveListsSQL(p) {
+export function liveListsSQL(p, accounts) {
+  const { IDS, IDS_CTE, FIRST } = ids(accounts);
   return `
-WITH ${liveBase(p)},
+WITH ${liveBase(p, IDS, IDS_CTE)},
 last_per_fan AS (
   SELECT country, user_id,
     MAX(IF(is_fan, ts, NULL)) AS last_fan, MAX(IF(NOT is_fan, ts, NULL)) AS last_out,
@@ -205,7 +210,7 @@ tx_hoc AS (
   SELECT t.user_id, t.creator_id, CAST(t.net AS FLOAT64) AS net, t.created_at, t.type
   FROM \`${p}.onlyfans.attributed_transactions\` t
   WHERE t.calendar_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 183 DAY)
-    AND t.organization_id = (SELECT ANY_VALUE(organization_id) FROM \`${p}.onlyfans.attributed_transactions\` WHERE creator_id = 250167499 AND calendar_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 DAY))
+    AND t.organization_id = (SELECT ANY_VALUE(organization_id) FROM \`${p}.onlyfans.attributed_transactions\` WHERE creator_id = ${FIRST} AND calendar_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 DAY))
 ),
 spend AS (
   SELECT i.country, t.user_id,
@@ -269,7 +274,8 @@ UNION ALL SELECT * FROM queue
 UNION ALL SELECT * FROM pending`;
 }
 
-export function liveUnlocksSQL(p) {
+export function liveUnlocksSQL(p, accounts) {
+  const { IDS, IDS_CTE, FIRST } = ids(accounts);
   return `
 WITH ${IDS_CTE}
 SELECT i.country, t.user_id, t.created_at AS ts, CAST(t.net AS FLOAT64) AS net, m.id IS NOT NULL AS is_mass,
@@ -281,7 +287,8 @@ WHERE t.created_at >= ${TODAY_START} AND t.type = 'message'
 ORDER BY t.created_at DESC`;
 }
 
-export function boundarySQL(p) {
+export function boundarySQL(p, accounts) {
+  const { IDS, IDS_CTE, FIRST } = ids(accounts);
   return `
 SELECT
   (SELECT MAX(created_at) FROM \`${p}.onlyfans.chat\` WHERE creator_id IN ${IDS} AND created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 3 DAY)) AS of_max,
@@ -296,10 +303,11 @@ SELECT
 // Esce come righe {kind, country, d, payload JSON} per non leggere la chat due volte.
 export const DAILY_DAYS = 37;
 
-export function dailyChatSQL(p) {
+export function dailyChatSQL(p, accounts) {
+  const { IDS, IDS_CTE, FIRST } = ids(accounts);
   return `
 WITH ${IDS_CTE},
-ws AS (${wsMsgs(p, `w.created_at >= TIMESTAMP(DATE_SUB(${TODAY}, INTERVAL ${DAILY_DAYS + 2} DAY), 'Europe/Rome')`)}),
+ws AS (${wsMsgs(p, `w.created_at >= TIMESTAMP(DATE_SUB(${TODAY}, INTERVAL ${DAILY_DAYS + 2} DAY), 'Europe/Rome')`, IDS)}),
 msgs AS (
   SELECT i.country, m.user_id, m.is_fan, m.ts, COALESCE(m.price, 0) AS price, COALESCE(m.media_count, 0) AS media_count,
     DATE(m.ts, 'Europe/Rome') AS d, EXTRACT(HOUR FROM m.ts AT TIME ZONE 'Europe/Rome') AS hr,
@@ -401,7 +409,8 @@ UNION ALL SELECT 'heat', h.country, NULL, TO_JSON_STRING(STRUCT(h.dow, h.hr, h.f
 
 // Soldi e coorti: revenue per giorno, conversione a 7 giorni per coorte di
 // iscrizione, coorti settimanali a 30 giorni (solo mature).
-export function dailyMoneySQL(p) {
+export function dailyMoneySQL(p, accounts) {
+  const { IDS, IDS_CTE, FIRST } = ids(accounts);
   return `
 WITH ${IDS_CTE},
 tx AS (
@@ -446,7 +455,8 @@ UNION ALL SELECT 'cohort30', k.country, CAST(k.wk AS STRING), TO_JSON_STRING(STR
 }
 
 // Classifica chatter (takes CreatorsPro) e presidio: persone in turno per ora.
-export function chattersSQL(p) {
+export function chattersSQL(p, accounts) {
+  const { IDS, IDS_CTE, FIRST } = ids(accounts);
   return `
 WITH ${IDS_CTE},
 shifts AS (
@@ -481,9 +491,11 @@ UNION ALL SELECT 'staff', country, NULL, TO_JSON_STRING(STRUCT(dow, hr, avg_staf
 }
 
 // ─── RIEPILOGO & TREND ───────────────────────────────────────────────────────
-// Copia della vista hoc.laura_chat_monitor (dell'altro split, può sparire):
+// Copia della vista hoc.laura_chat_monitor (dell'altro split, può sparire), generalizzata agli
+// account della creator scelta:
 // metriche settimanali da chat + transazioni, ultime 26 settimane.
-export function weeklySQL(p) {
+export function weeklySQL(p, accounts) {
+  const { IDS, IDS_CTE, FIRST } = ids(accounts);
   return `
 WITH ${IDS_CTE},
 chat_w AS (
@@ -542,7 +554,8 @@ ORDER BY c.country, c.settimana`;
 // Fasce di valore del fan (LTV sulla finestra mobile di 182 giorni, per account):
 // quanto rende ogni fascia, per fonte (DM / mass / tip), totale e per settimana.
 export const LTV_BUCKETS = ["$0–50", "$50–200", "$200–500", "$500–1k", "$1k–5k", "$5k+"];
-export function ltvSQL(p) {
+export function ltvSQL(p, accounts) {
+  const { IDS, IDS_CTE, FIRST } = ids(accounts);
   return `
 WITH ${IDS_CTE},
 tx AS (

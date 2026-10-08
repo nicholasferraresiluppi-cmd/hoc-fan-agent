@@ -1,16 +1,20 @@
-// Chi vede le pagine di Laura (Revenue Laura, Laura Chat Monitor): come le pagine
-// di squadra — capability SCORES_VIEW con scope team o all, POI il filtro per
-// creator: serve avere Laura tra le creator assegnate (admin: tutto). Operatori → 403.
+// Chi vede Revenue e Chat di una creator (strumento "Revenue e chat"): come le pagine di
+// squadra — capability SCORES_VIEW con scope team o all, POI il filtro per creator: serve
+// avere quella creator tra le assegnate (admin: tutte). Operatori → 403.
+// (Nome storico del file: nato per sola Laura.)
 import { CAPABILITIES } from "@/lib/rbac";
 import { authorizeScoped } from "@/lib/creator-scope";
+import { LIVE_CREATORS, DEFAULT_CREATOR, getLiveCreator, seesCreator, publicCreator } from "@/lib/live-creators";
 
-// Laura in CreatorsPro/Infloww compare come "Laura", "Laura ENG", "Laura Sommaruga - IT"…:
-// basta che una creator assegnata sia una "Laura".
-export const seesLaura = (scope) => Boolean(scope?.all || [...(scope?.creators || [])].some((c) => /^laura\b/i.test(String(c).trim())));
-
-export async function authorizeLaura() {
+/** Autorizza su una creator (slug dalla query, default Laura). Ritorna az + creator + elenco visibile. */
+export async function authorizeLiveCreator(slug) {
   const az = await authorizeScoped(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return az;
-  if (!seesLaura(az.creatorScope)) return { ok: false, status: 403, message: "Laura non è tra le creator che ti sono assegnate" };
-  return az;
+  const visible = LIVE_CREATORS.filter((c) => seesCreator(az.creatorScope, c));
+  const creator = getLiveCreator(slug || DEFAULT_CREATOR);
+  if (!creator) return { ok: false, status: 400, message: "Creator non valida" };
+  if (!seesCreator(az.creatorScope, creator)) {
+    return { ok: false, status: 403, message: `${creator.name} non è tra le creator che ti sono assegnate`, visible: visible.map(publicCreator) };
+  }
+  return { ...az, creator, visible: visible.map(publicCreator) };
 }

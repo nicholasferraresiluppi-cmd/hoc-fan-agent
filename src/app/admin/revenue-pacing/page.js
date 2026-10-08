@@ -7,7 +7,8 @@
 // Numeri: stessa logica delle sue viste BigQuery (src/lib/revenue-pacing-sql.js).
 // In più rispetto all'originale: obiettivi modificabili in pagina e "Come si calcola".
 
-import { useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useLiveCreator, CreatorPills, liveFetcher } from "@/components/LiveCreatorPicker";
 import useSWR from "swr";
 import { RefreshCw, Info } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
@@ -17,14 +18,11 @@ import { Disclosure, Notice, card, NUM } from "@/components/ds";
 const errText = (status) =>
   status === 401 || status === 403 ? "Non hai il permesso per vedere questi dati." :
   status >= 500 ? "Calcolo fallito o troppo lungo — riprova." : "Errore.";
-const fetcher = (url) =>
-  fetch(url).then((r) =>
-    r.ok ? r.json() : r.json().catch(() => ({})).then((d) => Promise.reject(new Error(d.error || errText(r.status))))
-  );
-
-const COUNTRIES = ["IT", "EN", "ES"];
+// Paesi (account) della creator scelta: arrivano dall'API, li leggono i componenti sotto.
+const CountriesCtx = createContext([]);
+const useCountries = () => useContext(CountriesCtx);
 const COUNTRY_LABEL = { ALL: "Totale", IT: "IT", EN: "EN", ES: "ES" };
-const COUNTRY_LONG = { ALL: "Totale 3 country", IT: "Italia", EN: "Inglese", ES: "Spagnolo" };
+const COUNTRY_LONG = { ALL: "Totale account", IT: "Italia", EN: "Inglese", ES: "Spagnolo" };
 const CONFIDENCE = { BASSA: "BASSA", MEDIA: "MEDIA", ALTA: "ALTA", "MOLTO ALTA": "MOLTO ALTA" };
 
 const ok = (v) => v != null && Number.isFinite(Number(v));
@@ -76,10 +74,10 @@ function totalRow(rows) {
   return t;
 }
 
-function goalFor(goals, country, month) {
+function goalFor(goals, country, month, countries) {
   if (!goals) return null;
   if (country === "ALL") {
-    const vals = COUNTRIES.map((c) => goals[c]?.[month]);
+    const vals = countries.map((c) => goals[c]?.[month]);
     return vals.every((v) => v == null) ? null : vals.reduce((a, v) => a + (v || 0), 0);
   }
   return goals[country]?.[month] ?? null;
@@ -90,7 +88,7 @@ function useDaily(trend, country) {
   return useMemo(() => {
     const by = new Map();
     for (const t of trend || []) {
-      const d = by.get(t.date) || { date: t.date, rev: 0, subs: 0, revBy: { IT: 0, EN: 0, ES: 0 }, subsBy: { IT: 0, EN: 0, ES: 0 } };
+      const d = by.get(t.date) || { date: t.date, rev: 0, subs: 0, revBy: {}, subsBy: {} };
       d.revBy[t.country] = (d.revBy[t.country] || 0) + (t.daily_revenue || 0);
       d.subsBy[t.country] = (d.subsBy[t.country] || 0) + (t.daily_new_subs || 0);
       if (country === "ALL" || t.country === country) {
@@ -104,24 +102,35 @@ function useDaily(trend, country) {
 }
 
 export default function RevenuePacingPage() {
-  const [country, setCountryState] = useState("ALL");
-  // Paese condiviso con la scheda Chat (stessa voce di menu "Laura")
-  useEffect(() => { try { const v = localStorage.getItem("hoc:laura:paese"); if (["ALL", "IT", "EN", "ES"].includes(v)) setCountryState(v); } catch {} }, []);
-  const setCountry = (c) => { setCountryState(c); try { localStorage.setItem("hoc:laura:paese", c); } catch {} };
+  const [slug, setSlug] = useLiveCreator();
+  const [countryPick, setCountryState] = useState("ALL");
+  // Paese condiviso con la scheda Chat
+  useEffect(() => { try { const v = localStorage.getItem("hoc:live:paese"); if (v) setCountryState(v); } catch {} }, []);
+  const setCountry = (c) => { setCountryState(c); try { localStorage.setItem("hoc:live:paese", c); } catch {} };
   const [tab, setTab] = useState("mese");
   const [refreshing, setRefreshing] = useState(false);
-  const { data, error, isLoading, mutate } = useSWR("/api/admin/revenue-pacing", fetcher, { revalidateOnFocus: false });
+  const apiUrl = slug == null ? null : `/api/admin/revenue-pacing${slug ? `?creator=${encodeURIComponent(slug)}` : ""}`;
+  const { data, error, isLoading, mutate } = useSWR(apiUrl, liveFetcher, { revalidateOnFocus: false });
+  // Creator salvata che non è più tra le tue (403 con l'elenco): si passa alla prima visibile.
+  useEffect(() => {
+    if (error?.creators?.length && !error.creators.some((c) => c.slug === slug)) setSlug(error.creators[0].slug);
+  }, [error, slug]);
+  const COUNTRIES = data?.countries || [];
+  const multi = COUNTRIES.length > 1;
+  // "Totale" solo con più account; un paese che la creator non ha → il primo (o Totale)
+  const country = countryPick === "ALL" ? (multi ? "ALL" : COUNTRIES[0]) : COUNTRIES.includes(countryPick) ? countryPick : multi ? "ALL" : COUNTRIES[0];
+  const creatorName = (data?.creators || []).find((c) => c.slug === data?.creator)?.short || "";
 
   const rows = data?.data || [];
   const row = useMemo(() => (country === "ALL" ? totalRow(rows) : rows.find((r) => r.country === country)), [rows, country]);
   const daily = useDaily(data?.trend, country);
   const month = monthKey(row?.as_of_date);
-  const goal = row ? goalFor(data?.goals, country, month) : null;
+  const goal = row ? goalFor(data?.goals, country, month, COUNTRIES) : null;
 
   const refresh = async () => {
     setRefreshing(true);
     try {
-      const fresh = await fetcher("/api/admin/revenue-pacing?refresh=1");
+      const fresh = await liveFetcher(`/api/admin/revenue-pacing?refresh=1&creator=${encodeURIComponent(data?.creator || slug || "")}`);
       await mutate(fresh, { revalidate: false });
     } catch (e) {
       alert(e.message);
@@ -135,11 +144,12 @@ export default function RevenuePacingPage() {
     : null;
 
   return (
+    <CountriesCtx.Provider value={COUNTRIES}>
     <div style={{ maxWidth: 1000, margin: "0 auto", padding: "20px 16px 60px", fontFamily: FONTS.body }}>
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
         <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, color: CP.textPrimary, display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ width: 14, height: 14, background: CP.accent, transform: "rotate(45deg)", borderRadius: 2, display: "inline-block" }} />
-          Revenue Analytics · Laura
+          Revenue Analytics{creatorName ? ` · ${creatorName}` : ""}
         </h1>
         <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: CP.textMuted }}>
           {data?.updated_at && <span>{new Date(data.updated_at).toLocaleString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}
@@ -149,8 +159,9 @@ export default function RevenuePacingPage() {
         </div>
       </header>
 
+      <CreatorPills creators={data?.creators || error?.creators} current={data?.creator || slug} onChange={setSlug} />
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-        {["ALL", ...COUNTRIES].map((c) => (
+        {(multi ? ["ALL", ...COUNTRIES] : COUNTRIES).map((c) => (
           <button key={c} onClick={() => setCountry(c)} style={pill(country === c)}>{COUNTRY_LABEL[c]}</button>
         ))}
       </div>
@@ -177,6 +188,7 @@ export default function RevenuePacingPage() {
       {row && <div style={{ textAlign: "center", fontSize: 12, color: CP.textMuted, marginTop: 20 }}>Fonte: BigQuery HOC · {COUNTRY_LONG[country]} · i giorni sono in ora UTC</div>}
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
+    </CountriesCtx.Provider>
   );
 }
 
@@ -273,7 +285,7 @@ function MonthTab({ row, goal, country, month, daily, data, mutate }) {
           <div style={{ marginTop: 6 }}>
             <span style={{ fontSize: 11.5, padding: "2px 8px", borderRadius: 6, background: CP.surfaceAlt, color: CP.textSecondary }}>Affidabilità: {CONFIDENCE[row.projection_confidence] || row.projection_confidence}</span>
           </div>
-          <div style={{ ...small, marginTop: 6 }}>{country === "ALL" ? "Aggregato 3 country" : COUNTRY_LONG[country]}</div>
+          <div style={{ ...small, marginTop: 6 }}>{country === "ALL" ? "Somma degli account" : COUNTRY_LONG[country]}</div>
         </div>
 
         <div style={box}>
@@ -357,7 +369,7 @@ function MonthTab({ row, goal, country, month, daily, data, mutate }) {
 
       <div style={{ marginTop: 14 }}>
         <Disclosure open={goalsOpen} onToggle={() => setGoalsOpen((o) => !o)} title="Obiettivi mensili" summary={`Imposta o correggi l'obiettivo di ${monthName(month)} e dei mesi vicini`}>
-          <GoalsEditor goals={data.goals} history={data.goals_history} month={month} onSaved={(g) => mutate({ ...data, goals: g.goals, goals_history: g.goals_history }, { revalidate: false })} />
+          <GoalsEditor creator={data.creator} goals={data.goals} history={data.goals_history} month={month} onSaved={(g) => mutate({ ...data, goals: g.goals, goals_history: g.goals_history }, { revalidate: false })} />
         </Disclosure>
         <Disclosure open={howOpen} onToggle={() => setHowOpen((o) => !o)} title="Come si calcola" summary="Pesi per giorno del mese, media storica, affidabilità">
           <HowItWorks row={row} />
@@ -496,6 +508,7 @@ function LineChart({ points, k, fmt }) {
 }
 
 function DailyTable({ country, today, daily }) {
+  const COUNTRIES = useCountries();
   const [mode, setMode] = useState("rev");
   const isRev = mode === "rev";
   const fmtV = isRev ? fmt$ : fmtInt;
@@ -525,7 +538,7 @@ function DailyTable({ country, today, daily }) {
                 <th style={th}>{isRev ? "Revenue" : "Nuovi sub"}</th>
                 <th style={th}>Δ vs mese prec.</th>
                 <th style={th}>{isRev ? "Rev. cumulativo" : "Cumulativo"}</th>
-                {country === "ALL" && <th style={th}>IT / EN / ES</th>}
+                {country === "ALL" && <th style={th}>{COUNTRIES.join(" / ")}</th>}
               </tr>
             </thead>
             <tbody>
@@ -566,7 +579,8 @@ function DailyTable({ country, today, daily }) {
 
 // ─── Obiettivi e metodo ─────────────────────────────────────────────────────
 
-function GoalsEditor({ goals, history, month, onSaved }) {
+function GoalsEditor({ creator, goals, history, month, onSaved }) {
+  const COUNTRIES = useCountries();
   const months = [-2, -1, 0, 1].map((n) => addMonths(month, n));
   const [draft, setDraft] = useState({});
   const [busy, setBusy] = useState(null);
@@ -578,7 +592,7 @@ function GoalsEditor({ goals, history, month, onSaved }) {
     setBusy(k);
     setErr(null);
     try {
-      const r = await fetch("/api/admin/revenue-pacing", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ country, month: m, value: raw === "" ? null : Number(raw) }) });
+      const r = await fetch("/api/admin/revenue-pacing", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ creator, country, month: m, value: raw === "" ? null : Number(raw) }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || errText(r.status));
       onSaved(d);
@@ -643,7 +657,7 @@ function HowItWorks({ row }) {
       <li style={li}><b>Affidabilità.</b> Bassa fino al giorno 7, media fino al 15, alta fino al 25, poi molto alta.</li>
       <li style={li}><b>New sub non ancora spesi.</b> Revenue atteso dai nuovi abbonati a fine mese meno quello che hanno già speso.</li>
       <li style={li}><b>Ritmo atteso.</b> Quota di mese trascorsa (giorni passati ÷ giorni del mese), come nel sito originale.</li>
-      <li style={li}><b>Revenue.</b> Netto delle transazioni attribuite ai tre account di Laura, per giorno in ora UTC. Metodo attuale: {row.projection_method === "day_weight" ? "pesi per giorno" : row.projection_method === "linear" ? "lineare" : "misto"}, {row.closed_months_count ?? "—"} mesi chiusi di storico.</li>
+      <li style={li}><b>Revenue.</b> Netto delle transazioni attribuite agli account della creator, per giorno in ora UTC. Metodo attuale: {row.projection_method === "day_weight" ? "pesi per giorno" : row.projection_method === "linear" ? "lineare" : "misto"}, {row.closed_months_count ?? "—"} mesi chiusi di storico.</li>
     </ul>
   );
 }
