@@ -22,6 +22,7 @@ import {
   HandCoins, MessageCircle,
   Snowflake, Megaphone, Share2, Shield, Building2, BookUser,
   BookMarked,
+  LineChart,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee } from "@/lib/nav-access";
@@ -61,6 +62,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/leaderboard",                  title: "Classifica allenamento",        desc: "Classifica principale operatori", icon: Trophy },
       { href: "/leaderboard/sales-cp",         title: "Classifica vendite", desc: "Score 0-100 da CreatorsPro", icon: DollarSign },
       { href: "/leaderboard/creators",         title: "Creator", desc: "Quanto rende ogni creator + team interno", icon: Users },
+      { href: "/admin/revenue-pacing",         title: "Revenue Laura", desc: "Dove chiude il mese per paese (IT/EN/ES): proiezione, obiettivo, media 12 mesi, nuovi abbonati", icon: LineChart },
       { href: "/leaderboard/creators/heatmap", title: "Mappa operatore×creator",      desc: "Score operatore × creator a colpo d'occhio", icon: Flame },
       { href: "/admin/conversation-intelligence", title: "Presidio chat", desc: "Latenza risposta, % entro 5 min e response rate per creator (dai transcript, solo metadati)", icon: Activity },
       { href: "/admin/sales-coaching", title: "Coaching vendite", desc: "Per split: quanto comprano in chat i fan mai paganti, chi vende meglio a parità di pagina, cosa fa vendere, pagine e operatori modello di HOC, test in corso ed esempi da far studiare", icon: HandCoins },

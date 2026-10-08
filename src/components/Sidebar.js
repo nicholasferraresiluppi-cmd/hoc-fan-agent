@@ -34,6 +34,7 @@ import {
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
   History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
 Megaphone, Share2, Shield, BookUser,
+  LineChart,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
@@ -94,6 +95,7 @@ const NAV_GROUPS_RAW = [
     items: [
       { href: "/leaderboard/sales-cp",           label: "Classifica vendite", icon: DollarSign },
       { href: "/leaderboard/creators",           label: "Creator",      icon: Users },
+      { href: "/admin/revenue-pacing",           label: "Revenue Laura", icon: LineChart },
       { href: "/leaderboard/creators/heatmap",   label: "Mappa operatore×creator",     icon: Flame },
       { href: "/admin/conversation-intelligence", label: "Presidio chat", icon: Activity },
       { href: "/admin/shift-quality",            label: "Qualità turni", icon: MessagesSquare },
