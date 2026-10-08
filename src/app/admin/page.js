@@ -63,7 +63,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/leaderboard/sales-cp",         title: "Classifica vendite", desc: "Score 0-100 da CreatorsPro", icon: DollarSign },
       { href: "/leaderboard/creators",         title: "Creator", desc: "Quanto rende ogni creator + team interno", icon: Users },
       { href: "/admin/chat-monitor",           title: "Laura Chat Monitor", desc: "Live chat di Laura per paese: benvenuto entro 2h, fan senza risposta, latenza, PPV, coda, soglie del giorno, coorti e presidio", icon: MessagesSquare },
-      { href: "/admin/revenue-pacing",         title: "Revenue Laura", desc: "Dove chiude il mese per paese (IT/EN/ES): proiezione, obiettivo, media 12 mesi, nuovi abbonati", icon: LineChart },
+      { href: "/admin/revenue-pacing",         title: "Revenue Laura", desc: "Revenue (proiezione di fine mese, obiettivo, nuovi abbonati) e chat dal vivo (benvenuto, senza risposta, latenza, PPV, coorti), per paese", icon: LineChart },
       { href: "/leaderboard/creators/heatmap", title: "Mappa operatore×creator",      desc: "Score operatore × creator a colpo d'occhio", icon: Flame },
       { href: "/admin/conversation-intelligence", title: "Presidio chat", desc: "Latenza risposta, % entro 5 min e response rate per creator (dai transcript, solo metadati)", icon: Activity },
       { href: "/admin/sales-coaching", title: "Coaching vendite", desc: "Per split: quanto comprano in chat i fan mai paganti, chi vende meglio a parità di pagina, cosa fa vendere, pagine e operatori modello di HOC, test in corso ed esempi da far studiare", icon: HandCoins },

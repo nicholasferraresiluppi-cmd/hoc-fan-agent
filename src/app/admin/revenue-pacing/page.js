@@ -7,7 +7,7 @@
 // Numeri: stessa logica delle sue viste BigQuery (src/lib/revenue-pacing-sql.js).
 // In più rispetto all'originale: obiettivi modificabili in pagina e "Come si calcola".
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { RefreshCw, Info } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
@@ -104,7 +104,10 @@ function useDaily(trend, country) {
 }
 
 export default function RevenuePacingPage() {
-  const [country, setCountry] = useState("ALL");
+  const [country, setCountryState] = useState("ALL");
+  // Paese condiviso con la scheda Chat (stessa voce di menu "Laura")
+  useEffect(() => { try { const v = localStorage.getItem("hoc:laura:paese"); if (["ALL", "IT", "EN", "ES"].includes(v)) setCountryState(v); } catch {} }, []);
+  const setCountry = (c) => { setCountryState(c); try { localStorage.setItem("hoc:laura:paese", c); } catch {} };
   const [tab, setTab] = useState("mese");
   const [refreshing, setRefreshing] = useState(false);
   const { data, error, isLoading, mutate } = useSWR("/api/admin/revenue-pacing", fetcher, { revalidateOnFocus: false });

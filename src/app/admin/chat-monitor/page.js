@@ -4,7 +4,7 @@
 // spento con lo split a ottobre 2026. Struttura, schede, riquadri ed etichette dal
 // sito originale (letto il 20 e 22/07/2026). Dati: src/lib/chat-monitor*.js.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { RefreshCw } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
@@ -27,7 +27,10 @@ const TABS = [
 ];
 
 export default function ChatMonitorPage() {
-  const [country, setCountry] = useState("IT");
+  const [country, setCountryState] = useState("IT");
+  // Paese condiviso con la scheda Revenue ("Totale" là non esiste qui: resta l'ultimo paese scelto)
+  useEffect(() => { try { const v = localStorage.getItem("hoc:laura:paese"); if (["IT", "EN", "ES"].includes(v)) setCountryState(v); } catch {} }, []);
+  const setCountry = (c) => { setCountryState(c); try { localStorage.setItem("hoc:laura:paese", c); } catch {} };
   const [tab, setTab] = useState("live");
   const [refreshing, setRefreshing] = useState(false);
   const opts = { revalidateOnFocus: false };
