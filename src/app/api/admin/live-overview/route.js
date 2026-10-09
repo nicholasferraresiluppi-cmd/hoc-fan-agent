@@ -13,7 +13,7 @@ import { LIVE_CREATORS, seesCreator } from "@/lib/live-creators";
 import { getRevenuePacing, getGoals, bigQueryConfigured } from "@/lib/revenue-pacing";
 import { getChatMonitor } from "@/lib/chat-monitor";
 import { getLiveShifts } from "@/lib/live-shifts";
-import { prioritizeQueue, shiftStatus, creatorLight } from "@/lib/live-priority";
+import { prioritizeQueue, shiftStatus, creatorLight, suggestedGoal } from "@/lib/live-priority";
 
 const safe = (p) => p.catch(() => null);
 
@@ -23,8 +23,13 @@ async function summarize(c) {
   const first = rows[0] || {};
   const month = String(first.as_of_date || "").slice(0, 7);
   const sum = (f) => rows.reduce((a, r) => a + (Number(r[f]) || 0), 0);
-  const goalVals = c.accounts.map((a) => goals?.goals?.[a.country]?.[month]).filter((v) => v != null);
-  const goal = goalVals.length === c.accounts.length ? goalVals.reduce((a, b) => a + b, 0) : null;
+  // per paese: il traguardo messo a mano, se no la proposta (mese prima +10%)
+  const perCountry = c.accounts.map((a) => {
+    const set = goals?.goals?.[a.country]?.[month];
+    return set != null ? { v: set, sugg: false } : { v: suggestedGoal(rev?.trend, [a.country], month), sugg: true };
+  });
+  const goal = perCountry.every((x) => x.v != null) ? perCountry.reduce((a, x) => a + x.v, 0) : null;
+  const goalSuggested = goal != null && perCountry.some((x) => x.sugg);
   const mtd = sum("revenue_mtd"), proj = sum("revenue_proj_eom"), hist = sum("revenue_hist_avg");
   const shouldBe = goal && first.days_in_month ? (goal * first.day_of_month) / first.days_in_month : null;
   const paceRatio = shouldBe ? mtd / shouldBe : hist ? proj / hist : null;
@@ -54,7 +59,7 @@ async function summarize(c) {
 
   return {
     slug: c.slug, name: c.name, countries,
-    revenue: rev ? { month, mtd, proj, hist, goal, shouldBe, paceRatio, day: first.day_of_month, days: first.days_in_month, updated_at: rev.updated_at } : null,
+    revenue: rev ? { month, mtd, proj, hist, goal, goalSuggested, shouldBe, paceRatio, day: first.day_of_month, days: first.days_in_month, updated_at: rev.updated_at } : null,
     chatUpdated: chat?.generated_at || null,
     light,
     missing: [!rev && "revenue", !chat && "chat", !shifts && "turni"].filter(Boolean),

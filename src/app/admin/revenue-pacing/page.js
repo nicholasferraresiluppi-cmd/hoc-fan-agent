@@ -15,6 +15,7 @@ import { CP, FONTS, alpha } from "@/lib/brand";
 import { fmt$, fmtInt, fmtAgo, MONTHS_IT } from "@/lib/format";
 import { Disclosure, Notice, card, NUM } from "@/components/ds";
 import RaceHero from "./RaceHero";
+import { suggestedGoal } from "@/lib/live-priority";
 import { waitingNow } from "../chat-monitor/ui";
 
 const errText = (status) =>
@@ -138,7 +139,11 @@ export default function RevenuePacingPage() {
   const row = useMemo(() => (country === "ALL" ? totalRow(rows) : rows.find((r) => r.country === country)), [rows, country]);
   const daily = useDaily(data?.trend, country);
   const month = monthKey(row?.as_of_date);
-  const goal = row ? goalFor(data?.goals, country, month, COUNTRIES) : null;
+  const goalSet = row ? goalFor(data?.goals, country, month, COUNTRIES) : null;
+  // senza traguardo impostato: proposta = mese precedente +10% (decisione di Nicholas, 09/10)
+  const goalSugg = row && goalSet == null ? suggestedGoal(data?.trend, country === "ALL" ? COUNTRIES : [country], month) : null;
+  const goal = goalSet ?? goalSugg;
+  const goalSuggested = goalSet == null && goalSugg != null;
 
   const refresh = async () => {
     setRefreshing(true);
@@ -189,7 +194,7 @@ export default function RevenuePacingPage() {
       {row && tab === "mese" && (
         <>
           <StatusChip>Aggiornato · {new Date(data.updated_at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })} <span style={{ color: CP.textMuted }}>({fmtAgo(new Date(data.updated_at).getTime())})</span></StatusChip>
-          <MonthTab row={row} goal={goal} country={country} month={month} daily={daily} data={data} mutate={mutate} creatorName={creatorFull} chat={chat} />
+          <MonthTab row={row} goal={goal} goalSuggested={goalSuggested} country={country} month={month} daily={daily} data={data} mutate={mutate} creatorName={creatorFull} chat={chat} />
         </>
       )}
       {row && tab === "recente" && (
@@ -249,7 +254,7 @@ const grid = (min) => ({ display: "grid", gridTemplateColumns: `repeat(auto-fit,
 
 // ─── Scheda "Mese & Proiezioni" ─────────────────────────────────────────────
 
-function MonthTab({ row, goal, country, month, daily, data, mutate, creatorName, chat }) {
+function MonthTab({ row, goal, goalSuggested, country, month, daily, data, mutate, creatorName, chat }) {
   const [goalsOpen, setGoalsOpen] = useState(false);
   const openGoals = () => { setGoalsOpen(true); setTimeout(() => document.getElementById("obiettivi-mensili")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50); };
   const [howOpen, setHowOpen] = useState(false);
@@ -275,7 +280,7 @@ function MonthTab({ row, goal, country, month, daily, data, mutate, creatorName,
 
   return (
     <>
-      <RaceHero row={row} goal={goal} month={month} daily={daily} creatorName={creatorName} onSetGoal={openGoals} chat={chat} />
+      <RaceHero row={row} goal={goal} goalSuggested={goalSuggested} month={month} daily={daily} creatorName={creatorName} onSetGoal={openGoals} chat={chat} />
       <Disclosure open={detailsOpen} onToggle={() => setDetailsOpen((o) => !o)} title="Tutti i numeri del mese"
         summary="Composizione del revenue, proiezioni, monetizzazione dei nuovi, obiettivo e mese scorso">
       <div style={grid(240)}>
@@ -321,7 +326,7 @@ function MonthTab({ row, goal, country, month, daily, data, mutate, creatorName,
 
       <div style={{ ...box, marginTop: 10 }}>
         <Label tip="Incassato del mese contro l'obiettivo. Ritmo atteso = quota di mese trascorsa (giorni passati ÷ giorni del mese).">
-          Obiettivo mensile · {COUNTRY_LONG[country]} — {monthName(month)}
+          Obiettivo mensile · {COUNTRY_LONG[country]} — {monthName(month)}{goalSuggested ? " · suggerito (mese prima +10%)" : ""}
         </Label>
         {goal == null ? (
           <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 8 }}>
