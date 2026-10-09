@@ -82,7 +82,7 @@ Ogni notte il cron di HOC Pro (dispatcher, 03:00 UTC → `/api/cron/warehouse-ba
 - **Guardia:** se una tabella di origine scende sotto metà delle righe dell'ultima copia riuscita, quella tabella non viene sovrascritta e il heartbeat va in errore.
 - **Esito:** heartbeat `cron:heartbeat:warehouse-backup`; stato e tabelle saltate in KV `warehouse:backup:state`.
 - **Costo:** conservazione ~20 $/mese, più ~3 $/mese di letture.
-- **Credenziali escluse:** `public_creators.token` (sessioni OnlyFans), `public_proxies.password`, `public_sessions.device_token` e `public_accounts.graph_token` non vengono mai copiate (`EXCLUDED_COLUMNS` in `warehouse-backup-core.js`).
+- **Copia completa, credenziali incluse** (decisione di Nicholas, 9/10/2026): token di sessione OnlyFans, password dei proxy, device token e graph token Meta sono nel backup. Chi ha accesso a `hoc-pro.warehouse_backup` può usarli finché sono validi, quindi l'accesso al progetto va tenuto ristretto.
 - **Restano fuori:** le viste (il loro SQL è in `views/`) e i fogli Google collegati (il service account non può leggerli).
 
 Primo giro verificato il 9/10/2026: 91 job su 91 riusciti, e la Recap ricalcolata sulla copia dà $1.399.080,31.

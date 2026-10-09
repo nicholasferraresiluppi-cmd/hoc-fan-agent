@@ -71,17 +71,15 @@ ok(backupTableName("onlyfans", "chat") === "onlyfans__chat", "nome destinazione"
   ok(!noCl.query.query.includes("CLUSTER BY"), "senza clustering niente CLUSTER BY");
 }
 
-// credenziali escluse
+// copia completa: nessuna colonna esclusa (decisione 9/10/2026)
 {
-  const { jobs } = planBackup([
-    { dataset: "postgres", table: "public_creators", mode: "ctas", numRows: 342, clustering: ["id"] },
-    { dataset: "postgres", table: "public_accounts", mode: "copy", numRows: 10 },
-    { dataset: "postgres", table: "public_transactions", mode: "ctas", numRows: 10 },
-  ]);
-  const q = (j) => jobConfiguration(j, P).query?.query || "";
-  ok(q(jobs[0]).includes("SELECT * EXCEPT(`token`) FROM"), "token di sessione escluso: " + q(jobs[0]));
-  ok(jobs[1].mode === "ctas" && q(jobs[1]).includes("EXCEPT(`graph_token`)"), "colonne escluse forzano la CTAS anche da copy");
-  ok(!q(jobs[2]).includes("EXCEPT"), "tabelle senza credenziali restano SELECT *");
+  const { jobs } = planBackup([{ dataset: "postgres", table: "public_creators", mode: "ctas", numRows: 342, clustering: ["id"] }]);
+  const q = jobConfiguration(jobs[0], P).query.query;
+  ok(!q.includes("EXCEPT"), "public_creators copiata intera: " + q);
+}
+{
+  const { jobs } = planBackup([{ dataset: "postgres", table: "public_accounts", mode: "copy", numRows: 10 }]);
+  ok(jobs[0].mode === "copy", "senza esclusioni la copy job resta copy job");
 }
 
 console.log(`warehouse-backup: ${n} asserzioni ok`);
