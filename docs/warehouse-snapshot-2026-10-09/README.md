@@ -86,3 +86,30 @@ Ogni notte il cron di HOC Pro (dispatcher, 03:00 UTC → `/api/cron/warehouse-ba
 - **Restano fuori:** le viste (il loro SQL è in `views/`) e i fogli Google collegati (il service account non può leggerli).
 
 Primo giro verificato il 9/10/2026: 91 job su 91 riusciti, e la Recap ricalcolata sulla copia dà $1.399.080,31.
+
+## Altri due report Looker (verificati il 9 ottobre 2026)
+
+### KPI Sales (`datastudio.google.com/reporting/278483c8-2dbc-4ce3-9050-6405aa39c359`, 2 pagine)
+
+| Pagina | Fonte | Formula | Esito |
+|---|---|---|---|
+| Conversion Analytics | `onlyfans.transactions_analytics` | ultimi **28 giorni**: `SUM(new_subs)`, `SUM(new_subs_converted)`, `SUM(unique_users)`, `SUM(num_transactions)`, `SUM(tot_revenue)`; % Δ = 28 giorni precedenti | ✔ al centesimo (Alessandra Sparagno 2.087 / 180 / 578 / 1.100 / 37.910,47; totale 160.544 abbonati e $2.832.978,98) |
+| Sales Ratio | transazioni non-abbonamento per creator e mese | Num. Trans., Tot. Revenue, AVG = revenue/trans, **MED = mediana di `net` escluse le subscription**, **RR = AVG/MED** (quanto la media è tirata su dalle vendite grandi) | ≈ mediana esatta (24,8), conteggio 268 contro 261 su `attributed_transactions`: fonte del conteggio da confermare |
+
+### HOC Marketing Analytics (`datastudio.google.com/reporting/4cdacd38-1beb-49fe-b27d-2543719e4be2`, 16 pagine)
+
+Le 6 pagine "Index" (IT ed ENG) sono il **manuale dei campi** scritto da chi ha fatto il report. Le definizioni chiave:
+- `spending_id` = una campagna advertising per network (Instagram, Facebook…), che raggruppa più tracking link.
+- **Revenue di un tracking link** = tutto ciò che hanno speso gli utenti entrati da quel link, anche **prima** del periodo scelto (non solo i nuovi iscritti del periodo).
+- **ROAS** = revenue generata nel tempo dagli iscritti del periodo ÷ spesa: cresce nel tempo, perché quegli utenti continuano a spendere.
+- La spesa ads è inserita **a mano** ogni mattina entro le 12 (con il 10% di fee della linea di credito e la conversione in dollari; Facebook già in euro con il ricarico WL).
+- I dati Telegram (unioni) riguardano solo i canali di cui **Riccardo** è proprietario.
+
+| Pagina | Fonte | Esito |
+|---|---|---|
+| Tracking Links Stats | `onlyfans.links_stats` (`SUM(clicks_diff)`, `SUM(subs_diff)`, `SUM(revenue)`, `SUM(new_sub_revenue)`; il traffico organico è escluso) | ✔ esatto (2–8 ott: 183.304 click, 20.103 abbonati, $280.652,14, $61.732,92) |
+| Subs Notifications Report | `hoc.subs_notifications` in **tempo reale** (vista sui grezzi), `COUNT(*)` per creator e `sub_type` | ✔ stessa fonte; piccoli scarti dovuti alla cache di Looker (Cynthia 4.430 contro 4.439) |
+| Free Trials Reports | `hoc.subs_notifications` con `sub_type = new_subscriber_trial`, nomi creator da `hoc.creators.name` | ≈ 1.649 contro 1.710: stessa fonte, filtro esatto da confermare |
+| ADV Users / ADV Creators | `hoc.newsubs_spending` con `spending_id` valorizzato | ≈ 299 / 41 / $1.997,77 contro 304 / 39 / $1.879,38: l'abbinamento link→campagna passa da un foglio Google (`funnels_sheets`) che non possiamo leggere |
+| CPA, ROAS, Spending Intervals, Funnel ADV | spesa da `onlyfans.ad_def_spent` (+ fogli `ad_spend`/`creators_budget`) | il report stesso mostra **"Nessun dato"** su ottobre: la spesa manuale non viene più inserita |
+| Untitled Page | `tg.telegram_metric_points` (metriche dei canali Telegram) | pagina vuota, in bozza |
