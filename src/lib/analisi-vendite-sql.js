@@ -8,7 +8,7 @@
 // li decide lib/analisi-vendite.js). `ids` = creator_id già filtrati per
 // split + creator visibili all'utente: qui si validano solo come numeri.
 
-export const VIEWS = ["recap", "conversioni", "rapporto", "meta-mese", "transazioni"];
+export const VIEWS = ["recap", "conversioni", "rapporto", "meta-mese", "transazioni", "nuovi-abbonati", "tracking", "copertura"];
 
 const DAY = 86400e3;
 const isoDay = (t) => new Date(t).toISOString().slice(0, 10);
@@ -176,6 +176,103 @@ export function chargebackSql(refs, ids, range) {
     FROM \`${refs.chargebacks}\` c LEFT JOIN \`${refs.users}\` u ON u.id = c.user_id
     WHERE c.creator_id IN (${idList(ids)}) AND DATE(c.created_at_transaction) BETWEEN ${d(range.from)} AND ${d(range.to)}
     ORDER BY c.created_at_transaction DESC LIMIT 500`;
+}
+
+/**
+ * Nuovi abbonati — Looker "HOC Analytics 3.0 › Dashboard" (+ "New Subs CR"), tabella hoc.newsubs_spending_daily.
+ * Unità = coppia fan×creator (`user_key`): un fan su due creator conta due volte.
+ * LTV 1° giorno = SUM(spend_d0) / abbonati; CR 1° giorno = abbonati con spend_d0 > 0 / abbonati;
+ * LTV 30 gg = SUM(revenue) / abbonati; CR 30 gg = abbonati con revenue > 0 / abbonati; ARPPU = revenue / convertiti.
+ * Verificato (2-8/10, tutta l'agenzia): 21.346 · $4,84 · 9% · $5,90 · 10,25% · $57,58; Fishball EN 91 · $11,87 · 5,49% · $215,94.
+ * `dim` = colonna di raggruppamento (sub_type | creator_id), già validata.
+ */
+export function nuoviMetricsSql(refs, ids, range, dim) {
+  if (!["sub_type", "creator_id"].includes(dim)) throw new Error("raggruppamento non valido");
+  return `
+    SELECT ${dim} AS k, COUNT(DISTINCT user_key) AS subs, SUM(spend_d0) AS spend_d0,
+      COUNT(DISTINCT IF(spend_d0 > 0, user_key, NULL)) AS conv_d0, SUM(revenue) AS revenue,
+      COUNT(DISTINCT IF(revenue > 0, user_key, NULL)) AS conv
+    FROM \`${refs.newsubs}\`
+    WHERE creator_id IN (${idList(ids)}) AND calendar_date BETWEEN ${d(range.from)} AND ${d(range.to)}
+    GROUP BY ROLLUP(${dim})`;
+}
+
+/**
+ * Nuovi abbonati in PERSONE — Looker "New Subs Revenue": unità = fan (`user_id`), una persona su più creator conta una volta.
+ * "Nuovi" = tutto ciò che non è returning (trial compresi). Periodo e periodo precedente.
+ * Verificato (2-8/10): 17.881 persone (2.177 di ritorno, 15.975 nuove), $126.047,83, convertiti 2.025 (203 / 1.833).
+ */
+export function nuoviPersoneSql(refs, ids, range) {
+  const p = previousRange(range);
+  return `
+    SELECT cur,
+      COUNT(DISTINCT user_id) AS gained,
+      COUNT(DISTINCT IF(sub_type = 'returning_subscriber', user_id, NULL)) AS gained_ret,
+      COUNT(DISTINCT IF(sub_type != 'returning_subscriber', user_id, NULL)) AS gained_new,
+      SUM(revenue) AS revenue,
+      SUM(IF(sub_type = 'returning_subscriber', revenue, 0)) AS revenue_ret,
+      SUM(IF(sub_type != 'returning_subscriber', revenue, 0)) AS revenue_new,
+      COUNT(DISTINCT IF(revenue > 0, user_id, NULL)) AS conv,
+      COUNT(DISTINCT IF(revenue > 0 AND sub_type = 'returning_subscriber', user_id, NULL)) AS conv_ret,
+      COUNT(DISTINCT IF(revenue > 0 AND sub_type != 'returning_subscriber', user_id, NULL)) AS conv_new
+    FROM (SELECT *, calendar_date >= ${d(range.from)} AS cur FROM \`${refs.newsubs}\`
+          WHERE creator_id IN (${idList(ids)}) AND calendar_date BETWEEN ${d(p.from)} AND ${d(range.to)})
+    GROUP BY cur`;
+}
+
+/**
+ * Nuovi abbonati per link — Looker "New Subs CR": per creator, link, placement e alterego.
+ * Verificato (2-8/10): Giulia Ottorini, senza link → $6.473,49 · 903 · 97 · 10,74% · ARPPU $66,74.
+ */
+export function nuoviLinkSql(refs, ids, range) {
+  return `
+    SELECT creator_id, link_name, placement_username AS placement, alterego,
+      SUM(revenue) AS revenue, COUNT(DISTINCT user_key) AS subs, COUNT(DISTINCT IF(revenue > 0, user_key, NULL)) AS conv
+    FROM \`${refs.newsubs}\`
+    WHERE creator_id IN (${idList(ids)}) AND calendar_date BETWEEN ${d(range.from)} AND ${d(range.to)}
+    GROUP BY 1, 2, 3, 4
+    ORDER BY revenue DESC LIMIT 1000`;
+}
+
+/**
+ * Tracking link — Looker "Tracking Links Stats" + "Clicks Overall", tabella onlyfans.links_stats.
+ * Click e abbonati = somme dei `*_diff` giornalieri; revenue = spesa nel periodo di TUTTI i fan entrati da quel link
+ * (anche prima del periodo); new_sub_revenue = solo dei nuovi. Traffico organico escluso (non passa da un link).
+ * Verificato (2-8/10): Alessandra c3 898 · 115 · $2.596,37 · $381,59; Fishball IT 9.331 click · 515 abbonati.
+ */
+export function trackingSql(refs, ids, range) {
+  const p = previousRange(range);
+  return `
+    SELECT creator_id, link_name, link_url, ANY_VALUE(placement) AS placement, ANY_VALUE(spending_id) AS spending_id,
+      SUM(IF(cur, clicks_diff, 0)) AS clicks, SUM(IF(cur, 0, clicks_diff)) AS clicks_prev,
+      SUM(IF(cur, subs_diff, 0)) AS subs, SUM(IF(cur, 0, subs_diff)) AS subs_prev,
+      SUM(IF(cur, revenue, 0)) AS revenue, SUM(IF(cur, 0, revenue)) AS revenue_prev,
+      SUM(IF(cur, new_sub_revenue, 0)) AS new_sub_revenue
+    FROM (SELECT *, calendar_date >= ${d(range.from)} AS cur FROM \`${refs.linksStats}\`
+          WHERE creator_id IN (${idList(ids)}) AND calendar_date BETWEEN ${d(p.from)} AND ${d(range.to)})
+    GROUP BY creator_id, link_name, link_url
+    HAVING clicks != 0 OR subs != 0 OR revenue != 0 OR clicks_prev != 0 OR subs_prev != 0`;
+}
+
+/**
+ * Copertura — Looker "Creators Reach" / "Creator Overall", tabella onlyfans.reach (SUM(total) dei giorni).
+ * Verificato (2-8/10): Giulia Ottorini 77.350 (+15,9%), Fishball IT 60.430 (+145,6%), Cubanita 60.776 (−39,6%).
+ */
+export function coperturaSql(refs, ids, range) {
+  const p = previousRange(range);
+  return `
+    SELECT creator_id, SUM(IF(calendar_date >= ${d(range.from)}, total, 0)) AS reach, SUM(IF(calendar_date < ${d(range.from)}, total, 0)) AS reach_prev
+    FROM \`${refs.reach}\`
+    WHERE creator_id IN (${idList(ids)}) AND calendar_date BETWEEN ${d(p.from)} AND ${d(range.to)}
+    GROUP BY creator_id`;
+}
+
+export function coperturaDailySql(refs, ids, range) {
+  return `
+    SELECT FORMAT_DATE('%Y-%m-%d', calendar_date) AS day, SUM(total) AS reach
+    FROM \`${refs.reach}\`
+    WHERE creator_id IN (${idList(ids)}) AND calendar_date BETWEEN ${d(range.from)} AND ${d(range.to)}
+    GROUP BY 1 ORDER BY 1`;
 }
 
 /** Variazione percentuale come in Looker: null se il periodo prima è zero. */

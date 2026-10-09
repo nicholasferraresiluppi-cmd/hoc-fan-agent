@@ -11,7 +11,8 @@ const GUARD_MIN_ROWS = 1000; // sotto questa soglia le oscillazioni sono normali
 export const BACKUP_SOURCES = [
   { dataset: "onlyfans", mode: "copy" },
   { dataset: "postgres", mode: "ctas" },
-  { dataset: "hoc", mode: "copy", only: ["ws_chat"] },
+  // newsubs_spending_daily (9/10/2026): la legge Analisi vendite → Nuovi abbonati
+  { dataset: "hoc", mode: "copy", only: ["ws_chat", "newsubs_spending_daily"] },
 ];
 
 // Colonne da NON copiare, per tabella ("dataset.tabella": [colonne]).
