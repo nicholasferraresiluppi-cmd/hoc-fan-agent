@@ -10,7 +10,7 @@ import {
   weekKey, normHandle, parseRefreshItem, appendHistory, growthPct, sumHistories,
   handleStem, linkKey, suggestLinks, buildCreators, stageCounts,
   creatorIdOf, setStage, addNote, setField, linkHandles, unlinkHandle, dismissSuggestion, forgetHandle,
-  HISTORY_MAX, DEFAULT_STAGE, applyRefresh,
+  HISTORY_MAX, DEFAULT_STAGE, applyRefresh, scrubContacts,
 } from "../src/lib/scouting-core.js";
 
 let n = 0;
@@ -137,5 +137,10 @@ eq(sc.sig, "forte", "il giudizio della ricerca resta"); eq(growthPct(sc.hist, 1)
 const gone = res.profiles.find((p) => p.h === "sparita");
 eq(gone.fol, 900, "chi manca tiene gli ultimi numeri"); eq(gone.missing, 1, "e conta un mancato");
 eq(applyRefresh(res.profiles, [], new Date(Date.UTC(2026, 9, 23))).profiles.find((p) => p.h === "sparita").missing, 2, "i mancati si sommano");
+
+// contatti tolti dalla bio, handle tenuti
+eq(scrubContacts("chat 📞 +39 333 123 4567 info: anna.rossi@gmail.com seguimi @anna_privata"), "chat 📞 info: seguimi @anna_privata", "via telefono ed email, resta l'handle");
+eq(scrubContacts("classe 1998 · 1,70"), "classe 1998 · 1,70", "anni e altezza non sono telefoni");
+eq(parseRefreshItem({ Account: "https://instagram.com/x_y", Biography: "wa 3331234567", "Analysis Status": "analyzed" }).bio, "wa", "il giro settimanale pulisce la bio");
 
 console.log(`scouting: ${n} asserzioni ok`);

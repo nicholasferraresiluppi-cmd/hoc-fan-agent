@@ -6,7 +6,7 @@
 // giudizi e link della ricerca); gli handle cancellati su richiesta (scouting:forgotten) non rientrano.
 import { readFileSync } from "node:fs";
 import { getProfiles, saveProfiles, getForgotten } from "../src/lib/scouting-store.js";
-import { normHandle } from "../src/lib/scouting-core.js";
+import { normHandle, scrubContacts } from "../src/lib/scouting-core.js";
 
 const [file, flag] = process.argv.slice(2);
 if (!file) { console.error("uso: scripts/scouting-import.mjs <profili.json> [--dry]"); process.exit(1); }
@@ -27,6 +27,14 @@ for (const raw of incoming) {
     added++;
   }
 }
+// Email e telefoni non si tengono: pulisce anche le bio già in archivio.
+let scrubbed = 0;
+for (const [h, p] of by) {
+  if (typeof p.bio !== "string") continue;
+  const clean = scrubContacts(p.bio);
+  if (clean !== p.bio) { by.set(h, { ...p, bio: clean }); scrubbed++; }
+}
+console.log(`bio ripulite da email/telefoni: ${scrubbed}`);
 console.log(`nuovi ${added}, aggiornati ${updated}, saltati ${skipped} (cancellati o senza handle), totale ${by.size}`);
 if (flag === "--dry") process.exit(0);
 console.log(await saveProfiles([...by.values()]));

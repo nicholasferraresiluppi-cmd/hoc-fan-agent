@@ -45,6 +45,15 @@ const num = (v) => {
 };
 
 /** Riga del giro settimanale (output Apify "analyzeSpecificAccounts") → numeri del profilo. */
+/** Toglie dalla bio email e numeri di telefono: non li teniamo (docs/SCOUTING_PRIVACY.md). Gli @handle restano, servono ai collegamenti. */
+export function scrubContacts(text) {
+  return String(text || "")
+    .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, "")
+    .replace(/\+?\d[\d\s.\-/]{7,}\d/g, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
 export function parseRefreshItem(it) {
   if (!it?.Account || it.Account === "N/A") return null;
   const h = normHandle(it.Account);
@@ -57,7 +66,7 @@ export function parseRefreshItem(it) {
     vf: num(it["Views.Followers Ratio"]),
     er: num(it["Median ER"]),
     url: url && url !== "N/A" ? String(url) : "",
-    bio: typeof it.Biography === "string" ? it.Biography.slice(0, 300) : undefined,
+    bio: typeof it.Biography === "string" ? scrubContacts(it.Biography).slice(0, 300) : undefined,
   };
 }
 
