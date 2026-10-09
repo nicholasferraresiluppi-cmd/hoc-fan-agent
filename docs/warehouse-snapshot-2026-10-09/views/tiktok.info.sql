@@ -1,0 +1,86 @@
+WITH raw_values AS (
+    SELECT
+        DATE_SUB(DATE(batch_timestamp), INTERVAL 1 DAY) AS date_key,
+        id, 
+        platform_id,
+        CAST(JSON_VALUE(`data`, '$.user.uniqueId') AS STRING) AS unique_id,
+        CAST(JSON_VALUE(`data`, '$.user.nickname') AS STRING) AS nickname,
+        CAST(JSON_VALUE(`data`, '$.user.avatarThumb') AS STRING) AS avatar_thumb,
+        CAST(JSON_VALUE(`data`, '$.user.avatarMedium') AS STRING) AS avatar_medium,
+        CAST(JSON_VALUE(`data`, '$.user.avatarLarger') AS STRING) AS avatar_larger,
+        CAST(JSON_VALUE(`data`, '$.user.signature') AS STRING) AS `signature`,
+        CAST(JSON_VALUE(`data`, '$.user.verified') AS BOOLEAN) AS verified,
+        CAST(JSON_VALUE(`data`, '$.user.secUid') AS STRING) AS sec_uid,
+        CAST(JSON_VALUE(`data`, '$.user.secret') AS BOOLEAN) AS `secret`,
+        CAST(JSON_VALUE(`data`, '$.user.ftc') AS BOOLEAN) AS ftc,
+        CAST(JSON_VALUE(`data`, '$.user.relation') AS INT64) AS relation,
+        CAST(JSON_VALUE(`data`, '$.user.openFavorite') AS BOOLEAN) AS open_favorite,
+        CAST(JSON_VALUE(`data`, '$.user.commentSetting') AS STRING) AS comment_setting,
+        CAST(JSON_VALUE(`data`, '$.user.duetSetting') AS STRING) AS duet_setting,
+        CAST(JSON_VALUE(`data`, '$.user.stitchSetting') AS STRING) AS stitch_setting,
+        CAST(JSON_VALUE(`data`, '$.user.privateAccount') AS BOOLEAN) AS private_account,
+        CAST(JSON_VALUE(`data`, '$.user.isADVirtual') AS BOOLEAN) AS is_ad_virtual,
+        CAST(JSON_VALUE(`data`, '$.user.isUnderAge18') AS BOOLEAN) AS is_under_age_18,
+        CAST(JSON_VALUE(`data`, '$.user.ins_id') AS STRING) AS ins_id,
+        CAST(JSON_VALUE(`data`, '$.user.twitter_id') AS STRING) AS twitter_id,
+        CAST(JSON_VALUE(`data`, '$.user.youtube_channel_title') AS STRING) AS youtube_channel_title,
+        CAST(JSON_VALUE(`data`, '$.user.youtube_channel_id') AS STRING) AS youtube_channel_id,
+        CAST(JSON_VALUE(`data`, '$.stats.followingCount') AS INT64) AS following_count,
+        CAST(JSON_VALUE(`data`, '$.stats.followerCount') AS INT64) AS follower_count,
+        CAST(JSON_VALUE(`data`, '$.stats.heartCount') AS INT64) AS heart_count,
+        CAST(JSON_VALUE(`data`, '$.stats.videoCount') AS INT64) AS video_count,
+        CAST(JSON_VALUE(`data`, '$.stats.diggCount') AS INT64) AS digg_count,
+        CAST(JSON_VALUE(`data`, '$.stats.heart') AS INT64) AS heart,
+        commit_timestamp,
+        TIMESTAMP_TRUNC(batch_timestamp, HOUR) AS batch_timestamp,
+        label,
+        organization_id
+    FROM
+        `house-of-creators-358213.tt.raw_info`
+    WHERE 
+        CAST(JSON_VALUE(`data`, '$.stats.followerCount') AS INT64) IS NOT NULL
+
+)
+
+SELECT
+  date_key,
+  rv.id, 
+  rv.platform_id,
+  unique_id,
+  nickname,
+  avatar_thumb,
+  avatar_medium,
+  avatar_larger,
+  signature,
+  verified,
+  sec_uid,
+  secret,
+  ftc,
+  relation,
+  open_favorite,
+  comment_setting,
+  duet_setting,
+  stitch_setting,
+  private_account,
+  is_ad_virtual,
+  is_under_age_18,
+  ins_id,
+  twitter_id,
+  youtube_channel_title,
+  youtube_channel_id,
+  IF(following_count = 0, NULL, following_count) AS following_count,
+  IF(follower_count = 0, NULL, follower_count) AS follower_count,
+  IF(heart_count = 0, NULL, heart_count) AS heart_count,
+  IF(video_count = 0, NULL, video_count) AS video_count,
+  IF(digg_count = 0, NULL, digg_count) AS digg_count,
+  IF(heart = 0, NULL, heart) AS heart,
+  commit_timestamp,
+  batch_timestamp,
+  label,
+  acc.promoted_instagram_account_id,
+  acc2.username AS ig_username,
+  rv.organization_id
+FROM
+  raw_values AS rv
+  LEFT JOIN `house-of-creators-358213.postgres.public_accounts` AS acc USING(id)
+  LEFT JOIN `house-of-creators-358213.postgres.public_accounts` AS acc2 ON acc2.id = acc.promoted_instagram_account_id
