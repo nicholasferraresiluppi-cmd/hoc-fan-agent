@@ -62,12 +62,16 @@ function base64url(input) {
 }
 
 // Cache token (come fa creatorspro-api.js): riusa finché non è quasi scaduto.
-let _tokenCache = { token: null, expiresAt: 0 };
+// Una cache per scope: le query usano il readonly, la copia di sicurezza del
+// warehouse (warehouse-backup.js) lo scope pieno per creare tabelle in hoc-pro.
+const WRITE_SCOPE = "https://www.googleapis.com/auth/bigquery";
+const _tokenCache = {};
 
-async function getAccessToken(force = false) {
+async function getAccessToken(force = false, scope = SCOPE) {
   const now = Date.now();
-  if (!force && _tokenCache.token && _tokenCache.expiresAt > now + 30_000) {
-    return _tokenCache.token;
+  const cached = _tokenCache[scope];
+  if (!force && cached?.token && cached.expiresAt > now + 30_000) {
+    return cached.token;
   }
   const { sa } = getEnv();
   const iat = Math.floor(now / 1000);
@@ -75,7 +79,7 @@ async function getAccessToken(force = false) {
 
   const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const claim = base64url(
-    JSON.stringify({ iss: sa.client_email, scope: SCOPE, aud: TOKEN_URI, iat, exp })
+    JSON.stringify({ iss: sa.client_email, scope, aud: TOKEN_URI, iat, exp })
   );
   const signingInput = `${header}.${claim}`;
   const signature = crypto
@@ -100,8 +104,38 @@ async function getAccessToken(force = false) {
   if (!res.ok) {
     throw new Error(`BigQuery auth fallita (${res.status}): ${data?.error_description || data?.error}`);
   }
-  _tokenCache = { token: data.access_token, expiresAt: now + (data.expires_in || 3600) * 1000 };
-  return _tokenCache.token;
+  _tokenCache[scope] = { token: data.access_token, expiresAt: now + (data.expires_in || 3600) * 1000 };
+  return _tokenCache[scope].token;
+}
+
+/** Progetti configurati: chi paga (e ospita la copia di sicurezza) e dove stanno i dati. */
+export function bqProjects() {
+  const { billingProject, dataProject, location } = getEnv();
+  return { billingProject, dataProject, location };
+}
+
+/**
+ * Chiamata REST generica all'API BigQuery v2 (tables.list, jobs.insert, jobs.get…).
+ * `write: true` usa lo scope pieno: serve solo a chi scrive nel billing project.
+ * @param {string} path - es. `/projects/p/datasets/d/tables`
+ */
+export async function bqApi(path, { method = "GET", body, write = false, params } = {}) {
+  const token = await getAccessToken(false, write ? WRITE_SCOPE : SCOPE);
+  const url = new URL(`${BQ_BASE}${path}`);
+  for (const [k, v] of Object.entries(params || {})) if (v != null) url.searchParams.set(k, String(v));
+  const res = await fetch(url.toString(), {
+    method,
+    headers: { Authorization: `Bearer ${token}`, ...(body ? { "Content-Type": "application/json" } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data?.error?.message || res.statusText;
+    const err = new Error(`BigQuery ${method} ${path} (${res.status}): ${msg}`);
+    err.status = res.status;
+    throw err;
+  }
+  return data;
 }
 
 // Converte lo schema+righe BigQuery ({ f:[{v}] }) in array di oggetti JS con coercizione base.

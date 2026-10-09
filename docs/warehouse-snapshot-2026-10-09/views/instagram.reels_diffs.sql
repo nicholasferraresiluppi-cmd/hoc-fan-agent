@@ -1,0 +1,25 @@
+SELECT
+  date_key,
+  id,
+  platform_id,
+  content_id,
+  fbid,
+  commit_timestamp,
+  batch_timestamp,
+  owner_full_name,
+  create_time,
+  CONCAT('https://www.instagram.com/reel/', code, '/') AS video_url,
+  CONCAT('https://www.instagram.com/reels/audio/', code, '/') AS music_url,
+  thumbnail_url,
+  play_count,
+  IF(DATE(create_time) = date_key, play_count, play_count - IFNULL(LAG(play_count) OVER(PARTITION BY id, content_id ORDER BY date_key), play_count)) AS play_count_diff,
+  like_count,
+  IF(DATE(create_time) = date_key, like_count, like_count - IFNULL(LAG(like_count) OVER(PARTITION BY id, content_id ORDER BY date_key), like_count)) AS like_count_diff,
+  comment_count,
+  IF(DATE(create_time) = date_key, comment_count, comment_count - IFNULL(LAG(comment_count) OVER(PARTITION BY id, content_id ORDER BY date_key), comment_count)) AS comment_count_diff,
+  caption,
+  1 AS reels_count,
+  CASE date_key = DATE(create_time, 'UTC') WHEN TRUE THEN 1 ELSE 0 END AS reels_count_diff,
+  organization_id
+FROM
+  `house-of-creators-358213.instagram.reels_gaps_filled`

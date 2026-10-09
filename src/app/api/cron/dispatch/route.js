@@ -18,6 +18,7 @@
  *   - sempre:            tick cp-wages, payout-ledger e infloww-agency (auto-concatenanti)
  *                        + snapshot coda del loop azione→esito (queue-snapshot)
  *   - sempre:            run alert operativi (watchdog catena incluso)
+ *   - sempre:            copia di sicurezza del warehouse (warehouse-backup)
  *   - lunedì:            + digest email (dopo il run: legge i suoi findings)
  *   - giorno 1 del mese: snapshot leghe (chiusura stagione)
  *   - sempre, in fondo:  Centro HR: riconciliazione con ClickUp (solo con HR_CLICKUP_LIST_ID)
@@ -93,6 +94,10 @@ export async function POST(request) {
   // sales manager AI: la notte degli uffici sui turni di ieri (catena propria,
   // aspetta i batch AI; tetto di spesa giornaliero in KV smai:config)
   out.sales_ai = await kickEndpoint(request, "/api/cron/sales-ai");
+
+  // copia di sicurezza del warehouse HOC nel progetto di Nicholas (09/10/2026):
+  // job BigQuery asincroni nella SUA route, esito letto al giro dopo
+  out.warehouse_backup = await kickEndpoint(request, "/api/cron/warehouse-backup");
 
   // Riscalda la cache degli Academy Signals (query analitica pesante): così la
   // GET admin legge sempre dalla cache invece di calcolare inline. Best-effort:
