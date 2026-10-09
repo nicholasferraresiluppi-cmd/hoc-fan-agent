@@ -2,6 +2,8 @@
 
 Studio del 9 ottobre 2026. Contesto: i dati di HOC arrivano da una piattaforma che non controlliamo (Postgres → Datastream → BigQuery `house-of-creators-358213`, pipeline Dataform su GitHub privato). La mappa di cosa c'è e come si legge è in `docs/warehouse-snapshot-2026-10-09/`; dal 9/10 una copia notturna completa sta in `hoc-pro.warehouse_backup`.
 
+> **Decisione del 9/10/2026 (Nicholas):** si usa solo **OnlyFansAPI.com**, con un account suo (team `hoc-pro`); Infloww è escluso dal piano. Pilota partito su Elisa Vimercati, Martina Scavo a seguire; il controllo notturno sta in `/api/cron/ofapi-pilot`. La raccomandazione "ibrida" qui sotto resta come analisi.
+
 ## Come prende i dati oggi la piattaforma (dedotto dallo schema)
 - Ogni creator ha una **sessione OnlyFans** salvata (`public_creators.token`), un **proxy dedicato** (394 proxy) e un **profilo browser anti-rilevamento** (Dolphin). Con questi legge le API interne di OnlyFans.
 - Le chat arrivano in **tempo reale** via websocket (`hoc.ws_chat`, 1-2 s di ritardo).
