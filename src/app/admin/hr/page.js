@@ -21,7 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { Plus, Link2, RefreshCw, Power, SlidersHorizontal } from "lucide-react";
+import { Plus, Link2, RefreshCw, Power, SlidersHorizontal, FileSignature } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Notice, DataTable, card } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
@@ -29,6 +29,7 @@ import { PHASE_LABELS, PHASE_EXITED, CONTRACT_LABELS } from "@/lib/hr-fields";
 import { SKILL_AREAS, SKILL_LEVELS, PAST_ROLES, normalizeSkillMap, normalizePastRoles, hasSkillAtLeast, pastRoleText } from "@/lib/hr-skills";
 import { lbl, input, btnPrimary, btnGhost, chip, SYNC_LABEL, fetcher, postJson, CopyLink, fmtDateTime } from "@/components/hr-ui";
 import { RestoreButton } from "@/components/hr-archive";
+import { ContractPill } from "@/components/hr-contracts-ui";
 import { readiness, initials, avatarColor } from "@/lib/hr-readiness";
 
 const NONE = "__none__";
@@ -72,6 +73,7 @@ export default function HrPeoplePage() {
   }, []);
 
   const items = data?.items || [];
+  const cflag = (p) => data?.contracts?.byId?.[p.id]?.flag || null;
   const archivedItems = data?.archived || [];
   const flags = data?.cleanup?.byId || {};
   const byId = useMemo(() => Object.fromEntries(items.map((p) => [p.id, p])), [items]);
@@ -109,9 +111,12 @@ export default function HrPeoplePage() {
     { key: "attive", label: "Attive", test: (p) => phase(p) === "Attiva" },
     { key: "cambio", label: "In riassegnazione o in uscita", test: (p) => ["In riassegnazione", "In uscita"].includes(phase(p)) },
     { key: "uscite", label: "Uscite", test: (p) => phase(p) === PHASE_EXITED },
+    // contratti Dropbox Sign (09/10/2026): le due domande che il CRM deve far notare da solo
+    { key: "mansione-cambiata", label: "Mansione cambiata", attn: true, hideEmpty: true, test: (p) => phase(p) !== PHASE_EXITED && cflag(p) === "cambiata" },
+    { key: "senza-contratto", label: "Senza contratto", attn: true, hideEmpty: true, test: (p) => phase(p) !== PHASE_EXITED && ["mancante", "risolto"].includes(cflag(p)) },
     { key: "senza-fase", label: "Fase da sistemare", attn: true, hideEmpty: true, test: (p) => !PHASE_LABELS.includes(phase(p)) },
     { key: "ripulire", label: "Da ripulire", attn: true, hideEmpty: true, test: (p) => Boolean(flags[p.id]) },
-  ], [ready, flags]);
+  ], [ready, flags, data]);
   const tabCounts = useMemo(() => Object.fromEntries(TABS.map((t) => [t.key, items.filter(t.test).length])), [TABS, items]);
   const curTab = TABS.find((t) => t.key === tab);
 
@@ -164,6 +169,15 @@ export default function HrPeoplePage() {
     },
     { key: "status", label: "Fase", sort: (p) => { const i = PHASE_LABELS.indexOf(phase(p)); return i < 0 ? 99 : i; }, render: (p) => <PhasePill phase={phase(p)} /> },
     { key: "mansioni", label: "Mansione", sortable: false, render: (p) => (p.fields?.mansioni || []).join(", ") || <span style={{ color: CP.textMuted }}>—</span> },
+    ...(data?.contracts ? [{
+      key: "contract", label: "Contratto", sort: (p) => ["cambiata", "mancante", "risolto", "da_verificare", "in_firma", "cambiata_in_firma", "ok", "non_richiesto"].indexOf(cflag(p)),
+      render: (p) => { const c = data.contracts.byId[p.id]; return (
+        <span style={{ whiteSpace: "nowrap" }}>
+          <ContractPill flag={c?.flag} />
+          {c?.flag === "cambiata" && c.contractMansioni?.length > 0 && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2 }}>contratto: {c.contractMansioni.join(", ")}</div>}
+        </span>
+      ); },
+    }] : []),
     { key: "project", label: "Progetto", sortable: false, render: (p) => (p.fields?.progetto || []).length ? (p.fields.progetto.slice(0, 2).join(", ") + (p.fields.progetto.length > 2 ? ` +${p.fields.progetto.length - 2}` : "")) : <span style={{ color: CP.textMuted }}>—</span> },
     { key: "referent", label: "Referente", sort: (p) => (p.fields?.referent || [])[0]?.name || "", render: (p) => (p.fields?.referent || []).map((u) => u.name).join(", ") || <span style={{ color: CP.textMuted }}>—</span> },
     {
@@ -196,6 +210,7 @@ export default function HrPeoplePage() {
         subtitle="Chi lavora con noi. Si aggiorna da sola con ClickUp."
         actions={!error && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Link href="/admin/hr/contratti" style={btnGhost}><FileSignature size={15} /> Contratti</Link>
             <button type="button" onClick={() => setLinkOpen(true)} style={btnGhost}><Link2 size={15} /> Link del modulo</button>
             <button type="button" onClick={() => setNewOpen(true)} style={btnPrimary}><Plus size={15} /> Nuova persona</button>
           </div>
@@ -212,6 +227,18 @@ export default function HrPeoplePage() {
         <Notice danger>{syncProblems.length === 1 ? "1 scheda non è" : `${syncProblems.length} schede non sono`} allineate con ClickUp ({syncProblems.slice(0, 3).map((p) => p.name).join(", ")}{syncProblems.length > 3 ? "…" : ""}). Il sistema riprova da solo; il pallino rosso le segna nell'elenco. <Link href="/admin/hr/sync" style={{ color: CP.accentSoftText }}>Dettagli →</Link></Notice>
       )}
 
+      {data?.contracts && (() => {
+        const live = items.filter((p) => phase(p) !== PHASE_EXITED);
+        const n = (fs) => live.filter((p) => fs.includes(cflag(p))).length;
+        const changed = n(["cambiata"]), missing = n(["mancante", "risolto"]), pending = n(["in_firma", "cambiata_in_firma"]);
+        if (!changed && !missing && !pending && !data.contracts.unmatched) return null;
+        return (
+          <Notice danger={changed > 0 || missing > 0}>
+            Contratti: {[changed && `${changed} con la mansione cambiata (serve un contratto nuovo)`, missing && `${missing} senza contratto`, pending && `${pending} in attesa di firma`].filter(Boolean).join(" · ") || "tutti a posto"}.{" "}
+            <Link href="/admin/hr/contratti" style={{ color: CP.accentSoftText }}>Controllo contratti →</Link>
+          </Notice>
+        );
+      })()}
       {!error && isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
 
       {data && items.length === 0 && archivedItems.length === 0 && (

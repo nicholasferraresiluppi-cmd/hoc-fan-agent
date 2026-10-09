@@ -152,6 +152,9 @@ export async function POST(request) {
   // lascia solo il heartbeat (nessuna pulizia delle archiviate dal 03/10/2026:
   // da procedura non si elimina mai una persona).
   out.hr_clickup = await kickEndpoint(request, "/api/cron/hr-clickup");
+  // Contratti Dropbox Sign (09/10/2026): stato del contratto sulle schede e PDF firmati su
+  // ClickUp. Dopo la riconciliazione HR, nella SUA funzione (budget proprio).
+  out.hr_contracts = await kickEndpoint(request, "/api/cron/hr-contracts");
 
   // Esito dei kick nel heartbeat: un 401 dei figli deve lasciare traccia
   // (per 2 mesi sono falliti tutti senza che nessuno lo vedesse).

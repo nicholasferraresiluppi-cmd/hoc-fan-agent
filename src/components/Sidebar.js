@@ -35,6 +35,7 @@ import {
   History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
 Megaphone, Share2, Shield, BookUser,
   LineChart,
+  FileSignature,
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
@@ -177,6 +178,7 @@ const NAV_GROUPS_RAW = [
     items: [
       { href: "/cm-cockpit",                     label: "Cockpit CM",   icon: Gauge },
       { href: "/admin/hr",                       label: "Persone HR",   icon: BookUser },
+      { href: "/admin/hr/contratti",             label: "Contratti",    icon: FileSignature },
       { href: "/admin/hr/sync",                  label: "Sincronizzazione ClickUp", icon: RefreshCw },
       { href: "/admin/candidate-assessments",    label: "Assessment candidati", icon: UserCheck },
       { href: "/admin/priority-queue",           label: "Fan da seguire ora", icon: Inbox },
