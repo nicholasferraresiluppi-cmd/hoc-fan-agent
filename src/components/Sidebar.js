@@ -168,6 +168,7 @@ const NAV_GROUPS_RAW = [
     // Marketing (26/09/2026): moduli di luglio-agosto rimasti non pubblicati
     label: "Marketing",
     items: [
+      { href: "/admin/scouting",                 label: "Radar creator", icon: Radar },
       { href: "/admin/ads",                      label: "Studio bio-funnel", icon: Megaphone },
       { href: "/admin/social-accounts",          label: "Account social",  icon: Share2 },
       { href: "/admin/social-proxies",           label: "Proxy account social", icon: Shield },

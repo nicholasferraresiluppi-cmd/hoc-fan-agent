@@ -20,6 +20,7 @@
  *   - sempre:            run alert operativi (watchdog catena incluso)
  *   - sempre:            copia di sicurezza del warehouse (warehouse-backup)
  *   - sempre:            pilota OnlyFansAPI (ofapi-pilot)
+ *   - sempre:            Radar creator (scouting-refresh: giro Apify settimanale, esito al giro dopo)
  *   - lunedì:            + digest email (dopo il run: legge i suoi findings)
  *   - giorno 1 del mese: snapshot leghe (chiusura stagione)
  *   - sempre, in fondo:  Centro HR: riconciliazione con ClickUp (solo con HR_CLICKUP_LIST_ID)
@@ -101,6 +102,9 @@ export async function POST(request) {
   out.warehouse_backup = await kickEndpoint(request, "/api/cron/warehouse-backup");
   // pilota OnlyFansAPI (09/10/2026): stato degli account + confronto col warehouse
   out.ofapi_pilot = await kickEndpoint(request, "/api/cron/ofapi-pilot");
+  // Radar creator (10/10/2026): giro settimanale Apify sulle creator dello scouting —
+  // lancia il run una volta a settimana, ne raccoglie l'esito al giro dopo
+  out.scouting_refresh = await kickEndpoint(request, "/api/cron/scouting-refresh");
 
   // Riscalda la cache degli Academy Signals (query analitica pesante): così la
   // GET admin legge sempre dalla cache invece di calcolare inline. Best-effort:
