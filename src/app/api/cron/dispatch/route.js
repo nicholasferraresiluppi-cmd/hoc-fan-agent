@@ -19,6 +19,7 @@
  *                        + snapshot coda del loop azione→esito (queue-snapshot)
  *   - sempre:            run alert operativi (watchdog catena incluso)
  *   - sempre:            copia di sicurezza del warehouse (warehouse-backup)
+ *   - sempre:            pilota OnlyFansAPI (ofapi-pilot)
  *   - lunedì:            + digest email (dopo il run: legge i suoi findings)
  *   - giorno 1 del mese: snapshot leghe (chiusura stagione)
  *   - sempre, in fondo:  Centro HR: riconciliazione con ClickUp (solo con HR_CLICKUP_LIST_ID)
@@ -98,6 +99,8 @@ export async function POST(request) {
   // copia di sicurezza del warehouse HOC nel progetto di Nicholas (09/10/2026):
   // job BigQuery asincroni nella SUA route, esito letto al giro dopo
   out.warehouse_backup = await kickEndpoint(request, "/api/cron/warehouse-backup");
+  // pilota OnlyFansAPI (09/10/2026): stato degli account + confronto col warehouse
+  out.ofapi_pilot = await kickEndpoint(request, "/api/cron/ofapi-pilot");
 
   // Riscalda la cache degli Academy Signals (query analitica pesante): così la
   // GET admin legge sempre dalla cache invece di calcolare inline. Best-effort:
