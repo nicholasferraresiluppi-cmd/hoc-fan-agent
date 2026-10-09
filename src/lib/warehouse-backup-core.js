@@ -14,16 +14,12 @@ export const BACKUP_SOURCES = [
   { dataset: "hoc", mode: "copy", only: ["ws_chat"] },
 ];
 
-// Credenziali: NON si copiano (sessioni OnlyFans delle creator, password dei
-// proxy, token Meta/dispositivi). Non servono a nessun numero e una loro copia
-// è solo un'altra porta d'accesso agli account. Vale per ogni giro, anche per
-// le tabelle in copy job (che per questo passano in CTAS).
-export const EXCLUDED_COLUMNS = {
-  "postgres.public_creators": ["token"],
-  "postgres.public_proxies": ["password"],
-  "postgres.public_sessions": ["device_token"],
-  "postgres.public_accounts": ["graph_token"],
-};
+// Colonne da NON copiare, per tabella ("dataset.tabella": [colonne]).
+// Vuoto per decisione di Nicholas (9/10/2026): la copia è COMPLETA, credenziali
+// incluse (token di sessione OnlyFans, password dei proxy, device token, graph
+// token Meta) — sono dati di HOC e il progetto hoc-pro è suo. Attenzione: chi
+// ha accesso a hoc-pro.warehouse_backup può usare quelle sessioni finché valide.
+export const EXCLUDED_COLUMNS = {};
 
 export const backupTableName = (dataset, table) => `${dataset}__${table}`;
 
