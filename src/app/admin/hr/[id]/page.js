@@ -28,6 +28,7 @@ import { normalizeSkillMap, skillName } from "@/lib/hr-skills";
 import { lbl, btnPrimary, btnGhost, SYNC_LABEL, displayValue, FieldInput, fmtDate, fmtDateTime, fetcher, postJson } from "@/components/hr-ui";
 import { RestoreButton, archivedSummary } from "@/components/hr-archive";
 import { ExitButton, ReactivateButton } from "@/components/hr-phase";
+import { PersonContractCard } from "@/components/hr-contracts-ui";
 
 const ACTION_LABEL = {
   create: "Scheda creata", update: "Modifica", conflict: "Conflitto con ClickUp", cf_revealed: "Codice fiscale mostrato",
@@ -35,8 +36,9 @@ const ACTION_LABEL = {
   clickup_deleted: "Task cancellato su ClickUp", echo_ignored: "Eco di una nostra scrittura (ignorata)", cf_skipped: "Codice fiscale non importato",
   archived: "Scheda archiviata", restored: "Scheda ripristinata", task_trashed: "Task nel cestino di ClickUp",
   task_delete_queued: "Cancellazione del task in coda", mirror_unrecognized: "Testo di ClickUp non riconosciuto",
+  contract_attached: "Contratto allegato su ClickUp", contract_link: "Contratto collegato",
 };
-const SOURCE_LABEL = { app: "HOC Pro", clickup: "ClickUp", modulo: "Modulo della persona", sistema: "Sistema" };
+const SOURCE_LABEL = { app: "HOC Pro", clickup: "ClickUp", modulo: "Modulo della persona", sistema: "Sistema" }; // le scritture da Dropbox Sign hanno source "sistema", chi = "Dropbox Sign"
 const who = (by) => (!by ? "—" : String(by).startsWith("user_") ? `utente …${String(by).slice(-6)}` : by);
 
 // telefono in formato internazionale per WhatsApp (hr-people-core usa node:crypto: qui non si importa)
@@ -165,7 +167,13 @@ export default function HrPersonPage() {
             ))}
           </div>
 
-          {tab === "panoramica" && <Overview p={p} onGo={setTab} />}
+          {tab === "panoramica" && (
+            <>
+              {["cambiata", "mancante", "risolto"].includes(data.contracts?.status?.flag) && <PersonContractCard contracts={data.contracts} />}
+              <Overview p={p} onGo={setTab} />
+            </>
+          )}
+          {tab === "lavoro" && !p.archived && <PersonContractCard contracts={data.contracts} />}
           {TABS.filter((t) => t.keys && t.key === tab).map((t) => (
             <Section key={t.key} title={t.label} keys={t.keys} person={p} options={data.options || {}} crypto={data.crypto} incoming={data.incoming || []} locked={Boolean(p.archived)} onSaved={(j) => { mutate(); setNotice(j.notice); }} />
           ))}
