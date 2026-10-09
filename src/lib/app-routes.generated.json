@@ -43,6 +43,7 @@
  "/admin/infloww-ingest",
  "/admin/infloww-reconcile",
  "/admin/infloww-revenue",
+ "/admin/le-mie-creator",
  "/admin/leaderboard-exclusions",
  "/admin/leaderboard-import",
  "/admin/leaderboard-settings",

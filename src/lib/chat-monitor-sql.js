@@ -257,7 +257,7 @@ fans AS (
 queue AS (
   SELECT 'queue' AS kind, l.country, l.user_id, COALESCE(n.username, fs.username) AS username,
     CAST(NULL AS BOOL), TRUE, l.last_fan, l.last_out, CAST(NULL AS INT64), CAST(NULL AS FLOAT64), CAST(NULL AS INT64),
-    COALESCE(sp.spent_60d, 0), CAST(NULL AS FLOAT64), CAST(NULL AS FLOAT64), CAST(NULL AS FLOAT64), CAST(NULL AS FLOAT64), CAST(NULL AS DATE), SUBSTR(l.preview, 1, 140), CAST(NULL AS STRING), CAST(NULL AS TIMESTAMP)
+    COALESCE(sp.spent_60d, 0), CAST(NULL AS FLOAT64), CAST(NULL AS FLOAT64), COALESCE(sp.ltv_project, 0), CAST(NULL AS FLOAT64), fs.sub_date, SUBSTR(l.preview, 1, 140), CAST(NULL AS STRING), CAST(NULL AS TIMESTAMP)
   FROM last_per_fan l
   LEFT JOIN names n USING (country, user_id)
   LEFT JOIN spend sp USING (country, user_id)

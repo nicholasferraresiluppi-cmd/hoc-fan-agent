@@ -12,7 +12,7 @@ export const PAGE_GROUPS = [
   { label: "Come migliorare", tabs: [["/me/coaching", "Coaching"], ["/me/qualita", "Qualità delle chat"]] },
   { label: "Il mio compenso", tabs: [["/me/compenso", "Compenso"], ["/me/contestazioni", "Contestazioni"]] },
   // Revenue e chat (08/10/2026): revenue.hoc.tools + chat.hoc.tools ricostruiti, per le creator di Antonio (sales)
-  { label: "Revenue e chat", tabs: [["/admin/revenue-pacing", "Revenue"], ["/admin/chat-monitor", "Chat"]] },
+  { label: "Revenue e chat", tabs: [["/admin/le-mie-creator", "Le mie creator"], ["/admin/revenue-pacing", "Revenue"], ["/admin/chat-monitor", "Chat"]] },
   // chi guida una squadra: chi è sotto soglia, chi far crescere, le sessioni
   { label: "Da seguire", tabs: [["/admin/settimana", "Questa settimana"], ["/admin/action-center", "Sotto soglia"], ["/admin/coaching-center", "Da far crescere"], ["/admin/coaching-sessions", "Sessioni"]] },
   // scheda dell'operatore: stesse persone, più viste (":e" = nome operatore nell'indirizzo)
