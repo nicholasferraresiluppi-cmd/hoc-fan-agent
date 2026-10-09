@@ -1,0 +1,1 @@
+SELECT * FROM `hoc.newsubs_spending_daily`

@@ -1,0 +1,4527 @@
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_439663849.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_439737963.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_439911165.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_439962246.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440056211.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440088211.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440111234.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440133252.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440137999.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440250940.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440252982.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440255673.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440262407.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440274728.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440277153.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440285940.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440294525.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440299677.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440302404.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440323261.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440337395.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440346678.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440352551.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440355975.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440357181.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440509792.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440511788.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440517855.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440624397.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440665564.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440668933.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440773096.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_440867695.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_441896331.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_441961002.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_442115532.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_442143980.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_442159212.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_442259991.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_442284107.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_442298519.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_442298751.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_443396398.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_443408237.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_443415605.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_443417205.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_443429538.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_443468625.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_444566407.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_444606365.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_444626044.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_444627521.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_444627846.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_444631021.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_444650666.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445220473.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445249784.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445282340.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445469052.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445471829.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445487030.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445492287.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445498442.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445502483.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445574009.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445839333.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445840242.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445849020.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445859223.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445878721.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445889724.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445958213.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445962154.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_445963163.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446027612.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446075975.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446172159.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446180846.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446183402.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446190980.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446218199.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446219157.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446219158.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446219945.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446227819.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446253079.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446258917.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446282319.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446330352.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446351704.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446556047.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_446580781.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_447155612.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_447167629.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_447191364.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_447195892.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_447202289.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_447529502.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_447533537.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_447558246.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_447680846.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_448015375.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_448028490.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_356863780.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_448235690.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_448463121.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_448506268.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_448898300.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_448920247.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_449813252.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_449828797.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_449850691.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_450087009.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_450589229.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_451181738.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_452301527.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_452531881.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_452549004.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_452853970.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_452903270.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_452905270.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_452909086.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_452931871.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_453484954.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_454290439.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_454299024.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_454740916.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_454748394.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_454754048.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_454759117.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_454761722.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_454766059.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_455684011.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_455700070.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_455750252.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_455755297.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_455759818.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_455780510.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_455849808.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_455850536.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_456441191.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_456685840.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_457297802.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_457344158.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_457406716.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_457697018.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_457721559.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_457729987.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_457731696.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_457737892.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_457739089.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_457838180.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_457858269.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_458074344.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_458482016.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459584766.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459622516.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459645972.events_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459711814.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459715883.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459722485.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459722494.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459734815.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459735451.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459737081.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459740048.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459741708.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459741977.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459743516.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459746571.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459763054.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459764593.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459767301.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459768226.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459769273.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459770714.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459771844.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459895458.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_459908995.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460511114.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460539943.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460540507.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460547024.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460569606.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460590038.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460598220.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460598625.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460698186.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460706665.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460739773.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460743296.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460750428.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460752996.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460754815.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460759605.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460760367.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460760860.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460767726.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460768140.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460768144.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460769482.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460773193.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460774944.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460780208.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460780339.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460780397.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460780643.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460781445.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460798894.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460804895.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460915456.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460920316.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460934602.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460939019.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460943725.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460945825.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460952917.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460957425.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460959442.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460959771.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460965085.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460971972.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460980812.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_460985689.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461203276.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461207618.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461209139.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461209641.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461225999.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461301225.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461304265.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461308984.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461312234.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461312433.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461312845.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461323937.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461326773.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461340284.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461364280.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461397116.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461420613.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461420899.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461420903.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461438720.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461453512.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461531639.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461637140.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461827022.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461829241.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461834278.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461850817.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461866418.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461873460.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461880297.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_461888474.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462241760.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462320143.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462332655.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462416918.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462418642.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462420063.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462441554.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462446690.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462451979.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462474631.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462477334.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462517196.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462518102.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462518105.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462533593.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462541168.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_462960982.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_463187288.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_463697583.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464046299.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464058924.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464123739.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464173519.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464175513.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464185520.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464188948.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464483442.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464514637.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464531489.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464537656.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464561350.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464688050.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464702090.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464704005.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464730302.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464731330.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464732528.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_464734365.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_465079735.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_465091672.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_465167805.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_465204071.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_465210035.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_465212218.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_465223094.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_465610497.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_465621103.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_465637261.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_465638675.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_465718204.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_465725871.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_465726069.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_465906335.events_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_466345872.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_466351097.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_467260371.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_467910788.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_467924769.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_467926256.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468320588.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468343298.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468367236.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468419682.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468420889.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468432298.events_intraday_*`
+UNION ALL
+--SELECT event_date,event_timestamp,event_name,event_params,user_pseudo_id,device,geo,stream_id
+--FROM
+  --`house-of-creators-358213.analytics_468440219.events_intraday_*`
+--UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468442772.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468442802.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468447385.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468452187.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468458911.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468462137.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468465825.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468470210.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468697314.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468703719.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468705147.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468705965.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468744482.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468757981.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468771744.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468776576.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468781447.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468788376.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468795367.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468800167.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468801093.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468813866.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468815029.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468874586.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_468932338.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_469023784.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_469053008.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_469113075.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_469136391.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_469211535.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_469224476.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_469257128.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_469314750.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_469332016.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_469399976.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_469422883.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_469573297.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_469576700.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_470270528.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_470274245.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_470276467.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_470296065.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_470303289.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_470310815.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_470314471.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_470372672.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_470377123.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_470387849.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_470607974.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_470623454.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_470641251.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_471167286.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_471253517.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_471285790.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_471426590.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_471464833.events_intraday_*`
+UNION ALL
+SELECT
+  event_date,
+  event_timestamp,
+  event_name,
+  event_params,
+  user_pseudo_id,
+  device,
+  geo,
+  stream_id
+FROM
+  `house-of-creators-358213.analytics_472066471.events_intraday_*`
