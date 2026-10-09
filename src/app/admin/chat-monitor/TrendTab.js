@@ -59,7 +59,7 @@ export default function TrendTab({ trend, daily, country }) {
 
   return (
     <>
-      <div style={{ ...grid(165), marginBottom: 12 }}>
+      <div style={{ ...grid(190), marginBottom: 12 }}>
         <Kpi label="Revenue settimana" value={usd(cur.revenue_tot)} sub={<span style={{ color: w("revenue_tot").col }}>{w("revenue_tot").txt}</span>} tip="Ultima settimana completa (lun-dom)." />
         <Kpi label="Quota DM 1:1" value={pct(quotaDm(cur), 0)} sub={<span style={{ color: wq.col }}>{wq.txt}</span>} tip="Quota del revenue che viene dai messaggi in chat 1:1 (non mass)." />
         <Kpi label="Ratio fan/chatter" value={cur.ratio_fan_chatter?.toFixed(2) ?? "–"} sub={<span style={{ color: w("ratio_fan_chatter").col }}>{w("ratio_fan_chatter").txt}</span>} tip="Messaggi dei fan per ogni messaggio del team: quanto rispondono i fan." />

@@ -26,7 +26,7 @@ export default function LiveTab({ data, country }) {
   return (
     <>
       <Section title="Oggi in corso" badge={<Badge tone="live">● LIVE</Badge>} tip="Dati di oggi (ora italiana), dalla chat in tempo reale e dalle iscrizioni/transazioni.">
-        <div style={grid(165)}>
+        <div style={grid(190)}>
           <Kpi label="Nuovi sub oggi" value={int(t.new_subs)} sub={`${int(t.ret_subs)} returning`} tip="Iscritti di oggi alla prima iscrizione (new) e chi torna dopo aver disdetto (returning)." />
           <Kpi label="Da contattare ora" value={int(t.welcome_pending)} sub={t.welcome_pending ? "benvenuto mancante · clicca per la lista" : "nessun benvenuto mancante"}
             status={t.welcome_pending > 0 ? "bad" : "ok"} onClick={t.welcome_pending ? () => setOpen(open === "pending" ? null : "pending") : undefined} active={open === "pending"}
