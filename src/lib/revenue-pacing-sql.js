@@ -57,11 +57,28 @@ daily_rev AS (
   GROUP BY 1, 2, 3, 4
 ),
 
+-- ── Mesi validi per lo storico (aggiunta HOC Pro, 09/10/2026) ──
+-- La vista originale era pensata per un account maturo. Per un account partito negli
+-- ultimi 12 mesi il mese d'inizio è parziale (tutti i giorni a fine mese) e il mese dopo
+-- è d'avvio: contati come mesi normali fanno sembrare "leggeri" i primi giorni del mese
+-- e GONFIANO la proiezione (caso reale: Martina Scavo, partita il 27/04 → $51k previsti
+-- contro ~$38k di ritmo lineare) e abbassano la media storica. Per questi account si
+-- escludono il mese d'inizio e quello successivo; per gli account maturi (attivi già
+-- dall'inizio della finestra) non cambia nulla rispetto all'originale.
+acct_start AS (SELECT country, MIN(date) AS first_date FROM daily_rev GROUP BY 1),
+eligible_months AS (
+  SELECT DISTINCT d.country, d.month
+  FROM daily_rev d JOIN acct_start s ON s.country = d.country
+  WHERE d.month < DATE_TRUNC(CURRENT_DATE(), MONTH)
+    AND (s.first_date <= DATE_ADD(DATE_SUB(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL 12 MONTH), INTERVAL 2 DAY)
+         OR d.month >= DATE_ADD(DATE_TRUNC(s.first_date, MONTH), INTERVAL 2 MONTH))
+),
+
 -- ── v_day_weights_country ──
 rev_monthly_totals AS (
-  SELECT country, month, SUM(daily_revenue) AS monthly_revenue
-  FROM daily_rev
-  WHERE month < DATE_TRUNC(CURRENT_DATE(), MONTH)
+  SELECT d.country, d.month, SUM(d.daily_revenue) AS monthly_revenue
+  FROM daily_rev d
+  JOIN eligible_months e ON e.country = d.country AND e.month = d.month
   GROUP BY 1, 2
 ),
 rev_day_weights AS (
@@ -89,9 +106,9 @@ daily_new_subs AS (
   GROUP BY 1, 2, 3, 4
 ),
 sub_monthly_totals AS (
-  SELECT country, month, SUM(new_subs) AS monthly_new_subs
-  FROM daily_new_subs
-  WHERE month < DATE_TRUNC(CURRENT_DATE(), MONTH)
+  SELECT d.country, d.month, SUM(d.new_subs) AS monthly_new_subs
+  FROM daily_new_subs d
+  JOIN eligible_months e ON e.country = d.country AND e.month = d.month
   GROUP BY 1, 2
 ),
 sub_day_weights AS (
@@ -173,41 +190,44 @@ total_sub_weight AS (SELECT country, SUM(weighted_day_weight) AS sum_w FROM sub_
 hist_avg_revenue AS (
   SELECT country, AVG(monthly_revenue) AS avg_monthly_revenue
   FROM (
-    SELECT country, month, SUM(daily_revenue) AS monthly_revenue
-    FROM daily_rev
-    WHERE month < (SELECT current_month FROM date_info)
-      AND month >= DATE_SUB((SELECT current_month FROM date_info), INTERVAL 12 MONTH)
+    SELECT d.country, d.month, SUM(d.daily_revenue) AS monthly_revenue
+    FROM daily_rev d
+    JOIN eligible_months e ON e.country = d.country AND e.month = d.month
+    WHERE d.month >= DATE_SUB((SELECT current_month FROM date_info), INTERVAL 12 MONTH)
     GROUP BY 1, 2
   )
   GROUP BY 1
 ),
 hist_avg_subs AS (
-  SELECT ${CASE_COUNTRY("creator_id")} AS country, AVG(monthly_new_subs) AS avg_monthly_new_subs
+  SELECT m.country, AVG(m.monthly_new_subs) AS avg_monthly_new_subs
   FROM (
-    SELECT creator_id, DATE_TRUNC(DATE(created_at), MONTH) AS month, COUNT(DISTINCT user_id) AS monthly_new_subs
+    SELECT ${CASE_COUNTRY("creator_id")} AS country, DATE_TRUNC(DATE(created_at), MONTH) AS month, COUNT(DISTINCT user_id) AS monthly_new_subs
     FROM ${subs}
     WHERE creator_id IN ${IDS}
       AND DATE_TRUNC(DATE(created_at), MONTH) < (SELECT current_month FROM date_info)
       AND DATE_TRUNC(DATE(created_at), MONTH) >= DATE_SUB((SELECT current_month FROM date_info), INTERVAL 12 MONTH)
     GROUP BY 1, 2
-  )
+  ) m
+  JOIN eligible_months e ON e.country = m.country AND e.month = m.month
   GROUP BY 1
 ),
 new_sub_coeff AS (
-  SELECT country, AVG(revenue_per_user) AS avg_revenue_per_new_sub
-  FROM cohort
-  WHERE cohort_type = 'new_sub'
-    AND month < (SELECT current_month FROM date_info)
-    AND month >= DATE_SUB((SELECT current_month FROM date_info), INTERVAL 12 MONTH)
+  SELECT c.country, AVG(c.revenue_per_user) AS avg_revenue_per_new_sub
+  FROM cohort c
+  JOIN eligible_months e ON e.country = c.country AND e.month = c.month
+  WHERE c.cohort_type = 'new_sub'
+    AND c.month < (SELECT current_month FROM date_info)
+    AND c.month >= DATE_SUB((SELECT current_month FROM date_info), INTERVAL 12 MONTH)
   GROUP BY 1
 ),
 hist_conversion_rate AS (
-  SELECT country, AVG(SAFE_DIVIDE(unique_users, total_subs_month)) AS avg_conversion_rate
-  FROM cohort
-  WHERE cohort_type = 'new_sub'
-    AND month < (SELECT current_month FROM date_info)
-    AND month >= DATE_SUB((SELECT current_month FROM date_info), INTERVAL 12 MONTH)
-    AND total_subs_month > 0
+  SELECT c.country, AVG(SAFE_DIVIDE(c.unique_users, c.total_subs_month)) AS avg_conversion_rate
+  FROM cohort c
+  JOIN eligible_months e ON e.country = c.country AND e.month = c.month
+  WHERE c.cohort_type = 'new_sub'
+    AND c.month < (SELECT current_month FROM date_info)
+    AND c.month >= DATE_SUB((SELECT current_month FROM date_info), INTERVAL 12 MONTH)
+    AND c.total_subs_month > 0
   GROUP BY 1
 ),
 current_cohort AS (
@@ -238,8 +258,7 @@ rolling_cohort_revenue AS (
   GROUP BY 1
 ),
 closed_months AS (
-  SELECT country, COUNT(DISTINCT month) AS n_closed
-  FROM daily_rev WHERE month < (SELECT current_month FROM date_info) GROUP BY 1
+  SELECT country, COUNT(DISTINCT month) AS n_closed FROM eligible_months GROUP BY 1
 ),
 all_countries AS (${acc.map((a) => `SELECT '${a.country}' AS country`).join(" UNION ALL ")})
 

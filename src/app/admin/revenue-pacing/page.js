@@ -15,6 +15,7 @@ import { CP, FONTS, alpha } from "@/lib/brand";
 import { fmt$, fmtInt, fmtAgo, MONTHS_IT } from "@/lib/format";
 import { Disclosure, Notice, card, NUM } from "@/components/ds";
 import RaceHero from "./RaceHero";
+import { waitingNow } from "../chat-monitor/ui";
 
 const errText = (status) =>
   status === 401 || status === 403 ? "Non hai il permesso per vedere questi dati." :
@@ -130,7 +131,7 @@ export default function RevenuePacingPage() {
     const today = (live.today || []).filter(inScope);
     const wrote = today.reduce((a, t) => a + (t.fans_wrote || 0), 0);
     const lat = wrote ? today.reduce((a, t) => a + (t.lat_med_s || 0) * (t.fans_wrote || 0), 0) / wrote / 60 : null;
-    return { waiting: (live.queue || []).filter(inScope).length, latMin: lat, href: `/admin/chat-monitor?creator=${encodeURIComponent(data.creator)}` };
+    return { waiting: waitingNow((live.queue || []).filter(inScope)).length, latMin: lat, href: `/admin/chat-monitor?creator=${encodeURIComponent(data.creator)}` };
   }, [chatSwr.data, country, data?.creator]);
 
   const rows = data?.data || [];
@@ -252,6 +253,7 @@ function MonthTab({ row, goal, country, month, daily, data, mutate, creatorName,
   const [goalsOpen, setGoalsOpen] = useState(false);
   const openGoals = () => { setGoalsOpen(true); setTimeout(() => document.getElementById("obiettivi-mensili")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50); };
   const [howOpen, setHowOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const tot = (row.new_sub_revenue_mtd || 0) + (row.retention_revenue_mtd || 0);
   const pNew = div(row.new_sub_revenue_mtd, tot) || 0;
   const deltaHistPct = div(row.revenue_delta_vs_hist, row.revenue_hist_avg);
@@ -274,7 +276,8 @@ function MonthTab({ row, goal, country, month, daily, data, mutate, creatorName,
   return (
     <>
       <RaceHero row={row} goal={goal} month={month} daily={daily} creatorName={creatorName} onSetGoal={openGoals} chat={chat} />
-      <div style={{ fontSize: 12.5, color: CP.textMuted, margin: "18px 2px 8px" }}>I numeri nel dettaglio</div>
+      <Disclosure open={detailsOpen} onToggle={() => setDetailsOpen((o) => !o)} title="Tutti i numeri del mese"
+        summary="Composizione del revenue, proiezioni, monetizzazione dei nuovi, obiettivo e mese scorso">
       <div style={grid(240)}>
         <div style={box}>
           <Label tip="Revenue netto incassato dal primo del mese a oggi, diviso tra nuovi abbonati del mese e abbonati dei mesi prima.">Revenue del mese</Label>
@@ -382,6 +385,7 @@ function MonthTab({ row, goal, country, month, daily, data, mutate, creatorName,
         </div>
       </div>
 
+      </Disclosure>
       <div style={{ marginTop: 14 }}>
 <div id="obiettivi-mensili">
         <Disclosure open={goalsOpen} onToggle={() => setGoalsOpen((o) => !o)} title="Obiettivi mensili" summary={`Imposta o correggi l'obiettivo di ${monthName(month)} e dei mesi vicini`}>

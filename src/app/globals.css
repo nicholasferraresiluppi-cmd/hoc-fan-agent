@@ -326,3 +326,10 @@ html.casa-intro[data-style="v3"]::after {
 /* tasto chiaro/scuro nel menu Casa */
 [data-style="v3"] .casa-theme { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 999px; border: 1px solid var(--cp-border); background: transparent; color: var(--cp-textSecondary); cursor: pointer; flex: none; }
 [data-style="v3"] .casa-theme:hover { color: var(--cp-textPrimary); border-color: var(--cp-borderStrong); }
+
+/* Su telefono il pulsante "Segnala o suggerisci" resta solo icona: a tutta etichetta copriva
+   titoli e grafici (prova d'uso 09/10/2026, Revenue e chat). */
+@media (max-width: 767px) {
+  .hoc-fb { padding: 10px !important; right: 12px !important; bottom: 12px !important; }
+  .hoc-fb-label { display: none; }
+}

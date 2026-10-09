@@ -6,7 +6,7 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { CP, alpha } from "@/lib/brand";
-import { Kpi, Section, Badge, grid, th, td, FanLink, usd, int, pct, mins, ago, div, dayLabel, todayRome, addDays, diffDays } from "./ui";
+import { Kpi, Section, Badge, grid, th, td, FanLink, usd, int, pct, mins, ago, div, dayLabel, todayRome, addDays, diffDays, waitingNow, waitColor, MIN_SAMPLE, WAIT_WINDOW_H } from "./ui";
 
 export default function DailyTab({ daily, live, country }) {
   const today = todayRome();
@@ -23,7 +23,7 @@ export default function DailyTab({ daily, live, country }) {
   const ppv = pick(daily.ppv).find((r) => r.d === day) || {};
   const rev = pick(daily.revenue).find((r) => r.d === day) || {};
   const c7 = pick(daily.conv7).find((r) => r.d === day) || {};
-  const queue = (live?.queue || []).filter((r) => r.country === country);
+  const queue = waitingNow((live?.queue || []).filter((r) => r.country === country));
 
   const age = diffDays(today, day);
   const replyPartial = age < 2; // la finestra di 48h non è ancora chiusa
@@ -37,16 +37,19 @@ export default function DailyTab({ daily, live, country }) {
   const conv7 = convMature ? div(c7.conv7, c7.subs) : null;
 
   // Soglie del giorno (stesse dell'originale; PPV a freddo: attenzione oltre il 5%, critico oltre il 10%).
+  // Livello solo con abbastanza casi: sotto MIN_SAMPLE si dice "campione piccolo", niente rosso.
+  const lvl = (n, f) => (n == null || n < MIN_SAMPLE ? null : f());
+  const small = (n) => (n != null && n > 0 && n < MIN_SAMPLE ? ` Campione piccolo (${n}): nessun giudizio.` : "");
   const checks = [
-    { name: "Copertura benvenuto new ≤2h", v: contact, level: contact == null ? null : contact < 0.95 ? "bad" : "ok",
-      text: `${pct(contact)} (${int(subNew.contacted_2h)}/${int(subNew.subs)}). Soglia rossa: <95%.` },
-    { name: "Copertura returning ≤2h", v: retC, level: retC == null ? null : retC < 0.7 ? "bad" : retC < 0.8 ? "warn" : "ok",
-      text: `${pct(retC)} (${int(subRet.contacted_2h)}/${int(subRet.subs)}). Soglia rossa: <70%.${retC != null && retC < 0.7 ? " I returning oggi sono il punto debole." : ""}` },
+    { name: "Copertura benvenuto new ≤2h", v: contact, level: contact == null ? null : lvl(subNew.subs, () => (contact < 0.95 ? "bad" : "ok")),
+      text: `${pct(contact)} (${int(subNew.contacted_2h)}/${int(subNew.subs)}). Soglia rossa: <95%.${small(subNew.subs)}` },
+    { name: "Copertura returning ≤2h", v: retC, level: retC == null ? null : lvl(subRet.subs, () => (retC < 0.7 ? "bad" : retC < 0.8 ? "warn" : "ok")),
+      text: `${pct(retC)} (${int(subRet.contacted_2h)}/${int(subRet.subs)}). Soglia rossa: <70%.${retC != null && retC < 0.7 ? " I returning oggi sono il punto debole." : ""}${small(subRet.subs)}` },
     { name: "Latenza di risposta", v: lat.lat_med, level: lat.lat_med == null ? null : lat.lat_med > 10 || lat.lat_p90 > 45 ? "bad" : lat.lat_p90 > 30 ? "warn" : "ok",
       text: `Mediana ${mins(lat.lat_med)} · p90 ${mins(lat.lat_p90)}. Soglie: 10 min (med) / 45 min (p90). Il p90 scopre i buchi di presidio.` },
-    { name: "Fan senza risposta nel giorno", v: noReply, level: noReply == null ? null : noReply > 0.08 ? "bad" : noReply > 0.05 ? "warn" : "ok",
+    { name: "Fan senza risposta nel giorno", v: noReply, level: noReply == null ? null : lvl(lat.fans_wrote, () => (noReply > 0.08 ? "bad" : noReply > 0.05 ? "warn" : "ok")),
       text: `${pct(noReply)} (${int(lat.no_reply)} su ${int(lat.fans_wrote)}). Soglia rossa: >8%.` },
-    { name: "PPV a freddo (fuori sequenza)", v: cold, level: cold == null ? null : cold > 0.1 ? "bad" : cold > 0.05 ? "warn" : "ok",
+    { name: "PPV a freddo (fuori sequenza)", v: cold, level: cold == null ? null : lvl(nonWelcome, () => (cold > 0.1 ? "bad" : cold > 0.05 ? "warn" : "ok")),
       text: `${pct(cold)} (${int(ppv.ppv_cold)} su ${int(nonWelcome)} PPV non-welcome). Il PPV va dopo la risposta del fan, non prima.` },
   ];
   const nBad = checks.filter((c) => c.level === "bad").length;
@@ -66,25 +69,25 @@ export default function DailyTab({ daily, live, country }) {
         <button onClick={() => setDay(addDays(day, 1))} disabled={day >= today} style={navBtn} aria-label="Giorno dopo"><ChevronRight size={16} /></button>
         <span style={{ fontSize: 14, color: CP.textPrimary, fontWeight: 500 }}>{dayLabel(day)}</span>
         <span style={{ fontSize: 12.5, color: CP.textMuted }}>
-          · reply 48h {replyPartial ? "⏳ parziale" : "completa"} · conv 7gg {convMature ? "matura" : "⏳ non matura"}
+          · risposte a 48h {replyPartial ? "ancora parziali" : "complete"} · conversione a 7gg {convMature ? "completa" : "non ancora matura"}
         </span>
       </div>
 
-      <div style={{ ...grid(190), marginBottom: 12 }}>
+      <div style={{ ...grid(170), marginBottom: 12 }}>
         <Kpi label="Nuovi sub" value={int(subNew.subs)} sub={`${int(subRet.subs)} returning`} />
         <Kpi label="Contattati ≤2h" value={pct(contact)} sub={`mediana ${mins(subNew.med_min_contact)}`} status={checks[0].level} tip="Nuovi iscritti del giorno contattati entro 2 ore dall'iscrizione." />
         <Kpi label="Returning ≤2h" value={pct(retC)} sub={`${int(subRet.contacted_2h)} su ${int(subRet.subs)}`} status={checks[1].level} tip="Chi torna dopo aver disdetto, contattato entro 2 ore." />
-        <Kpi label="Hanno scritto ≤48h" value={<>{pct(wrote48)}{replyPartial ? " ⏳" : ""}</>} sub={replyPartial ? "coorte parziale" : `${int(subNew.wrote_48h)} su ${int(subNew.subs)}`} tip="Nuovi iscritti del giorno che hanno scritto almeno un messaggio entro 48 ore dall'iscrizione (anche 24h nel trend)." />
+        <Kpi label="Hanno scritto ≤48h" value={pct(wrote48)} sub={replyPartial ? "coorte parziale" : `${int(subNew.wrote_48h)} su ${int(subNew.subs)}`} tip="Nuovi iscritti del giorno che hanno scritto almeno un messaggio entro 48 ore dall'iscrizione (anche 24h nel trend)." />
         <Kpi label="Latenza risposta" value={mins(lat.lat_med)} sub={`p90: ${mins(lat.lat_p90)}`} status={checks[2].level} />
         <Kpi label="Senza risposta" value={pct(noReply, 0)} sub={`${int(lat.no_reply)} fan su ${int(lat.fans_wrote)}`} status={checks[3].level} tip="Fan che hanno scritto nel giorno e non hanno avuto risposta entro 6 ore dal loro ultimo messaggio." />
-        <Kpi label="Coda adesso" value={int(queue.length)} sub={<span style={{ color: CP.accentGreen }}>● live · clicca per la lista</span>} onClick={() => setShowQueue((s) => !s)} active={showQueue}
-          tip="Fan il cui ultimo messaggio (ultimi 7 giorni) aspetta ancora una risposta, adesso." />
+        <Kpi label="In attesa adesso" value={int(queue.length)} sub={`fan senza risposta nelle ultime ${WAIT_WINDOW_H} ore · clicca per la lista`} onClick={() => setShowQueue((s) => !s)} active={showQueue}
+          tip="Fan il cui ultimo messaggio, delle ultime 24 ore, non ha ancora avuto risposta. È lo stesso numero che vedi nella Revenue." />
         <Kpi label="Revenue giorno" value={usd(rev.revenue)} sub={`${int(rev.payers)} paganti · ARPPU ${usd(rev.arppu, 1)}`} />
         <Kpi label="Conv 7gg coorte" value={conv7 == null ? "–" : pct(conv7)} sub={convMature ? `${int(c7.conv7)} su ${int(c7.subs)} · ${usd(c7.rev7)}` : `matura tra ${7 - age}gg`} tip="Nuovi iscritti del giorno che hanno speso almeno una volta (abbonamento escluso) entro 7 giorni." />
       </div>
 
       {showQueue && (
-        <Section title="Coda adesso" aside={`${int(queue.length)} fan in attesa, dal più vecchio`}>
+        <Section title="In attesa adesso" aside={`${int(queue.length)} fan senza risposta nelle ultime ${WAIT_WINDOW_H} ore`}>
           <div style={{ overflow: "auto", maxHeight: 380 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 680 }}>
               <thead><tr>
@@ -94,7 +97,7 @@ export default function DailyTab({ daily, live, country }) {
                 {[...queue].sort((a, b) => (b.spent_60d || 0) - (a.spent_60d || 0) || (a.last_fan_at < b.last_fan_at ? -1 : 1)).slice(0, 300).map((q) => (
                   <tr key={q.user_id}>
                     <td style={{ ...td, textAlign: "left" }}><FanLink userId={q.user_id} username={q.username} /></td>
-                    <td style={{ ...td, color: CP.accentRed }}>{ago(q.last_fan_at)}</td>
+                    <td style={{ ...td, color: waitColor(q.last_fan_at) }}>{ago(q.last_fan_at)}</td>
                     <td style={td}>{q.last_out_at ? ago(q.last_out_at) : "mai risposto"}</td>
                     <td style={td}>{q.spent_60d ? usd(q.spent_60d) : "–"}</td>
                     <td style={{ ...td, textAlign: "left", whiteSpace: "normal", maxWidth: 420, color: CP.textSecondary, fontSize: 12.5 }}>{q.preview || ""}</td>
@@ -138,7 +141,7 @@ export default function DailyTab({ daily, live, country }) {
                   <div style={{ width: `${Math.min(1, w || 0) * 100}%`, height: "100%", background: CP.accent }} />
                 </div>
                 <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4 }}>
-                  {i === 0 ? "100%" : s.immature ? "coorte non matura" : `${pct(s.rate)} dello step prec.${s.partial ? " ⏳" : ""}`}
+                  {i === 0 ? "100%" : s.immature ? "coorte non matura" : `${pct(s.rate)} dello step prec.${s.partial ? " (parziale)" : ""}`}
                 </div>
               </div>
             );

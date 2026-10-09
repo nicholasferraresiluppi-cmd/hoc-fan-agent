@@ -4,7 +4,7 @@
 
 import { useMemo, useState } from "react";
 import { CP } from "@/lib/brand";
-import { Kpi, Section, Badge, grid, chip, th, td, FanLink, usd, int, pct, mins, ago, hm, div } from "./ui";
+import { Kpi, Section, Badge, grid, chip, th, td, FanLink, usd, int, pct, mins, ago, hm, div, waitColor } from "./ui";
 
 // Soglie dell'originale: benvenuto new ≤2h <95% rosso; latenza mediana 10 min / p90 45 min; senza risposta >8%.
 const TH = { contact: 0.95, ret: 0.7, latMed: 10, latP90: 45, noReply: 0.08 };
@@ -26,7 +26,7 @@ export default function LiveTab({ data, country }) {
   return (
     <>
       <Section title="Oggi in corso" badge={<Badge tone="live">● LIVE</Badge>} tip="Dati di oggi (ora italiana), dalla chat in tempo reale e dalle iscrizioni/transazioni.">
-        <div style={grid(190)}>
+        <div style={grid(170)}>
           <Kpi label="Nuovi sub oggi" value={int(t.new_subs)} sub={`${int(t.ret_subs)} returning`} tip="Iscritti di oggi alla prima iscrizione (new) e chi torna dopo aver disdetto (returning)." />
           <Kpi label="Da contattare ora" value={int(t.welcome_pending)} sub={t.welcome_pending ? "benvenuto mancante · clicca per la lista" : "nessun benvenuto mancante"}
             status={t.welcome_pending > 0 ? "bad" : "ok"} onClick={t.welcome_pending ? () => setOpen(open === "pending" ? null : "pending") : undefined} active={open === "pending"}
@@ -143,8 +143,8 @@ function FansToday({ fans }) {
               return (
                 <tr key={f.user_id}>
                   <td style={{ ...td, textAlign: "left" }}>{(f.ltv_project || 0) > 0 && <span title="ha già speso" style={{ marginRight: 4 }}>$</span>}<FanLink userId={f.user_id} username={f.username} /></td>
-                  <td style={{ ...td, color: waiting ? CP.accentRed : CP.textPrimary }}>{ago(f.last_fan_at)}</td>
-                  <td style={{ ...td, color: waiting ? CP.accentRed : CP.textPrimary }}>{!f.last_out_at ? "mai risposto" : waiting ? `⏳ ${ago(f.last_out_at)}` : ago(f.last_out_at)}</td>
+                  <td style={{ ...td, color: waiting ? waitColor(f.last_fan_at) : CP.textPrimary }}>{ago(f.last_fan_at)}</td>
+                  <td style={{ ...td, color: waiting ? waitColor(f.last_fan_at) : CP.textPrimary }}>{!f.last_out_at ? "mai risposto" : waiting ? `in attesa · ${ago(f.last_out_at)}` : ago(f.last_out_at)}</td>
                   <td style={td}>{money(f.revenue_today)}</td>
                   <td style={td}>{money(f.ltv_7d)}</td>
                   <td style={td}>{money(f.ltv_30d)}</td>
