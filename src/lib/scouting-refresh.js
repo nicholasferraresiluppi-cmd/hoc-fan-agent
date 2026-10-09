@@ -75,9 +75,11 @@ export async function scoutingTick({ force = false } = {}) {
     const res = applyRefresh(await getProfiles(), items);
     await saveProfiles(res.profiles);
     const done = { lastCompletedAt: Date.now(), lastWeek: weekKey(new Date()), lastUpdated: res.updated, lastMissing: res.missing, lastCostUsd: run.usageTotalUsd ?? null };
-    await setRefreshState({ ...done, runId: null });
+    await setRefreshState({ ...done, runId: null, pausedUntil: st.pausedUntil ?? null });
     return { completed: done };
   }
+  // Pausa decisa da un admin (budget Apify dirottato sulla ricerca): il bottone "Aggiorna ora" la scavalca.
+  if (!force && st.pausedUntil && Date.now() < st.pausedUntil) return { paused: true, until: st.pausedUntil };
   const daysSince = st.lastCompletedAt ? (Date.now() - st.lastCompletedAt) / 86400000 : Infinity;
   if (!force && daysSince < MIN_DAYS) return { idle: true, nextInDays: Math.round((MIN_DAYS - daysSince) * 10) / 10 };
   const forgotten = await getForgotten();

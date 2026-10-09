@@ -155,6 +155,7 @@ export default function ScoutingPage() {
       </Notice>
       <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 16px" }}>
         {!ref.configured ? "Aggiornamento settimanale non attivo: manca la chiave Apify (APIFY_TOKEN) nelle impostazioni di HOC Pro." :
+          ref.pausedUntil && Date.now() < ref.pausedUntil && !ref.runId ? `Aggiornamento settimanale in pausa fino al ${fmtDate(ref.pausedUntil)}: il budget Apify del mese va alla ricerca di creator nuove. ${ref.lastCompletedAt ? `Ultimo aggiornamento ${fmtDate(ref.lastCompletedAt)}.` : ""} "Aggiorna ora" lo lancia comunque.` :
           ref.runId ? `Giro in corso dal ${fmtDate(ref.startedAt)} su ${ref.count} account: i numeri arrivano al prossimo controllo notturno.` :
           ref.lastCompletedAt ? `Ultimo aggiornamento ${fmtDate(ref.lastCompletedAt)} (${ref.lastUpdated} account letti${ref.lastMissing ? `, ${ref.lastMissing} non trovati` : ""}${ref.lastCostUsd != null ? `, ${ref.lastCostUsd.toFixed(2)} $` : ""}). Il prossimo parte da solo dopo una settimana.` :
           "Nessun giro ancora: i numeri sono quelli della ricerca del 9 ottobre."}
