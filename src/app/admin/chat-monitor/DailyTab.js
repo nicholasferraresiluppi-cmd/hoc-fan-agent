@@ -70,7 +70,7 @@ export default function DailyTab({ daily, live, country }) {
         </span>
       </div>
 
-      <div style={{ ...grid(165), marginBottom: 12 }}>
+      <div style={{ ...grid(190), marginBottom: 12 }}>
         <Kpi label="Nuovi sub" value={int(subNew.subs)} sub={`${int(subRet.subs)} returning`} />
         <Kpi label="Contattati ≤2h" value={pct(contact)} sub={`mediana ${mins(subNew.med_min_contact)}`} status={checks[0].level} tip="Nuovi iscritti del giorno contattati entro 2 ore dall'iscrizione." />
         <Kpi label="Returning ≤2h" value={pct(retC)} sub={`${int(subRet.contacted_2h)} su ${int(subRet.subs)}`} status={checks[1].level} tip="Chi torna dopo aver disdetto, contattato entro 2 ore." />

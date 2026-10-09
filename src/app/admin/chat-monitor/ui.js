@@ -50,27 +50,30 @@ export function Tip({ text }) {
   return <span title={text} style={{ display: "inline-flex", color: CP.textMuted, cursor: "help" }}><Info size={12} /></span>;
 }
 
+// Tessera (09/10/2026, "più bello e amichevole"): colore morbido per lo stato al posto del
+// pallino, una parola che lo dice ("tutto ok" / "da guardare"), etichetta normale, numero grande.
+const STATUS_WORD = { ok: "tutto ok", warn: "attenzione", bad: "da guardare" };
 export function Kpi({ label, value, sub, status, tip, onClick, active, badge }) {
-  const c = dotColor(status);
+  const c = dotColor(status) || CP.accent;
   return (
     <div onClick={onClick} role={onClick ? "button" : undefined}
-      style={{ ...card, padding: "12px 14px", minHeight: 96, cursor: onClick ? "pointer" : "default", borderColor: active ? CP.accent : undefined, background: active ? alpha(CP.accent, "0d") : undefined }}>
+      style={{ background: alpha(c, active ? "26" : "12"), border: `1px solid ${alpha(c, active ? "88" : "2e")}`, borderRadius: 18, padding: "14px 16px", minHeight: 104, cursor: onClick ? "pointer" : "default", transition: "background .15s" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ fontSize: 11, letterSpacing: "0.05em", textTransform: "uppercase", color: CP.textSecondary, fontWeight: 500, display: "flex", gap: 6, alignItems: "center" }}>
+        <div style={{ fontSize: 13, color: CP.textPrimary, fontWeight: 500, display: "flex", gap: 6, alignItems: "center" }}>
           {label} <Tip text={tip} />
         </div>
-        {c && <span style={{ width: 8, height: 8, borderRadius: 999, background: c, flexShrink: 0, marginTop: 3 }} />}
         {badge}
       </div>
-      <div style={{ fontSize: 22, fontWeight: 500, color: CP.textPrimary, margin: "6px 0 2px", ...NUM }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.45, ...NUM }}>{sub}</div>}
+      <div style={{ fontSize: 28, fontWeight: 700, color: CP.textPrimary, margin: "8px 0 2px", letterSpacing: "-0.01em", ...NUM }}>{value}</div>
+      {sub && <div style={{ fontSize: 12.5, color: CP.textSecondary, lineHeight: 1.45, ...NUM }}>{sub}</div>}
+      {status && <span style={{ display: "inline-block", marginTop: 8, fontSize: 11.5, fontWeight: 600, color: c, background: CP.surface, borderRadius: 999, padding: "2px 9px", whiteSpace: "nowrap" }}>{STATUS_WORD[status]}</span>}
     </div>
   );
 }
 
 export function Section({ title, tip, aside, badge, children, style }) {
   return (
-    <section style={{ ...card, padding: "14px 16px", marginBottom: 12, ...style }}>
+    <section style={{ ...card, borderRadius: 20, padding: "16px 18px", marginBottom: 12, ...style }}>
       {title && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
           <h2 style={{ fontSize: 15, fontWeight: 500, margin: 0, color: CP.textPrimary }}>{title}</h2>

@@ -14,6 +14,7 @@ import { RefreshCw, Info } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { fmt$, fmtInt, fmtAgo, MONTHS_IT } from "@/lib/format";
 import { Disclosure, Notice, card, NUM } from "@/components/ds";
+import RaceHero from "./RaceHero";
 
 const errText = (status) =>
   status === 401 || status === 403 ? "Non hai il permesso per vedere questi dati." :
@@ -120,6 +121,17 @@ export default function RevenuePacingPage() {
   // "Totale" solo con più account; un paese che la creator non ha → il primo (o Totale)
   const country = countryPick === "ALL" ? (multi ? "ALL" : COUNTRIES[0]) : COUNTRIES.includes(countryPick) ? countryPick : multi ? "ALL" : COUNTRIES[0];
   const creatorName = (data?.creators || []).find((c) => c.slug === data?.creator)?.short || "";
+  const creatorFull = (data?.creators || []).find((c) => c.slug === data?.creator)?.name || creatorName;
+  const chatSwr = useSWR(data?.creator ? `/api/admin/chat-monitor?tab=live&creator=${encodeURIComponent(data.creator)}` : null, liveFetcher, { revalidateOnFocus: false });
+  const chat = useMemo(() => {
+    const live = chatSwr.data;
+    if (!live) return null;
+    const inScope = (r) => country === "ALL" || r.country === country;
+    const today = (live.today || []).filter(inScope);
+    const wrote = today.reduce((a, t) => a + (t.fans_wrote || 0), 0);
+    const lat = wrote ? today.reduce((a, t) => a + (t.lat_med_s || 0) * (t.fans_wrote || 0), 0) / wrote / 60 : null;
+    return { waiting: (live.queue || []).filter(inScope).length, latMin: lat, href: `/admin/chat-monitor?creator=${encodeURIComponent(data.creator)}` };
+  }, [chatSwr.data, country, data?.creator]);
 
   const rows = data?.data || [];
   const row = useMemo(() => (country === "ALL" ? totalRow(rows) : rows.find((r) => r.country === country)), [rows, country]);
@@ -176,7 +188,7 @@ export default function RevenuePacingPage() {
       {row && tab === "mese" && (
         <>
           <StatusChip>Aggiornato · {new Date(data.updated_at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })} <span style={{ color: CP.textMuted }}>({fmtAgo(new Date(data.updated_at).getTime())})</span></StatusChip>
-          <MonthTab row={row} goal={goal} country={country} month={month} daily={daily} data={data} mutate={mutate} />
+          <MonthTab row={row} goal={goal} country={country} month={month} daily={daily} data={data} mutate={mutate} creatorName={creatorFull} chat={chat} />
         </>
       )}
       {row && tab === "recente" && (
@@ -236,8 +248,9 @@ const grid = (min) => ({ display: "grid", gridTemplateColumns: `repeat(auto-fit,
 
 // ─── Scheda "Mese & Proiezioni" ─────────────────────────────────────────────
 
-function MonthTab({ row, goal, country, month, daily, data, mutate }) {
+function MonthTab({ row, goal, country, month, daily, data, mutate, creatorName, chat }) {
   const [goalsOpen, setGoalsOpen] = useState(false);
+  const openGoals = () => { setGoalsOpen(true); setTimeout(() => document.getElementById("obiettivi-mensili")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50); };
   const [howOpen, setHowOpen] = useState(false);
   const tot = (row.new_sub_revenue_mtd || 0) + (row.retention_revenue_mtd || 0);
   const pNew = div(row.new_sub_revenue_mtd, tot) || 0;
@@ -260,6 +273,8 @@ function MonthTab({ row, goal, country, month, daily, data, mutate }) {
 
   return (
     <>
+      <RaceHero row={row} goal={goal} month={month} daily={daily} creatorName={creatorName} onSetGoal={openGoals} chat={chat} />
+      <div style={{ fontSize: 12.5, color: CP.textMuted, margin: "18px 2px 8px" }}>I numeri nel dettaglio</div>
       <div style={grid(240)}>
         <div style={box}>
           <Label tip="Revenue netto incassato dal primo del mese a oggi, diviso tra nuovi abbonati del mese e abbonati dei mesi prima.">Revenue del mese</Label>
@@ -368,9 +383,11 @@ function MonthTab({ row, goal, country, month, daily, data, mutate }) {
       </div>
 
       <div style={{ marginTop: 14 }}>
+<div id="obiettivi-mensili">
         <Disclosure open={goalsOpen} onToggle={() => setGoalsOpen((o) => !o)} title="Obiettivi mensili" summary={`Imposta o correggi l'obiettivo di ${monthName(month)} e dei mesi vicini`}>
           <GoalsEditor creator={data.creator} goals={data.goals} history={data.goals_history} month={month} onSaved={(g) => mutate({ ...data, goals: g.goals, goals_history: g.goals_history }, { revalidate: false })} />
         </Disclosure>
+        </div>
         <Disclosure open={howOpen} onToggle={() => setHowOpen((o) => !o)} title="Come si calcola" summary="Pesi per giorno del mese, media storica, affidabilità">
           <HowItWorks row={row} />
         </Disclosure>
