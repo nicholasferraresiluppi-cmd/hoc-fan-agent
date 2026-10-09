@@ -14,6 +14,17 @@ export const BACKUP_SOURCES = [
   { dataset: "hoc", mode: "copy", only: ["ws_chat"] },
 ];
 
+// Credenziali: NON si copiano (sessioni OnlyFans delle creator, password dei
+// proxy, token Meta/dispositivi). Non servono a nessun numero e una loro copia
+// è solo un'altra porta d'accesso agli account. Vale per ogni giro, anche per
+// le tabelle in copy job (che per questo passano in CTAS).
+export const EXCLUDED_COLUMNS = {
+  "postgres.public_creators": ["token"],
+  "postgres.public_proxies": ["password"],
+  "postgres.public_sessions": ["device_token"],
+  "postgres.public_accounts": ["graph_token"],
+};
+
 export const backupTableName = (dataset, table) => `${dataset}__${table}`;
 
 /**
@@ -35,8 +46,10 @@ export function planBackup(sources, lastRows = {}) {
     }
     // CTAS solo su tabelle non partizionate (PARTITION BY andrebbe ricostruito
     // dallo schema); le partizionate passano dalla copy job, che conserva lo schema.
-    const mode = s.mode === "ctas" && !s.partitioned ? "ctas" : "copy";
-    jobs.push({ key, dataset: s.dataset, table: s.table, mode, clustering: s.clustering || [], numRows: now });
+    const except = EXCLUDED_COLUMNS[`${s.dataset}.${s.table}`] || [];
+    // con colonne escluse serve per forza la CTAS (la copy job copia tutto)
+    const mode = (s.mode === "ctas" && !s.partitioned) || except.length ? "ctas" : "copy";
+    jobs.push({ key, dataset: s.dataset, table: s.table, mode, clustering: s.clustering || [], numRows: now, except });
   }
   return { jobs, skipped };
 }
@@ -57,7 +70,7 @@ export function jobConfiguration(job, { dataProject, billingProject }) {
   const cluster = job.clustering.length ? ` CLUSTER BY ${job.clustering.map((c) => `\`${c}\``).join(", ")}` : "";
   return {
     query: {
-      query: `CREATE OR REPLACE TABLE \`${billingProject}.${BACKUP_DATASET}.${job.key}\`${cluster} AS SELECT * FROM \`${dataProject}.${job.dataset}.${job.table}\``,
+      query: `CREATE OR REPLACE TABLE \`${billingProject}.${BACKUP_DATASET}.${job.key}\`${cluster} AS SELECT *${job.except?.length ? ` EXCEPT(${job.except.map((c) => `\`${c}\``).join(", ")})` : ""} FROM \`${dataProject}.${job.dataset}.${job.table}\``,
       useLegacySql: false,
       maximumBytesBilled: String(MAX_BYTES_CTAS),
     },
