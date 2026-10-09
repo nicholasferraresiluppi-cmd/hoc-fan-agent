@@ -36,3 +36,11 @@ console.assert(q2.map((x) => x.user_id).join(",") === "hot2,hot,old", q2.map((x)
 const l3 = creatorLight({ paceRatio: 0.6, waitingSpenders: 3, waitingOld: 3, latMin: 1, shift: sh });
 console.assert(l3.level === 1, "senza traguardo e con chat ok: attenzione, non rosso");
 console.log("ok2");
+import { suggestedGoal } from "../src/lib/live-priority.js";
+const tr = [];
+for (let d = 1; d <= 30; d++) { tr.push({ date: `2026-09-${String(d).padStart(2, "0")}`, country: "IT", daily_revenue: 1000 }); tr.push({ date: `2026-09-${String(d).padStart(2, "0")}`, country: "EN", daily_revenue: 100 }); }
+console.assert(suggestedGoal(tr, ["IT"], "2026-10") === 33000, suggestedGoal(tr, ["IT"], "2026-10"));
+console.assert(suggestedGoal(tr, ["IT", "EN"], "2026-10") === 36300);
+console.assert(suggestedGoal(tr.slice(0, 20), ["IT"], "2026-10") === null, "mese precedente incompleto");
+console.assert(suggestedGoal(tr, ["IT"], "2026-12") === null);
+console.log("ok3");

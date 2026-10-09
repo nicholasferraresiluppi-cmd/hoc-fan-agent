@@ -152,7 +152,7 @@ function MiniRace({ r }) {
         {target && <div title={`traguardo ${usd(target)}`} style={{ position: "absolute", left: x(target), top: -4, bottom: -4, width: 3, borderRadius: 2, background: CP.textPrimary }} />}
       </div>
       <div style={{ fontSize: 12.5, color: CP.textSecondary, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-        {target ? <><Flag size={12} /> traguardo {usd(target)}</> : <span>nessun traguardo messo</span>}
+        {target ? <><Flag size={12} /> {r.goalSuggested ? "traguardo suggerito" : "traguardo"} {usd(target)}{r.goalSuggested ? <span style={{ color: CP.textMuted }}>(mese prima +10%)</span> : null}</> : <span>nessun traguardo messo</span>}
         {paceText && <span style={{ color: delta >= 0 ? CP.accentGreen : delta < -10 ? CP.accentRed : CP.textSecondary }}>· {paceText}</span>}
       </div>
     </div>

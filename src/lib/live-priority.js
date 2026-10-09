@@ -69,3 +69,29 @@ export function creatorLight({ paceRatio, hasGoal = false, waitingSpenders, wait
   if (paceRatio != null && paceRatio < 0.9) bump(paceRatio < 0.75 && hasGoal ? 2 : 1, hasGoal ? "il mese va sotto il ritmo del traguardo" : "il mese va sotto la media degli ultimi mesi");
   return { level, reasons: reasons.sort((a, b) => b.level - a.level) };
 }
+
+// Traguardo suggerito (09/10/2026, decisione di Nicholas): se per il mese non c'è un traguardo
+// impostato, si propone l'incassato del mese precedente +10%. È una proposta, non un obiettivo
+// deciso: in pagina si dice "suggerito" e quello messo a mano vince sempre.
+export const SUGGESTED_GOAL_UPLIFT = 0.1;
+
+const prevMonth = (ym) => { const [y, m] = ym.split("-").map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`; };
+
+/** Mese precedente +10% sui paesi indicati, arrotondato alle centinaia; null se il mese prima non ha dati. */
+export function suggestedGoal(trend, countries, month) {
+  if (!month || !trend?.length) return null;
+  const pm = prevMonth(month);
+  const set = new Set(countries);
+  const days = new Set();
+  let sum = 0;
+  for (const t of trend) {
+    if (!t.date?.startsWith(pm) || !set.has(t.country)) continue;
+    sum += Number(t.daily_revenue) || 0;
+    days.add(t.date);
+  }
+  // serve il mese precedente (quasi) intero, altrimenti la proposta sarebbe falsata
+  const [y, m] = pm.split("-").map(Number);
+  const dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  if (!sum || days.size < dim - 2) return null;
+  return Math.round((sum * (1 + SUGGESTED_GOAL_UPLIFT)) / 100) * 100;
+}

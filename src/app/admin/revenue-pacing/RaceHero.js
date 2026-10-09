@@ -25,7 +25,7 @@ function streakAbove(daily, month, today, perDay) {
   return n;
 }
 
-export default function RaceHero({ row, goal, month, daily, creatorName, onSetGoal, chat }) {
+export default function RaceHero({ row, goal, goalSuggested = false, month, daily, creatorName, onSetGoal, chat }) {
   const m = Number(month.slice(5, 7));
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "UTC" }); // i giorni della revenue sono in UTC
   const mtd = row.revenue_mtd || 0;
@@ -67,9 +67,9 @@ export default function RaceHero({ row, goal, month, daily, creatorName, onSetGo
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <div style={{ fontSize: 20, fontWeight: 700, color: CP.textPrimary }}>La corsa di {MONTHS[m - 1]}</div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        {!target && (
-          <button onClick={onSetGoal} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999, border: `1px dashed ${CP.borderStrong}`, background: CP.surface, color: CP.textPrimary, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body }}>
-            <Flag size={14} /> Metti il traguardo
+        {(!target || goalSuggested) && (
+          <button onClick={onSetGoal} title={goalSuggested ? `Traguardo proposto: ${MONTHS[(m + 10) % 12]} +10%. Mettine uno tuo e vale quello.` : undefined} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999, border: `1px dashed ${CP.borderStrong}`, background: CP.surface, color: CP.textPrimary, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body }}>
+            <Flag size={14} /> {goalSuggested ? "Cambia il traguardo" : "Metti il traguardo"}
           </button>
         )}
         {streak > 0 && (
@@ -94,7 +94,7 @@ export default function RaceHero({ row, goal, month, daily, creatorName, onSetGo
         {target ? (
           <div style={{ position: "absolute", left: x(target), top: TRACK + 5 - 17, transform: "translateX(-50%)", textAlign: "center", width: 100 }}>
             <div style={{ width: 34, height: 34, margin: "0 auto", borderRadius: 10, background: CP.textPrimary, color: CP.bg, display: "flex", alignItems: "center", justifyContent: "center" }}><Flag size={16} /></div>
-            <div style={{ fontSize: 12, color: CP.textSecondary, marginTop: 6, ...NUM }}><b style={{ color: CP.textPrimary }}>{usd(target)}</b> traguardo</div>
+            <div style={{ fontSize: 12, color: CP.textSecondary, marginTop: 6, ...NUM }}><b style={{ color: CP.textPrimary }}>{usd(target)}</b> {goalSuggested ? "traguardo suggerito" : "traguardo"}</div>
           </div>
         ) : null}
       </div>
@@ -112,7 +112,7 @@ export default function RaceHero({ row, goal, month, daily, creatorName, onSetGo
         {target ? (
           remaining > 0 ? (
             <>
-              <b style={{ fontWeight: 700 }}>Per arrivare al traguardo:</b> {usd(needPerDay)} al giorno nei prossimi {row.days_remaining} giorni
+              <b style={{ fontWeight: 700 }}>Per arrivare al traguardo{goalSuggested ? ` (suggerito: ${MONTHS[(m + 10) % 12]} +10%)` : ""}:</b> {usd(needPerDay)} al giorno nei prossimi {row.days_remaining} giorni
               {nowPerDay ? <> · finora {usd(nowPerDay)} al giorno</> : null}
               {ahead != null && <span style={{ color: ahead >= 0 ? CP.accentGreen : CP.textSecondary }}> · {ahead >= 0 ? `${usd(ahead)} avanti` : `${usd(-ahead)} indietro`} rispetto al ritmo</span>}
             </>
