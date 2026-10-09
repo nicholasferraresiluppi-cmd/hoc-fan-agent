@@ -30,6 +30,10 @@ const isPublicRoute = createRouteMatcher([
   '/tessera', '/hr/privacy',
   // tessera condivisa (05/10/2026): solo nome, competenze e lingue, id casuale (lib/hr-tessera-link)
   '/t/(.*)',
+  // webhook OnlyFansAPI (09/10/2026): si difende da solo con la firma HMAC SHA256
+  // del corpo (header Signature, segreto OFAPI_WEBHOOK_SECRET); senza segreto
+  // configurato rifiuta tutto. Vedi lib/ofapi-webhook-core.
+  '/api/webhooks/ofapi',
 ]);
 const isApiRoute = createRouteMatcher(['/api/(.*)']);
 

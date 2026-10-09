@@ -11,6 +11,9 @@ import { isCronAuthorized } from "@/lib/cron-auth";
 import { bigQueryConfigured } from "@/lib/bigquery-api";
 import { ofapiConfigured } from "@/lib/ofapi-client";
 import { runOfapiPilot } from "@/lib/ofapi-pilot";
+import { chainDepth, continueChain } from "@/lib/cron-chain";
+
+const KV_CURSOR = "ofapi:pilot:cursor";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -21,7 +24,10 @@ export async function POST(request) {
     const az = await authorize(CAPABILITIES.SEED);
     if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   }
-  const day = new URL(request.url).searchParams.get("day");
+  const sp = new URL(request.url).searchParams;
+  const day = sp.get("day");
+  // budget della tappa (ms), solo per prove manuali: tra 10 s e 200 s
+  const budgetMs = Math.min(200000, Math.max(10000, Number(sp.get("budgetMs")) || 200000));
   let result;
   let summary;
   try {
@@ -29,10 +35,20 @@ export async function POST(request) {
       result = { skip: "non configurato" };
       summary = "skip:non-configurato";
     } else {
-      result = await runOfapiPilot(/^\d{4}-\d{2}-\d{2}$/.test(day || "") ? { day } : {});
-      const bad = result.results.filter((r) => r.verdict !== "ok");
+      // tappa successiva di una catena: giorno e account da cui ripartire stanno in KV
+      const chain = chainDepth(request);
+      const cursor = chain > 0 ? await kv.get(KV_CURSOR) : null;
+      const opts = cursor ? { day: cursor.day, start: cursor.start } : /^\d{4}-\d{2}-\d{2}$/.test(day || "") ? { day } : {};
+      result = await runOfapiPilot({ ...opts, budgetMs });
+      if (result.nextStart !== null) {
+        await kv.set(KV_CURSOR, { day: result.day, start: result.nextStart }, { ex: 3600 });
+        result.chain = await continueChain(request, chain);
+      } else {
+        await kv.del(KV_CURSOR).catch(() => {});
+      }
+      const bad = result.results.filter((r) => r.verdict !== "ok" || r.storeError);
       summary = `${bad.length ? "err" : "ok"}: ${result.day} · ` +
-        result.results.map((r) => `${r.username} ${r.verdict}${r.comparison ? ` ${r.comparison.matched}/${Math.max(r.comparison.api.n, r.comparison.wh.n)}` : ""}`).join(", ") +
+        result.results.map((r) => `${r.username} ${r.verdict}${r.comparison ? ` ${r.comparison.matched}/${Math.max(r.comparison.api.n, r.comparison.wh.n)}` : ""}${r.storeError ? " archivio-ko" : ""}`).join(", ") +
         ` · ${result.credits} crediti`;
     }
   } catch (e) {
