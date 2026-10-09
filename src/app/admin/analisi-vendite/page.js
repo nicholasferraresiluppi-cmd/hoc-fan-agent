@@ -16,6 +16,9 @@ const VIEWS = [
   { id: "rapporto", label: "Rapporto vendite", hint: "Per mese: transazione media e mediana. RR = media ÷ mediana: più è alto, più il fatturato dipende da poche vendite grandi." },
   { id: "meta-mese", label: "Metà mese", hint: "Revenue, transazioni, spender e nuovi abbonati nella prima (1-15) e nella seconda metà del mese." },
   { id: "transazioni", label: "Transazioni", hint: "Le ultime 500 transazioni del periodo, con il link da cui è arrivato il fan, e i chargeback." },
+  { id: "nuovi-abbonati", label: "Nuovi abbonati", hint: "Chi si è abbonato nel periodo e quanto ha speso nei primi 30 giorni: LTV, conversione e ARPPU per tipo, per creator e per link." },
+  { id: "tracking", label: "Tracking link", hint: "Click, abbonati e revenue di ogni tracking link. Il traffico organico (senza link) non compare qui." },
+  { id: "copertura", label: "Copertura", hint: "Quante persone ha raggiunto il profilo di ogni creator nel periodo, contro il periodo precedente." },
 ];
 
 const DAY = 86400e3;
@@ -216,6 +219,134 @@ function TransazioniView({ d }) {
   );
 }
 
+function NuoviAbbonatiView({ d }) {
+  const p = d.people;
+  const abs = (v) => (v == null ? null : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toLocaleString("it-IT", { useGrouping: "always" })}`);
+  const pctTxt = (v) => (v == null ? null : `${v > 0 ? "+" : "−"}${Math.abs(v * 100).toLocaleString("it-IT", { maximumFractionDigits: 1 })}%`);
+  const metricCols = (first) => [
+    first,
+    { key: "subs", label: "Abbonati", align: "right", render: (r) => int(r.subs) },
+    { key: "ltv_d0", label: "LTV 1° giorno", align: "right", render: (r) => money(r.ltv_d0) },
+    { key: "cr_d0", label: "CR 1° giorno", align: "right", render: (r) => pct(r.cr_d0) },
+    { key: "ltv30", label: "LTV 30 gg", align: "right", render: (r) => money(r.ltv30) },
+    { key: "cr30", label: "CR 30 gg", align: "right", render: (r) => pct(r.cr30) },
+    { key: "arppu30", label: "ARPPU 30 gg", align: "right", render: (r) => money(r.arppu30) },
+    { key: "revenue", label: "Revenue 30 gg", align: "right", render: (r) => money(r.revenue) },
+  ];
+  const linkCols = [
+    { key: "name", label: "Creator" },
+    { key: "link_name", label: "Link", render: (r) => r.link_name || "senza link (organico)", muted: true },
+    { key: "placement", label: "Placement", render: (r) => r.placement || "—", muted: true },
+    { key: "alterego", label: "Alterego", render: (r) => r.alterego || "—", muted: true },
+    { key: "revenue", label: "Revenue 30 gg", align: "right", render: (r) => money(r.revenue) },
+    { key: "subs", label: "Abbonati", align: "right", render: (r) => int(r.subs) },
+    { key: "conv", label: "Convertiti", align: "right", render: (r) => int(r.conv) },
+    { key: "cr", label: "CR", align: "right", render: (r) => pct(r.cr) },
+    { key: "arppu", label: "ARPPU", align: "right", render: (r) => money(r.arppu) },
+  ];
+  return (
+    <>
+      <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
+        <Metric label="Persone abbonate" value={int(p.gained.value)} delta={abs(p.gained.value - p.gained.prev)} deltaLabel="sul periodo prima" note={`${int(p.gained_new.value)} nuove · ${int(p.gained_ret.value)} di ritorno`} />
+        <Metric label="Revenue nei primi 30 giorni" value={money(p.revenue.value)} delta={pctTxt(p.revenue.delta)} deltaLabel="sul periodo prima" note={`${money(p.revenue_new.value)} nuove · ${money(p.revenue_ret.value)} di ritorno`} />
+        <Metric label="Persone che hanno speso" value={int(p.conv.value)} delta={pctTxt(p.conv.delta)} deltaLabel="sul periodo prima" note={`${int(p.conv_new.value)} nuove · ${int(p.conv_ret.value)} di ritorno`} />
+      </div>
+      <div style={{ fontSize: 12, color: CP.textMuted, marginTop: -12 }}>
+        Qui una persona abbonata a due creator conta una volta; nelle tabelle sotto conta per ogni creator (come in Looker).
+        La revenue è quella spesa da chi si è abbonato nel periodo, nei suoi primi 30 giorni: per gli ultimi giorni cresce ancora.
+      </div>
+      <TableBlock title="Per tipo di abbonamento" name="nuovi-abbonati-tipo" columns={metricCols({ key: "label", label: "Tipo" })} rows={[...d.byType, ...(d.total ? [{ type: "zz", label: "Totale", ...d.total }] : [])]} minWidth={900} />
+      <TableBlock title="Per creator" name="nuovi-abbonati-creator" columns={metricCols({ key: "name", label: "Creator" })} rows={d.byCreator} defaultSort={{ key: "revenue", dir: -1 }} minWidth={900} />
+      <TableBlock title="Per link" name="nuovi-abbonati-link" columns={linkCols} rows={d.byLink} defaultSort={{ key: "revenue", dir: -1 }} minWidth={1100} maxHeight={520} />
+    </>
+  );
+}
+
+function TrackingView({ d }) {
+  const creatorCols = [
+    { key: "name", label: "Creator" },
+    { key: "links", label: "Link attivi", align: "right", render: (r) => int(r.links) },
+    { key: "clicks", label: "Click", align: "right", render: (r) => int(r.clicks) },
+    { key: "clicks_delta", label: "% Δ", align: "right", render: (r) => <Delta v={r.clicks_delta} />, csv: (r) => r.clicks_delta },
+    { key: "subs", label: "Abbonati", align: "right", render: (r) => int(r.subs) },
+    { key: "subs_delta", label: "% Δ ", align: "right", render: (r) => <Delta v={r.subs_delta} />, csv: (r) => r.subs_delta },
+    { key: "cr", label: "CR abbonati/click", align: "right", render: (r) => pct(r.cr) },
+    { key: "revenue", label: "Revenue", align: "right", render: (r) => money(r.revenue) },
+    { key: "new_sub_revenue", label: "di cui nuovi", align: "right", render: (r) => money(r.new_sub_revenue) },
+  ];
+  const linkCols = [
+    { key: "name", label: "Creator" },
+    { key: "link_name", label: "Link", render: (r) => r.link_name || "—" },
+    { key: "placement", label: "Placement", render: (r) => r.placement || "—", muted: true },
+    { key: "spending_id", label: "Campagna", render: (r) => r.spending_id || "—", muted: true },
+    { key: "clicks", label: "Click", align: "right", render: (r) => int(r.clicks) },
+    { key: "clicks_delta", label: "% Δ", align: "right", render: (r) => <Delta v={r.clicks_delta} />, csv: (r) => r.clicks_delta },
+    { key: "subs", label: "Abbonati", align: "right", render: (r) => int(r.subs) },
+    { key: "subs_delta", label: "% Δ ", align: "right", render: (r) => <Delta v={r.subs_delta} />, csv: (r) => r.subs_delta },
+    { key: "revenue", label: "Revenue", align: "right", render: (r) => money(r.revenue) },
+    { key: "revenue_delta", label: "% Δ  ", align: "right", render: (r) => <Delta v={r.revenue_delta} />, csv: (r) => r.revenue_delta },
+    { key: "cr", label: "CR", align: "right", render: (r) => pct(r.cr) },
+    { key: "new_sub_revenue", label: "Revenue nuovi", align: "right", render: (r) => money(r.new_sub_revenue) },
+    { key: "link_url", label: "Indirizzo", render: (r) => r.link_url || "—", muted: true },
+  ];
+  const t = d.total;
+  return (
+    <>
+      <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
+        <Metric label="Click" value={int(t.clicks)} delta={t.clicks_delta == null ? null : `${t.clicks_delta > 0 ? "+" : "−"}${Math.abs(t.clicks_delta * 100).toLocaleString("it-IT", { maximumFractionDigits: 1 })}%`} deltaLabel="sul periodo prima" />
+        <Metric label="Abbonati dai link" value={int(t.subs)} delta={t.subs_delta == null ? null : `${t.subs_delta > 0 ? "+" : "−"}${Math.abs(t.subs_delta * 100).toLocaleString("it-IT", { maximumFractionDigits: 1 })}%`} deltaLabel="sul periodo prima" note={`CR ${pct(t.cr)}`} />
+        <Metric label="Revenue dai fan dei link" value={money(t.revenue)} note={`${money(t.new_sub_revenue)} dai nuovi`} />
+      </div>
+      <div style={{ fontSize: 12, color: CP.textMuted, marginTop: -12 }}>
+        La revenue di un link è quanto hanno speso nel periodo tutti i fan entrati da quel link, anche se si erano abbonati prima.
+      </div>
+      <TableBlock title="Per creator" name="tracking-creator" columns={creatorCols} rows={d.byCreator} defaultSort={{ key: "clicks", dir: -1 }} minWidth={950} />
+      <TableBlock title="Per link" name="tracking-link" columns={linkCols} rows={d.links} defaultSort={{ key: "clicks", dir: -1 }} minWidth={1400} maxHeight={560}
+        footer="Solo i link con click, abbonati o revenue nel periodo o in quello precedente." />
+    </>
+  );
+}
+
+function ReachChart({ daily }) {
+  if (!daily?.length) return null;
+  const W = 760, H = 160, P = 28;
+  const max = Math.max(1, ...daily.map((d) => d.reach));
+  const bw = (W - P * 2) / daily.length;
+  return (
+    <div style={{ ...card, padding: 16 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }} role="img" aria-label="Copertura giorno per giorno">
+        {daily.map((d, i) => {
+          const h = (d.reach / max) * (H - P * 2);
+          return (
+            <g key={d.day}>
+              <rect x={P + bw * i + 2} y={H - P - h} width={Math.max(1, bw - 4)} height={h} fill={CP.accent} opacity={0.75}><title>{`${dshort(d.day)}: ${int(d.reach)}`}</title></rect>
+              {(daily.length <= 16 || i % Math.ceil(daily.length / 12) === 0) && <text x={P + bw * i + bw / 2} y={H - 8} textAnchor="middle" fontSize="10" fill={CP.textMuted}>{d.day.slice(8, 10)}/{d.day.slice(5, 7)}</text>}
+            </g>
+          );
+        })}
+        <text x={P} y={14} fontSize="10" fill={CP.textMuted}>max {int(max)} al giorno</text>
+      </svg>
+    </div>
+  );
+}
+
+function CoperturaView({ d }) {
+  const cols = [
+    { key: "name", label: "Creator" },
+    { key: "reach", label: "Copertura", align: "right", render: (r) => int(r.reach) },
+    { key: "delta", label: "% Δ", align: "right", render: (r) => <Delta v={r.delta} />, csv: (r) => r.delta },
+    { key: "reach_prev", label: "Periodo prima", align: "right", render: (r) => int(r.reach_prev), muted: true },
+  ];
+  return (
+    <>
+      <Metric label="Copertura totale" value={int(d.total.reach)} delta={d.total.delta == null ? null : `${d.total.delta > 0 ? "+" : "−"}${Math.abs(d.total.delta * 100).toLocaleString("it-IT", { maximumFractionDigits: 1 })}%`} deltaLabel={`dal ${dshort(d.previous.from)} al ${dshort(d.previous.to)}`} />
+      <ReachChart daily={d.daily} />
+      <TableBlock title="Per creator" name="copertura" columns={cols} rows={d.rows} defaultSort={{ key: "reach", dir: -1 }} minWidth={600}
+        footer="Somma dei valori giornalieri di copertura del profilo (come Looker Creators Reach)." />
+    </>
+  );
+}
+
 function TableBlock({ title, name, columns, rows, defaultSort, minWidth = 700, maxHeight, footer }) {
   return (
     <section>
@@ -302,6 +433,9 @@ export default function AnalisiVenditePage() {
           {view === "rapporto" && <RapportoView d={data} />}
           {view === "meta-mese" && <MetaMeseView d={data} />}
           {view === "transazioni" && <TransazioniView d={data} />}
+          {view === "nuovi-abbonati" && <NuoviAbbonatiView d={data} />}
+          {view === "tracking" && <TrackingView d={data} />}
+          {view === "copertura" && <CoperturaView d={data} />}
         </div>
       )}
     </div>

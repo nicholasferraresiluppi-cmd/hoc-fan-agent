@@ -34,4 +34,18 @@ ok(!/type\s*!=\s*'subscription'/.test(rapp), "rapporto NON esclude gli abbonamen
 ok(q.transazioniSql(refs, [1], { from: "2026-10-01", to: "2026-10-08" }, 99999).includes("LIMIT 2000"), "tetto alle righe di transazioni");
 ok(q.chargebackSql(refs, [1], { from: "2026-10-01", to: "2026-10-08" }).includes("created_at_transaction"), "chargeback per data della transazione");
 
+// fase 2
+const refs2 = { ...refs, newsubs: "p.hoc.newsubs_spending_daily", linksStats: "p.onlyfans.links_stats", reach: "p.onlyfans.reach" };
+const r7 = { from: "2026-10-02", to: "2026-10-08" };
+assert.throws(() => q.nuoviMetricsSql(refs2, [1], r7, "user_id; --"), /raggruppamento/); n++;
+const nm = q.nuoviMetricsSql(refs2, [1], r7, "sub_type");
+ok(nm.includes("COUNT(DISTINCT user_key)") && nm.includes("ROLLUP(sub_type)"), "nuovi abbonati: coppie fan×creator + totale");
+const np = q.nuoviPersoneSql(refs2, [1], r7);
+ok(np.includes("COUNT(DISTINCT user_id)") && np.includes("sub_type != 'returning_subscriber'") && np.includes("DATE '2026-09-25'"), "persone: per fan, nuovi = non returning (trial compresi), periodo prima");
+const tr = q.trackingSql(refs2, [1], r7);
+ok(tr.includes("clicks_diff") && tr.includes("HAVING") && tr.includes("DATE '2026-09-25'"), "tracking: somme dei diff, solo link attivi, periodo prima");
+ok(q.coperturaSql(refs2, [1], r7).includes("SUM(IF(calendar_date >= DATE '2026-10-02', total, 0))"), "copertura: somma di total");
+ok(q.VIEWS.length === 8 && q.VIEWS.includes("copertura"), "8 viste");
+ok(JSON.stringify(q.defaultRange("tracking", now)) === JSON.stringify({ from: "2026-10-02", to: "2026-10-08" }), "tracking: 7 giorni come Looker");
+
 console.log(`analisi-vendite: ${n} asserzioni ok`);

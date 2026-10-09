@@ -16,6 +16,7 @@ import { allowsCreator } from "@/lib/creator-scope";
 import {
   normalizeRange, previousRange, pctDelta, namesSql, recapSql, recapDailySql, conversioniSql,
   rapportoSql, metaMeseSql, transazioniSql, chargebackSql,
+  nuoviMetricsSql, nuoviPersoneSql, nuoviLinkSql, trackingSql, coperturaSql, coperturaDailySql,
 } from "@/lib/analisi-vendite-sql";
 
 const TABLES = {
@@ -26,6 +27,9 @@ const TABLES = {
   chargebacks: ["postgres", "public_chargebacks"],
   users: ["postgres", "public_users"],
   creators: ["postgres", "public_creators"],
+  newsubs: ["hoc", "newsubs_spending_daily"],
+  linksStats: ["onlyfans", "links_stats"],
+  reach: ["onlyfans", "reach"],
 };
 
 function refsFor(source) {
@@ -112,6 +116,55 @@ function shape(view, rows, names, range) {
       truncated: tx.length >= 500,
     };
   }
+  if (view === "nuovi-abbonati") {
+    const [byType, byCreator, people, byLink] = rows;
+    const metrics = (r) => {
+      const subs = Number(r.subs) || 0;
+      return {
+        subs, ltv_d0: subs ? r2(r.spend_d0 / subs) : null, cr_d0: subs ? r.conv_d0 / subs : null,
+        ltv30: subs ? r2(r.revenue / subs) : null, cr30: subs ? r.conv / subs : null,
+        arppu30: r.conv ? r2(r.revenue / r.conv) : null, revenue: r2(r.revenue), conv: Number(r.conv) || 0,
+      };
+    };
+    const TYPE = { new_subscriber: "Nuovi", returning_subscriber: "Di ritorno", new_subscriber_trial: "Trial" };
+    const total = byType.find((r) => r.k == null);
+    const cur = people.find((r) => r.cur === true) || {};
+    const prev = people.find((r) => r.cur === false) || {};
+    const pick = (k) => ({ value: k.startsWith("revenue") ? r2(cur[k]) : Number(cur[k]) || 0, prev: k.startsWith("revenue") ? r2(prev[k]) : Number(prev[k]) || 0, delta: pctDelta(cur[k], prev[k]) });
+    return {
+      byType: byType.filter((r) => r.k != null).map((r) => ({ type: r.k, label: TYPE[r.k] || r.k, ...metrics(r) })),
+      total: total ? metrics(total) : null,
+      byCreator: byCreator.filter((r) => r.k != null).map((r) => ({ creator_id: Number(r.k), name: nameOf(r.k), ...metrics(r) })),
+      people: Object.fromEntries(["gained", "gained_ret", "gained_new", "revenue", "revenue_ret", "revenue_new", "conv", "conv_ret", "conv_new"].map((k) => [k, pick(k)])),
+      byLink: byLink.map((r) => ({ creator_id: Number(r.creator_id), name: nameOf(r.creator_id), link_name: r.link_name, placement: r.placement, alterego: r.alterego, revenue: r2(r.revenue), subs: Number(r.subs) || 0, conv: Number(r.conv) || 0, cr: r.subs ? r.conv / r.subs : null, arppu: r.conv ? r2(r.revenue / r.conv) : null })),
+      previous: previousRange(range),
+    };
+  }
+  if (view === "tracking") {
+    const links = rows[0].map((r) => ({
+      creator_id: Number(r.creator_id), name: nameOf(r.creator_id), link_name: r.link_name, link_url: r.link_url, placement: r.placement, spending_id: r.spending_id,
+      clicks: Number(r.clicks) || 0, clicks_delta: pctDelta(r.clicks, r.clicks_prev), subs: Number(r.subs) || 0, subs_delta: pctDelta(r.subs, r.subs_prev),
+      revenue: r2(r.revenue), revenue_delta: pctDelta(r.revenue, r.revenue_prev), cr: r.clicks ? r.subs / r.clicks : null,
+      cr_delta: r.clicks && r.clicks_prev && r.subs_prev ? (r.subs / r.clicks - r.subs_prev / r.clicks_prev) / (r.subs_prev / r.clicks_prev) : null,
+      new_sub_revenue: r2(r.new_sub_revenue),
+    }));
+    const byId = {};
+    for (const r of rows[0]) {
+      const c = (byId[r.creator_id] ||= { creator_id: Number(r.creator_id), name: nameOf(r.creator_id), clicks: 0, clicks_prev: 0, subs: 0, subs_prev: 0, revenue: 0, new_sub_revenue: 0, links: 0 });
+      c.clicks += Number(r.clicks) || 0; c.clicks_prev += Number(r.clicks_prev) || 0; c.subs += Number(r.subs) || 0; c.subs_prev += Number(r.subs_prev) || 0;
+      c.revenue += Number(r.revenue) || 0; c.new_sub_revenue += Number(r.new_sub_revenue) || 0; c.links += 1;
+    }
+    const creators = Object.values(byId).map((c) => ({ ...c, revenue: r2(c.revenue), new_sub_revenue: r2(c.new_sub_revenue), cr: c.clicks ? c.subs / c.clicks : null, clicks_delta: pctDelta(c.clicks, c.clicks_prev), subs_delta: pctDelta(c.subs, c.subs_prev) }));
+    const t = creators.reduce((a, c) => ({ clicks: a.clicks + c.clicks, clicks_prev: a.clicks_prev + c.clicks_prev, subs: a.subs + c.subs, subs_prev: a.subs_prev + c.subs_prev, revenue: a.revenue + c.revenue, new_sub_revenue: a.new_sub_revenue + c.new_sub_revenue }), { clicks: 0, clicks_prev: 0, subs: 0, subs_prev: 0, revenue: 0, new_sub_revenue: 0 });
+    // NB: non chiamarlo `creators`: la route aggiunge `creators` (quelle visibili) e lo sovrascriverebbe
+    return { links, byCreator: creators, total: { ...t, revenue: r2(t.revenue), new_sub_revenue: r2(t.new_sub_revenue), cr: t.clicks ? t.subs / t.clicks : null, clicks_delta: pctDelta(t.clicks, t.clicks_prev), subs_delta: pctDelta(t.subs, t.subs_prev) }, previous: previousRange(range) };
+  }
+  if (view === "copertura") {
+    const [byCreator, daily] = rows;
+    const list = byCreator.map((r) => ({ creator_id: Number(r.creator_id), name: nameOf(r.creator_id), reach: Number(r.reach) || 0, reach_prev: Number(r.reach_prev) || 0, delta: pctDelta(r.reach, r.reach_prev) })).sort((a, b) => b.reach - a.reach);
+    const tot = list.reduce((a, r) => ({ reach: a.reach + r.reach, reach_prev: a.reach_prev + r.reach_prev }), { reach: 0, reach_prev: 0 });
+    return { rows: list, total: { ...tot, delta: pctDelta(tot.reach, tot.reach_prev) }, daily: daily.map((d) => ({ day: d.day, reach: Number(d.reach) || 0 })), previous: previousRange(range) };
+  }
   throw new Error("vista sconosciuta");
 }
 
@@ -121,6 +174,9 @@ const BUILDERS = {
   rapporto: (refs, ids, range) => [rapportoSql(refs, ids, range)],
   "meta-mese": (refs, ids, range) => [metaMeseSql(refs, ids, range)],
   transazioni: (refs, ids, range) => [transazioniSql(refs, ids, range), chargebackSql(refs, ids, range)],
+  "nuovi-abbonati": (refs, ids, range) => [nuoviMetricsSql(refs, ids, range, "sub_type"), nuoviMetricsSql(refs, ids, range, "creator_id"), nuoviPersoneSql(refs, ids, range), nuoviLinkSql(refs, ids, range)],
+  tracking: (refs, ids, range) => [trackingSql(refs, ids, range)],
+  copertura: (refs, ids, range) => [coperturaSql(refs, ids, range), coperturaDailySql(refs, ids, range)],
 };
 
 /**
@@ -130,7 +186,7 @@ const BUILDERS = {
 export async function getAnalisi(view, ids, query = {}, { force = false } = {}) {
   if (!BUILDERS[view]) throw new Error("vista sconosciuta");
   const range = normalizeRange(view, query);
-  const key = `analisi:v1:${view}:${range.from}:${range.to}:${[...ids].sort((a, b) => a - b).join(",")}`;
+  const key = `analisi:v2:${view}:${range.from}:${range.to}:${[...ids].sort((a, b) => a - b).join(",")}`;
   if (!force) {
     const hit = await kv.get(key).catch(() => null);
     if (hit) return { ...hit, cached: true };
