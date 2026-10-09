@@ -36,7 +36,7 @@ export async function GET(request) {
     const ids = asked.length ? asked.filter((id) => visibleIds.has(id)) : [...visibleIds];
     if (!ids.length) return Response.json({ error: "Nessuna delle creator scelte è visibile per te", creators, scope }, { status: 403 });
 
-    const data = await getAnalisi(view, ids, { from: sp.get("from"), to: sp.get("to") }, { force: sp.get("refresh") === "1" });
+    const data = await getAnalisi(view, ids, { from: sp.get("from"), to: sp.get("to"), q: sp.get("q") }, { force: sp.get("refresh") === "1" });
     return Response.json({ ...data, creators, selected: ids, scope });
   } catch (e) {
     return Response.json({ error: e.message || "Calcolo fallito" }, { status: 500 });

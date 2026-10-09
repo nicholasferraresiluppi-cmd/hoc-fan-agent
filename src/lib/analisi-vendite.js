@@ -17,6 +17,7 @@ import {
   normalizeRange, previousRange, pctDelta, namesSql, recapSql, recapDailySql, conversioniSql,
   rapportoSql, metaMeseSql, transazioniSql, chargebackSql,
   nuoviMetricsSql, nuoviPersoneSql, nuoviLinkSql, trackingSql, coperturaSql, coperturaDailySql,
+  notificheAggSql, notificheListSql, welcomeSql, ricercaSql, cleanSearch, SUB_TYPES,
 } from "@/lib/analisi-vendite-sql";
 
 const TABLES = {
@@ -30,6 +31,10 @@ const TABLES = {
   newsubs: ["hoc", "newsubs_spending_daily"],
   linksStats: ["onlyfans", "links_stats"],
   reach: ["onlyfans", "reach"],
+  notifications: ["postgres", "public_notifications"],
+  linksSubscriptions: ["onlyfans", "links_subscriptions"],
+  welcomeUnlocks: ["onlyfans", "welcome_unlocks"],
+  usersResearch: ["onlyfans", "users_research"],
 };
 
 function refsFor(source) {
@@ -165,6 +170,38 @@ function shape(view, rows, names, range) {
     const tot = list.reduce((a, r) => ({ reach: a.reach + r.reach, reach_prev: a.reach_prev + r.reach_prev }), { reach: 0, reach_prev: 0 });
     return { rows: list, total: { ...tot, delta: pctDelta(tot.reach, tot.reach_prev) }, daily: daily.map((d) => ({ day: d.day, reach: Number(d.reach) || 0 })), previous: previousRange(range) };
   }
+  if (view === "notifiche") {
+    const [agg, list] = rows;
+    const zero = () => Object.fromEntries(SUB_TYPES.map((t) => [t, 0]));
+    const byCreator = {}, byDay = {}, byHour = Array.from({ length: 24 }, (_, h) => ({ hour: h, n: 0 }));
+    const totals = zero();
+    for (const r of agg) {
+      const n = Number(r.n) || 0;
+      (byCreator[r.creator_id] ||= { creator_id: Number(r.creator_id), name: nameOf(r.creator_id), ...zero() })[r.sub_type] += n;
+      (byDay[r.day] ||= { day: r.day, ...zero() })[r.sub_type] += n;
+      byHour[Number(r.hour)].n += n;
+      totals[r.sub_type] += n;
+    }
+    const sum = (o) => SUB_TYPES.reduce((a, t) => a + o[t], 0);
+    return {
+      totals: { ...totals, total: sum(totals) },
+      byCreator: Object.values(byCreator).map((c) => ({ ...c, total: sum(c) })).sort((a, b) => b.total - a.total),
+      daily: Object.values(byDay).map((d) => ({ ...d, total: sum(d) })).sort((a, b) => a.day.localeCompare(b.day)),
+      hourly: byHour,
+      list: list.map((r) => ({ ...r, creator_id: Number(r.creator_id), name: nameOf(r.creator_id) })),
+    };
+  }
+  if (view === "welcome") {
+    const list = rows[0].map((r) => {
+      const subs = Number(r.subs) || 0, unlocks = Number(r.unlocks) || 0, amount = Number(r.amount) || 0;
+      return { creator_id: Number(r.creator_id), name: nameOf(r.creator_id), amount, type: r.type, subs, unlocks, revenue: r2(amount * unlocks), cr: subs ? unlocks / subs : null };
+    }).sort((a, b) => b.revenue - a.revenue || a.name.localeCompare(b.name, "it"));
+    const unlocks = list.reduce((a, r) => a + r.unlocks, 0);
+    return { rows: list, total: { unlocks, revenue: r2(list.reduce((a, r) => a + r.revenue, 0)) } };
+  }
+  if (view === "ricerca-fan") {
+    return { rows: (rows[0] || []).map((r) => ({ ...r, creator_id: Number(r.creator_id), name: nameOf(r.creator_id), spent: r2(r.spent), transactions: Number(r.transactions) || 0 })) };
+  }
   throw new Error("vista sconosciuta");
 }
 
@@ -177,6 +214,9 @@ const BUILDERS = {
   "nuovi-abbonati": (refs, ids, range) => [nuoviMetricsSql(refs, ids, range, "sub_type"), nuoviMetricsSql(refs, ids, range, "creator_id"), nuoviPersoneSql(refs, ids, range), nuoviLinkSql(refs, ids, range)],
   tracking: (refs, ids, range) => [trackingSql(refs, ids, range)],
   copertura: (refs, ids, range) => [coperturaSql(refs, ids, range), coperturaDailySql(refs, ids, range)],
+  notifiche: (refs, ids, range) => [notificheAggSql(refs, ids, range), notificheListSql(refs, ids, range)],
+  welcome: (refs, ids, range) => [welcomeSql(refs, ids, range)],
+  "ricerca-fan": (refs, ids, range, q) => [ricercaSql(refs, ids, q)],
 };
 
 /**
@@ -186,15 +226,17 @@ const BUILDERS = {
 export async function getAnalisi(view, ids, query = {}, { force = false } = {}) {
   if (!BUILDERS[view]) throw new Error("vista sconosciuta");
   const range = normalizeRange(view, query);
-  const key = `analisi:v2:${view}:${range.from}:${range.to}:${[...ids].sort((a, b) => a - b).join(",")}`;
+  const q = view === "ricerca-fan" ? cleanSearch(query.q) : null;
+  if (view === "ricerca-fan" && !q) return { view, range, rows: [], needsQuery: true, source: null, computed_at: new Date().toISOString() };
+  const key = `analisi:v2:${view}:${range.from}:${range.to}:${q || ""}:${[...ids].sort((a, b) => a - b).join(",")}`;
   if (!force) {
     const hit = await kv.get(key).catch(() => null);
     if (hit) return { ...hit, cached: true };
   }
   const creators = await splitCreators();
   const names = Object.fromEntries(creators.map((c) => [c.id, c.name]));
-  const { source, rows } = await runOnSource((refs) => BUILDERS[view](refs, ids, range));
-  const out = { view, range, source, computed_at: new Date().toISOString(), ...shape(view, rows, names, range) };
+  const { source, rows } = await runOnSource((refs) => BUILDERS[view](refs, ids, range, q));
+  const out = { view, range, source, computed_at: new Date().toISOString(), ...(q ? { q } : {}), ...shape(view, rows, names, range) };
   await kv.set(key, out, { ex: 600 }).catch(() => {});
   return out;
 }
