@@ -18,7 +18,21 @@ import {
   rapportoSql, metaMeseSql, transazioniSql, chargebackSql,
   nuoviMetricsSql, nuoviPersoneSql, nuoviLinkSql, trackingSql, coperturaSql, coperturaDailySql,
   notificheAggSql, notificheListSql, welcomeSql, ricercaSql, cleanSearch, SUB_TYPES,
+  diagnosiSql, diagnosiDailySql,
 } from "@/lib/analisi-vendite-sql";
+import { buildDiagnosi, summaryOf } from "@/lib/analisi-vendite-diagnosi";
+import { LIVE_CREATORS } from "@/lib/live-creators";
+
+function daysOf(range) {
+  const out = [];
+  for (let t = Date.parse(`${range.from}T00:00:00Z`); t <= Date.parse(`${range.to}T00:00:00Z`); t += 86400e3) out.push(new Date(t).toISOString().slice(0, 10));
+  return out;
+}
+/** Pagina "Revenue e chat" della persona, se ce l'ha (creator seguite dal vivo). */
+function liveSlugOf(person) {
+  const p = String(person || "").trim().toLowerCase();
+  return LIVE_CREATORS.find((c) => c.matches(p))?.slug || null;
+}
 
 const TABLES = {
   attributed: ["onlyfans", "attributed_transactions"],
@@ -202,6 +216,37 @@ function shape(view, rows, names, range) {
   if (view === "ricerca-fan") {
     return { rows: (rows[0] || []).map((r) => ({ ...r, creator_id: Number(r.creator_id), name: nameOf(r.creator_id), spent: r2(r.spent), transactions: Number(r.transactions) || 0 })) };
   }
+  if (view === "diagnosi") {
+    const [agg, daily] = rows;
+    const persons = buildDiagnosi(agg, names, daily, daysOf(range)).map((p) => ({ ...p, live: liveSlugOf(p.name) }));
+    return { persons, summary: summaryOf(persons), previous: previousRange(range) };
+  }
+  if (view === "creator") {
+    const [agg, daily, links, cbs, welcome, ticket, types] = rows;
+    const person = buildDiagnosi(agg, names, daily, daysOf(range))[0] || null;
+    const linkRows = links.map((r) => ({
+      name: nameOf(r.creator_id), link_name: r.link_name, link_url: r.link_url, spending_id: r.spending_id,
+      clicks: Number(r.clicks) || 0, clicks_prev: Number(r.clicks_prev) || 0, subs: Number(r.subs) || 0, subs_prev: Number(r.subs_prev) || 0,
+      revenue: r2(r.revenue), new_sub_revenue: r2(r.new_sub_revenue), cr: r.clicks ? r.subs / r.clicks : null, subs_delta: pctDelta(r.subs, r.subs_prev),
+    }));
+    const TYPE = { new_subscriber: "Nuovi", returning_subscriber: "Di ritorno", new_subscriber_trial: "Trial" };
+    return {
+      person: person && { ...person, live: liveSlugOf(person.name) },
+      links: {
+        top: [...linkRows].sort((a, b) => b.subs - a.subs || b.clicks - a.clicks).slice(0, 8),
+        falling: linkRows.filter((l) => l.subs_prev >= 10 && l.subs_delta != null && l.subs_delta <= -0.3).sort((a, b) => (a.subs - a.subs_prev) - (b.subs - b.subs_prev)).slice(0, 5),
+        // link nuovi o ripartiti che portano tanti abbonati: spesso spiegano un cambio di conversione (traffico diverso)
+        fresh: linkRows.filter((l) => l.subs_prev === 0 && l.subs >= 20).sort((a, b) => b.subs - a.subs).slice(0, 5),
+        total: linkRows.length,
+      },
+      chargebacks: cbs.slice(0, 10).map((r) => ({ ...r, name: nameOf(r.creator_id), amount: r2(r.amount) })),
+      welcome: welcome.filter((r) => Number(r.amount) > 0).map((r) => ({ name: nameOf(r.creator_id), amount: Number(r.amount), subs: Number(r.subs) || 0, unlocks: Number(r.unlocks) || 0, revenue: r2(Number(r.amount) * (Number(r.unlocks) || 0)) })),
+      welcomeMissing: welcome.filter((r) => !(Number(r.amount) > 0)).map((r) => nameOf(r.creator_id)),
+      ticket: ticket.filter((r) => r.month === range.to.slice(0, 7)).map((r) => ({ name: nameOf(r.creator_id), avg: r2(r.avg), median: r2(r.median), transactions: Number(r.transactions) })),
+      newsubs: types.filter((r) => r.k != null).map((r) => ({ type: TYPE[r.k] || r.k, subs: Number(r.subs) || 0, d0: r.subs ? r2(r.spend_d0 / r.subs) : null, cr30: r.subs ? r.conv / r.subs : null, ltv30: r.subs ? r2(r.revenue / r.subs) : null })),
+      previous: previousRange(range),
+    };
+  }
   throw new Error("vista sconosciuta");
 }
 
@@ -217,6 +262,11 @@ const BUILDERS = {
   notifiche: (refs, ids, range) => [notificheAggSql(refs, ids, range), notificheListSql(refs, ids, range)],
   welcome: (refs, ids, range) => [welcomeSql(refs, ids, range)],
   "ricerca-fan": (refs, ids, range, q) => [ricercaSql(refs, ids, q)],
+  diagnosi: (refs, ids, range) => [diagnosiSql(refs, ids, range), diagnosiDailySql(refs, ids, range)],
+  creator: (refs, ids, range) => [
+    diagnosiSql(refs, ids, range), diagnosiDailySql(refs, ids, range), trackingSql(refs, ids, range), chargebackSql(refs, ids, range),
+    welcomeSql(refs, ids, range), rapportoSql(refs, ids, { from: `${range.to.slice(0, 7)}-01`, to: range.to }), nuoviMetricsSql(refs, ids, range, "sub_type"),
+  ],
 };
 
 /**
@@ -228,7 +278,7 @@ export async function getAnalisi(view, ids, query = {}, { force = false } = {}) 
   const range = normalizeRange(view, query);
   const q = view === "ricerca-fan" ? cleanSearch(query.q) : null;
   if (view === "ricerca-fan" && !q) return { view, range, rows: [], needsQuery: true, source: null, computed_at: new Date().toISOString() };
-  const key = `analisi:v2:${view}:${range.from}:${range.to}:${q || ""}:${[...ids].sort((a, b) => a - b).join(",")}`;
+  const key = `analisi:v4:${view}:${range.from}:${range.to}:${q || ""}:${[...ids].sort((a, b) => a - b).join(",")}`;
   if (!force) {
     const hit = await kv.get(key).catch(() => null);
     if (hit) return { ...hit, cached: true };
