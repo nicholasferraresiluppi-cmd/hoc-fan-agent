@@ -97,6 +97,7 @@ const NAV_GROUPS_RAW = [
       { href: "/leaderboard/sales-cp",           label: "Classifica vendite", icon: DollarSign },
       { href: "/leaderboard/creators",           label: "Creator",      icon: Users },
       { href: "/admin/le-mie-creator",           label: "Revenue e chat", icon: LineChart },
+      { href: "/admin/analisi-vendite",          label: "Analisi vendite", icon: BarChart3 },
       { href: "/admin/chat-monitor",             label: "Chat Monitor", icon: MessagesSquare },
       { href: "/leaderboard/creators/heatmap",   label: "Mappa operatore×creator",     icon: Flame },
       { href: "/admin/conversation-intelligence", label: "Presidio chat", icon: Activity },

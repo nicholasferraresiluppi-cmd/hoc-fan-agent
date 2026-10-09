@@ -25,7 +25,7 @@ const REPORTS = [
   {
     id: "hoc-analytics-3",
     title: "HOC Analytics 3.0",
-    description: "Il cruscotto principale dell'agenzia: incasso per creator, abbonati, chargeback (rimborsi contestati) e KPI dell'agenzia.",
+    description: "Il cruscotto principale dell'agenzia: incasso per creator, abbonati, chargeback (rimborsi contestati) e KPI dell'agenzia. Le pagine di vendita sono ora anche in HOC Pro, in Analisi vendite, con le stesse formule.",
     url: "https://lookerstudio.google.com/reporting/0aa0b857-b441-4969-bc85-8cdc32acb6f5/page/p_ljomtrr8bd",
   },
 ];
