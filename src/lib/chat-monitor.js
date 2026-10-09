@@ -25,7 +25,8 @@ const TABS = {
   daily: { ttl: 6 * 3600 * 1000, kvTtl: 26 * 3600 },
   trend: { ttl: 6 * 3600 * 1000, kvTtl: 26 * 3600 },
 };
-const key = (slug, tab) => `chatmon:${slug}:${tab}:v3`;
+// v4 (09/10): la coda porta data di iscrizione e speso 182gg (coda a priorità)
+const key = (slug, tab) => `chatmon:${slug}:${tab}:v4`;
 const lockKey = (slug, tab) => `chatmon:${slug}:${tab}:lock`;
 
 // TIMESTAMP via REST = secondi epoch (anche in notazione 1.7E9) → ISO

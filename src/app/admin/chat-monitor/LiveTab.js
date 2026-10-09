@@ -5,6 +5,7 @@
 import { useMemo, useState } from "react";
 import { CP } from "@/lib/brand";
 import { Kpi, Section, Badge, grid, chip, th, td, FanLink, usd, int, pct, mins, ago, hm, div, waitColor } from "./ui";
+import NextUp from "./NextUp";
 
 // Soglie dell'originale: benvenuto new ≤2h <95% rosso; latenza mediana 10 min / p90 45 min; senza risposta >8%.
 const TH = { contact: 0.95, ret: 0.7, latMed: 10, latP90: 45, noReply: 0.08 };
@@ -23,8 +24,11 @@ export default function LiveTab({ data, country }) {
   const latP90 = t.lat_p90_s != null ? t.lat_p90_s / 60 : null;
   const unlockedNet = (t.ppv_unlocked_value_ws || 0) * 0.8; // il valore dell'evento è il prezzo lordo: netto = 80%
 
+  const queue = useMemo(() => (data.queue || []).filter((q) => q.country === country), [data.queue, country]);
+
   return (
     <>
+      <NextUp queue={queue} shifts={data.shifts ? data.shifts.byCountry?.[country] || [] : null} />
       <Section title="Oggi in corso" badge={<Badge tone="live">● LIVE</Badge>} tip="Dati di oggi (ora italiana), dalla chat in tempo reale e dalle iscrizioni/transazioni.">
         <div style={grid(170)}>
           <Kpi label="Nuovi sub oggi" value={int(t.new_subs)} sub={`${int(t.ret_subs)} returning`} tip="Iscritti di oggi alla prima iscrizione (new) e chi torna dopo aver disdetto (returning)." />
