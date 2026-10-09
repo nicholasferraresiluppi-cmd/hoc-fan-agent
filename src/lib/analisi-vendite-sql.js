@@ -8,7 +8,7 @@
 // li decide lib/analisi-vendite.js). `ids` = creator_id già filtrati per
 // split + creator visibili all'utente: qui si validano solo come numeri.
 
-export const VIEWS = ["recap", "conversioni", "rapporto", "meta-mese", "transazioni", "nuovi-abbonati", "tracking", "copertura", "notifiche", "welcome", "ricerca-fan"];
+export const VIEWS = ["recap", "conversioni", "rapporto", "meta-mese", "transazioni", "nuovi-abbonati", "tracking", "copertura", "notifiche", "welcome", "ricerca-fan", "diagnosi", "creator"];
 
 const DAY = 86400e3;
 const isoDay = (t) => new Date(t).toISOString().slice(0, 10);
@@ -23,7 +23,7 @@ export function defaultRange(view, now = new Date()) {
   const y = isoDay(now.getTime() - DAY);
   // notifiche: dati in tempo reale → il periodo arriva fino a OGGI (come Looker)
   if (view === "notifiche") return { from: isoDay(now.getTime() - 13 * DAY), to: isoDay(now.getTime()) };
-  const days = view === "conversioni" ? 28 : view === "recap" || view === "welcome" ? 14 : 7;
+  const days = view === "conversioni" ? 28 : view === "recap" || view === "welcome" ? 14 : 7; // diagnosi e creator: 7 contro 7
   if (view === "rapporto" || view === "meta-mese") return { from: `${y.slice(0, 7)}-01`, to: y };
   return { from: isoDay(parseDay(y) - (days - 1) * DAY), to: y };
 }
@@ -348,6 +348,69 @@ export function ricercaSql(refs, ids, term) {
     FROM \`${refs.usersResearch}\`
     WHERE creator_id IN (${idList(ids)}) AND (STARTS_WITH(LOWER(username), '${t}')${byId})
     ORDER BY spent DESC LIMIT 200`;
+}
+
+/**
+ * Diagnosi (v2, 9/10/2026): per creator, periodo e periodo precedente di pari durata, i numeri che
+ * spiegano PERCHÉ la revenue si è mossa. Revenue = fan che spendono × spesa a testa; i fan che spendono
+ * dipendono da nuovi abbonati e conversione. Fonti già verificate su Looker:
+ *   revenue e fan che spendono → attributed_transactions (fan DISTINTI nel periodo: Looker somma i
+ *     distinti giornalieri e gonfia il numero, qui no); nuovi abbonati → subscriptions; conversione dei
+ *     nuovi → transactions_analytics; click → links_stats; chargeback → public_chargebacks;
+ *     spesa del primo giorno per nuovo abbonato → newsubs_spending_daily (spend_d0, confrontabile tra periodi).
+ */
+export function diagnosiSql(refs, ids, range) {
+  const p = previousRange(range);
+  const list = idList(ids);
+  const cur = `calendar_date >= ${d(range.from)}`;
+  const win = `creator_id IN (${list}) AND calendar_date BETWEEN ${d(p.from)} AND ${d(range.to)}`;
+  return `
+    WITH ids AS (SELECT creator_id FROM UNNEST([${list}]) AS creator_id),
+    a AS (SELECT creator_id,
+            SUM(IF(${cur}, net, 0)) AS revenue, SUM(IF(${cur}, 0, net)) AS revenue_prev,
+            COUNT(DISTINCT IF(${cur} AND net > 0, user_id, NULL)) AS spenders,
+            COUNT(DISTINCT IF(NOT (${cur}) AND net > 0, user_id, NULL)) AS spenders_prev,
+            COUNTIF(${cur} AND net > 0) AS transactions, COUNTIF(NOT (${cur}) AND net > 0) AS transactions_prev
+          FROM \`${refs.attributed}\` WHERE ${win} GROUP BY 1),
+    u AS (SELECT creator_id, ${cur} AS is_cur, user_id, SUM(net) AS spent FROM \`${refs.attributed}\` WHERE ${win} AND user_id IS NOT NULL GROUP BY 1, 2, 3),
+    w AS (SELECT creator_id, MAX(IF(is_cur, spent, 0)) AS top_fan, MAX(IF(is_cur, 0, spent)) AS top_fan_prev FROM u GROUP BY 1),
+    s AS (SELECT creator_id, SUM(IF(${cur}, new_subs, 0)) AS subs, SUM(IF(${cur}, 0, new_subs)) AS subs_prev
+          FROM \`${refs.subscriptions}\` WHERE ${win} GROUP BY 1),
+    t AS (SELECT creator_id, SUM(IF(${cur}, new_subs, 0)) AS conv_base, SUM(IF(${cur}, new_subs_converted, 0)) AS conv,
+            SUM(IF(${cur}, 0, new_subs)) AS conv_base_prev, SUM(IF(${cur}, 0, new_subs_converted)) AS conv_prev
+          FROM \`${refs.transactionsAnalytics}\` WHERE ${win} GROUP BY 1),
+    l AS (SELECT creator_id, SUM(IF(${cur}, clicks_diff, 0)) AS clicks, SUM(IF(${cur}, 0, clicks_diff)) AS clicks_prev
+          FROM \`${refs.linksStats}\` WHERE ${win} GROUP BY 1),
+    n AS (SELECT creator_id, SUM(IF(${cur}, spend_d0, 0)) AS d0, COUNT(DISTINCT IF(${cur}, user_key, NULL)) AS d0_subs,
+            SUM(IF(${cur}, 0, spend_d0)) AS d0_prev, COUNT(DISTINCT IF(${cur}, NULL, user_key)) AS d0_subs_prev
+          FROM \`${refs.newsubs}\` WHERE ${win} GROUP BY 1),
+    c AS (SELECT creator_id,
+            COUNTIF(DATE(created_at_transaction) >= ${d(range.from)}) AS chargebacks,
+            SUM(IF(DATE(created_at_transaction) >= ${d(range.from)}, CAST(amount AS FLOAT64), 0)) AS chargeback_amount,
+            SUM(IF(DATE(created_at_transaction) < ${d(range.from)}, CAST(amount AS FLOAT64), 0)) AS chargeback_amount_prev
+          FROM \`${refs.chargebacks}\`
+          WHERE creator_id IN (${list}) AND DATE(created_at_transaction) BETWEEN ${d(p.from)} AND ${d(range.to)} GROUP BY 1)
+    SELECT ids.creator_id,
+      IFNULL(a.revenue, 0) AS revenue, IFNULL(a.revenue_prev, 0) AS revenue_prev,
+      IFNULL(a.spenders, 0) AS spenders, IFNULL(a.spenders_prev, 0) AS spenders_prev,
+      IFNULL(a.transactions, 0) AS transactions, IFNULL(a.transactions_prev, 0) AS transactions_prev,
+      IFNULL(s.subs, 0) AS subs, IFNULL(s.subs_prev, 0) AS subs_prev,
+      IFNULL(t.conv_base, 0) AS conv_base, IFNULL(t.conv, 0) AS conv, IFNULL(t.conv_base_prev, 0) AS conv_base_prev, IFNULL(t.conv_prev, 0) AS conv_prev,
+      IFNULL(l.clicks, 0) AS clicks, IFNULL(l.clicks_prev, 0) AS clicks_prev,
+      IFNULL(n.d0, 0) AS d0, IFNULL(n.d0_subs, 0) AS d0_subs, IFNULL(n.d0_prev, 0) AS d0_prev, IFNULL(n.d0_subs_prev, 0) AS d0_subs_prev,
+      IFNULL(c.chargebacks, 0) AS chargebacks, IFNULL(c.chargeback_amount, 0) AS chargeback_amount, IFNULL(c.chargeback_amount_prev, 0) AS chargeback_amount_prev,
+      IFNULL(w.top_fan, 0) AS top_fan, IFNULL(w.top_fan_prev, 0) AS top_fan_prev
+    FROM ids LEFT JOIN a USING (creator_id) LEFT JOIN w USING (creator_id) LEFT JOIN s USING (creator_id) LEFT JOIN t USING (creator_id)
+      LEFT JOIN l USING (creator_id) LEFT JOIN n USING (creator_id) LEFT JOIN c USING (creator_id)`;
+}
+
+/** Revenue giorno per giorno di ogni creator nel periodo (per il mini-grafico). */
+export function diagnosiDailySql(refs, ids, range) {
+  return `
+    SELECT creator_id, FORMAT_DATE('%Y-%m-%d', calendar_date) AS day, SUM(net) AS revenue
+    FROM \`${refs.attributed}\`
+    WHERE creator_id IN (${idList(ids)}) AND calendar_date BETWEEN ${d(range.from)} AND ${d(range.to)}
+    GROUP BY 1, 2`;
 }
 
 /** Variazione percentuale come in Looker: null se il periodo prima è zero. */

@@ -483,18 +483,17 @@ function TableBlock({ title, name, columns, rows, defaultSort, minWidth = 700, m
   );
 }
 
-export default function AnalisiVenditePage() {
-  const [view, setView] = useState("recap");
+function DatiCompleti({ initialView, initialPicked, onBack, onState }) {
+  const [view, setView] = useState(initialView && VIEWS.some((x) => x.id === initialView) ? initialView : "recap");
   const [preset, setPreset] = useState(null); // null = periodo di default della vista
   const [custom, setCustom] = useState(null);
-  const [picked, setPicked] = useState([]); // [] = tutte le creator visibili
+  const [picked, setPicked] = useState(initialPicked || []); // [] = tutte le creator visibili
   const [refresh, setRefresh] = useState(0);
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    try { const v = localStorage.getItem("analisi-vendite:view"); if (v && VIEWS.some((x) => x.id === v)) setView(v); } catch {}
-  }, []);
-  const chooseView = (v) => { setView(v); setPreset(null); setCustom(null); try { localStorage.setItem("analisi-vendite:view", v); } catch {} };
+  // link diretto a ogni scheda: ?vista=dati&scheda=<id>[&creators=…]
+  useEffect(() => { onState?.({ scheda: view, creators: picked }); }, [view, picked]);
+  const chooseView = (v) => { setView(v); setPreset(null); setCustom(null); };
 
   const range = custom || (preset ? PRESETS.find((p) => p.id === preset)?.range() : null);
   const url = useMemo(() => {
@@ -512,9 +511,11 @@ export default function AnalisiVenditePage() {
   const current = VIEWS.find((v) => v.id === view);
 
   return (
-    <div style={{ display: "grid", gap: 20, maxWidth: 1280, margin: "0 auto", padding: "8px 0 40px" }}>
-      <PageHead crumbs={[{ label: "Performance" }]} title="Analisi vendite"
-        subtitle="I report di Looker, con le stesse formule e solo le tue creator." />
+    <div style={{ display: "grid", gap: 20 }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "baseline", flexWrap: "wrap" }}>
+        <button onClick={onBack} style={linkBtn}>← Torna alle creator</button>
+        <span style={{ fontSize: 13, color: CP.textMuted }}>Dati completi: le tabelle dei report Looker, stesse formule, da scaricare in CSV.</span>
+      </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} role="tablist" aria-label="Viste">
         {VIEWS.map((v) => <FilterChip key={v.id} label={v.label} active={view === v.id} onClick={() => chooseView(v.id)} />)}
@@ -574,3 +575,301 @@ export default function AnalisiVenditePage() {
 }
 
 const dateInput = { background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, padding: "5px 8px", fontSize: 13, fontFamily: "inherit" };
+const linkBtn = { border: "none", background: "none", padding: 0, color: CP.accentSoftText, cursor: "pointer", fontSize: 14, fontFamily: FONTS.body };
+
+/* ───────── v2 (9/10/2026): si parte dalle creator, non dalle tabelle ───────── */
+
+const STATUS = {
+  "in-calo": { label: "In calo", color: CP.accentRed },
+  stabile: { label: "Stabile", color: CP.textMuted },
+  "in-crescita": { label: "In crescita", color: CP.accentGreen },
+  "pochi-dati": { label: "Pochi dati", color: CP.textMuted },
+};
+const DIAG_PERIODS = [7, 14, 28];
+
+function StatusChip({ status }) {
+  const s = STATUS[status] || STATUS.stabile;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: CP.textSecondary, whiteSpace: "nowrap" }}>
+      <span style={{ width: 8, height: 8, borderRadius: 999, background: s.color }} />{s.label}
+    </span>
+  );
+}
+
+function deltaText(v) {
+  if (v == null || !Number.isFinite(v)) return null;
+  return `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(Math.round(v * 100))}%`;
+}
+const moneyShort = (n) => (n == null ? "—" : `$${Math.round(Number(n)).toLocaleString("it-IT", { useGrouping: "always" })}`);
+
+function Sparkline({ points, height = 36 }) {
+  if (!points?.length) return null;
+  const W = 240, H = height;
+  const max = Math.max(1, ...points.map((p) => p.revenue));
+  const step = points.length > 1 ? W / (points.length - 1) : W;
+  const path = points.map((p, i) => `${i ? "L" : "M"}${(i * step).toFixed(1)},${(H - 3 - (p.revenue / max) * (H - 6)).toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: H, display: "block" }} aria-hidden="true">
+      <path d={path} fill="none" stroke={CP.accent} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
+function PersonCard({ p, onOpen }) {
+  const m = p.metrics;
+  const [main, ...more] = p.reasons;
+  return (
+    <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpen())}
+      style={{ ...card, padding: 16, display: "grid", gap: 10, cursor: "pointer", alignContent: "start" }} aria-label={`Apri ${p.name}`}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>{p.name}</div>
+          {p.accounts.length > 1 && <div style={{ fontSize: 12, color: CP.textMuted }}>{p.accounts.map((a) => a.market || a.alias).join(" · ")}</div>}
+        </div>
+        <StatusChip status={p.status} />
+      </div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 22, fontWeight: 500, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{moneyShort(m.revenue)}</span>
+        {deltaText(m.revenue_delta) && <span style={{ fontSize: 13, color: CP.textSecondary, fontVariantNumeric: "tabular-nums" }}>{deltaText(m.revenue_delta)} ({m.revenue_diff >= 0 ? "+" : "−"}{moneyShort(Math.abs(m.revenue_diff))})</span>}
+      </div>
+      <Sparkline points={p.daily} />
+      {main && <div style={{ fontSize: 14, color: CP.textPrimary, lineHeight: 1.45 }}>{main.text}</div>}
+      {more.slice(0, 2).map((r) => <div key={r.kind} style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.45 }}>{r.text}</div>)}
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12, color: CP.textMuted, borderTop: `1px solid ${CP.borderSoft}`, paddingTop: 8 }}>
+        <span>{int(m.subs)} nuovi abbonati</span>
+        <span>{int(m.spenders)} fan che spendono</span>
+        {m.spend_per_fan != null && <span>{moneyShort(m.spend_per_fan)} a testa</span>}
+      </div>
+    </div>
+  );
+}
+
+function Fact({ label, now, prev, delta, hint }) {
+  return (
+    <div style={{ ...card, padding: 14 }}>
+      <div style={{ fontSize: 12, color: CP.textMuted }}>{label}</div>
+      <div style={{ fontSize: 19, fontWeight: 500, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{now}</div>
+      <div style={{ fontSize: 12, color: CP.textSecondary }}>{prev != null ? `prima ${prev}` : ""}{delta ? ` · ${delta}` : ""}</div>
+      {hint && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4, lineHeight: 1.4 }}>{hint}</div>}
+    </div>
+  );
+}
+
+function CreatorDetail({ d, onBack, onDati }) {
+  const p = d.person;
+  if (!p) return <Notice>Nessun dato per questa creator nel periodo.</Notice>;
+  const m = p.metrics;
+  const pctOrDash = (v) => (v == null ? "—" : pct(v, 1));
+  const linkCols = [
+    { key: "link_name", label: "Link", render: (r) => r.link_name || "—" },
+    { key: "clicks", label: "Click", align: "right", render: (r) => int(r.clicks) },
+    { key: "subs", label: "Abbonati", align: "right", render: (r) => int(r.subs) },
+    { key: "subs_delta", label: "rispetto a prima", align: "right", render: (r) => <Delta v={r.subs_delta} />, csv: (r) => r.subs_delta },
+    { key: "cr", label: "Abbonati ogni 100 click", align: "right", render: (r) => (r.cr == null ? "—" : (r.cr * 100).toLocaleString("it-IT", { maximumFractionDigits: 1 })) },
+    { key: "revenue", label: "Speso dai suoi fan", align: "right", render: (r) => money(r.revenue) },
+  ];
+  return (
+    <div style={{ display: "grid", gap: 22 }}>
+      <button onClick={onBack} style={{ ...linkBtn, justifySelf: "start" }}>← Tutte le creator</button>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 500, color: CP.textPrimary }}>{p.name}</h2>
+          <div style={{ fontSize: 13, color: CP.textMuted }}>{p.accounts.map((a) => a.alias).join(" · ")}</div>
+        </div>
+        <StatusChip status={p.status} />
+      </div>
+      <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "baseline" }}>
+        <Metric label="Revenue netta" value={money(m.revenue)} delta={deltaText(m.revenue_delta)} deltaLabel={`dal ${dshort(d.previous.from)} al ${dshort(d.previous.to)} (${money(m.revenue_prev)})`} />
+      </div>
+      <section style={{ ...card, padding: 16, display: "grid", gap: 8 }}>
+        <div style={{ fontSize: 12, color: CP.textMuted }}>Perché</div>
+        {p.reasons.map((r, i) => <div key={r.kind + i} style={{ fontSize: i ? 14 : 15, color: i ? CP.textSecondary : CP.textPrimary, lineHeight: 1.5 }}>{r.text}</div>)}
+      </section>
+      <div style={{ ...card, padding: 16 }}>
+        <BarsChart label="Revenue al giorno" valueKey="revenue" fmt={moneyShort}
+          points={p.daily.map((x) => ({ key: x.day, label: dshort(x.day), short: `${x.day.slice(8, 10)}/${x.day.slice(5, 7)}`, revenue: x.revenue }))} />
+      </div>
+
+      <section style={{ display: "grid", gap: 10 }}>
+        <SectionTitle>I numeri che spiegano la revenue</SectionTitle>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
+          <Fact label="Fan che hanno speso" now={int(m.spenders)} prev={int(m.spenders_prev)} delta={deltaText(m.spenders_delta)} />
+          <Fact label="Spesa media per fan" now={money(m.spend_per_fan)} prev={money(m.spend_per_fan_prev)} delta={deltaText(m.spend_per_fan_delta)} />
+          <Fact label="Nuovi abbonati" now={int(m.subs)} prev={int(m.subs_prev)} delta={deltaText(m.subs_delta)} />
+          <Fact label="Nuovi che hanno comprato" now={pctOrDash(m.cr)} prev={pctOrDash(m.cr_prev)} hint="Su 100 nuovi abbonati, quanti hanno speso qualcosa." />
+          <Fact label="Speso il primo giorno da un nuovo abbonato" now={money(m.d0_per_sub)} prev={money(m.d0_per_sub_prev)} hint="In media, nel giorno in cui si abbona." />
+          <Fact label="Click sui tracking link" now={int(m.clicks)} prev={int(m.clicks_prev)} delta={deltaText(m.clicks_delta)} />
+          <Fact label="Chargeback" now={moneyShort(m.chargeback_amount)} prev={moneyShort(m.chargeback_amount_prev)} hint={m.chargebacks ? `${int(m.chargebacks)} nel periodo` : "Nessuno nel periodo"} />
+        </div>
+      </section>
+
+      {p.accounts.length > 1 && (
+        <section style={{ display: "grid", gap: 6 }}>
+          <SectionTitle>Per mercato</SectionTitle>
+          {p.accounts.map((a) => (
+            <div key={a.creator_id} style={{ fontSize: 14, color: CP.textSecondary }}>
+              <span style={{ color: CP.textPrimary }}>{a.alias}</span>: {money(a.revenue)} <span style={{ color: CP.textMuted }}>(prima {money(a.revenue_prev)}, {deltaText((a.revenue - a.revenue_prev) / (a.revenue_prev || 1)) || "—"})</span>
+            </div>
+          ))}
+        </section>
+      )}
+
+      <section style={{ display: "grid", gap: 10 }}>
+        <SectionTitle aside={`${d.links.total} link attivi`}>Da dove arrivano gli abbonati</SectionTitle>
+        {d.links.falling.length > 0 && (
+          <div style={{ fontSize: 14, color: CP.textSecondary, lineHeight: 1.5 }}>
+            In calo: {d.links.falling.map((l) => `«${l.link_name || "senza nome"}» ${int(l.subs)} abbonati invece di ${int(l.subs_prev)}`).join("; ")}.
+          </div>
+        )}
+        {d.links.fresh?.length > 0 && (
+          <div style={{ fontSize: 14, color: CP.textSecondary, lineHeight: 1.5 }}>
+            Link nuovi (nessun abbonato nel periodo prima): {d.links.fresh.map((l) => `«${l.link_name || "senza nome"}» ${int(l.subs)} abbonati, ${l.cr == null ? "—" : (l.cr * 100).toLocaleString("it-IT", { maximumFractionDigits: 1 })} ogni 100 click`).join("; ")}.
+            {" "}Un traffico nuovo spesso converte in modo diverso: guardalo accanto a «nuovi che hanno comprato».
+          </div>
+        )}
+        <DataTable columns={linkCols} rows={d.links.top} minWidth={700} empty="Nessun tracking link attivo nel periodo." />
+        <div style={{ fontSize: 12, color: CP.textMuted }}>«Speso dai suoi fan» è quanto hanno speso nel periodo tutti i fan entrati da quel link, anche prima.</div>
+      </section>
+
+      {d.ticket.length > 0 && (
+        <section style={{ display: "grid", gap: 6 }}>
+          <SectionTitle aside="mese in corso">Come spendono</SectionTitle>
+          {d.ticket.map((t) => (
+            <div key={t.name} style={{ fontSize: 14, color: CP.textSecondary, lineHeight: 1.5 }}>
+              <span style={{ color: CP.textPrimary }}>{t.name}</span>: metà delle {int(t.transactions)} transazioni è sotto {money(t.median)}; la media è {money(t.avg)}
+              {t.median && t.avg / t.median >= 1.8 ? " — buona parte dell'incasso viene da poche vendite grandi." : "."}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {(d.welcome.length > 0 || d.welcomeMissing.length > 0) && (
+        <section style={{ display: "grid", gap: 6 }}>
+          <SectionTitle>Messaggio di benvenuto a pagamento</SectionTitle>
+          {d.welcome.map((w) => (
+            <div key={`${w.name}-${w.amount}`} style={{ fontSize: 14, color: CP.textSecondary }}>
+              <span style={{ color: CP.textPrimary }}>{w.name}</span> a {money(w.amount)}: sbloccato da {int(w.unlocks)} nuovi abbonati su {int(w.subs)} ({pct(w.subs ? w.unlocks / w.subs : 0, 1)}), {money(w.revenue)}.
+            </div>
+          ))}
+          {d.welcomeMissing.length > 0 && <div style={{ fontSize: 13, color: CP.textMuted }}>Nessun prezzo welcome registrato per {d.welcomeMissing.join(", ")}: gli sblocchi non si possono misurare.</div>}
+        </section>
+      )}
+
+      {d.chargebacks.length > 0 && (
+        <section style={{ display: "grid", gap: 6 }}>
+          <SectionTitle>Ultimi chargeback</SectionTitle>
+          {d.chargebacks.map((c, i) => (
+            <div key={i} style={{ fontSize: 14, color: CP.textSecondary }}>{dt(c.chargeback_at)} · {c.username || c.user_id} · {c.payment_type} · {money(c.amount)}</div>
+          ))}
+        </section>
+      )}
+
+      <section style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {p.live && <a href={`/admin/le-mie-creator?creator=${encodeURIComponent(p.live)}`} style={actionBtn}>Chat e revenue dal vivo</a>}
+        <a href="/admin/sales-coaching" style={actionBtn}>Coaching vendite</a>
+        <button onClick={() => onDati(p.ids)} style={actionBtn}>Tutte le tabelle di {p.name}</button>
+      </section>
+    </div>
+  );
+}
+const actionBtn = { display: "inline-flex", alignItems: "center", padding: "8px 14px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, textDecoration: "none", cursor: "pointer", fontFamily: FONTS.body };
+
+function useDiag(view, days, ids, enabled = true) {
+  const url = useMemo(() => {
+    const to = yesterday();
+    const from = iso(Date.parse(`${to}T00:00:00Z`) - (days - 1) * DAY);
+    const q = new URLSearchParams({ view, from, to });
+    if (ids?.length) q.set("creators", ids.join(","));
+    return `/api/admin/analisi-vendite?${q}`;
+  }, [view, days, ids?.join(",")]);
+  return useSWR(enabled ? url : null, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
+}
+
+function readUrl() {
+  if (typeof window === "undefined") return {};
+  const q = new URLSearchParams(window.location.search);
+  return { vista: q.get("vista"), scheda: q.get("scheda"), creator: q.get("creator"), creators: (q.get("creators") || "").split(",").map(Number).filter(Boolean), giorni: Number(q.get("giorni")) || null };
+}
+function writeUrl(params) {
+  if (typeof window === "undefined") return;
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v != null && v !== "" && !(Array.isArray(v) && !v.length)) q.set(k, Array.isArray(v) ? v.join(",") : String(v));
+  const s = q.toString();
+  window.history.replaceState(null, "", `${window.location.pathname}${s ? `?${s}` : ""}`);
+}
+
+export default function AnalisiVenditePage() {
+  const [ready, setReady] = useState(false);
+  const [mode, setMode] = useState("creator"); // creator | dati
+  const [days, setDays] = useState(7);
+  const [person, setPerson] = useState(null); // nome della persona aperta
+  const [datiInit, setDatiInit] = useState({ scheda: null, creators: [] });
+
+  useEffect(() => {
+    const u = readUrl();
+    if (u.vista === "dati") { setMode("dati"); setDatiInit({ scheda: u.scheda, creators: u.creators }); }
+    if (u.creator) setPerson(u.creator);
+    if (DIAG_PERIODS.includes(u.giorni)) setDays(u.giorni);
+    setReady(true);
+  }, []);
+  useEffect(() => {
+    if (!ready || mode !== "creator") return;
+    writeUrl({ creator: person, giorni: days !== 7 ? days : null });
+  }, [ready, mode, person, days]);
+
+  const list = useDiag("diagnosi", days, null);
+  const persons = list.data?.persons || [];
+  const open = persons.find((p) => p.name === person) || null;
+  const detail = useDiag("creator", days, open ? open.ids : null, Boolean(open));
+  const showDetail = Boolean(person && open);
+
+  const goDati = (ids) => { setDatiInit({ scheda: null, creators: ids || [] }); setMode("dati"); writeUrl({ vista: "dati", creators: ids || [] }); window.scrollTo?.(0, 0); };
+
+  return (
+    <div style={{ display: "grid", gap: 20, maxWidth: 1280, margin: "0 auto", padding: "8px 0 40px" }}>
+      <PageHead crumbs={[{ label: "Performance" }]} title="Analisi vendite"
+        subtitle={mode === "dati" ? "Le tabelle dei report Looker, con le stesse formule e solo le tue creator." : "Come vanno le tue creator e perché. Prima chi sta perdendo di più."} />
+
+      {mode === "dati" ? (
+        ready && <DatiCompleti initialView={datiInit.scheda} initialPicked={datiInit.creators} onBack={() => { setMode("creator"); writeUrl({}); }}
+          onState={({ scheda, creators }) => writeUrl({ vista: "dati", scheda, creators })} />
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            {DIAG_PERIODS.map((n) => <FilterChip key={n} label={`Ultimi ${n} giorni`} active={days === n} onClick={() => setDays(n)} />)}
+            <span style={{ fontSize: 13, color: CP.textMuted }}>contro i {days} giorni prima · fino a ieri</span>
+            <span style={{ flex: 1 }} />
+            <button onClick={() => goDati(open ? open.ids : [])} style={linkBtn}>Dati completi (tabelle Looker) →</button>
+          </div>
+
+          {list.error && <Notice danger>{list.error.message}</Notice>}
+          {list.data?.empty && <Notice>{list.data.message}</Notice>}
+          {!list.data && !list.error && <div style={{ ...card, padding: 24, color: CP.textMuted, fontSize: 14 }}>Calcolo in corso…</div>}
+
+          {showDetail ? (
+            detail.data?.person && detail.data.view === "creator" ? (
+              <div style={{ opacity: detail.isLoading ? 0.6 : 1 }}>
+                <CreatorDetail d={detail.data} onBack={() => setPerson(null)} onDati={goDati} />
+              </div>
+            ) : detail.error ? <Notice danger>{detail.error.message}</Notice> : <div style={{ ...card, padding: 24, color: CP.textMuted, fontSize: 14 }}>Apro {person}…</div>
+          ) : list.data?.persons && (
+            <>
+              <div style={{ fontSize: 14, color: CP.textSecondary, lineHeight: 1.5 }}>
+                {list.data.summary.down > 0 && <><span style={{ color: CP.textPrimary }}>{list.data.summary.down} in calo</span>, </>}
+                {list.data.summary.steady} stabili, {list.data.summary.up} in crescita{list.data.summary.few ? `, ${list.data.summary.few} con pochi dati` : ""}.
+                {" "}In tutto {moneyShort(list.data.summary.revenue)}{deltaText(list.data.summary.revenue_delta) ? ` (${deltaText(list.data.summary.revenue_delta)} sul periodo prima)` : ""}.
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 330px), 1fr))", gap: 14, opacity: list.isLoading ? 0.6 : 1 }}>
+                {persons.map((p) => <PersonCard key={p.name} p={p} onOpen={() => { setPerson(p.name); window.scrollTo?.(0, 0); }} />)}
+              </div>
+              <div style={{ fontSize: 12, color: CP.textMuted }}>
+                «In calo» = almeno −10% e almeno −$300 rispetto al periodo prima. Revenue netta come in Looker; i fan che spendono sono persone distinte nel periodo.
+                {list.data.source === "backup" ? " Fonte: copia di sicurezza nostra (il warehouse dell'altra parte non risponde)." : ""}
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
