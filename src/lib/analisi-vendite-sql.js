@@ -8,7 +8,7 @@
 // li decide lib/analisi-vendite.js). `ids` = creator_id già filtrati per
 // split + creator visibili all'utente: qui si validano solo come numeri.
 
-export const VIEWS = ["recap", "conversioni", "rapporto", "meta-mese", "transazioni", "nuovi-abbonati", "tracking", "copertura"];
+export const VIEWS = ["recap", "conversioni", "rapporto", "meta-mese", "transazioni", "nuovi-abbonati", "tracking", "copertura", "notifiche", "welcome", "ricerca-fan"];
 
 const DAY = 86400e3;
 const isoDay = (t) => new Date(t).toISOString().slice(0, 10);
@@ -21,7 +21,9 @@ export function isDay(s) {
 /** Periodo di default di ogni vista (come in Looker), sempre fino a ieri (UTC). */
 export function defaultRange(view, now = new Date()) {
   const y = isoDay(now.getTime() - DAY);
-  const days = view === "conversioni" ? 28 : view === "recap" ? 14 : 7;
+  // notifiche: dati in tempo reale → il periodo arriva fino a OGGI (come Looker)
+  if (view === "notifiche") return { from: isoDay(now.getTime() - 13 * DAY), to: isoDay(now.getTime()) };
+  const days = view === "conversioni" ? 28 : view === "recap" || view === "welcome" ? 14 : 7;
   if (view === "rapporto" || view === "meta-mese") return { from: `${y.slice(0, 7)}-01`, to: y };
   return { from: isoDay(parseDay(y) - (days - 1) * DAY), to: y };
 }
@@ -273,6 +275,79 @@ export function coperturaDailySql(refs, ids, range) {
     FROM \`${refs.reach}\`
     WHERE creator_id IN (${idList(ids)}) AND calendar_date BETWEEN ${d(range.from)} AND ${d(range.to)}
     GROUP BY 1 ORDER BY 1`;
+}
+
+export const SUB_TYPES = ["new_subscriber", "returning_subscriber", "new_subscriber_trial"];
+const SUB_TYPES_SQL = SUB_TYPES.map((t) => `'${t}'`).join(", ");
+
+/**
+ * Notifiche abbonamenti — Looker "Subs Notifications Report" (Analytics 3.0 e Marketing): le notifiche
+ * grezze della piattaforma (hoc.subs_notifications = postgres.public_notifications con la data UTC),
+ * tipi nuovo / di ritorno / trial. Un solo aggregato per creator × tipo × giorno × ora.
+ * Verificato: Kaia Kitsune EN 4.230 nuovi (26/9-9/10, dati alle 04:00 UTC) = Looker. Giulia Ottorini
+ * 2.464 contro 2.451 (−0,5%, non spiegato). I TRIAL qui sono tutti: la pagina Free Trials di Looker
+ * conta solo l'ULTIMA notifica del giorno di ogni fan (hoc.organic_trials_subscriptions_history) e
+ * perde i trial seguiti da un acquisto nello stesso giorno (≈ −4%).
+ */
+export function notificheAggSql(refs, ids, range) {
+  return `
+    SELECT creator_id, sub_type, FORMAT_DATE('%Y-%m-%d', DATE(created_at)) AS day, EXTRACT(HOUR FROM created_at) AS hour, COUNT(*) AS n
+    FROM \`${refs.notifications}\`
+    WHERE creator_id IN (${idList(ids)}) AND DATE(created_at) BETWEEN ${d(range.from)} AND ${d(range.to)} AND sub_type IN (${SUB_TYPES_SQL})
+    GROUP BY 1, 2, 3, 4`;
+}
+
+/** Ultime 500 notifiche, con il link da cui è arrivato il fan quando c'è (links_subscriptions, aggiornata una volta al giorno). */
+export function notificheListSql(refs, ids, range) {
+  const list = idList(ids);
+  return `
+    WITH n AS (
+      SELECT id, created_at, creator_id, username, sub_type, user_id FROM \`${refs.notifications}\`
+      WHERE creator_id IN (${list}) AND DATE(created_at) BETWEEN ${d(range.from)} AND ${d(range.to)} AND sub_type IN (${SUB_TYPES_SQL})
+      ORDER BY created_at DESC LIMIT 500
+    )
+    SELECT FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', n.created_at) AS created_at, n.creator_id, n.username, n.sub_type, l.link_name, l.spending_id
+    FROM n LEFT JOIN \`${refs.linksSubscriptions}\` l
+      ON l.creator_id = n.creator_id AND l.user_id = n.user_id AND l.calendar_date = DATE(n.created_at)
+      AND l.calendar_date BETWEEN ${d(range.from)} AND ${d(range.to)}
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY n.id ORDER BY l.created_at DESC) = 1
+    ORDER BY n.created_at DESC`;
+}
+
+/**
+ * Welcome e mass unlock — Looker "Welcome mass unlocks", tabella onlyfans.welcome_unlocks: per creator e prezzo,
+ * abbonati, sblocchi, revenue = prezzo × sblocchi, CR = sblocchi / abbonati.
+ * Verificato (25/9-8/10): Stormy IT $5,88 · 505 · 19 · $111,72 · 3,76%; Fishball IT $4,89 · 1.712 · 95 · $464,55 · 5,55%.
+ */
+export function welcomeSql(refs, ids, range) {
+  return `
+    SELECT creator_id, amount, ANY_VALUE(type) AS type, SUM(subs_count) AS subs, SUM(unlocks_count) AS unlocks
+    FROM \`${refs.welcomeUnlocks}\`
+    WHERE creator_id IN (${idList(ids)}) AND calendar_date BETWEEN ${d(range.from)} AND ${d(range.to)}
+    GROUP BY creator_id, amount`;
+}
+
+/** Termine di ricerca ammesso: username o id OnlyFans (lettere, cifre, . _ -), 3-40 caratteri. */
+export function cleanSearch(term) {
+  const t = String(term || "").trim().replace(/^@/, "").toLowerCase();
+  return /^[a-z0-9._-]{3,40}$/.test(t) ? t : null;
+}
+
+/**
+ * Ricerca fan — Looker "User research", tabella onlyfans.users_research: per username (inizio) o id,
+ * su quali creator è abbonato, da quale link, da quando, quanto ha speso in tutto.
+ */
+export function ricercaSql(refs, ids, term) {
+  const t = cleanSearch(term);
+  if (!t) throw new Error("ricerca non valida");
+  const byId = /^\d+$/.test(t) ? ` OR user_id = ${Number(t)}` : "";
+  return `
+    SELECT creator_id, user_id, username, name, FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', started_at) AS started_at,
+      FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', ended_at) AS ended_at, link_name, sub_type, spending_id,
+      CAST(total_net_expenses AS FLOAT64) AS spent, transaction_count AS transactions
+    FROM \`${refs.usersResearch}\`
+    WHERE creator_id IN (${idList(ids)}) AND (STARTS_WITH(LOWER(username), '${t}')${byId})
+    ORDER BY spent DESC LIMIT 200`;
 }
 
 /** Variazione percentuale come in Looker: null se il periodo prima è zero. */

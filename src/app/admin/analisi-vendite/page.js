@@ -19,7 +19,11 @@ const VIEWS = [
   { id: "nuovi-abbonati", label: "Nuovi abbonati", hint: "Chi si è abbonato nel periodo e quanto ha speso nei primi 30 giorni: LTV, conversione e ARPPU per tipo, per creator e per link." },
   { id: "tracking", label: "Tracking link", hint: "Click, abbonati e revenue di ogni tracking link. Il traffico organico (senza link) non compare qui." },
   { id: "copertura", label: "Copertura", hint: "Quante persone ha raggiunto il profilo di ogni creator nel periodo, contro il periodo precedente." },
+  { id: "notifiche", label: "Notifiche", hint: "Ogni nuovo abbonato, abbonato di ritorno e trial, in tempo reale: per creator, per giorno e per ora del giorno." },
+  { id: "welcome", label: "Welcome unlock", hint: "Quanti nuovi abbonati hanno sbloccato il messaggio di benvenuto a pagamento, per creator e prezzo." },
+  { id: "ricerca-fan", label: "Ricerca fan", hint: "Cerca un fan per username (o id): su quali tue creator è abbonato, da quale link, da quando e quanto ha speso." },
 ];
+const TYPE_LABEL = { new_subscriber: "Nuovi", returning_subscriber: "Di ritorno", new_subscriber_trial: "Trial" };
 
 const DAY = 86400e3;
 const iso = (t) => new Date(t).toISOString().slice(0, 10);
@@ -347,6 +351,128 @@ function CoperturaView({ d }) {
   );
 }
 
+function BarsChart({ points, valueKey, label, fmt, max: maxIn }) {
+  if (!points?.length) return null;
+  const W = 760, H = 150, P = 26;
+  const max = Math.max(1, maxIn || 0, ...points.map((p) => p[valueKey]));
+  const bw = (W - P * 2) / points.length;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }} role="img" aria-label={label}>
+      {points.map((p, i) => {
+        const h = (p[valueKey] / max) * (H - P * 2);
+        return (
+          <g key={p.key}>
+            <rect x={P + bw * i + 2} y={H - P - h} width={Math.max(1, bw - 4)} height={h} fill={CP.accent} opacity={0.75}><title>{`${p.label}: ${fmt(p[valueKey])}`}</title></rect>
+            {(points.length <= 24 || i % Math.ceil(points.length / 12) === 0) && <text x={P + bw * i + bw / 2} y={H - 8} textAnchor="middle" fontSize="10" fill={CP.textMuted}>{p.short}</text>}
+          </g>
+        );
+      })}
+      <text x={P} y={14} fontSize="10" fill={CP.textMuted}>{label} · max {fmt(max)}</text>
+    </svg>
+  );
+}
+
+function NotificheView({ d }) {
+  const t = d.totals;
+  const creatorCols = [
+    { key: "name", label: "Creator" },
+    { key: "new_subscriber", label: "Nuovi", align: "right", render: (r) => int(r.new_subscriber) },
+    { key: "returning_subscriber", label: "Di ritorno", align: "right", render: (r) => int(r.returning_subscriber) },
+    { key: "new_subscriber_trial", label: "Trial", align: "right", render: (r) => int(r.new_subscriber_trial) },
+    { key: "total", label: "Totale", align: "right", render: (r) => int(r.total) },
+  ];
+  const listCols = [
+    { key: "created_at", label: "Quando (UTC)", render: (r) => dt(r.created_at) },
+    { key: "name", label: "Creator" },
+    { key: "username", label: "Fan" },
+    { key: "sub_type", label: "Tipo", render: (r) => TYPE_LABEL[r.sub_type] || r.sub_type, csv: (r) => TYPE_LABEL[r.sub_type] || r.sub_type },
+    { key: "link_name", label: "Link", render: (r) => r.link_name || "—", muted: true },
+    { key: "spending_id", label: "Campagna", render: (r) => r.spending_id || "—", muted: true },
+  ];
+  return (
+    <>
+      <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
+        <Metric label="Nuovi abbonati" value={int(t.new_subscriber)} />
+        <Metric label="Di ritorno" value={int(t.returning_subscriber)} />
+        <Metric label="Trial" value={int(t.new_subscriber_trial)} />
+        <Metric label="Totale" value={int(t.total)} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
+        <div style={{ ...card, padding: 16 }}>
+          <BarsChart label="Abbonamenti al giorno" valueKey="total" fmt={int}
+            points={d.daily.map((x) => ({ key: x.day, label: dshort(x.day), short: `${x.day.slice(8, 10)}/${x.day.slice(5, 7)}`, total: x.total }))} />
+        </div>
+        <div style={{ ...card, padding: 16 }}>
+          <BarsChart label="Per ora del giorno (UTC)" valueKey="n" fmt={int}
+            points={d.hourly.map((x) => ({ key: x.hour, label: `ore ${x.hour}`, short: String(x.hour).padStart(2, "0"), n: x.n }))} />
+        </div>
+      </div>
+      <TableBlock title="Per creator" name="notifiche-creator" columns={creatorCols} rows={d.byCreator} defaultSort={{ key: "total", dir: -1 }} minWidth={640}
+        footer="I trial qui sono tutti. Looker (Free Trials) ne perde circa il 4%: conta solo l'ultima notifica del giorno di ogni fan, quindi un trial seguito da un acquisto nello stesso giorno sparisce." />
+      <TableBlock title="Ultime 500" name="notifiche" columns={listCols} rows={d.list} minWidth={900} maxHeight={520}
+        footer="Il link di provenienza compare dal giorno dopo (la tabella dei link si aggiorna una volta al giorno)." />
+    </>
+  );
+}
+
+function WelcomeView({ d }) {
+  const priced = d.rows.filter((r) => r.amount > 0);
+  const missing = d.rows.filter((r) => !(r.amount > 0));
+  const cols = [
+    { key: "name", label: "Creator" },
+    { key: "amount", label: "Prezzo welcome", align: "right", render: (r) => money(r.amount) },
+    { key: "subs", label: "Nuovi abbonati", align: "right", render: (r) => int(r.subs) },
+    { key: "unlocks", label: "Sblocchi", align: "right", render: (r) => int(r.unlocks) },
+    { key: "revenue", label: "Revenue", align: "right", render: (r) => money(r.revenue) },
+    { key: "cr", label: "CR sblocchi/abbonati", align: "right", render: (r) => pct(r.cr) },
+  ];
+  return (
+    <>
+      <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
+        <Metric label="Sblocchi del welcome" value={int(d.total.unlocks)} />
+        <Metric label="Revenue dal welcome" value={money(d.total.revenue)} />
+      </div>
+      <TableBlock title="Per creator e prezzo" name="welcome-unlock" columns={cols} rows={priced} defaultSort={{ key: "revenue", dir: -1 }} minWidth={760}
+        footer="Revenue = prezzo × sblocchi. Una creator compare più volte se il prezzo del welcome è cambiato." />
+      {missing.length > 0 && (
+        <Notice>
+          Senza prezzo welcome registrato, quindi senza sblocchi misurabili: {missing.map((r) => r.name).join(", ")}.
+          Il dato dipende dall'elenco dei prezzi welcome tenuto dall'altra parte, che non comprende queste creator.
+        </Notice>
+      )}
+    </>
+  );
+}
+
+function RicercaFanView({ d, query, setQuery }) {
+  const [text, setText] = useState(query || "");
+  const cols = [
+    { key: "username", label: "Fan" },
+    { key: "name", label: "Creator" },
+    { key: "started_at", label: "Abbonato dal", render: (r) => (r.started_at ? dshort(r.started_at.slice(0, 10)) : "—") },
+    { key: "ended_at", label: "Attivo fino al", render: (r) => (r.ended_at ? dshort(r.ended_at.slice(0, 10)) : "—"), muted: true },
+    { key: "link_name", label: "Link", render: (r) => r.link_name || "—", muted: true },
+    { key: "sub_type", label: "Tipo", render: (r) => TYPE_LABEL[r.sub_type] || r.sub_type || "—" },
+    { key: "transactions", label: "Transazioni", align: "right", render: (r) => int(r.transactions) },
+    { key: "spent", label: "Speso in tutto", align: "right", render: (r) => money(r.spent) },
+  ];
+  return (
+    <>
+      <form onSubmit={(e) => { e.preventDefault(); setQuery(text.trim()); }} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="username (es. u5912…) o id del fan" aria-label="Username o id del fan"
+          style={{ ...dateInput, minWidth: 280, padding: "8px 10px", fontSize: 14 }} />
+        <button type="submit" style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: CP.accent, color: CP.accentInk, fontSize: 14, cursor: "pointer", fontFamily: FONTS.body }}>Cerca</button>
+      </form>
+      {d?.needsQuery ? (
+        <div style={{ fontSize: 13, color: CP.textMuted }}>Scrivi almeno 3 caratteri: l'inizio dello username (senza @) o l'id numerico del fan.</div>
+      ) : (
+        <TableBlock title={`Risultati per «${d.q}»`} name={`ricerca-${d.q}`} columns={cols} rows={d.rows} defaultSort={{ key: "spent", dir: -1 }} minWidth={1000}
+          footer={d.rows.length >= 200 ? "Mostrati i primi 200: scrivi più caratteri per restringere." : "Solo le tue creator. «Speso in tutto» è la spesa netta del fan su quella creator da quando è abbonato."} />
+      )}
+    </>
+  );
+}
+
 function TableBlock({ title, name, columns, rows, defaultSort, minWidth = 700, maxHeight, footer }) {
   return (
     <section>
@@ -363,6 +489,7 @@ export default function AnalisiVenditePage() {
   const [custom, setCustom] = useState(null);
   const [picked, setPicked] = useState([]); // [] = tutte le creator visibili
   const [refresh, setRefresh] = useState(0);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     try { const v = localStorage.getItem("analisi-vendite:view"); if (v && VIEWS.some((x) => x.id === v)) setView(v); } catch {}
@@ -374,9 +501,10 @@ export default function AnalisiVenditePage() {
     const q = new URLSearchParams({ view });
     if (range) { q.set("from", range.from); q.set("to", range.to); }
     if (picked.length) q.set("creators", picked.join(","));
+    if (view === "ricerca-fan" && search) q.set("q", search);
     if (refresh) q.set("refresh", "1");
     return `/api/admin/analisi-vendite?${q}`;
-  }, [view, range?.from, range?.to, picked, refresh]);
+  }, [view, range?.from, range?.to, picked, refresh, search]);
   const { data, error, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
 
   const creators = data?.creators || error?.info?.creators || [];
@@ -436,6 +564,9 @@ export default function AnalisiVenditePage() {
           {view === "nuovi-abbonati" && <NuoviAbbonatiView d={data} />}
           {view === "tracking" && <TrackingView d={data} />}
           {view === "copertura" && <CoperturaView d={data} />}
+          {view === "notifiche" && <NotificheView d={data} />}
+          {view === "welcome" && <WelcomeView d={data} />}
+          {view === "ricerca-fan" && <RicercaFanView d={data} query={search} setQuery={setSearch} />}
         </div>
       )}
     </div>
