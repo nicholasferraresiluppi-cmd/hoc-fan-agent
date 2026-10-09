@@ -50,11 +50,13 @@ export default function RaceHero({ row, goal, month, daily, creatorName, onSetGo
   // Etichette: "oggi" sopra la pista, gli altri segnaposto sotto; l'arrivo previsto va sopra
   // se è troppo vicino al traguardo (le due etichette si coprirebbero).
   const TRACK = 44;
+  // Vicino ai bordi l'etichetta si allinea verso l'interno (sul telefono usciva tagliata).
+  const edge = (v) => { const p = (v / max) * 100; return p > 75 ? { right: 65, textAlign: "right" } : p < 25 ? { left: 65, textAlign: "left" } : { left: 0, right: 0 }; };
   const projNearGoal = target && Math.abs(proj - target) / max < 0.2;
   const marker = (v, label, sub, { strong = false, above = false } = {}) => (
     <div style={{ position: "absolute", left: x(v), top: 0, bottom: 0, width: 150, transform: "translateX(-50%)", whiteSpace: "nowrap", textAlign: "center", fontSize: 12, color: CP.textSecondary, ...NUM }}>
       <span style={{ position: "absolute", left: "50%", top: TRACK - 5, transform: "translateX(-50%)", width: 14, height: 14, borderRadius: "50%", background: CP.surface, border: `3px solid ${strong ? CP.accent : alpha(CP.accent, "66")}` }} />
-      <div style={{ position: "absolute", left: 0, right: 0, ...(above ? { top: 0 } : { top: TRACK + 32 }) }}>
+      <div style={{ position: "absolute", ...edge(v), ...(above ? { top: 0 } : { top: TRACK + 32 }) }}>
         <b style={{ color: CP.textPrimary, fontWeight: 600 }}>{label}</b> <span>{sub}</span>
       </div>
     </div>
@@ -97,13 +99,13 @@ export default function RaceHero({ row, goal, month, daily, creatorName, onSetGo
         ) : null}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 10, marginTop: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginTop: 18 }}>
         <Tile icon={<UserPlus size={19} />} color={CP.accent} value={int(row.new_subs_mtd)} label="nuovi abbonati" sub={`a fine mese circa ${int(row.new_subs_proj_eom)}`} />
         <Tile icon={<ShoppingBag size={19} />} color={CP.gold} value={int(spenders)} label="hanno già comprato"
           sub={nowOneIn && usualOneIn ? `di solito 1 su ${usualOneIn}, ora 1 su ${nowOneIn}` : usualOneIn ? `di solito compra 1 nuovo su ${usualOneIn}` : null} />
         <Tile icon={<MessageCircle size={19} />} color={CP.accentGreen}
           value={chat ? int(chat.waiting) : "…"} label="fan aspettano una risposta"
-          sub={chat ? (chat.latMin != null ? `oggi si risponde in ${Math.max(1, Math.round(chat.latMin))} min` : null) : "sto guardando la chat"} href={chat?.href} />
+          sub={chat ? `nelle ultime 24 ore${chat.latMin != null ? ` · oggi si risponde in ${Math.max(1, Math.round(chat.latMin))} min` : ""}` : "sto guardando la chat"} href={chat?.href} />
       </div>
 
       <div style={{ marginTop: 12, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 14, padding: "12px 14px", fontSize: 14, color: CP.textPrimary, lineHeight: 1.5, ...NUM }}>

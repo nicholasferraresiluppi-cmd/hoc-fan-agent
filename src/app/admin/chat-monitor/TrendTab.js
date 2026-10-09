@@ -52,6 +52,19 @@ export default function TrendTab({ trend, daily, country }) {
     { name: "Revenue settimanale", level: revChg == null ? null : revChg < -0.15 ? "bad" : revChg < -0.05 ? "warn" : "ok",
       text: `${revChg == null ? "–" : `${revChg > 0 ? "+" : ""}${Math.round(revChg * 100)}%`} sett. su sett. ${revChg != null && revChg < -0.05 ? "Sotto la settimana prima." : "Nel range o in crescita."}` },
   ];
+  // Fasce orarie scoperte (ultime 3 settimane): latenza mediana oltre 45 min.
+  const DOW = ["", "dom", "lun", "mar", "mer", "gio", "ven", "sab"];
+  const holes = (daily.heat || []).filter((h) => h.country === country && h.lat_med > 45).sort((a, b) => b.lat_med - a.lat_med);
+  signals.push({ name: "Fasce orarie scoperte", level: holes.length === 0 ? "ok" : holes.length > 4 ? "bad" : "warn",
+    text: holes.length === 0 ? "Nessuna fascia con risposte oltre i 45 minuti nelle ultime 3 settimane."
+      : `${holes.length} ${holes.length === 1 ? "fascia" : "fasce"} con risposta mediana oltre 45 min: ${holes.slice(0, 4).map((h) => `${DOW[h.dow]} ${h.hr}:00 (${Math.round(h.lat_med)} min)`).join(", ")}${holes.length > 4 ? "…" : ""}. Da coprire nei turni.` });
+  // Coorti a 30 giorni: ultime 4 mature contro le 4 prima.
+  const coh = (daily.cohorts30 || []).filter((r) => r.country === country && r.subs > 0).sort((a, b) => (a.d < b.d ? -1 : 1));
+  const rate = (arr) => { const s = arr.reduce((a, r) => a + r.subs, 0); return s ? arr.reduce((a, r) => a + r.conv30, 0) / s : null; };
+  const cNow = rate(coh.slice(-4)), cPrev = rate(coh.slice(-8, -4));
+  const cChg = cNow != null && cPrev ? (cNow - cPrev) / cPrev : null;
+  if (cChg != null) signals.push({ name: "Conversione dei nuovi a 30 giorni", level: cChg < -0.25 ? "bad" : cChg < -0.1 ? "warn" : "ok",
+    text: `Ultime 4 settimane mature ${pct(cNow)} contro ${pct(cPrev)} delle 4 prima (${cChg > 0 ? "+" : ""}${Math.round(cChg * 100)}%). ${cChg < -0.1 ? "I nuovi iscritti comprano meno di prima." : "Stabile o in salita."}` });
   const nBad = signals.filter((s) => s.level === "bad").length, nWarn = signals.filter((s) => s.level === "warn").length;
 
   const w = (k) => wow(cur[k], prev[k]);
@@ -59,7 +72,7 @@ export default function TrendTab({ trend, daily, country }) {
 
   return (
     <>
-      <div style={{ ...grid(190), marginBottom: 12 }}>
+      <div style={{ ...grid(170), marginBottom: 12 }}>
         <Kpi label="Revenue settimana" value={usd(cur.revenue_tot)} sub={<span style={{ color: w("revenue_tot").col }}>{w("revenue_tot").txt}</span>} tip="Ultima settimana completa (lun-dom)." />
         <Kpi label="Quota DM 1:1" value={pct(quotaDm(cur), 0)} sub={<span style={{ color: wq.col }}>{wq.txt}</span>} tip="Quota del revenue che viene dai messaggi in chat 1:1 (non mass)." />
         <Kpi label="Ratio fan/chatter" value={cur.ratio_fan_chatter?.toFixed(2) ?? "–"} sub={<span style={{ color: w("ratio_fan_chatter").col }}>{w("ratio_fan_chatter").txt}</span>} tip="Messaggi dei fan per ogni messaggio del team: quanto rispondono i fan." />

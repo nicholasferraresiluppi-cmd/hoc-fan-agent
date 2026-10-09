@@ -17,8 +17,22 @@ const MONTHS = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "
 
 export const ok = (v) => v != null && Number.isFinite(Number(v));
 export const div = (a, b) => (!ok(a) || !ok(b) || Number(b) === 0 ? null : Number(a) / Number(b));
-export const usd = (v, d = 0) => (!ok(v) ? "–" : `$${Number(v).toLocaleString("it-IT", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
-export const int = (v) => (!ok(v) ? "–" : Math.round(Number(v)).toLocaleString("it-IT"));
+// punto delle migliaia sempre, anche a 4 cifre (in it-IT di base "1565" resterebbe senza)
+export const usd = (v, d = 0) => (!ok(v) ? "–" : `$${Number(v).toLocaleString("it-IT", { minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: "always" })}`);
+export const int = (v) => (!ok(v) ? "–" : Math.round(Number(v)).toLocaleString("it-IT", { useGrouping: "always" }));
+
+// "In attesa" — UNA definizione in tutto lo strumento (prova d'uso 09/10: tre numeri diversi
+// per la stessa cosa): fan il cui ultimo messaggio, delle ultime 24 ore, non ha ancora risposta.
+export const WAIT_WINDOW_H = 24;
+export const waitingNow = (queue) => (queue || []).filter((q) => q.last_fan_at && Date.now() - new Date(q.last_fan_at).getTime() <= WAIT_WINDOW_H * 3600_000);
+// Colore dell'attesa: fino a 15 min normale, fino a 2 ore attenzione, oltre in rosso.
+export const waitColor = (iso) => {
+  if (!iso) return CP.textPrimary;
+  const m = (Date.now() - new Date(iso).getTime()) / 60000;
+  return m <= 15 ? CP.textPrimary : m <= 120 ? CP.gold : CP.accentRed;
+};
+// Sotto questo numero di casi una percentuale non dà un giudizio (3 su 5 non è "critico").
+export const MIN_SAMPLE = 10;
 export const pct = (v, d = 1) => (!ok(v) ? "–" : `${(Number(v) * 100).toLocaleString("it-IT", { minimumFractionDigits: d, maximumFractionDigits: d })}%`);
 export const mins = (v) => (!ok(v) ? "–" : `${Math.round(Number(v)).toLocaleString("it-IT")} min`);
 export const hm = (iso) => (!iso ? "–" : new Date(iso).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" }));

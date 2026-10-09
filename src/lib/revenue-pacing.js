@@ -20,7 +20,7 @@ import { eomProjectionSQL } from "@/lib/revenue-pacing-sql";
 export { bigQueryConfigured };
 
 const P = () => process.env.BIGQUERY_DATA_PROJECT || "house-of-creators-358213";
-const CACHE_KEY = (slug) => `revenue:pacing:v4:${slug}`;
+const CACHE_KEY = (slug) => `revenue:pacing:v5:${slug}`;
 const LOCK_KEY = (slug) => `revenue:pacing:lock:${slug}`;
 const GOALS_KEY = (slug) => `revenue:goals:${slug}`;
 const FRESH_MS = 15 * 60 * 1000;
