@@ -20,7 +20,7 @@ import {
   Wallet, Scale, ShieldCheck, History, FlaskConical, MessageSquareWarning,
   Signpost, Bell, ListTree, Inbox, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket,
   HandCoins, MessageCircle,
-  Snowflake, Megaphone, Share2, Shield, Building2, BookUser,
+  Snowflake, Megaphone, Share2, Shield, Building2, BookUser, Radar,
   BookMarked,
   LineChart,
   FileSignature,
@@ -111,6 +111,7 @@ const SHORTCUT_GROUPS_RAW = [
   {
     label: "Marketing",
     items: [
+      { href: "/admin/scouting", title: "Radar creator", desc: "Le creator italiane trovate su Instagram: una scheda per persona, fasi dello scouting, crescita settimana per settimana", icon: Radar },
       { href: "/admin/ads", title: "Studio bio-funnel", desc: "Come lavorano gli altri sulla landing-ponte OF e cosa converte meglio: 112 landing reali analizzate + template per le creator", icon: Megaphone },
       { href: "/admin/social-accounts", title: "Account social", desc: "Account di promozione dei creator + proxy assegnato", icon: Share2 },
       { href: "/admin/social-proxies", title: "Proxy account social", desc: "Proxy SOCKS5/HTTP per isolare le connessioni degli account social ufficiali dei creator", icon: Shield },
