@@ -160,7 +160,7 @@ export async function processSignal({ text, by, why }) {
   try { hlLinks = await fetchFirstHighlightLinks(h); } catch { /* le evidenze sono un di più: senza, la scheda nasce lo stesso */ }
   const draft = { url: row.url, hlLinks };
   const link0 = bestLink([draft]);
-  const sig = !link0 ? "nessuno" : link0.strength >= 2 ? "forte" : "debole";
+  const sig = !link0 || link0.strength < 1 ? "nessuno" : link0.strength >= 2 ? "forte" : "debole";
   const now = Date.now();
   profiles.push({
     h, fol: row.fol, medv: row.medv, vf: row.vf ?? null, sig, hl: hlLinks.length > 0, hlLinks,

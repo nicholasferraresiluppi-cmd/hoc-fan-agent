@@ -386,7 +386,7 @@ const LINK_KINDS = [
   { re: /(^|\.)onlyfans\.com$/, label: "OnlyFans", strength: 3 },
   { re: /(^|\.)(fanvue|fansly|mym\.fans|loyalfans|fanplace)\.[a-z.]+$/, label: "Piattaforma a pagamento", strength: 3 },
   { re: /(^|\.)(t\.me|telegram\.me)$/, label: "Telegram", strength: 2 },
-  { re: /(^|\.)(linktr\.ee|link\.me|beacons\.ai|beacons\.page|allmylinks\.com|heylink\.me|heyliiink\.com|lovemylink\.me|hoo\.be|bio\.site|snipfeed\.co|getmysocial\.com|solo\.to|taplink\.cc|linkin\.bio|tap\.bio|lnk\.bio|taap\.it)$/, label: "Pagina di link", strength: 1 },
+  { re: /(^|\.)(linktr\.ee|link\.me|beacons\.ai|beacons\.page|allmylinks\.com|heylink\.me|heyliiink\.com|lovemylink\.me|hoo\.be|bio\.site|snipfeed\.co|getmysocial\.com|solo\.to|taplink\.cc|linkin\.bio|tap\.bio|lnk\.bio|taap\.it|[a-z0-9-]+\.link)$/, label: "Pagina di link", strength: 1 },
 ];
 
 /** Che cosa c'è dietro un link: { label, strength } (3 piattaforma a pagamento, 2 Telegram, 1 pagina di link, 0 altro) o null. */
