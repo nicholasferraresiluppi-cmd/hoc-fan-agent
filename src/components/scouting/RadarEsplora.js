@@ -22,6 +22,7 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
   const [grp, setGrp] = useState("all");
   const [growing, setGrowing] = useState(false);
   const [fmtOnly, setFmtOnly] = useState(false);
+  const [itaSure, setItaSure] = useState(false);
   const [q, setQ] = useState("");
   const [shown, setShown] = useState(PAGE);
 
@@ -38,15 +39,16 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
       if (grp !== "all" && r.g !== grp) return false;
       if (growing && !(r.g4 != null && r.g4 >= 5)) return false;
       if (fmtOnly && (!r.fmt || r.fmt === "nessuno")) return false;
+      if (itaSure && r.ita === "forse") return false;
       if (s && !`${r.name} ${r.handles.join(" ")} ${r.nic} ${r.fmts.join(" ")} ${r.g}`.toLowerCase().includes(s)) return false;
       return true;
     }).sort((a, b) => (b.g4 ?? -999) - (a.g4 ?? -999) || (b.medv || 0) - (a.medv || 0));
-  }, [base, grp, growing, fmtOnly, q]);
+  }, [base, grp, growing, fmtOnly, itaSure, q]);
 
   const columns = [
     { key: "name", label: "Creator", render: (r) => (
       <span style={{ display: "flex", flexDirection: "column" }}>
-        <span style={{ fontWeight: 600 }}>{r.name}{r.n > 1 && <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 12 }}> · {r.n} account</span>}{r.ours && <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 12 }}> · già nostra</span>}</span>
+        <span style={{ fontWeight: 600 }}>{r.name}{r.n > 1 && <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 12 }}> · {r.n} account</span>}{r.ours && <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 12 }}> · già nostra</span>}{r.ita === "forse" && <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 12 }}> · forse italiana</span>}</span>
         <span style={{ fontSize: 12.5, color: CP.textMuted }}>{[r.g, r.nic].filter(Boolean).join(" · ")}</span>
       </span>) },
     { key: "link", label: "Dove porta", sort: (r) => r.link?.strength ?? (r.sig === "forte" ? 2 : -1), render: (r) => <LinkChip link={r.link} sig={r.sig} /> },
@@ -76,6 +78,7 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
         </select>
         <FilterChip label="In crescita (+5% in 4 settimane)" active={growing} onClick={() => setGrowing((x) => !x)} />
         <FilterChip label="Ha un format" active={fmtOnly} onClick={() => setFmtOnly((x) => !x)} />
+        <FilterChip label={`Solo italiane sicure (senza ${base.filter((r) => r.ita === "forse").length} «forse»)`} active={itaSure} onClick={() => setItaSure((x) => !x)} />
         <span style={{ flex: "1 1 auto" }} />
         <label htmlFor="rx-q" style={{ position: "absolute", left: -9999 }}>Cerca</label>
         <input id="rx-q" type="search" value={q} onChange={(e) => { setQ(e.target.value); setShown(PAGE); }} placeholder="Cerca nome, @ o nicchia" style={{ ...input, flex: "1 1 220px", maxWidth: 320 }} />

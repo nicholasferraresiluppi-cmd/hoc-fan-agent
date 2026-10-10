@@ -269,6 +269,7 @@ export function buildCreators(profiles, crm) {
       updatedAt: c.updatedAt || null,
       missing: ps.every((p) => p.missing),
       link: bestLink(ps),
+      ita: ps.some((p) => p.ita === "si") ? "si" : ps.some((p) => p.ita === "forse") ? "forse" : null,
       firstSeen: Math.min(...ps.map((p) => p.firstSeen || Infinity)) || null,
       reels: ps.flatMap((p) => (p.reels || []).map((r) => ({ ...r, h: p.h }))).sort((a, b) => (b.v || 0) - (a.v || 0)).slice(0, 9),
     });
