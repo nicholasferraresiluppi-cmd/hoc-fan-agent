@@ -104,6 +104,17 @@ export function appendHistory(hist, week, fol, medv) {
   return out.slice(-HISTORY_MAX);
 }
 
+/**
+ * Come applyRefresh ma solo per i profili tornati (es. il giro delle foto sulle 354 col profilo
+ * a pagamento): chi non c'è resta com'era, senza contare un "mancato".
+ */
+export function applyPartialRefresh(profiles, items, now = new Date()) {
+  const want = new Set(items.map(parseRefreshItem).filter(Boolean).map((r) => r.h));
+  const res = applyRefresh(profiles.filter((p) => want.has(p.h)), items, now);
+  const by = new Map(res.profiles.map((p) => [p.h, p]));
+  return { profiles: profiles.map((p) => by.get(p.h) || p), updated: res.updated, pics: res.profiles.filter((p) => p.pic).length };
+}
+
 /** Variazione % dei follower tra l'ultima misura e quella di `back` misure prima; null se non c'è abbastanza storia. */
 export function growthPct(hist, back = 1) {
   const pts = (hist || []).filter((p) => p[1] != null && p[1] > 0);
