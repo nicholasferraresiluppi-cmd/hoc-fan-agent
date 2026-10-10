@@ -1,6 +1,7 @@
 "use client";
 // Radar creator — pezzi condivisi tra le viste (10/10/2026). Stile: token CP (seguono il tema
 // e lo stile "Casa"), titoli in serif (--cp-sig), niente riquadri pesanti: linee sottili.
+import { useEffect, useState } from "react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 
 export const NUM = { fontVariantNumeric: "tabular-nums" };
@@ -87,3 +88,16 @@ export function BigNum({ value, label, gold }) {
 }
 
 export const STAGE_LABEL = { da_valutare: "Da valutare", interessante: "Interessante", contattata: "Contattata", trattativa: "In trattativa", firmata: "Firmata", scartata: "Scartata" };
+
+/** Telefono (<700px): alcune viste del radar hanno un disegno apposta, non la pagina da computer stretta. */
+export function useIsPhone() {
+  const [phone, setPhone] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 699px)");
+    const on = () => setPhone(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return phone;
+}

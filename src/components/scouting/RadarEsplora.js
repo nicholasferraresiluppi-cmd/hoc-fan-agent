@@ -4,7 +4,7 @@
 import { useMemo, useState } from "react";
 import { CP } from "@/lib/brand";
 import { DataTable, FilterChip } from "@/components/ds";
-import { NUM, fmtFull, input, LinkChip, Growth, Spark, STAGE_LABEL } from "./radar-ui";
+import { NUM, fmtFull, fmtN, input, btn, LinkChip, Growth, Spark, Initials, STAGE_LABEL, useIsPhone } from "./radar-ui";
 
 const views = (newCut) => [
   { id: "paid", label: "Con profilo a pagamento", test: (c) => c.sig === "forte" },
@@ -25,6 +25,8 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
   const [itaSure, setItaSure] = useState(false);
   const [q, setQ] = useState("");
   const [shown, setShown] = useState(PAGE);
+  const phone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const viewCounts = useMemo(() => Object.fromEntries(VIEWS.map((v) => [v.id, creators.filter(v.test).length])), [creators, VIEWS]);
   const base = useMemo(() => creators.filter(VIEWS.find((v) => v.id === view).test), [creators, view, VIEWS]);
@@ -59,6 +61,65 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
       <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>{r.n === 1 && <Spark hist={profilesBy[r.handles[0]]?.hist} w={64} h={20} />}<Growth v={r.g4} /></span>) },
     { key: "stage", label: "Fase", sort: (r) => Object.keys(STAGE_LABEL).indexOf(r.stage), render: (r) => <span style={{ color: r.stage === "interessante" ? CP.gold : r.stage === "scartata" ? CP.textMuted : CP.textSecondary }}>{STAGE_LABEL[r.stage]}</span> },
   ];
+
+  const activeFilters = (grp !== "all") + growing + fmtOnly + itaSure;
+  const more = rows.length > shown && (
+    <button onClick={() => setShown((x) => x + PAGE)} style={{ ...btn, alignSelf: "center" }}>Mostra altre {fmtFull(Math.min(PAGE, rows.length - shown))}</button>
+  );
+
+  if (phone) return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <label htmlFor="rx-q" style={{ position: "absolute", left: -9999 }}>Cerca</label>
+      <input id="rx-q" type="search" value={q} onChange={(e) => { setQ(e.target.value); setShown(PAGE); }} placeholder="Cerca nome, @ o nicchia" style={{ ...input, width: "100%", fontSize: 16 }} />
+      <div role="tablist" aria-label="Viste" className="rx-strip">
+        {VIEWS.map((v) => (
+          <button key={v.id} role="tab" aria-selected={view === v.id} onClick={() => { setView(v.id); setGrp("all"); setShown(PAGE); }}
+            style={{ flexShrink: 0, whiteSpace: "nowrap", borderRadius: 999, padding: "7px 13px", fontSize: 13.5, fontFamily: "inherit", cursor: "pointer", border: `1px solid ${view === v.id ? CP.gold : CP.border}`, background: view === v.id ? CP.surface : "transparent", color: view === v.id ? CP.textPrimary : CP.textSecondary }}>
+            {v.label} <span style={{ color: CP.textMuted, ...NUM }}>{fmtFull(viewCounts[v.id])}</span>
+          </button>
+        ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 13.5, color: CP.textMuted }}>{fmtFull(rows.length)} creator · le più in crescita prima</span>
+        <button onClick={() => setFiltersOpen((x) => !x)} aria-expanded={filtersOpen} style={{ ...btn, minHeight: 36, padding: "6px 14px" }}>Filtri{activeFilters ? ` · ${activeFilters}` : ""}</button>
+      </div>
+      {filtersOpen && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 14, borderRadius: 14, border: `1px solid ${CP.border}`, background: CP.surface }}>
+          <label htmlFor="rx-grp" style={{ fontSize: 13, color: CP.textMuted }}>Nicchia</label>
+          <select id="rx-grp" value={grp} onChange={(e) => { setGrp(e.target.value); setShown(PAGE); }} style={{ ...input, fontSize: 16 }}>
+            <option value="all">Tutte · {base.length}</option>
+            {groups.map(([g, n]) => <option key={g} value={g}>{g} · {n}</option>)}
+          </select>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <FilterChip label="In crescita" active={growing} onClick={() => setGrowing((x) => !x)} />
+            <FilterChip label="Ha un format" active={fmtOnly} onClick={() => setFmtOnly((x) => !x)} />
+            <FilterChip label="Solo italiane sicure" active={itaSure} onClick={() => setItaSure((x) => !x)} />
+          </div>
+        </div>
+      )}
+      {rows.length === 0 ? <p style={{ color: CP.textSecondary }}>Nessuna creator con questi filtri.</p> : (
+        <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+          {rows.slice(0, shown).map((r) => (
+            <li key={r.id} style={{ borderBottom: `1px solid ${CP.borderSoft || CP.border}` }}>
+              <button onClick={() => onOpen(r)} style={{ all: "unset", boxSizing: "border-box", width: "100%", cursor: "pointer", display: "grid", gridTemplateColumns: "40px minmax(0,1fr) auto", gap: 12, alignItems: "center", padding: "12px 0" }}>
+                <Initials name={r.name} size={40} gold={r.sig === "forte"} />
+                <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+                  <span style={{ fontSize: 15.5, fontWeight: 500, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}{r.n > 1 ? <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 12.5 }}> · {r.n} account</span> : null}</span>
+                  <span style={{ fontSize: 13, color: CP.textSecondary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[r.nic || r.g, r.fmt && r.fmt !== "nessuno" ? r.fmt : null].filter(Boolean).join(" · ")}</span>
+                  <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}><LinkChip link={r.link} sig={r.sig} />{r.stage !== "da_valutare" && <span style={{ fontSize: 12, color: r.stage === "interessante" ? CP.gold : CP.textMuted }}>{STAGE_LABEL[r.stage]}</span>}</span>
+                </span>
+                <span style={{ textAlign: "right", display: "flex", flexDirection: "column", gap: 3, ...NUM }}>
+                  <span style={{ fontSize: 15, color: CP.textPrimary }}>{fmtN(r.fol)}</span>
+                  <span style={{ fontSize: 12.5 }}><Growth v={r.g4} /></span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {more}
+    </div>
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>

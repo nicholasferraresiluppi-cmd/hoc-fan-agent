@@ -57,21 +57,25 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
       <button onClick={onBack} style={{ ...btnQuiet, alignSelf: "flex-start", padding: 0, minHeight: 0 }}>← Torna alla lista</button>
 
       <header style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: "24px 36px", borderBottom: `1px solid ${CP.border}`, paddingBottom: 30 }}>
-        <Initials name={c.name} size={96} gold={c.sig === "forte"} />
+        <span className="rs-ini"><Initials name={c.name} size={96} gold={c.sig === "forte"} /></span>
         <div style={{ flex: "1 1 520px", display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
           <span style={{ fontSize: 13, color: CP.textMuted }}>{[c.g, c.nic, c.firstSeen ? `nel radar dal ${fmtDate(c.firstSeen)}` : null].filter(Boolean).join(" · ")}</span>
           <h1 style={{ margin: 0, ...SERIF, fontSize: "clamp(36px, 5vw, 60px)", lineHeight: 1, overflowWrap: "anywhere" }}>{c.name}</h1>
           {why[0] && <p style={{ margin: 0, ...SERIF, fontStyle: "italic", fontSize: 24, lineHeight: 1.25, color: CP.textSecondary }}>{why[0]}</p>}
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className="rs-acts" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {c.handles.map((h) => <a key={h} href={igProfile(h)} target="_blank" rel="noopener noreferrer" style={btn}>Apri @{h} ↗</a>)}
+          {c.stage === "da_valutare" && <>
+            <button style={btnPrimary} disabled={busy} onClick={() => act({ action: "stage", id: c.id, stage: "interessante" }, `${c.name}: interessante.`)}>Interessante</button>
+            <button style={btnQuiet} disabled={busy} onClick={() => act({ action: "stage", id: c.id, stage: "scartata" }, `${c.name}: scartata.`)}>Scarta</button>
+          </>}
         </div>
       </header>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 52 }}>
-        <main style={{ flex: "999 1 600px", minWidth: 0, display: "flex", flexDirection: "column", gap: 40 }}>
+        <main className="rs-main" style={{ flex: "999 1 600px", minWidth: 0, display: "flex", flexDirection: "column", gap: 40 }}>
           {why.length > 0 && (
-            <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <section className="rs-why" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <H2>Perché guardarla</H2>
               <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 10, fontSize: 16 }}>
                 {why.map((w) => <li key={w} style={{ display: "grid", gridTemplateColumns: "22px minmax(0,1fr)", gap: 8 }}><span style={{ color: CP.gold }}>—</span><span>{w}</span></li>)}
@@ -79,7 +83,7 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
             </section>
           )}
 
-          <section style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <section className="rs-nums" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <H2>I numeri</H2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 20 }}>
               <Big v={fmtFull(c.fol)} l={c.n > 1 ? `follower (${c.n} account)` : "follower"} />
@@ -93,14 +97,14 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
             </div>
           </section>
 
-          <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <section className="rs-reels" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: 10 }}>
               <H2 sub={reels.length ? "Dal più visto. I video si guardano qui; i link di Instagram scadono in un paio di giorni, poi si ricaricano." : "Carica gli ultimi 12 reel per guardarli qui, anche se il profilo ha il limite d'età."}>I reel</H2>
               <button style={btn} disabled={loading} onClick={loadReels}>{loading ? "Carico i reel…" : reels.length ? "Aggiorna i reel" : "Carica i reel"}</button>
             </div>
             {reelMsg && <p style={{ margin: 0, color: CP.attn, fontSize: 14 }}>{reelMsg}</p>}
             {reels.length > 0 && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 18 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(140px, 45%), 1fr))", gap: 14 }}>
                 {reels.slice(0, 9).map((r) => {
                   const m = media[r.sc];
                   const mult = medianV && r.v ? r.v / medianV : null;
@@ -115,7 +119,7 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
                           {watching === r.sc ? "Carico il video…" : "Guarda qui"}
                         </button>
                       )}
-                      <figcaption style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13 }}>
+                      <figcaption style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: "2px 8px", fontSize: 13 }}>
                         <span style={NUM}>{fmtFull(r.v)} view{mult && mult >= 2 ? <span style={{ color: CP.gold }}> · ×{mult.toFixed(1).replace(".", ",")}</span> : null}</span>
                         <a href={igReel(r.sc)} target="_blank" rel="noopener noreferrer" style={{ color: CP.textSecondary, textDecoration: "none" }}>Apri ↗</a>
                       </figcaption>
@@ -132,7 +136,7 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
             {links.length === 0 ? <p style={{ margin: 0, color: CP.textSecondary, fontSize: 14 }}>Nessun link in bio né nella prima storia in evidenza.</p> : (
               <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
                 {links.map((l, i) => (
-                  <li key={i} style={{ display: "grid", gridTemplateColumns: "minmax(140px, 200px) minmax(0,1fr) auto", gap: 14, padding: "11px 0", borderBottom: `1px solid ${CP.borderSoft || CP.border}`, fontSize: 14, alignItems: "baseline" }}>
+                  <li key={i} style={{ display: "grid", gridTemplateColumns: "minmax(110px, 200px) minmax(0,1fr) auto", gap: 14, padding: "11px 0", borderBottom: `1px solid ${CP.borderSoft || CP.border}`, fontSize: 14, alignItems: "baseline" }}>
                     <span style={{ color: CP.textSecondary }}>{l.where}{c.n > 1 ? ` · @${l.h}` : ""}</span>
                     <span style={{ color: l.k?.strength >= 2 ? CP.gold : CP.textPrimary }}>{l.k?.label || "Link"}</span>
                     <a href={l.url} target="_blank" rel="noopener noreferrer nofollow" style={{ color: CP.textSecondary, fontSize: 13 }}>Apri ↗</a>
@@ -144,7 +148,7 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
 
           <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <H2>Da dove viene ogni dato</H2>
-            <dl style={{ margin: 0, display: "grid", gridTemplateColumns: "minmax(140px, 220px) minmax(0,1fr)", gap: "8px 18px", fontSize: 14 }}>
+            <dl style={{ margin: 0, display: "grid", gridTemplateColumns: "minmax(110px, 220px) minmax(0,1fr)", gap: "8px 18px", fontSize: 14 }}>
               <dt style={{ color: CP.textSecondary }}>Trovata</dt><dd style={{ margin: 0 }}>{main.src === "segnalata" ? `Segnalata${main.by ? ` da ${main.by}` : ""}` : main.src === "profili simili" ? "Ricerca nei profili collegati" : main.src === "parole chiave" ? "Ricerca per parole chiave" : "Prima ricerca"}{c.firstSeen ? ` · ${fmtDate(c.firstSeen)}` : ""}</dd>
               <dt style={{ color: CP.textSecondary }}>Numeri</dt><dd style={{ margin: 0 }}>Giro settimanale{main.lastSeen ? ` · ultimo ${fmtDate(main.lastSeen)}` : ""}</dd>
               <dt style={{ color: CP.textSecondary }}>Nicchia e format</dt><dd style={{ margin: 0 }}>{c.g === "Da classificare" ? "Da classificare" : "Letti da bio e ultimi post · da confermare a occhio"}</dd>
@@ -189,7 +193,7 @@ function Aside({ c, data, ps, act, busy, notes, onSelectHandle, onBack }) {
     <aside aria-label="Lavoro sulla creator" style={{ flex: "1 1 300px", minWidth: 0, display: "flex", flexDirection: "column", gap: 28 }}>
       <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <h2 style={lbl}>A che punto siamo</h2>
-        <div role="radiogroup" aria-label="Fase" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div role="radiogroup" aria-label="Fase" className="rs-stages" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {STAGES_ASIDE.map((s) => {
             const on = c.stage === s;
             return (
