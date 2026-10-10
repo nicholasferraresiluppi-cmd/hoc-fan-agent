@@ -22,7 +22,7 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 52 }}>
-      <section aria-label="Il radar in numeri" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "24px 40px", borderTop: `1px solid ${CP.border}`, borderBottom: `1px solid ${CP.border}`, padding: "26px 0" }}>
+      <section aria-label="Il radar in numeri" className="ro-nums" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "24px 40px", borderTop: `1px solid ${CP.border}`, borderBottom: `1px solid ${CP.border}`, padding: "26px 0" }}>
         <BigNum value={fmtFull(creators.length)} label="creator italiane seguite" />
         <BigNum value={fmtFull(paid)} label="con un profilo a pagamento" gold />
         <BigNum value={fmtFull(fmt)} label="con un format che si ripete" />
@@ -37,7 +37,7 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
         {today.length === 0 ? (
           <p style={{ color: CP.textSecondary, margin: 0 }}>Nessuna creator da valutare con un profilo a pagamento: le hai già guardate tutte.</p>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 36 }}>
+          <div className="ro-today" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 36 }}>
             {today.map((c, i) => {
               const why = whyLines(c, { newCut });
               return (
@@ -69,7 +69,7 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
         )}
       </section>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 56 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))", gap: 56 }}>
         <section aria-labelledby="r-muove" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <H2 id="r-muove" sub="Le crescite più forti delle ultime 4 settimane, tra chi ha un profilo a pagamento.">Chi si muove</H2>
           {moving.length === 0 ? (
@@ -77,7 +77,7 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
           ) : (
             <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {moving.map((c) => (
-                <li key={c.id} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 96px 64px", alignItems: "center", gap: 14, padding: "13px 0", borderBottom: `1px solid ${CP.borderSoft || CP.border}` }}>
+                <li key={c.id} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 72px 56px", alignItems: "center", gap: 14, padding: "13px 0", borderBottom: `1px solid ${CP.borderSoft || CP.border}` }}>
                   <span style={{ minWidth: 0 }}>
                     <button onClick={() => onOpen(c)} style={{ ...btnQuiet, padding: 0, minHeight: 0, color: CP.textPrimary, fontWeight: 500 }}>{c.name}</button>
                     <span style={{ color: CP.textMuted, fontSize: 13 }}> · {c.nic || c.g}</span>
@@ -96,7 +96,7 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
             {stages.map((s) => {
               const n = counts[s] || 0;
               return (
-                <div key={s} style={{ display: "grid", gridTemplateColumns: "130px minmax(0,1fr) 64px", alignItems: "center", gap: 12, color: n ? CP.textPrimary : CP.textMuted }}>
+                <div key={s} style={{ display: "grid", gridTemplateColumns: "110px minmax(0,1fr) 56px", alignItems: "center", gap: 12, color: n ? CP.textPrimary : CP.textMuted }}>
                   <span style={{ fontSize: 14 }}>{STAGE_LABEL[s]}</span>
                   <span style={{ height: 6, borderRadius: 3, width: n ? `${Math.max(2, (n / maxStage) * 100)}%` : 2, background: s === "da_valutare" ? alpha(CP.textPrimary, "66") : n ? CP.gold : CP.border }} />
                   <span style={{ textAlign: "right", ...NUM }}>{fmtFull(n)}</span>

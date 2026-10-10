@@ -19,8 +19,8 @@ export default function RadarContatti({ creators, onOpen }) {
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px 20px", border: `1px solid ${alpha(CP.gold, "55")}`, borderRadius: 12, padding: "14px 18px", fontSize: 14.5 }}>
         <span style={{ flex: "1 1 360px" }}>Contatti in pausa: aspettiamo il parere sull&apos;uso dei dati pubblici e il testo da mandare al primo messaggio.</span>
       </div>
-      <div style={{ overflowX: "auto" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(230px, 1fr))", gap: 24, minWidth: 980 }}>
+      <div className="rc-scroll" style={{ overflowX: "auto" }}>
+        <div className="rc-cols" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(230px, 1fr))", gap: 24, minWidth: 980 }}>
           {COLS.map((s) => (
             <section key={s} aria-label={STAGE_LABEL[s]} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <h2 style={{ margin: 0, display: "flex", justifyContent: "space-between", fontSize: 14, fontWeight: 500, borderBottom: `1px solid ${s === "interessante" ? CP.gold : CP.border}`, paddingBottom: 10 }}>

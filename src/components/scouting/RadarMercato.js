@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { CP, alpha } from "@/lib/brand";
 import { marketByGroup } from "@/lib/scouting-core";
 import { NICHE_INDEX, REEL_RULES, REEL_TYPES, COMPETITOR, MARKET_ASOF, CAPTION_STUDY } from "@/lib/scouting-market";
-import { SERIF, NUM, fmtFull, H2, igProfile } from "./radar-ui";
+import { SERIF, NUM, fmtFull, H2, igProfile, useIsPhone } from "./radar-ui";
 
 const W = 720, H = 360, X0 = 40, X1 = 700, Y0 = 20, Y1 = 330;
 
@@ -17,12 +17,28 @@ export default function RadarMercato({ creators }) {
   const lx = (n) => X0 + ((Math.log(n) - Math.log(nMin * 0.8)) / (Math.log(nMax * 1.1) - Math.log(nMin * 0.8))) * (X1 - X0);
   const ly = (i) => Y1 - ((i - 0.6) / 0.9) * (Y1 - Y0);
   const generic = groups.find((g) => g.g === "Estetica generica");
+  const phone = useIsPhone();
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 52 }}>
       <section aria-labelledby="rm-spazio" style={{ display: "flex", flexWrap: "wrap", gap: "32px 52px", alignItems: "flex-start" }}>
         <div style={{ flex: "999 1 560px", minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }}>
-          <H2 id="rm-spazio" sub="Più a sinistra: meno concorrenti. Più in alto: più view a parità di follower. Il cerchio è grande quante OnlyFanser ha la nicchia.">Dove c&apos;è spazio</H2>
+          <H2 id="rm-spazio" sub={phone ? "Dalla nicchia che rende di più a parità di follower. Sopra ×1 = sopra la media del mercato." : "Più a sinistra: meno concorrenti. Più in alto: più view a parità di follower. Il cerchio è grande quante OnlyFanser ha la nicchia."}>Dove c&apos;è spazio</H2>
+          {phone ? (
+            <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {[...mapped].sort((a, b) => NICHE_INDEX[b.g] - NICHE_INDEX[a.g] || a.n - b.n).map((g) => {
+                const idx = NICHE_INDEX[g.g], good = idx > 1;
+                return (
+                  <li key={g.g} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "2px 12px", padding: "12px 0", borderBottom: `1px solid ${CP.borderSoft || CP.border}` }}>
+                    <span style={{ fontSize: 15.5, color: good ? CP.textPrimary : CP.textSecondary }}>{g.g}</span>
+                    <span style={{ ...SERIF, fontSize: 24, lineHeight: 1, color: good ? CP.gold : CP.textSecondary, ...NUM }}>×{String(idx).replace(".", ",")}</span>
+                    <span style={{ fontSize: 12.5, color: CP.textMuted }}>{fmtFull(g.n)} creator · {fmtFull(g.paid)} con profilo a pagamento</span>
+                    <span style={{ fontSize: 12.5, color: CP.textMuted, textAlign: "right" }}>view a parità di follower</span>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : (
           <svg role="img" aria-label="Mappa delle nicchie per concorrenza e resa delle view" width="100%" viewBox={`0 0 ${W} ${H + 24}`}>
             <rect x={X0} y={Y0} width={lx(140) - X0} height={ly(1) - Y0} fill={alpha(CP.gold, "10")} />
             <line x1={X0} y1={ly(1)} x2={X1} y2={ly(1)} stroke={CP.borderStrong || CP.border} strokeDasharray="3 5" />
@@ -49,8 +65,9 @@ export default function RadarMercato({ creators }) {
               );
             })}
           </svg>
+          )}
         </div>
-        <div style={{ flex: "1 1 320px", minWidth: 0, display: "flex", flexDirection: "column", gap: 14, paddingTop: 48 }}>
+        <div style={{ flex: "1 1 320px", minWidth: 0, display: "flex", flexDirection: "column", gap: 14, paddingTop: phone ? 0 : 48 }}>
           {generic && <p style={{ margin: 0, ...SERIF, fontSize: 25, lineHeight: 1.25 }}>{Math.round((generic.n / total) * 100)}% del mercato fa la ragazza estetica, e rende sotto la media.</p>}
           <p style={{ margin: 0, color: CP.textSecondary, fontSize: 15 }}>Comicità e fetish fanno il 44% di view in più a parità di follower, con un decimo delle concorrenti. Nei mestieri la resa media è bassa, ma un personaggio fisso fa la differenza.</p>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, borderTop: `1px solid ${CP.borderSoft || CP.border}` }}>
@@ -83,6 +100,17 @@ export default function RadarMercato({ creators }) {
 
       <section aria-labelledby="rm-tipi" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <H2 id="rm-tipi" sub="201 reel fuori scala di 127 creator. In oro i tipi che insieme esplodono, si fanno da sola in casa e portano verso OnlyFans.">I reel che esplodono</H2>
+        {phone ? (
+          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            {REEL_TYPES.map((t) => (
+              <li key={t.t} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "4px 12px", padding: "12px 0", borderBottom: `1px solid ${CP.borderSoft || CP.border}`, color: t.dim ? CP.textSecondary : CP.textPrimary }}>
+                <span style={{ fontSize: 15, color: t.top ? CP.gold : undefined }}>{t.t}</span>
+                <span style={{ ...NUM, fontSize: 15 }}>×{String(t.x).replace(".", ",")}</span>
+                <span style={{ gridColumn: "1 / 3", fontSize: 12.5, color: CP.textMuted }}>{t.solo}% da sola in casa · {t.of}% porta a OnlyFans</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", minWidth: 680, borderCollapse: "collapse", fontSize: 14.5 }}>
             <thead><tr style={{ textAlign: "left", color: CP.textMuted, fontSize: 12.5 }}>
@@ -103,6 +131,7 @@ export default function RadarMercato({ creators }) {
             </tbody>
           </table>
         </div>
+        )}
         <p style={{ margin: 0, fontSize: 13, color: CP.textMuted }}>Descrittivo: dice cosa c&apos;è nei reel che esplodono, non che un tipo esploda più spesso. Studio del {MARKET_ASOF}.</p>
       </section>
 
