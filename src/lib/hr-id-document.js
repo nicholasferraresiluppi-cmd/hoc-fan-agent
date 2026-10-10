@@ -93,12 +93,21 @@ export async function readIdDocument(person, { actor } = {}) {
   content.push({ type: "text", text: "Queste immagini sono fronte e/o retro del documento d'identità di un collaboratore, caricate da lui per il suo contratto. Trascrivi i dati del documento nello schema. Scrivi solo ciò che leggi: se un dato non si legge lascia la stringa vuota, non dedurlo." });
 
   const client = new Anthropic();
-  const res = await client.messages.create({
-    model: MODEL(),
-    max_tokens: 2000,
-    output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA } },
-    messages: [{ role: "user", content }],
-  });
+  let res;
+  try {
+    res = await client.messages.create({
+      model: MODEL(),
+      max_tokens: 2000,
+      output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA } },
+      messages: [{ role: "user", content }],
+    });
+  } catch (e) {
+    // messaggi in italiano per chi prepara il contratto (il testo grezzo dell'API non dice cosa fare)
+    const msg = String(e?.message || "");
+    if (/credit balance/i.test(msg)) return { ok: false, files, error: "Il credito dell'AI (account Anthropic) è esaurito: va ricaricato. Nel frattempo inserisci i dati del documento a mano qui sotto." };
+    if (e?.status === 429 || e?.status >= 500) return { ok: false, files, error: "L'AI non risponde in questo momento: riprova tra poco o inserisci i dati a mano." };
+    return { ok: false, files, error: `Lettura non riuscita (${msg.slice(0, 120)}): inserisci i dati a mano.` };
+  }
   if (res.stop_reason === "refusal") return { ok: false, files, error: "L'AI non ha letto il documento: inserisci i dati a mano." };
   const text = (res.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
   let data;
