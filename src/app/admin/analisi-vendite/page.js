@@ -6,7 +6,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import { Download, RefreshCw } from "lucide-react";
+import { Download, RefreshCw, Sparkles } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card } from "@/components/ds";
 import PeriodPicker from "@/components/PeriodPicker";
@@ -674,11 +674,16 @@ function CreatorDetail({ d, onBack, onDati }) {
       </div>
       <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "baseline" }}>
         <Metric label="Revenue netta" value={money(m.revenue)} delta={deltaText(m.revenue_delta)} deltaLabel={`dal ${dshort(d.previous.from)} al ${dshort(d.previous.to)} (${money(m.revenue_prev)})`} />
+        {m.revenue_base != null && (
+          <Metric label="Rispetto al suo normale" value={deltaText(m.revenue_base_delta) || "—"} deltaLabel=""
+            note={`livello normale ${moneyShort(m.revenue_base)}: mediana delle 8 settimane prima`} />
+        )}
       </div>
       <section style={{ ...card, padding: 16, display: "grid", gap: 8 }}>
         <div style={{ fontSize: 12, color: CP.textMuted }}>Perché</div>
         {p.reasons.map((r, i) => <div key={r.kind + i} style={{ fontSize: i ? 14 : 15, color: i ? CP.textSecondary : CP.textPrimary, lineHeight: 1.5 }}>{r.text}</div>)}
       </section>
+      {p.status !== "pochi-dati" && <ChatPerche ids={p.ids} range={d.range} person={p} />}
       <div style={{ ...card, padding: 16 }}>
         <BarsChart label="Revenue al giorno" valueKey="revenue" fmt={moneyShort}
           points={p.daily.map((x) => ({ key: x.day, label: dshort(x.day), short: `${x.day.slice(8, 10)}/${x.day.slice(5, 7)}`, revenue: x.revenue }))} />
@@ -781,6 +786,156 @@ function SkeletonCards() {
         </div>
       ))}
       <style>{"@keyframes av-pulse{0%,100%{opacity:.55}50%{opacity:1}}"}</style>
+    </div>
+  );
+}
+
+/* ───────── Perché, nelle chat (10/10/2026): l'AI legge le chat dei fan che hanno spostato la revenue ───────── */
+
+const TIPO = { metodo: "Metodo di chi scrive", contenuto: "Contenuto della creator", prezzo: "Prezzo", fan: "Il fan", traffico: "Traffico", altro: "Altro" };
+const CHI = { "sales manager": "Sales manager", operatore: "Operatori", creator: "Creator" };
+const STEPS = [[0, "Scelgo i fan e faccio i conti"], [6, "Prendo le loro chat"], [14, "L'AI sta leggendo le chat: di solito 30-60 secondi"]];
+
+function ChatPerche({ ids, range, person }) {
+  const q = `creators=${ids.join(",")}&from=${range.from}&to=${range.to}`;
+  const cached = useSWR(`/api/admin/analisi-vendite/perche?${q}`, fetcher, { revalidateOnFocus: false });
+  const [run, setRun] = useState({ busy: false, started: 0, error: null, result: null });
+  const [tick, setTick] = useState(0);
+  useEffect(() => { setRun({ busy: false, started: 0, error: null, result: null }); }, [q]);
+  useEffect(() => {
+    if (!run.busy) return undefined;
+    const t = window.setInterval(() => setTick((n) => n + 1), 1000);
+    return () => window.clearInterval(t);
+  }, [run.busy]);
+
+  const start = async (refresh = false) => {
+    setRun({ busy: true, started: Date.now(), error: null, result: null });
+    try {
+      for (let i = 0; i < 40; i++) {
+        const r = await fetch("/api/admin/analisi-vendite/perche", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ creators: ids, from: range.from, to: range.to, refresh: refresh && i === 0 }) });
+        const j = await r.json().catch(() => ({}));
+        if (r.status === 202) { await new Promise((res) => setTimeout(res, 5000)); continue; } // un collega la sta già facendo
+        if (!r.ok) throw new Error(j.error || "Lettura non riuscita");
+        setRun({ busy: false, started: 0, error: null, result: j.result });
+        cached.mutate({ result: j.result }, false);
+        return;
+      }
+      throw new Error("Ci sta mettendo troppo: riprova tra un minuto");
+    } catch (e) {
+      setRun({ busy: false, started: 0, error: e.message, result: null });
+    }
+  };
+
+  const res = run.result || cached.data?.result;
+  const down = (person.metrics.revenue_diff || 0) < 0;
+  const secs = run.busy ? Math.round((Date.now() - run.started) / 1000) : 0;
+  const step = [...STEPS].reverse().find(([t]) => secs >= t)?.[1];
+  void tick;
+
+  return (
+    <section style={{ ...card, padding: 18, display: "grid", gap: 14, borderColor: res ? CP.border : CP.accentDim }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>
+          <Sparkles size={16} color={CP.accentSoftText} /> Perché, nelle chat
+        </div>
+        {res?.status === "ok" && (
+          <span style={{ fontSize: 12, color: CP.textMuted }}>
+            letto dall&apos;AI su {res.read.fans} fan e {int(res.read.messages)} messaggi · {dtLocal(res.computed_at)}
+            {" · "}<button onClick={() => start(true)} disabled={run.busy} style={{ ...linkBtn, fontSize: 12 }}>rileggi</button>
+          </span>
+        )}
+      </div>
+
+      {!res && !run.busy && (
+        <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ fontSize: 14, color: CP.textSecondary, lineHeight: 1.5, flex: "1 1 320px" }}>
+            I numeri dicono cosa è cambiato. Il perché sta nelle conversazioni: l&apos;AI legge le chat dei {down ? "fan che hanno smesso di spendere" : "fan che hanno speso di più"} e ti dice cosa è successo, con le frasi vere.
+          </div>
+          <button onClick={() => start(false)} disabled={cached.isLoading}
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, border: "none", background: CP.accent, color: CP.accentInk, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: FONTS.body }}>
+            <Sparkles size={15} /> Leggi le chat
+          </button>
+        </div>
+      )}
+
+      {run.busy && (
+        <div style={{ display: "grid", gap: 8 }}>
+          <div style={{ fontSize: 14, color: CP.textSecondary }}>{step}…</div>
+          <div style={{ height: 4, borderRadius: 999, background: CP.surfaceAlt, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${Math.min(95, (secs / 60) * 100)}%`, background: CP.accent, transition: "width 1s linear" }} />
+          </div>
+        </div>
+      )}
+      {run.error && <Notice danger>{run.error}</Notice>}
+
+      {res?.status === "nothing" && <div style={{ fontSize: 14, color: CP.textSecondary }}>{res.message}</div>}
+      {res?.status === "ok" && <PercheResult r={res} />}
+    </section>
+  );
+}
+
+function PercheResult({ r }) {
+  const a = r.analysis;
+  const st = r.stats || {};
+  const facts = [
+    r.dir === "down" && st.base_fans ? `${int(st.stopped)} fan su ${int(st.base_fans)} che spendevano almeno $50 hanno smesso di comprare` : null,
+    r.dir === "up" && st.fans ? `${int(st.fans)} fan hanno più che raddoppiato la spesa (${moneyShort(st.spent_prev)} → ${moneyShort(st.spent_cur)})` : null,
+    r.dir === "down" && st.fans ? `${int(st.fan_silent)} di loro non ci hanno più scritto` : null,
+    r.dir === "down" && st.fans ? `a ${int(st.us_silent)} non abbiamo scritto niente noi` : null,
+    ...(r.blasts || []).slice(0, 2).map((b) => `“${b.t.length > 40 ? `${b.t.slice(0, 40)}…` : b.t}” mandato uno per uno a ${int(b.fans)} fan in ${b.minutes || 1} minuti`),
+  ].filter(Boolean);
+  return (
+    <div style={{ display: "grid", gap: 16 }}>
+      {facts.length > 0 && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {facts.map((f) => <span key={f} style={{ fontSize: 12, color: CP.textSecondary, background: CP.surfaceAlt, borderRadius: 999, padding: "5px 10px" }}>{f}</span>)}
+        </div>
+      )}
+      <div style={{ fontSize: 17, lineHeight: 1.5, color: CP.textPrimary, maxWidth: 820 }}>{a.sintesi}</div>
+
+      <div style={{ display: "grid", gap: 12 }}>
+        {a.cause.map((c, i) => (
+          <div key={i} style={{ border: `1px solid ${CP.borderSoft}`, borderRadius: 12, padding: 14, display: "grid", gap: 10 }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, color: CP.textMuted, fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>
+              <span style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>{c.titolo}</span>
+              <span style={{ fontSize: 11, color: CP.accentSoftText, background: CP.accentSoft, borderRadius: 999, padding: "2px 8px" }}>{TIPO[c.tipo] || c.tipo}</span>
+              {c.fan_letti > 0 && <span style={{ fontSize: 12, color: CP.textMuted }}>vista in {c.fan_letti} fan su {r.read.fans} letti</span>}
+            </div>
+            <div style={{ fontSize: 14, color: CP.textSecondary, lineHeight: 1.55 }}>{c.spiegazione}</div>
+            {c.esempi.length > 0 && (
+              <div style={{ display: "grid", gap: 6 }}>
+                {c.esempi.map((e, j) => (
+                  <div key={j} style={{ display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 11, color: CP.textMuted, width: 200, flex: "0 0 auto", paddingTop: 6 }}>
+                      {e.chi === "noi" ? "Noi" : "Il fan"} · {e.fan}{e.spent_prev ? ` (aveva speso ${moneyShort(e.spent_prev)})` : ""}
+                    </span>
+                    <span style={{ fontSize: 14, color: CP.textPrimary, background: e.chi === "noi" ? CP.accentSoft : CP.surfaceAlt, borderRadius: e.chi === "noi" ? "12px 12px 4px 12px" : "12px 12px 12px 4px", padding: "6px 11px", maxWidth: 560 }}>
+                      {e.citazione}{e.ppv ? <span style={{ color: CP.textMuted }}> · PPV ${e.ppv}</span> : null}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {a.azioni.length > 0 && (
+        <div style={{ display: "grid", gap: 8 }}>
+          <div style={{ fontSize: 13, color: CP.textMuted }}>Cosa fare questa settimana</div>
+          {a.azioni.map((x, i) => (
+            <div key={i} style={{ display: "flex", gap: 10, fontSize: 14, lineHeight: 1.5 }}>
+              <span style={{ minWidth: 110, color: CP.textMuted }}>{CHI[x.chi] || x.chi}</span>
+              <span style={{ color: CP.textPrimary }}>{x.cosa}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ fontSize: 12, color: CP.textMuted, lineHeight: 1.5 }}>
+        {a.limiti} I conti in alto sono del codice; la lettura è dell&apos;AI. Le frasi citate sono state controllate parola per parola nelle chat
+        ({a.citazioni.verificate} vere{a.citazioni.scartate ? `, ${a.citazioni.scartate} scartate perché non trovate` : ""}).
+      </div>
     </div>
   );
 }

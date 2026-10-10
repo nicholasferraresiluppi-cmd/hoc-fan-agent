@@ -1,6 +1,6 @@
 // node tests/analisi-vendite-diagnosi.mjs
 import assert from "node:assert/strict";
-import { personOf, marketOf, groupPersons, metricsOf, statusOf, reasonsOf, buildDiagnosi, summaryOf } from "../src/lib/analisi-vendite-diagnosi.js";
+import { personOf, marketOf, groupPersons, metricsOf, statusOf, reasonsOf, buildDiagnosi, summaryOf, oddPrevOf } from "../src/lib/analisi-vendite-diagnosi.js";
 
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -66,4 +66,23 @@ ok(out.find((p) => p.name === "Cresce").status === "in-crescita", "crescita rico
 const s = summaryOf(out);
 ok(s.down === 2 && s.up === 1 && s.few === 1 && s.revenue === 15050, "riassunto");
 
+
+// livello normale (10/10): il periodo prima era un picco → tornare al normale non è un calo
+const peakT = { ...aleT, revenue: 10000, revenue_prev: 14000, revenue_base: 10200, base_missing: 0 };
+const peak = metricsOf(peakT);
+ok(oddPrevOf(peak) === "peak", "periodo prima +37% sul normale = picco");
+ok(statusOf(peak) === "stabile", "−29% sul periodo prima ma −2% sul normale = stabile");
+const pr = reasonsOf(peak);
+ok(pr[0].kind === "peak" && pr[0].text.includes("sopra il solito") && pr[0].text.includes("in linea con il normale"), "il picco si dice per primo — " + pr[0].text);
+// caso reale Alessandra 22/8-4/9: periodo prima solo +7% sul normale → NON è un picco, il calo resta
+const realAle = metricsOf({ ...aleT, revenue: 17993, revenue_prev: 27368, revenue_base: 25570, base_missing: 0 });
+ok(oddPrevOf(realAle) === null && statusOf(realAle) === "in-calo", "Alessandra: Ferragosto non era un picco, il calo è vero");
+// sotto il picco ma ancora molto sotto il normale → in calo, con la frase
+const deep = metricsOf({ ...peakT, revenue: 7000 });
+ok(statusOf(deep) === "in-calo" && reasonsOf(deep)[0].text.includes("−31% rispetto al normale"), "dopo un picco ma sotto il normale = in calo");
+// buco nel periodo prima → la ripresa non è una crescita
+const dip = metricsOf({ ...aleT, revenue: 10000, revenue_prev: 7000, revenue_base: 9800, base_missing: 0 });
+ok(oddPrevOf(dip) === "dip" && statusOf(dip) === "stabile" && reasonsOf(dip)[0].kind === "dip", "ripresa da un buco = stabile");
+// senza 8 settimane di storia (o con un account nuovo) il livello normale non c'è
+ok(metricsOf({ ...peakT, base_missing: 1 }).revenue_base === null && oddPrevOf(metricsOf({ ...peakT, base_missing: 1 })) === null, "senza storia niente livello normale");
 console.log(`analisi-vendite-diagnosi: ${n} asserzioni ok`);
