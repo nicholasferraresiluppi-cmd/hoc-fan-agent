@@ -1,0 +1,45 @@
+# Giro per persona + prova del compito (lib/qualita, scripts/qualita/giro.mjs).
+# Ogni lunedì alle 06:00 UTC (08:00 a Roma), o a mano da Actions → "Giro qualità" → Run workflow.
+# Il robot entra con l'account QA, prova l'app con i permessi di ogni membro e consegna il rapporto
+# a /admin/qualita (+ alert «Giro per persona»). Segreto richiesto: CLERK_PROD_SECRET.
+name: Giro qualità
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Solo le persone la cui chiave inizia così (vuoto = tutte)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  giro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Robot (solo puppeteer-core, in una cartella a parte: niente install del progetto)
+        run: |
+          mkdir -p "$RUNNER_TEMP/robot"
+          cp scripts/qualita/giro.mjs "$RUNNER_TEMP/robot/"
+          npm install --prefix "$RUNNER_TEMP/robot" --no-audit --no-fund puppeteer-core@23
+      - name: Giro
+        env:
+          CLERK_PROD_SECRET: ${{ secrets.CLERK_PROD_SECRET }}
+          CHROME_PATH: /usr/bin/google-chrome
+        run: node "$RUNNER_TEMP/robot/giro.mjs" --out=giro-qualita.json ${{ github.event.inputs.only && format('--only={0}', github.event.inputs.only) || '' }}
+      - name: Rapporto completo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: giro-qualita
+          path: giro-qualita.json
+          retention-days: 30

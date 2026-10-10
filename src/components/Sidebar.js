@@ -162,6 +162,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/loop",                     label: "Loop azione→esito", icon: RefreshCw },
       { href: "/admin/citta",                    label: "La città",        icon: Building2 },
       { href: "/admin/sede",                     label: "La Sede",         icon: Building2 },
+      { href: "/admin/qualita",                  label: "Controllo qualità", icon: ShieldCheck },
       { href: "/admin/roadmap",                  label: "Roadmap",         icon: Signpost },
     ],
   },

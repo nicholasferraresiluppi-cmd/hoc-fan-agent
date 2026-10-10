@@ -5,7 +5,7 @@
  * ufficio senza controllore sia credibile (non vuoto, non vecchio, non crollato,
  * non in contraddizione con lo studio su cui si basa il coaching). Scrive l'esito
  * per ufficio in `sede:ctrl:{id}` (letto dalla Sede) e apre/chiude gli alert con
- * un giro PARZIALE del motore alert (solo il check "uscite-sospette": gli altri
+ * un giro PARZIALE del motore alert (check "uscite-sospette" + i controlli qualità "access-coherence" e "qa-giro", 10/10/2026: gli altri
  * alert non vengono toccati).
  *
  * Perché un cron suo e non un passo del centralino: i lavori notturni partono a
@@ -65,7 +65,7 @@ async function handle(request) {
   }
   const ko = Object.values(esiti).filter((x) => !x.ok).length;
   await kv.set("cron:heartbeat:controllori", { at: now, via: viaCron ? "cron" : "session", result: `${CONTROLLI.length - ko} uscite su ${CONTROLLI.length} credibili` }, { ex: 40 * 86400 }).catch(() => {});
-  const alerts = await runChecks({ trigger: "controllori", only: ["uscite-sospette"] }).catch((e) => ({ error: String(e?.message || e) }));
+  const alerts = await runChecks({ trigger: "controllori", only: ["uscite-sospette", "access-coherence", "qa-giro"] }).catch((e) => ({ error: String(e?.message || e) }));
   return Response.json({ esiti, alerts });
 }
 

@@ -492,6 +492,62 @@ const CHECKS = [
       }];
     },
   },
+  {
+    // Controllo qualità 1 (10/10/2026, lib/qualita): ruolo, creator e vista di un membro si
+    // contraddicono. Caso d'origine: Membri diceva «nessun ruolo» a un Sales Manager vero.
+    id: "access-coherence",
+    severity: "warning",
+    label: "Accessi incoerenti",
+    async run() {
+      const { coherenceReport } = await import("@/lib/qualita");
+      const bad = await coherenceReport();
+      return bad.flatMap((m) => m.issues.map((x) => ({
+        fingerprint: `access:${m.userId}:${x.code}`,
+        title: `${m.name}: accessi da sistemare`,
+        detail: x.text,
+        value: x.code,
+        cta: { href: "/admin/ruoli", label: "Apri Membri e ruoli" },
+      })));
+    },
+  },
+  {
+    // Controlli qualità 2 e 3 (10/10/2026): il robot del giro per persona ha trovato pagine rosse o
+    // compiti non riusciti — oppure non gira da più di una settimana (assenza di rapporto ≠ tutto ok).
+    id: "qa-giro",
+    severity: "warning",
+    label: "Giro per persona",
+    async run() {
+      const { getGiroReport, GIRO_STALE_DAYS } = await import("@/lib/qualita");
+      const { last } = await getGiroReport();
+      if (!last || Date.now() - last.at > GIRO_STALE_DAYS * 86400000) {
+        return [{
+          fingerprint: "qa-giro-stale",
+          title: "Il giro per persona non gira",
+          detail: last ? `Ultimo rapporto del robot il ${new Date(last.at).toLocaleDateString("it-IT", { timeZone: "Europe/Rome" })}: oltre ${GIRO_STALE_DAYS} giorni fa.` : "Il robot non ha mai consegnato un rapporto.",
+          value: last ? `${daysAgo(last.at)}g` : "mai",
+          cta: { href: "/admin/qualita", label: "Apri Controllo qualità" },
+        }];
+      }
+      return last.personas.flatMap((p) => {
+        const fails = p.pages.filter((g) => g.status === "fail");
+        const tasks = p.tasks.filter((t) => !t.ok);
+        if (!fails.length && !tasks.length && !p.error) return [];
+        const parts = [
+          p.error ? `Il robot non è riuscito a entrare con i suoi permessi: ${p.error}` : null,
+          tasks.length ? `Compiti non riusciti: ${tasks.map((t) => t.title).join(" · ")}` : null,
+          fails.length ? `Pagine in errore: ${fails.map((g) => g.label || g.href).join(", ")}` : null,
+        ].filter(Boolean);
+        return [{
+          fingerprint: `qa-giro:${p.key}`,
+          severity: tasks.length || p.error ? "critical" : "warning",
+          title: `${p.label}: ${tasks.length ? `${tasks.length} ${tasks.length === 1 ? "compito non riesce" : "compiti non riescono"}` : `${fails.length} ${fails.length === 1 ? "pagina in errore" : "pagine in errore"}`}`,
+          detail: parts.join(" — "),
+          value: String(tasks.length + fails.length),
+          cta: { href: "/admin/qualita", label: "Apri Controllo qualità" },
+        }];
+      });
+    },
+  },
 ];
 
 /* ------------------------------------------------------------------ */
