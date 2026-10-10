@@ -137,15 +137,18 @@ function FanCard({ f, st, onMark }) {
       {f.perche && <div style={{ fontSize: 14, color: CP.textPrimary, lineHeight: 1.5 }}><span style={{ color: CP.textMuted }}>Perché si è fermato: </span>{f.perche}</div>}
 
       {f.scrivere === "no" ? (
-        <div style={{ fontSize: 14, color: CP.textSecondary, background: CP.surfaceAlt, borderRadius: 10, padding: "10px 12px" }}>
-          Meglio non scrivere adesso{f.motivo_no ? `: ${f.motivo_no}` : "."}
+        <div style={{ fontSize: 14, color: CP.textSecondary, borderLeft: `2px solid ${CP.border}`, padding: "2px 0 2px 12px", lineHeight: 1.5 }}>
+          <span style={{ color: CP.textPrimary }}>Meglio non scrivere adesso</span>{f.motivo_no ? `: ${f.motivo_no}` : "."}
         </div>
       ) : f.messaggio ? (
-        <div style={{ display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap" }}>
-          <div style={{ flex: "1 1 360px", fontSize: 15, color: CP.textPrimary, background: CP.accentSoft, borderRadius: "14px 14px 4px 14px", padding: "10px 14px", lineHeight: 1.45, userSelect: "text" }}>
+        <div style={{ display: "grid", gap: 6 }}>
+          <div style={{ fontSize: 12, color: CP.textMuted }}>Bozza da mandare (rileggila e falla tua)</div>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 360px", fontSize: 15, color: CP.textPrimary, background: CP.accentSoft, border: `1px solid ${CP.accentDim}`, borderRadius: "14px 14px 4px 14px", padding: "10px 14px", lineHeight: 1.45, userSelect: "text" }}>
             {f.messaggio}
           </div>
           <button onClick={copy} style={btn(false)}>{copied ? <Check size={14} /> : <Copy size={14} />}{copied ? "Copiata" : "Copia"}</button>
+          </div>
         </div>
       ) : (
         <div style={{ fontSize: 13, color: CP.textMuted }}>{f.scartata ? `Nessuna bozza (${f.scartata}): scrivi tu, partendo da una cosa che ha detto.` : "Nessuna bozza."}</div>

@@ -31,6 +31,8 @@ Bug ricorrenti, tutti riscontrati su `/leaderboard/operational`.
 - [ ] **Differenza visiva tra ambito pubblico e admin-only** (badge "admin only", colore diverso, sezione separata)
 - [ ] **Health bar e summary card non sono sotto un fold da scrollare**
 - [ ] **Drill-down sempre raggiungibile**: ogni nome operatore in tabella è cliccabile e va al drill-down
+- [ ] **Verificata nei 4 stili, non in uno**: stile vecchio scuro e chiaro, stile "Casa" notte e chiaro (`<html data-style="v3">` + `data-theme`). Nello stile Casa `CP.surface`/`surfaceAlt` sono velature semitrasparenti: tutto ciò che galleggia sopra altro contenuto (popover, menu, tendine, fogli dal basso, modali) usa **`CP.panel`**. Controllo automatico: `node scripts/check-overlay-bg.mjs`
+- [ ] **Componenti che si aprono provati APERTI** in ogni stile, sopra contenuto vero (non su pagina vuota), e su schermo stretto
 
 ## 3. Stati: loading, empty, error
 
@@ -126,6 +128,7 @@ Vedi `tests/smoke-leaderboard.mjs` per dettagli.
 
 | Data | Cosa | Da quale bug |
 |------|------|--------------|
+| 2026-10-10 | Sezione 2 (4 stili + pannelli pieni, `check-overlay-bg.mjs`) | Calendario di Analisi vendite trasparente nello stile Casa: verificato solo nello stile vecchio chiaro. Stesso difetto trovato nel menu ⋮ della classifica operativa e nella tendina paesi del modulo HR |
 | 2026-05-20 | Sezione 1 (filtri/count) | "Tutte" senza count + counts pill sbagliati al filtro ITA |
 | 2026-05-20 | Sezione 2 (posizionamento) | Top 10 da cambiare in fondo alla pagina |
 | 2026-05-20 | Sezione 4 (stima ~ vs trattino) | `~12.7%` confuso con `-12.7%` |

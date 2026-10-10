@@ -238,7 +238,7 @@ export function ComuneInput({ id, value, onChange, disabled, placeholder = "Scri
         </button>
       )}
       {hits.length > 0 && (
-        <div role="listbox" style={{ position: "absolute", zIndex: 5, left: 0, right: 0, top: "100%", marginTop: 4, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, overflow: "hidden", boxShadow: "0 8px 24px rgba(0,0,0,.18)" }}>
+        <div role="listbox" style={{ position: "absolute", zIndex: 5, left: 0, right: 0, top: "100%", marginTop: 4, background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 8, overflow: "hidden", boxShadow: "0 8px 24px rgba(0,0,0,.18)" }}>
           {hits.map((c) => (
             <button key={c.code} type="button" role="option" onClick={() => { onChange(c); setOpen(false); setQ(""); }}
               style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "9px 12px", background: "transparent", border: "none", borderBottom: `1px solid ${CP.border}`, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, cursor: "pointer", textAlign: "left" }}>

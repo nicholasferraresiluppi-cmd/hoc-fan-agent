@@ -910,7 +910,11 @@ function PercheResult({ r }) {
                     <span style={{ fontSize: 11, color: CP.textMuted, width: 240, flex: "0 0 auto", paddingTop: 6 }}>
                       {e.chi === "noi" ? "Noi a" : "Il fan"} {e.username ? `@${e.username}` : e.fan}{e.spent_prev ? ` (aveva speso ${moneyShort(e.spent_prev)})` : ""}
                     </span>
-                    <span style={{ fontSize: 14, color: CP.textPrimary, background: e.chi === "noi" ? CP.accentSoft : CP.surfaceAlt, borderRadius: e.chi === "noi" ? "12px 12px 4px 12px" : "12px 12px 12px 4px", padding: "6px 11px", maxWidth: 560 }}>
+                    <span style={{ fontSize: 14, color: CP.textPrimary, maxWidth: 560, padding: "6px 11px",
+                      // chi parla si legge dalla FORMA, non solo dal colore: nello stile Casa i due fondi sono quasi uguali
+                      ...(e.chi === "noi"
+                        ? { background: CP.accentSoft, border: `1px solid ${CP.accentDim}`, borderRadius: "12px 12px 4px 12px" }
+                        : { background: "transparent", border: `1px dashed ${CP.border}`, borderRadius: "12px 12px 12px 4px" }) }}>
                       {e.citazione}{e.ppv ? <span style={{ color: CP.textMuted }}> · PPV ${e.ppv}</span> : null}
                     </span>
                   </div>

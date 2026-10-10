@@ -4,6 +4,10 @@
  * e apre un calendario a due mesi con i periodi pronti a lato. Primo clic = inizio, secondo = fine
  * (in qualsiasi ordine), anteprima al passaggio del mouse, "Applica" conferma.
  * Su schermo stretto diventa un foglio dal basso con un mese solo.
+ *
+ * Fondo: CP.panel (pieno in tutti gli stili). CP.surface nello stile "Casa" è una velatura
+ * semitrasparente, giusta per le schede sulla pagina ma non per un pannello che galleggia sopra
+ * altro contenuto (10/10: il calendario si leggeva in trasparenza sopra la scheda creator).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
@@ -99,12 +103,12 @@ export default function PeriodPicker({ value, onChange, max, maxDays = 400, comp
           {narrow && <div onClick={close} style={{ position: "fixed", inset: 0, background: CP.scrim, zIndex: 60 }} />}
           <div role="dialog" aria-label="Scegli il periodo"
             style={narrow
-              ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 61, background: CP.surface, borderTop: `1px solid ${CP.border}`, borderRadius: "16px 16px 0 0", padding: "16px 16px 20px", maxHeight: "88vh", overflowY: "auto", display: "grid", gap: 14 }
-              : { position: "absolute", top: "calc(100% + 8px)", left: 0, zIndex: 60, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,.35)", display: "grid", gridTemplateColumns: "170px auto", overflow: "hidden" }}>
+              ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 61, background: CP.panel, borderTop: `1px solid ${CP.border}`, borderRadius: "16px 16px 0 0", padding: "16px 16px 20px", maxHeight: "88vh", overflowY: "auto", display: "grid", gap: 14 }
+              : { position: "absolute", top: "calc(100% + 8px)", left: 0, zIndex: 60, background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,.35)", display: "grid", gridTemplateColumns: "170px auto", overflow: "hidden" }}>
 
             <div style={narrow
               ? { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }
-              : { display: "grid", alignContent: "start", gap: 2, padding: 10, borderRight: `1px solid ${CP.borderSoft}`, background: CP.bgSunken }}>
+              : { display: "grid", alignContent: "start", gap: 2, padding: 10, borderRight: `1px solid ${CP.borderSoft}`, background: CP.surfaceAlt }}>
               {presets.map((p) => {
                 const on = draft?.to && p.from === draft.from && p.to === draft.to;
                 return (
@@ -170,35 +174,46 @@ function NavBtn({ dir, disabled, onClick }) {
 
 function Month({ m, shown, prev, min, max, narrow, onPick, onHover, nav }) {
   const weeks = monthGrid(m.year, m.month);
-  const flat = weeks.flat();
   const inside = (d, r) => r && parseDay(d) >= parseDay(r.from) && parseDay(d) <= parseDay(r.to);
+  // La fascia del periodo è UNA striscia per settimana (posizionata nella griglia), non un pezzo per
+  // giorno: i pezzi affiancati lasciavano righine tra un giorno e l'altro (10/10). Sugli estremi parte
+  // dal centro del giorno (il cerchio pieno la chiude); dove la settimana va a capo è arrotondata.
+  const bands = [];
+  weeks.forEach((week, w) => {
+    const cols = week.map((d, c) => (d && inside(d, shown) ? c : -1)).filter((c) => c >= 0);
+    if (!cols.length || (shown && shown.from === shown.to)) return;
+    const a = cols[0];
+    const b = cols[cols.length - 1];
+    const n = b - a + 1;
+    const startsAtEdge = week[a] === shown.from;
+    const endsAtEdge = week[b] === shown.to;
+    if (n === 1 && startsAtEdge && endsAtEdge) return;
+    bands.push({
+      key: w, row: w + 2, a: a + 1, b: b + 2,
+      ml: startsAtEdge ? `${50 / n}%` : "3px", mr: endsAtEdge ? `${50 / n}%` : "3px",
+      rl: startsAtEdge ? 0 : 8, rr: endsAtEdge ? 0 : 8,
+    });
+  });
+  const cell = narrow ? 42 : 38;
   return (
     <div style={{ display: "grid", gap: 6, width: narrow ? "100%" : undefined }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>{nav}</div>
-      <div style={{ display: "grid", gridTemplateColumns: narrow ? "repeat(7, 1fr)" : "repeat(7, 38px)" }}>
-        {WEEK.map((w) => <span key={w} style={{ textAlign: "center", fontSize: 11, color: CP.textMuted, padding: "2px 0 6px" }}>{w}</span>)}
-        {flat.map((d, i) => {
-          if (!d) return <span key={i} />;
+      <div style={{ display: "grid", gridTemplateColumns: narrow ? "repeat(7, 1fr)" : "repeat(7, 38px)", gridTemplateRows: `auto repeat(6, ${cell}px)` }}>
+        {WEEK.map((w, c) => <span key={w} style={{ gridRow: 1, gridColumn: c + 1, textAlign: "center", fontSize: 11, color: CP.textMuted, padding: "2px 0 6px" }}>{w}</span>)}
+        {bands.map((x) => (
+          <span key={`band-${x.key}`} aria-hidden="true" style={{ gridRow: x.row, gridColumn: `${x.a} / ${x.b}`, margin: `3px ${x.mr} 3px ${x.ml}`, background: CP.accentSoft,
+            borderRadius: `${x.rl}px ${x.rr}px ${x.rr}px ${x.rl}px`, pointerEvents: "none" }} />
+        ))}
+        {weeks.flatMap((week, w) => week.map((d, c) => {
+          if (!d) return null;
           const off = parseDay(d) > parseDay(max) || parseDay(d) < parseDay(min);
           const inRange = inside(d, shown);
-          const edgeFrom = shown && d === shown.from;
-          const edgeTo = shown && d === shown.to;
-          const edge = edgeFrom || edgeTo;
+          const edge = shown && (d === shown.from || d === shown.to);
           const inPrev = !inRange && inside(d, prev);
-          const col = i % 7;
-          const rowStart = col === 0 || !flat[i - 1];
-          const rowEnd = col === 6 || !flat[i + 1];
-          // la fascia del periodo: mezza sugli estremi, arrotondata dove la riga inizia o finisce
-          const band = inRange && !(edgeFrom && edgeTo) && {
-            left: edgeFrom ? "50%" : rowStart ? 3 : 0, right: edgeTo ? "50%" : rowEnd ? 3 : 0,
-            borderTopLeftRadius: rowStart && !edgeFrom ? 8 : 0, borderBottomLeftRadius: rowStart && !edgeFrom ? 8 : 0,
-            borderTopRightRadius: rowEnd && !edgeTo ? 8 : 0, borderBottomRightRadius: rowEnd && !edgeTo ? 8 : 0,
-          };
           return (
             <button key={d} className="pp-day" disabled={off} onClick={() => onPick(d)} onMouseEnter={() => onHover(d)}
-              aria-label={d} aria-pressed={edge}
-              style={{ position: "relative", height: narrow ? 42 : 38, padding: 0, border: "none", background: "transparent", cursor: off ? "default" : "pointer", fontFamily: FONTS.body }}>
-              {band && <span style={{ position: "absolute", top: 3, bottom: 3, background: CP.accentSoft, ...band }} />}
+              aria-label={d} aria-pressed={Boolean(edge)}
+              style={{ gridRow: w + 2, gridColumn: c + 1, position: "relative", height: cell, padding: 0, border: "none", background: "transparent", cursor: off ? "default" : "pointer", fontFamily: FONTS.body }}>
               <span className="pp-dot" style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 999, fontSize: 13, fontVariantNumeric: "tabular-nums",
                 border: `1px solid ${edge ? CP.accent : inPrev ? alpha(CP.textMuted, "55") : "transparent"}`,
                 borderStyle: inPrev ? "dashed" : "solid",
@@ -209,7 +224,7 @@ function Month({ m, shown, prev, min, max, narrow, onPick, onHover, nav }) {
               </span>
             </button>
           );
-        })}
+        }))}
       </div>
     </div>
   );
