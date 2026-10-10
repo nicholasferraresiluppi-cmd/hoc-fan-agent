@@ -8,6 +8,7 @@
 //   forget  { handle }               cancellazione su richiesta: via da archivio e CRM, il giro non la riaggiunge
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { getProfiles, saveProfiles, getCrm, saveCrm, addForgotten } from "@/lib/scouting-store";
+import { deletePic } from "@/lib/scouting-pics";
 import { setStage, addNote, setField, linkHandles, unlinkHandle, dismissSuggestion, forgetHandle, normHandle } from "@/lib/scouting-core";
 
 export const runtime = "nodejs";
@@ -34,6 +35,7 @@ export async function POST(request) {
         const profiles = await getProfiles();
         await saveProfiles(profiles.filter((p) => p.h !== h));
         await addForgotten(h);
+        await deletePic(h);
         break;
       }
       default: return Response.json({ error: "Azione sconosciuta" }, { status: 400 });
