@@ -50,7 +50,7 @@ reset();
 page.on("response", (res) => {
   const u = res.url();
   if (!u.startsWith(BASE) || !u.includes("/api/") || u.includes("/api/track")) return;
-  if (res.status() >= 400) sink.api.push({ path: new URL(u).pathname, status: res.status() });
+  if (res.status() >= 400 && res.status() !== 429) sink.api.push({ path: new URL(u).pathname, status: res.status() }); // 429 = limite toccato dal robot stesso
 });
 page.on("pageerror", (e) => sink.pageErrors.push(String(e?.message || e).slice(0, 200)));
 page.on("console", (m) => {
@@ -143,23 +143,35 @@ async function runTask(task, ignoreApi) {
       } else if (s.click) {
         const el = await page.$(s.click);
         if (!el) return failAt("non trovo l'elemento da cliccare");
-        await settle(Promise.all([page.waitForNavigation({ timeout: 8000 }).catch(() => null), el.click()]));
+        const before = page.url();
+        await el.click();
+        // navigazione client-side di Next: niente evento di navigazione, si aspetta il cambio di indirizzo
+        for (let w = 0; w < 30 && page.url() === before; w++) await sleep(200);
+        await settle(Promise.resolve());
       } else {
-        const text = (await textOf()).toLowerCase();
-        if (s.expectText) {
-          const miss = [].concat(s.expectText).filter((t) => !text.includes(String(t).toLowerCase()));
-          if (miss.length) return failAt(`non compare: ${miss.join(", ")}`);
-        }
-        if (s.expectAnyText && !s.expectAnyText.some((t) => text.includes(t.toLowerCase()))) return failAt(`non compare nessuno tra: ${s.expectAnyText.join(", ")}`);
-        if (s.expectNotText) {
-          const hit = s.expectNotText.filter((t) => text.includes(t.toLowerCase()));
-          if (hit.length) return failAt(`a schermo: «${hit.join("», «")}»`);
-        }
-        if (s.expectCount) {
-          const n = await page.$$eval(s.expectCount, (els) => els.length);
-          if (n < (s.min || 1)) return failAt(`servono almeno ${s.min || 1} elementi «${s.expectCount}», ce ne sono ${n}`);
-        }
-        if (s.expectMoney && !/\$\s?\d|\d[\d.,]*\s?\$/.test(text)) return failAt("nessun importo in dollari a schermo");
+        // le verifiche riprovano fino a 10 s: i dati arrivano dopo il primo disegno della pagina
+        const check = async () => {
+          const text = (await textOf()).toLowerCase();
+          if (s.expectText) {
+            const miss = [].concat(s.expectText).filter((t) => !text.includes(String(t).toLowerCase()));
+            if (miss.length) return `non compare: ${miss.join(", ")}`;
+          }
+          if (s.expectAnyText && !s.expectAnyText.some((t) => text.includes(t.toLowerCase()))) return `non compare nessuno tra: ${s.expectAnyText.join(", ")}`;
+          if (s.expectNotText) {
+            const hit = s.expectNotText.filter((t) => text.includes(t.toLowerCase()));
+            if (hit.length) return `a schermo: «${hit.join("», «")}»`;
+          }
+          if (s.expectCount) {
+            const n = await page.$$eval(s.expectCount, (els) => els.length);
+            if (n < (s.min || 1)) return `servono almeno ${s.min || 1} elementi «${s.expectCount}», ce ne sono ${n}`;
+          }
+          if (s.expectMoney && !/\$\s?\d|\d[\d.,]*\s?\$/.test(text)) return "nessun importo in dollari a schermo";
+          return null;
+        };
+        let problem = await check();
+        // «non deve comparire» si giudica subito (aspettare lo farebbe passare prima che il testo arrivi)
+        for (let w = 0; problem && !s.expectNotText && w < 20; w++) { await sleep(500); problem = await check(); }
+        if (problem) return failAt(problem);
       }
     } catch (e) {
       return failAt(String(e?.message || e).slice(0, 200));
