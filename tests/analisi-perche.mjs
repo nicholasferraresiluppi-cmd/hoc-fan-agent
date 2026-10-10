@@ -8,7 +8,7 @@ const ok = (c, m) => { assert.ok(c, m); n++; };
 ok(PERCHE_MODEL === "claude-sonnet-5", "modello scelto: Sonnet 5");
 ok(norm("  Ciao   «amo»  ") === "ciao amo", "normalizza spazi e virgolette");
 
-const fans = [{ creator_id: 7, user_id: 111, prev: 876, cur: 0 }, { creator_id: 7, user_id: 222, prev: 430, cur: 50.4 }];
+const fans = [{ creator_id: 7, user_id: 111, prev: 876, cur: 0, username: "marco_segreto" }, { creator_id: 7, user_id: 222, prev: 430, cur: 50.4 }];
 const chats = [
   { creator_id: 7, user_id: 222, sent_at: "2026-08-29T17:49:00Z", from_fan: true, price: null, text: "Haha of course but not paying for it sweety 😘" },
   { creator_id: 7, user_id: 111, sent_at: "2026-08-28T09:18:00Z", from_fan: false, price: 0, text: "buongiorno comunque💙" },
@@ -25,7 +25,11 @@ const pack = buildPack({ person: "Alessandra Sparagno", range: { from: "2026-08-
   blasts: [{ t: "buonanotte💙", first_at: "2026-08-26T00:23:50Z", fans: 134, minutes: 5 }], fans: L, reasons: ["Meno fan che spendono: 249 invece di 281 (−11%)."] });
 ok(pack.includes("hanno smesso del tutto di comprare: 98") && pack.includes('"buonanotte💙" → 134 fan in 5 min'), "pacchetto con i conti del codice");
 ok(pack.includes("=== F01 (Alessandra Sparagno - IT) — speso $876") && pack.includes("[PPV $100]"), "pacchetto con le chat etichettate");
-ok(!pack.includes("111") && !pack.includes("222"), "nessun id fan esce verso l'AI");
+const packN = buildPack({ person: "X", range: { from: "2026-08-22", to: "2026-09-04" }, previous: { from: "2026-08-08", to: "2026-08-21" }, dir: "down", fans: L, normal: { base: 25570, prev: 27368, cur: 17993 } });
+ok(packN.includes("+7% sul normale") && packN.includes("NON era un picco"), "il livello normale arriva all'AI col giudizio del codice");
+ok(buildPack({ person: "X", range: { from: "a", to: "b" }, previous: { from: "a", to: "b" }, dir: "down", fans: L, normal: { base: 10000, prev: 14000, cur: 9000 } }).includes("ERA un picco"), "picco dichiarato");
+ok(!pack.includes("111") && !pack.includes("222") && !pack.includes("marco_segreto"), "nessun id né username fan esce verso l'AI");
+ok(L[0].username === "marco_segreto" && L[0].user_id === 111, "username e id restano per la pagina");
 
 const ai = {
   sintesi: "I fan grossi sono stati lasciati soli.",
