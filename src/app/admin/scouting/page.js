@@ -18,6 +18,7 @@ import RadarEsplora from "@/components/scouting/RadarEsplora";
 import RadarScheda from "@/components/scouting/RadarScheda";
 import RadarMercato from "@/components/scouting/RadarMercato";
 import RadarContatti from "@/components/scouting/RadarContatti";
+import RadarFormat from "@/components/scouting/RadarFormat";
 import RadarSegnala from "@/components/scouting/RadarSegnala";
 import { btn, btnPrimary, fmtFull } from "@/components/scouting/radar-ui";
 import { newCutoff } from "@/lib/scouting-core";
@@ -28,6 +29,7 @@ const TABS = [
   { id: "oggi", label: "Oggi" },
   { id: "esplora", label: "Esplora" },
   { id: "mercato", label: "Mercato" },
+  { id: "format", label: "Format" },
   { id: "contatti", label: "Contatti" },
 ];
 
@@ -94,7 +96,7 @@ export default function ScoutingPage() {
     } finally { setBusy(false); }
   }
 
-  const line2 = sel || !data ? null : tab === "oggi" ? `${fmtFull(paid)} creator con un profilo a pagamento.` : tab === "mercato" ? "Dove c'è spazio, cosa funziona." : tab === "contatti" ? "Dalla scelta alla firma." : `${fmtFull(creators.length)} creator italiane.`;
+  const line2 = sel || !data ? null : tab === "oggi" ? `${fmtFull(paid)} creator con un profilo a pagamento.` : tab === "mercato" ? "Dove c'è spazio, cosa funziona." : tab === "format" ? "I format che esistono già." : tab === "contatti" ? "Dalla scelta alla firma." : `${fmtFull(creators.length)} creator italiane.`;
 
   return (
     <div style={{ maxWidth: 1280, margin: "0 auto", padding: "24px 20px 72px" }}>
@@ -128,6 +130,8 @@ export default function ScoutingPage() {
           <RadarEsplora creators={creators} newCut={newCut} profilesBy={profilesBy} onOpen={(c) => go("esplora", c.handles[0])} />
         ) : tab === "mercato" ? (
           <RadarMercato creators={creators} />
+        ) : tab === "format" ? (
+          <RadarFormat />
         ) : tab === "contatti" ? (
           <RadarContatti creators={creators} onOpen={(c) => go("contatti", c.handles[0])} />
         ) : (

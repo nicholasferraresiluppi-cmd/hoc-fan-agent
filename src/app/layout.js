@@ -31,7 +31,11 @@ const fBrand = Cinzel({ subsets: ["latin"], weight: ["500"], display: "swap", va
 export const metadata = {
   title: "HOC Pro",
   description: "La console operativa di House of Creators: performance, training, compensation e team.",
+  // aggiunta alla schermata Home dell'iPhone: si apre a schermo intero col nome giusto
+  appleWebApp: { capable: true, title: "HOC Pro", statusBarStyle: "black-translucent" },
 };
+
+export const viewport = { themeColor: "#08090c" };
 
 export default function RootLayout({ children }) {
   // `dynamic` (Clerk 6): ripristina il comportamento di Clerk 5 — stato auth
