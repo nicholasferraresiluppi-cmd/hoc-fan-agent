@@ -157,6 +157,8 @@ export function requestToContract(req, { now = Date.now(), hocEmails = HOC_SIGNE
     state: signatureState(req, now),
     signerName: other ? String(other.signer_name || "").trim() : "",
     signerEmail: other ? String(other.signer_email_address || "").trim().toLowerCase() : "",
+    // richiesta di prova (filigrana, non vincolante): si vede in elenco ma non conta mai per lo stato
+    test: Boolean(req?.test_mode),
   };
 }
 
@@ -222,7 +224,7 @@ export const EXEMPT_MANSIONI = ["Board", "Formatore"];
 export function contractStatus(mansioni = [], contracts = []) {
   const crm = [...new Set([].concat(mansioni || []).map((m) => String(m || "").trim()).filter(Boolean))];
   const required = crm.filter((m) => !EXEMPT_MANSIONI.includes(m));
-  const all = [...contracts].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  const all = contracts.filter((c) => !c.test).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   const terms = all.filter((c) => c.kind === KIND.risoluzione && c.state === "firmato");
   const lastTerm = terms[terms.length - 1] || null;
   const active = all.filter((c) => PERSONNEL_KINDS.has(c.kind) && (!lastTerm || (c.createdAt || 0) > (lastTerm.createdAt || 0)));

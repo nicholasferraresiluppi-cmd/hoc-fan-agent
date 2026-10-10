@@ -71,3 +71,38 @@ export async function pdfText(bytes) {
     return "";
   }
 }
+
+/** Account e quote (10/10/2026): `api_signature_requests_left` = invii reali via API rimasti. */
+export async function getAccountInfo() {
+  const d = await ds("/account");
+  return { quotas: d.account?.quotas || {}, email: d.account?.email_address || null };
+}
+
+/**
+ * Invia un contratto in firma (10/10/2026). Unica scrittura verso Dropbox Sign, sempre da
+ * un'azione esplicita di una persona nel CRM (mai da cron).
+ * `testMode` = richiesta di prova (gratuita, filigrana, NON vincolante).
+ * Firme dai text tag del PDF: signer1 = House of Creators, signer2 = la persona.
+ */
+export async function sendForSignature({ pdf, filename, title, subject, message, signers, testMode = false, metadata = {} }) {
+  if (!dropboxSignConfigured()) throw new DropboxSignError("DROPBOX_SIGN_API_KEY non configurata");
+  const form = new FormData();
+  form.append("title", title);
+  form.append("subject", subject);
+  form.append("message", message);
+  signers.forEach((sg, i) => {
+    form.append(`signers[${i}][email_address]`, sg.email);
+    form.append(`signers[${i}][name]`, sg.name);
+  });
+  form.append("file[0]", new Blob([pdf], { type: "application/pdf" }), filename);
+  form.append("use_text_tags", "1");
+  form.append("hide_text_tags", "1");
+  if (testMode) form.append("test_mode", "1");
+  for (const [k, v] of Object.entries(metadata)) form.append(`metadata[${k}]`, String(v));
+  const res = await fetch(BASE + "/signature_request/send", { method: "POST", headers: { Authorization: authHeader() }, body: form, signal: AbortSignal.timeout(60_000) });
+  const body = await res.text();
+  let j = null;
+  try { j = JSON.parse(body); } catch { /* testo */ }
+  if (!res.ok) throw new DropboxSignError(`Dropbox Sign ${res.status}: ${j?.error?.error_msg || body.slice(0, 200)}`, { status: res.status });
+  return j.signature_request;
+}

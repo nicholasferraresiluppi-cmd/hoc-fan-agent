@@ -159,6 +159,8 @@ const fmtItDate = (ms) => {
 export function hocBlockLines(person, byName, { cfPlain } = {}) {
   const f = person.fields || {};
   const lines = [`ID HOC Pro: ${person.id}`];
+  // 10/10/2026: il "pulsante" su ClickUp per preparare e inviare il contratto (apre il percorso in HOC Pro)
+  lines.push(`Prepara il contratto: https://houseofcreators.app/admin/hr/${person.id}/contratto`);
   if (!byName.has(lc("Mansione attuale"))) lines.push(`Mansione attuale: ${oneLine(f.currentJob, 300) || "—"}`);
   if (!byName.has(lc("Partita IVA"))) lines.push(`Partita IVA: ${f.partitaIva === true ? "sì" : f.partitaIva === false ? "no" : "—"}`);
   if (!byName.has(lc("Codice fiscale")) && (cfPlain || person.cfEnc)) lines.push(`Codice fiscale: ${cfPlain ? maskCf(cfPlain) : "presente"} (completo in HOC Pro)`);

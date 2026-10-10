@@ -191,3 +191,18 @@ export async function listWebhooks(teamId) {
   const r = await cu(`/team/${teamId}/webhook`);
   return r?.webhooks || [];
 }
+
+/**
+ * Scarica un allegato di un task (10/10/2026, lettura del documento d'identità per il
+ * contratto). I link degli allegati ClickUp vogliono il token: si passa solo verso i
+ * domini di ClickUp, mai verso un URL qualsiasi.
+ */
+export async function downloadAttachment(url, { maxBytes = 15 * 1024 * 1024 } = {}) {
+  const u = new URL(url);
+  if (!/(^|\.)clickup(-attachments)?\.com$|(^|\.)clickupusercontent\.com$/.test(u.hostname)) throw new ClickupError(`allegato fuori da ClickUp (${u.hostname})`, 0);
+  const res = await fetch(u, { headers: { Authorization: process.env.CLICKUP_API_TOKEN || "" }, signal: AbortSignal.timeout(30_000) });
+  if (!res.ok) throw new ClickupError(`ClickUp ${res.status} scaricando l'allegato`, res.status);
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length > maxBytes) throw new ClickupError("allegato troppo grande", 413);
+  return { bytes: buf, contentType: res.headers.get("content-type") || "" };
+}

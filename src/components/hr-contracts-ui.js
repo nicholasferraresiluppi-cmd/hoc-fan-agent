@@ -4,7 +4,7 @@
  * Pezzi condivisi dei contratti Dropbox Sign nel Centro HR (09/10/2026): etichetta dello
  * stato, riga del contratto con «Apri PDF», scheda «Contratto» della persona.
  */
-import { FileText, ExternalLink, Check } from "lucide-react";
+import { FileText, ExternalLink, Check, FilePen } from "lucide-react";
 import { CP } from "@/lib/brand";
 import { card } from "@/components/ds";
 import { FLAG_LABEL, KIND_LABEL, statusSentence } from "@/lib/hr-contracts-core";
@@ -56,12 +56,13 @@ export function ContractLine({ c, compact = false }) {
 }
 
 /** Scheda «Contratto» della persona: cosa succede, cosa fare, i documenti. */
-export function PersonContractCard({ contracts }) {
+export function PersonContractCard({ contracts, personId }) {
   if (!contracts) {
     return (
       <section style={{ ...card, padding: "14px 16px", marginBottom: 14 }}>
         <h2 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Contratto</h2>
         <p style={{ margin: 0, fontSize: 13, color: CP.textMuted }}>Contratti Dropbox Sign non ancora collegati.</p>
+        {personId && <PrepareLink personId={personId} />}
       </section>
     );
   }
@@ -74,6 +75,7 @@ export function PersonContractCard({ contracts }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
         <h2 id="hr-contract-h" style={{ margin: 0, fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Contratto</h2>
         <ContractPill flag={status.flag} />
+        {personId && <span style={{ marginLeft: "auto" }}><PrepareLink personId={personId} primary={urgent} /></span>}
       </div>
       <p style={{ margin: "0 0 8px", fontSize: 14, color: CP.textSecondary, lineHeight: 1.55 }}>{statusSentence(status, byId, fmtDate)}</p>
       {shown.map((c) => <ContractLine key={c.id} c={c} compact />)}
@@ -81,5 +83,15 @@ export function PersonContractCard({ contracts }) {
         Da Dropbox Sign, aggiornato il {fmtDate(contracts.syncedAt)}. Contratto mancante o sbagliato? Si collega a mano dal <a href="/admin/hr/contratti" style={{ color: CP.accentSoftText }}>controllo contratti</a>.
       </p>
     </section>
+  );
+}
+
+/** Pulsante verso il percorso «prepara e invia» (/admin/hr/[id]/contratto). */
+export function PrepareLink({ personId, primary = false, label = "Prepara contratto" }) {
+  return (
+    <a href={`/admin/hr/${personId}/contratto`} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap",
+      background: primary ? CP.accent : CP.surface, color: primary ? CP.accentInk : CP.textPrimary, border: primary ? "1px solid transparent" : `1px solid ${CP.border}` }}>
+      <FilePen size={13} /> {label}
+    </a>
   );
 }

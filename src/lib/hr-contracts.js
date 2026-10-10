@@ -70,7 +70,7 @@ export function buildView(people, store, links = {}, attached = {}) {
   }
   const linked = new Set(Object.keys(byContract));
   const unmatched = contracts
-    .filter((c) => !linked.has(c.id) && links[c.id] !== "none")
+    .filter((c) => !c.test && !linked.has(c.id) && links[c.id] !== "none")
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
     .map((c) => c.id);
   return {
@@ -165,7 +165,7 @@ async function applyToCrm({ store, deadline, pdfSource, by, onlyPersonId = null 
     if (!syncOn || !person?.clickupTaskId) continue;
     for (const cid of st.contracts) {
       const c = view.contracts[cid];
-      if (c.state !== "firmato" || !(PERSONNEL_KINDS.has(c.kind) || c.kind === KIND.risoluzione)) continue;
+      if (c.test || c.state !== "firmato" || !(PERSONNEL_KINDS.has(c.kind) || c.kind === KIND.risoluzione)) continue;
       const done = attached[cid];
       if (done && done.taskId === person.clickupTaskId) continue;
       if (Date.now() > deadline - 6000) { out.attachPending++; continue; }
@@ -218,4 +218,18 @@ export async function setContractLink(contractId, personId, { actor } = {}) {
 
 export async function beat(result) {
   await kv.set(K.heartbeat, { at: Date.now(), result }, { ex: 40 * 24 * 3600 }).catch(() => {});
+}
+
+/**
+ * Contratto appena inviato dal CRM (10/10/2026): entra subito nell'elenco, già letto
+ * (tipo e mansione li sappiamo: li ha scelti chi l'ha preparato) e collegato A MANO alla
+ * persona — niente abbinamento per nome da indovinare.
+ */
+export async function registerSentContract(req, personId, { kind, role, mansione }) {
+  const store = await getStore();
+  const c = { ...requestToContract(req), kind, role: role || null, mansione: mansione || null, readFrom: "testo", pdfMissing: false };
+  const contracts = [...(store.contracts || []).filter((x) => x.id !== c.id), c];
+  await kv.set(K.store, { ...store, contracts });
+  await kv.hset(K.links, { [c.id]: personId });
+  return c;
 }
