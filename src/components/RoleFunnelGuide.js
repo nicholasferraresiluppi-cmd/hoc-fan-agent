@@ -7,7 +7,7 @@
  * raggruppati per FASE (Diagnostica → Allena/Agisci → Misura). Ogni passo è
  * un link allo strumento reale con il PERCHÉ e cosa ci fai.
  *
- * Riusato da: la pagina /guida (tab per ruolo) e la modale OnboardingNudge.
+ * Riusato da: la pagina /guida (tab per ruolo) (la modale di primo accesso è stata tolta il 10/10/2026).
  *
  * Design: token CP, pesi 400/500, sentence case, un solo accent viola, flat.
  */

@@ -20,7 +20,6 @@ import { Menu, X } from "lucide-react";
 import Sidebar from "./Sidebar";
 import SidebarCasa from "./SidebarCasa";
 import ErrorBoundary from "./ErrorBoundary";
-import OnboardingNudge from "./OnboardingNudge";
 import WelcomeAttestato from "./WelcomeAttestato";
 import { SecurityBanner, FeedbackButton, ViewAsBanner, CreatorsBanner } from "./AppHelpers";
 import { CP } from "@/lib/brand";
@@ -188,10 +187,8 @@ export default function AppShell({ children }) {
         <FeedbackButton />
       </ErrorBoundary>
 
-      {/* Onboarding: modale primo-accesso col funnel di strumenti per ruolo */}
-      <ErrorBoundary silent label="OnboardingNudge">
-        <OnboardingNudge />
-      </ErrorBoundary>
+      {/* Modale primo-accesso (OnboardingNudge) tolta il 10/10/2026: copriva la prima
+          schermata e veniva chiusa senza leggerla. La guida per ruolo resta in /guida. */}
 
       {/* Attestato di benvenuto: primo accesso da invito operatore, sopra il resto */}
       <ErrorBoundary silent label="WelcomeAttestato">

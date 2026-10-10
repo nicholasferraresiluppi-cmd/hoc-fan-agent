@@ -16,10 +16,10 @@ const IVORY = "#f2eee6";
 const GOLD = "#d9b46a";
 
 const CSS = `
-.auth-wrap{min-height:100vh;display:grid;grid-template-columns:1fr;align-items:center;gap:40px;padding:48px 20px;box-sizing:border-box;max-width:1080px;margin:0 auto}
+.auth-wrap{min-height:100vh;min-height:100dvh;display:grid;grid-template-columns:1fr;align-items:center;gap:40px;padding:48px 20px;box-sizing:border-box;max-width:1080px;margin:0 auto}
 @media (min-width:900px){.auth-wrap{grid-template-columns:1.1fr 1fr;gap:72px;padding:48px 40px}}
 .auth-copy{display:grid;gap:22px}
-@media (max-width:899px){.auth-copy{text-align:center;justify-items:center}.auth-lead{display:none}}
+@media (max-width:899px){.auth-copy{text-align:center;justify-items:center;gap:14px}.auth-lead{display:none}.auth-wrap{gap:22px;padding:24px 16px;align-content:center}.auth-wrap .cl-card{padding:26px 20px !important}.auth-wrap .cl-header{gap:4px}}
 .auth-fade{animation:authFade .6s ease both}
 @keyframes authFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.auth-fade{animation:none}}
@@ -73,9 +73,6 @@ export default function AuthShell({ children }) {
       <div className="auth-wrap">
         <div className="auth-copy auth-fade">
           <BrandLockup size="lg" />
-          <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 400, fontSize: "clamp(40px, 6vw, 64px)", lineHeight: 1, letterSpacing: "-0.01em" }}>
-            La console<br /><span style={{ fontStyle: "italic", color: "rgba(242,238,230,.62)", fontFamily: SERIF }}>della Casa.</span>
-          </h1>
           <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: GOLD }}>
             <span style={{ width: 28, height: 1, background: GOLD, display: "inline-block" }} />
             <span>Accesso riservato</span>
