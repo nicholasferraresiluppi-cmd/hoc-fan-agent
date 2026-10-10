@@ -203,3 +203,17 @@ console.log(`scouting: ${n} asserzioni ok`);
   assert.equal(r.updated, 1); assert.equal(r.pics, 1);
   console.log("aggiornamento parziale: ok");
 }
+
+// --- agenzie mappate a mano (10/10/2026)
+{
+  const { setField, buildCreators, agencies } = await import("../src/lib/scouting-core.js");
+  let crm = setField({ creators: {} }, "h:a", "agency", "  Agenzia Rossa ");
+  crm = setField(crm, "h:b", "agency", "agenzia rossa");
+  crm = setField(crm, "h:c", "agency", "Indipendente");
+  const cs = buildCreators([{ h: "a", sig: "forte" }, { h: "b" }, { h: "c" }, { h: "d" }], crm);
+  assert.equal(cs.find((c) => c.handles[0] === "a").agency, "Agenzia Rossa");
+  const ag = agencies(cs);
+  assert.deepEqual(ag.map((x) => [x.name, x.n, x.paid]), [["Agenzia Rossa", 2, 1], ["Indipendente", 1, 0]], "stessa agenzia scritta in modo diverso = una; Indipendente in fondo");
+  assert.throws(() => setField(crm, "h:a", "bio", "x"));
+  console.log("agenzie: ok");
+}

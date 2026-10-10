@@ -3,7 +3,7 @@
 // studio), le regole dei reel e i tipi di reel che esplodono (studio di ottobre), chi lo fa già.
 import { useMemo } from "react";
 import { CP, alpha } from "@/lib/brand";
-import { marketByGroup } from "@/lib/scouting-core";
+import { marketByGroup, agencies } from "@/lib/scouting-core";
 import { NICHE_INDEX, REEL_RULES, REEL_TYPES, COMPETITOR, MARKET_ASOF, CAPTION_STUDY } from "@/lib/scouting-market";
 import { SERIF, NUM, fmtFull, H2, igProfile, useIsPhone } from "./radar-ui";
 
@@ -18,6 +18,7 @@ export default function RadarMercato({ creators }) {
   const ly = (i) => Y1 - ((i - 0.6) / 0.9) * (Y1 - Y0);
   const generic = groups.find((g) => g.g === "Estetica generica");
   const phone = useIsPhone();
+  const ags = useMemo(() => agencies(creators), [creators]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 52 }}>
@@ -156,6 +157,22 @@ export default function RadarMercato({ creators }) {
           ))}
         </div>
         <p style={{ margin: 0, fontSize: 13, color: CP.textMuted }}>Frasi lette dalle copertine dei reel. Studio del {CAPTION_STUDY.asof}.</p>
+      </section>
+
+      <section aria-labelledby="rm-ag" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <H2 id="rm-ag" sub="Chi c'è dietro le creator del radar, man mano che lo scopriamo. Si scrive nella scheda della creator.">Le agenzie che conosciamo</H2>
+        {ags.length === 0 ? (
+          <p style={{ margin: 0, color: CP.textSecondary, fontSize: 14 }}>Ancora nessuna: quando sai con chi lavora una creator, scrivilo nella sua scheda alla voce «Agenzia che la gestisce».</p>
+        ) : (
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, maxWidth: 640 }}>
+            {ags.map((a) => (
+              <li key={a.name} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "10px 0", borderBottom: `1px solid ${CP.borderSoft || CP.border}`, fontSize: 15, color: a.name === "Indipendente" ? CP.textSecondary : CP.textPrimary }}>
+                <span>{a.name}</span>
+                <span style={{ ...NUM, color: CP.textSecondary, fontSize: 14 }}>{fmtFull(a.n)} creator{a.paid ? ` · ${fmtFull(a.paid)} col profilo a pagamento` : ""}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section aria-labelledby="rm-conc" style={{ display: "flex", flexWrap: "wrap", gap: "28px 52px", borderTop: `1px solid ${CP.border}`, paddingTop: 36 }}>
