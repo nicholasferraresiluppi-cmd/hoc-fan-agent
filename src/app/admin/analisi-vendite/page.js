@@ -9,6 +9,8 @@ import useSWR from "swr";
 import { Download, RefreshCw } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card } from "@/components/ds";
+import PeriodPicker from "@/components/PeriodPicker";
+import { isDay, presetsFor } from "@/lib/period-range";
 
 const VIEWS = [
   { id: "recap", label: "Riepilogo", hint: "Revenue e nuovi abbonati per creator, contro il periodo precedente di pari durata." },
@@ -28,13 +30,6 @@ const TYPE_LABEL = { new_subscriber: "Nuovi", returning_subscriber: "Di ritorno"
 const DAY = 86400e3;
 const iso = (t) => new Date(t).toISOString().slice(0, 10);
 const yesterday = () => iso(Date.now() - DAY);
-const PRESETS = [
-  { id: "7", label: "Ultimi 7 giorni", range: () => ({ from: iso(Date.now() - 7 * DAY), to: yesterday() }) },
-  { id: "14", label: "Ultimi 14 giorni", range: () => ({ from: iso(Date.now() - 14 * DAY), to: yesterday() }) },
-  { id: "28", label: "Ultimi 28 giorni", range: () => ({ from: iso(Date.now() - 28 * DAY), to: yesterday() }) },
-  { id: "mese", label: "Questo mese", range: () => ({ from: `${yesterday().slice(0, 7)}-01`, to: yesterday() }) },
-  { id: "mese-prima", label: "Mese scorso", range: () => { const d = new Date(); const first = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)); const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 0)); return { from: iso(first), to: iso(last) }; } },
-];
 
 // useGrouping "always": in it-IT il browser non separa le migliaia sotto 10.000 ("8160") — qui sì ("8.160")
 const money = (n) => (n == null || !Number.isFinite(Number(n)) ? "—" : `$${Number(n).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" })}`);
@@ -483,19 +478,21 @@ function TableBlock({ title, name, columns, rows, defaultSort, minWidth = 700, m
   );
 }
 
-function DatiCompleti({ initialView, initialPicked, onBack, onState }) {
+// viste che si confrontano col periodo prima (di pari durata); le notifiche arrivano fino a oggi
+const COMPARED = new Set(["recap", "conversioni", "nuovi-abbonati", "tracking", "copertura"]);
+
+function DatiCompleti({ initialView, initialPicked, initialRange, onBack, onState }) {
   const [view, setView] = useState(initialView && VIEWS.some((x) => x.id === initialView) ? initialView : "recap");
-  const [preset, setPreset] = useState(null); // null = periodo di default della vista
-  const [custom, setCustom] = useState(null);
+  const [custom, setCustom] = useState(initialRange || null); // null = periodo di default della vista
   const [picked, setPicked] = useState(initialPicked || []); // [] = tutte le creator visibili
   const [refresh, setRefresh] = useState(0);
   const [search, setSearch] = useState("");
 
   // link diretto a ogni scheda: ?vista=dati&scheda=<id>[&creators=…]
-  useEffect(() => { onState?.({ scheda: view, creators: picked }); }, [view, picked]);
-  const chooseView = (v) => { setView(v); setPreset(null); setCustom(null); };
+  useEffect(() => { onState?.({ scheda: view, creators: picked, dal: custom?.from, al: custom?.to }); }, [view, picked, custom?.from, custom?.to]);
+  const chooseView = (v) => setView(v);
 
-  const range = custom || (preset ? PRESETS.find((p) => p.id === preset)?.range() : null);
+  const range = custom;
   const url = useMemo(() => {
     const q = new URLSearchParams({ view });
     if (range) { q.set("from", range.from); q.set("to", range.to); }
@@ -525,11 +522,9 @@ function DatiCompleti({ initialView, initialPicked, onBack, onState }) {
       <div style={{ ...card, padding: 14, display: "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <span style={{ fontSize: 12, color: CP.textMuted, minWidth: 64 }}>Periodo</span>
-          {PRESETS.map((p) => <FilterChip key={p.id} label={p.label} active={preset === p.id && !custom} onClick={() => { setPreset(p.id); setCustom(null); }} />)}
-          <span style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 13, color: CP.textSecondary }}>
-            dal <input type="date" value={data?.range?.from || ""} onChange={(e) => e.target.value && setCustom({ from: e.target.value, to: data?.range?.to || e.target.value })} style={dateInput} />
-            al <input type="date" value={data?.range?.to || ""} onChange={(e) => e.target.value && setCustom({ from: data?.range?.from || e.target.value, to: e.target.value })} style={dateInput} />
-          </span>
+          <PeriodPicker value={custom || data?.range || null} onChange={setCustom} max={view === "notifiche" ? iso(Date.now()) : yesterday()}
+            compare={COMPARED.has(view)} loading={isLoading && Boolean(data)} />
+          {custom && <button onClick={() => setCustom(null)} style={{ ...linkBtn, fontSize: 13 }}>periodo standard della vista</button>}
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <span style={{ fontSize: 12, color: CP.textMuted, minWidth: 64 }}>Creator</span>
@@ -585,7 +580,6 @@ const STATUS = {
   "in-crescita": { label: "In crescita", color: CP.accentGreen },
   "pochi-dati": { label: "Pochi dati", color: CP.textMuted },
 };
-const DIAG_PERIODS = [7, 14, 28];
 
 function StatusChip({ status }) {
   const s = STATUS[status] || STATUS.stabile;
@@ -774,21 +768,36 @@ function CreatorDetail({ d, onBack, onDati }) {
 }
 const actionBtn = { display: "inline-flex", alignItems: "center", padding: "8px 14px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, textDecoration: "none", cursor: "pointer", fontFamily: FONTS.body };
 
-function useDiag(view, days, ids, enabled = true) {
+// segnaposto mentre il warehouse calcola: la pagina ha già la sua forma, non un "caricamento" a vuoto
+function SkeletonCards() {
+  return (
+    <div aria-label="Calcolo in corso" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 330px), 1fr))", gap: 14 }}>
+      {Array.from({ length: 6 }, (_, i) => (
+        <div key={i} style={{ ...card, padding: 18, display: "grid", gap: 12, animation: "av-pulse 1.4s ease-in-out infinite", animationDelay: `${i * 0.08}s` }}>
+          <div style={{ height: 14, width: "45%", borderRadius: 6, background: CP.surfaceAlt }} />
+          <div style={{ height: 26, width: "60%", borderRadius: 6, background: CP.surfaceAlt }} />
+          <div style={{ height: 36, borderRadius: 6, background: CP.surfaceAlt, opacity: 0.6 }} />
+          <div style={{ height: 12, width: "80%", borderRadius: 6, background: CP.surfaceAlt, opacity: 0.6 }} />
+        </div>
+      ))}
+      <style>{"@keyframes av-pulse{0%,100%{opacity:.55}50%{opacity:1}}"}</style>
+    </div>
+  );
+}
+
+function useDiag(view, range, ids, enabled = true) {
   const url = useMemo(() => {
-    const to = yesterday();
-    const from = iso(Date.parse(`${to}T00:00:00Z`) - (days - 1) * DAY);
-    const q = new URLSearchParams({ view, from, to });
+    const q = new URLSearchParams({ view, from: range.from, to: range.to });
     if (ids?.length) q.set("creators", ids.join(","));
     return `/api/admin/analisi-vendite?${q}`;
-  }, [view, days, ids?.join(",")]);
+  }, [view, range.from, range.to, ids?.join(",")]);
   return useSWR(enabled ? url : null, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
 }
 
 function readUrl() {
   if (typeof window === "undefined") return {};
   const q = new URLSearchParams(window.location.search);
-  return { vista: q.get("vista"), scheda: q.get("scheda"), creator: q.get("creator"), creators: (q.get("creators") || "").split(",").map(Number).filter(Boolean), giorni: Number(q.get("giorni")) || null };
+  return { vista: q.get("vista"), scheda: q.get("scheda"), creator: q.get("creator"), creators: (q.get("creators") || "").split(",").map(Number).filter(Boolean), giorni: Number(q.get("giorni")) || null, dal: q.get("dal"), al: q.get("al") };
 }
 function writeUrl(params) {
   if (typeof window === "undefined") return;
@@ -801,29 +810,33 @@ function writeUrl(params) {
 export default function AnalisiVenditePage() {
   const [ready, setReady] = useState(false);
   const [mode, setMode] = useState("creator"); // creator | dati
-  const [days, setDays] = useState(7);
+  const [range, setRange] = useState(() => presetsFor(yesterday())[0]); // ultimi 7 giorni, fino a ieri
   const [person, setPerson] = useState(null); // nome della persona aperta
-  const [datiInit, setDatiInit] = useState({ scheda: null, creators: [] });
+  const [datiInit, setDatiInit] = useState({ scheda: null, creators: [], range: null });
 
   useEffect(() => {
     const u = readUrl();
-    if (u.vista === "dati") { setMode("dati"); setDatiInit({ scheda: u.scheda, creators: u.creators }); }
+    const linked = isDay(u.dal) && isDay(u.al) ? { from: u.dal, to: u.al } : null;
+    if (u.vista === "dati") { setMode("dati"); setDatiInit({ scheda: u.scheda, creators: u.creators, range: linked }); }
     if (u.creator) setPerson(u.creator);
-    if (DIAG_PERIODS.includes(u.giorni)) setDays(u.giorni);
+    if (linked) setRange(linked);
+    else if (u.giorni >= 1 && u.giorni <= 400) setRange({ from: iso(Date.now() - u.giorni * DAY), to: yesterday() }); // link vecchi con ?giorni=
     setReady(true);
   }, []);
   useEffect(() => {
     if (!ready || mode !== "creator") return;
-    writeUrl({ creator: person, giorni: days !== 7 ? days : null });
-  }, [ready, mode, person, days]);
+    const def = presetsFor(yesterday())[0];
+    const moved = range.from !== def.from || range.to !== def.to;
+    writeUrl({ creator: person, dal: moved ? range.from : null, al: moved ? range.to : null });
+  }, [ready, mode, person, range.from, range.to]);
 
-  const list = useDiag("diagnosi", days, null);
+  const list = useDiag("diagnosi", range, null);
   const persons = list.data?.persons || [];
   const open = persons.find((p) => p.name === person) || null;
-  const detail = useDiag("creator", days, open ? open.ids : null, Boolean(open));
+  const detail = useDiag("creator", range, open ? open.ids : null, Boolean(open));
   const showDetail = Boolean(person && open);
 
-  const goDati = (ids) => { setDatiInit({ scheda: null, creators: ids || [] }); setMode("dati"); writeUrl({ vista: "dati", creators: ids || [] }); window.scrollTo?.(0, 0); };
+  const goDati = (ids) => { setDatiInit({ scheda: null, creators: ids || [], range }); setMode("dati"); writeUrl({ vista: "dati", creators: ids || [], dal: range.from, al: range.to }); window.scrollTo?.(0, 0); };
 
   return (
     <div style={{ display: "grid", gap: 20, maxWidth: 1280, margin: "0 auto", padding: "8px 0 40px" }}>
@@ -831,20 +844,19 @@ export default function AnalisiVenditePage() {
         subtitle={mode === "dati" ? "Le tabelle dei report Looker, con le stesse formule e solo le tue creator." : "Come vanno le tue creator e perché. Prima chi sta perdendo di più."} />
 
       {mode === "dati" ? (
-        ready && <DatiCompleti initialView={datiInit.scheda} initialPicked={datiInit.creators} onBack={() => { setMode("creator"); writeUrl({}); }}
-          onState={({ scheda, creators }) => writeUrl({ vista: "dati", scheda, creators })} />
+        ready && <DatiCompleti initialView={datiInit.scheda} initialPicked={datiInit.creators} initialRange={datiInit.range} onBack={() => { setMode("creator"); writeUrl({}); }}
+          onState={({ scheda, creators, dal, al }) => writeUrl({ vista: "dati", scheda, creators, dal, al })} />
       ) : (
         <>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            {DIAG_PERIODS.map((n) => <FilterChip key={n} label={`Ultimi ${n} giorni`} active={days === n} onClick={() => setDays(n)} />)}
-            <span style={{ fontSize: 13, color: CP.textMuted }}>contro i {days} giorni prima · fino a ieri</span>
+            <PeriodPicker value={range} onChange={setRange} max={yesterday()} loading={list.isLoading && Boolean(list.data)} />
             <span style={{ flex: 1 }} />
             <button onClick={() => goDati(open ? open.ids : [])} style={linkBtn}>Dati completi (tabelle Looker) →</button>
           </div>
 
           {list.error && <Notice danger>{list.error.message}</Notice>}
           {list.data?.empty && <Notice>{list.data.message}</Notice>}
-          {!list.data && !list.error && <div style={{ ...card, padding: 24, color: CP.textMuted, fontSize: 14 }}>Calcolo in corso…</div>}
+          {!list.data && !list.error && <SkeletonCards />}
 
           {showDetail ? (
             detail.data?.person && detail.data.view === "creator" ? (
