@@ -236,7 +236,7 @@ function UnderperformersKebab({ employee, onExcluded, onIgnored }) {
         <MoreVertical size={15} />
       </button>
       {open && (
-        <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, minWidth: 260, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, padding: 4, zIndex: 50 }}>
+        <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, minWidth: 260, background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 10, padding: 4, zIndex: 50 }}>
           <div style={{ padding: "8px 12px 6px", fontSize: 12, color: CP.textMuted, borderBottom: `1px solid ${CP.borderSoft}`, marginBottom: 4 }}>{employee}</div>
           <button onClick={() => run(() => ignoreEmployee(employee), onIgnored)} disabled={busy} style={{ ...menuItem, cursor: busy ? "wait" : "pointer" }} onMouseEnter={hover(true)} onMouseLeave={hover(false)}>
             <div style={{ fontWeight: 500 }}>Ignora dalla lista</div>
