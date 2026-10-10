@@ -149,6 +149,8 @@ eq(classifyUrl("https://t.me/+AbCd"), { label: "Telegram privato", strength: 3 }
 eq(classifyUrl("t.me/canale").label, "Telegram", "canale Telegram pubblico");
 eq(classifyUrl("https://onlyfans.com/x").strength, 3, "OnlyFans");
 eq(classifyUrl("https://linktr.ee/x").label, "Pagina di link", "linktree");
+eq(classifyUrl("http://sfamurri.link/sara").label, "Pagina di link", "dominio .link = pagina di link");
+eq(classifyUrl("https://www.miosito.it").strength, 0, "sito qualsiasi non è un indizio");
 eq(classifyUrl("https://open.spotify.com/x"), null, "spotify non dice niente");
 eq(bestLink([{ url: "https://linktr.ee/a", hlLinks: ["https://t.me/+x"] }]).where, "evidenza", "vince il link più parlante, dalle evidenze");
 // segnalazioni: link di Instagram
