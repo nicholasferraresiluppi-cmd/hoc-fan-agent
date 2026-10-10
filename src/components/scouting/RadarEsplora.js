@@ -3,7 +3,7 @@
 // scouting) e filtri. Una riga = una persona (più account collegati contano una volta).
 import { useMemo, useState } from "react";
 import { CP, alpha } from "@/lib/brand";
-import { hookLine, attentionScore } from "@/lib/scouting-core";
+import { hookLine, attentionScore, agencies } from "@/lib/scouting-core";
 import { DataTable, FilterChip } from "@/components/ds";
 import { NUM, SERIF, fmtFull, fmtN, input, btn, igProfile, LinkChip, Growth, Spark, Initials, STAGE_LABEL, useIsPhone } from "./radar-ui";
 
@@ -24,6 +24,7 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
   const [growing, setGrowing] = useState(false);
   const [fmtOnly, setFmtOnly] = useState(false);
   const [itaSure, setItaSure] = useState(false);
+  const [ag, setAg] = useState("all");
   const [q, setQ] = useState("");
   const [shown, setShown] = useState(PAGE);
   const phone = useIsPhone();
@@ -43,10 +44,13 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
       if (growing && !(r.g4 != null && r.g4 >= 5)) return false;
       if (fmtOnly && (!r.fmt || r.fmt === "nessuno")) return false;
       if (itaSure && r.ita === "forse") return false;
-      if (s && !`${r.name} ${r.handles.join(" ")} ${r.nic} ${r.fmts.join(" ")} ${r.g}`.toLowerCase().includes(s)) return false;
+      if (ag === "none" && r.agency && r.agency !== "Indipendente") return false;
+      if (ag !== "all" && ag !== "none" && (r.agency || "").toLowerCase() !== ag) return false;
+      if (s && !`${r.name} ${r.handles.join(" ")} ${r.nic} ${r.fmts.join(" ")} ${r.g} ${r.agency || ""}`.toLowerCase().includes(s)) return false;
       return true;
     }).sort((a, b) => (b.g4 ?? -999) - (a.g4 ?? -999) || (b.medv || 0) - (a.medv || 0));
-  }, [base, grp, growing, fmtOnly, itaSure, q]);
+  }, [base, grp, growing, fmtOnly, itaSure, ag, q]);
+  const agList = useMemo(() => agencies(creators), [creators]);
 
   const columns = [
     { key: "name", label: "Creator", render: (r) => (
@@ -54,7 +58,7 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
       <Initials name={r.name} size={34} gold={r.sig === "forte"} pic={r.pic} />
       <span style={{ display: "flex", flexDirection: "column" }}>
         <span style={{ fontWeight: 600 }}>{r.name}{r.n > 1 && <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 12 }}> · {r.n} account</span>}{r.ours && <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 12 }}> · già nostra</span>}{r.ita === "forse" && <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 12 }}> · forse italiana</span>}</span>
-        <span style={{ fontSize: 12.5, color: CP.textMuted }}>{[r.g, r.nic].filter(Boolean).join(" · ")}</span>
+        <span style={{ fontSize: 12.5, color: CP.textMuted }}>{[r.agency ? (r.agency === "Indipendente" ? "indipendente" : `con ${r.agency}`) : null, r.g, r.nic].filter(Boolean).join(" · ")}</span>
       </span></span>) },
     { key: "link", label: "Dove porta", sort: (r) => r.link?.strength ?? (r.sig === "forte" ? 2 : -1), render: (r) => <LinkChip link={r.link} sig={r.sig} /> },
     { key: "fmt", label: "Format", muted: true, render: (r) => (r.fmt === "nessuno" ? "—" : r.fmt) },
@@ -70,7 +74,7 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
     const xs = creators.filter((c) => c.stage === "da_valutare" && !c.ours).map((c) => attentionScore(c, newCut)).sort((a, b) => b - a);
     return xs.length ? xs[Math.floor(xs.length * 0.1)] : Infinity;
   }, [creators, newCut]);
-  const activeFilters = (grp !== "all") + growing + fmtOnly + itaSure;
+  const activeFilters = (grp !== "all") + growing + fmtOnly + itaSure + (ag !== "all");
   const more = rows.length > shown && (
     <button onClick={() => setShown((x) => x + PAGE)} style={{ ...btn, alignSelf: "center" }}>Mostra altre {fmtFull(Math.min(PAGE, rows.length - shown))}</button>
   );
@@ -97,6 +101,11 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
           <select id="rx-grp" value={grp} onChange={(e) => { setGrp(e.target.value); setShown(PAGE); }} style={{ ...input, fontSize: 16 }}>
             <option value="all">Tutte · {base.length}</option>
             {groups.map(([g, n]) => <option key={g} value={g}>{g} · {n}</option>)}
+          </select>
+          <select aria-label="Agenzia" value={ag} onChange={(e) => { setAg(e.target.value); setShown(PAGE); }} style={{ ...input, fontSize: 16 }}>
+            <option value="all">Agenzia: tutte</option>
+            <option value="none">Senza agenzia nota</option>
+            {agList.map((a) => <option key={a.name} value={a.name.toLowerCase()}>{a.name} · {a.n}</option>)}
           </select>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             <FilterChip label="In crescita" active={growing} onClick={() => setGrowing((x) => !x)} />
@@ -131,6 +140,7 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
                     <LinkChip link={r.link} sig={r.sig} />
                     {best ? <span style={NUM}>reel top {fmtN(best)}</span> : reach && reach >= 0.3 ? <span style={NUM}>view ×{reach.toFixed(1).replace(".", ",")} i follower</span> : null}
                     {r.g4 != null && <span><Growth v={r.g4} /></span>}
+                    {r.agency && <span style={{ color: CP.textSecondary }}>{r.agency === "Indipendente" ? "indipendente" : `con ${r.agency}`}</span>}
                     {r.stage !== "da_valutare" && <span style={{ color: r.stage === "interessante" ? CP.gold : CP.textMuted }}>{STAGE_LABEL[r.stage]}</span>}
                   </span>
                 </span>
@@ -164,6 +174,11 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
           <option value="all">Tutte · {base.length}</option>
           {groups.map(([g, n]) => <option key={g} value={g}>{g} · {n}</option>)}
         </select>
+        <select aria-label="Agenzia" value={ag} onChange={(e) => { setAg(e.target.value); setShown(PAGE); }} style={{ ...input, padding: "8px 10px" }}>
+            <option value="all">Agenzia: tutte</option>
+            <option value="none">Senza agenzia nota</option>
+            {agList.map((a) => <option key={a.name} value={a.name.toLowerCase()}>{a.name} · {a.n}</option>)}
+          </select>
         <FilterChip label="In crescita (+5% in 4 settimane)" active={growing} onClick={() => setGrowing((x) => !x)} />
         <FilterChip label="Ha un format" active={fmtOnly} onClick={() => setFmtOnly((x) => !x)} />
         <FilterChip label={`Solo italiane sicure (senza ${base.filter((r) => r.ita === "forse").length} «forse»)`} active={itaSure} onClick={() => setItaSure((x) => !x)} />

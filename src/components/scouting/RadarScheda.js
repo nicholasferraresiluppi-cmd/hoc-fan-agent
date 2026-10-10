@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { CP, alpha } from "@/lib/brand";
-import { whyLines, classifyUrl } from "@/lib/scouting-core";
+import { whyLines, classifyUrl, agencies } from "@/lib/scouting-core";
 import { SERIF, NUM, fmtFull, fmtDate, btn, btnPrimary, btnQuiet, input, igProfile, igReel, Initials, LinkChip, Spark, H2, STAGE_LABEL } from "./radar-ui";
 
 const fetcher = (u) => fetch(u).then((r) => (r.ok ? r.json() : {}));
@@ -59,7 +59,7 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
       <header style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: "24px 36px", borderBottom: `1px solid ${CP.border}`, paddingBottom: 30 }}>
         <span className="rs-ini"><Initials name={c.name} size={96} gold={c.sig === "forte"} pic={c.pic} /></span>
         <div style={{ flex: "1 1 520px", display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
-          <span style={{ fontSize: 13, color: CP.textMuted }}>{[c.g, c.nic, c.firstSeen ? `nel radar dal ${fmtDate(c.firstSeen)}` : null].filter(Boolean).join(" · ")}</span>
+          <span style={{ fontSize: 13, color: CP.textMuted }}>{[c.agency ? (c.agency === "Indipendente" ? "indipendente" : `con ${c.agency}`) : null, c.g, c.nic, c.firstSeen ? `nel radar dal ${fmtDate(c.firstSeen)}` : null].filter(Boolean).join(" · ")}</span>
           <h1 style={{ margin: 0, ...SERIF, fontSize: "clamp(36px, 5vw, 60px)", lineHeight: 1, overflowWrap: "anywhere" }}>{c.name}</h1>
           {why[0] && <p style={{ margin: 0, ...SERIF, fontStyle: "italic", fontSize: 24, lineHeight: 1.25, color: CP.textSecondary }}>{why[0]}</p>}
         </div>
@@ -177,6 +177,9 @@ const STAGES_ASIDE = ["da_valutare", "interessante", "contattata", "trattativa",
 function Aside({ c, data, ps, act, busy, notes, onSelectHandle, onBack }) {
   const [name, setName] = useState(c.name.startsWith("@") ? "" : c.name);
   const [owner, setOwner] = useState(c.owner || "");
+  const [agency, setAgency] = useState(c.agency || "");
+  const known = agencies(data.creators || []).map((a) => a.name).filter((n) => n !== "Indipendente");
+  const saveAgency = (v) => { const x = String(v || "").trim(); setAgency(x); if (x !== (c.agency || "")) act({ action: "field", id: c.id, field: "agency", value: x }, x ? (x === "Indipendente" ? "Segnata come indipendente." : `Agenzia: ${x}.`) : "Agenzia tolta."); };
   const [note, setNote] = useState("");
   const [forget, setForget] = useState(null);
   const sug = [];
@@ -210,6 +213,16 @@ function Aside({ c, data, ps, act, busy, notes, onSelectHandle, onBack }) {
         <label style={{ display: "grid", gap: 4, fontSize: 13, color: CP.textSecondary }}>Nome della scheda
           <input value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name !== (c.name.startsWith("@") ? "" : c.name) && act({ action: "field", id: c.id, field: "name", value: name })} placeholder="es. Serena camionista" style={input} />
         </label>
+        <div style={{ display: "grid", gap: 6 }}>
+          <label htmlFor={`ra-${c.id}`} style={{ fontSize: 13, color: CP.textSecondary }}>Agenzia che la gestisce</label>
+          <input id={`ra-${c.id}`} list={`ral-${c.id}`} value={agency} onChange={(e) => setAgency(e.target.value)} onBlur={() => saveAgency(agency)} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} placeholder="Se la sai: nome dell'agenzia" style={input} />
+          <datalist id={`ral-${c.id}`}>{known.map((n) => <option key={n} value={n} />)}</datalist>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {known.filter((n) => n !== agency).slice(0, 4).map((n) => <button key={n} type="button" disabled={busy} onClick={() => saveAgency(n)} style={{ ...btn, minHeight: 30, padding: "4px 11px", fontSize: 12.5 }}>{n}</button>)}
+            {agency !== "Indipendente" && <button type="button" disabled={busy} onClick={() => saveAgency("Indipendente")} style={{ ...btn, minHeight: 30, padding: "4px 11px", fontSize: 12.5 }}>Indipendente</button>}
+            {agency && <button type="button" disabled={busy} onClick={() => saveAgency("")} style={{ ...btnQuiet, minHeight: 30, padding: "4px 6px", fontSize: 12.5 }}>Non lo so</button>}
+          </div>
+        </div>
         <label style={{ display: "grid", gap: 4, fontSize: 13, color: CP.textSecondary }}>La segue
           <input value={owner} onChange={(e) => setOwner(e.target.value)} onBlur={() => owner !== (c.owner || "") && act({ action: "field", id: c.id, field: "owner", value: owner })} placeholder="Nome" style={input} />
         </label>

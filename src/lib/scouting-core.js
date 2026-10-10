@@ -303,6 +303,8 @@ export function buildCreators(profiles, crm) {
       ag: ps.some((p) => p.ag),
       stage: STAGE_IDS.includes(c.stage) ? c.stage : DEFAULT_STAGE,
       owner: c.owner || null,
+      // agenzia che la gestisce, quando la sappiamo (scritta a mano dal team; "Indipendente" = verificato senza agenzia)
+      agency: c.agency || null,
       notes: c.notes?.length || 0,
       updatedAt: c.updatedAt || null,
       missing: ps.every((p) => p.missing),
@@ -315,6 +317,20 @@ export function buildCreators(profiles, crm) {
     });
   }
   return rows;
+}
+
+/** Agenzie mappate: [{ name, n, paid }] dalla più grande; "Indipendente" a parte (non è un'agenzia). */
+export function agencies(creators) {
+  const m = new Map();
+  for (const c of creators) {
+    if (!c.agency) continue;
+    const k = c.agency.trim();
+    const key = k.toLowerCase();
+    const cur = m.get(key) || { name: k, n: 0, paid: 0 };
+    cur.n++; if (c.sig === "forte") cur.paid++;
+    m.set(key, cur);
+  }
+  return [...m.values()].sort((a, b) => (a.name === "Indipendente") - (b.name === "Indipendente") || b.n - a.n || a.name.localeCompare(b.name));
 }
 
 /** Conteggi per fase (sempre tutte le fasi, anche a zero). */
@@ -358,7 +374,7 @@ export function addNote(crm, id, text, by) {
 }
 
 export function setField(crm, id, field, value) {
-  if (!["name", "owner"].includes(field)) throw new Error("campo non modificabile");
+  if (!["name", "owner", "agency"].includes(field)) throw new Error("campo non modificabile");
   const handles = id.startsWith("h:") ? [id.slice(2)] : undefined;
   const next = ensureCreator(crm, id, handles);
   next.creators[id] = { ...next.creators[id], [field]: String(value || "").trim().slice(0, 120) || null, updatedAt: Date.now() };
