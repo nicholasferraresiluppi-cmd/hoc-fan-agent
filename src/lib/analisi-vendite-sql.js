@@ -362,6 +362,7 @@ export function ricercaSql(refs, ids, term) {
 export function diagnosiSql(refs, ids, range) {
   const p = previousRange(range);
   const list = idList(ids);
+  const len = Math.round((parseDay(range.to) - parseDay(range.from)) / DAY) + 1;
   const cur = `calendar_date >= ${d(range.from)}`;
   const win = `creator_id IN (${list}) AND calendar_date BETWEEN ${d(p.from)} AND ${d(range.to)}`;
   return `
@@ -389,7 +390,14 @@ export function diagnosiSql(refs, ids, range) {
             SUM(IF(DATE(created_at_transaction) >= ${d(range.from)}, CAST(amount AS FLOAT64), 0)) AS chargeback_amount,
             SUM(IF(DATE(created_at_transaction) < ${d(range.from)}, CAST(amount AS FLOAT64), 0)) AS chargeback_amount_prev
           FROM \`${refs.chargebacks}\`
-          WHERE creator_id IN (${list}) AND DATE(created_at_transaction) BETWEEN ${d(p.from)} AND ${d(range.to)} GROUP BY 1)
+          WHERE creator_id IN (${list}) AND DATE(created_at_transaction) BETWEEN ${d(p.from)} AND ${d(range.to)} GROUP BY 1),
+    -- livello normale: mediana delle 8 settimane PRIMA del periodo, riportata alla sua durata. Serve quando il
+    -- "periodo prima" era un picco (o un buco) e il confronto da solo inganna. Solo con 8 settimane di dati.
+    bw AS (SELECT creator_id, DIV(DATE_DIFF(${d(range.from)}, calendar_date, DAY) - 1, 7) AS w, SUM(net) AS wk
+          FROM \`${refs.attributed}\`
+          WHERE creator_id IN (${list}) AND calendar_date BETWEEN DATE_SUB(${d(range.from)}, INTERVAL 56 DAY) AND DATE_SUB(${d(range.from)}, INTERVAL 1 DAY)
+          GROUP BY 1, 2),
+    b AS (SELECT creator_id, APPROX_QUANTILES(wk, 2)[OFFSET(1)] * ${len} / 7 AS revenue_base, COUNT(*) AS base_weeks FROM bw GROUP BY 1)
     SELECT ids.creator_id,
       IFNULL(a.revenue, 0) AS revenue, IFNULL(a.revenue_prev, 0) AS revenue_prev,
       IFNULL(a.spenders, 0) AS spenders, IFNULL(a.spenders_prev, 0) AS spenders_prev,
@@ -399,9 +407,94 @@ export function diagnosiSql(refs, ids, range) {
       IFNULL(l.clicks, 0) AS clicks, IFNULL(l.clicks_prev, 0) AS clicks_prev,
       IFNULL(n.d0, 0) AS d0, IFNULL(n.d0_subs, 0) AS d0_subs, IFNULL(n.d0_prev, 0) AS d0_prev, IFNULL(n.d0_subs_prev, 0) AS d0_subs_prev,
       IFNULL(c.chargebacks, 0) AS chargebacks, IFNULL(c.chargeback_amount, 0) AS chargeback_amount, IFNULL(c.chargeback_amount_prev, 0) AS chargeback_amount_prev,
-      IFNULL(w.top_fan, 0) AS top_fan, IFNULL(w.top_fan_prev, 0) AS top_fan_prev
+      IFNULL(w.top_fan, 0) AS top_fan, IFNULL(w.top_fan_prev, 0) AS top_fan_prev,
+      IF(IFNULL(b.base_weeks, 0) = 8, b.revenue_base, 0) AS revenue_base, IF(IFNULL(b.base_weeks, 0) = 8, 0, 1) AS base_missing
     FROM ids LEFT JOIN a USING (creator_id) LEFT JOIN w USING (creator_id) LEFT JOIN s USING (creator_id) LEFT JOIN t USING (creator_id)
-      LEFT JOIN l USING (creator_id) LEFT JOIN n USING (creator_id) LEFT JOIN c USING (creator_id)`;
+      LEFT JOIN l USING (creator_id) LEFT JOIN n USING (creator_id) LEFT JOIN c USING (creator_id) LEFT JOIN b USING (creator_id)`;
+}
+
+/* ───────── "Perché, nelle chat" (10/10/2026) ─────────
+ * Il codice sceglie i fan e conta; l'AI legge solo le loro chat (lib/analisi-perche*). Le chat (onlyfans.chat)
+ * sono partizionate per giorno e clusterizzate per creator+fan: ~0,6 GB a lettura. I mass NON sono nella tabella:
+ * un testo identico a molti fan in pochi minuti è stato mandato uno per uno. */
+
+/** Soglia "fan che conta": aveva speso almeno questo nel periodo prima (o spende questo ora, se si cresce). */
+export const PERCHE_MIN_SPEND = 50;
+export const PERCHE_MAX_FANS = 25;
+
+const percheSpend = (refs, list, range) => {
+  const p = previousRange(range);
+  return `SELECT creator_id, user_id, SUM(IF(calendar_date >= ${d(range.from)}, net, 0)) AS cur, SUM(IF(calendar_date < ${d(range.from)}, net, 0)) AS prev
+    FROM \`${refs.attributed}\`
+    WHERE creator_id IN (${list}) AND calendar_date BETWEEN ${d(p.from)} AND ${d(range.to)} AND user_id IS NOT NULL
+    GROUP BY 1, 2`;
+};
+// down: chi ha più che dimezzato la spesa; up: chi l'ha più che raddoppiata
+const percheCond = (dir) => (dir === "up"
+  ? `cur >= ${PERCHE_MIN_SPEND} AND cur >= 2 * prev`
+  : `prev >= ${PERCHE_MIN_SPEND} AND cur < 0.5 * prev`);
+
+/** I fan da leggere: quelli che hanno spostato di più la revenue nella direzione del cambiamento. */
+export function percheFansSql(refs, ids, range, dir = "down") {
+  const list = idList(ids);
+  return `WITH u AS (${percheSpend(refs, list, range)})
+    SELECT creator_id, user_id, prev, cur FROM u WHERE ${percheCond(dir)}
+    ORDER BY ${dir === "up" ? "cur - prev" : "prev - cur"} DESC LIMIT ${PERCHE_MAX_FANS}`;
+}
+
+/** I conti su TUTTI i fan del gruppo (non solo i letti): quanti, quanti hanno smesso, chi ha smesso di scrivere, a chi non abbiamo scritto. */
+export function percheStatsSql(refs, ids, range, dir = "down") {
+  const list = idList(ids);
+  const p = previousRange(range);
+  return `WITH u AS (${percheSpend(refs, list, range)}),
+    g AS (SELECT creator_id, user_id, prev, cur FROM u WHERE ${percheCond(dir)}),
+    m AS (SELECT c.creator_id, c.user_id,
+            COUNTIF(c.created_at >= TIMESTAMP(${d(range.from)}) AND c.sender_id = c.user_id) AS fan_cur,
+            COUNTIF(c.created_at >= TIMESTAMP(${d(range.from)}) AND c.sender_id != c.user_id) AS us_cur
+          FROM \`${refs.chat}\` c
+          WHERE c.creator_id IN (${list}) AND DATE(c.created_at) BETWEEN ${d(p.from)} AND ${d(range.to)}
+            AND c.user_id IN (SELECT user_id FROM g)
+          GROUP BY 1, 2)
+    SELECT
+      (SELECT COUNT(*) FROM u WHERE ${dir === "up" ? `cur >= ${PERCHE_MIN_SPEND}` : `prev >= ${PERCHE_MIN_SPEND}`}) AS base_fans,
+      COUNT(*) AS fans, COUNTIF(g.cur = 0) AS stopped,
+      SUM(g.prev) AS spent_prev, SUM(g.cur) AS spent_cur,
+      COUNTIF(IFNULL(m.fan_cur, 0) = 0) AS fan_silent, COUNTIF(IFNULL(m.us_cur, 0) = 0) AS us_silent
+    FROM g LEFT JOIN m USING (creator_id, user_id)`;
+}
+
+/** Stesso testo nostro a ≥20 fan diversi nello stesso quarto d'ora: mandato a mano a tanti, non è un mass. */
+export function percheBlastSql(refs, ids, range) {
+  const list = idList(ids);
+  return `WITH x AS (
+      SELECT TRIM(REGEXP_REPLACE(REGEXP_REPLACE(text, r'<[^>]+>', ' '), r'\\s+', ' ')) AS t,
+        TIMESTAMP_BUCKET(created_at, INTERVAL 15 MINUTE) AS slot, user_id, created_at
+      FROM \`${refs.chat}\`
+      WHERE creator_id IN (${list}) AND DATE(created_at) BETWEEN ${d(range.from)} AND ${d(range.to)} AND sender_id != user_id
+        AND (price IS NULL OR price = 0) AND text IS NOT NULL)
+    SELECT t, FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', MIN(created_at)) AS first_at,
+      COUNT(DISTINCT user_id) AS fans, TIMESTAMP_DIFF(MAX(created_at), MIN(created_at), MINUTE) AS minutes
+    FROM x WHERE LENGTH(t) BETWEEN 1 AND 300
+    GROUP BY t, slot HAVING fans >= 20
+    ORDER BY fans DESC LIMIT 40`;
+}
+
+/** Le ultime chat dei fan scelti: dai 10 giorni prima del periodo alla fine, ultimi 30 messaggi per fan. */
+export function percheChatSql(refs, pairs, range) {
+  const clean = pairs.map(([c, u]) => [Number(c), Number(u)]).filter(([c, u]) => Number.isInteger(c) && Number.isInteger(u) && c > 0 && u > 0);
+  if (!clean.length) throw new Error("nessun fan");
+  const cids = [...new Set(clean.map(([c]) => c))].join(",");
+  const keys = clean.map(([c, u]) => `'${c}:${u}'`).join(",");
+  return `SELECT creator_id, user_id, FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', created_at) AS sent_at, sender_id = user_id AS from_fan,
+      CAST(price AS FLOAT64) AS price,
+      SUBSTR(TRIM(REGEXP_REPLACE(REGEXP_REPLACE(text, r'<[^>]+>', ' '), r'\\s+', ' ')), 1, 220) AS text
+    FROM (
+      SELECT *, ROW_NUMBER() OVER (PARTITION BY creator_id, user_id ORDER BY created_at DESC) AS rn
+      FROM \`${refs.chat}\`
+      WHERE creator_id IN (${cids}) AND DATE(created_at) BETWEEN DATE_SUB(${d(range.from)}, INTERVAL 10 DAY) AND ${d(range.to)}
+        AND CONCAT(CAST(creator_id AS STRING), ':', CAST(user_id AS STRING)) IN (${keys}))
+    WHERE rn <= 30
+    ORDER BY creator_id, user_id, created_at`;
 }
 
 /** Revenue giorno per giorno di ogni creator nel periodo (per il mini-grafico). */

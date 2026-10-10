@@ -49,6 +49,7 @@ const TABLES = {
   linksSubscriptions: ["onlyfans", "links_subscriptions"],
   welcomeUnlocks: ["onlyfans", "welcome_unlocks"],
   usersResearch: ["onlyfans", "users_research"],
+  chat: ["onlyfans", "chat"],
 };
 
 function refsFor(source) {
@@ -64,7 +65,7 @@ function refsFor(source) {
 const lostAccess = (e) => /access denied|permission|not found: (dataset|table)|\b40[34]\b/i.test(String(e?.message || ""));
 
 /** Esegue le query sulla fonte primaria; se l'accesso manca, sulla copia di sicurezza. */
-async function runOnSource(build) {
+export async function runOnSource(build) {
   try {
     return { source: "warehouse", rows: await Promise.all(build(refsFor("warehouse")).map((sql) => bqQuery(sql).then((r) => r.rows))) };
   } catch (e) {
@@ -278,7 +279,7 @@ export async function getAnalisi(view, ids, query = {}, { force = false } = {}) 
   const range = normalizeRange(view, query);
   const q = view === "ricerca-fan" ? cleanSearch(query.q) : null;
   if (view === "ricerca-fan" && !q) return { view, range, rows: [], needsQuery: true, source: null, computed_at: new Date().toISOString() };
-  const key = `analisi:v4:${view}:${range.from}:${range.to}:${q || ""}:${[...ids].sort((a, b) => a - b).join(",")}`;
+  const key = `analisi:v5:${view}:${range.from}:${range.to}:${q || ""}:${[...ids].sort((a, b) => a - b).join(",")}`;
   if (!force) {
     const hit = await kv.get(key).catch(() => null);
     if (hit) return { ...hit, cached: true };

@@ -21,6 +21,7 @@ const SUM_KEYS = [
   "revenue", "revenue_prev", "spenders", "spenders_prev", "transactions", "transactions_prev", "subs", "subs_prev",
   "conv_base", "conv", "conv_base_prev", "conv_prev", "clicks", "clicks_prev", "d0", "d0_subs", "d0_prev", "d0_subs_prev",
   "chargebacks", "chargeback_amount", "chargeback_amount_prev",
+  "revenue_base", "base_missing", // livello normale (mediana 8 settimane prima); base_missing>0 = qualche account senza storia
 ];
 // il fan che ha speso di più: tra gli account di una persona si prende il massimo, non la somma
 const MAX_KEYS = ["top_fan", "top_fan_prev"];
@@ -73,6 +74,9 @@ export function metricsOf(t) {
     clicks: t.clicks, clicks_prev: t.clicks_prev, clicks_delta: pctChange(t.clicks, t.clicks_prev),
     chargebacks: t.chargebacks, chargeback_amount: r2(t.chargeback_amount), chargeback_amount_prev: r2(t.chargeback_amount_prev),
     top_fan: r2(n(t.top_fan)), top_fan_prev: r2(n(t.top_fan_prev)),
+    // il livello normale vale solo se TUTTI gli account hanno 8 settimane di storia
+    revenue_base: !n(t.base_missing) && n(t.revenue_base) > 0 ? r2(n(t.revenue_base)) : null,
+    revenue_base_delta: !n(t.base_missing) && n(t.revenue_base) > 0 ? pctChange(t.revenue, t.revenue_base) : null,
   };
 }
 
@@ -81,18 +85,36 @@ const int = (v) => Math.round(v).toLocaleString("it-IT", { useGrouping: "always"
 const pct = (v, d = 0) => `${(v * 100).toLocaleString("it-IT", { maximumFractionDigits: d, minimumFractionDigits: d })}%`;
 const signed = (v) => `${v > 0 ? "+" : "−"}${Math.abs(Math.round(v * 100))}%`;
 
+// Il "periodo prima" è anomalo se si scosta di oltre il 20% dal livello normale della creator.
+const ODD_PREV = 0.2;
+
+/** Il periodo prima era un picco ("peak") o un buco ("dip") rispetto al solito? null se normale o se manca la storia. */
+export function oddPrevOf(m) {
+  if (!m.revenue_base || m.revenue_base < MIN_REVENUE_TO_JUDGE) return null;
+  const d = pctChange(m.revenue_prev, m.revenue_base);
+  if (d >= ODD_PREV) return "peak";
+  if (d <= -ODD_PREV) return "dip";
+  return null;
+}
+
 /** Stato: in calo / stabile / in crescita / pochi dati. */
 export function statusOf(m) {
   if (Math.max(m.revenue, m.revenue_prev) < MIN_REVENUE_TO_JUDGE) return "pochi-dati";
   if (m.revenue_delta == null) return m.revenue > 0 ? "in-crescita" : "pochi-dati";
-  if (m.revenue_delta <= -MOVE_PCT && m.revenue_diff <= -MOVE_ABS) return "in-calo";
-  if (m.revenue_delta >= MOVE_PCT && m.revenue_diff >= MOVE_ABS) return "in-crescita";
+  const odd = oddPrevOf(m);
+  if (m.revenue_delta <= -MOVE_PCT && m.revenue_diff <= -MOVE_ABS) {
+    // dopo un picco, tornare al proprio livello normale non è un calo
+    return odd === "peak" && m.revenue_base_delta > -MOVE_PCT ? "stabile" : "in-calo";
+  }
+  if (m.revenue_delta >= MOVE_PCT && m.revenue_diff >= MOVE_ABS) {
+    return odd === "dip" && m.revenue_base_delta < MOVE_PCT ? "stabile" : "in-crescita";
+  }
   return "stabile";
 }
 
 /**
  * Il perché, in frasi. La prima è la leva principale; le altre sono segnali di contorno.
- * Ogni frase: { kind, text } con kind = spenders | spend | subs | conversion | traffic | chargeback.
+ * Ogni frase: { kind, text } con kind = peak | dip | whale | spenders | spend | subs | conversion | traffic | chargeback | steady | data.
  */
 export function reasonsOf(m) {
   const out = [];
@@ -139,6 +161,17 @@ export function reasonsOf(m) {
   } else if (whaleNow && m.revenue_delta > 0) {
     const without = pctChange(m.revenue - m.top_fan, m.revenue_prev);
     out.splice(0, 0, { kind: "whale", text: `Un fan da solo ha speso ${money(m.top_fan)} (${pct(m.top_fan / m.revenue)} dell'incasso)${without != null ? `: senza di lui la revenue sarebbe ${without >= 0 ? "cresciuta" : "calata"} del ${pct(Math.abs(without))}` : ""}.` });
+  }
+
+  // 1c. il confronto inganna se il periodo prima era fuori dal solito: si dice per primo
+  const odd = oddPrevOf(m);
+  if ((odd === "peak" && m.revenue_delta < 0) || (odd === "dip" && m.revenue_delta > 0)) {
+    const bd = m.revenue_base_delta;
+    const vsNormal = Math.abs(bd) < 0.05 ? "in linea con il normale" : `${signed(bd)} rispetto al normale`;
+    out.splice(0, 0, {
+      kind: odd,
+      text: `Il periodo prima era ${odd === "peak" ? "sopra" : "sotto"} il solito: ${money(m.revenue_prev)} contro un livello normale di ${money(m.revenue_base)} (mediana delle 8 settimane prima). Oggi è ${vsNormal}.`,
+    });
   }
 
   // 2. segnali di contorno
