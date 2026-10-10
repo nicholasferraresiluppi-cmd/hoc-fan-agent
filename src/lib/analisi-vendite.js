@@ -65,12 +65,13 @@ function refsFor(source) {
 const lostAccess = (e) => /access denied|permission|not found: (dataset|table)|\b40[34]\b/i.test(String(e?.message || ""));
 
 /** Esegue le query sulla fonte primaria; se l'accesso manca, sulla copia di sicurezza. */
-export async function runOnSource(build) {
+export async function runOnSource(build, opts) {
+  // opts → bqQuery (es. maxBytesBilled più alto per chi legge le chat di tutte le creator)
   try {
-    return { source: "warehouse", rows: await Promise.all(build(refsFor("warehouse")).map((sql) => bqQuery(sql).then((r) => r.rows))) };
+    return { source: "warehouse", rows: await Promise.all(build(refsFor("warehouse")).map((sql) => bqQuery(sql, opts).then((r) => r.rows))) };
   } catch (e) {
     if (!lostAccess(e)) throw e;
-    return { source: "backup", rows: await Promise.all(build(refsFor("backup")).map((sql) => bqQuery(sql).then((r) => r.rows))) };
+    return { source: "backup", rows: await Promise.all(build(refsFor("backup")).map((sql) => bqQuery(sql, opts).then((r) => r.rows))) };
   }
 }
 

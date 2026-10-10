@@ -11,7 +11,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import { useUser } from "@clerk/nextjs";
 import {
-  Trophy, BarChart3, DollarSign, Users, Flame, Swords,
+  Trophy, BarChart3, DollarSign, Users, Flame, Swords, HeartHandshake,
   GraduationCap, ClipboardCheck, Target, Brain, Award,
   LayoutDashboard, UserCog, Sparkles, Bot,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders,
@@ -65,6 +65,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/leaderboard/creators",         title: "Creator", desc: "Quanto rende ogni creator + team interno", icon: Users },
       { href: "/admin/chat-monitor",           title: "Chat Monitor", desc: "Chat dal vivo per creator: benvenuto entro 2h, fan senza risposta, latenza, PPV, coda, soglie del giorno, coorti e presidio", icon: MessagesSquare },
       { href: "/admin/le-mie-creator",         title: "Revenue e chat", desc: "Le tue creator a colpo d'occhio, a chi scrivere adesso e chi è di turno; poi proiezione di fine mese, obiettivo, nuovi abbonati e chat dal vivo (benvenuto, senza risposta, latenza, PPV), per account", icon: LineChart },
+      { href: "/admin/fan-da-recuperare",     title: "Fan da recuperare", desc: "Ogni mattina i fan che spendevano bene e si sono fermati, con il perché e una bozza di ripresa personale scritta dall'AI dalle loro ultime chat. Segni a chi hai scritto e vedi chi ha ricomprato", icon: HeartHandshake },
       { href: "/admin/analisi-vendite",       title: "Analisi vendite", desc: "Come vanno le tue creator e perché: prima chi perde di più, con la leva che si è mossa (fan che spendono, conversione dei nuovi, traffico dai link, fan grossi) e la pagina di ogni creator. Le tabelle Looker restano in Dati completi", icon: BarChart3 },
       { href: "/leaderboard/creators/heatmap", title: "Mappa operatore×creator",      desc: "Score operatore × creator a colpo d'occhio", icon: Flame },
       { href: "/admin/conversation-intelligence", title: "Presidio chat", desc: "Latenza risposta, % entro 5 min e response rate per creator (dai transcript, solo metadati)", icon: Activity },
