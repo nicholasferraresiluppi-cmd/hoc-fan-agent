@@ -36,7 +36,9 @@ export async function GET(request) {
     const ids = asked.length ? asked.filter((id) => visibleIds.has(id)) : [...visibleIds];
     if (!ids.length) return Response.json({ error: "Nessuna delle creator scelte è visibile per te", creators, scope }, { status: 403 });
 
-    const data = await getAnalisi(view, ids, { from: sp.get("from"), to: sp.get("to"), q: sp.get("q") }, { force: sp.get("refresh") === "1" });
+    // filtri delle pagine del Report Looker (validati e messi in sicurezza nelle query di lib/looker-sql)
+    const f = Object.fromEntries(["link", "user", "type", "spending", "username", "payment"].map((k) => [k, sp.get(k)]).filter(([, v]) => v));
+    const data = await getAnalisi(view, ids, { from: sp.get("from"), to: sp.get("to"), q: sp.get("q"), f }, { force: sp.get("refresh") === "1" });
     return Response.json({ ...data, creators, selected: ids, scope });
   } catch (e) {
     return Response.json({ error: e.message || "Calcolo fallito" }, { status: 500 });
