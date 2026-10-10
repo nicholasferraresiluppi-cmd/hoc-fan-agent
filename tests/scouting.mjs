@@ -11,6 +11,7 @@ import {
   handleStem, linkKey, suggestLinks, buildCreators, stageCounts,
   creatorIdOf, setStage, addNote, setField, linkHandles, unlinkHandle, dismissSuggestion, forgetHandle,
   HISTORY_MAX, DEFAULT_STAGE, applyRefresh, scrubContacts,
+  classifyUrl, bestLink, whyLines, pickToday, parseInstagramLink, marketByGroup,
 } from "../src/lib/scouting-core.js";
 
 let n = 0;
@@ -142,5 +143,27 @@ eq(applyRefresh(res.profiles, [], new Date(Date.UTC(2026, 9, 23))).profiles.find
 eq(scrubContacts("chat 📞 +39 333 123 4567 info: anna.rossi@gmail.com seguimi @anna_privata"), "chat 📞 info: seguimi @anna_privata", "via telefono ed email, resta l'handle");
 eq(scrubContacts("classe 1998 · 1,70"), "classe 1998 · 1,70", "anni e altezza non sono telefoni");
 eq(parseRefreshItem({ Account: "https://instagram.com/x_y", Biography: "wa 3331234567", "Analysis Status": "analyzed" }).bio, "wa", "il giro settimanale pulisce la bio");
+
+// dove porta un link
+eq(classifyUrl("https://t.me/+AbCd"), { label: "Telegram privato", strength: 3 }, "invito Telegram = privato");
+eq(classifyUrl("t.me/canale").label, "Telegram", "canale Telegram pubblico");
+eq(classifyUrl("https://onlyfans.com/x").strength, 3, "OnlyFans");
+eq(classifyUrl("https://linktr.ee/x").label, "Pagina di link", "linktree");
+eq(classifyUrl("https://open.spotify.com/x"), null, "spotify non dice niente");
+eq(bestLink([{ url: "https://linktr.ee/a", hlLinks: ["https://t.me/+x"] }]).where, "evidenza", "vince il link più parlante, dalle evidenze");
+// segnalazioni: link di Instagram
+eq(parseInstagramLink("https://www.instagram.com/reel/DaNB2I_i6jA/?igsh=x"), { code: "DaNB2I_i6jA" }, "reel → codice");
+eq(parseInstagramLink("https://instagram.com/Lagnometta?igsh=1"), { handle: "lagnometta" }, "profilo → account");
+eq(parseInstagramLink("guarda @lagnometta"), null, "testo con @ in mezzo non è un link");
+eq(parseInstagramLink("@lagnometta"), { handle: "lagnometta" }, "solo @account");
+eq(parseInstagramLink("https://example.com/x"), null, "non Instagram");
+// perché guardarla e da guardare oggi
+const cA = { id: "h:a", name: "@a", handles: ["a"], sig: "forte", fmt: "ruolo o mestiere", u: 4, g4: 8, medv: 30000, fol: 50000, stage: "da_valutare", link: { label: "Telegram privato", where: "evidenza", strength: 3 }, firstSeen: Date.now() };
+const cB = { ...cA, id: "h:b", handles: ["b"], fmt: "nessuno", u: 1, g4: null, link: null, firstSeen: 0 };
+const cC = { ...cA, id: "h:c", handles: ["c"], stage: "interessante" };
+const why = whyLines(cA);
+ok(why[0].includes("ruolo o mestiere") && why.some((w) => w.includes("prima storia in evidenza")) && why.some((w) => w.includes("+8")), "il perché viene dai fatti");
+eq(pickToday([cB, cA, cC]).map((c) => c.id), ["h:a", "h:b"], "da guardare: prima chi ha più fatti, mai chi è già valutata");
+eq(marketByGroup([{ g: "X", sig: "forte" }, { g: "X", sig: "nessuno" }])[0], { g: "X", n: 2, paid: 1, pct: 50 }, "mercato per nicchia");
 
 console.log(`scouting: ${n} asserzioni ok`);

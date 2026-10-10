@@ -77,3 +77,24 @@ export async function getForgotten() {
   return new Set((await kv.smembers("scouting:forgotten")) || []);
 }
 export const addForgotten = (h) => kv.sadd("scouting:forgotten", h);
+
+// ---------- segnalazioni e reel (10/10/2026) ----------
+//   scouting:inbox               ultime 200 segnalazioni { id, at, by, text, why, status, h, msg }
+//   scouting:tokens              hash sha256(token) → { by, at } per il Comando rapido dell'iPhone
+//   scouting:reelmedia:{handle}  link video/copertine dei reel (scadono: TTL 36 h, mai copie dei file)
+const INBOX_MAX = 200;
+export async function getInbox() {
+  return dec(await kv.get("scouting:inbox"), []);
+}
+export async function saveInbox(items) {
+  await kv.set("scouting:inbox", enc(items.slice(0, INBOX_MAX)));
+}
+export async function updateInboxItem(id, patch) {
+  const items = await getInbox();
+  const i = items.findIndex((x) => x.id === id);
+  if (i >= 0) { items[i] = { ...items[i], ...patch }; await saveInbox(items); }
+}
+export const getTokenOwner = (hash) => kv.hget("scouting:tokens", hash);
+export const setToken = (hash, owner) => kv.hset("scouting:tokens", { [hash]: owner });
+export const getReelMedia = (h) => kv.get(`scouting:reelmedia:${h}`);
+export const setReelMedia = (h, v) => kv.set(`scouting:reelmedia:${h}`, v, { ex: 36 * 3600 });

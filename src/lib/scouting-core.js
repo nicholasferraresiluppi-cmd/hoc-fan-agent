@@ -268,6 +268,9 @@ export function buildCreators(profiles, crm) {
       notes: c.notes?.length || 0,
       updatedAt: c.updatedAt || null,
       missing: ps.every((p) => p.missing),
+      link: bestLink(ps),
+      firstSeen: Math.min(...ps.map((p) => p.firstSeen || Infinity)) || null,
+      reels: ps.flatMap((p) => (p.reels || []).map((r) => ({ ...r, h: p.h }))).sort((a, b) => (b.v || 0) - (a.v || 0)).slice(0, 9),
     });
   }
   return rows;
@@ -374,4 +377,123 @@ export function forgetHandle(crm, h) {
   const out = { creators: { ...(next.creators || {}) }, dismissed: (next.dismissed || []).filter((k) => !k.split("|").includes(h)) };
   delete out.creators[`h:${h}`];
   return out;
+}
+
+
+// ---------- dove porta il profilo (link in bio o nelle storie in evidenza) ----------
+
+const LINK_KINDS = [
+  { re: /(^|\.)onlyfans\.com$/, label: "OnlyFans", strength: 3 },
+  { re: /(^|\.)(fanvue|fansly|mym\.fans|loyalfans|fanplace)\.[a-z.]+$/, label: "Piattaforma a pagamento", strength: 3 },
+  { re: /(^|\.)(t\.me|telegram\.me)$/, label: "Telegram", strength: 2 },
+  { re: /(^|\.)(linktr\.ee|link\.me|beacons\.ai|beacons\.page|allmylinks\.com|heylink\.me|heyliiink\.com|lovemylink\.me|hoo\.be|bio\.site|snipfeed\.co|getmysocial\.com|solo\.to|taplink\.cc|linkin\.bio|tap\.bio|lnk\.bio|taap\.it)$/, label: "Pagina di link", strength: 1 },
+];
+
+/** Che cosa c'è dietro un link: { label, strength } (3 piattaforma a pagamento, 2 Telegram, 1 pagina di link, 0 altro) o null. */
+export function classifyUrl(url) {
+  if (!url) return null;
+  try {
+    const u = new URL(/^https?:/.test(url) ? url : `https://${url}`);
+    const host = u.hostname.replace(/^www\./, "").toLowerCase();
+    const path = u.pathname.toLowerCase();
+    for (const k of LINK_KINDS) if (k.re.test(host)) {
+      const priv = k.label === "Telegram" && (path.startsWith("/+") || path.startsWith("/joinchat") || /priv|vip|spicy|segret|secret/.test(path));
+      return { label: priv ? "Telegram privato" : k.label, strength: priv ? 3 : k.strength };
+    }
+    if (/\.vip$/.test(host) || /priv|vip|spicy|segret|secret/.test(host + path)) return { label: "Profilo privato", strength: 3 };
+    if (GENERIC_HOSTS.test(host)) return null;
+    return { label: "Sito", strength: 0 };
+  } catch {
+    return null;
+  }
+}
+
+/** Il link più "parlante" tra quelli degli account di una creator: { label, where: "bio"|"evidenza", url }. */
+export function bestLink(ps) {
+  let best = null;
+  for (const p of ps) {
+    const cands = [...(p.hlLinks || []).map((u) => [u, "evidenza"]), ...(p.url ? [[p.url, "bio"]] : [])];
+    for (const [url, where] of cands) {
+      const c = classifyUrl(url);
+      if (!c) continue;
+      if (!best || c.strength > best.strength) best = { ...c, where, url };
+    }
+  }
+  return best;
+}
+
+const DAY = 86400000;
+
+/**
+ * Da quando una creator conta come "nuova": ultimi 8 giorni, ma mai la prima grande ricerca
+ * (tutto ciò che è entrato nei primi 3 giorni del radar è la base, non una novità).
+ */
+export function newCutoff(creators, now = Date.now()) {
+  const first = Math.min(...creators.map((c) => c.firstSeen || Infinity));
+  return Math.max(Number.isFinite(first) ? first + 3 * DAY : 0, now - 8 * DAY);
+}
+
+/** Perché guardarla, in parole, solo da fatti che il radar ha. */
+export function whyLines(c, { newCut = Date.now() - 8 * DAY } = {}) {
+  const out = [];
+  if (c.fmt && c.fmt !== "nessuno") out.push(`Ha un format che si ripete: ${c.fmt}.`);
+  if (c.link && c.link.strength >= 2) out.push(`${c.link.label} ${c.link.where === "evidenza" ? "nella prima storia in evidenza" : "in bio"}.`);
+  else if (c.sig === "forte") out.push("Ha un profilo a pagamento.");
+  if (c.g4 != null && c.g4 >= 5) out.push(`Cresce: +${String(c.g4).replace(".", ",")}% di follower in 4 settimane.`);
+  if (c.medv && c.fol && c.medv / c.fol >= 0.3) out.push("I reel arrivano ben oltre i suoi follower.");
+  if (c.firstSeen && c.firstSeen >= newCut) out.push("Nuova nel radar questa settimana.");
+  return out;
+}
+
+/** Le creator da guardare oggi: profilo a pagamento + qualcosa di riconoscibile, ancora da valutare, non nostre. */
+export function pickToday(creators, { n = 3, newCut = Date.now() - 8 * DAY } = {}) {
+  const score = (c) =>
+    (c.sig === "forte" ? 4 : c.sig === "debole" ? 1 : 0) +
+    (c.fmt && c.fmt !== "nessuno" ? 2 : 0) + (c.u || 0) +
+    (c.g4 != null ? Math.max(-2, Math.min(4, c.g4 / 3)) : 0) +
+    (c.firstSeen && c.firstSeen >= newCut ? 1.5 : 0) +
+    (c.medv ? Math.log10(c.medv) / 2 : 0);
+  return creators
+    .filter((c) => !c.ours && c.stage === DEFAULT_STAGE && c.sig !== "nessuno" && !c.missing)
+    .map((c) => ({ c, s: score(c) }))
+    .sort((a, b) => b.s - a.s)
+    .slice(0, n)
+    .map(({ c }) => c);
+}
+
+/** Chi cresce di più (4 settimane) tra chi ha un profilo a pagamento; serve storico di almeno 5 settimane. */
+export function movers(creators, n = 5) {
+  return creators.filter((c) => c.g4 != null && c.sig === "forte" && !c.ours).sort((a, b) => b.g4 - a.g4).slice(0, n);
+}
+
+/** Per nicchia: quante creator, quante col profilo a pagamento evidente. */
+export function marketByGroup(creators) {
+  const by = new Map();
+  for (const c of creators) {
+    const g = c.g || "Altro";
+    const x = by.get(g) || { g, n: 0, paid: 0 };
+    x.n++;
+    if (c.sig === "forte") x.paid++;
+    by.set(g, x);
+  }
+  return [...by.values()].sort((a, b) => b.n - a.n).map((x) => ({ ...x, pct: x.n ? Math.round((x.paid / x.n) * 100) : 0 }));
+}
+
+// ---------- segnalazioni (link incollato o condiviso dal telefono) ----------
+
+/** Da un link di Instagram: { handle } per un profilo, { code } per un reel o un post; null se non è Instagram. */
+export function parseInstagramLink(text) {
+  const m = String(text || "").match(/https?:\/\/(?:www\.)?instagram\.com\/[^\s]+/i) || String(text || "").match(/(?:^|\s)(?:www\.)?instagram\.com\/[^\s]+/i);
+  const raw = m ? m[0].trim() : String(text || "").trim();
+  if (/^@?[a-z0-9._]{2,30}$/i.test(raw)) return { handle: raw.replace(/^@/, "").toLowerCase() };
+  let u;
+  try { u = new URL(/^https?:/i.test(raw) ? raw : `https://${raw}`); } catch { return null; }
+  if (!/(^|\.)instagram\.com$/i.test(u.hostname)) return null;
+  const seg = u.pathname.split("/").filter(Boolean);
+  if (!seg.length) return null;
+  if (["reel", "reels", "p", "tv"].includes(seg[0].toLowerCase())) return seg[1] ? { code: seg[1] } : null;
+  if (seg[1] && ["reel", "p"].includes(seg[1].toLowerCase()) && seg[2]) return { code: seg[2], handle: seg[0].toLowerCase() };
+  if (["stories"].includes(seg[0].toLowerCase()) && seg[1]) return { handle: seg[1].toLowerCase() };
+  if (/^[a-z0-9._]{2,30}$/i.test(seg[0]) && !["explore", "accounts", "direct"].includes(seg[0].toLowerCase())) return { handle: seg[0].toLowerCase() };
+  return null;
 }

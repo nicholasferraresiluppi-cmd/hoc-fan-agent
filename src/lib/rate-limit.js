@@ -44,6 +44,10 @@ export const LIMITS = {
   hr_form_shared:        [{ window: 60, max: 600 }, { window: 86400, max: 20000 }], // richieste per token condiviso
   hr_form_shared_submit: [{ window: 60, max: 150 }, { window: 86400, max: 2000 }],  // invii dal link condiviso
   hr_webhook:    [{ window: 60, max: 300 }],                              // per IP (ClickUp)
+  // Radar creator (10/10/2026): ogni segnalazione nuova costa ~3 centesimi di Apify.
+  // Un turno di scouting vero ne fa qualche decina al giorno per persona.
+  scouting_signal: [{ window: 60, max: 12 }, { window: 86400, max: 300 }],  // per persona (o token)
+  scouting_reels:  [{ window: 3600, max: 60 }],                             // carica reel, per persona
 };
 
 /**

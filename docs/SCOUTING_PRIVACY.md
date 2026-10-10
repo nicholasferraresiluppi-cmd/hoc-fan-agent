@@ -20,6 +20,8 @@ House of Creators gestisce creator che promuovono un profilo a pagamento (OnlyFa
 | Bio (primi 300 caratteri) | proposte di collegamento tra account (non mostrata in pagina) |
 | Giudizi nostri: nicchia, formato ricorrente, "unicità" 1-5, presenza di un profilo a pagamento (evidente / indizi / nessuno), nota breve | valutare l'interesse per lo scouting |
 | Note del team, fase (da valutare → interessante → contattata → in trattativa → firmata / scartata), chi la segue | lavoro di scouting |
+| Reel: codice, visualizzazioni, data, tipo di audio (niente testo integrale) | vedere cosa funziona; i video si guardano nella scheda direttamente dal server di Instagram con un link a tempo (tenuto 36 ore), **nessuna copia dei video** |
+| Segnalazioni: chi ha segnalato, quando, il link e un perché facoltativo | sapere da dove arriva una creator |
 
 **Non teniamo**: email, telefoni, foto, didascalie integrali (lette solo per la classificazione iniziale, non archiviate), follower o commenti di terzi, dati di salute, orientamento, identità di genere, religione (esclusi in modo esplicito dalle note e dai giudizi automatici; le note dei giudizi automatici che li toccavano sono state cancellate). **Profili che potrebbero essere di minorenni: esclusi del tutto** (7 esclusi alla prima raccolta).
 
