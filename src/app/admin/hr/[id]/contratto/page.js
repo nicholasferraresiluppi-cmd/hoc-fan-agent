@@ -38,6 +38,22 @@ export default function ContractFunnelPage() {
   const [preview, setPreview] = useState(0);
   const [confirmMismatch, setConfirmMismatch] = useState(false);
   const [testMode, setTestMode] = useState(false);
+  // anteprima: il PDF si scarica e si mostra da un blob — l'app vieta di essere incorniciata
+  // (frame-ancestors 'none', anche verso se stessa) e quella regola non va allentata per questo
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [pdfErr, setPdfErr] = useState(null);
+  const updatedAt = data?.terms ? JSON.stringify([data.templateId, data.terms, data.idDoc?.at]) : null;
+  useEffect(() => {
+    if (!id || !updatedAt) return undefined;
+    let url = null;
+    let alive = true;
+    setPdfErr(null);
+    fetch(`/api/admin/hr/people/${id}/contract/pdf?v=${preview}`)
+      .then(async (r) => { if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || `Errore ${r.status}`); return r.blob(); })
+      .then((b) => { if (!alive) return; url = URL.createObjectURL(b); setPdfUrl(url); })
+      .catch((e) => alive && setPdfErr(e.message));
+    return () => { alive = false; if (url) URL.revokeObjectURL(url); };
+  }, [id, preview, updatedAt]);
 
   useEffect(() => {
     if (!data) return;
@@ -151,7 +167,9 @@ export default function ContractFunnelPage() {
           : <p style={{ fontSize: 13, color: CP.accentGreen, margin: "0 0 8px" }}>Tutti i dati ci sono. Questo è il PDF esatto che partirà.</p>}
         {dirty && <p style={{ fontSize: 13, color: CP.attn, margin: "0 0 8px" }}>Salva le condizioni per vederle nell'anteprima.</p>}
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}><button type="button" onClick={() => setPreview((p) => p + 1)} style={{ ...btnGhost, padding: "5px 10px", fontSize: 12 }}><RefreshCw size={12} /> Aggiorna</button></div>
-        <iframe key={preview} title="Anteprima del contratto" src={`/api/admin/hr/people/${id}/contract/pdf?v=${preview}`} style={{ width: "100%", height: "min(78vh, 900px)", border: `1px solid ${CP.border}`, borderRadius: 8, background: "#fff" }} />
+        {pdfErr && <Notice danger>Anteprima non disponibile: {pdfErr}</Notice>}
+        {!pdfUrl && !pdfErr && <div style={{ fontSize: 13, color: CP.textMuted }}>Preparo l'anteprima…</div>}
+        {pdfUrl && <iframe title="Anteprima del contratto" src={pdfUrl} style={{ width: "100%", height: "min(78vh, 900px)", border: `1px solid ${CP.border}`, borderRadius: 8, background: "#fff" }} />}
       </Step>
 
       <Step n={4} title="Invia in firma" done={Boolean(data.sent && !data.sent.testMode)}>
