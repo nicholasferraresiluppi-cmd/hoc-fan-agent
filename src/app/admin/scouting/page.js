@@ -52,13 +52,14 @@ const PHONE_CSS = `
   .ro-today::-webkit-scrollbar{display:none}
   .ro-today > article{flex:0 0 86%;scroll-snap-align:start}
   .rx-page[data-sel] .ds-head{display:none !important}
-  .rs-ini{display:none}
+  .rs-ini > *{width:64px !important;height:64px !important;font-size:26px !important}
   .rs-acts{width:100%}
   .rs-main > section{order:4}
   .rs-main > .rs-why{order:1}.rs-main > .rs-reels{order:2}.rs-main > .rs-nums{order:3}
   .rs-stages{flex-direction:row !important;flex-wrap:wrap}
   .rs-stages button{padding:8px 12px !important;font-size:13.5px !important}
   .rc-scroll{overflow:visible !important}
+  .rf-later > div{grid-template-columns:1fr !important;gap:4px !important}
   .rc-cols{grid-template-columns:1fr !important;min-width:0 !important}
 }`;
 

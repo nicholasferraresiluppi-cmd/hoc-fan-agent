@@ -43,7 +43,7 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
               return (
                 <article key={c.id} style={{ display: "flex", flexDirection: "column", gap: 16, borderTop: `1px solid ${i === 0 ? CP.gold : CP.borderStrong || CP.border}`, paddingTop: 20 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                    <Initials name={c.name} gold={i === 0} />
+                    <Initials name={c.name} gold={i === 0} pic={c.pic} />
                     <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
                       <button onClick={() => onOpen(c)} style={{ ...btnQuiet, padding: 0, minHeight: 0, color: CP.textPrimary, fontSize: 16, fontWeight: 600, justifyContent: "flex-start" }}>{c.name}</button>
                       <span style={{ fontSize: 13.5, color: CP.textSecondary }}>{[c.g, c.nic].filter(Boolean).join(" · ")}</span>

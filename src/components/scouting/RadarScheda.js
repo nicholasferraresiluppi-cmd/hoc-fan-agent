@@ -57,7 +57,7 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
       <button onClick={onBack} style={{ ...btnQuiet, alignSelf: "flex-start", padding: 0, minHeight: 0 }}>← Torna alla lista</button>
 
       <header style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: "24px 36px", borderBottom: `1px solid ${CP.border}`, paddingBottom: 30 }}>
-        <span className="rs-ini"><Initials name={c.name} size={96} gold={c.sig === "forte"} /></span>
+        <span className="rs-ini"><Initials name={c.name} size={96} gold={c.sig === "forte"} pic={c.pic} /></span>
         <div style={{ flex: "1 1 520px", display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
           <span style={{ fontSize: 13, color: CP.textMuted }}>{[c.g, c.nic, c.firstSeen ? `nel radar dal ${fmtDate(c.firstSeen)}` : null].filter(Boolean).join(" · ")}</span>
           <h1 style={{ margin: 0, ...SERIF, fontSize: "clamp(36px, 5vw, 60px)", lineHeight: 1, overflowWrap: "anywhere" }}>{c.name}</h1>

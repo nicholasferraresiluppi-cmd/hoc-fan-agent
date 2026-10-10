@@ -2,9 +2,10 @@
 // Radar creator — vista "Esplora": tutte le creator, con viste pronte (le domande vere dello
 // scouting) e filtri. Una riga = una persona (più account collegati contano una volta).
 import { useMemo, useState } from "react";
-import { CP } from "@/lib/brand";
+import { CP, alpha } from "@/lib/brand";
+import { hookLine, attentionScore } from "@/lib/scouting-core";
 import { DataTable, FilterChip } from "@/components/ds";
-import { NUM, fmtFull, fmtN, input, btn, LinkChip, Growth, Spark, Initials, STAGE_LABEL, useIsPhone } from "./radar-ui";
+import { NUM, SERIF, fmtFull, fmtN, input, btn, igProfile, LinkChip, Growth, Spark, Initials, STAGE_LABEL, useIsPhone } from "./radar-ui";
 
 const views = (newCut) => [
   { id: "paid", label: "Con profilo a pagamento", test: (c) => c.sig === "forte" },
@@ -49,10 +50,12 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
 
   const columns = [
     { key: "name", label: "Creator", render: (r) => (
+      <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <Initials name={r.name} size={34} gold={r.sig === "forte"} pic={r.pic} />
       <span style={{ display: "flex", flexDirection: "column" }}>
         <span style={{ fontWeight: 600 }}>{r.name}{r.n > 1 && <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 12 }}> · {r.n} account</span>}{r.ours && <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 12 }}> · già nostra</span>}{r.ita === "forse" && <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 12 }}> · forse italiana</span>}</span>
         <span style={{ fontSize: 12.5, color: CP.textMuted }}>{[r.g, r.nic].filter(Boolean).join(" · ")}</span>
-      </span>) },
+      </span></span>) },
     { key: "link", label: "Dove porta", sort: (r) => r.link?.strength ?? (r.sig === "forte" ? 2 : -1), render: (r) => <LinkChip link={r.link} sig={r.sig} /> },
     { key: "fmt", label: "Format", muted: true, render: (r) => (r.fmt === "nessuno" ? "—" : r.fmt) },
     { key: "fol", label: "Follower", align: "right", render: (r) => fmtFull(r.fol) },
@@ -62,6 +65,11 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
     { key: "stage", label: "Fase", sort: (r) => Object.keys(STAGE_LABEL).indexOf(r.stage), render: (r) => <span style={{ color: r.stage === "interessante" ? CP.gold : r.stage === "scartata" ? CP.textMuted : CP.textSecondary }}>{STAGE_LABEL[r.stage]}</span> },
   ];
 
+  // «da guardare»: il 10% più alto per lo stesso punteggio di «Oggi», tra chi è ancora da valutare
+  const hotCut = useMemo(() => {
+    const xs = creators.filter((c) => c.stage === "da_valutare" && !c.ours).map((c) => attentionScore(c, newCut)).sort((a, b) => b - a);
+    return xs.length ? xs[Math.floor(xs.length * 0.1)] : Infinity;
+  }, [creators, newCut]);
   const activeFilters = (grp !== "all") + growing + fmtOnly + itaSure;
   const more = rows.length > shown && (
     <button onClick={() => setShown((x) => x + PAGE)} style={{ ...btn, alignSelf: "center" }}>Mostra altre {fmtFull(Math.min(PAGE, rows.length - shown))}</button>
@@ -80,7 +88,7 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
         ))}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-        <span style={{ fontSize: 13.5, color: CP.textMuted }}>{fmtFull(rows.length)} creator · le più in crescita prima</span>
+        <span style={{ fontSize: 13, color: CP.textMuted, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>{fmtFull(rows.length)} creator<span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: "50%", background: CP.gold, display: "inline-block", marginLeft: 6 }} />da guardare</span>
         <button onClick={() => setFiltersOpen((x) => !x)} aria-expanded={filtersOpen} style={{ ...btn, minHeight: 36, padding: "6px 14px" }}>Filtri{activeFilters ? ` · ${activeFilters}` : ""}</button>
       </div>
       {filtersOpen && (
@@ -99,22 +107,41 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
       )}
       {rows.length === 0 ? <p style={{ color: CP.textSecondary }}>Nessuna creator con questi filtri.</p> : (
         <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-          {rows.slice(0, shown).map((r) => (
-            <li key={r.id} style={{ borderBottom: `1px solid ${CP.borderSoft || CP.border}` }}>
-              <button onClick={() => onOpen(r)} style={{ all: "unset", boxSizing: "border-box", width: "100%", cursor: "pointer", display: "grid", gridTemplateColumns: "40px minmax(0,1fr) auto", gap: 12, alignItems: "center", padding: "12px 0" }}>
-                <Initials name={r.name} size={40} gold={r.sig === "forte"} />
-                <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
-                  <span style={{ fontSize: 15.5, fontWeight: 500, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}{r.n > 1 ? <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 12.5 }}> · {r.n} account</span> : null}</span>
-                  <span style={{ fontSize: 13, color: CP.textSecondary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[r.nic || r.g, r.fmt && r.fmt !== "nessuno" ? r.fmt : null].filter(Boolean).join(" · ")}</span>
-                  <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}><LinkChip link={r.link} sig={r.sig} />{r.stage !== "da_valutare" && <span style={{ fontSize: 12, color: r.stage === "interessante" ? CP.gold : CP.textMuted }}>{STAGE_LABEL[r.stage]}</span>}</span>
+          {rows.slice(0, shown).map((r) => {
+            const hook = hookLine(r, { newCut });
+            const hot = r.stage === "da_valutare" && !r.ours && attentionScore(r, newCut) >= hotCut;
+            const best = r.reels?.[0]?.v;
+            const reach = r.medv && r.fol ? r.medv / r.fol : null;
+            return (
+            <li key={r.id} style={{ borderBottom: `1px solid ${CP.borderSoft || CP.border}`, display: "grid", gridTemplateColumns: "minmax(0,1fr) 44px", alignItems: "center", gap: 8 }}>
+              <button onClick={() => onOpen(r)} style={{ all: "unset", boxSizing: "border-box", minWidth: 0, cursor: "pointer", display: "grid", gridTemplateColumns: "48px minmax(0,1fr)", gap: 12, alignItems: "start", padding: "14px 0" }}>
+                <span style={{ position: "relative" }}>
+                  <Initials name={r.name} size={48} gold={r.sig === "forte"} pic={r.pic} />
+                  {hot && <span title="Da guardare" style={{ position: "absolute", right: -1, top: -1, width: 12, height: 12, borderRadius: "50%", background: CP.gold, border: `2px solid ${CP.bg}` }} />}
                 </span>
-                <span style={{ textAlign: "right", display: "flex", flexDirection: "column", gap: 3, ...NUM }}>
-                  <span style={{ fontSize: 15, color: CP.textPrimary }}>{fmtN(r.fol)}</span>
-                  <span style={{ fontSize: 12.5 }}><Growth v={r.g4} /></span>
+                <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+                    <span style={{ fontSize: 15.5, fontWeight: 500, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+                    <span style={{ marginLeft: "auto", fontSize: 13.5, color: CP.textSecondary, ...NUM, flexShrink: 0 }}>{fmtN(r.fol)}</span>
+                  </span>
+                  {hook
+                    ? <span style={{ ...SERIF, fontStyle: "italic", fontSize: 15.5, lineHeight: 1.25, color: hot ? CP.gold : CP.textPrimary, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{hook.replace(/\.$/, "")}</span>
+                    : <span style={{ fontSize: 13, color: CP.textSecondary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.nic || r.g}</span>}
+                  <span style={{ display: "flex", gap: "4px 10px", alignItems: "center", flexWrap: "wrap", fontSize: 12.5, color: CP.textMuted }}>
+                    <LinkChip link={r.link} sig={r.sig} />
+                    {best ? <span style={NUM}>reel top {fmtN(best)}</span> : reach && reach >= 0.3 ? <span style={NUM}>view ×{reach.toFixed(1).replace(".", ",")} i follower</span> : null}
+                    {r.g4 != null && <span><Growth v={r.g4} /></span>}
+                    {r.stage !== "da_valutare" && <span style={{ color: r.stage === "interessante" ? CP.gold : CP.textMuted }}>{STAGE_LABEL[r.stage]}</span>}
+                  </span>
                 </span>
               </button>
+              <a href={igProfile(r.handles[0])} target="_blank" rel="noopener noreferrer" aria-label={`Apri @${r.handles[0]} su Instagram`}
+                style={{ width: 40, height: 40, borderRadius: "50%", border: `1px solid ${CP.border}`, display: "flex", alignItems: "center", justifyContent: "center", color: CP.textPrimary, background: alpha(CP.textPrimary, "06") }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" /></svg>
+              </a>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
       {more}

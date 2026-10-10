@@ -91,7 +91,7 @@ export default function RadarFormat() {
             ];
           })}
         </div>
-        <div style={{ display: "grid", gap: 0, marginTop: 8 }}>
+        <div className="rf-later" style={{ display: "grid", gap: 0, marginTop: 8 }}>
           <div style={{ fontSize: 13, color: CP.textMuted, borderBottom: `1px solid ${CP.border}`, paddingBottom: 6 }}>Per dopo · servono altre persone o bisogna uscire</div>
           {FORMATS.filter((x) => x.later).map((x) => (
             <div key={x.name} style={{ display: "grid", gridTemplateColumns: "minmax(160px, 240px) minmax(0,1fr)", gap: 14, padding: "11px 0", borderBottom: `1px solid ${CP.borderSoft || CP.border}`, fontSize: 14.5 }}>
