@@ -45,7 +45,7 @@ ok(np.includes("COUNT(DISTINCT user_id)") && np.includes("sub_type != 'returning
 const tr = q.trackingSql(refs2, [1], r7);
 ok(tr.includes("clicks_diff") && tr.includes("HAVING") && tr.includes("DATE '2026-09-25'"), "tracking: somme dei diff, solo link attivi, periodo prima");
 ok(q.coperturaSql(refs2, [1], r7).includes("SUM(IF(calendar_date >= DATE '2026-10-02', total, 0))"), "copertura: somma di total");
-ok(q.VIEWS.length === 13 && q.VIEWS.includes("diagnosi") && q.VIEWS.includes("creator"), "11 schede + diagnosi + creator");
+ok(["recap", "copertura", "diagnosi", "creator", "lk-recap", "lk-clicks"].every((v) => q.VIEWS.includes(v)) && new Set(q.VIEWS).size === q.VIEWS.length, "viste note, senza doppioni");
 ok(JSON.stringify(q.defaultRange("tracking", now)) === JSON.stringify({ from: "2026-10-02", to: "2026-10-08" }), "tracking: 7 giorni come Looker");
 
 // fase 3

@@ -8,7 +8,9 @@
 // li decide lib/analisi-vendite.js). `ids` = creator_id già filtrati per
 // split + creator visibili all'utente: qui si validano solo come numeri.
 
-export const VIEWS = ["recap", "conversioni", "rapporto", "meta-mese", "transazioni", "nuovi-abbonati", "tracking", "copertura", "notifiche", "welcome", "ricerca-fan", "diagnosi", "creator"];
+export const VIEWS = ["recap", "conversioni", "rapporto", "meta-mese", "transazioni", "nuovi-abbonati", "tracking", "copertura", "notifiche", "welcome", "ricerca-fan", "diagnosi", "creator",
+  // Report Looker (pagine copiate 1:1, lib/looker-sql.js)
+  "lk-recap", "lk-clicks", "lk-welcome", "lk-perf", "lk-tx", "lk-users", "lk-chargebacks", "lk-overall", "lk-newsubs"];
 
 const DAY = 86400e3;
 const isoDay = (t) => new Date(t).toISOString().slice(0, 10);
@@ -23,7 +25,11 @@ export function defaultRange(view, now = new Date()) {
   const y = isoDay(now.getTime() - DAY);
   // notifiche: dati in tempo reale → il periodo arriva fino a OGGI (come Looker)
   if (view === "notifiche") return { from: isoDay(now.getTime() - 13 * DAY), to: isoDay(now.getTime()) };
-  const days = view === "conversioni" ? 28 : view === "recap" || view === "welcome" ? 14 : 7; // diagnosi e creator: 7 contro 7
+  // Report Looker: i periodi di default delle pagine Looker (Transactions Details = oggi; User research e
+  // Chargeback Stats = ultimi 30 giorni fino a oggi)
+  if (view === "lk-tx") return { from: isoDay(now.getTime()), to: isoDay(now.getTime()) };
+  if (view === "lk-users" || view === "lk-chargebacks") return { from: isoDay(now.getTime() - 29 * DAY), to: isoDay(now.getTime()) };
+  const days = view === "conversioni" ? 28 : ["recap", "welcome", "lk-recap", "lk-welcome", "lk-perf"].includes(view) ? 14 : 7; // diagnosi e creator: 7 contro 7
   if (view === "rapporto" || view === "meta-mese") return { from: `${y.slice(0, 7)}-01`, to: y };
   return { from: isoDay(parseDay(y) - (days - 1) * DAY), to: y };
 }

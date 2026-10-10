@@ -21,6 +21,11 @@ import {
   diagnosiSql, diagnosiDailySql,
 } from "@/lib/analisi-vendite-sql";
 import { buildDiagnosi, summaryOf } from "@/lib/analisi-vendite-diagnosi";
+import {
+  lkRecapDailyNetSql, lkRecapDailySubsSql, lkClicksSql, lkWelcomeDailySql, lkPerfSql, lkSubsRangeSql, lkAmountRangeSql,
+  lkTxSummarySql, lkTxSeriesSql, lkTxTopUsersSql, lkTxListSql, lkUsersSql, lkChargebacksSql, lkOverallSql, lkOverallDailySql,
+  lkNewsubsDailySql, lkNewsubsListSql, lkNewsubsCreatorSql,
+} from "@/lib/looker-sql";
 import { LIVE_CREATORS } from "@/lib/live-creators";
 
 function daysOf(range) {
@@ -50,6 +55,9 @@ const TABLES = {
   welcomeUnlocks: ["onlyfans", "welcome_unlocks"],
   usersResearch: ["onlyfans", "users_research"],
   chat: ["onlyfans", "chat"],
+  // viste del warehouse usate dal Report Looker (non sono nella copia di sicurezza: senza warehouse non rispondono)
+  daysSubbed: ["hoc", "days_subbed_range"],
+  txByAmount: ["hoc", "transactions_by_amount"],
 };
 
 function refsFor(source) {
@@ -121,7 +129,11 @@ function shape(view, rows, names, range) {
       })
       .sort((a, b) => a.name.localeCompare(b.name, "it"));
     const t = list.reduce((a, r) => ({ new_subs: a.new_subs + r.new_subs, converted: a.converted + r.converted, users: a.users + r.users, transactions: a.transactions + r.transactions, revenue: a.revenue + r.revenue }), { new_subs: 0, converted: 0, users: 0, transactions: 0, revenue: 0 });
-    return { rows: list, total: { ...t, revenue: r2(t.revenue), cr: t.new_subs ? t.converted / t.new_subs : null, per_transaction: t.transactions ? r2(t.revenue / t.transactions) : null }, previous: previousRange(range) };
+    // % Δ anche sul totale, come la riga "Totale complessivo" di Looker KPI Sales
+    const tp = rows[0].reduce((a, r) => ({ new_subs: a.new_subs + (Number(r.new_subs_prev) || 0), converted: a.converted + (Number(r.converted_prev) || 0), revenue: a.revenue + (Number(r.revenue_prev) || 0) }), { new_subs: 0, converted: 0, revenue: 0 });
+    const crT = t.new_subs ? t.converted / t.new_subs : null;
+    const crTp = tp.new_subs ? tp.converted / tp.new_subs : null;
+    return { rows: list, total: { ...t, revenue: r2(t.revenue), cr: crT, cr_delta: crT != null && crTp ? (crT - crTp) / crTp : null, revenue_delta: pctDelta(t.revenue, tp.revenue), per_transaction: t.transactions ? r2(t.revenue / t.transactions) : null }, previous: previousRange(range) };
   }
   if (view === "rapporto") {
     return { rows: rows[0].map((r) => ({ creator_id: Number(r.creator_id), name: nameOf(r.creator_id), month: r.month, transactions: Number(r.transactions), revenue: r2(r.revenue), avg: r2(r.avg), median: r2(r.median), rr: r.rr == null ? null : Math.round(r.rr * 100) / 100 })).sort((a, b) => a.name.localeCompare(b.name, "it") || b.month.localeCompare(a.month)) };
@@ -204,6 +216,7 @@ function shape(view, rows, names, range) {
       byCreator: Object.values(byCreator).map((c) => ({ ...c, total: sum(c) })).sort((a, b) => b.total - a.total),
       daily: Object.values(byDay).map((d) => ({ ...d, total: sum(d) })).sort((a, b) => a.day.localeCompare(b.day)),
       hourly: byHour,
+      dayHour: agg.reduce((acc, r) => { const k = `${r.day}|${Number(r.hour)}`; acc[k] = (acc[k] || 0) + (Number(r.n) || 0); return acc; }, {}),
       list: list.map((r) => ({ ...r, creator_id: Number(r.creator_id), name: nameOf(r.creator_id) })),
     };
   }
@@ -249,6 +262,140 @@ function shape(view, rows, names, range) {
       previous: previousRange(range),
     };
   }
+  if (view === "lk-recap") {
+    // Looker "Recap Dashboard": tabella per creator (net / nuovi abbonati con % Δ), linee giornaliere, quote
+    const [agg, dn, ds] = rows;
+    const days = daysOf(range);
+    const series = (daily, ranked) => {
+      const by = {};
+      for (const r of daily) (by[Number(r.creator_id)] ||= {})[r.day] = Number(r.v) || 0;
+      return ranked.map((r) => ({ creator_id: r.creator_id, label: r.name, values: days.map((dd) => r2((by[r.creator_id] || {})[dd] || 0)) }));
+    };
+    const list = agg.map((r) => ({ creator_id: Number(r.creator_id), name: nameOf(r.creator_id), net: r2(r.net), net_prev: r2(r.net_prev), net_delta: pctDelta(r.net, r.net_prev), subs: Number(r.subs) || 0, subs_prev: Number(r.subs_prev) || 0, subs_delta: pctDelta(r.subs, r.subs_prev) }));
+    const byNet = [...list].sort((a, b) => b.net - a.net);
+    const bySubs = [...list].sort((a, b) => b.subs - a.subs);
+    const t = list.reduce((a, r) => ({ net: a.net + r.net, net_prev: a.net_prev + r.net_prev, subs: a.subs + r.subs, subs_prev: a.subs_prev + r.subs_prev }), { net: 0, net_prev: 0, subs: 0, subs_prev: 0 });
+    return {
+      net: byNet, subs: bySubs, days,
+      netSeries: series(dn, byNet), subsSeries: series(ds, bySubs),
+      total: { net: r2(t.net), net_delta: pctDelta(t.net, t.net_prev), subs: t.subs, subs_delta: pctDelta(t.subs, t.subs_prev) },
+      previous: previousRange(range),
+    };
+  }
+  if (view === "lk-clicks") {
+    // Looker "Clicks Overall": righe creator × mese con % Δ sulla stessa riga del periodo prima (vedi looker-sql)
+    const [agg] = rows;
+    const MONTHS = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
+    const list = agg.filter((r) => r.in_range === true || r.in_range === "true").map((r) => {
+      const cr = Number(r.clicks) ? Number(r.subs) / Number(r.clicks) : null;
+      const crPrev = Number(r.clicks_prev) ? Number(r.subs_prev) / Number(r.clicks_prev) : null;
+      return {
+        creator_id: Number(r.creator_id), name: nameOf(r.creator_id), month: r.month, month_label: `${MONTHS[Number(r.month.slice(5, 7)) - 1]} ${r.month.slice(0, 4)}`,
+        clicks: Number(r.clicks) || 0, clicks_delta: pctDelta(r.clicks, r.clicks_prev), subs: Number(r.subs) || 0, subs_delta: pctDelta(r.subs, r.subs_prev),
+        cr, cr_delta: cr != null && crPrev ? (cr - crPrev) / crPrev : null,
+      };
+    }).sort((a, b) => b.clicks - a.clicks);
+    const t = agg.reduce((a, r) => ({ c: a.c + (Number(r.clicks) || 0), cp: a.cp + (Number(r.clicks_prev) || 0), s: a.s + (Number(r.subs) || 0), sp: a.sp + (Number(r.subs_prev) || 0) }), { c: 0, cp: 0, s: 0, sp: 0 });
+    const cr = t.c ? t.s / t.c : null; const crp = t.cp ? t.sp / t.cp : null;
+    return { rows: list, total: { clicks: t.c, clicks_delta: pctDelta(t.c, t.cp), subs: t.s, subs_delta: pctDelta(t.s, t.sp), cr, cr_delta: cr != null && crp ? (cr - crp) / crp : null }, previous: previousRange(range) };
+  }
+  if (view === "lk-welcome") {
+    const w = shape("welcome", [rows[0]], names, range);
+    return { ...w, daily: rows[1].map((r) => ({ day: r.day, subs: Number(r.subs) || 0, unlocks: Number(r.unlocks) || 0 })) };
+  }
+  if (view === "lk-perf") {
+    const [perf, byRange, byCreatorRange, amount] = rows;
+    const list = perf.map((r) => {
+      const n = (k) => Number(r[k]) || 0;
+      const rpt = n("tx") ? n("revenue") / n("tx") : null, rptP = n("tx_prev") ? n("revenue_prev") / n("tx_prev") : null;
+      const rpu = n("users") ? n("revenue") / n("users") : null, rpuP = n("users_prev") ? n("revenue_prev") / n("users_prev") : null;
+      return {
+        creator_id: Number(r.creator_id), name: nameOf(r.creator_id),
+        new_subs: n("new_subs"), new_subs_delta: pctDelta(r.new_subs, r.new_subs_prev), tx: n("tx"), tx_delta: pctDelta(r.tx, r.tx_prev),
+        revenue: r2(n("revenue")), revenue_delta: pctDelta(r.revenue, r.revenue_prev), users: n("users"), users_delta: pctDelta(r.users, r.users_prev),
+        rpt: rpt == null ? null : r2(rpt), rpt_delta: rpt != null && rptP ? (rpt - rptP) / rptP : null,
+        rpu: rpu == null ? null : r2(rpu), rpu_delta: rpu != null && rpuP ? (rpu - rpuP) / rpuP : null,
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name, "it"));
+    const sum = (k) => list.reduce((a, r) => a + (r[k] || 0), 0);
+    const sumP = (k) => perf.reduce((a, r) => a + (Number(r[`${k}_prev`]) || 0), 0);
+    const t = { new_subs: sum("new_subs"), tx: sum("tx"), revenue: r2(sum("revenue")), users: sum("users") };
+    const arppu = (r) => ({ revenue: r2(r.revenue), users: Number(r.users) || 0, arppu: Number(r.users) ? r2(r.revenue / r.users) : null,
+      arppu_delta: Number(r.users) && Number(r.users_prev) ? (r.revenue / r.users - r.revenue_prev / r.users_prev) / (r.revenue_prev / r.users_prev) : null,
+      users_delta: pctDelta(r.users, r.users_prev) });
+    return {
+      rows: list,
+      total: { ...t, new_subs_delta: pctDelta(t.new_subs, sumP("new_subs")), tx_delta: pctDelta(t.tx, sumP("tx")), revenue_delta: pctDelta(t.revenue, sumP("revenue")), users_delta: pctDelta(t.users, sumP("users")),
+        rpt: t.tx ? r2(t.revenue / t.tx) : null, rpu: t.users ? r2(t.revenue / t.users) : null },
+      bySubsRange: byRange.filter((r) => r.k != null && r.k !== "0_UNKNOWN").map((r) => ({ range: r.k, ...arppu(r) })).sort((a, b) => a.range.localeCompare(b.range)),
+      subsRangeTotal: (() => { const r = byRange.find((x) => x.k == null); return r ? arppu(r) : null; })(),
+      byCreatorArppu: byCreatorRange.filter((r) => r.k != null).map((r) => ({ creator_id: Number(r.k), name: nameOf(r.k), ...arppu(r) })).sort((a, b) => (b.arppu || 0) - (a.arppu || 0)),
+      creatorArppuTotal: (() => { const r = byCreatorRange.find((x) => x.k == null); return r ? arppu(r) : null; })(),
+      byAmount: amount.map((r) => ({ range: r.k, tx: Number(r.tx) || 0 })),
+      previous: previousRange(range),
+    };
+  }
+  if (view === "lk-tx") {
+    const [list, summary, series, top] = rows;
+    const cur = summary.find((r) => r.cur === true || r.cur === "true") || {};
+    const prev = summary.find((r) => r.cur === false || r.cur === "false") || {};
+    const net = r2(cur.net), users = Number(cur.users) || 0;
+    const netP = Number(prev.net) || 0, usersP = Number(prev.users) || 0;
+    const byHour = Array.from({ length: 24 }, (_, h) => ({ hour: h, net: 0 }));
+    const byDay = {};
+    for (const r of series) { byHour[Number(r.hour)].net += Number(r.net) || 0; byDay[r.day] = (byDay[r.day] || 0) + (Number(r.net) || 0); }
+    return {
+      rows: list.map((r) => ({ ...r, creator_id: Number(r.creator_id), name: nameOf(r.creator_id), net: r2(r.net), amount: r2(r.amount) })),
+      truncated: list.length >= 1000,
+      totals: { net, net_delta: pctDelta(net, netP), users, users_delta: pctDelta(users, usersP), ltv: users ? r2(net / users) : null,
+        ltv_delta: users && usersP ? (net / users - netP / usersP) / (netP / usersP) : null },
+      byHour: byHour.map((h) => ({ ...h, net: r2(h.net) })),
+      byDay: daysOf(range).map((dd) => ({ day: dd, net: r2(byDay[dd] || 0) })),
+      topUsers: top.map((r) => ({ creator_id: Number(r.creator_id), name: nameOf(r.creator_id), user_id: Number(r.user_id), net: r2(r.net) })),
+      previous: previousRange(range),
+    };
+  }
+  if (view === "lk-users") {
+    // "name" della riga è il nome del FAN: va in fan_name, "name" resta la creator come in tutte le viste
+    const list = rows[0].map((r) => ({ ...r, fan_name: r.name, creator_id: Number(r.creator_id), name: nameOf(r.creator_id), user_id: Number(r.user_id), spent: r.spent == null ? null : r2(r.spent), transactions: Number(r.transactions) || 0 }));
+    return { rows: list, truncated: list.length >= 1000, total: { spent: r2(list.reduce((a, r) => a + (r.spent || 0), 0)), transactions: list.reduce((a, r) => a + r.transactions, 0) } };
+  }
+  if (view === "lk-chargebacks") {
+    const list = rows[0].map((r) => ({ ...r, creator_id: Number(r.creator_id), name: nameOf(r.creator_id), user_id: Number(r.user_id), amount: r2(r.amount) }));
+    const group = (key, label) => Object.values(list.reduce((acc, r) => { const k = r[key] ?? "null"; (acc[k] ||= { [label]: k, amount: 0, ...(key === "creator_id" ? { name: r.name } : {}) }).amount += r.amount; return acc; }, {}))
+      .map((x) => ({ ...x, amount: r2(x.amount) })).sort((a, b) => b.amount - a.amount);
+    return { rows: list, truncated: list.length >= 2000, total: r2(list.reduce((a, r) => a + r.amount, 0)), byUser: group("username", "username"), byCreator: group("creator_id", "creator_id"), paymentTypes: [...new Set(list.map((r) => r.payment_type).filter(Boolean))].sort() };
+  }
+  if (view === "lk-overall") {
+    const [agg, daily] = rows;
+    const a = agg[0] || {};
+    const n = (k) => (a[k] == null ? null : Number(a[k]));
+    const win = (N) => ({
+      subs: { value: n(`subs_${N}`), delta: pctDelta(a[`subs_${N}`], a[`subs_${N}_prev`]) },
+      users: { value: n(`users_${N}`), delta: pctDelta(a[`users_${N}`], a[`users_${N}_prev`]) },
+      rev: { value: r2(n(`rev_${N}`)), delta: pctDelta(a[`rev_${N}`], a[`rev_${N}_prev`]) },
+      rpu: { value: n(`rpu_${N}`) == null ? null : r2(n(`rpu_${N}`)), delta: pctDelta(a[`rpu_${N}`], a[`rpu_${N}_prev`]) },
+      hoc_rpu: { value: n(`hoc_rpu_${N}`) == null ? null : r2(n(`hoc_rpu_${N}`)), delta: pctDelta(a[`hoc_rpu_${N}`], a[`hoc_rpu_${N}_prev`]) },
+      reach: { value: n(`reach_${N}`), delta: pctDelta(a[`reach_${N}`], a[`reach_${N}_prev`]) },
+    });
+    return { windows: { 7: win(7), 14: win(14), 28: win(28) }, daily: daily.map((r) => ({ day: r.day, subs: Number(r.subs) || 0, users: Number(r.users) || 0, rev: r2(r.rev), rpu: r.rpu == null ? null : r2(r.rpu), reach: Number(r.reach) || 0 })), as_of: new Date().toISOString().slice(0, 10) };
+  }
+  if (view === "lk-newsubs") {
+    const base = shape("nuovi-abbonati", rows.slice(0, 4), names, range);
+    const [daily, list, byCreator] = rows.slice(4);
+    return {
+      ...base,
+      daily: daily.map((r) => ({ day: r.day, subs: Number(r.subs) || 0, spend_d0: r2(r.spend_d0), revenue: r2(r.revenue), ltv_d0: Number(r.subs) ? r2(r.spend_d0 / r.subs) : null })),
+      list: list.map((r) => ({ ...r, creator_id: Number(r.creator_id), name: nameOf(r.creator_id), revenue: r2(r.revenue), spend_d0: r2(r.spend_d0) })),
+      creatorCr: byCreator.map((r) => {
+        const subs = Number(r.subs) || 0, conv = Number(r.conv) || 0, subsP = Number(r.subs_prev) || 0, convP = Number(r.conv_prev) || 0;
+        const cr = subs ? conv / subs : null, crP = subsP ? convP / subsP : null;
+        const arppu = conv ? r.revenue / conv : null, arppuP = convP ? r.revenue_prev / convP : null;
+        return { creator_id: Number(r.creator_id), name: nameOf(r.creator_id), subs, conv, conv_delta: pctDelta(conv, convP), cr, cr_delta: cr != null && crP ? (cr - crP) / crP : null,
+          arppu: arppu == null ? null : r2(arppu), revenue: r2(r.revenue) };
+      }).sort((a, b) => b.cr - a.cr),
+    };
+  }
   throw new Error("vista sconosciuta");
 }
 
@@ -265,6 +412,18 @@ const BUILDERS = {
   welcome: (refs, ids, range) => [welcomeSql(refs, ids, range)],
   "ricerca-fan": (refs, ids, range, q) => [ricercaSql(refs, ids, q)],
   diagnosi: (refs, ids, range) => [diagnosiSql(refs, ids, range), diagnosiDailySql(refs, ids, range)],
+  "lk-recap": (refs, ids, range) => [recapSql(refs, ids, range), lkRecapDailyNetSql(refs, ids, range), lkRecapDailySubsSql(refs, ids, range)],
+  "lk-clicks": (refs, ids, range) => [lkClicksSql(refs, ids, range)],
+  "lk-welcome": (refs, ids, range) => [welcomeSql(refs, ids, range), lkWelcomeDailySql(refs, ids, range)],
+  "lk-perf": (refs, ids, range) => [lkPerfSql(refs, ids, range), lkSubsRangeSql(refs, ids, range, "subscription_range"), lkSubsRangeSql(refs, ids, range, "creator_id"), lkAmountRangeSql(refs, ids, range)],
+  "lk-tx": (refs, ids, range, q, f) => [lkTxListSql(refs, ids, range, f), lkTxSummarySql(refs, ids, range, f), lkTxSeriesSql(refs, ids, range, f), lkTxTopUsersSql(refs, ids, range, f)],
+  "lk-users": (refs, ids, range, q, f) => [lkUsersSql(refs, ids, range, f)],
+  "lk-chargebacks": (refs, ids, range, q, f) => [lkChargebacksSql(refs, ids, range, f)],
+  "lk-overall": (refs, ids) => [lkOverallSql(refs, ids, new Date().toISOString().slice(0, 10)), lkOverallDailySql(refs, ids, new Date().toISOString().slice(0, 10))],
+  "lk-newsubs": (refs, ids, range) => [
+    nuoviMetricsSql(refs, ids, range, "sub_type"), nuoviMetricsSql(refs, ids, range, "creator_id"), nuoviPersoneSql(refs, ids, range), nuoviLinkSql(refs, ids, range),
+    lkNewsubsDailySql(refs, ids, range), lkNewsubsListSql(refs, ids, range), lkNewsubsCreatorSql(refs, ids, range),
+  ],
   creator: (refs, ids, range) => [
     diagnosiSql(refs, ids, range), diagnosiDailySql(refs, ids, range), trackingSql(refs, ids, range), chargebackSql(refs, ids, range),
     welcomeSql(refs, ids, range), rapportoSql(refs, ids, { from: `${range.to.slice(0, 7)}-01`, to: range.to }), nuoviMetricsSql(refs, ids, range, "sub_type"),
@@ -280,15 +439,18 @@ export async function getAnalisi(view, ids, query = {}, { force = false } = {}) 
   const range = normalizeRange(view, query);
   const q = view === "ricerca-fan" ? cleanSearch(query.q) : null;
   if (view === "ricerca-fan" && !q) return { view, range, rows: [], needsQuery: true, source: null, computed_at: new Date().toISOString() };
-  const key = `analisi:v5:${view}:${range.from}:${range.to}:${q || ""}:${[...ids].sort((a, b) => a - b).join(",")}`;
+  // filtri delle pagine Looker (link, utente, tipo, spending, username, pagamento): validati nelle query
+  const f = Object.fromEntries(Object.entries(query.f || {}).filter(([, v]) => v != null && String(v).trim() !== "").map(([k, v]) => [k, String(v).trim().slice(0, 80)]));
+  const fk = Object.keys(f).sort().map((k) => `${k}=${f[k]}`).join("&");
+  const key = `analisi:v5:${view}:${range.from}:${range.to}:${q || ""}:${fk}:${[...ids].sort((a, b) => a - b).join(",")}`;
   if (!force) {
     const hit = await kv.get(key).catch(() => null);
     if (hit) return { ...hit, cached: true };
   }
   const creators = await splitCreators();
   const names = Object.fromEntries(creators.map((c) => [c.id, c.name]));
-  const { source, rows } = await runOnSource((refs) => BUILDERS[view](refs, ids, range, q));
-  const out = { view, range, source, computed_at: new Date().toISOString(), ...(q ? { q } : {}), ...shape(view, rows, names, range) };
+  const { source, rows } = await runOnSource((refs) => BUILDERS[view](refs, ids, range, q, f), view.startsWith("lk-") ? { maxBytesBilled: 20 * 1024 ** 3, timeoutMs: 45_000 } : undefined);
+  const out = { view, range, source, computed_at: new Date().toISOString(), ...(q ? { q } : {}), ...(fk ? { filters: f } : {}), ...shape(view, rows, names, range) };
   await kv.set(key, out, { ex: 600 }).catch(() => {});
   return out;
 }
