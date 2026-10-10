@@ -210,7 +210,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/infloww-reconcile",        label: "Controllo dati CP", icon: Link2 },
       { href: "/admin/debug-mapping",            label: "Operatori senza dati CP",   icon: Link2 },
       { href: "/admin/user-mapping",             label: "Collega utenti",  icon: Link2 },
-      { href: "/admin/reports",                  label: "Report Looker",       icon: BarChart3 },
+      { href: "/admin/reports",                  label: "Looker Studio (originale)", icon: BarChart3 },
       { href: "/admin/leaderboard-exclusions",   label: "Esclusioni",      icon: Ban },
       { href: "/admin/group-languages",          label: "Lingua dei gruppi",    icon: Languages },
       { href: "/admin/group-categories",         label: "Categorie dei gruppi", icon: Tags },
