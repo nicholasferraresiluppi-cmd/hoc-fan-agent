@@ -165,4 +165,9 @@ t("Account Manager (senza voce CRM) contro Sales Manager → cambiata", () => {
   assert.equal(contractStatus(["Sales Manager"], [C("a", { kind: KIND.staff, role: "Account Manager", mansione: null }), C("b", { createdAt: 1 })]).flag, "cambiata");
 });
 
+t("le richieste di prova non contano mai per lo stato", () => {
+  assert.equal(contractStatus(["Chatter"], [C("a", { test: true })]).flag, "mancante");
+  assert.equal(requestToContract(req({ test_mode: true })).test, true);
+});
+
 console.log(`hr-contracts: ${n} test ok`);

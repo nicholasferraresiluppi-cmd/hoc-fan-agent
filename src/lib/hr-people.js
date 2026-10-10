@@ -184,7 +184,7 @@ export async function getLog(id, limit = 200) {
 }
 const safeJson = (s) => { try { return JSON.parse(s); } catch { return null; } };
 
-function readCf(person) {
+export function readCf(person) {
   if (!person?.cfEnc) return null;
   if (!hrCryptoConfigured()) return undefined; // c'è ma non si può leggere
   try { return decryptHr(person.cfEnc); } catch { return undefined; }

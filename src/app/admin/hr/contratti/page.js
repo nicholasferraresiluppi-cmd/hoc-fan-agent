@@ -19,7 +19,7 @@ import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Notice, DataTable, SectionTitle, card } from "@/components/ds";
 import { FLAG_LABEL, KIND_LABEL, PERSONNEL_KINDS, statusSentence } from "@/lib/hr-contracts-core";
 import { btnPrimary, btnGhost, input, fetcher, postJson, fmtDate, fmtDateTime } from "@/components/hr-ui";
-import { ContractPill, FLAG_TONE } from "@/components/hr-contracts-ui";
+import { ContractPill, FLAG_TONE, PrepareLink } from "@/components/hr-contracts-ui";
 
 const SIX_MONTHS = 183 * 86400e3;
 
@@ -70,6 +70,7 @@ export default function HrContractsPage() {
   const personCell = (r) => <Link href={`/admin/hr/${r.id}`} style={{ color: CP.textPrimary, textDecoration: "none", fontWeight: 500 }}>{r.name}</Link>;
   const signedCell = (r) => { const c = byId[r.st.latestSigned]; return c ? <span>{c.role || KIND_LABEL[c.kind]}<div style={{ fontSize: 12, color: CP.textMuted }}>firmato il {fmtDate(c.signedAt || c.createdAt)}</div></span> : <span style={{ color: CP.textMuted }}>—</span>; };
   const mansCell = (r) => (r.mansioni || []).join(", ") || <span style={{ color: CP.textMuted }}>non indicata</span>;
+  const prepCol = { key: "prep", label: "", sortable: false, render: (r) => <span onClick={(e) => e.stopPropagation()}><PrepareLink personId={r.id} /></span> };
   const whatCell = (r) => <span style={{ fontSize: 13, color: CP.textSecondary }}>{statusSentence(r.st, byId, fmtDate)}</span>;
 
   return (
@@ -107,11 +108,11 @@ export default function HrContractsPage() {
 
           <Group id="cambiata" title="Mansione cambiata: serve un contratto nuovo" rows={groups.cambiata}
             intro="La mansione scritta nel CRM non è coperta da nessun contratto firmato. O si prepara il contratto nuovo, o la mansione nel CRM è sbagliata e va corretta: in entrambi i casi questa riga sparisce da sola."
-            columns={[{ key: "name", label: "Persona", sort: (r) => r.name, render: personCell }, { key: "crm", label: "Nel CRM", sortable: false, render: mansCell }, { key: "c", label: "Contratto firmato", sortable: false, render: signedCell }, { key: "phase", label: "Fase", sort: (r) => r.phase || "", render: (r) => r.phase || "—", muted: true }]} />
+            columns={[{ key: "name", label: "Persona", sort: (r) => r.name, render: personCell }, { key: "crm", label: "Nel CRM", sortable: false, render: mansCell }, { key: "c", label: "Contratto firmato", sortable: false, render: signedCell }, { key: "phase", label: "Fase", sort: (r) => r.phase || "", render: (r) => r.phase || "—", muted: true }, prepCol]} />
 
           <Group id="mancante" title="Senza contratto" rows={[...(groups.mancante || []), ...(groups.risolto || [])]}
             intro="Nessun contratto su Dropbox Sign (o l'ultimo atto è una risoluzione). Se il contratto esiste ma è intestato in modo diverso, collegalo a mano qui sotto in «Contratti senza scheda»."
-            columns={[{ key: "name", label: "Persona", sort: (r) => r.name, render: personCell }, { key: "f", label: "Stato", sort: (r) => r.st.flag, render: (r) => <ContractPill flag={r.st.flag} /> }, { key: "crm", label: "Mansione", sortable: false, render: mansCell }, { key: "phase", label: "Fase", sort: (r) => r.phase || "", render: (r) => r.phase || "—", muted: true }]} />
+            columns={[{ key: "name", label: "Persona", sort: (r) => r.name, render: personCell }, { key: "f", label: "Stato", sort: (r) => r.st.flag, render: (r) => <ContractPill flag={r.st.flag} /> }, { key: "crm", label: "Mansione", sortable: false, render: mansCell }, { key: "phase", label: "Fase", sort: (r) => r.phase || "", render: (r) => r.phase || "—", muted: true }, prepCol]} />
 
           <Group id="in_firma" title="In attesa di firma" rows={[...(groups.in_firma || []), ...(groups.cambiata_in_firma || [])]}
             intro="Contratti inviati e non ancora firmati: quando la persona firma, la scheda si aggiorna da sola."
