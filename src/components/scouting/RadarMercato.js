@@ -4,7 +4,7 @@
 import { useMemo } from "react";
 import { CP, alpha } from "@/lib/brand";
 import { marketByGroup } from "@/lib/scouting-core";
-import { NICHE_INDEX, REEL_RULES, REEL_TYPES, COMPETITOR, MARKET_ASOF } from "@/lib/scouting-market";
+import { NICHE_INDEX, REEL_RULES, REEL_TYPES, COMPETITOR, MARKET_ASOF, CAPTION_STUDY } from "@/lib/scouting-market";
 import { SERIF, NUM, fmtFull, H2, igProfile } from "./radar-ui";
 
 const W = 720, H = 360, X0 = 40, X1 = 700, Y0 = 20, Y1 = 330;
@@ -104,6 +104,29 @@ export default function RadarMercato({ creators }) {
           </table>
         </div>
         <p style={{ margin: 0, fontSize: 13, color: CP.textMuted }}>Descrittivo: dice cosa c&apos;è nei reel che esplodono, non che un tipo esploda più spesso. Studio del {MARKET_ASOF}.</p>
+      </section>
+
+      <section aria-labelledby="rm-cap" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <H2 id="rm-cap" sub={CAPTION_STUDY.who}>Le creator che vivono di caption</H2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 24 }}>
+          {CAPTION_STUDY.findings.map((f) => (
+            <div key={f.title} style={{ display: "flex", flexDirection: "column", gap: 8, borderTop: `1px solid ${f.tone === "up" ? CP.gold : CP.borderSoft || CP.border}`, paddingTop: 14 }}>
+              <span style={{ ...SERIF, fontSize: 34, lineHeight: 1, color: f.tone === "up" ? CP.gold : CP.textMuted }}>{f.v}</span>
+              <span style={{ fontSize: 15 }}>{f.title}</span>
+              <span style={{ fontSize: 13, color: CP.textSecondary }}>{f.text}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "14px 28px" }}>
+          {CAPTION_STUDY.families.map((f, i) => (
+            <div key={f.t} style={{ display: "flex", flexDirection: "column", gap: 6, borderTop: `1px solid ${CP.borderSoft || CP.border}`, paddingTop: 12 }}>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>{i + 1} · {f.t}</span>
+              <span style={{ fontSize: 13.5, color: CP.textSecondary }}>{f.d}</span>
+              {f.ex.map((e) => <span key={e} style={{ ...SERIF, fontSize: 18, lineHeight: 1.3 }}>{e}</span>)}
+            </div>
+          ))}
+        </div>
+        <p style={{ margin: 0, fontSize: 13, color: CP.textMuted }}>Frasi lette dalle copertine dei reel. Studio del {CAPTION_STUDY.asof}.</p>
       </section>
 
       <section aria-labelledby="rm-conc" style={{ display: "flex", flexWrap: "wrap", gap: "28px 52px", borderTop: `1px solid ${CP.border}`, paddingTop: 36 }}>
