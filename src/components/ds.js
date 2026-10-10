@@ -43,7 +43,7 @@ export function PageHead({ crumbs = [], title, line2, subtitle, actions }) {
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 420px" }}>
           <h1 className="ds-h1" style={{ fontSize: 28, fontWeight: 500, margin: "0 0 4px", letterSpacing: "-0.01em", color: CP.textPrimary }}>{title}{st === "v3" && line2 && <><br /><em className="ds-h1-em">{line2}</em></>}</h1>
-          {subtitle && <p className="ds-sub" style={{ fontSize: 14, color: CP.textSecondary, margin: 0, maxWidth: 760, lineHeight: 1.5 }}>{subtitle}</p>}
+          {subtitle && <p className="ds-sub" onClick={(e) => e.currentTarget.toggleAttribute("data-open")} style={{ fontSize: 14, color: CP.textSecondary, margin: 0, maxWidth: 760, lineHeight: 1.5 }}>{subtitle}</p>}
         </div>
         {actions && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{actions}</div>}
       </div>

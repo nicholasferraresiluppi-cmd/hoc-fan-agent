@@ -107,9 +107,11 @@ export default function CittaPage() {
   const bar = <Bar view={view} setView={setView} data={data} setMonth={setMonth} fixed={view === "city"} mineOnly={mineOnly} setMineOnly={setMineOnly} />;
   return (
     <>
-      {view === "city" ? <CityScene key={`${data.month || "cur"}-${mineOnly ? "mine" : "all"}`} data={scene} /> : <CityTable data={data} bar={bar} />}
+      {/* barra PRIMA della scena: su desktop è fissa (l'ordine non conta), su telefono sta in
+          cima nel flusso — fissa finiva sotto l'intestazione e usciva dallo schermo (10/10/2026) */}
       {view === "city" && bar}
-      <style>{`.ct-bar.ct-fixed{position:fixed;top:24px;left:calc(248px + (100vw - 248px)/2);transform:translateX(-50%);z-index:35}`}</style>
+      {view === "city" ? <CityScene key={`${data.month || "cur"}-${mineOnly ? "mine" : "all"}`} data={scene} /> : <CityTable data={data} bar={bar} />}
+      <style>{`@media (min-width:900px){.ct-bar.ct-fixed{position:fixed;top:24px;left:calc(248px + (100vw - 248px)/2);transform:translateX(-50%);z-index:35}}`}</style>
     </>
   );
 }
@@ -144,7 +146,7 @@ function Bar({ view, setView, data, setMonth, fixed, mineOnly, setMineOnly }) {
 .ct-seg button{font:inherit;font-family:var(--f-sans),Manrope,sans-serif;font-size:13.5px;color:rgba(242,238,230,.6);background:none;border:0;border-radius:999px;padding:7px 14px;cursor:pointer}
 .ct-seg .ct-lnk{font-family:var(--f-sans),Manrope,sans-serif;font-size:13.5px;color:rgba(242,238,230,.6);text-decoration:none;padding:7px 14px}
 .ct-seg button[aria-pressed="true"]{background:#F2EEE6;color:#111}
-@media (max-width:899px){.ct-bar.ct-fixed{left:50%;top:66px}}`}</style>
+@media (max-width:899px){.ct-bar.ct-fixed{position:fixed;top:calc(124px + env(safe-area-inset-top,0px));left:0;right:0;transform:none;z-index:35;display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100vw;box-sizing:border-box;padding:10px 12px}.ct-bar{max-width:100%;flex-wrap:wrap}.ct-seg{flex-shrink:0}.ct-seg button,.ct-seg .ct-lnk{padding:7px 11px}}`}</style>
     </>
   );
 }
