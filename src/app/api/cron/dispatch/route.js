@@ -97,6 +97,10 @@ export async function POST(request) {
   // aspetta i batch AI; tetto di spesa giornaliero in KV smai:config)
   out.sales_ai = await kickEndpoint(request, "/api/cron/sales-ai");
 
+  // Fan da recuperare (10/10/2026): fan che valevano e si sono fermati + bozza di ripresa
+  // personale (Sonnet 5 in batch, catena propria, tetto mensile condiviso con "Perché, nelle chat")
+  out.recupero = await kickEndpoint(request, "/api/cron/recupero");
+
   // copia di sicurezza del warehouse HOC nel progetto di Nicholas (09/10/2026):
   // job BigQuery asincroni nella SUA route, esito letto al giro dopo
   out.warehouse_backup = await kickEndpoint(request, "/api/cron/warehouse-backup");
