@@ -190,3 +190,15 @@ console.log(`scouting: ${n} asserzioni ok`);
   assert.equal(r.profiles[0].pic, u);
   console.log("foto profilo + gancio: ok");
 }
+
+// --- aggiornamento parziale (giro foto): chi non è nel run non conta un "mancato"
+{
+  const { applyPartialRefresh } = await import("../src/lib/scouting-core.js");
+  const pic = "https://scontent.cdninstagram.com/x.jpg?oe=6A000000";
+  const r = applyPartialRefresh([{ h: "a", fol: 1 }, { h: "b", fol: 2 }], [{ Account: "a", "Followers Count": 5, "Profile Picture": pic }]);
+  assert.equal(r.profiles[0].fol, 5);
+  assert.equal(r.profiles[0].pic, pic);
+  assert.equal(r.profiles[1].missing, undefined, "b non era nel run: resta com'era");
+  assert.equal(r.updated, 1); assert.equal(r.pics, 1);
+  console.log("aggiornamento parziale: ok");
+}

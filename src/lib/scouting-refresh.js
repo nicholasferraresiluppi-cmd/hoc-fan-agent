@@ -10,13 +10,13 @@
 // Strumento: afanasenko/instagram-profile-scraper (legge anche i profili con limite d'età,
 // a differenza di apify/instagram-profile-scraper — verificato il 9/10/2026).
 import { getProfiles, saveProfiles, getRefreshState, setRefreshState, getForgotten } from "@/lib/scouting-store";
-import { applyRefresh, weekKey } from "@/lib/scouting-core";
+import { applyRefresh, applyPartialRefresh, weekKey } from "@/lib/scouting-core";
 
 const ACTOR = "afanasenko~instagram-profile-scraper";
 const API = "https://api.apify.com/v2";
 const PRICE_PER_PROFILE = 0.01;
 const MIN_DAYS = 6.5;
-const FIELDS = ["Account", "Followers Count", "Median Views", "Views.Followers Ratio", "Median ER", "External URL", "Biography", "Analysis Status"].join(",");
+const FIELDS = ["Account", "Followers Count", "Median Views", "Views.Followers Ratio", "Median ER", "External URL", "Biography", "Analysis Status", "Profile Picture"].join(",");
 
 export const apifyConfigured = () => Boolean(process.env.APIFY_TOKEN);
 
@@ -58,6 +58,15 @@ async function collect(datasetId) {
     if (page.length < 1000) break;
   }
   return items;
+}
+
+/** Applica il risultato di un run già fatto (es. giro delle foto) solo ai profili che contiene. */
+export async function applyDatasetPartial(datasetId) {
+  if (!/^[A-Za-z0-9]{8,30}$/.test(String(datasetId || ""))) throw new Error("dataset non valido");
+  const items = await collect(datasetId);
+  const res = applyPartialRefresh(await getProfiles(), items);
+  await saveProfiles(res.profiles);
+  return { items: items.length, updated: res.updated, pics: res.pics };
 }
 
 /** Un passo della macchina a stati. `force` = lancia anche se l'ultimo giro è recente (bottone admin). */
