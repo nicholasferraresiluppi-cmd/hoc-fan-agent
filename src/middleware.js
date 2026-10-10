@@ -34,6 +34,9 @@ const isPublicRoute = createRouteMatcher([
   // del corpo (header Signature, segreto OFAPI_WEBHOOK_SECRET); senza segreto
   // configurato rifiuta tutto. Vedi lib/ofapi-webhook-core.
   '/api/webhooks/ofapi',
+  // Radar creator (10/10/2026): segnalazione dal Comando rapido dell'iPhone. Si difende da
+  // sola col token personale (hash in scouting:tokens) + tetto d'uso; accetta solo un link.
+  '/api/scouting/segnala',
 ]);
 const isApiRoute = createRouteMatcher(['/api/(.*)']);
 
@@ -72,7 +75,7 @@ export const config = {
   // che devono aprirsi anche dal modulo pubblico /hr/modulo (chi lo compila non ha un account Clerk).
   // Solo file statici di public/: nessuna route né API diventa pubblica.
   matcher: [
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|mp4|webm)).*)',
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|mp4|webm|shortcut)).*)',
     '/(api|trpc)(.*)',
   ],
 };
