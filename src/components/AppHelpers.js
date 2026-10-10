@@ -27,17 +27,18 @@ export function SecurityBanner() {
   return (
     <div className="hoc-banner" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: CP.dangerSoft, borderBottom: `1px solid ${CP.border}`, fontSize: 13, color: CP.textPrimary, flexWrap: "wrap" }}>
       <ShieldAlert size={16} color={CP.accentRed} />
-      <span style={{ flex: "1 1 300px" }}>
+      <style>{`.hoc-b-short{display:none}@media (max-width:699px){.hoc-b-long{display:none}.hoc-b-short{display:inline}.hoc-banner{flex-wrap:nowrap !important;padding:8px 14px !important}}`}</style>
+      <span style={{ flex: "1 1 auto", minWidth: 0 }}>
         {sec.mfa_required
           ? "I poteri da admin sono sospesi: il tuo account non ha la verifica in due passaggi, che ora è obbligatoria per gli admin."
-          : "Sei admin e vedi i dati di tutti: proteggi l'account con la verifica in due passaggi (un codice dal telefono oltre alla password)."}
+          : <><span className="hoc-b-long">Sei admin e vedi i dati di tutti: proteggi l&apos;account con la verifica in due passaggi (un codice dal telefono oltre alla password).</span><span className="hoc-b-short">Attiva la verifica in due passaggi.</span></>}
       </span>
-      <button onClick={() => openUserProfile()} style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: CP.accent, color: CP.accentInk, fontSize: 12, cursor: "pointer" }}>
+      <button onClick={() => openUserProfile()} style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: CP.accent, color: CP.accentInk, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
         Attivala ora
       </button>
       {!sec.mfa_required && (
         <button onClick={() => { try { localStorage.setItem("hoc:mfa-snooze", String(Date.now() + 86400000)); } catch {} setSnoozed(true); }}
-          style={{ padding: "6px 10px", borderRadius: 7, border: `1px solid ${CP.border}`, background: "transparent", color: CP.textSecondary, fontSize: 12, cursor: "pointer" }}>
+          style={{ padding: "6px 10px", borderRadius: 7, border: `1px solid ${CP.border}`, background: "transparent", color: CP.textSecondary, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
           Più tardi
         </button>
       )}

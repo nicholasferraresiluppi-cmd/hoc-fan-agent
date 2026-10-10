@@ -31,6 +31,7 @@ import { WORKSPACES, workspaceSections } from "@/lib/workspaces";
 import { fmt$, fmtInt, fmtDelta, fmtAgo, MONTHS_IT } from "@/lib/format";
 import { useStyle } from "@/lib/theme-client";
 import { PageHead, HeroMetric, Metric, SectionTitle, ActionRow, card } from "@/components/ds";
+import { useIsPhone } from "@/lib/use-phone";
 import { isEarlyMonth } from "@/lib/use-smart-period";
 
 // Tollera 4xx/5xx: ritorna null invece di throware (le metriche mostrano "—")
@@ -169,6 +170,9 @@ const SHORTCUT_GROUPS = SHORTCUT_GROUPS_RAW.map((g) => ({ ...g, items: collapseI
 // descrizione e icona di ogni strumento (anche quelli raccolti in schede), per "I tuoi strumenti" della mansione
 const TOOL_BY_HREF = new Map(SHORTCUT_GROUPS_RAW.flatMap((g) => g.items.map((i) => [i.href, i])));
 
+// Scorciatoie sul telefono quando non c'è una mansione: gli strumenti che si aprono davvero in giro.
+const PHONE_QUICK = ["/admin/scouting", "/admin/le-mie-creator", "/admin/analisi-vendite", "/admin/alerts", "/admin/pnl-live", "/admin/hr"];
+
 export default function AdminHub() {
   const { user } = useUser();
   const [q, setQ] = useState("");
@@ -234,7 +238,7 @@ export default function AdminHub() {
   const base = cmp?.until_day ? cmp.current : agency?.current;
   const basePrev = cmp?.until_day ? cmp.prev : agency?.prev_full;
   const perShift = (x) => (x?.shifts ? x.sales / x.shifts : null);
-  const dl = cmp?.until_day ? `su ${prevName}, stessi giorni` : "sul mese prima";
+  const dl0 = cmp?.until_day ? `su ${prevName}, stessi giorni` : "sul mese prima";
   const lastSync = sync?.meta?.last_sync_at;
   const syncStale = !lastSync || Date.now() - lastSync > 36 * 3600 * 1000;
 
@@ -242,6 +246,10 @@ export default function AdminHub() {
     .sort((a, b) => (a.severity === "critical" ? 0 : 1) - (b.severity === "critical" ? 0 : 1));
 
   const [st] = useStyle();
+  // Telefono (10/10/2026, Nicholas: "sembra un libro"): verdetto corto, 3 alert, decisioni in una riga,
+  // scorciatoie al posto dell'elenco degli strumenti. Il computer resta com'è.
+  const phone = useIsPhone();
+  const dl = phone ? `su ${prevName}` : dl0;
   const allowed = (href) => !me?.authenticated || canSee(href, me.capabilities, me.admin);
   const needle = q.trim().toLowerCase();
   const groups = SHORTCUT_GROUPS.map((g) => ({
@@ -265,7 +273,7 @@ export default function AdminHub() {
     <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         title={`${greeting}${userName ? `, ${userName}` : ""}.`}
-        line2={isHr ? null : paceLine}
+        line2={isHr ? null : phone && dSales != null && cmp?.until_day >= FEW_DAYS && !agency?.incomplete ? `${fmtPct(dSales)} su ${prevName}, stessi giorni.` : paceLine}
         subtitle={isHr ? "Persone, accessi e contestazioni: da qui parti per il lavoro di oggi."
           : paceLine ? (st === "v3" ? null : paceLine) : `Come va ${partial ? "il tuo perimetro" : "l'agenzia"} a ${monthName} e cosa guardare oggi.`}
       />
@@ -282,7 +290,7 @@ export default function AdminHub() {
       {!isHr && !noCreators && <HeroMetric
         label={`${partial ? `Venduto delle tue ${me.creators.count} creator` : "Venduto agenzia"} · ${monthName} finora`}
         value={fmt$(agency?.current?.sales)}
-        compare={compareLine}
+        compare={phone && cmp?.until_day ? `${fmt$(cmp.prev.sales)} a ${prevName} negli stessi giorni` : compareLine}
         hint={<>
           {agency?.incomplete && (
             <Link href={agency.warnings?.[0]?.href || "/admin/alerts"} style={{ display: "inline-block", marginRight: 8, padding: "1px 8px", borderRadius: 999, border: `1px solid ${CP.border}`, color: CP.textSecondary, textDecoration: "none", fontSize: 12 }}
@@ -290,10 +298,11 @@ export default function AdminHub() {
               Dati incompleti
             </Link>
           )}
-          {sync ? `Tutti i turni CreatorsPro, come il P&L · aggiornati ${fmtAgo(lastSync)}${syncStale ? " — più vecchi del solito, controlla il sync" : ""}` : "Tutti i turni CreatorsPro, come il P&L"}
+          {phone ? (syncStale && sync ? `Dati aggiornati ${fmtAgo(lastSync)}: più vecchi del solito` : null)
+            : sync ? `Tutti i turni CreatorsPro, come il P&L · aggiornati ${fmtAgo(lastSync)}${syncStale ? " — più vecchi del solito, controlla il sync" : ""}` : "Tutti i turni CreatorsPro, come il P&L"}
         </>}
       >
-        <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+        <div className="hub-metrics" style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
           <Metric label="Operatori attivi" value={fmtInt(base?.operators)} delta={fmtDelta(base?.operators, basePrev?.operators)} deltaLabel={dl} />
           <Metric label="Creator" value={fmtInt(base?.creators)} />
           <Metric label="Turni" value={fmtInt(base?.shifts)} delta={fmtDelta(base?.shifts, basePrev?.shifts)} deltaLabel={dl} />
@@ -311,21 +320,29 @@ export default function AdminHub() {
               Nessun problema rilevato dai controlli automatici (dati, sync, compensi).
             </div>
           )}
-          {open.slice(0, 5).map((a) => (
+          {open.slice(0, phone ? 3 : 5).map((a) => (
             <ActionRow key={a.fingerprint} severity={a.severity}
-              title={`${a.value ? `${a.value} · ` : ""}${a.title}`}
-              detail={`aperto ${fmtAgo(a.firstSeen)} · ${a.status === "ack" ? `in carico a ${a.ackBy || "?"}` : "nessuno in carico"}`}
+              title={phone ? a.title : `${a.value ? `${a.value} · ` : ""}${a.title}`}
+              detail={phone ? null : `aperto ${fmtAgo(a.firstSeen)} · ${a.status === "ack" ? `in carico a ${a.ackBy || "?"}` : "nessuno in carico"}`}
               href={a.cta?.href && allowed(a.cta.href.split("?")[0]) ? a.cta.href : null} cta={a.cta?.label} />
           ))}
           <div className="ds-open-f" style={{ padding: "10px 16px", borderTop: `1px solid ${CP.borderSoft}` }}>
             <Link href="/admin/alerts" style={{ fontSize: 13, color: CP.accentSoftText, textDecoration: "none" }}>
-              {open.length > 5 ? `Tutti gli alert (${open.length}) →` : "Alert e storico →"}
+              {open.length > (phone ? 3 : 5) ? `Tutti gli alert (${open.length}) →` : "Alert e storico →"}
             </Link>
           </div>
         </section>
       )}
 
-      {wantDecisions && decisions.length > 0 && (
+      {phone && wantDecisions && decisions.length > 0 && (
+        <Link href="/admin/roadmap" style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 16px", marginBottom: 14, textDecoration: "none", color: CP.textPrimary }}>
+          <span><span style={{ fontSize: 15 }}>{decisions.length} {decisions.length === 1 ? "decisione ti aspetta" : "decisioni ti aspettano"}</span>
+            <span style={{ display: "block", fontSize: 12.5, color: CP.textMuted, marginTop: 2 }}>la più vecchia da {daysAgo(decisions[0].added_at) ?? "?"} giorni</span></span>
+          <span style={{ color: CP.accentSoftText }}>→</span>
+        </Link>
+      )}
+
+      {!phone && wantDecisions && decisions.length > 0 && (
         <section className="ds-open" style={{ ...card, marginBottom: 14 }}>
           <div className="ds-open-h" style={{ padding: "14px 16px 10px" }}>
             <SectionTitle aside={`${decisions.length} in attesa, le più vecchie prima`}>Decisioni che aspettano</SectionTitle>
@@ -344,7 +361,7 @@ export default function AdminHub() {
         </section>
       )}
 
-      {loop && (
+      {loop && !phone && (
         <section className="ds-open" style={{ ...card, padding: "14px 16px", marginBottom: 24 }}>
           <SectionTitle aside={loopPeriod === prevId ? `${prevName}: il mese appena chiuso, come la Classifica` : "coaching e sostituzioni del mese scorso, misurati su questo"}>Le decisioni sulle persone funzionano?</SectionTitle>
           <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
@@ -358,6 +375,25 @@ export default function AdminHub() {
         </section>
       )}
 
+      {phone && !needle && !showAll && (() => {
+        const quick = (mine.length ? mine : PHONE_QUICK.map((h) => TOOL_BY_HREF.get(h) && { ...TOOL_BY_HREF.get(h), href: h }).filter(Boolean).filter((it) => allowed(it.href))).slice(0, 6);
+        return quick.length > 0 && (
+          <section style={{ marginBottom: 18 }}>
+            <h2 className="ds-sect" style={{ fontSize: 16, fontWeight: 500, margin: "6px 0 10px", color: CP.textPrimary }}>Vai a</h2>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+              {quick.map((it) => { const Icon = it.icon || LayoutDashboard; return (
+                <Link key={it.href} href={it.href} className="hub-tool" style={{ ...card, display: "flex", flexDirection: "column", gap: 10, padding: "14px 14px 12px", textDecoration: "none", color: CP.textPrimary, minHeight: 86 }}>
+                  <Icon size={18} color={CP.textMuted} strokeWidth={1.8} />
+                  <span style={{ fontSize: 14.5, fontWeight: 500, lineHeight: 1.25 }}>{it.title}</span>
+                </Link>
+              ); })}
+            </div>
+            <button type="button" onClick={() => setShowAll(true)} style={{ display: "block", margin: "12px 0 0", padding: "8px 0", background: "none", border: "none", color: CP.accentSoftText, fontSize: 13.5, fontFamily: FONTS.body, cursor: "pointer" }}>Tutti gli strumenti →</button>
+          </section>
+        );
+      })()}
+
+      {(!phone || needle || showAll) && <>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
         <h2 className="ds-sect" style={{ fontSize: 16, fontWeight: 500, margin: 0, color: CP.textPrimary, flex: "1 1 auto" }}>Strumenti</h2>
         <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", border: `1px solid ${CP.border}`, borderRadius: 8, background: CP.surface, flex: "0 1 320px" }}>
@@ -389,7 +425,9 @@ export default function AdminHub() {
           </div>
         </section>
       ))}
-      <style>{`.hub-tool:hover{background:${CP.surfaceAlt} !important}`}</style>
+      </>}
+      <style>{`.hub-tool:hover{background:${CP.surfaceAlt} !important}
+@media (max-width:699px){.hub-metrics{display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 18px !important}.ds-arow > div{flex:1 1 0 !important}.ds-arow .ds-arow-go{margin-left:20px}}`}</style>
     </div>
   );
 }
