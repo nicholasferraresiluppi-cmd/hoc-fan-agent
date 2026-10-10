@@ -151,6 +151,22 @@ h1, h2, h3, h4, h5, h6 {
   [data-style="v3"] .ds-hero-v { font-size: 46px !important; }
   [data-style="v3"] .ds-metric-v { font-size: 28px !important; }
 }
+/* DataTable su telefono: righe come schede, niente scorrimento di lato (10/10/2026) */
+@media (max-width: 699px) {
+  .ds-tbl-wrap { overflow: visible !important; max-height: none !important; }
+  .ds-tbl { min-width: 0 !important; display: block; }
+  .ds-tbl thead { display: none; }
+  .ds-tbl tbody { display: block; }
+  .ds-tbl tr { display: block; }
+  .ds-tbl tr.ds-tr { padding: 12px 14px; }
+  .ds-tbl tr.ds-tr > td { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 3px 0 !important; height: auto !important; text-align: right !important; position: static !important; background: transparent !important; min-width: 0; overflow-wrap: anywhere; }
+  .ds-tbl tr.ds-tr > td::before { content: attr(data-l); color: var(--cp-textMuted); font-size: 12.5px; text-align: left; flex-shrink: 0; max-width: 45%; }
+  .ds-tbl tr.ds-tr > td[data-l=""]::before { content: none; }
+  .ds-tbl tr.ds-tr > td[data-l=""] { justify-content: flex-start; }
+  .ds-tbl tr.ds-tr > td.ds-first { display: block; text-align: left !important; padding-bottom: 6px !important; font-size: 15px; }
+  .ds-tbl tr.ds-tr > td.ds-first::before { content: none; }
+  .ds-tbl tr.ds-tr > td > * { max-width: 100%; }
+}
 /* ScoreChart (componente nuovo): sotto 520px solo le soglie vicine al valore */
 @media (max-width: 519px) { .ds-sc .ds-sc-far { display: none; } }
 

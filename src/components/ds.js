@@ -205,6 +205,9 @@ export function EarlyMonthNote({ info, periodId, onSwitch }) {
 /**
  * Tabella ordinabile. columns: [{ key, label, align, render(row), sort(row) }]
  * Righe cliccabili con onRowClick; `selected(row)` evidenzia.
+ * Telefono (<700px, globals.css): ogni riga diventa una scheda — la prima colonna di
+ * testo fa da titolo, le altre «etichetta · valore» una sotto l'altra (data-l). Niente
+ * più tabelle tagliate a destra da scorrere di lato (10/10/2026, dall'app iOS).
  */
 export function DataTable({ columns, rows, defaultSort, onRowClick, selected, minWidth = 600, empty = "Nessun dato.", maxHeight, density }) {
   const [sort, setSort] = useState(defaultSort || null);
@@ -267,7 +270,7 @@ export function DataTable({ columns, rows, defaultSort, onRowClick, selected, mi
                 onClick={onRowClick ? () => { if (nav) setActive(i); onRowClick(r); } : undefined}
                 style={{ borderTop: `1px solid ${CP.borderSoft}`, cursor: onRowClick ? "pointer" : "default", background: sel ? CP.accentSoft : "transparent" }}>
                 {columns.map((c, ci) => (
-                  <td key={c.key} className={ci === stickyIdx ? "ds-stk" : undefined} style={{ padding: "9px 12px", textAlign: c.align || "left", color: c.muted ? CP.textSecondary : CP.textPrimary, verticalAlign: "middle", ...(c.align === "right" ? NUM : {}), ...(ci === stickyIdx ? { position: "sticky", left: 0, zIndex: 1, background: sel ? CP.accentSoft : CP.surface } : {}) }}>
+                  <td key={c.key} className={ci === stickyIdx ? "ds-stk ds-first" : undefined} data-l={typeof c.label === "string" ? c.label : ""} style={{ padding: "9px 12px", textAlign: c.align || "left", color: c.muted ? CP.textSecondary : CP.textPrimary, verticalAlign: "middle", ...(c.align === "right" ? NUM : {}), ...(ci === stickyIdx ? { position: "sticky", left: 0, zIndex: 1, background: sel ? CP.accentSoft : CP.surface } : {}) }}>
                     {c.render ? c.render(r) : r[c.key]}
                   </td>
                 ))}
