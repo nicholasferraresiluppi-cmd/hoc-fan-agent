@@ -91,39 +91,51 @@ export async function getView() {
 // ── Sincronizzazione ─────────────────────────────────────────────────────────
 
 /**
- * Un giro completo a budget. `pdfSource(id)` → bytes (di base: download da Dropbox Sign;
+ * Un giro a budget. `pdfSource(id)` → bytes (di base: download da Dropbox Sign;
  * lo script del primo caricamento passa i PDF già scaricati).
+ *
+ * `list: false` (10/10/2026) = giro di sola lettura/allegati sullo store già salvato: l'elenco
+ * di Dropbox Sign da solo richiede ~38 s (9 s per pagina da 100, misurato) e nel giro notturno
+ * non lasciava tempo ai PDF. Il primo giro fa l'elenco, i successivi (catena, vedi la route cron)
+ * leggono i contratti nuovi e allegano i PDF finché non resta niente (`more`).
  */
-export async function syncContracts({ budgetMs = 45_000, pdfSource = downloadContractPdf, by = "sistema" } = {}) {
+export async function syncContracts({ budgetMs = 45_000, pdfSource = downloadContractPdf, by = "sistema", list = true } = {}) {
   if (!dropboxSignConfigured()) return { ok: false, reason: "DROPBOX_SIGN_API_KEY non configurata" };
   const got = await kv.set(K.lock, Date.now(), { nx: true, ex: Math.ceil(budgetMs / 1000) + 30 }).catch(() => "OK");
   if (!got) return { ok: false, reason: "un altro aggiornamento è in corso" };
   const deadline = Date.now() + budgetMs;
-  const stats = { requests: 0, classified: 0, pending: 0, statusSet: 0, attached: 0, attachPending: 0, errors: [] };
+  const stats = { requests: 0, listed: list, classified: 0, pending: 0, statusSet: 0, attached: 0, attachPending: 0, noPdf: 0, errors: [] };
   try {
     const store = await getStore();
     const prev = Object.fromEntries((store.contracts || []).map((c) => [c.id, c]));
-    let reqs;
-    try {
-      reqs = await listAllSignatureRequests();
-    } catch (e) {
-      await kv.set(K.store, { ...store, lastError: { at: Date.now(), message: e.message } });
-      return { ok: false, reason: e.message };
+    let contracts;
+    if (list) {
+      let reqs;
+      try {
+        reqs = await listAllSignatureRequests();
+      } catch (e) {
+        await kv.set(K.store, { ...store, lastError: { at: Date.now(), message: e.message } });
+        return { ok: false, reason: e.message };
+      }
+      contracts = [];
+      for (const r of reqs) {
+        const base = requestToContract(r);
+        const old = prev[base.id];
+        // lettura dal testo firmato = definitiva; dal titolo = da rifare quando arriva la firma
+        const keep = old && old.kind && (old.readFrom === "testo" || (old.readFrom === "titolo" && (base.state !== "firmato" || old.pdfMissing)));
+        contracts.push(keep ? { ...base, kind: old.kind, role: old.role, mansione: old.mansione, readFrom: old.readFrom, pdfMissing: old.pdfMissing || false } : { ...base, kind: null });
+      }
+    } else {
+      contracts = (store.contracts || []).map((c) => ({ ...c }));
     }
-    stats.requests = reqs.length;
-    const contracts = [];
-    for (const r of reqs) {
-      const base = requestToContract(r);
-      const old = prev[base.id];
-      // lettura dal testo firmato = definitiva; dal titolo = da rifare quando arriva la firma
-      const keep = old && old.kind && (old.readFrom === "testo" || (old.readFrom === "titolo" && (base.state !== "firmato" || old.pdfMissing)));
-      contracts.push(keep ? { ...base, kind: old.kind, role: old.role, mansione: old.mansione, readFrom: old.readFrom, pdfMissing: old.pdfMissing || false } : { ...base, kind: null });
-    }
-    // lettura dei contratti nuovi: i non firmati dal titolo (il PDF non c'è), i firmati dal testo
+    stats.requests = contracts.length;
+    // lettura dei contratti nuovi: i non firmati dal titolo (il PDF non c'è), i firmati dal testo.
+    // Quelli non ancora letti restano con kind null: fuori dallo stato (mai una mansione inventata)
+    // e li legge il giro dopo.
     for (const c of contracts) {
       if (c.kind) continue;
       if (c.state !== "firmato") { Object.assign(c, classifyContract({ title: c.title })); stats.classified++; continue; }
-      if (Date.now() > deadline - 4000) { stats.pending++; continue; }
+      if (Date.now() > deadline - 8000) { stats.pending++; continue; }
       let bytes = null;
       try { bytes = await pdfSource(c.id); } catch (e) {
         if (e?.status === 429) { stats.pending++; continue; }
@@ -133,12 +145,11 @@ export async function syncContracts({ budgetMs = 45_000, pdfSource = downloadCon
       Object.assign(c, classifyContract({ text, title: c.title }), { pdfMissing: !bytes });
       stats.classified++;
     }
-    // quelli non ancora letti restano fuori dallo stato fino al prossimo giro (mai una mansione inventata)
-    const ready = contracts.filter((c) => c.kind);
-    const next = { syncedAt: Date.now(), contracts: ready, lastError: null, pendingRead: stats.pending };
+    const next = { syncedAt: list ? Date.now() : store.syncedAt || Date.now(), contracts, lastError: null, pendingRead: stats.pending };
     await kv.set(K.store, next);
     const applied = await applyToCrm({ store: next, deadline, pdfSource, by });
-    Object.assign(stats, applied);
+    Object.assign(stats, applied, { errors: [...stats.errors, ...applied.errors] });
+    stats.more = stats.pending > 0 || stats.attachPending > 0 || (stats.statusPending || 0) > 0;
     return { ok: true, ...stats };
   } finally {
     await kv.del(K.lock).catch(() => {});
@@ -147,16 +158,17 @@ export async function syncContracts({ budgetMs = 45_000, pdfSource = downloadCon
 
 /** Campo «Stato del contratto» + PDF allegati su ClickUp, per tutte le persone abbinate. */
 async function applyToCrm({ store, deadline, pdfSource, by, onlyPersonId = null }) {
-  const out = { statusSet: 0, attached: 0, attachPending: 0, errors: [] };
+  const out = { statusSet: 0, attached: 0, attachPending: 0, noPdf: 0, errors: [] };
   const [people, links, attached] = await Promise.all([listPeople(), getLinks(), getAttached()]);
   const view = buildView(people, store, links, attached);
   const byPersonId = Object.fromEntries(people.map((p) => [p.id, p]));
   const syncOn = hrSyncConfig().enabled;
   for (const [pid, st] of Object.entries(view.persons)) {
     if (onlyPersonId && pid !== onlyPersonId) continue;
-    if (Date.now() > deadline) break;
+    const late = Date.now() > deadline - 6000; // tempo finito: si contano i PDF rimasti, non si esce in silenzio
     const want = desiredContractField(st, st.current);
-    if (want) {
+    if (want && late) out.statusPending = (out.statusPending || 0) + 1;
+    if (want && !late) {
       const r = await savePerson({ id: pid, input: { hvContractStatus: want }, allowed: ["hvContractStatus"], actor: ACTOR, source: "sistema" });
       if (r.ok) out.statusSet++; else out.errors.push(`${view.names[pid]}: ${r.errors?.join(" ")}`);
     }
@@ -168,10 +180,10 @@ async function applyToCrm({ store, deadline, pdfSource, by, onlyPersonId = null 
       if (c.test || c.state !== "firmato" || !(PERSONNEL_KINDS.has(c.kind) || c.kind === KIND.risoluzione)) continue;
       const done = attached[cid];
       if (done && done.taskId === person.clickupTaskId) continue;
-      if (Date.now() > deadline - 6000) { out.attachPending++; continue; }
+      if (late || Date.now() > deadline - 6000) { out.attachPending++; continue; }
       try {
         const bytes = await pdfSource(cid);
-        if (!bytes) continue;
+        if (!bytes) { out.noPdf++; continue; }
         const day = new Date(c.signedAt || c.createdAt).toISOString().slice(0, 10);
         const filename = `${c.title.replace(/[^\p{L}\p{N} .\-]+/gu, "").replace(/\s+/g, " ").trim().slice(0, 90)} (firmato ${day}).pdf`;
         const res = await uploadAttachment(person.clickupTaskId, { filename, bytes, contentType: "application/pdf" });

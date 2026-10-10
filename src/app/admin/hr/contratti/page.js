@@ -54,7 +54,7 @@ export default function HrContractsPage() {
       const j = await postJson("/api/admin/hr/contracts", { action: "sync" });
       const parts = [`${j.requests} contratti su Dropbox Sign`, j.classified ? `${j.classified} letti adesso` : null, j.statusSet ? `${j.statusSet} schede aggiornate` : null, j.attached ? `${j.attached} PDF allegati su ClickUp` : null].filter(Boolean);
       const more = (j.pending || 0) + (j.attachPending || 0);
-      setNotice({ ok: !j.errors?.length, text: `Aggiornato: ${parts.join(", ")}.${more ? ` Ne restano ${more} da completare: premi di nuovo o ci pensa il giro di stanotte.` : ""}${j.errors?.length ? ` Problemi: ${j.errors.slice(0, 3).join("; ")}` : ""}` });
+      setNotice({ ok: !j.errors?.length, text: `Aggiornato: ${parts.join(", ")}.${more ? ` Ne restano ${more} da completare: proseguono da soli in background, ricarica la pagina tra qualche minuto.` : ""}${j.errors?.length ? ` Problemi: ${j.errors.slice(0, 3).join("; ")}` : ""}` });
       await mutate();
     } catch (e) { setNotice({ ok: false, text: e.message }); } finally { setBusy(false); }
   };
@@ -132,7 +132,7 @@ export default function HrContractsPage() {
             <DataTable rows={unmatched} defaultSort={{ key: "at", dir: -1 }} minWidth={900} maxHeight={520} empty="Nessun contratto da collegare."
               columns={[
                 { key: "t", label: "Contratto", sort: (c) => c.title, render: (c) => <span>{c.title}<div style={{ fontSize: 12, color: CP.textMuted }}>{c.signerName || "—"}{c.signerEmail ? ` · ${c.signerEmail}` : ""}</div></span> },
-                { key: "k", label: "Mansione letta", sort: (c) => c.role || c.kind, render: (c) => c.role || KIND_LABEL[c.kind] },
+                { key: "k", label: "Mansione letta", sort: (c) => c.role || c.kind, render: (c) => c.role || KIND_LABEL[c.kind] || "in lettura" },
                 { key: "at", label: "Data", sort: (c) => c.createdAt, render: (c) => <span style={{ whiteSpace: "nowrap" }}>{fmtDate(c.signedAt || c.createdAt)}<div style={{ fontSize: 12, color: CP.textMuted }}>{c.state === "firmato" ? "firmato" : c.state.replace("_", " ")}</div></span> },
                 { key: "a", label: "Collega a", sortable: false, render: (c) => (
                   <span style={{ display: "flex", gap: 6, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>

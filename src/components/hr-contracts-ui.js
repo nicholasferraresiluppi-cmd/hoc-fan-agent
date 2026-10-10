@@ -39,7 +39,7 @@ export function ContractLine({ c, compact = false }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ color: CP.textPrimary, overflowWrap: "anywhere" }}>{c.title || "Contratto"}</div>
         <div style={{ fontSize: 12.5, color: CP.textMuted }}>
-          {c.role || KIND_LABEL[c.kind] || "mansione non letta"}
+          {c.role || KIND_LABEL[c.kind] || "in lettura"}
           {" · "}{STATE_LABEL[c.state] || c.state}{when ? ` il ${fmtDate(when)}` : ""}
           {c.readFrom === "titolo" && c.kind !== "risoluzione" ? " · mansione presa dal titolo" : ""}
           {c.attached ? <> · <Check size={11} style={{ verticalAlign: "-1px" }} /> allegato su ClickUp</> : null}
