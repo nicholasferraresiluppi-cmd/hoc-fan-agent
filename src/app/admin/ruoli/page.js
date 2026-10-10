@@ -24,6 +24,7 @@ import WelcomeCertificate, { certButton } from "@/components/WelcomeCertificate"
 import { WELCOME_FIELDS, composeWelcome, welcomeVars } from "@/lib/welcome-card";
 import { PageHead, SectionTitle, Disclosure, Notice, DataTable, card } from "@/components/ds";
 import { WORKSPACES, WORKSPACE_IDS, defaultWorkspace } from "@/lib/workspaces";
+import { memberIssues } from "@/lib/member-coherence";
 
 const btn = (primary) => ({
   display: "inline-flex",
@@ -194,7 +195,7 @@ export default function MembersPage() {
     setBusy(null);
     load();
   };
-  // mansione mostrata: la scelta salvata, altrimenti quella che il ruolo dà di partenza
+  // vista mostrata: la scelta salvata, altrimenti quella che il ruolo dà di partenza
   const wsOf = (r) => r.workspace || defaultWorkspace({ admin: Boolean(r.admin), roles: r.roles });
 
   const openEditor = (userId) => {
@@ -216,6 +217,7 @@ export default function MembersPage() {
   const neverIn = allRows.filter((r) => !r.last_sign_in_at).length;
   const suspended = allRows.filter((r) => r.banned).length;
   const admins = allRows.filter((r) => r.admin).length;
+  const toFix = allRows.filter((r) => memberIssues(r).length).length;
   const editRow = allRows.find((r) => r.userId === editing) || null;
 
   const columns = [
@@ -232,6 +234,7 @@ export default function MembersPage() {
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
         {r.admin && <span title="Amministratore: vede i dati di tutti e cambia le impostazioni" style={{ fontSize: 12, padding: "2px 9px", borderRadius: 999, background: CP.accentSoft, color: CP.accentSoftText, border: `1px solid ${CP.accent}` }}>Admin</span>}
         <RoleChips ids={storedOf(r).filter((x) => x !== "admin")} label={roleLabel} />
+        {memberIssues(r).length > 0 && <span title={memberIssues(r).map((x) => x.text).join("\n")} style={{ fontSize: 12, padding: "2px 9px", borderRadius: 999, border: `1px solid ${CP.accentRed}`, color: CP.accentRed }}>da sistemare</span>}
       </div>
     ) },
     {
@@ -242,7 +245,7 @@ export default function MembersPage() {
         : <span style={{ color: CP.textMuted }}>nessuna</span>),
     },
     {
-      key: "ws", label: "Mansione", sort: (r) => WORKSPACES[wsOf(r)]?.label || "~",
+      key: "ws", label: "Vista", sort: (r) => WORKSPACES[wsOf(r)]?.label || "~",
       render: (r) => (wsOf(r)
         ? <span style={{ color: CP.textSecondary }} title={r.workspace ? "scelta" : "dal ruolo"}>{WORKSPACES[wsOf(r)].label}{!r.workspace && <span style={{ color: CP.textMuted }}> · dal ruolo</span>}</span>
         : <span style={{ color: CP.textMuted }}>menu personale</span>),
@@ -304,6 +307,7 @@ export default function MembersPage() {
           {` · ${neverIn} ${neverIn === 1 ? "non è mai entrato" : "non sono mai entrati"}`}
           {suspended > 0 && ` · ${suspended} ${suspended === 1 ? "sospeso" : "sospesi"}`}
           {` · ${admins} admin`}
+          {toFix > 0 && <span style={{ color: CP.accentRed }}>{` · ${toFix} da sistemare`}</span>}
         </div>
       )}
 
@@ -376,6 +380,9 @@ export default function MembersPage() {
                 <div style={{ fontSize: 12, color: CP.textMuted }}>{editRow.email}</div>
                 <button style={{ ...smallBtn, marginLeft: "auto" }} onClick={() => setEditing(null)}>Chiudi</button>
               </div>
+              {memberIssues(editRow).map((x) => (
+                <div key={x.code} style={{ fontSize: 13, color: CP.accentRed, marginBottom: 8 }}>{x.text}</div>
+              ))}
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12, padding: "10px 12px", borderRadius: 8, border: `1px solid ${CP.borderSoft}` }}>
                 <div style={{ fontSize: 13, color: CP.textSecondary, marginRight: "auto" }}>
                   Amministratore: <b style={{ fontWeight: 500, color: CP.textPrimary }}>{editRow.admin ? "sì" : "no"}</b>
@@ -386,7 +393,7 @@ export default function MembersPage() {
                   : <button style={smallBtn} disabled={busy === editRow.userId} onClick={() => toggleAdmin(editRow)}>{editRow.admin ? "Togli da admin" : "Rendi admin"}</button>}
               </div>
               <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Mansione: decide menu e pagina iniziale, non i permessi (si salva subito)</div>
+                <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Vista: quali strumenti trova nel menu e la pagina iniziale. Non apre né chiude dati, quelli li decide il ruolo (si salva subito)</div>
                 <WorkspacePicker value={editRow.workspace || ""} fallback={defaultWorkspace({ admin: Boolean(editRow.admin), roles: editRow.roles })}
                   disabled={busy === editRow.userId} onChange={(id) => saveWorkspace(editRow, id)} />
               </div>
@@ -451,7 +458,7 @@ export default function MembersPage() {
           )}
 
           <p style={{ fontSize: 12, color: CP.textMuted, marginTop: 10 }}>
-            Un membro può avere più ruoli: i permessi si sommano. «Vedi come» apre l&apos;app con i suoi permessi, in sola lettura. I ruoli personalizzati si creano in <Link href="/admin/ruoli-custom" style={{ color: CP.accentSoftText }}>Ruoli custom</Link>.
+            <b style={{ fontWeight: 500, color: CP.textSecondary }}>Ruolo</b> = cosa può vedere e fare. <b style={{ fontWeight: 500, color: CP.textSecondary }}>Creator visibili</b> = su quali creator (restringono il ruolo, da sole non aprono niente). <b style={{ fontWeight: 500, color: CP.textSecondary }}>Vista</b> = quali strumenti trova nel menu. Un membro può avere più ruoli: i permessi si sommano. «Vedi come» apre l&apos;app con i suoi permessi, in sola lettura. I ruoli personalizzati si creano in <Link href="/admin/ruoli-custom" style={{ color: CP.accentSoftText }}>Ruoli custom</Link>.
           </p>
         </section>
       )}
@@ -504,7 +511,7 @@ function WorkspacePicker({ value, fallback, onChange, disabled }) {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
       <button type="button" disabled={disabled} aria-pressed={!value} style={chip(!value)} onClick={() => onChange("")}
-        title="La mansione che il ruolo dà di partenza">{!value ? "✓ " : ""}Dal ruolo{fallback ? ` (${WORKSPACES[fallback].label})` : " (menu personale)"}</button>
+        title="La vista che il ruolo dà di partenza">{!value ? "✓ " : ""}Dal ruolo{fallback ? ` (${WORKSPACES[fallback].label})` : " (menu personale)"}</button>
       {WORKSPACE_IDS.map((id) => (
         <button type="button" key={id} disabled={disabled} aria-pressed={value === id} style={chip(value === id)} onClick={() => onChange(id)} title={WORKSPACES[id].hint}>
           {value === id ? "✓ " : ""}{WORKSPACES[id].label}
@@ -580,7 +587,7 @@ function AddMemberModal({ assignable, creatorList = [], onClose, onDone }) {
 
         {!picked.every((r) => r === "operator") && (
           <>
-            <label style={{ display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Mansione</label>
+            <label style={{ display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Vista</label>
             <div style={{ marginBottom: 6 }}><WorkspacePicker value={ws} fallback={defaultWorkspace({ admin: picked.includes("admin"), roles: picked })} onChange={setWs} /></div>
             <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 16 }}>Il menu e la pagina iniziale che vedrà. I permessi restano quelli del ruolo.</div>
           </>
