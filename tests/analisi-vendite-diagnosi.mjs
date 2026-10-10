@@ -85,4 +85,7 @@ const dip = metricsOf({ ...aleT, revenue: 10000, revenue_prev: 7000, revenue_bas
 ok(oddPrevOf(dip) === "dip" && statusOf(dip) === "stabile" && reasonsOf(dip)[0].kind === "dip", "ripresa da un buco = stabile");
 // senza 8 settimane di storia (o con un account nuovo) il livello normale non c'è
 ok(metricsOf({ ...peakT, base_missing: 1 }).revenue_base === null && oddPrevOf(metricsOf({ ...peakT, base_missing: 1 })) === null, "senza storia niente livello normale");
+// zero vendite dopo un periodo normale = account fermo, non "più fan che spendono: 0 invece di 28"
+const zero = reasonsOf(metricsOf({ ...aleT, revenue: 0, spenders: 0, revenue_prev: 1519, spenders_prev: 28, subs: 0, conv_base: 0, conv: 0 }));
+ok(zero.length === 1 && zero[0].kind === "nodata" && zero[0].text.includes("ancora collegato"), "zero vendite: si dice di controllare l'account — " + zero[0].text);
 console.log(`analisi-vendite-diagnosi: ${n} asserzioni ok`);

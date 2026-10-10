@@ -114,12 +114,16 @@ export function statusOf(m) {
 
 /**
  * Il perché, in frasi. La prima è la leva principale; le altre sono segnali di contorno.
- * Ogni frase: { kind, text } con kind = peak | dip | whale | spenders | spend | subs | conversion | traffic | chargeback | steady | data.
+ * Ogni frase: { kind, text } con kind = nodata | peak | dip | whale | spenders | spend | subs | conversion | traffic | chargeback | steady | data.
  */
 export function reasonsOf(m) {
   const out = [];
   const st = statusOf(m);
   if (st === "pochi-dati") return [{ kind: "data", text: "Troppa poca revenue nei due periodi per dire come sta andando." }];
+  // zero vendite dopo un periodo normale: quasi sempre un account scollegato o fermo, non un calo da spiegare
+  if (m.revenue <= 0 && m.spenders === 0 && m.revenue_prev >= MIN_REVENUE_TO_JUDGE) {
+    return [{ kind: "nodata", text: `Nessuna vendita registrata nel periodo (prima ${money(m.revenue_prev)}): controllare se l'account è ancora collegato o attivo prima di leggerlo come un calo.` }];
+  }
 
   // 1. leva principale: quanti fan spendono o quanto spende ciascuno?
   const lnSp = m.spenders && m.spenders_prev ? Math.log(m.spenders / m.spenders_prev) : 0;

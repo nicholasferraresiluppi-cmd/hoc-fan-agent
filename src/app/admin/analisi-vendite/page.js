@@ -683,7 +683,7 @@ function CreatorDetail({ d, onBack, onDati }) {
         <div style={{ fontSize: 12, color: CP.textMuted }}>Perché</div>
         {p.reasons.map((r, i) => <div key={r.kind + i} style={{ fontSize: i ? 14 : 15, color: i ? CP.textSecondary : CP.textPrimary, lineHeight: 1.5 }}>{r.text}</div>)}
       </section>
-      {p.status !== "pochi-dati" && <ChatPerche ids={p.ids} range={d.range} person={p} />}
+      {p.status !== "pochi-dati" && p.reasons[0]?.kind !== "nodata" && <ChatPerche ids={p.ids} range={d.range} person={p} />}
       <div style={{ ...card, padding: 16 }}>
         <BarsChart label="Revenue al giorno" valueKey="revenue" fmt={moneyShort}
           points={p.daily.map((x) => ({ key: x.day, label: dshort(x.day), short: `${x.day.slice(8, 10)}/${x.day.slice(5, 7)}`, revenue: x.revenue }))} />
@@ -907,8 +907,8 @@ function PercheResult({ r }) {
               <div style={{ display: "grid", gap: 6 }}>
                 {c.esempi.map((e, j) => (
                   <div key={j} style={{ display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 11, color: CP.textMuted, width: 200, flex: "0 0 auto", paddingTop: 6 }}>
-                      {e.chi === "noi" ? "Noi" : "Il fan"} · {e.fan}{e.spent_prev ? ` (aveva speso ${moneyShort(e.spent_prev)})` : ""}
+                    <span style={{ fontSize: 11, color: CP.textMuted, width: 240, flex: "0 0 auto", paddingTop: 6 }}>
+                      {e.chi === "noi" ? "Noi a" : "Il fan"} {e.username ? `@${e.username}` : e.fan}{e.spent_prev ? ` (aveva speso ${moneyShort(e.spent_prev)})` : ""}
                     </span>
                     <span style={{ fontSize: 14, color: CP.textPrimary, background: e.chi === "noi" ? CP.accentSoft : CP.surfaceAlt, borderRadius: e.chi === "noi" ? "12px 12px 4px 12px" : "12px 12px 12px 4px", padding: "6px 11px", maxWidth: 560 }}>
                       {e.citazione}{e.ppv ? <span style={{ color: CP.textMuted }}> · PPV ${e.ppv}</span> : null}
@@ -931,6 +931,18 @@ function PercheResult({ r }) {
             </div>
           ))}
         </div>
+      )}
+      {r.fans?.length > 0 && (
+        <details style={{ fontSize: 13, color: CP.textSecondary }}>
+          <summary style={{ cursor: "pointer", color: CP.textMuted }}>I {r.fans.length} fan letti (F01 = {r.dir === "down" ? "chi ha perso di più" : "chi è cresciuto di più"})</summary>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))", gap: "4px 18px", marginTop: 8 }}>
+            {r.fans.map((f) => (
+              <span key={f.label} style={{ fontVariantNumeric: "tabular-nums" }}>
+                <span style={{ color: CP.textMuted }}>{f.label}</span> {f.username ? `@${f.username}` : `id ${f.user_id}`} · {moneyShort(f.prev)} → {moneyShort(f.cur)}
+              </span>
+            ))}
+          </div>
+        </details>
       )}
       <div style={{ fontSize: 12, color: CP.textMuted, lineHeight: 1.5 }}>
         {a.limiti} I conti in alto sono del codice; la lettura è dell&apos;AI. Le frasi citate sono state controllate parola per parola nelle chat

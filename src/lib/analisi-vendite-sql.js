@@ -437,9 +437,11 @@ const percheCond = (dir) => (dir === "up"
 /** I fan da leggere: quelli che hanno spostato di più la revenue nella direzione del cambiamento. */
 export function percheFansSql(refs, ids, range, dir = "down") {
   const list = idList(ids);
+  // username solo per chi guarda la pagina (sales manager): all'AI non arriva (lib/analisi-perche-core.buildPack)
   return `WITH u AS (${percheSpend(refs, list, range)})
-    SELECT creator_id, user_id, prev, cur FROM u WHERE ${percheCond(dir)}
-    ORDER BY ${dir === "up" ? "cur - prev" : "prev - cur"} DESC LIMIT ${PERCHE_MAX_FANS}`;
+    SELECT u.creator_id, u.user_id, u.prev, u.cur, us.username FROM u LEFT JOIN \`${refs.users}\` us ON us.id = u.user_id
+    WHERE ${percheCond(dir).replace(/\b(cur|prev)\b/g, "u.$1")}
+    ORDER BY ${dir === "up" ? "u.cur - u.prev" : "u.prev - u.cur"} DESC LIMIT ${PERCHE_MAX_FANS}`;
 }
 
 /** I conti su TUTTI i fan del gruppo (non solo i letti): quanti, quanti hanno smesso, chi ha smesso di scrivere, a chi non abbiamo scritto. */
@@ -479,7 +481,7 @@ export function percheBlastSql(refs, ids, range) {
     ORDER BY fans DESC LIMIT 40`;
 }
 
-/** Le ultime chat dei fan scelti: dai 10 giorni prima del periodo alla fine, ultimi 30 messaggi per fan. */
+/** Le ultime chat dei fan scelti: dai 10 giorni prima del periodo alla fine, ultimi 24 messaggi per fan (180 caratteri). */
 export function percheChatSql(refs, pairs, range) {
   const clean = pairs.map(([c, u]) => [Number(c), Number(u)]).filter(([c, u]) => Number.isInteger(c) && Number.isInteger(u) && c > 0 && u > 0);
   if (!clean.length) throw new Error("nessun fan");
@@ -487,13 +489,13 @@ export function percheChatSql(refs, pairs, range) {
   const keys = clean.map(([c, u]) => `'${c}:${u}'`).join(",");
   return `SELECT creator_id, user_id, FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', created_at) AS sent_at, sender_id = user_id AS from_fan,
       CAST(price AS FLOAT64) AS price,
-      SUBSTR(TRIM(REGEXP_REPLACE(REGEXP_REPLACE(text, r'<[^>]+>', ' '), r'\\s+', ' ')), 1, 220) AS text
+      SUBSTR(TRIM(REGEXP_REPLACE(REGEXP_REPLACE(text, r'<[^>]+>', ' '), r'\\s+', ' ')), 1, 180) AS text
     FROM (
       SELECT *, ROW_NUMBER() OVER (PARTITION BY creator_id, user_id ORDER BY created_at DESC) AS rn
       FROM \`${refs.chat}\`
       WHERE creator_id IN (${cids}) AND DATE(created_at) BETWEEN DATE_SUB(${d(range.from)}, INTERVAL 10 DAY) AND ${d(range.to)}
         AND CONCAT(CAST(creator_id AS STRING), ':', CAST(user_id AS STRING)) IN (${keys}))
-    WHERE rn <= 30
+    WHERE rn <= 24
     ORDER BY creator_id, user_id, created_at`;
 }
 

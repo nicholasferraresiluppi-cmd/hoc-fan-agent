@@ -69,14 +69,14 @@ export async function runPerche(ids, query, { force = false, by = null } = {}) {
 
     const chatRes = await runOnSource((refs) => [percheChatSql(refs, fanRows.map((f) => [f.creator_id, f.user_id]), range)]);
     const fans = labelFans(fanRows, chatRes.rows[0], names);
-    const pack = buildPack({ person: person.name, range, previous: base.previous, dir, stats, blasts, fans, reasons: person.reasons.map((r) => r.text) });
+    const pack = buildPack({ person: person.name, range, previous: base.previous, dir, stats, blasts, fans, reasons: person.reasons.map((r) => r.text), normal: { base: person.metrics.revenue_base, prev: person.metrics.revenue_prev, cur: person.metrics.revenue } });
 
     const client = new Anthropic();
     const msg = await client.messages.create({
       model: PERCHE_MODEL,
       max_tokens: 16000,
       thinking: { type: "adaptive" },
-      output_config: { effort: "medium", format: { type: "json_schema", schema: PERCHE_SCHEMA } },
+      output_config: { effort: "low", format: { type: "json_schema", schema: PERCHE_SCHEMA } },
       system: PERCHE_SYSTEM,
       messages: [{ role: "user", content: `${pack}\n\nCOMPITO:\n${PERCHE_TASK}` }],
     }).catch((e) => {
@@ -94,6 +94,8 @@ export async function runPerche(ids, query, { force = false, by = null } = {}) {
     const out = {
       ...base, status: "ok", analysis,
       read: { fans: fans.length, messages: fans.reduce((a, f) => a + f.messages.length, 0) },
+      // chi sono i fan letti (per il sales manager: etichetta → username)
+      fans: fans.map((f) => ({ label: f.label, username: f.username, user_id: f.user_id, page: f.page, prev: f.prev, cur: f.cur })),
       ai: { model: msg.model || PERCHE_MODEL, cost_usd: Math.round(cost * 10000) / 10000, input_tokens: msg.usage?.input_tokens, output_tokens: msg.usage?.output_tokens, seconds: Math.round((Date.now() - started) / 1000) },
     };
     await kv.set(key, out, { ex: 7 * 24 * 3600 }).catch(() => {});

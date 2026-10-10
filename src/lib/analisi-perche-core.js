@@ -7,7 +7,7 @@
 //
 // Privacy: all'AI non arrivano id né username dei fan, solo un'etichetta (F01…) e la chat.
 
-export const PERCHE_VERSION = "perche-1";
+export const PERCHE_VERSION = "perche-2"; // v2: livello normale nel pacchetto, sforzo basso, chat più corte
 export const PERCHE_MODEL = "claude-sonnet-5"; // scelta di Nicholas (10/10): ~1/3 del costo di Opus
 
 const r2 = (x) => Math.round((Number(x) || 0) * 100) / 100;
@@ -40,6 +40,9 @@ export function labelFans(fans, chats, names = {}) {
     return {
       label: `F${String(i + 1).padStart(2, "0")}`,
       key: k,
+      // per la pagina (chi è il fan), MAI nel pacchetto per l'AI
+      user_id: Number(f.user_id),
+      username: f.username || null,
       page: names[Number(f.creator_id)] || null,
       prev: r2(f.prev),
       cur: r2(f.cur),
@@ -61,11 +64,16 @@ const hhmm = (iso) => {
 };
 
 /** Il pacchetto testuale per l'AI. I numeri sono già calcolati: l'AI non deve ricalcolarli. */
-export function buildPack({ person, range, previous, dir, stats, blasts, fans, reasons }) {
+export function buildPack({ person, range, previous, dir, stats, blasts, fans, reasons, normal }) {
   const lines = [];
   lines.push(`CREATOR: ${person}`);
   lines.push(`PERIODO: ${range.from} → ${range.to}, confrontato con ${previous.from} → ${previous.to} (giorni UTC).`);
   lines.push(`DIREZIONE: ${dir === "up" ? "la revenue è CRESCIUTA: cerca cosa ha funzionato" : "la revenue è CALATA: cerca cosa è andato storto"}.`);
+  if (normal?.base) {
+    const d = (normal.prev - normal.base) / normal.base;
+    const verdict = d >= 0.2 ? "il periodo prima ERA un picco" : d <= -0.2 ? "il periodo prima era un BUCO" : "il periodo prima NON era un picco né un buco: era nella norma";
+    lines.push(`LIVELLO NORMALE (mediana delle 8 settimane prima, riportata alla durata del periodo): ${money(normal.base)}. Periodo prima ${money(normal.prev)} (${d >= 0 ? "+" : "−"}${Math.abs(Math.round(d * 100))}% sul normale): ${verdict}. Periodo ora ${money(normal.cur)}. Questo giudizio è del codice: NON contraddirlo.`);
+  }
   if (reasons?.length) lines.push(`COSA DICONO GIÀ I NUMERI (calcolati dal codice, non ricalcolarli):\n${reasons.map((r) => `- ${r}`).join("\n")}`);
   if (stats) {
     lines.push(`IL GRUPPO DI FAN (conti del codice su tutti, non solo su quelli che leggi):
@@ -77,7 +85,7 @@ ${dir === "up" ? "" : `- hanno smesso del tutto di comprare: ${stats.stopped}\n`
   if (blasts?.length) {
     lines.push(`STESSO MESSAGGIO NOSTRO A TANTI FAN IN POCHI MINUTI (mandato uno per uno, i mass non sono in questa tabella):\n${blasts.slice(0, 8).map((b) => `- "${b.t}" → ${b.fans} fan in ${b.minutes} min (${hhmm(b.first_at)})`).join("\n")}`);
   }
-  lines.push(`LE CHAT (ultimi 30 messaggi per fan, dai 10 giorni prima del periodo; NOI = chi scrive per la creator; [PPV $x] = contenuto a pagamento proposto):`);
+  lines.push(`LE CHAT (ultimi 24 messaggi per fan, dai 10 giorni prima del periodo; NOI = chi scrive per la creator; [PPV $x] = contenuto a pagamento proposto):`);
   for (const f of fans) {
     lines.push(`\n=== ${f.label}${f.page ? ` (${f.page})` : ""} — speso ${money(f.prev)} nel periodo prima, ${money(f.cur)} ora`);
     if (!f.messages.length) lines.push("(nessun messaggio nella finestra)");
@@ -101,7 +109,8 @@ REGOLE:
 - Ogni causa deve reggersi su più fan; indica quanti dei fan letti la mostrano.
 - Le citazioni vanno copiate PAROLA PER PAROLA da una riga della chat del fan indicato (anche emoji e errori), senza l'ora né "NOI:"/"FAN:". Una citazione inventata o riassunta viene scartata dal controllo automatico.
 - Distingui ciò che dipende dall'operatore (metodo), dal contenuto della creator, dal prezzo, o dal fan stesso (soldi finiti, perso interesse): non dare sempre la colpa all'operatore.
-- Se il periodo prima era un picco, dillo: parte del calo può essere solo un ritorno alla normalità.
+- Se il periodo prima sia stato un picco lo dice il LIVELLO NORMALE nel pacchetto: ripeti quel giudizio, non dedurlo dalle chat.
+- Gli esempi devono MOSTRARE la causa a chi li legge (es. il messaggio identico mandato a tutti, il fan che dice no e l'insistenza dopo): mai una riga qualsiasi come "ok" o un saluto isolato che da sola non prova niente.
 - I fan si chiamano con l'etichetta (F01…), mai per nome.
 - Se le chat non spiegano il cambiamento, dillo chiaramente invece di forzare una causa.`;
 
@@ -178,7 +187,7 @@ export function verifyQuotes(analysis, fans) {
     }).map((e) => {
       const f = byLabel.get(String(e.fan).trim().toUpperCase());
       const hit = f.messages.find((m) => (m.who === "FAN") === (e.chi === "fan") && norm(m.text).includes(norm(e.citazione)));
-      return { fan: f.label, chi: e.chi, citazione: e.citazione, at: hit?.at || null, ppv: hit?.ppv || null, spent_prev: f.prev, spent_cur: f.cur };
+      return { fan: f.label, username: f.username || null, chi: e.chi, citazione: e.citazione, at: hit?.at || null, ppv: hit?.ppv || null, spent_prev: f.prev, spent_cur: f.cur };
     });
     return {
       titolo: String(c.titolo || ""),
