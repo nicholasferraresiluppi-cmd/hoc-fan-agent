@@ -48,3 +48,25 @@ export const COMPETITOR = {
   text: "Due o tre reel al giorno, didascalie lunghe in prima persona che chiudono con una domanda. Un reel a 798 mila view. Occupa la nicchia «matura + mestiere», dove in Italia non c'è quasi nessuno.",
   handles: ["serena.cab_", "serena.onroad", "serena.motore.1", "serena.su_strada", "serena.strada0", "serena.incabina", "serena.direzione_nord"],
 };
+
+// Creator che vivono di caption (studio del 10/10/2026: 967 reel di 50 OnlyFanser, copertine
+// lette una per una). Confronti dentro la stessa creator; tra parentesi quante creator entrano.
+export const CAPTION_STUDY = {
+  asof: "10 ottobre 2026",
+  who: "17 OnlyFanser su 50 vivono di caption: una posa in casa e la frase sopra. Sono account piccoli (15 mila follower mediani contro 63 mila).",
+  findings: [
+    { v: "+79%", tone: "up", title: "La domanda a schermo fa commentare", text: "Quasi il doppio dei commenti per view, ma −26% di view (24 creator). Serve a far scrivere, non a farsi vedere." },
+    { v: "≈ 0", tone: "flat", title: "Il caption reel non fa più view", text: "Stesse view degli altri tipi sulla stessa creator (20). Il vantaggio è il costo: si fa da sola in casa e si ripete." },
+    { v: "≈ 0", tone: "flat", title: "La serie non alza le view del reel", text: "Stesse view di un reel isolato (25), un po' più condivisioni. Il suo effetto su iscritti e fiducia va misurato con un link per serie." },
+    { v: "×3", tone: "up", title: "La confessione è la pista da provare", text: "Molto sopra la media della creator, ma la usano solo 4 creator: è un segnale, non una regola." },
+  ],
+  families: [
+    { t: "Il personaggio con la sua serie", d: "Un ruolo fisso e una situazione che torna.", ex: ["«Collega: Sono sposato! Io:»", "«non so chi è più cavalla tra le due»"] },
+    { t: "L'indovinello con il «senza»", d: "Un gioco di parole da decifrare; lo usano più creator.", ex: ["«La mia debolezza: Mare (senza re), Tuono (senza ono)… Capito?»"] },
+    { t: "La domanda che apre la chat", d: "Meno view, molti più commenti.", ex: ["«Fammi una domanda»"] },
+    { t: "Il doppio senso di casa propria", d: "Una frase innocente legata alla sua terra.", ex: ["«Sono sarda, è ovvio che il sole qui non è la cosa più calda»"] },
+    { t: "La confessione", d: "Prima persona, qualcosa di intimo o di sfida.", ex: ["«Non mi sento bene, ho solo bisogno di un po' d'acqua»"] },
+    { t: "Il gioco con chi guarda", d: "Un numero da trovare, una scelta da fare.", ex: ["«Il numero che vedi dice ciò che devi fare…»"] },
+    { t: "La battuta secca su di sé", d: "Autoironia breve, funziona anche in inglese.", ex: ["«Io quando ho soldi»"] },
+  ],
+};
