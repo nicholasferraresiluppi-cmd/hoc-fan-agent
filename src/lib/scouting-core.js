@@ -476,7 +476,7 @@ export function newCutoff(creators, now = Date.now()) {
 /** Perché guardarla, in parole, solo da fatti che il radar ha. */
 export function whyLines(c, { newCut = Date.now() - 8 * DAY } = {}) {
   const out = [];
-  if (c.fmt && c.fmt !== "nessuno") out.push(`Ha un format che si ripete: ${c.fmt}.`);
+  if (c.fmt && c.fmt !== "nessuno") out.push(`Ha un format che si ripete: ${String(c.fmt).replace(/^altro:\s*/i, "")}.`);
   if (c.link && c.link.strength >= 2) out.push(`${c.link.label} ${c.link.where === "evidenza" ? "nella prima storia in evidenza" : "in bio"}.`);
   else if (c.sig === "forte") out.push("Ha un profilo a pagamento.");
   if (c.g4 != null && c.g4 >= 5) out.push(`Cresce: +${String(c.g4).replace(".", ",")}% di follower in 4 settimane.`);

@@ -188,6 +188,7 @@ console.log(`scouting: ${n} asserzioni ok`);
   const { applyRefresh } = await import("../src/lib/scouting-core.js");
   const r = applyRefresh([{ h: "anna" }], [{ Account: "anna", "Followers Count": 10, "Profile Picture": u }]);
   assert.equal(r.profiles[0].pic, u);
+  assert.equal(hookLine({ sig: "forte", fmt: "altro: valuta il mio outfit" }), "Ha un format che si ripete: valuta il mio outfit.");
   console.log("foto profilo + gancio: ok");
 }
 
