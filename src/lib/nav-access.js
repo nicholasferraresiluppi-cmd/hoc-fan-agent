@@ -40,7 +40,7 @@ export const NAV_ACCESS = {
   "/admin/utilizzo": { type: "admin" },
   // report Looker aziendale: serve un account Google HOC con accesso al report (non gli operatori)
   "/admin/reports": all("scores.view"),
-  // Analisi vendite, Report Looker, Fan da recuperare: authorizeScoped(ANALYTICS_VIEW) + creator assegnate
+  // Analisi vendite, HOC Analytics, Fan da recuperare: authorizeScoped(ANALYTICS_VIEW) + creator assegnate
   "/admin/analisi-vendite": team("analytics.view"), "/admin/looker": team("analytics.view"), "/admin/fan-da-recuperare": team("analytics.view"),
 };
 

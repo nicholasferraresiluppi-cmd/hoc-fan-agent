@@ -2,7 +2,7 @@
 /**
  * Analisi vendite (9-10/10/2026): come vanno le creator e perché, per i sales manager (formule in
  * lib/analisi-vendite-sql.js, verificate al centesimo contro Looker). Le pagine di Looker rifatte 1:1
- * stanno nel Report Looker (/admin/looker); la vecchia vista "Dati completi" a schede è stata tolta
+ * stanno in HOC Analytics (/admin/looker); la vecchia vista "Dati completi" a schede è stata tolta
  * (10/10) e i suoi link (?vista=dati&scheda=…) portano alla pagina Looker corrispondente.
  * Ognuno vede solo le creator che gli sono assegnate.
  */
@@ -256,7 +256,7 @@ function CreatorDetail({ d, onBack, onDati }) {
       <section style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {p.live && <a href={`/admin/le-mie-creator?creator=${encodeURIComponent(p.live)}`} style={actionBtn}>Chat e revenue dal vivo</a>}
         <a href="/admin/sales-coaching" style={actionBtn}>Coaching vendite</a>
-        <button onClick={() => onDati(p.ids)} style={actionBtn}>Tutte le tabelle di {p.name}</button>
+        <button onClick={() => onDati(p.ids)} style={actionBtn}>Apri {p.name} in HOC Analytics</button>
       </section>
     </div>
   );
@@ -468,7 +468,7 @@ function writeUrl(params) {
   window.history.replaceState(null, "", `${window.location.pathname}${s ? `?${s}` : ""}`);
 }
 
-// vecchie schede di "Dati completi" → pagina corrispondente del Report Looker
+// vecchie schede di "Dati completi" → pagina corrispondente di HOC Analytics
 const SCHEDA_TO_PAGE = {
   recap: "recap-dashboard", conversioni: "conversion-analytics", rapporto: "sales-ratio", "meta-mese": "detailed-kpi",
   transazioni: "transactions-details", "nuovi-abbonati": "dashboard", tracking: "clicks-overall", copertura: "creators-reach",
@@ -513,8 +513,6 @@ export default function AnalisiVenditePage() {
       <>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <PeriodPicker value={range} onChange={setRange} max={yesterday()} loading={list.isLoading && Boolean(list.data)} />
-            <span style={{ flex: 1 }} />
-            <a href={lookerHref("recap-dashboard", open ? open.ids : [])} style={{ ...linkBtn, textDecoration: "none" }}>Report Looker (le pagine di Looker Studio) →</a>
           </div>
 
           {list.error && <Notice danger>{list.error.message}</Notice>}

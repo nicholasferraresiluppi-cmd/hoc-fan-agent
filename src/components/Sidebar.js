@@ -98,7 +98,7 @@ const NAV_GROUPS_RAW = [
       { href: "/leaderboard/creators",           label: "Creator",      icon: Users },
       { href: "/admin/le-mie-creator",           label: "Revenue e chat", icon: LineChart },
       { href: "/admin/analisi-vendite",          label: "Analisi vendite", icon: BarChart3 },
-      { href: "/admin/looker",                   label: "Report Looker", icon: LayoutDashboard },
+      { href: "/admin/looker",                   label: "HOC Analytics", icon: LayoutDashboard },
       { href: "/admin/fan-da-recuperare",        label: "Fan da recuperare", icon: HeartHandshake },
       { href: "/admin/chat-monitor",             label: "Chat Monitor", icon: MessagesSquare },
       { href: "/leaderboard/creators/heatmap",   label: "Mappa operatore×creator",     icon: Flame },

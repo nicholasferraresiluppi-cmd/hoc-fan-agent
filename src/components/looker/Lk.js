@@ -51,11 +51,11 @@ export const lkCard = { background: CP.surface, border: `1px solid ${CP.border}`
 
 export function LkPage({ title, description, filters, actions, children }) {
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div style={{ display: "grid", gap: 12 }}>
       <div style={{ display: "flex", gap: 20, alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 420px", minWidth: 0 }}>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 500, color: CP.textPrimary, letterSpacing: "-0.01em" }}>{title}</h2>
-          {description && <p style={{ margin: "6px 0 0", fontSize: 14, color: CP.textSecondary, lineHeight: 1.5, maxWidth: 820 }}>{description}</p>}
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 500, color: CP.textPrimary, letterSpacing: "-0.01em" }}>{title}</h2>
+          {description && <p style={{ margin: "4px 0 0", fontSize: 13, color: CP.textSecondary, lineHeight: 1.45, maxWidth: 900 }}>{description}</p>}
         </div>
         {actions && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{actions}</div>}
       </div>
@@ -478,7 +478,7 @@ export function LkStyles() {
     "@media (max-width: 900px){",
     ".lk-grid{grid-template-columns:1fr !important}",
     ".lk-shell{grid-template-columns:1fr !important}",
-    ".lk-shell nav{position:static !important;display:flex !important;overflow-x:auto;gap:6px !important}",
+    ".lk-shell nav{position:static !important;display:flex !important;overflow-x:auto;max-height:none !important;gap:6px !important}",
     ".lk-shell nav>div{display:flex !important;gap:6px !important}",
     ".lk-shell nav>div>div{display:none}",
     ".lk-shell nav button{white-space:nowrap}",

@@ -180,7 +180,7 @@ export function WelcomeMassUnlocks({ creators, setCreators }) {
           const unlocks = rows.reduce((s, r) => s + r.unlocks, 0);
           return (
           <LkGrid cols="minmax(max-content, 1.2fr) minmax(0, 1fr)">
-            <LkTable maxHeight={520}
+            <LkTable maxHeight={440}
               columns={[
                 { key: "name", label: "creator_name", width: 180 },
                 { key: "amount", label: "amount", align: "right", render: (r) => fmt.num(r.amount) },
@@ -217,7 +217,7 @@ export function PerformanceKpi({ creators, setCreators }) {
       <State swr={swr}>
         {d && d.view === "lk-perf" && (
           <>
-            <LkTable numbered maxHeight={330}
+            <LkTable numbered maxHeight={250}
               columns={[
                 { key: "name", label: "creator_name", width: 190 },
                 ...pair("new_subs", "new_subs", fmt.int), ...pair("tx", "num_transactions", fmt.int), ...pair("revenue", "tot_revenue", fmt.num),
@@ -227,11 +227,11 @@ export function PerformanceKpi({ creators, setCreators }) {
             <LkGrid cols="1fr 1fr">
               <div style={{ display: "grid", gap: 6 }}>
                 <LkTitle>Spent by Subscription Date Range</LkTitle>
-                <LkDonut hole={0} items={d.bySubsRange.map((r) => ({ label: r.range, value: r.revenue }))} valueFmt={fmt.num} height={200} />
+                <LkDonut hole={0} items={d.bySubsRange.map((r) => ({ label: r.range, value: r.revenue }))} valueFmt={fmt.num} height={170} />
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <LkTitle>Avg Revenue per Conv. Users per Subscription Range</LkTitle>
-                <LkTable maxHeight={230}
+                <LkTable maxHeight={185}
                   columns={[
                     { key: "range", label: "subscription_range" },
                     { key: "arppu", label: "ARPPU", align: "right", render: (r) => fmt.num(r.arppu) },
@@ -243,7 +243,7 @@ export function PerformanceKpi({ creators, setCreators }) {
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <LkTitle>Converted Users per Subscriptions Date Range</LkTitle>
-                <LkTable numbered maxHeight={230}
+                <LkTable numbered maxHeight={185}
                   columns={[
                     { key: "name", label: "creator_name", width: 130 },
                     { key: "arppu", label: "ARPPU", align: "right", render: (r) => fmt.num(r.arppu) },
@@ -253,7 +253,7 @@ export function PerformanceKpi({ creators, setCreators }) {
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <LkTitle>Num. Transactions per Amount Range</LkTitle>
-                <LkDonut hole={0} items={sortedBy(d.byAmount, "tx").map((r) => ({ label: r.range, value: r.tx }))} height={200} />
+                <LkDonut hole={0} items={sortedBy(d.byAmount, "tx").map((r) => ({ label: r.range, value: r.tx }))} height={170} />
               </div>
             </LkGrid>
           </>
@@ -639,7 +639,7 @@ export function NewSubsRevenue({ creators, setCreators }) {
         {d && d.view === "lk-newsubs" && p && (
           <LkGrid cols="minmax(0, 1.6fr) minmax(340px, 1fr)">
             <div style={{ display: "grid", gap: 8 }}>
-              <LkTable numbered maxHeight={600}
+              <LkTable numbered maxHeight={520}
                 columns={[
                   { key: "name", label: "creator_name", width: 150 },
                   { key: "day", label: "calendar_date", render: (r) => fmt.dayFull(r.day) },
@@ -695,7 +695,7 @@ export function NewSubsCr({ creators, setCreators }) {
       <State swr={swr}>
         {d && d.view === "lk-newsubs" && t && (
           <>
-            <LkTable maxHeight={460}
+            <LkTable maxHeight={320}
               columns={[
                 { key: "name", label: "creator_name", width: 150 },
                 { key: "link_name", label: "link_name", width: 150 },
@@ -709,7 +709,7 @@ export function NewSubsCr({ creators, setCreators }) {
               ]}
               rows={d.byLink} total={{ name: "", link_name: "", placement: "", alterego: "", revenue: t.revenue, subs: t.subs, conv: t.conv, cr: t.cr30, arppu: t.arppu30 }} initialSort={{ key: "revenue", dir: "desc" }} />
             <LkGrid cols="minmax(0, 1.35fr) minmax(0, 1fr)">
-              <LkTable maxHeight={300}
+              <LkTable maxHeight={250}
                 columns={[
                   { key: "name", label: "creator_name", width: 130 },
                   { key: "arppu", label: "ARPPU", align: "right", render: (r) => fmt.num(r.arppu) },
@@ -720,7 +720,7 @@ export function NewSubsCr({ creators, setCreators }) {
                   { key: "cr_delta", label: "% Δ", align: "right", render: (r) => <LkDelta v={r.cr_delta} /> },
                 ]}
                 rows={d.creatorCr} total={{ name: "", arppu: t.arppu30, subs: t.subs, conv: t.conv, cr: t.cr30 }} initialSort={{ key: "cr", dir: "desc" }} />
-              <LkTable maxHeight={260}
+              <LkTable maxHeight={250}
                 columns={[
                   { key: "alterego", label: "alterego" },
                   { key: "subs", label: "Subs Gained", align: "right", render: (r) => fmt.int(r.subs) },
