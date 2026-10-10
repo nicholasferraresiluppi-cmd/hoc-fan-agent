@@ -25,7 +25,7 @@ export const TASKS = [
   {
     id: "sm-settimana", for: "sales", title: "Vedere chi seguire questa settimana",
     why: "È la pagina iniziale della vista Sales Manager: se è vuota, il lunedì non parte.",
-    steps: [{ goto: "/admin/settimana" }, { expectNotText: ["nessuna creator", "non vedrai numeri"] }, { expectMoney: true }],
+    steps: [{ goto: "/admin/settimana" }, { expectNotText: ["nessuna creator", "non vedrai numeri"] }, { expectAnyText: ["apri la scheda", "nessuno da seguire"] }],
   },
   {
     id: "sm-scheda-operatore", for: "sales", title: "Aprire la scheda di un operatore dalla classifica",

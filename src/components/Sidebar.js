@@ -386,8 +386,15 @@ const silentFetcher = async (url) => {
 export default function Sidebar() {
   const pathname = usePathname() || "";
 
+  // Menu per ruolo: si nascondono le voci che per questi permessi risponderebbero
+  // "non hai il permesso" (lib/nav-access). Finché i permessi non arrivano si
+  // mostra tutto, come prima (niente menu che "salta" vuoto).
+  const { data: me } = useSWR("/api/whoami", silentFetcher, { revalidateOnFocus: false });
+
   // Badge alert operativi: SOLO i critici aperti (un segnale sempre acceso è spento).
-  const { data: opsAlertsData } = useSWR("/api/admin/ops-alerts", silentFetcher, {
+  // Si chiede solo a chi gli alert li vede: prima partiva un 403 a ogni pagina per tutti gli
+  // altri (trovato dal giro per persona, 10/10/2026).
+  const { data: opsAlertsData } = useSWR(me?.authenticated && canSee("/admin/alerts", me.capabilities, me.admin) ? "/api/admin/ops-alerts" : null, silentFetcher, {
     revalidateOnFocus: false,
     refreshInterval: 5 * 60 * 1000,
   });
@@ -395,10 +402,6 @@ export default function Sidebar() {
     (a) => a.severity === "critical" && a.status !== "resolved"
   ).length;
 
-  // Menu per ruolo: si nascondono le voci che per questi permessi risponderebbero
-  // "non hai il permesso" (lib/nav-access). Finché i permessi non arrivano si
-  // mostra tutto, come prima (niente menu che "salta" vuoto).
-  const { data: me } = useSWR("/api/whoami", silentFetcher, { revalidateOnFocus: false });
   const allowed = (href) => !me?.authenticated || canSee(href, me.capabilities, me.admin);
   const [theme, setTheme] = useTheme();
   const [style, setStyle] = useStyle();
