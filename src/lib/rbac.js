@@ -192,23 +192,24 @@ export async function getUserRoles(userId) {
     const rest = roles.filter((r) => r !== "admin");
     return rest.length ? rest : ["operator"];
   };
-  // Multi-ruolo
-  const set = (await kv.smembers(`roles:${userId}`)) || [];
-  if (set.length) return gate(set);
-  // Legacy single-role
-  const legacy = await kv.get(`role:${userId}`);
-  if (legacy) return gate([legacy]);
-  // Fallback Clerk
+  const stored = await getStoredRoles(userId);
+  if (stored.length) return gate(stored);
+  return ["operator"];
+}
+
+/**
+ * Ruoli scritti sul profilo Clerk dall'INVITO (publicMetadata.roles, o `role` legacy).
+ * Chi accetta un invito si porta dietro i ruoli lì, non in KV.
+ */
+async function invitedRoles(userId) {
   try {
     const u = await getClerkUser(userId);
-    // `roles` (array, anche ruoli custom "c:…") arriva dagli inviti fatti in app;
-    // `role` è il ruolo primario predefinito (legacy / mirror di setUserRoles)
     const clerkRoles = u?.publicMetadata?.roles;
-    if (Array.isArray(clerkRoles) && clerkRoles.length) return gate(clerkRoles.map(String));
+    if (Array.isArray(clerkRoles) && clerkRoles.length) return clerkRoles.map(String);
     const clerkRole = u?.publicMetadata?.role;
-    if (clerkRole) return gate([clerkRole]);
+    if (clerkRole) return [String(clerkRole)];
   } catch {}
-  return ["operator"];
+  return [];
 }
 
 /**
@@ -223,7 +224,15 @@ export async function getStoredRoles(userId) {
   const set = (await kv.smembers(`roles:${userId}`)) || [];
   if (set.length) return set.map(String);
   const legacy = await kv.get(`role:${userId}`);
-  return legacy ? [String(legacy)] : [];
+  if (legacy) return [String(legacy)];
+  // Ruoli dall'invito (10/10/2026): prima valevano per i permessi ma Membri non li vedeva
+  // (Antonio Marucci: Sales Manager di fatto, «nessun ruolo» in tabella). Al primo passaggio
+  // si copiano in KV: da lì una sola fonte, quella che Membri mostra e modifica.
+  const invited = await invitedRoles(userId);
+  if (invited.length) {
+    try { for (const r of invited) await kv.sadd(`roles:${userId}`, r); } catch {}
+  }
+  return invited;
 }
 
 export async function setUserRoles(userId, roles) {
@@ -235,16 +244,17 @@ export async function setUserRoles(userId, roles) {
   for (const r of arr) await kv.sadd(`roles:${userId}`, r);
   // Mantieni legacy role:{} come "primo predefinito" per retrocompat endpoint vecchi
   const primaryPredef = arr.find((r) => ROLES.includes(r));
-  if (primaryPredef) {
-    await kv.set(`role:${userId}`, primaryPredef);
-    try {
-      const cc = await clerkClient();
-      // updateUserMetadata fa MERGE: updateUser sovrascriveva tutto publicMetadata
-      // (perdendo contentPipeline, invited_by, …)
-      await cc.users.updateUserMetadata(userId, { publicMetadata: { role: primaryPredef, roles: arr } });
-      await forgetClerkUser(userId);
-    } catch {}
-  }
+  if (primaryPredef) await kv.set(`role:${userId}`, primaryPredef);
+  else await kv.del(`role:${userId}`); // altrimenti togliere tutti i ruoli faceva riemergere il vecchio
+  // Il profilo Clerk si allinea SEMPRE (anche a ruoli vuoti): getStoredRoles ripesca i ruoli
+  // dell'invito quando il KV è vuoto, quindi lì non deve restare un ruolo tolto.
+  try {
+    const cc = await clerkClient();
+    // updateUserMetadata fa MERGE: updateUser sovrascriveva tutto publicMetadata
+    // (perdendo contentPipeline, invited_by, …)
+    await cc.users.updateUserMetadata(userId, { publicMetadata: { role: primaryPredef || null, roles: arr } });
+    await forgetClerkUser(userId);
+  } catch {}
   return { userId, roles: arr };
 }
 
