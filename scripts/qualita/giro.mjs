@@ -77,13 +77,23 @@ if (args.only) personas = personas.filter((p) => p.key.startsWith(String(args.on
 log(`piano: ${personas.length} persone`);
 
 const textOf = () => page.evaluate(() => (document.querySelector("main") || document.body).innerText || "");
+// Pronta = il contenuto smette di cambiare (alcune pagine tengono connessioni aperte: aspettare la rete
+// ferma dava 21 s a tutte). Il tempo misurato è quello fino al primo istante stabile.
 async function settle(navPromise) {
   const t0 = Date.now();
   let navError = null;
   try { await navPromise; } catch (e) { navError = String(e?.message || e).slice(0, 160); }
-  try { await page.waitForNetworkIdle({ idleTime: 800, timeout: 20000 }); } catch {}
-  await sleep(600); // SWR e render dopo l'ultima risposta
-  return { ms: Date.now() - t0, navError };
+  let prev = -1, stableSince = Date.now(), readyAt = null;
+  while (Date.now() - t0 < 25000) {
+    await sleep(300);
+    const { len, loading } = await page.evaluate(() => {
+      const t = (document.querySelector("main") || document.body).innerText || "";
+      return { len: t.length, loading: /caricamento|loading…|sto calcolando/i.test(t.slice(0, 2000)) };
+    }).catch(() => ({ len: -1, loading: true }));
+    if (len !== prev || loading) { prev = len; stableSince = Date.now(); continue; }
+    if (Date.now() - stableSince >= 1500) { readyAt = stableSince; break; }
+  }
+  return { ms: (readyAt || Date.now()) - t0, navError, timedOut: !readyAt };
 }
 
 async function readMenu() {
@@ -96,10 +106,11 @@ async function readMenu() {
 
 async function visit(link) {
   reset();
-  const { ms, navError } = await settle(page.goto(BASE + link.href, { waitUntil: "domcontentloaded", timeout: 45000 }));
-  const text = (await textOf()).toLowerCase();
+  const { ms, navError, timedOut } = await settle(page.goto(BASE + link.href, { waitUntil: "domcontentloaded", timeout: 45000 }));
+  const raw = await textOf();
+  const text = raw.toLowerCase();
   const url = page.url();
-  return { link, ms, navError, text, url, api: sink.api, pageErrors: sink.pageErrors, console: sink.console };
+  return { link, ms, navError, timedOut, text, excerpt: raw.replace(/\s+/g, " ").slice(0, 1500), url, api: sink.api, pageErrors: sink.pageErrors, console: sink.console };
 }
 
 function judge(v, ignoreApi) {
@@ -113,7 +124,8 @@ function judge(v, ignoreApi) {
   for (const e of v.pageErrors) fail.push(`errore nella pagina: ${e}`);
   const shown = ERROR_TEXTS.filter((t) => v.text.includes(t));
   if (shown.length) fail.push(`a schermo: «${shown.join("», «")}»`);
-  if (v.ms > SLOW_MS) warn.push(`lenta: ${(v.ms / 1000).toFixed(1)} s`);
+  if (v.timedOut) warn.push("non smette di caricare (25 s)");
+  else if (v.ms > SLOW_MS) warn.push(`lenta: ${(v.ms / 1000).toFixed(1)} s`);
   if (v.text.replace(/\s+/g, " ").trim().length < 80) warn.push("quasi vuota");
   for (const c of v.console.slice(0, 2)) warn.push(`errore in console: ${c}`);
   return { status: fail.length ? "fail" : warn.length ? "warn" : "ok", problems: [...fail, ...warn] };
@@ -123,7 +135,7 @@ async function runTask(task, ignoreApi) {
   reset();
   for (let i = 0; i < task.steps.length; i++) {
     const s = task.steps[i];
-    const failAt = (problem) => ({ id: task.id, title: task.title, ok: false, failedStep: i, problem });
+    const failAt = (problem) => ({ id: task.id, title: task.title, ok: false, failedStep: i, problem, url: page.url().replace(BASE, "") });
     try {
       if (s.goto) {
         const { navError } = await settle(page.goto(BASE + s.goto, { waitUntil: "domcontentloaded", timeout: 45000 }));
@@ -172,8 +184,25 @@ for (const p of personas) {
       const r = await api("/api/admin/view-as", { method: "POST", body: JSON.stringify(p.viewAs) });
       if (!r.ok) throw new Error(`«Vedi come» non attivato (${r.status} ${r.body?.error || ""})`);
     }
+    // l'admin si prova sul menu completo; per tutti si apre anche «Tutti gli strumenti» del menu (stile Casa):
+    // la persona può aprirlo da sé, quindi ogni voce lì dentro deve funzionare
+    if (!p.viewAs) await api("/api/me/workspace", { method: "POST", body: JSON.stringify({ workspace: "all" }) });
+    await page.evaluate(() => { try {
+      localStorage.setItem("hoc:casa:tools", "1");          // stile Casa: «Tutti gli strumenti» aperto
+      localStorage.setItem("hoc:sidebar:viewMode", "advanced"); // menu classico: tutte le voci, non solo Essential
+      localStorage.setItem("hoc:sidebar:allTools", "1");
+    } catch {} });
     await settle(page.goto(`${BASE}/guida`, { waitUntil: "domcontentloaded", timeout: 45000 }));
-    const menu = (await readMenu()).slice(0, MAX_PAGES);
+    // gruppi del menu classico chiusi → si aprono tutti (openGroups in localStorage, chiave = titolo del gruppo)
+    const opened = await page.evaluate(() => {
+      const labels = [...document.querySelectorAll("aside nav button")].map((b) => (b.innerText || "").split("\n")[0].trim()).filter(Boolean);
+      try { localStorage.setItem("hoc:sidebar:openGroups", JSON.stringify(Object.fromEntries(labels.map((l) => [l, true])))); } catch {}
+      return labels.length;
+    });
+    if (opened) await settle(page.goto(`${BASE}/guida`, { waitUntil: "domcontentloaded", timeout: 45000 }));
+    const fullMenu = await readMenu();
+    log(`  menu: ${fullMenu.length} voci`);
+    const menu = fullMenu.slice(0, MAX_PAGES);
     if (!menu.length) throw new Error("menu vuoto: nessuna voce da aprire");
     const visits = [];
     for (const link of menu) { visits.push(await visit(link)); process.stdout.write("."); }
@@ -183,7 +212,7 @@ for (const p of personas) {
     for (const v of visits) for (const k of new Set(v.api.map((a) => `${a.status} ${a.path}`))) counts.set(k, (counts.get(k) || 0) + 1);
     const ignore = new Set([...counts].filter(([, n]) => visits.length >= 4 && n >= visits.length * 0.8).map(([k]) => k));
     if (ignore.size) rec.pages.push({ href: "/guida", label: "Sfondo di ogni pagina (menu, contatori)", status: "warn", ms: 0, problems: [...ignore].map((k) => `chiamata negata su ogni pagina: ${k}`) });
-    for (const v of visits) rec.pages.push({ href: v.link.href, label: v.link.label, ms: v.ms, ...judge(v, ignore) });
+    for (const v of visits) rec.pages.push({ href: v.link.href, label: v.link.label, ms: v.ms, excerpt: v.excerpt, ...judge(v, ignore) });
     for (const t of p.tasks || []) rec.tasks.push(await runTask(t, ignore));
     log(`  ${rec.pages.filter((g) => g.status === "fail").length} pagine in errore, ${rec.tasks.filter((t) => !t.ok).length}/${rec.tasks.length} compiti non riusciti`);
   } catch (e) {

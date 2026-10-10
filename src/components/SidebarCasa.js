@@ -91,7 +91,8 @@ function dateLabel() {
 export default function SidebarCasa() {
   const pathname = usePathname() || "";
   const { data: me } = useSWR("/api/whoami", silentFetcher, { revalidateOnFocus: false });
-  const { data: alerts } = useSWR("/api/admin/ops-alerts", silentFetcher, { revalidateOnFocus: false, refreshInterval: 5 * 60 * 1000 });
+  // alert solo a chi li vede (prima: 403 a ogni pagina per gli altri — giro per persona, 10/10/2026)
+  const { data: alerts } = useSWR(me?.authenticated && canSee("/admin/alerts", me.capabilities, me.admin) ? "/api/admin/ops-alerts" : null, silentFetcher, { revalidateOnFocus: false, refreshInterval: 5 * 60 * 1000 });
   const [style, setStyle] = useStyle();
   const [theme, setTheme] = useTheme();
   const [tools, setTools] = useState(false);

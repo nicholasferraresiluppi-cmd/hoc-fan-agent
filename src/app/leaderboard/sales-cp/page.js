@@ -70,7 +70,11 @@ export default function SalesCpLeaderboardPage() {
   const { data, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
   const { data: prev } = useSWR(prevId ? `/api/leaderboard/sales-cp?${qs(prevId)}` : null, fetcher, { revalidateOnFocus: false });
   const { data: official } = useSWR(periodId ? `/api/leaderboard/agency-sales?period_id=${periodId}` : null, fetcher, { revalidateOnFocus: false });
-  const { data: infw } = useSWR(periodId ? `/api/leaderboard/operational?period_type=monthly&period_id=${periodId}` : null, fetcher, { revalidateOnFocus: false });
+  // Score Infloww = dato di tutta l'agenzia: si chiede solo a chi vede tutte le creator (prima un Sales Manager
+  // con le sue creator prendeva un 403 a ogni apertura e la colonna spariva in silenzio — giro per persona, 10/10/2026)
+  const { data: me } = useSWR("/api/whoami", fetcher, { revalidateOnFocus: false });
+  const seesAllCreators = Boolean(me?.admin || me?.capabilities?.["creators.all"]);
+  const { data: infw } = useSWR(periodId && seesAllCreators ? `/api/leaderboard/operational?period_type=monthly&period_id=${periodId}` : null, fetcher, { revalidateOnFocus: false });
 
   const ranking = data?.ranking || [];
   const prevScore = useMemo(() => {
