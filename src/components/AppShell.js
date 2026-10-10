@@ -17,7 +17,8 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Menu, X } from "lucide-react";
-import Sidebar from "./Sidebar";
+import Sidebar, { NAV_ITEMS } from "./Sidebar";
+import { groupMatch } from "@/lib/page-groups";
 import SidebarCasa from "./SidebarCasa";
 import ErrorBoundary from "./ErrorBoundary";
 import WelcomeAttestato from "./WelcomeAttestato";
@@ -40,6 +41,20 @@ function isAuthRoute(path) {
 // (/hr/modulo/[token]): lo compila chi magari non ha ancora un account.
 function isBareRoute(path) {
   return path.startsWith("/assessment") || path.startsWith("/hr/modulo") || path.startsWith("/t/") || path === "/hr/privacy" || path === "/privacy";
+}
+
+// Nome della pagina nell'intestazione del telefono (10/10/2026: con «HOC Pro» fisso
+// non si capiva dove si era). Prima la scheda del gruppo, poi la voce di menu più lunga che combacia.
+function mobileTitle(pathname) {
+  const p = String(pathname || "").replace(/\/$/, "") || "/";
+  const m = groupMatch(p);
+  const tab = m?.group.tabs.find(([h]) => h.replace(":e", m.param || "") === p);
+  if (tab) return tab[1];
+  let best = null;
+  for (const it of NAV_ITEMS) {
+    if (p === it.href || (it.href !== "/" && p.startsWith(it.href + "/"))) if (!best || it.href.length > best.href.length) best = it;
+  }
+  return best?.label || (m?.group.label) || "HOC Pro";
 }
 
 export default function AppShell({ children }) {
@@ -123,7 +138,7 @@ export default function AppShell({ children }) {
             >
               <Menu size={22} />
             </button>
-            <div style={{ color: CP.textPrimary, fontWeight: 700, fontSize: 14 }}>HOC Pro</div>
+            <div style={{ color: CP.textPrimary, fontWeight: 600, fontSize: 15, flex: 1, minWidth: 0, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", padding: "0 8px" }}>{mobileTitle(pathname)}</div>
             <div style={{ width: 22 }} />
           </div>
 

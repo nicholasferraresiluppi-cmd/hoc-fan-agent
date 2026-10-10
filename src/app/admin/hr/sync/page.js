@@ -23,7 +23,7 @@ function Row({ ok, label, children }) {
     <div style={{ display: "flex", gap: 12, padding: "10px 0", borderTop: `1px solid ${CP.borderSoft}`, alignItems: "baseline", flexWrap: "wrap" }}>
       <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: ok === true ? CP.accentGreen : ok === false ? CP.accentRed : CP.textMuted, alignSelf: "center" }} />
       <span style={{ width: 190, flexShrink: 0, fontSize: 14, color: CP.textPrimary }}>{label}</span>
-      <span style={{ flex: "1 1 300px", fontSize: 14, color: CP.textSecondary, lineHeight: 1.5 }}>{children}</span>
+      <span style={{ flex: "1 1 300px", minWidth: 0, overflowWrap: "anywhere", fontSize: 14, color: CP.textSecondary, lineHeight: 1.5 }}>{children}</span>
     </div>
   );
 }
