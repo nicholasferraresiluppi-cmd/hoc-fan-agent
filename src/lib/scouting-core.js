@@ -54,6 +54,31 @@ export function scrubContacts(text) {
     .trim();
 }
 
+/**
+ * Foto profilo: solo il LINK al server di Instagram (nessuna copia, come i reel). Si accetta
+ * solo un indirizzo https dei CDN di Instagram/Facebook.
+ */
+export function igPicUrl(u) {
+  if (typeof u !== "string" || !/^https:\/\//.test(u)) return null;
+  try {
+    const host = new URL(u).hostname;
+    return /(^|\.)(cdninstagram\.com|fbcdn\.net)$/.test(host) ? u : null;
+  } catch { return null; }
+}
+
+/** Scadenza del link firmato di Instagram (parametro oe= in esadecimale, secondi); null se manca. */
+export function picExpiry(u) {
+  const m = /[?&]oe=([0-9a-f]{6,10})/i.exec(String(u || ""));
+  return m ? parseInt(m[1], 16) * 1000 : null;
+}
+
+/** Il link della foto se è ancora valido (con un'ora di margine), altrimenti null → si mostrano le iniziali. */
+export function livePic(u, now = Date.now()) {
+  if (!igPicUrl(u)) return null;
+  const exp = picExpiry(u);
+  return exp && exp - 3600000 > now ? u : null;
+}
+
 export function parseRefreshItem(it) {
   if (!it?.Account || it.Account === "N/A") return null;
   const h = normHandle(it.Account);
@@ -67,6 +92,7 @@ export function parseRefreshItem(it) {
     er: num(it["Median ER"]),
     url: url && url !== "N/A" ? String(url) : "",
     bio: typeof it.Biography === "string" ? scrubContacts(it.Biography).slice(0, 300) : undefined,
+    pic: igPicUrl(it["Profile Picture"]),
   };
 }
 
@@ -120,6 +146,7 @@ export function applyRefresh(profiles, items, now = new Date()) {
       vf: r.vf ?? p.vf,
       url: r.url || p.url,
       ...(r.bio !== undefined ? { bio: r.bio } : {}),
+      ...(r.pic ? { pic: r.pic } : {}),
       hist: appendHistory(p.hist, week, r.fol, r.medv),
       lastSeen: now.getTime(),
       missing: 0,
@@ -272,6 +299,7 @@ export function buildCreators(profiles, crm) {
       ita: ps.some((p) => p.ita === "si") ? "si" : ps.some((p) => p.ita === "forse") ? "forse" : null,
       firstSeen: Math.min(...ps.map((p) => p.firstSeen || Infinity)) || null,
       reels: ps.flatMap((p) => (p.reels || []).map((r) => ({ ...r, h: p.h }))).sort((a, b) => (b.v || 0) - (a.v || 0)).slice(0, 9),
+      pic: ps.map((p) => livePic(p.pic)).find(Boolean) || null,
     });
   }
   return rows;
@@ -447,13 +475,22 @@ export function whyLines(c, { newCut = Date.now() - 8 * DAY } = {}) {
 }
 
 /** Le creator da guardare oggi: profilo a pagamento + qualcosa di riconoscibile, ancora da valutare, non nostre. */
-export function pickToday(creators, { n = 3, newCut = Date.now() - 8 * DAY } = {}) {
-  const score = (c) =>
-    (c.sig === "forte" ? 4 : c.sig === "debole" ? 1 : 0) +
+export function attentionScore(c, newCut = Date.now() - 8 * DAY) {
+  return (c.sig === "forte" ? 4 : c.sig === "debole" ? 1 : 0) +
     (c.fmt && c.fmt !== "nessuno" ? 2 : 0) + (c.u || 0) +
     (c.g4 != null ? Math.max(-2, Math.min(4, c.g4 / 3)) : 0) +
     (c.firstSeen && c.firstSeen >= newCut ? 1.5 : 0) +
     (c.medv ? Math.log10(c.medv) / 2 : 0);
+}
+
+/** Il gancio della riga: il motivo più specifico per guardarla (format > link forte > crescita > portata). */
+export function hookLine(c, opts) {
+  const w = whyLines(c, opts).filter((x) => x !== "Ha un profilo a pagamento.");
+  return w[0] || null;
+}
+
+export function pickToday(creators, { n = 3, newCut = Date.now() - 8 * DAY } = {}) {
+  const score = (c) => attentionScore(c, newCut);
   return creators
     .filter((c) => !c.ours && c.stage === DEFAULT_STAGE && c.sig !== "nessuno" && !c.missing)
     .map((c) => ({ c, s: score(c) }))

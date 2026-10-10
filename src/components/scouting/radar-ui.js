@@ -19,7 +19,14 @@ export const btnPrimary = { ...btn, background: CP.accent, color: CP.accentInk, 
 export const btnQuiet = { ...btn, border: "none", color: CP.textSecondary, padding: "9px 6px" };
 export const input = { padding: "10px 12px", borderRadius: 10, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, minWidth: 0 };
 
-export function Initials({ name, size = 52, gold }) {
+export function Initials({ name, size = 52, gold, pic }) {
+  // foto profilo: link a tempo di Instagram (nessuna copia); se non carica, le iniziali
+  const [broken, setBroken] = useState(false);
+  if (pic && !broken) return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={pic} alt="" width={size} height={size} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)}
+      style={{ width: size, height: size, flex: "0 0 auto", borderRadius: "50%", objectFit: "cover", border: `1px solid ${gold ? alpha(CP.gold, "aa") : CP.border}`, background: CP.surface }} />
+  );
   const clean = String(name || "").replace(/^@/, "").replace(/[._\d]+/g, " ").trim().split(/\s+/);
   const ini = ((clean[0]?.[0] || "") + (clean[1]?.[0] || clean[0]?.[1] || "")).toUpperCase();
   return (

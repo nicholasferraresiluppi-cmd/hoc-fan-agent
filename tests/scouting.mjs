@@ -169,3 +169,24 @@ eq(pickToday([cB, cA, cC]).map((c) => c.id), ["h:a", "h:b"], "da guardare: prima
 eq(marketByGroup([{ g: "X", sig: "forte" }, { g: "X", sig: "nessuno" }])[0], { g: "X", n: 2, paid: 1, pct: 50 }, "mercato per nicchia");
 
 console.log(`scouting: ${n} asserzioni ok`);
+
+// --- foto profilo (link a tempo di Instagram) e gancio della riga, 10/10/2026
+{
+  const { igPicUrl, picExpiry, livePic, hookLine, attentionScore } = await import("../src/lib/scouting-core.js");
+  const exp = Math.floor(Date.UTC(2026, 9, 14) / 1000).toString(16);
+  const u = `https://scontent-fco2-1.cdninstagram.com/v/t51.2885-19/x.jpg?stp=dst&oe=${exp}&_nc_sid=1`;
+  assert.equal(igPicUrl(u), u);
+  assert.equal(igPicUrl("https://evil.example.com/x.jpg"), null);
+  assert.equal(igPicUrl("http://scontent.cdninstagram.com/x.jpg"), null);
+  assert.equal(picExpiry(u), parseInt(exp, 16) * 1000);
+  assert.equal(livePic(u, Date.UTC(2026, 9, 10)), u);
+  assert.equal(livePic(u, Date.UTC(2026, 9, 15)), null);
+  assert.equal(livePic("https://scontent.cdninstagram.com/x.jpg", Date.UTC(2026, 9, 10)), null, "senza scadenza non si rischia un'immagine rotta");
+  assert.equal(hookLine({ sig: "forte", fmt: "personaggi ricorrenti" }), "Ha un format che si ripete: personaggi ricorrenti.");
+  assert.equal(hookLine({ sig: "forte", fmt: "nessuno" }), null, "il profilo a pagamento è già nel chip, non nel gancio");
+  assert.ok(attentionScore({ sig: "forte", fmt: "x", u: 4 }) > attentionScore({ sig: "nessuno" }));
+  const { applyRefresh } = await import("../src/lib/scouting-core.js");
+  const r = applyRefresh([{ h: "anna" }], [{ Account: "anna", "Followers Count": 10, "Profile Picture": u }]);
+  assert.equal(r.profiles[0].pic, u);
+  console.log("foto profilo + gancio: ok");
+}
