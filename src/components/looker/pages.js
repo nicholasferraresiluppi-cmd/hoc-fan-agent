@@ -217,7 +217,7 @@ export function PerformanceKpi({ creators, setCreators }) {
       <State swr={swr}>
         {d && d.view === "lk-perf" && (
           <>
-            <LkTable numbered maxHeight={250}
+            <LkTable numbered maxHeight={215}
               columns={[
                 { key: "name", label: "creator_name", width: 190 },
                 ...pair("new_subs", "new_subs", fmt.int), ...pair("tx", "num_transactions", fmt.int), ...pair("revenue", "tot_revenue", fmt.num),
@@ -227,11 +227,11 @@ export function PerformanceKpi({ creators, setCreators }) {
             <LkGrid cols="1fr 1fr">
               <div style={{ display: "grid", gap: 6 }}>
                 <LkTitle>Spent by Subscription Date Range</LkTitle>
-                <LkDonut hole={0} items={d.bySubsRange.map((r) => ({ label: r.range, value: r.revenue }))} valueFmt={fmt.num} height={170} />
+                <LkDonut hole={0} items={d.bySubsRange.map((r) => ({ label: r.range, value: r.revenue }))} valueFmt={fmt.num} height={145} />
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <LkTitle>Avg Revenue per Conv. Users per Subscription Range</LkTitle>
-                <LkTable maxHeight={185}
+                <LkTable maxHeight={140}
                   columns={[
                     { key: "range", label: "subscription_range" },
                     { key: "arppu", label: "ARPPU", align: "right", render: (r) => fmt.num(r.arppu) },
@@ -243,7 +243,7 @@ export function PerformanceKpi({ creators, setCreators }) {
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <LkTitle>Converted Users per Subscriptions Date Range</LkTitle>
-                <LkTable numbered maxHeight={185}
+                <LkTable numbered maxHeight={140}
                   columns={[
                     { key: "name", label: "creator_name", width: 130 },
                     { key: "arppu", label: "ARPPU", align: "right", render: (r) => fmt.num(r.arppu) },
@@ -253,7 +253,7 @@ export function PerformanceKpi({ creators, setCreators }) {
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <LkTitle>Num. Transactions per Amount Range</LkTitle>
-                <LkDonut hole={0} items={sortedBy(d.byAmount, "tx").map((r) => ({ label: r.range, value: r.tx }))} height={170} />
+                <LkDonut hole={0} items={sortedBy(d.byAmount, "tx").map((r) => ({ label: r.range, value: r.tx }))} height={145} />
               </div>
             </LkGrid>
           </>
