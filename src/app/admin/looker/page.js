@@ -1,6 +1,6 @@
 "use client";
 /**
- * Report Looker (10/10/2026): le pagine dei report Looker Studio "HOC Analytics 3.0" e "KPI Sales"
+ * HOC Analytics (10/10/2026; nome del report Looker originale): le pagine dei report Looker Studio "HOC Analytics 3.0" e "KPI Sales"
  * rifatte in HOC Pro con la STESSA disposizione (stessi nomi di pagina, stesso ordine, stessi blocchi
  * negli stessi punti), così chi era abituato a Looker non deve reimparare niente. Formule e numeri:
  * lib/analisi-vendite-sql.js + lib/looker-sql.js, verificati pagina per pagina contro Looker.
@@ -8,7 +8,6 @@
  */
 import { useEffect, useState } from "react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead } from "@/components/ds";
 import { LkStyles } from "@/components/looker/Lk";
 import {
   RecapDashboard, ClicksOverall, CreatorsReach, WelcomeMassUnlocks, PerformanceKpi, DetailedKpi, TransactionsDetails,
@@ -70,11 +69,14 @@ export default function ReportLookerPage() {
   const Page = page.C;
 
   return (
-    <div style={{ display: "grid", gap: 14, maxWidth: 1360, margin: "0 auto", padding: "8px 0 40px" }}>
-      <PageHead crumbs={[{ label: "Performance" }, { label: "Analisi vendite", href: "/admin/analisi-vendite" }]} title="Report Looker"
-        subtitle="Le pagine di Looker Studio, con gli stessi nomi e la stessa disposizione. Vedi solo le tue creator." />
-      <div className="lk-shell" style={{ display: "grid", gridTemplateColumns: "220px minmax(0, 1fr)", gap: 20, alignItems: "start" }}>
-        <nav aria-label="Pagine del report" style={{ position: "sticky", top: 12, display: "grid", gap: 14 }}>
+    // niente intestazione grande: come su Looker la pagina parte dall'alto e sta in uno schermo senza scorrere
+    <div style={{ maxWidth: 1440, margin: "0 auto", padding: "4px 0 24px" }}>
+      <div className="lk-shell" style={{ display: "grid", gridTemplateColumns: "200px minmax(0, 1fr)", gap: 20, alignItems: "start" }}>
+        <nav aria-label="Pagine del report" style={{ position: "sticky", top: 12, display: "grid", gap: 12, maxHeight: "calc(100vh - 24px)", overflowY: "auto" }}>
+          <div style={{ padding: "0 10px" }}>
+            <h1 style={{ margin: 0, fontSize: 18, fontWeight: 500, color: CP.textPrimary }}>HOC Analytics</h1>
+            <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2, lineHeight: 1.4 }}>Le pagine di Looker Studio. Solo le tue creator.</div>
+          </div>
           {REPORTS.map((r) => (
             <div key={r.name} style={{ display: "grid", gap: 2 }}>
               <div style={{ fontSize: 12, color: CP.textMuted, padding: "0 10px 4px" }}>{r.name}</div>
@@ -82,7 +84,7 @@ export default function ReportLookerPage() {
                 const on = p.id === pageId;
                 return (
                   <button key={p.id} onClick={() => { setPageId(p.id); window.scrollTo?.(0, 0); }} aria-current={on ? "page" : undefined}
-                    style={{ textAlign: "left", padding: "8px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: FONTS.body, fontSize: 13,
+                    style={{ textAlign: "left", padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: FONTS.body, fontSize: 13,
                       background: on ? CP.accentSoft : "transparent", color: on ? CP.accentSoftText : CP.textSecondary, fontWeight: on ? 500 : 400 }}>
                     {p.title}
                   </button>

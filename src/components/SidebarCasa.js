@@ -43,7 +43,7 @@ const MANAGER = [
     { href: "/leaderboard/creators", label: "Creator" },
     { href: "/admin/le-mie-creator", label: "Revenue e chat" },
     { href: "/admin/analisi-vendite", label: "Analisi vendite" },
-    { href: "/admin/looker", label: "Report Looker" },
+    { href: "/admin/looker", label: "HOC Analytics" },
     { href: "/admin/fan-da-recuperare", label: "Fan da recuperare" },
     { href: "/admin/settimana", label: "Da seguire" },
     { href: "/cm-cockpit", label: "Cockpit turno" },
