@@ -64,6 +64,7 @@ export const WORKSPACES = {
         { href: "/admin/le-mie-creator", label: "Revenue e chat", desc: "Giulia Amici, Martina Scavo, Rebecca: proiezione di fine mese, obiettivo, benvenuto, fan senza risposta, latenza, PPV" },
         { href: "/leaderboard/creators/heatmap", label: "Mappa operatore×creator" },
         { href: "/admin/creator-difficulty", label: "Difficoltà creator" },
+        { href: "/admin/s4s", label: "Calendario S4S", desc: "Chi scambia promozione con chi e quanti abbonati ha portato ogni scambio" },
       ] },
       { title: "Chat e turni", items: [
         { href: "/admin/conversation-intelligence", label: "Presidio chat" },
