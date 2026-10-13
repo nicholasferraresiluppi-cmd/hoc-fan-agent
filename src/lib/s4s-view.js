@@ -1,11 +1,12 @@
 // S4S — la vista della pagina (calendario arricchito + risultati), costruita per uno split.
 // Separata dalla route così si può far girare anche fuori da Next (verifica sui dati veri).
 
+import { getKits } from "@/lib/s4s-kit";
 import { getNames, getResults, getAliases, syncPlan, getLinks, getLinkStats, getDeals, getPlan, WINDOW_DAYS, DEFAULT_WEEKDAYS } from "@/lib/s4s";
 import {
   planSchedule, addDays, baseName, linkNameFor, buildAliasIndex, enrichResults, summarizeByPage,
   reciprocity, resultFor, lastExchange, langOf, MIN_MATURE, matchPartner, labelKey, sideKey, sideStatus, toDate, handleFromUrl,
-  mergeDeals, FORMATS, DEAL_DEFAULTS, MAX_PER_DAY,
+  mergeDeals, FORMATS, DEAL_DEFAULTS, MAX_PER_DAY, kitReady, kitMissing, KIT_MAX_PHOTOS, PHOTO_USES,
 } from "@/lib/s4s-core";
 
 const PAST_DAYS = 28;
@@ -17,7 +18,7 @@ export async function buildView(split, { force = false, settings, userId } = {})
   const today = todayIT();
   const names = await getNames();
   const { plan, pages } = await syncPlan(split, names, today, { settings, userId });
-  const [res, aliases, pasted, stored] = await Promise.all([getResults(split.id, split.creator_ids, { force }), getAliases(), getLinks(split.id), getDeals(split.id)]);
+  const [res, aliases, pasted, stored, kitsRaw] = await Promise.all([getResults(split.id, split.creator_ids, { force }), getAliases(), getLinks(split.id), getDeals(split.id), getKits(split.creator_ids)]);
   const lstat = await getLinkStats(split.id, split.creator_ids, Object.values(pasted).map((x) => x.url), { force });
   const aliasIdx = buildAliasIndex(Object.values(names));
   const results = enrichResults(res.rows, names, aliasIdx, aliases);
@@ -72,7 +73,7 @@ export async function buildView(split, { force = false, settings, userId } = {})
     rest: d.rest.map((id) => ({ id, name: disp(id) })),
     deals: d.deals.map((x) => ({
       id: x.id, day: d.day, lang: x.lang, source: x.source, status: x.status, saved: Boolean(stored[x.id]),
-      time: x.time, mass_time: x.mass_time, pin_hours: x.pin_hours, note: x.note || "",
+      time: x.time, mass_time: x.mass_time, pin_hours: x.pin_hours, note: x.note || "", done: x.done || {},
       // a pubblica la promo di b con fmt_a; b pubblica a con fmt_b
       a: { ...side(d.day, x.a, x.b), fmt: x.fmt_a },
       b: { ...side(d.day, x.b, x.a), fmt: x.fmt_b },
@@ -105,7 +106,13 @@ export async function buildView(split, { force = false, settings, userId } = {})
     aliases,
     partner_options: [...new Set(Object.values(names).map(baseName))].sort((a, b) => a.localeCompare(b, "it")),
     baseline: res.baseline || null,
-    deal_defaults: DEAL_DEFAULTS, formats: FORMATS, max_per_day: MAX_PER_DAY,
+    deal_defaults: DEAL_DEFAULTS, formats: FORMATS, max_per_day: MAX_PER_DAY, kit_max_photos: KIT_MAX_PHOTOS, photo_uses: PHOTO_USES,
+    // kit di ogni pagina: senza path del blob (le foto si leggono solo dalla route protetta)
+    kits: Object.fromEntries(Object.entries(kitsRaw).map(([id, k]) => [id, {
+      photos: (k.photos || []).map((p) => ({ id: p.id, use: p.use, at: p.at })),
+      text_post: k.text_post || "", text_mass: k.text_mass || "",
+      ready: kitReady(k), missing: kitMissing(k), updated_at: k.updated_at || null,
+    }])),
     meta: { generated_at: res.generated_at, links_at: lstat.generated_at, bytes_processed: res.bytes_processed, window_days: WINDOW_DAYS, min_mature: MIN_MATURE, default_weekdays: DEFAULT_WEEKDAYS },
   };
 }
@@ -119,4 +126,25 @@ export async function dayDeals(split, day) {
   const sameBase = (a, b) => baseName(nm(a)) === baseName(nm(b));
   const days = plan ? planSchedule(plan, day, day, { sameBase }) : [];
   return { entry: mergeDeals(days, stored, { from: day, to: day })[0] || null, stored, today, names };
+}
+
+// Vista ristretta alle pagine di chi guarda (sales manager con creator assegnate): restano gli
+// scambi in cui c'è almeno una sua pagina, i risultati delle sue pagine, nessuna impostazione.
+export function restrictView(view, mineIds) {
+  const mine = new Set(mineIds.map(Number));
+  const has = (id) => mine.has(Number(id));
+  return {
+    ...view,
+    me: { all: false, pages: [...mine] },
+    pages: view.pages.map((p) => ({ ...p, mine: has(p.id) })),
+    schedule: view.schedule
+      .map((d) => ({ ...d, rest: d.rest.filter((r) => has(r.id)), deals: d.deals.filter((x) => has(x.a.id) || has(x.b.id)) }))
+      .filter((d) => d.deals.length || d.rest.length),
+    results: view.results.filter((r) => has(r.creator_id)),
+    by_page: view.by_page.filter((p) => has(p.creator_id)),
+    reciprocity: [],
+    unmatched: [],
+    aliases: {},
+    partner_options: [],
+  };
 }

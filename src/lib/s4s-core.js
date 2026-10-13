@@ -539,3 +539,39 @@ export function dealsOnDay(dayEntry, pageId, exceptId) {
   if (!dayEntry) return 0;
   return dayEntry.deals.filter((x) => x.status !== "annullato" && x.id !== exceptId && (x.a === Number(pageId) || x.b === Number(pageId))).length;
 }
+
+// ── Kit promo (13/10/2026, punto 2) ─────────────────────────────────────────
+// Ogni pagina ha un kit: fino a 4 foto (ognuna per post, per mass o per entrambi) e due
+// testi. Chi pubblica la promo di quella pagina prende foto e testo da qui; nel testo
+// {link} diventa il link di tracciamento creato dalla pagina promossa per quello scambio.
+export const KIT_MAX_PHOTOS = 4;
+export const KIT_TEXT_MAX = 1000;
+export const PHOTO_USES = { both: "post e mass", post: "solo post", mass: "solo mass" };
+
+export function kitReady(kit) {
+  if (!kit) return false;
+  return (kit.photos || []).length > 0 && Boolean(String(kit.text_post || "").trim() || String(kit.text_mass || "").trim());
+}
+// Che cosa manca a un kit per essere usabile (per gli avvisi)
+export function kitMissing(kit) {
+  const m = [];
+  if (!(kit?.photos || []).length) m.push("foto");
+  if (!String(kit?.text_post || "").trim() && !String(kit?.text_mass || "").trim()) m.push("testo");
+  return m;
+}
+// Foto adatte a un uso ("post" | "mass"); se nessuna è marcata per quell'uso, tutte.
+export function photosFor(kit, use) {
+  const all = kit?.photos || [];
+  const fit = all.filter((p) => p.use === "both" || p.use === use);
+  return fit.length ? fit : all;
+}
+// Testo pronto da incollare: {link} → URL del link creato dal partner (o resta il segnaposto)
+export function fillCaption(text, url) {
+  const t = String(text || "");
+  if (!url) return t;
+  const full = /^https?:\/\//.test(url) ? url : `https://${url}`;
+  return t.includes("{link}") ? t.split("{link}").join(full) : `${t}${t ? " " : ""}${full}`;
+}
+// Cosa deve fare una pagina in un accordo, in base al formato che PUBBLICA
+export const needsPost = (fmt) => fmt === "post" || fmt === "post_mass";
+export const needsMass = (fmt) => fmt === "mass" || fmt === "post_mass";
