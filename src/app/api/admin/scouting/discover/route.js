@@ -16,7 +16,7 @@ const MAX_USD = 30; // per singolo run
 const KINDS = {
   profiles: { actor: "afanasenko~instagram-profile-scraper", unit: 0.011, input: (h) => ({ operationMode: "analyzeSpecificAccounts", specificUsernamesList: h, maxCountList: h.length, extractEmail: false, extractPhoneNumber: false, extractWebsiteUrl: true, extractBusinessCategory: false, analyzeQuality: true, extractPosts: false }) },
   followings: { actor: "scraping_solutions~instagram-scraper-followers-following-no-cookies", unit: 0.35, input: (h) => ({ Account: h, resultsLimit: 1500, dataToScrape: "Followings" }) },
-  highlights: { actor: "afanasenko~instagram-stories-highlights-scraper", unit: 0.022, input: (h) => ({ highlightsByUsername: h, includeHighlightItems: true, maxHighlightsPerAccount: 1 }) },
+  highlights: { actor: "afanasenko~instagram-stories-highlights-scraper", unit: 0.022, input: (h) => ({ operationMode: "highlightsByUsername", usernames: h, maxAccounts: h.length, includeHighlightItems: true, maxHighlightsPerAccount: 1, analyzeFrames: false, skipPrivate: true }) },
 };
 
 export async function POST(request) {
