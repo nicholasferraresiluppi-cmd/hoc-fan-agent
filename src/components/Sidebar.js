@@ -25,7 +25,7 @@ import { canSee } from "@/lib/nav-access";
 import { useTheme, useStyle } from "@/lib/theme-client";
 import { UserButton, SignedIn } from "@clerk/nextjs";
 import {
-  Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown, HeartHandshake,
+  ArrowLeftRight, Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown, HeartHandshake,
   GraduationCap, BookOpen, BookMarked, ClipboardCheck, Target, Brain, Award,
   LayoutDashboard, UserCog, Sparkles, Radar, Bot,
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Gauge, MessageSquareWarning,
@@ -105,6 +105,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/conversation-intelligence", label: "Presidio chat", icon: Activity },
       { href: "/admin/shift-quality",            label: "Qualità turni", icon: MessagesSquare },
       { href: "/admin/sales-coaching",           label: "Coaching vendite", icon: HandCoins },
+      { href: "/admin/s4s",                      label: "Calendario S4S", icon: ArrowLeftRight },
       { href: "/admin/sales-ai",                 label: "Sales manager AI", icon: Bot },
       { href: "/admin/manuale-vendite",          label: "Manuale vendite", icon: BookMarked },
     ],
