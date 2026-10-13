@@ -8,9 +8,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import { AlertTriangle, Check, Copy, RefreshCw } from "lucide-react";
+import { AlertTriangle, Check, ChevronLeft, ChevronRight, Copy, RefreshCw } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, HeroMetric, Metric, FilterChip, DataTable, Notice, SectionTitle, card, NUM } from "@/components/ds";
+import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, NUM } from "@/components/ds";
 import { fmtInt, fmtPct, MONTHS_IT } from "@/lib/format";
 
 const fetcher = (url) =>
@@ -141,44 +141,131 @@ function DayCard({ d, today }) {
   );
 }
 
-// Di default i prossimi giorni fino a 2 settimane: il resto su richiesta (25 giorni aperti = pagina infinita)
-const SHOW_DAYS = 14;
+// Vista a calendario (pannello 13/10: la data gigante nello stile Casa era esagerata;
+// "deve ricordare un calendario"). Griglia lun→dom a settimane, 4 alla volta; ogni casella
+// dice quanti scambi e le prime coppie; un clic apre il dettaglio del giorno sotto.
+const WEEKS_SHOWN = 4;
 const addDaysISO = (s, n) => new Date(Date.parse(`${s}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+const mondayOf = (s) => addDaysISO(s, -((new Date(`${s}T00:00:00Z`).getUTCDay() + 6) % 7));
+const COLS = ["lun", "mar", "mer", "gio", "ven", "sab", "dom"];
+
+// Nome corto per le caselle: il primo nome, più l'iniziale del secondo se due pagine
+// cominciano uguale ("Giulia A." / "Giulia O."); la lingua resta se distingue ("Fishball EN").
+function shortNames(pages) {
+  const first = (n) => n.split(" ")[0];
+  const count = {};
+  for (const p of pages) count[first(p.name)] = (count[first(p.name)] || 0) + 1;
+  const out = {};
+  for (const p of pages) {
+    const w = p.name.split(" ");
+    const lang = /^(IT|EN|ES|DE|FR)$/.test(w[w.length - 1]) ? w[w.length - 1] : null;
+    let sn = w[0];
+    if (count[w[0]] > 1) {
+      const dupWithLang = pages.filter((q) => q.name.split(" ")[0] === w[0]).every((q) => q.name.replace(/ (IT|EN|ES|DE|FR)$/, "") === p.name.replace(/ (IT|EN|ES|DE|FR)$/, ""));
+      sn = dupWithLang && lang ? `${w[0]} ${lang}` : `${w[0]} ${(w[1] || "").slice(0, 1)}.`;
+      if (lang && !dupWithLang) sn += ` ${lang}`;
+    }
+    out[p.id] = sn;
+  }
+  return out;
+}
+
+const dayTotals = (d) => {
+  let pairs = 0, subs = 0, measured = 0;
+  for (const g of Object.values(d.groups)) for (const p of g.pairs) {
+    pairs++;
+    for (const side of [p.a, p.b]) if (side.result) { subs += side.result.subs; measured++; }
+  }
+  return { pairs, subs, measured };
+};
 
 function Calendario({ v }) {
-  const [showPast, setShowPast] = useState(false);
-  const [showAll, setShowAll] = useState(false);
+  const byDay = useMemo(() => Object.fromEntries(v.schedule.map((d) => [d.day, d])), [v.schedule]);
+  const short = useMemo(() => shortNames(v.pages), [v.pages]);
+  const first = v.schedule[0]?.day || v.today;
+  const last = v.schedule[v.schedule.length - 1]?.day || v.today;
   const upcoming = v.schedule.filter((d) => d.day >= v.today);
-  const horizon = addDaysISO(v.today, SHOW_DAYS);
-  const visible = showAll ? upcoming : upcoming.filter((d) => d.day < horizon);
-  const hidden = upcoming.length - visible.length;
-  const past = v.schedule.filter((d) => d.day < v.today).reverse();
+  const [start, setStart] = useState(() => mondayOf(v.today));
+  const [sel, setSel] = useState(() => upcoming[0]?.day || null);
+  const canPrev = start > mondayOf(first);
+  const canNext = addDaysISO(start, 7 * WEEKS_SHOWN) <= last;
+  const weeks = Array.from({ length: WEEKS_SHOWN }, (_, w) => Array.from({ length: 7 }, (_, i) => addDaysISO(start, w * 7 + i)));
+  const monthTitle = (() => {
+    const a = new Date(`${start}T00:00:00Z`), b = new Date(`${addDaysISO(start, 7 * WEEKS_SHOWN - 1)}T00:00:00Z`);
+    const m = (d) => MONTHS_IT[d.getUTCMonth()];
+    return a.getUTCMonth() === b.getUTCMonth() ? `${m(a)} ${a.getUTCFullYear()}` : `${m(a)} – ${m(b)} ${b.getUTCFullYear()}`;
+  })();
   const totSubs = v.by_page.reduce((s, p) => s + p.subs, 0);
   const mature = v.results.reduce((s, r) => s + (r.mature_subs || 0), 0);
   const net = v.results.reduce((s, r) => s + (r.net30 || 0), 0);
   const next = upcoming[0];
+  const selDay = sel && byDay[sel];
+  // i giorni senza S4S restano visibili (è un calendario) ma stretti: lo spazio va alle caselle con le coppie
+  const activeWd = new Set(v.settings.weekdays);
+  const colTemplate = [1, 2, 3, 4, 5, 6, 0].map((wd) => (activeWd.has(wd) ? "minmax(0, 1fr)" : "minmax(0, 0.42fr)")).join(" ");
+
+  const cellBtn = { all: "unset", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 4, width: "100%", minHeight: 96, padding: "8px 9px", borderRadius: 8, cursor: "pointer" };
   return (
     <>
-      <HeroMetric
-        label="Prossimo giorno di S4S"
-        value={next ? dayLabel(next.day) : "—"}
-        compare={next ? `${Object.values(next.groups).reduce((s, g) => s + g.pairs.length, 0)} scambi${next.day === v.today ? " · è oggi" : ""}` : "Nessun giorno in calendario: controlla le impostazioni"}
-      >
-        <Metric label={`Abbonati portati dagli S4S (${v.meta.window_days} giorni)`} value={int(totSubs)} note={`${v.results.length} link misurati`} />
+      <style>{`.s4s-cell-list{display:flex} @media (max-width:760px){.s4s-cell-list,.s4s-cell-n,.s4s-cell-m{display:none!important}.s4s-cell{min-height:48px!important;padding:6px!important}}`}</style>
+      <section style={{ ...card, padding: "14px 18px", marginBottom: 16, display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <Metric label="Prossimo S4S" value={next ? (next.day === v.today ? "Oggi" : dayLabel(next.day)) : "—"} note={next ? `${dayTotals(next).pairs} scambi` : "nessun giorno in calendario"} />
+        <Metric label={`Abbonati portati (${v.meta.window_days} giorni)`} value={int(totSubs)} note={`${v.results.length} link misurati`} />
         <Metric label="Speso a 30 giorni per abbonato" value={mature >= v.meta.min_mature ? usd(net / mature, 2) : "—"} note={`su ${int(mature)} abbonati da almeno 30 giorni`} />
-      </HeroMetric>
-      <Note style={{ marginBottom: 16 }}>
-        Su ogni scambio, ciascuna pagina crea un link di tracciamento con il nome indicato e lo dà al partner, che lo pubblica. Con quel nome il risultato compare qui da solo il giorno dopo.
-      </Note>
-      {upcoming.length === 0 && <Notice>Nessun giorno di S4S nelle prossime 8 settimane.</Notice>}
-      {visible.map((d) => <DayCard key={d.day} d={d} today={v.today} />)}
-      {hidden > 0 && <button type="button" style={btn} onClick={() => setShowAll(true)}>Mostra i giorni dopo ({hidden}, fino al {ddmm(upcoming[upcoming.length - 1].day)})</button>}
-      {past.length > 0 && (
-        <div style={{ marginTop: 18 }}>
-          <button type="button" style={btn} onClick={() => setShowPast((x) => !x)}>{showPast ? "Nascondi i giorni passati" : `Mostra i giorni passati (${past.length})`}</button>
-          {showPast && <div style={{ marginTop: 12 }}>{past.map((d) => <DayCard key={d.day} d={d} today={v.today} />)}</div>}
+      </section>
+
+      <section style={{ ...card, padding: "14px 14px 12px", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, padding: "0 4px" }}>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: CP.textPrimary, textTransform: "none" }}>{monthTitle.charAt(0).toUpperCase() + monthTitle.slice(1)}</h2>
+          <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}>
+            <button type="button" style={{ ...btn, padding: "5px 9px" }} disabled={!canPrev} onClick={() => setStart(addDaysISO(start, -7))} aria-label="Settimana prima"><ChevronLeft size={15} /></button>
+            <button type="button" style={{ ...btn, padding: "5px 10px" }} onClick={() => { setStart(mondayOf(v.today)); setSel(upcoming[0]?.day || null); }}>Oggi</button>
+            <button type="button" style={{ ...btn, padding: "5px 9px" }} disabled={!canNext} onClick={() => setStart(addDaysISO(start, 7))} aria-label="Settimana dopo"><ChevronRight size={15} /></button>
+          </span>
         </div>
-      )}
+        <div role="grid" aria-label="Calendario S4S" style={{ display: "grid", gridTemplateColumns: colTemplate, gap: 6 }}>
+          {COLS.map((c) => <div key={c} role="columnheader" style={{ fontSize: 12, color: CP.textMuted, padding: "0 6px 2px" }}>{c}</div>)}
+          {weeks.flat().map((day) => {
+            const d = byDay[day];
+            const isToday = day === v.today;
+            const isSel = day === sel;
+            const past = day < v.today;
+            const dn = Number(day.slice(8, 10));
+            const showMonth = dn === 1;
+            if (!d) {
+              return (
+                <div key={day} className="s4s-cell" style={{ ...cellBtn, cursor: "default", minHeight: 96, border: `1px dashed ${CP.borderSoft}`, background: "transparent" }}>
+                  <span style={{ fontSize: 13, color: isToday ? CP.textPrimary : CP.textMuted, fontWeight: isToday ? 500 : 400 }}>{dn}{showMonth && <span className="s4s-cell-m">{` ${MONTHS_IT[Number(day.slice(5, 7)) - 1].slice(0, 3)}`}</span>}</span>
+                </div>
+              );
+            }
+            const t = dayTotals(d);
+            const pairs = Object.values(d.groups).flatMap((g) => g.pairs);
+            return (
+              <button key={day} type="button" className="s4s-cell" role="gridcell" aria-selected={isSel} aria-label={`${dayLabel(day)}: ${t.pairs} scambi`}
+                onClick={() => setSel(day)}
+                style={{ ...cellBtn, background: isSel ? CP.accentSoft : CP.surfaceAlt, border: `1px solid ${isSel ? CP.accent : isToday ? CP.textSecondary : CP.border}`, opacity: past && !isSel ? 0.72 : 1 }}>
+                <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: isSel ? CP.accentSoftText : CP.textPrimary, ...(isToday ? { textDecoration: "underline", textUnderlineOffset: 3 } : {}) }}>{dn}{showMonth && <span className="s4s-cell-m">{` ${MONTHS_IT[Number(day.slice(5, 7)) - 1].slice(0, 3)}`}</span>}</span>
+                  <span className="s4s-cell-n" style={{ fontSize: 11.5, color: CP.textMuted, ...NUM }}>{t.pairs} sc.</span>
+                </span>
+                <span className="s4s-cell-list" style={{ flexDirection: "column", gap: 1, minWidth: 0 }}>
+                  {pairs.slice(0, 3).map((p) => (
+                    <span key={`${p.a.id}-${p.b.id}`} style={{ fontSize: 11.5, color: CP.textSecondary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{short[p.a.id] || p.a.name} ⇄ {short[p.b.id] || p.b.name}</span>
+                  ))}
+                  {pairs.length > 3 && <span style={{ fontSize: 11.5, color: CP.textMuted }}>+{pairs.length - 3} altre</span>}
+                </span>
+                {past && t.measured > 0 && <span style={{ marginTop: "auto", fontSize: 11.5, color: CP.textSecondary, ...NUM }}>{int(t.subs)} abbonati</span>}
+              </button>
+            );
+          })}
+        </div>
+        <Note style={{ marginTop: 10, padding: "0 4px" }}>
+          Su ogni scambio ciascuna pagina crea un link di tracciamento con il nome indicato e lo dà al partner, che lo pubblica: con quel nome il risultato compare qui da solo il giorno dopo.
+        </Note>
+      </section>
+
+      {selDay ? <DayCard d={selDay} today={v.today} /> : <Notice>Nessun giorno di S4S nelle prossime 8 settimane: controlla le impostazioni.</Notice>}
     </>
   );
 }
