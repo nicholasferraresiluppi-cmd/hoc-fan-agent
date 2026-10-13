@@ -163,3 +163,24 @@ ok(txt.includes("giovedì 15 ottobre") && txt.includes("link su Giulia Amici: S4
 eq(dayLabel("2026-10-19"), "lunedì 19 ottobre", "etichetta giorno");
 
 console.log(`ok ${n} asserzioni`);
+
+// ── Link incollati ──
+import { normalizeLinkUrl, handleFromUrl, sideKey, sideStatus } from "../src/lib/s4s-core.js";
+let m2 = 0;
+const eq2 = (a, b, msg) => { assert.deepEqual(a, b, msg); m2++; };
+eq2(normalizeLinkUrl("https://onlyfans.com/martyscavo/c24"), "onlyfans.com/martyscavo/c24", "url base");
+eq2(normalizeLinkUrl("onlyfans.com/MartyScavo/c24/"), "onlyfans.com/martyscavo/c24", "senza schema, maiuscole, barra finale");
+eq2(normalizeLinkUrl("https://www.onlyfans.com/u570022653/c11?ref=x"), "onlyfans.com/u570022653/c11", "www e query");
+eq2(normalizeLinkUrl("https://onlyfans.com/martyscavo"), null, "profilo senza campagna → no");
+eq2(normalizeLinkUrl("https://evil.com/onlyfans.com/a/c1"), null, "altro dominio → no");
+eq2(handleFromUrl("https://onlyfans.com/fishballsgg/c251"), "fishballsgg", "handle");
+eq2(sideKey("2026-10-15", 1, 2), "2026-10-15|1|2", "chiave");
+const T = "2026-10-15";
+eq2(sideStatus({ day: "2026-10-20", today: T }).code, "futuro", "futuro senza link");
+eq2(sideStatus({ day: T, today: T }).code, "da-fare", "oggi senza link");
+eq2(sideStatus({ day: "2026-10-13", today: T }).code, "mancante", "passato senza link");
+eq2(sideStatus({ day: T, today: T, url: "x" }).code, "pronto", "incollato senza dati");
+eq2(sideStatus({ day: T, today: T, url: "x", stat: { clicks: 40, subs: 0 } }), { code: "pubblicato", label: "pubblicato · 40 click" }, "click senza abbonati");
+eq2(sideStatus({ day: T, today: T, url: "x", stat: { clicks: 40, subs: 12 } }).code, "misurato", "abbonati");
+eq2(sideStatus({ day: "2026-10-13", today: T, result: { subs: 5 } }).code, "misurato", "trovato per nome");
+console.log(`ok ${m2} asserzioni sui link incollati`);

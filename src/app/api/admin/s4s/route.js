@@ -6,13 +6,14 @@
 // POST {action:"settings", split, weekdays, start, lang_override, paused}
 // POST {action:"alias", label_key, partner}   partner = nome | null ("nessuna") | undefined (togli)
 // POST {action:"refresh", split}              ricalcola i risultati dal warehouse
+// POST {action:"link", split, day, receiver, partner, url}   link incollato (url vuoto = togli)
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 import { authorizeAllCreators } from "@/lib/creator-scope";
 import { CAPABILITIES } from "@/lib/rbac";
-import { bigQueryConfigured, listSplits, setAlias } from "@/lib/s4s";
+import { bigQueryConfigured, listSplits, setAlias, setLink } from "@/lib/s4s";
 import { buildView } from "@/lib/s4s-view";
 
 export async function GET(request) {
@@ -42,6 +43,13 @@ export async function POST(request) {
     }
     const split = (await listSplits()).find((s) => s.id === body.split);
     if (!split) return Response.json({ error: "Split non trovato" }, { status: 404 });
+    if (body.action === "link") {
+      if (!split.creator_ids.includes(Number(body.receiver)) || !split.creator_ids.includes(Number(body.partner))) {
+        return Response.json({ error: "Pagina fuori dallo split" }, { status: 400 });
+      }
+      await setLink(split.id, body, az.userId);
+      return Response.json({ ok: true });
+    }
     if (body.action === "settings") {
       const { weekdays, start, lang_override, paused } = body;
       await buildView(split, { settings: { weekdays, start, lang_override, paused }, userId: az.userId });

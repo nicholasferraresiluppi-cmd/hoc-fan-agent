@@ -1,10 +1,10 @@
 // S4S — la vista della pagina (calendario arricchito + risultati), costruita per uno split.
 // Separata dalla route così si può far girare anche fuori da Next (verifica sui dati veri).
 
-import { getNames, getResults, getAliases, syncPlan, WINDOW_DAYS, DEFAULT_WEEKDAYS } from "@/lib/s4s";
+import { getNames, getResults, getAliases, syncPlan, getLinks, getLinkStats, WINDOW_DAYS, DEFAULT_WEEKDAYS } from "@/lib/s4s";
 import {
   planSchedule, addDays, baseName, linkNameFor, buildAliasIndex, enrichResults, summarizeByPage,
-  reciprocity, resultFor, lastExchange, langOf, MIN_MATURE,
+  reciprocity, resultFor, lastExchange, langOf, MIN_MATURE, matchPartner, labelKey, sideKey, sideStatus, toDate, handleFromUrl,
 } from "@/lib/s4s-core";
 
 const PAST_DAYS = 28;
@@ -16,7 +16,8 @@ export async function buildView(split, { force = false, settings, userId } = {})
   const today = todayIT();
   const names = await getNames();
   const { plan, pages } = await syncPlan(split, names, today, { settings, userId });
-  const [res, aliases] = await Promise.all([getResults(split.id, split.creator_ids, { force }), getAliases()]);
+  const [res, aliases, pasted] = await Promise.all([getResults(split.id, split.creator_ids, { force }), getAliases(), getLinks(split.id)]);
+  const lstat = await getLinkStats(split.id, split.creator_ids, Object.values(pasted).map((x) => x.url), { force });
   const aliasIdx = buildAliasIndex(Object.values(names));
   const results = enrichResults(res.rows, names, aliasIdx, aliases);
   const nm = (id) => names[String(id)] || String(id);
@@ -27,6 +28,39 @@ export async function buildView(split, { force = false, settings, userId } = {})
   for (const p of pages) baseCount[baseName(p.name)] = (baseCount[baseName(p.name)] || 0) + 1;
   const disp = (id) => (baseCount[baseName(nm(id))] > 1 ? `${baseName(nm(id))} ${langOfId(id).toUpperCase()}` : baseName(nm(id)));
 
+  // Link S4S trovati in links_stats (anche a 0 abbonati) col partner ricavato dal nome:
+  // servono quando nessuno ha incollato il link ma è stato creato col nome giusto.
+  const pastedUrls = new Set(Object.values(pasted).map((x) => x.url));
+  const found = Object.entries(lstat.links).filter(([u]) => !pastedUrls.has(u)).map(([url, l]) => {
+    const lk = labelKey(l.link_name);
+    const manual = lk && Object.prototype.hasOwnProperty.call(aliases, lk) ? aliases[lk] : undefined;
+    const partner = manual !== undefined ? manual : matchPartner(l.link_name, aliasIdx, { exclude: baseName(nm(l.creator_id)) });
+    return { url, ...l, partner };
+  });
+  const near = (a, b, lo, hi) => { const d = (toDate(a) - toDate(b)) / 86400000; return d >= lo && d <= hi; };
+  function side(day, recv, partner) {
+    const k = sideKey(day, recv, partner);
+    let url = pasted[k]?.url || null;
+    let source = url ? "incollato" : null;
+    if (!url && day <= addDays(today, 1)) {
+      const f = found.find((l) => l.creator_id === Number(recv) && l.partner === baseName(nm(partner)) && l.created && near(l.created, day, -3, 1));
+      if (f) { url = f.url; source = "trovato"; }
+    }
+    const stat = url ? lstat.links[url] || null : null;
+    const result = !url && day <= today ? resultFor(results, recv, nm(partner), day) : null;
+    return {
+      id: recv, name: disp(recv), handle: lstat.handles[String(recv)] || null,
+      link: linkNameFor(nm(partner), day),
+      url, url_source: source,
+      // link incollato che non è della pagina che riceve (es. quello del partner): da correggere
+      url_mismatch: Boolean(url && lstat.handles[String(recv)] && handleFromUrl(url) !== lstat.handles[String(recv)]),
+      stat: stat ? { clicks: stat.clicks, subs: stat.subs, link_name: stat.link_name } : null,
+      result,
+      status: sideStatus({ day, today, url, stat, result }),
+      last: lastExchange(results, recv, nm(partner), day),
+    };
+  }
+
   const first = plan.segments[0]?.from || today;
   const from = first > addDays(today, -PAST_DAYS) ? first : addDays(today, -PAST_DAYS);
   const sameBase = (a, b) => baseName(nm(a)) === baseName(nm(b));
@@ -35,8 +69,8 @@ export async function buildView(split, { force = false, settings, userId } = {})
     groups: Object.fromEntries(Object.entries(d.groups).map(([lang, g]) => [lang, {
       rest: g.rest.map((id) => ({ id, name: disp(id) })),
       pairs: g.pairs.map(([a, b]) => ({
-        a: { id: a, name: disp(a), link: linkNameFor(nm(b), d.day), result: d.day <= today ? resultFor(results, a, nm(b), d.day) : null, last: lastExchange(results, a, nm(b), d.day) },
-        b: { id: b, name: disp(b), link: linkNameFor(nm(a), d.day), result: d.day <= today ? resultFor(results, b, nm(a), d.day) : null, last: lastExchange(results, b, nm(a), d.day) },
+        a: side(d.day, a, b),
+        b: side(d.day, b, a),
       })),
     }])),
   }));
@@ -56,7 +90,7 @@ export async function buildView(split, { force = false, settings, userId } = {})
     split: { id: split.id, name: split.name },
     settings: plan.settings,
     segments: plan.segments.map((s) => ({ from: s.from, weekdays: s.weekdays, groups: s.groups })),
-    pages: pages.map((p) => ({ id: p.id, name: disp(p.id), lang: langOfId(p.id), lang_guessed: !plan.settings.lang_override[p.id] && langOf(p.name).guessed, paused: plan.settings.paused.includes(Number(p.id)) })),
+    pages: pages.map((p) => ({ id: p.id, name: disp(p.id), handle: lstat.handles[String(p.id)] || null, lang: langOfId(p.id), lang_guessed: !plan.settings.lang_override[p.id] && langOf(p.name).guessed, paused: plan.settings.paused.includes(Number(p.id)) })),
     schedule,
     results: results.map(({ key, creator_id, page, link_name, partner, partner_label, partner_source, label_key, format, subs, first_day, mature_subs, net30, net30_per_sub, payers_rate }) => ({
       key, creator_id, page: split.creator_ids.includes(creator_id) ? disp(creator_id) : baseName(page), link_name, partner, partner_label, partner_source, label_key, format, subs, first_day, mature_subs, net30, net30_per_sub, payers_rate,
@@ -66,7 +100,8 @@ export async function buildView(split, { force = false, settings, userId } = {})
     unmatched: [...unmatched.values()].sort((a, b) => b.subs - a.subs),
     aliases,
     partner_options: [...new Set(Object.values(names).map(baseName))].sort((a, b) => a.localeCompare(b, "it")),
-    meta: { generated_at: res.generated_at, bytes_processed: res.bytes_processed, window_days: WINDOW_DAYS, min_mature: MIN_MATURE, default_weekdays: DEFAULT_WEEKDAYS },
+    baseline: res.baseline || null,
+    meta: { generated_at: res.generated_at, links_at: lstat.generated_at, bytes_processed: res.bytes_processed, window_days: WINDOW_DAYS, min_mature: MIN_MATURE, default_weekdays: DEFAULT_WEEKDAYS },
   };
 }
 
