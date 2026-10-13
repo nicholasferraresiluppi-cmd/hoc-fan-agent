@@ -21,7 +21,7 @@ const FIELDS = ["Account", "Followers Count", "Median Views", "Views.Followers R
 
 export const apifyConfigured = () => Boolean(process.env.APIFY_TOKEN);
 
-async function apify(path, init = {}) {
+export async function apify(path, init = {}) {
   const sep = path.includes("?") ? "&" : "?";
   const r = await fetch(`${API}${path}${sep}token=${encodeURIComponent(process.env.APIFY_TOKEN)}`, {
     ...init,
