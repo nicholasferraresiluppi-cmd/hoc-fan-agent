@@ -217,3 +217,20 @@ console.log(`scouting: ${n} asserzioni ok`);
   assert.throws(() => setField(crm, "h:a", "bio", "x"));
   console.log("agenzie: ok");
 }
+
+// --- coda Valuta (13/10/2026)
+{
+  const { review, unreview, reviewQueue, buildCreators } = await import("../src/lib/scouting-core.js");
+  let crm = review({ creators: {} }, "h:a", "vista", "N");
+  assert.equal(crm.creators["h:a"].stage, "da_valutare", "vista non cambia la fase");
+  assert.ok(crm.creators["h:a"].reviewedAt);
+  crm = review(crm, "h:b", "interessante", "N");
+  assert.equal(crm.creators["h:b"].stage, "interessante");
+  const cs = buildCreators([{ h: "a", sig: "forte" }, { h: "b", sig: "forte" }, { h: "c", sig: "forte" }, { h: "d", sig: "nessuno" }], crm);
+  assert.deepEqual(reviewQueue(cs).map((c) => c.handles[0]), ["c"], "fuori le già valutate");
+  assert.deepEqual(reviewQueue(cs, { scope: "all" }).map((c) => c.handles[0]).sort(), ["c", "d"]);
+  crm = unreview(crm, "h:b");
+  assert.equal(crm.creators["h:b"].stage, "da_valutare"); assert.equal(crm.creators["h:b"].reviewedAt, undefined);
+  assert.throws(() => review(crm, "h:x", "firmata"));
+  console.log("coda valuta: ok");
+}

@@ -9,7 +9,7 @@
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { getProfiles, saveProfiles, getCrm, saveCrm, addForgotten } from "@/lib/scouting-store";
 import { deletePic } from "@/lib/scouting-pics";
-import { setStage, addNote, setField, linkHandles, unlinkHandle, dismissSuggestion, forgetHandle, normHandle } from "@/lib/scouting-core";
+import { review, unreview, setStage, addNote, setField, linkHandles, unlinkHandle, dismissSuggestion, forgetHandle, normHandle } from "@/lib/scouting-core";
 
 export const runtime = "nodejs";
 
@@ -23,6 +23,8 @@ export async function POST(request) {
     let crm = await getCrm();
     switch (body.action) {
       case "stage": crm = setStage(crm, String(body.id), String(body.stage), by); break;
+      case "review": crm = review(crm, String(body.id), String(body.decision), by); break;
+      case "unreview": crm = unreview(crm, String(body.id)); break;
       case "note": crm = addNote(crm, String(body.id), body.text, by); break;
       case "field": crm = setField(crm, String(body.id), String(body.field), body.value); break;
       case "link": crm = linkHandles(crm, normHandle(body.target), normHandle(body.handle)); break;
