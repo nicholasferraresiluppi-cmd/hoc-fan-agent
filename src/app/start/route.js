@@ -5,7 +5,9 @@
 // resta invece rispettato, perché Clerk usa il redirect_url quando c'è.
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { getScope, CAPABILITIES } from "@/lib/rbac";
+import { getScope, getUserRoles, CAPABILITIES } from "@/lib/rbac";
+import { isUserIdAdmin } from "@/lib/admin";
+import { restrictionFor } from "@/lib/restricted-roles";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,9 @@ export async function GET(request) {
   if (!userId) return NextResponse.redirect(new URL("/sign-in", request.url));
   let dest = "/";
   try {
+    // ruolo ristretto (es. Social): direttamente sulla sua pagina
+    const rx = restrictionFor({ admin: await isUserIdAdmin(userId), roles: await getUserRoles(userId) });
+    if (rx) return NextResponse.redirect(new URL(rx.home, request.url));
     const sv = await getScope(userId, CAPABILITIES.SCORES_VIEW);
     if (sv === "all") dest = "/admin";
     // team lead: parte da chi seguire nella sua squadra

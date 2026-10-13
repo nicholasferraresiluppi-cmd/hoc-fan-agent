@@ -20,9 +20,11 @@ import { getClerkUser, forgetClerkUser } from "@/lib/clerk-user";
  * Ogni capability ha anche uno scope: "all" | "team" | "own".
  */
 
-export const ROLES = ["operator", "team_lead", "sales_manager", "qa_reviewer", "admin"];
+// "social" per primo = il più basso: diventa ruolo principale solo se è l'unico (lib/invitations)
+export const ROLES = ["social", "operator", "team_lead", "sales_manager", "qa_reviewer", "admin"];
 
 export const ROLE_META = {
+  social: { label: "Social", emoji: "📱", color: "#EC4899", description: "Gestione account social — vede solo Account social" },
   operator: { label: "Operator", emoji: "💬", color: "#10B981", description: "Chatter in training — vede i suoi dati" },
   team_lead: { label: "Team Lead", emoji: "👥", color: "#3B82F6", description: "Lead del team — vede il suo team" },
   sales_manager: { label: "Sales Manager", emoji: "📈", color: "#F5A623", description: "SM — vede tutto, override score" },
@@ -51,10 +53,15 @@ export const CAPABILITIES = {
   CM_COCKPIT: "cm.cockpit",                   // cockpit turno di supervisione CM
   COPILOT_PILOT: "copilot.pilot",             // scheda-fan "Il mio turno" (aperto a tutta HOC; espone LTV fan del PROPRIO turno)
   USERS_INVITE: "users.invite",               // invitare persone in HOC Pro (accesso solo su invito dal 25/09/2026)
+  SOCIAL_MANAGE: "social.manage",             // Account social (/admin/supervisor): account, telefoni, caselle, password (13/10/2026)
 };
 
 // "all" = tutta l'org | "team" = solo proprio team | "own" = solo sé stesso | "none" = nessun accesso
 export const ROLE_CAPABILITIES = {
+  // 13/10/2026: solo Account social; chi ha solo questo ruolo vede l'app ridotta a quella pagina (lib/restricted-roles)
+  social: {
+    [CAPABILITIES.SOCIAL_MANAGE]: "all",
+  },
   operator: {
     [CAPABILITIES.TRAINING_DO]: "own",
     [CAPABILITIES.SCORES_VIEW]: "own",
@@ -104,6 +111,7 @@ export const ROLE_CAPABILITIES = {
     [CAPABILITIES.LEADERBOARD_SNAPSHOT]: "all",
     [CAPABILITIES.CM_COCKPIT]: "all",
     [CAPABILITIES.COPILOT_PILOT]: "all",
+    [CAPABILITIES.SOCIAL_MANAGE]: "all",
   },
 };
 

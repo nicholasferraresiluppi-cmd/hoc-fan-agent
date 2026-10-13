@@ -191,7 +191,7 @@ export default function SocialProxiesPage() {
             <ol style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: CP.textSecondary, lineHeight: 1.6 }}>
               <li>Aggiungi un proxy con “Nuovo proxy” (indirizzo, porta e, se il fornitore le dà, utente e password).</li>
               <li>Premi “Prova connessione”: se riesce diventa “Funziona” e può essere assegnato.</li>
-              <li>Poi crea gli account in <Link href="/admin/social-accounts" style={{ color: CP.accentSoftText, textDecoration: "none" }}>Account social</Link>: ognuno riceve da solo il proxy funzionante con meno account.</li>
+              <li>Poi crea gli account in <Link href="/admin/supervisor" style={{ color: CP.accentSoftText, textDecoration: "none" }}>Account social</Link>: ognuno riceve da solo il proxy funzionante con meno account.</li>
             </ol>
           </section>
         )
