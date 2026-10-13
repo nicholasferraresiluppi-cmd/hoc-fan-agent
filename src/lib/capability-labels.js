@@ -10,6 +10,7 @@ export const CAP_LABELS = {
   seed: "Pagine di amministrazione (dati di tutti)",
   "access.mgmt": "Gestire accessi e ruoli",
   "users.invite": "Invitare nuove persone",
+  "social.manage": "Account social (account, telefoni, mail, password)",
   "seniority.override": "Cambiare il livello di anzianità",
   "leagues.snapshot": "Chiudere le leghe",
   "leaderboard.snapshot": "Fotografare la classifica",

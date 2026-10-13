@@ -6,6 +6,7 @@ import { getUserRole, getUserRoles, getUserTeam, getEffectiveCapabilities } from
 import { getCreatorScope } from "@/lib/creator-scope";
 import { resolveWorkspace } from "@/lib/workspace-store";
 import { defaultWorkspace } from "@/lib/workspaces";
+import { restrictionFor } from "@/lib/restricted-roles";
 
 export async function GET() {
   try {
@@ -43,6 +44,8 @@ export async function GET() {
       creators,
       security,
       workspace,
+      // ruolo ristretto (lib/restricted-roles): app ridotta alle sue pagine
+      restricted: restrictionFor({ admin, roles }),
       view_as: va ? { label: va.label, roles: va.roles, exp: va.exp, employee: va.employee || null } : null,
       email: user?.emailAddresses?.[0]?.emailAddress,
       name: `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || null,
