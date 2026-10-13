@@ -13,6 +13,7 @@ import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, NUM } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
 import { fmtInt, fmtPct, MONTHS_IT } from "@/lib/format";
+import { fillCaption, photosFor, needsPost, needsMass } from "@/lib/s4s-core";
 
 const fetcher = (url) =>
   fetch(url).then(async (r) => {
@@ -22,8 +23,10 @@ const fetcher = (url) =>
   });
 
 const TABS = [
+  ["oggi", "Oggi"],
   ["planner", "Planner"],
   ["agenda", "Giorno"],
+  ["kit", "Kit"],
   ["risultati", "Risultati"],
   ["impostazioni", "Impostazioni"],
 ];
@@ -289,7 +292,7 @@ function DealEditor({ v, deal, onClose, reload }) {
           <label style={field}>Pagina
             <select value={f.a} onChange={(e) => set("a")(Number(e.target.value))} style={input}>
               <option value="">Scegli…</option>
-              {pages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {pages.filter((p) => p.mine || Number(f.a) === p.id).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </label>
           <span aria-hidden style={{ textAlign: "center", color: CP.textMuted, paddingBottom: 8 }}>⇄</span>
@@ -345,7 +348,7 @@ const plusDays = (s, n) => new Date(Date.parse(`${s}T00:00:00Z`) + n * 86400000)
 const WD_SHORT = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
 
 function Planner({ v, onEdit, onNew, onOpenDay }) {
-  const pages = v.pages.filter((p) => !p.paused);
+  const pages = v.pages.filter((p) => !p.paused && p.mine);
   const byDay = useMemo(() => Object.fromEntries(v.schedule.map((d) => [d.day, d])), [v.schedule]);
   const [start, setStart] = useState(() => mondayOfISO(v.today));
   const days = Array.from({ length: 7 }, (_, i) => plusDays(start, i));
@@ -444,6 +447,242 @@ function Planner({ v, onEdit, onNew, onOpenDay }) {
   );
 }
 
+// ── Oggi (13/10/2026, punto 2): i compiti del sales manager, pagina per pagina ──
+// Per ogni scambio di una sua pagina: 1) crea e incolla il proprio link, 2) pubblica il
+// partner con le sue foto e il suo testo (già col link del partner), 3) la mass, 4) "fatto".
+const photoUrl = (cid, pid, dl) => `/api/admin/s4s/kit/photo?c=${cid}&p=${pid}${dl ? "&dl=1" : ""}`;
+const hhmm = (iso) => new Date(iso).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
+
+function KitPhotos({ cid, photos }) {
+  if (!photos.length) return null;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 8, maxWidth: 440 }}>
+      {photos.map((ph) => (
+        <a key={ph.id} href={photoUrl(cid, ph.id, true)} title="Scarica la foto" style={{ display: "block", position: "relative", borderRadius: 8, overflow: "hidden", border: `1px solid ${CP.borderSoft}`, aspectRatio: "3 / 4", background: CP.bgSunken }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photoUrl(cid, ph.id)} alt="Foto del kit" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          <span style={{ position: "absolute", left: 6, bottom: 6, fontSize: 11, padding: "1px 6px", borderRadius: 6, background: CP.panel, color: CP.textPrimary }}>Scarica</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function Caption({ text, url, partnerName }) {
+  const filled = fillCaption(text, url);
+  const waiting = !url && String(text || "").includes("{link}");
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, maxWidth: 560 }}>
+      <div style={{ fontSize: 13.5, lineHeight: 1.5, whiteSpace: "pre-wrap", padding: "8px 10px", borderRadius: 8, background: CP.bgSunken, border: `1px solid ${CP.borderSoft}`, color: CP.textPrimary }}>{filled || <span style={{ color: CP.textMuted }}>Nessun testo nel kit</span>}</div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        {filled && <CopyButton text={filled} label="Copia il testo" />}
+        {waiting && <span style={{ fontSize: 12, color: CP.attn }}>Il link di {partnerName} non c&apos;è ancora: al suo posto resta {"{link}"}</span>}
+      </div>
+    </div>
+  );
+}
+
+function Step({ n, title, children, done }) {
+  return (
+    <li style={{ display: "flex", gap: 12 }}>
+      <span aria-hidden style={{ width: 24, height: 24, borderRadius: "50%", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, border: `1px solid ${done ? CP.accentGreen : CP.border}`, color: done ? CP.accentGreen : CP.textSecondary }}>{done ? "✓" : n}</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: 14, color: CP.textPrimary }}>{title}</div>
+        {children}
+      </div>
+    </li>
+  );
+}
+
+function TaskCard({ v, x, me, other, day, reload }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const kit = v.kits[String(other.id)] || { photos: [], ready: false, missing: ["foto", "testo"] };
+  const doneAt = x.done?.[String(me.id)];
+  const [open, setOpen] = useState(!doneAt); // chi ha già programmato vede la scheda chiusa
+  const otherDone = x.done?.[String(other.id)];
+  const first = (n) => n.split(" ")[0];
+  async function post(body) {
+    setBusy(true); setErr(null);
+    const r = await fetch("/api/admin/s4s", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ split: v.split.id, ...body }) });
+    const d = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) setErr(d.error || "Operazione fallita"); else reload();
+  }
+  const pin = x.pin_hours ? `, fissato ${x.pin_hours} ore` : "";
+  let n = 1;
+  return (
+    <section style={{ ...card, padding: 16, marginBottom: 12, borderColor: doneAt ? CP.accentGreen : x.status === "confermato" ? CP.accent : CP.border }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+        <span style={{ fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>{me.name} con {other.name}</span>
+        <span style={{ fontSize: 13, color: CP.textSecondary, ...NUM }}>ore {x.time}</span>
+        <DealStatus x={x} />
+        {x.status === "proposto" && <button type="button" disabled={busy} onClick={() => post({ action: "deal_status", id: x.id, status: "confermato" })} style={{ ...btnPrimary, padding: "5px 10px", fontSize: 12.5 }}>Conferma</button>}
+        {x.note && <span style={{ flexBasis: "100%", fontSize: 12.5, color: CP.textSecondary }}>Nota: {x.note}</span>}
+      </div>
+      {!open && <button type="button" onClick={() => setOpen(true)} style={{ ...btn, padding: "5px 10px", fontSize: 12.5, marginBottom: 4 }}>Mostra i passi</button>}
+      {open && !kit.ready && <Notice>Manca il kit di {other.name} ({kit.missing.join(" e ")}): chiedilo al suo sales manager prima delle {x.time}.</Notice>}
+      {open && <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 16 }}>
+        <Step n={n++} title={<>Crea su OnlyFans di {first(me.name)} il link <span style={mono}>{me.link}</span> e incollalo qui</>} done={Boolean(me.url)}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}><CopyButton text={me.link} label="Copia il nome" /></div>
+          <div style={{ maxWidth: 560 }}><PasteLink splitId={v.split.id} day={day} s={me} partner={other} reload={reload} /></div>
+        </Step>
+        {(needsPost(me.fmt) || me.fmt === "telegram") && (
+          <Step n={n++} title={<>{me.fmt === "telegram" ? "Pubblica su Telegram" : "Programma il post"} di {first(other.name)} alle <b style={{ fontWeight: 500 }}>{x.time}</b>{me.fmt === "telegram" ? "" : pin}</>}>
+            <KitPhotos cid={other.id} photos={photosFor(kit, "post")} />
+            <Caption text={kit.text_post || kit.text_mass} url={other.url} partnerName={first(other.name)} />
+          </Step>
+        )}
+        {needsMass(me.fmt) && (
+          <Step n={n++} title={<>Mass message alle <b style={{ fontWeight: 500 }}>{me.fmt === "mass" ? x.time : x.mass_time}</b></>}>
+            <KitPhotos cid={other.id} photos={photosFor(kit, "mass")} />
+            <Caption text={kit.text_mass || kit.text_post} url={other.url} partnerName={first(other.name)} />
+          </Step>
+        )}
+      </ol>}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: open ? 16 : 8, paddingTop: 12, borderTop: `1px solid ${CP.borderSoft}` }}>
+        <span style={{ fontSize: 12.5, color: CP.textSecondary }}>
+          {first(other.name)}: {other.url ? "link incollato" : "link non ancora incollato"} · {otherDone ? `ha programmato (${hhmm(otherDone)})` : "non ha ancora programmato"}
+        </span>
+        <span style={{ marginLeft: "auto", display: "inline-flex", gap: 8, alignItems: "center" }}>
+          {doneAt
+            ? <><span style={{ fontSize: 13, color: CP.accentGreen }}>✓ Fatto alle {hhmm(doneAt)}</span><button type="button" disabled={busy} onClick={() => post({ action: "done", id: x.id, page: me.id, done: false })} style={{ ...btn, padding: "5px 10px", fontSize: 12.5 }}>Annulla</button></>
+            : <button type="button" disabled={busy || x.status === "annullato"} onClick={() => post({ action: "done", id: x.id, page: me.id })} style={btnPrimary}>Ho programmato tutto</button>}
+        </span>
+        {err && <span style={{ flexBasis: "100%", fontSize: 12.5, color: CP.accentRed }}>{err}</span>}
+      </div>
+    </section>
+  );
+}
+
+function Oggi({ v, reload }) {
+  const mine = new Set(v.pages.filter((p) => p.mine && !p.paused).map((p) => p.id));
+  const myDays = v.schedule.filter((d) => activeDeals(d).some((x) => mine.has(x.a.id) || mine.has(x.b.id)));
+  const start = myDays.find((d) => d.day >= v.today)?.day || myDays[myDays.length - 1]?.day || v.today;
+  const [day, setDay] = useState(start);
+  const idx = myDays.findIndex((d) => d.day === day);
+  const d = myDays[idx];
+  const tasks = d ? activeDeals(d).flatMap((x) => [[x.a, x.b], [x.b, x.a]].filter(([me]) => mine.has(me.id)).map(([me, other]) => ({ x, me, other }))) : [];
+  const doneN = tasks.filter((t) => t.x.done?.[String(t.me.id)]).length;
+  return (
+    <div style={{ maxWidth: 900 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 500, color: CP.textPrimary }}>{d ? (d.day === v.today ? `Oggi, ${dayLabel(d.day)}` : dayLabel(d.day).charAt(0).toUpperCase() + dayLabel(d.day).slice(1)) : "Nessuno S4S in programma"}</h2>
+        {d && <span style={{ fontSize: 13, color: CP.textMuted, ...NUM }}>{tasks.length} {tasks.length === 1 ? "S4S" : "S4S"} · {doneN} fatti</span>}
+        <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}>
+          <button type="button" aria-label="Giorno di S4S prima" disabled={idx <= 0} onClick={() => setDay(myDays[idx - 1].day)} style={{ ...btn, padding: "6px 9px" }}><ChevronLeft size={15} /></button>
+          <button type="button" onClick={() => setDay(start)} style={{ ...btn, padding: "6px 10px" }}>Prossimo</button>
+          <button type="button" aria-label="Giorno di S4S dopo" disabled={idx < 0 || idx >= myDays.length - 1} onClick={() => setDay(myDays[idx + 1].day)} style={{ ...btn, padding: "6px 9px" }}><ChevronRight size={15} /></button>
+        </span>
+      </div>
+      {d && d.day !== v.today && d.day === start && <Note style={{ marginBottom: 12 }}>Oggi non hai S4S: questo è il prossimo giorno in programma.</Note>}
+      {!d && <Notice>Le tue pagine non hanno S4S in calendario.</Notice>}
+      {tasks.map((t) => <TaskCard key={`${t.x.id}-${t.me.id}`} v={v} x={t.x} me={t.me} other={t.other} day={d.day} reload={reload} />)}
+    </div>
+  );
+}
+
+// ── Kit (13/10/2026, punto 2): foto e testi che le altre pagine pubblicano ──
+function KitEditor({ v, reload }) {
+  const pages = v.pages.filter((p) => p.mine && !p.paused);
+  const [pageId, setPageId] = useState(pages[0]?.id || null);
+  const page = pages.find((p) => p.id === pageId) || pages[0];
+  const kit = (page && v.kits[String(page.id)]) || { photos: [], text_post: "", text_mass: "", ready: false, missing: ["foto", "testo"] };
+  const [texts, setTexts] = useState({ post: kit.text_post, mass: kit.text_mass });
+  const [state, setState] = useState(null);
+  useEffect(() => { setTexts({ post: kit.text_post, mass: kit.text_mass }); setState(null); }, [page?.id, kit.text_post, kit.text_mass]);
+  if (!page) return <Notice>Nessuna pagina da gestire.</Notice>;
+  const post = async (body, okMsg) => {
+    setState({ busy: true });
+    const r = await fetch("/api/admin/s4s/kit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ c: page.id, ...body }) });
+    const d = await r.json().catch(() => ({}));
+    setState(r.ok ? { msg: okMsg } : { error: d.error || "Operazione fallita" });
+    if (r.ok) reload();
+  };
+  async function upload(files) {
+    const room = v.kit_max_photos - kit.photos.length;
+    const list = [...files].slice(0, Math.max(0, room));
+    if (!list.length) { setState({ error: `Al massimo ${v.kit_max_photos} foto` }); return; }
+    setState({ busy: true, msg: "Carico…" });
+    const { shrinkImage } = await import("@/lib/hr-upload-client");
+    for (const f of list) {
+      const small = await shrinkImage(f);
+      const fd = new FormData();
+      fd.append("c", String(page.id));
+      fd.append("file", small, small.name || "foto.jpg");
+      const r = await fetch("/api/admin/s4s/kit", { method: "POST", body: fd });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setState({ error: d.error || "Caricamento non riuscito" }); reload(); return; }
+    }
+    setState({ msg: list.length === 1 ? "Foto caricata" : `${list.length} foto caricate` });
+    reload();
+  }
+  const sample = "https://onlyfans.com/esempio/c1";
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        {pages.map((p) => {
+          const k = v.kits[String(p.id)];
+          return <FilterChip key={p.id} active={p.id === page.id} onClick={() => setPageId(p.id)} attn={!k?.ready} label={`${p.name}${k?.ready ? " ✓" : ""}`} />;
+        })}
+      </div>
+      <Note style={{ marginBottom: 14 }}>Il kit di {page.name} è quello che le altre pagine pubblicano quando fanno S4S con lei. {kit.ready ? "È pronto." : `Manca: ${kit.missing.join(" e ")}.`}</Note>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(420px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <section style={{ ...card, padding: 16 }}>
+            <SectionTitle aside={`${kit.photos.length} di ${v.kit_max_photos}`}>Foto</SectionTitle>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+              {kit.photos.map((ph) => (
+                <div key={ph.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ borderRadius: 8, overflow: "hidden", border: `1px solid ${CP.borderSoft}`, aspectRatio: "3 / 4", background: CP.bgSunken }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photoUrl(page.id, ph.id)} alt="Foto del kit" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  </div>
+                  <select aria-label="Per cosa va la foto" value={ph.use} onChange={(e) => post({ action: "use", id: ph.id, use: e.target.value }, "Salvato")} style={{ ...input, padding: "5px 8px", fontSize: 12.5 }}>
+                    {Object.entries(v.photo_uses).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                  </select>
+                  <button type="button" disabled={state?.busy} onClick={() => { if (window.confirm("Togliere questa foto dal kit?")) post({ action: "remove", id: ph.id }, "Foto tolta"); }} style={{ ...btn, padding: "4px 8px", fontSize: 12.5, justifyContent: "center" }}>Togli</button>
+                </div>
+              ))}
+              {kit.photos.length < v.kit_max_photos && (
+                <label style={{ display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", aspectRatio: "3 / 4", borderRadius: 8, border: `1px dashed ${CP.border}`, color: CP.textSecondary, fontSize: 13, cursor: "pointer", padding: 8 }}>
+                  + Carica foto
+                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(e) => { upload(e.target.files); e.target.value = ""; }} style={{ display: "none" }} />
+                </label>
+              )}
+            </div>
+          </section>
+          <section style={{ ...card, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+            <SectionTitle>Testi</SectionTitle>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12.5, color: CP.textSecondary }}>Testo per il post
+              <textarea rows={4} value={texts.post} maxLength={1000} onChange={(e) => setTexts((t) => ({ ...t, post: e.target.value }))} placeholder="Es. Conoscete già lei? Seguitela qui {link}" style={{ ...input, resize: "vertical", lineHeight: 1.5 }} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12.5, color: CP.textSecondary }}>Testo per la mass
+              <textarea rows={3} value={texts.mass} maxLength={1000} onChange={(e) => setTexts((t) => ({ ...t, mass: e.target.value }))} placeholder="Testo breve per il messaggio di massa, con {link}" style={{ ...input, resize: "vertical", lineHeight: 1.5 }} />
+            </label>
+            <Note>Scrivi {"{link}"} dove va il link: il giorno dello scambio diventa il link creato da {page.name.split(" ")[0]} per quel partner.</Note>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <button type="button" disabled={state?.busy || (texts.post === kit.text_post && texts.mass === kit.text_mass)} onClick={() => post({ action: "text", text_post: texts.post, text_mass: texts.mass }, "Testi salvati")} style={btnPrimary}>Salva i testi</button>
+              {state?.msg && <span style={{ fontSize: 13, color: CP.textSecondary }}>{state.msg}</span>}
+              {state?.error && <span style={{ fontSize: 13, color: CP.accentRed }}>{state.error}</span>}
+            </div>
+          </section>
+        </div>
+        <aside style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <span style={{ fontSize: 12.5, color: CP.textSecondary }}>Come lo vedono i fan della pagina partner</span>
+          <article style={{ ...card, padding: 14, display: "flex", flexDirection: "column", gap: 10, maxWidth: 420 }}>
+            <div style={{ fontSize: 14, lineHeight: 1.5, whiteSpace: "pre-wrap", color: CP.textPrimary }}>{fillCaption(texts.post || texts.mass, sample) || <span style={{ color: CP.textMuted }}>Il testo del post comparirà qui</span>}</div>
+            {kit.photos[0]
+              /* eslint-disable-next-line @next/next/no-img-element */
+              ? <img src={photoUrl(page.id, photosFor(kit, "post")[0].id)} alt="Anteprima" style={{ width: "100%", maxHeight: 340, objectFit: "cover", borderRadius: 10, display: "block" }} />
+              : <div style={{ height: 240, borderRadius: 10, background: CP.bgSunken, border: `1px dashed ${CP.border}` }} />}
+          </article>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
 function MiniMonth({ month, setMonth, sel, setSel, today, byDay, only }) {
   const first = `${month}-01`;
   const startWd = (new Date(`${first}T00:00:00Z`).getUTCDay() + 6) % 7;
@@ -501,7 +740,7 @@ function StatBox({ label, value, note }) {
 
 function Agenda({ v, reload, initialDay, onEdit }) {
   const byDay = useMemo(() => Object.fromEntries(v.schedule.map((d) => [d.day, d])), [v.schedule]);
-  const pages = v.pages.filter((p) => !p.paused);
+  const pages = v.pages.filter((p) => !p.paused && p.mine);
   const upcoming = v.schedule.filter((d) => d.day >= v.today);
   const [only, setOnly] = useState(null); // null = tutte le pagine
   const [sel, setSel] = useState(() => initialDay || upcoming[0]?.day || v.schedule[v.schedule.length - 1]?.day || v.today);
@@ -665,7 +904,7 @@ function Risultati({ v, reload }) {
       <SectionTitle aside={`ultimi ${v.meta.window_days} giorni · dal più recente`}>Tutti gli scambi misurati</SectionTitle>
       <ResultsTable rows={v.results} />
       <div style={{ height: 24 }} />
-      <Unmatched v={v} reload={reload} />
+      {v.me?.all && <Unmatched v={v} reload={reload} />}
     </>
   );
 }
@@ -788,7 +1027,7 @@ function Impostazioni({ v, splitId, reload }) {
 
 export default function S4SPage() {
   const [splitId, setSplitId] = useState(null);
-  const [tab, setTab] = useState("planner");
+  const [tab, setTab] = useState(null); // null = scheda di partenza in base a chi guarda
   const [editing, setEditing] = useState(null); // accordo aperto nella finestra
   const [focusDay, setFocusDay] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -803,6 +1042,10 @@ export default function S4SPage() {
   const url = `/api/admin/s4s${splitId ? `?split=${encodeURIComponent(splitId)}` : ""}`;
   const { data, error, mutate, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false });
   const v = data?.view;
+  // chi vede tutte le creator parte dal planner, un sales manager dai compiti di oggi
+  const allView = Boolean(v?.me?.all);
+  const tabs = TABS.filter(([k]) => allView || k !== "impostazioni");
+  const current = tab && tabs.some(([k]) => k === tab) ? tab : allView ? "planner" : "oggi";
   const choose = (id) => {
     setSplitId(id);
     try { localStorage.setItem("s4s:split", id); } catch { /* ok */ }
@@ -823,10 +1066,10 @@ export default function S4SPage() {
   );
   const wrap = { padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body };
 
-  if (error) return <div style={wrap}>{header}<Notice danger>{/scope|capability|vista su tutte|permesso/i.test(String(error.message)) ? "Questa pagina è riservata a sales manager e admin con la vista su tutte le creator." : error.message}</Notice></div>;
+  if (error) return <div style={wrap}>{header}<Notice danger>{/scope|capability|vista su tutte|permesso/i.test(String(error.message)) ? "Questa pagina è per i sales manager e gli admin." : error.message}</Notice></div>;
   if (isLoading || !data) return <div style={wrap}>{header}<Note>Caricamento…</Note></div>;
   if (data.bigquery === false) return <div style={wrap}>{header}<Notice>Il collegamento al warehouse (BigQuery) non è configurato in questo ambiente.</Notice></div>;
-  if (!v) return <div style={wrap}>{header}<Notice>Non c&apos;è ancora nessuno split. Crealo in <a href="/admin/sales-coaching" style={{ color: CP.accentSoftText }}>Coaching vendite</a>: il calendario usa le sue pagine.</Notice></div>;
+  if (!v) return <div style={wrap}>{header}<Notice>Nessuno split con le tue pagine. Gli split si creano in Coaching vendite: il calendario usa le loro pagine.</Notice></div>;
 
   return (
     <div style={wrap}>
@@ -839,19 +1082,21 @@ export default function S4SPage() {
         <span style={{ marginLeft: "auto", fontSize: 12.5, color: CP.textMuted }}>
           Risultati al {new Date(v.meta.generated_at).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
         </span>
-        <button type="button" style={btn} disabled={refreshing} onClick={refresh}><RefreshCw size={14} />{refreshing ? "Aggiorno…" : "Aggiorna"}</button>
+        {allView && <button type="button" style={btn} disabled={refreshing} onClick={refresh}><RefreshCw size={14} />{refreshing ? "Aggiorno…" : "Aggiorna"}</button>}
       </div>
       <div role="tablist" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, borderBottom: `1px solid ${CP.border}`, paddingBottom: 12 }}>
-        {TABS.map(([k, l]) => (
-          <FilterChip key={k} active={tab === k} onClick={() => { setTab(k); try { window.history.replaceState(null, "", `#${k}`); } catch { /* ok */ } }}
+        {tabs.map(([k, l]) => (
+          <FilterChip key={k} active={current === k} onClick={() => { setTab(k); try { window.history.replaceState(null, "", `#${k}`); } catch { /* ok */ } }}
             label={k === "risultati" && v.unmatched.length ? `${l} · ${v.unmatched.length} da attribuire` : l} />
         ))}
       </div>
-      {tab === "planner" && <Planner key={v.split.id} v={v} onEdit={setEditing} onNew={setEditing} onOpenDay={(day) => { setFocusDay(day); setTab("agenda"); }} />}
-      {tab === "agenda" && <Agenda key={`${v.split.id}-${focusDay || ""}`} v={v} reload={mutate} initialDay={focusDay} onEdit={setEditing} />}
+      {current === "oggi" && <Oggi key={v.split.id} v={v} reload={mutate} />}
+      {current === "kit" && <KitEditor key={v.split.id} v={v} reload={mutate} />}
+      {current === "planner" && <Planner key={v.split.id} v={v} onEdit={setEditing} onNew={setEditing} onOpenDay={(day) => { setFocusDay(day); setTab("agenda"); }} />}
+      {current === "agenda" && <Agenda key={`${v.split.id}-${focusDay || ""}`} v={v} reload={mutate} initialDay={focusDay} onEdit={setEditing} />}
       {editing && <DealEditor key={editing.id || `${editing.day}-${editing.a || ""}`} v={v} deal={editing} onClose={() => setEditing(null)} reload={mutate} />}
-      {tab === "risultati" && <Risultati v={v} reload={mutate} />}
-      {tab === "impostazioni" && <Impostazioni key={v.split.id} v={v} splitId={v.split.id} reload={mutate} />}
+      {current === "risultati" && <Risultati v={v} reload={mutate} />}
+      {current === "impostazioni" && <Impostazioni key={v.split.id} v={v} splitId={v.split.id} reload={mutate} />}
       <Note style={{ marginTop: 28 }}>
         Come si misura: abbonati arrivati da link di tracciamento con S4S o SFS nel nome, sulle pagine dello split, negli ultimi {v.meta.window_days} giorni. Il partner si ricava dal nome del link solo quando è inequivocabile. &quot;Incasso netto a 30 giorni&quot; = quanto resta a House of Creators (dopo la quota di OnlyFans) da ciò che i fan arrivati da quel link spendono nei primi 30 giorni, contato solo sui fan abbonati da almeno 30 giorni e su link con almeno {v.meta.min_mature} di loro. Riguarda le pagine, non gli operatori: non entra in score né compensi.
       </Note>

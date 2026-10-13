@@ -218,3 +218,21 @@ eq3(dealsOnDay(mg[0], 3), 0, "l'annullato non conta");
 eq3(dealsOnDay(mg[0], 1), 1, "conteggio per pagina");
 eq3(mergeDeals(days, stored, { from: "2026-10-22", to: "2026-10-25" }).some((x) => x.day === "2026-10-21"), false, "extra fuori finestra esclusi");
 console.log(`ok ${m3} asserzioni sugli accordi`);
+
+// ── Kit ──
+import { kitReady, kitMissing, photosFor, fillCaption, needsPost, needsMass } from "../src/lib/s4s-core.js";
+let m4 = 0;
+const eq4 = (a, b, msg) => { assert.deepEqual(a, b, msg); m4++; };
+eq4(kitReady(null), false, "nessun kit");
+eq4(kitReady({ photos: [{ id: 1 }], text_post: "  " }), false, "foto senza testo");
+eq4(kitReady({ photos: [{ id: 1 }], text_mass: "ciao" }), true, "foto + testo mass");
+eq4(kitMissing({ photos: [] }), ["foto", "testo"], "cosa manca");
+const kit = { photos: [{ id: "a", use: "both" }, { id: "b", use: "post" }, { id: "c", use: "mass" }] };
+eq4(photosFor(kit, "post").map((p) => p.id), ["a", "b"], "foto per il post");
+eq4(photosFor(kit, "mass").map((p) => p.id), ["a", "c"], "foto per la mass");
+eq4(photosFor({ photos: [{ id: "x", use: "mass" }] }, "post").map((p) => p.id), ["x"], "nessuna marcata per l'uso → tutte");
+eq4(fillCaption("Seguila {link} ora", "onlyfans.com/martyscavo/c31"), "Seguila https://onlyfans.com/martyscavo/c31 ora", "segnaposto sostituito");
+eq4(fillCaption("Seguila", "https://onlyfans.com/a/c1"), "Seguila https://onlyfans.com/a/c1", "senza segnaposto: link in coda");
+eq4(fillCaption("Seguila {link}", null), "Seguila {link}", "senza link resta il segnaposto");
+eq4([needsPost("post_mass"), needsMass("post_mass"), needsPost("mass"), needsMass("post"), needsPost("telegram")], [true, true, false, false, false], "cosa serve per formato");
+console.log(`ok ${m4} asserzioni sul kit`);
