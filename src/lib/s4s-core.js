@@ -452,3 +452,90 @@ export function sideStatus({ day, today, url, stat, result }) {
   if (day === today) return { code: "da-fare", label: "link da incollare" };
   return { code: "mancante", label: "nessun link" };
 }
+
+// ── Accordi (13/10/2026, punto 1 del ridisegno) ─────────────────────────────
+// Uno scambio non è più solo "A con B": è un ACCORDO con giorno, ora, formato di
+// ciascuna pagina, durata del post fissato e stato. Il girone resta come generatore
+// di PROPOSTE ("dal giro"); un accordo salvato in KV vince sulla proposta con lo
+// stesso id. Gli accordi extra (fuori giro) si aggiungono a mano.
+export const FORMATS = { post: "post fissato", mass: "mass message", post_mass: "post + mass", telegram: "Telegram" };
+export const FORMAT_SHORT = { post: "post", mass: "mass", post_mass: "post + mass", telegram: "Telegram" };
+export const DEAL_STATUS = { proposto: "proposto", confermato: "confermato", annullato: "annullato" };
+export const DEAL_DEFAULTS = { time: "21:00", mass_time: "21:30", fmt: "post_mass", pin_hours: 24 };
+export const MAX_PER_DAY = 3; // regola di Infloww (policy OnlyFans sui contenuti promozionali)
+export const dealId = (day, a, b) => `${day}|${Math.min(Number(a), Number(b))}|${Math.max(Number(a), Number(b))}`;
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// Pulisce e valida un accordo in ingresso. pageIds = pagine dello split.
+export function cleanDeal(input, pageIds) {
+  const ids = new Set(pageIds.map(Number));
+  const a = Number(input.a), b = Number(input.b);
+  if (!ids.has(a) || !ids.has(b)) throw new Error("Scegli due pagine dello split");
+  if (a === b) throw new Error("Una pagina non può fare S4S con sé stessa");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(input.day || ""))) throw new Error("Giorno non valido");
+  const time = TIME_RE.test(String(input.time || "")) ? input.time : DEAL_DEFAULTS.time;
+  const mass_time = TIME_RE.test(String(input.mass_time || "")) ? input.mass_time : DEAL_DEFAULTS.mass_time;
+  const fmt = (f) => (FORMATS[f] ? f : DEAL_DEFAULTS.fmt);
+  const pin = Number(input.pin_hours);
+  const status = DEAL_STATUS[input.status] ? input.status : "proposto";
+  // a/b in ordine canonico (id minore = a), i formati seguono la pagina
+  const swap = a > b;
+  return {
+    id: dealId(input.day, a, b),
+    day: input.day,
+    a: swap ? b : a, b: swap ? a : b,
+    fmt_a: fmt(swap ? input.fmt_b : input.fmt_a), // cosa PUBBLICA la pagina a (la promo di b)
+    fmt_b: fmt(swap ? input.fmt_a : input.fmt_b),
+    time, mass_time,
+    pin_hours: [0, 12, 24, 48].includes(pin) ? pin : DEAL_DEFAULTS.pin_hours,
+    status,
+    note: String(input.note || "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 300),
+  };
+}
+
+const virtualDeal = (day, a, b, lang) => ({
+  id: dealId(day, a, b), day, a: Math.min(a, b), b: Math.max(a, b), lang,
+  fmt_a: DEAL_DEFAULTS.fmt, fmt_b: DEAL_DEFAULTS.fmt, time: DEAL_DEFAULTS.time, mass_time: DEAL_DEFAULTS.mass_time,
+  pin_hours: DEAL_DEFAULTS.pin_hours, status: "proposto", note: "", source: "giro",
+});
+
+// Unisce il calendario del giro (planSchedule) con gli accordi salvati.
+// days: [{day, groups:{lang:{pairs:[[a,b]], rest:[ids]}}}]; stored: {id → accordo}
+// Ritorna [{day, deals:[...], rest:[ids]}] per i giorni del giro più quelli con accordi extra in [from, to].
+export function mergeDeals(days, stored = {}, { from, to, langOf = () => null } = {}) {
+  const out = new Map();
+  const used = new Set();
+  for (const d of days) {
+    const deals = [];
+    const rest = new Set();
+    for (const [lang, g] of Object.entries(d.groups || {})) {
+      for (const [a, b] of g.pairs) {
+        const v = virtualDeal(d.day, a, b, lang);
+        const s = stored[v.id];
+        if (s) used.add(v.id);
+        deals.push(s ? { ...v, ...s, source: "giro" } : v);
+      }
+      for (const r of g.rest) rest.add(r);
+    }
+    out.set(d.day, { day: d.day, deals, rest });
+  }
+  for (const s of Object.values(stored)) {
+    if (used.has(s.id) || (from && s.day < from) || (to && s.day > to)) continue;
+    if (!out.has(s.day)) out.set(s.day, { day: s.day, deals: [], rest: new Set() });
+    const e = out.get(s.day);
+    if (e.deals.some((x) => x.id === s.id)) continue;
+    e.deals.push({ ...s, lang: s.lang || langOf(s.a), source: "extra" });
+  }
+  return [...out.values()]
+    .map((e) => {
+      const busy = new Set(e.deals.filter((x) => x.status !== "annullato").flatMap((x) => [x.a, x.b]));
+      return { day: e.day, deals: e.deals.sort((x, y) => (x.time < y.time ? -1 : x.time > y.time ? 1 : 0)), rest: [...e.rest].filter((r) => !busy.has(r)) };
+    })
+    .sort((x, y) => (x.day < y.day ? -1 : 1));
+}
+
+// Quanti accordi attivi ha una pagina in un giorno (escluso eventualmente un id).
+export function dealsOnDay(dayEntry, pageId, exceptId) {
+  if (!dayEntry) return 0;
+  return dayEntry.deals.filter((x) => x.status !== "annullato" && x.id !== exceptId && (x.a === Number(pageId) || x.b === Number(pageId))).length;
+}

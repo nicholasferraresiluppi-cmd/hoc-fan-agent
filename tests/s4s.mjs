@@ -184,3 +184,37 @@ eq2(sideStatus({ day: T, today: T, url: "x", stat: { clicks: 40, subs: 0 } }), {
 eq2(sideStatus({ day: T, today: T, url: "x", stat: { clicks: 40, subs: 12 } }).code, "misurato", "abbonati");
 eq2(sideStatus({ day: "2026-10-13", today: T, result: { subs: 5 } }).code, "misurato", "trovato per nome");
 console.log(`ok ${m2} asserzioni sui link incollati`);
+
+// ── Accordi ──
+import { cleanDeal, mergeDeals, dealId, dealsOnDay, DEAL_DEFAULTS } from "../src/lib/s4s-core.js";
+let m3 = 0;
+const eq3 = (a, b, msg) => { assert.deepEqual(a, b, msg); m3++; };
+const thr = (fn, re, msg) => { assert.throws(fn, re, msg); m3++; };
+const P = [1, 2, 3, 4];
+eq3(dealId("2026-10-20", 4, 2), "2026-10-20|2|4", "id canonico");
+const c1 = cleanDeal({ day: "2026-10-20", a: 4, b: 2, fmt_a: "mass", fmt_b: "post", time: "20:00" }, P);
+eq3([c1.a, c1.b, c1.fmt_a, c1.fmt_b], [2, 4, "post", "mass"], "ordine canonico: i formati seguono la pagina");
+eq3([c1.time, c1.mass_time, c1.pin_hours, c1.status], ["20:00", "21:30", 24, "proposto"], "default");
+eq3(cleanDeal({ day: "2026-10-20", a: 1, b: 2, time: "25:00", fmt_a: "boh", pin_hours: 7 }, P).time, DEAL_DEFAULTS.time, "ora non valida → default");
+thr(() => cleanDeal({ day: "2026-10-20", a: 1, b: 9 }, P), /split/, "pagina fuori split");
+thr(() => cleanDeal({ day: "2026-10-20", a: 1, b: 1 }, P), /sé stessa/, "stessa pagina");
+thr(() => cleanDeal({ day: "20/10", a: 1, b: 2 }, P), /Giorno/, "giorno non valido");
+const days = [{ day: "2026-10-20", groups: { it: { pairs: [[1, 2], [3, 4]], rest: [] } } }, { day: "2026-10-22", groups: { it: { pairs: [[1, 3]], rest: [2, 4] } } }];
+let mg = mergeDeals(days, {});
+eq3(mg[0].deals.map((x) => [x.id, x.source, x.status]), [["2026-10-20|1|2", "giro", "proposto"], ["2026-10-20|3|4", "giro", "proposto"]], "proposte dal giro");
+const stored = {
+  "2026-10-20|1|2": { ...cleanDeal({ day: "2026-10-20", a: 1, b: 2, status: "confermato", time: "20:00" }, P) },
+  "2026-10-20|3|4": { ...cleanDeal({ day: "2026-10-20", a: 3, b: 4, status: "annullato" }, P) },
+  "2026-10-22|2|4": { ...cleanDeal({ day: "2026-10-22", a: 2, b: 4, status: "confermato", time: "22:00" }, P) },
+  "2026-10-21|1|4": { ...cleanDeal({ day: "2026-10-21", a: 1, b: 4 }, P) },
+};
+mg = mergeDeals(days, stored, { from: "2026-10-19", to: "2026-10-25" });
+eq3(mg.map((x) => x.day), ["2026-10-20", "2026-10-21", "2026-10-22"], "il giorno extra (mer) compare");
+eq3(mg[0].deals.find((x) => x.id === "2026-10-20|1|2").status, "confermato", "il salvato vince sulla proposta");
+eq3(mg[0].deals.map((x) => x.time), ["20:00", "21:00"], "ordinati per ora");
+eq3(mg[2].deals.find((x) => x.id === "2026-10-22|2|4").source, "extra", "accordo extra");
+eq3(mg[2].rest, [], "chi aveva riposo ma ha un extra non riposa più");
+eq3(dealsOnDay(mg[0], 3), 0, "l'annullato non conta");
+eq3(dealsOnDay(mg[0], 1), 1, "conteggio per pagina");
+eq3(mergeDeals(days, stored, { from: "2026-10-22", to: "2026-10-25" }).some((x) => x.day === "2026-10-21"), false, "extra fuori finestra esclusi");
+console.log(`ok ${m3} asserzioni sugli accordi`);

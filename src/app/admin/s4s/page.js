@@ -11,6 +11,7 @@ import useSWR from "swr";
 import { AlertTriangle, Check, ChevronLeft, ChevronRight, Copy, RefreshCw } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, NUM } from "@/components/ds";
+import { Modal } from "@/components/cp-style";
 import { fmtInt, fmtPct, MONTHS_IT } from "@/lib/format";
 
 const fetcher = (url) =>
@@ -21,7 +22,8 @@ const fetcher = (url) =>
   });
 
 const TABS = [
-  ["agenda", "Agenda"],
+  ["planner", "Planner"],
+  ["agenda", "Giorno"],
   ["risultati", "Risultati"],
   ["impostazioni", "Impostazioni"],
 ];
@@ -66,24 +68,20 @@ function CopyButton({ text, label = "Copia", small }) {
   );
 }
 
-// Testo del giorno da incollare nel gruppo WhatsApp: per ogni scambio il link già creato
-// (se incollato) o il nome con cui crearlo.
+// Testo del giorno da incollare nel gruppo WhatsApp: per ogni accordo ora, formato e il
+// link già creato (se incollato) o il nome con cui crearlo.
+const fmtLabel = (f) => FORMAT_TEXT[f] || f;
 function dayText(d, only) {
-  const langs = Object.keys(d.groups);
   const lines = [`S4S · ${dayLabel(d.day)}`];
-  for (const lang of langs) {
-    const g = d.groups[lang];
-    const pairs = g.pairs.filter((p) => !only || p.a.id === only || p.b.id === only);
-    if (!pairs.length) continue;
-    if (langs.length > 1) lines.push("", `Pagine ${LANG_LABEL[lang] || lang}`);
-    for (const p of pairs) {
-      lines.push(`• ${p.a.name} ⇄ ${p.b.name}`);
-      for (const [s, o] of [[p.a, p.b], [p.b, p.a]]) {
-        lines.push(s.url ? `   ${o.name} pubblica: https://${s.url}` : `   link su ${s.name}: ${s.link}`);
-      }
+  for (const x of activeDeals(d).filter((x) => !only || x.a.id === only || x.b.id === only)) {
+    lines.push("", `• ${x.a.name} ⇄ ${x.b.name} · ${x.time}${x.status === "proposto" ? " (da confermare)" : ""}`);
+    for (const [s, o] of [[x.a, x.b], [x.b, x.a]]) {
+      const extra = s.fmt === "post_mass" || s.fmt === "mass" ? ` (mass alle ${s.fmt === "mass" ? x.time : x.mass_time})` : "";
+      lines.push(`   ${s.name} pubblica ${o.name}: ${fmtLabel(s.fmt)}${extra}`);
+      lines.push(o.url ? `   link da usare: https://${o.url}` : `   ${o.name} crea il link: ${o.link}`);
     }
-    if (!only && g.rest.length) lines.push(`Riposa: ${g.rest.map((r) => r.name).join(", ")}`);
   }
+  if (!only && d.rest.length) lines.push("", `Riposa: ${d.rest.map((r) => r.name).join(", ")}`);
   return lines.join("\n");
 }
 
@@ -119,7 +117,8 @@ function StatusChip({ status }) {
 }
 
 const DONE = new Set(["pronto", "pubblicato", "misurato"]);
-const sides = (d) => Object.values(d.groups).flatMap((g) => g.pairs.flatMap((p) => [p.a, p.b]));
+const activeDeals = (d) => d.deals.filter((x) => x.status !== "annullato");
+const sides = (d) => activeDeals(d).flatMap((x) => [x.a, x.b]);
 
 function PasteLink({ splitId, day, s, partner, reload }) {
   const [val, setVal] = useState("");
@@ -182,14 +181,266 @@ function SideBlock({ s, partner, day, splitId, reload }) {
   );
 }
 
-function ExchangeCard({ p, day, splitId, reload }) {
+function ExchangeCard({ p, day, splitId, reload, onEdit }) {
+  const off = p.status === "annullato";
   return (
-    <section style={{ ...card, padding: 12, marginBottom: 10 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 8 }}>
-        <SideBlock s={p.a} partner={p.b} day={day} splitId={splitId} reload={reload} />
-        <SideBlock s={p.b} partner={p.a} day={day} splitId={splitId} reload={reload} />
-      </div>
+    <section style={{ ...card, padding: 12, marginBottom: 10, opacity: off ? 0.6 : 1 }}>
+      <DealHeader x={p} onEdit={onEdit} />
+      {!off && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 8, marginTop: 10 }}>
+          <SideBlock s={p.a} partner={p.b} day={day} splitId={splitId} reload={reload} />
+          <SideBlock s={p.b} partner={p.a} day={day} splitId={splitId} reload={reload} />
+        </div>
+      )}
     </section>
+  );
+}
+
+// ── Accordi: intestazione, stato, finestra di modifica (punto 1 del ridisegno, 13/10) ──
+const FORMAT_TEXT = { post: "post fissato", mass: "mass message", post_mass: "post + mass", telegram: "Telegram" };
+const FORMAT_SHORT = { post: "post", mass: "mass", post_mass: "post + mass", telegram: "Telegram" };
+// Forma prima del colore: proposto tratteggiato, confermato pieno, annullato barrato
+const DEAL_LOOK = {
+  proposto: { border: `1px dashed ${CP.textMuted}`, color: CP.textSecondary, label: "da confermare" },
+  confermato: { border: `1px solid ${CP.accent}`, color: CP.accentSoftText, label: "confermato" },
+  annullato: { border: `1px solid ${CP.borderSoft}`, color: CP.textMuted, label: "annullato" },
+};
+function DealStatus({ x }) {
+  const l = DEAL_LOOK[x.status] || DEAL_LOOK.proposto;
+  return <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 999, border: l.border, color: l.color, whiteSpace: "nowrap", textDecoration: x.status === "annullato" ? "line-through" : "none" }}>{l.label}{x.source === "extra" ? " · extra" : ""}</span>;
+}
+const pinText = (h) => (h ? `fissato ${h} h` : "non fissato");
+function DealHeader({ x, onEdit }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <span style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>{x.a.name} ⇄ {x.b.name}</span>
+      <span style={{ fontSize: 13, color: CP.textSecondary, ...NUM }}>ore {x.time}</span>
+      <DealStatus x={x} />
+      <span style={{ flexBasis: "100%", height: 0 }} />
+      <span style={{ fontSize: 12.5, color: CP.textMuted }}>
+        {x.a.name.split(" ")[0]} pubblica {x.b.name.split(" ")[0]}: {FORMAT_TEXT[x.a.fmt]} · {x.b.name.split(" ")[0]} pubblica {x.a.name.split(" ")[0]}: {FORMAT_TEXT[x.b.fmt]}
+        {(x.a.fmt.includes("mass") || x.b.fmt.includes("mass")) ? ` · mass alle ${x.mass_time}` : ""} · {pinText(x.pin_hours)}
+      </span>
+      {onEdit && <button type="button" onClick={() => onEdit(x)} style={{ ...btn, padding: "4px 10px", fontSize: 12.5, marginLeft: "auto" }}>Modifica</button>}
+      {x.note && <span style={{ flexBasis: "100%", fontSize: 12.5, color: CP.textSecondary }}>Nota: {x.note}</span>}
+    </div>
+  );
+}
+
+function FormatRadios({ name, value, onChange, legend }) {
+  return (
+    <fieldset style={{ margin: 0, border: `1px solid ${CP.border}`, borderRadius: 10, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
+      <legend style={{ fontSize: 12.5, color: CP.textSecondary, padding: "0 4px" }}>{legend}</legend>
+      {Object.entries(FORMAT_TEXT).map(([k, l]) => (
+        <label key={k} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13.5, color: CP.textPrimary, cursor: "pointer" }}>
+          <input type="radio" name={name} checked={value === k} onChange={() => onChange(k)} /> {l}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+// Crea o modifica un accordo. deal = accordo esistente (dalla vista) oppure bozza {day, a?, b?}
+function DealEditor({ v, deal, onClose, reload }) {
+  const pages = v.pages.filter((p) => !p.paused);
+  const isNew = !deal.id;
+  const D = v.deal_defaults;
+  // aperto dalla riga di una pagina: quella pagina va per prima (con il suo formato)
+  const flip = deal.focus && deal.b?.id === deal.focus;
+  const A = flip ? deal.b : deal.a, B = flip ? deal.a : deal.b;
+  const [f, setF] = useState(() => ({
+    day: deal.day, a: A?.id ?? A ?? "", b: B?.id ?? B ?? "",
+    fmt_a: A?.fmt || D.fmt, fmt_b: B?.fmt || D.fmt,
+    time: deal.time || D.time, mass_time: deal.mass_time || D.mass_time,
+    pin_hours: deal.pin_hours ?? D.pin_hours, note: deal.note || "",
+  }));
+  const [same, setSame] = useState(() => (A?.fmt || D.fmt) === (B?.fmt || D.fmt));
+  const [state, setState] = useState(null);
+  const set = (k) => (val) => setF((o) => ({ ...o, [k]: val, ...(same && k === "fmt_a" ? { fmt_b: val } : {}) }));
+  const nameOf = (id) => pages.find((p) => p.id === Number(id))?.name || "";
+  const first = (id) => nameOf(id).split(" ")[0] || "…";
+  const langA = pages.find((p) => p.id === Number(f.a))?.lang, langB = pages.find((p) => p.id === Number(f.b))?.lang;
+  const hasMass = f.fmt_a.includes("mass") || f.fmt_b.includes("mass");
+  // ultimo scambio tra le due pagine, nei due versi: dai risultati misurati
+  const history = useMemo(() => {
+    if (!f.a || !f.b) return null;
+    const base = (id) => nameOf(id).replace(/ (IT|EN|ES)$/, "");
+    const got = (recv, from) => v.results.filter((r) => r.creator_id === Number(recv) && r.partner === base(from)).sort((x, y) => (x.first_day < y.first_day ? 1 : -1))[0];
+    const ra = got(f.a, f.b), rb = got(f.b, f.a);
+    return ra || rb ? { ra, rb } : null;
+  }, [f.a, f.b, v.results]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function send(body) {
+    setState({ busy: true });
+    const r = await fetch("/api/admin/s4s", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ split: v.split.id, ...body }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { setState({ error: d.error || "Salvataggio fallito" }); return; }
+    setState(null); reload(); onClose();
+  }
+  const save = (status) => send({ action: "deal", ...f, a: Number(f.a), b: Number(f.b), status, prev_id: deal.id || null, prev_source: deal.source || null });
+  const setStatus = (status) => send({ action: "deal_status", id: deal.id, status });
+  const ready = f.a && f.b && f.a !== f.b && f.day;
+  const field = { display: "flex", flexDirection: "column", gap: 5, fontSize: 12.5, color: CP.textSecondary };
+
+  return (
+    <Modal open onClose={onClose} title={isNew ? "Nuovo S4S" : "Accordo S4S"} maxWidth={640}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 24px minmax(0,1fr)", gap: 8, alignItems: "end" }}>
+          <label style={field}>Pagina
+            <select value={f.a} onChange={(e) => set("a")(Number(e.target.value))} style={input}>
+              <option value="">Scegli…</option>
+              {pages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </label>
+          <span aria-hidden style={{ textAlign: "center", color: CP.textMuted, paddingBottom: 8 }}>⇄</span>
+          <label style={field}>Con
+            <select value={f.b} onChange={(e) => set("b")(Number(e.target.value))} style={input}>
+              <option value="">Scegli…</option>
+              {pages.filter((p) => p.id !== Number(f.a)).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </label>
+        </div>
+        {langA && langB && langA !== langB && <Notice>Lingue diverse ({langA.toUpperCase()} e {langB.toUpperCase()}): di solito porta pochi abbonati.</Notice>}
+        {history && (
+          <div style={{ fontSize: 12.5, color: CP.textSecondary, padding: "8px 10px", borderRadius: 8, background: CP.bgSunken, border: `1px solid ${CP.borderSoft}`, ...NUM }}>
+            Ultimi scambi misurati: {history.ra ? `${first(f.a)} ha ricevuto ${int(history.ra.subs)} abbonati (${ddmm(history.ra.first_day)})` : `${first(f.a)}: nessun link trovato`} · {history.rb ? `${first(f.b)} ${int(history.rb.subs)} (${ddmm(history.rb.first_day)})` : `${first(f.b)}: nessun link trovato`}
+          </div>
+        )}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+          <label style={field}>Giorno<input type="date" value={f.day} onChange={(e) => set("day")(e.target.value)} style={input} /></label>
+          <label style={field}>Ora del post<input type="time" value={f.time} onChange={(e) => set("time")(e.target.value)} style={input} /></label>
+          {hasMass && <label style={field}>Ora della mass<input type="time" value={f.mass_time} onChange={(e) => set("mass_time")(e.target.value)} style={input} /></label>}
+          <label style={field}>Post fissato
+            <select value={f.pin_hours} onChange={(e) => set("pin_hours")(Number(e.target.value))} style={input}>
+              <option value={0}>non fissato</option><option value={12}>12 ore</option><option value={24}>24 ore</option><option value={48}>48 ore</option>
+            </select>
+          </label>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <label style={{ display: "inline-flex", gap: 8, alignItems: "center", fontSize: 13, color: CP.textSecondary }}>
+            <input type="checkbox" checked={same} onChange={(e) => { setSame(e.target.checked); if (e.target.checked) setF((o) => ({ ...o, fmt_b: o.fmt_a })); }} /> stesso formato per entrambe
+          </label>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
+            <FormatRadios name="fmt_a" value={f.fmt_a} onChange={set("fmt_a")} legend={`${first(f.a)} pubblica ${first(f.b)}`} />
+            {!same && <FormatRadios name="fmt_b" value={f.fmt_b} onChange={set("fmt_b")} legend={`${first(f.b)} pubblica ${first(f.a)}`} />}
+          </div>
+        </div>
+        <label style={field}>Nota (facoltativa)<input value={f.note} onChange={(e) => set("note")(e.target.value)} maxLength={300} placeholder="Es. usare le foto nuove" style={input} /></label>
+        {state?.error && <span style={{ fontSize: 13, color: CP.accentRed }}>{state.error}</span>}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {!isNew && deal.status !== "annullato" && <button type="button" disabled={state?.busy} onClick={() => setStatus("annullato")} style={{ ...btn, marginRight: "auto" }}>Annulla lo scambio</button>}
+          {!isNew && deal.status === "annullato" && <button type="button" disabled={state?.busy} onClick={() => setStatus("proposto")} style={{ ...btn, marginRight: "auto" }}>Ripristina</button>}
+          <button type="button" disabled={!ready || state?.busy} onClick={() => save(deal.status === "confermato" ? "confermato" : "proposto")} style={btn}>{isNew ? "Proponi" : "Salva"}</button>
+          {deal.status !== "confermato" && <button type="button" disabled={!ready || state?.busy} onClick={() => save("confermato")} style={btnPrimary}>{isNew ? "Crea già confermato" : "Salva e conferma"}</button>}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// Planner della settimana: righe = pagine, colonne = giorni (i giorni fuori dal giro più stretti).
+// Ogni casella: gli accordi della pagina quel giorno; "+" per aggiungerne uno extra.
+const mondayOfISO = (s) => new Date(Date.parse(`${s}T00:00:00Z`) - ((new Date(`${s}T00:00:00Z`).getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
+const plusDays = (s, n) => new Date(Date.parse(`${s}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+const WD_SHORT = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
+
+function Planner({ v, onEdit, onNew, onOpenDay }) {
+  const pages = v.pages.filter((p) => !p.paused);
+  const byDay = useMemo(() => Object.fromEntries(v.schedule.map((d) => [d.day, d])), [v.schedule]);
+  const [start, setStart] = useState(() => mondayOfISO(v.today));
+  const days = Array.from({ length: 7 }, (_, i) => plusDays(start, i));
+  const activeWd = new Set(v.settings.weekdays);
+  const wdOf = (day) => new Date(`${day}T00:00:00Z`).getUTCDay();
+  const hasDeals = (day) => (byDay[day]?.deals || []).length > 0;
+  const wide = (day) => activeWd.has(wdOf(day)) || hasDeals(day);
+  const cols = `minmax(170px, 210px) ${days.map((d) => (wide(d) ? "minmax(150px, 1fr)" : "minmax(64px, 0.45fr)")).join(" ")}`;
+  const weekDeals = days.flatMap((d) => byDay[d]?.deals || []);
+  const live = weekDeals.filter((x) => x.status !== "annullato");
+  const confirmed = live.filter((x) => x.status === "confermato").length;
+  const first = v.schedule[0]?.day || v.today, last = v.schedule[v.schedule.length - 1]?.day || v.today;
+  const range = `${Number(days[0].slice(8))} ${MONTHS_IT[Number(days[0].slice(5, 7)) - 1]} – ${Number(days[6].slice(8))} ${MONTHS_IT[Number(days[6].slice(5, 7)) - 1]}`;
+  const sideOf = (x, pid) => (x.a.id === pid ? { me: x.a, other: x.b } : { me: x.b, other: x.a });
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 500, color: CP.textPrimary }}>Settimana {range}</h2>
+        <span style={{ fontSize: 13, color: CP.textMuted, ...NUM }}>{live.length} scambi · {confirmed} confermati · {live.length - confirmed} da confermare</span>
+        <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}>
+          <button type="button" aria-label="Settimana prima" disabled={start <= mondayOfISO(first)} onClick={() => setStart(plusDays(start, -7))} style={{ ...btn, padding: "6px 9px" }}><ChevronLeft size={15} /></button>
+          <button type="button" onClick={() => setStart(mondayOfISO(v.today))} style={{ ...btn, padding: "6px 10px" }}>Oggi</button>
+          <button type="button" aria-label="Settimana dopo" disabled={plusDays(start, 7) > last} onClick={() => setStart(plusDays(start, 7))} style={{ ...btn, padding: "6px 9px" }}><ChevronRight size={15} /></button>
+          <button type="button" onClick={() => onNew({ day: v.today >= days[0] && v.today <= days[6] ? v.today : days[0] })} style={btnPrimary}>Nuovo S4S</button>
+        </span>
+      </div>
+
+      <div style={{ ...card, overflowX: "auto" }}>
+        <div role="grid" aria-label={`Planner S4S, settimana ${range}`} style={{ minWidth: 980 }}>
+          <div role="row" style={{ display: "grid", gridTemplateColumns: cols, borderBottom: `1px solid ${CP.border}` }}>
+            <div role="columnheader" style={{ padding: "10px 12px", fontSize: 12, color: CP.textMuted }}>Pagina</div>
+            {days.map((day) => (
+              <div key={day} role="columnheader" style={{ padding: "8px 10px", borderLeft: `1px solid ${CP.borderSoft}` }}>
+                <button type="button" onClick={() => onOpenDay(day)} title="Apri il giorno" style={{ all: "unset", cursor: "pointer", display: "flex", flexDirection: "column" }}>
+                  <span style={{ fontSize: 12, color: wide(day) ? CP.textSecondary : CP.textMuted }}>{WD_SHORT[wdOf(day)]}</span>
+                  <span style={{ fontSize: 15, fontWeight: 500, color: day === v.today ? CP.accentSoftText : wide(day) ? CP.textPrimary : CP.textMuted, textDecoration: day === v.today ? "underline" : "none", textUnderlineOffset: 3 }}>{Number(day.slice(8))}</span>
+                </button>
+              </div>
+            ))}
+          </div>
+          {pages.map((p) => {
+            const mine = weekDeals.filter((x) => x.status !== "annullato" && (x.a.id === p.id || x.b.id === p.id)).length;
+            return (
+              <div key={p.id} role="row" style={{ display: "grid", gridTemplateColumns: cols, borderBottom: `1px solid ${CP.borderSoft}`, minHeight: 76 }}>
+                <div role="rowheader" style={{ padding: "10px 12px", display: "flex", gap: 10, alignItems: "center", minWidth: 0 }}>
+                  <Avatar name={p.name} size={30} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 13.5, fontWeight: 500, color: CP.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+                    <span style={{ display: "block", fontSize: 12, color: CP.textMuted, ...NUM }}>{mine} questa settimana</span>
+                  </span>
+                </div>
+                {days.map((day) => {
+                  const dd = byDay[day];
+                  const mineDay = (dd?.deals || []).filter((x) => x.a.id === p.id || x.b.id === p.id);
+                  const resting = dd?.rest?.some((r) => r.id === p.id);
+                  const n = mineDay.filter((x) => x.status !== "annullato").length;
+                  const canAdd = day >= v.today && n < v.max_per_day;
+                  return (
+                    <div key={day} role="gridcell" style={{ padding: 6, borderLeft: `1px solid ${CP.borderSoft}`, display: "flex", flexDirection: "column", gap: 5 }}>
+                      {mineDay.map((x) => {
+                        const { me, other } = sideOf(x, p.id);
+                        const l = DEAL_LOOK[x.status] || DEAL_LOOK.proposto;
+                        const done = DONE.has(me.status.code);
+                        return (
+                          <button key={x.id} type="button" onClick={() => onEdit({ ...x, focus: p.id })} aria-label={`${p.name} con ${other.name}, ${dayLabel(day)} ore ${x.time}, ${l.label}`}
+                            style={{ all: "unset", boxSizing: "border-box", cursor: "pointer", display: "flex", flexDirection: "column", gap: 2, padding: "6px 8px", borderRadius: 8, background: CP.surfaceAlt, border: l.border, opacity: x.status === "annullato" ? 0.55 : 1, minWidth: 0 }}>
+                            <span style={{ fontSize: 12.5, fontWeight: 500, color: CP.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: x.status === "annullato" ? "line-through" : "none" }}>{other.name}</span>
+                            <span style={{ fontSize: 11.5, color: CP.textSecondary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", ...NUM }}>{FORMAT_SHORT[me.fmt]} · {x.time}</span>
+                            <span style={{ fontSize: 11, color: l.color, display: "inline-flex", gap: 4, alignItems: "center", whiteSpace: "nowrap" }}>
+                              {done && <Check size={11} aria-label="link pronto" />}{l.label}{x.source === "extra" ? " · extra" : ""}
+                            </span>
+                          </button>
+                        );
+                      })}
+                      {resting && mineDay.length === 0 && <span style={{ fontSize: 11.5, color: CP.textMuted, padding: "4px 2px" }}>riposa</span>}
+                      {canAdd && mineDay.length === 0 && (
+                        <button type="button" onClick={() => onNew({ day, a: p.id })} aria-label={`Aggiungi uno S4S a ${p.name} il ${dayLabel(day)}`}
+                          style={{ all: "unset", boxSizing: "border-box", cursor: "pointer", textAlign: "center", fontSize: 12, color: CP.textMuted, padding: "8px 0", borderRadius: 8, border: wide(day) ? `1px dashed ${CP.borderSoft}` : "none" }}>+</button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 10, fontSize: 12, color: CP.textMuted }}>
+        <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}><span style={{ width: 14, height: 10, borderRadius: 3, border: DEAL_LOOK.proposto.border }} />da confermare (proposto dal giro o a mano)</span>
+        <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}><span style={{ width: 14, height: 10, borderRadius: 3, border: DEAL_LOOK.confermato.border }} />confermato</span>
+        <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}><Check size={11} />link già incollato</span>
+        <span>Massimo {v.max_per_day} S4S al giorno per pagina. Clic su uno scambio per modificarlo, su un giorno per aprirne il dettaglio.</span>
+      </div>
+    </div>
   );
 }
 
@@ -248,16 +499,16 @@ function StatBox({ label, value, note }) {
   );
 }
 
-function Agenda({ v, reload }) {
+function Agenda({ v, reload, initialDay, onEdit }) {
   const byDay = useMemo(() => Object.fromEntries(v.schedule.map((d) => [d.day, d])), [v.schedule]);
   const pages = v.pages.filter((p) => !p.paused);
   const upcoming = v.schedule.filter((d) => d.day >= v.today);
   const [only, setOnly] = useState(null); // null = tutte le pagine
-  const [sel, setSel] = useState(() => upcoming[0]?.day || v.schedule[v.schedule.length - 1]?.day || v.today);
-  const [month, setMonth] = useState(() => (upcoming[0]?.day || v.today).slice(0, 7));
+  const [sel, setSel] = useState(() => initialDay || upcoming[0]?.day || v.schedule[v.schedule.length - 1]?.day || v.today);
+  const [month, setMonth] = useState(() => (initialDay || upcoming[0]?.day || v.today).slice(0, 7));
   const d = byDay[sel];
-  const pairs = d ? Object.values(d.groups).flatMap((g) => g.pairs).filter((p) => !only || p.a.id === only || p.b.id === only) : [];
-  const resting = d ? Object.values(d.groups).flatMap((g) => g.rest) : [];
+  const pairs = d ? d.deals.filter((p) => !only || p.a.id === only || p.b.id === only) : [];
+  const resting = d ? d.rest : [];
 
   // cosa manca per pagina: metà di scambio di oggi o degli ultimi 14 giorni senza link
   const pending = useMemo(() => {
@@ -271,16 +522,15 @@ function Agenda({ v, reload }) {
   }, [v]);
   const partnerOn = (pid) => {
     if (!d) return null;
-    for (const g of Object.values(d.groups)) {
-      if (g.rest.some((r) => r.id === pid)) return "riposa";
-      for (const p of g.pairs) { if (p.a.id === pid) return `con ${p.b.name}`; if (p.b.id === pid) return `con ${p.a.name}`; }
-    }
-    return null;
+    if (d.rest.some((r) => r.id === pid)) return "riposa";
+    const x = activeDeals(d).find((p) => p.a.id === pid || p.b.id === pid);
+    if (!x) return null;
+    return `con ${x.a.id === pid ? x.b.name : x.a.name} · ${x.time}`;
   };
   // numeri del mese mostrato
   const monthDays = v.schedule.filter((x) => x.day.startsWith(month));
   const monthSides = monthDays.flatMap(sides).filter((s) => !only || s.id === only);
-  const monthPairs = monthDays.reduce((n, x) => n + Object.values(x.groups).flatMap((g) => g.pairs).filter((p) => !only || p.a.id === only || p.b.id === only).length, 0);
+  const monthPairs = monthDays.reduce((n, x) => n + activeDeals(x).filter((p) => !only || p.a.id === only || p.b.id === only).length, 0);
   const withLink = monthSides.filter((s) => DONE.has(s.status.code)).length;
   const brought = monthSides.reduce((n, s) => n + (s.stat?.subs ?? s.result?.subs ?? 0), 0);
   const mature = v.results.reduce((s, r) => s + (r.mature_subs || 0), 0);
@@ -301,7 +551,7 @@ function Agenda({ v, reload }) {
           {[{ id: null, name: "Tutte le pagine" }, ...pages].map((p) => {
             const active = only === p.id;
             const n = p.id ? pending[p.id] || 0 : Object.values(pending).reduce((a, b) => a + b, 0);
-            const line = p.id ? partnerOn(p.id) : `${pairs.length || (d ? Object.values(d.groups).flatMap((g) => g.pairs).length : 0)} scambi il ${ddmm(sel)}`;
+            const line = p.id ? partnerOn(p.id) : `${d ? activeDeals(d).length : 0} scambi il ${ddmm(sel)}`;
             return (
               <button key={p.id ?? "all"} type="button" onClick={() => setOnly(p.id)} aria-pressed={active}
                 style={{ all: "unset", boxSizing: "border-box", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, background: active ? CP.accentSoft : "transparent", border: `1px solid ${active ? CP.accent : "transparent"}` }}>
@@ -326,7 +576,7 @@ function Agenda({ v, reload }) {
         </div>
         {!d && <Notice>Nessuno scambio in questo giorno: scegli un giorno con il puntino nel calendario.</Notice>}
         {d && pairs.length === 0 && <Notice>{only ? `${pages.find((p) => p.id === only)?.name} oggi riposa.` : "Nessuno scambio."}</Notice>}
-        {d && pairs.map((p) => <ExchangeCard key={`${p.a.id}-${p.b.id}`} p={p} day={d.day} splitId={v.split.id} reload={reload} />)}
+        {d && pairs.map((p) => <ExchangeCard key={p.id} p={p} day={d.day} splitId={v.split.id} reload={reload} onEdit={onEdit} />)}
         {d && !only && resting.length > 0 && <Note style={{ marginTop: 4 }}>Riposa: {resting.map((r) => r.name).join(", ")}</Note>}
         <Note style={{ marginTop: 14 }}>
           Su ogni scambio ciascuna pagina crea su OnlyFans il link col nome indicato, lo incolla qui e lo manda al partner, che lo pubblica. Click e abbonati del link compaiono qui da soli, entro qualche ora.
@@ -538,7 +788,9 @@ function Impostazioni({ v, splitId, reload }) {
 
 export default function S4SPage() {
   const [splitId, setSplitId] = useState(null);
-  const [tab, setTab] = useState("agenda");
+  const [tab, setTab] = useState("planner");
+  const [editing, setEditing] = useState(null); // accordo aperto nella finestra
+  const [focusDay, setFocusDay] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   useEffect(() => {
     try {
@@ -595,7 +847,9 @@ export default function S4SPage() {
             label={k === "risultati" && v.unmatched.length ? `${l} · ${v.unmatched.length} da attribuire` : l} />
         ))}
       </div>
-      {tab === "agenda" && <Agenda key={v.split.id} v={v} reload={mutate} />}
+      {tab === "planner" && <Planner key={v.split.id} v={v} onEdit={setEditing} onNew={setEditing} onOpenDay={(day) => { setFocusDay(day); setTab("agenda"); }} />}
+      {tab === "agenda" && <Agenda key={`${v.split.id}-${focusDay || ""}`} v={v} reload={mutate} initialDay={focusDay} onEdit={setEditing} />}
+      {editing && <DealEditor key={editing.id || `${editing.day}-${editing.a || ""}`} v={v} deal={editing} onClose={() => setEditing(null)} reload={mutate} />}
       {tab === "risultati" && <Risultati v={v} reload={mutate} />}
       {tab === "impostazioni" && <Impostazioni key={v.split.id} v={v} splitId={v.split.id} reload={mutate} />}
       <Note style={{ marginTop: 28 }}>

@@ -262,3 +262,19 @@ export async function getLinkStats(splitId, creatorIds, urls, { force = false } 
   await kv.set(LSTAT_KEY(splitId), out, { ex: 2 * 24 * 3600 });
   return out;
 }
+
+// ── Accordi ─────────────────────────────────────────────────────────────────
+// KV s4s:deals:{splitId} = { id → accordo }. Solo ciò che qualcuno ha toccato: le
+// proposte del giro non salvate restano virtuali (s4s-core mergeDeals).
+const DEALS_KEY = (id) => `s4s:deals:${id}`;
+export async function getDeals(splitId) {
+  const v = await kv.get(DEALS_KEY(splitId));
+  return v && typeof v === "object" ? v : {};
+}
+export async function putDeals(splitId, map) {
+  // pulizia: accordi più vecchi di 120 giorni non servono più al calendario
+  const cutoff = new Date(Date.now() - 120 * 86400000).toISOString().slice(0, 10);
+  for (const [k, d] of Object.entries(map)) if (d.day < cutoff) delete map[k];
+  await kv.set(DEALS_KEY(splitId), map);
+  return map;
+}
