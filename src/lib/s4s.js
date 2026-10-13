@@ -278,3 +278,18 @@ export async function putDeals(splitId, map) {
   await kv.set(DEALS_KEY(splitId), map);
   return map;
 }
+
+// ── Disponibilità per pagina (punto 3) ──────────────────────────────────────
+// KV s4s:avail:{creatorId} = { per_week, weekdays, times, formats, exclude, updated_at, updated_by }
+const AVAIL_KEY = (cid) => `s4s:avail:${Number(cid)}`;
+export async function getAvails(ids) {
+  const list = [...new Set(ids.map(Number))];
+  if (!list.length) return {};
+  const vals = await kv.mget(...list.map(AVAIL_KEY));
+  return Object.fromEntries(list.map((id, i) => [id, vals[i] && typeof vals[i] === "object" ? vals[i] : null]));
+}
+export async function saveAvail(cid, clean, uid) {
+  const out = { ...clean, updated_at: new Date().toISOString(), updated_by: uid || null };
+  await kv.set(AVAIL_KEY(cid), out);
+  return out;
+}

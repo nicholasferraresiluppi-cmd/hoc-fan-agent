@@ -2,11 +2,12 @@
 // Separata dalla route così si può far girare anche fuori da Next (verifica sui dati veri).
 
 import { getKits } from "@/lib/s4s-kit";
-import { getNames, getResults, getAliases, syncPlan, getLinks, getLinkStats, getDeals, getPlan, WINDOW_DAYS, DEFAULT_WEEKDAYS } from "@/lib/s4s";
+import { getNames, getResults, getAliases, syncPlan, getLinks, getLinkStats, getDeals, getPlan, getAvails, WINDOW_DAYS, DEFAULT_WEEKDAYS } from "@/lib/s4s";
 import {
   planSchedule, addDays, baseName, linkNameFor, buildAliasIndex, enrichResults, summarizeByPage,
   reciprocity, resultFor, lastExchange, langOf, MIN_MATURE, matchPartner, labelKey, sideKey, sideStatus, toDate, handleFromUrl,
   mergeDeals, FORMATS, DEAL_DEFAULTS, MAX_PER_DAY, kitReady, kitMissing, KIT_MAX_PHOTOS, PHOTO_USES,
+  dealState, availIssues, weekRange, weekCount, TIME_SLOTS,
 } from "@/lib/s4s-core";
 
 const PAST_DAYS = 28;
@@ -18,7 +19,7 @@ export async function buildView(split, { force = false, settings, userId } = {})
   const today = todayIT();
   const names = await getNames();
   const { plan, pages } = await syncPlan(split, names, today, { settings, userId });
-  const [res, aliases, pasted, stored, kitsRaw] = await Promise.all([getResults(split.id, split.creator_ids, { force }), getAliases(), getLinks(split.id), getDeals(split.id), getKits(split.creator_ids)]);
+  const [res, aliases, pasted, stored, kitsRaw, avails] = await Promise.all([getResults(split.id, split.creator_ids, { force }), getAliases(), getLinks(split.id), getDeals(split.id), getKits(split.creator_ids), getAvails(split.creator_ids)]);
   const lstat = await getLinkStats(split.id, split.creator_ids, Object.values(pasted).map((x) => x.url), { force });
   const aliasIdx = buildAliasIndex(Object.values(names));
   const results = enrichResults(res.rows, names, aliasIdx, aliases);
@@ -68,12 +69,23 @@ export async function buildView(split, { force = false, settings, userId } = {})
   const sameBase = (a, b) => baseName(nm(a)) === baseName(nm(b));
   const to = addDays(today, FUTURE_DAYS);
   const merged = mergeDeals(planSchedule(plan, from, to, { sameBase }), stored, { from, to, langOf: (id) => langOfId(id) });
+  // problemi di disponibilità di una metà: conteggi della settimana senza questo accordo
+  const issuesFor = (d, x, me, other, fmt) => {
+    const [w0, w1] = weekRange(d.day);
+    const week = merged.filter((e) => e.day >= w0 && e.day <= w1);
+    return availIssues(avails[me], {
+      day: d.day, time: x.time, fmt, partnerId: other, partnerName: disp(other),
+      weekCount: weekCount(week, me, x.id),
+    });
+  };
   const schedule = merged.map((d) => ({
     day: d.day,
     rest: d.rest.map((id) => ({ id, name: disp(id) })),
     deals: d.deals.map((x) => ({
       id: x.id, day: d.day, lang: x.lang, source: x.source, status: x.status, saved: Boolean(stored[x.id]),
       time: x.time, mass_time: x.mass_time, pin_hours: x.pin_hours, note: x.note || "", done: x.done || {},
+      accepted: x.accepted || {}, declined_by: x.declined_by || null, ...dealState(x),
+      issues: x.status === "annullato" ? { a: [], b: [] } : { a: issuesFor(d, x, x.a, x.b, x.fmt_a), b: issuesFor(d, x, x.b, x.a, x.fmt_b) },
       // a pubblica la promo di b con fmt_a; b pubblica a con fmt_b
       a: { ...side(d.day, x.a, x.b), fmt: x.fmt_a },
       b: { ...side(d.day, x.b, x.a), fmt: x.fmt_b },
@@ -106,6 +118,7 @@ export async function buildView(split, { force = false, settings, userId } = {})
     aliases,
     partner_options: [...new Set(Object.values(names).map(baseName))].sort((a, b) => a.localeCompare(b, "it")),
     baseline: res.baseline || null,
+    avail: Object.fromEntries(split.creator_ids.map((id) => [id, avails[id] || null])), time_slots: TIME_SLOTS,
     deal_defaults: DEAL_DEFAULTS, formats: FORMATS, max_per_day: MAX_PER_DAY, kit_max_photos: KIT_MAX_PHOTOS, photo_uses: PHOTO_USES,
     // kit di ogni pagina: senza path del blob (le foto si leggono solo dalla route protetta)
     kits: Object.fromEntries(Object.entries(kitsRaw).map(([id, k]) => [id, {
@@ -147,4 +160,13 @@ export function restrictView(view, mineIds) {
     aliases: {},
     partner_options: [],
   };
+}
+
+// Accordi (giro + salvati) di un intervallo di giorni, senza BigQuery: per i controlli al salvataggio.
+export async function rangeDeals(split, from, to) {
+  const [names, plan, stored] = await Promise.all([getNames(), getPlan(split.id), getDeals(split.id)]);
+  const nm = (id) => names[String(id)] || String(id);
+  const sameBase = (a, b) => baseName(nm(a)) === baseName(nm(b));
+  const days = plan ? planSchedule(plan, from, to, { sameBase }) : [];
+  return { days: mergeDeals(days, stored, { from, to }), stored, names };
 }

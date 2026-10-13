@@ -13,7 +13,7 @@ import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, NUM } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
 import { fmtInt, fmtPct, MONTHS_IT } from "@/lib/format";
-import { fillCaption, photosFor, needsPost, needsMass } from "@/lib/s4s-core";
+import { fillCaption, photosFor, needsPost, needsMass, availIssues } from "@/lib/s4s-core";
 
 const fetcher = (url) =>
   fetch(url).then(async (r) => {
@@ -27,6 +27,7 @@ const TABS = [
   ["planner", "Planner"],
   ["agenda", "Giorno"],
   ["kit", "Kit"],
+  ["disponibilita", "Disponibilità"],
   ["risultati", "Risultati"],
   ["impostazioni", "Impostazioni"],
 ];
@@ -184,11 +185,11 @@ function SideBlock({ s, partner, day, splitId, reload }) {
   );
 }
 
-function ExchangeCard({ p, day, splitId, reload, onEdit }) {
+function ExchangeCard({ p, day, splitId, reload, onEdit, v }) {
   const off = p.status === "annullato";
   return (
     <section style={{ ...card, padding: 12, marginBottom: 10, opacity: off ? 0.6 : 1 }}>
-      <DealHeader x={p} onEdit={onEdit} />
+      <DealHeader x={p} onEdit={onEdit} v={v} />
       {!off && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 8, marginTop: 10 }}>
           <SideBlock s={p.a} partner={p.b} day={day} splitId={splitId} reload={reload} />
@@ -205,20 +206,30 @@ const FORMAT_SHORT = { post: "post", mass: "mass", post_mass: "post + mass", tel
 // Forma prima del colore: proposto tratteggiato, confermato pieno, annullato barrato
 const DEAL_LOOK = {
   proposto: { border: `1px dashed ${CP.textMuted}`, color: CP.textSecondary, label: "da confermare" },
+  attesa: { border: `1px dashed ${CP.accent}`, color: CP.accentSoftText, label: "in attesa" },
   confermato: { border: `1px solid ${CP.accent}`, color: CP.accentSoftText, label: "confermato" },
   annullato: { border: `1px solid ${CP.borderSoft}`, color: CP.textMuted, label: "annullato" },
 };
-function DealStatus({ x }) {
-  const l = DEAL_LOOK[x.status] || DEAL_LOOK.proposto;
+// Stato in parole: "attende Martina" quando manca solo il sì dell'altra pagina (punto 3)
+const pageName = (v, id) => v?.pages.find((p) => p.id === Number(id))?.name || "";
+function dealLook(x, v) {
+  const st = x.state || x.status;
+  const l = DEAL_LOOK[st] || DEAL_LOOK.proposto;
+  if (st === "attesa" && v) return { ...l, label: `attende ${pageName(v, x.waiting[0]).split(" ")[0]}` };
+  if (st === "annullato" && x.declined_by && v) return { ...l, label: `rifiutato da ${pageName(v, x.declined_by).split(" ")[0]}` };
+  return l;
+}
+function DealStatus({ x, v }) {
+  const l = dealLook(x, v);
   return <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 999, border: l.border, color: l.color, whiteSpace: "nowrap", textDecoration: x.status === "annullato" ? "line-through" : "none" }}>{l.label}{x.source === "extra" ? " · extra" : ""}</span>;
 }
 const pinText = (h) => (h ? `fissato ${h} h` : "non fissato");
-function DealHeader({ x, onEdit }) {
+function DealHeader({ x, onEdit, v }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
       <span style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>{x.a.name} ⇄ {x.b.name}</span>
       <span style={{ fontSize: 13, color: CP.textSecondary, ...NUM }}>ore {x.time}</span>
-      <DealStatus x={x} />
+      <DealStatus x={x} v={v} />
       <span style={{ flexBasis: "100%", height: 0 }} />
       <span style={{ fontSize: 12.5, color: CP.textMuted }}>
         {x.a.name.split(" ")[0]} pubblica {x.b.name.split(" ")[0]}: {FORMAT_TEXT[x.a.fmt]} · {x.b.name.split(" ")[0]} pubblica {x.a.name.split(" ")[0]}: {FORMAT_TEXT[x.b.fmt]}
@@ -273,6 +284,31 @@ function DealEditor({ v, deal, onClose, reload }) {
     return ra || rb ? { ra, rb } : null;
   }, [f.a, f.b, v.results]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // disponibilità delle due pagine, controllata mentre si compila (il server la ricontrolla)
+  const live = useMemo(() => {
+    if (!f.a || !f.b || !f.day) return [];
+    const out = [];
+    for (const [me, other, fmt] of [[f.a, f.b, f.fmt_a], [f.b, f.a, f.fmt_b]]) {
+      if (countDay(v, me, f.day, deal.id) >= v.max_per_day) out.push(`${nameOf(me)} ha già ${v.max_per_day} S4S quel giorno`);
+      for (const t of availIssues(v.avail[String(me)], { day: f.day, time: f.time, fmt, partnerId: other, partnerName: nameOf(other), weekCount: countWeek(v, me, f.day, deal.id) })) out.push(`${nameOf(me)} ${t}`);
+    }
+    return out;
+  }, [f, v, deal.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // pagine libere quel giorno per la pagina scelta: stessa lingua, non la stessa creator, nessun limite sforato
+  const free = useMemo(() => {
+    if (!f.a || !f.day) return [];
+    const A = pages.find((p) => p.id === Number(f.a));
+    if (!A) return [];
+    const base = (n) => n.replace(/ (IT|EN|ES)$/, "");
+    const busyWithA = new Set((v.schedule.find((d) => d.day === f.day)?.deals || []).filter((x) => x.status !== "annullato" && (x.a.id === A.id || x.b.id === A.id)).map((x) => (x.a.id === A.id ? x.b.id : x.a.id)));
+    return pages.filter((p) => p.id !== A.id && p.lang === A.lang && base(p.name) !== base(A.name) && !busyWithA.has(p.id))
+      .filter((p) => countDay(v, p.id, f.day) < v.max_per_day
+        && !availIssues(v.avail[String(p.id)], { day: f.day, time: f.time, fmt: f.fmt_b, partnerId: A.id, partnerName: A.name, weekCount: countWeek(v, p.id, f.day) }).length
+        && !availIssues(v.avail[String(A.id)], { day: f.day, time: f.time, fmt: f.fmt_a, partnerId: p.id, partnerName: p.name, weekCount: 0 }).some((t) => t.startsWith("non scambia")))
+      .map((p) => ({ ...p, week: countWeek(v, p.id, f.day), cap: v.avail[String(p.id)]?.per_week ?? null }))
+      .sort((x, y) => x.week - y.week);
+  }, [f.a, f.day, f.time, f.fmt_a, f.fmt_b, v]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function send(body) {
     setState({ busy: true });
     const r = await fetch("/api/admin/s4s", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ split: v.split.id, ...body }) });
@@ -303,6 +339,14 @@ function DealEditor({ v, deal, onClose, reload }) {
             </select>
           </label>
         </div>
+        {f.a && f.day && free.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 12.5, color: CP.textSecondary }}>Libere quel giorno per {first(f.a)} (meno S4S in settimana per prime):</span>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {free.slice(0, 8).map((p) => <FilterChip key={p.id} active={Number(f.b) === p.id} onClick={() => set("b")(p.id)} label={`${p.name} · ${p.week}${p.cap != null ? `/${p.cap}` : ""}`} />)}
+            </div>
+          </div>
+        )}
         {langA && langB && langA !== langB && <Notice>Lingue diverse ({langA.toUpperCase()} e {langB.toUpperCase()}): di solito porta pochi abbonati.</Notice>}
         {history && (
           <div style={{ fontSize: 12.5, color: CP.textSecondary, padding: "8px 10px", borderRadius: 8, background: CP.bgSunken, border: `1px solid ${CP.borderSoft}`, ...NUM }}>
@@ -329,12 +373,13 @@ function DealEditor({ v, deal, onClose, reload }) {
           </div>
         </div>
         <label style={field}>Nota (facoltativa)<input value={f.note} onChange={(e) => set("note")(e.target.value)} maxLength={300} placeholder="Es. usare le foto nuove" style={input} /></label>
+        {live.length > 0 && <Notice danger>{live.map((t, i) => <div key={i}>{t}</div>)}</Notice>}
         {state?.error && <span style={{ fontSize: 13, color: CP.accentRed }}>{state.error}</span>}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           {!isNew && deal.status !== "annullato" && <button type="button" disabled={state?.busy} onClick={() => setStatus("annullato")} style={{ ...btn, marginRight: "auto" }}>Annulla lo scambio</button>}
           {!isNew && deal.status === "annullato" && <button type="button" disabled={state?.busy} onClick={() => setStatus("proposto")} style={{ ...btn, marginRight: "auto" }}>Ripristina</button>}
-          <button type="button" disabled={!ready || state?.busy} onClick={() => save(deal.status === "confermato" ? "confermato" : "proposto")} style={btn}>{isNew ? "Proponi" : "Salva"}</button>
-          {deal.status !== "confermato" && <button type="button" disabled={!ready || state?.busy} onClick={() => save("confermato")} style={btnPrimary}>{isNew ? "Crea già confermato" : "Salva e conferma"}</button>}
+          <button type="button" disabled={!ready || state?.busy || live.length > 0} onClick={() => save("proposto")} style={v.me?.all ? btn : btnPrimary}>{isNew ? (v.me?.all ? "Proponi" : "Invia la proposta") : "Salva le modifiche"}</button>
+          {v.me?.all && <button type="button" disabled={!ready || state?.busy || live.length > 0} onClick={() => save("confermato")} style={btnPrimary}>{isNew ? "Crea già confermato" : "Salva e conferma per entrambe"}</button>}
         </div>
       </div>
     </Modal>
@@ -398,7 +443,17 @@ function Planner({ v, onEdit, onNew, onOpenDay }) {
                   <Avatar name={p.name} size={30} />
                   <span style={{ minWidth: 0 }}>
                     <span style={{ display: "block", fontSize: 13.5, fontWeight: 500, color: CP.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
-                    <span style={{ display: "block", fontSize: 12, color: CP.textMuted, ...NUM }}>{mine} questa settimana</span>
+                    {(() => {
+                      const cap = v.avail[String(p.id)]?.per_week;
+                      if (cap == null) return <span style={{ display: "block", fontSize: 12, color: CP.textMuted, ...NUM }}>{mine} questa settimana</span>;
+                      const full = mine >= cap;
+                      return (
+                        <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                          <span style={{ fontSize: 12, color: full ? CP.textSecondary : CP.textMuted, ...NUM }}>{mine} / {cap} questa settimana</span>
+                          <span aria-hidden style={{ height: 3, borderRadius: 2, background: CP.borderSoft, overflow: "hidden", width: 90 }}><span style={{ display: "block", height: 3, width: `${Math.min(100, (mine / Math.max(cap, 1)) * 100)}%`, background: full ? CP.accentGreen : CP.accent }} /></span>
+                        </span>
+                      );
+                    })()}
                   </span>
                 </div>
                 {days.map((day) => {
@@ -406,20 +461,23 @@ function Planner({ v, onEdit, onNew, onOpenDay }) {
                   const mineDay = (dd?.deals || []).filter((x) => x.a.id === p.id || x.b.id === p.id);
                   const resting = dd?.rest?.some((r) => r.id === p.id);
                   const n = mineDay.filter((x) => x.status !== "annullato").length;
-                  const canAdd = day >= v.today && n < v.max_per_day;
+                  const cap = v.avail[String(p.id)]?.per_week;
+                  const days_ok = !v.avail[String(p.id)]?.weekdays || v.avail[String(p.id)].weekdays.includes(wdOf(day));
+                  const canAdd = day >= v.today && n < v.max_per_day && days_ok && (cap == null || mine < cap);
                   return (
                     <div key={day} role="gridcell" style={{ padding: 6, borderLeft: `1px solid ${CP.borderSoft}`, display: "flex", flexDirection: "column", gap: 5 }}>
                       {mineDay.map((x) => {
                         const { me, other } = sideOf(x, p.id);
-                        const l = DEAL_LOOK[x.status] || DEAL_LOOK.proposto;
+                        const l = dealLook(x, v);
                         const done = DONE.has(me.status.code);
+                        const myIssues = (x.a.id === p.id ? x.issues?.a : x.issues?.b) || [];
                         return (
-                          <button key={x.id} type="button" onClick={() => onEdit({ ...x, focus: p.id })} aria-label={`${p.name} con ${other.name}, ${dayLabel(day)} ore ${x.time}, ${l.label}`}
+                          <button key={x.id} type="button" onClick={() => onEdit({ ...x, focus: p.id })} title={myIssues.length ? `${p.name}: ${myIssues.join("; ")}` : undefined} aria-label={`${p.name} con ${other.name}, ${dayLabel(day)} ore ${x.time}, ${l.label}${myIssues.length ? `, fuori disponibilità: ${myIssues.join("; ")}` : ""}`}
                             style={{ all: "unset", boxSizing: "border-box", cursor: "pointer", display: "flex", flexDirection: "column", gap: 2, padding: "6px 8px", borderRadius: 8, background: CP.surfaceAlt, border: l.border, opacity: x.status === "annullato" ? 0.55 : 1, minWidth: 0 }}>
                             <span style={{ fontSize: 12.5, fontWeight: 500, color: CP.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: x.status === "annullato" ? "line-through" : "none" }}>{other.name}</span>
                             <span style={{ fontSize: 11.5, color: CP.textSecondary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", ...NUM }}>{FORMAT_SHORT[me.fmt]} · {x.time}</span>
                             <span style={{ fontSize: 11, color: l.color, display: "inline-flex", gap: 4, alignItems: "center", whiteSpace: "nowrap" }}>
-                              {done && <Check size={11} aria-label="link pronto" />}{l.label}{x.source === "extra" ? " · extra" : ""}
+                              {myIssues.length > 0 && <AlertTriangle size={11} aria-label="fuori disponibilità" />}{done && <Check size={11} aria-label="link pronto" />}{l.label}{x.source === "extra" ? " · extra" : ""}
                             </span>
                           </button>
                         );
@@ -439,6 +497,8 @@ function Planner({ v, onEdit, onNew, onOpenDay }) {
       </div>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 10, fontSize: 12, color: CP.textMuted }}>
         <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}><span style={{ width: 14, height: 10, borderRadius: 3, border: DEAL_LOOK.proposto.border }} />da confermare (proposto dal giro o a mano)</span>
+        <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}><span style={{ width: 14, height: 10, borderRadius: 3, border: DEAL_LOOK.attesa.border }} />una pagina ha accettato, attende l&apos;altra</span>
+        <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}><AlertTriangle size={11} />fuori dalla disponibilità della pagina</span>
         <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}><span style={{ width: 14, height: 10, borderRadius: 3, border: DEAL_LOOK.confermato.border }} />confermato</span>
         <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}><Check size={11} />link già incollato</span>
         <span>Massimo {v.max_per_day} S4S al giorno per pagina. Clic su uno scambio per modificarlo, su un giorno per aprirne il dettaglio.</span>
@@ -516,8 +576,8 @@ function TaskCard({ v, x, me, other, day, reload }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
         <span style={{ fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>{me.name} con {other.name}</span>
         <span style={{ fontSize: 13, color: CP.textSecondary, ...NUM }}>ore {x.time}</span>
-        <DealStatus x={x} />
-        {x.status === "proposto" && <button type="button" disabled={busy} onClick={() => post({ action: "deal_status", id: x.id, status: "confermato" })} style={{ ...btnPrimary, padding: "5px 10px", fontSize: 12.5 }}>Conferma</button>}
+        <DealStatus x={x} v={v} />
+        {(x.waiting || []).includes(me.id) && <button type="button" disabled={busy} onClick={() => post({ action: "deal_status", id: x.id, status: "confermato" })} style={{ ...btnPrimary, padding: "5px 10px", fontSize: 12.5 }}>Accetta</button>}
         {x.note && <span style={{ flexBasis: "100%", fontSize: 12.5, color: CP.textSecondary }}>Nota: {x.note}</span>}
       </div>
       {!open && <button type="button" onClick={() => setOpen(true)} style={{ ...btn, padding: "5px 10px", fontSize: 12.5, marginBottom: 4 }}>Mostra i passi</button>}
@@ -683,6 +743,170 @@ function KitEditor({ v, reload }) {
   );
 }
 
+// ── Disponibilità e richieste (13/10/2026, punto 3) ─────────────────────────
+const mondayISO = (s) => new Date(Date.parse(`${s}T00:00:00Z`) - ((new Date(`${s}T00:00:00Z`).getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
+const addISO = (s, n) => new Date(Date.parse(`${s}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+// accordi attivi di una pagina nella settimana di `day` (escluso un id)
+function countWeek(v, pageId, day, exceptId) {
+  const w0 = mondayISO(day), w1 = addISO(w0, 6);
+  return v.schedule.filter((d) => d.day >= w0 && d.day <= w1)
+    .reduce((n, d) => n + d.deals.filter((x) => x.status !== "annullato" && x.id !== exceptId && (x.a.id === Number(pageId) || x.b.id === Number(pageId))).length, 0);
+}
+function countDay(v, pageId, day, exceptId) {
+  const d = v.schedule.find((e) => e.day === day);
+  return d ? d.deals.filter((x) => x.status !== "annullato" && x.id !== exceptId && (x.a.id === Number(pageId) || x.b.id === Number(pageId))).length : 0;
+}
+
+function Requests({ v, onEdit, reload }) {
+  const [busy, setBusy] = useState(null);
+  const [err, setErr] = useState(null);
+  const mine = new Set(v.pages.filter((p) => p.mine).map((p) => p.id));
+  const deals = v.schedule.filter((d) => d.day >= v.today).flatMap((d) => d.deals.map((x) => ({ ...x, day: d.day })));
+  const forMe = deals.filter((x) => x.state === "attesa" && x.waiting.some((p) => mine.has(p)));
+  const theirs = v.me?.all ? [] : deals.filter((x) => x.state === "attesa" && !x.waiting.some((p) => mine.has(p)));
+  const soon = addISO(v.today, 14);
+  const giro = deals.filter((x) => x.day <= soon && x.state === "proposto" && x.waiting.some((p) => mine.has(p))).length;
+  const [bulk, setBulk] = useState(null);
+  async function acceptAll() {
+    setBulk({ busy: true });
+    const r = await fetch("/api/admin/s4s", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "accept_all", split: v.split.id, days: 14 }) });
+    const d = await r.json().catch(() => ({}));
+    setBulk(r.ok ? { msg: `${d.accepted} accettate${d.skipped ? `, ${d.skipped} da guardare una per una (sforano una disponibilità)` : ""}` } : { error: d.error || "Operazione fallita" });
+    if (r.ok) reload();
+  }
+  if (!forMe.length && !theirs.length && !giro) return null;
+  async function act(x, status) {
+    if (status === "annullato" && !window.confirm("Rifiutare questo S4S? L'altra pagina lo vedrà come rifiutato.")) return;
+    setBusy(x.id); setErr(null);
+    const r = await fetch("/api/admin/s4s", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deal_status", split: v.split.id, id: x.id, status }) });
+    const d = await r.json().catch(() => ({}));
+    setBusy(null);
+    if (!r.ok) setErr(d.error || "Operazione fallita"); else reload();
+  }
+  return (
+    <section style={{ ...card, padding: 14, marginBottom: 16, borderColor: forMe.length ? CP.accent : CP.border }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: forMe.length ? 10 : 0 }}>
+        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Richieste {forMe.length ? `· ${forMe.length} da accettare` : ""}</h2>
+        {giro > 0 && <span style={{ fontSize: 12.5, color: CP.textMuted }}>{giro} proposte del giro nei prossimi 14 giorni aspettano ancora il tuo sì</span>}
+        {giro > 0 && !v.me?.all && <button type="button" disabled={bulk?.busy} onClick={acceptAll} style={{ ...btn, padding: "5px 10px", fontSize: 12.5, marginLeft: "auto" }}>{bulk?.busy ? "Accetto…" : "Accetta tutte quelle senza problemi"}</button>}
+        {bulk?.msg && <span style={{ flexBasis: "100%", fontSize: 12.5, color: CP.textSecondary }}>{bulk.msg}</span>}
+        {bulk?.error && <span style={{ flexBasis: "100%", fontSize: 12.5, color: CP.accentRed }}>{bulk.error}</span>}
+      </div>
+      {forMe.map((x) => {
+        const meId = x.waiting.find((p) => mine.has(p));
+        const meSide = x.a.id === meId ? x.a : x.b, other = x.a.id === meId ? x.b : x.a;
+        const iss = x.a.id === meId ? x.issues.a : x.issues.b;
+        return (
+          <div key={x.id} style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", padding: "10px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
+            <div style={{ flex: "1 1 320px", minWidth: 0 }}>
+              <div style={{ fontSize: 14, color: CP.textPrimary }}><b style={{ fontWeight: 500 }}>{other.name}</b> propone a <b style={{ fontWeight: 500 }}>{meSide.name}</b></div>
+              <div style={{ fontSize: 12.5, color: CP.textSecondary, ...NUM }}>{dayLabel(x.day)} · ore {x.time} · {meSide.name.split(" ")[0]} pubblica {FORMAT_TEXT[meSide.fmt]}{x.pin_hours ? `, fissato ${x.pin_hours} h` : ""}</div>
+              {x.note && <div style={{ fontSize: 12.5, color: CP.textMuted }}>Nota: {x.note}</div>}
+              {iss.length > 0 && <div style={{ fontSize: 12.5, color: CP.attn, display: "flex", gap: 5, alignItems: "center" }}><AlertTriangle size={12} />{meSide.name.split(" ")[0]} {iss.join("; ")}</div>}
+            </div>
+            <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
+              <button type="button" disabled={busy === x.id} onClick={() => act(x, "confermato")} style={btnPrimary}>Accetta</button>
+              <button type="button" disabled={busy === x.id} onClick={() => onEdit({ ...x, focus: meId })} style={btn}>Proponi un altro giorno</button>
+              <button type="button" disabled={busy === x.id} onClick={() => act(x, "annullato")} style={btn}>Rifiuta</button>
+            </span>
+          </div>
+        );
+      })}
+      {theirs.length > 0 && (
+        <div style={{ fontSize: 12.5, color: CP.textMuted, paddingTop: forMe.length ? 8 : 6 }}>
+          In attesa dell&apos;altra pagina: {theirs.slice(0, 4).map((x) => `${x.a.name.split(" ")[0]} ⇄ ${x.b.name.split(" ")[0]} (${ddmm(x.day)})`).join(" · ")}{theirs.length > 4 ? ` e altre ${theirs.length - 4}` : ""}
+        </div>
+      )}
+      {err && <div style={{ fontSize: 12.5, color: CP.accentRed, paddingTop: 6 }}>{err}</div>}
+    </section>
+  );
+}
+
+function AvailEditor({ v, reload }) {
+  const pages = v.pages.filter((p) => p.mine && !p.paused);
+  const [pageId, setPageId] = useState(pages[0]?.id || null);
+  const page = pages.find((p) => p.id === pageId) || pages[0];
+  const cur = (page && v.avail[String(page.id)]) || null;
+  const blank = { per_week: null, weekdays: null, times: null, formats: null, exclude: [] };
+  const [f, setF] = useState(cur || blank);
+  const [state, setState] = useState(null);
+  useEffect(() => { setF(cur || blank); setState(null); }, [page?.id, cur?.updated_at]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!page) return <Notice>Nessuna pagina da gestire.</Notice>;
+  const toggle = (k, val, allVals) => setF((o) => {
+    const curList = o[k] || allVals;
+    const next = curList.includes(val) ? curList.filter((x) => x !== val) : [...curList, val];
+    return { ...o, [k]: next.length === allVals.length ? null : next };
+  });
+  const thisWeek = countWeek(v, page.id, v.today);
+  async function save() {
+    setState({ busy: true });
+    const r = await fetch("/api/admin/s4s", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "avail", split: v.split.id, c: page.id, ...f }) });
+    const d = await r.json().catch(() => ({}));
+    setState(r.ok ? { msg: "Salvato" } : { error: d.error || "Salvataggio fallito" });
+    if (r.ok) reload();
+  }
+  const WD = [[1, "lun"], [2, "mar"], [3, "mer"], [4, "gio"], [5, "ven"], [6, "sab"], [0, "dom"]];
+  const others = v.pages.filter((p) => p.id !== page.id && !p.paused);
+  const row = { display: "flex", flexDirection: "column", gap: 8, padding: "14px 0", borderTop: `1px solid ${CP.borderSoft}` };
+  return (
+    <div style={{ maxWidth: 820 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+        {pages.map((p) => <FilterChip key={p.id} active={p.id === page.id} onClick={() => setPageId(p.id)} label={`${p.name}${v.avail[String(p.id)] ? " ✓" : ""}`} />)}
+      </div>
+      <Note style={{ marginBottom: 12 }}>
+        La disponibilità di {page.name} vale per tutti gli scambi: il sistema non lascia proporre o accettare uno S4S che la sfora. Lasciare un campo su &quot;tutti&quot; vuol dire nessun limite. {cur ? "" : "Per ora non è impostata: nessun limite."}
+      </Note>
+      <section style={{ ...card, padding: "4px 18px 16px" }}>
+        <div style={{ ...row, borderTop: "none" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <span>
+              <span style={{ display: "block", fontSize: 14.5, color: CP.textPrimary }}>S4S a settimana</span>
+              <span style={{ fontSize: 12.5, color: CP.textMuted, ...NUM }}>Questa settimana ne ha {thisWeek}.</span>
+            </span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <button type="button" aria-label="Uno in meno" disabled={f.per_week == null || f.per_week <= 0} onClick={() => setF((o) => ({ ...o, per_week: Math.max(0, (o.per_week ?? 0) - 1) }))} style={{ ...btn, padding: "6px 12px" }}>−</button>
+              <span style={{ minWidth: 92, textAlign: "center", fontSize: 18, fontWeight: 500, color: CP.textPrimary, ...NUM }}>{f.per_week == null ? "senza limite" : f.per_week}</span>
+              <button type="button" aria-label="Uno in più" onClick={() => setF((o) => ({ ...o, per_week: Math.min(21, (o.per_week ?? thisWeek) + (o.per_week == null ? 0 : 1)) }))} style={{ ...btn, padding: "6px 12px" }}>+</button>
+              {f.per_week != null && <button type="button" onClick={() => setF((o) => ({ ...o, per_week: null }))} style={{ ...btn, padding: "6px 10px", fontSize: 12.5 }}>Togli il limite</button>}
+            </span>
+          </div>
+        </div>
+        <div style={row}>
+          <span style={{ fontSize: 14.5, color: CP.textPrimary }}>Giorni</span>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {WD.map(([d, l]) => <FilterChip key={d} label={l} active={!f.weekdays || f.weekdays.includes(d)} onClick={() => toggle("weekdays", d, WD.map((x) => x[0]))} />)}
+          </div>
+        </div>
+        <div style={row}>
+          <span style={{ fontSize: 14.5, color: CP.textPrimary }}>Orari in cui può pubblicare</span>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {v.time_slots.map((t) => <FilterChip key={t} label={t} active={!f.times || f.times.includes(t)} onClick={() => toggle("times", t, v.time_slots)} />)}
+          </div>
+          <span style={{ fontSize: 12, color: CP.textMuted }}>Un orario vale per tutta l&apos;ora (21:00 copre anche le 21:30).</span>
+        </div>
+        <div style={row}>
+          <span style={{ fontSize: 14.5, color: CP.textPrimary }}>Cosa accetta di pubblicare</span>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {Object.entries(FORMAT_TEXT).map(([k, l]) => <FilterChip key={k} label={l} active={!f.formats || f.formats.includes(k)} onClick={() => toggle("formats", k, Object.keys(FORMAT_TEXT))} />)}
+          </div>
+        </div>
+        <div style={row}>
+          <span style={{ fontSize: 14.5, color: CP.textPrimary }}>Pagine con cui non scambiare</span>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {others.map((p) => <FilterChip key={p.id} label={p.name} danger={(f.exclude || []).includes(p.id)} active={false} onClick={() => setF((o) => ({ ...o, exclude: (o.exclude || []).includes(p.id) ? o.exclude.filter((x) => x !== p.id) : [...(o.exclude || []), p.id] }))} />)}
+          </div>
+          <span style={{ fontSize: 12, color: CP.textMuted }}>Le pagine segnate in rosso sono escluse.</span>
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", paddingTop: 6 }}>
+          <button type="button" disabled={state?.busy} onClick={save} style={btnPrimary}>Salva la disponibilità</button>
+          {state?.msg && <span style={{ fontSize: 13, color: CP.textSecondary }}>{state.msg}</span>}
+          {state?.error && <span style={{ fontSize: 13, color: CP.accentRed }}>{state.error}</span>}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function MiniMonth({ month, setMonth, sel, setSel, today, byDay, only }) {
   const first = `${month}-01`;
   const startWd = (new Date(`${first}T00:00:00Z`).getUTCDay() + 6) % 7;
@@ -815,7 +1039,7 @@ function Agenda({ v, reload, initialDay, onEdit }) {
         </div>
         {!d && <Notice>Nessuno scambio in questo giorno: scegli un giorno con il puntino nel calendario.</Notice>}
         {d && pairs.length === 0 && <Notice>{only ? `${pages.find((p) => p.id === only)?.name} oggi riposa.` : "Nessuno scambio."}</Notice>}
-        {d && pairs.map((p) => <ExchangeCard key={p.id} p={p} day={d.day} splitId={v.split.id} reload={reload} onEdit={onEdit} />)}
+        {d && pairs.map((p) => <ExchangeCard key={p.id} p={p} day={d.day} splitId={v.split.id} reload={reload} onEdit={onEdit} v={v} />)}
         {d && !only && resting.length > 0 && <Note style={{ marginTop: 4 }}>Riposa: {resting.map((r) => r.name).join(", ")}</Note>}
         <Note style={{ marginTop: 14 }}>
           Su ogni scambio ciascuna pagina crea su OnlyFans il link col nome indicato, lo incolla qui e lo manda al partner, che lo pubblica. Click e abbonati del link compaiono qui da soli, entro qualche ora.
@@ -1090,7 +1314,9 @@ export default function S4SPage() {
             label={k === "risultati" && v.unmatched.length ? `${l} · ${v.unmatched.length} da attribuire` : l} />
         ))}
       </div>
+      {(current === "oggi" || current === "planner") && <Requests v={v} onEdit={setEditing} reload={mutate} />}
       {current === "oggi" && <Oggi key={v.split.id} v={v} reload={mutate} />}
+      {current === "disponibilita" && <AvailEditor key={v.split.id} v={v} reload={mutate} />}
       {current === "kit" && <KitEditor key={v.split.id} v={v} reload={mutate} />}
       {current === "planner" && <Planner key={v.split.id} v={v} onEdit={setEditing} onNew={setEditing} onOpenDay={(day) => { setFocusDay(day); setTab("agenda"); }} />}
       {current === "agenda" && <Agenda key={`${v.split.id}-${focusDay || ""}`} v={v} reload={mutate} initialDay={focusDay} onEdit={setEditing} />}

@@ -575,3 +575,76 @@ export function fillCaption(text, url) {
 // Cosa deve fare una pagina in un accordo, in base al formato che PUBBLICA
 export const needsPost = (fmt) => fmt === "post" || fmt === "post_mass";
 export const needsMass = (fmt) => fmt === "mass" || fmt === "post_mass";
+
+// ── Disponibilità e accettazione (13/10/2026, punto 3) ──────────────────────
+// Ogni pagina dice quanti S4S vuole a settimana, in che giorni e orari, cosa accetta di
+// pubblicare e con chi non scambiare. Non impostata = nessun limite (non blocca nulla).
+export const AVAIL_DEFAULT = { per_week: null, weekdays: null, times: null, formats: null, exclude: [] };
+export const TIME_SLOTS = ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00"];
+
+export function cleanAvail(input = {}, pageIds = []) {
+  const ids = new Set(pageIds.map(Number));
+  const n = input.per_week === null || input.per_week === "" || input.per_week === undefined ? null : Math.round(Number(input.per_week));
+  const wd = Array.isArray(input.weekdays) ? [...new Set(input.weekdays.map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort() : null;
+  const times = Array.isArray(input.times) ? [...new Set(input.times.filter((t) => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(t))))].sort() : null;
+  const formats = Array.isArray(input.formats) ? [...new Set(input.formats.filter((f) => FORMATS[f]))] : null;
+  return {
+    per_week: n === null || !Number.isFinite(n) ? null : Math.min(21, Math.max(0, n)),
+    weekdays: wd && wd.length ? wd : null,
+    times: times && times.length ? times : null,
+    formats: formats && formats.length ? formats : null,
+    exclude: [...new Set((input.exclude || []).map(Number).filter((id) => ids.has(id)))],
+  };
+}
+
+const hourOf = (t) => Number(String(t).slice(0, 2));
+// Problemi di UNA pagina rispetto alla sua disponibilità.
+// ctx: { day, time, fmt (cosa pubblica lei), partnerId, partnerName, weekCount (accordi attivi
+// della settimana SENZA questo), excludedBy (la pagina partner esclude lei) }
+export function availIssues(avail, ctx) {
+  const a = { ...AVAIL_DEFAULT, ...(avail || {}) };
+  const out = [];
+  if (a.per_week != null && ctx.weekCount >= a.per_week) out.push(`ha già ${ctx.weekCount} S4S questa settimana (ne vuole ${a.per_week})`);
+  if (a.weekdays && !a.weekdays.includes(weekday(ctx.day))) out.push(`non fa S4S di ${dayLabel(ctx.day).split(" ")[0]}`);
+  // l'orario va bene se è entro un'ora da uno degli orari indicati (le 21:30 stanno nella fascia delle 21)
+  if (a.times && !a.times.some((t) => hourOf(t) === hourOf(ctx.time))) out.push(`non pubblica alle ${ctx.time}`);
+  if (a.formats && !a.formats.includes(ctx.fmt)) out.push(`non accetta di pubblicare ${FORMATS[ctx.fmt] || ctx.fmt}`);
+  if ((a.exclude || []).map(Number).includes(Number(ctx.partnerId))) out.push(`non scambia con ${ctx.partnerName || "questa pagina"}`);
+  return out;
+}
+
+// Lunedì–domenica della settimana di un giorno
+export const weekRange = (day) => { const m = weekKey(day); return [m, addDays(m, 6)]; };
+
+// Accordi attivi di una pagina in una lista di giorni mergeDeals (escluso un id)
+export function weekCount(days, pageId, exceptId) {
+  return days.reduce((n, d) => n + d.deals.filter((x) => x.status !== "annullato" && x.id !== exceptId && (Number(x.a) === Number(pageId) || Number(x.b) === Number(pageId))).length, 0);
+}
+
+// Stato di accettazione: accepted = { pageId → iso }. Un accordo "confermato" senza
+// accepted (salvato prima del punto 3) vale come accettato da entrambe.
+export function dealState(x) {
+  if (x.status === "annullato") return { state: "annullato", waiting: [] };
+  const acc = x.accepted || {};
+  if (x.status === "confermato" && !Object.keys(acc).length) return { state: "confermato", waiting: [] };
+  const a = Number(x.a?.id ?? x.a), b = Number(x.b?.id ?? x.b);
+  const waiting = [a, b].filter((p) => !acc[p]);
+  if (!waiting.length) return { state: "confermato", waiting: [] };
+  if (waiting.length === 1) return { state: "attesa", waiting };
+  return { state: "proposto", waiting };
+}
+
+// Applica un'accettazione: le pagine in `pages` accettano adesso.
+export function accept(deal, pages, now = new Date().toISOString()) {
+  const accepted = { ...(deal.accepted || {}) };
+  for (const p of pages) accepted[Number(p)] = now;
+  const both = accepted[Number(deal.a)] && accepted[Number(deal.b)];
+  return { ...deal, accepted, status: both ? "confermato" : "proposto" };
+}
+
+// Una modifica ai termini (giorno, ora, formati, fissato) fa decadere l'accettazione
+// dell'ALTRA pagina: deve rivederli.
+export function termsChanged(prev, next) {
+  if (!prev) return true;
+  return ["day", "time", "mass_time", "fmt_a", "fmt_b", "pin_hours"].some((k) => String(prev[k] ?? "") !== String(next[k] ?? ""));
+}
