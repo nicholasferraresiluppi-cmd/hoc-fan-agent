@@ -1,10 +1,11 @@
 // S4S — la vista della pagina (calendario arricchito + risultati), costruita per uno split.
 // Separata dalla route così si può far girare anche fuori da Next (verifica sui dati veri).
 
-import { getNames, getResults, getAliases, syncPlan, getLinks, getLinkStats, WINDOW_DAYS, DEFAULT_WEEKDAYS } from "@/lib/s4s";
+import { getNames, getResults, getAliases, syncPlan, getLinks, getLinkStats, getDeals, getPlan, WINDOW_DAYS, DEFAULT_WEEKDAYS } from "@/lib/s4s";
 import {
   planSchedule, addDays, baseName, linkNameFor, buildAliasIndex, enrichResults, summarizeByPage,
   reciprocity, resultFor, lastExchange, langOf, MIN_MATURE, matchPartner, labelKey, sideKey, sideStatus, toDate, handleFromUrl,
+  mergeDeals, FORMATS, DEAL_DEFAULTS, MAX_PER_DAY,
 } from "@/lib/s4s-core";
 
 const PAST_DAYS = 28;
@@ -16,7 +17,7 @@ export async function buildView(split, { force = false, settings, userId } = {})
   const today = todayIT();
   const names = await getNames();
   const { plan, pages } = await syncPlan(split, names, today, { settings, userId });
-  const [res, aliases, pasted] = await Promise.all([getResults(split.id, split.creator_ids, { force }), getAliases(), getLinks(split.id)]);
+  const [res, aliases, pasted, stored] = await Promise.all([getResults(split.id, split.creator_ids, { force }), getAliases(), getLinks(split.id), getDeals(split.id)]);
   const lstat = await getLinkStats(split.id, split.creator_ids, Object.values(pasted).map((x) => x.url), { force });
   const aliasIdx = buildAliasIndex(Object.values(names));
   const results = enrichResults(res.rows, names, aliasIdx, aliases);
@@ -64,15 +65,18 @@ export async function buildView(split, { force = false, settings, userId } = {})
   const first = plan.segments[0]?.from || today;
   const from = first > addDays(today, -PAST_DAYS) ? first : addDays(today, -PAST_DAYS);
   const sameBase = (a, b) => baseName(nm(a)) === baseName(nm(b));
-  const schedule = planSchedule(plan, from, addDays(today, FUTURE_DAYS), { sameBase }).map((d) => ({
+  const to = addDays(today, FUTURE_DAYS);
+  const merged = mergeDeals(planSchedule(plan, from, to, { sameBase }), stored, { from, to, langOf: (id) => langOfId(id) });
+  const schedule = merged.map((d) => ({
     day: d.day,
-    groups: Object.fromEntries(Object.entries(d.groups).map(([lang, g]) => [lang, {
-      rest: g.rest.map((id) => ({ id, name: disp(id) })),
-      pairs: g.pairs.map(([a, b]) => ({
-        a: side(d.day, a, b),
-        b: side(d.day, b, a),
-      })),
-    }])),
+    rest: d.rest.map((id) => ({ id, name: disp(id) })),
+    deals: d.deals.map((x) => ({
+      id: x.id, day: d.day, lang: x.lang, source: x.source, status: x.status, saved: Boolean(stored[x.id]),
+      time: x.time, mass_time: x.mass_time, pin_hours: x.pin_hours, note: x.note || "",
+      // a pubblica la promo di b con fmt_a; b pubblica a con fmt_b
+      a: { ...side(d.day, x.a, x.b), fmt: x.fmt_a },
+      b: { ...side(d.day, x.b, x.a), fmt: x.fmt_b },
+    })),
   }));
 
   // testi dei link che il sistema non ha saputo attribuire, dal più grosso
@@ -101,7 +105,18 @@ export async function buildView(split, { force = false, settings, userId } = {})
     aliases,
     partner_options: [...new Set(Object.values(names).map(baseName))].sort((a, b) => a.localeCompare(b, "it")),
     baseline: res.baseline || null,
+    deal_defaults: DEAL_DEFAULTS, formats: FORMATS, max_per_day: MAX_PER_DAY,
     meta: { generated_at: res.generated_at, links_at: lstat.generated_at, bytes_processed: res.bytes_processed, window_days: WINDOW_DAYS, min_mature: MIN_MATURE, default_weekdays: DEFAULT_WEEKDAYS },
   };
 }
 
+
+// Gli accordi di un giorno (giro + salvati), senza BigQuery: per i controlli al salvataggio.
+export async function dayDeals(split, day) {
+  const today = todayIT();
+  const [names, plan, stored] = await Promise.all([getNames(), getPlan(split.id), getDeals(split.id)]);
+  const nm = (id) => names[String(id)] || String(id);
+  const sameBase = (a, b) => baseName(nm(a)) === baseName(nm(b));
+  const days = plan ? planSchedule(plan, day, day, { sameBase }) : [];
+  return { entry: mergeDeals(days, stored, { from: day, to: day })[0] || null, stored, today, names };
+}
