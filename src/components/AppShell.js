@@ -13,7 +13,10 @@
  * Su mobile (<900px) la sidebar diventa drawer toggleable da hamburger button.
  */
 import PageTabs from "@/components/PageTabs";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import useSWR from "swr";
+import { UserButton } from "@clerk/nextjs";
+import { pathAllowed } from "@/lib/restricted-roles";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Menu, X } from "lucide-react";
@@ -57,8 +60,37 @@ function mobileTitle(pathname) {
   return best?.label || (m?.group.label) || "HOC Pro";
 }
 
+const whoFetcher = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+
+/**
+ * Guscio di chi ha un ruolo ristretto (lib/restricted-roles, es. "Social"): niente menu, niente
+ * hub, solo il nome dell'app, la pagina e l'account. Le altre pagine riportano alla sua.
+ */
+function RestrictedShell({ restriction, allowed, children }) {
+  return (
+    <div className="hoc-root" style={{ minHeight: "100vh", background: CP.bg }}>
+      <header style={{ position: "sticky", top: 0, zIndex: 40, display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", background: CP.bgSunken, borderBottom: `1px solid ${CP.border}` }}>
+        <a href={restriction.home} style={{ color: CP.textPrimary, textDecoration: "none", fontSize: 15, fontWeight: 500 }}>House of Creators <span style={{ color: CP.textMuted, fontWeight: 400 }}>· {restriction.label}</span></a>
+        <span style={{ flex: 1 }} />
+        <UserButton afterSignOutUrl="/sign-in" />
+      </header>
+      <main>
+        <ErrorBoundary label="Pagina">{allowed ? children : null}</ErrorBoundary>
+      </main>
+    </div>
+  );
+}
+
 export default function AppShell({ children }) {
   const pathname = usePathname() || "";
+  const router = useRouter();
+  // Ruolo ristretto: la stessa risposta di /api/whoami che usano già menu e banner (SWR la condivide)
+  const { data: me } = useSWR(isAuthRoute(pathname) || isBareRoute(pathname) ? null : "/api/whoami", whoFetcher, { revalidateOnFocus: false });
+  const restriction = me?.restricted || null;
+  const allowedHere = pathAllowed(restriction, pathname);
+  useEffect(() => {
+    if (restriction && !allowedHere) router.replace(restriction.home);
+  }, [restriction, allowedHere, router]);
   const [mobileOpen, setMobileOpen] = useState(false);
   // Stile v3 in anteprima: guscio nuovo (barra ⌘K + stato dati, barra da telefono).
   // Senza data-style="v3" nulla di questo viene reso.
@@ -110,6 +142,10 @@ export default function AppShell({ children }) {
 
   if (isAuthRoute(pathname) || isBareRoute(pathname)) {
     return <>{children}</>;
+  }
+
+  if (restriction) {
+    return <RestrictedShell restriction={restriction} allowed={allowedHere}>{children}</RestrictedShell>;
   }
 
   return (

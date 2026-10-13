@@ -118,7 +118,7 @@ const SHORTCUT_GROUPS_RAW = [
     items: [
       { href: "/admin/scouting", title: "Radar creator", desc: "Le creator italiane trovate su Instagram: una scheda per persona, fasi dello scouting, crescita settimana per settimana", icon: Radar },
       { href: "/admin/ads", title: "Studio bio-funnel", desc: "Come lavorano gli altri sulla landing-ponte OF e cosa converte meglio: 112 landing reali analizzate + template per le creator", icon: Megaphone },
-      { href: "/admin/social-accounts", title: "Account social", desc: "Account di promozione dei creator + proxy assegnato", icon: Share2 },
+      { href: "/admin/supervisor", title: "Account social", desc: "Account di promozione per creator e alterego, telefoni dei publisher, caselle mail e link in bio; password cifrate, viste una alla volta e registrate", icon: Share2 },
       { href: "/admin/social-proxies", title: "Proxy account social", desc: "Proxy SOCKS5/HTTP per isolare le connessioni degli account social ufficiali dei creator", icon: Shield },
     ],
   },
