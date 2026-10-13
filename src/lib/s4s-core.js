@@ -422,3 +422,33 @@ export function whatsappText(dayEntry, names, langLabel = { it: "IT", en: "EN" }
   }
   return lines.join("\n");
 }
+
+// ── Link incollati a mano (13/10/2026) ──────────────────────────────────────
+// Flusso scelto da Nicholas: chi crea il link su OnlyFans lo incolla qui, sullo
+// scambio giusto. L'abbinamento diventa per URL (certo), non più per nome.
+// Formato OnlyFans: https://onlyfans.com/<username>/c<numero>
+const OF_LINK_RE = /^(?:https?:\/\/)?(?:www\.)?onlyfans\.com\/([a-z0-9._-]+)\/c(\d+)\/?(?:[?#].*)?$/i;
+export function normalizeLinkUrl(url) {
+  const m = OF_LINK_RE.exec(String(url || "").trim());
+  return m ? `onlyfans.com/${m[1].toLowerCase()}/c${m[2]}` : null;
+}
+export const handleFromUrl = (url) => {
+  const n = normalizeLinkUrl(url);
+  return n ? n.split("/")[1] : null;
+};
+// chiave di una metà dello scambio: il giorno, la pagina che riceve (dove sta il link), il partner
+export const sideKey = (day, receiverId, partnerId) => `${day}|${receiverId}|${partnerId}`;
+
+// Stato di una metà dello scambio, dalla meno alla più avanzata.
+// stat = riga di links_stats del link incollato ({clicks, subs}) o null
+export function sideStatus({ day, today, url, stat, result }) {
+  if (url) {
+    if (stat && stat.subs > 0) return { code: "misurato", label: `${stat.subs} abbonati` };
+    if (stat && stat.clicks > 0) return { code: "pubblicato", label: `pubblicato · ${stat.clicks} click` };
+    return { code: "pronto", label: day > today ? "link pronto" : "in attesa dei dati" };
+  }
+  if (result) return { code: "misurato", label: `${result.subs} abbonati` }; // trovato per nome
+  if (day > today) return { code: "futuro", label: "da creare" };
+  if (day === today) return { code: "da-fare", label: "link da incollare" };
+  return { code: "mancante", label: "nessun link" };
+}

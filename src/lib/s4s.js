@@ -10,13 +10,15 @@
 //   s4s:aliases                 { labelKey → nome base | null } — partner assegnati a mano (vale per tutta HOC)
 //   s4s:res:{v}:{splitId}       cache risultati { rows, generated_at } (TTL 2g, ricalcolo >12h)
 //   s4s:names:{v}               nomi delle pagine HOC (TTL 1g)
+//   s4s:links:{splitId}         { "giorno|ricevente|partner" → { url, at, by } } link incollati a mano
+//   s4s:lstat:{v}:{splitId}     cache click/abbonati per link + @handle delle pagine (3h, si rifà se arriva un URL nuovo)
 //
 // COSTO: la query dei risultati legge ~0,1 GB (misurato 13/10/2026 su 15 pagine, 180 giorni).
 
 import { kv } from "@vercel/kv";
 import { bqQuery, bigQueryConfigured, HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
 import { listSplits } from "@/lib/sales-coaching";
-import { S4S_VERSION, groupPages, reconcilePlan, baseName } from "@/lib/s4s-core";
+import { S4S_VERSION, groupPages, reconcilePlan, baseName, normalizeLinkUrl, sideKey } from "@/lib/s4s-core";
 
 export { bigQueryConfigured, listSplits };
 
@@ -26,6 +28,9 @@ const ALIAS_KEY = "s4s:aliases";
 const RES_KEY = (id) => `s4s:res:${S4S_VERSION}:${id}`;
 const NAMES_KEY = `s4s:names:${S4S_VERSION}`;
 const RES_STALE_H = 12;
+const LINKS_KEY = (id) => `s4s:links:${id}`;
+const LSTAT_KEY = (id) => `s4s:lstat:${S4S_VERSION}:${id}`;
+const LSTAT_STALE_H = 3;
 export const WINDOW_DAYS = 180;
 export const DEFAULT_WEEKDAYS = [1, 2, 4]; // come il calendario 2.0: lun, mar, gio
 
@@ -85,17 +90,45 @@ GROUP BY 1, 2
 ORDER BY first_day DESC`;
 }
 
+// Incasso netto a 30 giorni dei fan arrivati dagli altri link (non S4S): il termine di paragone.
+export function baselineSQL(creatorIds) {
+  const list = ids(creatorIds).join(",");
+  const d = DATA();
+  return `
+WITH s AS (
+  SELECT creator_id, user_id, MIN(created_at) AS joined_at
+  FROM \`${d}.onlyfans.links_subscriptions\`
+  WHERE organization_id = '${HOC_ORGANIZATION_ID}' AND creator_id IN (${list})
+    AND calendar_date >= DATE_SUB(CURRENT_DATE(), INTERVAL ${WINDOW_DAYS} DAY)
+    AND link_name IS NOT NULL AND NOT REGEXP_CONTAINS(LOWER(link_name), r's4s|sfs|shout')
+  GROUP BY 1, 2
+  HAVING DATE(MIN(created_at)) <= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)),
+t AS (
+  SELECT creator_id, user_id, created_at, net FROM \`${d}.onlyfans.attributed_transactions\`
+  WHERE organization_id = '${HOC_ORGANIZATION_ID}' AND creator_id IN (${list})
+    AND calendar_date >= DATE_SUB(CURRENT_DATE(), INTERVAL ${WINDOW_DAYS} DAY))
+SELECT COUNT(DISTINCT FORMAT('%d|%d', s.creator_id, s.user_id)) AS fans, SUM(IFNULL(t.net, 0)) AS net30
+FROM s LEFT JOIN t ON t.creator_id = s.creator_id AND t.user_id = s.user_id
+  AND t.created_at >= s.joined_at AND t.created_at < TIMESTAMP_ADD(s.joined_at, INTERVAL 30 DAY)`;
+}
+
 export async function getResults(splitId, creatorIds, { force = false } = {}) {
   const cached = await kv.get(RES_KEY(splitId));
   const sameIds = cached && ids(cached.creator_ids).sort().join() === ids(creatorIds).sort().join();
   const fresh = cached && sameIds && Date.now() - Date.parse(cached.generated_at) < RES_STALE_H * 3600 * 1000;
   if (fresh && !force) return cached;
-  const { rows, totalBytesProcessed } = await bqQuery(resultsSQL(creatorIds), { maxBytesBilled: 4 * 1024 ** 3, timeoutMs: 45_000 });
+  const [{ rows, totalBytesProcessed }, base] = await Promise.all([
+    bqQuery(resultsSQL(creatorIds), { maxBytesBilled: 4 * 1024 ** 3, timeoutMs: 45_000 }),
+    bqQuery(baselineSQL(creatorIds), { maxBytesBilled: 4 * 1024 ** 3, timeoutMs: 45_000 }),
+  ]);
+  const b = base.rows[0] || {};
   const out = {
     rows: rows.map((r) => ({ ...r, first_day: String(r.first_day).slice(0, 10), last_day: String(r.last_day).slice(0, 10) })),
+    // confronto: i fan arrivati dagli ALTRI link (non S4S) delle stesse pagine, stessa regola dei 30 giorni
+    baseline: { fans: Number(b.fans) || 0, net30: Number(b.net30) || 0 },
     creator_ids: ids(creatorIds),
     generated_at: new Date().toISOString(),
-    bytes_processed: totalBytesProcessed,
+    bytes_processed: totalBytesProcessed + (base.totalBytesProcessed || 0),
   };
   await kv.set(RES_KEY(splitId), out, { ex: 2 * 24 * 3600 });
   return out;
@@ -156,4 +189,76 @@ export async function syncPlan(split, names, today, { settings: patch, userId } 
     await kv.set(PLAN_KEY(split.id), out);
   }
   return { plan: out, pages };
+}
+
+// ── Link incollati a mano ───────────────────────────────────────────────────
+export async function getLinks(splitId) {
+  const v = await kv.get(LINKS_KEY(splitId));
+  return v && typeof v === "object" ? v : {};
+}
+
+// url vuoto/null = togli. Ritorna la mappa aggiornata.
+export async function setLink(splitId, { day, receiver, partner, url }, userId) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(day || ""))) throw new Error("Giorno non valido");
+  const r = Number(receiver), p = Number(partner);
+  if (!Number.isInteger(r) || !Number.isInteger(p)) throw new Error("Scambio non valido");
+  const map = await getLinks(splitId);
+  const k = sideKey(day, r, p);
+  if (!url) delete map[k];
+  else {
+    const n = normalizeLinkUrl(url);
+    if (!n) throw new Error("Non sembra un link di tracciamento OnlyFans (onlyfans.com/<pagina>/c<numero>)");
+    const dup = Object.entries(map).find(([kk, v]) => kk !== k && v.url === n);
+    if (dup) throw new Error(`Questo link è già incollato su un altro scambio (${dup[0].slice(8, 10)}/${dup[0].slice(5, 7)})`);
+    map[k] = { url: n, at: new Date().toISOString(), by: userId || null };
+  }
+  await kv.set(LINKS_KEY(splitId), map);
+  return map;
+}
+
+// Click/abbonati dell'ultimo giorno disponibile per ogni link S4S delle pagine (e per ogni URL
+// incollato, qualunque sia il nome) + @handle delle pagine. links_stats è una fotografia giornaliera.
+export function linkStatsSQL(creatorIds, urls = []) {
+  const list = ids(creatorIds).join(",");
+  const d = DATA();
+  const safe = urls.map(normalizeLinkUrl).filter(Boolean).map((u) => `'${u}'`);
+  const urlCond = safe.length ? ` OR REGEXP_REPLACE(LOWER(link_url), r'^https?://(www\\.)?', '') IN (${safe.join(",")})` : "";
+  return `
+WITH l AS (
+  SELECT creator_id, link_name, link_url, creation_date, clicks, subs, calendar_date
+  FROM \`${d}.onlyfans.links_stats\`
+  WHERE organization_id = '${HOC_ORGANIZATION_ID}' AND creator_id IN (${list})
+    AND calendar_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)),
+latest AS (
+  SELECT * FROM l
+  WHERE DATE(creation_date) >= DATE_SUB(CURRENT_DATE(), INTERVAL ${WINDOW_DAYS} DAY)
+    AND (REGEXP_CONTAINS(LOWER(link_name), r's4s|sfs|shout')${urlCond})
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY link_url ORDER BY calendar_date DESC) = 1),
+h AS (
+  SELECT creator_id, REGEXP_EXTRACT(LOWER(link_url), r'onlyfans\\.com/([^/]+)/') AS handle, COUNT(*) AS n
+  FROM l GROUP BY 1, 2
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY creator_id ORDER BY n DESC) = 1)
+SELECT 'link' AS kind, creator_id, link_name, link_url, CAST(creation_date AS STRING) AS created, clicks, subs, NULL AS handle FROM latest
+UNION ALL
+SELECT 'handle', creator_id, NULL, NULL, NULL, NULL, NULL, handle FROM h`;
+}
+
+export async function getLinkStats(splitId, creatorIds, urls, { force = false } = {}) {
+  const cached = await kv.get(LSTAT_KEY(splitId));
+  const want = [...new Set(urls.map(normalizeLinkUrl).filter(Boolean))].sort();
+  const covered = cached && want.every((u) => cached.urls?.includes(u));
+  const fresh = cached && covered && Date.now() - Date.parse(cached.generated_at) < LSTAT_STALE_H * 3600 * 1000;
+  if (fresh && !force) return cached;
+  const { rows } = await bqQuery(linkStatsSQL(creatorIds, want), { maxBytesBilled: 2 * 1024 ** 3, timeoutMs: 30_000 });
+  const links = {};
+  const handles = {};
+  for (const r of rows) {
+    if (r.kind === "handle") { if (r.handle) handles[String(r.creator_id)] = r.handle; continue; }
+    const n = normalizeLinkUrl(r.link_url);
+    if (!n) continue;
+    links[n] = { creator_id: Number(r.creator_id), link_name: r.link_name, created: String(r.created || "").slice(0, 10), clicks: Number(r.clicks) || 0, subs: Number(r.subs) || 0 };
+  }
+  const out = { links, handles, urls: want, generated_at: new Date().toISOString() };
+  await kv.set(LSTAT_KEY(splitId), out, { ex: 2 * 24 * 3600 });
+  return out;
 }
