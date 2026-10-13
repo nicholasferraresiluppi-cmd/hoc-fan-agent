@@ -236,3 +236,30 @@ eq4(fillCaption("Seguila", "https://onlyfans.com/a/c1"), "Seguila https://onlyfa
 eq4(fillCaption("Seguila {link}", null), "Seguila {link}", "senza link resta il segnaposto");
 eq4([needsPost("post_mass"), needsMass("post_mass"), needsPost("mass"), needsMass("post"), needsPost("telegram")], [true, true, false, false, false], "cosa serve per formato");
 console.log(`ok ${m4} asserzioni sul kit`);
+
+// ── Disponibilità e accettazione ──
+import { cleanAvail, availIssues, dealState, accept, termsChanged, weekRange, weekCount, AVAIL_DEFAULT } from "../src/lib/s4s-core.js";
+let m5 = 0;
+const eq5 = (a, b, msg) => { assert.deepEqual(a, b, msg); m5++; };
+eq5(cleanAvail({}, [1, 2]), AVAIL_DEFAULT, "vuota = nessun limite");
+eq5(cleanAvail({ per_week: "5", weekdays: [4, 1, 1, 9], times: ["21:00", "bad"], formats: ["post", "x"], exclude: [2, 7] }, [1, 2]),
+  { per_week: 5, weekdays: [1, 4], times: ["21:00"], formats: ["post"], exclude: [2] }, "pulizia");
+eq5(availIssues(null, { day: "2026-10-15", time: "21:00", fmt: "post", weekCount: 9 }), [], "nessuna disponibilità → nessun blocco");
+const av = { per_week: 2, weekdays: [1, 2, 4], times: ["20:00", "21:00"], formats: ["post", "post_mass"], exclude: [7] };
+eq5(availIssues(av, { day: "2026-10-15", time: "21:30", fmt: "post", weekCount: 1, partnerId: 3 }), [], "dentro tutti i limiti (21:30 è nella fascia delle 21)");
+eq5(availIssues(av, { day: "2026-10-14", time: "23:00", fmt: "mass", weekCount: 2, partnerId: 7, partnerName: "Stormy" }).length, 5, "fuori da tutto: 5 problemi");
+eq5(availIssues(av, { day: "2026-10-15", time: "21:00", fmt: "post", weekCount: 2 })[0], "ha già 2 S4S questa settimana (ne vuole 2)", "limite settimanale");
+eq5(weekRange("2026-10-15"), ["2026-10-12", "2026-10-18"], "settimana lun-dom");
+const wk = [{ deals: [{ id: "x", a: 1, b: 2, status: "proposto" }, { id: "y", a: 1, b: 3, status: "annullato" }] }, { deals: [{ id: "z", a: 3, b: 1, status: "confermato" }] }];
+eq5([weekCount(wk, 1), weekCount(wk, 1, "z"), weekCount(wk, 2)], [2, 1, 1], "conteggio settimanale");
+const d0 = { a: 1, b: 2, status: "proposto" };
+eq5(dealState(d0), { state: "proposto", waiting: [1, 2] }, "nessuno ha accettato");
+const d1 = accept(d0, [1], "t1");
+eq5([d1.status, dealState(d1)], ["proposto", { state: "attesa", waiting: [2] }], "attende l'altra pagina");
+const d2 = accept(d1, [2], "t2");
+eq5([d2.status, dealState(d2).state], ["confermato", "confermato"], "entrambe → confermato");
+eq5(dealState({ a: 1, b: 2, status: "confermato" }).state, "confermato", "confermati di prima del punto 3");
+eq5(dealState({ a: 1, b: 2, status: "annullato", accepted: { 1: "t" } }).state, "annullato", "annullato");
+eq5(dealState({ a: { id: 1 }, b: { id: 2 }, status: "proposto", accepted: { 2: "t" } }).waiting, [1], "funziona anche con le metà della vista");
+eq5([termsChanged({ day: "d", time: "21:00" }, { day: "d", time: "21:00", note: "x" }), termsChanged({ day: "d", time: "21:00" }, { day: "d", time: "20:00" })], [false, true], "la nota non conta, l'ora sì");
+console.log(`ok ${m5} asserzioni su disponibilità e accettazione`);

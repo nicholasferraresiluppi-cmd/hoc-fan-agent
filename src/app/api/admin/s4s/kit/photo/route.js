@@ -13,7 +13,7 @@ export async function GET(request) {
   const u = new URL(request.url);
   const ph = await readPhoto(u.searchParams.get("c"), u.searchParams.get("p"));
   if (!ph) return new Response(null, { status: 404 });
-  const headers = { "Content-Type": ph.type, "Cache-Control": "private, max-age=86400" };
+  const headers = { "Content-Type": ph.type, "Cache-Control": "private, max-age=600" };
   if (u.searchParams.get("dl")) headers["Content-Disposition"] = `attachment; filename="${ph.name}"`;
   return new Response(ph.stream, { headers });
 }

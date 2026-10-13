@@ -13,15 +13,22 @@
 //      salva un accordo; con prev_id diverso (giorno o partner cambiati) il vecchio si annulla (giro) o si toglie (extra)
 // POST {action:"deal_status", split, id, status}            conferma / annulla / ripristina
 // POST {action:"done", split, id, page, done}               la pagina ha programmato la sua parte (done=false: annulla)
+// POST {action:"avail", split, c, per_week, weekdays, times, formats, exclude}   disponibilità di una pagina
+// POST {action:"accept_all", split, days}                  accetta per le proprie pagine tutte le proposte dei
+//      prossimi `days` giorni (max 21) che non sforano la disponibilità; le altre restano da guardare una per una
+// Accettazione (punto 3): un accordo è confermato quando l'hanno accettato ENTRAMBE le pagine
+// (accepted = {pagina → quando}). Chi crea o modifica accetta per le sue pagine; se cambia
+// giorno, ora, formati o fissato, l'accettazione dell'altra decade. Chi vede tutte le creator
+// (o segue entrambe le pagine) accetta per tutte e due. "Rifiuta" = annullato con declined_by.
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 import { authorizeScoped, allowsCreator } from "@/lib/creator-scope";
 import { CAPABILITIES } from "@/lib/rbac";
-import { bigQueryConfigured, listSplits, setAlias, setLink, putDeals, getNames } from "@/lib/s4s";
-import { buildView, dayDeals, restrictView } from "@/lib/s4s-view";
-import { cleanDeal, dealsOnDay, baseName, MAX_PER_DAY } from "@/lib/s4s-core";
+import { bigQueryConfigured, listSplits, setAlias, setLink, putDeals, getNames, getAvails, saveAvail } from "@/lib/s4s";
+import { buildView, dayDeals, restrictView, rangeDeals } from "@/lib/s4s-view";
+import { cleanDeal, dealsOnDay, baseName, MAX_PER_DAY, cleanAvail, availIssues, weekRange, weekCount, accept, termsChanged } from "@/lib/s4s-core";
 
 // Pagine dello split su cui chi chiama può agire
 async function access() {
@@ -73,56 +80,130 @@ export async function POST(request) {
       await setLink(split.id, body, az.userId);
       return Response.json({ ok: true });
     }
-    if (body.action === "done") {
-      const [day] = String(body.id || "").split("|");
-      const page = Number(body.page);
-      if (!mine.has(page)) return notMine();
-      const { entry, stored } = await dayDeals(split, day);
-      const x = entry?.deals.find((d) => d.id === body.id);
-      if (!x || (x.a !== page && x.b !== page)) return Response.json({ error: "Scambio non trovato" }, { status: 404 });
-      if (x.status === "annullato") return Response.json({ error: "Lo scambio è annullato" }, { status: 400 });
-      const { lang, source, ...keep } = x; // eslint-disable-line no-unused-vars
-      const done = { ...(x.done || {}) };
-      if (body.done === false) delete done[page]; else done[page] = new Date().toISOString();
-      // programmare la propria parte vale come conferma
-      const map = { ...stored, [x.id]: { ...keep, status: "confermato", done, updated_at: new Date().toISOString(), updated_by: az.userId } };
-      await putDeals(split.id, map);
+    const now = () => new Date().toISOString();
+    const stamp = (d) => ({ ...d, updated_at: now(), updated_by: az.userId });
+    // per quali pagine dell'accordo agisce chi chiama
+    const actorPages = (a, b) => (all ? [a, b] : [a, b].filter((p) => mine.has(Number(p))));
+
+    if (body.action === "avail") {
+      const c = Number(body.c);
+      if (!split.creator_ids.map(Number).includes(c)) return Response.json({ error: "Pagina fuori dallo split" }, { status: 400 });
+      if (!mine.has(c)) return notMine();
+      await saveAvail(c, cleanAvail(body, split.creator_ids), az.userId);
       return Response.json({ ok: true });
     }
-    if (body.action === "deal" || body.action === "deal_status") {
-      let input = body;
-      if (body.action === "deal_status") {
-        const [day, a, b] = String(body.id || "").split("|");
-        const { stored } = await dayDeals(split, day);
-        input = { ...(stored[body.id] || { day, a, b }), status: body.status };
-      }
-      const clean = cleanDeal(input, split.creator_ids);
-      if (!mine.has(clean.a) && !mine.has(clean.b)) return notMine();
-      const { entry, stored, names } = await dayDeals(split, clean.day);
+
+    // controlli comuni: stessa creator, massimo al giorno, disponibilità di entrambe le pagine
+    async function check(clean) {
+      const [w0, w1] = weekRange(clean.day);
+      const [{ days, names }, avails] = await Promise.all([rangeDeals(split, w0, w1), getAvails([clean.a, clean.b])]);
       const nm = (id) => baseName(names[String(id)] || String(id));
-      if (nm(clean.a) === nm(clean.b)) return Response.json({ error: "Sono due pagine della stessa creator" }, { status: 400 });
-      if (clean.status !== "annullato") {
-        for (const pid of [clean.a, clean.b]) {
-          if (dealsOnDay(entry, pid, clean.id) >= MAX_PER_DAY) {
-            return Response.json({ error: `${nm(pid)} ha già ${MAX_PER_DAY} S4S quel giorno (il massimo)` }, { status: 400 });
-          }
+      if (nm(clean.a) === nm(clean.b)) return "Sono due pagine della stessa creator";
+      const entry = days.find((d) => d.day === clean.day);
+      for (const pid of [clean.a, clean.b]) {
+        if (dealsOnDay(entry, pid, clean.id) >= MAX_PER_DAY) return `${nm(pid)} ha già ${MAX_PER_DAY} S4S quel giorno (il massimo)`;
+      }
+      for (const [me, other, fmt] of [[clean.a, clean.b, clean.fmt_a], [clean.b, clean.a, clean.fmt_b]]) {
+        const iss = availIssues(avails[me], { day: clean.day, time: clean.time, fmt, partnerId: other, partnerName: nm(other), weekCount: weekCount(days, me, clean.id) });
+        if (iss.length) return `${nm(me)} ${iss.join("; ")}. Cambia giorno, ora o formato, oppure la sua disponibilità.`;
+      }
+      return null;
+    }
+    // accordo del giorno così com'è ora (giro + salvato), in forma da archivio
+    async function current(id) {
+      const [day] = String(id || "").split("|");
+      const { entry, stored } = await dayDeals(split, day);
+      const x = entry?.deals.find((d) => d.id === id);
+      if (!x) return { stored };
+      const { lang, source, ...keep } = x; // eslint-disable-line no-unused-vars
+      return { x: keep, stored };
+    }
+
+    if (body.action === "accept_all") {
+      // solo per chi segue le pagine: per chi vede tutto confermerebbe ogni proposta per entrambi i team
+      if (all) return Response.json({ error: "L'accettazione in blocco è per i sales manager delle pagine" }, { status: 403 });
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date());
+      const until = new Date(Date.parse(`${today}T00:00:00Z`) + Math.min(21, Math.max(1, Number(body.days) || 14)) * 86400000).toISOString().slice(0, 10);
+      const { days, stored } = await rangeDeals(split, today, until);
+      const map = { ...stored };
+      let ok = 0, skipped = 0;
+      for (const d of days) {
+        for (const x0 of d.deals) {
+          if (x0.status === "annullato") continue;
+          const pages = actorPages(x0.a, x0.b).filter((p) => !(x0.accepted || {})[p] && !(x0.status === "confermato" && !Object.keys(x0.accepted || {}).length));
+          if (!pages.length) continue;
+          const { lang, source, ...x } = { ...x0, ...(map[x0.id] || {}) }; // eslint-disable-line no-unused-vars
+          if (await check(x)) { skipped++; continue; }
+          map[x.id] = stamp(accept(x, pages));
+          ok++;
         }
       }
+      await putDeals(split.id, map);
+      return Response.json({ ok: true, accepted: ok, skipped });
+    }
+
+    if (body.action === "done") {
+      const page = Number(body.page);
+      if (!mine.has(page)) return notMine();
+      const { x, stored } = await current(body.id);
+      if (!x || (x.a !== page && x.b !== page)) return Response.json({ error: "Scambio non trovato" }, { status: 404 });
+      if (x.status === "annullato") return Response.json({ error: "Lo scambio è annullato" }, { status: 400 });
+      const done = { ...(x.done || {}) };
+      if (body.done === false) delete done[page]; else done[page] = now();
+      // programmare la propria parte vale come accettazione di quella pagina
+      const next = body.done === false ? { ...x, done } : accept({ ...x, done }, [page]);
+      await putDeals(split.id, { ...stored, [x.id]: stamp(next) });
+      return Response.json({ ok: true });
+    }
+
+    if (body.action === "deal_status") {
+      const { x, stored } = await current(body.id);
+      if (!x) return Response.json({ error: "Scambio non trovato" }, { status: 404 });
+      const pages = actorPages(x.a, x.b);
+      if (!pages.length) return notMine();
+      let next;
+      if (body.status === "confermato") {
+        const err = await check(x);
+        if (err) return Response.json({ error: err }, { status: 400 });
+        next = accept(x, pages);
+      } else if (body.status === "annullato") {
+        next = { ...x, status: "annullato", declined_by: all ? null : pages[0], decline_note: String(body.note || "").slice(0, 200) };
+      } else {
+        next = { ...x, status: "proposto", accepted: {}, declined_by: null }; // ripristina
+      }
+      await putDeals(split.id, { ...stored, [x.id]: stamp(next) });
+      return Response.json({ ok: true });
+    }
+
+    if (body.action === "deal") {
+      const clean = cleanDeal(body, split.creator_ids);
+      const pages = actorPages(clean.a, clean.b);
+      if (!pages.length) return notMine();
+      const err = await check(clean);
+      if (err) return Response.json({ error: err }, { status: 400 });
+      const { stored } = await dayDeals(split, clean.day);
       const map = { ...stored };
-      if (body.action === "deal" && body.prev_id && body.prev_id !== clean.id) {
+      let prev = map[clean.id] || null;
+      if (body.prev_id && body.prev_id !== clean.id) {
         const [pday, pa, pb] = String(body.prev_id).split("|");
         if (!mine.has(Number(pa)) && !mine.has(Number(pb))) return notMine();
-        if (body.prev_source === "giro") {
-          const prev = map[body.prev_id] || cleanDeal({ day: pday, a: pa, b: pb }, split.creator_ids);
-          map[body.prev_id] = { ...prev, status: "annullato", updated_at: new Date().toISOString(), updated_by: az.userId };
-        } else {
-          delete map[body.prev_id]; // extra spostato: l'archivio è unico per split, basta toglierlo
-        }
+        const old = (await current(body.prev_id)).x || cleanDeal({ day: pday, a: pa, b: pb }, split.creator_ids);
+        if (body.prev_source === "giro") map[body.prev_id] = stamp({ ...old, status: "annullato" });
+        else delete map[body.prev_id];
+        prev = null; // giorno o partner nuovi: si riparte da capo con l'accettazione
+      } else if (!prev) {
+        prev = (await current(clean.id)).x || null; // proposta del giro mai salvata
       }
-      map[clean.id] = { ...(map[clean.id] || {}), ...clean, updated_at: new Date().toISOString(), updated_by: az.userId };
-      await putDeals(split.id, map);
+      const base = { ...(prev || {}), ...clean, status: prev?.status === "annullato" ? "proposto" : clean.status };
+      // termini cambiati: l'accettazione dell'altra pagina decade
+      const kept = prev && !termsChanged(prev, clean) ? prev.accepted || {} : {};
+      let next = { ...base, accepted: kept, declined_by: null, requested_by: prev?.requested_by || pages[0] };
+      // chi salva accetta per le sue pagine; chi vede tutto conferma solo se lo chiede (status confermato)
+      next = accept(next, all && body.status !== "confermato" ? [] : pages);
+      await putDeals(split.id, { ...map, [clean.id]: stamp(next) });
       return Response.json({ ok: true, id: clean.id });
     }
+
     if ((body.action === "settings" || body.action === "refresh") && !all) return onlyAll();
     if (body.action === "settings") {
       const { weekdays, start, lang_override, paused } = body;
