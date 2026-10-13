@@ -305,6 +305,8 @@ export function buildCreators(profiles, crm) {
       owner: c.owner || null,
       // agenzia che la gestisce, quando la sappiamo (scritta a mano dal team; "Indipendente" = verificato senza agenzia)
       agency: c.agency || null,
+      reviewedAt: c.reviewedAt || null,
+      reviewedBy: c.reviewedBy || null,
       notes: c.notes?.length || 0,
       updatedAt: c.updatedAt || null,
       missing: ps.every((p) => p.missing),
@@ -361,6 +363,39 @@ export function setStage(crm, id, stage, by) {
   const next = ensureCreator(crm, id, handles);
   next.creators[id] = { ...next.creators[id], stage, updatedAt: Date.now(), updatedBy: by || null };
   return next;
+}
+
+/**
+ * Coda «Valuta» (13/10/2026): ogni creator riceve una decisione — scartata, vista (guardata, nessuna
+ * azione per ora) o interessante — ed esce dalla coda. La fase di prima resta salvata per «Annulla».
+ */
+export const REVIEW_DECISIONS = ["scartata", "vista", "interessante"];
+export function review(crm, id, decision, by) {
+  if (!REVIEW_DECISIONS.includes(decision)) throw new Error("decisione non valida");
+  const handles = id.startsWith("h:") ? [id.slice(2)] : undefined;
+  const next = ensureCreator(crm, id, handles);
+  const cur = next.creators[id];
+  const prevStage = cur.stage || DEFAULT_STAGE;
+  next.creators[id] = { ...cur, stage: decision === "vista" ? prevStage : decision, prevStage, reviewedAt: Date.now(), reviewedBy: by || null, updatedAt: Date.now(), updatedBy: by || null };
+  return next;
+}
+export function unreview(crm, id) {
+  const cur = crm?.creators?.[id];
+  if (!cur) return crm;
+  const next = { ...crm, creators: { ...crm.creators } };
+  const { reviewedAt, reviewedBy, prevStage, ...rest } = cur;
+  next.creators[id] = { ...rest, stage: prevStage || cur.stage || DEFAULT_STAGE, updatedAt: Date.now() };
+  return next;
+}
+
+/** La coda: non ancora valutate, non nostre, ancora «da valutare», dalla più promettente. */
+export function reviewQueue(creators, { scope = "paid", newCut } = {}) {
+  return creators
+    .filter((c) => !c.reviewedAt && !c.ours && c.stage === DEFAULT_STAGE)
+    .filter((c) => scope === "all" || (scope === "paid" ? c.sig === "forte" : c.sig === "debole"))
+    .map((c) => ({ c, s: attentionScore(c, newCut) }))
+    .sort((a, b) => b.s - a.s)
+    .map(({ c }) => c);
 }
 
 export function addNote(crm, id, text, by) {

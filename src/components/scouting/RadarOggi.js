@@ -4,11 +4,11 @@
 // le ultime segnalazioni e da dove vengono i dati.
 import { useMemo } from "react";
 import { CP, alpha } from "@/lib/brand";
-import { pickToday, movers, whyLines } from "@/lib/scouting-core";
+import { pickToday, movers, whyLines, reviewQueue } from "@/lib/scouting-core";
 import { SERIF, NUM, fmtFull, fmtDate, btn, btnPrimary, btnQuiet, Initials, LinkChip, Growth, Spark, H2, BigNum, STAGE_LABEL } from "./radar-ui";
 
 
-export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, act, busy, inbox, onSegnala }) {
+export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, act, busy, inbox, onSegnala, onValuta }) {
   const today = useMemo(() => pickToday(creators, { n: 3, newCut }), [creators, newCut]);
   const moving = useMemo(() => movers(creators, 5), [creators]);
   const counts = data.counts || {};
@@ -20,8 +20,18 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
   const stages = ["da_valutare", "interessante", "contattata", "trattativa", "firmata"];
   const maxStage = Math.max(1, ...stages.map((s) => counts[s] || 0));
 
+  const toReview = reviewQueue(creators, { scope: "paid", newCut }).length;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 52 }}>
+      {onValuta && toReview > 0 && (
+        <button onClick={onValuta} style={{ all: "unset", boxSizing: "border-box", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, padding: "16px 18px", borderRadius: 14, border: `1px solid ${alpha(CP.gold, "77")}`, background: alpha(CP.gold, "10") }}>
+          <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <span style={{ ...SERIF, fontSize: 24, lineHeight: 1.1 }}>{fmtFull(toReview)} creator col profilo a pagamento da valutare</span>
+            <span style={{ fontSize: 13.5, color: CP.textSecondary }}>Una alla volta: scarta, vista o interessante.</span>
+          </span>
+          <span style={{ fontSize: 15, color: CP.gold, whiteSpace: "nowrap" }}>Inizia →</span>
+        </button>
+      )}
       <section aria-label="Il radar in numeri" className="ro-nums" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "24px 40px", borderTop: `1px solid ${CP.border}`, borderBottom: `1px solid ${CP.border}`, padding: "26px 0" }}>
         <BigNum value={fmtFull(creators.length)} label="creator italiane seguite" />
         <BigNum value={fmtFull(paid)} label="con un profilo a pagamento" gold />

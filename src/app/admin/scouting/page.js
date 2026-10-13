@@ -20,6 +20,7 @@ import RadarMercato from "@/components/scouting/RadarMercato";
 import RadarContatti from "@/components/scouting/RadarContatti";
 import RadarFormat from "@/components/scouting/RadarFormat";
 import RadarSegnala from "@/components/scouting/RadarSegnala";
+import RadarValuta from "@/components/scouting/RadarValuta";
 import { btn, btnPrimary, fmtFull } from "@/components/scouting/radar-ui";
 import { newCutoff } from "@/lib/scouting-core";
 
@@ -27,6 +28,7 @@ const errText = (s) => (s === 401 || s === 403 ? "Sessione scaduta o permessi in
 const fetcher = (url) => fetch(url).then((r) => (r.ok ? r.json() : r.json().catch(() => ({})).then((d) => Promise.reject(new Error(d.error || errText(r.status))))));
 const TABS = [
   { id: "oggi", label: "Oggi" },
+  { id: "valuta", label: "Valuta" },
   { id: "esplora", label: "Esplora" },
   { id: "mercato", label: "Mercato" },
   { id: "format", label: "Format" },
@@ -59,6 +61,7 @@ const PHONE_CSS = `
   .rs-stages{flex-direction:row !important;flex-wrap:wrap}
   .rs-stages button{padding:8px 12px !important;font-size:13.5px !important}
   .rc-scroll{overflow:visible !important}
+  [data-style="v3"] .rv-bar{bottom:calc(80px + env(safe-area-inset-bottom)) !important}
   .rf-later > div{grid-template-columns:1fr !important;gap:4px !important}
   .rc-cols{grid-template-columns:1fr !important;min-width:0 !important}
 }`;
@@ -126,7 +129,7 @@ export default function ScoutingPage() {
     } finally { setBusy(false); }
   }
 
-  const line2 = sel || !data ? null : tab === "oggi" ? `${fmtFull(paid)} creator con un profilo a pagamento.` : tab === "mercato" ? "Dove c'è spazio, cosa funziona." : tab === "format" ? "I format che esistono già." : tab === "contatti" ? "Dalla scelta alla firma." : `${fmtFull(creators.length)} creator italiane.`;
+  const line2 = sel || !data ? null : tab === "oggi" ? `${fmtFull(paid)} creator con un profilo a pagamento.` : tab === "mercato" ? "Dove c'è spazio, cosa funziona." : tab === "format" ? "I format che esistono già." : tab === "contatti" ? "Dalla scelta alla firma." : tab === "valuta" ? "Una alla volta, nessuna saltata." : `${fmtFull(creators.length)} creator italiane.`;
 
   return (
     <div className="rx-page" data-sel={sel ? "1" : undefined} style={{ maxWidth: 1280, margin: "0 auto", padding: "24px 20px 72px" }}>
@@ -157,6 +160,8 @@ export default function ScoutingPage() {
         sel ? (
           <RadarScheda key={sel.id} c={sel} newCut={newCut} data={data} profilesBy={profilesBy} act={act} busy={busy}
             onBack={() => window.history.length > 1 ? window.history.back() : go(tab)} onSelectHandle={(h) => go(tab, h)} />
+        ) : tab === "valuta" ? (
+          <RadarValuta creators={creators} newCut={newCut} me={me} onOpen={(c) => go("valuta", c.handles[0])} onChanged={mutate} />
         ) : tab === "esplora" ? (
           <RadarEsplora creators={creators} newCut={newCut} profilesBy={profilesBy} onOpen={(c) => go("esplora", c.handles[0])} />
         ) : tab === "mercato" ? (
@@ -166,7 +171,7 @@ export default function ScoutingPage() {
         ) : tab === "contatti" ? (
           <RadarContatti creators={creators} onOpen={(c) => go("contatti", c.handles[0])} />
         ) : (
-          <RadarOggi newCut={newCut} data={data} creators={creators} profilesBy={profilesBy} onOpen={(c) => go("oggi", c.handles[0])} act={act} busy={busy} inbox={inbox} onSegnala={() => setSegnala(true)} />
+          <RadarOggi newCut={newCut} data={data} creators={creators} profilesBy={profilesBy} onOpen={(c) => go("oggi", c.handles[0])} act={act} busy={busy} inbox={inbox} onSegnala={() => setSegnala(true)} onValuta={() => go("valuta")} />
         )
       )}
 
