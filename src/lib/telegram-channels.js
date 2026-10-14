@@ -6,21 +6,22 @@
 //
 // KV (namespace tg:*):
 //   tg:ch:index                set degli id canale
-//   tg:ch:{id}                 { creator, handle|invite, url, kind, manager, note, of_link, chat_id, title,
+//   tg:ch:{id}                 { creators[], handle|invite, url, kind, manager, note, chat_id, title,
 //                                bot:{status,can_invite,at}, members, members_at, members_hist[], links[], … }
 //   tg:chat:{chat_id}          → id canale (abbinamento fatto)
 //   tg:pending                 { chat_id → { title, username, kind, at } } bot aggiunto a un canale non ancora abbinato
 //   tg:st:{id}                 hash contatori j:{link} l:{link} jd:{giorno} ld:{giorno}
 //   tg:mm:{id}                 hash HMAC(id utente Telegram) → link da cui è entrato (per attribuire l'uscita)
 //   tg:upd:{update_id}         dedup degli update (Telegram riprova se non rispondiamo in tempo)
-//   tg:of:{TG_VERSION}         cache clic/abbonati dei link OF dei canali (3h)
+//   tg:of:{TG_VERSION}         cache clic/abbonati dei link OF con "telegram"/"TG" nel nome, per creator (6h)
 
 import crypto from "crypto";
 import { kv } from "@vercel/kv";
 import { bqQuery, bigQueryConfigured, HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
-import { normalizeLinkUrl } from "@/lib/s4s-core";
+import { getNames } from "@/lib/s4s";
+import { personOf } from "@/lib/creator-scope";
 import {
-  TG_VERSION, BEFORE_BOT, botStatusOf, classifyMemberUpdate, inviteLinkName, pushMemberCount, romeDay, SOURCES,
+  TG_VERSION, BEFORE_BOT, botStatusOf, classifyMemberUpdate, creatorsOf, inviteLinkName, pushMemberCount, romeDay, summarizeOfLinks, SOURCES,
 } from "@/lib/telegram-channels-core";
 
 const IDX = "tg:ch:index";
@@ -58,7 +59,7 @@ export async function listChannels() {
   const ids = await kv.smembers(IDX);
   if (!ids?.length) return [];
   const rows = await Promise.all(ids.map((id) => kv.get(CH(id))));
-  return rows.filter(Boolean).sort((a, b) => a.creator.localeCompare(b.creator) || (a.created_at || 0) - (b.created_at || 0));
+  return rows.filter(Boolean).sort((a, b) => creatorsOf(a).join().localeCompare(creatorsOf(b).join()) || (a.created_at || 0) - (b.created_at || 0));
 }
 
 export const getChannel = (id) => kv.get(CH(id));
@@ -68,7 +69,8 @@ export async function saveChannel(value, { id, by } = {}) {
   if (id) {
     const prev = await kv.get(CH(id));
     if (!prev) return null;
-    const next = { ...prev, ...value, updated_at: now, updated_by: by };
+    const { creator: _old, ...rest } = prev; // i dati vecchi avevano `creator` singolo
+    const next = { ...rest, ...value, updated_at: now, updated_by: by };
     await kv.set(CH(id), next);
     return next;
   }
@@ -262,27 +264,34 @@ export async function botInfo() {
   }
 }
 
-// ── Passaggio a OnlyFans: link di tracciamento OF pubblicati nei canali ────────
-export function ofLinkSQL(urls) {
-  const list = urls.map((u) => `'${u.replace(/'/g, "")}'`).join(",");
+// ── Passaggio a OnlyFans: link di tracciamento OF con "telegram"/"TG" nel nome, per creator ─────────
+// Riconosciuti dal nome (nessun campo da compilare). Per ogni link: totale da quando esiste (ultima
+// fotografia) + ultimi 30 giorni (somma dei *_diff giornalieri). ~pochi MB letti.
+export function ofTelegramSQL() {
   return `
-SELECT REGEXP_REPLACE(LOWER(link_url), r'^https?://(www\\.)?', '') AS url, clicks, subs, CAST(calendar_date AS STRING) AS day
-FROM \`${DATA()}.onlyfans.links_stats\`
-WHERE organization_id = '${HOC_ORGANIZATION_ID}'
-  AND calendar_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
-  AND REGEXP_REPLACE(LOWER(link_url), r'^https?://(www\\.)?', '') IN (${list})
-QUALIFY ROW_NUMBER() OVER (PARTITION BY link_url ORDER BY calendar_date DESC) = 1`;
+WITH l AS (
+  SELECT creator_id, link_name, link_url, calendar_date, subs, clicks, revenue, subs_diff, clicks_diff
+  FROM \`${DATA()}.onlyfans.links_stats\`
+  WHERE organization_id = '${HOC_ORGANIZATION_ID}'
+    AND calendar_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+    AND REGEXP_CONTAINS(LOWER(link_name), r'telegram|\\btg\\b'))
+SELECT creator_id, link_url, ANY_VALUE(link_name) AS link_name,
+  ARRAY_AGG(STRUCT(subs, clicks, revenue) ORDER BY calendar_date DESC LIMIT 1)[OFFSET(0)].*,
+  SUM(subs_diff) AS subs_30, SUM(clicks_diff) AS clicks_30
+FROM l GROUP BY creator_id, link_url`;
 }
 
-/** { url normalizzato → { clicks, subs, day } } per i link OF dei canali. Cache 3h, rifatta se arriva un URL nuovo. */
-export async function getOfLinkStats(rawUrls) {
-  const want = [...new Set(rawUrls.map(normalizeLinkUrl).filter(Boolean))].sort();
-  if (!want.length || !bigQueryConfigured()) return { links: {}, available: bigQueryConfigured() };
+/** { persona → { links[], subs, clicks, revenue, subs_30, clicks_30 } }. Cache 6h. */
+export async function getOfTelegramStats() {
+  if (!bigQueryConfigured()) return { creators: {}, available: false };
   const cached = await kv.get(OF_CACHE);
-  if (cached && want.every((u) => cached.urls.includes(u)) && Date.now() - cached.at < 3 * 3600e3) return { links: cached.links, available: true };
-  const { rows } = await bqQuery(ofLinkSQL(want), { maxBytesBilled: 2 * 1024 ** 3, timeoutMs: 30_000 });
-  const links = {};
-  for (const r of rows) links[normalizeLinkUrl(r.url)] = { clicks: Number(r.clicks) || 0, subs: Number(r.subs) || 0, day: r.day };
-  await kv.set(OF_CACHE, { urls: want, links, at: Date.now() }, { ex: 2 * 86400 });
-  return { links, available: true };
+  if (cached && Date.now() - cached.at < 6 * 3600e3) return { creators: cached.creators, at: cached.at, available: true };
+  const [{ rows }, names] = await Promise.all([
+    bqQuery(ofTelegramSQL(), { maxBytesBilled: 2 * 1024 ** 3, timeoutMs: 30_000 }),
+    getNames().catch(() => ({})),
+  ]);
+  const creators = summarizeOfLinks(rows, (id) => personOf(names[id]));
+  const at = Date.now();
+  await kv.set(OF_CACHE, { creators, at }, { ex: 2 * 86400 });
+  return { creators, at, available: true };
 }

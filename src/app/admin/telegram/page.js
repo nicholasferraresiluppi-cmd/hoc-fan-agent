@@ -7,7 +7,7 @@
 
 import { useMemo, useState } from "react";
 import useSWR from "swr";
-import { Check, Copy, Plus, RefreshCw, Trash2, ExternalLink, Link2 } from "lucide-react";
+import { Check, Copy, Plus, RefreshCw, Trash2, ExternalLink, Link2, X } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Metric, DataTable, Notice, SectionTitle, card, NUM } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
@@ -54,47 +54,103 @@ function CopyBtn({ text }) {
   );
 }
 
-const EMPTY = { creator: "", url: "", kind: "canale", manager: "", of_link: "", note: "" };
+const EMPTY_ROW = { creators: [], url: "", kind: "canale" };
 
-function ChannelForm({ initial, creators, onDone, onCancel }) {
-  const [f, setF] = useState(initial || EMPTY);
+// Più creator per canale: chip delle scelte + tendina per aggiungerne una.
+function CreatorPicker({ value, options, onChange }) {
+  const left = options.filter((c) => !value.includes(c));
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+      {value.map((c) => (
+        <button type="button" key={c} onClick={() => onChange(value.filter((x) => x !== c))} title="Togli" style={{ ...btn, padding: "4px 8px", fontSize: 12 }}>{c} <X size={12} /></button>
+      ))}
+      <select style={{ ...input, width: value.length ? 170 : "100%", flex: value.length ? "0 0 auto" : 1 }} value="" onChange={(e) => e.target.value && onChange([...value, e.target.value])}>
+        <option value="">{value.length ? "+ un'altra creator" : "Scegli la creator…"}</option>
+        {left.map((c) => <option key={c} value={c}>{c}</option>)}
+      </select>
+    </div>
+  );
+}
+
+// Aggiunta: N righe (creator + link + tipo), "Aggiungi un altro canale". Modifica: una riga sola.
+function ChannelForm({ initial, preset, creators, onDone, onCancel }) {
+  const editing = Boolean(initial?.id);
+  const [rows, setRows] = useState(() => (editing ? [{ creators: initial.creators, url: initial.url, kind: initial.kind }] : [{ ...EMPTY_ROW, creators: preset ? [preset] : [] }]));
+  const [manager, setManager] = useState(initial?.manager || "");
+  const [note, setNote] = useState(initial?.note || "");
   const [err, setErr] = useState(null);
+  const [badRow, setBadRow] = useState(null);
   const [busy, setBusy] = useState(false);
-  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  const options = useMemo(() => (f.creator && !creators.includes(f.creator) ? [f.creator, ...creators] : creators), [creators, f.creator]);
+  const options = useMemo(() => [...new Set([...creators, ...rows.flatMap((r) => r.creators)])].sort((a, b) => a.localeCompare(b)), [creators, rows]);
+  const setRow = (i, patch) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const submit = async (e) => {
     e.preventDefault();
-    setBusy(true); setErr(null);
-    try { await post({ action: "save", ...f, id: initial?.id }); onDone(); } catch (x) { setErr(x.message); } finally { setBusy(false); }
+    setBusy(true); setErr(null); setBadRow(null);
+    try {
+      if (editing) await post({ action: "save", id: initial.id, ...rows[0], manager, note });
+      else await post({ action: "add", rows, manager, note });
+      onDone();
+    } catch (x) {
+      setErr(x.message);
+      const m = /^Riga (\d+)/.exec(x.message);
+      if (m) setBadRow(Number(m[1]) - 1);
+    } finally { setBusy(false); }
   };
   return (
     <form onSubmit={submit}>
-      <label style={label}>Creator</label>
-      <select style={input} value={f.creator} onChange={set("creator")} required>
-        <option value="">Scegli…</option>
-        {options.map((c) => <option key={c} value={c}>{c}</option>)}
-      </select>
-      <label style={label}>Link del canale</label>
-      <input style={input} value={f.url} onChange={set("url")} placeholder="t.me/nomecanale, @nomecanale o t.me/+codice" required />
-      <label style={label}>Tipo</label>
-      <select style={input} value={f.kind} onChange={set("kind")}>
-        <option value="canale">Canale (solo lei pubblica)</option>
-        <option value="gruppo">Gruppo (scrivono anche i fan)</option>
-      </select>
-      <label style={label}>Chi lo gestisce</label>
-      <input style={input} value={f.manager} onChange={set("manager")} placeholder="Es. la creator, Antonio, l'agenzia…" />
-      <label style={label}>Link OnlyFans pubblicato nel canale (facoltativo)</label>
-      <input style={input} value={f.of_link} onChange={set("of_link")} placeholder="onlyfans.com/nome/c123 — un link di tracciamento dedicato al canale" />
-      <div style={{ ...muted, marginTop: 4 }}>Se nel canale c'è un link di tracciamento solo suo, qui vedi quanti abbonati porta su OnlyFans.</div>
+      {rows.map((r, i) => (
+        <div key={i} style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${badRow === i ? CP.accentRed : CP.border}`, marginBottom: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: CP.textMuted }}>{editing ? "Canale" : `Canale ${i + 1}`}</span>
+            {rows.length > 1 && <button type="button" style={{ ...btn, padding: "2px 8px", fontSize: 12 }} onClick={() => setRows(rows.filter((_, j) => j !== i))}>Togli</button>}
+          </div>
+          <label style={label}>Creator (anche più di una, se il canale è in comune)</label>
+          <CreatorPicker value={r.creators} options={options} onChange={(v) => setRow(i, { creators: v })} />
+          <label style={label}>Link del canale</label>
+          <input style={input} value={r.url} onChange={(e) => setRow(i, { url: e.target.value })} placeholder="t.me/nomecanale, @nomecanale o t.me/+codice" />
+          <label style={label}>Tipo</label>
+          <select style={input} value={r.kind} onChange={(e) => setRow(i, { kind: e.target.value })}>
+            <option value="canale">Canale (solo lei pubblica)</option>
+            <option value="gruppo">Gruppo (scrivono anche i fan)</option>
+          </select>
+        </div>
+      ))}
+      {!editing && (
+        <button type="button" style={btn} onClick={() => setRows([...rows, { ...EMPTY_ROW, creators: rows[rows.length - 1]?.creators || [] }])}><Plus size={13} />Aggiungi un altro canale</button>
+      )}
+      <label style={label}>Chi lo gestisce{rows.length > 1 ? " (vale per tutti)" : ""}</label>
+      <input style={input} value={manager} onChange={(e) => setManager(e.target.value)} placeholder="Es. la creator, Antonio, l'agenzia…" />
       <label style={label}>Note</label>
-      <input style={input} value={f.note} onChange={set("note")} placeholder="Facoltative" />
+      <input style={input} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Facoltative" />
       {err && <div style={{ color: CP.accentRed, fontSize: 13, marginTop: 12 }}>{err}</div>}
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 18 }}>
         <button type="button" style={btn} onClick={onCancel}>Annulla</button>
-        <button type="submit" style={btnPrimary} disabled={busy}>{busy ? "Salvo…" : "Salva"}</button>
+        <button type="submit" style={btnPrimary} disabled={busy}>{busy ? "Salvo…" : editing ? "Salva" : rows.length > 1 ? `Salva ${rows.length} canali` : "Salva"}</button>
       </div>
     </form>
   );
+}
+
+// Link di tracciamento OnlyFans con "telegram"/"TG" nel nome: trovati da soli, per creator.
+function OfBlock({ names, of }) {
+  const list = names.map((n) => [n, of?.[n]]).filter(([, o]) => o);
+  if (!list.length) return <div style={muted}>Nessun link di tracciamento OnlyFans con «Telegram» o «TG» nel nome per {names.join(", ")}.</div>;
+  return list.map(([n, o]) => (
+    <div key={n} style={{ marginBottom: 10 }}>
+      {names.length > 1 && <div style={{ color: CP.textPrimary, marginBottom: 4 }}>{n}</div>}
+      <DataTable
+        minWidth={420}
+        rows={o.links}
+        defaultSort={{ key: "subs_30", dir: -1 }}
+        columns={[
+          { key: "name", label: "Link OnlyFans", render: (l) => <a href={l.url} target="_blank" rel="noreferrer" style={{ color: "inherit" }}>{l.name}</a> },
+          { key: "subs_30", label: "Abbonati 30g", align: "right", render: (l) => int(l.subs_30) },
+          { key: "clicks_30", label: "Clic 30g", align: "right", render: (l) => int(l.clicks_30) },
+          { key: "subs", label: "Abbonati da sempre", align: "right", render: (l) => int(l.subs) },
+        ]}
+      />
+    </div>
+  ));
 }
 
 function DayBars({ days }) {
@@ -153,7 +209,6 @@ function ChannelDetail({ ch, data, onChanged, onEdit, onClose }) {
         <Metric label="Iscritti" value={int(ch.members)} note={ch.members_at ? `letto ${when(ch.members_at)}` : null} />
         <Metric label="Ultimi 7 giorni" value={signed(ch.members_7d)} />
         <Metric label="Ultimi 30 giorni" value={signed(ch.members_30d)} />
-        {ch.of_link && <Metric label="Abbonati OF dal link" value={ch.of_stats ? int(ch.of_stats.subs) : "—"} note={ch.of_stats ? `${int(ch.of_stats.clicks)} clic` : ch.of_link_valid === false ? "link OF non riconosciuto" : "non trovato nel warehouse"} />}
       </div>
 
       <SectionTitle aside={live ? `dal ${new Date(ch.bot.at).toLocaleDateString("it-IT")}` : null}>Da dove entrano</SectionTitle>
@@ -174,8 +229,8 @@ function ChannelDetail({ ch, data, onChanged, onEdit, onClose }) {
       {st.totals.leaves_before_bot > 0 && <div style={{ ...muted, marginTop: 6 }}>{int(st.totals.leaves_before_bot)} uscite di iscritti entrati prima del bot (senza fonte).</div>}
       {st.days.some((d) => d.joins) && <div style={{ marginTop: 14 }}><DayBars days={st.days} /></div>}
 
-      <SectionTitle>Link d'invito per fonte</SectionTitle>
-      <div style={{ ...muted, marginBottom: 8 }}>Un link per ogni posto dove viene pubblicato (bio Instagram, TikTok, S4S…): così ogni entrata ha la sua fonte.</div>
+      <SectionTitle>Link d'ingresso per fonte (facoltativi)</SectionTitle>
+      <div style={{ ...muted, marginBottom: 8 }}>Lo stesso canale può avere più link per entrare: tutti portano qui dentro, ma ognuno conta chi lo usa. Se metti un link nella bio di Instagram e un altro su TikTok, sopra vedi quanti sono entrati da Instagram e quanti da TikTok. Senza, vedi solo il totale.</div>
       {activeLinks.map((l) => (
         <div key={l.key} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${CP.border}`, flexWrap: "wrap" }}>
           <span style={{ color: CP.textPrimary, minWidth: 140 }}>{l.name}</span>
@@ -193,6 +248,10 @@ function ChannelDetail({ ch, data, onChanged, onEdit, onClose }) {
           <button style={btnPrimary} disabled={busy === "link"} onClick={() => run("link", { action: "link", id: ch.id, source: src, label: lbl }).then(() => setLbl(""))}><Link2 size={13} />{busy === "link" ? "Creo…" : "Crea link"}</button>
         </div>
       ) : <div style={muted}>I link si creano quando il bot è amministratore del canale.</div>}
+
+      <SectionTitle>Da Telegram a OnlyFans</SectionTitle>
+      <div style={{ ...muted, marginBottom: 8 }}>I link di tracciamento OnlyFans della creator con «Telegram» o «TG» nel nome, trovati da soli: non serve inserirli. Se una creator ha più canali, i numeri sono della creator, non del singolo canale.</div>
+      <OfBlock names={ch.creators} of={data.of} />
 
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 22, gap: 8, flexWrap: "wrap" }}>
         <span style={muted}>{[ch.manager && `Gestito da ${ch.manager}`, ch.note].filter(Boolean).join(" · ")}</span>
@@ -213,7 +272,7 @@ function PendingRow({ p, channels, onDone }) {
       <span style={{ flex: 1 }} />
       <select style={{ ...input, width: 220 }} value={id} onChange={(e) => setId(e.target.value)}>
         <option value="">È il canale di…</option>
-        {candidates.map((c) => <option key={c.id} value={c.id}>{c.creator} · {c.url.replace("https://", "")}</option>)}
+        {candidates.map((c) => <option key={c.id} value={c.id}>{c.creators.join(", ")} · {c.url.replace("https://", "")}</option>)}
       </select>
       <button style={btnPrimary} disabled={!id} onClick={async () => { setErr(null); try { await post({ action: "connect", id, chat_id: p.chat_id }); onDone(); } catch (x) { setErr(x.message); } }}>Collega</button>
       {err && <div style={{ color: CP.accentRed, fontSize: 12, width: "100%" }}>{err}</div>}
@@ -223,25 +282,27 @@ function PendingRow({ p, channels, onDone }) {
 
 export default function TelegramChannelsPage() {
   const { data, error, isLoading, mutate } = useSWR(API, fetcher, { revalidateOnFocus: false });
-  const [form, setForm] = useState(null); // null | "new" | channel
+  const [form, setForm] = useState(null); // null | {} nuovo | { preset } | canale
   const [openId, setOpenId] = useState(null);
   const [setupMsg, setSetupMsg] = useState(null);
   const channels = data?.channels || [];
   const open = channels.find((c) => c.id === openId);
 
-  const withChannel = new Set(channels.map((c) => c.creator));
+  // abbonati OF a 30 giorni dai link "Telegram"/"TG" delle creator del canale (della creator, non del canale)
+  const ofSubs30 = (r) => { const v = r.creators.map((n) => data?.of?.[n]?.subs_30).filter((x) => x != null); return v.length ? v.reduce((a, b) => a + b, 0) : null; };
+  const withChannel = new Set(channels.flatMap((c) => c.creators));
   const missing = (data?.creators || []).filter((c) => !withChannel.has(c));
   const live = channels.filter((c) => c.chat_id && c.bot?.status === "admin").length;
   const joins30 = channels.reduce((s, c) => s + c.stats.days.reduce((a, d) => a + d.joins, 0), 0);
 
   const columns = [
-    { key: "creator", label: "Creator" },
+    { key: "creator", label: "Creator", render: (r) => r.creators.join(", "), sort: (r) => r.creators.join(", ") },
     { key: "title", label: "Canale", render: (r) => <span>{r.title || r.url.replace("https://t.me/", "")}<span style={muted}> · {r.kind}</span></span>, sort: (r) => r.title || r.url },
     { key: "bot", label: "Bot", render: (r) => <BotBadge ch={r} />, sort: (r) => (r.bot?.status === "admin" ? 1 : 0) },
     { key: "members", label: "Iscritti", align: "right", render: (r) => int(r.members) },
     { key: "members_7d", label: "7 giorni", align: "right", render: (r) => signed(r.members_7d) },
     { key: "joins30", label: "Entrati 30g", align: "right", render: (r) => int(r.stats.days.reduce((a, d) => a + d.joins, 0)), sort: (r) => r.stats.days.reduce((a, d) => a + d.joins, 0) },
-    { key: "of", label: "Abbonati OF", align: "right", render: (r) => (r.of_stats ? int(r.of_stats.subs) : r.of_link ? "—" : <span style={muted}>nessun link</span>), sort: (r) => r.of_stats?.subs ?? -1 },
+    { key: "of", label: "Abbonati OF 30g", align: "right", render: (r) => { const v = ofSubs30(r); return v == null ? <span style={muted}>—</span> : int(v); }, sort: (r) => ofSubs30(r) ?? -1 },
   ];
 
   return (
@@ -249,8 +310,8 @@ export default function TelegramChannelsPage() {
       <PageHead
         crumbs={[{ label: "Performance" }, { label: "Canali Telegram" }]}
         title="Canali Telegram"
-        subtitle="La mappa dei canali delle creator. Con il bot HOC amministratore del canale vedi chi entra, da quale link e quanti restano; con un link di tracciamento OF dedicato, quanti passano su OnlyFans."
-        actions={<button style={btnPrimary} onClick={() => setForm("new")}><Plus size={14} />Aggiungi canale</button>}
+        subtitle="La mappa dei canali delle creator. Con il bot HOC amministratore del canale vedi chi entra e quanti restano; dai link di tracciamento con «Telegram» o «TG» nel nome, quanti passano su OnlyFans."
+        actions={<button style={btnPrimary} onClick={() => setForm({})}><Plus size={14} />Aggiungi canali</button>}
       />
 
       {error && <Notice danger>{error.message}</Notice>}
@@ -300,7 +361,7 @@ export default function TelegramChannelsPage() {
               <SectionTitle aside={int(missing.length)}>Creator senza canale in mappa</SectionTitle>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {missing.map((c) => (
-                  <button key={c} style={{ ...btn, padding: "4px 10px", fontSize: 12 }} onClick={() => setForm({ ...EMPTY, creator: c })}>{c} <Plus size={12} /></button>
+                  <button key={c} style={{ ...btn, padding: "4px 10px", fontSize: 12 }} onClick={() => setForm({ preset: c })}>{c} <Plus size={12} /></button>
                 ))}
               </div>
               <div style={{ ...muted, marginTop: 6 }}>Se una creator non ha un canale Telegram, lasciala qui: la lista serve a vedere chi manca.</div>
@@ -310,10 +371,10 @@ export default function TelegramChannelsPage() {
         </>
       )}
 
-      <Modal open={Boolean(form)} onClose={() => setForm(null)} title={form?.id ? "Modifica canale" : "Aggiungi canale"} maxWidth={520}>
-        {form && <ChannelForm initial={form === "new" ? null : form} creators={data?.creators || []} onCancel={() => setForm(null)} onDone={() => { setForm(null); mutate(); }} />}
+      <Modal open={Boolean(form)} onClose={() => setForm(null)} title={form?.id ? "Modifica canale" : "Aggiungi canali"} maxWidth={520}>
+        {form && <ChannelForm initial={form.id ? form : null} preset={form.preset} creators={data?.creators || []} onCancel={() => setForm(null)} onDone={() => { setForm(null); mutate(); }} />}
       </Modal>
-      <Modal open={Boolean(open)} onClose={() => setOpenId(null)} title={open ? `${open.creator} · ${open.title || "Telegram"}` : ""} maxWidth={720}>
+      <Modal open={Boolean(open)} onClose={() => setOpenId(null)} title={open ? `${open.creators.join(", ")} · ${open.title || "Telegram"}` : ""} maxWidth={720}>
         {open && <ChannelDetail ch={open} data={data} onChanged={mutate} onEdit={() => { setForm(open); setOpenId(null); }} onClose={() => setOpenId(null)} />}
       </Modal>
     </div>

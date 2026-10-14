@@ -4,7 +4,8 @@
 // Registrazione del webhook: solo chi vede tutto.
 //
 // GET                                   canali visibili + statistiche + chat in attesa di abbinamento + creator scegliibili
-// POST {action:"save", id?, creator, url, kind, manager, note, of_link}
+// POST {action:"add", rows:[{creators[], url, kind}], manager?, note?}   più canali in un colpo
+// POST {action:"save", id, creators[], url, kind, manager, note}            modifica di un canale
 // POST {action:"delete", id}
 // POST {action:"refresh", id}           rilegge dal bot titolo / stato bot / iscritti
 // POST {action:"connect", id, chat_id}  collega un canale privato alla chat dove è stato aggiunto il bot
@@ -18,12 +19,11 @@ export const maxDuration = 60;
 import { authorizeScoped, allowsCreator, personOf } from "@/lib/creator-scope";
 import { CAPABILITIES } from "@/lib/rbac";
 import { getNames } from "@/lib/s4s";
-import { cleanChannel, sameChannel, summarizeStats, memberDelta, romeDay, SOURCES } from "@/lib/telegram-channels-core";
+import { cleanChannel, cleanBatch, creatorsOf, mergeCreators, sameChannel, summarizeStats, memberDelta, romeDay, SOURCES } from "@/lib/telegram-channels-core";
 import {
   listChannels, getChannel, saveChannel, deleteChannel, refreshChannel, connectChat, createInviteLink,
-  revokeInviteLink, getStats, getPending, setupWebhook, botInfo, botConfigured, getOfLinkStats,
+  revokeInviteLink, getStats, getPending, setupWebhook, botInfo, botConfigured, getOfTelegramStats,
 } from "@/lib/telegram-channels";
-import { normalizeLinkUrl } from "@/lib/s4s-core";
 
 async function creatorOptions(scope) {
   const names = await getNames().catch(() => ({}));
@@ -36,27 +36,26 @@ export async function GET() {
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const scope = az.creatorScope;
   const all = Boolean(scope.all);
-  const channels = (await listChannels()).filter((c) => all || allowsCreator(scope, c.creator));
+  const sees = (c) => all || creatorsOf(c).some((n) => allowsCreator(scope, n));
+  const channels = (await listChannels()).filter(sees);
   const today = romeDay(Date.now() / 1000);
   const [stats, pending, creators, bot, of] = await Promise.all([
     Promise.all(channels.map((c) => getStats(c.id))),
     getPending(),
     creatorOptions(scope),
     botInfo(),
-    getOfLinkStats(channels.map((c) => c.of_link).filter(Boolean)).catch((e) => ({ links: {}, error: e.message })),
+    getOfTelegramStats().catch((e) => ({ creators: {}, error: e.message })),
   ]);
-  const rows = channels.map((c, i) => {
-    const ofKey = normalizeLinkUrl(c.of_link);
-    return {
-      ...c,
-      stats: summarizeStats(stats[i], c.links || [], { today, dayCount: 30 }),
-      members_7d: memberDelta(c.members_hist, 7),
-      members_30d: memberDelta(c.members_hist, 30),
-      of_stats: ofKey ? of.links?.[ofKey] || null : null,
-      of_link_valid: c.of_link ? Boolean(ofKey) : null,
-      members_hist: undefined,
-    };
-  });
+  const rows = channels.map((c, i) => ({
+    ...c,
+    creators: creatorsOf(c),
+    stats: summarizeStats(stats[i], c.links || [], { today, dayCount: 30 }),
+    members_7d: memberDelta(c.members_hist, 7),
+    members_30d: memberDelta(c.members_hist, 30),
+    members_hist: undefined,
+  }));
+  // link OF "telegram"/"TG" per creator, solo delle creator visibili
+  const ofByCreator = Object.fromEntries(Object.entries(of.creators || {}).filter(([n]) => all || allowsCreator(scope, n)));
   return Response.json({
     all,
     bot_configured: botConfigured(),
@@ -66,6 +65,8 @@ export async function GET() {
     pending: Object.entries(pending).map(([chat_id, p]) => ({ chat_id, ...p })),
     creators,
     sources: SOURCES,
+    of: ofByCreator,
+    of_at: of.at || null,
     of_error: of.error || null,
   });
 }
@@ -83,22 +84,41 @@ export async function POST(request) {
   const own = async (id) => {
     const ch = await getChannel(String(id || ""));
     if (!ch) return { error: fail("Canale non trovato", 404) };
-    if (!all && !allowsCreator(scope, ch.creator)) return { error: fail("Questo canale non è di una creator che segui", 403) };
+    if (!all && !creatorsOf(ch).some((n) => allowsCreator(scope, n))) return { error: fail("Questo canale non è di una creator che segui", 403) };
     return { ch };
   };
 
   try {
+    if (body.action === "add") {
+      const b = cleanBatch(body.rows, { manager: body.manager, note: body.note });
+      if (!b.ok) return Response.json({ error: b.error, row: b.row }, { status: 400 });
+      for (const [i, v] of b.values.entries()) {
+        const notMine = all ? [] : v.creators.filter((n) => !allowsCreator(scope, n));
+        if (notMine.length) return Response.json({ error: `Riga ${i + 1}: ${notMine.join(", ")} non è tra le creator che segui`, row: i }, { status: 403 });
+      }
+      const existing = await listChannels();
+      for (const [i, v] of b.values.entries()) {
+        const dup = existing.find((x) => sameChannel(x, v));
+        if (dup) return Response.json({ error: `Riga ${i + 1}: questo canale è già in mappa (${creatorsOf(dup).join(", ")})`, row: i }, { status: 409 });
+      }
+      const saved = [];
+      for (const v of b.values) saved.push(await saveChannel(v, { by }));
+      return Response.json({ ok: true, channels: saved });
+    }
     if (body.action === "save") {
       const c = cleanChannel(body);
       if (!c.ok) return fail(c.error);
-      if (!all && !allowsCreator(scope, c.value.creator)) return fail("Puoi aggiungere canali solo delle creator che segui", 403);
-      if (body.id) {
-        const { error } = await own(body.id);
-        if (error) return error;
+      const { ch, error } = await own(body.id);
+      if (error) return error;
+      const value = { ...c.value };
+      if (!all) {
+        // chi segue solo alcune creator tocca solo quelle: le altre del canale restano
+        value.creators = mergeCreators(creatorsOf(ch), c.value.creators, (n) => allowsCreator(scope, n));
+        if (!value.creators.some((n) => allowsCreator(scope, n))) return fail("Lascia almeno una creator che segui", 403);
       }
-      const dup = (await listChannels()).find((x) => x.id !== body.id && sameChannel(x, c.value));
-      if (dup) return fail(`Questo canale è già in mappa (${dup.creator})`, 409);
-      const saved = await saveChannel(c.value, { id: body.id, by });
+      const dup = (await listChannels()).find((x) => x.id !== body.id && sameChannel(x, value));
+      if (dup) return fail(`Questo canale è già in mappa (${creatorsOf(dup).join(", ")})`, 409);
+      const saved = await saveChannel(value, { id: body.id, by });
       return Response.json({ ok: true, channel: saved });
     }
     if (body.action === "delete") {
