@@ -151,7 +151,7 @@ export async function computeSquadra({ now = Date.now() } = {}) {
       name,
       idx: r2(c?.idx),
       exp: r2(c?.exp, 0),
-      sph: r2(o.sph, 0),
+      sph: o.sph == null ? null : r2(o.sph, 0),
       h: Math.round(o.h),
       cp_h: c ? Math.round(c.cp_h) : 0,
       crs: c ? Object.fromEntries(Object.entries(c.crs).map(([k, v]) => [k, r2(v, 3)])) : {},

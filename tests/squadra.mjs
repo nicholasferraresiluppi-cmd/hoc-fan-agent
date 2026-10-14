@@ -4,7 +4,7 @@
 // quota dello split, disaccordo tra le due misure.
 import assert from "node:assert/strict";
 import {
-  nameKey, matchName, rowHours, aggregateKpi, buildCells, compareWithPeers,
+  nameKey, matchName, rowHours, aggregateKpi, buildCells, compareWithPeers, rankPeriod,
   splitShare, rowFlags, measuresDisagree, monthRange, shiftMonth,
 } from "../src/lib/squadra-core.js";
 
@@ -69,6 +69,24 @@ t("almeno 2 colleghi nella cella, altrimenti si usa la modella intera", () => {
   assert.equal(c.get("A").exp, 35); // (50×100 + 20×100) / 200
   assert.equal(c.get("A").few_peers, true);
   assert.equal(c.get("A").night, 1);
+});
+
+t("v2: il venduto all'ora usa le ore di turno, non le ore attive Infloww", () => {
+  // stesso venduto e stesse ore di turno, ma Infloww conta ore attive diverse (cambio di definizione)
+  const rows = [row("A", 6000, 40), row("B", 6000, 90), row("C", 6000, 60)];
+  const shifts = [sh("A", 1, "Evening", 60), sh("B", 1, "Evening", 60), sh("C", 1, "Evening", 60)];
+  const { ops, cmp } = rankPeriod(rows, shifts, resolve);
+  assert.equal(ops.get("A").sph, 100);
+  assert.equal(ops.get("B").sph, 100);
+  assert.equal(cmp.get("A").idx, 1);
+  assert.equal(ops.get("A").h_infloww, 40);
+});
+
+t("v2: senza turni abbinati resta in elenco ma non confrontabile", () => {
+  const { ops, cmp } = rankPeriod([row("A", 6000, 60), row("Z", 6000, 60)], [sh("A", 1, "Evening", 60)], resolve);
+  assert.equal(ops.get("Z").sph, null);
+  assert.equal(ops.get("Z").no_calendar, true);
+  assert.ok(!cmp.has("Z"));
 });
 
 t("un turno su due modelle si divide in parti uguali", () => {

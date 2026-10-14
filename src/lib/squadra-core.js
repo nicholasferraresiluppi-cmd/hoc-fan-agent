@@ -17,16 +17,17 @@
  *     ≈ $116/h misurati ago-set 2026).
  *   - ANZIANITÀ = mesi con busta CP e turni (Nicholas: "quante buste ha avuto").
  *     Pesa molto (mediana 0,49 a 1-3 mesi, 1,05 a 13+): un nuovo in fondo è normale.
- *   - Il venduto all'ora Infloww usa le ore ATTIVE di Infloww (venduto ÷ vendite
- *     all'ora), non le ore timbrate: queste sono vuote per metà delle righe.
+ *   - v2: il venduto all'ora si divide per le ORE DI TURNO del calendario CP (vedi
+ *     rankPeriod): le ore "attive" di Infloww cambiano definizione tra un export e
+ *     l'altro e rendevano i mesi non confrontabili.
  * Limiti dichiarati in pagina: correlazione non causa; le ore per modella vengono
  * dal calendario CP (turni multi-modella divisi in parti uguali); fuori dal
  * calcolo chi non si abbina al calendario.
  */
 
-export const SQUADRA_VERSION = "squadra-1";
-export const MIN_HOURS = 30; // ore Infloww nel periodo per entrare
-export const MIN_HOURS_MONTH = 40; // ore Infloww nel mese per avere la bravura del mese
+export const SQUADRA_VERSION = "squadra-2";
+export const MIN_HOURS = 30; // ore attive Infloww nel periodo per entrare (solo filtro di sanità dei dati)
+export const MIN_HOURS_MONTH = 40; // ore di turno nel mese per avere la bravura del mese
 export const MIN_CP_HOURS = 20; // ore di calendario per poter fare il confronto
 export const MIN_PEER_HOURS = 40; // ore dei colleghi in una cella modella×fascia
 export const MIN_PEERS = 2; // colleghi diversi in una cella per poterla usare
@@ -243,11 +244,29 @@ export function compareWithPeers(ops, cells) {
   return out;
 }
 
-/** Classifica completa di un insieme di righe+turni (un periodo). */
+/**
+ * Classifica completa di un insieme di righe+turni (un periodo).
+ *
+ * v2 (14/10/2026): il venduto all'ora si divide per le ORE DI TURNO del calendario
+ * CP, non per le ore "attive" di Infloww. Le ore attive cambiano definizione da un
+ * export all'altro (rapporto ore attive/timbrate: giu 1,00 · ago 0,87 · set 1,32 ·
+ * ott 1,31): a settembre lo split sembrava vendere il 41% in meno all'ora con un
+ * venduto calato dell'8%. Il venduto resta di Infloww; il calendario dà solo le ore.
+ * Chi non ha turni abbinati resta in elenco con sph/idx null ("non confrontabile").
+ */
 export function rankPeriod(rows, shifts, resolve) {
-  const ops = aggregateKpi(rows);
+  const kpi = aggregateKpi(rows);
   const cells = buildCells(shifts, resolve);
-  const cmp = compareWithPeers(ops, cells);
+  const ops = new Map();
+  for (const [name, o] of kpi) {
+    const c = cells.get(name);
+    const cal = c ? [...c.values()].reduce((a, b) => a + b, 0) : 0;
+    ops.set(name, cal >= MIN_CP_HOURS
+      ? { ...o, h_infloww: o.h, h: cal, sph: o.sales / cal }
+      : { ...o, h_infloww: o.h, h: o.h, sph: null, no_calendar: true });
+  }
+  const comparable = new Map([...ops].filter(([, o]) => o.sph != null));
+  const cmp = compareWithPeers(comparable, cells);
   return { ops, cmp };
 }
 
@@ -261,7 +280,7 @@ export function splitShare(crs, creatorIds) {
 /** Avvisi di lettura su una riga. */
 export function rowFlags(r) {
   const f = [];
-  if (r.h < 100) f.push("poche ore");
+  if (r.h < 100) f.push("poche ore"); // ore di turno (calendario) nel periodo
   if (r.tenure != null && r.tenure <= 3) f.push("nuovo");
   if (r.m1 != null && r.m2 != null && Math.abs(r.m1 - r.m2) > 0.5) f.push("altalenante");
   if (r.few_peers) f.push("pochi colleghi");
