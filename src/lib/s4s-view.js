@@ -170,3 +170,52 @@ export async function rangeDeals(split, from, to) {
   const days = plan ? planSchedule(plan, from, to, { sameBase }) : [];
   return { days: mergeDeals(days, stored, { from, to }), stored, names };
 }
+
+// ── Cosa aspetta chi guarda (14/10/2026, punto 4: notifiche in app) ─────────
+// Leggero (niente BigQuery): piano, accordi salvati, kit. Serve al badge in menu, al
+// riquadro nella home e al numero sulla scheda Oggi.
+//   requests  = scambi in cui l'altra pagina ha accettato e manca il sì di una mia
+//   todayTodo = mie metà di scambi di OGGI non ancora segnate "programmato"
+//   proposals = proposte del giro (nessuno ha accettato) dei prossimi 14 giorni che aspettano il mio sì
+//   missingKit= mie pagine con uno scambio nei prossimi 7 giorni e il kit incompleto
+// count (badge) = requests + todayTodo: le cose da fare adesso, non le proposte lontane.
+export async function inboxFor(splits, mineOf) {
+  const today = todayIT();
+  const until = addDays(today, 14), week = addDays(today, 7);
+  const names = await getNames();
+  const nm = (id) => baseName(names[String(id)] || String(id));
+  const seen = new Set();
+  const out = { today, requests: [], todayTodo: [], proposals: 0, missingKit: [] };
+  const kitNeeded = new Map(); // pagina → primo giorno di scambio
+  for (const split of splits) {
+    const mine = new Set(mineOf(split));
+    if (!mine.size) continue;
+    const { days } = await rangeDeals(split, today, until);
+    for (const d of days) {
+      for (const x of d.deals) {
+        if (seen.has(x.id) || x.status === "annullato") continue;
+        seen.add(x.id);
+        const st = dealState(x);
+        const myWaiting = st.waiting.filter((p) => mine.has(Number(p)));
+        if (st.state === "attesa" && myWaiting.length) {
+          const me = myWaiting[0], other = Number(x.a) === Number(me) ? x.b : x.a;
+          out.requests.push({ id: x.id, day: d.day, time: x.time, page: nm(me), partner: nm(other) });
+        }
+        if (st.state === "proposto" && myWaiting.length) out.proposals++;
+        if (d.day === today) {
+          for (const p of [x.a, x.b]) if (mine.has(Number(p)) && !(x.done || {})[p]) out.todayTodo.push({ id: x.id, time: x.time, page: nm(p), partner: nm(Number(p) === Number(x.a) ? x.b : x.a) });
+        }
+        if (d.day <= week) for (const p of [x.a, x.b]) if (mine.has(Number(p)) && !kitNeeded.has(Number(p))) kitNeeded.set(Number(p), d.day);
+      }
+    }
+  }
+  if (kitNeeded.size) {
+    const kits = await getKits([...kitNeeded.keys()]);
+    for (const [p, day] of kitNeeded) if (!kitReady(kits[p])) out.missingKit.push({ page: nm(p), day });
+  }
+  out.requests.sort((a, b) => (a.day + a.time < b.day + b.time ? -1 : 1));
+  out.todayTodo.sort((a, b) => (a.time < b.time ? -1 : 1));
+  out.missingKit.sort((a, b) => (a.day < b.day ? -1 : 1));
+  out.count = out.requests.length + out.todayTodo.length;
+  return out;
+}

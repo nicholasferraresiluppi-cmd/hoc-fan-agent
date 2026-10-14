@@ -94,6 +94,9 @@ export default function SidebarCasa() {
   const { data: me } = useSWR("/api/whoami", silentFetcher, { revalidateOnFocus: false });
   // alert solo a chi li vede (prima: 403 a ogni pagina per gli altri — giro per persona, 10/10/2026)
   const { data: alerts } = useSWR(me?.authenticated && canSee("/admin/alerts", me.capabilities, me.admin) ? "/api/admin/ops-alerts" : null, silentFetcher, { revalidateOnFocus: false, refreshInterval: 5 * 60 * 1000 });
+  // S4S (14/10/2026): richieste da accettare + S4S di oggi da programmare
+  const { data: s4sInbox } = useSWR(me?.authenticated && canSee("/admin/s4s", me.capabilities, me.admin) ? "/api/admin/s4s/inbox" : null, silentFetcher, { revalidateOnFocus: false, refreshInterval: 5 * 60 * 1000 });
+  const s4sCount = s4sInbox?.count || 0;
   const [style, setStyle] = useStyle();
   const [theme, setTheme] = useTheme();
   const [tools, setTools] = useState(false);
@@ -144,6 +147,7 @@ export default function SidebarCasa() {
               <Link key={i.href} href={i.href} className={isActive(i) ? "on" : undefined} aria-current={isActive(i) ? "page" : undefined}>
                 {i.label}
                 {i.badge && openAlerts > 0 && <span className="b">{openAlerts}</span>}
+                {i.href === "/admin/s4s" && s4sCount > 0 && <span className="b" aria-label={`${s4sCount} cose da fare`}>{s4sCount}</span>}
               </Link>
             ))}
           </div>
@@ -161,7 +165,7 @@ export default function SidebarCasa() {
               <h4>{g.label}</h4>
               {items.map((i) => {
                 const on = i.match ? i.match(pathname) : i.href === "/" ? pathname === "/" : pathname === i.href || pathname.startsWith(i.href + "/");
-                return <Link key={i.href} href={i.href} className={on ? "on" : undefined} aria-current={on ? "page" : undefined}>{i.label}</Link>;
+                return <Link key={i.href} href={i.href} className={on ? "on" : undefined} aria-current={on ? "page" : undefined}>{i.label}{i.href === "/admin/s4s" && s4sCount > 0 && <span className="b" aria-label={`${s4sCount} cose da fare`}>{s4sCount}</span>}</Link>;
               })}
             </div>
           );
