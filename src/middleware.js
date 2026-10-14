@@ -34,6 +34,9 @@ const isPublicRoute = createRouteMatcher([
   // del corpo (header Signature, segreto OFAPI_WEBHOOK_SECRET); senza segreto
   // configurato rifiuta tutto. Vedi lib/ofapi-webhook-core.
   '/api/webhooks/ofapi',
+  // webhook del bot Telegram HOC (14/10/2026): si difende da solo con l'header
+  // X-Telegram-Bot-Api-Secret-Token (segreto TELEGRAM_WEBHOOK_SECRET, fail closed). Vedi lib/telegram-channels.
+  '/api/webhooks/telegram',
   // Radar creator (10/10/2026): segnalazione dal Comando rapido dell'iPhone. Si difende da
   // sola col token personale (hash in scouting:tokens) + tetto d'uso; accetta solo un link.
   '/api/scouting/segnala',
