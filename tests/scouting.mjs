@@ -234,3 +234,13 @@ console.log(`scouting: ${n} asserzioni ok`);
   assert.throws(() => review(crm, "h:x", "firmata"));
   console.log("coda valuta: ok");
 }
+
+// --- catena dei seguiti: folAt/fing arrivano sulla creator (14/10/2026)
+{
+  const { buildCreators } = await import("../src/lib/scouting-core.js");
+  const cs = buildCreators([{ h: "a", sig: "forte", folAt: 5, fing: 120 }, { h: "b", sig: "forte" }], { creators: {} });
+  assert.equal(cs.find((c) => c.handles[0] === "a").folAt, 5);
+  assert.equal(cs.find((c) => c.handles[0] === "a").fing, 120);
+  assert.equal(cs.find((c) => c.handles[0] === "b").folAt, null);
+  console.log("catena seguiti: ok");
+}

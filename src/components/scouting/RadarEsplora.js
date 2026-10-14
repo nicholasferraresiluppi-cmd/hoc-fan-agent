@@ -13,6 +13,8 @@ const views = (newCut) => [
   { id: "new", label: "Nuove questa settimana", test: (c) => c.firstSeen && c.firstSeen >= newCut },
   { id: "check", label: "Indizi da verificare", test: (c) => c.sig === "debole" },
   { id: "todo", label: "Da classificare", test: (c) => c.g === "Da classificare" },
+  // catena dei seguiti: OnlyFanser di cui non abbiamo ancora letto chi segue (le prossime della matrioska)
+  { id: "folq", label: "Seguiti da leggere", test: (c) => c.sig === "forte" && !c.folAt && !c.ours },
   { id: "all", label: "Tutte", test: () => true },
 ];
 const PAGE = 150;
