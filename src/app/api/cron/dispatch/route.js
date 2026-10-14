@@ -109,6 +109,8 @@ export async function POST(request) {
   // Radar creator (10/10/2026): giro settimanale Apify sulle creator dello scouting —
   // lancia il run una volta a settimana, ne raccoglie l'esito al giro dopo
   out.scouting_refresh = await kickEndpoint(request, "/api/cron/scouting-refresh");
+  // canali Telegram delle creator (14/10/2026): iscritti del giorno di ogni canale dal bot HOC
+  out.telegram_channels = await kickEndpoint(request, "/api/cron/telegram-channels");
 
   // Riscalda la cache degli Academy Signals (query analitica pesante): così la
   // GET admin legge sempre dalla cache invece di calcolare inline. Best-effort:

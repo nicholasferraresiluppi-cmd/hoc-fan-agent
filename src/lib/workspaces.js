@@ -65,6 +65,7 @@ export const WORKSPACES = {
         { href: "/leaderboard/creators/heatmap", label: "Mappa operatore×creator" },
         { href: "/admin/creator-difficulty", label: "Difficoltà creator" },
         { href: "/admin/s4s", label: "Calendario S4S", desc: "Chi scambia promozione con chi e quanti abbonati ha portato ogni scambio" },
+        { href: "/admin/telegram", label: "Canali Telegram", desc: "I canali delle creator, chi entra e da quale link" },
       ] },
       { title: "Chat e turni", items: [
         { href: "/admin/conversation-intelligence", label: "Presidio chat" },
