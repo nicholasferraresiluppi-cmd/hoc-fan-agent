@@ -20,7 +20,7 @@ import { selectFunnels, getFunnel } from "@/lib/role-funnels";
 import RoleFunnelGuide from "@/components/RoleFunnelGuide";
 import RoleFunnelChecklist from "@/components/RoleFunnelChecklist";
 import { TutorialVideoCard } from "@/components/TutorialVideo";
-import { TUTORIAL_VIDEOS } from "@/lib/tutorial-videos";
+import { TUTORIAL_VIDEOS, groupVideos } from "@/lib/tutorial-videos";
 
 export default function GuidaPage() {
   const { user, isLoaded } = useUser();
@@ -63,17 +63,25 @@ export default function GuidaPage() {
           )}
 
           {/* Video tutorial: prima i video, poi il percorso scritto (03/10/2026). Quelli su pagine
-              riservate agli admin li vede solo chi le può aprire: pertinenza, non difesa. */}
+              riservate agli admin li vede solo chi le può aprire: pertinenza, non difesa.
+              14/10/2026: divisi per vista (Per tutti / Sales Manager / HR / Board), la propria vista in cima. */}
           {(() => {
             const lead = whoami?.admin || ["team", "all"].includes(whoami?.capabilities?.["scores.view"]);
-            const vids = TUTORIAL_VIDEOS.filter((v) => (!v.adminOnly || whoami?.admin) && (!v.leadsOnly || lead));
+            const staff = whoami?.admin || !!whoami?.workspace?.id;
+            const vids = TUTORIAL_VIDEOS.filter((v) => (!v.adminOnly || whoami?.admin) && (!v.leadsOnly || lead) && (!v.staffOnly || staff));
             if (!vids.length) return null;
+            const groups = groupVideos(vids, whoami?.workspace?.id);
+            const h = { fontFamily: FONTS.body, fontSize: 13, fontWeight: 500, letterSpacing: ".08em", textTransform: "uppercase", color: CP.textMuted, margin: "0 0 10px" };
             return (
-              <section aria-label="Video tutorial" style={{ marginBottom: 28 }}>
-                <h2 style={{ fontFamily: FONTS.body, fontSize: 13, fontWeight: 500, letterSpacing: ".08em", textTransform: "uppercase", color: CP.textMuted, margin: "0 0 10px" }}>Video tutorial</h2>
-                <div style={{ display: "grid", gap: 10 }}>
-                  {vids.map((v) => <TutorialVideoCard key={v.id} video={v} />)}
-                </div>
+              <section aria-label="Video tutorial" style={{ marginBottom: 28, display: "grid", gap: 22 }}>
+                {groups.map(({ group, videos }) => (
+                  <div key={group}>
+                    <h2 style={h}>{groups.length > 1 ? `Video · ${group}` : "Video tutorial"}</h2>
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {videos.map((v) => <TutorialVideoCard key={v.id} video={v} />)}
+                    </div>
+                  </div>
+                ))}
               </section>
             );
           })()}
