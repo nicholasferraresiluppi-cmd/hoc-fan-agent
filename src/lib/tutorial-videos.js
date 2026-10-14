@@ -12,8 +12,21 @@
  *    lo vede solo chi ha accesso a quelle pagine — non è una difesa, è solo pertinenza)
  *  - leadsOnly: true se serve solo a chi guida una squadra (stessa logica di pertinenza)
  *  - asOf: data della versione dell'interfaccia mostrata: se la pagina cambia molto, il video va rifatto
+ *  - staffOnly: true se serve solo a chi ha una vista (Board / Sales Manager / HR) o è admin
+ *  - group: sezione in /guida ("Per tutti" | "Sales Manager" | "HR" | "Board"); senza group = "Altri video"
  */
 export const TUTORIAL_VIDEOS = [
+  // Serie «HOC Pro, vista per vista» (14/10/2026): 8 video 16:9, uno per pezzo di lavoro, con i passaggi
+  // tra una pagina e l'altra. Sorgenti in ~/Documents/progetti/hoc-video/tour-app (motore riusabile).
+  // Sostituisce il vecchio «La settimana del Sales Manager» (03/10), coperto e aggiornato da hoc-sm-settimana.
+  { id: "hoc-intro", group: "Per tutti", title: "Come è fatta HOC Pro", summary: "La mia vista, la pagina Oggi, gli alert, le pagine a schede, come gli strumenti si passano il lavoro e da dove arrivano i numeri.", src: "/video/hoc-pro-come-e-fatta.mp4", poster: "/video/hoc-pro-come-e-fatta.jpg", orientation: "landscape", durationSec: 101, audience: "Tutti", staffOnly: true, asOf: "2026-10-14" },
+  { id: "hoc-sm-settimana", group: "Sales Manager", title: "La settimana del sales manager", summary: "Da seguire → scheda operatore → Sotto soglia con la vista colloquio → Da far crescere → Sessioni di coaching.", src: "/video/hoc-pro-sales-settimana.mp4", poster: "/video/hoc-pro-sales-settimana.jpg", orientation: "landscape", durationSec: 133, audience: "Sales Manager e team lead", leadsOnly: true, asOf: "2026-10-14" },
+  { id: "hoc-sm-creator", group: "Sales Manager", title: "Le creator: come vanno e perché", summary: "Analisi vendite e Leggi le chat, HOC Analytics, Revenue e chat dal vivo, Creator, Mappa operatore × creator, Difficoltà creator.", src: "/video/hoc-pro-sales-creator.mp4", poster: "/video/hoc-pro-sales-creator.jpg", orientation: "landscape", durationSec: 133, audience: "Sales Manager e team lead", leadsOnly: true, asOf: "2026-10-14" },
+  { id: "hoc-sm-coaching", group: "Sales Manager", title: "Le chat e il coaching", summary: "Presidio chat, Qualità turni, Profilo operatore e Game film, Coaching vendite, Sales manager AI, Manuale vendite.", src: "/video/hoc-pro-sales-chat-coaching.mp4", poster: "/video/hoc-pro-sales-chat-coaching.jpg", orientation: "landscape", durationSec: 145, audience: "Sales Manager e team lead", leadsOnly: true, asOf: "2026-10-14" },
+  { id: "hoc-sm-giorno", group: "Sales Manager", title: "Il lavoro di ogni giorno", summary: "Fan da recuperare, i passi del giorno nel Calendario S4S, la supervisione del turno nel Cockpit CM.", src: "/video/hoc-pro-sales-ogni-giorno.mp4", poster: "/video/hoc-pro-sales-ogni-giorno.jpg", orientation: "landscape", durationSec: 109, audience: "Sales Manager e team lead", leadsOnly: true, asOf: "2026-10-14" },
+  { id: "hoc-hr", group: "HR", title: "Persone, contratti e accessi", summary: "Persone e Link del modulo, la scheda, Controllo contratti, l'uscita che chiude Membri e Team, Contestazioni, Assessment candidati.", src: "/video/hoc-pro-hr-persone.mp4", poster: "/video/hoc-pro-hr-persone.jpg", orientation: "landscape", durationSec: 137, audience: "Team HR", adminOnly: true, asOf: "2026-10-14" },
+  { id: "hoc-board-soldi", group: "Board", title: "Andamento e soldi", summary: "Oggi, P&L Live, Calendario compensi, Anomalie compensi ed Esame creator, Incassi Infloww, Classifica vendite.", src: "/video/hoc-pro-board-soldi.mp4", poster: "/video/hoc-pro-board-soldi.jpg", orientation: "landscape", durationSec: 120, audience: "Board", adminOnly: true, asOf: "2026-10-14" },
+  { id: "hoc-board-decisioni", group: "Board", title: "Le persone e le decisioni", summary: "La Sede, Controllo qualità, La città e la Roadmap: se l'azienda lavora, dove guardare, cosa decidere.", src: "/video/hoc-pro-board-decisioni.mp4", poster: "/video/hoc-pro-board-decisioni.jpg", orientation: "landscape", durationSec: 115, audience: "Board", adminOnly: true, asOf: "2026-10-14" },
   {
     id: "persone-hr",
     title: "Persone HR: come si usa il CRM",
@@ -24,6 +37,7 @@ export const TUTORIAL_VIDEOS = [
     durationSec: 70,
     audience: "Team HR",
     adminOnly: true,
+    group: "HR",
     asOf: "2026-10-03",
   },
   {
@@ -36,19 +50,6 @@ export const TUTORIAL_VIDEOS = [
     durationSec: 50,
     audience: "Collaboratori",
     adminOnly: false,
-    asOf: "2026-10-03",
-  },
-  {
-    id: "sales-manager",
-    title: "La settimana del Sales Manager",
-    summary: "Da dove cominciare il lunedì: Da seguire, Sotto soglia con contesto e sostituti, Da far crescere, Classifica vendite, Creator e Presidio chat.",
-    src: "/video/tutorial-sales-manager.mp4",
-    poster: "/video/tutorial-sales-manager.jpg",
-    orientation: "landscape",
-    durationSec: 82,
-    audience: "Sales Manager e team lead",
-    adminOnly: false,
-    leadsOnly: true, // in /guida solo a chi guida una squadra (scores.view team o all): agli operatori non serve
     asOf: "2026-10-03",
   },
 ];
@@ -78,4 +79,13 @@ export const getTutorial = (id) => TUTORIAL_VIDEOS.find((v) => v.id === id) || V
 export function fmtDuration(sec) {
   const m = Math.floor(sec / 60), s = Math.round(sec % 60);
   return m ? `${m}:${String(s).padStart(2, "0")}` : `${s} s`;
+}
+
+/** Ordine delle sezioni in /guida; la vista dell'utente va in cima. */
+export const VIDEO_GROUPS = ["Per tutti", "Sales Manager", "HR", "Board", "Altri video"];
+const WS_GROUP = { sales: "Sales Manager", hr: "HR", board: "Board" };
+export function groupVideos(videos, workspaceId) {
+  const mine = WS_GROUP[workspaceId];
+  const order = mine ? ["Per tutti", mine, ...VIDEO_GROUPS.filter((g) => g !== "Per tutti" && g !== mine)] : VIDEO_GROUPS;
+  return order.map((g) => ({ group: g, videos: videos.filter((v) => (v.group || "Altri video") === g) })).filter((x) => x.videos.length);
 }

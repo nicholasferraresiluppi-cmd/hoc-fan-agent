@@ -66,7 +66,7 @@ export default function SettimanaPage() {
 
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 900, margin: "0 auto", fontFamily: FONTS.body }}>
-      <PageHead title="Questa settimana" line2="Chi seguire, e perché." actions={<TutorialVideoButton id="sales-manager" />}
+      <PageHead title="Questa settimana" line2="Chi seguire, e perché." actions={<TutorialVideoButton id="hoc-sm-settimana" />}
         subtitle="Al massimo cinque persone della tua squadra, in ordine: prima chi è sotto soglia, poi chi cala forte rispetto al mese scorso (anche se è sopra soglia), poi chi può crescere. Non è una classifica: è da dove cominciare." />
       <EarlyMonthNote info={{ early, current: month(0) }} periodId={cur} onSwitch={() => setForceCurrent(true)} />
       {noCreators && <Notice>Non hai ancora creator assegnate: chiedi a un admin di assegnarti le tue creator.</Notice>}
