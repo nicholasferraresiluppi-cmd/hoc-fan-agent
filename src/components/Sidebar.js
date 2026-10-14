@@ -64,6 +64,7 @@ const ESSENTIAL_HREFS = new Set([
   "/academy/tapes",
   "/academy/vendere",
   "/admin/sales-coaching",
+  "/admin/s4s", // S4S quotidiano dei sales manager: con il badge delle cose da fare (14/10/2026)
   "/admin/team",
   "/admin/settimana",
   "/admin/coaching-center",

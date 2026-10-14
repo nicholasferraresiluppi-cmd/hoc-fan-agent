@@ -774,7 +774,7 @@ function Requests({ v, onEdit, reload }) {
     setBulk(r.ok ? { msg: `${d.accepted} accettate${d.skipped ? `, ${d.skipped} da guardare una per una (sforano una disponibilità)` : ""}` } : { error: d.error || "Operazione fallita" });
     if (r.ok) reload();
   }
-  if (!forMe.length && !theirs.length && !giro) return null;
+  if (!forMe.length && !theirs.length && !(giro && !v.me?.all)) return null;
   async function act(x, status) {
     if (status === "annullato" && !window.confirm("Rifiutare questo S4S? L'altra pagina lo vedrà come rifiutato.")) return;
     setBusy(x.id); setErr(null);
@@ -787,7 +787,7 @@ function Requests({ v, onEdit, reload }) {
     <section style={{ ...card, padding: 14, marginBottom: 16, borderColor: forMe.length ? CP.accent : CP.border }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: forMe.length ? 10 : 0 }}>
         <h2 style={{ margin: 0, fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Richieste {forMe.length ? `· ${forMe.length} da accettare` : ""}</h2>
-        {giro > 0 && <span style={{ fontSize: 12.5, color: CP.textMuted }}>{giro} proposte del giro nei prossimi 14 giorni aspettano ancora il tuo sì</span>}
+        {giro > 0 && !v.me?.all && <span style={{ fontSize: 12.5, color: CP.textMuted }}>{giro} proposte del giro nei prossimi 14 giorni aspettano ancora il tuo sì</span>}
         {giro > 0 && !v.me?.all && <button type="button" disabled={bulk?.busy} onClick={acceptAll} style={{ ...btn, padding: "5px 10px", fontSize: 12.5, marginLeft: "auto" }}>{bulk?.busy ? "Accetto…" : "Accetta tutte quelle senza problemi"}</button>}
         {bulk?.msg && <span style={{ flexBasis: "100%", fontSize: 12.5, color: CP.textSecondary }}>{bulk.msg}</span>}
         {bulk?.error && <span style={{ flexBasis: "100%", fontSize: 12.5, color: CP.accentRed }}>{bulk.error}</span>}
@@ -1313,7 +1313,7 @@ export default function S4SPage() {
       <div role="tablist" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, borderBottom: `1px solid ${CP.border}`, paddingBottom: 12 }}>
         {tabs.map(([k, l]) => (
           <FilterChip key={k} active={current === k} onClick={() => { setTab(k); try { window.history.replaceState(null, "", `#${k}`); } catch { /* ok */ } }}
-            label={k === "risultati" && v.unmatched.length ? `${l} · ${v.unmatched.length} da attribuire` : k === "oggi" && inbox?.count ? `${l} · ${inbox.count}` : l} attn={k === "oggi" && inbox?.count > 0 && current !== "oggi"} />
+            label={k === "risultati" && v.unmatched.length ? `${l} · ${v.unmatched.length} da attribuire` : k === "oggi" && inbox?.count ? `${l} · ${inbox.count}` : l} />
         ))}
       </div>
       {(current === "oggi" || current === "planner") && <Requests v={v} onEdit={setEditing} reload={reloadAll} />}
