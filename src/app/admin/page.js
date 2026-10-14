@@ -203,6 +203,8 @@ export default function AdminHub() {
   const { data: roadmap } = useSWR(wantDecisions ? "/api/admin/roadmap" : null, fetcher, { revalidateOnFocus: false });
   const [showAll, setShowAll] = useState(false);
   const { data: alertsData } = useSWR(`/api/admin/ops-alerts`, fetcher);
+  // S4S (14/10/2026, notifiche in app): cosa aspetta chi guarda nel calendario S4S
+  const { data: s4s } = useSWR(me?.authenticated && canSee("/admin/s4s", me.capabilities, me.admin) ? "/api/admin/s4s/inbox" : null, fetcher, { revalidateOnFocus: false });
 
   const greeting = useMemo(() => {
     const h = now.getHours();
@@ -310,6 +312,26 @@ export default function AdminHub() {
           <Metric label="Venduto per turno" value={fmt$(perShift(base))} delta={fmtDelta(perShift(base), perShift(basePrev))} deltaLabel={dl} />
         </div>
       </HeroMetric>}
+
+      {s4s?.access && (s4s.count > 0 || s4s.missingKit?.length > 0 || s4s.proposals > 0) && (
+        <section style={{ ...card, marginBottom: 14 }}>
+          <div style={{ padding: "14px 16px 10px" }}>
+            <SectionTitle aside={s4s.count ? `${s4s.count} da fare` : null}>S4S</SectionTitle>
+          </div>
+          {s4s.requests.slice(0, 3).map((r) => (
+            <ActionRow key={r.id} severity="warning" title={`${r.partner} propone uno S4S a ${r.page}`} detail={phone ? null : `${new Date(`${r.day}T00:00:00Z`).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" })} alle ${r.time}`} href="/admin/s4s#oggi" cta="Rispondi" />
+          ))}
+          {s4s.todayTodo.length > 0 && (
+            <ActionRow severity="warning" title={`${s4s.todayTodo.length} S4S di oggi da programmare`} detail={phone ? null : s4s.todayTodo.slice(0, 3).map((t) => `${t.page} con ${t.partner} alle ${t.time}`).join(" · ")} href="/admin/s4s#oggi" cta="Apri" />
+          )}
+          {s4s.missingKit?.length > 0 && (
+            <ActionRow severity="info" title={`Kit da preparare: ${s4s.missingKit.slice(0, 3).map((k) => k.page).join(", ")}${s4s.missingKit.length > 3 ? ` e altre ${s4s.missingKit.length - 3}` : ""}`} detail={phone ? null : "Pagine con uno scambio nei prossimi 7 giorni e foto o testo mancanti"} href="/admin/s4s#kit" cta="Carica" />
+          )}
+          {s4s.proposals > 0 && !s4s.all && (
+            <ActionRow severity="info" title={`${s4s.proposals} proposte del giro aspettano il tuo sì`} detail={phone ? null : "Prossimi 14 giorni: puoi accettarle tutte insieme quelle senza problemi"} href="/admin/s4s#planner" cta="Guarda" />
+          )}
+        </section>
+      )}
 
       {alertsData && !isHr && (
         <section className="ds-open" style={{ ...card, marginBottom: 14 }}>

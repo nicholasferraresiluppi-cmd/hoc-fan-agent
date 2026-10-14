@@ -238,7 +238,7 @@ export const iconFor = (href) => ICON_BY_HREF.get(href) || Compass;
 /** Voci di menu piatte { href, label, group } — per l'analytics d'uso. */
 export const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label, group: g.label })));
 
-function NavItem({ href, label, icon: Icon, isActive, badge }) {
+function NavItem({ href, label, icon: Icon, isActive, badge, badgeTone }) {
   return (
     <Link
       href={href}
@@ -282,7 +282,8 @@ function NavItem({ href, label, icon: Icon, isActive, badge }) {
       {badge > 0 && (
         <span style={{
           marginLeft: "auto", minWidth: 18, height: 18, padding: "0 5px",
-          borderRadius: 9, background: CP.accentRed, color: "#2b0f0f",
+          // rosso = alert critici; "todo" (cose da fare, es. S4S) = accento, non allarme
+          borderRadius: 9, background: badgeTone === "todo" ? CP.accent : CP.accentRed, color: badgeTone === "todo" ? CP.accentInk : "#2b0f0f",
           fontFamily: FONTS.mono, fontSize: 10.5, fontWeight: 700,
           display: "inline-flex", alignItems: "center", justifyContent: "center",
         }}>{badge}</span>
@@ -402,6 +403,15 @@ export default function Sidebar() {
   const criticalCount = (opsAlertsData?.alerts || []).filter(
     (a) => a.severity === "critical" && a.status !== "resolved"
   ).length;
+
+  // S4S (14/10/2026): richieste da accettare + S4S di oggi da programmare, per chi vede il calendario
+  const { data: s4sInbox } = useSWR(me?.authenticated && canSee("/admin/s4s", me.capabilities, me.admin) ? "/api/admin/s4s/inbox" : null, silentFetcher, {
+    revalidateOnFocus: false,
+    refreshInterval: 5 * 60 * 1000,
+  });
+  const s4sCount = s4sInbox?.count || 0;
+  const badgeOf = (href, flag) => (href === "/admin/s4s" ? s4sCount : flag ? criticalCount : 0);
+  const toneOf = (href) => (href === "/admin/s4s" ? "todo" : undefined);
 
   const allowed = (href) => !me?.authenticated || canSee(href, me.capabilities, me.admin);
   const [theme, setTheme] = useTheme();
@@ -535,7 +545,7 @@ export default function Sidebar() {
             {sec.items.map((item) => (
               <NavItem key={item.href} href={item.href} label={item.label} icon={iconFor(item.href)}
                 isActive={item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + "/")}
-                badge={item.badge ? criticalCount : 0} />
+                badge={badgeOf(item.href, item.badge)} badgeTone={toneOf(item.href)} />
             ))}
           </div>
         ))}
@@ -568,6 +578,8 @@ export default function Sidebar() {
                       label={item.label}
                       icon={item.icon}
                       isActive={isItemActive(item)}
+                      badge={badgeOf(item.href, false)}
+                      badgeTone={toneOf(item.href)}
                     />
                   ))}
                 </div>

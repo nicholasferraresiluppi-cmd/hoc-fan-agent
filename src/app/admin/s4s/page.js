@@ -1265,6 +1265,8 @@ export default function S4SPage() {
   }, []);
   const url = `/api/admin/s4s${splitId ? `?split=${encodeURIComponent(splitId)}` : ""}`;
   const { data, error, mutate, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false });
+  const { data: inbox, mutate: mutateInbox } = useSWR("/api/admin/s4s/inbox", fetcher, { revalidateOnFocus: false });
+  const reloadAll = () => { mutate(); mutateInbox(); };
   const v = data?.view;
   // chi vede tutte le creator parte dal planner, un sales manager dai compiti di oggi
   const allView = Boolean(v?.me?.all);
@@ -1311,18 +1313,18 @@ export default function S4SPage() {
       <div role="tablist" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, borderBottom: `1px solid ${CP.border}`, paddingBottom: 12 }}>
         {tabs.map(([k, l]) => (
           <FilterChip key={k} active={current === k} onClick={() => { setTab(k); try { window.history.replaceState(null, "", `#${k}`); } catch { /* ok */ } }}
-            label={k === "risultati" && v.unmatched.length ? `${l} · ${v.unmatched.length} da attribuire` : l} />
+            label={k === "risultati" && v.unmatched.length ? `${l} · ${v.unmatched.length} da attribuire` : k === "oggi" && inbox?.count ? `${l} · ${inbox.count}` : l} attn={k === "oggi" && inbox?.count > 0 && current !== "oggi"} />
         ))}
       </div>
-      {(current === "oggi" || current === "planner") && <Requests v={v} onEdit={setEditing} reload={mutate} />}
-      {current === "oggi" && <Oggi key={v.split.id} v={v} reload={mutate} />}
-      {current === "disponibilita" && <AvailEditor key={v.split.id} v={v} reload={mutate} />}
-      {current === "kit" && <KitEditor key={v.split.id} v={v} reload={mutate} />}
+      {(current === "oggi" || current === "planner") && <Requests v={v} onEdit={setEditing} reload={reloadAll} />}
+      {current === "oggi" && <Oggi key={v.split.id} v={v} reload={reloadAll} />}
+      {current === "disponibilita" && <AvailEditor key={v.split.id} v={v} reload={reloadAll} />}
+      {current === "kit" && <KitEditor key={v.split.id} v={v} reload={reloadAll} />}
       {current === "planner" && <Planner key={v.split.id} v={v} onEdit={setEditing} onNew={setEditing} onOpenDay={(day) => { setFocusDay(day); setTab("agenda"); }} />}
-      {current === "agenda" && <Agenda key={`${v.split.id}-${focusDay || ""}`} v={v} reload={mutate} initialDay={focusDay} onEdit={setEditing} />}
-      {editing && <DealEditor key={editing.id || `${editing.day}-${editing.a || ""}`} v={v} deal={editing} onClose={() => setEditing(null)} reload={mutate} />}
-      {current === "risultati" && <Risultati v={v} reload={mutate} />}
-      {current === "impostazioni" && <Impostazioni key={v.split.id} v={v} splitId={v.split.id} reload={mutate} />}
+      {current === "agenda" && <Agenda key={`${v.split.id}-${focusDay || ""}`} v={v} reload={reloadAll} initialDay={focusDay} onEdit={setEditing} />}
+      {editing && <DealEditor key={editing.id || `${editing.day}-${editing.a || ""}`} v={v} deal={editing} onClose={() => setEditing(null)} reload={reloadAll} />}
+      {current === "risultati" && <Risultati v={v} reload={reloadAll} />}
+      {current === "impostazioni" && <Impostazioni key={v.split.id} v={v} splitId={v.split.id} reload={reloadAll} />}
       <Note style={{ marginTop: 28 }}>
         Come si misura: abbonati arrivati da link di tracciamento con S4S o SFS nel nome, sulle pagine dello split, negli ultimi {v.meta.window_days} giorni. Il partner si ricava dal nome del link solo quando è inequivocabile. &quot;Incasso netto a 30 giorni&quot; = quanto resta a House of Creators (dopo la quota di OnlyFans) da ciò che i fan arrivati da quel link spendono nei primi 30 giorni, contato solo sui fan abbonati da almeno 30 giorni e su link con almeno {v.meta.min_mature} di loro. Riguarda le pagine, non gli operatori: non entra in score né compensi.
       </Note>
