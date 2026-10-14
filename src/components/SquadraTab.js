@@ -183,9 +183,9 @@ export default function SquadraTab({ splitId, names, coachingOps }) {
     { key: "m2", label: monthName(m.m2), align: "right", muted: true, render: (r) => fx(r.m2) },
     { key: "m1", label: monthName(m.m1), align: "right", muted: true, render: (r) => fx(r.m1) },
     { key: "chat", label: "Indice chat", align: "right", render: (r) => r.chat == null ? <span style={{ color: CP.textMuted }}>–</span> : <span title={r.disagree ? "Le due misure non sono d'accordo: da guardare" : undefined} style={{ color: r.disagree ? CP.accentSoftText : CP.textSecondary, ...NUM }}>{fx(r.chat)}{r.disagree ? " ≠" : ""}</span> },
-    { key: "sph", label: "$/ora", align: "right", render: (r) => `${r.sph}` },
+    { key: "sph", label: "$/ora di turno", align: "right", render: (r) => (r.sph == null ? "–" : `${r.sph}`) },
     { key: "exp", label: "Attesi", align: "right", muted: true, render: (r) => (r.exp == null ? "–" : `${r.exp}`) },
-    { key: "h", label: "Ore", align: "right", muted: true },
+    { key: "h", label: "Ore di turno", align: "right", muted: true },
     { key: "tenure", label: "Mesi di buste", align: "right", muted: true, render: (r) => r.tenure ?? "–" },
     { key: "crs", label: "Modelle (quota ore)", sortable: false, muted: true, render: (r) => <span style={{ fontSize: 12, whiteSpace: "normal", display: "inline-block", minWidth: 170 }}>{r.top.map(([c, s]) => `${cname(c)} ${Math.round(s * 100)}%`).join(" · ") || "–"}</span> },
     { key: "night", label: "Notte", align: "right", muted: true, render: (r) => (r.night == null ? "–" : `${Math.round(r.night * 100)}%`) },
@@ -206,7 +206,7 @@ export default function SquadraTab({ splitId, names, coachingOps }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <h2 style={{ fontSize: 17, fontWeight: 500, color: CP.textPrimary, margin: 0 }}>Chi sa vendere, a parità di modella e fascia oraria{data.split ? ` · ${data.split.name}` : " · tutta HOC"}</h2>
         <p style={{ fontSize: 12, color: CP.textMuted, margin: 0, lineHeight: 1.55, maxWidth: 860 }}>
-          Bravura = venduto all'ora (Infloww) diviso il venduto all'ora dei colleghi sulla stessa modella e nella stessa fascia oraria; 1,00 = come loro. Periodo dal 1 {monthName(m.m2)} al {dmy(m.infloww_until)} (ultimo export Infloww); le ore per modella e fascia vengono dal calendario CreatorsPro, usato solo come calendario. {data.split ? "In squadra chi fa almeno metà delle ore sulle modelle dello split." : "Scegli uno split per vedere solo la sua squadra."} L'indice chat è quello della scheda Operatori: una misura diversa, solo sui PPV in chat.
+          Bravura = venduto (Infloww) per ora di turno, diviso quello dei colleghi sulla stessa modella e nella stessa fascia oraria; 1,00 = come loro. Periodo dal 1 {monthName(m.m2)} al {dmy(m.infloww_until)} (ultimo export Infloww). Le ore di turno, per modella e fascia, vengono dal calendario CreatorsPro, usato solo come calendario: le ore «attive» di Infloww cambiano definizione da un mese all'altro e non sono confrontabili. {data.split ? "In squadra chi fa almeno metà delle ore sulle modelle dello split." : "Scegli uno split per vedere solo la sua squadra."} L'indice chat è quello della scheda Operatori: una misura diversa, solo sui PPV in chat.
         </p>
       </div>
 
@@ -237,7 +237,7 @@ export default function SquadraTab({ splitId, names, coachingOps }) {
       <DataTable columns={cols} rows={visible} defaultSort={{ key: "idx", dir: -1 }} minWidth={1700} maxHeight="72vh" empty="Nessun operatore con questi filtri." />
 
       <p style={{ fontSize: 12, color: CP.textMuted, margin: 0, lineHeight: 1.55, maxWidth: 900 }}>
-        Come leggerla: misura solo la vendita, non la qualità delle conversazioni né la presenza. Correlazione, non causa. Avvisi: «poche ore» sotto 100 ore Infloww; «nuovo» fino a 3 mesi di buste (un nuovo in fondo è normale); «altalenante» se i due mesi distano più di 0,5; «pochi colleghi» se il confronto si regge su meno di 3 colleghi. Mesi di buste contati dal {monthName(data.tenure_from)} {data.tenure_from?.slice(0, 4)}: il massimo vuol dire «da allora o prima». Notte = quota di ore fra mezzanotte e mattina. Busta = totale delle buste CreatorsPro del mese (passa sopra per lo stato: le buste aperte possono ancora cambiare). Presenza dal CRM persone; «Nessun turno da 3 settimane» = ultimo turno più vecchio di 21 giorni. Contatto e nota si salvano da soli e li vede chi ha accesso a questa pagina. Dati del {new Date(data.generated_at).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}, ricalcolati ogni notte.
+        Come leggerla: misura solo la vendita, non la qualità delle conversazioni né la presenza. Correlazione, non causa. Avvisi: «poche ore» sotto 100 ore di turno; «nuovo» fino a 3 mesi di buste (un nuovo in fondo è normale); «altalenante» se i due mesi distano più di 0,5; «pochi colleghi» se il confronto si regge su meno di 3 colleghi. Mesi di buste contati dal {monthName(data.tenure_from)} {data.tenure_from?.slice(0, 4)}: il massimo vuol dire «da allora o prima». Notte = quota di ore fra mezzanotte e mattina. Busta = totale delle buste CreatorsPro del mese (passa sopra per lo stato: le buste aperte possono ancora cambiare). Presenza dal CRM persone; «Nessun turno da 3 settimane» = ultimo turno più vecchio di 21 giorni. Contatto e nota si salvano da soli e li vede chi ha accesso a questa pagina. Dati del {new Date(data.generated_at).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}, ricalcolati ogni notte.
       </p>
 
       {msg && (
