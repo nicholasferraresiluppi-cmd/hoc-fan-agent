@@ -6,12 +6,12 @@
 // - con il bot HOC amministratore del canale arrivano in tempo reale le entrate e le uscite
 //   (update chat_member) e, per chi entra da un link d'invito creato dal bot, QUALE link ha usato;
 // - l'elenco degli iscritti che c'erano prima del bot NON si recupera (la Bot API non lo dà);
-// - il passaggio a OnlyFans non si vede da Telegram: si misura col link di tracciamento OF
-//   pubblicato nel canale (clic e abbonati da onlyfans.links_stats).
+// - il passaggio a OnlyFans non si vede da Telegram: si misura dai link di tracciamento OF che
+//   hanno "telegram"/"TG" nel nome (clic e abbonati da onlyfans.links_stats), per creator.
 // Privacy: degli iscritti si tiene solo un HMAC dell'id Telegram (serve ad attribuire l'uscita al
 // link da cui la persona era entrata). Niente username, niente nomi: i numeri escono aggregati.
 
-export const TG_VERSION = "tg-1";
+export const TG_VERSION = "tg-2";
 
 // Fonti da cui si crea un link d'invito. Il nome del link su Telegram ha un tetto di 32 caratteri.
 export const SOURCES = {
@@ -54,26 +54,84 @@ export function parseChannelInput(raw) {
 export const channelUrl = (p) => (p?.handle ? `https://t.me/${p.handle}` : p?.invite ? `https://t.me/+${p.invite}` : null);
 export const sameChannel = (a, b) => Boolean((a?.handle && a.handle === b?.handle) || (a?.invite && a.invite === b?.invite));
 
-/** Valida i campi del form. → { ok, value } | { ok:false, error } */
+// Un canale può essere di più creator (es. un canale in comune, un duo). Dati vecchi: `creator` singolo.
+export const creatorsOf = (ch) => (Array.isArray(ch?.creators) && ch.creators.length ? ch.creators : ch?.creator ? [ch.creator] : []);
+
+/** Valida una riga del form. → { ok, value } | { ok:false, error } */
 export function cleanChannel(body) {
-  const creator = clip(body?.creator, 80);
-  if (!creator) return { ok: false, error: "Scegli la creator" };
+  const raw = Array.isArray(body?.creators) ? body.creators : body?.creator ? [body.creator] : [];
+  const creators = [...new Set(raw.map((c) => clip(c, 80)).filter(Boolean))].slice(0, 10);
+  if (!creators.length) return { ok: false, error: "Scegli almeno una creator" };
   const parsed = parseChannelInput(body?.url);
   if (!parsed) return { ok: false, error: "Il link del canale non si legge: incolla t.me/nome, @nome o il link d'invito t.me/+…" };
   const kind = body?.kind === "gruppo" ? "gruppo" : "canale";
   return {
     ok: true,
     value: {
-      creator,
+      creators,
       handle: parsed.handle || null,
       invite: parsed.invite || null,
       url: channelUrl(parsed),
       kind,
       manager: clip(body?.manager, 80),
       note: clip(body?.note, 300),
-      of_link: clip(body?.of_link, 200),
     },
   };
+}
+
+/**
+ * Più canali in un colpo solo (il form ha N righe). Le righe vuote si saltano; un errore su una riga
+ * blocca tutto (niente salvataggi a metà) e dice quale riga. Doppioni dentro l'invio = errore.
+ * → { ok, values } | { ok:false, error, row }
+ */
+export function cleanBatch(rows, shared = {}) {
+  const list = (Array.isArray(rows) ? rows : []).slice(0, 30);
+  const values = [];
+  for (let i = 0; i < list.length; i++) {
+    const r = list[i] || {};
+    const empty = !String(r.url || "").trim() && !(r.creators || []).length;
+    if (empty) continue;
+    const c = cleanChannel({ ...shared, ...r });
+    if (!c.ok) return { ok: false, error: `Riga ${i + 1}: ${c.error}`, row: i };
+    if (values.some((v) => sameChannel(v, c.value))) return { ok: false, error: `Riga ${i + 1}: canale già inserito in una riga sopra`, row: i };
+    values.push(c.value);
+  }
+  if (!values.length) return { ok: false, error: "Aggiungi almeno un canale", row: 0 };
+  return { ok: true, values };
+}
+
+/**
+ * Creator dopo una modifica fatta da chi segue solo alcune creator: può togliere o aggiungere solo
+ * le sue; quelle degli altri restano. `allows(nome)` = la segue.
+ */
+export function mergeCreators(prev, next, allows) {
+  const keep = prev.filter((c) => !allows(c));
+  const mine = next.filter((c) => allows(c));
+  return [...new Set([...keep, ...mine])];
+}
+
+// Link di tracciamento OnlyFans usati su Telegram: si riconoscono dal NOME (verificato il 14/10/2026 sul
+// warehouse: 543 link su 35 creator, "post telegram", "TG PRINCIPALE", "TG ENG", "Main Tg"…).
+// Niente da compilare per i sales: una creator ha spesso più link Telegram.
+export const TG_LINK_RE = /telegram|\btg\b/i;
+
+/**
+ * Righe per link (creator_id, link_name, subs, clicks, revenue, subs_30, clicks_30) → per persona.
+ * `personOfId(id)` = nome della creator (persona, IT+EN uniti). Link ordinati per abbonati 30 giorni.
+ */
+export function summarizeOfLinks(rows, personOfId) {
+  const out = {};
+  for (const r of rows || []) {
+    if (!TG_LINK_RE.test(r.link_name || "")) continue;
+    const who = personOfId(String(r.creator_id));
+    if (!who) continue;
+    const o = (out[who] ||= { links: [], subs: 0, clicks: 0, revenue: 0, subs_30: 0, clicks_30: 0 });
+    const l = { name: r.link_name, url: r.link_url, subs: +r.subs || 0, clicks: +r.clicks || 0, revenue: +r.revenue || 0, subs_30: +r.subs_30 || 0, clicks_30: +r.clicks_30 || 0 };
+    o.links.push(l);
+    for (const k of ["subs", "clicks", "revenue", "subs_30", "clicks_30"]) o[k] += l[k];
+  }
+  for (const o of Object.values(out)) o.links.sort((a, b) => b.subs_30 - a.subs_30 || b.subs - a.subs);
+  return out;
 }
 
 /** Nome del link d'invito su Telegram (max 32): "Instagram · bio" → visibile agli admin del canale. */

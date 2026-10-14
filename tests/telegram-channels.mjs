@@ -1,7 +1,7 @@
 // node tests/telegram-channels.mjs — logica pura dei canali Telegram (lib/telegram-channels-core.js)
 import assert from "node:assert/strict";
 import {
-  parseChannelInput, cleanChannel, inviteLinkName, classifyMemberUpdate, botStatusOf, summarizeStats,
+  parseChannelInput, cleanChannel, cleanBatch, mergeCreators, creatorsOf, summarizeOfLinks, TG_LINK_RE, inviteLinkName, classifyMemberUpdate, botStatusOf, summarizeStats,
   pushMemberCount, memberDelta, romeDay, sameChannel, NO_LINK, OTHER_LINK, FOLDER,
 } from "../src/lib/telegram-channels-core.js";
 
@@ -20,15 +20,51 @@ t("link d'invito privati", () => {
 t("input illeggibili", () => {
   for (const s of ["", "ciao come va", "https://instagram.com/giulia", "t.me/joinchat", "@ab", "https://t.me/share"]) assert.equal(parseChannelInput(s), null, s);
 });
-t("form: creator obbligatoria, link valido, tipo", () => {
+t("form: almeno una creator, link valido, tipo", () => {
   assert.equal(cleanChannel({ url: "@giuliavip" }).ok, false);
-  assert.equal(cleanChannel({ creator: "Giulia", url: "boh boh" }).ok, false);
-  const c = cleanChannel({ creator: " Giulia Amici ", url: "@GiuliaVip", kind: "gruppo", manager: "Antonio" });
+  assert.equal(cleanChannel({ creators: [], url: "@giuliavip" }).ok, false);
+  assert.equal(cleanChannel({ creators: ["Giulia"], url: "boh boh" }).ok, false);
+  const c = cleanChannel({ creators: [" Giulia Amici ", "Martina Scavo", "Giulia Amici"], url: "@GiuliaVip", kind: "gruppo", manager: "Antonio" });
   assert.equal(c.ok, true);
   assert.equal(c.value.url, "https://t.me/giuliavip");
   assert.equal(c.value.kind, "gruppo");
-  assert.equal(c.value.creator, "Giulia Amici");
-  assert.equal(cleanChannel({ creator: "G", url: "@giuliavip", kind: "x" }).value.kind, "canale");
+  assert.deepEqual(c.value.creators, ["Giulia Amici", "Martina Scavo"]);
+  assert.ok(!("of_link" in c.value));
+  assert.deepEqual(cleanChannel({ creator: "Vecchio", url: "@giuliavip" }).value.creators, ["Vecchio"]);
+  assert.equal(cleanChannel({ creators: ["G"], url: "@giuliavip", kind: "x" }).value.kind, "canale");
+});
+t("più canali in un invio", () => {
+  const ok = cleanBatch([{ creators: ["A"], url: "@canaleuno" }, { creators: [], url: "" }, { creators: ["A", "B"], url: "t.me/+abcdefgh12" }], { manager: "Ilaria" });
+  assert.equal(ok.ok, true);
+  assert.equal(ok.values.length, 2);
+  assert.equal(ok.values[1].manager, "Ilaria");
+  const bad = cleanBatch([{ creators: ["A"], url: "@canaleuno" }, { creators: ["A"], url: "ciao ciao" }]);
+  assert.equal(bad.ok, false); assert.equal(bad.row, 1); assert.match(bad.error, /^Riga 2/);
+  const dup = cleanBatch([{ creators: ["A"], url: "@canaleuno" }, { creators: ["B"], url: "t.me/CanaleUno" }]);
+  assert.equal(dup.ok, false); assert.match(dup.error, /già inserito/);
+  assert.equal(cleanBatch([]).ok, false);
+});
+t("modifica da chi segue solo alcune creator", () => {
+  const mine = (n) => n === "A";
+  assert.deepEqual(mergeCreators(["A", "B"], ["C"], mine), ["B"]);
+  assert.deepEqual(mergeCreators(["B"], ["A"], mine), ["B", "A"]);
+  assert.deepEqual(creatorsOf({ creator: "X" }), ["X"]);
+  assert.deepEqual(creatorsOf({ creators: ["Y"], creator: "X" }), ["Y"]);
+});
+t("link OF Telegram riconosciuti dal nome (nomi veri del warehouse)", () => {
+  for (const n of ["post telegram", "TG PRINCIPALE", "TG ENG", "Main Tg", "TELEGRAM_principale_ZDI0", "Funnel TG Canale Creator"]) assert.ok(TG_LINK_RE.test(n), n);
+  for (const n of ["S4S Giulia 12/10", "tiktok bio", "Instagram storia", "stgallen", "tgif"]) assert.ok(!TG_LINK_RE.test(n), n);
+  const names = { 1: "Giulia - IT", 2: "Giulia - EN" };
+  const out = summarizeOfLinks([
+    { creator_id: 1, link_name: "post telegram", link_url: "u1", subs: 100, clicks: 900, subs_30: 10, clicks_30: 50 },
+    { creator_id: 2, link_name: "TG ENG", link_url: "u2", subs: 40, clicks: 300, subs_30: 25, clicks_30: 80 },
+    { creator_id: 2, link_name: "tiktok", link_url: "u3", subs: 999, subs_30: 999 },
+    { creator_id: 9, link_name: "telegram", link_url: "u4", subs: 5, subs_30: 5 },
+  ], (id) => (names[id] || "").replace(/\s*-\s*[A-Z]{2}$/, "") || null);
+  assert.deepEqual(Object.keys(out), ["Giulia"]);
+  assert.equal(out.Giulia.subs_30, 35);
+  assert.equal(out.Giulia.subs, 140);
+  assert.equal(out.Giulia.links[0].name, "TG ENG");
 });
 t("stesso canale: per @nome o per codice d'invito", () => {
   assert.ok(sameChannel({ handle: "a1234" }, { handle: "a1234" }));
@@ -132,6 +168,8 @@ console.log(`telegram-channels: ${n} gruppi ok`);
   registerHooks({
     resolve(specifier, context, next) {
       if (specifier === "@vercel/kv") return { url: "data:text/javascript,export const kv = globalThis.__tgFakeKv;", shortCircuit: true };
+      if (specifier === "@/lib/s4s") return { url: "data:text/javascript,export const getNames = async () => ({});", shortCircuit: true };
+      if (specifier === "@/lib/creator-scope") return { url: "data:text/javascript,export const personOf = (a) => String(a || '').replace(/ - [A-Z]{2}$/, '');", shortCircuit: true };
       if (specifier.startsWith("@/")) {
         const p = path.join(SRC, specifier.slice(2));
         return next(pathToFileURL(p.endsWith(".js") ? p : `${p}.js`).href, context);
@@ -166,8 +204,8 @@ console.log(`telegram-channels: ${n} gruppi ok`);
   let k = 0;
   const ok = (c, msg) => { assert.ok(c, msg); k++; };
 
-  const pub = await T.saveChannel({ creator: "Giulia Amici", handle: "giuliavip", invite: null, url: "https://t.me/giuliavip", kind: "canale", manager: "", note: "", of_link: "" }, { by: "u1" });
-  const priv = await T.saveChannel({ creator: "Marta", handle: null, invite: "AbCdEf123456", url: "https://t.me/+AbCdEf123456", kind: "canale", manager: "", note: "", of_link: "" }, { by: "u1" });
+  const pub = await T.saveChannel({ creators: ["Giulia Amici"], handle: "giuliavip", invite: null, url: "https://t.me/giuliavip", kind: "canale", manager: "", note: "" }, { by: "u1" });
+  const priv = await T.saveChannel({ creators: ["Marta", "Giulia Amici"], handle: null, invite: "AbCdEf123456", url: "https://t.me/+AbCdEf123456", kind: "canale", manager: "", note: "" }, { by: "u1" });
   ok((await T.listChannels()).length === 2, "due canali in mappa");
 
   // bot aggiunto al canale pubblico: abbinamento automatico per @nome
