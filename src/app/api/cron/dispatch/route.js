@@ -157,6 +157,10 @@ export async function POST(request) {
   }
   await beat("transfer", out.transfer);
 
+  // Squadra di Coaching vendite (14/10/2026): classifica dello split da KPI Infloww +
+  // calendario CP, nella SUA funzione (legge 3 mesi di wage: budget proprio)
+  out.squadra = await kickEndpoint(request, "/api/cron/squadra");
+
   // Centro HR (29/09/2026): riconciliazione notturna con la lista ClickUp HR,
   // nella SUA funzione (budget proprio). Si chiama sempre: a sync spenta la route
   // lascia solo il heartbeat (nessuna pulizia delle archiviate dal 03/10/2026:
