@@ -315,6 +315,9 @@ export function buildCreators(profiles, crm) {
       firstSeen: Math.min(...ps.map((p) => p.firstSeen || Infinity)) || null,
       reels: ps.flatMap((p) => (p.reels || []).map((r) => ({ ...r, h: p.h }))).sort((a, b) => (b.v || 0) - (a.v || 0)).slice(0, 9),
       // foto salvata (privata, non scade) se c'è, altrimenti il link di Instagram finché vale
+      // catena dei seguiti (14/10/2026): quando abbiamo letto chi segue, e quanti ne segue
+      folAt: Math.max(0, ...ps.map((p) => p.folAt || 0)) || null,
+      fing: main.fing ?? null,
       pic: ps.map((p) => (p.picKey ? `/api/admin/scouting/pic/${encodeURIComponent(p.h)}?v=${p.picAt || 0}` : livePic(p.pic))).find(Boolean) || null,
     });
   }

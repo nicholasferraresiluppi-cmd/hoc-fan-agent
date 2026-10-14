@@ -90,6 +90,7 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
             <dl style={{ margin: 0, display: "grid", gridTemplateColumns: "minmax(110px, 220px) minmax(0,1fr)", gap: "8px 18px", fontSize: 14 }}>
               <dt style={{ color: CP.textSecondary }}>Trovata</dt><dd style={{ margin: 0 }}>{main.src === "segnalata" ? `Segnalata${main.by ? ` da ${main.by}` : ""}` : main.src === "profili simili" ? "Ricerca nei profili collegati" : main.src === "parole chiave" ? "Ricerca per parole chiave" : "Prima ricerca"}{c.firstSeen ? ` · ${fmtDate(c.firstSeen)}` : ""}</dd>
               <dt style={{ color: CP.textSecondary }}>Numeri</dt><dd style={{ margin: 0 }}>Giro settimanale{main.lastSeen ? ` · ultimo ${fmtDate(main.lastSeen)}` : ""}</dd>
+              <dt style={{ color: CP.textSecondary }}>Chi segue</dt><dd style={{ margin: 0 }}>{c.folAt ? `Letto il ${fmtDate(c.folAt)}${c.fing != null ? ` · segue ${fmtFull(c.fing)} account` : ""}` : c.sig === "forte" ? `Da leggere${c.fing != null ? ` · segue ${fmtFull(c.fing)} account` : ""}: è il prossimo anello della catena` : "Non serve finché non ha un profilo a pagamento"}</dd>
               <dt style={{ color: CP.textSecondary }}>Nicchia e format</dt><dd style={{ margin: 0 }}>{c.g === "Da classificare" ? "Da classificare" : "Letti da bio e ultimi post · da confermare a occhio"}</dd>
               {main.nota && <><dt style={{ color: CP.textSecondary }}>Nota della ricerca</dt><dd style={{ margin: 0 }}>{main.nota}</dd></>}
             </dl>
