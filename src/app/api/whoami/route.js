@@ -7,6 +7,7 @@ import { getCreatorScope } from "@/lib/creator-scope";
 import { resolveWorkspace } from "@/lib/workspace-store";
 import { defaultWorkspace } from "@/lib/workspaces";
 import { restrictionFor } from "@/lib/restricted-roles";
+import { hasAccountingAccess } from "@/lib/compensi-access";
 
 export async function GET() {
   try {
@@ -28,6 +29,10 @@ export async function GET() {
     const workspace = va
       ? (va.target ? await resolveWorkspace(va.target, { admin: false, roles }) : { id: defaultWorkspace({ admin: false, roles }), source: "ruolo" })
       : await resolveWorkspace(userId, { admin, roles }).catch(() => ({ id: defaultWorkspace({ admin, roles }), source: "ruolo" }));
+    // Contabilità (15/10/2026): NON è una capability RBAC (l'admin le ha tutte) — accesso a parte,
+    // dato solo dal titolare (lib/compensi-access). Pseudo-permesso solo per mostrare la voce di menu;
+    // le API si difendono da sole. In "Vedi come" mai.
+    if (!va && (await hasAccountingAccess(userId).catch(() => false))) capabilities["accounting.private"] = "all";
     // appena attivata la 2FA la cache del controllo si aggiorna subito
     if (adminRaw && user?.twoFactorEnabled) await kv.set(`mfa:ok:${userId}`, 1, { ex: 600 }).catch(() => {});
     const security = adminRaw

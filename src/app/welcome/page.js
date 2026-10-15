@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import useSWR from "swr";
-import { canSee } from "@/lib/nav-access";
+import { canSee, isPrivateHref } from "@/lib/nav-access";
 import {
   BarChart3, GraduationCap, Users, Layers,
   ArrowRight, Sparkles, LayoutDashboard,
@@ -80,7 +80,7 @@ const iconBox = { width: 36, height: 36, borderRadius: 8, background: CP.surface
 export default function WelcomePage() {
   const { data: me } = useSWR("/api/whoami", (u) => fetch(u).then((r) => r.json()), { revalidateOnFocus: false });
   // Finché whoami non risponde si mostra tutto (come prima); poi solo ciò che il ruolo apre
-  const allowed = (href) => !me?.authenticated || canSee(href, me.capabilities, me.admin);
+  const allowed = (href) => (!me?.authenticated && !isPrivateHref(href)) || canSee(href, me?.capabilities, me?.admin);
   const modules = MODULES.filter((m) => allowed(m.primaryCta.href));
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body, color: CP.textPrimary }}>
