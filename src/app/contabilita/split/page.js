@@ -15,7 +15,7 @@ import { Plus, Loader2, Lock, Trash2, Check, RefreshCw } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { PageHead, FilterChip, Notice, DataTable, SectionTitle, Metric, card } from "@/components/ds";
-import { computeSplitMonth } from "@/lib/split-core";
+import { computeSplitMonth, applyBusteExclusions } from "@/lib/split-core";
 import { describeTiers, parseDealText } from "@/lib/creator-deals-core";
 import { monthLabel, nextMonthId } from "@/lib/compensi-core";
 
@@ -166,7 +166,7 @@ function TeamEditor({ team, onSave, onDelete, onClose }) {
 }
 
 // ── Dettaglio di un team nel mese ────────────────────────────────────────────
-function TeamDetail({ t, fx }) {
+function TeamDetail({ t, fx, onExclude }) {
   return (
     <div style={{ display: "grid", gap: 10 }}>
       {t.creator && <div style={{ fontSize: 13, color: CP.textSecondary }}>Accordo: {t.tiers?.length ? describeTiers(t.tiers) : "non impostato"} → {t.revenueUsd !== null ? `${usd(t.revenueUsd)} × ${pct(t.feePct)} = ${usd(t.feeUsd)} × ${fx ?? "?"} = ${eur(t.feeEur)}` : "revenue mancante"}</div>}
@@ -191,7 +191,7 @@ function TeamDetail({ t, fx }) {
             {t.chatterBuste.map((b, i) => (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12, padding: "3px 0", color: CP.textSecondary }}>
                 <span>{b.name} <span style={{ color: ["PAID", "CLOSED", "PAYABLE"].includes(b.status) ? CP.textMuted : CP.accentSoftText }}>{b.status === "OPEN" ? "aperta" : b.status === "PAID" ? "pagata" : b.status === "CLOSED" ? "chiusa" : b.status === "PAYABLE" ? "da pagare" : b.status.toLowerCase()}</span>{b.usd < b.wageUsd - 1 ? <span style={{ color: CP.textMuted }}> · divisa: {usd(b.usd)} su {usd(b.wageUsd)}</span> : null}</span>
-                <span>{usd(b.usd)}</span>
+                <span style={{ display: "flex", gap: 8, alignItems: "center" }}>{usd(b.usd)}{onExclude && <button style={{ ...btn(), padding: "2px 8px", fontSize: 11 }} onClick={() => onExclude(b.name)}>Escludi</button>}</span>
               </div>
             ))}
           </div>
@@ -270,10 +270,19 @@ export default function SplitPage() {
       const bs = r.busteStatus;
       const src = bs ? `buste CreatorsPro${bs.open ? ` · ${bs.open} su ${bs.total} non chiuse` : " · tutte chiuse"}` : "CreatorsPro";
       for (const [id, v] of Object.entries(r.chatter || {})) teams[id] = { ...(teams[id] || {}), chatterUsd: v, chatterSource: src, chatterBuste: r.buste?.[id] || [] };
-      return { ...d, teams };
+      return { ...d, teams: d.excludedBuste?.length ? applyBusteExclusions(teams, d.excludedBuste) : teams };
     });
     setInfo([`Presi: revenue di ${Object.keys(r.revenue || {}).length} team, chatter di ${Object.keys(r.chatter || {}).length}. Controlla e salva.`, ...(r.notes || [])].join(" "));
   });
+  const excludeBusta = (name) => {
+    const note = prompt(`Togliere la busta di ${name} dal conto di ${monthLabel(month)}? Motivo (facoltativo):`);
+    if (note === null) return;
+    upd((d) => {
+      const excludedBuste = [...(d.excludedBuste || []), { name, note, at: Date.now() }];
+      return { ...d, excludedBuste, teams: applyBusteExclusions(d.teams, excludedBuste) };
+    });
+  };
+  const includeBusta = (name) => upd((d) => ({ ...d, excludedBuste: (d.excludedBuste || []).filter((x) => x.name !== name) }));
   const fetchFx = () => run("fx", async () => { const r = await fetcher(`/api/contabilita/tasso?m=${month}`); upd((d) => ({ ...d, fx: { rate: r.rate, source: r.source } })); });
 
   const teamsAll = cfg.teams || [];
@@ -373,6 +382,17 @@ export default function SplitPage() {
             <button style={btn()} onClick={() => upd((d) => ({ ...d, extras: [...(d.extras || []), { id: tmpId(), teamId: "", label: "", person: "", eur: "" }] }))}><Plus size={14} />Spesa extra</button>
           </section>
         )}
+        {tab === "extra" && (doc.excludedBuste || []).length > 0 && (
+          <section style={{ ...card, padding: 16, marginTop: 14 }}>
+            <SectionTitle aside={(doc.excludedBuste || []).length}>Buste escluse dal chatter di {monthLabel(month)}</SectionTitle>
+            {doc.excludedBuste.map((x) => (
+              <div key={x.name} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 13, padding: "6px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
+                <span><span style={{ color: CP.textPrimary }}>{x.name}</span>{x.note ? <span style={muted}> · {x.note}</span> : null}</span>
+                <button style={{ ...btn(), padding: "2px 8px", fontSize: 12 }} onClick={() => includeBusta(x.name)}>Rimetti (poi «Prendi dai dati»)</button>
+              </div>
+            ))}
+          </section>
+        )}
 
         {tab === "persone" && (
           <DataTable
@@ -418,7 +438,7 @@ export default function SplitPage() {
       )}
 
       <Modal open={Boolean(open)} onClose={() => setOpen(null)} title={calc?.teams.find((t) => t.id === open)?.name || ""} maxWidth={760}>
-        {open && calc?.teams.find((t) => t.id === open) && <TeamDetail t={calc.teams.find((t) => t.id === open)} fx={calc.fx} />}
+        {open && calc?.teams.find((t) => t.id === open) && <TeamDetail t={calc.teams.find((t) => t.id === open)} fx={calc.fx} onExclude={excludeBusta} />}
       </Modal>
       <Modal open={Boolean(editTeam)} onClose={() => setEditTeam(null)} title={editTeam?.isNew ? "Nuovo team" : `Team · ${editTeam?.team?.name || ""}`} maxWidth={760}>
         {editTeam && <TeamEditor team={editTeam.team} onClose={() => setEditTeam(null)} onSave={(t) => putTeam(t, editTeam.isNew)} onDelete={editTeam.isNew ? null : () => delTeam(editTeam.team.id)} />}

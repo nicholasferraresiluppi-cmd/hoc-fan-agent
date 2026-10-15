@@ -1,7 +1,7 @@
 // Unit test — split-core. Esegui: node tests/split.mjs
 // Il caso grosso rifà il foglio "Team & Stipendi" di agosto 2026 di Nicholas al centesimo.
 import assert from "node:assert/strict";
-import { computeSplitMonth, personCost, activeIn, sanitizeConfig, sanitizeMonthInput, sanitizePerson, chatterFromWages } from "../src/lib/split-core.js";
+import { computeSplitMonth, personCost, activeIn, sanitizeConfig, sanitizeMonthInput, sanitizePerson, chatterFromWages, applyBusteExclusions } from "../src/lib/split-core.js";
 
 let n = 0;
 const t = (name, fn) => { try { fn(); n++; } catch (e) { console.error("✗", name); throw e; } };
@@ -124,4 +124,12 @@ t("voci della busta fuori dai turni: ridistribuite", () => {
   assert.equal(r.byTeam.a_0001.usd, 90); assert.equal(r.byTeam.b_0001.usd, 60);
 });
 t("operatore che non tocca le nostre: ignorato", () => assert.equal(chatterFromWages([{ status: "OPEN", total_wage: 9, shifts: [sh(9, 1, [["Altra - IT", 1]])] }], tw).total, 0));
+t("busta esclusa: tolta da tutti i team e dal conteggio delle aperte", () => {
+  const inp = { a_0001: { chatterUsd: 500, chatterSource: "buste", chatterBuste: [{ name: "Ilaria Maggio", status: "OPEN", usd: 300 }, { name: "Op1", status: "PAID", usd: 200 }] },
+    b_0001: { chatterUsd: 100, chatterSource: "buste", chatterBuste: [{ name: "ilaria maggio", status: "OPEN", usd: 40 }, { name: "Op2", status: "PAYABLE", usd: 60 }] } };
+  const o = applyBusteExclusions(inp, [{ name: "Ilaria Maggio" }]);
+  assert.equal(o.a_0001.chatterUsd, 200); assert.equal(o.b_0001.chatterUsd, 60);
+  assert.equal(o.a_0001.chatterBuste.length, 1);
+  assert.equal(o.a_0001.chatterSource, "buste CreatorsPro · tutte chiuse · 1 esclusa");
+});
 console.log(`split: ${n} ok`);

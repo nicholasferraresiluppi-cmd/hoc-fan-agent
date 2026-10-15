@@ -99,6 +99,9 @@ export function sanitizeMonthInput(d, newId) {
       eur: round2(toNumber(x?.eur)),
     })).filter((x) => x.label || x.eur),
     note: str(d?.note, 1000),
+    // buste tolte dal conto del mese (es. turno sospetto da verificare): per nome dell'operatore
+    excludedBuste: (Array.isArray(d?.excludedBuste) ? d.excludedBuste : []).slice(0, 50)
+      .map((x) => ({ name: str(x?.name, 120), note: str(x?.note, 300), at: Number(x?.at) || null })).filter((x) => x.name),
   };
 }
 
@@ -271,4 +274,28 @@ export function chatterFromWages(wages, teams) {
   for (const v of Object.values(byTeam)) v.buste.sort((a, b) => b.usd - a.usd);
   const open = Object.entries(status).filter(([s]) => !CLOSED_WAGE_STATUSES.includes(s)).reduce((n, [, c]) => n + c, 0);
   return { byTeam, status, total: Object.values(status).reduce((a, b) => a + b, 0), open };
+}
+
+/**
+ * Toglie dal chatter del mese le buste escluse (per nome operatore, su tutti i team
+ * dove compaiono) e ricalcola la fonte "N su M non chiuse" sulle buste rimaste.
+ * Lavora sull'input del mese (teams:{[id]:{chatterUsd, chatterBuste}}), puro.
+ */
+export function applyBusteExclusions(teamsInput, excluded) {
+  const out = {};
+  const ex = new Set((excluded || []).map((x) => personKey(x.name)));
+  const names = new Map();
+  for (const [id, v] of Object.entries(teamsInput || {})) {
+    const buste = v?.chatterBuste || [];
+    if (!buste.length) { out[id] = v; continue; }
+    const keep = buste.filter((b) => !ex.has(personKey(b.name)));
+    const removed = buste.filter((b) => ex.has(personKey(b.name))).reduce((s, b) => s + (Number(b.usd) || 0), 0);
+    for (const b of keep) names.set(personKey(b.name), (names.get(personKey(b.name)) || "") + "|" + b.status);
+    out[id] = { ...v, chatterBuste: keep, chatterUsd: v.chatterUsd === null || v.chatterUsd === undefined ? v.chatterUsd : round2(Math.max(0, v.chatterUsd - removed)) };
+  }
+  const total = names.size;
+  const open = [...names.values()].filter((st) => st.split("|").some((x) => x && !CLOSED_WAGE_STATUSES.includes(x))).length;
+  const src = `buste CreatorsPro · ${open ? `${open} su ${total} non chiuse` : "tutte chiuse"}${ex.size ? ` · ${ex.size} esclus${ex.size === 1 ? "a" : "e"}` : ""}`;
+  for (const v of Object.values(out)) if (v?.chatterBuste?.length || (v?.chatterSource || "").startsWith("buste")) v.chatterSource = src;
+  return out;
 }
