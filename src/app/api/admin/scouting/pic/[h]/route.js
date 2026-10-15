@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(_req, { params }) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.SCOUTING_USE);
   if (!az.ok) return new Response(null, { status: az.status });
   const { h } = await params;
   const pic = await readPic(h);

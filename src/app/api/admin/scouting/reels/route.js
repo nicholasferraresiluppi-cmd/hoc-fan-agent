@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 180;
 
 export async function GET(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.SCOUTING_USE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const h = normHandle(new URL(request.url).searchParams.get("h"));
   if (!h) return Response.json({ error: "account mancante" }, { status: 400 });
@@ -20,7 +20,7 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.SCOUTING_USE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   if (!process.env.APIFY_TOKEN) return Response.json({ error: "Manca la chiave Apify nelle impostazioni di HOC Pro." }, { status: 503 });
   const body = await request.json().catch(() => ({}));

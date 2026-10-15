@@ -10,13 +10,13 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 export async function GET() {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.SCOUTING_USE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   return Response.json({ items: (await getInbox()).slice(0, 50) });
 }
 
 export async function POST(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.SCOUTING_USE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const body = await request.json().catch(() => ({}));
   if (!String(body.text || "").trim()) return Response.json({ error: "Incolla il link del profilo o del reel." }, { status: 400 });
