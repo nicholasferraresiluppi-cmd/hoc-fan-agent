@@ -850,8 +850,13 @@ function cmpCsv(cols, rows) {
   window.setTimeout(() => window.URL.revokeObjectURL(a.href), 1000);
 }
 
-export function CreatorCompare({ creators, setCreators }) {
-  const [range, setRange] = useState(null);
+// `embedded` (Analisi vendite, 15/10/2026): niente titolo né periodo propri — la pagina che lo ospita ha i suoi, e il
+// periodo arriva da lì (`range`/`setRange`) così le due viste guardano sempre gli stessi giorni. `onOpenCreator(nome)`
+// rende cliccabile il nome e apre la scheda della creator.
+export function CreatorCompare({ creators, setCreators, embedded = false, range: extRange, setRange: extSetRange, onOpenCreator }) {
+  const [ownRange, setOwnRange] = useState(null);
+  const range = extRange !== undefined ? extRange : ownRange;
+  const setRange = extSetRange || setOwnRange;
   const [byPerson, setByPerson] = useState(true);
   const [sort, setSort] = useState({ key: "gross", dir: "desc" });
   const swr = useLk("confronto", range, creators);
@@ -884,15 +889,15 @@ export function CreatorCompare({ creators, setCreators }) {
     </div>
   );
   return (
-    <LkPage title="Confronto creator"
-      description="Tutte le creator sulla stessa riga, con i numeri veri. Sotto ogni nome una riga di lettura: le differenze più forti rispetto alla creator tipica del gruppo."
+    <LkPage title={embedded ? null : "Confronto creator"}
+      description={embedded ? null : "Tutte le creator sulla stessa riga, con i numeri veri. Sotto ogni nome una riga di lettura: le differenze più forti rispetto alla creator tipica del gruppo."}
       filters={<>
         <div role="group" aria-label="Raggruppa" style={{ display: "inline-flex", gap: 6 }}>
           <button onClick={() => setByPerson(true)} style={seg(byPerson)} aria-pressed={byPerson}>Per creator</button>
           <button onClick={() => setByPerson(false)} style={seg(!byPerson)} aria-pressed={!byPerson}>Per pagina (IT, EN…)</button>
         </div>
         <LkSelect label="Creator" options={(swr.data?.creators || []).map((c) => ({ value: c.id, label: c.name }))} value={creators} onChange={setCreators} width={220} />
-        <PeriodPicker value={range || swr.data?.range || null} onChange={setRange} max={yesterday()} loading={swr.isLoading && Boolean(swr.data)} />
+        {!embedded && <PeriodPicker value={range || swr.data?.range || null} onChange={setRange} max={yesterday()} loading={swr.isLoading && Boolean(swr.data)} />}
       </>}>
       <State swr={swr}>
         {d && (
@@ -926,7 +931,9 @@ export function CreatorCompare({ creators, setCreators }) {
                     <tr key={r.creator_id || r.name}>
                       <td style={{ ...td, textAlign: "left", paddingLeft: 0, whiteSpace: "normal", minWidth: 300, maxWidth: 380 }}>
                         <div style={{ fontSize: 15 }}>
-                          {r.name}{byPerson && r.pages > 1 && <span style={{ color: CP.textMuted, fontSize: 12 }}> · {r.pages} pagine</span>}
+                          {onOpenCreator
+                            ? <button onClick={() => onOpenCreator(r.name)} title="Apri la scheda della creator" style={{ background: "none", border: 0, padding: 0, font: "inherit", color: CP.textPrimary, cursor: "pointer", textDecoration: "underline", textDecorationColor: CP.border, textUnderlineOffset: 3 }}>{r.name}</button>
+                            : r.name}{byPerson && r.pages > 1 && <span style={{ color: CP.textMuted, fontSize: 12 }}> · {r.pages} pagine</span>}
                         </div>
                         <div style={{ fontSize: 12, color: CP.textSecondary, marginTop: 4, lineHeight: 1.45 }}>{r.lettura}</div>
                       </td>

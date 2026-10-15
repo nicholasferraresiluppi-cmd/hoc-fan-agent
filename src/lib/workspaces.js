@@ -25,14 +25,18 @@ export const WORKSPACES = {
         { href: "/admin", label: "Oggi", exact: true },
         { href: "/admin/alerts", label: "Alert operativi", badge: true },
       ] },
-      { title: "Andamento", items: [
-        { href: "/admin/pnl-live", label: "P&L Live" },
-        { href: "/admin/le-mie-creator", label: "Revenue e chat" },
-        { href: "/admin/analisi-vendite", label: "Analisi vendite", desc: "Come vanno le creator e perché, con il perché letto nelle chat" },
-        { href: "/admin/looker", label: "HOC Analytics", desc: "Le pagine di Looker Studio con la stessa disposizione e le stesse formule" },
-        { href: "/admin/infloww-agency", label: "Incassi Infloww" },
-        { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
+      // gruppi per DOMANDA (15/10/2026): prima 7 voci in fila, di cui 4 su "come vanno le creator" senza dire la differenza
+      { title: "Le creator", items: [
+        { href: "/admin/analisi-vendite", label: "Analisi vendite", desc: "Tutte a confronto sugli stessi numeri, come vanno e perché, scheda di ogni creator" },
+        { href: "/admin/le-mie-creator", label: "Revenue e chat", desc: "Oggi, dal vivo: proiezione di fine mese, benvenuto, fan senza risposta, latenza" },
+      ] },
+      { title: "Soldi", items: [
+        { href: "/admin/pnl-live", label: "P&L Live", desc: "Margini per creator" },
+        { href: "/admin/infloww-agency", label: "Incassi Infloww", desc: "Gli incassi dell'agenzia" },
         { href: "/admin/comp-review", label: "Anomalie compensi", desc: "Chi incassa molto più o molto meno della media del team sulla stessa creator, per dollari in gioco" },
+      ] },
+      { title: "Operatori", items: [
+        { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
       ] },
       { title: "Persone e decisioni", items: [
         { href: "/admin/hr", label: "Persone HR" },
@@ -41,6 +45,9 @@ export const WORKSPACES = {
         { href: "/admin/qualita", label: "Controllo qualità" },
         { href: "/admin/citta", label: "La città" },
         { href: "/admin/roadmap", label: "Roadmap" },
+      ] },
+      { title: "Dati completi", items: [
+        { href: "/admin/looker", label: "Report Looker", desc: "Le 16 pagine originali di Looker Studio (HOC Analytics), con le stesse formule" },
       ] },
     ],
   },
@@ -57,9 +64,8 @@ export const WORKSPACES = {
         { href: "/admin/alerts", label: "Alert operativi", badge: true },
       ] },
       { title: "Vendite", items: [
-        { href: "/admin/analisi-vendite", label: "Analisi vendite", desc: "Come vanno le tue creator e perché, con il perché letto nelle chat" },
+        { href: "/admin/analisi-vendite", label: "Analisi vendite", desc: "Le tue creator a confronto, come vanno e perché, scheda di ogni creator" },
         { href: "/admin/fan-da-recuperare", label: "Fan da recuperare", desc: "Ogni mattina i fan che spendevano e si sono fermati, con una bozza di ripresa personale" },
-        { href: "/admin/looker", label: "HOC Analytics", desc: "Le pagine di Looker Studio con la stessa disposizione e le stesse formule" },
         { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
         { href: "/leaderboard/creators", label: "Creator" },
         { href: "/admin/le-mie-creator", label: "Revenue e chat", desc: "Giulia Amici, Martina Scavo, Rebecca: proiezione di fine mese, obiettivo, benvenuto, fan senza risposta, latenza, PPV" },
@@ -75,6 +81,9 @@ export const WORKSPACES = {
         { href: "/admin/shift-quality", label: "Qualità turni" },
         { href: "/cm-cockpit", label: "Cockpit CM" },
         { href: "/admin/operator-signals", label: "Profilo operatore" },
+      ] },
+      { title: "Dati completi", items: [
+        { href: "/admin/looker", label: "Report Looker", desc: "Le 16 pagine originali di Looker Studio (HOC Analytics), con le stesse formule" },
       ] },
     ],
   },

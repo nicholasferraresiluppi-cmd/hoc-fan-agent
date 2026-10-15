@@ -52,13 +52,13 @@ export const lkCard = { background: CP.surface, border: `1px solid ${CP.border}`
 export function LkPage({ title, description, filters, actions, children }) {
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", gap: 20, alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap" }}>
+      {(title || description || actions) && <div style={{ display: "flex", gap: 20, alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 420px", minWidth: 0 }}>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 500, color: CP.textPrimary, letterSpacing: "-0.01em" }}>{title}</h2>
           {description && <p style={{ margin: "4px 0 0", fontSize: 13, color: CP.textSecondary, lineHeight: 1.45, maxWidth: 900 }}>{description}</p>}
         </div>
         {actions && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{actions}</div>}
-      </div>
+      </div>}
       {filters && <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>{filters}</div>}
       {children}
     </div>

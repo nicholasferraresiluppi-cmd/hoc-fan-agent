@@ -13,6 +13,9 @@ import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Metric, DataTable, Notice, SectionTitle, card } from "@/components/ds";
 import PeriodPicker from "@/components/PeriodPicker";
 import { isDay, presetsFor } from "@/lib/period-range";
+import { CreatorCompare } from "@/components/looker/pages";
+import { LkStyles } from "@/components/looker/Lk";
+import { personOf } from "@/lib/analisi-vendite-diagnosi";
 
 const DAY = 86400e3;
 const iso = (t) => new Date(t).toISOString().slice(0, 10);
@@ -256,7 +259,7 @@ function CreatorDetail({ d, onBack, onDati }) {
       <section style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {p.live && <a href={`/admin/le-mie-creator?creator=${encodeURIComponent(p.live)}`} style={actionBtn}>Chat e revenue dal vivo</a>}
         <a href="/admin/sales-coaching" style={actionBtn}>Coaching vendite</a>
-        <button onClick={() => onDati(p.ids)} style={actionBtn}>Apri {p.name} in HOC Analytics</button>
+        <button onClick={() => onDati(p.ids)} style={actionBtn}>Apri {p.name} nel Report Looker</button>
       </section>
     </div>
   );
@@ -480,11 +483,15 @@ export default function AnalisiVenditePage() {
   const [ready, setReady] = useState(false);
   const [range, setRange] = useState(() => presetsFor(yesterday())[0]); // ultimi 7 giorni, fino a ieri
   const [person, setPerson] = useState(null); // nome della persona aperta
+  // due viste sulle stesse creator e sullo stesso periodo (15/10/2026): le schede con il perché, o tutte in tabella
+  const [vista, setVista] = useState("come");
+  const [cmpCreators, setCmpCreators] = useState([]);
 
   useEffect(() => {
     const u = readUrl();
     const linked = isDay(u.dal) && isDay(u.al) ? { from: u.dal, to: u.al } : null;
     if (u.vista === "dati") { window.location.replace(lookerHref(SCHEDA_TO_PAGE[u.scheda] || "recap-dashboard", u.creators)); return; }
+    if (u.vista === "confronto") setVista("confronto");
     if (u.creator) setPerson(u.creator);
     if (linked) setRange(linked);
     else if (u.giorni >= 1 && u.giorni <= 400) setRange({ from: iso(Date.now() - u.giorni * DAY), to: yesterday() }); // link vecchi con ?giorni=
@@ -494,8 +501,8 @@ export default function AnalisiVenditePage() {
     if (!ready) return;
     const def = presetsFor(yesterday())[0];
     const moved = range.from !== def.from || range.to !== def.to;
-    writeUrl({ creator: person, dal: moved ? range.from : null, al: moved ? range.to : null });
-  }, [ready, person, range.from, range.to]);
+    writeUrl({ vista: vista === "confronto" ? "confronto" : null, creator: vista === "confronto" ? null : person, dal: moved ? range.from : null, al: moved ? range.to : null });
+  }, [ready, vista, person, range.from, range.to]);
 
   const list = useDiag("diagnosi", range, null);
   const persons = list.data?.persons || [];
@@ -508,12 +515,28 @@ export default function AnalisiVenditePage() {
   return (
     <div style={{ display: "grid", gap: 20, maxWidth: 1280, margin: "0 auto", padding: "8px 0 40px" }}>
       <PageHead crumbs={[{ label: "Performance" }]} title="Analisi vendite"
-        subtitle="Come vanno le tue creator e perché. Prima chi sta perdendo di più." />
+        subtitle="Come vanno le tue creator e perché, oppure tutte a confronto sugli stessi numeri." />
 
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <div role="tablist" aria-label="Vista" style={{ display: "inline-flex", gap: 4, padding: 3, border: `1px solid ${CP.border}`, borderRadius: 10 }}>
+          {[["come", "Come vanno e perché"], ["confronto", "Tutte a confronto"]].map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={vista === k} onClick={() => { setVista(k); if (k === "confronto") setPerson(null); }}
+              style={{ border: 0, borderRadius: 7, padding: "6px 12px", fontSize: 13, cursor: "pointer", background: vista === k ? CP.surfaceAlt : "transparent", color: vista === k ? CP.textPrimary : CP.textSecondary }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <PeriodPicker value={range} onChange={setRange} max={yesterday()} loading={list.isLoading && Boolean(list.data)} />
+      </div>
+
+      {vista === "confronto" ? (
+        <>
+          <LkStyles />
+          <CreatorCompare embedded creators={cmpCreators} setCreators={setCmpCreators} range={range} setRange={setRange}
+            onOpenCreator={(name) => { setPerson(personOf(name)); setVista("come"); window.scrollTo?.(0, 0); }} />
+        </>
+      ) : (
       <>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <PeriodPicker value={range} onChange={setRange} max={yesterday()} loading={list.isLoading && Boolean(list.data)} />
-          </div>
 
           {list.error && <Notice danger>{list.error.message}</Notice>}
           {list.data?.empty && <Notice>{list.data.message}</Notice>}
@@ -542,6 +565,7 @@ export default function AnalisiVenditePage() {
             </>
           )}
       </>
+      )}
     </div>
   );
 }
