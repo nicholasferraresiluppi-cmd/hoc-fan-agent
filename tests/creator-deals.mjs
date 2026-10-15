@@ -1,11 +1,10 @@
-// Unit test — creator-deals-core. Esegui: node tests/creator-deals.mjs
+// Unit test — creator-deals-core (lettura delle percentuali). Esegui: node tests/creator-deals.mjs
 import assert from "node:assert/strict";
-import { parseDealText, shareUsd, describeTiers, computeDealsMonth, sanitizeDeal } from "../src/lib/creator-deals-core.js";
+import { parseDealText, shareUsd, describeTiers } from "../src/lib/creator-deals-core.js";
 
 let n = 0;
 const t = (name, fn) => { try { fn(); n++; } catch (e) { console.error("✗", name); throw e; } };
 
-// ── Lettura del foglio di Nicholas ──
 t("flat", () => assert.deepEqual(parseDealText("60% flat").tiers, [{ fromUsd: 0, pct: 0.6 }]));
 t("due scaglioni con k", () => assert.deepEqual(parseDealText("23% <=150k ; 25% >150k;").tiers, [{ fromUsd: 0, pct: 0.23 }, { fromUsd: 150000, pct: 0.25 }]));
 t("quattro scaglioni", () => assert.deepEqual(parseDealText("30% <= 25k; 35% <= 50k; 40% <= 65k; 45% > 65k;").tiers,
@@ -14,76 +13,21 @@ t("senza spazio dopo ;", () => assert.deepEqual(parseDealText("35% <= 25k; 40% <
   [{ fromUsd: 0, pct: 0.35 }, { fromUsd: 25000, pct: 0.4 }, { fromUsd: 33000, pct: 0.5 }]));
 t("decimali con virgola e punto finale", () => assert.deepEqual(parseDealText("50%<=130k; 52,5%>130k.").tiers, [{ fromUsd: 0, pct: 0.5 }, { fromUsd: 130000, pct: 0.525 }]));
 t("100% flat", () => assert.deepEqual(parseDealText("100% flat").tiers, [{ fromUsd: 0, pct: 1 }]));
-t("Pamela: '>= 25k' come primo pezzo → avviso, vale da 0", () => {
-  const r = parseDealText("50% >= 25k ; 60% > 90k;");
-  assert.deepEqual(r.tiers, [{ fromUsd: 0, pct: 0.5 }, { fromUsd: 90000, pct: 0.6 }]);
-  assert.equal(r.warnings.length, 1);
+t("sales manager: «sopra» letterale, sotto soglia zero", () => {
+  const r = parseDealText("2% > 170k; 2,25% > 200k; 2,5% > 230k");
+  assert.deepEqual(r.tiers, [{ fromUsd: 170000, pct: 0.02 }, { fromUsd: 200000, pct: 0.0225 }, { fromUsd: 230000, pct: 0.025 }]);
+  assert.equal(shareUsd(r.tiers, 160000).usd, 0);
+  assert.equal(shareUsd(r.tiers, 210000).usd, 4725);
 });
 t("testo incomprensibile → avviso", () => assert.equal(parseDealText("metà").warnings.length, 1));
 
-// ── Calcolo quota ──
 const claudia = parseDealText("30% <= 25k; 35% <= 50k; 40% <= 65k; 45% > 65k;").tiers;
-t("raggiunto: 40k → 35% su tutto", () => assert.deepEqual(shareUsd(claudia, 40000, "raggiunto"), { usd: 14000, pct: 0.35 }));
-t("raggiunto: esattamente 25k resta al 30%", () => assert.equal(shareUsd(claudia, 25000).usd, 7500));
-t("progressivo: 40k → 25k×30% + 15k×35%", () => assert.equal(shareUsd(claudia, 40000, "progressivo").usd, 7500 + 5250));
-t("progressivo: 80k", () => assert.equal(shareUsd(claudia, 80000, "progressivo").usd, 7500 + 8750 + 6000 + 6750));
+t("scaglione raggiunto su tutto: 40k → 35%", () => assert.deepEqual(shareUsd(claudia, 40000), { usd: 14000, pct: 0.35 }));
+t("esattamente 25k resta al 30%", () => assert.equal(shareUsd(claudia, 25000).usd, 7500));
+t("progressivo (non usato in pagina)", () => assert.equal(shareUsd(claudia, 40000, "progressivo").usd, 7500 + 5250));
 t("revenue 0", () => assert.equal(shareUsd(claudia, 0).usd, 0));
 t("descrizione", () => assert.equal(describeTiers([{ fromUsd: 0, pct: 0.23 }, { fromUsd: 150000, pct: 0.25 }]), "23% fino a 150.000$ · 25% sopra 150.000$"));
 t("descrizione flat", () => assert.equal(describeTiers([{ fromUsd: 0, pct: 0.55 }]), "55% flat"));
-
-// ── Mese per ecosistema ──
-const deals = [
-  { id: "d1", creator: "Claudia Surace", tiers: claudia, mode: "raggiunto", ecosystem: "Claudia" },
-  { id: "d2", creator: "Camilla Stelluti", tiers: parseDealText("40% <= 15k; 50% > 15k;").tiers, mode: "raggiunto", ecosystem: "Camilla" },
-  { id: "d3", creator: "Matilde Micheli", revenueName: "Matilde", tiers: [{ fromUsd: 0, pct: 0.5 }], mode: "raggiunto", ecosystem: "" },
-  { id: "d4", creator: "Ex creator", tiers: [{ fromUsd: 0, pct: 0.5 }], active: false },
-];
-const monthDoc = { fx: { rate: 0.9 }, revenues: [{ name: "Claudia Surace", usd: 40000 }, { name: "camilla stelluti", usd: 10000 }, { name: "Matilde", usd: 2000 }, { name: "Michela", usd: 5000 }] };
-const byTeam = [{ team: "Claudia", totalEur: 5000, lines: [1, 2] }, { team: "Camilla", totalEur: 6000, lines: [1] }, { team: "HR", totalEur: 3000, lines: [1] }];
-const m = computeDealsMonth(deals, monthDoc, byTeam);
-t("accordi non attivi esclusi", () => assert.equal(m.creators.length, 3));
-t("quota in € = $ × cambio", () => {
-  const c = m.creators.find((x) => x.creator === "Claudia Surace");
-  assert.equal(c.shareUsd, 14000); assert.equal(c.shareEur, 12600); assert.equal(c.creatorEur, 36000 - 12600);
-});
-t("nome revenue diverso dal nome creator", () => assert.equal(m.creators.find((x) => x.creator === "Matilde Micheli").shareUsd, 1000));
-t("netto ecosistema = quota − costo squadra", () => {
-  const cl = m.ecosystems.find((e) => e.ecosystem === "Claudia");
-  assert.equal(cl.netEur, 12600 - 5000);
-  const ca = m.ecosystems.find((e) => e.ecosystem === "Camilla");
-  assert.equal(ca.netEur, 4000 * 0.9 - 6000);
-});
-t("squadre non collegate = struttura", () => assert.deepEqual(m.otherTeams.map((x) => x.team), ["HR"]));
-t("creator senza ecosistema", () => assert.deepEqual(m.unlinkedCreators.map((c) => c.creator), ["Matilde Micheli"]));
-t("revenue senza accordo", () => assert.deepEqual(m.revenuesWithoutDeal.map((r) => r.name), ["Michela"]));
-t("netto ecosistemi (le squadre non collegate restano fuori)", () => { assert.equal(m.totals.ecoNet, 12600 + 3600 - 11000); assert.equal(m.totals.otherCost, 3000); });
-t("più squadre in un ecosistema, assegnazione esplicita", () => {
-  const ds = [{ id: "a", creator: "Christina", tiers: [{ fromUsd: 0, pct: 0.3 }], ecosystem: "Cantera" }, { id: "b", creator: "Rebecca", tiers: [{ fromUsd: 0, pct: 0.4 }], ecosystem: "Cantera" }];
-  const md = { fx: { rate: 1 }, revenues: [{ name: "Christina", usd: 10000 }, { name: "Rebecca", usd: 10000 }] };
-  const bt = [{ team: "Cantera", totalEur: 2000, lines: [1] }, { team: "Chatter Manager", totalEur: 1500, lines: [1, 2] }, { team: "HR", totalEur: 900, lines: [1] }, { team: "Live", totalEur: 500, lines: [1] }];
-  const x = computeDealsMonth(ds, md, bt, { "Chatter Manager": "cantera", Live: "" });
-  assert.equal(x.ecosystems.length, 1);
-  assert.equal(x.ecosystems[0].costEur, 3500);
-  assert.equal(x.ecosystems[0].netEur, 7000 - 3500);
-  assert.deepEqual(x.ecosystems[0].teams.map((t) => t.team), ["Cantera", "Chatter Manager"]);
-  assert.deepEqual(x.otherTeams.map((t) => t.team), ["HR", "Live"]);
-});
-t("squadra assegnata a un ecosistema senza creator: costo visibile, quota zero", () => {
-  const x = computeDealsMonth([], { fx: { rate: 1 }, revenues: [] }, [{ team: "Fishball", totalEur: 1000, lines: [1] }], { Fishball: "Fishball" });
-  assert.equal(x.ecosystems[0].netEur, -1000);
-});
-t("senza cambio: niente €, problema segnalato", () => {
-  const x = computeDealsMonth(deals, { revenues: monthDoc.revenues }, byTeam);
-  assert.equal(x.creators[0].shareEur, null);
-  assert.ok(x.creators[0].problems.includes("manca il cambio del mese"));
-});
-t("revenue non inserita", () => {
-  const x = computeDealsMonth(deals, { fx: { rate: 0.9 }, revenues: [{ name: "Claudia Surace", usd: null }] }, byTeam);
-  assert.ok(x.creators[0].problems.includes("revenue del mese non inserita"));
-});
-t("sanitize: mode sconosciuto → raggiunto, id nuovo", () => {
-  const d = sanitizeDeal({ creator: "X", mode: "boh", tiers: [{ fromUsd: 0, pct: 1.5 }] }, () => "d_test");
-  assert.equal(d.mode, "raggiunto"); assert.equal(d.id, "d_test");
-});
+t("descrizione «sopra» dal primo", () => assert.equal(describeTiers(parseDealText("3% > 80k; 3,5% > 100k").tiers), "3% sopra 80.000$ · 3,5% sopra 100.000$"));
 
 console.log(`creator-deals: ${n} ok`);

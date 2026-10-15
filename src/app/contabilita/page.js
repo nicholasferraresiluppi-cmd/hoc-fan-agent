@@ -20,7 +20,6 @@ import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { PageHead, FilterChip, Notice, DataTable, SectionTitle, Metric, card } from "@/components/ds";
 import { computeMonth, monthLabel, nextMonthId, personKey, normalizeTiers, namesMatch } from "@/lib/compensi-core";
-import { DealsTab, EcosystemsTab } from "./accordi";
 
 const fetcher = async (url) => {
   const r = await fetch(url, { cache: "no-store" });
@@ -255,7 +254,6 @@ export default function ContabilitaPage() {
   const calc = useMemo(() => (draft ? computeMonth(draft) : null), [draft]);
   const teams = useMemo(() => (calc ? calc.byTeam.map((t) => t.team) : []), [calc]);
   const { data: crm } = useSWR(tab === "crm" && home ? "/api/contabilita/crm" : null, fetcher, { revalidateOnFocus: false });
-  const { data: dealsDoc, error: dealsErr, mutate: mutateDeals } = useSWR((tab === "accordi" || tab === "ecosistemi") && home ? "/api/contabilita/accordi" : null, fetcher, { revalidateOnFocus: false });
 
   useEffect(() => {
     if (!dirty) return;
@@ -303,17 +301,18 @@ export default function ContabilitaPage() {
   const ql = q.trim().toLowerCase();
   const match = (s) => !ql || String(s || "").toLowerCase().includes(ql);
 
-  const tabs = [["persone", "Da pagare"], ["squadre", "Per squadra"], ["revenue", "Revenue e cambio"], ["accordi", "Accordi creator"], ["ecosistemi", "Ecosistemi"], ["crm", "Incrocio CRM"], ...(home.owner ? [["accessi", "Accessi"]] : [])];
+  const tabs = [["persone", "Da pagare"], ["squadre", "Per squadra"], ["revenue", "Revenue e cambio"], ["crm", "Incrocio CRM"], ...(home.owner ? [["accessi", "Accessi"]] : [])];
 
   return (
     <div style={{ padding: "24px 16px 80px", maxWidth: 1280, margin: "0 auto" }}>
       <PageHead
         crumbs={[{ label: "People" }, { label: "Contabilità" }]}
         title="Compensi team"
-        subtitle="Quanto si paga a chi, mese per mese, gli accordi con le creator e quanto rende ogni ecosistema. Operatori esclusi. Visibile solo a chi ha l'accesso contabilità."
+        subtitle="Quanto si paga a chi, mese per mese: fissi e gamification, una voce per persona. Operatori esclusi. Visibile solo a chi ha l'accesso contabilità."
         actions={<>
           {dirty && <button style={btn(true)} onClick={save} disabled={saving}>{saving ? <Loader2 size={14} /> : <Check size={14} />}Salva modifiche</button>}
           <button style={btn()} onClick={newMonth}><Plus size={14} />Nuovo mese</button>
+          <a href="/contabilita/split" style={{ ...btn(), textDecoration: "none" }}>Conto dello split</a>
         </>}
       />
 
@@ -423,11 +422,6 @@ export default function ContabilitaPage() {
         {tab === "crm" && (
           <CrmCross crm={crm} lines={draft.lines} />
         )}
-
-        {(tab === "accordi" || tab === "ecosistemi") && (dealsErr ? <Notice danger>{dealsErr.message}</Notice> : !dealsDoc ? <div style={{ color: CP.textMuted }}>Carico gli accordi…</div>
-          : tab === "accordi"
-            ? <DealsTab dealsDoc={dealsDoc} owner={home.owner} month={month} monthDoc={draft} byTeam={calc.byTeam} send={send} onSaved={(d) => mutateDeals(d, { revalidate: false })} />
-            : <EcosystemsTab dealsDoc={dealsDoc} owner={home.owner} month={month} monthDoc={draft} byTeam={calc.byTeam} send={send} onSaved={(d) => mutateDeals(d, { revalidate: false })} />)}
 
         {tab === "accessi" && home.owner && <AccessPanel />}
       </>)}

@@ -1,25 +1,18 @@
 /**
- * Accordi creator ed ecosistemi — logica pura (15/10/2026, Nicholas).
- *
- * "Lato deal e net sulle creator": per ogni creator la percentuale che resta a
- * HOC sulle sue revenue (in DOLLARI, a scaglioni o flat), convertita in euro al
- * cambio del mese; poi, per ecosistema (= una squadra dei Compensi team), quanto
- * entra dalle sue creator meno quanto costa la squadra = il netto.
+ * Percentuali a scaglioni scritte come nei fogli di Nicholas — logica pura (15/10/2026).
+ * Usata dal conto dello split (split-core.js) per gli accordi creator e persona.
  *
  * Le percentuali arrivano dal foglio di Nicholas in forma di testo
  * ("30% <= 25k; 35% <= 50k; 45% > 65k;", "60% flat"): `parseDealText` le legge.
  *
  * Scaglioni: la percentuale dello scaglione raggiunto vale su TUTTA la revenue
  * (confermato da Nicholas 15/10/2026, come la gamification dei compensi e le wage CP).
- * Il modo "progressivo" (fasce tipo IRPEF) resta nel calcolo ma non in pagina.
+ * Il modo "progressivo" (fasce tipo IRPEF) resta nel calcolo ma non è usato.
+ * "P% > X" come primo pezzo è letterale: sotto X la percentuale è zero.
  *
- * Solo le creator dello split di Nicholas (le altre: accordo non attivo).
- * Fuori da qui (dichiarato in pagina): il costo degli operatori (wage CP) e le
- * squadre non assegnate a un ecosistema non entrano nel netto.
  */
-import { normalizeTiers, tierFor, personKey, toNumber } from "./compensi-core.js";
+import { normalizeTiers, tierFor, toNumber } from "./compensi-core.js";
 
-export const DEAL_MODES = ["raggiunto", "progressivo"];
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 /** "25k" / "1,5k" / "130.000" / "65000" → dollari. */
@@ -56,9 +49,8 @@ export function parseDealText(text) {
       tiers.push({ fromUsd: prevUpper, pct: s.pct });
       prevUpper = s.amt;
     } else {
-      // "sopra X": se è il primo pezzo, sotto X il foglio non dice nulla
-      if (!tiers.length && s.amt > 0) warnings.push(`sotto ${s.amt.toLocaleString("it-IT")}$ la percentuale non è scritta: uso ${Math.round(s.pct * 1000) / 10}%`);
-      tiers.push({ fromUsd: tiers.length ? s.amt : 0, pct: s.pct });
+      // "sopra X" letterale: sotto X non si prende nulla (per i sales manager vale il minimo garantito)
+      tiers.push({ fromUsd: s.amt, pct: s.pct });
       prevUpper = s.amt;
     }
   }
@@ -72,6 +64,7 @@ export function describeTiers(tiers) {
   const p = (x) => `${(Math.round(x * 10000) / 100).toLocaleString("it-IT")}%`;
   const d = (x) => `${Math.round(x).toLocaleString("it-IT")}$`;
   if (t.length === 1 && t[0].fromUsd === 0) return `${p(t[0].pct)} flat`;
+  if (t[0]?.fromUsd > 0) return t.map((x) => `${p(x.pct)} sopra ${d(x.fromUsd)}`).join(" · "); // sotto la prima soglia: zero
   return t.map((x, i) => {
     const next = t[i + 1];
     if (next) return x.fromUsd === 0 ? `${p(x.pct)} fino a ${d(next.fromUsd)}` : `${p(x.pct)} da ${d(x.fromUsd)} a ${d(next.fromUsd)}`;
@@ -96,114 +89,4 @@ export function shareUsd(tiers, revenueUsd, mode = "raggiunto") {
   // raggiunto: lo scaglione più alto con revenue > soglia, su tutto (tierFor dei compensi)
   const hit = tierFor(t, rev);
   return { usd: round2(rev * (hit?.pct || 0)), pct: hit?.pct || 0 };
-}
-
-/** Pulizia di un accordo che arriva dal client. */
-export function sanitizeDeal(d, newId) {
-  const str = (v, max = 200) => String(v ?? "").slice(0, max).trim();
-  return {
-    id: /^[a-z0-9_-]{4,40}$/i.test(d?.id || "") ? d.id : newId(),
-    creator: str(d?.creator, 120),
-    text: str(d?.text, 300),
-    tiers: normalizeTiers(d?.tiers).filter((t) => t.pct <= 1),
-    mode: DEAL_MODES.includes(d?.mode) ? d.mode : "raggiunto",
-    ecosystem: str(d?.ecosystem, 120),          // nome della squadra nei Compensi team
-    revenueName: str(d?.revenueName, 120),      // nome del progetto in «Revenue e cambio» (vuoto = nome creator)
-    active: d?.active !== false,
-    note: str(d?.note, 500),
-  };
-}
-
-/** Pulizia della mappa squadra → ecosistema: { [nome squadra]: nome ecosistema ("" = nessuno). */
-export function sanitizeTeamEcosystems(m) {
-  const out = {};
-  for (const [team, eco] of Object.entries(m && typeof m === "object" ? m : {}).slice(0, 200)) {
-    const t = String(team).slice(0, 120).trim();
-    if (t) out[t] = String(eco ?? "").slice(0, 120).trim();
-  }
-  return out;
-}
-
-/**
- * Il mese visto per creator ed ecosistema.
- * Un ecosistema è un NOME: ci stanno le creator che lo indicano nell'accordo e le
- * squadre dei compensi assegnate a lui (una squadra senza assegnazione appartiene
- * all'ecosistema col suo stesso nome, se esiste). Così un ecosistema può avere più
- * squadre (es. Cantera + Chatter Manager) e la stessa squadra non si conta due volte.
- * @param deals         accordi
- * @param monthDoc      il documento del mese dei Compensi (revenues, fx)
- * @param byTeam        computeMonth(monthDoc).byTeam (costo per squadra in €)
- * @param teamEcosystems { [nome squadra]: nome ecosistema }
- */
-export function computeDealsMonth(deals, monthDoc, byTeam, teamEcosystems = {}) {
-  const fx = toNumber(monthDoc?.fx?.rate);
-  const revByKey = new Map((monthDoc?.revenues || []).map((r) => [personKey(r.name), r]));
-  const creators = (deals || []).filter((d) => d.active !== false).map((d) => {
-    const rev = revByKey.get(personKey(d.revenueName || d.creator));
-    const revenueUsd = rev && rev.usd !== null && rev.usd !== "" ? toNumber(rev.usd) : null;
-    const s = revenueUsd !== null ? shareUsd(d.tiers, revenueUsd, d.mode) : null;
-    const problems = [];
-    if (!rev) problems.push("nessun progetto con questo nome in «Revenue e cambio»");
-    else if (revenueUsd === null) problems.push("revenue del mese non inserita");
-    if (!(fx > 0)) problems.push("manca il cambio del mese");
-    if (!normalizeTiers(d.tiers).length) problems.push("percentuale non impostata");
-    const shareEur = s && fx > 0 ? round2(s.usd * fx) : null;
-    return {
-      ...d,
-      revenueUsd,
-      revenueEur: revenueUsd !== null && fx > 0 ? round2(revenueUsd * fx) : null,
-      pctApplied: s?.pct ?? null,
-      shareUsd: s?.usd ?? null,
-      shareEur,
-      creatorEur: shareEur !== null ? round2(revenueUsd * fx - shareEur) : null,
-      problems,
-    };
-  });
-
-  const eco = new Map();
-  const ecoOf = (name) => {
-    const k = personKey(name);
-    if (!eco.has(k)) eco.set(k, { key: k, ecosystem: name, creators: [], teams: [], shareEur: 0, missingShare: 0, costEur: 0 });
-    return eco.get(k);
-  };
-  for (const c of creators) {
-    if (!personKey(c.ecosystem)) continue;
-    const e = ecoOf(c.ecosystem);
-    e.creators.push(c);
-    if (c.shareEur === null) e.missingShare++; else e.shareEur = round2(e.shareEur + c.shareEur);
-  }
-  const assigned = new Map(Object.entries(sanitizeTeamEcosystems(teamEcosystems)).map(([t, e]) => [personKey(t), e]));
-  const otherTeams = [];
-  for (const t of byTeam || []) {
-    const tk = personKey(t.team);
-    const target = assigned.has(tk) ? assigned.get(tk) : (eco.has(tk) ? eco.get(tk).ecosystem : "");
-    if (!personKey(target)) { otherTeams.push(t); continue; }
-    const e = ecoOf(target);
-    e.teams.push({ team: t.team, totalEur: t.totalEur, lines: t.lines.length });
-    e.costEur = round2(e.costEur + t.totalEur);
-  }
-  const ecosystems = [...eco.values()].map((e) => ({ ...e, netEur: round2(e.shareEur - e.costEur) })).sort((a, b) => b.netEur - a.netEur);
-
-  const sum = (arr, f) => round2(arr.reduce((s, x) => s + (f(x) || 0), 0));
-  const dealKeys = new Set(creators.map((c) => personKey(c.revenueName || c.creator)));
-  const ecoShare = sum(ecosystems, (e) => e.shareEur);
-  const ecoCost = sum(ecosystems, (e) => e.costEur);
-  return {
-    fx: fx > 0 ? fx : null,
-    creators,
-    ecosystems,
-    otherTeams: otherTeams.sort((a, b) => b.totalEur - a.totalEur),
-    unlinkedCreators: creators.filter((c) => !personKey(c.ecosystem)),
-    revenuesWithoutDeal: (monthDoc?.revenues || []).filter((r) => !dealKeys.has(personKey(r.name))),
-    totals: {
-      revenueUsd: sum(creators, (c) => c.revenueUsd),
-      shareUsd: sum(creators, (c) => c.shareUsd),
-      shareEur: sum(creators, (c) => c.shareEur),
-      ecoShare,
-      ecoCost,
-      ecoNet: round2(ecoShare - ecoCost),
-      otherCost: sum(otherTeams, (t) => t.totalEur),
-      problems: creators.filter((c) => c.problems.length).length,
-    },
-  };
 }
