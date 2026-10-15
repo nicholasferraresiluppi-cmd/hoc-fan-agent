@@ -21,11 +21,11 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { canSee } from "@/lib/nav-access";
+import { canSee, isPrivateHref } from "@/lib/nav-access";
 import { useTheme, useStyle } from "@/lib/theme-client";
 import { UserButton, SignedIn } from "@clerk/nextjs";
 import {
-  ArrowLeftRight, Send, Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown, HeartHandshake,
+  Landmark, ArrowLeftRight, Send, Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown, HeartHandshake,
   GraduationCap, BookOpen, BookMarked, ClipboardCheck, Target, Brain, Award,
   LayoutDashboard, UserCog, Sparkles, Radar, Bot,
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Gauge, MessageSquareWarning,
@@ -187,6 +187,7 @@ const NAV_GROUPS_RAW = [
     items: [
       { href: "/cm-cockpit",                     label: "Cockpit CM",   icon: Gauge },
       { href: "/admin/hr",                       label: "Persone HR",   icon: BookUser },
+      { href: "/contabilita",                    label: "Contabilità",  icon: Landmark },
       { href: "/admin/hr/contratti",             label: "Contratti",    icon: FileSignature },
       { href: "/admin/hr/sync",                  label: "Sincronizzazione ClickUp", icon: RefreshCw },
       { href: "/admin/candidate-assessments",    label: "Assessment candidati", icon: UserCheck },
@@ -416,7 +417,7 @@ export default function Sidebar() {
   const badgeOf = (href, flag) => (href === "/admin/s4s" ? s4sCount : flag ? criticalCount : 0);
   const toneOf = (href) => (href === "/admin/s4s" ? "todo" : undefined);
 
-  const allowed = (href) => !me?.authenticated || canSee(href, me.capabilities, me.admin);
+  const allowed = (href) => (!me?.authenticated && !isPrivateHref(href)) || canSee(href, me?.capabilities, me?.admin);
   const [theme, setTheme] = useTheme();
   const [style, setStyle] = useStyle();
 

@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { UserButton, SignedIn } from "@clerk/nextjs";
-import { canSee } from "@/lib/nav-access";
+import { canSee, isPrivateHref } from "@/lib/nav-access";
 import { useStyle, useTheme } from "@/lib/theme-client";
 import { Sun, Moon } from "lucide-react";
 import { NAV_GROUPS, SIDEBAR_WIDTH } from "./Sidebar";
@@ -112,7 +112,7 @@ export default function SidebarCasa() {
     return !t;
   });
 
-  const allowed = (href) => !me?.authenticated || canSee(href, me.capabilities, me.admin);
+  const allowed = (href) => (!me?.authenticated && !isPrivateHref(href)) || canSee(href, me?.capabilities, me?.admin);
   const manager = me?.authenticated && (canSee("/admin", me.capabilities, me.admin) || canSee("/admin/settimana", me.capabilities, me.admin));
   // Mansione (lib/workspaces): Board / Sales Manager / HR hanno il loro menu corto; "Tutti gli strumenti" = quello di sempre
   const ws = me?.workspace?.id;

@@ -36,6 +36,7 @@ export const WORKSPACES = {
       ] },
       { title: "Persone e decisioni", items: [
         { href: "/admin/hr", label: "Persone HR" },
+        { href: "/contabilita", label: "Contabilità" },
         { href: "/admin/sede", label: "La Sede" },
         { href: "/admin/qualita", label: "Controllo qualità" },
         { href: "/admin/citta", label: "La città" },

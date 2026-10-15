@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { Search, CornerDownLeft, ArrowUp, ArrowDown, Compass, Signpost, LayoutDashboard, Bell } from "lucide-react";
 import { NAV_GROUPS } from "@/components/Sidebar";
-import { canSee } from "@/lib/nav-access";
+import { canSee, isPrivateHref } from "@/lib/nav-access";
 import { CP, FONTS } from "@/lib/brand";
 
 const silentFetcher = async (url) => {
@@ -54,7 +54,7 @@ export default function CommandBar({ open, onClose }) {
       out.push(it);
     }
     // Permessi non ancora arrivati: si mostra tutto (come la Sidebar)
-    return me?.authenticated ? out.filter((it) => canSee(it.href, me.capabilities, me.admin)) : out;
+    return me?.authenticated ? out.filter((it) => canSee(it.href, me.capabilities, me.admin)) : out.filter((it) => !isPrivateHref(it.href));
   }, [me]);
 
   const results = useMemo(() => {

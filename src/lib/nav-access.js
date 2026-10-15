@@ -38,6 +38,8 @@ export const NAV_ACCESS = {
   "/admin/team": any("access.mgmt"), "/admin/access": any("access.mgmt"), "/admin/ruoli": any("access.mgmt"), "/admin/ruoli-custom": any("access.mgmt"),
   "/admin/seniority": any("seniority.override"),
   "/admin/utilizzo": { type: "admin" },
+  // Contabilità (15/10/2026): accesso a parte, NON passa dall'admin (lib/compensi-access)
+  "/contabilita": { type: "accounting" },
   // report Looker aziendale: serve un account Google HOC con accesso al report (non gli operatori)
   "/admin/reports": all("scores.view"),
   // Analisi vendite, HOC Analytics, Fan da recuperare: authorizeScoped(ANALYTICS_VIEW) + creator assegnate
@@ -48,6 +50,7 @@ export const NAV_ACCESS = {
 export function canSee(href, caps, isAdmin) {
   const req = NAV_ACCESS[href];
   if (!req || req.type === "any") return true;
+  if (req.type === "accounting") return Boolean(caps?.["accounting.private"]); // prima dell'admin: l'admin qui non basta
   if (isAdmin) return true;
   if (req.type === "admin") return false;
   const scope = caps?.[req.cap];
@@ -56,3 +59,6 @@ export function canSee(href, caps, isAdmin) {
   if (req.scope === "any") return true;
   return (SCOPE_RANK[scope] || 0) >= (SCOPE_RANK[req.scope] || 0);
 }
+
+/** Voci da NON mostrare nemmeno mentre i permessi si caricano (contabilità): finché non si sa chi sei, non ci sono. */
+export const isPrivateHref = (href) => NAV_ACCESS[href]?.type === "accounting";
