@@ -3,6 +3,7 @@
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { listMembers, coherenceReport, getGiroReport, readiness, GIRO_STALE_DAYS } from "@/lib/qualita";
 import { TASKS } from "@/lib/qualita-tasks";
+import { getDuplicateReport } from "@/lib/warehouse-duplicates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,13 +13,14 @@ export async function GET() {
   const az = await authorize(CAPABILITIES.SEED);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const members = await listMembers();
-  const [coherence, giro] = await Promise.all([coherenceReport(members), getGiroReport()]);
+  const [coherence, giro, duplicates] = await Promise.all([coherenceReport(members), getGiroReport(), getDuplicateReport()]);
   const stale = !giro.last || Date.now() - giro.last.at > GIRO_STALE_DAYS * 86400000;
   return Response.json({
     members: members.length,
     coherence,
     giro: { ...giro, stale, staleDays: GIRO_STALE_DAYS },
     readiness: readiness(giro.last, coherence),
+    duplicates,
     tasks: TASKS.map(({ id, for: f, title, why }) => ({ id, for: f, title, why })),
   });
 }

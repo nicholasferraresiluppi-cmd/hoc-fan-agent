@@ -21,6 +21,7 @@
 
 import crypto from "crypto";
 import { kv } from "@vercel/kv";
+import { dedupeCreatorIds } from "@/lib/warehouse-duplicates";
 import { bqQuery, bigQueryConfigured, HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
 import { fanHmac } from "@/lib/academy-tapes";
 import { salesCoachingSQL, exampleMessagesSQL } from "@/lib/sales-coaching-sql";
@@ -148,7 +149,10 @@ const cleanText = (s, max) => String(s || "").replace(/[\u0000-\u001f]/g, " ").t
 
 export async function listSplits() {
   const v = await kv.get(SPLITS_KEY);
-  return Array.isArray(v) ? v : [];
+  const list = Array.isArray(v) ? v : [];
+  // scudo doppioni (lib/warehouse-duplicates): un record creator doppio (stesso account OnlyFans) viene sostituito
+  // dal record da tenere, così nessuna vista per split può contare due volte le stesse vendite
+  return Promise.all(list.map(async (s) => ({ ...s, creator_ids: await dedupeCreatorIds(s.creator_ids || []) })));
 }
 
 export async function saveSplit({ id, name, creator_ids }, userId) {

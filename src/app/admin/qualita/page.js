@@ -10,11 +10,14 @@ import { PageHead, Notice, card, SectionTitle, Disclosure, DataTable } from "@/c
  * /admin/qualita — Controllo qualità: i problemi li trova il sistema, non le persone (10/10/2026).
  * Tre controlli (lib/qualita): coerenza degli accessi (ogni notte), giro per persona e prova del compito
  * (robot settimanale con i permessi di ogni membro). In alto «pronto per…»: una persona riceve uno
- * strumento quando i tre sono verdi.
+ * strumento quando i tre sono verdi. Sezione 4 (15/10/2026, lib/warehouse-duplicates): i doppioni nel warehouse —
+ * controllo sui DATI, non sulle persone, quindi fuori dal «pronto per…».
  */
 
 const fetcher = (u) => fetch(u, { cache: "no-store" }).then(async (r) => { const j = await r.json().catch(() => ({ error: "Risposta non valida" })); return r.ok ? j : { error: j.error || `Errore ${r.status}` }; });
 const fmtWhen = (ts) => new Date(ts).toLocaleString("it-IT", { timeZone: "Europe/Rome", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const fmtDay = (iso) => (iso ? new Date(`${iso}T00:00:00Z`).toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "—");
+const fmtUsd = (v) => `$${Math.round(Number(v) || 0).toLocaleString("it-IT", { useGrouping: "always" })}`;
 const KIND = { sales: "Chi guida le vendite", admin: "Admin", operator: "Operatore" };
 const STATUS = { ok: { label: "ok", color: () => CP.accentGreen }, warn: { label: "da guardare", color: () => CP.attn }, fail: { label: "errore", color: () => CP.accentRed } };
 
@@ -33,7 +36,7 @@ export default function QualitaPage() {
   if (isLoading) return <div style={{ maxWidth: 1100 }}>{head}<div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div></div>;
   if (error || data?.error) return <div style={{ maxWidth: 1100 }}>{head}<Notice danger>{data?.error || "Non riesco a leggere il controllo qualità."}</Notice></div>;
 
-  const { coherence = [], giro = {}, readiness = [], tasks = [], members = 0 } = data;
+  const { coherence = [], giro = {}, readiness = [], tasks = [], members = 0, duplicates = {} } = data;
   const last = giro.last;
   const ready = readiness.filter((r) => r.ready).length;
 
@@ -114,6 +117,31 @@ export default function QualitaPage() {
         ))}
         <div style={{ fontSize: 12.5, color: CP.textMuted }}>I compiti si aggiungono in <code>src/lib/qualita-tasks.js</code>: uno nuovo per ogni strumento che si dà in mano a qualcuno.</div>
       </Disclosure>
+
+      <div style={{ height: 8 }} />
+      <SectionTitle aside={duplicates.at ? `ogni notte · ultimo controllo ${fmtWhen(duplicates.at)} · alert «Doppioni nel warehouse»` : "ogni notte · alert «Doppioni nel warehouse»"}>4 · Doppioni nel warehouse</SectionTitle>
+      <section style={{ ...card, padding: "14px 18px", marginBottom: 18 }}>
+        <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.55, marginBottom: 10 }}>
+          Quando lo stesso account OnlyFans ha due record creator attivi, ogni vendita finisce nel warehouse due volte. HOC Pro tiene il record più vecchio e
+          sostituisce il doppio ovunque metta insieme più creator (split, media HOC, difficoltà creator), anche dopo che il doppio si ferma: i mesi già duplicati restano nel warehouse.
+          Chi legge i totali direttamente dal warehouse li vede gonfiati.
+        </div>
+        {!duplicates.at && <div style={{ fontSize: 13, color: CP.textMuted }}>Il controllo non è ancora girato: parte stanotte con i controllori.</div>}
+        {(duplicates.pairs || []).filter((p) => p.kind !== "separati").map((p) => (
+          <div key={p.drop.id} style={{ display: "flex", alignItems: "baseline", fontSize: 13, lineHeight: 1.6, padding: "6px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
+            <Dot color={p.kind === "doppione" ? CP.attn : CP.textMuted} />
+            <div>
+              <span style={{ color: CP.textPrimary }}>{p.keep.name}</span>
+              <span style={{ color: CP.textSecondary }}>
+                {p.kind === "doppione"
+                  ? ` — doppio: «${p.drop.name}» (${p.drop.id}) dal ${fmtDay(p.first_both)}, ${p.identical_days} giorni identici, ${fmtUsd(p.gross_doubled)} di lordo contato due volte · neutralizzato in HOC Pro`
+                  : ` — passaggio a «${p.drop.name}» (${p.drop.id}): ${p.both_days} giorni sovrapposti, non è una copia · nessuna correzione`}
+              </span>
+            </div>
+          </div>
+        ))}
+        {duplicates.at && !(duplicates.pairs || []).some((p) => p.kind !== "separati") && <div style={{ fontSize: 13, color: CP.textMuted }}>Nessun doppione: ogni account OnlyFans ha un solo record attivo.</div>}
+      </section>
     </div>
   );
 }
