@@ -56,18 +56,18 @@ export default function RadarSegnala({ open, onClose, me, onSent }) {
       <div style={{ borderTop: `1px solid ${CP.border}`, marginTop: 20, paddingTop: 16, display: "grid", gap: 10 }}>
         <strong style={{ fontWeight: 600, fontSize: 15 }}>Dall&apos;iPhone, con un tocco</strong>
         <p style={{ margin: 0, fontSize: 14, color: CP.textSecondary }}>Installa il Comando rapido «Radar HOC»: da un reel o un profilo su Instagram, Condividi → Radar HOC, e la creator arriva qui.</p>
-        <ol style={{ margin: 0, paddingLeft: 18, fontSize: 14, color: CP.textSecondary, display: "grid", gap: 4 }}>
+        <ol style={{ margin: 0, paddingLeft: 20, listStyle: "decimal", fontSize: 14, color: CP.textSecondary, display: "grid", gap: 4 }}>
           <li>Crea la tua chiave personale (si mostra una volta sola).</li>
           <li>Sull&apos;iPhone apri <a href="/radar-hoc.shortcut" style={{ color: CP.textPrimary }}>il Comando rapido</a> e aggiungilo: ti chiede la chiave, incollala.</li>
         </ol>
         {token ? (
           <div style={{ display: "grid", gap: 8 }}>
             <code style={{ ...input, fontSize: 13, wordBreak: "break-all", userSelect: "all" }}>{token}</code>
-            <button type="button" style={btn} onClick={copy}>{copied ? "Copiata" : "Copia la chiave"}</button>
+            <button type="button" style={{ ...btn, justifyContent: "center" }} onClick={copy}>{copied ? "Copiata" : "Copia la chiave"}</button>
             <span style={{ fontSize: 12.5, color: CP.textMuted }}>Non la rivedrai: se la perdi, creane una nuova.</span>
           </div>
         ) : (
-          <button type="button" style={btn} disabled={busy} onClick={makeToken}>Crea la mia chiave</button>
+          <button type="button" style={{ ...btn, justifyContent: "center" }} disabled={busy} onClick={makeToken}>Crea la mia chiave</button>
         )}
       </div>
     </Modal>
