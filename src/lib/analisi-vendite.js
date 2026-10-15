@@ -26,7 +26,8 @@ import {
   lkTxSummarySql, lkTxSeriesSql, lkTxTopUsersSql, lkTxListSql, lkUsersSql, lkChargebacksSql, lkOverallSql, lkOverallDailySql,
   lkNewsubsDailySql, lkNewsubsListSql, lkNewsubsCreatorSql, confrontoSql,
 } from "@/lib/looker-sql";
-import { LIVE_CREATORS } from "@/lib/live-creators";
+import { personKey } from "@/lib/live-creators";
+import { getLiveCreators } from "@/lib/live-creators-store";
 
 function daysOf(range) {
   const out = [];
@@ -34,9 +35,9 @@ function daysOf(range) {
   return out;
 }
 /** Pagina "Revenue e chat" della persona, se ce l'ha (creator seguite dal vivo). */
-function liveSlugOf(person) {
-  const p = String(person || "").trim().toLowerCase();
-  return LIVE_CREATORS.find((c) => c.matches(p))?.slug || null;
+function liveSlugOf(person, live) {
+  const k = personKey(person);
+  return (live || []).find((c) => personKey(c.name) === k)?.slug || null;
 }
 
 const TABLES = {
@@ -105,7 +106,7 @@ export async function visibleCreators(scope) {
 
 const r2 = (x) => Math.round((Number(x) || 0) * 100) / 100;
 
-function shape(view, rows, names, range) {
+function shape(view, rows, names, range, live) {
   const nameOf = (id) => names[Number(id)] || `Creator ${id}`;
   if (view === "recap") {
     const [byCreator, daily] = rows;
@@ -233,7 +234,7 @@ function shape(view, rows, names, range) {
   }
   if (view === "diagnosi") {
     const [agg, daily] = rows;
-    const persons = buildDiagnosi(agg, names, daily, daysOf(range)).map((p) => ({ ...p, live: liveSlugOf(p.name) }));
+    const persons = buildDiagnosi(agg, names, daily, daysOf(range)).map((p) => ({ ...p, live: liveSlugOf(p.name, live) }));
     return { persons, summary: summaryOf(persons), previous: previousRange(range) };
   }
   if (view === "creator") {
@@ -246,7 +247,7 @@ function shape(view, rows, names, range) {
     }));
     const TYPE = { new_subscriber: "Nuovi", returning_subscriber: "Di ritorno", new_subscriber_trial: "Trial" };
     return {
-      person: person && { ...person, live: liveSlugOf(person.name) },
+      person: person && { ...person, live: liveSlugOf(person.name, live) },
       links: {
         top: [...linkRows].sort((a, b) => b.subs - a.subs || b.clicks - a.clicks).slice(0, 8),
         falling: linkRows.filter((l) => l.subs_prev >= 10 && l.subs_delta != null && l.subs_delta <= -0.3).sort((a, b) => (a.subs - a.subs_prev) - (b.subs - b.subs_prev)).slice(0, 5),
@@ -488,7 +489,7 @@ export async function getAnalisi(view, ids, query = {}, { force = false } = {}) 
   const creators = await splitCreators();
   const names = Object.fromEntries(creators.map((c) => [c.id, c.name]));
   const { source, rows } = await runOnSource((refs) => BUILDERS[view](refs, ids, range, q, f), view.startsWith("lk-") || view === "confronto" ? { maxBytesBilled: 20 * 1024 ** 3, timeoutMs: 45_000 } : undefined);
-  const out = { view, range, source, computed_at: new Date().toISOString(), ...(q ? { q } : {}), ...(fk ? { filters: f } : {}), ...shape(view, rows, names, range) };
+  const out = { view, range, source, computed_at: new Date().toISOString(), ...(q ? { q } : {}), ...(fk ? { filters: f } : {}), ...shape(view, rows, names, range, await getLiveCreators().catch(() => [])) };
   await kv.set(key, out, { ex: 600 }).catch(() => {});
   return out;
 }

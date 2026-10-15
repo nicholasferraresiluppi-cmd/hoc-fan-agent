@@ -9,7 +9,8 @@ export const maxDuration = 120;
 
 import { CAPABILITIES } from "@/lib/rbac";
 import { authorizeScoped } from "@/lib/creator-scope";
-import { LIVE_CREATORS, seesCreator } from "@/lib/live-creators";
+import { seesCreator } from "@/lib/live-creators";
+import { getLiveCreators } from "@/lib/live-creators-store";
 import { getRevenuePacing, getGoals, bigQueryConfigured } from "@/lib/revenue-pacing";
 import { getChatMonitor } from "@/lib/chat-monitor";
 import { getLiveShifts } from "@/lib/live-shifts";
@@ -70,7 +71,7 @@ export async function GET() {
   const az = await authorizeScoped(CAPABILITIES.SCORES_VIEW);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   if (!bigQueryConfigured()) return Response.json({ error: "BigQuery non configurato" }, { status: 503 });
-  const visible = LIVE_CREATORS.filter((c) => seesCreator(az.creatorScope, c));
+  const visible = (await getLiveCreators()).filter((c) => seesCreator(az.creatorScope, c));
   const creators = await Promise.all(visible.map(summarize));
   return Response.json({ creators, at: new Date().toISOString() });
 }

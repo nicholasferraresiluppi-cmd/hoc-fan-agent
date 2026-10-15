@@ -1,6 +1,6 @@
 // Revenue per creator — proiezione di fine mese per account/paese, ricostruzione di
 // revenue.hoc.tools ("Revenue Analytics"), spento a ottobre 2026. Creator e account
-// in live-creators.js (strumento dei progetti di Antonio Marucci).
+// dallo split (live-creators-store.js): si aggiungono da /admin/creator-split.
 //
 // STESSI NUMERI DEL SITO ORIGINALE: il vecchio sito leggeva le viste BigQuery del
 // dataset `hoc` (v_eom_projection e le 4 viste sotto), che appartengono all'altro
