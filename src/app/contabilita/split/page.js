@@ -14,7 +14,7 @@ import useSWR from "swr";
 import { Plus, Loader2, Lock, Trash2, Check, RefreshCw } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
-import { PageHead, FilterChip, Notice, DataTable, SectionTitle, Metric, card } from "@/components/ds";
+import { PageHead, FilterChip, Notice, DataTable, SectionTitle, card } from "@/components/ds";
 import { computeSplitMonth, applyBusteExclusions } from "@/lib/split-core";
 import { describeTiers, parseDealText } from "@/lib/creator-deals-core";
 import { monthLabel, nextMonthId } from "@/lib/compensi-core";
@@ -32,8 +32,8 @@ const send = async (url, method, body) => {
   return j;
 };
 
-const eur = (n) => n === null || n === undefined ? "—" : new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
-const usd = (n) => n === null || n === undefined ? "—" : new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+const eur = (n) => n === null || n === undefined ? "—" : new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0, useGrouping: "always" }).format(n);
+const usd = (n) => n === null || n === undefined ? "—" : new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", maximumFractionDigits: 0, useGrouping: "always" }).format(n);
 const pct = (f) => `${(Math.round(f * 10000) / 100).toLocaleString("it-IT")}%`;
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 const tmpId = () => `s_${Math.random().toString(16).slice(2, 14)}`;
@@ -221,6 +221,7 @@ export default function SplitPage() {
   const [info, setInfo] = useState(null);
   const [tab, setTab] = useState("conto");
   const [open, setOpen] = useState(null);     // team aperto nel conto
+  const [updating, setUpdating] = useState(false); // finestra «Aggiorna il mese»
   const [editTeam, setEditTeam] = useState(null);
   const [editDeal, setEditDeal] = useState(null);
 
@@ -318,50 +319,66 @@ export default function SplitPage() {
       </div>
 
       {calc && doc && (<>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 14 }}>
-          <div style={{ ...card, padding: 14 }}><Metric label="Revenue creator" value={usd(T.revenueUsd)} /></div>
-          <div style={{ ...card, padding: 14 }}><Metric label="Fee HOC" value={eur(T.feeEur)} note={usd(T.feeUsd)} /></div>
-          <div style={{ ...card, padding: 14 }}><Metric label="Persone" value={eur(T.staffEur)} /></div>
-          <div style={{ ...card, padding: 14 }}><Metric label="Chatter" value={eur(T.chatterEur)} note={usd(T.chatterUsd)} /></div>
-          <div style={{ ...card, padding: 14 }}><Metric label="Extra" value={eur(T.extrasEur)} /></div>
-          <div style={{ ...card, padding: 14 }}><Metric label={`Netto ${monthLabel(month)}`} value={eur(T.netEur)} danger={T.netEur < 0} /></div>
+        {/* Stile fintech (scelto da Nicholas 15/10/2026): un riquadro protagonista col netto, una scheda per creator. */}
+        <div style={{ background: CP.textPrimary, color: CP.bg, borderRadius: 18, padding: "22px 24px", display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 20, flexWrap: "wrap", marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: 13, opacity: 0.65 }}>Netto {monthLabel(month)}</div>
+            <div style={{ fontSize: 44, fontWeight: 500, letterSpacing: "-0.02em", lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{eur(T.netEur)}</div>
+            <div style={{ fontSize: 13, opacity: 0.65, marginTop: 4 }}>{usd(T.revenueUsd)} di revenue delle creator · cambio {calc.fx ? String(calc.fx).replace(".", ",") : "da inserire"}</div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "auto auto", columnGap: 18, rowGap: 3, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+            <span style={{ opacity: 0.65 }}>Fee HOC</span><span style={{ textAlign: "right" }}>{eur(T.feeEur)}</span>
+            <span style={{ opacity: 0.65 }}>Persone</span><span style={{ textAlign: "right" }}>− {eur(T.staffEur)}</span>
+            <span style={{ opacity: 0.65 }}>Chatter</span><span style={{ textAlign: "right" }}>− {eur(T.chatterEur)}</span>
+            {T.extrasEur > 0 && <><span style={{ opacity: 0.65 }}>Extra</span><span style={{ textAlign: "right" }}>− {eur(T.extrasEur)}</span></>}
+          </div>
         </div>
-        <div style={{ ...card, padding: 12, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 12 }}>
-          <Field label="Cambio: 1 $ = … €" style={{ width: 150 }}>
-            <input style={input} inputMode="decimal" value={doc.fx?.rate ?? ""} onChange={(e) => upd((d) => ({ ...d, fx: { rate: e.target.value === "" ? null : e.target.value, source: "inserito a mano" } }))} />
-          </Field>
-          <button style={btn()} onClick={fetchFx} disabled={busy === "fx"}>{busy === "fx" ? <Loader2 size={14} /> : null}Media BCE del mese</button>
-          <span style={muted}>{doc.fx?.source || ""}</span>
-          <button style={{ ...btn(), marginLeft: "auto" }} onClick={fromData} disabled={busy === "dati"}>{busy === "dati" ? <Loader2 size={14} /> : <RefreshCw size={14} />}Prendi revenue e chatter dai dati</button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
+          <span style={muted}>{(() => { const src = calc.teams.find((t) => t.chatterSource)?.chatterSource; return src ? `Chatter: ${src.replace(/^buste CreatorsPro · /, "buste ")}` : "Chatter non ancora preso dalle buste"; })()}</span>
+          <button style={{ ...btn(), marginLeft: "auto" }} onClick={() => setUpdating(true)}><RefreshCw size={14} />Aggiorna il mese</button>
         </div>
         {info && <Notice>{info}</Notice>}
         {T.problems > 0 && <Notice danger>{T.problems} team con dati mancanti (revenue, cambio o accordo): contano zero finché non si completano.</Notice>}
 
-        {tab === "conto" && (
-          <DataTable
-            minWidth={1000}
-            defaultSort={{ key: "netEur", dir: -1 }}
-            onRowClick={(t) => setOpen(t.id)}
-            rows={calc.teams}
-            columns={[
-              { key: "name", label: "Team", render: (t) => <div><div style={{ color: CP.textPrimary }}>{t.name}</div><div style={muted}>{[t.manager, t.creator ? (t.tiers?.length ? describeTiers(t.tiers) : "accordo da impostare") : "senza creator"].filter(Boolean).join(" · ")}</div></div> },
-              { key: "revenueUsd", label: "Revenue $", align: "right", render: (t) => t.creator ? (
-                <div onClick={(e) => e.stopPropagation()}>
-                  <input style={{ ...small, width: 110, textAlign: "right" }} inputMode="decimal" value={doc.teams?.[t.id]?.revenueUsd ?? ""} onChange={(e) => setTeamInput(t.id, "revenueUsd", e.target.value)} />
-                  {t.revenueSource && <div style={muted}>{t.revenueSource}</div>}
-                </div>) : "" },
-              { key: "feeEur", label: "Fee HOC", align: "right", render: (t) => (t.creator ? <div>{eur(t.feeEur)}<div style={muted}>{t.feePct ? pct(t.feePct) : ""}</div></div> : "") },
-              { key: "staffEur", label: "Persone", align: "right", render: (t) => <div>{eur(t.staffEur)}<div style={muted}>{t.members.length} accordi</div></div> },
-              { key: "chatterUsd", label: "Chatter $", align: "right", render: (t) => t.creator ? (
-                <div onClick={(e) => e.stopPropagation()}>
-                  <input style={{ ...small, width: 100, textAlign: "right" }} inputMode="decimal" value={doc.teams?.[t.id]?.chatterUsd ?? ""} onChange={(e) => setTeamInput(t.id, "chatterUsd", e.target.value)} />
-                  {t.chatterSource && <div style={muted}>{t.chatterSource}</div>}
-                </div>) : "" },
-              { key: "extrasEur", label: "Extra", align: "right", render: (t) => (t.extrasEur ? eur(t.extrasEur) : "") },
-              { key: "netEur", label: "Netto", align: "right", render: (t) => <div><strong style={{ fontWeight: 500, color: t.netEur < 0 ? CP.accentRed : CP.textPrimary }}>{eur(t.netEur)}</strong>{t.problems.length > 0 && <div style={{ fontSize: 12, color: CP.accentSoftText }}>dati mancanti</div>}</div> },
-            ]}
-          />
-        )}
+        {tab === "conto" && (() => {
+          const creators = calc.teams.filter((t) => t.creator).sort((a, b) => b.netEur - a.netEur);
+          const struttura = calc.teams.filter((t) => !t.creator);
+          const tint = (c) => `color-mix(in srgb, ${c} 14%, transparent)`;
+          const Card = ({ t }) => {
+            const missing = t.problems.length > 0;
+            const loss = t.netEur < 0;
+            const keep = t.feeEur > 0 ? Math.round((t.netEur / t.feeEur) * 100) : null;
+            const tone = missing ? CP.accentSoftText : loss ? CP.accentRed : CP.accentGreen;
+            return (
+              <button onClick={() => setOpen(t.id)} style={{ textAlign: "left", cursor: "pointer", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 14, padding: 16, color: CP.textPrimary, fontFamily: FONTS.body, display: "grid", gap: 6 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ fontSize: 13, color: CP.textSecondary }}>{t.name}</span>
+                  {t.manager && <span style={{ fontSize: 12, color: CP.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.manager.split(" ")[0]}</span>}
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 500, letterSpacing: "-0.01em", fontVariantNumeric: "tabular-nums", color: loss ? CP.accentRed : CP.textPrimary }}>{eur(t.netEur)}</div>
+                <div><span style={{ display: "inline-block", fontSize: 11, padding: "2px 8px", borderRadius: 20, background: tint(tone), color: tone }}>{missing ? "dati mancanti" : loss ? "in perdita" : `${keep}% della fee resta`}</span></div>
+                <div style={{ fontSize: 12, color: CP.textMuted, fontVariantNumeric: "tabular-nums" }}>Fee {eur(t.feeEur)} · costi {eur(t.costEur)}</div>
+              </button>
+            );
+          };
+          return (<>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 10 }}>
+              {creators.map((t) => <Card key={t.id} t={t} />)}
+            </div>
+            {struttura.length > 0 && (<>
+              <div style={{ ...muted, margin: "18px 0 8px" }}>Struttura (senza creator): {eur(struttura.reduce((s, t) => s + t.costEur, 0))}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 10 }}>
+                {struttura.map((t) => (
+                  <button key={t.id} onClick={() => setOpen(t.id)} style={{ textAlign: "left", cursor: "pointer", background: "transparent", border: `1px dashed ${CP.border}`, borderRadius: 14, padding: 14, color: CP.textPrimary, fontFamily: FONTS.body }}>
+                    <div style={{ fontSize: 13, color: CP.textSecondary }}>{t.name}</div>
+                    <div style={{ fontSize: 20, fontWeight: 500, fontVariantNumeric: "tabular-nums", marginTop: 4 }}>− {eur(t.costEur)}</div>
+                    <div style={{ fontSize: 12, color: CP.textMuted }}>{t.members.length} persone</div>
+                  </button>
+                ))}
+              </div>
+            </>)}
+          </>);
+        })()}
 
         {tab === "extra" && (
           <section style={{ ...card, padding: 16 }}>
@@ -437,6 +454,35 @@ export default function SplitPage() {
         </div>
       )}
 
+      <Modal open={updating && Boolean(doc)} onClose={() => setUpdating(false)} title={`Aggiorna ${month ? monthLabel(month) : ""}`} maxWidth={820}>
+        {updating && doc && calc && (
+          <div style={{ display: "grid", gap: 14 }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+              <Field label="Cambio: 1 $ = … €" style={{ width: 150 }}>
+                <input style={input} inputMode="decimal" value={doc.fx?.rate ?? ""} onChange={(e) => upd((d) => ({ ...d, fx: { rate: e.target.value === "" ? null : e.target.value, source: "inserito a mano" } }))} />
+              </Field>
+              <button style={btn()} onClick={fetchFx} disabled={busy === "fx"}>{busy === "fx" ? <Loader2 size={14} /> : null}Media BCE del mese</button>
+              <span style={muted}>{doc.fx?.source || ""}</span>
+              <button style={{ ...btn(true), marginLeft: "auto" }} onClick={fromData} disabled={busy === "dati"}>{busy === "dati" ? <Loader2 size={14} /> : <RefreshCw size={14} />}Prendi revenue e chatter dai dati</button>
+            </div>
+            {info && <Notice>{info}</Notice>}
+            <div>
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(140px, 1.4fr) 130px 130px", gap: 8, ...muted, padding: "0 0 6px" }}><span>Creator</span><span style={{ textAlign: "right" }}>Revenue $</span><span style={{ textAlign: "right" }}>Chatter $</span></div>
+              {calc.teams.filter((t) => t.creator).map((t) => (
+                <div key={t.id} style={{ display: "grid", gridTemplateColumns: "minmax(140px, 1.4fr) 130px 130px", gap: 8, alignItems: "center", padding: "6px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
+                  <span style={{ fontSize: 13 }}>{t.name}<span style={{ ...muted, display: "block" }}>{[t.revenueSource, t.chatterSource && t.chatterSource.replace(/^buste CreatorsPro · /, "buste ")].filter(Boolean).join(" · ")}</span></span>
+                  <input style={{ ...small, textAlign: "right" }} inputMode="decimal" value={doc.teams?.[t.id]?.revenueUsd ?? ""} onChange={(e) => setTeamInput(t.id, "revenueUsd", e.target.value)} />
+                  <input style={{ ...small, textAlign: "right" }} inputMode="decimal" value={doc.teams?.[t.id]?.chatterUsd ?? ""} onChange={(e) => setTeamInput(t.id, "chatterUsd", e.target.value)} />
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button style={btn()} onClick={() => setUpdating(false)}>Chiudi</button>
+              <button style={btn(true)} onClick={async () => { await saveDoc(); setUpdating(false); }} disabled={!docDirty || busy === "doc"}>{busy === "doc" ? <Loader2 size={14} /> : <Check size={14} />}Salva il mese</button>
+            </div>
+          </div>
+        )}
+      </Modal>
       <Modal open={Boolean(open)} onClose={() => setOpen(null)} title={calc?.teams.find((t) => t.id === open)?.name || ""} maxWidth={760}>
         {open && calc?.teams.find((t) => t.id === open) && <TeamDetail t={calc.teams.find((t) => t.id === open)} fx={calc.fx} onExclude={excludeBusta} />}
       </Modal>
