@@ -35,24 +35,30 @@ export const maxDuration = 60;
 const progKey = (p) => `cp:cron:progress:${p}`;
 const TTL_PROG = 40 * 24 * 3600;
 const STALE_MS = 20 * 3600 * 1000;   // refresh giornaliero, con margine
-const RESTART_MS = 24 * 3600 * 1000; // sync incagliato da un giorno → si riparte puliti
+// Sync incagliato → si riparte puliti dopo 40h, NON dopo 24h: il cron gira una volta al giorno e
+// con 24h ogni giro ripartiva da zero invece di riprendere (15/10/2026: fermo dal 7 ottobre).
+// Resta sotto la vita dello stato sync (2 giorni, creatorspro-sync).
+const RESTART_MS = 40 * 3600 * 1000;
 const FRESH_MS = 90 * 1000;          // guardia anti-sovrapposizione (solo chain 0)
-const BUDGET_MS = 35000;
+const BUDGET_MS = 30000;
 const PREPARE_PAGES = 3;
-const BATCH_SIZE = 30;
+// 15 (era 30): un batch lento di CreatorsPro partito a fine budget sforava i 60s di Vercel,
+// il tick veniva ucciso prima di concatenare il successivo e la catena si fermava.
+const BATCH_SIZE = 15;
 // Un mese pieno: ~10 link di prepare + ~25-30 batch (2-5 per tick) + code.
-const MAX_CHAIN = 60;
+const MAX_CHAIN = 120;
 
-// Mese corrente + precedente nei primi 3 giorni (chiusura), OPPURE finché il
-// precedente non ha mai completato un giro: se la catena è rimasta ferma per un
-// mese intero (lug→set 2026) quel mese non si recupererebbe più da solo.
+// Mese corrente + precedente fino al giorno 20, OPPURE finché il precedente non ha
+// mai completato un giro. Fino al 20 (era il 3): le buste del mese prima si chiudono
+// e si pagano durante il mese dopo, e il conto dello split calcola il chatter dalle
+// buste CHIUSE — con lo stato fermo al giorno 3 risultavano aperte per sempre.
 async function targets() {
   const now = new Date();
   const cur = now.toISOString().slice(0, 7);
   const out = [cur];
   const prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)).toISOString().slice(0, 7);
   const prevProg = await kv.get(progKey(prev)).catch(() => null);
-  if (now.getUTCDate() <= 3 || prevProg?.phase !== "done") out.push(prev);
+  if (now.getUTCDate() <= 20 || prevProg?.phase !== "done") out.push(prev);
   return out;
 }
 
