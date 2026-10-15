@@ -45,7 +45,9 @@ const MIN_SHRINK_RATIO = 0.7;
 
 const TTL_WAGES = 90 * 24 * 3600;
 const TTL_REFDATA = 7 * 24 * 3600;
-const TTL_SYNC_STATE = 6 * 3600; // 6 ore — un sync deve completarsi entro
+// 2 giorni (15/10/2026, era 6 ore): se la catena si ferma, il cron del giorno dopo deve poter
+// RIPRENDERE da dove era — con 6 ore lo stato scadeva e il sync non finiva mai (bloccato 7→15 ottobre).
+const TTL_SYNC_STATE = 2 * 24 * 3600; // un sync deve completarsi entro
 
 function monthBoundsIso(periodId) {
   const m = periodId.match(/^(\d{4})-(\d{2})$/);
