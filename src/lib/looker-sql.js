@@ -192,7 +192,10 @@ export function lkChargebacksSql(refs, ids, range, f = {}) {
  * Le "Links Visits" NON ci sono: hoc.linksinbio_visits legge un foglio Google (hoc.creators_linkinbio,
  * file 1OZCqp_…) che il service account non può aprire (403 "Drive credentials", 10/10).
  */
-export function lkOverallSql(refs, ids, today) {
+export function lkOverallSql(refs, ids, today, exclude = []) {
+  // `exclude` = record doppi del warehouse (lib/warehouse-duplicates): fuori dalla media HOC di tutte le creator
+  const notDup = exclude.map(Number).filter((n) => Number.isInteger(n) && n > 0);
+  const dupCut = notDup.length ? ` AND creator_id NOT IN (${notDup.join(",")})` : "";
   const list = idList(ids);
   const T = `DATE '${today}'`;
   const win = (n, off) => `day BETWEEN DATE_SUB(${T}, INTERVAL ${n * (off + 1)} DAY) AND DATE_SUB(${T}, INTERVAL ${n * off + 1} DAY)`;
@@ -210,7 +213,7 @@ export function lkOverallSql(refs, ids, today) {
         WHERE creator_id IN (${list}) AND calendar_date BETWEEN ${since} AND ${until}
       UNION ALL
       SELECT calendar_date, 0, 0, 0, 0, NULL, CAST(revenue_per_user AS FLOAT64) FROM \`${refs.transactionsAnalytics}\`
-        WHERE calendar_date BETWEEN ${since} AND ${until}
+        WHERE calendar_date BETWEEN ${since} AND ${until}${dupCut}
       UNION ALL
       SELECT calendar_date, 0, 0, CAST(net AS FLOAT64), 0, NULL, NULL FROM \`${refs.attributed}\`
         WHERE creator_id IN (${list}) AND calendar_date BETWEEN ${since} AND ${until}

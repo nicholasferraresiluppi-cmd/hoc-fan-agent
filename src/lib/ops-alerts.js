@@ -493,6 +493,29 @@ const CHECKS = [
     },
   },
   {
+    // Doppioni nel warehouse (15/10/2026, lib/warehouse-duplicates): lo stesso account OnlyFans con due record creator
+    // attivi scrive ogni vendita due volte. Ogni notte si ricalcolano le coppie e si aggiorna lo scudo di HOC Pro;
+    // l'alert dice che il doppione esiste a monte (HOC Pro lo neutralizza già, chi legge il warehouse no).
+    id: "warehouse-duplicates",
+    severity: "warning",
+    label: "Doppioni nel warehouse",
+    async run() {
+      const { refreshDuplicates } = await import("@/lib/warehouse-duplicates");
+      const { pairs } = await refreshDuplicates();
+      const usd = (v) => `$${Math.round(v).toLocaleString("it-IT", { useGrouping: "always" })}`;
+      const day = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+      return pairs.filter((p) => p.kind === "doppione").map((p) => ({
+        fingerprint: `wh-dup:${p.drop.id}`,
+        title: `${p.keep.name}: vendite registrate due volte nel warehouse`,
+        detail: `Lo stesso account OnlyFans ha due record attivi: ${p.keep.name} (${p.keep.id}, tenuto) e ${p.drop.name} (${p.drop.id}, doppio). `
+          + `Dal ${day(p.first_both)}: ${p.identical_days} giorni con incasso identico, ${usd(p.gross_doubled)} di lordo contato due volte. `
+          + "In HOC Pro è già neutralizzato; chi legge i totali direttamente dal warehouse li vede gonfiati.",
+        value: usd(p.gross_doubled),
+        cta: { href: "/admin/qualita", label: "Apri Controllo qualità" },
+      }));
+    },
+  },
+  {
     // Controllo qualità 1 (10/10/2026, lib/qualita): ruolo, creator e vista di un membro si
     // contraddicono. Caso d'origine: Membri diceva «nessun ruolo» a un Sales Manager vero.
     id: "access-coherence",

@@ -28,6 +28,7 @@
 
 import { kv } from "@vercel/kv";
 import { bqQuery, bigQueryConfigured, HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
+import { duplicateIds } from "@/lib/warehouse-duplicates";
 import {
   WINDOW_DAYS,
   DIFFICULTY_COMPONENTS,
@@ -149,7 +150,9 @@ export async function computeCreatorDifficulty() {
   const { rows, totalBytesProcessed } = await bqQuery(difficultySQL(), {
     maxBytesBilled: 12 * 1024 * 1024 * 1024, // fusibile: sopra i 12GB la query fallisce, non spende
   });
-  const profiles = buildProfiles(rows);
+  // scudo doppioni: un record creator doppio (stesso account OnlyFans) avrebbe una riga sua, uguale all'originale
+  const dups = new Set(await duplicateIds());
+  const profiles = buildProfiles(rows.filter((r) => !dups.has(Number(r.creator_id))));
   const payload = {
     version: CREATOR_DIFFICULTY_VERSION,
     window_days: WINDOW_DAYS,

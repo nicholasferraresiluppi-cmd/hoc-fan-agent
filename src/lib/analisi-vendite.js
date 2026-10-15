@@ -22,6 +22,7 @@ import {
 } from "@/lib/analisi-vendite-sql";
 import { buildDiagnosi, summaryOf, personOf } from "@/lib/analisi-vendite-diagnosi";
 import { withLettura } from "@/lib/confronto-lettura";
+import { duplicateIds } from "@/lib/warehouse-duplicates";
 import {
   lkRecapDailyNetSql, lkRecapDailySubsSql, lkClicksSql, lkWelcomeDailySql, lkPerfSql, lkSubsRangeSql, lkAmountRangeSql,
   lkTxSummarySql, lkTxSeriesSql, lkTxTopUsersSql, lkTxListSql, lkUsersSql, lkChargebacksSql, lkOverallSql, lkOverallDailySql,
@@ -480,7 +481,7 @@ const BUILDERS = {
   "lk-tx": (refs, ids, range, q, f) => [lkTxListSql(refs, ids, range, f), lkTxSummarySql(refs, ids, range, f), lkTxSeriesSql(refs, ids, range, f), lkTxTopUsersSql(refs, ids, range, f)],
   "lk-users": (refs, ids, range, q, f) => [lkUsersSql(refs, ids, range, f)],
   "lk-chargebacks": (refs, ids, range, q, f) => [lkChargebacksSql(refs, ids, range, f)],
-  "lk-overall": (refs, ids) => [lkOverallSql(refs, ids, new Date().toISOString().slice(0, 10)), lkOverallDailySql(refs, ids, new Date().toISOString().slice(0, 10))],
+  "lk-overall": (refs, ids, range, q, f, nameOf, dups) => [lkOverallSql(refs, ids, new Date().toISOString().slice(0, 10), dups), lkOverallDailySql(refs, ids, new Date().toISOString().slice(0, 10))],
   "lk-newsubs": (refs, ids, range) => [
     nuoviMetricsSql(refs, ids, range, "sub_type"), nuoviMetricsSql(refs, ids, range, "creator_id"), nuoviPersoneSql(refs, ids, range), nuoviLinkSql(refs, ids, range),
     lkNewsubsDailySql(refs, ids, range), lkNewsubsListSql(refs, ids, range), lkNewsubsCreatorSql(refs, ids, range),
@@ -510,7 +511,8 @@ export async function getAnalisi(view, ids, query = {}, { force = false } = {}) 
   }
   const creators = await splitCreators();
   const names = Object.fromEntries(creators.map((c) => [c.id, c.name]));
-  const { source, rows } = await runOnSource((refs) => BUILDERS[view](refs, ids, range, q, f, (id) => names[Number(id)] || `Creator ${id}`), view.startsWith("lk-") || view === "confronto" ? { maxBytesBilled: 20 * 1024 ** 3, timeoutMs: 45_000 } : undefined);
+  const dups = await duplicateIds();
+  const { source, rows } = await runOnSource((refs) => BUILDERS[view](refs, ids, range, q, f, (id) => names[Number(id)] || `Creator ${id}`, dups), view.startsWith("lk-") || view === "confronto" ? { maxBytesBilled: 20 * 1024 ** 3, timeoutMs: 45_000 } : undefined);
   const out = { view, range, source, computed_at: new Date().toISOString(), ...(q ? { q } : {}), ...(fk ? { filters: f } : {}), ...shape(view, rows, names, range, await getLiveCreators().catch(() => [])) };
   await kv.set(key, out, { ex: 600 }).catch(() => {});
   return out;
