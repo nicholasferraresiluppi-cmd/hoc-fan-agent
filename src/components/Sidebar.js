@@ -98,6 +98,7 @@ const NAV_GROUPS_RAW = [
       { href: "/leaderboard/sales-cp",           label: "Classifica vendite", icon: DollarSign },
       { href: "/leaderboard/creators",           label: "Creator",      icon: Users },
       { href: "/admin/le-mie-creator",           label: "Revenue e chat", icon: LineChart },
+      { href: "/admin/creator-split",            label: "Creator dello split", icon: Users },
       { href: "/admin/analisi-vendite",          label: "Analisi vendite", icon: BarChart3 },
       { href: "/admin/looker",                   label: "HOC Analytics", icon: LayoutDashboard },
       { href: "/admin/fan-da-recuperare",        label: "Fan da recuperare", icon: HeartHandshake },
