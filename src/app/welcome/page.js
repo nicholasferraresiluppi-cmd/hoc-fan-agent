@@ -51,7 +51,7 @@ const MODULES = [
     title: "Comp & Ben",
     subtitle: "Compensi, scaglioni e margine per creator",
     description:
-      "Il conto economico live di ogni creator (venduto × fee − costo degli operatori), gli scaglioni messi a confronto tra creator, la lista delle anomalie sui compensi e l'esame di una creator su più mesi.",
+      "Il venduto e il costo degli operatori di ogni creator, anche sul mese in corso, gli scaglioni messi a confronto tra creator, la lista delle anomalie sui compensi e l'esame di una creator su più mesi.",
     primaryCta: { href: "/admin/pnl-live", label: "Apri P&L live" },
     secondaryCtas: [
       { href: "/admin/profiles-compare", label: "Scaglioni a confronto" },

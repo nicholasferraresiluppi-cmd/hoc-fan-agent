@@ -57,7 +57,7 @@ resolved più vecchi di 90 giorni.
 | id | Severità | Condizione |
 |---|---|---|
 | `wage-gap:{mese}` | critical | wage KV < wage CP live per un mese sincato (riusa logica Wage Audit) |
-| `fee-config` | critical | creator con fee% non impostata nel P&L > 50% del totale |
+| `fee-config` | — | DISMESSO 15/10/2026 (fee tolte da P&L Live: accordi riservati nel conto dello split). Il check non emette più nulla e cancella `pnl:deal_fees` / `pnl:deal_fee_default` |
 | `infloww-import-stale` | warning | ultimo import in `ops_kpi:imports` più vecchio di 8 giorni |
 | `underperformers` | warning | operatori con score CP v3 ≤ 25 e ≥ MIN_SHIFTS_RELIABLE shift (riusa costanti `creator-aggregates.js`) |
 | `cp-sync-stale` | warning | ultimo sync CP più vecchio di 8 giorni |

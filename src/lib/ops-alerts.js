@@ -50,8 +50,6 @@ const INFLOWW_STALE_DAYS = 3;
 // (src/app/leaderboard/sales-cp/page.js — score ≤25 = tier Average boundary).
 const UNDERPERF_SCORE_MAX = 25;
 const UNDERPERF_MIN_SHIFTS = 5;
-// fee-config è critical solo se scoperta la maggioranza dei creator del mese.
-const FEE_UNCOVERED_CRITICAL = 0.5;
 const RESOLVED_RETENTION_MS = 90 * 24 * 3600 * 1000;
 
 const alertKey = (fp) => `ops:alerts:${fp}`;
@@ -109,60 +107,16 @@ const CHECKS = [
     },
   },
   {
+    // Fee del deal tolte da P&L Live il 15/10/2026: gli accordi delle creator
+    // sono riservati (stanno nel conto dello split, fuori da RBAC). Il check
+    // resta, vuoto, così l'alert "fee-config" ancora aperto si risolve da solo
+    // al primo giro, e cancella le vecchie chiavi in chiaro leggibili agli admin.
     id: "fee-config",
     severity: "critical",
-    label: "Fee % non configurate (P&L)",
+    label: "Fee % (P&L, dismesso)",
     async run() {
-      // Stessa aggregazione di /api/admin/pnl-live: creator del mese = alias
-      // con sales > 0 nelle wages CP; fee dalla mappa pnl:deal_fees.
-      const period = currentMonthId();
-      const [wagesCur, fees, meta, defaultFee] = await Promise.all([
-        getWages(period),
-        kv.get("pnl:deal_fees"),
-        kv.get("cp:_meta"),
-        kv.get("pnl:deal_fee_default"),
-      ]);
-      // con una fee standard impostata ogni creator ha una fee: niente buco
-      if (typeof defaultFee === "number") return [];
-      let wages = wagesCur;
-      let effPeriod = period;
-      if ((!Array.isArray(wages) || wages.length === 0) && meta?.last_sync_period) {
-        effPeriod = meta.last_sync_period;
-        wages = await getWages(effPeriod);
-      }
-      if (!Array.isArray(wages) || wages.length === 0) return [];
-      const feeMap = fees && typeof fees === "object" ? fees : {};
-      const salesByAlias = new Map();
-      for (const w of wages) {
-        for (const s of w.shifts || []) {
-          // stessa logica per-shift di pnl-live: takes con alias, altrimenti
-          // fallback sul totale shift se mono-creator
-          const shiftSales = new Map();
-          for (const t of s.takes || []) {
-            if (!t.creator_alias) continue;
-            shiftSales.set(t.creator_alias, (shiftSales.get(t.creator_alias) || 0) + (Number(t.amount) || 0));
-          }
-          const aliasList = s.creator_aliases || [];
-          if (shiftSales.size === 0 && aliasList.length <= 1 && aliasList[0]) {
-            shiftSales.set(aliasList[0], Number(s.total_attributed) || 0);
-          }
-          for (const [a, v] of shiftSales.entries()) {
-            salesByAlias.set(a, (salesByAlias.get(a) || 0) + v);
-          }
-        }
-      }
-      const aliases = [...salesByAlias.entries()].filter(([, v]) => v > 0).map(([a]) => a);
-      if (aliases.length === 0) return [];
-      const withFee = aliases.filter((a) => typeof feeMap[a] === "number").length;
-      const uncovered = (aliases.length - withFee) / aliases.length;
-      if (uncovered <= FEE_UNCOVERED_CRITICAL) return [];
-      return [{
-        fingerprint: "fee-config",
-        title: "Fee % non configurate: P&L senza margine",
-        detail: `${meseLabel(effPeriod)} · margine calcolabile solo per i creator con fee impostata`,
-        value: `${withFee}/${aliases.length} creator`,
-        cta: { href: "/admin/pnl-live", label: "Apri P&L Live" },
-      }];
+      await kv.del("pnl:deal_fees", "pnl:deal_fee_default");
+      return [];
     },
   },
   {
