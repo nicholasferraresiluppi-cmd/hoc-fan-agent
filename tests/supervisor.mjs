@@ -190,3 +190,13 @@ t("ruolo ristretto social", () => {
 });
 
 console.log(`supervisor: ${n} gruppi di asserzioni ok`);
+
+// --- ruolo SMM (15/10/2026): Radar + Account social, con le schede per passare dall'una all'altra
+{
+  const { restrictionFor, pathAllowed } = await import("../src/lib/restricted-roles.js");
+  const r = restrictionFor({ roles: ["smm"] });
+  if (r.home !== "/admin/scouting" || !pathAllowed(r, "/admin/supervisor") || pathAllowed(r, "/admin/pnl-live")) throw new Error("smm");
+  if (restrictionFor({ roles: ["smm", "sales_manager"] }) !== null) throw new Error("smm con altro ruolo non è ristretto");
+  const { ROLE_CAPABILITIES } = await import("../src/lib/rbac.js").catch(() => ({}));
+  console.log("ruolo smm: ok");
+}

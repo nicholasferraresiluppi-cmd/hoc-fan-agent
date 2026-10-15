@@ -66,11 +66,22 @@ const whoFetcher = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch((
  * Guscio di chi ha un ruolo ristretto (lib/restricted-roles, es. "Social"): niente menu, niente
  * hub, solo il nome dell'app, la pagina e l'account. Le altre pagine riportano alla sua.
  */
-function RestrictedShell({ restriction, allowed, children }) {
+const RESTRICTED_PAGE_LABEL = { "/admin/scouting": "Radar creator", "/admin/supervisor": "Account social" };
+
+function RestrictedShell({ restriction, allowed, children, pathname }) {
   return (
     <div className="hoc-root" style={{ minHeight: "100vh", background: CP.bg }}>
       <header style={{ position: "sticky", top: 0, zIndex: 40, display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", background: CP.bgSunken, borderBottom: `1px solid ${CP.border}` }}>
-        <a href={restriction.home} style={{ color: CP.textPrimary, textDecoration: "none", fontSize: 15, fontWeight: 500 }}>House of Creators <span style={{ color: CP.textMuted, fontWeight: 400 }}>· {restriction.label}</span></a>
+        <a href={restriction.home} style={{ color: CP.textPrimary, textDecoration: "none", fontSize: 15, fontWeight: 500, whiteSpace: "nowrap" }}>House of Creators</a>
+        {/* più pagine (es. SMM: Radar + Account social) → una scheda per pagina; una sola → solo il nome */}
+        {restriction.paths.length > 1 ? (
+          <nav style={{ display: "flex", gap: 4, overflowX: "auto", minWidth: 0 }}>
+            {restriction.paths.map((p) => {
+              const on = pathname === p || pathname.startsWith(p + "/");
+              return <a key={p} href={p} style={{ fontSize: 13.5, padding: "6px 12px", borderRadius: 999, textDecoration: "none", whiteSpace: "nowrap", border: `1px solid ${on ? CP.accent : CP.border}`, background: on ? CP.accentSoft : "transparent", color: on ? CP.accentSoftText : CP.textSecondary }}>{RESTRICTED_PAGE_LABEL[p] || p}</a>;
+            })}
+          </nav>
+        ) : <span style={{ color: CP.textMuted, fontSize: 15 }}>· {restriction.label}</span>}
         <span style={{ flex: 1 }} />
         <UserButton afterSignOutUrl="/sign-in" />
       </header>
@@ -145,7 +156,7 @@ export default function AppShell({ children }) {
   }
 
   if (restriction) {
-    return <RestrictedShell restriction={restriction} allowed={allowedHere}>{children}</RestrictedShell>;
+    return <RestrictedShell restriction={restriction} allowed={allowedHere} pathname={pathname}>{children}</RestrictedShell>;
   }
 
   return (

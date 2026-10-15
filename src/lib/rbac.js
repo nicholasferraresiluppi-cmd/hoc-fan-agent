@@ -21,10 +21,11 @@ import { getClerkUser, forgetClerkUser } from "@/lib/clerk-user";
  */
 
 // "social" per primo = il più basso: diventa ruolo principale solo se è l'unico (lib/invitations)
-export const ROLES = ["social", "operator", "team_lead", "sales_manager", "qa_reviewer", "admin"];
+export const ROLES = ["social", "smm", "operator", "team_lead", "sales_manager", "qa_reviewer", "admin"];
 
 export const ROLE_META = {
   social: { label: "Social", emoji: "📱", color: "#EC4899", description: "Gestione account social — vede solo Account social" },
+  smm: { label: "Social Media Manager", emoji: "🎬", color: "#D9B46A", description: "Radar creator, format e mercato, account social" },
   operator: { label: "Operator", emoji: "💬", color: "#10B981", description: "Chatter in training — vede i suoi dati" },
   team_lead: { label: "Team Lead", emoji: "👥", color: "#3B82F6", description: "Lead del team — vede il suo team" },
   sales_manager: { label: "Sales Manager", emoji: "📈", color: "#F5A623", description: "SM — vede tutto, override score" },
@@ -53,6 +54,7 @@ export const CAPABILITIES = {
   CM_COCKPIT: "cm.cockpit",                   // cockpit turno di supervisione CM
   COPILOT_PILOT: "copilot.pilot",             // scheda-fan "Il mio turno" (aperto a tutta HOC; espone LTV fan del PROPRIO turno)
   USERS_INVITE: "users.invite",               // invitare persone in HOC Pro (accesso solo su invito dal 25/09/2026)
+  SCOUTING_USE: "scouting.use",               // Radar creator: guardare, valutare, segnalare, caricare reel (15/10/2026, ruolo SMM)
   SOCIAL_MANAGE: "social.manage",             // Account social (/admin/supervisor): account, telefoni, caselle, password (13/10/2026)
 };
 
@@ -60,6 +62,12 @@ export const CAPABILITIES = {
 export const ROLE_CAPABILITIES = {
   // 13/10/2026: solo Account social; chi ha solo questo ruolo vede l'app ridotta a quella pagina (lib/restricted-roles)
   social: {
+    [CAPABILITIES.SOCIAL_MANAGE]: "all",
+  },
+  // 15/10/2026: Social Media Manager — Radar creator (anche Format, Mercato, Le nostre creator) + Account social.
+  // Le ricerche che spendono di più (giri Apify, scoperta, foto) e la cancellazione dei dati restano admin (SEED).
+  smm: {
+    [CAPABILITIES.SCOUTING_USE]: "all",
     [CAPABILITIES.SOCIAL_MANAGE]: "all",
   },
   operator: {
@@ -112,6 +120,7 @@ export const ROLE_CAPABILITIES = {
     [CAPABILITIES.CM_COCKPIT]: "all",
     [CAPABILITIES.COPILOT_PILOT]: "all",
     [CAPABILITIES.SOCIAL_MANAGE]: "all",
+    [CAPABILITIES.SCOUTING_USE]: "all",
   },
 };
 

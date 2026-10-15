@@ -8,6 +8,7 @@
 
 export const RESTRICTED_ROLES = {
   social: { home: "/admin/supervisor", paths: ["/admin/supervisor"], label: "Account social" },
+  smm: { home: "/admin/scouting", paths: ["/admin/scouting", "/admin/supervisor"], label: "Radar creator" },
 };
 
 /** { home, paths, label } se la persona è ristretta, altrimenti null. */

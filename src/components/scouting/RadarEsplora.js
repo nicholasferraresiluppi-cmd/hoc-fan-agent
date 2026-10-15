@@ -15,6 +15,7 @@ const views = (newCut) => [
   { id: "todo", label: "Da classificare", test: (c) => c.g === "Da classificare" },
   // catena dei seguiti: OnlyFanser di cui non abbiamo ancora letto chi segue (le prossime della matrioska)
   { id: "folq", label: "Seguiti da leggere", test: (c) => c.sig === "forte" && !c.folAt && !c.ours },
+  { id: "ours", label: "Le nostre creator", test: (c) => c.ours },
   { id: "all", label: "Tutte", test: () => true },
 ];
 const PAGE = 150;

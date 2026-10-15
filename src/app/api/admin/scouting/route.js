@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.SCOUTING_USE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const [profiles, crm, refresh] = await Promise.all([getProfiles(), getCrm(), getRefreshState()]);
   const creators = buildCreators(profiles, crm);

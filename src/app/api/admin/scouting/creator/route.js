@@ -14,10 +14,15 @@ import { review, unreview, setStage, addNote, setField, linkHandles, unlinkHandl
 export const runtime = "nodejs";
 
 export async function POST(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.SCOUTING_USE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   let body;
   try { body = await request.json(); } catch { return Response.json({ error: "Richiesta non valida" }, { status: 400 }); }
+  // cancellare i dati di una persona resta da admin (è irreversibile e fa parte delle richieste privacy)
+  if (body.action === "forget") {
+    const adm = await authorize(CAPABILITIES.SEED);
+    if (!adm.ok) return Response.json({ error: "Solo un admin può cancellare i dati di una creator." }, { status: 403 });
+  }
   const by = String(body.by || "").slice(0, 80) || az.userId;
   try {
     let crm = await getCrm();
