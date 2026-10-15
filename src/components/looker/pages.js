@@ -808,55 +808,151 @@ export function SalesRatio({ creators, setCreators }) {
 }
 
 /* ───────── HOC Pro › Confronto creator (pagina nuova, in Looker non c'è) ───────── */
-// Tutte le metriche di una creator sulla stessa riga: senza, il confronto si faceva incrociando 3 pagine a mano.
-function vd(value, delta) {
+// Tutte le metriche di una creator sulla stessa riga, numeri veri (niente scale né sfondi a intensità), una riga di
+// lettura scritta da regole fisse (lib/confronto-lettura.js) che cita il numero e la "creator tipica" (mediana).
+const cmpN = (v) => (v == null || !Number.isFinite(Number(v)) ? "—" : new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0, useGrouping: "always" }).format(Math.round(Number(v))));
+const cmpM = (v) => (v == null || !Number.isFinite(Number(v)) ? "—" : `$${cmpN(v)}`);
+const cmpP = (v) => (v == null || !Number.isFinite(Number(v)) ? "—" : `${new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 }).format(Number(v) * 100)}%`);
+const CMP_MIN_DELTA = 0.1; // sotto ±10% la variazione non si mostra: si vedono solo i movimenti veri
+
+function CmpDelta({ v }) {
+  const show = v != null && Number.isFinite(v) && Math.abs(v) >= CMP_MIN_DELTA;
   return (
-    <span style={{ display: "inline-grid", justifyItems: "end", lineHeight: 1.25 }}>
-      <span>{value}</span>
-      <span style={{ fontSize: 11, color: CP.textMuted }}><LkDelta v={delta} /></span>
+    <span style={{ display: "block", fontSize: 11, marginTop: 2, minHeight: 14, fontWeight: 400, color: !show ? "transparent" : v > 0 ? CP.accentGreen : CP.accentRed }}>
+      {show ? `${v > 0 ? "+" : "−"}${new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0 }).format(Math.abs(v) * 100)}%` : "·"}
     </span>
   );
 }
+
+const CMP_COLS = [
+  { key: "reach", label: "Reach", f: cmpN, delta: "reach_delta" },
+  { key: "clicks", label: "Click sui link", f: cmpN, delta: "clicks_delta" },
+  { key: "subs", label: "Nuovi abbonati", f: cmpN, delta: "subs_delta" },
+  { key: "conv", label: "Nuovi che hanno pagato", f: cmpP, hint: "Su 100 nuovi abbonati del periodo, quanti hanno speso qualcosa." },
+  { key: "payers", label: "Fan paganti", f: cmpN, delta: "payers_delta" },
+  { key: "arppu", label: "Spesa per fan", f: cmpM, delta: "arppu_delta", hint: "Lordo diviso fan paganti." },
+  { key: "top10_share", label: "Lordo dai 10 fan migliori", f: cmpP, hint: "Quanto del lordo viene dai 10 fan che hanno speso di più: più è alto, più l'incasso è fragile." },
+  { key: "eff", label: "Lordo ogni 1.000 reach", f: cmpM, hint: "Quanto rende il pubblico che arriva: lordo diviso reach, per 1.000." },
+  { key: "gross", label: "Lordo", f: cmpM, delta: "gross_delta", strong: true, hint: "Quanto hanno pagato i fan, abbonamenti compresi (il netto è l'80%)." },
+  { key: "cr", label: "Abbonati ogni 100 click", f: (v) => (v == null ? "—" : new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 }).format(v * 100)), delta: "cr_delta", extra: true },
+  { key: "writers", label: "Fan che scrivono in chat", f: cmpN, delta: "writers_delta", extra: true },
+  { key: "sub_gross", label: "Lordo da abbonamenti", f: cmpM, extra: true, onlyIfAny: true },
+];
+
+function cmpCsv(cols, rows) {
+  const cell = (v) => (v == null ? "" : typeof v === "number" ? String(v).replace(".", ",") : /[";\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+  const head = ["Creator", ...cols.map((c) => c.label), "Lettura"].map(cell).join(";");
+  const body = rows.map((r) => [r.name, ...cols.map((c) => r[c.key]), r.lettura].map(cell).join(";")).join("\n");
+  const a = window.document.createElement("a");
+  a.href = window.URL.createObjectURL(new window.Blob([`﻿${head}\n${body}`], { type: "text/csv;charset=utf-8" }));
+  a.download = `confronto-creator-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  window.setTimeout(() => window.URL.revokeObjectURL(a.href), 1000);
+}
+
 export function CreatorCompare({ creators, setCreators }) {
   const [range, setRange] = useState(null);
   const [byPerson, setByPerson] = useState(true);
+  const [sort, setSort] = useState({ key: "gross", dir: "desc" });
   const swr = useLk("confronto", range, creators);
-  const d = swr.data;
-  const rows = d?.view === "confronto" ? (byPerson ? d.persons : d.rows) : [];
-  const n1 = (v) => (v == null ? "—" : new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 }).format(v));
-  const columns = [
-    { key: "name", label: byPerson ? "Creator" : "Pagina", width: 200, render: (r) => (byPerson && r.pages > 1 ? <span title={`${r.pages} pagine sommate`}>{r.name} <span style={{ color: CP.textMuted }}>· {r.pages}</span></span> : r.name) },
-    { key: "gross", label: "Revenue lordo", align: "right", heat: true, render: (r) => vd(fmt.money0(r.gross), r.gross_delta) },
-    { key: "sub_share", label: "di cui abbonamenti", align: "right", render: (r) => (r.sub_gross ? `${fmt.money0(r.sub_gross)} · ${fmt.pct(r.sub_share, 0)}` : "—"), csv: (r) => r.sub_gross },
-    { key: "subs", label: "Nuovi abbonati", align: "right", heat: true, render: (r) => vd(fmt.int(r.subs), r.subs_delta) },
-    { key: "reach", label: "Reach", align: "right", heat: true, render: (r) => vd(fmt.int(r.reach), r.reach_delta) },
-    { key: "clicks", label: "Click sui link", align: "right", heat: true, render: (r) => vd(fmt.int(r.clicks), r.clicks_delta) },
-    { key: "cr", label: "Abbonati ogni 100 click", align: "right", render: (r) => vd(n1(r.cr == null ? null : r.cr * 100), r.cr_delta) },
-    { key: "payers", label: "Fan paganti", align: "right", heat: true, render: (r) => vd(fmt.int(r.payers), r.payers_delta) },
-    { key: "arppu", label: "Spesa per fan pagante", align: "right", render: (r) => vd(r.arppu == null ? "—" : fmt.money0(r.arppu), r.arppu_delta) },
-    { key: "writers", label: "Fan che scrivono in chat", align: "right", heat: true, render: (r) => vd(fmt.int(r.writers), r.writers_delta) },
-  ];
-  const seg = (on) => ({ border: `1px solid ${on ? CP.accent : CP.border}`, background: on ? `color-mix(in srgb, ${CP.accent} 14%, transparent)` : "transparent", color: on ? CP.textPrimary : CP.textSecondary, borderRadius: 8, padding: "6px 10px", fontSize: 13, cursor: "pointer" });
+  const d = swr.data?.view === "confronto" ? swr.data : null;
+  const rows = d ? (byPerson ? d.persons : d.rows) : [];
+  const med = d?.medians?.[byPerson ? "persons" : "rows"] || {};
+  const cols = CMP_COLS.filter((c) => !c.onlyIfAny || rows.some((r) => r[c.key] > 0));
+  const sorted = useMemo(() => {
+    const k = sort.key;
+    return [...rows].sort((a, b) => {
+      const x = k === "name" ? a.name : a[k]; const y = k === "name" ? b.name : b[k];
+      if (x == null && y == null) return 0;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      const c = typeof x === "number" ? x - y : String(x).localeCompare(String(y), "it");
+      return sort.dir === "asc" ? c : -c;
+    });
+  }, [rows, sort]);
+  const clickSort = (key) => setSort((s) => (s.key === key ? { key, dir: s.dir === "desc" ? "asc" : "desc" } : { key, dir: key === "name" ? "asc" : "desc" }));
+  const dshort = (s) => (s ? new Date(`${s}T00:00:00Z`).toLocaleDateString("it-IT", { day: "numeric", month: "short", timeZone: "UTC" }) : "");
+  const days = d ? Math.round((Date.parse(d.range.to) - Date.parse(d.range.from)) / 86400e3) + 1 : 0;
+  const seg = (on) => ({ border: `1px solid ${on ? CP.borderStrong : CP.border}`, background: on ? CP.surfaceAlt : "transparent", color: on ? CP.textPrimary : CP.textSecondary, borderRadius: 8, padding: "6px 12px", fontSize: 13, cursor: "pointer" });
+  const th = { fontWeight: 400, fontSize: 12, color: CP.textMuted, textAlign: "right", padding: "0 14px 10px", borderBottom: `1px solid ${CP.border}`, verticalAlign: "bottom", lineHeight: 1.3, cursor: "pointer", userSelect: "none", minWidth: 84 };
+  const td = { textAlign: "right", padding: "13px 14px", whiteSpace: "nowrap", borderBottom: `1px solid ${CP.borderSoft}`, verticalAlign: "top", fontVariantNumeric: "tabular-nums", fontSize: 14, color: CP.textPrimary };
+  const kpi = (label, value, sub) => (
+    <div>
+      <div style={{ fontSize: 12, color: CP.textMuted }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 500, color: CP.textPrimary, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>{value}</div>
+      {sub}
+    </div>
+  );
   return (
     <LkPage title="Confronto creator"
-      description="Tutte le metriche di ogni creator sulla stessa riga, per confrontarle. Sotto ogni numero la variazione rispetto al periodo prima di pari durata. Clicca un'intestazione per ordinare."
+      description="Tutte le creator sulla stessa riga, con i numeri veri. Sotto ogni nome una riga di lettura: le differenze più forti rispetto alla creator tipica del gruppo."
       filters={<>
         <div role="group" aria-label="Raggruppa" style={{ display: "inline-flex", gap: 6 }}>
           <button onClick={() => setByPerson(true)} style={seg(byPerson)} aria-pressed={byPerson}>Per creator</button>
           <button onClick={() => setByPerson(false)} style={seg(!byPerson)} aria-pressed={!byPerson}>Per pagina (IT, EN…)</button>
         </div>
-        <Filters data={d} creators={creators} setCreators={setCreators} range={range} setRange={setRange} isLoading={swr.isLoading} />
+        <LkSelect label="Creator" options={(swr.data?.creators || []).map((c) => ({ value: c.id, label: c.name }))} value={creators} onChange={setCreators} width={220} />
+        <PeriodPicker value={range || swr.data?.range || null} onChange={setRange} max={yesterday()} loading={swr.isLoading && Boolean(swr.data)} />
       </>}>
       <State swr={swr}>
-        {d && d.view === "confronto" && (
+        {d && (
           <>
-            <LkTable name="confronto-creator" maxHeight={620} numbered columns={columns} rows={rows} total={d.total} initialSort={{ key: "gross", dir: "desc" }} />
+            <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.5 }}>
+              Ultimi {days} giorni: {dshort(d.range.from)} – {dshort(d.range.to)}. Le percentuali in verde e rosso confrontano con i {days} giorni prima
+              ({dshort(d.previous.from)} – {dshort(d.previous.to)}) e compaiono solo oltre ±10%. La <b style={{ fontWeight: 500 }}>creator tipica</b> è quella a metà del gruppo mostrato.
+            </div>
+            <div style={{ maxWidth: 960 }}><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "14px 20px" }}>
+              {kpi("Lordo del gruppo", cmpM(d.total.gross), <CmpDelta v={d.total.gross_delta} />)}
+              {kpi("Nuovi abbonati", cmpN(d.total.subs), <CmpDelta v={d.total.subs_delta} />)}
+              {kpi("Nuovi che hanno pagato · creator tipica", cmpP(med.conv))}
+              {kpi("Lordo ogni 1.000 reach · creator tipica", cmpM(med.eff))}
+            </div></div>
+            <div style={{ ...lkCard, padding: "14px 4px 4px 18px", overflowX: "auto" }}>
+              <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                <thead>
+                  <tr>
+                    <th onClick={() => clickSort("name")} style={{ ...th, textAlign: "left", paddingLeft: 0, color: sort.key === "name" ? CP.textPrimary : CP.textMuted }}>
+                      {byPerson ? "Creator" : "Pagina"}{sort.key === "name" ? (sort.dir === "asc" ? " ↑" : " ↓") : ""}
+                    </th>
+                    {cols.map((c) => (
+                      <th key={c.key} onClick={() => clickSort(c.key)} title={c.hint} style={{ ...th, color: sort.key === c.key ? CP.textPrimary : CP.textMuted, ...(c.extra ? { borderLeft: c === cols.find((x) => x.extra) ? `1px solid ${CP.border}` : undefined } : {}) }}>
+                        {c.label}{sort.key === c.key ? (sort.dir === "desc" ? " ↓" : " ↑") : ""}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map((r) => (
+                    <tr key={r.creator_id || r.name}>
+                      <td style={{ ...td, textAlign: "left", paddingLeft: 0, whiteSpace: "normal", minWidth: 300, maxWidth: 380 }}>
+                        <div style={{ fontSize: 15 }}>
+                          {r.name}{byPerson && r.pages > 1 && <span style={{ color: CP.textMuted, fontSize: 12 }}> · {r.pages} pagine</span>}
+                        </div>
+                        <div style={{ fontSize: 12, color: CP.textSecondary, marginTop: 4, lineHeight: 1.45 }}>{r.lettura}</div>
+                      </td>
+                      {cols.map((c) => (
+                        <td key={c.key} style={{ ...td, ...(sort.key === c.key ? { background: `color-mix(in srgb, ${CP.textPrimary} 3%, transparent)` } : {}), ...(c.strong ? { fontWeight: 500 } : {}),
+                          ...(c.extra && c === cols.find((x) => x.extra) ? { borderLeft: `1px solid ${CP.border}` } : {}), ...(c.extra ? { color: CP.textSecondary } : {}) }}>
+                          {c.f(r[c.key])}
+                          <CmpDelta v={c.delta ? r[c.delta] : null} />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  {!sorted.length && <tr><td colSpan={cols.length + 1} style={{ ...td, textAlign: "center", color: CP.textMuted }}>Nessuna creator nel periodo.</td></tr>}
+                </tbody>
+              </table>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px 8px 0", fontSize: 12, color: CP.textMuted }}>
+                <span>{sorted.length} {byPerson ? "creator" : "pagine"} · clicca un&apos;intestazione per ordinare</span>
+                {sorted.length > 0 && <button onClick={() => cmpCsv(cols, sorted)} style={{ border: `1px solid ${CP.border}`, background: "transparent", color: CP.textSecondary, borderRadius: 8, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}>Scarica CSV</button>}
+              </div>
+            </div>
             {note(<>
-              <b style={{ fontWeight: 500 }}>Come leggerla.</b> Revenue lordo = quanto hanno pagato i fan, abbonamenti compresi (il netto è l&apos;80%).
-              Reach, click e nuovi abbonati dicono quanto traffico arriva; fan paganti e spesa per fan pagante quanto bene lo si monetizza; fan che scrivono quanti sono vivi in chat.
-              Due creator con la stessa reach ma revenue molto diverso hanno un potenziale non sfruttato, oppure un pubblico diverso: per il secondo caso vedi la <a href="/admin/creator-difficulty" style={{ color: CP.accent }}>difficoltà della creator</a>.
-              {byPerson && " Per creator le pagine (IT, EN…) sono sommate: un fan che paga su due pagine conta due volte."}
-              {" "}Non ci sono (ancora) gli abbonati attivi né le visualizzazioni delle mass: il warehouse non li registra in modo affidabile.
+              <b style={{ fontWeight: 500 }}>Come leggerla.</b> Reach, click e nuovi abbonati dicono quanto pubblico arriva; nuovi che hanno pagato e fan paganti quanti diventano clienti;
+              spesa per fan e lordo ogni 1.000 reach quanto rende. Lordo dai 10 fan migliori dice quanto l&apos;incasso è fragile.
+              La riga di lettura la scrivono regole fisse, non l&apos;AI: cita solo differenze forti, e tace quando i numeri sono troppo piccoli per dire qualcosa (meno di 30 fan paganti o 50 nuovi abbonati).
+              {byPerson && " Per creator le pagine (IT, EN…) sono sommate; i 10 fan migliori sono calcolati sommando la spesa di ogni fan su tutte le pagine."}
+              {" "}Un pubblico che rende poco può essere potenziale non sfruttato o un pubblico diverso: per il secondo caso vedi la <a href="/admin/creator-difficulty" style={{ color: CP.accent }}>difficoltà della creator</a>.
             </>)}
           </>
         )}
