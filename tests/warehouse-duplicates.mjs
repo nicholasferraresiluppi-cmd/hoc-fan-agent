@@ -4,9 +4,10 @@ import { duplicatesSql, classifyDuplicates, mergeSubstitutions, dedupeIds } from
 
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
-const sql = duplicatesSql({ creators: "p.pg.creators", attributed: "p.of.at" });
+const sql = duplicatesSql({ creators: "p.pg.creators", attributed: "p.of.at", reach: "p.of.reach" });
 ok(sql.includes("deleted_at IS NULL") && sql.includes("HAVING COUNT(*) > 1"), "solo record vivi con account condiviso");
 ok(sql.includes("ORDER BY created_at, id LIMIT 1"), "si tiene il più vecchio");
+ok(sql.includes("GROUP BY 1, 2 HAVING COUNT(*) > 1") && sql.includes("USING (platform_id, org)"), "doppione solo dentro la stessa organizzazione");
 ok(sql.includes("ABS(a.g - b.g) < 0.01"), "giorni identici al centesimo");
 
 const row = (o) => ({ platform_id: 1, keep_id: 10, keep_name: "Elisa - IT", id: 20, name: "Elisa", both_days: 0, identical_days: 0, gross_doubled: 0, ...o });

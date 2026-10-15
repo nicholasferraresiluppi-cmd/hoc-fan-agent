@@ -1,4 +1,5 @@
-// Doppioni nel warehouse (15/10/2026) — lo scudo di HOC Pro. Logica e regole in warehouse-duplicates-core.js.
+// Doppioni nel warehouse (15/10/2026) — lo scudo di HOC Pro. Doppione = stesso account OnlyFans con due record nella
+// STESSA organizzazione (il warehouse ne contiene molte: un account registrato da due agenzie non è un doppione). Logica e regole in warehouse-duplicates-core.js.
 //
 // - refreshDuplicates(): ricalcola le coppie dal warehouse (query piccola: solo i record con account condiviso) e
 //   aggiorna la mappa delle sostituzioni, APPICCICOSA. Gira ogni notte dal check "warehouse-duplicates" (ops-alerts).
@@ -12,7 +13,7 @@
 
 import { kv } from "@vercel/kv";
 import { bqQuery, bqProjects } from "@/lib/bigquery-api";
-import { duplicatesSql, classifyDuplicates, mergeSubstitutions, dedupeIds } from "@/lib/warehouse-duplicates-core";
+import { duplicatesSql, classifyDuplicates, mergeSubstitutions, dedupeIds, DUPLICATES_VERSION } from "@/lib/warehouse-duplicates-core";
 
 const KEY = "warehouse:duplicates";
 const MEM_TTL = 5 * 60 * 1000;
@@ -25,7 +26,7 @@ export async function getDuplicateReport() {
 export async function getSubstitutions() {
   if (mem && Date.now() - mem.loaded < MEM_TTL) return mem.subs;
   const rep = await getDuplicateReport();
-  mem = { loaded: Date.now(), subs: rep.subs || {} };
+  mem = { loaded: Date.now(), subs: rep.v === DUPLICATES_VERSION ? rep.subs || {} : {} };
   return mem.subs;
 }
 
@@ -41,11 +42,13 @@ export async function duplicateIds() {
 
 export async function refreshDuplicates() {
   const { dataProject } = bqProjects();
-  const refs = { creators: `${dataProject}.postgres.public_creators`, attributed: `${dataProject}.onlyfans.attributed_transactions` };
+  const refs = { creators: `${dataProject}.postgres.public_creators`, attributed: `${dataProject}.onlyfans.attributed_transactions`, reach: `${dataProject}.onlyfans.reach` };
   const { rows } = await bqQuery(duplicatesSql(refs));
   const pairs = classifyDuplicates(rows);
   const prev = await getDuplicateReport();
-  const out = { at: Date.now(), pairs, subs: mergeSubstitutions(prev.subs, pairs) };
+  // memoria appiccicosa, ma solo dalla stessa versione della regola (la v1 era sbagliata: si riparte da zero)
+  const prevSubs = prev.v === DUPLICATES_VERSION ? prev.subs : {};
+  const out = { v: DUPLICATES_VERSION, at: Date.now(), pairs, subs: mergeSubstitutions(prevSubs, pairs) };
   await kv.set(KEY, out);
   mem = { loaded: Date.now(), subs: out.subs };
   return out;
