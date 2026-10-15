@@ -11,7 +11,7 @@ import {
   handleStem, linkKey, suggestLinks, buildCreators, stageCounts,
   creatorIdOf, setStage, addNote, setField, linkHandles, unlinkHandle, dismissSuggestion, forgetHandle,
   HISTORY_MAX, DEFAULT_STAGE, applyRefresh, scrubContacts,
-  classifyUrl, bestLink, whyLines, pickToday, parseInstagramLink, marketByGroup,
+  classifyUrl, bestLink, linkWhere, whyLines, pickToday, parseInstagramLink, marketByGroup,
 } from "../src/lib/scouting-core.js";
 
 let n = 0;
@@ -167,6 +167,19 @@ const why = whyLines(cA);
 ok(why[0].includes("ruolo o mestiere") && why.some((w) => w.includes("prima storia in evidenza")) && why.some((w) => w.includes("+8")), "il perché viene dai fatti");
 eq(pickToday([cB, cA, cC]).map((c) => c.id), ["h:a", "h:b"], "da guardare: prima chi ha più fatti, mai chi è già valutata");
 eq(marketByGroup([{ g: "X", sig: "forte" }, { g: "X", sig: "nessuno" }])[0], { g: "X", n: 2, paid: 1, pct: 50 }, "mercato per nicchia");
+
+
+// giro dei tag (15/10/2026): link nella bio dell'account taggato nella prima evidenza
+const viaP = { h: "alice", url: "", hlLinks: [], hlVia: [{ h: "imieilinkzz", urls: ["http://getmysocial.com/alicelatsxo"] }] };
+const lv = bestLink([viaP]);
+eq([lv.where, lv.via, lv.strength], ["tag", "imieilinkzz", 1], "il link dell'account taggato conta, con chi l'ha portato");
+eq(linkWhere(lv, { short: true }), "tramite @imieilinkzz", "etichetta corta");
+ok(linkWhere(lv).includes("taggato nella prima storia in evidenza"), "frase lunga dice da dove viene");
+eq(bestLink([{ ...viaP, hlVia: [{ h: "x", urls: ["https://onlyfans.com/a"] }], url: "https://linktr.ee/a" }]).where, "tag", "OnlyFans dietro il tag batte la pagina di link in bio");
+eq(bestLink([{ ...viaP, hlVia: [{ h: "x", urls: [] }] }]), null, "tag senza link = nessun link, non inventato");
+eq(bestLink([{ url: "", hlVia: [null] }]), null, "voci rotte ignorate");
+ok(whyLines({ link: { label: "OnlyFans", strength: 3, where: "tag", via: "x" } })[0].includes("@x"), "il perché nomina l'account taggato");
+eq(suggestLinks([{ h: "a", url: "", hlVia: [{ h: "t", urls: ["https://onlyfans.com/zed"] }] }, { h: "b", url: "https://onlyfans.com/zed" }], (h) => h).length, 1, "stesso link anche via tag propone il collegamento");
 
 console.log(`scouting: ${n} asserzioni ok`);
 

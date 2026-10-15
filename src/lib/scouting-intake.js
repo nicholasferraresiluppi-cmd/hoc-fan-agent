@@ -6,7 +6,9 @@
 //   2. creator già nel radar → nota "segnalata di nuovo", nessuna spesa in più;
 //   3. creator nuova → numeri del profilo (afanasenko/instagram-profile-scraper, 1 cent)
 //      + PRIMA storia in evidenza (afanasenko/instagram-stories-highlights-scraper, ~2 cent):
-//      il link che c'è dentro dice se ha un profilo a pagamento.
+//      il link che c'è dentro dice se ha un profilo a pagamento; se la storia TAGGA un altro
+//      account, si legge il link nella bio di quell'account (apify/instagram-profile-scraper,
+//      ~0,3 cent, anche privato): è il giro che le creator usano per non farsi bloccare.
 // Nicchia e format restano "da classificare": li giudica una persona (o un giro di
 // classificazione in sessione), mai un'etichetta inventata.
 //
@@ -15,7 +17,9 @@
 // 36 ore e si riprendono quando servono. Nessuna copia dei video: la scheda li riproduce
 // dal server di Instagram (che li serve anche ad altri siti: cross-origin).
 import { getProfiles, saveProfiles, getForgotten, getCrm, saveCrm, getReelMedia, setReelMedia } from "@/lib/scouting-store";
-import { normHandle, parseRefreshItem, parseInstagramLink, bestLink, weekKey, addNote, creatorIdOf } from "@/lib/scouting-core";
+import { normHandle, parseRefreshItem, parseInstagramLink, bestLink, linkWhere, weekKey, addNote, creatorIdOf } from "@/lib/scouting-core";
+
+const sigOf = (l) => (!l || l.strength < 1 ? "nessuno" : l.strength >= 2 ? "forte" : "debole");
 
 const API = "https://api.apify.com/v2";
 
@@ -104,19 +108,57 @@ async function fetchProfileRow(h) {
   return rows.map(parseRefreshItem).find((p) => p && p.h === h) || null;
 }
 
-async function fetchFirstHighlightLinks(h) {
+/** Prima storia in evidenza: i link (sticker) e gli account taggati (menzioni). */
+async function fetchFirstHighlight(h) {
   const rows = await runSync("afanasenko~instagram-stories-highlights-scraper", {
     operationMode: "highlightsByUsername", usernames: [h], maxAccounts: 1, includeHighlightItems: true,
     maxHighlightsPerAccount: 1, analyzeFrames: false, maxAnalyzedPerAccount: 0, skipPrivate: true,
   }, { maxUsd: 0.05, timeout: 120 });
   const urls = new Set();
+  const mentions = new Set();
   for (const r of rows) {
     const ls = r.linkStickers;
     // l'attore a volte restituisce l'elenco come testo in stile Python ("[{'url': '…'}]")
     if (typeof ls === "string") for (const m of ls.matchAll(/['"]url['"]\s*:\s*['"]([^'"]+)['"]/g)) urls.add(m[1]);
     else for (const l of Array.isArray(ls) ? ls : []) if (l?.url) urls.add(l.url);
+    const ms = r.mentions;
+    if (typeof ms === "string") for (const m of ms.matchAll(/['"]username['"]\s*:\s*['"]([^'"]+)['"]/g)) mentions.add(normHandle(m[1]));
+    else for (const m of Array.isArray(ms) ? ms : []) if (m?.username) mentions.add(normHandle(m.username));
   }
-  return [...urls].slice(0, 5);
+  mentions.delete(h);
+  mentions.delete("");
+  return { urls: [...urls].slice(0, 5), mentions: [...mentions].slice(0, MAX_VIA) };
+}
+
+const MAX_VIA = 3;
+
+/**
+ * La bio degli account taggati nella prima evidenza (anche se PRIVATI: il link in bio di un
+ * account privato è pubblico). apify/instagram-profile-scraper, ~0,3 cent a account;
+ * afanasenko salta i privati, che sono proprio il caso tipico ("imieilinkzz").
+ */
+async function fetchViaLinks(handles) {
+  if (!handles.length) return [];
+  const rows = await runSync("apify~instagram-profile-scraper", { usernames: handles }, { maxUsd: 0.03, timeout: 90 });
+  const out = [];
+  for (const r of rows) {
+    const h = normHandle(r.username || "");
+    if (!h || !handles.includes(h)) continue;
+    const urls = new Set();
+    if (r.externalUrl) urls.add(r.externalUrl);
+    for (const l of Array.isArray(r.externalUrls) ? r.externalUrls : []) if (l?.url) urls.add(l.url);
+    out.push({ h, urls: [...urls].slice(0, 5), priv: !!r.private });
+  }
+  return out;
+}
+
+/** Evidenza + giro dei tag. Mai bloccante: senza, la scheda nasce lo stesso. */
+async function readHighlight(h) {
+  let hl = { urls: [], mentions: [] };
+  try { hl = await fetchFirstHighlight(h); } catch { return { hlLinks: [], hlVia: null }; }
+  let hlVia = [];
+  try { hlVia = await fetchViaLinks(hl.mentions); } catch { hlVia = hl.mentions.map((m) => ({ h: m, urls: [] })); }
+  return { hlLinks: hl.urls, hlVia };
 }
 
 /**
@@ -143,6 +185,21 @@ export async function processSignal({ text, by, why }) {
   const i = profiles.findIndex((p) => p.h === h);
   const note = [`Segnalata da ${by || "qualcuno"}`, why ? `: ${String(why).slice(0, 200)}` : ""].join("");
   if (i >= 0) {
+    // Già nel radar ma senza un link che dica qualcosa e mai letta con il giro dei tag:
+    // la segnalazione di una persona è il momento giusto per rileggere l'evidenza (~2,3 cent, una volta).
+    let found = "";
+    const cur = profiles[i];
+    if (!cur.hlVia && !((bestLink([cur])?.strength || 0) >= 2)) {
+      const { hlLinks, hlVia } = await readHighlight(h);
+      if (hlVia) {
+        const next = { ...cur, hlLinks: hlLinks.length ? hlLinks : cur.hlLinks || [], hlVia, hl: (hlLinks.length || cur.hlLinks?.length) > 0 };
+        const l = bestLink([next]);
+        next.sig = sigOf(l);
+        profiles[i] = next;
+        if (l && l.strength >= 1) found = ` · ${l.strength >= 2 ? l.label : "solo una pagina di link"} ${linkWhere(l)}`;
+        await saveProfiles(profiles);
+      }
+    }
     if (reel) {
       const rs = new Map((profiles[i].reels || []).map((x) => [x.sc, x]));
       rs.set(reel.sc, { ...rs.get(reel.sc), ...reel, signaled: true });
@@ -151,19 +208,18 @@ export async function processSignal({ text, by, why }) {
     }
     await noteOn(h, note, by);
     if (media) await cacheMedia(h, [media]);
-    return { status: "gia_nel_radar", h, msg: `@${h} era già nel radar: aggiunta la segnalazione.` };
+    return { status: "gia_nel_radar", h, msg: `@${h} era già nel radar: aggiunta la segnalazione${found}.` };
   }
 
   const row = await fetchProfileRow(h);
   if (!row) return { status: "non_trovata", h, msg: `Non riesco a leggere @${h} (privato o inesistente).` };
-  let hlLinks = [];
-  try { hlLinks = await fetchFirstHighlightLinks(h); } catch { /* le evidenze sono un di più: senza, la scheda nasce lo stesso */ }
-  const draft = { url: row.url, hlLinks };
+  const { hlLinks, hlVia } = await readHighlight(h);
+  const draft = { url: row.url, hlLinks, hlVia: hlVia || [] };
   const link0 = bestLink([draft]);
-  const sig = !link0 || link0.strength < 1 ? "nessuno" : link0.strength >= 2 ? "forte" : "debole";
+  const sig = sigOf(link0);
   const now = Date.now();
   profiles.push({
-    h, fol: row.fol, medv: row.medv, vf: row.vf ?? null, sig, hl: hlLinks.length > 0, hlLinks,
+    h, fol: row.fol, medv: row.medv, vf: row.vf ?? null, sig, hl: hlLinks.length > 0, hlLinks, ...(hlVia ? { hlVia } : {}),
     nic: "", fmt: "nessuno", u: 0, nota: "", ours: false, ag: false, chk: false,
     g: "Da classificare", src: "segnalata", url: row.url || "", bio: row.bio || "",
     hist: [[weekKey(new Date(now)), row.fol, row.medv]], firstSeen: now, lastSeen: now, missing: 0,
@@ -172,7 +228,7 @@ export async function processSignal({ text, by, why }) {
   await saveProfiles(profiles);
   await noteOn(h, note, by);
   if (media) await cacheMedia(h, [media]);
-  const what = sig === "forte" ? `${link0.label} trovato ${link0.where === "evidenza" ? "nella prima evidenza" : "in bio"}` : sig === "debole" ? "solo una pagina di link" : "nessun profilo a pagamento visibile";
+  const what = sig === "forte" ? `${link0.label} trovato ${linkWhere(link0)}` : sig === "debole" ? `solo una pagina di link ${linkWhere(link0)}` : "nessun profilo a pagamento visibile";
   return { status: "nuova", h, sig, msg: `@${h} aggiunta al radar · ${what}.` };
 }
 
