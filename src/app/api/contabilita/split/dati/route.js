@@ -3,8 +3,9 @@
  * da precompilare (si può sempre correggere a mano):
  *  - revenue $ = `attributed_transactions.net` del warehouse (netta della quota OnlyFans) sulle
  *    pagine del team (`creatorIds`). Su agosto 2026 coincide col foglio di Nicholas entro ~1-2%.
- *  - chatter $ = compenso operatori CreatorsPro attribuito per alias (`cpAliases`, pnl-aggregate).
- *    Su agosto è PIÙ BASSO del foglio (1-34% a seconda della creator): stima, da verificare.
+ *  - chatter $ = buste CreatorsPro del mese, busta per busta (split-core `chatterFromWages`):
+ *    turno con due modelle → costo diviso per venduto; con l'elenco delle buste per team e
+ *    quante non sono ancora chiuse (il conto vero si fa quando sono chiuse tutte).
  * Non scrive nulla: il browser mette i numeri nel mese e l'utente salva.
  */
 import { requireAccounting } from "@/lib/compensi-access";
@@ -13,7 +14,7 @@ import { isMonthId } from "@/lib/compensi-core";
 import { runOnSource } from "@/lib/analisi-vendite";
 import { bigQueryConfigured } from "@/lib/bigquery-api";
 import { getWages } from "@/lib/cp-wages-store";
-import { aggregateWagesByAlias } from "@/lib/pnl-aggregate";
+import { chatterFromWages } from "@/lib/split-core";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,15 +45,19 @@ export async function GET(request) {
   } else notes.push("Nessuna pagina OnlyFans collegata ai team o warehouse non configurato.");
 
   const chatter = {};
+  const buste = {};
+  let busteStatus = null;
   try {
     const wages = await getWages(m);
-    if (!wages?.length) notes.push(`Wage CreatorsPro di ${m} non sincronizzate: costo chatter da inserire a mano.`);
+    if (!wages?.length) notes.push(`Buste CreatorsPro di ${m} non sincronizzate: costo chatter da inserire a mano.`);
     else {
-      const by = aggregateWagesByAlias(wages);
-      for (const t of teams) if (t.cpAliases?.length) chatter[t.id] = Math.round(t.cpAliases.reduce((s, a) => s + (by.get(a)?.cost || 0), 0) * 100) / 100;
+      const r = chatterFromWages(wages, teams);
+      for (const t of teams) if (t.cpAliases?.length) { chatter[t.id] = r.byTeam[t.id]?.usd || 0; buste[t.id] = r.byTeam[t.id]?.buste || []; }
+      busteStatus = { total: r.total, open: r.open, status: r.status };
+      if (r.open) notes.push(`${r.open} buste su ${r.total} non sono ancora chiuse: il chatter è provvisorio, rifai «Prendi dai dati» quando sono chiuse tutte.`);
     }
-  } catch (e) { notes.push(`Wage CreatorsPro non leggibili: ${e.message}`); }
+  } catch (e) { notes.push(`Buste CreatorsPro non leggibili: ${e.message}`); }
 
   if (partial) notes.push("Mese in corso: i numeri sono parziali, fino a oggi.");
-  return Response.json({ month: m, partial, revenue, chatter, notes }, { headers: NS });
+  return Response.json({ month: m, partial, revenue, chatter, buste, busteStatus, notes }, { headers: NS });
 }

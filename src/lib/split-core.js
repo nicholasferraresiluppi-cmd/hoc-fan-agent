@@ -81,7 +81,11 @@ export function sanitizeMonthInput(d, newId) {
   const teams = {};
   for (const [id, v] of Object.entries(d?.teams && typeof d.teams === "object" ? d.teams : {}).slice(0, 200)) {
     if (!okId(id)) continue;
-    teams[id] = { revenueUsd: optNum(v?.revenueUsd), chatterUsd: optNum(v?.chatterUsd), revenueSource: str(v?.revenueSource, 120), chatterSource: str(v?.chatterSource, 120) };
+    teams[id] = {
+      revenueUsd: optNum(v?.revenueUsd), chatterUsd: optNum(v?.chatterUsd), revenueSource: str(v?.revenueSource, 120), chatterSource: str(v?.chatterSource, 160),
+      // buste CreatorsPro che compongono il chatter (per controllarle una per una)
+      chatterBuste: (Array.isArray(v?.chatterBuste) ? v.chatterBuste : []).slice(0, 80).map((b) => ({ name: str(b?.name, 120), status: str(b?.status, 20), usd: round2(toNumber(b?.usd)), wageUsd: round2(toNumber(b?.wageUsd)), shared: Boolean(b?.shared) })),
+    };
   }
   const rate = toNumber(d?.fx?.rate);
   return {
@@ -168,7 +172,7 @@ export function computeSplitMonth(config, month) {
     const extrasEur = round2(extras.reduce((s, x) => s + toNumber(x.eur), 0));
     const costEur = round2(staffEur + chatterEur + extrasEur);
     return {
-      ...t, revenueUsd, revenueSource: inp.revenueSource || "", chatterSource: inp.chatterSource || "",
+      ...t, revenueUsd, revenueSource: inp.revenueSource || "", chatterSource: inp.chatterSource || "", chatterBuste: inp.chatterBuste || [],
       feeUsd: round2(feeUsd), feePct, feeEur, members, staffEur, chatterUsd, chatterEur, extras, extrasEur, costEur,
       netEur: round2(feeEur - costEur),
       problems: [...new Set([...problems, ...members.flatMap((x) => x.deal.cost.problems)])],
@@ -214,4 +218,57 @@ export function computeSplitMonth(config, month) {
       problems: teams.filter((t) => t.problems.length).length,
     },
   };
+}
+
+// ── Chatter busta per busta (15/10/2026) ─────────────────────────────────────
+// Le buste CreatorsPro del mese (una per operatore). Per ogni busta: il costo di
+// ogni turno va alle modelle del turno in proporzione al venduto su ciascuna (due
+// modelle nello stesso turno → costo diviso; nessuna vendita → parti uguali); se la
+// busta ha voci fuori dai turni (ore pagate, rettifiche), il totale della busta si
+// ridistribuisce con le stesse proporzioni. Così la somma per team = buste reali.
+export const CLOSED_WAGE_STATUSES = ["PAID", "CLOSED", "PAYABLE"];
+
+export function chatterFromWages(wages, teams) {
+  const teamOf = new Map();
+  for (const t of teams || []) for (const a of t.cpAliases || []) teamOf.set(a, t.id);
+  const byTeam = {};
+  const status = {};
+  for (const w of wages || []) {
+    const perAlias = new Map();
+    let shiftSum = 0;
+    for (const s of w.shifts || []) {
+      const earn = Number(s.total_earnings) || 0;
+      const hours = Number(s.worked_hours) || 0;
+      const sales = new Map();
+      for (const k of s.takes || []) if (k.creator_alias) sales.set(k.creator_alias, (sales.get(k.creator_alias) || 0) + (Number(k.amount) || 0));
+      const tot = [...sales.values()].reduce((a, b) => a + b, 0);
+      const aliases = tot > 0 ? [...sales.keys()] : (s.creator_aliases || []);
+      for (const a of aliases) {
+        const share = tot > 0 ? sales.get(a) / tot : 1 / aliases.length;
+        const cur = perAlias.get(a) || { earn: 0, hours: 0 };
+        cur.earn += earn * share; cur.hours += hours * share;
+        perAlias.set(a, cur);
+      }
+      shiftSum += earn;
+    }
+    const ours = [...perAlias.keys()].filter((a) => teamOf.has(a));
+    if (!ours.length) continue;
+    status[w.status || "?"] = (status[w.status || "?"] || 0) + 1;
+    const wage = Number(w.total_wage ?? shiftSum) || 0;
+    const hoursAll = [...perAlias.values()].reduce((s, v) => s + v.hours, 0);
+    const perTeam = new Map();
+    for (const a of ours) {
+      const v = perAlias.get(a);
+      const usd = shiftSum > 0 ? wage * (v.earn / shiftSum) : hoursAll > 0 ? wage * (v.hours / hoursAll) : 0;
+      perTeam.set(teamOf.get(a), (perTeam.get(teamOf.get(a)) || 0) + usd);
+    }
+    for (const [teamId, usd] of perTeam) {
+      if (!byTeam[teamId]) byTeam[teamId] = { usd: 0, buste: [] };
+      byTeam[teamId].usd = round2(byTeam[teamId].usd + usd);
+      byTeam[teamId].buste.push({ name: w.member_name || w.member_username || "?", status: w.status || "?", usd: round2(usd), wageUsd: round2(wage), shared: perTeam.size > 1 || ours.length < perAlias.size });
+    }
+  }
+  for (const v of Object.values(byTeam)) v.buste.sort((a, b) => b.usd - a.usd);
+  const open = Object.entries(status).filter(([s]) => !CLOSED_WAGE_STATUSES.includes(s)).reduce((n, [, c]) => n + c, 0);
+  return { byTeam, status, total: Object.values(status).reduce((a, b) => a + b, 0), open };
 }
