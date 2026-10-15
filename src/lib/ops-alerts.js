@@ -507,7 +507,7 @@ const CHECKS = [
       return pairs.filter((p) => p.kind === "doppione").map((p) => ({
         fingerprint: `wh-dup:${p.drop.id}`,
         title: `${p.keep.name}: vendite registrate due volte nel warehouse`,
-        detail: `Lo stesso account OnlyFans ha due record attivi: ${p.keep.name} (${p.keep.id}, tenuto) e ${p.drop.name} (${p.drop.id}, doppio). `
+        detail: `Lo stesso account OnlyFans ha due record attivi nella stessa organizzazione: ${p.keep.name} (${p.keep.id}, tenuto) e ${p.drop.name} (${p.drop.id}, doppio). `
           + `Dal ${day(p.first_both)}: ${p.identical_days} giorni con incasso identico, ${usd(p.gross_doubled)} di lordo contato due volte. `
           + "In HOC Pro è già neutralizzato; chi legge i totali direttamente dal warehouse li vede gonfiati.",
         value: usd(p.gross_doubled),

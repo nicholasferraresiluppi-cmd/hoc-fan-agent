@@ -122,7 +122,7 @@ export default function QualitaPage() {
       <SectionTitle aside={duplicates.at ? `ogni notte · ultimo controllo ${fmtWhen(duplicates.at)} · alert «Doppioni nel warehouse»` : "ogni notte · alert «Doppioni nel warehouse»"}>4 · Doppioni nel warehouse</SectionTitle>
       <section style={{ ...card, padding: "14px 18px", marginBottom: 18 }}>
         <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.55, marginBottom: 10 }}>
-          Quando lo stesso account OnlyFans ha due record creator attivi, ogni vendita finisce nel warehouse due volte. HOC Pro tiene il record più vecchio e
+          Quando lo stesso account OnlyFans ha due record attivi dentro la stessa organizzazione, ogni vendita finisce nei suoi conti due volte (lo stesso account registrato anche da un'altra agenzia del warehouse è normale e non conta). HOC Pro tiene il record più vecchio e
           sostituisce il doppio ovunque metta insieme più creator (split, media HOC, difficoltà creator), anche dopo che il doppio si ferma: i mesi già duplicati restano nel warehouse.
           Chi legge i totali direttamente dal warehouse li vede gonfiati.
         </div>
@@ -140,7 +140,7 @@ export default function QualitaPage() {
             </div>
           </div>
         ))}
-        {duplicates.at && !(duplicates.pairs || []).some((p) => p.kind !== "separati") && <div style={{ fontSize: 13, color: CP.textMuted }}>Nessun doppione: ogni account OnlyFans ha un solo record attivo.</div>}
+        {duplicates.at && !(duplicates.pairs || []).some((p) => p.kind !== "separati") && <div style={{ fontSize: 13, color: CP.textMuted }}>Nessun doppione: dentro ogni organizzazione, ogni account OnlyFans ha un solo record attivo.</div>}
       </section>
     </div>
   );

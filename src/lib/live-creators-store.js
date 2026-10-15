@@ -7,7 +7,7 @@
 // Se split vuoto o warehouse giù: FALLBACK_PAGES (le creator com'erano il 15/10), mai pagina vuota.
 import crypto from "crypto";
 import { kv } from "@vercel/kv";
-import { bqQuery, bigQueryConfigured } from "@/lib/bigquery-api";
+import { bqQuery, bigQueryConfigured, HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
 import { listSplits } from "@/lib/sales-coaching";
 import { buildLiveCreators, isActiveAccount, FALLBACK_PAGES } from "@/lib/live-creators";
 
@@ -109,7 +109,10 @@ export async function searchPages(q) {
   if (!words.length) return [];
   // i termini contengono solo [a-z0-9._]: il punto si escapa per la regex, nient'altro può uscire dalla stringa
   const hay = "LOWER(CONCAT(IFNULL(alias,''),' ',IFNULL(name,''),' ',IFNULL(username,'')))";
-  const where = ["deleted_at IS NULL", ...words.map((w) => `REGEXP_CONTAINS(${hay}, r'${w.replace(/\./g, "\\.")}')`)].join(" AND ");
+  // niente pagine di altre organizzazioni del warehouse (lo stesso account può essere registrato anche da altre agenzie:
+  // «Elisa Vimercati» compariva due volte). Le pagine senza dati di reach recenti restano trovabili.
+  const otherOrg = `id NOT IN (SELECT creator_id FROM \`${P()}.onlyfans.reach\` WHERE organization_id != '${HOC_ORGANIZATION_ID}' AND calendar_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY))`;
+  const where = ["deleted_at IS NULL", otherOrg, ...words.map((w) => `REGEXP_CONTAINS(${hay}, r'${w.replace(/\./g, "\\.")}')`)].join(" AND ");
   const { rows } = await bqQuery(pagesSQL(where), QOPTS);
   return rows.map(shape);
 }

@@ -1,28 +1,34 @@
 // Doppioni nel warehouse (15/10/2026) — logica pura (la usano la lib server e i test).
 //
-// Il caso: nel sistema che raccoglie i dati da OnlyFans, a volte nasce un SECONDO record creator agganciato allo
-// stesso account OnlyFans (stesso `platform_id`), con un raccoglitore suo. Se restano attivi tutti e due, ogni vendita
-// finisce nel warehouse due volte con id diversi (misurato: Elisa Vimercati 173440612 + 1000000397 dal 27/07, 1.462
-// transazioni identiche per lato da settembre; in tutto ~$431k di lordo doppio da luglio su 5 creator, +5,4% sul
-// totale agenzia a 30 giorni). Il warehouse non è nostro (sola lettura): HOC Pro si difende da sé.
+// Il caso: il warehouse è MULTI-ORGANIZZAZIONE (il sistema di raccolta serve più agenzie, `organization_id`). Lo stesso
+// account OnlyFans può essere registrato da due organizzazioni: è normale e NON è un doppione per House of Creators
+// (al 15/10 tutte e 5 le coppie trovate erano così: altre org «Nicola (Da Cancellare)», «OSA», «VIBES VENTURES»; la
+// prima versione dello scudo le trattava come doppioni ed era sbagliata — per Atena e Marta teneva il record dell'altra
+// org). Doppione vero = due record dello stesso account DENTRO LA STESSA organizzazione: ogni vendita finirebbe due
+// volte nei conti di quell'organizzazione. Il warehouse non è nostro (sola lettura): HOC Pro si difende da sé.
 //
-// Regola: per ogni account OnlyFans con più record non cancellati si tiene il PIÙ VECCHIO; un record più nuovo è un
+// Regola: per ogni (account OnlyFans, organizzazione) con più record non cancellati si tiene il PIÙ VECCHIO; un record più nuovo è un
 // "doppione" se nei giorni in cui hanno incassato entrambi gli importi coincidono quasi sempre (≥3 giorni e ≥80%).
 // Altrimenti è un "passaggio" (un record ha sostituito l'altro, con pochi giorni sovrapposti): si segnala e basta,
 // perché lì entrambi i record portano dati veri (storia nel vecchio, presente nel nuovo).
 
+export const DUPLICATES_VERSION = 2; // v1 confondeva le altre organizzazioni coi doppioni: la sua memoria si butta
 export const MIN_IDENTICAL_DAYS = 3;
 export const MIN_IDENTICAL_SHARE = 0.8;
 const HISTORY_DAYS = 400;
 
 /** Coppie (record più nuovo → record più vecchio dello stesso account) con la sovrapposizione degli incassi. */
 export function duplicatesSql(refs) {
+  // organizzazione di ogni record: da reach (una riga al giorno per pagina, porta organization_id); senza dati → '?'
   return `
-    WITH c AS (SELECT id, platform_id, COALESCE(alias, name) AS nm, created_at, heartbeat FROM \`${refs.creators}\`
-               WHERE platform_id IS NOT NULL AND deleted_at IS NULL),
-    dup AS (SELECT platform_id FROM c GROUP BY 1 HAVING COUNT(*) > 1),
-    cc AS (SELECT c.* FROM c JOIN dup USING (platform_id)),
-    k AS (SELECT platform_id, ARRAY_AGG(STRUCT(id, nm) ORDER BY created_at, id LIMIT 1)[OFFSET(0)] AS keep FROM cc GROUP BY 1),
+    WITH o AS (SELECT creator_id, ARRAY_AGG(organization_id ORDER BY calendar_date DESC LIMIT 1)[OFFSET(0)] AS org
+               FROM \`${refs.reach}\` GROUP BY 1),
+    c AS (SELECT id, platform_id, COALESCE(o.org, '?') AS org, COALESCE(alias, name) AS nm, created_at, heartbeat
+          FROM \`${refs.creators}\` LEFT JOIN o ON o.creator_id = id
+          WHERE platform_id IS NOT NULL AND deleted_at IS NULL),
+    dup AS (SELECT platform_id, org FROM c GROUP BY 1, 2 HAVING COUNT(*) > 1),
+    cc AS (SELECT c.* FROM c JOIN dup USING (platform_id, org)),
+    k AS (SELECT platform_id, org, ARRAY_AGG(STRUCT(id, nm) ORDER BY created_at, id LIMIT 1)[OFFSET(0)] AS keep FROM cc GROUP BY 1, 2),
     d AS (SELECT creator_id, calendar_date, SUM(amount) AS g FROM \`${refs.attributed}\`
           WHERE creator_id IN (SELECT id FROM cc) AND calendar_date >= DATE_SUB(CURRENT_DATE(), INTERVAL ${HISTORY_DAYS} DAY)
           GROUP BY 1, 2)
@@ -34,7 +40,7 @@ export function duplicatesSql(refs) {
       SUM(IF(a.g IS NOT NULL, b.g, 0)) AS gross_doubled,
       FORMAT_DATE('%Y-%m-%d', MIN(IF(a.g IS NOT NULL, b.calendar_date, NULL))) AS first_both,
       FORMAT_DATE('%Y-%m-%d', MAX(IF(a.g IS NOT NULL, b.calendar_date, NULL))) AS last_both
-    FROM cc JOIN k USING (platform_id)
+    FROM cc JOIN k USING (platform_id, org)
     LEFT JOIN d b ON b.creator_id = cc.id
     LEFT JOIN d a ON a.creator_id = k.keep.id AND a.calendar_date = b.calendar_date
     WHERE cc.id != k.keep.id
