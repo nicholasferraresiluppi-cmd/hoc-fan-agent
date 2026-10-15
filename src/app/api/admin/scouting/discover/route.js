@@ -14,7 +14,8 @@ export const maxDuration = 60;
 
 const MAX_USD = 30; // per singolo run
 const KINDS = {
-  profiles: { actor: "afanasenko~instagram-profile-scraper", unit: 0.011, input: (h) => ({ operationMode: "analyzeSpecificAccounts", specificUsernamesList: h, maxCountList: h.length, extractEmail: false, extractPhoneNumber: false, extractWebsiteUrl: true, extractBusinessCategory: false, analyzeQuality: true, extractPosts: false }) },
+  // posts: true → anche le didascalie degli ultimi 8 post (stesso prezzo a profilo): servono per capire il format
+  profiles: { actor: "afanasenko~instagram-profile-scraper", unit: 0.011, input: (h, o) => ({ operationMode: "analyzeSpecificAccounts", specificUsernamesList: h, maxCountList: h.length, extractEmail: false, extractPhoneNumber: false, extractWebsiteUrl: true, extractBusinessCategory: false, analyzeQuality: true, extractPosts: Boolean(o.posts) }) },
   followings: { actor: "scraping_solutions~instagram-scraper-followers-following-no-cookies", unit: 0.35, input: (h) => ({ Account: h, resultsLimit: 1500, dataToScrape: "Followings" }) },
   highlights: { actor: "afanasenko~instagram-stories-highlights-scraper", unit: 0.022, input: (h) => ({ operationMode: "highlightsByUsername", usernames: h, maxAccounts: h.length, includeHighlightItems: true, maxHighlightsPerAccount: 1, analyzeFrames: false, skipPrivate: true }) },
 };
@@ -30,7 +31,7 @@ export async function POST(request) {
   if (!handles.length) return Response.json({ error: "nessun account" }, { status: 400 });
   const budget = Math.min(MAX_USD, Number(body.maxUsd) || 0, Math.ceil(handles.length * k.unit * 1.15 * 100) / 100 + 0.5);
   if (!(budget > 0)) return Response.json({ error: "tetto di spesa mancante" }, { status: 400 });
-  const input = { ...k.input(handles), ...(body.kind === "profiles" ? { maxBudgetUsd: budget } : {}) };
+  const input = { ...k.input(handles, body), ...(body.kind === "profiles" ? { maxBudgetUsd: budget } : {}) };
   const res = await apify(`/acts/${k.actor}/runs?maxTotalChargeUsd=${budget}&timeout=7200`, { method: "POST", body: JSON.stringify(input) });
   return Response.json({ runId: res.data.id, datasetId: res.data.defaultDatasetId, budget, handles: handles.length });
 }
