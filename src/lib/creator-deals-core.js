@@ -9,14 +9,13 @@
  * Le percentuali arrivano dal foglio di Nicholas in forma di testo
  * ("30% <= 25k; 35% <= 50k; 45% > 65k;", "60% flat"): `parseDealText` le legge.
  *
- * Due modi di applicare gli scaglioni (va scelto per accordo, il foglio non lo dice):
- *  - "raggiunto": la percentuale dello scaglione raggiunto vale su TUTTA la revenue
- *    (come la gamification dei compensi e le wage CP);
- *  - "progressivo": ogni fascia di revenue alla sua percentuale (come l'IRPEF).
- * La vista mostra sempre anche l'altro risultato, così la differenza si vede.
+ * Scaglioni: la percentuale dello scaglione raggiunto vale su TUTTA la revenue
+ * (confermato da Nicholas 15/10/2026, come la gamification dei compensi e le wage CP).
+ * Il modo "progressivo" (fasce tipo IRPEF) resta nel calcolo ma non in pagina.
  *
- * Fuori da qui (dichiarato in pagina): il costo degli operatori (wage CP) e la
- * quota di struttura (direzione, HR, finance…) non sono ripartiti sugli ecosistemi.
+ * Solo le creator dello split di Nicholas (le altre: accordo non attivo).
+ * Fuori da qui (dichiarato in pagina): il costo degli operatori (wage CP) e le
+ * squadre non assegnate a un ecosistema non entrano nel netto.
  */
 import { normalizeTiers, tierFor, personKey, toNumber } from "./compensi-core.js";
 
@@ -115,21 +114,34 @@ export function sanitizeDeal(d, newId) {
   };
 }
 
+/** Pulizia della mappa squadra → ecosistema: { [nome squadra]: nome ecosistema ("" = nessuno). */
+export function sanitizeTeamEcosystems(m) {
+  const out = {};
+  for (const [team, eco] of Object.entries(m && typeof m === "object" ? m : {}).slice(0, 200)) {
+    const t = String(team).slice(0, 120).trim();
+    if (t) out[t] = String(eco ?? "").slice(0, 120).trim();
+  }
+  return out;
+}
+
 /**
  * Il mese visto per creator ed ecosistema.
- * @param deals    accordi
- * @param monthDoc il documento del mese dei Compensi (revenues, fx)
- * @param byTeam   computeMonth(monthDoc).byTeam (costo per squadra in €)
+ * Un ecosistema è un NOME: ci stanno le creator che lo indicano nell'accordo e le
+ * squadre dei compensi assegnate a lui (una squadra senza assegnazione appartiene
+ * all'ecosistema col suo stesso nome, se esiste). Così un ecosistema può avere più
+ * squadre (es. Cantera + Chatter Manager) e la stessa squadra non si conta due volte.
+ * @param deals         accordi
+ * @param monthDoc      il documento del mese dei Compensi (revenues, fx)
+ * @param byTeam        computeMonth(monthDoc).byTeam (costo per squadra in €)
+ * @param teamEcosystems { [nome squadra]: nome ecosistema }
  */
-export function computeDealsMonth(deals, monthDoc, byTeam) {
+export function computeDealsMonth(deals, monthDoc, byTeam, teamEcosystems = {}) {
   const fx = toNumber(monthDoc?.fx?.rate);
   const revByKey = new Map((monthDoc?.revenues || []).map((r) => [personKey(r.name), r]));
   const creators = (deals || []).filter((d) => d.active !== false).map((d) => {
     const rev = revByKey.get(personKey(d.revenueName || d.creator));
     const revenueUsd = rev && rev.usd !== null && rev.usd !== "" ? toNumber(rev.usd) : null;
-    const other = d.mode === "progressivo" ? "raggiunto" : "progressivo";
     const s = revenueUsd !== null ? shareUsd(d.tiers, revenueUsd, d.mode) : null;
-    const alt = revenueUsd !== null ? shareUsd(d.tiers, revenueUsd, other) : null;
     const problems = [];
     if (!rev) problems.push("nessun progetto con questo nome in «Revenue e cambio»");
     else if (revenueUsd === null) problems.push("revenue del mese non inserita");
@@ -144,50 +156,53 @@ export function computeDealsMonth(deals, monthDoc, byTeam) {
       shareUsd: s?.usd ?? null,
       shareEur,
       creatorEur: shareEur !== null ? round2(revenueUsd * fx - shareEur) : null,
-      altShareUsd: alt?.usd ?? null,
-      altMode: other,
       problems,
     };
   });
 
-  const teamCost = new Map((byTeam || []).map((t) => [personKey(t.team), t]));
   const eco = new Map();
+  const ecoOf = (name) => {
+    const k = personKey(name);
+    if (!eco.has(k)) eco.set(k, { key: k, ecosystem: name, creators: [], teams: [], shareEur: 0, missingShare: 0, costEur: 0 });
+    return eco.get(k);
+  };
   for (const c of creators) {
-    const k = personKey(c.ecosystem);
-    if (!k) continue;
-    if (!eco.has(k)) eco.set(k, { key: k, ecosystem: teamCost.get(k)?.team || c.ecosystem, creators: [], shareEur: 0, missingShare: 0 });
-    const e = eco.get(k);
+    if (!personKey(c.ecosystem)) continue;
+    const e = ecoOf(c.ecosystem);
     e.creators.push(c);
     if (c.shareEur === null) e.missingShare++; else e.shareEur = round2(e.shareEur + c.shareEur);
   }
-  const ecosystems = [...eco.values()].map((e) => {
-    const team = teamCost.get(e.key);
-    const costEur = team ? team.totalEur : 0;
-    return { ...e, costEur, teamFound: Boolean(team), people: team ? team.lines.length : 0, netEur: round2(e.shareEur - costEur) };
-  }).sort((a, b) => b.netEur - a.netEur);
+  const assigned = new Map(Object.entries(sanitizeTeamEcosystems(teamEcosystems)).map(([t, e]) => [personKey(t), e]));
+  const otherTeams = [];
+  for (const t of byTeam || []) {
+    const tk = personKey(t.team);
+    const target = assigned.has(tk) ? assigned.get(tk) : (eco.has(tk) ? eco.get(tk).ecosystem : "");
+    if (!personKey(target)) { otherTeams.push(t); continue; }
+    const e = ecoOf(target);
+    e.teams.push({ team: t.team, totalEur: t.totalEur, lines: t.lines.length });
+    e.costEur = round2(e.costEur + t.totalEur);
+  }
+  const ecosystems = [...eco.values()].map((e) => ({ ...e, netEur: round2(e.shareEur - e.costEur) })).sort((a, b) => b.netEur - a.netEur);
 
-  const linked = new Set(ecosystems.map((e) => e.key));
-  const otherTeams = (byTeam || []).filter((t) => !linked.has(personKey(t.team))).sort((a, b) => b.totalEur - a.totalEur);
   const sum = (arr, f) => round2(arr.reduce((s, x) => s + (f(x) || 0), 0));
-  const shareEur = sum(creators, (c) => c.shareEur);
-  const ecoCost = sum(ecosystems, (e) => e.costEur);
-  const otherCost = sum(otherTeams, (t) => t.totalEur);
   const dealKeys = new Set(creators.map((c) => personKey(c.revenueName || c.creator)));
+  const ecoShare = sum(ecosystems, (e) => e.shareEur);
+  const ecoCost = sum(ecosystems, (e) => e.costEur);
   return {
     fx: fx > 0 ? fx : null,
     creators,
     ecosystems,
-    otherTeams,
+    otherTeams: otherTeams.sort((a, b) => b.totalEur - a.totalEur),
     unlinkedCreators: creators.filter((c) => !personKey(c.ecosystem)),
     revenuesWithoutDeal: (monthDoc?.revenues || []).filter((r) => !dealKeys.has(personKey(r.name))),
     totals: {
       revenueUsd: sum(creators, (c) => c.revenueUsd),
       shareUsd: sum(creators, (c) => c.shareUsd),
-      shareEur,
+      shareEur: sum(creators, (c) => c.shareEur),
+      ecoShare,
       ecoCost,
-      ecoNet: round2(sum(ecosystems, (e) => e.shareEur) - ecoCost),
-      otherCost,
-      net: round2(shareEur - ecoCost - otherCost),
+      ecoNet: round2(ecoShare - ecoCost),
+      otherCost: sum(otherTeams, (t) => t.totalEur),
       problems: creators.filter((c) => c.problems.length).length,
     },
   };

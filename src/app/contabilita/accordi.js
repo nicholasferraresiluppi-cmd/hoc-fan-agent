@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Check, Loader2 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
-import { FilterChip, Notice, DataTable, SectionTitle, Metric, card } from "@/components/ds";
+import { Notice, DataTable, SectionTitle, Metric, card } from "@/components/ds";
 import { parseDealText, describeTiers, computeDealsMonth } from "@/lib/creator-deals-core";
 import { monthLabel } from "@/lib/compensi-core";
 
@@ -20,7 +20,6 @@ const input = { background: CP.bg, border: `1px solid ${CP.border}`, borderRadiu
 const btn = (primary) => ({ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body, border: `1px solid ${primary ? CP.accent : CP.border}`, background: primary ? CP.accent : CP.surface, color: primary ? CP.accentInk : CP.textPrimary });
 const lbl = { fontSize: 12, color: CP.textMuted, marginBottom: 4, display: "block" };
 const Field = ({ label, children, style }) => <label style={{ display: "block", ...style }}><span style={lbl}>{label}</span>{children}</label>;
-const MODE_TXT = { raggiunto: "scaglione raggiunto su tutto", progressivo: "a fasce progressive" };
 
 function DealEditor({ deal, teams, revenueNames, onSave, onDelete, onClose }) {
   const [d, setD] = useState(() => ({ ...deal, text: deal.text || describeTiers(deal.tiers || []) }));
@@ -47,15 +46,7 @@ function DealEditor({ deal, teams, revenueNames, onSave, onDelete, onClose }) {
         {parsed.tiers.length ? `Letto: ${describeTiers(parsed.tiers)}` : "Non riesco a leggere la percentuale."}
       </div>
       {parsed.warnings.map((w) => <Notice key={w} danger>{w}</Notice>)}
-      {multi && (
-        <div>
-          <span style={lbl}>Come si applicano gli scaglioni</span>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <FilterChip label="Scaglione raggiunto su tutta la revenue" active={d.mode !== "progressivo"} onClick={() => set("mode", "raggiunto")} />
-            <FilterChip label="A fasce progressive" active={d.mode === "progressivo"} onClick={() => set("mode", "progressivo")} />
-          </div>
-        </div>
-      )}
+      {multi && <div style={{ fontSize: 12, color: CP.textMuted }}>Vale la percentuale dello scaglione raggiunto, su tutta la revenue del mese.</div>}
       <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: CP.textSecondary }}>
         <input type="checkbox" checked={d.active !== false} onChange={(e) => set("active", e.target.checked)} /> Accordo attivo
       </label>
@@ -79,7 +70,7 @@ export function DealsTab({ dealsDoc, owner, month, monthDoc, byTeam, onSaved, se
   const [err, setErr] = useState(null);
   const [editing, setEditing] = useState(null);
   useEffect(() => { if (!dirty) setList(dealsDoc?.deals || []); }, [dealsDoc]); // eslint-disable-line react-hooks/exhaustive-deps
-  const m = useMemo(() => computeDealsMonth(list, monthDoc, byTeam), [list, monthDoc, byTeam]);
+  const m = useMemo(() => computeDealsMonth(list, monthDoc, byTeam, dealsDoc?.teamEcosystems), [list, monthDoc, byTeam, dealsDoc]);
   const teams = (byTeam || []).map((t) => t.team);
   const revenueNames = (monthDoc?.revenues || []).map((r) => r.name);
   const inactive = list.filter((d) => d.active === false);
@@ -94,7 +85,7 @@ export function DealsTab({ dealsDoc, owner, month, monthDoc, byTeam, onSaved, se
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <Notice>
-        Quota HOC sulle revenue della creator, in dollari, convertita in euro al cambio di {monthLabel(month)}. Le revenue del mese sono quelle della scheda «Revenue e cambio».
+        Solo le creator dello split. Quota HOC sulle revenue della creator in dollari (scaglione raggiunto, su tutta la revenue), convertita in euro al cambio di {monthLabel(month)}. Le revenue del mese sono quelle della scheda «Revenue e cambio».
         {owner ? " Gli accordi li modifichi solo tu." : " Gli accordi li modifica solo il titolare."}
       </Notice>
       {err && <Notice danger>{err}</Notice>}
@@ -111,20 +102,18 @@ export function DealsTab({ dealsDoc, owner, month, monthDoc, byTeam, onSaved, se
         rows={m.creators}
         columns={[
           { key: "creator", label: "Creator", render: (r) => <div><div style={{ color: CP.textPrimary }}>{r.creator}</div><div style={{ fontSize: 12, color: CP.textMuted }}>{r.ecosystem ? `ecosistema ${r.ecosystem}` : "nessun ecosistema"}</div></div> },
-          { key: "tiers", label: "Accordo", sort: (r) => r.tiers?.[0]?.pct, render: (r) => <div><div style={{ fontSize: 13 }}>{describeTiers(r.tiers)}</div>{r.tiers?.length > 1 && <div style={{ fontSize: 12, color: CP.textMuted }}>{MODE_TXT[r.mode]}</div>}</div> },
+          { key: "tiers", label: "Accordo", sort: (r) => r.tiers?.[0]?.pct, render: (r) => <span style={{ fontSize: 13 }}>{describeTiers(r.tiers)}</span> },
           { key: "revenueUsd", label: "Revenue", align: "right", render: (r) => usd(r.revenueUsd) },
           { key: "pctApplied", label: "% applicata", align: "right", render: (r) => pct(r.pctApplied) },
           { key: "shareEur", label: "Quota HOC", align: "right", render: (r) => (
-            <div><strong style={{ fontWeight: 500 }}>{eur(r.shareEur)}</strong><div style={{ fontSize: 12, color: CP.textMuted }}>{usd(r.shareUsd)}</div>
-              {r.tiers?.length > 1 && r.altShareUsd !== null && r.altShareUsd !== r.shareUsd && <div style={{ fontSize: 12, color: CP.textMuted }}>{r.altMode === "progressivo" ? "a fasce" : "su tutto"}: {usd(r.altShareUsd)}</div>}
-            </div>) },
+            <div><strong style={{ fontWeight: 500 }}>{eur(r.shareEur)}</strong><div style={{ fontSize: 12, color: CP.textMuted }}>{usd(r.shareUsd)}</div></div>) },
           { key: "creatorEur", label: "Alla creator", align: "right", render: (r) => eur(r.creatorEur) },
           { key: "problems", label: "", sort: (r) => r.problems.length, render: (r) => (r.problems.length ? <span style={{ fontSize: 12, color: CP.accentSoftText }}>{r.problems.join(" · ")}</span> : r.note ? <span style={{ fontSize: 12, color: CP.textMuted }}>{r.note}</span> : null) },
         ]}
       />
       {inactive.length > 0 && (
         <section style={{ ...card, padding: 14 }}>
-          <SectionTitle aside={inactive.length}>Accordi non attivi</SectionTitle>
+          <SectionTitle aside={inactive.length}>Accordi non attivi (fuori dallo split o staccati)</SectionTitle>
           {inactive.map((d) => (
             <div key={d.id} onClick={owner ? () => setEditing({ deal: d, isNew: false }) : undefined} style={{ fontSize: 13, padding: "6px 0", borderTop: `1px solid ${CP.borderSoft}`, color: CP.textSecondary, cursor: owner ? "pointer" : "default" }}>
               <span style={{ color: CP.textPrimary }}>{d.creator}</span> · {describeTiers(d.tiers)}{d.note ? ` · ${d.note}` : ""}
@@ -142,21 +131,30 @@ export function DealsTab({ dealsDoc, owner, month, monthDoc, byTeam, onSaved, se
   );
 }
 
-/** Scheda «Ecosistemi»: per squadra-ecosistema, quanto entra dalle sue creator meno quanto costa. */
-export function EcosystemsTab({ dealsDoc, month, monthDoc, byTeam }) {
-  const m = useMemo(() => computeDealsMonth(dealsDoc?.deals || [], monthDoc, byTeam), [dealsDoc, monthDoc, byTeam]);
+/** Scheda «Ecosistemi»: per ecosistema, quanto entra dalle sue creator meno quanto costano le sue squadre. */
+export function EcosystemsTab({ dealsDoc, owner, month, monthDoc, byTeam, send, onSaved }) {
+  const [assign, setAssign] = useState(dealsDoc?.teamEcosystems || {});
+  const [dirty, setDirty] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  useEffect(() => { if (!dirty) setAssign(dealsDoc?.teamEcosystems || {}); }, [dealsDoc]); // eslint-disable-line react-hooks/exhaustive-deps
+  const m = useMemo(() => computeDealsMonth(dealsDoc?.deals || [], monthDoc, byTeam, assign), [dealsDoc, monthDoc, byTeam, assign]);
   const T = m.totals;
+  const names = [...new Set([...(dealsDoc?.deals || []).filter((d) => d.active !== false).map((d) => d.ecosystem), ...Object.values(assign)].filter(Boolean))].sort();
+  const ecoOfTeam = (team) => (team in assign ? assign[team] : m.ecosystems.find((e) => e.teams.some((t) => t.team === team))?.ecosystem || "");
+  const save = async () => {
+    setBusy(true); setErr(null);
+    try { const r = await send("/api/contabilita/accordi", "PUT", { deals: dealsDoc?.deals || [], rev: dealsDoc?.rev ?? 0, teamEcosystems: assign }); setDirty(false); onSaved(r); } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  };
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10 }}>
         <div style={{ ...card, padding: 14 }}><Metric label="Quota HOC dalle creator" value={eur(T.shareEur)} note={`${usd(T.shareUsd)} su ${usd(T.revenueUsd)} di revenue`} /></div>
-        <div style={{ ...card, padding: 14 }}><Metric label="Costo squadre ecosistema" value={eur(T.ecoCost)} /></div>
-        <div style={{ ...card, padding: 14 }}><Metric label="Netto ecosistemi" value={eur(T.ecoNet)} danger={T.ecoNet < 0} /></div>
-        <div style={{ ...card, padding: 14 }}><Metric label="Struttura e altre squadre" value={eur(T.otherCost)} /></div>
-        <div style={{ ...card, padding: 14 }}><Metric label={`Netto ${monthLabel(month)}`} value={eur(T.net)} danger={T.net < 0} note="dopo tutte le squadre" /></div>
+        <div style={{ ...card, padding: 14 }}><Metric label="Costo squadre degli ecosistemi" value={eur(T.ecoCost)} /></div>
+        <div style={{ ...card, padding: 14 }}><Metric label={`Netto ecosistemi · ${monthLabel(month)}`} value={eur(T.ecoNet)} danger={T.ecoNet < 0} /></div>
       </div>
       <Notice>
-        Costo = compensi del team in {monthLabel(month)} (scheda «Per squadra»). Non sono inclusi il costo degli operatori in chat né spese non di personale; la struttura non è ripartita sugli ecosistemi.
+        Costo = compensi del team in {monthLabel(month)} delle squadre assegnate all'ecosistema. Non sono inclusi il costo degli operatori in chat, le spese non di personale e le squadre non assegnate (elenco in fondo).
         {T.problems > 0 && ` ${T.problems} creator senza quota calcolabile (manca revenue o cambio): contano zero.`}
       </Notice>
       <DataTable
@@ -164,21 +162,29 @@ export function EcosystemsTab({ dealsDoc, month, monthDoc, byTeam }) {
         defaultSort={{ key: "netEur", dir: -1 }}
         rows={m.ecosystems.map((e) => ({ ...e, id: e.key }))}
         columns={[
-          { key: "ecosystem", label: "Ecosistema", render: (e) => <div><div style={{ color: CP.textPrimary }}>{e.ecosystem}</div><div style={{ fontSize: 12, color: CP.textMuted }}>{e.creators.map((c) => c.creator).join(" · ")}</div></div> },
+          { key: "ecosystem", label: "Ecosistema", render: (e) => <div><div style={{ color: CP.textPrimary }}>{e.ecosystem}</div><div style={{ fontSize: 12, color: CP.textMuted }}>{e.creators.length ? e.creators.map((c) => c.creator).join(" · ") : "nessuna creator con accordo"}</div></div> },
           { key: "shareEur", label: "Quota HOC", align: "right", render: (e) => <div>{eur(e.shareEur)}{e.missingShare > 0 && <div style={{ fontSize: 12, color: CP.accentSoftText }}>{e.missingShare} senza revenue</div>}</div> },
-          { key: "costEur", label: "Costo squadra", align: "right", render: (e) => <div>{e.teamFound ? eur(e.costEur) : <span style={{ fontSize: 12, color: CP.accentSoftText }}>squadra non trovata</span>}{e.teamFound && <div style={{ fontSize: 12, color: CP.textMuted }}>{e.people} righe</div>}</div> },
+          { key: "costEur", label: "Costo squadre", align: "right", render: (e) => <div>{e.teams.length ? eur(e.costEur) : <span style={{ fontSize: 12, color: CP.accentSoftText }}>nessuna squadra</span>}<div style={{ fontSize: 12, color: CP.textMuted }}>{e.teams.map((t) => t.team).join(" · ")}</div></div> },
           { key: "netEur", label: "Netto", align: "right", render: (e) => <strong style={{ fontWeight: 500, color: e.netEur < 0 ? CP.accentRed : CP.textPrimary }}>{eur(e.netEur)}</strong> },
           { key: "margin", label: "Margine", align: "right", sort: (e) => (e.shareEur ? e.netEur / e.shareEur : -Infinity), render: (e) => (e.shareEur > 0 ? pct(e.netEur / e.shareEur) : "—") },
         ]}
       />
       {m.unlinkedCreators.length > 0 && <Notice>Creator senza ecosistema (la loro quota conta solo nel totale): {m.unlinkedCreators.map((c) => c.creator).join(", ")}. Si collegano dalla scheda «Accordi creator».</Notice>}
       <section style={{ ...card, padding: 14 }}>
-        <SectionTitle aside={eur(T.otherCost)}>Struttura e squadre senza creator collegata</SectionTitle>
-        {m.otherTeams.map((t) => (
-          <div key={t.team} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "6px 0", borderTop: `1px solid ${CP.borderSoft}`, color: CP.textSecondary }}>
-            <span style={{ color: CP.textPrimary }}>{t.team}</span><span>{eur(t.totalEur)}</span>
+        <SectionTitle aside={owner ? "a quale ecosistema va il costo di ogni squadra" : null}>Squadre</SectionTitle>
+        {err && <Notice danger>{err}</Notice>}
+        <datalist id="eco-names">{names.map((n) => <option key={n} value={n} />)}</datalist>
+        {(byTeam || []).slice().sort((a, b) => b.totalEur - a.totalEur).map((t) => (
+          <div key={t.team} style={{ display: "grid", gridTemplateColumns: "minmax(140px, 2fr) 110px minmax(160px, 2fr)", gap: 8, alignItems: "center", fontSize: 13, padding: "6px 0", borderTop: `1px solid ${CP.borderSoft}`, color: CP.textSecondary }}>
+            <span style={{ color: CP.textPrimary }}>{t.team}</span>
+            <span style={{ textAlign: "right" }}>{eur(t.totalEur)}</span>
+            {owner
+              ? <input style={{ ...input, padding: "5px 8px", fontSize: 13 }} list="eco-names" placeholder="nessun ecosistema" value={ecoOfTeam(t.team)} onChange={(e) => { setAssign((a) => ({ ...a, [t.team]: e.target.value })); setDirty(true); }} />
+              : <span>{ecoOfTeam(t.team) || "—"}</span>}
           </div>
         ))}
+        {owner && dirty && <button style={{ ...btn(true), marginTop: 10 }} onClick={save} disabled={busy}>{busy ? <Loader2 size={14} /> : <Check size={14} />}Salva assegnazioni</button>}
+        <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 8 }}>Non assegnate, fuori dal netto: {eur(T.otherCost)}.</div>
       </section>
     </div>
   );

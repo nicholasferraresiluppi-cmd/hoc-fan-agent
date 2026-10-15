@@ -1,7 +1,7 @@
 /**
  * /api/contabilita/accordi — accordi con le creator (percentuale HOC sulle revenue in $).
  * Stesso accesso della contabilità (lib/compensi-access: titolari + membri, admin no).
- * GET → { rev, deals }      PUT { deals, rev } → solo TITOLARE (sono contratti)
+ * GET → { rev, deals, teamEcosystems }      PUT { deals, rev, teamEcosystems? } → solo TITOLARE (sono contratti)
  */
 import { requireAccounting, audit } from "@/lib/compensi-access";
 import { getDeals, saveDeals } from "@/lib/creator-deals";
@@ -25,11 +25,12 @@ export async function PUT(request) {
   if (!Array.isArray(body?.deals)) return Response.json({ error: "dati mancanti" }, { status: 400, headers: NS });
   try {
     const before = await getDeals();
-    const doc = await saveDeals(body.deals, { by: az.userId, expectRev: body.rev ?? null });
+    const doc = await saveDeals(body.deals, { by: az.userId, expectRev: body.rev ?? null, teamEcosystems: body.teamEcosystems });
     const was = new Map(before.deals.map((d) => [d.id, JSON.stringify(d)]));
     const changed = doc.deals.filter((d) => was.get(d.id) !== JSON.stringify(d)).map((d) => d.creator);
     const removed = before.deals.filter((d) => !doc.deals.some((x) => x.id === d.id)).map((d) => d.creator);
-    await audit(az.userId, "accordi creator salvati", { name: [...changed, ...removed.map((r) => `− ${r}`)].join(", ").slice(0, 300) || "nessun cambio" });
+    const teamsChanged = JSON.stringify(before.teamEcosystems || {}) !== JSON.stringify(doc.teamEcosystems);
+    await audit(az.userId, "accordi creator salvati", { name: [...changed, ...removed.map((r) => `− ${r}`), ...(teamsChanged ? ["squadre→ecosistemi"] : [])].join(", ").slice(0, 300) || "nessun cambio" });
     return Response.json(doc, { headers: NS });
   } catch (e) {
     if (e instanceof ConflictError) return Response.json({ error: e.message }, { status: 409, headers: NS });

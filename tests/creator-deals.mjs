@@ -45,7 +45,6 @@ t("accordi non attivi esclusi", () => assert.equal(m.creators.length, 3));
 t("quota in € = $ × cambio", () => {
   const c = m.creators.find((x) => x.creator === "Claudia Surace");
   assert.equal(c.shareUsd, 14000); assert.equal(c.shareEur, 12600); assert.equal(c.creatorEur, 36000 - 12600);
-  assert.equal(c.altShareUsd, 12750);
 });
 t("nome revenue diverso dal nome creator", () => assert.equal(m.creators.find((x) => x.creator === "Matilde Micheli").shareUsd, 1000));
 t("netto ecosistema = quota − costo squadra", () => {
@@ -57,7 +56,22 @@ t("netto ecosistema = quota − costo squadra", () => {
 t("squadre non collegate = struttura", () => assert.deepEqual(m.otherTeams.map((x) => x.team), ["HR"]));
 t("creator senza ecosistema", () => assert.deepEqual(m.unlinkedCreators.map((c) => c.creator), ["Matilde Micheli"]));
 t("revenue senza accordo", () => assert.deepEqual(m.revenuesWithoutDeal.map((r) => r.name), ["Michela"]));
-t("netto totale", () => assert.equal(m.totals.net, Math.round((12600 + 3600 + 900 - 5000 - 6000 - 3000) * 100) / 100));
+t("netto ecosistemi (le squadre non collegate restano fuori)", () => { assert.equal(m.totals.ecoNet, 12600 + 3600 - 11000); assert.equal(m.totals.otherCost, 3000); });
+t("più squadre in un ecosistema, assegnazione esplicita", () => {
+  const ds = [{ id: "a", creator: "Christina", tiers: [{ fromUsd: 0, pct: 0.3 }], ecosystem: "Cantera" }, { id: "b", creator: "Rebecca", tiers: [{ fromUsd: 0, pct: 0.4 }], ecosystem: "Cantera" }];
+  const md = { fx: { rate: 1 }, revenues: [{ name: "Christina", usd: 10000 }, { name: "Rebecca", usd: 10000 }] };
+  const bt = [{ team: "Cantera", totalEur: 2000, lines: [1] }, { team: "Chatter Manager", totalEur: 1500, lines: [1, 2] }, { team: "HR", totalEur: 900, lines: [1] }, { team: "Live", totalEur: 500, lines: [1] }];
+  const x = computeDealsMonth(ds, md, bt, { "Chatter Manager": "cantera", Live: "" });
+  assert.equal(x.ecosystems.length, 1);
+  assert.equal(x.ecosystems[0].costEur, 3500);
+  assert.equal(x.ecosystems[0].netEur, 7000 - 3500);
+  assert.deepEqual(x.ecosystems[0].teams.map((t) => t.team), ["Cantera", "Chatter Manager"]);
+  assert.deepEqual(x.otherTeams.map((t) => t.team), ["HR", "Live"]);
+});
+t("squadra assegnata a un ecosistema senza creator: costo visibile, quota zero", () => {
+  const x = computeDealsMonth([], { fx: { rate: 1 }, revenues: [] }, [{ team: "Fishball", totalEur: 1000, lines: [1] }], { Fishball: "Fishball" });
+  assert.equal(x.ecosystems[0].netEur, -1000);
+});
 t("senza cambio: niente €, problema segnalato", () => {
   const x = computeDealsMonth(deals, { revenues: monthDoc.revenues }, byTeam);
   assert.equal(x.creators[0].shareEur, null);

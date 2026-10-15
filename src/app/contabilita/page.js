@@ -427,7 +427,7 @@ export default function ContabilitaPage() {
         {(tab === "accordi" || tab === "ecosistemi") && (dealsErr ? <Notice danger>{dealsErr.message}</Notice> : !dealsDoc ? <div style={{ color: CP.textMuted }}>Carico gli accordi…</div>
           : tab === "accordi"
             ? <DealsTab dealsDoc={dealsDoc} owner={home.owner} month={month} monthDoc={draft} byTeam={calc.byTeam} send={send} onSaved={(d) => mutateDeals(d, { revalidate: false })} />
-            : <EcosystemsTab dealsDoc={dealsDoc} month={month} monthDoc={draft} byTeam={calc.byTeam} />)}
+            : <EcosystemsTab dealsDoc={dealsDoc} owner={home.owner} month={month} monthDoc={draft} byTeam={calc.byTeam} send={send} onSaved={(d) => mutateDeals(d, { revalidate: false })} />)}
 
         {tab === "accessi" && home.owner && <AccessPanel />}
       </>)}
