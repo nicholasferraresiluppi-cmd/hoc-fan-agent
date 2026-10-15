@@ -12,16 +12,11 @@ import { LkStyles } from "@/components/looker/Lk";
 import {
   RecapDashboard, ClicksOverall, CreatorsReach, WelcomeMassUnlocks, PerformanceKpi, DetailedKpi, TransactionsDetails,
   SubsNotifications, UserResearch, ChargebackStats, CreatorOverall, NewSubsDashboard, NewSubsRevenue, NewSubsCr,
-  ConversionAnalytics, SalesRatio, CreatorCompare,
+  ConversionAnalytics, SalesRatio,
 } from "@/components/looker/pages";
 
 /* ───────── l'elenco delle pagine, come la colonna di sinistra di Looker (stessi nomi, stesso ordine) ───────── */
 const REPORTS = [
-  {
-    // pagina nostra (non è in Looker): tutte le metriche di una creator sulla stessa riga
-    name: "HOC Pro",
-    pages: [{ id: "confronto-creator", title: "Confronto creator", C: CreatorCompare }],
-  },
   {
     name: "HOC Analytics 3.0",
     pages: [
@@ -59,6 +54,8 @@ export default function ReportLookerPage() {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const p = q.get("pagina");
+    // Confronto creator vive in Analisi vendite (15/10/2026): i link vecchi ci arrivano lì
+    if (p === "confronto-creator") { window.location.replace("/admin/analisi-vendite?vista=confronto"); return; }
     if (p && ALL.some((x) => x.id === p)) setPageId(p);
     const c = (q.get("creators") || "").split(",").map(Number).filter(Boolean);
     if (c.length) setCreators(c);
@@ -79,7 +76,7 @@ export default function ReportLookerPage() {
       <div className="lk-shell" style={{ display: "grid", gridTemplateColumns: "200px minmax(0, 1fr)", gap: 20, alignItems: "start" }}>
         <nav aria-label="Pagine del report" style={{ position: "sticky", top: 12, display: "grid", gap: 12, maxHeight: "calc(100vh - 24px)", overflowY: "auto" }}>
           <div style={{ padding: "0 10px" }}>
-            <h1 style={{ margin: 0, fontSize: 18, fontWeight: 500, color: CP.textPrimary }}>HOC Analytics</h1>
+            <h1 style={{ margin: 0, fontSize: 18, fontWeight: 500, color: CP.textPrimary }}>Report Looker</h1>
             <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2, lineHeight: 1.4 }}>Le pagine di Looker Studio. Solo le tue creator.</div>
           </div>
           {REPORTS.map((r) => (

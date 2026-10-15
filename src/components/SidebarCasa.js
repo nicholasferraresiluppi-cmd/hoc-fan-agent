@@ -43,7 +43,6 @@ const MANAGER = [
     { href: "/leaderboard/creators", label: "Creator" },
     { href: "/admin/le-mie-creator", label: "Revenue e chat" },
     { href: "/admin/analisi-vendite", label: "Analisi vendite" },
-    { href: "/admin/looker", label: "HOC Analytics" },
     { href: "/admin/fan-da-recuperare", label: "Fan da recuperare" },
     { href: "/admin/settimana", label: "Da seguire" },
     { href: "/cm-cockpit", label: "Cockpit turno" },
@@ -51,6 +50,7 @@ const MANAGER = [
     { href: "/admin/s4s", label: "Calendario S4S" },
     { href: "/admin/telegram", label: "Canali Telegram" },
     { href: "/admin/pnl-live", label: "P&L" },
+    { href: "/admin/looker", label: "Report Looker" },
   ] },
   { title: "Il mio quadro", items: [
     { href: "/me/score", label: "I miei score" },
