@@ -2,32 +2,26 @@
  * P&L live per creator (operativo, lato chat).
  *
  * GET /api/admin/pnl-live?period_id=YYYY-MM
- *   Per ogni creator del mese (da KV wages):
- *   - venduto (somma takes), costo operatori attribuito
- *   - fee% deal (config persistita in KV `pnl:deal_fees`, editabile da UI)
- *   - fee $ = venduto × fee% · margine = fee $ − costo operatori · margin %
- *   Funziona anche sul MESE CORRENTE (= live): basta che il sync sia girato.
- *   Include last_sync da cp:_meta per sapere quanto è fresco il dato.
+ *   Per ogni creator del mese (da KV wages): venduto (somma takes) e costo
+ *   operatori attribuito, con la % sul venduto. Funziona anche sul MESE
+ *   CORRENTE (= live): basta che il sync sia girato. Include last_sync da
+ *   cp:_meta per sapere quanto è fresco il dato.
  *
- * PUT body { alias, fee_pct }  (fee_pct 0..1 oppure null per rimuovere)
- *   Aggiorna la config fee. Audit-logged.
+ * Fee del deal e margine TOLTI (15/10/2026, decisione Nicholas): gli accordi
+ * delle creator sono riservati e vivono nel Conto dello split
+ * (`/contabilita/split`, cifrato, fuori da RBAC). Qui erano in `pnl:deal_fees`
+ * in chiaro e visibili a ogni admin. Non rimettere fee in questa pagina e non
+ * leggerle dal conto dello split: porterebbe un dato riservato agli admin.
  *
  * CAVEAT (esposto anche in UI): è il P&L OPERATIVO della chat — include
- * solo il costo operatori. Marketing, AM, struttura ecc. restano nel
- * foglio Finance. Valuta: $ (CP), non € (Finance).
+ * solo il costo operatori. Valuta: $ (CP), non € (Finance).
  */
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
-import { logAuditAction } from "@/lib/audit-log";
 import { getWages } from "@/lib/cp-wages-store";
 import { aggregateWagesByAlias } from "@/lib/pnl-aggregate";
 
 export const maxDuration = 30;
-const FEES_KEY = "pnl:deal_fees";
-// Fee standard (25/09/2026): la maggior parte dei deal ha la stessa %; si
-// imposta una volta e si scrivono solo le eccezioni. Tenuta in chiave a parte
-// così una creator senza riga resta distinguibile ("standard" vs "sua").
-const DEFAULT_KEY = "pnl:deal_fee_default";
 
 export async function GET(request) {
   const az = await authorize(CAPABILITIES.SEED);
@@ -39,48 +33,28 @@ export async function GET(request) {
     return Response.json({ error: "period_id YYYY-MM richiesto" }, { status: 400 });
   }
 
-  const [wages, fees, meta, defaultFee] = await Promise.all([
-    getWages(periodId),
-    kv.get(FEES_KEY),
-    kv.get("cp:_meta"),
-    kv.get(DEFAULT_KEY),
-  ]);
+  const [wages, meta] = await Promise.all([getWages(periodId), kv.get("cp:_meta")]);
   if (!Array.isArray(wages) || wages.length === 0) {
     return Response.json({
       error: `Nessuna wage in KV per ${periodId}. Sincronizza il mese (anche quello corrente: il P&L live si aggiorna a ogni sync).`,
     }, { status: 404 });
   }
-  const feeMap = fees && typeof fees === "object" ? fees : {};
 
   // Aggregazione per alias: venduto (takes esatti) + costo operatori attribuito (lib condivisa con la città)
   const byAlias = aggregateWagesByAlias(wages);
 
   const rows = [...byAlias.entries()]
     .filter(([, a]) => a.sales > 0)
-    .map(([alias, a]) => {
-      const own = typeof feeMap[alias] === "number" ? feeMap[alias] : null;
-      const fee_pct = own != null ? own : (typeof defaultFee === "number" ? defaultFee : null);
-      const fee_source = own != null ? "creator" : fee_pct != null ? "standard" : null;
-      const fee_usd = fee_pct != null ? a.sales * fee_pct : null;
-      const margin = fee_usd != null ? fee_usd - a.cost : null;
-      return {
-        alias,
-        sales: Math.round(a.sales),
-        cost_ops: Math.round(a.cost),
-        cost_pct: a.sales > 0 ? Math.round((a.cost / a.sales) * 1000) / 1000 : null,
-        fee_pct,
-        fee_source,
-        fee_usd: fee_usd != null ? Math.round(fee_usd) : null,
-        margin: margin != null ? Math.round(margin) : null,
-        margin_pct: margin != null && a.sales > 0 ? Math.round((margin / a.sales) * 1000) / 1000 : null,
-        shifts: a.shifts,
-      };
-    })
+    .map(([alias, a]) => ({
+      alias,
+      sales: Math.round(a.sales),
+      cost_ops: Math.round(a.cost),
+      cost_pct: a.sales > 0 ? Math.round((a.cost / a.sales) * 1000) / 1000 : null,
+      shifts: a.shifts,
+    }))
     .sort((x, y) => y.sales - x.sales);
 
-  const withFee = rows.filter((r) => r.fee_pct != null);
   return Response.json({
-    default_fee_pct: typeof defaultFee === "number" ? defaultFee : null,
     period_id: periodId,
     last_sync_at: meta?.last_sync_at ?? null,
     last_sync_period: meta?.last_sync_period ?? null,
@@ -88,56 +62,6 @@ export async function GET(request) {
     totals: {
       sales: rows.reduce((s, r) => s + r.sales, 0),
       cost_ops: rows.reduce((s, r) => s + r.cost_ops, 0),
-      fee_usd: withFee.reduce((s, r) => s + (r.fee_usd || 0), 0),
-      margin: withFee.reduce((s, r) => s + (r.margin || 0), 0),
-      fee_coverage: `${withFee.length}/${rows.length}`,
     },
   });
-}
-
-export async function PUT(request) {
-  const az = await authorize(CAPABILITIES.SEED);
-  if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
-
-  let body;
-  try { body = await request.json(); } catch { return Response.json({ error: "Invalid JSON" }, { status: 400 }); }
-  // Fee standard
-  if (body && "default_fee_pct" in body) {
-    const d = body.default_fee_pct;
-    if (d !== null && (typeof d !== "number" || d < 0 || d > 1)) return Response.json({ error: "default_fee_pct deve essere 0..1 oppure null" }, { status: 400 });
-    const prev = await kv.get(DEFAULT_KEY);
-    if (d === null) await kv.del(DEFAULT_KEY); else await kv.set(DEFAULT_KEY, d);
-    await logAuditAction({ action: "pnl.deal_fee.default", target: "*", by: az.userId, meta: { prev: prev ?? null, next: d } });
-    return Response.json({ ok: true, default_fee_pct: d });
-  }
-  // Import in blocco (incolla da foglio): [{ alias, fee_pct }]
-  if (Array.isArray(body?.bulk)) {
-    const rows = body.bulk.filter((r) => r && typeof r.alias === "string" && r.alias.trim() && typeof r.fee_pct === "number" && r.fee_pct >= 0 && r.fee_pct <= 1);
-    if (!rows.length || rows.length > 300) return Response.json({ error: "Nessuna riga valida (o più di 300)" }, { status: 400 });
-    const fees = (await kv.get(FEES_KEY)) || {};
-    const changes = rows.map((r) => ({ alias: r.alias.trim(), prev: fees[r.alias.trim()] ?? null, next: r.fee_pct }));
-    for (const c of changes) fees[c.alias] = c.next;
-    await kv.set(FEES_KEY, fees);
-    await logAuditAction({ action: "pnl.deal_fee.bulk", target: `${changes.length} creator`, by: az.userId, meta: { changes } });
-    return Response.json({ ok: true, updated: changes.length });
-  }
-  const alias = (body?.alias || "").trim();
-  let fee = body?.fee_pct;
-  if (!alias) return Response.json({ error: "alias richiesto" }, { status: 400 });
-  if (fee !== null && (typeof fee !== "number" || fee < 0 || fee > 1)) {
-    return Response.json({ error: "fee_pct deve essere 0..1 oppure null" }, { status: 400 });
-  }
-
-  const fees = (await kv.get(FEES_KEY)) || {};
-  const prev = fees[alias] ?? null;
-  if (fee === null) delete fees[alias];
-  else fees[alias] = fee;
-  await kv.set(FEES_KEY, fees);
-  await logAuditAction({
-    action: "pnl.deal_fee.set",
-    target: alias,
-    by: az.userId,
-    meta: { prev, next: fee },
-  });
-  return Response.json({ ok: true, alias, fee_pct: fee });
 }

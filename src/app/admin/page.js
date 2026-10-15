@@ -54,7 +54,7 @@ const SHORTCUT_GROUPS_RAW = [
   {
     label: "Compensi e margini",
     items: [
-      { href: "/admin/pnl-live",          title: "P&L Live",            desc: "Margine per creator: venduto, costo operatori, fee", icon: Wallet },
+      { href: "/admin/pnl-live",          title: "P&L Live",            desc: "Per creator: venduto e costo degli operatori, anche sul mese in corso", icon: Wallet },
       { href: "/admin/comp-calendar",     title: "Calendario compensi", desc: "Quanto costa ogni giorno di turni e perché, con simulatore", icon: Calendar },
       { href: "/admin/profiles-compare",  title: "Scaglioni a confronto", desc: "Standardizzazione dei profili di pagamento", icon: Scale },
     ],
@@ -149,7 +149,7 @@ const SHORTCUT_GROUPS_RAW = [
   {
     label: "Data & Integrations",
     items: [
-      { href: "/admin/alerts",                 title: "Alert operativi", desc: "Check automatici: wage gap, fee, import fermi, sotto soglia", icon: Bell },
+      { href: "/admin/alerts",                 title: "Alert operativi", desc: "Check automatici: wage gap, import fermi, sotto soglia", icon: Bell },
       { href: "/admin/creatorspro-sync",       title: "Sync CP",        desc: "Sincronizza wages + shifts CP (mensile)", icon: RefreshCw },
       { href: "/admin/wage-audit",             title: "Sync & Audit CP", desc: "Storico mese per mese: KV vs live CP, sync/ripara", icon: ShieldCheck },
       { href: "/admin/creatorspro-sync-history", title: "Storico sync CP", desc: "Storico dei job di sincronizzazione CreatorsPro", icon: History },
