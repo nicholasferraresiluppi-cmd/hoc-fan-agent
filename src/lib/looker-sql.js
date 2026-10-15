@@ -269,3 +269,49 @@ export function lkNewsubsCreatorSql(refs, ids, range) {
           WHERE creator_id IN (${idList(ids)}) AND calendar_date BETWEEN ${d(p.from)} AND ${d(range.to)})
     GROUP BY creator_id`;
 }
+
+/**
+ * Confronto creator (15/10/2026, pagina nuova: in Looker non esiste) — una riga per creator con le metriche
+ * che in Looker stanno su pagine diverse, periodo corrente e precedente di pari durata:
+ *  - lordo = SUM(amount) di attributed_transactions, TUTTI i tipi (abbonamenti compresi; net = 80% di amount,
+ *    verificato su set 2026); `sub_gross` = la parte subscription + recurring_subscription;
+ *  - fan paganti = user_id distinti con amount > 0 (stessa tabella);
+ *  - nuovi abbonati = subscriptions.new_subs (come Recap Dashboard); reach = reach.total (come Creators Reach);
+ *  - click e abbonati dai link = links_stats.clicks_diff / subs_diff (come Clicks Overall);
+ *  - fan che scrivono = user_id distinti che hanno mandato almeno un messaggio (onlyfans.chat, sender_id = user_id;
+ *    tabella a taglio giornaliero 05:00 UTC, quindi l'ultimo giorno può essere parziale).
+ * NON incluso di proposito: "abbonati attivi" (subscriptions_intervals non chiude mai gli intervalli: il 99,99% dei fan
+ * mai passati risulta attivo) e visualizzazioni delle mass (il warehouse registra solo i destinatari, non le aperture).
+ */
+export function confrontoSql(refs, ids, range) {
+  const p = previousRange(range);
+  const list = idList(ids);
+  const win = `creator_id IN (${list}) AND calendar_date BETWEEN ${d(p.from)} AND ${d(range.to)}`;
+  const cur = `calendar_date >= ${d(range.from)}`;
+  return `
+    WITH ids AS (SELECT creator_id FROM UNNEST([${list}]) AS creator_id),
+    t AS (SELECT creator_id,
+            SUM(IF(${cur}, amount, 0)) AS gross, SUM(IF(${cur}, 0, amount)) AS gross_prev,
+            SUM(IF(${cur} AND type IN ('subscription', 'recurring_subscription'), amount, 0)) AS sub_gross,
+            SUM(IF(NOT (${cur}) AND type IN ('subscription', 'recurring_subscription'), amount, 0)) AS sub_gross_prev,
+            COUNT(DISTINCT IF(${cur} AND amount > 0, user_id, NULL)) AS payers,
+            COUNT(DISTINCT IF(NOT (${cur}) AND amount > 0, user_id, NULL)) AS payers_prev
+          FROM \`${refs.attributed}\` WHERE ${win} GROUP BY 1),
+    s AS (SELECT creator_id, SUM(IF(${cur}, new_subs, 0)) AS subs, SUM(IF(${cur}, 0, new_subs)) AS subs_prev
+          FROM \`${refs.subscriptions}\` WHERE ${win} GROUP BY 1),
+    r AS (SELECT creator_id, SUM(IF(${cur}, total, 0)) AS reach, SUM(IF(${cur}, 0, total)) AS reach_prev
+          FROM \`${refs.reach}\` WHERE ${win} GROUP BY 1),
+    l AS (SELECT creator_id, SUM(IF(${cur}, clicks_diff, 0)) AS clicks, SUM(IF(${cur}, 0, clicks_diff)) AS clicks_prev,
+            SUM(IF(${cur}, subs_diff, 0)) AS link_subs, SUM(IF(${cur}, 0, subs_diff)) AS link_subs_prev
+          FROM \`${refs.linksStats}\` WHERE ${win} GROUP BY 1),
+    c AS (SELECT creator_id,
+            COUNT(DISTINCT IF(DATE(created_at) >= ${d(range.from)}, user_id, NULL)) AS writers,
+            COUNT(DISTINCT IF(DATE(created_at) < ${d(range.from)}, user_id, NULL)) AS writers_prev
+          FROM \`${refs.chat}\`
+          WHERE creator_id IN (${list}) AND sender_id = user_id
+            AND created_at >= TIMESTAMP(${d(p.from)}) AND created_at < TIMESTAMP(DATE_ADD(${d(range.to)}, INTERVAL 1 DAY))
+          GROUP BY 1)
+    SELECT ids.creator_id, t.* EXCEPT (creator_id), s.* EXCEPT (creator_id), r.* EXCEPT (creator_id), l.* EXCEPT (creator_id), c.* EXCEPT (creator_id)
+    FROM ids LEFT JOIN t USING (creator_id) LEFT JOIN s USING (creator_id) LEFT JOIN r USING (creator_id)
+      LEFT JOIN l USING (creator_id) LEFT JOIN c USING (creator_id)`;
+}

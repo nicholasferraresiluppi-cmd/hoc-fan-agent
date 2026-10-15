@@ -10,7 +10,9 @@
 
 export const VIEWS = ["recap", "conversioni", "rapporto", "meta-mese", "transazioni", "nuovi-abbonati", "tracking", "copertura", "notifiche", "welcome", "ricerca-fan", "diagnosi", "creator",
   // Report Looker (pagine copiate 1:1, lib/looker-sql.js)
-  "lk-recap", "lk-clicks", "lk-welcome", "lk-perf", "lk-tx", "lk-users", "lk-chargebacks", "lk-overall", "lk-newsubs"];
+  "lk-recap", "lk-clicks", "lk-welcome", "lk-perf", "lk-tx", "lk-users", "lk-chargebacks", "lk-overall", "lk-newsubs",
+  // pagina nuova di HOC Analytics: tutte le metriche di una creator sulla stessa riga
+  "confronto"];
 
 const DAY = 86400e3;
 const isoDay = (t) => new Date(t).toISOString().slice(0, 10);
@@ -29,7 +31,7 @@ export function defaultRange(view, now = new Date()) {
   // Chargeback Stats = ultimi 30 giorni fino a oggi)
   if (view === "lk-tx") return { from: isoDay(now.getTime()), to: isoDay(now.getTime()) };
   if (view === "lk-users" || view === "lk-chargebacks") return { from: isoDay(now.getTime() - 29 * DAY), to: isoDay(now.getTime()) };
-  const days = view === "conversioni" ? 28 : ["recap", "welcome", "lk-recap", "lk-welcome", "lk-perf"].includes(view) ? 14 : 7; // diagnosi e creator: 7 contro 7
+  const days = view === "conversioni" || view === "confronto" ? 28 : ["recap", "welcome", "lk-recap", "lk-welcome", "lk-perf"].includes(view) ? 14 : 7; // diagnosi e creator: 7 contro 7
   if (view === "rapporto" || view === "meta-mese") return { from: `${y.slice(0, 7)}-01`, to: y };
   return { from: isoDay(parseDay(y) - (days - 1) * DAY), to: y };
 }

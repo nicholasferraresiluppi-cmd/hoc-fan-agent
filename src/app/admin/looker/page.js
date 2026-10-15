@@ -12,11 +12,16 @@ import { LkStyles } from "@/components/looker/Lk";
 import {
   RecapDashboard, ClicksOverall, CreatorsReach, WelcomeMassUnlocks, PerformanceKpi, DetailedKpi, TransactionsDetails,
   SubsNotifications, UserResearch, ChargebackStats, CreatorOverall, NewSubsDashboard, NewSubsRevenue, NewSubsCr,
-  ConversionAnalytics, SalesRatio,
+  ConversionAnalytics, SalesRatio, CreatorCompare,
 } from "@/components/looker/pages";
 
 /* ───────── l'elenco delle pagine, come la colonna di sinistra di Looker (stessi nomi, stesso ordine) ───────── */
 const REPORTS = [
+  {
+    // pagina nostra (non è in Looker): tutte le metriche di una creator sulla stessa riga
+    name: "HOC Pro",
+    pages: [{ id: "confronto-creator", title: "Confronto creator", C: CreatorCompare }],
+  },
   {
     name: "HOC Analytics 3.0",
     pages: [

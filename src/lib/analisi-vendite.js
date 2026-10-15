@@ -20,11 +20,11 @@ import {
   notificheAggSql, notificheListSql, welcomeSql, ricercaSql, cleanSearch, SUB_TYPES,
   diagnosiSql, diagnosiDailySql,
 } from "@/lib/analisi-vendite-sql";
-import { buildDiagnosi, summaryOf } from "@/lib/analisi-vendite-diagnosi";
+import { buildDiagnosi, summaryOf, personOf } from "@/lib/analisi-vendite-diagnosi";
 import {
   lkRecapDailyNetSql, lkRecapDailySubsSql, lkClicksSql, lkWelcomeDailySql, lkPerfSql, lkSubsRangeSql, lkAmountRangeSql,
   lkTxSummarySql, lkTxSeriesSql, lkTxTopUsersSql, lkTxListSql, lkUsersSql, lkChargebacksSql, lkOverallSql, lkOverallDailySql,
-  lkNewsubsDailySql, lkNewsubsListSql, lkNewsubsCreatorSql,
+  lkNewsubsDailySql, lkNewsubsListSql, lkNewsubsCreatorSql, confrontoSql,
 } from "@/lib/looker-sql";
 import { LIVE_CREATORS } from "@/lib/live-creators";
 
@@ -396,7 +396,44 @@ function shape(view, rows, names, range) {
       }).sort((a, b) => b.cr - a.cr),
     };
   }
+  if (view === "confronto") return confrontoShape(rows[0], nameOf, range);
   throw new Error("vista sconosciuta");
+}
+
+/* Confronto creator: le somme (pagina o persona) e i rapporti derivati, ognuno col suo % Δ. */
+const CMP_SUMS = ["gross", "sub_gross", "payers", "subs", "reach", "clicks", "link_subs", "writers"];
+function cmpRow(base) {
+  const ratio = (a, b) => (b ? a / b : null);
+  const row = { ...base, gross: r2(base.gross), sub_gross: r2(base.sub_gross) };
+  for (const k of CMP_SUMS) row[`${k}_delta`] = pctDelta(base[k], base[`${k}_prev`]);
+  row.arppu = ratio(base.gross, base.payers);
+  row.arppu_delta = pctDelta(row.arppu, ratio(base.gross_prev, base.payers_prev));
+  row.cr = ratio(base.link_subs, base.clicks);
+  const crPrev = ratio(base.link_subs_prev, base.clicks_prev);
+  row.cr_delta = row.cr != null && crPrev ? (row.cr - crPrev) / crPrev : null;
+  row.sub_share = ratio(base.sub_gross, base.gross);
+  return row;
+}
+function confrontoShape(agg, nameOf, range) {
+  const pages = agg.map((r) => {
+    const base = { creator_id: Number(r.creator_id), name: nameOf(r.creator_id) };
+    for (const k of CMP_SUMS) { base[k] = Number(r[k]) || 0; base[`${k}_prev`] = Number(r[`${k}_prev`]) || 0; }
+    return base;
+  });
+  const sum = (list, extra) => list.reduce((a, r) => {
+    for (const k of CMP_SUMS) { a[k] += r[k]; a[`${k}_prev`] += r[`${k}_prev`]; }
+    return a;
+  }, { ...extra, ...Object.fromEntries(CMP_SUMS.flatMap((k) => [[k, 0], [`${k}_prev`, 0]])) });
+  // persona = le sue pagine (IT/EN/…) sommate. I fan si sommano per pagina: chi paga su due pagine conta due volte.
+  const byPerson = new Map();
+  for (const r of pages) { const n = personOf(r.name); if (!byPerson.has(n)) byPerson.set(n, []); byPerson.get(n).push(r); }
+  const persons = [...byPerson].map(([name, list]) => cmpRow(sum(list, { name, creator_ids: list.map((r) => r.creator_id), pages: list.length })));
+  return {
+    rows: pages.map(cmpRow).sort((a, b) => b.gross - a.gross),
+    persons: persons.sort((a, b) => b.gross - a.gross),
+    total: cmpRow(sum(pages, { name: "Totale" })),
+    previous: previousRange(range),
+  };
 }
 
 const BUILDERS = {
@@ -412,6 +449,7 @@ const BUILDERS = {
   welcome: (refs, ids, range) => [welcomeSql(refs, ids, range)],
   "ricerca-fan": (refs, ids, range, q) => [ricercaSql(refs, ids, q)],
   diagnosi: (refs, ids, range) => [diagnosiSql(refs, ids, range), diagnosiDailySql(refs, ids, range)],
+  confronto: (refs, ids, range) => [confrontoSql(refs, ids, range)],
   "lk-recap": (refs, ids, range) => [recapSql(refs, ids, range), lkRecapDailyNetSql(refs, ids, range), lkRecapDailySubsSql(refs, ids, range)],
   "lk-clicks": (refs, ids, range) => [lkClicksSql(refs, ids, range)],
   "lk-welcome": (refs, ids, range) => [welcomeSql(refs, ids, range), lkWelcomeDailySql(refs, ids, range)],
@@ -449,7 +487,7 @@ export async function getAnalisi(view, ids, query = {}, { force = false } = {}) 
   }
   const creators = await splitCreators();
   const names = Object.fromEntries(creators.map((c) => [c.id, c.name]));
-  const { source, rows } = await runOnSource((refs) => BUILDERS[view](refs, ids, range, q, f), view.startsWith("lk-") ? { maxBytesBilled: 20 * 1024 ** 3, timeoutMs: 45_000 } : undefined);
+  const { source, rows } = await runOnSource((refs) => BUILDERS[view](refs, ids, range, q, f), view.startsWith("lk-") || view === "confronto" ? { maxBytesBilled: 20 * 1024 ** 3, timeoutMs: 45_000 } : undefined);
   const out = { view, range, source, computed_at: new Date().toISOString(), ...(q ? { q } : {}), ...(fk ? { filters: f } : {}), ...shape(view, rows, names, range) };
   await kv.set(key, out, { ex: 600 }).catch(() => {});
   return out;
