@@ -10,6 +10,7 @@
 
 body {
   font-family: var(--cp-font, 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif);
+  touch-action: manipulation; /* niente zoom col doppio tocco (vedi viewport in layout.js) */
   background-color: var(--cp-bg);
   color: var(--cp-textPrimary);
 }

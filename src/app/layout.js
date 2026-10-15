@@ -35,7 +35,10 @@ export const metadata = {
   appleWebApp: { capable: true, title: "HOC Pro", statusBarStyle: "black-translucent" },
 };
 
-export const viewport = { themeColor: "#08090c" };
+// Niente zoom (decisione di Nicholas, 15/10/2026): l'app si usa dal telefono come un'app, non come
+// una pagina. maximumScale 1 toglie anche lo zoom automatico di iOS quando si tocca un campo con
+// testo sotto i 16 px. Safari ignora userScalable per il pizzico: lo ferma useNoZoom in Providers.
+export const viewport = { themeColor: "#08090c", width: "device-width", initialScale: 1, maximumScale: 1, userScalable: false };
 
 export default function RootLayout({ children }) {
   // `dynamic` (Clerk 6): ripristina il comportamento di Clerk 5 — stato auth
