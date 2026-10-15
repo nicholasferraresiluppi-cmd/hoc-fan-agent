@@ -18,6 +18,7 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
   const links = [];
   for (const p of ps) {
     for (const u of p.hlLinks || []) links.push({ url: u, where: "Prima storia in evidenza", h: p.h, k: classifyUrl(u) });
+    for (const v of p.hlVia || []) for (const u of v.urls || []) links.push({ url: u, where: `Bio di @${v.h}, taggato in evidenza`, h: p.h, k: classifyUrl(u) });
     if (p.url) links.push({ url: p.url, where: "Bio", h: p.h, k: classifyUrl(p.url) });
   }
 
@@ -72,7 +73,7 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
 
           <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <H2>Dove porta</H2>
-            {links.length === 0 ? <p style={{ margin: 0, color: CP.textSecondary, fontSize: 14 }}>Nessun link in bio né nella prima storia in evidenza.</p> : (
+            {links.length === 0 ? <p style={{ margin: 0, color: CP.textSecondary, fontSize: 14 }}>{(ps.some((p) => p.hlVia) ? "Nessun link in bio, nella prima storia in evidenza né negli account che tagga." : "Nessun link in bio né nella prima storia in evidenza.")}</p> : (
               <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
                 {links.map((l, i) => (
                   <li key={i} style={{ display: "grid", gridTemplateColumns: "minmax(110px, 200px) minmax(0,1fr) auto", gap: 14, padding: "11px 0", borderBottom: `1px solid ${CP.borderSoft || CP.border}`, fontSize: 14, alignItems: "baseline" }}>

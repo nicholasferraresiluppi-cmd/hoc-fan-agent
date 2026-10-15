@@ -3,6 +3,7 @@
 // e lo stile "Casa"), titoli in serif (--cp-sig), niente riquadri pesanti: linee sottili.
 import { useEffect, useState } from "react";
 import { CP, FONTS, alpha } from "@/lib/brand";
+import { linkWhere } from "@/lib/scouting-core";
 
 export const NUM = { fontVariantNumeric: "tabular-nums" };
 export const SERIF = { fontFamily: FONTS.signature, fontWeight: 400, letterSpacing: "-0.01em" };
@@ -38,7 +39,7 @@ export function Initials({ name, size = 52, gold, pic }) {
 export function LinkChip({ link, sig }) {
   if (!link && sig !== "forte") return <span style={{ fontSize: 12.5, color: CP.textMuted }}>Nessun link trovato</span>;
   const strong = link ? link.strength >= 2 : true;
-  const text = link ? `${link.label} · ${link.where === "evidenza" ? "nella prima evidenza" : "in bio"}` : "Profilo a pagamento";
+  const text = link ? `${link.label} · ${linkWhere(link, { short: true })}` : "Profilo a pagamento";
   return (
     <span style={{ alignSelf: "flex-start", fontSize: 12.5, color: strong ? CP.gold : CP.textSecondary, border: `1px solid ${strong ? alpha(CP.gold, "55") : CP.border}`, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>{text}</span>
   );

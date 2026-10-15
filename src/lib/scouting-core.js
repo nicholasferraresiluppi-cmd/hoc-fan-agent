@@ -230,7 +230,7 @@ export function suggestLinks(profiles, creatorOf, dismissed = new Set(), { max =
   const handles = new Set(profiles.map((p) => p.h));
   const add = (m, k, v) => { if (!m.has(k)) m.set(k, []); m.get(k).push(v); };
   for (const p of profiles) {
-    for (const k of new Set([p.url, ...(p.hlLinks || [])].map(linkKey).filter(Boolean))) add(byLink, k, p.h);
+    for (const k of new Set([p.url, ...(p.hlLinks || []), ...viaUrls(p)].map(linkKey).filter(Boolean))) add(byLink, k, p.h);
     const { first, joined } = handleStem(p.h);
     if (joined.length >= 6) add(byJoined, joined, p.h);
     if (first.length >= 4) add(byFirst, first, p);
@@ -503,18 +503,39 @@ export function classifyUrl(url) {
   }
 }
 
-/** Il link più "parlante" tra quelli degli account di una creator: { label, where: "bio"|"evidenza", url }. */
+// Il giro più usato per non farsi bloccare da Instagram (15/10/2026, caso @alicelatspreferita):
+// niente link sul profilo, la prima storia in evidenza TAGGA un secondo account (spesso
+// privato) e il link sta nella bio di quel secondo account. `hlVia` = [{ h, urls }]: gli
+// account taggati nella prima evidenza e i link nella loro bio.
+const viaUrls = (p) => (p.hlVia || []).flatMap((v) => v?.urls || []);
+
+/**
+ * Il link più "parlante" tra quelli degli account di una creator:
+ * { label, strength, where: "bio"|"evidenza"|"tag", url, via? } (via = account taggato).
+ */
 export function bestLink(ps) {
   let best = null;
   for (const p of ps) {
-    const cands = [...(p.hlLinks || []).map((u) => [u, "evidenza"]), ...(p.url ? [[p.url, "bio"]] : [])];
-    for (const [url, where] of cands) {
+    const cands = [
+      ...(p.hlLinks || []).map((u) => [u, "evidenza"]),
+      ...(p.hlVia || []).flatMap((v) => (v?.urls || []).map((u) => [u, "tag", v.h])),
+      ...(p.url ? [[p.url, "bio"]] : []),
+    ];
+    for (const [url, where, via] of cands) {
       const c = classifyUrl(url);
       if (!c) continue;
-      if (!best || c.strength > best.strength) best = { ...c, where, url };
+      if (!best || c.strength > best.strength) best = { ...c, where, url, ...(via ? { via } : {}) };
     }
   }
   return best;
+}
+
+/** Dove sta il link, in parole: lungo per le frasi, corto per le etichette. */
+export function linkWhere(link, { short = false } = {}) {
+  if (!link) return "";
+  if (link.where === "tag") return short ? `tramite @${link.via}` : `nella bio di @${link.via}, l'account taggato nella prima storia in evidenza`;
+  if (link.where === "evidenza") return short ? "nella prima evidenza" : "nella prima storia in evidenza";
+  return "in bio";
 }
 
 const DAY = 86400000;
@@ -532,7 +553,7 @@ export function newCutoff(creators, now = Date.now()) {
 export function whyLines(c, { newCut = Date.now() - 8 * DAY } = {}) {
   const out = [];
   if (c.fmt && c.fmt !== "nessuno") out.push(`Ha un format che si ripete: ${String(c.fmt).replace(/^altro:\s*/i, "")}.`);
-  if (c.link && c.link.strength >= 2) out.push(`${c.link.label} ${c.link.where === "evidenza" ? "nella prima storia in evidenza" : "in bio"}.`);
+  if (c.link && c.link.strength >= 2) out.push(`${c.link.label} ${linkWhere(c.link)}.`);
   else if (c.sig === "forte") out.push("Ha un profilo a pagamento.");
   if (c.g4 != null && c.g4 >= 5) out.push(`Cresce: +${String(c.g4).replace(".", ",")}% di follower in 4 settimane.`);
   if (c.medv && c.fol && c.medv / c.fol >= 0.3) out.push("I reel arrivano ben oltre i suoi follower.");
