@@ -184,6 +184,19 @@ function TeamDetail({ t, fx }) {
         </div>
       ))}
       {t.chatterUsd !== null && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, borderTop: `1px solid ${CP.borderSoft}`, paddingTop: 6 }}><span>Chatter {usd(t.chatterUsd)}{t.chatterSource ? <span style={muted}> · {t.chatterSource}</span> : null}</span><span>{eur(t.chatterEur)}</span></div>}
+      {t.chatterBuste?.length > 0 && (
+        <details>
+          <summary style={{ ...muted, cursor: "pointer" }}>Le {t.chatterBuste.length} buste del chatter</summary>
+          <div style={{ marginTop: 6 }}>
+            {t.chatterBuste.map((b, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12, padding: "3px 0", color: CP.textSecondary }}>
+                <span>{b.name} <span style={{ color: ["PAID", "CLOSED", "PAYABLE"].includes(b.status) ? CP.textMuted : CP.accentSoftText }}>{b.status === "OPEN" ? "aperta" : b.status === "PAID" ? "pagata" : b.status === "CLOSED" ? "chiusa" : b.status === "PAYABLE" ? "da pagare" : b.status.toLowerCase()}</span>{b.usd < b.wageUsd - 1 ? <span style={{ color: CP.textMuted }}> · divisa: {usd(b.usd)} su {usd(b.wageUsd)}</span> : null}</span>
+                <span>{usd(b.usd)}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
       {t.extras.map((x) => <div key={x.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}><span>Extra: {x.label}{x.person ? ` (${x.person})` : ""}</span><span>{eur(x.eur)}</span></div>)}
       {t.problems.length > 0 && <div style={{ fontSize: 12, color: CP.accentSoftText }}>{t.problems.join(" · ")}</div>}
       {t.note && <div style={muted}>{t.note}</div>}
@@ -254,7 +267,9 @@ export default function SplitPage() {
     upd((d) => {
       const teams = { ...(d.teams || {}) };
       for (const [id, v] of Object.entries(r.revenue || {})) teams[id] = { ...(teams[id] || {}), revenueUsd: v, revenueSource: `warehouse${r.partial ? " (parziale)" : ""}` };
-      for (const [id, v] of Object.entries(r.chatter || {})) teams[id] = { ...(teams[id] || {}), chatterUsd: v, chatterSource: "CreatorsPro" };
+      const bs = r.busteStatus;
+      const src = bs ? `buste CreatorsPro${bs.open ? ` · ${bs.open} su ${bs.total} non chiuse` : " · tutte chiuse"}` : "CreatorsPro";
+      for (const [id, v] of Object.entries(r.chatter || {})) teams[id] = { ...(teams[id] || {}), chatterUsd: v, chatterSource: src, chatterBuste: r.buste?.[id] || [] };
       return { ...d, teams };
     });
     setInfo([`Presi: revenue di ${Object.keys(r.revenue || {}).length} team, chatter di ${Object.keys(r.chatter || {}).length}. Controlla e salva.`, ...(r.notes || [])].join(" "));

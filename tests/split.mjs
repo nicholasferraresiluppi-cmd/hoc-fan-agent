@@ -1,7 +1,7 @@
 // Unit test — split-core. Esegui: node tests/split.mjs
 // Il caso grosso rifà il foglio "Team & Stipendi" di agosto 2026 di Nicholas al centesimo.
 import assert from "node:assert/strict";
-import { computeSplitMonth, personCost, activeIn, sanitizeConfig, sanitizeMonthInput, sanitizePerson } from "../src/lib/split-core.js";
+import { computeSplitMonth, personCost, activeIn, sanitizeConfig, sanitizeMonthInput, sanitizePerson, chatterFromWages } from "../src/lib/split-core.js";
 
 let n = 0;
 const t = (name, fn) => { try { fn(); n++; } catch (e) { console.error("✗", name); throw e; } };
@@ -99,4 +99,29 @@ t("problemi: revenue mancante", () => {
   const x = computeSplitMonth(config, { month: "2026-08", fx: { rate: 0.86 }, teams: {} });
   assert.ok(x.teams[0].problems.includes("revenue del mese non inserita"));
 });
+// ── Chatter busta per busta ──
+const tw = [{ id: "a_0001", cpAliases: ["Ann - IT"] }, { id: "b_0001", cpAliases: ["Bea - IT", "Bea - EN"] }];
+const sh = (earn, hours, takes, aliases) => ({ total_earnings: earn, worked_hours: hours, takes: takes.map(([a, amount]) => ({ creator_alias: a, amount })), creator_aliases: aliases || [...new Set(takes.map(([a]) => a))] });
+t("busta su una modella: tutto a lei", () => {
+  const r = chatterFromWages([{ member_name: "Op1", status: "PAID", total_wage: 100, shifts: [sh(100, 5, [["Ann - IT", 1000]])] }], tw);
+  assert.equal(r.byTeam.a_0001.usd, 100); assert.equal(r.open, 0);
+});
+t("due modelle nello stesso turno: diviso per venduto", () => {
+  const r = chatterFromWages([{ member_name: "Op2", status: "OPEN", total_wage: 90, shifts: [sh(90, 6, [["Ann - IT", 200], ["Bea - EN", 100]])] }], tw);
+  assert.equal(r.byTeam.a_0001.usd, 60); assert.equal(r.byTeam.b_0001.usd, 30); assert.equal(r.open, 1);
+  assert.equal(r.byTeam.a_0001.buste[0].shared, true);
+});
+t("turno senza vendite su due modelle: parti uguali", () => {
+  const r = chatterFromWages([{ member_name: "Op3", status: "PAID", total_wage: 40, shifts: [sh(40, 4, [], ["Ann - IT", "Bea - IT"])] }], tw);
+  assert.equal(r.byTeam.a_0001.usd, 20); assert.equal(r.byTeam.b_0001.usd, 20);
+});
+t("modella fuori dallo split: la sua parte non entra", () => {
+  const r = chatterFromWages([{ member_name: "Op4", status: "PAID", total_wage: 100, shifts: [sh(50, 4, [["Ann - IT", 10]]), sh(50, 4, [["Altra - IT", 10]])] }], tw);
+  assert.equal(r.byTeam.a_0001.usd, 50); assert.equal(r.total, 1);
+});
+t("voci della busta fuori dai turni: ridistribuite", () => {
+  const r = chatterFromWages([{ member_name: "Op5", status: "PAID", total_wage: 150, shifts: [sh(60, 3, [["Ann - IT", 10]]), sh(40, 2, [["Bea - IT", 10]])] }], tw);
+  assert.equal(r.byTeam.a_0001.usd, 90); assert.equal(r.byTeam.b_0001.usd, 60);
+});
+t("operatore che non tocca le nostre: ignorato", () => assert.equal(chatterFromWages([{ status: "OPEN", total_wage: 9, shifts: [sh(9, 1, [["Altra - IT", 1]])] }], tw).total, 0));
 console.log(`split: ${n} ok`);
