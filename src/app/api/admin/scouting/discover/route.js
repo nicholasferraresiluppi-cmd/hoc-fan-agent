@@ -13,10 +13,24 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const MAX_USD = 30; // per singolo run
+
+// Gira sui server di Apify (cheerio-scraper): scritta come funzione vera e passata come testo.
+async function pageFunction(context) {
+  const html = context.body.toString().split("\\/").join("/");
+  const ig = [...new Set([...html.matchAll(/instagram\.com\/([A-Za-z0-9._]{2,30})/g)].map((m) => m[1].toLowerCase()))];
+  return { url: context.request.url, ig, of: /onlyfans\.com\//i.test(html), fanvue: /fanvue\.com\//i.test(html), tg: /t\.me\//i.test(html) };
+}
 const KINDS = {
   // posts: true → anche le didascalie degli ultimi 8 post (stesso prezzo a profilo): servono per capire il format
   profiles: { actor: "afanasenko~instagram-profile-scraper", unit: 0.011, input: (h, o) => ({ operationMode: "analyzeSpecificAccounts", specificUsernamesList: h, maxCountList: h.length, extractEmail: false, extractPhoneNumber: false, extractWebsiteUrl: true, extractBusinessCategory: false, analyzeQuality: true, extractPosts: Boolean(o.posts) }) },
   followings: { actor: "scraping_solutions~instagram-scraper-followers-following-no-cookies", unit: 0.35, input: (h) => ({ Account: h, resultsLimit: 1500, dataToScrape: "Followings" }) },
+  // pagine di link (Linktree, AllMyLinks, Beacons…): profili Instagram citati e se portano a OnlyFans/Fanvue.
+  // Letta dai server di Apify (dal nostro indirizzo Linktree blocca dopo ~50 pagine). Costo: solo calcolo, pochi centesimi.
+  pages: { actor: "apify~cheerio-scraper", unit: 0.002, input: (urls) => ({
+    startUrls: urls.map((url) => ({ url })),
+    maxConcurrency: 5, maxRequestRetries: 2, proxyConfiguration: { useApifyProxy: true },
+    pageFunction: pageFunction.toString(),
+  }) },
   highlights: { actor: "afanasenko~instagram-stories-highlights-scraper", unit: 0.022, input: (h) => ({ operationMode: "highlightsByUsername", usernames: h, maxAccounts: h.length, includeHighlightItems: true, maxHighlightsPerAccount: 1, analyzeFrames: false, skipPrivate: true }) },
 };
 
@@ -27,7 +41,9 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   const k = KINDS[body.kind];
   if (!k) return Response.json({ error: "tipo di ricerca non valido" }, { status: 400 });
-  const handles = [...new Set((body.handles || []).map(normHandle).filter(Boolean))].slice(0, 3000);
+  const handles = body.kind === "pages"
+    ? [...new Set((body.handles || []).map(String).filter((u) => /^https:\/\/[a-z0-9.-]+\.[a-z]{2,}\/[^\s]{1,80}$/i.test(u)))].slice(0, 3000)
+    : [...new Set((body.handles || []).map(normHandle).filter(Boolean))].slice(0, 3000);
   if (!handles.length) return Response.json({ error: "nessun account" }, { status: 400 });
   const budget = Math.min(MAX_USD, Number(body.maxUsd) || 0, Math.ceil(handles.length * k.unit * 1.15 * 100) / 100 + 0.5);
   if (!(budget > 0)) return Response.json({ error: "tetto di spesa mancante" }, { status: 400 });
