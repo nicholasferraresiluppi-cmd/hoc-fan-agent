@@ -806,3 +806,61 @@ export function SalesRatio({ creators, setCreators }) {
     </LkPage>
   );
 }
+
+/* ───────── HOC Pro › Confronto creator (pagina nuova, in Looker non c'è) ───────── */
+// Tutte le metriche di una creator sulla stessa riga: senza, il confronto si faceva incrociando 3 pagine a mano.
+function vd(value, delta) {
+  return (
+    <span style={{ display: "inline-grid", justifyItems: "end", lineHeight: 1.25 }}>
+      <span>{value}</span>
+      <span style={{ fontSize: 11, color: CP.textMuted }}><LkDelta v={delta} /></span>
+    </span>
+  );
+}
+export function CreatorCompare({ creators, setCreators }) {
+  const [range, setRange] = useState(null);
+  const [byPerson, setByPerson] = useState(true);
+  const swr = useLk("confronto", range, creators);
+  const d = swr.data;
+  const rows = d?.view === "confronto" ? (byPerson ? d.persons : d.rows) : [];
+  const n1 = (v) => (v == null ? "—" : new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 }).format(v));
+  const columns = [
+    { key: "name", label: byPerson ? "Creator" : "Pagina", width: 200, render: (r) => (byPerson && r.pages > 1 ? <span title={`${r.pages} pagine sommate`}>{r.name} <span style={{ color: CP.textMuted }}>· {r.pages}</span></span> : r.name) },
+    { key: "gross", label: "Revenue lordo", align: "right", heat: true, render: (r) => vd(fmt.money0(r.gross), r.gross_delta) },
+    { key: "sub_share", label: "di cui abbonamenti", align: "right", render: (r) => (r.sub_gross ? `${fmt.money0(r.sub_gross)} · ${fmt.pct(r.sub_share, 0)}` : "—"), csv: (r) => r.sub_gross },
+    { key: "subs", label: "Nuovi abbonati", align: "right", heat: true, render: (r) => vd(fmt.int(r.subs), r.subs_delta) },
+    { key: "reach", label: "Reach", align: "right", heat: true, render: (r) => vd(fmt.int(r.reach), r.reach_delta) },
+    { key: "clicks", label: "Click sui link", align: "right", heat: true, render: (r) => vd(fmt.int(r.clicks), r.clicks_delta) },
+    { key: "cr", label: "Abbonati ogni 100 click", align: "right", render: (r) => vd(n1(r.cr == null ? null : r.cr * 100), r.cr_delta) },
+    { key: "payers", label: "Fan paganti", align: "right", heat: true, render: (r) => vd(fmt.int(r.payers), r.payers_delta) },
+    { key: "arppu", label: "Spesa per fan pagante", align: "right", render: (r) => vd(r.arppu == null ? "—" : fmt.money0(r.arppu), r.arppu_delta) },
+    { key: "writers", label: "Fan che scrivono in chat", align: "right", heat: true, render: (r) => vd(fmt.int(r.writers), r.writers_delta) },
+  ];
+  const seg = (on) => ({ border: `1px solid ${on ? CP.accent : CP.border}`, background: on ? `color-mix(in srgb, ${CP.accent} 14%, transparent)` : "transparent", color: on ? CP.textPrimary : CP.textSecondary, borderRadius: 8, padding: "6px 10px", fontSize: 13, cursor: "pointer" });
+  return (
+    <LkPage title="Confronto creator"
+      description="Tutte le metriche di ogni creator sulla stessa riga, per confrontarle. Sotto ogni numero la variazione rispetto al periodo prima di pari durata. Clicca un'intestazione per ordinare."
+      filters={<>
+        <div role="group" aria-label="Raggruppa" style={{ display: "inline-flex", gap: 6 }}>
+          <button onClick={() => setByPerson(true)} style={seg(byPerson)} aria-pressed={byPerson}>Per creator</button>
+          <button onClick={() => setByPerson(false)} style={seg(!byPerson)} aria-pressed={!byPerson}>Per pagina (IT, EN…)</button>
+        </div>
+        <Filters data={d} creators={creators} setCreators={setCreators} range={range} setRange={setRange} isLoading={swr.isLoading} />
+      </>}>
+      <State swr={swr}>
+        {d && d.view === "confronto" && (
+          <>
+            <LkTable name="confronto-creator" maxHeight={620} numbered columns={columns} rows={rows} total={d.total} initialSort={{ key: "gross", dir: "desc" }} />
+            {note(<>
+              <b style={{ fontWeight: 500 }}>Come leggerla.</b> Revenue lordo = quanto hanno pagato i fan, abbonamenti compresi (il netto è l&apos;80%).
+              Reach, click e nuovi abbonati dicono quanto traffico arriva; fan paganti e spesa per fan pagante quanto bene lo si monetizza; fan che scrivono quanti sono vivi in chat.
+              Due creator con la stessa reach ma revenue molto diverso hanno un potenziale non sfruttato, oppure un pubblico diverso: per il secondo caso vedi la <a href="/admin/creator-difficulty" style={{ color: CP.accent }}>difficoltà della creator</a>.
+              {byPerson && " Per creator le pagine (IT, EN…) sono sommate: un fan che paga su due pagine conta due volte."}
+              {" "}Non ci sono (ancora) gli abbonati attivi né le visualizzazioni delle mass: il warehouse non li registra in modo affidabile.
+            </>)}
+          </>
+        )}
+      </State>
+    </LkPage>
+  );
+}
