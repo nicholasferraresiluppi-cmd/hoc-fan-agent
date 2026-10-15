@@ -34,4 +34,11 @@ ok(!ov.includes("linksinbio"), "niente Links Visits (foglio Google non leggibile
 const cl = L.lkClicksSql(refs, [1], R);
 ok(cl.includes("FORMAT_DATE('%Y-%m', calendar_date) AS month") && cl.includes("DATE '2026-09-26'"), "Clicks: per mese, periodo prima incluso");
 ok(L.lkAmountRangeSql(refs, [1], R).includes("SUM(num_transactions)"), "fasce di importo: SUM(num_transactions)");
+// Confronto creator: lordo con gli abbonamenti, fan che scrivono = mittente fan, periodo prima di pari durata
+const cf = L.confrontoSql(refs, [1, 2, "x"], R);
+ok(cf.includes("SUM(IF(calendar_date >= DATE '2026-10-03', amount, 0)) AS gross") && !/\bnet\b/.test(cf), "lordo = amount, non net");
+ok(cf.includes("type IN ('subscription', 'recurring_subscription')"), "abbonamenti dentro il lordo e separati");
+ok(cf.includes("sender_id = user_id"), "fan che scrivono: solo messaggi del fan");
+ok(cf.includes("DATE '2026-09-26'") && cf.includes("UNNEST([1,2])"), "periodo prima + id validati");
+assert.throws(() => L.confrontoSql(refs, [], R)); n++;
 console.log(`looker-sql: ${n} asserzioni ok`);
