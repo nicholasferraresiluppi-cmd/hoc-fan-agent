@@ -41,4 +41,9 @@ ok(cf.includes("type IN ('subscription', 'recurring_subscription')"), "abbonamen
 ok(cf.includes("sender_id = user_id"), "fan che scrivono: solo messaggi del fan");
 ok(cf.includes("DATE '2026-09-26'") && cf.includes("UNNEST([1,2])"), "periodo prima + id validati");
 assert.throws(() => L.confrontoSql(refs, [], R)); n++;
+ok(cf.includes("COUNT(DISTINCT IF(revenue > 0, user_key, NULL)) AS ns_conv"), "nuovi che hanno pagato = come Analisi vendite");
+const tf = L.confrontoTopFansSql(refs, [1, 2, 3], R, [[1, 0], [2, 0], [3, "x"], ["1 OR 1=1", 1]]);
+ok(tf.includes("STRUCT(1 AS creator_id, 0 AS grp), STRUCT(2 AS creator_id, 0 AS grp)") && !tf.includes("OR 1=1") && !tf.includes("STRUCT(3"), "gruppi solo interi validi");
+ok(tf.includes("PARTITION BY grp") && tf.includes("rk <= 10"), "top 10 del gruppo sulla spesa sommata");
+assert.throws(() => L.confrontoTopFansSql(refs, [1], R, [])); n++;
 console.log(`looker-sql: ${n} asserzioni ok`);

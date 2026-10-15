@@ -280,6 +280,9 @@ export function lkNewsubsCreatorSql(refs, ids, range) {
  *  - click e abbonati dai link = links_stats.clicks_diff / subs_diff (come Clicks Overall);
  *  - fan che scrivono = user_id distinti che hanno mandato almeno un messaggio (onlyfans.chat, sender_id = user_id;
  *    tabella a taglio giornaliero 05:00 UTC, quindi l'ultimo giorno può essere parziale).
+ *  - nuovi che hanno pagato = nuovi abbonati del periodo (hoc.newsubs_spending_daily, user_key) con revenue > 0, stessa
+ *    definizione di Analisi vendite ("Nuovi che hanno comprato"); solo periodo corrente: chi si è abbonato ieri ha avuto
+ *    meno tempo per pagare, quindi su periodi brevi il tasso è un po' più basso.
  * NON incluso di proposito: "abbonati attivi" (subscriptions_intervals non chiude mai gli intervalli: il 99,99% dei fan
  * mai passati risulta attivo) e visualizzazioni delle mass (il warehouse registra solo i destinatari, non le aperture).
  */
@@ -310,8 +313,35 @@ export function confrontoSql(refs, ids, range) {
           FROM \`${refs.chat}\`
           WHERE creator_id IN (${list}) AND sender_id = user_id
             AND created_at >= TIMESTAMP(${d(p.from)}) AND created_at < TIMESTAMP(DATE_ADD(${d(range.to)}, INTERVAL 1 DAY))
-          GROUP BY 1)
-    SELECT ids.creator_id, t.* EXCEPT (creator_id), s.* EXCEPT (creator_id), r.* EXCEPT (creator_id), l.* EXCEPT (creator_id), c.* EXCEPT (creator_id)
+          GROUP BY 1),
+    ns AS (SELECT creator_id, COUNT(DISTINCT user_key) AS ns_subs, COUNT(DISTINCT IF(revenue > 0, user_key, NULL)) AS ns_conv
+          FROM \`${refs.newsubs}\` WHERE creator_id IN (${list}) AND calendar_date BETWEEN ${d(range.from)} AND ${d(range.to)} GROUP BY 1)
+    SELECT ids.creator_id, t.* EXCEPT (creator_id), s.* EXCEPT (creator_id), r.* EXCEPT (creator_id), l.* EXCEPT (creator_id),
+      c.* EXCEPT (creator_id), ns.* EXCEPT (creator_id)
     FROM ids LEFT JOIN t USING (creator_id) LEFT JOIN s USING (creator_id) LEFT JOIN r USING (creator_id)
-      LEFT JOIN l USING (creator_id) LEFT JOIN c USING (creator_id)`;
+      LEFT JOIN l USING (creator_id) LEFT JOIN c USING (creator_id) LEFT JOIN ns USING (creator_id)`;
+}
+
+/**
+ * Confronto creator — quanto del lordo viene dai 10 fan che hanno speso di più nel periodo (fragilità dell'incasso).
+ * Due livelli nello stesso risultato: per pagina (`lvl = 'page'`, k = creator_id) e per creator-persona (`lvl = 'group'`,
+ * k = indice del gruppo): nel gruppo la spesa di un fan si somma sulle sue pagine PRIMA di prendere i 10 migliori,
+ * quindi non è la somma delle quote per pagina. `groups` = [[creator_id, indice], …] (interi, validati qui).
+ * Denominatore = lordo con un fan noto (user_id non nullo).
+ */
+export function confrontoTopFansSql(refs, ids, range, groups) {
+  const list = idList(ids);
+  const pairs = (groups || []).map(([c, g]) => [Number(c), Number(g)]).filter(([c, g]) => Number.isInteger(c) && c > 0 && Number.isInteger(g) && g >= 0);
+  if (!pairs.length) throw new Error("nessun gruppo");
+  return `
+    WITH g AS (SELECT * FROM UNNEST([${pairs.map(([c, gi]) => `STRUCT(${c} AS creator_id, ${gi} AS grp)`).join(", ")}])),
+    u AS (SELECT creator_id, user_id, SUM(amount) AS s FROM \`${refs.attributed}\`
+          WHERE creator_id IN (${list}) AND calendar_date BETWEEN ${d(range.from)} AND ${d(range.to)} AND user_id IS NOT NULL
+          GROUP BY 1, 2),
+    gu AS (SELECT grp, user_id, SUM(s) AS s FROM u JOIN g USING (creator_id) GROUP BY 1, 2)
+    SELECT 'page' AS lvl, creator_id AS k, SUM(s) AS fan_gross, SUM(IF(rk <= 10, s, 0)) AS top10
+    FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY creator_id ORDER BY s DESC) AS rk FROM u) GROUP BY 2
+    UNION ALL
+    SELECT 'group' AS lvl, grp AS k, SUM(s) AS fan_gross, SUM(IF(rk <= 10, s, 0)) AS top10
+    FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY grp ORDER BY s DESC) AS rk FROM gu) GROUP BY 2`;
 }

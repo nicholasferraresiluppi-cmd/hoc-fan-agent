@@ -21,10 +21,11 @@ import {
   diagnosiSql, diagnosiDailySql,
 } from "@/lib/analisi-vendite-sql";
 import { buildDiagnosi, summaryOf, personOf } from "@/lib/analisi-vendite-diagnosi";
+import { withLettura } from "@/lib/confronto-lettura";
 import {
   lkRecapDailyNetSql, lkRecapDailySubsSql, lkClicksSql, lkWelcomeDailySql, lkPerfSql, lkSubsRangeSql, lkAmountRangeSql,
   lkTxSummarySql, lkTxSeriesSql, lkTxTopUsersSql, lkTxListSql, lkUsersSql, lkChargebacksSql, lkOverallSql, lkOverallDailySql,
-  lkNewsubsDailySql, lkNewsubsListSql, lkNewsubsCreatorSql, confrontoSql,
+  lkNewsubsDailySql, lkNewsubsListSql, lkNewsubsCreatorSql, confrontoSql, confrontoTopFansSql,
 } from "@/lib/looker-sql";
 import { personKey } from "@/lib/live-creators";
 import { getLiveCreators } from "@/lib/live-creators-store";
@@ -397,12 +398,19 @@ function shape(view, rows, names, range, live) {
       }).sort((a, b) => b.cr - a.cr),
     };
   }
-  if (view === "confronto") return confrontoShape(rows[0], nameOf, range);
+  if (view === "confronto") return confrontoShape(rows[0], rows[1], nameOf, range);
   throw new Error("vista sconosciuta");
 }
 
 /* Confronto creator: le somme (pagina o persona) e i rapporti derivati, ognuno col suo % Δ. */
-const CMP_SUMS = ["gross", "sub_gross", "payers", "subs", "reach", "clicks", "link_subs", "writers"];
+// ns_* (nuovi abbonati e quanti hanno pagato) esistono solo nel periodo corrente: il loro _prev resta 0 → nessun % Δ
+const CMP_SUMS = ["gross", "sub_gross", "payers", "subs", "reach", "clicks", "link_subs", "writers", "ns_subs", "ns_conv"];
+/** Creator-persona → indice (ordine alfabetico): lo stesso nella query dei 10 fan migliori e nella forma della risposta. */
+function personGroups(ids, nameOf) {
+  const persons = [...new Set(ids.map((id) => personOf(nameOf(id))))].sort((a, b) => a.localeCompare(b, "it"));
+  const idx = new Map(persons.map((p, i) => [p, i]));
+  return { idx, pairs: ids.map((id) => [Number(id), idx.get(personOf(nameOf(id)))]) };
+}
 function cmpRow(base) {
   const ratio = (a, b) => (b ? a / b : null);
   const row = { ...base, gross: r2(base.gross), sub_gross: r2(base.sub_gross) };
@@ -413,13 +421,19 @@ function cmpRow(base) {
   const crPrev = ratio(base.link_subs_prev, base.clicks_prev);
   row.cr_delta = row.cr != null && crPrev ? (row.cr - crPrev) / crPrev : null;
   row.sub_share = ratio(base.sub_gross, base.gross);
+  row.conv = ratio(base.ns_conv, base.ns_subs);
+  row.eff = base.reach ? (base.gross / base.reach) * 1000 : null;
+  row.top10_share = base.fan_gross ? base.top10 / base.fan_gross : null;
   return row;
 }
-function confrontoShape(agg, nameOf, range) {
+function confrontoShape(agg, topFans, nameOf, range) {
+  const top = { page: new Map(), group: new Map() };
+  for (const r of topFans || []) top[r.lvl]?.set(Number(r.k), { fan_gross: Number(r.fan_gross) || 0, top10: Number(r.top10) || 0 });
+  const groups = personGroups(agg.map((r) => Number(r.creator_id)), nameOf);
   const pages = agg.map((r) => {
     const base = { creator_id: Number(r.creator_id), name: nameOf(r.creator_id) };
     for (const k of CMP_SUMS) { base[k] = Number(r[k]) || 0; base[`${k}_prev`] = Number(r[`${k}_prev`]) || 0; }
-    return base;
+    return { ...base, ...(top.page.get(base.creator_id) || { fan_gross: 0, top10: 0 }) };
   });
   const sum = (list, extra) => list.reduce((a, r) => {
     for (const k of CMP_SUMS) { a[k] += r[k]; a[`${k}_prev`] += r[`${k}_prev`]; }
@@ -428,10 +442,18 @@ function confrontoShape(agg, nameOf, range) {
   // persona = le sue pagine (IT/EN/…) sommate. I fan si sommano per pagina: chi paga su due pagine conta due volte.
   const byPerson = new Map();
   for (const r of pages) { const n = personOf(r.name); if (!byPerson.has(n)) byPerson.set(n, []); byPerson.get(n).push(r); }
-  const persons = [...byPerson].map(([name, list]) => cmpRow(sum(list, { name, creator_ids: list.map((r) => r.creator_id), pages: list.length })));
+  // i 10 fan migliori della persona vengono dalla query a livello di gruppo (spesa sommata sulle pagine), non dalle pagine
+  const persons = [...byPerson].map(([name, list]) => cmpRow(sum(list, {
+    name, creator_ids: list.map((r) => r.creator_id), pages: list.length,
+    ...(top.group.get(groups.idx.get(name)) || { fan_gross: 0, top10: 0 }),
+  })));
+  const byPage = withLettura(pages.map(cmpRow));
+  const byPersona = withLettura(persons);
   return {
-    rows: pages.map(cmpRow).sort((a, b) => b.gross - a.gross),
-    persons: persons.sort((a, b) => b.gross - a.gross),
+    rows: byPage.rows.sort((a, b) => b.gross - a.gross),
+    persons: byPersona.rows.sort((a, b) => b.gross - a.gross),
+    // la "creator tipica" citata nelle righe di lettura (mediane delle righe mostrate, per vista)
+    medians: { rows: byPage.medians, persons: byPersona.medians },
     total: cmpRow(sum(pages, { name: "Totale" })),
     previous: previousRange(range),
   };
@@ -450,7 +472,7 @@ const BUILDERS = {
   welcome: (refs, ids, range) => [welcomeSql(refs, ids, range)],
   "ricerca-fan": (refs, ids, range, q) => [ricercaSql(refs, ids, q)],
   diagnosi: (refs, ids, range) => [diagnosiSql(refs, ids, range), diagnosiDailySql(refs, ids, range)],
-  confronto: (refs, ids, range) => [confrontoSql(refs, ids, range)],
+  confronto: (refs, ids, range, q, f, nameOf) => [confrontoSql(refs, ids, range), confrontoTopFansSql(refs, ids, range, personGroups(ids, nameOf).pairs)],
   "lk-recap": (refs, ids, range) => [recapSql(refs, ids, range), lkRecapDailyNetSql(refs, ids, range), lkRecapDailySubsSql(refs, ids, range)],
   "lk-clicks": (refs, ids, range) => [lkClicksSql(refs, ids, range)],
   "lk-welcome": (refs, ids, range) => [welcomeSql(refs, ids, range), lkWelcomeDailySql(refs, ids, range)],
@@ -481,14 +503,14 @@ export async function getAnalisi(view, ids, query = {}, { force = false } = {}) 
   // filtri delle pagine Looker (link, utente, tipo, spending, username, pagamento): validati nelle query
   const f = Object.fromEntries(Object.entries(query.f || {}).filter(([, v]) => v != null && String(v).trim() !== "").map(([k, v]) => [k, String(v).trim().slice(0, 80)]));
   const fk = Object.keys(f).sort().map((k) => `${k}=${f[k]}`).join("&");
-  const key = `analisi:v5:${view}:${range.from}:${range.to}:${q || ""}:${fk}:${[...ids].sort((a, b) => a - b).join(",")}`;
+  const key = `analisi:v6:${view}:${range.from}:${range.to}:${q || ""}:${fk}:${[...ids].sort((a, b) => a - b).join(",")}`;
   if (!force) {
     const hit = await kv.get(key).catch(() => null);
     if (hit) return { ...hit, cached: true };
   }
   const creators = await splitCreators();
   const names = Object.fromEntries(creators.map((c) => [c.id, c.name]));
-  const { source, rows } = await runOnSource((refs) => BUILDERS[view](refs, ids, range, q, f), view.startsWith("lk-") || view === "confronto" ? { maxBytesBilled: 20 * 1024 ** 3, timeoutMs: 45_000 } : undefined);
+  const { source, rows } = await runOnSource((refs) => BUILDERS[view](refs, ids, range, q, f, (id) => names[Number(id)] || `Creator ${id}`), view.startsWith("lk-") || view === "confronto" ? { maxBytesBilled: 20 * 1024 ** 3, timeoutMs: 45_000 } : undefined);
   const out = { view, range, source, computed_at: new Date().toISOString(), ...(q ? { q } : {}), ...(fk ? { filters: f } : {}), ...shape(view, rows, names, range, await getLiveCreators().catch(() => [])) };
   await kv.set(key, out, { ex: 600 }).catch(() => {});
   return out;
