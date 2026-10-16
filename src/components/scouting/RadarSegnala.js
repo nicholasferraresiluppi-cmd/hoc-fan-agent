@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { CP } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
+import { useIsPhone } from "@/lib/use-phone";
 import { btn, btnPrimary, input, SERIF } from "./radar-ui";
 
 export default function RadarSegnala({ open, onClose, me, onSent }) {
@@ -13,6 +14,7 @@ export default function RadarSegnala({ open, onClose, me, onSent }) {
   const [msg, setMsg] = useState(null);
   const [token, setToken] = useState(null);
   const [copied, setCopied] = useState(false);
+  const phone = useIsPhone();
 
   async function send(e) {
     e.preventDefault();
@@ -45,7 +47,7 @@ export default function RadarSegnala({ open, onClose, me, onSent }) {
       <form onSubmit={send} style={{ display: "grid", gap: 12 }}>
         <p style={{ margin: 0, ...SERIF, fontStyle: "italic", fontSize: 20, color: CP.textSecondary }}>Incolla il link del profilo o di un reel. Al resto pensa il radar.</p>
         <label htmlFor="rs-link" style={{ fontSize: 13, color: CP.textSecondary }}>Link del profilo o del reel</label>
-        <input id="rs-link" value={text} onChange={(e) => setText(e.target.value)} placeholder="https://www.instagram.com/…" style={input} autoFocus />
+        <input id="rs-link" value={text} onChange={(e) => setText(e.target.value)} placeholder="https://www.instagram.com/…" style={input} autoFocus={!phone} inputMode="url" autoCapitalize="off" autoCorrect="off" />
         <label htmlFor="rs-why" style={{ fontSize: 13, color: CP.textSecondary }}>Perché ti ha colpito (facoltativo)</label>
         <input id="rs-why" value={why} onChange={(e) => setWhy(e.target.value)} placeholder="es. personaggio fisso, reel virale" style={input} />
         <button type="submit" style={{ ...btnPrimary, justifyContent: "center" }} disabled={busy || !text.trim()}>{busy ? "Invio…" : "Segnala"}</button>
@@ -53,8 +55,9 @@ export default function RadarSegnala({ open, onClose, me, onSent }) {
         <p style={{ margin: 0, fontSize: 12.5, color: CP.textMuted }}>Il radar legge numeri e prima storia in evidenza (~3 centesimi). Se era già nel radar aggiunge solo la segnalazione.</p>
       </form>
 
-      <div style={{ borderTop: `1px solid ${CP.border}`, marginTop: 20, paddingTop: 16, display: "grid", gap: 10 }}>
-        <strong style={{ fontWeight: 600, fontSize: 15 }}>Dall&apos;iPhone, con un tocco</strong>
+      <details style={{ borderTop: `1px solid ${CP.border}`, marginTop: 20, paddingTop: 14 }}>
+        <summary style={{ cursor: "pointer", fontWeight: 500, fontSize: 15, color: CP.textPrimary, padding: "6px 0" }}>Dall&apos;iPhone, con un tocco</summary>
+        <div style={{ display: "grid", gap: 10, marginTop: 8 }}>
         <p style={{ margin: 0, fontSize: 14, color: CP.textSecondary }}>Installa il Comando rapido «Radar HOC»: da un reel o un profilo su Instagram, Condividi → Radar HOC, e la creator arriva qui.</p>
         <ol style={{ margin: 0, paddingLeft: 20, listStyle: "decimal", fontSize: 14, color: CP.textSecondary, display: "grid", gap: 4 }}>
           <li>Crea la tua chiave personale (si mostra una volta sola).</li>
@@ -69,7 +72,8 @@ export default function RadarSegnala({ open, onClose, me, onSent }) {
         ) : (
           <button type="button" style={{ ...btn, justifyContent: "center" }} disabled={busy} onClick={makeToken}>Crea la mia chiave</button>
         )}
-      </div>
+        </div>
+      </details>
     </Modal>
   );
 }
