@@ -172,7 +172,7 @@ export default function ScoutingPage() {
         ) : tab === "contatti" ? (
           <RadarContatti creators={creators} onOpen={(c) => go("contatti", c.handles[0])} />
         ) : (
-          <RadarOggi newCut={newCut} data={data} creators={creators} profilesBy={profilesBy} onOpen={(c) => go("oggi", c.handles[0])} act={act} busy={busy} inbox={inbox} onSegnala={() => setSegnala(true)} onValuta={() => go("valuta")} />
+          <RadarOggi newCut={newCut} data={data} creators={creators} profilesBy={profilesBy} onOpen={(c) => go("oggi", c.handles[0])} act={act} busy={busy} inbox={inbox} onSegnala={() => setSegnala(true)} onValuta={() => go("valuta")} onReload={mutate} />
         )
       )}
 

@@ -17,7 +17,7 @@
 // 36 ore e si riprendono quando servono. Nessuna copia dei video: la scheda li riproduce
 // dal server di Instagram (che li serve anche ad altri siti: cross-origin).
 import { getProfiles, saveProfiles, getForgotten, getCrm, saveCrm, getReelMedia, setReelMedia } from "@/lib/scouting-store";
-import { normHandle, parseRefreshItem, parseInstagramLink, bestLink, linkOrHint, sigFromLink, signalWhat, weekKey, addNote, creatorIdOf } from "@/lib/scouting-core";
+import { normHandle, parseRefreshItem, parseInstagramLink, bestLink, linkOrHint, sigFromLink, signalWhat, parseHighlightRows, weekKey, addNote, creatorIdOf } from "@/lib/scouting-core";
 
 const API = "https://api.apify.com/v2";
 
@@ -112,22 +112,10 @@ async function fetchFirstHighlight(h) {
     operationMode: "highlightsByUsername", usernames: [h], maxAccounts: 1, includeHighlightItems: true,
     maxHighlightsPerAccount: 1, analyzeFrames: false, maxAnalyzedPerAccount: 0, skipPrivate: true,
   }, { maxUsd: 0.05, timeout: 120 });
-  // nessuna riga = l'attore non ha letto niente (nemmeno "nessuna evidenza"): è un fallimento
-  if (!rows.length) throw new Error("evidenza non letta");
-  const urls = new Set();
-  const mentions = new Set();
-  for (const r of rows) {
-    const ls = r.linkStickers;
-    // l'attore a volte restituisce l'elenco come testo in stile Python ("[{'url': '…'}]")
-    if (typeof ls === "string") for (const m of ls.matchAll(/['"]url['"]\s*:\s*['"]([^'"]+)['"]/g)) urls.add(m[1]);
-    else for (const l of Array.isArray(ls) ? ls : []) if (l?.url) urls.add(l.url);
-    const ms = r.mentions;
-    if (typeof ms === "string") for (const m of ms.matchAll(/['"]username['"]\s*:\s*['"]([^'"]+)['"]/g)) mentions.add(normHandle(m[1]));
-    else for (const m of Array.isArray(ms) ? ms : []) if (m?.username) mentions.add(normHandle(m.username));
-  }
-  mentions.delete(h);
-  mentions.delete("");
-  return { urls: [...urls].slice(0, 5), mentions: [...mentions].slice(0, MAX_VIA) };
+  const r = parseHighlightRows(rows, { maxMentions: MAX_VIA }).get(h);
+  // l'attore risponde sempre con una riga per account: né letto né privato/sparito = non letta
+  if (!r?.read && !r?.gone) throw new Error("evidenza non letta");
+  return { urls: r.urls, mentions: r.mentions };
 }
 
 const MAX_VIA = 3;

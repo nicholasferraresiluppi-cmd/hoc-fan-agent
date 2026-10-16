@@ -2,13 +2,13 @@
 // Radar creator — vista "Oggi": il lavoro della mattina. Tre creator da guardare (scelte da
 // fatti del radar: profilo a pagamento, format, crescita, novità), chi si muove, il percorso,
 // le ultime segnalazioni e da dove vengono i dati.
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CP, alpha } from "@/lib/brand";
 import { pickToday, movers, whyLines, reviewQueue } from "@/lib/scouting-core";
 import { SERIF, NUM, fmtFull, fmtDate, btn, btnPrimary, btnQuiet, Initials, LinkChip, Growth, Spark, H2, BigNum, STAGE_LABEL } from "./radar-ui";
 
 
-export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, act, busy, inbox, onSegnala, onValuta }) {
+export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, act, busy, inbox, onSegnala, onValuta, onReload }) {
   const today = useMemo(() => pickToday(creators, { n: 3, newCut }), [creators, newCut]);
   const moving = useMemo(() => movers(creators, 5), [creators]);
   const counts = data.counts || {};
@@ -138,6 +138,8 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
         )}
       </section>
 
+      {data.canAdmin && <HlReread st={data.hlReread} onReload={onReload} />}
+
       <footer style={{ display: "flex", flexWrap: "wrap", gap: "6px 28px", fontSize: 13, color: CP.textMuted, borderTop: `1px solid ${CP.borderSoft || CP.border}`, paddingTop: 16 }}>
         <span>{ref.lastCompletedAt ? `Ultimo giro dei numeri: ${fmtDate(ref.lastCompletedAt)}${ref.lastUpdated ? `, ${fmtFull(ref.lastUpdated)} account letti` : ""}` : "Numeri della ricerca di ottobre"}</span>
         <span>{ref.pausedUntil && Date.now() < ref.pausedUntil ? `Giro settimanale in pausa fino al ${fmtDate(ref.pausedUntil)}` : "Giro settimanale attivo"}</span>
@@ -153,5 +155,63 @@ function Fig({ v, l }) {
       <div style={{ fontSize: 19, ...NUM }}>{v}</div>
       <div style={{ fontSize: 12.5, color: CP.textMuted }}>{l}</div>
     </div>
+  );
+}
+
+const usd = (v) => `${(Number(v) || 0).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
+
+/**
+ * Rilettura delle prime storie in evidenza (16/10/2026, solo admin): rilegge una volta le creator
+ * ancora da valutare senza profilo a pagamento, seguendo anche gli account taggati.
+ */
+function HlReread({ st, onReload }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const running = st?.status === "in_corso";
+  useEffect(() => {
+    if (!running || !onReload) return undefined;
+    const t = setInterval(() => onReload(), 30000);
+    return () => clearInterval(t);
+  }, [running, onReload]);
+  async function send(action) {
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch("/api/admin/scouting/hl-reread", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `Errore ${r.status}`);
+      onReload?.();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const found = st?.found || {};
+  const tally = st?.status ? `${fmtFull(st.done || 0)} di ${fmtFull(st.total || 0)} rilette · ${fmtFull(found.link || 0)} con un link e ${fmtFull(found.tag || 0)} con un tag nella prima storia${found.forte ? ` · ${fmtFull(found.forte)} col profilo a pagamento` : ""} · spesi ${usd(st.spentUsd)} su ${usd(st.capUsd)}` : null;
+  const extra = st?.status && (st.gone || st.failed) ? `${st.gone ? `${fmtFull(st.gone)} private o sparite` : ""}${st.gone && st.failed ? " · " : ""}${st.failed ? `${fmtFull(st.failed)} non lette per errore di Instagram` : ""}` : null;
+  const head = !st?.status ? "Rileggi le prime storie in evidenza"
+    : running ? "Rilettura delle prime storie in evidenza in corso"
+    : st.status === "fatta" ? `Rilettura finita il ${fmtDate(st.endedAt)}`
+    : st.status === "tetto" ? "Rilettura fermata: raggiunto il tetto di spesa"
+    : "Rilettura fermata";
+  return (
+    <section aria-labelledby="r-hlr" style={{ display: "flex", flexDirection: "column", gap: 10, borderTop: `1px solid ${CP.borderSoft || CP.border}`, paddingTop: 18 }}>
+      <h3 id="r-hlr" style={{ margin: 0, fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>{head}</h3>
+      <p style={{ margin: 0, fontSize: 14, color: CP.textSecondary, maxWidth: 760 }}>
+        {!st?.status
+          ? "Le creator ancora da valutare e senza profilo a pagamento vengono rilette una volta, seguendo anche gli account taggati nella prima storia in evidenza. Chi ha un link o un tag finisce in Esplora › Indizi da verificare. Circa 2 centesimi a creator, tetto 25 $."
+          : tally}
+      </p>
+      {extra && <p style={{ margin: 0, fontSize: 13, color: CP.textMuted }}>{extra}</p>}
+      {st?.lastError && running && <p style={{ margin: 0, fontSize: 13, color: CP.attn }}>Ultimo intoppo: {st.lastError} — il giro riprova da solo.</p>}
+      {err && <p role="alert" style={{ margin: 0, fontSize: 13, color: CP.attn }}>{err}</p>}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {running
+          ? <button style={btn} disabled={busy} onClick={() => send("stop")}>Ferma</button>
+          : st?.status === "fatta"
+            ? null
+            : <button style={btn} disabled={busy} onClick={() => send("start")}>{st?.status ? "Rileggi quelle rimaste" : "Avvia la rilettura"}</button>}
+      </div>
+    </section>
   );
 }

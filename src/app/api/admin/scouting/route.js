@@ -5,6 +5,7 @@ import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { getProfiles, getCrm, getRefreshState } from "@/lib/scouting-store";
 import { buildCreators, stageCounts, suggestLinks, creatorIdOf, STAGES } from "@/lib/scouting-core";
 import { apifyConfigured } from "@/lib/scouting-refresh";
+import { getHlReread, hlRereadSummary } from "@/lib/scouting-hlreread";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const az = await authorize(CAPABILITIES.SCOUTING_USE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
-  const [profiles, crm, refresh] = await Promise.all([getProfiles(), getCrm(), getRefreshState()]);
+  const [profiles, crm, refresh, hlr, admin] = await Promise.all([getProfiles(), getCrm(), getRefreshState(), getHlReread(), authorize(CAPABILITIES.SEED)]);
   const creators = buildCreators(profiles, crm);
   const suggestions = suggestLinks(profiles, (h) => creatorIdOf(crm, h), new Set(crm.dismissed || []));
   // i profili viaggiano interi (servono alla scheda), senza bio: la scheda mostra il link al profilo
@@ -25,5 +26,7 @@ export async function GET() {
     notes: Object.fromEntries(Object.entries(crm.creators || {}).filter(([, c]) => c.notes?.length).map(([id, c]) => [id, c.notes])),
     suggestions,
     refresh: { ...refresh, configured: apifyConfigured() },
+    // rilettura delle prime evidenze: solo agli admin (avvio/stop sono SEED)
+    ...(admin.ok ? { hlReread: hlRereadSummary(hlr) || { status: null }, canAdmin: true } : {}),
   });
 }
