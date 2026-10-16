@@ -27,6 +27,9 @@ export const TUTORIAL_VIDEOS = [
   { id: "hoc-hr", group: "HR", title: "Persone, contratti e accessi", summary: "Persone e Link del modulo, la scheda, Controllo contratti, l'uscita che chiude Membri e Team, Contestazioni, Assessment candidati.", src: "/video/hoc-pro-hr-persone.mp4", poster: "/video/hoc-pro-hr-persone.jpg", orientation: "landscape", durationSec: 137, audience: "Team HR", adminOnly: true, asOf: "2026-10-14" },
   { id: "hoc-board-soldi", group: "Board", title: "Andamento e soldi", summary: "Oggi, P&L Live, Calendario compensi, Anomalie compensi ed Esame creator, Incassi Infloww, Classifica vendite.", src: "/video/hoc-pro-board-soldi.mp4", poster: "/video/hoc-pro-board-soldi.jpg", orientation: "landscape", durationSec: 120, audience: "Board", adminOnly: true, asOf: "2026-10-14" },
   { id: "hoc-board-decisioni", group: "Board", title: "Le persone e le decisioni", summary: "La Sede, Controllo qualità, La città e la Roadmap: se l'azienda lavora, dove guardare, cosa decidere.", src: "/video/hoc-pro-board-decisioni.mp4", poster: "/video/hoc-pro-board-decisioni.jpg", orientation: "landscape", durationSec: 115, audience: "Board", adminOnly: true, asOf: "2026-10-14" },
+  // Radar creator (16/10/2026): 9:16 perché i social media manager lo usano dal telefono. Il pulsante
+  // «Come funziona» è nell'intestazione di /admin/scouting (lo vede anche il ruolo smm, che non apre /guida).
+  { id: "radar-smm", title: "Il Radar creator per i social media manager", summary: "Oggi, Valuta (Scarta / Vista / Interessante), Segnala dal telefono con Condividi → HOC Pro, Esplora e la scheda, Format e Mercato, Le nostre creator.", src: "/video/hoc-pro-radar-smm.mp4", poster: "/video/hoc-pro-radar-smm.jpg", orientation: "portrait", durationSec: 124, audience: "Social media manager", adminOnly: true, asOf: "2026-10-16" },
   {
     id: "persone-hr",
     title: "Persone HR: come si usa il CRM",

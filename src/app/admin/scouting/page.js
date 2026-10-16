@@ -13,6 +13,7 @@ import useSWR from "swr";
 import { useUser } from "@clerk/nextjs";
 import { CP } from "@/lib/brand";
 import { PageHead, Notice } from "@/components/ds";
+import { TutorialVideoButton } from "@/components/TutorialVideo";
 import RadarOggi from "@/components/scouting/RadarOggi";
 import RadarEsplora from "@/components/scouting/RadarEsplora";
 import RadarScheda from "@/components/scouting/RadarScheda";
@@ -139,7 +140,7 @@ export default function ScoutingPage() {
         title="Radar creator"
         line2={line2}
         subtitle={sel ? null : "Le creator italiane trovate su Instagram, una scheda per persona, seguite settimana per settimana."}
-        actions={<button style={btnPrimary} onClick={() => setSegnala(true)}>Segnala una creator</button>}
+        actions={<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}><TutorialVideoButton id="radar-smm" /><button style={btnPrimary} onClick={() => setSegnala(true)}>Segnala una creator</button></div>}
       />
 
       {!sel && (
