@@ -41,6 +41,7 @@ const MANAGER = [
   { title: "Agenzia", items: [
     { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
     { href: "/leaderboard/creators", label: "Creator" },
+    { href: "/admin/bilancio", label: "Bilancio del mese" },
     { href: "/admin/le-mie-creator", label: "Revenue e chat" },
     { href: "/admin/analisi-vendite", label: "Analisi vendite" },
     { href: "/admin/fan-da-recuperare", label: "Fan da recuperare" },

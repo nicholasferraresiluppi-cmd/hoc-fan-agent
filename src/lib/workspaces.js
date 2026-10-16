@@ -27,6 +27,7 @@ export const WORKSPACES = {
       ] },
       // gruppi per DOMANDA (15/10/2026): prima 7 voci in fila, di cui 4 su "come vanno le creator" senza dire la differenza
       { title: "Le creator", items: [
+        { href: "/admin/bilancio", label: "Bilancio del mese", desc: "La classifica di tutte le creator dello split sul loro goal: venduto, ritmo, proiezione, entrate di oggi" },
         { href: "/admin/analisi-vendite", label: "Analisi vendite", desc: "Tutte a confronto sugli stessi numeri, come vanno e perché, scheda di ogni creator" },
         { href: "/admin/le-mie-creator", label: "Revenue e chat", desc: "Oggi, dal vivo: proiezione di fine mese, benvenuto, fan senza risposta, latenza" },
       ] },
@@ -64,6 +65,7 @@ export const WORKSPACES = {
         { href: "/admin/alerts", label: "Alert operativi", badge: true },
       ] },
       { title: "Vendite", items: [
+        { href: "/admin/bilancio", label: "Bilancio del mese", desc: "La classifica di tutte le creator dello split sul loro goal: venduto, ritmo, proiezione, entrate di oggi" },
         { href: "/admin/analisi-vendite", label: "Analisi vendite", desc: "Le tue creator a confronto, come vanno e perché, scheda di ogni creator" },
         { href: "/admin/fan-da-recuperare", label: "Fan da recuperare", desc: "Ogni mattina i fan che spendevano e si sono fermati, con una bozza di ripresa personale" },
         { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
