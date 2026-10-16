@@ -24,8 +24,7 @@ import {
   BookMarked,
   LineChart,
   FileSignature,
-  Landmark,
-} from "lucide-react";
+  Landmark, Repeat } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
 import { WORKSPACES, workspaceSections } from "@/lib/workspaces";
@@ -55,6 +54,7 @@ const SHORTCUT_GROUPS_RAW = [
     label: "Compensi e margini",
     items: [
       { href: "/admin/pnl-live",          title: "P&L Live",            desc: "Per creator: venduto e costo degli operatori, anche sul mese in corso", icon: Wallet },
+      { href: "/admin/retention",         title: "Retention fan",       desc: "Per pagina dello split: dipendenza dai fan più grossi, fan di valore in pausa, nuovi che tornano", icon: Repeat },
       { href: "/admin/comp-calendar",     title: "Calendario compensi", desc: "Quanto costa ogni giorno di turni e perché, con simulatore", icon: Calendar },
       { href: "/admin/profiles-compare",  title: "Scaglioni a confronto", desc: "Standardizzazione dei profili di pagamento", icon: Scale },
     ],

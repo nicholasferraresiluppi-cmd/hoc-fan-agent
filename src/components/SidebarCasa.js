@@ -50,6 +50,7 @@ const MANAGER = [
     { href: "/admin/s4s", label: "Calendario S4S" },
     { href: "/admin/telegram", label: "Canali Telegram" },
     { href: "/admin/pnl-live", label: "P&L" },
+    { href: "/admin/retention", label: "Retention fan" },
     { href: "/admin/looker", label: "Report Looker" },
   ] },
   { title: "Il mio quadro", items: [

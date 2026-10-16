@@ -2,7 +2,8 @@
  * /api/contabilita/split/dati?m=YYYY-MM — PROPOSTA di revenue e costo chatter del mese per team,
  * da precompilare (si può sempre correggere a mano):
  *  - revenue $ = `attributed_transactions.net` del warehouse (netta della quota OnlyFans) sulle
- *    pagine del team (`creatorIds`). Su agosto 2026 coincide col foglio di Nicholas entro ~1-2%.
+ *    pagine del team (`creatorIds`), SOLO organizzazione HOC (il warehouse è multi-agenzia: alcune
+ *    pagine stanno in due org). Su agosto 2026 coincide col foglio di Nicholas entro ~1-2%.
  *  - chatter $ = buste CreatorsPro del mese, busta per busta (split-core `chatterFromWages`):
  *    turno con due modelle → costo diviso per venduto; con l'elenco delle buste per team e
  *    quante non sono ancora chiuse (il conto vero si fa quando sono chiuse tutte).
@@ -12,7 +13,7 @@ import { requireAccounting } from "@/lib/compensi-access";
 import { getSplitConfig } from "@/lib/split";
 import { isMonthId } from "@/lib/compensi-core";
 import { runOnSource } from "@/lib/analisi-vendite";
-import { bigQueryConfigured } from "@/lib/bigquery-api";
+import { bigQueryConfigured, HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
 import { getWages } from "@/lib/cp-wages-store";
 import { chatterFromWages } from "@/lib/split-core";
 
@@ -38,7 +39,7 @@ export async function GET(request) {
   const ids = [...new Set(teams.flatMap((t) => t.creatorIds || []))];
   if (ids.length && bigQueryConfigured()) {
     try {
-      const { rows } = await runOnSource((refs) => [`SELECT creator_id, SUM(net) AS net FROM \`${refs.attributed}\` WHERE creator_id IN (${ids.join(",")}) AND calendar_date BETWEEN DATE '${from}' AND DATE '${to}' GROUP BY 1`]);
+      const { rows } = await runOnSource((refs) => [`SELECT creator_id, SUM(net) AS net FROM \`${refs.attributed}\` WHERE creator_id IN (${ids.join(",")}) AND organization_id = '${HOC_ORGANIZATION_ID}' AND calendar_date BETWEEN DATE '${from}' AND DATE '${to}' GROUP BY 1`]);
       const byId = new Map(rows[0].map((r) => [Number(r.creator_id), Number(r.net) || 0]));
       for (const t of teams) if (t.creatorIds?.length) revenue[t.id] = Math.round(t.creatorIds.reduce((s, i) => s + (byId.get(i) || 0), 0) * 100) / 100;
     } catch (e) { notes.push(`Revenue dal warehouse non disponibile: ${e.message}`); }
