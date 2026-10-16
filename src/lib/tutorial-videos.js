@@ -30,6 +30,9 @@ export const TUTORIAL_VIDEOS = [
   // Radar creator (16/10/2026): 9:16 perché i social media manager lo usano dal telefono. Il pulsante
   // «Come funziona» è nell'intestazione di /admin/scouting (lo vede anche il ruolo smm, che non apre /guida).
   { id: "radar-smm", title: "Il Radar creator per i social media manager", summary: "Oggi, Valuta (Scarta / Vista / Interessante), Segnala dal telefono con Condividi → HOC Pro, Esplora e la scheda, Format e Mercato, Le nostre creator.", src: "/video/hoc-pro-radar-smm.mp4", poster: "/video/hoc-pro-radar-smm.jpg", orientation: "portrait", durationSec: 124, audience: "Social media manager", adminOnly: true, asOf: "2026-10-16" },
+  // Prova fedeltà (16/10/2026): 16:9 per il sales manager, pulsante «Come funziona» in /admin/prova-fedelta.
+  // Regola 3 ri-registrata il 16/10 (un'alternativa dopo un no; stop solo con difficoltà vera).
+  { id: "prova-fedelta", group: "Sales Manager", title: "La prova fedeltà su Martina Scavo", summary: "Perché la facciamo, come si dividono i fan, le regole per gli operatori, la lista Da fare adesso e come si legge la misura.", src: "/video/tutorial-prova-fedelta.mp4", poster: "/video/tutorial-prova-fedelta.jpg", orientation: "landscape", durationSec: 120, audience: "Sales Manager", leadsOnly: true, asOf: "2026-10-16" },
   {
     id: "persone-hr",
     title: "Persone HR: come si usa il CRM",

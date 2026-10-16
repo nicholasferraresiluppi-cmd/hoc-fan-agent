@@ -11,6 +11,7 @@ import useSWR from "swr";
 import { Loader2, RefreshCw, Copy, ExternalLink } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Notice } from "@/components/ds";
+import { TutorialVideoButton } from "@/components/TutorialVideo";
 
 const fetcher = async (url) => {
   const r = await fetch(url, { cache: "no-store" });
@@ -34,7 +35,10 @@ const PAGE = 30; // prima pagina della lista: chi la usa in turno parte dall'alt
 const REGOLE = [
   "Fan che scrive tanto: scena entro un'ora dal suo messaggio.",
   "La prima sera al massimo 2-3 proposte, poi un appuntamento per il giorno dopo («domani ti faccio vedere…»).",
-  "Se dice di no o parla di soldi (non può, è a fine mese, ha già speso): niente nuove proposte. Si continua a parlare, la vendita torna un altro giorno.",
+  // Regola 3 rivista il 16/10/2026 (decisione di Nicholas, prima dell'avvio): sui dati di Martina, dopo un no
+  // un'alternativa più bassa fa comprare il 53% entro 2 ore senza far perdere il fan; lo stop totale resta
+  // solo dove il fan è in difficoltà vera (protezione, non resa).
+  "Se dice di no: al massimo un'alternativa più bassa, presentata come un gesto per lui, poi basta per quella sera. Se racconta una difficoltà vera con i soldi (ha perso il lavoro, ha debiti, non arriva a fine mese): niente proposte, si parla e basta.",
   "Dal 7° giorno, ogni pochi giorni un messaggio personale senza vendita che riprende qualcosa che ti ha raccontato (lavoro, una partita, il viaggio).",
   "I fan «segnalati» (almeno 100 $ e acquisti in 2 giorni diversi nella prima settimana) li segue la persona migliore del turno.",
   "Vale solo per i fan in questa lista. Con tutti gli altri si lavora come sempre: è il confronto che ci dice se funziona.",
@@ -206,8 +210,8 @@ export default function ProvaFedeltaPage() {
       <PageHead
         crumbs={[{ label: "Agenzia" }, { label: "Prova fedeltà" }]}
         title="Prova fedeltà · Martina Scavo"
-        subtitle="Metà dei fan nuovi e caldi di Martina, scelti a caso, riceve un trattamento diverso: meno proposte la prima sera, niente insistenza, attenzione personale nei giorni dopo. L'altra metà come sempre. Così vediamo se diventano clienti più fedeli."
-        actions={<button style={btn} onClick={refresh} disabled={busy || !data?.config}>{busy ? <Loader2 size={14} /> : <RefreshCw size={14} />}Aggiorna</button>}
+        subtitle="Metà dei fan nuovi e caldi di Martina, scelti a caso, riceve un trattamento diverso: meno proposte la prima sera, un solo rilancio dopo un no, attenzione personale nei giorni dopo. L'altra metà come sempre. Così vediamo se diventano clienti più fedeli."
+        actions={<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}><TutorialVideoButton id="prova-fedelta" /><button style={btn} onClick={refresh} disabled={busy || !data?.config}>{busy ? <Loader2 size={14} /> : <RefreshCw size={14} />}Aggiorna</button></div>}
       />
       {error && <Notice danger>{error.message}</Notice>}
       {isLoading && <div style={{ color: CP.textMuted, display: "flex", gap: 8, alignItems: "center" }}><Loader2 size={14} />Leggo le chat di Martina (fino a mezzo minuto)…</div>}
