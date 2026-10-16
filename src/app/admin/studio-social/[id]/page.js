@@ -5,8 +5,9 @@
  *
  * Dall'alto: fase e numeri, cosa fare oggi a mano, la settimana (calendario fisso + contenuti del
  * giorno), la coda dei contenuti a colonne con gli esiti dei revisori, e l'identità (la "bibbia")
- * da cui tutto deve discendere. Un contenuto va in "Programmati" solo se conformità e voce sono
- * passate e nessun revisore blocca: la regola la applica il server.
+ * da cui tutto deve discendere, poi Telegram e landing (TelegramPanel). Un contenuto va in
+ * "Programmati" solo col video montato, i quattro revisori, la qualità «ok» con tutte le voci e
+ * nessun blocco: la regola la applica il server.
  */
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -16,9 +17,10 @@ import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { PageHead, Notice, SectionTitle, card, NUM, alpha } from "@/components/ds";
 import {
-  PLATFORM_LABEL, PHASES, STATUSES, KINDS, REVIEWERS, WEEKDAYS, WEEKDAY_LABEL,
+  PLATFORM_LABEL, PHASES, STATUSES, KINDS, REVIEWERS, qualityChecksFor, WEEKDAYS, WEEKDAY_LABEL,
   phaseLine, canSchedule, weekdayOf,
 } from "@/lib/studio-social-core";
+import TelegramPanel, { FunnelTiles } from "@/components/studio/TelegramPanel";
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -79,7 +81,7 @@ function ItemModal({ item, onClose, onSave, onDelete, saving, err }) {
     const cur = x.reviews?.[key] || {};
     const next = { ...cur, ...patch };
     const reviews = { ...x.reviews };
-    if (!next.outcome) delete reviews[key]; else reviews[key] = next;
+    if (!next.outcome && !(next.checks || []).length) delete reviews[key]; else reviews[key] = next;
     return { ...x, reviews };
   });
   const gate = canSchedule(f);
@@ -104,7 +106,11 @@ function ItemModal({ item, onClose, onSave, onDelete, saving, err }) {
         <L label="Didascalia" hint="Una riga, senza domande, 0-2 hashtag"><textarea style={{ ...field, minHeight: 70 }} value={f.caption || ""} onChange={(e) => setF({ ...f, caption: e.target.value })} /></L>
       </div>
       <L label="Perché dovrebbe funzionare"><input style={field} value={f.why || ""} onChange={(e) => setF({ ...f, why: e.target.value })} /></L>
-      <L label="Video montato (link)" hint="Opzionale: dove guardare il video da approvare"><input style={field} value={f.mediaUrl || ""} onChange={(e) => setF({ ...f, mediaUrl: e.target.value })} placeholder="https://…" /></L>
+      <L label="Video montato (link)" hint="Serve per approvare: qualità e controllo tecnico si fanno sul video, non sullo script"><input style={field} value={f.mediaUrl || ""} onChange={(e) => setF({ ...f, mediaUrl: e.target.value })} placeholder="https://…" /></L>
+      <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: CP.textPrimary, marginBottom: 12, cursor: "pointer" }}>
+        <input type="checkbox" checked={!!f.ai} onChange={(e) => setF({ ...f, ai: e.target.checked })} />
+        Ha parti generate con l'AI (va pubblicato con l'etichetta AI)
+      </label>
 
       <div style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary, margin: "6px 0 8px" }}>Revisori</div>
       {REVIEWERS.map((r) => {
@@ -117,6 +123,20 @@ function ItemModal({ item, onClose, onSave, onDelete, saving, err }) {
               {Object.entries(OUTCOME).map(([k, o]) => <option key={k} value={k}>{o.label}</option>)}
             </select>
             <input style={field} value={rv.note || ""} onChange={(e) => setReview(r.key, { note: e.target.value })} placeholder="Nota del revisore" aria-label={`Nota ${r.label}`} />
+            {r.key === "qualita" && (
+              <div style={{ gridColumn: "1 / -1", padding: "8px 10px", border: `1px solid ${CP.borderSoft}`, borderRadius: 8, marginBottom: 4 }}>
+                <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 6 }}>Ok solo con tutte le voci spuntate, guardando il video intero</div>
+                {qualityChecksFor(f).map((c) => {
+                  const on = (rv.checks || []).includes(c.key);
+                  return (
+                    <label key={c.key} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13, color: CP.textPrimary, padding: "3px 0", cursor: "pointer", lineHeight: 1.4 }}>
+                      <input type="checkbox" checked={on} style={{ marginTop: 3 }} onChange={() => setReview("qualita", { checks: on ? (rv.checks || []).filter((k) => k !== c.key) : [...(rv.checks || []), c.key] })} />
+                      {c.label}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })}
@@ -175,6 +195,7 @@ export default function StudioProfilePage() {
   const { id } = useParams();
   const url = `/api/admin/studio-social/${encodeURIComponent(id)}`;
   const { data, error, isLoading, mutate } = useSWR(url, fetcher, { revalidateOnFocus: false });
+  const { data: tg } = useSWR(`${url}/telegram`, fetcher, { revalidateOnFocus: false }); // stessa chiave del pannello: una sola richiesta
   const [editing, setEditing] = useState(null); // contenuto aperto
   const [editId, setEditId] = useState(false);  // identità aperta
   const [saving, setSaving] = useState(false);
@@ -250,16 +271,8 @@ export default function StudioProfilePage() {
           <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, marginTop: 2 }}>{phaseLine(profile, today)}</div>
           <div style={{ fontSize: 12, color: CP.textSecondary, marginTop: 4, lineHeight: 1.4 }}>{phase.hint}</div>
         </div>
-        {/* Numeri non ancora collegati: un solo riquadro che dice cosa manca, non tre vuoti uguali. */}
-        <div style={{ ...card, padding: "12px 14px" }}>
-          <div style={{ fontSize: 12, color: CP.textMuted }}>Numeri</div>
-          <div style={{ fontSize: 14, color: CP.textPrimary, marginTop: 2, lineHeight: 1.45 }}>
-            View mediana a 7 giorni, click in bio e abbonati per 1M view
-          </div>
-          <div style={{ fontSize: 12, color: CP.textSecondary, marginTop: 4, lineHeight: 1.4 }}>
-            {profile.trackingLink ? `Link «${profile.trackingLink}»: si collega a CreatorsPro nel prossimo passo.` : "Servono un tracking link dedicato a questo profilo (in Identità) e la lettura da CreatorsPro, che arriva nel prossimo passo."}
-          </div>
-        </div>
+        {/* Percorso: landing → Telegram → OnlyFans (numeri veri, o cosa manca per averli) */}
+        <FunnelTiles data={tg} />
       </div>
 
       {/* Oggi a mano + settimana */}
@@ -337,6 +350,9 @@ export default function StudioProfilePage() {
           ))}
         </div>
       )}
+
+      {/* Telegram e landing */}
+      <TelegramPanel pid={id} />
 
       {/* Identità */}
       <SectionTitle aside={<button style={btn(false)} onClick={() => setEditId(true)}><Pencil size={13} aria-hidden="true" /> Modifica</button>}>Identità</SectionTitle>

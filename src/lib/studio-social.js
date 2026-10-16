@@ -56,6 +56,12 @@ export async function saveItem(pid, input, userId) {
     if (!gate.ok) return { ok: false, errors: [gate.reason] };
   }
   const now = Date.now();
+  // Chi ha approvato resta scritto sul contenuto (l'approvazione è di una persona, non di un agente).
+  if (item.status === "programmato" && prev?.status !== "programmato" && !prev?.approvedBy) {
+    item.approvedBy = userId || null; item.approvedAt = now;
+  } else {
+    item.approvedBy = prev?.approvedBy || null; item.approvedAt = prev?.approvedAt || null;
+  }
   item.id = item.id || randomUUID().slice(0, 12);
   item.createdAt = prev?.createdAt || now;
   item.createdBy = prev?.createdBy || userId || null;

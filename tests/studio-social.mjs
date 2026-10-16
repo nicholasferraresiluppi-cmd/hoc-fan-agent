@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import {
   normalizeProfile, normalizeItem, canSchedule, blockingReviews, phaseDay, phaseLine,
-  countsByStatus, dailyChecklist, weekdayOf, nextUp, romeToday, STATUSES, DEFAULT_DAILY,
+  countsByStatus, dailyChecklist, QUALITY_CHECKS, weekdayOf, nextUp, romeToday, STATUSES, DEFAULT_DAILY,
 } from "../src/lib/studio-social-core.js";
 import { restrictionFor, pathAllowed } from "../src/lib/restricted-roles.js";
 
@@ -43,15 +43,30 @@ t("contenuto: titolo obbligatorio, passo e tipo validi, link solo https, revisor
   assert.deepEqual(Object.keys(item.reviews), ["conformita"]);
 });
 
-t("programmare: servono conformità e voce, nessun blocco", () => {
+t("programmare: video, quattro revisori, qualità piena con tutte le voci", () => {
+  const allChecks = QUALITY_CHECKS.filter((c) => !c.ai).map((c) => c.key);
+  const good = {
+    mediaUrl: "https://x/v.mp4",
+    reviews: { conformita: { outcome: "ok" }, voce: { outcome: "attenzione" }, tecnico: { outcome: "ok" }, qualita: { outcome: "ok", checks: allChecks } },
+  };
+  assert.equal(canSchedule(good).ok, true);
+  assert.match(canSchedule({ ...good, mediaUrl: "" }).reason, /video/);
   assert.equal(canSchedule({ reviews: {} }).ok, false);
-  assert.match(canSchedule({ reviews: { conformita: { outcome: "ok" } } }).reason, /Voce/);
-  assert.equal(canSchedule({ reviews: { conformita: { outcome: "ok" }, voce: { outcome: "attenzione" } } }).ok, true);
-  const blocked = { reviews: { conformita: { outcome: "blocca" }, voce: { outcome: "ok" } } };
+  const noQ = { ...good, reviews: { ...good.reviews } }; delete noQ.reviews.qualita;
+  assert.match(canSchedule(noQ).reason, /Qualità/);
+  // qualità "attenzione" non basta
+  assert.match(canSchedule({ ...good, reviews: { ...good.reviews, qualita: { outcome: "attenzione", checks: allChecks } } }).reason, /deve essere ok/);
+  // una voce non spuntata ferma
+  assert.match(canSchedule({ ...good, reviews: { ...good.reviews, qualita: { outcome: "ok", checks: allChecks.slice(1) } } }).reason, /manca una voce/);
+  // contenuto AI: serve anche l'etichetta
+  assert.match(canSchedule({ ...good, ai: true }).reason, /etichetta_ai/);
+  assert.equal(canSchedule({ ...good, ai: true, reviews: { ...good.reviews, qualita: { outcome: "ok", checks: [...allChecks, "etichetta_ai"] } } }).ok, true);
+  const blocked = { ...good, reviews: { ...good.reviews, conformita: { outcome: "blocca" } } };
   assert.equal(canSchedule(blocked).ok, false);
   assert.deepEqual(blockingReviews(blocked), ["Conformità"]);
-  // il tecnico che blocca ferma anche se gli altri sono ok
-  assert.equal(canSchedule({ reviews: { conformita: { outcome: "ok" }, voce: { outcome: "ok" }, tecnico: { outcome: "blocca" } } }).ok, false);
+  // normalizeItem tiene solo voci di qualità conosciute
+  const { item } = normalizeItem({ title: "x", reviews: { qualita: { outcome: "ok", checks: ["volto", "boh", "volto"] } } });
+  assert.deepEqual(item.reviews.qualita.checks, ["volto"]);
 });
 
 t("fase: giorno contato da 1, finita detta in parole", () => {

@@ -19,6 +19,10 @@
     {
       "path": "/api/cron/scouting-hlreread",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/studio-telegram",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

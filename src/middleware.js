@@ -40,6 +40,10 @@ const isPublicRoute = createRouteMatcher([
   // Radar creator (10/10/2026): segnalazione dal Comando rapido dell'iPhone. Si difende da
   // sola col token personale (hash in scouting:tokens) + tetto d'uso; accetta solo un link.
   '/api/scouting/segnala',
+  // Landing dello Studio social (16/10/2026): pagina pubblica della creator → canale Telegram.
+  // Mostra solo i testi e la foto scelti per la landing (lib/studio-telegram: landingBySlug,
+  // solo se attiva); il redirect va SOLO alla destinazione salvata; conteggi con tetto per IP.
+  '/l/(.*)', '/api/l/(.*)',
 ]);
 const isApiRoute = createRouteMatcher(['/api/(.*)']);
 
