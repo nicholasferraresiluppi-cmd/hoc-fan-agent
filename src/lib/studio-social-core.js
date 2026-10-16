@@ -178,7 +178,11 @@ export function normalizeItem(input, prev = null) {
     // Editoriale: a quale storia della settimana appartiene e con che ruolo
     arcId: str(input?.arcId ?? prev?.arcId, 40) || null,
     arcRole: str(input?.arcRole ?? prev?.arcRole, 20) || null,
-    aiReview: prev?.aiReview || null, // scritto solo dall'agente qualità (studio-quality.js), mai dal browser
+    aiReview: prev?.aiReview || null,
+    // Instagram via Postiz: il video controllato e lo stato del post li scrive solo il server
+    video: prev?.video || null,
+    postiz: prev?.postiz || null,
+    publishAtLocal: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(input?.publishAtLocal || "")) ? input.publishAtLocal : prev?.publishAtLocal || null, // scritto solo dall'agente qualità (studio-quality.js), mai dal browser
     createdAt: prev?.createdAt || null,
     updatedAt: null,
   };
@@ -194,7 +198,7 @@ export function blockingReviews(item) {
 export function canSchedule(item) {
   const blocks = blockingReviews(item);
   if (blocks.length) return { ok: false, reason: `Bloccato da: ${blocks.join(", ")}` };
-  if (!item?.mediaUrl) return { ok: false, reason: "Manca il video montato: la qualità si giudica sul video" };
+  if (!item?.mediaUrl && !item?.video?.path) return { ok: false, reason: "Manca il video montato: la qualità si giudica sul video" };
   const missing = REQUIRED_REVIEWERS.filter((k) => !item?.reviews?.[k]?.outcome);
   if (missing.length) {
     const names = REVIEWERS.filter((r) => missing.includes(r.key)).map((r) => r.label);

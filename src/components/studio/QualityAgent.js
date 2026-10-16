@@ -32,6 +32,17 @@ export default function QualityAgent({ pid, item, refs = [], onResult }) {
     try {
       const { analyzeVideo } = await import("@/lib/video-check-client");
       const { tech, frames } = await analyzeVideo(file, { onStage: setStage, ai: !!item.ai });
+      // lo stesso file diventa il video del contenuto: è quello che uscirà su Instagram
+      setStage("Salvo il video nell'app…");
+      const { upload } = await import("@vercel/blob/client");
+      const safe = (file.name || "reel.mp4").replace(/[^A-Za-z0-9._-]/g, "_").slice(-80);
+      const blob = await upload(`studio/${pid}/video/${item.id}/${safe}`, file, {
+        access: "private", handleUploadUrl: `${base}/video`, clientPayload: item.id, contentType: file.type, multipart: file.size > 20e6,
+        onUploadProgress: (e) => setStage(`Salvo il video nell'app (${Math.round(e?.percentage || 0)}%)…`),
+      }).catch((e) => { throw new Error(/content type/i.test(e?.message) ? "Formato non ammesso: MP4, MOV o WebM" : `Salvataggio del video non riuscito: ${e?.message || "riprova"}`); });
+      const att = await fetch(`${base}/video`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "attach", itemId: item.id, path: blob.pathname, name: file.name, size: file.size, contentType: file.type }) });
+      const attJ = await att.json().catch(() => null);
+      if (!att.ok) throw new Error(attJ?.error || "Video non collegato al contenuto");
       const post = async (body) => {
         const r = await fetch(`${base}/quality`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         const j = await r.json().catch(() => null);
@@ -67,7 +78,7 @@ export default function QualityAgent({ pid, item, refs = [], onResult }) {
         ) : <span style={{ fontSize: 12, color: CP.textMuted }}>Salva il contenuto prima di controllarne il video</span>}
       </div>
       <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4, lineHeight: 1.45 }}>
-        Scegli il video montato dal computer: resta sul tuo computer, all'AI vanno i fotogrammi (uno ogni mezzo secondo, uno ogni terzo di secondo se ci sono parti AI, e prima/dopo ogni taglio). I fotogrammi sono campioni: l'AI segnala, l'ok lo dai tu guardando il video intero.
+        Scegli il video montato dal computer: viene salvato nell'app (è quello che uscirà su Instagram, niente scambi di file) e all'AI vanno i fotogrammi (uno ogni mezzo secondo, uno ogni terzo di secondo se ci sono parti AI, e prima/dopo ogni taglio). I fotogrammi sono campioni: l'AI segnala, l'ok lo dai tu guardando il video intero.
         {!refs.length && " Mancano le foto di riferimento del volto: segnale con la stella nella sezione Foto."}
       </div>
       {stage && <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 8 }}>{stage}</div>}

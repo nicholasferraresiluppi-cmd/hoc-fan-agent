@@ -18,7 +18,7 @@ import { Modal } from "@/components/cp-style";
 import { PageHead, Notice, SectionTitle, card, NUM, alpha } from "@/components/ds";
 import {
   PLATFORM_LABEL, PHASES, STATUSES, KINDS, REVIEWERS, qualityChecksFor, WEEKDAYS, WEEKDAY_LABEL,
-  phaseLine, canSchedule, weekdayOf,
+  phaseLine, phaseDay, canSchedule, weekdayOf,
 } from "@/lib/studio-social-core";
 import TelegramPanel, { FunnelTiles, PostModal } from "@/components/studio/TelegramPanel";
 import EditorialSection from "@/components/studio/EditorialSection";
@@ -78,7 +78,50 @@ function ReviewChips({ item }) {
   );
 }
 
-function ItemModal({ item, onClose, onSave, onDelete, saving, err, pid, refs, onRefresh, arcs = [] }) {
+const fmtWhen = (ms) => (Number.isFinite(ms) ? new Date(ms).toLocaleString("it-IT", { timeZone: "Europe/Rome", weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "");
+
+/** Instagram via Postiz: ora di uscita, stato del post, riprova. Il video è quello del controllo AI. */
+function InstagramBlock({ pid, f, setF, postizOn, rodaggio, onRefresh }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const pz = f.postiz;
+  const publish = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await fetch(`/api/admin/studio-social/${encodeURIComponent(pid)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "publishIg", itemId: f.id, publishAtLocal: f.publishAtLocal }) });
+      const j = await r.json().catch(() => null);
+      if (j?.item) setF((x) => ({ ...x, postiz: j.item.postiz, publishAtLocal: j.item.publishAtLocal }));
+      if (!r.ok) throw new Error(j?.error || `Errore ${r.status}`);
+      setMsg("Programmato su Instagram");
+      onRefresh?.();
+    } catch (e) { setMsg(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <div style={{ border: `1px solid ${CP.border}`, borderRadius: 10, padding: 12, marginBottom: 14 }}>
+      <div style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary, marginBottom: 6 }}>Instagram</div>
+      {!postizOn && <div style={{ fontSize: 12, color: CP.textMuted }}>Postiz non è collegato in questo ambiente.</div>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 10, alignItems: "end" }}>
+        <L label="Esce su Instagram" hint="Ora di Roma">
+          <input type="datetime-local" style={field} value={f.publishAtLocal || (f.day ? `${f.day}T18:30` : "")} disabled={!!pz?.postId && pz.state !== "ERROR"} onChange={(e) => setF({ ...f, publishAtLocal: e.target.value })} />
+        </L>
+        <div style={{ fontSize: 13, color: CP.textSecondary, paddingBottom: 12, lineHeight: 1.45 }}>
+          {f.video?.path ? <>Video: {f.video.name || "salvato"}</> : <span style={{ color: CP.textMuted }}>Il video si salva facendo il controllo AI qui sopra</span>}
+        </div>
+      </div>
+      {pz?.state === "QUEUE" && <div style={{ fontSize: 13, color: CP.accentGreen }}>In coda su Instagram per {fmtWhen(pz.scheduledFor)}. Se lo riporti indietro nella coda, il post si toglie da solo.</div>}
+      {pz?.state === "PUBLISHED" && <div style={{ fontSize: 13, color: CP.accentGreen }}>Pubblicato{pz.releaseURL ? <> · <a href={pz.releaseURL} target="_blank" rel="noreferrer" style={{ color: CP.accent }}>apri su Instagram</a></> : null}</div>}
+      {pz?.state === "ERROR" && <div style={{ fontSize: 13, color: CP.accentRed }}>Non partito: {pz.error || "errore di Postiz"}</div>}
+      {f.status === "programmato" && postizOn && (!pz?.postId || pz.state === "ERROR") && (
+        <button style={{ ...btn(true), marginTop: 8 }} disabled={busy || !f.video?.path} onClick={publish}>{busy ? "Invio a Postiz…" : pz?.state === "ERROR" ? "Riprova su Instagram" : "Programma su Instagram"}</button>
+      )}
+      {f.status !== "programmato" && f.status !== "pubblicato" && <div style={{ fontSize: 12, color: CP.textMuted }}>Con «Approva e programma» va in coda su Instagram all'ora scelta.</div>}
+      {rodaggio && <div style={{ fontSize: 12, color: CP.textSecondary, marginTop: 6 }}>Il profilo è in rodaggio: consigliato pubblicare a mano dal telefono fino all'8º giorno.</div>}
+      {msg && <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 6 }}>{msg}</div>}
+    </div>
+  );
+}
+
+function ItemModal({ item, onClose, onSave, onDelete, saving, err, pid, refs, onRefresh, arcs = [], onApprove, postizOn, rodaggio }) {
   const [f, setF] = useState(() => ({ kind: "reel", status: "idea", ...item, reviews: { ...(item?.reviews || {}) } }));
   const setReview = (key, patch) => setF((x) => {
     const cur = x.reviews?.[key] || {};
@@ -158,12 +201,13 @@ function ItemModal({ item, onClose, onSave, onDelete, saving, err, pid, refs, on
           </div>
         );
       })}
+      {f.id && <InstagramBlock pid={pid} f={f} setF={setF} postizOn={postizOn} rodaggio={rodaggio} onRefresh={onRefresh} />}
       {!gate.ok && <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 10 }}>Per programmarlo: {gate.reason.toLowerCase()}.</div>}
       {err && <div style={{ color: CP.accentRed, fontSize: 13, marginBottom: 10 }}>{err}</div>}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <button style={btn(true)} disabled={saving} onClick={() => onSave(f)}>{saving ? "Salvataggio…" : "Salva"}</button>
         {f.status === "da_approvare" && gate.ok && (
-          <button style={btn(false)} disabled={saving} onClick={() => onSave({ ...f, status: "programmato" })}><Check size={14} aria-hidden="true" /> Approva e programma</button>
+          <button style={btn(false)} disabled={saving} onClick={() => onApprove({ ...f, status: "programmato", publishAtLocal: f.publishAtLocal || (f.day ? `${f.day}T18:30` : null) })}><Check size={14} aria-hidden="true" /> Approva e programma</button>
         )}
         {f.id && (
           <button style={{ ...btn(false), marginLeft: "auto", color: CP.accentRed }} onClick={() => onDelete(f)}><Trash2 size={14} aria-hidden="true" /> Elimina</button>
@@ -233,6 +277,19 @@ export default function StudioProfilePage() {
   const saveItem = async (item) => {
     setSaving(true); setErr(null);
     try { await post({ action: "item", item }); await mutate(); setEditing(null); } catch (e) { setErr(e.message); } finally { setSaving(false); }
+  };
+  // approvazione: il contenuto va in «Programmati» e, se c'è il video controllato, parte la coda su Instagram
+  const approveItem = async (item) => {
+    setSaving(true); setErr(null);
+    try {
+      const saved = await post({ action: "item", item });
+      if (data?.postiz && saved.item?.video?.path) {
+        const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "publishIg", itemId: saved.item.id, publishAtLocal: item.publishAtLocal }) });
+        const j = await r.json().catch(() => null);
+        if (!r.ok) { await mutate(); setEditing(j?.item || saved.item); setErr(`Approvato, ma Instagram non è partito: ${j?.error || r.status}`); return; }
+      }
+      await mutate(); setEditing(null);
+    } catch (e) { setErr(e.message); } finally { setSaving(false); }
   };
   const deleteItem = async (item) => {
     if (!confirm(`Eliminare "${item.title}"?`)) return;
@@ -395,7 +452,7 @@ export default function StudioProfilePage() {
         </div>
       </div>
 
-      {editing && <ItemModal item={editing} onClose={() => { setEditing(null); setErr(null); }} onSave={saveItem} onDelete={deleteItem} saving={saving} err={err} pid={id} refs={tg?.config?.referencePhotoIds || []} onRefresh={mutate} arcs={data.arcs || []} />}
+      {editing && <ItemModal key={`${editing.id || "nuovo"}-${editing.updatedAt || ""}`} item={editing} onClose={() => { setEditing(null); setErr(null); }} onSave={saveItem} onDelete={deleteItem} saving={saving} err={err} pid={id} refs={tg?.config?.referencePhotoIds || []} onRefresh={mutate} arcs={data.arcs || []} onApprove={approveItem} postizOn={!!data.postiz} rodaggio={profile.phase === "rodaggio" && (phaseDay(profile, today) || 99) <= 7} />}
       {postEditing && tg && <PostModal post={postEditing} photos={tg.photos || []} cfg={tg.config || {}} pid={id} arcs={data.arcs || []} onClose={() => setPostEditing(null)} onDone={async () => { setPostEditing(null); await mutateTg(); }} />}
       {editId && <IdentityModal profile={profile} onClose={() => { setEditId(false); setErr(null); }} onSave={saveProfile} saving={saving} err={err} />}
     </div>
