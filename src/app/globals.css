@@ -112,10 +112,41 @@ h1, h2, h3, h4, h5, h6 {
   [data-style="v3"] .hoc-v3-mhead, [data-style="v3"] .hoc-v3-tabbar, [data-style="v3"] .hoc-side { backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
+/* ── Telefono come un'app (16/10/2026, Nicholas: «si vede molto che è una web app») ──
+   Titolo che sale nella barra, feedback nel menu invece che sopra il contenuto,
+   banner in una riga, risposta al tocco sui pulsanti. Solo stile Casa, solo telefono. */
+.hoc-v3-mtitle, .casa-fb { display: none; }
+@media (max-width: 899px) {
+  [data-style="v3"] .hoc-v3-mtitle {
+    display: block; position: absolute; left: 16px; right: 168px; bottom: 0; height: 56px; line-height: 56px;
+    padding: 0; border: 0; background: none; text-align: left; font: inherit; font-size: 17px; font-weight: 500;
+    letter-spacing: -.01em; color: var(--cp-textPrimary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity .18s, transform .22s cubic-bezier(.2,.8,.2,1); cursor: pointer;
+  }
+  [data-style="v3"] .hoc-v3-mhead[data-titled] .hoc-v3-mtitle { opacity: 1; transform: none; pointer-events: auto; }
+  [data-style="v3"] .hoc-v3-logo { transition: opacity .15s; }
+  [data-style="v3"] .hoc-v3-mhead[data-titled] .hoc-v3-logo { opacity: 0; pointer-events: none; }
+  /* feedback: dal menu (icona accanto al tema), non più galleggiante sopra il testo */
+  [data-style="v3"] .hoc-fb { display: none !important; }
+  [data-style="v3"] .casa-fb { display: inline-flex; }
+  [data-style="v3"] .hoc-fb-wrap { padding: 0 !important; align-items: flex-end !important; justify-content: stretch !important; animation: hoc-v3-fade .16s ease-out both; }
+  [data-style="v3"] .hoc-fb-sheet { max-width: none !important; border-radius: 16px 16px 0 0 !important; border-bottom: 0 !important; padding: 18px 18px calc(18px + env(safe-area-inset-bottom)) !important; animation: hoc-sheet-up .26s cubic-bezier(.2,.8,.2,1) both; }
+  [data-style="v3"] .hoc-fb-sheet textarea { font-size: 16px !important; }
+  /* risposta al tocco: il pulsante "cede" un attimo come nelle app */
+  [data-style="v3"] .hoc-main button:not(:disabled), [data-style="v3"] .hoc-fb-sheet button:not(:disabled) { transition: transform 90ms ease-out, opacity 90ms; }
+  [data-style="v3"] .hoc-main button:not(:disabled):active, [data-style="v3"] .hoc-fb-sheet button:not(:disabled):active { transform: scale(.97); opacity: .85; }
+  /* niente selezione del testo né menu "copia" tenendo premuto sulla cornice dell'app */
+  [data-style="v3"] .hoc-v3-mhead, [data-style="v3"] .hoc-v3-tabbar, [data-style="v3"] .hoc-main button { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+}
+@keyframes hoc-sheet-up { from { transform: translateY(100%) } to { transform: none } }
+
 @media (prefers-reduced-motion: reduce) {
   [data-style="v3"] .hoc-v3-cmdk-wrap, [data-style="v3"] .hoc-v3-cmdk { animation: none; }
   [data-style="v3"] .hoc-v3-tab { transition: none; }
   [data-style="v3"] .hoc-v3-tab:active { transform: none; }
+  [data-style="v3"] .hoc-v3-mtitle, [data-style="v3"] .hoc-v3-logo { transition: none; }
+  [data-style="v3"] .hoc-main button:not(:disabled):active { transform: none; }
+  [data-style="v3"] .hoc-fb-wrap, [data-style="v3"] .hoc-fb-sheet { animation: none; }
 }
 
 /* ── Stile v3: componenti del design system (components/ds.js, passo 3) ──

@@ -8,7 +8,8 @@
 // nelle note (docs/SCOUTING_PRIVACY.md); cancellazione su richiesta dalla scheda; nessun
 // contatto prima del parere legale.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PlayCircle, Plus } from "lucide-react";
 import useSWR from "swr";
 import { useUser } from "@clerk/nextjs";
 import { CP } from "@/lib/brand";
@@ -46,7 +47,15 @@ const PHONE_CSS = `
   .rx-page .ds-head{margin-bottom:12px !important}
   .rx-page .ds-sub{display:none !important}
   .rx-page .ds-h1{font-size:30px !important;line-height:1.08 !important}
-  .rx-tabs{flex-wrap:nowrap !important;overflow-x:auto;scrollbar-width:none;gap:22px !important;margin:0 -16px 20px !important;padding:0 16px}
+  .rx-page .ds-crumbs{display:none !important}
+  .rx-page .ds-head > div:last-child{flex-wrap:nowrap !important;align-items:center !important;gap:10px !important}
+  .rx-page .ds-head > div:last-child > div:first-child{flex:1 1 auto !important;min-width:0}
+  .rx-page .ds-h1 br,.rx-page .ds-h1-em{display:none !important}
+  .rx-lbl{display:none !important}
+  .rx-ico-btn{width:42px;height:42px;padding:0 !important;justify-content:center;border-radius:999px !important;min-height:0 !important}
+  .rx-tabs{flex-wrap:nowrap !important;overflow-x:auto;scrollbar-width:none;gap:22px !important;margin:0 -16px 20px !important;padding:12px 16px 0 !important;
+    position:sticky;top:calc(56px + env(safe-area-inset-top));z-index:30;background:var(--cp-bg)}
+  .rx-tabs[data-more]{-webkit-mask-image:linear-gradient(90deg,#000 82%,transparent);mask-image:linear-gradient(90deg,#000 82%,transparent)}
   .rx-tabs::-webkit-scrollbar{display:none}
   .ro-nums{grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:18px 16px !important;padding:18px 0 !important}
   .ro-nums > div > span:first-child{font-size:34px !important}
@@ -81,6 +90,20 @@ export default function ScoutingPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [segnala, setSegnala] = useState(false);
+  const tabsRef = useRef(null);
+
+  // telefono: le schede scorrono di lato; la sfumatura a destra dice che ce ne sono altre
+  // e la scheda scelta viene portata in vista
+  useEffect(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+    const upd = () => el.toggleAttribute("data-more", el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    el.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest", inline: "center" });
+    upd();
+    el.addEventListener("scroll", upd, { passive: true });
+    window.addEventListener("resize", upd);
+    return () => { el.removeEventListener("scroll", upd); window.removeEventListener("resize", upd); };
+  }, [tab, selH]);
 
   // vista e scheda nell'indirizzo (?vista=…&c=handle): link condivisibili e tasto indietro
   useEffect(() => {
@@ -140,11 +163,19 @@ export default function ScoutingPage() {
         title="Radar creator"
         line2={line2}
         subtitle={sel ? null : "Le creator italiane trovate su Instagram, una scheda per persona, seguite settimana per settimana."}
-        actions={<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}><TutorialVideoButton id="radar-smm" /><button style={btnPrimary} onClick={() => setSegnala(true)}>Segnala una creator</button></div>}
+        actions={<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {/* sul telefono restano le icone, accanto al titolo (come i pulsanti nella barra di un'app) */}
+          <TutorialVideoButton id="radar-smm" render={(open, v) => (
+            <button type="button" className="rx-ico-btn" onClick={open} aria-label={`Come funziona: video di ${Math.round(v.durationSec / 60)} minuti`} title={`Video: ${v.title}`} style={{ ...btn, background: CP.surface }}>
+              <PlayCircle size={17} aria-hidden="true" /><span className="rx-lbl">Come funziona <span style={{ color: CP.textMuted }}>· {Math.floor(v.durationSec / 60)}:{String(v.durationSec % 60).padStart(2, "0")}</span></span>
+            </button>
+          )} />
+          <button type="button" className="rx-ico-btn" style={btnPrimary} onClick={() => setSegnala(true)} aria-label="Segnala una creator"><Plus size={19} aria-hidden="true" /><span className="rx-lbl">Segnala una creator</span></button>
+        </div>}
       />
 
       {!sel && (
-        <nav role="tablist" aria-label="Viste del radar" className="rx-tabs" style={{ display: "flex", flexWrap: "wrap", gap: "6px 28px", borderBottom: `1px solid ${CP.border}`, marginBottom: 32 }}>
+        <nav ref={tabsRef} role="tablist" aria-label="Viste del radar" className="rx-tabs" style={{ display: "flex", flexWrap: "wrap", gap: "6px 28px", borderBottom: `1px solid ${CP.border}`, marginBottom: 32 }}>
           {TABS.map((t) => (
             <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => go(t.id)}
               style={{ background: "none", border: "none", borderBottom: `1px solid ${tab === t.id ? CP.gold : "transparent"}`, color: tab === t.id ? CP.textPrimary : CP.textSecondary, padding: "0 0 12px", fontSize: 15, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0 }}>{t.label}</button>
