@@ -149,8 +149,10 @@ export function normalizeItem(input, prev = null) {
   const reviews = {};
   for (const r of REVIEWERS) {
     const src = input?.reviews?.[r.key] ?? prev?.reviews?.[r.key];
-    if (src && REVIEW_OUTCOMES.includes(src.outcome)) {
-      const rv = { outcome: src.outcome, note: str(src.note, 600), at: src.at || null };
+    // la Qualità può avere voci spuntate prima dell'esito (le spunta l'agente o chi guarda)
+    const hasChecks = r.key === "qualita" && Array.isArray(src?.checks) && src.checks.length > 0;
+    if (src && (REVIEW_OUTCOMES.includes(src.outcome) || hasChecks)) {
+      const rv = { outcome: REVIEW_OUTCOMES.includes(src.outcome) ? src.outcome : null, note: str(src.note, 600), at: src.at || null };
       if (r.key === "qualita") {
         const keys = QUALITY_CHECKS.map((c) => c.key);
         rv.checks = Array.isArray(src.checks) ? [...new Set(src.checks.filter((k) => keys.includes(k)))] : [];
@@ -173,6 +175,7 @@ export function normalizeItem(input, prev = null) {
     ai: input?.ai === undefined ? !!prev?.ai : !!input.ai,
     mediaUrl: /^https:\/\//.test(str(input?.mediaUrl, 600)) ? str(input.mediaUrl, 600) : "",
     reviews,
+    aiReview: prev?.aiReview || null, // scritto solo dall'agente qualità (studio-quality.js), mai dal browser
     createdAt: prev?.createdAt || null,
     updatedAt: null,
   };
@@ -189,7 +192,7 @@ export function canSchedule(item) {
   const blocks = blockingReviews(item);
   if (blocks.length) return { ok: false, reason: `Bloccato da: ${blocks.join(", ")}` };
   if (!item?.mediaUrl) return { ok: false, reason: "Manca il video montato: la qualità si giudica sul video" };
-  const missing = REQUIRED_REVIEWERS.filter((k) => !item?.reviews?.[k]);
+  const missing = REQUIRED_REVIEWERS.filter((k) => !item?.reviews?.[k]?.outcome);
   if (missing.length) {
     const names = REVIEWERS.filter((r) => missing.includes(r.key)).map((r) => r.label);
     return { ok: false, reason: `Manca il revisore: ${names.join(", ")}` };

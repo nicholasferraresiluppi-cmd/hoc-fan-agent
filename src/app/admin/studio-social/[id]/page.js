@@ -21,6 +21,7 @@ import {
   phaseLine, canSchedule, weekdayOf,
 } from "@/lib/studio-social-core";
 import TelegramPanel, { FunnelTiles } from "@/components/studio/TelegramPanel";
+import QualityAgent from "@/components/studio/QualityAgent";
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -75,7 +76,7 @@ function ReviewChips({ item }) {
   );
 }
 
-function ItemModal({ item, onClose, onSave, onDelete, saving, err }) {
+function ItemModal({ item, onClose, onSave, onDelete, saving, err, pid, refs, onRefresh }) {
   const [f, setF] = useState(() => ({ kind: "reel", status: "idea", ...item, reviews: { ...(item?.reviews || {}) } }));
   const setReview = (key, patch) => setF((x) => {
     const cur = x.reviews?.[key] || {};
@@ -112,6 +113,7 @@ function ItemModal({ item, onClose, onSave, onDelete, saving, err }) {
         Ha parti generate con l'AI (va pubblicato con l'etichetta AI)
       </label>
 
+      <QualityAgent pid={pid} item={f} refs={refs} onResult={(it) => { setF((x) => ({ ...x, reviews: it.reviews, aiReview: it.aiReview })); onRefresh?.(); }} />
       <div style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary, margin: "6px 0 8px" }}>Revisori</div>
       {REVIEWERS.map((r) => {
         const rv = f.reviews?.[r.key] || {};
@@ -383,7 +385,7 @@ export default function StudioProfilePage() {
         </div>
       </div>
 
-      {editing && <ItemModal item={editing} onClose={() => { setEditing(null); setErr(null); }} onSave={saveItem} onDelete={deleteItem} saving={saving} err={err} />}
+      {editing && <ItemModal item={editing} onClose={() => { setEditing(null); setErr(null); }} onSave={saveItem} onDelete={deleteItem} saving={saving} err={err} pid={id} refs={tg?.config?.referencePhotoIds || []} onRefresh={mutate} />}
       {editId && <IdentityModal profile={profile} onClose={() => { setEditId(false); setErr(null); }} onSave={saveProfile} saving={saving} err={err} />}
     </div>
   );

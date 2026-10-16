@@ -10,7 +10,7 @@
  */
 import { useState } from "react";
 import useSWR from "swr";
-import { Plus, Pencil, Trash2, Check, Copy, Upload, ExternalLink } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, Copy, Upload, ExternalLink, Star } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { Notice, SectionTitle, card, NUM, alpha } from "@/components/ds";
@@ -278,6 +278,15 @@ export default function TelegramPanel({ pid }) {
     setMsg(r.ok ? { text: "Foto tolta" } : { danger: true, text: j?.error || "Non riuscito" });
     await mutate();
   };
+  const refs = cfg.referencePhotoIds || [];
+  const toggleRef = async (id) => {
+    const next = refs.includes(id) ? refs.filter((x) => x !== id) : [...refs, id];
+    if (next.length > 4) { setMsg({ danger: true, text: "Al massimo 4 foto di riferimento" }); return; }
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "config", referencePhotoIds: next }) });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) setMsg({ danger: true, text: j?.error || "Non riuscito" });
+    await mutate();
+  };
   const duplicate = (p) => setEditing({ text: p.text, photoIds: p.photoIds, buttonLabel: p.buttonLabel, buttonUrl: p.buttonUrl, ai: p.ai, reviews: {}, sendAt: Number.isFinite(p.sendAt) ? p.sendAt + 86400e3 : null });
 
   const Row = ({ p }) => (
@@ -320,7 +329,7 @@ export default function TelegramPanel({ pid }) {
 
         <div style={{ ...card, padding: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <div style={{ fontSize: 12, color: CP.textMuted }}>Foto ({data.photos.length})</div>
+            <div style={{ fontSize: 12, color: CP.textMuted }}>Foto ({data.photos.length}) · stella = riferimento del volto ({refs.length} di 4)</div>
             <label style={{ ...btn(false), padding: "4px 10px", opacity: data.blobReady ? 1 : 0.5 }}>
               <Upload size={13} aria-hidden="true" /> Carica
               <input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden disabled={!data.blobReady} onChange={(e) => { if (e.target.files?.length) upload(e.target.files); e.target.value = ""; }} />
@@ -332,6 +341,8 @@ export default function TelegramPanel({ pid }) {
               <div key={p.id} style={{ position: "relative", aspectRatio: "3 / 4", borderRadius: 8, overflow: "hidden", background: CP.bgSunken }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={`/api/admin/studio-social/${encodeURIComponent(pid)}/photo?p=${p.id}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                <button onClick={() => toggleRef(p.id)} aria-pressed={refs.includes(p.id)} aria-label={refs.includes(p.id) ? "Togli dai riferimenti del volto" : "Usa come riferimento del volto"} title="Riferimento del volto per il controllo qualità"
+                  style={{ position: "absolute", top: 3, left: 3, background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 6, padding: 2, cursor: "pointer", display: "flex", color: refs.includes(p.id) ? CP.accent : CP.textMuted }}><Star size={12} fill={refs.includes(p.id) ? "currentColor" : "none"} /></button>
                 <button onClick={() => removePhoto(p.id)} aria-label="Togli la foto" style={{ position: "absolute", top: 3, right: 3, background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 6, padding: 2, cursor: "pointer", display: "flex", color: CP.textSecondary }}><Trash2 size={12} /></button>
               </div>
             ))}
