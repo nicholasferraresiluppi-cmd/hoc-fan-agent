@@ -575,6 +575,76 @@ export function signalWhat(link, { hlFailed = false } = {}) {
   return "nessun link né tag, in bio o nella prima storia in evidenza";
 }
 
+// ---------- prima storia in evidenza: lettura (segnalazioni e rilettura del radar) ----------
+
+/**
+ * Righe dell'attore afanasenko/instagram-stories-highlights-scraper → per account:
+ * { read, gone, retryable, urls, mentions }. Stati verificati il 16/10/2026: "ok" (evidenza
+ * aperta), "no_highlights" (letto, non ne ha), "private" / "not_found" (`gone`: non si legge,
+ * inutile riprovare), "not_scanned" = riga informativa (evidenze oltre la prima, non aperte).
+ * Nessuna riga che dica letto/sparito = NON letto (errore: si riprova). Sticker e menzioni
+ * a volte arrivano come testo in stile Python ("[{'url': '…'}]"): letti anche così.
+ */
+export function parseHighlightRows(rows, { maxUrls = 5, maxMentions = 3 } = {}) {
+  const by = new Map();
+  for (const r of rows || []) {
+    const h = normHandle(r?.inputUsername || r?.ownerUsername || "");
+    if (!h) continue;
+    const x = by.get(h) || { read: false, gone: false, retryable: false, urls: new Set(), mentions: new Set() };
+    if (r.accountStatus === "ok" || r.accountStatus === "no_highlights") x.read = true;
+    if (r.accountStatus === "private" || r.accountStatus === "not_found") x.gone = true;
+    if (r.retryable === true) x.retryable = true;
+    const ls = r.linkStickers;
+    if (typeof ls === "string") for (const m of ls.matchAll(/['"]url['"]\s*:\s*['"]([^'"]+)['"]/g)) x.urls.add(m[1]);
+    else for (const l of Array.isArray(ls) ? ls : []) if (l?.url) x.urls.add(l.url);
+    const ms = r.mentions;
+    if (typeof ms === "string") for (const m of ms.matchAll(/['"]username['"]\s*:\s*['"]([^'"]+)['"]/g)) x.mentions.add(normHandle(m[1]));
+    else for (const m of Array.isArray(ms) ? ms : []) if (m?.username) x.mentions.add(normHandle(m.username));
+    by.set(h, x);
+  }
+  const out = new Map();
+  for (const [h, x] of by) {
+    x.mentions.delete(h);
+    x.mentions.delete("");
+    out.set(h, { read: x.read, gone: x.gone && !x.read, retryable: x.retryable, urls: [...x.urls].slice(0, maxUrls), mentions: [...x.mentions].slice(0, maxMentions) });
+  }
+  return out;
+}
+
+/**
+ * Profilo dopo una lettura riuscita della prima evidenza. `via` = Map handle taggato →
+ * { urls, priv }. Il livello non scende mai (una lettura che non trova niente non cancella
+ * un "forte" deciso prima); i link già noti restano se questa volta non ce ne sono.
+ */
+export function applyHighlightRead(p, hl, via = new Map(), now = Date.now()) {
+  const hlVia = (hl.mentions || []).map((m) => {
+    const v = via.get(m);
+    return { h: m, urls: v?.urls || [], ...(v?.priv ? { priv: true } : {}) };
+  });
+  const hlLinks = hl.urls?.length ? hl.urls : p.hlLinks || [];
+  const next = { ...p, hlLinks, hlVia, hl: hlLinks.length > 0, hlAt: now };
+  const s = sigFromLink(linkOrHint([{ ...next, url: "" }]));
+  next.sig = SIG_RANK[s] > SIG_RANK[p.sig || "nessuno"] ? s : p.sig || "nessuno";
+  return next;
+}
+
+/**
+ * Chi rileggere (16/10/2026, dopo i casi @aliiciottaa e @alicelatspreferita): creator ancora
+ * da valutare, non nostre, senza un profilo a pagamento già trovato e ancora sul radar;
+ * solo account mai letti col giro dei tag (né `hlAt` né `hlVia`). Prima le segnalate.
+ */
+export function hlRereadCandidates(profiles, crm, forgotten = new Set()) {
+  const ok = new Set();
+  for (const c of buildCreators(profiles, crm)) {
+    if (c.ours || c.stage !== DEFAULT_STAGE || c.sig === "forte" || c.missing) continue;
+    for (const h of c.handles) ok.add(h);
+  }
+  return profiles
+    .filter((p) => ok.has(p.h) && !forgotten.has(p.h) && !p.hlAt && !Array.isArray(p.hlVia) && !p.missing)
+    .sort((a, b) => (b.src === "segnalata") - (a.src === "segnalata"))
+    .map((p) => p.h);
+}
+
 /** Dove sta il link, in parole: lungo per le frasi, corto per le etichette. */
 export function linkWhere(link, { short = false } = {}) {
   if (!link) return "";

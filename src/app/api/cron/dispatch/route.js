@@ -21,6 +21,7 @@
  *   - sempre:            copia di sicurezza del warehouse (warehouse-backup)
  *   - sempre:            pilota OnlyFansAPI (ofapi-pilot)
  *   - sempre:            Radar creator (scouting-refresh: giro Apify settimanale, esito al giro dopo)
+ *   - sempre:            Radar creator, rilettura delle prime evidenze (riaccende la catena se in corso)
  *   - lunedì:            + digest email (dopo il run: legge i suoi findings)
  *   - giorno 1 del mese: snapshot leghe (chiusura stagione)
  *   - sempre, in fondo:  Centro HR: riconciliazione con ClickUp (solo con HR_CLICKUP_LIST_ID)
@@ -109,6 +110,9 @@ export async function POST(request) {
   // Radar creator (10/10/2026): giro settimanale Apify sulle creator dello scouting —
   // lancia il run una volta a settimana, ne raccoglie l'esito al giro dopo
   out.scouting_refresh = await kickEndpoint(request, "/api/cron/scouting-refresh");
+  // rilettura delle prime evidenze del Radar (16/10/2026): si porta avanti da sola, qui la si
+  // riaccende se la catena si è interrotta (la route non fa niente se il giro non è in corso)
+  out.scouting_hlreread = await kickEndpoint(request, "/api/cron/scouting-hlreread");
   // canali Telegram delle creator (14/10/2026): iscritti del giorno di ogni canale dal bot HOC
   out.telegram_channels = await kickEndpoint(request, "/api/cron/telegram-channels");
 

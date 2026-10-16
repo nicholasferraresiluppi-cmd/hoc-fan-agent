@@ -11,7 +11,7 @@ import {
   handleStem, linkKey, suggestLinks, buildCreators, stageCounts,
   creatorIdOf, setStage, addNote, setField, linkHandles, unlinkHandle, dismissSuggestion, forgetHandle,
   HISTORY_MAX, DEFAULT_STAGE, applyRefresh, scrubContacts,
-  classifyUrl, bestLink, linkWhere, highlightHint, linkOrHint, sigFromLink, signalWhat, whyLines, pickToday, parseInstagramLink, marketByGroup,
+  classifyUrl, bestLink, linkWhere, highlightHint, linkOrHint, sigFromLink, signalWhat, parseHighlightRows, applyHighlightRead, hlRereadCandidates, whyLines, pickToday, parseInstagramLink, marketByGroup,
 } from "../src/lib/scouting-core.js";
 
 let n = 0;
@@ -199,6 +199,37 @@ ok(signalWhat(null).startsWith("nessun link"), "niente trovato davvero");
 const rowsSig = buildCreators([{ ...aliiP, sig: "nessuno", fol: 1 }, { h: "old", url: "", hlLinks: ["https://x.example"], sig: "nessuno", fol: 1 }], { creators: {} });
 eq(rowsSig.map((r) => r.sig), ["debole", "nessuno"], "da guardare anche se letta prima della regola; la prima ricerca (senza hlVia) non cambia");
 ok(whyLines({ sig: "debole", link: tagOnly })[0].includes("tagga @imieilinkzz"), "il perché dice del tag");
+
+// rilettura delle prime evidenze (16/10/2026): righe vere dell'attore
+const hlRows = [
+  { inputUsername: "aliiciottaa", accountStatus: "not_scanned", itemKind: "status" },
+  { inputUsername: "aliiciottaa", accountStatus: "ok", itemKind: "highlight_tray", linkStickers: [], mentions: [] },
+  { inputUsername: "aliiciottaa", accountStatus: "ok", itemKind: "highlight_item", linkStickers: [{ url: "https://cutepage.me/aliiciottaa" }], mentions: [] },
+  { inputUsername: "alicelatspreferita", accountStatus: "ok", itemKind: "highlight_item", linkStickers: "[]", mentions: "[{'username': 'imieilinkzz', 'isPrivate': True}]" },
+  { inputUsername: "mario", accountStatus: "no_highlights", itemKind: "status" },
+  { inputUsername: "test", accountStatus: "private", itemKind: "status" },
+  { inputUsername: "nonesiste", accountStatus: "not_found", itemKind: "status" },
+  { inputUsername: "rotto", accountStatus: "error", retryable: true, itemKind: "status" },
+];
+const ph = parseHighlightRows(hlRows);
+eq(ph.get("aliiciottaa"), { read: true, gone: false, retryable: false, urls: ["https://cutepage.me/aliiciottaa"], mentions: [] }, "link dello sticker letto, la riga not_scanned non conta");
+eq(ph.get("alicelatspreferita").mentions, ["imieilinkzz"], "menzioni anche in formato testo");
+eq([ph.get("mario").read, ph.get("mario").gone], [true, false], "senza evidenze = letta, non un errore");
+eq([ph.get("test").read, ph.get("test").gone, ph.get("nonesiste").gone], [false, true, true], "privata o sparita: non leggibile, non si riprova");
+eq([ph.get("rotto").read, ph.get("rotto").gone, ph.get("rotto").retryable], [false, false, true], "errore: non letta, da riprovare");
+const hlBefore = { h: "alicelatspreferita", url: "", sig: "nessuno", hlLinks: ["https://vecchio.example"] };
+const hlAfter = applyHighlightRead(hlBefore, { urls: [], mentions: ["imieilinkzz"] }, new Map([["imieilinkzz", { urls: ["http://getmysocial.com/alicelatsxo"], priv: true }]]), 5);
+eq([hlAfter.sig, hlAfter.hlAt, hlAfter.hlLinks[0], hlAfter.hlVia[0].priv], ["debole", 5, "https://vecchio.example", true], "tag con link in bio: da guardare, i link vecchi restano");
+eq(applyHighlightRead({ h: "x", sig: "forte", url: "https://onlyfans.com/x" }, { urls: [], mentions: [] }).sig, "forte", "una lettura vuota non abbassa mai il livello");
+eq(applyHighlightRead({ h: "x", sig: "nessuno", url: "https://linktr.ee/x" }, { urls: [], mentions: [] }).sig, "nessuno", "la bio non conta per la rilettura (resta la classificazione della ricerca)");
+const crmR = { creators: { "c1": { handles: ["vista"], stage: "interessante" } } };
+const candP = [
+  { h: "base", sig: "nessuno", fol: 1 }, { h: "segn", sig: "debole", src: "segnalata", fol: 1 },
+  { h: "pagante", sig: "forte", fol: 1 }, { h: "nostra", sig: "nessuno", ours: true, fol: 1 },
+  { h: "vista", sig: "nessuno", fol: 1 }, { h: "giaLetta", sig: "nessuno", hlAt: 1, fol: 1 },
+  { h: "conTag", sig: "nessuno", hlVia: [], fol: 1 }, { h: "cancellata", sig: "nessuno", fol: 1 }, { h: "sparita", sig: "nessuno", missing: 2, fol: 1 },
+];
+eq(hlRereadCandidates(candP, crmR, new Set(["cancellata"])), ["segn", "base"], "da rileggere: da valutare, senza profilo a pagamento, mai lette coi tag; prima le segnalate");
 
 console.log(`scouting: ${n} asserzioni ok`);
 
