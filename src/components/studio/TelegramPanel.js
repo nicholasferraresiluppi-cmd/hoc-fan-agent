@@ -14,6 +14,7 @@ import { Plus, Pencil, Trash2, Check, Copy, Upload, ExternalLink, Star } from "l
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { Notice, SectionTitle, card, NUM, alpha } from "@/components/ds";
+import { TG_ROLES } from "@/lib/studio-editorial-core";
 import { TG_REVIEWERS, TG_STATUSES, TG_MAX_PHOTOS, TG_TEXT_MAX_PHOTO, canApproveTg, msToRomeLocal, romeLocalToMs } from "@/lib/studio-telegram-core";
 
 const fetcher = async (url) => {
@@ -70,9 +71,9 @@ export function FunnelTiles({ data }) {
   );
 }
 
-function PostModal({ post, photos, cfg, pid, onClose, onDone }) {
+export function PostModal({ post, photos, cfg, pid, onClose, onDone, arcs = [] }) {
   const [f, setF] = useState(() => ({
-    text: "", photoIds: [], buttonLabel: cfg?.ofLinkUrl ? "Vieni a trovarmi" : "", buttonUrl: cfg?.ofLinkUrl || "",
+    text: "", photoIds: [], poll: null, pin: false, role: null, slot: null, arcId: null, buttonLabel: cfg?.ofLinkUrl ? "Vieni a trovarmi" : "", buttonUrl: cfg?.ofLinkUrl || "",
     sendAtLocal: msToRomeLocal(Date.now() + 3600e3).slice(0, 14) + "00", ai: false, reviews: {},
     ...post, ...(post?.sendAt ? { sendAtLocal: msToRomeLocal(post.sendAt) } : {}),
   }));
@@ -89,6 +90,8 @@ function PostModal({ post, photos, cfg, pid, onClose, onDone }) {
     setBusy(true); setErr(null);
     try {
       const { sendAt: _drop, ...rest } = f; // eslint-disable-line no-unused-vars
+      if (rest.poll) rest.poll = { question: rest.poll.question, options: (rest.poll.options || []).map((o) => o.trim()).filter(Boolean) };
+      if (rest.poll && !rest.poll.question && !rest.poll.options.length) rest.poll = null;
       const res = await call({ action: "post", post: rest });
       if (approve) await call({ action: "approve", postId: res.post.id });
       await onDone();
@@ -141,6 +144,29 @@ function PostModal({ post, photos, cfg, pid, onClose, onDone }) {
       </div>
       <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: CP.textPrimary, marginBottom: 12 }}>
         <input type="checkbox" checked={!!f.ai} disabled={sent} onChange={(e) => setF({ ...f, ai: e.target.checked })} /> Foto con parti generate con l'AI (scrivilo nel testo)
+      </label>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 12 }}>
+        <L label="Ruolo nel racconto">
+          <select style={field} value={f.role || ""} disabled={sent} onChange={(e) => setF({ ...f, role: e.target.value || null })}>
+            <option value="">—</option>
+            {TG_ROLES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+          </select>
+        </L>
+        <L label="Storia della settimana">
+          <select style={field} value={f.arcId || ""} disabled={sent} onChange={(e) => setF({ ...f, arcId: e.target.value || null })}>
+            <option value="">Nessuna</option>
+            {arcs.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
+          </select>
+        </L>
+      </div>
+      <details open={!!f.poll} style={{ marginBottom: 12 }}>
+        <summary style={{ fontSize: 13, color: CP.textSecondary, cursor: "pointer", marginBottom: 8 }}>Sondaggio (nel canale è l'unico modo per far rispondere chi legge)</summary>
+        <L label="Domanda"><input style={field} disabled={sent} value={f.poll?.question || ""} onChange={(e) => setF({ ...f, poll: { options: f.poll?.options || [], question: e.target.value } })} placeholder="Gli rispondo stavolta?" /></L>
+        <L label="Risposte" hint="Una per riga, da 2 a 10"><textarea style={{ ...field, minHeight: 70 }} disabled={sent} value={(f.poll?.options || []).join("\n")} onChange={(e) => setF({ ...f, poll: { question: f.poll?.question || "", options: e.target.value.split("\n") } })} /></L>
+        {f.poll && <button type="button" style={{ ...btn(false), padding: "3px 8px" }} disabled={sent} onClick={() => setF({ ...f, poll: null })}>Togli il sondaggio</button>}
+      </details>
+      <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: CP.textPrimary, marginBottom: 12 }}>
+        <input type="checkbox" checked={!!f.pin} disabled={sent} onChange={(e) => setF({ ...f, pin: e.target.checked })} /> Fissalo in alto nel canale (il messaggio di benvenuto)
       </label>
       <div style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary, margin: "6px 0 8px" }}>Revisori</div>
       {TG_REVIEWERS.map((r) => {
@@ -237,7 +263,7 @@ function SetupModal({ data, pid, onClose, onDone }) {
   );
 }
 
-export default function TelegramPanel({ pid }) {
+export default function TelegramPanel({ pid, arcs = [] }) {
   const url = `/api/admin/studio-social/${encodeURIComponent(pid)}/telegram`;
   const { data, error, mutate } = useSWR(url, fetcher, { revalidateOnFocus: false });
   const [editing, setEditing] = useState(null);
@@ -368,7 +394,7 @@ export default function TelegramPanel({ pid }) {
         )}
       </div>
 
-      {editing && <PostModal post={editing} photos={data.photos} cfg={cfg} pid={pid} onClose={() => setEditing(null)} onDone={async () => { setEditing(null); await mutate(); }} />}
+      {editing && <PostModal post={editing} photos={data.photos} cfg={cfg} pid={pid} arcs={arcs} onClose={() => setEditing(null)} onDone={async () => { setEditing(null); await mutate(); }} />}
       {setup && <SetupModal data={data} pid={pid} onClose={() => setSetup(false)} onDone={async () => { setSetup(false); await mutate(); }} />}
     </div>
   );

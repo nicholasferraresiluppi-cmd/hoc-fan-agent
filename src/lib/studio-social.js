@@ -4,12 +4,14 @@
 //   studio:profiles              → { [id]: profilo }
 //   studio:items:{profileId}     → { [itemId]: contenuto }
 //   studio:check:{profileId}:{giorno} → { done: [indici], by, at }   (TTL 40 giorni)
+//   studio:arcs:{profileId}      → { [arcId]: storia della settimana }  (Editoriale)
 //
 // Volumi piccoli (pochi profili, decine di contenuti a settimana): un documento per profilo,
 // read-modify-write senza lock come la roadmap (utenti pochi; vince l'ultima scrittura).
 import { kv } from "@vercel/kv";
 import { randomUUID } from "node:crypto";
 import { normalizeProfile, normalizeItem, canSchedule } from "@/lib/studio-social-core";
+import { normalizeArc } from "@/lib/studio-editorial-core";
 
 const PROFILES_KEY = "studio:profiles";
 const itemsKey = (pid) => `studio:items:${pid}`;
@@ -96,4 +98,36 @@ export async function toggleCheck(pid, day, index, done, userId) {
   const next = { done: [...set].sort((a, b) => a - b), by: userId || null, at: Date.now() };
   await kv.set(checkKey(pid, day), next, { ex: CHECK_TTL });
   return next;
+}
+
+// ── Editoriale: storie della settimana ──────────────────────────────────────
+const arcsKey = (pid) => `studio:arcs:${pid}`;
+
+export async function listArcs(pid) {
+  return Object.values((await kv.get(arcsKey(pid))) || {}).sort((a, b) => String(a.weekStart).localeCompare(String(b.weekStart)));
+}
+
+export async function saveArc(pid, input, userId) {
+  const all = (await kv.get(arcsKey(pid))) || {};
+  const prev = input?.id ? all[input.id] || null : null;
+  const { ok, errors, arc } = normalizeArc(input, prev);
+  if (!ok) return { ok, errors };
+  if (Object.values(all).some((a) => a.weekStart === arc.weekStart && a.id !== (prev?.id || arc.id))) return { ok: false, errors: ["Questa settimana ha già la sua storia"] };
+  const now = Date.now();
+  arc.id = arc.id || randomUUID().slice(0, 12);
+  arc.createdAt = prev?.createdAt || now;
+  arc.createdBy = prev?.createdBy || userId || null;
+  arc.updatedAt = now;
+  arc.updatedBy = userId || null;
+  all[arc.id] = arc;
+  await kv.set(arcsKey(pid), all);
+  return { ok: true, arc };
+}
+
+export async function removeArc(pid, id) {
+  const all = (await kv.get(arcsKey(pid))) || {};
+  if (!all[id]) return false;
+  delete all[id];
+  await kv.set(arcsKey(pid), all);
+  return true;
 }

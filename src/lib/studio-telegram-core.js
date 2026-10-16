@@ -69,7 +69,15 @@ export function normalizeTgPost(input, prev = null) {
   const max = photoIds.length ? TG_TEXT_MAX_PHOTO : TG_TEXT_MAX;
   const rawText = String(input?.text ?? "");
   const text = str(rawText, TG_TEXT_MAX);
-  if (!text && !photoIds.length) errors.push("Scrivi un testo o scegli almeno una foto");
+  // sondaggio (il canale non permette risposte: l'interazione è questa)
+  let poll = input?.poll === undefined ? prev?.poll || null : input.poll;
+  if (poll) {
+    const question = str(poll.question, 300);
+    const options = (Array.isArray(poll.options) ? poll.options : []).map((o) => str(o, 100)).filter(Boolean).slice(0, 10);
+    if (!question || options.length < 2) { if (question || options.length) errors.push("Il sondaggio vuole una domanda e almeno 2 risposte"); poll = null; }
+    else poll = { question, options };
+  }
+  if (!text && !photoIds.length && !poll) errors.push("Scrivi un testo, scegli una foto o prepara un sondaggio");
   if (text.length > max) errors.push(`Con le foto il testo può avere al massimo ${TG_TEXT_MAX_PHOTO} caratteri (ora ${text.length})`);
   const buttonUrl = str(input?.buttonUrl, 500);
   const buttonLabel = str(input?.buttonLabel, 40);
@@ -93,6 +101,12 @@ export function normalizeTgPost(input, prev = null) {
     buttonLabel: buttonUrl ? buttonLabel : "",
     sendAt,
     ai: input?.ai === undefined ? !!prev?.ai : !!input.ai,
+    poll,
+    pin: input?.pin === undefined ? !!prev?.pin : !!input.pin, // fissato in alto nel canale (il benvenuto)
+    // Editoriale: a quale storia della settimana appartiene, in che momento del giorno, con che ruolo
+    arcId: str(input?.arcId ?? prev?.arcId, 40) || null,
+    slot: ["mattina", "pomeriggio", "sera"].includes(input?.slot) ? input.slot : input?.slot === null ? null : prev?.slot || null,
+    role: str(input?.role ?? prev?.role, 20) || null,
     reviews,
     status,
   };
@@ -134,10 +148,14 @@ export function duePosts(posts, now = Date.now()) {
 export function sendPlan(post) {
   const n = (post?.photoIds || []).length;
   const button = post?.buttonUrl ? { inline_keyboard: [[{ text: post.buttonLabel || "Apri", url: post.buttonUrl }]] } : null;
-  if (n === 0) return [{ method: "sendMessage", text: post.text, button }];
-  if (n === 1) return [{ method: "sendPhoto", photo: post.photoIds[0], caption: post.text, button }];
-  const steps = [{ method: "sendMediaGroup", photos: post.photoIds, caption: post.text }];
-  if (button) steps.push({ method: "sendMessage", text: post.buttonLabel || "Apri", button });
+  const steps = [];
+  if (n === 0 && post?.text) steps.push({ method: "sendMessage", text: post.text, button: post.poll ? null : button });
+  else if (n === 1) steps.push({ method: "sendPhoto", photo: post.photoIds[0], caption: post.text, button: post.poll ? null : button });
+  else if (n > 1) steps.push({ method: "sendMediaGroup", photos: post.photoIds, caption: post.text });
+  // il sondaggio parte dopo il testo/foto; i sondaggi dei canali sono sempre anonimi
+  if (post?.poll) steps.push({ method: "sendPoll", question: post.poll.question, options: post.poll.options });
+  // pulsante a parte quando non può stare sul messaggio (album o sondaggio)
+  if (button && (n > 1 || post?.poll)) steps.push({ method: "sendMessage", text: post.buttonLabel || "Apri", button });
   return steps;
 }
 

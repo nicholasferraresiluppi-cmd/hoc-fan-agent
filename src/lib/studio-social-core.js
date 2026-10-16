@@ -175,6 +175,9 @@ export function normalizeItem(input, prev = null) {
     ai: input?.ai === undefined ? !!prev?.ai : !!input.ai,
     mediaUrl: /^https:\/\//.test(str(input?.mediaUrl, 600)) ? str(input.mediaUrl, 600) : "",
     reviews,
+    // Editoriale: a quale storia della settimana appartiene e con che ruolo
+    arcId: str(input?.arcId ?? prev?.arcId, 40) || null,
+    arcRole: str(input?.arcRole ?? prev?.arcRole, 20) || null,
     aiReview: prev?.aiReview || null, // scritto solo dall'agente qualità (studio-quality.js), mai dal browser
     createdAt: prev?.createdAt || null,
     updatedAt: null,
