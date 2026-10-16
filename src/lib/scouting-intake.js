@@ -17,9 +17,7 @@
 // 36 ore e si riprendono quando servono. Nessuna copia dei video: la scheda li riproduce
 // dal server di Instagram (che li serve anche ad altri siti: cross-origin).
 import { getProfiles, saveProfiles, getForgotten, getCrm, saveCrm, getReelMedia, setReelMedia } from "@/lib/scouting-store";
-import { normHandle, parseRefreshItem, parseInstagramLink, bestLink, linkWhere, weekKey, addNote, creatorIdOf } from "@/lib/scouting-core";
-
-const sigOf = (l) => (!l || l.strength < 1 ? "nessuno" : l.strength >= 2 ? "forte" : "debole");
+import { normHandle, parseRefreshItem, parseInstagramLink, bestLink, linkOrHint, sigFromLink, signalWhat, weekKey, addNote, creatorIdOf } from "@/lib/scouting-core";
 
 const API = "https://api.apify.com/v2";
 
@@ -114,6 +112,8 @@ async function fetchFirstHighlight(h) {
     operationMode: "highlightsByUsername", usernames: [h], maxAccounts: 1, includeHighlightItems: true,
     maxHighlightsPerAccount: 1, analyzeFrames: false, maxAnalyzedPerAccount: 0, skipPrivate: true,
   }, { maxUsd: 0.05, timeout: 120 });
+  // nessuna riga = l'attore non ha letto niente (nemmeno "nessuna evidenza"): è un fallimento
+  if (!rows.length) throw new Error("evidenza non letta");
   const urls = new Set();
   const mentions = new Set();
   for (const r of rows) {
@@ -152,7 +152,10 @@ async function fetchViaLinks(handles) {
   return out;
 }
 
-/** Evidenza + giro dei tag. Mai bloccante: senza, la scheda nasce lo stesso. */
+/**
+ * Evidenza + giro dei tag. Mai bloccante: senza, la scheda nasce lo stesso.
+ * hlVia null = evidenza NON letta (non si salva: una nuova segnalazione la riprova).
+ */
 async function readHighlight(h) {
   let hl = { urls: [], mentions: [] };
   try { hl = await fetchFirstHighlight(h); } catch { return { hlLinks: [], hlVia: null }; }
@@ -193,12 +196,12 @@ export async function processSignal({ text, by, why }) {
       const { hlLinks, hlVia } = await readHighlight(h);
       if (hlVia) {
         const next = { ...cur, hlLinks: hlLinks.length ? hlLinks : cur.hlLinks || [], hlVia, hl: (hlLinks.length || cur.hlLinks?.length) > 0 };
-        const l = bestLink([next]);
-        next.sig = sigOf(l);
+        const l = linkOrHint([next]);
+        next.sig = sigFromLink(l);
         profiles[i] = next;
-        if (l && l.strength >= 1) found = ` · ${l.strength >= 2 ? l.label : "solo una pagina di link"} ${linkWhere(l)}`;
+        found = ` · ${signalWhat(l)}`;
         await saveProfiles(profiles);
-      }
+      } else found = ` · ${signalWhat(null, { hlFailed: true })}`;
     }
     if (reel) {
       const rs = new Map((profiles[i].reels || []).map((x) => [x.sc, x]));
@@ -208,15 +211,15 @@ export async function processSignal({ text, by, why }) {
     }
     await noteOn(h, note, by);
     if (media) await cacheMedia(h, [media]);
-    return { status: "gia_nel_radar", h, msg: `@${h} era già nel radar: aggiunta la segnalazione${found}.` };
+    return { status: "gia_nel_radar", h, sig: profiles[i].sig || null, warn: found.includes("NON letta"), msg: `@${h} era già nel radar: aggiunta la segnalazione${found}.` };
   }
 
   const row = await fetchProfileRow(h);
   if (!row) return { status: "non_trovata", h, msg: `Non riesco a leggere @${h} (privato o inesistente).` };
   const { hlLinks, hlVia } = await readHighlight(h);
   const draft = { url: row.url, hlLinks, hlVia: hlVia || [] };
-  const link0 = bestLink([draft]);
-  const sig = sigOf(link0);
+  const link0 = linkOrHint([draft]);
+  const sig = sigFromLink(link0);
   const now = Date.now();
   profiles.push({
     h, fol: row.fol, medv: row.medv, vf: row.vf ?? null, sig, hl: hlLinks.length > 0, hlLinks, ...(hlVia ? { hlVia } : {}),
@@ -228,8 +231,8 @@ export async function processSignal({ text, by, why }) {
   await saveProfiles(profiles);
   await noteOn(h, note, by);
   if (media) await cacheMedia(h, [media]);
-  const what = sig === "forte" ? `${link0.label} trovato ${linkWhere(link0)}` : sig === "debole" ? `solo una pagina di link ${linkWhere(link0)}` : "nessun profilo a pagamento visibile";
-  return { status: "nuova", h, sig, msg: `@${h} aggiunta al radar · ${what}.` };
+  const what = signalWhat(link0, { hlFailed: !hlVia });
+  return { status: "nuova", h, sig, warn: !hlVia, msg: `@${h} aggiunta al radar · ${what}.` };
 }
 
 async function noteOn(h, text, by) {

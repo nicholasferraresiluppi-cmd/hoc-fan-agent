@@ -131,7 +131,7 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
               <li key={x.id} style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: "4px 16px", padding: "11px 0", borderBottom: `1px solid ${CP.borderSoft || CP.border}`, fontSize: 14 }}>
                 <span>{x.h ? <button onClick={() => { const c = creators.find((y) => y.handles.includes(x.h)); if (c) onOpen(c); }} style={{ ...btnQuiet, padding: 0, minHeight: 0, color: CP.textPrimary }}>@{x.h}</button> : <span style={{ color: CP.textSecondary }}>{x.text.slice(0, 60)}</span>}
                   <span style={{ color: CP.textMuted, fontSize: 12.5 }}> · {x.by || "—"} · {fmtDate(x.at)}{x.via === "iphone" ? " · iPhone" : ""}</span></span>
-                <span style={{ color: x.status === "nuova" && x.sig === "forte" ? CP.gold : x.status === "errore" || x.status === "non_trovata" ? CP.attn : CP.textSecondary, fontSize: 13 }}>{x.msg}</span>
+                <span style={{ color: x.sig === "forte" && x.status !== "errore" ? CP.gold : x.warn || x.status === "errore" || x.status === "non_trovata" ? CP.attn : x.sig === "debole" ? CP.textPrimary : CP.textSecondary, fontSize: 13 }}>{x.msg}</span>
               </li>
             ))}
           </ul>

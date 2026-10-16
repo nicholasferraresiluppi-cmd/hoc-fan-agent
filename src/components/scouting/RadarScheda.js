@@ -18,7 +18,12 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
   const links = [];
   for (const p of ps) {
     for (const u of p.hlLinks || []) links.push({ url: u, where: "Prima storia in evidenza", h: p.h, k: classifyUrl(u) });
-    for (const v of p.hlVia || []) for (const u of v.urls || []) links.push({ url: u, where: `Bio di @${v.h}, taggato in evidenza`, h: p.h, k: classifyUrl(u) });
+    for (const v of p.hlVia || []) {
+      if (!v?.h) continue;
+      for (const u of v.urls || []) links.push({ url: u, where: `Bio di @${v.h}, taggato in evidenza`, h: p.h, k: classifyUrl(u) });
+      // taggato senza link leggibile: lo si mostra lo stesso, lo apre una persona
+      if (!(v.urls || []).length) links.push({ url: igProfile(v.h), where: "Taggato nella prima storia in evidenza", h: p.h, k: { label: `@${v.h}${v.priv ? " (privato)" : ""}`, strength: 1 } });
+    }
     if (p.url) links.push({ url: p.url, where: "Bio", h: p.h, k: classifyUrl(p.url) });
   }
 
