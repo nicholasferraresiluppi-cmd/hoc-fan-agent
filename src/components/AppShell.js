@@ -66,7 +66,7 @@ const whoFetcher = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch((
  * Guscio di chi ha un ruolo ristretto (lib/restricted-roles, es. "Social"): niente menu, niente
  * hub, solo il nome dell'app, la pagina e l'account. Le altre pagine riportano alla sua.
  */
-const RESTRICTED_PAGE_LABEL = { "/admin/scouting": "Radar creator", "/admin/supervisor": "Account social" };
+const RESTRICTED_PAGE_LABEL = { "/admin/scouting": "Radar creator", "/admin/studio-social": "Studio social", "/admin/supervisor": "Account social" };
 
 function RestrictedShell({ restriction, allowed, children, pathname }) {
   return (
