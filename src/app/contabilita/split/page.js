@@ -14,8 +14,8 @@ import useSWR from "swr";
 import { Plus, Loader2, Lock, Trash2, Check, RefreshCw } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
-import { PageHead, FilterChip, Notice, DataTable, SectionTitle, card } from "@/components/ds";
-import { computeSplitMonth, applyBusteExclusions } from "@/lib/split-core";
+import { PageHead, FilterChip, Notice, card } from "@/components/ds";
+import { computeSplitMonth, applyBusteExclusions, activeIn } from "@/lib/split-core";
 import { describeTiers, parseDealText } from "@/lib/creator-deals-core";
 import { monthLabel, nextMonthId } from "@/lib/compensi-core";
 
@@ -56,6 +56,31 @@ function describeDeal(d) {
   return parts.join(" · ") || "da impostare";
 }
 const period = (x) => (x.from || x.to ? `${x.from ? `da ${monthLabel(x.from)}` : ""}${x.from && x.to ? " " : ""}${x.to ? `fino a ${monthLabel(x.to)}` : ""}` : "");
+
+// ── Stile fintech (15/10/2026): schede con un numero grande, etichetta a pillola, dettagli piccoli ──
+const tint = (c) => `color-mix(in srgb, ${c} 14%, transparent)`;
+const fcard = (clickable) => ({ textAlign: "left", cursor: clickable ? "pointer" : "default", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 14, padding: 16, color: CP.textPrimary, fontFamily: FONTS.body, display: "grid", gap: 6, alignContent: "start" });
+const addCard = { textAlign: "left", cursor: "pointer", background: "transparent", border: `1px dashed ${CP.border}`, borderRadius: 14, padding: 16, color: CP.textSecondary, fontFamily: FONTS.body, display: "flex", alignItems: "center", gap: 8, minHeight: 90, fontSize: 14 };
+const cardGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 };
+const bigNum = { fontSize: 24, fontWeight: 500, letterSpacing: "-0.01em", fontVariantNumeric: "tabular-nums" };
+const Pill = ({ children, tone }) => <span style={{ display: "inline-block", fontSize: 11, padding: "2px 8px", borderRadius: 20, background: tint(tone || CP.textMuted), color: tone || CP.textSecondary }}>{children}</span>;
+const Head = ({ title, aside }) => <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, margin: "4px 0 10px" }}><span style={{ fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>{title}</span>{aside != null && <span style={{ fontSize: 13, color: CP.textMuted }}>{aside}</span>}</div>;
+/** Il numero da mettere in grande per un accordo persona. */
+function dealHeadline(d) {
+  if (d.fixedEur && !d.tiers?.length) return eur(d.fixedEur);
+  if (d.fixedEur) return `${eur(d.fixedEur)} + %`;
+  if (d.min) return `min ${d.minCur === "USD" ? usd(d.min) : eur(d.min)}`;
+  if (d.tiers?.length) return d.tiers.length === 1 && !d.tiers[0].fromUsd ? pct(d.tiers[0].pct) : "a scaglioni";
+  return "—";
+}
+/** Stato temporale di un team o accordo rispetto al mese aperto. */
+function periodPill(x, m) {
+  if (x.from && m && x.from > m) return <Pill tone={CP.accentSoftText}>da {monthLabel(x.from)}</Pill>;
+  if (x.to && m && x.to < m) return <Pill>finito a {monthLabel(x.to)}</Pill>;
+  if (x.to) return <Pill tone={CP.accentSoftText}>fino a {monthLabel(x.to)}</Pill>;
+  if (x.from) return <Pill tone={CP.accentGreen}>da {monthLabel(x.from)}</Pill>;
+  return null;
+}
 
 // ── Accordo persona ──────────────────────────────────────────────────────────
 function PersonEditor({ deal, teams, onSave, onDelete, onClose }) {
@@ -343,7 +368,6 @@ export default function SplitPage() {
         {tab === "conto" && (() => {
           const creators = calc.teams.filter((t) => t.creator).sort((a, b) => b.netEur - a.netEur);
           const struttura = calc.teams.filter((t) => !t.creator);
-          const tint = (c) => `color-mix(in srgb, ${c} 14%, transparent)`;
           const Card = ({ t }) => {
             const missing = t.problems.length > 0;
             const loss = t.netEur < 0;
@@ -380,77 +404,110 @@ export default function SplitPage() {
           </>);
         })()}
 
-        {tab === "extra" && (
-          <section style={{ ...card, padding: 16 }}>
-            <SectionTitle aside={eur(T.extrasEur)}>Spese extra di {monthLabel(month)}</SectionTitle>
-            <div style={{ ...muted, marginBottom: 10 }}>Spese una tantum del mese (es. un token da 250€ a Eleonora). Valgono solo per questo mese.</div>
-            {(doc.extras || []).map((x, i) => (
-              <div key={x.id || i} style={{ display: "grid", gridTemplateColumns: "minmax(140px, 1.3fr) minmax(140px, 2fr) minmax(120px, 1.2fr) 110px auto", gap: 8, marginBottom: 6 }}>
-                <select style={small} value={x.teamId || ""} onChange={(e) => upd((d) => ({ ...d, extras: d.extras.map((y, j) => (j === i ? { ...y, teamId: e.target.value } : y)) }))}>
-                  <option value="">Agenzia (nessun team)</option>
-                  {teamsAll.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-                <input style={small} placeholder="Cosa (es. token)" value={x.label} onChange={(e) => upd((d) => ({ ...d, extras: d.extras.map((y, j) => (j === i ? { ...y, label: e.target.value } : y)) }))} />
-                <input style={small} placeholder="A chi" value={x.person || ""} onChange={(e) => upd((d) => ({ ...d, extras: d.extras.map((y, j) => (j === i ? { ...y, person: e.target.value } : y)) }))} />
-                <input style={{ ...small, textAlign: "right" }} inputMode="decimal" placeholder="€" value={x.eur} onChange={(e) => upd((d) => ({ ...d, extras: d.extras.map((y, j) => (j === i ? { ...y, eur: e.target.value } : y)) }))} />
-                <button style={btn()} onClick={() => upd((d) => ({ ...d, extras: d.extras.filter((_, j) => j !== i) }))} aria-label="Togli"><Trash2 size={14} /></button>
-              </div>
-            ))}
-            <button style={btn()} onClick={() => upd((d) => ({ ...d, extras: [...(d.extras || []), { id: tmpId(), teamId: "", label: "", person: "", eur: "" }] }))}><Plus size={14} />Spesa extra</button>
-          </section>
-        )}
-        {tab === "extra" && (doc.excludedBuste || []).length > 0 && (
-          <section style={{ ...card, padding: 16, marginTop: 14 }}>
-            <SectionTitle aside={(doc.excludedBuste || []).length}>Buste escluse dal chatter di {monthLabel(month)}</SectionTitle>
-            {doc.excludedBuste.map((x) => (
-              <div key={x.name} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 13, padding: "6px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
-                <span><span style={{ color: CP.textPrimary }}>{x.name}</span>{x.note ? <span style={muted}> · {x.note}</span> : null}</span>
-                <button style={{ ...btn(), padding: "2px 8px", fontSize: 12 }} onClick={() => includeBusta(x.name)}>Rimetti (poi «Prendi dai dati»)</button>
-              </div>
-            ))}
-          </section>
-        )}
+        {tab === "extra" && (<>
+          <Head title={`Spese extra di ${monthLabel(month)}`} aside={eur(T.extrasEur)} />
+          <div style={{ ...muted, margin: "-4px 0 10px" }}>Spese una tantum: valgono solo per questo mese (es. un token da 250 € a Eleonora).</div>
+          <div style={cardGrid}>
+            {(doc.extras || []).map((x, i) => {
+              const set = (k, v) => upd((d) => ({ ...d, extras: d.extras.map((y, j) => (j === i ? { ...y, [k]: v } : y)) }));
+              return (
+                <div key={x.id || i} style={fcard(false)}>
+                  <input style={{ ...small, fontSize: 22, fontWeight: 500, textAlign: "left", padding: "4px 8px" }} inputMode="decimal" placeholder="€" value={x.eur} onChange={(e) => set("eur", e.target.value)} />
+                  <input style={small} placeholder="Cosa (es. token)" value={x.label} onChange={(e) => set("label", e.target.value)} />
+                  <input style={small} placeholder="A chi" value={x.person || ""} onChange={(e) => set("person", e.target.value)} />
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <select style={{ ...small, flex: 1 }} value={x.teamId || ""} onChange={(e) => set("teamId", e.target.value)}>
+                      <option value="">Agenzia (nessun team)</option>
+                      {teamsAll.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                    <button style={{ ...btn(), padding: "4px 8px" }} onClick={() => upd((d) => ({ ...d, extras: d.extras.filter((_, j) => j !== i) }))} aria-label="Togli"><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              );
+            })}
+            <button style={addCard} onClick={() => upd((d) => ({ ...d, extras: [...(d.extras || []), { id: tmpId(), teamId: "", label: "", person: "", eur: "" }] }))}><Plus size={16} />Aggiungi spesa</button>
+          </div>
+          {(doc.excludedBuste || []).length > 0 && (<>
+            <div style={{ height: 22 }} />
+            <Head title="Buste escluse dal chatter" aside={doc.excludedBuste.length} />
+            <div style={cardGrid}>
+              {doc.excludedBuste.map((x) => (
+                <div key={x.name} style={fcard(false)}>
+                  <span style={{ fontSize: 13, color: CP.textSecondary }}>{x.name}</span>
+                  <div><Pill tone={CP.accentSoftText}>esclusa da {monthLabel(month)}</Pill></div>
+                  {x.note && <div style={{ fontSize: 12, color: CP.textMuted }}>{x.note}</div>}
+                  <button style={{ ...btn(), padding: "4px 10px", fontSize: 12, justifySelf: "start" }} onClick={() => includeBusta(x.name)}>Rimetti (poi «Prendi dai dati»)</button>
+                </div>
+              ))}
+            </div>
+          </>)}
+        </>)}
 
-        {tab === "persone" && (
-          <DataTable
-            minWidth={760}
-            defaultSort={{ key: "eur", dir: -1 }}
-            rows={calc.people.map((p) => ({ ...p, id: p.key }))}
-            columns={[
-              { key: "person", label: "Persona", render: (p) => <div><div style={{ color: CP.textPrimary }}>{p.person}</div><div style={muted}>{p.roles.join(" · ")}</div></div> },
-              { key: "deals", label: "Accordi del mese", sort: (p) => p.deals.length, render: (p) => (
-                <div style={{ display: "grid", gap: 2 }}>{p.deals.map((d) => <div key={d.id} style={{ fontSize: 13 }}>{d.teamIds.map(teamName).join(" + ") || "agenzia"}: {describeDeal(d)} → <strong style={{ fontWeight: 500 }}>{eur(d.cost.eur)}</strong></div>)}</div>) },
-              { key: "eur", label: "Totale", align: "right", render: (p) => <strong style={{ fontWeight: 500 }}>{eur(p.eur)}</strong> },
-            ]}
-          />
-        )}
+        {tab === "persone" && (<>
+          <Head title={`Chi costa quanto a ${monthLabel(month)}`} aside={`${calc.people.length} persone · ${eur(T.staffEur)}`} />
+          <div style={cardGrid}>
+            {calc.people.map((p) => (
+              <div key={p.key} style={fcard(false)}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ fontSize: 13, color: CP.textSecondary }}>{p.person}</span>
+                  <span style={{ fontSize: 12, color: CP.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.roles[0] || ""}</span>
+                </div>
+                <div style={bigNum}>{eur(p.eur)}</div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {p.deals.some((d) => d.cost.minApplied) && <Pill tone={CP.accentSoftText}>vale il minimo</Pill>}
+                  {p.deals.some((d) => d.cost.commissionEur > 0 && !d.cost.minApplied) && <Pill tone={CP.accentGreen}>con percentuale</Pill>}
+                  {p.deals.length > 1 && <Pill>{p.deals.length} accordi</Pill>}
+                </div>
+                <div style={{ display: "grid", gap: 2 }}>
+                  {p.deals.map((d) => <div key={d.id} style={{ fontSize: 12, color: CP.textMuted, display: "flex", justifyContent: "space-between", gap: 8 }}><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.teamIds.map(teamName).join(" + ") || "agenzia"}</span><span style={{ fontVariantNumeric: "tabular-nums" }}>{eur(d.cost.eur)}</span></div>)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>)}
       </>)}
 
       {tab === "accordi" && (
-        <div style={{ display: "grid", gap: 14 }}>
+        <div style={{ display: "grid", gap: 10 }}>
           {!owner && <Notice>Gli accordi li modifica solo il titolare.</Notice>}
-          <section style={{ ...card, padding: 16 }}>
-            <SectionTitle aside={`${teamsAll.length} team`}>Team e accordi con le creator</SectionTitle>
+          <Head title="Creator e accordi" aside={`${teamsAll.length} team`} />
+          <div style={cardGrid}>
             {teamsAll.map((t) => (
-              <div key={t.id} onClick={owner ? () => setEditTeam({ team: t, isNew: false }) : undefined} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 0", borderTop: `1px solid ${CP.borderSoft}`, cursor: owner ? "pointer" : "default", fontSize: 13 }}>
-                <span><span style={{ color: CP.textPrimary }}>{t.name}</span>{t.manager ? <span style={muted}> · {t.manager}</span> : null}{period(t) ? <span style={muted}> · {period(t)}</span> : null}</span>
-                <span style={{ color: CP.textSecondary, textAlign: "right" }}>{t.creator ? (t.tiers?.length ? describeTiers(t.tiers) : "accordo da impostare") : "senza creator"}</span>
-              </div>
+              <button key={t.id} onClick={owner ? () => setEditTeam({ team: t, isNew: false }) : undefined} style={fcard(owner)}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ fontSize: 13, color: CP.textSecondary }}>{t.name}</span>
+                  {t.manager && <span style={{ fontSize: 12, color: CP.textMuted }}>{t.manager.split(" ")[0]}</span>}
+                </div>
+                <div style={{ ...bigNum, fontSize: t.tiers?.length > 1 ? 18 : 24 }}>{t.creator ? (t.tiers?.length ? (t.tiers.length === 1 ? pct(t.tiers[0].pct) : "a scaglioni") : "—") : "struttura"}</div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {t.creator && !t.tiers?.length ? <Pill tone={CP.accentSoftText}>accordo da impostare</Pill> : null}
+                  {periodPill(t, month)}
+                  {t.creator && t.tiers?.length === 1 && <Pill>flat</Pill>}
+                </div>
+                {t.creator && t.tiers?.length > 1 && <div style={{ fontSize: 12, color: CP.textMuted }}>{describeTiers(t.tiers)}</div>}
+                <div style={{ fontSize: 12, color: CP.textMuted }}>{cfg.people.filter((d) => d.teamIds.includes(t.id) && activeIn(d, month)).length} persone su questo team</div>
+              </button>
             ))}
-            {owner && <button style={{ ...btn(), marginTop: 10 }} onClick={() => setEditTeam({ team: { name: "", creator: "", dealText: "", manager: "", creatorIds: [], cpAliases: [], from: null, to: null, note: "" }, isNew: true })}><Plus size={14} />Nuovo team</button>}
-          </section>
-          <section style={{ ...card, padding: 16 }}>
-            <SectionTitle aside={`${cfg.people.length} accordi`}>Accordi con le persone</SectionTitle>
-            <div style={{ ...muted, marginBottom: 6 }}>Una riga per accordo: la stessa persona può averne più di uno (es. una % diversa per creator, o un extra a tempo).</div>
+            {owner && <button style={addCard} onClick={() => setEditTeam({ team: { name: "", creator: "", dealText: "", manager: "", creatorIds: [], cpAliases: [], from: null, to: null, note: "" }, isNew: true })}><Plus size={16} />Nuovo team</button>}
+          </div>
+          <div style={{ height: 14 }} />
+          <Head title="Accordi con le persone" aside={`${cfg.people.length} accordi`} />
+          <div style={{ ...muted, margin: "-4px 0 10px" }}>Una scheda per accordo: la stessa persona può averne più di uno (una % diversa per creator, o un extra a tempo).</div>
+          <div style={cardGrid}>
             {[...cfg.people].sort((a, b) => (a.person || "").localeCompare(b.person || "", "it")).map((d) => (
-              <div key={d.id} onClick={owner ? () => setEditDeal({ deal: d, isNew: false }) : undefined} style={{ display: "grid", gridTemplateColumns: "minmax(160px, 1fr) minmax(160px, 1fr) minmax(200px, 2fr)", gap: 10, padding: "8px 0", borderTop: `1px solid ${CP.borderSoft}`, cursor: owner ? "pointer" : "default", fontSize: 13 }}>
-                <span><span style={{ color: CP.textPrimary }}>{d.person || "(da assegnare)"}</span> <span style={muted}>{d.role}</span></span>
-                <span style={{ color: CP.textSecondary }}>{d.teamIds.map(teamName).join(" + ") || "agenzia"}{period(d) ? <span style={muted}> · {period(d)}</span> : null}</span>
-                <span style={{ color: CP.textSecondary }}>{describeDeal(d)}{d.note ? <span style={muted}> · {d.note}</span> : null}</span>
-              </div>
+              <button key={d.id} onClick={owner ? () => setEditDeal({ deal: d, isNew: false }) : undefined} style={{ ...fcard(owner), opacity: d.to && month && d.to < month ? 0.55 : 1 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ fontSize: 13, color: CP.textSecondary }}>{d.person || "(da assegnare)"}</span>
+                  <span style={{ fontSize: 12, color: CP.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "50%" }}>{d.role}</span>
+                </div>
+                <div style={bigNum}>{dealHeadline(d)}</div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{periodPill(d, month)}<Pill>{d.teamIds.map(teamName).join(" + ") || "agenzia"}</Pill></div>
+                <div style={{ fontSize: 12, color: CP.textMuted }}>{describeDeal(d)}</div>
+                {d.note && <div style={{ fontSize: 12, color: CP.textMuted, fontStyle: "italic" }}>{d.note}</div>}
+              </button>
             ))}
-            {owner && <button style={{ ...btn(), marginTop: 10 }} onClick={() => setEditDeal({ deal: { person: "", role: "", teamIds: [], alloc: "uguale", fixedEur: null, pctText: "", capUsd: null, min: null, minCur: "EUR", from: null, to: null, note: "" }, isNew: true })}><Plus size={14} />Nuovo accordo persona</button>}
-          </section>
+            {owner && <button style={addCard} onClick={() => setEditDeal({ deal: { person: "", role: "", teamIds: [], alloc: "uguale", fixedEur: null, pctText: "", capUsd: null, min: null, minCur: "EUR", from: null, to: null, note: "" }, isNew: true })}><Plus size={16} />Nuovo accordo persona</button>}
+          </div>
         </div>
       )}
 
