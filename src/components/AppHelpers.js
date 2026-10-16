@@ -4,7 +4,7 @@
 //  - SecurityBanner: avvisa gli admin che non hanno la verifica in due passaggi
 //  - FeedbackButton: "Segnala o suggerisci" da qualsiasi pagina (la pagina è allegata)
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { useClerk } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
@@ -27,19 +27,19 @@ export function SecurityBanner() {
   return (
     <div className="hoc-banner" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: CP.dangerSoft, borderBottom: `1px solid ${CP.border}`, fontSize: 13, color: CP.textPrimary, flexWrap: "wrap" }}>
       <ShieldAlert size={16} color={CP.accentRed} />
-      <style>{`.hoc-b-short{display:none}@media (max-width:699px){.hoc-b-long{display:none}.hoc-b-short{display:inline}.hoc-banner{flex-wrap:nowrap !important;padding:8px 14px !important}}`}</style>
+      <style>{`.hoc-b-short{display:none}@media (max-width:699px){.hoc-b-long{display:none}.hoc-b-short{display:inline}.hoc-banner{flex-wrap:nowrap !important;padding:8px 12px !important;font-size:13px !important}.hoc-b-later{padding:6px 8px !important;border:0 !important}}`}</style>
       <span style={{ flex: "1 1 auto", minWidth: 0 }}>
         {sec.mfa_required
           ? "I poteri da admin sono sospesi: il tuo account non ha la verifica in due passaggi, che ora è obbligatoria per gli admin."
           : <><span className="hoc-b-long">Sei admin e vedi i dati di tutti: proteggi l&apos;account con la verifica in due passaggi (un codice dal telefono oltre alla password).</span><span className="hoc-b-short">Attiva la verifica in due passaggi.</span></>}
       </span>
       <button onClick={() => openUserProfile()} style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: CP.accent, color: CP.accentInk, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
-        Attivala ora
+        <span className="hoc-b-long">Attivala ora</span><span className="hoc-b-short">Attiva</span>
       </button>
       {!sec.mfa_required && (
         <button onClick={() => { try { localStorage.setItem("hoc:mfa-snooze", String(Date.now() + 86400000)); } catch {} setSnoozed(true); }}
-          style={{ padding: "6px 10px", borderRadius: 7, border: `1px solid ${CP.border}`, background: "transparent", color: CP.textSecondary, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
-          Più tardi
+          aria-label="Più tardi" className="hoc-b-later" style={{ padding: "6px 10px", borderRadius: 7, border: `1px solid ${CP.border}`, background: "transparent", color: CP.textSecondary, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+          <span className="hoc-b-long">Più tardi</span><span className="hoc-b-short" style={{ lineHeight: 0 }}><X size={14} /></span>
         </button>
       )}
     </div>
@@ -52,6 +52,12 @@ export function FeedbackButton() {
   const [kind, setKind] = useState("problem");
   const [text, setText] = useState("");
   const [state, setState] = useState(null); // null | sending | sent | error msg
+  // dal menu (telefono, stile Casa) il bottone galleggiante è nascosto: si apre con un evento
+  useEffect(() => {
+    const o = () => setOpen(true);
+    window.addEventListener("hoc:feedback", o);
+    return () => window.removeEventListener("hoc:feedback", o);
+  }, []);
 
   const send = async () => {
     setState("sending");
@@ -69,8 +75,8 @@ export function FeedbackButton() {
         <MessageSquarePlus size={15} /> <span className="hoc-fb-label">Segnala o suggerisci</span>
       </button>
       {open && (
-        <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(5,7,10,0.6)", display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 16 }}>
-          <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Segnala o suggerisci"
+        <div className="hoc-fb-wrap" onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(5,7,10,0.6)", display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 16 }}>
+          <div className="hoc-fb-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Segnala o suggerisci"
             style={{ width: "100%", maxWidth: 380, background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 14, padding: 18 }}>
             <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontSize: 15, fontWeight: 500, flex: 1 }}>Segnala o suggerisci</div>

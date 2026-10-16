@@ -13,6 +13,8 @@
  */
 import HocPalma from "@/components/HocPalma";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import useSWR from "swr";
 import { Search, Menu, Home, Gauge, Wallet, Compass, MoreHorizontal, LayoutDashboard, Trophy, Target } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
@@ -50,17 +52,69 @@ export function V3TopBar({ onSearch }) {
   );
 }
 
+/**
+ * Titolo "che sale" come nelle app del telefono (16/10/2026): quando il titolo della pagina
+ * (h1 di PageHead, attributo data-title) passa sotto la barra in alto, la barra mostra il nome
+ * della pagina al posto del simbolo; la riga sotto la barra compare solo quando si è scorso.
+ * Pagine senza PageHead: resta il simbolo, come prima.
+ */
+function useCollapsedTitle(barRef) {
+  const pathname = usePathname();
+  const [title, setTitle] = useState(null);
+  const [shown, setShown] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    setTitle(null); setShown(false);
+    let h1 = null, raf = 0;
+    const measure = () => {
+      raf = 0;
+      setScrolled(window.scrollY > 4);
+      if (!h1 || !h1.isConnected) { setShown(false); return; }
+      const bar = barRef.current?.getBoundingClientRect().bottom || 56;
+      const r = h1.getBoundingClientRect();
+      // display:none (es. scheda aperta che nasconde la testata) = rettangolo vuoto → titolo in barra
+      setShown(r.height === 0 || r.bottom < bar + 4);
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(measure); };
+    const attach = () => {
+      const el = document.querySelector(".hoc-main .ds-h1[data-title]");
+      if (el === h1) return;
+      h1 = el;
+      setTitle(el ? el.dataset.title : null);
+      onScroll();
+    };
+    attach();
+    const main = document.querySelector(".hoc-main");
+    const mo = new MutationObserver(attach);
+    if (main) mo.observe(main, { childList: true, subtree: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      mo.disconnect();
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [pathname, barRef]);
+  return { title: shown ? title : null, scrolled };
+}
+
 export function V3MobileHeader({ onSearch, onMenu }) {
   const iconBtn = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, borderRadius: 12, border: "none", background: "transparent", color: CP.textPrimary, cursor: "pointer" };
+  const barRef = useRef(null);
+  const { title, scrolled } = useCollapsedTitle(barRef);
   return (
-    <div className="hoc-v3-mhead" style={{
+    <div ref={barRef} className="hoc-v3-mhead" data-scrolled={scrolled ? "1" : undefined} data-titled={title ? "1" : undefined} style={{
       position: "sticky", top: 0, zIndex: 40, alignItems: "center", gap: 4,
       paddingTop: "env(safe-area-inset-top)", paddingLeft: 12, paddingRight: 8, minHeight: 56,
-      background: CP.bg, borderBottom: `1px solid ${CP.border}`,
+      background: CP.bg, borderBottom: `1px solid ${scrolled ? CP.border : "transparent"}`, transition: "border-color .2s",
     }}>
-      <Link href="/welcome" aria-label="HOC Pro, pagina iniziale" className="hoc-v3-btn" style={{ ...iconBtn, marginRight: "auto" }}>
+      <Link href="/welcome" aria-label="HOC Pro, pagina iniziale" className="hoc-v3-btn hoc-v3-logo" style={{ ...iconBtn, marginRight: "auto" }}>
         <HocPalma width={68} title="House of Creators" style={{ display: "block", color: CP.gold }} />
       </Link>
+      {/* tocco sul titolo = torna in cima, come la barra di stato dell'iPhone */}
+      <button type="button" className="hoc-v3-mtitle" tabIndex={title ? 0 : -1} aria-hidden={title ? undefined : "true"}
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} title="Torna in cima">{title || ""}</button>
       <button type="button" className="hoc-v3-btn" onClick={onSearch} aria-label="Cerca una pagina" style={iconBtn}><Search size={20} /></button>
       <DataStatus compact />
       <button type="button" className="hoc-v3-btn" onClick={onMenu} aria-label="Apri menu" style={iconBtn}><Menu size={22} /></button>
