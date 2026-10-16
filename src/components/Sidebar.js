@@ -112,6 +112,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/telegram",                 label: "Canali Telegram", icon: Send },
       { href: "/admin/sales-ai",                 label: "Sales manager AI", icon: Bot },
       { href: "/admin/manuale-vendite",          label: "Manuale vendite", icon: BookMarked },
+      { href: "/admin/prova-fedelta",            label: "Prova fedeltà", icon: FlaskConical },
     ],
   },
   {
