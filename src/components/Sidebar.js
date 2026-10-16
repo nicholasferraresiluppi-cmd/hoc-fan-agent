@@ -246,6 +246,8 @@ function NavItem({ href, label, icon: Icon, isActive, badge, badgeTone }) {
   return (
     <Link
       href={href}
+      aria-current={isActive ? "page" : undefined}
+      data-on={isActive ? "1" : undefined}
       style={{
         display: "flex",
         alignItems: "center",
@@ -254,8 +256,10 @@ function NavItem({ href, label, icon: Icon, isActive, badge, badgeTone }) {
         margin: "1px 8px",
         borderRadius: 8,
         textDecoration: "none",
-        color: isActive ? CP.textPrimary : CP.textSecondary,
-        background: isActive ? CP.surfaceAlt : "transparent",
+        // voce attiva (16/10): "sei qui" a colpo d'occhio — fondo accento, bordo, barretta; hover resta neutro
+        color: isActive ? CP.accentSoftText : CP.textSecondary,
+        background: isActive ? CP.accentSoft : "transparent",
+        boxShadow: isActive ? `inset 0 0 0 1px ${CP.accentDim}` : "none",
         fontSize: 13,
         fontWeight: isActive ? 500 : 400,
         fontFamily: FONTS.body,
@@ -277,11 +281,11 @@ function NavItem({ href, label, icon: Icon, isActive, badge, badgeTone }) {
     >
       {isActive && (
         <span style={{
-          position: "absolute", left: -8, top: "20%", bottom: "20%",
+          position: "absolute", left: -8, top: "18%", bottom: "18%",
           width: 3, background: CP.accent, borderRadius: "0 3px 3px 0",
         }} />
       )}
-      <Icon size={16} strokeWidth={1.8} />
+      <Icon size={16} strokeWidth={isActive ? 2.2 : 1.8} color={isActive ? CP.accent : "currentColor"} />
       <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
       {badge > 0 && (
         <span style={{
@@ -296,7 +300,7 @@ function NavItem({ href, label, icon: Icon, isActive, badge, badgeTone }) {
   );
 }
 
-function GroupHeader({ label, isOpen, onToggle, visibleCount }) {
+function GroupHeader({ label, isOpen, onToggle, visibleCount, hasActive }) {
   return (
     <button
       onClick={onToggle}
@@ -308,7 +312,7 @@ function GroupHeader({ label, isOpen, onToggle, visibleCount }) {
         padding: "6px 12px",
         background: "transparent",
         border: "none",
-        color: CP.textMuted,
+        color: hasActive ? CP.textPrimary : CP.textMuted,
         fontFamily: FONTS.mono,
         fontSize: 10,
         fontWeight: 700,
@@ -318,13 +322,16 @@ function GroupHeader({ label, isOpen, onToggle, visibleCount }) {
         borderRadius: 6,
       }}
       onMouseEnter={(e) => e.currentTarget.style.color = CP.textSecondary}
-      onMouseLeave={(e) => e.currentTarget.style.color = CP.textMuted}
+      onMouseLeave={(e) => e.currentTarget.style.color = hasActive ? CP.textPrimary : CP.textMuted}
     >
       <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
         {isOpen ? <ChevronDown size={11} strokeWidth={2.4} /> : <ChevronRight size={11} strokeWidth={2.4} />}
         {label}
       </span>
-      {!isOpen && visibleCount > 0 && (
+      {!isOpen && hasActive ? (
+        // gruppo chiuso ma sei dentro una sua pagina: un punto accento dice dove sei
+        <span title="Sei qui" style={{ width: 6, height: 6, borderRadius: 3, background: CP.accent }} />
+      ) : !isOpen && visibleCount > 0 && (
         <span style={{ fontSize: 9, opacity: 0.7 }}>{visibleCount}</span>
       )}
     </button>
@@ -458,6 +465,10 @@ export default function Sidebar() {
   };
 
   const isEssential = viewMode === "essential";
+  // la voce accesa resta sempre in vista nel menu che scorre
+  useEffect(() => {
+    try { document.querySelector('.hoc-side nav a[data-on="1"]')?.scrollIntoView({ block: "nearest" }); } catch {}
+  }, [pathname, openGroups]);
 
   // Mansione (03/10/2026, lib/workspaces): Board / Sales Manager / HR hanno un menu corto col loro lavoro;
   // "Tutti gli strumenti" (o nessuna mansione) = il menu di sempre. Solo ordine: i permessi non cambiano.
@@ -572,6 +583,7 @@ export default function Sidebar() {
                 isOpen={isOpen}
                 onToggle={() => toggleGroup(group.label)}
                 visibleCount={visibleItems.length}
+                hasActive={visibleItems.some(isItemActive)}
               />
               {isOpen && (
                 <div>

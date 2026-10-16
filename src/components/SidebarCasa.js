@@ -130,6 +130,10 @@ export default function SidebarCasa() {
   // Pagina corrente fuori dal menu corto → si apre l'elenco completo, così si vede dove si è
   const inShort = (wsOn && pathname === "/admin") || sections.some((s) => s.items.some(isActive));
   const shortHrefs = new Set(sections.flatMap((s) => s.items.map((i) => i.href)));
+  // la voce accesa resta sempre in vista, anche in fondo a "Tutti gli strumenti"
+  useEffect(() => {
+    try { document.querySelector(".casa-nav a.on")?.scrollIntoView({ block: "nearest" }); } catch {}
+  }, [pathname, me, tools]);
 
   return (
     <aside className="hoc-side casa-side" style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: SIDEBAR_WIDTH, zIndex: 50 }}>
