@@ -35,8 +35,7 @@ import {
   History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
 Megaphone, Share2, Shield, BookUser,
   LineChart,
-  FileSignature,
-} from "lucide-react";
+  FileSignature, Repeat } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
 import WorkspaceSwitch from "@/components/WorkspaceSwitch";
@@ -118,6 +117,7 @@ const NAV_GROUPS_RAW = [
     defaultOpen: true,
     items: [
       { href: "/admin/pnl-live",                 label: "P&L Live",              icon: Wallet },
+      { href: "/admin/retention",                label: "Retention fan",         icon: Repeat },
       { href: "/admin/profiles-compare",         label: "Scaglioni a confronto", icon: Scale },
       { href: "/admin/comp-calendar",            label: "Calendario compensi",   icon: CalendarDays },
       { href: "/admin/threshold-study",          label: "Studio soglie",         icon: Ruler },
