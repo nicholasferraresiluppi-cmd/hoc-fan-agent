@@ -15,8 +15,8 @@
  */
 import { kv } from "@vercel/kv";
 import { runOnSource } from "@/lib/analisi-vendite";
-import { HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
-import { summarySql, cohortSql } from "@/lib/retention-split-sql";
+import { HOC_ORGANIZATION_ID, bqQuery, bqProjects } from "@/lib/bigquery-api";
+import { summarySql, cohortSql, pausedFansSql, returnedFansSql } from "@/lib/retention-split-sql";
 export { VALUE_FAN_USD, PAUSE_DAYS, REPEAT_DAYS } from "@/lib/retention-split-sql";
 import { listSplits } from "@/lib/sales-coaching";
 import { pagesFor } from "@/lib/live-creators-store";
@@ -82,4 +82,43 @@ export async function getRetention({ force = false } = {}) {
   const fresh = await computeRetention();
   await kv.set(cacheKey(), fresh, { ex: 26 * 3600 }).catch(() => {});
   return fresh;
+}
+
+// ── Fan da far riprendere (16/10/2026, Nicholas: «procederei con la lista dei fan in pausa») ──
+// Unica superficie della retention con fan NOMINATI: si apre una pagina alla volta,
+// ogni apertura finisce nel registro (route). Legge il warehouse diretto (ws_chat non ha copia di backup).
+const fansKey = (id) => `retention:fans:${RETENTION_VERSION}:${new Date().toISOString().slice(0, 10)}:${id}`;
+
+export async function getPausedFans(creatorId, { force = false } = {}) {
+  const cid = Number(creatorId);
+  const page = (await splitPages()).find((p) => p.creator_id === cid);
+  if (!page) throw new Error("Questa pagina non è nello split");
+  if (!force) {
+    const hit = await kv.get(fansKey(cid)).catch(() => null);
+    if (hit) return { ...hit, cached: true };
+  }
+  const { dataProject } = bqProjects();
+  const t = {
+    attributed: `${dataProject}.onlyfans.attributed_transactions`,
+    chat: `${dataProject}.onlyfans.chat`,
+    users: `${dataProject}.postgres.public_users`,
+    wsChat: `${dataProject}.hoc.ws_chat`,
+  };
+  const [fans, back] = await Promise.all([
+    bqQuery(pausedFansSql(t, cid, HOC_ORGANIZATION_ID), { maxBytesBilled: 12 * 1024 ** 3 }),
+    bqQuery(returnedFansSql(t, cid, HOC_ORGANIZATION_ID), { maxBytesBilled: MAX_BYTES }),
+  ]);
+  const out = {
+    creator_id: cid, name: page.name, computed_at: Date.now(),
+    returned: { fans: num(back.rows[0]?.fans), spentSince: num(back.rows[0]?.spent_since) },
+    fans: fans.rows.map((r) => ({
+      userId: String(r.user_id), name: r.name || "", username: r.username || "",
+      lastBuy: r.last_buy, days: num(r.days), r365: num(r.r365), monthly: num(r.monthly), life: num(r.life),
+      fanLast: r.fan_last || null, ourLast: r.our_last || null,
+      sub: r.sub_on === true || r.sub_on === "true" ? (r.expired === true || r.expired === "true" ? "scaduto" : "attivo") : r.expired === true || r.expired === "true" ? "scaduto" : "non noto",
+      seen: r.seen || null,
+    })),
+  };
+  await kv.set(fansKey(cid), out, { ex: 26 * 3600 }).catch(() => {});
+  return out;
 }

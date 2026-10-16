@@ -81,3 +81,72 @@ SELECT creator_id, FORMAT_DATE('%Y-%m', first_d) month, COUNT(*) fans, ROUND(SUM
 FROM f GROUP BY 1, 2 ORDER BY 1, 2`;
 }
 
+
+/**
+ * Fan di valore IN PAUSA di una pagina, nominati (16/10/2026, decisione di Nicholas:
+ * la lista serve ai chatter per farli riprendere). Per ognuno: quanto spendeva al mese
+ * prima di fermarsi, ultimo acquisto, ultimo messaggio del fan e nostro (onlyfans.chat,
+ * D-1), stato dell'abbonamento all'ultimo messaggio visto (hoc.ws_chat.user_data).
+ * `t` = { attributed, chat, users, wsChat } tabelle complete. ~7 GB a pagina (ws_chat).
+ */
+export function pausedFansSql(t, creatorId, org = HOC_ORG) {
+  const cid = Number(creatorId);
+  if (!Number.isInteger(cid) || cid <= 0) throw new Error("creator_id non valido");
+  return `
+WITH tx AS (
+  SELECT user_id, calendar_date d, SUM(net) net
+  FROM \`${t.attributed}\`
+  WHERE creator_id = ${cid} AND organization_id = '${org}' AND user_id IS NOT NULL
+  GROUP BY 1, 2
+),
+fan AS (
+  SELECT user_id, MAX(d) last_d, SUM(IF(d > DATE_SUB(CURRENT_DATE(), INTERVAL 365 DAY), net, 0)) r365, SUM(net) life
+  FROM tx GROUP BY 1
+),
+paused AS (
+  SELECT f.user_id, f.last_d, f.r365, f.life, SUM(t.net) / 6 monthly
+  FROM fan f JOIN tx t ON t.user_id = f.user_id AND t.d > DATE_SUB(f.last_d, INTERVAL 180 DAY)
+  WHERE f.r365 >= ${VALUE_FAN_USD} AND f.last_d <= DATE_SUB(CURRENT_DATE(), INTERVAL ${PAUSE_DAYS[0]} DAY) AND f.last_d > DATE_SUB(CURRENT_DATE(), INTERVAL ${PAUSE_DAYS[1]} DAY)
+  GROUP BY 1, 2, 3, 4
+),
+msg AS (
+  SELECT c.user_id, MAX(IF(c.sender_id = c.user_id, c.created_at, NULL)) fan_last, MAX(IF(c.sender_id != c.user_id, c.created_at, NULL)) our_last
+  FROM \`${t.chat}\` c JOIN paused p USING (user_id)
+  WHERE c.creator_id = ${cid} AND c.created_at > TIMESTAMP(DATE_SUB(CURRENT_DATE(), INTERVAL 365 DAY))
+  GROUP BY 1
+),
+sub AS (
+  SELECT w.user_id, w.created_at seen_at, SAFE.BOOL(w.user_data.subscribedOn) sub_on, SAFE.BOOL(w.user_data.subscribedOnExpiredNow) expired
+  FROM \`${t.wsChat}\` w JOIN paused p USING (user_id)
+  WHERE w.creator_id = ${cid} AND w.created_at > TIMESTAMP(DATE_SUB(CURRENT_DATE(), INTERVAL 180 DAY)) AND w.user_data IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY w.user_id ORDER BY w.created_at DESC) = 1
+)
+SELECT p.user_id, u.name, u.username, FORMAT_DATE('%Y-%m-%d', p.last_d) last_buy, DATE_DIFF(CURRENT_DATE(), p.last_d, DAY) days,
+  ROUND(p.r365, 2) r365, ROUND(p.monthly, 2) monthly, ROUND(p.life, 2) life,
+  FORMAT_TIMESTAMP('%Y-%m-%d', m.fan_last) fan_last, FORMAT_TIMESTAMP('%Y-%m-%d', m.our_last) our_last,
+  s.sub_on, s.expired, FORMAT_TIMESTAMP('%Y-%m-%d', s.seen_at) seen
+FROM paused p
+LEFT JOIN \`${t.users}\` u ON u.id = p.user_id
+LEFT JOIN msg m USING (user_id) LEFT JOIN sub s USING (user_id)
+ORDER BY p.monthly DESC`;
+}
+
+/** Fan di valore RIPRESI: ultimo acquisto negli ultimi 30 giorni dopo una pausa di almeno 30. Misura se la lista funziona. */
+export function returnedFansSql(t, creatorId, org = HOC_ORG) {
+  const cid = Number(creatorId);
+  if (!Number.isInteger(cid) || cid <= 0) throw new Error("creator_id non valido");
+  return `
+WITH tx AS (
+  SELECT user_id, calendar_date d, SUM(net) net FROM \`${t.attributed}\`
+  WHERE creator_id = ${cid} AND organization_id = '${org}' AND user_id IS NOT NULL GROUP BY 1, 2
+),
+seq AS (SELECT user_id, d, net, LAG(d) OVER (PARTITION BY user_id ORDER BY d) prev_d FROM tx),
+back AS (
+  SELECT user_id, MIN(d) back_d FROM seq
+  WHERE d > DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY) AND prev_d <= DATE_SUB(d, INTERVAL ${PAUSE_DAYS[0]} DAY)
+  GROUP BY 1
+),
+val AS (SELECT user_id, SUM(IF(d > DATE_SUB(CURRENT_DATE(), INTERVAL 395 DAY) AND d <= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY), net, 0)) r365_before FROM tx GROUP BY 1)
+SELECT COUNT(*) fans, ROUND(SUM((SELECT SUM(t.net) FROM tx t WHERE t.user_id = b.user_id AND t.d >= b.back_d)), 2) spent_since
+FROM back b JOIN val v USING (user_id) WHERE v.r365_before >= ${VALUE_FAN_USD}`;
+}
