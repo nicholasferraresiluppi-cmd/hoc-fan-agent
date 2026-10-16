@@ -16,6 +16,7 @@
  */
 import { useEffect } from "react";
 import { CP, FONTS, creatorDotColor, alpha } from "@/lib/brand";
+import { useIsPhone } from "@/lib/use-phone";
 
 export function SectionLabel({ children, color, size = 10, style }) {
   return (
@@ -324,15 +325,24 @@ export function PillTab({ active, onClick, children, icon, style }) {
  * overlay o Escape. Contenuto libero via children.
  */
 export function Modal({ open, onClose, title, children, maxWidth = 480 }) {
+  const phone = useIsPhone();
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // La pagina sotto non scorre mentre la finestra è aperta (su telefono scorreva insieme).
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [open, onClose]);
 
   if (!open) return null;
 
+  // Telefono: a schermo intero, così i campi stanno in alto e la tastiera non li copre.
+  // Ovunque: titolo e × restano fermi in cima mentre il contenuto scorre.
   return (
     <div
       onClick={onClose}
@@ -341,35 +351,52 @@ export function Modal({ open, onClose, title, children, maxWidth = 480 }) {
         inset: 0,
         background: "rgba(6,8,12,0.55)", // velo: funziona in entrambi i temi
         display: "flex",
-        alignItems: "center",
+        alignItems: phone ? "stretch" : "center",
         justifyContent: "center",
-        padding: 20,
+        padding: phone ? 0 : 20,
         zIndex: 1000,
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={typeof title === "string" ? title : undefined}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
-          maxWidth,
-          maxHeight: "88vh",
+          maxWidth: phone ? "none" : maxWidth,
+          height: phone ? "100dvh" : undefined,
+          maxHeight: phone ? "100dvh" : "88vh",
           overflowY: "auto",
+          overscrollBehavior: "contain",
           background: CP.panel,
-          border: `1px solid ${CP.border}`,
-          borderRadius: 14,
-          padding: 22,
+          border: phone ? "none" : `1px solid ${CP.border}`,
+          borderRadius: phone ? 0 : 14,
+          padding: phone ? "0 18px calc(24px + env(safe-area-inset-bottom))" : "0 22px 22px",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div
+          style={{
+            position: "sticky", top: 0, zIndex: 1,
+            display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12,
+            background: CP.panel,
+            borderBottom: `1px solid ${CP.border}`,
+            margin: phone ? "0 -18px 16px" : "0 -22px 16px",
+            padding: phone ? "calc(10px + env(safe-area-inset-top)) 8px 10px 18px" : "14px 12px 14px 22px",
+          }}
+        >
           <h2 style={{ fontFamily: FONTS.display, fontSize: 18, fontWeight: 500, color: CP.textPrimary, margin: 0 }}>
             {title}
           </h2>
           <button
+            type="button"
             onClick={onClose}
             aria-label="Chiudi"
             style={{
-              background: "transparent", border: "none", color: CP.textMuted,
-              fontSize: 20, lineHeight: 1, cursor: "pointer", padding: 4,
+              background: "transparent", border: "none", color: CP.textSecondary,
+              fontSize: 26, lineHeight: 1, cursor: "pointer",
+              width: 44, height: 44, flexShrink: 0,
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
             }}
           >
             ×
