@@ -152,6 +152,9 @@ export function PostModal({ post, photos, cfg, pid, onClose, onDone, arcs = [] }
             {TG_ROLES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
           </select>
         </L>
+        <L label="Esce solo se" hint="Es. «Se vince Sì»: le versioni alternative restano in bozza">
+          <input style={field} value={f.condition || ""} disabled={sent} onChange={(e) => setF({ ...f, condition: e.target.value })} placeholder="Sempre" />
+        </L>
         <L label="Storia della settimana">
           <select style={field} value={f.arcId || ""} disabled={sent} onChange={(e) => setF({ ...f, arcId: e.target.value || null })}>
             <option value="">Nessuna</option>
@@ -319,7 +322,7 @@ export default function TelegramPanel({ pid, arcs = [] }) {
     <button onClick={() => setEditing(p)} style={{ display: "grid", gridTemplateColumns: "minmax(0, 150px) minmax(0, 1fr) auto", gap: 10, alignItems: "center", width: "100%", textAlign: "left", background: "none", border: "none", borderTop: `1px solid ${CP.borderSoft}`, padding: "9px 0", cursor: "pointer", fontFamily: FONTS.body }}>
       <span style={{ fontSize: 13, color: CP.textSecondary, ...NUM }}>{fmtWhen(p.sentAt || p.sendAt)}</span>
       <span style={{ fontSize: 13, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {p.photoIds?.length ? `${p.photoIds.length} foto · ` : ""}{p.text || "(solo foto)"}
+        {p.condition ? `${p.condition} · ` : ""}{p.photoIds?.length ? `${p.photoIds.length} foto · ` : ""}{p.poll ? `Sondaggio: ${p.poll.question}` : p.text || "(solo foto)"}
       </span>
       <span style={{ fontSize: 12, color: STATUS_COLOR[p.status] || CP.textSecondary, border: `1px solid ${alpha(STATUS_COLOR[p.status] || CP.textSecondary, "55")}`, borderRadius: 6, padding: "1px 6px" }}>
         {TG_STATUSES.find((s) => s.key === p.status)?.label || p.status}
