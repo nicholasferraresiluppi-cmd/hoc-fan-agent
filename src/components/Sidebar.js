@@ -63,6 +63,7 @@ const ESSENTIAL_HREFS = new Set([
   "/academy/tapes",
   "/academy/vendere",
   "/admin/sales-coaching",
+  "/admin/bilancio", // classifica aziendale delle creator, per i sales manager (16/10/2026)
   "/admin/s4s", // S4S quotidiano dei sales manager: con il badge delle cose da fare (14/10/2026)
   "/admin/team",
   "/admin/settimana",
@@ -96,6 +97,7 @@ const NAV_GROUPS_RAW = [
     items: [
       { href: "/leaderboard/sales-cp",           label: "Classifica vendite", icon: DollarSign },
       { href: "/leaderboard/creators",           label: "Creator",      icon: Users },
+      { href: "/admin/bilancio",                 label: "Bilancio del mese", icon: Trophy },
       { href: "/admin/le-mie-creator",           label: "Revenue e chat", icon: LineChart },
       { href: "/admin/creator-split",            label: "Creator dello split", icon: Users },
       { href: "/admin/analisi-vendite",          label: "Analisi vendite", icon: BarChart3 },
