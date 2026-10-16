@@ -9,32 +9,84 @@
 //    sempre a una persona (è lei identica; i primi 2 secondi fermano il pollice; audio ascoltato;
 //    etichetta AI): sul volto l'AI non è affidabile. L'esito della Qualità NON lo mette mai l'agente: lo mette chi approva.
 
-export const QC_VERSION = "qc-1";
+export const QC_VERSION = "qc-2";
 export const QC_MODEL = "claude-opus-5-5"; // la qualità è la differenza: modello migliore, ~15-20 centesimi a video
 // Le voci che l'AI legge sui fotogrammi. L'audio non lo sente (lo misura il controllo tecnico e lo
 // ascolta una persona); l'etichetta AI è una scelta di pubblicazione, non si vede nel video.
 export const AI_CHECKS = ["volto", "anatomia", "coerenza", "montaggio", "testo", "aggancio"];
 // Voci che si spuntano SOLO a mano, anche se l'AI dice ok.
 export const HUMAN_ONLY_CHECKS = ["volto", "aggancio", "audio", "etichetta_ai"];
-export const QC_MAX_FRAMES = 24;
+// Fotogrammi (v qc-2, 16/10 sera — Nicholas: «valuta se i fotogrammi sono abbastanza»): non più 24 fissi
+// (su un reel di 40 s = uno ogni 1,6 s: un difetto AI che dura pochi fotogrammi passava in mezzo) ma
+// una FREQUENZA: ogni 0,5 s sulle riprese vere, ogni 0,33 s se ci sono parti AI (lì nascono mani e
+// lineamenti che si deformano), più fitti nei primi 2 s, e uno subito prima/dopo ogni taglio (dove
+// nascono gli errori di coerenza). Risoluzione piena per l'AI (lato lungo ~1540 px, il massimo che legge).
+// I fotogrammi restano CAMPIONI: tra due campioni non si vede nulla, e chi approva guarda il video intero.
+export const QC_MAX_FRAMES = 120;
 
 // Regole tecniche (come ~/.claude/skills/social-creator/scripts/controllo_video.py)
 export const TECH_RULES = { minWidth: 720, minSec: 3, maxSec: 90, ratioMin: 1.7, ratioMax: 1.8, freezeSec: 1, blackSec: 0.5 };
+export const QC_STEP = { real: 0.5, ai: 0.33 };
+export const QC_FRAMES_PER_CALL = 20;
+const PER_FRAME_TOKENS = 1800;  // immagine ~860×1540 ≈ larghezza×altezza/750
+const PER_REF_TOKENS = 1600;
 
-/** Tempi dei fotogrammi da far leggere: i primi 2 secondi più fitti (il gancio), poi regolari. */
-export function frameTimes(duration, max = QC_MAX_FRAMES) {
+/** Tempi dei fotogrammi: gancio fitto, passo regolare, prima/dopo ogni taglio. */
+export function frameTimes(duration, { ai = false, cuts = [], max = QC_MAX_FRAMES } = {}) {
   const d = Number(duration);
   if (!Number.isFinite(d) || d <= 0) return [];
   const end = Math.max(0, d - 0.05);
-  const hook = [0.1, 0.6, 1.2, 1.9].filter((t) => t < end);
-  const rest = Math.max(0, max - hook.length);
-  const from = 2.5;
-  const out = [...hook];
-  if (end > from && rest > 0) {
-    const step = (end - from) / Math.max(1, rest - 1);
-    for (let i = 0; i < rest; i++) out.push(from + step * i);
+  const out = [0.1, 0.4, 0.7, 1.0, 1.3, 1.6, 1.9].filter((t) => t < end);
+  const step = ai ? QC_STEP.ai : QC_STEP.real;
+  for (let t = 2.2; t < end; t += step) out.push(t);
+  out.push(end);
+  const r2 = (t) => Math.round(Math.max(0, Math.min(t, end)) * 100) / 100;
+  const cutFrames = [];
+  for (const c of cuts || []) { if (c > 0.15) cutFrames.push(r2(c - 0.12)); if (c + 0.12 < end) cutFrames.push(r2(c + 0.12)); }
+  // due tempi a meno di 0,08 s sono lo stesso fotogramma: vince quello accanto al taglio
+  const grid = [...new Set(out.map(r2))].filter((t) => !cutFrames.some((c) => Math.abs(c - t) < 0.08));
+  let ts = [...new Set([...grid, ...cutFrames])].sort((a, b) => a - b);
+  ts = ts.filter((t, i) => i === 0 || t - ts[i - 1] >= 0.08 || cutFrames.includes(t));
+  if (ts.length <= max) return ts;
+  // oltre il massimo: si tengono gancio e tagli, si dirada il resto in modo uniforme
+  const keep = new Set(ts.filter((t) => t < 2 || (cuts || []).some((c) => Math.abs(c - t) < 0.2)));
+  const rest = ts.filter((t) => !keep.has(t));
+  const room = Math.max(0, max - keep.size);
+  const picked = rest.filter((_, i) => Math.floor((i * room) / rest.length) !== Math.floor(((i - 1) * room) / rest.length));
+  return [...keep, ...picked].sort((a, b) => a - b).slice(0, max);
+}
+
+/** Tagli di scena dalle differenze tra miniature consecutive (media assoluta di luminanza 0-255). */
+export function detectCuts(diffs, threshold = 28) {
+  const out = [];
+  for (const x of diffs || []) if (x.diff >= threshold && !out.some((c) => Math.abs(c - x.t) < 0.4)) out.push(x.t);
+  return out;
+}
+
+/** Stima del costo prima di partire (dollari): fotogrammi + riferimenti ripetuti in ogni chiamata. */
+export function estimateQcCost(nFrames, nRefs, price = { in: 4, out: 20 }) {
+  const calls = Math.max(1, Math.ceil(nFrames / QC_FRAMES_PER_CALL));
+  const input = nFrames * PER_FRAME_TOKENS + calls * (nRefs * PER_REF_TOKENS + 2500);
+  const output = calls * 1500;
+  return (input * price.in + output * price.out) / 1e6;
+}
+
+/** Unisce le risposte delle chiamate: per voce vince la peggiore (errore > dubbio > ok). */
+export function mergeAnswers(answers, checkKeys) {
+  const rank = { ok: 0, dubbio: 1, errore: 2 };
+  const voci = {};
+  for (const k of checkKeys) {
+    const parts = answers.map((a) => a?.voci?.[k]).filter(Boolean);
+    if (!parts.length) { voci[k] = { esito: "dubbio", nota: "", secondi: [] }; continue; }
+    const worst = parts.reduce((w, p) => (rank[p.esito] > rank[w.esito] ? p : w), parts[0]);
+    const notes = [...new Set(parts.filter((p) => p.esito !== "ok" && p.nota).map((p) => p.nota))];
+    const secondi = [...new Set(parts.flatMap((p) => (p.esito !== "ok" ? p.secondi || [] : [])))].sort((a, b) => a - b).slice(0, 12);
+    voci[k] = { esito: worst.esito, nota: (notes.join(" · ") || worst.nota || "").slice(0, 700), secondi };
   }
-  return [...new Set(out.map((t) => Math.round(Math.min(t, end) * 100) / 100))].sort((a, b) => a - b).slice(0, max);
+  const withErrors = answers.filter((a) => Object.values(a?.voci || {}).some((v) => v.esito !== "ok"));
+  const sintesi = [...new Set((withErrors.length ? withErrors : answers).map((a) => a?.sintesi).filter(Boolean))].slice(0, 3).join(" ").slice(0, 900);
+  const testo_letto = answers.map((a) => a?.testo_letto).filter(Boolean).join("\n").slice(0, 3000);
+  return { voci, sintesi, testo_letto };
 }
 
 /** Intervalli [from,to] dove una serie (t, valore booleano) resta vera per almeno minSec. */

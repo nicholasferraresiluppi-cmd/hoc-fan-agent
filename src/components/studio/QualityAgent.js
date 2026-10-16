@@ -12,7 +12,7 @@ import { ScanEye } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { alpha, NUM } from "@/components/ds";
 import { QUALITY_CHECKS } from "@/lib/studio-social-core";
-import { HUMAN_ONLY_CHECKS, fmtSec } from "@/lib/studio-quality-core";
+import { HUMAN_ONLY_CHECKS, fmtSec, estimateQcCost } from "@/lib/studio-quality-core";
 
 const ESITO = {
   ok: { label: "ok", color: CP.accentGreen },
@@ -31,11 +31,22 @@ export default function QualityAgent({ pid, item, refs = [], onResult }) {
     setErr(null);
     try {
       const { analyzeVideo } = await import("@/lib/video-check-client");
-      const { tech, frames } = await analyzeVideo(file, { onStage: setStage });
-      setStage("L'AI guarda i fotogrammi (circa un minuto)…");
-      const r = await fetch(`${base}/quality`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId: item.id, tech, frames }) });
-      const j = await r.json().catch(() => null);
-      if (!r.ok) throw new Error(j?.error || (r.status === 413 ? "Video troppo pesante da inviare: riprova" : `Errore ${r.status}`));
+      const { tech, frames } = await analyzeVideo(file, { onStage: setStage, ai: !!item.ai });
+      const post = async (body) => {
+        const r = await fetch(`${base}/quality`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        const j = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(j?.error || (r.status === 413 ? "Pacchetto troppo pesante: riprova" : `Errore ${r.status}`));
+        return j;
+      };
+      // fotogrammi a pacchetti sotto ~3,5 MB (limite del server per richiesta)
+      const runId = [...crypto.getRandomValues(new Uint8Array(6))].map((b) => b.toString(16).padStart(2, "0")).join("");
+      let pack = []; let size = 0; let sent = 0;
+      const flush = async () => { if (!pack.length) return; await post({ action: "frames", itemId: item.id, runId, frames: pack }); sent += pack.length; pack = []; size = 0; setStage(`Carico i fotogrammi (${sent} di ${frames.length})…`); };
+      for (const f of frames) { if (size + f.dataUrl.length > 3.5e6) await flush(); pack.push(f); size += f.dataUrl.length; }
+      await flush();
+      const est = estimateQcCost(frames.length, refs.length);
+      setStage(`L'AI guarda ${frames.length} fotogrammi (circa ${Math.max(1, Math.round(est * 100))} centesimi, 1-2 minuti)…`);
+      const j = await post({ action: "run", itemId: item.id, runId, tech });
       onResult?.(j.item);
     } catch (e) { setErr(e.message); } finally { setStage(null); }
   };
@@ -56,7 +67,7 @@ export default function QualityAgent({ pid, item, refs = [], onResult }) {
         ) : <span style={{ fontSize: 12, color: CP.textMuted }}>Salva il contenuto prima di controllarne il video</span>}
       </div>
       <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4, lineHeight: 1.45 }}>
-        Scegli il video montato dal computer: resta sul tuo computer, all'AI vanno solo i fotogrammi. L'AI segnala, l'ok lo dai tu.
+        Scegli il video montato dal computer: resta sul tuo computer, all'AI vanno i fotogrammi (uno ogni mezzo secondo, uno ogni terzo di secondo se ci sono parti AI, e prima/dopo ogni taglio). I fotogrammi sono campioni: l'AI segnala, l'ok lo dai tu guardando il video intero.
         {!refs.length && " Mancano le foto di riferimento del volto: segnale con la stella nella sezione Foto."}
       </div>
       {stage && <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 8 }}>{stage}</div>}
@@ -66,7 +77,7 @@ export default function QualityAgent({ pid, item, refs = [], onResult }) {
         <div style={{ marginTop: 12 }}>
           <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 8 }}>
             Ultimo controllo {new Date(ai.at).toLocaleString("it-IT", { timeZone: "Europe/Rome", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-            {ai.tech?.name ? ` · ${ai.tech.name}` : ""} · {ai.tech?.width}×{ai.tech?.height}, {Number(ai.tech?.duration || 0).toFixed(1)} s · {ai.cost_usd != null ? `${(ai.cost_usd * 100).toFixed(0)} centesimi` : ""}
+            {ai.tech?.name ? ` · ${ai.tech.name}` : ""} · {ai.tech?.width}×{ai.tech?.height}, {Number(ai.tech?.duration || 0).toFixed(1)} s · {ai.frames?.length || 0} fotogrammi · {ai.cost_usd != null ? `${(ai.cost_usd * 100).toFixed(0)} centesimi` : ""}
           </div>
           {ai.answer?.sintesi && <div style={{ fontSize: 14, color: CP.textPrimary, lineHeight: 1.5, marginBottom: 10 }}>{ai.answer.sintesi}</div>}
 

@@ -1,18 +1,39 @@
 // node tests/studio-quality.mjs — agente qualità dello Studio social.
 import assert from "node:assert/strict";
-import { frameTimes, runsOver, technicalVerdict, normalizeAgentAnswer, applyAgentToReviews, qcSchema, AI_CHECKS, HUMAN_ONLY_CHECKS } from "../src/lib/studio-quality-core.js";
+import { frameTimes, runsOver, detectCuts, technicalVerdict, normalizeAgentAnswer, mergeAnswers, estimateQcCost, applyAgentToReviews, qcSchema, AI_CHECKS, HUMAN_ONLY_CHECKS, QC_MAX_FRAMES } from "../src/lib/studio-quality-core.js";
 
 let n = 0;
 const t = (name, fn) => { fn(); n++; };
 const goodTech = { width: 1080, height: 1920, duration: 18.4, audio: { present: true, peakDb: -3, rmsDb: -18 }, black: [], freeze: [] };
 
-t("fotogrammi: gancio fitto, massimo rispettato, dentro il video", () => {
-  const ts = frameTimes(18, 24);
-  assert.ok(ts.length <= 24 && ts.length >= 20);
-  assert.deepEqual(ts.slice(0, 4), [0.1, 0.6, 1.2, 1.9]);
-  assert.ok(ts.every((x) => x < 18));
-  assert.ok(frameTimes(1.0).every((x) => x < 1));
+t("fotogrammi: frequenza, non numero fisso; più fitti con l'AI; prima/dopo i tagli; tetto", () => {
+  const real = frameTimes(30);
+  const ai = frameTimes(30, { ai: true });
+  assert.ok(real.length >= 60 && real.length <= 65, `riprese vere ~ogni 0,5 s (${real.length})`);
+  assert.ok(ai.length > real.length * 1.4, "con parti AI più fitti");
+  assert.deepEqual(real.slice(0, 4), [0.1, 0.4, 0.7, 1.0]);
+  assert.ok(real.every((x) => x < 30) && real.every((x, i) => i === 0 || x - real[i - 1] >= 0.08));
+  const withCut = frameTimes(30, { cuts: [12.6] });
+  assert.ok(withCut.includes(12.48) && withCut.includes(12.72), "prima e dopo il taglio");
+  const long = frameTimes(90, { ai: true, cuts: [30, 60] });
+  assert.equal(long.length, QC_MAX_FRAMES);
+  assert.ok(long.includes(29.88) && long.includes(0.1), "oltre il tetto restano gancio e tagli");
   assert.deepEqual(frameTimes(0), []);
+  assert.deepEqual(detectCuts([{ t: 1, diff: 5 }, { t: 3, diff: 40 }, { t: 3.25, diff: 35 }, { t: 8, diff: 30 }]), [3, 8]);
+  // stima: un reel vero di 20 s con 4 riferimenti ~ mezzo dollaro o meno
+  const est = estimateQcCost(frameTimes(20).length, 4);
+  assert.ok(est > 0.2 && est < 0.7, `stima ${est}`);
+});
+
+t("unione delle parti: per voce vince la peggiore, note e secondi dei problemi", () => {
+  const m = mergeAnswers([
+    { voci: { anatomia: { esito: "ok", nota: "", secondi: [] }, testo: { esito: "dubbio", nota: "forse", secondi: [3] } }, sintesi: "Parte 1 ok" },
+    { voci: { anatomia: { esito: "errore", nota: "sei dita", secondi: [14.2] }, testo: { esito: "ok", nota: "", secondi: [] } }, sintesi: "Mano a 0:14" },
+  ], ["anatomia", "testo", "volto"]);
+  assert.equal(m.voci.anatomia.esito, "errore"); assert.deepEqual(m.voci.anatomia.secondi, [14.2]); assert.equal(m.voci.anatomia.nota, "sei dita");
+  assert.equal(m.voci.testo.esito, "dubbio");
+  assert.equal(m.voci.volto.esito, "dubbio", "voce mai valutata = da guardare");
+  assert.match(m.sintesi, /Mano/);
 });
 
 t("nero/fermi: solo tratti lunghi abbastanza; dissolvenza finale perdonata", () => {
@@ -112,30 +133,42 @@ console.log(`studio-quality: ${n} gruppi di asserzioni ok`);
   ok((await T.getTgConfig(PID)).referencePhotoIds.length === 1, "solo foto vere come riferimento");
 
   const frame = (t) => ({ t, dataUrl: `data:image/jpeg;base64,${jpg.toString("base64")}` });
-  const frames = [0.1, 0.6, 1.2, 1.9, 2.5, 6].map(frame);
-  ok(!(await Q.runQualityCheck(PID, "it1", { tech: goodTech, frames: frames.slice(0, 2) }, "u1")).ok, "troppi pochi fotogrammi rifiutati");
-  ok(!(await Q.runQualityCheck(PID, "it1", { tech: goodTech, frames: [{ t: 1, dataUrl: "data:image/png;base64,AAAA" }, ...frames.slice(0, 3)] }, "u1")).ok, "fotogrammi non jpeg scartati (ne restano 3: troppo pochi)");
+  const times = Array.from({ length: 45 }, (_, i) => Math.round(i * 0.4 * 100) / 100);
+  const frames = times.map(frame);
+  const RUN = "abcdef123456";
+  ok(!(await Q.addFrames(PID, "it1", "bad", frames)).ok, "giro non valido rifiutato");
+  ok(!(await Q.addFrames(PID, "it1", RUN, [{ t: 1, dataUrl: "data:image/png;base64,AAAA" }])).ok, "fotogrammi non jpeg rifiutati");
+  ok((await Q.addFrames(PID, "it1", RUN, frames.slice(0, 20))).count === 20, "primo pacchetto");
+  ok((await Q.addFrames(PID, "it1", RUN, frames.slice(20))).count === 45, "secondo pacchetto");
+  ok(!(await Q.runQualityCheck(PID, "it1", { runId: "000000000000", tech: goodTech }, "u1")).ok, "giro inesistente");
 
-  const res = await Q.runQualityCheck(PID, "it1", { tech: goodTech, frames }, "u1");
+  const calls = [];
+  const realCreate = globalThis.__studioFakeAnthropic.messages.create;
+  globalThis.__studioFakeAnthropic.messages.create = async (req) => { calls.push(req); return realCreate(req); };
+  const res = await Q.runQualityCheck(PID, "it1", { runId: RUN, tech: goodTech }, "u1");
   ok(res.ok, "controllo eseguito");
-  const imgs = lastReq.messages[0].content.filter((c) => c.type === "image");
-  ok(imgs.length === 1 + frames.length, "all'AI: riferimento + fotogrammi");
+  ok(calls.length === 3, "45 fotogrammi = 3 chiamate da massimo 20");
+  ok(calls.every((c) => c.messages[0].content.filter((x) => x.type === "image").length <= 21), "ogni chiamata: riferimento + al più 20 fotogrammi");
+  ok(calls.filter((c) => c.output_config.format.schema.properties.voci.required.includes("aggancio")).length === 1, "il gancio si giudica solo nella prima parte");
   ok(res.item.reviews.tecnico.outcome === "ok" && !res.item.reviews.qualita.outcome, "tecnico scritto, qualità senza esito");
   ok(res.item.reviews.qualita.checks.includes("anatomia") && !res.item.reviews.qualita.checks.includes("volto") && !res.item.reviews.qualita.checks.includes("testo"), "spuntate solo le voci giuste");
-  ok(res.errors.includes("testo") && res.item.aiReview.frames.length === frames.length && res.item.aiReview.frames[0].path, "errore segnalato, fotogrammi salvati");
-  ok(Math.abs((await Q.qcSpend()).spent - (30000 * 4 + 1500 * 20) / 1e6) < 1e-9, "spesa contata (0,15 $)");
+  ok(res.errors.includes("testo") && res.item.aiReview.frames.length === 45 && res.item.aiReview.calls === 3, "errore segnalato, 45 fotogrammi");
+  ok(Math.abs((await Q.qcSpend()).spent - 3 * (30000 * 4 + 1500 * 20) / 1e6) < 1e-9, "spesa contata su tutte le chiamate");
   const firstPaths = res.item.aiReview.frames.map((f) => f.path);
   ok(await Q.readQcFrame(PID, "it1", 0), "fotogramma leggibile per la tavola");
 
   // secondo giro: i fotogrammi vecchi spariscono
-  const res2 = await Q.runQualityCheck(PID, "it1", { tech: goodTech, frames }, "u1");
+  const RUN2 = "abcdef654321";
+  await Q.addFrames(PID, "it1", RUN2, frames.slice(0, 10));
+  const res2 = await Q.runQualityCheck(PID, "it1", { runId: RUN2, tech: goodTech }, "u1");
   ok(res2.ok && firstPaths.every((p) => !blobs.has(p)), "fotogrammi del giro prima cancellati");
 
   // un contenuto già programmato non si ricontrolla; tetto di spesa
   const items = store.get(`studio:items:${PID}`); items.it1.status = "programmato"; store.set(`studio:items:${PID}`, items);
-  ok((await Q.runQualityCheck(PID, "it1", { tech: goodTech, frames }, "u1")).status === 409, "programmato: niente controllo");
+  ok((await Q.addFrames(PID, "it1", "aaaaaa111111", frames.slice(0, 5))).status === 409, "programmato: niente controllo");
   items.it1.status = "da_approvare"; store.set(`studio:items:${PID}`, items);
+  await Q.addFrames(PID, "it1", "aaaaaa222222", frames.slice(0, 5));
   process.env.STUDIO_QC_CAP_USD = "0.2";
-  ok((await Q.runQualityCheck(PID, "it1", { tech: goodTech, frames }, "u1")).status === 429, "tetto di spesa del mese");
+  ok((await Q.runQualityCheck(PID, "it1", { runId: "aaaaaa222222", tech: goodTech }, "u1")).status === 429, "tetto di spesa del mese");
   console.log(`studio-quality (percorso intero): ${m} verifiche ok`);
 }
