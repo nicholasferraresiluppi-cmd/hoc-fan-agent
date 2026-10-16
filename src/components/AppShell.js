@@ -43,7 +43,7 @@ function isAuthRoute(path) {
 // la navigazione interna dell'app. Stesso motivo per il modulo HR da link
 // (/hr/modulo/[token]): lo compila chi magari non ha ancora un account.
 function isBareRoute(path) {
-  return path.startsWith("/assessment") || path.startsWith("/hr/modulo") || path.startsWith("/t/") || path === "/hr/privacy" || path === "/privacy";
+  return path.startsWith("/assessment") || path.startsWith("/hr/modulo") || path.startsWith("/t/") || path.startsWith("/l/") || path === "/hr/privacy" || path === "/privacy";
 }
 
 // Nome della pagina nell'intestazione del telefono (10/10/2026: con «HOC Pro» fisso

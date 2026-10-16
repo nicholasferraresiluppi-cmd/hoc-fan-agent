@@ -48,6 +48,10 @@ export const LIMITS = {
   // Un turno di scouting vero ne fa qualche decina al giorno per persona.
   scouting_signal: [{ window: 60, max: 12 }, { window: 86400, max: 300 }],  // per persona (o token)
   scouting_reels:  [{ window: 3600, max: 60 }],                             // carica reel, per persona
+  // Landing dello Studio social (16/10/2026): pubblica. Non è un freno ai costi ma ai numeri gonfiati:
+  // oltre questa soglia per IP e indirizzo la visita/il clic passa ma NON si conta.
+  landing_visit:   [{ window: 3600, max: 3 }],
+  landing_click:   [{ window: 3600, max: 3 }],
 };
 
 /**

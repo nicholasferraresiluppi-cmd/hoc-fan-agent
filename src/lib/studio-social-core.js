@@ -9,9 +9,10 @@
 // Un CONTENUTO è un pezzo (reel, storia, carosello) che attraversa la coda:
 // idea → script → da girare → in montaggio → da approvare → programmato → pubblicato (o scartato).
 // Ogni contenuto porta gli esiti dei revisori della redazione (conformità adult, voce/brand,
-// controllo tecnico del video): passa ad "approvato/programmato" solo una persona.
+// qualità del video con le sue voci, controllo tecnico): passa a "programmato" solo una persona,
+// e solo sul video montato con qualità piena (v studio-2).
 
-export const STUDIO_VERSION = "studio-1";
+export const STUDIO_VERSION = "studio-2";
 
 export const PLATFORMS = ["instagram", "tiktok", "x", "reddit"];
 export const PLATFORM_LABEL = { instagram: "Instagram", tiktok: "TikTok", x: "X", reddit: "Reddit" };
@@ -44,11 +45,29 @@ export const KINDS = [
 const KIND_KEYS = KINDS.map((k) => k.key);
 
 // Revisori della redazione. Esito: ok | attenzione | blocca (null = non ancora passato).
+// Tutti e quattro servono per programmare: la qualità è la differenza, non un optional.
 export const REVIEWERS = [
   { key: "conformita", label: "Conformità", hint: "Regole adult: niente OF, link, persone reali, minore età, letto come set" },
   { key: "voce", label: "Voce e brand", hint: "Suona come lei, rispetta la bibbia, il gancio regge" },
-  { key: "tecnico", label: "Controllo tecnico", hint: "Formato verticale, durata, audio, nessun fermo immagine" },
+  { key: "qualita", label: "Qualità", hint: "È lei, identica; montaggio pulito; nessun errore. Si guarda il video, non lo script" },
+  { key: "tecnico", label: "Controllo tecnico", hint: "Formato verticale, durata, audio, nessun fermo immagine (controllo_video.py)" },
 ];
+export const REQUIRED_REVIEWERS = ["conformita", "voce", "qualita", "tecnico"];
+
+// Cosa guarda il revisore Qualità, una voce alla volta. "Ok" solo con tutte spuntate.
+// Le voci "ai" valgono solo se il contenuto ha parti generate con l'AI.
+export const QUALITY_CHECKS = [
+  { key: "volto", label: "È lei: volto, corpo, capelli, nei identici alle foto di riferimento, in ogni inquadratura" },
+  { key: "anatomia", label: "Mani, dita, denti, occhi giusti; niente pelle di plastica o lineamenti che cambiano" },
+  { key: "coerenza", label: "Vestiti, oggetti, luce e ambiente non cambiano da un taglio all'altro" },
+  { key: "montaggio", label: "Montaggio pulito: tagli a tempo, niente scatti, fermi o salti di colore" },
+  { key: "testo", label: "Testi a schermo e sottotitoli senza refusi, a tempo, leggibili e fuori dalle zone coperte da Instagram" },
+  { key: "audio", label: "Audio pulito e a volume giusto; la voce è la sua o dichiarata" },
+  { key: "aggancio", label: "I primi 2 secondi fermano il pollice: lo guarderesti fino in fondo?" },
+  { key: "etichetta_ai", label: "Etichetta AI prevista alla pubblicazione", ai: true },
+];
+export const qualityChecksFor = (item) => QUALITY_CHECKS.filter((c) => !c.ai || item?.ai);
+
 const REVIEW_OUTCOMES = ["ok", "attenzione", "blocca"];
 
 export const WEEKDAYS = ["lun", "mar", "mer", "gio", "ven", "sab", "dom"];
@@ -131,7 +150,12 @@ export function normalizeItem(input, prev = null) {
   for (const r of REVIEWERS) {
     const src = input?.reviews?.[r.key] ?? prev?.reviews?.[r.key];
     if (src && REVIEW_OUTCOMES.includes(src.outcome)) {
-      reviews[r.key] = { outcome: src.outcome, note: str(src.note, 600), at: src.at || null };
+      const rv = { outcome: src.outcome, note: str(src.note, 600), at: src.at || null };
+      if (r.key === "qualita") {
+        const keys = QUALITY_CHECKS.map((c) => c.key);
+        rv.checks = Array.isArray(src.checks) ? [...new Set(src.checks.filter((k) => keys.includes(k)))] : [];
+      }
+      reviews[r.key] = rv;
     }
   }
   const item = {
@@ -146,6 +170,7 @@ export function normalizeItem(input, prev = null) {
     shooting: str(input?.shooting, 1000),
     caption: str(input?.caption, 600),
     why: str(input?.why, 600),
+    ai: input?.ai === undefined ? !!prev?.ai : !!input.ai,
     mediaUrl: /^https:\/\//.test(str(input?.mediaUrl, 600)) ? str(input.mediaUrl, 600) : "",
     reviews,
     createdAt: prev?.createdAt || null,
@@ -159,15 +184,21 @@ export function blockingReviews(item) {
   return REVIEWERS.filter((r) => item?.reviews?.[r.key]?.outcome === "blocca").map((r) => r.label);
 }
 
-/** Si può portare a "programmato"? Serve che conformità e voce siano passate e nessuno blocchi. */
+/** Si può portare a "programmato"? Serve il video, tutti i revisori, nessun blocco e la qualità piena. */
 export function canSchedule(item) {
   const blocks = blockingReviews(item);
   if (blocks.length) return { ok: false, reason: `Bloccato da: ${blocks.join(", ")}` };
-  const missing = ["conformita", "voce"].filter((k) => !item?.reviews?.[k]);
+  if (!item?.mediaUrl) return { ok: false, reason: "Manca il video montato: la qualità si giudica sul video" };
+  const missing = REQUIRED_REVIEWERS.filter((k) => !item?.reviews?.[k]);
   if (missing.length) {
     const names = REVIEWERS.filter((r) => missing.includes(r.key)).map((r) => r.label);
     return { ok: false, reason: `Manca il revisore: ${names.join(", ")}` };
   }
+  const q = item.reviews.qualita;
+  if (q.outcome !== "ok") return { ok: false, reason: "La qualità deve essere ok: con «attenzione» si rifà, non si pubblica" };
+  const done = new Set(q.checks || []);
+  const open = qualityChecksFor(item).filter((c) => !done.has(c.key));
+  if (open.length) return { ok: false, reason: `Qualità: ${open.length === 1 ? "manca una voce" : `mancano ${open.length} voci`} (${open.map((c) => c.key).join(", ")})` };
   return { ok: true, reason: null };
 }
 
