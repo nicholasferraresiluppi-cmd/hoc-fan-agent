@@ -24,7 +24,7 @@ import {
   BookMarked,
   LineChart,
   FileSignature,
-  Landmark, Repeat } from "lucide-react";
+  Landmark, Repeat, Footprints } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
 import { WORKSPACES, workspaceSections } from "@/lib/workspaces";
@@ -75,6 +75,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/leaderboard/creators/heatmap", title: "Mappa operatore×creator",      desc: "Score operatore × creator a colpo d'occhio", icon: Flame },
       { href: "/admin/conversation-intelligence", title: "Presidio chat", desc: "Latenza risposta, % entro 5 min e response rate per creator (dai transcript, solo metadati)", icon: Activity },
       { href: "/admin/sales-coaching", title: "Coaching vendite", desc: "Per split: quanto comprano in chat i fan mai paganti, chi vende meglio a parità di pagina, cosa fa vendere, pagine e operatori modello di HOC, test in corso ed esempi da far studiare", icon: HandCoins },
+      { href: "/admin/scaletta", title: "La scaletta", desc: "Il funnel del sexting per profilo: in quante conversazioni si vende, quante volte dopo il primo acquisto arriva il gradino dopo, perché si ferma (il fan o noi), riscaldamento, mass e operatori, con i profili più forti accanto e le prove con obiettivo settimana per settimana", icon: Footprints },
       { href: "/admin/s4s", title: "Calendario S4S", desc: "Chi scambia promozione con chi tra le pagine dello split, giorno per giorno, con il nome del link da creare; quanti abbonati ha portato ogni scambio, quanto hanno speso a 30 giorni e quali coppie non sono alla pari", icon: ArrowLeftRight },
       { href: "/admin/telegram", title: "Canali Telegram", desc: "La mappa dei canali Telegram delle creator, compilata dai sales; con il bot HOC dentro, chi entra e da quale link (Instagram, TikTok, S4S…), quanti restano e quanti abbonati porta su OnlyFans il link del canale", icon: Send },
       { href: "/admin/sales-ai", title: "Sales manager AI", desc: "Ogni notte: due manager AI leggono i turni del giorno prima, un arbitro scrive il feedback, il Garante blocca gli errori. Li rivedi qui prima che arrivino agli operatori", icon: Bot },

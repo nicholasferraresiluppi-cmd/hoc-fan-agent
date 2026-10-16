@@ -48,6 +48,7 @@ const MANAGER = [
     { href: "/admin/settimana", label: "Da seguire" },
     { href: "/cm-cockpit", label: "Cockpit turno" },
     { href: "/admin/sales-coaching", label: "Coaching vendite" },
+    { href: "/admin/scaletta", label: "La scaletta" },
     { href: "/admin/prova-fedelta", label: "Prova fedeltà" },
     { href: "/admin/s4s", label: "Calendario S4S" },
     { href: "/admin/telegram", label: "Canali Telegram" },

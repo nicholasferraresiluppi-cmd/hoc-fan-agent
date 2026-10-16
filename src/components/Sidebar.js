@@ -32,7 +32,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
-  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
+  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, Footprints, MessageCircle, Sun, Moon, Snowflake,
 Megaphone, Share2, Shield, BookUser,
   LineChart,
   FileSignature, Repeat } from "lucide-react";
@@ -63,6 +63,7 @@ const ESSENTIAL_HREFS = new Set([
   "/academy/tapes",
   "/academy/vendere",
   "/admin/sales-coaching",
+  "/admin/scaletta",
   "/admin/bilancio", // classifica aziendale delle creator, per i sales manager (16/10/2026)
   "/admin/s4s", // S4S quotidiano dei sales manager: con il badge delle cose da fare (14/10/2026)
   "/admin/team",
@@ -108,6 +109,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/conversation-intelligence", label: "Presidio chat", icon: Activity },
       { href: "/admin/shift-quality",            label: "Qualità turni", icon: MessagesSquare },
       { href: "/admin/sales-coaching",           label: "Coaching vendite", icon: HandCoins },
+      { href: "/admin/scaletta",                 label: "La scaletta", icon: Footprints },
       { href: "/admin/s4s",                      label: "Calendario S4S", icon: ArrowLeftRight },
       { href: "/admin/telegram",                 label: "Canali Telegram", icon: Send },
       { href: "/admin/sales-ai",                 label: "Sales manager AI", icon: Bot },
