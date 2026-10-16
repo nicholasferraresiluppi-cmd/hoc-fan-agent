@@ -4,11 +4,12 @@
 // POST { action: "item", item }                 crea/modifica un contenuto (programmato solo con i revisori passati)
 // POST { action: "deleteItem", itemId }
 // POST { action: "check", index, done, day? }   spunta una voce della lista del giorno
+// POST { action: "arc", arc } | { action: "deleteArc", arcId }   storie della settimana (Editoriale)
 export const runtime = "nodejs";
 
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { logAuditAction } from "@/lib/audit-log";
-import { getProfile, listItems, saveItem, removeItem, getChecklist, toggleCheck } from "@/lib/studio-social";
+import { getProfile, listItems, saveItem, removeItem, getChecklist, toggleCheck, listArcs, saveArc, removeArc } from "@/lib/studio-social";
 import { dailyChecklist, romeToday } from "@/lib/studio-social-core";
 
 const noStore = { headers: { "Cache-Control": "no-store" } };
@@ -21,8 +22,8 @@ export async function GET(request, { params }) {
   const profile = await getProfile(id);
   if (!profile) return Response.json({ error: "Profilo non trovato" }, { status: 404 });
   const today = romeToday();
-  const [items, saved] = await Promise.all([listItems(id), getChecklist(id, today)]);
-  return Response.json({ profile, items, checklist: dailyChecklist(profile, saved), today }, noStore);
+  const [items, saved, arcs] = await Promise.all([listItems(id), getChecklist(id, today), listArcs(id)]);
+  return Response.json({ profile, items, arcs, checklist: dailyChecklist(profile, saved), today }, noStore);
 }
 
 export async function POST(request, { params }) {
@@ -52,6 +53,18 @@ export async function POST(request, { params }) {
     if (!Number.isInteger(index) || index < 0 || index > 20) return Response.json({ error: "Voce non valida" }, { status: 400 });
     const saved = await toggleCheck(id, day, index, !!body.done, az.userId);
     return Response.json({ ok: true, checklist: dailyChecklist(profile, saved) }, noStore);
+  }
+  if (body?.action === "arc") {
+    const res = await saveArc(id, body.arc, az.userId);
+    if (!res.ok) return Response.json({ error: res.errors.join(". ") }, { status: 400 });
+    await logAuditAction({ action: body.arc?.id ? "studio.arc.update" : "studio.arc.add", target: `${id}/${res.arc.id}`, by: az.userId, meta: { title: res.arc.title, week: res.arc.weekStart } });
+    return Response.json({ ok: true, arc: res.arc }, noStore);
+  }
+  if (body?.action === "deleteArc") {
+    const ok = await removeArc(id, String(body.arcId || ""));
+    if (!ok) return Response.json({ error: "Storia non trovata" }, { status: 404 });
+    await logAuditAction({ action: "studio.arc.remove", target: `${id}/${body.arcId}`, by: az.userId });
+    return Response.json({ ok: true }, noStore);
   }
   return Response.json({ error: "Azione sconosciuta" }, { status: 400 });
 }

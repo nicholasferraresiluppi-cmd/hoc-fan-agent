@@ -20,7 +20,9 @@ import {
   PLATFORM_LABEL, PHASES, STATUSES, KINDS, REVIEWERS, qualityChecksFor, WEEKDAYS, WEEKDAY_LABEL,
   phaseLine, canSchedule, weekdayOf,
 } from "@/lib/studio-social-core";
-import TelegramPanel, { FunnelTiles } from "@/components/studio/TelegramPanel";
+import TelegramPanel, { FunnelTiles, PostModal } from "@/components/studio/TelegramPanel";
+import EditorialSection from "@/components/studio/EditorialSection";
+import { IG_ROLES } from "@/lib/studio-editorial-core";
 import QualityAgent from "@/components/studio/QualityAgent";
 
 const fetcher = async (url) => {
@@ -76,7 +78,7 @@ function ReviewChips({ item }) {
   );
 }
 
-function ItemModal({ item, onClose, onSave, onDelete, saving, err, pid, refs, onRefresh }) {
+function ItemModal({ item, onClose, onSave, onDelete, saving, err, pid, refs, onRefresh, arcs = [] }) {
   const [f, setF] = useState(() => ({ kind: "reel", status: "idea", ...item, reviews: { ...(item?.reviews || {}) } }));
   const setReview = (key, patch) => setF((x) => {
     const cur = x.reviews?.[key] || {};
@@ -99,6 +101,20 @@ function ItemModal({ item, onClose, onSave, onDelete, saving, err, pid, refs, on
         </L>
         <L label="Giorno di uscita"><input type="date" style={field} value={f.day || ""} onChange={(e) => setF({ ...f, day: e.target.value })} /></L>
         <L label="Format"><input style={field} value={f.format || ""} onChange={(e) => setF({ ...f, format: e.target.value })} placeholder="Beccato" /></L>
+      </div>
+      <div style={grid}>
+        <L label="Storia della settimana">
+          <select style={field} value={f.arcId || ""} onChange={(e) => setF({ ...f, arcId: e.target.value || null })}>
+            <option value="">Nessuna</option>
+            {arcs.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
+          </select>
+        </L>
+        <L label="Ruolo nella storia">
+          <select style={field} value={f.arcRole || ""} onChange={(e) => setF({ ...f, arcRole: e.target.value || null })}>
+            <option value="">—</option>
+            {IG_ROLES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+          </select>
+        </L>
       </div>
       <L label="Gancio a schermo" hint="Massimo 6 parole, si legge in un secondo senza audio"><input style={field} value={f.hook || ""} onChange={(e) => setF({ ...f, hook: e.target.value })} /></L>
       <L label="Script"><textarea style={{ ...field, minHeight: 180, fontFamily: FONTS.mono || FONTS.body, fontSize: 13, lineHeight: 1.5 }} value={f.script || ""} onChange={(e) => setF({ ...f, script: e.target.value })} /></L>
@@ -197,9 +213,10 @@ export default function StudioProfilePage() {
   const { id } = useParams();
   const url = `/api/admin/studio-social/${encodeURIComponent(id)}`;
   const { data, error, isLoading, mutate } = useSWR(url, fetcher, { revalidateOnFocus: false });
-  const { data: tg } = useSWR(`${url}/telegram`, fetcher, { revalidateOnFocus: false }); // stessa chiave del pannello: una sola richiesta
+  const { data: tg, mutate: mutateTg } = useSWR(`${url}/telegram`, fetcher, { revalidateOnFocus: false }); // stessa chiave del pannello: una sola richiesta
   const [editing, setEditing] = useState(null); // contenuto aperto
   const [editId, setEditId] = useState(false);  // identità aperta
+  const [postEditing, setPostEditing] = useState(null); // messaggio Telegram aperto dall'Editoriale
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
 
@@ -238,6 +255,9 @@ export default function StudioProfilePage() {
       await mutate(); setEditId(false);
     } catch (e) { setErr(e.message); } finally { setSaving(false); }
   };
+
+  const saveArc = async (arc) => { await post({ action: "arc", arc }); await mutate(); };
+  const deleteArc = async (arc) => { await post({ action: "deleteArc", arcId: arc.id }); await mutate(); };
 
   if (isLoading) return <div style={{ padding: 28, color: CP.textMuted, fontFamily: FONTS.body }}>Caricamento profilo…</div>;
   if (error) {
@@ -289,27 +309,17 @@ export default function StudioProfilePage() {
             </label>
           ))}
         </div>
-        <div style={{ ...card, padding: 16 }}>
-          <SectionTitle>La settimana</SectionTitle>
-          {week.map((d) => {
-            const wd = weekdayOf(d);
-            const dayItems = items.filter((it) => it.day === d && it.status !== "scartato");
-            return (
-              <div key={d} style={{ display: "grid", gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10, padding: "7px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
-                <div style={{ fontSize: 13, color: d === today ? CP.textPrimary : CP.textSecondary, fontWeight: d === today ? 500 : 400 }}>{d === today ? "Oggi" : fmtDay(d)}</div>
-                <div style={{ minWidth: 0 }}>
-                  {dayItems.length === 0 && <div style={{ fontSize: 13, color: CP.textMuted }}>{profile.calendar?.[wd] ? `Previsto: ${profile.calendar[wd]}` : "Niente in programma"}</div>}
-                  {dayItems.map((it) => (
-                    <button key={it.id} onClick={() => setEditing(it)} style={{ display: "block", background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer", fontSize: 13, color: CP.textPrimary, fontFamily: FONTS.body }}>
-                      {it.title} <span style={{ color: CP.textMuted }}>· {STATUSES.find((s) => s.key === it.status)?.label.toLowerCase()}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
       </div>
+
+      {/* Editoriale: la settimana come una storia, Instagram e Telegram insieme */}
+      <EditorialSection
+        today={today} items={items} posts={tg?.posts || []} arcs={data.arcs || []}
+        onOpenItem={(it) => setEditing(it)}
+        onNewItem={(prefill) => setEditing({ format: profile.format || "", ...prefill })}
+        onOpenPost={(p) => setPostEditing(p)}
+        onNewPost={(prefill) => setPostEditing(prefill)}
+        onSaveArc={saveArc} onDeleteArc={deleteArc}
+      />
 
       {/* Coda */}
       <SectionTitle>Coda dei contenuti</SectionTitle>
@@ -354,7 +364,7 @@ export default function StudioProfilePage() {
       )}
 
       {/* Telegram e landing */}
-      <TelegramPanel pid={id} />
+      <TelegramPanel pid={id} arcs={data.arcs || []} />
 
       {/* Identità */}
       <SectionTitle aside={<button style={btn(false)} onClick={() => setEditId(true)}><Pencil size={13} aria-hidden="true" /> Modifica</button>}>Identità</SectionTitle>
@@ -385,7 +395,8 @@ export default function StudioProfilePage() {
         </div>
       </div>
 
-      {editing && <ItemModal item={editing} onClose={() => { setEditing(null); setErr(null); }} onSave={saveItem} onDelete={deleteItem} saving={saving} err={err} pid={id} refs={tg?.config?.referencePhotoIds || []} onRefresh={mutate} />}
+      {editing && <ItemModal item={editing} onClose={() => { setEditing(null); setErr(null); }} onSave={saveItem} onDelete={deleteItem} saving={saving} err={err} pid={id} refs={tg?.config?.referencePhotoIds || []} onRefresh={mutate} arcs={data.arcs || []} />}
+      {postEditing && tg && <PostModal post={postEditing} photos={tg.photos || []} cfg={tg.config || {}} pid={id} arcs={data.arcs || []} onClose={() => setPostEditing(null)} onDone={async () => { setPostEditing(null); await mutateTg(); }} />}
       {editId && <IdentityModal profile={profile} onClose={() => { setEditId(false); setErr(null); }} onSave={saveProfile} saving={saving} err={err} />}
     </div>
   );

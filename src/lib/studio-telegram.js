@@ -69,6 +69,19 @@ export async function saveTgConfig(pid, input, by) {
     }
   }
   if (errors.length) return { ok: false, errors };
+  // link OF nuovo o cambiato: va sui messaggi «richiamo» ancora in bozza che non hanno un pulsante
+  // (l'Editoriale li prepara prima che il link esista). I programmati non si toccano: sono approvati così.
+  if (next.ofLinkUrl && next.ofLinkUrl !== prev.ofLinkUrl) {
+    const all = (await kv.get(POSTS(pid))) || {};
+    let changed = 0;
+    for (const p of Object.values(all)) {
+      if (p.status === "bozza" && p.role === "richiamo" && (!p.buttonUrl || p.buttonUrl === prev.ofLinkUrl)) {
+        all[p.id] = { ...p, buttonUrl: next.ofLinkUrl, buttonLabel: p.buttonLabel || "Vieni di là" };
+        changed++;
+      }
+    }
+    if (changed) await kv.set(POSTS(pid), all);
+  }
   next.updatedAt = Date.now();
   next.updatedBy = by || null;
   await kv.set(CFG(pid), next);
@@ -228,8 +241,13 @@ async function sendPost(pid, chatId, post) {
       }
       const res = await tgCall("sendMediaGroup", { chat_id: String(chatId), media }, files);
       ids.push(...res.map((m) => m.message_id));
+    } else if (step.method === "sendPoll") {
+      const res = await tgCall("sendPoll", { chat_id: chatId, question: step.question, options: step.options.map((text) => ({ text })), is_anonymous: true });
+      ids.push(res.message_id);
     }
   }
+  // il benvenuto si fissa in alto (senza notifica: è un messaggio di casa, non una novità)
+  if (post.pin && ids.length) await tgCall("pinChatMessage", { chat_id: chatId, message_id: ids[0], disable_notification: true });
   return ids;
 }
 
