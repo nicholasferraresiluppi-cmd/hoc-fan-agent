@@ -1,7 +1,7 @@
 // node tests/studio-editorial.mjs — Editoriale dello Studio social (logica pura).
 import assert from "node:assert/strict";
 import { weekStartOf, weekDays, normalizeArc, hasOfLink, dailyLinkGaps, slotOfTime, editorialGrid, romeDayOf } from "../src/lib/studio-editorial-core.js";
-import { romeLocalToMs, normalizeTgPost, sendPlan } from "../src/lib/studio-telegram-core.js";
+import { romeLocalToMs, normalizeTgPost, sendPlan, canApproveTg } from "../src/lib/studio-telegram-core.js";
 
 let n = 0;
 const t = (name, fn) => { fn(); n++; };
@@ -53,6 +53,16 @@ t("post Telegram: sondaggio valido, fissato, ruolo e storia; come si manda", () 
   assert.deepEqual(sendPlan(post).map((s) => s.method), ["sendMessage", "sendPoll", "sendMessage"]); // testo, sondaggio, pulsante a parte
   assert.equal(sendPlan(post)[0].button, null);
   assert.deepEqual(sendPlan(normalizeTgPost({ poll: { question: "A o B?", options: ["A", "B"] } }).post).map((s) => s.method), ["sendPoll"]);
+});
+
+t("segnaposto non sostituito: non si approva; condizione salvata", () => {
+  const future = Date.now() + 3600e3;
+  const rv = { conformita: { outcome: "ok" }, qualita: { outcome: "ok" } };
+  const { post } = normalizeTgPost({ text: "Il nome è {soprannome}.", condition: "Se vince «Sì»", sendAt: future, reviews: rv });
+  assert.equal(post.condition, "Se vince «Sì»");
+  assert.match(canApproveTg(post).reason, /\{soprannome\}/);
+  assert.equal(canApproveTg({ ...post, text: "Il nome è il Ripetente." }).ok, true);
+  assert.match(canApproveTg({ ...post, text: "ok", poll: { question: "Diamo il numero a {soprannome}?", options: ["Sì", "No"] } }).reason, /soprannome/);
 });
 
 console.log(`studio-editorial: ${n} gruppi di asserzioni ok`);

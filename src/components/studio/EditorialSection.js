@@ -147,7 +147,7 @@ export default function EditorialSection({ today, items, posts, arcs, onOpenItem
               {grid.map((g) => (
                 <div key={g.day} style={{ padding: 6, borderTop: `1px solid ${CP.borderSoft}`, borderLeft: `1px solid ${CP.borderSoft}`, minWidth: 0 }}>
                   {g.tg[slot.key].map((p) => (
-                    <div key={p.id}>{chip(p.poll ? `Sondaggio: ${p.poll.question}` : (p.text || "(solo foto)"), [TG_STATUS[p.status], roleLabel(p.role), hasOfLink(p) ? "link OF" : null, p.pin ? "fissato" : null].filter(Boolean).join(" · "), () => onOpenPost(p), p.status === "programmato" || p.status === "inviato" ? CP.accentGreen : null)}</div>
+                    <div key={p.id}>{chip(p.poll ? `Sondaggio: ${p.poll.question}` : (p.text || "(solo foto)"), [p.condition, TG_STATUS[p.status], roleLabel(p.role), hasOfLink(p) ? "link OF" : null, p.pin ? "fissato" : null].filter(Boolean).join(" · "), () => onOpenPost(p), p.status === "programmato" || p.status === "inviato" ? CP.accentGreen : null)}</div>
                   ))}
                   {add(() => onNewPost({ sendAt: romeLocalToMs(`${g.day}T${slot.time}`), slot: slot.key, arcId: arc?.id || null }), `Nuovo messaggio Telegram (${slot.label.toLowerCase()})`)}
                 </div>

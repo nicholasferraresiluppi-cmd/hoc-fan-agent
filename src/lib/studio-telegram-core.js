@@ -107,6 +107,9 @@ export function normalizeTgPost(input, prev = null) {
     arcId: str(input?.arcId ?? prev?.arcId, 40) || null,
     slot: ["mattina", "pomeriggio", "sera"].includes(input?.slot) ? input.slot : input?.slot === null ? null : prev?.slot || null,
     role: str(input?.role ?? prev?.role, 20) || null,
+    // condizione di uscita (es. «Se vince "Sì"», «Da confermare con Martina»): le versioni alternative
+    // dopo un sondaggio restano in bozza, si approva quella giusta e si annullano le altre
+    condition: str(input?.condition ?? prev?.condition, 80) || null,
     reviews,
     status,
   };
@@ -119,6 +122,9 @@ export function canApproveTg(post, now = Date.now()) {
   if (post.status === "inviato") return { ok: false, reason: "Già inviato" };
   if (!Number.isFinite(post.sendAt)) return { ok: false, reason: "Manca l'ora di uscita" };
   if (post.sendAt < now - 60e3) return { ok: false, reason: "L'ora di uscita è già passata: scegline una futura" };
+  // un segnaposto rimasto ({soprannome}) uscirebbe tale e quale nel canale
+  const holder = [post.text, post.poll?.question, ...(post.poll?.options || []), post.buttonLabel].join(" ").match(/\{[^{}\s]{1,30}\}/);
+  if (holder) return { ok: false, reason: `Sostituisci ${holder[0]} prima di approvare` };
   const blocks = TG_REVIEWERS.filter((r) => post.reviews?.[r.key]?.outcome === "blocca").map((r) => r.label);
   if (blocks.length) return { ok: false, reason: `Bloccato da: ${blocks.join(", ")}` };
   const notOk = TG_REVIEWERS.filter((r) => post.reviews?.[r.key]?.outcome !== "ok").map((r) => r.label);
