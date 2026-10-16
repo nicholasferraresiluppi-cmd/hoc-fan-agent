@@ -25,7 +25,7 @@ export async function queueSignal({ text, why, by, via }) {
   const work = async () => {
     try {
       const r = await processSignal({ text: item.text, by: item.by, why: item.why });
-      await updateInboxItem(item.id, { status: r.status, h: r.h || null, msg: r.msg, sig: r.sig || null, doneAt: Date.now() });
+      await updateInboxItem(item.id, { status: r.status, h: r.h || null, msg: r.msg, sig: r.sig || null, warn: !!r.warn, doneAt: Date.now() });
     } catch (e) {
       await updateInboxItem(item.id, { status: "errore", msg: `Errore: ${String(e.message || e).slice(0, 140)}`, doneAt: Date.now() });
     }

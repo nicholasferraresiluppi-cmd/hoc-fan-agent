@@ -280,7 +280,13 @@ export function buildCreators(profiles, crm) {
     ps.sort((a, b) => (b.fol || 0) - (a.fol || 0));
     const main = ps[0];
     const hist = ps.length > 1 ? sumHistories(ps.map((p) => p.hist)) : main.hist || [];
-    const sig = ps.reduce((best, p) => (SIG_RANK[p.sig] > SIG_RANK[best] ? p.sig : best), "nessuno");
+    const link = linkOrHint(ps);
+    // un link o un tag nella prima evidenza basta per "da guardare" (anche se la segnalazione è
+    // stata letta prima di questa regola). Solo profili letti dalle segnalazioni (hlVia), così
+    // la classificazione della prima grande ricerca non cambia; mai dal link in bio.
+    const hlRead = ps.filter((p) => Array.isArray(p.hlVia)).map((p) => ({ ...p, url: "" }));
+    const hlSig = hlRead.length ? sigFromLink(linkOrHint(hlRead)) : "nessuno";
+    const sig = [hlSig, ...ps.map((p) => p.sig)].reduce((best, s) => (SIG_RANK[s] > SIG_RANK[best] ? s : best), "nessuno");
     const fmts = [...new Set(ps.map((p) => p.fmt).filter((f) => f && f !== "nessuno"))];
     rows.push({
       id,
@@ -310,7 +316,7 @@ export function buildCreators(profiles, crm) {
       notes: c.notes?.length || 0,
       updatedAt: c.updatedAt || null,
       missing: ps.every((p) => p.missing),
-      link: bestLink(ps),
+      link,
       ita: ps.some((p) => p.ita === "si") ? "si" : ps.some((p) => p.ita === "forse") ? "forse" : null,
       firstSeen: Math.min(...ps.map((p) => p.firstSeen || Infinity)) || null,
       reels: ps.flatMap((p) => (p.reels || []).map((r) => ({ ...r, h: p.h }))).sort((a, b) => (b.v || 0) - (a.v || 0)).slice(0, 9),
@@ -481,7 +487,7 @@ const LINK_KINDS = [
   { re: /(^|\.)onlyfans\.com$/, label: "OnlyFans", strength: 3 },
   { re: /(^|\.)(fanvue|fansly|mym\.fans|loyalfans|fanplace)\.[a-z.]+$/, label: "Piattaforma a pagamento", strength: 3 },
   { re: /(^|\.)(t\.me|telegram\.me)$/, label: "Telegram", strength: 2 },
-  { re: /(^|\.)(linktr\.ee|link\.me|beacons\.ai|beacons\.page|allmylinks\.com|heylink\.me|heyliiink\.com|lovemylink\.me|hoo\.be|bio\.site|snipfeed\.co|getmysocial\.com|solo\.to|taplink\.cc|linkin\.bio|tap\.bio|lnk\.bio|taap\.it|[a-z0-9-]+\.link)$/, label: "Pagina di link", strength: 1 },
+  { re: /(^|\.)(linktr\.ee|link\.me|beacons\.ai|beacons\.page|allmylinks\.com|heylink\.me|heyliiink\.com|lovemylink\.me|hoo\.be|bio\.site|snipfeed\.co|getmysocial\.com|cutepage\.me|solo\.to|taplink\.cc|linkin\.bio|tap\.bio|lnk\.bio|taap\.it|[a-z0-9-]+\.link)$/, label: "Pagina di link", strength: 1 },
 ];
 
 /** Che cosa c'è dietro un link: { label, strength } (3 piattaforma a pagamento, 2 Telegram, 1 pagina di link, 0 altro) o null. */
@@ -530,6 +536,45 @@ export function bestLink(ps) {
   return best;
 }
 
+/**
+ * Qualcosa da guardare nella prima storia in evidenza anche quando il radar non sa dire dove
+ * porta (16/10/2026, casi @aliiciottaa e @alicelatspreferita): un link QUALSIASI o un account
+ * taggato. Le pagine di link nascondono il pulsante a pagamento dietro JavaScript e conferme
+ * d'età, quindi dal server non si vede: il radar la segnala e a valutarla è una persona.
+ * Stessa forma di bestLink, strength 1 (= indizio da verificare).
+ */
+export function highlightHint(ps) {
+  for (const p of ps) for (const url of p.hlLinks || []) if (url) return { label: "Link", strength: 1, where: "evidenza", url };
+  for (const p of ps) for (const v of p.hlVia || []) if (v?.h) return { label: `Tag @${v.h}`, strength: 1, where: "evidenza", url: `https://www.instagram.com/${encodeURIComponent(v.h)}/`, tag: v.h };
+  return null;
+}
+
+/** Il link più parlante; se non dice niente, l'indizio nella prima storia in evidenza. */
+export function linkOrHint(ps) {
+  const best = bestLink(ps);
+  if (best && best.strength >= 1) return best;
+  return highlightHint(ps) || best;
+}
+
+/** Livello del profilo: forte (a pagamento), debole (indizio da guardare), nessuno. */
+export function sigFromLink(l) {
+  return !l || l.strength < 1 ? "nessuno" : l.strength >= 2 ? "forte" : "debole";
+}
+
+/**
+ * Esito di una segnalazione, in parole. `hlFailed` = la prima storia in evidenza non si è
+ * potuta leggere: va detto, altrimenti "niente trovato" e "non letto" sembrano la stessa cosa.
+ */
+export function signalWhat(link, { hlFailed = false } = {}) {
+  if (link && link.strength >= 2) return `${link.label} trovato ${linkWhere(link)}`;
+  if (link && link.strength === 1) {
+    const what = link.tag ? `tagga @${link.tag}` : link.label === "Link" ? "c'è un link" : link.label.toLowerCase();
+    return `da guardare: ${what} ${linkWhere(link)}`;
+  }
+  if (hlFailed) return "prima storia in evidenza NON letta (Instagram non ha risposto): segnalala di nuovo per riprovare";
+  return "nessun link né tag, in bio o nella prima storia in evidenza";
+}
+
 /** Dove sta il link, in parole: lungo per le frasi, corto per le etichette. */
 export function linkWhere(link, { short = false } = {}) {
   if (!link) return "";
@@ -555,6 +600,7 @@ export function whyLines(c, { newCut = Date.now() - 8 * DAY } = {}) {
   if (c.fmt && c.fmt !== "nessuno") out.push(`Ha un format che si ripete: ${String(c.fmt).replace(/^altro:\s*/i, "")}.`);
   if (c.link && c.link.strength >= 2) out.push(`${c.link.label} ${linkWhere(c.link)}.`);
   else if (c.sig === "forte") out.push("Ha un profilo a pagamento.");
+  else if (c.link && c.link.strength === 1 && c.link.where !== "bio") out.push(`Da guardare: ${c.link.tag ? `tagga @${c.link.tag}` : c.link.label.toLowerCase()} ${linkWhere(c.link)}.`);
   if (c.g4 != null && c.g4 >= 5) out.push(`Cresce: +${String(c.g4).replace(".", ",")}% di follower in 4 settimane.`);
   if (c.medv && c.fol && c.medv / c.fol >= 0.3) out.push("I reel arrivano ben oltre i suoi follower.");
   if (c.firstSeen && c.firstSeen >= newCut) out.push("Nuova nel radar questa settimana.");

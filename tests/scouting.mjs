@@ -11,7 +11,7 @@ import {
   handleStem, linkKey, suggestLinks, buildCreators, stageCounts,
   creatorIdOf, setStage, addNote, setField, linkHandles, unlinkHandle, dismissSuggestion, forgetHandle,
   HISTORY_MAX, DEFAULT_STAGE, applyRefresh, scrubContacts,
-  classifyUrl, bestLink, linkWhere, whyLines, pickToday, parseInstagramLink, marketByGroup,
+  classifyUrl, bestLink, linkWhere, highlightHint, linkOrHint, sigFromLink, signalWhat, whyLines, pickToday, parseInstagramLink, marketByGroup,
 } from "../src/lib/scouting-core.js";
 
 let n = 0;
@@ -180,6 +180,25 @@ eq(bestLink([{ ...viaP, hlVia: [{ h: "x", urls: [] }] }]), null, "tag senza link
 eq(bestLink([{ url: "", hlVia: [null] }]), null, "voci rotte ignorate");
 ok(whyLines({ link: { label: "OnlyFans", strength: 3, where: "tag", via: "x" } })[0].includes("@x"), "il perché nomina l'account taggato");
 eq(suggestLinks([{ h: "a", url: "", hlVia: [{ h: "t", urls: ["https://onlyfans.com/zed"] }] }, { h: "b", url: "https://onlyfans.com/zed" }], (h) => h).length, 1, "stesso link anche via tag propone il collegamento");
+
+// link o tag nella prima evidenza = da guardare (16/10/2026, @aliiciottaa e @alicelatspreferita)
+eq(classifyUrl("https://cutepage.me/aliiciottaa").label, "Pagina di link", "cutepage.me = pagina di link");
+const aliiP = { h: "aliiciottaa", url: "", hlLinks: ["https://cutepage.me/aliiciottaa"], hlVia: [] };
+eq(sigFromLink(linkOrHint([aliiP])), "debole", "pagina di link nella storia = da guardare");
+const unk = linkOrHint([{ h: "x", url: "", hlLinks: ["https://sconosciuto.example/x"], hlVia: [] }]);
+eq([unk.label, unk.strength, unk.where], ["Link", 1, "evidenza"], "link qualsiasi nella storia = da guardare, anche se non lo riconosciamo");
+const tagOnly = linkOrHint([{ h: "alice", url: "", hlLinks: [], hlVia: [{ h: "imieilinkzz", urls: [] }] }]);
+eq([tagOnly.tag, tagOnly.strength], ["imieilinkzz", 1], "tag senza link leggibile = da guardare");
+ok(signalWhat(tagOnly).includes("tagga @imieilinkzz"), "il messaggio nomina il tag");
+eq(linkOrHint([{ ...viaP }]).where, "tag", "il link dietro il tag vince sul solo tag");
+eq(linkOrHint([{ h: "a", url: "https://onlyfans.com/a", hlLinks: ["https://x.example"], hlVia: [] }]).label, "OnlyFans", "il link forte vince sull'indizio");
+eq(highlightHint([{ h: "a", url: "https://linktr.ee/a" }]), null, "il link in bio non è un indizio dell'evidenza");
+eq(sigFromLink(linkOrHint([{ h: "a", url: "https://www.miosito.it" }])), "nessuno", "un sito in bio resta nessuno");
+ok(signalWhat(null, { hlFailed: true }).includes("NON letta"), "evidenza non letta: detto, non confuso con niente trovato");
+ok(signalWhat(null).startsWith("nessun link"), "niente trovato davvero");
+const rowsSig = buildCreators([{ ...aliiP, sig: "nessuno", fol: 1 }, { h: "old", url: "", hlLinks: ["https://x.example"], sig: "nessuno", fol: 1 }], { creators: {} });
+eq(rowsSig.map((r) => r.sig), ["debole", "nessuno"], "da guardare anche se letta prima della regola; la prima ricerca (senza hlVia) non cambia");
+ok(whyLines({ sig: "debole", link: tagOnly })[0].includes("tagga @imieilinkzz"), "il perché dice del tag");
 
 console.log(`scouting: ${n} asserzioni ok`);
 
