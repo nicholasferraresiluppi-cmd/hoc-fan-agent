@@ -3,7 +3,7 @@
 // /discover (kind "google"); qui arriva solo il conteggio già fatto, con al massimo 3 titoli.
 // POST { entries: [{ h, n, of, top: [{ title, url, site }] }] } → { updated }
 import { authorize, CAPABILITIES } from "@/lib/rbac";
-import { getProfiles, saveProfiles } from "@/lib/scouting-store";
+import { getProfiles, commitProfiles } from "@/lib/scouting-store";
 import { normHandle } from "@/lib/scouting-core";
 
 export const runtime = "nodejs";
@@ -34,6 +34,6 @@ export async function POST(request) {
     updated++;
     return { ...p, press: v };
   });
-  if (updated) await saveProfiles(next);
+  if (updated) await commitProfiles(profiles, next);
   return Response.json({ updated, asked: by.size });
 }

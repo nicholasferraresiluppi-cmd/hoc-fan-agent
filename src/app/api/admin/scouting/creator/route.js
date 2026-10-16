@@ -7,7 +7,7 @@
 //   dismiss { a, b }                 "non sono la stessa creator": la proposta non torna
 //   forget  { handle }               cancellazione su richiesta: via da archivio e CRM, il giro non la riaggiunge
 import { authorize, CAPABILITIES } from "@/lib/rbac";
-import { getProfiles, saveProfiles, getCrm, saveCrm, addForgotten } from "@/lib/scouting-store";
+import { getProfiles, commitProfiles, getCrm, saveCrm, addForgotten } from "@/lib/scouting-store";
 import { deletePic } from "@/lib/scouting-pics";
 import { review, unreview, setStage, addNote, setField, linkHandles, unlinkHandle, dismissSuggestion, forgetHandle, normHandle } from "@/lib/scouting-core";
 
@@ -40,7 +40,7 @@ export async function POST(request) {
         if (!h) throw new Error("account mancante");
         crm = forgetHandle(crm, h);
         const profiles = await getProfiles();
-        await saveProfiles(profiles.filter((p) => p.h !== h));
+        await commitProfiles(profiles, profiles.filter((p) => p.h !== h));
         await addForgotten(h);
         await deletePic(h);
         break;

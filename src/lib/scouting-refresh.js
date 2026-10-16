@@ -9,7 +9,7 @@
 // Il costo è limitato due volte: maxBudgetUsd nell'input dell'attore e maxTotalChargeUsd sul run.
 // Strumento: afanasenko/instagram-profile-scraper (legge anche i profili con limite d'età,
 // a differenza di apify/instagram-profile-scraper — verificato il 9/10/2026).
-import { getProfiles, saveProfiles, getRefreshState, setRefreshState, getForgotten } from "@/lib/scouting-store";
+import { getProfiles, commitProfiles, getRefreshState, setRefreshState, getForgotten } from "@/lib/scouting-store";
 import { applyRefresh, applyPartialRefresh, weekKey } from "@/lib/scouting-core";
 import { savePics } from "@/lib/scouting-pics";
 
@@ -65,9 +65,10 @@ async function collect(datasetId) {
 export async function applyDatasetPartial(datasetId) {
   if (!/^[A-Za-z0-9]{8,30}$/.test(String(datasetId || ""))) throw new Error("dataset non valido");
   const items = await collect(datasetId);
-  const res = applyPartialRefresh(await getProfiles(), items);
+  const orig = await getProfiles();
+  const res = applyPartialRefresh(orig, items);
   const sp = await savePics(res.profiles, { budgetMs: 60000 });
-  await saveProfiles(sp.profiles);
+  await commitProfiles(orig, sp.profiles);
   return { items: items.length, updated: res.updated, pics: res.pics, saved: sp.saved, left: sp.left ?? 0 };
 }
 
@@ -83,18 +84,20 @@ export async function scoutingTick({ force = false } = {}) {
       return { error: `giro ${run.status}` };
     }
     const items = await collect(st.datasetId);
-    const res = applyRefresh(await getProfiles(), items);
+    const orig = await getProfiles();
+    const res = applyRefresh(orig, items);
     // foto: si salvano subito quelle nuove; quelle che non stanno nel tempo, ai tick dopo (sotto)
     const sp = await savePics(res.profiles, { budgetMs: 60000 });
-    await saveProfiles(sp.profiles);
+    await commitProfiles(orig, sp.profiles);
     const done = { lastCompletedAt: Date.now(), lastWeek: weekKey(new Date()), lastUpdated: res.updated, lastMissing: res.missing, lastCostUsd: run.usageTotalUsd ?? null };
     await setRefreshState({ ...done, runId: null, pausedUntil: st.pausedUntil ?? null });
     return { completed: done };
   }
   // Foto rimaste da salvare (link ancora validi): un po' a ogni tick, anche col giro in pausa.
   {
-    const sp = await savePics(await getProfiles(), { budgetMs: 40000 });
-    if (sp.saved) await saveProfiles(sp.profiles);
+    const orig = await getProfiles();
+    const sp = await savePics(orig, { budgetMs: 40000 });
+    if (sp.saved) await commitProfiles(orig, sp.profiles);
   }
   // Pausa decisa da un admin (budget Apify dirottato sulla ricerca): il bottone "Aggiorna ora" la scavalca.
   if (!force && st.pausedUntil && Date.now() < st.pausedUntil) return { paused: true, until: st.pausedUntil };
