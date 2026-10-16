@@ -9,7 +9,7 @@
  */
 import { useMemo, useState } from "react";
 import useSWR from "swr";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Copy, ExternalLink } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { PageHead, Notice } from "@/components/ds";
@@ -47,6 +47,60 @@ function readings(p, splitRepeat) {
   return out;
 }
 
+
+const dmy = (d) => (d ? d.slice(8, 10) + "/" + d.slice(5, 7) : "—");
+const SUB_TONE = () => ({ attivo: CP.accentGreen, scaduto: CP.accentRed, "non noto": null });
+
+/** Fan di valore in pausa di una pagina, nominati: la lista da dare ai chatter. */
+function PausedFans({ creatorId, name }) {
+  const { data, error, isLoading } = useSWR(`/api/admin/retention/fans?creator=${creatorId}`, fetcher, { revalidateOnFocus: false });
+  const [copied, setCopied] = useState(false);
+  if (isLoading) return <div style={{ ...muted, display: "flex", gap: 6, alignItems: "center" }}><Loader2 size={13} />Carico i fan in pausa (fino a mezzo minuto la prima volta del giorno)…</div>;
+  if (error) return <Notice danger>{error.message}</Notice>;
+  if (!data) return null;
+  const fans = data.fans || [];
+  const tone = SUB_TONE();
+  const copy = async () => {
+    const lines = fans.map((f) => `${f.username ? "@" + f.username : f.name || f.userId} — spendeva ~${usd(f.monthly)}/mese — fermo da ${f.days} gg — abbonamento ${f.sub}${f.fanLast && (!f.ourLast || f.fanLast > f.ourLast) ? " — ha scritto per ultimo, da rispondere" : ""}`);
+    try { await navigator.clipboard.writeText(`Fan da far riprendere · ${name}\n` + lines.join("\n")); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { alert("Copia non riuscita"); }
+  };
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+        <span style={{ fontSize: 14, fontWeight: 500 }}>Da far riprendere ({fans.length})</span>
+        {fans.length > 0 && <button style={{ ...btn, padding: "5px 10px", fontSize: 12 }} onClick={copy}><Copy size={13} />{copied ? "Copiata" : "Copia la lista per i chatter"}</button>}
+      </div>
+      <div style={{ ...muted, marginBottom: 8 }}>
+        Fan di valore fermi da 1 a 4 mesi, dal più prezioso. Negli ultimi 30 giorni ne sono tornati {int(data.returned?.fans)}{data.returned?.fans ? `, che hanno speso ${usd(data.returned.spentSince)}` : ""}.
+        Abbonamento = stato all'ultimo messaggio visto.
+      </div>
+      {fans.length === 0 && <div style={muted}>Nessun fan di valore in pausa su questa pagina.</div>}
+      {fans.map((f) => {
+        const unanswered = f.fanLast && (!f.ourLast || f.fanLast > f.ourLast);
+        return (
+          <div key={f.userId} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, padding: "8px 0", borderTop: `1px solid ${CP.borderSoft}`, alignItems: "center" }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 14, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {f.name || f.username || f.userId}{f.username ? <span style={{ color: CP.textMuted, fontSize: 12 }}> @{f.username}</span> : null}
+              </div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", margin: "3px 0" }}>
+                <Pill tone={tone[f.sub]}>abbonamento {f.sub}</Pill>
+                {unanswered && <Pill tone={CP.accentSoftText}>ha scritto per ultimo</Pill>}
+              </div>
+              <div style={muted}>Ultimo acquisto {dmy(f.lastBuy)} · ultimo messaggio suo {dmy(f.fanLast)}, nostro {dmy(f.ourLast)} · {usd(f.r365)} nell'ultimo anno</div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 16, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{usd(f.monthly)}<span style={{ ...muted }}>/mese</span></div>
+              <div style={muted}>fermo da {f.days} gg</div>
+              <a href={`https://onlyfans.com/my/chats/chat/${f.userId}/`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: CP.accentSoftText, display: "inline-flex", gap: 4, alignItems: "center" }}>Apri chat<ExternalLink size={11} /></a>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Detail({ p, splitRepeat }) {
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -69,6 +123,7 @@ function Detail({ p, splitRepeat }) {
           </div>
         ))}
       </div>
+      <PausedFans creatorId={p.creator_id} name={p.name} />
       {p.cohorts.length > 0 && (
         <div>
           <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 6 }}>Fan nuovi mese per mese</div>
@@ -111,7 +166,7 @@ export default function RetentionPage() {
       <PageHead
         crumbs={[{ label: "Comp & Ben" }, { label: "Retention fan" }]}
         title="Retention fan"
-        subtitle="Per ogni pagina del tuo split: quanto dipende da pochi fan, quali fan di valore si sono fermati, quanti fan nuovi tornano. Dati del warehouse, solo HOC, aggiornati una volta al giorno."
+        subtitle="Per ogni pagina del tuo split: quanto dipende da pochi fan, quali fan di valore si sono fermati (con la lista da far riprendere ai chatter), quanti fan nuovi tornano. Dati del warehouse, solo HOC, aggiornati una volta al giorno."
         actions={<button style={btn} onClick={refresh} disabled={busy}>{busy ? <Loader2 size={14} /> : <RefreshCw size={14} />}Ricalcola</button>}
       />
       {error && <Notice danger>{error.message}</Notice>}
