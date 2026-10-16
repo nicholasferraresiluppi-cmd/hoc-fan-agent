@@ -292,13 +292,16 @@ html.casa-intro[data-style="v3"]::after {
 [data-style="v3"] .casa-nav { flex: 1; overflow-y: auto; scrollbar-width: none; margin-right: -8px; padding-right: 8px; }
 [data-style="v3"] .casa-nav::-webkit-scrollbar { display: none; }
 [data-style="v3"] .casa-nav h4 { font-size: 12px; font-weight: 500; color: var(--cp-textMuted); margin: 20px 0 6px; letter-spacing: .03em; }
-[data-style="v3"] .casa-nav a { position: relative; display: flex; justify-content: space-between; padding: 7px 0 7px 16px; color: var(--cp-textSecondary); text-decoration: none; font-size: 14.5px; transition: color .25s; }
-[data-style="v3"] .casa-nav a:hover, [data-style="v3"] .casa-nav a.on { color: var(--cp-textPrimary); }
-[data-style="v3"] .casa-nav a.on::before { content: ""; position: absolute; left: 0; top: 50%; width: 8px; height: 1px; background: var(--cp-gold); }
+[data-style="v3"] .casa-nav a { position: relative; display: flex; justify-content: space-between; padding: 7px 10px 7px 16px; border-radius: 8px; color: var(--cp-textSecondary); text-decoration: none; font-size: 14.5px; transition: color .25s, background .25s; }
+[data-style="v3"] .casa-nav a:hover { color: var(--cp-textPrimary); }
+/* Voce attiva (16/10): "sei qui" deve leggersi a colpo d'occhio, non solo come hover —
+   velo dorato, barretta verticale, testo pieno. Hover = solo colore, così i due stati non si confondono. */
+[data-style="v3"] .casa-nav a.on { color: var(--cp-textPrimary); font-weight: 500; background: color-mix(in srgb, var(--cp-gold) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cp-gold) 22%, transparent); }
+[data-style="v3"] .casa-nav a.on::before { content: ""; position: absolute; left: 6px; top: 25%; bottom: 25%; width: 2px; border-radius: 2px; background: var(--cp-gold); }
 [data-style="v3"] .casa-nav a .b { font-size: 12px; color: var(--cp-gold); }
 [data-style="v3"] .casa-tools { display: flex; justify-content: space-between; width: 100%; margin-top: 24px; padding: 8px 0; background: none; border: 0; border-top: 1px solid var(--cp-border); color: var(--cp-textMuted); font-size: 13px; cursor: pointer; font-family: var(--cp-font); }
 [data-style="v3"] .casa-tools:hover { color: var(--cp-textPrimary); }
-[data-style="v3"] .casa-all a { font-size: 13.5px; padding: 5px 0 5px 16px; }
+[data-style="v3"] .casa-all a { font-size: 13.5px; padding: 5px 10px 5px 16px; }
 [data-style="v3"] .casa-me { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--cp-textSecondary); }
 [data-style="v3"] .casa-me .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 [data-style="v3"] .casa-style { margin-top: -12px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--cp-border); background: transparent; color: var(--cp-textMuted); font-size: 12px; cursor: pointer; text-align: left; font-family: var(--cp-font); }
