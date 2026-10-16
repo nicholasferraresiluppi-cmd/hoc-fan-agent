@@ -16,7 +16,7 @@
 // che Instagram restituisce sono FIRMATI e scadono in un paio di giorni: si tengono in KV
 // 36 ore e si riprendono quando servono. Nessuna copia dei video: la scheda li riproduce
 // dal server di Instagram (che li serve anche ad altri siti: cross-origin).
-import { getProfiles, saveProfiles, getForgotten, getCrm, saveCrm, getReelMedia, setReelMedia } from "@/lib/scouting-store";
+import { getProfiles, commitProfiles, getForgotten, getCrm, saveCrm, getReelMedia, setReelMedia } from "@/lib/scouting-store";
 import { normHandle, parseRefreshItem, parseInstagramLink, bestLink, linkOrHint, sigFromLink, signalWhat, parseHighlightRows, weekKey, addNote, creatorIdOf } from "@/lib/scouting-core";
 
 const API = "https://api.apify.com/v2";
@@ -69,12 +69,13 @@ export async function loadReels(h, n = 12) {
   const media = rows.map(mediaOf).filter(Boolean);
   if (!reels.length) return { reels: [], media: [] };
   const profiles = await getProfiles();
+  const before = [...profiles];
   const i = profiles.findIndex((p) => p.h === h);
   if (i >= 0) {
     const keep = new Map((profiles[i].reels || []).map((r) => [r.sc, r]));
     for (const r of reels) keep.set(r.sc, { ...keep.get(r.sc), ...r });
     profiles[i] = { ...profiles[i], reels: [...keep.values()].sort((a, b) => (b.v || 0) - (a.v || 0)).slice(0, 24), reelsAt: Date.now() };
-    await saveProfiles(profiles);
+    await commitProfiles(before, profiles);
   }
   const old = (await getReelMedia(h)) || {};
   const byCode = { ...(old.byCode || {}) };
@@ -173,6 +174,7 @@ export async function processSignal({ text, by, why }) {
   if ((await getForgotten()).has(h)) return { status: "cancellata", h, msg: "Questa creator ha chiesto di essere tolta dal radar." };
 
   const profiles = await getProfiles();
+  const before = [...profiles]; // si salva solo la differenza: chi scrive mentre si aspetta Apify non si perde
   const i = profiles.findIndex((p) => p.h === h);
   const note = [`Segnalata da ${by || "qualcuno"}`, why ? `: ${String(why).slice(0, 200)}` : ""].join("");
   if (i >= 0) {
@@ -188,14 +190,14 @@ export async function processSignal({ text, by, why }) {
         next.sig = sigFromLink(l);
         profiles[i] = next;
         found = ` · ${signalWhat(l)}`;
-        await saveProfiles(profiles);
+        await commitProfiles(before, profiles);
       } else found = ` · ${signalWhat(null, { hlFailed: true })}`;
     }
     if (reel) {
       const rs = new Map((profiles[i].reels || []).map((x) => [x.sc, x]));
       rs.set(reel.sc, { ...rs.get(reel.sc), ...reel, signaled: true });
       profiles[i] = { ...profiles[i], reels: [...rs.values()].sort((a, b) => (b.v || 0) - (a.v || 0)).slice(0, 24) };
-      await saveProfiles(profiles);
+      await commitProfiles(before, profiles);
     }
     await noteOn(h, note, by);
     if (media) await cacheMedia(h, [media]);
@@ -216,7 +218,7 @@ export async function processSignal({ text, by, why }) {
     hist: [[weekKey(new Date(now)), row.fol, row.medv]], firstSeen: now, lastSeen: now, missing: 0,
     reels: reel ? [{ ...reel, signaled: true }] : [], by: by || null,
   });
-  await saveProfiles(profiles);
+  await commitProfiles(before, profiles);
   await noteOn(h, note, by);
   if (media) await cacheMedia(h, [media]);
   const what = signalWhat(link0, { hlFailed: !hlVia });

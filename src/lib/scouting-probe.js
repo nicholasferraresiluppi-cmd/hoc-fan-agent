@@ -9,7 +9,7 @@
 // arrivano da bio di Instagram, cioè da sconosciuti); al massimo 3 rimandi, ognuno ricontrollato;
 // 8 secondi e 600 KB per pagina. Si legge e basta: niente cookie, niente moduli, niente clic.
 import { lookup } from "node:dns/promises";
-import { getProfiles, saveProfiles } from "@/lib/scouting-store";
+import { getProfiles, commitProfiles } from "@/lib/scouting-store";
 import { probeCandidates, probeVerdict, probeKind, applyProbes } from "@/lib/scouting-core";
 
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
@@ -115,6 +115,6 @@ export async function probeStep({ max = 40, concurrency = 6, now = Date.now() } 
     if (q.sig !== p.sig) upgraded++;
     return q;
   });
-  await saveProfiles(next);
+  await commitProfiles(profiles, next);
   return { done: cands.length < max, probed: cands.length, upgraded };
 }

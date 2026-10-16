@@ -858,3 +858,46 @@ export function parseInstagramLink(text) {
   if (/^[a-z0-9._]{2,30}$/i.test(seg[0]) && !["explore", "accounts", "direct"].includes(seg[0].toLowerCase())) return { handle: seg[0].toLowerCase() };
   return null;
 }
+
+// ---------- scritture sovrapposte (17/10/2026) ----------
+//
+// Ogni scrittura del radar riscrive TUTTI i profili. Chi leggeva, aspettava Apify (~30 s, la
+// segnalazione) e poi salvava, cancellava quello che altri avevano scritto nel frattempo
+// (successo davvero: 4 creator segnalate sparite mentre si salvava la notorietà). Ora si salva
+// solo la DIFFERENZA tra quello che si era letto e quello che si vuole scrivere, applicata
+// all'archivio riletto subito prima (sotto lucchetto, in scouting-store.commitProfiles).
+
+const same = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b);
+
+/** Differenza tra due versioni dei profili: campi cambiati per account, aggiunti, tolti. */
+export function diffProfiles(before, after) {
+  const was = new Map((before || []).map((p) => [p.h, p]));
+  const now = new Map((after || []).map((p) => [p.h, p]));
+  const patch = new Map();
+  const added = [];
+  for (const [h, p] of now) {
+    const o = was.get(h);
+    if (!o) { added.push(p); continue; }
+    const ch = {};
+    for (const k of new Set([...Object.keys(o), ...Object.keys(p)])) if (!same(o[k], p[k])) ch[k] = p[k];
+    if (Object.keys(ch).length) patch.set(h, ch);
+  }
+  const removed = new Set([...was.keys()].filter((h) => !now.has(h)));
+  return { patch, added, removed };
+}
+
+/** Applica una differenza all'archivio attuale. Un aggiunto che nel frattempo esiste già diventa una modifica. */
+export function applyProfileDiff(current, { patch, added, removed }) {
+  const out = [];
+  const seen = new Set();
+  const add = new Map(added.map((p) => [p.h, p]));
+  for (const p of current) {
+    if (removed.has(p.h)) continue;
+    seen.add(p.h);
+    const ch = patch.get(p.h);
+    const a = add.get(p.h);
+    out.push(a ? { ...p, ...a } : ch ? Object.fromEntries(Object.entries({ ...p, ...ch }).filter(([, v]) => v !== undefined)) : p);
+  }
+  for (const p of added) if (!seen.has(p.h)) out.push(p);
+  return out;
+}

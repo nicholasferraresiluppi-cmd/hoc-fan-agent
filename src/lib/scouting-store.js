@@ -14,6 +14,7 @@
 //   scouting:forgotten           handle cancellati su richiesta: il giro non li riaggiunge
 import { kv } from "@vercel/kv";
 import { gzipSync, gunzipSync } from "node:zlib";
+import { diffProfiles, applyProfileDiff } from "@/lib/scouting-core";
 
 const GZ = "gz1:";
 const CHUNK_BYTES = 900 * 1024; // JSON non compresso per pezzo (compresso ~1/6)
@@ -53,6 +54,33 @@ export async function saveProfiles(profiles) {
   for (let i = chunks.length; i < (old?.n || 0); i++) await kv.del(`scouting:pchunk:${i}`);
   memProfiles = { at, json: JSON.stringify(profiles) };
   return { chunks: chunks.length, count: profiles.length };
+}
+
+const LOCK = "scouting:profiles:lock";
+
+/**
+ * Salva solo quello che è cambiato tra `before` (come lo si era letto) e `after`, sopra
+ * l'archivio riletto ADESSO, sotto lucchetto (17/10/2026: le scritture lunghe — segnalazione,
+ * giro settimanale, foto — cancellavano quelle fatte nel frattempo). Senza lucchetto entro
+ * ~10 s si scrive lo stesso: meglio un raro conflitto che una segnalazione persa.
+ */
+export async function commitProfiles(before, after) {
+  const diff = diffProfiles(before, after);
+  if (!diff.patch.size && !diff.added.length && !diff.removed.size) return { changed: 0 };
+  const token = String(Math.random()).slice(2);
+  let locked = false;
+  for (let i = 0; i < 40 && !locked; i++) {
+    locked = Boolean(await kv.set(LOCK, token, { nx: true, ex: 30 }).catch(() => null));
+    if (!locked) await new Promise((r) => setTimeout(r, 250));
+  }
+  try {
+    memProfiles = null; // rilettura vera, non la copia in memoria
+    const fresh = await getProfiles();
+    const res = await saveProfiles(applyProfileDiff(fresh, diff));
+    return { ...res, changed: diff.patch.size + diff.added.length + diff.removed.size };
+  } finally {
+    if (locked && (await kv.get(LOCK).catch(() => null)) === token) await kv.del(LOCK).catch(() => {});
+  }
 }
 
 export async function getCrm() {

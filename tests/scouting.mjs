@@ -363,3 +363,20 @@ console.log(`scouting: ${n} asserzioni ok`);
   ok(attentionScore(c) > attentionScore(plain) + 4, "la notorietà sposta la creator in alto");
   console.log("test Elisa (pagine aperte + giornali): ok");
 }
+
+// --- scritture sovrapposte (17/10/2026): si salva la differenza, non la lista intera
+{
+  const { diffProfiles, applyProfileDiff } = await import("../src/lib/scouting-core.js");
+  const before = [{ h: "a", sig: "nessuno" }, { h: "b", fol: 1 }];
+  const mine = [{ h: "a", sig: "forte" }, { h: "b", fol: 1 }, { h: "nuova", fol: 5 }]; // la segnalazione
+  const meanwhile = [{ h: "a", sig: "nessuno", press: { n: 3 } }, { h: "b", fol: 2 }, { h: "x", fol: 9 }]; // scritto da altri nel frattempo
+  const out = applyProfileDiff(meanwhile, diffProfiles(before, mine));
+  assert.deepEqual(out.find((p) => p.h === "a"), { h: "a", sig: "forte", press: { n: 3 } }, "si tengono entrambe le modifiche");
+  assert.equal(out.find((p) => p.h === "b").fol, 2, "un campo non toccato da me resta quello nuovo");
+  ok(out.some((p) => p.h === "x") && out.some((p) => p.h === "nuova"), "nessun profilo perso, l'aggiunto c'è");
+  const del = applyProfileDiff(meanwhile, diffProfiles(before, [{ h: "b", fol: 1 }]));
+  ok(!del.some((p) => p.h === "a"), "una cancellazione resta cancellazione");
+  const unset = applyProfileDiff([{ h: "a", sig: "x", tmp: 1 }], diffProfiles([{ h: "a", sig: "x", tmp: 1 }], [{ h: "a", sig: "x" }]));
+  ok(!("tmp" in unset[0]), "un campo tolto si toglie");
+  console.log("scritture sovrapposte: ok");
+}
