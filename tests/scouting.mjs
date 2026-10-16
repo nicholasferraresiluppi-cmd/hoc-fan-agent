@@ -307,3 +307,59 @@ console.log(`scouting: ${n} asserzioni ok`);
   assert.equal(cs.find((c) => c.handles[0] === "b").folAt, null);
   console.log("catena seguiti: ok");
 }
+
+// --- test Elisa (17/10/2026): link che da soli non dicono niente, aperti dal server
+{
+  const { classifyUrl, probeVerdict, probeKind, probedOrClassified, probeUrlsOf, probeCandidates, applyProbes, buildCreators, whyLines, attentionScore } = await import("../src/lib/scouting-core.js");
+  // WhatsApp: canale = diretto come Telegram, numero = da guardare
+  assert.equal(classifyUrl("https://whatsapp.com/channel/0029Va").label, "Canale WhatsApp");
+  assert.equal(classifyUrl("https://whatsapp.com/channel/0029Va").strength, 2);
+  assert.equal(classifyUrl("https://wa.me/393331234567").strength, 1);
+  assert.equal(classifyUrl("https://cliickto.me/elisaaesp").label, "Pagina di link");
+  // codice delle pagine vere (ridotto): cliickto.me di Elisa, iambabye.com di Elena Maraga, elisaesposito.com
+  assert.equal(probeVerdict('<img src="https://assets.linkscale.to/icons/onlyfans/onlyfans-1.webp">').label, "OnlyFans");
+  assert.equal(probeVerdict('<a id="onlyfans" href="/go?k=of" class="link">').strength, 3);
+  assert.equal(probeVerdict('<img src="https://minisoft-cdn.pages.dev/sw/images/of.svg">').label, "OnlyFans");
+  assert.equal(probeVerdict('{"url":"https:\\/\\/onlyfans.com\\/sara_x"}').label, "OnlyFans", "indirizzo vero, anche nel JSON con le barre");
+  assert.equal(probeVerdict('<a href="https://onlyfans.com/legal/terms">'), null, "le pagine legali non sono un profilo");
+  // la sola parola non basta (Linktree, TikTok e i giornali la contengono per tutti)
+  assert.equal(probeVerdict('<script>var types=["onlyfans","telegram","18+"]</script>'), null);
+  // Telegram e WhatsApp contano solo sulle pagine di link, non su un sito qualsiasi
+  assert.equal(probeVerdict('<a href="https://t.me/ilfattoquotidiano">'), null, "il canale del giornale");
+  assert.deepEqual(probeVerdict('<a href="https://t.me/saracanale">', { linkPage: true }).strength, 1, "canale pubblico = indizio");
+  assert.equal(probeVerdict('<a href="https://t.me/+AbCdEf12">', { linkPage: true }).label, "Telegram privato");
+  assert.equal(probeVerdict('<a href="https://t.me/share/url?u=x">', { linkPage: true }), null, "pulsante condividi");
+  assert.equal(probeVerdict("<p>Benvenuti nel mio sito di gioielli</p>"), null);
+  // cosa si apre: pagine di link e siti propri sì; social, giornali e link già parlanti no
+  assert.deepEqual(probeKind("https://cliickto.me/elisaaesp"), { linkPage: true });
+  assert.deepEqual(probeKind("https://elisaesposito.com"), { linkPage: false });
+  assert.equal(probeKind("https://www.tiktok.com/@x"), null);
+  assert.equal(probeKind("https://www.corriere.it/scuola/x"), null);
+  assert.equal(probeKind("https://onlyfans.com/x"), null);
+  // il risultato aperto vince sull'etichetta del sito
+  const elisa = { h: "eli.espositoo", fol: 708000, sig: "nessuno", hlLinks: ["https://cliickto.me/elisaaesp"], hlVia: [] };
+  assert.deepEqual(probeUrlsOf(elisa), ["https://cliickto.me/elisaaesp"]);
+  const after = applyProbes(elisa, { "https://cliickto.me/elisaaesp": { label: "OnlyFans", strength: 3, hits: ["OnlyFans", "Telegram"] } }, 1000);
+  assert.equal(after.sig, "forte", "Elisa: da nessun segnale a profilo a pagamento");
+  assert.equal(probedOrClassified(after, "https://cliickto.me/elisaaesp").label, "OnlyFans dentro cliickto.me");
+  assert.deepEqual(probeUrlsOf(after, { now: 1000 + 86400000 }), [], "non si riapre prima di 30 giorni");
+  // una pagina che non dice niente non abbassa mai il livello e non crea un forte
+  const deb = applyProbes({ h: "x", sig: "debole", url: "https://miosito.it" }, { "https://miosito.it": null }, 1);
+  assert.equal(deb.sig, "debole");
+  // una pagina che non si è aperta si riprova dopo 7 giorni, non 30
+  const blk = applyProbes({ h: "w", sig: "nessuno", url: "https://linktr.ee/w" }, { "https://linktr.ee/w": { err: true } }, 0);
+  assert.equal(blk.sig, "nessuno");
+  assert.deepEqual(probeUrlsOf(blk, { now: 6 * 86400000 }), []);
+  assert.deepEqual(probeUrlsOf(blk, { now: 8 * 86400000 }), ["https://linktr.ee/w"]);
+  // link già parlanti o generici non si aprono; i forti non sono candidati
+  assert.deepEqual(probeUrlsOf({ h: "y", url: "https://onlyfans.com/y", hlLinks: ["https://open.spotify.com/a"] }), []);
+  assert.equal(probeCandidates([{ h: "z", sig: "forte", url: "https://miosito.it" }]).length, 0);
+  assert.equal(probeCandidates([{ h: "a", fol: 10, url: "https://a.it" }, { h: "b", fol: 99, url: "https://b.it" }])[0].h, "b", "prima i più seguiti");
+  // notorietà: famosa + OnlyFans sui giornali pesa e si dice in parole
+  const [c] = buildCreators([{ ...after, press: { n: 7, of: true, top: [{ title: "La prof del corsivo su OnlyFans", url: "https://www.fanpage.it/x", site: "fanpage.it" }], at: 5 } }], { creators: {} });
+  assert.equal(c.press.n, 7);
+  ok(whyLines(c).some((w) => w.includes("Famosa fuori da OnlyFans")), "il perché cita i giornali");
+  const [plain] = buildCreators([{ ...after }], { creators: {} });
+  ok(attentionScore(c) > attentionScore(plain) + 4, "la notorietà sposta la creator in alto");
+  console.log("test Elisa (pagine aperte + giornali): ok");
+}

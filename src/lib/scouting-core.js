@@ -324,6 +324,9 @@ export function buildCreators(profiles, crm) {
       // catena dei seguiti (14/10/2026): quando abbiamo letto chi segue, e quanti ne segue
       folAt: Math.max(0, ...ps.map((p) => p.folAt || 0)) || null,
       fing: main.fing ?? null,
+      // notorietà (17/10/2026, test Elisa): articoli di giornale che parlano di lei, da una ricerca
+      // Google per nome. È ciò che distingue "la prof del corsivo" da una ragazza in costume.
+      press: (() => { const ps2 = ps.filter((p) => p.press); if (!ps2.length) return null; const best = ps2.sort((a, b) => (b.press.n || 0) - (a.press.n || 0))[0].press; return { n: best.n || 0, of: !!best.of, top: (best.top || []).slice(0, 3), at: best.at || null }; })(),
       pic: ps.map((p) => (p.picKey ? `/api/admin/scouting/pic/${encodeURIComponent(p.h)}?v=${p.picAt || 0}` : livePic(p.pic))).find(Boolean) || null,
     });
   }
@@ -487,7 +490,11 @@ const LINK_KINDS = [
   { re: /(^|\.)onlyfans\.com$/, label: "OnlyFans", strength: 3 },
   { re: /(^|\.)(fanvue|fansly|mym\.fans|loyalfans|fanplace)\.[a-z.]+$/, label: "Piattaforma a pagamento", strength: 3 },
   { re: /(^|\.)(t\.me|telegram\.me)$/, label: "Telegram", strength: 2 },
-  { re: /(^|\.)(linktr\.ee|link\.me|beacons\.ai|beacons\.page|allmylinks\.com|heylink\.me|heyliiink\.com|lovemylink\.me|hoo\.be|bio\.site|snipfeed\.co|getmysocial\.com|cutepage\.me|solo\.to|taplink\.cc|linkin\.bio|tap\.bio|lnk\.bio|taap\.it|[a-z0-9-]+\.link)$/, label: "Pagina di link", strength: 1 },
+  // WhatsApp (17/10/2026, caso Elisa Esposito: vende anche da un canale WhatsApp): il canale è
+  // un canale diretto come Telegram; un numero (wa.me) è solo un contatto, da guardare.
+  { re: /(^|\.)whatsapp\.com$/, label: "Canale WhatsApp", strength: 2, path: /^\/channel\// },
+  { re: /(^|\.)(wa\.me|whatsapp\.com|chat\.whatsapp\.com)$/, label: "WhatsApp", strength: 1 },
+  { re: /(^|\.)(linktr\.ee|link\.me|beacons\.ai|beacons\.page|allmylinks\.com|heylink\.me|heyliiink\.com|lovemylink\.me|hoo\.be|bio\.site|snipfeed\.co|cliickto\.me|mylinxx\.com|linkbio\.co|fanslink\.me|getmysocial\.com|cutepage\.me|solo\.to|taplink\.cc|linkin\.bio|tap\.bio|lnk\.bio|taap\.it|[a-z0-9-]+\.link)$/, label: "Pagina di link", strength: 1 },
 ];
 
 /** Che cosa c'è dietro un link: { label, strength } (3 piattaforma a pagamento, 2 Telegram, 1 pagina di link, 0 altro) o null. */
@@ -497,7 +504,7 @@ export function classifyUrl(url) {
     const u = new URL(/^https?:/.test(url) ? url : `https://${url}`);
     const host = u.hostname.replace(/^www\./, "").toLowerCase();
     const path = u.pathname.toLowerCase();
-    for (const k of LINK_KINDS) if (k.re.test(host)) {
+    for (const k of LINK_KINDS) if (k.re.test(host) && (!k.path || k.path.test(path))) {
       const priv = k.label === "Telegram" && (path.startsWith("/+") || path.startsWith("/joinchat") || /priv|vip|spicy|segret|secret/.test(path));
       return { label: priv ? "Telegram privato" : k.label, strength: priv ? 3 : k.strength };
     }
@@ -507,6 +514,116 @@ export function classifyUrl(url) {
   } catch {
     return null;
   }
+}
+
+// ---------- dentro la pagina: cosa c'è DIETRO un link (17/10/2026) ----------
+//
+// Caso Elisa Esposito (nostra, $150k/mese): nel radar risultava "nessun segnale". La sua prima
+// evidenza porta a cliickto.me/elisaaesp, quella di Elena Maraga a iambabye.com: per il radar
+// erano un "sito qualsiasi" (forza 0). Aperte, entrambe le pagine contengono OnlyFans e
+// Telegram nel codice. Regola: un link che da solo non dice niente (sito, pagina di link,
+// WhatsApp) si APRE dal server una volta e si legge che cosa contiene. Il risultato sta sul
+// profilo in `probes[url] = { label, strength, hits, at }` e vince sulla sola etichetta del sito.
+
+// Regole STRETTE (provate sul radar intero il 17/10/2026: con la semplice parola "onlyfans",
+// "telegram" o "18+" nel codice uscivano ~450 falsi positivi — Linktree, TikTok e i siti di
+// giornali la contengono per tutti). Conta solo:
+//   - un indirizzo vero di un profilo: onlyfans.com/<nome>, fansly.com/<nome>… (3)
+//   - un pulsante vero dei costruttori di pagine (id="onlyfans", icone onlyfans/of.svg) (3)
+//   - un invito Telegram privato (3); un canale t.me/<nome> o un canale WhatsApp solo come indizio
+//     (1), e solo sulle pagine di link: un giornale ha il SUO canale Telegram nel piè di pagina.
+const OF_PATHS_NOT_PROFILES = /^(legal|terms|privacy|help|about|faq|my|login|signup|auth|files|upload|api|stories|explore|onlyfans|home|cdn|static)$/i;
+const PLATFORM_URL = /https?:\\?\/\\?\/(?:www\.)?(onlyfans\.com|fansly\.com|fanvue\.com|mym\.fans|loyalfans\.com|justfor\.fans)\\?\/([a-z0-9_.-]{3,40})/gi;
+const OF_BUTTON = /id=["']onlyfans["']|icons\/onlyfans\/|\/of\.svg\b|onlyfans[-_](?:white|black|icon|logo|btn|button)\.(?:svg|png|webp)/i;
+const TG_PRIVATE = /t\.me\\?\/(?:\+|joinchat\\?\/)[a-z0-9_-]{6,}/i;
+const TG_CHANNEL = /(?:t|telegram)\.me\\?\/(?!share\b|s\\?\/|iv\b|addstickers\b|proxy\b)[a-z][a-z0-9_]{4,31}\b/i;
+const WA_CHANNEL = /whatsapp\.com\\?\/channel\\?\/[a-z0-9]{10,}/i;
+
+/**
+ * Che cosa dice il codice di una pagina aperta: { label, strength, hits } (il segnale più forte) o
+ * null. `linkPage` = è una pagina di link (Linktree, cliickto…) e non un sito qualsiasi: solo lì
+ * Telegram e WhatsApp contano (vedi sopra).
+ */
+export function probeVerdict(html, { linkPage = false } = {}) {
+  const text = String(html || "").slice(0, 600_000);
+  const hits = [];
+  for (const m of text.matchAll(PLATFORM_URL)) {
+    if (OF_PATHS_NOT_PROFILES.test(m[2])) continue;
+    hits.push({ label: /onlyfans/i.test(m[1]) ? "OnlyFans" : "Piattaforma a pagamento", strength: 3 });
+    break;
+  }
+  if (OF_BUTTON.test(text)) hits.push({ label: "OnlyFans", strength: 3 });
+  if (linkPage) {
+    // un canale PUBBLICO dentro una pagina di link può essere di chiunque (provato: il canale di
+    // un giornale, di una radio): resta "da guardare", non alza il livello. L'invito privato sì.
+    if (TG_PRIVATE.test(text)) hits.push({ label: "Telegram privato", strength: 3 });
+    else if (TG_CHANNEL.test(text)) hits.push({ label: "Telegram", strength: 1 });
+    if (WA_CHANNEL.test(text)) hits.push({ label: "Canale WhatsApp", strength: 1 });
+  }
+  if (!hits.length) return null;
+  const best = hits.reduce((a, b) => (b.strength > a.strength ? b : a));
+  return { label: best.label, strength: best.strength, hits: [...new Set(hits.map((h) => h.label))] };
+}
+
+// Siti dove aprire la pagina non dice niente su di lei (social, sondaggi, negozi, giornali grandi):
+// non si aprono proprio.
+const NO_PROBE_HOSTS = /(^|\.)(tiktok\.com|instagram\.com|ig\.me|twitch\.tv|youtube\.com|youtu\.be|facebook\.com|fb\.com|x\.com|twitter\.com|threads\.net|snapchat\.com|ngl\.link|tellonym\.me|eventbrite\.[a-z.]+|substack\.com|amzn\.[a-z.]+|amazon\.[a-z.]+|spotify\.com|apple\.com|google\.[a-z.]+|ko-fi\.com|patreon\.com|paypal\.me|throne\.com|corriere\.it|repubblica\.it|ilfattoquotidiano\.it|mediaset\.it|rai\.it|fanpage\.it|lafeltrinelli\.it|mondadori\.it)$/;
+
+/** Si può aprire il link? Ritorna { linkPage } o null. */
+export function probeKind(url) {
+  const c = classifyUrl(url);
+  if (!c || c.strength >= 2) return null;
+  let host;
+  try { host = new URL(/^https?:/.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, "").toLowerCase(); } catch { return null; }
+  if (NO_PROBE_HOSTS.test(host)) return null;
+  return { linkPage: c.label === "Pagina di link" || c.label === "WhatsApp" };
+}
+
+const probeHost = (url) => { try { return new URL(/^https?:/.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, ""); } catch { return ""; } };
+
+/** classifyUrl, ma se la pagina è stata aperta e dice di più vince quello che c'è dentro. */
+export function probedOrClassified(p, url) {
+  const c = classifyUrl(url);
+  const pr = p?.probes?.[url];
+  if (pr && pr.strength > (c?.strength ?? -1)) return { label: `${pr.label} dentro ${probeHost(url)}`, strength: pr.strength, probed: true };
+  return c;
+}
+
+/** Link da aprire per un profilo: quelli che da soli non dicono abbastanza (forza ≤ 1), non aperti da `maxAgeDays`. */
+export function probeUrlsOf(p, { now = Date.now(), maxAgeDays = 30 } = {}) {
+  const urls = [p.url, ...(p.hlLinks || []), ...(p.hlVia || []).flatMap((v) => v?.urls || [])].filter(Boolean);
+  const out = [];
+  for (const url of [...new Set(urls)]) {
+    if (!probeKind(url)) continue; // già parlante, generico o un social: aprirlo non dice niente
+    const pr = p.probes?.[url];
+    // una pagina che non si è aperta (blocco, errore) si riprova dopo 7 giorni, le altre dopo 30
+    if (pr && now - (pr.at || 0) < (pr.err ? 7 : maxAgeDays) * DAY) continue;
+    out.push(url);
+  }
+  return out;
+}
+
+/** Chi aprire: profili non nostri, non spariti, senza un "forte" già certo, coi link da aprire. Prima i più seguiti. */
+export function probeCandidates(profiles, { now = Date.now(), max = 60 } = {}) {
+  return profiles
+    .filter((p) => !p.missing && p.sig !== "forte")
+    .map((p) => ({ h: p.h, fol: p.fol || 0, urls: probeUrlsOf(p, { now }) }))
+    .filter((x) => x.urls.length)
+    .sort((a, b) => b.fol - a.fol)
+    .slice(0, max);
+}
+
+/** Profilo dopo l'apertura dei suoi link: `results` = { url: verdetto|null }. Il livello non scende mai. */
+export function applyProbes(p, results, now = Date.now()) {
+  const probes = { ...(p.probes || {}) };
+  // `v` = verdetto, null (aperta, niente) o { err: true } (non si è aperta)
+  for (const [url, v] of Object.entries(results)) probes[url] = v?.err ? { label: null, strength: 0, err: true, at: now } : v ? { ...v, at: now } : { label: null, strength: 0, at: now };
+  const next = { ...p, probes };
+  const s = sigFromLink(bestLink([next]));
+  // dalla pagina aperta conta solo un segnale vero (≥ 2): "c'è un link" lo sapevamo già
+  const fromProbe = Object.values(probes).some((v) => v.strength >= 2) ? s : "nessuno";
+  next.sig = SIG_RANK[fromProbe] > SIG_RANK[p.sig || "nessuno"] ? fromProbe : p.sig || "nessuno";
+  return next;
 }
 
 // Il giro più usato per non farsi bloccare da Instagram (15/10/2026, caso @alicelatspreferita):
@@ -528,7 +645,7 @@ export function bestLink(ps) {
       ...(p.url ? [[p.url, "bio"]] : []),
     ];
     for (const [url, where, via] of cands) {
-      const c = classifyUrl(url);
+      const c = probedOrClassified(p, url);
       if (!c) continue;
       if (!best || c.strength > best.strength) best = { ...c, where, url, ...(via ? { via } : {}) };
     }
@@ -671,6 +788,7 @@ export function whyLines(c, { newCut = Date.now() - 8 * DAY } = {}) {
   if (c.link && c.link.strength >= 2) out.push(`${c.link.label} ${linkWhere(c.link)}.`);
   else if (c.sig === "forte") out.push("Ha un profilo a pagamento.");
   else if (c.link && c.link.strength === 1 && c.link.where !== "bio") out.push(`Da guardare: ${c.link.tag ? `tagga @${c.link.tag}` : c.link.label.toLowerCase()} ${linkWhere(c.link)}.`);
+  if (c.press?.n >= 2) out.push(c.press.of ? `Famosa fuori da OnlyFans, e i giornali scrivono che ce l'ha: ${c.press.n} articoli.` : `Se ne parla sui giornali: ${c.press.n} articoli.`);
   if (c.g4 != null && c.g4 >= 5) out.push(`Cresce: +${String(c.g4).replace(".", ",")}% di follower in 4 settimane.`);
   if (c.medv && c.fol && c.medv / c.fol >= 0.3) out.push("I reel arrivano ben oltre i suoi follower.");
   if (c.firstSeen && c.firstSeen >= newCut) out.push("Nuova nel radar questa settimana.");
@@ -681,6 +799,8 @@ export function whyLines(c, { newCut = Date.now() - 8 * DAY } = {}) {
 export function attentionScore(c, newCut = Date.now() - 8 * DAY) {
   return (c.sig === "forte" ? 4 : c.sig === "debole" ? 1 : 0) +
     (c.fmt && c.fmt !== "nessuno" ? 2 : 0) + (c.u || 0) +
+    // notorietà: il "test Elisa" — famosa per altro E con OnlyFans pesa più di un format
+    (c.press?.n ? Math.min(3, Math.log2(c.press.n + 1)) + (c.press.of ? 2 : 0) : 0) +
     (c.g4 != null ? Math.max(-2, Math.min(4, c.g4 / 3)) : 0) +
     (c.firstSeen && c.firstSeen >= newCut ? 1.5 : 0) +
     (c.medv ? Math.log10(c.medv) / 2 : 0);

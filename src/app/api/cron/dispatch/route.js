@@ -113,6 +113,9 @@ export async function POST(request) {
   // rilettura delle prime evidenze del Radar (16/10/2026): si porta avanti da sola, qui la si
   // riaccende se la catena si è interrotta (la route non fa niente se il giro non è in corso)
   out.scouting_hlreread = await kickEndpoint(request, "/api/cron/scouting-hlreread");
+  // apertura dei link del Radar che da soli non dicono niente (17/10/2026, caso Elisa Esposito):
+  // gratis, si concatena da sola finché ci sono link da aprire
+  out.scouting_probe = await kickEndpoint(request, "/api/cron/scouting-probe");
   // canali Telegram delle creator (14/10/2026): iscritti del giorno di ogni canale dal bot HOC
   out.telegram_channels = await kickEndpoint(request, "/api/cron/telegram-channels");
 
