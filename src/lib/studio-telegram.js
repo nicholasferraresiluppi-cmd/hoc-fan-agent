@@ -2,7 +2,7 @@
 // Logica pura in studio-telegram-core.js.
 //
 // Chiavi (namespace studio:*):
-//   studio:tgcfg:{pid}     { channelId (canale di /admin/telegram), ofLinkUrl, landing{…}, updatedAt, updatedBy }
+//   studio:tgcfg:{pid}     { channelId (canale di /admin/telegram), ofLinkUrl, landing{…}, referencePhotoIds[] (volto, per l'agente qualità), updatedAt, updatedBy }
 //   studio:tg:{pid}        { [postId]: post }                         post Telegram programmati
 //   studio:media:{pid}     { [photoId]: { id, path, type, size, at, by } }   foto (Blob PRIVATO studio/{pid}/…)
 //   studio:land:{slug}     → pid                                       indirizzo della landing
@@ -49,6 +49,11 @@ export async function saveTgConfig(pid, input, by) {
     const u = String(input.ofLinkUrl || "").trim();
     if (u && !/^https:\/\/onlyfans\.com\/\S+$/i.test(u)) errors.push("Il link OnlyFans deve iniziare con https://onlyfans.com/");
     next.ofLinkUrl = u;
+  }
+  if ("referencePhotoIds" in (input || {})) {
+    // foto di riferimento del volto per l'agente qualità (max 4, solo foto del profilo)
+    const media = (await kv.get(MEDIA(pid))) || {};
+    next.referencePhotoIds = [...new Set((Array.isArray(input.referencePhotoIds) ? input.referencePhotoIds : []).map(String))].filter((id) => media[id]).slice(0, 4);
   }
   if (input?.landing) {
     const { ok, errors: le, landing } = normalizeLanding(input.landing);
@@ -100,6 +105,7 @@ export async function removePhoto(pid, id) {
   if (posts.some((x) => x.status === "programmato" && (x.photoIds || []).includes(id))) return { ok: false, error: "È in un post programmato: toglila prima dal post" };
   const cfg = await getTgConfig(pid);
   if (cfg.landing?.photoId === id) return { ok: false, error: "È la foto della landing: cambiala prima" };
+  if ((cfg.referencePhotoIds || []).includes(id)) await kv.set(CFG(pid), { ...cfg, referencePhotoIds: cfg.referencePhotoIds.filter((x) => x !== id) });
   delete all[id];
   await kv.set(MEDIA(pid), all);
   if (blobReady()) { const { del } = await sdk(); await del(p.path).catch(() => {}); }

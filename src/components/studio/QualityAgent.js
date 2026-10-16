@@ -1,0 +1,128 @@
+"use client";
+
+/**
+ * Studio social — agente qualità dentro la scheda di un contenuto (16/10/2026).
+ * Si sceglie il video montato dal computer: il browser misura la parte tecnica ed estrae i
+ * fotogrammi, l'AI li legge con le foto di riferimento, il server scrive gli esiti. Qui si vede la
+ * TAVOLA per chi approva: voci con ok/dubbio/errore e il secondo, fotogrammi accanto ai riferimenti.
+ * L'ok finale della Qualità resta di una persona.
+ */
+import { useState } from "react";
+import { ScanEye } from "lucide-react";
+import { CP, FONTS } from "@/lib/brand";
+import { alpha, NUM } from "@/components/ds";
+import { QUALITY_CHECKS } from "@/lib/studio-social-core";
+import { HUMAN_ONLY_CHECKS, fmtSec } from "@/lib/studio-quality-core";
+
+const ESITO = {
+  ok: { label: "ok", color: CP.accentGreen },
+  dubbio: { label: "da guardare", color: CP.textSecondary },
+  errore: { label: "errore", color: CP.accentRed },
+};
+const SHORT = { volto: "È lei", anatomia: "Mani, occhi, pelle", coerenza: "Coerenza tra i tagli", montaggio: "Montaggio", testo: "Testi e sottotitoli", aggancio: "Primi 2 secondi", audio: "Audio", etichetta_ai: "Etichetta AI" };
+
+export default function QualityAgent({ pid, item, refs = [], onResult }) {
+  const [stage, setStage] = useState(null);
+  const [err, setErr] = useState(null);
+  const ai = item.aiReview;
+  const base = `/api/admin/studio-social/${encodeURIComponent(pid)}`;
+
+  const run = async (file) => {
+    setErr(null);
+    try {
+      const { analyzeVideo } = await import("@/lib/video-check-client");
+      const { tech, frames } = await analyzeVideo(file, { onStage: setStage });
+      setStage("L'AI guarda i fotogrammi (circa un minuto)…");
+      const r = await fetch(`${base}/quality`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId: item.id, tech, frames }) });
+      const j = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(j?.error || (r.status === 413 ? "Video troppo pesante da inviare: riprova" : `Errore ${r.status}`));
+      onResult?.(j.item);
+    } catch (e) { setErr(e.message); } finally { setStage(null); }
+  };
+
+  const flagged = new Set();
+  if (ai?.answer) for (const v of Object.values(ai.answer.voci || {})) if (v.esito !== "ok") (v.secondi || []).forEach((s) => flagged.add(Math.round(s * 10)));
+  const isFlagged = (t) => [...flagged].some((x) => Math.abs(x - Math.round(t * 10)) <= 3);
+
+  return (
+    <div style={{ border: `1px solid ${CP.border}`, borderRadius: 10, padding: 12, marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary, flex: 1, minWidth: 200 }}>Controllo AI del video</div>
+        {item.id ? (
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 8, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: stage ? "wait" : "pointer", background: CP.accent, color: CP.accentInk, opacity: stage ? 0.6 : 1 }}>
+            <ScanEye size={14} aria-hidden="true" /> {ai ? "Ricontrolla un video" : "Controlla il video"}
+            <input type="file" accept="video/mp4,video/quicktime,video/webm" hidden disabled={!!stage} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) run(f); }} />
+          </label>
+        ) : <span style={{ fontSize: 12, color: CP.textMuted }}>Salva il contenuto prima di controllarne il video</span>}
+      </div>
+      <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4, lineHeight: 1.45 }}>
+        Scegli il video montato dal computer: resta sul tuo computer, all'AI vanno solo i fotogrammi. L'AI segnala, l'ok lo dai tu.
+        {!refs.length && " Mancano le foto di riferimento del volto: segnale con la stella nella sezione Foto."}
+      </div>
+      {stage && <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 8 }}>{stage}</div>}
+      {err && <div style={{ fontSize: 13, color: CP.accentRed, marginTop: 8 }}>{err}</div>}
+
+      {ai && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 8 }}>
+            Ultimo controllo {new Date(ai.at).toLocaleString("it-IT", { timeZone: "Europe/Rome", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+            {ai.tech?.name ? ` · ${ai.tech.name}` : ""} · {ai.tech?.width}×{ai.tech?.height}, {Number(ai.tech?.duration || 0).toFixed(1)} s · {ai.cost_usd != null ? `${(ai.cost_usd * 100).toFixed(0)} centesimi` : ""}
+          </div>
+          {ai.answer?.sintesi && <div style={{ fontSize: 14, color: CP.textPrimary, lineHeight: 1.5, marginBottom: 10 }}>{ai.answer.sintesi}</div>}
+
+          <div style={{ fontSize: 13, color: CP.textPrimary, marginBottom: 4 }}>
+            Tecnico: <span style={{ color: ai.technical?.outcome === "ok" ? CP.accentGreen : ai.technical?.outcome === "blocca" ? CP.accentRed : CP.textSecondary }}>{ai.technical?.outcome === "ok" ? "ok" : ai.technical?.outcome === "blocca" ? "da rifare" : "attenzione"}</span>
+          </div>
+          {[...(ai.technical?.problems || []), ...(ai.technical?.warnings || [])].map((p, i) => <div key={i} style={{ fontSize: 12, color: CP.textSecondary, paddingLeft: 10 }}>· {p}</div>)}
+
+          <div style={{ marginTop: 10 }}>
+            {QUALITY_CHECKS.filter((c) => ai.answer?.voci?.[c.key] || HUMAN_ONLY_CHECKS.includes(c.key)).filter((c) => !c.ai || item.ai).map((c) => {
+              const v = ai.answer?.voci?.[c.key];
+              const e = v ? ESITO[v.esito] : null;
+              return (
+                <div key={c.key} style={{ display: "grid", gridTemplateColumns: "minmax(0, 150px) minmax(0, 1fr)", gap: 10, padding: "6px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
+                  <div style={{ fontSize: 13, color: CP.textPrimary }}>
+                    {SHORT[c.key] || c.key}
+                    {HUMAN_ONLY_CHECKS.includes(c.key) && <div style={{ fontSize: 11, color: CP.textMuted }}>la spunti tu</div>}
+                  </div>
+                  <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.45 }}>
+                    {e ? <span style={{ color: e.color, fontWeight: 500 }}>{e.label}</span> : <span style={{ color: CP.textMuted }}>{c.key === "audio" ? "ascoltalo tu (l'AI non sente)" : "decidi tu"}</span>}
+                    {v?.secondi?.length ? <span style={{ ...NUM }}> · {v.secondi.map(fmtSec).join(", ")}</span> : null}
+                    {v?.nota && <div>{v.nota}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {ai.answer?.testo_letto && (
+            <details style={{ marginTop: 8 }}>
+              <summary style={{ fontSize: 12, color: CP.textSecondary, cursor: "pointer" }}>Testi letti nel video</summary>
+              <div style={{ fontSize: 12, color: CP.textSecondary, whiteSpace: "pre-wrap", marginTop: 4 }}>{ai.answer.testo_letto}</div>
+            </details>
+          )}
+
+          <div style={{ fontSize: 12, color: CP.textMuted, margin: "12px 0 6px" }}>La tavola: riferimenti a sinistra, fotogrammi letti (bordo rosso dove l'AI ha visto qualcosa)</div>
+          <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6 }}>
+            {refs.map((id) => (
+              <div key={id} style={{ flex: "0 0 auto", width: 84 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`${base}/photo?p=${id}`} alt="Riferimento" style={{ width: 84, height: 150, objectFit: "cover", borderRadius: 6, display: "block", border: `2px solid ${CP.accent}` }} />
+                <div style={{ fontSize: 11, color: CP.textMuted, textAlign: "center" }}>riferimento</div>
+              </div>
+            ))}
+            {(ai.frames || []).map((f, i) => (
+              <div key={i} style={{ flex: "0 0 auto", width: 84 }}>
+                {f.path ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={`${base}/quality?item=${encodeURIComponent(item.id)}&i=${i}&r=${ai.runId}`} alt={`Fotogramma a ${fmtSec(f.t)}`} style={{ width: 84, height: 150, objectFit: "cover", borderRadius: 6, display: "block", border: `2px solid ${isFlagged(f.t) ? CP.accentRed : alpha(CP.border, "ff")}` }} />
+                ) : <div style={{ width: 84, height: 150, borderRadius: 6, background: CP.bgSunken }} />}
+                <div style={{ fontSize: 11, color: isFlagged(f.t) ? CP.accentRed : CP.textMuted, textAlign: "center", ...NUM }}>{fmtSec(f.t)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
