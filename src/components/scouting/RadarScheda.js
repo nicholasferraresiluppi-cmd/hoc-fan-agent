@@ -4,7 +4,7 @@
 // porta, da dove viene ogni dato; di lato il lavoro (fase, chi la segue, account, note).
 import { useState } from "react";
 import { CP, alpha } from "@/lib/brand";
-import { whyLines, classifyUrl, agencies } from "@/lib/scouting-core";
+import { whyLines, probedOrClassified, agencies } from "@/lib/scouting-core";
 import RadarReels from "./RadarReels";
 import { SERIF, NUM, fmtFull, fmtDate, btn, btnPrimary, btnQuiet, input, igProfile, Initials, LinkChip, Spark, H2, STAGE_LABEL } from "./radar-ui";
 
@@ -17,14 +17,14 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
   const ratio = c.medv && c.fol ? Math.round((c.medv / c.fol) * 100) : null;
   const links = [];
   for (const p of ps) {
-    for (const u of p.hlLinks || []) links.push({ url: u, where: "Prima storia in evidenza", h: p.h, k: classifyUrl(u) });
+    for (const u of p.hlLinks || []) links.push({ url: u, where: "Prima storia in evidenza", h: p.h, k: probedOrClassified(p, u) });
     for (const v of p.hlVia || []) {
       if (!v?.h) continue;
-      for (const u of v.urls || []) links.push({ url: u, where: `Bio di @${v.h}, taggato in evidenza`, h: p.h, k: classifyUrl(u) });
+      for (const u of v.urls || []) links.push({ url: u, where: `Bio di @${v.h}, taggato in evidenza`, h: p.h, k: probedOrClassified(p, u) });
       // taggato senza link leggibile: lo si mostra lo stesso, lo apre una persona
       if (!(v.urls || []).length) links.push({ url: igProfile(v.h), where: "Taggato nella prima storia in evidenza", h: p.h, k: { label: `@${v.h}${v.priv ? " (privato)" : ""}`, strength: 1 } });
     }
-    if (p.url) links.push({ url: p.url, where: "Bio", h: p.h, k: classifyUrl(p.url) });
+    if (p.url) links.push({ url: p.url, where: "Bio", h: p.h, k: probedOrClassified(p, p.url) });
   }
 
   return (
@@ -90,6 +90,25 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
               </ul>
             )}
           </section>
+
+          {c.press?.n > 0 && (
+            <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <H2>Sui giornali</H2>
+              <p style={{ margin: 0, color: CP.textSecondary, fontSize: 14 }}>
+                {c.press.n} {c.press.n === 1 ? "articolo parla" : "articoli parlano"} di lei{c.press.of ? ", e scrivono che ha OnlyFans" : ""}. Da una ricerca Google per nome{c.press.at ? ` del ${fmtDate(c.press.at)}` : ""}.
+              </p>
+              {c.press.top?.length > 0 && (
+                <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                  {c.press.top.map((t) => (
+                    <li key={t.url} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 14, padding: "9px 0", borderBottom: `1px solid ${CP.borderSoft || CP.border}`, fontSize: 14, alignItems: "baseline" }}>
+                      <span>{t.title}{t.site ? <span style={{ color: CP.textSecondary }}> · {t.site}</span> : null}</span>
+                      <a href={t.url} target="_blank" rel="noopener noreferrer nofollow" style={{ color: CP.textSecondary, fontSize: 13 }}>Apri ↗</a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
 
           <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <H2>Da dove viene ogni dato</H2>
