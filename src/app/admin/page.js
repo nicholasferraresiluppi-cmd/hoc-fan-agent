@@ -79,6 +79,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/admin/telegram", title: "Canali Telegram", desc: "La mappa dei canali Telegram delle creator, compilata dai sales; con il bot HOC dentro, chi entra e da quale link (Instagram, TikTok, S4S…), quanti restano e quanti abbonati porta su OnlyFans il link del canale", icon: Send },
       { href: "/admin/sales-ai", title: "Sales manager AI", desc: "Ogni notte: due manager AI leggono i turni del giorno prima, un arbitro scrive il feedback, il Garante blocca gli errori. Li rivedi qui prima che arrivino agli operatori", icon: Bot },
       { href: "/admin/manuale-vendite", title: "Manuale vendite", desc: "Cosa fa vendere davvero, su 26 mesi di chat: capitoli del manuale, guide di profilo con le risposte da provare e prove sul campo misurate ogni lunedì", icon: BookMarked },
+      { href: "/admin/prova-fedelta",         title: "Prova fedeltà",       desc: "Su Martina Scavo, metà dei fan nuovi e caldi scelti a caso ricevono meno proposte la prima sera e più attenzione dopo: lista di cosa fare oggi e confronto con l'altra metà", icon: FlaskConical },
       { href: "/admin/shift-quality", title: "Qualità turni", desc: "Turno×operatore: conversazioni, funnel PPV, venduto e analisi contenuto — attribuzione onesta singolo/duo", icon: MessagesSquare },
       { href: "/leaderboard/leghe",            title: "Leghe",         desc: "Tornei mensili + tier promozione/retrocessione", icon: Swords },
     ],

@@ -81,6 +81,7 @@ export const WORKSPACES = {
         { href: "/admin/conversation-intelligence", label: "Presidio chat" },
         { href: "/admin/sales-ai", label: "Sales manager AI" },
         { href: "/admin/manuale-vendite", label: "Manuale vendite" },
+        { href: "/admin/prova-fedelta", label: "Prova fedeltà", desc: "Martina Scavo: i fan del gruppo prova con cosa fare oggi, e se diventano più fedeli" },
         { href: "/admin/shift-quality", label: "Qualità turni" },
         { href: "/cm-cockpit", label: "Cockpit CM" },
         { href: "/admin/operator-signals", label: "Profilo operatore" },
