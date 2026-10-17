@@ -160,12 +160,12 @@ function inboxRows(inbox, max) {
 
 function inboxVerdict(x) {
   if (x.status === "in_lettura") return { key: "lettura", label: "In lettura", tone: "muted" };
-  if (x.status === "errore" || x.status === "non_trovata" || x.status === "non_instagram") return { key: "rifare", label: "Non letta", tone: "attn" };
+  if (x.status === "errore" || x.status === "non_trovata" || x.status === "non_instagram") return { key: "rifare", label: "Da rifare", tone: "attn" };
   if (x.status === "cancellata") return { key: "vuote", label: "Tolta dal radar", tone: "muted" };
-  if (x.warn) return { key: "rifare", label: "Storia non letta", tone: "attn" };
-  if (x.sig === "forte") return { key: "aprire", label: "Profilo a pagamento", tone: "gold", rank: 0 };
+  if (x.warn) return { key: "rifare", label: "Da rifare", tone: "attn" };
+  if (x.sig === "forte") return { key: "aprire", label: "A pagamento", tone: "gold", rank: 0 };
   if (x.sig === "debole") return { key: "aprire", label: "Da guardare", tone: "primary", rank: 1 };
-  return { key: "vuote", label: "Nessun link", tone: "muted" };
+  return { key: "vuote", label: "Senza link", tone: "muted" };
 }
 
 // Il messaggio senza la parte che ripete il nome («@x aggiunta al radar · …»).
@@ -182,89 +182,80 @@ function inboxDetail(x, h) {
 
 const shortBy = (by) => (by ? String(by).replace(/\s*\(fonte (\w+)\)/i, " · $1").split(" ").slice(0, 3).join(" ") : null);
 
-const toneColor = (t) => (t === "gold" ? CP.gold : t === "attn" ? CP.attn : t === "primary" ? CP.textPrimary : CP.textMuted);
+// Un colore per esito: oro = a pagamento, blu = indizio, rosso = lettura fallita (va rifatta).
+const toneColor = (t) => (t === "gold" ? CP.gold : t === "attn" ? CP.accentRed : t === "primary" ? CP.cool : CP.textMuted);
+const SEG_ORDER = { lettura: 0, aprire: 1, rifare: 2, vuote: 3 };
+const SEG_FILTERS = [
+  { id: "tutte", label: "Tutte", test: () => true },
+  { id: "pagamento", label: "A pagamento", test: (r) => r.v.key === "aprire" && r.v.rank === 0 },
+  { id: "guardare", label: "Da guardare", test: (r) => r.v.key === "aprire" && r.v.rank === 1 },
+  { id: "rifare", label: "Da rifare", test: (r) => r.v.key === "rifare" },
+  { id: "vuote", label: "Senza link", test: (r) => r.v.key === "vuote" },
+];
 
 /**
- * Le segnalazioni divise per cosa chiedono: prima quelle da aprire (profilo a pagamento,
- * poi indizi), poi quelle da rifare, e in fondo in una riga sola quelle senza nulla.
+ * Le segnalazioni come lista da app: filtri in alto, un riquadro unico con una riga per
+ * creator (anello del colore dell'esito, numeri del profilo, evidenza su una riga sola).
  */
 function Segnalazioni({ rows, creators, onOpen }) {
-  const items = rows.map((r) => ({ ...r, v: inboxVerdict(r.x), c: r.h ? creators.find((y) => y.handles.includes(r.h)) : null }));
-  const reading = items.filter((r) => r.v.key === "lettura");
-  const open = items.filter((r) => r.v.key === "aprire").sort((a, b) => a.v.rank - b.v.rank);
-  const redo = items.filter((r) => r.v.key === "rifare");
-  const empty = items.filter((r) => r.v.key === "vuote");
-  const counts = [
-    open.filter((r) => r.v.rank === 0).length && `${open.filter((r) => r.v.rank === 0).length} col profilo a pagamento`,
-    open.filter((r) => r.v.rank === 1).length && `${open.filter((r) => r.v.rank === 1).length} da guardare`,
-    empty.length && `${empty.length} senza link`,
-  ].filter(Boolean);
+  const [filter, setFilter] = useState("tutte");
+  const items = rows
+    .map((r) => ({ ...r, v: inboxVerdict(r.x), c: r.h ? creators.find((y) => y.handles.includes(r.h)) : null }))
+    .sort((a, b) => SEG_ORDER[a.v.key] - SEG_ORDER[b.v.key] || (a.v.rank ?? 0) - (b.v.rank ?? 0));
+  const chips = SEG_FILTERS.map((f) => ({ ...f, n: items.filter(f.test).length })).filter((f) => f.id === "tutte" || f.n > 0);
+  const active = chips.find((f) => f.id === filter) || chips[0];
+  const shown = items.filter(active.test);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <style>{`@keyframes ro-pulse{0%,100%{opacity:.35}50%{opacity:1}}.ro-sg-row:hover{background:${CP.hover || "transparent"}}`}</style>
-      {counts.length > 0 && <p style={{ margin: 0, fontSize: 13.5, color: CP.textSecondary }}>{counts.join(" · ")}</p>}
-
-      {reading.map(({ x, h }) => (
-        <div key={x.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: CP.textSecondary }}>
-          <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: "50%", background: CP.gold, animation: "ro-pulse 1.4s ease-in-out infinite" }} />
-          <span>Sto leggendo <span style={{ color: CP.textPrimary }}>{h ? `@${h}` : "un link"}</span>…</span>
-        </div>
-      ))}
-
-      {open.length > 0 && (
-        <ul style={{ listStyle: "none", margin: 0, padding: 0, borderTop: `1px solid ${CP.borderSoft || CP.border}` }}>
-          {open.map((r) => <SegRow key={r.x.id} {...r} onOpen={onOpen} />)}
-        </ul>
-      )}
-
-      {redo.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 12, letterSpacing: ".06em", textTransform: "uppercase", color: CP.attn }}>Da segnalare di nuovo</span>
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, borderTop: `1px solid ${CP.borderSoft || CP.border}` }}>
-            {redo.map((r) => <SegRow key={r.x.id} {...r} onOpen={onOpen} />)}
-          </ul>
-        </div>
-      )}
-
-      {empty.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 13.5, color: CP.textMuted }}>
-          <span>Senza link né tag:</span>
-          {empty.map(({ x, h, c, n }) => (
-            <button key={x.id} disabled={!c} onClick={() => c && onOpen(c)} style={{ all: "unset", cursor: c ? "pointer" : "default", padding: "4px 10px", borderRadius: 999, border: `1px solid ${CP.borderSoft || CP.border}`, color: CP.textSecondary }}>
-              @{h}{n > 1 ? ` ×${n}` : ""}
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <style>{`@keyframes ro-spin{to{transform:rotate(360deg)}}.ro-chips{scrollbar-width:none}.ro-chips::-webkit-scrollbar{display:none}.ro-sg-row:active{background:${CP.hover || "transparent"}}`}</style>
+      <div className="ro-chips" role="tablist" style={{ display: "flex", gap: 8, overflowX: "auto", margin: "0 -16px", padding: "0 16px" }}>
+        {chips.map((f) => {
+          const on = f.id === active.id;
+          return (
+            <button key={f.id} role="tab" aria-selected={on} onClick={() => setFilter(f.id)}
+              style={{ all: "unset", cursor: "pointer", flex: "0 0 auto", display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 999, fontSize: 13.5, background: on ? CP.textPrimary : CP.surfaceAlt || CP.surface, color: on ? CP.bg : CP.textSecondary }}>
+              {f.label}<span style={{ fontSize: 12, opacity: 0.7, ...NUM }}>{f.n}</span>
             </button>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0, borderRadius: 18, background: CP.panel || CP.surface, overflow: "hidden" }}>
+        {shown.map((r, i) => <SegRow key={r.x.id} {...r} last={i === shown.length - 1} onOpen={onOpen} />)}
+      </ul>
     </div>
   );
 }
 
-function SegRow({ x, h, n, c, v, onOpen }) {
+function SegRow({ x, h, n, c, v, last, onOpen }) {
   const detail = inboxDetail(x, h);
-  const stats = c ? [c.fol ? `${fmtN(c.fol)} follower` : null, c.medv ? `${fmtN(c.medv)} view a reel` : null].filter(Boolean).join(" · ") : "";
   const color = toneColor(v.tone);
+  const stats = c ? [c.fol ? `${fmtN(c.fol)} follower` : null, c.medv ? `${fmtN(c.medv)} view` : null].filter(Boolean).join(" · ") : "";
+  const reading = v.key === "lettura";
   const inner = (
     <>
-      <Initials name={h || "?"} size={44} pic={c?.pic} gold={v.tone === "gold"} />
-      <span style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, flex: 1 }}>
-        <span style={{ display: "flex", alignItems: "baseline", gap: 10, minWidth: 0 }}>
-          <span style={{ fontSize: 16, fontWeight: 500, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h ? `@${h}` : "Un link"}</span>
-          <span style={{ marginLeft: "auto", flex: "0 0 auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, color }}>
-            <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: "50%", background: color }} />{v.label}
-          </span>
-        </span>
-        {stats && <span style={{ fontSize: 13, color: CP.textSecondary, ...NUM }}>{stats}</span>}
-        {detail && <span style={{ fontSize: 13.5, color: CP.textPrimary, lineHeight: 1.45, paddingLeft: 10, borderLeft: `2px solid ${alpha(color, "66")}` }}>{detail}</span>}
-        <span style={{ fontSize: 12, color: CP.textMuted }}>{[shortBy(x.by), fmtDate(x.at), x.via === "iphone" ? "iPhone" : null, n > 1 ? `segnalata ${n} volte` : null].filter(Boolean).join(" · ")}</span>
+      <span style={{ position: "relative", flex: "0 0 auto", width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span aria-hidden="true" style={{ position: "absolute", inset: 0, borderRadius: "50%", border: `2px solid ${v.tone === "muted" ? "transparent" : color}`, ...(reading ? { borderColor: `${CP.gold} transparent transparent transparent`, animation: "ro-spin 1s linear infinite" } : {}) }} />
+        <Initials name={h || "?"} size={40} pic={c?.pic} />
       </span>
-      {c && <span aria-hidden="true" style={{ alignSelf: "center", fontSize: 20, color: CP.textMuted }}>›</span>}
+      <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 15.5, fontWeight: 600, color: v.key === "vuote" ? CP.textSecondary : CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h ? `@${h}` : "Un link"}</span>
+          {n > 1 && <span style={{ fontSize: 11.5, padding: "1px 6px", borderRadius: 6, background: CP.surfaceAlt || CP.surface, color: CP.textMuted, ...NUM }}>×{n}</span>}
+          <span style={{ marginLeft: "auto", flex: "0 0 auto", fontSize: 12, color: CP.textMuted }}>{fmtDate(x.at)}</span>
+        </span>
+        <span style={{ fontSize: 13, color: CP.textSecondary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ color, fontWeight: 500 }}>{reading ? "Sto leggendo il profilo…" : v.label}</span>{stats ? ` · ${stats}` : ""}
+        </span>
+        {detail && <span style={{ fontSize: 13, color: CP.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{detail}</span>}
+      </span>
+      {c && <span aria-hidden="true" style={{ alignSelf: "center", fontSize: 22, lineHeight: 1, color: CP.textMuted }}>›</span>}
     </>
   );
-  const st = { display: "flex", alignItems: "flex-start", gap: 14, padding: "16px 4px", width: "100%", boxSizing: "border-box", textAlign: "left" };
+  const st = { display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", width: "100%", boxSizing: "border-box", textAlign: "left" };
   return (
-    <li style={{ borderBottom: `1px solid ${CP.borderSoft || CP.border}` }}>
+    <li style={{ position: "relative" }}>
       {c ? <button className="ro-sg-row" onClick={() => onOpen(c)} style={{ all: "unset", cursor: "pointer", ...st }}>{inner}</button> : <div style={st}>{inner}</div>}
+      {!last && <span aria-hidden="true" style={{ position: "absolute", left: 76, right: 0, bottom: 0, height: 1, background: CP.borderSoft || CP.border }} />}
     </li>
   );
 }
