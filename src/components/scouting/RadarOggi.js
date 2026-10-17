@@ -126,14 +126,34 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
         {inbox.length === 0 ? (
           <p style={{ color: CP.textSecondary, margin: 0, fontSize: 14 }}>Ancora nessuna segnalazione.</p>
         ) : (
-          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-            {inbox.slice(0, 6).map((x) => (
-              <li key={x.id} style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: "4px 16px", padding: "11px 0", borderBottom: `1px solid ${CP.borderSoft || CP.border}`, fontSize: 14 }}>
-                <span>{x.h ? <button onClick={() => { const c = creators.find((y) => y.handles.includes(x.h)); if (c) onOpen(c); }} style={{ ...btnQuiet, padding: 0, minHeight: 0, color: CP.textPrimary }}>@{x.h}</button> : <span style={{ color: CP.textSecondary }}>{x.text.slice(0, 60)}</span>}
-                  <span style={{ color: CP.textMuted, fontSize: 12.5 }}> · {x.by || "—"} · {fmtDate(x.at)}{x.via === "iphone" ? " · iPhone" : ""}</span></span>
-                <span style={{ color: x.sig === "forte" && x.status !== "errore" ? CP.gold : x.warn || x.status === "errore" || x.status === "non_trovata" ? CP.attn : x.sig === "debole" ? CP.textPrimary : CP.textSecondary, fontSize: 13 }}>{x.msg}</span>
-              </li>
-            ))}
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+            {inboxRows(inbox, 6).map(({ x, h, n }) => {
+              const c = h ? creators.find((y) => y.handles.includes(h)) : null;
+              const v = inboxVerdict(x);
+              const detail = inboxDetail(x, h);
+              const body = (
+                <>
+                  <Initials name={h || "?"} size={40} pic={c?.pic} gold={v.tone === "gold"} />
+                  <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, flex: 1 }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                      <span style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h ? `@${h}` : /\/(reel|p)\//.test(x.text || "") ? "Un reel" : "Un link"}</span>
+                      {n > 1 && <span style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>×{n}</span>}
+                      <span style={{ marginLeft: "auto" }}><Verdict v={v} /></span>
+                    </span>
+                    {detail && <span style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.4 }}>{detail}</span>}
+                    <span style={{ fontSize: 12, color: CP.textMuted }}>{[shortBy(x.by), fmtDate(x.at), x.via === "iphone" ? "iPhone" : null].filter(Boolean).join(" · ")}</span>
+                  </span>
+                </>
+              );
+              const row = { display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${CP.borderSoft || CP.border}`, background: CP.panel || CP.surface, width: "100%", boxSizing: "border-box", textAlign: "left" };
+              return (
+                <li key={x.id}>
+                  {c
+                    ? <button onClick={() => onOpen(c)} style={{ all: "unset", cursor: "pointer", ...row }}>{body}</button>
+                    : <div style={row}>{body}</div>}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
@@ -146,6 +166,53 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
         <span>Dati da profili pubblici, ridotti al minimo · nessun contatto prima del parere legale</span>
       </footer>
     </div>
+  );
+}
+
+// ---------- Ultime segnalazioni: una riga per creator, esito in un'etichetta corta ----------
+
+const handleOf = (x) => x.h || (String(x.text || "").match(/instagram\.com\/(?!reel\/|p\/)([A-Za-z0-9._]{1,30})/)?.[1]?.toLowerCase()) || null;
+
+// Segnalazioni ripetute della stessa creator: resta la più recente, con quante volte.
+function inboxRows(inbox, max) {
+  const out = []; const at = new Map();
+  for (const x of inbox) {
+    const h = handleOf(x);
+    if (h && at.has(h)) { out[at.get(h)].n++; continue; }
+    if (h) at.set(h, out.length);
+    out.push({ x, h, n: 1 });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+function inboxVerdict(x) {
+  if (x.status === "in_lettura") return { label: "In lettura", tone: "muted" };
+  if (x.status === "errore" || x.status === "non_trovata" || x.status === "non_instagram") return { label: "Non letta", tone: "attn" };
+  if (x.status === "cancellata") return { label: "Tolta", tone: "muted" };
+  if (x.warn) return { label: "Da rileggere", tone: "attn" };
+  if (x.sig === "forte") return { label: "Profilo a pagamento", tone: "gold" };
+  if (x.sig === "debole") return { label: "Da guardare", tone: "primary" };
+  return { label: "Nessun link", tone: "muted" };
+}
+
+// Il messaggio senza la parte che ripete il nome («@x aggiunta al radar · …»).
+function inboxDetail(x, h) {
+  if (x.status === "in_lettura") return null;
+  let m = String(x.msg || "").replace(/\.$/, "");
+  m = m.replace(/^@\S+ (aggiunta al radar|era già nel radar: aggiunta la segnalazione)( · )?/, (_, w) => (w.startsWith("era") ? "Già nel radar · " : ""));
+  m = m.replace(/^da guardare: /, "").replace(/ · da guardare: /, " · ");
+  m = m.replace(/(^|· )nessun link né tag, in bio o nella prima storia in evidenza$/, "");
+  m = m.replace(/ · $/, "").trim();
+  return m ? m[0].toUpperCase() + m.slice(1) : null;
+}
+
+const shortBy = (by) => (by ? String(by).replace(/\s*\(fonte (\w+)\)/i, " · $1").split(" ").slice(0, 3).join(" ") : null);
+
+function Verdict({ v }) {
+  const color = v.tone === "gold" ? CP.gold : v.tone === "attn" ? CP.attn : v.tone === "primary" ? CP.textPrimary : CP.textMuted;
+  return (
+    <span style={{ flex: "0 0 auto", fontSize: 12, padding: "4px 10px", borderRadius: 999, color, border: `1px solid ${alpha(color, "55")}`, background: v.tone === "gold" ? alpha(CP.gold, "12") : "transparent", whiteSpace: "nowrap" }}>{v.label}</span>
   );
 }
 
