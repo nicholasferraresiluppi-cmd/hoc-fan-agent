@@ -98,8 +98,8 @@ export function buildUsageReport({ days, members = [], nav = [], now = Date.now(
     .filter(([, p]) => p.views > 0)
     .map(([page, p]) => ({
       page,
-      label: navByHref[page]?.label || null,
-      group: navByHref[page]?.group || null,
+      label: navByHref[page]?.label || pageLabel(page, nav),
+      group: navFor(page, nav)?.group || null,
       users: p.users.size,
       views: p.views,
       prev_users: p.prevUsers.size,
@@ -109,7 +109,7 @@ export function buildUsageReport({ days, members = [], nav = [], now = Date.now(
 
   const personRows = members.map((m) => {
     const u = people[m.userId];
-    const top = u ? Object.entries(u.pages).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([page]) => navByHref[page]?.label || page) : [];
+    const top = u ? Object.entries(u.pages).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([page]) => pageLabel(page, nav)) : [];
     return {
       userId: m.userId,
       name: m.name,
@@ -236,13 +236,14 @@ export const UX_MIN = { clicks: 5, rage: 3, scrollViews: 5, loadViews: 3, slowMs
  */
 export function buildUxReport(ux, navByHref = {}) {
   const pages = {};
-  const P = (p) => (pages[p] ||= { page: p, label: navByHref[p]?.label || null, clicks: {}, rage: {}, errors: {}, scrollSum: 0, scrollN: 0, loadSum: 0, loadN: 0 });
+  const navList = Object.values(navByHref).filter((n) => n?.href);
+  const P = (p) => (pages[p] ||= { page: p, label: navByHref[p]?.label || (navList.length ? pageLabel(p, navList) : null), clicks: {}, rage: {}, errors: {}, scrollSum: 0, scrollN: 0, loadSum: 0, loadN: 0 });
   for (const h of Object.values(ux || {})) {
     for (const [f, raw] of Object.entries(h || {})) {
       const n = Number(raw) || 0;
       const parts = f.split("\t");
       const kind = parts[0], page = parts[1];
-      if (!page) continue;
+      if (!page || !"crels".includes(kind) || kind.length !== 1) continue; // n/t/q/b: percorsi, li legge buildFlowReport
       const p = P(page);
       if (kind === "c") {
         const [fold, zone] = String(parts[3] || "?|?").split("|");
@@ -282,9 +283,248 @@ export function buildUxInsights(rows) {
     for (const g of r.rage.filter((x) => x.count >= UX_MIN.rage)) out.push({ kind: "warn", page: r.page, title: `Clic ripetuti per frustrazione su «${g.label}» (${name(r)})`, text: `${g.count} volte qualcuno ha cliccato 3+ volte di fila nello stesso punto: di solito vuol dire che non risponde, è lento o sembra cliccabile e non lo è.` });
     const errs = r.errors.reduce((a, e) => a + e.count, 0);
     if (errs) out.push({ kind: "warn", page: r.page, title: `${errs} ${errs === 1 ? "errore" : "errori"} su ${name(r)}`, text: `Il più frequente: «${r.errors[0].label}». Da correggere: chi lo incontra vede una pagina rotta.` });
-    if (r.load_n >= UX_MIN.loadViews && r.load_avg_ms >= UX_MIN.slowMs) out.push({ kind: "info", page: r.page, title: `${name(r)} è lenta ad aprirsi`, text: `In media ${(r.load_avg_ms / 1000).toFixed(1)} secondi al primo caricamento.` });
+    if (r.load_n >= UX_MIN.loadViews && r.load_avg_ms >= UX_MIN.slowMs) out.push({ kind: "info", page: r.page, title: `${name(r)} è lenta ad aprirsi`, text: `In media ${(r.load_avg_ms / 1000).toLocaleString("it-IT", { maximumFractionDigits: 1 })} secondi al primo caricamento.` });
     if (r.scroll_n >= UX_MIN.scrollViews && r.scroll_avg < UX_MIN.lowScrollPct) out.push({ kind: "info", page: r.page, title: `Su ${name(r)} si guarda solo la parte alta`, text: `In media si scorre fino al ${r.scroll_avg}% della pagina: quello che sta sotto quasi nessuno lo vede. Le cose importanti vanno in cima.` });
   }
   const rank = { warn: 0, info: 1, good: 2 };
   return out.sort((a, b) => rank[a.kind] - rank[b.kind]);
+}
+
+/* ------------------------------------------------------------------ */
+/* Percorsi e punti di blocco (17/10/2026).                             */
+/* ------------------------------------------------------------------ */
+/*
+ * Richiesta Nicholas: "chi apre cosa, cosa non apre nessuno, dove si blocca",
+ * in una sezione apposita. Modello dei prodotti di analytics (PostHog «Paths»,
+ * Amplitude «Journeys», Pendo «Friction»): da dove si arriva a una pagina e
+ * dove si va dopo, quanto ci si resta, quante aperture finiscono in un muro.
+ * Tutto ANONIMO e aggregato per pagina (in usage:x non c'è mai chi): i
+ * percorsi per persona sarebbero sorveglianza, e per decidere dove intervenire
+ * non servono. Campi nuovi in usage:x (scritti da ux-client → usage.recordEvents):
+ *   "n\t{da}\t{a}"          → passaggi da una pagina all'altra ("(ingresso)" = prima pagina della visita)
+ *   "t\t{pagina}\tsum|n"    → secondi con la pagina in primo piano (≤30 min a vista)
+ *   "q\t{pagina}"           → aperture durate <10 s senza nessun clic
+ *   "b\t{pagina}\t{codice}" → aperture in cui almeno una chiamata ai dati ha risposto 401/403/404/5xx o non è arrivata (rete)
+ * Le uscite non si registrano: uscite = aperture − passaggi verso un'altra pagina.
+ */
+
+export const ENTRY = "(ingresso)";
+export const EXIT = "(uscita)";
+export const BLOCK_CODES = ["401", "403", "404", "5xx", "rete"];
+
+// Soglie minime (regola di onestà: sotto il campione niente conclusioni).
+export const FLOW_MIN = { views: 5, quickViews: 8, quickShare: 0.4, blockShare: 0.2, errShare: 0.05, netShare: 0.1 };
+
+/** Voce di menu che "contiene" la pagina (la più lunga che ne è prefisso): per nome e area delle pagine di dettaglio. */
+export function navFor(page, nav = []) {
+  let best = null;
+  for (const n of nav) {
+    if (page === n.href) return n;
+    if (n.href !== "/" && n.href !== "/admin" && page.startsWith(n.href + "/") && (!best || n.href.length > best.href.length)) best = n;
+  }
+  return best;
+}
+
+/** Nome leggibile di una pagina: voce di menu, o "Voce › dettaglio" per le sottopagine. */
+const KNOWN_PAGES = { "/": "Inizio", "/admin": "Hub" };
+const prettySegs = (segs) => segs.map((s) => (/^\[.+\]$/.test(s) ? "scheda" : s.replace(/-/g, " "))).join(" › ");
+export function pageLabel(page, nav = []) {
+  if (page === ENTRY) return "Entra nell'app";
+  if (page === EXIT) return "Esce dall'app";
+  if (KNOWN_PAGES[page]) return KNOWN_PAGES[page];
+  const n = navFor(page, nav);
+  if (!n || n.href === "/admin") {
+    // fuori dal menu: "/academy/lezioni" → "Academy › lezioni"
+    const t = prettySegs(page.split("/").filter(Boolean));
+    return t ? t.charAt(0).toUpperCase() + t.slice(1) : page;
+  }
+  if (n.href === page) return n.label;
+  return `${n.label} › ${prettySegs(page.slice(n.href.length + 1).split("/"))}`;
+}
+
+/**
+ * @param {Record<string, Record<string, number>>} ux  giorno → hash usage:x
+ * @param {Array<{href,label,group}>} nav
+ */
+export function buildFlowReport(ux, nav = []) {
+  const P = {};
+  const get = (page) => (P[page] ||= { page, views: 0, entries: 0, out: 0, from: {}, to: {}, tSum: 0, tN: 0, quick: 0, blocks: {} });
+  let since = null;
+  for (const [day, h] of Object.entries(ux || {})) {
+    for (const [f, raw] of Object.entries(h || {})) {
+      const n = Number(raw) || 0;
+      if (!n) continue;
+      const [kind, a, b] = f.split("\t");
+      if (!a) continue;
+      if (kind === "n") {
+        if (!b || b === ENTRY) continue;
+        if (!since || day < since) since = day;
+        const to = get(b);
+        to.views += n; to.from[a] = (to.from[a] || 0) + n;
+        if (a === ENTRY) to.entries += n;
+        else if (a !== b) { const fr = get(a); fr.out += n; fr.to[b] = (fr.to[b] || 0) + n; }
+        else { const fr = get(a); fr.out += n; } // stessa pagina (ricarica nella visita): non è un'uscita
+      } else if (kind === "t") { const p = get(a); b === "sum" ? (p.tSum += n) : b === "n" ? (p.tN += n) : null; }
+      else if (kind === "q") get(a).quick += n;
+      else if (kind === "b" && BLOCK_CODES.includes(b)) { const p = get(a); p.blocks[b] = (p.blocks[b] || 0) + n; }
+    }
+  }
+  const top = (o, k = 6) => Object.entries(o).filter(([, c]) => c > 0).sort((x, y) => y[1] - x[1]).slice(0, k).map(([page, count]) => ({ page, label: pageLabel(page, nav), count }));
+  const pages = Object.values(P).filter((p) => p.views > 0).map((p) => {
+    const exits = Math.max(0, p.views - p.out);
+    const nb = navFor(p.page, nav);
+    const blocked = Object.values(p.blocks).reduce((s, c) => s + c, 0);
+    return {
+      page: p.page,
+      label: pageLabel(p.page, nav),
+      group: nb?.group || null,
+      views: p.views,
+      entries: p.entries,
+      exits,
+      exit_share: p.views ? exits / p.views : 0,
+      from: top(p.from),
+      to: top({ ...p.to, ...(exits ? { [EXIT]: exits } : {}) }),
+      avg_seconds: p.tN ? Math.round(p.tSum / p.tN) : null,
+      quick: p.quick,
+      quick_share: p.views ? Math.min(1, p.quick / p.views) : 0,
+      blocks: p.blocks,
+      blocked_views: blocked,
+    };
+  }).sort((a, b) => b.views - a.views);
+  return { since, pages, total_views: pages.reduce((s, p) => s + p.views, 0) };
+}
+
+/**
+ * I punti in cui ci si blocca, dal più grave: muri di permesso, errori,
+ * pagine aperte e richiuse subito, più i segnali di buildUxReport (clic per
+ * frustrazione, errori JavaScript, lentezza, tasti da scorrere).
+ * Ogni voce dice cosa succede, quante aperture tocca e cosa fare.
+ */
+export function buildStuckReport(flow, ux = null) {
+  const out = [];
+  const pct = (x) => `${Math.round(x * 100)}%`;
+  for (const p of flow?.pages || []) {
+    if (p.views < FLOW_MIN.views) continue;
+    const share = (code) => (p.blocks[code] || 0) / p.views;
+    const n = (code) => p.blocks[code] || 0;
+    if (share("403") >= FLOW_MIN.blockShare) out.push({ kind: "warn", cause: "permesso", page: p.page, affected: n("403"),
+      title: `«${p.label}» si apre, ma le rispondono «non hai il permesso»`,
+      text: `${n("403")} aperture su ${p.views} (${pct(share("403"))}) hanno chiesto dati che chi la apre non può vedere: o la voce non dovrebbe stare nel suo menu (nav-access), o gli manca un permesso o le creator assegnate.` });
+    if (share("5xx") >= FLOW_MIN.errShare) out.push({ kind: "warn", cause: "errore", page: p.page, affected: n("5xx"),
+      title: `«${p.label}» va in errore`,
+      text: `${n("5xx")} aperture su ${p.views} (${pct(share("5xx"))}) hanno avuto un errore del server nel caricare i dati: chi la apre vede una pagina vuota o a metà. Da correggere.` });
+    if (share("404") >= FLOW_MIN.blockShare) out.push({ kind: "info", cause: "vuota", page: p.page, affected: n("404"),
+      title: `«${p.label}» cerca dati che non trova`,
+      text: `${n("404")} aperture su ${p.views} hanno chiesto qualcosa che non esiste (un periodo, una scheda, una creator): di solito un link vecchio o un filtro rimasto nell'indirizzo.` });
+    if (share("401") >= FLOW_MIN.blockShare) out.push({ kind: "info", cause: "sessione", page: p.page, affected: n("401"),
+      title: `Su «${p.label}» la sessione risulta scaduta`,
+      text: `${n("401")} aperture su ${p.views}: la pagina era aperta da molto e l'accesso era scaduto. Bisogna ricaricare: se succede spesso, la pagina dovrebbe dirlo da sola.` });
+    if (share("rete") >= FLOW_MIN.netShare) out.push({ kind: "info", cause: "rete", page: p.page, affected: n("rete"),
+      title: `Su «${p.label}» i dati a volte non arrivano proprio`,
+      text: `${n("rete")} aperture su ${p.views}: la richiesta non è arrivata (connessione, o una richiesta troppo lunga interrotta).` });
+    if (p.views >= FLOW_MIN.quickViews && p.quick_share >= FLOW_MIN.quickShare) out.push({ kind: "warn", cause: "subito", page: p.page, affected: p.quick,
+      title: `«${p.label}» si apre e si richiude subito`,
+      text: `${p.quick} aperture su ${p.views} (${pct(p.quick_share)}) durano meno di 10 secondi senza nessun clic: chi ci arriva si aspettava altro (il nome nel menu?) o la pagina non mostra subito quello che serve.` });
+  }
+  for (const i of ux?.insights || []) {
+    const cause = /frustrazione/.test(i.title) ? "frustrazione" : /errore/.test(i.title) ? "errore" : /lenta/.test(i.title) ? "lenta" : /scorrere/.test(i.title) ? "nascosto" : "scorrimento";
+    out.push({ ...i, cause, affected: Number((i.text.match(/^(\d+)/) || i.title.match(/(\d+)/) || [])[1]) || 0 });
+  }
+  // a parità di gravità: prima ciò che è rotto (errori, permessi), poi ciò che fa perdere la gente, poi la comodità
+  const rank = { warn: 0, info: 1, good: 2 };
+  const CAUSE_RANK = { errore: 0, permesso: 1, subito: 2, frustrazione: 3, nascosto: 4, lenta: 5, vuota: 6, sessione: 7, rete: 8, scorrimento: 9 };
+  return out.sort((a, b) => rank[a.kind] - rank[b.kind] || (CAUSE_RANK[a.cause] ?? 9) - (CAUSE_RANK[b.cause] ?? 9) || b.affected - a.affected);
+}
+
+/* ------------------------------------------------------------------ */
+/* Persone: abitudine e parte della mansione mai aperta.                */
+/* ------------------------------------------------------------------ */
+
+export const PERSON_STATUS = {
+  abitudine: { label: "Lo usa ogni settimana", short: "Abitudine" },
+  occasionale: { label: "Lo usa ogni tanto", short: "Ogni tanto" },
+  fermo: { label: "Non lo apre da più di 14 giorni", short: "Fermo" },
+  mai: { label: "Invitato, mai entrato", short: "Mai entrato" },
+};
+
+/**
+ * Stato d'uso di una persona. Abitudine = attiva in almeno 3 delle ultime 4
+ * settimane, compresa l'ultima (con meno di 3 settimane di dati: almeno 5
+ * giorni sugli ultimi 14).
+ * @param {Record<string, Record<string, number>>} days
+ */
+export function personHabit(userId, days, { now = Date.now(), trackedDays = 999, everSignedIn = false } = {}) {
+  const ds = lastDays(28, now);
+  const strip = ds.map((d) => Object.keys(days?.[d] || {}).some((k) => k.startsWith(userId + "\t")));
+  let last = null;
+  for (const d of Object.keys(days || {}).sort()) if (Object.keys(days[d] || {}).some((k) => k.startsWith(userId + "\t"))) last = d;
+  const weeks = [0, 1, 2, 3].filter((w) => strip.slice(w * 7, w * 7 + 7).some(Boolean)).length;
+  const last14 = strip.slice(14).filter(Boolean).length;
+  const since = last ? Math.round((Date.parse(dayId(now)) - Date.parse(last)) / 86400000) : null;
+  let status;
+  if (!last) status = everSignedIn ? "fermo" : "mai";
+  else if (since > 14) status = "fermo";
+  else if ((weeks >= 3 && strip.slice(21).some(Boolean)) || (trackedDays < 21 && last14 >= 5)) status = "abitudine";
+  else status = "occasionale";
+  return { strip, status, active_weeks: weeks, days_since: since };
+}
+
+/**
+ * Arricchisce le persone del report: stato, striscia di 28 giorni e, per chi
+ * ha una mansione, le pagine della sua parte che nel periodo non ha mai
+ * aperto. `expectedFor(member)` → [{href,label}] (la decide la pagina:
+ * mansione ∩ permessi, così il core resta puro).
+ */
+export function enrichPeople(report, { days, members = [], expectedFor = () => [], now = Date.now() }) {
+  const byId = Object.fromEntries(members.map((m) => [m.userId, m]));
+  const opened = {}; // userId → Set(pagine) nella finestra
+  for (const d of lastDays(report.window, now)) for (const k of Object.keys(days?.[d] || {})) {
+    const [u, page] = k.split("\t");
+    (opened[u] ||= new Set()).add(page);
+  }
+  const people = report.people.map((p) => {
+    const m = byId[p.userId] || {};
+    const h = personHabit(p.userId, days, { now, trackedDays: report.tracked_days, everSignedIn: Boolean(m.lastSignInAt) });
+    const expected = expectedFor(m) || [];
+    const mine = opened[p.userId] || new Set();
+    const used = (href) => mine.has(href) || [...mine].some((pg) => pg.startsWith(href + "/"));
+    return {
+      ...p,
+      ...h,
+      workspace: m.workspace || null,
+      admin: Boolean(m.admin),
+      expected_count: expected.length,
+      expected_used: expected.filter((e) => used(e.href)).length,
+      missing: expected.filter((e) => !used(e.href)),
+    };
+  });
+  const counts = Object.fromEntries(Object.keys(PERSON_STATUS).map((s) => [s, people.filter((p) => p.status === s).length]));
+  const insights = [...(report.insights || [])];
+  // chi entra ma non usa la sua parte: il segnale più utile per spiegare (o togliere) uno strumento
+  const halfUnused = report.tracked_days >= 7
+    ? people.filter((p) => p.status !== "mai" && p.expected_count >= 2 && p.missing.length * 2 >= p.expected_count)
+    : [];
+  if (halfUnused.length) {
+    insights.push({
+      kind: "warn",
+      title: `${halfUnused.length} ${halfUnused.length === 1 ? "persona entra ma non usa" : "persone entrano ma non usano"} metà degli strumenti della sua mansione`,
+      text: halfUnused.slice(0, 4).map((p) => `${p.name}: mai ${p.missing.slice(0, 2).map((m) => m.label).join(", ")}`).join(" · ") + ". Chiedi se sa che esistono e a cosa servono: spesso basta mostrarli una volta.",
+    });
+  }
+  return { ...report, people, status_counts: counts, insights };
+}
+
+/** Aree del menu (gruppi): persone diverse che le usano e aperture, nella finestra. */
+export function buildAreas({ days, window = 30, nav = [], now = Date.now() }) {
+  const areas = {};
+  for (const d of lastDays(window, now)) for (const [k, raw] of Object.entries(days?.[d] || {})) {
+    const [u, page] = k.split("\t");
+    const c = Number(raw) || 0;
+    if (!u || !page || !c) continue;
+    const g = navFor(page, nav)?.group || "Fuori dal menu";
+    const a = (areas[g] ||= { group: g, views: 0, users: new Set() });
+    a.views += c; a.users.add(u);
+  }
+  const total = Object.values(areas).reduce((s, a) => s + a.views, 0) || 1;
+  return Object.values(areas).map((a) => ({ group: a.group, views: a.views, users: a.users.size, share: a.views / total })).sort((a, b) => b.users - a.users || b.views - a.views);
 }
