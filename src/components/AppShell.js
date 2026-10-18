@@ -66,7 +66,7 @@ const whoFetcher = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch((
  * Guscio di chi ha un ruolo ristretto (lib/restricted-roles, es. "Social"): niente menu, niente
  * hub, solo il nome dell'app, la pagina e l'account. Le altre pagine riportano alla sua.
  */
-const RESTRICTED_PAGE_LABEL = { "/admin/scouting": "Radar creator", "/admin/studio-social": "Studio social", "/admin/supervisor": "Account social" };
+const RESTRICTED_PAGE_LABEL = { "/admin/scouting": "Radar creator", "/admin/studio-social": "Studio social", "/admin/supervisor": "Account social", "/admin/hr": "Persone", "/admin/hr/contratti": "Contratti", "/contabilita": "Contabilità" };
 
 function RestrictedShell({ restriction, allowed, children, pathname }) {
   return (
@@ -76,8 +76,10 @@ function RestrictedShell({ restriction, allowed, children, pathname }) {
         {/* più pagine (es. SMM: Radar + Account social) → una scheda per pagina; una sola → solo il nome */}
         {restriction.paths.length > 1 ? (
           <nav style={{ display: "flex", gap: 4, overflowX: "auto", minWidth: 0 }}>
-            {restriction.paths.map((p) => {
-              const on = pathname === p || pathname.startsWith(p + "/");
+            {restriction.paths.map((p, _i, all) => {
+              // scheda accesa = la pagina più specifica che contiene l'indirizzo (/admin/hr/contratti non accende anche «Persone»)
+              const hits = all.filter((x) => pathname === x || pathname.startsWith(x + "/"));
+              const on = hits.length > 0 && hits.reduce((a, b) => (b.length > a.length ? b : a)) === p;
               return <a key={p} href={p} style={{ fontSize: 13.5, padding: "6px 12px", borderRadius: 999, textDecoration: "none", whiteSpace: "nowrap", border: `1px solid ${on ? CP.accent : CP.border}`, background: on ? CP.accentSoft : "transparent", color: on ? CP.accentSoftText : CP.textSecondary }}>{RESTRICTED_PAGE_LABEL[p] || p}</a>;
             })}
           </nav>

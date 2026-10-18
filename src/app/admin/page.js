@@ -133,7 +133,7 @@ const SHORTCUT_GROUPS_RAW = [
     items: [
       { href: "/cm-cockpit",              title: "Cockpit CM",    desc: "Turno di supervisione: team live, soglie, override shadow", icon: Gauge },
       { href: "/contabilita",             title: "Contabilità", desc: "Compensi del team per mese: fissi e gamification (minimo garantito o % sulle revenue, dollaro→euro), chi è pagato, dati di pagamento cifrati. Visibile solo a chi ha l'accesso contabilità", icon: Landmark },
-      { href: "/admin/hr",                title: "Persone HR",    desc: "CRM persone (HOC Pro è il master): anagrafica, rapporto, contratto, documenti e storico, sincronizzato con la lista HR di ClickUp; link di compilazione per la persona", icon: BookUser },
+      { href: "/admin/hr",                title: "Persone · Area Partner", desc: "CRM persone (HOC Pro è il master): anagrafica, rapporto, contratto, documenti e storico, sincronizzato con la lista HR di ClickUp; link di compilazione per la persona", icon: BookUser },
       { href: "/admin/hr/contratti",      title: "Controllo contratti", desc: "Contratti da Dropbox Sign confrontati con le schede: chi ce l'ha, chi no, chi ha cambiato mansione e serve un contratto nuovo; PDF firmati allegati su ClickUp", icon: FileSignature },
       { href: "/admin/hr/sync",           title: "Sincronizzazione ClickUp", desc: "Lista configurata, webhook, ultimo import, conflitti: import completo e registrazione webhook", icon: RefreshCw },
       { href: "/admin/candidate-assessments", title: "Assessment candidati", desc: "Simulatore Academy come test pre-assunzione: crea link, leggi il report (segnale per HR, non gate), registra l'esito", icon: UserCheck },

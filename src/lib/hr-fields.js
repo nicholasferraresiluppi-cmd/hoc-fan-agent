@@ -165,6 +165,10 @@ export const FIELDS = [
   { key: "companyPhone", label: "Telefono aziendale", section: "rapporto", type: "phone", cu: "Company Phone Number" },
   { key: "yellowWarnings", label: "Richiami gialli", section: "rapporto", type: "number", cu: "Yellow Warnings" },
   { key: "redWarnings", label: "Richiami rossi", section: "rapporto", type: "number", cu: "Red Warnings" },
+  // Note (18/10/2026, Nicholas: "la descrizione su ClickUp non riuscivo a modificarla"): il testo libero
+  // della DESCRIZIONE del task, cioè tutto ciò che sta sopra «— Dati HOC Pro —». A due vie: si scrive in
+  // app o su ClickUp. Niente `cu`: non è un campo personalizzato, lo legge e scrive hr-clickup-map.
+  { key: "notes", label: "Note", section: "rapporto", type: "longtext", desc: true, max: 4000 },
   // Contratto
   { key: "agreementWith", label: "Accordo con", section: "contratto", type: "labels", cu: "Agreement with" },
   // stato del contratto: asse separato dalla fase (tendina "HV Contract Status", tabella CONTRACT_STATUSES).

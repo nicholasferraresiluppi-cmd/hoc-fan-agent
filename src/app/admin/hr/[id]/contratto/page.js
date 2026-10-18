@@ -81,7 +81,7 @@ export default function ContractFunnelPage() {
       : "Contratto inviato in firma. Stato del contratto: «Firma richiesta». Quando firma, il CRM se ne accorge da solo.");
   };
 
-  if (error) return <Wrap id={id}><Notice danger={error.status !== 403}>{error.status === 403 ? "Pagina riservata agli admin." : error.message}</Notice></Wrap>;
+  if (error) return <Wrap id={id}><Notice danger={error.status !== 403}>{error.status === 403 ? "Pagina riservata a chi gestisce le persone (Area Partner o admin)." : error.message}</Notice></Wrap>;
   if (!data || !terms || !doc) return <Wrap id={id}><div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div></Wrap>;
 
   const dirty = tplId !== data.templateId || JSON.stringify(terms) !== JSON.stringify(data.terms);

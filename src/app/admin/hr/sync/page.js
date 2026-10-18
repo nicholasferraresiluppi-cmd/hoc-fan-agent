@@ -102,7 +102,7 @@ export default function HrSyncPage() {
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1100, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
-        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Persone HR", href: "/admin/hr" }, { label: "Sincronizzazione ClickUp" }]}
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Persone", href: "/admin/hr" }, { label: "Sincronizzazione ClickUp" }]}
         title="Sincronizzazione ClickUp"
         subtitle="HOC Pro è la fonte principale; la lista HR su ClickUp ne è lo specchio. Qui vedi se il collegamento funziona e lo fai ripartire."
         actions={c?.enabled && (
@@ -113,7 +113,7 @@ export default function HrSyncPage() {
         )}
       />
 
-      {error && <Notice danger={error.status !== 403}>{error.status === 403 ? "Pagina riservata agli admin." : `Non riesco a leggere lo stato: ${error.message}`}</Notice>}
+      {error && <Notice danger={error.status !== 403}>{error.status === 403 ? "Pagina riservata a chi gestisce le persone (Area Partner o admin)." : `Non riesco a leggere lo stato: ${error.message}`}</Notice>}
       {msg && <Notice danger={!msg.ok}>{msg.text}</Notice>}
       {!error && isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
 

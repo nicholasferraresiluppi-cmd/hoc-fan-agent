@@ -1,5 +1,5 @@
 /**
- * /api/admin/hr/people/[id] — scheda persona (Centro HR, SEED).
+ * /api/admin/hr/people/[id] — scheda persona (Centro HR, people.manage).
  *
  * GET   → { person (CF solo mascherato), log, cleanup (flag di questa scheda) }
  * PATCH → modifica campi; salva in app, poi spinge su ClickUp SOLO i campi cambiati.
@@ -18,7 +18,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(request, props) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const { id } = await props.params;
   const p = await getPerson(id);
@@ -49,7 +49,7 @@ export async function GET(request, props) {
 }
 
 export async function PATCH(request, props) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const { id } = await props.params;
   let body;

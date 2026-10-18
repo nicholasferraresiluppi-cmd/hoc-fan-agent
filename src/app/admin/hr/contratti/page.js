@@ -84,7 +84,7 @@ export default function HrContractsPage() {
         )}
       />
 
-      {error && <Notice danger={error.status !== 403}>{error.status === 403 ? "Pagina riservata agli admin." : `Non riesco a caricare i contratti: ${error.message}`}</Notice>}
+      {error && <Notice danger={error.status !== 403}>{error.status === 403 ? "Pagina riservata a chi gestisce le persone (Area Partner o admin)." : `Non riesco a caricare i contratti: ${error.message}`}</Notice>}
       {!error && isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
       {data && !data.configured && <Notice danger>Chiave di Dropbox Sign non configurata (DROPBOX_SIGN_API_KEY): i contratti non si possono leggere.</Notice>}
       {notice && <Notice danger={!notice.ok}>{notice.text}</Notice>}

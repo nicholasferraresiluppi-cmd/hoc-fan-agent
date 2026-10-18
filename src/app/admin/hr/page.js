@@ -217,7 +217,7 @@ export default function HrPeoplePage() {
         )}
       />
 
-      {error && <Notice danger={error.status !== 403}>{error.status === 403 ? "Pagina riservata agli admin." : `Non riesco a caricare le persone: ${error.message}`}</Notice>}
+      {error && <Notice danger={error.status !== 403}>{error.status === 403 ? "Pagina riservata a chi gestisce le persone (Area Partner o admin)." : `Non riesco a caricare le persone: ${error.message}`}</Notice>}
       {data && !data.sync?.enabled && (
         <Notice>Sincronizzazione con ClickUp <b>spenta</b>: le schede si salvano comunque qui. <Link href="/admin/hr/sync" style={{ color: CP.accentSoftText }}>Dettagli →</Link></Notice>
       )}

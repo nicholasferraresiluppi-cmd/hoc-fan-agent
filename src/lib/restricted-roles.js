@@ -8,16 +8,20 @@
 
 export const RESTRICTED_ROLES = {
   social: { home: "/admin/supervisor", paths: ["/admin/supervisor"], label: "Account social" },
+  // 18/10/2026: People Partner — CRM persone e contratti; Contabilità solo se il titolare gliel'ha aperta
+  // `needs`: pagina mostrata solo con quel permesso (la Contabilità la apre il titolare a mano)
+  people: { home: "/admin/hr", paths: ["/admin/hr", "/admin/hr/contratti", "/contabilita"], label: "Persone", needs: { "/contabilita": "accounting.private" } },
   smm: { home: "/admin/scouting", paths: ["/admin/scouting", "/admin/studio-social", "/admin/supervisor"], label: "Radar creator" },
 };
 
 /** { home, paths, label } se la persona è ristretta, altrimenti null. */
-export function restrictionFor({ admin, roles } = {}) {
+export function restrictionFor({ admin, roles, capabilities = null } = {}) {
   if (admin) return null;
   const rs = (roles || []).filter(Boolean);
   if (!rs.length || !rs.every((r) => RESTRICTED_ROLES[r])) return null;
   const first = RESTRICTED_ROLES[rs[0]];
-  return { home: first.home, label: first.label, paths: [...new Set(rs.flatMap((r) => RESTRICTED_ROLES[r].paths))] };
+  const ok = (r, p) => { const need = RESTRICTED_ROLES[r].needs?.[p]; return !need || Boolean(capabilities?.[need]); };
+  return { home: first.home, label: first.label, paths: [...new Set(rs.flatMap((r) => RESTRICTED_ROLES[r].paths.filter((p) => ok(r, p))))] };
 }
 
 /** La pagina è tra quelle permesse? (senza restrizione: sempre) */

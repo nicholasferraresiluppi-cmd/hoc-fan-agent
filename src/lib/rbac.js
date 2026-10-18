@@ -21,11 +21,12 @@ import { getClerkUser, forgetClerkUser } from "@/lib/clerk-user";
  */
 
 // "social" per primo = il più basso: diventa ruolo principale solo se è l'unico (lib/invitations)
-export const ROLES = ["social", "smm", "operator", "team_lead", "sales_manager", "qa_reviewer", "admin"];
+export const ROLES = ["social", "smm", "people", "operator", "team_lead", "sales_manager", "qa_reviewer", "admin"];
 
 export const ROLE_META = {
   social: { label: "Social", emoji: "📱", color: "#EC4899", description: "Gestione account social — vede solo Account social" },
   smm: { label: "Social Media Manager", emoji: "🎬", color: "#D9B46A", description: "Radar creator, format e mercato, account social" },
+  people: { label: "People Partner", emoji: "🤝", color: "#14B8A6", description: "Area Partner — CRM persone, documenti e contratti" },
   operator: { label: "Operator", emoji: "💬", color: "#10B981", description: "Chatter in training — vede i suoi dati" },
   team_lead: { label: "Team Lead", emoji: "👥", color: "#3B82F6", description: "Lead del team — vede il suo team" },
   sales_manager: { label: "Sales Manager", emoji: "📈", color: "#F5A623", description: "SM — vede tutto, override score" },
@@ -56,6 +57,7 @@ export const CAPABILITIES = {
   USERS_INVITE: "users.invite",               // invitare persone in HOC Pro (accesso solo su invito dal 25/09/2026)
   SCOUTING_USE: "scouting.use",               // Radar creator: guardare, valutare, segnalare, caricare reel (15/10/2026, ruolo SMM)
   SOCIAL_MANAGE: "social.manage",             // Account social (/admin/supervisor): account, telefoni, caselle, password (13/10/2026)
+  PEOPLE_MANAGE: "people.manage",             // CRM persone (/admin/hr): schede, documenti, contratti, link del modulo (18/10/2026, Area Partner)
 };
 
 // "all" = tutta l'org | "team" = solo proprio team | "own" = solo sé stesso | "none" = nessun accesso
@@ -69,6 +71,11 @@ export const ROLE_CAPABILITIES = {
   smm: {
     [CAPABILITIES.SCOUTING_USE]: "all",
     [CAPABILITIES.SOCIAL_MANAGE]: "all",
+  },
+  // 18/10/2026: People Partner (Area Partner, ex HR) — il CRM persone senza diventare admin
+  // (niente comp, score, denaro). La contabilità resta a parte: la apre il titolare da /contabilita.
+  people: {
+    [CAPABILITIES.PEOPLE_MANAGE]: "all",
   },
   operator: {
     [CAPABILITIES.TRAINING_DO]: "own",
@@ -121,6 +128,7 @@ export const ROLE_CAPABILITIES = {
     [CAPABILITIES.COPILOT_PILOT]: "all",
     [CAPABILITIES.SOCIAL_MANAGE]: "all",
     [CAPABILITIES.SCOUTING_USE]: "all",
+    [CAPABILITIES.PEOPLE_MANAGE]: "all",
   },
 };
 

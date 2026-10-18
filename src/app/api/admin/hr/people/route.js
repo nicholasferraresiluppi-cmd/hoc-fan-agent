@@ -1,5 +1,5 @@
 /**
- * /api/admin/hr/people — elenco e creazione persone (Centro HR, SEED).
+ * /api/admin/hr/people — elenco e creazione persone (Centro HR, people.manage).
  *
  * GET  → { items (attive, senza CF), archived (schede archiviate), cleanup { byId, duplicates, junk } (solo attive), sync }
  * POST → crea una persona { ...campi } → salva in app e la porta su ClickUp
@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET() {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const [all, cstore, clinks, cattached] = await Promise.all([listPeople({ archived: "include" }), getStore().catch(() => null), getLinks().catch(() => ({})), getAttached().catch(() => ({}))]);
   // archiviate a parte: fuori da elenco, doppioni e statistiche
@@ -34,7 +34,7 @@ export async function GET() {
 }
 
 export async function POST(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   let body;
   try { body = await request.json(); } catch { return Response.json({ error: "JSON non valido." }, { status: 400 }); }
