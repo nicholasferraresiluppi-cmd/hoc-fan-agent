@@ -10,6 +10,7 @@ import { kv } from "@vercel/kv";
 import { isCronAuthorized } from "@/lib/cron-auth";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { syncContractMilestones } from "@/lib/hr-contract-milestone";
+import { stripContractLinks } from "@/lib/hr-block-cleanup";
 
 async function handle(request) {
   if (!isCronAuthorized(request)) {
@@ -23,6 +24,11 @@ async function handle(request) {
   } catch (e) {
     result = "err:" + (e?.message || "unknown");
   }
+  // pulizia una tantum della riga «Prepara il contratto» (18/10/2026): si spegne da sola quando ha finito
+  try {
+    const c = await stripContractLinks({ budgetMs: 8_000 });
+    if (c.ok && !c.already) result += ` · righe contratto tolte: ${c.cleaned}${c.left ? ` (+${c.left})` : ""}`;
+  } catch (e) { result += ` · pulizia err:${e?.message || "?"}`; }
   await kv.set("cron:heartbeat:hr-milestones", { at: Date.now(), result }, { ex: 40 * 24 * 3600 }).catch(() => {});
   return Response.json({ ok: true, result });
 }
