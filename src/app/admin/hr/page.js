@@ -53,7 +53,6 @@ export default function HrPeoplePage() {
   const [q, setQ] = useState("");
   const [tab, setTab] = useState("con-noi");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [dept, setDept] = useState("");
   const [project, setProject] = useState("");
   const [emp, setEmp] = useState("");
   const [contract, setContract] = useState("");
@@ -84,7 +83,6 @@ export default function HrPeoplePage() {
     const order = (v) => (v === NONE ? 99 : CONTRACT_LABELS.includes(v) ? CONTRACT_LABELS.indexOf(v) : 50);
     return got.sort((a, b) => order(a[0]) - order(b[0]));
   }, [items]);
-  const depts = useMemo(() => uniq(items, (p) => p.fields?.department), [items]);
   const langs = useMemo(() => uniq(items, (p) => p.fields?.spokenLanguages), [items]);
   const projects = useMemo(() => uniq(items, (p) => p.fields?.progetto), [items]);
   const emps = useMemo(() => uniq(items, (p) => p.fields?.employmentType), [items]);
@@ -120,7 +118,7 @@ export default function HrPeoplePage() {
   const tabCounts = useMemo(() => Object.fromEntries(TABS.map((t) => [t.key, items.filter(t.test).length])), [TABS, items]);
   const curTab = TABS.find((t) => t.key === tab);
 
-  const activeFilters = [contract, dept, project, emp, lang, skill, pastRole, source, piva, mans].filter(Boolean).length;
+  const activeFilters = [contract, project, emp, lang, skill, pastRole, source, piva, mans].filter(Boolean).length;
   const rows = useMemo(() => {
     if (!curTab) return [];
     const needle = q.trim().toLowerCase();
@@ -129,7 +127,6 @@ export default function HrPeoplePage() {
       if (!curTab.test(p)) return false;
       if (lang && !has(f.spokenLanguages, lang)) return false;
       if (contract && !has(f.hvContractStatus, contract)) return false;
-      if (dept && !has(f.department, dept)) return false;
       if (project && !has(f.progetto, project)) return false;
       if (emp && !has(f.employmentType, emp)) return false;
       if (source && !has(f.source, source)) return false;
@@ -143,8 +140,8 @@ export default function HrPeoplePage() {
       }
       return true;
     });
-  }, [items, curTab, q, contract, dept, project, emp, lang, source, piva, mans, skill, minLevel, pastRole]);
-  const resetFilters = () => { setContract(""); setDept(""); setProject(""); setEmp(""); setLang(""); setSkill(""); setMinLevel(""); setPastRole(""); setSource(""); setPiva(""); setMans(""); };
+  }, [items, curTab, q, contract, project, emp, lang, source, piva, mans, skill, minLevel, pastRole]);
+  const resetFilters = () => { setContract(""); setProject(""); setEmp(""); setLang(""); setSkill(""); setMinLevel(""); setPastRole(""); setSource(""); setPiva(""); setMans(""); };
 
   const syncProblems = items.filter((p) => ["error", "partial", "deleted", "missing", "drift"].includes(p.sync?.status));
 
@@ -271,7 +268,6 @@ export default function HrPeoplePage() {
                   <FilterSelect label="Mansione" value={mans} onChange={setMans} options={mansList} />
                   <FilterSelect label="Progetto / creator" value={project} onChange={setProject} options={projects} />
                   <FilterSelect label="Stato del contratto" value={contract} onChange={setContract} options={contracts} />
-                  <FilterSelect label="Reparto" value={dept} onChange={setDept} options={depts} />
                   <FilterSelect label="Tipo di rapporto" value={emp} onChange={setEmp} options={emps} />
                   <FilterSelect label="Lingue" value={lang} onChange={setLang} options={langs} />
                   <FilterSelect label="Come ci ha conosciuto" value={source} onChange={setSource} options={sources} />

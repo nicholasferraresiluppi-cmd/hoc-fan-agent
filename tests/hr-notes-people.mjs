@@ -31,7 +31,7 @@ t("taskToPerson legge le note solo se il task porta la descrizione", () => {
 t("il webhook della descrizione porta anche le note", () => {
   const ts = incomingTimestamps([{ field: "content", date: "1000" }], [], 1);
   assert.equal(ts.notes, 1000);
-  assert.equal(ts.currentJob, 1000);
+  assert.equal(ts.currentJob, undefined); // «Mansione attuale» ritirata il 18/10
 });
 
 // ── Note verso ClickUp ───────────────────────────────────────────────────────
@@ -112,4 +112,16 @@ console.log(`note + People Partner + documenti: ${n} prove OK`);
   if (withoutContractLink("niente da togliere") !== null) throw new Error("withoutContractLink null");
   if (hocBlockLines({ id: "p_1", fields: {} }, new Map()).some((l) => l.startsWith("Prepara il contratto"))) throw new Error("riga ancora scritta");
   console.log("riga «Prepara il contratto»: ok");
+}
+
+// 18/10/2026: campi del vecchio CRM ritirati — non si sincronizzano e non si modificano più
+{
+  const F = await import("../src/lib/hr-fields.js");
+  const OLD = ["role", "additionalRole", "currentJob", "department", "project", "skills", "timeSlots"];
+  for (const k of OLD) if (!F.FIELD_BY_KEY[k].retired || F.FIELD_BY_KEY[k].cu || F.EDITABLE_KEYS.includes(k)) throw new Error("non ritirato: " + k);
+  const { hocBlockLines } = await import("../src/lib/hr-clickup-map.js");
+  if (hocBlockLines({ id: "p_1", fields: { currentJob: "x" } }, new Map()).some((l) => l.startsWith("Mansione attuale"))) throw new Error("riga Mansione attuale ancora scritta");
+  const plan = personToClickup({ id: "p_1", fields: { firstName: "A", role: ["HR"], timeSlots: ["7:00 - 12:00"], skills: ["AI"] } }, [{ id: "r", name: "Role", type: "labels" }, { id: "t", name: "Time Slots", type: "labels" }], { keys: null, currentDescription: "", currentTask: null });
+  if (JSON.stringify(plan).includes('"r"') || JSON.stringify(plan).includes('"t"')) throw new Error("campo ritirato scritto su ClickUp");
+  console.log("campi vecchi ritirati: ok");
 }

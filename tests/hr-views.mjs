@@ -54,7 +54,7 @@ t("viste principali: colonna Partita IVA", () => {
 });
 
 t("vista già a posto → niente da scrivere", () => {
-  const p = planView({ name: "Persone", grouping: { field: "status" }, columns: { fields: [{ field: "cf_iv", hidden: false }] } }, F);
+  const p = planView({ name: "Elenco", grouping: { field: "status" }, columns: { fields: [{ field: "cf_iv", hidden: false }] } }, F);
   assert.equal(p.patch, null);
 });
 
@@ -77,3 +77,15 @@ t("ordine: principali, creator A-Z, moduli in fondo", () => {
 });
 
 console.log(`viste CRM: ${n} prove OK`);
+
+// 18/10/2026: nella vista «Persone» tutti i campi del CRM come colonne (lingue, competenze…)
+{
+  const meta2 = [...meta, { id: "sl", name: "Spoken Languages", type: "labels" }, { id: "cl", name: "Competenze e livello", type: "text" }];
+  const F2 = pickFields(meta2);
+  const p = planView({ name: "Persone", columns: { fields: [{ field: "cf_sl", hidden: true }] } }, F2);
+  const cols = p.patch.columns.fields;
+  if (!cols.some((c) => c.field === "cf_sl" && !c.hidden) || !cols.some((c) => c.field === "cf_cl" && !c.hidden)) throw new Error("colonne Persone");
+  const again = planView({ ...p.patch, name: "Persone" }, F2);
+  if (again.patch) throw new Error("Persone: seconda passata deve essere vuota");
+  console.log("vista Persone con tutti i campi: ok");
+}

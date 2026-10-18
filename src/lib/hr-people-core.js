@@ -10,7 +10,7 @@
  * non per scheda — due persone che toccano due campi diversi non si
  * cancellano a vicenda.
  */
-import { normalizeSkillMap, normalizeLearnList, normalizePastRoles, clickupSkillLabels, skillName, pastRoleText } from "./hr-skills.js";
+import { normalizeSkillMap, normalizeLearnList, normalizePastRoles, skillName, pastRoleText } from "./hr-skills.js";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { FIELDS, FIELD_BY_KEY, EDITABLE_KEYS, validateCodiceFiscale, findChoice, SOURCE_REFERRAL, isLangNo, canonicalSource } from "./hr-fields.js";
 
@@ -247,8 +247,6 @@ export function normalizePersonInput(input = {}, allowed = EDITABLE_KEYS) {
       }
       case "skillmap": {
         values[key] = normalizeSkillMap(raw);
-        // il campo "Skills" di ClickUp segue: solo le voci che hanno un'etichetta equivalente
-        if (!("skills" in input)) values.skills = clickupSkillLabels(values[key]);
         break;
       }
       case "learn": {

@@ -53,7 +53,6 @@ import {
 import { taskToPerson, personToClickup, createTaskPayload, incomingTimestamps, expectedFieldNames, fieldsByName, msToIsoDate, statusForCollaboration, clickupDrift } from "./hr-clickup-map.js";
 import { notifyWhatsApp } from "./whatsapp-notify.js";
 import { mirrorIssueText, mirrorText, mirrorPrint } from "./hr-mirror.js";
-import { clickupSkillLabels } from "./hr-skills.js";
 import {
   hrSyncConfig, getListFields, getListInfo, getListMembers, listAllTasks, getTask, createTask, updateTask, setField, removeField,
   resolveTeamId, createWebhook, deleteWebhook, isTaskGone, ClickupError, HR_WEBHOOK_EVENTS, listWebhooks, getView, updateView,
@@ -600,12 +599,8 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
   const { apply, keepApp } = resolveFieldConflicts(current, fresh, atIn);
 
   const { codiceFiscale: cfApply, ...applyRest } = apply;
-  // competenze cambiate da ClickUp: le etichette "Skills" seguono, come quando si salva in app
+  // 18/10/2026: il campo «Skills» di ClickUp è ritirato, le etichette non si derivano più dalle competenze
   const derivedPush = [];
-  if ("skillLevels" in applyRest && !("skills" in fresh)) {
-    const labels = clickupSkillLabels(applyRest.skillLevels);
-    if (!valuesEqual(current.fields.skills, labels)) { applyRest.skills = labels; derivedPush.push("skills"); }
-  }
   // fase cambiata da ClickUp (tendina o stato del task): l'altro dei due si allinea
   if ("collaborationStatus" in applyRest && await phaseNeedsAlign(applyRest.collaborationStatus, { hasDropdown, dropdown: m.fields.collaborationStatus, statusPhase: m.statusPhase })) {
     derivedPush.push("collaborationStatus");
