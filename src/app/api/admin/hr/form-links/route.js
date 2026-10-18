@@ -1,5 +1,5 @@
 /**
- * POST /api/admin/hr/form-links — crea il link di compilazione (Centro HR, SEED).
+ * POST /api/admin/hr/form-links — crea il link di compilazione (Centro HR, people.manage).
  * Body: { personId? , label? } — senza personId il modulo crea una persona nuova.
  * Restituisce il PERCORSO da copiare: nessuna email parte da qui (Resend non
  * è verificato e la scelta del canale resta a chi manda il link).
@@ -15,7 +15,7 @@ import { createFormLink } from "@/lib/hr-people";
 export const runtime = "nodejs";
 
 export async function POST(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   let body;
   try { body = await request.json(); } catch { body = {}; }

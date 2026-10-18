@@ -50,7 +50,7 @@ export async function GET() {
       security,
       workspace,
       // ruolo ristretto (lib/restricted-roles): app ridotta alle sue pagine
-      restricted: restrictionFor({ admin, roles }),
+      restricted: restrictionFor({ admin, roles, capabilities }),
       view_as: va ? { label: va.label, roles: va.roles, exp: va.exp, employee: va.employee || null } : null,
       email: user?.emailAddresses?.[0]?.emailAddress,
       name: `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || null,

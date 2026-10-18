@@ -585,14 +585,14 @@ function AddMemberModal({ assignable, creatorList = [], onClose, onDone }) {
           })}
         </div>
 
-        {!picked.every((r) => r === "operator" || r === "social" || r === "smm") && (
+        {!picked.every((r) => r === "operator" || r === "social" || r === "smm" || r === "people") && (
           <>
             <label style={{ display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Vista</label>
             <div style={{ marginBottom: 6 }}><WorkspacePicker value={ws} fallback={defaultWorkspace({ admin: picked.includes("admin"), roles: picked })} onChange={setWs} /></div>
             <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 16 }}>Il menu e la pagina iniziale che vedrà. I permessi restano quelli del ruolo.</div>
           </>
         )}
-        {creatorList.length > 0 && !picked.every((r) => r === "operator" || r === "social" || r === "smm") && (
+        {creatorList.length > 0 && !picked.every((r) => r === "operator" || r === "social" || r === "smm" || r === "people") && (
           <>
             <label style={{ display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>
               Creator visibili{needsCreators && <span style={{ color: CP.textMuted }}> · obbligatorio per questo ruolo</span>}

@@ -41,7 +41,7 @@ export const WORKSPACES = {
         { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
       ] },
       { title: "Persone e decisioni", items: [
-        { href: "/admin/hr", label: "Persone HR" },
+        { href: "/admin/hr", label: "Persone" },
         { href: "/contabilita", label: "Contabilità" },
         { href: "/admin/sede", label: "La Sede" },
         { href: "/admin/qualita", label: "Controllo qualità" },
@@ -98,7 +98,7 @@ export const WORKSPACES = {
     home: "/admin/hr",
     sections: [
       { title: "Persone", items: [
-        { href: "/admin/hr", label: "Persone HR" },
+        { href: "/admin/hr", label: "Persone" },
         { href: "/admin/hr/sync", label: "Sincronizzazione ClickUp" },
         { href: "/admin/candidate-assessments", label: "Assessment candidati" },
       ] },

@@ -190,7 +190,7 @@ const NAV_GROUPS_RAW = [
     defaultOpen: false,
     items: [
       { href: "/cm-cockpit",                     label: "Cockpit CM",   icon: Gauge },
-      { href: "/admin/hr",                       label: "Persone HR",   icon: BookUser },
+      { href: "/admin/hr",                       label: "Persone",      icon: BookUser },
       { href: "/contabilita",                    label: "Contabilità",  icon: Landmark },
       { href: "/admin/hr/contratti",             label: "Contratti",    icon: FileSignature },
       { href: "/admin/hr/sync",                  label: "Sincronizzazione ClickUp", icon: RefreshCw },

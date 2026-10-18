@@ -1,5 +1,5 @@
 /**
- * /api/admin/hr/sync — stato e comandi della sincronizzazione con ClickUp (SEED).
+ * /api/admin/hr/sync — stato e comandi della sincronizzazione con ClickUp (people.manage).
  *
  * GET  → configurazione (lista impostata? token? chiave CF?), webhook registrato,
  *        ultimo import, conflitti recenti, campi attesi vs presenti sulla lista.
@@ -23,18 +23,22 @@ function webhookEndpoint(request) {
 }
 
 export async function GET(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const [status, uploads] = await Promise.all([getSyncStatus(), uploadQueueStatus().catch(() => null)]);
   return Response.json({ ...status, uploads, webhookEndpoint: webhookEndpoint(request) });
 }
 
 export async function POST(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   let body;
   try { body = await request.json(); } catch { body = {}; }
   try {
+    // vista e webhook toccano la configurazione di ClickUp: restano agli admin (18/10/2026)
+    if ((body?.action === "view_columns" || body?.action === "register_webhook") && !(await authorize(CAPABILITIES.SEED)).ok) {
+      return Response.json({ ok: false, error: "Serve un admin." }, { status: 403 });
+    }
     if (body?.action === "import") {
       const r = await importFromClickup({ mode: "import", by: az.userId });
       return Response.json(r, { status: r.ok || r.skipped ? 200 : r.busy ? 409 : 502 });

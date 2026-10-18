@@ -9,7 +9,7 @@ import { revealCf } from "@/lib/hr-people";
 export const runtime = "nodejs";
 
 export async function POST(request, props) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const { id } = await props.params;
   const res = await revealCf(id, az.userId);

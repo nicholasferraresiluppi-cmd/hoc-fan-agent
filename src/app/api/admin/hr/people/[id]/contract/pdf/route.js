@@ -1,5 +1,5 @@
 /**
- * /api/admin/hr/people/[id]/contract/pdf — anteprima del contratto (SEED, 10/10/2026).
+ * /api/admin/hr/people/[id]/contract/pdf — anteprima del contratto (people.manage, 10/10/2026).
  * È lo stesso PDF che parte all'invio; i dati mancanti compaiono come [segnaposto].
  */
 import { authorize, CAPABILITIES } from "@/lib/rbac";
@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(request, props) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const { id } = await props.params;
   const built = await buildContractPdf(id);

@@ -20,7 +20,13 @@ import { FIELDS, FIELD_BY_KEY, isEmptyValue, maskCf, findChoice, choiceLabel, ph
 import { mirrorText, parseMirror, mirrorPrint } from "./hr-mirror.js";
 
 export const HOC_BLOCK_START = "— Dati HOC Pro —";
-const HOC_BLOCK_NOTE = "(blocco scritto da HOC Pro: qui si leggono solo Mansione attuale e Partita IVA; il resto si modifica in app)";
+// 18/10/2026: le note scritte SOPRA il blocco arrivano in app (campo «Note», a due vie); il blocco lo riscrive HOC Pro
+const HOC_BLOCK_NOTE = "(sezione aggiornata da HOC Pro: queste righe si correggono in app. Le note scritte SOPRA «— Dati HOC Pro —» arrivano anche in HOC Pro.)";
+/** Note = descrizione senza il blocco, a capo normalizzati. "" → null. */
+export function notesFromDescription(desc) {
+  const t = stripHocBlock(String(desc || "").replace(/\r\n?/g, "\n")).trim();
+  return t || null;
+}
 
 const s = (v) => (v == null ? "" : String(v)).trim();
 const lc = (v) => s(v).toLowerCase();
@@ -251,7 +257,10 @@ export function taskToPerson(task, { comuni = null } = {}) {
     fields.firstName = taskName || null;
   }
   // Campi nuovi dal blocco in descrizione (solo se la lista non ha il campo omonimo)
-  const block = parseHocBlock(task?.description ?? task?.text_content);
+  const desc = task?.description ?? task?.text_content;
+  const block = parseHocBlock(desc);
+  // note: solo se il task porta la descrizione (assente ≠ vuota: non si cancellano le note per un task letto a metà)
+  if (task && ("description" in task || "text_content" in task)) fields.notes = notesFromDescription(desc);
   if (block) {
     if (!byName.has(lc("Mansione attuale")) && "currentJob" in block) fields.currentJob = block.currentJob;
     if (!byName.has(lc("Partita IVA")) && "partitaIva" in block) fields.partitaIva = block.partitaIva;
@@ -432,10 +441,15 @@ export function personToClickup(person, fieldsMeta, { keys, cfPlain, statuses, c
     const print = mirrorPrint(text);
     fieldOps.push(text ? { key: f.key, fieldId: meta.id, body: { value: text }, effective, print } : { key: f.key, fieldId: meta.id, remove: true, effective, print });
   }
-  const description = withHocBlock(currentDescription || "", hocBlockLines(person, byName, { cfPlain }));
+  // note (18/10/2026): si scrivono alla creazione o quando sono tra i campi da spingere; in ogni
+  // altro push si tiene il testo che c'è su ClickUp (una modifica appena fatta lì non va schiacciata)
+  const writeNotes = Boolean(want && want.has("notes")) || (!currentTask && !stripHocBlock(currentDescription || ""));
+  const notesText = writeNotes ? s(person.fields?.notes) : stripHocBlock(currentDescription || "");
+  const description = withHocBlock(notesText, hocBlockLines(person, byName, { cfPlain }));
   const status = statusForCollaboration(statuses, person.fields?.collaborationStatus);
   // campi nuovi rappresentati nel blocco in descrizione (letti indietro da parseHocBlock)
   const blockKeys = ["currentJob", "partitaIva"].filter((k) => !byName.has(lc(FIELD_BY_KEY[k].cu)));
+  if (writeNotes) blockKeys.push("notes");
   return { name: taskNameFor(person), description, status, fieldOps, skipped, blockKeys };
 }
 
@@ -481,7 +495,7 @@ export function incomingTimestamps(historyItems = [], fieldsMeta = [], fallback 
     let key = historyItemKey(it, fieldsMeta);
     if (!key) continue;
     const at = Number(it.date) || fallback;
-    const keys = key === "_description" ? ["currentJob", "partitaIva"] : [key];
+    const keys = key === "_description" ? ["currentJob", "partitaIva", "notes"] : [key];
     for (const k of keys) out[k] = Math.max(Number(out[k] || 0), at);
   }
   return out;
