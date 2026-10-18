@@ -11,6 +11,7 @@
  *        verso localhost: ClickUp deve poterlo raggiungere.
  */
 import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { realignCrmViews, lastViewsReport, orderCrmViews } from "@/lib/hr-views";
 import { getSyncStatus, importFromClickup, registerWebhook, showViewColumns, getPendingAssignments, setPendingAssignments } from "@/lib/hr-people";
 import { internalOrigin } from "@/lib/cron-chain";
 import { uploadQueueStatus } from "@/lib/hr-uploads";
@@ -26,7 +27,7 @@ export async function GET(request) {
   const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const [status, uploads] = await Promise.all([getSyncStatus(), uploadQueueStatus().catch(() => null)]);
-  return Response.json({ ...status, uploads, webhookEndpoint: webhookEndpoint(request) });
+  return Response.json({ ...status, uploads, webhookEndpoint: webhookEndpoint(request), views: await lastViewsReport() });
 }
 
 export async function POST(request) {
@@ -38,6 +39,18 @@ export async function POST(request) {
     // vista e webhook toccano la configurazione di ClickUp: restano agli admin (18/10/2026)
     if ((body?.action === "view_columns" || body?.action === "register_webhook") && !(await authorize(CAPABILITIES.SEED)).ok) {
       return Response.json({ ok: false, error: "Serve un admin." }, { status: 403 });
+    }
+    // viste del CRM sui campi nuovi (18/10/2026): anteprima, poi apply (scrive su ClickUp: solo admin)
+    if (body?.action === "views_realign") {
+      const apply = body.apply === true;
+      if (apply && !(await authorize(CAPABILITIES.SEED)).ok) return Response.json({ ok: false, error: "Serve un admin." }, { status: 403 });
+      const r = await realignCrmViews({ apply, by: az.userId });
+      return Response.json(r, { status: r.ok ? 200 : 400 });
+    }
+    if (body?.action === "views_order") {
+      if (!(await authorize(CAPABILITIES.SEED)).ok) return Response.json({ ok: false, error: "Serve un admin." }, { status: 403 });
+      const r = await orderCrmViews({ by: az.userId });
+      return Response.json(r, { status: r.ok ? 200 : 400 });
     }
     if (body?.action === "import") {
       const r = await importFromClickup({ mode: "import", by: az.userId });

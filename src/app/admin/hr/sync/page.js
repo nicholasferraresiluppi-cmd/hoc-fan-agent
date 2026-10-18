@@ -126,6 +126,8 @@ export default function HrSyncPage() {
           )}
           {c.isRealList && <Notice danger>La lista configurata è il <b>CRM vecchio</b> (901212383318), non «✅ New CRM»: dal 03/10/2026 il CRM attivo è New CRM e il vecchio resta solo come archivio. Ogni salvataggio e ogni import toccherebbero i task del vecchio.</Notice>}
 
+          {c.enabled && <ViewsCard last={data.views} onDone={mutate} />}
+
           <section style={{ ...card, padding: "6px 16px 8px", marginBottom: 14 }}>
             <Row ok={Boolean(c.listId)} label="Lista ClickUp">
               {c.listId ? <>id <code>{c.listId}</code>{data.list ? <> · «{data.list.name}»</> : null}{data.listError ? <span style={{ color: CP.accentRed }}> · non leggibile: {data.listError}</span> : null}</> : "non impostata (HR_CLICKUP_LIST_ID)"}
@@ -189,5 +191,70 @@ export default function HrSyncPage() {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Viste del CRM su ClickUp (18/10/2026): ereditate dal CRM vecchio, leggevano Role/Project (vuoti
+ * nel New CRM). Anteprima → applica → ordina. Lo scrivere su ClickUp è solo degli admin (l'API lo dice).
+ */
+function ViewsCard({ last, onDone }) {
+  const [busy, setBusy] = useState(null);
+  const [res, setRes] = useState(null);
+  const [err, setErr] = useState(null);
+  const report = res || last;
+  const go = async (action, apply = false) => {
+    if (apply && !confirm("Applico le modifiche alle viste del New CRM su ClickUp?")) return;
+    setBusy(action + (apply ? ":apply" : "")); setErr(null);
+    try { const j = await postJson("/api/admin/hr/sync", { action, apply }); setRes(action === "views_order" ? { ...(report || {}), orderResult: j } : j); await onDone?.(); }
+    catch (e) { setErr(e.message); } finally { setBusy(null); }
+  };
+  const rows = (report?.views || []).filter((v) => v.changes?.length || v.warnings?.length || v.error);
+  return (
+    <section style={{ ...card, padding: "14px 16px", marginBottom: 14 }} aria-labelledby="hr-views-h">
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div style={{ minWidth: 0, flex: "1 1 320px" }}>
+          <h2 id="hr-views-h" style={{ margin: 0, fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Viste del CRM su ClickUp</h2>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: CP.textMuted }}>Le viste copiate dal CRM vecchio raggruppano per «Role» e filtrano su «Project», vuoti nel New CRM: qui si ripuntano su Mansione e Progetto, si aggiunge la Partita IVA e si mettono in ordine.</p>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button type="button" onClick={() => go("views_realign")} disabled={Boolean(busy)} style={{ ...btnGhost, opacity: busy ? 0.5 : 1 }}>{busy === "views_realign" ? "Leggo…" : "Anteprima"}</button>
+          <button type="button" onClick={() => go("views_realign", true)} disabled={Boolean(busy) || !report} style={{ ...btnPrimary, opacity: busy || !report ? 0.5 : 1 }}>{busy === "views_realign:apply" ? "Applico…" : "Applica"}</button>
+          <button type="button" onClick={() => go("views_order")} disabled={Boolean(busy)} style={{ ...btnGhost, opacity: busy ? 0.5 : 1 }}>{busy === "views_order" ? "Ordino…" : "Metti in ordine"}</button>
+        </div>
+      </div>
+      {err && <div style={{ marginTop: 10 }}><Notice danger>{err}</Notice></div>}
+      {report && (
+        <div style={{ marginTop: 12, fontSize: 13.5, color: CP.textSecondary }}>
+          <div style={{ marginBottom: 8, color: CP.textMuted }}>
+            {report.apply ? "Applicato" : "Anteprima"} del {fmtDateTime(report.at)} · {(report.views || []).length} viste lette{report.missingFields?.length ? ` · campi mancanti sulla lista: ${report.missingFields.join(", ")}` : ""}
+          </div>
+          {rows.length === 0 && <div>Niente da cambiare.</div>}
+          {rows.length > 0 && (
+            <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.55 }}>
+              {rows.map((v) => (
+                <li key={v.id || v.name}>
+                  <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{v.name}</b>{v.changes?.length ? `: ${v.changes.join(", ")}` : ""}
+                  {report.apply && v.changes?.length ? (v.done ? <span style={{ color: CP.accentGreen }}> · fatto</span> : <span style={{ color: CP.accentRed }}> · non riuscito{v.error ? `: ${v.error}` : ""}</span>) : null}
+                  {!report.apply && v.error && <span style={{ color: CP.accentRed }}> · {v.error}</span>}
+                  {v.warnings?.map((w) => <div key={w} style={{ color: CP.textMuted, fontSize: 12.5 }}>{w}</div>)}
+                </li>
+              ))}
+            </ul>
+          )}
+          {(report.created || []).length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              Viste nuove per le creator senza vista: {report.created.map((c) => `${c.name}${report.apply ? (c.done ? " (creata)" : ` (non creata${c.error ? `: ${c.error}` : ""})`) : ""}`).join(", ")}
+            </div>
+          )}
+          {report.orderResult && (
+            <div style={{ marginTop: 10 }}>
+              {report.orderResult.took ? "Ordine applicato." : "ClickUp non ha preso l'ordine via API: va sistemato trascinando le viste."}
+              {report.orderResult.errors?.length ? ` Errori: ${report.orderResult.errors.join("; ")}` : ""}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
