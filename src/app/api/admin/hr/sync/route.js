@@ -12,6 +12,7 @@
  */
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { realignCrmViews, lastViewsReport, orderCrmViews } from "@/lib/hr-views";
+import { syncContractMilestones, milestoneStatus } from "@/lib/hr-contract-milestone";
 import { getSyncStatus, importFromClickup, registerWebhook, showViewColumns, getPendingAssignments, setPendingAssignments } from "@/lib/hr-people";
 import { internalOrigin } from "@/lib/cron-chain";
 import { uploadQueueStatus } from "@/lib/hr-uploads";
@@ -27,7 +28,7 @@ export async function GET(request) {
   const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const [status, uploads] = await Promise.all([getSyncStatus(), uploadQueueStatus().catch(() => null)]);
-  return Response.json({ ...status, uploads, webhookEndpoint: webhookEndpoint(request), views: await lastViewsReport() });
+  return Response.json({ ...status, uploads, webhookEndpoint: webhookEndpoint(request), views: await lastViewsReport(), milestones: await milestoneStatus().catch(() => null) });
 }
 
 export async function POST(request) {
@@ -46,6 +47,10 @@ export async function POST(request) {
       if (apply && !(await authorize(CAPABILITIES.SEED)).ok) return Response.json({ ok: false, error: "Serve un admin." }, { status: 403 });
       const r = await realignCrmViews({ apply, by: az.userId });
       return Response.json(r, { status: r.ok ? 200 : 400 });
+    }
+    if (body?.action === "contract_milestones") {
+      const r = await syncContractMilestones({ by: az.userId });
+      return Response.json(r, { status: r.ok ? 200 : 409 });
     }
     if (body?.action === "views_order") {
       if (!(await authorize(CAPABILITIES.SEED)).ok) return Response.json({ ok: false, error: "Serve un admin." }, { status: 403 });

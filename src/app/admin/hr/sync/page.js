@@ -126,6 +126,7 @@ export default function HrSyncPage() {
           )}
           {c.isRealList && <Notice danger>La lista configurata è il <b>CRM vecchio</b> (901212383318), non «✅ New CRM»: dal 03/10/2026 il CRM attivo è New CRM e il vecchio resta solo come archivio. Ogni salvataggio e ogni import toccherebbero i task del vecchio.</Notice>}
 
+          {c.enabled && <MilestonesCard status={data.milestones} onDone={mutate} />}
           {c.enabled && <ViewsCard last={data.views} onDone={mutate} />}
 
           <section style={{ ...card, padding: "6px 16px 8px", marginBottom: 14 }}>
@@ -255,6 +256,35 @@ function ViewsCard({ last, onDone }) {
           )}
         </div>
       )}
+    </section>
+  );
+}
+
+/** «Contratti da recuperare» nello spazio Area Partner (18/10/2026): un sottotask per chi non ha il contratto firmato. */
+function MilestonesCard({ status, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState(null);
+  const [err, setErr] = useState(null);
+  const go = async () => {
+    setBusy(true); setErr(null);
+    try { setRes(await postJson("/api/admin/hr/sync", { action: "contract_milestones" })); await onDone?.(); }
+    catch (e) { setErr(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <section style={{ ...card, padding: "14px 16px", marginBottom: 14 }} aria-labelledby="hr-ms-h">
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div style={{ minWidth: 0, flex: "1 1 320px" }}>
+          <h2 id="hr-ms-h" style={{ margin: 0, fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Contratti da recuperare</h2>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: CP.textMuted }}>
+            Nella lista «Milestone» dell'Area Partner: un sottotask per ogni persona del CRM senza contratto «Firmato». Va in done da solo quando nella scheda lo stato diventa «Firmato» (o la persona esce). Si aggiorna ogni notte e subito dopo ogni modifica alla scheda.
+            {status?.parentId ? <> · <a href={`https://app.clickup.com/t/${status.parentId}`} target="_blank" rel="noopener noreferrer" style={{ color: CP.accentSoftText }}>apri su ClickUp</a></> : null}
+          </p>
+          {status && (status.open || status.done) ? <p style={{ margin: "6px 0 0", fontSize: 13.5, color: CP.textSecondary }}>{status.open} da recuperare · {status.done} chiusi</p> : null}
+        </div>
+        <button type="button" onClick={go} disabled={busy} style={{ ...btnGhost, opacity: busy ? 0.5 : 1 }}>{busy ? "Aggiorno…" : "Aggiorna adesso"}</button>
+      </div>
+      {err && <div style={{ marginTop: 10 }}><Notice danger>{err}</Notice></div>}
+      {res && <div style={{ marginTop: 10, fontSize: 13.5, color: CP.textSecondary }}>{res.created} creati, {res.closed} chiusi, {res.open} aperti{res.pending ? `, ${res.pending} al prossimo giro (rilancia)` : ""}{res.errors?.length ? ` · errori: ${res.errors.slice(0, 3).join("; ")}` : ""}</div>}
     </section>
   );
 }
