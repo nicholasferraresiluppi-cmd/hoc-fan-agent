@@ -28,7 +28,7 @@ async function ensureParent(rec) {
   const t = await createTask(MILESTONE_LIST_ID(), {
     name: PARENT_NAME,
     status: "in lavorazione",
-    description: "Creato e aggiornato da HOC Pro. Un sottotask per ogni persona del CRM senza contratto firmato. Si chiude da solo quando nella scheda «Stato del contratto» diventa «Firmato» (o la persona esce).",
+    description: "Creato e aggiornato da HOC Pro. Un sottotask per ogni persona del CRM senza contratto firmato. Si chiude da solo quando nella scheda del CRM «HV Contract Status» diventa «Signed» (o la persona va in «Uscita»).",
   });
   rec.parentId = String(t.id);
   return rec.parentId;

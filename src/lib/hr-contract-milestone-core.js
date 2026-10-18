@@ -46,10 +46,10 @@ export function subtaskDescription(p) {
   const f = p.fields || {};
   return [
     `Contratto da recuperare per ${fullName(f) || "questa persona"}.`,
-    `Stato del contratto nel CRM: ${f.hvContractStatus || "vuoto"}.`,
+    `HV Contract Status nel CRM: ${f.hvContractStatus || "vuoto"}.`,
     p.clickupUrl ? `Scheda nel CRM: ${p.clickupUrl}` : null,
     "",
-    "Quando il contratto è firmato: carica il PDF sulla scheda del CRM e porta «Stato del contratto» su «Firmato». Questo sottotask va in done da solo.",
+    "Quando il contratto è firmato: carica il PDF sulla scheda del CRM e porta «HV Contract Status» su «Signed». Questo sottotask va in done da solo.",
   ].filter((x) => x !== null).join("\n");
 }
 
