@@ -102,3 +102,14 @@ t("all'interfaccia non esce mai l'URL dell'allegato", () => {
 });
 
 console.log(`note + People Partner + documenti: ${n} prove OK`);
+
+// 18/10/2026: la riga «Prepara il contratto» non si scrive più e si toglie dalle descrizioni esistenti
+{
+  const { withoutContractLink, hocBlockLines } = await import("../src/lib/hr-clickup-map.js");
+  const desc = "Nota.\n\n— Dati HOC Pro —\nID HOC Pro: p_1\nPrepara il contratto: https://houseofcreators.app/admin/hr/p_1/contratto\nDove vive (testo): Via Roma 1\n(nota)";
+  const out = withoutContractLink(desc);
+  if (!out || out.includes("Prepara il contratto") || !out.includes("Dove vive (testo): Via Roma 1") || !out.startsWith("Nota.")) throw new Error("withoutContractLink");
+  if (withoutContractLink("niente da togliere") !== null) throw new Error("withoutContractLink null");
+  if (hocBlockLines({ id: "p_1", fields: {} }, new Map()).some((l) => l.startsWith("Prepara il contratto"))) throw new Error("riga ancora scritta");
+  console.log("riga «Prepara il contratto»: ok");
+}

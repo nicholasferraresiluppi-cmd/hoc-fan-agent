@@ -117,6 +117,13 @@ export function decodeCustomField(cf, appType) {
 }
 
 // ── Blocco "— Dati HOC Pro —" in fondo alla descrizione ──────────────────────
+/** 18/10/2026: la descrizione senza la vecchia riga «Prepara il contratto: …» (null se non c'era). */
+export function withoutContractLink(desc) {
+  const d = String(desc ?? "");
+  const next = d.replace(/^[ \t]*Prepara il contratto:[^\n]*\n?/m, "");
+  return next === d ? null : next;
+}
+
 /** Toglie il blocco (dal marcatore alla fine) e ritorna la descrizione pulita. */
 export function stripHocBlock(desc) {
   const d = String(desc || "");
@@ -165,8 +172,7 @@ const fmtItDate = (ms) => {
 export function hocBlockLines(person, byName, { cfPlain } = {}) {
   const f = person.fields || {};
   const lines = [`ID HOC Pro: ${person.id}`];
-  // 10/10/2026: il "pulsante" su ClickUp per preparare e inviare il contratto (apre il percorso in HOC Pro)
-  lines.push(`Prepara il contratto: https://houseofcreators.app/admin/hr/${person.id}/contratto`);
+  // 18/10/2026: tolta la riga «Prepara il contratto» (link all'invio da HOC Pro): i contratti si fanno a mano
   if (!byName.has(lc("Mansione attuale"))) lines.push(`Mansione attuale: ${oneLine(f.currentJob, 300) || "—"}`);
   if (!byName.has(lc("Partita IVA"))) lines.push(`Partita IVA: ${f.partitaIva === true ? "sì" : f.partitaIva === false ? "no" : "—"}`);
   if (!byName.has(lc("Codice fiscale")) && (cfPlain || person.cfEnc)) lines.push(`Codice fiscale: ${cfPlain ? maskCf(cfPlain) : "presente"} (completo in HOC Pro)`);

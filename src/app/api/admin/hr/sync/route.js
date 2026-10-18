@@ -13,6 +13,7 @@
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { realignCrmViews, lastViewsReport, orderCrmViews } from "@/lib/hr-views";
 import { syncContractMilestones, milestoneStatus } from "@/lib/hr-contract-milestone";
+import { stripContractLinks } from "@/lib/hr-block-cleanup";
 import { getSyncStatus, importFromClickup, registerWebhook, showViewColumns, getPendingAssignments, setPendingAssignments } from "@/lib/hr-people";
 import { internalOrigin } from "@/lib/cron-chain";
 import { uploadQueueStatus } from "@/lib/hr-uploads";
@@ -47,6 +48,10 @@ export async function POST(request) {
       if (apply && !(await authorize(CAPABILITIES.SEED)).ok) return Response.json({ ok: false, error: "Serve un admin." }, { status: 403 });
       const r = await realignCrmViews({ apply, by: az.userId });
       return Response.json(r, { status: r.ok ? 200 : 400 });
+    }
+    if (body?.action === "strip_contract_link") {
+      const r = await stripContractLinks({ budgetMs: 45_000 });
+      return Response.json(r, { status: r.ok ? 200 : 409 });
     }
     if (body?.action === "contract_milestones") {
       const r = await syncContractMilestones({ by: az.userId });
