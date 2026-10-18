@@ -11,7 +11,7 @@
  *        verso localhost: ClickUp deve poterlo raggiungere.
  */
 import { authorize, CAPABILITIES } from "@/lib/rbac";
-import { realignCrmViews, lastViewsReport, orderCrmViews } from "@/lib/hr-views";
+import { realignCrmViews, lastViewsReport } from "@/lib/hr-views";
 import { syncContractMilestones, milestoneStatus } from "@/lib/hr-contract-milestone";
 import { stripContractLinks } from "@/lib/hr-block-cleanup";
 import { getSyncStatus, importFromClickup, registerWebhook, showViewColumns, getPendingAssignments, setPendingAssignments } from "@/lib/hr-people";
@@ -56,11 +56,6 @@ export async function POST(request) {
     if (body?.action === "contract_milestones") {
       const r = await syncContractMilestones({ by: az.userId });
       return Response.json(r, { status: r.ok ? 200 : 409 });
-    }
-    if (body?.action === "views_order") {
-      if (!(await authorize(CAPABILITIES.SEED)).ok) return Response.json({ ok: false, error: "Serve un admin." }, { status: 403 });
-      const r = await orderCrmViews({ by: az.userId });
-      return Response.json(r, { status: r.ok ? 200 : 400 });
     }
     if (body?.action === "import") {
       const r = await importFromClickup({ mode: "import", by: az.userId });

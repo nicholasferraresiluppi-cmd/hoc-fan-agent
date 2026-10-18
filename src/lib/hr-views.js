@@ -53,30 +53,3 @@ export async function realignCrmViews({ apply = false, by = "sistema", budgetMs 
 
 export const lastViewsReport = () => kv.get(LAST).catch(() => null);
 
-/**
- * Ordine delle viste (passo a parte: 2 chiamate per vista). ClickUp non documenta lo spostamento
- * di una vista via API: si prova con `orderindex` nel PUT e si RILEGGE l'elenco per dire se ha preso.
- */
-export async function orderCrmViews({ by = "sistema", budgetMs = 50_000 } = {}) {
-  const cfg = hrSyncConfig();
-  if (!cfg.enabled) return { ok: false, error: "Sincronizzazione ClickUp spenta." };
-  const deadline = Date.now() + budgetMs;
-  const list = await listListViews(cfg.listId);
-  const wanted = desiredOrder(list.map((v) => v.name));
-  const byName = new Map(list.map((v) => [v.name, v]));
-  const errors = [];
-  for (let i = 0; i < wanted.length; i++) {
-    if (Date.now() > deadline) { errors.push("tempo finito: rilancia"); break; }
-    const v = byName.get(wanted[i]);
-    if (!v || Number(v.orderindex) === i) continue;
-    try {
-      const full = await getView(v.id);
-      const { id, date_created, creator, visibility, protected: _p, protected_note, protected_by, date_protected, ...rest } = full;
-      await updateView(v.id, { ...rest, orderindex: i });
-    } catch (e) { errors.push(`${v.name}: ${e?.message || "errore"}`); }
-  }
-  const after = (await listListViews(cfg.listId)).slice().sort((a, b) => Number(a.orderindex) - Number(b.orderindex)).map((v) => v.name);
-  const took = after.join("|") === wanted.join("|");
-  await kv.set("hr:views:order:last", { at: Date.now(), by, wanted, after, took, errors }).catch(() => {});
-  return { ok: true, took, wanted, after, errors };
-}
