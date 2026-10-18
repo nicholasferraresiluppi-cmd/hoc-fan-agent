@@ -362,11 +362,29 @@ function DocumentsCard({ person }) {
     if (!file) return;
     setBusy(true); setMsg(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const r = await fetch(url, { method: "POST", body: fd });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.error || `Errore ${r.status}`);
+      if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) throw new Error("Si caricano solo PDF, JPG o PNG.");
+      let j;
+      if (data?.bigUpload) {
+        // fino a 50 MB: dal browser al Blob privato, poi il server lo porta su ClickUp (come il modulo)
+        if (file.size > 50 * 1024 * 1024) throw new Error("File oltre 50 MB.");
+        const post = async (body) => {
+          const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+          const out = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(out.error || `Errore ${r.status}`);
+          return out;
+        };
+        const slot = await post({ type: "slot", filename: file.name, contentType: file.type, size: file.size });
+        const { upload } = await import("@vercel/blob/client");
+        await upload(slot.pathname, file, { access: "private", handleUploadUrl: url, contentType: file.type, multipart: file.size > 20e6 });
+        j = await post({ type: "finish", pathname: slot.pathname });
+      } else {
+        if (file.size > 4 * 1024 * 1024) throw new Error("File oltre 4 MB: qui il caricamento grande non è attivo, caricalo sul task ClickUp.");
+        const fd = new FormData();
+        fd.append("file", file);
+        const r = await fetch(url, { method: "POST", body: fd });
+        j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || `Errore ${r.status}`);
+      }
       setMsg({ ok: true, text: `Caricato su ClickUp: ${j.name}` });
       await mutate();
     } catch (e) { setMsg({ ok: false, text: e.message }); } finally { setBusy(false); }
@@ -409,7 +427,7 @@ function DocumentsCard({ person }) {
           })}
         </ul>
       )}
-      <p style={{ fontSize: 12, color: CP.textMuted, margin: "10px 0 0" }}>Carichi qui PDF, JPG o PNG fino a 4 MB; i file più grandi caricali sul task ClickUp. Chi apre un documento resta scritto nello storico.</p>
+      <p style={{ fontSize: 12, color: CP.textMuted, margin: "10px 0 0" }}>Carichi qui PDF, JPG o PNG fino a {data?.bigUpload === false ? "4" : "50"} MB. Chi apre un documento resta scritto nello storico.</p>
     </section>
   );
 }
