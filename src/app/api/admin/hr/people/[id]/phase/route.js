@@ -11,6 +11,8 @@
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { markPersonExited, reactivatePerson, publicPerson } from "@/lib/hr-people";
 import { accessForPerson } from "@/lib/hr-access";
+import { after } from "next/server";
+import { syncContractMilestoneFor } from "@/lib/hr-contract-milestone";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -26,6 +28,7 @@ export async function POST(request, props) {
   else if (body?.action === "reactivate") res = await reactivatePerson(id, { actor: az.userId });
   else return Response.json({ error: "Azione non prevista." }, { status: 400 });
   if (!res.ok) return Response.json({ error: res.errors.join(" ") }, { status: res.status });
+  after(() => syncContractMilestoneFor(id).catch(() => {})); // uscita/rientro → «Contratti da recuperare»
   // all'uscita: chi ha ancora un account HOC Pro o un team (la checklist del dopo-uscita). Mai bloccante.
   const access = body.action === "exit" ? await accessForPerson(res.person?.fields).catch(() => null) : null;
   return Response.json({ ok: true, person: publicPerson(res.person, { withCfMask: true }), changed: res.changed, sync: res.sync, access });

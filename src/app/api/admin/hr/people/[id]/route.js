@@ -12,7 +12,8 @@ import { getPerson, getLog, publicPerson, savePerson, listPeople, computeCleanup
 import { hrCryptoConfigured } from "@/lib/hr-crypto";
 import { pendingUploadsFor } from "@/lib/hr-uploads";
 import { after } from "next/server";
-import { getStore, getLinks, getAttached, buildView, reconcilePerson } from "@/lib/hr-contracts";
+import { getStore, getLinks, getAttached, buildView } from "@/lib/hr-contracts";
+import { syncContractMilestoneFor } from "@/lib/hr-contract-milestone";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -56,7 +57,7 @@ export async function PATCH(request, props) {
   try { body = await request.json(); } catch { return Response.json({ error: "JSON non valido." }, { status: 400 }); }
   const res = await savePerson({ id, input: body || {}, actor: az.userId, source: "app" });
   if (!res.ok) return Response.json({ error: res.errors.join(" ") }, { status: res.status });
-  // mansione cambiata → lo «Stato del contratto» si riallinea subito (anche su ClickUp), dopo la risposta
-  if (res.changed?.includes("mansioni")) after(() => reconcilePerson(id).catch(() => {}));
+  // 18/10/2026: stato del contratto, fase o mansione cambiati → «Contratti da recuperare» (Area Partner) subito
+  if (res.changed?.some((k) => ["hvContractStatus", "collaborationStatus", "mansioni"].includes(k))) after(() => syncContractMilestoneFor(id).catch(() => {}));
   return Response.json({ ok: true, person: publicPerson(res.person, { withCfMask: true }), changed: res.changed, cfNote: res.cfNote, sync: res.sync });
 }

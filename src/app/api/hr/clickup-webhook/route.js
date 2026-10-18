@@ -16,6 +16,8 @@
 import { verifyClickupSignature } from "@/lib/hr-people-core";
 import { getWebhookRecord, handleWebhookEvent } from "@/lib/hr-people";
 import { checkRateLimit, tooMany } from "@/lib/rate-limit";
+import { after } from "next/server";
+import { syncContractMilestoneFor } from "@/lib/hr-contract-milestone";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -42,6 +44,8 @@ export async function POST(request) {
   }
   try {
     const out = await handleWebhookEvent(payload);
+    // contratto firmato / persona uscita su ClickUp → il sottotask in «Contratti da recuperare» si aggiorna subito
+    if (out?.personId) after(() => syncContractMilestoneFor(out.personId).catch(() => {}));
     return Response.json({ ok: true, ...out });
   } catch (e) {
     return Response.json({ error: "errore temporaneo" }, { status: 500 });
