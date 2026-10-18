@@ -185,6 +185,12 @@ export async function getView(viewId) {
   return r?.view || r;
 }
 export const updateView = (viewId, view) => cu(`/view/${encodeURIComponent(viewId)}`, { method: "PUT", json: view });
+/** Viste di una lista (18/10/2026, riallineamento delle viste del CRM) e creazione di una vista nuova. */
+export async function listListViews(listId) {
+  const r = await cu(`/list/${encodeURIComponent(listId)}/view`);
+  return r?.views || [];
+}
+export const createListView = (listId, view) => cu(`/list/${encodeURIComponent(listId)}/view`, { method: "POST", json: view });
 
 /** Webhook del workspace, ognuno con `health: { status: "active"|"failing"|"suspended", fail_count }`. */
 export async function listWebhooks(teamId) {
