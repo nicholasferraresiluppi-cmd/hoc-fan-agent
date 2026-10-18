@@ -22,6 +22,19 @@
 export const MAIN_VIEWS = ["Persone", "Collaboratori senza contratto", "Anagrafica Collaboratori", "HV Contract Tracking", "Dashboard - Collaboratori", "Elenco", "Board", "Team"];
 export const TAIL_VIEWS = ["Form CRM", "Form CRM ENG", "HV Contract Tracking Modelle"];
 export const PIVA_VIEWS = ["Persone", "Collaboratori senza contratto", "Anagrafica Collaboratori", "HV Contract Tracking"];
+// 18/10/2026, Nicholas: "quando sono su Persone voglio vedere tutti i campi che si compilano nel CRM
+// (che lingue parlano, che competenze hanno messo)". Nella vista «Persone» tutti i campi del CRM sono
+// colonne visibili, in quest'ordine; i campi del vecchio CRM ritirati il 18/10 non ci sono più.
+export const PERSONE_VIEW = "Persone";
+export const PERSONE_COLUMNS = [
+  "Mansione", "Progetto", "Collaboration Status", "Referent", "HV Contract Status", "Agreement with", "Partita IVA",
+  "Start of Collaboration", "End of Collaboration", "Type of Employment", "Seniority",
+  "Personal Email", "Personal Phone Number", "Company Email", "Company Phone Number",
+  "Spoken Languages", "Competenze e livello", "Altro che sa fare", "Vorrebbe imparare", "Ruoli già ricoperti",
+  "Surname", "Date Of Birth", "Gender", "Nationality", "Luogo di nascita", "Comune di residenza", "CAP", "Location", "Codice fiscale",
+  "Personal Interests", "LinkedIn", "Provenienza", "Segnalato da", "Yellow Warnings", "Red Warnings",
+  "CV", "Contract PDF",
+];
 
 export const norm = (v) => String(v || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const cfKey = (f) => (f ? `cf_${f.id}` : null);
@@ -30,7 +43,10 @@ const optionsOf = (f) => (f?.type_config?.options || []).map((o) => ({ id: Strin
 /** Campi che servono, per nome. */
 export function pickFields(meta = []) {
   const by = (n) => meta.find((m) => norm(m.name) === norm(n)) || null;
-  return { role: by("Role"), mansione: by("Mansione"), project: by("Project"), progetto: by("Progetto"), piva: by("Partita IVA") };
+  return {
+    role: by("Role"), mansione: by("Mansione"), project: by("Project"), progetto: by("Progetto"), piva: by("Partita IVA"),
+    persone: PERSONE_COLUMNS.map(by).filter(Boolean),
+  };
 }
 
 /** «CRM Elisa Vimercati» → id delle opzioni Progetto (Fishball → ITA+ENG). null = non è una vista creator. */
@@ -109,6 +125,10 @@ export function planView(view, F) {
     if (visible(F.role) && F.mansione && showColumn(cols, cfKey(F.mansione), cfKey(F.role))) changes.push("colonna Mansione");
     if (visible(F.project) && F.progetto && showColumn(cols, cfKey(F.progetto), cfKey(F.project))) changes.push("colonna Progetto");
     if (PIVA_VIEWS.includes(name) && F.piva && showColumn(cols, cfKey(F.piva))) changes.push("colonna Partita IVA");
+    if (name === PERSONE_VIEW) {
+      const added = (F.persone || []).filter((f) => showColumn(cols, cfKey(f))).map((f) => f.name);
+      if (added.length) changes.push(`colonne ${added.join(", ")}`);
+    }
   }
   if (!changes.length) return { changes, warnings, patch: null };
   const { id, date_created, creator, visibility, protected: _p, protected_note, protected_by, date_protected, orderindex, ...rest } = next;

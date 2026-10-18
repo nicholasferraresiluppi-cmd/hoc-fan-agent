@@ -173,7 +173,7 @@ export function hocBlockLines(person, byName, { cfPlain } = {}) {
   const f = person.fields || {};
   const lines = [`ID HOC Pro: ${person.id}`];
   // 18/10/2026: tolta la riga «Prepara il contratto» (link all'invio da HOC Pro): i contratti si fanno a mano
-  if (!byName.has(lc("Mansione attuale"))) lines.push(`Mansione attuale: ${oneLine(f.currentJob, 300) || "—"}`);
+  // 18/10/2026: tolta anche la riga «Mansione attuale» (campo del vecchio CRM ritirato: la mansione sta in «Mansione»)
   if (!byName.has(lc("Partita IVA"))) lines.push(`Partita IVA: ${f.partitaIva === true ? "sì" : f.partitaIva === false ? "no" : "—"}`);
   if (!byName.has(lc("Codice fiscale")) && (cfPlain || person.cfEnc)) lines.push(`Codice fiscale: ${cfPlain ? maskCf(cfPlain) : "presente"} (completo in HOC Pro)`);
   if (f.idDocument?.at) lines.push(`Documento d'identità: allegato il ${fmtItDate(f.idDocument.at)} (${s(f.idDocument.title)})`);
@@ -268,7 +268,6 @@ export function taskToPerson(task, { comuni = null } = {}) {
   // note: solo se il task porta la descrizione (assente ≠ vuota: non si cancellano le note per un task letto a metà)
   if (task && ("description" in task || "text_content" in task)) fields.notes = notesFromDescription(desc);
   if (block) {
-    if (!byName.has(lc("Mansione attuale")) && "currentJob" in block) fields.currentJob = block.currentJob;
     if (!byName.has(lc("Partita IVA")) && "partitaIva" in block) fields.partitaIva = block.partitaIva;
   }
   return {
@@ -454,7 +453,7 @@ export function personToClickup(person, fieldsMeta, { keys, cfPlain, statuses, c
   const description = withHocBlock(notesText, hocBlockLines(person, byName, { cfPlain }));
   const status = statusForCollaboration(statuses, person.fields?.collaborationStatus);
   // campi nuovi rappresentati nel blocco in descrizione (letti indietro da parseHocBlock)
-  const blockKeys = ["currentJob", "partitaIva"].filter((k) => !byName.has(lc(FIELD_BY_KEY[k].cu)));
+  const blockKeys = ["partitaIva"].filter((k) => !byName.has(lc(FIELD_BY_KEY[k].cu)));
   if (writeNotes) blockKeys.push("notes");
   return { name: taskNameFor(person), description, status, fieldOps, skipped, blockKeys };
 }
@@ -501,7 +500,7 @@ export function incomingTimestamps(historyItems = [], fieldsMeta = [], fallback 
     let key = historyItemKey(it, fieldsMeta);
     if (!key) continue;
     const at = Number(it.date) || fallback;
-    const keys = key === "_description" ? ["currentJob", "partitaIva", "notes"] : [key];
+    const keys = key === "_description" ? ["partitaIva", "notes"] : [key];
     for (const k of keys) out[k] = Math.max(Number(out[k] || 0), at);
   }
   return out;

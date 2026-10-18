@@ -59,8 +59,8 @@ const toE164 = (v) => {
 const SKILL_KEYS = ["skillLevels", "learnWish", "pastRoles", "otherSkills"];
 const TABS = [
   { key: "panoramica", label: "Panoramica" },
-  { key: "anagrafica", label: "Anagrafica", keys: FIELDS.filter((f) => f.section === "anagrafica").map((f) => f.key) },
-  { key: "lavoro", label: "Lavoro e contratto", keys: FIELDS.filter((f) => (f.section === "rapporto" || f.section === "contratto") && !SKILL_KEYS.includes(f.key) && f.key !== "skills").map((f) => f.key) },
+  { key: "anagrafica", label: "Anagrafica", keys: FIELDS.filter((f) => f.section === "anagrafica" && !f.retired).map((f) => f.key) },
+  { key: "lavoro", label: "Lavoro e contratto", keys: FIELDS.filter((f) => (f.section === "rapporto" || f.section === "contratto") && !SKILL_KEYS.includes(f.key) && !f.retired).map((f) => f.key) },
   { key: "competenze", label: "Competenze", keys: SKILL_KEYS },
   { key: "documenti", label: "Documenti", keys: FIELDS.filter((f) => f.section === "documenti").map((f) => f.key) },
   { key: "storico", label: "Storico" },

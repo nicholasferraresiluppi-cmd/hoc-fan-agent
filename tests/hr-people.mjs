@@ -134,7 +134,7 @@ const task = {
   eq(m.fields.spokenLanguages, ["Italiano", "Inglese"], "labels nel task");
   eq(m.fields.dateOfBirth, "1998-03-04", "data nel task");
   eq(m.fields.yellowWarnings, null, "number vuoto → null");
-  eq(m.fields.currentJob, "Chatter senior", "mansione dal blocco descrizione");
+  ok(!("currentJob" in m.fields), "«Mansione attuale» ritirata (18/10): la riga nel blocco non si legge più");
   eq(m.fields.partitaIva, true, "partita IVA dal blocco descrizione");
   ok(!("codiceFiscale" in m.fields), "CF mascherato nel blocco NON viene letto");
   ok(!("companyEmail" in m.fields), "campo assente sulla lista → chiave assente (non null)");
@@ -162,7 +162,7 @@ const meta = task.custom_fields.map(({ value, ...f }) => f);
   ok(!op("location"), "location senza coordinate non si scrive");
   ok(plan.description.startsWith("Note libere."), "testo sopra il blocco preservato");
   ok(!plan.description.includes("vecchio"), "vecchio blocco sostituito");
-  ok(plan.description.includes("Mansione attuale: Team lead"), "mansione nel blocco (nessun campo omonimo)");
+  ok(!plan.description.includes("Mansione attuale"), "«Mansione attuale» ritirata: niente riga nel blocco (18/10)");
   ok(plan.description.includes("Partita IVA: no"), "P.IVA nel blocco");
   ok(plan.description.includes("RSS••••••••••••S") && !plan.description.includes("RSSMRA85T10A562S"), "CF nel blocco solo mascherato");
   ok(plan.description.includes("Dove vive (testo): Roma"), "location senza coordinate nel blocco");
@@ -414,7 +414,7 @@ eq(stripHocBlock(withHocBlock("A", ["x: 1"])), "A", "blocco rimovibile");
     { field: "content", date: "4000" },
     { field: "assignee", date: "5000" },
   ], meta, 1);
-  eq([ts.surname, ts.firstName, ts.currentJob, ts.partitaIva, ts._default], [2000, 3000, 4000, 4000, 1], "timestamp per campo");
+  eq([ts.surname, ts.firstName, ts.partitaIva, ts.notes, ts._default], [2000, 3000, 4000, 4000, 1], "timestamp per campo");
 }
 
 // ── Token del modulo e file ─────────────────────────────────────────────────
@@ -529,7 +529,7 @@ console.log(`hr-people: ${n} asserzioni OK`);
   // normalizePersonInput: skillLevels → skills ClickUp; learnWish max 2; pastRoles; otherSkills max 500
   const r = normalizePersonInput({ skillLevels: { "OF Messaging": "Esperto", ads_meta: "Base", Zapier: "Autonomo" }, learnWish: ["Copywriting", "ai_coding", "ads_meta"], pastRoles: [{ role: "team_lead", duration: "3to5" }], otherSkills: "x".repeat(800) });
   te(r.values.skillLevels, { of_chat: "Esperto", ads_meta: "Base", tech_automation: "Autonomo" }, "skillLevels nel formato nuovo");
-  te(r.values.skills, ["OF Messaging", "Meta Ads (Facebook e Instagram)", "Automations"], "Skills ClickUp = tutte le voci, nome italiano se senza etichetta storica");
+  ok(!("skills" in r.values), "Skills ClickUp ritirato (18/10): non si deriva più dalle competenze");
   te(r.values.learnWish, ["soc_copy", "ai_coding"], "learnWish max 2");
   te(r.values.pastRoles, [{ role: "team_lead", duration: "3to5" }], "pastRoles");
   t(r.values.otherSkills.length === 500, "otherSkills tagliato a 500");
@@ -1054,7 +1054,7 @@ console.log(`hr-people: ${n} asserzioni OK`);
   const s3 = await H.getPerson(sara.id);
   t(r3.kind === "updated" && s3.fields.birthPlace?.name === "Milano" && s3.fields.birthPlace?.prov === "MI", "modifica su ClickUp: luogo di nascita aggiornato in app");
   t(s3.fields.skillLevels.soc_instagram === "Autonomo" && s3.fields.skillLevels.of_chat === "Esperto", "modifica su ClickUp: competenze aggiornate in app");
-  t(s3.fields.skills.includes("Instagram") && cu.tasks.get(taskId).values["f-skills"]?.includes("o-ig"), "le etichette Skills seguono le competenze (anche su ClickUp)");
+  t(!cu.tasks.get(taskId).values["f-skills"]?.includes("o-ig"), "Skills ClickUp ritirato (18/10): le etichette non seguono più le competenze");
   t((await logOf(sara.id)).some((e) => e.action === "update" && e.field === "birthPlace" && e.source === "clickup"), "storico: modifica da ClickUp");
 
   // 3b) due campi cambiati INSIEME su ClickUp, due webhook separati (caso reale 03/10):

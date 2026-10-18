@@ -121,6 +121,10 @@ export function taskStatusNamesFor(phase) {
   return [...new Set([p.status, p.label, p.cu])];
 }
 
+// 18/10/2026 — campi del vecchio CRM tolti dalla lista ClickUp (Nicholas: "se non servono li tolgo"):
+// Role, Additional Role, Project, Department, Skills, Mansione attuale, Time Slots. `retired: true` =
+// niente sincronizzazione con ClickUp e niente modifica in scheda; il valore già salvato in app resta
+// (storico, ricerca). Mansione → «Mansione», creator → «Progetto», competenze → «Competenze e livello».
 export const FIELDS = [
   // Anagrafica
   { key: "firstName", label: "Nome", section: "anagrafica", type: "text", taskName: true },
@@ -142,20 +146,20 @@ export const FIELDS = [
   // fase della persona: tendina "Collaboration Status" + stato del task (tabella PERSON_PHASES)
   { key: "collaborationStatus", label: "Fase", section: "rapporto", type: "option", cu: "Collaboration Status", choices: PERSON_PHASES, options: PHASE_LABELS },
   { key: "employmentType", label: "Tipo di rapporto", section: "rapporto", type: "option", cu: "Type of Employment" },
-  { key: "role", label: "Ruolo", section: "rapporto", type: "labels", cu: "Role" },
-  { key: "additionalRole", label: "Ruolo aggiuntivo", section: "rapporto", type: "labels", cu: "Additional Role" },
+  { key: "role", label: "Ruolo", section: "rapporto", type: "labels", retired: true },
+  { key: "additionalRole", label: "Ruolo aggiuntivo", section: "rapporto", type: "labels", retired: true },
   { key: "mansioni", label: "Mansione", section: "rapporto", type: "labels", cu: "Mansione", options: MANSIONI },
-  { key: "currentJob", label: "Mansione (testo, vecchio)", section: "rapporto", type: "text", cu: "Mansione attuale", extra: true },
-  { key: "department", label: "Reparto", section: "rapporto", type: "labels", cu: "Department" },
+  { key: "currentJob", label: "Mansione (testo, vecchio)", section: "rapporto", type: "text", retired: true, extra: true },
+  { key: "department", label: "Reparto", section: "rapporto", type: "labels", retired: true },
   { key: "progetto", label: "Progetto", section: "rapporto", type: "labels", cu: "Progetto", options: PROGETTI },
-  { key: "project", label: "Progetto (vecchio)", section: "rapporto", type: "labels", cu: "Project" },
+  { key: "project", label: "Progetto (vecchio)", section: "rapporto", type: "labels", retired: true },
   { key: "seniority", label: "Seniority", section: "rapporto", type: "option", cu: "Seniority" },
-  { key: "skills", label: "Competenze (etichette ClickUp)", section: "rapporto", type: "labels", cu: "Skills" },
+  { key: "skills", label: "Competenze (etichette ClickUp)", section: "rapporto", type: "labels", retired: true },
   { key: "skillLevels", label: "Competenze e livello", section: "rapporto", type: "skillmap", appOnly: true, mirror: "Competenze e livello" },
   { key: "learnWish", label: "Vorrebbe imparare", section: "rapporto", type: "learn", appOnly: true, mirror: "Vorrebbe imparare" },
   { key: "pastRoles", label: "Ruoli già ricoperti", section: "rapporto", type: "roles", appOnly: true, mirror: "Ruoli già ricoperti" },
   { key: "otherSkills", label: "Altro che sa fare", section: "rapporto", type: "longtext", appOnly: true, mirror: "Altro che sa fare", max: 500 },
-  { key: "timeSlots", label: "Fasce orarie", section: "rapporto", type: "labels", cu: "Time Slots" },
+  { key: "timeSlots", label: "Fasce orarie", section: "rapporto", type: "labels", retired: true },
   { key: "source", label: "Come ci ha conosciuto", section: "rapporto", type: "option", cu: "Provenienza", extra: true, options: SOURCES },
   { key: "referredBy", label: "Segnalato da", section: "rapporto", type: "text", cu: "Segnalato da", extra: true },
   { key: "startDate", label: "Inizio collaborazione", section: "rapporto", type: "date", cu: "Start of Collaboration" },
@@ -198,7 +202,7 @@ export const FORM_KEYS = [
   "source", "referredBy",
 ];
 // Campi che l'admin può modificare dalla scheda
-export const EDITABLE_KEYS = FIELDS.filter((f) => !f.readOnly).map((f) => f.key);
+export const EDITABLE_KEYS = FIELDS.filter((f) => !f.readOnly && !f.retired).map((f) => f.key);
 
 /**
  * Riporta i campi "a tabella" (fase, contratto) all'etichetta italiana: le schede
