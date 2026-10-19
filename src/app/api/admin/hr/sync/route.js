@@ -51,11 +51,11 @@ export async function POST(request) {
     }
     if (body?.action === "strip_contract_link") {
       const r = await stripContractLinks({ budgetMs: 45_000 });
-      return Response.json(r, { status: r.ok ? 200 : 409 });
+      return Response.json(r.ok ? r : { ...r, error: `Non fatto: ${r.reason}.` }, { status: r.ok ? 200 : 409 });
     }
     if (body?.action === "contract_milestones") {
-      const r = await syncContractMilestones({ by: az.userId });
-      return Response.json(r, { status: r.ok ? 200 : 409 });
+      const r = await syncContractMilestones({ by: az.userId, waitMs: 15_000 });
+      return Response.json(r.ok ? r : { ...r, error: `Non aggiornato: ${r.reason}. Riprova tra un minuto.` }, { status: r.ok ? 200 : 409 });
     }
     if (body?.action === "import") {
       const r = await importFromClickup({ mode: "import", by: az.userId });

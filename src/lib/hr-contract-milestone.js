@@ -65,9 +65,16 @@ async function apply(rec, plan, { deadline, by }) {
 }
 
 /** Giro completo (notte, o bottone). */
-export async function syncContractMilestones({ budgetMs = 45_000, by = "sistema" } = {}) {
+export async function syncContractMilestones({ budgetMs = 45_000, by = "sistema", waitMs = 0 } = {}) {
   if (!hrSyncConfig().enabled) return { ok: false, reason: "sincronizzazione ClickUp spenta" };
-  const got = await kv.set(LOCK, Date.now(), { nx: true, ex: Math.ceil(budgetMs / 1000) + 30 }).catch(() => "OK");
+  // 19/10/2026: dal bottone si aspetta qualche secondo che finisca il giro della singola persona
+  // (parte da solo dopo ogni modifica alla scheda), invece di rinunciare subito
+  let got = null;
+  for (const until = Date.now() + waitMs; ; ) {
+    got = await kv.set(LOCK, Date.now(), { nx: true, ex: Math.ceil(budgetMs / 1000) + 30 }).catch(() => "OK");
+    if (got || Date.now() > until) break;
+    await new Promise((r) => setTimeout(r, 1500));
+  }
   if (!got) return { ok: false, reason: "un altro giro è in corso" };
   try {
     const rec = await load();
