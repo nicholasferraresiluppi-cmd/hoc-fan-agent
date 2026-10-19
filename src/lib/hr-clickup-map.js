@@ -21,7 +21,7 @@ import { mirrorText, parseMirror, mirrorPrint } from "./hr-mirror.js";
 
 export const HOC_BLOCK_START = "— Dati HOC Pro —";
 // 18/10/2026: le note scritte SOPRA il blocco arrivano in app (campo «Note», a due vie); il blocco lo riscrive HOC Pro
-const HOC_BLOCK_NOTE = "(sezione aggiornata da HOC Pro: queste righe si correggono in app. Le note scritte SOPRA «— Dati HOC Pro —» arrivano anche in HOC Pro.)";
+export const HOC_BLOCK_NOTE = "(sezione aggiornata da HOC Pro: queste righe si correggono in app. Le note scritte SOPRA «— Dati HOC Pro —» arrivano anche in HOC Pro.)";
 /** Note = descrizione senza il blocco, a capo normalizzati. "" → null. */
 export function notesFromDescription(desc) {
   const t = stripHocBlock(String(desc || "").replace(/\r\n?/g, "\n")).trim();
@@ -121,6 +121,22 @@ export function decodeCustomField(cf, appType) {
 export function withoutContractLink(desc) {
   const d = String(desc ?? "");
   const next = d.replace(/^[ \t]*Prepara il contratto:[^\n]*\n?/m, "");
+  return next === d ? null : next;
+}
+
+/**
+ * 19/10/2026: nel blocco già scritto, la nota in fondo e le righe dei campi ritirati restavano quelle
+ * vecchie («qui si leggono solo Mansione attuale e Partita IVA»). Riporta la nota a quella attuale e
+ * toglie la riga «Mansione attuale: …». Solo dentro il blocco; null se non c'è niente da cambiare.
+ */
+export function refreshBlockBoilerplate(desc) {
+  const d = String(desc ?? "");
+  const i = d.indexOf(HOC_BLOCK_START);
+  if (i < 0) return null;
+  const head = d.slice(0, i);
+  const lines = d.slice(i).split("\n");
+  const out = lines.filter((l) => !/^\s*Mansione attuale:/.test(l)).map((l) => (/^\s*\((blocco scritto|sezione aggiornata) da HOC Pro\b.*\)\s*$/.test(l) ? HOC_BLOCK_NOTE : l));
+  const next = head + out.join("\n");
   return next === d ? null : next;
 }
 

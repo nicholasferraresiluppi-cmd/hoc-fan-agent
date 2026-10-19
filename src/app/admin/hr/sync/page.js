@@ -260,7 +260,8 @@ function MilestonesCard({ status, onDone }) {
   const [err, setErr] = useState(null);
   const go = async () => {
     setBusy(true); setErr(null);
-    try { setRes(await postJson("/api/admin/hr/sync", { action: "contract_milestones" })); await onDone?.(); }
+    setRes(null);
+    try { setRes({ ...(await postJson("/api/admin/hr/sync", { action: "contract_milestones" })), at: Date.now() }); await onDone?.(); }
     catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
   return (
@@ -277,7 +278,7 @@ function MilestonesCard({ status, onDone }) {
         <button type="button" onClick={go} disabled={busy} style={{ ...btnGhost, opacity: busy ? 0.5 : 1 }}>{busy ? "Aggiorno…" : "Aggiorna adesso"}</button>
       </div>
       {err && <div style={{ marginTop: 10 }}><Notice danger>{err}</Notice></div>}
-      {res && <div style={{ marginTop: 10, fontSize: 13.5, color: CP.textSecondary }}>{res.created} creati, {res.closed} chiusi, {res.open} aperti{res.pending ? `, ${res.pending} al prossimo giro (rilancia)` : ""}{res.errors?.length ? ` · errori: ${res.errors.slice(0, 3).join("; ")}` : ""}</div>}
+      {res && <div role="status" style={{ marginTop: 10, fontSize: 13.5, color: CP.textSecondary }}>Aggiornato alle {new Date(res.at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}: {res.created || 0} creati, {res.closed || 0} chiusi, {res.updated || 0} aggiornati · {res.open} da recuperare{res.pending ? ` · ${res.pending} al prossimo giro (rilancia)` : ""}{res.errors?.length ? ` · errori: ${res.errors.slice(0, 3).join("; ")}` : ""}</div>}
     </section>
   );
 }

@@ -125,3 +125,14 @@ console.log(`note + People Partner + documenti: ${n} prove OK`);
   if (JSON.stringify(plan).includes('"r"') || JSON.stringify(plan).includes('"t"')) throw new Error("campo ritirato scritto su ClickUp");
   console.log("campi vecchi ritirati: ok");
 }
+
+// 19/10/2026: nota vecchia in fondo al blocco + riga «Mansione attuale» → aggiornate
+{
+  const { refreshBlockBoilerplate, HOC_BLOCK_NOTE } = await import("../src/lib/hr-clickup-map.js");
+  const d = "Nota mia.\n\n— Dati HOC Pro —\nID HOC Pro: p_1\nMansione attuale: Chatter\nDove vive (testo): via X\n(blocco scritto da HOC Pro: qui si leggono solo Mansione attuale e Partita IVA; il resto si modifica in app)";
+  const out = refreshBlockBoilerplate(d);
+  if (!out || out.includes("Mansione attuale") || !out.endsWith(HOC_BLOCK_NOTE) || !out.startsWith("Nota mia.") || !out.includes("Dove vive (testo): via X")) throw new Error("refreshBlockBoilerplate: " + out);
+  if (refreshBlockBoilerplate(out) !== null) throw new Error("seconda passata deve essere null");
+  if (refreshBlockBoilerplate("(blocco scritto da HOC Pro: x) fuori dal blocco") !== null) throw new Error("fuori dal blocco non si tocca");
+  console.log("nota del blocco aggiornata: ok");
+}
