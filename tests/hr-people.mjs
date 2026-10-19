@@ -262,7 +262,7 @@ eq(stripHocBlock(withHocBlock("A", ["x: 1"])), "A", "blocco rimovibile");
       { id: "p1", name: "Personal Phone Number", type: "phone" },
       { id: "l1", name: "Spoken Languages", type: "labels", type_config: { options: [{ id: "o1", label: "ITA - Native" }, { id: "o2", label: "ENG - Advanced" }] } },
     ];
-    const task = (phone, langs, name = "Clizia") => ({ id: "t1", name, custom_fields: [
+    const task = (phone, langs, name = "Clizia Rossi") => ({ id: "t1", name, custom_fields: [
       { ...meta[0], value: "Rossi" }, { ...meta[1], value: phone }, { ...meta[2], value: langs },
     ] });
     const person = { id: "p", fields: { firstName: "Clizia", surname: "Rossi", personalPhone: "+39 333 1234567", spokenLanguages: ["ITA - Native", "ENG - Advanced"] } };

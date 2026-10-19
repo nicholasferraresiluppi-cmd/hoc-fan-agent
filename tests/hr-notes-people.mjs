@@ -136,3 +136,15 @@ console.log(`note + People Partner + documenti: ${n} prove OK`);
   if (refreshBlockBoilerplate("(blocco scritto da HOC Pro: x) fuori dal blocco") !== null) throw new Error("fuori dal blocco non si tocca");
   console.log("nota del blocco aggiornata: ok");
 }
+
+// 19/10/2026: nome del task sempre «Nome Cognome», iniziali maiuscole
+{
+  const { taskNameFor, niceName, taskToPerson } = await import("../src/lib/hr-clickup-map.js");
+  if (taskNameFor({ fields: { firstName: "eleonora", surname: "ragozzino" } }) !== "Eleonora Ragozzino") throw new Error("minuscole");
+  if (taskNameFor({ fields: { firstName: "Alfonso", surname: "Di domenico" } }) !== "Alfonso Di domenico") throw new Error("misto: si lascia");
+  if (niceName("DI DOMENICO") !== "Di Domenico" || niceName("d'anna") !== "D'Anna" || niceName("nuñez cuyuri") !== "Nuñez Cuyuri") throw new Error("niceName");
+  if (taskNameFor({ fields: { firstName: "Luca" } }) !== "Luca") throw new Error("senza cognome");
+  const back = taskToPerson({ id: "t", name: "Eleonora Ragozzino", custom_fields: [{ id: "s", name: "Surname", type: "short_text", value: "ragozzino" }] });
+  if (back.fields.firstName !== "Eleonora") throw new Error("ritorno da ClickUp: " + back.fields.firstName);
+  console.log("nome del task Nome Cognome: ok");
+}
