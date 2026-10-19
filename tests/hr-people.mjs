@@ -659,6 +659,8 @@ console.log(`hr-people: ${n} asserzioni OK`);
   const s2 = await H.submitForm(a.token, { consent: true, data: { ...req(), firstName: "Marco" } });
   t(s2.ok && s2.uploadToken !== s1.uploadToken, "secondo invio ok, token figlio diverso");
   t((await H.listPeople()).length === before + 2, "due invii = due schede nuove");
+  { const mine = (await H.listPeople()).filter((p) => p.fields?.firstName === "Marco").sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0))[0];
+    t(mine?.fields?.hvContractStatus === "Da preparare", "dal modulo il contratto parte sempre «Da preparare» (19/10): " + mine?.fields?.hvContractStatus); }
   const unchanged = await H.getPerson(existing.person.id);
   t(unchanged.fields.firstName === "Giulia" && !unchanged.consent && !unchanged.formLink, "la scheda esistente NON è stata toccata");
   const child1 = await fake.get(`hr:form:${s1.uploadToken}`);

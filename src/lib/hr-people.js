@@ -224,6 +224,10 @@ export async function savePerson({ id = null, input = {}, allowed = EDITABLE_KEY
     person = { id: newPersonId(), createdAt: at, updatedAt: at, source, fields: {}, fieldUpdatedAt: {}, clickupTaskId: null, sync: { status: "pending" } };
     // persona nuova dal modulo (link condiviso o personale): fase "In ingresso" se non indicata
     if (source === "modulo" && !values.collaborationStatus) values.collaborationStatus = PHASE_ENTRY;
+    // 19/10/2026 (Nicholas): chi compila il modulo parte SEMPRE con il contratto da fare, anche se in
+    // passato ha già lavorato con noi: un contratto vecchio non vale. Se l'Area Partner ritrova un
+    // contratto valido lo allega e mette «Firmato» a mano. Nessun controllo automatico.
+    if (source === "modulo" && !values.hvContractStatus) values.hvContractStatus = "Da preparare";
   }
   const r = applyChanges(person, values, { at, by: actor, source });
   person = r.person;
