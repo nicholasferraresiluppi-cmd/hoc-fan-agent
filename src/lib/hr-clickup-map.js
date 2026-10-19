@@ -403,12 +403,25 @@ export function clickupDrift(person, task, fieldsMeta = null) {
   return out;
 }
 
-/** Nome del task: il nome; "Nome Cognome" se il task lo aveva già così. */
+/**
+ * Iniziali maiuscole per i nomi scritti tutti minuscoli o tutti maiuscoli («eleonora» → «Eleonora»,
+ * «DI DOMENICO» → «Di Domenico», «d'anna» → «D'Anna»). Se la persona ha già usato maiuscole e
+ * minuscole («McCarthy», «De Luca») si lascia com'è.
+ */
+export function niceName(v) {
+  const t = s(v).replace(/\s+/g, " ");
+  if (!t) return "";
+  if (t !== t.toLowerCase() && t !== t.toUpperCase()) return t;
+  return t.toLowerCase().replace(/(^|[\s'’-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+}
+
+/**
+ * Nome del task: sempre «Nome Cognome» (19/10/2026, Nicholas: nella lista e nei link si vedeva solo
+ * «eleonora», «Nicholas»… e non si capiva chi fosse). Il cognome resta anche nel campo «Surname».
+ */
 export function taskNameFor(person) {
   const f = person.fields || {};
-  const first = s(f.firstName);
-  if (person.clickup?.nameIncludesSurname && s(f.surname)) return `${first} ${s(f.surname)}`.trim();
-  return first || s(f.surname) || "Senza nome";
+  return [niceName(f.firstName), niceName(f.surname)].filter(Boolean).join(" ") || "Senza nome";
 }
 
 /**

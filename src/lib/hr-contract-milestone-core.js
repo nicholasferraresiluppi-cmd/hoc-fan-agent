@@ -46,6 +46,7 @@ export function subtaskName(p) {
 export function subtaskDescription(p) {
   const f = p.fields || {};
   return [
+    p.contractReason ? `Serve un contratto nuovo: ${p.contractReason}.` : null,
     `Contratto da recuperare per ${fullName(f) || "questa persona"}.`,
     // il nome che l'Area Partner vede su ClickUp («Signature Requested»), non l'etichetta dell'app
     `HV Contract Status nel CRM: ${findChoice(CONTRACT_STATUSES, f.hvContractStatus)?.cu || f.hvContractStatus || "vuoto"}.`,
@@ -81,4 +82,49 @@ export function planMilestones(people, items = {}) {
   // schede sparite dall'elenco (archiviate e non più restituite): il sottotask si chiude
   for (const [pid, it] of Object.entries(items)) if (!seen.has(pid) && it?.state === "open") close.push(pid);
   return { create, close, update };
+}
+
+// ── Contratto firmato ma non più valido (19/10/2026) ─────────────────────────
+// Caso reale: Eleonora Ragozzino aveva «Firmato» per un contratto da collaboratore del 2025, ma oggi
+// è Social Media Manager. Nessuno se ne sarebbe accorto. Regola (playbook, «Quando serve un contratto
+// nuovo»): chi RIENTRA dopo un'uscita, o CAMBIA mansione, ha bisogno di un contratto nuovo.
+// Il sistema ricorda per ogni persona con quale mansione era «Firmato» e se è uscita; quando una delle
+// due cose cambia riporta lo stato del contratto a «Da preparare» (su ClickUp «To Do») e il sottotask
+// compare con il motivo. Prima mansione messa su una scheda già firmata = non è un cambio (si prende
+// come punto di partenza): evita falsi allarmi sulle schede a cui la mansione mancava e basta.
+export const RESET_TO = "Da preparare";
+const key = (arr) => [...new Set(arr)].map((x) => String(x).trim()).filter(Boolean).sort().join("|");
+
+/**
+ * @param people  schede (con fields.hvContractStatus, collaborationStatus, mansioni)
+ * @param snaps   { personId: { m: "Chatter|…", signed: bool, exited: bool } } ricordati dal giro prima
+ * @returns { resets: [{ id, reason }], snaps } — snaps aggiornati da salvare
+ */
+export function contractChecks(people, snaps = {}) {
+  const out = { ...snaps };
+  const resets = [];
+  for (const p of people || []) {
+    if (!p || p.archived) continue;
+    const f = p.fields || {};
+    const m = key(arr(f.mansioni));
+    const signed = f.hvContractStatus === SIGNED;
+    const exited = f.collaborationStatus === EXITED;
+    const prev = snaps[p.id];
+    if (exited) { out[p.id] = { m: prev?.m ?? m, signed, exited: true }; continue; }
+    if (!signed) { out[p.id] = { m, signed: false, exited: false }; continue; }
+    if (!prev || !prev.signed) {
+      // primo giro, o appena firmato: questa è la mansione del contratto (ma un rientro resta un rientro)
+      if (prev?.exited) { resets.push({ id: p.id, reason: "rientro dopo un'uscita" }); out[p.id] = { m, signed: false, exited: false }; continue; }
+      out[p.id] = { m, signed: true, exited: false };
+      continue;
+    }
+    if (prev.exited) { resets.push({ id: p.id, reason: "rientro dopo un'uscita" }); out[p.id] = { m, signed: false, exited: false }; continue; }
+    if (prev.m && m && prev.m !== m) {
+      resets.push({ id: p.id, reason: `cambio di mansione (era ${prev.m.split("|").join(", ")}, ora ${m.split("|").join(", ")})` });
+      out[p.id] = { m, signed: false, exited: false };
+      continue;
+    }
+    out[p.id] = { m: m || prev.m, signed: true, exited: false };
+  }
+  return { resets, snaps: out };
 }

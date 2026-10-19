@@ -57,3 +57,27 @@ console.log(`contratti da recuperare: ${n} prove OK`);
   if (!d.includes("HV Contract Status nel CRM: Signature Requested.") || !d.includes("«Signed»")) throw new Error("testo con i nomi di ClickUp: " + d);
   console.log("sottotask allineati alla scheda: ok");
 }
+
+// 19/10/2026: firmato ma non più valido — rientro o cambio di mansione
+{
+  const { contractChecks } = await import("../src/lib/hr-contract-milestone-core.js");
+  const S = (id, f) => P(id, { hvContractStatus: "Firmato", ...f });
+  // primo giro: tutti i firmati diventano punto di partenza, nessun allarme
+  let r = contractChecks([S("a"), S("b", { mansioni: [] }), P("c")], {});
+  if (r.resets.length) throw new Error("primo giro senza allarmi");
+  // b riceve la prima mansione: non è un cambio
+  r = contractChecks([S("b", { mansioni: ["Chatter"] })], r.snaps);
+  if (r.resets.length) throw new Error("prima mansione non è un cambio");
+  // a cambia mansione → contratto nuovo
+  const r2 = contractChecks([S("a", { mansioni: ["Sales Manager"] })], r.snaps);
+  if (r2.resets.length !== 1 || !/cambio di mansione/.test(r2.resets[0].reason)) throw new Error("cambio mansione");
+  // uscita e rientro con lo stato rimasto «Firmato» → contratto nuovo
+  let s = contractChecks([S("x")], {}).snaps;
+  s = contractChecks([S("x", { collaborationStatus: "Uscita" })], s).snaps;
+  const r3 = contractChecks([S("x", { collaborationStatus: "In ingresso" })], s);
+  if (r3.resets.length !== 1 || !/rientro/.test(r3.resets[0].reason)) throw new Error("rientro");
+  // firmato di nuovo dopo il reset: nuovo punto di partenza, niente allarme
+  const r4 = contractChecks([S("a", { mansioni: ["Sales Manager"] })], r2.snaps);
+  if (r4.resets.length) throw new Error("dopo la nuova firma niente allarmi");
+  console.log("contratto non più valido (rientro, cambio mansione): ok");
+}

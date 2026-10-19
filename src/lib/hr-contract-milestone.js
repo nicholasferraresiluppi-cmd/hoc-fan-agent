@@ -6,15 +6,35 @@
  */
 import { kv } from "@vercel/kv";
 import { createTask, updateTask, getTask, hrSyncConfig, isTaskGone } from "./clickup-hr-api.js";
-import { listPeople, getPerson } from "./hr-people.js";
-import { planMilestones, subtaskName, subtaskDescription, subtaskSig, PARENT_NAME, DONE_STATUS } from "./hr-contract-milestone-core.js";
+import { listPeople, getPerson, savePerson, appendLog } from "./hr-people.js";
+import { planMilestones, subtaskName, subtaskDescription, subtaskSig, contractChecks, RESET_TO, PARENT_NAME, DONE_STATUS } from "./hr-contract-milestone-core.js";
 
 // ⭐️ Area Partner → Milestone (Human Resources). Variabile d'ambiente solo per cambiarla.
 export const MILESTONE_LIST_ID = () => String(process.env.HR_MILESTONE_LIST_ID || "901222833798").trim();
 const KEY = "hr:contracts:milestone";
 const LOCK = "hr:contracts:milestone:lock";
 
-const load = async () => (await kv.get(KEY).catch(() => null)) || { parentId: null, items: {} };
+const load = async () => ({ snaps: {}, reasons: {}, ...((await kv.get(KEY).catch(() => null)) || { parentId: null, items: {} }) });
+
+/**
+ * 19/10/2026 — contratto «Firmato» ma non più valido (rientro dopo un'uscita, cambio di mansione):
+ * lo stato torna «Da preparare» (su ClickUp «To Do») e il motivo finisce nel sottotask. Regola in
+ * contractChecks (core). Ritorna le schede aggiornate, con il motivo attaccato per la descrizione.
+ */
+async function applyContractChecks(rec, people, { only = null } = {}) {
+  const { resets, snaps } = contractChecks(people, rec.snaps || {});
+  rec.snaps = only ? { ...(rec.snaps || {}), ...Object.fromEntries(Object.entries(snaps).filter(([id]) => id === only)) } : snaps;
+  const byId = new Map(people.map((p) => [p.id, p]));
+  for (const r of resets) {
+    try {
+      const res = await savePerson({ id: r.id, input: { hvContractStatus: RESET_TO }, allowed: ["hvContractStatus"], actor: "sistema", source: "sistema" });
+      if (res?.ok && res.person) byId.set(r.id, res.person);
+      await appendLog(r.id, [{ at: Date.now(), by: "sistema", source: "sistema", action: "update", field: "hvContractStatus", from: null, to: `${RESET_TO} — serve un contratto nuovo: ${r.reason}` }]).catch(() => {});
+      rec.reasons = { ...(rec.reasons || {}), [r.id]: r.reason };
+    } catch { /* si riprova al giro dopo */ }
+  }
+  return [...byId.values()].map((p) => (rec.reasons?.[p.id] ? { ...p, contractReason: rec.reasons[p.id] } : p));
+}
 const save = (rec) => kv.set(KEY, rec);
 
 async function ensureParent(rec) {
@@ -41,6 +61,7 @@ async function apply(rec, plan, { deadline, by }) {
     const it = rec.items[pid];
     try { await updateTask(it.taskId, { status: DONE_STATUS }); } catch (e) { if (!isTaskGone(e)) { out.errors.push(`${pid}: ${e.message}`); continue; } }
     rec.items[pid] = { ...it, state: "done", at: Date.now() };
+    if (rec.reasons?.[pid]) { const { [pid]: _gone, ...rest } = rec.reasons; rec.reasons = rest; }
     out.closed++;
   }
   for (const p of plan.update || []) {
@@ -78,7 +99,8 @@ export async function syncContractMilestones({ budgetMs = 45_000, by = "sistema"
   if (!got) return { ok: false, reason: "un altro giro è in corso" };
   try {
     const rec = await load();
-    const people = await listPeople({ archived: "include" }).catch(() => listPeople());
+    const people0 = await listPeople({ archived: "include" }).catch(() => listPeople());
+    const people = await applyContractChecks(rec, people0);
     const plan = planMilestones(people, rec.items);
     const r = await apply(rec, plan, { deadline: Date.now() + budgetMs, by });
     const open = Object.values(rec.items).filter((x) => x.state === "open").length;
@@ -95,11 +117,11 @@ export async function syncContractMilestoneFor(personId) {
   if (!got) return null; // c'è un giro completo in corso: lo prende lui (o la notte)
   try {
     const rec = await load();
-    const p = await getPerson(personId);
-    const people = p ? [p] : [];
+    const p0 = await getPerson(personId);
+    const people = p0 ? await applyContractChecks(rec, [p0], { only: personId }) : [];
     const items = rec.items[personId] ? { [personId]: rec.items[personId] } : {};
     const plan = planMilestones(people, items);
-    if (!plan.create.length && !plan.close.length && !plan.update.length) return { ok: true, noop: true };
+    if (!plan.create.length && !plan.close.length && !plan.update.length) { await save(rec); return { ok: true, noop: true }; }
     return await apply(rec, plan, { deadline: Date.now() + 20_000, by: "sistema" });
   } finally {
     await kv.del(LOCK).catch(() => {});
