@@ -15,7 +15,7 @@
  *    firmato (es. cambio di mansione → contratto nuovo); uno chiuso a mano dall'HR non lo
  *    sappiamo e non lo tocchiamo finché la scheda non arriva a «Firmato».
  */
-import { fullName } from "./hr-people-core.js";
+import { taskNameFor } from "./hr-clickup-map.js";
 import { CONTRACT_STATUSES, findChoice } from "./hr-fields.js";
 
 export const SIGNED = "Firmato";
@@ -40,14 +40,15 @@ export function needsContract(p) {
 export function subtaskName(p) {
   const f = p.fields || {};
   const roles = arr(f.mansioni);
-  return `${fullName(f) || "Senza nome"}${roles.length ? ` · ${roles.join(", ")}` : ""}`;
+  // stesso nome del task nel CRM: «Nome Cognome» con le iniziali maiuscole (19/10/2026)
+  return `${taskNameFor(p)}${roles.length ? ` · ${roles.join(", ")}` : ""}`;
 }
 
 export function subtaskDescription(p) {
   const f = p.fields || {};
   return [
     p.contractReason ? `Serve un contratto nuovo: ${p.contractReason}.` : null,
-    `Contratto da recuperare per ${fullName(f) || "questa persona"}.`,
+    `Contratto da recuperare per ${taskNameFor(p) === "Senza nome" ? "questa persona" : taskNameFor(p)}.`,
     // il nome che l'Area Partner vede su ClickUp («Signature Requested»), non l'etichetta dell'app
     `HV Contract Status nel CRM: ${findChoice(CONTRACT_STATUSES, f.hvContractStatus)?.cu || f.hvContractStatus || "vuoto"}.`,
     p.clickupUrl ? `Scheda nel CRM: ${p.clickupUrl}` : null,
