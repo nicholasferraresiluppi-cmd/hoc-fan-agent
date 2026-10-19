@@ -16,6 +16,7 @@
  *    sappiamo e non lo tocchiamo finché la scheda non arriva a «Firmato».
  */
 import { fullName } from "./hr-people-core.js";
+import { CONTRACT_STATUSES, findChoice } from "./hr-fields.js";
 
 export const SIGNED = "Firmato";
 export const EXITED = "Uscita";
@@ -46,20 +47,27 @@ export function subtaskDescription(p) {
   const f = p.fields || {};
   return [
     `Contratto da recuperare per ${fullName(f) || "questa persona"}.`,
-    `HV Contract Status nel CRM: ${f.hvContractStatus || "vuoto"}.`,
+    // il nome che l'Area Partner vede su ClickUp («Signature Requested»), non l'etichetta dell'app
+    `HV Contract Status nel CRM: ${findChoice(CONTRACT_STATUSES, f.hvContractStatus)?.cu || f.hvContractStatus || "vuoto"}.`,
     p.clickupUrl ? `Scheda nel CRM: ${p.clickupUrl}` : null,
     "",
     "Quando il contratto è firmato: carica il PDF sulla scheda del CRM e porta «HV Contract Status» su «Signed». Questo sottotask va in done da solo.",
   ].filter((x) => x !== null).join("\n");
 }
 
+/** Impronta di nome + descrizione: se cambia (mansione, stato del contratto…) il sottotask aperto si riscrive. */
+export function subtaskSig(p) {
+  return `${subtaskName(p)}\n${subtaskDescription(p)}`;
+}
+
 /**
- * Cosa fare. `items` = { personId: { taskId, state: "open"|"done" } }.
- * @returns { create: person[], close: personId[] }
+ * Cosa fare. `items` = { personId: { taskId, state: "open"|"done", sig } }.
+ * @returns { create: person[], close: personId[], update: person[] }
  */
 export function planMilestones(people, items = {}) {
   const create = [];
   const close = [];
+  const update = [];
   const seen = new Set();
   for (const p of people || []) {
     seen.add(p.id);
@@ -67,8 +75,10 @@ export function planMilestones(people, items = {}) {
     const need = needsContract(p);
     if (need && (!it || it.state === "done")) create.push(p);
     if (!need && it && it.state === "open") close.push(p.id);
+    // 19/10/2026: il sottotask aperto segue la scheda (es. mansione aggiunta dopo → «Nome · Chatter»)
+    if (need && it && it.state === "open" && it.sig !== subtaskSig(p)) update.push(p);
   }
   // schede sparite dall'elenco (archiviate e non più restituite): il sottotask si chiude
   for (const [pid, it] of Object.entries(items)) if (!seen.has(pid) && it?.state === "open") close.push(pid);
-  return { create, close };
+  return { create, close, update };
 }
