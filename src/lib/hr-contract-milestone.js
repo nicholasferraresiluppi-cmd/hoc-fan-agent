@@ -7,7 +7,7 @@
 import { kv } from "@vercel/kv";
 import { createTask, updateTask, getTask, hrSyncConfig, isTaskGone } from "./clickup-hr-api.js";
 import { listPeople, getPerson } from "./hr-people.js";
-import { planMilestones, subtaskName, subtaskDescription, PARENT_NAME, DONE_STATUS } from "./hr-contract-milestone-core.js";
+import { planMilestones, subtaskName, subtaskDescription, subtaskSig, PARENT_NAME, DONE_STATUS } from "./hr-contract-milestone-core.js";
 
 // ⭐️ Area Partner → Milestone (Human Resources). Variabile d'ambiente solo per cambiarla.
 export const MILESTONE_LIST_ID = () => String(process.env.HR_MILESTONE_LIST_ID || "901222833798").trim();
@@ -35,7 +35,7 @@ async function ensureParent(rec) {
 }
 
 async function apply(rec, plan, { deadline, by }) {
-  const out = { created: 0, closed: 0, pending: 0, errors: [] };
+  const out = { created: 0, closed: 0, updated: 0, pending: 0, errors: [] };
   for (const pid of plan.close) {
     if (Date.now() > deadline) { out.pending++; continue; }
     const it = rec.items[pid];
@@ -43,12 +43,20 @@ async function apply(rec, plan, { deadline, by }) {
     rec.items[pid] = { ...it, state: "done", at: Date.now() };
     out.closed++;
   }
+  for (const p of plan.update || []) {
+    if (Date.now() > deadline) { out.pending++; continue; }
+    const it = rec.items[p.id];
+    try { await updateTask(it.taskId, { name: subtaskName(p), description: subtaskDescription(p) }); }
+    catch (e) { if (!isTaskGone(e)) { out.errors.push(`${subtaskName(p)}: ${e.message}`.slice(0, 160)); continue; } }
+    rec.items[p.id] = { ...it, sig: subtaskSig(p), at: Date.now() };
+    out.updated++;
+  }
   if (plan.create.length) await ensureParent(rec);
   for (const p of plan.create) {
     if (Date.now() > deadline) { out.pending++; continue; }
     try {
       const t = await createTask(MILESTONE_LIST_ID(), { name: subtaskName(p), parent: rec.parentId, status: "backlog", description: subtaskDescription(p) });
-      rec.items[p.id] = { taskId: String(t.id), state: "open", at: Date.now() };
+      rec.items[p.id] = { taskId: String(t.id), state: "open", sig: subtaskSig(p), at: Date.now() };
       out.created++;
     } catch (e) { out.errors.push(`${subtaskName(p)}: ${e.message}`.slice(0, 160)); }
   }
@@ -84,7 +92,7 @@ export async function syncContractMilestoneFor(personId) {
     const people = p ? [p] : [];
     const items = rec.items[personId] ? { [personId]: rec.items[personId] } : {};
     const plan = planMilestones(people, items);
-    if (!plan.create.length && !plan.close.length) return { ok: true, noop: true };
+    if (!plan.create.length && !plan.close.length && !plan.update.length) return { ok: true, noop: true };
     return await apply(rec, plan, { deadline: Date.now() + 20_000, by: "sistema" });
   } finally {
     await kv.del(LOCK).catch(() => {});
