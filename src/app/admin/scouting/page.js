@@ -152,7 +152,7 @@ export default function ScoutingPage() {
         </nav>
       )}
 
-      {msg && <div style={{ position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)", zIndex: 900, maxWidth: "calc(100% - 32px)" }}><Notice>{msg} <button onClick={() => setMsg(null)} style={{ ...btn, minHeight: 0, padding: "2px 10px", marginLeft: 8 }}>Ok</button></Notice></div>}
+      {msg && <div className="hoc-dock" style={{ position: "fixed", left: "50%", bottom: "calc(24px + env(safe-area-inset-bottom))", transform: "translateX(-50%)", zIndex: 900, maxWidth: "calc(100% - 32px)" }}><Notice>{msg} <button onClick={() => setMsg(null)} style={{ ...btn, minHeight: 0, padding: "2px 10px", marginLeft: 8 }}>Ok</button></Notice></div>}
       {error && <Notice danger>{error.message}</Notice>}
       {isLoading && <p style={{ color: CP.textMuted }}>Caricamento…</p>}
       {data && creators.length === 0 && <Notice>Il radar è vuoto: si carica con lo script di importazione della ricerca (scripts/scouting-import.mjs) o segnalando una creator.</Notice>}
