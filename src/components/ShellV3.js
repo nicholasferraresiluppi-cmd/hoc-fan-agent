@@ -17,6 +17,7 @@ import useSWR from "swr";
 import { Search, Menu, Home, Gauge, Wallet, Compass, MoreHorizontal, LayoutDashboard, Trophy, Target } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee } from "@/lib/nav-access";
+import { useShownPath } from "@/lib/nav-pending";
 import DataStatus from "./DataStatus";
 
 const silentFetcher = async (url) => {
@@ -93,6 +94,7 @@ function activeHref(pathname, tabs) {
 }
 
 export function V3TabBar({ pathname, onMore, moreOpen }) {
+  const shown = useShownPath(pathname); // la voce si accende al tocco, non quando arriva la pagina
   const { data: me } = useSWR("/api/whoami", silentFetcher, { revalidateOnFocus: false });
   const caps = me?.capabilities;
   const isAdmin = !!me?.admin;
@@ -102,7 +104,7 @@ export function V3TabBar({ pathname, onMore, moreOpen }) {
   const squad = ADMIN_TABS.filter((t) => canSee(t.href, caps, isAdmin));
   // team lead: Hub e P&L non li vede → completa con Cockpit turno e il suo andamento
   const tabs = manager ? (squad.length < 4 ? [...squad, ...[{ href: "/cm-cockpit", label: "Turno", icon: Target }, { href: "/me/score", label: "Andamento", icon: Gauge }].filter((t) => canSee(t.href, caps, isAdmin))].slice(0, 4) : squad) : OPERATOR_TABS;
-  const cur = activeHref(pathname, tabs);
+  const cur = activeHref(shown, tabs);
 
   const item = (active) => ({
     minHeight: 52, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
@@ -126,7 +128,7 @@ export function V3TabBar({ pathname, onMore, moreOpen }) {
         const active = cur === t.href;
         const Icon = t.icon;
         return (
-          <Link key={t.href} href={t.href} className="hoc-v3-tab" aria-current={active ? "page" : undefined} style={item(active)}>
+          <Link key={t.href} href={t.href} prefetch className="hoc-v3-tab" aria-current={active ? "page" : undefined} style={item(active)}>
             <span style={pill(active)}><Icon size={20} strokeWidth={1.9} aria-hidden="true" /></span>
             <span style={labelStyle}>{t.label}</span>
           </Link>

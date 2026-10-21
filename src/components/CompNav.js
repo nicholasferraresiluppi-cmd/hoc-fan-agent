@@ -10,6 +10,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Wallet, Scale, CalendarDays, Activity, Search, FlaskConical, Ruler, ListTree } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
+import { useShownPath } from "@/lib/nav-pending";
 
 const TOOLS = [
   { href: "/admin/pnl-live",         label: "P&L Live",     icon: Wallet },
@@ -24,7 +25,7 @@ const TOOLS = [
 
 export default function CompNav({ palette } = {}) {
   const P = palette || CP; // palette alternativa (tema chiaro del pilota)
-  const pathname = usePathname();
+  const pathname = useShownPath(usePathname()); // si accende al tocco, non all'arrivo della pagina
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 22, padding: 5, background: P.surface, border: `1px solid ${P.border}`, borderRadius: 10, width: "fit-content" }}>
       {TOOLS.map(({ href, label, icon: Icon }) => {
@@ -33,6 +34,7 @@ export default function CompNav({ palette } = {}) {
           <Link
             key={href}
             href={href}
+            prefetch
             style={{
               display: "inline-flex", alignItems: "center", gap: 6,
               padding: "7px 13px", borderRadius: 7,
