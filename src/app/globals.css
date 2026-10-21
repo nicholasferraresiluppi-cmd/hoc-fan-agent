@@ -374,3 +374,11 @@ html.casa-intro[data-style="v3"]::after {
   .hoc-fb { padding: 10px !important; right: 12px !important; bottom: 12px !important; }
   .hoc-fb-label { display: none; }
 }
+
+/* Barra di cambio pagina (components/NavProgress, 21/10/2026): avanza veloce e poi rallenta finché
+   la pagina arriva, si chiude di colpo quando è montata. */
+.hoc-navbar > div { transform: scaleX(0); }
+.hoc-navbar-run > div { animation: hoc-navbar-run 8s cubic-bezier(.1,.7,.2,1) forwards; }
+.hoc-navbar-done > div { transform: scaleX(1); opacity: 0; transition: transform .15s ease-out, opacity .2s .1s; }
+@keyframes hoc-navbar-run { 0% { transform: scaleX(0); } 10% { transform: scaleX(.45); } 100% { transform: scaleX(.92); } }
+@media (prefers-reduced-motion: reduce) { .hoc-navbar-run > div { animation: none; transform: scaleX(.6); } }

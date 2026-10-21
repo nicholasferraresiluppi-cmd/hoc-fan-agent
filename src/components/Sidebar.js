@@ -18,6 +18,7 @@
  */
 import { collapseItems } from "@/lib/page-groups";
 import { usePathname } from "next/navigation";
+import { useShownPath } from "@/lib/nav-pending";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -401,7 +402,7 @@ const silentFetcher = async (url) => {
 };
 
 export default function Sidebar() {
-  const pathname = usePathname() || "";
+  const pathname = useShownPath(usePathname() || ""); // voce accesa al tocco
 
   // Menu per ruolo: si nascondono le voci che per questi permessi risponderebbero
   // "non hai il permesso" (lib/nav-access). Finché i permessi non arrivano si

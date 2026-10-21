@@ -10,6 +10,7 @@
  */
 import { groupOf } from "@/lib/page-groups";
 import { usePathname } from "next/navigation";
+import { useShownPath } from "@/lib/nav-pending";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -94,7 +95,7 @@ function dateLabel() {
 }
 
 export default function SidebarCasa() {
-  const pathname = usePathname() || "";
+  const pathname = useShownPath(usePathname() || ""); // voce accesa al tocco
   const { data: me } = useSWR("/api/whoami", silentFetcher, { revalidateOnFocus: false });
   // alert solo a chi li vede (prima: 403 a ogni pagina per gli altri — giro per persona, 10/10/2026)
   const { data: alerts } = useSWR(me?.authenticated && canSee("/admin/alerts", me.capabilities, me.admin) ? "/api/admin/ops-alerts" : null, silentFetcher, { revalidateOnFocus: false, refreshInterval: 5 * 60 * 1000 });
