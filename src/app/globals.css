@@ -8,7 +8,16 @@
   font-family: var(--cp-font, 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif);
 }
 
+/* Niente rimbalzo della pagina intera su iPhone (21/10/2026): tirando oltre la fine si
+   spostavano i bordi e compariva uno spazio sotto la barra. Lo scorrimento dentro la pagina
+   resta normale; si perde solo il «tira giù per aggiornare» di Safari. */
+html {
+  background-color: var(--cp-bg);
+  overscroll-behavior: none;
+}
+
 body {
+  overscroll-behavior: none;
   font-family: var(--cp-font, 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif);
   touch-action: manipulation; /* niente zoom col doppio tocco (vedi viewport in layout.js) */
   background-color: var(--cp-bg);
