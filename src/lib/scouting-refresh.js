@@ -17,7 +17,7 @@ const ACTOR = "afanasenko~instagram-profile-scraper";
 const API = "https://api.apify.com/v2";
 const PRICE_PER_PROFILE = 0.01;
 const MIN_DAYS = 6.5;
-const FIELDS = ["Account", "Followers Count", "Median Views", "Views.Followers Ratio", "Median ER", "External URL", "Biography", "Analysis Status", "Profile Picture"].join(",");
+const FIELDS = ["Account", "Followers Count", "Median Views", "Views.Followers Ratio", "Median ER", "Avg Likes", "Avg Comments", "External URL", "Biography", "Analysis Status", "Profile Picture"].join(",");
 
 export const apifyConfigured = () => Boolean(process.env.APIFY_TOKEN);
 

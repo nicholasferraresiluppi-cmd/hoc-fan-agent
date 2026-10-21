@@ -298,6 +298,55 @@ console.log(`scouting: ${n} asserzioni ok`);
   console.log("coda valuta: ok");
 }
 
+// --- voto a 4 livelli, engagement, filtri e ordinamento della coda (21/10/2026)
+{
+  const { review, unreview, reviewQueue, buildCreators, ratingOf, parseEr, passRanges, parseRefreshItem: pri, setStage: ss } = await import("../src/lib/scouting-core.js");
+  // engagement: testo con %, frazione, ripiego su like+commenti, valori assurdi
+  assert.equal(parseEr("3.4%"), 3.4);
+  assert.equal(parseEr("0.034"), 3.4);
+  assert.equal(parseEr("12"), 12, "numero > 1 senza % = già percento");
+  assert.equal(parseEr(null, { likes: 900, comments: 100, fol: 20000 }), 5);
+  assert.equal(parseEr("N/A"), null);
+  assert.equal(parseEr("250%"), null, "oltre 100% = dato sporco");
+  assert.equal(pri({ Account: "x", "Followers Count": 1000, "Median ER": "2.5%" }).er, 2.5);
+  // il voto: fase e coda
+  let crm = review({ creators: {} }, "h:a", "no", "N");
+  assert.equal(crm.creators["h:a"].stage, "scartata"); assert.equal(crm.creators["h:a"].rating, 1);
+  crm = review(crm, "h:b", "forse", "N");
+  assert.equal(crm.creators["h:b"].stage, "da_valutare", "forse resta da valutare");
+  crm = review(crm, "h:c", "top", "N");
+  assert.equal(crm.creators["h:c"].stage, "interessante"); assert.equal(crm.creators["h:c"].rating, 4);
+  // cambiare idea: da Sì a Forse torna da valutare; Annulla torna alla fase di prima del primo voto
+  crm = review(crm, "h:c", "forse", "N");
+  assert.equal(crm.creators["h:c"].stage, "da_valutare");
+  crm = review(crm, "h:c", "si", "N");
+  crm = unreview(crm, "h:c");
+  assert.equal(crm.creators["h:c"].stage, "da_valutare"); assert.equal(crm.creators["h:c"].rating, undefined);
+  // un voto non fa tornare indietro una creator già contattata
+  crm = ss(crm, "h:d", "contattata");
+  crm = review(crm, "h:d", "no", "N");
+  assert.equal(crm.creators["h:d"].stage, "contattata"); assert.equal(crm.creators["h:d"].rating, 1);
+  // le decisioni del primo giro valgono come voti, senza riscrivere il CRM
+  assert.equal(ratingOf({ reviewedAt: 1, stage: "interessante" }), 3);
+  assert.equal(ratingOf({ reviewedAt: 1, stage: "scartata" }), 1);
+  assert.equal(ratingOf({ reviewedAt: 1, stage: "da_valutare" }), 2);
+  assert.equal(ratingOf({ stage: "interessante" }), null, "interessante dalla scheda senza voto");
+  assert.equal(review({ creators: {} }, "h:z", "vista", "N").creators["h:z"].rating, 2, "vecchio «vista» = Forse");
+  // coda: «forse» = da rivedere; ordinamento e filtri
+  const cs = buildCreators([
+    { h: "a", sig: "forte", fol: 10000, medv: 5000, er: 2 }, { h: "b", sig: "forte", fol: 400000, medv: 90000, er: 1 },
+    { h: "e", sig: "forte", fol: 80000, medv: 60000, er: 7 }, { h: "f", sig: "forte", fol: 120000, medv: 20000 },
+  ], crm);
+  assert.deepEqual(reviewQueue(cs, { scope: "forse" }).map((c) => c.handles[0]), ["b"]);
+  assert.deepEqual(reviewQueue(cs, { sort: "er" }).map((c) => c.handles[0]), ["e", "f"], "senza engagement in fondo");
+  assert.deepEqual(reviewQueue(cs, { sort: "fol" }).map((c) => c.handles[0]), ["f", "e"]);
+  assert.deepEqual(reviewQueue(cs, { ranges: { er: "3" } }).map((c) => c.handles[0]), ["e"], "dato mancante non passa un filtro attivo");
+  assert.deepEqual(reviewQueue(cs, { ranges: { fol: "50-300", medv: "50k" } }).map((c) => c.handles[0]), ["e"]);
+  ok(passRanges({ fol: 50000 }, { fol: "50-300" }) && !passRanges({ fol: 300000 }, { fol: "50-300" }), "min incluso, max escluso");
+  assert.equal(cs.find((c) => c.handles[0] === "b").rating, 2);
+  console.log("voto e filtri: ok");
+}
+
 // --- catena dei seguiti: folAt/fing arrivano sulla creator (14/10/2026)
 {
   const { buildCreators } = await import("../src/lib/scouting-core.js");
