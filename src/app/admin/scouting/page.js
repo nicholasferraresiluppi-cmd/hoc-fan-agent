@@ -71,8 +71,8 @@ export default function ScoutingPage() {
   const { data, error, mutate, isLoading } = useSWR("/api/admin/scouting", fetcher, { revalidateOnFocus: false });
   const { data: inboxData, mutate: mutateInbox } = useSWR("/api/admin/scouting/segnala", fetcher, {
     revalidateOnFocus: false,
-    // finché una segnalazione è in lettura si riguarda ogni 5 secondi
-    refreshInterval: (d) => (d?.items || []).some((x) => x.status === "in_lettura") ? 5000 : 0,
+    // finché una segnalazione è in lettura si riguarda ogni 3 secondi (la finestra mostra i passi)
+    refreshInterval: (d) => (d?.items || []).some((x) => x.status === "in_lettura") ? 3000 : 0,
   });
   const { user } = useUser();
   const me = user?.fullName || user?.primaryEmailAddress?.emailAddress || "";
@@ -172,11 +172,11 @@ export default function ScoutingPage() {
         ) : tab === "contatti" ? (
           <RadarContatti creators={creators} onOpen={(c) => go("contatti", c.handles[0])} />
         ) : (
-          <RadarOggi newCut={newCut} data={data} creators={creators} profilesBy={profilesBy} onOpen={(c) => go("oggi", c.handles[0])} act={act} busy={busy} inbox={inbox} onSegnala={() => setSegnala(true)} onValuta={() => go("valuta")} onReload={mutate} />
+          <RadarOggi me={me} newCut={newCut} data={data} creators={creators} profilesBy={profilesBy} onOpen={(c) => go("oggi", c.handles[0])} act={act} busy={busy} inbox={inbox} onSegnala={() => setSegnala(true)} onValuta={() => go("valuta")} onReload={mutate} />
         )
       )}
 
-      <RadarSegnala open={segnala} onClose={() => setSegnala(false)} me={me} onSent={() => mutateInbox()} />
+      <RadarSegnala open={segnala} onClose={() => setSegnala(false)} me={me} onSent={() => mutateInbox()} inbox={inbox} creators={creators} onOpen={(c) => go("oggi", c.handles[0])} />
     </div>
   );
 }

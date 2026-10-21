@@ -5,10 +5,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { CP, alpha } from "@/lib/brand";
 import { pickToday, movers, whyLines, reviewQueue } from "@/lib/scouting-core";
+import { SignalRow } from "./RadarSegnala";
 import { SERIF, NUM, fmtFull, fmtDate, btn, btnPrimary, btnQuiet, Initials, LinkChip, Growth, Spark, H2, BigNum, STAGE_LABEL } from "./radar-ui";
 
 
-export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, act, busy, inbox, onSegnala, onValuta, onReload }) {
+export default function RadarOggi({ me, newCut, data, creators, profilesBy, onOpen, act, busy, inbox, onSegnala, onValuta, onReload }) {
   const today = useMemo(() => pickToday(creators, { n: 3, newCut }), [creators, newCut]);
   const moving = useMemo(() => movers(creators, 5), [creators]);
   const counts = data.counts || {};
@@ -118,22 +119,16 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
         </section>
       </div>
 
-      <section aria-labelledby="r-segn" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
-          <H2 id="r-segn" sub="Dall'app o dal Comando rapido dell'iPhone: il radar legge il profilo e la prima storia in evidenza.">Ultime segnalazioni</H2>
-          <button style={btn} onClick={onSegnala}>Segnala una creator</button>
+      <section aria-labelledby="r-segn" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
+          <H2 id="r-segn" sub="Chi l'ha trovata per primo e cosa c'è nella prima storia in evidenza.">Ultime segnalazioni</H2>
+          <button style={btnPrimary} onClick={onSegnala}>Segnala una creator</button>
         </div>
         {inbox.length === 0 ? (
           <p style={{ color: CP.textSecondary, margin: 0, fontSize: 14 }}>Ancora nessuna segnalazione.</p>
         ) : (
           <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-            {inbox.slice(0, 6).map((x) => (
-              <li key={x.id} style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: "4px 16px", padding: "11px 0", borderBottom: `1px solid ${CP.borderSoft || CP.border}`, fontSize: 14 }}>
-                <span>{x.h ? <button onClick={() => { const c = creators.find((y) => y.handles.includes(x.h)); if (c) onOpen(c); }} style={{ ...btnQuiet, padding: 0, minHeight: 0, color: CP.textPrimary }}>@{x.h}</button> : <span style={{ color: CP.textSecondary }}>{x.text.slice(0, 60)}</span>}
-                  <span style={{ color: CP.textMuted, fontSize: 12.5 }}> · {x.by || "—"} · {fmtDate(x.at)}{x.via === "iphone" ? " · iPhone" : ""}</span></span>
-                <span style={{ color: x.sig === "forte" && x.status !== "errore" ? CP.gold : x.warn || x.status === "errore" || x.status === "non_trovata" ? CP.attn : x.sig === "debole" ? CP.textPrimary : CP.textSecondary, fontSize: 13 }}>{x.msg}</span>
-              </li>
-            ))}
+            {inbox.slice(0, 6).map((x) => <SignalRow key={x.id} item={x} me={me} creators={creators} profilesBy={profilesBy} onOpen={onOpen} />)}
           </ul>
         )}
       </section>

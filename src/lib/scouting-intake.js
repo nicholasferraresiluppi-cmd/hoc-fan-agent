@@ -3,7 +3,8 @@
 // Una persona incolla (o condivide dall'iPhone) il link di un profilo o di un reel:
 //   1. reel → chi l'ha pubblicato (data-slayer/instagram-post-details: legge anche i reel
 //      con limite d'età, ~0,4 centesimi) e il reel finisce nella scheda;
-//   2. creator già nel radar → nota "segnalata di nuovo", nessuna spesa in più;
+//   2. creator già nel radar → nota "segnalata di nuovo" + verifica SUBITO (numeri e prima
+//      evidenza riletti, ~3 cent; dal 21/10/2026) e chi l'aveva trovata per primo;
 //   3. creator nuova → numeri del profilo (afanasenko/instagram-profile-scraper, 1 cent)
 //      + PRIMA storia in evidenza (afanasenko/instagram-stories-highlights-scraper, ~2 cent):
 //      il link che c'è dentro dice se ha un profilo a pagamento; se la storia TAGGA un altro
@@ -17,7 +18,7 @@
 // 36 ore e si riprendono quando servono. Nessuna copia dei video: la scheda li riproduce
 // dal server di Instagram (che li serve anche ad altri siti: cross-origin).
 import { getProfiles, commitProfiles, getForgotten, getCrm, saveCrm, getReelMedia, setReelMedia } from "@/lib/scouting-store";
-import { normHandle, parseRefreshItem, parseInstagramLink, bestLink, linkOrHint, sigFromLink, signalWhat, parseHighlightRows, weekKey, addNote, creatorIdOf } from "@/lib/scouting-core";
+import { normHandle, parseRefreshItem, parseInstagramLink, linkOrHint, sigFromLink, signalWhat, parseHighlightRows, weekKey, addNote, creatorIdOf, appendHistory, applyHighlightRead, knownBefore, sameAsSuggestions, linkWhere } from "@/lib/scouting-core";
 
 const API = "https://api.apify.com/v2";
 
@@ -153,11 +154,33 @@ async function readHighlight(h) {
   return { hlLinks: hl.urls, hlVia };
 }
 
+/** Quello che la segnalazione ha trovato, in breve (per la riga e la finestra). */
+function resultOf(p) {
+  const l = linkOrHint([p]);
+  return { fol: p.fol ?? null, medv: p.medv ?? null, link: l ? { label: l.label, where: linkWhere(l, { short: true }), strength: l.strength } : null };
+}
+
+/** Fatti noti su un account PRIMA della segnalazione (null = non è nel radar). Letture KV, nessuna spesa. */
+export async function precheckSignal(text) {
+  const link = parseInstagramLink(text);
+  const h = link?.handle ? normHandle(link.handle) : null;
+  if (!h) return { h: null, known: null };
+  const [profiles, crm] = await Promise.all([getProfiles(), getCrm()]);
+  const p = profiles.find((x) => x.h === h);
+  return { h, known: p ? knownBefore(p, crm.creators?.[creatorIdOf(crm, h)]) : null };
+}
+
+// Una creator già nel radar ricontrollata da meno di 6 ore non si rilegge (stessa segnalazione due volte).
+const RECHECK_MS = 6 * 3600 * 1000;
+
 /**
- * Lavora una segnalazione fino in fondo. Ritorna { status, h, msg } con status:
+ * Lavora una segnalazione fino in fondo. Ritorna { status, h, msg, known, ... } con status:
  * nuova | gia_nel_radar | cancellata | non_trovata | non_instagram | errore.
+ * Già nel radar = si VERIFICA SUBITO (decisione di Nicholas, 21/10/2026): numeri e prima storia
+ * in evidenza riletti adesso (~3 cent), non solo una nota. `onStep` dice a che punto è.
  */
-export async function processSignal({ text, by, why }) {
+export async function processSignal({ text, by, why }, { onStep } = {}) {
+  const step = async (s, extra) => { try { await onStep?.(s, extra); } catch { /* il passo è solo un'indicazione */ } };
   if (!process.env.APIFY_TOKEN) return { status: "errore", msg: "Manca la chiave Apify nelle impostazioni di HOC Pro." };
   const link = parseInstagramLink(text);
   if (!link) return { status: "non_instagram", msg: "Non è un link di Instagram." };
@@ -165,6 +188,7 @@ export async function processSignal({ text, by, why }) {
   let reel = null;
   let media = null;
   if (link.code) {
+    await step("reel");
     const r = await fetchReelByCode(link.code);
     if (!r?.h) return { status: "non_trovata", msg: "Non riesco a leggere questo reel: prova col link del profilo." };
     h = r.h; reel = r.reel; media = r.media;
@@ -175,23 +199,36 @@ export async function processSignal({ text, by, why }) {
 
   const profiles = await getProfiles();
   const before = [...profiles]; // si salva solo la differenza: chi scrive mentre si aspetta Apify non si perde
+  const crm0 = await getCrm();
   const i = profiles.findIndex((p) => p.h === h);
   const note = [`Segnalata da ${by || "qualcuno"}`, why ? `: ${String(why).slice(0, 200)}` : ""].join("");
+  const known = i >= 0 ? knownBefore(profiles[i], crm0.creators?.[creatorIdOf(crm0, h)]) : null;
+  // dal link di un reel l'account si scopre solo adesso: chi l'aveva trovata lo si dice subito
+  if (link.code) await step("account", { h, pre: { h, known } });
   if (i >= 0) {
-    // Già nel radar ma senza un link che dica qualcosa e mai letta con il giro dei tag:
-    // la segnalazione di una persona è il momento giusto per rileggere l'evidenza (~2,3 cent, una volta).
-    let found = "";
     const cur = profiles[i];
-    if (!cur.hlVia && !((bestLink([cur])?.strength || 0) >= 2)) {
+    let found = "";
+    let warn = false;
+    let checked = false;
+    if (!(cur.checkedAt && Date.now() - cur.checkedAt < RECHECK_MS)) {
+      const now = Date.now();
+      await step("profilo");
+      const row = await fetchProfileRow(h).catch(() => null);
+      let next = { ...cur };
+      if (row) {
+        next = { ...next, fol: row.fol ?? next.fol, medv: row.medv ?? next.medv, vf: row.vf ?? next.vf, url: row.url || next.url, ...(row.bio !== undefined ? { bio: row.bio } : {}), ...(row.pic ? { pic: row.pic } : {}), hist: appendHistory(next.hist, weekKey(new Date(now)), row.fol, row.medv), lastSeen: now, missing: 0 };
+      }
+      await step("storia");
       const { hlLinks, hlVia } = await readHighlight(h);
-      if (hlVia) {
-        const next = { ...cur, hlLinks: hlLinks.length ? hlLinks : cur.hlLinks || [], hlVia, hl: (hlLinks.length || cur.hlLinks?.length) > 0 };
-        const l = linkOrHint([next]);
-        next.sig = sigFromLink(l);
-        profiles[i] = next;
-        found = ` · ${signalWhat(l)}`;
-        await commitProfiles(before, profiles);
-      } else found = ` · ${signalWhat(null, { hlFailed: true })}`;
+      if (hlVia) next = applyHighlightRead(next, { urls: hlLinks, mentions: hlVia.map((v) => v.h) }, new Map(hlVia.map((v) => [v.h, v])), now);
+      next.checkedAt = now;
+      profiles[i] = next;
+      checked = true;
+      await commitProfiles(before, profiles);
+      const l = linkOrHint([next]);
+      found = ` · ${signalWhat(l, { hlFailed: !hlVia })}`;
+      if (!row) found += " · numeri NON riletti (Instagram non ha risposto)";
+      warn = !hlVia || !row;
     }
     if (reel) {
       const rs = new Map((profiles[i].reels || []).map((x) => [x.sc, x]));
@@ -201,28 +238,36 @@ export async function processSignal({ text, by, why }) {
     }
     await noteOn(h, note, by);
     if (media) await cacheMedia(h, [media]);
-    return { status: "gia_nel_radar", h, sig: profiles[i].sig || null, warn: found.includes("NON letta"), msg: `@${h} era già nel radar: aggiunta la segnalazione${found}.` };
+    const crm = await getCrm();
+    return {
+      status: "gia_nel_radar", h, sig: profiles[i].sig || null, warn, known, checked,
+      ...resultOf(profiles[i]), match: sameAsSuggestions(profiles, crm, h),
+      msg: `@${h} era già nel radar: aggiunta la segnalazione${checked ? `, ricontrollata adesso${found}` : ", già ricontrollata nelle ultime ore"}.`,
+    };
   }
 
+  await step("profilo");
   const row = await fetchProfileRow(h);
   if (!row) return { status: "non_trovata", h, msg: `Non riesco a leggere @${h} (privato o inesistente).` };
+  await step("storia");
   const { hlLinks, hlVia } = await readHighlight(h);
   const draft = { url: row.url, hlLinks, hlVia: hlVia || [] };
   const link0 = linkOrHint([draft]);
   const sig = sigFromLink(link0);
   const now = Date.now();
-  profiles.push({
-    h, fol: row.fol, medv: row.medv, vf: row.vf ?? null, sig, hl: hlLinks.length > 0, hlLinks, ...(hlVia ? { hlVia } : {}),
+  const p = {
+    h, fol: row.fol, medv: row.medv, vf: row.vf ?? null, sig, hl: hlLinks.length > 0, hlLinks, ...(hlVia ? { hlVia, hlAt: now } : {}),
     nic: "", fmt: "nessuno", u: 0, nota: "", ours: false, ag: false, chk: false,
     g: "Da classificare", src: "segnalata", url: row.url || "", bio: row.bio || "",
-    hist: [[weekKey(new Date(now)), row.fol, row.medv]], firstSeen: now, lastSeen: now, missing: 0,
+    hist: [[weekKey(new Date(now)), row.fol, row.medv]], firstSeen: now, lastSeen: now, checkedAt: now, missing: 0,
     reels: reel ? [{ ...reel, signaled: true }] : [], by: by || null,
-  });
+  };
+  profiles.push(p);
   await commitProfiles(before, profiles);
   await noteOn(h, note, by);
   if (media) await cacheMedia(h, [media]);
   const what = signalWhat(link0, { hlFailed: !hlVia });
-  return { status: "nuova", h, sig, warn: !hlVia, msg: `@${h} aggiunta al radar · ${what}.` };
+  return { status: "nuova", h, sig, warn: !hlVia, known: null, checked: true, ...resultOf(p), match: sameAsSuggestions(profiles, crm0, h), msg: `@${h} aggiunta al radar · ${what}.` };
 }
 
 async function noteOn(h, text, by) {
