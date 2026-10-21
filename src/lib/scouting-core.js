@@ -859,6 +859,92 @@ export function parseInstagramLink(text) {
   return null;
 }
 
+// ---------- chi l'aveva già trovata (21/10/2026) ----------
+//
+// Nicholas: «non si capisce se la creator c'era già… è venuta fuori da me o da te?». Una
+// segnalazione dice SEMPRE chi l'ha trovata per primo (il radar con una delle sue ricerche,
+// o una persona) e cosa ne è stato fatto (valutata, fase, nostra). Fatti presi PRIMA della
+// segnalazione, dal profilo e dalla scheda del CRM.
+
+const SIGNAL_NOTE = /^Segnalata da ([^:]+)/;
+const sameName = (a, b) => !!a && !!b && String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+
+/** Fatti noti su un account già nel radar, prima che arrivi la segnalazione. null se non c'è. */
+export function knownBefore(profile, crmCreator) {
+  if (!profile) return null;
+  const signals = (crmCreator?.notes || [])
+    .filter((n) => SIGNAL_NOTE.test(n.text || ""))
+    .map((n) => ({ by: n.by || (n.text.match(SIGNAL_NOTE)[1] || "").trim() || null, at: n.at || null }));
+  const how = profile.src === "segnalata" ? "segnalata" : profile.src === "profili simili" || profile.src === "parole chiave" ? profile.src : "ricerca";
+  const stage = STAGE_IDS.includes(crmCreator?.stage) ? crmCreator.stage : DEFAULT_STAGE;
+  return {
+    how,
+    by: how === "segnalata" ? profile.by || signals[0]?.by || null : null,
+    at: profile.firstSeen || null,
+    signals: signals.length,
+    lastSignal: signals.length ? signals[signals.length - 1] : null,
+    stage,
+    reviewedAt: crmCreator?.reviewedAt || null,
+    reviewedBy: crmCreator?.reviewedBy || null,
+    ours: !!profile.ours,
+    sig: profile.sig || "nessuno",
+  };
+}
+
+const dmy = (t) => (t ? new Date(t).toLocaleDateString("it-IT", { day: "numeric", month: "short", timeZone: "Europe/Rome" }) : "");
+const HOW_LABEL = { "profili simili": "cercando tra i profili collegati", "parole chiave": "cercando per parole chiave", ricerca: "con la prima grande ricerca" };
+
+/**
+ * Da dove viene una segnalazione, in parole, per chi la guarda (`me` = il suo nome).
+ * kind: "lettura" | "nuova" | "gia" | "errore"; who: "radar" | "persona" (chi l'ha trovata per primo).
+ * title + line per la finestra, short per la riga dell'elenco. Già nel radar si sa SUBITO
+ * (`pre.known`, letto quando arriva la segnalazione), prima che la verifica finisca.
+ */
+export function signalOrigin(item, { me, profile } = {}) {
+  if (!item) return null;
+  const mine = (who) => (sameName(who, me) ? "te" : who || "qualcuno");
+  if (["errore", "non_trovata", "non_instagram", "cancellata"].includes(item.status)) return { kind: "errore", title: item.status === "cancellata" ? "Tolta su richiesta" : "Non letta", line: item.msg || "", short: item.msg || "" };
+  const reading = item.status === "in_lettura";
+  if (reading && !item.pre?.known) {
+    return { kind: "lettura", title: item.pre?.h ? "Non è nel radar" : "In lettura", line: item.pre?.h ? "La leggo per la prima volta." : "Cerco chi l'ha pubblicato.", short: "La leggo adesso." };
+  }
+  if (item.status === "nuova") {
+    const who = mine(item.by);
+    return { kind: "nuova", who: "persona", title: who === "te" ? "Trovata da te" : `Trovata da ${who}`, line: "Il radar non la conosceva.", short: who === "te" ? "Trovata da te" : `Trovata da ${who}` };
+  }
+  // già nel radar: i fatti salvati con la segnalazione; per quelle di prima del 21/10, dal profilo
+  const saved = reading ? item.pre.known : item.known;
+  const k = saved || (profile ? knownBefore(profile, null) : null);
+  if (!k) return { kind: reading ? "lettura" : "gia", who: "radar", title: "Era già nel radar", line: "", short: "Era già nel radar" };
+  const at = saved ? k.at : k.at && item.at && k.at < item.at ? k.at : null;
+  const when = at ? ` il ${dmy(at)}` : "";
+  let title;
+  let first;
+  if (k.how === "segnalata") {
+    const w = mine(k.by);
+    title = w === "te" ? "L'avevi già segnalata tu" : `L'aveva già segnalata ${w}`;
+    first = w === "te" ? `Segnalata già da te${when}` : `Segnalata prima da ${w}${when}`;
+  } else {
+    title = "L'aveva già trovata il radar";
+    first = `Trovata dal radar${when}`;
+  }
+  let state;
+  if (k.ours) state = "è già una creator HOC";
+  else if (k.reviewedAt) state = `${k.stage === "scartata" ? "scartata" : k.stage === DEFAULT_STAGE ? "vista" : `«${(STAGES.find((s) => s.id === k.stage) || {}).label}»`} da ${mine(k.reviewedBy)} il ${dmy(k.reviewedAt)}`;
+  else if (k.stage !== DEFAULT_STAGE) state = `fase «${(STAGES.find((s) => s.id === k.stage) || {}).label}»`;
+  else state = "non ancora valutata";
+  const others = saved ? k.signals - (k.how === "segnalata" ? 1 : 0) : 0;
+  const again = others > 0 ? (others === 1 ? "segnalata un'altra volta" : `segnalata altre ${others} volte`) : null;
+  const line = [at ? (k.how === "segnalata" ? `il ${dmy(at)}` : `il ${dmy(at)}, ${HOW_LABEL[k.how]}`) : null, state, again].filter(Boolean).join(" · ");
+  return { kind: reading ? "lettura" : "gia", who: k.how === "segnalata" ? "persona" : "radar", title, line, short: [first, state].join(" · ") };
+}
+
+/** Altri account del radar che sembrano la stessa persona di `h` (massimo 2), con il perché. */
+export function sameAsSuggestions(profiles, crm, h, max = 2) {
+  const all = suggestLinks(profiles, (x) => creatorIdOf(crm, x), new Set(crm?.dismissed || []), { max: 5000 });
+  return all.filter((s) => s.a === h || s.b === h).slice(0, max).map((s) => ({ h: s.a === h ? s.b : s.a, reason: s.reason }));
+}
+
 // ---------- scritture sovrapposte (17/10/2026) ----------
 //
 // Ogni scrittura del radar riscrive TUTTI i profili. Chi leggeva, aspettava Apify (~30 s, la

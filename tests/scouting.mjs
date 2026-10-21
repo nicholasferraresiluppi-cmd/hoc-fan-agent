@@ -12,6 +12,7 @@ import {
   creatorIdOf, setStage, addNote, setField, linkHandles, unlinkHandle, dismissSuggestion, forgetHandle,
   HISTORY_MAX, DEFAULT_STAGE, applyRefresh, scrubContacts,
   classifyUrl, bestLink, linkWhere, highlightHint, linkOrHint, sigFromLink, signalWhat, parseHighlightRows, applyHighlightRead, hlRereadCandidates, whyLines, pickToday, parseInstagramLink, marketByGroup,
+  knownBefore, signalOrigin, sameAsSuggestions,
 } from "../src/lib/scouting-core.js";
 
 let n = 0;
@@ -230,6 +231,38 @@ const candP = [
   { h: "conTag", sig: "nessuno", hlVia: [], fol: 1 }, { h: "cancellata", sig: "nessuno", fol: 1 }, { h: "sparita", sig: "nessuno", missing: 2, fol: 1 },
 ];
 eq(hlRereadCandidates(candP, crmR, new Set(["cancellata"])), ["segn", "base"], "da rileggere: da valutare, senza profilo a pagamento, mai lette coi tag; prima le segnalate");
+
+
+// chi l'aveva già trovata (21/10/2026): segnalazione di un account già nel radar
+{
+  const D = (d) => Date.UTC(2026, 9, d, 10);
+  const radar = { h: "sassa.santo", src: "profili simili", firstSeen: D(9), sig: "debole" };
+  const crmC = { stage: "scartata", reviewedAt: D(12), reviewedBy: "Claudia", notes: [{ at: D(15), by: "Giulia", text: "Segnalata da Giulia: reel virale" }, { at: D(16), by: "x", text: "nota qualsiasi" }] };
+  const k = knownBefore(radar, crmC);
+  eq([k.how, k.by, k.signals, k.lastSignal.by, k.stage, k.reviewedBy], ["profili simili", null, 1, "Giulia", "scartata", "Claudia"], "fatti noti prima della segnalazione");
+  eq(knownBefore(null, crmC), null, "non nel radar = null");
+  const o = signalOrigin({ status: "gia_nel_radar", at: D(22), by: "Nicholas", known: k }, { me: "nicholas" });
+  eq([o.kind, o.who, o.title], ["gia", "radar", "L'aveva già trovata il radar"], "trovata dal radar");
+  ok(o.line.includes("cercando tra i profili collegati") && o.line.includes("scartata da Claudia") && o.line.includes("segnalata un'altra volta"), `riga: ${o.line}`);
+  const mineK = knownBefore({ h: "a", src: "segnalata", by: "Nicholas Ferraresi Luppi", firstSeen: D(17) }, { notes: [{ at: D(17), by: "Nicholas Ferraresi Luppi", text: "Segnalata da Nicholas Ferraresi Luppi" }] });
+  const o2 = signalOrigin({ status: "gia_nel_radar", at: D(22), by: "Nicholas Ferraresi Luppi", known: mineK }, { me: "Nicholas Ferraresi Luppi" });
+  eq([o2.who, o2.title], ["persona", "L'avevi già segnalata tu"], "già segnalata da me");
+  ok(o2.line.includes("non ancora valutata") && !o2.line.includes("altra volta"), "la prima segnalazione non conta come «un'altra volta»");
+  eq(signalOrigin({ status: "nuova", by: "Nicholas" }, { me: "Nicholas" }).title, "Trovata da te", "nuova = trovata da chi segnala");
+  eq(signalOrigin({ status: "nuova", by: "Giulia" }, { me: "Nicholas" }).title, "Trovata da Giulia", "nuova di un altro");
+  const subito = signalOrigin({ status: "in_lettura", pre: { h: "a", known: k } }, { me: "Nicholas" });
+  eq([subito.kind, subito.title], ["lettura", "L'aveva già trovata il radar"], "chi l'aveva trovata si sa SUBITO, prima della verifica");
+  eq(o.short, "Trovata dal radar il 9 ott · scartata da Claudia il 12 ott", "riga corta dell'elenco");
+  eq(signalOrigin({ status: "in_lettura", pre: { h: "a", known: null } }).title, "Non è nel radar", "subito: nuova");
+  // segnalazioni di prima del 21/10 (senza `known`): dal profilo, solo se c'era già prima
+  const old = signalOrigin({ status: "gia_nel_radar", at: D(17), by: "Nicholas" }, { me: "Nicholas", profile: radar });
+  eq(old.title, "L'aveva già trovata il radar", "segnalazione vecchia: origine dal profilo");
+  eq(signalOrigin({ status: "errore", msg: "boom" }).kind, "errore", "errore");
+  // stessa persona: stesso link in bio
+  const ps = [{ h: "mara.back", url: "https://onlyfans.com/maraxx" }, { h: "mara.main", url: "https://onlyfans.com/maraxx" }, { h: "altra", url: "" }];
+  eq(sameAsSuggestions(ps, { creators: {} }, "mara.back").map((x) => x.h), ["mara.main"], "proposta: stessa persona di un altro account");
+  eq(sameAsSuggestions(ps, { creators: {}, dismissed: ["mara.back|mara.main"] }, "mara.back"), [], "proposta scartata non torna");
+}
 
 console.log(`scouting: ${n} asserzioni ok`);
 

@@ -1,7 +1,7 @@
 // Radar creator — segnalazione dal Comando rapido dell'iPhone (10/10/2026).
 // ROUTE PUBBLICA (vedi middleware): si difende da sola col token personale che l'admin
 // genera nel Radar (salvato solo come hash sha256 in scouting:tokens) + tetto d'uso.
-// Accetta solo un link: non legge né restituisce dati del radar.
+// Accetta solo un link; dice soltanto se l'account era già nel radar (21/10/2026), nessun altro dato.
 import { after } from "next/server";
 import { ownerOfToken, queueSignal } from "@/lib/scouting-signal";
 import { checkRateLimit, tooMany } from "@/lib/rate-limit";
@@ -21,7 +21,13 @@ export async function POST(request) {
   if (!rl.ok) return tooMany(rl.retryAfter);
   const text = String(body.url || body.text || "").trim();
   if (!text) return Response.json({ ok: false, message: "Nessun link ricevuto." }, { status: 400 });
-  const { work } = await queueSignal({ text, why: body.why, by: owner.name || null, via: "iphone" });
+  const { item, work } = await queueSignal({ text, why: body.why, by: owner.name || null, via: "iphone" });
   after(work);
-  return Response.json({ ok: true, message: "Ricevuta: il Radar la sta leggendo." });
+  const h = item.pre?.h;
+  const k = item.pre?.known;
+  const message = !h ? "Ricevuta: il Radar la sta leggendo."
+    : !k ? `@${h} è nuova: la leggo adesso.`
+    : k.how === "segnalata" ? `@${h} era già nel radar (segnalata${k.by ? ` da ${k.by}` : ""}): la ricontrollo adesso.`
+    : `@${h} l'aveva già trovata il radar: la ricontrollo adesso.`;
+  return Response.json({ ok: true, message });
 }
