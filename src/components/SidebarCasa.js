@@ -16,7 +16,7 @@ import useSWR from "swr";
 import { UserButton, SignedIn } from "@clerk/nextjs";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
 import { useStyle, useTheme } from "@/lib/theme-client";
-import { Sun, Moon } from "lucide-react";
+import { Sun, Moon, MessageSquarePlus } from "lucide-react";
 import { NAV_GROUPS, SIDEBAR_WIDTH } from "./Sidebar";
 import WorkspaceSwitch from "@/components/WorkspaceSwitch";
 import { WORKSPACES, workspaceSections } from "@/lib/workspaces";
@@ -184,6 +184,11 @@ export default function SidebarCasa() {
         <div className="casa-me">
           <span className="hoc-avatar"><UserButton afterSignOutUrl="/sign-in" /></span>
           <span className="n">{me?.name || "Account"}</span>
+          {/* telefono: il feedback sta qui invece che galleggiare sopra il contenuto (16/10/2026) */}
+          <button type="button" className="casa-theme casa-fb" onClick={() => window.dispatchEvent(new Event("hoc:feedback"))}
+            aria-label="Segnala o suggerisci" title="Segnala o suggerisci">
+            <MessageSquarePlus size={15} />
+          </button>
           <button type="button" className="casa-theme" onClick={() => setTheme(theme === "light" ? "dark" : "light")}
             aria-label={theme === "light" ? "Passa al tema scuro" : "Passa al tema chiaro"} title={theme === "light" ? "Tema scuro" : "Tema chiaro"}>
             {theme === "light" ? <Moon size={15} /> : <Sun size={15} />}
