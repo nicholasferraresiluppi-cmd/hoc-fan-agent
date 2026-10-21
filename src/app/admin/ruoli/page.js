@@ -288,7 +288,7 @@ export default function MembersPage() {
       {/* 05/10/2026: l'esito compare anche in basso, sempre visibile: chi agiva dal pannello in fondo
           alla pagina non vedeva l'avviso in cima e pensava che il pulsante non funzionasse */}
       {msg && (
-        <div role="status" style={{ position: "fixed", left: "50%", bottom: 20, transform: "translateX(-50%)", zIndex: 80, maxWidth: "min(560px, calc(100vw - 32px))", display: "flex", gap: 12, alignItems: "center", padding: "10px 14px", borderRadius: 10, background: CP.bg, border: `1px solid ${msg.type === "error" ? CP.accentRed : CP.borderStrong}`, boxShadow: "0 12px 32px rgba(0,0,0,.35)", fontSize: 13.5, color: msg.type === "error" ? CP.accentRed : CP.textPrimary }}>
+        <div role="status" className="hoc-dock" style={{ position: "fixed", left: "50%", bottom: "calc(20px + env(safe-area-inset-bottom))", transform: "translateX(-50%)", zIndex: 80, maxWidth: "min(560px, calc(100vw - 32px))", display: "flex", gap: 12, alignItems: "center", padding: "10px 14px", borderRadius: 10, background: CP.bg, border: `1px solid ${msg.type === "error" ? CP.accentRed : CP.borderStrong}`, boxShadow: "0 12px 32px rgba(0,0,0,.35)", fontSize: 13.5, color: msg.type === "error" ? CP.accentRed : CP.textPrimary }}>
           <span style={{ flex: 1 }}>{msg.text}</span>
           <button type="button" onClick={() => setMsg(null)} style={{ background: "none", border: 0, color: CP.textMuted, cursor: "pointer", fontSize: 13 }}>Chiudi</button>
         </div>

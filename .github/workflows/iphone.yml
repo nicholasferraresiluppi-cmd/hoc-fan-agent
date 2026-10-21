@@ -1,0 +1,22 @@
+# Controlli iPhone (tests/iphone.mjs): viewport, rimbalzo, elementi fissi in basso e linea Home.
+# Statico, senza install del progetto: pochi secondi a ogni PR.
+name: Controlli iPhone
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  iphone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node tests/iphone.mjs
