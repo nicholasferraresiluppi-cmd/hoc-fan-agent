@@ -6,12 +6,18 @@
  * dopo: legge gli stessi 3 mesi di wage CP, che a quel punto sono già nella copia
  * in memoria di cp-wages-store (si scarica solo il manifest, niente banda in più —
  * incidente Upstash del 04/10). La pagina legge SOLO `fasce:data:{versione}`.
+ *
+ * v3 (22/10/2026): la BRAVURA delle persone è quella della Squadra (vendite Infloww,
+ * `squadra:data:*`, calcolata un attimo prima nello stesso cron); dai turni CP si
+ * prendono solo ore e valore delle fasce per pagina. Abbinamento membro CP → nome
+ * Infloww con le stesse regole della Squadra (`cp:member_mapping`, poi matchName:
+ * ambiguo = non abbinato).
  */
 import { kv } from "@vercel/kv";
 import { getWages } from "@/lib/cp-wages-store";
 import { FASCE_VERSION, toPieces, buildFasce } from "@/lib/fasce-core";
-import { currentMonthRome } from "@/lib/squadra";
-import { shiftMonth } from "@/lib/squadra-core";
+import { currentMonthRome, getSquadraData } from "@/lib/squadra";
+import { shiftMonth, matchName } from "@/lib/squadra-core";
 
 const DATA_KEY = `fasce:data:${FASCE_VERSION}`;
 const LOCK_KEY = "fasce:lock";
@@ -48,11 +54,26 @@ export async function computeFasce({ now = Date.now() } = {}) {
   const names = {};
   const shifts = [];
   for (const m of months) shifts.push(...shiftsFromWages((await getWages(m)) || [], names));
-  const doc = buildFasce(toPieces(shifts), { now, names });
+  const [squadra, mapping] = await Promise.all([getSquadraData(), kv.get("cp:member_mapping")]);
+  const sqRows = (squadra?.rows || []).filter((r) => r.idx != null);
+  const sqNames = sqRows.map((r) => r.name);
+  const byName = new Map(sqRows.map((r) => [r.name, r]));
+  const bravuraOf = new Map();
+  const seen = new Set();
+  for (const s of shifts) {
+    const mid = String(s.member_id);
+    if (seen.has(mid)) continue;
+    seen.add(mid);
+    const cpName = (mapping && mapping[s.member_id]) || s.member_name;
+    const hit = byName.has(cpName) ? cpName : matchName(cpName, sqNames);
+    if (hit) bravuraOf.set(mid, { idx: byName.get(hit).idx, infloww_name: hit });
+  }
+  const doc = buildFasce(toPieces(shifts), { now, names, bravuraOf });
   const out = {
     ...doc,
     generated_at: new Date(now).toISOString(),
     window: { from: `${months[0]}-01`, months },
+    bravura_window: squadra ? { from: `${squadra.months?.m2}-01`, until: squadra.months?.infloww_until || null, generated_at: squadra.generated_at } : null,
     counts: { shifts: shifts.length, pages: doc.pages.length, operators: doc.operators.length },
   };
   await kv.set(DATA_KEY, out, { ex: 4 * 24 * 3600 });

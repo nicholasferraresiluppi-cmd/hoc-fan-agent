@@ -64,6 +64,7 @@ export async function GET(request) {
       generated_at: data.generated_at,
       window: data.window,
       until: data.until || null,
+      bravura_window: data.bravura_window || null,
       stability: data.stability,
       overall: inSplit ? splitSlotValues(pages) : data.overall,
       split: split ? { id: split.id, name: split.name } : null,
