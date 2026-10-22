@@ -63,6 +63,7 @@ export async function GET(request) {
       stale: isFasceStale(data),
       generated_at: data.generated_at,
       window: data.window,
+      until: data.until || null,
       stability: data.stability,
       overall: inSplit ? splitSlotValues(pages) : data.overall,
       split: split ? { id: split.id, name: split.name } : null,
