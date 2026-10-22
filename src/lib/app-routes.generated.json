@@ -101,6 +101,7 @@
  "/admin/user-mapping",
  "/admin/utilizzo",
  "/admin/wage-audit",
+ "/admin/warmup",
  "/assessment/[token]",
  "/cm-cockpit",
  "/contabilita",
