@@ -13,9 +13,18 @@ description: >-
 # Guarda video
 
 Lo strumento è `scripts/guarda-video.mjs` (Node, nessuna dipendenza; servono `ffmpeg` e `ffprobe`).
-Il lavoro è diviso così: **lo script prende il video e ne fa i fotogrammi, Claude li guarda**.
-Gemini serve solo per l'AUDIO (parlato, musica) e per i testi a schermo letti su tutto il video:
-Claude non sente l'audio.
+Il lavoro è diviso così: **Gemini guarda il video intero e racconta, Claude controlla sui fotogrammi**.
+Gemini vede movimento, montaggio, audio e tempi (Claude il video non lo guarda e non sente l'audio);
+i fotogrammi sono gli occhi di Claude per verificare quello che Gemini dice (anche Gemini sbaglia).
+
+## La regola di qualità (fissa, decisa da Nicholas)
+
+La densità è **al secondo, uguale per ogni durata**: un reel da 3 secondi e uno da 3 minuti si guardano
+allo stesso modo. Un video più lungo costa più tempo, non perde qualità.
+- **Gemini: 5 immagini al secondo** + audio continuo, a pezzi da 30 secondi (ognuno alla stessa frequenza).
+- **Claude: 2 fotogrammi al secondo** + uno subito dopo ogni taglio.
+- Sopra i 3 minuti lo script chiede `--lungo`: si usa solo se la persona vuole davvero tutto il video.
+Non abbassare queste cifre per fare prima. I valori stanno in cima allo script (`GEMINI_FPS`, `CLAUDE_FPS`).
 
 ## Giro
 
@@ -25,11 +34,15 @@ Claude non sente l'audio.
    ```
    Stampa un JSON: `cartella`, `meta` (autore, didascalia, visualizzazioni, like, audio…),
    `video` (durata, tagli), `fogli` (immagini 3×3 di fotogrammi), `gemini.file`, `problemi`.
-2. Apri **tutti** i `fogli` con Read, in ordine: ogni riquadro porta il secondo in alto a sinistra.
-   I primi 3 secondi sono a passo di 0,5 s (il gancio), poi a passo regolare, più un fotogramma dopo
-   ogni taglio. Per un dettaglio, apri il singolo fotogramma in `cartella/fotogrammi/`.
-3. Se c'è `gemini.file`, leggilo: parlato con i secondi, testi a schermo, audio.
-4. Leggi `problemi` e dillo nella risposta se manca qualcosa (es. "il parlato non l'ho sentito").
+2. Se c'è `gemini.file`, leggilo per primo: scene, tagli, gancio, parlato, testi a schermo, audio,
+   tutto con i secondi.
+3. Apri **tutti** i `fogli` con Read, in ordine (9 fotogrammi a foglio, ognuno col secondo in alto a
+   sinistra; un fotogramma ogni 0,5 s). Per un dettaglio, apri il singolo file in `cartella/fotogrammi/`.
+4. **Incrocia**: per ogni affermazione di Gemini che conta (una scritta, un gesto, chi c'è, un taglio)
+   guarda il fotogramma di quel secondo. Se non torna, vale quello che vedi tu e nella risposta lo dici
+   («Gemini dice X al secondo 4, ma nel fotogramma non c'è»). Quello che si sente (parlato, musica) lo
+   sa solo Gemini: riportalo come suo.
+5. Leggi `problemi` e dillo nella risposta se manca qualcosa (es. "il parlato non l'ho sentito").
 
 ## Risposta (in italiano)
 

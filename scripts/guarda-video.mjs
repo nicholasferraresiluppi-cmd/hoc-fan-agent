@@ -14,12 +14,24 @@
 // solo SOLO sui link pubblici; un file locale (es. un reel non ancora pubblicato di una creator)
 // va a Gemini solo con --gemini esplicito. Nessun video finisce nel repo: tutto in --out
 // (di base la cartella temporanea del sistema).
+//
+// REGOLA DI QUALITÀ (decisione di Nicholas, 22/10/2026): la densità è fissa AL SECONDO, uguale
+// per un reel da 3 secondi e per uno da 3 minuti. Un video più lungo costa più tempo, non perde
+// qualità: Gemini lo guarda a pezzi da SEGMENT_S secondi, ognuno alla stessa frequenza.
+//   - Gemini: GEMINI_FPS immagini al secondo (a 5/s ogni inquadratura di almeno 0,2 s viene vista;
+//     di base Gemini ne guarda 1/s e i tagli rapidi dei reel passerebbero in mezzo) + audio continuo.
+//   - Claude: CLAUDE_FPS fotogrammi al secondo + uno subito dopo ogni taglio, per controllare con
+//     i propri occhi quello che Gemini racconta.
+// Oltre LONG_S secondi serve --lungo (così nessuno lancia per sbaglio un'ora di YouTube).
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const MAX_FRAMES = 60;
+const CLAUDE_FPS = 2;
+const GEMINI_FPS = 5;
+const SEGMENT_S = 30;
+const LONG_S = 180;
 const LONG_SIDE = 768;
 const DEFAULT_MODEL = "gemini-3.8-flash";
 
@@ -41,13 +53,14 @@ function loadEnv() {
 }
 
 function parseArgs(argv) {
-  const a = { src: null, domanda: "", gemini: null, out: null };
+  const a = { src: null, domanda: "", gemini: null, out: null, lungo: false };
   for (let i = 0; i < argv.length; i++) {
     const x = argv[i];
     if (x === "--domanda") a.domanda = argv[++i] || "";
     else if (x === "--gemini") a.gemini = true;
     else if (x === "--no-gemini") a.gemini = false;
     else if (x === "--out") a.out = argv[++i];
+    else if (x === "--lungo") a.lungo = true;
     else if (!a.src) a.src = x;
   }
   return a;
@@ -126,26 +139,30 @@ function probe(file) {
   return { duration: Number(j.format.duration) || 0, width: v?.width, height: v?.height, audio: j.streams.some((s) => s.codec_type === "audio") };
 }
 
-// Quando guardare: fitto nei primi 3 secondi (il gancio), poi a passo regolare, più ogni taglio.
 function sceneCuts(file) {
   const r = spawnSync("ffmpeg", ["-hide_banner", "-i", file, "-vf", "select='gt(scene,0.3)',showinfo", "-an", "-f", "null", "-"], { encoding: "utf8", maxBuffer: 64 << 20 });
   return [...(r.stderr || "").matchAll(/pts_time:([\d.]+)/g)].map((m) => Number(m[1]));
 }
 
-export function pickTimes(duration, cuts, max = MAX_FRAMES) {
+// Passo fisso di 1/CLAUDE_FPS secondi su tutto il video + subito dopo ogni taglio + l'ultimo istante.
+// Nessun tetto: la densità non cala con la durata (vedi REGOLA in cima).
+export function pickTimes(duration, cuts, fps = CLAUDE_FPS) {
   const t = [];
-  for (let s = 0; s < Math.min(3, duration); s += 0.5) t.push(s);
-  const step = Math.max(1, (duration - 3) / Math.max(1, max - 6 - Math.min(cuts.length, 20)));
-  for (let s = 3; s < duration; s += step) t.push(s);
-  for (const c of cuts.slice(0, 20)) t.push(c + 0.1); // subito dopo il taglio
+  for (let s = 0; s < duration; s += 1 / fps) t.push(s);
+  for (const c of cuts) t.push(c + 0.1);
   t.push(Math.max(0, duration - 0.2));
   const sorted = [...new Set(t.map((x) => Math.round(x * 10) / 10))].filter((x) => x >= 0 && x < duration).sort((a, b) => a - b);
   const kept = [];
-  for (const x of sorted) if (!kept.length || x - kept[kept.length - 1] >= 0.3) kept.push(x);
-  if (kept.length <= max) return kept;
+  for (const x of sorted) if (!kept.length || x - kept[kept.length - 1] >= 0.2) kept.push(x);
+  return kept;
+}
+
+// Pezzi da SEGMENT_S secondi per Gemini (l'ultimo può essere più corto).
+export function segments(duration, size = SEGMENT_S) {
+  if (!(duration > 0)) return [null];
   const out = [];
-  for (let i = 0; i < max; i++) out.push(kept[Math.round((i * (kept.length - 1)) / (max - 1))]);
-  return [...new Set(out)];
+  for (let s = 0; s < duration; s += size) out.push([s, Math.min(duration, s + size)]);
+  return out;
 }
 
 function findFont() {
@@ -239,32 +256,55 @@ async function geminiUpload(key, file) {
   return f;
 }
 
-const GEMINI_PROMPT = (domanda) => `Guarda questo video (immagini e audio) e rispondi in italiano, in testo semplice, con queste sezioni:
-PARLATO: trascrizione fedele di tutto ciò che si dice, con il secondo [m:ss] a inizio frase e chi parla. Se non si parla, scrivi "nessun parlato" e descrivi l'audio (musica, suoni).
-TESTI A SCHERMO: ogni scritta sovrimpressa, con il secondo in cui compare.
-AUDIO: musica/suoni, tono della voce.
-COSA SUCCEDE: la sequenza delle scene in breve, con i secondi.
-${domanda ? `DOMANDA: ${domanda}\n` : ""}Non inventare: se una parola non si capisce scrivi [incomprensibile].`;
+const GEMINI_PROMPT = (seg, domanda) => `Guarda questo video${seg ? ` dal secondo ${seg[0]} al secondo ${seg[1]}` : ""}, immagini e audio insieme. Rispondi in italiano, testo semplice, sempre con il secondo del VIDEO INTERO nel formato [m:ss.s]. Sezioni:
+SCENE: ogni inquadratura con inizio e fine, cosa si vede, chi c'è, dove, inquadratura (primo piano, figura intera…) e movimento della camera.
+TAGLI: l'istante di ogni taglio e se cade a tempo con la musica o con una parola.
+${seg && seg[0] > 0 ? "" : "GANCIO: cosa succede nei primi 3 secondi, decimo per decimo se serve, e cosa spinge a restare.\n"}PARLATO: trascrizione fedele, con chi parla e il tono di voce. Se non si parla, scrivi "nessun parlato".
+TESTI A SCHERMO: ogni scritta sovrimpressa, quando compare e quando sparisce.
+AUDIO: musica (cambia? quando sale?), suoni, silenzi.
+${domanda ? `DOMANDA: ${domanda}\n` : ""}Non inventare: quello che non vedi o non capisci scrivilo come [non chiaro].`;
 
-async function askGemini({ key, file, youtube, domanda }) {
-  const model = await geminiModel(key);
-  let part;
-  let uploaded = null;
-  if (youtube) part = { file_data: { file_uri: youtube } };
-  else {
-    uploaded = await geminiUpload(key, file);
-    part = { file_data: { mime_type: uploaded.mimeType || "video/mp4", file_uri: uploaded.uri } };
-  }
-  try {
-    const r = await fetch(`${GEMINI}/v1beta/models/${model}:generateContent?key=${key}`, {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function generate(key, model, body) {
+  for (let i = 0; ; i++) {
+    const r = await net(`${GEMINI}/v1beta/models/${model}:generateContent?key=${key}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [part, { text: GEMINI_PROMPT(domanda) }] }], generationConfig: { temperature: 0.2 } }),
+      body: JSON.stringify(body),
     });
     const j = await r.json();
-    if (!r.ok) throw new Error(`Gemini ${r.status}: ${JSON.stringify(j.error || j).slice(0, 300)}`);
-    const text = (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("").trim();
-    return { model, text: text || "(Gemini non ha risposto)" };
+    if (r.ok) return (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("").trim();
+    // Limite al minuto del livello gratuito: si aspetta quanto dice Google e si riprova.
+    const wait = Number(String(j.error?.details?.find((d) => d.retryDelay)?.retryDelay || "").replace("s", ""));
+    if (r.status === 429 && i < 4) {
+      await sleep((wait || 20) * 1000);
+      continue;
+    }
+    throw new Error(`Gemini ${r.status}: ${JSON.stringify(j.error || j).slice(0, 300)}`);
+  }
+}
+
+async function askGemini({ key, file, youtube, domanda, duration }) {
+  const model = await geminiModel(key);
+  let base;
+  let uploaded = null;
+  if (youtube) base = { file_data: { file_uri: youtube } };
+  else {
+    uploaded = await geminiUpload(key, file);
+    base = { file_data: { mime_type: uploaded.mimeType || "video/mp4", file_uri: uploaded.uri } };
+  }
+  try {
+    const parts = [];
+    for (const seg of segments(duration)) {
+      const videoMetadata = { fps: GEMINI_FPS, ...(seg ? { startOffset: `${seg[0]}s`, endOffset: `${seg[1]}s` } : {}) };
+      const text = await generate(key, model, {
+        contents: [{ parts: [{ ...base, videoMetadata }, { text: GEMINI_PROMPT(seg, domanda) }] }],
+        generationConfig: { temperature: 0.2 },
+      });
+      parts.push(seg ? `=== PEZZO ${seg[0]}-${seg[1]} s ===\n${text || "(nessuna risposta)"}` : text || "(nessuna risposta)");
+    }
+    return { model, pezzi: parts.length, text: parts.join("\n\n") };
   } finally {
     if (uploaded) await fetch(`${GEMINI}/v1beta/${uploaded.name}?key=${key}`, { method: "DELETE" }).catch(() => {});
   }
@@ -291,21 +331,26 @@ async function main() {
   const result = { cartella: dir, fonte: kind, meta, problemi: [] };
   if (file) {
     const info = probe(file);
+    if (info.duration > LONG_S && !a.lungo) {
+      throw new Error(`Video di ${Math.round(info.duration)} s: sopra ${LONG_S} s serve --lungo (stessa qualità al secondo, quindi ~${Math.ceil(info.duration * CLAUDE_FPS)} fotogrammi e ${segments(info.duration).length} passaggi di Gemini).`);
+    }
+    result.video = { durata_s: Math.round(info.duration * 10) / 10, risoluzione: `${info.width}x${info.height}`, audio: info.audio };
     const cuts = sceneCuts(file);
     const times = pickTimes(info.duration, cuts);
     const frames = extractFrames(file, times, dir, info);
-    result.video = { durata_s: Math.round(info.duration * 10) / 10, risoluzione: `${info.width}x${info.height}`, audio: info.audio, tagli: cuts.length };
+    result.video.tagli = cuts.length;
+    result.regola = { claude_fotogrammi_al_secondo: CLAUDE_FPS, gemini_immagini_al_secondo: GEMINI_FPS, pezzi_gemini_s: SEGMENT_S };
     result.fotogrammi = frames.length;
     result.fogli = contactSheets(frames, dir);
-  } else result.problemi.push("YouTube senza yt-dlp: niente fotogrammi, solo la lettura di Gemini dal link.");
+  } else result.problemi.push("YouTube senza yt-dlp: niente fotogrammi da controllare, e senza durata Gemini lo guarda in un passaggio solo (la regola dei pezzi non si applica).");
 
   const useGemini = a.gemini ?? (kind !== "file");
   const key = process.env.GEMINI_API_KEY;
   if (useGemini && key) {
     try {
-      const g = await askGemini({ key, file, youtube: kind === "youtube" && !file ? a.src : null, domanda: a.domanda });
+      const g = await askGemini({ key, file, youtube: kind === "youtube" && !file ? a.src : null, domanda: a.domanda, duration: result.video?.durata_s });
       fs.writeFileSync(path.join(dir, "gemini.txt"), g.text);
-      result.gemini = { modello: g.model, file: path.join(dir, "gemini.txt") };
+      result.gemini = { modello: g.model, pezzi: g.pezzi, file: path.join(dir, "gemini.txt") };
     } catch (e) {
       result.problemi.push(`Gemini: ${e.message}`);
     }
