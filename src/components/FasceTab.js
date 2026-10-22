@@ -206,7 +206,7 @@ export default function FasceTab({ splitId }) {
     { key: "name", label: "Operatore", render: (o) => opLink(o.link_name || o.name, o.name) },
     { key: "idx", label: "Bravura", align: "right", render: (o) => <Bravura v={o.idx} /> },
     { key: "prime_share", label: "Ore in fasce di punta", align: "right", sort: (o) => o.ps.h, render: (o) => `${o.ps.h} h · ${pct(o.prime_share)}` },
-    { key: "est", label: "Stima rispetto a una persona media", align: "right", render: (o) => <span title="Stima, non conto: ore di punta × valore dell'ora a pari bravura × (bravura − 1)" style={{ color: (o.est || 0) < 0 ? CP.accentRed : CP.textSecondary, ...NUM }}>{o.est == null ? "–" : `~${usd(o.est)}`}</span> },
+    { key: "est", label: "Stima su una persona media", align: "right", render: (o) => <span title="Stima, non conto: ore di punta × valore dell'ora a pari bravura × (bravura − 1)" style={{ color: (o.est || 0) < 0 ? CP.accentRed : CP.textSecondary, ...NUM }}>{o.est == null ? "–" : usd(o.est)}</span> },
     { key: "where", label: "Dove", sortable: false, muted: true, render: (o) => <span style={{ fontSize: 12, whiteSpace: "normal", display: "inline-block", minWidth: 200 }}>{o.ps.where.slice(0, 3).map((w) => `${w.name.replace(/ - IT$/, "")} ${w.h} h`).join(" · ")}</span> },
   ];
   const colsPortare = [
@@ -265,7 +265,7 @@ export default function FasceTab({ splitId }) {
 
       {view === "azioni" && (
         <>
-          <H2 sub={`Bravura fino a ${fx(WEAK)} e almeno il ${Math.round(0.3 * 100)}% delle ore nelle fasce di punta delle loro pagine. La stima dice quanto rendono in meno di una persona di bravura media nelle loro ore di punta, ${fromTxt}${lostTot < 0 ? `: in tutto ~${usd(lostTot)}` : ""} — è una stima per ordinare la lista, non un conto.`}>
+          <H2 sub={`Bravura fino a ${fx(WEAK)} e almeno il ${Math.round(0.3 * 100)}% delle ore nelle fasce di punta delle loro pagine. La stima dice quanto rendono in meno di una persona di bravura media nelle loro ore di punta, ${fromTxt}${lostTot < 0 ? `: in tutto circa ${usd(lostTot)}` : ""} — è una stima per ordinare la lista, non un conto.`}>
             Chiudono basso nelle fasce che valgono di più ({togliere.length})
           </H2>
           <DataTable columns={colsTogliere} rows={togliere} defaultSort={{ key: "gap", dir: 1 }} minWidth={900} empty="Nessuno: nelle fasce di punta non c'è chi chiude basso." />
