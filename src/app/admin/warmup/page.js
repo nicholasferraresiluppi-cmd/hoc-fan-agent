@@ -26,6 +26,7 @@ import {
   ownerName, mine, urgenze, FL, ST, MS, SE, wfields, xGoal, IPROT, fillDefaults, applyState, openFlag,
   clearFlag, endCooldown,
 } from "@/lib/warmup-plan";
+import { prefillFor, publicAlerts } from "@/lib/warmup-metrics-core";
 
 const API = "/api/admin/warmup";
 const fetcher = (url) =>
@@ -201,6 +202,59 @@ function ProfileForm({ edit, plat, preCreator, creators, devices, people, admin,
   );
 }
 
+// ── numeri pubblici letti in automatico (fase 1: Apify, ogni notte) ─────────
+
+function PublicCard({ a, wk, label }) {
+  const p = a.pub;
+  const x = a.platform === "x";
+  if (!p || !p.last) return (
+    <div style={{ ...cardBox, background: CP.bgSunken }}>
+      <div style={eyebrow}>Numeri pubblici · in automatico</div>
+      <p style={{ ...hint, margin: "6px 0 0" }}>Ogni notte HOC Pro legge il profilo pubblico {x ? "su X" : "su Instagram"} (follower, post, visualizzazioni). La prima lettura di questo profilo arriva col prossimo giro.</p>
+    </div>
+  );
+  const last = p.last;
+  const when = new Date(p.lastAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const days = Object.keys(p.days || {}).sort();
+  const lastDay = days[days.length - 1], weekAgo = days.find((d) => d >= days[Math.max(0, days.length - 8)]);
+  const d7 = lastDay && weekAgo && weekAgo !== lastDay && p.days[lastDay].followers != null && p.days[weekAgo].followers != null ? p.days[lastDay].followers - p.days[weekAgo].followers : null;
+  const w = p.weekly?.[wk];
+  return (
+    <div style={cardBox}>
+      <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap", marginBottom: 10 }}>
+        <div style={{ ...eyebrow, flex: 1 }}>Numeri pubblici · in automatico</div>
+        <span style={hint}>letto il {when}</span>
+      </div>
+      {last.notFound ? <Notice danger>Il profilo {a.username} non si trova {x ? "su X" : "su Instagram"}: nome utente cambiato, account chiuso o bannato? Controlla dal telefono, poi correggi il nome utente nei dati del profilo o cambia lo stato.</Notice>
+        : last.error ? <Notice danger>Lettura non riuscita: {last.error}</Notice>
+        : (
+        <>
+          {last.private && <Notice>Il profilo risulta privato: dal pubblico non si vedono post né visualizzazioni.</Notice>}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 8 }}>
+            <Metric2 value={numFmt(last.followers)} label="Follower adesso">{d7 != null && <div style={{ marginTop: 3 }}><Delta d={d7} /> <span style={{ ...hint, fontSize: 11.5 }}>in {days.length > 7 ? "7 giorni" : (days.length - 1) + " giorni"}</span></div>}</Metric2>
+            <Metric2 value={numFmt(last.posts)} label="Post pubblicati in tutto" />
+            {x && <Metric2 value={last.premium ? "Sì" : "No"} label="Premium" color={last.premium ? CP.accentGreen : CP.accentRed} />}
+            {x && <Metric2 value={last.website && /onlyfans/i.test(last.website) ? "Sì" : last.website ? "Altro" : "No"} label="Link OnlyFans in bio" color={last.website && /onlyfans/i.test(last.website) ? CP.accentGreen : CP.attn} />}
+            {!x && last.highlights != null && <Metric2 value={numFmt(last.highlights)} label="Storie in evidenza" />}
+          </div>
+          <div style={{ ...eyebrow, margin: "14px 0 8px" }}>Settimana {label}</div>
+          {!w || !w.published ? <p style={{ ...hint, margin: 0 }}>Nessun post di questa settimana visto dalle letture automatiche.</p> : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 8 }}>
+              <Metric2 value={w.published} label={x ? "Post pubblicati" : `Post pubblicati · ${w.reels} reel`} />
+              <Metric2 value={numFmt(w.views)} label={x ? "Visualizzazioni totali" : "Visualizzazioni dei reel"} />
+              <Metric2 value={numFmt(w.avgViews)} label="Media per post" color={x && w.avgViews != null ? (w.avgViews >= 600 ? CP.accentGreen : CP.accentRed) : undefined} />
+              <Metric2 value={numFmt(w.likes)} label="Like" />
+              <Metric2 value={numFmt(w.comments)} label="Commenti" />
+              {w.followersDelta != null && <Metric2 value={(w.followersDelta > 0 ? "+" : "") + numFmt(w.followersDelta)} label={w.deltaPartial ? "Follower (da quando si legge)" : "Follower nella settimana"} />}
+            </div>
+          )}
+        </>
+      )}
+      <p style={{ ...hint, margin: "10px 0 0" }}>Solo quello che vede chiunque apra il profilo. {x ? "" : "Visite al profilo e tocchi sul link li vede solo l'app: restano da segnare a mano. "}Le visualizzazioni di un post crescono nei giorni dopo: il numero di una settimana si assesta qualche giorno dopo la fine.</p>
+    </div>
+  );
+}
+
 // ── dati settimanali di un profilo ──────────────────────────────────────────
 
 function WeeklyPane({ a, onSave }) {
@@ -211,7 +265,9 @@ function WeeklyPane({ a, onSave }) {
   const rec = W[wk] || {};
   const F = wfields(a);
   const [vals, setVals] = useState({});
-  useEffect(() => { setVals(Object.fromEntries(F.map((x) => [x.k, rec[x.k] != null ? String(rec[x.k]) : ""]))); }, [wk, a.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // settimana non ancora salvata: i campi vuoti si precompilano coi numeri letti dal profilo pubblico
+  const auto = W[wk] ? {} : Object.fromEntries(Object.entries(prefillFor(a.platform, a.pub?.weekly?.[wk])).filter(([, v]) => v != null));
+  useEffect(() => { setVals(Object.fromEntries(F.map((x) => [x.k, rec[x.k] != null ? String(rec[x.k]) : auto[x.k] != null ? String(auto[x.k]).replace(".", ",") : ""]))); }, [wk, a.id, a.pub?.lastAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const filled = Object.keys(W).sort().reverse();
   const prevKey = filled.find((k) => k < wk);
   const prev = prevKey ? W[prevKey] : null;
@@ -229,6 +285,7 @@ function WeeklyPane({ a, onSave }) {
   const two = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "0 12px" };
   return (
     <>
+      <PublicCard a={a} wk={wk} label={curW.label} />
       <form onSubmit={submit} style={cardBox}>
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 160 }}><div style={eyebrow}>Dati della settimana</div><div style={{ fontSize: 17, fontWeight: 500, marginTop: 2 }}>{curW.label}</div></div>
@@ -240,7 +297,7 @@ function WeeklyPane({ a, onSave }) {
           {F.filter((x) => x.num).map((x) => {
             const g = xGoal(x, live);
             return (
-              <Field key={x.k} label={x.lab} hint={x.goalTxt ? <span style={g == null ? undefined : { color: g ? CP.accentGreen : CP.accentRed, fontWeight: 500 }}>{x.goalTxt}{g == null ? "" : g ? " ✓" : " ✗"}</span> : null}>
+              <Field key={x.k} label={x.lab} hint={x.goalTxt || auto[x.k] != null ? <>{x.goalTxt && <span style={g == null ? undefined : { color: g ? CP.accentGreen : CP.accentRed, fontWeight: 500 }}>{x.goalTxt}{g == null ? "" : g ? " ✓" : " ✗"}</span>}{auto[x.k] != null && <span style={{ color: CP.accentSoftText }}>{x.goalTxt ? " · " : ""}dal profilo pubblico, controlla</span>}</> : null}>
                 <input style={{ ...input, ...NUM }} inputMode={x.dec ? "decimal" : "numeric"} placeholder="0" value={vals[x.k] ?? ""} onChange={(e) => setVals((v) => ({ ...v, [x.k]: e.target.value }))} />
               </Field>
             );
@@ -580,7 +637,9 @@ export default function WarmupPage() {
     let openTot = 0, doneTot = 0;
     const blocks = accs.map((a) => { const t = tasksOn(a, tk); openTot += t.open.length; doneTot += t.n; const arr = hasArrears(a, yk) ? tasksOn(a, yk) : { open: [], done: {} }; return { a, t, arr }; });
     const late = blocks.filter((b) => b.arr.open.length);
-    const urg = urgenze(ACC).filter((u) => !om || isMine(u.acc));
+    const rankU = { bad: 0, warn: 1, ok: 2, flat: 3 };
+    const urg = [...ACC.flatMap((a) => publicAlerts(a, a.pub).map((u) => ({ ...u, acc: a }))), ...urgenze(ACC)]
+      .sort((x, y) => rankU[x.lev] - rankU[y.lev]).filter((u) => !om || isMine(u.acc));
     const todo = blocks.filter((b) => b.t.open.length), fine = blocks.filter((b) => !b.t.open.length);
     return (
       <>
@@ -666,7 +725,7 @@ export default function WarmupPage() {
           <Avatar a={a} />
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{ display: "block", fontSize: 15, fontWeight: 500 }}>{a.username}</span>
-            <span style={{ display: "block", fontSize: 13, color: CP.textSecondary, marginTop: 2 }}>{isCooldown(a) ? "Cooldown · giorno " + cooldownDay(a) : "Giorno " + opDay(a)} · {plan.title}</span>
+            <span style={{ display: "block", fontSize: 13, color: CP.textSecondary, marginTop: 2 }}>{isCooldown(a) ? "Cooldown · giorno " + cooldownDay(a) : "Giorno " + opDay(a)} · {plan.title}{a.pub?.last?.notFound ? <b style={{ color: CP.accentRed, fontWeight: 500 }}> · non trovato</b> : a.pub?.last?.followers != null ? ` · ${numFmt(a.pub.last.followers)} follower` : ""}</span>
             <span style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 5, flexWrap: "wrap" }}>{ownerTag(a)}{stateOf(a) !== "online" && <Chip color={TONE[stateInfo(a).tone]}>{stateInfo(a).label}</Chip>}</span>
             {a.flag && <span style={{ display: "block", fontSize: 12.5, color: statusColor(a.status), fontWeight: 500, marginTop: 4 }}>In flag da {fmtDur(tick - a.flag.startedAt)}</span>}
           </span>
@@ -920,7 +979,11 @@ export default function WarmupPage() {
       const row = { label: w.label, key: w.key };
       wfields(null, plat).filter((f) => f.num).forEach((f) => {
         let sum = null;
-        ACC.forEach((a) => { const v = (a.weekly[w.key] || {})[f.k]; if (v !== "" && v != null && !isNaN(Number(v))) sum = (sum || 0) + Number(v); });
+        ACC.forEach((a) => {
+          let v = (a.weekly[w.key] || {})[f.k];
+          if (v === "" || v == null) v = prefillFor(a.platform, a.pub?.weekly?.[w.key])[f.k]; // manca il dato a mano: quello letto in automatico
+          if (v !== "" && v != null && !isNaN(Number(v))) sum = (sum || 0) + Number(v);
+        });
         row[f.k] = sum;
       });
       return row;
@@ -953,7 +1016,7 @@ export default function WarmupPage() {
         </div>
         <div style={cardBox}>
           <div style={eyebrow}>Andamento · ultime 8 settimane</div>
-          <p style={{ ...hint, margin: "4px 0 12px" }}>Somma di tutti i profili. Gli stessi numeri, profilo per profilo, sono nella scheda Settimana.</p>
+          <p style={{ ...hint, margin: "4px 0 12px" }}>Somma di tutti i profili. Dove manca il dato inserito a mano si usa quello letto in automatico dal profilo pubblico. Profilo per profilo: scheda Settimana.</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))", gap: 10 }}>
             {wfields(null, plat).filter((f) => f.chart).map((f) => <LineChart key={f.k} title={f.lab} pts={ser.map((r) => ({ label: r.label, v: r[f.k] }))} />)}
           </div>
@@ -1147,6 +1210,7 @@ export default function WarmupPage() {
             </div>
           ))}
         </div>
+        <PubRunCard run={data.pubRun} onDone={() => mutate()} />
         <ImportCard onDone={() => mutate()} />
         <ActivityCard />
       </>
@@ -1243,6 +1307,29 @@ function HistoryPane({ a }) {
         )))}
       </div>
     </>
+  );
+}
+
+// Giro dei numeri pubblici (fase 1): stato dell'ultima lettura e «Aggiorna adesso».
+function PubRunCard({ run, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  async function go() {
+    setBusy(true); setMsg(null);
+    try { const d = await post({ action: "refreshPub" }); const r = d.result || {}; setMsg(r.skip ? "Apify non è configurato sul server" : r.busy ? "Un giro è già in corso" : `Letti ${r.read} profili su ${r.profiles}${r.notFound ? ` · ${r.notFound} non trovati` : ""}${r.errors?.length ? " · errori: " + r.errors.join("; ") : ""}`); onDone(); }
+    catch (e) { setMsg(e.message); }
+    finally { setBusy(false); }
+  }
+  return (
+    <div style={cardBox}>
+      <div style={{ ...eyebrow, marginBottom: 8 }}>Numeri pubblici in automatico</div>
+      <p style={{ ...hint, margin: "0 0 10px" }}>Ogni notte HOC Pro legge con Apify i profili pubblici (Instagram: follower, post, visualizzazioni dei reel; X: follower, post, Premium, link in bio, visualizzazioni). Niente accesso agli account. Costo stimato: circa 0,3 centesimi a profilo Instagram e 2 centesimi a profilo X per lettura.</p>
+      {!run?.configured && <Notice danger>Apify non è configurato su questo server.</Notice>}
+      {run?.lastAt ? <p style={{ fontSize: 14, margin: "0 0 10px" }}>Ultima lettura: {new Date(run.lastAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} · {run.read}/{run.profiles} profili letti{run.notFound ? ` · ${run.notFound} non trovati` : ""} · ~{String(run.estUsd ?? 0).replace(".", ",")} $</p> : <p style={{ ...hint, margin: "0 0 10px" }}>Nessuna lettura ancora.</p>}
+      {run?.errors?.length > 0 && <Notice danger>{run.errors.join(" · ")}</Notice>}
+      <button type="button" style={btn} disabled={busy} onClick={go}>{busy ? "Leggo i profili… (fino a un paio di minuti)" : "Aggiorna adesso"}</button>
+      {msg && <p style={{ ...hint, margin: "8px 0 0" }}>{msg}</p>}
+    </div>
   );
 }
 
