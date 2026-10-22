@@ -33,7 +33,7 @@ import {
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
   History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
-Megaphone, Share2, Shield, BookUser,
+Megaphone, Share2, Shield, BookUser, Sunrise,
   LineChart,
   FileSignature, Repeat } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
@@ -182,6 +182,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/ads",                      label: "Studio bio-funnel", icon: Megaphone },
       { href: "/admin/studio-social",            label: "Studio social",   icon: Clapperboard },
       { href: "/admin/supervisor",               label: "Account social",  icon: Share2 },
+      { href: "/admin/warmup",                   label: "Warm-up",         icon: Sunrise },
       { href: "/admin/social-proxies",           label: "Proxy account social", icon: Shield },
     ],
   },
