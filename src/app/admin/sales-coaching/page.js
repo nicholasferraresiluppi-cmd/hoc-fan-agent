@@ -20,6 +20,7 @@ import Link from "next/link";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, NUM } from "@/components/ds";
 import SquadraTab from "@/components/SquadraTab";
+import FasceTab from "@/components/FasceTab";
 
 const fetcher = (url) =>
   fetch(url).then(async (r) => {
@@ -41,6 +42,7 @@ const TABS = [
   ["panoramica", "Panoramica"],
   ["operatori", "Operatori"],
   ["squadra", "Squadra"],
+  ["fasce", "Fasce e turni"],
   ["riferimento", "Riferimento HOC"],
   ["comportamenti", "Cosa fa vendere"],
   ["test", "Test in corso"],
@@ -677,6 +679,7 @@ export default function SalesCoachingPage() {
       {tab === "panoramica" && <Panoramica d={data} name={split?.name} />}
       {tab === "operatori" && <Operatori d={data} />}
       {tab === "squadra" && <SquadraTab splitId={split ? splitId : null} names={data.names} coachingOps={data.operators} />}
+      {tab === "fasce" && <FasceTab splitId={split ? splitId : null} />}
       {tab === "riferimento" && <Riferimento d={data} />}
       {tab === "comportamenti" && <Comportamenti d={data} />}
       {tab === "test" && <Test d={data} reload={mutate} />}
