@@ -151,7 +151,7 @@ export function publicAlerts(a, pub, now = Date.now()) {
   const last = pub?.last;
   if (!last || now - (pub.lastAt || 0) > 4 * 86400000) return out;
   const where = a.platform === "x" ? "su X" : "su Instagram";
-  if (last.notFound) out.push({ lev: "bad", t: `Profilo non trovato ${where}: ${a.username}`, d: "La lettura automatica di stanotte non trova il profilo pubblico: nome utente cambiato, account chiuso o bannato? Controlla dal telefono e correggi il nome utente o lo stato." });
+  if (last.notFound) out.push({ lev: "bad", t: `Profilo non trovato ${where}: ${a.username}`, d: "L'ultima lettura automatica non trova il profilo pubblico: nome utente cambiato, account chiuso o bannato? Controlla dal telefono e correggi il nome utente o lo stato." });
   else if (last.private) out.push({ lev: "warn", t: `${a.username} risulta privato`, d: "Dal profilo pubblico non si vede niente: se non è il cooldown (dove è voluto), rimettilo pubblico." });
   if (a.platform === "x" && !last.notFound && last.premium === false) out.push({ lev: "warn", t: `Premium non attivo su ${a.username}`, d: "Letto dal profilo pubblico: senza Premium un post fa in media meno di 100 visualizzazioni." });
   return out;
