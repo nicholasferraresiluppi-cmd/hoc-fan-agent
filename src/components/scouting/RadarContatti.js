@@ -2,18 +2,18 @@
 // Radar creator — vista "Contatti": le colonne del percorso, dalla scelta alla firma.
 // I contatti restano in pausa finché non arriva il parere dell'avvocato (docs/SCOUTING_PRIVACY.md).
 import { CP, alpha } from "@/lib/brand";
-import { SERIF, NUM, fmtN, btnQuiet, LinkChip, STAGE_LABEL } from "./radar-ui";
+import { NUM, fmtN, btnQuiet, LinkChip, STAGE_LABEL, RatingTag } from "./radar-ui";
 
 const COLS = ["interessante", "contattata", "trattativa", "firmata"];
 const EMPTY = {
-  interessante: "Segna «Interessante» dalla scheda o da Oggi: le creator scelte arrivano qui.",
+  interessante: "Dai Sì o Assolutamente in Valuta, dalla scheda o da Oggi: le creator scelte arrivano qui.",
   contattata: "Dopo il primo messaggio: il radar ricorda data e canale.",
   trattativa: "Proposta inviata, risposta, prossimo appuntamento.",
   firmata: "Alla firma la creator passa nel CRM persone.",
 };
 
 export default function RadarContatti({ creators, onOpen }) {
-  const by = Object.fromEntries(COLS.map((s) => [s, creators.filter((c) => c.stage === s).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))]));
+  const by = Object.fromEntries(COLS.map((s) => [s, creators.filter((c) => c.stage === s).sort((a, b) => (b.rating || 0) - (a.rating || 0) || (b.updatedAt || 0) - (a.updatedAt || 0))]));
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px 20px", border: `1px solid ${alpha(CP.gold, "55")}`, borderRadius: 12, padding: "14px 18px", fontSize: 14.5 }}>
@@ -32,6 +32,7 @@ export default function RadarContatti({ creators, onOpen }) {
                   <button onClick={() => onOpen(c)} style={{ ...btnQuiet, padding: 0, minHeight: 0, justifyContent: "flex-start", color: CP.textPrimary, fontWeight: 600 }}>{c.name}</button>
                   <span style={{ fontSize: 13, color: CP.textSecondary }}>{[c.nic || c.g, `${fmtN(c.fol)} follower`].join(" · ")}</span>
                   <LinkChip link={c.link} sig={c.sig} />
+                  {c.rating === 4 && <RatingTag v={4} />}
                   <span style={{ fontSize: 12.5, color: CP.textMuted }}>{c.owner ? `La segue ${c.owner}` : "Nessuno la segue ancora"}{c.notes ? ` · ${c.notes} note` : ""}</span>
                 </article>
               ))}

@@ -3,7 +3,7 @@
 // e lo stile "Casa"), titoli in serif (--cp-sig), niente riquadri pesanti: linee sottili.
 import { useEffect, useState } from "react";
 import { CP, FONTS, alpha } from "@/lib/brand";
-import { linkWhere } from "@/lib/scouting-core";
+import { linkWhere, RATINGS, RATING_LABEL } from "@/lib/scouting-core";
 
 export const NUM = { fontVariantNumeric: "tabular-nums" };
 export const SERIF = { fontFamily: FONTS.signature, fontWeight: 400, letterSpacing: "-0.01em" };
@@ -108,4 +108,40 @@ export function useIsPhone() {
     return () => mq.removeEventListener("change", on);
   }, []);
   return phone;
+}
+
+// ---------- voto a 4 livelli (21/10/2026): No · Forse · Sì · Assolutamente ----------
+
+export const fmtEr = (v) => (v == null ? "—" : `${v.toLocaleString("it-IT", { maximumFractionDigits: v < 10 ? 1 : 0 })}%`);
+
+/** Stile di un bottone di voto: Sì con il bordo oro, Assolutamente pieno oro, gli altri neutri. */
+export function rateStyle(v, { active, big } = {}) {
+  // in grande (barra dei voti) Assolutamente è pieno; in piccolo (elenchi) l'oro pieno è solo sul voto scelto
+  const gold = big ? v === 4 : active && v === 4, warm = v >= 3;
+  return {
+    minHeight: big ? 54 : 34, padding: big ? "0 4px" : "0 10px", borderRadius: big ? 13 : 999, fontFamily: FONTS.body, cursor: "pointer",
+    fontSize: big ? 14.5 : 12.5, fontWeight: big ? 600 : 500, letterSpacing: "-0.01em", whiteSpace: "nowrap",
+    border: `1px solid ${gold || warm || active ? CP.gold : CP.border}`,
+    background: gold ? CP.gold : active ? alpha(CP.gold, "22") : big ? CP.surface : "transparent",
+    color: gold ? "#111" : CP.textPrimary,
+    boxShadow: active && !big ? `0 0 0 2px ${alpha(CP.gold, "55")}` : "none",
+  };
+}
+
+/** I quattro voti in piccolo (liste, Oggi, scheda); il voto attuale evidenziato. */
+export function RatingChips({ value, onRate, disabled, label = "Voto" }) {
+  return (
+    <div role="group" aria-label={label} style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      {RATINGS.map((r) => (
+        <button key={r.v} type="button" disabled={disabled} aria-pressed={value === r.v} onClick={(e) => { e.stopPropagation(); onRate(r.id); }}
+          style={{ ...rateStyle(r.v, { active: value === r.v }), opacity: disabled ? 0.6 : 1 }}>{r.label}</button>
+      ))}
+    </div>
+  );
+}
+
+/** Il voto come etichetta («Assolutamente» in oro). */
+export function RatingTag({ v }) {
+  if (!v) return null;
+  return <span style={{ fontSize: 12.5, color: v >= 3 ? CP.gold : CP.textMuted, fontWeight: v === 4 ? 600 : 400 }}>{RATING_LABEL[v]}</span>;
 }
