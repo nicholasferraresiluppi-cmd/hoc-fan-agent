@@ -39,7 +39,7 @@
  * calendario.
  */
 
-export const FASCE_VERSION = "fasce-2";
+export const FASCE_VERSION = "fasce-3";
 
 export const SLOTS = [
   { id: "22-3", label: "22–3", from: 22, to: 1 },
@@ -309,9 +309,17 @@ export function duoShare(piecesOfPage) {
 /**
  * Documento completo. `pieces` = tutti i pezzi della finestra (tutta HOC: più
  * colleghi = confronti migliori). `now` per la presenza. `names` = cid → nome pagina.
+ *
+ * `bravuraOf` (v3, 22/10/2026): Map op → { idx } da FUORI — in produzione la bravura
+ * della Squadra, fatta sulle vendite INFLOWW. Nicholas: CreatorsPro "non è veritiero"
+ * su CHI ha venduto (divide gli acquisti a modo suo). Misurato su settembre: per
+ * persona CP dà in mediana +30% su Infloww, da 0,46 a 3,3 volte; per PAGINA invece
+ * combacia col registro transazioni Infloww (0,97-1,01). Quindi dai turni CP si
+ * prendono solo cose di pagina (ore, valore della fascia); il giudizio sulla persona
+ * viene da Infloww. Senza `bravuraOf` (test) si usa la bravura dai turni.
  */
-export function buildFasce(pieces, { now = Date.now(), names = {} } = {}) {
-  const bra = bravura(pieces);
+export function buildFasce(pieces, { now = Date.now(), names = {}, bravuraOf = null } = {}) {
+  const bra = bravuraOf || bravura(pieces);
   const { peerRate } = peerTable(pieces);
   const lastDay = new Map();
   const opName = new Map();
@@ -360,19 +368,20 @@ export function buildFasce(pieces, { now = Date.now(), names = {} } = {}) {
     for (const [op, o] of ops) {
       const prime_h = val.prime.reduce((s, id) => s + (o.slots[id]?.h || 0), 0);
       const slots = {};
-      for (const [id, sl] of Object.entries(o.slots)) {
-        slots[id] = {
-          h: Math.round(sl.h),
-          sph: sl.h ? Math.round(sl.rev / sl.h) : null,
-          // venduto all'ora che i colleghi fanno nelle stesse celle (pagina×fascia×tipo)
-          peer_sph: sl.cmp_h >= 10 ? Math.round(sl.exp / sl.cmp_h) : null,
-          // venduto mancato (o in più) rispetto ai colleghi nelle stesse ore
-          gap: sl.cmp_h >= 10 ? Math.round(sl.rev * (sl.cmp_h / sl.h) - sl.exp) : null,
-        };
+      for (const [id, sl] of Object.entries(o.slots)) slots[id] = { h: Math.round(sl.h) };
+      const idx = bra.get(op)?.idx ?? null;
+      // STIMA (non contabile): nelle sue ore di punta, quanto in più o in meno di una
+      // persona di bravura media = ore × valore dell'ora a pari bravura × (bravura − 1)
+      let est = null;
+      if (idx != null && prime_h > 0) {
+        est = 0;
+        for (const id of val.prime) est += (o.slots[id]?.h || 0) * (val.slots[id]?.sph_adj || 0) * (idx - 1);
+        est = Math.round(est);
       }
-      people.push({ op, name: opName.get(op), h: Math.round(o.h), prime_h: Math.round(prime_h), slots, idx: r(bra.get(op)?.idx), active: active(op) });
-      const op_ = opPages.get(op) || { h: 0, prime_h: 0, valued_h: 0, pages: {} };
+      people.push({ op, name: opName.get(op), link_name: bra.get(op)?.infloww_name || opName.get(op), h: Math.round(o.h), prime_h: Math.round(prime_h), slots, idx: r(idx), est, active: active(op) });
+      const op_ = opPages.get(op) || { h: 0, prime_h: 0, valued_h: 0, est: null, pages: {} };
       op_.h += o.h;
+      if (est != null) op_.est = (op_.est || 0) + est;
       op_.prime_h += prime_h;
       if (val.prime.length) op_.valued_h += o.h;
       op_.pages[cid] = Math.round(o.h);
@@ -421,10 +430,13 @@ export function buildFasce(pieces, { now = Date.now(), names = {} } = {}) {
     operators.push({
       op,
       name: opName.get(op),
+      link_name: b?.infloww_name || opName.get(op),
       idx: r(idx),
       h: Math.round(o.h),
       cmp_h: Math.round(b?.cmp_h || 0),
       prime_share: r(primeShare),
+      prime_h: Math.round(o.prime_h),
+      est: o.est,
       slots: Object.fromEntries(Object.entries(o.slots || {}).map(([k, v]) => [k, Math.round(v)])),
       pages: o.pages,
       last_day: lastDay.get(op) || null,
@@ -439,6 +451,7 @@ export function buildFasce(pieces, { now = Date.now(), names = {} } = {}) {
   return {
     version: FASCE_VERSION,
     until: until || null,
+    bravura_source: bravuraOf ? "infloww" : "turni",
     pages,
     operators,
     overall: Object.fromEntries(Object.entries(all.slots).map(([id, v]) => [id, { h: Math.round(v.h), sph_adj: v.sph_adj == null ? null : Math.round(v.sph_adj) }])),

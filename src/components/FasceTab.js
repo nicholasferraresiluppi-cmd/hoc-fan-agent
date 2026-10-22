@@ -54,32 +54,20 @@ function Chip({ children, tone }) {
   return <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 10, border: `1px solid ${alpha(color, "66")}`, color, whiteSpace: "nowrap" }}>{children}</span>;
 }
 
-const opLink = (name) => <Link href={`/leaderboard/operational/${encodeURIComponent(name)}`} style={{ color: CP.textPrimary, textDecoration: "none" }}>{name}</Link>;
+const opLink = (name, label = name) => <Link href={`/leaderboard/operational/${encodeURIComponent(name)}`} style={{ color: CP.textPrimary, textDecoration: "none" }}>{label}</Link>;
 
-/** Ore e venduto di un operatore nelle fasce di punta delle pagine passate. */
+/** Ore di un operatore nelle fasce di punta delle pagine passate, e dove. */
 function primeStats(op, pages) {
   let h = 0;
-  let rev = 0;
-  let peerRev = 0;
-  let cmpH = 0;
-  let gap = 0;
   const where = [];
   for (const p of pages) {
     const me = p.people.find((x) => x.op === op);
     if (!me || !p.prime.length) continue;
-    let ph = 0;
-    for (const id of p.prime) {
-      const s = me.slots[id];
-      if (!s?.h) continue;
-      ph += s.h;
-      h += s.h;
-      rev += (s.sph || 0) * s.h;
-      if (s.peer_sph != null) { peerRev += s.peer_sph * s.h; cmpH += s.h; gap += s.gap || 0; }
-    }
-    if (ph) where.push({ name: p.name, h: ph, prime: p.prime });
+    const ph = p.prime.reduce((t, id) => t + (me.slots[id]?.h || 0), 0);
+    if (ph) { h += ph; where.push({ name: p.name, h: ph }); }
   }
   where.sort((a, b) => b.h - a.h);
-  return { h, sph: h ? rev / h : null, peer_sph: cmpH ? peerRev / cmpH : null, gap: cmpH ? gap : null, where };
+  return { h, where };
 }
 
 function SlotValues({ overall }) {
@@ -146,12 +134,12 @@ function PageCard({ p }) {
               const mark = p.weak_in_prime.includes(x.op) ? "bad" : p.strong_outside.includes(x.op) ? "good" : null;
               return (
                 <tr key={x.op}>
-                  <td style={tdL}>{opLink(x.name)}{mark === "bad" && <> <Chip tone="bad">basso in punta</Chip></>}{mark === "good" && <> <Chip tone="good">da portare in punta</Chip></>}{!x.active && <> <Chip>nessun turno da 3 settimane</Chip></>}</td>
+                  <td style={tdL}>{opLink(x.link_name || x.name, x.name)}{mark === "bad" && <> <Chip tone="bad">basso in punta</Chip></>}{mark === "good" && <> <Chip tone="good">da portare in punta</Chip></>}{!x.active && <> <Chip>nessun turno da 3 settimane</Chip></>}</td>
                   <td style={td}><Bravura v={x.idx} /></td>
                   {slotsHere.map((s) => {
                     const c = x.slots[s.id];
                     return (
-                      <td key={s.id} style={{ ...td, color: c?.h ? CP.textSecondary : CP.textMuted }} title={c?.h && c.sph != null ? `In ${s.label}: $${c.sph}/h${c.peer_sph != null ? `, colleghi $${c.peer_sph}/h` : ""}` : undefined}>
+                      <td key={s.id} style={{ ...td, color: c?.h ? CP.textSecondary : CP.textMuted }}>
                         {c?.h ? `${c.h} h` : "–"}
                       </td>
                     );
@@ -182,7 +170,7 @@ export default function FasceTab({ splitId }) {
   const derived = useMemo(() => {
     if (!data?.pages) return null;
     const ops = data.operators.filter((o) => !o.uscita);
-    const togliere = ops.filter((o) => o.verdict === "togliere").map((o) => ({ ...o, id: o.op, ps: primeStats(o.op, data.pages) })).sort((a, b) => (a.ps.gap ?? 0) - (b.ps.gap ?? 0));
+    const togliere = ops.filter((o) => o.verdict === "togliere").map((o) => ({ ...o, id: o.op, ps: primeStats(o.op, data.pages) })).sort((a, b) => (a.est ?? 0) - (b.est ?? 0));
     const portare = ops.filter((o) => o.verdict === "portare").map((o) => ({ ...o, id: o.op, ps: primeStats(o.op, data.pages) })).sort((a, b) => b.idx - a.idx);
     return { ops, togliere, portare };
   }, [data]);
@@ -194,6 +182,7 @@ export default function FasceTab({ splitId }) {
   const from = data.window?.from;
   const fromTxt = from ? `dal ${Number(from.slice(8, 10))} ${MONTHS_IT[Number(from.slice(5, 7)) - 1]}` : "";
   const st = data.stability || {};
+  const bw = data.bravura_window;
   const ov = data.overall || {};
   const top = SLOTS.filter((s) => ov[s.id]?.sph_adj != null).sort((a, b) => ov[b.id].sph_adj - ov[a.id].sph_adj);
   const hi = top[0];
@@ -204,7 +193,7 @@ export default function FasceTab({ splitId }) {
   const lo = common[common.length - 1];
   const ratio = hi && lo && ov[lo.id].sph_adj ? ov[hi.id].sph_adj / ov[lo.id].sph_adj : null;
   const { togliere, portare, ops } = derived;
-  const lostTot = togliere.reduce((s, o) => s + Math.min(0, o.ps.gap || 0), 0);
+  const lostTot = togliere.reduce((s, o) => s + Math.min(0, o.est || 0), 0);
 
   async function recompute() {
     setBusy(true);
@@ -214,16 +203,14 @@ export default function FasceTab({ splitId }) {
   }
 
   const colsTogliere = [
-    { key: "name", label: "Operatore", render: (o) => opLink(o.name) },
+    { key: "name", label: "Operatore", render: (o) => opLink(o.link_name || o.name, o.name) },
     { key: "idx", label: "Bravura", align: "right", render: (o) => <Bravura v={o.idx} /> },
     { key: "prime_share", label: "Ore in fasce di punta", align: "right", sort: (o) => o.ps.h, render: (o) => `${o.ps.h} h · ${pct(o.prime_share)}` },
-    { key: "sph", label: "Venduto/ora in punta", align: "right", sort: (o) => o.ps.sph, render: (o) => (o.ps.sph == null ? "–" : `${usd(o.ps.sph)}/h`) },
-    { key: "peer", label: "Colleghi, stesse fasce", align: "right", sort: (o) => o.ps.peer_sph, render: (o) => (o.ps.peer_sph == null ? "–" : `${usd(o.ps.peer_sph)}/h`) },
-    { key: "gap", label: "Rispetto ai colleghi", align: "right", sort: (o) => o.ps.gap, render: (o) => <span style={{ color: (o.ps.gap || 0) < 0 ? CP.accentRed : CP.textSecondary, ...NUM }}>{usd(o.ps.gap)}</span> },
+    { key: "est", label: "Stima rispetto a una persona media", align: "right", render: (o) => <span title="Stima, non conto: ore di punta × valore dell'ora a pari bravura × (bravura − 1)" style={{ color: (o.est || 0) < 0 ? CP.accentRed : CP.textSecondary, ...NUM }}>{o.est == null ? "–" : `~${usd(o.est)}`}</span> },
     { key: "where", label: "Dove", sortable: false, muted: true, render: (o) => <span style={{ fontSize: 12, whiteSpace: "normal", display: "inline-block", minWidth: 200 }}>{o.ps.where.slice(0, 3).map((w) => `${w.name.replace(/ - IT$/, "")} ${w.h} h`).join(" · ")}</span> },
   ];
   const colsPortare = [
-    { key: "name", label: "Operatore", render: (o) => opLink(o.name) },
+    { key: "name", label: "Operatore", render: (o) => opLink(o.link_name || o.name, o.name) },
     { key: "idx", label: "Bravura", align: "right", render: (o) => <Bravura v={o.idx} /> },
     { key: "h", label: "Ore", align: "right", render: (o) => hh(o.h) },
     { key: "prime_share", label: "Quota in fasce di punta", align: "right", render: (o) => pct(o.prime_share) },
@@ -231,7 +218,7 @@ export default function FasceTab({ splitId }) {
     { key: "where", label: "Pagine e loro fasce di punta", sortable: false, muted: true, render: (o) => <span style={{ fontSize: 12, whiteSpace: "normal", display: "inline-block", minWidth: 220 }}>{data.pages.filter((p) => (o.pages[p.cid] || 0) >= 20 && p.prime.length).slice(0, 3).map((p) => `${p.name.replace(/ - IT$/, "")} → ${slotList(p.prime)}`).join(" · ")}</span> },
   ];
   const colsAll = [
-    { key: "name", label: "Operatore", render: (o) => opLink(o.name) },
+    { key: "name", label: "Operatore", render: (o) => opLink(o.link_name || o.name, o.name) },
     { key: "idx", label: "Bravura", align: "right", render: (o) => <Bravura v={o.idx} /> },
     { key: "h", label: "Ore", align: "right", render: (o) => hh(o.h) },
     ...SLOTS.map((s) => ({ key: `s_${s.id}`, label: s.label, align: "right", muted: true, sort: (o) => o.slots[s.id] || 0, render: (o) => (o.slots[s.id] ? `${hh(o.slots[s.id])} h` : "–") })),
@@ -254,6 +241,9 @@ export default function FasceTab({ splitId }) {
       </div>
 
       {data.stale && <Notice>I dati sono di più di un giorno fa: il ricalcolo notturno non è passato.</Notice>}
+      {bw?.until && (Date.now() - Date.parse(bw.until)) / 86400000 > 3 && (
+        <Notice>La bravura usa le vendite Infloww fino al {dmy(bw.until)}: l'export automatico di Infloww non arriva da allora. Ore e fasce sono aggiornate al {dmy(data.until)}.</Notice>
+      )}
       {data.until && (Date.now() - Date.parse(data.until)) / 86400000 > 3 && (
         <Notice danger>I turni di CreatorsPro arrivano solo fino al {dmy(data.until)}: la sincronizzazione dei turni è ferma. I numeri qui sotto valgono fino a quel giorno.</Notice>
       )}
@@ -261,8 +251,9 @@ export default function FasceTab({ splitId }) {
 
       <div style={{ ...card, padding: "14px 18px" }}>
         <p style={{ fontSize: 14, color: CP.textPrimary, margin: "0 0 6px", fontWeight: 500 }}>Chi è bravo lo è in tutte le fasce</p>
+        <Note style={{ marginBottom: 6 }}>Bravura = quella della scheda Squadra: vendite Infloww di ogni persona confrontate coi colleghi sulla stessa pagina e fascia{bw ? `, dal ${dmy(bw.from)} al ${dmy(bw.until)}` : ""}. CreatorsPro qui serve solo come calendario e per il valore delle fasce di ogni pagina: divide gli acquisti tra le persone a modo suo, ma il totale della pagina combacia con le transazioni Infloww.</Note>
         <Note>
-          Abbiamo calcolato la bravura separatamente sui giorni pari e su quelli dispari. La bravura generale di una persona torna simile (correlazione {fx(st.general)} su {st.general_n} operatori); il fatto di rendere meglio in una certa fascia rispetto alle proprie altre quasi no ({fx(st.personal)}). Quindi la regola non è «ognuno nella sua fascia» ma «i più bravi nelle fasce che valgono di più, e chi chiude basso non ha la priorità su quelle». Quale fascia vale di più si decide pagina per pagina: non è sempre il 22–3.
+          Controllo fatto sui turni (giorni pari contro giorni dispari): La bravura generale di una persona torna simile (correlazione {fx(st.general)} su {st.general_n} operatori); il fatto di rendere meglio in una certa fascia rispetto alle proprie altre quasi no ({fx(st.personal)}). Quindi la regola non è «ognuno nella sua fascia» ma «i più bravi nelle fasce che valgono di più, e chi chiude basso non ha la priorità su quelle». Quale fascia vale di più si decide pagina per pagina: non è sempre il 22–3.
         </Note>
       </div>
 
@@ -274,7 +265,7 @@ export default function FasceTab({ splitId }) {
 
       {view === "azioni" && (
         <>
-          <H2 sub={`Bravura fino a ${fx(WEAK)} e almeno il ${Math.round(0.3 * 100)}% delle ore nelle fasce di punta delle loro pagine. «Rispetto ai colleghi» = quanto hanno venduto in meno (o in più) nelle loro ore di punta rispetto ai colleghi sulle stesse pagine e fasce, ${fromTxt}${lostTot < 0 ? `: in tutto ${usd(lostTot)}` : ""}.`}>
+          <H2 sub={`Bravura fino a ${fx(WEAK)} e almeno il ${Math.round(0.3 * 100)}% delle ore nelle fasce di punta delle loro pagine. La stima dice quanto rendono in meno di una persona di bravura media nelle loro ore di punta, ${fromTxt}${lostTot < 0 ? `: in tutto ~${usd(lostTot)}` : ""} — è una stima per ordinare la lista, non un conto.`}>
             Chiudono basso nelle fasce che valgono di più ({togliere.length})
           </H2>
           <DataTable columns={colsTogliere} rows={togliere} defaultSort={{ key: "gap", dir: 1 }} minWidth={900} empty="Nessuno: nelle fasce di punta non c'è chi chiude basso." />
@@ -297,7 +288,7 @@ export default function FasceTab({ splitId }) {
       )}
 
       <Note>
-        Come si calcola: turni CreatorsPro {fromTxt} al {dmy(data.until)} (l'unica fonte con le vendite per turno; Infloww dà solo il totale del mese). Bravura = venduto del turno ÷ quello dei colleghi sulla stessa pagina, nella stessa fascia e nello stesso tipo di turno (da solo o in duo), escluso sé stessi; 1,00 = come loro. Va d'accordo con la bravura della scheda Squadra, fatta sulle vendite Infloww. Fasce dall'ora di inizio del turno (ora italiana): 22–3, 17–22 (anche 19–01), 12–17 (anche 13–19), 7–12 (anche 7–13), 1–7. Nei turni in duo il venduto è già la quota della persona. Fuori dalle liste chi è uscito nel CRM o non fa turni da 3 settimane. Correlazione, non causa; le fasce dipendono anche dalla disponibilità delle persone. Non entra in score né compensi.
+        Come si calcola: bravura dalla scheda Squadra (venduto Infloww all'ora di turno ÷ quello dei colleghi sulla stessa pagina e fascia, escluso sé stessi; 1,00 = come loro). Ore e fasce dal calendario CreatorsPro {fromTxt} al {dmy(data.until)}. Valore di un'ora = venduto della pagina in quella fascia ÷ ore di turno pesate per la bravura di chi c'era (il venduto per pagina di CreatorsPro combacia con le transazioni Infloww: 0,97-1,01 a settembre). Il confronto giorni pari/dispari è fatto sui turni, l'unica fonte con le vendite per turno. Fasce dall'ora di inizio del turno (ora italiana): 22–3, 17–22 (anche 19–01), 12–17 (anche 13–19), 7–12 (anche 7–13), 1–7. Fuori dalle liste chi è uscito nel CRM o non fa turni da 3 settimane. Correlazione, non causa; le fasce dipendono anche dalla disponibilità delle persone. Non entra in score né compensi.
       </Note>
     </div>
   );
