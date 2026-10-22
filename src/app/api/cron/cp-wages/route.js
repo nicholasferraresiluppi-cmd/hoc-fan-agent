@@ -41,6 +41,10 @@ const STALE_MS = 20 * 3600 * 1000;   // refresh giornaliero, con margine
 const RESTART_MS = 40 * 3600 * 1000;
 const FRESH_MS = 90 * 1000;          // guardia anti-sovrapposizione (solo chain 0)
 const BUDGET_MS = 30000;
+// Un passo (batch da 15 buste) può durare 30-40s su CreatorsPro lento: si COMINCIA un passo
+// nuovo solo nei primi 20s, così il tick chiude sotto i 60s di Vercel e fa in tempo a
+// concatenare il successivo (un tick ucciso a metà non concatena e la catena si ferma).
+const STEP_START_MS = 20000;
 const PREPARE_PAGES = 3;
 // 15 (era 30): un batch lento di CreatorsPro partito a fine budget sforava i 60s di Vercel,
 // il tick veniva ucciso prima di concatenare il successivo e la catena si fermava.
@@ -65,7 +69,12 @@ async function targets() {
 async function tickPeriod(period, chain) {
   let prog = await kv.get(progKey(period));
   if (prog?.phase === "done" && Date.now() - (prog.finished_at || 0) <= STALE_MS) return null; // fresco
-  if (!prog || prog.phase === "done" || Date.now() - (prog.started_at || 0) > RESTART_MS) {
+  // Si riparte da zero solo se il giro è FERMO da RESTART_MS (nessun salvataggio), non se è
+  // INIZIATO da tanto: un mese con molte buste (ottobre 2026: 691) richiede più notti di catena
+  // spezzata, e misurare dall'inizio lo azzerava ogni 40h prima che arrivasse in fondo
+  // (fermo dal 15 al 22/10/2026 con il giro sempre a 555/691).
+  const lastMove = prog?.updated_at || prog?.started_at || 0;
+  if (!prog || prog.phase === "done" || Date.now() - lastMove > RESTART_MS) {
     prog = { phase: "refdata", page: 1, offset: 0, repair_rounds: 0, started_at: Date.now(), updated_at: 0 };
   }
   if (chain === 0 && prog.updated_at && Date.now() - prog.updated_at < FRESH_MS) {
@@ -84,7 +93,7 @@ async function tickPeriod(period, chain) {
   };
 
   try {
-    while (Date.now() - t0 < BUDGET_MS) {
+    while (Date.now() - t0 < Math.min(BUDGET_MS, STEP_START_MS)) {
       if (prog.phase === "refdata") {
         await syncRefdata();
         prog.phase = "prepare";

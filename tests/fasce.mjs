@@ -124,10 +124,26 @@ t("liste d'azione: scarso in punta da togliere, bravo fuori punta da portare", (
   assert.equal(op("scarso").verdict, "togliere");
   assert.equal(op("nascosto").verdict, "portare");
   assert.equal(op("medio3").verdict, null);
-  // chi chiude basso vende meno dei colleghi nelle sue ore di notte
-  const s = page.people.find((x) => x.op === "scarso").slots["22-3"];
-  assert.ok(s.sph < s.peer_sph);
-  assert.ok(s.gap < 0);
+  // stima: chi chiude basso rende meno di una persona media nelle ore di punta
+  assert.ok(page.people.find((x) => x.op === "scarso").est < 0);
+  assert.ok(page.people.find((x) => x.op === "forte").est > 0);
+  assert.equal(op("scarso").est, page.people.find((x) => x.op === "scarso").est);
+});
+
+t("bravura da fuori (Infloww): comanda lei, non i turni", () => {
+  // nei turni "scarso" vende poco, ma secondo Infloww è bravo: vince Infloww
+  const bravuraOf = new Map([["scarso", { idx: 1.4, infloww_name: "Scarso Infloww" }], ["forte", { idx: 1.0 }], ["nascosto", { idx: 1.5 }]]);
+  for (const id of ["medio1", "medio2", "medio3", "medio4"]) bravuraOf.set(id, { idx: 1 });
+  const doc = buildFasce(toPieces(scenario()), { now: Date.parse("2026-08-30"), names: {}, bravuraOf });
+  assert.equal(doc.bravura_source, "infloww");
+  const op = (id) => doc.operators.find((o) => o.op === id);
+  assert.equal(op("scarso").idx, 1.4);
+  assert.equal(op("scarso").verdict, null);
+  assert.equal(op("scarso").link_name, "Scarso Infloww");
+  assert.equal(op("medio1").link_name, "Op medio1");
+  // chi non è abbinato a Infloww non ha bravura né verdetto
+  const doc2 = buildFasce(toPieces(scenario()), { now: Date.parse("2026-08-30"), names: {}, bravuraOf: new Map() });
+  assert.ok(doc2.operators.every((o) => o.idx == null && o.verdict == null));
 });
 
 t("chi non fa turni da 3 settimane esce dalle liste — misurato dall'ultimo giorno dei dati", () => {
