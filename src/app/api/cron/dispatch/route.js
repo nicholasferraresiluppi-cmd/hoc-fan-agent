@@ -22,6 +22,7 @@
  *   - sempre:            pilota OnlyFansAPI (ofapi-pilot)
  *   - sempre:            Radar creator (scouting-refresh: giro Apify settimanale, esito al giro dopo)
  *   - sempre:            Radar creator, rilettura delle prime evidenze (riaccende la catena se in corso)
+ *   - sempre:            Warm-up: numeri pubblici dei profili IG e X (warmup-metrics, una volta al giorno)
  *   - lunedì:            + digest email (dopo il run: legge i suoi findings)
  *   - giorno 1 del mese: snapshot leghe (chiusura stagione)
  *   - sempre, in fondo:  Centro HR: riconciliazione con ClickUp (solo con HR_CLICKUP_LIST_ID)
@@ -110,6 +111,8 @@ export async function POST(request) {
   // Radar creator (10/10/2026): giro settimanale Apify sulle creator dello scouting —
   // lancia il run una volta a settimana, ne raccoglie l'esito al giro dopo
   out.scouting_refresh = await kickEndpoint(request, "/api/cron/scouting-refresh");
+  // Warm-up (22/10/2026): numeri pubblici dei profili IG e X letti con Apify, una volta al giorno
+  out.warmup_metrics = await kickEndpoint(request, "/api/cron/warmup-metrics");
   // rilettura delle prime evidenze del Radar (16/10/2026): si porta avanti da sola, qui la si
   // riaccende se la catena si è interrotta (la route non fa niente se il giro non è in corso)
   out.scouting_hlreread = await kickEndpoint(request, "/api/cron/scouting-hlreread");

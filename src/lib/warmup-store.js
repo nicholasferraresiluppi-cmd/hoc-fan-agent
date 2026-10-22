@@ -18,6 +18,7 @@
 import { kv } from "@vercel/kv";
 import { loadAll as loadSupervisor, upsert as supUpsert } from "@/lib/supervisor-store";
 import { META_KEYS, SUP_PLATFORM_STATUS } from "@/lib/warmup-plan";
+import { loadPublicSummaries } from "@/lib/warmup-metrics";
 
 const IDX = "warmup:index";
 const P = (id) => `warmup:p:${id}`;
@@ -86,6 +87,9 @@ export async function loadState() {
       progress, timers,
     });
   });
+  // numeri pubblici letti in automatico (warmup-metrics): riassunto, non lo storico intero
+  const pub = await loadPublicSummaries(profiles.map((p) => p.id)).catch(() => ({}));
+  for (const p of profiles) p.pub = pub[p.id] || null;
   if (prune.length) {
     const p2 = kv.pipeline();
     prune.forEach(([id, f]) => p2.hdel(D(id), f));

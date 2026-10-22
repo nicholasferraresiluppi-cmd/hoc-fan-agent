@@ -17,7 +17,7 @@
 // cooldown, archivio e registro restano agli admin.
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 import { currentUser } from "@clerk/nextjs/server";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
@@ -27,6 +27,7 @@ import {
   createProfile, updateProfile, setTask, setTimer, patchMeta, setArchived, purge, importBackup,
 } from "@/lib/warmup-store";
 import { kv } from "@vercel/kv";
+import { refreshPublicMetrics, getRunState, apifyConfigured } from "@/lib/warmup-metrics";
 
 const noStore = { headers: { "Cache-Control": "no-store" } };
 const LOG_TYPES = new Set(["accesso", "account", "task", "flag", "traguardo", "utente", "profilo", "dati", "stato"]);
@@ -61,8 +62,8 @@ export async function GET(request) {
     return Response.json({ activity: await getActivity() }, noStore);
   }
   await notePerson(g.by.userId, g.by.name);
-  const [state, people] = await Promise.all([loadState(), listPeople()]);
-  return Response.json({ ...state, people, me: { id: g.by.userId, name: g.by.name, admin: g.admin } }, noStore);
+  const [state, people, pubRun] = await Promise.all([loadState(), listPeople(), getRunState().catch(() => null)]);
+  return Response.json({ ...state, people, pubRun: { ...(pubRun || {}), configured: apifyConfigured() }, me: { id: g.by.userId, name: g.by.name, admin: g.admin } }, noStore);
 }
 
 export async function POST(request) {
@@ -84,6 +85,10 @@ export async function POST(request) {
       if (!r.ok) return fail(r);
       await appendLog(r.id, ["Account registrato nella console", ...logs], by, "account", "@" + String(f.username || "").replace(/^@+/, ""));
       return Response.json({ ok: true, id: r.id });
+    }
+    if (body.action === "refreshPub") {
+      if (!admin) return onlyAdmin("Rileggere i numeri pubblici");
+      return Response.json({ result: await refreshPublicMetrics({ force: true }) });
     }
     if (body.action === "import") {
       if (!admin) return onlyAdmin("Importare dalla console di prima");
