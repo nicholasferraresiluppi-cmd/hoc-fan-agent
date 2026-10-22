@@ -146,7 +146,7 @@ function PageCard({ p }) {
               const mark = p.weak_in_prime.includes(x.op) ? "bad" : p.strong_outside.includes(x.op) ? "good" : null;
               return (
                 <tr key={x.op}>
-                  <td style={tdL}>{opLink(x.name)}{mark === "bad" && <> <Chip tone="bad">basso in punta</Chip></>}{mark === "good" && <> <Chip tone="good">da portare in punta</Chip></>}{!x.active && <> <Chip>fermo da 3 settimane</Chip></>}</td>
+                  <td style={tdL}>{opLink(x.name)}{mark === "bad" && <> <Chip tone="bad">basso in punta</Chip></>}{mark === "good" && <> <Chip tone="good">da portare in punta</Chip></>}{!x.active && <> <Chip>nessun turno da 3 settimane</Chip></>}</td>
                   <td style={td}><Bravura v={x.idx} /></td>
                   {slotsHere.map((s) => {
                     const c = x.slots[s.id];
@@ -197,7 +197,11 @@ export default function FasceTab({ splitId }) {
   const ov = data.overall || {};
   const top = SLOTS.filter((s) => ov[s.id]?.sph_adj != null).sort((a, b) => ov[b.id].sph_adj - ov[a.id].sph_adj);
   const hi = top[0];
-  const lo = top[top.length - 1];
+  // confronto con la fascia più bassa tra quelle dove si lavora davvero (il 1–7 sullo
+  // split ha un quinto delle ore: 2,6 volte "tanto" contro di lui esagerava)
+  const maxH = Math.max(0, ...top.map((s) => ov[s.id].h || 0));
+  const common = top.filter((s) => (ov[s.id].h || 0) >= maxH * 0.5);
+  const lo = common[common.length - 1];
   const ratio = hi && lo && ov[lo.id].sph_adj ? ov[hi.id].sph_adj / ov[lo.id].sph_adj : null;
   const { togliere, portare, ops } = derived;
   const lostTot = togliere.reduce((s, o) => s + Math.min(0, o.ps.gap || 0), 0);
@@ -213,7 +217,7 @@ export default function FasceTab({ splitId }) {
     { key: "name", label: "Operatore", render: (o) => opLink(o.name) },
     { key: "idx", label: "Bravura", align: "right", render: (o) => <Bravura v={o.idx} /> },
     { key: "prime_share", label: "Ore in fasce di punta", align: "right", sort: (o) => o.ps.h, render: (o) => `${o.ps.h} h · ${pct(o.prime_share)}` },
-    { key: "sph", label: "Lui/lei in punta", align: "right", sort: (o) => o.ps.sph, render: (o) => (o.ps.sph == null ? "–" : `${usd(o.ps.sph)}/h`) },
+    { key: "sph", label: "Venduto/ora in punta", align: "right", sort: (o) => o.ps.sph, render: (o) => (o.ps.sph == null ? "–" : `${usd(o.ps.sph)}/h`) },
     { key: "peer", label: "Colleghi, stesse fasce", align: "right", sort: (o) => o.ps.peer_sph, render: (o) => (o.ps.peer_sph == null ? "–" : `${usd(o.ps.peer_sph)}/h`) },
     { key: "gap", label: "Rispetto ai colleghi", align: "right", sort: (o) => o.ps.gap, render: (o) => <span style={{ color: (o.ps.gap || 0) < 0 ? CP.accentRed : CP.textSecondary, ...NUM }}>{usd(o.ps.gap)}</span> },
     { key: "where", label: "Dove", sortable: false, muted: true, render: (o) => <span style={{ fontSize: 12, whiteSpace: "normal", display: "inline-block", minWidth: 200 }}>{o.ps.where.slice(0, 3).map((w) => `${w.name.replace(/ - IT$/, "")} ${w.h} h`).join(" · ")}</span> },
@@ -232,7 +236,7 @@ export default function FasceTab({ splitId }) {
     { key: "h", label: "Ore", align: "right", render: (o) => hh(o.h) },
     ...SLOTS.map((s) => ({ key: `s_${s.id}`, label: s.label, align: "right", muted: true, sort: (o) => o.slots[s.id] || 0, render: (o) => (o.slots[s.id] ? `${hh(o.slots[s.id])} h` : "–") })),
     { key: "prime_share", label: "In punta", align: "right", render: (o) => pct(o.prime_share) },
-    { key: "verdict", label: "Lettura", sort: (o) => o.verdict || "", render: (o) => (o.verdict === "togliere" ? <Chip tone="bad">via dalle fasce di punta</Chip> : o.verdict === "portare" ? <Chip tone="good">da portare in punta</Chip> : !o.active ? <Chip>fermo da 3 settimane</Chip> : <span style={{ color: CP.textMuted }}>–</span>) },
+    { key: "verdict", label: "Lettura", sort: (o) => o.verdict || "", render: (o) => (o.verdict === "togliere" ? <Chip tone="bad">via dalle fasce di punta</Chip> : o.verdict === "portare" ? <Chip tone="good">da portare in punta</Chip> : !o.active ? <Chip>nessun turno da 3 settimane</Chip> : <span style={{ color: CP.textMuted }}>–</span>) },
     { key: "last_day", label: "Ultimo turno", align: "right", muted: true, render: (o) => dmy(o.last_day) },
   ];
 
@@ -242,7 +246,7 @@ export default function FasceTab({ splitId }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 260 }}>
           <h2 style={{ fontSize: 17, fontWeight: 500, color: CP.textPrimary, margin: 0 }}>Chi rende di più, e in quali turni{data.split ? ` · ${data.split.name}` : " · tutta HOC"}</h2>
           <Note>
-            Quanto vende all'ora una persona di bravura media in ogni fascia, {fromTxt} a oggi.
+            Quanto vende all'ora una persona di bravura media in ogni fascia, {fromTxt} al {dmy(data.until)}.
             {hi && lo && ratio ? ` Un'ora di ${hi.label} vale ${usd(ov[hi.id].sph_adj)}, una di ${lo.label} ${usd(ov[lo.id].sph_adj)}: la stessa persona${ratio >= 1.5 ? " rende " + fx(ratio, 1) + " volte tanto" : " rende di più"} nella fascia migliore.` : ""}
           </Note>
         </div>
@@ -250,6 +254,9 @@ export default function FasceTab({ splitId }) {
       </div>
 
       {data.stale && <Notice>I dati sono di più di un giorno fa: il ricalcolo notturno non è passato.</Notice>}
+      {data.until && (Date.now() - Date.parse(data.until)) / 86400000 > 3 && (
+        <Notice danger>I turni di CreatorsPro arrivano solo fino al {dmy(data.until)}: la sincronizzazione dei turni è ferma. I numeri qui sotto valgono fino a quel giorno.</Notice>
+      )}
       <SlotValues overall={ov} />
 
       <div style={{ ...card, padding: "14px 18px" }}>
@@ -267,7 +274,7 @@ export default function FasceTab({ splitId }) {
 
       {view === "azioni" && (
         <>
-          <H2 sub={`Bravura sotto ${fx(WEAK)} e almeno il ${Math.round(0.3 * 100)}% delle ore nelle fasce di punta delle loro pagine. «Rispetto ai colleghi» = quanto hanno venduto in meno (o in più) nelle loro ore di punta rispetto ai colleghi sulle stesse pagine e fasce, ${fromTxt}${lostTot < 0 ? `: in tutto ${usd(lostTot)}` : ""}.`}>
+          <H2 sub={`Bravura fino a ${fx(WEAK)} e almeno il ${Math.round(0.3 * 100)}% delle ore nelle fasce di punta delle loro pagine. «Rispetto ai colleghi» = quanto hanno venduto in meno (o in più) nelle loro ore di punta rispetto ai colleghi sulle stesse pagine e fasce, ${fromTxt}${lostTot < 0 ? `: in tutto ${usd(lostTot)}` : ""}.`}>
             Chiudono basso nelle fasce che valgono di più ({togliere.length})
           </H2>
           <DataTable columns={colsTogliere} rows={togliere} defaultSort={{ key: "gap", dir: 1 }} minWidth={900} empty="Nessuno: nelle fasce di punta non c'è chi chiude basso." />
@@ -290,7 +297,7 @@ export default function FasceTab({ splitId }) {
       )}
 
       <Note>
-        Come si calcola: turni CreatorsPro {fromTxt} a oggi (l'unica fonte con le vendite per turno; Infloww dà solo il totale del mese). Bravura = venduto del turno ÷ quello dei colleghi sulla stessa pagina, nella stessa fascia e nello stesso tipo di turno (da solo o in duo), escluso sé stessi; 1,00 = come loro. Va d'accordo con la bravura della scheda Squadra, fatta sulle vendite Infloww. Fasce dall'ora di inizio del turno (ora italiana): 22–3, 17–22 (anche 19–01), 12–17 (anche 13–19), 7–12 (anche 7–13), 1–7. Nei turni in duo il venduto è già la quota della persona. Fuori dalle liste chi è uscito nel CRM o non fa turni da 3 settimane. Correlazione, non causa; le fasce dipendono anche dalla disponibilità delle persone. Non entra in score né compensi.
+        Come si calcola: turni CreatorsPro {fromTxt} al {dmy(data.until)} (l'unica fonte con le vendite per turno; Infloww dà solo il totale del mese). Bravura = venduto del turno ÷ quello dei colleghi sulla stessa pagina, nella stessa fascia e nello stesso tipo di turno (da solo o in duo), escluso sé stessi; 1,00 = come loro. Va d'accordo con la bravura della scheda Squadra, fatta sulle vendite Infloww. Fasce dall'ora di inizio del turno (ora italiana): 22–3, 17–22 (anche 19–01), 12–17 (anche 13–19), 7–12 (anche 7–13), 1–7. Nei turni in duo il venduto è già la quota della persona. Fuori dalle liste chi è uscito nel CRM o non fa turni da 3 settimane. Correlazione, non causa; le fasce dipendono anche dalla disponibilità delle persone. Non entra in score né compensi.
       </Note>
     </div>
   );

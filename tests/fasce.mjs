@@ -130,10 +130,16 @@ t("liste d'azione: scarso in punta da togliere, bravo fuori punta da portare", (
   assert.ok(s.gap < 0);
 });
 
-t("chi non fa turni da 3 settimane esce dalle liste", () => {
-  const doc = buildFasce(toPieces(scenario()), { now: Date.parse("2026-10-30"), names: {} });
+t("chi non fa turni da 3 settimane esce dalle liste — misurato dall'ultimo giorno dei dati", () => {
+  // un turno di un altro a fine ottobre: i protagonisti di agosto risultano fermi
+  const sh = [...scenario(), { ...S("altro", "p1", 1, 5, 5, 100), started_at: "2026-10-30T05:00:00Z" }];
+  const doc = buildFasce(toPieces(sh), { now: Date.parse("2026-10-30"), names: {} });
+  assert.equal(doc.until, "2026-10-30");
   assert.equal(doc.pages[0].weak_in_prime.length, 0);
   assert.ok(doc.operators.every((o) => o.verdict === null));
+  // se la sync si ferma e oggi è molto dopo, nessuno sembra fermo per quello
+  const doc2 = buildFasce(toPieces(scenario()), { now: Date.parse("2026-12-30"), names: {} });
+  assert.ok(doc2.pages[0].weak_in_prime.includes("scarso"));
 });
 
 t("doppio turno: quota di fasce coperte in due", () => {

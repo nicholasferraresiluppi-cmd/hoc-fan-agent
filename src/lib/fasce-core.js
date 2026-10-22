@@ -39,7 +39,7 @@
  * calendario.
  */
 
-export const FASCE_VERSION = "fasce-1";
+export const FASCE_VERSION = "fasce-2";
 
 export const SLOTS = [
   { id: "22-3", label: "22–3", from: 22, to: 1 },
@@ -313,13 +313,17 @@ export function duoShare(piecesOfPage) {
 export function buildFasce(pieces, { now = Date.now(), names = {} } = {}) {
   const bra = bravura(pieces);
   const { peerRate } = peerTable(pieces);
-  const today = new Date(now).toISOString().slice(0, 10);
   const lastDay = new Map();
   const opName = new Map();
+  let until = "";
   for (const x of pieces) {
     if (x.day > (lastDay.get(x.op) || "")) lastDay.set(x.op, x.day);
+    if (x.day > until) until = x.day;
     opName.set(x.op, x.name);
   }
+  // "fermo" si misura dall'ultimo giorno DEI DATI, non da oggi: se la sync dei
+  // turni CP si ferma (successo il 15/10/2026), da oggi sembrerebbero fermi tutti
+  const today = until || new Date(now).toISOString().slice(0, 10);
   const active = (op) => {
     const d = lastDay.get(op);
     return Boolean(d) && (Date.parse(today) - Date.parse(d)) / 86400000 <= STOP_DAYS;
@@ -434,6 +438,7 @@ export function buildFasce(pieces, { now = Date.now(), names = {} } = {}) {
   const all = slotValues(pieces, bra);
   return {
     version: FASCE_VERSION,
+    until: until || null,
     pages,
     operators,
     overall: Object.fromEntries(Object.entries(all.slots).map(([id, v]) => [id, { h: Math.round(v.h), sph_adj: v.sph_adj == null ? null : Math.round(v.sph_adj) }])),
