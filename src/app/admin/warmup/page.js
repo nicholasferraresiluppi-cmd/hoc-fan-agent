@@ -19,6 +19,7 @@ import {
   Metric2, Delta, ModalBox, Opt,
 } from "@/components/warmup/ui";
 import { GuideIG, GuideX } from "@/components/warmup/guide";
+import XRefs from "@/components/warmup/xrefs";
 import {
   DAY, PLATS, platOf, isX, keyOf, norm, todayKey, startOfDay, fmtDur, mmss, weekKey, weekLabel, lastWeeks,
   numFmt, delta, planFor, planForDate, visibleItems, dayProgress, tasksOn, adherence, hasArrears,
@@ -518,7 +519,7 @@ export default function WarmupPage() {
   const isMine = (a) => mine(a, me.id);
 
   const toast = (m) => { setToastMsg(m); setTimeout(() => setToastMsg((x) => (x === m ? null : x)), 2800); };
-  const setPlat = (v) => { if (v === plat) return; setPlatState(v); ls.set(PLAT_KEY, v); setSel(null); setFolder(null); setPane("oggi"); setOpenWhy({}); setForm(null); window.scrollTo(0, 0); };
+  const setPlat = (v) => { if (v === plat) return; setPlatState(v); ls.set(PLAT_KEY, v); setSel(null); setFolder(null); setPane("oggi"); setOpenWhy({}); setForm(null); if (tab === "xrefs") setTab("oggi"); window.scrollTo(0, 0); };
 
   // ── scritture: prima sullo schermo, poi sul server, poi si rilegge ──
   const optimistic = (id, fn) => mutate((cur) => cur && { ...cur, profiles: cur.profiles.map((p) => { if (p.id !== id) return p; const c = structuredClone(p); fillDefaults(c); fn(c); return c; }) }, { revalidate: false });
@@ -1275,11 +1276,13 @@ export default function WarmupPage() {
     } else if (tab === "oggi") body = viewToday();
     else if (tab === "dati") body = viewReport();
     else if (tab === "admin" && admin) body = viewAdmin();
+    else if (tab === "xrefs" && plat === "x") body = <XRefs />;
     else if (tab === "guide") body = <><h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: "0 0 4px" }}>Guida{plat === "x" ? " · X" : ""}</h2><p style={{ ...hint, fontSize: 14, margin: "0 0 14px" }}>{plat === "x" ? "Il riassunto del documento Account X." : "Il riassunto delle SOP a cui la console fa riferimento."}</p>{plat === "x" ? <GuideX /> : <GuideIG />}</>;
     else { const a = sel && byId(sel); body = a && !a.archived ? viewDay(a) : folder ? viewFolder(folder) : viewFolders(); }
   }
   const modalA = modal?.id ? byId(modal.id) : null;
-  const tabs = admin ? [...TABS, ["admin", "Admin"]] : TABS;
+  // Ispirazioni: reference di creator su X (per Instagram c'è il Radar creator)
+  const tabs = [...TABS.slice(0, 3), ...(plat === "x" ? [["xrefs", "Ispirazioni"]] : []), ...TABS.slice(3), ...(admin ? [["admin", "Admin"]] : [])];
   const openToday = ACC.reduce((t, a) => t + tasksOn(a, todayKey()).open.length, 0);
 
   return (
