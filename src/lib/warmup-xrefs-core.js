@@ -14,7 +14,18 @@ export const STATUSES = { nuova: "Da valutare", tenuta: "Tenuta", scartata: "Sca
 export const MIN_FOLLOWERS = 3000;
 
 const OF_DIRECT = /(onlyfans\.com|fansly\.com|fans\.ly|fanvue\.com)/i;
-const OF_BIO = /\b(onlyfans|0nlyfans|only\s?fans|fansly|\bOF\b|🔞|18\+)/i;
+// «OF» solo maiuscolo: con il confronto senza maiuscole prendeva la parola inglese «of»
+// (Mercedes F1, un giornalista: prima ricerca del 24/10)
+const OF_BIO = /(onlyfans|0nlyfans|only\s?fans|fansly)/i;
+const OF_UPPER = /(^|[^A-Za-z])OF([^A-Za-z]|$)|🔞/;
+// Le nostre creator sono donne: chi in bio si dichiara uomo non è una reference utile.
+const MALE = /(\bhe\s*\/\s*him\b|\bhim\s*\/\s*he\b|\bhe\s*\/\s*they\b|\bgay\b|\balpha\s*male\b|\bstraight\s*(male|guy|man)\b|\bbodybuilder\b|\bmuscle\b|\bdaddy\b|\btwink\b|\bcashmaster\b|\bfirefighter\b|\bhusband\b|\bboy\b|\bguy\b|\bprince\b|\bking\b|\bdude\b|\bmasc\b|🏳️‍🌈|👨)/i;
+const FEMALE = /(\bshe\s*\/\s*her\b|\bgirl\b|\bbabe\b|\bwife\b|\bmom\b|\bmilf\b|\blatina\b|\bpetite\b|\bgoddess\b|\bprincess\b|\bqueen\b|\bbaddie\b|\bblonde\b|\bbrunette\b|\bredhead\b|\bgirlfriend\b|\bwoman\b|\blady\b|\bgf\b|\bher\b|💋|💅|👸|🎀)/i;
+// account di marchi/piattaforme (Fansly, negozi): hanno il link ma non sono creator
+const BRAND = /(official\s+(x\s+)?account|subscription-based social media|\bnetwork\b|official twitter of)/i;
+export const looksBrand = (a) => BRAND.test(a?.bio || "") || /fansly\.com\/explore/i.test(a?.site || "");
+export const looksMale = (a) => MALE.test(`${a?.bio || ""} ${a?.name || ""}`);
+export const looksFemale = (a) => FEMALE.test(`${a?.bio || ""} ${a?.name || ""}`);
 const US = /\b(usa|united states|america|ca|tx|fl|ny|nyc|la|l\.a\.|miami|texas|california|florida|new york|las vegas|vegas|atlanta|chicago|arizona|ohio|georgia|houston|dallas|austin|denver|seattle|boston|phoenix|nashville|carolina|new jersey|nj|virginia|michigan|colorado|oregon|utah|hawaii)\b/i;
 
 const num = (v) => (v == null || v === "" || isNaN(Number(v)) ? null : Number(v));
@@ -22,15 +33,17 @@ const num = (v) => (v == null || v === "" || isNaN(Number(v)) ? null : Number(v)
 /** Ricerche della scoperta: quelle di base + una per nicchia (es. "tattoo", "latina", "fitness"). */
 export function discoveryQueries(niches = [], { since } = {}) {
   const s = since ? ` since:${since}` : "";
+  // frasi con cui le creator spingono la pagina, su post con media: meno rumore delle parole generiche
   const base = [
-    `onlyfans min_faves:500 lang:en -filter:replies${s}`,
-    `"new video" OF min_faves:300 lang:en -filter:replies${s}`,
-    `"in my bio" min_faves:500 lang:en -filter:replies${s}`,
-    `"subscribe" onlyfans min_faves:200 lang:en -filter:replies${s}`,
-    `"link below" min_faves:500 lang:en -filter:replies${s}`,
+    `"my OF" min_faves:300 lang:en filter:media -filter:replies${s}`,
+    `"full video" (OF OR onlyfans) min_faves:300 lang:en filter:media -filter:replies${s}`,
+    `"link in bio" (girl OR babe OR baddie OR wife) min_faves:500 lang:en filter:media -filter:replies${s}`,
+    `"subscribe" onlyfans min_faves:200 lang:en filter:media -filter:replies${s}`,
+    `"come see more" min_faves:300 lang:en filter:media -filter:replies${s}`,
+    `onlyfans (girl OR babe) min_faves:500 lang:en filter:media -filter:replies${s}`,
   ];
   const nic = niches.map((n) => String(n).trim().replace(/["\\]/g, "")).filter(Boolean).slice(0, 8)
-    .map((n) => `${n} onlyfans min_faves:100 lang:en -filter:replies${s}`);
+    .map((n) => `${n} (onlyfans OR "my OF" OR "link in bio") min_faves:100 lang:en filter:media -filter:replies${s}`);
   return [...base, ...nic];
 }
 
@@ -55,11 +68,21 @@ export function slimTweet(o) {
   };
 }
 
+/** Un utente di apidojo/twitter-user-scraper (es. dai «seguiti») nella stessa forma di un post. */
+export function userAsPost(o, via) {
+  return slimTweet({ id: `u-${o.userName || o.u}`, text: "", createdAt: null, searchTerm: via ? `seguiti da @${via}` : null, author: {
+    userName: o.userName || o.u, name: o.name || "", followers: o.followers ?? o.f, location: o.location ?? o.loc ?? "", isBlueVerified: o.isBlueVerified ?? o.blue,
+    description: o.description ?? o.bio ?? "", profilePicture: o.profilePicture ?? o.pic ?? null, statusesCount: o.statusesCount,
+    entities: { url: { urls: (o.entities?.url?.urls || (o.site ? [{ expanded_url: o.site }] : [])).map((u) => ({ expanded_url: u.expanded_url })) } },
+  } });
+}
+
 /** È una creator che porta su OnlyFans? (link diretto nel profilo, o OnlyFans nominato in bio) */
 export function isOfCreator(author) {
   if (!author) return false;
+  if (looksMale(author) || looksBrand(author)) return false;
   if (OF_DIRECT.test(author.site || "")) return true;
-  return OF_BIO.test(author.bio || "") && /linktr|beacons|allmylinks|link\.me|carrd|bio\.link|hoo\.be|snipfeed/i.test(author.site || "");
+  return (OF_BIO.test(author.bio || "") || OF_UPPER.test(author.bio || "")) && /linktr|beacons|allmylinks|link\.me|carrd|bio\.link|hoo\.be|snipfeed|getallmylinks|lnk\.bio/i.test(author.site || "");
 }
 export const looksUS = (author) => US.test(author?.loc || "");
 
@@ -81,7 +104,7 @@ export function candidatesFrom(tweets, existing = {}, { minFollowers = MIN_FOLLO
   for (const [k, a] of by) {
     if (existing[k]) continue;
     added.push({
-      key: k, u: a.u, name: a.name, f: a.f, loc: a.loc, us: looksUS(a), blue: a.blue, site: a.site, bio: a.bio, pic: a.pic,
+      key: k, u: a.u, name: a.name, f: a.f, loc: a.loc, us: looksUS(a), female: looksFemale(a), blue: a.blue, site: a.site, bio: a.bio, pic: a.pic,
       status: "nuova", niches: niche ? [niche] : [], addedAt: now, note: "",
       foundPost: a.found.sort((x, y) => (y.views || 0) - (x.views || 0))[0] || null,
     });

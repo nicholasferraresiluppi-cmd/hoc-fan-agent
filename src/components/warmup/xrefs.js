@@ -4,7 +4,7 @@
 // Logica in lib/warmup-xrefs-core.js, dati da /api/admin/warmup/xrefs.
 import { useMemo, useState } from "react";
 import useSWR from "swr";
-import { ExternalLink, Plus, RefreshCw, Search } from "lucide-react";
+import { ExternalLink, Plus, RefreshCw, Search, Share2 } from "lucide-react";
 import { CP } from "@/lib/brand";
 import { Notice, NUM } from "@/components/ds";
 import { btn, btnPrimary, btnSm, input, cardBox, hint, muted, SectionHead, Seg, Chip, Metric2, Field } from "@/components/warmup/ui";
@@ -60,12 +60,14 @@ function RefCard({ r, onStatus, onSave, busy }) {
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {r.us && <Chip color={CP.accentGreen}>USA</Chip>}
+        {r.female && <Chip>Donna</Chip>}
         {r.loc && !r.us && <Chip>{r.loc.slice(0, 24)}</Chip>}
         <Chip>{linkKind(r.site)}</Chip>
         {r.blue && <Chip>Premium</Chip>}
         {(r.niches || []).map((n) => <Chip key={n}>{n}</Chip>)}
       </div>
       {r.bio && <p style={{ fontSize: 13.5, color: CP.textSecondary, margin: 0, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{r.bio}</p>}
+      {r.via?.length > 0 && !s?.n && <p style={{ ...hint, margin: 0 }}>Trovata tra chi seguono {r.via.map((x) => "@" + x).join(", ")}</p>}
       {s?.n ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, fontSize: 13 }}>
           <div><b style={{ fontWeight: 500, ...NUM }}>{String(s.perDay).replace(".", ",")}</b><div style={muted}>post/giorno</div></div>
@@ -134,16 +136,22 @@ export default function XRefs() {
   return (
     <div>
       <p style={{ fontSize: 14, color: CP.textSecondary, margin: "0 0 14px", maxWidth: 820, lineHeight: 1.55 }}>
-        Creator, soprattutto americane, che usano X per portare su OnlyFans: esempi per chi pubblica per le nostre creator. Le trova il sistema tra i post più forti del mese, voi tenete quelle utili e scartate le altre. Delle tenute si leggono i post: ritmo, formati, link, orari e i post che hanno girato di più.
+        Creator, soprattutto americane, che usano X per portare su OnlyFans: esempi per chi pubblica per le nostre creator. Voi tenete quelle utili e scartate le altre; delle tenute si leggono i post (ritmo, formati, link, orari, post che hanno girato di più). Il modo migliore per trovarne di nuove è <b style={{ fontWeight: 500 }}>«Allarga dalla rete»</b>: le creator si seguono tra loro, quindi chi seguono le vostre tenute sono creator simili.
       </p>
       {!data.configured && <Notice danger>Apify non è configurato sul server: la ricerca non può partire.</Notice>}
+      <div style={{ ...cardBox, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ flex: "1 1 260px", fontSize: 14, color: CP.textSecondary }}>Trova creator simili a quelle tenute (o, all&apos;inizio, alle più grandi da valutare) leggendo chi seguono. ~8 centesimi a creator di partenza, fino a 5 per volta.</div>
+        <button type="button" style={btnPrimary} disabled={!!busy} onClick={() => run("network", { action: "network" }, (d) => `Partita da ${d.result.seeds.map((x) => "@" + x).join(", ")}: letti ${d.result.read} seguiti, ${d.result.added} creator nuove da valutare.`)}>
+          <Share2 size={15} />{busy === "network" ? "Leggo la rete… (fino a due minuti)" : "Allarga dalla rete"}
+        </button>
+      </div>
       <div style={{ ...cardBox, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
         <div style={{ flex: "1 1 220px" }}>
-          <Field label="Cerca nuove reference" hint="Vuoto = ricerca generale. Con una nicchia (es. tattoo, latina, goth, fitness) cerca creator simili alle nostre.">
+          <Field label="Cerca nei post" hint="Per partire o per una nicchia (es. tattoo, latina, goth, fitness). X nasconde molti contenuti sensibili a chi cerca da fuori: rende meno della rete.">
             <input style={input} value={niche} onChange={(e) => setNiche(e.target.value)} placeholder="nicchia (facoltativa)" />
           </Field>
         </div>
-        <button type="button" style={{ ...btnPrimary, marginBottom: 12 }} disabled={!!busy} onClick={() => run("discover", { action: "discover", niche: niche.trim() || null }, (d) => `Letti ${d.result.posts} post, ${d.result.creators} creator con link OnlyFans, ${d.result.added} nuove da valutare.`)}>
+        <button type="button" style={{ ...btn, marginBottom: 12 }} disabled={!!busy} onClick={() => run("discover", { action: "discover", niche: niche.trim() || null }, (d) => `Letti ${d.result.posts} post, ${d.result.creators} creator con link OnlyFans, ${d.result.added} nuove da valutare.`)}>
           <Search size={15} />{busy === "discover" ? "Cerco… (fino a un minuto)" : "Cerca"}
         </button>
         <div style={{ flex: "1 1 200px" }}>
