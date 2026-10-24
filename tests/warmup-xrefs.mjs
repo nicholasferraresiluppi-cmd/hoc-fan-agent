@@ -61,9 +61,37 @@ t("cosa fanno le migliori: solo le tenute con numeri", () => {
 
 t("ricerche: base + nicchia, ora italiana", () => {
   const q = M.discoveryQueries(["tattoo"], { since: "2026-09-24" });
-  assert.ok(q.length === 6 && q[5].startsWith("tattoo onlyfans") && q[0].includes("since:2026-09-24"));
+  assert.ok(q.length === 7 && q[6].startsWith("tattoo (onlyfans") && q[0].includes("since:2026-09-24"));
   const h = M.etToIt(20, new Date("2026-10-24T12:00:00Z")); // 20 a New York = 2 in Italia
   assert.equal(h, 2);
+});
+
+t("niente «of» inglese, niente uomini (casi della prima ricerca del 24/10)", () => {
+  const tweets = [
+    tw("1", A("MercedesAMGF1", 5279717, "https://linktr.ee/mercedesamgf1", { description: "Home of the 8x Formula 1 World Champions 🏆" })),
+    tw("2", A("bluestein", 152352, "https://linktr.ee/Gregbluestein", { description: "Husband, father, aspiring mensch. chief politics of the AJC" })),
+    tw("3", A("DJWilder_", 22749, "https://onlyfans.com/djwilder", { description: "California born. Built in the gym. muscle", location: "Visalia CA" })),
+    tw("4", A("jake_brooks_fd", 7472, "https://www.fanvue.com/jake_brooks", { description: "35 | gay 🏳️‍🌈 Single Firefighter" })),
+    tw("5", A("AccelGirl", 78041, "https://onlyfans.com/accelgirl", { description: "Coming soon… 🥰 ⬇️" })),
+    tw("6", A("Maddisonfox", 205629, "https://link.me/maddisonfox__", { description: "💕 The algorithm's favourite blonde. my OF below" })),
+  ].map(M.slimTweet);
+  const { added } = M.candidatesFrom(tweets, {});
+  assert.deepEqual(added.map((a) => a.u).sort(), ["AccelGirl", "Maddisonfox"]);
+  assert.equal(added.find((a) => a.u === "Maddisonfox").female, true);
+});
+
+t("dalla rete: utenti dei «seguiti», marchi fuori (forma vera del 24/10)", () => {
+  const users = [
+    { userName: "BARBEEBANDZ_XXX", followers: 981546, location: "Florida, USA", description: "💞👉🏾JOIN MY ONLYFANS ‼️ Prettiest", entities: { url: { urls: [{ expanded_url: "https://onlyfans.com/barbeebandz/c42" }] } } },
+    { userName: "fansly", followers: 319210, description: "A subscription-based social media platform.", entities: { url: { urls: [{ expanded_url: "https://fansly.com/explore" }] } } },
+    { userName: "femboynetwork_", followers: 113621, description: "network of clips", entities: { url: { urls: [{ expanded_url: "https://onlyfans.com/zayasissy" }] } } },
+    { userName: "misselusivex", followers: 234893, location: "UK", description: "Petite • Tattooed • Redhead", entities: { url: { urls: [{ expanded_url: "https://onlyfans.com/fantasyfreya/c1" }] } } },
+    { userName: "piccola", followers: 1200, description: "girl", entities: { url: { urls: [{ expanded_url: "https://onlyfans.com/x" }] } } },
+  ];
+  const { added } = M.candidatesFrom(users.map((u) => M.userAsPost(u)), {}, { minFollowers: 5000 });
+  assert.deepEqual(added.map((a) => a.u).sort(), ["BARBEEBANDZ_XXX", "misselusivex"]);
+  assert.equal(added.find((a) => a.u === "BARBEEBANDZ_XXX").us, true);
+  assert.equal(added.find((a) => a.u === "misselusivex").female, true);
 });
 
 console.log(`warmup-xrefs: ${n} gruppi di asserzioni ok`);

@@ -5,12 +5,15 @@
 // Spesa: scoperta ~400 post (~0,16 $), lettura ~1,6 cent a reference; al massimo 4 giri manuali al giorno.
 import { kv } from "@vercel/kv";
 import { gzipSync, gunzipSync } from "node:zlib";
-import { XREF_VERSION, STATUSES, discoveryQueries, slimTweet, candidatesFrom, analyzePosts, patterns, PRICE } from "@/lib/warmup-xrefs-core";
+import { XREF_VERSION, STATUSES, discoveryQueries, slimTweet, candidatesFrom, analyzePosts, patterns, PRICE, isOfCreator, userAsPost } from "@/lib/warmup-xrefs-core";
 
 const KEY = "xref:data";
 const API = "https://api.apify.com/v2";
 const SEARCH_ACTOR = "apidojo~tweet-scraper";
 const PROFILE_ACTOR = "apidojo~twitter-profile-scraper";
+const USER_ACTOR = "apidojo~twitter-user-scraper";
+const FOLLOWING_PER_SEED = 150;
+const MAX_SEEDS = 5;
 const GZ = "gz1:";
 const MAX_RUNS_PER_DAY = 4;
 const STALE_DAYS = 7;
@@ -56,6 +59,13 @@ export async function getXrefs() {
   return { refs, counts, patterns: patterns(refs), log: (doc.log || []).slice(-10).reverse(), configured: apifyConfigured() };
 }
 
+/** Le «da valutare» trovate con regole vecchie e che oggi non passano il filtro escono (tenute e scartate restano). */
+function prune(doc) {
+  let n = 0;
+  for (const [k, r] of Object.entries(doc.refs)) if (r.status === "nuova" && !r.manual && !isOfCreator(r)) { delete doc.refs[k]; n++; }
+  return n;
+}
+
 /** Cerca nuove reference (ricerca dei post forti dell'ultimo mese, eventualmente su una nicchia). */
 export async function discover({ niche = null, by } = {}) {
   if (!apifyConfigured()) throw new Error("Apify non è configurato");
@@ -67,11 +77,44 @@ export async function discover({ niche = null, by } = {}) {
   const rows = await runSync(SEARCH_ACTOR, { searchTerms: terms, maxItems, sort: "Top", includeSearchTerms: true, customMapFunction: MAP_FN }, Math.ceil(maxItems * PRICE.tweet * 1.3 * 100 + 5) / 100);
   const tweets = rows.map(slimTweet);
   const fresh2 = await load(); // rilettura appena prima di scrivere
+  const pruned = prune(fresh2);
   const { added, seen } = candidatesFrom(tweets, fresh2.refs, { niche });
   for (const r of added) fresh2.refs[r.key] = r;
-  fresh2.log.push({ at: Date.now(), day, kind: "scoperta", niche, by: by?.name || "", posts: tweets.length, creators: seen, added: added.length, usd: Math.round(tweets.length * PRICE.tweet * 100) / 100 });
+  fresh2.log.push({ at: Date.now(), day, kind: "scoperta", niche, by: by?.name || "", posts: tweets.length, creators: seen, added: added.length, pruned, usd: Math.round(tweets.length * PRICE.tweet * 100) / 100 });
   await save(fresh2);
-  return { posts: tweets.length, creators: seen, added: added.length };
+  return { posts: tweets.length, creators: seen, added: added.length, pruned };
+}
+
+/**
+ * Allarga dalla rete: le creator si seguono tra loro, quindi dai «seguiti» delle reference tenute
+ * escono creator simili (misurato il 24/10: 3 creator → 49 con link OnlyFans e ≥5.000 follower,
+ * contro 14 dalla ricerca nei post). Senza tenute si parte dalle «da valutare» più grandi.
+ * Costo: ~1,6 cent a creator di partenza + 0,04 cent a seguito letto (~8 cent a partenza).
+ */
+export async function discoverNetwork({ by } = {}) {
+  if (!apifyConfigured()) throw new Error("Apify non è configurato");
+  const doc = await load();
+  const day = spendGuard(doc);
+  prune(doc);
+  const all = Object.values(doc.refs);
+  const used = new Set(doc.seedsUsed || []);
+  const pick = (arr) => arr.filter((r) => !used.has(r.key)).sort((a, b) => (b.f || 0) - (a.f || 0));
+  let seeds = pick(all.filter((r) => r.status === "tenuta"));
+  if (!seeds.length) seeds = pick(all.filter((r) => r.status === "nuova" && r.female !== false));
+  seeds = seeds.slice(0, MAX_SEEDS);
+  if (!seeds.length) throw new Error("Nessuna reference da cui partire: tieni qualche creator, oppure fai prima una ricerca nei post");
+  const rows = await runSync(USER_ACTOR, { twitterHandles: seeds.map((r) => r.u), getFollowing: true, maxItems: FOLLOWING_PER_SEED * seeds.length },
+    Math.ceil((seeds.length * PRICE.profile + FOLLOWING_PER_SEED * seeds.length * PRICE.tweet) * 1.4 * 100 + 5) / 100);
+  const posts = rows.filter((o) => o.userName).map((o) => userAsPost(o, null));
+  const fresh2 = await load();
+  prune(fresh2);
+  const { added, seen } = candidatesFrom(posts, fresh2.refs, { minFollowers: 5000 });
+  for (const r of added) { r.via = seeds.map((x) => x.u).slice(0, 3); fresh2.refs[r.key] = r; }
+  fresh2.seedsUsed = [...new Set([...(fresh2.seedsUsed || []), ...seeds.map((x) => x.key)])].slice(-500);
+  fresh2.log.push({ at: Date.now(), day, kind: "scoperta", niche: "rete", by: by?.name || "", posts: posts.length, creators: seen, added: added.length,
+    usd: Math.round((seeds.length * PRICE.profile + posts.length * PRICE.tweet) * 100) / 100 });
+  await save(fresh2);
+  return { seeds: seeds.map((x) => x.u), read: posts.length, creators: seen, added: added.length };
 }
 
 /** Legge gli ultimi 40 post delle reference indicate (default: le tenute senza numeri o vecchi di 7 giorni). */
