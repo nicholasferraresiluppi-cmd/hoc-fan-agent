@@ -95,4 +95,64 @@ t("tetto di spesa del giro", () => {
   assert.ok(M.runBudget(0, 10) < 0.4);
 });
 
+t("visualizzazioni a un giorno: si fissano solo tra 18 e 48 ore", () => {
+  const ts = Date.parse("2026-10-20T10:00:00Z");
+  let s = M.mergeReading(null, { at: ts + 5 * 3600e3, followers: 1, posts: 1, items: [{ id: "r", ts, kind: "reel", views: 10 }] });
+  assert.equal(s.posts.r.early, undefined); // troppo presto
+  s = M.mergeReading(s, { at: ts + 26 * 3600e3, followers: 1, posts: 1, items: [{ id: "r", ts, kind: "reel", views: 70 }] });
+  assert.equal(s.posts.r.early, 70);
+  s = M.mergeReading(s, { at: ts + 50 * 3600e3, followers: 1, posts: 1, items: [{ id: "r", ts, kind: "reel", views: 200 }] });
+  assert.equal(s.posts.r.early, 70); // resta quella a un giorno
+  assert.equal(s.posts.r.views, 200);
+});
+
+t("allarme copertura: crollo, calo, pochi dati", () => {
+  const now = Date.parse("2026-11-10T05:00:00Z"), D = 86400000;
+  const mk = (recent, base) => {
+    const posts = {};
+    recent.forEach((v, i) => { posts["n" + i] = { kind: "reel", ts: now - (1 + i * 0.5) * D, early: v }; });
+    base.forEach((v, i) => { posts["o" + i] = { kind: "reel", ts: now - (6 + i) * D, early: v }; });
+    posts.c = { kind: "carosello", ts: now - D, early: 1 }; // i caroselli non contano
+    return { v: M.METRICS_VERSION, days: {}, posts };
+  };
+  const crollo = M.reachCheck(mk([20, 25, 18], [80, 70, 90, 75, 85]), "ig", now);
+  assert.equal(crollo.status, "crollo"); assert.equal(crollo.recentMedian, 20); assert.equal(crollo.baseMedian, 80);
+  assert.equal(M.reachCheck(mk([40, 45, 42], [80, 70, 90, 75, 85]), "ig", now).status, "calo");
+  assert.equal(M.reachCheck(mk([78, 70, 90], [80, 70, 90, 75, 85]), "ig", now).status, "ok");
+  assert.equal(M.reachCheck(mk([5, 5], [80, 70, 90, 75, 85]), "ig", now).status, "pochi_dati"); // 2 reel non bastano
+  assert.equal(M.reachCheck(mk([1, 2, 1], [10, 12, 9, 11, 10]), "ig", now).status, "pochi_dati"); // profilo troppo piccolo
+  const pub = { last: { followers: 50 }, lastAt: now, reach: crollo };
+  const al = M.publicAlerts({ platform: "ig", username: "@p", state: "online" }, pub, now);
+  assert.ok(al.some((x) => /Visualizzazioni crollate/.test(x.t) && /20 visualizzazioni/.test(x.d)));
+  assert.equal(M.publicAlerts({ platform: "ig", username: "@p", state: "shadowban" }, pub, now).filter((x) => /crollate/.test(x.t)).length, 0); // già segnato
+  assert.equal(M.publicAlerts({ platform: "ig", username: "@p", state: "online", flag: { type: "reach" } }, pub, now).filter((x) => /crollate/.test(x.t)).length, 0);
+});
+
+t("tracking link OnlyFans: quale si usa, righe del magazzino, settimana", () => {
+  assert.equal(M.effectiveLink({ platform: "ig", trackingLink: "https://onlyfans.com/Giulia/c12?x=1" }, null).url, "onlyfans.com/giulia/c12");
+  assert.deepEqual(M.effectiveLink({ platform: "x" }, { website: "https://onlyfans.com/elisavimercati/c320" }), { url: "onlyfans.com/elisavimercati/c320", from: "bio" });
+  assert.equal(M.effectiveLink({ platform: "ig" }, { website: "https://onlyfans.com/x/c1" }), null); // su IG la bio ha il dominio, non il link
+  const sql = M.linkStatsSQL(["https://onlyfans.com/elisavimercati/c320", "non un link"], { dataset: "d", orgId: "o" });
+  assert.match(sql, /IN \('onlyfans.com\/elisavimercati\/c320'\)/);
+  assert.equal(M.linkStatsSQL(["nulla"], { dataset: "d", orgId: "o" }), null);
+  // righe vere del 21-24/10 (link «X» di Elisa) + due giorni inventati con iscritti e ricavo
+  const rows = [
+    { day: "2026-10-21", url: "onlyfans.com/elisavimercati/c320", name: "X", created: "2026-10-21 09:54:33+00", clicks: 0, subs: 0, revenue: 0 },
+    { day: "2026-10-22", url: "onlyfans.com/elisavimercati/c320", name: "X", created: "2026-10-21 09:54:33+00", clicks: 1, subs: 0, revenue: 0 },
+    { day: "2026-10-24", url: "onlyfans.com/elisavimercati/c320", name: "X", created: "2026-10-21 09:54:33+00", clicks: 1, subs: 0, revenue: 0 },
+    { day: "2026-10-27", url: "onlyfans.com/elisavimercati/c320", name: "X", created: "2026-10-21 09:54:33+00", clicks: 9, subs: 2, revenue: 24.5 },
+    { day: "2026-10-28", url: "onlyfans.com/elisavimercati/c320", name: "X", created: "2026-10-21 09:54:33+00", clicks: 12, subs: 3, revenue: 40 },
+  ];
+  const s = M.mergeLinkRows(null, "onlyfans.com/elisavimercati/c320", rows, "bio");
+  assert.equal(s.link.created, "2026-10-21"); assert.deepEqual(s.link.total, { clicks: 12, subs: 3, revenue: 40 });
+  const w1 = M.weekOfDay("2026-10-22"), w2 = M.weekOfDay("2026-10-27");
+  assert.deepEqual(M.linkWeek(s.link, w1), { linkClicks: 1, linkSubs: 0, linkRevenue: 0 }); // nato in questa settimana: da zero
+  assert.deepEqual(M.linkWeek(s.link, w2), { linkClicks: 11, linkSubs: 3, linkRevenue: 40 }); // 12-1, 3-0, 40-0
+  const wk = M.weeklyFromStore(s, [w1, w2]);
+  assert.equal(wk[w2].linkSubs, 3);
+  assert.deepEqual(M.prefillFor("x", wk[w2]), { clicks: 11, subs: 3, spent: 40 });
+  const miss = M.mergeLinkRows(null, "onlyfans.com/nessuno/c1", rows, "profilo");
+  assert.equal(miss.link.missing, true);
+});
+
 console.log(`warmup-metrics: ${n} gruppi di asserzioni ok`);

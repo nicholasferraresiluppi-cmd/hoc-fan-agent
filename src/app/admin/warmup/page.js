@@ -26,7 +26,7 @@ import {
   ownerName, mine, urgenze, FL, ST, MS, SE, wfields, xGoal, IPROT, fillDefaults, applyState, openFlag,
   clearFlag, endCooldown,
 } from "@/lib/warmup-plan";
-import { prefillFor, publicAlerts } from "@/lib/warmup-metrics-core";
+import { prefillFor, publicAlerts, normalizeOfLink } from "@/lib/warmup-metrics-core";
 
 const API = "/api/admin/warmup";
 const fetcher = (url) =>
@@ -91,6 +91,7 @@ function ProfileForm({ edit, plat, preCreator, creators, devices, people, admin,
     username: edit ? edit.username : "", createdAt: edit ? edit.createdAt : todayKey(), displayName: edit?.displayName || "",
     creator: edit ? edit.creator : preCreator || "", bio: edit?.bio || "", pfpType: edit?.pfpType || "", device: edit?.device || "",
     deviceType: edit?.deviceType || "", email: edit?.email || "", birthDate: edit?.birthDate || "", owner: edit?.owner?.id || "", notes: edit?.notes || "",
+    trackingLink: edit?.trackingLink ? "https://" + edit.trackingLink : "",
   }));
   const [pfp, setPfp] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -101,6 +102,7 @@ function ProfileForm({ edit, plat, preCreator, creators, devices, people, admin,
   async function submit(e) {
     e.preventDefault();
     if (!f.username.trim()) { setErr("Serve almeno lo username"); return; }
+    if (f.trackingLink.trim() && !normalizeOfLink(f.trackingLink)) { setErr("Il tracking link deve essere un link OnlyFans del tipo onlyfans.com/<pagina>/c<numero>"); return; }
     setBusy(true); setErr(null);
     const fields = { ...f, platform: px ? "x" : "ig" };
     if (pfp) fields.pfp = pfp;
@@ -183,6 +185,9 @@ function ProfileForm({ edit, plat, preCreator, creators, devices, people, admin,
             </select>
           </Field>
         )}
+        <Field label="Tracking link OnlyFans di questo account" hint={px ? "Quello in bio. Se lo lasci vuoto si usa quello che si legge dal profilo pubblico: clic, iscritti e ricavo arrivano da soli." : "Il link di tracciamento OnlyFans che porta il traffico di QUESTO account (anche se in bio c'è un dominio che ci rimanda): clic, iscritti e ricavo arrivano da soli."}>
+          <input style={input} value={f.trackingLink} onChange={set("trackingLink")} placeholder="https://onlyfans.com/pagina/c123" autoCapitalize="none" autoCorrect="off" />
+        </Field>
         <Field label="Note"><textarea style={{ ...input, minHeight: 64, resize: "vertical" }} value={f.notes} onChange={set("notes")} placeholder="Nicchia, branding, link assegnato dal PM…" /></Field>
         <div style={{ display: "flex", gap: 8 }}>
           <button type="submit" style={{ ...btnPrimary, flex: 1 }} disabled={busy}>{busy ? "Salvo…" : edit ? "Salva" : "Registra account"}</button>
@@ -237,6 +242,8 @@ function PublicCard({ a, wk, label }) {
             {x && <Metric2 value={last.website && /onlyfans/i.test(last.website) ? "Sì" : last.website ? "Altro" : "No"} label="Link OnlyFans in bio" color={last.website && /onlyfans/i.test(last.website) ? CP.accentGreen : CP.attn} />}
             {!x && last.highlights != null && <Metric2 value={numFmt(last.highlights)} label="Storie in evidenza" />}
           </div>
+          <ReachLine r={p.reach} x={x} />
+          <LinkLine l={p.link} w={w} />
           <div style={{ ...eyebrow, margin: "14px 0 8px" }}>Settimana {label}</div>
           {!w || !w.published ? <p style={{ ...hint, margin: 0 }}>Nessun post di questa settimana visto dalle letture automatiche.</p> : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 8 }}>
@@ -251,6 +258,43 @@ function PublicCard({ a, wk, label }) {
         </>
       )}
       <p style={{ ...hint, margin: "10px 0 0" }}>Solo quello che vede chiunque apra il profilo. {x ? "" : "Visite al profilo e tocchi sul link li vede solo l'app: restano da segnare a mano. "}Le visualizzazioni di un post crescono nei giorni dopo: il numero di una settimana si assesta qualche giorno dopo la fine.</p>
+    </div>
+  );
+}
+
+// tracking link OnlyFans dell'account: clic, iscritti e ricavo dal magazzino dati
+function LinkLine({ l, w }) {
+  const box = { marginTop: 12, padding: "10px 12px", borderRadius: 10, border: `1px solid ${CP.borderSoft}`, background: CP.bgSunken, fontSize: 14 };
+  if (!l) return <div style={box}><b style={{ fontWeight: 500 }}>Tracking link OnlyFans</b> · non impostato: aggiungilo nei dati del profilo e da domani arrivano da soli clic, iscritti e ricavo di questo account.</div>;
+  if (l.missing) return <div style={box}><b style={{ fontWeight: 500 }}>Tracking link OnlyFans</b> · <span style={NUM}>{l.url}</span> non risulta tra i link delle creator HOC: controlla che sia giusto.</div>;
+  const t = l.total || {};
+  const money = (v) => (v == null ? "—" : "$" + Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 }));
+  return (
+    <div style={box}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "baseline", marginBottom: 8 }}>
+        <b style={{ fontWeight: 500 }}>Tracking link OnlyFans</b>
+        <span style={{ ...hint, ...NUM }}>{l.url}{l.name ? ` · «${l.name}»` : ""}{l.created ? ` · creato il ${new Date(l.created + "T12:00:00").toLocaleDateString("it-IT")}` : ""}{l.from === "bio" ? " · letto dalla bio" : ""}</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8 }}>
+        <Metric2 value={numFmt(t.clicks)} label="Clic in tutto" sub={w?.linkClicks != null ? `${w.linkClicks} questa settimana` : null} />
+        <Metric2 value={numFmt(t.subs)} label="Iscritti in tutto" sub={w?.linkSubs != null ? `${w.linkSubs} questa settimana` : null} />
+        <Metric2 value={money(t.revenue)} label="Ricavo dal link" sub={w?.linkRevenue != null ? `${money(w.linkRevenue)} questa settimana` : null} />
+      </div>
+    </div>
+  );
+}
+
+// copertura: visualizzazioni a un giorno di questi giorni contro quelle di prima (allarme shadowban)
+function ReachLine({ r, x }) {
+  if (!r) return null;
+  const cosa = x ? "post" : "reel";
+  if (r.status === "pochi_dati") return <p style={{ ...hint, margin: "12px 0 0" }}>Copertura: per confrontare le visualizzazioni servono almeno {3} {cosa} di questi giorni e {5} delle settimane prima letti a un giorno dalla pubblicazione (ora {r.nRecent} e {r.nBase}). Si riempie da solo con le letture notturne.</p>;
+  const col = r.status === "crollo" ? CP.accentRed : r.status === "calo" ? CP.attn : CP.accentGreen;
+  const txt = r.status === "crollo" ? "crollata" : r.status === "calo" ? "in calo" : "nella norma";
+  return (
+    <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, border: `1px solid ${alpha(col, "55")}`, background: alpha(col, "0d"), fontSize: 14 }}>
+      <b style={{ fontWeight: 500, color: col }}>Copertura {txt}</b> · i {cosa} di questi giorni fanno <b style={{ fontWeight: 500, ...NUM }}>{numFmt(r.recentMedian)}</b> visualizzazioni a un giorno, contro <b style={{ fontWeight: 500, ...NUM }}>{numFmt(r.baseMedian)}</b> nelle settimane prima ({Math.round(r.ratio * 100)}%).
+      {r.status === "crollo" && <span style={{ display: "block", marginTop: 4, color: CP.textSecondary }}>Con lo Stato dell&apos;account verde è il segno tipico dello shadowban: controllalo dal telefono.</span>}
     </div>
   );
 }

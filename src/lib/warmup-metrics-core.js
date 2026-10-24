@@ -14,6 +14,7 @@
 // Le visualizzazioni di un reel crescono nei giorni dopo: il numero di una settimana si
 // assesta qualche giorno dopo la sua fine. Lo si dice a schermo.
 import { weekKey } from "@/lib/warmup-plan";
+import { normalizeLinkUrl } from "@/lib/s4s-core";
 
 export const METRICS_VERSION = "wu-pub-1";
 export const KEEP_POST_DAYS = 120;
@@ -92,7 +93,11 @@ export function mergeReading(store, reading) {
   s.days[day] = { followers: reading.followers, following: reading.following, posts: reading.posts };
   for (const p of reading.items || []) {
     const prev = s.posts[p.id] || {};
-    s.posts[p.id] = { ...prev, ...p, firstAt: prev.firstAt || reading.at, lastAt: reading.at };
+    // visualizzazioni «a un giorno»: la prima lettura fatta tra 18 e 48 ore dalla pubblicazione.
+    // Serve a confrontare reel di età uguale (un reel di 10 giorni ha sempre più view di uno di ieri).
+    const age = reading.at - p.ts;
+    const early = prev.early ?? (p.views != null && age >= 18 * 3600000 && age <= 48 * 3600000 ? p.views : undefined);
+    s.posts[p.id] = { ...prev, ...p, ...(early != null ? { early } : {}), firstAt: prev.firstAt || reading.at, lastAt: reading.at };
   }
   const oldPost = reading.at - KEEP_POST_DAYS * 86400000;
   for (const [k, p] of Object.entries(s.posts)) if (p.ts < oldPost) delete s.posts[k];
@@ -133,15 +138,100 @@ export function weeklyFromStore(store, weekKeys) {
       likes: sum(posts, "likes"), comments: sum(posts, "comments"), reposts: sum(posts, "reposts"),
       engagementPct: withViews.length && sum(withViews, "views") ? Math.round(((sum(withViews, "likes") + sum(withViews, "comments") + sum(withViews, "reposts")) / sum(withViews, "views")) * 1000) / 10 : null,
       readAt: endDay || null,
+      ...linkWeek(store.link, wk),
     };
   }
+  // settimane con soli numeri del link (nessuna lettura del profilo)
+  for (const wk of sorted) if (!out[wk]) { const lw = linkWeek(store.link, wk); if (lw.linkClicks != null) out[wk] = { published: 0, ...lw }; }
+  return out;
+}
+
+/* ── tracking link OnlyFans dell'account (dal magazzino dati: onlyfans.links_stats) ──
+   Ogni account porta il SUO link di tracciamento: clic, iscritti e ricavo arrivano da OnlyFans
+   e li leggiamo dal nostro lato, senza toccare l'account. links_stats è una fotografia
+   giornaliera coi totali dalla creazione del link. */
+export const normalizeOfLink = (u) => normalizeLinkUrl(u);
+
+/** Il link da usare: quello scritto sul profilo, o (su X) quello che si legge in bio. */
+export function effectiveLink(rec, pubLast) {
+  const own = normalizeLinkUrl(rec?.trackingLink);
+  if (own) return { url: own, from: "profilo" };
+  if (rec?.platform === "x") { const bio = normalizeLinkUrl(pubLast?.website); if (bio) return { url: bio, from: "bio" }; }
+  return null;
+}
+
+export function linkStatsSQL(urls, { dataset, orgId, days = 120 }) {
+  const list = [...new Set(urls.map(normalizeLinkUrl).filter(Boolean))];
+  if (!list.length) return null;
+  return `
+SELECT CAST(calendar_date AS STRING) AS day, REGEXP_REPLACE(LOWER(link_url), r'^https?://(www\\.)?', '') AS url,
+  ANY_VALUE(link_name) AS name, CAST(MIN(creation_date) AS STRING) AS created,
+  MAX(clicks) AS clicks, MAX(subs) AS subs, CAST(MAX(revenue) AS FLOAT64) AS revenue
+FROM \`${dataset}.onlyfans.links_stats\`
+WHERE organization_id = '${orgId}' AND calendar_date >= DATE_SUB(CURRENT_DATE(), INTERVAL ${days} DAY)
+  AND REGEXP_REPLACE(LOWER(link_url), r'^https?://(www\\.)?', '') IN (${list.map((u) => `'${u.replace(/'/g, "")}'`).join(",")})
+GROUP BY 1, 2`;
+}
+
+/** Righe del magazzino → link nello storico del profilo (totali per giorno). */
+export function mergeLinkRows(store, url, rows, from) {
+  const s = store && store.v === METRICS_VERSION ? { ...store } : { v: METRICS_VERSION, days: {}, posts: {} };
+  const mine = rows.filter((r) => r.url === url);
+  if (!mine.length) { s.link = { url, from, missing: true, days: {} }; return s; }
+  const days = {};
+  for (const r of mine) days[r.day] = { clicks: Number(r.clicks) || 0, subs: Number(r.subs) || 0, revenue: Math.round((Number(r.revenue) || 0) * 100) / 100 };
+  const last = mine.map((r) => r.day).sort().pop();
+  s.link = { url, from, name: mine[0].name || null, created: String(mine[0].created || "").slice(0, 10), days, total: days[last], lastDay: last };
+  return s;
+}
+
+/** Clic, iscritti e ricavo del link nella settimana (differenza dei totali). */
+export function linkWeek(link, wk) {
+  if (!link || !link.days || link.missing) return {};
+  const days = Object.keys(link.days).sort();
+  const inWk = days.filter((d) => weekOfDay(d) === wk);
+  if (!inWk.length) return {};
+  const end = link.days[inWk[inWk.length - 1]];
+  const beforeDay = [...days].reverse().find((d) => d < inWk[0]);
+  let start = beforeDay ? link.days[beforeDay] : null;
+  // nessun giorno prima: se il link è nato in questa settimana si parte da zero, altrimenti non si sa
+  if (!start && link.created && weekOfDay(link.created) === wk) start = { clicks: 0, subs: 0, revenue: 0 };
+  if (!start) return { linkPartial: true };
+  return {
+    linkClicks: end.clicks - start.clicks,
+    linkSubs: end.subs - start.subs,
+    linkRevenue: Math.round((end.revenue - start.revenue) * 100) / 100,
+  };
+}
+
+/**
+ * Copertura: le visualizzazioni a un giorno dei reel (IG) o dei post (X) di questi giorni contro
+ * quelle dei 5-28 giorni prima, sullo stesso profilo. Un crollo con lo Stato dell'account verde è
+ * il segno tipico dello shadowban. Servono abbastanza post da tutte e due le parti, altrimenti
+ * «pochi dati» (niente allarmi su 1-2 post: una giornata storta non è uno shadowban).
+ */
+export const REACH = { recentDays: 4, baseFrom: 5, baseTo: 28, minRecent: 3, minBase: 5, minBaseViews: 20, collapse: 0.4, drop: 0.6 };
+const median = (a) => { const v = [...a].sort((x, y) => x - y); const m = Math.floor(v.length / 2); return v.length % 2 ? v[m] : Math.round((v[m - 1] + v[m]) / 2); };
+export function reachCheck(store, platform, now = Date.now()) {
+  const D = 86400000;
+  const posts = Object.values(store?.posts || {}).filter((p) => p.early != null && (platform === "x" || p.kind === "reel"));
+  const recent = posts.filter((p) => now - p.ts <= REACH.recentDays * D).map((p) => p.early);
+  const base = posts.filter((p) => now - p.ts >= REACH.baseFrom * D && now - p.ts <= REACH.baseTo * D).map((p) => p.early);
+  const out = { nRecent: recent.length, nBase: base.length, recentMedian: recent.length ? median(recent) : null, baseMedian: base.length ? median(base) : null };
+  if (recent.length < REACH.minRecent || base.length < REACH.minBase || out.baseMedian < REACH.minBaseViews) return { ...out, status: "pochi_dati" };
+  out.ratio = Math.round((out.recentMedian / out.baseMedian) * 100) / 100;
+  out.status = out.ratio < REACH.collapse ? "crollo" : out.ratio < REACH.drop ? "calo" : "ok";
   return out;
 }
 
 /** I numeri automatici con cui precompilare la scheda «Dati della settimana» (solo campi vuoti). */
 export function prefillFor(platform, w) {
+  const clean = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v != null));
   if (!w) return {};
-  if (platform === "x") return { followers: w.followersDelta, views: w.avgViews, eng: w.engagementPct };
+  return clean(prefillRaw(platform, w));
+}
+function prefillRaw(platform, w) {
+  if (platform === "x") return { followers: w.followersDelta, views: w.avgViews, eng: w.engagementPct, clicks: w.linkClicks, subs: w.linkSubs, spent: w.linkRevenue };
   return { followers: w.followers, views: w.views };
 }
 
@@ -151,8 +241,13 @@ export function publicAlerts(a, pub, now = Date.now()) {
   const last = pub?.last;
   if (!last || now - (pub.lastAt || 0) > 4 * 86400000) return out;
   const where = a.platform === "x" ? "su X" : "su Instagram";
-  if (last.notFound) out.push({ lev: "bad", t: `Profilo non trovato ${where}: ${a.username}`, d: "La lettura automatica di stanotte non trova il profilo pubblico: nome utente cambiato, account chiuso o bannato? Controlla dal telefono e correggi il nome utente o lo stato." });
+  if (last.notFound) out.push({ lev: "bad", t: `Profilo non trovato ${where}: ${a.username}`, d: "L'ultima lettura automatica non trova il profilo pubblico: nome utente cambiato, account chiuso o bannato? Controlla dal telefono e correggi il nome utente o lo stato." });
   else if (last.private) out.push({ lev: "warn", t: `${a.username} risulta privato`, d: "Dal profilo pubblico non si vede niente: se non è il cooldown (dove è voluto), rimettilo pubblico." });
+  const r = pub.reach;
+  if (!last.notFound && r?.status === "crollo" && (a.state || "online") === "online" && !a.flag) {
+    const cosa = a.platform === "x" ? "post" : "reel";
+    out.push({ lev: "warn", t: `Visualizzazioni crollate su ${a.username}`, d: `I ${cosa} di questi giorni fanno ${r.recentMedian} visualizzazioni a un giorno, contro le ${r.baseMedian} di prima (${Math.round(r.ratio * 100)}%). Con lo Stato dell'account verde è il segno tipico dello shadowban: controllalo dal telefono e, se confermato, apri la segnalazione.` });
+  }
   if (a.platform === "x" && !last.notFound && last.premium === false) out.push({ lev: "warn", t: `Premium non attivo su ${a.username}`, d: "Letto dal profilo pubblico: senza Premium un post fa in media meno di 100 visualizzazioni." });
   return out;
 }
