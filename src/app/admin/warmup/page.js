@@ -12,10 +12,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { ChevronRight, Flag, Pencil, Plus, Trash2, Undo2, UserRound, ExternalLink } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
-import { PageHead, Notice, NUM } from "@/components/ds";
+import { PageHead, Notice, NUM, FilterChip } from "@/components/ds";
 import {
   btn, btnPrimary, btnDanger, btnOk, btnSm, input, cardBox, eyebrow, muted, hint, TONE, statusColor,
-  GroupLabel, Ring, Avatar, Chip, Dot, Seg, Fold, Bullets, TaskRow, TimerChip, TaskList, KV, Field,
+  GroupLabel, SectionHead, Ring, Avatar, Chip, Dot, Seg, Fold, Bullets, TaskRow, TimerChip, TaskList, KV, Field,
   Metric2, Delta, ModalBox, Opt,
 } from "@/components/warmup/ui";
 import { GuideIG, GuideX } from "@/components/warmup/guide";
@@ -135,7 +135,7 @@ function ProfileForm({ edit, plat, preCreator, creators, devices, people, admin,
   const two = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "0 14px" };
   return (
     <div style={{ maxWidth: 760 }}>
-      <h2 style={{ fontSize: 22, fontWeight: 500, margin: "0 0 4px" }}>{edit ? "Modifica account" : `Nuovo account ${PLATS[px ? "x" : "ig"].label}`}</h2>
+      <h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: "0 0 4px" }}>{edit ? "Modifica account" : `Nuovo account ${PLATS[px ? "x" : "ig"].label}`}</h2>
       <p style={{ ...hint, fontSize: 14, margin: "0 0 14px" }}>{edit ? "Aggiorna i dati del profilo. Username, creator, telefono, email e note si aggiornano anche in Account social." : px ? "La data di creazione decide a che giorno della routine si trova l'account: il primo giorno è la checklist di setup." : "La data di creazione decide in che giorno del warm-up si trova l'account. Se l'account c'è già in Account social viene agganciato, altrimenti lo si crea lì."}</p>
       <form onSubmit={submit} style={cardBox}>
         {err && <Notice danger>{err}</Notice>}
@@ -687,20 +687,17 @@ export default function WarmupPage() {
     const todo = blocks.filter((b) => b.t.open.length), fine = blocks.filter((b) => !b.t.open.length);
     return (
       <>
-        <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 6 }}>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <h2 style={{ fontSize: 24, fontWeight: 500, margin: 0 }}>Oggi</h2>
-            <p style={{ ...hint, fontSize: 14, margin: "2px 0 0" }}>{new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}{ACC.length ? ` · ${openTot} task da fare su ${accs.length} profili` : ""}</p>
-          </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <p style={{ flex: 1, minWidth: 200, fontSize: 14, color: CP.textSecondary, margin: 0 }}>{new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}{ACC.length ? ` · ${openTot} task da fare su ${accs.length} profili` : ""}</p>
           {mineSeg()}
         </div>
         {!ACC.length && <div style={{ ...cardBox, textAlign: "center", padding: "30px 18px" }}><h3 style={{ margin: "0 0 6px", fontWeight: 500 }}>Nessun profilo {PLATS[plat].label}</h3><p style={{ ...hint, margin: "0 0 14px" }}>Registra il primo profilo dalla scheda Account.</p><button type="button" style={btnPrimary} onClick={() => { setTab("acct"); setForm({}); }}><Plus size={15} />Nuovo profilo</button></div>}
         {urg.length > 0 && (
           <>
-            <GroupLabel style={{ marginTop: 10 }}>Da non dimenticare</GroupLabel>
+            <SectionHead aside="trovate dal sistema, si aprono con un clic">Da non dimenticare</SectionHead>
             <TaskList>
               {urg.map((u, i) => (
-                <button key={i} type="button" onClick={() => openProfile(u.acc.id)} style={{ display: "flex", gap: 12, alignItems: "flex-start", width: "100%", textAlign: "left", padding: "12px 14px", borderTop: `1px solid ${CP.borderSoft}`, background: "transparent", border: "none", borderTopStyle: "solid", cursor: "pointer", color: CP.textPrimary, fontFamily: FONTS.body }}>
+                <button key={i} type="button" onClick={() => openProfile(u.acc.id)} style={{ display: "flex", gap: 12, alignItems: "flex-start", width: "100%", textAlign: "left", padding: "12px 14px", background: "transparent", border: "none", borderTop: i ? `1px solid ${CP.borderSoft}` : "none", cursor: "pointer", color: CP.textPrimary, fontFamily: FONTS.body }}>
                   <span style={{ marginTop: 7 }}><Dot color={TONE[u.lev]} size={9} /></span>
                   <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 15 }}>{u.t}</span><span style={{ display: "block", fontSize: 13.5, color: CP.textSecondary, marginTop: 3 }}>{u.d}</span></span>
                   <ChevronRight size={16} color={CP.textMuted} style={{ marginTop: 3 }} />
@@ -711,12 +708,15 @@ export default function WarmupPage() {
         )}
         {late.length > 0 && (
           <>
-            <GroupLabel>Rimaste indietro ieri</GroupLabel>
+            <SectionHead aside="si possono ancora spuntare: valgono per ieri">Rimaste indietro ieri</SectionHead>
             {late.map((b) => (
-              <div key={b.a.id}>
-                <GroupLabel color={CP.accentRed} style={{ margin: "10px 0 6px" }}>{b.a.username} · {b.arr.open.length} non fatte</GroupLabel>
-                <TaskList>{b.arr.open.map((i) => taskRow(b.a, i, b.arr.done, yk))}</TaskList>
-              </div>
+              <details key={b.a.id} style={{ ...cardBox, padding: 0, marginBottom: 8 }}>
+                <summary style={{ cursor: "pointer", padding: "12px 16px", display: "flex", gap: 10, alignItems: "center", listStyle: "revert", fontSize: 14.5 }}>
+                  <b style={{ fontWeight: 500 }}>{b.a.username}</b>
+                  <span style={{ color: CP.accentRed, fontSize: 13.5 }}>{b.arr.open.length} non {b.arr.open.length === 1 ? "fatta" : "fatte"}</span>
+                </summary>
+                <div style={{ borderTop: `1px solid ${CP.borderSoft}` }}>{b.arr.open.map((i) => taskRow(b.a, i, b.arr.done, yk))}</div>
+              </details>
             ))}
           </>
         )}
@@ -728,21 +728,25 @@ export default function WarmupPage() {
           </div>
         )}
         {todo.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 380px), 1fr))", gap: "0 16px", alignItems: "start" }}>
+          <>
+          <SectionHead aside={`${openTot} task su ${todo.length} ${todo.length === 1 ? "profilo" : "profili"}`}>Da fare oggi</SectionHead>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 420px), 1fr))", gap: 16, alignItems: "start" }}>
             {todo.map(({ a, t }) => (
-              <div key={a.id}>
-                <GroupLabel>{a.creator ? a.creator + " · " : ""}{a.username} · {isCooldown(a) ? "cooldown g." + cooldownDay(a) : "giorno " + opDay(a)}{ownerName(a) ? " · " + ownerName(a) : ""}</GroupLabel>
-                <TaskList>
-                  <button type="button" onClick={() => openProfile(a.id)} style={{ display: "flex", gap: 12, alignItems: "center", width: "100%", textAlign: "left", padding: "10px 14px", background: CP.surfaceAlt, border: "none", cursor: "pointer", color: CP.textPrimary, fontFamily: FONTS.body }}>
-                    <Avatar a={a} size={36} />
-                    <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 14.5, fontWeight: 500 }}>{t.plan.title}</span><span style={{ display: "block", fontSize: 12.5, color: CP.textSecondary, marginTop: 2 }}>{t.n} di {t.req.length} fatte{a.flag ? " · in flag" : ""}</span></span>
-                    <ChevronRight size={16} color={CP.textMuted} />
-                  </button>
-                  {t.open.map((i) => taskRow(a, i, t.done, tk))}
-                </TaskList>
-              </div>
+              <TaskList key={a.id}>
+                <button type="button" onClick={() => openProfile(a.id)} style={{ display: "flex", gap: 12, alignItems: "center", width: "100%", textAlign: "left", padding: "14px 16px", background: "transparent", border: "none", cursor: "pointer", color: CP.textPrimary, fontFamily: FONTS.body }}>
+                  <Avatar a={a} size={40} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>{a.username}</span>
+                    <span style={{ display: "block", fontSize: 13, color: CP.textSecondary, marginTop: 2 }}>{[a.creator, isCooldown(a) ? "cooldown giorno " + cooldownDay(a) : "giorno " + opDay(a), ownerName(a)].filter(Boolean).join(" · ")}</span>
+                    <span style={{ display: "block", fontSize: 13, color: CP.textMuted, marginTop: 2 }}>{t.plan.title}{a.flag ? " · in flag" : ""}</span>
+                  </span>
+                  <Ring n={t.n} total={t.req.length} />
+                </button>
+                {t.open.map((i) => taskRow(a, i, t.done, tk))}
+              </TaskList>
             ))}
           </div>
+          </>
         )}
         {fine.length > 0 && (
           <Fold title={`${fine.length} ${fine.length === 1 ? "profilo già a posto" : "profili già a posto"}`}>
@@ -786,7 +790,7 @@ export default function WarmupPage() {
     return (
       <>
         <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 12 }}>
-          <div style={{ flex: 1, minWidth: 180 }}><h2 style={{ fontSize: 24, fontWeight: 500, margin: 0 }}>Creator</h2><p style={{ ...hint, fontSize: 14, margin: "2px 0 0" }}>{list.length ? `${list.length} ${list.length === 1 ? "cartella" : "cartelle"} · ${tot} profili` : onlyMine ? "Nessun profilo assegnato a te" : "Nessun profilo ancora"}</p></div>
+          <div style={{ flex: 1, minWidth: 180 }}><h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: 0 }}>Creator</h2><p style={{ ...hint, fontSize: 14, margin: "2px 0 0" }}>{list.length ? `${list.length} ${list.length === 1 ? "cartella" : "cartelle"} · ${tot} profili` : onlyMine ? "Nessun profilo assegnato a te" : "Nessun profilo ancora"}</p></div>
           {mineSeg()}
           <button type="button" style={btnPrimary} onClick={() => setForm({})}><Plus size={15} />Nuovo profilo</button>
         </div>
@@ -828,7 +832,7 @@ export default function WarmupPage() {
       <>
         <button type="button" style={{ ...btnSm, marginBottom: 12 }} onClick={() => setFolder(null)}>← Creator</button>
         <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 12 }}>
-          <div style={{ flex: 1, minWidth: 180 }}><h2 style={{ fontSize: 24, fontWeight: 500, margin: 0 }}>{f.name}</h2><p style={{ ...hint, fontSize: 14, margin: "2px 0 0" }}>{items.length} {items.length === 1 ? "profilo" : "profili"}{onlyMine && f.items.length !== items.length ? " su " + f.items.length : ""}</p></div>
+          <div style={{ flex: 1, minWidth: 180 }}><h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: 0 }}>{f.name}</h2><p style={{ ...hint, fontSize: 14, margin: "2px 0 0" }}>{items.length} {items.length === 1 ? "profilo" : "profili"}{onlyMine && f.items.length !== items.length ? " su " + f.items.length : ""}</p></div>
           {mineSeg()}
           {!f.orphan && <button type="button" style={btnSm} onClick={() => setModal({ kind: "rename", old: f.name })}>Rinomina</button>}
         </div>
@@ -1008,7 +1012,7 @@ export default function WarmupPage() {
   function viewReport() {
     return (
       <>
-        <h2 style={{ fontSize: 24, fontWeight: 500, margin: "0 0 2px" }}>Dati</h2>
+        <h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: "0 0 4px" }}>Dati</h2>
         <p style={{ ...hint, fontSize: 14, margin: "0 0 12px" }}>Panoramica, numeri della settimana e segnalazioni · {PLATS[plat].label}</p>
         <Seg items={[["pano", "Panoramica"], ["week", "Settimana"], ["flags", "Segnalazioni"], ["exp", "Esporta"]]} value={rpane} onChange={setRpane} style={{ marginBottom: 14 }} />
         {rpane === "pano" && viewPano()}
@@ -1225,7 +1229,7 @@ export default function WarmupPage() {
     const oT = perAcc.reduce((t, x) => t + x.ad.todayTotal, 0), oF = perAcc.reduce((t, x) => t + x.ad.todayDone, 0);
     return (
       <>
-        <h2 style={{ fontSize: 24, fontWeight: 500, margin: "0 0 2px" }}>Amministrazione</h2>
+        <h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: "0 0 4px" }}>Amministrazione</h2>
         <p style={{ ...hint, fontSize: 14, margin: "0 0 14px" }}>Aderenza, archivio e tutto quello che è stato fatto. Gli accessi si danno da Membri con il ruolo «Social».</p>
         {ACC.length > 0 && (
           <div style={cardBox}>
@@ -1271,22 +1275,26 @@ export default function WarmupPage() {
     } else if (tab === "oggi") body = viewToday();
     else if (tab === "dati") body = viewReport();
     else if (tab === "admin" && admin) body = viewAdmin();
-    else if (tab === "guide") body = <><h2 style={{ fontSize: 24, fontWeight: 500, margin: "0 0 2px" }}>Guida{plat === "x" ? " · X" : ""}</h2><p style={{ ...hint, fontSize: 14, margin: "0 0 14px" }}>{plat === "x" ? "Il riassunto del documento Account X." : "Il riassunto delle SOP a cui la console fa riferimento."}</p>{plat === "x" ? <GuideX /> : <GuideIG />}</>;
+    else if (tab === "guide") body = <><h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: "0 0 4px" }}>Guida{plat === "x" ? " · X" : ""}</h2><p style={{ ...hint, fontSize: 14, margin: "0 0 14px" }}>{plat === "x" ? "Il riassunto del documento Account X." : "Il riassunto delle SOP a cui la console fa riferimento."}</p>{plat === "x" ? <GuideX /> : <GuideIG />}</>;
     else { const a = sel && byId(sel); body = a && !a.archived ? viewDay(a) : folder ? viewFolder(folder) : viewFolders(); }
   }
   const modalA = modal?.id ? byId(modal.id) : null;
   const tabs = admin ? [...TABS, ["admin", "Admin"]] : TABS;
+  const openToday = ACC.reduce((t, a) => t + tasksOn(a, todayKey()).open.length, 0);
 
   return (
     <div style={{ maxWidth: 1180, margin: "0 auto", padding: "20px 16px calc(110px + env(safe-area-inset-bottom))", fontFamily: FONTS.body, color: CP.textPrimary }}>
       <PageHead crumbs={[{ label: "Marketing" }, { label: "Warm-up" }]} title="Warm-up"
         subtitle="Il piano del giorno di ogni profilo Instagram e X in riscaldamento: cosa fare oggi, segnalazioni, cooldown e numeri della settimana."
-        actions={<span style={{ display: "inline-flex", gap: 10, alignItems: "center" }}><span title={net === "ok" ? "Collegato" : net === "pending" ? "Salvataggio…" : "Non salvato"} style={{ width: 9, height: 9, borderRadius: "50%", background: net === "ok" ? CP.accentGreen : net === "pending" ? CP.attn : CP.accentRed }} /><Seg items={Object.keys(PLATS).map((k) => [k, PLATS[k].label])} value={plat} onChange={setPlat} /></span>} />
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18, borderBottom: `1px solid ${CP.borderSoft}`, paddingBottom: 10 }}>
-        {tabs.map(([k, l]) => (
-          <button key={k} type="button" onClick={() => { setTab(k); setSel(null); setForm(null); setModal(null); if (k === "acct") setFolder(null); window.scrollTo(0, 0); }}
-            style={{ border: "none", background: tab === k && !form ? CP.accentSoft : "transparent", color: tab === k && !form ? CP.accentSoftText : CP.textSecondary, borderRadius: 8, padding: "8px 14px", fontSize: 14.5, fontWeight: tab === k ? 500 : 400, cursor: "pointer", fontFamily: FONTS.body }}>{l}</button>
-        ))}
+        actions={data ? <button type="button" style={btnPrimary} onClick={() => { setTab("acct"); setSel(null); setForm({}); }}><Plus size={15} />Nuovo profilo</button> : null} />
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 22 }}>
+        {tabs.map(([k, l]) => {
+          const n = !data ? null : k === "oggi" ? openToday || null : k === "acct" ? ACC.length : null;
+          return <FilterChip key={k} label={n != null ? `${l} · ${n}` : l} active={tab === k && !form} onClick={() => { setTab(k); setSel(null); setForm(null); setModal(null); if (k === "acct") setFolder(null); window.scrollTo(0, 0); }} />;
+        })}
+        <span style={{ flex: 1 }} />
+        <span title={net === "ok" ? "Collegato" : net === "pending" ? "Salvataggio…" : "Non salvato"} style={{ width: 8, height: 8, borderRadius: "50%", background: net === "ok" ? CP.accentGreen : net === "pending" ? CP.attn : CP.accentRed }} />
+        <Seg items={Object.keys(PLATS).map((k) => [k, PLATS[k].label])} value={plat} onChange={setPlat} />
       </div>
       {error && <Notice danger>{error.message}</Notice>}
       {!data && !error && <p style={{ ...hint, fontSize: 14 }}>Carico…</p>}
