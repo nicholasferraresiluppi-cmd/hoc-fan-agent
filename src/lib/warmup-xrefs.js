@@ -100,7 +100,9 @@ export async function discoverNetwork({ by } = {}) {
   const used = new Set(doc.seedsUsed || []);
   const pick = (arr) => arr.filter((r) => !used.has(r.key)).sort((a, b) => (b.f || 0) - (a.f || 0));
   let seeds = pick(all.filter((r) => r.status === "tenuta"));
-  if (!seeds.length) seeds = pick(all.filter((r) => r.status === "nuova" && r.female !== false));
+  // senza tenute si parte SOLO da chi si dichiara donna: da partenze non scelte da una persona la rete
+  // porta i suoi simili, anche uomini (visto il 24/10: da tre partenze maschili, altri creator uomini)
+  if (!seeds.length) seeds = pick(all.filter((r) => r.status === "nuova" && r.female === true));
   seeds = seeds.slice(0, MAX_SEEDS);
   if (!seeds.length) throw new Error("Nessuna reference da cui partire: tieni qualche creator, oppure fai prima una ricerca nei post");
   const rows = await runSync(USER_ACTOR, { twitterHandles: seeds.map((r) => r.u), getFollowing: true, maxItems: FOLLOWING_PER_SEED * seeds.length },
