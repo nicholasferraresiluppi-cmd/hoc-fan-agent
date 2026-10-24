@@ -19,6 +19,7 @@ import { kv } from "@vercel/kv";
 import { loadAll as loadSupervisor, upsert as supUpsert } from "@/lib/supervisor-store";
 import { META_KEYS, SUP_PLATFORM_STATUS } from "@/lib/warmup-plan";
 import { loadPublicSummaries } from "@/lib/warmup-metrics";
+import { normalizeLinkUrl } from "@/lib/s4s-core";
 
 const IDX = "warmup:index";
 const P = (id) => `warmup:p:${id}`;
@@ -88,7 +89,7 @@ export async function loadState() {
     });
   });
   // numeri pubblici letti in automatico (warmup-metrics): riassunto, non lo storico intero
-  const pub = await loadPublicSummaries(profiles.map((p) => p.id)).catch(() => ({}));
+  const pub = await loadPublicSummaries(profiles.map((p) => p.id), Object.fromEntries(profiles.map((p) => [p.id, p.platform]))).catch(() => ({}));
   for (const p of profiles) p.pub = pub[p.id] || null;
   if (prune.length) {
     const p2 = kv.pipeline();
@@ -163,7 +164,7 @@ export async function createProfile(input, by) {
     id: acc.id, platform,
     createdAt: DAY_RE.test(s(input.createdAt)) ? s(input.createdAt) : new Date().toISOString().slice(0, 10),
     displayName: s(input.displayName), bio: String(input.bio || "").slice(0, 400), birthDate: s(input.birthDate),
-    pfpType: s(input.pfpType) || null, hasPfp: false,
+    pfpType: s(input.pfpType) || null, hasPfp: false, trackingLink: normalizeLinkUrl(input.trackingLink) || null,
     owner: input.owner?.id ? { id: String(input.owner.id), name: s(input.owner.name) } : null,
     status: "verde", state: "online", stateHistory: [], stateSteps: {}, flag: null, flagHistory: [],
     pausedMs: 0, cooldownFrom: null, monitorUntil: null, milestones: {}, weekly: {},
@@ -191,6 +192,7 @@ export async function updateProfile(id, input, by) {
   }
   for (const k of ["displayName", "birthDate", "pfpType"]) if (input[k] !== undefined) rec[k] = s(input[k]) || (k === "pfpType" ? null : "");
   if (input.bio !== undefined) rec.bio = String(input.bio || "").slice(0, 400);
+  if (input.trackingLink !== undefined) rec.trackingLink = normalizeLinkUrl(input.trackingLink) || null;
   if (DAY_RE.test(s(input.createdAt))) rec.createdAt = s(input.createdAt);
   await kv.set(P(id), rec);
   if (input.pfp) await setPfp(id, input.pfp);

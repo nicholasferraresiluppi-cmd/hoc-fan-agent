@@ -9,7 +9,8 @@
 import { kv } from "@vercel/kv";
 import { loadAll as loadSupervisor } from "@/lib/supervisor-store";
 import { lastWeeks } from "@/lib/warmup-plan";
-import { parseInstagram, parseX, mergeReading, weeklyFromStore, handleOf, romeDay, runBudget, PRICE } from "@/lib/warmup-metrics-core";
+import { parseInstagram, parseX, mergeReading, weeklyFromStore, reachCheck, handleOf, romeDay, runBudget, PRICE, effectiveLink, linkStatsSQL, mergeLinkRows } from "@/lib/warmup-metrics-core";
+import { bqQuery, bigQueryConfigured, HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
 
 const API = "https://api.apify.com/v2";
 const RUN = "warmup:pub:run";
@@ -36,8 +37,7 @@ async function targets() {
   const acc = new Map(sup.accounts.map((a) => [a.id, a]));
   return ids.map((id, i) => ({ id, rec: recs[i], acc: acc.get(id) }))
     .filter((x) => x.rec && !x.rec.archived && x.acc)
-    .map((x) => ({ id: x.id, platform: x.rec.platform === "x" ? "x" : "ig", handle: handleOf(x.acc.username) }))
-    .filter((x) => x.handle);
+    .map((x) => ({ id: x.id, rec: x.rec, platform: x.rec.platform === "x" ? "x" : "ig", handle: handleOf(x.acc.username) }));
 }
 
 /** Un giro. Senza `force` legge al massimo una volta al giorno (giorno di Roma). */
@@ -50,7 +50,8 @@ export async function refreshPublicMetrics({ force = false } = {}) {
   await kv.set(RUN, { ...st, runningSince: Date.now() });
   const errors = [];
   try {
-    const list = await targets();
+    const all = await targets();
+    const list = all.filter((x) => x.handle);
     const ig = list.filter((x) => x.platform === "ig"), xs = list.filter((x) => x.platform === "x");
     const at = Date.now();
     const [igRows, xProfiles, xPosts] = await Promise.all([
@@ -73,8 +74,21 @@ export async function refreshPublicMetrics({ force = false } = {}) {
       await kv.set(PUB(t.id), merged);
       read++; if (reading.notFound) notFound++;
     }
+    // tracking link OnlyFans di ogni account: clic, iscritti e ricavo dal magazzino dati (links_stats)
+    let links = 0;
+    if (bigQueryConfigured()) {
+      const want = [];
+      for (const t of all) { const s0 = await kv.get(PUB(t.id)); const l = effectiveLink(t.rec, s0?.last); if (l) want.push({ id: t.id, ...l, store: s0 }); }
+      const sql = linkStatsSQL(want.map((w) => w.url), { dataset: process.env.BIGQUERY_DATA_PROJECT || "house-of-creators-358213", orgId: HOC_ORGANIZATION_ID });
+      if (sql) {
+        try {
+          const { rows } = await bqQuery(sql, { maxBytesBilled: 2 * 1024 ** 3, timeoutMs: 30_000 });
+          for (const w of want) { await kv.set(PUB(w.id), mergeLinkRows(w.store, w.url, rows, w.from)); links++; }
+        } catch (e) { errors.push("link OnlyFans: " + (e.message || e)); }
+      }
+    }
     const estUsd = Math.round((ig.length * PRICE.ig + xs.length * (PRICE.xProfile + PRICE.xPosts)) * 1000) / 1000;
-    const done = { lastDay: today, lastAt: Date.now(), profiles: list.length, read, notFound, estUsd, errors: errors.slice(0, 5), runningSince: null };
+    const done = { lastDay: today, lastAt: Date.now(), profiles: list.length, read, notFound, links, estUsd, errors: errors.slice(0, 5), runningSince: null };
     await kv.set(RUN, done);
     return done;
   } catch (e) {
@@ -88,7 +102,7 @@ export async function getRunState() {
 }
 
 /** Riassunto per la pagina: ultima lettura, follower degli ultimi giorni, settimane già calcolate. */
-export async function loadPublicSummaries(ids) {
+export async function loadPublicSummaries(ids, platforms = {}) {
   if (!ids.length) return {};
   const stores = await kv.mget(...ids.map(PUB));
   const weeks = lastWeeks(13).map((w) => w.key);
@@ -102,6 +116,8 @@ export async function loadPublicSummaries(ids) {
       last: s.last || null,
       days: Object.fromEntries(days.map((d) => [d, s.days[d]])),
       weekly: weeklyFromStore(s, weeks),
+      reach: reachCheck(s, platforms[id] || "ig"),
+      link: s.link ? { url: s.link.url, from: s.link.from, name: s.link.name || null, created: s.link.created || null, total: s.link.total || null, lastDay: s.link.lastDay || null, missing: Boolean(s.link.missing) } : null,
     };
   });
   return out;
