@@ -3,7 +3,7 @@
 // Pezzi d'interfaccia del warm-up (pagina /admin/warmup). Solo token CP: funziona nei 4 stili.
 import { Check, Clock, X } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
-import { NUM } from "@/components/ds";
+import { NUM, NumText, FilterChip } from "@/components/ds";
 import { mmss } from "@/lib/warmup-plan";
 
 export const TONE = {
@@ -20,13 +20,24 @@ export const btnDanger = { ...btn, color: CP.accentRed, border: `1px solid ${alp
 export const btnOk = { ...btn, color: CP.accentGreen, border: `1px solid ${alpha(CP.accentGreen, "66")}` };
 export const btnSm = { ...btn, padding: "5px 10px", fontSize: 13, minHeight: 32 };
 export const input = { width: "100%", boxSizing: "border-box", background: CP.bgSunken, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 10, padding: "10px 12px", fontSize: 15, fontFamily: FONTS.body };
-export const cardBox = { background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 14, padding: "16px 18px", marginBottom: 12 };
-export const eyebrow = { fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: CP.textMuted, fontWeight: 500 };
+// stesse misure delle card del resto dell'app (ds.card): bordo sottile, raggio 10
+export const cardBox = { background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, padding: "16px 18px", marginBottom: 12 };
+export const eyebrow = { fontSize: 13, color: CP.textMuted, fontWeight: 400 };
 export const muted = { color: CP.textMuted };
 export const hint = { fontSize: 12.5, color: CP.textMuted, lineHeight: 1.5 };
 
+/** Titolo di sezione (come SectionTitle dell'app: nello stile Casa diventa il serif grande). */
+export function SectionHead({ children, aside, style }) {
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 12, margin: "28px 0 12px", flexWrap: "wrap", ...style }}>
+      <h2 className="ds-sect" style={{ fontSize: 16, fontWeight: 500, margin: 0, color: CP.textPrimary }}>{children}</h2>
+      {aside && <span style={{ fontSize: 13, color: CP.textMuted }}>{aside}</span>}
+    </div>
+  );
+}
+/** Etichetta piccola sopra un gruppo di righe (sentence case, niente maiuscoletto). */
 export function GroupLabel({ children, color, style }) {
-  return <div style={{ ...eyebrow, color: color || CP.textMuted, margin: "18px 0 8px", ...style }}>{children}</div>;
+  return <div style={{ fontSize: 13.5, color: color || CP.textSecondary, margin: "18px 0 8px", ...style }}>{children}</div>;
 }
 
 export function Ring({ n, total }) {
@@ -35,7 +46,7 @@ export function Ring({ n, total }) {
     <div style={{ position: "relative", width: 44, height: 44, flex: "0 0 auto" }} aria-label={`${n} di ${total}`}>
       <svg width="44" height="44" viewBox="0 0 44 44" style={{ transform: "rotate(-90deg)" }}>
         <circle cx="22" cy="22" r={r} fill="none" stroke={CP.borderSoft} strokeWidth="4" />
-        <circle cx="22" cy="22" r={r} fill="none" stroke={n && n === total ? CP.accentGreen : CP.accent} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${(c * pct).toFixed(1)} ${c.toFixed(1)}`} />
+        {n > 0 && <circle cx="22" cy="22" r={r} fill="none" stroke={n === total ? CP.accentGreen : CP.accent} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${(c * pct).toFixed(1)} ${c.toFixed(1)}`} />}
       </svg>
       <b style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", fontSize: 11, fontWeight: 500, ...NUM }}>{n}/{total}</b>
     </div>
@@ -60,15 +71,11 @@ export function Dot({ color, size = 8 }) {
   return <span style={{ width: size, height: size, borderRadius: "50%", background: color, display: "inline-block", flex: "0 0 auto" }} />;
 }
 
+/** Scelta tra poche voci: le stesse «pillole» dei filtri del resto dell'app. */
 export function Seg({ items, value, onChange, style }) {
   return (
-    <div role="tablist" style={{ display: "inline-flex", gap: 2, background: CP.bgSunken, border: `1px solid ${CP.borderSoft}`, borderRadius: 10, padding: 3, flexWrap: "wrap", ...style }}>
-      {items.map(([k, l]) => (
-        <button key={k} type="button" role="tab" aria-selected={value === k} onClick={() => onChange(k)}
-          style={{ border: "none", cursor: "pointer", borderRadius: 8, padding: "7px 12px", fontSize: 13.5, fontFamily: FONTS.body, background: value === k ? CP.surface : "transparent", color: value === k ? CP.textPrimary : CP.textSecondary, fontWeight: value === k ? 500 : 400, boxShadow: value === k ? `0 0 0 1px ${CP.border}` : "none" }}>
-          {l}
-        </button>
-      ))}
+    <div role="tablist" style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", ...style }}>
+      {items.map(([k, l]) => <FilterChip key={k} label={l} active={value === k} onClick={() => onChange(k)} />)}
     </div>
   );
 }
@@ -76,7 +83,7 @@ export function Seg({ items, value, onChange, style }) {
 /** Riquadro richiudibile (regole, "oggi non si fa"). */
 export function Fold({ title, children, danger, open }) {
   return (
-    <details open={open} style={{ ...cardBox, padding: 0, marginTop: 12 }}>
+    <details open={open} style={{ ...cardBox, padding: 0, marginTop: 12, background: "transparent" }}>
       <summary style={{ cursor: "pointer", padding: "13px 16px", fontSize: 14, fontWeight: 500, color: danger ? CP.accentRed : CP.textPrimary, listStyle: "revert" }}>{title}</summary>
       <div style={{ padding: "0 16px 14px", fontSize: 14, color: CP.textSecondary, lineHeight: 1.6 }}>{children}</div>
     </details>
@@ -145,12 +152,13 @@ export function Field({ label, children, hint: h }) {
   );
 }
 
+/** Numero con etichetta, come Metric dell'app (nello stile Casa: numero serif grande). */
 export function Metric2({ value, label, color, sub, children }) {
   return (
-    <div style={{ background: CP.bgSunken, border: `1px solid ${CP.borderSoft}`, borderRadius: 12, padding: "12px 14px", minWidth: 0 }}>
-      <b style={{ display: "block", fontSize: 22, fontWeight: 500, color: color || CP.textPrimary, ...NUM }}>{value}</b>
-      <span style={{ fontSize: 12.5, color: CP.textSecondary }}>{label}</span>
-      {sub && <div style={{ ...hint, marginTop: 3 }}>{sub}</div>}
+    <div style={{ minWidth: 0, padding: "4px 0" }}>
+      <div className="ds-lbl" style={{ fontSize: 13, color: CP.textSecondary }}>{label}</div>
+      <div className="ds-metric-v" style={{ fontSize: 22, fontWeight: 500, lineHeight: 1.25, color: color || CP.textPrimary, ...NUM }}><NumText value={value} /></div>
+      {sub && <div style={{ ...hint, marginTop: 2 }}>{sub}</div>}
       {children}
     </div>
   );
