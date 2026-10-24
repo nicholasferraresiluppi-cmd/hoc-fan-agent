@@ -19,7 +19,7 @@ const OF_DIRECT = /(onlyfans\.com|fansly\.com|fans\.ly|fanvue\.com)/i;
 const OF_BIO = /(onlyfans|0nlyfans|only\s?fans|fansly)/i;
 const OF_UPPER = /(^|[^A-Za-z])OF([^A-Za-z]|$)|🔞/;
 // Le nostre creator sono donne: chi in bio si dichiara uomo non è una reference utile.
-const MALE = /(\bhe\s*\/\s*him\b|\bhim\s*\/\s*he\b|\bhe\s*\/\s*they\b|\bgay\b|\balpha\s*male\b|\bstraight\s*(male|guy|man)\b|\bbodybuilder\b|\bmuscle\b|\bdaddy\b|\btwink\b|\bcashmaster\b|\bfirefighter\b|\bhusband\b|\bboy\b|\bguy\b|\bprince\b|\bking\b|\bdude\b|\bmasc\b|🏳️‍🌈|👨)/i;
+const MALE = /(\bhe\s*\/\s*him\b|\bhim\s*\/\s*he\b|\bhe\s*\/\s*they\b|\bgay\b|\balpha\s*male\b|\bstraight\s*(male|guy|man)\b|\bbodybuilder\b|\bmuscle\b|\bdaddy\b|\btwink\b|\bcashmaster\b|\bfirefighter\b|\bhusband\b|\bboy\b|\bguy\b|\bprince\b|\bking\b|\bdude\b|\bmasc\b|\btwunk\b|\bversatile\b|\bbrazilian\s+top\b|\bbear\b|\bhung\b|\bstud\b|🍆|🐻|🏳️‍🌈|👨)/i;
 const FEMALE = /(\bshe\s*\/\s*her\b|\bgirl\b|\bbabe\b|\bwife\b|\bmom\b|\bmilf\b|\blatina\b|\bpetite\b|\bgoddess\b|\bprincess\b|\bqueen\b|\bbaddie\b|\bblonde\b|\bbrunette\b|\bredhead\b|\bgirlfriend\b|\bwoman\b|\blady\b|\bgf\b|\bher\b|💋|💅|👸|🎀)/i;
 // account di marchi/piattaforme (Fansly, negozi): hanno il link ma non sono creator
 const BRAND = /(official\s+(x\s+)?account|subscription-based social media|\bnetwork\b|official twitter of)/i;

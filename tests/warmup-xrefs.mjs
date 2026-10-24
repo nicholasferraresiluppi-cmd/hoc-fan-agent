@@ -94,4 +94,10 @@ t("dalla rete: utenti dei «seguiti», marchi fuori (forma vera del 24/10)", () 
   assert.equal(added.find((a) => a.u === "misselusivex").female, true);
 });
 
+t("uomini della prima rete (24/10) fuori", () => {
+  for (const bio of ["Brazilian Top ⬆️🍆💪🏻| Não faço PG", "💥French Bi Kinky Twunk💥  no collab", "🔞Brazilian Twunk | Versatile Sub", "RAFA OSO 🐻 it's Time"])
+    assert.equal(M.looksMale({ bio }), true, bio);
+  assert.equal(M.looksMale({ bio: "4’11 latina who’s wild on camera 🤪" }), false);
+});
+
 console.log(`warmup-xrefs: ${n} gruppi di asserzioni ok`);
