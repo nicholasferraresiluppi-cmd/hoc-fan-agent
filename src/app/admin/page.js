@@ -303,7 +303,7 @@ export default function AdminHub() {
         </section>
       )}
 
-      {!isHr && !noCreators && <HeroMetric
+      {!isHr && !noCreators && <div className="vt-hero" data-tone={dSales != null && cmp?.until_day >= FEW_DAYS && !agency?.incomplete && dSales > 3 ? "good" : "ink"}><HeroMetric
         label={`${partial ? `Venduto delle tue ${me.creators.count} creator` : "Venduto agenzia"} · ${monthName} finora`}
         value={fmt$(agency?.current?.sales)}
         compare={phone && cmp?.until_day ? `${fmt$(cmp.prev.sales)} a ${prevName} negli stessi giorni` : compareLine}
@@ -324,7 +324,7 @@ export default function AdminHub() {
           <Metric label="Turni" value={fmtInt(base?.shifts)} delta={fmtDelta(base?.shifts, basePrev?.shifts)} deltaLabel={dl} />
           <Metric label="Venduto per turno" value={fmt$(perShift(base))} delta={fmtDelta(perShift(base), perShift(basePrev))} deltaLabel={dl} />
         </div>
-      </HeroMetric>}
+      </HeroMetric></div>}
 
       {s4s?.access && (s4s.count > 0 || s4s.missingKit?.length > 0 || s4s.proposals > 0) && (
         <section className="vt-glass" style={{ ...card, marginBottom: 14, "--vt-i": 1 }}>
@@ -417,9 +417,9 @@ export default function AdminHub() {
           <section style={{ marginBottom: 18 }}>
             <h2 className="ds-sect" style={{ fontSize: 16, fontWeight: 500, margin: "6px 0 10px", color: CP.textPrimary }}>Vai a</h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
-              {quick.map((it) => { const Icon = it.icon || LayoutDashboard; return (
+              {quick.map((it, qi) => { const Icon = it.icon || LayoutDashboard; return (
                 <Link key={it.href} href={it.href} className="hub-tool" style={{ ...card, display: "flex", flexDirection: "column", gap: 10, padding: "14px 14px 12px", textDecoration: "none", color: CP.textPrimary, minHeight: 86 }}>
-                  <Icon size={18} color={CP.textMuted} strokeWidth={1.8} />
+                  <span className="vt-ico" data-tone={qi % 6} style={{ display: "inline-flex" }}><Icon size={18} color={CP.textMuted} strokeWidth={1.8} /></span>
                   <span style={{ fontSize: 14.5, fontWeight: 500, lineHeight: 1.25 }}>{it.title}</span>
                 </Link>
               ); })}
@@ -443,7 +443,7 @@ export default function AdminHub() {
         <section style={{ marginBottom: 22 }}>
           <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 8 }}>I tuoi strumenti · {WORKSPACES[ws]?.label}</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8 }}>
-            {mine.map((it) => <ToolCard key={it.href} it={it} />)}
+            {mine.map((it, i) => <ToolCard key={it.href} it={it} tone={i % 6} />)}
           </div>
         </section>
       )}
@@ -453,11 +453,11 @@ export default function AdminHub() {
           {showAll ? "Nascondi gli altri strumenti" : `Tutti gli strumenti (${others.reduce((n, g) => n + g.items.length, 0)})`}
         </button>
       )}
-      {othersOpen && others.map((g) => (
+      {othersOpen && others.map((g, gi) => (
         <section key={g.label} style={{ marginBottom: 22 }}>
           <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 8 }}>{g.label}</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8 }}>
-            {g.items.map((it) => <ToolCard key={it.href} it={it} />)}
+            {g.items.map((it) => <ToolCard key={it.href} it={it} tone={gi % 6} />)}
           </div>
         </section>
       ))}
@@ -469,12 +469,13 @@ export default function AdminHub() {
   );
 }
 
-function ToolCard({ it }) {
+// tone: colore del gruppo, usato solo dallo stile vetro (VetroScope) per la tessera dell'icona
+function ToolCard({ it, tone = 0 }) {
   const Icon = it.icon;
   return (
     <Link href={it.href} className="hub-tool"
       style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px", ...card, textDecoration: "none", color: CP.textPrimary }}>
-      <Icon size={16} color={CP.textMuted} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 2 }} />
+      <span className="vt-ico" data-tone={tone} style={{ display: "inline-flex", flexShrink: 0, marginTop: 2 }}><Icon size={16} color={CP.textMuted} strokeWidth={1.8} /></span>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 500 }}>{it.title}</div>
         {it.desc && <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.45, marginTop: 2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.desc}</div>}

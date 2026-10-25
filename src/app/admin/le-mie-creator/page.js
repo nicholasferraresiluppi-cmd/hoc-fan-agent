@@ -79,13 +79,13 @@ function CreatorCard({ c, i = 0 }) {
 
   return (
     <section className="vt-glass" data-lvl={c.light.level} style={{ "--vt-i": Math.min(i, 8), minWidth: 0, background: alpha(L.color, "0b"), border: `1px solid ${alpha(L.color, c.light.level ? "55" : "2e")}`, borderRadius: 22, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div className="vt-head" style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ width: 44, height: 44, borderRadius: "50%", background: CP.accent, color: CP.accentInk, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 15, flexShrink: 0 }}>{initials(c.name)}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 17, fontWeight: 700, color: CP.textPrimary }}>{c.name}</div>
           <div style={{ fontSize: 12.5, color: CP.textMuted }}>{c.countries.map((x) => COUNTRY_NAMES[x.country] || x.country).join(" + ")}</div>
         </div>
-        <span style={{ fontSize: 12, fontWeight: 600, color: L.color, background: CP.surface, border: `1px solid ${alpha(L.color, "44")}`, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>{L.word}</span>
+        <span className="vt-pill" style={{ fontSize: 12, fontWeight: 600, color: L.color, background: CP.surface, border: `1px solid ${alpha(L.color, "44")}`, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>{L.word}</span>
       </div>
 
       {c.light.reasons.length > 0 && (

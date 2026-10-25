@@ -41,6 +41,23 @@ ${SEL}{${GLASS};border-radius:22px !important}
 :root .hoc-vetro .ds-tbl-wrap .ds-tr > td{background-color:transparent !important}
 :root .hoc-vetro .vt-glass[data-lvl="1"]{border-color:rgba(122,79,20,.5) !important}
 :root .hoc-vetro .vt-glass[data-lvl="2"]{border-color:rgba(158,42,51,.55) !important}
+/* Colore = stato (come la pipeline di «rapport»): giallo attenzione, verde bene, rosso da guardare, nero neutro */
+:root .hoc-vetro .vt-hero .ds-hero{border-color:transparent !important;--cp-textPrimary:#fff;--cp-textSecondary:rgba(255,255,255,.84);--cp-textMuted:rgba(255,255,255,.74);--cp-border:rgba(255,255,255,.3);--cp-accentGreen:#bdf0d3;--cp-accentRed:#ffc2c2;--cp-attn:#fff;--cp-gold:#f3d58a}
+:root .hoc-vetro .vt-hero[data-tone="good"] .ds-hero{background:linear-gradient(160deg,#1f8a5b,#11653f) !important}
+:root .hoc-vetro .vt-hero[data-tone="ink"] .ds-hero{background:linear-gradient(160deg,#2c211a,#16100c) !important}
+.hoc-vetro .vt-head{margin:-18px -18px 0;padding:16px 18px;border-radius:21px 21px 0 0}
+.hoc-vetro [data-lvl="0"] .vt-head{background:#14714a;--cp-textPrimary:#fff;--cp-textMuted:rgba(255,255,255,.78)}
+.hoc-vetro [data-lvl="1"] .vt-head{background:#e9c46a;--cp-textMuted:rgba(29,21,16,.7)}
+.hoc-vetro [data-lvl="2"] .vt-head{background:#b23a3a;--cp-textPrimary:#fff;--cp-textMuted:rgba(255,255,255,.8)}
+.hoc-vetro .vt-head .vt-pill{background:rgba(255,255,255,.92) !important;border-color:transparent !important}
+.hoc-vetro .vt-ico{width:34px;height:34px;border-radius:11px;align-items:center;justify-content:center;margin-top:0 !important}
+.hoc-vetro .vt-ico svg{stroke:#fff}
+.hoc-vetro .vt-ico[data-tone="0"]{background:#e9c46a}.hoc-vetro .vt-ico[data-tone="0"] svg{stroke:#1d1510}
+.hoc-vetro .vt-ico[data-tone="1"]{background:#14714a}
+.hoc-vetro .vt-ico[data-tone="2"]{background:#1d1510}
+.hoc-vetro .vt-ico[data-tone="3"]{background:#b8573a}
+.hoc-vetro .vt-ico[data-tone="4"]{background:#2d6b6b}
+.hoc-vetro .vt-ico[data-tone="5"]{background:#8a6a4a}
 @keyframes vt-in{from{opacity:0;filter:blur(14px);transform:scale(.985)}to{opacity:1;filter:none;transform:none}}
 .hoc-vetro .vt-glass,.hoc-vetro .ds-hero,.hoc-vetro .ds-open,.hoc-vetro .hub-tool{animation:vt-in .7s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--vt-i,0) * 80ms)}
 .hoc-vetro .ds-open{--vt-i:2}.hoc-vetro .hub-tool{--vt-i:4}
