@@ -147,4 +147,20 @@ t("prima ricerca con l'API ufficiale (25/10): uomini e agenzie fuori", () => {
   assert.equal(M.isOfCreator({ u: "x", bio: "ꨄ 5’3 petite libra 🌿 sweet and spicy", site: "https://onlyfans.com/x" }), true);
 });
 
+t("pornostar fuori dalle creator (25/10): bio e testi dei post", () => {
+  assert.equal(M.looksExplicit({ bio: "@Lillianphi28967 24 instagram - lilyphillip_s 🤍 WORLD RECORD SLUZZA!!" }), true);
+  assert.equal(M.looksExplicit({ bio: "📍ATL Award Winning Adult Star 🎥" }), true);
+  assert.equal(M.looksExplicit({ bio: "the girl your mom warned you about 💌" }), false);
+  assert.equal(M.looksExplicit({ u: "porn_curves", bio: "Ivy 🔥" }), true); // anche dal nome utente
+  assert.equal(M.looksExplicit({ bio: "the girl your mom warned you about", stats: { n: 40, pctExplicit: 40 } }), true); // i post la tradiscono
+  assert.equal(M.looksExplicit({ bio: "gym girl 🏋️ link below", stats: { n: 40, pctExplicit: 5 } }), false);
+  const now = Date.parse("2026-10-25T00:00:00Z");
+  const st = M.analyzePosts([
+    { id: "1", text: "full video on my page, he fucked me", createdAt: "2026-10-24T10:00:00Z", sensitive: true },
+    { id: "2", text: "outfit check 🎀", createdAt: "2026-10-23T10:00:00Z", sensitive: false },
+  ], now);
+  assert.equal(st.pctSensitive, 50); assert.equal(st.pctExplicit, 50);
+  assert.ok(M.discoveryQueriesX([]).every((q) => q.includes("-porn") && q.length < 512));
+});
+
 console.log(`warmup-xrefs: ${n} gruppi di asserzioni ok`);

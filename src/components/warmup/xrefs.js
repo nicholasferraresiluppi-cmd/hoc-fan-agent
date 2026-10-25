@@ -64,6 +64,7 @@ function RefCard({ r, onStatus, onSave, busy }) {
         {r.loc && !r.us && <Chip>{r.loc.slice(0, 24)}</Chip>}
         <Chip>{linkKind(r.site)}</Chip>
         {r.blue && <Chip>Premium</Chip>}
+        {r.explicit && <Chip color={CP.accentRed}>Esplicita</Chip>}
         {(r.niches || []).map((n) => <Chip key={n}>{n}</Chip>)}
       </div>
       {r.bio && <p style={{ fontSize: 13.5, color: CP.textSecondary, margin: 0, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{r.bio}</p>}
@@ -74,6 +75,7 @@ function RefCard({ r, onStatus, onSave, busy }) {
           <div><b style={{ fontWeight: 500, ...NUM }}>{fmt(s.medViews)}</b><div style={muted}>view a post</div></div>
           <div><b style={{ fontWeight: 500, ...NUM }}>{pct(s.pctVideo)}</b><div style={muted}>video</div></div>
           <div><b style={{ fontWeight: 500, ...NUM }}>{pct(s.pctLinkInPost)}</b><div style={muted}>link nel post</div></div>
+          {s.pctSensitive != null && <div style={{ gridColumn: "1 / -1", ...hint, fontSize: 12 }}>{s.pctSensitive}% dei post segnati come sensibili da X · {s.pctExplicit}% con testo esplicito</div>}
         </div>
       ) : r.foundPost ? (
         <div style={{ fontSize: 13, color: CP.textSecondary, borderLeft: `2px solid ${CP.borderStrong}`, paddingLeft: 10 }}>
@@ -127,6 +129,7 @@ export default function XRefs() {
   const [sort, setSort] = useState("f");
   const [nicheF, setNicheF] = useState("");
   const [onlyF, setOnlyF] = useState("0");
+  const [noPorn, setNoPorn] = useState("1");
   const [niche, setNiche] = useState("");
   const [handle, setHandle] = useState("");
   const [busy, setBusy] = useState(null);
@@ -139,7 +142,7 @@ export default function XRefs() {
   };
   const refs = data?.refs || [];
   const niches = useMemo(() => [...new Set(refs.flatMap((r) => r.niches || []))].sort(), [refs]);
-  const shown = refs.filter((r) => r.status === status && (!nicheF || (r.niches || []).includes(nicheF)) && (onlyF === "0" || (onlyF === "1" ? r.female : onlyF === "us" ? r.us : r.us && r.female)))
+  const shown = refs.filter((r) => r.status === status && (!nicheF || (r.niches || []).includes(nicheF)) && (onlyF === "0" || (onlyF === "1" ? r.female : onlyF === "us" ? r.us : r.us && r.female)) && (noPorn === "0" || !r.explicit))
     .sort((a, b) => (b.female ? 1 : 0) - (a.female ? 1 : 0) || (sort === "views" ? (b.stats?.medViews || 0) - (a.stats?.medViews || 0) : sort === "new" ? (b.addedAt || 0) - (a.addedAt || 0) : (b.f || 0) - (a.f || 0)));
   if (error) return <Notice danger>{error.message}</Notice>;
   if (!data) return <p style={hint}>Carico…</p>;
@@ -190,6 +193,7 @@ export default function XRefs() {
         </select>
         {status === "tenuta" && <button type="button" style={btnSm} disabled={!!busy} onClick={() => run("analyze", { action: "analyze" }, (d) => (d.result.read ? `Letti i post di ${d.result.read} reference.` : "Le tenute sono già aggiornate (si rileggono ogni 7 giorni)."))}><RefreshCw size={13} />{busy === "analyze" ? "Leggo… (fino a due minuti)" : "Leggi i post"}</button>}
       </div>
+      <div style={{ marginBottom: 12 }}><Seg items={[["1", "Solo creator (niente porno)"], ["0", "Anche esplicite"]]} value={noPorn} onChange={setNoPorn} /></div>
       <div style={{ marginBottom: 12 }}><Seg items={[["0", "Tutte"], ["1", "Solo chi si dichiara donna"], ["us", "Solo USA"], ["usf", "USA e donna"]]} value={onlyF} onChange={setOnlyF} /></div>
       {niches.length > 0 && <div style={{ marginBottom: 12 }}><Seg items={[["", "Tutte le nicchie"], ...niches.map((n) => [n, n])]} value={nicheF} onChange={setNicheF} /></div>}
       {!shown.length ? (
