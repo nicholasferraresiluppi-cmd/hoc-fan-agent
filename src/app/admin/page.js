@@ -33,6 +33,7 @@ import { useStyle } from "@/lib/theme-client";
 import { PageHead, HeroMetric, Metric, SectionTitle, ActionRow, card } from "@/components/ds";
 import { useIsPhone } from "@/lib/use-phone";
 import { isEarlyMonth } from "@/lib/use-smart-period";
+import VetroScope, { useVetro, VetroSwitch } from "@/components/VetroScope";
 
 // Tollera 4xx/5xx: ritorna null invece di throware (le metriche mostrano "—")
 const fetcher = async (url) => {
@@ -257,6 +258,8 @@ export default function AdminHub() {
     .sort((a, b) => (a.severity === "critical" ? 0 : 1) - (b.severity === "critical" ? 0 : 1));
 
   const [st] = useStyle();
+  // Stile vetro in prova su questa pagina (VetroScope), spegnibile dall'intestazione
+  const [vetro, setVetro] = useVetro();
   // Telefono (10/10/2026, Nicholas: "sembra un libro"): verdetto corto, 3 alert, decisioni in una riga,
   // scorciatoie al posto dell'elenco degli strumenti. Il computer resta com'è.
   const phone = useIsPhone();
@@ -281,8 +284,10 @@ export default function AdminHub() {
   const loopNote = (x, fallback) => x?.reason === "no_history" ? "servono 2 mesi di dati" : x?.reason ? fallback : null;
 
   return (
+    <VetroScope on={vetro}>
     <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
+        actions={<VetroSwitch on={vetro} set={setVetro} />}
         title={`${greeting}${userName ? `, ${userName}` : ""}.`}
         line2={isHr ? null : phone && dSales != null && cmp?.until_day >= FEW_DAYS && !agency?.incomplete ? `${fmtPct(dSales)} su ${prevName}, stessi giorni.` : paceLine}
         subtitle={isHr ? "Persone, accessi e contestazioni: da qui parti per il lavoro di oggi."
@@ -290,7 +295,7 @@ export default function AdminHub() {
       />
 
       {noCreators && !isHr && (
-        <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+        <section className="vt-glass" style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
           <SectionTitle>Non hai ancora creator assegnate</SectionTitle>
           <div style={{ fontSize: 14, color: CP.textSecondary, lineHeight: 1.55 }}>
             Le pagine di vendita mostrano solo le creator che segui. Finché un admin non te le assegna (Membri e ruoli → la tua scheda → Creator visibili), qui e nelle classifiche non vedrai numeri.
@@ -322,7 +327,7 @@ export default function AdminHub() {
       </HeroMetric>}
 
       {s4s?.access && (s4s.count > 0 || s4s.missingKit?.length > 0 || s4s.proposals > 0) && (
-        <section style={{ ...card, marginBottom: 14 }}>
+        <section className="vt-glass" style={{ ...card, marginBottom: 14, "--vt-i": 1 }}>
           <div style={{ padding: "14px 16px 10px" }}>
             <SectionTitle aside={s4s.count ? `${s4s.count} da fare` : null}>S4S</SectionTitle>
           </div>
@@ -366,7 +371,7 @@ export default function AdminHub() {
       )}
 
       {phone && wantDecisions && decisions.length > 0 && (
-        <Link href="/admin/roadmap" style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 16px", marginBottom: 14, textDecoration: "none", color: CP.textPrimary }}>
+        <Link href="/admin/roadmap" className="vt-glass" style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 16px", marginBottom: 14, textDecoration: "none", color: CP.textPrimary }}>
           <span><span style={{ fontSize: 15 }}>{decisions.length} {decisions.length === 1 ? "decisione ti aspetta" : "decisioni ti aspettano"}</span>
             <span style={{ display: "block", fontSize: 12.5, color: CP.textMuted, marginTop: 2 }}>la più vecchia da {daysAgo(decisions[0].added_at) ?? "?"} giorni</span></span>
           <span style={{ color: CP.accentSoftText }}>→</span>
@@ -460,6 +465,7 @@ export default function AdminHub() {
       <style>{`.hub-tool:hover{background:${CP.surfaceAlt} !important}
 @media (max-width:699px){.hub-metrics{display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 18px !important}.ds-arow > div{flex:1 1 0 !important}.ds-arow .ds-arow-go{margin-left:20px}}`}</style>
     </div>
+    </VetroScope>
   );
 }
 

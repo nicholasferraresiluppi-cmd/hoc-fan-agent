@@ -231,6 +231,28 @@ export const CP_NOTTE_CALDA = {
   textMuted: "#a8a092", mutedIcons: "#857d70", hover: "rgba(255,245,225,.04)",
 };
 
+// "Vetro caldo" (25/10/2026, prova su Casa e Le mie creator — Nicholas dal reel @code.xr «Glassy
+// Dashboard V2»): vetro color sabbia sopra un fondo sfumato legno/sabbia, pulsanti neri e bianchi,
+// verde solo per il buon andamento. NON è un tema dell'app: lo applica <VetroScope> alle sole pagine
+// in prova (variabili ridefinite sul contenitore). Vetro anche sulle tabelle (scelta di Nicholas).
+export const CP_VETRO = {
+  ...CP_CASA_CHIARA,
+  bgSunken: "transparent", bg: "transparent",
+  surface: "rgba(250,244,236,.40)", surfaceAlt: "rgba(255,250,244,.62)",
+  panel: "#f3ebe1",
+  border: "rgba(255,255,255,.55)", borderSoft: "rgba(60,35,15,.10)", borderStrong: "rgba(60,35,15,.22)",
+  textPrimary: "#1d1510", textSecondary: "rgba(29,21,16,.76)", textMuted: "rgba(29,21,16,.62)", mutedIcons: "rgba(29,21,16,.5)",
+  accent: "#1d1510", accentInk: "#ffffff", accentSoft: "rgba(255,255,255,.62)", accentSoftText: "#1d1510", accentDim: "rgba(29,21,16,.22)",
+  accentGreen: "#11673f", accentRed: "#9e2a33", accentBlue: "rgba(29,21,16,.76)",
+  dangerSoft: "rgba(158,42,51,.08)",
+  gold: "#7a4f14", goldSoft: "rgba(122,79,20,.08)", track: "rgba(60,35,15,.16)", neu: "rgba(29,21,16,.8)",
+  ruleData: "rgba(60,35,15,.22)", fieldBd: "rgba(60,35,15,.28)", sel: "rgba(255,255,255,.45)", hover: "rgba(255,255,255,.22)",
+  scrim: "rgba(40,24,14,.35)", cool: "#2f5a9e", warm: "#11673f",
+  heroBg: "rgba(250,244,236,.40)",
+  tierTop: "#7a4f14", tierStrong: "#1d1510",
+  attn: "#1d1510", scale: "#11673f",
+};
+
 // Scala per i DATI (sequenziale, separata dall'accento viola che è per ciò che si
 // clicca): chiaro = valore basso. Una tinta, 5 passi, per tema.
 export const DATA_SCALE = {

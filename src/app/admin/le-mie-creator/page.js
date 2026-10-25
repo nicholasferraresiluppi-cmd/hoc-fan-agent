@@ -11,6 +11,7 @@ import { CP, FONTS, alpha } from "@/lib/brand";
 import { Notice } from "@/components/ds";
 import { liveFetcher } from "@/components/LiveCreatorPicker";
 import { COUNTRY_NAMES } from "@/lib/live-creators";
+import VetroScope, { useVetro, VetroSwitch } from "@/components/VetroScope";
 
 const NUM = { fontVariantNumeric: "tabular-nums" };
 const group = (n) => String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -32,8 +33,10 @@ export default function LeMieCreatorPage() {
   const { data, error, isLoading } = useSWR("/api/admin/live-overview", liveFetcher, { refreshInterval: 5 * 60 * 1000, revalidateOnFocus: false });
   const list = [...(data?.creators || [])].sort((a, b) => b.light.level - a.light.level);
   const toWatch = list.filter((c) => c.light.level === 2).length;
+  const [vetro, setVetro] = useVetro();
 
   return (
+    <VetroScope on={vetro}>
     <div style={{ maxWidth: 1180, margin: "0 auto", padding: "8px 16px 40px", fontFamily: FONTS.body }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
         <div>
@@ -42,7 +45,10 @@ export default function LeMieCreatorPage() {
             {data ? (toWatch ? (toWatch === 1 ? "Una creator da guardare adesso: è la prima." : `${toWatch} creator da guardare adesso: sono le prime.`) : "Come vanno adesso. In cima quella che ha più bisogno di te.") : "Come vanno adesso, e dove guardare per prima."}
           </div>
         </div>
-        {data && <div style={{ fontSize: 12.5, color: CP.textMuted }}>aggiornato alle {hm(data.at)} · si aggiorna da solo ogni 5 minuti</div>}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {data && <div style={{ fontSize: 12.5, color: CP.textMuted }}>aggiornato alle {hm(data.at)} · si aggiorna da solo ogni 5 minuti</div>}
+          <VetroSwitch on={vetro} set={setVetro} />
+        </div>
       </div>
 
       {error && <Notice danger>{error.message}</Notice>}
@@ -55,13 +61,14 @@ export default function LeMieCreatorPage() {
       {data && !list.length && <Notice>Non hai creator assegnate in questo strumento.</Notice>}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
-        {list.map((c) => <CreatorCard key={c.slug} c={c} />)}
+        {list.map((c, i) => <CreatorCard key={c.slug} c={c} i={i} />)}
       </div>
     </div>
+    </VetroScope>
   );
 }
 
-function CreatorCard({ c }) {
+function CreatorCard({ c, i = 0 }) {
   const L = LEVEL[c.light.level];
   const r = c.revenue;
   const multi = c.countries.length > 1;
@@ -71,7 +78,7 @@ function CreatorCard({ c }) {
   const q = `?creator=${encodeURIComponent(c.slug)}`;
 
   return (
-    <section style={{ minWidth: 0, background: alpha(L.color, "0b"), border: `1px solid ${alpha(L.color, c.light.level ? "55" : "2e")}`, borderRadius: 22, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+    <section className="vt-glass" data-lvl={c.light.level} style={{ "--vt-i": Math.min(i, 8), minWidth: 0, background: alpha(L.color, "0b"), border: `1px solid ${alpha(L.color, c.light.level ? "55" : "2e")}`, borderRadius: 22, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ width: 44, height: 44, borderRadius: "50%", background: CP.accent, color: CP.accentInk, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 15, flexShrink: 0 }}>{initials(c.name)}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
