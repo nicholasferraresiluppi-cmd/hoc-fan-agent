@@ -11,7 +11,7 @@ import { CP, FONTS, alpha } from "@/lib/brand";
 import { Notice } from "@/components/ds";
 import { liveFetcher } from "@/components/LiveCreatorPicker";
 import { COUNTRY_NAMES } from "@/lib/live-creators";
-import VetroScope, { useVetro, VetroSwitch } from "@/components/VetroScope";
+import VetroScope, { useVetro, VetroSwitch, VetroNum } from "@/components/VetroScope";
 
 const NUM = { fontVariantNumeric: "tabular-nums" };
 const group = (n) => String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -106,7 +106,7 @@ function CreatorCard({ c, i = 0 }) {
 
       <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 16, padding: "12px 14px", minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 24, fontWeight: 700, color: CP.textPrimary, ...NUM }}>{waiting}</span>
+          <span style={{ fontSize: 24, fontWeight: 700, color: CP.textPrimary, ...NUM }}><VetroNum value={String(waiting)} /></span>
           <span style={{ fontSize: 13.5, color: CP.textPrimary }}>{waiting === 1 ? "fan aspetta" : "fan aspettano"} una risposta</span>
           {bought > 0 && <span style={{ fontSize: 12.5, color: CP.gold, fontWeight: 500 }}>· {bought} {bought === 1 ? "ha" : "hanno"} già comprato</span>}
         </div>
@@ -150,8 +150,8 @@ function MiniRace({ r }) {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13, color: CP.textSecondary, ...NUM }}>
-        <span><b style={{ color: CP.textPrimary, fontSize: 15 }}>{usd(r.mtd)}</b> finora</span>
-        <span>arrivo previsto <b style={{ color: CP.textPrimary }}>{usd(r.proj)}</b></span>
+        <span><b style={{ color: CP.textPrimary, fontSize: 15 }}><VetroNum value={usd(r.mtd)} /></b> finora</span>
+        <span>arrivo previsto <b style={{ color: CP.textPrimary }}><VetroNum value={usd(r.proj)} /></b></span>
       </div>
       <div style={{ position: "relative", height: 10, borderRadius: 999, background: alpha(CP.accent, "22"), margin: "8px 0 6px" }}>
         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: x(r.mtd), borderRadius: 999, background: CP.accent }} />

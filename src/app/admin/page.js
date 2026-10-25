@@ -33,7 +33,7 @@ import { useStyle } from "@/lib/theme-client";
 import { PageHead, HeroMetric, Metric, SectionTitle, ActionRow, card } from "@/components/ds";
 import { useIsPhone } from "@/lib/use-phone";
 import { isEarlyMonth } from "@/lib/use-smart-period";
-import VetroScope, { useVetro, VetroSwitch } from "@/components/VetroScope";
+import VetroScope, { useVetro, VetroSwitch, VetroNum } from "@/components/VetroScope";
 
 // Tollera 4xx/5xx: ritorna null invece di throware (le metriche mostrano "—")
 const fetcher = async (url) => {
@@ -260,6 +260,8 @@ export default function AdminHub() {
   const [st] = useStyle();
   // Stile vetro in prova su questa pagina (VetroScope), spegnibile dall'intestazione
   const [vetro, setVetro] = useVetro();
+  // numeri che salgono (VetroNum); nello stile Casa li fa già NumText, che vuole una stringa
+  const num = (v) => (st === "v3" ? v : <VetroNum value={v} />);
   // Telefono (10/10/2026, Nicholas: "sembra un libro"): verdetto corto, 3 alert, decisioni in una riga,
   // scorciatoie al posto dell'elenco degli strumenti. Il computer resta com'è.
   const phone = useIsPhone();
@@ -305,7 +307,7 @@ export default function AdminHub() {
 
       {!isHr && !noCreators && <div className="vt-hero" data-tone={dSales != null && cmp?.until_day >= FEW_DAYS && !agency?.incomplete && dSales > 3 ? "good" : "ink"}><HeroMetric
         label={`${partial ? `Venduto delle tue ${me.creators.count} creator` : "Venduto agenzia"} · ${monthName} finora`}
-        value={fmt$(agency?.current?.sales)}
+        value={num(fmt$(agency?.current?.sales))}
         compare={phone && cmp?.until_day ? `${fmt$(cmp.prev.sales)} a ${prevName} negli stessi giorni` : compareLine}
         hint={<>
           {agency?.incomplete && (
@@ -319,10 +321,10 @@ export default function AdminHub() {
         </>}
       >
         <div className="hub-metrics" style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
-          <Metric label="Operatori attivi" value={fmtInt(base?.operators)} delta={fmtDelta(base?.operators, basePrev?.operators)} deltaLabel={dl} />
-          <Metric label="Creator" value={fmtInt(base?.creators)} />
-          <Metric label="Turni" value={fmtInt(base?.shifts)} delta={fmtDelta(base?.shifts, basePrev?.shifts)} deltaLabel={dl} />
-          <Metric label="Venduto per turno" value={fmt$(perShift(base))} delta={fmtDelta(perShift(base), perShift(basePrev))} deltaLabel={dl} />
+          <Metric label="Operatori attivi" value={num(fmtInt(base?.operators))} delta={fmtDelta(base?.operators, basePrev?.operators)} deltaLabel={dl} />
+          <Metric label="Creator" value={num(fmtInt(base?.creators))} />
+          <Metric label="Turni" value={num(fmtInt(base?.shifts))} delta={fmtDelta(base?.shifts, basePrev?.shifts)} deltaLabel={dl} />
+          <Metric label="Venduto per turno" value={num(fmt$(perShift(base)))} delta={fmtDelta(perShift(base), perShift(basePrev))} deltaLabel={dl} />
         </div>
       </HeroMetric></div>}
 
@@ -401,11 +403,11 @@ export default function AdminHub() {
         <section className="ds-open" style={{ ...card, padding: "14px 16px", marginBottom: 24 }}>
           <SectionTitle aside={loopPeriod === prevId ? `${prevName}: il mese appena chiuso, come la Classifica` : "coaching e sostituzioni del mese scorso, misurati su questo"}>Le decisioni sulle persone funzionano?</SectionTitle>
           <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
-            <Metric label="Migliorati dopo il coaching" value={loop.coaching?.rate != null ? `${loop.coaching.rate}%` : "—"}
+            <Metric label="Migliorati dopo il coaching" value={num(loop.coaching?.rate != null ? `${loop.coaching.rate}%` : "—")}
               note={loop.coaching?.total ? `${loop.coaching.improved} su ${loop.coaching.total}, almeno +5 punti` : loopNote(loop.coaching, "nessun coaching completato")} />
-            <Metric label="Sostituzioni riuscite" value={loop.swaps?.rate != null ? `${loop.swaps.rate}%` : "—"}
+            <Metric label="Sostituzioni riuscite" value={num(loop.swaps?.rate != null ? `${loop.swaps.rate}%` : "—")}
               note={loop.swaps?.total ? `${loop.swaps.success} su ${loop.swaps.total}, sostituto con score ≥ 50` : loopNote(loop.swaps, "nessuna sostituzione")} />
-            <Metric label="Score medio agenzia" value={trend?.current != null ? String(trend.current).replace(".", ",") : "—"}
+            <Metric label="Score medio agenzia" value={num(trend?.current != null ? String(trend.current).replace(".", ",") : "—")}
               note={trend?.delta != null ? `${trend.delta > 0 ? "+" : trend.delta < 0 ? "−" : ""}${String(Math.abs(trend.delta)).replace(".", ",")} punti sul mese prima` : loopNote(trend, "")} />
           </div>
         </section>
