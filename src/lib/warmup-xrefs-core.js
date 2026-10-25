@@ -26,6 +26,12 @@ const FEMALE = /(\bshe\s*\/\s*her\b|\bgirl\b|\bbabe\b|\bwife\b|\bmom\b|\bmilf\b|
 // account di marchi/piattaforme (Fansly, negozi): hanno il link ma non sono creator
 // + agenzie («Mgmt of Digital Content Creators», prima ricerca con l'API ufficiale 25/10)
 const BRAND = /(official\s+(x\s+)?account|subscription-based social media|\bnetwork\b|official twitter of|\bmgmt\b|\bmanagement\b|\bagency\b|\bagencia\b)/i;
+// Pornostar vs creator (25/10, Nicholas: «servono OnlyFancer, non pornostar»: la prima lettura metteva in
+// testa Lily Phillips). Si guarda la bio e, dopo la lettura, quanto sono espliciti i testi dei post.
+const EXPLICIT = /(porn|adult\s*(star|actress|performer|film|industry)|\bxxx\b|manyvids|\bmvsales\b|pornhub|faphouse|\bavn\b|\bxbiz\b|\banal\b|creampie|\bbbc\b|squirt|gangbang|threesome|\bcum\b|\bslut|\bfuck|\bpussy\b|\bdick\b|\bcock\b|deepthroat|\bsluzza\b|\bboy\s*\/\s*girl\b|\bb\/g\b|\bg\/g\b|\bcollabs?\b.*\bdm\b)/i;
+export const isExplicitText = (t) => EXPLICIT.test(String(t || ""));
+/** Esplicita = porno dichiarato in bio, oppure almeno 1 post su 4 con testo esplicito (dopo la lettura). */
+export const looksExplicit = (r) => isExplicitText(`${r?.bio || ""} ${r?.name || ""} ${r?.u || ""}`) || (r?.stats?.n >= 5 && (r.stats.pctExplicit ?? 0) >= 25);
 export const looksBrand = (a) => BRAND.test(a?.bio || "") || /fansly\.com\/explore/i.test(a?.site || "");
 export const looksMale = (a) => MALE.test(`${a?.bio || ""} ${a?.name || ""}`);
 export const looksFemale = (a) => FEMALE.test(`${a?.bio || ""} ${a?.name || ""}`);
@@ -59,10 +65,11 @@ export const X_USER_FIELDS = "description,location,public_metrics,profile_image_
 export const X_TWEET_FIELDS = "created_at,public_metrics,possibly_sensitive,attachments,entities,referenced_tweets,author_id,conversation_id";
 
 export function discoveryQueriesX(niches = []) {
-  const tail = "has:media -is:retweet -is:reply lang:en";
+  // si escludono le parole del porno: si cercano creator che stuzzicano, non pornostar
+  const tail = "has:media -is:retweet -is:reply lang:en -porn -anal -fuck -pussy -cum -xxx -creampie -slut -bbc -manyvids";
   const base = [
     `url:"onlyfans.com" ${tail}`,
-    `("my OF" OR "my onlyfans" OR "full video") (onlyfans OR OF) ${tail}`,
+    `("my OF" OR "my onlyfans" OR "link in bio") (onlyfans OR OF) ${tail}`,
     `url:"fansly.com" ${tail}`,
   ];
   const nic = niches.map((n) => String(n).trim().replace(/["\\]/g, "")).filter(Boolean).slice(0, 8)
@@ -211,6 +218,8 @@ export function analyzePosts(posts, now = Date.now()) {
     pctPhoto: pct((p) => p.media === "foto"),
     pctText: pct((p) => !p.media),
     pctLinkInPost: pct((p) => p.linkInPost),
+    pctSensitive: pct((p) => p.sensitive),
+    pctExplicit: pct((p) => isExplicitText(p.text)),
     medTextLen: median(lens),
     topHoursET: topHours,
     top,

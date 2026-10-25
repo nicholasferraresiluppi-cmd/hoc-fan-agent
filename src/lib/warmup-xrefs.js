@@ -11,7 +11,7 @@
 import { kv } from "@vercel/kv";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { XREF_VERSION, STATUSES, discoveryQueries, slimTweet, candidatesFrom, analyzePosts, patterns, PRICE, isOfCreator, userAsPost,
-  discoveryQueriesX, postsFromXApi, userFromXApi, X_PRICE } from "@/lib/warmup-xrefs-core";
+  discoveryQueriesX, postsFromXApi, userFromXApi, X_PRICE, looksExplicit } from "@/lib/warmup-xrefs-core";
 import { xApiConfigured, searchRecent, usersByUsernames, userTimeline, userFollowing } from "@/lib/x-api";
 
 const KEY = "xref:data";
@@ -63,7 +63,7 @@ function spendGuard(doc) {
 
 export async function getXrefs() {
   const doc = await load();
-  const refs = Object.values(doc.refs);
+  const refs = Object.values(doc.refs).map((r) => ({ ...r, explicit: looksExplicit(r) }));
   const counts = Object.fromEntries(Object.keys(STATUSES).map((k) => [k, refs.filter((r) => r.status === k).length]));
   return { refs, counts, patterns: patterns(refs), log: (doc.log || []).slice(-10).reverse(), configured: Boolean(engine()), engine: engine() };
 }
