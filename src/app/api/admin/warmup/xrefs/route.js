@@ -7,13 +7,14 @@
 // POST {action:"status", key, status}   tieni / scarta / da valutare
 // POST {action:"note", key, note?, niches?}
 // POST {action:"add", handle}           aggiunge a mano una reference già nota (nasce «tenuta»)
+// POST {action:"xcheck"}                prova da ~10 cent dell'API ufficiale di X (chiave, contenuti sensibili)
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 import { currentUser } from "@clerk/nextjs/server";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
-import { getXrefs, discover, discoverNetwork, analyze, setStatus, setNote, addManual } from "@/lib/warmup-xrefs";
+import { getXrefs, discover, discoverNetwork, analyze, setStatus, setNote, addManual, checkXApi } from "@/lib/warmup-xrefs";
 
 const noStore = { headers: { "Cache-Control": "no-store" } };
 
@@ -41,6 +42,7 @@ export async function POST(request) {
     if (b.action === "analyze") return Response.json({ result: await analyze({ keys: Array.isArray(b.keys) ? b.keys.slice(0, 30) : null, by: g.by }) });
     if (b.action === "status") return Response.json({ ref: await setStatus(b.key, b.status, g.by) });
     if (b.action === "note") return Response.json({ ref: await setNote(b.key, b.note, b.niches) });
+    if (b.action === "xcheck") return Response.json({ result: await checkXApi() });
     if (b.action === "add") return Response.json({ ref: await addManual(b.handle, g.by) });
     return Response.json({ error: "Azione sconosciuta" }, { status: 400 });
   } catch (e) {

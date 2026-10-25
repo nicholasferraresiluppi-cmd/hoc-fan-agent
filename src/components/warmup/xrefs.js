@@ -90,7 +90,7 @@ function RefCard({ r, onStatus, onSave, busy }) {
         <div style={{ borderTop: `1px solid ${CP.borderSoft}`, paddingTop: 10 }}>
           {s?.top?.length > 0 && (
             <>
-              <div style={{ fontSize: 13.5, color: CP.textSecondary, marginBottom: 6 }}>I post che hanno girato di più (ultimi 40)</div>
+              <div style={{ fontSize: 13.5, color: CP.textSecondary, marginBottom: 6 }}>I post che hanno girato di più (ultimi {s.src === "x" ? "60, risposte escluse" : "40"})</div>
               {s.top.map((t) => (
                 <a key={t.id} href={`https://x.com/${r.u}/status/${t.id}`} target="_blank" rel="noopener noreferrer" style={{ display: "block", padding: "8px 0", borderTop: `1px solid ${CP.borderSoft}`, textDecoration: "none", color: CP.textPrimary }}>
                   <div style={{ fontSize: 13.5, lineHeight: 1.45 }}>{t.text?.replace(/https?:\/\/\S+/g, "").trim() || <span style={muted}>solo media</span>}</div>
@@ -98,6 +98,16 @@ function RefCard({ r, onStatus, onSave, busy }) {
                 </a>
               ))}
               {s.topHoursET?.length > 0 && <p style={{ ...hint, margin: "8px 0 0" }}>Pubblica soprattutto alle {hoursIt(s.topHoursET)} (ora italiana).</p>}
+            </>
+          )}
+          {s?.replies?.examples?.length > 0 && (
+            <>
+              <div style={{ fontSize: 13.5, color: CP.textSecondary, margin: "12px 0 6px" }}>Come risponde ai commenti · {s.replies.share}% della sua attività sono risposte, di solito {s.replies.medLen} caratteri</div>
+              {s.replies.examples.map((t) => (
+                <a key={t.id} href={`https://x.com/${r.u}/status/${t.id}`} target="_blank" rel="noopener noreferrer" style={{ display: "block", padding: "6px 0", borderTop: `1px solid ${CP.borderSoft}`, textDecoration: "none", color: CP.textPrimary, fontSize: 13.5, lineHeight: 1.45 }}>
+                  «{t.text?.replace(/https?:\/\/\S+/g, "").trim() || "solo media"}» <span style={{ ...hint, fontSize: 12, ...NUM }}>· {fmt(t.likes)} like ↗</span>
+                </a>
+              ))}
             </>
           )}
           <div style={{ marginTop: 10 }}>
@@ -139,16 +149,22 @@ export default function XRefs() {
       <p style={{ fontSize: 14, color: CP.textSecondary, margin: "0 0 14px", maxWidth: 820, lineHeight: 1.55 }}>
         Creator, soprattutto americane, che usano X per portare su OnlyFans: esempi per chi pubblica per le nostre creator. Voi tenete quelle utili e scartate le altre; delle tenute si leggono i post (ritmo, formati, link, orari, post che hanno girato di più). Il modo migliore per trovarne di nuove è <b style={{ fontWeight: 500 }}>«Allarga dalla rete»</b>: le creator si seguono tra loro, quindi chi seguono le vostre tenute sono creator simili.
       </p>
-      {!data.configured && <Notice danger>Apify non è configurato sul server: la ricerca non può partire.</Notice>}
+      {!data.configured && <Notice danger>Né l&apos;API di X né Apify sono configurati sul server: la ricerca non può partire.</Notice>}
+      {data.engine && (
+        <p style={{ ...hint, margin: "0 0 12px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          {data.engine === "x" ? "Fonte: API ufficiale di X — vede la ricerca completa e le risposte; costa di più (scoperta ~2-3 $, lettura ~30 cent a reference)." : "Fonte: Apify (da fuori, ricerca parziale)."}
+          {data.engine === "x" && <button type="button" style={btnSm} disabled={!!busy} onClick={() => run("xcheck", { action: "xcheck" }, (d) => `API di X ok: ${d.result.posts} post letti, ${d.result.sensitive} segnati come sensibili, ${d.result.ofCreators} da creator OnlyFans (${d.result.authors.map((a) => "@" + a).join(", ")}).`)}>{busy === "xcheck" ? "Provo…" : "Prova la chiave (~10 cent)"}</button>}
+        </p>
+      )}
       <div style={{ ...cardBox, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <div style={{ flex: "1 1 260px", fontSize: 14, color: CP.textSecondary }}>Trova creator simili a quelle tenute (o, all&apos;inizio, alle più grandi da valutare) leggendo chi seguono. ~8 centesimi a creator di partenza, fino a 5 per volta.</div>
+        <div style={{ flex: "1 1 260px", fontSize: 14, color: CP.textSecondary }}>Trova creator simili a quelle tenute (o, all&apos;inizio, alle più grandi da valutare) leggendo chi seguono. {data.engine === "x" ? "~1,5 $" : "~8 centesimi"} a creator di partenza, fino a 5 per volta.</div>
         <button type="button" style={btnPrimary} disabled={!!busy} onClick={() => run("network", { action: "network" }, (d) => `Partita da ${d.result.seeds.map((x) => "@" + x).join(", ")}: letti ${d.result.read} seguiti, ${d.result.added} creator nuove da valutare.`)}>
           <Share2 size={15} />{busy === "network" ? "Leggo la rete… (fino a due minuti)" : "Allarga dalla rete"}
         </button>
       </div>
       <div style={{ ...cardBox, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
         <div style={{ flex: "1 1 220px" }}>
-          <Field label="Cerca nei post" hint="Per partire o per una nicchia (es. tattoo, latina, goth, fitness). X nasconde molti contenuti sensibili a chi cerca da fuori: rende meno della rete.">
+          <Field label="Cerca nei post" hint={data.engine === "x" ? "Per partire o per una nicchia (es. tattoo, latina, goth, fitness). Cerca i post dell'ultima settimana con link a OnlyFans/Fansly." : "Per partire o per una nicchia (es. tattoo, latina, goth, fitness). X nasconde molti contenuti sensibili a chi cerca da fuori: rende meno della rete."}>
             <input style={input} value={niche} onChange={(e) => setNiche(e.target.value)} placeholder="nicchia (facoltativa)" />
           </Field>
         </div>

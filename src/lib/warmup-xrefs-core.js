@@ -47,6 +47,65 @@ export function discoveryQueries(niches = [], { since } = {}) {
   return [...base, ...nic];
 }
 
+// --- API ufficiale di X (v2, a consumo: 25/10/2026) ---
+// Stessa forma dei post Apify, così scoperta/lettura/analisi restano una sola logica.
+// Differenze: la ricerca copre solo gli ultimi 7 giorni e non ha min_faves → si ordina per rilevanza
+// e si filtra per url:"onlyfans.com" (il link nel post: segnale più forte di qualsiasi parola).
+export const X_PRICE = { post: 0.005, user: 0.01 };
+export const X_USER_FIELDS = "description,location,public_metrics,profile_image_url,verified,verified_type,url,entities,created_at";
+export const X_TWEET_FIELDS = "created_at,public_metrics,possibly_sensitive,attachments,entities,referenced_tweets,author_id,conversation_id";
+
+export function discoveryQueriesX(niches = []) {
+  const tail = "has:media -is:retweet -is:reply lang:en";
+  const base = [
+    `url:"onlyfans.com" ${tail}`,
+    `("my OF" OR "my onlyfans" OR "full video") (onlyfans OR OF) ${tail}`,
+    `url:"fansly.com" ${tail}`,
+  ];
+  const nic = niches.map((n) => String(n).trim().replace(/["\\]/g, "")).filter(Boolean).slice(0, 8)
+    .map((n) => `"${n}" (onlyfans OR url:"onlyfans.com" OR "my OF") ${tail}`);
+  return [...base, ...nic];
+}
+
+/** Utente v2 → autore nella forma Apify. Il link a OnlyFans può stare nel campo sito o nella bio. */
+export function userFromXApi(u) {
+  if (!u?.username) return null;
+  const siteUrls = (u.entities?.url?.urls || []).map((x) => x.expanded_url).filter(Boolean);
+  const bioUrls = (u.entities?.description?.urls || []).map((x) => x.expanded_url).filter(Boolean);
+  const site = [...siteUrls, ...bioUrls].find((x) => OF_DIRECT.test(x)) || siteUrls[0] || bioUrls[0] || "";
+  const pm = u.public_metrics || {};
+  return {
+    id: u.id, userName: u.username, name: u.name || "", followers: pm.followers_count ?? null, location: u.location || "",
+    isBlueVerified: Boolean(u.verified || u.verified_type === "blue"), description: u.description || "",
+    profilePicture: u.profile_image_url ? u.profile_image_url.replace("_normal", "_200x200") : null, statusesCount: pm.tweet_count ?? null,
+    createdAt: u.created_at || null, entities: { url: { urls: site ? [{ expanded_url: site }] : [] } },
+  };
+}
+
+/** Post v2 (+ includes) → post nella forma Apify, pronto per slimTweet. */
+export function tweetFromXApi(t, { users = {}, media = {}, term = null } = {}) {
+  const pm = t.public_metrics || {};
+  const refs = (t.referenced_tweets || []).map((r) => r.type);
+  const kinds = (t.attachments?.media_keys || []).map((k) => media[k]?.type).filter(Boolean);
+  return {
+    id: t.id, text: t.text || "", createdAt: t.created_at || null, searchTerm: term,
+    viewCount: pm.impression_count ?? null, likeCount: pm.like_count ?? null, replyCount: pm.reply_count ?? null,
+    retweetCount: pm.retweet_count ?? null, bookmarkCount: pm.bookmark_count ?? null,
+    isReply: refs.includes("replied_to"), isRetweet: refs.includes("retweeted"), isQuote: refs.includes("quoted"),
+    sensitive: Boolean(t.possibly_sensitive),
+    mediaKind: kinds.includes("video") || kinds.includes("animated_gif") ? "video" : kinds.length ? "foto" : null,
+    entities: { urls: (t.entities?.urls || []).map((u) => ({ expanded_url: u.expanded_url })) },
+    author: userFromXApi(users[t.author_id]) || {},
+  };
+}
+
+/** Risposta v2 completa (data + includes) → post nella forma Apify. */
+export function postsFromXApi(res, term = null) {
+  const users = Object.fromEntries((res?.includes?.users || []).map((u) => [u.id, u]));
+  const media = Object.fromEntries((res?.includes?.media || []).map((m) => [m.media_key, m]));
+  return (res?.data || []).map((t) => tweetFromXApi(t, { users, media, term }));
+}
+
 /** Mappa compatta di un post dell'attore (anche dalla customMapFunction). */
 export function slimTweet(o) {
   const a = o.author || {};
@@ -60,7 +119,7 @@ export function slimTweet(o) {
     isReply: Boolean(o.isReply), isRetweet: Boolean(o.isRetweet), isQuote: Boolean(o.isQuote), pinned: Boolean(o.isPinned),
     media: kinds.includes("video") || kinds.includes("animated_gif") ? "video" : kinds.length ? "foto" : (o.mediaKind || null),
     linkInPost: urls.some((u) => OF_DIRECT.test(u) || /linktr|beacons|allmylinks|link\.me/i.test(u)),
-    term: o.searchTerm || null,
+    term: o.searchTerm || null, sensitive: Boolean(o.sensitive),
     author: a.userName ? {
       u: a.userName, name: a.name || "", f: num(a.followers), loc: a.location || "", blue: Boolean(a.isBlueVerified),
       site, bio: String(a.description || "").slice(0, 300), pic: a.profilePicture || null, posts: num(a.statusesCount), createdAt: a.createdAt || null,
@@ -132,6 +191,14 @@ export function analyzePosts(posts, now = Date.now()) {
   const top = [...own].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5)
     .map((p) => ({ id: p.id, createdAt: p.createdAt, text: p.text, views: p.views, likes: p.likes, replies: p.replies, media: p.media, linkInPost: p.linkInPost }));
   const lens = own.map((p) => (p.text || "").replace(/https?:\/\/\S+/g, "").trim().length);
+  // come risponde ai commenti (arriva solo dall'API ufficiale, che legge anche le risposte)
+  const reps = posts.filter((p) => p.isReply && !p.isRetweet && (p.text || "").trim());
+  const replies = reps.length ? {
+    n: reps.length,
+    share: Math.round((reps.length / (reps.length + own.length)) * 100),
+    medLen: median(reps.map((p) => (p.text || "").replace(/^(@\w+\s*)+/, "").replace(/https?:\/\/\S+/g, "").trim().length)),
+    examples: [...reps].sort((a, b) => (b.likes || 0) - (a.likes || 0)).slice(0, 4).map((p) => ({ id: p.id, text: (p.text || "").replace(/^(@\w+\s*)+/, "").slice(0, 200), likes: p.likes })),
+  } : null;
   return {
     n: own.length,
     perDay: Math.round((own.length / spanDays) * 10) / 10,
@@ -144,6 +211,7 @@ export function analyzePosts(posts, now = Date.now()) {
     medTextLen: median(lens),
     topHoursET: topHours,
     top,
+    replies,
   };
 }
 
