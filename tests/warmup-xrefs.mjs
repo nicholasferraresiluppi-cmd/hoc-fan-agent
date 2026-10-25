@@ -139,4 +139,12 @@ t("API ufficiale di X: risposta v2 → stessa forma di Apify (link OF nella bio,
   assert.ok(M.discoveryQueriesX(["tattoo"]).every((q) => q.includes("-is:retweet") && q.length < 512));
 });
 
+t("prima ricerca con l'API ufficiale (25/10): uomini e agenzie fuori", () => {
+  for (const bio of ["Essex London straight lad exploring my crazy wild sex life😈", "18+ | Mgmt of Digital Content Creators & Streamers💋DM For R", "str8 guys only", "Top gaybrasil"])
+    assert.equal(M.isOfCreator({ u: "x", bio, site: "https://onlyfans.com/x" }), false, bio);
+  assert.equal(M.isOfCreator({ u: "x", bio: "4’11 latina who’s wild on camera 🤪", site: "https://onlyfans.com/x" }), true);
+  assert.equal(M.isOfCreator({ u: "x", bio: "48 y/o Hotwife, my husband films 🔥 BBC lover", site: "https://onlyfans.com/x" }), true);
+  assert.equal(M.isOfCreator({ u: "x", bio: "ꨄ 5’3 petite libra 🌿 sweet and spicy", site: "https://onlyfans.com/x" }), true);
+});
+
 console.log(`warmup-xrefs: ${n} gruppi di asserzioni ok`);

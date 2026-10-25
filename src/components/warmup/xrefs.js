@@ -139,7 +139,7 @@ export default function XRefs() {
   };
   const refs = data?.refs || [];
   const niches = useMemo(() => [...new Set(refs.flatMap((r) => r.niches || []))].sort(), [refs]);
-  const shown = refs.filter((r) => r.status === status && (!nicheF || (r.niches || []).includes(nicheF)) && (onlyF === "0" || r.female))
+  const shown = refs.filter((r) => r.status === status && (!nicheF || (r.niches || []).includes(nicheF)) && (onlyF === "0" || (onlyF === "1" ? r.female : onlyF === "us" ? r.us : r.us && r.female)))
     .sort((a, b) => (b.female ? 1 : 0) - (a.female ? 1 : 0) || (sort === "views" ? (b.stats?.medViews || 0) - (a.stats?.medViews || 0) : sort === "new" ? (b.addedAt || 0) - (a.addedAt || 0) : (b.f || 0) - (a.f || 0)));
   if (error) return <Notice danger>{error.message}</Notice>;
   if (!data) return <p style={hint}>Carico…</p>;
@@ -190,7 +190,7 @@ export default function XRefs() {
         </select>
         {status === "tenuta" && <button type="button" style={btnSm} disabled={!!busy} onClick={() => run("analyze", { action: "analyze" }, (d) => (d.result.read ? `Letti i post di ${d.result.read} reference.` : "Le tenute sono già aggiornate (si rileggono ogni 7 giorni)."))}><RefreshCw size={13} />{busy === "analyze" ? "Leggo… (fino a due minuti)" : "Leggi i post"}</button>}
       </div>
-      <div style={{ marginBottom: 12 }}><Seg items={[["0", "Tutte"], ["1", "Solo chi si dichiara donna"]]} value={onlyF} onChange={setOnlyF} /></div>
+      <div style={{ marginBottom: 12 }}><Seg items={[["0", "Tutte"], ["1", "Solo chi si dichiara donna"], ["us", "Solo USA"], ["usf", "USA e donna"]]} value={onlyF} onChange={setOnlyF} /></div>
       {niches.length > 0 && <div style={{ marginBottom: 12 }}><Seg items={[["", "Tutte le nicchie"], ...niches.map((n) => [n, n])]} value={nicheF} onChange={setNicheF} /></div>}
       {!shown.length ? (
         <div style={{ ...cardBox, textAlign: "center", padding: "26px 18px" }}>
