@@ -48,7 +48,8 @@ async function summarize(c) {
       latMin: t.lat_med_s != null ? t.lat_med_s / 60 : null,
       welcomePending: t.welcome_pending ?? null,
       revenueToday: t.revenue ?? null,
-      top: q.slice(0, 3).map((x) => ({ user_id: x.user_id, username: x.username, reason: x.reason, tier: x.tier, wait_min: x.wait_min, last_fan_at: x.last_fan_at })),
+      // 8: la scheda ne mostra 3, la scheda aperta (stile vetro) tutti
+      top: q.slice(0, 8).map((x) => ({ user_id: x.user_id, username: x.username, reason: x.reason, tier: x.tier, wait_min: x.wait_min, last_fan_at: x.last_fan_at })),
       shift: shifts ? shiftStatus(shifts.byCountry?.[cc], now) : null,
     };
   });

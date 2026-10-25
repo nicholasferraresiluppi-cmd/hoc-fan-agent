@@ -5,13 +5,15 @@
 // Qui tutte insieme, la più da guardare in cima: la corsa del mese, chi è di turno, i fan in
 // attesa con i primi a cui scrivere. Dati: /api/admin/live-overview (stesse cache di Revenue e Chat).
 
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import useSWR from "swr";
-import { UserCheck, UserX, Clock, ExternalLink, ArrowRight, Flag } from "lucide-react";
+import { UserCheck, UserX, Clock, ExternalLink, ArrowRight, Flag, Maximize2, X } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { Notice } from "@/components/ds";
 import { liveFetcher } from "@/components/LiveCreatorPicker";
 import { COUNTRY_NAMES } from "@/lib/live-creators";
-import VetroScope, { useVetro, VetroSwitch, VetroNum } from "@/components/VetroScope";
+import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
 
 const NUM = { fontVariantNumeric: "tabular-nums" };
 const group = (n) => String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -34,6 +36,10 @@ export default function LeMieCreatorPage() {
   const list = [...(data?.creators || [])].sort((a, b) => b.light.level - a.light.level);
   const toWatch = list.filter((c) => c.light.level === 2).length;
   const [vetro, setVetro] = useVetro();
+  // scheda aperta (solo stile vetro): quale creator e da quale scheda parte l'animazione
+  const [open, setOpen] = useState(null);
+  const cardEls = useRef({});
+  const openC = open && list.find((c) => c.slug === open);
 
   return (
     <VetroScope on={vetro}>
@@ -61,14 +67,17 @@ export default function LeMieCreatorPage() {
       {data && !list.length && <Notice>Non hai creator assegnate in questo strumento.</Notice>}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
-        {list.map((c, i) => <CreatorCard key={c.slug} c={c} i={i} />)}
+        {list.map((c, i) => <CreatorCard key={c.slug} c={c} i={i} hidden={open === c.slug}
+          cardRef={(el) => { cardEls.current[c.slug] = el; }} onOpen={() => setOpen(c.slug)} />)}
       </div>
+      {openC && <CreatorDetail c={openC} originEl={cardEls.current[openC.slug]} onClose={() => setOpen(null)} />}
     </div>
     </VetroScope>
   );
 }
 
-function CreatorCard({ c, i = 0 }) {
+function CreatorCard({ c, i = 0, hidden, cardRef, onOpen }) {
+  const inVetro = useInVetro();
   const L = LEVEL[c.light.level];
   const r = c.revenue;
   const multi = c.countries.length > 1;
@@ -78,7 +87,10 @@ function CreatorCard({ c, i = 0 }) {
   const q = `?creator=${encodeURIComponent(c.slug)}`;
 
   return (
-    <section className="vt-glass" data-lvl={c.light.level} style={{ "--vt-i": Math.min(i, 8), minWidth: 0, background: alpha(L.color, "0b"), border: `1px solid ${alpha(L.color, c.light.level ? "55" : "2e")}`, borderRadius: 22, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+    <section ref={cardRef} className="vt-glass" data-lvl={c.light.level}
+      // nello stile vetro un tocco sulla scheda (non su link e pulsanti) la apre dov'è
+      onClick={inVetro ? (e) => { if (!e.target.closest("a,button")) onOpen?.(); } : undefined}
+      style={{ "--vt-i": Math.min(i, 8), visibility: hidden ? "hidden" : undefined, cursor: inVetro ? "pointer" : undefined, minWidth: 0, background: alpha(L.color, "0b"), border: `1px solid ${alpha(L.color, c.light.level ? "55" : "2e")}`, borderRadius: 22, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
       <div className="vt-head" style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ width: 44, height: 44, borderRadius: "50%", background: CP.accent, color: CP.accentInk, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 15, flexShrink: 0 }}>{initials(c.name)}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -86,6 +98,12 @@ function CreatorCard({ c, i = 0 }) {
           <div style={{ fontSize: 12.5, color: CP.textMuted }}>{c.countries.map((x) => COUNTRY_NAMES[x.country] || x.country).join(" + ")}</div>
         </div>
         <span className="vt-pill" style={{ fontSize: 12, fontWeight: 600, color: L.color, background: CP.surface, border: `1px solid ${alpha(L.color, "44")}`, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>{L.word}</span>
+        {inVetro && (
+          <button type="button" onClick={onOpen} aria-label={`Apri la scheda di ${c.name}`}
+            style={{ width: 32, height: 32, borderRadius: "50%", border: 0, background: "rgba(255,255,255,.85)", color: "#1d1510", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+            <Maximize2 size={14} />
+          </button>
+        )}
       </div>
 
       {c.light.reasons.length > 0 && (
@@ -184,5 +202,134 @@ function Btn({ href, strong, children }) {
       background: strong ? CP.accent : CP.surface, color: strong ? CP.accentInk : CP.textPrimary, border: `1px solid ${strong ? CP.accent : CP.border}` }}>
       {children} <ArrowRight size={14} />
     </a>
+  );
+}
+
+// Scheda aperta (stile vetro, 26/10/2026, dal reel «rapport»): parte dalla posizione della scheda
+// e si allarga al centro (FLIP: misura, trasforma, rilascia), dietro la pagina si sfoca; chiudendo
+// torna al suo posto. Dentro: tutto quello che l'API dà già (oggi, latenza, benvenuti, fino a 8 fan).
+const TONE_HEAD = ["#14714a", "#e9c46a", "#b23a3a"];
+function CreatorDetail({ c, originEl, onClose }) {
+  const panel = useRef(null);
+  const closeBtn = useRef(null);
+  const [phase, setPhase] = useState("from"); // from → open → closing
+  const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const L = LEVEL[c.light.level];
+  const r = c.revenue;
+  const q = `?creator=${encodeURIComponent(c.slug)}`;
+  const fans = c.countries.flatMap((x) => x.top.map((t) => ({ ...t, country: x.country }))).sort((a, b) => a.tier - b.tier || b.wait_min - a.wait_min);
+  const multi = c.countries.length > 1;
+
+  // trasformazione che porta il pannello (già al centro) sopra la scheda d'origine
+  const fromTransform = () => {
+    const a = originEl?.getBoundingClientRect();
+    const b = panel.current?.getBoundingClientRect();
+    if (!a || !b || !b.width) return "none";
+    return `translate(${a.left - b.left}px, ${a.top - b.top}px) scale(${a.width / b.width}, ${a.height / b.height})`;
+  };
+  useLayoutEffect(() => {
+    const el = panel.current;
+    if (!el || reduce) { setPhase("open"); return; }
+    el.style.transition = "none";
+    el.style.transform = fromTransform();
+    el.getBoundingClientRect(); // applica la posizione di partenza prima di animare
+    requestAnimationFrame(() => {
+      el.style.transition = "transform .42s cubic-bezier(.2,.8,.2,1), border-radius .42s";
+      el.style.transform = "none";
+      setPhase("open");
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const close = () => {
+    const el = panel.current;
+    if (!el || reduce || phase === "closing") { onClose(); return; }
+    setPhase("closing");
+    el.style.transition = "transform .34s cubic-bezier(.4,0,.2,1)";
+    el.style.transform = fromTransform();
+    setTimeout(onClose, 330);
+  };
+  useEffect(() => {
+    closeBtn.current?.focus({ preventScroll: true });
+    const onKey = (e) => { if (e.key === "Escape") close(); };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; originEl?.querySelector("button")?.focus?.({ preventScroll: true }); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const shown = phase === "open";
+  const head = TONE_HEAD[c.light.level];
+  const headInk = c.light.level === 1 ? "#1d1510" : "#ffffff";
+  return createPortal(
+    <div className="hoc-vetro-pop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) close(); }}
+      style={{ position: "fixed", inset: 0, zIndex: 80, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom))", overflowY: "auto",
+        background: shown ? "rgba(40,24,14,.28)" : "rgba(40,24,14,0)", backdropFilter: shown ? "blur(10px)" : "blur(0px)", WebkitBackdropFilter: shown ? "blur(10px)" : "blur(0px)", transition: "background .35s, backdrop-filter .35s" }}>
+      <div ref={panel} role="dialog" aria-modal="true" aria-label={c.name}
+        style={{ width: "min(720px, 100%)", marginTop: "6vh", transformOrigin: "0 0", borderRadius: 28, overflow: "hidden", background: "#fbf6ef", boxShadow: "0 30px 80px rgba(40,24,14,.35)", fontFamily: FONTS.body }}>
+        <div style={{ opacity: shown ? 1 : 0, transition: shown ? "opacity .25s .12s" : "opacity .12s" }}>
+          <div style={{ background: head, color: headInk, padding: "20px 22px 18px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#1d1510", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16, flexShrink: 0 }}>{initials(c.name)}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 22, fontWeight: 600 }}>{c.name}</div>
+                <div style={{ fontSize: 13, opacity: 0.8 }}>{c.countries.map((x) => COUNTRY_NAMES[x.country] || x.country).join(" + ")}{r?.day ? ` · giorno ${r.day} di ${r.days}` : ""}</div>
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 600, color: L.color, background: "rgba(255,255,255,.92)", borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>{L.word}</span>
+              <button ref={closeBtn} type="button" onClick={close} aria-label="Chiudi"
+                style={{ width: 40, height: 40, borderRadius: "50%", border: 0, background: "rgba(255,255,255,.25)", color: headInk, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}><X size={18} /></button>
+            </div>
+            {r && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.02em", ...NUM }}><VetroNum value={usd(r.mtd)} /></div>
+                <div style={{ fontSize: 13, opacity: 0.85, ...NUM }}>finora · arrivo previsto {usd(r.proj)}{r.goal ? ` · traguardo ${usd(r.goal)}${r.goalSuggested ? " (suggerito)" : ""}` : ""}{r.shouldBe ? ` · oggi dovrebbe essere a ${usd(r.shouldBe)}` : ""}</div>
+              </div>
+            )}
+          </div>
+          <div style={{ padding: "18px 22px 22px", display: "grid", gap: 16 }}>
+            {c.light.reasons.length > 0 && (
+              <div style={{ display: "grid", gap: 6 }}>
+                {c.light.reasons.map((x, i) => (
+                  <div key={i} style={{ fontSize: 14, display: "flex", gap: 8, alignItems: "baseline" }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: LEVEL[x.level].color, flexShrink: 0 }} />{x.text}</div>
+                ))}
+              </div>
+            )}
+            {r && <MiniRace r={r} />}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
+              {c.countries.map((x) => (
+                <div key={x.country} style={{ background: "#fff", borderRadius: 16, padding: "12px 14px", display: "grid", gap: 6, fontSize: 13 }}>
+                  {multi && <div style={{ fontSize: 12, fontWeight: 600, color: CP.textMuted }}>{COUNTRY_NAMES[x.country] || x.country}</div>}
+                  <ShiftLine s={x.shift} />
+                  {x.revenueToday != null && <div>Incassato oggi <b style={NUM}>{usd(x.revenueToday)}</b></div>}
+                  {x.latMin != null && <div>Latenza di oggi <b style={NUM}>{Math.round(x.latMin)} min</b></div>}
+                  <div>Fan in attesa <b style={NUM}>{x.waiting}</b>{x.waitingOld ? <span style={{ color: CP.textMuted }}> · {x.waitingOld} da più di 2 ore</span> : null}</div>
+                  {x.welcomePending != null && <div>Benvenuti da mandare <b style={NUM}>{x.welcomePending}</b></div>}
+                </div>
+              ))}
+            </div>
+            <div>
+              <div style={{ fontSize: 11.5, color: CP.textMuted, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 8 }}>A chi scrivere, in ordine</div>
+              {fans.length ? (
+                <div style={{ display: "grid", gap: 8 }}>
+                  {fans.map((t) => (
+                    <a key={`${t.country}-${t.user_id}`} href={`https://onlyfans.com/my/chats/chat/${t.user_id}`} target="_blank" rel="noreferrer"
+                      style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: CP.textPrimary, fontSize: 14, minHeight: 32 }}>
+                      <span style={{ width: 4, alignSelf: "stretch", borderRadius: 3, background: TIER_COLOR[t.tier] }} />
+                      <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}><b style={{ fontWeight: 600 }}>{t.username || `u${t.user_id}`}</b> <span style={{ color: CP.textSecondary }}>{t.reason}</span>{multi ? <span style={{ color: CP.textMuted }}> · {t.country}</span> : null}</span>
+                      <span style={{ color: waitColor(t.wait_min), fontWeight: 600, whiteSpace: "nowrap", ...NUM }}>{waitText(t.wait_min)}</span>
+                      <ExternalLink size={13} color={CP.textMuted} />
+                    </a>
+                  ))}
+                </div>
+              ) : <div style={{ fontSize: 14, color: CP.textSecondary }}>Nessuno in attesa. Ottimo.</div>}
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Btn href={`/admin/chat-monitor${q}`} strong>Apri la chat</Btn>
+              <Btn href={`/admin/revenue-pacing${q}`}>La corsa del mese</Btn>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }

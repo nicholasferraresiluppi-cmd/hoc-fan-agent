@@ -53,6 +53,8 @@ export function useVetroSolid() {
 }
 
 const VetroCtx = createContext(false);
+/** true dentro il vetro acceso: per le cose che esistono solo nella prova (es. la scheda che si apre). */
+export const useInVetro = () => useContext(VetroCtx);
 
 // "$248.300", "1.210", "62%", "$1.234,50" → prefisso, numero, decimali, suffisso. Altro (—, testo) = com'è.
 const NUM_RE = /^(\D*?)(\d{1,3}(?:\.\d{3})+|\d+)(,\d+)?(\D*)$/;
@@ -121,6 +123,8 @@ ${SEL}{${GLASS};border-radius:22px !important}
 .hoc-vetro .ds-open{--vt-i:2}.hoc-vetro .hub-tool{--vt-i:4}
 @media (prefers-reduced-motion: reduce){.hoc-vetro .vt-glass,.hoc-vetro .ds-hero,.hoc-vetro .ds-open,.hoc-vetro .hub-tool{animation:none}}
 @media (max-width:699px){:root .hoc-vetro .vt-glass,:root .hoc-vetro .ds-hero,:root .hoc-vetro .ds-open{backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}}
+/* finestre aperte sopra la pagina (portal su body: fuori dal contenitore, stesse variabili) */
+.hoc-vetro-pop{${vars}color-scheme:light;color:var(--cp-textPrimary)}
 .hoc-vetro[data-solid]{--cp-surface:rgba(251,246,239,.95);--cp-surfaceAlt:#fffaf3;--cp-border:rgba(60,35,15,.12)}
 ${SEL.split(",").map((x) => x.replace(".hoc-vetro", ".hoc-vetro[data-solid]")).join(",")}{backdrop-filter:none !important;-webkit-backdrop-filter:none !important}
 `;
