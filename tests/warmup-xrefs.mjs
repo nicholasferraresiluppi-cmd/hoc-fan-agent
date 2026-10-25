@@ -100,4 +100,43 @@ t("uomini della prima rete (24/10) fuori", () => {
   assert.equal(M.looksMale({ bio: "4’11 latina who’s wild on camera 🤪" }), false);
 });
 
+t("API ufficiale di X: risposta v2 → stessa forma di Apify (link OF nella bio, media, sensibili, risposte)", () => {
+  const res = {
+    data: [
+      { id: "10", author_id: "1", text: "new set is up 🔥 https://t.co/x", created_at: "2026-10-24T15:00:00.000Z", possibly_sensitive: true,
+        public_metrics: { impression_count: 52000, like_count: 900, reply_count: 40, retweet_count: 30, bookmark_count: 70 },
+        attachments: { media_keys: ["m1"] }, entities: { urls: [{ expanded_url: "https://onlyfans.com/lexi" }] } },
+      { id: "11", author_id: "1", text: "@fan1 @fan2 thank you babe 💋", created_at: "2026-10-24T16:00:00.000Z",
+        public_metrics: { impression_count: 800, like_count: 25 }, referenced_tweets: [{ type: "replied_to", id: "9" }] },
+      { id: "12", author_id: "2", text: "big news of the day", created_at: "2026-10-24T16:00:00.000Z", public_metrics: { impression_count: 9 } },
+    ],
+    includes: {
+      users: [
+        { id: "1", username: "LexiUS", name: "Lexi", location: "Miami, FL", verified: true, description: "your favorite girl 💋 https://t.co/a",
+          public_metrics: { followers_count: 120000, tweet_count: 5000 }, profile_image_url: "https://pbs.twimg.com/a_normal.jpg",
+          entities: { url: { urls: [{ expanded_url: "https://linktr.ee/lexi" }] }, description: { urls: [{ expanded_url: "https://onlyfans.com/lexi" }] } } },
+        { id: "2", username: "Journo", name: "J", description: "reporter", public_metrics: { followers_count: 90000 } },
+      ],
+      media: [{ media_key: "m1", type: "video" }],
+    },
+  };
+  const posts = M.postsFromXApi(res, "q").map(M.slimTweet);
+  assert.equal(posts.length, 3);
+  const p0 = posts[0];
+  assert.equal(p0.views, 52000); assert.equal(p0.media, "video"); assert.equal(p0.sensitive, true); assert.equal(p0.linkInPost, true);
+  assert.equal(p0.author.site, "https://onlyfans.com/lexi"); // il link OF in bio vince sull'aggregatore
+  assert.equal(p0.author.f, 120000); assert.equal(p0.author.blue, true);
+  assert.ok(p0.author.pic.endsWith("a_200x200.jpg"));
+  assert.equal(posts[1].isReply, true);
+  const { added } = M.candidatesFrom(posts, {});
+  assert.deepEqual(added.map((a) => a.u), ["LexiUS"]); // il giornalista no
+  assert.equal(added[0].us, true); assert.equal(added[0].female, true);
+  const st = M.analyzePosts(posts.filter((p) => p.author.u === "LexiUS"), Date.parse("2026-10-25T00:00:00Z"));
+  assert.equal(st.n, 1);
+  assert.equal(st.replies.n, 1); assert.equal(st.replies.share, 50);
+  assert.equal(st.replies.examples[0].text, "thank you babe 💋"); // senza le @menzioni iniziali
+  assert.equal(M.postsFromXApi({}).length, 0); // risposta vuota (nessun risultato)
+  assert.ok(M.discoveryQueriesX(["tattoo"]).every((q) => q.includes("-is:retweet") && q.length < 512));
+});
+
 console.log(`warmup-xrefs: ${n} gruppi di asserzioni ok`);
