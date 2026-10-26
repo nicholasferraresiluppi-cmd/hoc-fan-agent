@@ -28,6 +28,7 @@ import {
   clearFlag, endCooldown,
 } from "@/lib/warmup-plan";
 import { prefillFor, publicAlerts, normalizeOfLink } from "@/lib/warmup-metrics-core";
+import { pubKindOfTask, itemForTask } from "@/lib/editoriale-core";
 
 const API = "/api/admin/warmup";
 const fetcher = (url) =>
@@ -660,7 +661,69 @@ export default function WarmupPage() {
       if (!on || run) timerEl = <TimerChip item={item} running={run} left={timerLeft(timer)} doneMin={mins} onStart={() => startTimer(a, item)} onPause={() => (item.timer.mode === "accum" ? stopTimer() : setTimer(null))} />;
       else if (mins > 0) timerEl = <div style={{ ...hint, marginTop: 4 }}>{mins} min col timer</div>;
     }
-    return <TaskRow key={k} item={item} done={on} open={openWhy[k]} onToggle={() => toggleTask(a, item.id, day)} onWhy={() => setOpenWhy((o) => ({ ...o, [k]: !o[k] }))} timer={timerEl} />;
+    const edEl = edLine(a, item.id, day, on);
+    return <TaskRow key={k} item={item} done={on} open={openWhy[k]} onToggle={() => toggleTask(a, item.id, day)} onWhy={() => setOpenWhy((o) => ({ ...o, [k]: !o[k] }))} timer={edEl ? <>{timerEl}{edEl}</> : timerEl} />;
+  }
+  // Editoriale: sotto «Pubblica il carosello / il reel» il contenuto in calendario quel giorno
+  function edLine(a, taskId, day, done) {
+    const kind = pubKindOfTask(taskId);
+    if (!kind || isX(a) || !a.creator) return null;
+    const list = (a.ed?.[day] || []).map((x) => ({ ...x, slot: { profileId: a.id, date: day, time: x.time } }));
+    const it = itemForTask(list, a.id, day, taskId);
+    const href = `/admin/editoriale`;
+    if (!it) {
+      if (done) return null;
+      return <div style={{ ...hint, marginTop: 5 }}>Niente in calendario per oggi · <a href={href} style={{ color: CP.accentSoftText }}>preparalo nell'Editoriale</a></div>;
+    }
+    const thumb = it.cover ? `/api/admin/editoriale?creator=${encodeURIComponent(a.creator)}&thumb=${encodeURIComponent(it.cover)}` : null;
+    return (
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 7, padding: 8, borderRadius: 10, border: `1px solid ${CP.borderSoft}`, background: CP.bgSunken, maxWidth: 520 }}>
+        {thumb && <img src={thumb} alt="" loading="lazy" style={{ width: 44, height: 44, borderRadius: 7, objectFit: "cover", flex: "0 0 auto", background: CP.surfaceAlt }} />}
+        <div style={{ flex: 1, minWidth: 0, fontSize: 13 }}>
+          <div style={{ color: CP.textPrimary }}>{kind === "carosello" ? "Carosello" : "Reel"} «{it.title}»{it.time ? ` · ${it.time}` : ""}{it.status === "pubblicato" ? " · pubblicato" : ""}</div>
+          <div style={{ ...hint, marginTop: 2 }}>{kind === "carosello" ? `${it.files} foto` : "video montato"}{it.sound ? ` · sound: ${it.sound}` : ""}{it.city ? ` · ${it.city}` : ""}</div>
+          {it.caption && <div style={{ fontSize: 12.5, color: CP.textSecondary, marginTop: 4, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{it.caption}</div>}
+          <div style={{ display: "flex", gap: 10, marginTop: 5, flexWrap: "wrap" }}>
+            {it.caption && <button type="button" onClick={() => { try { navigator.clipboard.writeText(it.caption); toast("Didascalia copiata"); } catch {} }} style={{ ...btnSm, minHeight: 26, padding: "2px 8px", fontSize: 12 }}>Copia didascalia</button>}
+            <a href={href} style={{ fontSize: 12.5, color: CP.accentSoftText, alignSelf: "center" }}>Apri nell'Editoriale</a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  // contenuti in calendario oggi che nessuna task del giorno copre (es. caroselli dopo il warm-up,
+  // quando il piano li chiede a settimana): si vedono e si segnano pubblicati da qui
+  function edExtra(a, day, items) {
+    if (isX(a) || !a.creator || !a.ed?.[day]?.length) return null;
+    const list = a.ed[day].map((x) => ({ ...x, slot: { profileId: a.id, date: day, time: x.time } }));
+    const covered = new Set();
+    for (const i of items) { if (!pubKindOfTask(i.id)) continue; const it = itemForTask(list, a.id, day, i.id); if (it) covered.add(it.id); }
+    const rest = list.filter((x) => !covered.has(x.id)).sort((x, y) => String(x.time || "99").localeCompare(String(y.time || "99")));
+    if (!rest.length) return null;
+    const publish = async (it, on) => {
+      try {
+        const r = await fetch("/api/admin/editoriale", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "publish", creator: a.creator, id: it.id, on, today: day }) });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || "Non riuscito");
+        toast(on ? "Segnato pubblicato nell'Editoriale" : "Riaperto");
+      } catch (e) { toast(e.message); } finally { mutate(); }
+    };
+    return (
+      <div style={{ padding: "10px 14px", borderTop: `1px solid ${CP.borderSoft}` }}>
+        <div style={{ ...hint, marginBottom: 6 }}>Anche in calendario oggi, dall'Editoriale</div>
+        {rest.map((it) => {
+          const pub = it.status === "pubblicato";
+          return (
+            <div key={it.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "4px 0", flexWrap: "wrap" }}>
+              {it.cover && <img src={`/api/admin/editoriale?creator=${encodeURIComponent(a.creator)}&thumb=${encodeURIComponent(it.cover)}`} alt="" loading="lazy" style={{ width: 34, height: 34, borderRadius: 6, objectFit: "cover", background: CP.surfaceAlt }} />}
+              <span style={{ flex: 1, minWidth: 140, fontSize: 13.5, textDecoration: pub ? "line-through" : "none", color: pub ? CP.textMuted : CP.textPrimary }}>{it.type === "carosello" ? "Carosello" : "Reel"} «{it.title}»{it.time ? ` · ${it.time}` : ""}</span>
+              {it.caption && !pub && <button type="button" onClick={() => { try { navigator.clipboard.writeText(it.caption); toast("Didascalia copiata"); } catch {} }} style={{ ...btnSm, minHeight: 26, padding: "2px 8px", fontSize: 12 }}>Copia didascalia</button>}
+              <button type="button" onClick={() => publish(it, !pub)} style={{ ...btnSm, minHeight: 26, padding: "2px 8px", fontSize: 12 }}>{pub ? "Riapri" : "Pubblicato"}</button>
+            </div>
+          );
+        })}
+      </div>
+    );
   }
   function stepRow(key, step, on, onToggle) {
     return <TaskRow key={key} item={{ t: step.t, why: step.w }} done={on} open={openWhy[key]} onToggle={onToggle} onWhy={() => setOpenWhy((o) => ({ ...o, [key]: !o[key] }))} />;
@@ -744,6 +807,7 @@ export default function WarmupPage() {
                   <Ring n={t.n} total={t.req.length} />
                 </button>
                 {t.open.map((i) => taskRow(a, i, t.done, tk))}
+                {edExtra(a, tk, t.items)}
               </TaskList>
             ))}
           </div>
@@ -924,7 +988,7 @@ export default function WarmupPage() {
               <div style={{ ...hint, marginTop: 7, ...NUM }}>{p.n} di {p.total} task di oggi</div>
             </div>
             {plan.groups.map((g) => (
-              <div key={g.t}><GroupLabel>{g.t}</GroupLabel><TaskList>{g.items.map((i) => taskRow(a, i, done, key))}</TaskList></div>
+              <div key={g.t}><GroupLabel>{g.t}</GroupLabel><TaskList>{g.items.map((i) => taskRow(a, i, done, key))}{g.t === "Pubblicazione" && edExtra(a, key, visibleItems(a, plan))}</TaskList></div>
             ))}
             {plan.gates.map((gt) => {
               const ok = gt.need.every((n) => a.milestones[n]);

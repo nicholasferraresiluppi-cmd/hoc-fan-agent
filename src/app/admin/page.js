@@ -24,7 +24,7 @@ import {
   BookMarked,
   LineChart,
   FileSignature,
-  Landmark, Repeat, Gift } from "lucide-react";
+  Landmark, Repeat, Gift, CalendarDays } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
 import { WORKSPACES, workspaceSections } from "@/lib/workspaces";
@@ -128,6 +128,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/admin/studio-social", title: "Studio social", desc: "I profili social delle creator gestiti dalla redazione: identità, coda dei contenuti con i revisori, cosa fare oggi a mano", icon: Clapperboard },
       { href: "/admin/supervisor", title: "Account social", desc: "Account di promozione per creator e alterego, telefoni dei publisher, caselle mail e link in bio; password cifrate, viste una alla volta e registrate", icon: Share2 },
       { href: "/admin/warmup", title: "Warm-up", desc: "Il piano del giorno dei profili Instagram e X in riscaldamento: task, segnalazioni, cooldown post-unban e numeri della settimana", icon: Sunrise },
+      { href: "/admin/editoriale", title: "Editoriale Instagram", desc: "Dal drive della creator al calendario del profilo: foto in caroselli, video in reel da montare, niente doppioni; il Warm-up mostra cosa pubblicare oggi", icon: CalendarDays },
       { href: "/admin/social-proxies", title: "Proxy account social", desc: "Proxy SOCKS5/HTTP per isolare le connessioni degli account social ufficiali dei creator", icon: Shield },
     ],
   },
