@@ -124,7 +124,7 @@ const Key = ({ swatch, children }) => <span style={{ display: "inline-flex", ali
 export function Donut({ items = [], center, centerSub, size = 156, format = usd, limit = 5 }) {
   const top = items.slice(0, limit);
   const rest = items.slice(limit).reduce((a, x) => a + (Number(x.value) || 0), 0);
-  const all = [...top.map((x, i) => ({ ...x, color: SERIES[i] || OTHER })), ...(rest > 0 ? [{ label: `Altre ${items.length - limit}`, value: rest, color: OTHER }] : [])];
+  const all = [...top.map((x, i) => ({ ...x, color: x.color || SERIES[i] || OTHER })), ...(rest > 0 ? [{ label: `Altre ${items.length - limit}`, value: rest, color: OTHER }] : [])];
   const tot = all.reduce((a, x) => a + (Number(x.value) || 0), 0);
   const r = size / 2 - 12, C = 2 * Math.PI * r, gap = all.length > 1 ? 3 : 0;
   let off = 0;
