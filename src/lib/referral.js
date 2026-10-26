@@ -22,7 +22,7 @@ import { randomBytes } from "node:crypto";
 import {
   REFERRAL_RULES, validateReferrer, validateRecruit, validateStory, findDuplicateRecruit,
   recruitMilestones, storyMilestone, recruitSteps, summarize, referrerView,
-  salesMapFromKpiRows, salesFor, monthsSince, normEmail, normName, shiftDatesFromWages, parseFx, addMonths,
+  salesMapFromKpiRows, salesFor, monthsSince, normEmail, normName, shiftDatesFromWages, parseFx, addMonths, recruitMetrics, buildDashboard,
 } from "@/lib/referral-core";
 
 const K = {
@@ -185,7 +185,7 @@ export async function loadState({ now = Date.now() } = {}) {
   const [sales, shifts] = await Promise.all([salesForRecruits(recruits, { now }), shiftsForRecruits(recruits, { now })]);
   const recruitRows = recruits.map((r) => {
     const milestones = recruitMilestones(r, { today, salesByMonth: sales[r.id] || {}, shiftDates: shifts[r.id], fx, paid });
-    return { ...r, milestones, steps: recruitSteps(r, milestones, { today }), totals: summarize(milestones) };
+    return { ...r, milestones, steps: recruitSteps(r, milestones, { today }), totals: summarize(milestones), metrics: recruitMetrics(r, { salesByMonth: sales[r.id] || {}, shiftDates: shifts[r.id] }) };
   });
   const storyRows = stories.map((st) => ({ ...st, milestone: storyMilestone(st, { today, paid }) }));
   const referrerRows = referrers.map((ref) => {
@@ -200,7 +200,8 @@ export async function loadState({ now = Date.now() } = {}) {
   for (const s of storyRows) if (s.milestone.status === "maturato") toPay.push({ ...s.milestone, referrerId: s.referrerId });
   // mesi delle provvigioni già calcolabili: l'HR ci mette il cambio
   const fxMonths = [...new Set(recruitRows.flatMap((r) => r.milestones.filter((m) => m.kind === "commission" && m.amountUsd != null && (m.status === "maturato" || m.fxMissing === false && m.status === "pagato")).map((m) => m.month)))].sort();
-  return { rules: REFERRAL_RULES, today, fx, fxMonths, referrers: referrerRows, recruits: recruitRows, stories: storyRows, toPay };
+  const dashboard = buildDashboard({ referrers, recruits: recruitRows, stories: storyRows, fx, today });
+  return { rules: REFERRAL_RULES, today, fx, fxMonths, referrers: referrerRows, recruits: recruitRows, stories: storyRows, toPay, dashboard };
 }
 
 /** Suggerimenti dal CRM persone: chi ha scritto «Me l'ha consigliato qualcuno» e non è ancora nel programma. */

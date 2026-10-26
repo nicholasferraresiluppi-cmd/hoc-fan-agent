@@ -6,7 +6,7 @@ import { Plus, Send } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, HeroMetric, Metric, FilterChip, DataTable, Notice, SectionTitle, Disclosure } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
-import { MilestoneRow, Steps, RulesList, StatusPill, fmtEur, fmtDay, monthLabel, box, pageWrap, NUM } from "@/components/referral-ui";
+import { MilestoneRow, Steps, RulesList, StatusPill, fmtEur, fmtUsd, fmtDay, monthLabel, box, pageWrap, NUM } from "@/components/referral-ui";
 
 /**
  * /admin/referral — «Porta un collega», lato HR (permesso referral.manage).
@@ -139,7 +139,7 @@ function RecruitModal({ initial, data, onClose, onDone }) {
             <option value="">Non ancora</option><option value="true">Sì</option><option value="false">No</option>
           </select>
         </Field>
-        <Field label="Primo turno in chat" hint="Sblocca il premio del primo turno e fa partire i 3 mesi.">
+        <Field label="Primo turno in chat" hint="Sblocca il premio del primo turno e fa partire il conteggio dei turni.">
           <input style={inp} type="date" value={f.firstShiftAt} onChange={set("firstShiftAt")} disabled={f.trainingPassed !== "true"} />
         </Field>
         <Field label="Uscita (se è andata via)"><input style={inp} type="date" value={f.exitedAt} onChange={set("exitedAt")} /></Field>
@@ -236,14 +236,142 @@ function FxPanel({ data, onDone }) {
   );
 }
 
+// ── Panoramica: dove sta andando il programma ───────────────────────────────
+const fmtUsdShort = (v) => (v == null ? "—" : "$" + Math.round(v).toLocaleString("it-IT", { useGrouping: "always" }));
+const fmtPctIt = (v) => (v == null ? "—" : `${String(v).replace(".", ",")}%`);
+
+function Bar({ value, max, label }) {
+  const w = max > 0 ? Math.max(value > 0 ? 2 : 0, (value / max) * 100) : 0;
+  return (
+    <div title={label} style={{ flex: "1 1 120px", minWidth: 80, height: 14, background: CP.surfaceAlt, borderRadius: 4, overflow: "hidden" }}>
+      <div style={{ width: `${w}%`, height: "100%", background: CP.accent, borderRadius: "0 4px 4px 0" }} />
+    </div>
+  );
+}
+
+function Overview({ d, rules, onOpenReferrer }) {
+  const top = d.funnel[0].n;
+  const e = d.economics;
+  const maxTrend = Math.max(1, ...d.trend.map((x) => x.referred));
+  const firstTurns = d.funnel.find((f) => f.key === "first_shift").n;
+  const at25 = d.funnel.find((f) => f.key === "s25").n;
+  if (top === 0 && d.storyStats.agreed === 0) {
+    return <Notice>Il programma non ha ancora dati. Quando l&apos;HR registra le prime persone portate e le prime storie, qui si vede dove sta andando: chi porta persone che restano, quanto rendono le storie, quanto costa rispetto a quello che porta.</Notice>;
+  }
+  return (
+    <div style={{ display: "grid", gap: 14 }}>
+      <section style={{ ...box, padding: "16px 18px", display: "flex", gap: 28, flexWrap: "wrap" }}>
+        <Metric label="Persone portate" value={String(top)} />
+        <Metric label="Arrivate al primo turno" value={String(firstTurns)} note={top ? `${fmtPctIt(d.funnel[3].pct)} delle segnalate` : null} />
+        <Metric label="Arrivate a 25 turni" value={String(at25)} note={top ? `${fmtPctIt(d.funnel[4].pct)} delle segnalate` : null} />
+        <Metric label="Costo per persona a 25 turni" value={e.costPer25 != null ? fmtEur(e.costPer25) : "—"} note="premi maturati e pagati ÷ persone a 25 turni" />
+      </section>
+
+      <section style={{ ...box, padding: "16px 18px" }}>
+        <SectionTitle aside="quante persone arrivano a ogni tappa">Dalla segnalazione ai 75 turni</SectionTitle>
+        {d.funnel.map((f, i) => (
+          <div key={f.key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "5px 0" }}>
+            <span style={{ width: 130, flexShrink: 0, fontSize: 13, color: CP.textSecondary }}>{f.label}</span>
+            <Bar value={f.n} max={top} label={`${f.label}: ${f.n} su ${top}`} />
+            <span style={{ width: 84, flexShrink: 0, textAlign: "right", fontSize: 13, whiteSpace: "nowrap", ...NUM }}>
+              <b style={{ fontWeight: 500, color: CP.textPrimary }}>{f.n}</b>
+              {i > 0 && <span style={{ color: CP.textMuted }}> · {fmtPctIt(f.pct)}</span>}
+            </span>
+          </div>
+        ))}
+        <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 6 }}>Le persone entrate da poco non hanno ancora avuto il tempo di arrivare alle tappe dopo: l&apos;imbuto si legge meglio sui mesi passati.</div>
+      </section>
+
+      <section style={{ ...box, padding: "16px 18px" }}>
+        <SectionTitle aside={`ordinati per persone arrivate a ${rules.pctBlock} turni, poi per venduto a turno`}>Reference di qualità</SectionTitle>
+        <div style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 10px", lineHeight: 1.5 }}>
+          Una reference vale quando la persona resta e vende. <b style={{ fontWeight: 500 }}>Tenuta</b> = quante delle persone «decise» (arrivate a {rules.pctBlock} turni o uscite prima) sono arrivate a {rules.pctBlock} turni; sotto {d.minDecided} persone decise non si giudica.
+          {" "}<b style={{ fontWeight: 500 }}>Venduto a turno</b> = nei primi {rules.pctBlock} turni, confrontato con la media del programma{d.avgRate != null ? ` (${fmtUsdShort(d.avgRate)})` : ""}; conta solo chi ha almeno {d.minShiftsRate} turni.
+        </div>
+        <DataTable
+          empty="Nessun referente con persone portate."
+          rows={d.quality.map((q) => ({ ...q, id: q.referrerId }))}
+          onRowClick={(q) => onOpenReferrer(q.referrerId)}
+          columns={[
+            { key: "name", label: "Referente" },
+            { key: "referred", label: "Portate", align: "right" },
+            { key: "reached25", label: `A ${rules.pctBlock} turni`, align: "right" },
+            { key: "tenurePct", label: "Tenuta", align: "right", render: (q) => q.fewData ? <span style={{ color: CP.textMuted }}>pochi dati ({q.decided})</span> : fmtPctIt(q.tenurePct), sort: (q) => q.tenurePct ?? -1 },
+            { key: "perShift", label: "Venduto a turno", align: "right", render: (q) => q.perShift == null ? "—" : <span>{fmtUsdShort(q.perShift)}{q.vsAvg != null && <span style={{ color: CP.textMuted }}> · {q.vsAvg >= 1 ? "+" : "−"}{Math.abs(Math.round((q.vsAvg - 1) * 100))}% sulla media</span>}</span>, sort: (q) => q.perShift ?? -1 },
+            { key: "salesTotal", label: "Venduto totale", align: "right", render: (q) => fmtUsdShort(q.salesTotal) },
+          ]}
+        />
+      </section>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
+        <section style={{ ...box, padding: "16px 18px" }}>
+          <SectionTitle>Storie Instagram</SectionTitle>
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 12 }}>
+            <Metric label="Pubblicate" value={`${d.storyStats.published} su ${d.storyStats.agreed}`} note={d.storyStats.publishers === 1 ? "da 1 persona" : `da ${d.storyStats.publishers} persone diverse`} />
+            <Metric label="Scadute" value={String(d.storyStats.expired)} note={`${d.storyStats.open} ancora aperte`} />
+            <Metric label="Persone arrivate da una storia" value={String(d.storyStats.recruitsFromStories)} note={d.storyStats.recruitsPerStory != null ? `${String(d.storyStats.recruitsPerStory).replace(".", ",")} per storia pubblicata` : null} />
+          </div>
+          {d.storyStats.byReferrer.length > 0 && (
+            <div>
+              <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 4 }}>Chi ha pubblicato</div>
+              {d.storyStats.byReferrer.map((x) => (
+                <div key={x.referrerId} style={{ display: "flex", gap: 10, padding: "6px 0", borderTop: `1px solid ${CP.borderSoft}`, fontSize: 13 }}>
+                  <span style={{ flex: 1 }}>{x.name}</span>
+                  <span style={{ color: CP.textSecondary, ...NUM }}>{x.agreed === 1 ? (x.published ? "storie pubblicate" : "storie non pubblicate") : `${x.published} volte su ${x.agreed}`}</span>
+                  <span style={{ width: 110, textAlign: "right", ...NUM }}>{x.recruits} {x.recruits === 1 ? "persona" : "persone"}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 10, lineHeight: 1.5 }}>
+            Tenuta a {rules.pctBlock} turni: arrivate da una storia {d.channel.withStory.pct != null ? fmtPctIt(d.channel.withStory.pct) : `pochi dati (${d.channel.withStory.decided})`}, senza storia {d.channel.withoutStory.pct != null ? fmtPctIt(d.channel.withoutStory.pct) : `pochi dati (${d.channel.withoutStory.decided})`}.
+          </div>
+        </section>
+
+        <section style={{ ...box, padding: "16px 18px" }}>
+          <SectionTitle>Quanto costa e quanto porta</SectionTitle>
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+            <Metric label="Premi maturati e pagati" value={fmtEur(e.costEur)} note={`${fmtEur(e.paidEur)} già pagati`} />
+            <Metric label="Venduto delle persone portate" value={fmtUsdShort(e.salesUsd)} note="da Infloww, dal primo turno" />
+            <Metric label="Utile stimato per l'agenzia" value={e.marginEur != null ? fmtEur(e.marginEur) : "—"} note={e.marginEur != null ? `22,7% del venduto al cambio medio ${String(e.fxAvg).replace(".", ",")}` : "serve almeno un cambio del mese"} />
+          </div>
+          {e.costOnMarginPct != null && (
+            <div style={{ fontSize: 14, color: CP.textPrimary, marginTop: 12 }}>
+              Il programma costa il <b style={{ fontWeight: 500 }}>{fmtPctIt(e.costOnMarginPct)}</b> dell&apos;utile che le persone portate hanno generato finora.
+            </div>
+          )}
+          <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 8, lineHeight: 1.5 }}>
+            Stima: 22,7% è il margine netto medio dell&apos;agenzia sul venduto (file Finance, novembre 2025 → giugno 2026). È un tetto: parte di quelle vendite l&apos;avrebbe fatta comunque un altro operatore.
+          </div>
+        </section>
+      </div>
+
+      {d.trend.length > 0 && (
+        <section style={{ ...box, padding: "16px 18px" }}>
+          <SectionTitle aside="persone segnalate nel mese · primi turni nel mese">Andamento</SectionTitle>
+          {d.trend.map((x) => (
+            <div key={x.month} style={{ display: "flex", alignItems: "center", gap: "4px 12px", padding: "5px 0", flexWrap: "wrap" }}>
+              <span style={{ width: 120, fontSize: 13, color: CP.textSecondary }}>{monthLabel(x.month)}</span>
+              <Bar value={x.referred} max={maxTrend} label={`${monthLabel(x.month)}: ${x.referred} segnalate, ${x.started} primi turni`} />
+              <span style={{ marginLeft: "auto", textAlign: "right", fontSize: 13, whiteSpace: "nowrap", ...NUM }}>
+                <b style={{ fontWeight: 500 }}>{x.referred}</b> {x.referred === 1 ? "segnalata" : "segnalate"}<span style={{ color: CP.textMuted }}> · {x.started} {x.started === 1 ? "primo turno" : "primi turni"}</span>
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+}
+
 // ── Pagina ──────────────────────────────────────────────────────────────────
 const TABS = [
-  ["topay", "Da pagare"], ["recruits", "Persone portate"], ["referrers", "Referenti"], ["stories", "Storie"], ["fx", "Cambio"], ["crm", "Dal CRM"], ["log", "Registro"],
+  ["overview", "Panoramica"], ["topay", "Da pagare"], ["recruits", "Persone portate"], ["referrers", "Referenti"], ["stories", "Storie"], ["fx", "Cambio"], ["crm", "Dal CRM"], ["log", "Registro"],
 ];
 
 export default function ReferralAdminPage() {
   const { data, error, isLoading, mutate } = useSWR(API, fetcher, { revalidateOnFocus: false });
-  const [tab, setTab] = useState("topay");
+  const [tab, setTab] = useState("overview");
   const [modal, setModal] = useState(null); // { kind, initial }
   const [busyKey, setBusyKey] = useState(null);
   const [payErr, setPayErr] = useState(null);
@@ -267,9 +395,15 @@ export default function ReferralAdminPage() {
     try { await post({ action: "markPaid", key }); mutate(); } catch (e) { setPayErr(e.message); } finally { setBusyKey(null); }
   };
 
-  const addFromCrm = (s) => {
-    const guess = data.referrers.find((r) => s.referredBy && r.name.toLowerCase().includes(s.referredBy.trim().toLowerCase()));
-    setModal({ kind: "recruit", initial: { name: s.name, hrPersonId: s.hrPersonId, referrerId: guess?.id || "" } });
+  const guessReferrer = (s) => data.referrers.find((r) => s.referredBy && r.name.toLowerCase().includes(s.referredBy.trim().toLowerCase()));
+  const addFromCrm = async (s) => {
+    let ref = guessReferrer(s);
+    // chi ha segnalato non è ancora referente: lo si crea con il nome scritto nel modulo
+    if (!ref && s.referredBy && confirm(`«${s.referredBy}» non è ancora tra i referenti. Lo aggiungo?`)) {
+      try { const j = await post({ action: "saveReferrer", data: { name: s.referredBy } }); ref = j.result; await mutate(); }
+      catch (e) { alert(e.message); return; }
+    }
+    setModal({ kind: "recruit", initial: { name: s.name, hrPersonId: s.hrPersonId, referrerId: ref?.id || "" } });
   };
 
   return (
@@ -293,7 +427,7 @@ export default function ReferralAdminPage() {
           <HeroMetric label="Da pagare adesso" value={fmtEur(totals.toPay)} compare={`${data.toPay.length} premi sbloccati e non ancora pagati`} hint={totals.toPayUsd > 0 ? `In più $${totals.toPayUsd} di percentuali che aspettano il cambio del mese (tab «Cambio»)` : null}>
             <Metric label="In maturazione questo mese" value={fmtEur(totals.running)} note="stima, cresce con le vendite" />
             <Metric label="Già pagati" value={fmtEur(totals.paid)} />
-            <Metric label="Persone portate" value={String(data.recruits.length)} note={`${data.referrers.length} referenti`} />
+            <Metric label="Referenti" value={String(data.referrers.length)} note={(() => { const k = data.referrers.filter((r) => r.userId).length; return k === 1 ? "1 vede la sua pagina" : `${k} vedono la loro pagina`; })()} />
           </HeroMetric>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
@@ -304,9 +438,38 @@ export default function ReferralAdminPage() {
             ))}
           </div>
 
+          {tab === "overview" && (
+            <Overview d={data.dashboard} rules={data.rules} onOpenReferrer={(id) => { const r = data.referrers.find((x) => x.id === id); if (r) setModal({ kind: "referrer", initial: r }); }} />
+          )}
+
           {tab === "topay" && (
             <>
               {payErr && <Notice danger>{payErr}</Notice>}
+              {data.toPay.length > 0 && (
+                <section style={{ ...box, padding: "10px 16px", marginBottom: 12 }}>
+                  <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 4 }}>Per referente: un bonifico a testa</div>
+                  {Object.entries(data.toPay.reduce((acc, m) => { (acc[m.referrerId] ||= []).push(m); return acc; }, {})).map(([rid, items]) => {
+                    const ready = items.filter((m) => m.amountEur != null);
+                    const tot = Math.round(ready.reduce((a, m) => a + m.amountEur, 0) * 100) / 100;
+                    const waiting = items.length - ready.length;
+                    return (
+                      <div key={rid} style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 0", borderTop: `1px solid ${CP.borderSoft}`, flexWrap: "wrap" }}>
+                        <span style={{ flex: 1, fontSize: 14 }}>{refName[rid] || "—"}<span style={{ color: CP.textMuted, fontSize: 12 }}> · {items.length} {items.length === 1 ? "premio" : "premi"}{waiting ? `, ${waiting} in attesa del cambio` : ""}</span></span>
+                        <span style={{ fontSize: 14, fontWeight: 500, ...NUM }}>{fmtEur(tot)}</span>
+                        <button type="button" style={btn} disabled={!ready.length || busyKey != null} onClick={async () => {
+                          if (!confirm(`Segnare pagati ${ready.length} premi a ${refName[rid]} per ${fmtEur(tot)}? Gli importi si congelano.`)) return;
+                          setPayErr(null);
+                          for (const m of ready) {
+                            setBusyKey(m.key);
+                            try { await post({ action: "markPaid", key: m.key }); } catch (e) { setPayErr(`${m.label}: ${e.message}`); break; }
+                          }
+                          setBusyKey(null); mutate();
+                        }}>Segna pagato tutto</button>
+                      </div>
+                    );
+                  })}
+                </section>
+              )}
               <DataTable
                 empty="Niente da pagare: quando un premio si sblocca compare qui."
                 rows={data.toPay.map((m) => ({ ...m, id: m.key }))}
@@ -316,8 +479,8 @@ export default function ReferralAdminPage() {
                   { key: "what", label: "Premio", render: (m) => <span>{m.label}{m.recruitName && <span style={{ color: CP.textMuted }}> · {m.recruitName}</span>}</span>, sort: (m) => m.label },
                   { key: "unlockedAt", label: "Sbloccato", render: (m) => fmtDay(m.unlockedAt), sort: (m) => m.unlockedAt || "" },
                   { key: "amountEur", label: "Importo", align: "right", render: (m) => m.amountEur == null
-                    ? <span>${m.amountUsd}<span style={{ color: CP.attn, fontSize: 12 }}> · manca il cambio</span></span>
-                    : <span>{fmtEur(m.amountEur)}{m.amountUsd != null && <span style={{ color: CP.textMuted, fontSize: 12 }}> · ${m.amountUsd}</span>}</span> },
+                    ? <span>{fmtUsd(m.amountUsd)}<span style={{ color: CP.attn, fontSize: 12 }}> · manca il cambio</span></span>
+                    : <span>{fmtEur(m.amountEur)}{m.amountUsd != null && <span style={{ color: CP.textMuted, fontSize: 12 }}> · {fmtUsd(m.amountUsd)}</span>}</span> },
                   { key: "pay", label: "", sortable: false, align: "right", render: (m) => (
                     <button type="button" style={btn} disabled={busyKey === m.key} onClick={(e) => { e.stopPropagation(); if (confirm(`Segnare pagato ${fmtEur(m.amountEur)} a ${refName[m.referrerId]}? L'importo si congela.`)) pay(m.key); }}>
                       {busyKey === m.key ? "…" : "Segna pagato"}
@@ -339,9 +502,9 @@ export default function ReferralAdminPage() {
                 { key: "ref", label: "Portata da", muted: true, render: (r) => refName[r.referrerId] || "—", sort: (r) => refName[r.referrerId] || "" },
                 { key: "next", label: "A che punto è", sort: (r) => r.steps.next || "", render: (r) => {
                   const st = r.steps.steps.find((s) => s.key === r.steps.next);
-                  return st ? <span>Prossimo: {st.label}</span> : <span style={{ color: CP.textMuted }}>{r.exitedAt ? "Uscita" : "Percorso finito"}</span>;
+                  return st ? <span>Prossimo: {st.label}</span> : <span style={{ color: CP.textMuted }}>{r.steps.closedWhy || "Percorso finito"}</span>;
                 } },
-                { key: "infloww", label: "Infloww", muted: true, render: (r) => r.inflowwName || <span style={{ color: CP.attn }}>da collegare</span>, sort: (r) => r.inflowwName || "" },
+                { key: "infloww", label: "Infloww", muted: true, render: (r) => r.inflowwName || (r.metrics?.started && !r.exitedAt ? <span style={{ color: CP.attn }}>da collegare</span> : "—"), sort: (r) => r.inflowwName || "" },
                 { key: "earned", label: "Maturato", align: "right", render: (r) => fmtEur(r.totals.guadagnato), sort: (r) => r.totals.guadagnato },
                 { key: "running", label: "In corso", align: "right", render: (r) => fmtEur(r.totals.in_corso), sort: (r) => r.totals.in_corso },
                 { key: "createdAt", label: "Segnalata", align: "right", render: (r) => r.createdAt ? new Date(r.createdAt).toLocaleDateString("it-IT") : "—", sort: (r) => r.createdAt || 0 },
@@ -394,7 +557,7 @@ export default function ReferralAdminPage() {
                 <div key={s.hrPersonId} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14 }}>{s.name}</div>
-                    <div style={{ fontSize: 12, color: CP.textMuted }}>Segnalata da: {s.referredBy || "non scritto"}{s.phase && ` · ${s.phase}`}</div>
+                    <div style={{ fontSize: 12, color: CP.textMuted }}>Segnalata da: {s.referredBy || "non scritto"}{s.referredBy && (guessReferrer(s) ? " · già referente" : " · non ancora referente")}{s.phase && ` · ${s.phase}`}</div>
                   </div>
                   <button type="button" style={btn} onClick={() => addFromCrm(s)}><Plus size={14} /> Aggiungi</button>
                 </div>

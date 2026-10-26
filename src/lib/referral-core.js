@@ -340,7 +340,9 @@ export function recruitSteps(r, milestones = [], { today } = {}) {
     ...ret.map((m) => ({ key: m.key, label: `${m.shifts} turni`, done: m.status === "maturato" || m.status === "pagato", failed: m.status === "perso", at: m.unlockedAt || null })),
   ];
   const next = steps.find((x) => !x.done && !x.failed);
-  return { steps, next: r.exitedAt && r.exitedAt <= today ? null : next?.key || null };
+  // formazione non superata o uscita: il percorso è chiuso, niente «prossima tappa»
+  const closed = r.trainingPassed === false || (r.exitedAt && r.exitedAt <= today);
+  return { steps, next: closed ? null : next?.key || null, closedWhy: r.trainingPassed === false ? "Formazione non superata" : closed ? "Uscita" : null };
 }
 
 /**
@@ -427,3 +429,130 @@ export function shiftDatesFromWages(wages = [], mapping = {}, nowMs = Date.now()
   return out;
 }
 
+
+// ── Dashboard del programma (HR) ────────────────────────────────────────────
+//
+// Serve a capire la DIREZIONE: chi porta persone che restano e rendono, quanto
+// rendono le storie, quanto costa il programma rispetto a quello che porta.
+// Regole di onestà: sotto 3 persone «decise» (arrivate a 25 turni o uscite
+// prima) la tenuta non si giudica; il venduto a turno si confronta solo su
+// chi ha almeno 5 turni; l'utile è una STIMA dichiarata dal file Finance.
+
+/** Margine netto agenzia sul venduto (file Finance nov 2025 → giu 2026: 22,7% del ricavo in €). */
+export const NET_MARGIN_ON_SALES = 0.227;
+const MIN_DECIDED = 3;
+const MIN_SHIFTS_RATE = 5;
+
+/** Numeri di una persona portata: turni, venduto da quando lavora, venduto a turno nei primi 25. */
+export function recruitMetrics(r, { salesByMonth = {}, shiftDates = null, rules = REFERRAL_RULES } = {}) {
+  const started = Boolean(r.firstShiftAt && r.trainingPassed === true);
+  const dates = Array.isArray(shiftDates) && started ? shiftDates.filter((d) => d >= r.firstShiftAt).sort() : null;
+  const manual = Number.isInteger(r.shiftsManual) ? r.shiftsManual : null;
+  const done = started ? (manual ?? (dates ? dates.length : null)) : 0;
+  const known = Object.values(salesByMonth).filter((v) => v != null);
+  const salesTotal = started && known.length ? round2(known.reduce((a, v) => a + (Number(v) || 0), 0)) : null;
+  let first25 = null;
+  if (started && manual == null && dates && dates.length) {
+    first25 = blockSales(dates, 0, Math.min(rules.pctBlock, dates.length), salesByMonth).sales;
+  } else if (started && r.blockSalesManual?.[0] != null) first25 = r.blockSalesManual[0];
+  const n25 = done == null ? 0 : Math.min(rules.pctBlock, done);
+  const perShift = first25 != null && n25 >= MIN_SHIFTS_RATE ? round2(first25 / n25) : null;
+  const reached25 = done != null && done >= rules.pctBlock;
+  return { started, shiftsDone: done, salesTotal, first25, perShift, reached25, decided: reached25 || (started && Boolean(r.exitedAt)) || (!started && (r.trainingPassed === false || Boolean(r.exitedAt))) };
+}
+
+const pctOf = (a, b) => (b > 0 ? Math.round((a / b) * 1000) / 10 : null);
+
+/**
+ * recruits: [{ ...recruit, metrics, milestones }], stories: [{ ...story, milestone }],
+ * referrers: [{ id, name }], fx: { mese: cambio }.
+ */
+export function buildDashboard({ referrers = [], recruits = [], stories = [], fx = {}, today, rules = REFERRAL_RULES } = {}) {
+  const N = recruits.length;
+  const count = (f) => recruits.filter(f).length;
+  const funnel = [
+    { key: "referred", label: "Segnalate", n: N },
+    { key: "interview", label: "Colloquio fatto", n: count((r) => r.interviewAt) },
+    { key: "training", label: "Formazione superata", n: count((r) => r.trainingPassed === true) },
+    { key: "first_shift", label: "Primo turno", n: count((r) => r.metrics.started) },
+    { key: "s25", label: "25 turni", n: count((r) => (r.metrics.shiftsDone ?? 0) >= 25) },
+    { key: "s50", label: "50 turni", n: count((r) => (r.metrics.shiftsDone ?? 0) >= 50) },
+    { key: "s75", label: "75 turni", n: count((r) => (r.metrics.shiftsDone ?? 0) >= 75) },
+  ].map((f) => ({ ...f, pct: pctOf(f.n, N) }));
+
+  // storie
+  const storyOk = stories.filter((s) => s.milestone.status === "maturato" || s.milestone.status === "pagato");
+  const fromStory = recruits.filter((r) => r.storyId);
+  const storyStats = {
+    agreed: stories.length,
+    published: storyOk.length,
+    expired: stories.filter((s) => s.milestone.status === "perso").length,
+    open: stories.filter((s) => s.milestone.status === "in_attesa").length,
+    publishers: new Set(storyOk.map((s) => s.referrerId)).size,
+    recruitsFromStories: fromStory.length,
+    recruitsPerStory: storyOk.length ? Math.round((fromStory.length / storyOk.length) * 100) / 100 : null,
+    // chi ha pubblicato: storie complete e persone arrivate dalle sue storie
+    byReferrer: [...new Set(stories.map((s) => s.referrerId))].map((id) => ({
+      referrerId: id,
+      name: referrers.find((x) => x.id === id)?.name || "—",
+      agreed: stories.filter((s) => s.referrerId === id).length,
+      published: storyOk.filter((s) => s.referrerId === id).length,
+      recruits: fromStory.filter((r) => r.referrerId === id).length,
+    })).sort((a, b) => b.published - a.published || b.recruits - a.recruits),
+  };
+  // con storia vs senza: arrivano a 25 turni?
+  const tenure = (list) => {
+    const dec = list.filter((r) => r.metrics.decided);
+    return { n: list.length, decided: dec.length, reached: dec.filter((r) => r.metrics.reached25).length, pct: dec.length >= MIN_DECIDED ? pctOf(dec.filter((r) => r.metrics.reached25).length, dec.length) : null };
+  };
+  const channel = { withStory: tenure(fromStory), withoutStory: tenure(recruits.filter((r) => !r.storyId)) };
+
+  // reference di qualità: per referente
+  const rates = recruits.map((r) => r.metrics.perShift).filter((x) => x != null);
+  const avgRate = rates.length ? round2(rates.reduce((a, b) => a + b, 0) / rates.length) : null;
+  const quality = referrers.map((ref) => {
+    const mine = recruits.filter((r) => r.referrerId === ref.id);
+    const t = tenure(mine);
+    const myRates = mine.map((r) => r.metrics.perShift).filter((x) => x != null);
+    const rate = myRates.length ? round2(myRates.reduce((a, b) => a + b, 0) / myRates.length) : null;
+    return {
+      referrerId: ref.id, name: ref.name,
+      referred: mine.length, started: mine.filter((r) => r.metrics.started).length,
+      reached25: mine.filter((r) => r.metrics.reached25).length,
+      decided: t.decided, tenurePct: t.pct, fewData: t.decided < MIN_DECIDED,
+      perShift: rate, vsAvg: rate != null && avgRate ? Math.round((rate / avgRate) * 100) / 100 : null,
+      salesTotal: round2(mine.reduce((a, r) => a + (r.metrics.salesTotal || 0), 0)),
+    };
+  }).filter((q) => q.referred > 0).sort((a, b) => b.reached25 - a.reached25 || (b.perShift ?? -1) - (a.perShift ?? -1) || b.referred - a.referred);
+
+  // costo e ritorno
+  const allMs = [...recruits.flatMap((r) => r.milestones), ...stories.map((s) => s.milestone)];
+  const sum = (st) => round2(allMs.filter((m) => m.status === st && m.amountEur != null).reduce((a, m) => a + m.amountEur, 0));
+  const costEur = round2(sum("pagato") + sum("maturato"));
+  const salesUsd = round2(recruits.reduce((a, r) => a + (r.metrics.salesTotal || 0), 0));
+  const fxVals = Object.values(fx).filter((x) => x != null);
+  const fxAvg = fxVals.length ? fxVals.reduce((a, b) => a + b, 0) / fxVals.length : null;
+  const marginEur = fxAvg != null ? round2(salesUsd * fxAvg * NET_MARGIN_ON_SALES) : null;
+  const reached = funnel.find((f) => f.key === "s25").n;
+  const economics = {
+    costEur, paidEur: sum("pagato"), dueEur: sum("maturato"), runningEur: sum("in_corso"),
+    salesUsd, marginEur, fxAvg: fxAvg != null ? Math.round(fxAvg * 10000) / 10000 : null,
+    costPer25: reached ? round2(costEur / reached) : null,
+    costOnMarginPct: marginEur ? pctOf(costEur, marginEur) : null,
+  };
+
+  // andamento per mese: segnalate e primi turni
+  const months = {};
+  const bump = (m, k) => { if (!m) return; (months[m] ||= { month: m, referred: 0, started: 0 })[k]++; };
+  for (const r of recruits) {
+    bump(r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 7) : null, "referred");
+    if (r.metrics.started) bump(r.firstShiftAt.slice(0, 7), "started");
+  }
+  // mesi vuoti in mezzo compresi (un mese senza segnalazioni è un dato, non un buco)
+  const keys = Object.keys(months).sort();
+  const trend = [];
+  if (keys.length) for (let m = keys[0]; m <= keys[keys.length - 1]; m = addMonths(m, 1)) trend.push(months[m] || { month: m, referred: 0, started: 0 });
+  trend.splice(0, Math.max(0, trend.length - 12));
+
+  return { today, funnel, storyStats, channel, quality, avgRate, economics, trend, minDecided: MIN_DECIDED, minShiftsRate: MIN_SHIFTS_RATE };
+}
