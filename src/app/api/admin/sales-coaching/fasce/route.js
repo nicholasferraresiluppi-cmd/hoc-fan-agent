@@ -6,6 +6,10 @@
 //   squadra dello split (chi fa almeno metà delle ore sulle sue pagine). Legge SOLO
 //   la cache notturna `fasce:data:*`; se manca calcola una volta (lock).
 // POST { action: "recompute" } → ricalcola ora.
+//
+// `duo` (26/10/2026): «Due operatori» — quando il secondo operatore in turno aggiunge
+// incasso (src/lib/fasce-duo-core.js). Celle dalla cache `fasce:duo:*`, confronto fatto
+// qui sulle sole pagine dello split. Senza cache: `duo.missing` (la scheda lo dice).
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -16,6 +20,8 @@ import { listSplits } from "@/lib/sales-coaching";
 import { listPeople } from "@/lib/hr-people";
 import { getFasceData, computeFasceOnce, isFasceComputing, isFasceStale } from "@/lib/fasce";
 import { splitSlotValues } from "@/lib/fasce-core";
+import { getFasceDuoData, isFasceDuoComputing, computeFasceDuoOnce } from "@/lib/fasce-duo";
+import { buildDuo } from "@/lib/fasce-duo-core";
 import { matchName, SPLIT_SHARE } from "@/lib/squadra-core";
 
 export async function GET(request) {
@@ -29,7 +35,13 @@ export async function GET(request) {
       if (!done) return Response.json({ computing: true });
       data = done;
     }
-    const [splits, people, computing] = await Promise.all([listSplits(), listPeople(), isFasceComputing()]);
+    const [splits, people, computing, duoDoc, duoComputing] = await Promise.all([
+      listSplits(),
+      listPeople(),
+      isFasceComputing(),
+      getFasceDuoData().catch(() => null),
+      isFasceDuoComputing().catch(() => false),
+    ]);
     const split = splitId ? splits.find((s) => s.id === splitId) || null : null;
     const inSplit = split ? new Set(split.creator_ids.map(String)) : null;
 
@@ -58,6 +70,11 @@ export async function GET(request) {
       operators.push({ ...o, share, uscita, verdict: uscita ? null : o.verdict });
     }
 
+    const names = Object.fromEntries(data.pages.map((p) => [p.cid, p.name]));
+    const duo = duoDoc?.cells
+      ? { ...buildDuo(duoDoc.cells, { only: inSplit, names, commission: duoDoc.commission }), generated_at: duoDoc.generated_at, window: duoDoc.window, computing: duoComputing }
+      : { missing: true, computing: duoComputing };
+
     return Response.json({
       computing,
       stale: isFasceStale(data),
@@ -70,6 +87,7 @@ export async function GET(request) {
       split: split ? { id: split.id, name: split.name } : null,
       pages,
       operators,
+      duo,
     });
   } catch (e) {
     return Response.json({ error: e.message || "Lettura fallita" }, { status: 500 });
@@ -81,6 +99,11 @@ export async function POST(request) {
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   let body;
   try { body = await request.json(); } catch { return Response.json({ error: "JSON non valido." }, { status: 400 }); }
+  if (body?.action === "recompute_duo") {
+    const doc = await computeFasceDuoOnce().catch((e) => ({ error: e.message }));
+    if (doc?.error) return Response.json({ error: doc.error }, { status: 500 });
+    return Response.json(doc ? { ok: true, generated_at: doc.generated_at } : { computing: true });
+  }
   if (body?.action === "recompute") {
     const doc = await computeFasceOnce();
     return Response.json(doc ? { ok: true, generated_at: doc.generated_at } : { computing: true });
