@@ -336,7 +336,7 @@ export default function CmCockpitPage() {
 
   /* ---------- render ---------- */
   const shell = (children, actions) => (
-    <div style={{ padding: "28px 24px 80px", maxWidth: 1180, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 80px", maxWidth: 1600, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "People" }, { label: "Cockpit CM" }]}
         title="Cockpit CM"

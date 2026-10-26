@@ -65,7 +65,7 @@ export default function TeamsAdminPage() {
   const assigned = teams.reduce((s, t) => s + (t.members || []).length, 0);
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "People" }, { label: "Team" }]}
         title="Team"

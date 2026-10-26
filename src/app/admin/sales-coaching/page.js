@@ -637,7 +637,7 @@ export default function SalesCoachingPage() {
       subtitle="Come vendono le creator del tuo split ai fan che non hanno mai pagato, chi lo fa meglio a parità di creator e cosa allenare nel team. Serve a decidere chi affiancare a chi. Aggiornato ogni notte."
     />
   );
-  const wrap = { padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body };
+  const wrap = { padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body };
 
   if (error) return <div style={wrap}>{header}<Notice danger>{String(error.message).includes("scope") || String(error.message).includes("capability") ? "Questa pagina è riservata a sales manager e admin." : error.message}</Notice></div>;
   if (isLoading || !data) return <div style={wrap}>{header}<Note>Caricamento…</Note></div>;

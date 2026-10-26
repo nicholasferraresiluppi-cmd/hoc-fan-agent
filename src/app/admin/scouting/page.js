@@ -136,7 +136,7 @@ export default function ScoutingPage() {
   const line2 = sel || !data ? null : tab === "oggi" ? `${fmtFull(paid)} creator con un profilo a pagamento.` : tab === "mercato" ? "Dove c'è spazio, cosa funziona." : tab === "format" ? "I format che esistono già." : tab === "contatti" ? "Dalla scelta alla firma." : tab === "valuta" ? "Un voto per ognuna, nessuna saltata." : `${fmtFull(creators.length)} creator italiane.`;
 
   return (
-    <div className="rx-page" data-sel={sel ? "1" : undefined} style={{ maxWidth: 1280, margin: "0 auto", padding: "24px 20px 72px" }}>
+    <div className="rx-page" data-sel={sel ? "1" : undefined} style={{ maxWidth: 1600, margin: "0 auto", padding: "24px 20px 72px" }}>
       <style>{PHONE_CSS}</style>
       <PageHead
         crumbs={[{ label: "Admin", href: "/admin" }, { label: "Marketing" }]}

@@ -57,7 +57,7 @@ export default function BilancioPage() {
   const mine = useMemo(() => new Set(data?.mine || []), [data]);
 
   return (
-    <div style={{ maxWidth: 1180, margin: "0 auto", padding: "8px 16px 56px", fontFamily: FONTS.body }}>
+    <div style={{ maxWidth: 1600, margin: "0 auto", padding: "8px 16px 56px", fontFamily: FONTS.body }}>
       <PageHead
         title="Bilancio del mese"
         subtitle="Tutte le creator dello split, ognuna misurata sul suo goal, divise per ecosistema."

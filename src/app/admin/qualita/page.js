@@ -33,15 +33,15 @@ export default function QualitaPage() {
 
   const head = <PageHead crumbs={[{ label: "Admin", href: "/admin" }, { label: "Controllo qualità" }]} title="Controllo qualità"
     subtitle="Tre controlli che girano da soli e trovano i problemi prima delle persone: accessi incoerenti, pagine che non funzionano per chi le apre, lavori che non si riescono a finire. Una persona riceve uno strumento quando i tre sono verdi." />;
-  if (isLoading) return <div style={{ maxWidth: 1100 }}>{head}<div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div></div>;
-  if (error || data?.error) return <div style={{ maxWidth: 1100 }}>{head}<Notice danger>{data?.error || "Non riesco a leggere il controllo qualità."}</Notice></div>;
+  if (isLoading) return <div style={{ maxWidth: 1600 }}>{head}<div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div></div>;
+  if (error || data?.error) return <div style={{ maxWidth: 1600 }}>{head}<Notice danger>{data?.error || "Non riesco a leggere il controllo qualità."}</Notice></div>;
 
   const { coherence = [], giro = {}, readiness = [], tasks = [], members = 0, duplicates = {} } = data;
   const last = giro.last;
   const ready = readiness.filter((r) => r.ready).length;
 
   return (
-    <div style={{ maxWidth: 1100 }}>
+    <div style={{ maxWidth: 1600 }}>
       {head}
 
       {giro.stale && (

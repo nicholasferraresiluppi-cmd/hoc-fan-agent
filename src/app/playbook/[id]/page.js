@@ -31,7 +31,7 @@ const CREATOR_LABELS = {
 const tag = { fontSize: 12, padding: "3px 10px", borderRadius: 6, background: CP.surfaceAlt, color: CP.textSecondary };
 const label = { fontSize: 13, color: CP.textMuted, marginBottom: 6 };
 const body = { fontSize: 14, color: CP.textPrimary, lineHeight: 1.6 };
-const WRAP = { padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body };
+const WRAP = { padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body };
 const CRUMBS = [{ label: "Academy", href: "/" }, { label: "Playbook", href: "/playbook" }];
 
 function MessageBubble({ msg }) {

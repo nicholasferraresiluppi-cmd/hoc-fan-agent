@@ -406,7 +406,7 @@ export default function OperatorFilmPage() {
   const col = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(420px, 100%), 1fr))", gap: 18, alignItems: "start" };
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Training" }, { label: "Profilo operatore", href: "/admin/operator-signals" }, { label: operator }]}
         title={`Game film: ${operator}`}

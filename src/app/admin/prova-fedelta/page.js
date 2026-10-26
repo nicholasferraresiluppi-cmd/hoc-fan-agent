@@ -206,7 +206,7 @@ export default function ProvaFedeltaPage() {
   const refresh = async () => { setBusy(true); try { await mutate(await fetcher("/api/admin/prova-fedelta?refresh=1"), { revalidate: false }); } catch { /* l'errore lo mostra SWR al prossimo giro */ } finally { setBusy(false); } };
   const stopped = data?.phase?.key === "fermata" || data?.phase?.key === "conclusa";
   return (
-    <div style={{ padding: "24px 16px 80px", maxWidth: 1100, margin: "0 auto", display: "grid", gap: 14 }}>
+    <div style={{ padding: "24px 16px 80px", maxWidth: 1600, margin: "0 auto", display: "grid", gap: 14 }}>
       <PageHead
         crumbs={[{ label: "Agenzia" }, { label: "Prova fedeltà" }]}
         title="Prova fedeltà · Martina Scavo"

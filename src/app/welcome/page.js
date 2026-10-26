@@ -83,7 +83,7 @@ export default function WelcomePage() {
   const allowed = (href) => (!me?.authenticated && !isPrivateHref(href)) || canSee(href, me?.capabilities, me?.admin);
   const modules = MODULES.filter((m) => allowed(m.primaryCta.href));
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body, color: CP.textPrimary }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body, color: CP.textPrimary }}>
       <PageHead
         title="HOC Pro, la console di House of Creators"
         subtitle="Qui trovi i risultati del lavoro in chat, la formazione, i compensi e l'organizzazione del team. I dati arrivano da CreatorsPro (vendite reali) e da Infloww (attività in chat)."

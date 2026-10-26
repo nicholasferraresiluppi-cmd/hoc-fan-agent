@@ -306,7 +306,7 @@ export default function TelegramChannelsPage() {
   ];
 
   return (
-    <div style={{ maxWidth: 1180, margin: "0 auto", padding: "8px 16px 40px", fontFamily: FONTS.body }}>
+    <div style={{ maxWidth: 1600, margin: "0 auto", padding: "8px 16px 40px", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Performance" }, { label: "Canali Telegram" }]}
         title="Canali Telegram"

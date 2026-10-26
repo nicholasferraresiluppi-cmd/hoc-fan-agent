@@ -23,7 +23,7 @@ export default function PageTabs({ pathname }) {
     .filter(([, , base]) => !who || canSee(base, who.capabilities, who.admin));
   if (tabs.length < 2) return null;
   return (
-    <nav ref={ref} className="pg-tabs" aria-label={m.group.label} style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", padding: "18px 24px 0", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <nav ref={ref} className="pg-tabs" aria-label={m.group.label} style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", padding: "18px 24px 0", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <span className="pg-tabs-l" style={{ fontSize: 12.5, color: CP.textMuted, marginRight: 10 }}>{m.group.label}</span>
       {tabs.map(([href, label]) => {
         const on = href === cur;

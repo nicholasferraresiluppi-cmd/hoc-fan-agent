@@ -52,7 +52,7 @@ export default function MyLadderPage() {
   const v3 = st === "v3";
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Il mio quadro" }, { label: "Il mio percorso" }]}
         title="Il mio percorso"

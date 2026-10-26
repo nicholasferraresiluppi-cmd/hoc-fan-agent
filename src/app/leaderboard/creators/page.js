@@ -106,7 +106,7 @@ export default function CreatorsLeaderboardPage() {
   ];
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       {tutorialOpen && <ScoreTutorialModal onClose={() => setTutorialOpen(false)} />}
       <PageHead
         crumbs={[{ label: "Performance" }, { label: "Creator" }]}

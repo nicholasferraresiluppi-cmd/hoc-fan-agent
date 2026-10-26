@@ -178,7 +178,7 @@ export default function DebugMappingPage() {
   const toneColor = diagnosis ? diagnoseColor(diagnosis.tone) : CP.textPrimary;
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Sync CP", href: "/admin/creatorspro-sync" }, { label: "Debug mapping" }]}
         title="Perché un operatore non ha dati CP"

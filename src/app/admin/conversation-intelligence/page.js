@@ -80,7 +80,7 @@ export default function ConversationIntelligencePage() {
     : null;
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Performance" }, { label: "Presidio chat" }]}
         title="Presidio chat"

@@ -14,7 +14,7 @@ const Breadcrumb = () => (
 
 export default function ContentPipelineHome() {
   return (
-    <div style={{ padding: "32px 28px 64px 28px", maxWidth: 1400, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
+    <div style={{ padding: "32px 28px 64px 28px", maxWidth: 1600, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
       <PageHeader
         breadcrumb={<Breadcrumb />}
         section="Content · Pipeline"

@@ -1286,7 +1286,7 @@ export default function WarmupPage() {
   const openToday = ACC.reduce((t, a) => t + tasksOn(a, todayKey()).open.length, 0);
 
   return (
-    <div style={{ maxWidth: 1180, margin: "0 auto", padding: "20px 16px calc(110px + env(safe-area-inset-bottom))", fontFamily: FONTS.body, color: CP.textPrimary }}>
+    <div style={{ maxWidth: 1600, margin: "0 auto", padding: "20px 16px calc(110px + env(safe-area-inset-bottom))", fontFamily: FONTS.body, color: CP.textPrimary }}>
       <PageHead crumbs={[{ label: "Marketing" }, { label: "Warm-up" }]} title="Warm-up"
         subtitle="Il piano del giorno di ogni profilo Instagram e X in riscaldamento: cosa fare oggi, segnalazioni, cooldown e numeri della settimana."
         actions={data ? <button type="button" style={btnPrimary} onClick={() => { setTab("acct"); setSel(null); setForm({}); }}><Plus size={15} />Nuovo profilo</button> : null} />

@@ -175,7 +175,7 @@ export default function LeaderboardSettingsPage() {
     });
   }
 
-  const page = { padding: "28px 24px 96px", maxWidth: 1080, margin: "0 auto", fontFamily: FONTS.body };
+  const page = { padding: "28px 24px 96px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body };
   const input = { padding: "6px 10px", background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, width: 84, textAlign: "right", ...NUM };
   const inputText = { ...input, textAlign: "left", width: 120 };
   const th = { textAlign: "left", padding: "10px 12px", color: CP.textMuted, fontSize: 12, fontWeight: 500, borderBottom: `1px solid ${CP.border}`, whiteSpace: "nowrap" };
