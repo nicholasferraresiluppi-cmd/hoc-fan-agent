@@ -24,7 +24,7 @@ import {
   BookMarked,
   LineChart,
   FileSignature,
-  Landmark, Repeat } from "lucide-react";
+  Landmark, Repeat, Gift } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
 import { WORKSPACES, workspaceSections } from "@/lib/workspaces";
@@ -137,6 +137,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/contabilita",             title: "Contabilità", desc: "Compensi del team per mese: fissi e gamification (minimo garantito o % sulle revenue, dollaro→euro), chi è pagato, dati di pagamento cifrati. Visibile solo a chi ha l'accesso contabilità", icon: Landmark },
       { href: "/admin/hr",                title: "Persone · Area Partner", desc: "CRM persone (HOC Pro è il master): anagrafica, rapporto, contratto, documenti e storico, sincronizzato con la lista HR di ClickUp; link di compilazione per la persona", icon: BookUser },
       { href: "/admin/hr/contratti",      title: "Controllo contratti", desc: "Contratti da Dropbox Sign confrontati con le schede: chi ce l'ha, chi no, chi ha cambiato mansione e serve un contratto nuovo; PDF firmati allegati su ClickUp", icon: FileSignature },
+      { href: "/admin/referral",          title: "Porta un collega", desc: "Programma referral: chi ha portato chi, a che punto è ogni persona (colloquio, formazione, primo turno, 3 mesi), premi e percentuali sul venduto Infloww, cosa va pagato", icon: Gift },
       { href: "/admin/hr/sync",           title: "Sincronizzazione ClickUp", desc: "Lista configurata, webhook, ultimo import, conflitti: import completo e registrazione webhook", icon: RefreshCw },
       { href: "/admin/candidate-assessments", title: "Assessment candidati", desc: "Simulatore Academy come test pre-assunzione: crea link, leggi il report (segnale per HR, non gate), registra l'esito", icon: UserCheck },
       { href: "/admin/priority-queue",    title: "Fan da seguire ora", desc: "Quale fan seguire ora per creator: whale in attesa o in raffreddamento, ordinati per valore", icon: Inbox },
