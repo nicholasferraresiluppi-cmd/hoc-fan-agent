@@ -10,6 +10,8 @@
 // fino al valore alla prima apparizione, solo dentro il vetro acceso (fuori: il testo com'è).
 // 26/10/2026: due tinte (hoc:vetro:tinta) — "blu" (vetro bianco su azzurro, accento viola HOC, la
 // prima prova del canvas che Nicholas ha scelto: di base) e "caldo" (il vetro sabbia di prima).
+// Sempre 26/10: sulle pagine in prova (VETRO_PATHS) AppShell avvolge tutto il guscio, così anche il menu
+// a sinistra diventa una lastra di vetro staccata dal bordo, con la voce attiva piena di viola (reel 1).
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { CP_VETRO, CP_VETRO_BLU } from "@/lib/brand";
 
@@ -72,6 +74,10 @@ export function useVetroTint() {
   return [tint, set];
 }
 
+/** Pagine in prova: qui il vetro avvolge anche il menu e le schede in alto (AppShell). */
+export const VETRO_PATHS = ["/admin", "/admin/le-mie-creator"];
+export const isVetroPath = (p) => VETRO_PATHS.includes(String(p || "").replace(/\/$/, "") || "/");
+
 const VetroCtx = createContext(false);
 /** true dentro il vetro acceso: per le cose che esistono solo nella prova (es. la scheda che si apre). */
 export const useInVetro = () => useContext(VetroCtx);
@@ -118,6 +124,7 @@ const TINTS = {
     ink: "linear-gradient(160deg,#2c211a,#16100c)",
     tiles: ["#e9c46a", "#14714a", "#1d1510", "#b8573a", "#2d6b6b", "#8a6a4a"],
     solid: "--cp-surface:rgba(251,246,239,.95);--cp-surfaceAlt:#fffaf3;--cp-border:rgba(60,35,15,.12)",
+    series: ["#1d1510", "#14714a", "#b8573a", "#2d6b6b", "#8a6a4a", "#a89a8c"],
     darkTiles: [0], lvl1: "rgba(122,79,20,.5)", lvl2: "rgba(158,42,51,.55)",
   },
   blu: {
@@ -128,6 +135,8 @@ const TINTS = {
     ink: "linear-gradient(160deg,#7466ee,#4e3fcf)",
     tiles: ["#6353e0", "#2f6bff", "#0f8a8a", "#147a4c", "#e0a33b", "#c2508a"],
     solid: "--cp-surface:rgba(255,255,255,.96);--cp-surfaceAlt:#ffffff;--cp-border:rgba(20,30,60,.10)",
+    // serie dei grafici: validate_palette (dataviz) passa lightness, chroma, daltonici e contrasto; ultima = «Altre»
+    series: ["#6353e0", "#009b9d", "#c97a10", "#c2508a", "#2f6bff", "#9aa2b5"],
     darkTiles: [4], lvl1: "rgba(224,163,59,.75)", lvl2: "rgba(180,48,61,.55)",
   },
 };
@@ -137,6 +146,7 @@ const cssFor = (t) => {
   const T = TINTS[t];
   const GLASS = `background:var(--cp-surface) !important;border:1px solid var(--cp-border) !important;box-shadow:${T.shadow} !important;backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%)`;
   return `
+.hoc-vetro,.hoc-vetro-pop[data-tint="${t}"]{${T.series.map((c, i) => `--vt-c${i === 5 ? "x" : i}:${c};`).join("")}}
 .hoc-vetro{${T.vars}color-scheme:light;position:relative;isolation:isolate;min-height:100vh;color:var(--cp-textPrimary);background:${T.bg};background-attachment:fixed}
 ${SEL}{${GLASS};border-radius:22px !important}
 :root .hoc-vetro .hub-tool{border-radius:16px !important}
@@ -157,6 +167,20 @@ ${SEL}{${GLASS};border-radius:22px !important}
 .hoc-vetro .vt-ico svg{stroke:#fff}
 ${T.tiles.map((c, i) => `.hoc-vetro .vt-ico[data-tone="${i}"]{background:${c}}`).join("")}
 ${T.darkTiles.map((i) => `.hoc-vetro .vt-ico[data-tone="${i}"] svg{stroke:#1d1510}`).join("")}
+/* menu a sinistra: lastra staccata dal bordo (computer), voce attiva piena d'accento */
+:root:not([data-style="v3"]) .hoc-vetro .hoc-desk .hoc-side{top:12px !important;left:12px !important;bottom:12px !important;width:240px !important;border-radius:24px !important;border:1px solid var(--cp-border) !important;background:var(--cp-surface) !important;box-shadow:${T.shadow};backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%)}
+@media (min-width:900px){:root:not([data-style="v3"]) .hoc-vetro .hoc-main{margin-left:264px}}
+:root:not([data-style="v3"]) .hoc-vetro .hoc-side > div:first-child{padding-left:14px !important;padding-right:10px !important}
+:root:not([data-style="v3"]) .hoc-vetro .hoc-side > div{border-color:var(--cp-borderSoft) !important;background:transparent !important}
+:root:not([data-style="v3"]) .hoc-vetro .hoc-side a{border-radius:12px !important;padding-top:9px !important;padding-bottom:9px !important}
+:root:not([data-style="v3"]) .hoc-vetro .hoc-side a:hover{background:var(--cp-surfaceAlt) !important}
+:root:not([data-style="v3"]) .hoc-vetro .hoc-side a[data-on]{background:var(--cp-accent) !important;color:var(--cp-accentInk) !important;box-shadow:0 6px 18px color-mix(in srgb,var(--cp-accent) 35%,transparent) !important}
+:root:not([data-style="v3"]) .hoc-vetro .hoc-side a[data-on] svg{stroke:var(--cp-accentInk) !important}
+:root:not([data-style="v3"]) .hoc-vetro .hoc-side a[data-on] > span[style*="absolute"]{display:none}
+:root:not([data-style="v3"]) .hoc-vetro .hoc-side .hoc-grp{font-family:inherit !important;letter-spacing:.02em !important;font-size:11.5px !important;font-weight:500 !important}
+:root .hoc-vetro .hoc-mhead-v2{background:var(--cp-surfaceAlt) !important;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.hoc-vetro .vt-row21{display:grid;gap:14px;grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+@media (max-width:999px){.hoc-vetro .vt-row21{grid-template-columns:minmax(0,1fr)}}
 @keyframes vt-in{from{opacity:0;filter:blur(14px);transform:scale(.985)}to{opacity:1;filter:none;transform:none}}
 .hoc-vetro .vt-glass,.hoc-vetro .ds-hero,.hoc-vetro .ds-open,.hoc-vetro .hub-tool{animation:vt-in .7s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--vt-i,0) * 80ms)}
 .hoc-vetro .ds-open{--vt-i:2}.hoc-vetro .hub-tool{--vt-i:4}
@@ -170,10 +194,21 @@ const CSS = { caldo: cssFor("caldo"), blu: cssFor("blu") };
 // finestre aperte sopra la pagina (portal su body: fuori dal contenitore, stesse variabili della tinta)
 const POP_CSS = Object.keys(TINTS).map((t) => `.hoc-vetro-pop[data-tint="${t}"]{${TINTS[t].vars}color-scheme:light;color:var(--cp-textPrimary)}`).join("");
 
-export default function VetroScope({ on, children }) {
+export default function VetroScope({ on, stable = false, children }) {
   const [solid] = useVetroSolid();
   const [tint] = useVetroTint();
-  if (!on) return children;
+  const outer = useContext(VetroCtx);
+  // stable (guscio dell'app): stessi elementi acceso o spento, così cambiare pagina non rimonta il menu
+  if (stable) {
+    const live = on && !outer;
+    return (
+      <div className={live ? "hoc-vetro" : undefined} data-solid={live && solid ? "" : undefined}>
+        {live && <style>{CSS[tint] + POP_CSS}</style>}
+        <VetroCtx.Provider value={outer || live}>{children}</VetroCtx.Provider>
+      </div>
+    );
+  }
+  if (!on || outer) return children; // già dentro un vetro (AppShell avvolge le pagine in prova)
   return (
     <div className="hoc-vetro" data-tint={tint} data-solid={solid ? "" : undefined}>
       <style>{CSS[tint] + POP_CSS}</style>

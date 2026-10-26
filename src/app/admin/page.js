@@ -33,7 +33,8 @@ import { useStyle } from "@/lib/theme-client";
 import { PageHead, HeroMetric, Metric, SectionTitle, ActionRow, card } from "@/components/ds";
 import { useIsPhone } from "@/lib/use-phone";
 import { isEarlyMonth } from "@/lib/use-smart-period";
-import VetroScope, { useVetro, VetroSwitch, VetroNum } from "@/components/VetroScope";
+import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
+import { MonthArea, Donut, usd } from "@/components/VetroCharts";
 
 // Tollera 4xx/5xx: ritorna null invece di throware (le metriche mostrano "—")
 const fetcher = async (url) => {
@@ -288,7 +289,7 @@ export default function AdminHub() {
 
   return (
     <VetroScope on={vetro}>
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         actions={<VetroSwitch on={vetro} set={setVetro} />}
         title={`${greeting}${userName ? `, ${userName}` : ""}.`}
@@ -328,6 +329,8 @@ export default function AdminHub() {
           <Metric label="Venduto per turno" value={num(fmt$(perShift(base)))} delta={fmtDelta(perShift(base), perShift(basePrev))} deltaLabel={dl} />
         </div>
       </HeroMetric></div>}
+
+      {!isHr && !noCreators && <HubCharts agency={agency} periodId={periodId} curName={monthName} prevName={prevName} partial={partial} />}
 
       {s4s?.access && (s4s.count > 0 || s4s.missingKit?.length > 0 || s4s.proposals > 0) && (
         <section className="vt-glass" style={{ ...card, marginBottom: 14, "--vt-i": 1 }}>
@@ -484,5 +487,35 @@ function ToolCard({ it, tone = 0 }) {
         {it.desc && <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.45, marginTop: 2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.desc}</div>}
       </div>
     </Link>
+  );
+}
+
+// Il mese che sale e chi porta il venduto (solo stile vetro, 26/10/2026, come la copertina del reel 1):
+// gli stessi turni CreatorsPro del numero qui sopra, giorno per giorno e per creator (agency-sales).
+const capIt = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+const daysOfMonth = (ym) => { const [y, m] = ym.split("-").map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); };
+function HubCharts({ agency, periodId, curName, prevName, partial }) {
+  const inVetro = useInVetro();
+  const cur = agency?.current;
+  if (!inVetro || !cur?.byDay || !cur.lastDay) return null;
+  const prevId = agency.prev_period_id || periodId;
+  const shares = (cur.byCreator || []).map((x) => ({ label: x.alias, value: x.sales }));
+  return (
+    <div className="vt-row21" style={{ marginBottom: 14 }}>
+      <section className="vt-glass" style={{ "--vt-i": 1, borderRadius: 22, padding: 18, minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>{partial ? "Il mese delle tue creator" : "Il mese dell'agenzia"}</div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted }}>venduto sommato giorno per giorno, turni CreatorsPro</div>
+        </div>
+        <MonthArea cur={cur.byDay} prev={agency.prev_full?.byDay || []} days={daysOfMonth(periodId)} prevDays={daysOfMonth(prevId)}
+          upto={cur.lastDay} curLabel={capIt(curName)} prevLabel={capIt(prevName)} />
+      </section>
+      {shares.length > 0 && (
+        <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 12 }}>Chi porta il venduto</div>
+          <Donut items={shares} center={usd(cur.sales)} centerSub={`a ${curName}`} />
+        </section>
+      )}
+    </div>
   );
 }

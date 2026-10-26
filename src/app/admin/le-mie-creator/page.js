@@ -8,12 +8,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import useSWR from "swr";
-import { UserCheck, UserX, Clock, ExternalLink, ArrowRight, Flag, Maximize2, X } from "lucide-react";
+import { UserCheck, UserX, Clock, ExternalLink, ArrowRight, Flag, Maximize2, X, Wallet, Target, MessageCircle, AlertTriangle } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { Notice } from "@/components/ds";
 import { liveFetcher } from "@/components/LiveCreatorPicker";
 import { COUNTRY_NAMES } from "@/lib/live-creators";
 import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro, useVetroTint } from "@/components/VetroScope";
+import { MonthArea, Donut, Spark, KpiCard } from "@/components/VetroCharts";
 
 const NUM = { fontVariantNumeric: "tabular-nums" };
 const group = (n) => String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -43,7 +44,7 @@ export default function LeMieCreatorPage() {
 
   return (
     <VetroScope on={vetro}>
-    <div style={{ maxWidth: 1180, margin: "0 auto", padding: "8px 16px 40px", fontFamily: FONTS.body }}>
+    <div style={{ maxWidth: 1600, margin: "0 auto", padding: "8px 16px 40px", fontFamily: FONTS.body }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0, color: CP.textPrimary }}>Le mie creator</h1>
@@ -65,6 +66,7 @@ export default function LeMieCreatorPage() {
         </div>
       )}
       {data && !list.length && <Notice>Non hai creator assegnate in questo strumento.</Notice>}
+      {list.length > 0 && <Overview list={list} />}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
         {list.map((c, i) => <CreatorCard key={c.slug} c={c} i={i} hidden={open === c.slug}
@@ -73,6 +75,68 @@ export default function LeMieCreatorPage() {
       {openC && <CreatorDetail c={openC} originEl={cardEls.current[openC.slug]} onClose={() => setOpen(null)} />}
     </div>
     </VetroScope>
+  );
+}
+
+const MONTHS = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+const daysIn = (ym) => { const [y, m] = ym.split("-").map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); };
+const prevYm = (ym) => { const [y, m] = ym.split("-").map(Number); return new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7); };
+const pct = (a, b) => (b > 0 ? Math.round(((a - b) / b) * 100) : null);
+const signPct = (v) => (v == null ? null : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v)}%`);
+
+// Colpo d'occhio sopra le schede (solo stile vetro, 26/10/2026 sul modello della copertina del reel 1):
+// quattro numeri, il mese di tutte le creator che sale contro il mese prima, e chi porta il venduto.
+// Tutto dai dati che la pagina ha già (live-overview); il confronto col mese prima è sui giorni CHIUSI.
+function Overview({ list }) {
+  const inVetro = useInVetro();
+  if (!inVetro) return null;
+  const withRev = list.filter((c) => c.revenue?.month);
+  if (!withRev.length) return null;
+  const month = withRev[0].revenue.month;
+  const day = Math.max(...withRev.map((c) => c.revenue.day || 0));
+  const days = withRev[0].revenue.days || daysIn(month);
+  const sumArr = (k) => { const o = new Array(31).fill(0); for (const c of withRev) (c.revenue[k] || []).forEach((v, i) => { o[i] += Number(v) || 0; }); return o; };
+  const cur = sumArr("daily"), prev = sumArr("prevDaily");
+  const closed = Math.max(0, day - 1);
+  const curClosed = cur.slice(0, closed).reduce((a, b) => a + b, 0), prevClosed = prev.slice(0, closed).reduce((a, b) => a + b, 0);
+  const d = closed ? pct(curClosed, prevClosed) : null;
+  const mtd = withRev.reduce((a, c) => a + (c.revenue.mtd || 0), 0);
+  const proj = withRev.reduce((a, c) => a + (c.revenue.proj || 0), 0);
+  const allGoals = withRev.every((c) => c.revenue.goal != null);
+  const goal = allGoals ? withRev.reduce((a, c) => a + c.revenue.goal, 0) : null;
+  const waiting = list.reduce((a, c) => a + c.countries.reduce((b, x) => b + x.waiting, 0), 0);
+  const bought = list.reduce((a, c) => a + c.countries.reduce((b, x) => b + x.waitingSpenders, 0), 0);
+  const toWatch = list.filter((c) => c.light.level === 2).length;
+  const curName = MONTHS[Number(month.slice(5, 7)) - 1], prevName = MONTHS[Number(prevYm(month).slice(5, 7)) - 1];
+  const shares = [...withRev].sort((a, b) => (b.revenue.mtd || 0) - (a.revenue.mtd || 0)).map((c) => ({ label: c.name, value: c.revenue.mtd || 0 }));
+  return (
+    <div style={{ display: "grid", gap: 14, marginBottom: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14 }}>
+        <KpiCard i={0} icon={Wallet} tone={0} label={`Venduto a ${curName}`} value={<VetroNum value={usd(mtd)} />}
+          sub={d != null ? `${signPct(d)} su ${prevName} nei primi ${closed} giorni chiusi` : "Il confronto parte col primo giorno chiuso"}
+          spark={<Spark data={cur.slice(0, day)} />} />
+        <KpiCard i={1} icon={Target} tone={1} label="Arrivo previsto" value={<VetroNum value={usd(proj)} />}
+          sub={goal ? `Traguardo ${usd(goal)}: ${proj >= goal ? "ci arriva" : `mancano ${usd(goal - proj)}`}` : "Non tutte hanno un traguardo"} />
+        <KpiCard i={2} icon={MessageCircle} tone={4} label="Fan in attesa" value={<VetroNum value={String(waiting)} />}
+          sub={bought ? `${bought} ${bought === 1 ? "ha" : "hanno"} già comprato: rispondi prima a loro` : "Nessuno di quelli che hanno comprato"} />
+        <KpiCard i={3} icon={AlertTriangle} tone={3} label="Da guardare" value={<VetroNum value={String(toWatch)} />}
+          sub={`su ${list.length} creator${toWatch ? ": sono in cima" : ""}`} />
+      </div>
+      <div className="vt-row21">
+        <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Il mese di tutte le tue creator</div>
+            <div style={{ fontSize: 12.5, color: CP.textMuted }}>venduto sommato giorno per giorno</div>
+          </div>
+          <MonthArea cur={cur} prev={prev} days={days} prevDays={daysIn(prevYm(month))} upto={day} goal={goal} curLabel={cap(curName)} prevLabel={cap(prevName)} />
+        </section>
+        <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 12 }}>Chi porta il venduto</div>
+          <Donut items={shares} center={usd(mtd)} centerSub={`a ${curName}`} />
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -117,6 +181,7 @@ function CreatorCard({ c, i = 0, hidden, cardRef, onOpen }) {
       )}
 
       {r ? <MiniRace r={r} /> : <div style={{ fontSize: 13, color: CP.textMuted }}>Revenue non disponibile adesso.</div>}
+      {inVetro && r?.daily && r.day > 1 && <Spark data={r.daily.slice(0, r.day)} height={30} />}
 
       <div style={{ display: "grid", gap: 6 }}>
         {c.countries.map((x) => <ShiftLine key={x.country} s={x.shift} label={multi ? x.country : null} />)}
