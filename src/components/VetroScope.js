@@ -75,7 +75,7 @@ export function useVetroTint() {
 }
 
 /** Pagine in prova: qui il vetro avvolge anche il menu e le schede in alto (AppShell). */
-export const VETRO_PATHS = ["/admin", "/admin/le-mie-creator"];
+export const VETRO_PATHS = ["/admin", "/admin/le-mie-creator", "/admin/bilancio"];
 export const isVetroPath = (p) => VETRO_PATHS.includes(String(p || "").replace(/\/$/, "") || "/");
 
 const VetroCtx = createContext(false);

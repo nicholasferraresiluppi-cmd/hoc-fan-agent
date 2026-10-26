@@ -7,14 +7,19 @@
 // ECOSISTEMI con il totale di squadra contro il goal; chi è indietro legge quanto SERVE al giorno,
 // mai "in perdita" (Nicholas: "avevo paura che chi vede la sua creator in svantaggio si demoralizzi").
 // Conti e definizioni in src/lib/bilancio-core.js. Goal condivisi con Revenue e chat.
+// 26/10/2026: stile vetro (terza pagina della prova dopo Casa e Le mie creator): riquadri con i numeri,
+// il mese che sale contro il mese prima e il ritmo del goal, il venduto per ecosistema. Col vetro spento
+// la pagina è quella di prima. Anche qui niente rosso per chi è indietro: verde solo per «ci arriva».
 
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import { RefreshCw, Pencil, Check, ChevronLeft, ChevronRight, CalendarDays, Plus } from "lucide-react";
+import { RefreshCw, Pencil, Check, ChevronLeft, ChevronRight, CalendarDays, Plus, Wallet, Target, TrendingUp, History } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHead, Notice, card } from "@/components/ds";
 import { liveFetcher } from "@/components/LiveCreatorPicker";
 import { MONTHS_IT } from "@/lib/format";
+import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
+import { MonthArea, Donut, Spark, KpiCard } from "@/components/VetroCharts";
 
 const NUM = { fontVariantNumeric: "tabular-nums" };
 const ok = (v) => v != null && Number.isFinite(Number(v));
@@ -55,33 +60,39 @@ export default function BilancioPage() {
   };
 
   const mine = useMemo(() => new Set(data?.mine || []), [data]);
+  const [vetro, setVetro] = useVetro();
 
   return (
+    <VetroScope on={vetro}>
     <div style={{ maxWidth: 1600, margin: "0 auto", padding: "8px 16px 56px", fontFamily: FONTS.body }}>
       <PageHead
         title="Bilancio del mese"
         subtitle="Tutte le creator dello split, ognuna misurata sul suo goal, divise per ecosistema."
-        actions={data && (
+        actions={(
           <>
-            {data.canEdit && (
+            <VetroSwitch on={vetro} set={setVetro} />
+            {data?.canEdit && (
               <button onClick={() => setEditing((v) => !v)} style={btn(editing)}>
                 {editing ? <Check size={14} /> : <Pencil size={14} />} {editing ? "Fatto" : "Goal ed ecosistemi"}
               </button>
             )}
-            <button onClick={refresh} disabled={refreshing} style={btn(false)} title="Ricalcola adesso dal warehouse">
-              <RefreshCw size={14} style={refreshing ? { animation: "spin 1s linear infinite" } : null} /> Aggiorna
-            </button>
+            {data && (
+              <button onClick={refresh} disabled={refreshing} style={btn(false)} title="Ricalcola adesso dal warehouse">
+                <RefreshCw size={14} style={refreshing ? { animation: "spin 1s linear infinite" } : null} /> Aggiorna
+              </button>
+            )}
           </>
         )}
       />
 
       {data && <DayNav data={data} go={go} />}
       {error && <Notice danger>{error.message}</Notice>}
-      {isLoading && !data && <div style={{ ...card, padding: 24, color: CP.textMuted, fontSize: 14 }}>Sto sommando il venduto di tutte le creator…</div>}
+      {isLoading && !data && <div className="vt-glass" style={{ ...card, padding: 24, color: CP.textMuted, fontSize: 14 }}>Sto sommando il venduto di tutte le creator…</div>}
 
       {data && (
         <div style={{ opacity: isLoading ? 0.55 : 1, transition: "opacity .15s" }}>
           <Summary data={data} />
+          <Charts data={data} />
           {editing && <GroupEditor data={data} onSaved={() => mutate()} />}
           <div style={{ display: "grid", gap: 16 }}>
             {data.groups.map((g) => <Ecosystem key={g.id} g={g} data={data} mine={mine} editing={editing} onSaved={() => mutate()} />)}
@@ -98,6 +109,7 @@ export default function BilancioPage() {
       )}
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
+    </VetroScope>
   );
 }
 
@@ -143,6 +155,21 @@ function Summary({ data }) {
     { label: data.daysLeft ? "Arrivo previsto" : "Chiuso a", value: usd(data.daysLeft ? t.projection : t.mtd), note: <StatusText r={t} closed={!data.daysLeft} />, noteColor: CP.textSecondary },
     { label: "Mese precedente", value: usd(t.prev), note: ok(t.deltaPrev) ? `${t.deltaPrev >= 0 ? "+" : "−"}$${group(t.deltaPrev)}${data.daysLeft ? " nella proiezione" : ""}` : null, noteColor: ok(t.deltaPrev) && t.deltaPrev >= 0 ? CP.accentGreen : CP.textSecondary },
   ];
+  const inVetro = useInVetro();
+  if (inVetro) {
+    const icons = [[Wallet, 0], [Target, 1], [TrendingUp, 3], [History, 4]];
+    const spark = data.days.filter((d) => !d.future).map((d) => d.total || 0);
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, marginBottom: 14 }}>
+        {items.map((x, i) => (
+          <KpiCard key={x.label} i={i} icon={icons[i][0]} tone={icons[i][1]} label={x.label}
+            value={typeof x.value === "string" ? <VetroNum value={x.value} /> : x.value}
+            sub={x.note ? <span style={{ color: x.noteColor || CP.textMuted }}>{x.note}</span> : null}
+            spark={i === 0 && spark.length > 1 ? <Spark data={spark} /> : null} />
+        ))}
+      </div>
+    );
+  }
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 24 }}>
       {items.map((x) => (
@@ -152,6 +179,38 @@ function Summary({ data }) {
           {x.note && <div style={{ fontSize: 12.5, color: x.noteColor || CP.textSecondary, marginTop: 4, ...NUM }}>{x.note}</div>}
         </div>
       ))}
+    </div>
+  );
+}
+
+// Il mese che sale e chi porta il venduto (solo col vetro): somma dello split giorno per giorno contro
+// il mese prima (stessi account) e il ritmo del goal; ciambella per ecosistema, così si legge il lavoro
+// di squadra. Il mese prima manca solo nelle cache scritte prima del 26/10 (si riempie al ricalcolo).
+function Charts({ data }) {
+  const inVetro = useInVetro();
+  if (!inVetro) return null;
+  const cur = data.days.map((d) => d.total || 0);
+  const upto = data.days.filter((d) => !d.future).length;
+  const [y, m] = data.month.split("-").map(Number);
+  const prevDays = new Date(Date.UTC(y, m - 1, 0)).getUTCDate();
+  const curName = MONTHS_IT[m - 1], prevName = MONTHS_IT[(m + 10) % 12];
+  const eco = data.groups.filter((g) => ok(g.mtd) && g.mtd > 0).map((g) => ({ label: g.name, value: g.mtd })).sort((a, b) => b.value - a.value);
+  return (
+    <div className="vt-row21" style={{ marginBottom: 16 }}>
+      <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>{cap(curName)} di tutto lo split</div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted }}>venduto sommato giorno per giorno{data.live ? ", oggi in corso" : ""}</div>
+        </div>
+        <MonthArea cur={cur} prev={data.prevDaily || []} days={data.daysInMonth} prevDays={prevDays} upto={upto}
+          goal={ok(data.totals.goal) ? data.totals.goal : null} curLabel={cap(curName)} prevLabel={cap(prevName)} />
+      </section>
+      {eco.length > 0 && (
+        <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 12 }}>Venduto per ecosistema</div>
+          <Donut items={eco} center={usd(data.totals.mtd)} centerSub={`a ${curName}`} />
+        </section>
+      )}
     </div>
   );
 }
@@ -183,7 +242,7 @@ function Ecosystem({ g, data, mine, editing, onSaved }) {
   const soloLine = solo ? [[...new Set(solo.accounts.map((a) => a.sm).filter(Boolean))].join(" · ") && `SM ${[...new Set(solo.accounts.map((a) => a.sm).filter(Boolean))].join(" · ")}`, [...new Set(solo.accounts.map((a) => a.am).filter(Boolean))].join(" · ") && `AM ${[...new Set(solo.accounts.map((a) => a.am).filter(Boolean))].join(" · ")}`].filter(Boolean).join(" · ") : null;
   const isMine = solo ? mine.has(solo.slug) : false;
   return (
-    <section style={{ ...card, overflow: "hidden", ...(isMine ? { borderColor: alpha(CP.accent, "66") } : null) }}>
+    <section className="vt-glass" data-lvl={g.status === "arriva" ? 0 : undefined} style={{ ...card, overflow: "hidden", ...(isMine ? { borderColor: alpha(CP.accent, "66") } : null) }}>
       <header style={{ padding: "16px 18px 14px", display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 260px", minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
@@ -355,7 +414,7 @@ function GroupEditor({ data, onSaved }) {
     } catch (e) { setMsg(e.message); }
   };
   return (
-    <section style={{ ...card, padding: "16px 18px", marginBottom: 16 }}>
+    <section className="vt-glass" style={{ ...card, padding: "16px 18px", marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>Ecosistemi</h2>
         <span style={{ fontSize: 12.5, color: CP.textMuted, maxWidth: 720 }}>Un gruppo di creator che condividono le persone. Ogni creator sta in un solo ecosistema; senza ecosistema finisce in «Altre creator». Goal, SM e AM si cambiano direttamente nelle tabelle sotto.</span>
@@ -399,7 +458,7 @@ function TheDay({ data }) {
       <h2 style={{ fontSize: 16, fontWeight: 500, margin: "0 0 10px", color: CP.textPrimary }}>
         La giornata <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 13.5 }}>{dayLabel(data.asOf)}{data.live ? " · in corso" : ""}</span>
       </h2>
-      <div style={{ ...card, overflowX: "auto" }}>
+      <div className="vt-glass" style={{ ...card, overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
           <thead><tr>
             <th style={{ ...th, textAlign: "left" }}>Creator</th>
@@ -442,7 +501,7 @@ function Days({ data, go }) {
       <h2 style={{ fontSize: 16, fontWeight: 500, margin: "0 0 10px", color: CP.textPrimary }}>
         Andamento di {monthLabel(data.month).toLowerCase()} <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 13.5 }}>tocca un giorno per aprirlo</span>
       </h2>
-      <div style={{ ...card, overflowX: "auto" }}>
+      <div className="vt-glass" style={{ ...card, overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
           <thead>
             <tr>
