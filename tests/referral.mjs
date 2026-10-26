@@ -1,7 +1,7 @@
 // Unit test — referral-core («Porta un collega»). Esegui: node tests/referral.mjs
 import assert from "node:assert/strict";
 import {
-  REFERRAL_RULES as R, parseFx, shiftDatesFromWages, monthsSince, blockSales, addMonths, monthEnd, validateRecruit, validateStory, validateReferrer,
+  REFERRAL_RULES as R, recruitMetrics, buildDashboard, parseFx, shiftDatesFromWages, monthsSince, blockSales, addMonths, monthEnd, validateRecruit, validateStory, validateReferrer,
   recruitMilestones, storyMilestone, summarize, recruitSteps, referrerView, salesMapFromKpiRows, salesFor,
   findDuplicateRecruit,
 } from "../src/lib/referral-core.js";
@@ -151,6 +151,44 @@ const turni = (n, from = "2026-11-03") => Array.from({ length: n }, (_, i) => { 
     { member_id: 8, member_name: "Ada Neri", shifts: [{ started_at: "2026-11-04T10:00:00Z" }] },
   ], { 7: "Luca Verdi" }, now);
   eq(map, { "luca verdi": ["2026-11-04"], "ada neri": ["2026-11-04"] }, "23:30 UTC = giorno dopo a Roma; turno futuro escluso");
+}
+
+
+// ── dashboard del programma ─────────────────────────────────────────────────
+{
+  const today = "2027-03-01";
+  const mk = (id, ref, o = {}, salesByMonth = {}, shiftDates = null) => {
+    const r = { id, name: id, referrerId: ref, trainingPassed: true, firstShiftAt: "2026-11-03", createdAt: Date.parse("2026-10-15"), ...o };
+    return { ...r, metrics: recruitMetrics(r, { salesByMonth, shiftDates }), milestones: recruitMilestones(r, { today, salesByMonth, shiftDates, fx: FX }) };
+  };
+  const recs = [
+    mk("a", "g", { storyId: "s1" }, { "2026-11": 5000, "2026-12": 5000 }, turni(40)),   // 25 turni, $200/turno
+    mk("b", "g", {}, { "2026-11": 1000 }, turni(10)),                                     // 10 turni, ancora dentro
+    mk("c", "m", { exitedAt: "2026-11-20" }, { "2026-11": 300 }, turni(6)),               // uscita a 6 turni
+    mk("d", "m", { trainingPassed: false, firstShiftAt: null }),                         // formazione non superata
+    mk("e", "m", {}, { "2026-11": 100 }, turni(28)),                                      // 25 turni, $100/turno... (28 turni a nov)
+  ];
+  const stories = [
+    { id: "s1", referrerId: "g", agreedAt: "2026-10-01", publishedAt: ["2026-10-02", "2026-10-05"] },
+    { id: "s2", referrerId: "m", agreedAt: "2026-10-01", publishedAt: ["2026-10-02"] },
+  ].map((s) => ({ ...s, milestone: storyMilestone(s, { today }) }));
+  const d = buildDashboard({ referrers: [{ id: "g", name: "Giulia" }, { id: "m", name: "Marco" }], recruits: recs, stories, fx: FX, today });
+  eq(d.funnel.map((f) => f.n), [5, 0, 4, 4, 2, 0, 0], "imbuto");
+  eq([d.storyStats.published, d.storyStats.expired, d.storyStats.publishers, d.storyStats.recruitsFromStories], [1, 1, 1, 1], "storie");
+  eq(d.storyStats.byReferrer[0].name, "Giulia", "chi ha pubblicato in cima");
+  const g = d.quality.find((q) => q.name === "Giulia"), m = d.quality.find((q) => q.name === "Marco");
+  eq([g.referred, g.reached25, g.decided, g.fewData], [2, 1, 1, true], "Giulia: pochi dati, non si giudica");
+  eq(g.tenurePct, null);
+  eq([m.reached25, m.decided, m.tenurePct], [1, 3, 33.3], "Marco: 1 su 3 decise arriva a 25 turni");
+  ok(g.perShift > m.perShift && g.vsAvg > 1 && m.vsAvg < 1, "venduto a turno contro la media del programma");
+  eq(recs[2].metrics.perShift, 50, "6 turni: venduto a turno calcolato (≥5)");
+  eq(d.quality[0].name, "Giulia", "a pari 25 turni, prima chi vende di più a turno");
+  ok(d.economics.costEur > 0 && d.economics.marginEur > 0 && d.economics.costPer25 === Math.round(d.economics.costEur / 2 * 100) / 100, "costo e ritorno");
+  eq(d.trend, [{ month: "2026-10", referred: 5, started: 0 }, { month: "2026-11", referred: 0, started: 4 }], "andamento");
+  const gap = buildDashboard({ today, recruits: [mk("x", "g", { createdAt: Date.parse("2026-08-10") }), mk("y", "g", { createdAt: Date.parse("2026-10-10"), trainingPassed: false, firstShiftAt: null })] });
+  eq(gap.trend.map((x) => x.month), ["2026-08", "2026-09", "2026-10", "2026-11"], "i mesi vuoti restano, a zero");
+  eq(recruitSteps({ id: "z", trainingPassed: false }, [], { today }).closedWhy, "Formazione non superata");
+  eq(buildDashboard({ today }).economics.costPer25, null, "programma vuoto: niente divisioni per zero");
 }
 
 // ── venduto Infloww ─────────────────────────────────────────────────────────

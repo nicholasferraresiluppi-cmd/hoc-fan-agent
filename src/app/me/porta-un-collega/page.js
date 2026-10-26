@@ -33,8 +33,22 @@ function RecruitCard({ r }) {
       </div>
       {r.exited && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4 }}>Non lavora più in agenzia: restano i premi già sbloccati.</div>}
       <Steps steps={r.steps} next={r.next} />
+      {(() => {
+        // il prossimo premio a turni e quanti turni mancano: la cosa da guardare insieme alla persona
+        const nxt = r.milestones.find((m) => (m.kind === "shifts" || m.kind === "commission") && (m.status === "in_attesa" || m.status === "in_corso") && m.shiftsDone != null);
+        if (!nxt || r.exited) return null;
+        const target = nxt.kind === "shifts" ? nxt.shifts : nxt.shiftsTo;
+        const left = Math.max(0, target - nxt.shiftsDone);
+        const prizes = r.milestones.filter((m) => (m.shifts === target || m.shiftsTo === target) && m.status !== "pagato" && m.status !== "maturato");
+        const what = prizes.map((m) => (m.kind === "shifts" ? fmtEur(m.amountEur) : `il ${String(m.pct * 100).replace(".", ",")}% sul venduto`)).join(" + ");
+        return left > 0 ? (
+          <div style={{ fontSize: 13, color: CP.textSecondary, margin: "2px 0 8px" }}>
+            Prossimo premio: <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{what}</b> a {target} turni — ne mancano {left}.
+          </div>
+        ) : null;
+      })()}
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
-        style={{ background: "none", border: "none", padding: 0, color: CP.accentSoftText, cursor: "pointer", fontSize: 13, font: "inherit" }}>
+        style={{ background: "none", border: "none", padding: 0, color: CP.accentSoftText, cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>
         {open ? "Nascondi i premi" : "Vedi i premi uno per uno"}
       </button>
       {open && <div style={{ marginTop: 6 }}>{r.milestones.map((m) => <MilestoneRow key={m.key} m={m} />)}</div>}
@@ -108,7 +122,7 @@ export default function PortaUnCollegaPage() {
             </section>
           )}
 
-          <Disclosure open={rulesOpen} onToggle={() => setRulesOpen((v) => !v)} title="Come si guadagna" summary="storie, primo turno, tre mesi, percentuale sul venduto">
+          <Disclosure open={rulesOpen} onToggle={() => setRulesOpen((v) => !v)} title="Come si guadagna" summary="storie, primo turno, premi ogni 25 turni, percentuale sul venduto">
             <RulesList rules={data.rules} />
           </Disclosure>
         </>
