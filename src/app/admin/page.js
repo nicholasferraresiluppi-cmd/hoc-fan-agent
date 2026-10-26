@@ -33,6 +33,8 @@ import { useStyle } from "@/lib/theme-client";
 import { PageHead, HeroMetric, Metric, SectionTitle, ActionRow, card } from "@/components/ds";
 import { useIsPhone } from "@/lib/use-phone";
 import { isEarlyMonth } from "@/lib/use-smart-period";
+import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
+import { MonthArea, Donut, usd } from "@/components/VetroCharts";
 
 // Tollera 4xx/5xx: ritorna null invece di throware (le metriche mostrano "—")
 const fetcher = async (url) => {
@@ -258,6 +260,10 @@ export default function AdminHub() {
     .sort((a, b) => (a.severity === "critical" ? 0 : 1) - (b.severity === "critical" ? 0 : 1));
 
   const [st] = useStyle();
+  // Stile vetro in prova su questa pagina (VetroScope), spegnibile dall'intestazione
+  const [vetro, setVetro] = useVetro();
+  // numeri che salgono (VetroNum); nello stile Casa li fa già NumText, che vuole una stringa
+  const num = (v) => (st === "v3" ? v : <VetroNum value={v} />);
   // Telefono (10/10/2026, Nicholas: "sembra un libro"): verdetto corto, 3 alert, decisioni in una riga,
   // scorciatoie al posto dell'elenco degli strumenti. Il computer resta com'è.
   const phone = useIsPhone();
@@ -282,8 +288,10 @@ export default function AdminHub() {
   const loopNote = (x, fallback) => x?.reason === "no_history" ? "servono 2 mesi di dati" : x?.reason ? fallback : null;
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
+    <VetroScope on={vetro}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
+        actions={<VetroSwitch on={vetro} set={setVetro} />}
         title={`${greeting}${userName ? `, ${userName}` : ""}.`}
         line2={isHr ? null : phone && dSales != null && cmp?.until_day >= FEW_DAYS && !agency?.incomplete ? `${fmtPct(dSales)} su ${prevName}, stessi giorni.` : paceLine}
         subtitle={isHr ? "Persone, accessi e contestazioni: da qui parti per il lavoro di oggi."
@@ -291,7 +299,7 @@ export default function AdminHub() {
       />
 
       {noCreators && !isHr && (
-        <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+        <section className="vt-glass" style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
           <SectionTitle>Non hai ancora creator assegnate</SectionTitle>
           <div style={{ fontSize: 14, color: CP.textSecondary, lineHeight: 1.55 }}>
             Le pagine di vendita mostrano solo le creator che segui. Finché un admin non te le assegna (Membri e ruoli → la tua scheda → Creator visibili), qui e nelle classifiche non vedrai numeri.
@@ -299,9 +307,9 @@ export default function AdminHub() {
         </section>
       )}
 
-      {!isHr && !noCreators && <HeroMetric
+      {!isHr && !noCreators && <div className="vt-hero" data-tone={dSales != null && cmp?.until_day >= FEW_DAYS && !agency?.incomplete && dSales > 3 ? "good" : "ink"}><HeroMetric
         label={`${partial ? `Venduto delle tue ${me.creators.count} creator` : "Venduto agenzia"} · ${monthName} finora`}
-        value={fmt$(agency?.current?.sales)}
+        value={num(fmt$(agency?.current?.sales))}
         compare={phone && cmp?.until_day ? `${fmt$(cmp.prev.sales)} a ${prevName} negli stessi giorni` : compareLine}
         hint={<>
           {agency?.incomplete && (
@@ -315,15 +323,17 @@ export default function AdminHub() {
         </>}
       >
         <div className="hub-metrics" style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
-          <Metric label="Operatori attivi" value={fmtInt(base?.operators)} delta={fmtDelta(base?.operators, basePrev?.operators)} deltaLabel={dl} />
-          <Metric label="Creator" value={fmtInt(base?.creators)} />
-          <Metric label="Turni" value={fmtInt(base?.shifts)} delta={fmtDelta(base?.shifts, basePrev?.shifts)} deltaLabel={dl} />
-          <Metric label="Venduto per turno" value={fmt$(perShift(base))} delta={fmtDelta(perShift(base), perShift(basePrev))} deltaLabel={dl} />
+          <Metric label="Operatori attivi" value={num(fmtInt(base?.operators))} delta={fmtDelta(base?.operators, basePrev?.operators)} deltaLabel={dl} />
+          <Metric label="Creator" value={num(fmtInt(base?.creators))} />
+          <Metric label="Turni" value={num(fmtInt(base?.shifts))} delta={fmtDelta(base?.shifts, basePrev?.shifts)} deltaLabel={dl} />
+          <Metric label="Venduto per turno" value={num(fmt$(perShift(base)))} delta={fmtDelta(perShift(base), perShift(basePrev))} deltaLabel={dl} />
         </div>
-      </HeroMetric>}
+      </HeroMetric></div>}
+
+      {!isHr && !noCreators && <HubCharts agency={agency} periodId={periodId} curName={monthName} prevName={prevName} partial={partial} />}
 
       {s4s?.access && (s4s.count > 0 || s4s.missingKit?.length > 0 || s4s.proposals > 0) && (
-        <section style={{ ...card, marginBottom: 14 }}>
+        <section className="vt-glass" style={{ ...card, marginBottom: 14, "--vt-i": 1 }}>
           <div style={{ padding: "14px 16px 10px" }}>
             <SectionTitle aside={s4s.count ? `${s4s.count} da fare` : null}>S4S</SectionTitle>
           </div>
@@ -367,7 +377,7 @@ export default function AdminHub() {
       )}
 
       {phone && wantDecisions && decisions.length > 0 && (
-        <Link href="/admin/roadmap" style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 16px", marginBottom: 14, textDecoration: "none", color: CP.textPrimary }}>
+        <Link href="/admin/roadmap" className="vt-glass" style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 16px", marginBottom: 14, textDecoration: "none", color: CP.textPrimary }}>
           <span><span style={{ fontSize: 15 }}>{decisions.length} {decisions.length === 1 ? "decisione ti aspetta" : "decisioni ti aspettano"}</span>
             <span style={{ display: "block", fontSize: 12.5, color: CP.textMuted, marginTop: 2 }}>la più vecchia da {daysAgo(decisions[0].added_at) ?? "?"} giorni</span></span>
           <span style={{ color: CP.accentSoftText }}>→</span>
@@ -397,11 +407,11 @@ export default function AdminHub() {
         <section className="ds-open" style={{ ...card, padding: "14px 16px", marginBottom: 24 }}>
           <SectionTitle aside={loopPeriod === prevId ? `${prevName}: il mese appena chiuso, come la Classifica` : "coaching e sostituzioni del mese scorso, misurati su questo"}>Le decisioni sulle persone funzionano?</SectionTitle>
           <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
-            <Metric label="Migliorati dopo il coaching" value={loop.coaching?.rate != null ? `${loop.coaching.rate}%` : "—"}
+            <Metric label="Migliorati dopo il coaching" value={num(loop.coaching?.rate != null ? `${loop.coaching.rate}%` : "—")}
               note={loop.coaching?.total ? `${loop.coaching.improved} su ${loop.coaching.total}, almeno +5 punti` : loopNote(loop.coaching, "nessun coaching completato")} />
-            <Metric label="Sostituzioni riuscite" value={loop.swaps?.rate != null ? `${loop.swaps.rate}%` : "—"}
+            <Metric label="Sostituzioni riuscite" value={num(loop.swaps?.rate != null ? `${loop.swaps.rate}%` : "—")}
               note={loop.swaps?.total ? `${loop.swaps.success} su ${loop.swaps.total}, sostituto con score ≥ 50` : loopNote(loop.swaps, "nessuna sostituzione")} />
-            <Metric label="Score medio agenzia" value={trend?.current != null ? String(trend.current).replace(".", ",") : "—"}
+            <Metric label="Score medio agenzia" value={num(trend?.current != null ? String(trend.current).replace(".", ",") : "—")}
               note={trend?.delta != null ? `${trend.delta > 0 ? "+" : trend.delta < 0 ? "−" : ""}${String(Math.abs(trend.delta)).replace(".", ",")} punti sul mese prima` : loopNote(trend, "")} />
           </div>
         </section>
@@ -413,9 +423,9 @@ export default function AdminHub() {
           <section style={{ marginBottom: 18 }}>
             <h2 className="ds-sect" style={{ fontSize: 16, fontWeight: 500, margin: "6px 0 10px", color: CP.textPrimary }}>Vai a</h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
-              {quick.map((it) => { const Icon = it.icon || LayoutDashboard; return (
+              {quick.map((it, qi) => { const Icon = it.icon || LayoutDashboard; return (
                 <Link key={it.href} href={it.href} className="hub-tool" style={{ ...card, display: "flex", flexDirection: "column", gap: 10, padding: "14px 14px 12px", textDecoration: "none", color: CP.textPrimary, minHeight: 86 }}>
-                  <Icon size={18} color={CP.textMuted} strokeWidth={1.8} />
+                  <span className="vt-ico" data-tone={qi % 6} style={{ display: "inline-flex" }}><Icon size={18} color={CP.textMuted} strokeWidth={1.8} /></span>
                   <span style={{ fontSize: 14.5, fontWeight: 500, lineHeight: 1.25 }}>{it.title}</span>
                 </Link>
               ); })}
@@ -439,7 +449,7 @@ export default function AdminHub() {
         <section style={{ marginBottom: 22 }}>
           <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 8 }}>I tuoi strumenti · {WORKSPACES[ws]?.label}</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8 }}>
-            {mine.map((it) => <ToolCard key={it.href} it={it} />)}
+            {mine.map((it, i) => <ToolCard key={it.href} it={it} tone={i % 6} />)}
           </div>
         </section>
       )}
@@ -449,11 +459,11 @@ export default function AdminHub() {
           {showAll ? "Nascondi gli altri strumenti" : `Tutti gli strumenti (${others.reduce((n, g) => n + g.items.length, 0)})`}
         </button>
       )}
-      {othersOpen && others.map((g) => (
+      {othersOpen && others.map((g, gi) => (
         <section key={g.label} style={{ marginBottom: 22 }}>
           <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 8 }}>{g.label}</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8 }}>
-            {g.items.map((it) => <ToolCard key={it.href} it={it} />)}
+            {g.items.map((it) => <ToolCard key={it.href} it={it} tone={gi % 6} />)}
           </div>
         </section>
       ))}
@@ -461,19 +471,51 @@ export default function AdminHub() {
       <style>{`.hub-tool:hover{background:${CP.surfaceAlt} !important}
 @media (max-width:699px){.hub-metrics{display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 18px !important}.ds-arow > div{flex:1 1 0 !important}.ds-arow .ds-arow-go{margin-left:20px}}`}</style>
     </div>
+    </VetroScope>
   );
 }
 
-function ToolCard({ it }) {
+// tone: colore del gruppo, usato solo dallo stile vetro (VetroScope) per la tessera dell'icona
+function ToolCard({ it, tone = 0 }) {
   const Icon = it.icon;
   return (
     <Link href={it.href} className="hub-tool"
       style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px", ...card, textDecoration: "none", color: CP.textPrimary }}>
-      <Icon size={16} color={CP.textMuted} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 2 }} />
+      <span className="vt-ico" data-tone={tone} style={{ display: "inline-flex", flexShrink: 0, marginTop: 2 }}><Icon size={16} color={CP.textMuted} strokeWidth={1.8} /></span>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 500 }}>{it.title}</div>
         {it.desc && <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.45, marginTop: 2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.desc}</div>}
       </div>
     </Link>
+  );
+}
+
+// Il mese che sale e chi porta il venduto (solo stile vetro, 26/10/2026, come la copertina del reel 1):
+// gli stessi turni CreatorsPro del numero qui sopra, giorno per giorno e per creator (agency-sales).
+const capIt = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+const daysOfMonth = (ym) => { const [y, m] = ym.split("-").map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); };
+function HubCharts({ agency, periodId, curName, prevName, partial }) {
+  const inVetro = useInVetro();
+  const cur = agency?.current;
+  if (!inVetro || !cur?.byDay || !cur.lastDay) return null;
+  const prevId = agency.prev_period_id || periodId;
+  const shares = (cur.byCreator || []).map((x) => ({ label: x.alias, value: x.sales }));
+  return (
+    <div className="vt-row21" style={{ marginBottom: 14 }}>
+      <section className="vt-glass" style={{ "--vt-i": 1, borderRadius: 22, padding: 18, minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>{partial ? "Il mese delle tue creator" : "Il mese dell'agenzia"}</div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted }}>venduto sommato giorno per giorno, turni CreatorsPro</div>
+        </div>
+        <MonthArea cur={cur.byDay} prev={agency.prev_full?.byDay || []} days={daysOfMonth(periodId)} prevDays={daysOfMonth(prevId)}
+          upto={cur.lastDay} curLabel={capIt(curName)} prevLabel={capIt(prevName)} />
+      </section>
+      {shares.length > 0 && (
+        <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 12 }}>Chi porta il venduto</div>
+          <Donut items={shares} center={usd(cur.sales)} centerSub={`a ${curName}`} />
+        </section>
+      )}
+    </div>
   );
 }
