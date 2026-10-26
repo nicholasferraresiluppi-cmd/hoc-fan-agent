@@ -120,11 +120,11 @@ export function MonthArea({ cur = [], prev = [], days = 30, prevDays = 30, upto,
 
 const Key = ({ swatch, children }) => <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>{swatch}{children}</span>;
 
-/** Ciambella con legenda a numeri: items [{ label, value }] già in ordine; oltre 5 voci → «Altre». */
-export function Donut({ items = [], center, centerSub, size = 156 }) {
-  const top = items.slice(0, 5);
-  const rest = items.slice(5).reduce((a, x) => a + (Number(x.value) || 0), 0);
-  const all = [...top.map((x, i) => ({ ...x, color: SERIES[i] })), ...(rest > 0 ? [{ label: `Altre ${items.length - 5}`, value: rest, color: OTHER }] : [])];
+/** Ciambella con legenda a numeri: items [{ label, value }] già in ordine; oltre `limit` voci → «Altre». `format` per i numeri della legenda (di base dollari). */
+export function Donut({ items = [], center, centerSub, size = 156, format = usd, limit = 5 }) {
+  const top = items.slice(0, limit);
+  const rest = items.slice(limit).reduce((a, x) => a + (Number(x.value) || 0), 0);
+  const all = [...top.map((x, i) => ({ ...x, color: SERIES[i] || OTHER })), ...(rest > 0 ? [{ label: `Altre ${items.length - limit}`, value: rest, color: OTHER }] : [])];
   const tot = all.reduce((a, x) => a + (Number(x.value) || 0), 0);
   const r = size / 2 - 12, C = 2 * Math.PI * r, gap = all.length > 1 ? 3 : 0;
   let off = 0;
@@ -152,7 +152,7 @@ export function Donut({ items = [], center, centerSub, size = 156 }) {
           <div key={x.label} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: CP.textSecondary, minWidth: 0 }}>
             <span style={{ width: 10, height: 10, borderRadius: 3, background: x.color, flexShrink: 0 }} />
             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.label}</span>
-            <span style={{ color: CP.textPrimary, fontWeight: 500, ...NUM }}>{usd(x.value)}</span>
+            <span style={{ color: CP.textPrimary, fontWeight: 500, ...NUM }}>{format(x.value)}</span>
             <span style={{ width: 36, textAlign: "right", color: CP.textMuted, ...NUM }}>{tot ? Math.round((x.value / tot) * 100) : 0}%</span>
           </div>
         ))}
