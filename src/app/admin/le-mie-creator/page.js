@@ -5,12 +5,16 @@
 // Qui tutte insieme, la più da guardare in cima: la corsa del mese, chi è di turno, i fan in
 // attesa con i primi a cui scrivere. Dati: /api/admin/live-overview (stesse cache di Revenue e Chat).
 
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import useSWR from "swr";
-import { UserCheck, UserX, Clock, ExternalLink, ArrowRight, Flag } from "lucide-react";
+import { UserCheck, UserX, Clock, ExternalLink, ArrowRight, Flag, Maximize2, X, Wallet, Target, MessageCircle, AlertTriangle } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { Notice } from "@/components/ds";
 import { liveFetcher } from "@/components/LiveCreatorPicker";
 import { COUNTRY_NAMES } from "@/lib/live-creators";
+import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro, useVetroTint } from "@/components/VetroScope";
+import { MonthArea, Donut, Spark, KpiCard } from "@/components/VetroCharts";
 
 const NUM = { fontVariantNumeric: "tabular-nums" };
 const group = (n) => String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -32,8 +36,14 @@ export default function LeMieCreatorPage() {
   const { data, error, isLoading } = useSWR("/api/admin/live-overview", liveFetcher, { refreshInterval: 5 * 60 * 1000, revalidateOnFocus: false });
   const list = [...(data?.creators || [])].sort((a, b) => b.light.level - a.light.level);
   const toWatch = list.filter((c) => c.light.level === 2).length;
+  const [vetro, setVetro] = useVetro();
+  // scheda aperta (solo stile vetro): quale creator e da quale scheda parte l'animazione
+  const [open, setOpen] = useState(null);
+  const cardEls = useRef({});
+  const openC = open && list.find((c) => c.slug === open);
 
   return (
+    <VetroScope on={vetro}>
     <div style={{ maxWidth: 1600, margin: "0 auto", padding: "8px 16px 40px", fontFamily: FONTS.body }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
         <div>
@@ -42,7 +52,10 @@ export default function LeMieCreatorPage() {
             {data ? (toWatch ? (toWatch === 1 ? "Una creator da guardare adesso: è la prima." : `${toWatch} creator da guardare adesso: sono le prime.`) : "Come vanno adesso. In cima quella che ha più bisogno di te.") : "Come vanno adesso, e dove guardare per prima."}
           </div>
         </div>
-        {data && <div style={{ fontSize: 12.5, color: CP.textMuted }}>aggiornato alle {hm(data.at)} · si aggiorna da solo ogni 5 minuti</div>}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {data && <div style={{ fontSize: 12.5, color: CP.textMuted }}>aggiornato alle {hm(data.at)} · si aggiorna da solo ogni 5 minuti</div>}
+          <VetroSwitch on={vetro} set={setVetro} />
+        </div>
       </div>
 
       {error && <Notice danger>{error.message}</Notice>}
@@ -53,15 +66,82 @@ export default function LeMieCreatorPage() {
         </div>
       )}
       {data && !list.length && <Notice>Non hai creator assegnate in questo strumento.</Notice>}
+      {list.length > 0 && <Overview list={list} />}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
-        {list.map((c) => <CreatorCard key={c.slug} c={c} />)}
+        {list.map((c, i) => <CreatorCard key={c.slug} c={c} i={i} hidden={open === c.slug}
+          cardRef={(el) => { cardEls.current[c.slug] = el; }} onOpen={() => setOpen(c.slug)} />)}
+      </div>
+      {openC && <CreatorDetail c={openC} originEl={cardEls.current[openC.slug]} onClose={() => setOpen(null)} />}
+    </div>
+    </VetroScope>
+  );
+}
+
+const MONTHS = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+const daysIn = (ym) => { const [y, m] = ym.split("-").map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); };
+const prevYm = (ym) => { const [y, m] = ym.split("-").map(Number); return new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7); };
+const pct = (a, b) => (b > 0 ? Math.round(((a - b) / b) * 100) : null);
+const signPct = (v) => (v == null ? null : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v)}%`);
+
+// Colpo d'occhio sopra le schede (solo stile vetro, 26/10/2026 sul modello della copertina del reel 1):
+// quattro numeri, il mese di tutte le creator che sale contro il mese prima, e chi porta il venduto.
+// Tutto dai dati che la pagina ha già (live-overview); il confronto col mese prima è sui giorni CHIUSI.
+function Overview({ list }) {
+  const inVetro = useInVetro();
+  if (!inVetro) return null;
+  const withRev = list.filter((c) => c.revenue?.month);
+  if (!withRev.length) return null;
+  const month = withRev[0].revenue.month;
+  const day = Math.max(...withRev.map((c) => c.revenue.day || 0));
+  const days = withRev[0].revenue.days || daysIn(month);
+  const sumArr = (k) => { const o = new Array(31).fill(0); for (const c of withRev) (c.revenue[k] || []).forEach((v, i) => { o[i] += Number(v) || 0; }); return o; };
+  const cur = sumArr("daily"), prev = sumArr("prevDaily");
+  const closed = Math.max(0, day - 1);
+  const curClosed = cur.slice(0, closed).reduce((a, b) => a + b, 0), prevClosed = prev.slice(0, closed).reduce((a, b) => a + b, 0);
+  const d = closed ? pct(curClosed, prevClosed) : null;
+  const mtd = withRev.reduce((a, c) => a + (c.revenue.mtd || 0), 0);
+  const proj = withRev.reduce((a, c) => a + (c.revenue.proj || 0), 0);
+  const allGoals = withRev.every((c) => c.revenue.goal != null);
+  const goal = allGoals ? withRev.reduce((a, c) => a + c.revenue.goal, 0) : null;
+  const waiting = list.reduce((a, c) => a + c.countries.reduce((b, x) => b + x.waiting, 0), 0);
+  const bought = list.reduce((a, c) => a + c.countries.reduce((b, x) => b + x.waitingSpenders, 0), 0);
+  const toWatch = list.filter((c) => c.light.level === 2).length;
+  const curName = MONTHS[Number(month.slice(5, 7)) - 1], prevName = MONTHS[Number(prevYm(month).slice(5, 7)) - 1];
+  const shares = [...withRev].sort((a, b) => (b.revenue.mtd || 0) - (a.revenue.mtd || 0)).map((c) => ({ label: c.name, value: c.revenue.mtd || 0 }));
+  return (
+    <div style={{ display: "grid", gap: 14, marginBottom: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14 }}>
+        <KpiCard i={0} icon={Wallet} tone={0} label={`Venduto a ${curName}`} value={<VetroNum value={usd(mtd)} />}
+          sub={d != null ? `${signPct(d)} su ${prevName} nei primi ${closed} giorni chiusi` : "Il confronto parte col primo giorno chiuso"}
+          spark={<Spark data={cur.slice(0, day)} />} />
+        <KpiCard i={1} icon={Target} tone={1} label="Arrivo previsto" value={<VetroNum value={usd(proj)} />}
+          sub={goal ? `Traguardo ${usd(goal)}: ${proj >= goal ? "ci arriva" : `mancano ${usd(goal - proj)}`}` : "Non tutte hanno un traguardo"} />
+        <KpiCard i={2} icon={MessageCircle} tone={4} label="Fan in attesa" value={<VetroNum value={String(waiting)} />}
+          sub={bought ? `${bought} ${bought === 1 ? "ha" : "hanno"} già comprato: rispondi prima a loro` : "Nessuno di quelli che hanno comprato"} />
+        <KpiCard i={3} icon={AlertTriangle} tone={3} label="Da guardare" value={<VetroNum value={String(toWatch)} />}
+          sub={`su ${list.length} creator${toWatch ? ": sono in cima" : ""}`} />
+      </div>
+      <div className="vt-row21">
+        <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Il mese di tutte le tue creator</div>
+            <div style={{ fontSize: 12.5, color: CP.textMuted }}>venduto sommato giorno per giorno</div>
+          </div>
+          <MonthArea cur={cur} prev={prev} days={days} prevDays={daysIn(prevYm(month))} upto={day} goal={goal} curLabel={cap(curName)} prevLabel={cap(prevName)} />
+        </section>
+        <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 12 }}>Chi porta il venduto</div>
+          <Donut items={shares} center={usd(mtd)} centerSub={`a ${curName}`} />
+        </section>
       </div>
     </div>
   );
 }
 
-function CreatorCard({ c }) {
+function CreatorCard({ c, i = 0, hidden, cardRef, onOpen }) {
+  const inVetro = useInVetro();
   const L = LEVEL[c.light.level];
   const r = c.revenue;
   const multi = c.countries.length > 1;
@@ -71,14 +151,23 @@ function CreatorCard({ c }) {
   const q = `?creator=${encodeURIComponent(c.slug)}`;
 
   return (
-    <section style={{ minWidth: 0, background: alpha(L.color, "0b"), border: `1px solid ${alpha(L.color, c.light.level ? "55" : "2e")}`, borderRadius: 22, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+    <section ref={cardRef} className="vt-glass" data-lvl={c.light.level}
+      // nello stile vetro un tocco sulla scheda (non su link e pulsanti) la apre dov'è
+      onClick={inVetro ? (e) => { if (!e.target.closest("a,button")) onOpen?.(); } : undefined}
+      style={{ "--vt-i": Math.min(i, 8), visibility: hidden ? "hidden" : undefined, cursor: inVetro ? "pointer" : undefined, minWidth: 0, background: alpha(L.color, "0b"), border: `1px solid ${alpha(L.color, c.light.level ? "55" : "2e")}`, borderRadius: 22, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="vt-head" style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ width: 44, height: 44, borderRadius: "50%", background: CP.accent, color: CP.accentInk, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 15, flexShrink: 0 }}>{initials(c.name)}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 17, fontWeight: 700, color: CP.textPrimary }}>{c.name}</div>
           <div style={{ fontSize: 12.5, color: CP.textMuted }}>{c.countries.map((x) => COUNTRY_NAMES[x.country] || x.country).join(" + ")}</div>
         </div>
-        <span style={{ fontSize: 12, fontWeight: 600, color: L.color, background: CP.surface, border: `1px solid ${alpha(L.color, "44")}`, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>{L.word}</span>
+        <span className="vt-pill" style={{ fontSize: 12, fontWeight: 600, color: L.color, background: CP.surface, border: `1px solid ${alpha(L.color, "44")}`, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>{L.word}</span>
+        {inVetro && (
+          <button type="button" onClick={onOpen} aria-label={`Apri la scheda di ${c.name}`}
+            style={{ width: 32, height: 32, borderRadius: "50%", border: 0, background: "rgba(255,255,255,.85)", color: "#1d1510", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+            <Maximize2 size={14} />
+          </button>
+        )}
       </div>
 
       {c.light.reasons.length > 0 && (
@@ -92,6 +181,7 @@ function CreatorCard({ c }) {
       )}
 
       {r ? <MiniRace r={r} /> : <div style={{ fontSize: 13, color: CP.textMuted }}>Revenue non disponibile adesso.</div>}
+      {inVetro && r?.daily && r.day > 1 && <Spark data={r.daily.slice(0, r.day)} height={30} />}
 
       <div style={{ display: "grid", gap: 6 }}>
         {c.countries.map((x) => <ShiftLine key={x.country} s={x.shift} label={multi ? x.country : null} />)}
@@ -99,7 +189,7 @@ function CreatorCard({ c }) {
 
       <div style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 16, padding: "12px 14px", minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 24, fontWeight: 700, color: CP.textPrimary, ...NUM }}>{waiting}</span>
+          <span style={{ fontSize: 24, fontWeight: 700, color: CP.textPrimary, ...NUM }}><VetroNum value={String(waiting)} /></span>
           <span style={{ fontSize: 13.5, color: CP.textPrimary }}>{waiting === 1 ? "fan aspetta" : "fan aspettano"} una risposta</span>
           {bought > 0 && <span style={{ fontSize: 12.5, color: CP.gold, fontWeight: 500 }}>· {bought} {bought === 1 ? "ha" : "hanno"} già comprato</span>}
         </div>
@@ -143,8 +233,8 @@ function MiniRace({ r }) {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13, color: CP.textSecondary, ...NUM }}>
-        <span><b style={{ color: CP.textPrimary, fontSize: 15 }}>{usd(r.mtd)}</b> finora</span>
-        <span>arrivo previsto <b style={{ color: CP.textPrimary }}>{usd(r.proj)}</b></span>
+        <span><b style={{ color: CP.textPrimary, fontSize: 15 }}><VetroNum value={usd(r.mtd)} /></b> finora</span>
+        <span>arrivo previsto <b style={{ color: CP.textPrimary }}><VetroNum value={usd(r.proj)} /></b></span>
       </div>
       <div style={{ position: "relative", height: 10, borderRadius: 999, background: alpha(CP.accent, "22"), margin: "8px 0 6px" }}>
         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: x(r.mtd), borderRadius: 999, background: CP.accent }} />
@@ -177,5 +267,135 @@ function Btn({ href, strong, children }) {
       background: strong ? CP.accent : CP.surface, color: strong ? CP.accentInk : CP.textPrimary, border: `1px solid ${strong ? CP.accent : CP.border}` }}>
       {children} <ArrowRight size={14} />
     </a>
+  );
+}
+
+// Scheda aperta (stile vetro, 26/10/2026, dal reel «rapport»): parte dalla posizione della scheda
+// e si allarga al centro (FLIP: misura, trasforma, rilascia), dietro la pagina si sfoca; chiudendo
+// torna al suo posto. Dentro: tutto quello che l'API dà già (oggi, latenza, benvenuti, fino a 8 fan).
+const TONE_HEAD = ["#14714a", "#e9c46a", "#b23a3a"];
+function CreatorDetail({ c, originEl, onClose }) {
+  const panel = useRef(null);
+  const closeBtn = useRef(null);
+  const [phase, setPhase] = useState("from"); // from → open → closing
+  const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const L = LEVEL[c.light.level];
+  const r = c.revenue;
+  const q = `?creator=${encodeURIComponent(c.slug)}`;
+  const fans = c.countries.flatMap((x) => x.top.map((t) => ({ ...t, country: x.country }))).sort((a, b) => a.tier - b.tier || b.wait_min - a.wait_min);
+  const multi = c.countries.length > 1;
+
+  // trasformazione che porta il pannello (già al centro) sopra la scheda d'origine
+  const fromTransform = () => {
+    const a = originEl?.getBoundingClientRect();
+    const b = panel.current?.getBoundingClientRect();
+    if (!a || !b || !b.width) return "none";
+    return `translate(${a.left - b.left}px, ${a.top - b.top}px) scale(${a.width / b.width}, ${a.height / b.height})`;
+  };
+  useLayoutEffect(() => {
+    const el = panel.current;
+    if (!el || reduce) { setPhase("open"); return; }
+    el.style.transition = "none";
+    el.style.transform = fromTransform();
+    el.getBoundingClientRect(); // applica la posizione di partenza prima di animare
+    requestAnimationFrame(() => {
+      el.style.transition = "transform .42s cubic-bezier(.2,.8,.2,1), border-radius .42s";
+      el.style.transform = "none";
+      setPhase("open");
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const close = () => {
+    const el = panel.current;
+    if (!el || reduce || phase === "closing") { onClose(); return; }
+    setPhase("closing");
+    el.style.transition = "transform .34s cubic-bezier(.4,0,.2,1)";
+    el.style.transform = fromTransform();
+    setTimeout(onClose, 330);
+  };
+  useEffect(() => {
+    closeBtn.current?.focus({ preventScroll: true });
+    const onKey = (e) => { if (e.key === "Escape") close(); };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; originEl?.querySelector("button")?.focus?.({ preventScroll: true }); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [tint] = useVetroTint();
+  const shown = phase === "open";
+  const head = TONE_HEAD[c.light.level];
+  const headInk = c.light.level === 1 ? "#1d1510" : "#ffffff";
+  return createPortal(
+    <div className="hoc-vetro-pop" data-tint={tint} role="presentation" onClick={(e) => { if (e.target === e.currentTarget) close(); }}
+      style={{ position: "fixed", inset: 0, zIndex: 80, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom))", overflowY: "auto",
+        background: shown ? "var(--cp-scrim)" : "transparent", backdropFilter: shown ? "blur(10px)" : "blur(0px)", WebkitBackdropFilter: shown ? "blur(10px)" : "blur(0px)", transition: "background .35s, backdrop-filter .35s" }}>
+      <div ref={panel} role="dialog" aria-modal="true" aria-label={c.name}
+        style={{ width: "min(720px, 100%)", marginTop: "6vh", transformOrigin: "0 0", borderRadius: 28, overflow: "hidden", background: "var(--cp-panel)", boxShadow: "0 30px 80px var(--cp-scrim)", fontFamily: FONTS.body }}>
+        <div style={{ opacity: shown ? 1 : 0, transition: shown ? "opacity .25s .12s" : "opacity .12s" }}>
+          <div style={{ background: head, color: headInk, padding: "20px 22px 18px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(0,0,0,.72)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16, flexShrink: 0 }}>{initials(c.name)}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 22, fontWeight: 600 }}>{c.name}</div>
+                <div style={{ fontSize: 13, opacity: 0.8 }}>{c.countries.map((x) => COUNTRY_NAMES[x.country] || x.country).join(" + ")}{r?.day ? ` · giorno ${r.day} di ${r.days}` : ""}</div>
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 600, color: L.color, background: "rgba(255,255,255,.92)", borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>{L.word}</span>
+              <button ref={closeBtn} type="button" onClick={close} aria-label="Chiudi"
+                style={{ width: 40, height: 40, borderRadius: "50%", border: 0, background: "rgba(255,255,255,.25)", color: headInk, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}><X size={18} /></button>
+            </div>
+            {r && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.02em", ...NUM }}><VetroNum value={usd(r.mtd)} /></div>
+                <div style={{ fontSize: 13, opacity: 0.85, ...NUM }}>finora · arrivo previsto {usd(r.proj)}{r.goal ? ` · traguardo ${usd(r.goal)}${r.goalSuggested ? " (suggerito)" : ""}` : ""}{r.shouldBe ? ` · oggi dovrebbe essere a ${usd(r.shouldBe)}` : ""}</div>
+              </div>
+            )}
+          </div>
+          <div style={{ padding: "18px 22px 22px", display: "grid", gap: 16 }}>
+            {c.light.reasons.length > 0 && (
+              <div style={{ display: "grid", gap: 6 }}>
+                {c.light.reasons.map((x, i) => (
+                  <div key={i} style={{ fontSize: 14, display: "flex", gap: 8, alignItems: "baseline" }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: LEVEL[x.level].color, flexShrink: 0 }} />{x.text}</div>
+                ))}
+              </div>
+            )}
+            {r && <MiniRace r={r} />}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
+              {c.countries.map((x) => (
+                <div key={x.country} style={{ background: "#fff", borderRadius: 16, padding: "12px 14px", display: "grid", gap: 6, fontSize: 13 }}>
+                  {multi && <div style={{ fontSize: 12, fontWeight: 600, color: CP.textMuted }}>{COUNTRY_NAMES[x.country] || x.country}</div>}
+                  <ShiftLine s={x.shift} />
+                  {x.revenueToday != null && <div>Incassato oggi <b style={NUM}>{usd(x.revenueToday)}</b></div>}
+                  {x.latMin != null && <div>Latenza di oggi <b style={NUM}>{Math.round(x.latMin)} min</b></div>}
+                  <div>Fan in attesa <b style={NUM}>{x.waiting}</b>{x.waitingOld ? <span style={{ color: CP.textMuted }}> · {x.waitingOld} da più di 2 ore</span> : null}</div>
+                  {x.welcomePending != null && <div>Benvenuti da mandare <b style={NUM}>{x.welcomePending}</b></div>}
+                </div>
+              ))}
+            </div>
+            <div>
+              <div style={{ fontSize: 11.5, color: CP.textMuted, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 8 }}>A chi scrivere, in ordine</div>
+              {fans.length ? (
+                <div style={{ display: "grid", gap: 8 }}>
+                  {fans.map((t) => (
+                    <a key={`${t.country}-${t.user_id}`} href={`https://onlyfans.com/my/chats/chat/${t.user_id}`} target="_blank" rel="noreferrer"
+                      style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: CP.textPrimary, fontSize: 14, minHeight: 32 }}>
+                      <span style={{ width: 4, alignSelf: "stretch", borderRadius: 3, background: TIER_COLOR[t.tier] }} />
+                      <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}><b style={{ fontWeight: 600 }}>{t.username || `u${t.user_id}`}</b> <span style={{ color: CP.textSecondary }}>{t.reason}</span>{multi ? <span style={{ color: CP.textMuted }}> · {t.country}</span> : null}</span>
+                      <span style={{ color: waitColor(t.wait_min), fontWeight: 600, whiteSpace: "nowrap", ...NUM }}>{waitText(t.wait_min)}</span>
+                      <ExternalLink size={13} color={CP.textMuted} />
+                    </a>
+                  ))}
+                </div>
+              ) : <div style={{ fontSize: 14, color: CP.textSecondary }}>Nessuno in attesa. Ottimo.</div>}
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Btn href={`/admin/chat-monitor${q}`} strong>Apri la chat</Btn>
+              <Btn href={`/admin/revenue-pacing${q}`}>La corsa del mese</Btn>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }

@@ -35,7 +35,7 @@ import {
   History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
 Megaphone, Share2, Shield, BookUser, Sunrise,
   LineChart,
-  FileSignature, Repeat } from "lucide-react";
+  FileSignature, Repeat, Gift } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
 import WorkspaceSwitch from "@/components/WorkspaceSwitch";
@@ -89,6 +89,7 @@ const NAV_GROUPS_RAW = [
       { href: "/me/allenatore", label: "Il mio allenatore", icon: Sparkles },
       { href: "/me/contestazioni", label: "Le mie contestazioni", icon: MessageSquareWarning },
       { href: "/me/turno", label: "Il mio turno", icon: Radar },
+      { href: "/me/porta-un-collega", label: "Porta un collega", icon: Gift },
     ],
   },
   {
@@ -195,6 +196,7 @@ const NAV_GROUPS_RAW = [
       { href: "/contabilita",                    label: "Contabilità",  icon: Landmark },
       { href: "/admin/hr/contratti",             label: "Contratti",    icon: FileSignature },
       { href: "/admin/hr/sync",                  label: "Sincronizzazione ClickUp", icon: RefreshCw },
+      { href: "/admin/referral",                 label: "Porta un collega", icon: Gift },
       { href: "/admin/candidate-assessments",    label: "Assessment candidati", icon: UserCheck },
       { href: "/admin/priority-queue",           label: "Fan da seguire ora", icon: Inbox },
       { href: "/admin/settimana",                 label: "Da seguire", icon: Target },

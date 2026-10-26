@@ -30,6 +30,7 @@ import { CP } from "@/lib/brand";
 import { uxPageChange } from "@/lib/ux-client";
 import { useStyle } from "@/lib/theme-client";
 import { V3TopBar, V3MobileHeader, V3TabBar } from "./ShellV3";
+import VetroScope, { useVetro, isVetroPath } from "./VetroScope";
 
 // Command bar (stile v3): scaricata solo alla prima apertura
 const CommandBar = dynamic(() => import("./CommandBar"), { ssr: false });
@@ -66,7 +67,7 @@ const whoFetcher = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch((
  * Guscio di chi ha un ruolo ristretto (lib/restricted-roles, es. "Social"): niente menu, niente
  * hub, solo il nome dell'app, la pagina e l'account. Le altre pagine riportano alla sua.
  */
-const RESTRICTED_PAGE_LABEL = { "/admin/scouting": "Radar creator", "/admin/studio-social": "Studio social", "/admin/supervisor": "Account social", "/admin/warmup": "Warm-up", "/admin/hr": "Persone", "/admin/hr/contratti": "Contratti", "/contabilita": "Contabilità" };
+const RESTRICTED_PAGE_LABEL = { "/admin/scouting": "Radar creator", "/admin/studio-social": "Studio social", "/admin/supervisor": "Account social", "/admin/warmup": "Warm-up", "/admin/hr": "Persone", "/admin/hr/contratti": "Contratti", "/admin/referral": "Porta un collega", "/me/porta-un-collega": "Porta un collega", "/contabilita": "Contabilità" };
 
 function RestrictedShell({ restriction, allowed, children, pathname }) {
   return (
@@ -112,6 +113,9 @@ export default function AppShell({ children }) {
   const [cmdOpen, setCmdOpen] = useState(false);
   const [cmdLoaded, setCmdLoaded] = useState(false);
   const openCmd = () => { setCmdLoaded(true); setCmdOpen(true); setMobileOpen(false); };
+  // Stile vetro in prova (VetroScope): sulle sue pagine avvolge anche menu, avvisi e schede in alto
+  const [vetro] = useVetro();
+  const vetroShell = vetro && isVetroPath(pathname);
 
   // ⌘K / Ctrl+K globale, solo nello stile v3
   useEffect(() => {
@@ -162,6 +166,7 @@ export default function AppShell({ children }) {
   }
 
   return (
+    <VetroScope on={vetroShell} stable>
     <div className="hoc-root" style={{ minHeight: "100vh", background: CP.bg }}>
       {/* Desktop: sidebar fissa — wrapped in silent ErrorBoundary */}
       <div className="hoc-desk">
@@ -259,5 +264,6 @@ export default function AppShell({ children }) {
         <WelcomeAttestato />
       </ErrorBoundary>
     </div>
+    </VetroScope>
   );
 }
