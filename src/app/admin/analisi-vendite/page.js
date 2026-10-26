@@ -513,7 +513,7 @@ export default function AnalisiVenditePage() {
   const goDati = (ids) => { window.location.href = lookerHref("recap-dashboard", ids); };
 
   return (
-    <div style={{ display: "grid", gap: 20, maxWidth: 1280, margin: "0 auto", padding: "8px 0 40px" }}>
+    <div style={{ display: "grid", gap: 20, maxWidth: 1600, margin: "0 auto", padding: "8px 0 40px" }}>
       <PageHead crumbs={[{ label: "Performance" }]} title="Analisi vendite"
         subtitle="Come vanno le tue creator e perché, oppure tutte a confronto sugli stessi numeri." />
 

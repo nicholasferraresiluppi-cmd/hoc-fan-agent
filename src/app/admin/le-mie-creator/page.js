@@ -34,7 +34,7 @@ export default function LeMieCreatorPage() {
   const toWatch = list.filter((c) => c.light.level === 2).length;
 
   return (
-    <div style={{ maxWidth: 1180, margin: "0 auto", padding: "8px 16px 40px", fontFamily: FONTS.body }}>
+    <div style={{ maxWidth: 1600, margin: "0 auto", padding: "8px 16px 40px", fontFamily: FONTS.body }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0, color: CP.textPrimary }}>Le mie creator</h1>

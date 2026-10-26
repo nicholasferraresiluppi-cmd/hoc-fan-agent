@@ -207,7 +207,7 @@ export default function CompCalendarPage() {
   const dl = (cur, prv) => (prv != null ? fmtDelta(cur, prv) : null);
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1400, margin: "0 auto", fontFamily: FONTS.body, color: P.textPrimary }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body, color: P.textPrimary }}>
         <PageHead
           crumbs={[{ label: "Hub", href: "/admin" }, { label: "Comp & Ben" }, { label: "Calendario compensi" }]}
           title="Calendario compensi"

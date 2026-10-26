@@ -83,7 +83,7 @@ export default function QaReviewsPage() {
   const missing = [!employee && "operatore", !convRef && "riferimento della conversazione", !allScored && "un voto per ogni voce"].filter(Boolean);
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1080, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Training" }, { label: "QA conversazioni" }]}
         title="QA conversazioni"

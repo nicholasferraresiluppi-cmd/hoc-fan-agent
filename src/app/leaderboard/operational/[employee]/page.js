@@ -132,7 +132,7 @@ export default function EmployeeDrilldownPage({ params }) {
     .map((h) => ({ ...h, id: h.period_id, infw: infwBy.get(h.period_id)?.score ?? null }));
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Performance" }, { label: "Classifica vendite", href: "/leaderboard/sales-cp" }, { label: employee }]}
         title={employee}

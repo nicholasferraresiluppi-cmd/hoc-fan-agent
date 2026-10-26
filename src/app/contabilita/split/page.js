@@ -322,7 +322,7 @@ export default function SplitPage() {
   const tabs = [["conto", "Conto del mese"], ["extra", "Spese extra"], ["persone", "Persone"], ["accordi", owner ? "Team e accordi" : "Accordi"]];
 
   return (
-    <div style={{ padding: "24px 16px 80px", maxWidth: 1280, margin: "0 auto" }}>
+    <div style={{ padding: "24px 16px 80px", maxWidth: 1600, margin: "0 auto" }}>
       <PageHead
         crumbs={[{ label: "People" }, { label: "Contabilità", href: "/contabilita" }, { label: "Conto dello split" }]}
         title="Conto dello split"

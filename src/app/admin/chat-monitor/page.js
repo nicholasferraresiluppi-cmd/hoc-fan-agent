@@ -71,7 +71,7 @@ export default function ChatMonitorPage() {
   };
 
   return (
-    <div style={{ maxWidth: 1180, margin: "0 auto", padding: "20px 16px 60px", fontFamily: FONTS.body }}>
+    <div style={{ maxWidth: 1600, margin: "0 auto", padding: "20px 16px 60px", fontFamily: FONTS.body }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, color: CP.textPrimary }}>{creatorName ? `${creatorName} · ` : ""}Chat Monitor <span style={{ fontSize: 14, color: CP.textMuted, fontWeight: 400 }}>· Live</span></h1>

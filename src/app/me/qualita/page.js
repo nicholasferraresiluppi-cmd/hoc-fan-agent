@@ -27,7 +27,7 @@ export default function MyQaPage() {
   const gs = data?.gate_status;
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Il mio quadro" }, { label: "La mia qualità" }]}
         title="La mia qualità"

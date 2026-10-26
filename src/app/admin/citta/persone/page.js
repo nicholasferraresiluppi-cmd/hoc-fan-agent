@@ -121,7 +121,7 @@ function People() {
 
 export default function PersonePage() {
   return (
-    <div style={{ padding: "28px 28px 64px", fontFamily: FONTS.body, maxWidth: 1180 }}>
+    <div style={{ padding: "28px 28px 64px", fontFamily: FONTS.body, maxWidth: 1600 }}>
       <Suspense fallback={null}><People /></Suspense>
     </div>
   );

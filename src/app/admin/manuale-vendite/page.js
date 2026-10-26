@@ -86,7 +86,7 @@ export default function ManualeVendite() {
   const docs = data?.docs || [];
   const inp = { font: "inherit", fontSize: 14, padding: "7px 10px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary };
   return (
-    <div style={{ maxWidth: 1100 }}>
+    <div style={{ maxWidth: 1600 }}>
       <PageHead crumbs={["Performance"]} title="Manuale vendite" subtitle="Cosa fa vendere davvero, misurato su 26 mesi di chat: i capitoli del manuale, le guide di profilo e le prove sul campo." />
       {data?.error && <Notice danger>{data.error}</Notice>}
       <Notice>Materiale interno per la direzione vendite: contiene estratti di chat reali con i nomi dei fan oscurati. Agli operatori arriva in un'altra forma (regole, video, colloquio con il sales manager), dopo il via dell'avvocato.</Notice>

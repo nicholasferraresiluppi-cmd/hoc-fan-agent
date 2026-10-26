@@ -1290,7 +1290,7 @@ export default function S4SPage() {
       subtitle="Chi scambia promozione con chi, giorno per giorno, e quanti abbonati ha portato ogni scambio. Le pagine arrivano dallo split; ogni pagina scambia una volta con tutte le altre, poi il giro ricomincia rimescolato."
     />
   );
-  const wrap = { padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body };
+  const wrap = { padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body };
 
   if (error) return <div style={wrap}>{header}<Notice danger>{/scope|capability|vista su tutte|permesso/i.test(String(error.message)) ? "Questa pagina è per i sales manager e gli admin." : error.message}</Notice></div>;
   if (isLoading || !data) return <div style={wrap}>{header}<Note>Caricamento…</Note></div>;

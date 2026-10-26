@@ -149,7 +149,7 @@ export default function GroupLanguagesPage() {
   const rows = filtered.map((g) => ({ id: g, group: g, d: display[g], current: pendingOverrides[g] !== undefined ? pendingOverrides[g] : (overrides[g] || "") }));
 
   return (
-    <div style={{ padding: "28px 24px 96px", maxWidth: 1080, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 96px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Dati" }, { label: "Lingue gruppi" }]}
         title="Lingua dei gruppi"

@@ -73,7 +73,7 @@ export default function HeatmapPage({ searchParams }) {
   const ctl = { padding: "7px 10px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1400, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Performance" }, { label: "Creator", href: `/leaderboard/creators?period_id=${periodId}` }, { label: "Mappa operatore × creator" }]}
         title="Mappa operatore × creator"

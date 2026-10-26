@@ -281,7 +281,7 @@ export default function AdminHub() {
   const loopNote = (x, fallback) => x?.reason === "no_history" ? "servono 2 mesi di dati" : x?.reason ? fallback : null;
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         title={`${greeting}${userName ? `, ${userName}` : ""}.`}
         line2={isHr ? null : phone && dSales != null && cmp?.until_day >= FEW_DAYS && !agency?.incomplete ? `${fmtPct(dSales)} su ${prevName}, stessi giorni.` : paceLine}

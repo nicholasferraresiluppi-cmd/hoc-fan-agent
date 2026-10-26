@@ -122,7 +122,7 @@ export default function ScoreConfigHistoryPage() {
   const lnk = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, color: CP.textPrimary, fontFamily: FONTS.body, textDecoration: "none" };
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Dati" }, { label: "Storico formula" }]}
         title="Storico della formula score"

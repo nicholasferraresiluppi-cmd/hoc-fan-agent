@@ -731,7 +731,7 @@ export default function OperationalLeaderboardPage() {
   const excludedTot = (data?.mass_excluded || 0) + (data?.manual_excluded || 0);
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Performance" }, { label: "Classifica mestiere" }]}
         title="Classifica mestiere"

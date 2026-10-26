@@ -152,7 +152,7 @@ export default function MyScorePage() {
   const chartThresholds = tiers.filter((t) => t.min > 0).map((t) => ({ label: tierLabel(t.label), min: t.min }));
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Il mio quadro" }, { label: "I miei score" }]}
         title="I miei score"

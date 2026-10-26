@@ -304,7 +304,7 @@ export default function ContabilitaPage() {
   const tabs = [["persone", "Da pagare"], ["squadre", "Per squadra"], ["revenue", "Revenue e cambio"], ["crm", "Incrocio CRM"], ...(home.owner ? [["accessi", "Accessi"]] : [])];
 
   return (
-    <div style={{ padding: "24px 16px 80px", maxWidth: 1280, margin: "0 auto" }}>
+    <div style={{ padding: "24px 16px 80px", maxWidth: 1600, margin: "0 auto" }}>
       <PageHead
         crumbs={[{ label: "People" }, { label: "Contabilità" }]}
         title="Compensi team"

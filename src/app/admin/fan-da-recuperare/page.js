@@ -45,7 +45,7 @@ export default function FanDaRecuperarePage() {
     .filter((g) => g.fans.length);
 
   return (
-    <div style={{ display: "grid", gap: 20, maxWidth: 1080, margin: "0 auto", padding: "8px 0 40px" }}>
+    <div style={{ display: "grid", gap: 20, maxWidth: 1600, margin: "0 auto", padding: "8px 0 40px" }}>
       <PageHead crumbs={[{ label: "Performance" }]} title="Fan da recuperare"
         subtitle="Chi spendeva bene e si è fermato. Scrivigli una cosa sua, non un saluto." />
 

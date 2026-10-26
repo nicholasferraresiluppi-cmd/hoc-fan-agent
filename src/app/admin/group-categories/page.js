@@ -175,7 +175,7 @@ export default function GroupCategoriesPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
         {head}
         <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento gruppi e statistiche…</div>
       </div>
@@ -184,7 +184,7 @@ export default function GroupCategoriesPage() {
 
   if (groupList.length === 0) {
     return (
-      <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
         {head}
         {error ? <Notice danger>{error}</Notice> : (
           <Notice>
@@ -220,7 +220,7 @@ export default function GroupCategoriesPage() {
   ];
 
   return (
-    <div style={{ padding: "28px 24px 96px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 96px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       {head}
 
       {error && <Notice danger>{error}</Notice>}

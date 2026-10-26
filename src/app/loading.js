@@ -4,7 +4,7 @@
 export default function Loading() {
   const row = { height: 40, marginBottom: 8 };
   return (
-    <div aria-busy="true" aria-label="Caricamento" style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto" }}>
+    <div aria-busy="true" aria-label="Caricamento" style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto" }}>
       <div className="hoc-sk" style={{ width: 120, height: 14, marginBottom: 12 }} />
       <div className="hoc-sk" style={{ width: 320, maxWidth: "80%", height: 30, marginBottom: 10 }} />
       <div className="hoc-sk" style={{ width: 520, maxWidth: "95%", height: 14, marginBottom: 24 }} />

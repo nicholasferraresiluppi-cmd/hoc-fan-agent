@@ -185,7 +185,7 @@ export default function ProfilesComparePage() {
   ] : [];
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1400, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Comp & Ben" }, { label: "Scaglioni a confronto" }]}
         title="Scaglioni a confronto"
