@@ -21,7 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { Plus, Link2, RefreshCw, Power, SlidersHorizontal, FileSignature } from "lucide-react";
+import { Plus, Link2, RefreshCw, Power, SlidersHorizontal, FileSignature, Users, UserCheck, UserPlus, FileWarning } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Notice, DataTable, card } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
@@ -31,6 +31,8 @@ import { lbl, input, btnPrimary, btnGhost, chip, SYNC_LABEL, fetcher, postJson, 
 import { RestoreButton } from "@/components/hr-archive";
 import { ContractPill } from "@/components/hr-contracts-ui";
 import { readiness, initials, avatarColor } from "@/lib/hr-readiness";
+import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
+import { Donut, KpiCard } from "@/components/VetroCharts";
 
 const NONE = "__none__";
 
@@ -66,6 +68,7 @@ export default function HrPeoplePage() {
   const [newOpen, setNewOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [archNotice, setArchNotice] = useState(null);
+  const [vetro, setVetro] = useVetro();
   // ?vista=archiviate (link diretto alla vista)
   useEffect(() => {
     if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("vista") === "archiviate") setTab("archiviate");
@@ -200,13 +203,15 @@ export default function HrPeoplePage() {
   );
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1240, margin: "0 auto", fontFamily: FONTS.body }}>
+    <VetroScope on={vetro}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "People" }, { label: "Persone" }]}
         title="Persone"
         subtitle="Chi lavora con noi. Si aggiorna da sola con ClickUp."
         actions={!error && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <VetroSwitch on={vetro} set={setVetro} />
             <Link href="/admin/hr/contratti" style={btnGhost}><FileSignature size={15} /> Contratti</Link>
             <button type="button" onClick={() => setLinkOpen(true)} style={btnGhost}><Link2 size={15} /> Link del modulo</button>
             <button type="button" onClick={() => setNewOpen(true)} style={btnPrimary}><Plus size={15} /> Nuova persona</button>
@@ -244,6 +249,8 @@ export default function HrPeoplePage() {
           <p style={{ margin: 0, fontSize: 14, color: CP.textSecondary, lineHeight: 1.6 }}>Manda il <button type="button" onClick={() => setLinkOpen(true)} style={{ background: "none", border: 0, padding: 0, color: CP.accentSoftText, cursor: "pointer", fontSize: 14 }}>link del modulo</button> a chi entra, oppure crea una scheda con «Nuova persona».</p>
         </section>
       )}
+
+      {data && items.length > 0 && <VetroOverview items={items} ready={ready} cflag={cflag} hasContracts={Boolean(data.contracts)} tabCounts={tabCounts} onTab={setTab} />}
 
       {data && (items.length > 0 || archivedItems.length > 0) && (
         <>
@@ -334,6 +341,75 @@ export default function HrPeoplePage() {
       </Modal>
       <NewPersonModal open={newOpen} onClose={() => setNewOpen(false)} onCreated={(p) => { setNewOpen(false); mutate(); router.push(`/admin/hr/${p.id}`); }} />
     </div>
+    </VetroScope>
+  );
+}
+
+// Colpo d'occhio delle persone (solo col vetro, 26/10/2026): quattro riquadri sulle domande di tutti i
+// giorni (con noi, attive, in ingresso, contratti da sistemare), chi lavora su quale progetto (barre) e
+// per mansione (ciambella). Contano solo le persone con noi (fase diversa da Uscita), come la scheda
+// «Con noi». Un clic sul titolo di un riquadro apre la scheda corrispondente sotto.
+function VetroOverview({ items, ready, cflag, hasContracts, tabCounts, onTab }) {
+  const inVetro = useInVetro();
+  if (!inVetro) return null;
+  const live = items.filter((p) => (p.fields?.collaborationStatus || "") !== PHASE_EXITED);
+  const toFix = hasContracts ? live.filter((p) => ["cambiata", "mancante", "risolto"].includes(cflag(p))).length : null;
+  const NO = "Senza indicazione";
+  const count = (get) => {
+    const m = new Map();
+    for (const p of live) {
+      const vals = [].concat(get(p) ?? []).filter(Boolean);
+      for (const v of vals.length ? vals : [NO]) m.set(v, (m.get(v) || 0) + 1);
+    }
+    return [...m.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+  };
+  // «Senza indicazione» in fondo e in grigio: è un buco da riempire, non una mansione
+  const byMans = count((p) => p.fields?.mansioni).sort((a, b) => (a.label === NO) - (b.label === NO)).map((x) => (x.label === NO ? { ...x, color: "var(--vt-cx)" } : x));
+  const byProj = count((p) => p.fields?.progetto).sort((a, b) => (a.label === NO) - (b.label === NO)).slice(0, 8);
+  const maxP = Math.max(1, ...byProj.map((x) => x.value));
+  const kpis = [
+    { icon: Users, tone: 0, label: "Con noi", value: String(tabCounts["con-noi"] || 0), tab: "con-noi",
+      sub: `${tabCounts["da-completare"] || 0} schede da completare` },
+    { icon: UserCheck, tone: 1, label: "Attive", value: String(tabCounts.attive || 0), tab: "attive",
+      sub: `${tabCounts.cambio || 0} in riassegnazione o in uscita` },
+    { icon: UserPlus, tone: 3, label: "In ingresso", value: String(tabCounts.ingresso || 0), tab: "ingresso", sub: "stanno iniziando" },
+    { icon: FileWarning, tone: 4, label: "Contratti da sistemare", value: toFix == null ? "—" : String(toFix), tab: toFix ? "senza-contratto" : null,
+      sub: toFix == null ? "controllo contratti non disponibile" : `${tabCounts["mansione-cambiata"] || 0} con la mansione cambiata` },
+  ];
+  return (
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, marginBottom: 14 }}>
+        {kpis.map((k, i) => (
+          <button key={k.label} type="button" onClick={() => k.tab && onTab(k.tab)} disabled={!k.tab}
+            style={{ display: "grid", background: "none", border: 0, padding: 0, margin: 0, textAlign: "left", font: "inherit", color: "inherit", borderRadius: 22, cursor: k.tab ? "pointer" : "default", minWidth: 0 }} aria-label={`${k.label}: apri la scheda`}>
+            <KpiCard i={i} icon={k.icon} tone={k.tone} label={k.label} value={<VetroNum value={k.value} />} sub={k.sub} />
+          </button>
+        ))}
+      </div>
+      <div className="vt-row21" style={{ marginBottom: 14 }}>
+        <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Su quale progetto</div>
+            <div style={{ fontSize: 12.5, color: CP.textMuted }}>persone con noi; chi segue più progetti conta in ognuno</div>
+          </div>
+          {byProj.map((x) => (
+            <div key={x.label} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1.6fr) 36px", gap: 10, alignItems: "center", fontSize: 13, color: CP.textPrimary, padding: "3px 0" }}>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: x.label === NO ? CP.textMuted : CP.textPrimary }}>{x.label}</span>
+              <span style={{ height: 8, borderRadius: 99, background: CP.track, overflow: "hidden" }}>
+                <span style={{ display: "block", height: "100%", width: `${(x.value / maxP) * 100}%`, borderRadius: 99, background: x.label === NO ? "var(--vt-cx)" : "var(--vt-c0)" }} />
+              </span>
+              <span style={{ textAlign: "right", color: CP.textSecondary, fontVariantNumeric: "tabular-nums" }}>{x.value}</span>
+            </div>
+          ))}
+        </section>
+        {byMans.length > 0 && (
+          <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 22, padding: 18, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 12 }}>Per mansione</div>
+            <Donut items={byMans} center={String(live.length)} centerSub="con noi" format={(v) => String(v)} />
+          </section>
+        )}
+      </div>
+    </>
   );
 }
 
