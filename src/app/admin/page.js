@@ -331,7 +331,17 @@ export default function AdminHub() {
         </div>
       </HeroMetric></div>}
 
-      {!isHr && !noCreators && <HubCharts agency={agency} periodId={periodId} curName={monthName} prevName={prevName} partial={partial} />}
+      {!isHr && !noCreators && <HubCharts agency={agency} periodId={periodId} curName={monthName} prevName={prevName} partial={partial}
+        todo={[
+          alertsData && { key: "crit", n: open.filter((a) => a.severity === "critical").length, label: "alert critici", zero: "nessun alert critico", lvl: 2, href: "/admin/alerts",
+            detail: open.find((a) => a.severity === "critical")?.title },
+          alertsData && { key: "open", n: open.filter((a) => a.severity !== "critical").length, label: "altri controlli aperti", zero: "nessun altro controllo aperto", lvl: "ink", href: "/admin/alerts",
+            detail: open.find((a) => a.severity !== "critical")?.title },
+          s4s?.access && { key: "s4s", n: s4s.count || 0, label: "S4S da fare", zero: "nessuno S4S da fare", lvl: "ink", href: "/admin/s4s#oggi",
+            detail: s4s.requests?.[0] ? `${s4s.requests[0].partner} propone a ${s4s.requests[0].page}` : s4s.todayTodo?.length ? `${s4s.todayTodo.length} di oggi da programmare` : null },
+          wantDecisions && { key: "dec", n: decisions.length, label: decisions.length === 1 ? "decisione aspetta" : "decisioni aspettano", zero: "nessuna decisione in attesa", lvl: "ink", href: "/admin/roadmap",
+            detail: decisions[0] ? `la più vecchia da ${daysAgo(decisions[0].added_at) ?? "?"} giorni` : null },
+        ].filter(Boolean)} />}
 
       {s4s?.access && (s4s.count > 0 || s4s.missingKit?.length > 0 || s4s.proposals > 0) && (
         <section className="vt-glass" style={{ ...card, marginBottom: 14, "--vt-i": 1 }}>
@@ -495,7 +505,11 @@ function ToolCard({ it, tone = 0 }) {
 // gli stessi turni CreatorsPro del numero qui sopra, giorno per giorno e per creator (agency-sales).
 const capIt = (x) => x.charAt(0).toUpperCase() + x.slice(1);
 const daysOfMonth = (ym) => { const [y, m] = ym.split("-").map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); };
-function HubCharts({ agency, periodId, curName, prevName, partial }) {
+// 26/10/2026 («per ogni pagina capiscine l'utilità»): Casa risponde a «come va e cosa devo fare oggi» → accanto
+// al mese, al posto della ciambella per creator (che ripeteva la pagina Creator), le cose da fare come
+// schede piene di colore (le «Hot deals» del reel rapport): rosso = critico, inchiostro = da fare,
+// vetro = niente in sospeso. Gli elenchi completi restano sotto. Senza nulla da mostrare torna la ciambella.
+function HubCharts({ agency, periodId, curName, prevName, partial, todo = [] }) {
   const inVetro = useInVetro();
   const cur = agency?.current;
   if (!inVetro || !cur?.byDay || !cur.lastDay) return null;
@@ -511,7 +525,23 @@ function HubCharts({ agency, periodId, curName, prevName, partial }) {
         <MonthArea cur={cur.byDay} prev={agency.prev_full?.byDay || []} days={daysOfMonth(periodId)} prevDays={daysOfMonth(prevId)}
           upto={cur.lastDay} curLabel={capIt(curName)} prevLabel={capIt(prevName)} />
       </section>
-      {shares.length > 0 && (
+      {todo.length > 0 ? (
+        <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0, display: "grid", gap: 12, alignContent: "start" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Da fare oggi</div>
+            <div style={{ fontSize: 12.5, color: CP.textMuted }}>{todo.reduce((a, t) => a + t.n, 0) ? "tocca una scheda per aprirla" : "tutto a posto"}</div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10 }}>
+            {todo.map((t, i) => (
+              <Link key={t.key} href={t.href} className={t.n ? "vt-hot" : "vt-hot vt-glass"} data-lvl={t.n ? t.lvl : undefined} style={{ "--vt-i": 3 + i }}>
+                <span style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{t.n}</span>
+                <span style={{ fontSize: 13.5, fontWeight: 500, color: CP.textPrimary }}>{t.n ? t.label : t.zero}</span>
+                {t.n > 0 && t.detail && <span style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{t.detail}</span>}
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : shares.length > 0 && (
         <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 12 }}>Chi porta il venduto</div>
           <Donut items={shares} center={usd(cur.sales)} centerSub={`a ${curName}`} />

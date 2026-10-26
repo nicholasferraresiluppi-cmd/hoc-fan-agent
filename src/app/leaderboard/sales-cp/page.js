@@ -11,8 +11,8 @@
 import { useState, useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
-import { Info, Search, Loader2, CheckCircle2, XCircle, Wrench, ShieldCheck, Languages, Tags, RefreshCw, Link2, UserX, Gauge, Users, Wallet, LifeBuoy } from "lucide-react";
-import { CP, FONTS } from "@/lib/brand";
+import { Info, Search, Loader2, CheckCircle2, XCircle, Wrench, ShieldCheck, Languages, Tags, RefreshCw, Link2, UserX } from "lucide-react";
+import { CP, FONTS, alpha } from "@/lib/brand";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmt$, fmtInt, fmtDelta, MONTHS_IT } from "@/lib/format";
@@ -20,7 +20,7 @@ import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice
 
 import { tierLabel, tierColor, TIER_ORDER } from "@/lib/tier-label";
 import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
-import { Donut, KpiCard } from "@/components/VetroCharts";
+import { MixBar } from "@/components/VetroCharts";
 const fetcher = async (url) => {
   const r = await fetch(url);
   const j = await r.json().catch(() => ({}));
@@ -324,29 +324,24 @@ export default function SalesCpLeaderboardPage() {
 // Colpo d'occhio della classifica (solo col vetro, 26/10/2026): quattro riquadri al posto del numero
 // grande, chi si è mosso di più sul mese prima (barre a due lati) e quanti operatori per fascia.
 // Stessi numeri della pagina, nessuna richiesta nuova. I cali non sono rossi: lo score è relativo.
+// 26/10/2026 («per ogni pagina capiscine l'utilità»): la Classifica serve a «chi va bene, chi aiutare» →
+// il podio (i primi tre con almeno MIN_SHIFTS turni, iniziali al posto della foto) e la scheda rossa di chi
+// è sotto soglia in cima; poi chi si è mosso e la distribuzione per fascia come barra ordinata dalla più
+// bassa alla più alta (le fasce hanno un ordine: una ciambella lo perdeva). Lo score medio non c'è più:
+// resta vicino a 50 per costruzione e non diceva niente.
 function VetroOverview({ data, prev, official, rows, counts, monthLabel, prevLabel, periodId, onView }) {
   const inVetro = useInVetro();
   if (!inVetro) return null;
   const agency = data.agency;
-  const mine = data.visibility && !data.visibility.all;
-  const dAvg = prev?.avg_score ? data.avg_score - prev.avg_score : null;
-  const kpis = [
-    { icon: Gauge, tone: 0, label: mine ? "Score medio delle tue creator" : "Score medio", value: fmtScore(data.avg_score),
-      sub: dAvg == null ? "la media resta vicina a 50 per costruzione" : `${prevLabel}: ${fmtScore(prev.avg_score)} (${fmtPtsDelta(dAvg)} punti)` },
-    { icon: Users, tone: 1, label: "In classifica", value: fmtInt(data.eligible_total),
-      sub: `${counts.up} in miglioramento · ${counts.down} in calo` },
-    { icon: Wallet, tone: 3, label: "Venduto in classifica", value: fmt$(agency?.total_sales),
-      sub: official?.current?.sales ? `di ${fmt$(official.current.sales)} ufficiali · ${fmt$(agency?.avg_sales_per_shift)} a turno` : `${fmtInt(agency?.total_shifts)} turni` },
-    { icon: LifeBuoy, tone: 4, label: "Sotto soglia", value: fmtInt(counts.review),
-      sub: counts.review > 0 ? <Link href={`/admin/action-center?period_id=${periodId}`} style={{ color: CP.accent, textDecoration: "none" }}>Apri Sotto soglia →</Link> : `score ≤ ${REVIEW_SCORE}, almeno ${MIN_SHIFTS} turni` },
-  ];
+  const podium = rows.filter((r) => !r.thin).sort((a, b) => b.score - a.score).slice(0, 3);
   const moved = rows.filter((r) => r.delta != null && !r.thin);
   const ups = [...moved].filter((r) => r.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 5);
   const downs = [...moved].filter((r) => r.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 5);
   const maxD = Math.max(1, ...ups.map((r) => r.delta), ...downs.map((r) => -r.delta));
-  const tiers = [...TIER_ORDER].reverse().map((t) => ({ label: tierLabel(t), value: rows.filter((r) => r.tier === t).length })).filter((x) => x.value > 0);
+  const tiers = TIER_ORDER.map((t, i) => ({ label: tierLabel(t), value: rows.filter((r) => r.tier === t).length, color: TIER_SCALE[i] })).filter((x) => x.value > 0);
+  const opHref = (r) => `/leaderboard/operational/${encodeURIComponent(r.employee)}`;
   const bar = (r, up) => (
-    <Link key={r.id} href={`/leaderboard/operational/${encodeURIComponent(r.employee)}`} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1.3fr) 52px", gap: 10, alignItems: "center", fontSize: 13, color: CP.textPrimary, textDecoration: "none", padding: "3px 0" }}>
+    <Link key={r.id} href={opHref(r)} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1.3fr) 52px", gap: 10, alignItems: "center", fontSize: 13, color: CP.textPrimary, textDecoration: "none", padding: "3px 0" }}>
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.employee}</span>
       <span style={{ height: 8, borderRadius: 99, background: CP.track, overflow: "hidden" }}>
         <span style={{ display: "block", height: "100%", width: `${(Math.abs(r.delta) / maxD) * 100}%`, borderRadius: 99, background: up ? "var(--vt-c1)" : "var(--vt-c2)" }} />
@@ -356,12 +351,36 @@ function VetroOverview({ data, prev, official, rows, counts, monthLabel, prevLab
   );
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, marginBottom: 14 }}>
-        {kpis.map((k, i) => <KpiCard key={k.label} i={i} icon={k.icon} tone={k.tone} label={k.label} value={<VetroNum value={k.value} />} sub={k.sub} />)}
+      <div style={{ fontSize: 13, color: CP.textSecondary, margin: "0 2px 10px", ...NUM }}>
+        {fmtInt(data.eligible_total)} in classifica · {counts.up} in miglioramento, {counts.down} in calo · venduto in classifica <b style={{ color: CP.textPrimary, fontWeight: 500 }}><VetroNum value={fmt$(agency?.total_sales)} /></b>
+        {official?.current?.sales ? ` di ${fmt$(official.current.sales)} ufficiali` : ""} · sul podio chi ha almeno {MIN_SHIFTS} turni
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginBottom: 14 }}>
+        {podium.map((r, i) => (
+          <Link key={r.id} href={opHref(r)} className={i === 0 ? "vt-hot" : "vt-hot vt-glass"} data-lvl={i === 0 ? "ink" : undefined} style={{ "--vt-i": i, gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Initials name={r.employee} strong={i === 0} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, color: CP.textMuted }}>{i + 1}° del podio</div>
+                <div style={{ fontSize: 14.5, fontWeight: 600, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.employee}</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 28, fontWeight: 600, letterSpacing: "-0.02em", color: CP.textPrimary, ...NUM }}>{fmtScore(r.score)}</span>
+              <span style={{ fontSize: 12.5, color: CP.textSecondary }}>{tierLabel(r.tier)}{r.delta != null ? ` · ${fmtPtsDelta(r.delta)}` : ""}</span>
+            </div>
+            <div style={{ fontSize: 12, color: CP.textSecondary, ...NUM }}>{fmt$(r.sales)} in {fmtInt(r.shifts)} turni{r.topCreator ? ` · su ${r.topCreator}` : ""}</div>
+          </Link>
+        ))}
+        <Link href={`/admin/action-center?period_id=${periodId}`} className={counts.review ? "vt-hot" : "vt-hot vt-glass"} data-lvl={counts.review ? 2 : undefined} style={{ "--vt-i": 3, gap: 6 }}>
+          <span style={{ fontSize: 12, color: CP.textMuted }}>score ≤ {REVIEW_SCORE}, almeno {MIN_SHIFTS} turni</span>
+          <span style={{ fontSize: 28, fontWeight: 600, letterSpacing: "-0.02em", color: CP.textPrimary, ...NUM }}>{fmtInt(counts.review)}</span>
+          <span style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary }}>{counts.review ? "sotto soglia: apri la lista →" : "nessuno sotto soglia"}</span>
+        </Link>
       </div>
       {(ups.length > 0 || downs.length > 0 || tiers.length > 0) && (
         <div className="vt-row21" style={{ marginBottom: 14 }}>
-          <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <section className="vt-glass" style={{ "--vt-i": 4, borderRadius: 22, padding: 18, minWidth: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Chi si è mosso di più</div>
               <div style={{ fontSize: 12.5, color: CP.textMuted }}>punti di score su {prevLabel || "il mese prima"}, almeno {MIN_SHIFTS} turni</div>
@@ -382,15 +401,22 @@ function VetroOverview({ data, prev, official, rows, counts, monthLabel, prevLab
             )}
           </section>
           {tiers.length > 0 && (
-            <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 22, padding: 18, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 12 }}>Operatori per fascia · {monthLabel}</div>
-              <Donut items={tiers} center={fmtInt(rows.length)} centerSub="operatori" format={(v) => fmtInt(v)} limit={6} />
+            <section className="vt-glass" style={{ "--vt-i": 5, borderRadius: 22, padding: 18, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 4 }}>Operatori per fascia</div>
+              <div style={{ fontSize: 12.5, color: CP.textMuted, marginBottom: 12 }}>{monthLabel} · dalla più bassa alla più alta</div>
+              <MixBar items={tiers} format={(v) => fmtInt(v)} height={26} />
             </section>
           )}
         </div>
       )}
     </>
   );
+}
+// Scala delle fasce dalla più bassa alla più alta: grigio → accento pieno (sequenziale, non arcobaleno).
+const TIER_SCALE = ["var(--vt-cx)", "color-mix(in srgb, var(--vt-c0) 30%, var(--vt-cx))", "color-mix(in srgb, var(--vt-c0) 50%, transparent)", "color-mix(in srgb, var(--vt-c0) 70%, transparent)", "color-mix(in srgb, var(--vt-c0) 85%, transparent)", "var(--vt-c0)"];
+function Initials({ name, strong }) {
+  const ini = String(name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+  return <span aria-hidden="true" style={{ width: 38, height: 38, borderRadius: 999, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 13.5, fontWeight: 600, background: strong ? "rgba(255,255,255,.22)" : alpha(CP.accent, "1f"), color: strong ? "#fff" : CP.accent }}>{ini}</span>;
 }
 const moveHead = { display: "block", background: "none", border: "none", padding: 0, margin: "0 0 6px", fontSize: 12.5, color: CP.textSecondary, cursor: "pointer", fontFamily: FONTS.body };
 

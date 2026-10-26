@@ -13,13 +13,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import { RefreshCw, Pencil, Check, ChevronLeft, ChevronRight, CalendarDays, Plus, Wallet, Target, TrendingUp, History } from "lucide-react";
+import { RefreshCw, Pencil, Check, ChevronLeft, ChevronRight, CalendarDays, Plus } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHead, Notice, card } from "@/components/ds";
 import { liveFetcher } from "@/components/LiveCreatorPicker";
 import { MONTHS_IT } from "@/lib/format";
 import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
-import { MonthArea, Donut, Spark, KpiCard } from "@/components/VetroCharts";
+import { MonthArea, Gauge, GaugeKey, GoalRing } from "@/components/VetroCharts";
 
 const NUM = { fontVariantNumeric: "tabular-nums" };
 const ok = (v) => v != null && Number.isFinite(Number(v));
@@ -92,7 +92,7 @@ export default function BilancioPage() {
       {data && (
         <div style={{ opacity: isLoading ? 0.55 : 1, transition: "opacity .15s" }}>
           <Summary data={data} />
-          <Charts data={data} />
+          <Charts data={data} mine={mine} />
           {editing && <GroupEditor data={data} onSaved={() => mutate()} />}
           <div style={{ display: "grid", gap: 16 }}>
             {data.groups.map((g) => <Ecosystem key={g.id} g={g} data={data} mine={mine} editing={editing} onSaved={() => mutate()} />)}
@@ -155,21 +155,8 @@ function Summary({ data }) {
     { label: data.daysLeft ? "Arrivo previsto" : "Chiuso a", value: usd(data.daysLeft ? t.projection : t.mtd), note: <StatusText r={t} closed={!data.daysLeft} />, noteColor: CP.textSecondary },
     { label: "Mese precedente", value: usd(t.prev), note: ok(t.deltaPrev) ? `${t.deltaPrev >= 0 ? "+" : "−"}$${group(t.deltaPrev)}${data.daysLeft ? " nella proiezione" : ""}` : null, noteColor: ok(t.deltaPrev) && t.deltaPrev >= 0 ? CP.accentGreen : CP.textSecondary },
   ];
-  const inVetro = useInVetro();
-  if (inVetro) {
-    const icons = [[Wallet, 0], [Target, 1], [TrendingUp, 3], [History, 4]];
-    const spark = data.days.filter((d) => !d.future).map((d) => d.total || 0);
-    return (
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, marginBottom: 14 }}>
-        {items.map((x, i) => (
-          <KpiCard key={x.label} i={i} icon={icons[i][0]} tone={icons[i][1]} label={x.label}
-            value={typeof x.value === "string" ? <VetroNum value={x.value} /> : x.value}
-            sub={x.note ? <span style={{ color: x.noteColor || CP.textMuted }}>{x.note}</span> : null}
-            spark={i === 0 && spark.length > 1 ? <Spark data={spark} /> : null} />
-        ))}
-      </div>
-    );
-  }
+  // Col vetro i quattro numeri stanno dentro il riquadro della quota (Charts), accanto all'arco.
+  if (useInVetro()) return null;
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 24 }}>
       {items.map((x) => (
@@ -183,36 +170,89 @@ function Summary({ data }) {
   );
 }
 
-// Il mese che sale e chi porta il venduto (solo col vetro): somma dello split giorno per giorno contro
-// il mese prima (stessi account) e il ritmo del goal; ciambella per ecosistema, così si legge il lavoro
-// di squadra. Il mese prima manca solo nelle cache scritte prima del 26/10 (si riempie al ricalcolo).
-function Charts({ data }) {
+// Solo col vetro (26/10/2026, «per ogni pagina capiscine l'utilità»). La domanda del Bilancio è «chi arriva
+// al goal?»: in alto il mese dello split contro il mese prima e il ritmo del goal, accanto l'arco della
+// quota (fatto, dove dovremmo essere oggi, arrivo previsto) con i quattro numeri; sotto un anello per
+// creator, in ordine di classifica (proiezione ÷ goal), come gli obiettivi del reel «Savings & Goals».
+// Un clic sull'anello porta all'ecosistema della creator. Le creator senza goal restano fuori dagli anelli.
+function Charts({ data, mine }) {
   const inVetro = useInVetro();
   if (!inVetro) return null;
+  const t = data.totals;
   const cur = data.days.map((d) => d.total || 0);
   const upto = data.days.filter((d) => !d.future).length;
   const [y, m] = data.month.split("-").map(Number);
   const prevDays = new Date(Date.UTC(y, m - 1, 0)).getUTCDate();
   const curName = MONTHS_IT[m - 1], prevName = MONTHS_IT[(m + 10) % 12];
-  const eco = data.groups.filter((g) => ok(g.mtd) && g.mtd > 0).map((g) => ({ label: g.name, value: g.mtd })).sort((a, b) => b.value - a.value);
+  const hasGoal = ok(t.goal);
+  const ecoOf = new Map(data.groups.flatMap((g) => g.creators.map((c) => [c.slug, g.id])));
+  const rings = (data.creators || []).filter((c) => ok(c.goal));
+  const noGoal = (data.creators || []).filter((c) => !ok(c.goal)).length;
+  const lines = [
+    ["Venduto", usd(t.mtd), hasGoal ? `di ${usd(t.goal)} di goal` : null],
+    [data.daysLeft ? "Arrivo previsto" : "Chiuso a", usd(data.daysLeft ? t.projection : t.mtd), <StatusText key="s" r={t} closed={!data.daysLeft} />],
+    [data.daysLeft ? "Serve al giorno" : "Al giorno", usd(data.daysLeft ? t.needPerDay : t.perDay), data.daysLeft && ok(t.perDay) ? `oggi ne fa ${usd(t.perDay)}` : null],
+    [cap(prevName), usd(t.prev), ok(t.deltaPrev) ? <span key="d" style={{ color: t.deltaPrev >= 0 ? CP.accentGreen : CP.textMuted }}>{t.deltaPrev >= 0 ? "+" : "−"}${group(t.deltaPrev)}{data.daysLeft ? " nella proiezione" : ""}</span> : null],
+  ];
   return (
-    <div className="vt-row21" style={{ marginBottom: 16 }}>
-      <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>{cap(curName)} di tutto lo split</div>
-          <div style={{ fontSize: 12.5, color: CP.textMuted }}>venduto sommato giorno per giorno{data.live ? ", oggi in corso" : ""}</div>
-        </div>
-        <MonthArea cur={cur} prev={data.prevDaily || []} days={data.daysInMonth} prevDays={prevDays} upto={upto}
-          goal={ok(data.totals.goal) ? data.totals.goal : null} curLabel={cap(curName)} prevLabel={cap(prevName)} />
-      </section>
-      {eco.length > 0 && (
-        <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 22, padding: 18, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 12 }}>Venduto per ecosistema</div>
-          <Donut items={eco} center={usd(data.totals.mtd)} centerSub={`a ${curName}`} />
+    <>
+      <div className="vt-row21" style={{ marginBottom: 16 }}>
+        <section className="vt-glass" style={{ "--vt-i": 1, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>{cap(curName)} di tutto lo split</div>
+            <div style={{ fontSize: 12.5, color: CP.textMuted }}>venduto sommato giorno per giorno{data.live ? ", oggi in corso" : ""}</div>
+          </div>
+          <MonthArea cur={cur} prev={data.prevDaily || []} days={data.daysInMonth} prevDays={prevDays} upto={upto}
+            goal={hasGoal ? t.goal : null} curLabel={cap(curName)} prevLabel={cap(prevName)} />
+        </section>
+        <section className="vt-glass" data-lvl={t.status === "arriva" ? 0 : undefined} style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0, display: "grid", gap: 12, alignContent: "start" }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Il goal dello split</div>
+          <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+            {hasGoal && <Gauge value={t.pctActual} mark={data.daysLeft ? data.idealPct : null} proj={data.daysLeft ? t.reach : null} good={t.status === "arriva"}
+              centerSub={`del goal di ${curName}`} label={`Goal dello split a ${curName}`} />}
+            <div style={{ display: "grid", gap: 10, flex: "1 1 150px", minWidth: 0 }}>
+              {lines.map(([k, v, sub]) => (
+                <div key={k} style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12, color: CP.textMuted }}>{k}</div>
+                  <div style={{ fontSize: 19, fontWeight: 600, color: CP.textPrimary, ...NUM }}><VetroNum value={v} /></div>
+                  {sub && <div style={{ fontSize: 12, color: CP.textSecondary, ...NUM }}>{sub}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+          {hasGoal && <GaugeKey proj={Boolean(data.daysLeft)} mark={Boolean(data.daysLeft)} good={t.status === "arriva"} />}
+        </section>
+      </div>
+      {rings.length > 0 && (
+        <section style={{ marginBottom: 22 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, flexWrap: "wrap", margin: "0 2px 10px" }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Chi arriva al goal</div>
+            <div style={{ fontSize: 12.5, color: CP.textMuted }}>in ordine di arrivo previsto sul proprio goal{noGoal ? ` · ${noGoal} senza goal, in fondo alla pagina` : ""}</div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
+            {rings.map((c, i) => (
+              <GoalRing key={c.slug} i={Math.min(i, 8)} pct={c.pctActual} mark={data.daysLeft ? data.idealPct : null}
+                tone={c.status === "arriva" ? "good" : c.status === "vicina" ? "near" : null}
+                title={<>{c.rank ? <span style={{ color: CP.textMuted, fontWeight: 400 }}>{c.rank}° </span> : null}{c.name}</>}
+                sub={`${usdShort(c.mtd)} di ${usdShort(c.goal)}`} href={ecoOf.has(c.slug) ? `#eco-${ecoOf.get(c.slug)}` : undefined}
+                highlight={mine.has(c.slug)} badge={<RingBadge r={c} closed={!data.daysLeft} />} />
+            ))}
+          </div>
         </section>
       )}
-    </div>
+    </>
   );
+}
+
+const usdShort = (v) => (!ok(v) ? "—" : v >= 1e6 ? `$${(v / 1e6).toFixed(1).replace(".", ",")}M` : v >= 1e4 ? `$${Math.round(v / 1e3)}k` : v >= 1e3 ? `$${(v / 1e3).toFixed(1).replace(".", ",")}k` : `$${Math.round(v)}`);
+
+function RingBadge({ r, closed }) {
+  const base = { fontSize: 11.5, fontWeight: 500, padding: "2px 9px", borderRadius: 999, whiteSpace: "nowrap" };
+  if (r.status === "arriva") return <span style={{ ...base, background: alpha(CP.accentGreen, "1f"), color: CP.accentGreen }}>{closed ? "goal raggiunto" : "ci arriva"}</span>;
+  if (closed) return null;
+  if (r.status === "vicina") return <span style={{ ...base, background: alpha(CP.accent, "1f"), color: CP.accent }}>ci è vicina</span>;
+  if (ok(r.perDay) && ok(r.needPerDay)) return <span style={{ ...base, color: CP.textSecondary, fontWeight: 400 }}>+{usdShort(r.needPerDay - r.perDay)} al giorno</span>;
+  return null;
 }
 
 function StatusText({ r, closed }) {
@@ -242,7 +282,7 @@ function Ecosystem({ g, data, mine, editing, onSaved }) {
   const soloLine = solo ? [[...new Set(solo.accounts.map((a) => a.sm).filter(Boolean))].join(" · ") && `SM ${[...new Set(solo.accounts.map((a) => a.sm).filter(Boolean))].join(" · ")}`, [...new Set(solo.accounts.map((a) => a.am).filter(Boolean))].join(" · ") && `AM ${[...new Set(solo.accounts.map((a) => a.am).filter(Boolean))].join(" · ")}`].filter(Boolean).join(" · ") : null;
   const isMine = solo ? mine.has(solo.slug) : false;
   return (
-    <section className="vt-glass" data-lvl={g.status === "arriva" ? 0 : undefined} style={{ ...card, overflow: "hidden", ...(isMine ? { borderColor: alpha(CP.accent, "66") } : null) }}>
+    <section id={`eco-${g.id}`} className="vt-glass" data-lvl={g.status === "arriva" ? 0 : undefined} style={{ ...card, overflow: "hidden", scrollMarginTop: 80, ...(isMine ? { borderColor: alpha(CP.accent, "66") } : null) }}>
       <header style={{ padding: "16px 18px 14px", display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 260px", minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>

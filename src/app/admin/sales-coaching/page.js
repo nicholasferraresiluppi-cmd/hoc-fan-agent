@@ -21,8 +21,7 @@ import { CP, FONTS } from "@/lib/brand";
 import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, NUM } from "@/components/ds";
 import SquadraTab from "@/components/SquadraTab";
 import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
-import { Donut, KpiCard } from "@/components/VetroCharts";
-import { Percent, PauseCircle, Gift, Repeat } from "lucide-react";
+import { RankBars } from "@/components/VetroCharts";
 import FasceTab from "@/components/FasceTab";
 
 const fetcher = (url) =>
@@ -251,37 +250,32 @@ function Panoramica({ d, name }) {
   );
 }
 
-// Colpo d'occhio della panoramica (solo col vetro, 26/10/2026): i quattro numeri del coaching come
-// riquadri col confronto con le creator modello, la conversione settimana per settimana (barre, con la
-// linea del modello) e da quali creator arriva l'incasso PPV. Stessi numeri, nessuna richiesta nuova.
+// Colpo d'occhio della panoramica (solo col vetro). 26/10/2026, secondo giro («per ogni pagina capiscine
+// l'utilità»): il Coaching serve a «dove siamo lontani dalle creator modello, e cosa allenare» → le quattro
+// abitudini come coppie di barre noi/modello (verde dove siamo pari o meglio), la conversione settimana per
+// settimana con la linea del modello, e le pagine dalla più lontana dal modello (tacca = modello). La
+// ciambella dell'incasso per creator non rispondeva a questa domanda: tolta. Stessi numeri, nessuna richiesta.
 function VetroPanoramica({ d }) {
   const t = d.pages.total;
   const g = d.reference.goal;
   const org = d.reference.org;
   const better = (a, b, lowIsGood = false) => (a == null || b == null ? false : lowIsGood ? a <= b : a >= b);
-  const sub = (txt, ok) => <span style={{ color: ok ? CP.accentGreen : CP.textSecondary }}>{txt}</span>;
-  const kpis = [
-    { icon: Percent, tone: 0, label: "Mai paganti che comprano", value: pct(t.conv_nonpayer),
-      sub: sub(`modello ${pct(g?.conv_nonpayer)} · HOC ${pct(org?.conv_nonpayer)}`, better(t.conv_nonpayer, g?.conv_nonpayer)) },
-    { icon: PauseCircle, tone: 4, label: "PPV a chat ferma", value: pct(t.dead_share),
-      sub: sub(`lì compra il ${pct(t.conv_dead)} · modello ${pct(g?.dead_share)}`, better(t.dead_share, g?.dead_share, true)) },
-    { icon: Gift, tone: 3, label: "Con bonus o prezzo di rif.", value: pct(t.tech_share),
-      sub: sub(`modello ${pct(g?.tech_share)}`, better(t.tech_share, g?.tech_share)) },
-    { icon: Repeat, tone: 1, label: "Già paganti che comprano", value: pct(t.conv_payer),
-      sub: sub(`modello ${pct(g?.conv_payer)}`, better(t.conv_payer, g?.conv_payer)) },
+  const habits = [
+    { label: "Mai paganti che comprano", us: t.conv_nonpayer, model: g?.conv_nonpayer },
+    { label: "Già paganti che comprano", us: t.conv_payer, model: g?.conv_payer },
+    { label: "PPV con bonus o prezzo di riferimento", us: t.tech_share, model: g?.tech_share },
+    { label: "PPV a chat ferma (meno è meglio)", us: t.dead_share, model: g?.dead_share, low: true },
   ];
   const weeks = (d.series || []).filter((w) => w.ppv >= 15);
   const top = Math.max(0.01, g?.conv_nonpayer || 0, ...weeks.map((w) => w.conv || 0)) * 1.15;
   // altezza delle barre 190 px; sotto ogni barra la data (~17 px): la linea del modello va alla stessa scala
   const goalY = g?.conv_nonpayer != null ? 17 + (g.conv_nonpayer / top) * 190 : null;
-  const mix = (d.pages.pages || []).filter((p) => p.recent.net > 0).sort((a, b) => b.recent.net - a.recent.net)
-    .map((p) => ({ label: d.names[String(p.creator_id)] || String(p.creator_id), value: p.recent.net }));
-  const totNet = mix.reduce((a, x) => a + x.value, 0);
+  const far = (d.pages.pages || []).filter((p) => (p.recent.chat_ppv || 0) >= MIN_ROW_PPV && p.recent.conv_nonpayer != null)
+    .sort((a, b) => a.recent.conv_nonpayer - b.recent.conv_nonpayer)
+    .map((p) => ({ label: d.names[String(p.creator_id)] || String(p.creator_id), value: p.recent.conv_nonpayer, good: g?.conv_nonpayer != null && p.recent.conv_nonpayer >= g.conv_nonpayer }));
+  const hMax = Math.max(0.01, ...habits.flatMap((h) => [h.us || 0, h.model || 0]));
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14 }}>
-        {kpis.map((k, i) => <KpiCard key={k.label} i={i} icon={k.icon} tone={k.tone} label={k.label} value={<VetroNum value={k.value} />} sub={k.sub} />)}
-      </div>
       <div className="vt-row21">
         <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
@@ -303,13 +297,41 @@ function VetroPanoramica({ d }) {
             </div>
           )}
         </section>
-        {mix.length > 0 && (
-          <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 22, padding: 18, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 12 }}>Incasso PPV per creator</div>
-            <Donut items={mix} center={usd(totNet)} centerSub={`ultime ${d.meta.recent_n} settimane`} />
-          </section>
-        )}
+        <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 4 }}>Le abitudini contro il modello</div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted, marginBottom: 14 }}>ultime {d.meta.recent_n} settimane · in verde dove siamo pari o meglio</div>
+          <div style={{ display: "grid", gap: 14 }}>
+            {habits.map((h) => {
+              const ok = better(h.us, h.model, h.low);
+              const barRow = (who, v, col) => (
+                <div style={{ display: "grid", gridTemplateColumns: "62px 1fr 44px", gap: 8, alignItems: "center", fontSize: 12, color: CP.textMuted }}>
+                  <span>{who}</span>
+                  <span style={{ height: 9, borderRadius: 6, background: CP.track, overflow: "hidden" }}>
+                    <span style={{ display: "block", height: "100%", width: `${v == null ? 0 : Math.max(2, (v / hMax) * 100)}%`, borderRadius: 6, background: col }} />
+                  </span>
+                  <span style={{ textAlign: "right", color: CP.textPrimary, ...NUM }}>{pct(v, 0)}</span>
+                </div>
+              );
+              return (
+                <div key={h.label} style={{ display: "grid", gap: 5 }}>
+                  <div style={{ fontSize: 13, color: CP.textPrimary }}>{h.label}</div>
+                  {barRow("lo split", h.us, ok ? CP.accentGreen : "var(--vt-c0)")}
+                  {barRow("modello", h.model, "var(--vt-cx)")}
+                </div>
+              );
+            })}
+          </div>
+        </section>
       </div>
+      {far.length > 0 && (
+        <section className="vt-glass" style={{ "--vt-i": 4, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Mai paganti che comprano, pagina per pagina</div>
+            <div style={{ fontSize: 12.5, color: CP.textMuted }}>dalla più lontana dal modello · almeno {MIN_ROW_PPV} PPV</div>
+          </div>
+          <RankBars items={far} limit={15} format={(v) => pct(v, 0)} mark={g?.conv_nonpayer ?? undefined} markLabel={g?.conv_nonpayer != null ? `creator modello ${pct(g.conv_nonpayer, 0)} · in verde chi la raggiunge` : null} />
+        </section>
+      )}
     </>
   );
 }

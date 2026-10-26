@@ -21,7 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { Plus, Link2, RefreshCw, Power, SlidersHorizontal, FileSignature, Users, UserCheck, UserPlus, FileWarning } from "lucide-react";
+import { Plus, Link2, RefreshCw, Power, SlidersHorizontal, FileSignature } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Notice, DataTable, card } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
@@ -32,7 +32,7 @@ import { RestoreButton } from "@/components/hr-archive";
 import { ContractPill } from "@/components/hr-contracts-ui";
 import { readiness, initials, avatarColor } from "@/lib/hr-readiness";
 import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
-import { Donut, KpiCard } from "@/components/VetroCharts";
+import { Donut } from "@/components/VetroCharts";
 
 const NONE = "__none__";
 
@@ -367,27 +367,71 @@ function VetroOverview({ items, ready, cflag, hasContracts, tabCounts, onTab }) 
   const byMans = count((p) => p.fields?.mansioni).sort((a, b) => (a.label === NO) - (b.label === NO)).map((x) => (x.label === NO ? { ...x, color: "var(--vt-cx)" } : x));
   const byProj = count((p) => p.fields?.progetto).sort((a, b) => (a.label === NO) - (b.label === NO)).slice(0, 8);
   const maxP = Math.max(1, ...byProj.map((x) => x.value));
-  const kpis = [
-    { icon: Users, tone: 0, label: "Con noi", value: String(tabCounts["con-noi"] || 0), tab: "con-noi",
-      sub: `${tabCounts["da-completare"] || 0} schede da completare` },
-    { icon: UserCheck, tone: 1, label: "Attive", value: String(tabCounts.attive || 0), tab: "attive",
-      sub: `${tabCounts.cambio || 0} in riassegnazione o in uscita` },
-    { icon: UserPlus, tone: 3, label: "In ingresso", value: String(tabCounts.ingresso || 0), tab: "ingresso", sub: "stanno iniziando" },
-    { icon: FileWarning, tone: 4, label: "Contratti da sistemare", value: toFix == null ? "—" : String(toFix), tab: toFix ? "senza-contratto" : null,
-      sub: toFix == null ? "controllo contratti non disponibile" : `${tabCounts["mansione-cambiata"] || 0} con la mansione cambiata` },
+  // 26/10/2026 («per ogni pagina capiscine l'utilità»): Persone HR serve a «chi c'è, chi sta entrando, cosa
+  // c'è da sistemare» → il percorso delle fasi in fila (come la pipeline del reel rapport: ogni fase una
+  // colonna con il suo numero, un clic apre la scheda), accanto la scheda rossa di quello che va sistemato;
+  // sotto chi sta entrando con le iniziali (i «Members» del reel 2), un clic apre la sua scheda.
+  const flow = [
+    { label: "In ingresso", n: tabCounts.ingresso || 0, tab: "ingresso", sub: "stanno iniziando" },
+    { label: "Attive", n: tabCounts.attive || 0, tab: "attive", sub: "al lavoro" },
+    { label: "In riassegnazione", n: live.filter((p) => p.fields?.collaborationStatus === "In riassegnazione").length, tab: "cambio", sub: "cambiano progetto" },
+    { label: "In uscita", n: live.filter((p) => p.fields?.collaborationStatus === "In uscita").length, tab: "cambio", sub: "stanno lasciando" },
   ];
+  const fix = [
+    (tabCounts["senza-contratto"] || 0) > 0 && { n: tabCounts["senza-contratto"], label: "senza contratto", tab: "senza-contratto" },
+    (tabCounts["mansione-cambiata"] || 0) > 0 && { n: tabCounts["mansione-cambiata"], label: "con la mansione cambiata", tab: "mansione-cambiata" },
+    (tabCounts["da-completare"] || 0) > 0 && { n: tabCounts["da-completare"], label: "schede da completare", tab: "da-completare" },
+  ].filter(Boolean);
+  const entering = live.filter((p) => p.fields?.collaborationStatus === "In ingresso")
+    .sort((x, y) => (Number(y.createdAt) || 0) - (Number(x.createdAt) || 0)).slice(0, 12);
+  const tab = (key) => ({ role: "button", tabIndex: 0, onClick: () => onTab(key), onKeyDown: (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onTab(key)) });
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, marginBottom: 14 }}>
-        {kpis.map((k, i) => (
-          <button key={k.label} type="button" onClick={() => k.tab && onTab(k.tab)} disabled={!k.tab}
-            style={{ display: "grid", background: "none", border: 0, padding: 0, margin: 0, textAlign: "left", font: "inherit", color: "inherit", borderRadius: 22, cursor: k.tab ? "pointer" : "default", minWidth: 0 }} aria-label={`${k.label}: apri la scheda`}>
-            <KpiCard i={i} icon={k.icon} tone={k.tone} label={k.label} value={<VetroNum value={k.value} />} sub={k.sub} />
-          </button>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
+        {flow.map((f, i) => (
+          <div key={f.label} {...tab(f.tab)} className="vt-glass" aria-label={`${f.label}: ${f.n}, apri la scheda`}
+            style={{ "--vt-i": i, borderRadius: 20, padding: "14px 16px", display: "grid", gap: 4, cursor: "pointer", minWidth: 0, position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: CP.textSecondary }}>
+              <span style={{ width: 9, height: 9, borderRadius: 9, background: ["var(--vt-c1)", "var(--vt-c0)", "var(--vt-c3)", "var(--vt-c2)"][i] }} />{f.label}
+              {i < flow.length - 1 && <span aria-hidden="true" style={{ marginLeft: "auto", color: CP.textMuted }}>→</span>}
+            </div>
+            <div style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}><VetroNum value={String(f.n)} /></div>
+            <div style={{ fontSize: 12, color: CP.textMuted }}>{f.sub}</div>
+          </div>
         ))}
+        <div {...(fix[0] ? tab(fix[0].tab) : {})} className={fix.length ? "vt-hot" : "vt-hot vt-glass"} data-lvl={fix.length ? 2 : undefined}
+          style={{ "--vt-i": 4, cursor: fix.length ? "pointer" : "default", gap: 4 }}>
+          <span style={{ fontSize: 12.5, color: CP.textSecondary }}>Da sistemare</span>
+          {fix.length ? fix.map((x) => (
+            <button key={x.tab} type="button" onClick={(e) => { e.stopPropagation(); onTab(x.tab); }}
+              style={{ all: "unset", cursor: "pointer", display: "flex", alignItems: "baseline", gap: 8, color: CP.textPrimary }}>
+              <span style={{ fontSize: x === fix[0] ? 30 : 17, fontWeight: 600, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}>{x.n}</span>
+              <span style={{ fontSize: 13, fontWeight: 500 }}>{x.label}</span>
+            </button>
+          )) : <span style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary }}>{toFix == null ? "controllo contratti non disponibile" : "niente da sistemare"}</span>}
+        </div>
       </div>
+      {entering.length > 0 && (
+        <section className="vt-glass" style={{ "--vt-i": 5, borderRadius: 22, padding: 18, minWidth: 0, marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Stanno entrando</div>
+            <button type="button" onClick={() => onTab("ingresso")} style={{ all: "unset", cursor: "pointer", fontSize: 12.5, color: CP.accentSoftText || CP.accent }}>
+              {(tabCounts.ingresso || 0) > entering.length ? `tutte le ${tabCounts.ingresso} →` : "apri la scheda →"}
+            </button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))", gap: 12 }}>
+            {entering.map((p) => (
+              <Link key={p.id} href={`/admin/hr/${p.id}`} style={{ display: "grid", justifyItems: "center", gap: 6, textAlign: "center", textDecoration: "none", color: CP.textPrimary, minWidth: 0 }}>
+                <span aria-hidden="true" style={{ width: 52, height: 52, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 16, fontWeight: 600, background: avatarColor(p.id), color: "#fff" }}>{initials(p.name)}</span>
+                <span style={{ fontSize: 12.5, lineHeight: 1.3, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name || "Senza nome"}</span>
+                {[].concat(p.fields?.progetto || []).length > 0 && <span style={{ fontSize: 11.5, color: CP.textMuted, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[].concat(p.fields.progetto)[0]}</span>}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
       <div className="vt-row21" style={{ marginBottom: 14 }}>
-        <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
+        <section className="vt-glass" style={{ "--vt-i": 6, borderRadius: 22, padding: 18, minWidth: 0 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Su quale progetto</div>
             <div style={{ fontSize: 12.5, color: CP.textMuted }}>persone con noi; chi segue più progetti conta in ognuno</div>
@@ -403,7 +447,7 @@ function VetroOverview({ items, ready, cflag, hasContracts, tabCounts, onTab }) 
           ))}
         </section>
         {byMans.length > 0 && (
-          <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <section className="vt-glass" style={{ "--vt-i": 7, borderRadius: 22, padding: 18, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 12 }}>Per mansione</div>
             <Donut items={byMans} center={String(live.length)} centerSub="con noi" format={(v) => String(v)} />
           </section>

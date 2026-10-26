@@ -162,6 +162,12 @@ ${SEL}{${GLASS};border-radius:22px !important}
 .hoc-vetro [data-lvl="0"] .vt-head{background:#14714a;--cp-textPrimary:#fff;--cp-textMuted:rgba(255,255,255,.78)}
 .hoc-vetro [data-lvl="1"] .vt-head{background:#e9c46a;--cp-textPrimary:#1d1510;--cp-textMuted:rgba(29,21,16,.7)}
 .hoc-vetro [data-lvl="2"] .vt-head{background:#b23a3a;--cp-textPrimary:#fff;--cp-textMuted:rgba(255,255,255,.8)}
+/* Schede «da fare» piene di colore (come le «Hot deals» di rapport): rosso = critico, inchiostro = da fare, verde = tutto a posto */
+.hoc-vetro .vt-hot{display:grid;gap:4px;align-content:start;min-width:0;border-radius:20px;padding:14px 16px;text-decoration:none;color:var(--cp-textPrimary)}
+.hoc-vetro .vt-hot[data-lvl="2"]{background:#b23a3a;--cp-textPrimary:#fff;--cp-textSecondary:rgba(255,255,255,.86);--cp-textMuted:rgba(255,255,255,.76)}
+.hoc-vetro .vt-hot[data-lvl="ink"]{background:${T.ink};--cp-textPrimary:#fff;--cp-textSecondary:rgba(255,255,255,.84);--cp-textMuted:rgba(255,255,255,.7)}
+.hoc-vetro .vt-hot[data-lvl="0"]{background:#14714a;--cp-textPrimary:#fff;--cp-textSecondary:rgba(255,255,255,.86);--cp-textMuted:rgba(255,255,255,.76)}
+.hoc-vetro a.vt-hot:hover{filter:brightness(1.06)}
 .hoc-vetro .vt-head .vt-pill{background:rgba(255,255,255,.92) !important;border-color:transparent !important}
 .hoc-vetro .vt-ico{width:34px;height:34px;border-radius:11px;align-items:center;justify-content:center;margin-top:0 !important}
 .hoc-vetro .vt-ico svg{stroke:#fff}

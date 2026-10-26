@@ -10,7 +10,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useLiveCreator, CreatorPills, liveFetcher } from "@/components/LiveCreatorPicker";
 import useSWR from "swr";
-import { RefreshCw, Info, Wallet, TrendingUp, UserPlus, Sparkles } from "lucide-react";
+import { RefreshCw, Info } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { fmt$, fmtInt, fmtAgo, MONTHS_IT } from "@/lib/format";
 import { Disclosure, Notice, card, NUM } from "@/components/ds";
@@ -18,7 +18,7 @@ import RaceHero from "./RaceHero";
 import { suggestedGoal } from "@/lib/live-priority";
 import { waitingNow } from "../chat-monitor/ui";
 import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
-import { MonthArea, Donut, Spark, KpiCard, usd } from "@/components/VetroCharts";
+import { MonthArea, MixBar, Bars, usd } from "@/components/VetroCharts";
 
 const errText = (status) =>
   status === 401 || status === 403 ? "Non hai il permesso per vedere questi dati." :
@@ -428,13 +428,10 @@ function MonthOverview({ row, rows, goal, goalSuggested, country, month, daily }
   const hasPrev = prev.some((v) => v > 0);
   const closed = Math.max(0, row.day_of_month - 1); // oggi è in corso
   const sparkRev = cur.slice(0, closed);
-  const sparkSubs = Array.from({ length: closed }, (_, i) => daily.get(dayKey(month, i + 1))?.subs || 0);
   // il mese prima agli stessi giorni chiusi: confronto onesto a metà mese
   const prevSame = prev.slice(0, closed).reduce((a, v) => a + v, 0);
   const curClosed = sparkRev.reduce((a, v) => a + v, 0);
   const vsPrev = hasPrev && prevSame > 0 && closed > 0 ? (curClosed - prevSame) / prevSame : null;
-  const goalPct = div(row.revenue_mtd, goal);
-  const projVsGoal = goal != null ? row.revenue_proj_eom - goal : null;
   const spenders = row.current_month_converting_new_subs || 0;
   const tot = (row.new_sub_revenue_mtd || 0) + (row.retention_revenue_mtd || 0);
   const pNew = div(row.new_sub_revenue_mtd, tot);
@@ -451,47 +448,38 @@ function MonthOverview({ row, rows, goal, goalSuggested, country, month, daily }
     { label: "Abbonati di prima", value: row.retention_revenue_mtd || 0 },
   ].sort((a, b) => b.value - a.value) : []);
 
-  const kpis = [
-    { icon: Wallet, tone: 0, label: `Venduto a ${curName}`, value: usd(row.revenue_mtd),
-      sub: vsPrev == null ? `giorno ${row.day_of_month} di ${row.days_in_month}`
-        : <>{vsPrev >= 0 ? green(`${signedPct(vsPrev, 0)} sul ${prevName}`) : `${signedPct(vsPrev, 0)} sul ${prevName}`} agli stessi giorni</>,
-      spark: sparkRev.length > 1 ? <Spark data={sparkRev} /> : null },
-    { icon: TrendingUp, tone: 1, label: "Arrivo previsto", value: usd(row.revenue_proj_eom),
-      sub: goal == null ? `media dei 12 mesi ${usd(row.revenue_hist_avg)}`
-        : projVsGoal >= 0 ? green(`sopra il traguardo di ${usd(projVsGoal)}`)
-        : `${usd(-projVsGoal)} sotto il traguardo${goalSuggested ? " suggerito" : ""}` },
-    { icon: UserPlus, tone: 3, label: "Nuovi abbonati", value: fmtInt(row.new_subs_mtd),
-      sub: `${fmtInt(spenders)} hanno già comprato`,
-      spark: sparkSubs.length > 1 ? <Spark data={sparkSubs} color="var(--vt-c3)" /> : null },
-    { icon: Sparkles, tone: 4, label: "Dai nuovi abbonati", value: pct(pNew, 0),
-      sub: `${usd(row.new_sub_revenue_mtd)} del venduto del mese` },
-  ];
+  // 26/10/2026 («per ogni pagina capiscine l'utilità»): la domanda «arriva al traguardo?» ha già il suo
+  // widget, la corsa del mese qui sotto (RaceHero: dove sei, dove dovresti essere, arrivo previsto) → niente
+  // riquadri che la ripetono. Qui solo ciò che la corsa non dice: come sale il mese contro il mese prima,
+  // da dove arriva il venduto (barra del mix: paesi o nuovi/vecchi abbonati) e i nuovi abbonati giorno per
+  // giorno, oggi evidenziato.
+  const subsDays = Array.from({ length: row.day_of_month }, (_, i) => daily.get(dayKey(month, i + 1))?.subs || 0);
 
   return (
-    <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14, marginBottom: 14 }}>
-        {kpis.map((k, i) => (
-          <KpiCard key={k.label} i={i} icon={k.icon} tone={k.tone} label={k.label}
-            value={<VetroNum value={k.value} />} sub={k.sub} spark={k.spark} />
-        ))}
-      </div>
-      <div className="vt-row21" style={{ marginBottom: 14 }}>
-        <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>{Cap(curName)} giorno per giorno</div>
-            <div style={{ fontSize: 12.5, color: CP.textMuted }}>venduto sommato{goalPct != null ? ` · ${pct(goalPct, 0)} del traguardo` : ""}, oggi in corso</div>
-          </div>
-          <MonthArea cur={cur} prev={hasPrev ? prev : []} days={row.days_in_month} prevDays={prevDays} upto={row.day_of_month}
-            goal={goal} curLabel={Cap(curName)} prevLabel={Cap(prevName)} />
-        </section>
+    <div className="vt-row21" style={{ marginBottom: 14 }}>
+      <section className="vt-glass" style={{ "--vt-i": 1, borderRadius: 22, padding: 18, minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>{Cap(curName)} giorno per giorno</div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted, ...NUM }}>{usd(row.revenue_mtd)}{vsPrev == null ? "" : <> · {vsPrev >= 0 ? green(`${signedPct(vsPrev, 0)} sul ${prevName}`) : `${signedPct(vsPrev, 0)} sul ${prevName}`} agli stessi giorni</>}</div>
+        </div>
+        <MonthArea cur={cur} prev={hasPrev ? prev : []} days={row.days_in_month} prevDays={prevDays} upto={row.day_of_month}
+          goal={goal} curLabel={Cap(curName)} prevLabel={Cap(prevName)} />
+      </section>
+      <div style={{ display: "grid", gap: 14, minWidth: 0, alignContent: "start" }}>
         {mix.length > 0 && (
-          <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 22, padding: 18, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 12 }}>{byCountry ? "Venduto per paese" : "Da dove arriva il venduto"}</div>
-            <Donut items={mix} center={usd(row.revenue_mtd)} centerSub={`a ${curName}`} />
+          <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 4 }}>{byCountry ? "Venduto per paese" : "Da dove arriva il venduto"}</div>
+            <div style={{ fontSize: 12.5, color: CP.textMuted, marginBottom: 12 }}>{byCountry ? `a ${curName}` : `${pct(pNew, 0)} dai fan arrivati a ${curName}`}</div>
+            <MixBar items={mix} height={26} />
           </section>
         )}
+        <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 4 }}>Nuovi abbonati al giorno</div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted, marginBottom: 10, ...NUM }}>{fmtInt(row.new_subs_mtd)} a {curName}, {fmtInt(spenders)} hanno già comprato · oggi in corso</div>
+          <Bars data={subsDays} hi={subsDays.length - 1} partial unit=" nuovi" height={110} />
+        </section>
       </div>
-    </>
+    </div>
   );
 }
 
