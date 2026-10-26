@@ -20,28 +20,44 @@
  * e si guadagna solo su chi porti tu, mai sulle persone portate da loro.
  * Su più livelli diventa vendita piramidale (vietata, L. 173/2005).
  *
+ * ref-2 (26/10/2026, stesso giorno, decisione di Nicholas): i €100 non sono più
+ * «al mese» ma «ogni 25 turni, fino a 75» — un premio legato ai turni fatti e
+ * non al mese di calendario (tema finanza: non deve somigliare a una retribuzione
+ * mensile). Turni = turni INIZIATI su CreatorsPro dal primo turno in poi (la
+ * fonte dei turni dell'app); l'HR può scrivere il numero a mano se l'abbinamento
+ * non riesce. Il cambio dollaro→euro delle provvigioni lo inserisce l'HR mese per
+ * mese: senza cambio la provvigione resta in dollari e non si può pagare.
+ *
  * Cambiare le regole = nuova `version` + commento qui: chi guadagna vede lo
  * storico dei propri premi, che non deve cambiare sotto i piedi. I premi già
  * pagati restano congelati all'importo del pagamento.
  */
 
 export const REFERRAL_RULES = {
-  version: "ref-1",
+  version: "ref-2",
   storyEur: 50,            // 2 storie Instagram pubblicate entro 30 giorni, concordate con l'HR
   storiesRequired: 2,
   storyWindowDays: 30,
   firstShiftEur: 50,       // primo turno in chat dopo aver superato la formazione
-  retentionEur: 100,       // per ognuno dei primi 3 mesi in cui la persona lavora davvero
-  retentionMonths: 3,
+  shiftBonusEur: 100,      // ogni 25 turni fatti…
+  shiftStep: 25,
+  shiftMax: 75,            // …fino a 75 turni (3 premi)
   salesPct: [0.05, 0.025], // mese 1, mese 2 — sul venduto Infloww (netto creator)
   // se il primo turno cade dopo il 15 il mese 1 è il mese dopo, e i giorni di
   // rodaggio prima si sommano al mese 1 (anche loro sono apprendimento)
   lateStartDay: 15,
-  // le provvigioni maturano in dollari (come i compensi operatori); per un
-  // totale unico si mostrano anche in euro a questo cambio, dichiarato.
-  // Media nov 2025 → giu 2026 dal foglio FX Rates del file Finance.
-  usdToEur: 0.86,
+  // le provvigioni maturano in dollari (come i compensi operatori); l'euro si
+  // calcola col cambio del mese inserito dall'HR (referral:fx). Fuori da qui il
+  // cambio è considerato sbagliato (errore di battitura, es. 86 invece di 0,86).
+  fxMin: 0.5,
+  fxMax: 1.5,
 };
+
+/** Cambio inserito dall'HR: numero tra fxMin e fxMax (accetta la virgola), o null. */
+export function parseFx(v, rules = REFERRAL_RULES) {
+  const x = Number(String(v ?? "").trim().replace(",", "."));
+  return Number.isFinite(x) && x >= rules.fxMin && x <= rules.fxMax ? Math.round(x * 10000) / 10000 : null;
+}
 
 const s = (v) => (v == null ? "" : String(v)).trim();
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -94,7 +110,7 @@ export function referralMonths(firstShiftAt, rules = REFERRAL_RULES) {
   const startMonth = firstShiftAt.slice(0, 7);
   const late = Number(firstShiftAt.slice(8, 10)) > rules.lateStartDay;
   const month1 = late ? addMonths(startMonth, 1) : startMonth;
-  const months = Array.from({ length: rules.retentionMonths }, (_, i) => addMonths(month1, i));
+  const months = rules.salesPct.map((_, i) => addMonths(month1, i));
   return { month1, months, late, salesMonths1: late ? [startMonth, month1] : [month1] };
 }
 
@@ -137,10 +153,13 @@ export function validateRecruit(input = {}) {
   if (out.firstShiftAt && out.trainingPassed !== true) return { error: "Il primo turno si segna solo dopo la formazione superata" };
   if (out.trainingAt && out.interviewAt && out.trainingAt < out.interviewAt) return { error: "La formazione non può essere prima del colloquio" };
   if (out.firstShiftAt && out.trainingAt && out.firstShiftAt < out.trainingAt) return { error: "Il primo turno non può essere prima della formazione" };
-  // override mensile dell'HR: { "2026-11": "ok" | "no" } — "no" = mese non valido (es. turni saltati)
-  const ov = {};
-  for (const [m, v] of Object.entries(input.monthOverrides || {})) if (isMonth(m) && (v === "ok" || v === "no")) ov[m] = v;
-  out.monthOverrides = ov;
+  // turni scritti a mano dall'HR (vince sul conteggio da CreatorsPro): vuoto = automatico
+  const sm = s(input.shiftsManual);
+  if (sm) {
+    const x = Number(sm);
+    if (!Number.isInteger(x) || x < 0 || x > 2000) return { error: "Turni fatti: un numero intero" };
+    out.shiftsManual = x;
+  } else out.shiftsManual = null;
   return { value: out };
 }
 
@@ -196,9 +215,10 @@ export function storyMilestone(story, { today, paid = {}, rules = REFERRAL_RULES
 /**
  * Tutte le voci di una persona portata.
  * salesByMonth: { "2026-11": 4321.5 } venduto Infloww della persona (null = dato assente).
- * currentMonth: mese in corso "YYYY-MM" (il mese aperto matura "in corso").
+ * shiftDates: date ("YYYY-MM-DD") dei turni iniziati su CreatorsPro, null = non letti.
+ * fx: { "2026-11": 0.86 } cambio dollaro→euro del mese inserito dall'HR.
  */
-export function recruitMilestones(recruit, { today, salesByMonth = {}, paid = {}, rules = REFERRAL_RULES } = {}) {
+export function recruitMilestones(recruit, { today, salesByMonth = {}, shiftDates = null, fx = {}, paid = {}, rules = REFERRAL_RULES } = {}) {
   const r = recruit;
   const out = [];
   const currentMonth = today.slice(0, 7);
@@ -238,7 +258,8 @@ export function recruitMilestones(recruit, { today, salesByMonth = {}, paid = {}
     const salesMonths = i === 0 ? mm.salesMonths1 : [month];
     const sales = salesOf(salesMonths);
     const usd = sales == null ? null : round2(sales * pct);
-    m = { ...m, month, salesMonths, salesUsd: sales, amountUsd: usd, amountEur: usd == null ? null : round2(usd * rules.usdToEur) };
+    const rate = fx?.[month] ?? null;
+    m = { ...m, month, salesMonths, salesUsd: sales, amountUsd: usd, fx: rate, fxMissing: usd != null && rate == null, amountEur: usd == null || rate == null ? null : round2(usd * rate) };
     if (month > currentMonth) m = { ...m, status: "in_attesa", why: `Da ${monthWords(month)}` };
     else if (month === currentMonth) m = { ...m, status: "in_corso", why: sales == null ? "Il venduto del mese arriva con il prossimo aggiornamento Infloww" : "Mese in corso: la cifra cresce con le vendite" };
     else if (sales == null) m = { ...m, status: "in_attesa", why: "Venduto Infloww del mese non ancora importato" };
@@ -247,27 +268,25 @@ export function recruitMilestones(recruit, { today, salesByMonth = {}, paid = {}
     out.push(pay(key, m));
   });
 
-  // 3) €100 per ognuno dei primi 3 mesi in cui la persona lavora davvero
-  for (let i = 0; i < rules.retentionMonths; i++) {
-    const key = `${r.id}:month_${i + 1}`;
-    let m = { key, kind: "retention", monthIndex: i + 1, label: `Mese ${i + 1} in agenzia`, amountEur: rules.retentionEur };
+  // 3) €100 ogni 25 turni, fino a 75
+  const dates = Array.isArray(shiftDates) && started ? shiftDates.filter((d) => d >= r.firstShiftAt).sort() : null;
+  const manual = Number.isInteger(r.shiftsManual) ? r.shiftsManual : null;
+  const done = manual ?? (dates ? dates.length : null);
+  for (let n = rules.shiftStep; n <= rules.shiftMax; n += rules.shiftStep) {
+    const key = `${r.id}:shifts_${n}`;
+    let m = { key, kind: "shifts", shifts: n, label: `${n} turni fatti`, amountEur: rules.shiftBonusEur, shiftsDone: done };
     if (!started) {
       m = { ...m, status: r.trainingPassed === false || exited ? "perso" : "in_attesa", why: r.trainingPassed === false ? "Formazione non superata" : exited ? "Uscita prima del primo turno" : "Parte dal primo turno" };
-      out.push(pay(key, m));
-      continue;
+    } else if (done != null && done >= n) {
+      // data del n-esimo turno quando la conosciamo (con il numero a mano no)
+      m = { ...m, status: "maturato", unlockedAt: manual == null && dates?.[n - 1] ? dates[n - 1] : null };
+    } else if (exited) {
+      m = { ...m, status: "perso", why: `Uscita dopo ${done ?? 0} turni` };
+    } else if (done == null) {
+      m = { ...m, status: "in_attesa", why: "Turni non ancora letti da CreatorsPro" };
+    } else {
+      m = { ...m, status: "in_attesa", why: `${done} turni su ${n}` };
     }
-    const month = mm.months[i];
-    const salesMonths = i === 0 ? mm.salesMonths1 : [month];
-    const sales = salesOf(salesMonths);
-    const ov = r.monthOverrides?.[month] || null;
-    m = { ...m, month };
-    if (exited && exited < monthEnd(month)) m = { ...m, status: "perso", why: `Uscita il ${exited}` };
-    else if (ov === "no") m = { ...m, status: "perso", why: "Mese non valido (segnato dall'HR)" };
-    else if (month >= currentMonth) m = { ...m, status: month === currentMonth ? "in_corso" : "in_attesa", why: month === currentMonth ? "Matura a fine mese se la persona lavora" : `Da ${monthWords(month)}` };
-    else if (ov === "ok") m = { ...m, status: "maturato", unlockedAt: monthEnd(month) };
-    else if (sales == null) m = { ...m, status: "in_attesa", why: "Venduto Infloww del mese non ancora importato" };
-    else if (sales <= 0) m = { ...m, status: "perso", why: "Nessuna vendita nel mese" };
-    else m = { ...m, status: "maturato", unlockedAt: monthEnd(month) };
     out.push(pay(key, m));
   }
   return out;
@@ -275,28 +294,33 @@ export function recruitMilestones(recruit, { today, salesByMonth = {}, paid = {}
 
 /** Tappe del percorso della persona portata, per la vista del referente. */
 export function recruitSteps(r, milestones = [], { today } = {}) {
-  const mm = referralMonths(r.firstShiftAt);
-  const ret = milestones.filter((m) => m.kind === "retention");
+  const ret = milestones.filter((m) => m.kind === "shifts");
   const steps = [
     { key: "referred", label: "Segnalata", done: true, at: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : null },
     { key: "interview", label: "Colloquio", done: Boolean(r.interviewAt), at: r.interviewAt || null },
     { key: "training", label: "Formazione", done: r.trainingPassed === true, failed: r.trainingPassed === false, at: r.trainingAt || null },
     { key: "first_shift", label: "Primo turno", done: Boolean(r.firstShiftAt && r.trainingPassed === true), at: r.firstShiftAt || null },
-    ...ret.map((m, i) => ({ key: m.key, label: `Mese ${i + 1}`, done: m.status === "maturato" || m.status === "pagato", failed: m.status === "perso", current: m.status === "in_corso", at: mm?.months[i] || null })),
+    ...ret.map((m) => ({ key: m.key, label: `${m.shifts} turni`, done: m.status === "maturato" || m.status === "pagato", failed: m.status === "perso", at: m.unlockedAt || null })),
   ];
   const next = steps.find((x) => !x.done && !x.failed);
   return { steps, next: r.exitedAt && r.exitedAt <= today ? null : next?.key || null };
 }
 
-/** Somme per stato. In euro (le provvigioni convertite al cambio dichiarato). */
+/**
+ * Somme per stato, in euro. Le provvigioni senza il cambio del mese restano in
+ * dollari: si sommano a parte (`senzaCambioUsd`, solo maturate e in corso).
+ */
 export function summarize(milestones = []) {
   const t = { pagato: 0, maturato: 0, in_corso: 0, in_attesa: 0, perso: 0 };
+  let senzaCambioUsd = 0;
   for (const m of milestones) {
-    if (m.amountEur == null) continue;
+    if (m.amountEur == null) {
+      if (m.amountUsd != null && (m.status === "maturato" || m.status === "in_corso")) senzaCambioUsd += m.amountUsd;
+      continue;
+    }
     t[m.status] = round2((t[m.status] || 0) + m.amountEur);
   }
-  // potenziale ancora sbloccabile = voci fisse in attesa (le provvigioni future non si stimano)
-  return { ...t, guadagnato: round2(t.pagato + t.maturato) };
+  return { ...t, guadagnato: round2(t.pagato + t.maturato), senzaCambioUsd: round2(senzaCambioUsd) };
 }
 
 /**
@@ -313,6 +337,7 @@ export function referrerView(recruit, milestones, steps) {
     milestones: milestones.map((m) => ({
       key: m.key, kind: m.kind, label: m.label, status: m.status, why: m.why || null,
       amountEur: m.amountEur, amountUsd: m.amountUsd ?? null, salesUsd: m.salesUsd ?? null, salesMonths: m.salesMonths || null, pct: m.pct ?? null,
+      fxMissing: Boolean(m.fxMissing), shifts: m.shifts ?? null, shiftsDone: m.shiftsDone ?? null,
       month: m.month || null, unlockedAt: m.unlockedAt || null, paidAt: m.paidAt || null,
     })),
     totals: summarize(milestones),
@@ -344,3 +369,24 @@ export function salesFor(map, inflowwName) {
   if (hits.length > 1) return null;
   return hits.length === 1 ? map[hits[0]] : 0;
 }
+
+/**
+ * Date dei turni INIZIATI per persona da righe wage CP di un mese:
+ * { nomeNormalizzato: ["YYYY-MM-DD", …] }. Nome = mapping CP→Infloww se c'è,
+ * altrimenti il nome del membro CP. Giorno in ora di Roma.
+ */
+export function shiftDatesFromWages(wages = [], mapping = {}, nowMs = Date.now()) {
+  const day = (iso) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date(iso));
+  const out = {};
+  for (const w of wages || []) {
+    const name = normName(mapping?.[w?.member_id] || w?.member_name);
+    if (!name) continue;
+    for (const sh of w.shifts || []) {
+      const ts = Date.parse(sh?.started_at);
+      if (!Number.isFinite(ts) || ts > nowMs) continue;
+      (out[name] ||= []).push(day(ts));
+    }
+  }
+  return out;
+}
+

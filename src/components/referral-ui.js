@@ -38,7 +38,9 @@ export function StatusPill({ status }) {
 export function MilestoneRow({ m }) {
   const s = STATUS[m.status] || STATUS.in_attesa;
   const amount = m.kind === "commission" && m.amountUsd != null
-    ? <span>{fmtEur(m.amountEur)}<span style={{ color: CP.textMuted, fontSize: 12 }}> · {fmtUsd(m.amountUsd)}</span></span>
+    ? (m.amountEur == null
+      ? <span>{fmtUsd(m.amountUsd)}<span style={{ color: CP.textMuted, fontSize: 12, fontWeight: 400 }}> · cambio da inserire</span></span>
+      : <span>{fmtEur(m.amountEur)}<span style={{ color: CP.textMuted, fontSize: 12 }}> · {fmtUsd(m.amountUsd)}</span></span>)
     : fmtEur(m.amountEur);
   const detail = m.kind === "commission" && m.salesUsd != null
     ? `su ${fmtUsd(m.salesUsd)} venduti${m.month ? ` (${m.salesMonths?.length > 1 ? "fino a " : ""}${monthLabel(m.month)})` : ""}`
@@ -93,7 +95,7 @@ export function RulesList({ rules: r }) {
   const rows = [
     [fmtEur(r.storyEur), `quando pubblichi ${r.storiesRequired} storie Instagram entro ${r.storyWindowDays} giorni, concordate con l'HR. Le storie non sono obbligatorie: puoi portare qualcuno anche senza.`],
     [fmtEur(r.firstShiftEur), "quando la persona che hai portato supera la formazione e fa il primo turno in chat."],
-    [`${fmtEur(r.retentionEur)} al mese`, `per i primi ${r.retentionMonths} mesi in cui la persona lavora davvero (vende nel mese e non è uscita).`],
+    [`${fmtEur(r.shiftBonusEur)} ogni ${r.shiftStep} turni`, `fatti dalla persona che hai portato, fino a ${r.shiftMax} turni (${r.shiftMax / r.shiftStep} premi). I turni si contano dal primo turno in chat.`],
     [pct(r.salesPct[0]), "di tutto quello che vende nel primo mese: è il mese in cui la persona impara, e il tuo aiuto conta di più: guardate insieme le sue chat, falle fare domande."],
     [pct(r.salesPct[1]), "di tutto quello che vende nel secondo mese."],
   ];
@@ -106,7 +108,7 @@ export function RulesList({ rules: r }) {
         </div>
       ))}
       <div style={{ fontSize: 12, color: CP.textMuted, lineHeight: 1.5, marginTop: 4 }}>
-        Il venduto è quello di Infloww, al netto della quota di OnlyFans. Le percentuali maturano in dollari e le vedi anche in euro al cambio di {String(r.usdToEur).replace(".", ",")}.
+        Il venduto è quello di Infloww, al netto della quota di OnlyFans. Le percentuali maturano in dollari e diventano euro al cambio del mese, che inserisce l&apos;HR.
         Il primo mese parte dal mese del primo turno; se il primo turno è dopo il {r.lateStartDay}, parte dal mese dopo e i giorni prima si sommano al primo mese.
         Si guadagna solo sulle persone che porti tu, non su quelle portate da loro.
       </div>

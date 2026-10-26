@@ -102,7 +102,7 @@ function RecruitModal({ initial, data, onClose, onDone }) {
     interviewAt: initial?.interviewAt || "", trainingAt: initial?.trainingAt || "",
     trainingPassed: initial?.trainingPassed == null ? "" : String(initial.trainingPassed),
     firstShiftAt: initial?.firstShiftAt || "", exitedAt: initial?.exitedAt || "",
-    note: initial?.note || "", monthOverrides: initial?.monthOverrides || {},
+    note: initial?.note || "", shiftsManual: initial?.shiftsManual ?? "",
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
@@ -142,24 +142,11 @@ function RecruitModal({ initial, data, onClose, onDone }) {
           <input style={inp} type="date" value={f.firstShiftAt} onChange={set("firstShiftAt")} disabled={f.trainingPassed !== "true"} />
         </Field>
         <Field label="Uscita (se è andata via)"><input style={inp} type="date" value={f.exitedAt} onChange={set("exitedAt")} /></Field>
+        <Field label="Turni fatti (a mano)" hint={saved ? `Da CreatorsPro: ${saved.milestones.find((m) => m.kind === "shifts")?.shiftsDone ?? "non letti"}. Lascia vuoto per il conteggio automatico.` : "Lascia vuoto: si contano da soli da CreatorsPro."}>
+          <input style={inp} inputMode="numeric" value={f.shiftsManual} onChange={set("shiftsManual")} placeholder="automatico" />
+        </Field>
       </div>
       <Field label="Note (le vede solo l'HR)"><textarea style={{ ...inp, minHeight: 56 }} value={f.note} onChange={set("note")} /></Field>
-
-      {saved?.months && (
-        <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>Mesi in agenzia — di base contano se nel mese ha venduto; qui puoi decidere a mano (es. malattia, turni saltati).</div>
-          {saved.months.months.map((m, i) => (
-            <div key={m} style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
-              <span style={{ flex: 1, fontSize: 14 }}>Mese {i + 1} · {monthLabel(m)}</span>
-              <select style={{ ...inp, width: 190 }} value={f.monthOverrides[m] || ""} onChange={(e) => setF((x) => {
-                const mo = { ...x.monthOverrides }; if (e.target.value) mo[m] = e.target.value; else delete mo[m]; return { ...x, monthOverrides: mo };
-              })}>
-                <option value="">Automatico (dalle vendite)</option><option value="ok">Vale</option><option value="no">Non vale</option>
-              </select>
-            </div>
-          ))}
-        </div>
-      )}
 
       {saved && (
         <div style={{ marginTop: 16 }}>
@@ -211,9 +198,40 @@ function StoryModal({ initial, data, onClose, onDone }) {
   );
 }
 
+// ── Cambio dollaro→euro del mese (lo inserisce l'HR) ────────────────────────
+function FxPanel({ data, onDone }) {
+  const months = [...new Set([...data.fxMonths, ...Object.keys(data.fx)])].sort().reverse();
+  const [vals, setVals] = useState(() => Object.fromEntries(months.map((m) => [m, data.fx[m] != null ? String(data.fx[m]).replace(".", ",") : ""])));
+  const [busy, setBusy] = useState(null);
+  const [msg, setMsg] = useState(null);
+  const save = async (m) => {
+    setBusy(m); setMsg(null);
+    try { await post({ action: "setFx", month: m, rate: vals[m] ?? "" }); onDone(); setMsg({ ok: true, text: `Cambio di ${monthLabel(m)} salvato.` }); }
+    catch (e) { setMsg({ ok: false, text: e.message }); } finally { setBusy(null); }
+  };
+  return (
+    <section style={{ ...box, padding: "14px 18px" }}>
+      <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 8 }}>
+        Le percentuali sul venduto maturano in dollari. Scrivi quanti euro vale 1 dollaro nel mese (es. 0,86): finché manca, la provvigione di quel mese resta in dollari e non si può segnare pagata.
+      </div>
+      {months.length === 0 && <div style={{ fontSize: 14, color: CP.textMuted }}>Nessun mese con provvigioni, per ora.</div>}
+      {months.map((m) => (
+        <div key={m} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
+          <span style={{ flex: 1, fontSize: 14 }}>{monthLabel(m)}{data.fx[m] == null && <span style={{ color: CP.attn }}> · manca</span>}</span>
+          <span style={{ fontSize: 13, color: CP.textMuted }}>1 $ =</span>
+          <input style={{ ...inp, width: 90 }} inputMode="decimal" value={vals[m] ?? ""} onChange={(e) => setVals((v) => ({ ...v, [m]: e.target.value }))} placeholder="0,86" />
+          <span style={{ fontSize: 13, color: CP.textMuted }}>€</span>
+          <button type="button" style={btn} disabled={busy === m} onClick={() => save(m)}>{busy === m ? "…" : "Salva"}</button>
+        </div>
+      ))}
+      {msg && <div style={{ fontSize: 13, marginTop: 8, color: msg.ok ? CP.textSecondary : CP.accentRed }}>{msg.text}</div>}
+    </section>
+  );
+}
+
 // ── Pagina ──────────────────────────────────────────────────────────────────
 const TABS = [
-  ["topay", "Da pagare"], ["recruits", "Persone portate"], ["referrers", "Referenti"], ["stories", "Storie"], ["crm", "Dal CRM"], ["log", "Registro"],
+  ["topay", "Da pagare"], ["recruits", "Persone portate"], ["referrers", "Referenti"], ["stories", "Storie"], ["fx", "Cambio"], ["crm", "Dal CRM"], ["log", "Registro"],
 ];
 
 export default function ReferralAdminPage() {
@@ -231,9 +249,10 @@ export default function ReferralAdminPage() {
   const totals = useMemo(() => {
     if (!ok) return null;
     const toPay = data.toPay.reduce((a, m) => a + (m.amountEur || 0), 0);
+    const toPayUsd = data.toPay.reduce((a, m) => a + (m.amountEur == null ? m.amountUsd || 0 : 0), 0);
     const paid = data.referrers.reduce((a, r) => a + r.totals.pagato, 0);
     const running = data.referrers.reduce((a, r) => a + r.totals.in_corso, 0);
-    return { toPay: Math.round(toPay * 100) / 100, paid, running };
+    return { toPay: Math.round(toPay * 100) / 100, toPayUsd: Math.round(toPayUsd * 100) / 100, paid, running };
   }, [data, ok]);
 
   const pay = async (key) => {
@@ -251,7 +270,7 @@ export default function ReferralAdminPage() {
       <PageHead
         crumbs={[{ label: "People" }, { label: "Porta un collega" }]}
         title="Porta un collega"
-        subtitle="Chi ha portato chi, a che punto è ogni persona e cosa va pagato. Il venduto del primo e del secondo mese arriva da solo da Infloww."
+        subtitle="Chi ha portato chi, a che punto è ogni persona e cosa va pagato. Il venduto del primo e del secondo mese arriva da Infloww, i turni da CreatorsPro."
         actions={ok && <>
           <button type="button" style={btn} onClick={() => setModal({ kind: "referrer" })}><Plus size={14} /> Referente</button>
           <button type="button" style={btn} onClick={() => setModal({ kind: "story" })}><Plus size={14} /> Storie</button>
@@ -264,7 +283,7 @@ export default function ReferralAdminPage() {
 
       {ok && (
         <>
-          <HeroMetric label="Da pagare adesso" value={fmtEur(totals.toPay)} compare={`${data.toPay.length} premi sbloccati e non ancora pagati`}>
+          <HeroMetric label="Da pagare adesso" value={fmtEur(totals.toPay)} compare={`${data.toPay.length} premi sbloccati e non ancora pagati`} hint={totals.toPayUsd > 0 ? `In più $${totals.toPayUsd} di percentuali che aspettano il cambio del mese (tab «Cambio»)` : null}>
             <Metric label="In maturazione questo mese" value={fmtEur(totals.running)} note="stima, cresce con le vendite" />
             <Metric label="Già pagati" value={fmtEur(totals.paid)} />
             <Metric label="Persone portate" value={String(data.recruits.length)} note={`${data.referrers.length} referenti`} />
@@ -273,7 +292,8 @@ export default function ReferralAdminPage() {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
             {TABS.map(([k, l]) => (
               <FilterChip key={k} active={tab === k} onClick={() => setTab(k)}
-                label={k === "topay" ? `${l} · ${data.toPay.length}` : k === "crm" ? `${l} · ${data.suggestions.length}` : l} />
+                attn={k === "fx" && data.fxMonths.some((m) => data.fx[m] == null)}
+                label={k === "topay" ? `${l} · ${data.toPay.length}` : k === "crm" ? `${l} · ${data.suggestions.length}` : k === "fx" ? `${l} · ${data.fxMonths.filter((m) => data.fx[m] == null).length} da inserire` : l} />
             ))}
           </div>
 
@@ -288,7 +308,9 @@ export default function ReferralAdminPage() {
                   { key: "ref", label: "Referente", render: (m) => refName[m.referrerId] || "—", sort: (m) => refName[m.referrerId] || "" },
                   { key: "what", label: "Premio", render: (m) => <span>{m.label}{m.recruitName && <span style={{ color: CP.textMuted }}> · {m.recruitName}</span>}</span>, sort: (m) => m.label },
                   { key: "unlockedAt", label: "Sbloccato", render: (m) => fmtDay(m.unlockedAt), sort: (m) => m.unlockedAt || "" },
-                  { key: "amountEur", label: "Importo", align: "right", render: (m) => <span>{fmtEur(m.amountEur)}{m.amountUsd != null && <span style={{ color: CP.textMuted, fontSize: 12 }}> · ${m.amountUsd}</span>}</span> },
+                  { key: "amountEur", label: "Importo", align: "right", render: (m) => m.amountEur == null
+                    ? <span>${m.amountUsd}<span style={{ color: CP.attn, fontSize: 12 }}> · manca il cambio</span></span>
+                    : <span>{fmtEur(m.amountEur)}{m.amountUsd != null && <span style={{ color: CP.textMuted, fontSize: 12 }}> · ${m.amountUsd}</span>}</span> },
                   { key: "pay", label: "", sortable: false, align: "right", render: (m) => (
                     <button type="button" style={btn} disabled={busyKey === m.key} onClick={(e) => { e.stopPropagation(); if (confirm(`Segnare pagato ${fmtEur(m.amountEur)} a ${refName[m.referrerId]}? L'importo si congela.`)) pay(m.key); }}>
                       {busyKey === m.key ? "…" : "Segna pagato"}
@@ -352,6 +374,8 @@ export default function ReferralAdminPage() {
               ]}
             />
           )}
+
+          {tab === "fx" && <FxPanel key={JSON.stringify(data.fx) + data.fxMonths.join()} data={data} onDone={() => mutate()} />}
 
           {tab === "crm" && (
             <section style={{ ...box, padding: "14px 18px" }}>

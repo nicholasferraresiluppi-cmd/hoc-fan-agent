@@ -9,6 +9,8 @@
  *   referral:stories    HASH id → storie Instagram {referrerId, agreedAt, publishedAt[]}
  *   referral:paid       HASH chiave voce → pagamento congelato {amountEur, amountUsd, paidAt, by}
  *   referral:sales:{YYYY-MM}  venduto Infloww del mese per nome {builtAt, map} (piccolo)
+ *   referral:shifts:{YYYY-MM} date dei turni iniziati per nome, da CreatorsPro {builtAt, map}
+ *   referral:fx         HASH mese → cambio dollaro→euro inserito dall'HR
  *   referral:audit      LIST cap 500 — chi ha fatto cosa
  *
  * Il venduto si legge da `ops_kpi:monthly:{mese}` (~360 KB) UNA volta per
@@ -20,7 +22,7 @@ import { randomBytes } from "node:crypto";
 import {
   REFERRAL_RULES, validateReferrer, validateRecruit, validateStory, findDuplicateRecruit,
   recruitMilestones, storyMilestone, recruitSteps, summarize, referrerView,
-  salesMapFromKpiRows, salesFor, referralMonths, normEmail, normName,
+  salesMapFromKpiRows, salesFor, referralMonths, normEmail, normName, shiftDatesFromWages, parseFx, addMonths,
 } from "@/lib/referral-core";
 
 const K = {
@@ -29,7 +31,9 @@ const K = {
   stories: "referral:stories",
   paid: "referral:paid",
   audit: "referral:audit",
+  fx: "referral:fx",
   sales: (m) => `referral:sales:${m}`,
+  shifts: (m) => `referral:shifts:${m}`,
 };
 
 const newId = (p) => `${p}_${randomBytes(6).toString("hex")}`;
@@ -113,6 +117,70 @@ async function salesForRecruits(recruits) {
   return out;
 }
 
+// ── Turni da CreatorsPro ────────────────────────────────────────────────────
+//
+// Le buste CP di un mese sono pesanti (lezione banda 4/10): se ne tiene una
+// mappa piccola {nome: [date dei turni]} e la si ricostruisce solo se vecchia
+// (12 ore per il mese in corso e quello prima, che la sync notturna aggiorna;
+// 30 giorni per i mesi più vecchi, che non cambiano più).
+async function getMonthShiftDates(month, { now = Date.now() } = {}) {
+  const c = parse(await kv.get(K.shifts(month)).catch(() => null));
+  const cur = todayRome(now).slice(0, 7);
+  const fresh = month >= addMonths(cur, -1) ? 12 * 3600e3 : 30 * 24 * 3600e3;
+  if (c && now - c.builtAt < fresh) return c.map || {};
+  const { getWages } = await import("@/lib/cp-wages-store");
+  const [wages, mapping] = await Promise.all([getWages(month).catch(() => null), kv.get("cp:member_mapping").catch(() => null)]);
+  if (!wages) return c?.map || null;
+  const map = shiftDatesFromWages(wages, mapping || {}, now);
+  await kv.set(K.shifts(month), JSON.stringify({ builtAt: now, map }), { ex: 400 * 24 * 3600 }).catch(() => {});
+  return map;
+}
+
+/** Date dei turni di ogni persona portata dal primo turno a oggi: { recruitId: [date] | null }. */
+async function shiftsForRecruits(recruits, { now = Date.now() } = {}) {
+  const cur = todayRome(now).slice(0, 7);
+  const monthsOf = (r) => {
+    if (!r.firstShiftAt || !r.inflowwName || Number.isInteger(r.shiftsManual)) return [];
+    const out = [];
+    for (let m = r.firstShiftAt.slice(0, 7); m <= cur && out.length < 12; m = addMonths(m, 1)) out.push(m);
+    return out;
+  };
+  const need = new Set(recruits.flatMap(monthsOf));
+  const maps = {};
+  for (const m of need) maps[m] = await getMonthShiftDates(m, { now });
+  const out = {};
+  for (const r of recruits) {
+    const months = monthsOf(r);
+    if (!months.length) { out[r.id] = null; continue; }
+    const key = normName(r.inflowwName);
+    // nessun mese leggibile = non letti (mai «zero turni» per un dato mancante)
+    if (months.every((m) => !maps[m])) { out[r.id] = null; continue; }
+    out[r.id] = months.flatMap((m) => maps[m]?.[key] || []);
+  }
+  return out;
+}
+
+export async function getFx() {
+  const h = (await kv.hgetall(K.fx).catch(() => null)) || {};
+  const out = {};
+  for (const [m, v] of Object.entries(h)) { const x = parseFx(v); if (x != null) out[m] = x; }
+  return out;
+}
+
+export async function setFx(month, rate, actor) {
+  if (!/^\d{4}-\d{2}$/.test(String(month || ""))) throw new Error("Mese non valido");
+  if (rate === "" || rate == null) {
+    await kv.hdel(K.fx, month);
+    await audit(actor, "fx.clear", { month });
+    return null;
+  }
+  const x = parseFx(rate);
+  if (x == null) throw new Error("Cambio non valido: scrivi quanti euro vale 1 dollaro (es. 0,86)");
+  await kv.hset(K.fx, { [month]: String(x) });
+  await audit(actor, "fx.set", { month, rate: x });
+  return x;
+}
+
 // ── Stato completo (HR) ─────────────────────────────────────────────────────
 
 async function readPaid() {
@@ -123,11 +191,11 @@ async function readPaid() {
 }
 
 export async function loadState({ now = Date.now() } = {}) {
-  const [referrers, recruits, stories, paid] = await Promise.all([readHash(K.referrers), readHash(K.recruits), readHash(K.stories), readPaid()]);
+  const [referrers, recruits, stories, paid, fx] = await Promise.all([readHash(K.referrers), readHash(K.recruits), readHash(K.stories), readPaid(), getFx()]);
   const today = todayRome(now);
-  const sales = await salesForRecruits(recruits);
+  const [sales, shifts] = await Promise.all([salesForRecruits(recruits), shiftsForRecruits(recruits, { now })]);
   const recruitRows = recruits.map((r) => {
-    const milestones = recruitMilestones(r, { today, salesByMonth: sales[r.id] || {}, paid });
+    const milestones = recruitMilestones(r, { today, salesByMonth: sales[r.id] || {}, shiftDates: shifts[r.id], fx, paid });
     return { ...r, milestones, steps: recruitSteps(r, milestones, { today }), totals: summarize(milestones), months: referralMonths(r.firstShiftAt) };
   });
   const storyRows = stories.map((st) => ({ ...st, milestone: storyMilestone(st, { today, paid }) }));
@@ -141,7 +209,9 @@ export async function loadState({ now = Date.now() } = {}) {
   const toPay = [];
   for (const r of recruitRows) for (const m of r.milestones) if (m.status === "maturato") toPay.push({ ...m, recruitId: r.id, recruitName: r.name, referrerId: r.referrerId });
   for (const s of storyRows) if (s.milestone.status === "maturato") toPay.push({ ...s.milestone, referrerId: s.referrerId });
-  return { rules: REFERRAL_RULES, today, referrers: referrerRows, recruits: recruitRows, stories: storyRows, toPay };
+  // mesi delle provvigioni già calcolabili: l'HR ci mette il cambio
+  const fxMonths = [...new Set(recruitRows.flatMap((r) => r.milestones.filter((m) => m.kind === "commission" && m.amountUsd != null).map((m) => m.month)))].sort();
+  return { rules: REFERRAL_RULES, today, fx, fxMonths, referrers: referrerRows, recruits: recruitRows, stories: storyRows, toPay };
 }
 
 /** Suggerimenti dal CRM persone: chi ha scritto «Me l'ha consigliato qualcuno» e non è ancora nel programma. */
@@ -245,6 +315,7 @@ export async function markPaid(key, actor, { now = Date.now() } = {}) {
   const state = await loadState({ now });
   const m = state.toPay.find((x) => x.key === key);
   if (!m) throw new Error("Questa voce non è da pagare (non maturata o già pagata)");
+  if (m.amountEur == null) throw new Error(`Manca il cambio dollaro→euro di ${m.month}: inseriscilo prima di pagare`);
   const rec = { amountEur: m.amountEur, amountUsd: m.amountUsd ?? null, paidAt: todayRome(now), by: actor?.name || null, at: now };
   // HSETNX: due clic in contemporanea non pagano due volte
   const ok = await kv.hsetnx(K.paid, key, JSON.stringify(rec));

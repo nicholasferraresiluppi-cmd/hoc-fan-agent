@@ -9,7 +9,7 @@ import { internalOrigin } from "@/lib/cron-chain";
 import {
   loadState, crmSuggestions, listInflowwNames, listAudit,
   saveReferrer, deleteReferrer, saveRecruit, deleteRecruit, saveStory, deleteStory,
-  markPaid, unmarkPaid, inviteReferrer,
+  markPaid, unmarkPaid, inviteReferrer, setFx,
 } from "@/lib/referral";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +41,7 @@ const ACTIONS = {
   deleteStory: (b, actor) => deleteStory(b.id, actor),
   markPaid: (b, actor) => markPaid(String(b.key || ""), actor),
   unmarkPaid: (b, actor) => unmarkPaid(String(b.key || ""), actor),
+  setFx: (b, actor) => setFx(String(b.month || ""), b.rate, actor),
 };
 
 export async function POST(request) {

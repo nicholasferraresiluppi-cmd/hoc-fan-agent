@@ -51,7 +51,7 @@ export default function PortaUnCollegaPage() {
       <PageHead
         crumbs={[{ label: "Il mio quadro" }, { label: "Porta un collega" }]}
         title="Porta un collega"
-        subtitle="Chi porti in agenzia e quanto stai guadagnando su ognuno, passo per passo: dal colloquio al primo turno, fino al terzo mese."
+        subtitle="Chi porti in agenzia e quanto stai guadagnando su ognuno, passo per passo: dal colloquio al primo turno, fino ai 75 turni."
       />
 
       {isLoading && <div style={{ ...box, padding: 16, color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
@@ -79,7 +79,9 @@ export default function PortaUnCollegaPage() {
               data.totals.pagato > 0 && `${fmtEur(data.totals.pagato)} già pagati`,
               data.totals.maturato > 0 && `${fmtEur(data.totals.maturato)} da pagare`,
             ].filter(Boolean).join(" · ") || "Ancora nessun premio sbloccato"}
-            hint="Da pagare = sbloccato, arriva col prossimo pagamento."
+            hint={data.totals.senzaCambioUsd > 0
+              ? `In più $${data.totals.senzaCambioUsd.toLocaleString("it-IT")} di percentuali: diventano euro quando l'HR inserisce il cambio del mese.`
+              : "Da pagare = sbloccato, arriva col prossimo pagamento."}
           >
             <Metric label="In arrivo questo mese" value={fmtEur(data.totals.in_corso)} note="cresce con le vendite" />
             <Metric label="Persone portate" value={String(data.recruits.length)} />
