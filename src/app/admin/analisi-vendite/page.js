@@ -16,6 +16,7 @@ import { isDay, presetsFor } from "@/lib/period-range";
 import { CreatorCompare } from "@/components/looker/pages";
 import { LkStyles } from "@/components/looker/Lk";
 import { personOf } from "@/lib/analisi-vendite-diagnosi";
+import VetroScope, { useVetro, VetroSwitch, useInVetro } from "@/components/VetroScope";
 
 const DAY = 86400e3;
 const iso = (t) => new Date(t).toISOString().slice(0, 10);
@@ -106,7 +107,7 @@ function PersonCard({ p, onOpen }) {
   const m = p.metrics;
   const [main, ...more] = p.reasons;
   return (
-    <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpen())}
+    <div className="vt-glass" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpen())}
       style={{ ...card, padding: 16, display: "grid", gap: 10, cursor: "pointer", alignContent: "start" }} aria-label={`Apri ${p.name}`}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
         <div style={{ minWidth: 0 }}>
@@ -511,11 +512,14 @@ export default function AnalisiVenditePage() {
   const showDetail = Boolean(person && open);
 
   const goDati = (ids) => { window.location.href = lookerHref("recap-dashboard", ids); };
+  const [vetro, setVetro] = useVetro();
 
   return (
+    <VetroScope on={vetro}>
     <div style={{ display: "grid", gap: 20, maxWidth: 1600, margin: "0 auto", padding: "8px 0 40px" }}>
       <PageHead crumbs={[{ label: "Performance" }]} title="Analisi vendite"
-        subtitle="Come vanno le tue creator e perché, oppure tutte a confronto sugli stessi numeri." />
+        subtitle="Come vanno le tue creator e perché, oppure tutte a confronto sugli stessi numeri."
+        actions={<VetroSwitch on={vetro} set={setVetro} />} />
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <div role="tablist" aria-label="Vista" style={{ display: "inline-flex", gap: 4, padding: 3, border: `1px solid ${CP.border}`, borderRadius: 10 }}>
@@ -555,6 +559,7 @@ export default function AnalisiVenditePage() {
                 {list.data.summary.steady} stabili, {list.data.summary.up} in crescita{list.data.summary.few ? `, ${list.data.summary.few} con pochi dati` : ""}.
                 {" "}In tutto {moneyShort(list.data.summary.revenue)}{deltaText(list.data.summary.revenue_delta) ? ` (${deltaText(list.data.summary.revenue_delta)} sul periodo prima)` : ""}.
               </div>
+              <VetroAnalisi persons={persons} summary={list.data.summary} onOpen={(name) => { setPerson(name); window.scrollTo?.(0, 0); }} />
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 330px), 1fr))", gap: 14, opacity: list.isLoading ? 0.6 : 1 }}>
                 {persons.map((p) => <PersonCard key={p.name} p={p} onOpen={() => { setPerson(p.name); window.scrollTo?.(0, 0); }} />)}
               </div>
@@ -565,6 +570,103 @@ export default function AnalisiVenditePage() {
             </>
           )}
       </>
+      )}
+    </div>
+    </VetroScope>
+  );
+}
+
+/* ───────── Col vetro (26/10/2026): i due grafici di QUESTA pagina, non i riquadri delle altre ─────────
+ * La domanda della pagina è «chi perde dollari e perché», quindi:
+ * 1) «Dove si sono spostati i dollari»: cascata dal periodo prima a oggi, un gradino per creator
+ *    (prima chi perde di più, poi chi guadagna). La scala parte da sopra lo zero e lo dice.
+ * 2) «Le due leve»: lo stesso calcolo delle schede (revenue = fan che spendono × spesa a testa,
+ *    peso di ciascuna leva col logaritmo del rapporto), fatto su tutte le creator insieme.
+ * Stessi numeri della diagnosi, nessuna richiesta nuova. */
+function VetroAnalisi({ persons, summary, onOpen }) {
+  const inVetro = useInVetro();
+  if (!inVetro || !persons.length) return null;
+  const moved = persons.filter((p) => Math.abs(p.metrics.revenue_diff || 0) >= 1).map((p) => ({ name: p.name, diff: p.metrics.revenue_diff }));
+  const MAX = 9;
+  let steps = [...moved].sort((a, b) => a.diff - b.diff);
+  if (steps.length > MAX) {
+    const keep = [...steps].sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff)).slice(0, MAX - 1);
+    const rest = steps.filter((x) => !keep.includes(x));
+    steps = [...keep.sort((a, b) => a.diff - b.diff), { name: `Altre ${rest.length}`, diff: rest.reduce((a, x) => a + x.diff, 0), other: true }];
+  }
+  const start = summary.revenue_prev || 0;
+  let run = start;
+  const bars = steps.map((x) => { const from = run; run += x.diff; return { ...x, from, to: run }; });
+  const end = summary.revenue || 0;
+  const vals = [start, end, ...bars.flatMap((b) => [b.from, b.to])];
+  const hi = Math.max(...vals), lo0 = Math.min(...vals);
+  const pad = Math.max((hi - lo0) * 0.25, hi * 0.02, 1);
+  const lo = Math.max(0, lo0 - pad);
+  const top = hi + (hi - lo) * 0.14; // spazio per l'etichetta sopra la colonna più alta
+  const Y = (v) => ((v - lo) / (top - lo)) * 100; // percentuale dell'altezza
+  const H = 230;
+  const col = (key, label, a, b, color, value, onClick, strong) => (
+    <button key={key} type="button" onClick={onClick} disabled={!onClick} title={`${label}: ${value}`}
+      style={{ flex: "1 0 62px", minWidth: 62, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, background: "none", border: 0, padding: 0, cursor: onClick ? "pointer" : "default", font: "inherit", color: "inherit" }}>
+      <div style={{ position: "relative", width: "100%", height: H }}>
+        <div style={{ position: "absolute", left: "14%", right: "14%", bottom: `${Y(Math.min(a, b))}%`, height: `max(3px, ${Y(Math.max(a, b)) - Y(Math.min(a, b))}%)`, background: color, borderRadius: 6 }} />
+        <span style={{ position: "absolute", left: 0, right: 0, bottom: `calc(${Y(Math.max(a, b))}% + 4px)`, textAlign: "center", fontSize: 11, color: strong ? CP.textPrimary : CP.textSecondary, fontWeight: strong ? 600 : 400, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{value}</span>
+      </div>
+      <span style={{ fontSize: 11, color: CP.textMuted, width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{label}</span>
+    </button>
+  );
+  const signedMoney = (v) => `${v >= 0 ? "+" : "−"}${moneyShort(Math.abs(v))}`;
+
+  // le due leve su tutte le creator insieme
+  const sum = (k) => persons.reduce((a, p) => a + (Number(p.metrics[k]) || 0), 0);
+  const sp = sum("spenders"), spPrev = sum("spenders_prev");
+  const spend = sp ? summary.revenue / sp : null, spendPrev = spPrev ? summary.revenue_prev / spPrev : null;
+  const lnSp = sp && spPrev ? Math.log(sp / spPrev) : null;
+  const lnSpend = spend && spendPrev ? Math.log(spend / spendPrev) : null;
+  const lnTot = lnSp != null && lnSpend != null ? lnSp + lnSpend : null;
+  const levers = lnTot == null ? [] : [
+    { key: "fan", label: "Fan che spendono", now: int(sp), prev: int(spPrev), ln: lnSp, delta: sp / spPrev - 1 },
+    { key: "testa", label: "Spesa a testa", now: moneyShort(spend), prev: moneyShort(spendPrev), ln: lnSpend, delta: spend / spendPrev - 1 },
+  ];
+  const lnMax = Math.max(0.01, ...levers.map((l) => Math.abs(l.ln)));
+  const main = levers.length ? [...levers].sort((a, b) => Math.abs(b.ln) - Math.abs(a.ln))[0] : null;
+
+  return (
+    <div className="vt-row21">
+      <section className="vt-glass" style={{ "--vt-i": 0, borderRadius: 22, padding: 18, minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Dove si sono spostati i dollari</div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted }}>dal periodo prima a oggi, un gradino per creator · la scala parte da {moneyShort(lo)}</div>
+        </div>
+        <div role="img" aria-label={`Periodo prima ${moneyShort(start)}, ${bars.map((b) => `${b.name} ${signedMoney(b.diff)}`).join(", ")}, oggi ${moneyShort(end)}`}
+          style={{ display: "flex", alignItems: "flex-end", gap: 4, overflowX: "auto", paddingBottom: 2 }}>
+          {col("start", "Prima", lo, start, "var(--vt-cx)", moneyShort(start), null, true)}
+          {bars.map((b) => col(b.name, b.name, b.from, b.to, b.diff < 0 ? "var(--vt-c2)" : "var(--vt-c1)", signedMoney(b.diff), b.other ? null : () => onOpen(b.name)))}
+          {col("end", "Oggi", lo, end, "var(--vt-c0)", moneyShort(end), null, true)}
+        </div>
+      </section>
+      {levers.length > 0 && (
+        <section className="vt-glass" style={{ "--vt-i": 1, borderRadius: 22, padding: 18, minWidth: 0, display: "grid", gap: 14, alignContent: "start" }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Le due leve</div>
+          <div style={{ fontSize: 13.5, color: CP.textSecondary, lineHeight: 1.5 }}>
+            Revenue = fan che spendono × spesa a testa. {Math.abs(lnTot) < 0.02 ? "Nel complesso è in linea col periodo prima." : <>Il cambio viene soprattutto da <b style={{ color: CP.textPrimary, fontWeight: 600 }}>{main.label.toLowerCase()}</b>.</>}
+          </div>
+          {levers.map((l) => (
+            <div key={l.key} style={{ display: "grid", gap: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13 }}>
+                <span style={{ color: CP.textPrimary }}>{l.label}</span>
+                <span style={{ color: CP.textSecondary, fontVariantNumeric: "tabular-nums" }}>{l.now} <span style={{ color: CP.textMuted }}>· prima {l.prev}</span></span>
+              </div>
+              <div style={{ position: "relative", height: 10, borderRadius: 99, background: CP.track }}>
+                <span style={{ position: "absolute", left: "50%", top: -3, bottom: -3, width: 1.5, background: CP.textMuted }} />
+                <span style={{ position: "absolute", top: 0, bottom: 0, borderRadius: 99, background: l.ln < 0 ? "var(--vt-c2)" : "var(--vt-c1)",
+                  left: l.ln < 0 ? `${50 - (Math.abs(l.ln) / lnMax) * 50}%` : "50%", width: `${(Math.abs(l.ln) / lnMax) * 50}%` }} />
+              </div>
+              <div style={{ fontSize: 12, color: l.delta > 0.005 ? CP.accentGreen : CP.textSecondary, fontVariantNumeric: "tabular-nums" }}>{deltaText(l.delta) || "—"} sul periodo prima</div>
+            </div>
+          ))}
+          <div style={{ fontSize: 12, color: CP.textMuted, lineHeight: 1.45 }}>Fan sommati creator per creator: chi compra da due creator conta due volte, come nelle schede.</div>
+        </section>
       )}
     </div>
   );
