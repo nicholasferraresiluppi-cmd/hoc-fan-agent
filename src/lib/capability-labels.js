@@ -16,5 +16,6 @@ export const CAP_LABELS = {
   "leaderboard.snapshot": "Fotografare la classifica",
   "cm.cockpit": "Cockpit del chat manager",
   "copilot.pilot": "Il mio turno (copilota)",
+  "referral.manage": "Porta un collega: referenti, persone portate e pagamenti",
 };
 export const SCOPE_LABELS = { own: "solo i propri dati", team: "il proprio team", all: "tutti" };
