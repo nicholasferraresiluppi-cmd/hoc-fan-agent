@@ -12,7 +12,7 @@ import { CP } from "@/lib/brand";
 const NUM = { fontVariantNumeric: "tabular-nums" };
 const group = (n) => String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 export const usd = (v) => (v == null || !Number.isFinite(Number(v)) ? "—" : `${v < 0 ? "−" : ""}$${group(Number(v))}`);
-const usdShort = (v) => (v >= 1e6 ? `$${(v / 1e6).toFixed(1).replace(".", ",")}M` : v >= 1e3 ? `$${Math.round(v / 1e3)}k` : `$${Math.round(v)}`);
+const usdShort = (v) => (v >= 1e6 ? `$${(v / 1e6).toFixed(1).replace(".", ",")}M` : v >= 1e3 ? `$${v < 1e4 && v % 1e3 ? (v / 1e3).toFixed(1).replace(".", ",") : Math.round(v / 1e3)}k` : `$${Math.round(v)}`);
 export const SERIES = ["var(--vt-c0)", "var(--vt-c1)", "var(--vt-c2)", "var(--vt-c3)", "var(--vt-c4)"];
 export const OTHER = "var(--vt-cx)";
 
@@ -36,7 +36,7 @@ const cumulate = (arr, n) => {
 const niceMax = (v) => {
   if (!(v > 0)) return 1;
   const p = Math.pow(10, Math.floor(Math.log10(v)));
-  const m = [1, 2, 2.5, 5, 10].find((x) => x * p >= v);
+  const m = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((x) => x * p >= v);
   return m * p;
 };
 
@@ -147,7 +147,7 @@ export function Donut({ items = [], center, centerSub, size = 156 }) {
           {centerSub && <div style={{ fontSize: 11, color: CP.textMuted }}>{centerSub}</div>}
         </div>
       </div>
-      <div style={{ display: "grid", gap: 7, flex: 1, minWidth: 150 }}>
+      <div style={{ display: "grid", gap: 7, flex: 1, minWidth: 200 }}>
         {all.map((x) => (
           <div key={x.label} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: CP.textSecondary, minWidth: 0 }}>
             <span style={{ width: 10, height: 10, borderRadius: 3, background: x.color, flexShrink: 0 }} />
