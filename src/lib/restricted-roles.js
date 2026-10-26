@@ -11,7 +11,9 @@ export const RESTRICTED_ROLES = {
   social: { home: "/admin/warmup", paths: ["/admin/warmup", "/admin/supervisor"], label: "Warm-up" },
   // 18/10/2026: People Partner — CRM persone e contratti; Contabilità solo se il titolare gliel'ha aperta
   // `needs`: pagina mostrata solo con quel permesso (la Contabilità la apre il titolare a mano)
-  people: { home: "/admin/hr", paths: ["/admin/hr", "/admin/hr/contratti", "/contabilita"], label: "Persone", needs: { "/contabilita": "accounting.private" } },
+  people: { home: "/admin/hr", paths: ["/admin/hr", "/admin/hr/contratti", "/admin/referral", "/contabilita"], label: "Persone", needs: { "/contabilita": "accounting.private" } },
+  // 26/10/2026: chi ha portato un collega e non lavora in HOC Pro vede solo i suoi guadagni
+  referente: { home: "/me/porta-un-collega", paths: ["/me/porta-un-collega"], label: "Porta un collega" },
   smm: { home: "/admin/scouting", paths: ["/admin/scouting", "/admin/studio-social", "/admin/supervisor", "/admin/warmup"], label: "Radar creator" },
 };
 
