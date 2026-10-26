@@ -43,7 +43,7 @@ export function MilestoneRow({ m }) {
       : <span>{fmtEur(m.amountEur)}<span style={{ color: CP.textMuted, fontSize: 12 }}> · {fmtUsd(m.amountUsd)}</span></span>)
     : fmtEur(m.amountEur);
   const detail = m.kind === "commission" && m.salesUsd != null
-    ? `su ${fmtUsd(m.salesUsd)} venduti${m.month ? ` (${m.salesMonths?.length > 1 ? "fino a " : ""}${monthLabel(m.month)})` : ""}`
+    ? `su ${fmtUsd(m.salesUsd)} venduti${m.status === "in_corso" || m.status === "in_attesa" ? " finora" : ""}${m.why && m.status !== "maturato" && m.status !== "pagato" ? ` · ${m.why}` : ""}`
     : m.status === "pagato" ? `pagato il ${fmtDay(m.paidAt)}`
     : m.status === "maturato" && m.unlockedAt ? `sbloccato il ${fmtDay(m.unlockedAt)}`
     : m.why || null;
@@ -96,8 +96,8 @@ export function RulesList({ rules: r }) {
     [fmtEur(r.storyEur), `quando pubblichi ${r.storiesRequired} storie Instagram entro ${r.storyWindowDays} giorni, concordate con l'HR. Le storie non sono obbligatorie: puoi portare qualcuno anche senza.`],
     [fmtEur(r.firstShiftEur), "quando la persona che hai portato supera la formazione e fa il primo turno in chat."],
     [`${fmtEur(r.shiftBonusEur)} ogni ${r.shiftStep} turni`, `fatti dalla persona che hai portato, fino a ${r.shiftMax} turni (${r.shiftMax / r.shiftStep} premi). I turni si contano dal primo turno in chat.`],
-    [pct(r.salesPct[0]), "di tutto quello che vende nel primo mese: è il mese in cui la persona impara, e il tuo aiuto conta di più: guardate insieme le sue chat, falle fare domande."],
-    [pct(r.salesPct[1]), "di tutto quello che vende nel secondo mese."],
+    [pct(r.salesPct[0]), `di quello che vende nei primi ${r.pctBlock} turni: è quando la persona impara, e il tuo aiuto conta di più. Guardate insieme le sue chat, falle fare domande.`],
+    [pct(r.salesPct[1]), `di quello che vende dal turno ${r.pctBlock + 1} al ${r.pctBlock * 2}.`],
   ];
   return (
     <div style={{ display: "grid", gap: 10 }}>
@@ -109,7 +109,8 @@ export function RulesList({ rules: r }) {
       ))}
       <div style={{ fontSize: 12, color: CP.textMuted, lineHeight: 1.5, marginTop: 4 }}>
         Il venduto è quello di Infloww, al netto della quota di OnlyFans. Le percentuali maturano in dollari e diventano euro al cambio del mese, che inserisce l&apos;HR.
-        Il primo mese parte dal mese del primo turno; se il primo turno è dopo il {r.lateStartDay}, parte dal mese dopo e i giorni prima si sommano al primo mese.
+        Ogni percentuale si sblocca solo quando la persona completa i suoi {r.pctBlock} turni: se esce prima, o viene mandata via, quella percentuale non si sblocca. Non è un giudizio su come ha lavorato: il programma premia chi porta persone che restano, e una persona che non resta non si paga.
+        Infloww dà il venduto per mese: il venduto di un blocco di turni è la parte del venduto del mese che corrisponde ai turni del blocco.
         Si guadagna solo sulle persone che porti tu, non su quelle portate da loro.
       </div>
     </div>

@@ -28,13 +28,24 @@
  * non riesce. Il cambio dollaro→euro delle provvigioni lo inserisce l'HR mese per
  * mese: senza cambio la provvigione resta in dollari e non si può pagare.
  *
+ * ref-3 (26/10/2026, decisione di Nicholas): anche le percentuali vanno a
+ * TURNI, non a mesi. 5% sul venduto dei primi 25 turni, 2,5% sul venduto dei
+ * turni 26-50; ogni percentuale si sblocca SOLO quando la persona completa il
+ * suo blocco di 25 turni. Chi non ci arriva (esce o viene mandato via) non
+ * sblocca niente: il programma paga chi porta persone che restano, e una
+ * reference sbagliata non si paga. Non è un giudizio sul lavoro della persona.
+ * Infloww dà il venduto per MESE: il venduto di un blocco è la quota del venduto
+ * Infloww di ogni mese pari ai turni del blocco fatti in quel mese sul totale
+ * dei turni del mese (CreatorsPro solo come calendario, come Squadra/Fasce).
+ * È una ripartizione dichiarata, non il venduto turno per turno.
+ *
  * Cambiare le regole = nuova `version` + commento qui: chi guadagna vede lo
  * storico dei propri premi, che non deve cambiare sotto i piedi. I premi già
  * pagati restano congelati all'importo del pagamento.
  */
 
 export const REFERRAL_RULES = {
-  version: "ref-2",
+  version: "ref-3",
   storyEur: 50,            // 2 storie Instagram pubblicate entro 30 giorni, concordate con l'HR
   storiesRequired: 2,
   storyWindowDays: 30,
@@ -42,10 +53,8 @@ export const REFERRAL_RULES = {
   shiftBonusEur: 100,      // ogni 25 turni fatti…
   shiftStep: 25,
   shiftMax: 75,            // …fino a 75 turni (3 premi)
-  salesPct: [0.05, 0.025], // mese 1, mese 2 — sul venduto Infloww (netto creator)
-  // se il primo turno cade dopo il 15 il mese 1 è il mese dopo, e i giorni di
-  // rodaggio prima si sommano al mese 1 (anche loro sono apprendimento)
-  lateStartDay: 15,
+  salesPct: [0.05, 0.025], // turni 1-25, turni 26-50 — sul venduto Infloww (netto creator)
+  pctBlock: 25,            // ampiezza di un blocco di turni per le percentuali
   // le provvigioni maturano in dollari (come i compensi operatori); l'euro si
   // calcola col cambio del mese inserito dall'HR (referral:fx). Fuori da qui il
   // cambio è considerato sbagliato (errore di battitura, es. 86 invece di 0,86).
@@ -100,18 +109,32 @@ export function normEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? e : null;
 }
 
+/** Mesi "YYYY-MM" dal primo turno a oggi (massimo 12), per leggere venduto e turni. */
+export function monthsSince(firstShiftAt, today, max = 12) {
+  if (!isIsoDate(firstShiftAt) || !today) return [];
+  const out = [];
+  for (let m = firstShiftAt.slice(0, 7); m <= today.slice(0, 7) && out.length < max; m = addMonths(m, 1)) out.push(m);
+  return out;
+}
+
 /**
- * Mesi del percorso a partire dal primo turno.
- * month1 = mese del primo turno, o il mese dopo se il primo turno è dopo il giorno 15.
- * salesMonths1 = mesi il cui venduto conta per il mese 1 (con l'avvio tardivo anche il mese parziale).
+ * Venduto di un blocco di turni (indici [from, to) nelle date ordinate):
+ * per ogni mese, venduto Infloww del mese × turni del blocco nel mese ÷ turni
+ * della persona nel mese. null se manca il venduto di un mese che serve.
  */
-export function referralMonths(firstShiftAt, rules = REFERRAL_RULES) {
-  if (!isIsoDate(firstShiftAt)) return null;
-  const startMonth = firstShiftAt.slice(0, 7);
-  const late = Number(firstShiftAt.slice(8, 10)) > rules.lateStartDay;
-  const month1 = late ? addMonths(startMonth, 1) : startMonth;
-  const months = rules.salesPct.map((_, i) => addMonths(month1, i));
-  return { month1, months, late, salesMonths1: late ? [startMonth, month1] : [month1] };
+export function blockSales(dates, from, to, salesByMonth) {
+  const all = {};
+  for (const d of dates) all[d.slice(0, 7)] = (all[d.slice(0, 7)] || 0) + 1;
+  const inBlock = {};
+  for (const d of dates.slice(from, to)) inBlock[d.slice(0, 7)] = (inBlock[d.slice(0, 7)] || 0) + 1;
+  let sum = 0;
+  const months = Object.keys(inBlock).sort();
+  for (const m of months) {
+    const s = salesByMonth[m];
+    if (s == null) return { sales: null, months };
+    sum += (Number(s) || 0) * (inBlock[m] / all[m]);
+  }
+  return { sales: Math.round(sum * 100) / 100, months };
 }
 
 // ── Validazione input ───────────────────────────────────────────────────────
@@ -160,6 +183,12 @@ export function validateRecruit(input = {}) {
     if (!Number.isInteger(x) || x < 0 || x > 2000) return { error: "Turni fatti: un numero intero" };
     out.shiftsManual = x;
   } else out.shiftsManual = null;
+  // venduto per blocco scritto a mano (serve solo quando i turni non vengono da CreatorsPro)
+  out.blockSalesManual = [0, 1].map((i) => {
+    const v = s(input.blockSalesManual?.[i]).replace(",", ".");
+    const x = Number(v);
+    return v && Number.isFinite(x) && x >= 0 ? Math.round(x * 100) / 100 : null;
+  });
   return { value: out };
 }
 
@@ -236,42 +265,50 @@ export function recruitMilestones(recruit, { today, salesByMonth = {}, shiftDate
     out.push(pay(key, m));
   }
 
-  const mm = referralMonths(r.firstShiftAt, rules);
-  const started = Boolean(mm && r.trainingPassed === true);
-  const salesOf = (months) => {
-    const vals = months.map((x) => salesByMonth[x]);
-    if (vals.every((v) => v == null)) return null;
-    return round2(vals.reduce((a, v) => a + (Number(v) || 0), 0));
-  };
+  const started = Boolean(r.firstShiftAt && r.trainingPassed === true);
+  const dates = Array.isArray(shiftDates) && started ? shiftDates.filter((d) => d >= r.firstShiftAt).sort() : null;
+  const manual = Number.isInteger(r.shiftsManual) ? r.shiftsManual : null;
+  const done = manual ?? (dates ? dates.length : null);
 
-  // 2) provvigioni mese 1 e 2
+  // 2) percentuali: 5% sui turni 1-25, 2,5% sui turni 26-50, sbloccate a blocco completato
   rules.salesPct.forEach((pct, i) => {
     const key = `${r.id}:commission_${i + 1}`;
-    const label = `${String(pct * 100).replace(".", ",")}% sul venduto del mese ${i + 1}`;
-    let m = { key, kind: "commission", monthIndex: i + 1, pct, label, amountEur: null, amountUsd: null };
+    const from = i * rules.pctBlock, to = (i + 1) * rules.pctBlock;
+    const label = `${String(pct * 100).replace(".", ",")}% sul venduto dei turni ${from + 1}-${to}`;
+    let m = { key, kind: "commission", block: i + 1, pct, label, amountEur: null, amountUsd: null, shiftsDone: done, shiftsTo: to };
     if (!started) {
       m = { ...m, status: r.trainingPassed === false || exited ? "perso" : "in_attesa", why: r.trainingPassed === false ? "Formazione non superata" : exited ? "Uscita prima del primo turno" : "Parte dal primo turno" };
       out.push(pay(key, m));
       return;
     }
-    const month = mm.months[i];
-    const salesMonths = i === 0 ? mm.salesMonths1 : [month];
-    const sales = salesOf(salesMonths);
-    const usd = sales == null ? null : round2(sales * pct);
-    const rate = fx?.[month] ?? null;
-    m = { ...m, month, salesMonths, salesUsd: sales, amountUsd: usd, fx: rate, fxMissing: usd != null && rate == null, amountEur: usd == null || rate == null ? null : round2(usd * rate) };
-    if (month > currentMonth) m = { ...m, status: "in_attesa", why: `Da ${monthWords(month)}` };
-    else if (month === currentMonth) m = { ...m, status: "in_corso", why: sales == null ? "Il venduto del mese arriva con il prossimo aggiornamento Infloww" : "Mese in corso: la cifra cresce con le vendite" };
-    else if (sales == null) m = { ...m, status: "in_attesa", why: "Venduto Infloww del mese non ancora importato" };
-    else if (sales <= 0) m = { ...m, status: "perso", why: "Nessuna vendita nel mese" };
-    else m = { ...m, status: "maturato", unlockedAt: monthEnd(month) };
+    const reached = done != null && done >= to;
+    // venduto del blocco: a mano se l'HR l'ha scritto, altrimenti ripartito dalle date dei turni
+    const manualSales = r.blockSalesManual?.[i] ?? null;
+    const bs = manualSales != null ? { sales: manualSales, months: [] } : manual == null && dates ? blockSales(dates, from, Math.min(to, dates.length), salesByMonth) : { sales: null, months: [] };
+    const unlockDay = reached && manual == null && dates?.[to - 1] ? dates[to - 1] : null;
+    const fxMonth = (unlockDay || today).slice(0, 7);
+    const rate = fx?.[fxMonth] ?? null;
+    const usd = bs.sales == null ? null : round2(bs.sales * pct);
+    m = { ...m, salesUsd: bs.sales, salesMonths: bs.months, amountUsd: usd, month: fxMonth, fx: rate, fxMissing: usd != null && rate == null, amountEur: usd == null || rate == null ? null : round2(usd * rate) };
+    if (!reached) {
+      if (exited) m = { ...m, status: "perso", why: `Uscita dopo ${done ?? 0} turni: la percentuale si sblocca solo a ${to} turni` };
+      else if (done == null) m = { ...m, status: "in_attesa", why: "Turni non ancora letti da CreatorsPro" };
+      else if (done <= from) m = { ...m, status: "in_attesa", why: `Dal turno ${from + 1}` };
+      else m = { ...m, status: "in_corso", why: `${done} turni su ${to}: si sblocca al ${to}°${usd != null ? ", la cifra cresce con le vendite" : ""}` };
+    } else if (bs.sales == null) {
+      m = { ...m, status: "in_attesa", why: manual != null ? "Con i turni scritti a mano serve anche il venduto del blocco (a mano)" : "Venduto Infloww di un mese non ancora importato" };
+    } else if (bs.months.includes(currentMonth)) {
+      // blocco finito nel mese in corso: il venduto Infloww del mese cresce ancora
+      m = { ...m, status: "in_corso", why: `${to} turni fatti: la cifra si chiude a fine mese col venduto Infloww` };
+    } else if (bs.sales <= 0) {
+      m = { ...m, status: "perso", why: "Nessuna vendita nei turni del blocco" };
+    } else {
+      m = { ...m, status: "maturato", unlockedAt: unlockDay };
+    }
     out.push(pay(key, m));
   });
 
-  // 3) €100 ogni 25 turni, fino a 75
-  const dates = Array.isArray(shiftDates) && started ? shiftDates.filter((d) => d >= r.firstShiftAt).sort() : null;
-  const manual = Number.isInteger(r.shiftsManual) ? r.shiftsManual : null;
-  const done = manual ?? (dates ? dates.length : null);
+  // 3) €100 ogni 25 turni, fino a 75 (si accumulano)
   for (let n = rules.shiftStep; n <= rules.shiftMax; n += rules.shiftStep) {
     const key = `${r.id}:shifts_${n}`;
     let m = { key, kind: "shifts", shifts: n, label: `${n} turni fatti`, amountEur: rules.shiftBonusEur, shiftsDone: done };
@@ -337,7 +374,7 @@ export function referrerView(recruit, milestones, steps) {
     milestones: milestones.map((m) => ({
       key: m.key, kind: m.kind, label: m.label, status: m.status, why: m.why || null,
       amountEur: m.amountEur, amountUsd: m.amountUsd ?? null, salesUsd: m.salesUsd ?? null, salesMonths: m.salesMonths || null, pct: m.pct ?? null,
-      fxMissing: Boolean(m.fxMissing), shifts: m.shifts ?? null, shiftsDone: m.shiftsDone ?? null,
+      fxMissing: Boolean(m.fxMissing), shifts: m.shifts ?? null, shiftsDone: m.shiftsDone ?? null, shiftsTo: m.shiftsTo ?? null,
       month: m.month || null, unlockedAt: m.unlockedAt || null, paidAt: m.paidAt || null,
     })),
     totals: summarize(milestones),

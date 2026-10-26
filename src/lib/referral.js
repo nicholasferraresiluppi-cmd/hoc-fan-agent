@@ -22,7 +22,7 @@ import { randomBytes } from "node:crypto";
 import {
   REFERRAL_RULES, validateReferrer, validateRecruit, validateStory, findDuplicateRecruit,
   recruitMilestones, storyMilestone, recruitSteps, summarize, referrerView,
-  salesMapFromKpiRows, salesFor, referralMonths, normEmail, normName, shiftDatesFromWages, parseFx, addMonths,
+  salesMapFromKpiRows, salesFor, monthsSince, normEmail, normName, shiftDatesFromWages, parseFx, addMonths,
 } from "@/lib/referral-core";
 
 const K = {
@@ -97,22 +97,17 @@ export async function listInflowwNames() {
   return [...names].sort((a, b) => a.localeCompare(b, "it"));
 }
 
-/** Venduto per mese di ogni persona portata: { recruitId: { "YYYY-MM": venduto|null } }. */
-async function salesForRecruits(recruits) {
-  const need = new Set();
-  for (const r of recruits) {
-    const mm = r.inflowwName ? referralMonths(r.firstShiftAt) : null;
-    if (!mm) continue;
-    for (const m of [...mm.salesMonths1, ...mm.months]) need.add(m);
-  }
+/** Venduto per mese di ogni persona portata, dal mese del primo turno a oggi: { recruitId: { "YYYY-MM": venduto|null } }. */
+async function salesForRecruits(recruits, { now = Date.now() } = {}) {
+  const today = todayRome(now);
+  const monthsOf = (r) => (r.inflowwName ? monthsSince(r.firstShiftAt, today) : []);
+  const need = new Set(recruits.flatMap(monthsOf));
   const maps = {};
   for (const m of need) maps[m] = await getMonthSales(m);
   const out = {};
   for (const r of recruits) {
-    const mm = r.inflowwName ? referralMonths(r.firstShiftAt) : null;
     out[r.id] = {};
-    if (!mm) continue;
-    for (const m of [...mm.salesMonths1, ...mm.months]) out[r.id][m] = salesFor(maps[m], r.inflowwName);
+    for (const m of monthsOf(r)) out[r.id][m] = salesFor(maps[m], r.inflowwName);
   }
   return out;
 }
@@ -138,13 +133,7 @@ async function getMonthShiftDates(month, { now = Date.now() } = {}) {
 
 /** Date dei turni di ogni persona portata dal primo turno a oggi: { recruitId: [date] | null }. */
 async function shiftsForRecruits(recruits, { now = Date.now() } = {}) {
-  const cur = todayRome(now).slice(0, 7);
-  const monthsOf = (r) => {
-    if (!r.firstShiftAt || !r.inflowwName || Number.isInteger(r.shiftsManual)) return [];
-    const out = [];
-    for (let m = r.firstShiftAt.slice(0, 7); m <= cur && out.length < 12; m = addMonths(m, 1)) out.push(m);
-    return out;
-  };
+  const monthsOf = (r) => (!r.inflowwName || Number.isInteger(r.shiftsManual) ? [] : monthsSince(r.firstShiftAt, todayRome(now)));
   const need = new Set(recruits.flatMap(monthsOf));
   const maps = {};
   for (const m of need) maps[m] = await getMonthShiftDates(m, { now });
@@ -193,10 +182,10 @@ async function readPaid() {
 export async function loadState({ now = Date.now() } = {}) {
   const [referrers, recruits, stories, paid, fx] = await Promise.all([readHash(K.referrers), readHash(K.recruits), readHash(K.stories), readPaid(), getFx()]);
   const today = todayRome(now);
-  const [sales, shifts] = await Promise.all([salesForRecruits(recruits), shiftsForRecruits(recruits, { now })]);
+  const [sales, shifts] = await Promise.all([salesForRecruits(recruits, { now }), shiftsForRecruits(recruits, { now })]);
   const recruitRows = recruits.map((r) => {
     const milestones = recruitMilestones(r, { today, salesByMonth: sales[r.id] || {}, shiftDates: shifts[r.id], fx, paid });
-    return { ...r, milestones, steps: recruitSteps(r, milestones, { today }), totals: summarize(milestones), months: referralMonths(r.firstShiftAt) };
+    return { ...r, milestones, steps: recruitSteps(r, milestones, { today }), totals: summarize(milestones) };
   });
   const storyRows = stories.map((st) => ({ ...st, milestone: storyMilestone(st, { today, paid }) }));
   const referrerRows = referrers.map((ref) => {
@@ -210,7 +199,7 @@ export async function loadState({ now = Date.now() } = {}) {
   for (const r of recruitRows) for (const m of r.milestones) if (m.status === "maturato") toPay.push({ ...m, recruitId: r.id, recruitName: r.name, referrerId: r.referrerId });
   for (const s of storyRows) if (s.milestone.status === "maturato") toPay.push({ ...s.milestone, referrerId: s.referrerId });
   // mesi delle provvigioni già calcolabili: l'HR ci mette il cambio
-  const fxMonths = [...new Set(recruitRows.flatMap((r) => r.milestones.filter((m) => m.kind === "commission" && m.amountUsd != null).map((m) => m.month)))].sort();
+  const fxMonths = [...new Set(recruitRows.flatMap((r) => r.milestones.filter((m) => m.kind === "commission" && m.amountUsd != null && (m.status === "maturato" || m.fxMissing === false && m.status === "pagato")).map((m) => m.month)))].sort();
   return { rules: REFERRAL_RULES, today, fx, fxMonths, referrers: referrerRows, recruits: recruitRows, stories: storyRows, toPay };
 }
 

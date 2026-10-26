@@ -103,6 +103,7 @@ function RecruitModal({ initial, data, onClose, onDone }) {
     trainingPassed: initial?.trainingPassed == null ? "" : String(initial.trainingPassed),
     firstShiftAt: initial?.firstShiftAt || "", exitedAt: initial?.exitedAt || "",
     note: initial?.note || "", shiftsManual: initial?.shiftsManual ?? "",
+    bs1: initial?.blockSalesManual?.[0] ?? "", bs2: initial?.blockSalesManual?.[1] ?? "",
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
@@ -110,7 +111,7 @@ function RecruitModal({ initial, data, onClose, onDone }) {
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
   const stories = data.stories.filter((s) => s.referrerId === f.referrerId);
   const saved = initial?.id ? data.recruits.find((r) => r.id === initial.id) : null;
-  const payload = { ...f, trainingPassed: f.trainingPassed === "" ? null : f.trainingPassed === "true" };
+  const payload = { ...f, blockSalesManual: [f.bs1, f.bs2], trainingPassed: f.trainingPassed === "" ? null : f.trainingPassed === "true" };
   return (
     <Modal open onClose={onClose} title={initial?.id ? initial.name : "Nuova persona portata"} maxWidth={620}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", columnGap: 14 }}>
@@ -145,6 +146,12 @@ function RecruitModal({ initial, data, onClose, onDone }) {
         <Field label="Turni fatti (a mano)" hint={saved ? `Da CreatorsPro: ${saved.milestones.find((m) => m.kind === "shifts")?.shiftsDone ?? "non letti"}. Lascia vuoto per il conteggio automatico.` : "Lascia vuoto: si contano da soli da CreatorsPro."}>
           <input style={inp} inputMode="numeric" value={f.shiftsManual} onChange={set("shiftsManual")} placeholder="automatico" />
         </Field>
+        {String(f.shiftsManual).trim() !== "" && <>
+          <Field label="Venduto turni 1-25 ($, a mano)" hint="Senza le date dei turni non si può ripartire il venduto Infloww: scrivilo tu.">
+            <input style={inp} inputMode="decimal" value={f.bs1} onChange={set("bs1")} />
+          </Field>
+          <Field label="Venduto turni 26-50 ($, a mano)"><input style={inp} inputMode="decimal" value={f.bs2} onChange={set("bs2")} /></Field>
+        </>}
       </div>
       <Field label="Note (le vede solo l'HR)"><textarea style={{ ...inp, minHeight: 56 }} value={f.note} onChange={set("note")} /></Field>
 
@@ -270,7 +277,7 @@ export default function ReferralAdminPage() {
       <PageHead
         crumbs={[{ label: "People" }, { label: "Porta un collega" }]}
         title="Porta un collega"
-        subtitle="Chi ha portato chi, a che punto è ogni persona e cosa va pagato. Il venduto del primo e del secondo mese arriva da Infloww, i turni da CreatorsPro."
+        subtitle="Chi ha portato chi, a che punto è ogni persona e cosa va pagato. I turni arrivano da CreatorsPro, il venduto da Infloww (ripartito sui turni)."
         actions={ok && <>
           <button type="button" style={btn} onClick={() => setModal({ kind: "referrer" })}><Plus size={14} /> Referente</button>
           <button type="button" style={btn} onClick={() => setModal({ kind: "story" })}><Plus size={14} /> Storie</button>
