@@ -20,6 +20,9 @@ import Link from "next/link";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, NUM } from "@/components/ds";
 import SquadraTab from "@/components/SquadraTab";
+import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
+import { Donut, KpiCard } from "@/components/VetroCharts";
+import { Percent, PauseCircle, Gift, Repeat } from "lucide-react";
 import FasceTab from "@/components/FasceTab";
 
 const fetcher = (url) =>
@@ -112,7 +115,7 @@ function Spark({ series, w = 110, h = 26 }) {
 
 function Kpi({ label, value, sub }) {
   return (
-    <div style={{ ...card, display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+    <div className="vt-glass" style={{ ...card, display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
       <span style={{ fontSize: 13, color: CP.textSecondary }}>{label}</span>
       <span style={{ fontSize: 22, fontWeight: 500, color: CP.textPrimary, ...NUM }}>{value}</span>
       {sub && <span style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.45 }}>{sub}</span>}
@@ -148,7 +151,7 @@ function SplitEditor({ names, allIds, split, onSaved, onCancel }) {
     onSaved(null);
   }
   return (
-    <div style={{ ...card, display: "flex", flexDirection: "column", gap: 12, marginBottom: 18 }}>
+    <div className="vt-glass" style={{ ...card, display: "flex", flexDirection: "column", gap: 12, marginBottom: 18 }}>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <label htmlFor="split-name" style={{ fontSize: 12, color: CP.textMuted }}>Nome split</label>
         <input id="split-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="es. Split Nicholas" style={{ ...input, minWidth: 220 }} />
@@ -210,9 +213,11 @@ function Panoramica({ d, name }) {
   const t = d.pages.total;
   const g = d.reference.goal;
   const org = d.reference.org;
+  const inVetro = useInVetro();
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-      <HeroMetric
+      {inVetro && <VetroPanoramica d={d} />}
+      {!inVetro && <HeroMetric
         label={`Fan mai paganti che comprano il PPV in chat · ${name || "tutta HOC"}`}
         value={pct(t.conv_nonpayer)}
         compare={`creator modello ${pct(g?.conv_nonpayer)} · tutta HOC ${pct(org?.conv_nonpayer)}`}
@@ -223,7 +228,7 @@ function Panoramica({ d, name }) {
           <Metric label="PPV con bonus o prezzo di rif." value={pct(t.tech_share)} note={`modello ${pct(g?.tech_share)}`} />
           <Metric label="Fan già paganti che comprano" value={pct(t.conv_payer)} note={`modello ${pct(g?.conv_payer)}`} />
         </div>
-      </HeroMetric>
+      </HeroMetric>}
       <div>
         <H2 sub={`Ultime ${d.meta.recent_n} settimane chiuse (${fmtDate(d.meta.recent_weeks[0])}–${fmtDate(d.meta.recent_weeks.at(-1))}), tra parentesi la variazione in punti rispetto alle ${d.meta.recent_n} precedenti. "In chat" esclude il messaggio di benvenuto automatico.`}>Tabella creator {name ? `· ${name}` : "· tutta HOC"}</H2>
         <DataTable
@@ -235,14 +240,77 @@ function Panoramica({ d, name }) {
           empty='Nessun PPV su queste creator nel periodo. Controlla le creator dello split con "Modifica split".'
         />
       </div>
-      <div style={{ ...card }}>
+      {!inVetro && <div className="vt-glass" style={{ ...card }}>
         <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
           <span style={{ fontSize: 13, color: CP.textPrimary }}>Andamento settimanale: fan mai paganti che comprano in chat</span>
           <span style={{ fontSize: 12, color: CP.textMuted }}>{d.series.map((s) => `${fmtDate(s.wk)} ${pct(s.conv, 0)}`).join(" · ")}</span>
         </div>
         <Spark series={d.series.map((s) => [s.wk, s.ppv, s.conv])} w={600} h={60} />
-      </div>
+      </div>}
     </div>
+  );
+}
+
+// Colpo d'occhio della panoramica (solo col vetro, 26/10/2026): i quattro numeri del coaching come
+// riquadri col confronto con le creator modello, la conversione settimana per settimana (barre, con la
+// linea del modello) e da quali creator arriva l'incasso PPV. Stessi numeri, nessuna richiesta nuova.
+function VetroPanoramica({ d }) {
+  const t = d.pages.total;
+  const g = d.reference.goal;
+  const org = d.reference.org;
+  const better = (a, b, lowIsGood = false) => (a == null || b == null ? false : lowIsGood ? a <= b : a >= b);
+  const sub = (txt, ok) => <span style={{ color: ok ? CP.accentGreen : CP.textSecondary }}>{txt}</span>;
+  const kpis = [
+    { icon: Percent, tone: 0, label: "Mai paganti che comprano", value: pct(t.conv_nonpayer),
+      sub: sub(`modello ${pct(g?.conv_nonpayer)} · HOC ${pct(org?.conv_nonpayer)}`, better(t.conv_nonpayer, g?.conv_nonpayer)) },
+    { icon: PauseCircle, tone: 4, label: "PPV a chat ferma", value: pct(t.dead_share),
+      sub: sub(`lì compra il ${pct(t.conv_dead)} · modello ${pct(g?.dead_share)}`, better(t.dead_share, g?.dead_share, true)) },
+    { icon: Gift, tone: 3, label: "Con bonus o prezzo di rif.", value: pct(t.tech_share),
+      sub: sub(`modello ${pct(g?.tech_share)}`, better(t.tech_share, g?.tech_share)) },
+    { icon: Repeat, tone: 1, label: "Già paganti che comprano", value: pct(t.conv_payer),
+      sub: sub(`modello ${pct(g?.conv_payer)}`, better(t.conv_payer, g?.conv_payer)) },
+  ];
+  const weeks = (d.series || []).filter((w) => w.ppv >= 15);
+  const top = Math.max(0.01, g?.conv_nonpayer || 0, ...weeks.map((w) => w.conv || 0)) * 1.15;
+  // altezza delle barre 190 px; sotto ogni barra la data (~17 px): la linea del modello va alla stessa scala
+  const goalY = g?.conv_nonpayer != null ? 17 + (g.conv_nonpayer / top) * 190 : null;
+  const mix = (d.pages.pages || []).filter((p) => p.recent.net > 0).sort((a, b) => b.recent.net - a.recent.net)
+    .map((p) => ({ label: d.names[String(p.creator_id)] || String(p.creator_id), value: p.recent.net }));
+  const totNet = mix.reduce((a, x) => a + x.value, 0);
+  return (
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14 }}>
+        {kpis.map((k, i) => <KpiCard key={k.label} i={i} icon={k.icon} tone={k.tone} label={k.label} value={<VetroNum value={k.value} />} sub={k.sub} />)}
+      </div>
+      <div className="vt-row21">
+        <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Mai paganti che comprano, settimana per settimana</div>
+            <div style={{ fontSize: 12.5, color: CP.textMuted }}>la linea è il livello delle creator modello</div>
+          </div>
+          {weeks.length < 2 ? <Note>Ancora poche settimane con abbastanza PPV.</Note> : (
+            <div role="img" aria-label={weeks.map((w) => `${fmtDate(w.wk)} ${pct(w.conv, 0)}`).join(", ")} style={{ position: "relative", height: 240, display: "flex", alignItems: "flex-end", gap: 8, paddingTop: 18 }}>
+              {goalY != null && <div style={{ position: "absolute", left: 0, right: 0, bottom: goalY, borderTop: `1.5px dashed ${CP.textMuted}` }}>
+                <span style={{ position: "absolute", right: 0, bottom: 3, fontSize: 11, color: CP.textMuted, ...NUM }}>modello {pct(g.conv_nonpayer, 0)}</span>
+              </div>}
+              {weeks.map((w) => (
+                <div key={w.wk} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontSize: 11, color: CP.textSecondary, ...NUM }}>{pct(w.conv, 0)}</span>
+                  <div style={{ width: "100%", maxWidth: 44, height: Math.max(3, ((w.conv || 0) / top) * 190), borderRadius: 8, background: "var(--vt-c0)" }} />
+                  <span style={{ fontSize: 11, color: CP.textMuted, ...NUM }}>{fmtDate(w.wk)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+        {mix.length > 0 && (
+          <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 22, padding: 18, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 12 }}>Incasso PPV per creator</div>
+            <Donut items={mix} center={usd(totNet)} centerSub={`ultime ${d.meta.recent_n} settimane`} />
+          </section>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -347,7 +415,7 @@ function Comportamenti({ d }) {
       {order.map((k) => {
         const o = d.lifts.org[k], s = d.lifts.split[k];
         return (
-          <div key={k} style={{ ...card, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(260px, 100%), 1fr))", gap: 16, alignItems: "center" }}>
+          <div key={k} className="vt-glass" style={{ ...card, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(260px, 100%), 1fr))", gap: 16, alignItems: "center" }}>
             <div>
               <div style={{ fontSize: 13.5, color: CP.textPrimary }}>{d.lifts.labels[k]}</div>
               <div style={{ fontSize: 11.5, color: CP.textMuted, marginTop: 3 }}>usato nel {pct(s?.usage, 0)} dei PPV {d.split ? "dello split" : ""} · {pct(o?.usage, 0)} in HOC</div>
@@ -392,7 +460,7 @@ function ExperimentForm({ d, exp, onDone }) {
   }
   const opNames = d.operators.map((o) => o.op);
   return (
-    <div style={{ ...card, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
+    <div className="vt-glass" style={{ ...card, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
       <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: CP.textMuted }}>Nome del test<input id="exp-name" style={input} value={f.name} onChange={set("name")} placeholder="es. Operatori forti su Martina" /></label>
       <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: CP.textMuted }}>Creator
         <select id="exp-page" style={input} value={f.creator_id} onChange={set("creator_id")}>{pages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
@@ -432,7 +500,7 @@ function Test({ d, reload }) {
         const v = e.view;
         const tmax = Math.max(0.05, v.target || 0, ...v.weeks.map((w) => w.conv || 0));
         return (
-          <div key={e.id} style={{ ...card, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div key={e.id} className="vt-glass" style={{ ...card, display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontSize: 15, color: CP.textPrimary }}>{e.name}</div>
@@ -502,7 +570,7 @@ function Esempi({ d, reload }) {
         Approvati: <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{d.approved.length}</b> · <Link href="/academy/vendere" style={{ color: CP.accent }}>vedi la pagina degli operatori</Link>
       </div>
       {d.approved.map((e) => (
-        <div key={e.id} style={{ ...card, borderColor: CP.accentDim }}>
+        <div key={e.id} className="vt-glass" style={{ ...card, borderColor: CP.accentDim }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontSize: 13, color: CP.textPrimary }}>Approvato · {e.creator} · PPV ${e.ppv_price} · {e.op}</span>
             <button style={btn} disabled={busy === e.id} onClick={() => act("unapprove", e.id)}>Togli dagli esempi</button>
@@ -511,7 +579,7 @@ function Esempi({ d, reload }) {
         </div>
       ))}
       {pending.map((e) => (
-        <div key={e.id} style={{ ...card, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div key={e.id} className="vt-glass" style={{ ...card, display: "flex", flexDirection: "column", gap: 10 }}>
           <button onClick={() => setOpen(open === e.id ? null : e.id)} style={{ all: "unset", cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontSize: 13.5, color: CP.textPrimary }}>{d.names[String(e.creator_id)] || e.creator_id} · PPV ${e.ppv_price} comprato</span>
             <span style={{ fontSize: 12, color: CP.textMuted }}>{e.op} · {fmtDate(e.at)} · {open === e.id ? "chiudi" : "leggi"}</span>
@@ -546,7 +614,7 @@ function Programma() {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <H2 sub="Mandare un documento da leggere cambia poco: la formazione arriva sul lavoro quando il responsabile la sostiene e c'è subito occasione di praticarla (Blume et al. 2010, 89 studi). Funziona vedere esempi reali buoni e cattivi e poi provarli (Taylor et al. 2005, 117 studi), con un obiettivo specifico (Locke & Latham).">Come allenare il team</H2>
       {steps.map(([t, s], i) => (
-        <div key={t} style={{ ...card, display: "grid", gridTemplateColumns: "30px 1fr", gap: 12 }}>
+        <div key={t} className="vt-glass" style={{ ...card, display: "grid", gridTemplateColumns: "30px 1fr", gap: 12 }}>
           <span style={{ ...NUM, fontSize: 13, color: CP.accentSoftText, background: CP.accentSoft, borderRadius: 6, height: 26, display: "grid", placeItems: "center" }}>{i + 1}</span>
           <div><div style={{ fontSize: 14, color: CP.textPrimary, marginBottom: 3 }}>{t}</div><div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.5 }}>{s}</div></div>
         </div>
@@ -593,6 +661,7 @@ export default function SalesCoachingPage() {
   const [tab, setTab] = useState("panoramica");
   const [editing, setEditing] = useState(null); // null | "new" | split
   const [recomputing, setRecomputing] = useState(false);
+  const [vetro, setVetro] = useVetro();
 
   useEffect(() => {
     try {
@@ -635,17 +704,19 @@ export default function SalesCoachingPage() {
       crumbs={[{ label: "Performance" }, { label: "Coaching vendite" }]}
       title="Coaching vendite"
       subtitle="Come vendono le creator del tuo split ai fan che non hanno mai pagato, chi lo fa meglio a parità di creator e cosa allenare nel team. Serve a decidere chi affiancare a chi. Aggiornato ogni notte."
+      actions={<VetroSwitch on={vetro} set={setVetro} />}
     />
   );
   const wrap = { padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body };
 
-  if (error) return <div style={wrap}>{header}<Notice danger>{String(error.message).includes("scope") || String(error.message).includes("capability") ? "Questa pagina è riservata a sales manager e admin." : error.message}</Notice></div>;
-  if (isLoading || !data) return <div style={wrap}>{header}<Note>Caricamento…</Note></div>;
+  if (error) return <VetroScope on={vetro}><div style={wrap}>{header}<Notice danger>{String(error.message).includes("scope") || String(error.message).includes("capability") ? "Questa pagina è riservata a sales manager e admin." : error.message}</Notice></div></VetroScope>;
+  if (isLoading || !data) return <VetroScope on={vetro}><div style={wrap}>{header}<Note>Caricamento…</Note></div></VetroScope>;
   if (data.bigquery === false) return <div style={wrap}>{header}<Notice>Il collegamento al warehouse (BigQuery) non è configurato in questo ambiente.</Notice></div>;
   if (data.computing && !data.pages) return <div style={wrap}>{header}<Notice>Sto calcolando i dati di tutta HOC (circa 20 secondi). La pagina si aggiorna da sola.</Notice></div>;
 
   const split = data.split;
   return (
+    <VetroScope on={vetro}>
     <div style={wrap}>
       {header}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
@@ -689,5 +760,6 @@ export default function SalesCoachingPage() {
         Come si calcola: PPV mandati a mano in chat (esclusi messaggi di massa e il benvenuto automatico), comprato = acquisto dello stesso fan per lo stesso importo entro 72 ore (abbinamento dedotto, uguale per tutte le creator). Operatori solo nei turni in cui erano gli unici in chat (circa metà dei PPV: i turni in duo non si possono attribuire). Bonus, prezzo di riferimento e obiezioni sono riconosciuti da parole chiave, quindi qualcuno sfugge. Non entra in score né compensi.
       </Note>
     </div>
+    </VetroScope>
   );
 }
