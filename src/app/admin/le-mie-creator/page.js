@@ -13,7 +13,7 @@ import { CP, FONTS, alpha } from "@/lib/brand";
 import { Notice } from "@/components/ds";
 import { liveFetcher } from "@/components/LiveCreatorPicker";
 import { COUNTRY_NAMES } from "@/lib/live-creators";
-import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
+import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro, useVetroTint } from "@/components/VetroScope";
 
 const NUM = { fontVariantNumeric: "tabular-nums" };
 const group = (n) => String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -257,19 +257,20 @@ function CreatorDetail({ c, originEl, onClose }) {
     return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; originEl?.querySelector("button")?.focus?.({ preventScroll: true }); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [tint] = useVetroTint();
   const shown = phase === "open";
   const head = TONE_HEAD[c.light.level];
   const headInk = c.light.level === 1 ? "#1d1510" : "#ffffff";
   return createPortal(
-    <div className="hoc-vetro-pop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) close(); }}
+    <div className="hoc-vetro-pop" data-tint={tint} role="presentation" onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       style={{ position: "fixed", inset: 0, zIndex: 80, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom))", overflowY: "auto",
-        background: shown ? "rgba(40,24,14,.28)" : "rgba(40,24,14,0)", backdropFilter: shown ? "blur(10px)" : "blur(0px)", WebkitBackdropFilter: shown ? "blur(10px)" : "blur(0px)", transition: "background .35s, backdrop-filter .35s" }}>
+        background: shown ? "var(--cp-scrim)" : "transparent", backdropFilter: shown ? "blur(10px)" : "blur(0px)", WebkitBackdropFilter: shown ? "blur(10px)" : "blur(0px)", transition: "background .35s, backdrop-filter .35s" }}>
       <div ref={panel} role="dialog" aria-modal="true" aria-label={c.name}
-        style={{ width: "min(720px, 100%)", marginTop: "6vh", transformOrigin: "0 0", borderRadius: 28, overflow: "hidden", background: "#fbf6ef", boxShadow: "0 30px 80px rgba(40,24,14,.35)", fontFamily: FONTS.body }}>
+        style={{ width: "min(720px, 100%)", marginTop: "6vh", transformOrigin: "0 0", borderRadius: 28, overflow: "hidden", background: "var(--cp-panel)", boxShadow: "0 30px 80px var(--cp-scrim)", fontFamily: FONTS.body }}>
         <div style={{ opacity: shown ? 1 : 0, transition: shown ? "opacity .25s .12s" : "opacity .12s" }}>
           <div style={{ background: head, color: headInk, padding: "20px 22px 18px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#1d1510", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16, flexShrink: 0 }}>{initials(c.name)}</div>
+              <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(0,0,0,.72)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16, flexShrink: 0 }}>{initials(c.name)}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 22, fontWeight: 600 }}>{c.name}</div>
                 <div style={{ fontSize: 13, opacity: 0.8 }}>{c.countries.map((x) => COUNTRY_NAMES[x.country] || x.country).join(" + ")}{r?.day ? ` · giorno ${r.day} di ${r.days}` : ""}</div>

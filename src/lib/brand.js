@@ -253,6 +253,26 @@ export const CP_VETRO = {
   attn: "#1d1510", scale: "#11673f",
 };
 
+// "Vetro bianco e blu" (26/10/2026, Nicholas sceglie la prima prova del canvas, quella fatta sulla
+// copertina del reel 1): vetro bianco su un fondo azzurro con macchie di colore sfocate, inchiostro
+// blu notte, accento viola HOC per ciò che si clicca. Stesso uso di CP_VETRO (solo dentro <VetroScope>).
+export const CP_VETRO_BLU = {
+  ...CP_VETRO,
+  surface: "rgba(255,255,255,.55)", surfaceAlt: "rgba(255,255,255,.74)",
+  panel: "#f6f8fc",
+  border: "rgba(255,255,255,.85)", borderSoft: "rgba(20,30,60,.08)", borderStrong: "rgba(20,30,60,.18)",
+  textPrimary: "#141a2e", textSecondary: "#4a536b", textMuted: "#5f6880", mutedIcons: "rgba(20,26,46,.45)",
+  accent: "#6353e0", accentInk: "#ffffff", accentSoft: "rgba(99,83,224,.10)", accentSoftText: "#4a3cc4", accentDim: "rgba(99,83,224,.25)",
+  accentGreen: "#147a4c", accentRed: "#b4303d", accentBlue: "#2f6bff",
+  dangerSoft: "rgba(180,48,61,.08)",
+  gold: "#8a5a00", goldSoft: "rgba(138,90,0,.08)", track: "rgba(20,30,60,.10)", neu: "rgba(20,26,46,.8)",
+  ruleData: "rgba(20,30,60,.18)", fieldBd: "rgba(20,30,60,.22)", sel: "rgba(99,83,224,.08)", hover: "rgba(255,255,255,.4)",
+  scrim: "rgba(20,26,46,.32)", cool: "#2f6bff", warm: "#147a4c",
+  heroBg: "rgba(255,255,255,.55)",
+  tierTop: "#6353e0", tierStrong: "#141a2e",
+  attn: "#141a2e", scale: "#6353e0",
+};
+
 // Scala per i DATI (sequenziale, separata dall'accento viola che è per ciò che si
 // clicca): chiaro = valore basso. Una tinta, 5 passi, per tema.
 export const DATA_SCALE = {
