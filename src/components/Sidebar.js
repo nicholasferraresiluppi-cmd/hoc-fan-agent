@@ -33,7 +33,7 @@ import {
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
   History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
-Megaphone, Share2, Shield, BookUser, Sunrise,
+Megaphone, Share2, Shield, BookUser, Sunrise, UserPlus,
   LineChart,
   FileSignature, Repeat, Gift } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
@@ -122,6 +122,7 @@ const NAV_GROUPS_RAW = [
     items: [
       { href: "/admin/pnl-live",                 label: "P&L Live",              icon: Wallet },
       { href: "/admin/retention",                label: "Retention fan",         icon: Repeat },
+      { href: "/admin/publisher-x",              label: "Publisher X",           icon: UserPlus },
       { href: "/admin/profiles-compare",         label: "Scaglioni a confronto", icon: Scale },
       { href: "/admin/comp-calendar",            label: "Calendario compensi",   icon: CalendarDays },
       { href: "/admin/threshold-study",          label: "Studio soglie",         icon: Ruler },
