@@ -20,7 +20,7 @@ import {
   Wallet, Scale, ShieldCheck, History, FlaskConical, MessageSquareWarning,
   Signpost, Bell, ListTree, Inbox, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket,
   HandCoins, MessageCircle, ArrowLeftRight, Send,
-  Snowflake, Megaphone, Share2, Shield, Sunrise, Building2, BookUser, Radar,
+  Snowflake, Megaphone, Share2, Shield, Sunrise, Building2, BookUser, Radar, UserPlus,
   BookMarked,
   LineChart,
   FileSignature,
@@ -57,6 +57,7 @@ const SHORTCUT_GROUPS_RAW = [
     items: [
       { href: "/admin/pnl-live",          title: "P&L Live",            desc: "Per creator: venduto e costo degli operatori, anche sul mese in corso", icon: Wallet },
       { href: "/admin/retention",         title: "Retention fan",       desc: "Per pagina dello split: dipendenza dai fan più grossi, fan di valore in pausa, nuovi che tornano", icon: Repeat },
+      { href: "/admin/publisher-x",       title: "Publisher X",         desc: "Quanto pagare chi porta sub da X: fan per fan, sui loro primi 30 giorni", icon: UserPlus },
       { href: "/admin/comp-calendar",     title: "Calendario compensi", desc: "Quanto costa ogni giorno di turni e perché, con simulatore", icon: Calendar },
       { href: "/admin/profiles-compare",  title: "Scaglioni a confronto", desc: "Standardizzazione dei profili di pagamento", icon: Scale },
     ],
