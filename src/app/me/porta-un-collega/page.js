@@ -4,7 +4,8 @@ import useSWR from "swr";
 import { useState } from "react";
 import { CP } from "@/lib/brand";
 import { PageHead, HeroMetric, Metric, SectionTitle, Notice, Disclosure } from "@/components/ds";
-import { MilestoneRow, Steps, RulesList, StatusPill, fmtEur, fmtDay, box, pageWrap } from "@/components/referral-ui";
+import { MissionRow, PayslipCard, Steps, RulesList, fmtEur, box, pageWrap } from "@/components/referral-ui";
+import { missionProgress } from "@/lib/referral-core";
 
 /**
  * /me/porta-un-collega — «Porta un collega» visto da chi ha portato qualcuno.
@@ -19,7 +20,7 @@ const fetcher = async (url) => {
 };
 
 function RecruitCard({ r }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const earned = r.totals.guadagnato;
   const coming = r.totals.in_corso;
   return (
@@ -49,9 +50,14 @@ function RecruitCard({ r }) {
       })()}
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
         style={{ background: "none", border: "none", padding: 0, color: CP.accentSoftText, cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>
-        {open ? "Nascondi i premi" : "Vedi i premi uno per uno"}
+        {open ? "Nascondi le missioni" : "Vedi le missioni"}
       </button>
-      {open && <div style={{ marginTop: 6 }}>{r.milestones.map((m) => <MilestoneRow key={m.key} m={m} />)}</div>}
+      {open && (() => {
+        // le tappe fatte vengono dalle stesse voci della pagina: la missione «primo turno» si misura sulle tappe
+        const st = Object.fromEntries(r.steps.map((s) => [s.key, s]));
+        const pseudo = { interviewAt: st.interview?.done || null, trainingPassed: st.training?.done ? true : null, firstShiftAt: st.first_shift?.done || null };
+        return <div style={{ marginTop: 6 }}>{r.milestones.map((m) => <MissionRow key={m.key} m={m} progress={missionProgress(m, pseudo)} />)}</div>;
+      })()}
     </section>
   );
 }
@@ -106,19 +112,17 @@ export default function PortaUnCollegaPage() {
           )}
           {data.recruits.map((r) => <RecruitCard key={r.id} r={r} />)}
 
+          {data.payslips?.length > 0 && (
+            <section style={{ marginBottom: 14 }}>
+              <SectionTitle aside="ogni missione completata entra nella busta del mese">Le tue buste</SectionTitle>
+              {data.payslips.map((b) => <PayslipCard key={b.month} slip={b} showName={false} />)}
+            </section>
+          )}
+
           {data.stories.length > 0 && (
             <section style={{ ...box, padding: "14px 18px", marginBottom: 14 }}>
               <SectionTitle>Le tue storie Instagram</SectionTitle>
-              {data.stories.map((s) => (
-                <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
-                  <div style={{ flex: 1, fontSize: 14, color: CP.textPrimary }}>
-                    {s.published} su {data.rules.storiesRequired} pubblicate
-                    <div style={{ fontSize: 12, color: CP.textMuted }}>{s.status === "pagato" ? `pagato il ${fmtDay(s.paidAt)}` : s.why || (s.unlockedAt ? `sbloccato il ${fmtDay(s.unlockedAt)}` : "")}</div>
-                  </div>
-                  <div style={{ fontSize: 14, fontWeight: 500 }}>{fmtEur(s.amountEur)}</div>
-                  <StatusPill status={s.status} />
-                </div>
-              ))}
+              {data.stories.map((s) => <MissionRow key={s.id} m={s} progress={missionProgress(s)} />)}
             </section>
           )}
 
