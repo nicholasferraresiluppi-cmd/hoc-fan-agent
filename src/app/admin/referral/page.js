@@ -6,7 +6,9 @@ import { Plus, Send } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, HeroMetric, Metric, FilterChip, DataTable, Notice, SectionTitle, Disclosure } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
-import { MilestoneRow, Steps, RulesList, StatusPill, fmtEur, fmtUsd, fmtDay, monthLabel, box, pageWrap, NUM } from "@/components/referral-ui";
+import { TutorialVideoButton } from "@/components/TutorialVideo";
+import { MilestoneRow, Steps, RulesList, StatusPill, PayslipCard, fmtEur, fmtUsd, fmtDay, monthLabel, box, pageWrap, NUM } from "@/components/referral-ui";
+import { payslipsCsv } from "@/lib/referral-core";
 
 /**
  * /admin/referral — «Porta un collega», lato HR (permesso referral.manage).
@@ -364,9 +366,62 @@ function Overview({ d, rules, onOpenReferrer }) {
   );
 }
 
+// ── Buste del mese (27/10/2026) ─────────────────────────────────────────────
+// Ogni missione completata finisce nella busta del mese del suo referente:
+// l'HR la paga in un bonifico, la stampa o la scarica per la contabilità.
+function downloadCsv(name, text) {
+  // BOM: Excel riconosce gli accenti
+  const url = URL.createObjectURL(new Blob(["\ufeff" + text], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a"); a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+function printSlip(slip) {
+  // stampa con colori fissi (la carta non segue il tema dell'app)
+  const rows = slip.lines.map((l) => `<tr><td>${esc(l.label)}${l.recruitName ? ` · ${esc(l.recruitName)}` : ""}</td><td>${l.unlockedAt ? esc(fmtDay(l.unlockedAt)) : "—"}</td><td class="r">${l.amountEur != null ? esc(fmtEur(l.amountEur)) : esc(fmtUsd(l.amountUsd)) + " (manca il cambio)"}</td><td>${l.status === "pagato" ? "pagato il " + esc(fmtDay(l.paidAt)) : "da pagare"}</td></tr>`).join("");
+  const w = window.open("", "_blank");
+  if (!w) return;
+  w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Busta ${esc(slip.name)} ${esc(slip.month)}</title><style>body{font:14px/1.5 -apple-system,Helvetica,Arial,sans-serif;color:#111;margin:40px}h1{font-size:20px;margin:0}p{color:#555;margin:4px 0 20px}table{width:100%;border-collapse:collapse}td,th{padding:8px 6px;border-bottom:1px solid #ddd;text-align:left}th{font-size:12px;color:#666;text-transform:uppercase;letter-spacing:.05em}.r{text-align:right}tfoot td{font-weight:600;border-bottom:0}</style></head><body><h1>Porta un collega · busta di ${esc(monthLabel(slip.month))}</h1><p>${esc(slip.name)} · House of Creators</p><table><thead><tr><th>Premio</th><th>Sbloccato</th><th class="r">Importo</th><th>Stato</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="2">Totale</td><td class="r">${esc(fmtEur(slip.totalEur))}</td><td>${slip.dueEur > 0 ? esc(fmtEur(slip.dueEur)) + " da pagare" : "tutto pagato"}</td></tr></tfoot></table></body></html>`);
+  w.document.close(); w.focus(); w.print();
+}
+
+function Payslips({ data, onDone }) {
+  const months = [...new Set(data.payslips.map((b) => b.month))];
+  const [month, setMonth] = useState(months[0] || null);
+  const [busy, setBusy] = useState(null);
+  const [err, setErr] = useState(null);
+  const slips = data.payslips.filter((b) => b.month === month);
+  const payAll = async (slip) => {
+    const ready = slip.lines.filter((l) => l.status !== "pagato" && l.amountEur != null);
+    if (!ready.length || !confirm(`Segnare pagati ${ready.length} premi a ${slip.name} per ${fmtEur(ready.reduce((a, l) => a + l.amountEur, 0))}? Gli importi si congelano.`)) return;
+    setBusy(slip.referrerId); setErr(null);
+    for (const l of ready) { try { await post({ action: "markPaid", key: l.key }); } catch (e) { setErr(`${l.label}: ${e.message}`); break; } }
+    setBusy(null); onDone();
+  };
+  if (!months.length) return <Notice>Nessuna busta ancora: quando un referente completa una missione, il premio entra nella busta del mese.</Notice>;
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+        {months.map((m) => <FilterChip key={m} active={m === month} onClick={() => setMonth(m)} label={monthLabel(m)} />)}
+        <span style={{ flex: 1 }} />
+        <button type="button" style={btn} onClick={() => downloadCsv(`porta-un-collega-buste-${month}.csv`, payslipsCsv(slips))}>Scarica il mese (CSV)</button>
+      </div>
+      <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 10 }}>Ogni premio entra nella busta del mese in cui si è sbloccato. Una busta = un bonifico al referente.</div>
+      {err && <Notice danger>{err}</Notice>}
+      {slips.map((b) => (
+        <PayslipCard key={b.referrerId} slip={b} actions={<>
+          {b.dueEur > 0 && <button type="button" style={btnPrimary} disabled={busy != null} onClick={() => payAll(b)}>{busy === b.referrerId ? "…" : "Segna pagato tutto"}</button>}
+          <button type="button" style={btn} onClick={() => printSlip(b)}>Stampa</button>
+          <button type="button" style={btn} onClick={() => downloadCsv(`busta-${b.name.replace(/\s+/g, "-").toLowerCase()}-${b.month}.csv`, payslipsCsv([b]))}>CSV</button>
+        </>} />
+      ))}
+    </div>
+  );
+}
+
 // ── Pagina ──────────────────────────────────────────────────────────────────
 const TABS = [
-  ["overview", "Panoramica"], ["topay", "Da pagare"], ["recruits", "Persone portate"], ["referrers", "Referenti"], ["stories", "Storie"], ["fx", "Cambio"], ["crm", "Dal CRM"], ["log", "Registro"],
+  ["overview", "Panoramica"], ["topay", "Da pagare"], ["slips", "Buste"], ["recruits", "Persone portate"], ["referrers", "Referenti"], ["stories", "Storie"], ["fx", "Cambio"], ["crm", "Dal CRM"], ["log", "Registro"],
 ];
 
 export default function ReferralAdminPage() {
@@ -412,10 +467,11 @@ export default function ReferralAdminPage() {
         crumbs={[{ label: "People" }, { label: "Porta un collega" }]}
         title="Porta un collega"
         subtitle="Chi ha portato chi, a che punto è ogni persona e cosa va pagato. I turni arrivano da CreatorsPro, il venduto da Infloww (ripartito sui turni)."
-        actions={ok && <>
-          <button type="button" style={btn} onClick={() => setModal({ kind: "referrer" })}><Plus size={14} /> Referente</button>
+        actions={<>
+          <TutorialVideoButton id="porta-un-collega" />
+          {ok && <><button type="button" style={btn} onClick={() => setModal({ kind: "referrer" })}><Plus size={14} /> Referente</button>
           <button type="button" style={btn} onClick={() => setModal({ kind: "story" })}><Plus size={14} /> Storie</button>
-          <button type="button" style={btnPrimary} onClick={() => setModal({ kind: "recruit" })}><Plus size={14} /> Persona portata</button>
+          <button type="button" style={btnPrimary} onClick={() => setModal({ kind: "recruit" })}><Plus size={14} /> Persona portata</button></>}
         </>}
       />
 
@@ -490,6 +546,8 @@ export default function ReferralAdminPage() {
               />
             </>
           )}
+
+          {tab === "slips" && <Payslips data={data} onDone={() => mutate()} />}
 
           {tab === "recruits" && (
             <DataTable
