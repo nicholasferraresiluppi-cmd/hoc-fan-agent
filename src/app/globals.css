@@ -90,8 +90,8 @@ h1, h2, h3, h4, h5, h6 {
    decide desktop/telefono. Il menu notte (.hoc-side) è in themeCss() (brand.js). */
 .hoc-v3-top, .hoc-v3-mhead, .hoc-v3-tabbar { display: none; }
 [data-style="v3"] { -webkit-tap-highlight-color: transparent; }
-[data-style="v3"] .hoc-v3-top { display: flex; }
-[data-style="v3"] .hoc-v3-btn:hover, [data-style="v3"] .hoc-v3-chip:hover { background: var(--cp-surfaceAlt) !important; color: var(--cp-textPrimary) !important; }
+.hoc-v3-top { display: flex; } /* 27/10/2026: barra Cerca + Stato dati per tutti (desktop) */
+.hoc-v3-btn:hover, [data-style="v3"] .hoc-v3-chip:hover { background: var(--cp-surfaceAlt) !important; color: var(--cp-textPrimary) !important; }
 /* Focus: outline trasparente (resta visibile in contrasto elevato di Windows) + anello */
 [data-style="v3"] .hoc-v3-btn:focus-visible, [data-style="v3"] .hoc-v3-chip:focus-visible,
 [data-style="v3"] .hoc-v3-tab:focus-visible, [data-style="v3"] .hoc-side a:focus-visible,
@@ -107,7 +107,7 @@ h1, h2, h3, h4, h5, h6 {
 @keyframes hoc-v3-in { from { opacity: 0; transform: translateY(-6px) scale(.985) } to { opacity: 1; transform: none } }
 
 @media (max-width: 899px) {
-  [data-style="v3"] .hoc-v3-top { display: none; }
+  .hoc-v3-top { display: none; }
   [data-style="v3"] .hoc-mhead-v2 { display: none !important; }
   [data-style="v3"] .hoc-v3-mhead { display: flex; }
   /* barra in basso: fondo PIENO (niente trasparenza né backdrop-filter) */

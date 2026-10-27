@@ -15,23 +15,13 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { CP_VETRO, CP_VETRO_BLU } from "@/lib/brand";
 
-const KEY = "hoc:vetro";
 const EVT = "hoc:vetro-change";
 
+// 27/10/2026: il vetro diventa lo stile UNICO dell'app (scelta di Nicholas: "uniformerei la web app").
+// Niente più interruttore per persona né tinta calda: useVetro resta per le pagine che lo chiamano,
+// ma è sempre acceso. Resta "Riduci trasparenza" (accessibilità).
 export function useVetro() {
-  const [on, setOn] = useState(true);
-  useEffect(() => {
-    const read = () => { try { setOn(localStorage.getItem(KEY) !== "0"); } catch {} };
-    read();
-    window.addEventListener(EVT, read);
-    return () => window.removeEventListener(EVT, read);
-  }, []);
-  const set = (v) => {
-    try { localStorage.setItem(KEY, v ? "1" : "0"); } catch {}
-    setOn(v);
-    window.dispatchEvent(new Event(EVT));
-  };
-  return [on, set];
+  return [true, () => {}];
 }
 
 const SOLID_KEY = "hoc:vetro:solid";
@@ -56,27 +46,13 @@ export function useVetroSolid() {
   return [solid, set];
 }
 
-const TINT_KEY = "hoc:vetro:tinta";
-
+// Tinta unica: vetro bianco ("blu"). La calda resta nel codice (TINTS.caldo) ma non si sceglie più.
 export function useVetroTint() {
-  const [tint, setTint] = useState("blu");
-  useEffect(() => {
-    const read = () => { try { setTint(localStorage.getItem(TINT_KEY) === "caldo" ? "caldo" : "blu"); } catch {} };
-    read();
-    window.addEventListener(EVT, read);
-    return () => window.removeEventListener(EVT, read);
-  }, []);
-  const set = (v) => {
-    try { localStorage.setItem(TINT_KEY, v); } catch {}
-    setTint(v);
-    window.dispatchEvent(new Event(EVT));
-  };
-  return [tint, set];
+  return ["blu", () => {}];
 }
 
-/** Pagine in prova: qui il vetro avvolge anche il menu e le schede in alto (AppShell). */
-export const VETRO_PATHS = ["/admin", "/admin/le-mie-creator", "/admin/bilancio", "/admin/revenue-pacing", "/leaderboard/sales-cp", "/leaderboard/creators", "/admin/hr", "/admin/sales-coaching", "/admin/analisi-vendite"];
-export const isVetroPath = (p) => VETRO_PATHS.includes(String(p || "").replace(/\/$/, "") || "/");
+/** Dal 27/10/2026 il vetro avvolge menu e schede in alto su TUTTE le pagine (AppShell). */
+export const isVetroPath = () => true;
 
 const VetroCtx = createContext(false);
 /** true dentro il vetro acceso: per le cose che esistono solo nella prova (es. la scheda che si apre). */
@@ -217,27 +193,10 @@ export default function VetroScope({ on, stable = false, children }) {
   );
 }
 
-/** Interruttore della prova, da mettere nell'intestazione della pagina. */
-export function VetroSwitch({ on, set }) {
-  const [solid, setSolid] = useVetroSolid();
-  const [tint, setTint] = useVetroTint();
-  const pill = (active) => ({ font: "inherit", fontSize: 12.5, minHeight: 32, padding: "0 12px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap",
-    border: "1px solid var(--cp-border)", background: active ? "rgba(255,255,255,.6)" : "transparent", color: "var(--cp-textSecondary)" });
-  return (
-    <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
-      {on && (
-        <button type="button" onClick={() => setTint(tint === "blu" ? "caldo" : "blu")} style={pill(false)}>
-          {tint === "blu" ? "Vetro bianco · prova il caldo" : "Vetro caldo · prova il bianco"}
-        </button>
-      )}
-      {on && (
-        <button type="button" onClick={() => setSolid(!solid)} aria-pressed={solid} style={pill(solid)}>
-          {solid ? "Trasparenza ridotta" : "Riduci trasparenza"}
-        </button>
-      )}
-      <button type="button" onClick={() => set(!on)} aria-pressed={on} style={pill(on)}>
-        {on ? "Stile vetro (prova) · spegni" : "Prova lo stile vetro"}
-      </button>
-    </span>
-  );
+/**
+ * Era l'interruttore della prova nell'intestazione delle pagine in vetro. Dal 27/10/2026 il vetro
+ * non si spegne e «Riduci trasparenza» sta in fondo al menu (vale per tutte le pagine): qui niente.
+ */
+export function VetroSwitch() {
+  return null;
 }
