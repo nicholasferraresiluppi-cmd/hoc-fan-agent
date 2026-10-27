@@ -8,7 +8,19 @@
  * configurato, altrimenti l'header di transizione (vedi lib/cron-auth).
  * Best-effort by design: se la catena si spezza, il cron del giorno dopo (o
  * il trigger manuale) riprende dallo stato salvato in KV.
+ *
+ * ⚠️ 27/10/2026 — Vercel ferma le catene al 4º passaggio: le fetch in uscita
+ * portano l'id della richiesta che le ha originate e dal 5º salto il bordo
+ * risponde 508 INFINITE_LOOP_DETECTED ("automatic recursion protection").
+ * Misurato sui log di produzione: dal 14/10 OGNI catena (cp-wages,
+ * payout-ledger, infloww-agency, recupero, sales-ai) si fermava a 4 richieste
+ * per notte → turni CP fermi al 22/10, 30 buste su 691 in due notti. Una catena
+ * quindi NON basta a finire un lavoro lungo: ogni lavoro lungo ha anche un cron
+ * suo in vercel.json che riparte ogni 10 minuti nella finestra notturna (ogni
+ * scatto è una richiesta nuova con altri 4 salti). La rottura ora si registra
+ * (`cron:chainbreak`, letto dall'alert cron-chain-broken) invece di sparire.
  */
+import { kv } from "@vercel/kv";
 
 /**
  * Origin a cui mandare le chiamate server→server (figli di catena, kick del
@@ -51,10 +63,40 @@ export async function continueChain(request, chain, { maxChain = 25 } = {}) {
     // Al figlio basta che la richiesta ARRIVI alla piattaforma — poi corre da
     // solo mentre il padre chiude entro il proprio maxDuration.
     const r = await fireAndCheck(`${origin}${url.pathname}`, { method: "POST", headers });
-    return r.kicked ? { chained: true } : { chained: false, reason: `http_${r.status}` };
+    if (r.kicked) return { chained: true };
+    await noteBreak(url.pathname, chain, `http_${r.status}`);
+    return { chained: false, reason: `http_${r.status}` };
   } catch {
+    await noteBreak(url.pathname, chain, "fetch_failed");
     return { chained: false, reason: "fetch_failed" };
   }
+}
+
+/** Catena spezzata: si scrive (path → quando, a che salto, perché). Mai bloccante. */
+async function noteBreak(path, chain, reason) {
+  try {
+    await kv.hset("cron:chainbreak", { [path]: JSON.stringify({ at: Date.now(), chain, reason }) });
+  } catch {}
+}
+
+/** Rotture recenti (per l'alert): [{ path, at, chain, reason }]. */
+export async function recentChainBreaks(sinceMs = 30 * 3600 * 1000) {
+  const h = (await kv.hgetall("cron:chainbreak").catch(() => null)) || {};
+  return Object.entries(h)
+    .map(([path, v]) => ({ path, ...(typeof v === "string" ? JSON.parse(v) : v) }))
+    .filter((x) => x.at && Date.now() - x.at < sinceMs);
+}
+
+/**
+ * Lucchetto per i lavori senza guardia propria (recupero, sales-ai): con il cron ogni
+ * 10 minuti più la catena, due tick potrebbero lavorare insieme sullo stesso giorno.
+ * Si prende all'inizio e si LASCIA prima di concatenare (il figlio deve trovarlo libero).
+ */
+export async function takeTickLock(name, ttlS = 90) {
+  try { return (await kv.set(`cron:ticklock:${name}`, Date.now(), { nx: true, ex: ttlS })) === "OK"; } catch { return true; }
+}
+export async function dropTickLock(name) {
+  try { await kv.del(`cron:ticklock:${name}`); } catch {}
 }
 
 /** Profondità di catena della richiesta corrente (0 = tick avviato dal cron). */

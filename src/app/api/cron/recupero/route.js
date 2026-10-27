@@ -6,7 +6,7 @@
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { isCronAuthorized } from "@/lib/cron-auth";
-import { continueChain, chainDepth } from "@/lib/cron-chain";
+import { continueChain, chainDepth, takeTickLock, dropTickLock } from "@/lib/cron-chain";
 import { getJob, startJob, step, todayUTC } from "@/lib/recupero";
 
 export const runtime = "nodejs";
@@ -30,10 +30,13 @@ export async function POST(request) {
   await kv.set("recupero:active_day", day, { ex: 2 * 86400 }).catch(() => {});
   if (chain === 0) await kv.set("cron:heartbeat:recupero", { at: Date.now(), via: viaCron ? "cron" : "session", day }, { ex: 40 * 86400 }).catch(() => {});
 
+  // cron ogni 10 minuti + catena: un tick alla volta (il figlio parte dopo che il padre ha lasciato)
+  if (!(await takeTickLock("recupero", 75))) return Response.json({ action: "skip", reason: "tick già in corso" });
+
   const t0 = Date.now();
   let job = await getJob(day);
   if (!job || (body?.force && chain === 0)) job = await startJob(day, { force: !!body?.force, by });
-  if (job.status !== "in_corso") return Response.json({ action: "idle", day, status: job.status });
+  if (job.status !== "in_corso") { await dropTickLock("recupero"); return Response.json({ action: "idle", day, status: job.status }); }
 
   let last = null;
   while (Date.now() - t0 < BUDGET_MS) {
@@ -45,6 +48,7 @@ export async function POST(request) {
     }
   }
   const done = !!last?.done;
+  await dropTickLock("recupero");
   const chained = done ? null : await continueChain(request, chain, { maxChain: MAX_CHAIN });
   return Response.json({ action: "step", day, stage: last?.job?.stage, status: last?.job?.status, chain, ...(chained ? { next: chained } : {}) });
 }
