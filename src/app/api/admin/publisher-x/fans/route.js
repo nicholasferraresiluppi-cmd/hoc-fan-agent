@@ -1,7 +1,7 @@
 /**
- * GET /api/admin/publisher-x/fans?month=YYYY-MM&publisher=Nome — i fan portati da UN publisher
- * nel mese, NOMINATI, con la spesa dei primi 30 giorni (lib/publisher-x getPublisherFans).
- * Dati fan identificati → SEED + ogni apertura nel registro azioni.
+ * GET /api/admin/publisher-x/fans?month=YYYY-MM&publisher=Nome — le buste di UN publisher:
+ * chiuse nel mese e ancora aperte, coi fan NOMINATI (lib/publisher-x getPublisherFans).
+ * Dati fan identificati → solo admin (SEED, l'HR no) + ogni apertura nel registro azioni.
  */
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { bigQueryConfigured } from "@/lib/bigquery-api";
@@ -21,7 +21,7 @@ export async function GET(request) {
   if (!publisher) return Response.json({ error: "publisher mancante" }, { status: 400 });
   try {
     const data = await getPublisherFans(month, publisher);
-    await logAuditAction({ action: "publisher-x.fans.view", target: publisher, by: az.userId, meta: { month, fans: data.publisher.fans.length } }).catch(() => {});
+    await logAuditAction({ action: "publisher-x.fans.view", target: publisher, by: az.userId, meta: { month, closed: data.publisher?.fans.length || 0, open: data.open.length } }).catch(() => {});
     return Response.json(data, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return Response.json({ error: e.message || "Lettura non riuscita" }, { status: /mese|Nessun link/.test(e.message || "") ? 400 : 500 });

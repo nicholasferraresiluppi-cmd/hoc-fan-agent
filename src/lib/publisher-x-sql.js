@@ -49,19 +49,20 @@ HAVING subs_6m >= 3 OR ${assignedFilter(links)}
 ORDER BY subs_month DESC, subs_6m DESC`;
 }
 
-/** I fan nuovi del mese entrati dai link assegnati, uno per riga. */
-export function fansSql({ table, org }, month, links) {
-  const [y, m] = month.split("-").map(Number);
-  const start = `${month}-01`;
-  const next = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+/**
+ * Le buste: i fan nuovi entrati dai link assegnati da `since` (YYYY-MM-DD, ora di Roma) in poi.
+ * Una sola lettura per tutti i mesi: il mese di pagamento dipende dalla CHIUSURA (ingresso + 30 gg).
+ * spend_d30 di una busta aperta = speso fino a oggi (verificato al centesimo con attributed_transactions).
+ */
+export function fansSql({ table, org }, since, links) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(since))) throw new Error("data non valida");
   return `
 SELECT creator_id, creator_name, link_name, CAST(user_id AS STRING) AS user_id, username, sub_start_at,
   spend_d0, spend_d7, spend_d30
 FROM ${table}
 WHERE organization_id = ${sqlStr(org)}
   AND is_first_sub
-  AND sub_start_at >= TIMESTAMP(${sqlStr(start)}, 'Europe/Rome')
-  AND sub_start_at < TIMESTAMP(${sqlStr(next)}, 'Europe/Rome')
+  AND sub_start_at >= TIMESTAMP(${sqlStr(since)}, 'Europe/Rome')
   AND ${assignedFilter(links)}
 ORDER BY sub_start_at`;
 }
