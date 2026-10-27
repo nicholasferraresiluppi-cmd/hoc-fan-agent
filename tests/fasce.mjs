@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import {
   slotOfHour, romeParts, toPieces, bravura, slotValues, duoShare, buildFasce, splitSlotValues,
+  shrinkK, slotBravura, SLOT_MIN_H,
 } from "../src/lib/fasce-core.js";
 
 let n = 0;
@@ -175,6 +176,46 @@ t("valore per split pesato sulle ore, fasce senza valore ignorate", () => {
     { slots: { "22-3": { h: 300, sph_adj: 60 } } },
   ]);
   assert.deepEqual(v, { "22-3": { h: 400, sph_adj: 70 } });
+});
+
+t("bravura per fascia: K dalla prova pari/dispari, mai diviso per zero", () => {
+  assert.equal(shrinkK({ personal: 0.2, personal_h: 40 }), 160);
+  assert.equal(shrinkK({ personal: 0, personal_h: 40 }), 760); // r stretta a 0,05
+  assert.equal(shrinkK({ personal: -0.3, personal_h: 40 }), 760);
+  assert.equal(shrinkK({ personal: 0.95, personal_h: 40 }), 10); // r stretta a 0,8
+  assert.equal(shrinkK(null), 760);
+});
+
+t("bravura per fascia: ristretta verso la generale, grezzo conservato", () => {
+  // nei turni CP rende 1,2 nel 22-3 e 0,8 nel 7-12 rispetto ai colleghi; generale Infloww 1,00
+  const slots = { "22-3": { rev: 120, exp: 100, cmp_h: 100 }, "7-12": { rev: 80, exp: 100, cmp_h: 100 }, "1-7": { rev: 5, exp: 4, cmp_h: SLOT_MIN_H - 1 } };
+  const out = slotBravura(slots, 1, 100);
+  assert.equal(out["22-3"].w, 0.5);
+  assert.ok(out["22-3"].v > 1 && out["22-3"].v < out["22-3"].raw, "si sposta verso il misurato ma meno");
+  assert.ok(out["7-12"].v < 1 && out["7-12"].v > out["7-12"].raw);
+  assert.equal(out["1-7"].v, null, "sotto il minimo di ore: niente numero");
+  // con K enorme (fascia personale che non si ripete) resta la bravura generale
+  const flat = slotBravura(slots, 0.9, 1e9);
+  assert.equal(flat["22-3"].v, 0.9);
+  assert.equal(flat["7-12"].v, 0.9);
+  // CP gonfia la persona (×3 su tutto): la forma non cambia
+  const inflated = slotBravura({ "22-3": { rev: 360, exp: 100, cmp_h: 100 }, "7-12": { rev: 240, exp: 100, cmp_h: 100 } }, 1, 100);
+  const two = slotBravura({ "22-3": slots["22-3"], "7-12": slots["7-12"] }, 1, 100);
+  assert.equal(inflated["22-3"].v, two["22-3"].v);
+  assert.equal(inflated["7-12"].v, two["7-12"].v);
+  // senza bravura generale nessun numero
+  assert.equal(slotBravura(slots, null, 100)["22-3"].v, null);
+  // venduto zero in una fascia: numero basso ma finito
+  const z = slotBravura({ "22-3": { rev: 0, exp: 100, cmp_h: 100 }, "7-12": { rev: 100, exp: 100, cmp_h: 100 } }, 1, 100);
+  assert.ok(Number.isFinite(z["22-3"].v) && z["22-3"].v > 0);
+});
+
+t("bravura per fascia nel documento + K nella stabilità", () => {
+  const doc = buildFasce(toPieces(scenario()), { now: Date.parse("2026-08-30") });
+  assert.ok(Number.isFinite(doc.stability.k) && doc.stability.k > 0);
+  const o = doc.operators.find((x) => x.idx != null);
+  assert.ok(o.slot_idx && typeof o.slot_idx === "object");
+  for (const v of Object.values(o.slot_idx)) assert.ok(v.v == null || v.v > 0);
 });
 
 console.log(`fasce: ${n} test ok`);

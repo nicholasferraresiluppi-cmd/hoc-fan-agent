@@ -11,7 +11,7 @@ import useSWR from "swr";
 import Link from "next/link";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { FilterChip, DataTable, Notice, NUM, card } from "@/components/ds";
-import { SLOTS, WEAK, STRONG } from "@/lib/fasce-core";
+import { SLOTS, WEAK, STRONG, SLOT_DIFF, SLOT_MIN_H } from "@/lib/fasce-core";
 
 const fetcher = (url) =>
   fetch(url).then(async (r) => {
@@ -54,6 +54,26 @@ function Chip({ children, tone }) {
   return <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 10, border: `1px solid ${alpha(color, "66")}`, color, whiteSpace: "nowrap" }}>{children}</span>;
 }
 
+/**
+ * Bravura in una fascia: numero + ore. Freccia solo se si stacca dalla bravura generale
+ * della persona di almeno il 10% (dopo la correzione per il campione): sotto è rumore.
+ */
+function SlotCell({ c, idx, hours }) {
+  if (!c && !hours) return <span style={{ color: CP.textMuted }}>–</span>;
+  const h = hours ?? c?.h ?? 0;
+  if (c?.v == null) return <span style={{ color: CP.textMuted, fontSize: 12 }} title="Troppe poche ore confrontabili in questa fascia per dare un numero">{h ? `${hh(h)} h` : "–"}</span>;
+  const d = idx ? c.v / idx - 1 : 0;
+  const up = d >= SLOT_DIFF;
+  const down = d <= -SLOT_DIFF;
+  const tip = `Bravura in questa fascia ${fx(c.v)} (generale ${fx(idx)}). Misurato senza correzione ${fx(c.raw)}: con ${hh(c.h)} ore confrontabili il numero si sposta del ${Math.round((c.w || 0) * 100)}% verso il misurato, perché in questi dati il rendere meglio in una fascia si ripete poco.`;
+  return (
+    <span title={tip} style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", lineHeight: 1.2 }}>
+      <span style={{ ...NUM, color: up ? CP.accentGreen : down ? CP.accentRed : CP.textPrimary, fontWeight: up || down ? 500 : 400 }}>{fx(c.v)}{up ? " ↑" : down ? " ↓" : ""}</span>
+      <span style={{ fontSize: 11, color: CP.textMuted, ...NUM }}>{hh(h)} h</span>
+    </span>
+  );
+}
+
 const opLink = (name, label = name) => <Link href={`/leaderboard/operational/${encodeURIComponent(name)}`} style={{ color: CP.textPrimary, textDecoration: "none" }}>{label}</Link>;
 
 /** Ore di un operatore nelle fasce di punta delle pagine passate, e dove. */
@@ -87,7 +107,7 @@ function SlotValues({ overall }) {
   );
 }
 
-function PageCard({ p }) {
+function PageCard({ p, opsById }) {
   const [open, setOpen] = useState(false);
   const ops = (ids) => ids.map((o) => p.people.find((x) => x.op === o)).filter(Boolean);
   const weak = ops(p.weak_in_prime);
@@ -138,9 +158,10 @@ function PageCard({ p }) {
                   <td style={td}><Bravura v={x.idx} /></td>
                   {slotsHere.map((s) => {
                     const c = x.slots[s.id];
+                    const o = opsById.get(x.op);
                     return (
                       <td key={s.id} style={{ ...td, color: c?.h ? CP.textSecondary : CP.textMuted }}>
-                        {c?.h ? `${c.h} h` : "–"}
+                        {c?.h ? <SlotCell c={o?.slot_idx?.[s.id]} idx={o?.idx} hours={c.h} /> : "–"}
                       </td>
                     );
                   })}
@@ -164,7 +185,8 @@ const tdL = { ...td, textAlign: "left", color: CP.textPrimary };
 export default function FasceTab({ splitId }) {
   const url = `/api/admin/sales-coaching/fasce${splitId ? `?split=${encodeURIComponent(splitId)}` : ""}`;
   const { data, error, mutate, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false, refreshInterval: (d) => (d?.computing && !d?.pages ? 15000 : 0) });
-  const [view, setView] = useState("azioni");
+  const [view, setView] = useState("persone");
+  const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
 
   const derived = useMemo(() => {
@@ -172,7 +194,8 @@ export default function FasceTab({ splitId }) {
     const ops = data.operators.filter((o) => !o.uscita);
     const togliere = ops.filter((o) => o.verdict === "togliere").map((o) => ({ ...o, id: o.op, ps: primeStats(o.op, data.pages) })).sort((a, b) => (a.est ?? 0) - (b.est ?? 0));
     const portare = ops.filter((o) => o.verdict === "portare").map((o) => ({ ...o, id: o.op, ps: primeStats(o.op, data.pages) })).sort((a, b) => b.idx - a.idx);
-    return { ops, togliere, portare };
+    const opsById = new Map(data.operators.map((o) => [o.op, o]));
+    return { ops, togliere, portare, opsById };
   }, [data]);
 
   if (error) return <Notice danger>{error.message}</Notice>;
@@ -192,7 +215,9 @@ export default function FasceTab({ splitId }) {
   const common = top.filter((s) => (ov[s.id].h || 0) >= maxH * 0.5);
   const lo = common[common.length - 1];
   const ratio = hi && lo && ov[lo.id].sph_adj ? ov[hi.id].sph_adj / ov[lo.id].sph_adj : null;
-  const { togliere, portare, ops } = derived;
+  const { togliere, portare, ops, opsById } = derived;
+  const norm = (x) => String(x || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const shownOps = q.trim() ? ops.filter((o) => norm(o.name).includes(norm(q.trim())) || norm(o.link_name).includes(norm(q.trim()))) : ops;
   const lostTot = togliere.reduce((s, o) => s + Math.min(0, o.est || 0), 0);
 
   async function recompute() {
@@ -205,6 +230,7 @@ export default function FasceTab({ splitId }) {
   const colsTogliere = [
     { key: "name", label: "Operatore", render: (o) => opLink(o.link_name || o.name, o.name) },
     { key: "idx", label: "Bravura", align: "right", render: (o) => <Bravura v={o.idx} /> },
+    { key: "prime_idx", label: "Nelle sue fasce di punta", align: "right", render: (o) => <Bravura v={o.prime_idx} /> },
     { key: "prime_share", label: "Ore in fasce di punta", align: "right", sort: (o) => o.ps.h, render: (o) => `${o.ps.h} h · ${pct(o.prime_share)}` },
     { key: "est", label: "Stima su una persona media", align: "right", render: (o) => <span title="Stima, non conto: ore di punta × valore dell'ora a pari bravura × (bravura − 1)" style={{ color: (o.est || 0) < 0 ? CP.accentRed : CP.textSecondary, ...NUM }}>{o.est == null ? "–" : usd(o.est)}</span> },
     { key: "where", label: "Dove", sortable: false, muted: true, render: (o) => <span style={{ fontSize: 12, whiteSpace: "normal", display: "inline-block", minWidth: 200 }}>{o.ps.where.slice(0, 3).map((w) => `${w.name.replace(/ - IT$/, "")} ${w.h} h`).join(" · ")}</span> },
@@ -221,7 +247,7 @@ export default function FasceTab({ splitId }) {
     { key: "name", label: "Operatore", render: (o) => opLink(o.link_name || o.name, o.name) },
     { key: "idx", label: "Bravura", align: "right", render: (o) => <Bravura v={o.idx} /> },
     { key: "h", label: "Ore", align: "right", render: (o) => hh(o.h) },
-    ...SLOTS.map((s) => ({ key: `s_${s.id}`, label: s.label, align: "right", muted: true, sort: (o) => o.slots[s.id] || 0, render: (o) => (o.slots[s.id] ? `${hh(o.slots[s.id])} h` : "–") })),
+    ...SLOTS.map((s) => ({ key: `s_${s.id}`, label: s.label, align: "right", sort: (o) => o.slot_idx?.[s.id]?.v ?? -1, render: (o) => <SlotCell c={o.slot_idx?.[s.id]} idx={o.idx} hours={o.slots[s.id]} /> })),
     { key: "prime_share", label: "In punta", align: "right", render: (o) => pct(o.prime_share) },
     { key: "verdict", label: "Lettura", sort: (o) => o.verdict || "", render: (o) => (o.verdict === "togliere" ? <Chip tone="bad">via dalle fasce di punta</Chip> : o.verdict === "portare" ? <Chip tone="good">da portare in punta</Chip> : !o.active ? <Chip>nessun turno da 3 settimane</Chip> : <span style={{ color: CP.textMuted }}>–</span>) },
     { key: "last_day", label: "Ultimo turno", align: "right", muted: true, render: (o) => dmy(o.last_day) },
@@ -250,22 +276,26 @@ export default function FasceTab({ splitId }) {
       <SlotValues overall={ov} />
 
       <div style={{ ...card, padding: "14px 18px" }}>
-        <p style={{ fontSize: 14, color: CP.textPrimary, margin: "0 0 6px", fontWeight: 500 }}>Chi è bravo lo è in tutte le fasce</p>
-        <Note style={{ marginBottom: 6 }}>Bravura = quella della scheda Squadra: vendite Infloww di ogni persona confrontate coi colleghi sulla stessa pagina e fascia{bw ? `, dal ${dmy(bw.from)} al ${dmy(bw.until)}` : ""}. CreatorsPro qui serve solo come calendario e per il valore delle fasce di ogni pagina: divide gli acquisti tra le persone a modo suo, ma il totale della pagina combacia con le transazioni Infloww.</Note>
+        <p style={{ fontSize: 14, color: CP.textPrimary, margin: "0 0 6px", fontWeight: 500 }}>Come leggere la bravura</p>
+        <Note style={{ marginBottom: 6 }}>
+          <b style={{ fontWeight: 500, color: CP.textSecondary }}>Bravura 0,95</b> vuol dire: nelle ore che fa, la persona vende il 95% di quello che vendono all'ora i colleghi sulle stesse pagine e nelle stesse fasce. È un confronto ad armi pari: chi fa le notti è confrontato con chi fa le notti, chi è su una pagina difficile con chi è sulla stessa pagina.
+          La bravura generale mette insieme tutte le sue fasce; nella vista «Ogni persona, fascia per fascia» c'è il numero di ogni fascia.
+        </Note>
+        <Note style={{ marginBottom: 6 }}>Fonte: quella della scheda Squadra: vendite Infloww di ogni persona confrontate coi colleghi sulla stessa pagina e fascia{bw ? `, dal ${dmy(bw.from)} al ${dmy(bw.until)}` : ""}. CreatorsPro qui serve solo come calendario e per il valore delle fasce di ogni pagina: divide gli acquisti tra le persone a modo suo, ma il totale della pagina combacia con le transazioni Infloww.</Note>
         <Note>
-          Controllo fatto sui turni (giorni pari contro giorni dispari): La bravura generale di una persona torna simile (correlazione {fx(st.general)} su {st.general_n} operatori); il fatto di rendere meglio in una certa fascia rispetto alle proprie altre quasi no ({fx(st.personal)}). Quindi la regola non è «ognuno nella sua fascia» ma «i più bravi nelle fasce che valgono di più, e chi chiude basso non ha la priorità su quelle». Quale fascia vale di più si decide pagina per pagina: non è sempre il 22–3.
+          Controllo fatto sui turni (giorni pari contro giorni dispari): La bravura generale di una persona torna simile (correlazione {fx(st.general)} su {st.general_n} operatori); il fatto di rendere meglio in una certa fascia rispetto alle proprie altre quasi no ({fx(st.personal)}). Quindi la regola di base non è «ognuno nella sua fascia» ma «i più bravi nelle fasce che valgono di più, e chi chiude basso non ha la priorità su quelle»; le eccezioni per persona sono le frecce nella vista fascia per fascia. Quale fascia vale di più si decide pagina per pagina: non è sempre il 22–3.
         </Note>
       </div>
 
       <div role="tablist" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <FilterChip label={`Ogni persona, fascia per fascia (${ops.length})`} active={view === "persone"} onClick={() => setView("persone")} />
         <FilterChip label={`Da spostare (${togliere.length + portare.length})`} active={view === "azioni"} onClick={() => setView("azioni")} />
         <FilterChip label={`Per pagina (${data.pages.length})`} active={view === "pagine"} onClick={() => setView("pagine")} />
-        <FilterChip label={`Tutta la squadra (${ops.length})`} active={view === "squadra"} onClick={() => setView("squadra")} />
       </div>
 
       {view === "azioni" && (
         <>
-          <H2 sub={`Bravura fino a ${fx(WEAK)} e almeno il ${Math.round(0.3 * 100)}% delle ore nelle fasce di punta delle loro pagine. La stima dice quanto rendono in meno di una persona di bravura media nelle loro ore di punta, ${fromTxt}${lostTot < 0 ? `: in tutto circa ${usd(lostTot)}` : ""} — è una stima per ordinare la lista, non un conto.`}>
+          <H2 sub={`Bravura nelle loro fasce di punta fino a ${fx(WEAK)} e almeno il ${Math.round(0.3 * 100)}% delle ore nelle fasce di punta delle loro pagine. La stima dice quanto rendono in meno di una persona di bravura media nelle loro ore di punta, ${fromTxt}${lostTot < 0 ? `: in tutto circa ${usd(lostTot)}` : ""} — è una stima per ordinare la lista, non un conto.`}>
             Chiudono basso nelle fasce che valgono di più ({togliere.length})
           </H2>
           <DataTable columns={colsTogliere} rows={togliere} defaultSort={{ key: "gap", dir: 1 }} minWidth={900} empty="Nessuno: nelle fasce di punta non c'è chi chiude basso." />
@@ -278,13 +308,22 @@ export default function FasceTab({ splitId }) {
 
       {view === "pagine" && (
         <>
-          <Note>Per ogni pagina: quanto vale un'ora in ogni fascia a pari bravura (in grassetto le fasce di punta, entro il 10% della migliore) e chi le copre. Passa sopra alle ore per vedere il venduto all'ora della persona in quella fascia e quello dei colleghi.</Note>
-          {data.pages.map((p) => <PageCard key={p.cid} p={p} />)}
+          <Note>Per ogni pagina: quanto vale un'ora in ogni fascia a pari bravura (in grassetto le fasce di punta, entro il 10% della migliore) e chi le copre. Nelle celle la bravura della persona in quella fascia (su tutte le sue pagine) e le ore che ci fa QUI. Passa sopra al numero per il dettaglio.</Note>
+          {data.pages.map((p) => <PageCard key={p.cid} p={p} opsById={opsById} />)}
         </>
       )}
 
-      {view === "squadra" && (
-        <DataTable columns={colsAll} rows={ops.map((o) => ({ ...o, id: o.op }))} defaultSort={{ key: "idx", dir: -1 }} minWidth={1100} maxHeight="72vh" empty="Nessun operatore." />
+      {view === "persone" && (
+        <>
+          <Note>
+            Ogni numero dice quanto vende la persona in quella fascia rispetto ai colleghi che fanno la STESSA fascia sulle STESSE pagine: 1,00 = come la media, 1,20 = il 20% in più, 0,80 = il 20% in meno.
+            Il numero è corretto per il campione: in questi dati il rendere meglio in una fascia rispetto alle altre si ripete poco tra un periodo e l'altro (correlazione {fx(st.personal)}), quindi con poche ore resta vicino alla bravura generale e si stacca solo con tante ore.
+            La freccia compare quando la fascia si stacca di almeno il {Math.round(SLOT_DIFF * 100)}% dalla bravura generale della persona. Sotto le {SLOT_MIN_H} ore confrontabili non diamo un numero.
+          </Note>
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca un operatore" aria-label="Cerca un operatore"
+            style={{ alignSelf: "flex-start", width: 280, maxWidth: "100%", padding: "8px 12px", borderRadius: 10, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body }} />
+          <DataTable columns={colsAll} rows={shownOps.map((o) => ({ ...o, id: o.op }))} defaultSort={{ key: "idx", dir: -1 }} minWidth={1100} maxHeight="72vh" empty={q ? "Nessun operatore con quel nome." : "Nessun operatore."} />
+        </>
       )}
 
       <Note>
