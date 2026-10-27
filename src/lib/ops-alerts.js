@@ -436,12 +436,19 @@ const CHECKS = [
       const beats = await Promise.all(children.map((c) => kv.get(`cron:heartbeat:${c}`).catch(() => null)));
       const stale = children.filter((c, i) => !beats[i]?.at || Date.now() - beats[i].at > 30 * 3600 * 1000);
       const failed = dispatch.failed_kicks || [];
-      if (!stale.length && !failed.length) return [];
+      // catene spezzate a metà (27/10/2026: Vercel risponde 508 dal 5º salto) — partire non basta
+      const { recentChainBreaks } = await import("@/lib/cron-chain");
+      const breaks = (await recentChainBreaks().catch(() => [])).filter((b) => b.reason !== "max_chain");
+      if (!stale.length && !failed.length && !breaks.length) return [];
       return [{
         fingerprint: "cron-chain-broken",
-        title: "Lavori notturni non partiti",
-        detail: [stale.length ? `Senza esecuzione da oltre 30h: ${stale.join(", ")}` : null, failed.length ? `Kick falliti: ${failed.join(", ")}` : null].filter(Boolean).join(" · "),
-        value: String(stale.length + failed.length),
+        title: stale.length || failed.length ? "Lavori notturni non partiti" : "Lavori notturni interrotti a metà",
+        detail: [
+          stale.length ? `Senza esecuzione da oltre 30h: ${stale.join(", ")}` : null,
+          failed.length ? `Kick falliti: ${failed.join(", ")}` : null,
+          breaks.length ? `Catena interrotta: ${breaks.map((b) => `${b.path.replace("/api/cron/", "")} al passo ${b.chain + 1} (${b.reason})`).join(", ")} — riprende col cron dei 10 minuti` : null,
+        ].filter(Boolean).join(" · "),
+        value: String(stale.length + failed.length + breaks.length),
         cta: { href: "/admin/creatorspro-sync", label: "Apri sync CP" },
       }];
     },

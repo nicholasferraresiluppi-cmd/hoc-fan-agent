@@ -12,7 +12,7 @@
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { isCronAuthorized } from "@/lib/cron-auth";
-import { continueChain, chainDepth } from "@/lib/cron-chain";
+import { continueChain, chainDepth, takeTickLock, dropTickLock } from "@/lib/cron-chain";
 import { getConfig, getJob } from "@/lib/sales-ai/store";
 import { startJob, step, romeYesterday } from "@/lib/sales-ai/pipeline";
 
@@ -42,10 +42,13 @@ export async function POST(request) {
   const cfg = await getConfig();
   if (!cfg.enabled && !body?.force) return Response.json({ action: "spento" });
 
+  // cron ogni 10 minuti + catena: un tick alla volta (il figlio parte dopo che il padre ha lasciato)
+  if (!(await takeTickLock("sales-ai", 75))) return Response.json({ action: "skip", reason: "tick già in corso" });
+
   const t0 = Date.now();
   let job = await getJob(day);
   if (!job || (body?.force && chain === 0)) job = await startJob(day, { force: !!body?.force, by });
-  if (job.status !== "in_corso") return Response.json({ action: "idle", day, status: job.status });
+  if (job.status !== "in_corso") { await dropTickLock("sales-ai"); return Response.json({ action: "idle", day, status: job.status }); }
 
   let last = null;
   while (Date.now() - t0 < BUDGET_MS) {
@@ -57,6 +60,7 @@ export async function POST(request) {
     }
   }
   const done = !!last?.done;
+  await dropTickLock("sales-ai");
   // la catena continua anche dopo un errore non fatale: step() conta i fallimenti e si ferma da solo a 4
   const chained = done ? null : await continueChain(request, chain, { maxChain: MAX_CHAIN });
   return Response.json({ action: "step", day, stage: last?.job?.stage, status: last?.job?.status, chain, ...(chained ? { next: chained } : {}) });

@@ -33,7 +33,7 @@ import {
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
   History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Snowflake, Contrast,
-Megaphone, Share2, Shield, BookUser, Sunrise,
+Megaphone, Share2, Shield, BookUser, Sunrise, UserPlus,
   LineChart,
   FileSignature, Repeat, Gift } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
@@ -122,6 +122,7 @@ const NAV_GROUPS_RAW = [
     items: [
       { href: "/admin/pnl-live",                 label: "P&L Live",              icon: Wallet },
       { href: "/admin/retention",                label: "Retention fan",         icon: Repeat },
+      { href: "/admin/publisher-x",              label: "Publisher X",           icon: UserPlus },
       { href: "/admin/profiles-compare",         label: "Scaglioni a confronto", icon: Scale },
       { href: "/admin/comp-calendar",            label: "Calendario compensi",   icon: CalendarDays },
       { href: "/admin/threshold-study",          label: "Studio soglie",         icon: Ruler },
@@ -429,8 +430,14 @@ export default function Sidebar() {
     refreshInterval: 5 * 60 * 1000,
   });
   const s4sCount = s4sInbox?.count || 0;
-  const badgeOf = (href, flag) => (href === "/admin/s4s" ? s4sCount : flag ? criticalCount : 0);
-  const toneOf = (href) => (href === "/admin/s4s" ? "todo" : undefined);
+  // Porta un collega (27/10/2026): premi sbloccati da pagare + mesi senza cambio, per chi gestisce il programma
+  const { data: refInbox } = useSWR(me?.authenticated && canSee("/admin/referral", me.capabilities, me.admin) ? "/api/admin/referral/inbox" : null, silentFetcher, {
+    revalidateOnFocus: false,
+    refreshInterval: 10 * 60 * 1000,
+  });
+  const refCount = refInbox?.count || 0;
+  const badgeOf = (href, flag) => (href === "/admin/s4s" ? s4sCount : href === "/admin/referral" ? refCount : flag ? criticalCount : 0);
+  const toneOf = (href) => (href === "/admin/s4s" || href === "/admin/referral" ? "todo" : undefined);
 
   const [solid, setSolid] = useVetroSolid();
   const allowed = (href) => (!me?.authenticated && !isPrivateHref(href)) || canSee(href, me?.capabilities, me?.admin);

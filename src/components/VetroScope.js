@@ -51,7 +51,9 @@ export function useVetroTint() {
   return ["blu", () => {}];
 }
 
-/** Dal 27/10/2026 il vetro avvolge menu e schede in alto su TUTTE le pagine (AppShell). */
+/** Dal 27/10/2026 il vetro avvolge menu e schede in alto su TUTTE le pagine (AppShell). L'elenco resta
+ *  solo come storia delle pagine ridisegnate a mano (riquadri e grafici propri), non decide più nulla. */
+export const VETRO_PATHS = ["/admin", "/admin/le-mie-creator", "/admin/bilancio", "/admin/revenue-pacing", "/leaderboard/sales-cp", "/leaderboard/creators", "/admin/hr", "/admin/sales-coaching", "/admin/analisi-vendite", "/admin/publisher-x", "/admin/referral", "/me/porta-un-collega"];
 export const isVetroPath = () => true;
 
 const VetroCtx = createContext(false);
