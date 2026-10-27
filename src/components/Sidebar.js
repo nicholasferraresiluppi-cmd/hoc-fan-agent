@@ -21,8 +21,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
+import { useVetroSolid } from "./VetroScope";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
-import { useTheme, useStyle } from "@/lib/theme-client";
 import { UserButton, SignedIn } from "@clerk/nextjs";
 import {
   Landmark, ArrowLeftRight, Send, Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown, HeartHandshake,
@@ -32,7 +32,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
-  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
+  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Snowflake, Contrast,
 Megaphone, Share2, Shield, BookUser, Sunrise, UserPlus,
   LineChart,
   FileSignature, Repeat, Gift } from "lucide-react";
@@ -439,9 +439,8 @@ export default function Sidebar() {
   const badgeOf = (href, flag) => (href === "/admin/s4s" ? s4sCount : href === "/admin/referral" ? refCount : flag ? criticalCount : 0);
   const toneOf = (href) => (href === "/admin/s4s" || href === "/admin/referral" ? "todo" : undefined);
 
+  const [solid, setSolid] = useVetroSolid();
   const allowed = (href) => (!me?.authenticated && !isPrivateHref(href)) || canSee(href, me?.capabilities, me?.admin);
-  const [theme, setTheme] = useTheme();
-  const [style, setStyle] = useStyle();
 
   // Toggle Essential / Advanced
   const [viewMode, setViewMode] = useState("essential");
@@ -629,18 +628,12 @@ export default function Sidebar() {
               <div style={{ color: CP.textSecondary, fontWeight: 500, fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me?.name || "Account"}</div>
               <div style={{ fontSize: 10, marginTop: 1 }}>HOC Pro</div>
             </div>
-            <button onClick={() => setTheme(theme === "light" ? "dark" : "light")} title={theme === "light" ? "Passa al tema scuro" : "Passa al tema chiaro"} aria-label="Cambia tema"
-              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textSecondary, cursor: "pointer" }}>
-              {theme === "light" ? <Moon size={15} /> : <Sun size={15} />}
+            {/* al posto del sole/luna: il vetro è lo stile unico, resta la trasparenza ridotta (accessibilità) */}
+            <button onClick={() => setSolid(!solid)} aria-pressed={solid} title={solid ? "Trasparenza ridotta: torna al vetro" : "Riduci trasparenza"} aria-label="Riduci trasparenza"
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 8, border: `1px solid ${CP.border}`, background: solid ? CP.accentSoft : CP.surface, color: solid ? CP.accentSoftText : CP.textSecondary, cursor: "pointer" }}>
+              <Contrast size={15} />
             </button>
           </div>
-          {/* Stile v3 "Notte / Carta" in ANTEPRIMA: solo admin, finché non è verificato su tutte le pagine */}
-          {me?.admin && (
-            <button onClick={() => setStyle(style === "v3" ? "v2" : "v3")} aria-pressed={style === "v3"}
-              style={{ marginTop: 10, width: "100%", padding: "7px 10px", borderRadius: 8, border: `1px solid ${style === "v3" ? CP.accent : CP.border}`, background: style === "v3" ? CP.accentSoft : "transparent", color: style === "v3" ? CP.accentSoftText : CP.textSecondary, fontSize: 12, cursor: "pointer", textAlign: "left", fontFamily: FONTS.body }}>
-              {style === "v3" ? "Stile nuovo attivo (anteprima) · torna al vecchio" : "Prova lo stile nuovo (anteprima)"}
-            </button>
-          )}
         </SignedIn>
       </div>
     </aside>

@@ -28,9 +28,8 @@ import WelcomeAttestato from "./WelcomeAttestato";
 import { SecurityBanner, FeedbackButton, ViewAsBanner, CreatorsBanner } from "./AppHelpers";
 import { CP } from "@/lib/brand";
 import { uxPageChange } from "@/lib/ux-client";
-import { useStyle } from "@/lib/theme-client";
 import { V3TopBar, V3MobileHeader, V3TabBar } from "./ShellV3";
-import VetroScope, { useVetro, isVetroPath } from "./VetroScope";
+import VetroScope from "./VetroScope";
 
 // Command bar (stile v3): scaricata solo alla prima apertura
 const CommandBar = dynamic(() => import("./CommandBar"), { ssr: false });
@@ -112,18 +111,16 @@ export default function AppShell({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   // Stile v3 in anteprima: guscio nuovo (barra ⌘K + stato dati, barra da telefono).
   // Senza data-style="v3" nulla di questo viene reso.
-  const [style] = useStyle();
-  const v3 = style === "v3";
+  // 27/10/2026: Casa spento, stile unico = vetro. v3 resta false finché il codice Casa non viene tolto.
+  const v3 = false;
   const [cmdOpen, setCmdOpen] = useState(false);
   const [cmdLoaded, setCmdLoaded] = useState(false);
   const openCmd = () => { setCmdLoaded(true); setCmdOpen(true); setMobileOpen(false); };
   // Stile vetro in prova (VetroScope): sulle sue pagine avvolge anche menu, avvisi e schede in alto
-  const [vetro] = useVetro();
-  const vetroShell = vetro && isVetroPath(pathname);
+  const vetroShell = true;
 
-  // ⌘K / Ctrl+K globale, solo nello stile v3
+  // ⌘K / Ctrl+K globale (era solo nello stile Casa; dal 27/10 per tutti, con la barra Cerca + Stato dati)
   useEffect(() => {
-    if (!v3) { setCmdOpen(false); return; }
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && String(e.key).toLowerCase() === "k") {
         e.preventDefault();
@@ -133,7 +130,7 @@ export default function AppShell({ children }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [v3]);
+  }, []);
 
   // Esc chiude il drawer da telefono (solo v3: lo stile attuale resta com'è)
   useEffect(() => {
@@ -227,11 +224,9 @@ export default function AppShell({ children }) {
         minHeight: "100vh",
         background: CP.bg,
       }}>
-        {v3 && (
-          <ErrorBoundary silent label="V3TopBar">
-            <V3TopBar onSearch={openCmd} />
-          </ErrorBoundary>
-        )}
+        <ErrorBoundary silent label="V3TopBar">
+          <V3TopBar onSearch={openCmd} />
+        </ErrorBoundary>
         <ErrorBoundary silent label="ViewAsBanner">
           <ViewAsBanner />
         </ErrorBoundary>
@@ -250,7 +245,7 @@ export default function AppShell({ children }) {
         </ErrorBoundary>
       </main>
 
-      {v3 && cmdLoaded && (
+      {cmdLoaded && (
         <ErrorBoundary silent label="CommandBar">
           <CommandBar open={cmdOpen} onClose={() => setCmdOpen(false)} />
         </ErrorBoundary>
