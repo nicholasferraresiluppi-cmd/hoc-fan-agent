@@ -26,6 +26,8 @@ const fetcher = async (url) => {
 };
 const usd = (n, dec = 0) => (n === null || n === undefined ? "—" : new Intl.NumberFormat("it-IT", { style: "currency", currency: "USD", minimumFractionDigits: dec, maximumFractionDigits: dec, useGrouping: "always" }).format(n));
 const usd2 = (n) => usd(n, 2);
+const eur = (n, dec = 2) => (n === null || n === undefined ? "—" : new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: dec, maximumFractionDigits: dec, useGrouping: "always" }).format(n));
+const fxTxt = (x) => String(x).replace(".", ",");
 const int = (n) => new Intl.NumberFormat("it-IT", { useGrouping: "always" }).format(n || 0);
 const pctTxt = (f) => (f === null || f === undefined ? "—" : `${Math.round(f * 1000) / 10}%`.replace(".", ","));
 const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
@@ -51,29 +53,31 @@ function lastMonths(n = 6) {
  * niente chatter, niente creator — Nicholas (27/10): il publisher non deve poter risalire a
  * quanto l'agenzia prende dalla ragazza. L'esempio usa la spesa media vera dei fan da X.
  */
-function dealText({ rate, base, avgSpend, overrides }) {
+function dealText({ rate, perProfile, avgSpend, overrides, fx }) {
   const fans = 100;
   const spend = Math.round(fans * avgSpend);
-  const bonus = Math.round(spend * rate);
+  const bonusUsd = Math.round(spend * rate * 100) / 100;
+  const bonusEur = Math.round(bonusUsd * fx);
   const lines = [
-    `Ti paghiamo ${base > 0 ? `una base di ${usd(base)} al mese più ` : ""}il ${pctTxt(rate)} di quello che spendono i fan che arrivano dal tuo link.`,
-    "Ogni fan lo contiamo per i suoi primi 30 giorni dal giorno in cui si iscrive: abbonamento, contenuti a pagamento, mance.",
-    "Contano solo i fan nuovi, chi era già iscritto prima non vale. Il conto di un mese si chiude 30 giorni dopo la sua fine.",
-    `Esempio: porti ${fans} fan nuovi e spendono in media ${usd2(avgSpend)} a testa nel primo mese. In tutto fanno ${usd(spend)}, a te vanno ${usd(bonus)}${base > 0 ? ` più la base di ${usd(base)}, cioè ${usd(bonus + base)}` : ""}.`,
+    `Ti paghiamo ${eur(perProfile, 0)} al mese per ogni profilo che gestisci, più il ${pctTxt(rate)} di quello che spendono i fan che arrivano dal tuo link.`,
+    "Ogni fan che entra apre una busta: per 30 giorni ci finisce dentro tutto quello che spende, cioè abbonamento, contenuti a pagamento e mance.",
+    `Al 30° giorno la busta si chiude e il tuo ${pctTxt(rate)} si sblocca: te lo paghiamo nel mese in cui la busta si chiude. Nella tua pagina in HOC Pro vedi ogni busta, aperta o chiusa.`,
+    `Contano solo i fan nuovi, chi era già iscritto prima non vale. I fan spendono in dollari: il ${pctTxt(rate)} si calcola sui dollari e si paga in euro al cambio del mese.`,
+    `Esempio: porti ${fans} fan nuovi e nei loro primi 30 giorni spendono in media ${usd2(avgSpend)} a testa. In tutto fanno ${usd(spend)}: a te vanno ${usd2(bonusUsd)}, circa ${eur(bonusEur, 0)}, più ${eur(perProfile, 0)} di base per quel profilo.`,
   ];
   if (overrides.length) lines.push(`Su alcuni profili la percentuale è diversa: ${overrides.map((o) => `${o.name} ${pctTxt(o.rate)}`).join(", ")}.`);
   return lines.join("\n");
 }
 
-function DealCard({ settings, avgSpend, overrides, onSet }) {
+function DealCard({ settings, avgSpend, overrides, onSet, fx }) {
   const [copied, setCopied] = useState(false);
-  const text = dealText({ rate: settings.pubRate, base: settings.baseUsd, avgSpend, overrides });
+  const text = dealText({ rate: settings.pubRate, perProfile: settings.baseEurPerProfile, avgSpend, overrides, fx });
   const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { alert("Copia non riuscita"); } };
   return (
     <section style={{ ...card, padding: 18, display: "grid", gap: 14, marginBottom: 16 }}>
       <SectionTitle aside="è l'unica parte da far vedere al publisher">Il deal per il publisher</SectionTitle>
       <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
-        {[["pubRate", "Percentuale sulla spesa dei suoi fan", "%", 100, "0.5"], ["baseUsd", "Base fissa al mese", "$", 1, "50"]].map(([k, label, unit, mul, step]) => (
+        {[["pubRate", "Percentuale sulla spesa dei suoi fan", "%", 100, "0.5"], ["baseEurPerProfile", "Base al mese per profilo gestito", "€", 1, "10"]].map(([k, label, unit, mul, step]) => (
           <label key={k} style={{ display: "grid", gap: 4, fontSize: 13, color: CP.textSecondary }}>
             {label}
             <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
@@ -125,15 +129,15 @@ function PublisherFans({ month, name }) {
   const rows = tab === "closed" ? p.fans : data.open;
   const copy = async () => {
     const head = "fan;profilo;link;entrato;chiusa_il;spesa_30gg;al_publisher";
-    const lines = p.fans.map((f) => [f.username ? "@" + f.username : f.userId, f.creatorName, f.linkName, String(f.subStart).slice(0, 10), String(f.closeAt).slice(0, 10), f.spent, f.bonus].join(";"));
+    const lines = p.fans.map((f) => [f.username ? "@" + f.username : f.userId, f.creatorName, f.linkName, String(f.subStart).slice(0, 10), String(f.closeAt).slice(0, 10), f.spent, f.bonus].join(";")); // compenso in dollari: in euro al cambio del mese
     try { await navigator.clipboard.writeText([head, ...lines].join("\n")); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { alert("Copia non riuscita"); }
   };
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
         <Metric label={`Buste chiuse a ${meseLungo(month)}`} value={int(p.subs)} note={`i fan hanno speso ${usd(p.spend30)}`} />
-        <Metric label="Compenso" value={usd2(p.bonus)} note={`base ${usd(p.base)}`} />
-        <Metric label="Da pagare" value={usd2(p.total)} />
+        <Metric label="Compenso" value={eur(p.bonusEur)} note={`${usd2(p.bonusUsd)} · base ${eur(p.baseEur, 0)} (${p.profiles} profili)`} />
+        <Metric label="Da pagare" value={eur(p.totalEur)} note={p.fxEstimated ? `cambio stimato ${fxTxt(p.fx)}` : `cambio ${fxTxt(p.fx)}`} />
         <Metric label="Ancora aperte" value={int(data.open.length)} note={`stanno maturando ${usd2(data.open.reduce((s, e) => s + e.bonus, 0))}`} />
       </div>
       {p.topShare !== null && p.topShare >= WHALE_SHARE && p.subs > 1 && (
@@ -263,7 +267,7 @@ export default function PublisherXPage() {
   };
 
   const pubs = data?.publishers || [];
-  const T = pubs.reduce((s, p) => ({ total: s.total + p.total, subs: s.subs + p.subs, bonus: s.bonus + p.bonus, margin: s.margin + (p.margin || 0), openCount: s.openCount + p.openCount, openBonus: s.openBonus + p.openBonus }), { total: 0, subs: 0, bonus: 0, margin: 0, openCount: 0, openBonus: 0 });
+  const T = pubs.reduce((s, p) => ({ total: s.total + p.totalEur, subs: s.subs + p.subs, bonus: s.bonus + p.bonusEur, base: s.base + p.baseEur, margin: s.margin + (p.margin || 0), openCount: s.openCount + p.openCount, openBonus: s.openBonus + p.openBonusEur }), { total: 0, subs: 0, bonus: 0, base: 0, margin: 0, openCount: 0, openBonus: 0 });
   const hr = data?.view === "payout";
   const [vetro] = useVetro();
   const shownLinks = links.filter((l) => !onlyX || l.isX || l.publisher);
@@ -298,11 +302,18 @@ export default function PublisherXPage() {
 
       {data && (hr || cfg) && (<>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 18 }}>
-          <KpiCard i={0} icon={Wallet} tone={2} label={`Da pagare per ${meseLungo(month)}`} value={usd(T.total)}
-            sub={pubs.length ? `${int(pubs.length)} publisher · compensi ${usd(T.bonus)} + basi${data.current ? " · il mese è in corso: altre buste si chiuderanno" : ""}` : "Nessun publisher ancora"} />
+          <KpiCard i={0} icon={Wallet} tone={2} label={`Da pagare per ${meseLungo(month)}`} value={eur(T.total, 0)}
+            sub={pubs.length ? `${int(pubs.length)} publisher · compensi ${eur(T.bonus, 0)} + basi ${eur(T.base, 0)}${data.current ? " · il mese è in corso: altre buste si chiuderanno" : ""}` : "Nessun publisher ancora"} />
           <KpiCard i={1} icon={Mail} tone={0} label="Buste chiuse nel mese" value={int(T.subs)} sub="fan arrivati al 30° giorno in questo mese" />
-          <KpiCard i={2} icon={Hourglass} tone={1} label="Buste ancora aperte" value={int(T.openCount)} sub={`stanno maturando ${usd(T.openBonus)} di compensi`} />
+          <KpiCard i={2} icon={Hourglass} tone={1} label="Buste ancora aperte" value={int(T.openCount)} sub={`stanno maturando ${eur(T.openBonus, 0)} di compensi`} />
           {!hr && <KpiCard i={3} icon={Landmark} tone={T.margin < 0 ? 4 : 3} label="Resta all'agenzia" value={usd(T.margin)} sub="sulle buste chiuse, dopo creator, chatter, publisher e basi" />}
+        </div>
+
+        <div style={{ ...muted, marginTop: -8, marginBottom: 16 }}>
+          I fan spendono in dollari: il compenso si calcola sui dollari e si paga in euro.
+          {data.fxEstimated
+            ? ` Il cambio di ${meseLungo(month)} non è ancora stato inserito: gli euro sono una stima a ${fxTxt(data.fx)}. Lo inserisce l'HR in «Porta un collega», lo stesso cambio vale qui.`
+            : ` Cambio di ${meseLungo(month)}: ${fxTxt(data.fx)} € per 1 $ (lo stesso di «Porta un collega»).`}
         </div>
 
         {pubs.length > 0 && (
@@ -311,15 +322,15 @@ export default function PublisherXPage() {
             <DataTable
               rows={pubs.map((p) => ({ ...p, id: p.name }))}
               onRowClick={hr ? undefined : (p) => setOpen(p.name)}
-              defaultSort={{ key: "total", dir: -1 }}
+              defaultSort={{ key: "totalEur", dir: -1 }}
               columns={[
                 { key: "name", label: "Publisher", render: (p) => <span><span style={{ fontWeight: 500 }}>{p.name}</span>{!hr && <><br /><span style={muted}>{(p.creators || []).join(", ")}{p.topShare !== null && p.topShare >= WHALE_SHARE && p.subs > 1 ? ` · un fan fa il ${pctTxt(p.topShare)}` : ""}</span></>}</span> },
                 { key: "subs", label: "Buste chiuse", align: "right", render: (p) => int(p.subs) },
                 { key: "spend30", label: "I fan hanno speso", align: "right", render: (p) => usd(p.spend30) },
-                { key: "bonus", label: "Compenso", align: "right", render: (p) => usd2(p.bonus) },
-                { key: "base", label: "Base", align: "right", render: (p) => usd(p.base) },
-                { key: "total", label: "Da pagare", align: "right", render: (p) => <b>{usd2(p.total)}</b> },
-                { key: "openCount", label: "Aperte", align: "right", render: (p) => <span style={muted}>{int(p.openCount)} · {usd(p.openBonus)}</span> },
+                { key: "bonusEur", label: "Compenso", align: "right", render: (p) => <span>{eur(p.bonusEur)}<br /><span style={muted}>{usd2(p.bonusUsd)}</span></span> },
+                { key: "baseEur", label: "Base", align: "right", render: (p) => <span>{eur(p.baseEur, 0)}<br /><span style={muted}>{int(p.profiles)} {p.profiles === 1 ? "profilo" : "profili"}</span></span> },
+                { key: "totalEur", label: "Da pagare", align: "right", render: (p) => <b>{eur(p.totalEur)}</b> },
+                { key: "openCount", label: "Aperte", align: "right", render: (p) => <span style={muted}>{int(p.openCount)} · {eur(p.openBonusEur, 0)}</span> },
                 ...(hr ? [] : [{ key: "margin", label: "Resta all'agenzia", align: "right", render: (p) => <span style={{ color: p.margin < 0 ? CP.accentRed : CP.textPrimary }}>{usd(p.margin)}</span> }]),
               ]}
             />
@@ -371,7 +382,7 @@ export default function PublisherXPage() {
 
         <Accessi names={pubNames} people={cfg.people} onEmail={setEmail} dirty={dirty} onInvite={invite} busyName={inviting} />
 
-        {settings && <DealCard settings={settings} avgSpend={avgSpend} overrides={overrides} onSet={setSetting} />}
+        {settings && <DealCard settings={settings} avgSpend={avgSpend} overrides={overrides} onSet={setSetting} fx={data.fx || 0.86} />}
 
         <section style={{ ...card, padding: 18, display: "grid", gap: 16 }}>
           <SectionTitle aside="solo per voi, non da mostrare al publisher">Controllo interno: quanto resta all'agenzia</SectionTitle>

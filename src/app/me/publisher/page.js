@@ -21,6 +21,7 @@ const fetcher = async (url) => {
   if (!r.ok) throw new Error(j?.error || `Errore ${r.status}`);
   return j;
 };
+const eur = (n, dec = 2) => (n === null || n === undefined ? "—" : `${new Intl.NumberFormat("it-IT", { minimumFractionDigits: dec, maximumFractionDigits: dec, useGrouping: "always" }).format(n)} €`);
 const usd = (n, dec = 2) => (n === null || n === undefined ? "—" : `$${new Intl.NumberFormat("it-IT", { minimumFractionDigits: dec, maximumFractionDigits: dec, useGrouping: "always" }).format(n)}`);
 const int = (n) => new Intl.NumberFormat("it-IT", { useGrouping: "always" }).format(n || 0);
 const pct = (f) => `${String(Math.round(f * 1000) / 10).replace(".", ",")}%`;
@@ -60,7 +61,7 @@ function Busta({ e, windowDays }) {
         </div>
       </div>
       <div style={{ textAlign: "right", ...muted }}>
-        {e.closed ? <span style={{ color: CP.textPrimary }}>a te {usd(e.bonus)}</span> : <span>a te finora {usd(e.bonus)}</span>}
+        {e.closed ? <span style={{ color: CP.textPrimary }}>a te {eur(e.bonusEur)}</span> : <span>a te finora {eur(e.bonusEur)}</span>}
       </div>
     </div>
   );
@@ -83,8 +84,9 @@ export default function MyPublisherPage() {
     return byProfile.filter((e) => status === "all" || (status === "open" ? !e.closed : e.closed)).sort(cmp);
   }, [byProfile, status, sort]);
 
-  const month = thisMonth();
-  const cur = data?.months?.find((m) => m.month === month) || { closed: 0, bonus: 0, base: data?.deal?.base || 0, total: data?.deal?.base || 0 };
+  const month = data?.month || thisMonth();
+  const baseNow = (data?.deal?.perProfileEur || 0) * (data?.deal?.profiles || 0);
+  const cur = data?.months?.find((m) => m.month === month) || { closed: 0, bonusEur: 0, baseEur: baseNow, totalEur: baseNow };
   const sameRate = data?.deal?.rates?.every((r) => r.rate === data.deal.rate);
 
   return (
@@ -101,13 +103,17 @@ export default function MyPublisherPage() {
 
         {data?.linked && (<>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
-            <KpiCard i={0} icon={Wallet} tone={2} label={`Sbloccato a ${meseLungo(month)}`} value={usd(cur.total)}
-              sub={`${int(cur.closed)} buste chiuse: ${usd(cur.bonus)}${cur.base ? ` · base ${usd(cur.base, 0)}` : ""}`} />
-            <KpiCard i={1} icon={Hourglass} tone={0} label="Sta maturando" value={usd(data.open.bonus)}
+            <KpiCard i={0} icon={Wallet} tone={2} label={`Sbloccato a ${meseLungo(month)}`} value={eur(cur.totalEur)}
+              sub={`${int(cur.closed)} buste chiuse: ${eur(cur.bonusEur)}${cur.baseEur ? ` · base ${eur(cur.baseEur, 0)}` : ""}`} />
+            <KpiCard i={1} icon={Hourglass} tone={0} label="Sta maturando" value={eur(data.open.bonusEur)}
               sub={`${int(data.open.count)} buste aperte: si sbloccano al 30° giorno di ogni fan`} />
             <KpiCard i={2} icon={Users} tone={1} label="Fan nelle tue buste" value={int(envs.length)} sub="quelle aperte e le chiuse degli ultimi 3 mesi" />
             <KpiCard i={3} icon={Percent} tone={3} label="Il tuo deal" value={pct(data.deal.rate)}
-              sub={`di quello che spendono i tuoi fan nei primi 30 giorni${data.deal.base ? `, più ${usd(data.deal.base, 0)} al mese` : ""}`} />
+              sub={`di quello che spendono i tuoi fan nei primi 30 giorni, più ${eur(data.deal.perProfileEur, 0)} al mese per profilo${data.deal.profiles > 1 ? ` (ne gestisci ${data.deal.profiles})` : ""}`} />
+          </div>
+          <div style={muted}>
+            I fan spendono in dollari su OnlyFans: il tuo {pct(data.deal.rate)} si calcola sui dollari e si paga in euro al cambio del mese
+            {data.fxEstimated ? ` (per ${meseLungo(month)} il cambio non è ancora fissato: gli importi in euro sono una stima a ${String(data.fx).replace(".", ",")})` : ` (${String(data.fx).replace(".", ",")} € per 1 $)`}.
           </div>
           {!sameRate && data.deal.rates.length > 1 && (
             <div style={muted}>Percentuale per profilo: {data.deal.rates.map((r) => `${r.profile} ${pct(r.rate)}`).join(" · ")}.</div>
@@ -155,10 +161,10 @@ export default function MyPublisherPage() {
                   <span>{meseLungo(m.month)}{m.month === month ? <span style={muted}> · in corso</span> : null}</span>
                   <span style={{ textAlign: "right" }}>{int(m.closed)}</span>
                   <span style={{ textAlign: "right" }}>{usd(m.spent, 0)}</span>
-                  <span style={{ textAlign: "right", fontWeight: 600 }}>{usd(m.total)}</span>
+                  <span style={{ textAlign: "right", fontWeight: 600 }}>{eur(m.totalEur)}{m.fxEstimated ? <span style={muted}> stima</span> : null}</span>
                 </div>
               ))}
-              <div style={muted}>«A te» = compenso delle buste chiuse{data.deal.base ? " più la base del mese" : ""}. Dati aggiornati a ieri sera ({dm(data.dataUntil)}).</div>
+              <div style={muted}>«A te» = compenso delle buste chiuse più la base del mese ({eur(data.deal.perProfileEur, 0)} per profilo). «Stima» = cambio del mese non ancora fissato. Dati aggiornati a ieri sera ({dm(data.dataUntil)}).</div>
             </section>
           )}
         </>)}
