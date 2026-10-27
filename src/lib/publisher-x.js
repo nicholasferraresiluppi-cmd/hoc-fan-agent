@@ -7,15 +7,16 @@
  * doppioni; spesa al netto del 20% OnlyFans). Quindi il conto si fa fan per fan,
  * ognuno sui suoi 30 giorni, senza cambiare link ogni mese.
  *
- * KV `pubx:config` { rev, at, by, settings, fees, links } — chi usa quale link, fee per
+ * KV `pubx:config` { rev, at, by, settings, fees, rates, links } — chi usa quale link, fee per
  * profilo (la fee vera vive nel conto dello split, cifrato per la contabilità: qui si
- * imposta a mano), provvigione chatter, quota publisher, base mensile.
+ * imposta a mano, serve solo al controllo interno), provvigione chatter, tariffa publisher
+ * (una per tutti + eventuale tariffa per profilo), base mensile.
  * Sempre filtrato sull'organizzazione HOC (il warehouse è multi-agenzia).
  * Costo misurato: ~0,06 GB per l'elenco link, ~0,01 GB per il conto di un mese.
  */
 import { kv } from "@vercel/kv";
 import { HOC_ORGANIZATION_ID, bqQuery, bqProjects } from "@/lib/bigquery-api";
-import { sanitizeConfig, computeMonth, linkKey, isXLink, feeFor, publisherRate, monthClosesOn } from "@/lib/publisher-x-core";
+import { sanitizeConfig, computeMonth, linkKey, isXLink, feeFor, rateFor, splitDollar, monthClosesOn } from "@/lib/publisher-x-core";
 import { linksSql as linksSqlFor, fansSql as fansSqlFor, untilSql as untilSqlFor, isMonth } from "@/lib/publisher-x-sql";
 
 export const PUBX_VERSION = "pubx-1";
@@ -25,6 +26,13 @@ const T = () => ({ table: `\`${bqProjects().dataProject}.hoc.newsubs_spending\``
 const linksSql = (month, links) => linksSqlFor(T(), month, links);
 const fansSql = (month, links) => fansSqlFor(T(), month, links);
 const untilSql = () => untilSqlFor(T());
+const r2 = (n) => Math.round(n * 100) / 100;
+/** Per una sub media del link: quanto va al publisher e quanto resta all'agenzia (interno). */
+const perSub = (avgD30, fee, rate, settings) => {
+  if (avgD30 === null) return { perSubToPublisher: null, perSubToAgency: null };
+  const d = splitDollar(fee, rate, settings);
+  return { perSubToPublisher: r2(avgD30 * d.rate), perSubToAgency: r2(avgD30 * d.agency) };
+};
 const num = (v) => (v === null || v === undefined ? null : Number(v));
 
 export class ConflictError extends Error {}
@@ -70,13 +78,13 @@ export async function getOverview(month, { force = false } = {}) {
       publisher: a?.publisher || null, from: a?.from || null,
       subsMonth: Number(r.subs_month) || 0, subs6m: Number(r.subs_6m) || 0, mature6m: Number(r.mature_6m) || 0,
       avgD7: num(r.avg_d7), avgD30, firstDay: r.first_day, lastDay: r.last_day,
-      fee, perSubToPublisher: avgD30 === null ? null : Math.round(avgD30 * publisherRate(fee, config.settings).rate * 100) / 100,
+      fee, rate: rateFor(config, creatorId), ...perSub(avgD30, fee, rateFor(config, creatorId), config.settings),
     };
   });
   // un link assegnato che non compare (nome sbagliato o niente sub da 6 mesi) resta visibile
   for (const l of config.links) {
     if (!links.some((x) => x.key === linkKey(l.creatorId, l.linkName))) {
-      links.push({ key: linkKey(l.creatorId, l.linkName), creatorId: l.creatorId, creatorName: String(l.creatorId), linkName: l.linkName, linkUrl: null, isX: isXLink(l.linkName), publisher: l.publisher, from: l.from, subsMonth: 0, subs6m: 0, mature6m: 0, avgD7: null, avgD30: null, firstDay: null, lastDay: null, fee: feeFor(config, l.creatorId), perSubToPublisher: null, missing: true });
+      links.push({ key: linkKey(l.creatorId, l.linkName), creatorId: l.creatorId, creatorName: String(l.creatorId), linkName: l.linkName, linkUrl: null, isX: isXLink(l.linkName), publisher: l.publisher, from: l.from, subsMonth: 0, subs6m: 0, mature6m: 0, avgD7: null, avgD30: null, firstDay: null, lastDay: null, fee: feeFor(config, l.creatorId), rate: rateFor(config, l.creatorId), perSubToPublisher: null, perSubToAgency: null, missing: true });
     }
   }
   const fans = fansRes.rows.map(toFan);

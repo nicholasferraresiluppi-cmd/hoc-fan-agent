@@ -1,12 +1,14 @@
 /**
  * Publisher X — logica pura (27/10/2026). Archivio e query in publisher-x.js.
  *
- * Il publisher su X porta fan con un link tracciato OnlyFans. Si paga sul valore
- * che quei fan lasciano all'agenzia nei loro primi 30 giorni, fan per fan:
+ * Il publisher su X porta fan con un link tracciato OnlyFans. Il deal che VEDE lui:
  *
- *   spesa del fan nei primi 30 giorni (netto OnlyFans, dal warehouse)
- *   × (fee agenzia del profilo − provvigione chatter)   ← la parte "pulita" dell'agenzia
- *   × quota publisher                                    ← es. un terzo
+ *   tariffa publisher (es. 10%) × spesa dei suoi fan nei loro primi 30 giorni + base fissa
+ *
+ * La tariffa NON deriva dalla fee: Nicholas (27/10) non vuole che il publisher possa
+ * risalire a quanto l'agenzia prende dalla creator. Fee e provvigione chatter servono
+ * solo al controllo INTERNO: quanto resta all'agenzia su ogni profilo con quella tariffa
+ * (spesa × (fee − chatter − tariffa)), per vedere dove si va in perdita.
  *
  * Ogni fan si conta dal SUO giorno di ingresso per 30 giorni (colonna spend_d30 di
  * hoc.newsubs_spending): niente link mensili o settimanali, niente fan contati 60 giorni.
@@ -15,7 +17,7 @@
  * Si contano solo i fan NUOVI sulla pagina (is_first_sub): chi si riabbona non è merito del link.
  */
 
-export const DEFAULT_SETTINGS = { chatterPct: 0.15, sharePct: 1 / 3, baseUsd: 0 };
+export const DEFAULT_SETTINGS = { chatterPct: 0.15, pubRate: 0.1, baseUsd: 0 };
 export const DEFAULT_FEE = 0.45;
 export const WINDOW_DAYS = 30;
 export const WHALE_SHARE = 0.4; // sopra il 40% della spesa da un solo fan = mese che dipende da uno
@@ -43,13 +45,19 @@ export function sanitizeConfig(input = {}) {
   const s = input.settings || {};
   const settings = {
     chatterPct: clampPct(s.chatterPct, DEFAULT_SETTINGS.chatterPct),
-    sharePct: clampPct(s.sharePct, DEFAULT_SETTINGS.sharePct),
+    pubRate: clampPct(s.pubRate, DEFAULT_SETTINGS.pubRate),
     baseUsd: Math.max(0, Math.round(Number(s.baseUsd) || 0)),
   };
   const fees = {};
   for (const [k, v] of Object.entries(input.fees || {})) {
     const id = Number(k);
     if (Number.isInteger(id) && id > 0 && Number.isFinite(Number(v))) fees[id] = clampPct(v, DEFAULT_FEE);
+  }
+  // tariffa diversa su un profilo (es. fee bassa): resta una percentuale sulla spesa, mai la fee
+  const rates = {};
+  for (const [k, v] of Object.entries(input.rates || {})) {
+    const id = Number(k);
+    if (Number.isInteger(id) && id > 0 && v !== null && v !== "" && Number.isFinite(Number(v))) rates[id] = clampPct(v, settings.pubRate);
   }
   const seen = new Set();
   const links = [];
@@ -64,7 +72,7 @@ export function sanitizeConfig(input = {}) {
     const from = /^\d{4}-\d{2}-\d{2}$/.test(String(l.from || "")) ? l.from : null;
     links.push({ creatorId, linkName, publisher, from });
   }
-  return { settings, fees, links };
+  return { settings, fees, rates, links };
 }
 
 export const feeFor = (config, creatorId) => {
@@ -72,10 +80,20 @@ export const feeFor = (config, creatorId) => {
   return f === undefined || f === null ? DEFAULT_FEE : f;
 };
 
-/** Quanto dell'euro speso dal fan va al publisher: (fee − chatter) × quota, mai sotto zero. */
-export function publisherRate(fee, settings = DEFAULT_SETTINGS) {
-  const clean = Math.max(0, (Number(fee) || 0) - (Number(settings.chatterPct) || 0));
-  return { clean, rate: clean * (Number(settings.sharePct) || 0) };
+/** La tariffa del publisher su un profilo: quella del profilo se c'è, altrimenti quella di tutti. */
+export const rateFor = (config, creatorId) => {
+  const r = config?.rates?.[Number(creatorId)];
+  return r === undefined || r === null ? (config?.settings?.pubRate ?? DEFAULT_SETTINGS.pubRate) : r;
+};
+
+/**
+ * Per ogni dollaro speso dal fan: al publisher `rate`; all'agenzia, dopo creator e chatter,
+ * `clean` (fee − chatter) e, tolto il publisher, `agency` (può essere negativo: profilo in perdita).
+ */
+export function splitDollar(fee, rate, settings = DEFAULT_SETTINGS) {
+  const clean = (Number(fee) || 0) - Math.min(Number(fee) || 0, Number(settings.chatterPct) || 0);
+  const r = Number(rate) || 0;
+  return { clean, rate: r, agency: clean - r };
 }
 
 /** Il fan ha chiuso i suoi 30 giorni entro il giorno dei dati? */
@@ -112,10 +130,10 @@ export function computeMonth({ fans = [], config, dataUntil }) {
     if (!l) { unassigned += 1; continue; }
     if (l.from && String(f.subStart).slice(0, 10) < l.from) continue;
     const fee = feeFor(config, f.creatorId);
-    const { clean, rate } = publisherRate(fee, settings);
+    const { clean, rate } = splitDollar(fee, rateFor(config, f.creatorId), settings);
     const mature = isMature(f.subStart, dataUntil);
     const d30 = Number(f.d30) || 0;
-    const row = { ...f, mature, fee, value: r2(d30 * clean), bonus: r2(d30 * rate) };
+    const row = { ...f, mature, fee, rate, value: r2(d30 * clean), bonus: r2(d30 * rate) };
     if (!pubs.has(l.publisher)) pubs.set(l.publisher, []);
     pubs.get(l.publisher).push(row);
   }

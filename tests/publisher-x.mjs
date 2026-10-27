@@ -1,6 +1,6 @@
 // node tests/publisher-x.mjs — logica pura del conto publisher X.
 import assert from "node:assert/strict";
-import { isXLink, sanitizeConfig, publisherRate, isMature, monthOf, computeMonth, monthClosesOn, feeFor, DEFAULT_FEE } from "../src/lib/publisher-x-core.js";
+import { isXLink, sanitizeConfig, splitDollar, rateFor, isMature, monthOf, computeMonth, monthClosesOn, feeFor, DEFAULT_FEE } from "../src/lib/publisher-x-core.js";
 
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -12,8 +12,9 @@ for (const s of ["Traffic/01KZ6AFABJTCGWYDVS820WVR6X/#908119/1785870893", "IG pr
 
 // Config: scarta righe incomplete, doppioni, percentuali fuori scala
 const c = sanitizeConfig({
-  settings: { chatterPct: 0.15, sharePct: 2, baseUsd: "300.4" },
+  settings: { chatterPct: 0.15, pubRate: 2, baseUsd: "300.4" },
   fees: { 10: 0.23, abc: 0.5, 11: 7 },
+  rates: { 10: 0.05, 11: "", xx: 0.2 },
   links: [
     { creatorId: 10, linkName: "Linkscale_X", publisher: "  Mario   Rossi " },
     { creatorId: 10, linkName: "Linkscale_X", publisher: "Altro" },
@@ -23,7 +24,10 @@ const c = sanitizeConfig({
     { creatorId: 12, linkName: "tw", publisher: "Lia", from: "ottobre" },
   ],
 });
-eq(c.settings, { chatterPct: 0.15, sharePct: 1 / 3, baseUsd: 300 }, "quota fuori scala → predefinita, base arrotondata");
+eq(c.settings, { chatterPct: 0.15, pubRate: 0.1, baseUsd: 300 }, "tariffa fuori scala → predefinita 10%, base arrotondata");
+eq(c.rates, { 10: 0.05 }, "tariffa per profilo: vuota o id non numerico scartati");
+eq(rateFor(c, 10), 0.05, "tariffa del profilo");
+eq(rateFor(c, 99), 0.1, "senza tariffa del profilo vale quella di tutti");
 eq(c.fees, { 10: 0.23, 11: DEFAULT_FEE }, "fee: id non numerico scartato, fee >1 → predefinita");
 eq(c.links.length, 3, "doppione e righe vuote scartati");
 eq(c.links[0].publisher, "Mario Rossi", "spazi del nome normalizzati");
@@ -32,10 +36,12 @@ eq(c.links[2].from, null, "data non valida → null");
 eq(feeFor(c, 10), 0.23, "fee impostata");
 eq(feeFor(c, 99), DEFAULT_FEE, "fee mancante → 45%");
 
-// La torta: 45% − 15% = 30%, un terzo → 10 centesimi per euro
-const t = publisherRate(0.45, { chatterPct: 0.15, sharePct: 1 / 3 });
-ok(Math.abs(t.clean - 0.3) < 1e-9 && Math.abs(t.rate - 0.1) < 1e-9, "torta da bambino: 10%");
-eq(publisherRate(0.1, { chatterPct: 0.15, sharePct: 0.5 }).rate, 0, "fee sotto il chatter → zero, mai negativo");
+// La torta: fee 45%, chatter 15%, publisher 10% → all'agenzia 20 centesimi per dollaro
+const t = splitDollar(0.45, 0.1, { chatterPct: 0.15 });
+ok(Math.abs(t.clean - 0.3) < 1e-9 && Math.abs(t.agency - 0.2) < 1e-9, "torta da bambino");
+const low = splitDollar(0.23, 0.1, { chatterPct: 0.15 });
+ok(low.agency < 0 && Math.abs(low.agency + 0.02) < 1e-9, "fee 23%: con 10% al publisher l'agenzia perde 2 centesimi per dollaro");
+eq(splitDollar(0.1, 0.05, { chatterPct: 0.15 }).clean, 0, "fee sotto il chatter → pulito zero, mai negativo");
 
 // Maturità e mesi
 ok(isMature("2026-09-01T10:00:00Z", "2026-10-01T10:00:00Z"), "30 giorni esatti = chiuso");
@@ -48,8 +54,9 @@ eq(monthClosesOn("2026-02"), "2026-03-31", "febbraio corto");
 
 // Conto del mese
 const config = sanitizeConfig({
-  settings: { chatterPct: 0.15, sharePct: 1 / 3, baseUsd: 300 },
+  settings: { chatterPct: 0.15, pubRate: 0.1, baseUsd: 300 },
   fees: { 1: 0.45, 2: 0.23 },
+  rates: { 2: 0.04 },
   links: [
     { creatorId: 1, linkName: "Linkscale_X", publisher: "Mario" },
     { creatorId: 2, linkName: "twitter", publisher: "Mario" },
@@ -70,10 +77,12 @@ const mario = m.publishers.find((p) => p.name === "Mario");
 const lia = m.publishers.find((p) => p.name === "Lia");
 eq(mario.subs, 3, "Mario: tre fan su due profili");
 eq(mario.spend30, 170, "spesa sommata");
-// a: 100×0,30=30 → 10 ; b: 20×0,30=6 → 2 ; c: 50×0,08=4 → 1,33
-eq(mario.value, 40, "valore pulito per l'agenzia");
-eq(mario.bonus, 13.33, "bonus = un terzo del pulito, fee per profilo");
-eq(mario.total, 313.33, "base + bonus");
+// pulito: a 100×0,30=30, b 20×0,30=6, c 50×0,08=4 → 40 ; publisher: a 10, b 2, c 50×0,04=2 → 14
+eq(mario.value, 40, "valore pulito per l'agenzia (fee per profilo)");
+eq(mario.bonus, 14, "bonus = tariffa sulla spesa, con la tariffa del profilo dove c'è");
+eq(mario.total, 314, "base + bonus");
+eq(mario.margin, -274, "all'agenzia: pulito − bonus − base");
+eq(mario.fans.find((f) => f.userId === "c").rate, 0.04, "la riga del fan porta la sua tariffa");
 eq(mario.immature, 1, "il fan del 20/9 non ha ancora chiuso i 30 giorni al 15/10");
 ok(!mario.final, "mese provvisorio finché c'è un fan aperto");
 eq(mario.fans[0].userId, "a", "fan in ordine di spesa");

@@ -13,7 +13,7 @@ import { Loader2, RefreshCw, Copy, ExternalLink, Plus, Save } from "lucide-react
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { PageHead, HeroMetric, Metric, FilterChip, DataTable, Notice, SectionTitle, card } from "@/components/ds";
-import { DEFAULT_FEE, WHALE_SHARE, publisherRate, linkKey } from "@/lib/publisher-x-core";
+import { DEFAULT_FEE, WHALE_SHARE, splitDollar, rateFor, linkKey } from "@/lib/publisher-x-core";
 
 const API = "/api/admin/publisher-x";
 const fetcher = async (url) => {
@@ -44,23 +44,68 @@ function lastMonths(n = 6) {
   return out;
 }
 
-/** La torta da 100 $ con le regole attuali: la spiegazione in parole che sta sopra le leve. */
-function Torta({ fee, settings }) {
-  const { clean, rate } = publisherRate(fee, settings);
-  const creator = 100 * (1 - fee), agency = 100 * fee, chatter = 100 * Math.min(fee, settings.chatterPct), pub = 100 * rate, rest = agency - chatter - pub;
-  const parts = [["Creator", creator, CP.borderStrong], ["Chatter", chatter, CP.accentDim], ["Publisher", pub, CP.accent], ["Agenzia", rest, CP.accentGreen]];
+/**
+ * Il deal come lo legge il publisher: tariffa sulla spesa dei suoi fan + base. Niente fee,
+ * niente chatter, niente creator — Nicholas (27/10): il publisher non deve poter risalire a
+ * quanto l'agenzia prende dalla ragazza. L'esempio usa la spesa media vera dei fan da X.
+ */
+function dealText({ rate, base, avgSpend, overrides }) {
+  const fans = 100;
+  const spend = Math.round(fans * avgSpend);
+  const bonus = Math.round(spend * rate);
+  const lines = [
+    `Ti paghiamo ${base > 0 ? `una base di ${usd(base)} al mese più ` : ""}il ${pctTxt(rate)} di quello che spendono i fan che arrivano dal tuo link.`,
+    "Ogni fan lo contiamo per i suoi primi 30 giorni dal giorno in cui si iscrive: abbonamento, contenuti a pagamento, mance.",
+    "Contano solo i fan nuovi, chi era già iscritto prima non vale. Il conto di un mese si chiude 30 giorni dopo la sua fine.",
+    `Esempio: porti ${fans} fan nuovi e spendono in media ${usd2(avgSpend)} a testa nel primo mese. In tutto fanno ${usd(spend)}, a te vanno ${usd(bonus)}${base > 0 ? ` più la base di ${usd(base)}, cioè ${usd(bonus + base)}` : ""}.`,
+  ];
+  if (overrides.length) lines.push(`Su alcuni profili la percentuale è diversa: ${overrides.map((o) => `${o.name} ${pctTxt(o.rate)}`).join(", ")}.`);
+  return lines.join("\n");
+}
+
+function DealCard({ settings, avgSpend, overrides, onSet }) {
+  const [copied, setCopied] = useState(false);
+  const text = dealText({ rate: settings.pubRate, base: settings.baseUsd, avgSpend, overrides });
+  const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { alert("Copia non riuscita"); } };
+  return (
+    <section style={{ ...card, padding: 18, display: "grid", gap: 14, marginBottom: 16 }}>
+      <SectionTitle aside="è l'unica parte da far vedere al publisher">Il deal per il publisher</SectionTitle>
+      <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
+        {[["pubRate", "Percentuale sulla spesa dei suoi fan", "%", 100, "0.5"], ["baseUsd", "Base fissa al mese", "$", 1, "50"]].map(([k, label, unit, mul, step]) => (
+          <label key={k} style={{ display: "grid", gap: 4, fontSize: 13, color: CP.textSecondary }}>
+            {label}
+            <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+              <input type="number" min="0" step={step} value={Math.round(settings[k] * mul * 100) / 100} onChange={(e) => onSet(k, (Number(e.target.value) || 0) / mul)} style={{ ...input, width: 100 }} />
+              <span style={muted}>{unit}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      <div style={{ whiteSpace: "pre-line", fontSize: 14, lineHeight: 1.6, color: CP.textPrimary, padding: "12px 14px", borderRadius: 8, background: CP.surfaceAlt }}>{text}</div>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <button style={{ ...btn, padding: "6px 12px" }} onClick={copy}><Copy size={13} />{copied ? "Copiato" : "Copia il testo"}</button>
+        <span style={muted}>L'esempio usa la spesa media vera dei fan arrivati da X negli ultimi 6 mesi ({usd2(avgSpend)} a testa).</span>
+      </div>
+    </section>
+  );
+}
+
+/** Controllo interno: un dollaro speso dal fan, diviso fra creator, chatter, publisher e agenzia. */
+function Torta({ fee, rate, settings }) {
+  const { agency } = splitDollar(fee, rate, settings);
+  const creator = 100 * (1 - fee), chatter = 100 * Math.min(fee, settings.chatterPct), pub = 100 * rate, rest = 100 * agency;
+  const parts = [["Creator", creator, CP.borderStrong], ["Chatter", chatter, CP.accentDim], ["Publisher", pub, CP.accent], ["Agenzia", Math.max(0, rest), CP.accentGreen]];
   return (
     <div style={{ display: "grid", gap: 8 }}>
       <div style={{ fontSize: 14, lineHeight: 1.55, color: CP.textSecondary }}>
-        Un fan portato dal publisher spende {usd(100)} nei suoi primi 30 giorni. Alla creator vanno {usd(creator)}, all'agenzia {usd(agency)} (fee {pctTxt(fee)}).
-        Dall'agenzia si paga il chatter: {usd(chatter)}. Restano {usd(100 * clean)} puliti, e il publisher ne prende {pctTxt(settings.sharePct)}: <b style={{ color: CP.textPrimary }}>{usd2(pub)}</b>. All'agenzia restano {usd2(rest)}.
-        In breve: {pctTxt(rate)} di ogni dollaro speso dai suoi fan, più la base fissa.
+        Su un profilo con fee {pctTxt(fee)}: un fan spende {usd(100)}. Alla creator {usd(creator)}, al chatter {usd(chatter)}, al publisher {usd2(pub)}.
+        All'agenzia restano <b style={{ color: rest < 0 ? CP.accentRed : CP.textPrimary }}>{usd2(rest)}</b>.
       </div>
       <div style={{ display: "flex", height: 10, borderRadius: 6, overflow: "hidden", background: CP.borderSoft }} aria-hidden>
         {parts.map(([l, v, c]) => <div key={l} style={{ width: `${Math.max(0, v)}%`, background: c }} title={`${l} ${usd2(v)}`} />)}
       </div>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", ...muted }}>
-        {parts.map(([l, v, c]) => <span key={l} style={{ display: "inline-flex", gap: 5, alignItems: "center" }}><span style={{ width: 8, height: 8, borderRadius: 2, background: c }} />{l} {usd2(v)}</span>)}
+        {parts.map(([l, v, c]) => <span key={l} style={{ display: "inline-flex", gap: 5, alignItems: "center" }}><span style={{ width: 8, height: 8, borderRadius: 2, background: c }} />{l} {usd2(l === "Agenzia" ? rest : v)}</span>)}
       </div>
     </div>
   );
@@ -126,7 +171,8 @@ export default function PublisherXPage() {
 
   useEffect(() => { if (data?.config && !draft) setDraft(data.config); }, [data, draft]);
   const cfg = draft || data?.config;
-  const dirty = Boolean(draft && data?.config && JSON.stringify({ s: draft.settings, f: draft.fees, l: draft.links }) !== JSON.stringify({ s: data.config.settings, f: data.config.fees, l: data.config.links }));
+  const pick = (c) => JSON.stringify({ s: c.settings, f: c.fees, r: c.rates, l: c.links });
+  const dirty = Boolean(draft && data?.config && pick(draft) !== pick(data.config));
 
   const links = data?.links || [];
   const pubNames = useMemo(() => [...new Set((cfg?.links || []).map((l) => l.publisher))].sort((a, b) => a.localeCompare(b, "it")), [cfg]);
@@ -145,6 +191,12 @@ export default function PublisherXPage() {
   });
   const setSetting = (k, v) => setDraft((d) => ({ ...d, settings: { ...d.settings, [k]: v } }));
   const setFee = (id, v) => setDraft((d) => ({ ...d, fees: { ...d.fees, [id]: v } }));
+  const feeOf = (id) => (cfg?.fees?.[id] !== undefined ? cfg.fees[id] : DEFAULT_FEE);
+  const setRate = (id, v) => setDraft((d) => {
+    const rates = { ...(d.rates || {}) };
+    if (v === null) delete rates[id]; else rates[id] = v;
+    return { ...d, rates };
+  });
 
   const save = async () => {
     setBusy(true);
@@ -170,6 +222,11 @@ export default function PublisherXPage() {
   const T = pubs.reduce((s, p) => ({ total: s.total + p.total, subs: s.subs + p.subs, margin: s.margin + p.margin, immature: s.immature + p.immature }), { total: 0, subs: 0, margin: 0, immature: 0 });
   const shownLinks = links.filter((l) => !onlyX || l.isX || l.publisher);
   const settings = cfg?.settings;
+  // spesa media a 30 gg dei fan da X (pesata sui fan con 30 giorni chiusi): l'esempio del deal
+  const xLinks = links.filter((l) => l.isX && l.avgD30 !== null && l.mature6m > 0);
+  const xFans = xLinks.reduce((s, l) => s + l.mature6m, 0);
+  const avgSpend = xFans > 0 ? xLinks.reduce((s, l) => s + l.avgD30 * l.mature6m, 0) / xFans : 8;
+  const overrides = cfg ? creators.filter((c) => cfg.rates?.[c.id] !== undefined).map((c) => ({ name: c.name, rate: cfg.rates[c.id] })) : [];
 
   return (
     <div style={{ padding: "24px 16px 80px", maxWidth: 1600, margin: "0 auto" }}>
@@ -228,7 +285,7 @@ export default function PublisherXPage() {
           <DataTable
             rows={shownLinks.map((l) => ({ ...l, id: l.key }))}
             defaultSort={{ key: "subsMonth", dir: -1 }}
-            minWidth={980}
+            minWidth={1080}
             empty="Nessun link X con fan negli ultimi 6 mesi."
             columns={[
               { key: "creatorName", label: "Profilo", render: (l) => <span>{l.creatorName}{l.missing && <><br /><span style={{ ...muted, color: CP.accentSoftText }}>link senza fan da 6 mesi: controlla il nome</span></>}</span> },
@@ -244,6 +301,7 @@ export default function PublisherXPage() {
               { key: "avgD7", label: "Spesa media 7 gg", align: "right", render: (l) => usd2(l.avgD7) },
               { key: "avgD30", label: "Spesa media 30 gg", align: "right", render: (l) => <span>{usd2(l.avgD30)}<br /><span style={muted}>su {int(l.mature6m)} fan</span></span> },
               { key: "perSubToPublisher", label: "Al publisher per fan", align: "right", render: (l) => usd2(l.perSubToPublisher) },
+              { key: "perSubToAgency", label: "All'agenzia per fan", align: "right", render: (l) => <span style={{ color: l.perSubToAgency < 0 ? CP.accentRed : CP.textPrimary }}>{usd2(l.perSubToAgency)}</span> },
             ]}
           />
           <datalist id="pubx-names">{pubNames.map((n) => <option key={n} value={n} />)}</datalist>
@@ -260,40 +318,46 @@ export default function PublisherXPage() {
           <div style={{ ...muted, marginTop: 6 }}>Per i profili che non sono in elenco serve almeno un link X con fan. Dopo aver aggiunto, salva e ricalcola: il link compare con i suoi numeri.</div>
         </section>
 
+        {settings && <DealCard settings={settings} avgSpend={avgSpend} overrides={overrides} onSet={setSetting} />}
+
         <section style={{ ...card, padding: 18, display: "grid", gap: 16 }}>
-          <SectionTitle aside="valgono per tutti i publisher e tutti i mesi">Regole del conto</SectionTitle>
-          {settings && <Torta fee={DEFAULT_FEE} settings={settings} />}
-          <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
-            {[
-              ["chatterPct", "Provvigione chatter", "%", 100],
-              ["sharePct", "Quota al publisher (del pulito)", "%", 100],
-              ["baseUsd", "Base fissa al mese", "$", 1],
-            ].map(([k, label, unit, mul]) => (
-              <label key={k} style={{ display: "grid", gap: 4, fontSize: 13, color: CP.textSecondary }}>
-                {label}
-                <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                  <input type="number" min="0" step={unit === "%" ? "0.5" : "50"} value={Math.round(settings[k] * mul * 100) / 100}
-                    onChange={(e) => setSetting(k, (Number(e.target.value) || 0) / mul)} style={{ ...input, width: 100 }} />
-                  <span style={muted}>{unit}</span>
-                </span>
-              </label>
-            ))}
-          </div>
+          <SectionTitle aside="solo per voi, non da mostrare al publisher">Controllo interno: quanto resta all'agenzia</SectionTitle>
+          {settings && <Torta fee={DEFAULT_FEE} rate={settings.pubRate} settings={settings} />}
+          <label style={{ display: "grid", gap: 4, fontSize: 13, color: CP.textSecondary, width: "fit-content" }}>
+            Provvigione chatter
+            <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+              <input type="number" min="0" step="0.5" value={Math.round(settings.chatterPct * 10000) / 100} onChange={(e) => setSetting("chatterPct", (Number(e.target.value) || 0) / 100)} style={{ ...input, width: 100 }} />
+              <span style={muted}>%</span>
+            </span>
+          </label>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Fee dell'agenzia per profilo</div>
-            <div style={{ ...muted, marginBottom: 8 }}>La fee vera sta nel conto dello split, riservato alla contabilità: qui si scrive a mano. Dove non la scrivi vale {pctTxt(DEFAULT_FEE)}. Con una fee bassa il publisher prende poco: con 23% e chatter al 15% restano 8 centesimi puliti per dollaro.</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
+            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Per profilo</div>
+            <div style={{ ...muted, marginBottom: 8 }}>
+              La fee vera sta nel conto dello split, riservato alla contabilità: qui si scrive a mano, e dove manca vale {pctTxt(DEFAULT_FEE)}.
+              Se su un profilo la percentuale del publisher vi fa perdere soldi, dategliene una più bassa solo lì (resta una percentuale sulla spesa, la fee non si vede).
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 8 }}>
               {creators.map((c) => {
-                const set = cfg.fees?.[c.id] !== undefined;
-                const fee = set ? cfg.fees[c.id] : DEFAULT_FEE;
+                const fee = feeOf(c.id);
+                const own = cfg.rates?.[c.id];
+                const rate = rateFor(cfg, c.id);
+                const { agency } = splitDollar(fee, rate, settings);
                 return (
-                  <label key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 13, padding: "6px 10px", border: `1px solid ${CP.borderSoft}`, borderRadius: 8 }}>
-                    <span style={{ color: set ? CP.textPrimary : CP.textSecondary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
-                    <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
-                      <input type="number" min="0" max="100" step="0.5" value={Math.round(fee * 1000) / 10} onChange={(e) => setFee(c.id, (Number(e.target.value) || 0) / 100)} style={{ ...input, width: 64 }} aria-label={`Fee ${c.name}`} />
-                      <span style={muted}>%</span>
+                  <div key={c.id} style={{ display: "grid", gap: 6, fontSize: 13, padding: "8px 10px", border: `1px solid ${agency < 0 ? CP.accentRed : CP.borderSoft}`, borderRadius: 8 }}>
+                    <span style={{ color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+                    <span style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                      <span style={{ display: "inline-flex", gap: 4, alignItems: "center", ...muted }}>fee
+                        <input type="number" min="0" max="100" step="0.5" value={Math.round(fee * 1000) / 10} onChange={(e) => setFee(c.id, (Number(e.target.value) || 0) / 100)} style={{ ...input, width: 60 }} aria-label={`Fee ${c.name}`} />%
+                      </span>
+                      <span style={{ display: "inline-flex", gap: 4, alignItems: "center", ...muted }}>publisher
+                        <input type="number" min="0" max="100" step="0.5" placeholder={String(Math.round(settings.pubRate * 1000) / 10)} value={own === undefined ? "" : Math.round(own * 1000) / 10}
+                          onChange={(e) => setRate(c.id, e.target.value === "" ? null : (Number(e.target.value) || 0) / 100)} style={{ ...input, width: 60 }} aria-label={`Percentuale publisher su ${c.name}`} />%
+                      </span>
                     </span>
-                  </label>
+                    <span style={{ ...muted, color: agency < 0 ? CP.accentRed : CP.textMuted }}>
+                      {agency < 0 ? `In perdita: l'agenzia perde ${usd2(-100 * agency)} ogni ${usd(100)} spesi` : `All'agenzia ${usd2(100 * agency)} ogni ${usd(100)} spesi`}
+                    </span>
+                  </div>
                 );
               })}
             </div>
