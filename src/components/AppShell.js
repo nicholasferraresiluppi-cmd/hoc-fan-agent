@@ -70,6 +70,10 @@ const whoFetcher = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch((
 const RESTRICTED_PAGE_LABEL = { "/admin/scouting": "Radar creator", "/admin/studio-social": "Studio social", "/admin/supervisor": "Account social", "/admin/warmup": "Warm-up", "/admin/editoriale": "Editoriale", "/admin/hr": "Persone", "/admin/hr/contratti": "Contratti", "/admin/referral": "Porta un collega", "/me/porta-un-collega": "Porta un collega", "/contabilita": "Contabilità" };
 
 function RestrictedShell({ restriction, allowed, children, pathname }) {
+  // badge sulle schede (27/10/2026): l'HR col menu ridotto vede qui i premi di «Porta un collega» da pagare
+  const hasRef = restriction.paths.includes("/admin/referral");
+  const { data: refInbox } = useSWR(hasRef ? "/api/admin/referral/inbox" : null, (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null), { revalidateOnFocus: false, refreshInterval: 10 * 60 * 1000 });
+  const badge = { "/admin/referral": refInbox?.count || 0 };
   return (
     <div className="hoc-root" style={{ minHeight: "100vh", background: CP.bg }}>
       <header style={{ position: "sticky", top: 0, zIndex: 40, display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", background: CP.bgSunken, borderBottom: `1px solid ${CP.border}` }}>
@@ -81,7 +85,7 @@ function RestrictedShell({ restriction, allowed, children, pathname }) {
               // scheda accesa = la pagina più specifica che contiene l'indirizzo (/admin/hr/contratti non accende anche «Persone»)
               const hits = all.filter((x) => pathname === x || pathname.startsWith(x + "/"));
               const on = hits.length > 0 && hits.reduce((a, b) => (b.length > a.length ? b : a)) === p;
-              return <a key={p} href={p} style={{ fontSize: 13.5, padding: "6px 12px", borderRadius: 999, textDecoration: "none", whiteSpace: "nowrap", border: `1px solid ${on ? CP.accent : CP.border}`, background: on ? CP.accentSoft : "transparent", color: on ? CP.accentSoftText : CP.textSecondary }}>{RESTRICTED_PAGE_LABEL[p] || p}</a>;
+              return <a key={p} href={p} style={{ fontSize: 13.5, padding: "6px 12px", borderRadius: 999, textDecoration: "none", whiteSpace: "nowrap", border: `1px solid ${on ? CP.accent : CP.border}`, background: on ? CP.accentSoft : "transparent", color: on ? CP.accentSoftText : CP.textSecondary }}>{RESTRICTED_PAGE_LABEL[p] || p}{badge[p] > 0 && <span aria-label={`${badge[p]} cose da fare`} style={{ marginLeft: 6, minWidth: 18, padding: "0 6px", borderRadius: 9, background: CP.accent, color: CP.accentInk, fontSize: 11, fontWeight: 600, display: "inline-block", textAlign: "center", lineHeight: "18px" }}>{badge[p]}</span>}</a>;
             })}
           </nav>
         ) : <span style={{ color: CP.textMuted, fontSize: 15 }}>· {restriction.label}</span>}

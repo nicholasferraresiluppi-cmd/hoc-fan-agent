@@ -430,8 +430,14 @@ export default function Sidebar() {
     refreshInterval: 5 * 60 * 1000,
   });
   const s4sCount = s4sInbox?.count || 0;
-  const badgeOf = (href, flag) => (href === "/admin/s4s" ? s4sCount : flag ? criticalCount : 0);
-  const toneOf = (href) => (href === "/admin/s4s" ? "todo" : undefined);
+  // Porta un collega (27/10/2026): premi sbloccati da pagare + mesi senza cambio, per chi gestisce il programma
+  const { data: refInbox } = useSWR(me?.authenticated && canSee("/admin/referral", me.capabilities, me.admin) ? "/api/admin/referral/inbox" : null, silentFetcher, {
+    revalidateOnFocus: false,
+    refreshInterval: 10 * 60 * 1000,
+  });
+  const refCount = refInbox?.count || 0;
+  const badgeOf = (href, flag) => (href === "/admin/s4s" ? s4sCount : href === "/admin/referral" ? refCount : flag ? criticalCount : 0);
+  const toneOf = (href) => (href === "/admin/s4s" || href === "/admin/referral" ? "todo" : undefined);
 
   const allowed = (href) => (!me?.authenticated && !isPrivateHref(href)) || canSee(href, me?.capabilities, me?.admin);
   const [theme, setTheme] = useTheme();

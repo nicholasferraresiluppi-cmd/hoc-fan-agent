@@ -1,7 +1,7 @@
 // Unit test — referral-core («Porta un collega»). Esegui: node tests/referral.mjs
 import assert from "node:assert/strict";
 import {
-  REFERRAL_RULES as R, recruitMetrics, buildDashboard, parseFx, shiftDatesFromWages, monthsSince, blockSales, addMonths, monthEnd, validateRecruit, validateStory, validateReferrer,
+  REFERRAL_RULES as R, missionProgress, buildPayslips, payslipsCsv, hrInbox, payslipMonth, recruitMetrics, buildDashboard, parseFx, shiftDatesFromWages, monthsSince, blockSales, addMonths, monthEnd, validateRecruit, validateStory, validateReferrer,
   recruitMilestones, storyMilestone, summarize, recruitSteps, referrerView, salesMapFromKpiRows, salesFor,
   findDuplicateRecruit,
 } from "../src/lib/referral-core.js";
@@ -191,6 +191,36 @@ const turni = (n, from = "2026-11-03") => Array.from({ length: n }, (_, i) => { 
   eq(buildDashboard({ today }).economics.costPer25, null, "programma vuoto: niente divisioni per zero");
 }
 
+
+// ── missioni e buste ────────────────────────────────────────────────────────
+{
+  const today = "2027-02-05";
+  const sales = { "2026-11": 8400, "2026-12": 6200, "2027-01": 100 };
+  const paid = { "rc1:first_shift": { amountEur: 50, paidAt: "2026-11-30" } };
+  const ms = recruitMilestones(luca, { today, salesByMonth: sales, shiftDates: turni(60), fx: { "2026-11": 0.86 }, paid });
+  const m = byKey(ms);
+  eq(missionProgress(m.shifts_75, luca), { done: 60, target: 75, unit: "turni" });
+  eq(missionProgress(m.shifts_25, luca), { done: 25, target: 25, unit: "turni" }, "completata non va oltre il traguardo");
+  eq(missionProgress(m.first_shift, luca), { done: 3, target: 3, unit: "tappe" });
+  eq(missionProgress(m.first_shift, { interviewAt: "2026-10-20" }), { done: 1, target: 3, unit: "tappe" });
+  eq(missionProgress(byKey(recruitMilestones(luca, { today: "2026-11-10" })).shifts_25, luca), null, "turni non letti: niente barra finta");
+  const st = { id: "s", referrerId: "rf1", agreedAt: "2026-11-01", publishedAt: ["2026-11-02"] };
+  eq(missionProgress(storyMilestone(st, { today: "2026-11-05" })), { done: 1, target: 2, unit: "storie" });
+  eq(payslipMonth({ unlockedAt: "2026-12-07" }, today), "2026-12");
+  eq(payslipMonth({ paidAt: "2026-11-30" }, today), "2026-11");
+  eq(payslipMonth({}, today), "2027-02", "senza date: busta del mese in corso");
+  const story = { referrerId: "rf1", milestone: storyMilestone({ ...st, publishedAt: ["2026-11-02", "2026-11-09"] }, { today }) };
+  const slips = buildPayslips({ referrers: [{ id: "rf1", name: "Giulia" }], recruits: [{ id: "rc1", name: "Luca", referrerId: "rf1", milestones: ms }], stories: [story], today });
+  eq(slips.map((b) => b.month), ["2026-12", "2026-11"], "una busta per mese di sblocco, la più recente prima");
+  const nov = slips.find((b) => b.month === "2026-11"), dic = slips.find((b) => b.month === "2026-12");
+  eq([nov.paidEur, nov.dueEur], [50, 50 + 100 + 322.5], "novembre: primo turno pagato; storie, 25 turni e 5% da pagare");
+  eq([dic.dueEur, dic.waitingFxUsd], [100, 132.5], "dicembre: 50 turni da pagare, 2,5% in attesa del cambio");
+  ok(!slips.some((b) => b.lines.some((l) => l.label.includes("75"))), "le missioni non completate non entrano nella busta");
+  const csv = payslipsCsv([nov]);
+  ok(csv.split("\n").length === 1 + nov.lines.length && csv.includes(";322,5;") && csv.includes('"pagato"'), "CSV per Excel italiano");
+  eq(hrInbox({ toPay: [1, 2, 3], fxMonths: ["2026-11", "2026-12"], fx: { "2026-11": 0.86 } }), { toPay: 3, fxMissing: 1, count: 4 });
+}
+
 // ── venduto Infloww ─────────────────────────────────────────────────────────
 {
   const map = salesMapFromKpiRows([{ employee: "Luca Rossi", sales: 100.5 }, { employee: "Luca Rossi", sales: 50 }, { employee: "Ada", sales: "20" }, { sales: 9 }]);
@@ -223,6 +253,7 @@ const turni = (n, from = "2026-11-03") => Array.from({ length: n }, (_, i) => { 
   const kv = {
     async get(k) { if (k.startsWith("ops_kpi:monthly:")) kvReads++; return store.has(k) ? clone(store.get(k)) : null; },
     async set(k, v) { store.set(k, typeof v === "string" ? JSON.parse(v) : clone(v)); return "OK"; },
+    async del(k) { store.delete(k); return 1; },
     async hset(k, obj) { Object.assign(hash(k), clone(obj)); return 1; },
     async hsetnx(k, f, v) { const h = hash(k); if (f in h) return 0; h[f] = v; return 1; },
     async hget(k, f) { return store.get(k)?.[f] ?? null; },
@@ -318,6 +349,12 @@ const turni = (n, from = "2026-11-03") => Array.from({ length: n }, (_, i) => { 
   ok(!JSON.stringify(dash).includes("inflowwName") && !JSON.stringify(dash).includes("hrPersonId"), "niente dati interni");
   ok(dash.totals.pagato === 50 + 430, `pagato ${dash.totals.pagato}`);
   ok((await L.listAudit()).length > 5, "registro delle azioni");
+  // badge HR: cache, svuotata a ogni modifica
+  const ib = await L.getInbox({ now: NOW });
+  ok(ib.count >= 1 && store.has("referral:inbox"), `badge HR (${ib.count}) in cache`);
+  await L.setFx("2027-01", "0,9", hr);
+  ok(!store.has("referral:inbox"), "una modifica svuota la cache del badge");
+  ok((await L.referrerDashboard(me, { now: NOW })).payslips.length >= 1, "il referente vede le sue buste");
 }
 
 ok(R.version === "ref-3");
