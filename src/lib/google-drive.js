@@ -131,12 +131,18 @@ export async function listMedia(folderId) {
  * Anteprima di un file (JPEG/PNG) per la griglia. Prima la miniatura di Drive (anche per i
  * video), se non c'è e il file è una foto non troppo grande, la foto intera.
  */
+const thumbMeta = new Map(); // id → metadati con thumbnailLink (per istanza, 30 min: il link dura ore)
 export async function thumbnail(fileId, size = 400) {
   // Drive gira le foto del telefono (HEIF/EXIF) solo nelle anteprime da 800 px in su: sotto le dà
   // coricate (verificato 28/10 su IMG_0702.heif: s600 → 600x450, s800 → 600x800). Quindi mai sotto 800.
   size = Math.max(800, size);
   const bearer = await token();
-  const meta = await gget(`/files/${encodeURIComponent(fileId)}`, { fields: "id,mimeType,size,thumbnailLink" });
+  let meta = thumbMeta.get(fileId);
+  if (!meta || Date.now() - meta.at > 30 * 60_000) {
+    meta = { ...(await gget(`/files/${encodeURIComponent(fileId)}`, { fields: "id,mimeType,size,thumbnailLink" })), at: Date.now() };
+    thumbMeta.set(fileId, meta);
+    if (thumbMeta.size > 3000) thumbMeta.delete(thumbMeta.keys().next().value);
+  }
   if (meta.thumbnailLink) {
     const url = meta.thumbnailLink.replace(/=s\d+$/, `=s${size}`);
     const r = await fetch(url, { headers: { Authorization: `Bearer ${bearer}` } });
@@ -173,9 +179,7 @@ export async function mediaChunk(fileId, rangeHeader) {
   const bearer = await token();
   const r = await fetch(`${API}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`, { headers: { Authorization: `Bearer ${bearer}`, Range: `bytes=${start}-${end}` } });
   if (!r.ok && r.status !== 206) throw new Error(`Google Drive ${r.status}`);
-  // il QuickTime dei telefoni (.mov) si legge come mp4 nei browser che ne hanno il codec
-  const mime = meta.mime === "video/quicktime" ? "video/mp4" : meta.mime;
-  return { status: 206, body: r.body, start, end, size, mime };
+  return { status: 206, body: r.body, start, end, size, mime: meta.mime };
 }
 
 /**

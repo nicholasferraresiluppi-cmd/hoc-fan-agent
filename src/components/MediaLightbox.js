@@ -8,6 +8,8 @@ import { CP, alpha } from "@/lib/brand";
 import { btn, btnPrimary, btnSm, hint } from "@/components/warmup/ui";
 
 const API = "/api/admin/editoriale";
+// il browser legge l'HEVC dei video dell'iPhone? (Safari sì, Chrome di solito no)
+const nativeHevc = () => { try { return document.createElement("video").canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"') !== ""; } catch { return false; } };
 
 // Foto ingrandita: frecce (anche da tastiera e col dito) per passare alle altre della griglia e
 // scelta direttamente da qui. Esc chiude, spazio sceglie.
@@ -35,7 +37,7 @@ export default function Lightbox({ creator, file, pos = 0, total = 1, selected =
       onClick={(e) => e.target === e.currentTarget && onClose()}
       onTouchStart={(e) => setTouch(e.touches[0].clientX)}
       onTouchEnd={(e) => { if (touch == null) return; const dx = e.changedTouches[0].clientX - touch; setTouch(null); if (dx > 50 && onPrev) onPrev(); else if (dx < -50 && onNext) onNext(); }}
-      style={{ position: "fixed", inset: 0, zIndex: 95, background: alpha(CP.bgSunken, "f2"), display: "grid", gridTemplateRows: "auto minmax(0,1fr) auto", padding: "max(12px, env(safe-area-inset-top)) 12px calc(14px + env(safe-area-inset-bottom))" }}>
+      style={{ position: "fixed", inset: 0, zIndex: 95, background: CP.panel, display: "grid", gridTemplateRows: "auto minmax(0,1fr) auto", padding: "max(12px, env(safe-area-inset-top)) 12px calc(14px + env(safe-area-inset-bottom))" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 4px 10px", color: CP.textPrimary }}>
         <span style={{ fontSize: 14, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name || "Foto"}</span>
         {total > 1 && <span style={{ ...hint, fontSize: 13 }}>{pos + 1} di {total}</span>}
@@ -44,7 +46,12 @@ export default function Lightbox({ creator, file, pos = 0, total = 1, selected =
       </div>
       <div style={{ position: "relative", display: "grid", placeItems: "center", minHeight: 0 }} onClick={(e) => e.target === e.currentTarget && onClose()}>
         {arrow("l", onPrev, ChevronLeft)}
-        {file.kind === "video" ? (
+        {file.kind === "video" && !nativeHevc() ? (
+          // Chrome e altri browser senza HEVC: i video dell'iPhone non si leggono. Il lettore di
+          // Drive li converte da solo (serve l'account Google con accesso alla cartella).
+          <iframe key={file.id} title={file.name || "Video"} src={`https://drive.google.com/file/d/${file.id}/preview`} allow="autoplay; fullscreen"
+            style={{ border: "none", height: "100%", maxHeight: "100%", aspectRatio: "9 / 16", maxWidth: "100%", borderRadius: 10, background: CP.bgSunken }} />
+        ) : file.kind === "video" ? (
           <video key={file.id} controls autoPlay playsInline preload="metadata"
             poster={`${API}?creator=${encodeURIComponent(creator)}&thumb=${encodeURIComponent(file.id)}&v=2&s=1200`}
             src={`${API}?creator=${encodeURIComponent(creator)}&media=${encodeURIComponent(file.id)}`}
@@ -62,7 +69,7 @@ export default function Lightbox({ creator, file, pos = 0, total = 1, selected =
               {picked ? <><X size={15} />Scelta n° {selected + 1} · togli</> : <><Check size={15} />{file.kind === "video" ? "Scegli questo video" : "Scegli questa foto"}</>}
             </button>
           ) : null}
-        {file.kind === "video" && <span style={hint}>Se il video non parte, il formato non è leggibile da questo browser: aprilo in Drive.</span>}
+        {file.kind === "video" && !nativeHevc() && <span style={hint}>Il video si vede col lettore di Google Drive (serve l'account Google con accesso alla cartella).</span>}
       </div>
     </div>
   );
