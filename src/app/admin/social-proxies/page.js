@@ -22,6 +22,7 @@ import { Plus, Loader2 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { PageHead, FilterChip, Notice, DataTable, card } from "@/components/ds";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const PROVIDERS = ["coronium", "proxycaro", "nsocks"];
 
@@ -85,7 +86,7 @@ export default function SocialProxiesPage() {
   };
 
   const runDelete = async (p) => {
-    if (!window.confirm(`Eliminare il proxy ${p.host}:${p.port}?\n\nNon si può eliminare se lo usa un account attivo; gli account non attivi che lo usano restano senza proxy.`)) return;
+    if (!(await confirmDialog({ title: `Eliminare il proxy ${p.host}:${p.port}?`, message: "Non si può eliminare se lo usa un account attivo; gli account non attivi che lo usano restano senza proxy.", ok: "Elimina", danger: true }))) return;
     setDeletingId(p.id);
     setRowError(null);
     try {

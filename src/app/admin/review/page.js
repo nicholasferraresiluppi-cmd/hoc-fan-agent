@@ -12,6 +12,7 @@ import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, card } from "@/components/ds";
+import { alertDialog } from "@/components/AppDialogs";
 
 const lbl = { display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 6 };
 const inp = { width: "100%", padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, boxSizing: "border-box" };
@@ -64,10 +65,10 @@ export default function ReviewPage() {
         const d = await r.json();
         setItems(d.feedback || []);
       } else {
-        alert(data.error || "Errore");
+        alertDialog(data.error || "Errore");
       }
     } catch (e) {
-      alert(e.message);
+      alertDialog(e.message);
     }
   }
 

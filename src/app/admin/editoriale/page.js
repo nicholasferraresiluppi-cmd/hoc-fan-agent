@@ -9,14 +9,19 @@
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import {
-  ArrowLeft, ArrowRight, CalendarDays, Check, ChevronLeft, ChevronRight, Copy, ExternalLink, Eye, Film, FolderOpen,
-  Image as ImageIcon, Plus, RefreshCw, Trash2, X,
+  ArrowLeft, ArrowRight, CalendarCheck, CalendarDays, Check, ChevronLeft, ChevronRight, CircleCheck, Copy, ExternalLink, Film, FolderOpen,
+  Image as ImageIcon, Images, Layers, Lock, Maximize2, Plus, RefreshCw, Trash2, X,
 } from "lucide-react";
+import VetroScope, { useVetro, VetroNum } from "@/components/VetroScope";
+import { KpiCard } from "@/components/VetroCharts";
+import { confirmDialog } from "@/components/AppDialogs";
+import PublishDownload from "@/components/PublishDownload";
+import Lightbox from "@/components/MediaLightbox";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHead, Notice, FilterChip } from "@/components/ds";
 import { btn, btnPrimary, btnDanger, btnSm, input, cardBox, hint, muted, SectionHead, Chip, Seg, ModalBox, Field } from "@/components/warmup/ui";
 import {
-  TYPES, STAGES, stageOf, readyProblems, needsFromTaskIds, coverage, dayItems, monthGrid, shiftMonth,
+  TYPES, STAGES, stageOf, readyProblems, needsFromTaskIds, coverage, dayItems, monthGrid, shiftMonth, usageMap,
 } from "@/lib/editoriale-core";
 import { planForDate, visibleItems, dayNumberFor, todayKey, WINDOWS, estToIt } from "@/lib/warmup-plan";
 
@@ -50,8 +55,11 @@ function Thumb({ creator, id, kind, size = "100%", ratio, dim, onClick, children
   return (
     <div title={title} onClick={onClick} style={{ position: "relative", width: size, aspectRatio: ratio || (kind === "video" ? "9 / 14" : "4 / 5"), borderRadius: 8, overflow: "hidden", background: CP.surfaceAlt, border: `1px solid ${CP.borderSoft}`, cursor: onClick ? "pointer" : "default", opacity: dim ? 0.35 : 1, flex: "0 0 auto" }}>
       {!err && id
-        ? <img src={`${API}?creator=${encodeURIComponent(creator)}&thumb=${encodeURIComponent(id)}`} alt="" loading="lazy" onError={() => setErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-        : <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: CP.textMuted }}>{kind === "video" ? <Film size={20} /> : <ImageIcon size={20} />}</div>}
+        ? <img src={`${API}?creator=${encodeURIComponent(creator)}&thumb=${encodeURIComponent(id)}&v=2`} alt="" loading="lazy" draggable={false} onError={() => setErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        : kind === "video" && id
+          // Drive non ha ancora la miniatura (video appena caricato): si mostra il primo fotogramma
+          ? <video src={`${API}?creator=${encodeURIComponent(creator)}&media=${encodeURIComponent(id)}#t=0.5`} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", pointerEvents: "none" }} />
+          : <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: CP.textMuted }}>{kind === "video" ? <Film size={20} /> : <ImageIcon size={20} />}</div>}
       {kind === "video" && !err && <span style={{ position: "absolute", left: 5, bottom: 5, background: alpha(CP.bgSunken, "cc"), color: CP.textPrimary, borderRadius: 6, padding: "1px 5px", fontSize: 11, display: "inline-flex", alignItems: "center", gap: 3 }}><Film size={11} /></span>}
       {children}
     </div>
@@ -65,7 +73,7 @@ function StageCols({ type, items, creator, onOpen, onPlace }) {
         const list = items.filter((it) => it.type === type && stageOf(it) === st.key)
           .sort((a, b) => st.key === "calendario" ? `${a.slot.date}${a.slot.time || ""}`.localeCompare(`${b.slot.date}${b.slot.time || ""}`) : (b.updatedAt || 0) - (a.updatedAt || 0));
         return (
-          <div key={st.key} style={{ background: CP.bgSunken, border: `1px solid ${CP.borderSoft}`, borderRadius: 12, padding: 10, minHeight: 120 }}>
+          <div key={st.key} className="vt-glass" style={{ background: CP.bgSunken, border: `1px solid ${CP.borderSoft}`, borderRadius: 14, padding: 10, minHeight: 120 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, color: CP.textSecondary, margin: "2px 4px 10px" }}><span>{st.label[type]}</span><span style={muted}>{list.length}</span></div>
             {!list.length && <div style={{ ...hint, padding: "6px 4px" }}>{st.key === "lavorazione" ? "Si crea dalla scheda Drive scegliendo i file." : "Niente qui."}</div>}
             {(st.key === "pubblicato" ? list.slice(0, 12) : list).map((it) => (
@@ -82,7 +90,7 @@ function ItemCard({ it, creator, onOpen, onPlace, compact }) {
   const covers = it.type === "carosello" ? it.files.slice(0, 4) : [it.final || it.files[0]].filter(Boolean);
   const probs = readyProblems(it);
   return (
-    <div onClick={onOpen} style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10, padding: 8, marginBottom: 8, cursor: "pointer" }}>
+    <div onClick={onOpen} style={{ background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 12, padding: 8, marginBottom: 8, cursor: "pointer" }}>
       <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
         {covers.map((f) => <Thumb key={f} creator={creator} id={f} kind={it.type === "carosello" ? "photo" : "video"} size={compact ? 34 : 46} ratio="1 / 1" />)}
         {it.type === "carosello" && it.files.length > 4 && <span style={{ ...hint, alignSelf: "center" }}>+{it.files.length - 4}</span>}
@@ -140,6 +148,63 @@ function PlaceModal({ place, items, itemById, profiles, pid, creator, busy, onCl
   );
 }
 
+// Ordine delle foto trascinandole (Nicholas, 28/10: «meglio trascinarle» al posto delle frecce).
+// Puntatore unico per mouse e dito: si muove la foto, le altre si spostano mentre passa; un tocco
+// senza spostamento è un clic (ingrandisce). La griglia va a capo, così sul telefono non deve
+// scorrere di lato mentre si trascina.
+function SortableFiles({ files, disabled, render, onReorder, onTap }) {
+  const [drag, setDrag] = useState(null); // { id, x0, y0, moved }
+  const down = (e, id) => {
+    if (disabled || e.button > 0 || e.target.closest("[data-nodrag]")) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    setDrag({ id, x0: e.clientX, y0: e.clientY, moved: false });
+  };
+  const move = (e) => {
+    if (!drag) return;
+    const moved = drag.moved || Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 6;
+    if (moved !== drag.moved) setDrag({ ...drag, moved });
+    if (!moved) return;
+    const el = document.elementsFromPoint(e.clientX, e.clientY).find((n) => n.dataset?.sortid && n.dataset.sortid !== drag.id);
+    if (!el) return;
+    const from = files.indexOf(drag.id), to = files.indexOf(el.dataset.sortid);
+    if (from < 0 || to < 0) return;
+    const next = [...files];
+    next.splice(from, 1);
+    next.splice(to, 0, drag.id);
+    onReorder(next);
+  };
+  const up = () => {
+    if (drag && !drag.moved) onTap(drag.id);
+    setDrag(null);
+  };
+  return files.map((f, i) => {
+    const on = drag?.id === f && drag.moved;
+    return (
+      <div key={f} data-sortid={f} onPointerDown={(e) => down(e, f)} onPointerMove={move} onPointerUp={up} onPointerCancel={() => setDrag(null)}
+        style={{ width: 96, flex: "0 0 auto", touchAction: disabled ? "auto" : "none", cursor: disabled ? "pointer" : on ? "grabbing" : "grab",
+          transform: on ? "scale(1.06)" : "none", opacity: on ? 0.85 : 1, transition: "transform .12s", zIndex: on ? 2 : 0, position: "relative", userSelect: "none" }}>
+        {render(f, i, on)}
+      </div>
+    );
+  });
+}
+
+// Cerchio di scelta in alto a sinistra della foto (decisione di Nicholas, 28/10): il tocco al
+// centro ingrandisce, il cerchio sceglie. Area di tocco 36 px anche se il cerchio ne mostra 24.
+function SelectDot({ n, locked, onClick }) {
+  return (
+    <button type="button" aria-label={locked ? "Già usata" : n ? `Scelta numero ${n}: togli` : "Scegli"} aria-pressed={Boolean(n)} disabled={locked}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      style={{ position: "absolute", top: 0, left: 0, width: 40, height: 40, padding: 6, border: "none", background: "transparent", cursor: locked ? "default" : "pointer", display: "grid", placeItems: "start" }}>
+      <span style={{ width: 26, height: 26, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 12.5, fontWeight: 500,
+        background: n ? CP.accent : alpha(CP.bgSunken, "99"), color: n ? CP.accentInk : CP.textPrimary,
+        border: `2px solid ${n ? CP.accent : alpha(CP.surface, "ee")}`, boxShadow: `0 1px 4px ${alpha(CP.bgSunken, "66")}` }}>
+        {locked ? <Lock size={12} /> : n || ""}
+      </span>
+    </button>
+  );
+}
+
 // ── pagina ────────────────────────────────────────────────────────────────────
 
 export default function EditorialePage() {
@@ -155,7 +220,7 @@ export default function EditorialePage() {
   const [sel, setSel] = useState([]);              // file scelti nel drive (in ordine di clic)
   const [kind, setKind] = useState("photo");
   const [freeOnly, setFreeOnly] = useState(true);
-  const [path, setPath] = useState("");
+  const [path, setPath] = useState("*");          // "*" = tutte, "" = cartella principale
   const [shown, setShown] = useState(PAGE);
   const [addTo, setAddTo] = useState(null);         // id del contenuto a cui si aggiungono file
   const [edit, setEdit] = useState(null);           // bozza del contenuto aperto
@@ -167,6 +232,7 @@ export default function EditorialePage() {
   const [msg, setMsg] = useState(null);
   const [folderUrl, setFolderUrl] = useState("");
   const [copied, setCopied] = useState(false);
+  const [vetro] = useVetro();
 
   const files = data?.files || [];
   const items = data?.items || [];
@@ -181,16 +247,33 @@ export default function EditorialePage() {
   useEffect(() => { setShown(PAGE); }, [kind, freeOnly, path, creator]);
   useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(null), 4500); return () => clearTimeout(t); }, [msg]);
 
+  // Dopo un'azione la pagina si aggiorna SUBITO con il contenuto che il server restituisce
+  // (prima rileggeva tutto: profili, drive e contenuti a ogni clic). Si rilegge per intero solo
+  // quando si collega la cartella; un controllo completo parte comunque in sottofondo.
+  function applyLocal(d, body, r) {
+    if (!d) return d;
+    let items = d.items || [];
+    if (body.action === "delete") items = items.filter((it) => it.id !== body.id);
+    else if (r?.item) items = items.some((it) => it.id === r.item.id) ? items.map((it) => (it.id === r.item.id ? r.item : it)) : [r.item, ...items];
+    const used = usageMap(items);
+    return { ...d, items, files: (d.files || []).map((f) => ({ ...f, usedBy: used.get(f.id) || null })) };
+  }
   async function act(body, ok) {
     setBusy(true);
-    try { const r = await post({ creator, ...body }); await mutate(); if (ok) setMsg({ t: ok }); return r; }
+    try {
+      const r = await post({ creator, ...body });
+      if (body.action === "folder") await mutate();
+      else { mutate((d) => applyLocal(d, body, r), { revalidate: false }); setTimeout(() => mutate(), 1500); }
+      if (ok) setMsg({ t: ok });
+      return r;
+    }
     catch (e) { setMsg({ t: e.message, bad: true }); return null; }
     finally { setBusy(false); }
   }
 
   // ── drive: scelta dei file ──
-  const paths = useMemo(() => [...new Set(files.map((f) => f.path))].sort((a, b) => a.localeCompare(b, "it")), [files]);
-  const visible = files.filter((f) => f.kind === pickKind && (!path || f.path === path) && (!freeOnly || !f.usedBy || (addTo && f.usedBy === addTo)));
+  const paths = useMemo(() => [...new Set(["", ...(data?.folders || []), ...files.map((f) => f.path)])].sort((a, b) => a.localeCompare(b, "it")), [files, data?.folders]);
+  const visible = files.filter((f) => f.kind === pickKind && (path === "*" || f.path === path) && (!freeOnly || !f.usedBy || (addTo && f.usedBy === addTo)));
   const toggle = (f) => {
     if (f.usedBy) return;
     setSel((s) => (s.includes(f.id) ? s.filter((x) => x !== f.id) : [...s, f.id]));
@@ -211,7 +294,7 @@ export default function EditorialePage() {
   function viewSetup() {
     const email = data?.drive?.email || base?.drive?.email;
     return (
-      <div style={{ ...cardBox, maxWidth: 680 }}>
+      <div className="vt-glass" style={{ ...cardBox, maxWidth: 680 }}>
         <h3 style={{ margin: "0 0 6px", fontWeight: 500 }}>Collega il drive di {creator}</h3>
         <p style={{ ...hint, fontSize: 13.5, margin: "0 0 14px" }}>HOC Pro legge la cartella e basta: non sposta, non copia e non cancella niente. Lo stato di ogni foto (libera, in un carosello, pubblicata) lo tiene qui.</p>
         <div style={{ fontSize: 14, marginBottom: 6 }}>1. In Google Drive, condividi la cartella della creator con questo indirizzo (basta «Visualizzatore»):</div>
@@ -239,37 +322,39 @@ export default function EditorialePage() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "4px 0 12px" }}>
           {!addItem && <Seg items={[["photo", `Foto · ${files.filter((f) => f.kind === "photo" && !f.usedBy).length} libere`], ["video", `Video · ${files.filter((f) => f.kind === "video" && !f.usedBy).length} liberi`]]} value={kind} onChange={(v) => { setKind(v); setSel([]); }} />}
           <FilterChip label={freeOnly ? "Solo liberi" : "Anche gli usati"} active={freeOnly} onClick={() => setFreeOnly((v) => !v)} />
-          {paths.length > 1 && (
-            <select value={path} onChange={(e) => setPath(e.target.value)} style={{ ...input, width: "auto", padding: "7px 10px", fontSize: 13.5 }}>
-              <option value="">Tutte le cartelle</option>
-              {paths.map((p) => <option key={p} value={p}>{p || "(cartella principale)"}</option>)}
-            </select>
-          )}
+
           <span style={{ flex: 1 }} />
           <span style={hint}>{data?.filesAt ? `letto ${new Date(data.filesAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
           <button type="button" style={btnSm} disabled={isValidating} onClick={() => mutate(fetcher(`${key}&refresh=1`), { revalidate: false })}><RefreshCw size={13} />Rileggi il drive</button>
           {data?.folder && <a href={`https://drive.google.com/drive/folders/${data.folder.folderId}`} target="_blank" rel="noreferrer" style={{ ...btnSm, textDecoration: "none" }}><FolderOpen size={13} />{data.folder.folderName}</a>}
         </div>
+        {paths.length > 1 && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", margin: "0 0 12px" }}>
+            <FolderOpen size={15} color={CP.textMuted} />
+            <FilterChip label={`Tutte · ${files.filter((f) => f.kind === pickKind).length}`} active={path === "*"} onClick={() => setPath("*")} />
+            {paths.map((p) => <FilterChip key={p || "_root"} label={`${p || "Cartella principale"} · ${files.filter((f) => f.kind === pickKind && f.path === p).length}`} active={path === p} onClick={() => setPath(p)} />)}
+          </div>
+        )}
         {data?.filesError && <Notice danger>{data.filesError}{data.filesAt ? " — sto mostrando l'ultimo elenco letto." : ""}</Notice>}
         {data?.truncated && <Notice>La cartella ha più di 6.000 file: ne mostro una parte. Conviene collegare una sottocartella.</Notice>}
-        {!visible.length && !data?.filesError && <div style={{ ...cardBox, textAlign: "center", ...hint, fontSize: 14 }}>{files.length ? (freeOnly ? "Tutti usati: niente di libero qui." : "Nessun file.") : "La cartella è vuota, o non ci sono foto e video."}</div>}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))", gap: 8 }}>
+        {!visible.length && !data?.filesError && <div style={{ ...cardBox, textAlign: "center", ...hint, fontSize: 14 }}>{path !== "*" && !files.some((f) => f.path === path) ? `La cartella «${path || "principale"}» è vuota: carica i file in Drive e premi «Rileggi il drive».` : files.length ? (freeOnly ? "Tutti usati: niente di libero qui." : `Niente ${pickKind === "photo" ? "foto" : "video"} qui.`) : "La cartella è vuota, o non ci sono foto e video."}</div>}
+        {visible.length > 0 && <p style={{ ...hint, margin: "0 0 8px" }}>Tocca la foto per ingrandirla, il cerchio in alto a sinistra per sceglierla.</p>}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8 }}>
           {visible.slice(0, shown).map((f) => {
             const i = sel.indexOf(f.id);
             const owner = f.usedBy ? itemById.get(f.usedBy) : null;
             return (
-              <Thumb key={f.id} creator={creator} id={f.id} kind={f.kind} dim={Boolean(f.usedBy) && f.usedBy !== addTo} onClick={() => toggle(f)} title={owner ? `Già in «${owner.title}»` : f.name}>
-                {i >= 0 && <div style={{ position: "absolute", inset: 0, border: `3px solid ${CP.accent}`, borderRadius: 8, background: alpha(CP.accent, "22") }} />}
-                {i >= 0 && <span style={{ position: "absolute", top: 5, left: 5, width: 22, height: 22, borderRadius: "50%", background: CP.accent, color: CP.accentInk, display: "grid", placeItems: "center", fontSize: 12, fontWeight: 500 }}>{i + 1}</span>}
-                {owner && <span style={{ position: "absolute", left: 4, right: 4, bottom: 4, background: alpha(CP.bgSunken, "dd"), color: CP.textPrimary, borderRadius: 6, padding: "2px 5px", fontSize: 10.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{stageOf(owner) === "pubblicato" ? "Pubblicata" : "In"} «{owner.title}»</span>}
-                <button type="button" aria-label="Ingrandisci" onClick={(e) => { e.stopPropagation(); setPreview(f); }} style={{ position: "absolute", top: 4, right: 4, width: 24, height: 24, borderRadius: 6, border: "none", background: alpha(CP.bgSunken, "cc"), color: CP.textPrimary, display: "grid", placeItems: "center", cursor: "pointer" }}><Eye size={13} /></button>
+              <Thumb key={f.id} creator={creator} id={f.id} kind={f.kind} dim={Boolean(f.usedBy) && f.usedBy !== addTo} onClick={() => setPreview(f)} title={owner ? `Già in «${owner.title}»` : f.name}>
+                {i >= 0 && <div style={{ position: "absolute", inset: 0, border: `3px solid ${CP.accent}`, borderRadius: 8, background: alpha(CP.accent, "1a"), pointerEvents: "none" }} />}
+                <SelectDot n={i >= 0 ? i + 1 : null} locked={Boolean(owner)} onClick={() => toggle(f)} />
+                {owner && <span style={{ position: "absolute", left: 4, right: 4, bottom: 4, background: alpha(CP.bgSunken, "dd"), color: CP.textPrimary, borderRadius: 6, padding: "2px 5px", fontSize: 10.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", pointerEvents: "none" }}>{stageOf(owner) === "pubblicato" ? "Pubblicata" : "In"} «{owner.title}»</span>}
               </Thumb>
             );
           })}
         </div>
         {visible.length > shown && <div style={{ textAlign: "center", marginTop: 14 }}><button type="button" style={btn} onClick={() => setShown((n) => n + PAGE)}>Mostra altri ({visible.length - shown})</button></div>}
         {nSel > 0 && (
-          <div style={{ position: "sticky", bottom: 12, marginTop: 16, zIndex: 20, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 14, padding: "10px 14px", boxShadow: `0 10px 30px ${alpha(CP.bgSunken, "88")}` }}>
+          <div className="vt-glass" style={{ position: "sticky", bottom: 12, marginTop: 16, zIndex: 20, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 14, padding: "10px 14px", boxShadow: `0 10px 30px ${alpha(CP.bgSunken, "88")}` }}>
             <span style={{ fontSize: 14 }}>{nSel} {pickKind === "photo" ? (nSel === 1 ? "foto scelta" : "foto scelte") : (nSel === 1 ? "video scelto" : "video scelti")}</span>
             {type === "carosello" && !addItem && nSel < 2 && <span style={hint}>un carosello ne vuole almeno 2</span>}
             <span style={{ flex: 1 }} />
@@ -371,8 +456,10 @@ export default function EditorialePage() {
     const isCar = it.type === "carosello";
     const dirty = ["title", "caption", "sound", "city", "notes", "final", "noEdit"].some((k) => (it[k] || "") !== (saved[k] || "")) || it.files.join() !== saved.files.join();
     const set = (k, v) => setEdit((e) => ({ ...e, [k]: v }));
-    const move = (i, d) => setEdit((e) => { const f = [...e.files]; const j = i + d; if (j < 0 || j >= f.length) return e; [f[i], f[j]] = [f[j], f[i]]; return { ...e, files: f }; });
-    const freeVideos = files.filter((f) => f.kind === "video" && (!f.usedBy || f.id === saved.final) && !it.files.includes(f.id));
+    // prima i video delle cartelle dei montati («video editati», «Montati»…), poi gli altri
+    const editedDir = (f) => /edit|montat|final|pront/i.test(f.path || "") && !/da\s*edit|da\s*mont/i.test(f.path || "");
+    const freeVideos = files.filter((f) => f.kind === "video" && (!f.usedBy || f.id === saved.final) && !it.files.includes(f.id))
+      .sort((a, b) => Number(editedDir(b)) - Number(editedDir(a)));
     const probs = readyProblems(it);
     const save = async (extra) => {
       const r = await act({ action: "save", item: { id: it.id, title: it.title, files: it.files, final: it.final || null, noEdit: Boolean(it.noEdit), caption: it.caption, sound: it.sound, city: it.city, notes: it.notes, ...extra } }, "Salvato");
@@ -389,7 +476,7 @@ export default function EditorialePage() {
       <ModalBox title={pub ? `${it.title} · pubblicato` : it.title} onClose={() => setEdit(null)}
         sub={`${TYPES[it.type].label} · ${STAGES.find((s) => s.key === stageOf(saved))?.label[it.type]}${saved.slot ? ` · ${prof?.username || ""} ${fmtDay(saved.slot.date, { weekday: "long", day: "numeric", month: "long" })}${saved.slot.time ? " alle " + saved.slot.time : ""}` : ""}`}
         foot={<>
-          {!pub && <button type="button" style={btnDanger} disabled={busy} onClick={async () => { if (!confirm(`Smontare «${it.title}»? I suoi file tornano liberi.`)) return; const r = await act({ action: "delete", id: it.id }, "Smontato: i file tornano liberi"); if (r) setEdit(null); }}><Trash2 size={14} />Smonta</button>}
+          {!pub && <button type="button" style={btnDanger} disabled={busy} onClick={async () => { if (!(await confirmDialog({ title: `Smontare «${it.title}»?`, message: "Il contenuto si cancella e le sue foto e i suoi video tornano liberi, sceglibili per altri contenuti.", ok: "Smonta", danger: true }))) return; const r = await act({ action: "delete", id: it.id }, "Smontato: i file tornano liberi"); if (r) setEdit(null); }}><Trash2 size={14} />Smonta</button>}
           <span style={{ flex: 1 }} />
           {!pub && dirty && <button type="button" style={btn} disabled={busy} onClick={() => save()}>Salva</button>}
           {saved.status === "lavorazione" && <button type="button" style={btnPrimary} disabled={busy || probs.length > 0} title={probs.join(", ")} onClick={() => step("ready", { on: true }, isCar ? "Carosello pronto" : "Reel pronto")}><Check size={15} />Segna pronto</button>}
@@ -399,21 +486,19 @@ export default function EditorialePage() {
         </>}>
         {!pub && <Field label="Nome (lo vedi solo tu)"><input style={input} value={it.title} onChange={(e) => set("title", e.target.value)} /></Field>}
         <div style={{ fontSize: 12.5, color: CP.textSecondary, fontWeight: 500, marginBottom: 6 }}>{isCar ? `Foto, nell'ordine in cui escono · ${it.files.length}` : `Video grezzi · ${it.files.length}`}</div>
-        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 6 }}>
-          {it.files.map((f, i) => (
-            <div key={f} style={{ width: 92, flex: "0 0 auto" }}>
-              <Thumb creator={creator} id={f} kind={isCar ? "photo" : "video"} onClick={() => setPreview(fileById.get(f) || { id: f, kind: isCar ? "photo" : "video", name: "" })}>
-                <span style={{ position: "absolute", top: 4, left: 4, background: alpha(CP.bgSunken, "cc"), color: CP.textPrimary, borderRadius: 6, padding: "0 6px", fontSize: 11.5 }}>{i + 1}</span>
-              </Thumb>
+        {!pub && it.files.length > 1 && <p style={{ ...hint, margin: "0 0 6px" }}>Trascina una foto per cambiarne il posto. Toccala per ingrandirla.</p>}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingBottom: 6, marginBottom: 6 }}>
+          <SortableFiles files={it.files} disabled={pub} render={(f, i, dragging) => (
+            <Thumb creator={creator} id={f} kind={isCar ? "photo" : "video"}>
+              <span style={{ position: "absolute", top: 4, left: 4, background: dragging ? CP.accent : alpha(CP.bgSunken, "cc"), color: dragging ? CP.accentInk : CP.textPrimary, borderRadius: 6, padding: "0 6px", fontSize: 11.5 }}>{i + 1}</span>
               {!pub && (
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                  <button type="button" aria-label="Prima" style={{ ...btnSm, padding: "2px 6px", minHeight: 24 }} onClick={() => move(i, -1)} disabled={i === 0}><ArrowLeft size={12} /></button>
-                  <button type="button" aria-label="Togli" style={{ ...btnSm, padding: "2px 6px", minHeight: 24 }} onClick={() => setEdit((e) => ({ ...e, files: e.files.filter((x) => x !== f) }))}><X size={12} /></button>
-                  <button type="button" aria-label="Dopo" style={{ ...btnSm, padding: "2px 6px", minHeight: 24 }} onClick={() => move(i, 1)} disabled={i === it.files.length - 1}><ArrowRight size={12} /></button>
-                </div>
+                <button type="button" aria-label="Togli" data-nodrag="1" onClick={(e) => { e.stopPropagation(); setEdit((x) => ({ ...x, files: x.files.filter((y) => y !== f) })); }}
+                  style={{ position: "absolute", top: 4, right: 4, width: 24, height: 24, borderRadius: "50%", border: "none", background: alpha(CP.bgSunken, "cc"), color: CP.textPrimary, display: "grid", placeItems: "center", cursor: "pointer" }}><X size={13} /></button>
               )}
-            </div>
-          ))}
+            </Thumb>
+          )}
+            onReorder={(files) => setEdit((x) => ({ ...x, files }))}
+            onTap={(f) => setPreview(fileById.get(f) || { id: f, kind: isCar ? "photo" : "video", name: "" })} />
           {!pub && (
             <button type="button" onClick={async () => { if (dirty) { const r = await save(); if (!r) return; } setAddTo(it.id); setSel([]); setTab("drive"); setEdit(null); }}
               style={{ width: 92, flex: "0 0 auto", aspectRatio: "4 / 5", borderRadius: 8, border: `1px dashed ${CP.borderStrong}`, background: "transparent", color: CP.textSecondary, cursor: "pointer", fontSize: 12.5, display: "grid", placeItems: "center", fontFamily: FONTS.body }}>
@@ -441,6 +526,13 @@ export default function EditorialePage() {
                 ) : <div style={hint}>Nessun video libero nel drive: caricalo e premi «Rileggi il drive».</div>)}
               </>
             )}
+          </div>
+        )}
+        {readyProblems(saved).length === 0 && (
+          <div className="vt-glass" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 12px", borderRadius: 12, border: `1px solid ${CP.border}`, background: CP.bgSunken, marginBottom: 12 }}>
+            <PublishDownload creator={creator} kind={it.type} title={it.title} caption={saved.caption}
+              files={it.type === "carosello" ? saved.files : [saved.final || saved.files[0]].filter(Boolean)} style={btnPrimary} />
+            <span style={{ ...hint, flex: 1, minWidth: 180 }}>{isCar ? "Foto in JPG già dritte, nell'ordine del carosello." : "Il video intero."} Dal telefono vanno nel rullino; la didascalia si copia da sola.</span>
           </div>
         )}
         {isCar && !pub && <p style={{ ...hint, margin: "0 0 10px" }}>Dal Warm-up: minimo 2 immagini, tutte forti, sempre un sound adatto e il tag della città USA assegnata.</p>}
@@ -476,13 +568,33 @@ export default function EditorialePage() {
   else if (tab === "reel") body = <StageCols type="reel" items={items} creator={creator} onOpen={(it) => setEdit({ ...it })} onPlace={(it) => setPlace({ itemId: it.id })} />;
   else body = viewCalendar();
 
+  // riquadri in alto (solo col vetro): dove sta il lavoro, in quattro numeri
+  const tk0 = todayKey();
+  const in7 = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const kpis = data?.folder ? {
+    free: files.filter((f) => !f.usedBy).length,
+    prep: items.filter((it) => stageOf(it) === "lavorazione").length,
+    ready: items.filter((it) => stageOf(it) === "pronto").length,
+    week: items.filter((it) => stageOf(it) === "calendario" && it.slot.date >= tk0 && it.slot.date <= in7).length,
+    pub: items.filter((it) => stageOf(it) === "pubblicato").length,
+  } : null;
+
   return (
+    <VetroScope on={vetro}>
     <div style={{ maxWidth: 1600, margin: "0 auto", padding: "20px 16px 60px", fontFamily: FONTS.body, color: CP.textPrimary }}>
       <PageHead crumbs={[{ label: "Marketing" }, { label: "Editoriale" }]} title="Editoriale Instagram"
         subtitle="Dal drive della creator al calendario del profilo: smisti foto e video, prepari caroselli e reel, li metti in calendario. Una foto usata non si può più scegliere." />
       {base?.creators?.length > 0 && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
           {base.creators.map((c) => <FilterChip key={c.ck} label={c.creator} active={c.creator === creator} onClick={() => setCreator(c.creator)} />)}
+        </div>
+      )}
+      {vetro && kpis && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14, marginBottom: 18 }}>
+          <KpiCard i={0} icon={Images} tone={0} label="Foto e video liberi" value={<VetroNum value={String(kpis.free)} />} sub={`su ${files.length} nel drive`} />
+          <KpiCard i={1} icon={Layers} tone={1} label="In preparazione" value={<VetroNum value={String(kpis.prep)} />} sub="caroselli da finire e reel da montare" />
+          <KpiCard i={2} icon={CircleCheck} tone={3} label="Pronti da mettere in calendario" value={<VetroNum value={String(kpis.ready)} />} sub={kpis.ready ? "trascinali su un giorno" : "niente in attesa"} />
+          <KpiCard i={3} icon={CalendarCheck} tone={4} label="In calendario nei prossimi 7 giorni" value={<VetroNum value={String(kpis.week)} />} sub={`${kpis.pub} già pubblicati`} />
         </div>
       )}
       {data?.folder && (
@@ -497,13 +609,21 @@ export default function EditorialePage() {
       {edit && editModal()}
       {place && <PlaceModal key={`${place.itemId || ""}${place.date || ""}${place.type || ""}`} place={place} items={items} itemById={itemById} profiles={profiles} pid={pid} creator={creator} busy={busy} onClose={() => setPlace(null)}
         onConfirm={async (id, slot) => { const r = await act({ action: "schedule", id, slot }, `In calendario: ${fmtDay(slot.date)}${slot.time ? " alle " + slot.time : ""}`); if (r) setPlace(null); }} />}
-      {preview && (
-        <ModalBox title={preview.name || "Anteprima"} onClose={() => setPreview(null)}
-          foot={<><a href={`https://drive.google.com/file/d/${preview.id}/view`} target="_blank" rel="noreferrer" style={{ ...btn, textDecoration: "none" }}><ExternalLink size={14} />Apri in Drive</a><button type="button" style={btnPrimary} onClick={() => setPreview(null)}>Chiudi</button></>}>
-          <img src={`${API}?creator=${encodeURIComponent(creator)}&thumb=${encodeURIComponent(preview.id)}&s=1200`} alt="" style={{ width: "100%", borderRadius: 10, display: "block" }} />
-          {preview.kind === "video" && <p style={{ ...hint, marginTop: 8 }}>Dei video qui vedi l'anteprima: per guardarlo aprilo in Drive.</p>}
-        </ModalBox>
-      )}
+      {preview && (() => {
+        const list = visible.some((f) => f.id === preview.id) ? visible : [preview];
+        const idx = list.findIndex((f) => f.id === preview.id);
+        const cur = fileById.get(preview.id) || preview;
+        return (
+          <Lightbox creator={creator} file={cur} pos={idx} total={list.length}
+            selected={sel.indexOf(cur.id)} owner={cur.usedBy && cur.usedBy !== addTo ? itemById.get(cur.usedBy) : null}
+            canPick={tab === "drive" && cur.kind === pickKind}
+            onPick={() => toggle(cur)}
+            onPrev={idx > 0 ? () => setPreview(list[idx - 1]) : null}
+            onNext={idx >= 0 && idx < list.length - 1 ? () => setPreview(list[idx + 1]) : null}
+            onClose={() => setPreview(null)} />
+        );
+      })()}
     </div>
+    </VetroScope>
   );
 }

@@ -7,6 +7,7 @@ import { Link2, CheckCircle2, Sparkles, Unlink, RefreshCw, Loader2, Search } fro
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, HeroMetric, Metric, FilterChip, Notice, DataTable, NUM } from "@/components/ds";
 import { fmtInt } from "@/lib/format";
+import { confirmDialog } from "@/components/AppDialogs";
 
 /**
  * /admin/user-mapping — collega gli utenti Clerk al loro operatore.
@@ -43,7 +44,7 @@ export default function UserMappingPage() {
   }
 
   async function unlink(u) {
-    if (!window.confirm(`Scollegare ${u.name} da ${u.mapping.employee}?`)) return;
+    if (!(await confirmDialog({ title: `Scollegare ${u.name} da ${u.mapping.employee}?`, ok: "Scollega", danger: true }))) return;
     setBusy(u.userId);
     setPageErr(null);
     try {

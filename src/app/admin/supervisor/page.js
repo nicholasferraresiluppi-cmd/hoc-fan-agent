@@ -20,6 +20,7 @@ import { fmtInt, fmtAgo } from "@/lib/format";
 import {
   ENUMS, PLATFORMS, PLATFORM_LABEL, PLATFORM_SHORT, SECRET_FIELDS, linkGroups, mapHeaders,
 } from "@/lib/supervisor-core";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const API = "/api/admin/supervisor";
 const fetcher = (url) =>
@@ -212,7 +213,7 @@ function Drawer({ kind, id, data, onClose, onSaved, onOpen }) {
     finally { setBusy(false); }
   }
   async function del() {
-    if (!window.confirm(`Eliminare ${TITLE[kind]} definitivamente? Resta traccia nel registro.`)) return;
+    if (!(await confirmDialog({ title: `Eliminare ${TITLE[kind]} definitivamente?`, message: "Resta traccia nel registro.", ok: "Elimina", danger: true }))) return;
     setBusy(true); setErr(null);
     try { await post({ action: "delete", kind, id }); onSaved(null); }
     catch (e) { setErr(e.message); }

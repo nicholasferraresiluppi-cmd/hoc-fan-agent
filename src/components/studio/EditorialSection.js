@@ -15,6 +15,7 @@ import { SectionTitle, card, alpha } from "@/components/ds";
 import { STATUSES } from "@/lib/studio-social-core";
 import { TG_SLOTS, TG_ROLES, IG_ROLES, weekStartOf, weekDays, editorialGrid, dailyLinkGaps, hasOfLink } from "@/lib/studio-editorial-core";
 import { romeLocalToMs } from "@/lib/studio-telegram-core";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const field = { width: "100%", padding: "8px 10px", background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, boxSizing: "border-box" };
 const btn = (primary) => ({
@@ -58,7 +59,7 @@ function ArcModal({ arc, weekStart, onClose, onSave, onDelete }) {
       {err && <div style={{ color: CP.accentRed, fontSize: 13, marginBottom: 10 }}>{err}</div>}
       <div style={{ display: "flex", gap: 8 }}>
         <button style={btn(true)} disabled={busy} onClick={save}>{busy ? "Salvataggio…" : "Salva"}</button>
-        {f.id && <button style={{ ...btn(false), marginLeft: "auto", color: CP.accentRed }} disabled={busy} onClick={() => confirm("Eliminare la storia? I contenuti restano, senza storia.") && onDelete(f)}>Elimina</button>}
+        {f.id && <button style={{ ...btn(false), marginLeft: "auto", color: CP.accentRed }} disabled={busy} onClick={async () => { if (await confirmDialog({ title: "Eliminare la storia?", message: "I contenuti restano, senza storia.", ok: "Elimina", danger: true })) onDelete(f); }}>Elimina</button>}
       </div>
     </Modal>
   );

@@ -16,6 +16,7 @@ import { Modal } from "@/components/cp-style";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmt$, fmtInt, MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, FilterChip, Notice, card, EarlyMonthNote } from "@/components/ds";
+import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
 import { tierLabel } from "@/lib/tier-label";
 const fetcher = async (url) => {
@@ -151,10 +152,10 @@ export default function ActionCenterPage() {
         body: JSON.stringify({ period_id: periodId, employee, action, swap_with, note, hr }),
       });
       const j = await res.json();
-      if (!res.ok) { if (hr) setHrErr(j.error || "Errore"); else alert(j.error || "Errore"); return false; }
+      if (!res.ok) { if (hr) setHrErr(j.error || "Errore"); else alertDialog(j.error || "Errore"); return false; }
       mutate(url);
       return true;
-    } catch (e) { alert(e.message); return false; }
+    } catch (e) { alertDialog(e.message); return false; }
   }
   async function saveAgreement(employee, agreement) {
     if (!periodId) return { ok: false, error: "Mese non scelto" };
@@ -177,16 +178,16 @@ export default function ActionCenterPage() {
   }
   async function unmark(employee) {
     if (!periodId) return;
-    if (!confirm(`Togliere "${employee}" dal pannello di questo mese? Resta in classifica e ricompare il mese prossimo se è ancora sotto soglia.`)) return;
+    if (!(await confirmDialog("Togliere questo operatore dal pannello di questo mese?", { message: `"${employee}" resta in classifica e ricompare il mese prossimo se è ancora sotto soglia.`, ok: "Togli", danger: true }))) return;
     try {
       const res = await fetch(`/api/admin/action-center?period_id=${periodId}&employee=${encodeURIComponent(employee)}`, { method: "DELETE" });
       const j = await res.json();
-      if (!res.ok) { alert(j.error || "Errore"); return; }
+      if (!res.ok) { alertDialog(j.error || "Errore"); return; }
       mutate(url);
-    } catch (e) { alert(e.message); }
+    } catch (e) { alertDialog(e.message); }
   }
   async function ignorePermanent(employee) {
-    if (!confirm(`Escludere "${employee}" da questo pannello per sempre?\n\nResta in classifica ma non comparirà più qui, anche nei mesi futuri. Si ripristina da Esclusioni.`)) return;
+    if (!(await confirmDialog({ title: `Escludere "${employee}" da questo pannello per sempre?`, message: "Resta in classifica ma non comparirà più qui, anche nei mesi futuri. Si ripristina da Esclusioni.", ok: "Escludi", danger: true }))) return;
     try {
       const res = await fetch("/api/admin/underperformers-ignored", {
         method: "POST",
@@ -194,13 +195,13 @@ export default function ActionCenterPage() {
         body: JSON.stringify({ employee, note: "Ignorato da Action Center" }),
       });
       const j = await res.json();
-      if (!res.ok) { alert(j.error || "Errore"); return; }
+      if (!res.ok) { alertDialog(j.error || "Errore"); return; }
       mutate(url);
-    } catch (e) { alert(e.message); }
+    } catch (e) { alertDialog(e.message); }
   }
 
   function exportCsv() {
-    if (readyForHr.length === 0) { alert("Nessun operatore pronto per HR."); return; }
+    if (readyForHr.length === 0) { alertDialog("Nessun operatore pronto per HR."); return; }
     const rowsCsv = [
       ["Operatore", "Gruppo", "Score", "Score mese prima", "Fascia", "Venduto CP", "Turni CP", "Creator principale", "Per turno vs colleghi %", "Creator (pubblico)", "Sostituto", "Colloquio del", "Motivazione", "Cosa ha detto l'operatore", "Segnato il", "Nota"],
       ...readyForHr.map((e) => {

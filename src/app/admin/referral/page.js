@@ -12,6 +12,7 @@ import { Donut, KpiCard } from "@/components/VetroCharts";
 import { Wallet, Hourglass, CircleCheck, Users, UserPlus, Repeat, Coins, Gift } from "lucide-react";
 import { MilestoneRow, Steps, RulesList, StatusPill, PayslipCard, fmtEur, fmtUsd, fmtDay, monthLabel, box, pageWrap, NUM } from "@/components/referral-ui";
 import { payslipsCsv } from "@/lib/referral-core";
+import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
 /**
  * /admin/referral — «Porta un amico», lato HR (permesso referral.manage).
@@ -94,7 +95,7 @@ function ReferrerModal({ initial, onClose, onDone }) {
       )}
       <Actions busy={busy} error={err}
         onSave={() => run(async () => { await post({ action: "saveReferrer", id: initial?.id, data: f }); onDone(true); })}
-        onDelete={initial?.id ? () => confirm("Eliminare il referente?") && run(async () => { await post({ action: "deleteReferrer", id: initial.id }); onDone(true); }) : null} />
+        onDelete={initial?.id ? async () => { if (await confirmDialog({ title: "Eliminare il referente?", ok: "Elimina", danger: true })) run(async () => { await post({ action: "deleteReferrer", id: initial.id }); onDone(true); }); } : null} />
     </Modal>
   );
 }
@@ -167,14 +168,14 @@ function RecruitModal({ initial, data, onClose, onDone }) {
           {saved.milestones.map((m) => (
             <div key={m.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ flex: 1 }}><MilestoneRow m={m} /></div>
-              {m.status === "pagato" && <button type="button" style={btnQuiet} disabled={busy} onClick={() => confirm("Togliere il pagamento? L'importo tornerà a essere ricalcolato.") && run(async () => { await post({ action: "unmarkPaid", key: m.key }); onDone(false); })}>Annulla</button>}
+              {m.status === "pagato" && <button type="button" style={btnQuiet} disabled={busy} onClick={async () => { if (await confirmDialog({ title: "Togliere il pagamento?", message: "L'importo tornerà a essere ricalcolato.", ok: "Togli", danger: true })) run(async () => { await post({ action: "unmarkPaid", key: m.key }); onDone(false); }); }}>Annulla</button>}
             </div>
           ))}
         </div>
       )}
       <Actions busy={busy} error={err}
         onSave={() => run(async () => { await post({ action: "saveRecruit", id: initial?.id, data: payload }); onDone(true); })}
-        onDelete={initial?.id ? () => confirm("Eliminare questa persona dal programma?") && run(async () => { await post({ action: "deleteRecruit", id: initial.id }); onDone(true); }) : null} />
+        onDelete={initial?.id ? async () => { if (await confirmDialog({ title: "Eliminare questa persona dal programma?", ok: "Elimina", danger: true })) run(async () => { await post({ action: "deleteRecruit", id: initial.id }); onDone(true); }); } : null} />
     </Modal>
   );
 }
@@ -205,7 +206,7 @@ function StoryModal({ initial, data, onClose, onDone }) {
       <Field label="Note"><textarea style={{ ...inp, minHeight: 50 }} value={f.note} onChange={set("note")} /></Field>
       <Actions busy={busy} error={err}
         onSave={() => run(async () => { await post({ action: "saveStory", id: initial?.id, data: { referrerId: f.referrerId, agreedAt: f.agreedAt, publishedAt: [f.p1, f.p2], note: f.note } }); onDone(true); })}
-        onDelete={initial?.id ? () => confirm("Eliminare queste storie?") && run(async () => { await post({ action: "deleteStory", id: initial.id }); onDone(true); }) : null} />
+        onDelete={initial?.id ? async () => { if (await confirmDialog({ title: "Eliminare queste storie?", ok: "Elimina", danger: true })) run(async () => { await post({ action: "deleteStory", id: initial.id }); onDone(true); }); } : null} />
     </Modal>
   );
 }
@@ -422,7 +423,7 @@ function Payslips({ data, onDone }) {
   const slips = data.payslips.filter((b) => b.month === month);
   const payAll = async (slip) => {
     const ready = slip.lines.filter((l) => l.status !== "pagato" && l.amountEur != null);
-    if (!ready.length || !confirm(`Segnare pagati ${ready.length} premi a ${slip.name} per ${fmtEur(ready.reduce((a, l) => a + l.amountEur, 0))}? Gli importi si congelano.`)) return;
+    if (!ready.length || !(await confirmDialog(`Segnare pagati ${ready.length} premi a ${slip.name} per ${fmtEur(ready.reduce((a, l) => a + l.amountEur, 0))}? Gli importi si congelano.`))) return;
     setBusy(slip.referrerId); setErr(null);
     for (const l of ready) { try { await post({ action: "markPaid", key: l.key }); } catch (e) { setErr(`${l.label}: ${e.message}`); break; } }
     setBusy(null); onDone();
@@ -484,9 +485,9 @@ export default function ReferralAdminPage() {
   const addFromCrm = async (s) => {
     let ref = guessReferrer(s);
     // chi ha segnalato non è ancora referente: lo si crea con il nome scritto nel modulo
-    if (!ref && s.referredBy && confirm(`«${s.referredBy}» non è ancora tra i referenti. Lo aggiungo?`)) {
+    if (!ref && s.referredBy && (await confirmDialog(`«${s.referredBy}» non è ancora tra i referenti. Lo aggiungo?`))) {
       try { const j = await post({ action: "saveReferrer", data: { name: s.referredBy } }); ref = j.result; await mutate(); }
-      catch (e) { alert(e.message); return; }
+      catch (e) { alertDialog(e.message); return; }
     }
     setModal({ kind: "recruit", initial: { name: s.name, hrPersonId: s.hrPersonId, referrerId: ref?.id || "" } });
   };
@@ -556,7 +557,7 @@ export default function ReferralAdminPage() {
                         <span style={{ flex: 1, fontSize: 14 }}>{refName[rid] || "—"}<span style={{ color: CP.textMuted, fontSize: 12 }}> · {items.length} {items.length === 1 ? "premio" : "premi"}{waiting ? `, ${waiting} in attesa del cambio` : ""}</span></span>
                         <span style={{ fontSize: 14, fontWeight: 500, ...NUM }}>{fmtEur(tot)}</span>
                         <button type="button" style={btn} disabled={!ready.length || busyKey != null} onClick={async () => {
-                          if (!confirm(`Segnare pagati ${ready.length} premi a ${refName[rid]} per ${fmtEur(tot)}? Gli importi si congelano.`)) return;
+                          if (!(await confirmDialog(`Segnare pagati ${ready.length} premi a ${refName[rid]} per ${fmtEur(tot)}? Gli importi si congelano.`))) return;
                           setPayErr(null);
                           for (const m of ready) {
                             setBusyKey(m.key);
@@ -581,7 +582,7 @@ export default function ReferralAdminPage() {
                     ? <span>{fmtUsd(m.amountUsd)}<span style={{ color: CP.attn, fontSize: 12 }}> · manca il cambio</span></span>
                     : <span>{fmtEur(m.amountEur)}{m.amountUsd != null && <span style={{ color: CP.textMuted, fontSize: 12 }}> · {fmtUsd(m.amountUsd)}</span>}</span> },
                   { key: "pay", label: "", sortable: false, align: "right", render: (m) => (
-                    <button type="button" style={btn} disabled={busyKey === m.key} onClick={(e) => { e.stopPropagation(); if (confirm(`Segnare pagato ${fmtEur(m.amountEur)} a ${refName[m.referrerId]}? L'importo si congela.`)) pay(m.key); }}>
+                    <button type="button" style={btn} disabled={busyKey === m.key} onClick={async (e) => { e.stopPropagation(); if (await confirmDialog(`Segnare pagato ${fmtEur(m.amountEur)} a ${refName[m.referrerId]}? L'importo si congela.`)) pay(m.key); }}>
                       {busyKey === m.key ? "…" : "Segna pagato"}
                     </button>
                   ) },

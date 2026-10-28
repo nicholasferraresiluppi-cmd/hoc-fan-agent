@@ -24,6 +24,7 @@ import TelegramPanel, { FunnelTiles, PostModal } from "@/components/studio/Teleg
 import EditorialSection from "@/components/studio/EditorialSection";
 import { IG_ROLES } from "@/lib/studio-editorial-core";
 import QualityAgent from "@/components/studio/QualityAgent";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -292,7 +293,7 @@ export default function StudioProfilePage() {
     } catch (e) { setErr(e.message); } finally { setSaving(false); }
   };
   const deleteItem = async (item) => {
-    if (!confirm(`Eliminare "${item.title}"?`)) return;
+    if (!(await confirmDialog({ title: `Eliminare "${item.title}"?`, ok: "Elimina", danger: true }))) return;
     try { await post({ action: "deleteItem", itemId: item.id }); await mutate(); setEditing(null); } catch (e) { setErr(e.message); }
   };
   const moveItem = async (item, status) => {

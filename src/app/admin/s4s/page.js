@@ -14,6 +14,7 @@ import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, NU
 import { Modal } from "@/components/cp-style";
 import { fmtInt, fmtPct, MONTHS_IT } from "@/lib/format";
 import { fillCaption, photosFor, needsPost, needsMass, availIssues } from "@/lib/s4s-core";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const fetcher = (url) =>
   fetch(url).then(async (r) => {
@@ -701,7 +702,7 @@ function KitEditor({ v, reload }) {
                   <select aria-label="Per cosa va la foto" value={ph.use} onChange={(e) => post({ action: "use", id: ph.id, use: e.target.value }, "Salvato")} style={{ ...input, padding: "5px 8px", fontSize: 12.5 }}>
                     {Object.entries(v.photo_uses).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
                   </select>
-                  <button type="button" disabled={state?.busy} onClick={() => { if (window.confirm("Togliere questa foto dal kit?")) post({ action: "remove", id: ph.id }, "Foto tolta"); }} style={{ ...btn, padding: "4px 8px", fontSize: 12.5, justifyContent: "center" }}>Togli</button>
+                  <button type="button" disabled={state?.busy} onClick={async () => { if (await confirmDialog({ title: "Togliere questa foto dal kit?", ok: "Togli", danger: true })) post({ action: "remove", id: ph.id }, "Foto tolta"); }} style={{ ...btn, padding: "4px 8px", fontSize: 12.5, justifyContent: "center" }}>Togli</button>
                 </div>
               ))}
               {kit.photos.length < v.kit_max_photos && (
@@ -776,7 +777,7 @@ function Requests({ v, onEdit, reload }) {
   }
   if (!forMe.length && !theirs.length && !(giro && !v.me?.all)) return null;
   async function act(x, status) {
-    if (status === "annullato" && !window.confirm("Rifiutare questo S4S? L'altra pagina lo vedrà come rifiutato.")) return;
+    if (status === "annullato" && !(await confirmDialog({ title: "Rifiutare questo S4S?", message: "L'altra pagina lo vedrà come rifiutato.", ok: "Rifiuta", danger: true }))) return;
     setBusy(x.id); setErr(null);
     const r = await fetch("/api/admin/s4s", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deal_status", split: v.split.id, id: x.id, status }) });
     const d = await r.json().catch(() => ({}));

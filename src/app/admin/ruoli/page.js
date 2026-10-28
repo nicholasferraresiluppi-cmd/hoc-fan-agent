@@ -25,6 +25,7 @@ import { WELCOME_FIELDS, composeWelcome, welcomeVars } from "@/lib/welcome-card"
 import { PageHead, SectionTitle, Disclosure, Notice, DataTable, card } from "@/components/ds";
 import { WORKSPACES, WORKSPACE_IDS, defaultWorkspace } from "@/lib/workspaces";
 import { memberIssues } from "@/lib/member-coherence";
+import { confirmDialog, promptDialog } from "@/components/AppDialogs";
 
 const btn = (primary) => ({
   display: "inline-flex",
@@ -139,7 +140,7 @@ export default function MembersPage() {
   };
 
   const revoke = async (inv) => {
-    if (!confirm(`Annullare l'invito a ${inv.email}? Il link nell'email smetterà di funzionare.`)) return;
+    if (!(await confirmDialog(`Annullare l'invito a ${inv.email}? Il link nell'email smetterà di funzionare.`))) return;
     setBusy(inv.id);
     const r = await fetch(`/api/admin/invitations?id=${encodeURIComponent(inv.id)}`, { method: "DELETE" });
     const j = await r.json().catch(() => ({}));
@@ -151,10 +152,10 @@ export default function MembersPage() {
   // Accesso: sospendi (reversibile) / riattiva / elimina (definitivo, conferma con l'email)
   const memberAction = async (row, action) => {
     let confirmText = null;
-    if (action === "suspend" && !confirm(`Sospendere l'accesso di ${row.name}? Esce subito dall'app e non può più entrare. Ruoli e dati restano: puoi riattivarlo quando vuoi.`)) return;
-    if (action === "reactivate" && !confirm(`Riattivare l'accesso di ${row.name}? Rientra con i ruoli di prima.`)) return;
+    if (action === "suspend" && !(await confirmDialog({ title: `Sospendere l'accesso di ${row.name}?`, message: "Esce subito dall'app e non può più entrare. Ruoli e dati restano: puoi riattivarlo quando vuoi.", ok: "Sospendi", danger: true }))) return;
+    if (action === "reactivate" && !(await confirmDialog(`Riattivare l'accesso di ${row.name}? Rientra con i ruoli di prima.`))) return;
     if (action === "delete") {
-      confirmText = prompt(`Eliminare DEFINITIVAMENTE l'account di ${row.name}? Non si può annullare (di solito basta sospendere).\n\nPer confermare scrivi la sua email: ${row.email || ""}`);
+      confirmText = await promptDialog(`Eliminare DEFINITIVAMENTE l'account di ${row.name}? Non si può annullare (di solito basta sospendere).\n\nPer confermare scrivi la sua email: ${row.email || ""}`);
       if (confirmText == null) return;
     }
     setBusy(row.userId);
@@ -169,7 +170,7 @@ export default function MembersPage() {
   // Admin (ex pagina Accessi): rendere/togliere admin. La revoca toglie anche Clerk e ruoli (API access).
   const toggleAdmin = async (row) => {
     const on = !row.admin;
-    if (!confirm(on ? `Rendere ${row.name} amministratore? Vedrà i dati di tutti e potrà cambiare impostazioni e accessi.` : `Togliere ${row.name} dagli amministratori?`)) return;
+    if (!(await confirmDialog(on ? `Rendere ${row.name} amministratore? Vedrà i dati di tutti e potrà cambiare impostazioni e accessi.` : { title: `Togliere ${row.name} dagli amministratori?`, ok: "Togli", danger: true }))) return;
     setBusy(row.userId);
     const r = await fetch("/api/admin/access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: on ? "add" : "remove", userId: row.userId }) });
     const j = await r.json().catch(() => ({}));
@@ -689,7 +690,7 @@ function OperatorInvites({ onSent }) {
   const chosen = [...sel];
   const send = async () => {
     if (!chosen.length) return;
-    if (!window.confirm(`Mandare l'invito a ${chosen.length} operatori?\n\nRiceveranno un'email da HOC Pro per creare l'account. Al primo accesso vedranno solo le loro pagine personali (score, compenso, percorso).`)) return;
+    if (!(await confirmDialog(`Mandare l'invito a ${chosen.length} operatori?\n\nRiceveranno un'email da HOC Pro per creare l'account. Al primo accesso vedranno solo le loro pagine personali (score, compenso, percorso).`))) return;
     setBusy(true); setResult(null);
     const all = [];
     for (let i = 0; i < chosen.length; i += 50) {
@@ -804,7 +805,7 @@ function WelcomeEditor() {
               <button style={{ ...btn(true), opacity: busy || !dirty ? 0.6 : 1 }} disabled={busy || !dirty} onClick={() => call("PUT", { template: draft }, () => "Salvato: i prossimi inviti useranno questo testo.")}>Salva</button>
               <button style={btn(false)} disabled={busy || !dirty} onClick={() => setDraft(data.template)}>Annulla modifiche</button>
               <button style={btn(false)} disabled={busy} onClick={() => call("POST", { template: draft, sample }, (j) => `Prova mandata a ${j.to}.`)}>Mandami una prova</button>
-              <button style={btn(false)} disabled={busy} onClick={() => window.confirm("Tornare al testo originale?") && call("PUT", { reset: true }, () => "Testo originale ripristinato.")}>Testo originale</button>
+              <button style={btn(false)} disabled={busy} onClick={async () => { if (await confirmDialog("Tornare al testo originale?")) call("PUT", { reset: true }, () => "Testo originale ripristinato."); }}>Testo originale</button>
               {dirty && <span style={{ fontSize: 12, color: CP.accentSoftText }}>Modifiche non salvate</span>}
             </div>
             {msg && <div style={{ fontSize: 13, color: msg.bad ? CP.accentRed : CP.textSecondary }}>{msg.text}</div>}

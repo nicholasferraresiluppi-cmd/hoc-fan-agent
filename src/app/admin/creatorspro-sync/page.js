@@ -6,6 +6,7 @@ import { RefreshCw, Link2, Loader2, CheckCircle2 } from "lucide-react";
 import { FONTS, CP, alpha } from "@/lib/brand";
 import { PageHead, HeroMetric, Metric, SectionTitle, Disclosure, Notice, DataTable, card, NUM } from "@/components/ds";
 import { fmt$, fmtInt, fmtPct, fmtAgo, MONTHS_IT } from "@/lib/format";
+import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -60,7 +61,7 @@ export default function CreatorsProSyncPage() {
   }
 
   async function runSync() {
-    if (!confirm(`Sincronizzare CreatorsPro per ${periodId}?\n\nL'operazione fa più chiamate sequenziali (~3-5 min totali per un mese). Non chiudere la tab.`)) return;
+    if (!(await confirmDialog({ title: `Sincronizzare CreatorsPro per ${periodId}?`, message: "L'operazione fa più chiamate sequenziali (~3-5 min totali per un mese). Non chiudere la tab.", ok: "Sincronizza" }))) return;
     setSyncing(true);
     setSyncError("");
     setSyncResult(null);
@@ -124,7 +125,7 @@ export default function CreatorsProSyncPage() {
       body: JSON.stringify({ cp_member_id: cpId, infloww_name: inflowwName || null }),
     });
     const d = await res.json();
-    if (!res.ok || d.error) { alert(d.error || "Errore"); return; }
+    if (!res.ok || d.error) { alertDialog(d.error || "Errore"); return; }
     await mutate("/api/admin/creatorspro-mapping");
   }
 
@@ -210,7 +211,7 @@ export default function CreatorsProSyncPage() {
     { key: "infloww", label: "Operatore in HOC Pro" },
     { key: "id", label: "Codice CP", muted: true, render: (r) => <span style={{ fontSize: 12 }}>{r.id.slice(0, 8)}…</span> },
     { key: "rm", label: "", align: "right", sortable: false, render: (r) => (
-      <button onClick={() => { if (confirm(`Rimuovere mapping per ${r.cpName || r.id}?`)) setMapping(r.id, null); }}
+      <button onClick={async () => { if (await confirmDialog({ title: `Rimuovere mapping per ${r.cpName || r.id}?`, ok: "Rimuovi", danger: true })) setMapping(r.id, null); }}
         style={{ ...btn, padding: "4px 10px", fontSize: 12, color: CP.accentRed }}>Rimuovi</button>
     ) },
   ];
@@ -297,7 +298,7 @@ export default function CreatorsProSyncPage() {
               <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 8 }}>Nome identico a parte accenti, emoji e &quot;HOC&quot;, e l&apos;operatore non è collegato a nessun altro. Controlla la lista e collega tutto insieme.</div>
               <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 12, lineHeight: 1.6 }}>{safe.map((x) => `${nameOf(x.m)} → ${x.name}`).join(" · ")}</div>
               <button disabled={bulkBusy} onClick={async () => {
-                if (!confirm(`Collegare ${safe.length} persone al loro operatore?`)) return;
+                if (!(await confirmDialog(`Collegare ${safe.length} persone al loro operatore?`))) return;
                 setBulkBusy(true);
                 for (const x of safe) await setMapping(x.m.cp_id || x.m.id, x.name);
                 setBulkBusy(false);

@@ -11,6 +11,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, SectionTitle, Notice, Disclosure, card } from "@/components/ds";
+import { confirmDialog } from "@/components/AppDialogs";
 
 export default function SeedAdminPage() {
   const [loading, setLoading] = useState(false);
@@ -19,8 +20,8 @@ export default function SeedAdminPage() {
   const [rawOpen, setRawOpen] = useState(false);
 
   const run = async (action) => {
-    if (action === "clear" && !confirm("Sicuro di voler cancellare tutti i dati demo?")) return;
-    if (action === "reseed" && !confirm("Questo cancella i dati demo esistenti e li ricrea. Confermi?")) return;
+    if (action === "clear" && !(await confirmDialog({ title: "Sicuro di voler cancellare tutti i dati demo?", ok: "Cancella", danger: true }))) return;
+    if (action === "reseed" && !(await confirmDialog({ title: "Cancellare e ricreare i dati demo?", message: "Questo cancella i dati demo esistenti e li ricrea.", ok: "Confermo", danger: true }))) return;
     setLoading(true); setError(null); setResult(null);
     try {
       const res = await fetch("/api/admin/seed-leaderboard", {

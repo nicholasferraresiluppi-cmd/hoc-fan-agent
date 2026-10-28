@@ -11,6 +11,7 @@ import Link from "next/link";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt, MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, SectionTitle, Notice, DataTable, card } from "@/components/ds";
+import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -98,10 +99,10 @@ export default function EmployeeProfilesPage() {
   }
 
   async function handleDelete(employee) {
-    if (!confirm(`Rimuovere il profilo di "${employee}"?\nLa scheda operatore resta visibile, ma senza data di ingresso né tempo in agenzia.`)) return;
+    if (!(await confirmDialog({ title: `Rimuovere il profilo di "${employee}"?`, message: "La scheda operatore resta visibile, ma senza data di ingresso né tempo in agenzia.", ok: "Rimuovi", danger: true }))) return;
     const res = await fetch(`${profilesUrl}?employee=${encodeURIComponent(employee)}`, { method: "DELETE" });
     const data = await res.json();
-    if (!res.ok || data.error) alert(data.error || "Errore");
+    if (!res.ok || data.error) alertDialog(data.error || "Errore");
     else await mutate(profilesUrl);
   }
 
