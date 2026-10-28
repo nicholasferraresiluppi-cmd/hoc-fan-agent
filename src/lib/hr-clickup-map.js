@@ -191,6 +191,7 @@ export function hocBlockLines(person, byName, { cfPlain } = {}) {
   // 18/10/2026: tolta la riga «Prepara il contratto» (link all'invio da HOC Pro): i contratti si fanno a mano
   // 18/10/2026: tolta anche la riga «Mansione attuale» (campo del vecchio CRM ritirato: la mansione sta in «Mansione»)
   if (!byName.has(lc("Partita IVA"))) lines.push(`Partita IVA: ${f.partitaIva === true ? "sì" : f.partitaIva === false ? "no" : "—"}`);
+  if (s(f.partitaIvaNumero) && !byName.has(lc("Numero partita IVA"))) lines.push(`Numero partita IVA: ${oneLine(f.partitaIvaNumero, 40)}`);
   if (!byName.has(lc("Codice fiscale")) && (cfPlain || person.cfEnc)) lines.push(`Codice fiscale: ${cfPlain ? maskCf(cfPlain) : "presente"} (completo in HOC Pro)`);
   if (f.idDocument?.at) lines.push(`Documento d'identità: allegato il ${fmtItDate(f.idDocument.at)} (${s(f.idDocument.title)})`);
   // campi solo-app (02/10): luogo di nascita, comune/CAP di residenza, competenze con livello
