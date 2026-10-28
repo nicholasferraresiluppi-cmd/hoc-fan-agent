@@ -8,8 +8,10 @@ import { CP, alpha } from "@/lib/brand";
 import { btn, btnPrimary, btnSm, hint } from "@/components/warmup/ui";
 
 const API = "/api/admin/editoriale";
-// il browser legge l'HEVC dei video dell'iPhone? (Safari sì, Chrome di solito no)
-const nativeHevc = () => { try { return document.createElement("video").canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"') !== ""; } catch { return false; } };
+// Lettore diretto solo su Safari (Mac e iPhone): legge l'HEVC dei video dell'iPhone. Chrome dice
+// «probably» col codec completo ma resta fermo (verificato 28/10 in produzione, readyState 0) →
+// negli altri browser si usa il lettore di Google Drive, che converte da solo.
+const nativeHevc = () => { try { return /^((?!chrome|chromium|crios|fxios|edg|android).)*safari/i.test(navigator.userAgent); } catch { return false; } };
 
 // Foto ingrandita: frecce (anche da tastiera e col dito) per passare alle altre della griglia e
 // scelta direttamente da qui. Esc chiude, spazio sceglie.
