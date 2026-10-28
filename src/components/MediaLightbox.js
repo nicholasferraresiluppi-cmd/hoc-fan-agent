@@ -52,7 +52,7 @@ export default function Lightbox({ creator, file, pos = 0, total = 1, selected =
           // Chrome e altri browser senza HEVC: i video dell'iPhone non si leggono. Il lettore di
           // Drive li converte da solo (serve l'account Google con accesso alla cartella).
           <iframe key={file.id} title={file.name || "Video"} src={`https://drive.google.com/file/d/${file.id}/preview`} allow="autoplay; fullscreen"
-            style={{ border: "none", height: "100%", maxHeight: "100%", aspectRatio: "9 / 16", maxWidth: "100%", borderRadius: 10, background: CP.bgSunken }} />
+            style={{ border: "none", height: "calc(100dvh - 190px)", aspectRatio: "9 / 16", maxWidth: "100%", borderRadius: 10, background: CP.bgSunken }} />
         ) : file.kind === "video" ? (
           <video key={file.id} controls autoPlay playsInline preload="metadata"
             poster={`${API}?creator=${encodeURIComponent(creator)}&thumb=${encodeURIComponent(file.id)}&v=2&s=1200`}
