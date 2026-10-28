@@ -433,7 +433,7 @@ function Payslips({ data, onDone }) {
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
         {months.map((m) => <FilterChip key={m} active={m === month} onClick={() => setMonth(m)} label={monthLabel(m)} />)}
         <span style={{ flex: 1 }} />
-        <button type="button" style={btn} onClick={() => downloadCsv(`porta-un-collega-premi-${month}.csv`, payslipsCsv(slips))}>Scarica il mese (CSV)</button>
+        <button type="button" style={btn} onClick={() => downloadCsv(`porta-un-amico-premi-${month}.csv`, payslipsCsv(slips))}>Scarica il mese (CSV)</button>
       </div>
       <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 10 }}>Ogni premio entra nel mese in cui si è sbloccato. Un riepilogo = un bonifico al referente.</div>
       {err && <Notice danger>{err}</Notice>}
