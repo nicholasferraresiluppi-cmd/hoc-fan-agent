@@ -12,6 +12,7 @@ import Link from "next/link";
 import { FlaskConical, History } from "lucide-react";
 import { FONTS, CP } from "@/lib/brand";
 import { PageHead, SectionTitle, Notice, NUM, card } from "@/components/ds";
+import { confirmDialog } from "@/components/AppDialogs";
 
 // KPI: nome in italiano + cosa misura (il nome Infloww resta sotto, piccolo)
 const KPI_LABELS = {
@@ -115,7 +116,7 @@ export default function LeaderboardSettingsPage() {
   }
 
   async function resetAll() {
-    if (!confirm("Ripristinare tutti i valori scritti nel codice?\n\nCancella pesi, soglie e fasce salvati (anche quelli pubblicati dalle Bozze formula; la regola dei gruppi piccoli resta): lo score torna ai valori di fabbrica, anche sui mesi passati.")) return;
+    if (!(await confirmDialog({ title: "Ripristinare tutti i valori scritti nel codice?", message: "Cancella pesi, soglie e fasce salvati (anche quelli pubblicati dalle Bozze formula; la regola dei gruppi piccoli resta): lo score torna ai valori di fabbrica, anche sui mesi passati.", ok: "Ripristina", danger: true }))) return;
     setSaving(true);
     setError("");
     setMessage("");

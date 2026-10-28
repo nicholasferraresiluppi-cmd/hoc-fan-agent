@@ -10,6 +10,7 @@ import { useState, useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import { FONTS, CP } from "@/lib/brand";
 import { PageHead, Notice, DataTable, FilterChip, card } from "@/components/ds";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 const URL_API = "/api/admin/group-languages";
@@ -105,7 +106,7 @@ export default function GroupLanguagesPage() {
   }
 
   async function resetAll() {
-    if (!confirm("Cancellare TUTTE le lingue assegnate a mano? I gruppi torneranno alla lingua letta dal nome (e quelli senza «ITA»/«ENG» nel nome resteranno senza lingua).")) return;
+    if (!(await confirmDialog({ title: "Cancellare TUTTE le lingue assegnate a mano?", message: "I gruppi torneranno alla lingua letta dal nome (e quelli senza «ITA»/«ENG» nel nome resteranno senza lingua).", ok: "Cancella", danger: true }))) return;
     setSaving(true);
     try {
       const res = await fetch(URL_API, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reset" }) });

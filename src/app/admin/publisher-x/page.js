@@ -16,6 +16,7 @@ import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card } f
 import VetroScope, { useVetro } from "@/components/VetroScope";
 import { KpiCard } from "@/components/VetroCharts";
 import { DEFAULT_FEE, WHALE_SHARE, splitDollar, rateFor, linkKey } from "@/lib/publisher-x-core";
+import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
 const API = "/api/admin/publisher-x";
 const fetcher = async (url) => {
@@ -72,7 +73,7 @@ function dealText({ rate, perProfile, avgSpend, overrides, fx }) {
 function DealCard({ settings, avgSpend, overrides, onSet, fx }) {
   const [copied, setCopied] = useState(false);
   const text = dealText({ rate: settings.pubRate, perProfile: settings.baseEurPerProfile, avgSpend, overrides, fx });
-  const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { alert("Copia non riuscita"); } };
+  const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { alertDialog("Copia non riuscita"); } };
   return (
     <section style={{ ...card, padding: 18, display: "grid", gap: 14, marginBottom: 16 }}>
       <SectionTitle aside="è l'unica parte da far vedere al publisher">Il deal per il publisher</SectionTitle>
@@ -130,7 +131,7 @@ function PublisherFans({ month, name }) {
   const copy = async () => {
     const head = "fan;profilo;link;entrato;chiusa_il;spesa_30gg;al_publisher";
     const lines = p.fans.map((f) => [f.username ? "@" + f.username : f.userId, f.creatorName, f.linkName, String(f.subStart).slice(0, 10), String(f.closeAt).slice(0, 10), f.spent, f.bonus].join(";")); // compenso in dollari: in euro al cambio del mese
-    try { await navigator.clipboard.writeText([head, ...lines].join("\n")); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { alert("Copia non riuscita"); }
+    try { await navigator.clipboard.writeText([head, ...lines].join("\n")); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { alertDialog("Copia non riuscita"); }
   };
   return (
     <div style={{ display: "grid", gap: 14 }}>
@@ -234,8 +235,8 @@ export default function PublisherXPage() {
       if (!r.ok) throw new Error(j.error || "Invito non riuscito");
       setDraft(null);
       await mutate();
-      alert(j.exists ? `${name} ha già un account: entrando con quell'email vede la sua pagina.` : `Invito mandato a ${name}.`);
-    } catch (e) { alert(e.message); } finally { setInviting(null); }
+      alertDialog(j.exists ? `${name} ha già un account: entrando con quell'email vede la sua pagina.` : `Invito mandato a ${name}.`);
+    } catch (e) { alertDialog(e.message); } finally { setInviting(null); }
   };
   const setSetting = (k, v) => setDraft((d) => ({ ...d, settings: { ...d.settings, [k]: v } }));
   const setFee = (id, v) => setDraft((d) => ({ ...d, fees: { ...d.fees, [id]: v } }));
@@ -254,9 +255,9 @@ export default function PublisherXPage() {
       if (!r.ok) throw new Error(j.error || "Salvataggio non riuscito");
       setDraft(null);
       await mutate();
-    } catch (e) { alert(e.message); } finally { setBusy(false); }
+    } catch (e) { alertDialog(e.message); } finally { setBusy(false); }
   };
-  const refresh = async () => { setBusy(true); try { await mutate(await fetcher(`${API}?month=${month}&refresh=1`), { revalidate: false }); } catch (e) { alert(e.message); } finally { setBusy(false); } };
+  const refresh = async () => { setBusy(true); try { await mutate(await fetcher(`${API}?month=${month}&refresh=1`), { revalidate: false }); } catch (e) { alertDialog(e.message); } finally { setBusy(false); } };
   const addLink = () => {
     const id = Number(adding.creatorId);
     const name = adding.linkName.trim();
@@ -294,7 +295,7 @@ export default function PublisherXPage() {
       />
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
-        {months.map((m) => <FilterChip key={m} label={meseLungo(m)} active={m === month} onClick={() => { if (dirty && !confirm("Hai modifiche non salvate. Cambiare mese le tiene in sospeso, salvale prima per vederle nel conto. Continuare?")) return; setMonth(m); }} />)}
+        {months.map((m) => <FilterChip key={m} label={meseLungo(m)} active={m === month} onClick={async () => { if (dirty && !(await confirmDialog("Hai modifiche non salvate. Cambiare mese le tiene in sospeso, salvale prima per vederle nel conto. Continuare?"))) return; setMonth(m); }} />)}
       </div>
 
       {error && <Notice danger>{error.message}</Notice>}

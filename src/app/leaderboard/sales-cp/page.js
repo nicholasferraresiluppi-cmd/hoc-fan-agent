@@ -21,6 +21,7 @@ import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice
 import { tierLabel, tierColor, TIER_ORDER } from "@/lib/tier-label";
 import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
 import { Donut, KpiCard } from "@/components/VetroCharts";
+import { confirmDialog } from "@/components/AppDialogs";
 const fetcher = async (url) => {
   const r = await fetch(url);
   const j = await r.json().catch(() => ({}));
@@ -145,7 +146,7 @@ export default function SalesCpLeaderboardPage() {
   async function recheckAll() {
     if (bulk.running) return;
     const emps = noCp.map((o) => o.employee).filter((e) => e && recheckState[e]?.state !== "success");
-    if (!emps.length || !confirm(`Cercare di nuovo in CreatorsPro ${emps.length} operatori?`)) return;
+    if (!emps.length || !(await confirmDialog(`Cercare di nuovo in CreatorsPro ${emps.length} operatori?`))) return;
     let done = 0, recovered = 0, errors = 0;
     setBulk({ running: true, done, total: emps.length, recovered, errors });
     for (let i = 0; i < emps.length; i += 5) {

@@ -86,6 +86,7 @@ const kindOf = (mime) => (String(mime).startsWith("image/") ? "photo" : String(m
  */
 export async function listMedia(folderId) {
   const out = [];
+  const folders = []; // tutte le sottocartelle, anche vuote (l'editor le usa come «da editare», «editati»…)
   const queue = [{ id: folderId, path: "", depth: 0 }];
   let truncated = false;
   while (queue.length) {
@@ -94,22 +95,26 @@ export async function listMedia(folderId) {
     do {
       const d = await gget("/files", {
         q: `'${f.id}' in parents and trashed = false`,
-        fields: "nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,size,imageMediaMetadata(width,height,time),videoMediaMetadata(width,height,durationMillis))",
+        fields: "nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,size,imageMediaMetadata(width,height,rotation),videoMediaMetadata(width,height,durationMillis))",
         pageSize: "1000", includeItemsFromAllDrives: "true", ...(pageToken ? { pageToken } : {}),
       });
       for (const x of d.files || []) {
         if (x.mimeType === FOLDER) {
-          if (f.depth + 1 <= MAX_DEPTH) queue.push({ id: x.id, path: f.path ? `${f.path}/${x.name}` : x.name, depth: f.depth + 1 });
+          const sub = f.path ? `${f.path}/${x.name}` : x.name;
+          folders.push(sub);
+          if (f.depth + 1 <= MAX_DEPTH) queue.push({ id: x.id, path: sub, depth: f.depth + 1 });
           continue;
         }
         const kind = kindOf(x.mimeType);
         if (!kind) continue;
         if (out.length >= MAX_FILES) { truncated = true; break; }
         const im = x.imageMediaMetadata || {}, vm = x.videoMediaMetadata || {};
+        // foto del telefono girate (rotation 1 o 3 = 90°/270°): larghezza e altezza vere sono scambiate
+        const turned = im.rotation === 1 || im.rotation === 3;
         out.push({
           id: x.id, name: x.name, kind, path: f.path,
           created: x.createdTime || null,
-          w: im.width || vm.width || null, h: im.height || vm.height || null,
+          w: (turned ? im.height : im.width) || vm.width || null, h: (turned ? im.width : im.height) || vm.height || null,
           dur: vm.durationMillis ? Math.round(Number(vm.durationMillis) / 1000) : null,
           size: x.size ? Number(x.size) : null,
         });
@@ -119,7 +124,7 @@ export async function listMedia(folderId) {
     if (truncated) break;
   }
   out.sort((a, b) => String(b.created || "").localeCompare(String(a.created || "")));
-  return { files: out, truncated };
+  return { files: out, folders: folders.sort((a, b) => a.localeCompare(b, "it")), truncated };
 }
 
 /**
@@ -127,6 +132,9 @@ export async function listMedia(folderId) {
  * video), se non c'è e il file è una foto non troppo grande, la foto intera.
  */
 export async function thumbnail(fileId, size = 400) {
+  // Drive gira le foto del telefono (HEIF/EXIF) solo nelle anteprime da 800 px in su: sotto le dà
+  // coricate (verificato 28/10 su IMG_0702.heif: s600 → 600x450, s800 → 600x800). Quindi mai sotto 800.
+  size = Math.max(800, size);
   const bearer = await token();
   const meta = await gget(`/files/${encodeURIComponent(fileId)}`, { fields: "id,mimeType,size,thumbnailLink" });
   if (meta.thumbnailLink) {
@@ -139,6 +147,49 @@ export async function thumbnail(fileId, size = 400) {
     if (r.ok) return { type: meta.mimeType, body: Buffer.from(await r.arrayBuffer()) };
   }
   return null;
+}
+
+/**
+ * Un pezzo di un file (per guardare i video nella pagina). Il browser chiede i byte a pezzi
+ * (Range); si risponde con al massimo MEDIA_CHUNK byte per volta, così ogni risposta resta sotto
+ * il limite delle funzioni e il lettore video chiede da solo il pezzo dopo.
+ */
+const MEDIA_CHUNK = 3 * 1024 * 1024;
+const metaCache = new Map(); // id → { mime, size, at } (per istanza, 10 min)
+export async function mediaChunk(fileId, rangeHeader) {
+  let meta = metaCache.get(fileId);
+  if (!meta || Date.now() - meta.at > 600_000) {
+    const m = await gget(`/files/${encodeURIComponent(fileId)}`, { fields: "id,mimeType,size" });
+    meta = { mime: m.mimeType, size: Number(m.size || 0), at: Date.now() };
+    metaCache.set(fileId, meta);
+  }
+  const size = meta.size;
+  const m = /bytes=(\d*)-(\d*)/.exec(rangeHeader || "");
+  let start = m && m[1] ? Number(m[1]) : 0;
+  let end = m && m[2] ? Number(m[2]) : start + MEDIA_CHUNK - 1;
+  if (m && !m[1] && m[2]) { start = Math.max(0, size - Number(m[2])); end = size - 1; } // "ultimi N byte"
+  end = Math.min(end, start + MEDIA_CHUNK - 1, size - 1);
+  if (!size || start >= size) return { status: 416, size, mime: meta.mime };
+  const bearer = await token();
+  const r = await fetch(`${API}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`, { headers: { Authorization: `Bearer ${bearer}`, Range: `bytes=${start}-${end}` } });
+  if (!r.ok && r.status !== 206) throw new Error(`Google Drive ${r.status}`);
+  // il QuickTime dei telefoni (.mov) si legge come mp4 nei browser che ne hanno il codec
+  const mime = meta.mime === "video/quicktime" ? "video/mp4" : meta.mime;
+  return { status: 206, body: r.body, start, end, size, mime };
+}
+
+/**
+ * Una foto pronta per Instagram: JPEG già girato nel verso giusto (anche le HEIF del telefono),
+ * lato lungo `size` px (Instagram pubblica al massimo 1080 di larghezza; 2048 lascia margine).
+ * Resta sotto il limite di risposta delle funzioni. null se Drive non ha un'anteprima.
+ */
+export async function photoForPublishing(fileId, size = 2048) {
+  const bearer = await token();
+  const meta = await gget(`/files/${encodeURIComponent(fileId)}`, { fields: "id,name,thumbnailLink" });
+  if (!meta.thumbnailLink) return null;
+  const r = await fetch(meta.thumbnailLink.replace(/=s\d+$/, `=s${size}`), { headers: { Authorization: `Bearer ${bearer}` } });
+  if (!r.ok) return null;
+  return { name: meta.name, body: Buffer.from(await r.arrayBuffer()) };
 }
 
 export const driveFileUrl = (id) => `https://drive.google.com/file/d/${id}/view`;

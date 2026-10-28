@@ -29,6 +29,8 @@ import {
 } from "@/lib/warmup-plan";
 import { prefillFor, publicAlerts, normalizeOfLink } from "@/lib/warmup-metrics-core";
 import { pubKindOfTask, itemForTask } from "@/lib/editoriale-core";
+import PublishDownload from "@/components/PublishDownload";
+import MediaLightbox from "@/components/MediaLightbox";
 
 const API = "/api/admin/warmup";
 const fetcher = (url) =>
@@ -491,6 +493,7 @@ export default function WarmupPage() {
   const [form, setForm] = useState(null); // { edit?: id, preCreator? }
   const [openWhy, setOpenWhy] = useState({});
   const [toastMsg, setToastMsg] = useState(null);
+  const [mview, setMview] = useState(null); // { creator, files: [{id, kind}], idx } — foto del contenuto ingrandite
   const [net, setNet] = useState("ok");
   const [rpane, setRpane] = useState("pano");
   const [wkAll, setWkAll] = useState(null);
@@ -664,6 +667,23 @@ export default function WarmupPage() {
     const edEl = edLine(a, item.id, day, on);
     return <TaskRow key={k} item={item} done={on} open={openWhy[k]} onToggle={() => toggleTask(a, item.id, day)} onWhy={() => setOpenWhy((o) => ({ ...o, [k]: !o[k] }))} timer={edEl ? <>{timerEl}{edEl}</> : timerEl} />;
   }
+  // fila di anteprime del contenuto (tutte le foto del carosello, o il reel): un tocco le ingrandisce
+  function edStrip(a, it, kind) {
+    const ids = it.dl || [];
+    if (!ids.length) return null;
+    const files = ids.map((id) => ({ id, kind: kind === "reel" ? "video" : "photo", name: "" }));
+    return (
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+        {files.map((f, i) => (
+          <button key={f.id} type="button" aria-label={`Apri ${i + 1}`} onClick={() => setMview({ creator: a.creator, files, idx: i })}
+            style={{ position: "relative", width: 58, height: kind === "reel" ? 84 : 72, padding: 0, borderRadius: 8, overflow: "hidden", border: `1px solid ${CP.borderSoft}`, background: CP.surfaceAlt, cursor: "zoom-in" }}>
+            <img src={`/api/admin/editoriale?creator=${encodeURIComponent(a.creator)}&thumb=${encodeURIComponent(f.id)}&v=2`} alt="" loading="lazy" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            {files.length > 1 && <span style={{ position: "absolute", top: 3, left: 3, background: alpha(CP.bgSunken, "cc"), color: CP.textPrimary, borderRadius: 5, padding: "0 5px", fontSize: 10.5 }}>{i + 1}</span>}
+          </button>
+        ))}
+      </div>
+    );
+  }
   // Editoriale: sotto «Pubblica il carosello / il reel» il contenuto in calendario quel giorno
   function edLine(a, taskId, day, done) {
     const kind = pubKindOfTask(taskId);
@@ -675,15 +695,15 @@ export default function WarmupPage() {
       if (done) return null;
       return <div style={{ ...hint, marginTop: 5 }}>Niente in calendario per oggi · <a href={href} style={{ color: CP.accentSoftText }}>preparalo nell'Editoriale</a></div>;
     }
-    const thumb = it.cover ? `/api/admin/editoriale?creator=${encodeURIComponent(a.creator)}&thumb=${encodeURIComponent(it.cover)}` : null;
     return (
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 7, padding: 8, borderRadius: 10, border: `1px solid ${CP.borderSoft}`, background: CP.bgSunken, maxWidth: 520 }}>
-        {thumb && <img src={thumb} alt="" loading="lazy" style={{ width: 44, height: 44, borderRadius: 7, objectFit: "cover", flex: "0 0 auto", background: CP.surfaceAlt }} />}
         <div style={{ flex: 1, minWidth: 0, fontSize: 13 }}>
           <div style={{ color: CP.textPrimary }}>{kind === "carosello" ? "Carosello" : "Reel"} «{it.title}»{it.time ? ` · ${it.time}` : ""}{it.status === "pubblicato" ? " · pubblicato" : ""}</div>
           <div style={{ ...hint, marginTop: 2 }}>{kind === "carosello" ? `${it.files} foto` : "video montato"}{it.sound ? ` · sound: ${it.sound}` : ""}{it.city ? ` · ${it.city}` : ""}</div>
+          {edStrip(a, it, kind)}
           {it.caption && <div style={{ fontSize: 12.5, color: CP.textSecondary, marginTop: 4, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{it.caption}</div>}
           <div style={{ display: "flex", gap: 10, marginTop: 5, flexWrap: "wrap" }}>
+            {it.status !== "pubblicato" && <PublishDownload creator={a.creator} kind={kind} title={it.title} caption={it.caption} files={it.dl} style={{ ...btnSm, minHeight: 26, padding: "2px 8px", fontSize: 12 }} />}
             {it.caption && <button type="button" onClick={() => { try { navigator.clipboard.writeText(it.caption); toast("Didascalia copiata"); } catch {} }} style={{ ...btnSm, minHeight: 26, padding: "2px 8px", fontSize: 12 }}>Copia didascalia</button>}
             <a href={href} style={{ fontSize: 12.5, color: CP.accentSoftText, alignSelf: "center" }}>Apri nell'Editoriale</a>
           </div>
@@ -715,10 +735,11 @@ export default function WarmupPage() {
           const pub = it.status === "pubblicato";
           return (
             <div key={it.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "4px 0", flexWrap: "wrap" }}>
-              {it.cover && <img src={`/api/admin/editoriale?creator=${encodeURIComponent(a.creator)}&thumb=${encodeURIComponent(it.cover)}`} alt="" loading="lazy" style={{ width: 34, height: 34, borderRadius: 6, objectFit: "cover", background: CP.surfaceAlt }} />}
               <span style={{ flex: 1, minWidth: 140, fontSize: 13.5, textDecoration: pub ? "line-through" : "none", color: pub ? CP.textMuted : CP.textPrimary }}>{it.type === "carosello" ? "Carosello" : "Reel"} «{it.title}»{it.time ? ` · ${it.time}` : ""}</span>
+              {!pub && <PublishDownload creator={a.creator} kind={it.type} title={it.title} caption={it.caption} files={it.dl} style={{ ...btnSm, minHeight: 26, padding: "2px 8px", fontSize: 12 }} label="Scarica" />}
               {it.caption && !pub && <button type="button" onClick={() => { try { navigator.clipboard.writeText(it.caption); toast("Didascalia copiata"); } catch {} }} style={{ ...btnSm, minHeight: 26, padding: "2px 8px", fontSize: 12 }}>Copia didascalia</button>}
               <button type="button" onClick={() => publish(it, !pub)} style={{ ...btnSm, minHeight: 26, padding: "2px 8px", fontSize: 12 }}>{pub ? "Riapri" : "Pubblicato"}</button>
+              <div style={{ flexBasis: "100%" }}>{edStrip(a, it, it.type)}</div>
             </div>
           );
         })}
@@ -1392,6 +1413,12 @@ export default function WarmupPage() {
               : <button type="button" style={{ ...btnSm, background: alpha(CP.accentInk, "22"), color: CP.accentInk, border: "none" }} onClick={() => setDoneBar(null)}>OK</button>}
           </div>
         </div>
+      )}
+      {mview && (
+        <MediaLightbox creator={mview.creator} file={mview.files[mview.idx]} pos={mview.idx} total={mview.files.length}
+          onPrev={mview.idx > 0 ? () => setMview((m) => ({ ...m, idx: m.idx - 1 })) : null}
+          onNext={mview.idx < mview.files.length - 1 ? () => setMview((m) => ({ ...m, idx: m.idx + 1 })) : null}
+          onClose={() => setMview(null)} />
       )}
       {toastMsg && (
         <div className="hoc-dock" role="status" style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: `calc(${timer ? 100 : 20}px + env(safe-area-inset-bottom))`, zIndex: 90, background: CP.textPrimary, color: CP.surface, borderRadius: 12, padding: "10px 16px", fontSize: 14, maxWidth: "calc(100vw - 32px)", boxShadow: `0 10px 26px ${alpha(CP.bgSunken, "88")}` }}>{toastMsg}</div>

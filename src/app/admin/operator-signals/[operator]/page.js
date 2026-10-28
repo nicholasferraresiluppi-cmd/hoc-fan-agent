@@ -18,6 +18,7 @@ import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHead, HeroMetric, Metric, SectionTitle, FilterChip, Notice, card, NUM } from "@/components/ds";
 import { FILM_THRESHOLDS } from "@/lib/game-film-core";
 import { LEGIT_REASONS } from "@/lib/film-library-core";
+import { promptDialog } from "@/components/AppDialogs";
 
 const T = FILM_THRESHOLDS; // soglie dal core versionato: il copy non va mai fuori sync
 
@@ -123,7 +124,7 @@ function JudgmentBar({ m, operator, onJudged }) {
     // chiusa vuole evitare): la nota qui è obbligatoria.
     let note = null;
     if (reason === "altro") {
-      note = (window.prompt("Motivo (obbligatorio per 'altro'):") || "").trim();
+      note = ((await promptDialog("Motivo (obbligatorio per 'altro'):")) || "").trim();
       if (!note) return;
     }
     setBusy(true);

@@ -17,6 +17,7 @@ import { Disclosure, Notice, card, NUM } from "@/components/ds";
 import RaceHero from "./RaceHero";
 import { suggestedGoal } from "@/lib/live-priority";
 import { waitingNow } from "../chat-monitor/ui";
+import { alertDialog } from "@/components/AppDialogs";
 import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
 import { MonthArea, Donut, Spark, KpiCard, usd } from "@/components/VetroCharts";
 
@@ -154,7 +155,7 @@ export default function RevenuePacingPage() {
       const fresh = await liveFetcher(`/api/admin/revenue-pacing?refresh=1&creator=${encodeURIComponent(data?.creator || slug || "")}`);
       await mutate(fresh, { revalidate: false });
     } catch (e) {
-      alert(e.message);
+      alertDialog(e.message);
     } finally {
       setRefreshing(false);
     }

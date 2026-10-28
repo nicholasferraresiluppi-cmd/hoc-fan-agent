@@ -6,6 +6,7 @@ import { Upload, Loader2, Check } from "lucide-react";
 import { FONTS, CP } from "@/lib/brand";
 import { PageHead, Metric, SectionTitle, Disclosure, Notice, DataTable, card, NUM } from "@/components/ds";
 import { fmtInt, fmtAgo, MONTHS_IT } from "@/lib/format";
+import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
 const PERIOD_OPTIONS = [
   { value: "monthly", label: "Mensile" },
@@ -27,19 +28,19 @@ export default function LeaderboardImportPage() {
   const [groupsOpen, setGroupsOpen] = useState(false);
 
   async function deleteImport(period) {
-    if (!confirm(`Eliminare l'import "${period}"?\n\nVerranno cancellati TUTTI i dati Infloww di quel periodo dal KV (non recuperabili senza ri-caricare il file).`)) return;
+    if (!(await confirmDialog({ title: `Eliminare l'import "${period}"?`, message: "Verranno cancellati TUTTI i dati Infloww di quel periodo dal KV (non recuperabili senza ri-caricare il file).", ok: "Elimina", danger: true }))) return;
     setDeletingPeriod(period);
     try {
       const res = await fetch(`/api/admin/leaderboard-import?period=${encodeURIComponent(period)}`, { method: "DELETE" });
       const j = await res.json();
-      if (!res.ok) { alert(j.error || "Errore"); return; }
+      if (!res.ok) { alertDialog(j.error || "Errore"); return; }
       // Reload list
       fetch("/api/admin/leaderboard-import")
         .then((r) => r.json())
         .then((d) => setImports(d.imports || []));
-      alert(`✓ Rimosso "${period}" — ${j.records_deleted} record cancellati.`);
+      alertDialog(`✓ Rimosso "${period}" — ${j.records_deleted} record cancellati.`);
     } catch (e) {
-      alert(e.message);
+      alertDialog(e.message);
     } finally {
       setDeletingPeriod(null);
     }
@@ -145,7 +146,7 @@ export default function LeaderboardImportPage() {
 
   async function runSave() {
     if (!preview) return;
-    if (!confirm(`Salvare ${preview.totalRecords} record per ${preview.period_type}:${preview.period_id}? Sovrascriverà eventuali dati esistenti.`)) return;
+    if (!(await confirmDialog(`Salvare ${preview.totalRecords} record per ${preview.period_type}:${preview.period_id}? Sovrascriverà eventuali dati esistenti.`))) return;
     setBusy(true);
     setError("");
     try {
@@ -164,7 +165,7 @@ export default function LeaderboardImportPage() {
         setError(data.error || "Errore nel salvataggio");
       } else {
         setSavedAt(data.saved_at);
-        alert(`Salvato! ${data.totalRecords} record in ${data.kv_key}`);
+        alertDialog(`Salvato! ${data.totalRecords} record in ${data.kv_key}`);
         setCsvText("");
         setPreview(null);
       }

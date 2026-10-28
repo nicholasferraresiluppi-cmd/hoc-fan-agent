@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -71,7 +72,7 @@ export default function CreatorDetailPage(props) {
   }
 
   async function onDelete() {
-    if (!confirm(`Eliminare il creator "${slug}"? Operazione irreversibile.`)) return;
+    if (!(await confirmDialog({ title: `Eliminare il creator "${slug}"?`, message: "Operazione irreversibile.", ok: "Elimina", danger: true }))) return;
     const r = await fetch(`/api/content-pipeline/creators/${slug}`, {
       method: "DELETE",
     });

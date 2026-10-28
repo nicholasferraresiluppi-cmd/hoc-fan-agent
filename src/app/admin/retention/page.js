@@ -13,6 +13,7 @@ import { Loader2, RefreshCw, Copy, ExternalLink } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { PageHead, Notice } from "@/components/ds";
+import { alertDialog } from "@/components/AppDialogs";
 
 const fetcher = async (url) => {
   const r = await fetch(url, { cache: "no-store" });
@@ -62,7 +63,7 @@ function PausedFans({ creatorId, name }) {
   const tone = SUB_TONE();
   const copy = async () => {
     const lines = fans.map((f) => `${f.username ? "@" + f.username : f.name || f.userId} — spendeva ~${usd(f.monthly)}/mese — fermo da ${f.days} gg — abbonamento ${f.sub}${f.fanLast && (!f.ourLast || f.fanLast > f.ourLast) ? " — ha scritto per ultimo, da rispondere" : ""}`);
-    try { await navigator.clipboard.writeText(`Fan da far riprendere · ${name}\n` + lines.join("\n")); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { alert("Copia non riuscita"); }
+    try { await navigator.clipboard.writeText(`Fan da far riprendere · ${name}\n` + lines.join("\n")); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { alertDialog("Copia non riuscita"); }
   };
   return (
     <div>
@@ -158,7 +159,7 @@ export default function RetentionPage() {
       concentrated: pages.filter((p) => p.top10Share !== null && p.top10Share >= CONC).length,
     };
   }, [pages]);
-  const refresh = async () => { setBusy(true); try { await mutate(await fetcher("/api/admin/retention?refresh=1"), { revalidate: false }); } catch (e) { alert(e.message); } finally { setBusy(false); } };
+  const refresh = async () => { setBusy(true); try { await mutate(await fetcher("/api/admin/retention?refresh=1"), { revalidate: false }); } catch (e) { alertDialog(e.message); } finally { setBusy(false); } };
   const cur = pages.find((p) => p.creator_id === open);
 
   return (
