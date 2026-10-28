@@ -1,5 +1,5 @@
 /**
- * «Porta un collega» — lato server del programma referral (26/10/2026).
+ * «Porta un amico» — lato server del programma referral (26/10/2026).
  * Regole e calcoli in referral-core.js (puro). Qui: KV, venduto Infloww, viste.
  *
  * KV (namespace isolato `referral:*`, HASH = una scrittura per voce, niente
@@ -373,7 +373,7 @@ export async function referrerDashboard(referrer, { now = Date.now() } = {}) {
   return { rules: state.rules, today: state.today, name: referrer.name, recruits, stories, totals: summarize(all), payslips };
 }
 
-/** Invito in HOC Pro col solo ruolo «Referente» (vede solo /me/porta-un-collega). */
+/** Invito in HOC Pro col solo ruolo «Referente» (vede solo /me/porta-un-amico). */
 export async function inviteReferrer(referrerId, actor, origin) {
   const ref = await readOne(K.referrers, referrerId);
   if (!ref) throw new Error("Referente non trovato");

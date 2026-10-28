@@ -46,7 +46,7 @@ export const GENDERS = ["Female", "Male", "Non-Binary", "I prefer not to declare
 export const GENDER_LABELS = { Female: "Donna", Male: "Uomo", "Non-Binary": "Non binario", "I prefer not to declare it": "Preferisco non dirlo" };
 // Come la persona è arrivata da noi (03/10/2026, decisione del titolare): serve a tenere
 // vivo il confronto reference ↔ annunci e a riconoscere il premio reference. Dal 26/10/2026
-// il premio è il programma «Porta un collega» (lib/referral-core.js, /admin/referral), che
+// il premio è il programma «Porta un amico» (lib/referral-core.js, /admin/referral), che
 // propone queste schede all'HR. La prima voce apre la domanda "Chi ti ha segnalato?".
 export const SOURCE_REFERRAL = "Me l'ha consigliato qualcuno";
 export const SOURCE_AD = "Ho visto un annuncio o un post sui social";

@@ -1,4 +1,4 @@
-// Unit test — referral-core («Porta un collega»). Esegui: node tests/referral.mjs
+// Unit test — referral-core («Porta un amico»). Esegui: node tests/referral.mjs
 import assert from "node:assert/strict";
 import {
   REFERRAL_RULES as R, missionProgress, buildPayslips, payslipsCsv, hrInbox, payslipMonth, recruitMetrics, buildDashboard, parseFx, shiftDatesFromWages, monthsSince, blockSales, addMonths, monthEnd, validateRecruit, validateStory, validateReferrer,

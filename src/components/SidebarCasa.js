@@ -59,7 +59,7 @@ const MANAGER = [
     { href: "/me/score", label: "I miei score" },
     { href: "/me/compenso", label: "Il mio compenso" },
     { href: "/me/percorso", label: "Il mio percorso" },
-    { href: "/me/porta-un-collega", label: "Porta un collega" },
+    { href: "/me/porta-un-amico", label: "Porta un amico" },
   ] },
   { title: "Noi", items: [
     { href: "/cultura", label: "Come lavoriamo" },
@@ -74,7 +74,7 @@ const OPERATOR = [
     { href: "/me/score", label: "Come sto andando" },
     { href: "/me/compenso", label: "Il mio compenso" },
     { href: "/me/coaching", label: "Come migliorare" },
-    { href: "/me/porta-un-collega", label: "Porta un collega" },
+    { href: "/me/porta-un-amico", label: "Porta un amico" },
   ] },
   { title: "Allenamento", items: [
     { href: "/", label: "Allenarsi", exact: true },
