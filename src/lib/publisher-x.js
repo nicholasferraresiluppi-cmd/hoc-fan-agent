@@ -21,7 +21,8 @@
 import { kv } from "@vercel/kv";
 import { HOC_ORGANIZATION_ID, bqQuery, bqProjects } from "@/lib/bigquery-api";
 import { createHmac } from "node:crypto";
-import { sanitizeConfig, toEnvelopes, monthPayout, monthsHistory, publisherForEmails, monthOf, linkKey, isXLink, feeFor, rateFor, splitDollar, WINDOW_DAYS } from "@/lib/publisher-x-core";
+import { sanitizeConfig, toEnvelopes, monthPayout, monthsHistory, publisherForEmails, profilesFor, fxFor, monthOf, linkKey, isXLink, feeFor, rateFor, splitDollar, WINDOW_DAYS } from "@/lib/publisher-x-core";
+import { getFx } from "@/lib/referral";
 import { linksSql as linksSqlFor, fansSql as fansSqlFor, untilSql as untilSqlFor, isMonth } from "@/lib/publisher-x-sql";
 
 export const PUBX_VERSION = "pubx-1";
@@ -86,7 +87,9 @@ async function loadEnvelopes(config, { force = false } = {}) {
   return { dataUntil: raw.dataUntil, envelopes: toEnvelopes({ fans: raw.fans, config, dataUntil: raw.dataUntil }) };
 }
 
-const PAYOUT_FIELDS = ["name", "subs", "spend30", "bonus", "base", "total", "openCount", "openBonus"];
+const PAYOUT_FIELDS = ["name", "profiles", "subs", "spend30", "bonusUsd", "bonusEur", "baseEur", "totalEur", "openCount", "openBonusEur", "fx", "fxEstimated"];
+/** Cambio dollaro→euro per mese, lo stesso di «Porta un collega» (inserito dall'HR). */
+const loadFx = () => getFx().catch(() => ({}));
 const pickFields = (o, keys) => Object.fromEntries(keys.map((k) => [k, o[k]]));
 
 /**
@@ -96,9 +99,9 @@ const pickFields = (o, keys) => Object.fromEntries(keys.map((k) => [k, o[k]]));
 export async function getOverview(month, { force = false, view = "full" } = {}) {
   if (!isMonth(month)) throw new Error("mese non valido");
   const config = await getConfig();
-  const { dataUntil, envelopes } = await loadEnvelopes(config, { force });
-  const { publishers } = monthPayout({ envelopes, config, month });
-  const base = { version: PUBX_VERSION, month, computedAt: Date.now(), dataUntil, view };
+  const [{ dataUntil, envelopes }, fxByMonth] = await Promise.all([loadEnvelopes(config, { force }), loadFx()]);
+  const { publishers, fx, fxEstimated } = monthPayout({ envelopes, config, month, fxByMonth });
+  const base = { version: PUBX_VERSION, month, computedAt: Date.now(), dataUntil, view, fx, fxEstimated };
   const current = monthOf(new Date().toISOString()) === month;
   if (view === "payout") {
     return { ...base, current, publishers: publishers.map((p) => pickFields(p, PAYOUT_FIELDS)) };
@@ -142,9 +145,9 @@ export async function getPublisherFans(month, publisher) {
   if (!isMonth(month)) throw new Error("mese non valido");
   const config = await getConfig();
   if (!config.links.some((l) => l.publisher === publisher)) throw new Error("Nessun link assegnato a questo publisher");
-  const { dataUntil, envelopes } = await loadEnvelopes(config);
+  const [{ dataUntil, envelopes }, fxByMonth] = await Promise.all([loadEnvelopes(config), loadFx()]);
   const mine = envelopes.filter((e) => e.publisher === publisher);
-  const p = monthPayout({ envelopes: mine, config, month }).publishers.find((x) => x.name === publisher);
+  const p = monthPayout({ envelopes: mine, config, month, fxByMonth }).publishers.find((x) => x.name === publisher);
   const open = mine.filter((e) => !e.closed).sort((a, b) => b.day - a.day);
   return { month, dataUntil, publisher: p, open };
 }
@@ -163,21 +166,24 @@ export async function getMyPublisher(verifiedEmails = []) {
   const config = await getConfig();
   const name = publisherForEmails(config, verifiedEmails);
   if (!name) return { linked: false };
-  const { dataUntil, envelopes } = await loadEnvelopes(config);
+  const [{ dataUntil, envelopes }, fxByMonth] = await Promise.all([loadEnvelopes(config), loadFx()]);
   const mine = envelopes.filter((e) => e.publisher === name);
-  const base = config.settings.baseUsd || 0;
+  const month = monthOf(new Date().toISOString());
+  const { fx, fxEstimated } = fxFor(fxByMonth, month);
+  const perProfile = config.settings.baseEurPerProfile;
   const myCreators = [...new Map(config.links.filter((l) => l.publisher === name).map((l) => [l.creatorId, l])).keys()];
   const nameOf = new Map(mine.map((e) => [e.creatorId, e.creatorName]));
   const rates = myCreators.map((id) => ({ profile: nameOf.get(id) || String(id), rate: rateFor(config, id) }));
   const cutoff = new Date(Date.now() - 100 * 86400000).toISOString(); // buste chiuse degli ultimi ~3 mesi + tutte le aperte
   return {
     linked: true, name, dataUntil, windowDays: WINDOW_DAYS,
-    deal: { rate: config.settings.pubRate, base, rates },
-    months: monthsHistory(mine, base).slice(0, 6),
-    open: { count: mine.filter((e) => !e.closed).length, bonus: Math.round(mine.filter((e) => !e.closed).reduce((s, e) => s + e.bonus, 0) * 100) / 100 },
+    deal: { rate: config.settings.pubRate, perProfileEur: perProfile, profiles: profilesFor(config, name, month), rates },
+    month, fx, fxEstimated,
+    months: monthsHistory(mine, { config, publisher: name, fxByMonth }).slice(0, 6),
+    open: { count: mine.filter((e) => !e.closed).length, bonusEur: r2(mine.filter((e) => !e.closed).reduce((s, e) => s + e.bonus, 0) * fx) },
     envelopes: mine.filter((e) => !e.closed || e.closeAt >= cutoff).map((e) => ({
       code: fanCode(e.creatorId, e.userId), profile: e.creatorName, entered: e.subStart, closeAt: e.closeAt,
-      day: e.day, closed: e.closed, spent: e.spent, bonus: e.bonus, rate: e.rate,
+      day: e.day, closed: e.closed, spent: e.spent, bonusEur: r2(e.bonus * fxFor(fxByMonth, e.closed ? e.closeMonth : month).fx), rate: e.rate,
     })),
   };
 }

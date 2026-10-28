@@ -17,7 +17,11 @@
  * Si contano solo i fan NUOVI sulla pagina (is_first_sub): chi si riabbona non è merito del link.
  */
 
-export const DEFAULT_SETTINGS = { chatterPct: 0.15, pubRate: 0.1, baseUsd: 0 };
+// Base (27/10, Nicholas): 150 € al mese per OGNI profilo che il publisher gestisce. Il compenso
+// variabile si calcola sui dollari spesi dai fan (OnlyFans è in dollari) e si paga in euro al
+// cambio del mese inserito dall'HR (lo stesso di «Porta un collega», KV referral:fx).
+export const DEFAULT_SETTINGS = { chatterPct: 0.15, pubRate: 0.1, baseEurPerProfile: 150 };
+export const FALLBACK_FX = 0.86; // euro per 1 dollaro, SOLO se l'HR non ha ancora inserito il cambio del mese (dichiarato «stimato»)
 export const DEFAULT_FEE = 0.45;
 export const WINDOW_DAYS = 30;
 export const WHALE_SHARE = 0.4; // sopra il 40% della spesa da un solo fan = mese che dipende da uno
@@ -46,7 +50,7 @@ export function sanitizeConfig(input = {}) {
   const settings = {
     chatterPct: clampPct(s.chatterPct, DEFAULT_SETTINGS.chatterPct),
     pubRate: clampPct(s.pubRate, DEFAULT_SETTINGS.pubRate),
-    baseUsd: Math.max(0, Math.round(Number(s.baseUsd) || 0)),
+    baseEurPerProfile: Number.isFinite(Number(s.baseEurPerProfile)) && Number(s.baseEurPerProfile) >= 0 ? Math.round(Number(s.baseEurPerProfile)) : DEFAULT_SETTINGS.baseEurPerProfile,
   };
   const fees = {};
   for (const [k, v] of Object.entries(input.fees || {})) {
@@ -154,12 +158,29 @@ export function toEnvelopes({ fans = [], config, dataUntil }) {
   return out;
 }
 
+/** Ultimo giorno del mese "YYYY-MM" (per sapere quali link erano già del publisher). */
+const monthEnd = (month) => { const [y, m] = String(month).split("-").map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); };
+
+/** Profili gestiti da un publisher in un mese: creator distinte dei suoi link, presi entro fine mese. */
+export function profilesFor(config, publisher, month) {
+  const end = month ? monthEnd(month) : "9999-12-31";
+  return new Set((config?.links || []).filter((l) => l.publisher === publisher && (!l.from || l.from <= end)).map((l) => l.creatorId)).size;
+}
+
+/** Cambio del mese: quello inserito dall'HR, altrimenti la stima (e lo si dice). */
+export function fxFor(fxByMonth, month) {
+  const x = Number(fxByMonth?.[month]);
+  return Number.isFinite(x) && x > 0 ? { fx: x, fxEstimated: false } : { fx: FALLBACK_FX, fxEstimated: true };
+}
+
 /**
- * Conto del mese per publisher: buste CHIUSE in quel mese (definitive) + buste ancora aperte
- * (in corso, valore che sta maturando). La base è per mese. → { publishers: [...] }
+ * Conto del mese per publisher: buste CHIUSE in quel mese (definitive) + buste ancora aperte.
+ * Compenso in dollari (sulla spesa) → euro al cambio del mese; base = 150 € × profili gestiti.
+ * Il margine per l'agenzia resta in dollari (la base si riporta in dollari col cambio).
  */
-export function monthPayout({ envelopes = [], config, month }) {
-  const base = config?.settings?.baseUsd || 0;
+export function monthPayout({ envelopes = [], config, month, fxByMonth = {} }) {
+  const perProfile = config?.settings?.baseEurPerProfile ?? DEFAULT_SETTINGS.baseEurPerProfile;
+  const { fx, fxEstimated } = fxFor(fxByMonth, month);
   const pubs = new Map();
   const get = (name) => { if (!pubs.has(name)) pubs.set(name, { closed: [], open: [] }); return pubs.get(name); };
   for (const e of envelopes) {
@@ -170,30 +191,41 @@ export function monthPayout({ envelopes = [], config, month }) {
   const publishers = [...pubs.entries()].map(([name, { closed, open }]) => {
     closed.sort((a, b) => b.spent - a.spent || String(a.subStart).localeCompare(String(b.subStart)));
     const sum = (rows, k) => r2(rows.reduce((s, r) => s + (Number(r[k]) || 0), 0));
-    const bonus = sum(closed, "bonus");
+    const bonusUsd = sum(closed, "bonus");
     const spend30 = sum(closed, "spent");
+    const profiles = profilesFor(config, name, month);
+    const baseEur = r2(profiles * perProfile);
+    const bonusEur = r2(bonusUsd * fx);
     // un solo fan grosso fa sembrare bravo chi l'ha beccato: si dichiara, non si corregge
     const topShare = spend30 > 0 ? (Number(closed[0]?.spent) || 0) / spend30 : null;
     return {
-      name, fans: closed, subs: closed.length, spend30, topShare,
-      value: sum(closed, "value"), bonus, base, total: r2(bonus + base), margin: r2(sum(closed, "value") - bonus - base),
-      openCount: open.length, openSpent: sum(open, "spent"), openBonus: sum(open, "bonus"),
+      name, fans: closed, subs: closed.length, spend30, topShare, profiles,
+      value: sum(closed, "value"), bonusUsd, bonusEur, baseEur, totalEur: r2(bonusEur + baseEur),
+      margin: r2(sum(closed, "value") - bonusUsd - baseEur / fx),
+      openCount: open.length, openSpent: sum(open, "spent"), openBonusUsd: sum(open, "bonus"), openBonusEur: r2(sum(open, "bonus") * fx),
+      fx, fxEstimated,
     };
-  }).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, "it"));
-  return { publishers };
+  }).sort((a, b) => b.totalEur - a.totalEur || a.name.localeCompare(b.name, "it"));
+  return { publishers, fx, fxEstimated };
 }
 
-/** Storico per mese di chiusura di un insieme di buste (per la pagina del publisher). */
-export function monthsHistory(envelopes = [], base = 0) {
+/** Storico per mese di chiusura delle buste di UN publisher (per la sua pagina), in euro. */
+export function monthsHistory(envelopes = [], { config, publisher, fxByMonth = {} } = {}) {
+  const perProfile = config?.settings?.baseEurPerProfile ?? DEFAULT_SETTINGS.baseEurPerProfile;
   const m = new Map();
   for (const e of envelopes) {
     if (!e.closed) continue;
     const k = e.closeMonth;
-    if (!m.has(k)) m.set(k, { month: k, closed: 0, spent: 0, bonus: 0 });
+    if (!m.has(k)) m.set(k, { month: k, closed: 0, spent: 0, bonusUsd: 0 });
     const x = m.get(k);
-    x.closed += 1; x.spent = r2(x.spent + e.spent); x.bonus = r2(x.bonus + e.bonus);
+    x.closed += 1; x.spent = r2(x.spent + e.spent); x.bonusUsd = r2(x.bonusUsd + e.bonus);
   }
-  return [...m.values()].map((x) => ({ ...x, base, total: r2(x.bonus + base) })).sort((a, b) => b.month.localeCompare(a.month));
+  return [...m.values()].map((x) => {
+    const { fx, fxEstimated } = fxFor(fxByMonth, x.month);
+    const baseEur = r2(profilesFor(config, publisher, x.month) * perProfile);
+    const bonusEur = r2(x.bonusUsd * fx);
+    return { ...x, bonusEur, baseEur, totalEur: r2(bonusEur + baseEur), fx, fxEstimated };
+  }).sort((a, b) => b.month.localeCompare(a.month));
 }
 
 /** Il publisher di un account: quello la cui email è tra le email VERIFICATE dell'account (una sola). */

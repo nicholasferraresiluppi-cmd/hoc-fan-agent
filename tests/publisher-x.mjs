@@ -1,8 +1,9 @@
 // node tests/publisher-x.mjs — logica pura del conto publisher X.
 import assert from "node:assert/strict";
-import { isXLink, sanitizeConfig, splitDollar, rateFor, isMature, monthOf, toEnvelopes, monthPayout, monthsHistory, publisherForEmails, feeFor, DEFAULT_FEE } from "../src/lib/publisher-x-core.js";
+import { isXLink, sanitizeConfig, splitDollar, rateFor, isMature, monthOf, toEnvelopes, monthPayout, monthsHistory, publisherForEmails, profilesFor, FALLBACK_FX, feeFor, DEFAULT_FEE } from "../src/lib/publisher-x-core.js";
 
 let n = 0;
+const r2 = (x) => Math.round(x * 100) / 100;
 const ok = (c, m) => { assert.ok(c, m); n++; };
 const eq = (a, b, m) => { assert.deepEqual(a, b, m); n++; };
 
@@ -12,7 +13,7 @@ for (const s of ["Traffic/01KZ6AFABJTCGWYDVS820WVR6X/#908119/1785870893", "IG pr
 
 // Config: scarta righe incomplete, doppioni, percentuali fuori scala
 const c = sanitizeConfig({
-  settings: { chatterPct: 0.15, pubRate: 2, baseUsd: "300.4" },
+  settings: { chatterPct: 0.15, pubRate: 2, baseEurPerProfile: "150.4" },
   fees: { 10: 0.23, abc: 0.5, 11: 7 },
   rates: { 10: 0.05, 11: "", xx: 0.2 },
   links: [
@@ -24,7 +25,8 @@ const c = sanitizeConfig({
     { creatorId: 12, linkName: "tw", publisher: "Lia", from: "ottobre" },
   ],
 });
-eq(c.settings, { chatterPct: 0.15, pubRate: 0.1, baseUsd: 300 }, "tariffa fuori scala → predefinita 10%, base arrotondata");
+eq(c.settings, { chatterPct: 0.15, pubRate: 0.1, baseEurPerProfile: 150 }, "tariffa fuori scala → predefinita 10%, base per profilo arrotondata");
+eq(sanitizeConfig({}).settings.baseEurPerProfile, 150, "base per profilo predefinita 150 €");
 eq(c.rates, { 10: 0.05 }, "tariffa per profilo: vuota o id non numerico scartati");
 eq(rateFor(c, 10), 0.05, "tariffa del profilo");
 eq(rateFor(c, 99), 0.1, "senza tariffa del profilo vale quella di tutti");
@@ -65,7 +67,7 @@ eq(sanitizeConfig({ links: [{ creatorId: 1, linkName: "X_a", publisher: "Mario" 
 
 // Buste
 const config = sanitizeConfig({
-  settings: { chatterPct: 0.15, pubRate: 0.1, baseUsd: 300 },
+  settings: { chatterPct: 0.15, pubRate: 0.1, baseEurPerProfile: 150 },
   fees: { 1: 0.45, 2: 0.23 },
   rates: { 2: 0.04 },
   links: [
@@ -92,25 +94,34 @@ eq(E.day, 3, "entrato il 12/10: giorno 3");
 eq(A.bonus, 10, "10% di 100");
 eq(env.find((e) => e.userId === "c").bonus, 2, "tariffa del profilo 4% su 50");
 
-const oct = monthPayout({ envelopes: env, config, month: "2026-10" });
+const FX = { "2026-10": 0.9 };
+const oct = monthPayout({ envelopes: env, config, month: "2026-10", fxByMonth: FX });
 const mario = oct.publishers.find((p) => p.name === "Mario");
 eq(mario.subs, 2, "ottobre: buste chiuse di a e c");
-eq(mario.bonus, 12, "10 + 2");
-eq(mario.total, 312, "più la base");
+eq(mario.bonusUsd, 12, "10 + 2 dollari");
+eq(mario.bonusEur, 10.8, "al cambio di ottobre 0,90");
+eq(mario.profiles, 2, "Mario gestisce due profili");
+eq(mario.baseEur, 300, "150 € × 2 profili");
+eq(mario.totalEur, 310.8, "base + compenso in euro");
+ok(!mario.fxEstimated, "cambio inserito dall'HR");
 eq(mario.openCount, 1, "b ancora aperta");
-eq(mario.openBonus, 2, "b sta maturando 2");
+eq(mario.openBonusUsd, 2, "b sta maturando 2 dollari");
 eq(mario.value, 34, "pulito per l'agenzia: 30 + 4");
-eq(mario.margin, -278, "pulito − bonus − base");
+eq(mario.margin, r2(34 - 12 - 300 / 0.9), "pulito − compenso − base riportata in dollari");
 ok(Math.abs(mario.topShare - 100 / 150) < 1e-9, "quota del fan più grosso sulle buste chiuse");
-const sep = monthPayout({ envelopes: env, config, month: "2026-09" }).publishers.find((p) => p.name === "Mario");
+const sepAll = monthPayout({ envelopes: env, config, month: "2026-09" });
+const sep = sepAll.publishers.find((p) => p.name === "Mario");
 eq(sep.subs, 1, "settembre: la busta di g, chiusa il 19/9");
+ok(sepAll.fxEstimated && sep.fx === FALLBACK_FX, "settembre senza cambio: stima dichiarata");
 const lia = oct.publishers.find((p) => p.name === "Lia");
-ok(lia && lia.subs === 0 && lia.openCount === 1 && lia.total === 300, "Lia: nessuna busta chiusa, una aperta, solo la base");
+ok(lia && lia.subs === 0 && lia.openCount === 1 && lia.profiles === 1 && lia.totalEur === 150, "Lia: un profilo, nessuna busta chiusa, solo la base");
+eq(profilesFor(config, "Lia", "2026-08"), 0, "Lia ha preso il link il 10/9: ad agosto zero profili");
 eq(oct.publishers[0].name, "Mario", "ordine per totale");
 
-const hist = monthsHistory(env.filter((e) => e.publisher === "Mario"), 300);
+const hist = monthsHistory(env.filter((e) => e.publisher === "Mario"), { config, publisher: "Mario", fxByMonth: FX });
 eq(hist.map((h) => h.month), ["2026-10", "2026-09"], "storico dal mese più recente");
 eq(hist[0].closed, 2, "due buste chiuse in ottobre");
-eq(hist[1].total, 307, "settembre: 7 + 300");
+eq(hist[0].totalEur, 310.8, "ottobre in euro");
+eq(hist[1].bonusEur, r2(7 * FALLBACK_FX), "settembre al cambio stimato");
 
 console.log(`publisher-x: ${n} asserzioni ok`);
