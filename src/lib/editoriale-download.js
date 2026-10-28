@@ -32,7 +32,8 @@ async function videoFile(creator, id, name, onProgress) {
     size = Number(m[3]);
     onProgress?.(Math.min(1, pos / size));
   } while (pos < size);
-  return new File(parts, `${name}.mp4`, { type });
+  const ext = /quicktime/.test(type) ? "mov" : type.split("/")[1]?.replace("x-", "") || "mp4";
+  return new File(parts, `${name}.${ext}`, { type });
 }
 
 /** Scarica i file di un contenuto (id nel drive in ordine). Ritorna File[] pronti da consegnare. */
