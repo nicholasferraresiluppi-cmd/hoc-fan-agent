@@ -1,7 +1,7 @@
 "use client";
 /**
- * Pezzi condivisi di «Porta un collega» (26/10/2026): stato di una voce,
- * importi, tappe del percorso, regole in parole. Usati da /me/porta-un-collega
+ * Pezzi condivisi di «Porta un amico» (26/10/2026): stato di una voce,
+ * importi, tappe del percorso, regole in parole. Usati da /me/porta-un-amico
  * (chi ha portato qualcuno) e da /admin/referral (HR). Solo token CP.
  * Niente rosso: una voce persa non è una colpa di chi guarda (stessa regola
  * della Difficoltà creator), si scrive in grigio barrato.

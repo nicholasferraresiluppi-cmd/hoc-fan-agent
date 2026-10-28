@@ -14,7 +14,7 @@ import { MilestoneRow, Steps, RulesList, StatusPill, PayslipCard, fmtEur, fmtUsd
 import { payslipsCsv } from "@/lib/referral-core";
 
 /**
- * /admin/referral — «Porta un collega», lato HR (permesso referral.manage).
+ * /admin/referral — «Porta un amico», lato HR (permesso referral.manage).
  * L'HR registra chi ha portato chi, segna gli step (colloquio, formazione,
  * primo turno, uscita) e i pagamenti. Il venduto arriva da solo da Infloww.
  * Regole e cifre: lib/referral-core.js (versionate).
@@ -86,7 +86,7 @@ function ReferrerModal({ initial, onClose, onDone }) {
                 setInviteMsg(j.exists ? "Ha già un account HOC Pro: entrando con questa email vede la pagina, nessun invito serve." : j.url ? `Invito mandato. Link da girare se la mail non arriva: ${j.url}` : "Invito mandato.");
                 onDone(false);
               })}><Send size={14} /> Invita in HOC Pro</button>
-              <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4 }}>Con il solo ruolo Referente: vede soltanto «Porta un collega».</div>
+              <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4 }}>Con il solo ruolo Referente: vede soltanto «Porta un amico».</div>
               {inviteMsg && <div style={{ marginTop: 8, color: CP.textPrimary, wordBreak: "break-all" }}>{inviteMsg}</div>}
             </div>
           )}
@@ -410,7 +410,7 @@ function printSlip(slip) {
   const rows = slip.lines.map((l) => `<tr><td>${esc(l.label)}${l.recruitName ? ` · ${esc(l.recruitName)}` : ""}</td><td>${l.unlockedAt ? esc(fmtDay(l.unlockedAt)) : "—"}</td><td class="r">${l.amountEur != null ? esc(fmtEur(l.amountEur)) : esc(fmtUsd(l.amountUsd)) + " (manca il cambio)"}</td><td>${l.status === "pagato" ? "pagato il " + esc(fmtDay(l.paidAt)) : "da pagare"}</td></tr>`).join("");
   const w = window.open("", "_blank");
   if (!w) return;
-  w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Premi ${esc(slip.name)} ${esc(slip.month)}</title><style>body{font:14px/1.5 -apple-system,Helvetica,Arial,sans-serif;color:#111;margin:40px}h1{font-size:20px;margin:0}p{color:#555;margin:4px 0 20px}table{width:100%;border-collapse:collapse}td,th{padding:8px 6px;border-bottom:1px solid #ddd;text-align:left}th{font-size:12px;color:#666;text-transform:uppercase;letter-spacing:.05em}.r{text-align:right}tfoot td{font-weight:600;border-bottom:0}</style></head><body><h1>Porta un collega · premi di ${esc(monthLabel(slip.month))}</h1><p>${esc(slip.name)} · House of Creators</p><table><thead><tr><th>Premio</th><th>Sbloccato</th><th class="r">Importo</th><th>Stato</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="2">Totale</td><td class="r">${esc(fmtEur(slip.totalEur))}</td><td>${slip.dueEur > 0 ? esc(fmtEur(slip.dueEur)) + " da pagare" : "tutto pagato"}</td></tr></tfoot></table></body></html>`);
+  w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Premi ${esc(slip.name)} ${esc(slip.month)}</title><style>body{font:14px/1.5 -apple-system,Helvetica,Arial,sans-serif;color:#111;margin:40px}h1{font-size:20px;margin:0}p{color:#555;margin:4px 0 20px}table{width:100%;border-collapse:collapse}td,th{padding:8px 6px;border-bottom:1px solid #ddd;text-align:left}th{font-size:12px;color:#666;text-transform:uppercase;letter-spacing:.05em}.r{text-align:right}tfoot td{font-weight:600;border-bottom:0}</style></head><body><h1>Porta un amico · premi di ${esc(monthLabel(slip.month))}</h1><p>${esc(slip.name)} · House of Creators</p><table><thead><tr><th>Premio</th><th>Sbloccato</th><th class="r">Importo</th><th>Stato</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="2">Totale</td><td class="r">${esc(fmtEur(slip.totalEur))}</td><td>${slip.dueEur > 0 ? esc(fmtEur(slip.dueEur)) + " da pagare" : "tutto pagato"}</td></tr></tfoot></table></body></html>`);
   w.document.close(); w.focus(); w.print();
 }
 
@@ -495,8 +495,8 @@ export default function ReferralAdminPage() {
     <VetroScope on={vetro}>
     <div style={{ ...pageWrap, maxWidth: 1600, "--ref-r": vetro ? "22px" : "10px" }}>
       <PageHead
-        crumbs={[{ label: "People" }, { label: "Porta un collega" }]}
-        title="Porta un collega"
+        crumbs={[{ label: "People" }, { label: "Porta un amico" }]}
+        title="Porta un amico"
         subtitle="Chi ha portato chi, a che punto è ogni persona e cosa va pagato. I turni arrivano da CreatorsPro, il venduto da Infloww (ripartito sui turni)."
         actions={<>
           <VetroSwitch on={vetro} set={setVetro} />

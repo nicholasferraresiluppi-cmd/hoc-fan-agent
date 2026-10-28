@@ -1,5 +1,5 @@
 /**
- * GET /api/admin/referral/inbox — badge di «Porta un collega» per l'HR: premi sbloccati da
+ * GET /api/admin/referral/inbox — badge di «Porta un amico» per l'HR: premi sbloccati da
  * pagare + mesi senza cambio. Leggero (cache 10 min, lib/referral getInbox). Chi non ha il
  * permesso riceve count 0 (il menu lo chiede per chi vede la voce, nessun errore in console).
  */

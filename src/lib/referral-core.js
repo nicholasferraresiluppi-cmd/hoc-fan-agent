@@ -1,5 +1,5 @@
 /**
- * «Porta un collega» — logica PURA del programma referral (26/10/2026).
+ * «Porta un amico» — logica PURA del programma referral (26/10/2026).
  *
  * Niente KV, niente rete: funzioni deterministiche, provate da tests/referral.mjs.
  * Il lato server (KV, Infloww, inviti) sta in referral.js.

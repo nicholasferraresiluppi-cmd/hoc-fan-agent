@@ -89,7 +89,7 @@ const NAV_GROUPS_RAW = [
       { href: "/me/allenatore", label: "Il mio allenatore", icon: Sparkles },
       { href: "/me/contestazioni", label: "Le mie contestazioni", icon: MessageSquareWarning },
       { href: "/me/turno", label: "Il mio turno", icon: Radar },
-      { href: "/me/porta-un-collega", label: "Porta un collega", icon: Gift },
+      { href: "/me/porta-un-amico", label: "Porta un amico", icon: Gift },
     ],
   },
   {
@@ -198,7 +198,7 @@ const NAV_GROUPS_RAW = [
       { href: "/contabilita",                    label: "Contabilità",  icon: Landmark },
       { href: "/admin/hr/contratti",             label: "Contratti",    icon: FileSignature },
       { href: "/admin/hr/sync",                  label: "Sincronizzazione ClickUp", icon: RefreshCw },
-      { href: "/admin/referral",                 label: "Porta un collega", icon: Gift },
+      { href: "/admin/referral",                 label: "Porta un amico", icon: Gift },
       { href: "/admin/candidate-assessments",    label: "Assessment candidati", icon: UserCheck },
       { href: "/admin/priority-queue",           label: "Fan da seguire ora", icon: Inbox },
       { href: "/admin/settimana",                 label: "Da seguire", icon: Target },
@@ -430,7 +430,7 @@ export default function Sidebar() {
     refreshInterval: 5 * 60 * 1000,
   });
   const s4sCount = s4sInbox?.count || 0;
-  // Porta un collega (27/10/2026): premi sbloccati da pagare + mesi senza cambio, per chi gestisce il programma
+  // Porta un amico (27/10/2026): premi sbloccati da pagare + mesi senza cambio, per chi gestisce il programma
   const { data: refInbox } = useSWR(me?.authenticated && canSee("/admin/referral", me.capabilities, me.admin) ? "/api/admin/referral/inbox" : null, silentFetcher, {
     revalidateOnFocus: false,
     refreshInterval: 10 * 60 * 1000,

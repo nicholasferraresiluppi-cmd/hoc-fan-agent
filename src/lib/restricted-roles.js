@@ -13,7 +13,7 @@ export const RESTRICTED_ROLES = {
   // `needs`: pagina mostrata solo con quel permesso (la Contabilità la apre il titolare a mano)
   people: { home: "/admin/hr", paths: ["/admin/hr", "/admin/hr/contratti", "/admin/referral", "/admin/publisher-x", "/contabilita"], label: "Persone", needs: { "/contabilita": "accounting.private" } },
   // 26/10/2026: chi ha portato un collega e non lavora in HOC Pro vede solo i suoi guadagni
-  referente: { home: "/me/porta-un-collega", paths: ["/me/porta-un-collega"], label: "Porta un collega" },
+  referente: { home: "/me/porta-un-amico", paths: ["/me/porta-un-amico"], label: "Porta un amico" },
   // 27/10/2026: il publisher su X vede solo i suoi fan e le sue buste
   publisher: { home: "/me/publisher", paths: ["/me/publisher"], label: "I miei fan" },
   smm: { home: "/admin/scouting", paths: ["/admin/scouting", "/admin/studio-social", "/admin/supervisor", "/admin/warmup", "/admin/editoriale"], label: "Radar creator" },
