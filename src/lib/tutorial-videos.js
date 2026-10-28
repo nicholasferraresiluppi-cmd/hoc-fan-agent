@@ -34,7 +34,7 @@ export const TUTORIAL_VIDEOS = [
   // Regola 3 ri-registrata il 16/10 (un'alternativa dopo un no; stop solo con difficoltà vera).
   // Porta un amico (27/10/2026): 16:9 per l'HR, pulsante «Come funziona» in /admin/referral. Regole ref-3.
   // Sorgenti in ~/Documents/progetti/hoc-video/tutorial-referral.
-  { id: "porta-un-collega", group: "HR", title: "Porta un amico: il programma referral", summary: "Le regole (storie, primo turno, €100 ogni 25 turni, percentuali sui primi 50 turni), referente e persona portata, Dal CRM, Cambio del mese, Da pagare, la Panoramica e cosa vede il referente.", src: "/video/tutorial-porta-un-collega.mp4", poster: "/video/tutorial-porta-un-collega.jpg", orientation: "landscape", durationSec: 187, audience: "Team HR", asOf: "2026-10-27" },
+  { id: "porta-un-collega", group: "HR", title: "Porta un amico: il programma referral", summary: "Le regole (storie, primo turno, €100 ogni 25 turni, percentuali sui primi 50 turni), referente e persona portata, Dal CRM, Cambio del mese, Da pagare, la Panoramica e cosa vede il referente.", src: "/video/tutorial-porta-un-amico.mp4", poster: "/video/tutorial-porta-un-amico.jpg", orientation: "landscape", durationSec: 187, audience: "Team HR", asOf: "2026-10-28" },
   { id: "prova-fedelta", group: "Sales Manager", title: "La prova fedeltà su Martina Scavo", summary: "Perché la facciamo, come si dividono i fan, le regole per gli operatori, la lista Da fare adesso e come si legge la misura.", src: "/video/tutorial-prova-fedelta.mp4", poster: "/video/tutorial-prova-fedelta.jpg", orientation: "landscape", durationSec: 120, audience: "Sales Manager", leadsOnly: true, asOf: "2026-10-16" },
   {
     id: "persone-hr",
