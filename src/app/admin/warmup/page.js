@@ -33,6 +33,7 @@ import { pubKindOfTask, itemForTask, autoItemForTask } from "@/lib/editoriale-co
 import PublishDownload from "@/components/PublishDownload";
 import MediaLightbox from "@/components/MediaLightbox";
 import EditorialeView from "@/components/editoriale/EditorialeView";
+import HeroHead, { BigNum } from "@/components/HeroHead";
 
 const API = "/api/admin/warmup";
 const fetcher = (url) =>
@@ -877,11 +878,23 @@ export default function WarmupPage() {
     const vista = oggiVista || (accs.length > 3 ? "azione" : "prof");
     return (
       <>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <p style={{ flex: 1, minWidth: 200, fontSize: 14, color: CP.textSecondary, margin: 0 }}>{new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}{ACC.length ? ` · ${openTot} task da fare su ${accs.length} profili` : ""}</p>
-          {mineSeg()}
-          {accs.length > 1 && <Segmented label="Vista" items={[["azione", "Per azione"], ["prof", "Per profilo"]]} value={vista} onChange={setOggiVista} />}
-        </div>
+        {/* in cima, nello stile del Radar (29/10): la giornata in una frase e quattro numeri */}
+        {ACC.length > 0 ? (
+          <HeroHead
+            eyebrow={new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" }).replace(/^./, (c) => c.toUpperCase())}
+            title={openTot ? "Oggi restano" : "Oggi è"} accent={openTot ? `${openTot} task` : "tutto fatto"}
+            sub={`${accs.length} ${accs.length === 1 ? "profilo" : "profili"} ${PLATS[plat].label}${om ? " tuoi" : ""}. Spunta man mano: ogni task vale per il giorno in cui la fai.`}
+            numbers={<>
+              <BigNum label="Profili da finire" value={todo.length} strong={todo.length > 0} />
+              <BigNum label="Task fatte" value={doneTot} />
+              <BigNum label="Da non dimenticare" value={urg.length} title="Avvisi trovati dal sistema: profili da controllare, scadenze" />
+              {late.length > 0 && <BigNum label="Rimaste ieri" value={late.reduce((n, b) => n + b.arr.open.length, 0)} />}
+            </>}
+            actions={(mineSeg() || accs.length > 1) ? <>
+              {mineSeg()}
+              {accs.length > 1 && <Segmented label="Vista" items={[["azione", "Per azione"], ["prof", "Per profilo"]]} value={vista} onChange={setOggiVista} />}
+            </> : null} />
+        ) : null}
         {!ACC.length && <div style={{ ...cardBox, textAlign: "center", padding: "30px 18px" }}><h3 style={{ margin: "0 0 6px", fontWeight: 500 }}>Nessun profilo {PLATS[plat].label}</h3><p style={{ ...hint, margin: "0 0 14px" }}>Registra il primo profilo dalla scheda Account.</p><button type="button" style={btnPrimary} onClick={() => { setTab("acct"); setForm({}); }}><Plus size={15} />Nuovo profilo</button></div>}
         {urg.length > 0 && (
           <>
