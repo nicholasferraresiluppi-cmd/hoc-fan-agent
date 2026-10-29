@@ -146,6 +146,16 @@ export function setReady(item, on) {
   return { ok: true, item: { ...item, status: "pronto" } };
 }
 
+/**
+ * Pronto da solo (29/10/2026, Nicholas: «la fase in preparazione non serve più»): un contenuto
+ * completo (carosello con le foto, reel col montato o «va bene così») è pronto senza un clic in più.
+ * Resta in lavorazione solo ciò che manca davvero (es. il reel ancora da montare).
+ */
+export function autoReady(item) {
+  if (item?.status !== "lavorazione" || readyProblems(item).length) return item;
+  return { ...item, status: "pronto" };
+}
+
 /** Mette in calendario (o toglie con slot null). `profileIds` = profili IG della stessa creator. */
 export function schedule(item, slot, profileIds) {
   if (item.status === "pubblicato") return { ok: false, errors: ["È già pubblicato"] };

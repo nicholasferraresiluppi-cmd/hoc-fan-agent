@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import {
   ArrowLeft, ArrowRight, CalendarCheck, CalendarDays, Check, ChevronLeft, ChevronRight, CircleCheck, Copy, ExternalLink, Film, FolderOpen,
-  Image as ImageIcon, Images, Layers, Lock, Maximize2, Plus, RefreshCw, Trash2, X,
+  Image as ImageIcon, Images, Lock, Maximize2, Plus, RefreshCw, Trash2, X,
 } from "lucide-react";
 import VetroScope, { useVetro, VetroNum } from "@/components/VetroScope";
 import { KpiCard } from "@/components/VetroCharts";
@@ -486,7 +486,7 @@ export default function EditorialeView({ embedded = false } = {}) {
           {!pub && <button type="button" style={btnDanger} disabled={busy} onClick={async () => { if (!(await confirmDialog({ title: `Smontare «${it.title}»?`, message: "Il contenuto si cancella e le sue foto e i suoi video tornano liberi, sceglibili per altri contenuti.", ok: "Smonta", danger: true }))) return; const r = await act({ action: "delete", id: it.id }, "Smontato: i file tornano liberi"); if (r) setEdit(null); }}><Trash2 size={14} />Smonta</button>}
           <span style={{ flex: 1 }} />
           {!pub && dirty && <button type="button" style={btn} disabled={busy} onClick={() => save()}>Salva</button>}
-          {saved.status === "lavorazione" && <button type="button" style={btnPrimary} disabled={busy || probs.length > 0} title={probs.join(", ")} onClick={() => step("ready", { on: true }, isCar ? "Carosello pronto" : "Reel pronto")}><Check size={15} />Segna pronto</button>}
+          {saved.status === "lavorazione" && probs.length > 0 && <span style={{ ...hint, alignSelf: "center" }}>{probs.join(" · ")}: poi è pronto da solo</span>}
           {saved.status === "pronto" && !saved.slot && <button type="button" style={btnPrimary} onClick={() => { setPlace({ itemId: it.id }); setEdit(null); }}><CalendarDays size={15} />Metti in calendario</button>}
           {saved.status === "pronto" && saved.slot && <button type="button" style={btnPrimary} disabled={busy} onClick={() => step("publish", { on: true, today: todayKey() }, "Segnato pubblicato")}><Check size={15} />Segna pubblicato</button>}
           {pub && <button type="button" style={btn} disabled={busy} onClick={() => step("publish", { on: false }, "Riaperto")}>Non è uscito, riapri</button>}
@@ -524,11 +524,10 @@ export default function EditorialeView({ embedded = false } = {}) {
                 <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflowWrap: "anywhere" }}>{fileById.get(it.final)?.name || "file nel drive"}</div>
                 {!pub && <button type="button" style={btnSm} onClick={() => set("final", null)}>Cambia</button>}
               </div>
-            ) : pub ? <div style={hint}>Uscito senza montaggio.</div> : (
+            ) : pub || it.noEdit ? <div style={hint}>{pub ? "Uscito senza montaggio." : "Segnato «senza montaggio» (scelta di prima): esce il video grezzo."}</div> : (
               <>
-                <p style={{ ...hint, margin: "0 0 8px" }}>Montalo, caricalo nel drive della creator (anche in una cartella «Montati») e sceglilo qui. Se il video va bene così com'è, spunta la casella sotto.</p>
-                <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14, marginBottom: 10 }}><input type="checkbox" checked={Boolean(it.noEdit)} onChange={(e) => set("noEdit", e.target.checked)} />Va bene così, senza montaggio</label>
-                {!it.noEdit && (freeVideos.length ? (
+                <p style={{ ...hint, margin: "0 0 8px" }}>Montalo, caricalo nel drive della creator (anche in una cartella «video editati») e sceglilo qui: il reel diventa pronto da solo.</p>
+                {(freeVideos.length ? (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(70px, 1fr))", gap: 6, maxHeight: 260, overflowY: "auto" }}>
                     {freeVideos.slice(0, 60).map((f) => <Thumb key={f.id} creator={creator} id={f.id} kind="video" title={f.name} onClick={() => set("final", f.id)} />)}
                   </div>
@@ -601,9 +600,8 @@ export default function EditorialeView({ embedded = false } = {}) {
       {vetro && kpis && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14, marginBottom: 18 }}>
           <KpiCard i={0} icon={Images} tone={0} label="Foto e video liberi" value={<VetroNum value={String(kpis.free)} />} sub={`su ${files.length} nel drive`} />
-          <KpiCard i={1} icon={Layers} tone={1} label="In preparazione" value={<VetroNum value={String(kpis.prep)} />} sub="caroselli da finire e reel da montare" />
-          <KpiCard i={2} icon={CircleCheck} tone={3} label="Pronti da mettere in calendario" value={<VetroNum value={String(kpis.ready)} />} sub={kpis.ready ? "trascinali su un giorno" : "niente in attesa"} />
-          <KpiCard i={3} icon={CalendarCheck} tone={4} label="In calendario nei prossimi 7 giorni" value={<VetroNum value={String(kpis.week)} />} sub={`${kpis.pub} già pubblicati`} />
+          <KpiCard i={1} icon={CircleCheck} tone={3} label="Pronti da mettere in calendario" value={<VetroNum value={String(kpis.ready)} />} sub={kpis.ready ? "trascinali su un giorno" : "niente in attesa"} />
+          <KpiCard i={2} icon={CalendarCheck} tone={4} label="In calendario nei prossimi 7 giorni" value={<VetroNum value={String(kpis.week)} />} sub={`${kpis.pub} già pubblicati`} />
         </div>
       )}
       {data?.folder && (
