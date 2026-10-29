@@ -1555,3 +1555,35 @@ console.log(`totale: ${n} asserzioni`);
   t(ours.fields.idDocument.title === "nuovo.jpg", "se il campo l'abbiamo cambiato noi, vince il nostro");
   n += m; console.log(`scritture concorrenti: ${m} asserzioni OK`);
 }
+
+// ── numero di partita IVA (28/10/2026): chiesto solo a chi risponde «sì» ──
+{
+  const { validatePartitaIva, FORM_KEYS } = await import("../src/lib/hr-fields.js");
+  const { requiredKeysFor, fieldErrors } = await import("../src/lib/hr-form-experience.js");
+  const { personToClickup: toCu } = await import("../src/lib/hr-clickup-map.js");
+  let m = 0; const t = (c, msg) => { assert.ok(c, msg); m++; };
+  t(validatePartitaIva("01114601006").ok, "P.IVA italiana valida");
+  t(validatePartitaIva("IT 0111 4601 006").value === "01114601006", "prefisso IT e spazi tolti");
+  t(!validatePartitaIva("01114601007").ok, "cifra di controllo sbagliata");
+  t(!validatePartitaIva("0111460100").ok, "10 cifre: italiana incompleta");
+  t(!validatePartitaIva("IT123").ok, "IT + poche cifre");
+  t(validatePartitaIva("ESB12345678").foreign, "partita IVA estera");
+  t(validatePartitaIva("123-456-789-000").foreign, "numero fiscale estero con trattini");
+  t(!validatePartitaIva("ciao").ok, "testo a caso");
+  t(FORM_KEYS.includes("partitaIvaNumero"), "nel modulo");
+  t(requiredKeysFor({ partitaIva: true }).includes("partitaIvaNumero"), "obbligatorio con sì");
+  t(!requiredKeysFor({ partitaIva: false }).includes("partitaIvaNumero"), "non richiesto con no");
+  const e = fieldErrors({ partitaIva: true, partitaIvaNumero: "123" }, ["partitaIva", "partitaIvaNumero"]);
+  t(Boolean(e.partitaIvaNumero), "errore sotto il campo");
+  t(!fieldErrors({ partitaIva: true, partitaIvaNumero: "01114601006" }, ["partitaIva", "partitaIvaNumero"]).partitaIvaNumero, "valida: nessun errore");
+  const ok = normalizePersonInput({ partitaIva: true, partitaIvaNumero: "IT01114601006" });
+  t(ok.values.partitaIvaNumero === "01114601006" && !ok.errors.length, "server normalizza");
+  t(normalizePersonInput({ partitaIva: true, partitaIvaNumero: "999" }).errors.length === 1, "server rifiuta");
+  t(normalizePersonInput({ partitaIva: false, partitaIvaNumero: "01114601006" }).values.partitaIvaNumero === null, "con no il numero si scarta");
+  const meta = [{ id: "f-piva", name: "Partita IVA", type: "drop_down", type_config: { options: [{ id: "si", name: "Sì", orderindex: 0 }, { id: "no", name: "No", orderindex: 1 }] } }, { id: "f-num", name: "Numero partita IVA", type: "short_text", type_config: {} }];
+  const cu = toCu({ id: "p_x", fields: { firstName: "A", partitaIva: true, partitaIvaNumero: "01114601006" } }, meta);
+  t(JSON.stringify(cu).includes("01114601006"), "va nel campo ClickUp «Numero partita IVA»");
+  const back = taskToPerson({ name: "A", custom_fields: [{ ...meta[1], value: "01114601006" }] });
+  t(back.fields.partitaIvaNumero === "01114601006", "e torna da ClickUp");
+  n += m; console.log(`numero partita IVA: ${m} asserzioni OK`);
+}

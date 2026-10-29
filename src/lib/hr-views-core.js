@@ -27,7 +27,7 @@ export const PIVA_VIEWS = ["Persone", "Collaboratori senza contratto", "Anagrafi
 // colonne visibili, in quest'ordine; i campi del vecchio CRM ritirati il 18/10 non ci sono più.
 export const PERSONE_VIEW = "Persone";
 export const PERSONE_COLUMNS = [
-  "Mansione", "Progetto", "Collaboration Status", "Referent", "HV Contract Status", "Agreement with", "Partita IVA",
+  "Mansione", "Progetto", "Collaboration Status", "Referent", "HV Contract Status", "Agreement with", "Partita IVA", "Numero partita IVA",
   "Start of Collaboration", "End of Collaboration", "Type of Employment", "Seniority",
   "Personal Email", "Personal Phone Number", "Company Email", "Company Phone Number",
   "Spoken Languages", "Competenze e livello", "Altro che sa fare", "Vorrebbe imparare", "Ruoli già ricoperti",
@@ -44,7 +44,7 @@ const optionsOf = (f) => (f?.type_config?.options || []).map((o) => ({ id: Strin
 export function pickFields(meta = []) {
   const by = (n) => meta.find((m) => norm(m.name) === norm(n)) || null;
   return {
-    role: by("Role"), mansione: by("Mansione"), project: by("Project"), progetto: by("Progetto"), piva: by("Partita IVA"),
+    role: by("Role"), mansione: by("Mansione"), project: by("Project"), progetto: by("Progetto"), piva: by("Partita IVA"), pivaNum: by("Numero partita IVA"),
     persone: PERSONE_COLUMNS.map(by).filter(Boolean),
   };
 }
@@ -125,6 +125,7 @@ export function planView(view, F) {
     if (visible(F.role) && F.mansione && showColumn(cols, cfKey(F.mansione), cfKey(F.role))) changes.push("colonna Mansione");
     if (visible(F.project) && F.progetto && showColumn(cols, cfKey(F.progetto), cfKey(F.project))) changes.push("colonna Progetto");
     if (PIVA_VIEWS.includes(name) && F.piva && showColumn(cols, cfKey(F.piva))) changes.push("colonna Partita IVA");
+    if (PIVA_VIEWS.includes(name) && F.pivaNum && showColumn(cols, cfKey(F.pivaNum), F.piva ? cfKey(F.piva) : null)) changes.push("colonna Numero partita IVA");
     if (name === PERSONE_VIEW) {
       const added = (F.persone || []).filter((f) => showColumn(cols, cfKey(f))).map((f) => f.name);
       if (added.length) changes.push(`colonne ${added.join(", ")}`);
