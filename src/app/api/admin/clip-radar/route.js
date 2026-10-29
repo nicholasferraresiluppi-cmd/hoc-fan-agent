@@ -56,7 +56,7 @@ export async function GET(request) {
       const sc = scoreVideo(v, st, now);
       delete sc.hist;
       const { video, ...rest } = sc;
-      videos.push({ ...rest, canDownload: Boolean(video), profileId: p.id, handle: p.handle, label: p.label || null, ours: Boolean(p.ours), creator: p.creator || null, base: st.median });
+      videos.push({ ...rest, canDownload: Boolean(video), country: p.country || null, profileId: p.id, handle: p.handle, label: p.label || null, ours: Boolean(p.ours), creator: p.creator || null, base: st.median });
     }
     const reading = p.reading && now - p.reading < 6 * 60000;
     return { ...p, reading: Boolean(reading), stats: st };
@@ -77,7 +77,7 @@ export async function POST(request) {
       if (!apifyConfigured()) return bad("Apify non è configurato sul server: i video non si possono leggere", 503);
       const parsed = parseProfileInput(body.text, body.platform === "tt" ? "tt" : "ig");
       if (!parsed) return bad("Non riconosco il profilo: incolla il link (instagram.com/… o tiktok.com/@…) o scrivi @nome");
-      const r = await addProfile(parsed, g.by);
+      const r = await addProfile({ ...parsed, country: body.country }, g.by);
       if (r.exists) return Response.json({ ok: true, id: r.id, exists: true });
       after(() => readProfiles([r.prof]).catch(() => updateProfile(r.id, { reading: null, error: "Lettura non riuscita: si riprova stanotte" }).catch(() => {})));
       return Response.json({ ok: true, id: r.id, cost: runBudget(1, parsed.platform) });
@@ -91,7 +91,7 @@ export async function POST(request) {
     }
     if (body.action === "label") {
       if (!body.id) return bad("Manca il profilo");
-      await updateProfile(String(body.id), { label: String(body.label || "").trim().slice(0, 60) || null, note: String(body.note || "").slice(0, 500) });
+      await updateProfile(String(body.id), { label: String(body.label || "").trim().slice(0, 60) || null, note: String(body.note || "").slice(0, 500), ...(body.country !== undefined ? { country: body.country === "eng" ? "eng" : body.country === "ita" ? "ita" : null } : {}) });
       return Response.json({ ok: true });
     }
     if (body.action === "save") {

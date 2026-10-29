@@ -36,7 +36,7 @@ function Cover({ v }) {
       {v.outlier != null && (
         <span title={`${String(v.outlier).replace(".", ",")} volte le visualizzazioni tipiche di questo profilo (di solito ${shortNum(v.base)}, mediana dei suoi video degli ultimi 30 giorni)`} style={{ position: "absolute", top: 8, left: 8, padding: "3px 8px", borderRadius: 999, fontSize: 13, fontWeight: 500, background: CP.panel, color: outColor(v.outlier), border: `1px solid ${alpha(outColor(v.outlier), "66")}`, ...NUM }}>{x10(v.outlier)}</span>
       )}
-      <span style={{ position: "absolute", top: 8, right: 8, padding: "2px 7px", borderRadius: 999, fontSize: 11.5, background: CP.panel, color: CP.textSecondary }}>{PLAT[v.platform]}</span>
+      <span style={{ position: "absolute", top: 8, right: 8, padding: "2px 7px", borderRadius: 999, fontSize: 11.5, background: CP.panel, color: CP.textSecondary }}>{PLAT[v.platform]}{v.country ? ` · ${v.country.toUpperCase()}` : ""}</span>
       {v.duration != null && <span style={{ position: "absolute", bottom: 8, right: 8, padding: "2px 7px", borderRadius: 6, fontSize: 12, background: CP.panel, color: CP.textPrimary, ...NUM }}>{v.duration}s</span>}
     </a>
   );
@@ -117,11 +117,13 @@ function ProfileRow({ p, onRemove, onLabel, busy }) {
   const [edit, setEdit] = useState(false);
   const [label, setLabel] = useState(p.label || "");
   const [note, setNote] = useState(p.note || "");
+  const [country, setCountry] = useState(p.country || "");
   const st = p.stats || {};
   return (
     <div style={{ padding: "10px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <Chip>{PLAT[p.platform]}</Chip>
+        <Chip color={p.country ? undefined : CP.attn} title={p.country ? "Paese del profilo" : "Paese non indicato: sceglilo in «Nome e nota»"}>{p.country ? p.country.toUpperCase() : "paese?"}</Chip>
         {p.ours && <Chip color={CP.accent} title="Entra da solo da Account social">nostro{p.creator ? ` · ${p.creator}` : ""}</Chip>}
         <a href={profileUrl(p)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 14.5, fontWeight: 500, color: CP.textPrimary, textDecoration: "none" }}>{p.label ? `${p.label} · ` : ""}@{p.handle}</a>
         <span style={{ ...hint, fontSize: 12.5, ...NUM }}>
@@ -137,7 +139,8 @@ function ProfileRow({ p, onRemove, onLabel, busy }) {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
           <input style={{ ...input, flex: "1 1 160px" }} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nome (facoltativo)" />
           <input style={{ ...input, flex: "2 1 240px" }} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Perché lo seguiamo: formato, nicchia…" />
-          <button type="button" style={btnSm} disabled={busy} onClick={() => { onLabel(p.id, label, note); setEdit(false); }}>Salva</button>
+          <Seg items={[["ita", "ITA"], ["eng", "ENG"]]} value={country} onChange={setCountry} />
+          <button type="button" style={btnSm} disabled={busy} onClick={() => { onLabel(p.id, label, note, country || null); setEdit(false); }}>Salva</button>
         </div>
       )}
     </div>
@@ -150,6 +153,10 @@ export default function ClipRadar() {
     refreshInterval: (d) => (d?.profiles?.some((p) => p.reading) ? 6000 : 0),
   });
   const [plat, setPlat] = useState("ig");
+  const [addCountry, setAddCountry] = useState("ita");
+  // paese = la divisione principale (29/10, Nicholas: «i meme sono diversi per country»), ricordata per persona
+  const [cf, setCfState] = useState(() => { try { return localStorage.getItem("hoc:clipradar:country") || "ita"; } catch { return "ita"; } });
+  const setCf = (v) => { setCfState(v); if (v !== "all") setAddCountry(v); try { localStorage.setItem("hoc:clipradar:country", v); } catch {} };
   const [text, setText] = useState("");
   const [days, setDays] = useState("7");
   const [pf, setPf] = useState("all");
@@ -172,17 +179,17 @@ export default function ClipRadar() {
     const key = { outlier: (v) => v.outlier ?? -1, views: (v) => v.views ?? -1, likes: (v) => v.likes ?? -1, comments: (v) => v.comments ?? -1, shares: (v) => v.shares ?? -1, recent: (v) => v.postedAt || 0, speed: (v) => v.perHour ?? -1 }[sort];
     return data.videos
       .filter((v) => (onlySaved ? saved[v.id] : v.postedAt && now - v.postedAt <= Number(days) * 86_400_000))
-      .filter((v) => (pf === "all" || v.platform === pf) && (!who || v.profileId === who) && (side === "all" || (side === "ours" ? v.ours : !v.ours)))
+      .filter((v) => (pf === "all" || v.platform === pf) && (!who || v.profileId === who) && (side === "all" || (side === "ours" ? v.ours : !v.ours)) && (cf === "all" || v.country === cf))
       .sort((a, b) => key(b) - key(a))
       .slice(0, 60);
-  }, [data, days, pf, who, side, sort, onlySaved, saved]);
+  }, [data, days, pf, who, side, cf, sort, onlySaved, saved]);
 
   if (error) return <Notice danger>{error.message}</Notice>;
   if (!data) return <p style={hint}>Carico…</p>;
   const profiles = data.profiles || [];
   const nSaved = Object.keys(saved).length;
   const add = async () => {
-    const d = await run("add", { action: "add", text, platform: plat }, (r) => (r.exists ? "Questo profilo è già nel radar." : "Aggiunto: leggo i suoi video (meno di un minuto)."));
+    const d = await run("add", { action: "add", text, platform: plat, country: addCountry }, (r) => (r.exists ? "Questo profilo è già nel radar." : "Aggiunto: leggo i suoi video (meno di un minuto)."));
     if (d) setText("");
   };
   const remove = async (p) => {
@@ -197,9 +204,15 @@ export default function ClipRadar() {
         I profili di clipping che volete tenere d&apos;occhio, su Instagram e TikTok: ogni notte si leggono i loro ultimi video e qui vedete quelli che hanno funzionato. Il numero grande sulla copertina è il <b style={{ fontWeight: 500 }}>multiplo sul solito del profilo</b>: «×4» vuol dire quattro volte le visualizzazioni che quella pagina fa di norma — è il segno che quel video (gancio, formato, audio) ha preso, anche su una pagina piccola.
       </p>
       {!data.configured && <Notice danger>Apify non è configurato sul server: i video non si possono leggere.</Notice>}
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+        <span style={{ fontSize: 14, color: CP.textSecondary }}>Paese</span>
+        <Seg items={[["ita", `Italia · ${profiles.filter((p) => p.country === "ita").length}`], ["eng", `Inglese · ${profiles.filter((p) => p.country === "eng").length}`], ["all", "Tutti"]]} value={cf} onChange={(v) => { setCf(v); setWho(""); }} />
+        {profiles.some((p) => !p.country) && <span style={{ ...hint, color: CP.attn }}>{profiles.filter((p) => !p.country).length} profili senza paese: li vedi in «Tutti», sceglilo in «Nome e nota»</span>}
+      </div>
 
       <div style={{ ...cardBox, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <Seg items={[["ig", "Instagram"], ["tt", "TikTok"]]} value={plat} onChange={setPlat} />
+        <Seg items={[["ita", "ITA"], ["eng", "ENG"]]} value={addCountry} onChange={setAddCountry} />
         <input style={{ ...input, flex: "1 1 240px" }} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && text.trim() && !busy) add(); }} placeholder={plat === "tt" ? "link tiktok.com/@… oppure @nome" : "link instagram.com/… oppure @nome"} />
         <button type="button" style={btnPrimary} disabled={!!busy || !text.trim()} onClick={add}><Plus size={15} />{busy === "add" ? "Aggiungo…" : "Aggiungi al radar"}</button>
       </div>
@@ -212,8 +225,8 @@ export default function ClipRadar() {
         </div>
       ) : (
         <div style={{ ...cardBox, paddingTop: 6, paddingBottom: 6 }}>
-          {profiles.map((p) => (
-            <ProfileRow key={p.id} p={p} busy={!!busy} onRemove={remove} onLabel={(id, label, note) => run("label", { action: "label", id, label, note }, null)} />
+          {profiles.filter((p) => cf === "all" || p.country === cf).map((p) => (
+            <ProfileRow key={p.id} p={p} busy={!!busy} onRemove={remove} onLabel={(id, label, note, country) => run("label", { action: "label", id, label, note, country }, null)} />
           ))}
         </div>
       )}
@@ -234,7 +247,7 @@ export default function ClipRadar() {
             <Seg items={[["all", "Tutti i profili"], ["ext", "Da fuori"], ["ours", "I nostri"]]} value={side} onChange={(v) => { setSide(v); setWho(""); }} />
             <select style={{ ...input, width: "auto", fontSize: 13.5, padding: "7px 10px" }} value={who} onChange={(e) => setWho(e.target.value)}>
               <option value="">Tutti i profili</option>
-              {profiles.filter((p) => (pf === "all" || p.platform === pf) && (side === "all" || (side === "ours" ? p.ours : !p.ours))).map((p) => <option key={p.id} value={p.id}>{p.label || `@${p.handle}`}</option>)}
+              {profiles.filter((p) => (pf === "all" || p.platform === pf) && (side === "all" || (side === "ours" ? p.ours : !p.ours)) && (cf === "all" || p.country === cf)).map((p) => <option key={p.id} value={p.id}>{p.label || `@${p.handle}`}</option>)}
             </select>
           </div>
           {!shown.length ? (

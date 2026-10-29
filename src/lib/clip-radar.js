@@ -68,13 +68,15 @@ export async function syncOurProfiles() {
     const h = String(a.username || "").trim().replace(/^@+/, "").toLowerCase();
     if (!/^[\w.]{2,40}$/.test(h)) continue;
     const platform = a.platform === "tiktok" ? "tt" : "ig";
-    want.set(profileId(platform, h), { platform, handle: h, creator: a.creator || null });
+    const lang = String(a.language || "").toUpperCase();
+    const country = lang === "IT" ? "ita" : ["EN", "US", "GB", "UK"].includes(lang) ? "eng" : null;
+    want.set(profileId(platform, h), { platform, handle: h, creator: a.creator || null, country });
   }
   const cur = new Map((await listProfiles()).map((p) => [p.id, p]));
   const added = [];
   for (const [id, w] of want) {
     const ex = cur.get(id);
-    if (ex) { if (!ex.ours || ex.creator !== w.creator) await kv.hset(P, { [id]: JSON.stringify({ ...ex, ours: true, creator: w.creator }) }); continue; }
+    if (ex) { if (!ex.ours || ex.creator !== w.creator || (!ex.country && w.country)) await kv.hset(P, { [id]: JSON.stringify({ ...ex, ours: true, creator: w.creator, country: ex.country || w.country }) }); continue; }
     const prof = { id, ...w, ours: true, label: null, note: "", addedAt: Date.now(), addedBy: "Account social", lastRead: null, error: null, reading: Date.now() };
     await kv.hset(P, { [id]: JSON.stringify(prof) });
     added.push(prof);
@@ -84,12 +86,12 @@ export async function syncOurProfiles() {
   return added;
 }
 
-export async function addProfile({ platform, handle }, by) {
+export async function addProfile({ platform, handle, country }, by) {
   const id = profileId(platform, handle);
   const all = await listProfiles();
   if (all.some((p) => p.id === id)) return { id, exists: true };
   if (all.filter((p) => !p.ours).length >= MAX_PROFILES) throw new Error(`Al massimo ${MAX_PROFILES} profili: togline uno prima`);
-  const prof = { id, platform, handle, label: null, note: "", addedAt: Date.now(), addedBy: by?.name || null, lastRead: null, error: null, reading: Date.now() };
+  const prof = { id, platform, handle, country: country === "eng" ? "eng" : country === "ita" ? "ita" : null, label: null, note: "", addedAt: Date.now(), addedBy: by?.name || null, lastRead: null, error: null, reading: Date.now() };
   await kv.hset(P, { [id]: JSON.stringify(prof) });
   return { id, prof };
 }
