@@ -55,6 +55,14 @@ function remember(periodId, at, json) {
   while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
 }
 
+/** Impronta del mese (quando sono state scritte le wage): cambia a ogni sync. Una sola lettura piccola. */
+export async function wagesStamp(periodId) {
+  const v = await kv.get(`cp:wages:${periodId}`);
+  if (!v) return null;
+  if (Array.isArray(v)) return `a${v.length}`;
+  return v.at ? String(v.at) : `n${v.n}`;
+}
+
 /** Array delle wage del mese, o null se il mese non è mai stato sincronizzato. */
 export async function getWages(periodId) {
   const v = await kv.get(`cp:wages:${periodId}`);
