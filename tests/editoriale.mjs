@@ -2,7 +2,7 @@
 // Esegui: node tests/editoriale.mjs
 import assert from "node:assert/strict";
 import {
-  creatorKey, stageOf, filesOf, usageMap, readyProblems, normalizeItem, setReady, schedule, setPublished,
+  creatorKey, stageOf, filesOf, usageMap, rawUses, romeTs, dueForAutoCheck, matchPublished, captionMatch, autoItemForTask, readyProblems, normalizeItem, setReady, schedule, setPublished,
   pubKindOfTask, needsFromTaskIds, itemForTask, dayItems, coverage, monthGrid, shiftMonth,
 } from "../src/lib/editoriale-core.js";
 
@@ -108,8 +108,39 @@ const kinds = new Map([["p1", "photo"], ["p2", "photo"], ["p3", "photo"], ["v1",
   eq(itemForTask(pubd, "A", day, "d5-r1")?.id, "r2", "il 1° è già uscito con un'altra task → il primo ancora da pubblicare");
   const cov = coverage(items, "A", day, { carosello: 1, reel: 3, reelMax: 3 });
   eq([cov.carosello.missing, cov.reel.missing], [0, 1], "copertura: manca un reel");
-  const used = usageMap([{ id: "x", files: ["p1"], final: null }, { id: "y", files: ["v1"], final: "v2" }]);
-  eq([used.get("p1"), used.get("v2"), used.get("p9")], ["x", "y", undefined], "mappa file → contenuto");
+  const used = usageMap([{ id: "x", type: "carosello", files: ["p1"], final: null }, { id: "y", type: "reel", files: ["v1"], final: "v2" }]);
+  eq([used.get("p1"), used.get("v2"), used.get("v1"), used.get("p9")], ["x", "y", undefined, undefined], "mappa file bloccati: foto e montato sì, video grezzo no");
+  const uses = rawUses([{ id: "a", type: "reel", files: ["v1"] }, { id: "b", type: "reel", files: ["v1", "v3"] }, { id: "c", type: "carosello", files: ["v1"] }]);
+  eq([uses.get("v1"), uses.get("v3")], [["a", "b"], ["b"]], "video grezzo: in quanti reel è usato");
+}
+
+// ── pubblicato in automatico ──
+{
+  const T = romeTs("2026-10-29", "14:00");
+  eq(new Date(T).toISOString(), "2026-10-29T13:00:00.000Z", "ora di Roma (ora solare)");
+  eq(new Date(romeTs("2026-07-01", "14:00")).toISOString(), "2026-07-01T12:00:00.000Z", "ora di Roma (ora legale)");
+  const it = (id, type, time, extra = {}) => ({ id, type, status: "pronto", slot: { profileId: "A", date: "2026-10-29", time }, caption: "", ...extra });
+  const items = [it("r1", "reel", "14:00", { caption: "Sole e mare a Rimini oggi pomeriggio" }), it("r2", "reel", "18:00"), it("c1", "carosello", "14:00"), it("old", "reel", "08:00", { slot: { profileId: "A", date: "2026-10-27", time: "08:00" } })];
+  eq(dueForAutoCheck(items, T + 10 * 60000).map((x) => x.id), [], "prima di 15 minuti dall'orario non si controlla");
+  eq(dueForAutoCheck(items, T + 20 * 60000).map((x) => x.id).sort(), ["c1", "r1"], "dopo l'orario sì; oltre 30 ore no");
+  ok(captionMatch("Sole e mare a Rimini oggi pomeriggio", "sole, mare a rimini! oggi pomeriggio 🌊") >= 0.9, "didascalia uguale riconosciuta");
+  eq(captionMatch("ciao", "ciao"), 0, "didascalie troppo corte non provano niente");
+  const posts = [
+    { id: "P1", ts: T + 5 * 60000, kind: "reel", caption: "altro testo qualunque per prova" },
+    { id: "P2", ts: T + 40 * 60000, kind: "reel", caption: "Sole e mare a Rimini oggi pomeriggio" },
+    { id: "P3", ts: T - 5 * 3600000, kind: "carosello", caption: "" },
+    { id: "P4", ts: T + 60000, kind: "post", caption: "" },
+  ];
+  const m = matchPublished([items[0], items[2]], posts);
+  eq(m.map((x) => [x.itemId, x.post.id]), [["r1", "P2"]], "vince la didascalia sul più vicino; carosello uscito 5 ore prima e foto singola no");
+  eq(matchPublished([items[0]], posts, new Set(["P2"])).map((x) => x.post.id), ["P1"], "un post già abbinato non si riusa");
+  eq(matchPublished([{ ...items[0], autoReject: ["P2", "P1"] }], posts), [], "post rifiutato a mano non torna");
+  eq(matchPublished([items[0], items[1]], [{ id: "Q", ts: T + 30 * 60000, kind: "reel" }]).map((x) => x.itemId), ["r1"], "un post, due reel: va al primo in ordine di orario");
+  const pubd = [{ ...items[0], status: "pubblicato", autoPub: { post: "P2" } }, items[1]];
+  eq(autoItemForTask(pubd, "A", "2026-10-29", "d9-r1")?.id, "r1", "task del 1° reel: fatta in automatico");
+  eq(autoItemForTask(pubd, "A", "2026-10-29", "d9-r2"), null, "2° reel non ancora");
+  const un = setPublished(pubd[0], false);
+  ok(un.item.status === "pronto" && !un.item.autoPub && un.item.autoReject.includes("P2"), "riaperto: il post segnato non si riabbina");
 }
 
 // ── griglia del mese ──
@@ -190,6 +221,10 @@ const kinds = new Map([["p1", "photo"], ["p2", "photo"], ["p3", "photo"], ["v1",
   ok(r.ok, "reel creato");
   ok((await S.saveItem(ck, { id: r.item.id, final: "vd-2" }, by)).ok, "montato scelto");
   ok(!(await S.saveItem(ck, { type: "reel", files: ["vd-2"] }, by)).ok, "il montato non si può usare come grezzo altrove");
+  const r2 = await S.saveItem(ck, { type: "reel", files: ["vd-1"] }, by);
+  ok(r2.ok, "lo stesso video grezzo si riusa in un secondo reel");
+  ok(!(await S.saveItem(ck, { id: r2.item.id, final: "vd-2" }, by)).ok, "ma il montato di un altro reel no");
+  ok((await S.deleteItem(ck, r2.item.id, by)).ok, "secondo reel smontato");
   // pronto, calendario, pubblicato dal Warm-up
   ok((await S.stepItem(ck, a.item.id, "ready", { on: true }, by)).ok, "Palestra pronto");
   ok(!(await S.stepItem(ck, a.item.id, "schedule", { slot: { profileId: "acc3", date: "2026-11-03" } }, by)).ok, "profilo di un'altra creator: no");
