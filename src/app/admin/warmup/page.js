@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { ChevronRight, Flag, Pencil, Plus, Trash2, Undo2, UserRound, ExternalLink } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
-import { PageHead, Notice, NUM, FilterChip } from "@/components/ds";
+import { PageHead, Notice, NUM, FilterChip, Tabs, Segmented, FilterBar } from "@/components/ds";
 import {
   btn, btnPrimary, btnDanger, btnOk, btnSm, input, cardBox, eyebrow, muted, hint, TONE, statusColor,
   GroupLabel, SectionHead, Ring, Avatar, Chip, Dot, Seg, Fold, Bullets, TaskRow, TimerChip, TaskList, KV, Field,
@@ -1014,7 +1014,7 @@ export default function WarmupPage() {
           <Chip color={TONE[stateInfo(a).tone]}>{stateInfo(a).label}</Chip>
           <Chip color={statusColor(a.status)}><Dot color={statusColor(a.status)} />{a.flag ? "Flag" : "Verde"}</Chip>
         </div>
-        <Seg items={[["oggi", "Oggi"], ["dati", "Dati"], ["profilo", "Profilo"], ["storico", "Storico"]]} value={pane} onChange={setPane} style={{ marginBottom: 14 }} />
+        <Tabs small items={[["oggi", "Oggi"], ["dati", "Dati"], ["profilo", "Profilo"], ["storico", "Storico"]]} value={pane} onChange={setPane} />
         {a.supMissing && <Notice danger>L&apos;account non c&apos;è più in Account social: username, creator e telefono non si vedono. Ricrealo lì o elimina questo profilo dal warm-up.</Notice>}
         {pane === "oggi" ? (
           <>
@@ -1118,7 +1118,7 @@ export default function WarmupPage() {
       <>
         <h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: "0 0 4px" }}>Dati</h2>
         <p style={{ ...hint, fontSize: 14, margin: "0 0 12px" }}>Panoramica, numeri della settimana e segnalazioni · {PLATS[plat].label}</p>
-        <Seg items={[["pano", "Panoramica"], ["week", "Settimana"], ["flags", "Segnalazioni"], ["exp", "Esporta"]]} value={rpane} onChange={setRpane} style={{ marginBottom: 14 }} />
+        <Tabs small items={[["pano", "Panoramica"], ["week", "Settimana"], ["flags", "Segnalazioni"], ["exp", "Esporta"]]} value={rpane} onChange={setRpane} />
         {rpane === "pano" && viewPano()}
         {rpane === "week" && viewWeekAll()}
         {rpane === "flags" && viewFlagStats()}
@@ -1232,7 +1232,7 @@ export default function WarmupPage() {
     const selSt = { ...input, width: "auto", fontSize: 13.5, padding: "7px 10px" };
     return (
       <>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+        <FilterBar onReset={panoCreator || panoAcc || per !== "w8" ? () => { setPanoCreator(""); setPanoAcc(""); setPer("w8"); } : null}>
           <select style={selSt} value={panoCreator} onChange={(e) => { setPanoCreator(e.target.value); setPanoAcc(""); }}>
             <option value="">Tutte le modelle</option>
             {creatorsHere.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -1241,9 +1241,8 @@ export default function WarmupPage() {
             <option value="">{panoCreator ? "Tutti i suoi account" : "Tutti gli account"}</option>
             {ACC.filter((a) => !panoCreator || a.creator === panoCreator).map((a) => <option key={a.id} value={a.id}>{a.username}{!panoCreator && a.creator ? ` · ${a.creator}` : ""}</option>)}
           </select>
-          <span style={{ flex: 1 }} />
           <Seg items={[["d7", "7 giorni"], ["d30", "30 giorni"], ["w8", "8 settimane"], ["w12", "12 settimane"], ["custom", "Date a scelta"]]} value={per} onChange={setPer} />
-        </div>
+        </FilterBar>
         {per === "custom" && (
           <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", margin: "0 0 12px" }}>
             <label style={{ fontSize: 13, color: CP.textSecondary }}>Dal<br /><input type="date" style={{ ...input, width: "auto" }} value={perFrom} max={isoDay(Date.now())} onChange={(e) => { const v = e.target.value; if (!v) return; setPerFrom(v); if (v > perTo) setPerTo(v); }} /></label>
@@ -1560,17 +1559,15 @@ export default function WarmupPage() {
   return (
     <div style={{ maxWidth: 1600, margin: "0 auto", padding: "20px 16px calc(110px + env(safe-area-inset-bottom))", fontFamily: FONTS.body, color: CP.textPrimary }}>
       <PageHead crumbs={[{ label: "Marketing" }, { label: "Social" }]} title="Social"
-        subtitle="I profili Instagram e X delle creator: cosa fare oggi (warm-up e contenuti da pubblicare), il calendario dei contenuti dal drive, segnalazioni, cooldown e numeri della settimana."
+        subtitle="I profili Instagram e X delle creator: cosa fare oggi, i contenuti, i numeri."
         actions={data ? <button type="button" style={btnPrimary} onClick={() => { setTab("acct"); setSel(null); setForm({}); }}><Plus size={15} />Nuovo profilo</button> : null} />
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 22 }}>
-        {tabs.map(([k, l]) => {
-          const n = !data ? null : k === "oggi" ? openToday || null : k === "acct" ? ACC.length : null;
-          return <FilterChip key={k} label={n != null ? `${l} · ${n}` : l} active={tab === k && !form} onClick={() => { setTab(k); setSel(null); setForm(null); setModal(null); if (k === "acct") setFolder(null); window.scrollTo(0, 0); }} />;
-        })}
-        <span style={{ flex: 1 }} />
-        <span title={net === "ok" ? "Collegato" : net === "pending" ? "Salvataggio…" : "Non salvato"} style={{ width: 8, height: 8, borderRadius: "50%", background: net === "ok" ? CP.accentGreen : net === "pending" ? CP.attn : CP.accentRed }} />
-        <Seg items={Object.keys(PLATS).map((k) => [k, PLATS[k].label])} value={plat} onChange={setPlat} />
-      </div>
+      <Tabs value={form ? null : tab} style={{ marginBottom: 22 }}
+        items={tabs.map(([k, l]) => [k, l, !data ? null : k === "oggi" ? openToday || null : k === "acct" ? ACC.length : null])}
+        onChange={(k) => { setTab(k); setSel(null); setForm(null); setModal(null); if (k === "acct") setFolder(null); window.scrollTo(0, 0); }}
+        aside={<span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+          <span title={net === "ok" ? "Collegato" : net === "pending" ? "Salvataggio…" : "Non salvato"} style={{ width: 8, height: 8, borderRadius: "50%", background: net === "ok" ? CP.accentGreen : net === "pending" ? CP.attn : CP.accentRed }} />
+          <Segmented items={Object.keys(PLATS).map((k) => [k, PLATS[k].label])} value={plat} onChange={setPlat} />
+        </span>} />
       {error && <Notice danger>{error.message}</Notice>}
       {!data && !error && <p style={{ ...hint, fontSize: 14 }}>Carico…</p>}
       {body}

@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { Bookmark, BookmarkCheck, Download, ExternalLink, Music, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { CP, alpha } from "@/lib/brand";
-import { Notice, NUM } from "@/components/ds";
+import { Notice, NUM, FilterBar } from "@/components/ds";
 import { confirmDialog } from "@/components/AppDialogs";
 import { btn, btnPrimary, btnSm, input, cardBox, hint, SectionHead, Seg, Chip, ModalBox, Field } from "@/components/warmup/ui";
 import { shortNum, ageLabel, profileUrl } from "@/lib/clip-radar-core";
@@ -209,13 +209,16 @@ export default function ClipRadar() {
 
   return (
     <div>
-      <p style={{ fontSize: 14, color: CP.textSecondary, margin: "0 0 12px", maxWidth: 820, lineHeight: 1.55 }}>
-        I video dei profili di clipping che funzionano. Il numero sulla copertina dice quante volte un video ha superato il solito di quel profilo.
-      </p>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", margin: "0 0 12px" }}>
+        <p style={{ fontSize: 14, color: CP.textSecondary, margin: 0, flex: "1 1 320px", lineHeight: 1.55 }}>
+          I video dei profili di clipping che funzionano. Il numero sulla copertina dice quante volte un video ha superato il solito di quel profilo.
+        </p>
+        <button type="button" style={btnPrimary} onClick={() => setAdding({ platform: "ig", country: cf === "all" ? "ita" : cf, text: "" })}><Plus size={15} />Aggiungi profilo</button>
+      </div>
       {!data.configured && <Notice danger>Apify non è configurato sul server: i video non si possono leggere.</Notice>}
 
       {/* l'unica barra filtri: vale per video e profili */}
-      <div style={{ ...cardBox, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", padding: "12px 14px" }}>
+      <FilterBar onReset={pf !== "all" || who !== "all" || period !== "7" || sort !== "outlier" ? () => { setPf("all"); setWho("all"); setPeriod("7"); setSort("outlier"); } : null}>
         <Seg items={[["ita", `Italia · ${profiles.filter((p) => p.country === "ita").length}`], ["eng", `Inglese · ${profiles.filter((p) => p.country === "eng").length}`], ["all", "Tutti i paesi"]]} value={cf} onChange={(v) => { setCf(v); setWho("all"); }} />
         <select aria-label="Piattaforma" style={selSt} value={pf} onChange={(e) => { setPf(e.target.value); setWho("all"); }}>
           <option value="all">Instagram e TikTok</option><option value="ig">Solo Instagram</option><option value="tt">Solo TikTok</option>
@@ -234,9 +237,7 @@ export default function ClipRadar() {
         <select aria-label="Ordina" style={selSt} value={sort} onChange={(e) => setSort(e.target.value)}>
           {SORTS.map(([k, l]) => <option key={k} value={k}>Ordina: {l.toLowerCase()}</option>)}
         </select>
-        <span style={{ flex: 1 }} />
-        <button type="button" style={btnPrimary} onClick={() => setAdding({ platform: "ig", country: cf === "all" ? "ita" : cf, text: "" })}><Plus size={15} />Aggiungi profilo</button>
-      </div>
+      </FilterBar>
       {noCountry > 0 && cf !== "all" && <p style={{ ...hint, margin: "-4px 0 10px" }}>{noCountry} profili senza paese si vedono solo in «Tutti i paesi».</p>}
       {msg && <Notice>{msg}</Notice>}
 
@@ -257,6 +258,7 @@ export default function ClipRadar() {
                   : "Nessun video in questo periodo."}
               </p>
               {listed.length > 0 && period !== "30" && <button type="button" style={btn} onClick={resetFilters}>Mostra gli ultimi 30 giorni di tutti</button>}
+              {!listed.length && cf !== "all" && !profiles.some((p) => p.country === cf) && <button type="button" style={btnPrimary} onClick={() => setAdding({ platform: "ig", country: cf, text: "" })}><Plus size={15} />Aggiungi un profilo {cf === "ita" ? "italiano" : "inglese"}</button>}
             </div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 200px), 1fr))", gap: 12, alignItems: "stretch" }}>
