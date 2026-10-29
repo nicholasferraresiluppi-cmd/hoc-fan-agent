@@ -9,7 +9,7 @@ import { Bookmark, BookmarkCheck, Download, ExternalLink, Music, Play, Plus, Ref
 import { CP, alpha } from "@/lib/brand";
 import { Notice, NUM } from "@/components/ds";
 import { confirmDialog } from "@/components/AppDialogs";
-import { btn, btnPrimary, btnSm, input, cardBox, hint, SectionHead, Seg, Chip } from "@/components/warmup/ui";
+import { btn, btnPrimary, btnSm, input, cardBox, hint, SectionHead, Seg, Chip, ModalBox, Field } from "@/components/warmup/ui";
 import { shortNum, ageLabel, profileUrl } from "@/lib/clip-radar-core";
 import { deliverFiles } from "@/lib/editoriale-download";
 
@@ -147,23 +147,24 @@ function ProfileRow({ p, onRemove, onLabel, busy }) {
   );
 }
 
+// Una sola barra filtri in cima (29/10, Nicholas: «è normale che ci siano filtri differenti?» — no):
+// paese, piattaforma, profili, periodo e ordine valgono per TUTTA la pagina, video e profili.
+// Aggiungere un profilo è un'azione, non un filtro: pulsante + finestra con le sue scelte.
+const selSt = { ...input, width: "auto", fontSize: 13.5, padding: "7px 10px" };
+
 export default function ClipRadar() {
   const { data, error, mutate } = useSWR(API, fetcher, {
     revalidateOnFocus: false,
     refreshInterval: (d) => (d?.profiles?.some((p) => p.reading) ? 6000 : 0),
   });
-  const [plat, setPlat] = useState("ig");
-  const [addCountry, setAddCountry] = useState("ita");
-  // paese = la divisione principale (29/10, Nicholas: «i meme sono diversi per country»), ricordata per persona
+  // paese = la divisione principale («i meme sono diversi per country»), ricordata per persona
   const [cf, setCfState] = useState(() => { try { return localStorage.getItem("hoc:clipradar:country") || "ita"; } catch { return "ita"; } });
-  const setCf = (v) => { setCfState(v); if (v !== "all") setAddCountry(v); try { localStorage.setItem("hoc:clipradar:country", v); } catch {} };
-  const [text, setText] = useState("");
-  const [days, setDays] = useState("7");
-  const [pf, setPf] = useState("all");
+  const setCf = (v) => { setCfState(v); try { localStorage.setItem("hoc:clipradar:country", v); } catch {} };
+  const [pf, setPf] = useState("all");          // piattaforma
+  const [who, setWho] = useState("all");        // all | ext | ours | id di un profilo
+  const [period, setPeriod] = useState("7");    // 7 | 30 | saved
   const [sort, setSort] = useState("outlier");
-  const [who, setWho] = useState("");
-  const [side, setSide] = useState("all"); // all | ours | ext
-  const [onlySaved, setOnlySaved] = useState(false);
+  const [adding, setAdding] = useState(null);   // { platform, country, text } quando la finestra è aperta
   const [busy, setBusy] = useState(null);
   const [msg, setMsg] = useState(null);
   const run = async (label, body, okText) => {
@@ -173,99 +174,131 @@ export default function ClipRadar() {
     finally { setBusy(null); }
   };
   const saved = data?.saved || {};
+  const profiles = data?.profiles || [];
+  // i profili che passano paese + piattaforma: base sia per l'elenco sia per la tendina «Profili»
+  const inScope = profiles.filter((p) => (cf === "all" || p.country === cf) && (pf === "all" || p.platform === pf));
+  const profOk = (p) => inScope.includes(p) && (who === "all" || (who === "ext" ? !p.ours : who === "ours" ? p.ours : p.id === who));
+  const okIds = new Set(profiles.filter(profOk).map((p) => p.id));
   const shown = useMemo(() => {
     if (!data) return [];
     const now = data.now || Date.now();
     const key = { outlier: (v) => v.outlier ?? -1, views: (v) => v.views ?? -1, likes: (v) => v.likes ?? -1, comments: (v) => v.comments ?? -1, shares: (v) => v.shares ?? -1, recent: (v) => v.postedAt || 0, speed: (v) => v.perHour ?? -1 }[sort];
     return data.videos
-      .filter((v) => (onlySaved ? saved[v.id] : v.postedAt && now - v.postedAt <= Number(days) * 86_400_000))
-      .filter((v) => (pf === "all" || v.platform === pf) && (!who || v.profileId === who) && (side === "all" || (side === "ours" ? v.ours : !v.ours)) && (cf === "all" || v.country === cf))
+      .filter((v) => okIds.has(v.profileId))
+      .filter((v) => (period === "saved" ? saved[v.id] : v.postedAt && now - v.postedAt <= Number(period) * 86_400_000))
       .sort((a, b) => key(b) - key(a))
       .slice(0, 60);
-  }, [data, days, pf, who, side, cf, sort, onlySaved, saved]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, period, sort, saved, cf, pf, who]);
 
   if (error) return <Notice danger>{error.message}</Notice>;
   if (!data) return <p style={hint}>Carico…</p>;
-  const profiles = data.profiles || [];
-  const nSaved = Object.keys(saved).length;
+  const nSaved = Object.keys(saved).filter((id) => data.videos.some((v) => v.id === id && okIds.has(v.profileId))).length;
+  const listed = profiles.filter(profOk);
   const add = async () => {
-    const d = await run("add", { action: "add", text, platform: plat, country: addCountry }, (r) => (r.exists ? "Questo profilo è già nel radar." : "Aggiunto: leggo i suoi video (meno di un minuto)."));
-    if (d) setText("");
+    const d = await run("add", { action: "add", text: adding.text, platform: adding.platform, country: adding.country }, (r) => (r.exists ? "Questo profilo è già nel radar." : "Aggiunto: leggo i suoi video (meno di un minuto)."));
+    if (d) setAdding(null);
   };
   const remove = async (p) => {
     if (!(await confirmDialog(`Togliere @${p.handle} dal radar? I suoi video escono dall'elenco (le idee salvate restano).`, { title: "Togli profilo", ok: "Togli", danger: true }))) return;
     run("remove", { action: "remove", id: p.id }, null);
   };
   const lastRun = data.run?.at ? new Date(data.run.at).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : null;
+  const noCountry = profiles.filter((p) => !p.country).length;
+  const resetFilters = () => { setPf("all"); setWho("all"); setPeriod("30"); };
 
   return (
     <div>
-      <p style={{ fontSize: 14, color: CP.textSecondary, margin: "0 0 14px", maxWidth: 820, lineHeight: 1.55 }}>
-        I profili di clipping che volete tenere d&apos;occhio, su Instagram e TikTok: ogni notte si leggono i loro ultimi video e qui vedete quelli che hanno funzionato. Il numero grande sulla copertina è il <b style={{ fontWeight: 500 }}>multiplo sul solito del profilo</b>: «×4» vuol dire quattro volte le visualizzazioni che quella pagina fa di norma — è il segno che quel video (gancio, formato, audio) ha preso, anche su una pagina piccola.
+      <p style={{ fontSize: 14, color: CP.textSecondary, margin: "0 0 12px", maxWidth: 820, lineHeight: 1.55 }}>
+        I video dei profili di clipping che funzionano. Il numero sulla copertina dice quante volte un video ha superato il solito di quel profilo.
       </p>
       {!data.configured && <Notice danger>Apify non è configurato sul server: i video non si possono leggere.</Notice>}
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
-        <span style={{ fontSize: 14, color: CP.textSecondary }}>Paese</span>
-        <Seg items={[["ita", `Italia · ${profiles.filter((p) => p.country === "ita").length}`], ["eng", `Inglese · ${profiles.filter((p) => p.country === "eng").length}`], ["all", "Tutti"]]} value={cf} onChange={(v) => { setCf(v); setWho(""); }} />
-        {profiles.some((p) => !p.country) && <span style={{ ...hint, color: CP.attn }}>{profiles.filter((p) => !p.country).length} profili senza paese: li vedi in «Tutti», sceglilo in «Nome e nota»</span>}
-      </div>
 
-      <div style={{ ...cardBox, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <Seg items={[["ig", "Instagram"], ["tt", "TikTok"]]} value={plat} onChange={setPlat} />
-        <Seg items={[["ita", "ITA"], ["eng", "ENG"]]} value={addCountry} onChange={setAddCountry} />
-        <input style={{ ...input, flex: "1 1 240px" }} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && text.trim() && !busy) add(); }} placeholder={plat === "tt" ? "link tiktok.com/@… oppure @nome" : "link instagram.com/… oppure @nome"} />
-        <button type="button" style={btnPrimary} disabled={!!busy || !text.trim()} onClick={add}><Plus size={15} />{busy === "add" ? "Aggiungo…" : "Aggiungi al radar"}</button>
+      {/* l'unica barra filtri: vale per video e profili */}
+      <div style={{ ...cardBox, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", padding: "12px 14px" }}>
+        <Seg items={[["ita", `Italia · ${profiles.filter((p) => p.country === "ita").length}`], ["eng", `Inglese · ${profiles.filter((p) => p.country === "eng").length}`], ["all", "Tutti i paesi"]]} value={cf} onChange={(v) => { setCf(v); setWho("all"); }} />
+        <select aria-label="Piattaforma" style={selSt} value={pf} onChange={(e) => { setPf(e.target.value); setWho("all"); }}>
+          <option value="all">Instagram e TikTok</option><option value="ig">Solo Instagram</option><option value="tt">Solo TikTok</option>
+        </select>
+        <select aria-label="Profili" style={selSt} value={who} onChange={(e) => setWho(e.target.value)}>
+          <option value="all">Tutti i profili</option>
+          <option value="ext">Solo da fuori</option>
+          <option value="ours">Solo i nostri</option>
+          <optgroup label="Un profilo">
+            {inScope.map((p) => <option key={p.id} value={p.id}>{p.label || `@${p.handle}`}{p.ours ? " (nostro)" : ""}</option>)}
+          </optgroup>
+        </select>
+        <select aria-label="Periodo" style={selSt} value={period} onChange={(e) => setPeriod(e.target.value)}>
+          <option value="7">Ultimi 7 giorni</option><option value="30">Ultimi 30 giorni</option><option value="saved">Idee salvate</option>
+        </select>
+        <select aria-label="Ordina" style={selSt} value={sort} onChange={(e) => setSort(e.target.value)}>
+          {SORTS.map(([k, l]) => <option key={k} value={k}>Ordina: {l.toLowerCase()}</option>)}
+        </select>
+        <span style={{ flex: 1 }} />
+        <button type="button" style={btnPrimary} onClick={() => setAdding({ platform: "ig", country: cf === "all" ? "ita" : cf, text: "" })}><Plus size={15} />Aggiungi profilo</button>
       </div>
+      {noCountry > 0 && cf !== "all" && <p style={{ ...hint, margin: "-4px 0 10px" }}>{noCountry} profili senza paese si vedono solo in «Tutti i paesi».</p>}
       {msg && <Notice>{msg}</Notice>}
 
-      <SectionHead aside={`${profiles.filter((p) => !p.ours).length} di ${data.max} da fuori · ${profiles.filter((p) => p.ours).length} nostri (entrano da soli da Account social)`}>Profili monitorati</SectionHead>
       {!profiles.length ? (
         <div style={{ ...cardBox, textAlign: "center", padding: "26px 18px" }}>
-          <p style={{ ...hint, margin: 0, fontSize: 14 }}>Nessun profilo nel radar: incolla qui sopra il link di una pagina di clipping che fa numeri.</p>
+          <p style={{ ...hint, margin: "0 0 12px", fontSize: 14 }}>Il radar è vuoto: aggiungi una pagina di clipping che fa numeri.</p>
+          <button type="button" style={btnPrimary} onClick={() => setAdding({ platform: "ig", country: cf === "all" ? "ita" : cf, text: "" })}><Plus size={15} />Aggiungi profilo</button>
         </div>
       ) : (
-        <div style={{ ...cardBox, paddingTop: 6, paddingBottom: 6 }}>
-          {profiles.filter((p) => cf === "all" || p.country === cf).map((p) => (
-            <ProfileRow key={p.id} p={p} busy={!!busy} onRemove={remove} onLabel={(id, label, note, country) => run("label", { action: "label", id, label, note, country }, null)} />
-          ))}
-        </div>
-      )}
-
-      {profiles.length > 0 && (
         <>
-          <SectionHead aside={onlySaved ? "le idee salvate da chi pubblica" : `ultimi ${days} giorni`}>Video che funzionano</SectionHead>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
-            <Seg items={[["7", "7 giorni"], ["30", "30 giorni"]]} value={onlySaved ? "" : days} onChange={(v) => { setDays(v); setOnlySaved(false); }} />
-            <Seg items={[["saved", `Idee salvate · ${nSaved}`]]} value={onlySaved ? "saved" : ""} onChange={() => setOnlySaved(!onlySaved)} />
-            <span style={{ flex: 1 }} />
-            <select style={{ ...input, width: "auto", fontSize: 13.5, padding: "7px 10px" }} value={sort} onChange={(e) => setSort(e.target.value)}>
-              {SORTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-            </select>
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
-            <Seg items={[["all", "Tutte"], ["ig", "Instagram"], ["tt", "TikTok"]]} value={pf} onChange={(v) => { setPf(v); setWho(""); }} />
-            <Seg items={[["all", "Tutti i profili"], ["ext", "Da fuori"], ["ours", "I nostri"]]} value={side} onChange={(v) => { setSide(v); setWho(""); }} />
-            <select style={{ ...input, width: "auto", fontSize: 13.5, padding: "7px 10px" }} value={who} onChange={(e) => setWho(e.target.value)}>
-              <option value="">Tutti i profili</option>
-              {profiles.filter((p) => (pf === "all" || p.platform === pf) && (side === "all" || (side === "ours" ? p.ours : !p.ours)) && (cf === "all" || p.country === cf)).map((p) => <option key={p.id} value={p.id}>{p.label || `@${p.handle}`}</option>)}
-            </select>
-          </div>
+          <SectionHead aside={period === "saved" ? `${nSaved} idee salvate` : `${shown.length} video`}>Video che funzionano</SectionHead>
           {!shown.length ? (
             <div style={{ ...cardBox, textAlign: "center", padding: "26px 18px" }}>
-              <p style={{ ...hint, margin: 0, fontSize: 14 }}>
-                {onlySaved ? "Nessuna idea salvata: premi «Salva idea» sotto un video da rifare." : profiles.some((p) => p.reading) ? "Sto leggendo i video dei profili appena aggiunti…" : "Nessun video in questo periodo: prova «30 giorni» o aggiungi altri profili."}
+              <p style={{ ...hint, margin: "0 0 12px", fontSize: 14 }}>
+                {!listed.length ? (cf !== "all" && !profiles.some((p) => p.country === cf) ? `Nessun profilo ${cf === "ita" ? "italiano" : "inglese"} nel radar: aggiungine uno.` : "Nessun profilo con questi filtri.")
+                  : period === "saved" ? "Nessuna idea salvata qui: premi «Salva idea» sotto un video da rifare."
+                  : listed.some((p) => p.reading) ? "Sto leggendo i video dei profili appena aggiunti…"
+                  : "Nessun video in questo periodo."}
               </p>
+              {listed.length > 0 && period !== "30" && <button type="button" style={btn} onClick={resetFilters}>Mostra gli ultimi 30 giorni di tutti</button>}
             </div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 200px), 1fr))", gap: 12, alignItems: "stretch" }}>
               {shown.map((v) => <VideoCard key={v.id} v={v} saved={Boolean(saved[v.id])} busy={busy === "save"} onSave={(id, on) => run("save", { action: "save", videoId: id, on }, null)} />)}
             </div>
           )}
-          <p style={{ ...hint, marginTop: 14, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <span>«Di solito» = mediana delle visualizzazioni dei video del profilo negli ultimi 30 giorni (servono almeno 3 video; i fissati non contano). «/ora» = visualizzazioni prese nelle ultime 24 ore lette, o dall&apos;uscita. Lettura ogni notte{lastRun ? `, l'ultima ${lastRun}` : ""} · spesa del mese ~{String(data.spent).replace(".", ",")} $ su un tetto di {data.cap} $.</span>
+
+          <details style={{ ...cardBox, padding: 0, marginTop: 16 }}>
+            <summary style={{ cursor: "pointer", padding: "13px 16px", fontSize: 14, fontWeight: 500 }}>
+              Profili monitorati · {listed.length}{listed.length !== profiles.length ? ` di ${profiles.length}` : ""} <span style={{ ...hint, fontWeight: 400 }}>· i nostri entrano da soli da Account social</span>
+            </summary>
+            <div style={{ padding: "0 16px 8px" }}>
+              {!listed.length ? <p style={{ ...hint, margin: "4px 0 10px" }}>Nessun profilo con questi filtri.</p>
+                : listed.map((p) => (
+                  <ProfileRow key={p.id} p={p} busy={!!busy} onRemove={remove} onLabel={(id, label, note, country) => run("label", { action: "label", id, label, note, country }, null)} />
+                ))}
+            </div>
+          </details>
+
+          <details style={{ marginTop: 12 }}>
+            <summary style={{ cursor: "pointer", ...hint, fontSize: 13 }}>Come si leggono i numeri · lettura ogni notte{lastRun ? `, l'ultima ${lastRun}` : ""}</summary>
+            <p style={{ ...hint, margin: "8px 0", maxWidth: 820 }}>
+              «×4» = quattro volte le visualizzazioni tipiche del profilo («di solito»: mediana dei suoi video degli ultimi 30 giorni, servono almeno 3 video; i fissati non contano). È il segno che quel video — gancio, formato, audio — ha preso, anche su una pagina piccola. «/ora» = visualizzazioni prese nelle ultime 24 ore lette, o dall&apos;uscita. Spesa del mese ~{String(data.spent).replace(".", ",")} $ su un tetto di {data.cap} $.
+            </p>
             <button type="button" style={btnSm} disabled={!!busy} onClick={() => run("refresh", { action: "refresh" }, (d) => `Riletti ${d.result.read} profili, ${d.result.videos} video (~${String(d.result.usd).replace(".", ",")} $).`)}><RefreshCw size={13} />{busy === "refresh" ? "Rileggo… (fino a due minuti)" : "Rileggi adesso"}</button>
-          </p>
+          </details>
         </>
+      )}
+
+      {adding && (
+        <ModalBox title="Aggiungi un profilo al radar" sub="Una pagina che fa numeri e da cui prendere idee. I nostri profili non serve aggiungerli: entrano da soli da Account social."
+          onClose={() => setAdding(null)}
+          foot={<>
+            <button type="button" style={btn} onClick={() => setAdding(null)}>Annulla</button>
+            <button type="button" style={btnPrimary} disabled={!!busy || !adding.text.trim()} onClick={add}><Plus size={15} />{busy === "add" ? "Aggiungo…" : "Aggiungi"}</button>
+          </>}>
+          <Field label="Piattaforma"><Seg items={[["ig", "Instagram"], ["tt", "TikTok"]]} value={adding.platform} onChange={(v) => setAdding((a) => ({ ...a, platform: v }))} /></Field>
+          <Field label="Paese del profilo" hint="I meme cambiano da paese a paese: il radar li tiene separati."><Seg items={[["ita", "Italia"], ["eng", "Inglese"]]} value={adding.country} onChange={(v) => setAdding((a) => ({ ...a, country: v }))} /></Field>
+          <Field label="Link o nome">
+            <input autoFocus style={input} value={adding.text} onChange={(e) => setAdding((a) => ({ ...a, text: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter" && adding.text.trim() && !busy) add(); }} placeholder={adding.platform === "tt" ? "tiktok.com/@… oppure @nome" : "instagram.com/… oppure @nome"} />
+          </Field>
+        </ModalBox>
       )}
     </div>
   );
