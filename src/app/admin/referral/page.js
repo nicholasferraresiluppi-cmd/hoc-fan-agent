@@ -105,7 +105,7 @@ function RecruitModal({ initial, data, onClose, onDone }) {
   const [f, setF] = useState({
     name: initial?.name || "", referrerId: initial?.referrerId || "", storyId: initial?.storyId || "",
     hrPersonId: initial?.hrPersonId || "", inflowwName: initial?.inflowwName || "",
-    interviewAt: initial?.interviewAt || "", trainingAt: initial?.trainingAt || "",
+    contactedAt: initial?.contactedAt || "", interviewAt: initial?.interviewAt || "", trainingAt: initial?.trainingAt || "",
     trainingPassed: initial?.trainingPassed == null ? "" : String(initial.trainingPassed),
     firstShiftAt: initial?.firstShiftAt || "", exitedAt: initial?.exitedAt || "",
     note: initial?.note || "", shiftsManual: initial?.shiftsManual ?? "",
@@ -137,6 +137,9 @@ function RecruitModal({ initial, data, onClose, onDone }) {
         <Field label="Nome su Infloww" hint="Serve per leggere da solo il venduto del mese.">
           <input style={inp} list="ref-infloww" value={f.inflowwName} onChange={set("inflowwName")} placeholder="Scegli dall'elenco" />
           <datalist id="ref-infloww">{data.inflowwNames.map((n) => <option key={n} value={n} />)}</datalist>
+        </Field>
+        <Field label="Ha scritto a Claudia il" hint={`La prova vale per chi scrive entro il ${fmtDay(data.rules?.campaignUntil)}. Vuoto = giorno in cui la inserisci.`}>
+          <input style={inp} type="date" value={f.contactedAt} onChange={set("contactedAt")} />
         </Field>
         <Field label="Colloquio"><input style={inp} type="date" value={f.interviewAt} onChange={set("interviewAt")} /></Field>
         <Field label="Formazione"><input style={inp} type="date" value={f.trainingAt} onChange={set("trainingAt")} /></Field>
@@ -600,7 +603,7 @@ export default function ReferralAdminPage() {
               onRowClick={(r) => setModal({ kind: "recruit", initial: r })}
               defaultSort={{ key: "createdAt", dir: -1 }}
               columns={[
-                { key: "name", label: "Persona", render: (r) => <span>{r.name}{r.exitedAt && <span style={{ color: CP.textMuted }}> · uscita</span>}</span> },
+                { key: "name", label: "Persona", render: (r) => <span>{r.name}{r.exitedAt && <span style={{ color: CP.textMuted }}> · uscita</span>}{r.outOfCampaign && <span style={{ color: CP.attn }} title={`Primo contatto il ${fmtDay(r.contactDay)}: dopo la fine della prova`}> · fuori dalla prova</span>}</span> },
                 { key: "ref", label: "Portata da", muted: true, render: (r) => refName[r.referrerId] || "—", sort: (r) => refName[r.referrerId] || "" },
                 { key: "next", label: "A che punto è", sort: (r) => r.steps.next || "", render: (r) => {
                   const st = r.steps.steps.find((s) => s.key === r.steps.next);

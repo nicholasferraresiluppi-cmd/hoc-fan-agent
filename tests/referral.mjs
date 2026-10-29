@@ -357,6 +357,26 @@ const turni = (n, from = "2026-11-03") => Array.from({ length: n }, (_, i) => { 
   ok((await L.referrerDashboard(me, { now: NOW })).payslips.length >= 1, "il referente vede le sue buste");
 }
 
-ok(R.version === "ref-3");
+ok(R.version === "ref-4");
+
+// ── prova: vale per chi scrive all'Area Partner entro il 30/11/2026 (ref-4) ──
+{
+  const { inCampaign, contactDay } = await import("../src/lib/referral-core.js");
+  ok(inCampaign({ contactedAt: "2026-11-30" }), "il 30 novembre è dentro");
+  ok(!inCampaign({ contactedAt: "2026-12-01" }), "il 1 dicembre è fuori");
+  ok(inCampaign({}), "senza data non si toglie niente");
+  eq(contactDay({ createdAt: Date.parse("2026-11-30T23:30:00+01:00") }), "2026-11-30", "giorno dell'inserimento in ora italiana");
+  ok(!inCampaign({ createdAt: Date.parse("2026-12-01T00:10:00+01:00") }), "inserita il 1 dicembre (ora italiana) = fuori");
+  ok(inCampaign({ contactedAt: "2026-11-28", createdAt: Date.parse("2026-12-03T10:00:00Z") }), "vince la data del contatto scritta dall'HR");
+  const late = { ...luca, contactedAt: "2026-12-02" };
+  const ms = recruitMilestones(late, { today: "2027-02-05", salesByMonth: { "2026-11": 8400, "2026-12": 6200, "2027-01": 100 }, shiftDates: turni(60), fx: FX });
+  ok(ms.every((m) => m.status === "perso" && m.outOfCampaign), "fuori dalla prova: niente matura");
+  ok(/Fuori dalla prova/.test(ms[0].why), ms[0].why);
+  const msPaid = recruitMilestones(late, { today: "2027-02-05", shiftDates: turni(60), fx: FX, paid: { "rc1:first_shift": { amountEur: 50, paidAt: "2026-12-10" } } });
+  eq(msPaid.find((m) => m.kind === "first_shift").status, "pagato", "il già pagato resta pagato");
+  eq(storyMilestone({ id: "s9", agreedAt: "2026-12-01", publishedAt: ["2026-12-02", "2026-12-03"] }, { today: "2026-12-05" }).status, "perso", "storie concordate dopo la prova");
+  eq(storyMilestone({ id: "s9", agreedAt: "2026-11-30", publishedAt: ["2026-12-02", "2026-12-03"] }, { today: "2026-12-05" }).status, "maturato", "concordate il 30/11, pubblicate dopo: valgono");
+  eq(validateRecruit({ name: "X", referrerId: "r", contactedAt: "30/11" }).error, "Primo contatto: data non valida");
+}
 
 console.log(`referral: ${n} verifiche ok`);
