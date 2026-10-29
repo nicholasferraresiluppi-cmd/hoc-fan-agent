@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
-import { ChevronRight, Flag, Pencil, Plus, Trash2, Undo2, UserRound, ExternalLink } from "lucide-react";
+import { Check, ChevronRight, Flag, Pencil, Plus, Trash2, Undo2, UserRound, ExternalLink } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHead, Notice, NUM, FilterChip, Tabs, Segmented, FilterBar } from "@/components/ds";
 import {
@@ -445,6 +445,19 @@ function RenameModal({ old, onClose, onSave }) {
 
 // ── grafico piccolo, una serie ──────────────────────────────────────────────
 
+// casella di un profilo dentro un'azione (vista «per azione» di Oggi): tutto il bottone si tocca
+function ProfileCheck({ a, on, onToggle }) {
+  return (
+    <button type="button" onClick={onToggle} aria-pressed={on} title={on ? "Fatta: tocca per riaprire" : "Tocca per segnarla fatta"}
+      style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 10px 6px 6px", minHeight: 36, borderRadius: 10, border: `1px solid ${on ? alpha(CP.accentGreen, "66") : CP.border}`, background: on ? alpha(CP.accentGreen, "14") : CP.surface, color: on ? CP.textMuted : CP.textPrimary, cursor: "pointer", fontFamily: FONTS.body, fontSize: 13.5, flex: "0 0 auto" }}>
+      <span style={{ width: 22, height: 22, borderRadius: 6, border: `1.5px solid ${on ? CP.accentGreen : CP.borderStrong}`, background: on ? CP.accentGreen : "transparent", display: "grid", placeItems: "center" }}>
+        {on && <Check size={14} strokeWidth={3} color={CP.surface} />}
+      </span>
+      <span style={{ textDecoration: on ? "line-through" : "none" }}>{a.username}</span>
+    </button>
+  );
+}
+
 // giorno locale come YYYY-MM-DD
 const isoDay = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
@@ -506,6 +519,10 @@ export default function WarmupPage() {
   const [perFrom, setPerFrom] = useState(() => isoDay(Date.now() - 6 * DAY));
   const [perTo, setPerTo] = useState(() => isoDay(Date.now()));
   const [panoCreator, setPanoCreator] = useState("");
+  // Oggi: per profilo o per azione (29/10, pannello tester: con 10-20 profili la stessa lista si ripete ~340 righe)
+  const [oggiVista, setOggiVistaState] = useState(null);
+  const setOggiVista = (v) => { setOggiVistaState(v); try { localStorage.setItem("hoc:warmup:oggi-vista", v); } catch {} };
+  useEffect(() => { try { const v = localStorage.getItem("hoc:warmup:oggi-vista"); if (v === "prof" || v === "azione") setOggiVistaState(v); } catch {} }, []);
   const [panoAcc, setPanoAcc] = useState("");
   const [wkAll, setWkAll] = useState(null);
   const [sortAll, setSortAll] = useState("views");
@@ -670,10 +687,11 @@ export default function WarmupPage() {
   const openProfile = (id, p = "oggi") => { setTab("acct"); setSel(id); setPane(p); setOpenWhy({}); setForm(null); const a = byId(id); setFolder(a?.creator || null); window.scrollTo(0, 0); };
 
   // ── righe di task con timer ──
-  function taskRow(a, item, done, day) {
+  // stato di una task su un profilo: fatta (anche in automatico), timer, contenuto in calendario
+  function taskBits(a, item, done, day) {
     // spunta anche quando il contenuto di questa task è stato trovato sul profilo (pubblicato in automatico)
     const auto = !done[item.id] && pubKindOfTask(item.id) && !isX(a) ? autoItemForTask((a.ed?.[day] || []).map((x) => ({ ...x, slot: { profileId: a.id, date: day, time: x.time } })), a.id, day, item.id) : null;
-    const k = a.id + ":" + item.id, on = Boolean(done[item.id] || auto);
+    const on = Boolean(done[item.id] || auto);
     let timerEl = null;
     if (item.timer && day === todayKey()) {
       const run = timer && timer.acc === a.id && timer.task === item.id;
@@ -681,7 +699,11 @@ export default function WarmupPage() {
       if (!on || run) timerEl = <TimerChip item={item} running={run} left={timerLeft(timer)} doneMin={mins} onStart={() => startTimer(a, item)} onPause={() => (item.timer.mode === "accum" ? stopTimer() : setTimer(null))} />;
       else if (mins > 0) timerEl = <div style={{ ...hint, marginTop: 4 }}>{mins} min col timer</div>;
     }
-    const edEl = edLine(a, item.id, day, on);
+    return { on, timerEl, edEl: edLine(a, item.id, day, on) };
+  }
+  function taskRow(a, item, done, day) {
+    const k = a.id + ":" + item.id;
+    const { on, timerEl, edEl } = taskBits(a, item, done, day);
     return <TaskRow key={k} item={item} done={on} open={openWhy[k]} onToggle={() => toggleTask(a, item.id, day)} onWhy={() => setOpenWhy((o) => ({ ...o, [k]: !o[k] }))} timer={edEl ? <>{timerEl}{edEl}</> : timerEl} />;
   }
   // fila di anteprime del contenuto (tutte le foto del carosello, o il reel): un tocco le ingrandisce
@@ -776,6 +798,69 @@ export default function WarmupPage() {
   };
   const mineSeg = () => (ACC.some((a) => a.owner) ? <Seg items={[["0", "Tutti"], ["1", `I miei${ACC.filter(isMine).length ? " · " + ACC.filter(isMine).length : ""}`]]} value={onlyMine ? "1" : "0"} onChange={(v) => setOnlyMine(v === "1")} /> : null);
 
+  // Oggi «per azione»: una riga per azione, dentro i profili che la devono fare (con casella).
+  // Si raggruppa per testo della task: la stessa azione ha lo stesso testo su tutti i profili.
+  function viewByAction(blocks, tk) {
+    const groups = new Map();
+    for (const { a, t } of blocks) {
+      for (const item of t.items) {
+        const g = groups.get(item.t) || { item, rows: [] };
+        g.rows.push({ a, item, done: t.done });
+        groups.set(item.t, g);
+      }
+    }
+    const all = [...groups.values()].map((g) => {
+      const bits = g.rows.map((r) => ({ ...r, ...taskBits(r.a, r.item, r.done, tk) }));
+      return { ...g, bits, open: bits.filter((b) => !b.on).length };
+    });
+    const req = all.filter((g) => !g.item.opt && g.open).sort((x, y) => y.open - x.open);
+    const opt = all.filter((g) => g.item.opt && g.open);
+    const doneAll = all.filter((g) => !g.open);
+    const rich = (item) => Boolean(item.timer) || Boolean(pubKindOfTask(item.id));
+    const card = (g) => {
+      const k = "act:" + g.item.t;
+      return (
+        <div key={k} style={{ ...cardBox, padding: 0, marginBottom: 10, overflow: "hidden" }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, lineHeight: 1.4 }}>{g.item.t}{g.item.opt && <span style={{ ...muted, fontSize: 12.5 }}> · facoltativa</span>}</div>
+              {openWhy[k] && g.item.why && <div style={{ fontSize: 13.5, color: CP.textSecondary, lineHeight: 1.55, marginTop: 6 }}>{g.item.why}</div>}
+            </div>
+            <span style={{ fontSize: 13, color: g.open ? CP.textSecondary : CP.accentGreen, whiteSpace: "nowrap", ...NUM }}>{g.open ? `${g.open} da fare su ${g.bits.length}` : "fatta ovunque"}</span>
+            {g.item.why && <button type="button" onClick={() => setOpenWhy((o) => ({ ...o, [k]: !o[k] }))} aria-label="Perché" title="Perché" style={{ width: 28, height: 28, flex: "0 0 auto", borderRadius: "50%", border: `1px solid ${CP.borderSoft}`, background: CP.surfaceAlt, color: CP.textSecondary, cursor: "pointer", fontSize: 13 }}>{openWhy[k] ? "×" : "?"}</button>}
+          </div>
+          {rich(g.item) ? (
+            g.bits.map((b) => (
+              <div key={b.a.id} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 14px", borderTop: `1px solid ${CP.borderSoft}`, background: b.on ? alpha(CP.accentGreen, "0d") : "transparent" }}>
+                <ProfileCheck a={b.a} on={b.on} onToggle={() => toggleTask(b.a, b.item.id, tk)} />
+                <div style={{ flex: 1, minWidth: 0 }}>{b.timerEl}{b.edEl}</div>
+              </div>
+            ))
+          ) : (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "10px 14px", borderTop: `1px solid ${CP.borderSoft}` }}>
+              {g.bits.map((b) => <ProfileCheck key={b.a.id} a={b.a} on={b.on} onToggle={() => toggleTask(b.a, b.item.id, tk)} />)}
+            </div>
+          )}
+        </div>
+      );
+    };
+    const extras = blocks.map(({ a, t }) => ({ a, el: edExtra(a, tk, t.items) })).filter((x) => x.el);
+    return (
+      <>
+        <SectionHead aside={`${req.length} azioni · tocca un profilo per segnarla fatta`}>Da fare oggi</SectionHead>
+        {req.length ? req.map(card) : <div style={{ ...cardBox, ...hint, textAlign: "center" }}>Le azioni obbligatorie di oggi sono fatte.</div>}
+        {extras.length > 0 && (
+          <>
+            <SectionHead>Anche in calendario oggi</SectionHead>
+            {extras.map((x) => <div key={x.a.id} style={{ ...cardBox, padding: 0, marginBottom: 10 }}><div style={{ padding: "10px 14px 0", fontSize: 14, fontWeight: 500 }}>{x.a.username}</div>{x.el}</div>)}
+          </>
+        )}
+        {opt.length > 0 && <Fold title={`${opt.length} ${opt.length === 1 ? "azione facoltativa" : "azioni facoltative"}`}>{opt.map(card)}</Fold>}
+        {doneAll.length > 0 && <Fold title={`${doneAll.length} ${doneAll.length === 1 ? "azione già fatta" : "azioni già fatte"} su tutti i profili`}>{doneAll.map(card)}</Fold>}
+      </>
+    );
+  }
+
   function viewToday() {
     const tk = todayKey(), yk = todayKey(new Date(Date.now() - DAY));
     const anyOwner = ACC.some((a) => a.owner);
@@ -788,11 +873,14 @@ export default function WarmupPage() {
     const urg = [...ACC.flatMap((a) => publicAlerts(a, a.pub).map((u) => ({ ...u, acc: a }))), ...urgenze(ACC)]
       .sort((x, y) => rankU[x.lev] - rankU[y.lev]).filter((u) => !om || isMine(u.acc));
     const todo = blocks.filter((b) => b.t.open.length), fine = blocks.filter((b) => !b.t.open.length);
+    // di base: per azione da 4 profili in su, per profilo sotto (scelta ricordata per persona)
+    const vista = oggiVista || (accs.length > 3 ? "azione" : "prof");
     return (
       <>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <p style={{ flex: 1, minWidth: 200, fontSize: 14, color: CP.textSecondary, margin: 0 }}>{new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}{ACC.length ? ` · ${openTot} task da fare su ${accs.length} profili` : ""}</p>
           {mineSeg()}
+          {accs.length > 1 && <Segmented label="Vista" items={[["azione", "Per azione"], ["prof", "Per profilo"]]} value={vista} onChange={setOggiVista} />}
         </div>
         {!ACC.length && <div style={{ ...cardBox, textAlign: "center", padding: "30px 18px" }}><h3 style={{ margin: "0 0 6px", fontWeight: 500 }}>Nessun profilo {PLATS[plat].label}</h3><p style={{ ...hint, margin: "0 0 14px" }}>Registra il primo profilo dalla scheda Account.</p><button type="button" style={btnPrimary} onClick={() => { setTab("acct"); setForm({}); }}><Plus size={15} />Nuovo profilo</button></div>}
         {urg.length > 0 && (
@@ -830,7 +918,8 @@ export default function WarmupPage() {
             <p style={{ ...hint, margin: 0 }}>{doneTot} task completate su {blocks.length} profili.</p>
           </div>
         )}
-        {todo.length > 0 && (
+        {todo.length > 0 && vista === "azione" && viewByAction(blocks, tk)}
+        {todo.length > 0 && vista !== "azione" && (
           <>
           <SectionHead aside={`${openTot} task su ${todo.length} ${todo.length === 1 ? "profilo" : "profili"}`}>Da fare oggi</SectionHead>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 420px), 1fr))", gap: 16, alignItems: "start" }}>
