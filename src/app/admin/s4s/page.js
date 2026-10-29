@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { AlertTriangle, Check, ChevronLeft, ChevronRight, Copy, RefreshCw } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, NUM } from "@/components/ds";
+import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, NUM, Tabs } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
 import { fmtInt, fmtPct, MONTHS_IT } from "@/lib/format";
 import { fillCaption, photosFor, needsPost, needsMass, availIssues } from "@/lib/s4s-core";
@@ -1401,12 +1401,8 @@ export default function S4SPage() {
         {allView && <button type="button" style={btn} disabled={refreshing} onClick={refresh}><RefreshCw size={14} />{refreshing ? "Aggiorno…" : "Aggiorna"}</button>}
       </div>
       <VetroWeek v={v} inbox={inbox} onOpenDay={(day) => { setFocusDay(day); setTab("agenda"); }} onTab={(k) => setTab(k)} />
-      <div role="tablist" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, borderBottom: `1px solid ${CP.border}`, paddingBottom: 12 }}>
-        {tabs.map(([k, l]) => (
-          <FilterChip key={k} active={current === k} onClick={() => { setTab(k); try { window.history.replaceState(null, "", `#${k}`); } catch { /* ok */ } }}
-            label={k === "risultati" && v.unmatched.length ? `${l} · ${v.unmatched.length} da attribuire` : k === "oggi" && inbox?.count ? `${l} · ${inbox.count}` : l} />
-        ))}
-      </div>
+      <Tabs value={current} style={{ marginBottom: 20 }} onChange={(k) => { setTab(k); try { window.history.replaceState(null, "", `#${k}`); } catch { /* ok */ } }}
+        items={tabs.map(([k, l]) => [k, l, k === "risultati" && v.unmatched.length ? `${v.unmatched.length} da attribuire` : k === "oggi" && inbox?.count ? inbox.count : null])} />
       {(current === "oggi" || current === "planner") && <Requests v={v} onEdit={setEditing} reload={reloadAll} />}
       {current === "oggi" && <Oggi key={v.split.id} v={v} reload={reloadAll} />}
       {current === "disponibilita" && <AvailEditor key={v.split.id} v={v} reload={reloadAll} />}

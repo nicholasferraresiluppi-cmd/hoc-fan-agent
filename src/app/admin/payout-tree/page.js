@@ -7,7 +7,7 @@ import { RefreshCw, ChevronDown, ChevronRight, Loader2, AlertTriangle, ArrowRigh
 import { CP, FONTS } from "@/lib/brand";
 import CompNav from "@/components/CompNav";
 import { MONTHS_IT } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, DataTable, card, NUM } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, DataTable, card, NUM, Tabs } from "@/components/ds";
 
 /**
  * /admin/payout-tree — Albero payout (trasparenza comp v2).
@@ -500,11 +500,7 @@ export default function PayoutTreePage() {
         }
       />
       <CompNav />
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        <FilterChip label="Albero per operatore" active={tab === "tree"} onClick={() => setTab("tree")} />
-        <FilterChip label="Rimborsi e compensi" active={tab === "refunds"} onClick={() => setTab("refunds")} />
-        <FilterChip label="Sincronizzazione dati" active={tab === "sync"} onClick={() => setTab("sync")} />
-      </div>
+      <Tabs items={[["tree", "Albero per operatore"], ["refunds", "Rimborsi e compensi"], ["sync", "Sincronizzazione dati"]]} value={tab} onChange={setTab} />
       {tab === "tree" && <TreeTab periodId={periodId} operator={operator} setOperator={setOperator} goSync={() => setTab("sync")} />}
       {tab === "refunds" && <RefundTab periodId={periodId} goSync={() => setTab("sync")} />}
       {tab === "sync" && <SyncTab periodId={periodId} />}

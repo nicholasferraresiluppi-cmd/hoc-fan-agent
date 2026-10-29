@@ -4,7 +4,7 @@ import useSWR from "swr";
 import { useMemo, useState } from "react";
 import { Plus, Send } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, HeroMetric, Metric, FilterChip, DataTable, Notice, SectionTitle, Disclosure } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, DataTable, Notice, SectionTitle, Disclosure, Tabs } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
 import { TutorialVideoButton } from "@/components/TutorialVideo";
 import VetroScope, { useVetro, VetroSwitch, VetroNum } from "@/components/VetroScope";
@@ -533,13 +533,8 @@ export default function ReferralAdminPage() {
           </HeroMetric>
           )}
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-            {TABS.map(([k, l]) => (
-              <FilterChip key={k} active={tab === k} onClick={() => setTab(k)}
-                attn={k === "fx" && data.fxMonths.some((m) => data.fx[m] == null)}
-                label={k === "topay" ? `${l} · ${data.toPay.length}` : k === "crm" ? `${l} · ${data.suggestions.length}` : k === "fx" ? `${l} · ${data.fxMonths.filter((m) => data.fx[m] == null).length} da inserire` : l} />
-            ))}
-          </div>
+          <Tabs value={tab} onChange={setTab}
+            items={TABS.map(([k, l]) => [k, l, k === "topay" ? data.toPay.length : k === "crm" ? data.suggestions.length : k === "fx" ? (data.fxMonths.filter((m) => data.fx[m] == null).length ? `${data.fxMonths.filter((m) => data.fx[m] == null).length} da inserire` : null) : null])} />
 
           {tab === "overview" && (
             <Overview vetro={vetro} d={data.dashboard} rules={data.rules} onOpenReferrer={(id) => { const r = data.referrers.find((x) => x.id === id); if (r) setModal({ kind: "referrer", initial: r }); }} />
