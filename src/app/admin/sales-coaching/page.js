@@ -18,7 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, NUM } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, NUM, Tabs } from "@/components/ds";
 import SquadraTab from "@/components/SquadraTab";
 import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
 import { RankBars } from "@/components/VetroCharts";
@@ -766,9 +766,7 @@ export default function SalesCoachingPage() {
         />
       )}
       <Glossary />
-      <div role="tablist" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, borderBottom: `1px solid ${CP.border}`, paddingBottom: 12 }}>
-        {TABS.map(([k, l]) => <FilterChip key={k} label={l} active={tab === k} onClick={() => { setTab(k); try { window.history.replaceState(null, "", `#${k}`); } catch { /* ok */ } }} />)}
-      </div>
+      <Tabs items={TABS} value={tab} style={{ marginBottom: 20 }} onChange={(k) => { setTab(k); try { window.history.replaceState(null, "", `#${k}`); } catch { /* ok */ } }} />
       {tab === "panoramica" && <Panoramica d={data} name={split?.name} />}
       {tab === "operatori" && <Operatori d={data} />}
       {tab === "squadra" && <SquadraTab splitId={split ? splitId : null} names={data.names} coachingOps={data.operators} />}

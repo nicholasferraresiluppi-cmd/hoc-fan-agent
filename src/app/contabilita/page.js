@@ -18,7 +18,7 @@ import useSWR from "swr";
 import { Plus, Loader2, Lock, Trash2, Check } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
-import { PageHead, FilterChip, Notice, DataTable, SectionTitle, Metric, card } from "@/components/ds";
+import { PageHead, FilterChip, Notice, DataTable, SectionTitle, Metric, card, Tabs } from "@/components/ds";
 import { computeMonth, monthLabel, nextMonthId, personKey, normalizeTiers, namesMatch } from "@/lib/compensi-core";
 import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
@@ -335,10 +335,8 @@ export default function ContabilitaPage() {
         {calc.totals.problems > 0 && <Notice danger>{calc.totals.problems} righe in gamification non si possono calcolare per intero (manca il cambio o la revenue di un progetto): per ora vale il minimo garantito. Vedi «Revenue e cambio».</Notice>}
         {draft.importedFrom && <Notice>Importato da {draft.importedFrom}. Le righe sono quelle del foglio così com'erano; le regole di gamification trovate nel foglio «Calcolo» sono allegate alle righe dei sales manager come proposta da confermare.</Notice>}
 
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
-          {tabs.map(([k, t]) => <FilterChip key={k} label={t} active={tab === k} onClick={() => setTab(k)} />)}
-          {(tab === "persone" || tab === "squadre") && <input style={{ ...input, maxWidth: 240, marginLeft: "auto" }} placeholder="Cerca persona, squadra, mansione" value={q} onChange={(e) => setQ(e.target.value)} />}
-        </div>
+        <Tabs items={tabs} value={tab} onChange={setTab}
+          aside={(tab === "persone" || tab === "squadre") ? <input style={{ ...input, maxWidth: 240 }} placeholder="Cerca persona, squadra, mansione" value={q} onChange={(e) => setQ(e.target.value)} /> : null} />
 
         {tab === "persone" && (
           <DataTable

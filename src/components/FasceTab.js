@@ -10,7 +10,7 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { CP, FONTS, alpha } from "@/lib/brand";
-import { FilterChip, DataTable, Notice, NUM, card } from "@/components/ds";
+import { FilterChip, DataTable, Notice, NUM, card, Tabs } from "@/components/ds";
 import { SLOTS, WEAK, STRONG, SLOT_DIFF, SLOT_MIN_H } from "@/lib/fasce-core";
 
 const fetcher = (url) =>
@@ -287,11 +287,7 @@ export default function FasceTab({ splitId }) {
         </Note>
       </div>
 
-      <div role="tablist" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <FilterChip label={`Ogni persona, fascia per fascia (${ops.length})`} active={view === "persone"} onClick={() => setView("persone")} />
-        <FilterChip label={`Da spostare (${togliere.length + portare.length})`} active={view === "azioni"} onClick={() => setView("azioni")} />
-        <FilterChip label={`Per pagina (${data.pages.length})`} active={view === "pagine"} onClick={() => setView("pagine")} />
-      </div>
+      <Tabs small items={[["persone", "Ogni persona, fascia per fascia", ops.length], ["azioni", "Da spostare", togliere.length + portare.length], ["pagine", "Per pagina", data.pages.length]]} value={view} onChange={setView} />
 
       {view === "azioni" && (
         <>

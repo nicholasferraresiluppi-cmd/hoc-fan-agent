@@ -14,7 +14,7 @@ import useSWR from "swr";
 import { Plus, Loader2, Lock, Trash2, Check, RefreshCw } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
-import { PageHead, FilterChip, Notice, card } from "@/components/ds";
+import { PageHead, FilterChip, Notice, card, Tabs } from "@/components/ds";
 import { computeSplitMonth, applyBusteExclusions, activeIn } from "@/lib/split-core";
 import { describeTiers, parseDealText } from "@/lib/creator-deals-core";
 import { monthLabel, nextMonthId } from "@/lib/compensi-core";
@@ -340,9 +340,7 @@ export default function SplitPage() {
         {months.map((m) => <FilterChip key={m} label={monthLabel(m)} active={m === month} onClick={async () => { if (docDirty && !(await confirmDialog("Modifiche non salvate: cambiare mese le perde. Continuare?"))) return; setDocDirty(false); setMonth(m); }} />)}
       </div>
       {mErr && <Notice danger>{mErr.message}</Notice>}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-        {tabs.map(([k, l]) => <FilterChip key={k} label={l} active={tab === k} onClick={() => setTab(k)} />)}
-      </div>
+      <Tabs items={tabs} value={tab} onChange={setTab} />
 
       {calc && doc && (<>
         {/* Stile fintech (scelto da Nicholas 15/10/2026): un riquadro protagonista col netto, una scheda per creator. */}
