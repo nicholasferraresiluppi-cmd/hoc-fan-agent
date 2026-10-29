@@ -3,6 +3,7 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { isUserIdAdmin, isUserIdAdminRaw, adminMfaOk } from "@/lib/admin";
 import { viewAsFor } from "@/lib/view-as";
 import { getClerkUser, forgetClerkUser } from "@/lib/clerk-user";
+import { memoAuthz, forgetAuthz } from "@/lib/authz-cache";
 
 /**
  * RBAC — Role-Based Access Control.
@@ -173,6 +174,7 @@ export async function getCustomRole(id) {
 }
 
 export async function saveCustomRole(role) {
+  forgetAuthz();
   if (!role || !role.id || !role.name) throw new Error("role id+name required");
   if (!role.id.startsWith("c:")) role.id = `c:${role.id}`;
   // sanitize capabilities
@@ -197,6 +199,7 @@ export async function saveCustomRole(role) {
 }
 
 export async function deleteCustomRole(id) {
+  forgetAuthz();
   if (!id) return;
   await kv.del(`custom_role:${id}`);
   await kv.srem("custom_roles:all", id);
@@ -213,6 +216,9 @@ export async function deleteCustomRole(id) {
 
 export async function getUserRoles(userId) {
   if (!userId) return ["operator"];
+  return memoAuthz("roles", userId, () => computeUserRoles(userId));
+}
+async function computeUserRoles(userId) {
   // "Vedi come…" (lib/view-as): solo per un admin vero e solo sulla sua sessione
   try {
     const va = await viewAsFor(userId);
@@ -272,6 +278,7 @@ export async function getStoredRoles(userId) {
 }
 
 export async function setUserRoles(userId, roles) {
+  forgetAuthz(userId);
   if (!userId) throw new Error("userId required");
   const arr = Array.isArray(roles) ? roles.filter(Boolean) : [];
   // purge old set
@@ -304,6 +311,10 @@ async function resolveRoleCapabilities(roleId) {
 }
 
 export async function getEffectiveCapabilities(userId) {
+  // copia: chi la riceve può aggiungerci pseudo-permessi (es. /api/whoami) senza sporcare la memoria
+  return { ...(await memoAuthz("caps", userId, () => computeEffectiveCapabilities(userId))) };
+}
+async function computeEffectiveCapabilities(userId) {
   const roles = await getUserRoles(userId);
   const out = {};
   for (const r of roles) {
@@ -321,6 +332,9 @@ export async function getEffectiveCapabilities(userId) {
  */
 export async function getUserRole(userId) {
   if (!userId) return "operator";
+  return memoAuthz("role", userId, () => computeUserRole(userId));
+}
+async function computeUserRole(userId) {
   try {
     if (await isUserIdAdmin(userId)) return "admin";
   } catch {}
@@ -340,6 +354,7 @@ export async function getUserRole(userId) {
 
 export async function setUserRole(userId, role) {
   if (!userId) throw new Error("userId required");
+  forgetAuthz(userId);
   if (!ROLES.includes(role)) throw new Error(`Invalid role: ${role}`);
   await kv.set(`role:${userId}`, role);
   // Mirror su Clerk
