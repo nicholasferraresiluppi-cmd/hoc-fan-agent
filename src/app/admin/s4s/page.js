@@ -15,6 +15,8 @@ import { Modal } from "@/components/cp-style";
 import { fmtInt, fmtPct, MONTHS_IT } from "@/lib/format";
 import { fillCaption, photosFor, needsPost, needsMass, availIssues } from "@/lib/s4s-core";
 import { confirmDialog } from "@/components/AppDialogs";
+import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
+import { MixBar } from "@/components/VetroCharts";
 
 const fetcher = (url) =>
   fetch(url).then(async (r) => {
@@ -189,7 +191,7 @@ function SideBlock({ s, partner, day, splitId, reload }) {
 function ExchangeCard({ p, day, splitId, reload, onEdit, v }) {
   const off = p.status === "annullato";
   return (
-    <section style={{ ...card, padding: 12, marginBottom: 10, opacity: off ? 0.6 : 1 }}>
+    <section className="vt-glass" style={{ ...card, padding: 12, marginBottom: 10, opacity: off ? 0.6 : 1 }}>
       <DealHeader x={p} onEdit={onEdit} v={v} />
       {!off && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 8, marginTop: 10 }}>
@@ -423,7 +425,7 @@ function Planner({ v, onEdit, onNew, onOpenDay }) {
         </span>
       </div>
 
-      <div style={{ ...card, overflowX: "auto" }}>
+      <div className="vt-glass" style={{ ...card, overflowX: "auto" }}>
         <div role="grid" aria-label={`Planner S4S, settimana ${range}`} style={{ minWidth: 980 }}>
           <div role="row" style={{ display: "grid", gridTemplateColumns: cols, borderBottom: `1px solid ${CP.border}` }}>
             <div role="columnheader" style={{ padding: "10px 12px", fontSize: 12, color: CP.textMuted }}>Pagina</div>
@@ -690,7 +692,7 @@ function KitEditor({ v, reload }) {
       <Note style={{ marginBottom: 14 }}>Il kit di {page.name} è quello che le altre pagine pubblicano quando fanno S4S con lei. {kit.ready ? "È pronto." : `Manca: ${kit.missing.join(" e ")}.`}</Note>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(420px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <section style={{ ...card, padding: 16 }}>
+          <section className="vt-glass" style={{ ...card, padding: 16 }}>
             <SectionTitle aside={`${kit.photos.length} di ${v.kit_max_photos}`}>Foto</SectionTitle>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
               {kit.photos.map((ph) => (
@@ -713,7 +715,7 @@ function KitEditor({ v, reload }) {
               )}
             </div>
           </section>
-          <section style={{ ...card, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+          <section className="vt-glass" style={{ ...card, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
             <SectionTitle>Testi</SectionTitle>
             <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12.5, color: CP.textSecondary }}>Testo per il post
               <textarea rows={4} value={texts.post} maxLength={1000} onChange={(e) => setTexts((t) => ({ ...t, post: e.target.value }))} placeholder="Es. Conoscete già lei? Seguitela qui {link}" style={{ ...input, resize: "vertical", lineHeight: 1.5 }} />
@@ -731,7 +733,7 @@ function KitEditor({ v, reload }) {
         </div>
         <aside style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <span style={{ fontSize: 12.5, color: CP.textSecondary }}>Come lo vedono i fan della pagina partner</span>
-          <article style={{ ...card, padding: 14, display: "flex", flexDirection: "column", gap: 10, maxWidth: 420 }}>
+          <article className="vt-glass" style={{ ...card, padding: 14, display: "flex", flexDirection: "column", gap: 10, maxWidth: 420 }}>
             <div style={{ fontSize: 14, lineHeight: 1.5, whiteSpace: "pre-wrap", color: CP.textPrimary }}>{fillCaption(texts.post || texts.mass, sample) || <span style={{ color: CP.textMuted }}>Il testo del post comparirà qui</span>}</div>
             {kit.photos[0]
               /* eslint-disable-next-line @next/next/no-img-element */
@@ -857,7 +859,7 @@ function AvailEditor({ v, reload }) {
       <Note style={{ marginBottom: 12 }}>
         La disponibilità di {page.name} vale per tutti gli scambi: il sistema non lascia proporre o accettare uno S4S che la sfora. Lasciare un campo su &quot;tutti&quot; vuol dire nessun limite. {cur ? "" : "Per ora non è impostata: nessun limite."}
       </Note>
-      <section style={{ ...card, padding: "4px 18px 16px" }}>
+      <section className="vt-glass" style={{ ...card, padding: "4px 18px 16px" }}>
         <div style={{ ...row, borderTop: "none" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <span>
@@ -916,7 +918,7 @@ function MiniMonth({ month, setMonth, sel, setSel, today, byDay, only }) {
   const shift = (n) => { const d = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + n, 1)); setMonth(d.toISOString().slice(0, 7)); };
   const title = `${MONTHS_IT[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
   return (
-    <section style={{ ...card, padding: "12px 12px 10px" }}>
+    <section className="vt-glass" style={{ ...card, padding: "12px 12px 10px" }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
         <button type="button" onClick={() => shift(-1)} aria-label="Mese prima" style={{ ...btn, padding: "4px 7px", background: "transparent", border: "none" }}><ChevronLeft size={15} /></button>
         <span style={{ flex: 1, textAlign: "center", fontSize: 14, fontWeight: 500, color: CP.textPrimary }}>{title.charAt(0).toUpperCase() + title.slice(1)}</span>
@@ -955,7 +957,7 @@ function MiniMonth({ month, setMonth, sel, setSel, today, byDay, only }) {
 
 function StatBox({ label, value, note }) {
   return (
-    <div style={{ ...card, padding: "12px 14px" }}>
+    <div className="vt-glass" style={{ ...card, padding: "12px 14px" }}>
       <div style={{ fontSize: 12.5, color: CP.textSecondary }}>{label}</div>
       <div style={{ fontSize: 20, fontWeight: 500, color: CP.textPrimary, lineHeight: 1.3, ...NUM }}>{value}</div>
       {note && <div style={{ fontSize: 12, color: CP.textMuted, ...NUM }}>{note}</div>}
@@ -1153,7 +1155,7 @@ function Unmatched({ v, reload }) {
       </Note>
       {v.unmatched.length === 0 && <Note>Nessun link da attribuire.</Note>}
       {v.unmatched.map((u) => (
-        <div key={u.label_key} style={{ ...card, padding: "10px 14px", marginBottom: 8, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div key={u.label_key} className="vt-glass" style={{ ...card, padding: "10px 14px", marginBottom: 8, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ minWidth: 200, flex: 1 }}>
             <div style={{ fontSize: 14, color: CP.textPrimary }}>&quot;{u.label}&quot; <span style={{ color: CP.textMuted, fontSize: 12.5, ...NUM }}>· {int(u.subs)} abbonati</span></div>
             <div style={{ fontSize: 12, color: CP.textMuted }}>{u.links.slice(0, 3).join(" · ")}{u.links.length > 3 ? ` · altri ${u.links.length - 3}` : ""}</div>
@@ -1203,7 +1205,7 @@ function Impostazioni({ v, splitId, reload }) {
       <Note style={{ marginBottom: 16 }}>
         Le pagine arrivano dallo split (si modifica in Coaching vendite). Ogni modifica vale dal prossimo giorno di S4S: i giorni già passati e quello di oggi non cambiano.
       </Note>
-      <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+      <section className="vt-glass" style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
         <SectionTitle>Giorni di S4S</SectionTitle>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {WEEKDAYS.map(([d, l]) => <FilterChip key={d} label={l} active={weekdays.includes(d)} onClick={() => toggleDay(d)} />)}
@@ -1214,7 +1216,7 @@ function Impostazioni({ v, splitId, reload }) {
           {started && <span style={{ fontSize: 12.5, color: CP.textMuted }}>il calendario è già partito il {ddmm(v.segments[0].from)}</span>}
         </div>
       </section>
-      <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+      <section className="vt-glass" style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
         <SectionTitle aside="le pagine scambiano solo con pagine della stessa lingua">Pagine</SectionTitle>
         {v.pages.map((p) => {
           const l = lang[p.id] || p.lang;
@@ -1250,12 +1252,97 @@ function Impostazioni({ v, splitId, reload }) {
   );
 }
 
+// Solo col vetro (26/10/2026, «per ogni pagina capiscine l'utilità»): il Calendario S4S serve a «cosa c'è da
+// fare oggi e com'è messa la settimana» → la settimana in sette giorni (come la striscia del calendario
+// del reel 2: oggi pieno, un clic apre il giorno), accanto la scheda «Da fare oggi» (rossa se ci sono
+// richieste che aspettano risposta) e quale formato porta abbonati (barra del mix). Le schede sotto
+// restano gli strumenti di lavoro. Stessi dati della pagina, nessuna richiesta nuova.
+// reset del bottone SENZA «all: unset»: quello azzera anche lo sfondo delle schede piene (.vt-hot)
+const BTN_RESET = { boxSizing: "border-box", cursor: "pointer", border: 0, margin: 0, font: "inherit", color: "inherit", background: undefined };
+function VetroWeek({ v, inbox, onOpenDay, onTab }) {
+  const inVetro = useInVetro();
+  if (!inVetro) return null;
+  const mine = new Set(v.pages.filter((p) => !p.paused && p.mine).map((p) => p.id));
+  const byDay = Object.fromEntries(v.schedule.map((d) => [d.day, d]));
+  const start = mondayOfISO(v.today);
+  const days = Array.from({ length: 7 }, (_, i) => plusDays(start, i));
+  const activeWd = new Set(v.settings.weekdays);
+  const dayInfo = (day) => {
+    const deals = (byDay[day]?.deals || []).filter((x) => x.status !== "annullato" && (mine.has(x.a.id) || mine.has(x.b.id)));
+    return { n: deals.length, ok: deals.filter((x) => x.status === "confermato").length, active: activeWd.has(new Date(`${day}T00:00:00Z`).getUTCDay()) || deals.length > 0 };
+  };
+  const week = days.map((d) => ({ day: d, ...dayInfo(d) }));
+  const todayDeals = (byDay[v.today]?.deals || []).filter((x) => x.status !== "annullato" && (mine.has(x.a.id) || mine.has(x.b.id))).sort((a, b) => String(a.time).localeCompare(String(b.time)));
+  const tot = week.reduce((a, d) => a + d.n, 0), conf = week.reduce((a, d) => a + d.ok, 0);
+  const req = inbox?.requests?.length || 0, todo = inbox?.todayTodo?.length || 0;
+  const count = inbox?.count || 0;
+  const byFormat = {};
+  for (const r of v.results || []) byFormat[r.format || "non indicato"] = (byFormat[r.format || "non indicato"] || 0) + (r.subs || 0);
+  const mix = Object.entries(byFormat).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).map(([k, n]) => ({ label: FORMAT_LABEL[k] || k, value: n }));
+  const subs = mix.reduce((a, x) => a + x.value, 0);
+  return (
+    <div className="vt-row21" style={{ marginBottom: 16 }}>
+      <section className="vt-glass" style={{ "--vt-i": 1, borderRadius: 22, padding: 18, minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Questa settimana</div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted, ...NUM }}>{tot} scambi · {conf} confermati{tot - conf ? ` · ${tot - conf} da confermare` : ""}</div>
+        </div>
+        {/* su telefono la riga sotto il numero non ci sta: resta il numero, il dettaglio è nel giorno */}
+        <style>{`@media (max-width:640px){.s4s-wk-sub{display:none}.s4s-wk{gap:4px !important}.s4s-wk button{padding:8px 2px !important}}`}</style>
+        <div className="s4s-wk" style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8 }}>
+          {week.map((d) => {
+            const today = d.day === v.today, past = d.day < v.today;
+            return (
+              <button key={d.day} type="button" onClick={() => onOpenDay(d.day)} className={today ? "vt-hot" : "vt-hot vt-glass"} data-lvl={today ? "ink" : undefined}
+                aria-label={`${dayLabel(d.day)}: ${d.n} scambi, apri il giorno`}
+                style={{ ...BTN_RESET, borderRadius: 16, padding: "10px 6px", display: "grid", justifyItems: "center", gap: 2, textAlign: "center", minWidth: 0, opacity: past && !today ? 0.62 : 1 }}>
+                <span style={{ fontSize: 11.5, color: CP.textMuted }}>{WD_SHORT[new Date(`${d.day}T00:00:00Z`).getUTCDay()]}</span>
+                <span style={{ fontSize: 17, fontWeight: 600, color: CP.textPrimary, ...NUM }}>{Number(d.day.slice(8))}</span>
+                <span style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", color: d.n ? CP.textPrimary : CP.textMuted, marginTop: 4, ...NUM }}>{d.active ? d.n : "—"}</span>
+                <span className="s4s-wk-sub" style={{ fontSize: 10.5, color: CP.textMuted, lineHeight: 1.2 }}>{!d.active ? "riposo" : d.n === 0 ? "nessuno" : d.ok === d.n ? "confermati" : `${d.ok} di ${d.n} ok`}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ marginTop: 16, display: "grid", gap: 6 }}>
+          <div style={{ fontSize: 12.5, color: CP.textMuted }}>Oggi</div>
+          {todayDeals.length === 0 ? <div style={{ fontSize: 13, color: CP.textSecondary }}>Nessuno scambio oggi.</div> : todayDeals.map((x) => (
+            <div key={x.id} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 13.5, color: CP.textPrimary }}>
+              <span style={{ fontWeight: 500 }}>{x.a.name} ⇄ {x.b.name}</span>
+              <span style={{ color: CP.textSecondary, ...NUM }}>ore {x.time}</span>
+              <DealStatus x={x} v={v} />
+            </div>
+          ))}
+        </div>
+      </section>
+      <div style={{ display: "grid", gap: 14, alignContent: "start", minWidth: 0 }}>
+        <button type="button" onClick={() => onTab("oggi")} className={count ? "vt-hot" : "vt-hot vt-glass"} data-lvl={count ? (req ? 2 : "ink") : undefined}
+          style={{ ...BTN_RESET, borderRadius: 20, padding: "14px 16px", display: "grid", gap: 4, textAlign: "left" }}>
+          <span style={{ fontSize: 12.5, color: CP.textSecondary }}>Da fare oggi</span>
+          <span style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: CP.textPrimary, ...NUM }}><VetroNum value={String(count)} /></span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: CP.textPrimary }}>
+            {!count ? "niente in sospeso" : [req && `${req} ${req === 1 ? "richiesta aspetta" : "richieste aspettano"} risposta`, todo && `${todo} di oggi da programmare`].filter(Boolean).join(" · ")}
+          </span>
+        </button>
+        {mix.length > 0 && (
+          <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 4 }}>Quale formato porta abbonati</div>
+            <div style={{ fontSize: 12.5, color: CP.textMuted, marginBottom: 12, ...NUM }}>{int(subs)} abbonati dagli S4S negli ultimi {v.meta.window_days} giorni</div>
+            <MixBar items={mix} format={(n) => int(n)} height={22} />
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function S4SPage() {
   const [splitId, setSplitId] = useState(null);
   const [tab, setTab] = useState(null); // null = scheda di partenza in base a chi guarda
   const [editing, setEditing] = useState(null); // accordo aperto nella finestra
   const [focusDay, setFocusDay] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [vetro, setVetro] = useVetro();
   useEffect(() => {
     try {
       const s = localStorage.getItem("s4s:split");
@@ -1288,6 +1375,7 @@ export default function S4SPage() {
     <PageHead
       crumbs={[{ label: "Performance" }, { label: "Calendario S4S" }]}
       title="Calendario S4S"
+      actions={<VetroSwitch on={vetro} set={setVetro} />}
       subtitle="Chi scambia promozione con chi, giorno per giorno, e quanti abbonati ha portato ogni scambio. Le pagine arrivano dallo split; ogni pagina scambia una volta con tutte le altre, poi il giro ricomincia rimescolato."
     />
   );
@@ -1299,6 +1387,7 @@ export default function S4SPage() {
   if (!v) return <div style={wrap}>{header}<Notice>Nessuno split con le tue pagine. Gli split si creano in Coaching vendite: il calendario usa le loro pagine.</Notice></div>;
 
   return (
+    <VetroScope on={vetro}>
     <div style={wrap}>
       {header}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
@@ -1311,6 +1400,7 @@ export default function S4SPage() {
         </span>
         {allView && <button type="button" style={btn} disabled={refreshing} onClick={refresh}><RefreshCw size={14} />{refreshing ? "Aggiorno…" : "Aggiorna"}</button>}
       </div>
+      <VetroWeek v={v} inbox={inbox} onOpenDay={(day) => { setFocusDay(day); setTab("agenda"); }} onTab={(k) => setTab(k)} />
       <div role="tablist" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, borderBottom: `1px solid ${CP.border}`, paddingBottom: 12 }}>
         {tabs.map(([k, l]) => (
           <FilterChip key={k} active={current === k} onClick={() => { setTab(k); try { window.history.replaceState(null, "", `#${k}`); } catch { /* ok */ } }}
@@ -1330,5 +1420,6 @@ export default function S4SPage() {
         Come si misura: abbonati arrivati da link di tracciamento con S4S o SFS nel nome, sulle pagine dello split, negli ultimi {v.meta.window_days} giorni. Il partner si ricava dal nome del link solo quando è inequivocabile. &quot;Incasso netto a 30 giorni&quot; = quanto resta a House of Creators (dopo la quota di OnlyFans) da ciò che i fan arrivati da quel link spendono nei primi 30 giorni, contato solo sui fan abbonati da almeno 30 giorni e su link con almeno {v.meta.min_mature} di loro. Riguarda le pagine, non gli operatori: non entra in score né compensi.
       </Note>
     </div>
+    </VetroScope>
   );
 }
