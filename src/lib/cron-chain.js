@@ -79,6 +79,15 @@ async function noteBreak(path, chain, reason) {
   } catch {}
 }
 
+/**
+ * Lavoro finito: la sua rottura di catena non conta più (30/10/2026). Le catene si fermano al 4º salto
+ * per la protezione di Vercel (508) e il cron dei 10 minuti le riprende fino in fondo: senza questo
+ * l'alert restava critico per 30 ore anche a lavoro finito (falso allarme ogni mattina).
+ */
+export async function clearChainBreak(path) {
+  try { await kv.hdel("cron:chainbreak", path); } catch {}
+}
+
 /** Rotture recenti (per l'alert): [{ path, at, chain, reason }]. */
 export async function recentChainBreaks(sinceMs = 30 * 3600 * 1000) {
   const h = (await kv.hgetall("cron:chainbreak").catch(() => null)) || {};
