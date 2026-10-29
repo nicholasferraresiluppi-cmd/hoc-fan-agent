@@ -3,7 +3,7 @@
 // Radar del clipping (scheda di Social): i profili Instagram/TikTok che il publisher tiene
 // d'occhio e i loro video usciti dal solito. Logica in lib/clip-radar-core.js, dati da
 // /api/admin/clip-radar (lettura notturna con Apify, solo profili pubblici).
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { Bookmark, BookmarkCheck, Download, ExternalLink, Music, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { CP, alpha } from "@/lib/brand";
@@ -12,6 +12,7 @@ import { confirmDialog } from "@/components/AppDialogs";
 import { btn, btnPrimary, btnSm, input, cardBox, hint, Seg, Chip, ModalBox, Field } from "@/components/warmup/ui";
 import { shortNum, ageLabel, profileUrl, timesLabel, isSmallBase } from "@/lib/clip-radar-core";
 import { deliverFiles } from "@/lib/editoriale-download";
+import HeroHead, { BigNum } from "@/components/HeroHead";
 
 const API = "/api/admin/clip-radar";
 const fetcher = (u) => fetch(u).then(async (r) => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || "Errore di caricamento"); return d; });
@@ -144,38 +145,6 @@ function VideoCard({ v, saved, onSave, busy, big, i = 0 }) {
   );
 }
 
-// numero che sale fino al valore all'apertura e quando cambia (mezzo secondo)
-function useCountUp(target) {
-  const [v, setV] = useState(0);
-  const from = useRef(0);
-  useEffect(() => {
-    const start = from.current;
-    if (start === target) return;
-    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { from.current = target; setV(target); return; }
-    let raf, t0;
-    const tick = (t) => {
-      t0 ??= t;
-      const p = Math.min(1, (t - t0) / 600);
-      const x = Math.round(start + (target - start) * (1 - Math.pow(1 - p, 3)));
-      from.current = x; setV(x);
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target]);
-  return v;
-}
-
-function BigNum({ label, value, strong, title }) {
-  const v = useCountUp(value);
-  return (
-    <div title={title} style={{ minWidth: 72 }}>
-      <div style={{ fontSize: 12.5, color: CP.textMuted, marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 32, fontWeight: 500, letterSpacing: -0.6, lineHeight: 1.1, color: strong ? CP.accent : CP.textPrimary, ...NUM }}>{v.toLocaleString("it-IT")}</div>
-    </div>
-  );
-}
-
 const CR_CSS = `
   @keyframes crIn { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
   .cr-card { animation: crIn .45s cubic-bezier(.2,.7,.2,1) both }
@@ -297,23 +266,14 @@ export default function ClipRadar() {
     <div>
       <style>{CR_CSS}</style>
       {/* in cima, come nel reel: un titolo, pochi numeri grandi, un alone di colore */}
-      <div style={{ position: "relative", borderRadius: 20, border: `1px solid ${CP.borderSoft}`, padding: "22px 24px", marginBottom: 16, background: `radial-gradient(ellipse at 18% 0%, ${alpha(CP.accent, "1c")}, transparent 60%), ${CP.surface}` }}>
-        <div style={{ display: "flex", gap: 22, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div style={{ flex: "1 1 300px", minWidth: 0 }}>
-            <div style={{ fontSize: 13, color: CP.textMuted }}>Radar del clipping</div>
-            <h2 style={{ margin: "3px 0 6px", fontSize: 28, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1.15 }}>Video che funzionano{where && <> <span style={{ color: CP.accent }}>{where}</span></>}</h2>
-            <p style={{ fontSize: 14, color: CP.textSecondary, margin: 0, lineHeight: 1.5, maxWidth: 560 }}>«10× il solito» = dieci volte le visualizzazioni di un video normale di quel profilo.</p>
-          </div>
-          <div style={{ display: "flex", gap: wide ? 26 : 16, flexWrap: "wrap" }}>
-            <BigNum label="Profili" value={listed.length} />
-            <BigNum label={period === "saved" ? "Idee salvate" : `Video in ${period} giorni`} value={period === "saved" ? nSaved : inPeriod} />
-            {period !== "saved" && <BigNum label="Oltre 3× il solito" value={strong} strong title="Video con almeno tre volte le visualizzazioni tipiche del loro profilo (profili piccoli esclusi)" />}
-          </div>
-        </div>
-        <div style={{ marginTop: 16 }}>
-          <button type="button" style={btnPrimary} onClick={() => setAdding({ platform: "ig", country: cf === "all" ? "ita" : cf, text: "" })}><Plus size={15} />Aggiungi profilo</button>
-        </div>
-      </div>
+      <HeroHead eyebrow="Radar del clipping" title="Video che funzionano" accent={where}
+        sub="«10× il solito» = dieci volte le visualizzazioni di un video normale di quel profilo."
+        numbers={<>
+          <BigNum label="Profili" value={listed.length} />
+          <BigNum label={period === "saved" ? "Idee salvate" : `Video in ${period} giorni`} value={period === "saved" ? nSaved : inPeriod} />
+          {period !== "saved" && <BigNum label="Oltre 3× il solito" value={strong} strong title="Video con almeno tre volte le visualizzazioni tipiche del loro profilo (profili piccoli esclusi)" />}
+        </>}
+        actions={<button type="button" style={btnPrimary} onClick={() => setAdding({ platform: "ig", country: cf === "all" ? "ita" : cf, text: "" })}><Plus size={15} />Aggiungi profilo</button>} />
       {!data.configured && <Notice danger>Apify non è configurato sul server: i video non si possono leggere.</Notice>}
 
       {/* l'unica barra filtri: vale per video e profili */}
