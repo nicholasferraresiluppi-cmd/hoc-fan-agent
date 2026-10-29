@@ -513,6 +513,8 @@ export default function WarmupPage() {
     try { const t = new URLSearchParams(window.location.search).get("tab"); if (t) { setTab(t); setSel(null); setForm(null); if (t === "contenuti") setPlatState("ig"); } } catch {}
   }, []);
   useEffect(() => { try { sessionStorage.setItem("hoc:warmup:view", JSON.stringify({ tab, sel, pane, folder })); } catch {} }, [tab, sel, pane, folder]);
+  // l'indirizzo segue la scheda: ricaricando si resta dove si è (niente ?tab= vecchio)
+  useEffect(() => { try { const u = new URL(window.location.href); const want = tab === "oggi" ? null : tab; if ((u.searchParams.get("tab") || null) !== want) { if (want) u.searchParams.set("tab", want); else u.searchParams.delete("tab"); window.history.replaceState(window.history.state, "", u.pathname + u.search); } } catch {} }, [tab]);
   // orologi delle segnalazioni ogni 30 s, il timer ogni secondo
   useEffect(() => { const t = setInterval(() => setTick(Date.now()), timer ? 1000 : 30000); return () => clearInterval(t); }, [timer]);
 
