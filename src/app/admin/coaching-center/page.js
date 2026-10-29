@@ -14,7 +14,7 @@ import { ChevronDown } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmtInt, MONTHS_IT } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, Notice, card, EarlyMonthNote } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, Notice, card, EarlyMonthNote, BTN_PRIMARY } from "@/components/ds";
 import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
 const fetcher = async (url) => {
@@ -208,7 +208,7 @@ function fmtCurrency(v) {
   return "$" + Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0, useGrouping: "always" });
 }
 const inputStyle = { padding: "8px 10px", background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none" };
-const primaryBtn = { padding: "7px 14px", borderRadius: 8, border: "none", background: CP.accent, color: CP.accentInk, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body };
+const primaryBtn = BTN_PRIMARY;
 const secondaryBtn = { padding: "7px 14px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body };
 const linkBtn = { background: "none", border: "none", padding: 0, color: CP.textMuted, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body };
 const ctl = { padding: "8px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };

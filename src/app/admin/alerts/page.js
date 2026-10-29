@@ -17,7 +17,7 @@ import { useUser } from "@clerk/nextjs";
 import { CheckCircle2, RefreshCw, Loader2, ArrowUpRight } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtAgo, fmtInt } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, DataTable, card } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, DataTable, card, BTN_PRIMARY } from "@/components/ds";
 import { alertDialog } from "@/components/AppDialogs";
 
 const fetcher = async (url) => {
@@ -30,7 +30,7 @@ const fetcher = async (url) => {
 };
 
 const btn = { display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body, whiteSpace: "nowrap" };
-const btnPrimary = { ...btn, padding: "8px 14px", background: CP.accent, border: `1px solid ${CP.accent}`, color: CP.accentInk, fontWeight: 500 };
+const btnPrimary = BTN_PRIMARY;
 const inp = { padding: "8px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, boxSizing: "border-box" };
 
 function sevColor(a) {

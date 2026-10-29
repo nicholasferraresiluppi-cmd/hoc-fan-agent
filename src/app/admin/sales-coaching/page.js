@@ -18,7 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, NUM, Tabs } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, NUM, Tabs, BTN_PRIMARY } from "@/components/ds";
 import SquadraTab from "@/components/SquadraTab";
 import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
 import { RankBars } from "@/components/VetroCharts";
@@ -61,7 +61,7 @@ const tdL = { ...td, textAlign: "left", color: CP.textPrimary };
 const MIN_ROW_PPV = 30;
 const few = (n) => <span title={`Solo ${n} PPV nel periodo: percentuale non affidabile`} style={{ color: CP.textMuted, fontSize: 12 }}>pochi dati</span>;
 const btn = { background: CP.surfaceAlt, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "7px 12px", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body };
-const btnPrimary = { ...btn, background: CP.accent, color: CP.accentInk, border: `1px solid ${CP.accent}`, fontWeight: 500 };
+const btnPrimary = BTN_PRIMARY;
 const input = { background: CP.bgSunken, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: FONTS.body };
 
 function Note({ children, style }) {

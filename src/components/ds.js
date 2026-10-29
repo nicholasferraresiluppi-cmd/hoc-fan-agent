@@ -161,6 +161,15 @@ export function FilterChip({ label, active, danger, attn, onClick, disabled, clo
  * Vedi docs/DESIGN.md «Regole d'uso».
  */
 
+/**
+ * Pulsanti (regola d'uso 5, 30/10/2026): un solo aspetto per tutta l'app. Prima c'erano ~28 definizioni
+ * locali di «pulsante principale» con 6 misure diverse. BTN_PRIMARY = l'azione principale (una per schermata),
+ * BTN = secondario (bianco col bordo), BTN_PRIMARY_OFF(disabled) per i pulsanti che si spengono.
+ */
+export const BTN = { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", minHeight: 38, borderRadius: 10, fontSize: 13.5, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer", textDecoration: "none", whiteSpace: "nowrap", background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}` };
+export const BTN_PRIMARY = { ...BTN, background: CP.accent, color: CP.accentInk, border: `1px solid ${CP.accent}` };
+export const BTN_PRIMARY_OFF = (disabled) => (disabled ? { ...BTN_PRIMARY, background: CP.surfaceAlt, color: CP.textMuted, border: `1px solid ${CP.border}`, cursor: "not-allowed" } : BTN_PRIMARY);
+
 /** Schede della pagina o di una sezione: testo con la riga sotto quella aperta. items = [[key, label, badge?], …] */
 export function Tabs({ items, value, onChange, aside, small = false, style }) {
   return (

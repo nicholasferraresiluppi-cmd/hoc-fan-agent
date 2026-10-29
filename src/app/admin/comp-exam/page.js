@@ -21,7 +21,7 @@ import { CP, FONTS, DATA_SCALE } from "@/lib/brand";
 import { useTheme } from "@/lib/theme-client";
 import CompNav from "@/components/CompNav";
 import { fmt$, fmtInt, fmtPct } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, SectionTitle, Notice, DataTable, card, NUM } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, SectionTitle, Notice, DataTable, card, NUM, BTN_PRIMARY_OFF } from "@/components/ds";
 
 // Verdetto: il rosso solo per "molto fuori media" (segnale su un dato).
 const VERDICT = {
@@ -295,12 +295,4 @@ function PctDistribution({ dist, S }) {
 
 const lbl = { display: "block", fontSize: 12, color: CP.textSecondary, fontWeight: 500, marginBottom: 6 };
 const input = { width: "100%", padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, outline: "none", boxSizing: "border-box" };
-const primaryBtn = (disabled) => ({
-  display: "inline-flex", alignItems: "center", gap: 8,
-  padding: "10px 18px",
-  background: disabled ? CP.surfaceAlt : CP.accent,
-  color: disabled ? CP.textMuted : CP.accentInk,
-  border: "none", borderRadius: 8,
-  fontSize: 14, fontWeight: 500, fontFamily: FONTS.body,
-  cursor: disabled ? "not-allowed" : "pointer",
-});
+const primaryBtn = BTN_PRIMARY_OFF;

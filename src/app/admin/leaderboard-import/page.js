@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { Upload, Loader2, Check } from "lucide-react";
 import { FONTS, CP } from "@/lib/brand";
-import { PageHead, Metric, SectionTitle, Disclosure, Notice, DataTable, card, NUM } from "@/components/ds";
+import { PageHead, Metric, SectionTitle, Disclosure, Notice, DataTable, card, NUM, BTN_PRIMARY } from "@/components/ds";
 import { fmtInt, fmtAgo, MONTHS_IT } from "@/lib/format";
 import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
@@ -331,5 +331,5 @@ function periodLabel(p) {
 const field = { display: "block", width: "100%", boxSizing: "border-box", marginTop: 6, padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
 const fieldLabel = { fontSize: 13, color: CP.textSecondary };
 const stepLabel = { fontSize: 13, color: CP.textMuted, marginBottom: 8 };
-const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", background: CP.accent, color: CP.accentInk, border: "1px solid transparent", borderRadius: 8, fontSize: 14, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };
+const btnPrimary = BTN_PRIMARY;
 const btnGhost = { display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px", background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 14, fontFamily: FONTS.body, cursor: "pointer" };
