@@ -209,7 +209,7 @@ export function EarlyMonthNote({ info, periodId, onSwitch }) {
  * testo fa da titolo, le altre «etichetta · valore» una sotto l'altra (data-l). Niente
  * più tabelle tagliate a destra da scorrere di lato (10/10/2026, dall'app iOS).
  */
-export function DataTable({ columns, rows, defaultSort, onRowClick, selected, minWidth = 600, empty = "Nessun dato.", maxHeight, density }) {
+export function DataTable({ columns, rows, defaultSort, onRowClick, onRowHover, selected, minWidth = 600, empty = "Nessun dato.", maxHeight, density }) {
   const [sort, setSort] = useState(defaultSort || null);
   // Navigazione da tastiera (solo con onRowClick): j/k o frecce spostano la riga
   // attiva, Invio la apre. Il focus sta sulla tabella (tabIndex 0); la riga
@@ -268,6 +268,7 @@ export function DataTable({ columns, rows, defaultSort, onRowClick, selected, mi
               <tr key={r.id ?? r.key ?? i} id={nav ? rowId(i) : undefined} className="ds-tr"
                 data-sel={sel ? "1" : undefined} data-active={nav && i === active ? "1" : undefined} aria-selected={nav ? Boolean(sel) : undefined}
                 onClick={onRowClick ? () => { if (nav) setActive(i); onRowClick(r); } : undefined}
+                onPointerEnter={onRowHover ? () => onRowHover(r) : undefined}
                 style={{ borderTop: `1px solid ${CP.borderSoft}`, cursor: onRowClick ? "pointer" : "default", background: sel ? CP.accentSoft : "transparent" }}>
                 {columns.map((c, ci) => (
                   <td key={c.key} className={ci === stickyIdx ? "ds-stk ds-first" : undefined} data-l={typeof c.label === "string" ? c.label : ""} style={{ padding: "9px 12px", textAlign: c.align || "left", color: c.muted ? CP.textSecondary : CP.textPrimary, verticalAlign: "middle", ...(c.align === "right" ? NUM : {}), ...(ci === stickyIdx ? { position: "sticky", left: 0, zIndex: 1, background: sel ? CP.accentSoft : CP.surface } : {}) }}>

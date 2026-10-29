@@ -20,6 +20,8 @@ import { collapseItems } from "@/lib/page-groups";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { prefetchNav } from "@/lib/nav-prefetch";
 import useSWR from "swr";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
 import { useTheme, useStyle } from "@/lib/theme-client";
@@ -252,9 +254,14 @@ export const iconFor = (href) => ICON_BY_HREF.get(href) || Compass;
 export const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label, group: g.label })));
 
 function NavItem({ href, label, icon: Icon, isActive, badge, badgeTone }) {
+  const router = useRouter();
+  const warm = () => { if (!isActive) prefetchNav(router, href); };
   return (
     <Link
       href={href}
+      onPointerEnter={warm}
+      onFocus={warm}
+      onTouchStart={warm}
       aria-current={isActive ? "page" : undefined}
       data-on={isActive ? "1" : undefined}
       style={{
