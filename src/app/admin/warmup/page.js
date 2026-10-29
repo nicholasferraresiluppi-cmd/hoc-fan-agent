@@ -28,7 +28,7 @@ import {
   ownerName, mine, urgenze, FL, ST, MS, SE, wfields, xGoal, IPROT, fillDefaults, applyState, openFlag,
   clearFlag, endCooldown,
 } from "@/lib/warmup-plan";
-import { prefillFor, publicAlerts, normalizeOfLink } from "@/lib/warmup-metrics-core";
+import { prefillFor, dailyPrefill, linkRange, publicAlerts, normalizeOfLink } from "@/lib/warmup-metrics-core";
 import { pubKindOfTask, itemForTask, autoItemForTask } from "@/lib/editoriale-core";
 import PublishDownload from "@/components/PublishDownload";
 import MediaLightbox from "@/components/MediaLightbox";
@@ -445,6 +445,9 @@ function RenameModal({ old, onClose, onSave }) {
 
 // ── grafico piccolo, una serie ──────────────────────────────────────────────
 
+// giorno locale come YYYY-MM-DD
+const isoDay = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+
 function LineChart({ title, pts }) {
   const vals = pts.map((p) => p.v).filter((v) => v != null);
   const last = [...pts].reverse().find((p) => p.v != null);
@@ -498,6 +501,12 @@ export default function WarmupPage() {
   const [mview, setMview] = useState(null); // { creator, files: [{id, kind}], idx } — foto del contenuto ingrandite
   const [net, setNet] = useState("ok");
   const [rpane, setRpane] = useState("pano");
+  // periodo dell'andamento (29/10, Nicholas: «un giorno specifico o un arco di tempo specifico»)
+  const [per, setPer] = useState("w8");
+  const [perFrom, setPerFrom] = useState(() => isoDay(Date.now() - 6 * DAY));
+  const [perTo, setPerTo] = useState(() => isoDay(Date.now()));
+  const [panoCreator, setPanoCreator] = useState("");
+  const [panoAcc, setPanoAcc] = useState("");
   const [wkAll, setWkAll] = useState(null);
   const [sortAll, setSortAll] = useState("views");
   const [flagDays, setFlagDays] = useState(30);
@@ -1117,12 +1126,53 @@ export default function WarmupPage() {
       </>
     );
   }
-  function weekSeries(n) {
+  // giorni come YYYY-MM-DD tra due date comprese
+  function dayRange(from, to) {
+    const out = [];
+    const a = new Date(from + "T12:00:00"), b = new Date(to + "T12:00:00");
+    for (let d = a; d <= b && out.length < 400; d = new Date(d.getTime() + DAY)) out.push(isoDay(d.getTime()));
+    return out;
+  }
+  // il periodo scelto come giorni {from, to}
+  function perBounds() {
+    const today = isoDay(Date.now());
+    if (per === "d7") return [isoDay(Date.now() - 6 * DAY), today];
+    if (per === "d30") return [isoDay(Date.now() - 29 * DAY), today];
+    if (per === "custom") return perFrom <= perTo ? [perFrom, perTo] : [perTo, perFrom];
+    const ws = lastWeeks(Number(per.slice(1)));
+    return [isoDay(ws[ws.length - 1].start), today];
+  }
+  // l'andamento nel periodo: settimane (dato a mano + automatico) o giorni (solo automatico)
+  function periodSeries(list) {
+    const [from, to] = perBounds();
+    if (per === "w8" || per === "w12") return { unit: "week", from, to, rows: weekSeries(Number(per.slice(1)), list) };
+    const days = dayRange(from, to);
+    if (days.length > 31) {
+      const wk = new Set(days.map((d) => weekKey(new Date(d + "T12:00:00"))));
+      return { unit: "week", from, to, rows: weekSeries(60, list).filter((r) => wk.has(r.key)) };
+    }
+    const rows = days.map((d) => {
+      const prev = isoDay(new Date(d + "T12:00:00").getTime() - DAY);
+      const row = { label: new Date(d + "T12:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" }), key: d };
+      wfields(null, plat).filter((f) => f.num).forEach((f) => {
+        let sum = null;
+        list.forEach((a) => {
+          const v = dailyPrefill(a.platform, a.pub?.daily?.[d], a.pub?.daily?.[prev])[f.k];
+          if (v != null && !isNaN(Number(v))) sum = (sum || 0) + Number(v);
+        });
+        row[f.k] = sum;
+      });
+      row.posts = list.reduce((t, a) => t + (a.pub?.daily?.[d]?.posts || 0), 0);
+      return row;
+    });
+    return { unit: "day", from, to, rows };
+  }
+  function weekSeries(n, list = ACC) {
     return lastWeeks(n).slice().reverse().map((w) => {
       const row = { label: w.label, key: w.key };
       wfields(null, plat).filter((f) => f.num).forEach((f) => {
         let sum = null;
-        ACC.forEach((a) => {
+        list.forEach((a) => {
           let v = (a.weekly[w.key] || {})[f.k];
           if (v === "" || v == null) v = prefillFor(a.platform, a.pub?.weekly?.[w.key])[f.k]; // manca il dato a mano: quello letto in automatico
           if (v !== "" && v != null && !isNaN(Number(v))) sum = (sum || 0) + Number(v);
@@ -1132,23 +1182,154 @@ export default function WarmupPage() {
       return row;
     });
   }
+  // numeri del periodo per un account (solo dati letti in automatico + tracking link)
+  function accPeriod(a, from, to) {
+    const daily = a.pub?.daily || {};
+    const ds = Object.keys(daily).sort();
+    const fIn = ds.filter((d) => d >= from && d <= to && daily[d].followers != null);
+    const fEnd = fIn.length ? daily[fIn[fIn.length - 1]].followers : null;
+    const fBefore = [...ds].reverse().find((d) => d < from && daily[d].followers != null);
+    const fStart = fBefore ? daily[fBefore].followers : fIn.length ? daily[fIn[0]].followers : null;
+    const posts = (a.pub?.posts || []).filter((p) => { const d = isoDay(p.ts); return d >= from && d <= to; });
+    const wv = posts.filter((p) => p.views != null);
+    const views = wv.length ? wv.reduce((t, p) => t + p.views, 0) : null;
+    const inter = wv.reduce((t, p) => t + (p.likes || 0) + (p.comments || 0), 0);
+    const link = a.pub?.linkDays ? linkRange(a.pub.linkDays, from, to, a.pub?.link?.created) : null;
+    return {
+      followers: fEnd, fDelta: fEnd != null && fStart != null && (fBefore || fIn.length > 1) ? fEnd - fStart : null,
+      posts: posts.length, views, avg: wv.length ? Math.round(views / wv.length) : null,
+      eng: views ? Math.round((inter / views) * 1000) / 10 : null,
+      clicks: link?.clicks ?? null, subs: link?.subs ?? null, revenue: link?.revenue ?? null, hasLink: Boolean(a.pub?.linkDays),
+      top: posts,
+    };
+  }
   function viewPano() {
+    // filtri: modella → account (29/10, Nicholas)
+    const creatorsHere = [...new Set(ACC.map((a) => a.creator).filter(Boolean))].sort((x, y) => x.localeCompare(y, "it"));
+    const SEL = ACC.filter((a) => (!panoCreator || a.creator === panoCreator) && (!panoAcc || a.id === panoAcc));
     const st = { verde: 0, arancione: 0, rosso: 0 };
-    ACC.forEach((a) => { st[a.status] = (st[a.status] || 0) + 1; });
-    const ads = ACC.map((a) => adherence(a, 7));
+    SEL.forEach((a) => { st[a.status] = (st[a.status] || 0) + 1; });
+    const ads = SEL.map((a) => adherence(a, 7));
     const withT = ads.filter((x) => x.total);
     const adPct = withT.length ? Math.round((withT.reduce((t, x) => t + x.done, 0) / withT.reduce((t, x) => t + x.total, 0)) * 100) : null;
     const oF = ads.reduce((t, x) => t + x.todayDone, 0), oT = ads.reduce((t, x) => t + x.todayTotal, 0);
-    const inWarm = ACC.filter((a) => !isCooldown(a) && opDay(a) <= 7).length;
-    const non = ACC.filter((a) => stateOf(a) !== "online");
+    const inWarm = SEL.filter((a) => !isCooldown(a) && opDay(a) <= 7).length;
+    const non = SEL.filter((a) => stateOf(a) !== "online");
     const nonTxt = ["shadowban", "sospeso", "bannato"].map((k) => ({ k, n: non.filter((a) => stateOf(a) === k).length })).filter((x) => x.n).map((x) => x.n + " " + ST({ platform: plat })[x.k].label.toLowerCase()).join(" · ");
-    const ser = weekSeries(8);
+    const ps = periodSeries(SEL);
+    const ser = ps.rows;
+    const dayF = (f) => f.k === "followers" || f.k === "views"; // gli unici letti anche giorno per giorno
+    const fmtD = (d) => new Date(d + "T12:00:00").toLocaleDateString("it-IT", { day: "numeric", month: "long" });
+    const perTitle = per === "w8" || per === "w12" ? `ultime ${per.slice(1)} settimane` : ps.from === ps.to ? fmtD(ps.from) : `${fmtD(ps.from)} – ${fmtD(ps.to)}`;
+    const rowsAcc = SEL.map((a) => ({ a, n: accPeriod(a, ps.from, ps.to) }));
+    const sumN = (k) => { const v = rowsAcc.map((r) => r.n[k]).filter((x) => x != null); return v.length ? v.reduce((t, x) => t + x, 0) : null; };
+    const tot = { followers: sumN("followers"), fDelta: sumN("fDelta"), posts: sumN("posts") || 0, views: sumN("views"), clicks: sumN("clicks"), subs: sumN("subs"), revenue: sumN("revenue") };
+    const allTop = rowsAcc.flatMap((r) => r.n.top.map((p) => ({ ...p, acc: r.a }))).filter((p) => p.views != null).sort((x, y) => y.views - x.views).slice(0, 8);
+    const inter = rowsAcc.flatMap((r) => r.n.top).filter((p) => p.views != null);
+    const engAll = tot.views ? Math.round((inter.reduce((t, p) => t + (p.likes || 0) + (p.comments || 0), 0) / tot.views) * 1000) / 10 : null;
+    const anyLink = rowsAcc.some((r) => r.n.hasLink);
+    const fmt$ = (v) => (v == null ? "—" : "$" + Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 }));
+    const selSt = { ...input, width: "auto", fontSize: 13.5, padding: "7px 10px" };
     return (
       <>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+          <select style={selSt} value={panoCreator} onChange={(e) => { setPanoCreator(e.target.value); setPanoAcc(""); }}>
+            <option value="">Tutte le modelle</option>
+            {creatorsHere.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select style={selSt} value={panoAcc} onChange={(e) => setPanoAcc(e.target.value)}>
+            <option value="">{panoCreator ? "Tutti i suoi account" : "Tutti gli account"}</option>
+            {ACC.filter((a) => !panoCreator || a.creator === panoCreator).map((a) => <option key={a.id} value={a.id}>{a.username}{!panoCreator && a.creator ? ` · ${a.creator}` : ""}</option>)}
+          </select>
+          <span style={{ flex: 1 }} />
+          <Seg items={[["d7", "7 giorni"], ["d30", "30 giorni"], ["w8", "8 settimane"], ["w12", "12 settimane"], ["custom", "Date a scelta"]]} value={per} onChange={setPer} />
+        </div>
+        {per === "custom" && (
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", margin: "0 0 12px" }}>
+            <label style={{ fontSize: 13, color: CP.textSecondary }}>Dal<br /><input type="date" style={{ ...input, width: "auto" }} value={perFrom} max={isoDay(Date.now())} onChange={(e) => { const v = e.target.value; if (!v) return; setPerFrom(v); if (v > perTo) setPerTo(v); }} /></label>
+            <label style={{ fontSize: 13, color: CP.textSecondary }}>Al<br /><input type="date" style={{ ...input, width: "auto" }} value={perTo} min={perFrom} max={isoDay(Date.now())} onChange={(e) => e.target.value && setPerTo(e.target.value)} /></label>
+            <button type="button" style={btnSm} onClick={() => setPerTo(perFrom)}>Solo il {fmtD(perFrom)}</button>
+          </div>
+        )}
+        {!SEL.length ? <div style={{ ...cardBox, ...hint, textAlign: "center" }}>Nessun profilo con questi filtri.</div> : <>
         <div style={cardBox}>
-          <div style={{ ...eyebrow, marginBottom: 10 }}>Stato della farm</div>
+          <div style={{ ...eyebrow, marginBottom: 10 }}>Nel periodo · {perTitle}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8 }}>
+            <Metric2 value={tot.followers == null ? "—" : numFmt(tot.followers)} label="Follower" sub={tot.fDelta != null ? `${tot.fDelta >= 0 ? "+" : ""}${numFmt(tot.fDelta)} nel periodo` : null} />
+            <Metric2 value={tot.views == null ? "—" : numFmt(tot.views)} label="Visualizzazioni" sub="dei post usciti nel periodo" />
+            <Metric2 value={tot.posts} label="Post usciti" sub={tot.posts && tot.views != null ? `${numFmt(Math.round(tot.views / Math.max(1, inter.length)))} di media` : null} />
+            <Metric2 value={engAll == null ? "—" : String(engAll).replace(".", ",") + "%"} label="Interazioni" sub="like + commenti ÷ visualizzazioni" />
+            {anyLink && <Metric2 value={tot.clicks == null ? "—" : numFmt(tot.clicks)} label="Clic sul tracking link" />}
+            {anyLink && <Metric2 value={tot.subs == null ? "—" : numFmt(tot.subs)} label="Nuovi abbonati dal link" sub={tot.clicks ? `${String(Math.round((tot.subs / tot.clicks) * 1000) / 10).replace(".", ",")}% dei clic` : null} />}
+            {anyLink && <Metric2 value={fmt$(tot.revenue)} label="Speso dagli abbonati del link" color={tot.revenue ? CP.accentGreen : undefined} />}
+          </div>
+          {!anyLink && <p style={{ ...hint, margin: "8px 0 0" }}>Nessun tracking link OnlyFans collegato a questi profili: si aggiunge nella scheda del profilo (campo «Tracking link OnlyFans») e da lì arrivano clic, abbonati e speso.</p>}
+          <p style={{ ...hint, margin: "8px 0 0" }}>Numeri letti in automatico dal profilo pubblico e dal magazzino OnlyFans; le visualizzazioni dei post recenti crescono ancora per qualche giorno.</p>
+        </div>
+        <div style={cardBox}>
+          <div style={eyebrow}>Andamento · {perTitle}</div>
+          <p style={{ ...hint, margin: "4px 0 12px" }}>
+            {ps.unit === "day"
+              ? "Giorno per giorno, dai dati letti in automatico: follower di quel giorno e visualizzazioni dei post usciti quel giorno. Visite e tocchi sul link si inseriscono a settimana: per vederli scegli un periodo più lungo di un mese."
+              : "Settimana per settimana. Dove manca il dato inserito a mano si usa quello letto in automatico dal profilo pubblico."}
+          </p>
+          {ps.unit === "day" && ser.length === 1 ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
+              {wfields(null, plat).filter((f) => f.chart && dayF(f)).map((f) => <Metric2 key={f.k} value={ser[0][f.k] == null ? "—" : numFmt(ser[0][f.k])} label={f.lab} />)}
+              <Metric2 value={ser[0].posts} label="Post usciti quel giorno" />
+            </div>
+          ) : !ser.length ? (
+            <p style={{ ...hint, textAlign: "center", padding: "18px 0" }}>Nessun dato nel periodo scelto.</p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))", gap: 10 }}>
+              {wfields(null, plat).filter((f) => f.chart && (ps.unit === "week" || dayF(f))).map((f) => <LineChart key={f.k} title={f.lab} pts={ser.map((r) => ({ label: r.label, v: r[f.k] }))} />)}
+              {ps.unit === "day" && <LineChart title="Post usciti" pts={ser.map((r) => ({ label: r.label, v: r.posts }))} />}
+            </div>
+          )}
+        </div>
+        {allTop.length > 0 && (
+          <div style={cardBox}>
+            <div style={{ ...eyebrow, marginBottom: 8 }}>I post migliori del periodo</div>
+            {allTop.map((p) => (
+              <a key={p.acc.id + p.id} href={p.url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "8px 0", borderTop: `1px solid ${CP.borderSoft}`, textDecoration: "none", color: CP.textPrimary, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 15, fontWeight: 500, minWidth: 90, ...NUM }}>{numFmt(p.views)}</span>
+                <span style={{ fontSize: 13.5 }}>{p.acc.username}</span>
+                <span style={{ ...hint, fontSize: 12.5, ...NUM }}>{p.kind === "reel" ? "reel" : p.kind === "carosello" ? "carosello" : "post"} · {new Date(p.ts).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}{p.likes != null ? ` · ${numFmt(p.likes)} like` : ""}{p.comments != null ? ` · ${numFmt(p.comments)} commenti` : ""}</span>
+                <span style={{ flex: 1 }} /><ExternalLink size={13} color={CP.textMuted} />
+              </a>
+            ))}
+          </div>
+        )}
+        {SEL.length > 1 && (
+          <div style={{ ...cardBox, overflowX: "auto" }}>
+            <div style={{ ...eyebrow, marginBottom: 8 }}>Account per account · {perTitle}</div>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5, minWidth: 640 }}>
+              <thead><tr style={{ color: CP.textSecondary, textAlign: "right" }}>
+                <th style={{ textAlign: "left", fontWeight: 400, padding: "6px 8px" }}>Account</th><th style={{ fontWeight: 400, padding: "6px 8px" }}>Follower</th><th style={{ fontWeight: 400, padding: "6px 8px" }}>Nel periodo</th><th style={{ fontWeight: 400, padding: "6px 8px" }}>Post</th><th style={{ fontWeight: 400, padding: "6px 8px" }}>Visualizzazioni</th><th style={{ fontWeight: 400, padding: "6px 8px" }}>Media</th><th style={{ fontWeight: 400, padding: "6px 8px" }}>Interaz.</th>
+                {anyLink && <><th style={{ fontWeight: 400, padding: "6px 8px" }}>Clic</th><th style={{ fontWeight: 400, padding: "6px 8px" }}>Abbonati</th><th style={{ fontWeight: 400, padding: "6px 8px" }}>Speso</th></>}
+              </tr></thead>
+              <tbody>
+                {rowsAcc.sort((x, y) => (y.n.views || 0) - (x.n.views || 0)).map(({ a, n }) => (
+                  <tr key={a.id} onClick={() => { setPanoCreator(a.creator || ""); setPanoAcc(a.id); }} style={{ borderTop: `1px solid ${CP.borderSoft}`, cursor: "pointer", textAlign: "right", ...NUM }}>
+                    <td style={{ textAlign: "left", padding: "7px 8px" }}>{a.username}<div style={{ ...hint, fontSize: 12 }}>{a.creator || ""}</div></td>
+                    <td style={{ padding: "7px 8px" }}>{numFmt(n.followers)}</td>
+                    <td style={{ padding: "7px 8px", color: n.fDelta > 0 ? CP.accentGreen : undefined }}>{n.fDelta == null ? "—" : (n.fDelta >= 0 ? "+" : "") + numFmt(n.fDelta)}</td>
+                    <td style={{ padding: "7px 8px" }}>{n.posts}</td>
+                    <td style={{ padding: "7px 8px" }}>{numFmt(n.views)}</td>
+                    <td style={{ padding: "7px 8px" }}>{numFmt(n.avg)}</td>
+                    <td style={{ padding: "7px 8px" }}>{n.eng == null ? "—" : String(n.eng).replace(".", ",") + "%"}</td>
+                    {anyLink && <><td style={{ padding: "7px 8px" }}>{numFmt(n.clicks)}</td><td style={{ padding: "7px 8px" }}>{numFmt(n.subs)}</td><td style={{ padding: "7px 8px" }}>{fmt$(n.revenue)}</td></>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p style={{ ...hint, margin: "8px 0 0" }}>Tocca una riga per vedere solo quell&apos;account.</p>
+          </div>
+        )}
+        <div style={cardBox}>
+          <div style={{ ...eyebrow, marginBottom: 10 }}>Stato della farm{panoCreator || panoAcc ? " · selezione" : ""}</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8 }}>
-            <Metric2 value={ACC.length} label="Profili" sub={`${inWarm} in warm-up`} />
+            <Metric2 value={SEL.length} label="Profili" sub={`${inWarm} in warm-up`} />
             <Metric2 value={oT ? `${oF}/${oT}` : "—"} label="Oggi" color={!oT ? CP.textMuted : oF === oT ? CP.accentGreen : undefined} />
             <Metric2 value={adPct == null ? "—" : adPct + "%"} label="Aderenza 7g" color={adPct == null ? CP.textMuted : adPct >= 80 ? CP.accentGreen : adPct >= 50 ? CP.attn : CP.accentRed} />
             <Metric2 value={st.verde || 0} label="Verdi" color={CP.accentGreen} />
@@ -1157,13 +1338,7 @@ export default function WarmupPage() {
             {non.length > 0 && <Metric2 value={non.length} label="Non online" color={CP.accentRed} sub={nonTxt} />}
           </div>
         </div>
-        <div style={cardBox}>
-          <div style={eyebrow}>Andamento · ultime 8 settimane</div>
-          <p style={{ ...hint, margin: "4px 0 12px" }}>Somma di tutti i profili. Dove manca il dato inserito a mano si usa quello letto in automatico dal profilo pubblico. Profilo per profilo: scheda Settimana.</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))", gap: 10 }}>
-            {wfields(null, plat).filter((f) => f.chart).map((f) => <LineChart key={f.k} title={f.lab} pts={ser.map((r) => ({ label: r.label, v: r[f.k] }))} />)}
-          </div>
-        </div>
+        </>}
       </>
     );
   }
