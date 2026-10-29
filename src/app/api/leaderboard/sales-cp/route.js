@@ -141,7 +141,10 @@ export async function GET(request) {
   return Response.json({
     period_id,
     cp_available: true,
-    ranking: view,
+    // 30/10/2026: si toglie dal ranking il dettaglio dei turni (best/worst shift con tutte le vendite,
+    // shifts_attributed): ~8 KB a riga, 1,1 MB a mese, e nessuna pagina lo legge — la Classifica
+    // scaricava ~2,7 MB a ogni apertura (giro qualità: 9-10 s). Restano i totali e le fasce orarie.
+    ranking: view.map(slimRow),
     groupMeansCp: az.creatorScope.all ? groupMeansCp : Object.fromEntries(Object.entries(groupMeansCp || {}).filter(([g]) => allowsCreator(az.creatorScope, g))),
     visibility: scopeSummary(az.creatorScope),
     groups: Array.from(eligibleGroups).sort(),
@@ -160,4 +163,11 @@ export async function GET(request) {
       avg_sales_per_shift: totalCpShifts > 0 ? Math.round((totalCpSales / totalCpShifts) * 100) / 100 : 0,
     },
   });
+}
+
+function slimRow(r) {
+  const a = r.cp_aggregates;
+  if (!a) return r;
+  const { best_shift, worst_shift, shifts_attributed, ...keep } = a;
+  return { ...r, cp_aggregates: keep };
 }
