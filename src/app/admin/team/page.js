@@ -11,6 +11,7 @@ import { X } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, SectionTitle, Notice, card } from "@/components/ds";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const ctl = { padding: "7px 10px", background: CP.surface, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, fontSize: 13, fontFamily: FONTS.body };
 const btn = { padding: "7px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body };
@@ -139,7 +140,7 @@ export default function TeamsAdminPage() {
                 </label>
                 <button
                   disabled={busy}
-                  onClick={() => { if (confirm(`Eliminare il team "${t.teamId}"? Gli operatori diventano non assegnati.`)) act("delete_team", { teamId: t.teamId }); }}
+                  onClick={async () => { if (await confirmDialog({ title: `Eliminare il team "${t.teamId}"?`, message: "Gli operatori diventano non assegnati.", ok: "Elimina", danger: true })) act("delete_team", { teamId: t.teamId }); }}
                   style={{ ...btn, background: "transparent", color: CP.accentRed }}
                 >
                   Elimina team

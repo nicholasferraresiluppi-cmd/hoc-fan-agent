@@ -1,5 +1,5 @@
 /**
- * «Porta un collega» — lato server del programma referral (26/10/2026).
+ * «Porta un amico» — lato server del programma referral (26/10/2026).
  * Regole e calcoli in referral-core.js (puro). Qui: KV, venduto Infloww, viste.
  *
  * KV (namespace isolato `referral:*`, HASH = una scrittura per voce, niente
@@ -22,7 +22,7 @@ import { randomBytes } from "node:crypto";
 import {
   REFERRAL_RULES, validateReferrer, validateRecruit, validateStory, findDuplicateRecruit,
   recruitMilestones, storyMilestone, recruitSteps, summarize, referrerView,
-  salesMapFromKpiRows, salesFor, monthsSince, normEmail, normName, shiftDatesFromWages, parseFx, addMonths, recruitMetrics, buildDashboard,
+  salesMapFromKpiRows, salesFor, monthsSince, normEmail, normName, shiftDatesFromWages, parseFx, addMonths, recruitMetrics, buildDashboard, buildPayslips, hrInbox,
 } from "@/lib/referral-core";
 
 const K = {
@@ -34,6 +34,7 @@ const K = {
   fx: "referral:fx",
   sales: (m) => `referral:sales:${m}`,
   shifts: (m) => `referral:shifts:${m}`,
+  inbox: "referral:inbox",
 };
 
 const newId = (p) => `${p}_${randomBytes(6).toString("hex")}`;
@@ -62,6 +63,8 @@ const writeOne = (key, id, obj) => {
 };
 
 export async function audit(actor, action, detail = {}) {
+  // ogni modifica cambia le cose da fare: il conteggio del badge si ricalcola alla prossima lettura
+  try { await kv.del(K.inbox); } catch {}
   try {
     await kv.lpush(K.audit, JSON.stringify({ at: Date.now(), actor: actor?.id || null, actorName: actor?.name || null, action, ...detail }));
     await kv.ltrim(K.audit, 0, 499);
@@ -201,7 +204,22 @@ export async function loadState({ now = Date.now() } = {}) {
   // mesi delle provvigioni già calcolabili: l'HR ci mette il cambio
   const fxMonths = [...new Set(recruitRows.flatMap((r) => r.milestones.filter((m) => m.kind === "commission" && m.amountUsd != null && (m.status === "maturato" || m.fxMissing === false && m.status === "pagato")).map((m) => m.month)))].sort();
   const dashboard = buildDashboard({ referrers, recruits: recruitRows, stories: storyRows, fx, today });
-  return { rules: REFERRAL_RULES, today, fx, fxMonths, referrers: referrerRows, recruits: recruitRows, stories: storyRows, toPay, dashboard };
+  const payslips = buildPayslips({ referrers, recruits: recruitRows, stories: storyRows, today });
+  return { rules: REFERRAL_RULES, today, fx, fxMonths, referrers: referrerRows, recruits: recruitRows, stories: storyRows, toPay, dashboard, payslips };
+}
+
+/**
+ * Badge dell'HR: premi sbloccati da pagare + mesi senza cambio. In cache 10 minuti
+ * (lo legge il menu a ogni pagina) e svuotato a ogni modifica (audit). Un premio che si
+ * sblocca da solo (turni o venduto nuovi) compare entro 10 minuti.
+ */
+export async function getInbox({ now = Date.now() } = {}) {
+  const c = parse(await kv.get(K.inbox).catch(() => null));
+  if (c && now - c.at < 10 * 60 * 1000) return c;
+  const s = await loadState({ now });
+  const out = { ...hrInbox(s), at: now };
+  await kv.set(K.inbox, JSON.stringify(out), { ex: 3600 }).catch(() => {});
+  return out;
 }
 
 /** Suggerimenti dal CRM persone: chi ha scritto «Me l'ha consigliato qualcuno» e non è ancora nel programma. */
@@ -351,10 +369,11 @@ export async function referrerDashboard(referrer, { now = Date.now() } = {}) {
     id: s.id, agreedAt: s.agreedAt, published: s.publishedAt.length, ...s.milestone,
   }));
   const all = [...recruits.flatMap((r) => r.milestones), ...stories];
-  return { rules: state.rules, today: state.today, name: referrer.name, recruits, stories, totals: summarize(all) };
+  const payslips = state.payslips.filter((b) => b.referrerId === referrer.id);
+  return { rules: state.rules, today: state.today, name: referrer.name, recruits, stories, totals: summarize(all), payslips };
 }
 
-/** Invito in HOC Pro col solo ruolo «Referente» (vede solo /me/porta-un-collega). */
+/** Invito in HOC Pro col solo ruolo «Referente» (vede solo /me/porta-un-amico). */
 export async function inviteReferrer(referrerId, actor, origin) {
   const ref = await readOne(K.referrers, referrerId);
   if (!ref) throw new Error("Referente non trovato");

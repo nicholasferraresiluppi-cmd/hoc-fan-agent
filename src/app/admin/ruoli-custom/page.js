@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, SectionTitle, Notice, DataTable, card } from "@/components/ds";
+import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
 const CAP_LABELS = CAP_LABELS_SHARED;
 
@@ -70,7 +71,7 @@ export default function CustomRolesPage() {
   };
 
   const save = async () => {
-    if (!draft.id || !draft.name) { alert("Servono un ID e un nome."); return; }
+    if (!draft.id || !draft.name) { alertDialog("Servono un ID e un nome."); return; }
     setBusy(true);
     try {
       const res = await fetch("/api/admin/custom-roles", {
@@ -79,7 +80,7 @@ export default function CustomRolesPage() {
         body: JSON.stringify(draft),
       });
       const j = await res.json();
-      if (!res.ok) alert(j?.error || "errore");
+      if (!res.ok) alertDialog(j?.error || "errore");
       else {
         resetDraft();
         await load();
@@ -90,7 +91,7 @@ export default function CustomRolesPage() {
   };
 
   const remove = async (id) => {
-    if (!confirm(`Eliminare il ruolo "${id}"?`)) return;
+    if (!(await confirmDialog({ title: `Eliminare il ruolo "${id}"?`, ok: "Elimina", danger: true }))) return;
     await fetch(`/api/admin/custom-roles?id=${encodeURIComponent(id)}`, { method: "DELETE" });
     await load();
   };

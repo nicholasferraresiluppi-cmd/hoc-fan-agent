@@ -21,10 +21,11 @@ import { getClerkUser, forgetClerkUser } from "@/lib/clerk-user";
  */
 
 // "social" per primo = il più basso: diventa ruolo principale solo se è l'unico (lib/invitations)
-export const ROLES = ["referente", "social", "smm", "people", "operator", "team_lead", "sales_manager", "qa_reviewer", "admin"];
+export const ROLES = ["referente", "publisher", "social", "smm", "people", "operator", "team_lead", "sales_manager", "qa_reviewer", "admin"];
 
 export const ROLE_META = {
-  referente: { label: "Referente", emoji: "🎁", color: "#A78BFA", description: "Porta un collega — vede solo quanto guadagna sulle persone che ha portato" },
+  referente: { label: "Referente", emoji: "🎁", color: "#A78BFA", description: "Porta un amico — vede solo quanto guadagna sulle persone che ha portato" },
+  publisher: { label: "Publisher", emoji: "📣", color: "#7C6CF0", description: "Publisher su X — vede solo i fan che porta, le sue buste e quanto ha maturato" },
   social: { label: "Social", emoji: "📱", color: "#EC4899", description: "Gestione account social — vede solo Account social" },
   smm: { label: "Social Media Manager", emoji: "🎬", color: "#D9B46A", description: "Radar creator, format e mercato, account social" },
   people: { label: "People Partner", emoji: "🤝", color: "#14B8A6", description: "Area Partner — CRM persone, documenti e contratti" },
@@ -59,14 +60,17 @@ export const CAPABILITIES = {
   SCOUTING_USE: "scouting.use",               // Radar creator: guardare, valutare, segnalare, caricare reel (15/10/2026, ruolo SMM)
   SOCIAL_MANAGE: "social.manage",             // Account social (/admin/supervisor): account, telefoni, caselle, password (13/10/2026)
   PEOPLE_MANAGE: "people.manage",
-  REFERRAL_MANAGE: "referral.manage",         // Porta un collega (/admin/referral): referenti, persone portate, storie, pagamenti (26/10/2026)             // CRM persone (/admin/hr): schede, documenti, contratti, link del modulo (18/10/2026, Area Partner)
+  REFERRAL_MANAGE: "referral.manage",         // Porta un amico (/admin/referral): referenti, persone portate, storie, pagamenti (26/10/2026)             // CRM persone (/admin/hr): schede, documenti, contratti, link del modulo (18/10/2026, Area Partner)
 };
 
 // "all" = tutta l'org | "team" = solo proprio team | "own" = solo sé stesso | "none" = nessun accesso
 export const ROLE_CAPABILITIES = {
-  // 26/10/2026: chi ha portato qualcuno («Porta un collega»). Nessun permesso: la sua pagina
-  // (/me/porta-un-collega) mostra SOLO i suoi dati, abbinati dal server all'account (lib/referral).
+  // 26/10/2026: chi ha portato qualcuno («Porta un amico»). Nessun permesso: la sua pagina
+  // (/me/porta-un-amico) mostra SOLO i suoi dati, abbinati dal server all'account (lib/referral).
   referente: {},
+  // 27/10/2026: publisher su X. Nessun permesso: /me/publisher mostra SOLO le sue buste,
+  // riconosciuto dal server per email verificata (lib/publisher-x). Mai fee, mai nomi dei fan.
+  publisher: {},
   // 13/10/2026: solo Account social; chi ha solo questo ruolo vede l'app ridotta a quella pagina (lib/restricted-roles)
   social: {
     [CAPABILITIES.SOCIAL_MANAGE]: "all",
@@ -81,7 +85,7 @@ export const ROLE_CAPABILITIES = {
   // (niente comp, score, denaro). La contabilità resta a parte: la apre il titolare da /contabilita.
   people: {
     [CAPABILITIES.PEOPLE_MANAGE]: "all",
-    [CAPABILITIES.REFERRAL_MANAGE]: "all", // 26/10/2026: l'HR gestisce «Porta un collega»
+    [CAPABILITIES.REFERRAL_MANAGE]: "all", // 26/10/2026: l'HR gestisce «Porta un amico»
   },
   operator: {
     [CAPABILITIES.TRAINING_DO]: "own",

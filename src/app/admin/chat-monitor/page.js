@@ -14,6 +14,7 @@ import { COUNTRY_NAMES } from "@/lib/live-creators";
 import { useLiveCreator, CreatorPills, liveFetcher } from "@/components/LiveCreatorPicker";
 import LiveTab from "./LiveTab";
 import DailyTab from "./DailyTab";
+import { alertDialog } from "@/components/AppDialogs";
 import TrendTab from "./TrendTab";
 
 const TABS = [
@@ -64,7 +65,7 @@ export default function ChatMonitorPage() {
         await trend.mutate(await liveFetcher(url("trend", "&refresh=1")), { revalidate: false });
       }
     } catch (e) {
-      alert(e.message);
+      alertDialog(e.message);
     } finally {
       setRefreshing(false);
     }

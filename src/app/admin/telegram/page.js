@@ -12,6 +12,7 @@ import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Metric, DataTable, Notice, SectionTitle, card, NUM } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
 import { fmtInt, fmtPct } from "@/lib/format";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const API = "/api/admin/telegram-channels";
 const fetcher = (url) =>
@@ -236,7 +237,7 @@ function ChannelDetail({ ch, data, onChanged, onEdit, onClose }) {
           <span style={{ color: CP.textPrimary, minWidth: 140 }}>{l.name}</span>
           <code style={{ fontSize: 12, color: CP.textSecondary, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{l.url}</code>
           <CopyBtn text={l.url} />
-          <button style={{ ...btn, padding: "4px 8px" }} disabled={busy === l.key} onClick={() => { if (confirm(`Revocare il link «${l.name}»? Chi lo usa non potrà più entrare da lì.`)) run(l.key, { action: "revoke", id: ch.id, key: l.key }); }}>Revoca</button>
+          <button style={{ ...btn, padding: "4px 8px" }} disabled={busy === l.key} onClick={async () => { if (await confirmDialog({ title: `Revocare il link «${l.name}»?`, message: "Chi lo usa non potrà più entrare da lì.", ok: "Revoca", danger: true })) run(l.key, { action: "revoke", id: ch.id, key: l.key }); }}>Revoca</button>
         </div>
       ))}
       {live ? (
@@ -255,7 +256,7 @@ function ChannelDetail({ ch, data, onChanged, onEdit, onClose }) {
 
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 22, gap: 8, flexWrap: "wrap" }}>
         <span style={muted}>{[ch.manager && `Gestito da ${ch.manager}`, ch.note].filter(Boolean).join(" · ")}</span>
-        <button style={{ ...btn, color: CP.accentRed }} onClick={() => { if (confirm("Togliere il canale dalla mappa? Si perdono anche i conteggi delle entrate.")) run("del", { action: "delete", id: ch.id }).then(onClose); }}><Trash2 size={13} />Togli dalla mappa</button>
+        <button style={{ ...btn, color: CP.accentRed }} onClick={async () => { if (await confirmDialog({ title: "Togliere il canale dalla mappa?", message: "Si perdono anche i conteggi delle entrate.", ok: "Togli", danger: true })) run("del", { action: "delete", id: ch.id }).then(onClose); }}><Trash2 size={13} />Togli dalla mappa</button>
       </div>
     </div>
   );

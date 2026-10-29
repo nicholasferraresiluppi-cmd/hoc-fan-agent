@@ -4,6 +4,8 @@
 // GET ?creator=Nome           tutto della creator: cartella, file del drive (con chi li usa), contenuti, profili
 //                             (+ &refresh=1 rilegge il drive subito)
 // GET ?creator=Nome&thumb=id  anteprima di un file (solo file della cartella di quella creator)
+// GET ?creator=Nome&media=id  il file a pezzi (Range), per guardare i video nella pagina
+// GET ?creator=Nome&photo=id  la foto in JPEG pronta da pubblicare (girata, 2048 px)
 // GET ?creator=Nome&log=1     storico
 // POST {action:"folder",  creator, url}              collega la cartella del drive
 // POST {action:"save",    creator, item}             nuovo contenuto o modifica (foto, ordine, testi)
@@ -16,7 +18,7 @@ export const maxDuration = 60;
 
 import { currentUser } from "@clerk/nextjs/server";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
-import { driveConfigured, driveEmail, thumbnail } from "@/lib/google-drive";
+import { driveConfigured, driveEmail, thumbnail, mediaChunk, photoForPublishing } from "@/lib/google-drive";
 import {
   creatorsWithProfiles, allConfigs, getConfig, setFolder, getFiles, listItems, saveItem, deleteItem, stepItem, getLog,
 } from "@/lib/editoriale-store";
@@ -56,6 +58,31 @@ export async function GET(request) {
       return new Response(t.body, { headers: { "Content-Type": t.type, "Cache-Control": "private, max-age=86400" } });
     } catch { return new Response(null, { status: 502 }); }
   }
+  if (sp.get("photo")) {
+    const id = sp.get("photo");
+    const doc = await kv.get(`edit:files:${ck}`);
+    const used = await kv.hget(`edit:used:${ck}`, id);
+    if (!doc?.files?.some((f) => f.id === id) && !used) return new Response(null, { status: 404 });
+    try {
+      const p = await photoForPublishing(id);
+      if (!p) return new Response(null, { status: 404 });
+      return new Response(p.body, { headers: { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=3600" } });
+    } catch { return new Response(null, { status: 502 }); }
+  }
+  if (sp.get("media")) {
+    const id = sp.get("media");
+    const doc = await kv.get(`edit:files:${ck}`);
+    const used = await kv.hget(`edit:used:${ck}`, id);
+    if (!doc?.files?.some((f) => f.id === id) && !used) return new Response(null, { status: 404 });
+    try {
+      const c = await mediaChunk(id, request.headers.get("range"));
+      if (c.status === 416) return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${c.size}` } });
+      return new Response(c.body, { status: 206, headers: {
+        "Content-Type": c.mime, "Accept-Ranges": "bytes", "Content-Length": String(c.end - c.start + 1),
+        "Content-Range": `bytes ${c.start}-${c.end}/${c.size}`, "Cache-Control": "private, max-age=3600",
+      } });
+    } catch { return new Response(null, { status: 502 }); }
+  }
   if (sp.get("log")) return Response.json({ log: await getLog(ck) }, noStore);
   const [creators, cfg] = await Promise.all([creatorsWithProfiles(), getConfig(ck)]);
   const c = creators.find((x) => x.ck === ck);
@@ -65,7 +92,7 @@ export async function GET(request) {
   const list = (files?.files || []).map((f) => ({ ...f, usedBy: used.get(f.id) || null }));
   return Response.json({
     creator: c.creator, ck, profiles: c.profiles, folder: cfg, drive,
-    files: list, filesAt: files?.at || null, filesError: files?.error || null, truncated: Boolean(files?.truncated),
+    files: list, folders: files?.folders || [], filesAt: files?.at || null, filesError: files?.error || null, truncated: Boolean(files?.truncated),
     items: items.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
   }, noStore);
 }

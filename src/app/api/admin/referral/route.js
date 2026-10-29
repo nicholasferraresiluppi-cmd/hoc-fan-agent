@@ -1,5 +1,5 @@
 /**
- * /api/admin/referral — «Porta un collega», lato HR (permesso referral.manage:
+ * /api/admin/referral — «Porta un amico», lato HR (permesso referral.manage:
  * admin + People Partner). Vede tutto il programma e scrive: referenti, persone
  * portate, storie, pagamenti. Logica in lib/referral(.js|-core.js).
  */

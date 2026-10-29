@@ -1,5 +1,5 @@
 /**
- * «Porta un collega» — logica PURA del programma referral (26/10/2026).
+ * «Porta un amico» — logica PURA del programma referral (26/10/2026).
  *
  * Niente KV, niente rete: funzioni deterministiche, provate da tests/referral.mjs.
  * Il lato server (KV, Infloww, inviti) sta in referral.js.
@@ -555,4 +555,72 @@ export function buildDashboard({ referrers = [], recruits = [], stories = [], fx
   trend.splice(0, Math.max(0, trend.length - 12));
 
   return { today, funnel, storyStats, channel, quality, avgRate, economics, trend, minDecided: MIN_DECIDED, minShiftsRate: MIN_SHIFTS_RATE };
+}
+
+// ── Missioni e buste (27/10/2026) ───────────────────────────────────────────
+//
+// Idea di Nicholas: ogni premio è una MISSIONE che si sblocca; quando si
+// sblocca l'HR lo vede e il premio finisce nella BUSTA del mese del referente.
+// Nessun numero nuovo: missioni e buste leggono le stesse voci di
+// recruitMilestones/storyMilestone (una sola fonte, niente drift).
+
+/**
+ * Avanzamento di una missione: { done, target, unit } o null se non misurabile.
+ * first_shift: tappe fatte su 3 (colloquio, formazione superata, primo turno).
+ */
+export function missionProgress(m, recruit = {}) {
+  if (m.kind === "shifts") return m.shiftsDone == null ? null : { done: Math.min(m.shiftsDone, m.shifts), target: m.shifts, unit: "turni" };
+  if (m.kind === "commission") return m.shiftsDone == null ? null : { done: Math.min(m.shiftsDone, m.shiftsTo), target: m.shiftsTo, unit: "turni" };
+  if (m.kind === "story") return { done: Math.min(m.published || 0, REFERRAL_RULES.storiesRequired), target: REFERRAL_RULES.storiesRequired, unit: "storie" };
+  if (m.kind === "first_shift") {
+    const d = [recruit.interviewAt, recruit.trainingPassed === true, recruit.firstShiftAt && recruit.trainingPassed === true].filter(Boolean).length;
+    return { done: d, target: 3, unit: "tappe" };
+  }
+  return null;
+}
+
+/** Mese della busta di una voce: mese in cui si è sbloccata (o, se non si sa, in cui è stata pagata; altrimenti oggi). */
+export function payslipMonth(m, today) {
+  return (m.unlockedAt || m.paidAt || today).slice(0, 7);
+}
+
+/**
+ * Buste: per referente e per mese, le voci sbloccate (da pagare) o pagate.
+ * recruits: [{ id, name, referrerId, milestones }], stories: [{ referrerId, milestone }].
+ * → [{ referrerId, name, month, lines:[…], totalEur, paidEur, dueEur, waitingFxUsd }], ordinate per mese desc, poi nome.
+ */
+export function buildPayslips({ referrers = [], recruits = [], stories = [], today }) {
+  const byKey = new Map();
+  const add = (referrerId, m, recruitName) => {
+    if (m.status !== "maturato" && m.status !== "pagato") return;
+    const month = payslipMonth(m, today);
+    const k = `${referrerId}|${month}`;
+    if (!byKey.has(k)) byKey.set(k, { referrerId, name: referrers.find((r) => r.id === referrerId)?.name || "—", month, lines: [] });
+    byKey.get(k).lines.push({ key: m.key, label: m.label, recruitName: recruitName || null, status: m.status, amountEur: m.amountEur, amountUsd: m.amountUsd ?? null, unlockedAt: m.unlockedAt || null, paidAt: m.paidAt || null, fxMissing: m.amountEur == null });
+  };
+  for (const r of recruits) for (const m of r.milestones || []) add(r.referrerId, m, r.name);
+  for (const s of stories) add(s.referrerId, s.milestone, null);
+  const out = [...byKey.values()].map((b) => {
+    const eur = (st) => round2(b.lines.filter((l) => l.status === st && l.amountEur != null).reduce((a, l) => a + l.amountEur, 0));
+    const lines = b.lines.sort((x, y) => String(x.unlockedAt || "").localeCompare(String(y.unlockedAt || "")));
+    return { ...b, lines, paidEur: eur("pagato"), dueEur: eur("maturato"), totalEur: round2(eur("pagato") + eur("maturato")), waitingFxUsd: round2(lines.filter((l) => l.fxMissing && l.amountUsd != null).reduce((a, l) => a + l.amountUsd, 0)) };
+  });
+  return out.sort((a, b) => b.month.localeCompare(a.month) || a.name.localeCompare(b.name, "it"));
+}
+
+/** CSV di una o più buste (separatore «;» e virgola decimale, come lo apre Excel in italiano). */
+export function payslipsCsv(slips = []) {
+  const n = (v) => (v == null ? "" : String(v).replace(".", ","));
+  const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const rows = [["Mese", "Referente", "Premio", "Persona portata", "Sbloccato", "Importo €", "Importo $", "Stato", "Pagato il"].map(q).join(";")];
+  for (const b of slips) for (const l of b.lines) {
+    rows.push([b.month, b.name, l.label, l.recruitName || "", l.unlockedAt || "", n(l.amountEur), n(l.amountUsd), l.status === "pagato" ? "pagato" : l.fxMissing ? "manca il cambio" : "da pagare", l.paidAt || ""].map((v, i) => (i === 5 || i === 6 ? v : q(v))).join(";"));
+  }
+  return rows.join("\n");
+}
+
+/** Cose che l'HR deve fare adesso: premi sbloccati da pagare + mesi senza cambio. */
+export function hrInbox({ toPay = [], fxMonths = [], fx = {} } = {}) {
+  const fxMissing = fxMonths.filter((m) => fx[m] == null).length;
+  return { toPay: toPay.length, fxMissing, count: toPay.length + fxMissing };
 }

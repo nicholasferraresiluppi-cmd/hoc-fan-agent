@@ -33,7 +33,7 @@ import {
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
   History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
-Megaphone, Share2, Shield, BookUser, Sunrise,
+Megaphone, Share2, Shield, BookUser, Sunrise, UserPlus,
   LineChart,
   FileSignature, Repeat, Gift } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
@@ -89,7 +89,7 @@ const NAV_GROUPS_RAW = [
       { href: "/me/allenatore", label: "Il mio allenatore", icon: Sparkles },
       { href: "/me/contestazioni", label: "Le mie contestazioni", icon: MessageSquareWarning },
       { href: "/me/turno", label: "Il mio turno", icon: Radar },
-      { href: "/me/porta-un-collega", label: "Porta un collega", icon: Gift },
+      { href: "/me/porta-un-amico", label: "Porta un amico", icon: Gift },
     ],
   },
   {
@@ -122,6 +122,7 @@ const NAV_GROUPS_RAW = [
     items: [
       { href: "/admin/pnl-live",                 label: "P&L Live",              icon: Wallet },
       { href: "/admin/retention",                label: "Retention fan",         icon: Repeat },
+      { href: "/admin/publisher-x",              label: "Publisher X",           icon: UserPlus },
       { href: "/admin/profiles-compare",         label: "Scaglioni a confronto", icon: Scale },
       { href: "/admin/comp-calendar",            label: "Calendario compensi",   icon: CalendarDays },
       { href: "/admin/threshold-study",          label: "Studio soglie",         icon: Ruler },
@@ -197,7 +198,7 @@ const NAV_GROUPS_RAW = [
       { href: "/contabilita",                    label: "Contabilità",  icon: Landmark },
       { href: "/admin/hr/contratti",             label: "Contratti",    icon: FileSignature },
       { href: "/admin/hr/sync",                  label: "Sincronizzazione ClickUp", icon: RefreshCw },
-      { href: "/admin/referral",                 label: "Porta un collega", icon: Gift },
+      { href: "/admin/referral",                 label: "Porta un amico", icon: Gift },
       { href: "/admin/candidate-assessments",    label: "Assessment candidati", icon: UserCheck },
       { href: "/admin/priority-queue",           label: "Fan da seguire ora", icon: Inbox },
       { href: "/admin/settimana",                 label: "Da seguire", icon: Target },
@@ -429,8 +430,14 @@ export default function Sidebar() {
     refreshInterval: 5 * 60 * 1000,
   });
   const s4sCount = s4sInbox?.count || 0;
-  const badgeOf = (href, flag) => (href === "/admin/s4s" ? s4sCount : flag ? criticalCount : 0);
-  const toneOf = (href) => (href === "/admin/s4s" ? "todo" : undefined);
+  // Porta un amico (27/10/2026): premi sbloccati da pagare + mesi senza cambio, per chi gestisce il programma
+  const { data: refInbox } = useSWR(me?.authenticated && canSee("/admin/referral", me.capabilities, me.admin) ? "/api/admin/referral/inbox" : null, silentFetcher, {
+    revalidateOnFocus: false,
+    refreshInterval: 10 * 60 * 1000,
+  });
+  const refCount = refInbox?.count || 0;
+  const badgeOf = (href, flag) => (href === "/admin/s4s" ? s4sCount : href === "/admin/referral" ? refCount : flag ? criticalCount : 0);
+  const toneOf = (href) => (href === "/admin/s4s" || href === "/admin/referral" ? "todo" : undefined);
 
   const allowed = (href) => (!me?.authenticated && !isPrivateHref(href)) || canSee(href, me?.capabilities, me?.admin);
   const [theme, setTheme] = useTheme();

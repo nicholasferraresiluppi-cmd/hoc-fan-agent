@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { Plus, Link2, RefreshCw, Power, SlidersHorizontal, FileSignature } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
+import { confirmDialog } from "@/components/AppDialogs";
 import { PageHead, Notice, DataTable, card } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
 import { PHASE_LABELS, PHASE_EXITED, CONTRACT_LABELS } from "@/lib/hr-fields";
@@ -510,8 +511,8 @@ function SharedLinkBox({ onChanged }) {
   const [err, setErr] = useState(null);
   const link = data?.link || null;
   const act = async (action) => {
-    if (action === "regenerate" && link && !confirm("Rigenero il link? Quello di adesso smette subito di funzionare: chi lo ha ricevuto e non ha ancora compilato dovrà avere quello nuovo.")) return;
-    if (action === "disable" && !confirm("Disattivo il link? Nessuno potrà più compilare il modulo finché non ne crei uno nuovo.")) return;
+    if (action === "regenerate" && link && !(await confirmDialog({ title: "Rigenero il link?", message: "Quello di adesso smette subito di funzionare: chi lo ha ricevuto e non ha ancora compilato dovrà avere quello nuovo.", ok: "Rigenera", danger: true }))) return;
+    if (action === "disable" && !(await confirmDialog({ title: "Disattivo il link?", message: "Nessuno potrà più compilare il modulo finché non ne crei uno nuovo.", ok: "Disattiva", danger: true }))) return;
     setBusy(true); setErr(null);
     try {
       const j = await postJson("/api/admin/hr/form-links/shared", { action });

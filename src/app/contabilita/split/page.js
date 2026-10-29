@@ -18,6 +18,7 @@ import { PageHead, FilterChip, Notice, card } from "@/components/ds";
 import { computeSplitMonth, applyBusteExclusions, activeIn } from "@/lib/split-core";
 import { describeTiers, parseDealText } from "@/lib/creator-deals-core";
 import { monthLabel, nextMonthId } from "@/lib/compensi-core";
+import { confirmDialog, promptDialog } from "@/components/AppDialogs";
 
 const fetcher = async (url) => {
   const r = await fetch(url, { cache: "no-store" });
@@ -282,9 +283,9 @@ export default function SplitPage() {
   const saveDoc = () => run("doc", async () => { const r = await send(`/api/contabilita/split/mese?m=${month}`, "PUT", { doc, rev: doc.rev ?? null }); setDoc(r.doc); setDocDirty(false); mutateMonth({ doc: r.doc }, { revalidate: false }); });
   const saveCfg = () => run("cfg", async () => { const r = await send("/api/contabilita/split", "PUT", { config: cfg, rev: home.config.rev ?? 0 }); setCfg(r.config); setCfgDirty(false); mutateHome({ ...home, config: r.config }, { revalidate: false }); });
   const newMonth = () => run("new", async () => {
-    if (docDirty && !confirm("Modifiche non salvate nel mese aperto. Continuare?")) return;
+    if (docDirty && !(await confirmDialog("Modifiche non salvate nel mese aperto. Continuare?"))) return;
     const target = months.length ? nextMonthId(months[0]) : thisMonth();
-    if (!confirm(`Creare ${monthLabel(target)}? Gli accordi sono quelli attuali; revenue, chatter ed extra si inseriscono nel mese.`)) return;
+    if (!(await confirmDialog(`Creare ${monthLabel(target)}? Gli accordi sono quelli attuali; revenue, chatter ed extra si inseriscono nel mese.`))) return;
     await send(`/api/contabilita/split/mese?m=${target}`, "POST");
     await mutateHome(); setMonth(target);
   });
@@ -300,8 +301,8 @@ export default function SplitPage() {
     });
     setInfo([`Presi: revenue di ${Object.keys(r.revenue || {}).length} team, chatter di ${Object.keys(r.chatter || {}).length}. Controlla e salva.`, ...(r.notes || [])].join(" "));
   });
-  const excludeBusta = (name) => {
-    const note = prompt(`Togliere la busta di ${name} dal conto di ${monthLabel(month)}? Motivo (facoltativo):`);
+  const excludeBusta = async (name) => {
+    const note = await promptDialog(`Togliere la busta di ${name} dal conto di ${monthLabel(month)}? Motivo (facoltativo):`);
     if (note === null) return;
     upd((d) => {
       const excludedBuste = [...(d.excludedBuste || []), { name, note, at: Date.now() }];
@@ -314,9 +315,9 @@ export default function SplitPage() {
   const teamsAll = cfg.teams || [];
   const teamName = (id) => teamsAll.find((t) => t.id === id)?.name || "agenzia";
   const putTeam = (t, isNew) => { updCfg((c) => ({ ...c, teams: isNew ? [...c.teams, { ...t, id: tmpId() }] : c.teams.map((x) => (x.id === t.id ? t : x)) })); setEditTeam(null); };
-  const delTeam = (id) => { if (!confirm("Eliminare il team? Gli accordi persona perdono questo team.")) return; updCfg((c) => ({ ...c, teams: c.teams.filter((x) => x.id !== id), people: c.people.map((p) => ({ ...p, teamIds: p.teamIds.filter((i) => i !== id) })) })); setEditTeam(null); };
+  const delTeam = async (id) => { if (!(await confirmDialog({ title: "Eliminare il team?", message: "Gli accordi persona perdono questo team.", ok: "Elimina", danger: true }))) return; updCfg((c) => ({ ...c, teams: c.teams.filter((x) => x.id !== id), people: c.people.map((p) => ({ ...p, teamIds: p.teamIds.filter((i) => i !== id) })) })); setEditTeam(null); };
   const putDeal = (d, isNew) => { updCfg((c) => ({ ...c, people: isNew ? [...c.people, { ...d, id: tmpId() }] : c.people.map((x) => (x.id === d.id ? d : x)) })); setEditDeal(null); };
-  const delDeal = (id) => { if (!confirm("Eliminare questo accordo?")) return; updCfg((c) => ({ ...c, people: c.people.filter((x) => x.id !== id) })); setEditDeal(null); };
+  const delDeal = async (id) => { if (!(await confirmDialog({ title: "Eliminare questo accordo?", ok: "Elimina", danger: true }))) return; updCfg((c) => ({ ...c, people: c.people.filter((x) => x.id !== id) })); setEditDeal(null); };
 
   const T = calc?.totals;
   const tabs = [["conto", "Conto del mese"], ["extra", "Spese extra"], ["persone", "Persone"], ["accordi", owner ? "Team e accordi" : "Accordi"]];
@@ -336,7 +337,7 @@ export default function SplitPage() {
       {err && <Notice danger>{err}</Notice>}
       {months.length === 0 && <Notice>Nessun mese ancora: crealo con «Nuovo mese».</Notice>}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
-        {months.map((m) => <FilterChip key={m} label={monthLabel(m)} active={m === month} onClick={() => { if (docDirty && !confirm("Modifiche non salvate: cambiare mese le perde. Continuare?")) return; setDocDirty(false); setMonth(m); }} />)}
+        {months.map((m) => <FilterChip key={m} label={monthLabel(m)} active={m === month} onClick={async () => { if (docDirty && !(await confirmDialog("Modifiche non salvate: cambiare mese le perde. Continuare?"))) return; setDocDirty(false); setMonth(m); }} />)}
       </div>
       {mErr && <Notice danger>{mErr.message}</Notice>}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>

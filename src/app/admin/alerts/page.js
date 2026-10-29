@@ -18,6 +18,7 @@ import { CheckCircle2, RefreshCw, Loader2, ArrowUpRight } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtAgo, fmtInt } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, DataTable, card } from "@/components/ds";
+import { alertDialog } from "@/components/AppDialogs";
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -78,7 +79,7 @@ export default function OpsAlertsPage() {
       const r = await fetch("/api/admin/ops-alerts/run", { method: "POST" });
       if (!r.ok) {
         const d = await r.json().catch(() => null);
-        alert(d?.error || `Errore run (${r.status})`);
+        alertDialog(d?.error || `Errore run (${r.status})`);
       }
       await mutate();
     } finally {
@@ -96,7 +97,7 @@ export default function OpsAlertsPage() {
       });
       if (!r.ok) {
         const d = await r.json().catch(() => null);
-        alert(d?.error || `Errore (${r.status})`);
+        alertDialog(d?.error || `Errore (${r.status})`);
       }
       await mutate();
     } finally {

@@ -100,7 +100,7 @@ export const WORKSPACES = {
       { title: "Persone", items: [
         { href: "/admin/hr", label: "Persone" },
         { href: "/admin/hr/sync", label: "Sincronizzazione ClickUp" },
-        { href: "/admin/referral", label: "Porta un collega" },
+        { href: "/admin/referral", label: "Porta un amico" },
         { href: "/admin/candidate-assessments", label: "Assessment candidati" },
       ] },
       { title: "Accessi e richieste", items: [

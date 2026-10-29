@@ -14,6 +14,7 @@ const LOCALE = {
 };
 import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
+import AppDialogHost from "@/components/AppDialogs";
 import "./globals.css";
 import { themeCss, CP } from "@/lib/brand";
 import { Manrope, Instrument_Serif, Cinzel } from "next/font/google";
@@ -101,6 +102,7 @@ export default function RootLayout({ children }) {
         <body style={{ background: "var(--cp-bg)", color: "var(--cp-textPrimary)", minHeight: "100vh", fontFamily: "var(--cp-font)" }}>
           <Providers>
             <AppShell>{children}</AppShell>
+            <AppDialogHost />
           </Providers>
         </body>
       </html>

@@ -84,8 +84,8 @@ export async function getFiles(ck, { force = false } = {}) {
   const cached = await kv.get(FILES(ck));
   if (cached && !force && cached.folderId === cfg.folderId && Date.now() - cached.at < STALE_MS) return cached;
   try {
-    const { files, truncated } = await listMedia(cfg.folderId);
-    const doc = { at: Date.now(), folderId: cfg.folderId, files, truncated };
+    const { files, folders, truncated } = await listMedia(cfg.folderId);
+    const doc = { at: Date.now(), folderId: cfg.folderId, files, folders: folders || [], truncated };
     await kv.set(FILES(ck), doc);
     return doc;
   } catch (e) {
@@ -211,7 +211,9 @@ export async function scheduledForProfiles(profiles, days) {
       ((out[sl.profileId] ||= {})[sl.date] ||= []).push({
         id: it.id, ck, type: it.type, title: it.title, time: sl.time, status: it.status, pubTask: it.pubTask || null,
         files: filesOf(it).length, cover: it.type === "carosello" ? it.files[0] || null : it.final || it.files[0] || null,
-        caption: (it.caption || "").slice(0, 300), sound: it.sound || "", city: it.city || "",
+        caption: (it.caption || "").slice(0, 2200), sound: it.sound || "", city: it.city || "",
+        // i file da scaricare per pubblicare: le foto in ordine, o il reel montato (o il grezzo se va bene così)
+        dl: it.type === "carosello" ? it.files : [it.final || it.files[0]].filter(Boolean),
       });
     }
   }

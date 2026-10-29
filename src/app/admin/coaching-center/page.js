@@ -15,6 +15,7 @@ import { CP, FONTS } from "@/lib/brand";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmtInt, MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, FilterChip, Notice, card, EarlyMonthNote } from "@/components/ds";
+import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -61,13 +62,13 @@ export default function CoachingCenterPage() {
       body: JSON.stringify({ period_id: periodId, employee, action, ...extra }),
     });
     if (res.ok) mutate(url);
-    else alert("Errore: " + (await res.text()));
+    else alertDialog("Errore: " + (await res.text()));
   }
   async function deleteAssignment(employee) {
-    if (!confirm(`Togliere l'assegnazione di ${employee}?`)) return;
+    if (!(await confirmDialog({ title: `Togliere l'assegnazione di ${employee}?`, ok: "Togli", danger: true }))) return;
     const res = await fetch(`/api/admin/coaching-center?period_id=${periodId}&employee=${encodeURIComponent(employee)}`, { method: "DELETE" });
     if (res.ok) mutate(url);
-    else alert("Errore: " + (await res.text()));
+    else alertDialog("Errore: " + (await res.text()));
   }
 
   return (

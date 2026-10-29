@@ -23,6 +23,26 @@
     {
       "path": "/api/cron/studio-telegram",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/cp-wages",
+      "schedule": "5-55/10 3-8 * * *"
+    },
+    {
+      "path": "/api/cron/payout-ledger",
+      "schedule": "5-55/10 3-8 * * *"
+    },
+    {
+      "path": "/api/cron/infloww-agency",
+      "schedule": "5-55/10 3-8 * * *"
+    },
+    {
+      "path": "/api/cron/recupero",
+      "schedule": "5-55/10 3-8 * * *"
+    },
+    {
+      "path": "/api/cron/sales-ai",
+      "schedule": "5-55/10 3-8 * * *"
     }
   ]
 }
