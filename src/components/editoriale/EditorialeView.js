@@ -9,11 +9,11 @@
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import {
-  ArrowLeft, ArrowRight, CalendarCheck, CalendarDays, Check, ChevronLeft, ChevronRight, CircleCheck, Copy, ExternalLink, Film, FolderOpen,
-  Image as ImageIcon, Images, Lock, Maximize2, Plus, RefreshCw, Trash2, X,
+  ArrowLeft, ArrowRight, CalendarDays, Check, ChevronLeft, ChevronRight, Copy, ExternalLink, Film, FolderOpen,
+  Image as ImageIcon, Lock, Maximize2, Plus, RefreshCw, Trash2, X,
 } from "lucide-react";
-import VetroScope, { useVetro, VetroNum } from "@/components/VetroScope";
-import { KpiCard } from "@/components/VetroCharts";
+import VetroScope, { useVetro } from "@/components/VetroScope";
+import HeroHead, { BigNum } from "@/components/HeroHead";
 import { confirmDialog } from "@/components/AppDialogs";
 import PublishDownload from "@/components/PublishDownload";
 import Lightbox from "@/components/MediaLightbox";
@@ -43,6 +43,13 @@ const ls = {
   set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
 };
 const CREATOR_KEY = "hoc:editoriale:creator";
+// miniature del drive (stile del Radar, 29/10): entrano una dopo l'altra, si sollevano al passaggio
+const ED_CSS = `
+  @keyframes edIn { from { opacity: 0; transform: translateY(8px) } to { opacity: var(--ed-o, 1); transform: none } }
+  .ed-tile { animation: edIn .4s cubic-bezier(.2,.7,.2,1) both; transition: transform .18s ease, box-shadow .18s ease }
+  .ed-tile:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.16) }
+  @media (prefers-reduced-motion: reduce) { .ed-tile { animation: none; transition: none } }
+`;
 const PAGE = 120;
 const fmtDay = (k, o = { weekday: "short", day: "numeric", month: "short" }) => new Date(k + "T12:00:00").toLocaleDateString("it-IT", o);
 // le finestre USA in ora italiana; quella delle 19 USA cade dopo mezzanotte da noi
@@ -50,10 +57,10 @@ const windowTimes = () => WINDOWS.map((w) => { const t = estToIt(w.h); return { 
 
 // ── pezzi piccoli ─────────────────────────────────────────────────────────────
 
-function Thumb({ creator, id, kind, size = "100%", ratio, dim, onClick, children, title }) {
+function Thumb({ creator, id, kind, size = "100%", ratio, dim, onClick, children, title, tile, delay = 0 }) {
   const [err, setErr] = useState(false);
   return (
-    <div title={title} onClick={onClick} style={{ position: "relative", width: size, aspectRatio: ratio || (kind === "video" ? "9 / 14" : "4 / 5"), borderRadius: 8, overflow: "hidden", background: CP.surfaceAlt, border: `1px solid ${CP.borderSoft}`, cursor: onClick ? "pointer" : "default", opacity: dim ? 0.35 : 1, flex: "0 0 auto" }}>
+    <div title={title} onClick={onClick} className={tile ? "ed-tile" : undefined} style={{ position: "relative", width: size, aspectRatio: ratio || (kind === "video" ? "9 / 14" : "4 / 5"), borderRadius: tile ? 12 : 8, ...(tile ? { animationDelay: `${delay}ms`, "--ed-o": dim ? 0.35 : 1 } : {}), overflow: "hidden", background: CP.surfaceAlt, border: `1px solid ${CP.borderSoft}`, cursor: onClick ? "pointer" : "default", opacity: dim ? 0.35 : 1, flex: "0 0 auto" }}>
       {!err && id
         ? <img src={`${API}?creator=${encodeURIComponent(creator)}&thumb=${encodeURIComponent(id)}&v=2`} alt="" loading="lazy" draggable={false} onError={() => setErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         : kind === "video" && id
@@ -345,13 +352,13 @@ export default function EditorialeView({ embedded = false } = {}) {
         {data?.truncated && <Notice>La cartella ha più di 6.000 file: ne mostro una parte. Conviene collegare una sottocartella.</Notice>}
         {!visible.length && !data?.filesError && <div style={{ ...cardBox, textAlign: "center", ...hint, fontSize: 14 }}>{path !== "*" && !files.some((f) => f.path === path) ? `La cartella «${path || "principale"}» è vuota: carica i file in Drive e premi «Rileggi il drive».` : files.length ? (useF === "liberi" ? "Tutti usati: niente di libero qui." : useF === "usati" ? "Niente di già usato qui." : `Niente ${pickKind === "photo" ? "foto" : "video"} qui.`) : "La cartella è vuota, o non ci sono foto e video."}</div>}
         {visible.length > 0 && <p style={{ ...hint, margin: "0 0 8px" }}>Tocca la foto per ingrandirla, il cerchio in alto a sinistra per sceglierla.</p>}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8 }}>
-          {visible.slice(0, shown).map((f) => {
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(31%, 150px), 1fr))", gap: 12 }}>
+          {visible.slice(0, shown).map((f, fi) => {
             const i = sel.indexOf(f.id);
             const owner = f.usedBy ? itemById.get(f.usedBy) : null;
             return (
-              <Thumb key={f.id} creator={creator} id={f.id} kind={f.kind} dim={Boolean(f.usedBy) && f.usedBy !== addTo} onClick={() => setPreview(f)} title={owner ? `Già in «${owner.title}»` : f.uses ? `${f.name} — già usato in ${f.uses} reel, si può riusare` : f.name}>
-                {i >= 0 && <div style={{ position: "absolute", inset: 0, border: `3px solid ${CP.accent}`, borderRadius: 8, background: alpha(CP.accent, "1a"), pointerEvents: "none" }} />}
+              <Thumb key={`${path}|${useF}|${pickKind}|${f.id}`} tile delay={fi < 40 ? fi * 25 : 0} creator={creator} id={f.id} kind={f.kind} dim={Boolean(f.usedBy) && f.usedBy !== addTo} onClick={() => setPreview(f)} title={owner ? `Già in «${owner.title}»` : f.uses ? `${f.name} — già usato in ${f.uses} reel, si può riusare` : f.name}>
+                {i >= 0 && <div style={{ position: "absolute", inset: 0, border: `3px solid ${CP.accent}`, borderRadius: 12, background: alpha(CP.accent, "1a"), pointerEvents: "none" }} />}
                 <SelectDot n={i >= 0 ? i + 1 : null} locked={Boolean(owner)} onClick={() => toggle(f)} />
                 {!owner && f.uses > 0 && <span style={{ position: "absolute", left: 4, right: 4, bottom: 4, background: alpha(CP.bgSunken, "dd"), color: CP.textPrimary, borderRadius: 6, padding: "2px 5px", fontSize: 10.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", pointerEvents: "none" }}>Usato {f.uses === 1 ? "1 volta" : `${f.uses} volte`}</span>}
                 {owner && <span style={{ position: "absolute", left: 4, right: 4, bottom: 4, background: alpha(CP.bgSunken, "dd"), color: CP.textPrimary, borderRadius: 6, padding: "2px 5px", fontSize: 10.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", pointerEvents: "none" }}>{stageOf(owner) === "pubblicato" ? "Pubblicata" : "In"} «{owner.title}»</span>}
@@ -589,6 +596,7 @@ export default function EditorialeView({ embedded = false } = {}) {
 
   return (
     <VetroScope on={vetro}>
+    <style>{ED_CSS}</style>
     <div style={embedded ? { fontFamily: FONTS.body, color: CP.textPrimary } : { maxWidth: 1600, margin: "0 auto", padding: "20px 16px 60px", fontFamily: FONTS.body, color: CP.textPrimary }}>
       {!embedded && <PageHead crumbs={[{ label: "Marketing" }, { label: "Social" }]} title="Contenuti Instagram"
         subtitle="Dal drive della creator al calendario del profilo: smisti foto e video, prepari caroselli e reel, li metti in calendario. Una foto usata non si può più scegliere." />}
@@ -597,12 +605,16 @@ export default function EditorialeView({ embedded = false } = {}) {
           {base.creators.map((c) => <FilterChip key={c.ck} label={c.creator} active={c.creator === creator} onClick={() => setCreator(c.creator)} />)}
         </div>
       )}
-      {vetro && kpis && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14, marginBottom: 18 }}>
-          <KpiCard i={0} icon={Images} tone={0} label="Foto e video liberi" value={<VetroNum value={String(kpis.free)} />} sub={`su ${files.length} nel drive`} />
-          <KpiCard i={1} icon={CircleCheck} tone={3} label="Pronti da mettere in calendario" value={<VetroNum value={String(kpis.ready)} />} sub={kpis.ready ? "trascinali su un giorno" : "niente in attesa"} />
-          <KpiCard i={2} icon={CalendarCheck} tone={4} label="In calendario nei prossimi 7 giorni" value={<VetroNum value={String(kpis.week)} />} sub={`${kpis.pub} già pubblicati`} />
-        </div>
+      {/* in cima, nello stile del Radar (29/10): titolo, una riga, quattro numeri che salgono */}
+      {kpis && (
+        <HeroHead eyebrow="Contenuti Instagram" title="I contenuti di" accent={creator}
+          sub="Dal drive al calendario: scegli le foto e i video, prepara caroselli e reel, mettili in calendario."
+          numbers={<>
+            <BigNum label="Liberi nel drive" value={kpis.free} title={`Foto e video mai usati, su ${files.length} nel drive`} />
+            <BigNum label="Pronti" value={kpis.ready} strong={kpis.ready > 0} title="Contenuti completi da mettere in calendario" />
+            <BigNum label="In calendario 7 giorni" value={kpis.week} />
+            <BigNum label="Pubblicati" value={kpis.pub} />
+          </>} />
       )}
       {data?.folder && (
         <Tabs small style={{ marginBottom: 18 }} value={tab} onChange={(k) => { setTab(k); if (k !== "drive") { setAddTo(null); } }}
