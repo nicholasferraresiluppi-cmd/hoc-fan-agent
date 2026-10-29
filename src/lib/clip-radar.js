@@ -10,6 +10,7 @@
 //          clipradar:run           esito dell'ultimo giro (giorno di Roma, letti, errori, costo stimato)
 //          clipradar:spend:{YYYY-MM}  spesa stimata del mese (tetto CLIP_RADAR_CAP_USD, def. 40 $)
 import { kv } from "@vercel/kv";
+import { loadAll as loadSupervisor } from "@/lib/supervisor-store";
 import {
   profileId, normalizeIg, normalizeTt, mergeVideos, runBudget, MAX_PROFILES, PER_PROFILE, PRICE,
 } from "@/lib/clip-radar-core";
@@ -53,12 +54,44 @@ export async function loadAll() {
   return { profiles, videosByProfile, saved, run: run || null, spent: Number(spent) || 0, cap: capUsd() };
 }
 
-export async function addProfile({ platform, handle }, by) {
+/**
+ * I NOSTRI profili (Account social: Instagram e TikTok non ritirati) entrano nel radar da soli
+ * (29/10, Nicholas): così si confrontano anche i nostri video con quelli che funzionano fuori.
+ * `ours: true`, non contano nel tetto e non si tolgono da qui (si ritirano in Account social).
+ * Ritorna i profili nuovi da leggere.
+ */
+export async function syncOurProfiles() {
+  const sup = await loadSupervisor();
+  const want = new Map();
+  for (const a of sup.accounts || []) {
+    if (a.retired || (a.platform !== "instagram" && a.platform !== "tiktok")) continue;
+    const h = String(a.username || "").trim().replace(/^@+/, "").toLowerCase();
+    if (!/^[\w.]{2,40}$/.test(h)) continue;
+    const platform = a.platform === "tiktok" ? "tt" : "ig";
+    const lang = String(a.language || "").toUpperCase();
+    const country = lang === "IT" ? "ita" : ["EN", "US", "GB", "UK"].includes(lang) ? "eng" : null;
+    want.set(profileId(platform, h), { platform, handle: h, creator: a.creator || null, country });
+  }
+  const cur = new Map((await listProfiles()).map((p) => [p.id, p]));
+  const added = [];
+  for (const [id, w] of want) {
+    const ex = cur.get(id);
+    if (ex) { if (!ex.ours || ex.creator !== w.creator || (!ex.country && w.country)) await kv.hset(P, { [id]: JSON.stringify({ ...ex, ours: true, creator: w.creator, country: ex.country || w.country }) }); continue; }
+    const prof = { id, ...w, ours: true, label: null, note: "", addedAt: Date.now(), addedBy: "Account social", lastRead: null, error: null, reading: Date.now() };
+    await kv.hset(P, { [id]: JSON.stringify(prof) });
+    added.push(prof);
+  }
+  // un nostro account ritirato o tolto esce anche da qui
+  for (const [id, p] of cur) if (p.ours && !want.has(id)) await removeProfile(id);
+  return added;
+}
+
+export async function addProfile({ platform, handle, country }, by) {
   const id = profileId(platform, handle);
   const all = await listProfiles();
   if (all.some((p) => p.id === id)) return { id, exists: true };
-  if (all.length >= MAX_PROFILES) throw new Error(`Al massimo ${MAX_PROFILES} profili: togline uno prima`);
-  const prof = { id, platform, handle, label: null, note: "", addedAt: Date.now(), addedBy: by?.name || null, lastRead: null, error: null, reading: Date.now() };
+  if (all.filter((p) => !p.ours).length >= MAX_PROFILES) throw new Error(`Al massimo ${MAX_PROFILES} profili: togline uno prima`);
+  const prof = { id, platform, handle, country: country === "eng" ? "eng" : country === "ita" ? "ita" : null, label: null, note: "", addedAt: Date.now(), addedBy: by?.name || null, lastRead: null, error: null, reading: Date.now() };
   await kv.hset(P, { [id]: JSON.stringify(prof) });
   return { id, prof };
 }
@@ -110,7 +143,7 @@ export async function readProfiles(profiles) {
     if (failed) { await updateProfile(p.id, { reading: null, error: "Lettura non riuscita: si riprova stanotte" }).catch(() => {}); continue; }
     const merged = mergeVideos((await kv.get(V(p.id))) || [], fresh, at);
     await kv.set(V(p.id), merged);
-    await updateProfile(p.id, { reading: null, lastRead: at, error: fresh.length ? null : "Nessun video negli ultimi 30 giorni (o profilo privato / inesistente)" }).catch(() => {});
+    await updateProfile(p.id, { reading: null, lastRead: at, error: fresh.length ? null : "Nessun video negli ultimi 30 giorni: profilo privato, chiuso, rinominato o fermo — controlla che il nome sia giusto" }).catch(() => {});
     read++; videos += fresh.length;
   }
   return { read, videos, usd, errors };
@@ -123,6 +156,7 @@ export async function nightlyRefresh({ force = false } = {}) {
   const st = (await kv.get(RUN)) || {};
   if (!force && st.lastDay === today) return { idle: true };
   if (st.runningSince && Date.now() - st.runningSince < 8 * 60000) return { busy: true };
+  await syncOurProfiles().catch(() => {});
   const profiles = await listProfiles();
   if (!profiles.length) { await kv.set(RUN, { lastDay: today, at: Date.now(), read: 0 }); return { read: 0 }; }
   await kv.set(RUN, { ...st, runningSince: Date.now() });
@@ -131,4 +165,18 @@ export async function nightlyRefresh({ force = false } = {}) {
   catch (e) { res = { errors: [e?.message || "errore"] }; }
   await kv.set(RUN, { lastDay: res.skip === "cap" ? st.lastDay : today, at: Date.now(), ...res, runningSince: null });
   return res;
+}
+
+/** Il video originale di un post, a pezzi (Range) — per «Scarica». null se non c'è o il link è scaduto. */
+const CHUNK = 3 * 1024 * 1024;
+export async function videoChunk(pid, videoId, rangeHeader) {
+  const vids = (await kv.get(V(pid))) || [];
+  const v = vids.find((x) => x.id === videoId);
+  if (!v?.video) return null;
+  const m = /bytes=(\d*)-(\d*)/.exec(rangeHeader || "");
+  const start = m && m[1] ? Number(m[1]) : 0;
+  const end = start + CHUNK - 1;
+  const r = await fetch(v.video, { headers: { Range: `bytes=${start}-${end}` }, cache: "no-store" });
+  if (!r.ok && r.status !== 206) return { expired: true };
+  return { status: r.status, body: r.body, type: r.headers.get("content-type") || "video/mp4", range: r.headers.get("content-range"), len: r.headers.get("content-length"), name: `${v.owner || "video"}-${videoId.split(":")[1]}` };
 }

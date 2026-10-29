@@ -57,6 +57,7 @@ export function normalizeIg(row) {
     postedAt: Number.isFinite(posted) ? posted : null,
     duration: num(row.videoDuration) != null ? Math.round(num(row.videoDuration)) : null,
     cover: s(row.displayUrl, 1200) || null,
+    video: s(row.videoUrl, 2000) || null, // file originale (link firmato di Instagram, scade in qualche giorno)
     caption: s(row.caption, 400),
     sound: [row.musicInfo?.song_name, row.musicInfo?.artist_name].filter(Boolean).join(" · ").slice(0, 120),
     pinned: Boolean(row.isPinned),
