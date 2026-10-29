@@ -992,14 +992,23 @@ export default function WarmupPage() {
   function viewFolders() {
     let list = folderList();
     if (onlyMine) list = list.map((f) => ({ ...f, items: f.items.filter(isMine) })).filter((f) => f.items.length);
-    const tot = (onlyMine ? ACC.filter(isMine) : ACC).length;
+    const mine = onlyMine ? ACC.filter(isMine) : ACC;
+    const tot = mine.length;
+    const stAll = { verde: 0, arancione: 0, rosso: 0 };
+    mine.forEach((a) => { stAll[a.status] = (stAll[a.status] || 0) + 1; });
     return (
       <>
-        <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 12 }}>
-          <div style={{ flex: 1, minWidth: 180 }}><h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: 0 }}>Creator</h2><p style={{ ...hint, fontSize: 14, margin: "2px 0 0" }}>{list.length ? `${list.length} ${list.length === 1 ? "cartella" : "cartelle"} · ${tot} profili` : onlyMine ? "Nessun profilo assegnato a te" : "Nessun profilo ancora"}</p></div>
-          {mineSeg()}
-          <button type="button" style={btnPrimary} onClick={() => setForm({})}><Plus size={15} />Nuovo profilo</button>
-        </div>
+        {/* in cima, nello stile del Radar (29/10): quanti profili e come stanno */}
+        <HeroHead eyebrow="Account"
+          title={list.length ? "I profili di" : onlyMine ? "Nessun profilo" : "Ancora nessun"} accent={list.length ? `${list.length} creator` : onlyMine ? "assegnato a te" : "profilo"}
+          sub={list.length ? "Una cartella per creator: tocca per vedere i profili, il giorno del warm-up e le segnalazioni." : null}
+          numbers={list.length ? <>
+            <BigNum label="Profili" value={tot} />
+            <BigNum label="In verde" value={stAll.verde} title="Nessuna segnalazione aperta" />
+            <BigNum label="In arancione" value={stAll.arancione} title="Segnalazione aperta, da seguire" />
+            <BigNum label="In rosso" value={stAll.rosso} strong={stAll.rosso > 0} title="Segnalazione grave aperta" />
+          </> : null}
+          actions={mineSeg()} />
         {!list.length ? (
           <div style={{ ...cardBox, textAlign: "center", padding: "30px 18px" }}>
             <h3 style={{ margin: "0 0 6px", fontWeight: 500 }}>{onlyMine ? "Nessun profilo assegnato a te" : "Registra il primo profilo"}</h3>
