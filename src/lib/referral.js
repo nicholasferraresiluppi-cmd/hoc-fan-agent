@@ -20,7 +20,7 @@
 import { kv } from "@vercel/kv";
 import { randomBytes } from "node:crypto";
 import {
-  REFERRAL_RULES, validateReferrer, validateRecruit, validateStory, findDuplicateRecruit,
+  REFERRAL_RULES, inCampaign, contactDay, validateReferrer, validateRecruit, validateStory, findDuplicateRecruit,
   recruitMilestones, storyMilestone, recruitSteps, summarize, referrerView,
   salesMapFromKpiRows, salesFor, monthsSince, normEmail, normName, shiftDatesFromWages, parseFx, addMonths, recruitMetrics, buildDashboard, buildPayslips, hrInbox,
 } from "@/lib/referral-core";
@@ -188,7 +188,7 @@ export async function loadState({ now = Date.now() } = {}) {
   const [sales, shifts] = await Promise.all([salesForRecruits(recruits, { now }), shiftsForRecruits(recruits, { now })]);
   const recruitRows = recruits.map((r) => {
     const milestones = recruitMilestones(r, { today, salesByMonth: sales[r.id] || {}, shiftDates: shifts[r.id], fx, paid });
-    return { ...r, milestones, steps: recruitSteps(r, milestones, { today }), totals: summarize(milestones), metrics: recruitMetrics(r, { salesByMonth: sales[r.id] || {}, shiftDates: shifts[r.id] }) };
+    return { ...r, contactDay: contactDay(r), outOfCampaign: !inCampaign(r), milestones, steps: recruitSteps(r, milestones, { today }), totals: summarize(milestones), metrics: recruitMetrics(r, { salesByMonth: sales[r.id] || {}, shiftDates: shifts[r.id] }) };
   });
   const storyRows = stories.map((st) => ({ ...st, milestone: storyMilestone(st, { today, paid }) }));
   const referrerRows = referrers.map((ref) => {

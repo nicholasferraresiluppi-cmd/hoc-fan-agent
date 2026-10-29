@@ -44,8 +44,15 @@
  * pagati restano congelati all'importo del pagamento.
  */
 
+// ref-4 (29/10/2026): il programma è una PROVA e vale per chi scrive all'Area
+// Partner (Claudia) entro il 30 novembre 2026 (decisione di Nicholas). Conta il
+// giorno del primo contatto (`contactedAt`, se l'HR lo scrive; altrimenti il
+// giorno in cui la persona è stata inserita): chi arriva dopo resta registrato,
+// ma i suoi premi non maturano. Le storie concordate dopo la scadenza idem.
+// Le persone e le storie entro la data non cambiano rispetto a ref-3.
 export const REFERRAL_RULES = {
-  version: "ref-3",
+  version: "ref-4",
+  campaignUntil: "2026-11-30", // ultimo giorno per scrivere all'Area Partner (null = nessuna scadenza)
   storyEur: 50,            // 2 storie Instagram pubblicate entro 30 giorni, concordate con l'HR
   storiesRequired: 2,
   storyWindowDays: 30,
@@ -61,6 +68,21 @@ export const REFERRAL_RULES = {
   fxMin: 0.5,
   fxMax: 1.5,
 };
+
+const romeDay = (ms) => (ms ? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date(ms)) : null);
+
+/** Giorno del primo contatto con l'Area Partner: quello scritto dall'HR, altrimenti il giorno dell'inserimento. */
+export function contactDay(r) {
+  return r?.contactedAt || romeDay(r?.createdAt) || null;
+}
+
+/** La persona rientra nella prova? (senza data = sì: non si toglie un premio per un dato mancante) */
+export function inCampaign(r, rules = REFERRAL_RULES) {
+  const d = contactDay(r);
+  return !rules.campaignUntil || !d || d <= rules.campaignUntil;
+}
+
+const itDay = (d) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : "");
 
 /** Cambio inserito dall'HR: numero tra fxMin e fxMax (accetta la virgola), o null. */
 export function parseFx(v, rules = REFERRAL_RULES) {
@@ -166,7 +188,7 @@ export function validateRecruit(input = {}) {
     inflowwName: s(input.inflowwName).slice(0, 120) || null,
     note: s(input.note).slice(0, 1000) || null,
   };
-  for (const [k, label] of [["interviewAt", "Colloquio"], ["trainingAt", "Formazione"], ["firstShiftAt", "Primo turno"], ["exitedAt", "Uscita"]]) {
+  for (const [k, label] of [["contactedAt", "Primo contatto"], ["interviewAt", "Colloquio"], ["trainingAt", "Formazione"], ["firstShiftAt", "Primo turno"], ["exitedAt", "Uscita"]]) {
     const r = optDate(input[k], label);
     if (r.error) return r;
     out[k] = r.value;
@@ -236,6 +258,7 @@ export function storyMilestone(story, { today, paid = {}, rules = REFERRAL_RULES
   const inTime = (story.publishedAt || []).filter((d) => d <= dueBy);
   const base = { key, kind: "story", label: `${rules.storiesRequired} storie Instagram`, storyId: story.id, dueBy, published: (story.publishedAt || []).length, amountEur: rules.storyEur };
   if (paid[key]) return { ...base, status: "pagato", amountEur: paid[key].amountEur, paidAt: paid[key].paidAt };
+  if (rules.campaignUntil && story.agreedAt > rules.campaignUntil) return { ...base, status: "perso", outOfCampaign: true, why: `Fuori dalla prova: storie concordate dopo il ${itDay(rules.campaignUntil)}` };
   if (inTime.length >= rules.storiesRequired) return { ...base, status: "maturato", unlockedAt: inTime[rules.storiesRequired - 1] };
   if (today > dueBy) return { ...base, status: "perso", why: `Servivano ${rules.storiesRequired} storie entro il ${dueBy}` };
   return { ...base, status: "in_attesa", why: `${inTime.length}/${rules.storiesRequired} storie, entro il ${dueBy}` };
@@ -326,6 +349,11 @@ export function recruitMilestones(recruit, { today, salesByMonth = {}, shiftDate
     }
     out.push(pay(key, m));
   }
+  // fuori dalla prova: la persona resta registrata, ma niente matura (il già pagato resta)
+  if (!inCampaign(r, rules)) {
+    const why = `Fuori dalla prova: primo contatto il ${itDay(contactDay(r))}, la prova valeva fino al ${itDay(rules.campaignUntil)}`;
+    return out.map((m) => (m.status === "pagato" ? m : { ...m, status: "perso", outOfCampaign: true, why }));
+  }
   return out;
 }
 
@@ -333,7 +361,7 @@ export function recruitMilestones(recruit, { today, salesByMonth = {}, shiftDate
 export function recruitSteps(r, milestones = [], { today } = {}) {
   const ret = milestones.filter((m) => m.kind === "shifts");
   const steps = [
-    { key: "referred", label: "Segnalata", done: true, at: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : null },
+    { key: "referred", label: "Segnalata", done: true, at: contactDay(r) },
     { key: "interview", label: "Colloquio", done: Boolean(r.interviewAt), at: r.interviewAt || null },
     { key: "training", label: "Formazione", done: r.trainingPassed === true, failed: r.trainingPassed === false, at: r.trainingAt || null },
     { key: "first_shift", label: "Primo turno", done: Boolean(r.firstShiftAt && r.trainingPassed === true), at: r.firstShiftAt || null },
@@ -371,6 +399,7 @@ export function referrerView(recruit, milestones, steps) {
     id: recruit.id,
     name: recruit.name,
     exited: Boolean(recruit.exitedAt),
+    outOfCampaign: !inCampaign(recruit),
     steps: steps.steps,
     next: steps.next,
     milestones: milestones.map((m) => ({

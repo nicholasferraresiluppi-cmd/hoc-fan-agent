@@ -113,6 +113,7 @@ export function RulesList({ rules: r }) {
         Il venduto è quello di Infloww: le vendite della persona, una per una, al netto della quota di OnlyFans. Non quello di CreatorsPro, che divide le vendite tra chi è in turno. Le percentuali maturano in dollari e diventano euro al cambio del mese, che inserisce l&apos;HR.
         Ogni percentuale si sblocca solo quando la persona completa i suoi {r.pctBlock} turni: se esce prima, o viene mandata via, quella percentuale non si sblocca. Non è un giudizio su come ha lavorato: il programma premia chi porta persone che restano, e una persona che non resta non si paga.
         Infloww dà il venduto per mese: il venduto di un blocco di turni è la parte del venduto del mese che corrisponde ai turni del blocco.
+        {r.campaignUntil && <>È una prova: vale per le persone che scrivono all&apos;Area Partner entro il {fmtDay(r.campaignUntil)}, e per le storie concordate entro quella data. </>}
         Si guadagna solo sulle persone che porti tu, non su quelle portate da loro. Per qualsiasi dubbio, scrivi all&apos;Area Partner.
       </div>
     </div>

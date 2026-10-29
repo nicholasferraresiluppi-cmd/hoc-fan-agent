@@ -36,6 +36,7 @@ function RecruitCard({ r }) {
         </div>
       </div>
       {r.exited && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4 }}>Non lavora più in agenzia: restano i premi già sbloccati.</div>}
+      {r.outOfCampaign && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4 }}>Ha scritto all&apos;Area Partner dopo la fine della prova: i premi per questa persona non maturano.</div>}
       <Steps steps={r.steps} next={r.next} />
       {(() => {
         // il prossimo premio a turni e quanti turni mancano: la cosa da guardare insieme alla persona
