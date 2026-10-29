@@ -47,5 +47,9 @@ for (const file of files) {
   }
 }
 
+// 5. menu a tendina del telefono nel vetro: lo sfondo del menu (bgSunken) lì è trasparente → serve la lastra
+//    piena, altrimenti la pagina si legge attraverso il menu (visto il 29/10/2026 sull'iPhone di Nicholas)
+if (!/\.hoc-mob \.hoc-side\{background:var\(--cp-panel\)/.test(read("src/components/VetroScope.js"))) problems.push("src/components/VetroScope.js: il menu a tendina del telefono nel vetro non ha uno sfondo pieno");
+
 assert.deepEqual(problems, [], "Controlli iPhone:\n  " + problems.join("\n  "));
 console.log(`iphone: viewport e rimbalzo ok, ${fixedBottom} elementi fissi in basso controllati`);
