@@ -18,12 +18,14 @@ import { confirmDialog } from "@/components/AppDialogs";
 import PublishDownload from "@/components/PublishDownload";
 import Lightbox from "@/components/MediaLightbox";
 import { CP, FONTS, alpha } from "@/lib/brand";
-import { PageHead, Notice, FilterChip, Tabs } from "@/components/ds";
+import { PageHead, Notice, FilterChip, Tabs, Segmented } from "@/components/ds";
 import { btn, btnPrimary, btnDanger, btnSm, input, cardBox, hint, muted, SectionHead, Chip, Seg, ModalBox, Field } from "@/components/warmup/ui";
 import {
   TYPES, STAGES, stageOf, readyProblems, needsFromTaskIds, coverage, dayItems, monthGrid, shiftMonth, usageMap, rawUses,
 } from "@/lib/editoriale-core";
 import { planForDate, visibleItems, dayNumberFor, todayKey, WINDOWS, estToIt } from "@/lib/warmup-plan";
+import SortBoard from "@/components/editoriale/SortBoard";
+import { SORT_CATEGORIES, groupOf, sortLabel } from "@/lib/editoriale-sort-core";
 
 const API = "/api/admin/editoriale";
 const fetcher = (url) =>
@@ -43,6 +45,7 @@ const ls = {
   set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
 };
 const CREATOR_KEY = "hoc:editoriale:creator";
+const DRIVE_VIEW_KEY = "hoc:editoriale:drive-vista";
 const PAGE = 120;
 const fmtDay = (k, o = { weekday: "short", day: "numeric", month: "short" }) => new Date(k + "T12:00:00").toLocaleDateString("it-IT", o);
 // le finestre USA in ora italiana; quella delle 19 USA cade dopo mezzanotte da noi
@@ -213,7 +216,7 @@ export default function EditorialeView({ embedded = false } = {}) {
   const { data: base, error: baseErr } = useSWR(API, fetcher, { revalidateOnFocus: false });
   const [creator, setCreatorState] = useState(null);
   useEffect(() => { if (!creator && base?.creators?.length) { const saved = ls.get(CREATOR_KEY); setCreatorState(base.creators.find((c) => c.creator === saved)?.creator || base.creators[0].creator); } }, [base, creator]);
-  const setCreator = (c) => { setCreatorState(c); ls.set(CREATOR_KEY, c); setSel([]); setAddTo(null); setTab("calendario"); setProfileId(null); };
+  const setCreator = (c) => { setCreatorState(c); ls.set(CREATOR_KEY, c); setSel([]); setAddTo(null); setTab("calendario"); setProfileId(null); setGrp("*"); };
   const key = creator ? `${API}?creator=${encodeURIComponent(creator)}` : null;
   const { data, error, mutate, isValidating } = useSWR(key, fetcher, { revalidateOnFocus: true });
   const { data: wu } = useSWR("/api/admin/warmup", fetcher, { revalidateOnFocus: false });
@@ -224,6 +227,12 @@ export default function EditorialeView({ embedded = false } = {}) {
   // filtro d'uso (29/10, Nicholas): Libere / Usate / Tutte — prima era un solo tasto «Anche gli usati», poco chiaro
   const [useF, setUseF] = useState("liberi");
   const [path, setPath] = useState("*");          // "*" = tutte, "" = cartella principale
+  // smistamento (29/10): «Per gruppi» = la tavola con i gruppi dell'AI, «Tutti i file» = la griglia
+  const [driveView, setDriveViewState] = useState("gruppi");
+  useEffect(() => { const v = ls.get(DRIVE_VIEW_KEY); if (v === "griglia" || v === "gruppi") setDriveViewState(v); }, []);
+  const setDriveView = (v) => { setDriveViewState(v); ls.set(DRIVE_VIEW_KEY, v); };
+  const [grp, setGrp] = useState("*");            // gruppo dello smistamento: "*" tutti, chiave, "dup", "nd", "none"
+  const [moveTo, setMoveTo] = useState("");
   const [shown, setShown] = useState(PAGE);
   const [addTo, setAddTo] = useState(null);         // id del contenuto a cui si aggiungono file
   const [edit, setEdit] = useState(null);           // bozza del contenuto aperto
@@ -247,7 +256,7 @@ export default function EditorialeView({ embedded = false } = {}) {
   const addItem = addTo ? itemById.get(addTo) : null;
   const pickKind = addItem ? TYPES[addItem.type].kind : kind;
 
-  useEffect(() => { setShown(PAGE); }, [kind, useF, path, creator]);
+  useEffect(() => { setShown(PAGE); }, [kind, useF, path, creator, grp]);
   useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(null), 4500); return () => clearTimeout(t); }, [msg]);
 
   // Dopo un'azione la pagina si aggiorna SUBITO con il contenuto che il server restituisce
@@ -279,11 +288,24 @@ export default function EditorialeView({ embedded = false } = {}) {
   // «libero» = mai usato; i video grezzi già usati restano sceglibili (si riusano), le foto no
   const isFree = (f) => !f.usedBy && !f.uses;
   const inUse = (f) => useF === "tutti" || (useF === "usati" ? !isFree(f) : isFree(f));
-  const visible = files.filter((f) => f.kind === pickKind && (path === "*" || f.path === path) && (useF === "tutti" || (useF === "usati" ? !isFree(f) : isFree(f) || (addTo && (f.usedBy === addTo || items.find((it) => it.id === addTo)?.files?.includes(f.id))))));
+  const sortLabels = data?.sort?.labels || {};
+  const sortDups = useMemo(() => new Map(Object.entries(data?.sort?.dups || {})), [data?.sort?.dups]);
+  const sorted = Object.keys(sortLabels).length > 0 || sortDups.size > 0;
+  const grpOf = (f) => groupOf(f, sortLabels, sortDups) || "none";
+  const inGrp = (f) => grp === "*" || grpOf(f) === grp;
+  const visible = files.filter((f) => f.kind === pickKind && inGrp(f) && (path === "*" || f.path === path) && (useF === "tutti" || (useF === "usati" ? !isFree(f) : isFree(f) || (addTo && (f.usedBy === addTo || items.find((it) => it.id === addTo)?.files?.includes(f.id))))));
   const toggle = (f) => {
     if (f.usedBy) return;
     setSel((s) => (s.includes(f.id) ? s.filter((x) => x !== f.id) : [...s, f.id]));
   };
+  function mergeLabels(m) {
+    mutate((d) => d && ({ ...d, sort: { ...(d.sort || {}), labels: m === null ? {} : Object.fromEntries(Object.entries({ ...(d.sort?.labels || {}), ...m }).filter(([, v]) => v != null)) } }), { revalidate: false });
+  }
+  async function moveSel(group) {
+    const r = await act({ action: "sortSet", ids: sel, group: group || null }, `${sel.length} ${sel.length === 1 ? "file spostato" : "file spostati"} in «${group ? sortLabel(group) : "Da smistare"}»`);
+    if (r?.labels) { mergeLabels(r.labels); setSel([]); }
+    setMoveTo("");
+  }
   async function createFromSel() {
     const type = pickKind === "photo" ? "carosello" : "reel";
     if (addItem) {
@@ -320,8 +342,28 @@ export default function EditorialeView({ embedded = false } = {}) {
   function viewDrive() {
     const nSel = sel.length;
     const type = pickKind === "photo" ? "carosello" : "reel";
+    const viewSwitch = !addItem && (
+      <div style={{ marginBottom: 14 }}><Segmented items={[["gruppi", "Per gruppi"], ["griglia", "Tutti i file"]]} value={driveView} onChange={(v) => { setDriveView(v); if (v === "gruppi") { setSel([]); setGrp("*"); } }} /></div>
+    );
+    if (driveView === "gruppi" && !addItem) {
+      return (
+        <>
+          {viewSwitch}
+          {data?.filesError && <Notice danger>{data.filesError}{data.filesAt ? " — sto mostrando l'ultimo elenco letto." : ""}</Notice>}
+          {files.length ? (
+            <SortBoard creator={creator} files={files} sort={data?.sort} isFree={isFree}
+              onLabels={mergeLabels}
+              onMessage={(t, bad) => setMsg({ t, bad })}
+              onOpen={(k, g) => { setKind(k); setGrp(g); setUseF("tutti"); setPath("*"); setSel([]); setDriveView("griglia"); }} />
+          ) : <div style={{ ...cardBox, textAlign: "center", ...hint, fontSize: 14 }}>La cartella è vuota, o non ci sono foto e video.</div>}
+        </>
+      );
+    }
+    const kindFiles = files.filter((f) => f.kind === pickKind);
+    const grpCount = (g) => kindFiles.filter((f) => grpOf(f) === g && inUse(f)).length;
     return (
       <>
+        {viewSwitch}
         {addItem && (
           <Notice>Stai aggiungendo {pickKind === "photo" ? "foto" : "video"} a «{addItem.title}». <button type="button" style={{ ...btnSm, marginLeft: 8 }} onClick={() => { setAddTo(null); setSel([]); }}>Annulla</button></Notice>
         )}
@@ -341,6 +383,18 @@ export default function EditorialeView({ embedded = false } = {}) {
             {paths.map((p) => <FilterChip key={p || "_root"} label={`${p || "Cartella principale"} · ${files.filter((f) => f.kind === pickKind && f.path === p && inUse(f)).length}`} active={path === p} onClick={() => setPath(p)} />)}
           </div>
         )}
+        {sorted && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", margin: "0 0 12px" }}>
+            <span style={{ ...hint, fontSize: 12.5 }}>Gruppi:</span>
+            <FilterChip label={`Tutti · ${kindFiles.filter(inUse).length}`} active={grp === "*"} onClick={() => setGrp("*")} />
+            {[...SORT_CATEGORIES.map((c) => c.key), "dup", "nd", "none"].map((g) => {
+              const n = grpCount(g);
+              if (!n && grp !== g) return null;
+              return <FilterChip key={g} attn={g === "dup"} label={`${g === "none" ? "Da smistare" : sortLabel(g)} · ${n}`} active={grp === g} onClick={() => setGrp(g)} />;
+            })}
+          </div>
+        )}
+        {grp === "dup" && <Notice>Questi file sono copie identiche di un altro file del drive (stessi byte). HOC Pro il drive lo legge e basta: le copie si tolgono da Google Drive a mano.</Notice>}
         {data?.filesError && <Notice danger>{data.filesError}{data.filesAt ? " — sto mostrando l'ultimo elenco letto." : ""}</Notice>}
         {data?.truncated && <Notice>La cartella ha più di 6.000 file: ne mostro una parte. Conviene collegare una sottocartella.</Notice>}
         {!visible.length && !data?.filesError && <div style={{ ...cardBox, textAlign: "center", ...hint, fontSize: 14 }}>{path !== "*" && !files.some((f) => f.path === path) ? `La cartella «${path || "principale"}» è vuota: carica i file in Drive e premi «Rileggi il drive».` : files.length ? (useF === "liberi" ? "Tutti usati: niente di libero qui." : useF === "usati" ? "Niente di già usato qui." : `Niente ${pickKind === "photo" ? "foto" : "video"} qui.`) : "La cartella è vuota, o non ci sono foto e video."}</div>}
@@ -365,6 +419,14 @@ export default function EditorialeView({ embedded = false } = {}) {
             <span style={{ fontSize: 14 }}>{nSel} {pickKind === "photo" ? (nSel === 1 ? "foto scelta" : "foto scelte") : (nSel === 1 ? "video scelto" : "video scelti")}</span>
             {type === "carosello" && !addItem && nSel < 2 && <span style={hint}>un carosello ne vuole almeno 2</span>}
             <span style={{ flex: 1 }} />
+            {sorted && !addItem && (
+              <select aria-label="Sposta nel gruppo" style={{ ...input, width: "auto", minHeight: 40, padding: "8px 10px", fontSize: 14 }} value={moveTo} disabled={busy}
+                onChange={(e) => { const v = e.target.value; setMoveTo(v); if (v) moveSel(v === "_none" ? null : v); }}>
+                <option value="">Sposta nel gruppo…</option>
+                {SORT_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                <option value="_none">Da smistare</option>
+              </select>
+            )}
             <button type="button" style={btn} onClick={() => setSel([])}>Deseleziona</button>
             <button type="button" style={btnPrimary} disabled={busy} onClick={createFromSel}>
               <Plus size={15} />{addItem ? `Aggiungi a «${addItem.title}»` : type === "carosello" ? "Crea carosello" : nSel > 1 ? "Crea un reel con questi video" : "Crea reel"}

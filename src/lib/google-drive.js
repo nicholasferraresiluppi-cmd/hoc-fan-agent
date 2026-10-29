@@ -95,7 +95,7 @@ export async function listMedia(folderId) {
     do {
       const d = await gget("/files", {
         q: `'${f.id}' in parents and trashed = false`,
-        fields: "nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,size,imageMediaMetadata(width,height,rotation),videoMediaMetadata(width,height,durationMillis))",
+        fields: "nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,size,md5Checksum,imageMediaMetadata(width,height,rotation),videoMediaMetadata(width,height,durationMillis))",
         pageSize: "1000", includeItemsFromAllDrives: "true", ...(pageToken ? { pageToken } : {}),
       });
       for (const x of d.files || []) {
@@ -117,6 +117,8 @@ export async function listMedia(folderId) {
           w: (turned ? im.height : im.width) || vm.width || null, h: (turned ? im.width : im.height) || vm.height || null,
           dur: vm.durationMillis ? Math.round(Number(vm.durationMillis) / 1000) : null,
           size: x.size ? Number(x.size) : null,
+          // impronta dei byte: due file uguali = doppione (smistamento, editoriale-sort-core)
+          md5: x.md5Checksum || null,
         });
       }
       pageToken = d.nextPageToken;
@@ -135,7 +137,19 @@ const thumbMeta = new Map(); // id → metadati con thumbnailLink (per istanza, 
 export async function thumbnail(fileId, size = 400) {
   // Drive gira le foto del telefono (HEIF/EXIF) solo nelle anteprime da 800 px in su: sotto le dà
   // coricate (verificato 28/10 su IMG_0702.heif: s600 → 600x450, s800 → 600x800). Quindi mai sotto 800.
-  size = Math.max(800, size);
+  return thumbAt(fileId, Math.max(800, size));
+}
+
+/**
+ * Miniatura piccola per l'AI dello smistamento (~0,03 cent a foto invece di ~0,1 a 800 px). Può
+ * arrivare coricata (vedi sopra): per dire «selfie» o «mare» non conta. Solo la miniatura di
+ * Drive, mai il file intero.
+ */
+export async function smallThumb(fileId, size = 400) {
+  return thumbAt(fileId, size, { full: false });
+}
+
+async function thumbAt(fileId, size, { full = true } = {}) {
   const bearer = await token();
   let meta = thumbMeta.get(fileId);
   if (!meta || Date.now() - meta.at > 30 * 60_000) {
@@ -148,7 +162,7 @@ export async function thumbnail(fileId, size = 400) {
     const r = await fetch(url, { headers: { Authorization: `Bearer ${bearer}` } });
     if (r.ok) return { type: r.headers.get("content-type") || "image/jpeg", body: Buffer.from(await r.arrayBuffer()) };
   }
-  if (String(meta.mimeType).startsWith("image/") && Number(meta.size || 0) < 12_000_000) {
+  if (full && String(meta.mimeType).startsWith("image/") && Number(meta.size || 0) < 12_000_000) {
     const r = await fetch(`${API}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`, { headers: { Authorization: `Bearer ${bearer}` } });
     if (r.ok) return { type: meta.mimeType, body: Buffer.from(await r.arrayBuffer()) };
   }

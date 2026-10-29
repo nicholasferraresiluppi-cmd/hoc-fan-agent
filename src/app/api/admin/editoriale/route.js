@@ -13,6 +13,9 @@
 // POST {action:"ready",   creator, id, on}           pronto / di nuovo in preparazione
 // POST {action:"schedule",creator, id, slot|null}    in calendario {profileId, date, time}
 // POST {action:"publish", creator, id, on, today, profileId}
+// POST {action:"sort",      creator, retry?}         un passo dello smistamento con l'AI (≤48 file)
+// POST {action:"sortSet",   creator, ids, group|null} sposta a mano i file in un altro gruppo
+// POST {action:"sortReset", creator}                 rimette tutto da smistare
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -24,6 +27,8 @@ import {
 } from "@/lib/editoriale-store";
 import { creatorKey, usageMap, rawUses } from "@/lib/editoriale-core";
 import { kv } from "@vercel/kv";
+import { getLabels, sortStep, setLabels, resetLabels, sortSpend } from "@/lib/editoriale-sort";
+import { duplicatesOf, SORT_USD_PER_FILE } from "@/lib/editoriale-sort-core";
 
 const noStore = { headers: { "Cache-Control": "no-store" } };
 
@@ -87,13 +92,16 @@ export async function GET(request) {
   const [creators, cfg] = await Promise.all([creatorsWithProfiles(), getConfig(ck)]);
   const c = creators.find((x) => x.ck === ck);
   if (!c) return Response.json({ error: "Creator senza profili Instagram in Account social" }, { status: 404 });
-  const [files, items] = await Promise.all([cfg ? getFiles(ck, { force: sp.get("refresh") === "1" }) : null, listItems(ck)]);
+  const [files, items, labels, spend] = await Promise.all([cfg ? getFiles(ck, { force: sp.get("refresh") === "1" }) : null, listItems(ck), cfg ? getLabels(ck) : {}, sortSpend()]);
   const used = usageMap(items), raw = rawUses(items);
+  // smistamento: gruppo dell'AI per file + copie dei doppioni (copia → originale)
+  const dups = Object.fromEntries(duplicatesOf(files?.files || []));
   const list = (files?.files || []).map((f) => ({ ...f, usedBy: used.get(f.id) || null, uses: raw.get(f.id)?.length || 0 }));
   return Response.json({
     creator: c.creator, ck, profiles: c.profiles, folder: cfg, drive,
     files: list, folders: files?.folders || [], filesAt: files?.at || null, filesError: files?.error || null, truncated: Boolean(files?.truncated),
     items: items.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
+    sort: { labels, dups, spent: spend.spent, cap: spend.cap, usdPerFile: SORT_USD_PER_FILE },
   }, noStore);
 }
 
@@ -109,6 +117,9 @@ export async function POST(request) {
     if (body.action === "folder") r = await setFolder(String(body.creator), body.url, g.by);
     else if (body.action === "save") r = await saveItem(ck, body.item || {}, g.by);
     else if (body.action === "delete") r = await deleteItem(ck, String(body.id || ""), g.by);
+    else if (body.action === "sort") r = await sortStep(ck, g.by, { retry: Boolean(body.retry) });
+    else if (body.action === "sortSet") r = await setLabels(ck, body.ids, body.group ?? null);
+    else if (body.action === "sortReset") r = await resetLabels(ck, g.by);
     else if (["ready", "schedule", "publish"].includes(body.action)) r = await stepItem(ck, String(body.id || ""), body.action, body, g.by);
     else return Response.json({ error: "Azione sconosciuta" }, { status: 400 });
     return r.ok ? Response.json(r) : fail(r);
