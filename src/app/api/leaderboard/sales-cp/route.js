@@ -20,6 +20,7 @@
 import { CAPABILITIES } from "@/lib/rbac";
 import { authorizeScoped, allowsCreator, scopeSummary } from "@/lib/creator-scope";
 import { kv } from "@vercel/kv";
+import { wagesStamp } from "@/lib/cp-wages-store";
 import { buildOperatorsForCpLeaderboard, hasCpDataForPeriod } from "@/lib/creatorspro-data";
 import { buildCpLeaderboard } from "@/lib/creatorspro-score";
 import { loadGroupCategories } from "@/app/api/admin/group-categories/route";
@@ -69,25 +70,37 @@ export async function GET(request) {
     }, { status: 404 });
   }
 
-  // Carica operators + arricchimento Group categoria/lingua
-  const [operatorsRaw, categories, langOverrides, manualExclusions] = await Promise.all([
-    buildOperatorsForCpLeaderboard(period_id),
+  // Carica arricchimento Group categoria/lingua + esclusioni (piccoli) e l'impronta delle wage
+  const [categories, langOverrides, manualExclusions, stamp] = await Promise.all([
     loadGroupCategories(),
     loadGroupLanguages(),
     kv.get("leaderboard:exclusions"),
+    wagesStamp(period_id),
   ]);
-
-  // Decora ogni operator con language (override > regex), category, e filtra esclusi manuali
   const exclusions = manualExclusions || {};
-  const decorated = operatorsRaw
-    .filter((op) => !exclusions[op.employee]) // escludi denylist
-    .map((op) => {
-      const lang = langOverrides?.[op.group] || detectLanguage(op.group);
-      return { ...op, category: categories?.[op.group] || null, language: lang || null };
-    });
 
-  // Build score (v3: deriva da creator-matrix con percentile blending)
-  const { ranking: scoredAll, groupMeansCp } = await buildCpLeaderboard(decorated, period_id);
+  // 30/10/2026: il calcolo dello score (wage del mese → matrice → percentili) costava 1-2 s a OGNI
+  // apertura, due volte per pagina (mese e mese prima). Si tiene in memoria per istanza finché non
+  // cambiano le wage (nuova sync), le esclusioni, le categorie o le lingue; al massimo 5 minuti,
+  // così anche un import Infloww nuovo entra presto. Lo score resta identico: cambia solo quando si ricalcola.
+  const cacheKey = `${period_id}|${stamp}|${hashOf([exclusions, categories, langOverrides])}`;
+  let built = RANK_CACHE.get(cacheKey);
+  if (!built || Date.now() - built.t > 5 * 60 * 1000) {
+    const operatorsRaw = await buildOperatorsForCpLeaderboard(period_id);
+    // Decora ogni operator con language (override > regex), category, e filtra esclusi manuali
+    const decorated = operatorsRaw
+      .filter((op) => !exclusions[op.employee]) // escludi denylist
+      .map((op) => {
+        const lang = langOverrides?.[op.group] || detectLanguage(op.group);
+        return { ...op, category: categories?.[op.group] || null, language: lang || null };
+      });
+    // Build score (v3: deriva da creator-matrix con percentile blending)
+    const res = await buildCpLeaderboard(decorated, period_id);
+    built = { t: Date.now(), ranking: res.ranking.map(slimRow), groupMeansCp: res.groupMeansCp };
+    RANK_CACHE.set(cacheKey, built);
+    while (RANK_CACHE.size > 8) RANK_CACHE.delete(RANK_CACHE.keys().next().value);
+  }
+  const { ranking: scoredAll, groupMeansCp } = built;
   // visibilità per creator: lo score resta calcolato su tutti (percentili veri), si mostrano
   // solo gli operatori la cui creator PRINCIPALE è tra quelle assegnate
   const scored = az.creatorScope.all ? scoredAll : scoredAll.filter((r) => allowsCreator(az.creatorScope, r.cp_breakdown?.top_creator));
@@ -100,7 +113,8 @@ export async function GET(request) {
   if (language_filter === "none") view = view.filter((o) => !o.language);
   else if (language_filter) view = view.filter((o) => o.language === language_filter);
 
-  // Re-rank dopo filtri
+  // Re-rank dopo filtri (su copie: le righe calcolate stanno in memoria e servono anche ad altre richieste)
+  view = view.map((r) => ({ ...r }));
   let rank = 1;
   for (const r of view) {
     if (r.score !== null && r.score > 0) r.rank = rank++;
@@ -141,6 +155,9 @@ export async function GET(request) {
   return Response.json({
     period_id,
     cp_available: true,
+    // 30/10/2026: si toglie dal ranking il dettaglio dei turni (best/worst shift con tutte le vendite,
+    // shifts_attributed): ~8 KB a riga, 1,1 MB a mese, e nessuna pagina lo legge — la Classifica
+    // scaricava ~2,7 MB a ogni apertura (giro qualità: 9-10 s). Restano i totali e le fasce orarie.
     ranking: view,
     groupMeansCp: az.creatorScope.all ? groupMeansCp : Object.fromEntries(Object.entries(groupMeansCp || {}).filter(([g]) => allowsCreator(az.creatorScope, g))),
     visibility: scopeSummary(az.creatorScope),
@@ -160,4 +177,19 @@ export async function GET(request) {
       avg_sales_per_shift: totalCpShifts > 0 ? Math.round((totalCpSales / totalCpShifts) * 100) / 100 : 0,
     },
   });
+}
+
+function slimRow(r) {
+  const a = r.cp_aggregates;
+  if (!a) return r;
+  const { best_shift, worst_shift, shifts_attributed, ...keep } = a;
+  return { ...r, cp_aggregates: keep };
+}
+
+const RANK_CACHE = new Map(); // per istanza: chiave → { t, ranking, groupMeansCp }
+function hashOf(v) {
+  const str = JSON.stringify(v || null);
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+  return `${str.length}:${h}`;
 }

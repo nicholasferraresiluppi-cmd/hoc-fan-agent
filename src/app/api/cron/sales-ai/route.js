@@ -12,7 +12,7 @@
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { isCronAuthorized } from "@/lib/cron-auth";
-import { continueChain, chainDepth, takeTickLock, dropTickLock } from "@/lib/cron-chain";
+import { continueChain, chainDepth, takeTickLock, dropTickLock, clearChainBreak } from "@/lib/cron-chain";
 import { getConfig, getJob } from "@/lib/sales-ai/store";
 import { startJob, step, romeYesterday } from "@/lib/sales-ai/pipeline";
 
@@ -48,7 +48,7 @@ export async function POST(request) {
   const t0 = Date.now();
   let job = await getJob(day);
   if (!job || (body?.force && chain === 0)) job = await startJob(day, { force: !!body?.force, by });
-  if (job.status !== "in_corso") { await dropTickLock("sales-ai"); return Response.json({ action: "idle", day, status: job.status }); }
+  if (job.status !== "in_corso") { await dropTickLock("sales-ai"); if (job.status === "fatto") await clearChainBreak("/api/cron/sales-ai"); return Response.json({ action: "idle", day, status: job.status }); }
 
   let last = null;
   while (Date.now() - t0 < BUDGET_MS) {
@@ -60,6 +60,7 @@ export async function POST(request) {
     }
   }
   const done = !!last?.done;
+  if (done) await clearChainBreak("/api/cron/sales-ai");
   await dropTickLock("sales-ai");
   // la catena continua anche dopo un errore non fatale: step() conta i fallimenti e si ferma da solo a 4
   const chained = done ? null : await continueChain(request, chain, { maxChain: MAX_CHAIN });
