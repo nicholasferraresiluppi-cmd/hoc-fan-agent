@@ -385,7 +385,7 @@ export default function EditorialeView({ embedded = false } = {}) {
       <>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
           {profiles.length > 1 ? <Seg items={profiles.map((p) => [p.id, p.username])} value={pid} onChange={setProfileId} /> : <Chip>{prof?.username}</Chip>}
-          {wp && <span style={hint}>in Warm-up: le caselle tratteggiate sono quello che il piano chiede e manca</span>}
+          {wp && <span style={hint}>le caselle tratteggiate sono quello che il piano del warm-up chiede e ancora manca</span>}
           <span style={{ flex: 1 }} />
           <button type="button" style={btnSm} aria-label="Mese prima" onClick={() => setYm((m) => shiftMonth(m, -1))}><ChevronLeft size={14} /></button>
           <span style={{ fontSize: 15, minWidth: 130, textAlign: "center" }}>{new Date(ym + "-15T12:00:00").toLocaleDateString("it-IT", { month: "long", year: "numeric" })}</span>
