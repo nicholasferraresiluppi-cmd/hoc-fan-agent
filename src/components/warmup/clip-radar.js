@@ -3,14 +3,14 @@
 // Radar del clipping (scheda di Social): i profili Instagram/TikTok che il publisher tiene
 // d'occhio e i loro video usciti dal solito. Logica in lib/clip-radar-core.js, dati da
 // /api/admin/clip-radar (lettura notturna con Apify, solo profili pubblici).
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { Bookmark, BookmarkCheck, Download, ExternalLink, Music, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { CP, alpha } from "@/lib/brand";
 import { Notice, NUM, FilterBar } from "@/components/ds";
 import { confirmDialog } from "@/components/AppDialogs";
-import { btn, btnPrimary, btnSm, input, cardBox, hint, SectionHead, Seg, Chip, ModalBox, Field } from "@/components/warmup/ui";
-import { shortNum, ageLabel, profileUrl } from "@/lib/clip-radar-core";
+import { btn, btnPrimary, btnSm, input, cardBox, hint, Seg, Chip, ModalBox, Field } from "@/components/warmup/ui";
+import { shortNum, ageLabel, profileUrl, timesLabel, isSmallBase } from "@/lib/clip-radar-core";
 import { deliverFiles } from "@/lib/editoriale-download";
 
 const API = "/api/admin/clip-radar";
@@ -22,22 +22,32 @@ async function post(body) {
   return d;
 }
 const PLAT = { ig: "Instagram", tt: "TikTok" };
-const x10 = (n) => `×${String(n).replace(".", ",")}`;
 const outColor = (o) => (o == null ? CP.textMuted : o >= 3 ? CP.accentGreen : o >= 1.5 ? CP.accent : CP.textMuted);
 const SORTS = [["outlier", "Fuori dal solito"], ["speed", "Più veloci adesso"], ["views", "Più visualizzazioni"], ["likes", "Più like"], ["comments", "Più commenti"], ["shares", "Più condivisioni"], ["recent", "Più recenti"]];
 
-function Cover({ v }) {
+// Copertina protagonista (29/10, stile del reel scelto da Nicholas: «più chiaro»): il video in
+// grande, sopra l'immagine solo il multiplo e le visualizzazioni. Il velo scuro in basso è fisso
+// (sta su una foto, non su una superficie dell'app: in tema chiaro il testo bianco resta leggibile).
+const SCRIM = "linear-gradient(180deg, rgba(0,0,0,0) 45%, rgba(0,0,0,.78) 100%)";
+function Cover({ v, big }) {
   const [broken, setBroken] = useState(false);
   return (
-    <a href={v.url} target="_blank" rel="noopener noreferrer" style={{ position: "relative", display: "block", aspectRatio: "9 / 16", borderRadius: 8, overflow: "hidden", background: CP.surfaceAlt }}>
+    <a href={v.url} target="_blank" rel="noopener noreferrer" className="cr-cover" style={{ position: "relative", display: "block", aspectRatio: "9 / 16", borderRadius: 14, overflow: "hidden", background: CP.surfaceAlt }}>
       {v.cover && !broken
         ? <img src={v.cover} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-        : <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: CP.textMuted }}><Play size={28} /></div>}
-      {v.outlier != null && (
-        <span title={`${String(v.outlier).replace(".", ",")} volte le visualizzazioni tipiche di questo profilo (di solito ${shortNum(v.base)}, mediana dei suoi video degli ultimi 30 giorni)`} style={{ position: "absolute", top: 8, left: 8, padding: "3px 8px", borderRadius: 999, fontSize: 13, fontWeight: 500, background: CP.panel, color: outColor(v.outlier), border: `1px solid ${alpha(outColor(v.outlier), "66")}`, ...NUM }}>{x10(v.outlier)}</span>
+        : <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: CP.textMuted }}><Play size={big ? 40 : 28} /></div>}
+      <div style={{ position: "absolute", inset: 0, background: SCRIM, pointerEvents: "none" }} />
+      {v.outlier != null && !big && (
+        <span title={`${String(v.outlier).replace(".", ",")} volte le visualizzazioni tipiche di questo profilo (di solito ${shortNum(v.base)}, mediana dei suoi video degli ultimi 30 giorni)`} style={{ position: "absolute", top: 10, left: 10, padding: big ? "5px 12px" : "3px 9px", borderRadius: 999, fontSize: big ? 17 : 13.5, fontWeight: 500, background: v.outlier >= 1.5 && !isSmallBase(v.base) ? (v.outlier >= 3 ? CP.accentGreen : CP.accent) : CP.panel, color: v.outlier >= 1.5 && !isSmallBase(v.base) ? CP.accentInk : CP.textSecondary, ...NUM }}>{timesLabel(v.outlier)}</span>
       )}
-      <span style={{ position: "absolute", top: 8, right: 8, padding: "2px 7px", borderRadius: 999, fontSize: 11.5, background: CP.panel, color: CP.textSecondary }}>{PLAT[v.platform]}{v.country ? ` · ${v.country.toUpperCase()}` : ""}</span>
-      {v.duration != null && <span style={{ position: "absolute", bottom: 8, right: 8, padding: "2px 7px", borderRadius: 6, fontSize: 12, background: CP.panel, color: CP.textPrimary, ...NUM }}>{v.duration}s</span>}
+      <span style={{ position: "absolute", top: 10, right: 10, padding: "3px 8px", borderRadius: 999, fontSize: 11.5, background: "rgba(0,0,0,.45)", color: "#fff" }}>{ageLabel(v.ageH)}</span>
+      <div style={{ position: "absolute", left: 12, right: 12, bottom: 10, color: "#fff", display: "flex", alignItems: "flex-end", gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: big ? 38 : 24, fontWeight: 500, lineHeight: 1, letterSpacing: -0.5, ...NUM }}>{shortNum(v.views)}</div>
+          <div style={{ fontSize: big ? 13.5 : 12, opacity: 0.85, marginTop: 3, ...NUM }}>{v.base != null ? `di solito ${shortNum(v.base)}` : "visualizzazioni"}</div>
+        </div>
+        {v.duration != null && <span style={{ fontSize: 12, opacity: 0.85, ...NUM }}>{v.duration}s</span>}
+      </div>
     </a>
   );
 }
@@ -81,37 +91,98 @@ function DownloadBtn({ v }) {
   );
 }
 
-function VideoCard({ v, saved, onSave, busy }) {
+function VideoCard({ v, saved, onSave, busy, big, i = 0 }) {
+  const extra = [
+    v.perHour != null && `${shortNum(v.perHour)}/ora`,
+    v.likes != null && `${shortNum(v.likes)} like`,
+    v.comments != null && `${shortNum(v.comments)} commenti`,
+    v.shares != null && `${shortNum(v.shares)} condivisioni`,
+  ].filter(Boolean);
+  const actions = (
+    <div style={{ display: "flex", gap: 6, marginTop: "auto" }}>
+      <DownloadBtn v={v} />
+      <button type="button" style={{ ...btnSm, flex: 1, ...(saved ? { color: CP.accent, borderColor: alpha(CP.accent, "66") } : {}) }} disabled={busy} onClick={() => onSave(v.id, !saved)}>
+        {saved ? <BookmarkCheck size={13} /> : <Bookmark size={13} />}{saved ? "Salvata" : "Salva idea"}
+      </button>
+    </div>
+  );
   return (
-    <div style={{ ...cardBox, marginBottom: 0, padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-      <Cover v={v} />
-      <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-        <span style={{ fontSize: 18, fontWeight: 500, ...NUM }}>{shortNum(v.views)}</span>
-        <span style={{ ...hint, fontSize: 12 }}>visualizzazioni</span>
-        <span style={{ flex: 1 }} />
-        <span style={{ ...hint, fontSize: 12, ...NUM }} title="Da quanto è uscito">{ageLabel(v.ageH)}</span>
+    <div className="cr-card" style={{ minWidth: 0, animationDelay: `${Math.min(i, 16) * 35}ms`, ...(big
+      // il protagonista: due colonne, copertina a sinistra (alta come le altre) e tutto il resto accanto
+      ? { gridColumn: "span 2", display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 18, alignItems: "stretch" }
+      : { display: "flex", flexDirection: "column", gap: 10 }) }}>
+      <Cover v={v} big={big} />
+      <div style={{ display: "flex", flexDirection: "column", gap: big ? 8 : 5, padding: big ? "4px 0" : "0 2px", minWidth: 0 }}>
+        {big && (
+          <>
+            <div style={{ fontSize: 13, color: CP.textMuted }}>Il più forte adesso</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+              {v.outlier != null && <span style={{ fontSize: 44, fontWeight: 500, letterSpacing: -1, lineHeight: 1, color: v.outlier >= 3 ? CP.accentGreen : CP.accent, ...NUM }}>{timesLabel(v.outlier, { short: true })}</span>}
+              <span style={{ fontSize: 14, color: CP.textSecondary }}>{v.outlier != null ? "le visualizzazioni di un suo video normale" : ""}</span>
+            </div>
+            <div style={{ fontSize: 14, color: CP.textSecondary, ...NUM }}>{shortNum(v.views)} visualizzazioni{v.base != null ? `, di solito ${shortNum(v.base)}` : ""} · uscito {ageLabel(v.ageH)} fa</div>
+          </>
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <a href={profileUrl({ platform: v.platform, handle: v.handle })} target="_blank" rel="noopener noreferrer" style={{ fontSize: big ? 16 : 14, color: CP.textPrimary, textDecoration: "none", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>{v.label || `@${v.handle}`}</a>
+          <span style={{ fontSize: 12, color: CP.textMuted, whiteSpace: "nowrap" }}>{PLAT[v.platform]}{v.country ? ` · ${v.country.toUpperCase()}` : ""}</span>
+        </div>
+        {extra.length > 0 && <div style={{ ...hint, fontSize: 12, ...NUM }}>{extra.join(" · ")}</div>}
+        {v.caption && <p style={{ fontSize: 13, color: CP.textSecondary, margin: 0, lineHeight: 1.45, display: "-webkit-box", WebkitLineClamp: big ? 4 : 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{v.caption}</p>}
+        {v.sound && <div style={{ ...hint, fontSize: 12, display: "flex", gap: 5, alignItems: "center", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}><Music size={12} style={{ flex: "0 0 auto" }} />{v.sound}</div>}
+        {(v.ours || v.fresh || (v.outlier != null && isSmallBase(v.base))) && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {v.outlier != null && isSmallBase(v.base) && <Chip color={CP.attn} title={`Di solito fa ${shortNum(v.base)} visualizzazioni: su una pagina così piccola basta poco per un multiplo alto, può essere un caso`}>profilo piccolo</Chip>}
+            {v.ours && <Chip color={CP.accent} title="Un nostro profilo, da Account social">nostro{v.creator ? ` · ${v.creator}` : ""}</Chip>}
+            {v.fresh && <Chip title="Un video di meno di 3 giorni sta ancora crescendo: il multiplo salirà">giovane, sta crescendo</Chip>}
+          </div>
+        )}
+        {big && actions}
       </div>
-      <div style={{ ...hint, fontSize: 12, ...NUM, marginTop: -4 }}>
-        {v.base != null ? <>di solito {shortNum(v.base)}</> : <>pochi video per un confronto</>}
-        {v.perHour != null && <> · {shortNum(v.perHour)}/ora</>}
-        {v.likes != null && <> · {shortNum(v.likes)} like</>}
-        {v.comments != null && <> · {shortNum(v.comments)} commenti</>}
-        {v.shares != null && <> · {shortNum(v.shares)} condivisioni</>}
-      </div>
-      <a href={profileUrl({ platform: v.platform, handle: v.handle })} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13.5, color: CP.textPrimary, textDecoration: "none", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.label || `@${v.handle}`}</a>
-      {v.caption && <p style={{ fontSize: 13, color: CP.textSecondary, margin: 0, lineHeight: 1.45, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{v.caption}</p>}
-      {v.sound && <div style={{ ...hint, fontSize: 12, display: "flex", gap: 5, alignItems: "center", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}><Music size={12} style={{ flex: "0 0 auto" }} />{v.sound}</div>}
-      {v.ours && <div><Chip color={CP.accent} title="Un nostro profilo, da Account social">nostro{v.creator ? ` · ${v.creator}` : ""}</Chip></div>}
-      {v.fresh && <div><Chip title="Un video di meno di 3 giorni sta ancora crescendo: il multiplo salirà">giovane, sta crescendo</Chip></div>}
-      <div style={{ display: "flex", gap: 6, marginTop: "auto" }}>
-        <DownloadBtn v={v} />
-        <button type="button" style={{ ...btnSm, flex: 1, ...(saved ? { color: CP.accent, borderColor: alpha(CP.accent, "66") } : {}) }} disabled={busy} onClick={() => onSave(v.id, !saved)}>
-          {saved ? <BookmarkCheck size={13} /> : <Bookmark size={13} />}{saved ? "Salvata" : "Salva idea"}
-        </button>
-      </div>
+      {!big && actions}
     </div>
   );
 }
+
+// numero che sale fino al valore all'apertura e quando cambia (mezzo secondo)
+function useCountUp(target) {
+  const [v, setV] = useState(0);
+  const from = useRef(0);
+  useEffect(() => {
+    const start = from.current;
+    if (start === target) return;
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { from.current = target; setV(target); return; }
+    let raf, t0;
+    const tick = (t) => {
+      t0 ??= t;
+      const p = Math.min(1, (t - t0) / 600);
+      const x = Math.round(start + (target - start) * (1 - Math.pow(1 - p, 3)));
+      from.current = x; setV(x);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+  return v;
+}
+
+function BigNum({ label, value, strong, title }) {
+  const v = useCountUp(value);
+  return (
+    <div title={title} style={{ minWidth: 72 }}>
+      <div style={{ fontSize: 12.5, color: CP.textMuted, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 32, fontWeight: 500, letterSpacing: -0.6, lineHeight: 1.1, color: strong ? CP.accent : CP.textPrimary, ...NUM }}>{v.toLocaleString("it-IT")}</div>
+    </div>
+  );
+}
+
+const CR_CSS = `
+  @keyframes crIn { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+  .cr-card { animation: crIn .45s cubic-bezier(.2,.7,.2,1) both }
+  .cr-cover { transition: transform .2s ease, box-shadow .2s ease }
+  .cr-cover:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(0,0,0,.18) }
+  @media (prefers-reduced-motion: reduce) { .cr-card { animation: none } .cr-cover { transition: none } }
+`;
 
 function ProfileRow({ p, onRemove, onLabel, busy }) {
   const [edit, setEdit] = useState(false);
@@ -167,6 +238,14 @@ export default function ClipRadar() {
   const [adding, setAdding] = useState(null);   // { platform, country, text } quando la finestra è aperta
   const [busy, setBusy] = useState(null);
   const [msg, setMsg] = useState(null);
+  // il video protagonista occupa due colonne: solo dove ce ne stanno almeno due
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const m = window.matchMedia("(min-width: 720px)");
+    const f = () => setWide(m.matches);
+    f(); m.addEventListener?.("change", f);
+    return () => m.removeEventListener?.("change", f);
+  }, []);
   const run = async (label, body, okText) => {
     setBusy(label); setMsg(null);
     try { const d = await post(body); setMsg(okText ? okText(d) : null); await mutate(); return d; }
@@ -207,13 +286,33 @@ export default function ClipRadar() {
   const noCountry = profiles.filter((p) => !p.country).length;
   const resetFilters = () => { setPf("all"); setWho("all"); setPeriod("30"); };
 
+  const inPeriod = shown.length;
+  const strong = shown.filter((v) => (v.outlier ?? 0) >= 3 && !isSmallBase(v.base)).length;
+  const where = cf === "ita" ? "in Italia" : cf === "eng" ? "in inglese" : null;
+  // protagonista = il primo video che non viene da un profilo piccolo (lì un multiplo alto può essere un caso)
+  const heroIdx = wide && shown.length >= 4 && period !== "saved" ? shown.findIndex((v) => v.outlier != null && !isSmallBase(v.base)) : -1;
+  const ordered = heroIdx > 0 ? [shown[heroIdx], ...shown.filter((_, i) => i !== heroIdx)] : shown;
+  const big = heroIdx >= 0;
   return (
     <div>
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", margin: "0 0 12px" }}>
-        <p style={{ fontSize: 14, color: CP.textSecondary, margin: 0, flex: "1 1 320px", lineHeight: 1.55 }}>
-          I video dei profili di clipping che funzionano. Il numero sulla copertina dice quante volte un video ha superato il solito di quel profilo.
-        </p>
-        <button type="button" style={btnPrimary} onClick={() => setAdding({ platform: "ig", country: cf === "all" ? "ita" : cf, text: "" })}><Plus size={15} />Aggiungi profilo</button>
+      <style>{CR_CSS}</style>
+      {/* in cima, come nel reel: un titolo, pochi numeri grandi, un alone di colore */}
+      <div style={{ position: "relative", borderRadius: 20, border: `1px solid ${CP.borderSoft}`, padding: "22px 24px", marginBottom: 16, background: `radial-gradient(ellipse at 18% 0%, ${alpha(CP.accent, "1c")}, transparent 60%), ${CP.surface}` }}>
+        <div style={{ display: "flex", gap: 22, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ flex: "1 1 300px", minWidth: 0 }}>
+            <div style={{ fontSize: 13, color: CP.textMuted }}>Radar del clipping</div>
+            <h2 style={{ margin: "3px 0 6px", fontSize: 28, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1.15 }}>Video che funzionano{where && <> <span style={{ color: CP.accent }}>{where}</span></>}</h2>
+            <p style={{ fontSize: 14, color: CP.textSecondary, margin: 0, lineHeight: 1.5, maxWidth: 560 }}>«10× il solito» = dieci volte le visualizzazioni di un video normale di quel profilo.</p>
+          </div>
+          <div style={{ display: "flex", gap: wide ? 26 : 16, flexWrap: "wrap" }}>
+            <BigNum label="Profili" value={listed.length} />
+            <BigNum label={period === "saved" ? "Idee salvate" : `Video in ${period} giorni`} value={period === "saved" ? nSaved : inPeriod} />
+            {period !== "saved" && <BigNum label="Oltre 3× il solito" value={strong} strong title="Video con almeno tre volte le visualizzazioni tipiche del loro profilo (profili piccoli esclusi)" />}
+          </div>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <button type="button" style={btnPrimary} onClick={() => setAdding({ platform: "ig", country: cf === "all" ? "ita" : cf, text: "" })}><Plus size={15} />Aggiungi profilo</button>
+        </div>
       </div>
       {!data.configured && <Notice danger>Apify non è configurato sul server: i video non si possono leggere.</Notice>}
 
@@ -248,7 +347,6 @@ export default function ClipRadar() {
         </div>
       ) : (
         <>
-          <SectionHead aside={period === "saved" ? `${nSaved} idee salvate` : `${shown.length} video`}>Video che funzionano</SectionHead>
           {!shown.length ? (
             <div style={{ ...cardBox, textAlign: "center", padding: "26px 18px" }}>
               <p style={{ ...hint, margin: "0 0 12px", fontSize: 14 }}>
@@ -261,8 +359,8 @@ export default function ClipRadar() {
               {!listed.length && cf !== "all" && !profiles.some((p) => p.country === cf) && <button type="button" style={btnPrimary} onClick={() => setAdding({ platform: "ig", country: cf, text: "" })}><Plus size={15} />Aggiungi un profilo {cf === "ita" ? "italiano" : "inglese"}</button>}
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 200px), 1fr))", gap: 12, alignItems: "stretch" }}>
-              {shown.map((v) => <VideoCard key={v.id} v={v} saved={Boolean(saved[v.id])} busy={busy === "save"} onSave={(id, on) => run("save", { action: "save", videoId: id, on }, null)} />)}
+            <div style={{ display: "grid", gridTemplateColumns: wide ? "repeat(auto-fill, minmax(200px, 1fr))" : "repeat(2, minmax(0, 1fr))", gridAutoFlow: "row dense", gap: wide ? 18 : 12, alignItems: "start", marginTop: 4 }}>
+              {ordered.map((v, i) => <VideoCard key={`${sort}|${period}|${v.id}`} i={i} big={big && i === 0} v={v} saved={Boolean(saved[v.id])} busy={busy === "save"} onSave={(id, on) => run("save", { action: "save", videoId: id, on }, null)} />)}
             </div>
           )}
 
@@ -281,7 +379,7 @@ export default function ClipRadar() {
           <details style={{ marginTop: 12 }}>
             <summary style={{ cursor: "pointer", ...hint, fontSize: 13 }}>Come si leggono i numeri · lettura ogni notte{lastRun ? `, l'ultima ${lastRun}` : ""}</summary>
             <p style={{ ...hint, margin: "8px 0", maxWidth: 820 }}>
-              «×4» = quattro volte le visualizzazioni tipiche del profilo («di solito»: mediana dei suoi video degli ultimi 30 giorni, servono almeno 3 video; i fissati non contano). È il segno che quel video — gancio, formato, audio — ha preso, anche su una pagina piccola. «/ora» = visualizzazioni prese nelle ultime 24 ore lette, o dall&apos;uscita. Spesa del mese ~{String(data.spent).replace(".", ",")} $ su un tetto di {data.cap} $.
+              «4× il solito» = quattro volte le visualizzazioni tipiche del profilo («di solito»: mediana dei suoi video degli ultimi 30 giorni, servono almeno 3 video; i fissati non contano). È il segno che quel video — gancio, formato, audio — ha preso. Sotto le 1.000 visualizzazioni di solito il profilo è «piccolo»: basta poco per un multiplo alto, quindi il video non fa da protagonista e non conta tra gli «oltre 3×». «/ora» = visualizzazioni prese nelle ultime 24 ore lette, o dall&apos;uscita. Spesa del mese ~{String(data.spent).replace(".", ",")} $ su un tetto di {data.cap} $.
             </p>
             <button type="button" style={btnSm} disabled={!!busy} onClick={() => run("refresh", { action: "refresh" }, (d) => `Riletti ${d.result.read} profili, ${d.result.videos} video (~${String(d.result.usd).replace(".", ",")} $).`)}><RefreshCw size={13} />{busy === "refresh" ? "Rileggo… (fino a due minuti)" : "Rileggi adesso"}</button>
           </details>
