@@ -5,7 +5,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { HelpCircle, CheckCircle2, Clock } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, Notice, card } from "@/components/ds";
+import { PageHead, Notice, card, BTN_PRIMARY } from "@/components/ds";
 
 /**
  * /me/coaching — "Il mio coaching" (scope own).
@@ -16,7 +16,7 @@ import { PageHead, Notice, card } from "@/components/ds";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
-const btnPrimary = { padding: "8px 14px", background: CP.accent, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, color: CP.accentInk, cursor: "pointer", fontFamily: FONTS.body };
+const btnPrimary = BTN_PRIMARY;
 const btnGhost = { padding: "8px 14px", background: "transparent", border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, color: CP.textSecondary, cursor: "pointer", fontFamily: FONTS.body };
 const label = { fontSize: 13, fontWeight: 500, color: CP.textSecondary, margin: "0 0 4px" };
 const list = { margin: 0, paddingLeft: 18, color: CP.textSecondary, fontSize: 13, lineHeight: 1.55 };

@@ -12,7 +12,7 @@ import useSWR from "swr";
 import { Loader2, RefreshCw, Copy, ExternalLink, Plus, Save, Wallet, Mail, Hourglass, Landmark, Send } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
-import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card } from "@/components/ds";
+import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, BTN_PRIMARY } from "@/components/ds";
 import VetroScope, { useVetro } from "@/components/VetroScope";
 import { KpiCard } from "@/components/VetroCharts";
 import { DEFAULT_FEE, WHALE_SHARE, splitDollar, rateFor, linkKey } from "@/lib/publisher-x-core";
@@ -36,7 +36,7 @@ const meseLungo = (m) => { const [y, mm] = m.split("-").map(Number); return `${M
 const dmy = (d) => (d ? `${String(d).slice(8, 10)}/${String(d).slice(5, 7)}` : "—");
 const muted = { fontSize: 12, color: CP.textMuted };
 const btn = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary };
-const btnMain = { ...btn, background: CP.accent, border: `1px solid ${CP.accent}`, color: "#fff" };
+const btnMain = BTN_PRIMARY;
 const input = { padding: "6px 8px", borderRadius: 6, fontSize: 13, fontFamily: FONTS.body, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, minWidth: 0 };
 
 function lastMonths(n = 6) {

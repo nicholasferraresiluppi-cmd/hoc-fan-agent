@@ -19,7 +19,7 @@ import useSWR from "swr";
 import { Plus, X, Copy, Check } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
-import { PageHead, Metric, Notice, DataTable, SectionTitle, card } from "@/components/ds";
+import { PageHead, Metric, Notice, DataTable, SectionTitle, card, BTN_PRIMARY } from "@/components/ds";
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -355,5 +355,5 @@ const input = {
   width: "100%", boxSizing: "border-box", padding: "8px 10px", background: CP.surface, border: `1px solid ${CP.border}`,
   borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, outline: "none",
 };
-const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", background: CP.accent, color: CP.accentInk, border: "1px solid transparent", borderRadius: 8, fontSize: 14, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };
+const btnPrimary = BTN_PRIMARY;
 const btnGhost = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };

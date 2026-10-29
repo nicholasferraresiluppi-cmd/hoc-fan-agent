@@ -4,7 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, Notice, card } from "@/components/ds";
+import { PageHead, Notice, card, BTN_PRIMARY } from "@/components/ds";
 
 /**
  * /me/allenatore — "Il mio allenatore" (scope own).
@@ -16,8 +16,7 @@ import { PageHead, Notice, card } from "@/components/ds";
  */
 const fetcher = (u) => fetch(u, { cache: "no-store" }).then((r) => r.json());
 const btnGhost = { display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", background: "transparent", border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, color: CP.textSecondary, cursor: "pointer", fontFamily: FONTS.body };
-const btnPrimary = { padding: "8px 14px", background: CP.accent, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, color: CP.accentInk, cursor: "pointer", fontFamily: FONTS.body };
-
+const btnPrimary = BTN_PRIMARY;
 function dayLabel(d) {
   const dt = new Date(`${d}T12:00:00Z`);
   return dt.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
