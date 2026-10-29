@@ -1225,10 +1225,18 @@ export default function WarmupPage() {
 
   // ── scheda Dati ──
   function viewReport() {
+    const nonOn = ACC.filter((a) => stateOf(a) !== "online").length;
+    const inWarmAll = ACC.filter((a) => !isCooldown(a) && opDay(a) <= 7).length;
     return (
       <>
-        <h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: "0 0 4px" }}>Dati</h2>
-        <p style={{ ...hint, fontSize: 14, margin: "0 0 12px" }}>Panoramica, numeri della settimana e segnalazioni · {PLATS[plat].label}</p>
+        {/* in cima, nello stile del Radar (29/10): di cosa parla la scheda e tre numeri di tutta la farm */}
+        <HeroHead eyebrow="Dati" title="I numeri dei profili" accent={PLATS[plat].label}
+          sub="Panoramica del periodo, numeri della settimana, segnalazioni ed esportazione."
+          numbers={ACC.length ? <>
+            <BigNum label="Profili" value={ACC.length} />
+            <BigNum label="In warm-up" value={inWarmAll} title="Nei primi 7 giorni, cooldown esclusi" />
+            <BigNum label="Non online" value={nonOn} strong={nonOn > 0} title="Shadowban, sospesi o bannati" />
+          </> : null} />
         <Tabs small items={[["pano", "Panoramica"], ["week", "Settimana"], ["flags", "Segnalazioni"], ["exp", "Esporta"]]} value={rpane} onChange={setRpane} />
         {rpane === "pano" && viewPano()}
         {rpane === "week" && viewWeekAll()}
