@@ -20,6 +20,7 @@ import {
 } from "@/components/warmup/ui";
 import { GuideIG, GuideX } from "@/components/warmup/guide";
 import XRefs from "@/components/warmup/xrefs";
+import ClipRadar from "@/components/warmup/clip-radar";
 import {
   DAY, PLATS, platOf, isX, keyOf, norm, todayKey, startOfDay, fmtDur, mmss, weekKey, weekLabel, lastWeeks,
   numFmt, delta, planFor, planForDate, visibleItems, dayProgress, tasksOn, adherence, hasArrears,
@@ -28,7 +29,7 @@ import {
   clearFlag, endCooldown,
 } from "@/lib/warmup-plan";
 import { prefillFor, publicAlerts, normalizeOfLink } from "@/lib/warmup-metrics-core";
-import { pubKindOfTask, itemForTask } from "@/lib/editoriale-core";
+import { pubKindOfTask, itemForTask, autoItemForTask } from "@/lib/editoriale-core";
 import PublishDownload from "@/components/PublishDownload";
 import MediaLightbox from "@/components/MediaLightbox";
 import EditorialeView from "@/components/editoriale/EditorialeView";
@@ -661,7 +662,9 @@ export default function WarmupPage() {
 
   // ── righe di task con timer ──
   function taskRow(a, item, done, day) {
-    const k = a.id + ":" + item.id, on = Boolean(done[item.id]);
+    // spunta anche quando il contenuto di questa task è stato trovato sul profilo (pubblicato in automatico)
+    const auto = !done[item.id] && pubKindOfTask(item.id) && !isX(a) ? autoItemForTask((a.ed?.[day] || []).map((x) => ({ ...x, slot: { profileId: a.id, date: day, time: x.time } })), a.id, day, item.id) : null;
+    const k = a.id + ":" + item.id, on = Boolean(done[item.id] || auto);
     let timerEl = null;
     if (item.timer && day === todayKey()) {
       const run = timer && timer.acc === a.id && timer.task === item.id;
@@ -704,7 +707,7 @@ export default function WarmupPage() {
     return (
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 7, padding: 8, borderRadius: 10, border: `1px solid ${CP.borderSoft}`, background: CP.bgSunken, maxWidth: 520 }}>
         <div style={{ flex: 1, minWidth: 0, fontSize: 13 }}>
-          <div style={{ color: CP.textPrimary }}>{kind === "carosello" ? "Carosello" : "Reel"} «{it.title}»{it.time ? ` · ${it.time}` : ""}{it.status === "pubblicato" ? " · pubblicato" : ""}</div>
+          <div style={{ color: CP.textPrimary }}>{kind === "carosello" ? "Carosello" : "Reel"} «{it.title}»{it.time ? ` · ${it.time}` : ""}{it.status === "pubblicato" ? " · pubblicato" : ""}{it.autoPub?.url && <> · <a href={it.autoPub.url} target="_blank" rel="noopener noreferrer" style={{ color: CP.accentSoftText }}>trovato sul profilo ↗</a></>}</div>
           <div style={{ ...hint, marginTop: 2 }}>{kind === "carosello" ? `${it.files} foto` : "video montato"}{it.sound ? ` · sound: ${it.sound}` : ""}{it.city ? ` · ${it.city}` : ""}</div>
           {edStrip(a, it, kind)}
           {it.caption && <div style={{ fontSize: 12.5, color: CP.textSecondary, marginTop: 4, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{it.caption}</div>}
@@ -1369,13 +1372,14 @@ export default function WarmupPage() {
     else if (tab === "dati") body = viewReport();
     else if (tab === "admin" && admin) body = viewAdmin();
     else if (tab === "xrefs" && plat === "x") body = <XRefs />;
+    else if (tab === "radar") body = <ClipRadar />;
     else if (tab === "guide") body = <><h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: "0 0 4px" }}>Guida{plat === "x" ? " · X" : ""}</h2><p style={{ ...hint, fontSize: 14, margin: "0 0 14px" }}>{plat === "x" ? "Il riassunto del documento Account X." : "Il riassunto delle SOP a cui la console fa riferimento."}</p>{plat === "x" ? <GuideX /> : <GuideIG />}</>;
     else { const a = sel && byId(sel); body = a && !a.archived ? viewDay(a) : folder ? viewFolder(folder) : viewFolders(); }
   }
   const modalA = modal?.id ? byId(modal.id) : null;
   // Ispirazioni: reference di creator su X (per Instagram c'è il Radar creator)
   // Contenuti (29/10/2026): l'Editoriale dentro Social, solo per Instagram
-  const tabs = [TABS[0], ...(plat === "ig" ? [["contenuti", "Contenuti"]] : []), ...TABS.slice(1, 3), ...(plat === "x" ? [["xrefs", "Ispirazioni"]] : []), ...TABS.slice(3), ...(admin ? [["admin", "Admin"]] : [])];
+  const tabs = [TABS[0], ...(plat === "ig" ? [["contenuti", "Contenuti"]] : []), ...TABS.slice(1, 3), ...(plat === "x" ? [["xrefs", "Ispirazioni"]] : []), ["radar", "Radar clipping"], ...TABS.slice(3), ...(admin ? [["admin", "Admin"]] : [])];
   const openToday = ACC.reduce((t, a) => t + tasksOn(a, todayKey()).open.length, 0);
 
   return (

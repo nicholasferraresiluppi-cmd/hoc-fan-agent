@@ -21,7 +21,7 @@ import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHead, Notice, FilterChip } from "@/components/ds";
 import { btn, btnPrimary, btnDanger, btnSm, input, cardBox, hint, muted, SectionHead, Chip, Seg, ModalBox, Field } from "@/components/warmup/ui";
 import {
-  TYPES, STAGES, stageOf, readyProblems, needsFromTaskIds, coverage, dayItems, monthGrid, shiftMonth, usageMap,
+  TYPES, STAGES, stageOf, readyProblems, needsFromTaskIds, coverage, dayItems, monthGrid, shiftMonth, usageMap, rawUses,
 } from "@/lib/editoriale-core";
 import { planForDate, visibleItems, dayNumberFor, todayKey, WINDOWS, estToIt } from "@/lib/warmup-plan";
 
@@ -257,8 +257,8 @@ export default function EditorialeView({ embedded = false } = {}) {
     let items = d.items || [];
     if (body.action === "delete") items = items.filter((it) => it.id !== body.id);
     else if (r?.item) items = items.some((it) => it.id === r.item.id) ? items.map((it) => (it.id === r.item.id ? r.item : it)) : [r.item, ...items];
-    const used = usageMap(items);
-    return { ...d, items, files: (d.files || []).map((f) => ({ ...f, usedBy: used.get(f.id) || null })) };
+    const used = usageMap(items), raw = rawUses(items);
+    return { ...d, items, files: (d.files || []).map((f) => ({ ...f, usedBy: used.get(f.id) || null, uses: raw.get(f.id)?.length || 0 })) };
   }
   async function act(body, ok) {
     setBusy(true);
@@ -275,7 +275,9 @@ export default function EditorialeView({ embedded = false } = {}) {
 
   // ── drive: scelta dei file ──
   const paths = useMemo(() => [...new Set(["", ...(data?.folders || []), ...files.map((f) => f.path)])].sort((a, b) => a.localeCompare(b, "it")), [files, data?.folders]);
-  const visible = files.filter((f) => f.kind === pickKind && (path === "*" || f.path === path) && (!freeOnly || !f.usedBy || (addTo && f.usedBy === addTo)));
+  // «libero» = mai usato; i video grezzi già usati restano sceglibili (si riusano), le foto no
+  const isFree = (f) => !f.usedBy && !f.uses;
+  const visible = files.filter((f) => f.kind === pickKind && (path === "*" || f.path === path) && (!freeOnly || isFree(f) || (addTo && (f.usedBy === addTo || items.find((it) => it.id === addTo)?.files?.includes(f.id)))));
   const toggle = (f) => {
     if (f.usedBy) return;
     setSel((s) => (s.includes(f.id) ? s.filter((x) => x !== f.id) : [...s, f.id]));
@@ -322,8 +324,8 @@ export default function EditorialeView({ embedded = false } = {}) {
           <Notice>Stai aggiungendo {pickKind === "photo" ? "foto" : "video"} a «{addItem.title}». <button type="button" style={{ ...btnSm, marginLeft: 8 }} onClick={() => { setAddTo(null); setSel([]); }}>Annulla</button></Notice>
         )}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "4px 0 12px" }}>
-          {!addItem && <Seg items={[["photo", `Foto · ${files.filter((f) => f.kind === "photo" && !f.usedBy).length} libere`], ["video", `Video · ${files.filter((f) => f.kind === "video" && !f.usedBy).length} liberi`]]} value={kind} onChange={(v) => { setKind(v); setSel([]); }} />}
-          <FilterChip label={freeOnly ? "Solo liberi" : "Anche gli usati"} active={freeOnly} onClick={() => setFreeOnly((v) => !v)} />
+          {!addItem && <Seg items={[["photo", `Foto · ${files.filter((f) => f.kind === "photo" && isFree(f)).length} libere`], ["video", `Video · ${files.filter((f) => f.kind === "video" && isFree(f)).length} mai usati`]]} value={kind} onChange={(v) => { setKind(v); setSel([]); }} />}
+          <FilterChip label={freeOnly ? "Solo mai usati" : "Anche gli usati"} active={freeOnly} onClick={() => setFreeOnly((v) => !v)} />
 
           <span style={{ flex: 1 }} />
           <span style={hint}>{data?.filesAt ? `letto ${new Date(data.filesAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
@@ -346,9 +348,10 @@ export default function EditorialeView({ embedded = false } = {}) {
             const i = sel.indexOf(f.id);
             const owner = f.usedBy ? itemById.get(f.usedBy) : null;
             return (
-              <Thumb key={f.id} creator={creator} id={f.id} kind={f.kind} dim={Boolean(f.usedBy) && f.usedBy !== addTo} onClick={() => setPreview(f)} title={owner ? `Già in «${owner.title}»` : f.name}>
+              <Thumb key={f.id} creator={creator} id={f.id} kind={f.kind} dim={Boolean(f.usedBy) && f.usedBy !== addTo} onClick={() => setPreview(f)} title={owner ? `Già in «${owner.title}»` : f.uses ? `${f.name} — già usato in ${f.uses} reel, si può riusare` : f.name}>
                 {i >= 0 && <div style={{ position: "absolute", inset: 0, border: `3px solid ${CP.accent}`, borderRadius: 8, background: alpha(CP.accent, "1a"), pointerEvents: "none" }} />}
                 <SelectDot n={i >= 0 ? i + 1 : null} locked={Boolean(owner)} onClick={() => toggle(f)} />
+                {!owner && f.uses > 0 && <span style={{ position: "absolute", left: 4, right: 4, bottom: 4, background: alpha(CP.bgSunken, "dd"), color: CP.textPrimary, borderRadius: 6, padding: "2px 5px", fontSize: 10.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", pointerEvents: "none" }}>Usato {f.uses === 1 ? "1 volta" : `${f.uses} volte`}</span>}
                 {owner && <span style={{ position: "absolute", left: 4, right: 4, bottom: 4, background: alpha(CP.bgSunken, "dd"), color: CP.textPrimary, borderRadius: 6, padding: "2px 5px", fontSize: 10.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", pointerEvents: "none" }}>{stageOf(owner) === "pubblicato" ? "Pubblicata" : "In"} «{owner.title}»</span>}
               </Thumb>
             );
@@ -486,6 +489,7 @@ export default function EditorialeView({ embedded = false } = {}) {
           {saved.status === "pronto" && saved.slot && <button type="button" style={btnPrimary} disabled={busy} onClick={() => step("publish", { on: true, today: todayKey() }, "Segnato pubblicato")}><Check size={15} />Segna pubblicato</button>}
           {pub && <button type="button" style={btn} disabled={busy} onClick={() => step("publish", { on: false }, "Riaperto")}>Non è uscito, riapri</button>}
         </>}>
+        {pub && saved.autoPub?.url && <Notice>Segnato pubblicato in automatico: trovato sul profilo {saved.autoPub.profile || ""} — <a href={saved.autoPub.url} target="_blank" rel="noopener noreferrer" style={{ color: CP.accentSoftText }}>apri il post ↗</a>. Se non è questo, «Non è uscito, riapri» e quel post non verrà più abbinato.</Notice>}
         {!pub && <Field label="Nome (lo vedi solo tu)"><input style={input} value={it.title} onChange={(e) => set("title", e.target.value)} /></Field>}
         <div style={{ fontSize: 12.5, color: CP.textSecondary, fontWeight: 500, marginBottom: 6 }}>{isCar ? `Foto, nell'ordine in cui escono · ${it.files.length}` : `Video grezzi · ${it.files.length}`}</div>
         {!pub && it.files.length > 1 && <p style={{ ...hint, margin: "0 0 6px" }}>Trascina una foto per cambiarne il posto. Toccala per ingrandirla.</p>}
@@ -493,6 +497,7 @@ export default function EditorialeView({ embedded = false } = {}) {
           <SortableFiles files={it.files} disabled={pub} render={(f, i, dragging) => (
             <Thumb creator={creator} id={f} kind={isCar ? "photo" : "video"}>
               <span style={{ position: "absolute", top: 4, left: 4, background: dragging ? CP.accent : alpha(CP.bgSunken, "cc"), color: dragging ? CP.accentInk : CP.textPrimary, borderRadius: 6, padding: "0 6px", fontSize: 11.5 }}>{i + 1}</span>
+              {!isCar && fileById.get(f)?.uses > 1 && <span title="Reel in cui è usato questo video, contando questo" style={{ position: "absolute", left: 4, bottom: 4, background: alpha(CP.bgSunken, "dd"), color: CP.textPrimary, borderRadius: 6, padding: "0 6px", fontSize: 10.5, pointerEvents: "none" }}>usato {fileById.get(f).uses}×</span>}
               {!pub && (
                 <button type="button" aria-label="Togli" data-nodrag="1" onClick={(e) => { e.stopPropagation(); setEdit((x) => ({ ...x, files: x.files.filter((y) => y !== f) })); }}
                   style={{ position: "absolute", top: 4, right: 4, width: 24, height: 24, borderRadius: "50%", border: "none", background: alpha(CP.bgSunken, "cc"), color: CP.textPrimary, display: "grid", placeItems: "center", cursor: "pointer" }}><X size={13} /></button>
@@ -574,7 +579,7 @@ export default function EditorialeView({ embedded = false } = {}) {
   const tk0 = todayKey();
   const in7 = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
   const kpis = data?.folder ? {
-    free: files.filter((f) => !f.usedBy).length,
+    free: files.filter((f) => !f.usedBy && !f.uses).length,
     prep: items.filter((it) => stageOf(it) === "lavorazione").length,
     ready: items.filter((it) => stageOf(it) === "pronto").length,
     week: items.filter((it) => stageOf(it) === "calendario" && it.slot.date >= tk0 && it.slot.date <= in7).length,
@@ -601,7 +606,7 @@ export default function EditorialeView({ embedded = false } = {}) {
       )}
       {data?.folder && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 18, borderTop: `1px solid ${CP.borderSoft}`, paddingTop: 14 }}>
-          {[["calendario", "Calendario"], ["drive", `Drive · ${files.filter((f) => !f.usedBy).length} liberi`], ["caroselli", `Caroselli · ${nCar}`], ["reel", `Reel · ${nReel}`]].map(([k, l]) => (
+          {[["calendario", "Calendario"], ["drive", `Drive · ${files.filter((f) => !f.usedBy && !f.uses).length} liberi`], ["caroselli", `Caroselli · ${nCar}`], ["reel", `Reel · ${nReel}`]].map(([k, l]) => (
             <FilterChip key={k} label={l} active={tab === k} onClick={() => { setTab(k); if (k !== "drive") { setAddTo(null); } }} />
           ))}
         </div>

@@ -16,7 +16,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import { UserButton, SignedIn } from "@clerk/nextjs";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
-import { useStyle, useTheme } from "@/lib/theme-client";
+import { useTheme } from "@/lib/theme-client";
 import { Sun, Moon } from "lucide-react";
 import { NAV_GROUPS, SIDEBAR_WIDTH } from "./Sidebar";
 import WorkspaceSwitch from "@/components/WorkspaceSwitch";
@@ -107,7 +107,6 @@ export default function SidebarCasa() {
   // S4S (14/10/2026): richieste da accettare + S4S di oggi da programmare
   const { data: s4sInbox } = useSWR(me?.authenticated && canSee("/admin/s4s", me.capabilities, me.admin) ? "/api/admin/s4s/inbox" : null, silentFetcher, { revalidateOnFocus: false, refreshInterval: 5 * 60 * 1000 });
   const s4sCount = s4sInbox?.count || 0;
-  const [style, setStyle] = useStyle();
   const [theme, setTheme] = useTheme();
   const [tools, setTools] = useState(false);
   const [today, setToday] = useState("");
@@ -198,11 +197,6 @@ export default function SidebarCasa() {
             {theme === "light" ? <Moon size={15} /> : <Sun size={15} />}
           </button>
         </div>
-        {me?.admin && (
-          <button type="button" className="casa-style" onClick={() => setStyle(style === "v3" ? "v2" : "v3")}>
-            Stile nuovo (anteprima) · torna al vecchio
-          </button>
-        )}
       </SignedIn>
     </aside>
   );

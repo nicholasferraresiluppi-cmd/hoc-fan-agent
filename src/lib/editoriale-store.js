@@ -16,7 +16,7 @@ import { randomUUID } from "node:crypto";
 import { loadAll as loadSupervisor } from "@/lib/supervisor-store";
 import { folderIdFromUrl, folderInfo, listMedia } from "@/lib/google-drive";
 import {
-  creatorKey, normalizeItem, filesOf, setReady, schedule, setPublished, itemForTask, stageOf,
+  lockedFilesOf, creatorKey, normalizeItem, filesOf, setReady, schedule, setPublished, itemForTask, stageOf,
 } from "@/lib/editoriale-core";
 
 const CFG = "edit:cfg";
@@ -121,7 +121,8 @@ async function lockFiles(ck, itemId, before, after, nameOf) {
     const owner = await kv.hget(USED(ck), f);
     if (owner === itemId) continue;
     const other = owner ? await getItem(ck, owner) : null;
-    if (!other) { await kv.hset(USED(ck), { [f]: itemId }); taken.push(f); continue; } // lucchetto orfano
+    // lucchetto orfano, o rimasto da quando anche i video grezzi si bloccavano (prima del 29/10)
+    if (!other || !lockedFilesOf(other).includes(f)) { await kv.hset(USED(ck), { [f]: itemId }); taken.push(f); continue; } // lucchetto orfano
     if (taken.length) await kv.hdel(USED(ck), ...taken);
     const where = { pubblicato: "già pubblicato", calendario: "in calendario", pronto: "pronto", lavorazione: "in preparazione" }[stageOf(other)];
     return { ok: false, errors: [`«${nameOf(f)}» è già usato in «${other.title}» (${where})`] };
@@ -147,7 +148,16 @@ export async function saveItem(ck, input, by) {
   if (!r.ok) return r;
   const item = r.item;
   item.id = prev?.id || randomUUID().slice(0, 12);
-  const lk = await lockFiles(ck, item.id, prev ? filesOf(prev) : [], filesOf(item), (f) => byId.get(f)?.name || "file");
+  // i video grezzi si riusano, ma non il reel montato di un altro contenuto
+  if (item.type !== "carosello") {
+    for (const f of item.files.filter((x) => !(prev?.files || []).includes(x))) {
+      const owner = await kv.hget(USED(ck), f);
+      if (!owner || owner === item.id) continue;
+      const other = await getItem(ck, owner);
+      if (other && lockedFilesOf(other).includes(f)) return { ok: false, status: 409, errors: [`«${byId.get(f)?.name || "file"}» è il reel montato di «${other.title}»`] };
+    }
+  }
+  const lk = await lockFiles(ck, item.id, prev ? lockedFilesOf(prev) : [], lockedFilesOf(item), (f) => byId.get(f)?.name || "file");
   if (!lk.ok) return { ...lk, status: 409 };
   const now = Date.now();
   item.createdAt = prev?.createdAt || now;
@@ -164,7 +174,7 @@ export async function deleteItem(ck, id, by) {
   const prev = await getItem(ck, id);
   if (!prev) return { ok: false, status: 404, errors: ["Contenuto non trovato"] };
   if (prev.status === "pubblicato") return { ok: false, status: 409, errors: ["È già pubblicato: i suoi file restano usati"] };
-  await lockFiles(ck, id, filesOf(prev), [], () => "");
+  await lockFiles(ck, id, lockedFilesOf(prev), [], () => "");
   await kv.hdel(ITEMS(ck), id);
   await appendLog(ck, `Smontato: «${prev.title}» — i file tornano liberi`, by);
   return { ok: true };
@@ -210,6 +220,7 @@ export async function scheduledForProfiles(profiles, days) {
       if (!sl || !ids.has(sl.profileId) || !want.has(sl.date)) continue;
       ((out[sl.profileId] ||= {})[sl.date] ||= []).push({
         id: it.id, ck, type: it.type, title: it.title, time: sl.time, status: it.status, pubTask: it.pubTask || null,
+        autoPub: it.autoPub ? { url: it.autoPub.url } : null,
         files: filesOf(it).length, cover: it.type === "carosello" ? it.files[0] || null : it.final || it.files[0] || null,
         caption: (it.caption || "").slice(0, 2200), sound: it.sound || "", city: it.city || "",
         // i file da scaricare per pubblicare: le foto in ordine, o il reel montato (o il grezzo se va bene così)
@@ -238,4 +249,18 @@ export async function publishFromTask(profile, day, taskId, on, by) {
   await putItem(ck, { ...r.item, updatedAt: Date.now(), updatedBy: by?.name || "" });
   await appendLog(ck, `«${it.title}» ${on ? "pubblicato" : "riaperto"} dal Warm-up (${profile.username || ""})`, by);
   return r.item;
+}
+
+/**
+ * Segnato pubblicato dal controllo automatico (editoriale-autopub.js): il post trovato sul profilo
+ * resta sul contenuto (`autoPub`). Non tocca un contenuto cambiato nel frattempo.
+ */
+export async function markAutoPublished(ck, id, post) {
+  const it = await getItem(ck, id);
+  if (!it || it.status !== "pronto" || !it.slot) return false;
+  const r = setPublished(it, true, { by: "controllo automatico" });
+  if (!r.ok) return false;
+  await putItem(ck, { ...r.item, autoPub: { ...post, at: Date.now() }, updatedAt: Date.now(), updatedBy: "controllo automatico" });
+  await appendLog(ck, `«${it.title}» pubblicato: trovato su ${post.profile || "Instagram"} (${post.url}) — segnato in automatico`, { name: "Controllo automatico" });
+  return true;
 }
