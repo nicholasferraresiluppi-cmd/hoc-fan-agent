@@ -10,7 +10,7 @@
  */
 import { groupOf } from "@/lib/page-groups";
 import { usePathname, useRouter } from "next/navigation";
-import { prefetchNav } from "@/lib/nav-prefetch";
+import { prefetchNav, prefetchMenuWhenIdle } from "@/lib/nav-prefetch";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -139,6 +139,9 @@ export default function SidebarCasa() {
   // Pagina corrente fuori dal menu corto → si apre l'elenco completo, così si vede dove si è
   const inShort = (wsOn && pathname === "/admin") || sections.some((s) => s.items.some(isActive));
   const shortHrefs = new Set(sections.flatMap((s) => s.items.map((i) => i.href)));
+  // telefono: le pagine principali del menu precaricate quando l'app è ferma (niente hover)
+  const menuKey = [...shortHrefs].join(",");
+  useEffect(() => { if (me?.authenticated) prefetchMenuWhenIdle(router, [...shortHrefs]); }, [me?.authenticated, menuKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // la voce accesa resta sempre in vista, anche in fondo a "Tutti gli strumenti"
   useEffect(() => {
     try { document.querySelector(".casa-nav a.on")?.scrollIntoView({ block: "nearest" }); } catch {}
