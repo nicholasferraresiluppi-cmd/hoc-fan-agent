@@ -12,7 +12,11 @@ import { mutate } from "swr";
 const ls = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 
 const DATA = {
-  "/admin/warmup": () => ["/api/admin/warmup"],
+  "/admin/warmup": () => {
+    // Social: to-do e anche la scheda Contenuti (Editoriale) già pronta
+    const c = ls("hoc:editoriale:creator");
+    return ["/api/admin/warmup", "/api/admin/editoriale", ...(c ? [`/api/admin/editoriale?creator=${encodeURIComponent(c)}`] : [])];
+  },
   "/admin/editoriale": () => {
     const c = ls("hoc:editoriale:creator");
     return ["/api/admin/editoriale", "/api/admin/warmup", ...(c ? [`/api/admin/editoriale?creator=${encodeURIComponent(c)}`] : [])];
