@@ -17,6 +17,7 @@
  * Vista "Archiviate" = rete di sicurezza per i task cancellati su ClickUp: fuori
  * da elenco, doppioni e numeri; si ripristinano, non si cancellano mai.
  */
+import { prefetchData } from "@/lib/nav-prefetch";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -310,7 +311,7 @@ export default function HrPeoplePage() {
                 </section>
               )}
 
-              <DataTable columns={columns} rows={rows} defaultSort={{ key: "name", dir: 1 }} onRowClick={(p) => router.push(`/admin/hr/${p.id}`)} minWidth={860} maxHeight={680}
+              <DataTable columns={columns} rows={rows} defaultSort={{ key: "name", dir: 1 }} onRowClick={(p) => router.push(`/admin/hr/${p.id}`)} onRowHover={(p) => { try { router.prefetch(`/admin/hr/${p.id}`); } catch {} prefetchData([`/api/admin/hr/people/${p.id}`]); }} minWidth={860} maxHeight={680}
                 empty={<span>Nessuna persona qui{activeFilters || q ? " con questi filtri" : ""}.{(activeFilters || q) ? <> <button type="button" onClick={() => { resetFilters(); setQ(""); }} style={{ background: "none", border: "none", padding: 0, color: CP.accentSoftText, cursor: "pointer" }}>Togli i filtri</button></> : null}</span>} />
 
               {tab === "ripulire" && data.cleanup && (

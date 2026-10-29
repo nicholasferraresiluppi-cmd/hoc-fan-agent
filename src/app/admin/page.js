@@ -27,6 +27,8 @@ import {
   Landmark, Repeat, Gift, CalendarDays } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
+import { useRouter } from "next/navigation";
+import { prefetchNav } from "@/lib/nav-prefetch";
 import { WORKSPACES, workspaceSections } from "@/lib/workspaces";
 import { fmt$, fmtInt, fmtDelta, fmtAgo, MONTHS_IT } from "@/lib/format";
 import { useStyle } from "@/lib/theme-client";
@@ -188,6 +190,7 @@ const TOOL_BY_HREF = new Map(SHORTCUT_GROUPS_RAW.flatMap((g) => g.items.map((i) 
 const PHONE_QUICK = ["/admin/scouting", "/admin/le-mie-creator", "/admin/analisi-vendite", "/admin/alerts", "/admin/pnl-live", "/admin/hr"];
 
 export default function AdminHub() {
+  const router = useRouter();
   const { user } = useUser();
   const [q, setQ] = useState("");
   const now = useMemo(() => new Date(), []);
@@ -436,7 +439,7 @@ export default function AdminHub() {
             <h2 className="ds-sect" style={{ fontSize: 16, fontWeight: 500, margin: "6px 0 10px", color: CP.textPrimary }}>Vai a</h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
               {quick.map((it, qi) => { const Icon = it.icon || LayoutDashboard; return (
-                <Link key={it.href} href={it.href} className="hub-tool" style={{ ...card, display: "flex", flexDirection: "column", gap: 10, padding: "14px 14px 12px", textDecoration: "none", color: CP.textPrimary, minHeight: 86 }}>
+                <Link key={it.href} href={it.href} onPointerEnter={() => prefetchNav(router, it.href)} onTouchStart={() => prefetchNav(router, it.href)} className="hub-tool" style={{ ...card, display: "flex", flexDirection: "column", gap: 10, padding: "14px 14px 12px", textDecoration: "none", color: CP.textPrimary, minHeight: 86 }}>
                   <span className="vt-ico" data-tone={qi % 6} style={{ display: "inline-flex" }}><Icon size={18} color={CP.textMuted} strokeWidth={1.8} /></span>
                   <span style={{ fontSize: 14.5, fontWeight: 500, lineHeight: 1.25 }}>{it.title}</span>
                 </Link>
@@ -489,9 +492,10 @@ export default function AdminHub() {
 
 // tone: colore del gruppo, usato solo dallo stile vetro (VetroScope) per la tessera dell'icona
 function ToolCard({ it, tone = 0 }) {
+  const router = useRouter();
   const Icon = it.icon;
   return (
-    <Link href={it.href} className="hub-tool"
+    <Link href={it.href} onPointerEnter={() => prefetchNav(router, it.href)} onTouchStart={() => prefetchNav(router, it.href)} className="hub-tool"
       style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px", ...card, textDecoration: "none", color: CP.textPrimary }}>
       <span className="vt-ico" data-tone={tone} style={{ display: "inline-flex", flexShrink: 0, marginTop: 2 }}><Icon size={16} color={CP.textMuted} strokeWidth={1.8} /></span>
       <div style={{ minWidth: 0 }}>
