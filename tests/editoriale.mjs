@@ -2,7 +2,7 @@
 // Esegui: node tests/editoriale.mjs
 import assert from "node:assert/strict";
 import {
-  creatorKey, stageOf, filesOf, usageMap, rawUses, romeTs, dueForAutoCheck, matchPublished, captionMatch, autoItemForTask, readyProblems, normalizeItem, setReady, schedule, setPublished,
+  creatorKey, stageOf, filesOf, usageMap, rawUses, romeTs, dueForAutoCheck, matchPublished, captionMatch, autoItemForTask, autoReady, readyProblems, normalizeItem, setReady, schedule, setPublished,
   pubKindOfTask, needsFromTaskIds, itemForTask, dayItems, coverage, monthGrid, shiftMonth,
 } from "../src/lib/editoriale-core.js";
 
@@ -55,6 +55,8 @@ const kinds = new Map([["p1", "photo"], ["p2", "photo"], ["p3", "photo"], ["v1",
   eq(readyProblems(reel), ["Manca il reel montato"], "reel senza montato");
   ok(readyProblems({ ...reel, noEdit: true }).length === 0, "senza montaggio: pronto");
   ok(readyProblems({ ...reel, final: "v2" }).length === 0, "con montato: pronto");
+  eq(autoReady({ ...reel, status: "lavorazione" }).status, "lavorazione", "reel senza montato resta da montare");
+  eq(autoReady({ ...reel, status: "lavorazione", final: "v2" }).status, "pronto", "col montato è pronto da solo");
   eq(filesOf({ ...reel, final: "v2" }), ["v1", "v2"], "file occupati dal reel: grezzi + montato");
   const back = setReady({ ...r.item, slot: { profileId: "x", date: "2026-11-01" } }, false);
   ok(back.item.status === "lavorazione" && back.item.slot === null, "riportato in preparazione esce dal calendario");

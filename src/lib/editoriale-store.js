@@ -16,7 +16,7 @@ import { randomUUID } from "node:crypto";
 import { loadAll as loadSupervisor } from "@/lib/supervisor-store";
 import { folderIdFromUrl, folderInfo, listMedia } from "@/lib/google-drive";
 import {
-  lockedFilesOf, creatorKey, normalizeItem, filesOf, setReady, schedule, setPublished, itemForTask, stageOf,
+  lockedFilesOf, autoReady, creatorKey, normalizeItem, filesOf, setReady, schedule, setPublished, itemForTask, stageOf,
 } from "@/lib/editoriale-core";
 
 const CFG = "edit:cfg";
@@ -97,11 +97,11 @@ export async function getFiles(ck, { force = false } = {}) {
 
 export async function listItems(ck) {
   const h = (await kv.hgetall(ITEMS(ck))) || {};
-  return Object.values(h).map(parse);
+  return Object.values(h).map((v) => autoReady(parse(v)));
 }
 async function getItem(ck, id) {
   const v = await kv.hget(ITEMS(ck), id);
-  return v ? parse(v) : null;
+  return v ? autoReady(parse(v)) : null;
 }
 async function putItem(ck, item) {
   await kv.hset(ITEMS(ck), { [item.id]: JSON.stringify(item) });
@@ -146,7 +146,7 @@ export async function saveItem(ck, input, by) {
   for (const f of prev ? filesOf(prev) : []) if (!kinds.has(f)) kinds.set(f, prev.type === "carosello" ? "photo" : "video");
   const r = normalizeItem(input, prev, kinds);
   if (!r.ok) return r;
-  const item = r.item;
+  const item = autoReady(r.item);
   item.id = prev?.id || randomUUID().slice(0, 12);
   // i video grezzi si riusano, ma non il reel montato di un altro contenuto
   if (item.type !== "carosello") {
