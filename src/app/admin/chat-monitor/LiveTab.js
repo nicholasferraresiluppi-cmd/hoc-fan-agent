@@ -3,8 +3,11 @@
 // Scheda "Live chat": oggi in corso + fan di oggi (come chat.hoc.tools).
 
 import { useMemo, useState } from "react";
-import { CP } from "@/lib/brand";
-import { Kpi, Section, Badge, grid, chip, th, td, FanLink, usd, int, pct, mins, ago, hm, div, waitColor } from "./ui";
+import { CP, alpha } from "@/lib/brand";
+import { NUM } from "@/components/ds";
+import { useInVetro, VetroNum } from "@/components/VetroScope";
+import { MixBar } from "@/components/VetroCharts";
+import { Kpi, Section, Badge, grid, chip, th, td, FanLink, usd, int, pct, mins, ago, hm, div, waitColor, waitingNow, MIN_SAMPLE } from "./ui";
 import NextUp from "./NextUp";
 
 // Soglie dell'originale: benvenuto new ≤2h <95% rosso; latenza mediana 10 min / p90 45 min; senza risposta >8%.
@@ -25,10 +28,47 @@ export default function LiveTab({ data, country }) {
   const unlockedNet = (t.ppv_unlocked_value_ws || 0) * 0.8; // il valore dell'evento è il prezzo lordo: netto = 80%
 
   const queue = useMemo(() => (data.queue || []).filter((q) => q.country === country), [data.queue, country]);
+  const inVetro = useInVetro();
+  const toggle = (k) => setOpen(open === k ? null : k);
+  const shiftList = data.shifts ? data.shifts.byCountry?.[country] || [] : null;
+  const details = (
+    <>
+      {open === "pending" && (
+          <div style={{ marginTop: 12 }}>
+            <SubTable head={["Utente", "Tipo", "Iscritto", "Da"]} rows={pending.map((p) => [
+              <FanLink key="u" userId={p.user_id} username={p.username} />, p.sub_kind === "new" ? "new" : "returning", hm(p.sub_at), <span key="a" style={{ color: CP.accentRed }}>{ago(p.sub_at)}</span>,
+            ])} empty="Nessun benvenuto mancante." />
+          </div>
+        )}
+        {open === "ppv" && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 12.5, color: CP.textSecondary, marginBottom: 6 }}>
+              Messaggi pagati oggi: {int(t.msg_tx)} ({usd(t.msg_net)}) · tip {int(t.tip_tx)} ({usd(t.tip_net)}) · altro {int(t.other_tx)} ({usd(t.other_net)})
+            </div>
+            <SubTable head={["Ora", "Utente", "Netto", "Tipo"]} rows={unlocks.map((u) => [hm(u.ts), <FanLink key="u" userId={u.user_id} username={u.username} />, usd(u.net, 2), u.is_mass ? "mass" : "DM"])} empty="Nessun messaggio pagato oggi." />
+          </div>
+        )}
+    </>
+  );
+  if (inVetro) {
+    return (
+      <>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "4px 2px 10px" }}>
+          <h2 style={{ fontSize: 17, fontWeight: 500, margin: 0, color: CP.textPrimary }}>La chat adesso</h2>
+          <Badge tone="live">● LIVE</Badge>
+        </div>
+        <VetroNow t={t} queue={queue} open={open} toggle={toggle} rates={{ contactRate, retRate, noReplyRate, latMed, latP90, unlockedNet }} />
+        {open && <Section style={{ marginTop: 12 }}>{details}</Section>}
+        <div style={{ height: 12 }} />
+        <NextUp queue={queue} shifts={shiftList} />
+        <FansToday fans={fans} />
+      </>
+    );
+  }
 
   return (
     <>
-      <NextUp queue={queue} shifts={data.shifts ? data.shifts.byCountry?.[country] || [] : null} />
+      <NextUp queue={queue} shifts={shiftList} />
       <Section title="Oggi in corso" badge={<Badge tone="live">● LIVE</Badge>} tip="Dati di oggi (ora italiana), dalla chat in tempo reale e dalle iscrizioni/transazioni.">
         <div style={grid(170)}>
           <Kpi label="Nuovi sub oggi" value={int(t.new_subs)} sub={`${int(t.ret_subs)} returning`} tip="Iscritti di oggi alla prima iscrizione (new) e chi torna dopo aver disdetto (returning)." />
@@ -49,26 +89,105 @@ export default function LiveTab({ data, country }) {
             tip="PPV mandati in chat oggi (mass esclusi). Sbloccati = acquisti notificati in tempo reale; aperti = PPV di oggi che il fan ha aperto." />
           <Kpi label="Revenue oggi" value={usd(t.revenue)} sub={`${int(t.payers)} paganti (lag ~1h)`} tip="Netto delle transazioni di oggi su questo account (messaggi, tip, abbonamenti). Le transazioni arrivano con qualche minuto di ritardo." />
         </div>
-
-        {open === "pending" && (
-          <div style={{ marginTop: 12 }}>
-            <SubTable head={["Utente", "Tipo", "Iscritto", "Da"]} rows={pending.map((p) => [
-              <FanLink key="u" userId={p.user_id} username={p.username} />, p.sub_kind === "new" ? "new" : "returning", hm(p.sub_at), <span key="a" style={{ color: CP.accentRed }}>{ago(p.sub_at)}</span>,
-            ])} empty="Nessun benvenuto mancante." />
-          </div>
-        )}
-        {open === "ppv" && (
-          <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 12.5, color: CP.textSecondary, marginBottom: 6 }}>
-              Messaggi pagati oggi: {int(t.msg_tx)} ({usd(t.msg_net)}) · tip {int(t.tip_tx)} ({usd(t.tip_net)}) · altro {int(t.other_tx)} ({usd(t.other_net)})
-            </div>
-            <SubTable head={["Ora", "Utente", "Netto", "Tipo"]} rows={unlocks.map((u) => [hm(u.ts), <FanLink key="u" userId={u.user_id} username={u.username} />, usd(u.net, 2), u.is_mass ? "mass" : "DM"])} empty="Nessun messaggio pagato oggi." />
-          </div>
-        )}
+        {details}
       </Section>
 
       <FansToday fans={fans} />
     </>
+  );
+}
+
+// Stile vetro (29/10/2026): la domanda della scheda è «la chat è presidiata, adesso?». Quattro schede
+// piene di colore per i quattro controlli dell'originale (rosso = fuori soglia, verde = a posto, vetro =
+// campione troppo piccolo per giudicare), da quanto aspettano i fan in attesa, e la giornata in chat
+// (PPV mandati → aperti → sbloccati, venduto). Stesse soglie e stessi numeri delle tessere di prima.
+const BTN_RESET = { boxSizing: "border-box", cursor: "pointer", border: 0, margin: 0, font: "inherit", color: "inherit" };
+const WAIT_BUCKETS = [
+  { label: "Fino a 15 min", max: 15, color: CP.accentGreen },
+  { label: "Da 15 min a 2 ore", max: 120, color: CP.gold },
+  { label: "Oltre 2 ore", max: Infinity, color: CP.accentRed },
+];
+
+function NowTile({ label, value, sub, lvl, onClick, active, i }) {
+  const cls = lvl == null ? "vt-hot vt-glass" : "vt-hot";
+  const body = (
+    <>
+      <span style={{ fontSize: 13, fontWeight: 500, color: CP.textPrimary }}>{label}</span>
+      <span style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: CP.textPrimary, ...NUM }}><VetroNum value={value} /></span>
+      {sub && <span style={{ fontSize: 12.5, color: CP.textSecondary, lineHeight: 1.4, ...NUM }}>{sub}</span>}
+    </>
+  );
+  const style = { "--vt-i": i, minHeight: 112, outline: active ? `2px solid ${CP.textPrimary}` : "none", outlineOffset: 2 };
+  if (!onClick) return <div className={cls} data-lvl={lvl ?? undefined} style={style}>{body}</div>;
+  return <button type="button" onClick={onClick} className={cls} data-lvl={lvl ?? undefined} style={{ ...BTN_RESET, ...style, textAlign: "left" }}>{body}</button>;
+}
+
+function VetroNow({ t, queue, open, toggle, rates }) {
+  const { contactRate, retRate, noReplyRate, latMed, latP90, unlockedNet } = rates;
+  const enough = (n) => n != null && n >= MIN_SAMPLE;
+  const lvlContact = contactRate == null || !enough(t.new_ge2h) ? null : contactRate >= TH.contact ? "0" : "2";
+  const lvlNoReply = noReplyRate == null || !enough(t.fans_wrote) ? null : noReplyRate > TH.noReply ? "2" : "0";
+  const lvlLat = latMed == null ? null : latMed <= TH.latMed && (latP90 ?? 0) <= TH.latP90 ? "0" : "2";
+  const waiting = waitingNow(queue);
+  const now = Date.now();
+  const buckets = WAIT_BUCKETS.map((b) => ({ ...b, value: 0 }));
+  for (const q of waiting) {
+    const m = (now - new Date(q.last_fan_at).getTime()) / 60000;
+    buckets.find((b) => m <= b.max).value += 1;
+  }
+  const sent = t.ppv_sent || 0;
+  const steps = [
+    { label: "PPV mandati", n: t.ppv_sent },
+    { label: "Aperti", n: t.ppv_opened_today },
+    { label: "Sbloccati", n: t.ppv_unlocked_ws, extra: unlockedNet ? `${usd(unlockedNet)} netti` : null },
+  ];
+  return (
+    <div className="vt-row21" style={{ gap: 12 }}>
+      <div style={{ display: "grid", gap: 12, minWidth: 0 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
+          <NowTile i={0} label="Da salutare ora" value={int(t.welcome_pending)} lvl={t.welcome_pending > 0 ? "2" : "0"}
+            sub={t.welcome_pending ? "iscritti oggi senza benvenuto · tocca per la lista" : "tutti gli iscritti di oggi salutati"}
+            onClick={t.welcome_pending ? () => toggle("pending") : undefined} active={open === "pending"} />
+          <NowTile i={1} label="Benvenuto entro 2 ore" value={pct(contactRate, 0)} lvl={lvlContact}
+            sub={lvlContact == null && contactRate != null ? `solo ${int(t.new_ge2h)} iscritti: nessun giudizio` : `soglia 95% · returning ${pct(retRate, 0)}`} />
+          <NowTile i={2} label="Senza risposta" value={int(t.no_reply)} lvl={lvlNoReply}
+            sub={`${pct(noReplyRate, 0)} dei ${int(t.fans_wrote)} fan che hanno scritto · soglia 8%`} />
+          <NowTile i={3} label="Tempo di risposta" value={latMed == null ? "–" : mins(latMed)} lvl={lvlLat}
+            sub={`il 10% più lento: ${latP90 == null ? "–" : mins(latP90)} · soglie 10 e 45 min`} />
+        </div>
+        <section className="vt-glass" style={{ "--vt-i": 4, borderRadius: 20, padding: "16px 18px", minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 500, margin: 0, color: CP.textPrimary }}>Da quanto aspettano</h2>
+            <span style={{ fontSize: 12.5, color: CP.textMuted }}>{waiting.length ? `${int(waiting.length)} fan in attesa di risposta, ultime 24 ore` : "nessun fan in attesa"}</span>
+          </div>
+          {waiting.length ? <MixBar items={buckets} format={(v) => `${int(v)} fan`} height={28} /> : <div style={{ fontSize: 13.5, color: CP.textSecondary }}>Tutti i fan che hanno scritto hanno avuto risposta.</div>}
+        </section>
+      </div>
+      <section className="vt-glass" style={{ "--vt-i": 5, borderRadius: 20, padding: "16px 18px", display: "grid", gap: 12, alignContent: "start", minWidth: 0 }}>
+        <div>
+          <div style={{ fontSize: 13, color: CP.textSecondary }}>Venduto oggi</div>
+          <div style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.02em", color: CP.textPrimary, ...NUM }}><VetroNum value={usd(t.revenue)} /></div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted, ...NUM }}>{int(t.payers)} paganti · {int(t.new_subs)} nuovi abbonati, {int(t.ret_subs)} tornati · arriva con ~1 ora di ritardo</div>
+        </div>
+        <button type="button" onClick={() => toggle("ppv")} style={{ ...BTN_RESET, background: "transparent", textAlign: "left", display: "grid", gap: 9, borderRadius: 12, outline: open === "ppv" ? `2px solid ${CP.accent}` : "none", outlineOffset: 4 }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: CP.textPrimary }}>I PPV di oggi <span style={{ color: CP.textMuted, fontWeight: 400 }}>· tocca per il dettaglio</span></span>
+          {steps.map((s, k) => {
+            const w = sent ? Math.min(1, (s.n || 0) / sent) : 0;
+            return (
+              <span key={s.label} style={{ display: "grid", gap: 4 }}>
+                <span style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5, color: CP.textSecondary, ...NUM }}>
+                  <span>{s.label}</span>
+                  <span><b style={{ color: CP.textPrimary, fontWeight: 600 }}>{int(s.n)}</b>{k > 0 && sent ? ` · ${pct(w, 0)}` : ""}{s.extra ? ` · ${s.extra}` : ""}</span>
+                </span>
+                <span style={{ height: 10, borderRadius: 6, background: alpha(CP.accent, "1f"), overflow: "hidden" }}>
+                  <span style={{ display: "block", width: `${w * 100}%`, height: "100%", borderRadius: 6, background: `var(--vt-c${k})` }} />
+                </span>
+              </span>
+            );
+          })}
+        </button>
+      </section>
+    </div>
   );
 }
 

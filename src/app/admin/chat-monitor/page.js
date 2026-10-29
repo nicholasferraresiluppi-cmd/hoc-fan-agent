@@ -16,6 +16,7 @@ import LiveTab from "./LiveTab";
 import DailyTab from "./DailyTab";
 import { alertDialog } from "@/components/AppDialogs";
 import TrendTab from "./TrendTab";
+import VetroScope, { useVetro, VetroSwitch } from "@/components/VetroScope";
 
 const TABS = [
   { id: "live", label: "Live chat" },
@@ -30,6 +31,7 @@ export default function ChatMonitorPage() {
   useEffect(() => { try { const v = localStorage.getItem("hoc:live:paese"); if (v) setCountryState(v); } catch {} }, []);
   const setCountry = (c) => { setCountryState(c); try { localStorage.setItem("hoc:live:paese", c); } catch {} };
   const [tab, setTab] = useState("live");
+  const [vetro, setVetro] = useVetro();
   const [refreshing, setRefreshing] = useState(false);
   const opts = { revalidateOnFocus: false };
   const url = (t, extra = "") => (slug == null ? null : `/api/admin/chat-monitor?tab=${t}${slug ? `&creator=${encodeURIComponent(slug)}` : ""}${extra}`);
@@ -72,15 +74,19 @@ export default function ChatMonitorPage() {
   };
 
   return (
+    <VetroScope on={vetro}>
     <div style={{ maxWidth: 1600, margin: "0 auto", padding: "20px 16px 60px", fontFamily: FONTS.body }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, color: CP.textPrimary }}>{creatorName ? `${creatorName} · ` : ""}Chat Monitor <span style={{ fontSize: 14, color: CP.textMuted, fontWeight: 400 }}>· Live</span></h1>
           <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 4 }}>Segnali comportamentali da chat + transazioni · aggiornamento da BigQuery</div>
         </div>
-        {current.data?.generated_at && (
-          <div style={{ fontSize: 12.5, color: CP.textMuted }}>Aggiornato: {new Date(current.data.generated_at).toLocaleString("it-IT", { timeZone: "Europe/Rome" })}</div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {current.data?.generated_at && (
+            <div style={{ fontSize: 12.5, color: CP.textMuted }}>Aggiornato: {new Date(current.data.generated_at).toLocaleString("it-IT", { timeZone: "Europe/Rome" })}</div>
+          )}
+          <VetroSwitch on={vetro} set={setVetro} />
+        </div>
       </header>
 
       <CreatorPills creators={live.data?.creators || live.error?.creators} current={live.data?.creator || slug} onChange={setSlug} />
@@ -96,7 +102,7 @@ export default function ChatMonitorPage() {
       </div>
 
       {live.data && tab !== "trend" && (
-        <div style={{ ...card, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "9px 14px", marginBottom: 12, fontSize: 12.5, color: CP.textSecondary }}>
+        <div className={vetro ? "vt-glass" : undefined} style={{ ...card, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "9px 14px", marginBottom: 12, fontSize: 12.5, color: CP.textSecondary }}>
           <span style={{ width: 8, height: 8, borderRadius: 999, background: CP.accentGreen }} />
           <b style={{ color: CP.textPrimary, fontWeight: 500 }}>Chat live a {hm(b.ws_max)} ({ago(b.ws_max)})</b>
           <span>Storico consolidato fino a {ymdRome(b.of_max)} · {hm(b.of_max)} · Iscrizioni/transazioni: ~{hm(b.tx_max)}</span>
@@ -122,6 +128,7 @@ export default function ChatMonitorPage() {
       )}
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
+    </VetroScope>
   );
 }
 
