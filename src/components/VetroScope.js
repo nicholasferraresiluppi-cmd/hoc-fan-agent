@@ -185,6 +185,8 @@ ${T.darkTiles.map((i) => `.hoc-vetro .vt-ico[data-tone="${i}"] svg{stroke:#1d151
 :root:not([data-style="v3"]) .hoc-vetro .hoc-side a[data-on] svg{stroke:var(--cp-accentInk) !important}
 :root:not([data-style="v3"]) .hoc-vetro .hoc-side a[data-on] > span[style*="absolute"]{display:none}
 :root:not([data-style="v3"]) .hoc-vetro .hoc-side .hoc-grp{font-family:inherit !important;letter-spacing:.02em !important;font-size:11.5px !important;font-weight:500 !important}
+/* menu a tendina del telefono: lastra piena (bgSunken del vetro è trasparente: senza questa riga la pagina si vede attraverso) */
+:root:not([data-style="v3"]) .hoc-vetro .hoc-mob .hoc-side{background:var(--cp-panel) !important;border-right:1px solid var(--cp-borderStrong) !important;box-shadow:${T.shadow}}
 :root .hoc-vetro .hoc-mhead-v2{background:var(--cp-surfaceAlt) !important;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
 .hoc-vetro .vt-row21{display:grid;gap:14px;grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
 @media (max-width:999px){.hoc-vetro .vt-row21{grid-template-columns:minmax(0,1fr)}}

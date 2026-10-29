@@ -20,7 +20,7 @@ import { pathAllowed } from "@/lib/restricted-roles";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Menu, X } from "lucide-react";
-import Sidebar, { NAV_ITEMS } from "./Sidebar";
+import Sidebar, { NAV_ITEMS, SIDEBAR_WIDTH } from "./Sidebar";
 import { groupMatch } from "@/lib/page-groups";
 import SidebarCasa from "./SidebarCasa";
 import ErrorBoundary from "./ErrorBoundary";
@@ -213,7 +213,7 @@ export default function AppShell({ children }) {
                 <button
                   onClick={() => setMobileOpen(false)}
                   aria-label="Chiudi menu"
-                  style={{ position: "absolute", top: 14, right: -36, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, cursor: "pointer", padding: 6 }}
+                  style={{ position: "fixed", top: "calc(14px + env(safe-area-inset-top))", left: "min(calc(100vw - 44px), " + (SIDEBAR_WIDTH + 8) + "px)", background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, cursor: "pointer", padding: 6 }}
                 >
                   <X size={18} />
                 </button>
