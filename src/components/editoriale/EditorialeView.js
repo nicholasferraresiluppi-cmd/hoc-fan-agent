@@ -18,7 +18,7 @@ import { confirmDialog } from "@/components/AppDialogs";
 import PublishDownload from "@/components/PublishDownload";
 import Lightbox from "@/components/MediaLightbox";
 import { CP, FONTS, alpha } from "@/lib/brand";
-import { PageHead, Notice, FilterChip } from "@/components/ds";
+import { PageHead, Notice, FilterChip, Tabs } from "@/components/ds";
 import { btn, btnPrimary, btnDanger, btnSm, input, cardBox, hint, muted, SectionHead, Chip, Seg, ModalBox, Field } from "@/components/warmup/ui";
 import {
   TYPES, STAGES, stageOf, readyProblems, needsFromTaskIds, coverage, dayItems, monthGrid, shiftMonth, usageMap, rawUses,
@@ -592,7 +592,7 @@ export default function EditorialeView({ embedded = false } = {}) {
     <div style={embedded ? { fontFamily: FONTS.body, color: CP.textPrimary } : { maxWidth: 1600, margin: "0 auto", padding: "20px 16px 60px", fontFamily: FONTS.body, color: CP.textPrimary }}>
       {!embedded && <PageHead crumbs={[{ label: "Marketing" }, { label: "Social" }]} title="Contenuti Instagram"
         subtitle="Dal drive della creator al calendario del profilo: smisti foto e video, prepari caroselli e reel, li metti in calendario. Una foto usata non si può più scegliere." />}
-      {base?.creators?.length > 0 && (
+      {base?.creators?.length > 1 && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
           {base.creators.map((c) => <FilterChip key={c.ck} label={c.creator} active={c.creator === creator} onClick={() => setCreator(c.creator)} />)}
         </div>
@@ -605,11 +605,8 @@ export default function EditorialeView({ embedded = false } = {}) {
         </div>
       )}
       {data?.folder && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 18, borderTop: `1px solid ${CP.borderSoft}`, paddingTop: 14 }}>
-          {[["calendario", "Calendario"], ["drive", `Drive · ${files.filter((f) => !f.usedBy && !f.uses).length} liberi`], ["caroselli", `Caroselli · ${nCar}`], ["reel", `Reel · ${nReel}`]].map(([k, l]) => (
-            <FilterChip key={k} label={l} active={tab === k} onClick={() => { setTab(k); if (k !== "drive") { setAddTo(null); } }} />
-          ))}
-        </div>
+        <Tabs small style={{ marginBottom: 18 }} value={tab} onChange={(k) => { setTab(k); if (k !== "drive") { setAddTo(null); } }}
+          items={[["calendario", "Calendario"], ["drive", "Drive", `${files.filter((f) => !f.usedBy && !f.uses).length} liberi`], ["caroselli", "Caroselli", nCar], ["reel", "Reel", nReel]]} />
       )}
       {msg && <div role="status" className="hoc-dock" style={{ position: "fixed", left: "50%", bottom: "calc(24px + env(safe-area-inset-bottom))", transform: "translateX(-50%)", zIndex: 90, background: CP.panel, border: `1px solid ${msg.bad ? CP.accentRed : CP.border}`, color: msg.bad ? CP.accentRed : CP.textPrimary, borderRadius: 12, padding: "10px 16px", fontSize: 14, boxShadow: `0 10px 30px ${alpha(CP.bgSunken, "88")}`, maxWidth: "90vw" }}>{msg.t}</div>}
       {body}
