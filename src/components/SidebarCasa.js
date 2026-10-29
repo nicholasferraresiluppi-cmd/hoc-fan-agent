@@ -9,7 +9,8 @@
  * Nello stile attuale non viene mai reso (vedi AppShell).
  */
 import { groupOf } from "@/lib/page-groups";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { prefetchNav } from "@/lib/nav-prefetch";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -96,6 +97,9 @@ function dateLabel() {
 }
 
 export default function SidebarCasa() {
+  const router = useRouter();
+  // precaricamento al passaggio (29/10/2026): pagina e dati pronti al clic
+  const warm = (href) => ({ onPointerEnter: () => prefetchNav(router, href), onFocus: () => prefetchNav(router, href), onTouchStart: () => prefetchNav(router, href) });
   const pathname = usePathname() || "";
   const { data: me } = useSWR("/api/whoami", silentFetcher, { revalidateOnFocus: false });
   // alert solo a chi li vede (prima: 403 a ogni pagina per gli altri — giro per persona, 10/10/2026)
@@ -154,7 +158,7 @@ export default function SidebarCasa() {
           <div key={si}>
             {s.title && <h4>{s.title}</h4>}
             {s.items.map((i) => (
-              <Link key={i.href} href={i.href} className={isActive(i) ? "on" : undefined} aria-current={isActive(i) ? "page" : undefined}>
+              <Link key={i.href} href={i.href} {...warm(i.href)} className={isActive(i) ? "on" : undefined} aria-current={isActive(i) ? "page" : undefined}>
                 {i.label}
                 {i.badge && openAlerts > 0 && <span className="b">{openAlerts}</span>}
                 {i.href === "/admin/s4s" && s4sCount > 0 && <span className="b" aria-label={`${s4sCount} cose da fare`}>{s4sCount}</span>}
@@ -175,7 +179,7 @@ export default function SidebarCasa() {
               <h4>{g.label}</h4>
               {items.map((i) => {
                 const on = i.match ? i.match(pathname) : i.href === "/" ? pathname === "/" : pathname === i.href || pathname.startsWith(i.href + "/");
-                return <Link key={i.href} href={i.href} className={on ? "on" : undefined} aria-current={on ? "page" : undefined}>{i.label}{i.href === "/admin/s4s" && s4sCount > 0 && <span className="b" aria-label={`${s4sCount} cose da fare`}>{s4sCount}</span>}</Link>;
+                return <Link key={i.href} href={i.href} {...warm(i.href)} className={on ? "on" : undefined} aria-current={on ? "page" : undefined}>{i.label}{i.href === "/admin/s4s" && s4sCount > 0 && <span className="b" aria-label={`${s4sCount} cose da fare`}>{s4sCount}</span>}</Link>;
               })}
             </div>
           );
