@@ -31,6 +31,7 @@ import { prefillFor, publicAlerts, normalizeOfLink } from "@/lib/warmup-metrics-
 import { pubKindOfTask, itemForTask } from "@/lib/editoriale-core";
 import PublishDownload from "@/components/PublishDownload";
 import MediaLightbox from "@/components/MediaLightbox";
+import EditorialeView from "@/components/editoriale/EditorialeView";
 
 const API = "/api/admin/warmup";
 const fetcher = (url) =>
@@ -508,6 +509,8 @@ export default function WarmupPage() {
     const p = ls.get(PLAT_KEY); if (p === "x" || p === "ig") setPlatState(p);
     try { const t = JSON.parse(ls.get(TIMER_KEY) || "null"); if (t && t.day === todayKey()) setTimerState(t); else ls.set(TIMER_KEY, null); } catch {}
     try { const v = JSON.parse(sessionStorage.getItem("hoc:warmup:view") || "null"); if (v) { if (v.tab) setTab(v.tab); if (v.folder) setFolder(v.folder); if (v.sel) { setSel(v.sel); setPane(v.pane || "oggi"); } } } catch {}
+    // ?tab=contenuti (link dal vecchio /admin/editoriale e dai compiti di Oggi) vince sulla vista salvata
+    try { const t = new URLSearchParams(window.location.search).get("tab"); if (t) { setTab(t); setSel(null); setForm(null); if (t === "contenuti") setPlatState("ig"); } } catch {}
   }, []);
   useEffect(() => { try { sessionStorage.setItem("hoc:warmup:view", JSON.stringify({ tab, sel, pane, folder })); } catch {} }, [tab, sel, pane, folder]);
   // orologi delle segnalazioni ogni 30 s, il timer ogni secondo
@@ -523,7 +526,7 @@ export default function WarmupPage() {
   const isMine = (a) => mine(a, me.id);
 
   const toast = (m) => { setToastMsg(m); setTimeout(() => setToastMsg((x) => (x === m ? null : x)), 2800); };
-  const setPlat = (v) => { if (v === plat) return; setPlatState(v); ls.set(PLAT_KEY, v); setSel(null); setFolder(null); setPane("oggi"); setOpenWhy({}); setForm(null); if (tab === "xrefs") setTab("oggi"); window.scrollTo(0, 0); };
+  const setPlat = (v) => { if (v === plat) return; setPlatState(v); ls.set(PLAT_KEY, v); setSel(null); setFolder(null); setPane("oggi"); setOpenWhy({}); setForm(null); if (tab === "xrefs" || tab === "contenuti") setTab("oggi"); window.scrollTo(0, 0); };
 
   // ── scritture: prima sullo schermo, poi sul server, poi si rilegge ──
   const optimistic = (id, fn) => mutate((cur) => cur && { ...cur, profiles: cur.profiles.map((p) => { if (p.id !== id) return p; const c = structuredClone(p); fillDefaults(c); fn(c); return c; }) }, { revalidate: false });
@@ -690,10 +693,11 @@ export default function WarmupPage() {
     if (!kind || isX(a) || !a.creator) return null;
     const list = (a.ed?.[day] || []).map((x) => ({ ...x, slot: { profileId: a.id, date: day, time: x.time } }));
     const it = itemForTask(list, a.id, day, taskId);
-    const href = `/admin/editoriale`;
+    const href = `/admin/warmup?tab=contenuti`;
+    const goContent = (e) => { e.preventDefault(); setTab("contenuti"); setSel(null); window.scrollTo(0, 0); };
     if (!it) {
       if (done) return null;
-      return <div style={{ ...hint, marginTop: 5 }}>Niente in calendario per oggi · <a href={href} style={{ color: CP.accentSoftText }}>preparalo nell'Editoriale</a></div>;
+      return <div style={{ ...hint, marginTop: 5 }}>Niente in calendario per oggi · <a href={href} onClick={goContent} style={{ color: CP.accentSoftText }}>preparalo in Contenuti</a></div>;
     }
     return (
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 7, padding: 8, borderRadius: 10, border: `1px solid ${CP.borderSoft}`, background: CP.bgSunken, maxWidth: 520 }}>
@@ -705,7 +709,7 @@ export default function WarmupPage() {
           <div style={{ display: "flex", gap: 10, marginTop: 5, flexWrap: "wrap" }}>
             {it.status !== "pubblicato" && <PublishDownload creator={a.creator} kind={kind} title={it.title} caption={it.caption} files={it.dl} style={{ ...btnSm, minHeight: 26, padding: "2px 8px", fontSize: 12 }} />}
             {it.caption && <button type="button" onClick={() => { try { navigator.clipboard.writeText(it.caption); toast("Didascalia copiata"); } catch {} }} style={{ ...btnSm, minHeight: 26, padding: "2px 8px", fontSize: 12 }}>Copia didascalia</button>}
-            <a href={href} style={{ fontSize: 12.5, color: CP.accentSoftText, alignSelf: "center" }}>Apri nell'Editoriale</a>
+            <a href={href} onClick={goContent} style={{ fontSize: 12.5, color: CP.accentSoftText, alignSelf: "center" }}>Apri in Contenuti</a>
           </div>
         </div>
       </div>
@@ -725,12 +729,12 @@ export default function WarmupPage() {
         const r = await fetch("/api/admin/editoriale", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "publish", creator: a.creator, id: it.id, on, today: day }) });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.error || "Non riuscito");
-        toast(on ? "Segnato pubblicato nell'Editoriale" : "Riaperto");
+        toast(on ? "Segnato pubblicato" : "Riaperto");
       } catch (e) { toast(e.message); } finally { mutate(); }
     };
     return (
       <div style={{ padding: "10px 14px", borderTop: `1px solid ${CP.borderSoft}` }}>
-        <div style={{ ...hint, marginBottom: 6 }}>Anche in calendario oggi, dall'Editoriale</div>
+        <div style={{ ...hint, marginBottom: 6 }}>Anche in calendario oggi, da Contenuti</div>
         {rest.map((it) => {
           const pub = it.status === "pubblicato";
           return (
@@ -1359,6 +1363,7 @@ export default function WarmupPage() {
       body = <ProfileForm key={form.edit || "new"} edit={edit} plat={plat} preCreator={form.preCreator} creators={data.creators} devices={data.devices} people={people} admin={admin} accounts={ACC}
         onCancel={() => setForm(null)} onDone={async (id, msg) => { await mutate(); setForm(null); toast(msg); openProfile(id, form.edit ? "profilo" : "oggi"); }} />;
     } else if (tab === "oggi") body = viewToday();
+    else if (tab === "contenuti" && plat === "ig") body = <EditorialeView embedded />;
     else if (tab === "dati") body = viewReport();
     else if (tab === "admin" && admin) body = viewAdmin();
     else if (tab === "xrefs" && plat === "x") body = <XRefs />;
@@ -1367,13 +1372,14 @@ export default function WarmupPage() {
   }
   const modalA = modal?.id ? byId(modal.id) : null;
   // Ispirazioni: reference di creator su X (per Instagram c'è il Radar creator)
-  const tabs = [...TABS.slice(0, 3), ...(plat === "x" ? [["xrefs", "Ispirazioni"]] : []), ...TABS.slice(3), ...(admin ? [["admin", "Admin"]] : [])];
+  // Contenuti (29/10/2026): l'Editoriale dentro Social, solo per Instagram
+  const tabs = [TABS[0], ...(plat === "ig" ? [["contenuti", "Contenuti"]] : []), ...TABS.slice(1, 3), ...(plat === "x" ? [["xrefs", "Ispirazioni"]] : []), ...TABS.slice(3), ...(admin ? [["admin", "Admin"]] : [])];
   const openToday = ACC.reduce((t, a) => t + tasksOn(a, todayKey()).open.length, 0);
 
   return (
     <div style={{ maxWidth: 1600, margin: "0 auto", padding: "20px 16px calc(110px + env(safe-area-inset-bottom))", fontFamily: FONTS.body, color: CP.textPrimary }}>
-      <PageHead crumbs={[{ label: "Marketing" }, { label: "Warm-up" }]} title="Warm-up"
-        subtitle="Il piano del giorno di ogni profilo Instagram e X in riscaldamento: cosa fare oggi, segnalazioni, cooldown e numeri della settimana."
+      <PageHead crumbs={[{ label: "Marketing" }, { label: "Social" }]} title="Social"
+        subtitle="I profili Instagram e X delle creator: cosa fare oggi (warm-up e contenuti da pubblicare), il calendario dei contenuti dal drive, segnalazioni, cooldown e numeri della settimana."
         actions={data ? <button type="button" style={btnPrimary} onClick={() => { setTab("acct"); setSel(null); setForm({}); }}><Plus size={15} />Nuovo profilo</button> : null} />
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 22 }}>
         {tabs.map(([k, l]) => {
