@@ -522,7 +522,7 @@ export default function AnalisiVenditePage() {
         actions={<VetroSwitch on={vetro} set={setVetro} />} />
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <Tabs items={[["come", "Come vanno e perché"], ["confronto", "Tutte a confronto"]]} value={vista} style={{ margin: 0, flex: "1 1 320px" }} onChange={(k) => { setVista(k); if (k === "confronto") setPerson(null); }} />
+        <Tabs items={[["come", "Come vanno e perché"], ["confronto", "Tutte a confronto"]]} value={vista} style={{ margin: 0, flex: "0 1 auto", minWidth: 0 }} onChange={(k) => { setVista(k); if (k === "confronto") setPerson(null); }} />
         <PeriodPicker value={range} onChange={setRange} max={yesterday()} loading={list.isLoading && Boolean(list.data)} />
       </div>
 
