@@ -221,7 +221,8 @@ export default function EditorialeView({ embedded = false } = {}) {
   const [tab, setTab] = useState("calendario");
   const [sel, setSel] = useState([]);              // file scelti nel drive (in ordine di clic)
   const [kind, setKind] = useState("photo");
-  const [freeOnly, setFreeOnly] = useState(true);
+  // filtro d'uso (29/10, Nicholas): Libere / Usate / Tutte — prima era un solo tasto «Anche gli usati», poco chiaro
+  const [useF, setUseF] = useState("liberi");
   const [path, setPath] = useState("*");          // "*" = tutte, "" = cartella principale
   const [shown, setShown] = useState(PAGE);
   const [addTo, setAddTo] = useState(null);         // id del contenuto a cui si aggiungono file
@@ -246,7 +247,7 @@ export default function EditorialeView({ embedded = false } = {}) {
   const addItem = addTo ? itemById.get(addTo) : null;
   const pickKind = addItem ? TYPES[addItem.type].kind : kind;
 
-  useEffect(() => { setShown(PAGE); }, [kind, freeOnly, path, creator]);
+  useEffect(() => { setShown(PAGE); }, [kind, useF, path, creator]);
   useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(null), 4500); return () => clearTimeout(t); }, [msg]);
 
   // Dopo un'azione la pagina si aggiorna SUBITO con il contenuto che il server restituisce
@@ -277,7 +278,8 @@ export default function EditorialeView({ embedded = false } = {}) {
   const paths = useMemo(() => [...new Set(["", ...(data?.folders || []), ...files.map((f) => f.path)])].sort((a, b) => a.localeCompare(b, "it")), [files, data?.folders]);
   // «libero» = mai usato; i video grezzi già usati restano sceglibili (si riusano), le foto no
   const isFree = (f) => !f.usedBy && !f.uses;
-  const visible = files.filter((f) => f.kind === pickKind && (path === "*" || f.path === path) && (!freeOnly || isFree(f) || (addTo && (f.usedBy === addTo || items.find((it) => it.id === addTo)?.files?.includes(f.id)))));
+  const inUse = (f) => useF === "tutti" || (useF === "usati" ? !isFree(f) : isFree(f));
+  const visible = files.filter((f) => f.kind === pickKind && (path === "*" || f.path === path) && (useF === "tutti" || (useF === "usati" ? !isFree(f) : isFree(f) || (addTo && (f.usedBy === addTo || items.find((it) => it.id === addTo)?.files?.includes(f.id))))));
   const toggle = (f) => {
     if (f.usedBy) return;
     setSel((s) => (s.includes(f.id) ? s.filter((x) => x !== f.id) : [...s, f.id]));
@@ -325,7 +327,7 @@ export default function EditorialeView({ embedded = false } = {}) {
         )}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "4px 0 12px" }}>
           {!addItem && <Seg items={[["photo", `Foto · ${files.filter((f) => f.kind === "photo" && isFree(f)).length} libere`], ["video", `Video · ${files.filter((f) => f.kind === "video" && isFree(f)).length} mai usati`]]} value={kind} onChange={(v) => { setKind(v); setSel([]); }} />}
-          <FilterChip label={freeOnly ? "Solo mai usati" : "Anche gli usati"} active={freeOnly} onClick={() => setFreeOnly((v) => !v)} />
+          <Seg items={[["liberi", pickKind === "photo" ? "Libere" : "Mai usati"], ["usati", pickKind === "photo" ? `Usate · ${files.filter((f) => f.kind === "photo" && !isFree(f)).length}` : `Usati · ${files.filter((f) => f.kind === "video" && !isFree(f)).length}`], ["tutti", pickKind === "photo" ? "Tutte" : "Tutti"]]} value={useF} onChange={setUseF} />
 
           <span style={{ flex: 1 }} />
           <span style={hint}>{data?.filesAt ? `letto ${new Date(data.filesAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
@@ -334,14 +336,14 @@ export default function EditorialeView({ embedded = false } = {}) {
         </div>
         {paths.length > 1 && (
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", margin: "0 0 12px" }}>
-            <FolderOpen size={15} color={CP.textMuted} />
-            <FilterChip label={`Tutte · ${files.filter((f) => f.kind === pickKind).length}`} active={path === "*"} onClick={() => setPath("*")} />
-            {paths.map((p) => <FilterChip key={p || "_root"} label={`${p || "Cartella principale"} · ${files.filter((f) => f.kind === pickKind && f.path === p).length}`} active={path === p} onClick={() => setPath(p)} />)}
+            <FolderOpen size={15} color={CP.textMuted} /><span style={{ ...hint, fontSize: 12.5 }}>Cartelle del drive:</span>
+            <FilterChip label={`Tutte · ${files.filter((f) => f.kind === pickKind && inUse(f)).length}`} active={path === "*"} onClick={() => setPath("*")} />
+            {paths.map((p) => <FilterChip key={p || "_root"} label={`${p || "Cartella principale"} · ${files.filter((f) => f.kind === pickKind && f.path === p && inUse(f)).length}`} active={path === p} onClick={() => setPath(p)} />)}
           </div>
         )}
         {data?.filesError && <Notice danger>{data.filesError}{data.filesAt ? " — sto mostrando l'ultimo elenco letto." : ""}</Notice>}
         {data?.truncated && <Notice>La cartella ha più di 6.000 file: ne mostro una parte. Conviene collegare una sottocartella.</Notice>}
-        {!visible.length && !data?.filesError && <div style={{ ...cardBox, textAlign: "center", ...hint, fontSize: 14 }}>{path !== "*" && !files.some((f) => f.path === path) ? `La cartella «${path || "principale"}» è vuota: carica i file in Drive e premi «Rileggi il drive».` : files.length ? (freeOnly ? "Tutti usati: niente di libero qui." : `Niente ${pickKind === "photo" ? "foto" : "video"} qui.`) : "La cartella è vuota, o non ci sono foto e video."}</div>}
+        {!visible.length && !data?.filesError && <div style={{ ...cardBox, textAlign: "center", ...hint, fontSize: 14 }}>{path !== "*" && !files.some((f) => f.path === path) ? `La cartella «${path || "principale"}» è vuota: carica i file in Drive e premi «Rileggi il drive».` : files.length ? (useF === "liberi" ? "Tutti usati: niente di libero qui." : useF === "usati" ? "Niente di già usato qui." : `Niente ${pickKind === "photo" ? "foto" : "video"} qui.`) : "La cartella è vuota, o non ci sono foto e video."}</div>}
         {visible.length > 0 && <p style={{ ...hint, margin: "0 0 8px" }}>Tocca la foto per ingrandirla, il cerchio in alto a sinistra per sceglierla.</p>}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8 }}>
           {visible.slice(0, shown).map((f) => {
