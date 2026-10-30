@@ -10,6 +10,8 @@ import { useRouter } from "next/navigation";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, Notice, DataTable, card } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, Bars, HotTile } from "@/components/VetroCharts";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -55,6 +57,9 @@ export default function SessionsListPage() {
   const scored = sessions.filter((s) => s.score?.overall != null);
   const avg = scored.length ? Math.round(scored.reduce((a, s) => a + s.score.overall, 0) / scored.length) : null;
   const low = scored.filter((s) => s.score.overall < 50).length;
+  const inVetro = useInVetro();
+  // voti a fasce di 10 (l'ultima va fino a 100): dove cadono le sessioni recenti
+  const bands = Array.from({ length: 10 }, (_, k) => scored.filter((s) => Math.min(9, Math.floor(s.score.overall / 10)) === k).length);
 
   const columns = [
     { key: "timestamp", label: "Quando", sort: (s) => s.timestamp || "", render: (s) => <span style={{ whiteSpace: "nowrap" }}>{fmtDate(s.timestamp)}</span> },
@@ -85,7 +90,18 @@ export default function SessionsListPage() {
       {data?.error && <Notice danger>{data.error}. Probabilmente il tuo ruolo non ha il permesso di rivedere le sessioni.</Notice>}
 
       {data?.sessions && (<>
-        <HeroMetric
+        {inVetro && scored.length > 0 && (
+          <div className="vt-row21" style={{ marginBottom: 18 }}>
+            <Panel title={`Voto AI medio ${avg}%`} aside={`${fmtInt(scored.length)} sessioni valutate · quante per fascia di voto, piena quella della media`} i={0}>
+              <Bars data={bands} labels={bands.map((_, k) => `${k * 10}`)} hi={Math.min(9, Math.floor(avg / 10))} unit=" sessioni" />
+            </Panel>
+            <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+              <HotTile i={1} lvl={low ? "ink" : "0"} label="Sotto il 50%" value={fmtInt(low)} sub={low ? "sessioni da rileggere con l'operatore" : "nessuna sessione sotto il 50%"} />
+              <HotTile i={2} label="Sessioni recenti" value={fmtInt(sessions.length)} sub={SCOPE_TEXT[data.scope] || ""} />
+            </div>
+          </div>
+        )}
+        {!(inVetro && scored.length > 0) && <HeroMetric
           label="Sessioni recenti"
           value={fmtInt(sessions.length)}
           compare={avg != null ? `Voto AI medio: ${avg}%` : null}
@@ -96,7 +112,7 @@ export default function SessionsListPage() {
               <Metric label="Sotto il 50%" value={fmtInt(low)} note="sessioni da rileggere" />
             </div>
           )}
-        </HeroMetric>
+        </HeroMetric>}
 
         {sessions.length === 0 ? (
           <div style={{ ...card, padding: "18px 20px", fontSize: 14, color: CP.textSecondary, lineHeight: 1.5 }}>

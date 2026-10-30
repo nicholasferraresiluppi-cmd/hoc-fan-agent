@@ -18,6 +18,8 @@ import useSWR from "swr";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt, fmtPct } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, Notice, Disclosure, DataTable, SectionTitle, card } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, CompareBars, GoalRing } from "@/components/VetroCharts";
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -45,6 +47,7 @@ export default function ActivationPage() {
   const cfg = data?.config;
   const rate = data?.activationRate;
   const cohort = data?.cohortSize ?? 0;
+  const inVetro = useInVetro();
   const members = data?.members || [];
 
   const columns = [
@@ -71,7 +74,22 @@ export default function ActivationPage() {
 
       {data && (
         <>
-          <HeroMetric
+          {inVetro && (
+            <div className="vt-row21" style={{ marginBottom: 18 }}>
+              <Panel title="Dal primo accesso all'attivazione" aside="quanti arrivano a ogni passo" i={0}>
+                <CompareBars format={fmtInt} items={[
+                  { label: "Hanno usato l'app", value: cohort },
+                  { label: "Hanno visto il loro punto debole", value: data.ahaCount ?? 0 },
+                  { label: "Attivati: visto e allenato", value: data.activatedCount ?? 0, color: CP.accentGreen },
+                ]} />
+              </Panel>
+              <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start", justifyItems: "stretch" }}>
+                <GoalRing i={1} pct={rate ?? 0} title="Attivati" center={rate == null ? "—" : undefined}
+                  sub={rate == null ? "non ancora calcolabile: servono operatori che usano l'app" : `${fmtInt(data.activatedCount ?? 0)} su ${fmtInt(cohort)} di chi ha usato l'app`} />
+              </div>
+            </div>
+          )}
+          {!inVetro && <HeroMetric
             label="Operatori attivati"
             value={`${fmtInt(data.activatedCount ?? 0)} su ${fmtInt(cohort)}`}
             compare={rate == null ? "Percentuale non ancora calcolabile: servono operatori che usano l’app" : `${fmtPct(rate)} di chi ha usato l’app`}
@@ -82,9 +100,9 @@ export default function ActivationPage() {
               <Metric label="Hanno visto il punto debole" value={fmtInt(data.ahaCount ?? 0)} note="aperto il proprio profilo" />
               <Metric label="Attivati" value={fmtInt(data.activatedCount ?? 0)} note="visto e allenato" />
             </div>
-          </HeroMetric>
+          </HeroMetric>}
 
-          <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+          <section className={inVetro ? "vt-glass" : undefined} style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
             <SectionTitle aside={cfg?.version ? `versione ${cfg.version}` : null}>Quando un operatore conta come attivato</SectionTitle>
             <p style={{ margin: 0, fontSize: 14, color: CP.textPrimary, lineHeight: 1.6 }}>
               Entro {cfg?.windowDays ?? "…"} giorni da quando vede nel suo profilo un punto debole reale, completa almeno {cfg?.minGapScenarios ?? "…"} scenari del simulatore che allenano proprio quel punto, con un punteggio di almeno {cfg?.minOverall ?? "…"} su 100.
