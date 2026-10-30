@@ -26,6 +26,11 @@ export default function PianiPage() {
     try { const u = new URL(window.location.href); u.searchParams.set("id", id); window.history.replaceState(window.history.state, "", u.pathname + u.search); } catch {}
   };
   const onChange = (p) => mutate({ ...data, plans: plans.map((x) => (x.id === p.id ? p : x)) }, { revalidate: false });
+  const onDeleted = async () => {
+    await mutate(); setEdit(null); setSel(null);
+    try { const u = new URL(window.location.href); u.searchParams.delete("id"); window.history.replaceState(window.history.state, "", u.pathname + u.search); } catch {}
+    window.scrollTo(0, 0);
+  };
   const onSaved = async (id) => { await mutate(); setEdit(null); choose(id); window.scrollTo(0, 0); };
 
   const editing = edit === "new" ? null : edit ? plans.find((p) => p.id === edit) : undefined;
@@ -40,7 +45,7 @@ export default function PianiPage() {
           <button type="button" style={plan ? BTN : BTN_PRIMARY} onClick={() => setEdit("new")}><Plus size={14} />Nuovo piano</button>
         </> : null} />
       {edit ? (
-        <PlanEditor key={edit} plan={editing} onSaved={onSaved} onCancel={() => setEdit(null)} />
+        <PlanEditor key={edit} plan={editing} onSaved={onSaved} onCancel={() => setEdit(null)} onDeleted={onDeleted} />
       ) : (
         <>
           {plans.length > 1 && <Tabs items={plans.map((p) => [p.id, p.archived ? `${p.title} (archiviato)` : p.title, `${p.progress.done}/${p.progress.total}`])} value={plan?.id} onChange={choose} style={{ marginBottom: 18 }} />}

@@ -4,6 +4,7 @@
 // GET ?id={id}        un piano valutato (voci, spunte, controlli automatici)
 // GET ?area={area}    il piano in corso di un'area (per la scheda in cima alla pagina di lavoro)
 // POST {action:"item", planId, itemId, done?, answer?}   spunta o risposta su una voce
+// POST {action:"delete", planId}                       cancella il piano con spunte e risposte (solo admin)
 // POST {action:"save", plan, create?}                   crea / aggiorna / archivia un piano (solo admin, dall'editor in pagina)
 //
 // Chi vede un piano: gli admin tutti; gli altri i piani la cui capability (`cap`) hanno
@@ -13,7 +14,7 @@ export const runtime = "nodejs";
 import { currentUser } from "@clerk/nextjs/server";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { isUserIdAdmin } from "@/lib/admin";
-import { listPlans, getPlan, loadEvaluated, setItem, savePlan } from "@/lib/piani";
+import { listPlans, getPlan, loadEvaluated, setItem, savePlan, deletePlan } from "@/lib/piani";
 
 const noStore = { headers: { "Cache-Control": "no-store" } };
 
@@ -56,6 +57,11 @@ export async function POST(request) {
     if (!g.admin) return Response.json({ error: "I piani li scrive un amministratore" }, { status: 403 });
     const r = await savePlan(body.plan, { create: Boolean(body.create), by: g.by });
     return r.ok ? Response.json({ ok: true, plan: r.plan }) : Response.json({ error: r.errors.join(" · ") }, { status: 400 });
+  }
+  if (body.action === "delete") {
+    if (!g.admin) return Response.json({ error: "I piani li cancella un amministratore" }, { status: 403 });
+    const r = await deletePlan(String(body.planId || ""));
+    return r.ok ? Response.json({ ok: true }) : Response.json({ error: r.errors.join(" · ") }, { status: r.status || 400 });
   }
   if (body.action === "item") {
     const def = await getPlan(String(body.planId || ""));
