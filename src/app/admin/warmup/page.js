@@ -8,6 +8,7 @@
 //  - le spunte si salvano una per una: due persone sullo stesso profilo non si cancellano il lavoro;
 //  - cambiare la situazione (shadowban, sospeso, bannato) aggiorna anche lo stato in Account social.
 
+import { PlanCard } from "@/components/piani/PlanView";
 import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { Check, ChevronRight, Flag, Pencil, Plus, Trash2, Undo2, UserRound, ExternalLink } from "lucide-react";
@@ -895,6 +896,8 @@ export default function WarmupPage() {
               {accs.length > 1 && <Segmented label="Vista" items={[["azione", "Per azione"], ["prof", "Per profilo"]]} value={vista} onChange={setOggiVista} />}
             </> : null} />
         ) : null}
+        {/* il piano di lavoro in corso (30/10): le prossime voci di chi apre la pagina */}
+        <PlanCard area="social" />
         {!ACC.length && <div style={{ ...cardBox, textAlign: "center", padding: "30px 18px" }}><h3 style={{ margin: "0 0 6px", fontWeight: 500 }}>Nessun profilo {PLATS[plat].label}</h3><p style={{ ...hint, margin: "0 0 14px" }}>Registra il primo profilo dalla scheda Account.</p><button type="button" style={btnPrimary} onClick={() => { setTab("acct"); setForm({}); }}><Plus size={15} />Nuovo profilo</button></div>}
         {urg.length > 0 && (
           <>

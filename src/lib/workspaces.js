@@ -47,6 +47,7 @@ export const WORKSPACES = {
         { href: "/admin/qualita", label: "Controllo qualità" },
         { href: "/admin/citta", label: "La città" },
         { href: "/admin/roadmap", label: "Roadmap" },
+        { href: "/admin/piani", label: "Piani" },
       ] },
       { title: "Dati completi", items: [
         { href: "/admin/looker", label: "Report Looker", desc: "Le 16 pagine originali di Looker Studio (HOC Analytics), con le stesse formule" },

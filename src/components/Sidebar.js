@@ -34,7 +34,7 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
-  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
+  History, Signpost, ListChecks, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
 Megaphone, Share2, Shield, BookUser, Sunrise, UserPlus,
   LineChart,
   FileSignature, Repeat, Gift } from "lucide-react";
@@ -155,6 +155,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/studio-social",            label: "Studio social",   icon: Clapperboard },
       { href: "/admin/supervisor",               label: "Account social",  icon: Share2 },
       { href: "/admin/warmup",                   label: "Clipping",       icon: Sunrise },
+      { href: "/admin/piani",                    label: "Piani",          icon: ListChecks },
       { href: "/admin/social-proxies",           label: "Proxy account social", icon: Shield },
     ],
   },
