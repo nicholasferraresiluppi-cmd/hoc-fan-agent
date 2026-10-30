@@ -442,7 +442,7 @@ function GiornataBody({ data, t, multi, single, Row }) {
 
 function Quadro({ data, multi, single, mine, editing, onSaved }) {
   const open = data.daysLeft > 0;
-  const span = open ? 10 : 8;
+  const span = open ? 11 : 8;
   const ctx = { data, open, editing, onSaved };
   return <QuadroBody data={data} open={open} span={span} multi={multi} single={single} mine={mine} ctx={ctx} />;
 }
@@ -463,7 +463,8 @@ function QRow({ name, r, acc, slug, strong, bg, rank, isMine, data, open, editin
         </td>
         <td style={cell({ color: pctColor(r, data.idealPct), fontWeight: strong ? 600 : 400 })}>{pct(r.pctActual)}</td>
         {open && <td style={cell({ fontWeight: strong ? 600 : 400 })}>{usd(r.projection)}</td>}
-        {open && <td style={cell({ color: CP.textSecondary })}>{r.status === "arriva" ? <span style={{ color: CP.accentGreen }}>ci arriva</span> : r.status === "vicina" ? <span style={{ color: CP.accent }}>vicina · {usd(r.needPerDay)}</span> : usd(r.needPerDay)}</td>}
+        {open && <td style={cell({ fontWeight: strong ? 600 : 400 })}><Mancano r={r} daysLeft={data.daysLeft} /></td>}
+        {open && <td style={cell({ fontWeight: strong ? 600 : 400 })}><Gap r={r} /></td>}
         <td style={cell({ color: CP.textMuted })}>{usd(r.prev)}</td>
       </tr>
     );
@@ -479,7 +480,7 @@ function QuadroBody({ data, open, span, multi, single, mine, ctx }) {
   );
   return (
     <Block className="bil-quadro" title="Quadro per creator" sub="mese + proiezione · posizione = venduto del mese, per paese" color={SH.navy}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 760 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 860 }}>
         <thead><tr>
           <th style={hd(FILL.navy, "center")} title="Classifica per venduto del mese, ogni paese per conto suo">Pos.</th>
           <th style={{ ...hd(FILL.navy, "left"), ...stick(false, FILL.navy) }}>Creator</th>
@@ -489,7 +490,8 @@ function QuadroBody({ data, open, span, multi, single, mine, ctx }) {
           <th style={hd(FILL.navy)}>Goal</th>
           <th style={hd(FILL.navy)} title={`ritmo ideale ${pct(data.idealPct)}`}>% goal</th>
           {open && <th style={hd(FILL.navy)}>Proiezione</th>}
-          {open && <th style={hd(FILL.navy)} title="quanto al giorno da qui a fine mese per arrivare al goal">Serve al giorno</th>}
+          {open && <th style={hd(FILL.navy)} title="quanto manca al goal da qui a fine mese">Mancano</th>}
+          {open && <th style={hd(FILL.navy)} title="a questo ritmo, quanto sopra o sotto il goal finisce il mese">Gap a fine mese</th>}
           <th style={hd(FILL.navy)}>Mese prima</th>
         </tr></thead>
         <tbody>
@@ -505,7 +507,7 @@ function QuadroBody({ data, open, span, multi, single, mine, ctx }) {
         </tbody>
       </table>
       <div style={{ fontSize: 12, color: CP.textMuted, padding: "8px 12px 10px" }}>
-        % goal verde = pari o sopra il ritmo ideale ({pct(data.idealPct)}).{open ? " Serve al giorno = quanto manca al goal diviso i giorni che restano." : ""}
+        % goal verde = pari o sopra il ritmo ideale ({pct(data.idealPct)}).{open ? " Mancano = goal meno venduto (passa il mouse per quanto serve al giorno). Gap = proiezione meno goal." : ""}
       </div>
     </Block>
   );
@@ -527,7 +529,8 @@ function Ecosistemi({ data, mine }) {
             <th style={hd(FILL.lilac)}>Goal</th>
             <th style={hd(FILL.lilac)}>% goal</th>
             {open && <th style={hd(FILL.lilac)}>Proiezione</th>}
-            {open && <th style={hd(FILL.lilac)}>Serve al giorno</th>}
+            {open && <th style={hd(FILL.lilac)}>Mancano</th>}
+            {open && <th style={hd(FILL.lilac)}>Gap a fine mese</th>}
           </tr></thead>
           <tbody>
             {groups.map((g) => (
@@ -541,7 +544,8 @@ function Ecosistemi({ data, mine }) {
                 <td style={cell({ color: CP.textSecondary })}>{usd(g.goal)}</td>
                 <td style={cell({ color: pctColor(g, data.idealPct) })}>{pct(g.pctActual)}</td>
                 {open && <td style={cell()}>{usd(g.projection)}</td>}
-                {open && <td style={cell({ color: CP.textSecondary })}>{g.status === "arriva" ? <span style={{ color: CP.accentGreen }}>ci arriva</span> : usd(g.needPerDay)}</td>}
+                {open && <td style={cell()}><Mancano r={g} daysLeft={data.daysLeft} /></td>}
+                {open && <td style={cell()}><Gap r={g} /></td>}
               </tr>
             ))}
           </tbody>
@@ -550,11 +554,28 @@ function Ecosistemi({ data, mine }) {
   );
 }
 
+// 30/10 sera (Nicholas: «serve al giorno non è stimolante»): a fine mese diventava un numero enorme e
+// irreale ($78.555 al giorno con 2 giorni). Al suo posto due numeri che si leggono subito: quanto MANCA al
+// goal (scende ogni giorno, si vede il traguardo avvicinarsi) e il GAP previsto a fine mese (dove finisce a
+// questo ritmo). Il «serve al giorno» resta nel tooltip. Sotto il goal: grigio col segno, mai rosso.
+function Mancano({ r, daysLeft }) {
+  if (!ok(r.goal) || !r.goal) return <span style={{ color: CP.textMuted }}>—</span>;
+  const rem = r.goal - (r.mtd || 0);
+  if (rem <= 0) return <span style={{ color: CP.accentGreen, fontWeight: 600 }}>goal preso</span>;
+  return <span title={daysLeft > 0 ? `servono ${usd(rem / daysLeft)} al giorno nei ${daysLeft} giorni che restano` : undefined}>{usd(rem)}</span>;
+}
+
+function Gap({ r }) {
+  if (!ok(r.gap)) return <span style={{ color: CP.textMuted }}>—</span>;
+  if (r.gap >= 0) return <span style={{ color: CP.accentGreen, fontWeight: 600 }}>+{usd(r.gap)}</span>;
+  return <span style={{ color: CP.textSecondary }}>{usd(r.gap)}</span>;
+}
+
 function StatusText({ r, closed }) {
   if (closed) return r.status === "arriva" ? <span style={{ color: CP.accentGreen }}>goal raggiunto</span> : ok(r.pctActual) ? <span>{pct(r.pctActual)} del goal</span> : null;
   if (r.status === "arriva") return <span style={{ color: CP.accentGreen }}>arriva al goal</span>;
   if (r.status === "vicina") return <span style={{ color: CP.accent }}>è vicino al goal</span>;
-  if (r.status === "sotto") return <span>servono {usd(r.needPerDay)} al giorno</span>;
+  if (r.status === "sotto" && ok(r.goal) && ok(r.gap)) return <span>mancano {usd(r.goal - r.mtd)} al goal</span>;
   return null;
 }
 
@@ -661,7 +682,7 @@ function Explain({ data }) {
       <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>
         <li><b>Venduto</b>: il netto delle vendite dal warehouse, per giorno (ora UTC), fino al giorno scelto. Sono gli stessi numeri dei fogli-creator.</li>
         <li><b>% goal</b>: venduto diviso goal. È verde quando è pari o sopra il ritmo ideale ({pct(data.idealPct)}: {data.closedDays} giorni finiti su {data.daysInMonth}).</li>
-        <li><b>Fa al giorno</b>: la media dei giorni finiti. <b>Serve al giorno</b>: quanto manca al goal diviso i giorni che restano.</li>
+        <li><b>Fa al giorno</b>: la media dei giorni finiti. <b>Mancano</b>: goal meno venduto fino a oggi (passandoci sopra: quanto serve al giorno nei giorni che restano). <b>Gap a fine mese</b>: dove arriva la proiezione rispetto al goal — verde se lo supera.</li>
         <li><b>Ci arriva</b>: a questo ritmo supera il goal. <b>Ci è vicina</b>: fa almeno il 90% di quello che le serve. Altrimenti si legge quanto le serve in più al giorno.</li>
         <li><b>Ecosistemi</b>: gruppi di creator che condividono le persone. Il totale dell'ecosistema si misura sulla somma dei goal; gli ecosistemi sono in ordine di quanto arrivano vicino al loro goal.</li>
         <li><b>Il giorno</b>: con le frecce o il calendario rivedi com'era la situazione a fine di un giorno passato, anche nei mesi chiusi.</li>
