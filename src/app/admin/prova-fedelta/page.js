@@ -12,6 +12,8 @@ import { Loader2, RefreshCw, Copy, ExternalLink } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Notice } from "@/components/ds";
 import { TutorialVideoButton } from "@/components/TutorialVideo";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, CompareBars } from "@/components/VetroCharts";
 
 const fetcher = async (url) => {
   const r = await fetch(url, { cache: "no-store" });
@@ -50,6 +52,7 @@ function nextMonday() {
 }
 
 function Phase({ phase }) {
+  const inVetro = useInVetro();
   if (!phase || phase.key === "non-avviata") return <Notice>La prova non è ancora avviata. La avvia un admin dal riquadro in fondo alla pagina.</Notice>;
   const lines = {
     "in-partenza": `Parte il ${giorno(phase.start)}. Da quel giorno ogni fan nuovo e caldo di Martina entra a caso in uno dei due gruppi.`,
@@ -58,6 +61,7 @@ function Phase({ phase }) {
     conclusa: `Prova conclusa il ${giorno(phase.end)}: i numeri qui sotto sono quelli definitivi.`,
     fermata: "Prova fermata da un admin. I numeri restano visibili, la lista non dà più azioni.",
   };
+  if (inVetro) return <div className="vt-glass" style={{ ...box, background: undefined }}><div style={{ fontSize: 15, lineHeight: 1.5, color: CP.textPrimary }}>{lines[phase.key]}</div></div>;
   return <div style={{ ...box, background: CP.textPrimary, color: CP.bg, border: "none" }}><div style={{ fontSize: 15, lineHeight: 1.5 }}>{lines[phase.key]}</div></div>;
 }
 
@@ -166,6 +170,34 @@ function Misura({ m, controlCount }) {
   );
 }
 
+/* Vetro: in cima la domanda della prova, «funziona?», sulle tre misure che hanno una lettura statistica. */
+function Funziona({ m }) {
+  const read = (z) => (z === null || z === undefined ? "Ancora pochi fan per dirlo." : Math.abs(z) >= 2 ? (z > 0 ? "Meglio la prova: difficilmente è il caso." : "Meglio il controllo: difficilmente è il caso.") : "Differenza ancora alla portata del caso.");
+  const good = (z) => z !== null && z !== undefined && z >= 2;
+  const tiles = [
+    ["Tornano a comprare dopo il primo giorno", "backAfterD1", `${m.prova.n7} + ${m.controllo.n7} fan`],
+    ["Comprano ancora tra il giorno 8 e il 30", "still8_30", `${m.prova.n30} + ${m.controllo.n30} fan da almeno 30 giorni`],
+    ["Comprano ancora tra il giorno 8 e il 60", "still8_60", `${m.prova.n60} + ${m.controllo.n60} fan da almeno 60 giorni`],
+  ];
+  return (
+    <Panel title="Funziona?" aside="prova contro controllo, divisi a caso" i={0}>
+      <div style={{ display: "grid", gap: 18, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+        {tiles.map(([label, k, note]) => (
+          <div key={k} style={{ display: "grid", gap: 8, alignContent: "start" }}>
+            <div style={{ fontSize: 13, color: CP.textPrimary, fontWeight: 500 }}>{label}</div>
+            <CompareBars format={pct} items={[
+              { label: "Prova", value: m.prova[k], color: good(m.z[k]) ? CP.accentGreen : "var(--vt-c0)" },
+              { label: "Controllo", value: m.controllo[k] },
+            ]} />
+            <div style={{ fontSize: 12, color: CP.textSecondary }}>{read(m.z[k])}</div>
+            <div style={muted}>{note}</div>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
 function Gestione({ config, phase, onDone }) {
   const [date, setDate] = useState(nextMonday());
   const [busy, setBusy] = useState(false);
@@ -205,6 +237,7 @@ export default function ProvaFedeltaPage() {
   const [busy, setBusy] = useState(false);
   const refresh = async () => { setBusy(true); try { await mutate(await fetcher("/api/admin/prova-fedelta?refresh=1"), { revalidate: false }); } catch { /* l'errore lo mostra SWR al prossimo giro */ } finally { setBusy(false); } };
   const stopped = data?.phase?.key === "fermata" || data?.phase?.key === "conclusa";
+  const inVetro = useInVetro();
   return (
     <div style={{ padding: "24px 16px 80px", maxWidth: 1600, margin: "0 auto", display: "grid", gap: 14 }}>
       <PageHead
@@ -217,6 +250,7 @@ export default function ProvaFedeltaPage() {
       {isLoading && <div style={{ color: CP.textMuted, display: "flex", gap: 8, alignItems: "center" }}><Loader2 size={14} />Leggo le chat di Martina (fino a mezzo minuto)…</div>}
       {data && (<>
         <Phase phase={data.phase} />
+        {inVetro && data.metrics && <Funziona m={data.metrics} />}
         {data.computing && <Notice>Calcolo in corso da un'altra apertura: riprova tra un minuto.</Notice>}
         <Regole />
         {data.config && data.phase?.key !== "in-partenza" && <Lista fans={data.fans || []} stopped={stopped} />}

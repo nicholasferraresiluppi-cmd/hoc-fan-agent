@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHead, Notice, card, DataTable, Disclosure, FilterChip, SectionTitle, BTN_PRIMARY } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, HotTile, MixBar, Gauge } from "@/components/VetroCharts";
 
 /**
  * /admin/sales-ai — Quartier generale del sales manager AI.
@@ -45,10 +47,48 @@ const ago = (t) => {
 };
 const usd = (v) => `${(Number(v) || 0).toFixed(2).replace(".", ",")} $`;
 
+/* Vetro: la domanda della pagina è «quanto ho da rivedere stanotte, e quanto è costata?». */
+function SalesAiTop({ data, job, toReview, onReview }) {
+  const items = data.items || [];
+  const count = (st) => items.filter((x) => x.status === st).length;
+  const mix = [
+    { label: "Da rivedere", value: count("in_revisione"), color: "var(--vt-c0)" },
+    { label: "Bloccati dal Garante", value: count("bloccato"), color: CP.accentRed },
+    { label: "Approvati", value: count("approvato") + count("modificato"), color: CP.accentGreen },
+    { label: "Scartati o pochi dati", value: count("scartato") + count("non_consegnato"), color: CP.textMuted },
+  ];
+  const cap = Number(data.config?.daily_cap_usd) || 0;
+  const spent = Number(data.spend_today_usd) || 0;
+  const state = job ? (job.status === "in_corso" ? `in corso · ${String(job.stage || "").replace("_", " ")}` : job.status === "errore" ? "errore" : "chiusa") : "non partita";
+  return (
+    <div className="vt-row21" style={{ marginBottom: 18, alignItems: "start" }}>
+      <Panel title={`I feedback della notte del ${data.day}`} aside={state} i={0}>
+        {items.length ? <MixBar items={mix} format={(v) => String(v)} /> : <div style={{ fontSize: 13, color: CP.textMuted }}>Nessun feedback per questa notte.</div>}
+        <div style={{ marginTop: 12, fontSize: 12.5, color: CP.textSecondary, lineHeight: 1.5 }}>
+          {data.config?.operator_visible ? "Gli operatori vedono i feedback approvati." : "Gli operatori non vedono ancora nulla: tutto resta qui finché non si dà il via."}
+        </div>
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 14 }}>
+        <HotTile label="Da rivedere" value={toReview} sub={toReview ? "Approva, correggi o scarta" : "Niente in attesa"} lvl={toReview ? "ink" : "0"} onClick={toReview ? onReview : undefined} i={1} />
+        <Panel title="Spesa AI di oggi" i={2}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <Gauge value={cap ? spent / cap : 0} size={120} center={usd(spent)} centerSub={`su ${usd(cap)}`} label="Spesa AI di oggi sul tetto" />
+            <div style={{ fontSize: 12.5, color: CP.textSecondary, lineHeight: 1.5 }}>
+              {job?.spend_usd != null ? <>Questa notte <b style={{ color: CP.textPrimary }}>{usd(job.spend_usd)}</b>.<br /></> : null}
+              {data.is_admin ? "Il tetto si cambia nelle impostazioni in fondo." : "Oltre il tetto, gli operatori in più si saltano per quella notte."}
+            </div>
+          </div>
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
 export default function SalesAiHQ() {
   const [day, setDay] = useState(null);
   const [sel, setSel] = useState(null);
   const [logOpen, setLogOpen] = useState(false);
+  const inVetro = useInVetro();
   const q = day ? `?day=${day}` : "";
   const { data, error, mutate } = useSWR(`/api/admin/sales-ai${q}`, fetcher, { refreshInterval: 20000, revalidateOnFocus: false });
   useEffect(() => { if (!day && data?.day) setDay(data.day); }, [data, day]);
@@ -71,15 +111,17 @@ export default function SalesAiHQ() {
         subtitle="Ogni notte gli uffici leggono i turni del giorno prima e preparano un feedback per ogni operatore che ha lavorato da solo. Niente arriva a un operatore senza passare da qui: lo approvi, lo correggi o lo scarti. È coaching: non entra in score, compensi o decisioni HR."
       />
 
+      {inVetro && <SalesAiTop data={data} job={job} toReview={toReview} onReview={() => document.getElementById("smai-coda")?.scrollIntoView({ behavior: "smooth", block: "start" })} />}
+
       {/* ticker */}
-      <div style={{ ...card, padding: "10px 16px", marginBottom: 14, display: "flex", gap: 22, flexWrap: "wrap", fontSize: 13, color: CP.textSecondary }}>
+      {!inVetro && <div style={{ ...card, padding: "10px 16px", marginBottom: 14, display: "flex", gap: 22, flexWrap: "wrap", fontSize: 13, color: CP.textSecondary }}>
         <span>Notte del <b style={{ color: CP.textPrimary }}>{data.day}</b></span>
         <span>{job ? (job.status === "in_corso" ? <Chip tone="accent">in corso · {job.stage.replace("_", " ")}</Chip> : job.status === "errore" ? <Chip tone="red">errore</Chip> : <Chip tone="green">chiusa</Chip>) : <Chip>non partita</Chip>}</span>
         <span>Spesa AI oggi <b style={{ color: CP.textPrimary }}>{usd(data.spend_today_usd)}</b> su {usd(data.config.daily_cap_usd)}</span>
         {job?.spend_usd != null && <span>Questa notte <b style={{ color: CP.textPrimary }}>{usd(job.spend_usd)}</b></span>}
         <span>Da rivedere <b style={{ color: toReview ? CP.accentSoftText : CP.textPrimary }}>{toReview}</b></span>
         <span>Operatori: {data.config.operator_visible ? <b style={{ color: CP.accentGreen }}>vedono i feedback approvati</b> : <b style={{ color: CP.textPrimary }}>non vedono ancora nulla</b>}</span>
-      </div>
+      </div>}
 
       {/* pianta degli uffici */}
       <SectionTitle>Gli uffici</SectionTitle>
@@ -113,6 +155,7 @@ export default function SalesAiHQ() {
       )}
 
       {/* coda di revisione */}
+      <div id="smai-coda" style={{ scrollMarginTop: 80 }} />
       <SectionTitle aside={job?.result ? `${job.result.in_revisione} passati dal Garante · ${job.result.bloccati} bloccati · ${job.result.non_consegnati} con pochi dati` : null}>Feedback della notte</SectionTitle>
       {(data.items || []).length === 0 ? (
         <Notice>{job ? "Nessun feedback per questa notte (ancora in corso, o nessun operatore da solo con abbastanza PPV)." : "Questa notte non è partita. Il sistema gira da solo alle 5 del mattino, ora italiana."}</Notice>

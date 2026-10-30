@@ -362,7 +362,7 @@ export function Bars({ data = [], labels, hi, partial = false, height = 150, for
   const bw = n ? Math.max(2, (w - gap * (n - 1)) / n) : 0;
   const hiI = hi ?? n - 1;
   const lab = (i) => (labels ? labels[i] : String(i + 1));
-  const showLab = (i) => (labels && n <= 12) || i === 0 || i === n - 1 || (i + 1) % 7 === 1;
+  const showLab = (i) => (labels && n <= 12) || i === 0 || i === n - 1 || ((i + 1) % 7 === 1 && i < n - 3); // niente etichetta della settimana addosso all'ultima
   const read = `${n} colonne; ${lab(hiI)}: ${format(vals[hiI] || 0)}${unit}; massimo ${format(Math.max(0, ...vals))}${unit}`;
   return (
     <div ref={ref} style={{ position: "relative", width: "100%" }}>
