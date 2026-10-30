@@ -10,7 +10,7 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { CP, FONTS, alpha } from "@/lib/brand";
-import { FilterChip, DataTable, Notice, NUM, card, Tabs } from "@/components/ds";
+import { FilterChip, DataTable, Notice, NUM, card, Tabs, Spiega } from "@/components/ds";
 import { SLOTS, WEAK, STRONG, SLOT_DIFF, SLOT_MIN_H } from "@/lib/fasce-core";
 
 const fetcher = (url) =>
@@ -262,6 +262,16 @@ export default function FasceTab({ splitId }) {
             Quanto vende all'ora una persona di bravura media in ogni fascia, {fromTxt} al {dmy(data.until)}.
             {hi && lo && ratio ? ` Un'ora di ${hi.label} vale ${usd(ov[hi.id].sph_adj)}, una di ${lo.label} ${usd(ov[lo.id].sph_adj)}: la stessa persona${ratio >= 1.5 ? " rende " + fx(ratio, 1) + " volte tanto" : " rende di più"} nella fascia migliore.` : ""}
           </Note>
+          <Spiega label="Come leggere la bravura" style={{ marginTop: 4 }}>
+        <Note>
+          <b style={{ fontWeight: 500, color: CP.textSecondary }}>Bravura 0,95</b> vuol dire: nelle ore che fa, la persona vende il 95% di quello che vendono all'ora i colleghi sulle stesse pagine e nelle stesse fasce. È un confronto ad armi pari: chi fa le notti è confrontato con chi fa le notti, chi è su una pagina difficile con chi è sulla stessa pagina.
+          La bravura generale mette insieme tutte le sue fasce; nella vista «Ogni persona, fascia per fascia» c'è il numero di ogni fascia.
+        </Note>
+        <Note>Fonte: quella della scheda Squadra: vendite Infloww di ogni persona confrontate coi colleghi sulla stessa pagina e fascia{bw ? `, dal ${dmy(bw.from)} al ${dmy(bw.until)}` : ""}. CreatorsPro qui serve solo come calendario e per il valore delle fasce di ogni pagina: divide gli acquisti tra le persone a modo suo, ma il totale della pagina combacia con le transazioni Infloww.</Note>
+        <Note>
+          Controllo fatto sui turni (giorni pari contro giorni dispari): La bravura generale di una persona torna simile (correlazione {fx(st.general)} su {st.general_n} operatori); il fatto di rendere meglio in una certa fascia rispetto alle proprie altre quasi no ({fx(st.personal)}). Quindi la regola di base non è «ognuno nella sua fascia» ma «i più bravi nelle fasce che valgono di più, e chi chiude basso non ha la priorità su quelle»; le eccezioni per persona sono le frecce nella vista fascia per fascia. Quale fascia vale di più si decide pagina per pagina: non è sempre il 22–3.
+        </Note>
+          </Spiega>
         </div>
         <button type="button" style={btnSm} disabled={busy || data.computing} onClick={recompute}>{busy || data.computing ? "Aggiorno…" : "Aggiorna ora"}</button>
       </div>
@@ -275,17 +285,6 @@ export default function FasceTab({ splitId }) {
       )}
       <SlotValues overall={ov} />
 
-      <div style={{ ...card, padding: "14px 18px" }}>
-        <p style={{ fontSize: 14, color: CP.textPrimary, margin: "0 0 6px", fontWeight: 500 }}>Come leggere la bravura</p>
-        <Note style={{ marginBottom: 6 }}>
-          <b style={{ fontWeight: 500, color: CP.textSecondary }}>Bravura 0,95</b> vuol dire: nelle ore che fa, la persona vende il 95% di quello che vendono all'ora i colleghi sulle stesse pagine e nelle stesse fasce. È un confronto ad armi pari: chi fa le notti è confrontato con chi fa le notti, chi è su una pagina difficile con chi è sulla stessa pagina.
-          La bravura generale mette insieme tutte le sue fasce; nella vista «Ogni persona, fascia per fascia» c'è il numero di ogni fascia.
-        </Note>
-        <Note style={{ marginBottom: 6 }}>Fonte: quella della scheda Squadra: vendite Infloww di ogni persona confrontate coi colleghi sulla stessa pagina e fascia{bw ? `, dal ${dmy(bw.from)} al ${dmy(bw.until)}` : ""}. CreatorsPro qui serve solo come calendario e per il valore delle fasce di ogni pagina: divide gli acquisti tra le persone a modo suo, ma il totale della pagina combacia con le transazioni Infloww.</Note>
-        <Note>
-          Controllo fatto sui turni (giorni pari contro giorni dispari): La bravura generale di una persona torna simile (correlazione {fx(st.general)} su {st.general_n} operatori); il fatto di rendere meglio in una certa fascia rispetto alle proprie altre quasi no ({fx(st.personal)}). Quindi la regola di base non è «ognuno nella sua fascia» ma «i più bravi nelle fasce che valgono di più, e chi chiude basso non ha la priorità su quelle»; le eccezioni per persona sono le frecce nella vista fascia per fascia. Quale fascia vale di più si decide pagina per pagina: non è sempre il 22–3.
-        </Note>
-      </div>
 
       <Tabs small items={[["persone", "Ogni persona, fascia per fascia", ops.length], ["azioni", "Da spostare", togliere.length + portare.length], ["pagine", "Per pagina", data.pages.length]]} value={view} onChange={setView} />
 
@@ -304,27 +303,31 @@ export default function FasceTab({ splitId }) {
 
       {view === "pagine" && (
         <>
-          <Note>Per ogni pagina: quanto vale un'ora in ogni fascia a pari bravura (in grassetto le fasce di punta, entro il 10% della migliore) e chi le copre. Nelle celle la bravura della persona in quella fascia (su tutte le sue pagine) e le ore che ci fa QUI. Passa sopra al numero per il dettaglio.</Note>
+          <Spiega label="Come leggere le pagine"><Note>Per ogni pagina: quanto vale un'ora in ogni fascia a pari bravura (in grassetto le fasce di punta, entro il 10% della migliore) e chi le copre. Nelle celle la bravura della persona in quella fascia (su tutte le sue pagine) e le ore che ci fa QUI. Passa sopra al numero per il dettaglio.</Note></Spiega>
           {data.pages.map((p) => <PageCard key={p.cid} p={p} opsById={opsById} />)}
         </>
       )}
 
       {view === "persone" && (
         <>
-          <Note>
+          <Spiega label="Come leggere i numeri della tabella">
+            <Note>
             Ogni numero dice quanto vende la persona in quella fascia rispetto ai colleghi che fanno la STESSA fascia sulle STESSE pagine: 1,00 = come la media, 1,20 = il 20% in più, 0,80 = il 20% in meno.
             Il numero è corretto per il campione: in questi dati il rendere meglio in una fascia rispetto alle altre si ripete poco tra un periodo e l'altro (correlazione {fx(st.personal)}), quindi con poche ore resta vicino alla bravura generale e si stacca solo con tante ore.
             La freccia compare quando la fascia si stacca di almeno il {Math.round(SLOT_DIFF * 100)}% dalla bravura generale della persona. Sotto le {SLOT_MIN_H} ore confrontabili non diamo un numero.
-          </Note>
+            </Note>
+          </Spiega>
           <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca un operatore" aria-label="Cerca un operatore"
             style={{ alignSelf: "flex-start", width: 280, maxWidth: "100%", padding: "8px 12px", borderRadius: 10, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body }} />
           <DataTable columns={colsAll} rows={shownOps.map((o) => ({ ...o, id: o.op }))} defaultSort={{ key: "idx", dir: -1 }} minWidth={1100} maxHeight="72vh" empty={q ? "Nessun operatore con quel nome." : "Nessun operatore."} />
         </>
       )}
 
+      <Spiega label="Come si calcola">
       <Note>
-        Come si calcola: bravura dalla scheda Squadra (venduto Infloww all'ora di turno ÷ quello dei colleghi sulla stessa pagina e fascia, escluso sé stessi; 1,00 = come loro). Ore e fasce dal calendario CreatorsPro {fromTxt} al {dmy(data.until)}. Valore di un'ora = venduto della pagina in quella fascia ÷ ore di turno pesate per la bravura di chi c'era (il venduto per pagina di CreatorsPro combacia con le transazioni Infloww: 0,97-1,01 a settembre). Il confronto giorni pari/dispari è fatto sui turni, l'unica fonte con le vendite per turno. Fasce dall'ora di inizio del turno (ora italiana): 22–3, 17–22 (anche 19–01), 12–17 (anche 13–19), 7–12 (anche 7–13), 1–7. Fuori dalle liste chi è uscito nel CRM o non fa turni da 3 settimane. Correlazione, non causa; le fasce dipendono anche dalla disponibilità delle persone. Non entra in score né compensi.
+        Bravura dalla scheda Squadra (venduto Infloww all'ora di turno ÷ quello dei colleghi sulla stessa pagina e fascia, escluso sé stessi; 1,00 = come loro). Ore e fasce dal calendario CreatorsPro {fromTxt} al {dmy(data.until)}. Valore di un'ora = venduto della pagina in quella fascia ÷ ore di turno pesate per la bravura di chi c'era (il venduto per pagina di CreatorsPro combacia con le transazioni Infloww: 0,97-1,01 a settembre). Il confronto giorni pari/dispari è fatto sui turni, l'unica fonte con le vendite per turno. Fasce dall'ora di inizio del turno (ora italiana): 22–3, 17–22 (anche 19–01), 12–17 (anche 13–19), 7–12 (anche 7–13), 1–7. Fuori dalle liste chi è uscito nel CRM o non fa turni da 3 settimane. Correlazione, non causa; le fasce dipendono anche dalla disponibilità delle persone. Non entra in score né compensi.
       </Note>
+      </Spiega>
     </div>
   );
 }
