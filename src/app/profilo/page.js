@@ -10,6 +10,8 @@ import { Sparkles, TrendingUp, GraduationCap, BookOpen, Mail, ArrowRight, Award 
 import SignalsStrip from "@/components/SignalsStrip";
 import { fmt$, fmtInt, MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, SectionTitle, DataTable, Notice, card, NUM, BTN_PRIMARY } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, Gauge, RankBars } from "@/components/VetroCharts";
 
 import { tierLabel } from "@/lib/tier-label";
 // Ridisegno sul design system 26/09/2026: contenuti e logica del 25/09 invariati
@@ -92,6 +94,7 @@ export default function MyProfilePage() {
   const { data: sig } = useSWR("/api/me/signals", fetcher, { revalidateOnFocus: false });
 
   const cp = drill?.cp;
+  const inVetro = useInVetro();
   const nextTier = cp?.tier ? TIER_PERCENTILE_NEXT[cp.tier] : null;
 
   const greeting = useMemo(() => {
@@ -153,7 +156,9 @@ export default function MyProfilePage() {
           </div>
 
           {/* NUMERO PRINCIPALE: score vendite del mese */}
-          {cp ? (
+          {cp && inVetro ? (
+            <ProfileTop cp={cp} periodId={periodId} myScore={myScore} tenureMonths={tenureMonths} firstSeen={firstSeen} cpHist={cpHist} />
+          ) : cp ? (
             <HeroMetric
               label={`Il tuo score vendite · ${formatPeriodLabel(periodId)}`}
               value={dec1(cp.score)}
@@ -222,6 +227,43 @@ export default function MyProfilePage() {
           </section>
         </>
       )}
+    </div>
+  );
+}
+
+/*
+ * Vetro: «come sta andando il mio mese, e dove vado forte?» — il venduto per turno creator per
+ * creator (verde dove sei sopra la media di chi ci lavora, mai rosso: regola del board), accanto
+ * l'arco dello score vendite e i numeri del mese.
+ */
+function ProfileTop({ cp, periodId, myScore, tenureMonths, firstSeen, cpHist }) {
+  const rows = [...(cp.per_creator || [])].filter((r) => r.sales_per_shift != null).sort((a, b) => b.sales_per_shift - a.sales_per_shift)
+    .map((r) => ({ label: r.creator, value: r.sales_per_shift, good: r.vs_cohort_pct != null && r.vs_cohort_pct > 0, sub: r.shifts }));
+  const line = (l, v) => <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 13, color: CP.textSecondary, ...NUM }}><span>{l}</span><b style={{ color: CP.textPrimary, fontWeight: 500 }}>{v}</b></div>;
+  return (
+    <div className="vt-row21" style={{ marginBottom: 18 }}>
+      <Panel title="Venduto per turno, creator per creator" aside="in verde dove sei sopra la media di chi ci lavora" i={0}>
+        {rows.length ? <RankBars items={rows} format={fmt$} limit={rows.length} total={0} valueWidth={80} /> : <div style={{ fontSize: 13, color: CP.textMuted }}>Nessun turno sulle creator questo mese.</div>}
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+        <Panel title={`Score vendite · ${formatPeriodLabel(periodId)}`} i={1}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <Gauge value={Number(cp.score) / 100} size={124} center={dec1(cp.score)} centerSub={cp.tier ? tierLabel(cp.tier) : "da 0 a 100"} label="Score vendite del mese" />
+            <div style={{ display: "grid", gap: 6, flex: 1, minWidth: 0 }}>
+              {line("Venduto nel mese", fmt$(cp.total_sales))}
+              {line("Turni", fmtInt(cp.total_shifts || 0))}
+              {line("Creator attive", fmtInt(cp.per_creator?.length || 0))}
+            </div>
+          </div>
+          <div style={{ display: "grid", gap: 6, marginTop: 12 }}>
+            {myScore?.peer_rank && (myScore.peer_rank.top_half
+              ? line("Mestiere · tra i tuoi colleghi", `${myScore.peer_rank.position}° su ${myScore.peer_rank.size}`)
+              : myScore.next_tier ? line(`Mestiere · per «${tierLabel(myScore.next_tier.tier)}»`, `${dec1(myScore.next_tier.gap)} punti`) : null)}
+            {tenureMonths != null && line("In agenzia da", `${fmtInt(tenureMonths)} ${tenureMonths === 1 ? "mese" : "mesi"} (da ${formatPeriodLabel(firstSeen)})`)}
+            {cpHist?.ltv_cp_eur != null && line(`Fatturato CP totale · ${fmtInt(cpHist.periods_count)} mesi`, fmt$(cpHist.ltv_cp_eur))}
+          </div>
+        </Panel>
+      </div>
     </div>
   );
 }

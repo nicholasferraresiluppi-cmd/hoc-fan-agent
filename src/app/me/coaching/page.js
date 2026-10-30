@@ -6,6 +6,8 @@ import useSWR from "swr";
 import { HelpCircle, CheckCircle2, Clock } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Notice, card, BTN_PRIMARY } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { HotTile } from "@/components/VetroCharts";
 
 /**
  * /me/coaching — "Il mio coaching" (scope own).
@@ -64,6 +66,8 @@ export default function MyCoachingPage() {
   }
 
   const sessions = data?.sessions || [];
+  const inVetro = useInVetro();
+  const toAck = sessions.filter((x) => x.status === "sent");
 
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 880, margin: "0 auto", fontFamily: FONTS.body }}>
@@ -93,8 +97,14 @@ export default function MyCoachingPage() {
               <SignalsStrip sig={sig} />
             </>
           )}
+          {/* Vetro: «c'è qualcosa che devo leggere?» — le sessioni da confermare in cima */}
+          {inVetro && sessions.length > 0 && (
+            <HotTile i={0} lvl={toAck.length ? "ink" : "0"} label="Da leggere e confermare" value={toAck.length}
+              sub={toAck.length ? "le trovi qui sotto, segnate «Da confermare»" : `hai confermato tutte le ${sessions.length} sessioni`}
+              onClick={toAck.length ? () => document.getElementById(`sessione-${toAck[0].id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }) : undefined} />
+          )}
           {sessions.map((s) => (
-            <article key={s.id} style={{ ...card, padding: "16px 18px", ...(s.status === "sent" ? { borderLeft: `3px solid ${CP.accent}` } : {}) }}>
+            <article key={s.id} id={`sessione-${s.id}`} className={inVetro ? "vt-glass" : undefined} style={{ scrollMarginTop: 80, ...card, padding: "16px 18px", ...(s.status === "sent" ? { borderLeft: `3px solid ${CP.accent}` } : {}) }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
                 <StatusChip status={s.status} />
                 {s.follow_up_date && <span style={{ fontSize: 12, color: CP.textMuted }}>Verifica prevista il {s.follow_up_date}</span>}

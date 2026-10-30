@@ -11,6 +11,8 @@ import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, BandBar
 import { tierLabel, tierColor } from "@/lib/tier-label";
 import { useStyle } from "@/lib/theme-client";
 import { normalizeKpi } from "@/lib/leaderboard-calc";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, HotTile, Gauge, Bars } from "@/components/VetroCharts";
 
 /**
  * /me/score — "Il mio score, spiegato" (scope own, docs/VISIBILITY_POLICY.md).
@@ -115,6 +117,55 @@ const note = { fontSize: 13, color: CP.textMuted, margin: "0 0 8px", lineHeight:
 const link = { color: CP.accentSoftText };
 const btnTrain = { display: "inline-flex", alignItems: "center", padding: "6px 12px", background: CP.accent, color: CP.accentInk, borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap" };
 
+/*
+ * Vetro: la domanda della pagina è «come sto andando, e da dove guadagno punti?».
+ * Un arco per score (0-100) con la tacca della fascia successiva; accanto la voce con più
+ * margine e la sua azione. Niente rosso: sono numeri di una persona (regola del board).
+ */
+function ScoreTop({ cp, data, hasMestiere, salesMonth, top, topAct }) {
+  const nextMin = data?.next_tier && Number.isFinite(Number(data.score)) ? Number(data.score) + Number(data.next_tier.gap) : null;
+  const label = top ? (KPI_LABELS[top.kpi] || top.kpi.replace(/_/g, " ")) : null;
+  const few = cp && (cp.total_shifts || 0) < PRIMO_MESE_TURNI;
+  return (
+    <div className="vt-row21" style={{ marginBottom: 18 }}>
+      <Panel title="I tuoi due score" aside="da 0 a 100" i={0}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 18 }}>
+          {cp && (
+            <div style={{ display: "grid", justifyItems: "center", gap: 6, textAlign: "center" }}>
+              <Gauge value={cp.score != null ? cp.score / 100 : 0} size={160} center={cp.score != null ? fmtScore(cp.score) : "—"} centerSub={`Vendite · ${monthLabel(salesMonth)}`} label="Score Vendite" />
+              <div style={{ fontSize: 13, color: CP.textSecondary }}>{few && cp.score != null ? `solo ${cp.total_shifts} ${cp.total_shifts === 1 ? "turno" : "turni"}: ancora instabile` : cp.tier ? tierLabel(cp.tier) : ""}</div>
+              <div style={{ fontSize: 12, color: CP.textMuted, lineHeight: 1.45, maxWidth: 300 }}>Quello delle revisioni mensili: il tuo venduto per turno confrontato con chi lavora sulle tue stesse creator (70%) e con tutta l&apos;agenzia (30%). Il dettaglio è nel <Link href="/profilo" style={link}>tuo profilo</Link>.</div>
+            </div>
+          )}
+          {hasMestiere && (
+            <div style={{ display: "grid", justifyItems: "center", gap: 6, textAlign: "center" }}>
+              <Gauge value={Number(data.score) / 100} mark={nextMin != null ? nextMin / 100 : null} markName="fascia successiva" size={160} center={fmtScore(data.score)} centerSub={`Mestiere · ${monthLabel(data.period_id)}`} label="Score Mestiere" />
+              <div style={{ fontSize: 13, color: data.tier ? tierColor(data.tier) : CP.textSecondary }}>{data.tier ? tierLabel(data.tier) : ""}</div>
+              <div style={{ fontSize: 12, color: CP.textMuted, lineHeight: 1.45, maxWidth: 300 }}>
+                Quello del percorso di carriera: misura come chatti.
+                {nextMin != null ? ` La tacca è la fascia «${tierLabel(data.next_tier.tier)}», a ${fmtScore(data.next_tier.gap)} punti.` : ""}
+              </div>
+            </div>
+          )}
+        </div>
+      </Panel>
+      <div style={{ display: "grid", gap: 14, alignContent: "start" }}>
+        {label && (
+          <HotTile lvl="ink" i={1} label="Da dove guadagni di più" value={label}
+            sub={topAct && !topAct.atMax ? `Da ${fmtKpi(top.kpi, topAct.from)} a ${fmtKpi(top.kpi, topAct.to, true)}${topAct.toMean ? " (la media del tuo gruppo)" : ""} = ${fmtGain(topAct.gain)}` : "È la voce con più margine: allenala."} />
+        )}
+        {data?.peer_rank?.top_half && (
+          <Panel title="Tra i tuoi colleghi" i={2}>
+            <div style={{ fontSize: 28, fontWeight: 600, color: CP.textPrimary, ...NUM }}>{data.peer_rank.position}° su {data.peer_rank.size}</div>
+            {data.peer_rank.label && <div style={{ fontSize: 12.5, color: CP.textMuted }}>su {data.peer_rank.label}</div>}
+          </Panel>
+        )}
+        {label && <Link href="/" style={{ ...btnTrain, justifyContent: "center", padding: "10px 14px" }}>Allenati su questo</Link>}
+      </div>
+    </div>
+  );
+}
+
 export default function MyScorePage() {
   const [periodId, setPeriodId] = useState(null);
   const url = periodId ? `/api/me/score?period_id=${periodId}` : "/api/me/score";
@@ -135,6 +186,7 @@ export default function MyScorePage() {
   // attuale la pagina resta com'era (barre verticali, nessuna barra fasce).
   const [st] = useStyle();
   const v3 = st === "v3";
+  const inVetro = useInVetro();
   const tiers = Array.isArray(data?.tiers) ? data.tiers : [];
   // Azioni per voce + voce con più margine = peso × distanza dalla media, cioè i
   // punti recuperabili (lo stesso numero dell'azione). Senza scalini nell'API si
@@ -159,8 +211,9 @@ export default function MyScorePage() {
         subtitle="Hai due score che misurano cose diverse: Vendite (quanto vendi per turno) e Mestiere (come chatti). Vedi solo i tuoi dati: è un diritto, non una concessione."
       />
 
+      {inVetro && (cp || hasMestiere) && <ScoreTop cp={cp} data={data} hasMestiere={hasMestiere} salesMonth={salesMonth} top={topKpi ? composition.find((c) => c.kpi === topKpi) : null} topAct={topKpi ? actions[topKpi] : null} />}
       {/* I due numeri, affiancati: ognuno dice a cosa serve */}
-      {(cp || hasMestiere) && (
+      {!inVetro && (cp || hasMestiere) && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", columnGap: 14 }}>
           {cp && (
             <HeroMetric
@@ -283,7 +336,11 @@ export default function MyScorePage() {
           {history.length > 1 && (
             <section style={{ marginBottom: 22 }}>
               <SectionTitle aside="il mese che stai guardando è evidenziato">Mestiere: il mio andamento</SectionTitle>
-              {v3 ? (
+              {inVetro ? (
+                <div className="vt-glass" style={{ ...card, padding: "16px 18px" }}>
+                  <Bars data={history.map((h) => h.score || 0)} labels={history.map((h) => monthShort(h.period_id))} hi={Math.max(0, history.findIndex((h) => h.period_id === data.period_id))} height={140} format={(v) => fmtScore(v)} unit=" punti" />
+                </div>
+              ) : v3 ? (
                 <div style={{ ...card, padding: "16px 18px" }}>
                   <ScoreChart
                     caption="Mestiere mese per mese"
