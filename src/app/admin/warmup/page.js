@@ -26,7 +26,7 @@ import {
   numFmt, delta, planFor, planForDate, visibleItems, dayProgress, tasksOn, adherence, hasArrears,
   opDay, realDay, pausedDays, isCooldown, cooldownDay, stateOf, stateInfo, undoableState, restoreState,
   ownerName, mine, urgenze, FL, ST, MS, SE, wfields, xGoal, IPROT, fillDefaults, applyState, openFlag,
-  clearFlag, endCooldown,
+  clearFlag, endCooldown, WINDOWS,
 } from "@/lib/warmup-plan";
 import { prefillFor, dailyPrefill, linkRange, publicAlerts, normalizeOfLink } from "@/lib/warmup-metrics-core";
 import { pubKindOfTask, itemForTask, autoItemForTask } from "@/lib/editoriale-core";
@@ -1666,7 +1666,12 @@ export default function WarmupPage() {
     else if (tab === "admin" && admin) body = viewAdmin();
     else if (tab === "xrefs" && plat === "x") body = <XRefs />;
     else if (tab === "radar") body = <ClipRadar />;
-    else if (tab === "guide") body = <><h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: "0 0 4px" }}>Guida{plat === "x" ? " · X" : ""}</h2><p style={{ ...hint, fontSize: 14, margin: "0 0 14px" }}>{plat === "x" ? "Il riassunto del documento Account X." : "Il riassunto delle SOP a cui la console fa riferimento."}</p>{plat === "x" ? <GuideX /> : <GuideIG />}</>;
+    else if (tab === "guide") body = <>{plat === "x"
+      ? <HeroHead eyebrow="Guida" title="Come si lavora un profilo" accent="X" sub="Il riassunto del documento Account X: perché conta, i numeri di riferimento, cosa dipende da noi."
+          numbers={<><BigNum label="Visualizzazioni a post con Premium" value={600} strong /><BigNum label="Follower attivi per le prime sub" value={500} /></>} />
+      : <HeroHead eyebrow="Guida" title="Come si scalda un profilo" accent="Instagram" sub="Il riassunto delle SOP a cui la console fa riferimento: calendario, pubblicazioni, finestre, segnalazioni."
+          numbers={<><BigNum label="Giorni di warm-up" value={7} strong /><BigNum label="Reel al giorno, a regime" value={3} /><BigNum label="Finestre USA" value={WINDOWS.length} /></>} />}
+      {plat === "x" ? <GuideX /> : <GuideIG />}</>;
     else { const a = sel && byId(sel); body = a && !a.archived ? viewDay(a) : folder ? viewFolder(folder) : viewFolders(); }
   }
   const modalA = modal?.id ? byId(modal.id) : null;
