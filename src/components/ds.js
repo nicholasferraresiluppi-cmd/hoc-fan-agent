@@ -8,7 +8,7 @@
  */
 import { useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, HelpCircle, X } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { useStyle } from "@/lib/theme-client";
 import { tierLabel, TIER_ORDER } from "@/lib/tier-label";
@@ -267,6 +267,28 @@ export function Disclosure({ open, onToggle, title, summary, icon, children }) {
       </button>
       {open && <div style={{ padding: "0 16px 16px" }}>{children}</div>}
     </section>
+  );
+}
+
+/**
+ * Spiegazione a richiesta (30/10/2026, Nicholas: «tanto scritto, devo scorrere per arrivare ai dati»).
+ * Il «come si legge / come si calcola» non sta più aperto sopra i numeri: un tasto «?» lo apre sotto.
+ * In pagina resta solo la frase che dice cosa si vede.
+ */
+export function Spiega({ label = "Come si legge", children, style }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={style}>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "none", padding: "2px 0", cursor: "pointer", fontSize: 13, color: open ? CP.accentSoftText : CP.textMuted, fontFamily: FONTS.body }}>
+        <HelpCircle size={15} />{label}
+      </button>
+      {open && (
+        <div style={{ ...card, padding: "12px 16px", marginTop: 8, display: "flex", flexDirection: "column", gap: 8, fontSize: 13, lineHeight: 1.55, color: CP.textSecondary, maxWidth: 920 }}>
+          {children}
+        </div>
+      )}
+    </div>
   );
 }
 
