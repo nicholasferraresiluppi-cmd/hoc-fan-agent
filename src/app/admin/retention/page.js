@@ -180,7 +180,7 @@ function RetentionTop({ pages, S, onOpen }) {
           </div>
         </Panel>
         <Panel i={4} title="Dipendono da pochi fan" aside="i 10 fan più grossi fanno il 40% o più degli ultimi 90 giorni">
-          {conc.length ? <RankBars items={conc.map((p) => ({ label: p.name, value: p.top10Share, onClick: () => onOpen(p.creator_id) }))} format={pct} limit={6} valueWidth={44} total={0} />
+          {conc.length ? <RankBars items={conc.map((p) => ({ label: p.name, value: p.top10Share, onClick: () => onOpen(p.creator_id) }))} format={pct} limit={conc.length} valueWidth={44} total={0} />
             : <div style={{ fontSize: 13, color: CP.textSecondary }}>Nessuna pagina: il fatturato è distribuito.</div>}
         </Panel>
       </div>
