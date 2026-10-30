@@ -14,6 +14,8 @@ import { Plus } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { PageHead, Notice, card, NUM } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, HotTile, MixBar } from "@/components/VetroCharts";
 import { PLATFORMS, PLATFORM_LABEL, STATUSES, phaseLine } from "@/lib/studio-social-core";
 
 const fetcher = async (url) => {
@@ -67,13 +69,34 @@ function NewProfile({ open, onClose, onSaved }) {
   );
 }
 
+/*
+ * Vetro: «a che punto è la coda dei contenuti, e cosa aspetta una persona?» — tutti i contenuti dei
+ * profili in una barra nell'ordine del lavoro (idea → pubblicato), accanto «Da approvare».
+ */
+function StudioTop({ profiles }) {
+  const sum = (k) => profiles.reduce((a, p) => a + (p.counts?.[k] || 0), 0);
+  const items = STATUSES.filter((x) => x.key !== "scartato").map((x, k) => ({ label: x.label, value: sum(x.key), color: x.key === "pubblicato" ? CP.accentGreen : undefined, k }));
+  const toApprove = sum("da_approvare");
+  return (
+    <div className="vt-row21" style={{ marginBottom: 16 }}>
+      <Panel title="La coda dei contenuti" aside={`${profiles.length} ${profiles.length === 1 ? "profilo" : "profili"} · dall'idea al pubblicato`} i={0}>
+        {items.some((x) => x.value > 0) ? <MixBar items={items} format={(v) => String(v)} /> : <div style={{ fontSize: 13, color: CP.textMuted }}>Ancora nessun contenuto in coda.</div>}
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+        <HotTile i={1} lvl={toApprove ? "ink" : "0"} label="Da approvare" value={toApprove} sub={toApprove ? "pronti: una persona li guarda prima che escano" : "niente in attesa"} />
+      </div>
+    </div>
+  );
+}
+
 export default function StudioSocialPage() {
   const { data, error, isLoading, mutate } = useSWR("/api/admin/studio-social", fetcher, { revalidateOnFocus: false });
   const [creating, setCreating] = useState(false);
   const profiles = data?.profiles || [];
+  const inVetro = useInVetro();
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1200, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Marketing" }, { label: "Studio social" }]}
         title="Studio social"
@@ -99,6 +122,8 @@ export default function StudioSocialPage() {
           <button onClick={() => setCreating(true)} style={{ padding: "8px 14px", background: CP.accent, color: CP.accentInk, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Nuovo profilo</button>
         </div>
       )}
+
+      {inVetro && profiles.length > 0 && <StudioTop profiles={profiles} />}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 340px), 1fr))", gap: 14 }}>
         {profiles.map((p) => {
