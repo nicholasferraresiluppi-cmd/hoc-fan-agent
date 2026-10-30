@@ -48,6 +48,14 @@ export async function listPlans() {
   return raw.filter(Boolean).map(parse).sort((a, b) => (b.start || "").localeCompare(a.start || ""));
 }
 
+/** Cancella un piano con le sue spunte e risposte (definitivo). */
+export async function deletePlan(id) {
+  if (!(await kv.exists(P(id)))) return { ok: false, status: 404, errors: ["Piano non trovato"] };
+  await kv.del(P(id), S(id));
+  await kv.srem(IDX, id);
+  return { ok: true };
+}
+
 async function getState(id) {
   const h = (await kv.hgetall(S(id))) || {};
   return Object.fromEntries(Object.entries(h).map(([k, v]) => [k, parse(v)]));

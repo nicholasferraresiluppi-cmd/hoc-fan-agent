@@ -5,6 +5,7 @@
 // esistenti tengono il loro anche se cambi testo o le sposti — così spostare non sposta le spunte.
 import { useState } from "react";
 import { ArrowUp, ArrowDown, Trash2, Plus } from "lucide-react";
+import { confirmDialog } from "@/components/AppDialogs";
 import { CP, FONTS } from "@/lib/brand";
 import { card, BTN, BTN_PRIMARY_OFF, Notice } from "@/components/ds";
 import { AUTO_TYPES, AUTO_FIELDS, newId } from "@/lib/piani-core";
@@ -95,7 +96,7 @@ function ItemEditor({ it, people, onChange, onMove, onRemove, condition }) {
   );
 }
 
-export function PlanEditor({ plan, onSaved, onCancel }) {
+export function PlanEditor({ plan, onSaved, onCancel, onDeleted }) {
   const creating = !plan;
   const [d, setD] = useState(() => draftOf(plan));
   const [busy, setBusy] = useState(false);
@@ -112,6 +113,17 @@ export function PlanEditor({ plan, onSaved, onCancel }) {
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || `Errore ${r.status}`);
       onSaved(j.plan.id);
+    } catch (e) { setErr(e.message); setBusy(false); }
+  };
+
+  const remove = async () => {
+    if (!(await confirmDialog({ title: `Cancellare «${plan.title}»?`, message: "Si cancellano anche le spunte e le risposte date. Non si torna indietro: se vuoi solo toglierlo di mezzo, archivialo.", ok: "Cancella", danger: true }))) return;
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch("/api/admin/piani", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete", planId: plan.id }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `Errore ${r.status}`);
+      onDeleted();
     } catch (e) { setErr(e.message); setBusy(false); }
   };
 
@@ -196,6 +208,11 @@ export function PlanEditor({ plan, onSaved, onCancel }) {
         {!creating && (
           <button type="button" disabled={busy} onClick={() => save({ archived: !d.archived })} style={{ ...BTN, marginLeft: "auto" }}>
             {d.archived ? "Riapri il piano" : "Archivia il piano"}
+          </button>
+        )}
+        {!creating && (
+          <button type="button" disabled={busy} onClick={remove} style={{ ...BTN, color: CP.accentRed }}>
+            <Trash2 size={14} />Cancella
           </button>
         )}
         <span style={{ fontSize: 12, color: CP.textMuted, flexBasis: "100%" }}>Le spunte e le risposte già date restano: sono legate alla voce, non alla sua posizione.</span>
