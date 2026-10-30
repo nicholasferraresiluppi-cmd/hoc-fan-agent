@@ -471,11 +471,17 @@ function QRow({ name, r, acc, slug, strong, bg, rank, isMine, data, open, editin
 
 function QuadroBody({ data, open, span, multi, single, mine, ctx }) {
   const Row = QRow;
+  // 30/10 sera (Nicholas): la posizione è il VENDUTO del mese, per singolo paese — ogni pagina (Fishball IT,
+  // Fishball ENG…) ha il suo posto; i totali per creator non ne hanno. Prima era l'arrivo sul proprio goal.
+  const pos = new Map(
+    data.creators.flatMap((c) => c.accounts).filter((a) => ok(a.mtd) && a.mtd > 0)
+      .sort((a, b) => b.mtd - a.mtd).map((a, i) => [a.creator_id, i + 1]),
+  );
   return (
-    <Block className="bil-quadro" title="Quadro per creator" sub="mese + proiezione · posizione = arrivo previsto sul proprio goal" color={SH.navy}>
+    <Block className="bil-quadro" title="Quadro per creator" sub="mese + proiezione · posizione = venduto del mese, per paese" color={SH.navy}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 760 }}>
         <thead><tr>
-          <th style={hd(FILL.navy, "center")} title="Classifica: arrivo previsto diviso il proprio goal">Pos.</th>
+          <th style={hd(FILL.navy, "center")} title="Classifica per venduto del mese, ogni paese per conto suo">Pos.</th>
           <th style={{ ...hd(FILL.navy, "left"), ...stick(false, FILL.navy) }}>Creator</th>
           <th style={hd(FILL.navy, "left")}>AM</th>
           <th style={hd(FILL.navy, "left")}>SM</th>
@@ -489,12 +495,12 @@ function QuadroBody({ data, open, span, multi, single, mine, ctx }) {
         <tbody>
           {multi.map((c) => (
             <Fragment key={c.slug}>
-              {c.accounts.map((a) => <Row {...ctx} key={a.country} name={<>{c.name}<Tag country={a.country} /></>} r={a} acc={a} slug={c.slug} isMine={mine.has(c.slug)} />)}
-              <Row {...ctx} name={`${c.name} totale`} r={c} strong bg={SUBTOTAL_BG} rank={c.rank} isMine={mine.has(c.slug)} />
+              {c.accounts.map((a) => <Row {...ctx} key={a.country} name={<>{c.name}<Tag country={a.country} /></>} r={a} acc={a} slug={c.slug} rank={pos.get(a.creator_id)} isMine={mine.has(c.slug)} />)}
+              <Row {...ctx} name={`${c.name} totale`} r={c} strong bg={SUBTOTAL_BG} isMine={mine.has(c.slug)} />
             </Fragment>
           ))}
           {single.length > 0 && <SectionRow label="Profili singolo paese" span={span} />}
-          {single.map((c) => <Row {...ctx} key={c.slug} name={<>{c.name}<Tag country={c.accounts[0].country} /></>} r={c} acc={c.accounts[0]} slug={c.slug} rank={c.rank} isMine={mine.has(c.slug)} />)}
+          {single.map((c) => <Row {...ctx} key={c.slug} name={<>{c.name}<Tag country={c.accounts[0].country} /></>} r={c} acc={c.accounts[0]} slug={c.slug} rank={pos.get(c.accounts[0].creator_id)} isMine={mine.has(c.slug)} />)}
           <Row {...ctx} name="Totale generale" r={data.totals} strong bg={TOTAL_BG} />
         </tbody>
       </table>
