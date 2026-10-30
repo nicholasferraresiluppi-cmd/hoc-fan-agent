@@ -1,54 +1,41 @@
 "use client";
 
 /**
- * CompNav — barra di navigazione orizzontale del toolkit Comp & Ben.
- * Montata sotto il PageHeader di ogni pagina comp: rende il funnel
- * navigabile lateralmente (confronto ↔ calendar ↔ P&L ↔ review) senza
- * dover risalire all'Hub. Active state sul path corrente.
+ * CompNav — schede del toolkit Comp & Ben, sotto la testata di ogni pagina comp: si passa da uno
+ * strumento all'altro (P&L ↔ scaglioni ↔ calendario ↔ review) senza risalire all'Hub.
+ *
+ * 30/10/2026 (regole d'uso, docs/DESIGN.md §1b): schede = testo sottolineato, non riquadri a
+ * pillole (che nell'app sono i filtri). «Scaglioni» resta accesa su tutte e tre le pagine del suo
+ * gruppo (Confronto, Profili di pagamento, Studio soglie), che hanno le loro schede in cima.
  */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Wallet, Scale, CalendarDays, Activity, Search, FlaskConical, Ruler, ListTree } from "lucide-react";
-import { CP, FONTS, alpha } from "@/lib/brand";
+import { CP, FONTS } from "@/lib/brand";
 
 const TOOLS = [
-  { href: "/admin/pnl-live",         label: "P&L Live",     icon: Wallet },
-  { href: "/admin/profiles-compare", label: "Scaglioni",    icon: Scale },
-  { href: "/admin/comp-calendar",    label: "Calendario",   icon: CalendarDays },
-  { href: "/admin/threshold-study",  label: "Studio soglie", icon: Ruler },
-  { href: "/admin/comp-review",      label: "Review",       icon: Activity },
-  { href: "/admin/comp-exam",        label: "Esame creator", icon: Search },
-  { href: "/admin/payout-tree",      label: "Albero payout", icon: ListTree },
-  { href: "/admin/shift-research",   label: "Research",     icon: FlaskConical },
+  { href: "/admin/pnl-live",         label: "P&L Live" },
+  { href: "/admin/profiles-compare", label: "Scaglioni", also: ["/admin/payment-profiles", "/admin/threshold-study"] },
+  { href: "/admin/comp-calendar",    label: "Calendario" },
+  { href: "/admin/comp-review",      label: "Review" },
+  { href: "/admin/comp-exam",        label: "Esame creator" },
+  { href: "/admin/payout-tree",      label: "Albero payout" },
+  { href: "/admin/shift-research",   label: "Research" },
 ];
 
 export default function CompNav({ palette } = {}) {
   const P = palette || CP; // palette alternativa (tema chiaro del pilota)
-  const pathname = usePathname();
+  const pathname = String(usePathname() || "").replace(/\/$/, "");
   return (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 22, padding: 5, background: P.surface, border: `1px solid ${P.border}`, borderRadius: 10, width: "fit-content" }}>
-      {TOOLS.map(({ href, label, icon: Icon }) => {
-        const active = pathname === href;
+    <nav aria-label="Comp & Ben" className="ds-tabs" style={{ display: "flex", alignItems: "flex-end", gap: 22, borderBottom: `1px solid ${P.border}`, margin: "0 0 22px", overflowX: "auto", scrollbarWidth: "none", fontFamily: FONTS.body }}>
+      {TOOLS.map(({ href, label, also }) => {
+        const active = pathname === href || (also || []).includes(pathname);
         return (
-          <Link
-            key={href}
-            href={href}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
-              padding: "7px 13px", borderRadius: 7,
-              background: active ? P.surfaceAlt : "transparent",
-              border: `1px solid ${active ? alpha(P.accent, "66") : "transparent"}`,
-              color: active ? P.textPrimary : P.textSecondary,
-              fontSize: 12, fontWeight: active ? 500 : 400,
-              fontFamily: FONTS.body, textDecoration: "none",
-              whiteSpace: "nowrap",
-            }}
-          >
-            <Icon size={13} color={active ? P.accent : P.mutedIcons} />
+          <Link key={href} href={href} aria-current={active ? "page" : undefined}
+            style={{ display: "inline-block", padding: "8px 0 10px", marginBottom: -1, borderBottom: `2px solid ${active ? P.accent : "transparent"}`, color: active ? P.textPrimary : P.textSecondary, fontSize: 14.5, fontWeight: active ? 500 : 400, textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0 }}>
             {label}
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 }

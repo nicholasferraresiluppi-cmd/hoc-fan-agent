@@ -8,7 +8,7 @@
 // (aria-label) e i numeri accanto: il colore non è mai l'unico modo di capire.
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CP } from "@/lib/brand";
+import { CP, alpha } from "@/lib/brand";
 
 const NUM = { fontVariantNumeric: "tabular-nums" };
 const group = (n) => String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -389,6 +389,126 @@ export function Bars({ data = [], labels, hi, partial = false, height = 150, for
           <span style={{ color: CP.textPrimary, fontWeight: 600 }}>{lab(hover)}</span> · {format(vals[hover])}{unit}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─── Pezzi comuni delle pagine di lavoro (30/10/2026, gruppo Compensi) ────────────────────────────
+ * Panel: un riquadro di vetro con titolo e riga di lettura. HotTile: scheda piena di colore per uno
+ * stato (rosso = da guardare, inchiostro = da fare, verde = a posto, vetro = nessun giudizio), che
+ * può aprire un filtro. CompareBars: due o tre valori dello stesso numero a barre (es. questo mese e
+ * il mese prima). DeviationBars: scarto dalla media, a destra chi sta sopra e a sinistra chi sta
+ * sotto, con le fasce di tolleranza. TargetStrip: dove cade un valore rispetto a una fascia obiettivo.
+ * Il pulsante non usa «all: unset», che toglierebbe lo sfondo pieno delle schede `.vt-hot`. */
+const BTN_RESET = { boxSizing: "border-box", cursor: "pointer", border: 0, margin: 0, font: "inherit", color: "inherit" };
+
+export function Panel({ title, aside, children, i = 0, style }) {
+  return (
+    <section className="vt-glass" style={{ "--vt-i": i, borderRadius: 20, padding: "16px 18px", minWidth: 0, ...style }}>
+      {(title || aside) && (
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          {title && <h2 style={{ margin: 0, fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>{title}</h2>}
+          {aside && <span style={{ fontSize: 12.5, color: CP.textMuted }}>{aside}</span>}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+
+export function HotTile({ label, value, sub, lvl, onClick, href, active, i = 0, children }) {
+  const cls = lvl == null ? "vt-hot vt-glass" : "vt-hot";
+  const style = { "--vt-i": i, textAlign: "left", outline: active ? `2px solid ${CP.textPrimary}` : "none", outlineOffset: 2, minWidth: 0 };
+  const body = (
+    <>
+      <span style={{ fontSize: 13, fontWeight: 500, color: CP.textPrimary }}>{label}</span>
+      <span style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: CP.textPrimary, ...NUM }}>{value}</span>
+      {sub && <span style={{ fontSize: 12.5, color: CP.textSecondary, lineHeight: 1.4 }}>{sub}</span>}
+      {children}
+    </>
+  );
+  if (href) return <Link href={href} className={cls} data-lvl={lvl ?? undefined} style={style}>{body}</Link>;
+  if (onClick) return <button type="button" onClick={onClick} className={cls} data-lvl={lvl ?? undefined} style={{ ...BTN_RESET, ...style }}>{body}</button>;
+  return <div className={cls} data-lvl={lvl ?? undefined} style={style}>{body}</div>;
+}
+
+/** items [{ label, value, color? }]: la prima di solito è il periodo scelto. */
+export function CompareBars({ items = [], format = (v) => String(v) }) {
+  const all = items.filter((x) => x.value != null && Number.isFinite(Number(x.value)));
+  const max = Math.max(...all.map((x) => Math.abs(Number(x.value))), 0) * 1.12 || 1;
+  return (
+    <div style={{ display: "grid", gap: 9 }}>
+      {all.map((x, k) => (
+        <div key={x.label} style={{ display: "grid", gap: 4 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5, color: CP.textSecondary, ...NUM }}>
+            <span>{x.label}</span><b style={{ color: CP.textPrimary, fontWeight: 600 }}>{format(x.value)}</b>
+          </div>
+          <div style={{ height: 10, borderRadius: 6, background: CP.track, overflow: "hidden" }}>
+            <div style={{ width: `${(Math.abs(Number(x.value)) / max) * 100}%`, height: "100%", borderRadius: 6, background: x.color || (k === 0 ? "var(--vt-c0)" : OTHER) }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Scarto dalla media: items [{ label, dev, value?, href?, onClick? }] con dev = (valore − media) ÷ media.
+ * Fasce: entro `ok` in grigio, fino a `far` in accento, oltre in rosso. La scala è simmetrica.
+ */
+export function DeviationBars({ items = [], ok = 0.15, far = 0.35, format, limit = 12 }) {
+  const top = items.slice(0, limit);
+  const span = Math.max(far * 1.3, ...top.map((x) => Math.abs(x.dev || 0))) || 1;
+  const pos = (d) => 50 + (Math.max(-span, Math.min(span, d)) / span) * 50;
+  const col = (d) => (Math.abs(d) > far ? CP.accentRed : Math.abs(d) > ok ? "var(--vt-c0)" : OTHER);
+  const sign = (d) => `${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.round(Math.abs(d) * 100)}%`;
+  return (
+    <div style={{ display: "grid", gap: 9 }}>
+      {top.map((x, k) => {
+        const Tag = x.href ? Link : x.onClick ? "button" : "div";
+        const d = x.dev || 0;
+        return (
+          <Tag key={x.label + k} href={x.href} onClick={x.onClick} type={Tag === "button" ? "button" : undefined}
+            style={{ ...(Tag === "button" ? { ...BTN_RESET, background: "transparent" } : {}), width: "100%", display: "grid", gridTemplateColumns: "minmax(90px, 30%) 1fr 92px", alignItems: "center", gap: 10, fontSize: 13, color: CP.textSecondary, textDecoration: "none", textAlign: "left" }}>
+            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: CP.textPrimary }}>{x.label}</span>
+            <span style={{ position: "relative", height: 14, borderRadius: 7, background: CP.track }}>
+              <span aria-hidden="true" style={{ position: "absolute", left: `${pos(-ok)}%`, right: `${100 - pos(ok)}%`, top: 0, bottom: 0, background: alpha(CP.textPrimary, "10") }} />
+              <span style={{ position: "absolute", top: 2, bottom: 2, borderRadius: 5, left: `${Math.min(50, pos(d))}%`, width: `${Math.max(1, Math.abs(pos(d) - 50))}%`, background: col(d) }} />
+              <span aria-hidden="true" style={{ position: "absolute", left: "50%", top: -3, bottom: -3, width: 2, marginLeft: -1, borderRadius: 1, background: CP.textPrimary }} />
+            </span>
+            <span style={{ ...NUM, textAlign: "right", whiteSpace: "nowrap" }}><b style={{ color: CP.textPrimary, fontWeight: 500 }}>{sign(d)}</b>{format && x.value != null ? <span style={{ color: CP.textMuted }}> · {format(x.value)}</span> : null}</span>
+          </Tag>
+        );
+      })}
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 11.5, color: CP.textMuted, marginTop: 2 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 2, height: 11, borderRadius: 1, background: CP.textPrimary }} />media</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 14, height: 9, borderRadius: 3, background: alpha(CP.textPrimary, "10") }} />entro {Math.round(ok * 100)}%: in linea</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 9, borderRadius: 3, background: CP.accentRed }} />oltre {Math.round(far * 100)}%</span>
+      </div>
+    </div>
+  );
+}
+
+/** items [{ label, value, sub? }] su una scala 0..max, con la fascia obiettivo [lo, hi] evidenziata. */
+export function TargetStrip({ items = [], lo, hi, max, format = (v) => String(v), targetLabel }) {
+  const m = max ?? Math.max(hi * 1.6, ...items.map((x) => x.value || 0)) * 1.05;
+  const p = (v) => Math.max(0, Math.min(100, (v / m) * 100));
+  return (
+    <div style={{ display: "grid", gap: 9 }}>
+      {items.map((x, k) => {
+        const inT = x.value != null && x.value >= lo && x.value <= hi;
+        return (
+          <div key={x.label + k} style={{ display: "grid", gridTemplateColumns: "minmax(110px, 34%) 1fr 64px", alignItems: "center", gap: 10, fontSize: 13 }}>
+            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: CP.textPrimary }} title={x.sub}>{x.label}</span>
+            <span style={{ position: "relative", height: 14, borderRadius: 7, background: CP.track }}>
+              <span aria-hidden="true" style={{ position: "absolute", left: `${p(lo)}%`, width: `${p(hi) - p(lo)}%`, top: 0, bottom: 0, background: alpha(CP.accentGreen, "30") }} />
+              {x.value != null && <span style={{ position: "absolute", left: `${p(x.value)}%`, top: "50%", width: 12, height: 12, marginLeft: -6, marginTop: -6, borderRadius: 999, background: inT ? CP.accentGreen : CP.accentRed, border: `2px solid ${CP.surface}` }} />}
+            </span>
+            <span style={{ ...NUM, textAlign: "right", color: inT ? CP.textPrimary : CP.accentRed, fontWeight: 500 }}>{x.value != null ? format(x.value) : "—"}</span>
+          </div>
+        );
+      })}
+      {targetLabel && <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: CP.textMuted, marginTop: 2 }}><span style={{ width: 14, height: 9, borderRadius: 3, background: alpha(CP.accentGreen, "30") }} />{targetLabel}</div>}
     </div>
   );
 }
