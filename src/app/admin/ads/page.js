@@ -17,6 +17,8 @@ import { ExternalLink } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
 import { PageHead, Metric, Notice, Disclosure, DataTable, SectionTitle, card } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { RankBars } from "@/components/VetroCharts";
 
 const fetcher = (url) =>
   fetch(url).then((r) => (r.ok ? r.json() : r.json().then((d) => Promise.reject(new Error(d.error || "Errore")))));
@@ -28,6 +30,7 @@ const n1 = (v) => Number(v).toLocaleString("it-IT", { maximumFractionDigits: 1 }
 export default function AdsPage() {
   const { data, error, isLoading } = useSWR("/api/admin/ads/funnel-study", fetcher, { revalidateOnFocus: false });
   const [methodOpen, setMethodOpen] = useState(false);
+  const inVetro = useInVetro();
 
   const scored = data?.scored || [];
   const keyFinding = (data?.winning || []).find((w) => /fattore #1/i.test(w));
@@ -102,9 +105,17 @@ export default function AdsPage() {
           </div>
 
           <SectionTitle aside="la piattaforma non fa il funnel, ma alcune lo ostacolano (elenchi di link tutti uguali) e altre lo aiutano (foto grande + un solo bottone)">Piattaforme a confronto</SectionTitle>
+          {/* Vetro: le piattaforme in fila per punteggio medio, con la tacca della soglia sotto cui una landing è debole */}
+          {inVetro ? (
+            <div className="vt-glass" style={{ ...card, padding: "16px 18px", marginBottom: 20 }}>
+              <RankBars items={[...data.platforms].sort((a, b) => b.avg - a.avg).map((p) => ({ label: `${p.platform} · ${p.n} landing`, value: p.avg, bad: p.avg < WEAK }))}
+                format={(v) => fmtInt(v)} limit={data.platforms.length} mark={WEAK} markLabel={`sotto ${WEAK} la landing è debole`} valueWidth={44} />
+            </div>
+          ) : (
           <div style={{ marginBottom: 20, maxWidth: 560 }}>
             <DataTable columns={platformCols} rows={data.platforms.map((p) => ({ ...p, id: p.platform }))} defaultSort={{ key: "avg", dir: -1 }} minWidth={320} />
           </div>
+          )}
 
           <SectionTitle aside={`punteggio 0-100, in rosso sotto ${WEAK} · clicca un’intestazione per ordinare`}>Tutte le {fmtInt(scored.length)} landing, dalla migliore</SectionTitle>
           <div style={{ marginBottom: 20 }}>
