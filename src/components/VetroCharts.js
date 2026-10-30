@@ -315,7 +315,7 @@ export function MixBar({ items = [], format = usd, height = 34 }) {
 
 /**
  * Classifica a barre orizzontali (al posto di una ciambella con troppe fette): items [{ label, value, sub?, onClick? }]
- * già in ordine; la barra è la quota sul primo, a destra il numero e la quota sul totale.
+ * già in ordine; la barra è la quota sul primo, a destra il numero e la quota sul totale. `good` = verde, `bad` = rosso.
  */
 export function RankBars({ items = [], format = usd, limit = 8, total, mark, markLabel, valueWidth }) {
   const vw = valueWidth ?? (mark != null ? 60 : 124);
@@ -329,7 +329,7 @@ export function RankBars({ items = [], format = usd, limit = 8, total, mark, mar
       <Tag key={k} href={x.href} onClick={x.onClick} style={{ all: Tag === "button" ? "unset" : undefined, boxSizing: "border-box", width: "100%", display: "grid", gridTemplateColumns: `minmax(90px, 30%) 1fr ${vw}px`, alignItems: "center", gap: 10, fontSize: 13, color: CP.textSecondary, textDecoration: "none", cursor: x.href || x.onClick ? "pointer" : "default" }}>
         <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: CP.textPrimary }}>{x.label}</span>
         <span style={{ position: "relative", height: 12, borderRadius: 6, background: CP.track }}>
-          <span style={{ display: "block", height: "100%", width: `${Math.max(2, (Number(x.value) / max) * 100)}%`, borderRadius: 6, background: muted ? OTHER : x.good ? CP.accentGreen : "var(--vt-c0)", opacity: muted ? 1 : 0.9 }} />
+          <span style={{ display: "block", height: "100%", width: `${Math.max(2, (Number(x.value) / max) * 100)}%`, borderRadius: 6, background: muted ? OTHER : x.bad ? CP.accentRed : x.good ? CP.accentGreen : "var(--vt-c0)", opacity: muted ? 1 : 0.9 }} />
           {mark != null && <span aria-hidden="true" style={{ position: "absolute", left: `${(mark / max) * 100}%`, top: -3, bottom: -3, width: 2, borderRadius: 1, background: CP.textPrimary }} />}
         </span>
         <span style={{ ...NUM, whiteSpace: "nowrap", textAlign: "right" }}><b style={{ color: CP.textPrimary, fontWeight: 500 }}>{format(x.value)}</b>{tot && mark == null ? <span style={{ color: CP.textMuted }}> · {Math.round((x.value / tot) * 100)}%</span> : null}</span>
