@@ -62,6 +62,7 @@
  "/admin/outcomes",
  "/admin/payment-profiles",
  "/admin/payout-tree",
+ "/admin/piani",
  "/admin/pnl-live",
  "/admin/priority-queue",
  "/admin/profiles-compare",
