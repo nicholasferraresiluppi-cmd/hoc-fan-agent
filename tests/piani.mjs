@@ -1,6 +1,6 @@
 // Unit test — Piani di lavoro (piani-core). Esegui: node tests/piani.mjs
 import assert from "node:assert/strict";
-import { normalizePlan, itemStatus, evaluatePlan, currentPhase, openItemsFor, dueLabel, shortDay, coveredDays } from "../src/lib/piani-core.js";
+import { newId, AUTO_TYPES, AUTO_FIELDS, normalizePlan, itemStatus, evaluatePlan, currentPhase, openItemsFor, dueLabel, shortDay, coveredDays } from "../src/lib/piani-core.js";
 import { SOCIAL_PLAN } from "../src/data/piani/social.js";
 
 let n = 0;
@@ -54,6 +54,19 @@ eq([dueLabel("2026-11-02", T), dueLabel("2026-11-03", T), dueLabel("2026-11-01",
 eq(shortDay("2026-11-03"), "mar 3/11", "giorno corto");
 eq(coveredDays(["2026-11-02", "2026-11-03", "2026-11-05"], T), 2, "giorni consecutivi coperti (il buco ferma il conto)");
 eq(coveredDays([], T), 0, "niente calendario");
+
+// editor: spostare o riscrivere una voce non sposta la spunta
+const base = { id: "e", title: "E", phases: [{ id: "f", title: "F", items: [{ id: "x1", text: "uno" }, { id: "x2", text: "due" }] }] };
+const st = { x1: { done: { at: 1, by: "L" } } };
+const moved = normalizePlan({ ...base, phases: [{ ...base.phases[0], items: [{ id: "x2", text: "due" }, { id: "x1", text: "uno, riscritta" }] }] }).plan;
+const evm = evaluatePlan(moved, st, {}, T);
+eq(evm.phases[0].items.map((i) => [i.id, i.status.done]), [["x2", false], ["x1", true]], "spunta segue la voce spostata e riscritta");
+const a1 = newId(), a2 = newId();
+ok(a1 !== a2 && /^v-/.test(a1), "id nuovi diversi");
+eq(normalizePlan({ ...base, phases: [{ id: "f", title: "F", items: [{ id: a1, text: "nuova" }] }] }).plan.phases[0].items[0].id, a1, "id dell'editor conservato");
+eq(normalizePlan({ ...base, phases: [{ id: "f", title: "F", items: [{ id: "z", text: "auto", auto: { type: "radar_profiles", country: "", min: "3" } }] }] }).plan.phases[0].items[0].auto, { type: "radar_profiles", country: "", min: "3" }, "parametri dell'editor passano");
+ok(Object.keys(AUTO_TYPES).every((k) => Array.isArray(AUTO_FIELDS[k])), "ogni controllo automatico ha i suoi campi nell'editor");
+eq(normalizePlan({ ...base, archived: true }).plan.archived, true, "archiviazione");
 
 // il piano Social vero è valido
 const soc = normalizePlan(SOCIAL_PLAN);

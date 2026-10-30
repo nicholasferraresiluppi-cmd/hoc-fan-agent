@@ -25,9 +25,12 @@ export function romeToday(now = Date.now()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date(now));
 }
 
-export async function savePlan(input) {
+export async function savePlan(input, { create = false, by } = {}) {
   const r = normalizePlan(input);
   if (!r.ok) return r;
+  if (create && (await kv.exists(P(r.plan.id)))) return { ok: false, errors: ["C'è già un piano con questo nome: cambialo"] };
+  r.plan.updatedAt = Date.now();
+  r.plan.updatedBy = by?.name || null;
   await kv.set(P(r.plan.id), r.plan);
   await kv.sadd(IDX, r.plan.id);
   return r;
