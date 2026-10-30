@@ -14,7 +14,9 @@ import { ChevronDown } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmtInt, MONTHS_IT } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, Notice, card, EarlyMonthNote, BTN_PRIMARY } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, FilterBar, Notice, card, EarlyMonthNote, BTN_PRIMARY } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, MixBar, RankBars, HotTile } from "@/components/VetroCharts";
 import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
 const fetcher = async (url) => {
@@ -43,6 +45,7 @@ export default function CoachingCenterPage() {
   const [stage, setStage] = useState("todo");
   const [pattern, setPattern] = useState("");
   const [q, setQ] = useState("");
+  const inVetro = useInVetro();
   const periodOptions = useMemo(() => monthOpts(), []);
   const url = periodId ? `/api/admin/coaching-center?period_id=${periodId}` : null;
   const { data, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
@@ -90,16 +93,19 @@ export default function CoachingCenterPage() {
       {data?.error && <Notice danger>{data.error}</Notice>}
 
       {data && !data.error && (<>
-        <HeroMetric label="Da far crescere · score tra 25 e 50" value={fmtInt(candidates.length)}
+        {inVetro && <CoachTop candidates={candidates} n={n} patterns={patterns} pattern={pattern}
+          onStage={(st) => { setStage(st); setPattern(""); document.getElementById("cc-lista")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+          onPattern={(id) => { setPattern(pattern === id ? "" : id); setStage("all"); }} />}
+        {!inVetro && <HeroMetric label="Da far crescere · score tra 25 e 50" value={fmtInt(candidates.length)}
           hint="Il training è un suggerimento in base al motivo: chi segue l'operatore decide.">
           <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
             <Metric label="Da assegnare" value={fmtInt(n("todo"))} />
             <Metric label="Assegnati" value={fmtInt(n("assigned"))} />
             <Metric label="Completati" value={fmtInt(n("done"))} />
           </div>
-        </HeroMetric>
+        </HeroMetric>}
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+        <FilterBar onReset={stage !== "todo" || pattern || q ? () => { setStage("todo"); setPattern(""); setQ(""); } : undefined} style={{ margin: "0 0 8px" }}>
           <FilterChip label={`Da assegnare (${n("todo")})`} active={stage === "todo"} onClick={() => setStage("todo")} />
           <FilterChip label={`Assegnati (${n("assigned")})`} active={stage === "assigned"} disabled={!n("assigned")} onClick={() => setStage("assigned")} />
           <FilterChip label={`Completati (${n("done")})`} active={stage === "done"} disabled={!n("done")} onClick={() => setStage("done")} />
@@ -110,10 +116,12 @@ export default function CoachingCenterPage() {
             {patterns.map((p) => <option key={p.id} value={p.id}>{PATTERN_LABELS[p.id]} ({p.count})</option>)}
           </select>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca operatore" aria-label="Cerca operatore" style={{ ...ctl, width: 200, fontSize: 13 }} />
-        </div>
+        </FilterBar>
         <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 8 }}>Clic su una riga per il dettaglio e per assegnare il training.</div>
 
-        <div style={{ ...card, overflow: "hidden" }}>
+        {/* al telefono la lista scorre di lato dentro il suo riquadro (prima le colonne a destra erano tagliate) */}
+        <div id="cc-lista" className={inVetro ? "vt-glass" : undefined} style={{ ...card, overflowX: "auto" }}>
+          <div style={{ minWidth: 860 }}>
           <div style={{ display: "grid", gridTemplateColumns: "minmax(200px,1.3fr) minmax(180px,1.2fr) 90px minmax(200px,1.4fr) 110px 20px", gap: 14, padding: "10px 16px", fontSize: 12, color: CP.textMuted }}>
             <span>Operatore</span><span>Motivo</span><span style={{ textAlign: "right" }}>Score</span><span>Training suggerito</span><span>Stato</span><span />
           </div>
@@ -125,8 +133,43 @@ export default function CoachingCenterPage() {
               onReject={(note) => postAction(c.employee, "reject", { note })}
               onDelete={() => deleteAssignment(c.employee)} />
           ))}
+          </div>
         </div>
       </>)}
+    </div>
+  );
+}
+
+// Vetro: «a che punto siamo?» (le fasi del coaching in una barra) e «perché?» (i motivi, clic = filtro).
+// Sono persone: niente rosso; verde solo per i coaching completati.
+function CoachTop({ candidates, n, patterns, pattern, onStage, onPattern }) {
+  const stages = [
+    { label: "Da assegnare", value: n("todo") },
+    { label: "Assegnati", value: n("assigned"), color: "var(--vt-c1)" },
+    { label: "Completati", value: n("done"), color: CP.accentGreen },
+    { label: "Non fatti", value: n("rejected"), color: "var(--vt-cx)" },
+  ];
+  const motives = [...patterns].sort((a, b) => b.count - a.count)
+    .map((p) => ({ label: PATTERN_LABELS[p.id], value: p.count, onClick: () => onPattern(p.id), good: pattern === p.id }));
+  return (
+    <div className="vt-row21" style={{ marginBottom: 18 }}>
+      <div style={{ display: "grid", gap: 14, alignContent: "start", minWidth: 0 }}>
+        <Panel title={`${fmtInt(candidates.length)} da far crescere`} aside="score tra 25 e 50 · a che punto è il coaching" i={0}>
+          {candidates.length ? <MixBar items={stages} format={fmtInt} /> : <div style={{ fontSize: 13, color: CP.textMuted }}>Nessun operatore tra 25 e 50 questo mese.</div>}
+        </Panel>
+        {motives.length > 0 && (
+          <Panel title="Perché" aside="il motivo più frequente in cima · clic = filtra la lista" i={1}>
+            <RankBars items={motives} format={fmtInt} limit={motives.length} />
+          </Panel>
+        )}
+      </div>
+      <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+        <HotTile i={2} lvl={n("todo") ? "ink" : "0"} label="Da assegnare" value={fmtInt(n("todo"))}
+          sub={n("todo") ? "hanno il training suggerito: manca solo chi li segue" : "a tutti è già stato assegnato un training"}
+          onClick={n("todo") ? () => onStage("todo") : undefined} />
+        <HotTile i={3} label="In corso" value={fmtInt(n("assigned"))} sub="training assegnati, da segnare quando sono fatti"
+          onClick={n("assigned") ? () => onStage("assigned") : undefined} />
+      </div>
     </div>
   );
 }

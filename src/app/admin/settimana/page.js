@@ -16,6 +16,8 @@ import useSWR from "swr";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Notice, EarlyMonthNote, card } from "@/components/ds";
 import { TutorialVideoButton } from "@/components/TutorialVideo";
+import { useInVetro } from "@/components/VetroScope";
+import { HotTile } from "@/components/VetroCharts";
 
 const fetcher = (u) => fetch(u).then((r) => r.json()).catch(() => null);
 const month = (k = 0) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - k); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
@@ -33,6 +35,7 @@ export default function SettimanaPage() {
   const loading = !rank || !ac || !cc;
   const vis = rank?.visibility;
   const noCreators = vis && !vis.all && !(vis.creators || []).length;
+  const inVetro = useInVetro();
 
   const list = useMemo(() => {
     const byName = {};
@@ -61,7 +64,11 @@ export default function SettimanaPage() {
       if (c.assignment?.status === "completed") continue;
       add(c.employee, 40 + (50 - (c.score || 50)), `da far crescere (score ${dec(c.score)})`, { creator: creatorOf[c.employee] || c.top_creator || null, training: c.training?.categoryName || null, why: c.training?.rationale || null, assigned: c.assignment?.status || null });
     }
-    return Object.values(byName).sort((a, b) => b.pri - a.pri).slice(0, 5);
+    const all = Object.values(byName);
+    const has = (w) => all.filter((e) => e.reasons.some((r) => r.startsWith(w))).length;
+    const top = all.sort((a, b) => b.pri - a.pri).slice(0, 5);
+    top.counts = { under: has("sotto soglia"), drop: has("in calo"), grow: has("da far crescere"), total: all.length };
+    return top;
   }, [rank, rankPrev, ac, cc]);
 
   return (
@@ -72,9 +79,19 @@ export default function SettimanaPage() {
       {noCreators && <Notice>Non hai ancora creator assegnate: chiedi a un admin di assegnarti le tue creator.</Notice>}
       {loading && !noCreators && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
       {!loading && !noCreators && list.length === 0 && <Notice>Questa settimana nessuno ha bisogno di attenzione particolare. Buon segno: usa il tempo per chi può crescere.</Notice>}
+      {inVetro && !loading && !noCreators && list.counts?.total > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 12, marginBottom: 16 }}>
+          <HotTile i={0} label="Sotto soglia" value={String(list.counts.under)} sub="score ≤ 25 con almeno 5 turni" href={`/admin/action-center?period_id=${cur}`} />
+          <HotTile i={1} label="In calo forte" value={String(list.counts.drop)} sub="15 punti o più sotto il mese scorso" />
+          <HotTile i={2} label="Da far crescere" value={String(list.counts.grow)} sub="score tra 25 e 50, con il training" href="/admin/coaching-center" />
+        </div>
+      )}
+      {inVetro && !loading && !noCreators && list.counts?.total > list.length && (
+        <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 12px" }}>Qui sotto le prime {list.length} di {list.counts.total}, in ordine di priorità.</p>
+      )}
       <div style={{ display: "grid", gap: 12 }}>
         {list.map((p, i) => (
-          <section key={p.employee} style={{ ...card, padding: "16px 18px" }}>
+          <section key={p.employee} className={inVetro ? "vt-glass" : undefined} style={{ ...card, padding: "16px 18px", "--vt-i": i + 3 }}>
             <div style={{ display: "flex", gap: 12, alignItems: "baseline", flexWrap: "wrap" }}>
               <span style={{ fontSize: 13, color: CP.textMuted }}>{i + 1}</span>
               <span style={{ fontSize: 17, fontWeight: 500, color: CP.textPrimary }}>{p.employee}</span>
