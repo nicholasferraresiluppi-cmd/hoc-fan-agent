@@ -11,9 +11,10 @@
 // il mese che sale contro il mese prima e il ritmo del goal, il venduto per ecosistema. Col vetro spento
 // la pagina è quella di prima. Anche qui niente rosso per chi è indietro: verde solo per «ci arriva».
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import useSWR from "swr";
-import { RefreshCw, Pencil, Check, ChevronLeft, ChevronRight, CalendarDays, Plus } from "lucide-react";
+import { RefreshCw, Pencil, Check, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Plus } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHead, Notice, card } from "@/components/ds";
 import { liveFetcher } from "@/components/LiveCreatorPicker";
@@ -119,18 +120,131 @@ function DayNav({ data, go }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", margin: "-4px 0 18px" }}>
       <button aria-label="Giorno prima" onClick={() => go(addDays(data.asOf, -1))} style={iconBtn(false)}><ChevronLeft size={16} /></button>
-      <label style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 14px", borderRadius: 999, border: `1px solid ${CP.border}`, background: CP.surface, cursor: "pointer", fontSize: 14.5, fontWeight: 500, color: CP.textPrimary }}>
-        <CalendarDays size={15} color={CP.textSecondary} />
-        <span>{cap(dayLabel(data.asOf))}</span>
-        {data.live && <span style={{ fontSize: 12, fontWeight: 500, color: CP.accentGreen }}>· in corso</span>}
-        <input type="date" value={data.asOf} max={data.today} onChange={(e) => e.target.value && go(e.target.value)}
-          aria-label="Scegli il giorno" style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", width: "100%" }} />
-      </label>
+      <DayPicker data={data} go={go} trigger={({ open, toggle }) => (
+        <button type="button" onClick={toggle} aria-expanded={open} aria-label="Scegli il giorno"
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 14px", borderRadius: 999, border: `1px solid ${open ? CP.accent : CP.border}`, background: CP.surface, cursor: "pointer", fontSize: 14.5, fontWeight: 500, color: CP.textPrimary }}>
+          <CalendarDays size={15} color={open ? CP.accent : CP.textSecondary} />
+          <span>{cap(dayLabel(data.asOf))}</span>
+          {data.live && <span style={{ fontSize: 12, fontWeight: 500, color: CP.accentGreen }}>· in corso</span>}
+          <ChevronDown size={14} color={CP.textMuted} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
+        </button>
+      )} />
       <button aria-label="Giorno dopo" disabled={atToday} onClick={() => !atToday && go(addDays(data.asOf, 1))} style={iconBtn(atToday)}><ChevronRight size={16} /></button>
       {!atToday && <button onClick={() => go(null)} style={{ ...btn(false), padding: "6px 12px", fontSize: 13 }}>Torna a oggi</button>}
       <span style={{ fontSize: 13, color: CP.textMuted }}>
         {data.live ? `giorno ${Number(data.asOf.slice(8))} di ${data.daysInMonth} · mancano ${data.daysLeft} giorni` : data.daysLeft ? `com'era a fine giornata · mancavano ${data.daysLeft} giorni` : `${monthLabel(data.month)} chiuso`}
       </span>
+    </div>
+  );
+}
+
+// ─── Calendario per scegliere il giorno (30/10/2026) ────────────────────────
+// Nicholas: «anche in web app si possa selezionare un giorno specifico, nel modo più aesthetic
+// possibile» (nel foglio c'è la tendina «Giorno attuale»). Al posto del calendario di sistema: un
+// riquadro con il mese a griglia, ogni giorno con il suo venduto sotto il numero e un puntino verde
+// quando ha preso il target del giorno; frecce per i mesi passati, scorciatoie Oggi / Ieri.
+// Si apre dalla data in alto e dalla casella «Giorno» della testata, come la tendina del foglio.
+
+const WD_SHORT = ["L", "M", "M", "G", "V", "S", "D"];
+const shiftMonth = (m, k) => { const [y, mm] = m.split("-").map(Number); const d = new Date(Date.UTC(y, mm - 1 + k, 1)); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`; };
+const kShort = (v) => (!ok(v) || !v ? "" : v >= 1e4 ? `$${(v / 1e3).toFixed(1).replace(".", ",")}k` : v >= 1e3 ? `$${(v / 1e3).toFixed(1).replace(".", ",")}k` : `$${Math.round(v)}`);
+
+function DayPicker({ data, go, trigger, block = false }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const [view, setView] = useState(data.month);
+  const ref = useRef(null);
+  const popRef = useRef(null);
+  useEffect(() => { if (open) setView(data.month); }, [open, data.month]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (ref.current?.contains(e.target) || popRef.current?.contains(e.target)) return; setOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    // fisso sullo schermo (la testata ha overflow nascosto): si ricolloca se la pagina scorre
+    const place = () => {
+      const r = ref.current?.getBoundingClientRect();
+      if (!r) return;
+      const w = Math.min(360, window.innerWidth - 32);
+      // il riquadro vive in <body> (sopra il vetro, che crea contesti propri): si porta dietro le variabili
+      // di colore del punto in cui si apre, così resta nei colori della pagina
+      const cs = getComputedStyle(ref.current);
+      const vars = {};
+      for (let i = 0; i < cs.length; i++) { const k = cs[i]; if (k.startsWith("--")) vars[k] = cs.getPropertyValue(k); }
+      setPos({ top: r.bottom + 8, left: Math.max(16, Math.min(r.left, window.innerWidth - w - 16)), width: w, vars });
+    };
+    place();
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", place, true); window.removeEventListener("resize", place);
+    };
+  }, [open]);
+
+  const todayMonth = data.today.slice(0, 7);
+  const minMonth = shiftMonth(todayMonth, -24);
+  const [y, m] = view.split("-").map(Number);
+  const dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const lead = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7; // lunedì = 0
+  const sameMonth = view === data.month;
+  const byDay = sameMonth ? new Map(data.days.map((d) => [d.day, d])) : new Map();
+  const target = sameMonth ? data.totals?.targetDay : null;
+  const cells = [...Array(lead).fill(null), ...Array.from({ length: dim }, (_, i) => i + 1)];
+  const pick = (iso) => { setOpen(false); go(iso); };
+
+  return (
+    <div ref={ref} style={{ position: "relative", display: block ? "block" : "inline-block" }}>
+      {trigger({ open, toggle: () => setOpen((v) => !v) })}
+      {open && pos && createPortal(
+        <div ref={popRef} role="dialog" aria-label="Scegli il giorno" style={{
+          ...pos.vars, fontFamily: FONTS.body,
+          position: "fixed", top: pos.top, left: pos.left, zIndex: 1000, width: pos.width,
+          background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 18, padding: 14,
+          boxShadow: "0 18px 50px rgba(20,23,31,.18), 0 2px 8px rgba(20,23,31,.08)", animation: "bilPop .14s ease-out",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <button type="button" aria-label="Mese prima" disabled={view <= minMonth} onClick={() => setView(shiftMonth(view, -1))} style={iconBtn(view <= minMonth)}><ChevronLeft size={16} /></button>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>{monthLabel(view)}</div>
+            <button type="button" aria-label="Mese dopo" disabled={view >= todayMonth} onClick={() => setView(shiftMonth(view, 1))} style={iconBtn(view >= todayMonth)}><ChevronRight size={16} /></button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+            {WD_SHORT.map((w, i) => <div key={i} style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: i >= 5 ? CP.accent : CP.textMuted, padding: "2px 0 4px" }}>{w}</div>)}
+            {cells.map((d, i) => {
+              if (!d) return <div key={`e${i}`} />;
+              const iso = `${view}-${String(d).padStart(2, "0")}`;
+              const future = iso > data.today;
+              const sel = iso === data.asOf;
+              const isToday = iso === data.today;
+              const info = byDay.get(d);
+              const hit = ok(target) && target > 0 && !info?.partial && (info?.total || 0) >= target;
+              const weekend = (lead + d - 1) % 7 >= 5;
+              return (
+                <button key={iso} type="button" disabled={future} onClick={() => pick(iso)} title={future ? undefined : cap(dayLabel(iso))}
+                  className="bil-day"
+                  style={{
+                    position: "relative", height: 48, borderRadius: 12, cursor: future ? "default" : "pointer",
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
+                    border: isToday && !sel ? `1.5px solid ${alpha(CP.accent, "88")}` : "1px solid transparent",
+                    background: sel ? CP.accent : "transparent", color: sel ? "#fff" : future ? alpha(CP.textMuted, "88") : weekend ? CP.accent : CP.textPrimary,
+                  }}>
+                  <span style={{ fontSize: 14, fontWeight: sel || isToday ? 600 : 500, ...NUM }}>{d}</span>
+                  {info && !future && <span style={{ fontSize: 9.5, ...NUM, color: sel ? "rgba(255,255,255,.85)" : CP.textMuted }}>{kShort(info.total)}</span>}
+                  {hit && <span style={{ position: "absolute", top: 5, right: 6, width: 5, height: 5, borderRadius: 999, background: sel ? "#fff" : CP.accentGreen }} />}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${CP.borderSoft}` }}>
+            <button type="button" onClick={() => pick(null)} style={{ ...btn(data.asOf === data.today), padding: "6px 12px", fontSize: 13 }}>Oggi</button>
+            <button type="button" onClick={() => pick(addDays(data.today, -1))} style={{ ...btn(data.asOf === addDays(data.today, -1)), padding: "6px 12px", fontSize: 13 }}>Ieri</button>
+            {sameMonth && ok(target) && <span style={{ marginLeft: "auto", fontSize: 11.5, color: CP.textMuted, display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 6, height: 6, borderRadius: 999, background: CP.accentGreen }} />target del giorno preso</span>}
+          </div>
+          <style>{`@keyframes bilPop { from { opacity: 0; transform: translateY(-4px) scale(.98) } to { opacity: 1; transform: none } } .bil-day:not(:disabled):hover { background: ${alpha(CP.accent, "14")} !important; }`}</style>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
@@ -171,7 +285,13 @@ function Sheet({ data, go, mine, editing, onSaved }) {
           Bilancio creator · {monthLabel(data.month)} <span style={{ fontWeight: 400, opacity: 0.75 }}>· dati live dal warehouse</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
-          <HeadCell fill={FILL.yellow} label="Giorno" value={`${Number(data.asOf.slice(8))} di ${data.daysInMonth}`} note={data.live ? "in corso" : data.daysLeft ? "a fine giornata" : "mese chiuso"} />
+          <DayPicker block data={data} go={go} trigger={({ open, toggle }) => (
+            <button type="button" onClick={toggle} aria-expanded={open} aria-label="Scegli il giorno" title="Scegli il giorno"
+              style={{ all: "unset", display: "block", width: "100%", height: "100%", boxSizing: "border-box", cursor: "pointer" }}>
+              <HeadCell fill={FILL.yellow} label={<span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>Giorno <ChevronDown size={13} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }} /></span>}
+                value={`${Number(data.asOf.slice(8))} di ${data.daysInMonth}`} note={data.live ? "in corso" : data.daysLeft ? "a fine giornata" : "mese chiuso"} />
+            </button>
+          )} />
           <HeadCell fill={FILL.blue} label="Revenue mese ad oggi" value={usd(t.mtd)} note={ok(t.goal) ? `${pct(t.pctActual)} del goal · ideale ${pct(data.idealPct)}` : null} />
           <HeadCell fill={FILL.green} label={data.daysLeft ? "Proiezione fine mese" : "Chiuso a"} value={usd(data.daysLeft ? t.projection : t.mtd)} note={<StatusText r={t} closed={!data.daysLeft} />} />
           <HeadCell label="Goal del mese" value={usd(t.goal)} note={ok(t.targetDay) ? `${usd(t.targetDay)} al giorno` : "nessun goal messo"} />
