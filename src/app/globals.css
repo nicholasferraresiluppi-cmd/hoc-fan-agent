@@ -374,3 +374,8 @@ html.casa-intro[data-style="v3"]::after {
   .hoc-fb { padding: 10px !important; right: 12px !important; bottom: 12px !important; }
   .hoc-fb-label { display: none; }
 }
+
+/* Schede (ds.js tabStyle): fondo tenue al passaggio su quelle non aperte */
+.hoc-tab { transition: background-color .12s ease, color .12s ease; }
+.hoc-tab:not([aria-selected="true"]):not([aria-current]):hover { background-color: color-mix(in srgb, var(--cp-accent) 7%, transparent) !important; color: var(--cp-textPrimary) !important; }
+.hoc-tab:focus-visible { outline: 2px solid var(--cp-accent); outline-offset: -2px; }

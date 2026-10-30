@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CP, FONTS } from "@/lib/brand";
+import { tabStyle, TABS_BAR } from "@/components/ds";
 
 const TOOLS = [
   { href: "/admin/pnl-live",         label: "P&L Live" },
@@ -26,12 +27,11 @@ export default function CompNav({ palette } = {}) {
   const P = palette || CP; // palette alternativa (tema chiaro del pilota)
   const pathname = String(usePathname() || "").replace(/\/$/, "");
   return (
-    <nav aria-label="Comp & Ben" className="ds-tabs" style={{ display: "flex", alignItems: "flex-end", gap: 22, borderBottom: `1px solid ${P.border}`, margin: "0 0 22px", overflowX: "auto", scrollbarWidth: "none", fontFamily: FONTS.body }}>
+    <nav aria-label="Comp & Ben" className="ds-tabs" style={{ ...TABS_BAR, borderBottom: `1px solid ${P.borderStrong}`, margin: "0 0 22px", fontFamily: FONTS.body }}>
       {TOOLS.map(({ href, label, also }) => {
         const active = pathname === href || (also || []).includes(pathname);
         return (
-          <Link key={href} href={href} aria-current={active ? "page" : undefined}
-            style={{ display: "inline-block", padding: "8px 0 10px", marginBottom: -1, borderBottom: `2px solid ${active ? P.accent : "transparent"}`, color: active ? P.textPrimary : P.textSecondary, fontSize: 14.5, fontWeight: active ? 500 : 400, textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0 }}>
+          <Link key={href} href={href} aria-current={active ? "page" : undefined} className="hoc-tab" style={tabStyle(active, { P })}>
             {label}
           </Link>
         );
