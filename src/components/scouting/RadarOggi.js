@@ -5,7 +5,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { CP, alpha } from "@/lib/brand";
 import { pickToday, movers, whyLines, reviewQueue, RATINGS } from "@/lib/scouting-core";
-import { SERIF, NUM, fmtFull, fmtDate, btn, btnPrimary, btnQuiet, Initials, LinkChip, Growth, Spark, H2, BigNum, STAGE_LABEL, RatingChips } from "./radar-ui";
+import HeroHead, { BigNum as HeroNum } from "@/components/HeroHead";
+import { SERIF, NUM, fmtFull, fmtDate, btn, btnPrimary, btnQuiet, Initials, LinkChip, Growth, Spark, H2, STAGE_LABEL, RatingChips } from "./radar-ui";
 
 
 export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, act, busy, inbox, onSegnala, onValuta, onReload }) {
@@ -23,21 +24,21 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
   const toReview = reviewQueue(creators, { scope: "paid", newCut }).length;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 52 }}>
-      {onValuta && toReview > 0 && (
-        <button onClick={onValuta} style={{ all: "unset", boxSizing: "border-box", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, padding: "16px 18px", borderRadius: 14, border: `1px solid ${alpha(CP.gold, "77")}`, background: alpha(CP.gold, "10") }}>
-          <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            <span style={{ ...SERIF, fontSize: 24, lineHeight: 1.1 }}>{fmtFull(toReview)} creator col profilo a pagamento da valutare</span>
-            <span style={{ fontSize: 13.5, color: CP.textSecondary }}>Una alla volta: scarta, vista o interessante.</span>
-          </span>
-          <span style={{ fontSize: 15, color: CP.gold, whiteSpace: "nowrap" }}>Inizia →</span>
-        </button>
-      )}
-      <section aria-label="Il radar in numeri" className="ro-nums" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "24px 40px", borderTop: `1px solid ${CP.border}`, borderBottom: `1px solid ${CP.border}`, padding: "26px 0" }}>
-        <BigNum value={fmtFull(creators.length)} label="creator italiane seguite" />
-        <BigNum value={fmtFull(paid)} label="con un profilo a pagamento" gold />
-        <BigNum value={fmtFull(fmt)} label="con un format che si ripete" />
-        <BigNum value={fmtFull(contacted)} label="contattate · in attesa del parere legale" />
-      </section>
+      <style>{RO_CSS}</style>
+      <HeroHead
+        eyebrow="Radar creator · oggi"
+        title={toReview ? "Da valutare ci sono" : "Il radar segue"}
+        accent={toReview ? `${fmtFull(toReview)} creator` : `${fmtFull(creators.length)} creator`}
+        sub={toReview ? "Tutte col profilo a pagamento. Una alla volta: un voto per ognuna." : "Nessuna col profilo a pagamento resta da valutare: le hai guardate tutte."}
+        numbers={<>
+          <HeroNum label="Creator seguite" value={creators.length} />
+          <HeroNum label="Con profilo a pagamento" value={paid} strong />
+          <HeroNum label="Con un format" value={fmt} />
+          <HeroNum label="Contattate" value={contacted} title="In attesa del parere legale" />
+        </>}
+        actions={onValuta && toReview > 0 ? <button style={btnPrimary} onClick={onValuta}>Inizia a valutare</button> : null}
+        style={{ marginBottom: -20 }}
+      />
 
       <section aria-labelledby="r-oggi" style={{ display: "flex", flexDirection: "column", gap: 26 }}>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
@@ -47,11 +48,11 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
         {today.length === 0 ? (
           <p style={{ color: CP.textSecondary, margin: 0 }}>Nessuna creator da valutare con un profilo a pagamento: le hai già guardate tutte.</p>
         ) : (
-          <div className="ro-today" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 36 }}>
+          <div className="ro-today" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
             {today.map((c, i) => {
               const why = whyLines(c, { newCut });
               return (
-                <article key={c.id} style={{ display: "flex", flexDirection: "column", gap: 16, borderTop: `1px solid ${i === 0 ? CP.gold : CP.borderStrong || CP.border}`, paddingTop: 20 }}>
+                <article key={c.id} className="ro-card" style={{ display: "flex", flexDirection: "column", gap: 16, borderRadius: 18, border: `1px solid ${i === 0 ? alpha(CP.gold, "88") : CP.borderSoft || CP.border}`, background: i === 0 ? `radial-gradient(ellipse at 15% 0%, ${alpha(CP.gold, "14")}, transparent 60%), ${CP.surface}` : CP.surface, padding: 20, animationDelay: `${i * 70}ms` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <Initials name={c.name} gold={i === 0} pic={c.pic} />
                     <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
@@ -214,3 +215,11 @@ function HlReread({ st, onReload }) {
     </section>
   );
 }
+
+// Schede di «Da guardare oggi»: entrano una dopo l'altra e si sollevano al passaggio (stile reel).
+const RO_CSS = `
+.ro-card{animation:roIn .45s cubic-bezier(.2,.7,.2,1) both;transition:transform .18s ease, box-shadow .18s ease}
+@media (hover:hover){.ro-card:hover{transform:translateY(-3px);box-shadow:0 10px 28px -14px rgba(0,0,0,.35)}}
+@keyframes roIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.ro-card{animation:none;transition:none}.ro-card:hover{transform:none}}
+`;
