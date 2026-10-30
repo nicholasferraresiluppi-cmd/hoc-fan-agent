@@ -130,7 +130,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/admin/ads", title: "Studio bio-funnel", desc: "Come lavorano gli altri sulla landing-ponte OF e cosa converte meglio: 112 landing reali analizzate + template per le creator", icon: Megaphone },
       { href: "/admin/studio-social", title: "Studio social", desc: "I profili social delle creator gestiti dalla redazione: identità, coda dei contenuti con i revisori, cosa fare oggi a mano", icon: Clapperboard },
       { href: "/admin/supervisor", title: "Account social", desc: "Account di promozione per creator e alterego, telefoni dei publisher, caselle mail e link in bio; password cifrate, viste una alla volta e registrate", icon: Share2 },
-      { href: "/admin/warmup", title: "Social", desc: "I profili Instagram e X delle creator: il to-do di oggi (warm-up e contenuti da pubblicare), il calendario dei contenuti dal drive, segnalazioni, cooldown e numeri della settimana", icon: Sunrise },
+      { href: "/admin/warmup", title: "Clipping", desc: "I profili Instagram e X delle creator: il to-do di oggi (warm-up e contenuti da pubblicare), il calendario dei contenuti dal drive, segnalazioni, cooldown e numeri della settimana", icon: Sunrise },
       { href: "/admin/social-proxies", title: "Proxy account social", desc: "Proxy SOCKS5/HTTP per isolare le connessioni degli account social ufficiali dei creator", icon: Shield },
     ],
   },

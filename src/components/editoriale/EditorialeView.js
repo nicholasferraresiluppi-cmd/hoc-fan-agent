@@ -598,7 +598,7 @@ export default function EditorialeView({ embedded = false } = {}) {
     <VetroScope on={vetro}>
     <style>{ED_CSS}</style>
     <div style={embedded ? { fontFamily: FONTS.body, color: CP.textPrimary } : { maxWidth: 1600, margin: "0 auto", padding: "20px 16px 60px", fontFamily: FONTS.body, color: CP.textPrimary }}>
-      {!embedded && <PageHead crumbs={[{ label: "Marketing" }, { label: "Social" }]} title="Contenuti Instagram"
+      {!embedded && <PageHead crumbs={[{ label: "Marketing" }, { label: "Clipping" }]} title="Contenuti Instagram"
         subtitle="Dal drive della creator al calendario del profilo: smisti foto e video, prepari caroselli e reel, li metti in calendario. Una foto usata non si può più scegliere." />}
       {base?.creators?.length > 1 && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>

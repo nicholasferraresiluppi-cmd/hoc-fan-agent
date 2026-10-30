@@ -154,7 +154,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/ads",                      label: "Studio bio-funnel", icon: Megaphone },
       { href: "/admin/studio-social",            label: "Studio social",   icon: Clapperboard },
       { href: "/admin/supervisor",               label: "Account social",  icon: Share2 },
-      { href: "/admin/warmup",                   label: "Social",         icon: Sunrise },
+      { href: "/admin/warmup",                   label: "Clipping",       icon: Sunrise },
       { href: "/admin/social-proxies",           label: "Proxy account social", icon: Shield },
     ],
   },
