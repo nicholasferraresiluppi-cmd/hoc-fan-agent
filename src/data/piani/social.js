@@ -1,6 +1,7 @@
 // Primo piano (30/10/2026): Social, collaudo dello strumento e decisione sui 3 dispositivi.
 // Stesso contenuto del documento «Social: piano dei prossimi giorni» consegnato a Luis.
-// Si carica con scripts/piani-seed.mjs; ricaricarlo cambia le voci ma non tocca le spunte.
+// Caricato con scripts/piani-seed.mjs il 30/10; da allora si modifica dall'editor in /admin/piani
+// (questo file è la versione di partenza, non quella viva).
 const W = "/admin/warmup";
 
 export const SOCIAL_PLAN = {

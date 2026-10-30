@@ -4,7 +4,7 @@
 // GET ?id={id}        un piano valutato (voci, spunte, controlli automatici)
 // GET ?area={area}    il piano in corso di un'area (per la scheda in cima alla pagina di lavoro)
 // POST {action:"item", planId, itemId, done?, answer?}   spunta o risposta su una voce
-// POST {action:"save", plan}                            crea / aggiorna un piano (solo admin)
+// POST {action:"save", plan, create?}                   crea / aggiorna / archivia un piano (solo admin, dall'editor in pagina)
 //
 // Chi vede un piano: gli admin tutti; gli altri i piani la cui capability (`cap`) hanno
 // (es. social.manage per il piano Social).
@@ -54,7 +54,7 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   if (body.action === "save") {
     if (!g.admin) return Response.json({ error: "I piani li scrive un amministratore" }, { status: 403 });
-    const r = await savePlan(body.plan);
+    const r = await savePlan(body.plan, { create: Boolean(body.create), by: g.by });
     return r.ok ? Response.json({ ok: true, plan: r.plan }) : Response.json({ error: r.errors.join(" · ") }, { status: 400 });
   }
   if (body.action === "item") {

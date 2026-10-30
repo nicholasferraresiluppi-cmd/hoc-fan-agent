@@ -19,6 +19,20 @@ export const AUTO_TYPES = {
   feedback_open: "Segnalazioni aperte",
 };
 
+/** Campi di ogni controllo automatico, per l'editor: [chiave, etichetta, tipo | elenco di valori]. */
+export const AUTO_FIELDS = {
+  radar_profiles: [["country", "Paese", [["", "tutti"], ["ita", "Italia"], ["eng", "Inglese"]]], ["min", "Almeno", "n"]],
+  radar_saved: [["min", "Almeno", "n"]],
+  editoriale_items: [["kind", "Tipo", [["", "tutti"], ["carosello", "Caroselli"], ["reel", "Reel"]]], ["min", "Almeno", "n"]],
+  autopub: [["min", "Almeno", "n"]],
+  calendar_days: [["days", "Giorni", "n"]],
+  weekly_data: [],
+  feedback_open: [["kind", "Tipo", [["", "tutte"], ["problem", "Problemi"], ["idea", "Idee"], ["question", "Domande"]]], ["page", "Pagina che inizia con", "t"]],
+};
+
+/** Id nuovo e stabile per voci e fasi aggiunte dall'editor (mai dalla posizione: le spunte sono legate all'id). */
+export const newId = (p = "v") => `${p}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
 const s = (v, n) => String(v ?? "").trim().slice(0, n);
 const isDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ""));
 const slug = (v) => s(v, 40).toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "");
