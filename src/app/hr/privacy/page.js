@@ -35,7 +35,7 @@ export default function HrPrivacyPage() {
           <li style={li}>Dati anagrafici: nome, cognome, data e luogo di nascita, genere, nazionalità, codice fiscale.</li>
           <li style={li}>Residenza e recapiti: indirizzo, comune, CAP, email e telefono personali, profilo LinkedIn se lo indichi.</li>
           <li style={li}>Documento d'identità e curriculum, se li carichi.</li>
-          <li style={li}>Informazioni sul lavoro: mansione attuale, partita IVA sì/no, lingue, disponibilità oraria, competenze e livello, ruoli già ricoperti, cosa vorresti imparare, interessi.</li>
+          <li style={li}>Informazioni sul lavoro: mansione attuale, partita IVA (sì/no e, se ce l'hai, il numero), lingue, disponibilità oraria, competenze e livello, ruoli già ricoperti, cosa vorresti imparare, interessi.</li>
         </ul>
         <p style={p}>Non ti chiediamo dati bancari in questo modulo e non ti chiediamo dati sanitari, opinioni o altre categorie particolari di dati.</p>
 

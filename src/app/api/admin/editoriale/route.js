@@ -22,7 +22,7 @@ import { driveConfigured, driveEmail, thumbnail, mediaChunk, photoForPublishing 
 import {
   creatorsWithProfiles, allConfigs, getConfig, setFolder, getFiles, listItems, saveItem, deleteItem, stepItem, getLog,
 } from "@/lib/editoriale-store";
-import { creatorKey, usageMap } from "@/lib/editoriale-core";
+import { creatorKey, usageMap, rawUses } from "@/lib/editoriale-core";
 import { kv } from "@vercel/kv";
 
 const noStore = { headers: { "Cache-Control": "no-store" } };
@@ -88,8 +88,8 @@ export async function GET(request) {
   const c = creators.find((x) => x.ck === ck);
   if (!c) return Response.json({ error: "Creator senza profili Instagram in Account social" }, { status: 404 });
   const [files, items] = await Promise.all([cfg ? getFiles(ck, { force: sp.get("refresh") === "1" }) : null, listItems(ck)]);
-  const used = usageMap(items);
-  const list = (files?.files || []).map((f) => ({ ...f, usedBy: used.get(f.id) || null }));
+  const used = usageMap(items), raw = rawUses(items);
+  const list = (files?.files || []).map((f) => ({ ...f, usedBy: used.get(f.id) || null, uses: raw.get(f.id)?.length || 0 }));
   return Response.json({
     creator: c.creator, ck, profiles: c.profiles, folder: cfg, drive,
     files: list, folders: files?.folders || [], filesAt: files?.at || null, filesError: files?.error || null, truncated: Boolean(files?.truncated),

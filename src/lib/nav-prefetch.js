@@ -12,7 +12,11 @@ import { mutate } from "swr";
 const ls = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 
 const DATA = {
-  "/admin/warmup": () => ["/api/admin/warmup"],
+  "/admin/warmup": () => {
+    // Social: to-do e anche la scheda Contenuti (Editoriale) già pronta
+    const c = ls("hoc:editoriale:creator");
+    return ["/api/admin/warmup", "/api/admin/editoriale", ...(c ? [`/api/admin/editoriale?creator=${encodeURIComponent(c)}`] : [])];
+  },
   "/admin/editoriale": () => {
     const c = ls("hoc:editoriale:creator");
     return ["/api/admin/editoriale", "/api/admin/warmup", ...(c ? [`/api/admin/editoriale?creator=${encodeURIComponent(c)}`] : [])];
@@ -53,4 +57,23 @@ export function prefetchData(keys) {
       .then((d) => { if (d && !d.error) mutate(key, d, { revalidate: false }); })
       .catch(() => {});
   }
+}
+
+/**
+ * Telefono e tablet (niente passaggio del mouse): quando l'app è ferma si precaricano da sole le
+ * pagine principali che la persona ha nel menu (solo quelle con dati noti, al massimo 6), così il
+ * tocco trova tutto pronto. Una volta per caricamento dell'app.
+ */
+let idleDone = false;
+export function prefetchMenuWhenIdle(router, hrefs) {
+  if (idleDone || typeof window === "undefined") return;
+  let touch = false;
+  try { touch = window.matchMedia("(hover: none)").matches; } catch {}
+  if (!touch) return;
+  const list = (hrefs || []).filter((h) => DATA[h]).slice(0, 6);
+  if (!list.length) return;
+  idleDone = true;
+  const run = () => list.forEach((h, i) => setTimeout(() => prefetchNav(router, h), i * 400));
+  if ("requestIdleCallback" in window) window.requestIdleCallback(run, { timeout: 4000 });
+  else setTimeout(run, 2500);
 }

@@ -10,9 +10,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
-import { ChevronRight, Flag, Pencil, Plus, Trash2, Undo2, UserRound, ExternalLink } from "lucide-react";
+import { Check, ChevronRight, Flag, Pencil, Plus, Trash2, Undo2, UserRound, ExternalLink } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
-import { PageHead, Notice, NUM, FilterChip } from "@/components/ds";
+import { PageHead, Notice, NUM, FilterChip, Tabs, Segmented, FilterBar } from "@/components/ds";
 import {
   btn, btnPrimary, btnDanger, btnOk, btnSm, input, cardBox, eyebrow, muted, hint, TONE, statusColor,
   GroupLabel, SectionHead, Ring, Avatar, Chip, Dot, Seg, Fold, Bullets, TaskRow, TimerChip, TaskList, KV, Field,
@@ -20,17 +20,20 @@ import {
 } from "@/components/warmup/ui";
 import { GuideIG, GuideX } from "@/components/warmup/guide";
 import XRefs from "@/components/warmup/xrefs";
+import ClipRadar from "@/components/warmup/clip-radar";
 import {
   DAY, PLATS, platOf, isX, keyOf, norm, todayKey, startOfDay, fmtDur, mmss, weekKey, weekLabel, lastWeeks,
   numFmt, delta, planFor, planForDate, visibleItems, dayProgress, tasksOn, adherence, hasArrears,
   opDay, realDay, pausedDays, isCooldown, cooldownDay, stateOf, stateInfo, undoableState, restoreState,
   ownerName, mine, urgenze, FL, ST, MS, SE, wfields, xGoal, IPROT, fillDefaults, applyState, openFlag,
-  clearFlag, endCooldown,
+  clearFlag, endCooldown, WINDOWS,
 } from "@/lib/warmup-plan";
-import { prefillFor, publicAlerts, normalizeOfLink } from "@/lib/warmup-metrics-core";
-import { pubKindOfTask, itemForTask } from "@/lib/editoriale-core";
+import { prefillFor, dailyPrefill, linkRange, publicAlerts, normalizeOfLink } from "@/lib/warmup-metrics-core";
+import { pubKindOfTask, itemForTask, autoItemForTask } from "@/lib/editoriale-core";
 import PublishDownload from "@/components/PublishDownload";
 import MediaLightbox from "@/components/MediaLightbox";
+import EditorialeView from "@/components/editoriale/EditorialeView";
+import HeroHead, { BigNum } from "@/components/HeroHead";
 
 const API = "/api/admin/warmup";
 const fetcher = (url) =>
@@ -443,6 +446,22 @@ function RenameModal({ old, onClose, onSave }) {
 
 // ── grafico piccolo, una serie ──────────────────────────────────────────────
 
+// casella di un profilo dentro un'azione (vista «per azione» di Oggi): tutto il bottone si tocca
+function ProfileCheck({ a, on, onToggle }) {
+  return (
+    <button type="button" onClick={onToggle} aria-pressed={on} title={on ? "Fatta: tocca per riaprire" : "Tocca per segnarla fatta"}
+      style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 10px 6px 6px", minHeight: 36, borderRadius: 10, border: `1px solid ${on ? alpha(CP.accentGreen, "66") : CP.border}`, background: on ? alpha(CP.accentGreen, "14") : CP.surface, color: on ? CP.textMuted : CP.textPrimary, cursor: "pointer", fontFamily: FONTS.body, fontSize: 13.5, flex: "0 0 auto" }}>
+      <span style={{ width: 22, height: 22, borderRadius: 6, border: `1.5px solid ${on ? CP.accentGreen : CP.borderStrong}`, background: on ? CP.accentGreen : "transparent", display: "grid", placeItems: "center" }}>
+        {on && <Check size={14} strokeWidth={3} color={CP.surface} />}
+      </span>
+      <span style={{ textDecoration: on ? "line-through" : "none" }}>{a.username}</span>
+    </button>
+  );
+}
+
+// giorno locale come YYYY-MM-DD
+const isoDay = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+
 function LineChart({ title, pts }) {
   const vals = pts.map((p) => p.v).filter((v) => v != null);
   const last = [...pts].reverse().find((p) => p.v != null);
@@ -496,6 +515,16 @@ export default function WarmupPage() {
   const [mview, setMview] = useState(null); // { creator, files: [{id, kind}], idx } — foto del contenuto ingrandite
   const [net, setNet] = useState("ok");
   const [rpane, setRpane] = useState("pano");
+  // periodo dell'andamento (29/10, Nicholas: «un giorno specifico o un arco di tempo specifico»)
+  const [per, setPer] = useState("w8");
+  const [perFrom, setPerFrom] = useState(() => isoDay(Date.now() - 6 * DAY));
+  const [perTo, setPerTo] = useState(() => isoDay(Date.now()));
+  const [panoCreator, setPanoCreator] = useState("");
+  // Oggi: per profilo o per azione (29/10, pannello tester: con 10-20 profili la stessa lista si ripete ~340 righe)
+  const [oggiVista, setOggiVistaState] = useState(null);
+  const setOggiVista = (v) => { setOggiVistaState(v); try { localStorage.setItem("hoc:warmup:oggi-vista", v); } catch {} };
+  useEffect(() => { try { const v = localStorage.getItem("hoc:warmup:oggi-vista"); if (v === "prof" || v === "azione") setOggiVistaState(v); } catch {} }, []);
+  const [panoAcc, setPanoAcc] = useState("");
   const [wkAll, setWkAll] = useState(null);
   const [sortAll, setSortAll] = useState("views");
   const [flagDays, setFlagDays] = useState(30);
@@ -508,8 +537,12 @@ export default function WarmupPage() {
     const p = ls.get(PLAT_KEY); if (p === "x" || p === "ig") setPlatState(p);
     try { const t = JSON.parse(ls.get(TIMER_KEY) || "null"); if (t && t.day === todayKey()) setTimerState(t); else ls.set(TIMER_KEY, null); } catch {}
     try { const v = JSON.parse(sessionStorage.getItem("hoc:warmup:view") || "null"); if (v) { if (v.tab) setTab(v.tab); if (v.folder) setFolder(v.folder); if (v.sel) { setSel(v.sel); setPane(v.pane || "oggi"); } } } catch {}
+    // ?tab=contenuti (link dal vecchio /admin/editoriale e dai compiti di Oggi) vince sulla vista salvata
+    try { const t = new URLSearchParams(window.location.search).get("tab"); if (t) { setTab(t); setSel(null); setForm(null); if (t === "contenuti") setPlatState("ig"); } } catch {}
   }, []);
   useEffect(() => { try { sessionStorage.setItem("hoc:warmup:view", JSON.stringify({ tab, sel, pane, folder })); } catch {} }, [tab, sel, pane, folder]);
+  // l'indirizzo segue la scheda: ricaricando si resta dove si è (niente ?tab= vecchio)
+  useEffect(() => { try { const u = new URL(window.location.href); const want = tab === "oggi" ? null : tab; if ((u.searchParams.get("tab") || null) !== want) { if (want) u.searchParams.set("tab", want); else u.searchParams.delete("tab"); window.history.replaceState(window.history.state, "", u.pathname + u.search); } } catch {} }, [tab]);
   // orologi delle segnalazioni ogni 30 s, il timer ogni secondo
   useEffect(() => { const t = setInterval(() => setTick(Date.now()), timer ? 1000 : 30000); return () => clearInterval(t); }, [timer]);
 
@@ -523,7 +556,7 @@ export default function WarmupPage() {
   const isMine = (a) => mine(a, me.id);
 
   const toast = (m) => { setToastMsg(m); setTimeout(() => setToastMsg((x) => (x === m ? null : x)), 2800); };
-  const setPlat = (v) => { if (v === plat) return; setPlatState(v); ls.set(PLAT_KEY, v); setSel(null); setFolder(null); setPane("oggi"); setOpenWhy({}); setForm(null); if (tab === "xrefs") setTab("oggi"); window.scrollTo(0, 0); };
+  const setPlat = (v) => { if (v === plat) return; setPlatState(v); ls.set(PLAT_KEY, v); setSel(null); setFolder(null); setPane("oggi"); setOpenWhy({}); setForm(null); if (tab === "xrefs" || tab === "contenuti") setTab("oggi"); window.scrollTo(0, 0); };
 
   // ── scritture: prima sullo schermo, poi sul server, poi si rilegge ──
   const optimistic = (id, fn) => mutate((cur) => cur && { ...cur, profiles: cur.profiles.map((p) => { if (p.id !== id) return p; const c = structuredClone(p); fillDefaults(c); fn(c); return c; }) }, { revalidate: false });
@@ -655,8 +688,11 @@ export default function WarmupPage() {
   const openProfile = (id, p = "oggi") => { setTab("acct"); setSel(id); setPane(p); setOpenWhy({}); setForm(null); const a = byId(id); setFolder(a?.creator || null); window.scrollTo(0, 0); };
 
   // ── righe di task con timer ──
-  function taskRow(a, item, done, day) {
-    const k = a.id + ":" + item.id, on = Boolean(done[item.id]);
+  // stato di una task su un profilo: fatta (anche in automatico), timer, contenuto in calendario
+  function taskBits(a, item, done, day) {
+    // spunta anche quando il contenuto di questa task è stato trovato sul profilo (pubblicato in automatico)
+    const auto = !done[item.id] && pubKindOfTask(item.id) && !isX(a) ? autoItemForTask((a.ed?.[day] || []).map((x) => ({ ...x, slot: { profileId: a.id, date: day, time: x.time } })), a.id, day, item.id) : null;
+    const on = Boolean(done[item.id] || auto);
     let timerEl = null;
     if (item.timer && day === todayKey()) {
       const run = timer && timer.acc === a.id && timer.task === item.id;
@@ -664,7 +700,11 @@ export default function WarmupPage() {
       if (!on || run) timerEl = <TimerChip item={item} running={run} left={timerLeft(timer)} doneMin={mins} onStart={() => startTimer(a, item)} onPause={() => (item.timer.mode === "accum" ? stopTimer() : setTimer(null))} />;
       else if (mins > 0) timerEl = <div style={{ ...hint, marginTop: 4 }}>{mins} min col timer</div>;
     }
-    const edEl = edLine(a, item.id, day, on);
+    return { on, timerEl, edEl: edLine(a, item.id, day, on) };
+  }
+  function taskRow(a, item, done, day) {
+    const k = a.id + ":" + item.id;
+    const { on, timerEl, edEl } = taskBits(a, item, done, day);
     return <TaskRow key={k} item={item} done={on} open={openWhy[k]} onToggle={() => toggleTask(a, item.id, day)} onWhy={() => setOpenWhy((o) => ({ ...o, [k]: !o[k] }))} timer={edEl ? <>{timerEl}{edEl}</> : timerEl} />;
   }
   // fila di anteprime del contenuto (tutte le foto del carosello, o il reel): un tocco le ingrandisce
@@ -690,22 +730,23 @@ export default function WarmupPage() {
     if (!kind || isX(a) || !a.creator) return null;
     const list = (a.ed?.[day] || []).map((x) => ({ ...x, slot: { profileId: a.id, date: day, time: x.time } }));
     const it = itemForTask(list, a.id, day, taskId);
-    const href = `/admin/editoriale`;
+    const href = `/admin/warmup?tab=contenuti`;
+    const goContent = (e) => { e.preventDefault(); setTab("contenuti"); setSel(null); window.scrollTo(0, 0); };
     if (!it) {
       if (done) return null;
-      return <div style={{ ...hint, marginTop: 5 }}>Niente in calendario per oggi · <a href={href} style={{ color: CP.accentSoftText }}>preparalo nell'Editoriale</a></div>;
+      return <div style={{ ...hint, marginTop: 5 }}>Niente in calendario per oggi · <a href={href} onClick={goContent} style={{ color: CP.accentSoftText }}>preparalo in Contenuti</a></div>;
     }
     return (
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 7, padding: 8, borderRadius: 10, border: `1px solid ${CP.borderSoft}`, background: CP.bgSunken, maxWidth: 520 }}>
         <div style={{ flex: 1, minWidth: 0, fontSize: 13 }}>
-          <div style={{ color: CP.textPrimary }}>{kind === "carosello" ? "Carosello" : "Reel"} «{it.title}»{it.time ? ` · ${it.time}` : ""}{it.status === "pubblicato" ? " · pubblicato" : ""}</div>
+          <div style={{ color: CP.textPrimary }}>{kind === "carosello" ? "Carosello" : "Reel"} «{it.title}»{it.time ? ` · ${it.time}` : ""}{it.status === "pubblicato" ? " · pubblicato" : ""}{it.autoPub?.url && <> · <a href={it.autoPub.url} target="_blank" rel="noopener noreferrer" style={{ color: CP.accentSoftText }}>trovato sul profilo ↗</a></>}</div>
           <div style={{ ...hint, marginTop: 2 }}>{kind === "carosello" ? `${it.files} foto` : "video montato"}{it.sound ? ` · sound: ${it.sound}` : ""}{it.city ? ` · ${it.city}` : ""}</div>
           {edStrip(a, it, kind)}
           {it.caption && <div style={{ fontSize: 12.5, color: CP.textSecondary, marginTop: 4, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{it.caption}</div>}
           <div style={{ display: "flex", gap: 10, marginTop: 5, flexWrap: "wrap" }}>
             {it.status !== "pubblicato" && <PublishDownload creator={a.creator} kind={kind} title={it.title} caption={it.caption} files={it.dl} style={{ ...btnSm, minHeight: 26, padding: "2px 8px", fontSize: 12 }} />}
             {it.caption && <button type="button" onClick={() => { try { navigator.clipboard.writeText(it.caption); toast("Didascalia copiata"); } catch {} }} style={{ ...btnSm, minHeight: 26, padding: "2px 8px", fontSize: 12 }}>Copia didascalia</button>}
-            <a href={href} style={{ fontSize: 12.5, color: CP.accentSoftText, alignSelf: "center" }}>Apri nell'Editoriale</a>
+            <a href={href} onClick={goContent} style={{ fontSize: 12.5, color: CP.accentSoftText, alignSelf: "center" }}>Apri in Contenuti</a>
           </div>
         </div>
       </div>
@@ -725,12 +766,12 @@ export default function WarmupPage() {
         const r = await fetch("/api/admin/editoriale", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "publish", creator: a.creator, id: it.id, on, today: day }) });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.error || "Non riuscito");
-        toast(on ? "Segnato pubblicato nell'Editoriale" : "Riaperto");
+        toast(on ? "Segnato pubblicato" : "Riaperto");
       } catch (e) { toast(e.message); } finally { mutate(); }
     };
     return (
       <div style={{ padding: "10px 14px", borderTop: `1px solid ${CP.borderSoft}` }}>
-        <div style={{ ...hint, marginBottom: 6 }}>Anche in calendario oggi, dall'Editoriale</div>
+        <div style={{ ...hint, marginBottom: 6 }}>Anche in calendario oggi, da Contenuti</div>
         {rest.map((it) => {
           const pub = it.status === "pubblicato";
           return (
@@ -758,6 +799,69 @@ export default function WarmupPage() {
   };
   const mineSeg = () => (ACC.some((a) => a.owner) ? <Seg items={[["0", "Tutti"], ["1", `I miei${ACC.filter(isMine).length ? " · " + ACC.filter(isMine).length : ""}`]]} value={onlyMine ? "1" : "0"} onChange={(v) => setOnlyMine(v === "1")} /> : null);
 
+  // Oggi «per azione»: una riga per azione, dentro i profili che la devono fare (con casella).
+  // Si raggruppa per testo della task: la stessa azione ha lo stesso testo su tutti i profili.
+  function viewByAction(blocks, tk) {
+    const groups = new Map();
+    for (const { a, t } of blocks) {
+      for (const item of t.items) {
+        const g = groups.get(item.t) || { item, rows: [] };
+        g.rows.push({ a, item, done: t.done });
+        groups.set(item.t, g);
+      }
+    }
+    const all = [...groups.values()].map((g) => {
+      const bits = g.rows.map((r) => ({ ...r, ...taskBits(r.a, r.item, r.done, tk) }));
+      return { ...g, bits, open: bits.filter((b) => !b.on).length };
+    });
+    const req = all.filter((g) => !g.item.opt && g.open).sort((x, y) => y.open - x.open);
+    const opt = all.filter((g) => g.item.opt && g.open);
+    const doneAll = all.filter((g) => !g.open);
+    const rich = (item) => Boolean(item.timer) || Boolean(pubKindOfTask(item.id));
+    const card = (g) => {
+      const k = "act:" + g.item.t;
+      return (
+        <div key={k} style={{ ...cardBox, padding: 0, marginBottom: 10, overflow: "hidden" }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, lineHeight: 1.4 }}>{g.item.t}{g.item.opt && <span style={{ ...muted, fontSize: 12.5 }}> · facoltativa</span>}</div>
+              {openWhy[k] && g.item.why && <div style={{ fontSize: 13.5, color: CP.textSecondary, lineHeight: 1.55, marginTop: 6 }}>{g.item.why}</div>}
+            </div>
+            <span style={{ fontSize: 13, color: g.open ? CP.textSecondary : CP.accentGreen, whiteSpace: "nowrap", ...NUM }}>{g.open ? `${g.open} da fare su ${g.bits.length}` : "fatta ovunque"}</span>
+            {g.item.why && <button type="button" onClick={() => setOpenWhy((o) => ({ ...o, [k]: !o[k] }))} aria-label="Perché" title="Perché" style={{ width: 28, height: 28, flex: "0 0 auto", borderRadius: "50%", border: `1px solid ${CP.borderSoft}`, background: CP.surfaceAlt, color: CP.textSecondary, cursor: "pointer", fontSize: 13 }}>{openWhy[k] ? "×" : "?"}</button>}
+          </div>
+          {rich(g.item) ? (
+            g.bits.map((b) => (
+              <div key={b.a.id} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 14px", borderTop: `1px solid ${CP.borderSoft}`, background: b.on ? alpha(CP.accentGreen, "0d") : "transparent" }}>
+                <ProfileCheck a={b.a} on={b.on} onToggle={() => toggleTask(b.a, b.item.id, tk)} />
+                <div style={{ flex: 1, minWidth: 0 }}>{b.timerEl}{b.edEl}</div>
+              </div>
+            ))
+          ) : (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "10px 14px", borderTop: `1px solid ${CP.borderSoft}` }}>
+              {g.bits.map((b) => <ProfileCheck key={b.a.id} a={b.a} on={b.on} onToggle={() => toggleTask(b.a, b.item.id, tk)} />)}
+            </div>
+          )}
+        </div>
+      );
+    };
+    const extras = blocks.map(({ a, t }) => ({ a, el: edExtra(a, tk, t.items) })).filter((x) => x.el);
+    return (
+      <>
+        <SectionHead aside={`${req.length} azioni · tocca un profilo per segnarla fatta`}>Da fare oggi</SectionHead>
+        {req.length ? req.map(card) : <div style={{ ...cardBox, ...hint, textAlign: "center" }}>Le azioni obbligatorie di oggi sono fatte.</div>}
+        {extras.length > 0 && (
+          <>
+            <SectionHead>Anche in calendario oggi</SectionHead>
+            {extras.map((x) => <div key={x.a.id} style={{ ...cardBox, padding: 0, marginBottom: 10 }}><div style={{ padding: "10px 14px 0", fontSize: 14, fontWeight: 500 }}>{x.a.username}</div>{x.el}</div>)}
+          </>
+        )}
+        {opt.length > 0 && <Fold title={`${opt.length} ${opt.length === 1 ? "azione facoltativa" : "azioni facoltative"}`}>{opt.map(card)}</Fold>}
+        {doneAll.length > 0 && <Fold title={`${doneAll.length} ${doneAll.length === 1 ? "azione già fatta" : "azioni già fatte"} su tutti i profili`}>{doneAll.map(card)}</Fold>}
+      </>
+    );
+  }
+
   function viewToday() {
     const tk = todayKey(), yk = todayKey(new Date(Date.now() - DAY));
     const anyOwner = ACC.some((a) => a.owner);
@@ -770,12 +874,27 @@ export default function WarmupPage() {
     const urg = [...ACC.flatMap((a) => publicAlerts(a, a.pub).map((u) => ({ ...u, acc: a }))), ...urgenze(ACC)]
       .sort((x, y) => rankU[x.lev] - rankU[y.lev]).filter((u) => !om || isMine(u.acc));
     const todo = blocks.filter((b) => b.t.open.length), fine = blocks.filter((b) => !b.t.open.length);
+    // di base: per azione da 4 profili in su, per profilo sotto (scelta ricordata per persona)
+    const vista = oggiVista || (accs.length > 3 ? "azione" : "prof");
     return (
       <>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <p style={{ flex: 1, minWidth: 200, fontSize: 14, color: CP.textSecondary, margin: 0 }}>{new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}{ACC.length ? ` · ${openTot} task da fare su ${accs.length} profili` : ""}</p>
-          {mineSeg()}
-        </div>
+        {/* in cima, nello stile del Radar (29/10): la giornata in una frase e quattro numeri */}
+        {ACC.length > 0 ? (
+          <HeroHead
+            eyebrow={new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" }).replace(/^./, (c) => c.toUpperCase())}
+            title={openTot ? "Oggi restano" : "Oggi è"} accent={openTot ? `${openTot} task` : "tutto fatto"}
+            sub={`${accs.length} ${accs.length === 1 ? "profilo" : "profili"} ${PLATS[plat].label}${om ? " tuoi" : ""}. Spunta man mano: ogni task vale per il giorno in cui la fai.`}
+            numbers={<>
+              <BigNum label="Profili da finire" value={todo.length} strong={todo.length > 0} />
+              <BigNum label="Task fatte" value={doneTot} />
+              <BigNum label="Da non dimenticare" value={urg.length} title="Avvisi trovati dal sistema: profili da controllare, scadenze" />
+              {late.length > 0 && <BigNum label="Rimaste ieri" value={late.reduce((n, b) => n + b.arr.open.length, 0)} />}
+            </>}
+            actions={(mineSeg() || accs.length > 1) ? <>
+              {mineSeg()}
+              {accs.length > 1 && <Segmented label="Vista" items={[["azione", "Per azione"], ["prof", "Per profilo"]]} value={vista} onChange={setOggiVista} />}
+            </> : null} />
+        ) : null}
         {!ACC.length && <div style={{ ...cardBox, textAlign: "center", padding: "30px 18px" }}><h3 style={{ margin: "0 0 6px", fontWeight: 500 }}>Nessun profilo {PLATS[plat].label}</h3><p style={{ ...hint, margin: "0 0 14px" }}>Registra il primo profilo dalla scheda Account.</p><button type="button" style={btnPrimary} onClick={() => { setTab("acct"); setForm({}); }}><Plus size={15} />Nuovo profilo</button></div>}
         {urg.length > 0 && (
           <>
@@ -812,7 +931,8 @@ export default function WarmupPage() {
             <p style={{ ...hint, margin: 0 }}>{doneTot} task completate su {blocks.length} profili.</p>
           </div>
         )}
-        {todo.length > 0 && (
+        {todo.length > 0 && vista === "azione" && viewByAction(blocks, tk)}
+        {todo.length > 0 && vista !== "azione" && (
           <>
           <SectionHead aside={`${openTot} task su ${todo.length} ${todo.length === 1 ? "profilo" : "profili"}`}>Da fare oggi</SectionHead>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 420px), 1fr))", gap: 16, alignItems: "start" }}>
@@ -872,14 +992,23 @@ export default function WarmupPage() {
   function viewFolders() {
     let list = folderList();
     if (onlyMine) list = list.map((f) => ({ ...f, items: f.items.filter(isMine) })).filter((f) => f.items.length);
-    const tot = (onlyMine ? ACC.filter(isMine) : ACC).length;
+    const mine = onlyMine ? ACC.filter(isMine) : ACC;
+    const tot = mine.length;
+    const stAll = { verde: 0, arancione: 0, rosso: 0 };
+    mine.forEach((a) => { stAll[a.status] = (stAll[a.status] || 0) + 1; });
     return (
       <>
-        <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 12 }}>
-          <div style={{ flex: 1, minWidth: 180 }}><h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: 0 }}>Creator</h2><p style={{ ...hint, fontSize: 14, margin: "2px 0 0" }}>{list.length ? `${list.length} ${list.length === 1 ? "cartella" : "cartelle"} · ${tot} profili` : onlyMine ? "Nessun profilo assegnato a te" : "Nessun profilo ancora"}</p></div>
-          {mineSeg()}
-          <button type="button" style={btnPrimary} onClick={() => setForm({})}><Plus size={15} />Nuovo profilo</button>
-        </div>
+        {/* in cima, nello stile del Radar (29/10): quanti profili e come stanno */}
+        <HeroHead eyebrow="Account"
+          title={list.length ? "I profili di" : onlyMine ? "Nessun profilo" : "Ancora nessun"} accent={list.length ? `${list.length} creator` : onlyMine ? "assegnato a te" : "profilo"}
+          sub={list.length ? "Una cartella per creator: tocca per vedere i profili, il giorno del warm-up e le segnalazioni." : null}
+          numbers={list.length ? <>
+            <BigNum label="Profili" value={tot} />
+            <BigNum label="In verde" value={stAll.verde} title="Nessuna segnalazione aperta" />
+            <BigNum label="In arancione" value={stAll.arancione} title="Segnalazione aperta, da seguire" />
+            <BigNum label="In rosso" value={stAll.rosso} strong={stAll.rosso > 0} title="Segnalazione grave aperta" />
+          </> : null}
+          actions={mineSeg()} />
         {!list.length ? (
           <div style={{ ...cardBox, textAlign: "center", padding: "30px 18px" }}>
             <h3 style={{ margin: "0 0 6px", fontWeight: 500 }}>{onlyMine ? "Nessun profilo assegnato a te" : "Registra il primo profilo"}</h3>
@@ -996,7 +1125,7 @@ export default function WarmupPage() {
           <Chip color={TONE[stateInfo(a).tone]}>{stateInfo(a).label}</Chip>
           <Chip color={statusColor(a.status)}><Dot color={statusColor(a.status)} />{a.flag ? "Flag" : "Verde"}</Chip>
         </div>
-        <Seg items={[["oggi", "Oggi"], ["dati", "Dati"], ["profilo", "Profilo"], ["storico", "Storico"]]} value={pane} onChange={setPane} style={{ marginBottom: 14 }} />
+        <Tabs small items={[["oggi", "Oggi"], ["dati", "Dati"], ["profilo", "Profilo"], ["storico", "Storico"]]} value={pane} onChange={setPane} />
         {a.supMissing && <Notice danger>L&apos;account non c&apos;è più in Account social: username, creator e telefono non si vedono. Ricrealo lì o elimina questo profilo dal warm-up.</Notice>}
         {pane === "oggi" ? (
           <>
@@ -1096,11 +1225,19 @@ export default function WarmupPage() {
 
   // ── scheda Dati ──
   function viewReport() {
+    const nonOn = ACC.filter((a) => stateOf(a) !== "online").length;
+    const inWarmAll = ACC.filter((a) => !isCooldown(a) && opDay(a) <= 7).length;
     return (
       <>
-        <h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: "0 0 4px" }}>Dati</h2>
-        <p style={{ ...hint, fontSize: 14, margin: "0 0 12px" }}>Panoramica, numeri della settimana e segnalazioni · {PLATS[plat].label}</p>
-        <Seg items={[["pano", "Panoramica"], ["week", "Settimana"], ["flags", "Segnalazioni"], ["exp", "Esporta"]]} value={rpane} onChange={setRpane} style={{ marginBottom: 14 }} />
+        {/* in cima, nello stile del Radar (29/10): di cosa parla la scheda e tre numeri di tutta la farm */}
+        <HeroHead eyebrow="Dati" title="I numeri dei profili" accent={PLATS[plat].label}
+          sub="Panoramica del periodo, numeri della settimana, segnalazioni ed esportazione."
+          numbers={ACC.length ? <>
+            <BigNum label="Profili" value={ACC.length} />
+            <BigNum label="In warm-up" value={inWarmAll} title="Nei primi 7 giorni, cooldown esclusi" />
+            <BigNum label="Non online" value={nonOn} strong={nonOn > 0} title="Shadowban, sospesi o bannati" />
+          </> : null} />
+        <Tabs small items={[["pano", "Panoramica"], ["week", "Settimana"], ["flags", "Segnalazioni"], ["exp", "Esporta"]]} value={rpane} onChange={setRpane} />
         {rpane === "pano" && viewPano()}
         {rpane === "week" && viewWeekAll()}
         {rpane === "flags" && viewFlagStats()}
@@ -1108,12 +1245,53 @@ export default function WarmupPage() {
       </>
     );
   }
-  function weekSeries(n) {
+  // giorni come YYYY-MM-DD tra due date comprese
+  function dayRange(from, to) {
+    const out = [];
+    const a = new Date(from + "T12:00:00"), b = new Date(to + "T12:00:00");
+    for (let d = a; d <= b && out.length < 400; d = new Date(d.getTime() + DAY)) out.push(isoDay(d.getTime()));
+    return out;
+  }
+  // il periodo scelto come giorni {from, to}
+  function perBounds() {
+    const today = isoDay(Date.now());
+    if (per === "d7") return [isoDay(Date.now() - 6 * DAY), today];
+    if (per === "d30") return [isoDay(Date.now() - 29 * DAY), today];
+    if (per === "custom") return perFrom <= perTo ? [perFrom, perTo] : [perTo, perFrom];
+    const ws = lastWeeks(Number(per.slice(1)));
+    return [isoDay(ws[ws.length - 1].start), today];
+  }
+  // l'andamento nel periodo: settimane (dato a mano + automatico) o giorni (solo automatico)
+  function periodSeries(list) {
+    const [from, to] = perBounds();
+    if (per === "w8" || per === "w12") return { unit: "week", from, to, rows: weekSeries(Number(per.slice(1)), list) };
+    const days = dayRange(from, to);
+    if (days.length > 31) {
+      const wk = new Set(days.map((d) => weekKey(new Date(d + "T12:00:00"))));
+      return { unit: "week", from, to, rows: weekSeries(60, list).filter((r) => wk.has(r.key)) };
+    }
+    const rows = days.map((d) => {
+      const prev = isoDay(new Date(d + "T12:00:00").getTime() - DAY);
+      const row = { label: new Date(d + "T12:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" }), key: d };
+      wfields(null, plat).filter((f) => f.num).forEach((f) => {
+        let sum = null;
+        list.forEach((a) => {
+          const v = dailyPrefill(a.platform, a.pub?.daily?.[d], a.pub?.daily?.[prev])[f.k];
+          if (v != null && !isNaN(Number(v))) sum = (sum || 0) + Number(v);
+        });
+        row[f.k] = sum;
+      });
+      row.posts = list.reduce((t, a) => t + (a.pub?.daily?.[d]?.posts || 0), 0);
+      return row;
+    });
+    return { unit: "day", from, to, rows };
+  }
+  function weekSeries(n, list = ACC) {
     return lastWeeks(n).slice().reverse().map((w) => {
       const row = { label: w.label, key: w.key };
       wfields(null, plat).filter((f) => f.num).forEach((f) => {
         let sum = null;
-        ACC.forEach((a) => {
+        list.forEach((a) => {
           let v = (a.weekly[w.key] || {})[f.k];
           if (v === "" || v == null) v = prefillFor(a.platform, a.pub?.weekly?.[w.key])[f.k]; // manca il dato a mano: quello letto in automatico
           if (v !== "" && v != null && !isNaN(Number(v))) sum = (sum || 0) + Number(v);
@@ -1123,23 +1301,153 @@ export default function WarmupPage() {
       return row;
     });
   }
+  // numeri del periodo per un account (solo dati letti in automatico + tracking link)
+  function accPeriod(a, from, to) {
+    const daily = a.pub?.daily || {};
+    const ds = Object.keys(daily).sort();
+    const fIn = ds.filter((d) => d >= from && d <= to && daily[d].followers != null);
+    const fEnd = fIn.length ? daily[fIn[fIn.length - 1]].followers : null;
+    const fBefore = [...ds].reverse().find((d) => d < from && daily[d].followers != null);
+    const fStart = fBefore ? daily[fBefore].followers : fIn.length ? daily[fIn[0]].followers : null;
+    const posts = (a.pub?.posts || []).filter((p) => { const d = isoDay(p.ts); return d >= from && d <= to; });
+    const wv = posts.filter((p) => p.views != null);
+    const views = wv.length ? wv.reduce((t, p) => t + p.views, 0) : null;
+    const inter = wv.reduce((t, p) => t + (p.likes || 0) + (p.comments || 0), 0);
+    const link = a.pub?.linkDays ? linkRange(a.pub.linkDays, from, to, a.pub?.link?.created) : null;
+    return {
+      followers: fEnd, fDelta: fEnd != null && fStart != null && (fBefore || fIn.length > 1) ? fEnd - fStart : null,
+      posts: posts.length, views, avg: wv.length ? Math.round(views / wv.length) : null,
+      eng: views ? Math.round((inter / views) * 1000) / 10 : null,
+      clicks: link?.clicks ?? null, subs: link?.subs ?? null, revenue: link?.revenue ?? null, hasLink: Boolean(a.pub?.linkDays),
+      top: posts,
+    };
+  }
   function viewPano() {
+    // filtri: modella → account (29/10, Nicholas)
+    const creatorsHere = [...new Set(ACC.map((a) => a.creator).filter(Boolean))].sort((x, y) => x.localeCompare(y, "it"));
+    const SEL = ACC.filter((a) => (!panoCreator || a.creator === panoCreator) && (!panoAcc || a.id === panoAcc));
     const st = { verde: 0, arancione: 0, rosso: 0 };
-    ACC.forEach((a) => { st[a.status] = (st[a.status] || 0) + 1; });
-    const ads = ACC.map((a) => adherence(a, 7));
+    SEL.forEach((a) => { st[a.status] = (st[a.status] || 0) + 1; });
+    const ads = SEL.map((a) => adherence(a, 7));
     const withT = ads.filter((x) => x.total);
     const adPct = withT.length ? Math.round((withT.reduce((t, x) => t + x.done, 0) / withT.reduce((t, x) => t + x.total, 0)) * 100) : null;
     const oF = ads.reduce((t, x) => t + x.todayDone, 0), oT = ads.reduce((t, x) => t + x.todayTotal, 0);
-    const inWarm = ACC.filter((a) => !isCooldown(a) && opDay(a) <= 7).length;
-    const non = ACC.filter((a) => stateOf(a) !== "online");
+    const inWarm = SEL.filter((a) => !isCooldown(a) && opDay(a) <= 7).length;
+    const non = SEL.filter((a) => stateOf(a) !== "online");
     const nonTxt = ["shadowban", "sospeso", "bannato"].map((k) => ({ k, n: non.filter((a) => stateOf(a) === k).length })).filter((x) => x.n).map((x) => x.n + " " + ST({ platform: plat })[x.k].label.toLowerCase()).join(" · ");
-    const ser = weekSeries(8);
+    const ps = periodSeries(SEL);
+    const ser = ps.rows;
+    const dayF = (f) => f.k === "followers" || f.k === "views"; // gli unici letti anche giorno per giorno
+    const fmtD = (d) => new Date(d + "T12:00:00").toLocaleDateString("it-IT", { day: "numeric", month: "long" });
+    const perTitle = per === "w8" || per === "w12" ? `ultime ${per.slice(1)} settimane` : ps.from === ps.to ? fmtD(ps.from) : `${fmtD(ps.from)} – ${fmtD(ps.to)}`;
+    const rowsAcc = SEL.map((a) => ({ a, n: accPeriod(a, ps.from, ps.to) }));
+    const sumN = (k) => { const v = rowsAcc.map((r) => r.n[k]).filter((x) => x != null); return v.length ? v.reduce((t, x) => t + x, 0) : null; };
+    const tot = { followers: sumN("followers"), fDelta: sumN("fDelta"), posts: sumN("posts") || 0, views: sumN("views"), clicks: sumN("clicks"), subs: sumN("subs"), revenue: sumN("revenue") };
+    const allTop = rowsAcc.flatMap((r) => r.n.top.map((p) => ({ ...p, acc: r.a }))).filter((p) => p.views != null).sort((x, y) => y.views - x.views).slice(0, 8);
+    const inter = rowsAcc.flatMap((r) => r.n.top).filter((p) => p.views != null);
+    const engAll = tot.views ? Math.round((inter.reduce((t, p) => t + (p.likes || 0) + (p.comments || 0), 0) / tot.views) * 1000) / 10 : null;
+    const anyLink = rowsAcc.some((r) => r.n.hasLink);
+    const fmt$ = (v) => (v == null ? "—" : "$" + Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 }));
+    const selSt = { ...input, width: "auto", fontSize: 13.5, padding: "7px 10px" };
     return (
       <>
+        <FilterBar onReset={panoCreator || panoAcc || per !== "w8" ? () => { setPanoCreator(""); setPanoAcc(""); setPer("w8"); } : null}>
+          <select style={selSt} value={panoCreator} onChange={(e) => { setPanoCreator(e.target.value); setPanoAcc(""); }}>
+            <option value="">Tutte le modelle</option>
+            {creatorsHere.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select style={selSt} value={panoAcc} onChange={(e) => setPanoAcc(e.target.value)}>
+            <option value="">{panoCreator ? "Tutti i suoi account" : "Tutti gli account"}</option>
+            {ACC.filter((a) => !panoCreator || a.creator === panoCreator).map((a) => <option key={a.id} value={a.id}>{a.username}{!panoCreator && a.creator ? ` · ${a.creator}` : ""}</option>)}
+          </select>
+          <Seg items={[["d7", "7 giorni"], ["d30", "30 giorni"], ["w8", "8 settimane"], ["w12", "12 settimane"], ["custom", "Date a scelta"]]} value={per} onChange={setPer} />
+        </FilterBar>
+        {per === "custom" && (
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", margin: "0 0 12px" }}>
+            <label style={{ fontSize: 13, color: CP.textSecondary }}>Dal<br /><input type="date" style={{ ...input, width: "auto" }} value={perFrom} max={isoDay(Date.now())} onChange={(e) => { const v = e.target.value; if (!v) return; setPerFrom(v); if (v > perTo) setPerTo(v); }} /></label>
+            <label style={{ fontSize: 13, color: CP.textSecondary }}>Al<br /><input type="date" style={{ ...input, width: "auto" }} value={perTo} min={perFrom} max={isoDay(Date.now())} onChange={(e) => e.target.value && setPerTo(e.target.value)} /></label>
+            <button type="button" style={btnSm} onClick={() => setPerTo(perFrom)}>Solo il {fmtD(perFrom)}</button>
+          </div>
+        )}
+        {!SEL.length ? <div style={{ ...cardBox, ...hint, textAlign: "center" }}>Nessun profilo con questi filtri.</div> : <>
         <div style={cardBox}>
-          <div style={{ ...eyebrow, marginBottom: 10 }}>Stato della farm</div>
+          <div style={{ ...eyebrow, marginBottom: 10 }}>Nel periodo · {perTitle}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8 }}>
+            <Metric2 value={tot.followers == null ? "—" : numFmt(tot.followers)} label="Follower" sub={tot.fDelta != null ? `${tot.fDelta >= 0 ? "+" : ""}${numFmt(tot.fDelta)} nel periodo` : null} />
+            <Metric2 value={tot.views == null ? "—" : numFmt(tot.views)} label="Visualizzazioni" sub="dei post usciti nel periodo" />
+            <Metric2 value={tot.posts} label="Post usciti" sub={tot.posts && tot.views != null ? `${numFmt(Math.round(tot.views / Math.max(1, inter.length)))} di media` : null} />
+            <Metric2 value={engAll == null ? "—" : String(engAll).replace(".", ",") + "%"} label="Interazioni" sub="like + commenti ÷ visualizzazioni" />
+            {anyLink && <Metric2 value={tot.clicks == null ? "—" : numFmt(tot.clicks)} label="Clic sul tracking link" />}
+            {anyLink && <Metric2 value={tot.subs == null ? "—" : numFmt(tot.subs)} label="Nuovi abbonati dal link" sub={tot.clicks ? `${String(Math.round((tot.subs / tot.clicks) * 1000) / 10).replace(".", ",")}% dei clic` : null} />}
+            {anyLink && <Metric2 value={fmt$(tot.revenue)} label="Speso dagli abbonati del link" color={tot.revenue ? CP.accentGreen : undefined} />}
+          </div>
+          {!anyLink && <p style={{ ...hint, margin: "8px 0 0" }}>Nessun tracking link OnlyFans collegato a questi profili: si aggiunge nella scheda del profilo (campo «Tracking link OnlyFans») e da lì arrivano clic, abbonati e speso.</p>}
+          <p style={{ ...hint, margin: "8px 0 0" }}>Numeri letti in automatico dal profilo pubblico e dal magazzino OnlyFans; le visualizzazioni dei post recenti crescono ancora per qualche giorno.</p>
+        </div>
+        <div style={cardBox}>
+          <div style={eyebrow}>Andamento · {perTitle}</div>
+          <p style={{ ...hint, margin: "4px 0 12px" }}>
+            {ps.unit === "day"
+              ? "Giorno per giorno, dai dati letti in automatico: follower di quel giorno e visualizzazioni dei post usciti quel giorno. Visite e tocchi sul link si inseriscono a settimana: per vederli scegli un periodo più lungo di un mese."
+              : "Settimana per settimana. Dove manca il dato inserito a mano si usa quello letto in automatico dal profilo pubblico."}
+          </p>
+          {ps.unit === "day" && ser.length === 1 ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
+              {wfields(null, plat).filter((f) => f.chart && dayF(f)).map((f) => <Metric2 key={f.k} value={ser[0][f.k] == null ? "—" : numFmt(ser[0][f.k])} label={f.lab} />)}
+              <Metric2 value={ser[0].posts} label="Post usciti quel giorno" />
+            </div>
+          ) : !ser.length ? (
+            <p style={{ ...hint, textAlign: "center", padding: "18px 0" }}>Nessun dato nel periodo scelto.</p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))", gap: 10 }}>
+              {wfields(null, plat).filter((f) => f.chart && (ps.unit === "week" || dayF(f))).map((f) => <LineChart key={f.k} title={f.lab} pts={ser.map((r) => ({ label: r.label, v: r[f.k] }))} />)}
+              {ps.unit === "day" && <LineChart title="Post usciti" pts={ser.map((r) => ({ label: r.label, v: r.posts }))} />}
+            </div>
+          )}
+        </div>
+        {allTop.length > 0 && (
+          <div style={cardBox}>
+            <div style={{ ...eyebrow, marginBottom: 8 }}>I post migliori del periodo</div>
+            {allTop.map((p) => (
+              <a key={p.acc.id + p.id} href={p.url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "8px 0", borderTop: `1px solid ${CP.borderSoft}`, textDecoration: "none", color: CP.textPrimary, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 15, fontWeight: 500, minWidth: 90, ...NUM }}>{numFmt(p.views)}</span>
+                <span style={{ fontSize: 13.5 }}>{p.acc.username}</span>
+                <span style={{ ...hint, fontSize: 12.5, ...NUM }}>{p.kind === "reel" ? "reel" : p.kind === "carosello" ? "carosello" : "post"} · {new Date(p.ts).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}{p.likes != null ? ` · ${numFmt(p.likes)} like` : ""}{p.comments != null ? ` · ${numFmt(p.comments)} commenti` : ""}</span>
+                <span style={{ flex: 1 }} /><ExternalLink size={13} color={CP.textMuted} />
+              </a>
+            ))}
+          </div>
+        )}
+        {SEL.length > 1 && (
+          <div style={{ ...cardBox, overflowX: "auto" }}>
+            <div style={{ ...eyebrow, marginBottom: 8 }}>Account per account · {perTitle}</div>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5, minWidth: 640 }}>
+              <thead><tr style={{ color: CP.textSecondary, textAlign: "right" }}>
+                <th style={{ textAlign: "left", fontWeight: 400, padding: "6px 8px" }}>Account</th><th style={{ fontWeight: 400, padding: "6px 8px" }}>Follower</th><th style={{ fontWeight: 400, padding: "6px 8px" }}>Nel periodo</th><th style={{ fontWeight: 400, padding: "6px 8px" }}>Post</th><th style={{ fontWeight: 400, padding: "6px 8px" }}>Visualizzazioni</th><th style={{ fontWeight: 400, padding: "6px 8px" }}>Media</th><th style={{ fontWeight: 400, padding: "6px 8px" }}>Interaz.</th>
+                {anyLink && <><th style={{ fontWeight: 400, padding: "6px 8px" }}>Clic</th><th style={{ fontWeight: 400, padding: "6px 8px" }}>Abbonati</th><th style={{ fontWeight: 400, padding: "6px 8px" }}>Speso</th></>}
+              </tr></thead>
+              <tbody>
+                {rowsAcc.sort((x, y) => (y.n.views || 0) - (x.n.views || 0)).map(({ a, n }) => (
+                  <tr key={a.id} onClick={() => { setPanoCreator(a.creator || ""); setPanoAcc(a.id); }} style={{ borderTop: `1px solid ${CP.borderSoft}`, cursor: "pointer", textAlign: "right", ...NUM }}>
+                    <td style={{ textAlign: "left", padding: "7px 8px" }}>{a.username}<div style={{ ...hint, fontSize: 12 }}>{a.creator || ""}</div></td>
+                    <td style={{ padding: "7px 8px" }}>{numFmt(n.followers)}</td>
+                    <td style={{ padding: "7px 8px", color: n.fDelta > 0 ? CP.accentGreen : undefined }}>{n.fDelta == null ? "—" : (n.fDelta >= 0 ? "+" : "") + numFmt(n.fDelta)}</td>
+                    <td style={{ padding: "7px 8px" }}>{n.posts}</td>
+                    <td style={{ padding: "7px 8px" }}>{numFmt(n.views)}</td>
+                    <td style={{ padding: "7px 8px" }}>{numFmt(n.avg)}</td>
+                    <td style={{ padding: "7px 8px" }}>{n.eng == null ? "—" : String(n.eng).replace(".", ",") + "%"}</td>
+                    {anyLink && <><td style={{ padding: "7px 8px" }}>{numFmt(n.clicks)}</td><td style={{ padding: "7px 8px" }}>{numFmt(n.subs)}</td><td style={{ padding: "7px 8px" }}>{fmt$(n.revenue)}</td></>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p style={{ ...hint, margin: "8px 0 0" }}>Tocca una riga per vedere solo quell&apos;account.</p>
+          </div>
+        )}
+        <div style={cardBox}>
+          <div style={{ ...eyebrow, marginBottom: 10 }}>Stato della farm{panoCreator || panoAcc ? " · selezione" : ""}</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8 }}>
-            <Metric2 value={ACC.length} label="Profili" sub={`${inWarm} in warm-up`} />
+            <Metric2 value={SEL.length} label="Profili" sub={`${inWarm} in warm-up`} />
             <Metric2 value={oT ? `${oF}/${oT}` : "—"} label="Oggi" color={!oT ? CP.textMuted : oF === oT ? CP.accentGreen : undefined} />
             <Metric2 value={adPct == null ? "—" : adPct + "%"} label="Aderenza 7g" color={adPct == null ? CP.textMuted : adPct >= 80 ? CP.accentGreen : adPct >= 50 ? CP.attn : CP.accentRed} />
             <Metric2 value={st.verde || 0} label="Verdi" color={CP.accentGreen} />
@@ -1148,13 +1456,7 @@ export default function WarmupPage() {
             {non.length > 0 && <Metric2 value={non.length} label="Non online" color={CP.accentRed} sub={nonTxt} />}
           </div>
         </div>
-        <div style={cardBox}>
-          <div style={eyebrow}>Andamento · ultime 8 settimane</div>
-          <p style={{ ...hint, margin: "4px 0 12px" }}>Somma di tutti i profili. Dove manca il dato inserito a mano si usa quello letto in automatico dal profilo pubblico. Profilo per profilo: scheda Settimana.</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))", gap: 10 }}>
-            {wfields(null, plat).filter((f) => f.chart).map((f) => <LineChart key={f.k} title={f.lab} pts={ser.map((r) => ({ label: r.label, v: r[f.k] }))} />)}
-          </div>
-        </div>
+        </>}
       </>
     );
   }
@@ -1359,31 +1661,37 @@ export default function WarmupPage() {
       body = <ProfileForm key={form.edit || "new"} edit={edit} plat={plat} preCreator={form.preCreator} creators={data.creators} devices={data.devices} people={people} admin={admin} accounts={ACC}
         onCancel={() => setForm(null)} onDone={async (id, msg) => { await mutate(); setForm(null); toast(msg); openProfile(id, form.edit ? "profilo" : "oggi"); }} />;
     } else if (tab === "oggi") body = viewToday();
+    else if (tab === "contenuti" && plat === "ig") body = <EditorialeView embedded />;
     else if (tab === "dati") body = viewReport();
     else if (tab === "admin" && admin) body = viewAdmin();
     else if (tab === "xrefs" && plat === "x") body = <XRefs />;
-    else if (tab === "guide") body = <><h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: "0 0 4px" }}>Guida{plat === "x" ? " · X" : ""}</h2><p style={{ ...hint, fontSize: 14, margin: "0 0 14px" }}>{plat === "x" ? "Il riassunto del documento Account X." : "Il riassunto delle SOP a cui la console fa riferimento."}</p>{plat === "x" ? <GuideX /> : <GuideIG />}</>;
+    else if (tab === "radar") body = <ClipRadar />;
+    else if (tab === "guide") body = <>{plat === "x"
+      ? <HeroHead eyebrow="Guida" title="Come si lavora un profilo" accent="X" sub="Il riassunto del documento Account X: perché conta, i numeri di riferimento, cosa dipende da noi."
+          numbers={<><BigNum label="Visualizzazioni a post con Premium" value={600} strong /><BigNum label="Follower attivi per le prime sub" value={500} /></>} />
+      : <HeroHead eyebrow="Guida" title="Come si scalda un profilo" accent="Instagram" sub="Il riassunto delle SOP a cui la console fa riferimento: calendario, pubblicazioni, finestre, segnalazioni."
+          numbers={<><BigNum label="Giorni di warm-up" value={7} strong /><BigNum label="Reel al giorno, a regime" value={3} /><BigNum label="Finestre USA" value={WINDOWS.length} /></>} />}
+      {plat === "x" ? <GuideX /> : <GuideIG />}</>;
     else { const a = sel && byId(sel); body = a && !a.archived ? viewDay(a) : folder ? viewFolder(folder) : viewFolders(); }
   }
   const modalA = modal?.id ? byId(modal.id) : null;
   // Ispirazioni: reference di creator su X (per Instagram c'è il Radar creator)
-  const tabs = [...TABS.slice(0, 3), ...(plat === "x" ? [["xrefs", "Ispirazioni"]] : []), ...TABS.slice(3), ...(admin ? [["admin", "Admin"]] : [])];
+  // Contenuti (29/10/2026): l'Editoriale dentro Social, solo per Instagram
+  const tabs = [TABS[0], ...(plat === "ig" ? [["contenuti", "Contenuti"]] : []), ...TABS.slice(1, 3), ...(plat === "x" ? [["xrefs", "Ispirazioni"]] : []), ["radar", "Radar clipping"], ...TABS.slice(3), ...(admin ? [["admin", "Admin"]] : [])];
   const openToday = ACC.reduce((t, a) => t + tasksOn(a, todayKey()).open.length, 0);
 
   return (
     <div style={{ maxWidth: 1600, margin: "0 auto", padding: "20px 16px calc(110px + env(safe-area-inset-bottom))", fontFamily: FONTS.body, color: CP.textPrimary }}>
-      <PageHead crumbs={[{ label: "Marketing" }, { label: "Warm-up" }]} title="Warm-up"
-        subtitle="Il piano del giorno di ogni profilo Instagram e X in riscaldamento: cosa fare oggi, segnalazioni, cooldown e numeri della settimana."
+      <PageHead crumbs={[{ label: "Marketing" }, { label: "Clipping" }]} title="Clipping"
+        subtitle="I profili Instagram e X delle creator: cosa fare oggi, i contenuti, i numeri."
         actions={data ? <button type="button" style={btnPrimary} onClick={() => { setTab("acct"); setSel(null); setForm({}); }}><Plus size={15} />Nuovo profilo</button> : null} />
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 22 }}>
-        {tabs.map(([k, l]) => {
-          const n = !data ? null : k === "oggi" ? openToday || null : k === "acct" ? ACC.length : null;
-          return <FilterChip key={k} label={n != null ? `${l} · ${n}` : l} active={tab === k && !form} onClick={() => { setTab(k); setSel(null); setForm(null); setModal(null); if (k === "acct") setFolder(null); window.scrollTo(0, 0); }} />;
-        })}
-        <span style={{ flex: 1 }} />
-        <span title={net === "ok" ? "Collegato" : net === "pending" ? "Salvataggio…" : "Non salvato"} style={{ width: 8, height: 8, borderRadius: "50%", background: net === "ok" ? CP.accentGreen : net === "pending" ? CP.attn : CP.accentRed }} />
-        <Seg items={Object.keys(PLATS).map((k) => [k, PLATS[k].label])} value={plat} onChange={setPlat} />
-      </div>
+      <Tabs value={form ? null : tab} style={{ marginBottom: 22 }}
+        items={tabs.map(([k, l]) => [k, l, !data ? null : k === "oggi" ? openToday || null : k === "acct" ? ACC.length : null])}
+        onChange={(k) => { setTab(k); setSel(null); setForm(null); setModal(null); if (k === "acct") setFolder(null); window.scrollTo(0, 0); }}
+        aside={<span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+          <span title={net === "ok" ? "Collegato" : net === "pending" ? "Salvataggio…" : "Non salvato"} style={{ width: 8, height: 8, borderRadius: "50%", background: net === "ok" ? CP.accentGreen : net === "pending" ? CP.attn : CP.accentRed }} />
+          <Segmented items={Object.keys(PLATS).map((k) => [k, PLATS[k].label])} value={plat} onChange={setPlat} />
+        </span>} />
       {error && <Notice danger>{error.message}</Notice>}
       {!data && !error && <p style={{ ...hint, fontSize: 14 }}>Carico…</p>}
       {body}

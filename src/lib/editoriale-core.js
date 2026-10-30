@@ -50,10 +50,28 @@ export function stageOf(item) {
 /** Tutti i file che un contenuto tiene occupati (le foto, i video grezzi, il reel montato). */
 export const filesOf = (item) => [...new Set([...(item?.files || []), ...(item?.final ? [item.final] : [])])];
 
-/** Mappa fileId → id del contenuto che lo usa. */
+/**
+ * I file che un contenuto tiene BLOCCATI per sé: le foto del carosello e il reel montato.
+ * I video grezzi di un reel no (29/10/2026, Nicholas: «invece che bloccare i video usati, fammi
+ * vedere quante volte è stato usato ma posso riselezionarlo»): da uno stesso girato si montano più
+ * reel, quindi si contano (`rawUses`) invece di bloccarli. Le foto restano senza doppioni.
+ */
+export const lockedFilesOf = (item) => [...new Set([...(item?.type === "carosello" ? item.files || [] : []), ...(item?.final ? [item.final] : [])])];
+
+/** Mappa fileId → id del contenuto che lo tiene bloccato. */
 export function usageMap(items) {
   const m = new Map();
-  for (const it of items || []) for (const f of filesOf(it)) if (!m.has(f)) m.set(f, it.id);
+  for (const it of items || []) for (const f of lockedFilesOf(it)) if (!m.has(f)) m.set(f, it.id);
+  return m;
+}
+
+/** Mappa fileId → id dei reel che usano quel video grezzo (quante volte è stato riusato). */
+export function rawUses(items) {
+  const m = new Map();
+  for (const it of items || []) {
+    if (it.type === "carosello") continue;
+    for (const f of new Set(it.files || [])) { if (!m.has(f)) m.set(f, []); m.get(f).push(it.id); }
+  }
   return m;
 }
 
@@ -128,6 +146,16 @@ export function setReady(item, on) {
   return { ok: true, item: { ...item, status: "pronto" } };
 }
 
+/**
+ * Pronto da solo (29/10/2026, Nicholas: «la fase in preparazione non serve più»): un contenuto
+ * completo (carosello con le foto, reel col montato o «va bene così») è pronto senza un clic in più.
+ * Resta in lavorazione solo ciò che manca davvero (es. il reel ancora da montare).
+ */
+export function autoReady(item) {
+  if (item?.status !== "lavorazione" || readyProblems(item).length) return item;
+  return { ...item, status: "pronto" };
+}
+
 /** Mette in calendario (o toglie con slot null). `profileIds` = profili IG della stessa creator. */
 export function schedule(item, slot, profileIds) {
   if (item.status === "pubblicato") return { ok: false, errors: ["È già pubblicato"] };
@@ -145,7 +173,9 @@ export function schedule(item, slot, profileIds) {
 export function setPublished(item, on, { by, today, profileId, task } = {}) {
   if (!on) {
     if (item.status !== "pubblicato") return { ok: true, item };
-    const { publishedAt, publishedBy, pubTask, ...rest } = item;
+    const { publishedAt, publishedBy, pubTask, autoPub, ...rest } = item;
+    // riaperto dopo il segno automatico: quel post non è questo contenuto, non va riabbinato
+    if (autoPub?.post) rest.autoReject = [...new Set([...(item.autoReject || []), autoPub.post])].slice(-10);
     return { ok: true, item: { ...rest, status: "pronto" } };
   }
   const p = readyProblems(item);
@@ -235,3 +265,75 @@ export const shiftMonth = (ym, n) => {
   const d = new Date(Date.UTC(y, m - 1 + n, 1));
   return d.toISOString().slice(0, 7);
 };
+
+// ── pubblicato in automatico (29/10/2026) ────────────────────────────────────
+// Nicholas: «far sì che si segni pubblicato in automatico, un giro ogni ora sul profilo IG che
+// controlla in base all'orario». Si leggono gli ultimi post PUBBLICI del profilo (Apify, nessun
+// accesso all'account) e si abbina ogni contenuto in calendario a un post dello stesso tipo uscito
+// vicino all'orario previsto. Prova in più: la didascalia. Mai abbinato due volte lo stesso post.
+
+const AUTO_BEFORE_H = 3;   // un post uscito fino a 3 ore prima dell'orario conta
+const AUTO_AFTER_H = 18;   // …e fino a 18 ore dopo
+export const AUTO_GIVEUP_H = 30; // oltre, si smette di cercare: lo si segna a mano
+
+/** Millisecondi dell'orario in calendario (ora di Roma). Senza ora = inizio del giorno. */
+export function romeTs(date, time) {
+  const [y, m, d] = String(date).split("-").map(Number);
+  const [hh, mm] = /^\d{1,2}:\d{2}$/.test(time || "") ? time.split(":").map(Number) : [0, 0];
+  const guess = Date.UTC(y, m - 1, d, hh, mm);
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Rome", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(new Date(guess)).map((p) => [p.type, p.value]));
+  const asRome = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute);
+  return guess - (asRome - guess);
+}
+
+/** Contenuti da controllare adesso: pronti, in calendario, orario passato da 15 min, non oltre 30 h. */
+export function dueForAutoCheck(items, now) {
+  return (items || []).filter((it) => {
+    if (it.status !== "pronto" || !it.slot?.date) return false;
+    const t = romeTs(it.slot.date, it.slot.time);
+    return now >= t + 15 * 60000 && now <= t + AUTO_GIVEUP_H * 3600000;
+  });
+}
+
+const words = (s) => new Set(String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/https?:\/\/\S+/g, "").match(/[\p{L}\p{N}]{3,}/gu) || []);
+/** Somiglianza delle didascalie (0-1): parole in comune sulle parole della più corta. */
+export function captionMatch(a, b) {
+  const A = words(a), B = words(b);
+  if (A.size < 3 || B.size < 3) return 0;
+  let n = 0; for (const w of A) if (B.has(w)) n++;
+  return n / Math.min(A.size, B.size);
+}
+
+/**
+ * Abbina i contenuti ai post letti. posts: [{ id, ts, kind: "reel"|"carosello"|"post", caption, url }].
+ * `taken` = post già abbinati ad altri contenuti. Ritorna [{ itemId, post }].
+ * Con più candidati vince la didascalia (≥0,5), poi il più vicino all'orario.
+ */
+export function matchPublished(items, posts, taken = new Set()) {
+  const used = new Set(taken);
+  const out = [];
+  const sorted = [...(items || [])].sort((a, b) => romeTs(a.slot.date, a.slot.time) - romeTs(b.slot.date, b.slot.time));
+  for (const it of sorted) {
+    const t = romeTs(it.slot.date, it.slot.time);
+    const lo = t - AUTO_BEFORE_H * 3600000, hi = t + (it.slot.time ? AUTO_AFTER_H : 24 + 6) * 3600000;
+    const reject = new Set(it.autoReject || []);
+    const cands = (posts || []).filter((p) => p.kind === it.type && p.ts >= lo && p.ts <= hi && !used.has(p.id) && !reject.has(p.id))
+      .map((p) => ({ p, cap: captionMatch(it.caption, p.caption), dist: Math.abs(p.ts - t) }))
+      .sort((a, b) => (b.cap >= 0.5) - (a.cap >= 0.5) || a.dist - b.dist);
+    if (!cands.length) continue;
+    used.add(cands[0].p.id);
+    out.push({ itemId: it.id, post: cands[0].p, caption: cands[0].cap >= 0.5 });
+  }
+  return out;
+}
+
+/** La task del Warm-up risulta fatta se il suo contenuto è stato segnato pubblicato in automatico. */
+export function autoItemForTask(items, profileId, date, taskId) {
+  const kind = pubKindOfTask(taskId);
+  if (!kind) return null;
+  const list = dayItems(items, profileId, date, kind);
+  if (taskId === "w1-reels") return list.find((it) => it.status === "pubblicato" && it.autoPub) || null;
+  const m = /-r(\d+)$/.exec(taskId);
+  const it = list[m ? Number(m[1]) - 1 : 0];
+  return it && it.status === "pubblicato" && it.autoPub ? it : null;
+}

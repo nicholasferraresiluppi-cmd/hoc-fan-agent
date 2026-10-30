@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { Sparkles } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, Metric, DataTable, Notice, SectionTitle, card } from "@/components/ds";
+import { PageHead, Metric, DataTable, Notice, SectionTitle, card, Tabs } from "@/components/ds";
 import PeriodPicker from "@/components/PeriodPicker";
 import { isDay, presetsFor } from "@/lib/period-range";
 import { CreatorCompare } from "@/components/looker/pages";
@@ -522,14 +522,7 @@ export default function AnalisiVenditePage() {
         actions={<VetroSwitch on={vetro} set={setVetro} />} />
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <div role="tablist" aria-label="Vista" style={{ display: "inline-flex", gap: 4, padding: 3, border: `1px solid ${CP.border}`, borderRadius: 10 }}>
-          {[["come", "Come vanno e perché"], ["confronto", "Tutte a confronto"]].map(([k, label]) => (
-            <button key={k} role="tab" aria-selected={vista === k} onClick={() => { setVista(k); if (k === "confronto") setPerson(null); }}
-              style={{ border: 0, borderRadius: 7, padding: "6px 12px", fontSize: 13, cursor: "pointer", background: vista === k ? CP.surfaceAlt : "transparent", color: vista === k ? CP.textPrimary : CP.textSecondary }}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <Tabs items={[["come", "Come vanno e perché"], ["confronto", "Tutte a confronto"]]} value={vista} style={{ margin: 0, flex: "0 1 auto", minWidth: 0 }} onChange={(k) => { setVista(k); if (k === "confronto") setPerson(null); }} />
         <PeriodPicker value={range} onChange={setRange} max={yesterday()} loading={list.isLoading && Boolean(list.data)} />
       </div>
 

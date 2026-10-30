@@ -151,6 +151,85 @@ export function FilterChip({ label, active, danger, attn, onClick, disabled, clo
   );
 }
 
+/*
+ * Regole d'uso (29/10/2026, pannello tester + Nicholas: «schede, filtri e scelte hanno lo stesso
+ * aspetto»). Tre aspetti per tre funzioni, ovunque:
+ *   - SCHEDE (cambiano la vista)          → <Tabs>: testo con la riga sotto, mai pillole
+ *   - FILTRI (restringono ciò che si vede) → <FilterChip>/tendine dentro una sola <FilterBar>
+ *   - MODALITÀ di tutta la pagina          → <Segmented> (es. Instagram | X)
+ *   - AZIONI                               → bottoni (un solo primario viola per schermata)
+ * Vedi docs/DESIGN.md «Regole d'uso».
+ */
+
+/**
+ * Pulsanti (regola d'uso 5, 30/10/2026): un solo aspetto per tutta l'app. Prima c'erano ~28 definizioni
+ * locali di «pulsante principale» con 6 misure diverse. BTN_PRIMARY = l'azione principale (una per schermata),
+ * BTN = secondario (bianco col bordo), BTN_PRIMARY_OFF(disabled) per i pulsanti che si spengono.
+ */
+export const BTN = { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", minHeight: 38, borderRadius: 10, fontSize: 13.5, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer", textDecoration: "none", whiteSpace: "nowrap", background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}` };
+export const BTN_PRIMARY = { ...BTN, background: CP.accent, color: CP.accentInk, border: `1px solid ${CP.accent}` };
+export const BTN_PRIMARY_OFF = (disabled) => (disabled ? { ...BTN_PRIMARY, background: CP.surfaceAlt, color: CP.textMuted, border: `1px solid ${CP.border}`, cursor: "not-allowed" } : BTN_PRIMARY);
+
+/** Schede della pagina o di una sezione: testo con la riga sotto quella aperta. items = [[key, label, badge?], …] */
+export function Tabs({ items, value, onChange, aside, small = false, style }) {
+  return (
+    <div role="tablist" className="ds-tabs" style={{ display: "flex", alignItems: "flex-end", gap: small ? 16 : 22, borderBottom: `1px solid ${CP.border}`, margin: "0 0 16px", overflowX: "auto", scrollbarWidth: "none", ...style }}>
+      {items.map(([k, label, badge]) => {
+        const on = value === k;
+        return (
+          <button key={k} type="button" role="tab" aria-selected={on} onClick={() => onChange(k)}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "none", borderBottom: `2px solid ${on ? CP.accent : "transparent"}`, marginBottom: -1, padding: small ? "6px 0 8px" : "8px 0 10px", fontSize: small ? 13.5 : 14.5, fontWeight: on ? 500 : 400, color: on ? CP.textPrimary : CP.textSecondary, cursor: "pointer", whiteSpace: "nowrap", fontFamily: FONTS.body }}>
+            {label}
+            {badge != null && badge !== "" && <span style={{ fontSize: 12, color: on ? CP.accentSoftText : CP.textMuted, ...NUM }}>{badge}</span>}
+          </button>
+        );
+      })}
+      {aside && <span style={{ marginLeft: "auto", paddingBottom: 6, flexShrink: 0 }}>{aside}</span>}
+    </div>
+  );
+}
+
+/** Modalità di tutta la pagina (es. piattaforma): bottoni uniti in un solo riquadro. items = [[key, label], …] */
+export function Segmented({ items, value, onChange, label, style }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 8, ...style }}>
+      {label && <span style={{ fontSize: 12.5, color: CP.textMuted }}>{label}</span>}
+      <span role="radiogroup" style={{ display: "inline-flex", border: `1px solid ${CP.border}`, borderRadius: 10, padding: 2, background: CP.surface }}>
+        {items.map(([k, l]) => {
+          const on = value === k;
+          return (
+            <button key={k} type="button" role="radio" aria-checked={on} onClick={() => onChange(k)}
+              style={{ border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 13, cursor: "pointer", fontFamily: FONTS.body, background: on ? CP.accent : "transparent", color: on ? CP.accentInk : CP.textSecondary, fontWeight: on ? 500 : 400 }}>
+              {l}
+            </button>
+          );
+        })}
+      </span>
+    </span>
+  );
+}
+
+/** L'unica barra dei filtri di una vista: sta sotto le schede; a destra «Azzera» se serve. */
+export function FilterBar({ children, onReset, style }) {
+  return (
+    <div className="ds-filterbar" style={{ ...card, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", padding: "10px 12px", margin: "0 0 14px", ...style }}>
+      {children}
+      {onReset && <button type="button" onClick={onReset} style={{ marginLeft: "auto", background: "transparent", border: "none", color: CP.textSecondary, fontSize: 13, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, fontFamily: FONTS.body }}>Azzera</button>}
+    </div>
+  );
+}
+
+/** Stato vuoto: cosa manca, perché, e il tasto per risolvere dentro il riquadro. */
+export function EmptyState({ title, children, action }) {
+  return (
+    <div style={{ ...card, textAlign: "center", padding: "26px 18px", margin: "0 0 14px" }}>
+      {title && <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, marginBottom: 4 }}>{title}</div>}
+      {children && <p style={{ fontSize: 13.5, color: CP.textSecondary, margin: "0 0 12px", lineHeight: 1.5 }}>{children}</p>}
+      {action}
+    </div>
+  );
+}
+
 export function SectionTitle({ children, aside }) {
   return (
     <div style={{ display: "flex", alignItems: "baseline", gap: 12, margin: "0 0 10px", flexWrap: "wrap" }}>

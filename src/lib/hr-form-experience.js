@@ -12,7 +12,7 @@
  *  4. accesso a localStorage sempre protetto (in navigazione privata può
  *     lanciare: il modulo deve funzionare lo stesso).
  */
-import { FIELD_BY_KEY, FORM_KEYS, validateCodiceFiscale, SOURCE_REFERRAL, langsUnanswered, stripLangNo } from "./hr-fields.js";
+import { FIELD_BY_KEY, FORM_KEYS, validateCodiceFiscale, validatePartitaIva, SOURCE_REFERRAL, langsUnanswered, stripLangNo } from "./hr-fields.js";
 
 // ── 0. Campi obbligatori (04/10/2026, decisione del titolare) ────────────────
 // Servono tutti i dati per contratto e documenti; restano facoltativi solo quelli
@@ -41,6 +41,7 @@ export function requiredKeysFor(data = {}, { cfEnabled = true, cfPresent = false
   const keys = [...REQUIRED_FORM_KEYS];
   if (cfEnabled && !cfPresent && !data.residenceComune?.abroad) keys.push("codiceFiscale");
   if (data.source === SOURCE_REFERRAL) keys.push("referredBy");
+  if (data.partitaIva === true) keys.push("partitaIvaNumero");
   return keys;
 }
 
@@ -92,6 +93,10 @@ export function fieldErrors(data = {}, keys = FORM_KEYS, { cfEnabled = true, cfP
   if (has("codiceFiscale") && cfEnabled && String(data.codiceFiscale || "").trim()) {
     const r = validateCodiceFiscale(data.codiceFiscale);
     if (!r.ok) out.codiceFiscale = `Il codice fiscale non sembra giusto. ${r.error}`;
+  }
+  if (has("partitaIvaNumero") && data.partitaIva === true && String(data.partitaIvaNumero || "").trim()) {
+    const r = validatePartitaIva(data.partitaIvaNumero);
+    if (!r.ok) out.partitaIvaNumero = r.error;
   }
   if (has("personalEmail")) {
     const v = String(data.personalEmail || "").trim();

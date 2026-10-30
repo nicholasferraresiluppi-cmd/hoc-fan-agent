@@ -67,7 +67,7 @@ const whoFetcher = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch((
  * Guscio di chi ha un ruolo ristretto (lib/restricted-roles, es. "Social"): niente menu, niente
  * hub, solo il nome dell'app, la pagina e l'account. Le altre pagine riportano alla sua.
  */
-const RESTRICTED_PAGE_LABEL = { "/admin/scouting": "Radar creator", "/admin/studio-social": "Studio social", "/admin/supervisor": "Account social", "/admin/warmup": "Warm-up", "/admin/editoriale": "Editoriale", "/admin/hr": "Persone", "/admin/hr/contratti": "Contratti", "/admin/referral": "Porta un amico", "/me/porta-un-amico": "Porta un amico", "/contabilita": "Contabilità" };
+const RESTRICTED_PAGE_LABEL = { "/admin/scouting": "Radar creator", "/admin/studio-social": "Studio social", "/admin/supervisor": "Account social", "/admin/warmup": "Clipping", "/admin/hr": "Persone", "/admin/hr/contratti": "Contratti", "/admin/referral": "Porta un amico", "/me/porta-un-amico": "Porta un amico", "/contabilita": "Contabilità" };
 
 function RestrictedShell({ restriction, allowed, children, pathname }) {
   // badge sulle schede (27/10/2026): l'HR col menu ridotto vede qui i premi di «Porta un amico» da pagare
@@ -80,12 +80,12 @@ function RestrictedShell({ restriction, allowed, children, pathname }) {
         <a href={restriction.home} style={{ color: CP.textPrimary, textDecoration: "none", fontSize: 15, fontWeight: 500, whiteSpace: "nowrap" }}>House of Creators</a>
         {/* più pagine (es. SMM: Radar + Account social) → una scheda per pagina; una sola → solo il nome */}
         {restriction.paths.length > 1 ? (
-          <nav style={{ display: "flex", gap: 4, overflowX: "auto", minWidth: 0 }}>
+          <nav data-restricted-tabs="" style={{ display: "flex", gap: 18, overflowX: "auto", minWidth: 0, alignSelf: "stretch", alignItems: "flex-end" }}>
             {restriction.paths.map((p, _i, all) => {
               // scheda accesa = la pagina più specifica che contiene l'indirizzo (/admin/hr/contratti non accende anche «Persone»)
               const hits = all.filter((x) => pathname === x || pathname.startsWith(x + "/"));
               const on = hits.length > 0 && hits.reduce((a, b) => (b.length > a.length ? b : a)) === p;
-              return <a key={p} href={p} style={{ fontSize: 13.5, padding: "6px 12px", borderRadius: 999, textDecoration: "none", whiteSpace: "nowrap", border: `1px solid ${on ? CP.accent : CP.border}`, background: on ? CP.accentSoft : "transparent", color: on ? CP.accentSoftText : CP.textSecondary }}>{RESTRICTED_PAGE_LABEL[p] || p}{badge[p] > 0 && <span aria-label={`${badge[p]} cose da fare`} style={{ marginLeft: 6, minWidth: 18, padding: "0 6px", borderRadius: 9, background: CP.accent, color: CP.accentInk, fontSize: 11, fontWeight: 600, display: "inline-block", textAlign: "center", lineHeight: "18px" }}>{badge[p]}</span>}</a>;
+              return <a key={p} href={p} aria-current={on ? "page" : undefined} style={{ fontSize: 14, padding: "6px 0 8px", textDecoration: "none", whiteSpace: "nowrap", borderBottom: `2px solid ${on ? CP.accent : "transparent"}`, fontWeight: on ? 500 : 400, color: on ? CP.textPrimary : CP.textSecondary }}>{RESTRICTED_PAGE_LABEL[p] || p}{badge[p] > 0 && <span aria-label={`${badge[p]} cose da fare`} style={{ marginLeft: 6, minWidth: 18, padding: "0 6px", borderRadius: 9, background: CP.accent, color: CP.accentInk, fontSize: 11, fontWeight: 600, display: "inline-block", textAlign: "center", lineHeight: "18px" }}>{badge[p]}</span>}</a>;
             })}
           </nav>
         ) : <span style={{ color: CP.textMuted, fontSize: 15 }}>· {restriction.label}</span>}

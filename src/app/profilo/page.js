@@ -9,7 +9,7 @@ import { useUser } from "@clerk/nextjs";
 import { Sparkles, TrendingUp, GraduationCap, BookOpen, Mail, ArrowRight, Award } from "lucide-react";
 import SignalsStrip from "@/components/SignalsStrip";
 import { fmt$, fmtInt, MONTHS_IT } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, SectionTitle, DataTable, Notice, card, NUM } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, SectionTitle, DataTable, Notice, card, NUM, BTN_PRIMARY } from "@/components/ds";
 
 import { tierLabel } from "@/lib/tier-label";
 // Ridisegno sul design system 26/09/2026: contenuti e logica del 25/09 invariati
@@ -50,7 +50,7 @@ function formatPeriodLabel(periodId) {
   return periodId;
 }
 
-const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", background: CP.accent, color: CP.accentInk, borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap" };
+const btnPrimary = BTN_PRIMARY;
 const btnGhost = { display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap" };
 const tierChip = { display: "inline-block", padding: "2px 10px", borderRadius: 999, fontSize: 12, fontWeight: 500, background: CP.surfaceAlt, color: CP.textSecondary, border: `1px solid ${CP.border}` };
 

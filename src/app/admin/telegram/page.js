@@ -9,7 +9,7 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { Check, Copy, Plus, RefreshCw, Trash2, ExternalLink, Link2, X } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, Metric, DataTable, Notice, SectionTitle, card, NUM } from "@/components/ds";
+import { PageHead, Metric, DataTable, Notice, SectionTitle, card, NUM, BTN_PRIMARY } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
 import { fmtInt, fmtPct } from "@/lib/format";
 import { confirmDialog } from "@/components/AppDialogs";
@@ -29,7 +29,7 @@ async function post(body) {
 }
 
 const btn = { display: "inline-flex", alignItems: "center", gap: 6, background: CP.surfaceAlt, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "7px 12px", fontSize: 13, cursor: "pointer", fontFamily: FONTS.body };
-const btnPrimary = { ...btn, background: CP.accent, color: CP.accentInk, border: `1px solid ${CP.accent}`, fontWeight: 500 };
+const btnPrimary = BTN_PRIMARY;
 const input = { background: CP.bgSunken, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: FONTS.body, width: "100%", boxSizing: "border-box" };
 const label = { display: "block", fontSize: 12, color: CP.textSecondary, margin: "12px 0 4px" };
 const muted = { fontSize: 12, color: CP.textMuted };

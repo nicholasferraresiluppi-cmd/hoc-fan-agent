@@ -7,7 +7,7 @@
  * Replica il pattern visivo di CreatorsPro (logo top → org → nav grouped).
  *
  * FEATURES UX:
- *   - Toggle "Essential / Advanced" in alto: Essential mostra solo le voci
+ *   - (fino al 29/10/2026) toggle "Essential / Advanced": tolto, resta solo «La mia vista». Essential mostrava solo le voci
  *     core in ESSENTIAL_HREFS (primo accesso / demo / consulenti), Advanced
  *     mostra tutto.
  *   - Gruppi collapsible: Performance + Training aperti di default, gli altri
@@ -24,7 +24,7 @@ import { useRouter } from "next/navigation";
 import { prefetchNav } from "@/lib/nav-prefetch";
 import useSWR from "swr";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
-import { useTheme, useStyle } from "@/lib/theme-client";
+import { useTheme } from "@/lib/theme-client";
 import { UserButton, SignedIn } from "@clerk/nextjs";
 import {
   Landmark, ArrowLeftRight, Send, Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown, HeartHandshake,
@@ -43,39 +43,7 @@ import BrandLockup from "@/components/BrandLockup";
 import WorkspaceSwitch from "@/components/WorkspaceSwitch";
 import { workspaceSections } from "@/lib/workspaces";
 
-// Voci "essential" (mostrate sempre): core per primo accesso / demo.
-const ESSENTIAL_HREFS = new Set([
-  "/welcome",
-  "/welcome/score-friendly",
-  "/profilo",
-  "/me/score",
-  "/me/compenso",
-  "/me/percorso",
-  "/me/contestazioni",
-  "/me/qualita",
-  "/me/turno",
-  "/me/coaching",
-  "/me/allenatore",
-  "/admin",
-  "/admin/alerts",
-  "/leaderboard/sales-cp",
-  "/leaderboard/creators",
-  "/",
-  "/playbook",
-  "/academy/tapes",
-  "/academy/vendere",
-  "/admin/sales-coaching",
-  "/admin/bilancio", // classifica aziendale delle creator, per i sales manager (16/10/2026)
-  "/admin/s4s", // S4S quotidiano dei sales manager: con il badge delle cose da fare (14/10/2026)
-  "/admin/team",
-  "/admin/settimana",
-  "/admin/coaching-center",
-  "/admin/pnl-live",
-  "/admin/conversation-intelligence",
-  "/admin/profiles-compare",
-  "/admin/comp-calendar",
-  "/admin/roadmap",
-]);
+
 
 const NAV_GROUPS_RAW = [
   {
@@ -186,8 +154,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/ads",                      label: "Studio bio-funnel", icon: Megaphone },
       { href: "/admin/studio-social",            label: "Studio social",   icon: Clapperboard },
       { href: "/admin/supervisor",               label: "Account social",  icon: Share2 },
-      { href: "/admin/warmup",                   label: "Warm-up",         icon: Sunrise },
-      { href: "/admin/editoriale",               label: "Editoriale Instagram", icon: CalendarDays },
+      { href: "/admin/warmup",                   label: "Clipping",       icon: Sunrise },
       { href: "/admin/social-proxies",           label: "Proxy account social", icon: Shield },
     ],
   },
@@ -354,50 +321,6 @@ function GroupHeader({ label, isOpen, onToggle, visibleCount, hasActive }) {
   );
 }
 
-function ViewToggle({ mode, onChange }) {
-  return (
-    <div style={{
-      display: "flex",
-      padding: 3,
-      background: CP.surface,
-      border: `1px solid ${CP.border}`,
-      borderRadius: 8,
-      margin: "8px 16px 0 16px",
-    }}>
-      {[
-        { v: "essential", label: "Essential", icon: Compass, tooltip: "Voci core — primo accesso, demo" },
-        { v: "advanced",  label: "Advanced",  icon: Layers,   tooltip: "Tutti gli strumenti" },
-      ].map((opt) => {
-        const active = mode === opt.v;
-        const Icon = opt.icon;
-        return (
-          <button
-            key={opt.v}
-            onClick={() => onChange(opt.v)}
-            title={opt.tooltip}
-            style={{
-              flex: 1,
-              display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5,
-              padding: "5px 8px",
-              background: active ? CP.surfaceAlt : "transparent",
-              border: active ? `1px solid ${CP.borderStrong}` : "1px solid transparent",
-              borderRadius: 6,
-              color: active ? CP.textPrimary : CP.textMuted,
-              fontSize: 11,
-              fontWeight: active ? 600 : 500,
-              fontFamily: FONTS.body,
-              cursor: "pointer",
-              transition: "color 0.12s, background 0.12s",
-            }}
-          >
-            <Icon size={12} strokeWidth={1.8} />
-            <span>{opt.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 // Fetcher silenzioso: la sidebar è renderizzata per TUTTI gli utenti loggati,
 // ma /api/admin/ops-alerts risponde 403 sotto SCORES_VIEW "all" — in quel caso
@@ -448,10 +371,7 @@ export default function Sidebar() {
 
   const allowed = (href) => (!me?.authenticated && !isPrivateHref(href)) || canSee(href, me?.capabilities, me?.admin);
   const [theme, setTheme] = useTheme();
-  const [style, setStyle] = useStyle();
 
-  // Toggle Essential / Advanced
-  const [viewMode, setViewMode] = useState("essential");
   // Map { label: isOpen } per i gruppi collassabili
   const [openGroups, setOpenGroups] = useState(() => {
     const init = {};
@@ -462,8 +382,6 @@ export default function Sidebar() {
   // Hydrate da localStorage (post-mount, evita hydration mismatch)
   useEffect(() => {
     try {
-      const v = localStorage.getItem("hoc:sidebar:viewMode");
-      if (v === "essential" || v === "advanced") setViewMode(v);
       const og = localStorage.getItem("hoc:sidebar:openGroups");
       if (og) {
         const parsed = JSON.parse(og);
@@ -474,9 +392,6 @@ export default function Sidebar() {
 
   // Persist on change
   useEffect(() => {
-    try { localStorage.setItem("hoc:sidebar:viewMode", viewMode); } catch {}
-  }, [viewMode]);
-  useEffect(() => {
     try { localStorage.setItem("hoc:sidebar:openGroups", JSON.stringify(openGroups)); } catch {}
   }, [openGroups]);
 
@@ -486,7 +401,6 @@ export default function Sidebar() {
     return pathname === item.href || pathname.startsWith(item.href + "/");
   };
 
-  const isEssential = viewMode === "essential";
   // la voce accesa resta sempre in vista nel menu che scorre
   useEffect(() => {
     try { document.querySelector('.hoc-side nav a[data-on="1"]')?.scrollIntoView({ block: "nearest" }); } catch {}
@@ -553,22 +467,16 @@ export default function Sidebar() {
       {/* Mansione: "La mia vista" (solo chi ne ha una; gli operatori restano sul menu personale) */}
       <WorkspaceSwitch me={me} style={{ margin: "10px 16px 0 16px" }} />
 
-      {/* View mode toggle (menu completo) */}
-      {!wsSections && <ViewToggle mode={viewMode} onChange={setViewMode} />}
+      {/* 30/10/2026: un solo controllo del menu, «La mia vista» (tolto Essential/Advanced: due comandi per la stessa cosa) */}
 
       {/* Welcome link (always visible, both modes) — con una mansione resta solo la Guida */}
       {wsSections ? (
-        <div style={{ padding: "10px 0 4px 0", borderBottom: `1px solid ${CP.border}` }}>
-          <NavItem href="/guida" label="Guida strumenti" icon={Signpost} isActive={pathname === "/guida"} />
-        </div>
+        null
       ) : (
       <div style={{ padding: "10px 0 4px 0", borderBottom: `1px solid ${CP.border}` }}>
-        <NavItem href="/welcome" label="Benvenuto" icon={Compass} isActive={pathname === "/welcome"} />
-        <NavItem href="/guida" label="Guida strumenti" icon={Signpost} isActive={pathname === "/guida"} />
-        <NavItem href="/cultura" label="Come lavoriamo" icon={Compass} isActive={pathname === "/cultura"} />
-        <NavItem href="/grazie" label="Dire grazie" icon={Compass} isActive={pathname === "/grazie"} />
         {allowed("/admin") && <NavItem href="/admin" label="Hub" icon={LayoutDashboard} isActive={pathname === "/admin"} />}
         {allowed("/admin/alerts") && <NavItem href="/admin/alerts" label="Alert operativi" icon={Bell} isActive={pathname.startsWith("/admin/alerts")} badge={criticalCount} />}
+        {!allowed("/admin") && <NavItem href="/guida" label="Guida strumenti" icon={Signpost} isActive={pathname === "/guida"} />}
       </div>
       )}
 
@@ -593,9 +501,9 @@ export default function Sidebar() {
           </button>
         )}
         {showAll && NAV_GROUPS.map((group) => {
-          const visibleItems = (isEssential && !wsSections
-            ? group.items.filter((it) => ESSENTIAL_HREFS.has(it.href))
-            : group.items).filter((it) => allowed(it.href) && !wsHrefs.has(it.href));
+          // «Il mio quadro» (pagine personali dell'operatore) solo a chi non ha una mansione, cioè agli operatori
+          if (group.label === "Il mio quadro" && ws) return null;
+          const visibleItems = group.items.filter((it) => allowed(it.href) && !wsHrefs.has(it.href));
           if (visibleItems.length === 0) return null;
           const isOpen = openGroups[group.label];
           return (
@@ -625,6 +533,17 @@ export default function Sidebar() {
             </div>
           );
         })}
+        {/* Aiuto: le pagine di orientamento raccolte in fondo (prima 4 voci in cima a ogni menu) */}
+        <GroupHeader label="Aiuto" isOpen={Boolean(openGroups.Aiuto)} onToggle={() => toggleGroup("Aiuto")} visibleCount={4}
+          hasActive={["/welcome", "/guida", "/cultura", "/grazie"].includes(pathname)} />
+        {openGroups.Aiuto && (
+          <div>
+            <NavItem href="/guida" label="Guida strumenti" icon={Signpost} isActive={pathname === "/guida"} />
+            <NavItem href="/welcome" label="Benvenuto" icon={Compass} isActive={pathname === "/welcome"} />
+            <NavItem href="/cultura" label="Come lavoriamo" icon={Compass} isActive={pathname === "/cultura"} />
+            <NavItem href="/grazie" label="Dire grazie" icon={Compass} isActive={pathname === "/grazie"} />
+          </div>
+        )}
       </nav>
 
       {/* Bottom: UserButton */}
@@ -641,13 +560,7 @@ export default function Sidebar() {
               {theme === "light" ? <Moon size={15} /> : <Sun size={15} />}
             </button>
           </div>
-          {/* Stile v3 "Notte / Carta" in ANTEPRIMA: solo admin, finché non è verificato su tutte le pagine */}
-          {me?.admin && (
-            <button onClick={() => setStyle(style === "v3" ? "v2" : "v3")} aria-pressed={style === "v3"}
-              style={{ marginTop: 10, width: "100%", padding: "7px 10px", borderRadius: 8, border: `1px solid ${style === "v3" ? CP.accent : CP.border}`, background: style === "v3" ? CP.accentSoft : "transparent", color: style === "v3" ? CP.accentSoftText : CP.textSecondary, fontSize: 12, cursor: "pointer", textAlign: "left", fontFamily: FONTS.body }}>
-              {style === "v3" ? "Stile nuovo attivo (anteprima) · torna al vecchio" : "Prova lo stile nuovo (anteprima)"}
-            </button>
-          )}
+          {/* Stile v3 «Casa» spento il 27/10/2026 (stile unico vetro): niente più anteprima, 29/10 tolto anche il tasto */}
         </SignedIn>
       </div>
     </aside>

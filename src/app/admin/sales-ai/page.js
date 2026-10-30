@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { CP, FONTS, alpha } from "@/lib/brand";
-import { PageHead, Notice, card, DataTable, Disclosure, FilterChip, SectionTitle } from "@/components/ds";
+import { PageHead, Notice, card, DataTable, Disclosure, FilterChip, SectionTitle, BTN_PRIMARY } from "@/components/ds";
 
 /**
  * /admin/sales-ai — Quartier generale del sales manager AI.
@@ -319,7 +319,7 @@ function Config({ cfg, onSaved, day }) {
   );
 }
 
-const btnPrimary = { padding: "8px 14px", background: CP.accent, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, color: CP.accentInk, cursor: "pointer", fontFamily: FONTS.body };
+const btnPrimary = BTN_PRIMARY;
 const btnGhost = { padding: "8px 14px", background: "transparent", border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, color: CP.textSecondary, cursor: "pointer", fontFamily: FONTS.body };
 const Pre = ({ children }) => <div style={{ whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.55, color: CP.textPrimary }}>{children}</div>;
 const Wrap = ({ children }) => <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>{children}</div>;

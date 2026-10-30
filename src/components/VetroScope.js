@@ -21,7 +21,8 @@ const EVT = "hoc:vetro-change";
 export function useVetro() {
   const [on, setOn] = useState(true);
   useEffect(() => {
-    const read = () => { try { setOn(localStorage.getItem(KEY) !== "0"); } catch {} };
+    // 27/10/2026: stile unico vetro (decisione di Nicholas) → niente più «spegni»; chi l'aveva spento lo ritrova
+    const read = () => { try { if (localStorage.getItem(KEY) === "0") localStorage.removeItem(KEY); } catch {} setOn(true); };
     read();
     window.addEventListener(EVT, read);
     return () => window.removeEventListener(EVT, read);
@@ -61,7 +62,7 @@ const TINT_KEY = "hoc:vetro:tinta";
 export function useVetroTint() {
   const [tint, setTint] = useState("blu");
   useEffect(() => {
-    const read = () => { try { setTint(localStorage.getItem(TINT_KEY) === "caldo" ? "caldo" : "blu"); } catch {} };
+    const read = () => { setTint("blu"); }; // tinta unica: vetro bianco (la prova «caldo» è chiusa)
     read();
     window.addEventListener(EVT, read);
     return () => window.removeEventListener(EVT, read);
@@ -75,7 +76,7 @@ export function useVetroTint() {
 }
 
 /** Pagine in prova: qui il vetro avvolge anche il menu e le schede in alto (AppShell). */
-export const VETRO_PATHS = ["/admin", "/admin/le-mie-creator", "/admin/bilancio", "/admin/revenue-pacing", "/leaderboard/sales-cp", "/leaderboard/creators", "/admin/hr", "/admin/sales-coaching", "/admin/analisi-vendite", "/admin/publisher-x", "/admin/referral", "/me/porta-un-amico", "/admin/editoriale", "/admin/s4s", "/admin/chat-monitor", "/admin/fan-da-recuperare"];
+export const VETRO_PATHS = ["/admin/warmup", "/admin", "/admin/le-mie-creator", "/admin/bilancio", "/admin/revenue-pacing", "/leaderboard/sales-cp", "/leaderboard/creators", "/admin/hr", "/admin/sales-coaching", "/admin/analisi-vendite", "/admin/publisher-x", "/admin/referral", "/me/porta-un-amico", "/admin/editoriale", "/admin/s4s", "/admin/chat-monitor", "/admin/fan-da-recuperare"];
 export const isVetroPath = (p) => VETRO_PATHS.includes(String(p || "").replace(/\/$/, "") || "/");
 
 const VetroCtx = createContext(false);
@@ -223,27 +224,9 @@ export default function VetroScope({ on, stable = false, children }) {
   );
 }
 
-/** Interruttore della prova, da mettere nell'intestazione della pagina. */
-export function VetroSwitch({ on, set }) {
-  const [solid, setSolid] = useVetroSolid();
-  const [tint, setTint] = useVetroTint();
-  const pill = (active) => ({ font: "inherit", fontSize: 12.5, minHeight: 32, padding: "0 12px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap",
-    border: "1px solid var(--cp-border)", background: active ? "rgba(255,255,255,.6)" : "transparent", color: "var(--cp-textSecondary)" });
-  return (
-    <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
-      {on && (
-        <button type="button" onClick={() => setTint(tint === "blu" ? "caldo" : "blu")} style={pill(false)}>
-          {tint === "blu" ? "Vetro bianco · prova il caldo" : "Vetro caldo · prova il bianco"}
-        </button>
-      )}
-      {on && (
-        <button type="button" onClick={() => setSolid(!solid)} aria-pressed={solid} style={pill(solid)}>
-          {solid ? "Trasparenza ridotta" : "Riduci trasparenza"}
-        </button>
-      )}
-      <button type="button" onClick={() => set(!on)} aria-pressed={on} style={pill(on)}>
-        {on ? "Stile vetro (prova) · spegni" : "Prova lo stile vetro"}
-      </button>
-    </span>
-  );
-}
+/**
+ * Era l'interruttore della prova nell'intestazione delle pagine. Dal 29/10/2026 non mostra niente:
+ * i comandi di stile non stanno dentro le pagine (regole d'uso), lo stile è uno solo. «Riduci
+ * trasparenza» segue l'impostazione di sistema (prefers-reduced-transparency).
+ */
+export function VetroSwitch() { return null; }

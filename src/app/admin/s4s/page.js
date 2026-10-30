@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { AlertTriangle, Check, ChevronLeft, ChevronRight, Copy, RefreshCw } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, NUM } from "@/components/ds";
+import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, NUM, Tabs, BTN_PRIMARY } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
 import { fmtInt, fmtPct, MONTHS_IT } from "@/lib/format";
 import { fillCaption, photosFor, needsPost, needsMass, availIssues } from "@/lib/s4s-core";
@@ -49,7 +49,7 @@ const pct = (x) => fmtPct(x);
 const FORMAT_LABEL = { massa: "messaggio di massa", post: "post", telegram: "Telegram" };
 
 const btn = { display: "inline-flex", alignItems: "center", gap: 6, background: CP.surfaceAlt, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "7px 12px", fontSize: 13, cursor: "pointer", fontFamily: FONTS.body };
-const btnPrimary = { ...btn, background: CP.accent, color: CP.accentInk, border: `1px solid ${CP.accent}`, fontWeight: 500 };
+const btnPrimary = BTN_PRIMARY;
 const input = { background: CP.bgSunken, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: FONTS.body };
 // nome del link da copiare: riquadro incassato (non monospazio: DESIGN.md)
 const mono = { fontFamily: FONTS.body, fontSize: 12.5, background: CP.bgSunken, border: `1px solid ${CP.borderSoft}`, borderRadius: 6, padding: "1px 6px" };
@@ -1401,12 +1401,8 @@ export default function S4SPage() {
         {allView && <button type="button" style={btn} disabled={refreshing} onClick={refresh}><RefreshCw size={14} />{refreshing ? "Aggiorno…" : "Aggiorna"}</button>}
       </div>
       <VetroWeek v={v} inbox={inbox} onOpenDay={(day) => { setFocusDay(day); setTab("agenda"); }} onTab={(k) => setTab(k)} />
-      <div role="tablist" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, borderBottom: `1px solid ${CP.border}`, paddingBottom: 12 }}>
-        {tabs.map(([k, l]) => (
-          <FilterChip key={k} active={current === k} onClick={() => { setTab(k); try { window.history.replaceState(null, "", `#${k}`); } catch { /* ok */ } }}
-            label={k === "risultati" && v.unmatched.length ? `${l} · ${v.unmatched.length} da attribuire` : k === "oggi" && inbox?.count ? `${l} · ${inbox.count}` : l} />
-        ))}
-      </div>
+      <Tabs value={current} style={{ marginBottom: 20 }} onChange={(k) => { setTab(k); try { window.history.replaceState(null, "", `#${k}`); } catch { /* ok */ } }}
+        items={tabs.map(([k, l]) => [k, l, k === "risultati" && v.unmatched.length ? `${v.unmatched.length} da attribuire` : k === "oggi" && inbox?.count ? inbox.count : null])} />
       {(current === "oggi" || current === "planner") && <Requests v={v} onEdit={setEditing} reload={reloadAll} />}
       {current === "oggi" && <Oggi key={v.split.id} v={v} reload={reloadAll} />}
       {current === "disponibilita" && <AvailEditor key={v.split.id} v={v} reload={reloadAll} />}

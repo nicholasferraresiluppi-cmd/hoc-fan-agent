@@ -6,7 +6,7 @@
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { isCronAuthorized } from "@/lib/cron-auth";
-import { continueChain, chainDepth, takeTickLock, dropTickLock } from "@/lib/cron-chain";
+import { continueChain, chainDepth, takeTickLock, dropTickLock, clearChainBreak } from "@/lib/cron-chain";
 import { getJob, startJob, step, todayUTC } from "@/lib/recupero";
 
 export const runtime = "nodejs";
@@ -36,7 +36,7 @@ export async function POST(request) {
   const t0 = Date.now();
   let job = await getJob(day);
   if (!job || (body?.force && chain === 0)) job = await startJob(day, { force: !!body?.force, by });
-  if (job.status !== "in_corso") { await dropTickLock("recupero"); return Response.json({ action: "idle", day, status: job.status }); }
+  if (job.status !== "in_corso") { await dropTickLock("recupero"); if (job.status === "fatto") await clearChainBreak("/api/cron/recupero"); return Response.json({ action: "idle", day, status: job.status }); }
 
   let last = null;
   while (Date.now() - t0 < BUDGET_MS) {
@@ -48,6 +48,7 @@ export async function POST(request) {
     }
   }
   const done = !!last?.done;
+  if (done) await clearChainBreak("/api/cron/recupero");
   await dropTickLock("recupero");
   const chained = done ? null : await continueChain(request, chain, { maxChain: MAX_CHAIN });
   return Response.json({ action: "step", day, stage: last?.job?.stage, status: last?.job?.status, chain, ...(chained ? { next: chained } : {}) });

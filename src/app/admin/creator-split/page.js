@@ -10,7 +10,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { Plus, RefreshCw, Search, X, ExternalLink } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, Notice, SectionTitle, card, NUM } from "@/components/ds";
+import { PageHead, Notice, SectionTitle, card, NUM, BTN_PRIMARY } from "@/components/ds";
 import { COUNTRY_NAMES, isActiveAccount as isActive } from "@/lib/live-creators";
 import { fmtInt } from "@/lib/format";
 import { confirmDialog } from "@/components/AppDialogs";
@@ -30,7 +30,7 @@ async function post(body) {
 }
 
 const btn = { display: "inline-flex", alignItems: "center", gap: 6, background: CP.surfaceAlt, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "7px 12px", fontSize: 13, cursor: "pointer", fontFamily: FONTS.body };
-const btnPrimary = { ...btn, background: CP.accent, color: CP.accentInk, border: `1px solid ${CP.accent}`, fontWeight: 500 };
+const btnPrimary = BTN_PRIMARY;
 const input = { background: CP.bgSunken, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: FONTS.body, boxSizing: "border-box" };
 const muted = { fontSize: 12, color: CP.textMuted };
 const money = (v) => (v == null ? "—" : `$${fmtInt(v)}`);

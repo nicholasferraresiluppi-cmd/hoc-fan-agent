@@ -15,7 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { Check, Copy, Eye, EyeOff, ExternalLink, Plus, Trash2, Upload, X, Search, KeyRound } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, NUM } from "@/components/ds";
+import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, NUM, BTN_PRIMARY } from "@/components/ds";
 import { fmtInt, fmtAgo } from "@/lib/format";
 import {
   ENUMS, PLATFORMS, PLATFORM_LABEL, PLATFORM_SHORT, SECRET_FIELDS, linkGroups, mapHeaders,
@@ -47,7 +47,7 @@ const TABS = [
 ];
 
 const btn = { display: "inline-flex", alignItems: "center", gap: 6, background: CP.surfaceAlt, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "7px 12px", fontSize: 13, cursor: "pointer", fontFamily: FONTS.body };
-const btnPrimary = { ...btn, background: CP.accent, color: CP.accentInk, border: `1px solid ${CP.accent}`, fontWeight: 500 };
+const btnPrimary = BTN_PRIMARY;
 const btnSmall = { ...btn, padding: "3px 7px", fontSize: 12 };
 const input = { width: "100%", boxSizing: "border-box", background: CP.bgSunken, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: FONTS.body };
 const muted = { color: CP.textMuted };

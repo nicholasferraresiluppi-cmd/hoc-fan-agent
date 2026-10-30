@@ -10,13 +10,14 @@ import { Copy, Check } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { NationalityInput, JobInput, LanguagesInput, PhoneInput, UsersInput, ComuneInput, ResidenceInput, BirthInput, SkillsInput, LearnInput, PastRolesInput } from "@/components/hr-inputs";
 import { SKILL_AREAS, normalizeSkillMap, normalizeLearnList, normalizePastRoles, skillName, pastRoleText } from "@/lib/hr-skills";
+import { BTN_PRIMARY } from "@/components/ds";
 
 export const lbl = { display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 4 };
 export const input = {
   width: "100%", boxSizing: "border-box", padding: "8px 10px", background: CP.surface, border: `1px solid ${CP.border}`,
   borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, outline: "none",
 };
-export const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", background: CP.accent, color: CP.accentInk, border: "1px solid transparent", borderRadius: 8, fontSize: 14, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };
+export const btnPrimary = BTN_PRIMARY;
 export const btnGhost = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer", textDecoration: "none" };
 export const chip = { display: "inline-block", fontSize: 12, padding: "2px 8px", borderRadius: 6, background: CP.surfaceAlt, color: CP.textSecondary, marginRight: 4, marginBottom: 2 };
 export const chipAccent = { ...chip, background: CP.accentSoft, color: CP.accentSoftText };
