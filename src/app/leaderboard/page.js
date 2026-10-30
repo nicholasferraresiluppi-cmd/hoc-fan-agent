@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
-import { PageHead, FilterChip, SectionTitle, DataTable, Notice, card, NUM } from "@/components/ds";
+import { PageHead, FilterChip, FilterBar, SectionTitle, DataTable, Notice, card, NUM } from "@/components/ds";
 
 const PERIODS = [
   { key: "week", label: "Settimana" },
@@ -103,7 +103,7 @@ export default function LeaderboardPage() {
         }
       />
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18, alignItems: "center" }}>
+      <FilterBar style={{ marginBottom: 18 }}>
         {PERIODS.map((p) => (
           <FilterChip key={p.key} label={p.label} active={period === p.key} onClick={() => setPeriod(p.key)} />
         ))}
@@ -118,7 +118,7 @@ export default function LeaderboardPage() {
         <span style={{ color: CP.textMuted, fontSize: 13, marginLeft: "auto", ...NUM }}>
           {fmtInt(data?.totalQualifying || 0)} in classifica
         </span>
-      </div>
+      </FilterBar>
 
       {loading && <Notice>Caricamento della classifica…</Notice>}
       {error && !loading && <Notice danger>Non riesco a caricare la classifica: {error}</Notice>}
