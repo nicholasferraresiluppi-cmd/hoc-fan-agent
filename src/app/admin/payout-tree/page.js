@@ -8,6 +8,8 @@ import { CP, FONTS } from "@/lib/brand";
 import CompNav from "@/components/CompNav";
 import { MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, DataTable, card, NUM, Tabs } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, HotTile, Gauge, MixBar, RankBars } from "@/components/VetroCharts";
 
 /**
  * /admin/payout-tree — Albero payout (trasparenza comp v2).
@@ -221,6 +223,7 @@ function TreeTab({ periodId, operator, setOperator, goSync }) {
   const { data, error, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false });
   const [open, setOpen] = useState(() => new Set());
   const [q, setQ] = useState("");
+  const inVetro = useInVetro();
 
   if (isLoading) return <Loading text={operator ? `Carico i turni di ${operator}…` : "Carico gli operatori del mese…"} />;
   if (error) return <Notice danger>Errore di rete: riprova.</Notice>;
@@ -285,6 +288,7 @@ function TreeTab({ periodId, operator, setOperator, goSync }) {
         <span style={{ fontSize: 13, color: CP.textMuted }}>{monthName(periodId)}</span>
       </div>
 
+      {inVetro ? <TreeTop s={s} /> : (
       <HeroMetric
         label="Venduto ritrovato nelle transazioni Infloww"
         value={fmtPct(s?.coverage)}
@@ -296,6 +300,7 @@ function TreeTab({ periodId, operator, setOperator, goSync }) {
           <Metric label="Vendite poi rimborsate" value={fmtInt(s?.refunded?.count)} note={s?.refunded?.count > 0 ? fmtUsd(s.refunded.gross_usd) : null} danger={s?.refunded?.count > 0} />
         </div>
       </HeroMetric>
+      )}
 
       {(s?.unlinked_aliases?.length > 0 || s?.no_ledger_creators?.length > 0 || s?.invalid_window_shifts > 0) && (
         <Notice>
@@ -402,8 +407,63 @@ function TreeTab({ periodId, operator, setOperator, goSync }) {
   );
 }
 
+// Vetro (30/10/2026). Albero di un operatore — domanda: «posso rispondere a una contestazione?»: l'arco
+// di quanto venduto ritroviamo nelle transazioni, con la tacca all'85% (sopra, l'albero regge), e le
+// vendite abbinate contro quelle non abbinate. Rimborsi — domanda: «quanto compenso abbiamo pagato su
+// vendite poi rimborsate, e a chi?»: la scheda rossa col totale stimato e chi ne ha ricevuto di più.
+const RELIABLE = 0.85;
+function TreeTop({ s }) {
+  const cov = s?.coverage;
+  const mix = [
+    { label: "Abbinate", value: s?.matched_count || 0, color: "var(--vt-c0)" },
+    { label: "Non abbinate", value: s?.unmatched_count ?? Math.max(0, (s?.takes_count || 0) - (s?.matched_count || 0)), color: "var(--vt-cx)" },
+  ];
+  return (
+    <div className="vt-row21" style={{ gap: 12, marginBottom: 14, alignItems: "start" }}>
+      <Panel i={0} title="Le vendite del mese" aside="vendite registrate in CreatorsPro ritrovate o no tra le transazioni dei fan">
+        <MixBar items={mix} format={(v) => fmtInt(v)} height={28} />
+        <div style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 12, lineHeight: 1.5, ...NUM }}>
+          {[s?.share_count > 0 ? `${fmtInt(s.share_count)} in quota tra più operatori nello stesso turno` : null, s?.ambiguous_count > 0 ? `${fmtInt(s.ambiguous_count)} incerte` : null, `venduto in CreatorsPro ${fmtUsd(s?.takes_gross)}`].filter(Boolean).join(" · ")}
+        </div>
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 12, minWidth: 0, alignContent: "start" }}>
+        <Panel i={1} style={{ display: "grid", justifyItems: "center", textAlign: "center" }}>
+          <Gauge label="venduto ritrovato, tacca alla soglia di affidabilità dell'albero" value={cov ?? 0} mark={RELIABLE} good={cov != null && cov >= RELIABLE} size={170} center={fmtPct(cov)} centerSub="venduto ritrovato" />
+          <div style={{ fontSize: 12.5, color: CP.textSecondary, marginTop: 4 }}>{cov != null && cov >= RELIABLE ? "Sopra l'85%: l'albero regge per una contestazione." : "Sotto l'85%: l'albero è solo un'indicazione."}</div>
+        </Panel>
+        {s?.refunded?.count > 0 && (
+          <HotTile i={2} lvl="2" label="Vendite poi rimborsate" value={fmtInt(s.refunded.count)} sub={`${fmtUsd(s.refunded.gross_usd)} di venduto rimborsato`} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RefundTop({ t, byOperator, periodId }) {
+  const items = [...byOperator].filter((o) => o.comp_leak_usd > 0).sort((a, b) => b.comp_leak_usd - a.comp_leak_usd)
+    .map((o) => ({ label: o.operator, value: o.comp_leak_usd, bad: true }));
+  return (
+    <div className="vt-row21" style={{ gap: 12, marginBottom: 14 }}>
+      <Panel i={0} title="Chi ha ricevuto compenso su vendite rimborsate" aside={`stima · ${monthName(periodId)}`}>
+        {items.length ? <RankBars items={items} format={fmtUsd} limit={8} /> : <div style={{ fontSize: 13.5, color: CP.textSecondary }}>Nessun compenso pagato su vendite rimborsate in questo mese.</div>}
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 12, minWidth: 0, alignContent: "start" }}>
+        <HotTile i={1} lvl={t?.comp_leak_usd > 0 ? "2" : "0"} label="Compenso su vendite poi rimborsate" value={fmtUsd(t?.comp_leak_usd)}
+          sub={`stima · ${fmtInt(t?.refunds)} rimborsi per ${fmtUsd(t?.refunded_usd)} nel mese`} />
+        <Panel i={2}>
+          <div style={{ fontSize: 12.5, color: CP.textSecondary, lineHeight: 1.5, ...NUM }}>
+            {fmtInt(t?.attributed)} su vendite con operatore ({fmtUsd(t?.attributed_usd)}) · {fmtInt(t?.unattributed)} senza operatore (messaggi di massa, turni non tracciati: nessun compenso pagato){t?.wages_missing > 0 ? ` · ${fmtInt(t.wages_missing)} con compensi CP mancanti` : ""}
+          </div>
+          <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 8, lineHeight: 1.5 }}>Si ricalcola il turno senza la vendita rimborsata: la differenza di compenso è quanto è stato pagato in più.</div>
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
 // ── Tab Rimborsi ─────────────────────────────────────────────────────────────
 function RefundTab({ periodId, goSync }) {
+  const inVetro = useInVetro();
   const { data, error, isLoading } = useSWR(`/api/admin/refund-impact?period_id=${periodId}`, fetcher, { revalidateOnFocus: false });
 
   if (isLoading) return <Loading text="Carico i rimborsi del mese…" />;
@@ -446,6 +506,7 @@ function RefundTab({ periodId, goSync }) {
 
   return (
     <div>
+      {inVetro ? <RefundTop t={t} byOperator={data?.by_operator || []} periodId={periodId} /> : (
       <HeroMetric
         label={`Compenso pagato su vendite poi rimborsate · stima · ${monthName(periodId)}`}
         value={fmtUsd(t?.comp_leak_usd)}
@@ -458,6 +519,7 @@ function RefundTab({ periodId, goSync }) {
           {t?.wages_missing > 0 && <Metric label="Compensi CP mancanti" value={fmtInt(t.wages_missing)} note="mesi da scaricare" />}
         </div>
       </HeroMetric>
+      )}
 
       {data?.wages_missing_periods?.length > 0 && (
         <Notice>

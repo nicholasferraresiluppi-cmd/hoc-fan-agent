@@ -23,7 +23,9 @@ import { CP, FONTS, DATA_SCALE } from "@/lib/brand";
 import { useTheme } from "@/lib/theme-client";
 import CompNav from "@/components/CompNav";
 import { fmt$, fmtSigned$, fmtInt, fmtPct, MONTHS_IT } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, DataTable, card, NUM } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, FilterBar, SectionTitle, Notice, DataTable, card, NUM } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { RankBars, Panel, HotTile } from "@/components/VetroCharts";
 
 function monthOpts(n = 12) {
   const out = [];
@@ -54,6 +56,7 @@ export default function CompReviewPage() {
   const [operatorFilter, setOperatorFilter] = useState("");
   const [sel, setSel] = useState(null); // { creator, operator }
   const detailRef = useRef(null);
+  const inVetro = useInVetro();
 
   const url = periodId
     ? `/api/admin/comp-review?period_id=${periodId}&direction=${direction}&min_sales=${minSales}&min_shifts=${minShifts}&limit=200`
@@ -134,7 +137,11 @@ export default function CompReviewPage() {
         </div>
       )}
 
-      {s && (
+      {s && inVetro && (
+        <ReviewTop s={s} data={data} net={net} periodId={periodId} direction={direction} setDirection={setDirection}
+          creatorFilter={creatorFilter} setCreatorFilter={setCreatorFilter} operatorFilter={operatorFilter} setOperatorFilter={setOperatorFilter} />
+      )}
+      {s && !inVetro && (
         <HeroMetric
           label={`Coppie fuori media · ${monthName(periodId)}`}
           value={fmtInt(s.total_anomalies)}
@@ -150,13 +157,14 @@ export default function CompReviewPage() {
         </HeroMetric>
       )}
 
-      {/* Filtri */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+      {/* Filtri: una sola barra (regole d'uso) */}
+      <FilterBar onReset={direction !== "all" || creatorFilter || operatorFilter ? () => { setDirection("all"); setCreatorFilter(""); setOperatorFilter(""); } : undefined}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", width: "100%" }}>
         <FilterChip label="Tutte" active={direction === "all"} onClick={() => setDirection("all")} />
         <FilterChip label="Pagati più della media (costo per HOC)" active={direction === "overpaid"} onClick={() => setDirection(direction === "overpaid" ? "all" : "overpaid")} />
         <FilterChip label="Pagati meno della media (rischio che se ne vadano)" active={direction === "underpaid"} onClick={() => setDirection(direction === "underpaid" ? "all" : "underpaid")} />
-      </div>
-      <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 14 }}>
+        </div>
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap", width: "100%" }}>
         <div>
           <label style={lbl}>Venduto minimo $</label>
           <input type="number" value={minSales} onChange={(e) => setMinSales(parseInt(e.target.value) || 0)} style={{ ...input, width: 100 }} />
@@ -191,9 +199,10 @@ export default function CompReviewPage() {
           <input value={operatorFilter} onChange={(e) => setOperatorFilter(e.target.value)} placeholder="Cerca operatore" style={{ ...input, paddingRight: operatorFilter ? 30 : 12, width: "100%" }} />
           {operatorFilter && <button onClick={() => setOperatorFilter("")} title="Togli filtro" aria-label="Togli filtro operatore" style={clearBtn}><X size={12} /></button>}
         </div>
-      </div>
+        </div>
+      </FilterBar>
 
-      {s?.top_creators_with_anomalies?.length > 0 && (
+      {!inVetro && s?.top_creators_with_anomalies?.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 10, marginBottom: 16 }}>
           <div>
             <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 6 }}>Creator con più coppie fuori media</div>
@@ -255,6 +264,44 @@ export default function CompReviewPage() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// Vetro (30/10/2026): la domanda è «chi è pagato fuori dalla media del team, e quanto costa?».
+// A sinistra dove si concentrano le coppie fuori media (creator e operatori, un tocco = filtro); a
+// destra le due direzioni come schede piene (più della media = costo per HOC, meno = rischio che se
+// ne vadano), che aprono il filtro, e l'impatto netto detto a parole.
+function ReviewTop({ s, data, net, periodId, direction, setDirection, creatorFilter, setCreatorFilter, operatorFilter, setOperatorFilter }) {
+  const cre = (s.top_creators_with_anomalies || []).slice(0, 6).map((c) => ({ label: c.creator, value: c.count, onClick: () => setCreatorFilter(creatorFilter === c.creator ? "" : c.creator) }));
+  const ops = (s.top_operators_with_anomalies || []).slice(0, 6).map((o) => ({ label: o.operator, value: o.count, onClick: () => setOperatorFilter(operatorFilter === o.operator ? "" : o.operator) }));
+  const n = (v) => fmtInt(v);
+  return (
+    <div className="vt-row21" style={{ gap: 12, marginBottom: 14 }}>
+      <Panel i={0} title={`Dove si concentrano · ${monthName(periodId)}`} aside={`${fmtInt(s.total_anomalies)} coppie fuori media su ${fmtInt(data.creators_analyzed)} creator e ${fmtInt(data.operators_analyzed)} operatori · tocca per filtrare`}>
+        {cre.length || ops.length ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 18 }}>
+            <div><div style={{ fontSize: 12.5, color: CP.textMuted, marginBottom: 8 }}>Creator</div><RankBars items={cre} format={n} limit={6} valueWidth={44} /></div>
+            <div><div style={{ fontSize: 12.5, color: CP.textMuted, marginBottom: 8 }}>Operatori</div><RankBars items={ops} format={n} limit={6} valueWidth={44} /></div>
+          </div>
+        ) : <div style={{ fontSize: 13.5, color: CP.textSecondary }}>Nessuna coppia fuori media con questi filtri: gli operatori incassano entro il 15% dalla media del team.</div>}
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 12, minWidth: 0, alignContent: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+          <HotTile i={1} lvl={s.overpaid_count ? "2" : "0"} label="Pagati più della media" value={n(s.overpaid_count)} active={direction === "overpaid"}
+            sub={`${fmtSigned$(s.total_overpaid_impact_usd)} di costo in più · tocca per vederli`} onClick={() => setDirection(direction === "overpaid" ? "all" : "overpaid")} />
+          <HotTile i={2} lvl={s.underpaid_count ? "ink" : "0"} label="Pagati meno della media" value={n(s.underpaid_count)} active={direction === "underpaid"}
+            sub={`${fmtSigned$(s.total_underpaid_impact_usd)} · rischio che se ne vadano`} onClick={() => setDirection(direction === "underpaid" ? "all" : "underpaid")} />
+        </div>
+        <Panel i={3}>
+          <div style={{ fontSize: 13.5, color: CP.textPrimary, lineHeight: 1.5 }}>
+            {net === 0 ? "Nel complesso le differenze si compensano." : <>Nel complesso queste coppie sono pagate <b style={{ fontWeight: 600, ...NUM }}>{fmt$(Math.abs(net))} {net > 0 ? "in più" : "in meno"}</b> di quanto prenderebbero alla media del team.</>}
+          </div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 8, ...NUM }}>
+            {fmtInt(s.out_of_scale_count)} molto fuori media (oltre il 35%) · {fmtInt(s.review_count)} da rivedere (15-35%)
+          </div>
+        </Panel>
+      </div>
     </div>
   );
 }

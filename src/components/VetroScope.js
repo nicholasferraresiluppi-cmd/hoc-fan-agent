@@ -76,7 +76,7 @@ export function useVetroTint() {
 }
 
 /** Pagine in prova: qui il vetro avvolge anche il menu e le schede in alto (AppShell). */
-export const VETRO_PATHS = ["/admin/warmup", "/admin", "/admin/le-mie-creator", "/admin/bilancio", "/admin/revenue-pacing", "/leaderboard/sales-cp", "/leaderboard/creators", "/admin/hr", "/admin/sales-coaching", "/admin/analisi-vendite", "/admin/publisher-x", "/admin/referral", "/me/porta-un-amico", "/admin/editoriale", "/admin/s4s", "/admin/chat-monitor", "/admin/fan-da-recuperare", "/admin/pnl-live"];
+export const VETRO_PATHS = ["/admin/warmup", "/admin", "/admin/le-mie-creator", "/admin/bilancio", "/admin/revenue-pacing", "/leaderboard/sales-cp", "/leaderboard/creators", "/admin/hr", "/admin/sales-coaching", "/admin/analisi-vendite", "/admin/publisher-x", "/admin/referral", "/me/porta-un-amico", "/admin/editoriale", "/admin/s4s", "/admin/chat-monitor", "/admin/fan-da-recuperare", "/admin/pnl-live", "/admin/profiles-compare", "/admin/comp-calendar", "/admin/threshold-study", "/admin/comp-review", "/admin/comp-exam", "/admin/payout-tree", "/admin/payment-profiles", "/admin/shift-research"];
 export const isVetroPath = (p) => VETRO_PATHS.includes(String(p || "").replace(/\/$/, "") || "/");
 
 const VetroCtx = createContext(false);
@@ -187,7 +187,7 @@ ${T.darkTiles.map((i) => `.hoc-vetro .vt-ico[data-tone="${i}"] svg{stroke:#1d151
 :root:not([data-style="v3"]) .hoc-vetro .hoc-side .hoc-grp{font-family:inherit !important;letter-spacing:.02em !important;font-size:11.5px !important;font-weight:500 !important}
 :root .hoc-vetro .hoc-mhead-v2{background:var(--cp-surfaceAlt) !important;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
 .hoc-vetro .vt-row21{display:grid;gap:14px;grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
-@media (max-width:999px){.hoc-vetro .vt-row21{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:999px){.hoc-vetro .vt-row21{grid-template-columns:minmax(0,1fr)}.hoc-vetro .vt-row21 > .vt-side{order:-1}}
 @keyframes vt-in{from{opacity:0;filter:blur(14px);transform:scale(.985)}to{opacity:1;filter:none;transform:none}}
 .hoc-vetro .vt-glass,.hoc-vetro .ds-hero,.hoc-vetro .ds-open,.hoc-vetro .hub-tool{animation:vt-in .7s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--vt-i,0) * 80ms)}
 .hoc-vetro .ds-open{--vt-i:2}.hoc-vetro .hub-tool{--vt-i:4}
