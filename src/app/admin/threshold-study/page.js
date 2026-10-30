@@ -6,6 +6,8 @@ import { Loader2 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import CompNav from "@/components/CompNav";
 import HowToRead from "@/components/HowToRead";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, TargetStrip, GoalRing } from "@/components/VetroCharts";
 import HoverTip from "@/components/HoverTip";
 import { fmt$, fmtInt, MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, SectionTitle, Disclosure, Notice, card, NUM } from "@/components/ds";
@@ -47,6 +49,7 @@ export default function ThresholdStudyPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showRatios, setShowRatios] = useState(false);
+  const inVetro = useInVetro();
 
   useEffect(() => {
     let cancelled = false;
@@ -110,7 +113,8 @@ export default function ThresholdStudyPage() {
 
       {data && data.bands?.length > 0 && (
         <>
-          {summary && (
+          {summary && inVetro && <StudyTop bands={data.bands} summary={summary} />}
+          {summary && !inVetro && (
             <HeroMetric
               label="Soglie top nel target"
               value={`${fmtInt(summary.ok)} su ${fmtInt(summary.reliable)}`}
@@ -251,6 +255,36 @@ function Histogram({ buckets = [], bucketWidth = 25, mid, top, totalShifts = 0 }
       )}
       <div style={{ position: "absolute", bottom: -6, left: 0, fontSize: 11, color: CP.textMuted }}>$0</div>
       <div style={{ position: "absolute", bottom: -6, right: 0, fontSize: 11, color: CP.textMuted, ...NUM }}>${scale.toLocaleString("it-IT")}</div>
+    </div>
+  );
+}
+
+// Vetro (30/10/2026): la domanda è «le soglie top proposte sono calibrate?». Ogni banda × squadra
+// con abbastanza turni è un punto su una scala 0-50%: dentro la fascia verde (18-28% dei turni sopra
+// la soglia top) è calibrata, fuori è in rosso. Accanto l'anello «quante nel target».
+function StudyTop({ bands, summary }) {
+  const items = bands.flatMap((b) => b.classes
+    .filter((c) => c.shifts >= MIN_SAMPLE && c.suggested_top != null && c.top_share != null)
+    .map((c) => ({ label: `${b.band} · ${(CLASS_LABEL[c.cls] || `in ${c.cls}`).toLowerCase()}`, value: c.top_share, sub: `${fmtInt(c.shifts)} turni · soglia top ${fmt$(c.suggested_top)}` })));
+  const rate = summary.reliable ? summary.ok / summary.reliable : 0;
+  return (
+    <div className="vt-row21" style={{ gap: 12, marginBottom: 14 }}>
+      <Panel i={0} title="Dove cade ogni soglia top" aside="quota dei turni che superano la soglia top proposta, banda per banda">
+        {items.length ? <TargetStrip items={items} lo={18} hi={28} max={50} format={(v) => `${v}%`} targetLabel="target: tra il 18% e il 28% dei turni (ideale 20-25%)" />
+          : <div style={{ fontSize: 13.5, color: CP.textSecondary }}>Nessuna banda con almeno {MIN_SAMPLE} turni.</div>}
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 12, minWidth: 0, alignContent: "start" }}>
+        <GoalRing i={1} pct={rate} tone={summary.off.length === 0 ? "good" : "near"} size={112} title="Soglie top nel target"
+          sub={`${fmtInt(summary.ok)} su ${fmtInt(summary.reliable)} con abbastanza turni`} />
+        <Panel i={2}>
+          <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.5 }}>
+            {summary.off.length ? <>Da aggiustare a mano: <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{summary.off.join(", ")}</b>.</> : "Tutte le soglie top con abbastanza turni sono calibrate."}
+          </div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 8, ...NUM }}>
+            {fmtInt(bands.length)} bande · {fmtInt(summary.creators)} creator · {fmtInt(summary.shifts)} turni{summary.small > 0 ? ` · ${fmtInt(summary.small)} campioni piccoli fuori dal conteggio` : ""}
+          </div>
+        </Panel>
+      </div>
     </div>
   );
 }

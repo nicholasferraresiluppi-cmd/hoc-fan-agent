@@ -167,8 +167,7 @@ function VetroPnl({ rows, t, prev, costPct, prevCostPct, median, isHigh, high, m
         {items.length ? <RankBars items={items} format={pct1} limit={RANK_MAX} mark={median ?? undefined} markLabel={median != null ? `Mediana delle creator: ${pct1(median)}` : undefined} />
           : <div style={{ fontSize: 13.5, color: CP.textSecondary }}>Nessun venduto in questo mese.</div>}
       </section>
-      <style>{`@media (max-width:999px){.pnl-side{order:-1}}`}</style>
-      <div className="pnl-side" style={{ display: "grid", gap: 12, minWidth: 0, alignContent: "start" }}>
+      <div className="vt-side" style={{ display: "grid", gap: 12, minWidth: 0, alignContent: "start" }}>
         <section className="vt-glass" style={{ "--vt-i": 1, borderRadius: 20, padding: "16px 18px", display: "grid", gap: 10, minWidth: 0 }}>
           <div style={{ fontSize: 13, color: CP.textSecondary }}>Costo operatori sul venduto · {monthName}{isCurrent ? " finora" : ""}</div>
           <div style={{ fontSize: 34, fontWeight: 600, letterSpacing: "-0.02em", color: CP.textPrimary, ...NUM }}><VetroNum value={pct1(costPct)} /></div>

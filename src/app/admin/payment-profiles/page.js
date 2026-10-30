@@ -21,11 +21,48 @@ import useSWR from "swr";
 import { Search, Loader2 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmt$, fmtInt, fmtPct } from "@/lib/format";
-import { PageHead, Metric, FilterChip, Disclosure, Notice, DataTable, card, NUM } from "@/components/ds";
+import { PageHead, Metric, FilterChip, FilterBar, Disclosure, Notice, DataTable, card, NUM } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, MixBar, RankBars } from "@/components/VetroCharts";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
 const COSELLERS_LABEL = { 1: "Da solo", 2: "In coppia", 3: "In tre", 4: "In quattro" };
+
+// Vetro (30/10/2026): la domanda è «come sono fatti i profili di pagamento, e quanto sono diversi?».
+// Quanti profili per squadra (barra, un tocco = filtro) e quante percentuali diverse si pagano sullo
+// scaglione più alto: più valori diversi ci sono, più c'è da uniformare.
+function ProfilesTop({ profiles, byC, total, tags, creatorsCovered, groups }) {
+  const LBL = { 1: "Da solo", 2: "In coppia", 3: "In tre", 4: "In quattro" };
+  const mix = [1, 2, 3, 4].map((n, k) => ({ label: LBL[n], value: byC[String(n)] ?? 0, color: `var(--vt-c${k})` }));
+  const topCount = {};
+  for (const p of profiles) {
+    const ts = (p.thresholds || []).map((t) => Number(t.percentage)).filter((v) => Number.isFinite(v));
+    if (!ts.length) continue;
+    const k = Math.round(Math.max(...ts) * 1000) / 10;
+    topCount[k] = (topCount[k] || 0) + 1;
+  }
+  const tops = Object.entries(topCount).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: `${String(k).replace(".", ",")}%`, value: v }));
+  return (
+    <div className="vt-row21" style={{ gap: 12, marginBottom: 14, alignItems: "start" }}>
+      <Panel i={0} title="Quanto si paga sullo scaglione più alto" aside={`profili per percentuale pagata sullo scaglione più alto · ${tops.length} valori diversi: più sono, più c'è da uniformare`}>
+        {tops.length ? <RankBars items={tops} format={(v) => `${fmtInt(v)} profili`} limit={8} /> : <div style={{ fontSize: 13.5, color: CP.textSecondary }}>Nessun profilo con scaglioni.</div>}
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 12, minWidth: 0, alignContent: "start" }}>
+        <Panel i={1} title="Profili per squadra">
+          <MixBar items={mix} format={(v) => fmtInt(v)} height={26} />
+        </Panel>
+        <Panel i={2}>
+          <div style={{ fontSize: 34, fontWeight: 600, letterSpacing: "-0.02em", ...NUM }}>{fmtInt(total)}</div>
+          <div style={{ fontSize: 13, color: CP.textSecondary }}>profili attivi su CreatorsPro</div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 8, ...NUM }}>
+            {fmtInt(tags)} tag (scenario operatore × creator) · creator coperte {creatorsCovered ? `${fmtInt(creatorsCovered)} su ${fmtInt(groups ?? 0)} gruppi` : "n/d (vedi nota)"}
+          </div>
+        </Panel>
+      </div>
+    </div>
+  );
+}
 
 export default function PaymentProfilesPage() {
   const { data, error, isLoading, mutate } = useSWR("/api/admin/payment-profiles", fetcher, {
@@ -38,6 +75,7 @@ export default function PaymentProfilesPage() {
   const [tagFilter, setTagFilter] = useState("");
   const [showRaw, setShowRaw] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
+  const inVetro = useInVetro();
 
   const profiles = data?.profiles || [];
 
@@ -126,6 +164,7 @@ export default function PaymentProfilesPage() {
 
       {data && !data.error && (
         <>
+          {inVetro ? <ProfilesTop profiles={profiles} byC={byC} total={data.total} tags={data.counts?.by_tag_count} creatorsCovered={creatorsCovered} groups={data.groups_loaded} /> : (
           <section style={{ ...card, padding: "16px 20px", marginBottom: 14, display: "flex", gap: 28, flexWrap: "wrap" }}>
             <Metric label="Profili attivi" value={fmtInt(data.total)} />
             <Metric label="Da solo" value={fmtInt(byC["1"] ?? 0)} />
@@ -134,6 +173,7 @@ export default function PaymentProfilesPage() {
             <Metric label="Tag distinti" value={fmtInt(data.counts?.by_tag_count)} note="tag = scenario operatore × creator" />
             <Metric label="Creator coperte" value={creatorsCovered ? fmtInt(creatorsCovered) : "n/d"} note={creatorsCovered ? `su ${fmtInt(data.groups_loaded ?? 0)} gruppi CreatorsPro` : "vedi nota sotto"} />
           </section>
+          )}
 
           {!creatorsCovered && (
             <Notice>
@@ -141,12 +181,11 @@ export default function PaymentProfilesPage() {
             </Notice>
           )}
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+          <FilterBar style={{ marginBottom: 10 }} onReset={cosellersFilter || tagFilter || search ? () => { setCosellersFilter(""); setTagFilter(""); setSearch(""); } : undefined}>
             <FilterChip label={`Tutti (${fmtInt(data.total)})`} active={cosellersFilter === ""} onClick={() => setCosellersFilter("")} />
             {[1, 2, 3, 4].filter((n) => (byC[String(n)] ?? 0) > 0).map((n) => (
               <FilterChip key={n} label={`${COSELLERS_LABEL[n]} (${byC[String(n)]})`} active={cosellersFilter === String(n)} onClick={() => setCosellersFilter(cosellersFilter === String(n) ? "" : String(n))} />
             ))}
-            <span style={{ flex: 1 }} />
             <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} aria-label="Tag" style={{ ...input, width: "auto", minWidth: 200, cursor: "pointer" }}>
               <option value="">Tutti i tag ({allTags.length})</option>
               {allTags.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -155,7 +194,7 @@ export default function PaymentProfilesPage() {
               <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: CP.textMuted }} />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Profilo, tag o creator" aria-label="Cerca" style={{ ...input, paddingLeft: 32 }} />
             </div>
-          </div>
+          </FilterBar>
           <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 8 }}>
             {fmtInt(filtered.length)} profili su {fmtInt(profiles.length)} · ordinati per tag e nome, clicca un'intestazione per riordinare · passa sulle creator per l'elenco completo
           </div>
