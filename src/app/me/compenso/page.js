@@ -7,6 +7,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtPct } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, SectionTitle, DataTable, Notice, card, NUM } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, Bars, MixBar } from "@/components/VetroCharts";
 
 /**
  * /me/compenso — "Il mio compenso, spiegato" (scope own, docs/VISIBILITY_POLICY.md).
@@ -85,6 +87,34 @@ const TIER_COLUMNS = [
   { key: "tier_earning", label: "Riconosciuto", align: "right", sortable: false, render: (b) => (b.reached ? <span style={{ fontWeight: 500 }}>{fmtUsd(b.tier_earning)}</span> : <span style={{ color: CP.textMuted }}>—</span>) },
 ];
 
+/* Vetro: «quanto ho guadagnato questo mese, e da dove viene?» — il totale e i turni in fila. */
+function PayTop({ data, shifts, soldTotal }) {
+  const seq = [...shifts].filter((s) => s.started_at).sort((a, b) => String(a.started_at).localeCompare(String(b.started_at)));
+  const fromHours = Number(data.totals.from_hours) || 0;
+  const wage = Number(data.totals.wage) || 0;
+  return (
+    <div className="vt-row21" style={{ marginBottom: 6 }}>
+      <Panel title="Turno per turno" aside="compenso di ogni turno, dal primo del mese" i={0}>
+        {seq.length > 1
+          ? <Bars data={seq.map((s) => Number(s.earned) || 0)} labels={seq.map((s) => fmtDate(s.started_at).split(" · ")[0])} height={150} format={fmtUsd} />
+          : <div style={{ fontSize: 13, color: CP.textMuted }}>Il grafico compare dal secondo turno del mese.</div>}
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+        <Panel title={`Il tuo compenso · ${monthLabel(data.period_id)}`} i={1}>
+          <div style={{ fontSize: 34, fontWeight: 600, letterSpacing: "-0.02em", color: CP.textPrimary, ...NUM }}>{fmtUsd(wage)}</div>
+          <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 2 }}>{data.totals.shifts} turni{data.totals.hours ? ` · ${Math.round(data.totals.hours)}h` : ""}</div>
+          <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 10, ...NUM }}>
+            Il tuo venduto <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtUsd(soldTotal)}</b>{soldTotal > 0 ? ` · quota media ${fmtPct(wage / soldTotal, 1)}` : ""}
+          </div>
+          {fromHours > 0 && wage > fromHours && (
+            <div style={{ marginTop: 12 }}><MixBar format={fmtUsd} items={[{ label: "Dalle vendite", value: wage - fromHours }, { label: "Dalle ore", value: fromHours }]} /></div>
+          )}
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
 export default function MyPayoutPage() {
   const { data, error, isLoading } = useSWR("/api/me/payout", fetcher, { revalidateOnFocus: false });
   const [open, setOpen] = useState(null);
@@ -92,6 +122,7 @@ export default function MyPayoutPage() {
   const soldTotal = shifts.reduce((a, s) => a + (Number(s.sold) || 0), 0);
   const sel = open != null ? shifts.find((s) => s.key === open) : null;
   const canHover = useCanHover();
+  const inVetro = useInVetro();
   const detailRef = useRef(null);
   // Telefono: il dettaglio è un pannello dal basso; il focus ci va dentro.
   useEffect(() => { if (sel && !canHover && detailRef.current) detailRef.current.focus(); }, [sel, canHover]);
@@ -128,7 +159,7 @@ export default function MyPayoutPage() {
 
       {data?.linked && data.totals && (
         <>
-          <HeroMetric
+          {inVetro ? <PayTop data={data} shifts={shifts} soldTotal={soldTotal} /> : <HeroMetric
             label={`Il tuo compenso · ${monthLabel(data.period_id)}`}
             value={fmtUsd(data.totals.wage)}
             compare={`${data.totals.shifts} turni${data.totals.hours ? ` · ${Math.round(data.totals.hours)}h` : ""}`}
@@ -136,7 +167,7 @@ export default function MyPayoutPage() {
             {/* pannello pilota: prima una seconda riga con lo stesso numero ("Da scaglioni") confondeva */}
             <Metric label="Il tuo venduto" value={fmtUsd(soldTotal)} note={soldTotal > 0 ? `quota media ${fmtPct(data.totals.wage / soldTotal, 1)}` : null} />
             {data.totals.from_hours > 0 && <Metric label="Di cui da ore" value={fmtUsd(data.totals.from_hours)} />}
-          </HeroMetric>
+          </HeroMetric>}
           <p style={{ fontSize: 12.5, color: CP.textMuted, margin: "-4px 0 0" }}>Importi in dollari, come in CreatorsPro.</p>
 
           <section style={{ marginTop: 22, marginBottom: 14 }}>

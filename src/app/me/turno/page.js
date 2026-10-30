@@ -8,6 +8,8 @@ import { CP, FONTS } from "@/lib/brand";
 import { fmt$, fmtInt } from "@/lib/format";
 import { PageHead, SectionTitle, Notice, card, NUM } from "@/components/ds";
 import SignalsStrip from "@/components/SignalsStrip";
+import { useInVetro } from "@/components/VetroScope";
+import { HotTile } from "@/components/VetroCharts";
 
 /**
  * /me/turno — "Il mio turno" (pilota copilot, gate copilot.pilot).
@@ -112,6 +114,10 @@ export default function MyShiftPage() {
   const creatorsForSelect = data?.admin_creators || adminCreators;
   const groups = data?.groups || [];
   const denied = data?.error && !data?.groups;
+  const inVetro = useInVetro();
+  const nWaiting = groups.reduce((a, g) => a + g.rows.filter((r) => r.state === "waiting").length, 0);
+  const nCooling = groups.reduce((a, g) => a + g.rows.filter((r) => r.state === "cooling").length, 0);
+  const jump = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 880, margin: "0 auto", fontFamily: FONTS.body }}>
@@ -168,11 +174,19 @@ export default function MyShiftPage() {
         </p>
       ) : null}
 
+      {/* Vetro: «chi seguo adesso?» — due conti in cima, un tocco porta al primo fan del gruppo */}
+      {inVetro && data?.shift && groups.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 18 }}>
+          <HotTile i={0} lvl={nWaiting ? "ink" : "0"} label="In attesa di risposta" value={nWaiting} sub={nWaiting ? "rispondi prima a questi" : "nessuno aspetta"} onClick={nWaiting ? () => jump("turno-waiting") : undefined} />
+          <HotTile i={1} lvl={null} label="Si stanno raffreddando" value={nCooling} sub={nCooling ? "oggi un messaggio personale" : "nessuno"} onClick={nCooling ? () => jump("turno-cooling") : undefined} />
+        </div>
+      )}
+
       {data?.shift && data.mode !== "demo" && groups.length === 0 ? (
         <EmptyCard title="Nessun account di questo turno è tra i creator HOC attivi in chat: per ora non c'è nessuno da seguire." />
       ) : null}
 
-      {groups.map((g) => {
+      {groups.map((g, gi) => {
         const waiting = g.rows.filter((r) => r.state === "waiting");
         const cooling = g.rows.filter((r) => r.state === "cooling");
         return (
@@ -183,13 +197,13 @@ export default function MyShiftPage() {
             )}
             {waiting.length > 0 && (
               <>
-                <h3 style={subHead}>In attesa di risposta · rispondi prima a questi</h3>
+                <h3 id={gi === groups.findIndex((x) => x.rows.some((r) => r.state === "waiting")) ? "turno-waiting" : undefined} style={{ ...subHead, scrollMarginTop: 80 }}>In attesa di risposta · rispondi prima a questi</h3>
                 {waiting.map((r) => <FanCard key={r.user_id} row={r} copied={copied} onCopy={onCopy} />)}
               </>
             )}
             {cooling.length > 0 && (
               <>
-                <h3 style={{ ...subHead, marginTop: 16 }}>Si stanno raffreddando · oggi un messaggio personale</h3>
+                <h3 id={gi === groups.findIndex((x) => x.rows.some((r) => r.state === "cooling")) ? "turno-cooling" : undefined} style={{ ...subHead, marginTop: 16, scrollMarginTop: 80 }}>Si stanno raffreddando · oggi un messaggio personale</h3>
                 {cooling.map((r) => <FanCard key={r.user_id} row={r} copied={copied} onCopy={onCopy} />)}
               </>
             )}

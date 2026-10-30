@@ -213,7 +213,7 @@ const arcPath = (cx, cy, r, a0, a1) => {
  * con la tacca del ritmo ideale (`mark`, 0-1) e, se c'è, la proiezione a fine mese (`proj`, puntino vuoto).
  * Verde se `good`, altrimenti accento. Il numero al centro è la percentuale; `children` va sotto.
  */
-export function Gauge({ value, mark, proj, good = false, size = 176, center, centerSub, label }) {
+export function Gauge({ value, mark, proj, good = false, size = 176, center, centerSub, label, markName = "ritmo ideale" }) {
   const sw = 14, r = size / 2 - sw, cx = size / 2, cy = size / 2;
   const a0 = Math.PI * 0.75, span = Math.PI * 1.5;
   const at = (f) => a0 + span * Math.max(0, Math.min(1, f));
@@ -223,7 +223,7 @@ export function Gauge({ value, mark, proj, good = false, size = 176, center, cen
     return { x1: cx + (r - len) * c, y1: cy + (r - len) * s, x2: cx + (r + len) * c, y2: cy + (r + len) * s };
   };
   const v = Number.isFinite(value) ? value : 0;
-  const read = [label, `fatto ${pctTxt(value)}`, mark != null && `ritmo ideale ${pctTxt(mark)}`, proj != null && `arrivo previsto ${pctTxt(proj)}`].filter(Boolean).join(", ");
+  const read = [label, `fatto ${pctTxt(value)}`, mark != null && `${markName} ${pctTxt(mark)}`, proj != null && `arrivo previsto ${pctTxt(proj)}`].filter(Boolean).join(", ");
   return (
     <div style={{ position: "relative", width: size, height: size * 0.86, flexShrink: 0 }}>
       <svg width={size} height={size} role="img" aria-label={read} style={{ display: "block" }}>
@@ -256,7 +256,7 @@ export function GaugeKey({ proj = true, mark = true, good = false }) {
  * Un anello per traguardo (come «Savings & Goals» del reel 1): percentuale fatta, tacca del ritmo ideale,
  * nome e una riga sotto. `tone`: "good" (verde, ci arriva), "near" (accento pieno), altrimenti accento tenue.
  */
-export function GoalRing({ pct, mark, title, sub, badge, tone, size = 92, onClick, href, i = 0, highlight = false }) {
+export function GoalRing({ pct, mark, title, sub, badge, tone, size = 92, onClick, href, i = 0, highlight = false, center }) {
   const sw = 9, r = size / 2 - sw, C = 2 * Math.PI * r;
   const v = Number.isFinite(pct) ? Math.max(0, Math.min(1, pct)) : 0;
   const col = tone === "good" ? CP.accentGreen : "var(--vt-c0)";
@@ -272,7 +272,7 @@ export function GoalRing({ pct, mark, title, sub, badge, tone, size = 92, onClic
             strokeDasharray={`${v * C} ${C}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} opacity={tone === "good" || tone === "near" ? 1 : 0.75} />}
           {markA != null && <line x1={size / 2 + (r - 7) * Math.cos(markA)} y1={size / 2 + (r - 7) * Math.sin(markA)} x2={size / 2 + (r + 7) * Math.cos(markA)} y2={size / 2 + (r + 7) * Math.sin(markA)} stroke={CP.textPrimary} strokeWidth="2.2" strokeLinecap="round" />}
         </svg>
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 600, color: CP.textPrimary, ...NUM }}>{pctTxt(pct)}</div>
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 600, color: CP.textPrimary, ...NUM }}>{center ?? pctTxt(pct)}</div>
       </div>
       <div style={{ minWidth: 0, width: "100%" }}>
         <div style={{ fontSize: 13.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
