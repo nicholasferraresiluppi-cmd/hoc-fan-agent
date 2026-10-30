@@ -1682,7 +1682,7 @@ export default function WarmupPage() {
 
   return (
     <div style={{ maxWidth: 1600, margin: "0 auto", padding: "20px 16px calc(110px + env(safe-area-inset-bottom))", fontFamily: FONTS.body, color: CP.textPrimary }}>
-      <PageHead crumbs={[{ label: "Marketing" }, { label: "Social" }]} title="Social"
+      <PageHead crumbs={[{ label: "Marketing" }, { label: "Clipping" }]} title="Clipping"
         subtitle="I profili Instagram e X delle creator: cosa fare oggi, i contenuti, i numeri."
         actions={data ? <button type="button" style={btnPrimary} onClick={() => { setTab("acct"); setSel(null); setForm({}); }}><Plus size={15} />Nuovo profilo</button> : null} />
       <Tabs value={form ? null : tab} style={{ marginBottom: 22 }}
