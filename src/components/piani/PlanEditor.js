@@ -48,11 +48,11 @@ function ItemEditor({ it, people, onChange, onMove, onRemove, condition }) {
         <button type="button" title="Togli la voce" style={{ ...icon, color: CP.accentRed }} onClick={onRemove}><Trash2 size={15} /></button>
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <Field label="Tipo" style={{ flex: "1 1 150px" }}>
+        <Field label="Tipo" style={{ flex: "1 1 150px" }}>{/* la spiegazione sta sotto: nella tendina si taglierebbe */}
           <select value={kindOf(it)} onChange={(e) => setKind(e.target.value)} style={input}>
             <option value="check">Da spuntare</option>
-            <option value="ask">Domanda (si chiude con la risposta)</option>
-            <option value="auto">Automatica (dai dati dell&apos;app)</option>
+            <option value="ask">Domanda</option>
+            <option value="auto">Automatica</option>
           </select>
         </Field>
         {!condition && (
@@ -69,6 +69,7 @@ function ItemEditor({ it, people, onChange, onMove, onRemove, condition }) {
           <input value={it.link} onChange={(e) => set("link", e.target.value)} placeholder="/admin/warmup?tab=contenuti" style={input} />
         </Field>
       </div>
+      {it.ask && <div style={{ fontSize: 12, color: CP.textMuted }}>Si chiude quando qualcuno scrive la risposta.</div>}
       {it.auto && (
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", padding: "8px 10px", borderRadius: 8, background: CP.surfaceAlt }}>
           <Field label="Si spunta da solo quando" style={{ flex: "2 1 220px" }}>
@@ -158,7 +159,7 @@ export function PlanEditor({ plan, onSaved, onCancel }) {
               <Field label="Tipo" style={{ flex: "1 1 140px" }}>
                 <select value={ph.kind} onChange={(e) => setPhase(i, { ...ph, kind: e.target.value })} style={input}>
                   <option value="work">Lavoro</option>
-                  <option value="decision">Decisione (voci = condizioni)</option>
+                  <option value="decision">Decisione</option>
                 </select>
               </Field>
               <span style={{ display: "inline-flex", paddingBottom: 4 }}>
