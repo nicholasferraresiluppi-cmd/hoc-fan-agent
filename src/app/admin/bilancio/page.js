@@ -145,8 +145,13 @@ function DayNav({ data, go }) {
 // niente rosso per chi è indietro, come prima: si legge quanto serve al giorno.
 
 const SH = { blue: "#4a7fd4", green: "#3f9b5a", grey: "#8a92a2", amber: "#d9a520", peach: "#e8a76a", navy: "#1f2a44" };
+// 30/10 sera (Nicholas: «mi sembra privo di colori»): le tinte al 15% sul vetro diventavano grigie →
+// i pastelli pieni del foglio (palette standard di Google Sheets), intestazione del quadro blu notte piena.
+const FILL = { peach: "#fce5cd", blue: "#c9daf8", green: "#d9ead3", grey: "#e6e6e6", yellow: "#fff2cc", yellowStrong: "#ffe599", coral: "#f4cccc", target: "#cfe2f3", hit: "#b6d7a8", navy: "#1f2a44", section: "#e8ebf2", lilac: "#e4dcfb" };
+const ECO_DOT = { rosa: "#e58bb5", viola: "#8b6fe0", verde: "#3f9b5a" };
 const COUNTRY_SHORT = { IT: "IT", EN: "ENG", ES: "ESP" };
 const COUNTRY_TINT = { IT: SH.blue, EN: SH.green, ES: SH.grey };
+const COUNTRY_FILL = { IT: "#c9daf8", EN: "#d9ead3", ES: "#e6e6e6" };
 
 /** Le righe come nel foglio: [{ kind:"multi", c, accounts }...], poi [{ kind:"single", c, a }...]. */
 function sheetRows(creators) {
@@ -166,9 +171,9 @@ function Sheet({ data, go, mine, editing, onSaved }) {
           Bilancio creator · {monthLabel(data.month)} <span style={{ fontWeight: 400, opacity: 0.75 }}>· dati live dal warehouse</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
-          <HeadCell label="Giorno" value={`${Number(data.asOf.slice(8))} di ${data.daysInMonth}`} note={data.live ? "in corso" : data.daysLeft ? "a fine giornata" : "mese chiuso"} />
-          <HeadCell label="Revenue mese ad oggi" value={usd(t.mtd)} note={ok(t.goal) ? `${pct(t.pctActual)} del goal · ideale ${pct(data.idealPct)}` : null} />
-          <HeadCell label={data.daysLeft ? "Proiezione fine mese" : "Chiuso a"} value={usd(data.daysLeft ? t.projection : t.mtd)} note={<StatusText r={t} closed={!data.daysLeft} />} />
+          <HeadCell fill={FILL.yellow} label="Giorno" value={`${Number(data.asOf.slice(8))} di ${data.daysInMonth}`} note={data.live ? "in corso" : data.daysLeft ? "a fine giornata" : "mese chiuso"} />
+          <HeadCell fill={FILL.blue} label="Revenue mese ad oggi" value={usd(t.mtd)} note={ok(t.goal) ? `${pct(t.pctActual)} del goal · ideale ${pct(data.idealPct)}` : null} />
+          <HeadCell fill={FILL.green} label={data.daysLeft ? "Proiezione fine mese" : "Chiuso a"} value={usd(data.daysLeft ? t.projection : t.mtd)} note={<StatusText r={t} closed={!data.daysLeft} />} />
           <HeadCell label="Goal del mese" value={usd(t.goal)} note={ok(t.targetDay) ? `${usd(t.targetDay)} al giorno` : "nessun goal messo"} />
           <HeadCell label="Mese precedente" value={usd(t.prev)} note={ok(t.deltaPrev) ? <span style={{ color: t.deltaPrev >= 0 ? CP.accentGreen : CP.textSecondary }}>{t.deltaPrev >= 0 ? "+" : "−"}${group(t.deltaPrev)}{data.daysLeft ? " nella proiezione" : ""}</span> : null} last />
         </div>
@@ -189,9 +194,9 @@ function Sheet({ data, go, mine, editing, onSaved }) {
   );
 }
 
-function HeadCell({ label, value, note, last }) {
+function HeadCell({ label, value, note, last, fill }) {
   return (
-    <div style={{ padding: "12px 18px", borderRight: last ? "none" : `1px solid ${CP.borderSoft}`, borderTop: `1px solid ${CP.borderSoft}`, minWidth: 0 }}>
+    <div style={{ background: fill, padding: "12px 18px", borderRight: last ? "none" : `1px solid ${CP.borderSoft}`, borderTop: `1px solid ${CP.borderSoft}`, minWidth: 0 }}>
       <div style={{ fontSize: 12, color: CP.textMuted }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 600, color: CP.textPrimary, marginTop: 2, ...NUM }}>{value}</div>
       {note && <div style={{ fontSize: 12, color: CP.textSecondary, marginTop: 2, ...NUM }}>{note}</div>}
@@ -203,7 +208,7 @@ function Block({ title, color, sub, className, children }) {
   return (
     <section className={className} style={{ minWidth: 0 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "0 2px 8px", flexWrap: "wrap" }}>
-        <span style={{ width: 4, height: 14, borderRadius: 2, background: color, alignSelf: "center" }} />
+        <span style={{ width: 5, height: 16, borderRadius: 2, background: color, alignSelf: "center" }} />
         <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>{title}</h2>
         {sub && <span style={{ fontSize: 12.5, color: CP.textMuted }}>{sub}</span>}
       </div>
@@ -212,18 +217,18 @@ function Block({ title, color, sub, className, children }) {
   );
 }
 
-const hd = (tint, align = "right") => ({ ...th, textAlign: align, background: tint ? alpha(tint, "24") : undefined, color: CP.textPrimary, fontWeight: 600, padding: "9px 12px" });
+const hd = (fill, align = "right") => ({ ...th, textAlign: align, background: fill, color: fill === FILL.navy ? "#fff" : "#1f2a44", fontWeight: 600, padding: "9px 12px", borderBottom: `1px solid ${fill === FILL.navy ? FILL.navy : "rgba(31,42,68,.18)"}` });
 const cell = (extra) => ({ ...td, padding: "7px 12px", textAlign: "right", ...NUM, ...extra });
-const TOTAL_BG = alpha(SH.amber, "2e");
-const SUBTOTAL_BG = alpha(CP.textPrimary, "06");
+const TOTAL_BG = FILL.yellowStrong;
+const SUBTOTAL_BG = FILL.yellow;
 
 function Tag({ country }) {
-  return <span style={{ fontSize: 10.5, fontWeight: 600, padding: "1px 5px", borderRadius: 4, marginLeft: 6, color: COUNTRY_TINT[country] || CP.textMuted, background: alpha(COUNTRY_TINT[country] || CP.textMuted, "1c") }}>{COUNTRY_SHORT[country] || country}</span>;
+  return <span style={{ fontSize: 10.5, fontWeight: 600, padding: "1px 5px", borderRadius: 4, marginLeft: 6, color: "#fff", background: COUNTRY_TINT[country] || CP.textMuted }}>{COUNTRY_SHORT[country] || country}</span>;
 }
 
 function SectionRow({ label, span }) {
   return (
-    <tr><td colSpan={span} style={{ ...td, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: CP.textSecondary, background: alpha(CP.textPrimary, "0a"), borderTop: `1px solid ${CP.border}` }}>{label}</td></tr>
+    <tr><td colSpan={span} style={{ ...td, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#1f2a44", background: FILL.section, borderTop: `1px solid ${CP.border}` }}>{label}</td></tr>
   );
 }
 
@@ -238,9 +243,9 @@ function Andamento({ data, go }) {
     <Block className="bil-and" title="Andamento del mese" sub="per paese · tocca un giorno" color={SH.blue}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead><tr>
-          <th style={hd(SH.peach, "left")}>Giorno</th>
-          {cols.map((k) => <th key={k} style={hd(COUNTRY_TINT[k])}>{COUNTRY_SHORT[k]}</th>)}
-          <th style={hd(SH.amber)}>Totale</th>
+          <th style={hd(FILL.peach, "left")}>Giorno</th>
+          {cols.map((k) => <th key={k} style={hd(COUNTRY_FILL[k])}>{COUNTRY_SHORT[k]}</th>)}
+          <th style={hd(FILL.yellowStrong)}>Totale</th>
         </tr></thead>
         <tbody>
           {data.days.map((d) => {
@@ -279,7 +284,7 @@ function GRow({ name, r, strong, bg }) {
   return (
     <tr style={{ background: bg }}>
       <td style={cell({ textAlign: "left", fontWeight: strong ? 600 : 400 })}>{name}</td>
-      <td style={cell({ fontWeight: strong ? 600 : 500, background: hit(r) ? alpha(CP.accentGreen, "26") : undefined })}>{usd(r.day)}</td>
+      <td style={cell({ fontWeight: strong ? 600 : 500, background: hit(r) ? FILL.hit : undefined })}>{usd(r.day)}</td>
       <td style={cell({ color: CP.textSecondary, fontWeight: strong ? 600 : 400 })}>{usd(r.targetDay)}</td>
     </tr>
   );
@@ -290,9 +295,9 @@ function GiornataBody({ data, t, multi, single, Row }) {
     <Block className="bil-gio" title={data.live ? "La giornata (oggi)" : "La giornata"} sub={dayLabel(data.asOf)} color={SH.green}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead><tr>
-          <th style={hd(SH.green, "left")}>Creator</th>
-          <th style={hd(CP.accent)}>{data.live ? "Entrate oggi" : "Entrate"}</th>
-          <th style={hd(SH.blue)}>{data.live ? "Target oggi" : "Target"}</th>
+          <th style={hd(FILL.green, "left")}>Creator</th>
+          <th style={hd(FILL.coral)}>{data.live ? "Entrate oggi" : "Entrate"}</th>
+          <th style={hd(FILL.target)}>{data.live ? "Target oggi" : "Target"}</th>
         </tr></thead>
         <tbody>
           {multi.map((c) => (
@@ -350,16 +355,16 @@ function QuadroBody({ data, open, span, multi, single, mine, ctx }) {
     <Block className="bil-quadro" title="Quadro per creator" sub="mese + proiezione · posizione = arrivo previsto sul proprio goal" color={SH.navy}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 760 }}>
         <thead><tr>
-          <th style={hd(SH.navy, "center")} title="Classifica: arrivo previsto diviso il proprio goal">Pos.</th>
-          <th style={{ ...hd(SH.navy, "left"), ...stick(false, alpha(SH.navy, "24")) }}>Creator</th>
-          <th style={hd(SH.navy, "left")}>AM</th>
-          <th style={hd(SH.navy, "left")}>SM</th>
-          <th style={hd(SH.navy)}>Revenue attuale</th>
-          <th style={hd(SH.navy)}>Goal</th>
-          <th style={hd(SH.navy)} title={`ritmo ideale ${pct(data.idealPct)}`}>% goal</th>
-          {open && <th style={hd(SH.navy)}>Proiezione</th>}
-          {open && <th style={hd(SH.navy)} title="quanto al giorno da qui a fine mese per arrivare al goal">Serve al giorno</th>}
-          <th style={hd(SH.navy)}>Mese prima</th>
+          <th style={hd(FILL.navy, "center")} title="Classifica: arrivo previsto diviso il proprio goal">Pos.</th>
+          <th style={{ ...hd(FILL.navy, "left"), ...stick(false, FILL.navy) }}>Creator</th>
+          <th style={hd(FILL.navy, "left")}>AM</th>
+          <th style={hd(FILL.navy, "left")}>SM</th>
+          <th style={hd(FILL.navy)}>Revenue attuale</th>
+          <th style={hd(FILL.navy)}>Goal</th>
+          <th style={hd(FILL.navy)} title={`ritmo ideale ${pct(data.idealPct)}`}>% goal</th>
+          {open && <th style={hd(FILL.navy)}>Proiezione</th>}
+          {open && <th style={hd(FILL.navy)} title="quanto al giorno da qui a fine mese per arrivare al goal">Serve al giorno</th>}
+          <th style={hd(FILL.navy)}>Mese prima</th>
         </tr></thead>
         <tbody>
           {multi.map((c) => (
@@ -390,20 +395,20 @@ function Ecosistemi({ data, mine }) {
     <Block className="bil-eco" title="Ecosistemi" sub="gruppi di creator che condividono le persone · in ordine di arrivo sul goal" color={CP.accent}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 640 }}>
           <thead><tr>
-            <th style={hd(CP.accent, "center")}>Pos.</th>
-            <th style={hd(CP.accent, "left")}>Ecosistema</th>
-            <th style={hd(CP.accent)}>Revenue attuale</th>
-            <th style={hd(CP.accent)}>Goal</th>
-            <th style={hd(CP.accent)}>% goal</th>
-            {open && <th style={hd(CP.accent)}>Proiezione</th>}
-            {open && <th style={hd(CP.accent)}>Serve al giorno</th>}
+            <th style={hd(FILL.lilac, "center")}>Pos.</th>
+            <th style={hd(FILL.lilac, "left")}>Ecosistema</th>
+            <th style={hd(FILL.lilac)}>Revenue attuale</th>
+            <th style={hd(FILL.lilac)}>Goal</th>
+            <th style={hd(FILL.lilac)}>% goal</th>
+            {open && <th style={hd(FILL.lilac)}>Proiezione</th>}
+            {open && <th style={hd(FILL.lilac)}>Serve al giorno</th>}
           </tr></thead>
           <tbody>
             {groups.map((g) => (
               <tr key={g.id} style={{ background: g.creators.some((c) => mine.has(c.slug)) ? alpha(CP.accent, "12") : null }}>
                 <td style={cell({ textAlign: "center", color: CP.textMuted, width: 36 })}>{g.rank ? `${g.rank}°` : ""}</td>
                 <td style={cell({ textAlign: "left", whiteSpace: "normal" })}>
-                  <div style={{ fontWeight: 600 }}>{g.name}</div>
+                  <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>{ECO_DOT[g.id] && <span style={{ width: 10, height: 10, borderRadius: 999, background: ECO_DOT[g.id] }} />}{g.name}</div>
                   <div style={{ fontSize: 12, color: CP.textMuted }}>{g.creators.map((c) => c.name).join(" · ")}</div>
                 </td>
                 <td style={cell({ fontWeight: 500 })}>{usd(g.mtd)}</td>
