@@ -156,7 +156,7 @@ export function ItemRow({ plan, item, onChange, onDone, compact = false, conditi
 }
 
 /** Dove si lavora per ogni area: da lì si arriva al piano e lì si torna. */
-export const AREA_HOME = { social: { href: "/admin/warmup", label: "Social" } };
+export const AREA_HOME = { social: { href: "/admin/warmup", label: "Clipping" } };
 
 /** La frase di stato in cima: cosa resta e quanto tempo c'è. */
 export function planStatus(plan) {
