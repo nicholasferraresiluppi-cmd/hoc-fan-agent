@@ -24,7 +24,7 @@ import {
   BookMarked,
   LineChart,
   FileSignature,
-  Landmark, Repeat, Gift, CalendarDays, ListChecks } from "lucide-react";
+  Landmark, Repeat, Gift, CalendarDays, ListChecks, MailOpen } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
 import { useRouter } from "next/navigation";
@@ -76,6 +76,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/admin/creator-split",         title: "Creator dello split", desc: "Aggiungi o togli una creator: HOC Pro collega da solo pagine OnlyFans, paese e turni, e la creator compare in Revenue e chat, Analisi vendite e S4S", icon: Users },
       { href: "/admin/fan-da-recuperare",     title: "Fan da recuperare", desc: "Ogni mattina i fan che spendevano bene e si sono fermati, con il perché e una bozza di ripresa personale scritta dall'AI dalle loro ultime chat. Segni a chi hai scritto e vedi chi ha ricomprato", icon: HeartHandshake },
       { href: "/admin/analisi-vendite",       title: "Analisi vendite", desc: "Le tue creator in un posto solo: tutte a confronto sugli stessi numeri (lordo, abbonati, reach, click, fan paganti) con una riga di lettura, come vanno e perché (prima chi perde di più, con il perché letto nelle chat), e la scheda di ogni creator", icon: BarChart3 },
+      { href: "/admin/benvenuto",             title: "Benvenuto a pagamento", desc: "Quanto sblocca il benvenuto di ogni pagina, prima e dopo ogni cambio di prezzo. Il prezzo si legge dalle chat; se il benvenuto parte da un altro strumento lo inserisci a mano con la data da cui vale", icon: MailOpen },
       { href: "/admin/looker",                title: "Report Looker", desc: "Le 16 pagine originali di Looker Studio (HOC Analytics 3.0 e KPI Sales) con gli stessi nomi, la stessa disposizione e le stesse formule, verificate contro Looker. Solo le tue creator, export CSV", icon: LayoutDashboard },
       { href: "/leaderboard/creators/heatmap", title: "Mappa operatore×creator",      desc: "Score operatore × creator a colpo d'occhio", icon: Flame },
       { href: "/admin/conversation-intelligence", title: "Presidio chat", desc: "Latenza risposta, % entro 5 min e response rate per creator (dai transcript, solo metadati)", icon: Activity },
