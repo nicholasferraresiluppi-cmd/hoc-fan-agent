@@ -4,7 +4,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { CheckCircle2, Circle, ArrowRight, ListChecks, ChevronDown } from "lucide-react";
+import { CheckCircle2, Circle, CircleDashed, MessageCircle, ArrowRight, ArrowUpRight, ListChecks, ChevronDown, Zap } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { card, BTN, BTN_PRIMARY_OFF } from "@/components/ds";
 import { dueLabel, shortDay, openItemsFor, currentPhase } from "@/lib/piani-core";
@@ -33,57 +33,123 @@ export function ProgressBar({ done, total, height = 6 }) {
   );
 }
 
-function DueTag({ due, today, done, late }) {
-  if (!due || done) return null;
-  return <span style={{ fontSize: 12, color: late ? CP.accentRed : CP.textMuted, whiteSpace: "nowrap" }}>{dueLabel(due, today)}</span>;
+/** Giorni da oggi a `due` (negativo = passato). */
+const daysTo = (due, today) => (due && today ? Math.round((Date.parse(due + "T12:00:00Z") - Date.parse(today + "T12:00:00Z")) / 86400000) : null);
+/** «mancano 3 giorni», «scade domani», «scaduta da 2 giorni». */
+export function countdown(due, today) {
+  const d = daysTo(due, today);
+  if (d == null) return due ? "entro " + shortDay(due) : "";
+  if (d > 1) return `mancano ${d} giorni`;
+  if (d === 1) return "scade domani";
+  if (d === 0) return "scade oggi";
+  return d === -1 ? "scaduta ieri" : `scaduta da ${-d} giorni`;
 }
 
-/** Una voce: spunta (o risposta), testo, chi, scadenza, link, stato del controllo automatico. */
-export function ItemRow({ plan, item, onChange, compact = false, condition = false }) {
-  const st = item.status;
+const firstName = (s) => String(s || "").trim().split(/[\s,]+/)[0] || "";
+
+/** Chi fa la maggior parte delle voci di una fase: lo si dice una volta nell'intestazione, non su ogni riga. */
+function mainWho(items) {
+  const n = {};
+  for (const it of items) if (it.who) n[it.who] = (n[it.who] || 0) + 1;
+  return Object.entries(n).sort((x, y) => y[1] - x[1])[0]?.[0] || null;
+}
+
+const chip = { display: "inline-flex", alignItems: "center", gap: 5, height: 26, padding: "0 9px", borderRadius: 7, fontSize: 12.5, whiteSpace: "nowrap", fontFamily: FONTS.body, lineHeight: 1 };
+
+/** Mini barra «3 su 5» per le voci che si spuntano dai dati. */
+function AutoChip({ st }) {
+  const a = st.auto || {};
+  const has = Number.isFinite(a.value) && Number.isFinite(a.target) && a.target > 0;
+  const pct = has ? Math.min(100, Math.round((a.value / a.target) * 100)) : 0;
+  return (
+    <span title={`Si spunta da sola leggendo i dati dell'app${a.label ? `: ${a.label}` : ""}`}
+      style={{ ...chip, background: CP.surfaceAlt, color: st.done ? CP.accentGreen : CP.textSecondary }}>
+      <Zap size={12} />
+      {has ? <>
+        <span style={{ width: 34, height: 4, borderRadius: 4, background: CP.border, overflow: "hidden" }}><span style={{ display: "block", width: `${pct}%`, height: "100%", background: st.done ? CP.accentGreen : CP.accent }} /></span>
+        {a.value}/{a.target}
+      </> : (a.label || "dai dati")}
+    </span>
+  );
+}
+
+/**
+ * Una voce del piano (31/10, rifatta da capo dopo il feedback di Nicholas sulla pagina «da persona
+ * senza esperienza»). Regole:
+ * - tre tipi di voce, tre segni diversi: cerchio = la spunti tu; cerchio tratteggiato con fulmine =
+ *   si spunta da sola dai dati (puoi comunque spuntarla a mano); fumetto = domanda, si risponde;
+ * - a destra, sempre nello stesso punto, al massimo tre cose: avanzamento dai dati, «Rispondi», «Apri»;
+ * - chi e scadenza compaiono solo se diversi da quelli della fase (nell'intestazione) o se in ritardo;
+ * - la spunta risponde subito (ottimistica) e torna indietro con un errore se il salvataggio fallisce.
+ */
+export function ItemRow({ plan, item, onChange, onDone, compact = false, condition = false, phaseWho = null, phaseDue = null }) {
+  const st0 = item.status;
   const [busy, setBusy] = useState(false);
-  const [draft, setDraft] = useState(st.answer || "");
+  const [optim, setOptim] = useState(null); // true/false mentre il salvataggio è in corso
+  const [draft, setDraft] = useState(st0.answer || "");
   const [open, setOpen] = useState(false);
   const [err, setErr] = useState(null);
+  const [hover, setHover] = useState(false);
+  const done = optim ?? st0.done;
+  const st = { ...st0, done };
   const run = async (body) => {
     setBusy(true); setErr(null);
     try { const j = await send({ action: "item", planId: plan.id, itemId: item.id, ...body }); onChange?.(j.plan); }
     catch (e) { setErr(e.message); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setOptim(null); }
   };
-  const toggle = () => { if (!busy && !item.ask) run({ done: !st.done }); };
-  const autoNote = st.auto && (st.via !== "mano") ? st.auto.label : null;
+  const toggle = () => { if (busy) return; if (item.ask) { setOpen((o) => !o); return; } setOptim(!done); if (!done) onDone?.(item.id); run({ done: !done }); };
+  const Icon = done ? CheckCircle2 : item.ask ? MessageCircle : item.auto ? CircleDashed : Circle;
+  const showWho = !condition && item.who && item.who !== phaseWho;
+  const showDue = !done && item.due && (st.late || item.due !== phaseDue);
+  const sub = [];
+  // le spunte salvate prima del 31/10 possono avere l'id utente al posto del nome: quello non si mostra
+  if (st.done && st.via === "mano") sub.push(st.by && !/^user_/.test(st.by) ? `fatto da ${firstName(st.by.includes("@") ? st.by.split("@")[0] : st.by)}` : "fatto");
+  // il dettaglio del controllo automatico va sotto solo se dice più del «3/5» già nel chip
+  const a = st.auto;
+  if (item.auto && a?.label && Number.isFinite(a.value) && a.target > 0 && !new RegExp(`^${a.value}[ /]`).test(a.label)) sub.push(a.label);
   return (
-    <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: compact ? "7px 0" : "10px 0", borderTop: `1px solid ${CP.borderSoft || CP.border}` }}>
-      <button onClick={item.ask ? () => setOpen((o) => !o) : toggle} disabled={busy}
-        title={item.ask ? "Rispondi" : st.done ? "Togli la spunta" : "Segna come fatto"}
-        style={{ background: "none", border: "none", padding: 2, cursor: busy ? "wait" : "pointer", color: st.done ? CP.accentGreen : CP.textMuted, flexShrink: 0, display: "inline-flex" }}>
-        {st.done ? <CheckCircle2 size={19} /> : <Circle size={19} />}
+    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: compact ? "6px 8px" : "7px 8px", margin: "0 -8px", borderRadius: 8, background: hover ? CP.surfaceAlt : "transparent", transition: "background .12s" }}>
+      <button type="button" onClick={toggle} disabled={busy && !item.ask} aria-pressed={done}
+        title={item.ask ? (st.answer ? "Modifica la risposta" : "Rispondi") : done ? "Togli la spunta" : item.auto ? "Si spunta da sola dai dati — puoi spuntarla anche a mano" : "Segna come fatto"}
+        style={{ width: 30, height: 30, margin: "-4px -2px -4px -6px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", borderRadius: 8, cursor: "pointer", flexShrink: 0,
+          color: done ? CP.accentGreen : hover ? CP.textSecondary : CP.textMuted, transform: optim === true ? "scale(1.15)" : "none", transition: "transform .15s, color .15s" }}>
+        <Icon size={20} strokeWidth={done ? 2.2 : 1.8} />
       </button>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, lineHeight: 1.45, color: st.done ? CP.textSecondary : CP.textPrimary, textDecoration: st.done && !item.ask ? "line-through" : "none", textDecorationColor: CP.textMuted }}>
+      {/* testo e pulsanti vanno a capo insieme: sul telefono i pulsanti scendono sotto il testo invece di schiacciarlo */}
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexWrap: "wrap", gap: "6px 10px", alignItems: "flex-start" }}>
+      <div style={{ flex: "1 1 240px", minWidth: 0, paddingTop: 2 }}>
+        <div style={{ fontSize: 14, lineHeight: 1.4, color: done ? CP.textMuted : CP.textPrimary, textDecorationLine: done && !item.ask ? "line-through" : "none", textDecorationColor: CP.textMuted, transition: "color .2s" }}>
           {item.text}
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 3, fontSize: 12, color: CP.textMuted }}>
-          {!condition && item.who && <span>{item.who}</span>}
-          <DueTag due={item.due} today={plan.today} done={st.done} late={st.late} />
-          {item.auto && <span title="Si spunta da solo leggendo i dati dell'app">{st.done && st.via === "dati" ? "fatto, dai dati" : "si spunta da solo"}{autoNote ? ` · ${autoNote}` : ""}</span>}
-          {st.done && st.via === "mano" && st.by && <span>fatto da {st.by.split(" ")[0]}</span>}
-          {item.ask && st.answer && !open && <span style={{ color: CP.textSecondary }}>«{st.answer.length > 90 ? st.answer.slice(0, 90) + "…" : st.answer}»{st.by ? ` — ${st.by.split(" ")[0]}` : ""}</span>}
-          {item.ask && !open && <button onClick={() => setOpen(true)} style={{ background: "none", border: "none", padding: 0, color: CP.textSecondary, cursor: "pointer", fontSize: 12, textDecoration: "underline", fontFamily: FONTS.body }}>{st.answer ? "modifica" : "rispondi"}</button>}
-          {item.link && <Link href={item.link} style={{ color: CP.textSecondary, display: "inline-flex", alignItems: "center", gap: 3, textDecoration: "none" }}>apri <ArrowRight size={12} /></Link>}
-        </div>
+        {(sub.length > 0 || showWho || showDue || (item.ask && st.answer && !open)) && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2, fontSize: 12, color: CP.textMuted }}>
+            {showWho && <span>{item.who}</span>}
+            {showDue && <span style={{ color: st.late ? CP.accentRed : CP.textMuted }}>{dueLabel(item.due, plan.today)}</span>}
+            {sub.map((t, i) => <span key={i}>{t}</span>)}
+            {item.ask && st.answer && !open && <span style={{ color: CP.textSecondary }}>«{st.answer.length > 120 ? st.answer.slice(0, 120) + "…" : st.answer}»{st.by && !/^user_/.test(st.by) ? ` — ${firstName(st.by)}` : ""}</span>}
+          </div>
+        )}
         {item.ask && open && (
           <div style={{ marginTop: 8 }}>
-            <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} placeholder="Scrivi la risposta"
+            <textarea autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} placeholder="Scrivi la risposta"
+              onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && draft.trim()) { run({ answer: draft }); setOpen(false); } }}
               style={{ width: "100%", boxSizing: "border-box", fontFamily: FONTS.body, fontSize: 14, padding: "8px 10px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, resize: "vertical" }} />
-            <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-              <button disabled={busy || !draft.trim()} onClick={async () => { await run({ answer: draft }); setOpen(false); }} style={{ ...BTN_PRIMARY_OFF(busy || !draft.trim()), minHeight: 32, padding: "5px 12px" }}>Salva</button>
-              <button onClick={() => { setOpen(false); setDraft(st.answer || ""); }} style={{ ...BTN, minHeight: 32, padding: "5px 12px" }}>Annulla</button>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, alignItems: "center" }}>
+              <button disabled={busy || !draft.trim()} onClick={async () => { await run({ answer: draft }); setOpen(false); }} style={{ ...BTN_PRIMARY_OFF(busy || !draft.trim()), minHeight: 30, padding: "4px 12px" }}>Salva</button>
+              <button onClick={() => { setOpen(false); setDraft(st.answer || ""); }} style={{ ...BTN, minHeight: 30, padding: "4px 12px" }}>Annulla</button>
+              <span style={{ fontSize: 12, color: CP.textMuted }}>⌘ Invio per salvare</span>
             </div>
           </div>
         )}
-        {err && <div style={{ fontSize: 12, color: CP.accentRed, marginTop: 4 }}>{err}</div>}
+        {err && <div style={{ fontSize: 12, color: CP.accentRed, marginTop: 4 }}>Non salvato: {err}</div>}
+      </div>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0, marginLeft: "auto" }}>
+        {item.auto && <AutoChip st={st} />}
+        {item.ask && !open && <button type="button" onClick={() => setOpen(true)} style={{ ...chip, background: st.answer ? "transparent" : CP.accentSoft, color: st.answer ? CP.textSecondary : CP.accentSoftText, border: st.answer ? `1px solid ${CP.border}` : "1px solid transparent", cursor: "pointer" }}>{st.answer ? "Modifica" : "Rispondi"}</button>}
+        {item.link && <Link href={item.link} title="Apri la pagina dove si fa" style={{ ...chip, border: `1px solid ${CP.border}`, color: CP.textSecondary, textDecoration: "none", background: CP.surface }}>Apri <ArrowUpRight size={13} /></Link>}
+      </div>
       </div>
     </div>
   );
@@ -92,56 +158,93 @@ export function ItemRow({ plan, item, onChange, compact = false, condition = fal
 /** Dove si lavora per ogni area: da lì si arriva al piano e lì si torna. */
 export const AREA_HOME = { social: { href: "/admin/warmup", label: "Social" } };
 
+/** La frase di stato in cima: cosa resta e quanto tempo c'è. */
+export function planStatus(plan) {
+  const cur = plan.phases.find((p) => p.kind !== "decision" && !p.complete);
+  const dec = plan.phases.find((p) => p.kind === "decision");
+  const parts = [];
+  if (cur) { const left = cur.total - cur.done; parts.push(`${cur.title}: ${left} ${left === 1 ? "voce aperta" : "voci aperte"}, ${countdown(cur.due, plan.today)}`); }
+  else if (plan.phases.some((p) => p.kind !== "decision")) parts.push("Tutte le voci di lavoro sono fatte");
+  if (dec) parts.push(`decisione ${shortDay(dec.due)}: ${dec.done} ${dec.done === 1 ? "condizione vera" : "condizioni vere"} su ${dec.total}`);
+  return parts.join(" · ");
+}
+
 /**
- * Il piano intero (31/10, su richiesta di Nicholas: deve stare in una schermata). Le fasi sono
- * colonne affiancate a tutta larghezza; in ogni fase si vedono le voci aperte, quelle fatte
- * stanno ripiegate in fondo («N fatte»), così la lista si accorcia man mano che si lavora.
+ * Il piano intero (31/10). Si legge come una lista di lavoro, non come un tabellone:
+ * a sinistra la fase di adesso, una colonna sola dall'alto in basso; a destra la decisione
+ * (il perché del piano) e le altre fasi. Le voci fatte si ripiegano in fondo a ogni fase.
  */
 export function PlanFull({ plan, onChange }) {
+  const work = plan.phases.filter((p) => p.kind !== "decision");
+  const now = work.find((p) => !p.complete) || work[0] || null;
+  const side = [...plan.phases.filter((p) => p.kind === "decision"), ...work.filter((p) => p !== now)];
   return (
-    <div>
-      <div style={{ ...card, padding: "10px 14px", marginBottom: 12, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ fontSize: 13, color: CP.textSecondary, whiteSpace: "nowrap" }}>{plan.progress.done} fatte su {plan.progress.total}{plan.progress.late ? ` · ${plan.progress.late} in ritardo` : ""}</div>
-        <div style={{ flex: "1 1 200px" }}><ProgressBar done={plan.progress.done} total={plan.progress.total} /></div>
-        <div style={{ fontSize: 13, color: CP.textMuted }}>
-          {plan.start && plan.end ? `dal ${shortDay(plan.start)} al ${shortDay(plan.end)}` : ""}{plan.people?.length ? ` · ${plan.people.join(", ")}` : ""}
-        </div>
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-start" }}>
-        {plan.phases.map((ph) => <PhaseColumn key={ph.id} plan={plan} ph={ph} onChange={onChange} />)}
-      </div>
+    <div className="piani-grid" style={{ display: "grid", gap: 16, alignItems: "start" }}>
+      <style>{`.piani-grid{grid-template-columns:minmax(0,1fr)}@media(min-width:1100px){.piani-grid{grid-template-columns:minmax(0,1.5fr) minmax(360px,1fr)}}`}</style>
+      {now && <Phase plan={plan} ph={now} onChange={onChange} main />}
+      {side.length > 0 && <div style={{ display: "grid", gap: 16 }}>{side.map((ph) => <Phase key={ph.id} plan={plan} ph={ph} onChange={onChange} />)}</div>}
     </div>
   );
 }
 
-function PhaseColumn({ plan, ph, onChange }) {
+/** La nota della fase; nelle fasi laterali due righe, il resto con un clic. */
+function Note({ text, clamp }) {
+  const [open, setOpen] = useState(false);
+  const cut = clamp && !open;
+  return (
+    <p onClick={clamp ? () => setOpen((o) => !o) : undefined} title={cut ? "Leggi tutto" : undefined}
+      style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.5, margin: "6px 0 8px", maxWidth: 680, cursor: clamp ? "pointer" : "default",
+        ...(cut ? { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" } : {}) }}>
+      {text}
+    </p>
+  );
+}
+
+function Phase({ plan, ph, onChange, main = false }) {
   const [showDone, setShowDone] = useState(false);
+  // una voce appena spuntata resta un attimo al suo posto (si vede la spunta) prima di ripiegarsi tra le fatte
+  const [keep, setKeep] = useState(() => new Set());
+  const onDone = (id) => {
+    setKeep((k) => new Set(k).add(id));
+    setTimeout(() => setKeep((k) => { const n = new Set(k); n.delete(id); return n; }), 1400);
+  };
   const dec = ph.kind === "decision";
+  const who = dec ? null : mainWho(ph.items);
   const items = ph.items.map((it) => ({ ...it, due: it.due || (dec ? null : ph.due) }));
   // le condizioni di una decisione restano tutte in vista: servono lette insieme
-  const open = dec ? items : items.filter((it) => !it.status.done);
-  const done = dec ? [] : items.filter((it) => it.status.done);
-  const row = (it) => <div key={it.id} style={{ breakInside: "avoid" }}><ItemRow plan={plan} item={it} condition={dec} onChange={onChange} compact /></div>;
-  // una fase con tante voci aperte prende tutta la riga e le voci vanno in colonne: niente lista lunga da scorrere
+  const open = dec ? items : items.filter((it) => !it.status.done || keep.has(it.id));
+  const done = dec ? [] : items.filter((it) => it.status.done && !keep.has(it.id));
+  const row = (it) => <ItemRow key={it.id} plan={plan} item={it} condition={dec} onChange={onChange} onDone={onDone} phaseWho={who} phaseDue={dec ? null : ph.due} />;
+  const late = !dec && ph.overdue;
   return (
-    <section style={{ ...card, padding: "12px 14px 6px", flex: open.length > 6 ? "1 1 100%" : "1 1 320px", minWidth: 0 }}>
-      <h2 style={{ fontSize: 15, fontWeight: 500, margin: 0, color: CP.textPrimary }}>{dec ? "Decisione: " : ""}{ph.title}</h2>
-      <div style={{ fontSize: 12.5, color: ph.overdue ? CP.accentRed : CP.textMuted, marginTop: 2 }}>
-        {ph.due ? (dec ? shortDay(ph.due) : dueLabel(ph.due, plan.today)) : ""}
-        {ph.due ? " · " : ""}{dec ? `condizioni vere ${ph.done} su ${ph.total}` : ph.complete ? "completata" : `${ph.done} su ${ph.total}`}
+    <section style={{ ...card, padding: main ? "16px 18px 10px" : "14px 16px 8px" }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+        {main && <span style={{ fontSize: 11.5, fontWeight: 500, letterSpacing: ".04em", textTransform: "uppercase", color: CP.accentSoftText, background: CP.accentSoft, padding: "2px 7px", borderRadius: 5 }}>Adesso</span>}
+        <h2 style={{ fontSize: main ? 17 : 15, fontWeight: 500, margin: 0, color: CP.textPrimary }}>{ph.title}</h2>
+        <span style={{ marginLeft: "auto", fontSize: 13, color: late ? CP.accentRed : CP.textSecondary, whiteSpace: "nowrap" }}>
+          {dec ? `${shortDay(ph.due)} · ${countdown(ph.due, plan.today).replace("scade", "è")}` : ph.complete ? "fase chiusa" : countdown(ph.due, plan.today)}
+        </span>
       </div>
-      {ph.note && <p title={ph.note} style={{ fontSize: 12.5, color: CP.textSecondary, lineHeight: 1.45, margin: "6px 0 6px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{ph.note}</p>}
-      <div style={{ columnWidth: 320, columnGap: 22 }}>{open.map(row)}</div>
-      {!dec && !open.length && <div style={{ fontSize: 13, color: CP.textSecondary, padding: "8px 0", borderTop: `1px solid ${CP.borderSoft || CP.border}` }}>Tutto fatto in questa fase.</div>}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "8px 0 4px" }}>
+        <div style={{ flex: 1 }}><ProgressBar done={ph.done} total={ph.total} height={5} /></div>
+        <span style={{ fontSize: 12.5, color: CP.textMuted, whiteSpace: "nowrap" }}>
+          {dec ? `${ph.done} di ${ph.total} condizioni vere` : `${ph.done} di ${ph.total} fatte`}{who ? ` · ${who}` : ""}{!dec && ph.due ? ` · entro ${shortDay(ph.due)}` : ""}
+        </span>
+      </div>
+      {ph.note && <Note text={ph.note} clamp={!main} />}
+      <div style={{ marginTop: 4 }}>
+        {open.map(row)}
+        {!dec && !open.length && <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: CP.accentGreen, padding: "10px 0" }}><CheckCircle2 size={18} />Fase chiusa: tutte le voci sono fatte.</div>}
+      </div>
       {done.length > 0 && (
-        <>
-          <button type="button" onClick={() => setShowDone((v) => !v)}
-            style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", background: "none", border: "none", borderTop: `1px solid ${CP.borderSoft || CP.border}`, padding: "8px 0", cursor: "pointer", fontSize: 12.5, color: CP.textSecondary, fontFamily: FONTS.body, textAlign: "left" }}>
+        <div style={{ borderTop: `1px solid ${CP.borderSoft || CP.border}`, marginTop: 6 }}>
+          <button type="button" onClick={() => setShowDone((v) => !v)} aria-expanded={showDone}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: "9px 0 4px", cursor: "pointer", fontSize: 13, color: CP.textSecondary, fontFamily: FONTS.body }}>
             <ChevronDown size={14} style={{ transform: showDone ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
-            {done.length} {done.length === 1 ? "fatta" : "fatte"}
+            {showDone ? "Nascondi le fatte" : `Fatte (${done.length})`}
           </button>
-          {showDone && <div style={{ columnWidth: 320, columnGap: 22 }}>{done.map(row)}</div>}
-        </>
+          {showDone && done.map(row)}
+        </div>
       )}
     </section>
   );
@@ -159,6 +262,9 @@ export function PlanCard({ area }) {
   const cur = currentPhase(plan);
   const dec = plan.phases.find((p) => p.kind === "decision");
   const onChange = (p) => mutate({ ...data, plan: p }, { revalidate: false });
+  // stessa scadenza per tutte le voci → si dice una volta in testa, non su ogni riga
+  const dues = [...new Set(mine.map((it) => it.due).filter(Boolean))];
+  const oneDue = dues.length === 1 && !mine.some((it) => it.status.late) ? dues[0] : null;
   return (
     <section style={{ ...card, padding: "14px 16px 8px", marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
@@ -174,9 +280,9 @@ export function PlanCard({ area }) {
       </div>
       <ProgressBar done={plan.progress.done} total={plan.progress.total} height={5} />
       <div style={{ fontSize: 12, color: CP.textMuted, margin: "6px 0 2px" }}>
-        {plan.progress.done} su {plan.progress.total} fatte{plan.progress.late ? ` · ${plan.progress.late} in ritardo` : ""}
+        {plan.progress.done} su {plan.progress.total} fatte{plan.progress.late ? ` · ${plan.progress.late} in ritardo` : ""}{oneDue ? ` · le tue entro ${shortDay(oneDue)}, ${countdown(oneDue, plan.today)}` : ""}
       </div>
-      {mine.length ? mine.map((it) => <ItemRow key={it.id} plan={plan} item={it} onChange={onChange} compact />) : (
+      {mine.length ? mine.map((it) => <ItemRow key={it.id} plan={plan} item={it} onChange={onChange} phaseWho={it.who} phaseDue={oneDue} compact />) : (
         <div style={{ fontSize: 13, color: CP.textSecondary, padding: "8px 0 6px" }}>Niente di aperto per te in questo piano.</div>
       )}
     </section>

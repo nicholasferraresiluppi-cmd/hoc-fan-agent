@@ -8,9 +8,9 @@
  */
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Pencil, Plus, ArrowLeft } from "lucide-react";
-import { PageHead, Tabs, EmptyState, Notice, BTN, BTN_PRIMARY } from "@/components/ds";
-import { usePlans, PlanFull, AREA_HOME } from "@/components/piani/PlanView";
+import { Pencil, Plus, ChevronLeft } from "lucide-react";
+import { PageHead, Tabs, EmptyState, Notice, Spiega, BTN, BTN_PRIMARY } from "@/components/ds";
+import { usePlans, PlanFull, AREA_HOME, planStatus } from "@/components/piani/PlanView";
 import { PlanEditor } from "@/components/piani/PlanEditor";
 import { CP } from "@/lib/brand";
 
@@ -40,14 +40,16 @@ export default function PianiPage() {
 
   return (
     <div style={{ maxWidth: 1600, margin: "0 auto", padding: "16px 16px 110px" }}>
-      <PageHead title={title} crumbs={home && !edit ? [{ label: home.label, href: home.href }, { label: "Piani" }] : [{ label: "Piani" }]}
-        subtitle={plan && !edit && plan.goal ? plan.goal : "Cosa c'è da fare, chi lo fa e per quando. Le voci che l'app può verificare si spuntano da sole."}
-        actions={!edit ? <>
-          {home && <Link href={home.href} style={{ ...BTN, textDecoration: "none" }}><ArrowLeft size={14} />Torna a {home.label}</Link>}
-          {admin && <>
-          {plan && <button type="button" style={BTN} onClick={() => setEdit(plan.id)}><Pencil size={14} />Modifica</button>}
-          <button type="button" style={plan ? BTN : BTN_PRIMARY} onClick={() => setEdit("new")}><Plus size={14} />Nuovo piano</button>
-          </>}
+      {home && !edit && (
+        <Link href={home.href} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13.5, color: CP.textSecondary, textDecoration: "none", margin: "0 0 8px -4px", padding: "4px 8px 4px 4px", borderRadius: 7 }}>
+          <ChevronLeft size={16} />{home.label}
+        </Link>
+      )}
+      <PageHead title={title} crumbs={edit || !home ? [{ label: "Piani" }] : []}
+        subtitle={plan && !edit ? planStatus(plan) : "Cosa c'è da fare, chi lo fa e per quando. Le voci che l'app può verificare si spuntano da sole."}
+        actions={admin && !edit ? <>
+          {plan && <button type="button" style={{ ...BTN, minHeight: 34, padding: "6px 12px" }} onClick={() => setEdit(plan.id)}><Pencil size={14} />Modifica</button>}
+          <button type="button" style={plan ? { ...BTN, minHeight: 34, padding: "6px 12px", background: "transparent", border: "1px solid transparent", color: CP.textSecondary } : BTN_PRIMARY} onClick={() => setEdit("new")}><Plus size={14} />Nuovo piano</button>
         </> : null} />
       {edit ? (
         <PlanEditor key={edit} plan={editing} onSaved={onSaved} onCancel={() => setEdit(null)} onDeleted={onDeleted} />
@@ -58,6 +60,7 @@ export default function PianiPage() {
           {isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
           {data && !plan && <EmptyState title="Nessun piano in corso">Quando c&apos;è un piano di lavoro per la tua area lo trovi qui.</EmptyState>}
           {plan?.archived && <Notice>Questo piano è archiviato: non compare più in cima alla pagina di lavoro.</Notice>}
+          {plan?.goal && <Spiega label="Perché questo piano" style={{ margin: "-8px 0 14px" }}><p style={{ margin: 0 }}>{plan.goal}</p></Spiega>}
           {plan && <PlanFull key={plan.id} plan={plan} onChange={onChange} />}
         </>
       )}
