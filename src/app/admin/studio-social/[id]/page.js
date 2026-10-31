@@ -314,6 +314,16 @@ export default function StudioProfilePage() {
     } catch (e) { setErr(e.message); } finally { setSaving(false); }
   };
 
+  // Archivia/riattiva (31/10/2026): si manda il profilo intero col flag, mai cancellato.
+  const toggleArchived = async () => {
+    setErr(null);
+    try {
+      const r = await fetch("/api/admin/studio-social", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...data.profile, archived: !data.profile.archived }) });
+      const j = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+      await mutate();
+    } catch (e) { setErr(e.message); }
+  };
   const saveArc = async (arc) => { await post({ action: "arc", arc }); await mutate(); };
   const deleteArc = async (arc) => { await post({ action: "deleteArc", arcId: arc.id }); await mutate(); };
 
@@ -337,11 +347,17 @@ export default function StudioProfilePage() {
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
-        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Studio social", href: "/admin/studio-social" }, { label: `@${profile.handle}` }]}
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Regia social", href: "/admin/studio-social" }, { label: `@${profile.handle}` }]}
         title={`@${profile.handle}`}
         subtitle={[profile.creator, PLATFORM_LABEL[profile.platform], profile.format && `format ${profile.format}`].filter(Boolean).join(" · ")}
-        actions={<button style={btn(true)} onClick={() => setEditing({ day: today, format: profile.format || "" })}><Plus size={14} aria-hidden="true" /> Nuovo contenuto</button>}
+        actions={
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button style={btn(false)} onClick={toggleArchived}>{profile.archived ? "Riattiva profilo" : "Archivia profilo"}</button>
+            {!profile.archived && <button style={btn(true)} onClick={() => setEditing({ day: today, format: profile.format || "" })}><Plus size={14} aria-hidden="true" /> Nuovo contenuto</button>}
+          </div>
+        }
       />
+      {profile.archived && <Notice>Profilo archiviato: non compare nell'elenco della Regia social. I contenuti restano qui, niente è stato cancellato.</Notice>}
       {err && !editing && !editId && <Notice danger>{err}</Notice>}
 
       {/* Fase e numeri */}

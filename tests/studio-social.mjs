@@ -114,4 +114,14 @@ t("ruolo SMM vede lo Studio social nella vista ridotta", () => {
   assert.equal(pathAllowed(social, "/admin/studio-social"), false); // il ruolo "Social" resta su Account social
 });
 
+t("profilo: archiviato — di default no, si accende, resta se non passato, si riattiva", () => {
+  const base = normalizeProfile({ handle: "ale.sprg" }).profile;
+  assert.equal(base.archived, false);
+  const arch = normalizeProfile({ ...base, archived: true }, base).profile;
+  assert.equal(arch.archived, true);
+  // una modifica che non nomina il flag (es. l'editor dell'identità) non lo spegne
+  assert.equal(normalizeProfile({ id: base.id, handle: "ale.sprg", format: "x" }, arch).profile.archived, true);
+  assert.equal(normalizeProfile({ ...arch, archived: false }, arch).profile.archived, false);
+});
+
 console.log(`studio-social: ${n} gruppi di asserzioni ok`);
