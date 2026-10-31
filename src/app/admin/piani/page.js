@@ -7,9 +7,10 @@
  * Gli admin creano, modificano e archiviano i piani da qui (editor, 30/10).
  */
 import { useEffect, useState } from "react";
-import { Pencil, Plus } from "lucide-react";
+import Link from "next/link";
+import { Pencil, Plus, ArrowLeft } from "lucide-react";
 import { PageHead, Tabs, EmptyState, Notice, BTN, BTN_PRIMARY } from "@/components/ds";
-import { usePlans, PlanFull } from "@/components/piani/PlanView";
+import { usePlans, PlanFull, AREA_HOME } from "@/components/piani/PlanView";
 import { PlanEditor } from "@/components/piani/PlanEditor";
 import { CP } from "@/lib/brand";
 
@@ -34,15 +35,19 @@ export default function PianiPage() {
   const onSaved = async (id) => { await mutate(); setEdit(null); choose(id); window.scrollTo(0, 0); };
 
   const editing = edit === "new" ? null : edit ? plans.find((p) => p.id === edit) : undefined;
+  const home = plan ? AREA_HOME[plan.area] : null;
   const title = edit === "new" ? "Nuovo piano" : edit ? `Modifica: ${editing?.title || ""}` : plan ? plan.title : "Piani";
 
   return (
-    <div style={{ maxWidth: 980, margin: "0 auto", padding: "20px 16px 110px" }}>
-      <PageHead title={title} crumbs={[{ label: "Piani" }]}
-        subtitle="Cosa c'è da fare, chi lo fa e per quando. Le voci che l'app può verificare si spuntano da sole."
-        actions={admin && !edit ? <>
+    <div style={{ maxWidth: 1600, margin: "0 auto", padding: "16px 16px 110px" }}>
+      <PageHead title={title} crumbs={home && !edit ? [{ label: home.label, href: home.href }, { label: "Piani" }] : [{ label: "Piani" }]}
+        subtitle={plan && !edit && plan.goal ? plan.goal : "Cosa c'è da fare, chi lo fa e per quando. Le voci che l'app può verificare si spuntano da sole."}
+        actions={!edit ? <>
+          {home && <Link href={home.href} style={{ ...BTN, textDecoration: "none" }}><ArrowLeft size={14} />Torna a {home.label}</Link>}
+          {admin && <>
           {plan && <button type="button" style={BTN} onClick={() => setEdit(plan.id)}><Pencil size={14} />Modifica</button>}
           <button type="button" style={plan ? BTN : BTN_PRIMARY} onClick={() => setEdit("new")}><Plus size={14} />Nuovo piano</button>
+          </>}
         </> : null} />
       {edit ? (
         <PlanEditor key={edit} plan={editing} onSaved={onSaved} onCancel={() => setEdit(null)} onDeleted={onDeleted} />

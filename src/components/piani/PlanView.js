@@ -4,7 +4,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { CheckCircle2, Circle, ArrowRight, ListChecks } from "lucide-react";
+import { CheckCircle2, Circle, ArrowRight, ListChecks, ChevronDown } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { card, BTN, BTN_PRIMARY_OFF } from "@/components/ds";
 import { dueLabel, shortDay, openItemsFor, currentPhase } from "@/lib/piani-core";
@@ -54,7 +54,7 @@ export function ItemRow({ plan, item, onChange, compact = false, condition = fal
   const toggle = () => { if (!busy && !item.ask) run({ done: !st.done }); };
   const autoNote = st.auto && (st.via !== "mano") ? st.auto.label : null;
   return (
-    <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: compact ? "8px 0" : "10px 0", borderTop: `1px solid ${CP.borderSoft || CP.border}` }}>
+    <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: compact ? "7px 0" : "10px 0", borderTop: `1px solid ${CP.borderSoft || CP.border}` }}>
       <button onClick={item.ask ? () => setOpen((o) => !o) : toggle} disabled={busy}
         title={item.ask ? "Rispondi" : st.done ? "Togli la spunta" : "Segna come fatto"}
         style={{ background: "none", border: "none", padding: 2, cursor: busy ? "wait" : "pointer", color: st.done ? CP.accentGreen : CP.textMuted, flexShrink: 0, display: "inline-flex" }}>
@@ -89,34 +89,61 @@ export function ItemRow({ plan, item, onChange, compact = false, condition = fal
   );
 }
 
-/** Il piano intero, fase per fase. */
+/** Dove si lavora per ogni area: da lì si arriva al piano e lì si torna. */
+export const AREA_HOME = { social: { href: "/admin/warmup", label: "Social" } };
+
+/**
+ * Il piano intero (31/10, su richiesta di Nicholas: deve stare in una schermata). Le fasi sono
+ * colonne affiancate a tutta larghezza; in ogni fase si vedono le voci aperte, quelle fatte
+ * stanno ripiegate in fondo («N fatte»), così la lista si accorcia man mano che si lavora.
+ */
 export function PlanFull({ plan, onChange }) {
   return (
     <div>
-      {plan.goal && <p style={{ fontSize: 14, color: CP.textSecondary, lineHeight: 1.55, margin: "0 0 16px", maxWidth: 820 }}>{plan.goal}</p>}
-      <div style={{ ...card, padding: "14px 16px", marginBottom: 16, display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ flex: "1 1 260px" }}>
-          <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 6 }}>{plan.progress.done} voci fatte su {plan.progress.total}{plan.progress.late ? ` · ${plan.progress.late} in ritardo` : ""}</div>
-          <ProgressBar done={plan.progress.done} total={plan.progress.total} />
-        </div>
+      <div style={{ ...card, padding: "10px 14px", marginBottom: 12, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13, color: CP.textSecondary, whiteSpace: "nowrap" }}>{plan.progress.done} fatte su {plan.progress.total}{plan.progress.late ? ` · ${plan.progress.late} in ritardo` : ""}</div>
+        <div style={{ flex: "1 1 200px" }}><ProgressBar done={plan.progress.done} total={plan.progress.total} /></div>
         <div style={{ fontSize: 13, color: CP.textMuted }}>
           {plan.start && plan.end ? `dal ${shortDay(plan.start)} al ${shortDay(plan.end)}` : ""}{plan.people?.length ? ` · ${plan.people.join(", ")}` : ""}
         </div>
       </div>
-      {plan.phases.map((ph) => (
-        <section key={ph.id} style={{ ...card, padding: "14px 16px 6px", marginBottom: 14 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-            <h2 style={{ fontSize: 16, fontWeight: 500, margin: 0, color: CP.textPrimary }}>{ph.kind === "decision" ? "Decisione: " : ""}{ph.title}</h2>
-            <span style={{ fontSize: 13, color: ph.overdue ? CP.accentRed : CP.textMuted }}>
-              {ph.due ? (ph.kind === "decision" ? shortDay(ph.due) : dueLabel(ph.due, plan.today)) : ""}
-              {" · "}{ph.kind === "decision" ? `condizioni vere ${ph.done} su ${ph.total}` : ph.complete ? "completata" : `${ph.done} su ${ph.total}`}
-            </span>
-          </div>
-          {ph.note && <p style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.5, margin: "6px 0 8px" }}>{ph.note}</p>}
-          {ph.items.map((it) => <ItemRow key={it.id} plan={plan} item={{ ...it, due: it.due || (ph.kind === "decision" ? null : ph.due) }} condition={ph.kind === "decision"} onChange={onChange} />)}
-        </section>
-      ))}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-start" }}>
+        {plan.phases.map((ph) => <PhaseColumn key={ph.id} plan={plan} ph={ph} onChange={onChange} />)}
+      </div>
     </div>
+  );
+}
+
+function PhaseColumn({ plan, ph, onChange }) {
+  const [showDone, setShowDone] = useState(false);
+  const dec = ph.kind === "decision";
+  const items = ph.items.map((it) => ({ ...it, due: it.due || (dec ? null : ph.due) }));
+  // le condizioni di una decisione restano tutte in vista: servono lette insieme
+  const open = dec ? items : items.filter((it) => !it.status.done);
+  const done = dec ? [] : items.filter((it) => it.status.done);
+  const row = (it) => <div key={it.id} style={{ breakInside: "avoid" }}><ItemRow plan={plan} item={it} condition={dec} onChange={onChange} compact /></div>;
+  // una fase con tante voci aperte prende tutta la riga e le voci vanno in colonne: niente lista lunga da scorrere
+  return (
+    <section style={{ ...card, padding: "12px 14px 6px", flex: open.length > 6 ? "1 1 100%" : "1 1 320px", minWidth: 0 }}>
+      <h2 style={{ fontSize: 15, fontWeight: 500, margin: 0, color: CP.textPrimary }}>{dec ? "Decisione: " : ""}{ph.title}</h2>
+      <div style={{ fontSize: 12.5, color: ph.overdue ? CP.accentRed : CP.textMuted, marginTop: 2 }}>
+        {ph.due ? (dec ? shortDay(ph.due) : dueLabel(ph.due, plan.today)) : ""}
+        {ph.due ? " · " : ""}{dec ? `condizioni vere ${ph.done} su ${ph.total}` : ph.complete ? "completata" : `${ph.done} su ${ph.total}`}
+      </div>
+      {ph.note && <p title={ph.note} style={{ fontSize: 12.5, color: CP.textSecondary, lineHeight: 1.45, margin: "6px 0 6px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{ph.note}</p>}
+      <div style={{ columnWidth: 320, columnGap: 22 }}>{open.map(row)}</div>
+      {!dec && !open.length && <div style={{ fontSize: 13, color: CP.textSecondary, padding: "8px 0", borderTop: `1px solid ${CP.borderSoft || CP.border}` }}>Tutto fatto in questa fase.</div>}
+      {done.length > 0 && (
+        <>
+          <button type="button" onClick={() => setShowDone((v) => !v)}
+            style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", background: "none", border: "none", borderTop: `1px solid ${CP.borderSoft || CP.border}`, padding: "8px 0", cursor: "pointer", fontSize: 12.5, color: CP.textSecondary, fontFamily: FONTS.body, textAlign: "left" }}>
+            <ChevronDown size={14} style={{ transform: showDone ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
+            {done.length} {done.length === 1 ? "fatta" : "fatte"}
+          </button>
+          {showDone && <div style={{ columnWidth: 320, columnGap: 22 }}>{done.map(row)}</div>}
+        </>
+      )}
+    </section>
   );
 }
 
