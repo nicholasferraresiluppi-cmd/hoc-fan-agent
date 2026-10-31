@@ -37,7 +37,7 @@ import {
   History, Signpost, ListChecks, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
 Megaphone, Share2, Shield, BookUser, Sunrise, UserPlus,
   LineChart,
-  FileSignature, Repeat, Gift } from "lucide-react";
+  FileSignature, Repeat, Gift, MailOpen } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
 import WorkspaceSwitch from "@/components/WorkspaceSwitch";
@@ -72,6 +72,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/le-mie-creator",           label: "Revenue e chat", icon: LineChart },
       { href: "/admin/creator-split",            label: "Creator dello split", icon: Users },
       { href: "/admin/analisi-vendite",          label: "Analisi vendite", icon: BarChart3 },
+      { href: "/admin/benvenuto",                label: "Benvenuto a pagamento", icon: MailOpen },
       { href: "/admin/looker",                   label: "Report Looker", icon: LayoutDashboard },
       { href: "/admin/fan-da-recuperare",        label: "Fan da recuperare", icon: HeartHandshake },
       { href: "/admin/chat-monitor",             label: "Chat Monitor", icon: MessagesSquare },

@@ -43,7 +43,7 @@ export const NAV_ACCESS = {
   // report Looker aziendale: serve un account Google HOC con accesso al report (non gli operatori)
   "/admin/reports": all("scores.view"),
   // Analisi vendite, HOC Analytics, Fan da recuperare: authorizeScoped(ANALYTICS_VIEW) + creator assegnate
-  "/admin/analisi-vendite": team("analytics.view"), "/admin/looker": team("analytics.view"), "/admin/fan-da-recuperare": team("analytics.view"),
+  "/admin/analisi-vendite": team("analytics.view"), "/admin/benvenuto": team("analytics.view"), "/admin/looker": team("analytics.view"), "/admin/fan-da-recuperare": team("analytics.view"),
 };
 
 /** La voce `href` funziona per chi ha queste capability? */
