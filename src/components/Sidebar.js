@@ -152,7 +152,7 @@ const NAV_GROUPS_RAW = [
     items: [
       { href: "/admin/scouting",                 label: "Radar creator", icon: Radar },
       { href: "/admin/ads",                      label: "Studio bio-funnel", icon: Megaphone },
-      { href: "/admin/studio-social",            label: "Studio social",   icon: Clapperboard },
+      { href: "/admin/studio-social",            label: "Regia social",    icon: Clapperboard },
       { href: "/admin/supervisor",               label: "Account social",  icon: Share2 },
       { href: "/admin/warmup",                   label: "Clipping",       icon: Sunrise },
       { href: "/admin/piani",                    label: "Piani",          icon: ListChecks },

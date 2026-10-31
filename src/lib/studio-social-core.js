@@ -132,6 +132,8 @@ export function normalizeProfile(input, prev = null) {
     calendar,
     daily: daily.length ? daily : [],
     trackingLink: str(input?.trackingLink, 120),
+    // Archiviato (31/10/2026): fuori dall'elenco principale, mai cancellato. Se non passato resta com'era.
+    archived: input?.archived === undefined ? !!prev?.archived : !!input.archived,
     note: str(input?.note, 1000),
     createdAt: prev?.createdAt || null,
     updatedAt: null,
