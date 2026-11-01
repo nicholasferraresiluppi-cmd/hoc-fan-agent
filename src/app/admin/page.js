@@ -129,6 +129,7 @@ const SHORTCUT_GROUPS_RAW = [
     items: [
       { href: "/admin/scouting", title: "Radar creator", desc: "Le creator italiane trovate su Instagram: una scheda per persona, fasi dello scouting, crescita settimana per settimana", icon: Radar },
       { href: "/admin/ads", title: "Studio bio-funnel", desc: "Come lavorano gli altri sulla landing-ponte OF e cosa converte meglio: 112 landing reali analizzate + template per le creator", icon: Megaphone },
+      { href: "/admin/creator-ai", title: "Creator AI", desc: "Studi su Fanvue e mappa delle creator AI italiane con i loro profili. Sezione privata.", icon: Bot },
       { href: "/admin/studio-social", title: "Regia social", desc: "I profili social delle creator gestiti dalla redazione: identità, coda dei contenuti con i revisori, cosa fare oggi a mano", icon: Clapperboard },
       { href: "/admin/supervisor", title: "Account social", desc: "Account di promozione per creator e alterego, telefoni dei publisher, caselle mail e link in bio; password cifrate, viste una alla volta e registrate", icon: Share2 },
       { href: "/admin/warmup", title: "Clipping", desc: "I profili Instagram e X delle creator: il to-do di oggi (warm-up e contenuti da pubblicare), il calendario dei contenuti dal drive, segnalazioni, cooldown e numeri della settimana", icon: Sunrise },
