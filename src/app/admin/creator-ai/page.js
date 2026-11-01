@@ -120,7 +120,7 @@ export default function CreatorAiPage() {
   const open = tab || items[0]?.[0];
   const studio = studi.find((s) => s.id === open);
   return (
-    <div>
+    <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 16px 64px", fontFamily: FONTS.body }}>
       <PageHead title="Creator AI" subtitle={data?.aggiornato ? `Studi e mappature, aggiornati al ${data.aggiornato}` : "Studi e mappature"} />
       {isLoading && <p style={muted}>Caricamento…</p>}
       {error && <Notice danger>{error.message}</Notice>}
