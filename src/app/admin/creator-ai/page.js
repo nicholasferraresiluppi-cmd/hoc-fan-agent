@@ -27,6 +27,15 @@ function Ext({ href, children }) {
   return <a href={href} target="_blank" rel="noopener noreferrer" style={linkStyle}>{children}</a>;
 }
 
+// Una cella è testo, oppure { t, u, s }: testo, link e riga secondaria.
+function Cella({ v, primo }) {
+  const testo = v && typeof v === "object" ? v.t : v;
+  if (testo == null || testo === "") return "—";
+  const base = primo ? <span style={{ color: CP.textPrimary }}>{testo}</span> : testo;
+  if (!v || typeof v !== "object") return base;
+  return <span>{v.u ? <Ext href={v.u}>{testo}</Ext> : base}{v.s && <><br /><span style={muted}>{v.s}</span></>}</span>;
+}
+
 function Blocco({ b }) {
   if (b.tipo === "testo") return <p style={para}>{b.testo}</p>;
   if (b.tipo === "metriche") {
@@ -39,7 +48,7 @@ function Blocco({ b }) {
   if (b.tipo === "tabella") {
     const columns = b.colonne.map((c, i) => ({
       key: c.k, label: c.l, align: c.right ? "right" : undefined, sortable: false,
-      render: i === 0 ? (r) => <span style={{ color: CP.textPrimary }}>{r[c.k]}</span> : undefined,
+      render: (r) => <Cella v={r[c.k]} primo={i === 0} />,
     }));
     return (
       <div style={{ margin: "0 0 18px" }}>
