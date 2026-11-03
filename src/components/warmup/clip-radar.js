@@ -7,7 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { Bookmark, BookmarkCheck, Download, ExternalLink, Music, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { CP, alpha } from "@/lib/brand";
-import { Notice, NUM, FilterBar } from "@/components/ds";
+import { Notice, NUM, FilterBar, Tabs } from "@/components/ds";
+import ClipTrends from "@/components/warmup/clip-trends";
 import { confirmDialog } from "@/components/AppDialogs";
 import { btn, btnPrimary, btnSm, input, cardBox, hint, Seg, Chip, ModalBox, Field } from "@/components/warmup/ui";
 import { shortNum, ageLabel, profileUrl, timesLabel, isSmallBase } from "@/lib/clip-radar-core";
@@ -192,14 +193,26 @@ function ProfileRow({ p, onRemove, onLabel, busy }) {
 // Aggiungere un profilo è un'azione, non un filtro: pulsante + finestra con le sue scelte.
 const selSt = { ...input, width: "auto", fontSize: 13.5, padding: "7px 10px" };
 
+// Due schede (3/11): i video dei profili seguiti e i Trend (formati che girano su tanti account,
+// cercati per parola ogni settimana). Il paese vale per entrambe ed è ricordato per persona.
 export default function ClipRadar() {
+  // paese = la divisione principale («i meme sono diversi per country»), ricordata per persona
+  const [cf, setCfState] = useState(() => { try { return localStorage.getItem("hoc:clipradar:country") || "ita"; } catch { return "ita"; } });
+  const setCf = (v) => { setCfState(v); try { localStorage.setItem("hoc:clipradar:country", v); } catch {} };
+  const [view, setView] = useState("video");
+  return (
+    <div>
+      <Tabs small items={[["video", "Video dei profili"], ["trend", "Trend"]]} value={view} onChange={setView} />
+      {view === "trend" ? <ClipTrends cf={cf} setCf={setCf} /> : <RadarVideos cf={cf} setCf={setCf} />}
+    </div>
+  );
+}
+
+function RadarVideos({ cf, setCf }) {
   const { data, error, mutate } = useSWR(API, fetcher, {
     revalidateOnFocus: false,
     refreshInterval: (d) => (d?.profiles?.some((p) => p.reading) ? 6000 : 0),
   });
-  // paese = la divisione principale («i meme sono diversi per country»), ricordata per persona
-  const [cf, setCfState] = useState(() => { try { return localStorage.getItem("hoc:clipradar:country") || "ita"; } catch { return "ita"; } });
-  const setCf = (v) => { setCfState(v); try { localStorage.setItem("hoc:clipradar:country", v); } catch {} };
   const [pf, setPf] = useState("all");          // piattaforma
   const [who, setWho] = useState("all");        // all | ext | ours | id di un profilo
   const [period, setPeriod] = useState("7");    // 7 | 30 | saved
