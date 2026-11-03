@@ -7,14 +7,16 @@
 //
 // Chiavi:  clipradar:trends:queries  HASH id → { id, text, country, addedAt, addedBy }
 //          clipradar:trends:seeded   le ricerche di partenza sono già state messe (una volta sola)
-//          clipradar:trends:job      il giro in corso { startedAt, by, queries, runs: { tt, ig } }
-//          clipradar:trends:last     l'ultimo giro raccolto { at, formats, sounds, usd, errors, prev }
+//          clipradar:trends:job      il giro in corso { startedAt, by, queries, runs: { tt_eng, tt_ita, ig } }
+//          clipradar:trends:last     l'ultimo giro raccolto { at, formats, sounds, candidates, usd, errors }
+// TikTok cerca «da un paese» (proxyCountryCode): le ricerche inglesi come le vede un utente
+// americano, quelle italiane come un utente italiano. Un run per paese, Instagram uno solo.
 // La spesa va nello stesso tetto mensile del Radar (clipradar:spend:{YYYY-MM}).
 import { kv } from "@vercel/kv";
-import { apifyConfigured, capUsd, spentThisMonth, addSpend } from "@/lib/clip-radar";
+import { apifyConfigured, capUsd, spentThisMonth, addSpend, listProfiles } from "@/lib/clip-radar";
 import {
-  DEFAULT_QUERIES, MAX_QUERIES, PER_QUERY, TREND_PRICE, parseQuery, queryId, normalizeTrendRow,
-  buildTrends, prevSnapshot, trendBudget, trendsDue,
+  DEFAULT_QUERIES, MAX_QUERIES, PER_QUERY, TREND_PRICE, COUNTRY_ADDON, SEARCH_COUNTRY, parseQuery, queryId, normalizeTrendRow,
+  buildTrends, candidateAccounts, prevSnapshot, trendBudget, trendsDue,
 } from "@/lib/clip-trends-core";
 
 const API = "https://api.apify.com/v2";
@@ -29,7 +31,7 @@ const token = () => encodeURIComponent(process.env.APIFY_TOKEN);
 const parse = (v) => (typeof v === "string" ? JSON.parse(v) : v);
 
 // solo i campi che servono: i risultati TikTok completi pesano decine di KB l'uno
-const TT_FIELDS = "id,text,createTime,createTimeISO,webVideoUrl,playCount,diggCount,commentCount,shareCount,collectCount,isPinned,isSlideshow,searchQuery,authorMeta,musicMeta,videoMeta";
+const TT_FIELDS = "id,text,textLanguage,createTime,createTimeISO,webVideoUrl,playCount,diggCount,commentCount,shareCount,collectCount,isPinned,isSlideshow,searchQuery,authorMeta,musicMeta,videoMeta";
 const IG_FIELDS = "shortCode,type,productType,videoDuration,timestamp,ownerUsername,url,videoPlayCount,videoViewCount,likesCount,commentsCount,sharesCount,displayUrl,caption,musicInfo,isPinned,inputUrl,error";
 
 async function apify(path, init) {
@@ -88,14 +90,18 @@ export async function startTrends({ force = false, by = null } = {}) {
   const planned = trendBudget(queries.length);
   const spent = await spentThisMonth();
   if (spent + planned > capUsd()) return { skip: "cap", spent, planned, cap: capUsd() };
+  // TikTok: un run per paese (ricerche inglesi dagli USA, italiane dall'Italia); Instagram: uno solo
+  const byCountry = {};
+  for (const q of queries) (byCountry[q.country] ||= new Set()).add(q.text);
+  const ttUsd = (n) => Math.round((n * PER_QUERY.tt * (TREND_PRICE.tt + COUNTRY_ADDON) * 1.5 + 0.02) * 100) / 100;
   const texts = [...new Set(queries.map((q) => q.text))];
-  const half = Math.round((planned / 2) * 100) / 100;
-  const [tt, ig] = await Promise.all([
-    startRun(TT_ACTOR, { searchQueries: texts, resultsPerPage: PER_QUERY.tt, searchSection: "/video", shouldDownloadVideos: false, shouldDownloadCovers: false, shouldDownloadSubtitles: false, shouldDownloadSlideshowImages: false }, half).catch((e) => ({ error: e.message })),
-    startRun(IG_ACTOR, { hashtags: texts, keywordSearch: true, resultsType: "reels", resultsLimit: PER_QUERY.ig }, half).catch((e) => ({ error: e.message })),
-  ]);
-  if (tt.error && ig.error) throw new Error(tt.error);
-  await kv.set(JOB, { startedAt: Date.now(), by: by?.name || null, queries: queries.map((q) => q.id), runs: { tt, ig } });
+  const starts = Object.entries(byCountry).map(([c, set]) => [`tt_${c}`,
+    startRun(TT_ACTOR, { searchQueries: [...set], resultsPerPage: PER_QUERY.tt, searchSection: "/video", proxyCountryCode: SEARCH_COUNTRY[c] || "None", shouldDownloadVideos: false, shouldDownloadCovers: false, shouldDownloadSubtitles: false, shouldDownloadSlideshowImages: false }, ttUsd(set.size))]);
+  starts.push(["ig", startRun(IG_ACTOR, { hashtags: texts, keywordSearch: true, resultsType: "reels", resultsLimit: PER_QUERY.ig }, Math.round((texts.length * PER_QUERY.ig * TREND_PRICE.ig * 1.5 + 0.02) * 100) / 100)]);
+  const done = await Promise.all(starts.map(([k, pr]) => pr.then((r) => [k, r]).catch((e) => [k, { error: e.message }])));
+  const runs = Object.fromEntries(done);
+  if (Object.values(runs).every((r) => r.error)) throw new Error(Object.values(runs)[0].error);
+  await kv.set(JOB, { startedAt: Date.now(), by: by?.name || null, queries: queries.map((q) => q.id), runs });
   return { started: true, planned };
 }
 
@@ -119,20 +125,30 @@ export async function collectTrends() {
   if (!(await kv.set(`${JOB}:lock`, 1, { nx: true, ex: 120 }))) return { pending: true };
   try {
     const late = Date.now() - job.startedAt > JOB_MAX_MS;
-    const [tt, ig] = await Promise.all([runItems(job.runs?.tt, TT_FIELDS), runItems(job.runs?.ig, IG_FIELDS)]);
-    if ((!tt.done || !ig.done) && !late) return { pending: true };
-    const posts = [
-      ...(tt.items || []).map((r) => normalizeTrendRow(r, "tt")),
-      ...(ig.items || []).map((r) => normalizeTrendRow(r, "ig")),
-    ].filter(Boolean);
-    const usd = Math.round(((tt.items?.length || 0) * TREND_PRICE.tt + (ig.items?.length || 0) * TREND_PRICE.ig + 0.002) * 1000) / 1000;
+    // giri vecchi (prima del 3/11 sera) hanno «tt»; quelli nuovi «tt_eng», «tt_ita»
+    const keys = Object.keys(job.runs || {});
+    const res = await Promise.all(keys.map((k) => runItems(job.runs[k], k.startsWith("tt") ? TT_FIELDS : IG_FIELDS).then((r) => [k, r])));
+    if (res.some(([, r]) => !r.done) && !late) return { pending: true };
+    const posts = [], errors = [];
+    let usd = 0.002;
+    for (const [k, r] of res) {
+      const plat = k.startsWith("tt") ? "tt" : "ig";
+      for (const row of r.items || []) { const p = normalizeTrendRow(row, plat); if (p) posts.push(p); }
+      usd += (r.items?.length || 0) * (plat === "tt" ? TREND_PRICE.tt + COUNTRY_ADDON : TREND_PRICE.ig);
+      const name = k === "ig" ? "Instagram" : `TikTok ${k.slice(3).toUpperCase() || ""}`.trim();
+      if (r.error) errors.push(`${name}: ${r.error}`);
+      if (!r.done) errors.push(`${name}: non ha finito in tempo`);
+    }
+    usd = Math.round(usd * 1000) / 1000;
     await addSpend(usd);
     const queries = (await listQueries()).filter((q) => (job.queries || []).includes(q.id));
     const last = parse(await kv.get(LAST));
     const prev = last?.formats ? prevSnapshot(last.formats) : {};
-    const { formats, sounds } = buildTrends(queries, posts, prev, Date.now());
-    const errors = [tt.error && `TikTok: ${tt.error}`, ig.error && `Instagram: ${ig.error}`, (!tt.done || !ig.done) && "una ricerca non ha finito in tempo"].filter(Boolean);
-    await kv.set(LAST, { at: Date.now(), startedAt: job.startedAt, by: job.by, formats, sounds, usd, posts: posts.length, errors, prevAt: last?.at || null });
+    const now = Date.now();
+    const { formats, sounds } = buildTrends(queries, posts, prev, now);
+    const known = (await listProfilesSafe()).map((p) => p.id);
+    const candidates = candidateAccounts(posts, queries, known, now);
+    await kv.set(LAST, { at: now, startedAt: job.startedAt, by: job.by, formats, sounds, candidates, usd, posts: posts.length, errors, prevAt: last?.at || null });
     await kv.del(JOB);
     return { collected: true, posts: posts.length, usd };
   } finally {
@@ -148,11 +164,17 @@ export async function weeklyTrends() {
   return { collect: c, start: s };
 }
 
+const listProfilesSafe = () => listProfiles().catch(() => []);
+
 export async function loadTrends() {
-  const [queries, last, job, spent] = await Promise.all([listQueries(), kv.get(LAST), kv.get(JOB), spentThisMonth()]);
+  const [queries, last, job, spent, profiles] = await Promise.all([listQueries(), kv.get(LAST), kv.get(JOB), spentThisMonth(), listProfilesSafe()]);
   const j = parse(job);
+  const l = parse(last) || null;
+  // chi nel frattempo è entrato nel Radar non si propone più
+  const inRadar = new Set(profiles.map((p) => p.id));
+  if (l?.candidates) l.candidates = l.candidates.filter((c) => !inRadar.has(c.id));
   return {
-    queries, last: parse(last) || null,
+    queries, last: l,
     running: j ? { startedAt: j.startedAt, by: j.by } : null,
     spent: Math.round(spent * 100) / 100, cap: capUsd(), budget: trendBudget(queries.length),
   };

@@ -10,7 +10,7 @@ import { CP } from "@/lib/brand";
 import { Notice, NUM, FilterBar, EmptyState, SectionTitle } from "@/components/ds";
 import { confirmDialog } from "@/components/AppDialogs";
 import { btn, btnPrimary, btnSm, input, cardBox, hint, Seg, Chip, ModalBox, Field } from "@/components/warmup/ui";
-import { shortNum, ageLabel } from "@/lib/clip-radar-core";
+import { shortNum, ageLabel, profileUrl } from "@/lib/clip-radar-core";
 import { HIT_VIEWS, SMALL_ACCOUNT, TREND_DAYS } from "@/lib/clip-trends-core";
 import HeroHead, { BigNum } from "@/components/HeroHead";
 
@@ -88,6 +88,30 @@ function FormatCard({ f }) {
   );
 }
 
+// Un profilo proposto: chi ha fatto numeri con i formati cercati e il Radar non segue ancora.
+function CandidateRow({ c, busy, onAdd }) {
+  const [broken, setBroken] = useState(false);
+  const b = c.best || {};
+  return (
+    <div style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
+      <a href={b.url} target="_blank" rel="noopener noreferrer" style={{ flex: "0 0 auto", width: 54, aspectRatio: "9 / 16", borderRadius: 8, overflow: "hidden", background: CP.surfaceAlt, display: "grid", placeItems: "center", color: CP.textMuted }} title="Il suo video migliore">
+        {b.cover && !broken ? <img src={b.cover} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <Play size={16} />}
+      </a>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <a href={profileUrl({ platform: c.platform, handle: c.handle })} target="_blank" rel="noopener noreferrer" style={{ fontSize: 14.5, fontWeight: 500, color: CP.textPrimary, textDecoration: "none" }}>@{c.handle}</a>
+          <span style={{ ...hint, fontSize: 12.5 }}>{c.platform === "tt" ? "TikTok" : "Instagram"}{c.fans != null ? ` · ${shortNum(c.fans)} follower` : ""}</span>
+          {c.fans != null && c.fans < SMALL_ACCOUNT && <Chip color={CP.accentGreen} title={`Sotto i ${shortNum(SMALL_ACCOUNT)} follower: i numeri li fa il formato, non il profilo`}>profilo piccolo</Chip>}
+        </div>
+        <div style={{ ...hint, fontSize: 12.5, ...NUM }}>
+          {shortNum(b.views)} visualizzazioni{b.postedAt ? ` · ${ageLabel(ageH(b.postedAt))} fa` : ""}{c.hits > 1 ? ` · ${c.hits} video sopra le ${shortNum(HIT_VIEWS)}` : ""}{c.shareRate != null ? ` · ${pct(c.shareRate)} condivisioni` : ""} · da «{c.queries.join("», «")}»
+        </div>
+      </div>
+      <button type="button" style={{ ...btnSm, flex: "0 0 auto" }} disabled={busy} onClick={() => onAdd(c)}><Plus size={13} />Aggiungi al Radar</button>
+    </div>
+  );
+}
+
 function SoundRow({ s }) {
   const top = s.examples?.[0];
   return (
@@ -125,6 +149,10 @@ export default function ClipTrends({ cf, setCf }) {
   const empty = formats.filter((f) => f.found === 0);
   const sounds = (data.last?.sounds || []).filter(inC);
   const live = formats.filter(isLive).length;
+  const candidates = (data.last?.candidates || []).filter(inC);
+  const follow = async (c) => {
+    await run(`add:${c.id}`, { action: "add", text: c.handle, platform: c.platform, country: c.country || (cf === "all" ? "eng" : cf) }, (r) => (r.exists ? `@${c.handle} è già nel Radar.` : `@${c.handle} aggiunto al Radar: leggo i suoi video (meno di un minuto), li trovi in «Video dei profili».`));
+  };
   const where = cf === "ita" ? "in Italia" : cf === "eng" ? "in inglese" : null;
   const when = (ts) => new Date(ts).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   const refresh = () => run("refresh", { action: "trend_refresh" }, () => "Ricerche partite: i risultati arrivano in pochi minuti, la pagina si aggiorna da sola.");
@@ -149,7 +177,7 @@ export default function ClipTrends({ cf, setCf }) {
         numbers={<>
           <BigNum label="Ricerche" value={queries.length} />
           <BigNum label="Vivi adesso" value={live} strong title={`Formati con almeno ${LIVE_HITS} account diversi sopra le ${shortNum(HIT_VIEWS)} negli ultimi ${TREND_DAYS} giorni`} />
-          <BigNum label="Audio che tornano" value={sounds.length} />
+          <BigNum label="Profili da seguire" value={candidates.length} title="Account che hanno fatto numeri con questi formati e il Radar non segue ancora" />
         </>}
         actions={<button type="button" style={btnPrimary} onClick={() => setAdding({ text: "", country: cf === "all" ? "eng" : cf })}><Plus size={15} />Aggiungi ricerca</button>} />
       {!data.configured && <Notice danger>Apify non è configurato sul server: le ricerche non possono partire.</Notice>}
@@ -173,6 +201,13 @@ export default function ClipTrends({ cf, setCf }) {
         </EmptyState>
       ) : (
         withResults.map((f) => <FormatCard key={f.id} f={f} />)
+      )}
+
+      {candidates.length > 0 && (
+        <div style={{ ...cardBox, marginTop: 4 }}>
+          <SectionTitle aside="hanno fatto numeri con questi formati e il Radar non li segue ancora">Profili da seguire · {candidates.length}</SectionTitle>
+          {candidates.map((c) => <CandidateRow key={c.id} c={c} busy={!!busy} onAdd={follow} />)}
+        </div>
       )}
 
       {sounds.length > 0 && (
@@ -203,7 +238,7 @@ export default function ClipTrends({ cf, setCf }) {
       <details style={{ marginTop: 12 }}>
         <summary style={{ cursor: "pointer", ...hint, fontSize: 13 }}>Come si leggono i numeri · ricerche una volta a settimana{data.last?.at ? `, l'ultima ${when(data.last.at)}` : ""}</summary>
         <p style={{ ...hint, margin: "8px 0", maxWidth: 820 }}>
-          Per ogni ricerca prendiamo i video più popolari su TikTok (30) e Instagram (20) e contiamo gli ACCOUNT, non i video: «12 account sopra le {shortNum(HIT_VIEWS)}» vuol dire dodici profili diversi che nell&apos;ultimo mese ci hanno fatto almeno {shortNum(HIT_VIEWS)} visualizzazioni. Un video virale da solo può essere un caso; dieci account diversi sono un formato che funziona. «Vivo adesso» = almeno {LIVE_HITS}. Le condivisioni contano più dei like: i meme di coppia si mandano al fidanzato o all&apos;amica, ed è così che un profilo nuovo arriva a chi non lo segue. «Da account piccoli» = profili sotto i {shortNum(SMALL_ACCOUNT)} follower (solo TikTok li dice): lì il merito è del formato. «In salita / in calo» confronta con il giro della settimana prima. Le copertine scadono dopo qualche giorno: il video si apre comunque dal link. Spesa del mese (Radar e Trend insieme) ~{String(data.spent).replace(".", ",")} $ su un tetto di {data.cap} $.
+          Per ogni ricerca prendiamo i video più popolari su TikTok (30, cercati come li vede un utente americano per le ricerche in inglese e italiano per quelle in italiano) e Instagram (20) e contiamo gli ACCOUNT, non i video: «12 account sopra le {shortNum(HIT_VIEWS)}» vuol dire dodici profili diversi che nell&apos;ultimo mese ci hanno fatto almeno {shortNum(HIT_VIEWS)} visualizzazioni. Un video virale da solo può essere un caso; dieci account diversi sono un formato che funziona. «Vivo adesso» = almeno {LIVE_HITS}. Le condivisioni contano più dei like: i meme di coppia si mandano al fidanzato o all&apos;amica, ed è così che un profilo nuovo arriva a chi non lo segue. «Da account piccoli» = profili sotto i {shortNum(SMALL_ACCOUNT)} follower (solo TikTok li dice): lì il merito è del formato. «Profili da seguire» = gli account che in queste ricerche hanno un video sopra le {shortNum(HIT_VIEWS)} e che il Radar non segue ancora (su TikTok solo chi scrive nella lingua del paese): si aggiungono con un clic, non da soli, perché nelle ricerche escono anche pagine fuori nicchia. «In salita / in calo» confronta con il giro della settimana prima. Le copertine scadono dopo qualche giorno: il video si apre comunque dal link. Spesa del mese (Radar e Trend insieme) ~{String(data.spent).replace(".", ",")} $ su un tetto di {data.cap} $.
         </p>
         {data.last && refreshBtn}
       </details>

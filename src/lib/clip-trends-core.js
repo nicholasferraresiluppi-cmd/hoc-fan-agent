@@ -27,6 +27,11 @@ export const MAX_QUERIES = 20;
 export const PER_QUERY = { tt: 30, ig: 20 };
 export const TREND_PRICE = { tt: 0.0023, ig: 0.0021 }; // $ a risultato (listino Apify, tier attuale)
 export const REFRESH_DAYS = 7;
+export const MAX_CANDIDATES = 30;
+// la lingua del testo (TikTok la dice) per tenere i profili proposti nel mercato giusto
+const LANG = { eng: "en", ita: "it" };
+// da dove si fa la ricerca TikTok: quello che vede un utente americano o italiano (proxyCountryCode)
+export const SEARCH_COUNTRY = { eng: "US", ita: "IT" };
 
 // Le ricerche di partenza: i formati trovati a mano il 3/11 (inglese) e i loro equivalenti italiani,
 // da correggere dalla pagina. Le ricerche sono il «dove guardare»: si aggiungono e tolgono lì.
@@ -66,6 +71,7 @@ export function normalizeTrendRow(row, platform) {
     const v = normalizeTt(row);
     if (!v || v.slideshow) return null;
     return { ...v, query: parseQuery(row.searchQuery), fans: num(row.authorMeta?.fans),
+      lang: row.textLanguage ? String(row.textLanguage).slice(0, 5).toLowerCase() : null,
       soundId: row.musicMeta?.musicId ? `tt:${row.musicMeta.musicId}` : null };
   }
   const v = normalizeIg(row);
@@ -165,11 +171,54 @@ export function buildTrends(queries, posts, prev = {}, now = Date.now()) {
   return { formats, sounds };
 }
 
+/**
+ * Profili da seguire (3/11, Nicholas: «tirarne fuori altri in automatico, per capire che trend ci
+ * sono sul mercato americano»): gli account che nelle ricerche della settimana hanno fatto numeri
+ * con i formati cercati, e che il Radar non segue ancora. Si PROPONGONO, non si aggiungono da soli:
+ * nelle ricerche per parola escono anche pagine fuori nicchia (lifestyle, film, altri paesi) e un
+ * clic umano costa meno di un Radar pieno di rumore. Su TikTok si scarta chi scrive in un'altra
+ * lingua rispetto al paese della ricerca. Ordine: video sopra le 50 mila, ricerche diverse in cui
+ * compare (lo stesso account su più formati = pagina del genere), poi il video migliore.
+ */
+export function candidateAccounts(posts, queries, known = [], now = Date.now()) {
+  const countryOf = new Map((queries || []).map((q) => [q.text, q.country]));
+  const skip = new Set(known || []);
+  const by = new Map();
+  for (const p of posts || []) {
+    if (!p?.owner || !p.postedAt || now - p.postedAt > TREND_DAYS * DAY) continue;
+    const id = `${p.platform}:${p.owner}`;
+    if (skip.has(id)) continue;
+    const country = countryOf.get(p.query) || null;
+    if (p.platform === "tt" && p.lang && country && !p.lang.startsWith(LANG[country])) continue;
+    const a = by.get(id) || { id, platform: p.platform, handle: p.owner, country, fans: null, posts: [], queries: new Set() };
+    a.posts.push(p); a.queries.add(p.query);
+    if (p.fans != null) a.fans = p.fans;
+    by.set(id, a);
+  }
+  return [...by.values()].map((a) => {
+    const hits = a.posts.filter((p) => (p.views ?? 0) >= HIT_VIEWS).length;
+    const best = a.posts.reduce((m, p) => ((p.views ?? -1) > (m.views ?? -1) ? p : m));
+    const ws = a.posts.filter((p) => p.shares != null && p.views);
+    const sv = ws.reduce((x, p) => x + p.views, 0);
+    return {
+      id: a.id, platform: a.platform, handle: a.handle, country: a.country, fans: a.fans,
+      hits, videos: a.posts.length, queries: [...a.queries].filter(Boolean),
+      shareRate: sv >= 10_000 ? Math.round((ws.reduce((x, p) => x + p.shares, 0) / sv) * 1000) / 10 : null,
+      best: { url: best.url, views: best.views, cover: best.cover, caption: best.caption, postedAt: best.postedAt },
+    };
+  })
+    .filter((a) => a.hits >= 1)
+    .sort((x, y) => (y.hits - x.hits) || (y.queries.length - x.queries.length) || ((y.best.views ?? 0) - (x.best.views ?? 0)))
+    .slice(0, MAX_CANDIDATES);
+}
+
 /** Il riassunto per ricerca da tenere per la settimana dopo (solo i numeri che servono a `heat`). */
 export const prevSnapshot = (formats) => Object.fromEntries((formats || []).map((f) => [f.id, { hits: f.hits, accounts: f.accounts, medianViews: f.medianViews }]));
 
 /** Tetto di spesa di un giro: risultati attesi × prezzo × 1,5 + avvii. */
-export const trendBudget = (nQueries) => Math.round((nQueries * (PER_QUERY.tt * TREND_PRICE.tt + PER_QUERY.ig * TREND_PRICE.ig) * 1.5 + 0.05) * 100) / 100;
+// TikTok da un paese costa un supplemento a risultato (add-on «Scrape as in country»)
+export const COUNTRY_ADDON = 0.0008;
+export const trendBudget = (nQueries) => Math.round((nQueries * (PER_QUERY.tt * (TREND_PRICE.tt + COUNTRY_ADDON) + PER_QUERY.ig * TREND_PRICE.ig) * 1.5 + 0.08) * 100) / 100;
 
 /** Il giro va fatto? Una volta a settimana, o subito se non c'è mai stato. */
 export const trendsDue = (last, now) => !last?.at || now - last.at >= (REFRESH_DAYS - 0.5) * DAY;
