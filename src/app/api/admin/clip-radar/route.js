@@ -7,6 +7,9 @@
 // POST {action:"label", id, label, note} nome e nota per chi pubblica
 // POST {action:"save", videoId, on, note}  salva / toglie un video dalle idee
 // POST {action:"refresh"}               rilegge tutti i profili adesso (una volta l'ora al massimo)
+// GET ?trends=1                         Trend: ricerche, ultimo giro (raccoglie quello in corso se è finito)
+// POST {action:"trend_add", text, country} / {action:"trend_remove", id}   ricerche dei trend
+// POST {action:"trend_refresh"}         avvia subito il giro delle ricerche (al massimo ogni 12 ore)
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
@@ -16,6 +19,7 @@ import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { parseProfileInput, profileStats, scoreVideo, runBudget, MAX_PROFILES } from "@/lib/clip-radar-core";
 import { loadAll, addProfile, removeProfile, updateProfile, toggleSaved, readProfiles, listProfiles, apifyConfigured, syncOurProfiles, videoChunk } from "@/lib/clip-radar";
+import { loadTrends, collectTrends, startTrends, addQuery, removeQuery } from "@/lib/clip-trends";
 
 const noStore = { headers: { "Cache-Control": "no-store" } };
 
@@ -31,6 +35,10 @@ export async function GET(request) {
   const g = await gate();
   if (g.err) return g.err;
   const sp = new URL(request.url).searchParams;
+  if (sp.get("trends")) {
+    if (apifyConfigured()) await collectTrends().catch(() => {});
+    return Response.json({ configured: apifyConfigured(), ...(await loadTrends()) }, noStore);
+  }
   if (sp.get("media")) {
     const c = await videoChunk(String(sp.get("p") || ""), String(sp.get("media")), request.headers.get("range"));
     if (!c) return Response.json({ error: "Video non disponibile per il download" }, { status: 404 });
@@ -108,6 +116,27 @@ export async function POST(request) {
       const res = await readProfiles(profiles);
       if (res.skip === "cap") return bad(`Tetto di spesa del mese raggiunto (${res.cap} $): si riparte il mese prossimo`, 429);
       return Response.json({ ok: true, result: res });
+    }
+    if (body.action === "trend_add") {
+      const r = await addQuery({ text: body.text, country: body.country }, g.by);
+      return Response.json({ ok: true, ...r });
+    }
+    if (body.action === "trend_remove") {
+      if (!body.id) return bad("Manca la ricerca");
+      await removeQuery(String(body.id));
+      return Response.json({ ok: true });
+    }
+    if (body.action === "trend_refresh") {
+      if (!apifyConfigured()) return bad("Apify non è configurato sul server", 503);
+      const lock = await kv.set("clipradar:trends:manual", Date.now(), { nx: true, ex: 12 * 3600 });
+      if (!lock) return bad("Le ricerche sono già partite nelle ultime 12 ore: i trend cambiano in giorni, non in ore", 429);
+      // se il giro non parte, il blocco delle 12 ore non deve restare: si può riprovare subito
+      const r = await startTrends({ force: true, by: g.by }).catch(async (e) => { await kv.del("clipradar:trends:manual"); throw e; });
+      if (!r.started) await kv.del("clipradar:trends:manual");
+      if (r.skip === "cap") return bad(`Tetto di spesa del mese raggiunto (${r.cap} $): si riparte il mese prossimo`, 429);
+      if (r.busy) return bad("Un giro di ricerche è già in corso: i risultati arrivano in pochi minuti", 409);
+      if (!r.started) return bad("Le ricerche non sono partite: controlla che ci sia almeno una ricerca", 400);
+      return Response.json({ ok: true, ...r });
     }
     return bad("Azione sconosciuta");
   } catch (e) {

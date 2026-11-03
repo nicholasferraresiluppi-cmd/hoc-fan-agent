@@ -26,9 +26,12 @@ const SPEND = (m) => `clipradar:spend:${m}`;
 const LOOKBACK_DAYS = 30;
 
 export const apifyConfigured = () => Boolean(process.env.APIFY_TOKEN);
-const capUsd = () => Number(process.env.CLIP_RADAR_CAP_USD) || 40;
+export const capUsd = () => Number(process.env.CLIP_RADAR_CAP_USD) || 40;
 const romeDay = (ts) => new Date(ts).toLocaleDateString("en-CA", { timeZone: "Europe/Rome" });
 const month = (ts) => romeDay(ts).slice(0, 7);
+// la spesa del mese è una sola per Radar e Trend (clip-trends.js): un tetto unico
+export const spentThisMonth = async () => Number(await kv.get(SPEND(month(Date.now())))) || 0;
+export const addSpend = (usd) => (usd ? kv.incrbyfloat(SPEND(month(Date.now())), usd).then(() => kv.expire(SPEND(month(Date.now())), 120 * 86400)).catch(() => {}) : Promise.resolve());
 const since = () => new Date(Date.now() - LOOKBACK_DAYS * 86_400_000).toISOString().slice(0, 10);
 
 async function runSync(actor, input, { maxUsd, timeout = 280 }) {
