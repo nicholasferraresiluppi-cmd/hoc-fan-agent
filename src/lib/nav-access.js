@@ -42,6 +42,8 @@ export const NAV_ACCESS = {
   "/contabilita": { type: "accounting" },
   // Creator AI (01/11/2026): solo il titolare, più stretto della Contabilità (lib/creator-ai-access)
   "/admin/creator-ai": { type: "owner" },
+  // Presenze Discord (03/11/2026): titolare + persone in env HOC_PRESENZE_VIEWER_IDS (lib/presenze-access)
+  "/admin/presenze-discord": { type: "presenze" },
   // report Looker aziendale: serve un account Google HOC con accesso al report (non gli operatori)
   "/admin/reports": all("scores.view"),
   // Analisi vendite, HOC Analytics, Fan da recuperare: authorizeScoped(ANALYTICS_VIEW) + creator assegnate
@@ -54,6 +56,7 @@ export function canSee(href, caps, isAdmin) {
   if (!req || req.type === "any") return true;
   if (req.type === "accounting") return Boolean(caps?.["accounting.private"]); // prima dell'admin: l'admin qui non basta
   if (req.type === "owner") return Boolean(caps?.["owner.private"]);
+  if (req.type === "presenze") return Boolean(caps?.["presenze.private"]);
   if (isAdmin) return true;
   if (req.type === "admin") return false;
   const scope = caps?.[req.cap];
@@ -64,4 +67,4 @@ export function canSee(href, caps, isAdmin) {
 }
 
 /** Voci da NON mostrare nemmeno mentre i permessi si caricano (contabilità): finché non si sa chi sei, non ci sono. */
-export const isPrivateHref = (href) => ["accounting", "owner"].includes(NAV_ACCESS[href]?.type);
+export const isPrivateHref = (href) => ["accounting", "owner", "presenze"].includes(NAV_ACCESS[href]?.type);

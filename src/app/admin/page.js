@@ -10,7 +10,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { useUser } from "@clerk/nextjs";
-import {
+import { Headphones,
   Trophy, BarChart3, DollarSign, Users, Flame, Swords, HeartHandshake,
   GraduationCap, ClipboardCheck, Target, Brain, Award,
   LayoutDashboard, UserCog, Sparkles, Bot,
@@ -143,6 +143,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/cm-cockpit",              title: "Cockpit CM",    desc: "Turno di supervisione: team live, soglie, override shadow", icon: Gauge },
       { href: "/contabilita",             title: "Contabilità", desc: "Compensi del team per mese: fissi e gamification (minimo garantito o % sulle revenue, dollaro→euro), chi è pagato, dati di pagamento cifrati. Visibile solo a chi ha l'accesso contabilità", icon: Landmark },
       { href: "/admin/hr",                title: "Persone · Area Partner", desc: "CRM persone (HOC Pro è il master): anagrafica, rapporto, contratto, documenti e storico, sincronizzato con la lista HR di ClickUp; link di compilazione per la persona", icon: BookUser },
+      { href: "/admin/presenze-discord",  title: "Presenze Discord", desc: "Chi è stato nelle stanze vocali del server Discord, quanto e con chi, giornata dalle 5 alle 5; storico per persona e per mansione. Visibile solo a chi ha l'accesso", icon: Headphones },
       { href: "/admin/hr/contratti",      title: "Controllo contratti", desc: "Contratti da Dropbox Sign confrontati con le schede: chi ce l'ha, chi no, chi ha cambiato mansione e serve un contratto nuovo; PDF firmati allegati su ClickUp", icon: FileSignature },
       { href: "/admin/referral",          title: "Porta un amico", desc: "Programma referral: chi ha portato chi, a che punto è ogni persona (colloquio, formazione, primo turno, 3 mesi), premi e percentuali sul venduto Infloww, cosa va pagato", icon: Gift },
       { href: "/admin/hr/sync",           title: "Sincronizzazione ClickUp", desc: "Lista configurata, webhook, ultimo import, conflitti: import completo e registrazione webhook", icon: RefreshCw },

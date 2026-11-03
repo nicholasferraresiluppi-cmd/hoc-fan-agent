@@ -26,7 +26,7 @@ import useSWR from "swr";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
 import { useTheme } from "@/lib/theme-client";
 import { UserButton, SignedIn } from "@clerk/nextjs";
-import {
+import { Headphones,
   Landmark, ArrowLeftRight, Send, Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown, HeartHandshake,
   GraduationCap, BookOpen, BookMarked, ClipboardCheck, Target, Brain, Award,
   LayoutDashboard, UserCog, Sparkles, Radar, Bot,
@@ -167,6 +167,7 @@ const NAV_GROUPS_RAW = [
     items: [
       { href: "/cm-cockpit",                     label: "Cockpit CM",   icon: Gauge },
       { href: "/admin/hr",                       label: "Persone",      icon: BookUser },
+      { href: "/admin/presenze-discord",         label: "Presenze Discord", icon: Headphones },
       { href: "/contabilita",                    label: "Contabilità",  icon: Landmark },
       { href: "/admin/hr/contratti",             label: "Contratti",    icon: FileSignature },
       { href: "/admin/hr/sync",                  label: "Sincronizzazione ClickUp", icon: RefreshCw },
