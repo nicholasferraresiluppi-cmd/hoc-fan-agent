@@ -93,11 +93,13 @@ export async function startTrends({ force = false, by = null } = {}) {
   // TikTok: un run per paese (ricerche inglesi dagli USA, italiane dall'Italia); Instagram: uno solo
   const byCountry = {};
   for (const q of queries) (byCountry[q.country] ||= new Set()).add(q.text);
-  const ttUsd = (n) => Math.round((n * PER_QUERY.tt * (TREND_PRICE.tt + COUNTRY_ADDON) * 1.5 + 0.02) * 100) / 100;
+  // Apify rifiuta un run con tetto sotto 0,50 $ (3/11: la ricerca TikTok ITA con 3 ricerche non partiva)
+  const cap = (usd) => Math.max(0.5, Math.round(usd * 100) / 100);
+  const ttUsd = (n) => cap(n * PER_QUERY.tt * (TREND_PRICE.tt + COUNTRY_ADDON) * 1.5 + 0.02);
   const texts = [...new Set(queries.map((q) => q.text))];
   const starts = Object.entries(byCountry).map(([c, set]) => [`tt_${c}`,
     startRun(TT_ACTOR, { searchQueries: [...set], resultsPerPage: PER_QUERY.tt, searchSection: "/video", proxyCountryCode: SEARCH_COUNTRY[c] || "None", shouldDownloadVideos: false, shouldDownloadCovers: false, shouldDownloadSubtitles: false, shouldDownloadSlideshowImages: false }, ttUsd(set.size))]);
-  starts.push(["ig", startRun(IG_ACTOR, { hashtags: texts, keywordSearch: true, resultsType: "reels", resultsLimit: PER_QUERY.ig }, Math.round((texts.length * PER_QUERY.ig * TREND_PRICE.ig * 1.5 + 0.02) * 100) / 100)]);
+  starts.push(["ig", startRun(IG_ACTOR, { hashtags: texts, keywordSearch: true, resultsType: "reels", resultsLimit: PER_QUERY.ig }, cap(texts.length * PER_QUERY.ig * TREND_PRICE.ig * 1.5 + 0.02))]);
   const done = await Promise.all(starts.map(([k, pr]) => pr.then((r) => [k, r]).catch((e) => [k, { error: e.message }])));
   const runs = Object.fromEntries(done);
   if (Object.values(runs).every((r) => r.error)) throw new Error(Object.values(runs)[0].error);

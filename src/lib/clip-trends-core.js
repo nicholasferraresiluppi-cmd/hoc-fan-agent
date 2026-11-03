@@ -28,6 +28,8 @@ export const PER_QUERY = { tt: 30, ig: 20 };
 export const TREND_PRICE = { tt: 0.0023, ig: 0.0021 }; // $ a risultato (listino Apify, tier attuale)
 export const REFRESH_DAYS = 7;
 export const MAX_CANDIDATES = 30;
+// oltre questi follower (solo TikTok li dice) è una pagina media o una celebrità, non una pagina da cui imparare il formato
+export const BIG_ACCOUNT = 1_000_000;
 // la lingua del testo (TikTok la dice) per tenere i profili proposti nel mercato giusto
 const LANG = { eng: "en", ita: "it" };
 // da dove si fa la ricerca TikTok: quello che vede un utente americano o italiano (proxyCountryCode)
@@ -190,6 +192,7 @@ export function candidateAccounts(posts, queries, known = [], now = Date.now()) 
     if (skip.has(id)) continue;
     const country = countryOf.get(p.query) || null;
     if (p.platform === "tt" && p.lang && country && !p.lang.startsWith(LANG[country])) continue;
+    if (p.fans != null && p.fans > BIG_ACCOUNT) continue;
     const a = by.get(id) || { id, platform: p.platform, handle: p.owner, country, fans: null, posts: [], queries: new Set() };
     a.posts.push(p); a.queries.add(p.query);
     if (p.fans != null) a.fans = p.fans;
