@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import {
   parseQuery, queryId, igQueryFromUrl, normalizeTrendRow, summarize, heat, buildTrends, prevSnapshot,
-  trendBudget, trendsDue, HIT_VIEWS, DEFAULT_QUERIES,
+  trendBudget, trendsDue, HIT_VIEWS, DEFAULT_QUERIES, candidateAccounts, SEARCH_COUNTRY, COUNTRY_ADDON,
 } from "../src/lib/clip-trends-core.js";
 
 let n = 0;
@@ -89,7 +89,34 @@ eq(t2.formats.find((f) => f.id === "ita:io quando lui").heat, "stabile", "zero e
 eq(buildTrends([{ id: "eng:new", text: "new", country: "eng" }], [], snap, NOW).formats[0].heat, "nuovo", "ricerca aggiunta in settimana");
 
 // --- spesa e cadenza
-eq(trendBudget(9), Math.round((9 * (30 * 0.0023 + 20 * 0.0021) * 1.5 + 0.05) * 100) / 100, "tetto del giro");
+eq(trendBudget(9), Math.round((9 * (30 * (0.0023 + COUNTRY_ADDON) + 20 * 0.0021) * 1.5 + 0.08) * 100) / 100, "tetto del giro (con TikTok da un paese)");
+eq(SEARCH_COUNTRY, { eng: "US", ita: "IT" }, "inglese dagli USA, italiano dall'Italia");
+
+// --- profili da seguire
+const ttl = (id, owner, views, daysAgo, q, lang, fans = 3000) => normalizeTrendRow({ ...tt(id, owner, views, daysAgo, { q, fans }), textLanguage: lang }, "tt");
+eq(ttl("x", "a", 1, 1, "me when him", "en").lang, "en", "lingua del testo TikTok");
+const cposts = [
+  ttl("50", "usa1", 300_000, 2, "me when him", "en", 4000),
+  ttl("51", "usa1", 90_000, 5, "boyfriend meme", "en", 4000),    // stesso account su due formati
+  ttl("52", "usa2", 2_000_000, 3, "me when him", "en", 900_000),
+  ttl("53", "spagna", 800_000, 3, "me when him", "es"),            // lingua sbagliata per una ricerca inglese
+  ttl("54", "ita1", 120_000, 4, "io quando lui", "it"),
+  ttl("55", "piccolo", 20_000, 2, "me when him", "en"),            // sotto la soglia: non si propone
+  ttl("56", "vecchio", 5_000_000, 90, "me when him", "en"),        // fuori dagli ultimi 30 giorni
+  ttl("57", "giaseguito", 700_000, 2, "me when him", "en"),
+  normalizeTrendRow({ shortCode: "Ig1", type: "Video", ownerUsername: "igpage", videoPlayCount: 150_000, timestamp: iso(3),
+    inputUrl: "https://www.instagram.com/explore/search/keyword/?q=me%20when%20him" }, "ig"),
+];
+const cand = candidateAccounts(cposts, queries, ["tt:giaseguito"], NOW);
+eq(cand.map((c) => c.id), ["tt:usa1", "tt:usa2", "ig:igpage", "tt:ita1"], "ordine: più video sopra soglia, poi più formati, poi il video migliore");
+eq(cand[0].queries, ["me when him", "boyfriend meme"], "le ricerche in cui compare");
+eq([cand[0].hits, cand[0].videos, cand[0].fans, cand[0].country], [2, 2, 4000, "eng"], "numeri del profilo");
+eq(cand[0].best.views, 300_000, "il suo video migliore");
+eq(cand.find((c) => c.id === "tt:ita1").country, "ita", "paese dalla ricerca");
+ok(!cand.some((c) => c.id === "tt:spagna"), "scarta chi scrive in un'altra lingua");
+ok(!cand.some((c) => c.id === "tt:giaseguito"), "scarta chi è già nel Radar");
+ok(!cand.some((c) => ["tt:piccolo", "tt:vecchio"].includes(c.id)), "scarta sotto soglia e vecchi");
+eq(candidateAccounts([], queries, [], NOW), [], "niente post, niente profili");
 ok(trendsDue(null, NOW), "mai fatto: sì");
 ok(!trendsDue({ at: NOW - 2 * D }, NOW), "2 giorni fa: no");
 ok(trendsDue({ at: NOW - 7 * D }, NOW), "una settimana fa: sì");
