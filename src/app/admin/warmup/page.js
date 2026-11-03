@@ -815,7 +815,8 @@ export default function WarmupPage() {
       const bits = g.rows.map((r) => ({ ...r, ...taskBits(r.a, r.item, r.done, tk) }));
       return { ...g, bits, open: bits.filter((b) => !b.on).length };
     });
-    const req = all.filter((g) => !g.item.opt && g.open).sort((x, y) => y.open - x.open);
+    // Ordine del piano, fisso: una card scende tra le «già fatte» solo quando è spuntata su TUTTI i profili.
+    const req = all.filter((g) => !g.item.opt && g.open);
     const opt = all.filter((g) => g.item.opt && g.open);
     const doneAll = all.filter((g) => !g.open);
     const rich = (item) => Boolean(item.timer) || Boolean(pubKindOfTask(item.id));
@@ -857,8 +858,8 @@ export default function WarmupPage() {
             {extras.map((x) => <div key={x.a.id} style={{ ...cardBox, padding: 0, marginBottom: 10 }}><div style={{ padding: "10px 14px 0", fontSize: 14, fontWeight: 500 }}>{x.a.username}</div>{x.el}</div>)}
           </>
         )}
-        {opt.length > 0 && <Fold title={`${opt.length} ${opt.length === 1 ? "azione facoltativa" : "azioni facoltative"}`}>{opt.map(card)}</Fold>}
         {doneAll.length > 0 && <Fold title={`${doneAll.length} ${doneAll.length === 1 ? "azione già fatta" : "azioni già fatte"} su tutti i profili`}>{doneAll.map(card)}</Fold>}
+        {opt.length > 0 && <Fold title={`${opt.length} ${opt.length === 1 ? "azione facoltativa" : "azioni facoltative"}`}>{opt.map(card)}</Fold>}
       </>
     );
   }
