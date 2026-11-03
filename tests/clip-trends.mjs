@@ -104,6 +104,7 @@ const cposts = [
   ttl("55", "piccolo", 20_000, 2, "me when him", "en"),            // sotto la soglia: non si propone
   ttl("56", "vecchio", 5_000_000, 90, "me when him", "en"),        // fuori dagli ultimi 30 giorni
   ttl("57", "giaseguito", 700_000, 2, "me when him", "en"),
+  ttl("58", "mediapage", 12_000_000, 2, "me when him", "en", 12_600_000), // pagina enorme: non è una pagina di clipping
   normalizeTrendRow({ shortCode: "Ig1", type: "Video", ownerUsername: "igpage", videoPlayCount: 150_000, timestamp: iso(3),
     inputUrl: "https://www.instagram.com/explore/search/keyword/?q=me%20when%20him" }, "ig"),
 ];
@@ -115,6 +116,7 @@ eq(cand[0].best.views, 300_000, "il suo video migliore");
 eq(cand.find((c) => c.id === "tt:ita1").country, "ita", "paese dalla ricerca");
 ok(!cand.some((c) => c.id === "tt:spagna"), "scarta chi scrive in un'altra lingua");
 ok(!cand.some((c) => c.id === "tt:giaseguito"), "scarta chi è già nel Radar");
+ok(!cand.some((c) => c.id === "tt:mediapage"), "scarta le pagine sopra il milione di follower");
 ok(!cand.some((c) => ["tt:piccolo", "tt:vecchio"].includes(c.id)), "scarta sotto soglia e vecchi");
 eq(candidateAccounts([], queries, [], NOW), [], "niente post, niente profili");
 ok(trendsDue(null, NOW), "mai fatto: sì");
