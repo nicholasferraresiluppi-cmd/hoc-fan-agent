@@ -10,6 +10,7 @@
 // GET ?trends=1                         Trend: ricerche, ultimo giro (raccoglie quello in corso se è finito)
 // POST {action:"trend_add", text, country} / {action:"trend_remove", id}   ricerche dei trend
 // POST {action:"trend_refresh"}         avvia subito il giro delle ricerche (al massimo ogni 12 ore)
+// POST {action:"similar_seed", id, on}  segna una pagina come partenza per i simili
 // POST {action:"similar_refresh"}       avvia subito la ricerca dei profili simili (al massimo ogni 12 ore)
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -103,6 +104,11 @@ export async function POST(request) {
     if (body.action === "label") {
       if (!body.id) return bad("Manca il profilo");
       await updateProfile(String(body.id), { label: String(body.label || "").trim().slice(0, 60) || null, note: String(body.note || "").slice(0, 500), ...(body.country !== undefined ? { country: body.country === "eng" ? "eng" : body.country === "ita" ? "ita" : null } : {}) });
+      return Response.json({ ok: true });
+    }
+    if (body.action === "similar_seed") {
+      if (!body.id) return bad("Manca il profilo");
+      await updateProfile(String(body.id), { similarSeed: Boolean(body.on) });
       return Response.json({ ok: true });
     }
     if (body.action === "save") {

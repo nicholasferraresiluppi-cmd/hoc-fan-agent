@@ -346,3 +346,14 @@ export function similarList(rows, seeds = [], known = []) {
     .sort((x, y) => (y.overlap - x.overlap) || ((y.fans ?? -1) - (x.fans ?? -1)))
     .slice(0, MAX_SIMILAR);
 }
+
+/**
+ * Le pagine da cui partire per i simili (4/11, Nicholas): le pagine Instagram del Radar che non sono
+ * nostre. Se qualcuna è segnata come partenza (`similarSeed`), solo quelle: da una pagina di modelle
+ * Instagram suggerisce altre modelle, da una pagina di meme altre pagine di meme. Nessuna segnata = tutte.
+ */
+export function pickSeeds(profiles) {
+  const ig = (profiles || []).filter((p) => p?.platform === "ig" && !p.ours);
+  const chosen = ig.filter((p) => p.similarSeed);
+  return (chosen.length ? chosen : ig).map((p) => ({ handle: p.handle, country: p.country || null }));
+}

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import {
   parseQuery, queryId, igQueryFromUrl, normalizeTrendRow, summarize, heat, buildTrends, prevSnapshot,
-  trendBudget, trendsDue, pickPrev, pushHist, musicList, soundKey, similarList, similarBudget, similarDue, buildTrends as bt, HIST_KEEP, HIT_VIEWS, DEFAULT_QUERIES, candidateAccounts, SEARCH_COUNTRY, COUNTRY_ADDON,
+  trendBudget, trendsDue, pickPrev, pushHist, musicList, soundKey, similarList, similarBudget, similarDue, pickSeeds, buildTrends as bt, HIST_KEEP, HIT_VIEWS, DEFAULT_QUERIES, candidateAccounts, SEARCH_COUNTRY, COUNTRY_ADDON,
 } from "../src/lib/clip-trends-core.js";
 
 let n = 0;
@@ -178,5 +178,14 @@ eq(similarList(null), [], "niente risultati");
 eq(similarBudget(1), 0.5, "minimo 0,50 $ per run (Apify)");
 eq(similarBudget(15), Math.round((15 * 15 * 0.0056 * 1.3 + 0.02) * 100) / 100, "tetto con 15 pagine");
 ok(similarDue(null, NOW) && !similarDue({ at: NOW - 3 * D }, NOW) && similarDue({ at: NOW - 7 * D }, NOW), "una volta a settimana");
+
+const profs = [
+  { platform: "ig", handle: "modella", country: "eng" }, { platform: "ig", handle: "meme", country: "eng" },
+  { platform: "tt", handle: "tiktok" }, { platform: "ig", handle: "nostra", ours: true },
+];
+eq(pickSeeds(profs).map((s) => s.handle), ["modella", "meme"], "nessuna segnata: tutte le Instagram non nostre");
+profs[1].similarSeed = true;
+eq(pickSeeds(profs), [{ handle: "meme", country: "eng" }], "solo le pagine segnate");
+eq(pickSeeds(null), [], "niente profili");
 
 console.log(`clip-trends: ${n} asserzioni ok`);
