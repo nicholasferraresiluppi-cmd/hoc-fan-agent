@@ -1059,6 +1059,20 @@ console.log(`hr-people: ${n} asserzioni OK`);
   t(recNew.parityChecked >= 1 && recNew.drift.length === 0 && cu.tasks.get(taskId).values["f-prov"] === "o-alt", "parità: il campo nuovo su ClickUp viene riempito dall'app");
   FIELDS_META.pop();
 
+  // 2c) incidente 04/11: campo specchio nuovo («Indirizzo») vuoto su ClickUp con una base
+  //     ereditata dal campo vecchio («Location»): l'app non si svuota e la parità lo riempie
+  await H.savePerson({ id: sara.id, input: { location: "Via Roma 1" }, actor: "admin", source: "app" });
+  const sLoc = await H.getPerson(sara.id);
+  await fake.set(`hr:person:${sara.id}`, { ...sLoc, cuBase: { ...(sLoc.cuBase || {}), location: valueHash(null) }, fieldUpdatedAt: { ...(sLoc.fieldUpdatedAt || {}), location: 1 } });
+  FIELDS_META.push({ id: "f-ind", name: "Indirizzo", type: "short_text" });
+  const recInd = await H.importFromClickup({ mode: "reconcile", by: "test" });
+  t((await H.getPerson(sara.id)).fields.location?.address === "Via Roma 1", "«Indirizzo» nuovo e vuoto con base vecchia: l'indirizzo dell'app resta");
+  t(recInd.drift.length === 0 && cu.tasks.get(taskId).values["f-ind"] === "Via Roma 1", "parità: «Indirizzo» riempito dall'app");
+  editOnClickup(taskId, "Indirizzo", null);
+  await webhook(taskId, ["Indirizzo"]);
+  t((await H.getPerson(sara.id)).fields.location == null, "chi cancella l'indirizzo su ClickUp lo cancella anche in app");
+  FIELDS_META.pop();
+
   // 3) modifica vera su ClickUp → l'app si aggiorna (anche le etichette Skills seguono)
   editOnClickup(taskId, "Luogo di nascita", "milano, mi");
   editOnClickup(taskId, "Competenze e livello", "OnlyFans: Chat e vendita (Esperto)\nSocial organico: Instagram (Autonomo)");
