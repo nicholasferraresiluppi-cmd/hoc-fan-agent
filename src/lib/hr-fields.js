@@ -135,7 +135,10 @@ export const FIELDS = [
   { key: "gender", label: "Genere", section: "anagrafica", type: "option", cu: "Gender", options: GENDERS, labels: GENDER_LABELS },
   { key: "birthPlace", label: "Luogo di nascita", section: "anagrafica", type: "birth", appOnly: true, mirror: "Luogo di nascita" },
   { key: "residenceComune", label: "Comune di residenza", section: "anagrafica", type: "comune", appOnly: true, mirror: "Comune di residenza" },
-  { key: "location", label: "Indirizzo", section: "anagrafica", type: "location", cu: "Location" },
+  // 04/11/2026: su ClickUp l'indirizzo va come TESTO nel campo «Indirizzo». Il campo mappa «Location»
+  // vuole le coordinate, il modulo raccoglie solo via e civico: l'indirizzo finiva nel blocco in
+  // descrizione e chi prepara il contratto non lo trovava tra i campi (93 schede su 94).
+  { key: "location", label: "Indirizzo", section: "anagrafica", type: "location", appOnly: true, mirror: "Indirizzo" },
   { key: "residenceCap", label: "CAP", section: "anagrafica", type: "text", appOnly: true, mirror: "CAP" },
   { key: "codiceFiscale", label: "Codice fiscale", section: "anagrafica", type: "cf", cu: "Codice fiscale", extra: true, sensitive: true },
   { key: "personalEmail", label: "Email personale", section: "anagrafica", type: "email", cu: "Personal Email" },

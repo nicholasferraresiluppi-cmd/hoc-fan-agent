@@ -31,7 +31,7 @@ export const PERSONE_COLUMNS = [
   "Start of Collaboration", "End of Collaboration", "Type of Employment", "Seniority",
   "Personal Email", "Personal Phone Number", "Company Email", "Company Phone Number",
   "Spoken Languages", "Competenze e livello", "Altro che sa fare", "Vorrebbe imparare", "Ruoli già ricoperti",
-  "Surname", "Date Of Birth", "Gender", "Nationality", "Luogo di nascita", "Comune di residenza", "CAP", "Location", "Codice fiscale",
+  "Surname", "Date Of Birth", "Gender", "Nationality", "Luogo di nascita", "Comune di residenza", "Indirizzo", "CAP", "Codice fiscale",
   "Personal Interests", "LinkedIn", "Provenienza", "Segnalato da", "Yellow Warnings", "Red Warnings",
   "CV", "Contract PDF",
 ];
