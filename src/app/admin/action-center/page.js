@@ -15,7 +15,9 @@ import ScoreTutorialModal from "@/components/ScoreTutorialModal";
 import { Modal } from "@/components/cp-style";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmt$, fmtInt, MONTHS_IT } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, Notice, card, EarlyMonthNote } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, FilterBar, Notice, card, EarlyMonthNote } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, MixBar, HotTile } from "@/components/VetroCharts";
 import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
 import { tierLabel } from "@/lib/tier-label";
@@ -53,6 +55,7 @@ export default function ActionCenterPage() {
   const [cvFor, setCvFor] = useState(null); // vista colloquio aperta su UNA persona
   const periodOptions = useMemo(() => monthOpts(), []);
   const prevId = prevOf(periodId);
+  const inVetro = useInVetro();
 
   const url = periodId ? `/api/admin/action-center?period_id=${periodId}` : null;
   const { data, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
@@ -247,7 +250,11 @@ export default function ActionCenterPage() {
 
       {(data?.visibility && !data.visibility.all && !(data.visibility.creators || []).length) && <Notice>Non hai ancora creator assegnate, quindi qui non c&apos;è niente da mostrare: non vuol dire che la squadra vada bene o male. Chiedi a un admin di assegnarti le tue creator.</Notice>}
       {ok && !(data?.visibility && !data.visibility.all && !(data.visibility.creators || []).length) && (<>
-        <HeroMetric
+        {inVetro && <AcTop all={inThresholdAll} evaluate={evaluate} stageOf={stageOf} threshold={threshold} hrMany={hrMany}
+          prevCount={prevCount} prevName={prevName} repeat={repeat} swapTargets={swapTargets.length}
+          onExport={isAll && readyForHr.length > 0 ? exportCsv : null}
+          onBucket={(b) => { setBucket(b); setStage("all"); document.getElementById("ac-lista")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} />}
+        {!inVetro && <HeroMetric
           label={`Da decidere · score ≤ ${threshold}, sotto i colleghi e in calo`}
           value={fmtInt(nDecide)}
           compare={prevCount != null ? `A ${prevName} erano sotto soglia in ${prevCount}` : null}
@@ -268,18 +275,19 @@ export default function ActionCenterPage() {
             </div>
             <Metric label="Sostituti disponibili" value={fmtInt(swapTargets.length)} note="score ≥ 50" />
           </div>
-        </HeroMetric>
+        </HeroMetric>}
 
         <Notice>La soglia è relativa: una parte del gruppo sarà sempre qui, anche se tutti migliorano. Per questo “Da decidere” richiede anche di rendere sotto i colleghi sulla stessa creator e una tendenza (due mesi o un calo). Conta la tendenza, non il singolo mese.</Notice>
         <style>{`@media (max-width: 760px){.ac-more{display:none!important}.ac-more[data-open="true"]{display:flex!important}.ac-filter-btn{display:inline-flex!important}.ac-table{display:none}.ac-cards{display:grid!important}.ac-search{width:100%!important}}`}</style>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+        <FilterBar onReset={stage !== "all" || tier || threshold !== 25 || q ? () => { setStage("all"); setTier(""); setThreshold(25); setQ(""); } : undefined} style={{ margin: "0 0 8px" }}>
+          <div id="ac-lista" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", flexBasis: "100%", scrollMarginTop: 80 }}>
           <FilterChip label={`Da decidere (${nDecide})`} active={bucket === "decide"} onClick={() => setBucket("decide")} />
           <FilterChip label={`Da osservare (${nWatch})`} active={bucket === "watch"} onClick={() => setBucket("watch")} />
           <button type="button" className="ac-filter-btn" onClick={() => setMoreOpen(!moreOpen)} aria-expanded={moreOpen}
             style={{ ...ctl, display: "none", fontSize: 13, cursor: "pointer" }}>{moreOpen ? "Meno filtri" : `Altri filtri${stage !== "all" || tier || threshold !== 25 ? " (attivi)" : ""}`}</button>
           {inThreshold.length > 8 && <input className="ac-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca operatore" aria-label="Cerca operatore" style={{ ...ctl, width: 200, fontSize: 13 }} />}
-        </div>
-        <div className="ac-more" data-open={moreOpen ? "true" : "false"} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+          </div>
+        <div className="ac-more" data-open={moreOpen ? "true" : "false"} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", flexBasis: "100%" }}>
           <FilterChip label={`Tutti (${inThreshold.length})`} active={stage === "all"} onClick={() => setStage("all")} />
           <FilterChip label={`Senza sostituto (${n("todo")})`} active={stage === "todo"} disabled={!n("todo")} onClick={() => setStage(stage === "todo" ? "all" : "todo")} />
           <FilterChip label={`Sostituto scelto (${n("swap")})`} active={stage === "swap"} disabled={!n("swap")} onClick={() => setStage(stage === "swap" ? "all" : "swap")} />
@@ -292,6 +300,7 @@ export default function ActionCenterPage() {
             {THRESHOLDS.map((t) => <option key={t} value={t}>{t === 25 ? "Soglia score ≤ 25 (standard)" : `Soglia score ≤ ${t} (più ampia)`}</option>)}
           </select>
         </div>
+        </FilterBar>
         <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 8 }}>
           {isAll
             ? "“Pronto per HR” si attiva dopo aver scelto un sostituto e chiede il colloquio documentato (data, motivazione, cosa ha detto l'operatore). “Togli” vale solo per questo mese; “Escludi sempre” lo toglie anche dai mesi futuri (resta in classifica)."
@@ -332,7 +341,7 @@ export default function ActionCenterPage() {
               );
             })}
           </div>
-          <div className="ac-table" style={{ ...card, overflowX: "auto" }}>
+          <div className={inVetro ? "ac-table vt-glass" : "ac-table"} style={{ ...card, overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: 1100, tableLayout: "fixed" }}>
               <colgroup>
                 <col style={{ width: 176 }} />
@@ -678,3 +687,36 @@ const cvH = { fontFamily: FONTS.display, fontSize: 17, fontWeight: 500, color: C
 const cvLi = { padding: "8px 0", borderBottom: `1px solid ${CP.borderSoft}` };
 const cvLbl = { display: "flex", flexDirection: "column", gap: 4, color: CP.textMuted, fontSize: 12 };
 const linkBtn = { background: "none", border: "none", padding: 0, color: CP.accentSoftText, fontSize: 12, cursor: "pointer", fontFamily: FONTS.body };
+
+// Vetro: «quanti casi ci sono, e a che punto è ognuno?». Sono persone: niente rosso (26/09, «una
+// conversazione, non un giudizio»); la barra dice solo dove sta il lavoro, dal colloquio al passaggio.
+function AcTop({ all, evaluate, stageOf, threshold, hrMany, prevCount, prevName, repeat, swapTargets, onExport, onBucket }) {
+  const decide = all.filter((c) => evaluate(c).decide || c.swap_entry?.status === "ready_for_hr");
+  const watch = all.length - decide.length;
+  const by = (st) => decide.filter((c) => stageOf(c) === st).length;
+  const items = [
+    { label: "Senza sostituto", value: by("todo") },
+    { label: "Sostituto scelto", value: by("swap"), color: "var(--vt-c1)" },
+    { label: hrMany, value: by("ready"), color: "var(--vt-c2)" },
+  ];
+  return (
+    <div className="vt-row21" style={{ marginBottom: 18 }}>
+      <Panel title={`${fmtInt(decide.length)} da decidere`} aside={`score ≤ ${threshold}, sotto i colleghi e in calo · a che punto è ognuno`} i={0}>
+        {decide.length ? <MixBar items={items} format={fmtInt} /> : <div style={{ fontSize: 13, color: CP.textMuted }}>Nessun caso da decidere questo mese.</div>}
+        <div style={{ display: "flex", gap: "8px 22px", flexWrap: "wrap", alignItems: "center", marginTop: 14, fontSize: 13, color: CP.textSecondary, fontVariantNumeric: "tabular-nums" }}>
+          {prevCount != null && <span>A {prevName} sotto soglia <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(prevCount)}</b>, ora <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(all.length)}</b></span>}
+          <span>Sotto soglia anche il mese prima <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(repeat)}</b></span>
+          <span>Sostituti disponibili <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(swapTargets)}</b> <span style={{ color: CP.textMuted }}>(score ≥ 50)</span></span>
+          {onExport && <button type="button" onClick={onExport} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: "none", background: CP.accent, color: CP.accentInk, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body }}><Download size={13} /> Esporta i casi documentati</button>}
+        </div>
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+        <HotTile i={1} lvl={decide.length ? "ink" : "0"} label="Da decidere" value={fmtInt(decide.length)}
+          sub={decide.length ? "tutte e tre le condizioni: si parte da un colloquio" : "nessuno ha tutte e tre le condizioni"}
+          onClick={decide.length ? () => onBucket("decide") : undefined} />
+        <HotTile i={2} label="Da osservare" value={fmtInt(watch)} sub="sotto soglia, ma non tutte le condizioni: conta la tendenza"
+          onClick={watch ? () => onBucket("watch") : undefined} />
+      </div>
+    </div>
+  );
+}

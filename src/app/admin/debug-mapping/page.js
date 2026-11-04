@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { Search, AlertCircle, CheckCircle2, XCircle, Loader2, ArrowRight } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, Metric, SectionTitle, Notice, DataTable, card, NUM } from "@/components/ds";
+import { PageHead, Metric, SectionTitle, Notice, DataTable, card, NUM, BTN_PRIMARY_OFF } from "@/components/ds";
 import { fmt$, fmtInt } from "@/lib/format";
 
 /**
@@ -434,13 +434,4 @@ function diagnoseColor(tone) {
 // Codici e ID (non numeri da confrontare): monospazio di sistema per leggerli carattere per carattere.
 const CODE = { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12 };
 const input = { display: "block", width: "100%", boxSizing: "border-box", padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
-const primaryBtn = (disabled) => ({
-  display: "inline-flex", alignItems: "center", gap: 6,
-  padding: "9px 16px",
-  background: disabled ? CP.surfaceAlt : CP.accent,
-  color: disabled ? CP.textMuted : CP.accentInk,
-  border: "none",
-  borderRadius: 8,
-  fontSize: 14, fontWeight: 500, fontFamily: FONTS.body,
-  cursor: disabled ? "not-allowed" : "pointer",
-});
+const primaryBtn = BTN_PRIMARY_OFF;

@@ -12,7 +12,9 @@
  */
 import { useEffect, useState } from "react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, HeroMetric, Metric, FilterChip, DataTable, Notice } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, FilterBar, DataTable, Notice } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, HotTile, RankBars } from "@/components/VetroCharts";
 
 // Redesign 26/09/2026 (pannello tester): numero principale → filtro "sotto soglia"
 // collegato alla sintesi → tabella ordinabile con intestazione ferma; spiegato cosa
@@ -30,11 +32,32 @@ const isLow = (r) => r.within_5min != null && r.within_5min < LOW5;
 // Coda lunga: la maggior parte risponde entro 5 min ma 1 fan su 10 aspetta oltre la soglia critica
 const longTail = (r) => !isLow(r) && r.frt_p90_min != null && r.frt_p90_min > BADP90;
 
+/* Vetro: «la chat è presidiata su ogni creator?» — creator dalla più lenta, con la tacca dell'obiettivo. */
+function ConvTop({ rows, low, tail, median5, updated, pick }) {
+  const items = rows
+    .filter((r) => r.within_5min != null)
+    .sort((a, b) => a.within_5min - b.within_5min)
+    .map((r) => ({ label: r.creator, value: r.within_5min, bad: r.within_5min < LOW5, good: r.within_5min >= OK5 }));
+  return (
+    <div className="vt-row21" style={{ marginBottom: 16 }}>
+      <Panel title="Risposte entro 5 minuti, dalla creator più lenta" aside={updated} i={0}>
+        <RankBars items={items} format={pct} limit={10} mark={OK5} markLabel={`obiettivo ${Math.round(OK5 * 100)}% · in rosso sotto ${Math.round(LOW5 * 100)}%`} valueWidth={64} />
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+        <HotTile label="Creator a metà classifica" value={pct(median5)} sub={`${num(rows.length)} creator monitorate`} lvl={null} i={1} />
+        <HotTile label="Sotto soglia" value={num(low.length)} sub={low.length ? "meno del 70% entro 5 minuti: vedi quali" : "tutte sopra soglia"} lvl={low.length ? "2" : "0"} onClick={low.length ? () => pick("low") : undefined} i={2} />
+        {tail.length > 0 && <HotTile label="Coda lunga" value={num(tail.length)} sub="veloci in media, ma 1 fan su 10 aspetta oltre 12 minuti" lvl="ink" onClick={() => pick("tail")} i={3} />}
+      </div>
+    </div>
+  );
+}
+
 export default function ConversationIntelligencePage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState("all");
+  const inVetro = useInVetro();
 
   useEffect(() => {
     (async () => {
@@ -99,7 +122,8 @@ export default function ConversationIntelligencePage() {
       {!loading && !error && rows.length === 0 && data?.visibility?.all !== false && <Notice>Nessuna creator con conversazioni nel periodo.</Notice>}
 
       {!loading && !error && rows.length > 0 && (<>
-        <HeroMetric
+        {inVetro && <ConvTop rows={rows} low={low} tail={tail} median5={median5} updated={updated} pick={(f) => { setFilter(f); document.getElementById("ci-tabella")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} />}
+        {!inVetro && <HeroMetric
           label="Risposte entro 5 minuti · creator a metà classifica"
           value={pct(median5)}
           compare={`obiettivo ≥ ${Math.round(OK5 * 100)}% · sotto ${Math.round(LOW5 * 100)}% il presidio va rinforzato`}
@@ -110,13 +134,14 @@ export default function ConversationIntelligencePage() {
             <Metric label="Sotto soglia" value={num(low.length)} danger={low.length > 0} note={low.length ? "meno del 70% entro 5 min" : "tutte sopra soglia"} />
             <Metric label="Con coda lunga" value={num(tail.length)} note="veloci in media, ma qualche fan aspetta molto" />
           </div>
-        </HeroMetric>
+        </HeroMetric>}
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+        <div id="ci-tabella" style={{ scrollMarginTop: 80 }} />
+        <FilterBar onReset={filter !== "all" ? () => setFilter("all") : undefined}>
           <FilterChip label={`Tutte (${rows.length})`} active={filter === "all"} onClick={() => setFilter("all")} />
           <FilterChip label={`Sotto soglia (${low.length})`} danger={low.length > 0} active={filter === "low"} onClick={() => setFilter("low")} disabled={!low.length} />
           <FilterChip label={`Coda lunga (${tail.length})`} active={filter === "tail"} onClick={() => setFilter("tail")} disabled={!tail.length} />
-        </div>
+        </FilterBar>
 
         <DataTable columns={columns} rows={shown} defaultSort={{ key: "within_5min", dir: 1 }} minWidth={900} maxHeight="calc(100vh - 260px)" empty="Nessuna creator in questo filtro." />
 

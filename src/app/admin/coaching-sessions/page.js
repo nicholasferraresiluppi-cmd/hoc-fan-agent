@@ -5,7 +5,9 @@ import useSWR from "swr";
 import { CheckCircle2, Clock, MessageCircle } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, card } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, FilterBar, SectionTitle, Notice, card } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, MixBar, HotTile } from "@/components/VetroCharts";
 
 /**
  * /admin/coaching-sessions — sessioni di coaching strutturate (benchmark #3).
@@ -46,6 +48,7 @@ export default function CoachingSessionsPage() {
   const [closing, setClosing] = useState(null);
   const [closingNote, setClosingNote] = useState("");
   const [filter, setFilter] = useState("all");
+  const inVetro = useInVetro();
 
   const canSend = employee.trim() && topic.trim().length >= 5;
 
@@ -97,7 +100,9 @@ export default function CoachingSessionsPage() {
   const waiting = sessions.filter((s) => s.status === "sent").length;
   const openS = sessions.filter((s) => s.status !== "closed");
   const dueFollowUp = openS.filter((s) => s.follow_up_date && s.follow_up_date <= today()).length;
-  const visible = filter === "all" ? sessions : sessions.filter((s) => s.status === filter);
+  const isLate = (s) => s.status !== "closed" && s.follow_up_date && s.follow_up_date <= today();
+  const visible = filter === "all" ? sessions : filter === "late" ? sessions.filter(isLate) : sessions.filter((s) => s.status === filter);
+  const showList = (f) => { setFilter(f); document.getElementById("cs-lista")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
 
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
@@ -111,7 +116,27 @@ export default function CoachingSessionsPage() {
         <Notice danger>Questa pagina è per team lead (vedono i loro operatori) e per chi vede i dati di tutti. {String(forbidden)}</Notice>
       )}
 
-      {!forbidden && data && !isLoading && (
+      {!forbidden && data && !isLoading && inVetro && (
+        <div className="vt-row21" style={{ marginBottom: 18 }}>
+          <Panel title={`${fmtInt(openS.length)} sessioni aperte`} aside={`${fmtInt(sessions.length)} in tutto · a che punto sono`} i={0}>
+            {sessions.length
+              ? <MixBar format={fmtInt} items={[
+                  { label: "In attesa di conferma", value: waiting },
+                  { label: "Confermate", value: sessions.filter((x) => x.status === "acknowledged").length, color: "var(--vt-c1)" },
+                  { label: "Chiuse con l'esito", value: sessions.filter((x) => x.status === "closed").length, color: CP.accentGreen },
+                ]} />
+              : <div style={{ fontSize: 13, color: CP.textMuted }}>Nessuna sessione ancora: la prima la scrivi nel modulo qui sotto.</div>}
+          </Panel>
+          <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+            <HotTile i={1} lvl={dueFollowUp ? "ink" : "0"} label="Follow-up da chiudere" value={fmtInt(dueFollowUp)}
+              sub={dueFollowUp ? "la data è arrivata: chiudile scrivendo com'è andata" : "nessun follow-up scaduto"}
+              onClick={dueFollowUp ? () => showList("late") : undefined} />
+            <HotTile i={2} label="Non ancora lette" value={fmtInt(waiting)} sub="aspettano che l'operatore le apra e le confermi"
+              onClick={waiting ? () => showList("sent") : undefined} />
+          </div>
+        </div>
+      )}
+      {!forbidden && data && !isLoading && !inVetro && (
         <HeroMetric
           label="Sessioni aperte"
           value={fmtInt(openS.length)}
@@ -125,7 +150,7 @@ export default function CoachingSessionsPage() {
       )}
 
       {!forbidden && (
-        <section style={{ ...card, padding: "18px 20px", marginBottom: 24 }}>
+        <section className={inVetro ? "vt-glass" : undefined} style={{ ...card, padding: "18px 20px", marginBottom: 24 }}>
           <SectionTitle>Nuova sessione</SectionTitle>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 14 }}>
             <div>
@@ -173,14 +198,15 @@ export default function CoachingSessionsPage() {
 
       {!isLoading && !forbidden && (
         <>
-          <SectionTitle aside={data?.scope === "team" ? "Solo quelle dei tuoi operatori." : null}>Sessioni</SectionTitle>
+          <div id="cs-lista" style={{ scrollMarginTop: 80 }}><SectionTitle aside={data?.scope === "team" ? "Solo quelle dei tuoi operatori." : null}>Sessioni</SectionTitle></div>
           {sessions.length > 0 && (
-            <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+            <FilterBar onReset={filter !== "all" ? () => setFilter("all") : undefined} style={{ margin: "0 0 12px" }}>
               <FilterChip label={`Tutte · ${sessions.length}`} active={filter === "all"} onClick={() => setFilter("all")} />
               {Object.entries(STATUS_META).map(([k, m]) => (
                 <FilterChip key={k} label={`${m.short} · ${sessions.filter((s) => s.status === k).length}`} active={filter === k} onClick={() => setFilter(k)} />
               ))}
-            </div>
+              <FilterChip label={`Follow-up scaduto · ${dueFollowUp}`} active={filter === "late"} disabled={!dueFollowUp} onClick={() => setFilter("late")} />
+            </FilterBar>
           )}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {sessions.length === 0 && (
@@ -193,7 +219,7 @@ export default function CoachingSessionsPage() {
               const meta = STATUS_META[s.status] || STATUS_META.sent;
               const late = s.status !== "closed" && s.follow_up_date && s.follow_up_date <= today();
               return (
-                <section key={s.id} style={{ ...card, padding: "14px 16px" }}>
+                <section key={s.id} className={inVetro ? "vt-glass" : undefined} style={{ ...card, padding: "14px 16px" }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
                     <span style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>{s.employee}</span>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13, color: meta.color }}>

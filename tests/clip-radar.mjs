@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import {
   parseProfileInput, profileId, normalizeIg, normalizeTt, mergeVideos, profileStats, velocity, scoreVideo,
-  topVideos, runBudget, shortNum, ageLabel,
+  topVideos, runBudget, shortNum, ageLabel, timesLabel, isSmallBase,
 } from "../src/lib/clip-radar-core.js";
 
 let n = 0;
@@ -62,5 +62,9 @@ eq(topVideos(profiles, byP, { minOutlier: 5 }, NOW).map((x) => x.id).sort(), ["4
 eq(runBudget(10, "ig"), 0.47, "tetto di spesa");
 eq([shortNum(1234567), shortNum(34500), shortNum(1500), shortNum(812)], ["1,2 mln", "35 mila", "1,5 mila", "812"], "numeri brevi");
 eq([ageLabel(5), ageLabel(72), ageLabel(24 * 30)], ["5 h", "3 g", "4 sett."], "età");
+
+eq([timesLabel(44.2), timesLabel(9.94), timesLabel(31.7), timesLabel(1.5), timesLabel(null)], ["44× il solito", "9,9× il solito", "32× il solito", "1,5× il solito", ""], "multiplo per esteso");
+eq(timesLabel(31.7, { short: true }), "32×", "multiplo corto");
+eq([isSmallBase(223), isSmallBase(999), isSmallBase(1000), isSmallBase(null)], [true, true, false, false], "profilo piccolo sotto 1.000 di solito");
 
 console.log(`clip-radar: ${n} verifiche ok`);

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { CheckCircle2, XCircle, ShieldAlert } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, HeroMetric, SectionTitle, Notice, card, NUM } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, HotTile, GoalRing, RankBars } from "@/components/VetroCharts";
 import { academyForQaDim, VOCAB_GAPS } from "@/lib/skill-vocabulary";
 
 /**
@@ -21,10 +23,35 @@ const monthLabel = (pid) => (/^\d{4}-\d{2}$/.test(pid || "") ? `${MESI[Number(pi
 const fmtAvg = (v) => (v == null || Number.isNaN(Number(v)) ? "—" : Number(v).toLocaleString("it-IT", { maximumFractionDigits: 2 }));
 const chip = { fontSize: 12, color: CP.textSecondary, background: CP.surfaceAlt, border: `1px solid ${CP.borderSoft}`, borderRadius: 999, padding: "3px 10px" };
 
+/*
+ * Vetro: «come vanno le mie review, e su cosa lavoro?» — la media di ogni aspetto con la tacca
+ * del 3 (la soglia del pass), dal più basso; accanto le review superate sul totale.
+ * Niente rosso sulle persone: il rosso resta solo per la compliance, che è una regola.
+ */
+function QaTop({ gs, dims, reviews }) {
+  const items = dims.map((d) => {
+    const v = reviews.map((r) => Number(r.scores?.[d.key])).filter(Number.isFinite);
+    return { label: d.label, value: v.length ? v.reduce((a, b) => a + b, 0) / v.length : null, good: v.length && v.reduce((a, b) => a + b, 0) / v.length >= 3 };
+  }).filter((x) => x.value != null).sort((a, b) => a.value - b.value);
+  return (
+    <div className="vt-row21" style={{ marginBottom: 14 }}>
+      <Panel title="Aspetto per aspetto" aside="media di tutte le tue review, da 1 a 4" i={0}>
+        {items.length ? <RankBars items={items} format={fmtAvg} limit={10} mark={3} markLabel="3 = la media che serve per il pass" valueWidth={48} /> : <div style={{ fontSize: 13, color: CP.textMuted }}>Ancora nessun voto per aspetto.</div>}
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+        {gs.frozen_by_compliance
+          ? <HotTile i={1} lvl="2" label="Compliance da risolvere" value={`${gs.passes} di ${gs.reviews}`} sub="Un fail su compliance congela le promozioni in corso (§8.1): parlane subito col tuo sales manager." />
+          : <GoalRing i={1} pct={gs.reviews ? gs.passes / gs.reviews : 0} center={`${gs.passes} di ${gs.reviews}`} tone={gs.pass ? "good" : undefined} title={gs.pass ? "QA superata" : "QA non ancora superata"} sub="review superate" size={110} />}
+      </div>
+    </div>
+  );
+}
+
 export default function MyQaPage() {
   const { data, error, isLoading } = useSWR("/api/me/qa", fetcher, { revalidateOnFocus: false });
   const dims = data?.dimensions || [];
   const gs = data?.gate_status;
+  const inVetro = useInVetro();
 
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
@@ -44,7 +71,8 @@ export default function MyQaPage() {
 
       {data?.linked && (
         <>
-          {gs ? (
+          {inVetro && gs && <QaTop gs={gs} dims={dims} reviews={data.reviews || []} />}
+          {gs && inVetro ? null : gs ? (
             <>
               <HeroMetric
                 label={`Controllo qualità · ultimi ${gs.window_months} mesi`}

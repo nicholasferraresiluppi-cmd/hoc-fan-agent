@@ -21,7 +21,9 @@ import useSWR from "swr";
 import { Plus, Loader2 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
-import { PageHead, FilterChip, Notice, DataTable, card } from "@/components/ds";
+import { PageHead, FilterChip, FilterBar, Notice, DataTable, card, BTN_PRIMARY } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { HotTile } from "@/components/VetroCharts";
 import { confirmDialog } from "@/components/AppDialogs";
 
 const PROVIDERS = ["coronium", "proxycaro", "nsocks"];
@@ -66,6 +68,8 @@ export default function SocialProxiesPage() {
   const items = data?.items || [];
   const knownProviders = [...new Set([...PROVIDERS, ...items.map((p) => p.provider).filter(Boolean)])];
   const filtered = !!(statusFilter || providerFilter);
+  const inVetro = useInVetro();
+  const nBy = (st) => items.filter((p) => (p.status || "inactive") === st).length;
 
   const openCreate = () => { setEditing(null); setModalOpen(true); };
   const openEdit = (p) => { setEditing(p); setModalOpen(true); };
@@ -163,8 +167,17 @@ export default function SocialProxiesPage() {
         </Notice>
       )}
 
+      {/* Vetro: «i proxy funzionano?» — tre schede che aprono il filtro (contate sull'elenco intero) */}
+      {inVetro && !error && !filtered && items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 14 }}>
+          <HotTile i={0} lvl="0" label="Funzionano" value={nBy("active")} sub={`su ${items.length} proxy`} onClick={() => setStatusFilter("active")} />
+          <HotTile i={1} lvl={nBy("error") ? "2" : null} label="Con errore" value={nBy("error")} sub={nBy("error") ? "da riprovare o sostituire" : "nessuno"} onClick={nBy("error") ? () => setStatusFilter("error") : undefined} />
+          <HotTile i={2} lvl={nBy("inactive") ? "ink" : null} label="Mai provati" value={nBy("inactive")} sub={nBy("inactive") ? "provali prima di assegnarli" : "tutti provati"} onClick={nBy("inactive") ? () => setStatusFilter("inactive") : undefined} />
+        </div>
+      )}
+
       {!error && (items.length > 0 || filtered) && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+        <FilterBar onReset={filtered ? () => { setStatusFilter(""); setProviderFilter(""); } : undefined}>
           <FilterChip label="Tutti" active={!statusFilter} onClick={() => setStatusFilter("")} />
           <FilterChip label="Funzionano" active={statusFilter === "active"} onClick={() => setStatusFilter(statusFilter === "active" ? "" : "active")} />
           <FilterChip label="Mai provati" active={statusFilter === "inactive"} onClick={() => setStatusFilter(statusFilter === "inactive" ? "" : "inactive")} />
@@ -174,7 +187,7 @@ export default function SocialProxiesPage() {
             <option value="">Tutti i fornitori</option>
             {knownProviders.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
-        </div>
+        </FilterBar>
       )}
 
       {rowError && (
@@ -330,6 +343,6 @@ const input = {
   width: "100%", boxSizing: "border-box", padding: "8px 10px", background: CP.surface, border: `1px solid ${CP.border}`,
   borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, outline: "none",
 };
-const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", background: CP.accent, color: CP.accentInk, border: "1px solid transparent", borderRadius: 8, fontSize: 14, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };
+const btnPrimary = BTN_PRIMARY;
 const btnSmall = { display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 7, cursor: "pointer", fontSize: 12.5, fontFamily: FONTS.body };
 const linkBtn = { background: "none", border: "none", padding: 0, color: CP.accentSoftText, cursor: "pointer", fontSize: 13, fontFamily: FONTS.body };

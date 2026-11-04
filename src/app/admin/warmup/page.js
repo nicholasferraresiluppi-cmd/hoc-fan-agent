@@ -8,9 +8,10 @@
 //  - le spunte si salvano una per una: due persone sullo stesso profilo non si cancellano il lavoro;
 //  - cambiare la situazione (shadowban, sospeso, bannato) aggiorna anche lo stato in Account social.
 
+import { PlanCard } from "@/components/piani/PlanView";
 import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
-import { ChevronRight, Flag, Pencil, Plus, Trash2, Undo2, UserRound, ExternalLink } from "lucide-react";
+import { Check, ChevronRight, Flag, Pencil, Plus, Trash2, Undo2, UserRound, ExternalLink } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHead, Notice, NUM, FilterChip, Tabs, Segmented, FilterBar } from "@/components/ds";
 import {
@@ -21,18 +22,20 @@ import {
 import { GuideIG, GuideX } from "@/components/warmup/guide";
 import XRefs from "@/components/warmup/xrefs";
 import ClipRadar from "@/components/warmup/clip-radar";
+import TrendModelle from "@/components/warmup/trend-modelle";
 import {
   DAY, PLATS, platOf, isX, keyOf, norm, todayKey, startOfDay, fmtDur, mmss, weekKey, weekLabel, lastWeeks,
   numFmt, delta, planFor, planForDate, visibleItems, dayProgress, tasksOn, adherence, hasArrears,
   opDay, realDay, pausedDays, isCooldown, cooldownDay, stateOf, stateInfo, undoableState, restoreState,
   ownerName, mine, urgenze, FL, ST, MS, SE, wfields, xGoal, IPROT, fillDefaults, applyState, openFlag,
-  clearFlag, endCooldown,
+  clearFlag, endCooldown, WINDOWS,
 } from "@/lib/warmup-plan";
 import { prefillFor, dailyPrefill, linkRange, publicAlerts, normalizeOfLink } from "@/lib/warmup-metrics-core";
 import { pubKindOfTask, itemForTask, autoItemForTask } from "@/lib/editoriale-core";
 import PublishDownload from "@/components/PublishDownload";
 import MediaLightbox from "@/components/MediaLightbox";
 import EditorialeView from "@/components/editoriale/EditorialeView";
+import HeroHead, { BigNum } from "@/components/HeroHead";
 
 const API = "/api/admin/warmup";
 const fetcher = (url) =>
@@ -445,6 +448,19 @@ function RenameModal({ old, onClose, onSave }) {
 
 // ── grafico piccolo, una serie ──────────────────────────────────────────────
 
+// casella di un profilo dentro un'azione (vista «per azione» di Oggi): tutto il bottone si tocca
+function ProfileCheck({ a, on, onToggle }) {
+  return (
+    <button type="button" onClick={onToggle} aria-pressed={on} title={on ? "Fatta: tocca per riaprire" : "Tocca per segnarla fatta"}
+      style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 10px 6px 6px", minHeight: 36, borderRadius: 10, border: `1px solid ${on ? alpha(CP.accentGreen, "66") : CP.border}`, background: on ? alpha(CP.accentGreen, "14") : CP.surface, color: on ? CP.textMuted : CP.textPrimary, cursor: "pointer", fontFamily: FONTS.body, fontSize: 13.5, flex: "0 0 auto" }}>
+      <span style={{ width: 22, height: 22, borderRadius: 6, border: `1.5px solid ${on ? CP.accentGreen : CP.borderStrong}`, background: on ? CP.accentGreen : "transparent", display: "grid", placeItems: "center" }}>
+        {on && <Check size={14} strokeWidth={3} color={CP.surface} />}
+      </span>
+      <span style={{ textDecoration: on ? "line-through" : "none" }}>{a.username}</span>
+    </button>
+  );
+}
+
 // giorno locale come YYYY-MM-DD
 const isoDay = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
@@ -506,6 +522,10 @@ export default function WarmupPage() {
   const [perFrom, setPerFrom] = useState(() => isoDay(Date.now() - 6 * DAY));
   const [perTo, setPerTo] = useState(() => isoDay(Date.now()));
   const [panoCreator, setPanoCreator] = useState("");
+  // Oggi: per profilo o per azione (29/10, pannello tester: con 10-20 profili la stessa lista si ripete ~340 righe)
+  const [oggiVista, setOggiVistaState] = useState(null);
+  const setOggiVista = (v) => { setOggiVistaState(v); try { localStorage.setItem("hoc:warmup:oggi-vista", v); } catch {} };
+  useEffect(() => { try { const v = localStorage.getItem("hoc:warmup:oggi-vista"); if (v === "prof" || v === "azione") setOggiVistaState(v); } catch {} }, []);
   const [panoAcc, setPanoAcc] = useState("");
   const [wkAll, setWkAll] = useState(null);
   const [sortAll, setSortAll] = useState("views");
@@ -670,10 +690,11 @@ export default function WarmupPage() {
   const openProfile = (id, p = "oggi") => { setTab("acct"); setSel(id); setPane(p); setOpenWhy({}); setForm(null); const a = byId(id); setFolder(a?.creator || null); window.scrollTo(0, 0); };
 
   // ── righe di task con timer ──
-  function taskRow(a, item, done, day) {
+  // stato di una task su un profilo: fatta (anche in automatico), timer, contenuto in calendario
+  function taskBits(a, item, done, day) {
     // spunta anche quando il contenuto di questa task è stato trovato sul profilo (pubblicato in automatico)
     const auto = !done[item.id] && pubKindOfTask(item.id) && !isX(a) ? autoItemForTask((a.ed?.[day] || []).map((x) => ({ ...x, slot: { profileId: a.id, date: day, time: x.time } })), a.id, day, item.id) : null;
-    const k = a.id + ":" + item.id, on = Boolean(done[item.id] || auto);
+    const on = Boolean(done[item.id] || auto);
     let timerEl = null;
     if (item.timer && day === todayKey()) {
       const run = timer && timer.acc === a.id && timer.task === item.id;
@@ -681,7 +702,11 @@ export default function WarmupPage() {
       if (!on || run) timerEl = <TimerChip item={item} running={run} left={timerLeft(timer)} doneMin={mins} onStart={() => startTimer(a, item)} onPause={() => (item.timer.mode === "accum" ? stopTimer() : setTimer(null))} />;
       else if (mins > 0) timerEl = <div style={{ ...hint, marginTop: 4 }}>{mins} min col timer</div>;
     }
-    const edEl = edLine(a, item.id, day, on);
+    return { on, timerEl, edEl: edLine(a, item.id, day, on) };
+  }
+  function taskRow(a, item, done, day) {
+    const k = a.id + ":" + item.id;
+    const { on, timerEl, edEl } = taskBits(a, item, done, day);
     return <TaskRow key={k} item={item} done={on} open={openWhy[k]} onToggle={() => toggleTask(a, item.id, day)} onWhy={() => setOpenWhy((o) => ({ ...o, [k]: !o[k] }))} timer={edEl ? <>{timerEl}{edEl}</> : timerEl} />;
   }
   // fila di anteprime del contenuto (tutte le foto del carosello, o il reel): un tocco le ingrandisce
@@ -776,6 +801,70 @@ export default function WarmupPage() {
   };
   const mineSeg = () => (ACC.some((a) => a.owner) ? <Seg items={[["0", "Tutti"], ["1", `I miei${ACC.filter(isMine).length ? " · " + ACC.filter(isMine).length : ""}`]]} value={onlyMine ? "1" : "0"} onChange={(v) => setOnlyMine(v === "1")} /> : null);
 
+  // Oggi «per azione»: una riga per azione, dentro i profili che la devono fare (con casella).
+  // Si raggruppa per testo della task: la stessa azione ha lo stesso testo su tutti i profili.
+  function viewByAction(blocks, tk) {
+    const groups = new Map();
+    for (const { a, t } of blocks) {
+      for (const item of t.items) {
+        const g = groups.get(item.t) || { item, rows: [] };
+        g.rows.push({ a, item, done: t.done });
+        groups.set(item.t, g);
+      }
+    }
+    const all = [...groups.values()].map((g) => {
+      const bits = g.rows.map((r) => ({ ...r, ...taskBits(r.a, r.item, r.done, tk) }));
+      return { ...g, bits, open: bits.filter((b) => !b.on).length };
+    });
+    // Ordine del piano, fisso: una card scende tra le «già fatte» solo quando è spuntata su TUTTI i profili.
+    const req = all.filter((g) => !g.item.opt && g.open);
+    const opt = all.filter((g) => g.item.opt && g.open);
+    const doneAll = all.filter((g) => !g.open);
+    const rich = (item) => Boolean(item.timer) || Boolean(pubKindOfTask(item.id));
+    const card = (g) => {
+      const k = "act:" + g.item.t;
+      return (
+        <div key={k} style={{ ...cardBox, padding: 0, marginBottom: 10, overflow: "hidden" }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, lineHeight: 1.4 }}>{g.item.t}{g.item.opt && <span style={{ ...muted, fontSize: 12.5 }}> · facoltativa</span>}</div>
+              {openWhy[k] && g.item.why && <div style={{ fontSize: 13.5, color: CP.textSecondary, lineHeight: 1.55, marginTop: 6 }}>{g.item.why}</div>}
+            </div>
+            <span style={{ fontSize: 13, color: g.open ? CP.textSecondary : CP.accentGreen, whiteSpace: "nowrap", ...NUM }}>{g.open ? `${g.open} da fare su ${g.bits.length}` : "fatta ovunque"}</span>
+            {g.item.why && <button type="button" onClick={() => setOpenWhy((o) => ({ ...o, [k]: !o[k] }))} aria-label="Perché" title="Perché" style={{ width: 28, height: 28, flex: "0 0 auto", borderRadius: "50%", border: `1px solid ${CP.borderSoft}`, background: CP.surfaceAlt, color: CP.textSecondary, cursor: "pointer", fontSize: 13 }}>{openWhy[k] ? "×" : "?"}</button>}
+          </div>
+          {rich(g.item) ? (
+            g.bits.map((b) => (
+              <div key={b.a.id} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 14px", borderTop: `1px solid ${CP.borderSoft}`, background: b.on ? alpha(CP.accentGreen, "0d") : "transparent" }}>
+                <ProfileCheck a={b.a} on={b.on} onToggle={() => toggleTask(b.a, b.item.id, tk)} />
+                <div style={{ flex: 1, minWidth: 0 }}>{b.timerEl}{b.edEl}</div>
+              </div>
+            ))
+          ) : (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "10px 14px", borderTop: `1px solid ${CP.borderSoft}` }}>
+              {g.bits.map((b) => <ProfileCheck key={b.a.id} a={b.a} on={b.on} onToggle={() => toggleTask(b.a, b.item.id, tk)} />)}
+            </div>
+          )}
+        </div>
+      );
+    };
+    const extras = blocks.map(({ a, t }) => ({ a, el: edExtra(a, tk, t.items) })).filter((x) => x.el);
+    return (
+      <>
+        <SectionHead aside={`${req.length} azioni · tocca un profilo per segnarla fatta`}>Da fare oggi</SectionHead>
+        {req.length ? req.map(card) : <div style={{ ...cardBox, ...hint, textAlign: "center" }}>Le azioni obbligatorie di oggi sono fatte.</div>}
+        {extras.length > 0 && (
+          <>
+            <SectionHead>Anche in calendario oggi</SectionHead>
+            {extras.map((x) => <div key={x.a.id} style={{ ...cardBox, padding: 0, marginBottom: 10 }}><div style={{ padding: "10px 14px 0", fontSize: 14, fontWeight: 500 }}>{x.a.username}</div>{x.el}</div>)}
+          </>
+        )}
+        {doneAll.length > 0 && <Fold title={`${doneAll.length} ${doneAll.length === 1 ? "azione già fatta" : "azioni già fatte"} su tutti i profili`}>{doneAll.map(card)}</Fold>}
+        {opt.length > 0 && <Fold title={`${opt.length} ${opt.length === 1 ? "azione facoltativa" : "azioni facoltative"}`}>{opt.map(card)}</Fold>}
+      </>
+    );
+  }
+
   function viewToday() {
     const tk = todayKey(), yk = todayKey(new Date(Date.now() - DAY));
     const anyOwner = ACC.some((a) => a.owner);
@@ -788,12 +877,29 @@ export default function WarmupPage() {
     const urg = [...ACC.flatMap((a) => publicAlerts(a, a.pub).map((u) => ({ ...u, acc: a }))), ...urgenze(ACC)]
       .sort((x, y) => rankU[x.lev] - rankU[y.lev]).filter((u) => !om || isMine(u.acc));
     const todo = blocks.filter((b) => b.t.open.length), fine = blocks.filter((b) => !b.t.open.length);
+    // di base: per azione da 4 profili in su, per profilo sotto (scelta ricordata per persona)
+    const vista = oggiVista || (accs.length > 3 ? "azione" : "prof");
     return (
       <>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <p style={{ flex: 1, minWidth: 200, fontSize: 14, color: CP.textSecondary, margin: 0 }}>{new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}{ACC.length ? ` · ${openTot} task da fare su ${accs.length} profili` : ""}</p>
-          {mineSeg()}
-        </div>
+        {/* in cima, nello stile del Radar (29/10): la giornata in una frase e quattro numeri */}
+        {ACC.length > 0 ? (
+          <HeroHead
+            eyebrow={new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" }).replace(/^./, (c) => c.toUpperCase())}
+            title={openTot ? "Oggi restano" : "Oggi è"} accent={openTot ? `${openTot} task` : "tutto fatto"}
+            sub={`${accs.length} ${accs.length === 1 ? "profilo" : "profili"} ${PLATS[plat].label}${om ? " tuoi" : ""}. Spunta man mano: ogni task vale per il giorno in cui la fai.`}
+            numbers={<>
+              <BigNum label="Profili da finire" value={todo.length} strong={todo.length > 0} />
+              <BigNum label="Task fatte" value={doneTot} />
+              <BigNum label="Da non dimenticare" value={urg.length} title="Avvisi trovati dal sistema: profili da controllare, scadenze" />
+              {late.length > 0 && <BigNum label="Rimaste ieri" value={late.reduce((n, b) => n + b.arr.open.length, 0)} />}
+            </>}
+            actions={(mineSeg() || accs.length > 1) ? <>
+              {mineSeg()}
+              {accs.length > 1 && <Segmented label="Vista" items={[["azione", "Per azione"], ["prof", "Per profilo"]]} value={vista} onChange={setOggiVista} />}
+            </> : null} />
+        ) : null}
+        {/* il piano di lavoro in corso (30/10): le prossime voci di chi apre la pagina */}
+        <PlanCard area="social" />
         {!ACC.length && <div style={{ ...cardBox, textAlign: "center", padding: "30px 18px" }}><h3 style={{ margin: "0 0 6px", fontWeight: 500 }}>Nessun profilo {PLATS[plat].label}</h3><p style={{ ...hint, margin: "0 0 14px" }}>Registra il primo profilo dalla scheda Account.</p><button type="button" style={btnPrimary} onClick={() => { setTab("acct"); setForm({}); }}><Plus size={15} />Nuovo profilo</button></div>}
         {urg.length > 0 && (
           <>
@@ -830,7 +936,8 @@ export default function WarmupPage() {
             <p style={{ ...hint, margin: 0 }}>{doneTot} task completate su {blocks.length} profili.</p>
           </div>
         )}
-        {todo.length > 0 && (
+        {todo.length > 0 && vista === "azione" && viewByAction(blocks, tk)}
+        {todo.length > 0 && vista !== "azione" && (
           <>
           <SectionHead aside={`${openTot} task su ${todo.length} ${todo.length === 1 ? "profilo" : "profili"}`}>Da fare oggi</SectionHead>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 420px), 1fr))", gap: 16, alignItems: "start" }}>
@@ -890,14 +997,23 @@ export default function WarmupPage() {
   function viewFolders() {
     let list = folderList();
     if (onlyMine) list = list.map((f) => ({ ...f, items: f.items.filter(isMine) })).filter((f) => f.items.length);
-    const tot = (onlyMine ? ACC.filter(isMine) : ACC).length;
+    const mine = onlyMine ? ACC.filter(isMine) : ACC;
+    const tot = mine.length;
+    const stAll = { verde: 0, arancione: 0, rosso: 0 };
+    mine.forEach((a) => { stAll[a.status] = (stAll[a.status] || 0) + 1; });
     return (
       <>
-        <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 12 }}>
-          <div style={{ flex: 1, minWidth: 180 }}><h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: 0 }}>Creator</h2><p style={{ ...hint, fontSize: 14, margin: "2px 0 0" }}>{list.length ? `${list.length} ${list.length === 1 ? "cartella" : "cartelle"} · ${tot} profili` : onlyMine ? "Nessun profilo assegnato a te" : "Nessun profilo ancora"}</p></div>
-          {mineSeg()}
-          <button type="button" style={btnPrimary} onClick={() => setForm({})}><Plus size={15} />Nuovo profilo</button>
-        </div>
+        {/* in cima, nello stile del Radar (29/10): quanti profili e come stanno */}
+        <HeroHead eyebrow="Account"
+          title={list.length ? "I profili di" : onlyMine ? "Nessun profilo" : "Ancora nessun"} accent={list.length ? `${list.length} creator` : onlyMine ? "assegnato a te" : "profilo"}
+          sub={list.length ? "Una cartella per creator: tocca per vedere i profili, il giorno del warm-up e le segnalazioni." : null}
+          numbers={list.length ? <>
+            <BigNum label="Profili" value={tot} />
+            <BigNum label="In verde" value={stAll.verde} title="Nessuna segnalazione aperta" />
+            <BigNum label="In arancione" value={stAll.arancione} title="Segnalazione aperta, da seguire" />
+            <BigNum label="In rosso" value={stAll.rosso} strong={stAll.rosso > 0} title="Segnalazione grave aperta" />
+          </> : null}
+          actions={mineSeg()} />
         {!list.length ? (
           <div style={{ ...cardBox, textAlign: "center", padding: "30px 18px" }}>
             <h3 style={{ margin: "0 0 6px", fontWeight: 500 }}>{onlyMine ? "Nessun profilo assegnato a te" : "Registra il primo profilo"}</h3>
@@ -1114,10 +1230,18 @@ export default function WarmupPage() {
 
   // ── scheda Dati ──
   function viewReport() {
+    const nonOn = ACC.filter((a) => stateOf(a) !== "online").length;
+    const inWarmAll = ACC.filter((a) => !isCooldown(a) && opDay(a) <= 7).length;
     return (
       <>
-        <h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: "0 0 4px" }}>Dati</h2>
-        <p style={{ ...hint, fontSize: 14, margin: "0 0 12px" }}>Panoramica, numeri della settimana e segnalazioni · {PLATS[plat].label}</p>
+        {/* in cima, nello stile del Radar (29/10): di cosa parla la scheda e tre numeri di tutta la farm */}
+        <HeroHead eyebrow="Dati" title="I numeri dei profili" accent={PLATS[plat].label}
+          sub="Panoramica del periodo, numeri della settimana, segnalazioni ed esportazione."
+          numbers={ACC.length ? <>
+            <BigNum label="Profili" value={ACC.length} />
+            <BigNum label="In warm-up" value={inWarmAll} title="Nei primi 7 giorni, cooldown esclusi" />
+            <BigNum label="Non online" value={nonOn} strong={nonOn > 0} title="Shadowban, sospesi o bannati" />
+          </> : null} />
         <Tabs small items={[["pano", "Panoramica"], ["week", "Settimana"], ["flags", "Segnalazioni"], ["exp", "Esporta"]]} value={rpane} onChange={setRpane} />
         {rpane === "pano" && viewPano()}
         {rpane === "week" && viewWeekAll()}
@@ -1547,18 +1671,24 @@ export default function WarmupPage() {
     else if (tab === "admin" && admin) body = viewAdmin();
     else if (tab === "xrefs" && plat === "x") body = <XRefs />;
     else if (tab === "radar") body = <ClipRadar />;
-    else if (tab === "guide") body = <><h2 className="ds-sect" style={{ fontSize: 22, fontWeight: 500, margin: "0 0 4px" }}>Guida{plat === "x" ? " · X" : ""}</h2><p style={{ ...hint, fontSize: 14, margin: "0 0 14px" }}>{plat === "x" ? "Il riassunto del documento Account X." : "Il riassunto delle SOP a cui la console fa riferimento."}</p>{plat === "x" ? <GuideX /> : <GuideIG />}</>;
+    else if (tab === "trend") body = <TrendModelle />;
+    else if (tab === "guide") body = <>{plat === "x"
+      ? <HeroHead eyebrow="Guida" title="Come si lavora un profilo" accent="X" sub="Il riassunto del documento Account X: perché conta, i numeri di riferimento, cosa dipende da noi."
+          numbers={<><BigNum label="Visualizzazioni a post con Premium" value={600} strong /><BigNum label="Follower attivi per le prime sub" value={500} /></>} />
+      : <HeroHead eyebrow="Guida" title="Come si scalda un profilo" accent="Instagram" sub="Il riassunto delle SOP a cui la console fa riferimento: calendario, pubblicazioni, finestre, segnalazioni."
+          numbers={<><BigNum label="Giorni di warm-up" value={7} strong /><BigNum label="Reel al giorno, a regime" value={3} /><BigNum label="Finestre USA" value={WINDOWS.length} /></>} />}
+      {plat === "x" ? <GuideX /> : <GuideIG />}</>;
     else { const a = sel && byId(sel); body = a && !a.archived ? viewDay(a) : folder ? viewFolder(folder) : viewFolders(); }
   }
   const modalA = modal?.id ? byId(modal.id) : null;
   // Ispirazioni: reference di creator su X (per Instagram c'è il Radar creator)
   // Contenuti (29/10/2026): l'Editoriale dentro Social, solo per Instagram
-  const tabs = [TABS[0], ...(plat === "ig" ? [["contenuti", "Contenuti"]] : []), ...TABS.slice(1, 3), ...(plat === "x" ? [["xrefs", "Ispirazioni"]] : []), ["radar", "Radar clipping"], ...TABS.slice(3), ...(admin ? [["admin", "Admin"]] : [])];
+  const tabs = [TABS[0], ...(plat === "ig" ? [["contenuti", "Contenuti"]] : []), ...TABS.slice(1, 3), ...(plat === "x" ? [["xrefs", "Ispirazioni"]] : []), ["radar", "Radar clipping"], ["trend", "Trend modelle"], ...TABS.slice(3), ...(admin ? [["admin", "Admin"]] : [])];
   const openToday = ACC.reduce((t, a) => t + tasksOn(a, todayKey()).open.length, 0);
 
   return (
     <div style={{ maxWidth: 1600, margin: "0 auto", padding: "20px 16px calc(110px + env(safe-area-inset-bottom))", fontFamily: FONTS.body, color: CP.textPrimary }}>
-      <PageHead crumbs={[{ label: "Marketing" }, { label: "Social" }]} title="Social"
+      <PageHead crumbs={[{ label: "Marketing" }, { label: "Clipping" }]} title="Clipping"
         subtitle="I profili Instagram e X delle creator: cosa fare oggi, i contenuti, i numeri."
         actions={data ? <button type="button" style={btnPrimary} onClick={() => { setTab("acct"); setSel(null); setForm({}); }}><Plus size={15} />Nuovo profilo</button> : null} />
       <Tabs value={form ? null : tab} style={{ marginBottom: 22 }}

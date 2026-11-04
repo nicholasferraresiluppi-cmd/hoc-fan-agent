@@ -340,7 +340,7 @@ function CreatorDetail({ c, originEl, onClose }) {
                 <div style={{ fontSize: 22, fontWeight: 600 }}>{c.name}</div>
                 <div style={{ fontSize: 13, opacity: 0.8 }}>{c.countries.map((x) => COUNTRY_NAMES[x.country] || x.country).join(" + ")}{r?.day ? ` · giorno ${r.day} di ${r.days}` : ""}</div>
               </div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: L.color, background: "rgba(255,255,255,.92)", borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>{L.word}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: headInk, background: alpha(headInk, "26"), border: `1px solid ${alpha(headInk, "55")}`, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>{L.word}</span>
               <button ref={closeBtn} type="button" onClick={close} aria-label="Chiudi"
                 style={{ width: 40, height: 40, borderRadius: "50%", border: 0, background: "rgba(255,255,255,.25)", color: headInk, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}><X size={18} /></button>
             </div>
@@ -362,7 +362,7 @@ function CreatorDetail({ c, originEl, onClose }) {
             {r && <MiniRace r={r} />}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
               {c.countries.map((x) => (
-                <div key={x.country} style={{ background: "#fff", borderRadius: 16, padding: "12px 14px", display: "grid", gap: 6, fontSize: 13 }}>
+                <div key={x.country} style={{ background: CP.surfaceAlt, borderRadius: 16, padding: "12px 14px", display: "grid", gap: 6, fontSize: 13 }}>
                   {multi && <div style={{ fontSize: 12, fontWeight: 600, color: CP.textMuted }}>{COUNTRY_NAMES[x.country] || x.country}</div>}
                   <ShiftLine s={x.shift} />
                   {x.revenueToday != null && <div>Incassato oggi <b style={NUM}>{usd(x.revenueToday)}</b></div>}

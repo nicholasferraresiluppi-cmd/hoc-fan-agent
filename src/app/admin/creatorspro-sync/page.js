@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import { RefreshCw, Link2, Loader2, CheckCircle2 } from "lucide-react";
 import { FONTS, CP, alpha } from "@/lib/brand";
-import { PageHead, HeroMetric, Metric, SectionTitle, Disclosure, Notice, DataTable, card, NUM } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, SectionTitle, Disclosure, Notice, DataTable, card, NUM, BTN_PRIMARY } from "@/components/ds";
 import { fmt$, fmtInt, fmtPct, fmtAgo, MONTHS_IT } from "@/lib/format";
 import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
@@ -398,4 +398,4 @@ function suggestName(cpName, names) {
 const linkBtn = { background: "none", border: "none", padding: 0, color: CP.accentSoftText, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body };
 const ctl = { padding: "8px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
 const btn = { padding: "6px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body };
-const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 14px", background: CP.accent, color: CP.accentInk, border: "1px solid transparent", borderRadius: 8, fontSize: 14, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };
+const btnPrimary = BTN_PRIMARY;

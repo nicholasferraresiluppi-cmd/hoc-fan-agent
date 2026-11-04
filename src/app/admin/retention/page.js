@@ -14,6 +14,8 @@ import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { PageHead, Notice } from "@/components/ds";
 import { alertDialog } from "@/components/AppDialogs";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, HotTile, RankBars, MixBar } from "@/components/VetroCharts";
 
 const fetcher = async (url) => {
   const r = await fetch(url, { cache: "no-store" });
@@ -144,6 +146,48 @@ function Detail({ p, splitRepeat }) {
   );
 }
 
+// Vetro (30/10/2026): la domanda è «dove si sono fermati i fan che spendevano, e da chi parto?».
+// Le pagine in fila per quanto spendevano al mese i loro fan di valore in pausa (un tocco apre la
+// lista da far riprendere), la scheda dei fan in pausa e i fan di valore divisi in attivi / in pausa /
+// persi. Accanto, le pagine che dipendono da pochi fan.
+function RetentionTop({ pages, S, onOpen }) {
+  const items = pages.filter((p) => p.valuePaused > 0).sort((a, b) => (b.pausedMonthly || 0) - (a.pausedMonthly || 0))
+    .map((p) => ({ label: p.name, value: p.pausedMonthly || 0, onClick: () => onOpen(p.creator_id) }));
+  const mix = [
+    { label: "Attivi", value: S.active, color: CP.accentGreen },
+    { label: "In pausa (1-4 mesi)", value: S.paused, color: "var(--vt-c0)" },
+    { label: "Persi (oltre 4 mesi)", value: S.lost, color: "var(--vt-cx)" },
+  ];
+  const conc = pages.filter((p) => p.top10Share !== null && p.top10Share >= CONC).sort((a, b) => b.top10Share - a.top10Share);
+  return (
+    <div className="vt-row21" style={{ gap: 12, marginBottom: 10 }}>
+      <div style={{ display: "grid", gap: 12, minWidth: 0, alignContent: "start" }}>
+        <Panel i={0} title="Da dove ripartire" aside="quanto spendevano al mese i fan di valore ora in pausa, pagina per pagina · tocca per la lista">
+          {items.length ? <RankBars items={items} format={usd} limit={10} /> : <div style={{ fontSize: 13.5, color: CP.textSecondary }}>Nessun fan di valore in pausa: bene così.</div>}
+        </Panel>
+        <Panel i={1} title="I fan di valore" aside={`almeno ${usd(500)} nell'ultimo anno su quella pagina`}>
+          <MixBar items={mix} format={int} height={26} />
+        </Panel>
+      </div>
+      <div className="vt-side" style={{ display: "grid", gap: 12, minWidth: 0, alignContent: "start" }}>
+        <HotTile i={2} lvl={S.paused ? "ink" : "0"} label="Fan di valore in pausa" value={int(S.paused)}
+          sub={S.paused ? `spendevano circa ${usd(S.pausedMonthly)} al mese · fermi da 1 a 4 mesi` : "nessun fan di valore fermo"} />
+        <Panel i={3}>
+          <div style={{ display: "grid", gridTemplateColumns: "auto auto", columnGap: 18, rowGap: 5, fontSize: 13, color: CP.textSecondary, fontVariantNumeric: "tabular-nums" }}>
+            <span>Revenue 90 giorni</span><b style={{ textAlign: "right", color: CP.textPrimary, fontWeight: 500 }}>{usd(S.rev90)}</b>
+            <span>Fan nuovi 90 giorni</span><b style={{ textAlign: "right", color: CP.textPrimary, fontWeight: 500 }}>{int(S.new90)}</b>
+            <span>Nuovi che tornano entro 60 gg</span><b style={{ textAlign: "right", color: CP.textPrimary, fontWeight: 500 }}>{pct(S.repeat)}</b>
+          </div>
+        </Panel>
+        <Panel i={4} title="Dipendono da pochi fan" aside="i 10 fan più grossi fanno il 40% o più degli ultimi 90 giorni">
+          {conc.length ? <RankBars items={conc.map((p) => ({ label: p.name, value: p.top10Share, onClick: () => onOpen(p.creator_id) }))} format={pct} limit={conc.length} valueWidth={44} total={0} />
+            : <div style={{ fontSize: 13, color: CP.textSecondary }}>Nessuna pagina: il fatturato è distribuito.</div>}
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
 export default function RetentionPage() {
   const { data, error, isLoading, mutate } = useSWR("/api/admin/retention", fetcher, { revalidateOnFocus: false });
   const [open, setOpen] = useState(null);
@@ -161,6 +205,7 @@ export default function RetentionPage() {
   }, [pages]);
   const refresh = async () => { setBusy(true); try { await mutate(await fetcher("/api/admin/retention?refresh=1"), { revalidate: false }); } catch (e) { alertDialog(e.message); } finally { setBusy(false); } };
   const cur = pages.find((p) => p.creator_id === open);
+  const inVetro = useInVetro();
 
   return (
     <div style={{ padding: "24px 16px 80px", maxWidth: 1600, margin: "0 auto" }}>
@@ -175,6 +220,7 @@ export default function RetentionPage() {
       {data && !pages.length && <Notice>Nessuna creator nello split, oppure nessun dato nel warehouse.</Notice>}
 
       {pages.length > 0 && (<>
+        {inVetro ? <RetentionTop pages={pages} S={S} onOpen={setOpen} /> : (
         <div style={{ background: CP.textPrimary, color: CP.bg, borderRadius: 18, padding: "22px 24px", display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 20, flexWrap: "wrap", marginBottom: 10 }}>
           <div>
             <div style={{ fontSize: 13, opacity: 0.65 }}>Fan di valore in pausa</div>
@@ -188,6 +234,7 @@ export default function RetentionPage() {
             <span style={{ opacity: 0.65 }}>Nuovi che tornano</span><span style={{ textAlign: "right" }}>{pct(S.repeat)}</span>
           </div>
         </div>
+        )}
         <div style={{ ...muted, marginBottom: 14 }}>
           Fan di valore = almeno {usd(500)} spesi nell'ultimo anno su quella pagina. {S.concentrated > 0 ? `${S.concentrated} pagine dipendono da pochi fan (i 10 più grossi fanno il 40% o più).` : ""} {data.cached ? "Calcolato oggi." : ""}
         </div>
@@ -197,7 +244,7 @@ export default function RetentionPage() {
             const conc = p.top10Share !== null && p.top10Share >= CONC;
             const repeatTone = p.repeatRate === null || S.repeat === null ? null : p.repeatRate < S.repeat - 0.03 ? CP.accentSoftText : p.repeatRate > S.repeat + 0.03 ? CP.accentGreen : null;
             return (
-              <button key={p.creator_id} onClick={() => setOpen(p.creator_id)} style={{ textAlign: "left", cursor: "pointer", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 14, padding: 16, color: CP.textPrimary, fontFamily: FONTS.body, display: "grid", gap: 6, alignContent: "start" }}>
+              <button key={p.creator_id} onClick={() => setOpen(p.creator_id)} className={inVetro ? "vt-glass" : undefined} style={{ textAlign: "left", cursor: "pointer", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 14, padding: 16, color: CP.textPrimary, fontFamily: FONTS.body, display: "grid", gap: 6, alignContent: "start" }}>
                 <span style={{ fontSize: 13, color: CP.textSecondary }}>{p.name}</span>
                 <div style={{ fontSize: 24, fontWeight: 500, letterSpacing: "-0.01em", fontVariantNumeric: "tabular-nums" }}>{usd(p.rev90)}</div>
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>

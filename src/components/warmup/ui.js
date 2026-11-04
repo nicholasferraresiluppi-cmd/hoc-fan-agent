@@ -3,7 +3,7 @@
 // Pezzi d'interfaccia del warm-up (pagina /admin/warmup). Solo token CP: funziona nei 4 stili.
 import { Check, Clock, X } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
-import { NUM, NumText, FilterChip } from "@/components/ds";
+import { NUM, NumText, FilterChip, BTN_PRIMARY } from "@/components/ds";
 import { mmss } from "@/lib/warmup-plan";
 
 export const TONE = {
@@ -15,7 +15,7 @@ export const TONE = {
 export const statusColor = (s) => (s === "rosso" ? CP.accentRed : s === "arancione" ? CP.attn : CP.accentGreen);
 
 export const btn = { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, background: CP.surfaceAlt, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 10, padding: "9px 14px", fontSize: 14, cursor: "pointer", fontFamily: FONTS.body, minHeight: 40 };
-export const btnPrimary = { ...btn, background: CP.accent, color: CP.accentInk, border: `1px solid ${CP.accent}`, fontWeight: 500 };
+export const btnPrimary = BTN_PRIMARY;
 export const btnDanger = { ...btn, color: CP.accentRed, border: `1px solid ${alpha(CP.accentRed, "66")}` };
 export const btnOk = { ...btn, color: CP.accentGreen, border: `1px solid ${alpha(CP.accentGreen, "66")}` };
 export const btnSm = { ...btn, padding: "5px 10px", fontSize: 13, minHeight: 32 };

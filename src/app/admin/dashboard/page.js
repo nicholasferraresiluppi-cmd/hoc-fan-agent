@@ -16,6 +16,8 @@ import PlayerCard from "@/components/PlayerCard";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, Notice, Disclosure, DataTable, SectionTitle, ActionRow, card, ATTN } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, RankBars, HotTile } from "@/components/VetroCharts";
 
 const SKILLS = [
   { key: "naturalezza", label: "Naturalezza" },
@@ -51,6 +53,7 @@ export default function SMDashboard() {
   const [loading, setLoading] = useState(true);
   const [cardOp, setCardOp] = useState(null);
   const [idleOpen, setIdleOpen] = useState(false);
+  const inVetro = useInVetro();
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -126,7 +129,9 @@ export default function SMDashboard() {
 
       {!loading && data?.operators && (
         <>
-          <HeroMetric
+          {inVetro && <TrainTop operators={operators} cohortAvg={data.cohortAvg} total={data.totalRecords} active7={active7} signals={signals.length} idle={idle.length}
+            onSignals={() => document.getElementById("dash-guardare")?.scrollIntoView({ behavior: "smooth", block: "start" })} />}
+          {!inVetro && <HeroMetric
             label="Media del gruppo nel simulatore"
             value={`${fmtInt(data.cohortAvg || 0)} / 100`}
             compare={`${fmtInt(data.totalRecords || 0)} sessioni valutate di ${fmtInt(operators.length)} operatori`}
@@ -138,7 +143,7 @@ export default function SMDashboard() {
               <Metric label="In calo questa settimana" value={fmtInt(signals.filter((a) => a.type === "trend_negativo").length)} note="−10 punti o più" />
               <Metric label="Fermi da oltre 7 giorni" value={fmtInt(idle.length)} />
             </div>
-          </HeroMetric>
+          </HeroMetric>}
 
           {operators.length > 0 && active7 === 0 && (
             <Notice>
@@ -147,7 +152,7 @@ export default function SMDashboard() {
           )}
 
           {signals.length > 0 && (
-            <section style={{ ...card, marginBottom: 14, overflow: "hidden" }}>
+            <section id="dash-guardare" className={inVetro ? "vt-glass" : undefined} style={{ ...card, marginBottom: 14, overflow: "hidden", scrollMarginTop: 80 }}>
               <div style={{ padding: "14px 16px 4px" }}>
                 <SectionTitle aside="apri la scheda per capire su cosa allenarli">Da guardare ({signals.length})</SectionTitle>
               </div>
@@ -221,6 +226,29 @@ export default function SMDashboard() {
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+// Vetro: «su quali abilità conviene lavorare, e chi si allena?». Le abilità sono del gruppo (media nel
+// simulatore), non persone: dalla più debole, con la tacca del 60 sotto cui la pagina segnala l'abilità.
+function TrainTop({ operators, cohortAvg, total, active7, signals, idle, onSignals }) {
+  const skills = SKILLS.map((s) => {
+    const v = operators.map((o) => o.skills?.[s.key]).filter((x) => x != null);
+    return { label: s.label, value: v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null };
+  }).filter((x) => x.value != null).sort((a, b) => a.value - b.value);
+  return (
+    <div className="vt-row21" style={{ marginBottom: 18 }}>
+      <Panel title={`Media del gruppo ${fmtInt(cohortAvg || 0)} su 100`} aside={`${fmtInt(total || 0)} sessioni di ${fmtInt(operators.length)} operatori · abilità dalla più debole`} i={0}>
+        {skills.length ? <RankBars items={skills} format={(v) => String(v)} limit={skills.length} mark={LOW} markLabel={`${LOW}: sotto, l'abilità è da allenare`} />
+          : <div style={{ fontSize: 13, color: CP.textMuted }}>Ancora nessuna sessione valutata.</div>}
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+        <HotTile i={1} lvl={operators.length && active7 === operators.length ? "0" : undefined} label="Allenati negli ultimi 7 giorni" value={`${fmtInt(active7)} su ${fmtInt(operators.length)}`}
+          sub={idle ? `${fmtInt(idle)} fermi da oltre 7 giorni` : "nessuno fermo da oltre 7 giorni"} />
+        <HotTile i={2} lvl={signals ? "ink" : undefined} label="Da guardare" value={fmtInt(signals)} sub={signals ? "molto sotto la media o in calo questa settimana" : "nessuno molto sotto la media o in calo"}
+          onClick={signals ? onSignals : undefined} />
+      </div>
     </div>
   );
 }

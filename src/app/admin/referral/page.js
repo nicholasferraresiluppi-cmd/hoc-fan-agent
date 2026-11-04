@@ -4,7 +4,7 @@ import useSWR from "swr";
 import { useMemo, useState } from "react";
 import { Plus, Send } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, HeroMetric, Metric, FilterChip, DataTable, Notice, SectionTitle, Disclosure } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, DataTable, Notice, SectionTitle, Disclosure, Tabs, BTN_PRIMARY } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
 import { TutorialVideoButton } from "@/components/TutorialVideo";
 import VetroScope, { useVetro, VetroSwitch, VetroNum } from "@/components/VetroScope";
@@ -31,7 +31,7 @@ const fetcher = async (url) => {
 const lbl = { display: "block", fontSize: 13, color: CP.textSecondary, margin: "12px 0 4px" };
 const inp = { width: "100%", boxSizing: "border-box", padding: "9px 10px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
 const btn = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 13px", background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };
-const btnPrimary = { ...btn, background: CP.accent, color: CP.accentInk, borderColor: CP.accent };
+const btnPrimary = BTN_PRIMARY;
 const btnQuiet = { ...btn, background: "transparent", border: "none", color: CP.textSecondary, padding: "8px 4px" };
 
 async function post(body) {
@@ -533,13 +533,8 @@ export default function ReferralAdminPage() {
           </HeroMetric>
           )}
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-            {TABS.map(([k, l]) => (
-              <FilterChip key={k} active={tab === k} onClick={() => setTab(k)}
-                attn={k === "fx" && data.fxMonths.some((m) => data.fx[m] == null)}
-                label={k === "topay" ? `${l} · ${data.toPay.length}` : k === "crm" ? `${l} · ${data.suggestions.length}` : k === "fx" ? `${l} · ${data.fxMonths.filter((m) => data.fx[m] == null).length} da inserire` : l} />
-            ))}
-          </div>
+          <Tabs value={tab} onChange={setTab}
+            items={TABS.map(([k, l]) => [k, l, k === "topay" ? data.toPay.length : k === "crm" ? data.suggestions.length : k === "fx" ? (data.fxMonths.filter((m) => data.fx[m] == null).length ? `${data.fxMonths.filter((m) => data.fx[m] == null).length} da inserire` : null) : null])} />
 
           {tab === "overview" && (
             <Overview vetro={vetro} d={data.dashboard} rules={data.rules} onOpenReferrer={(id) => { const r = data.referrers.find((x) => x.id === id); if (r) setModal({ kind: "referrer", initial: r }); }} />

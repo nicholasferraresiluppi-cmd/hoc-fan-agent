@@ -218,9 +218,9 @@ export function hocBlockLines(person, byName, { cfPlain } = {}) {
   if (s(f.otherSkills) && !has("Altro che sa fare")) lines.push(`Altro che sa fare: ${oneLine(f.otherSkills, 500)}`);
   const learn = normalizeLearnList(f.learnWish);
   if (learn.length && !has("Vorrebbe imparare")) lines.push(`Vorrebbe imparare: ${learn.map(skillName).join(", ")}`);
-  // Location senza coordinate: ClickUp la rifiuta, il testo va nel blocco
+  // indirizzo: nel campo «Indirizzo» se la lista ce l'ha, altrimenti riga nel blocco
   const loc = f.location;
-  if (loc?.address && (loc.lat == null || loc.lng == null)) lines.push(`Dove vive (testo): ${s(loc.address)}`);
+  if (loc?.address && !has("Indirizzo")) lines.push(`Dove vive (testo): ${s(loc.address)}`);
   return lines;
 }
 
@@ -375,7 +375,7 @@ export function statusForCollaboration(statuses = [], phase) {
  * deve vedere anche su ClickUp, non devo accorgermene io"). Confronta la scheda dell'app col
  * task, campo per campo, e restituisce le chiavi che su ClickUp NON sono come in app.
  * Solo i campi che la lista ha davvero; esclusi: sola lettura, file, codice fiscale (cifrato
- * in app), indirizzo su mappa (ClickUp vuole lat/lng: il testo va nel blocco).
+ * in app). L'indirizzo è un campo specchio («Indirizzo», testo) dal 04/11/2026.
  * Telefoni ed email confrontati normalizzati; campi specchio sull'impronta del testo.
  */
 export function clickupDrift(person, task, fieldsMeta = null) {

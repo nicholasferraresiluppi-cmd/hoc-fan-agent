@@ -18,6 +18,18 @@ export const BASE_DAYS = 30;          // finestra della mediana
 export const MIN_BASE = 3;            // video minimi per avere una mediana
 export const PRICE = { ig: 0.0014, tt: 0.0015 }; // $ a video letto (listino Apify, tier attuale)
 export const PER_PROFILE = 20;        // video letti per profilo a giro
+// Profilo piccolo (29/10, Nicholas sul «×44» di una pagina da 223 visualizzazioni): sotto questa
+// mediana bastano poche migliaia di visualizzazioni per un multiplo enorme, che può essere un caso.
+// Il multiplo resta, ma si dice «profilo piccolo» e il video non fa da protagonista.
+export const SMALL_BASE = 1000;
+export const isSmallBase = (base) => base != null && base < SMALL_BASE;
+
+/** Il multiplo scritto per esteso: «44× il solito», «9,9× il solito» (una cifra decimale sotto 10). */
+export function timesLabel(n, { short = false } = {}) {
+  if (n == null || !Number.isFinite(Number(n))) return "";
+  const x = Number(n) >= 10 ? String(Math.round(Number(n))) : String(Math.round(Number(n) * 10) / 10).replace(".", ",");
+  return short ? `${x}×` : `${x}× il solito`;
+}
 
 const DAY = 86_400_000;
 const s = (v, max = 300) => (v == null ? "" : String(v).trim().slice(0, max));

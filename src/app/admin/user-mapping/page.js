@@ -5,7 +5,7 @@ import useSWR from "swr";
 import Link from "next/link";
 import { Link2, CheckCircle2, Sparkles, Unlink, RefreshCw, Loader2, Search } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, HeroMetric, Metric, FilterChip, Notice, DataTable, NUM } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, Notice, DataTable, NUM, BTN_PRIMARY } from "@/components/ds";
 import { fmtInt } from "@/lib/format";
 import { confirmDialog } from "@/components/AppDialogs";
 
@@ -175,5 +175,5 @@ export default function UserMappingPage() {
   );
 }
 
-const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", background: CP.accent, border: "1px solid transparent", borderRadius: 8, fontSize: 13, fontWeight: 500, color: CP.accentInk, cursor: "pointer", fontFamily: FONTS.body };
+const btnPrimary = BTN_PRIMARY;
 const btnGhost = { display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, color: CP.textSecondary, cursor: "pointer", fontFamily: FONTS.body };
