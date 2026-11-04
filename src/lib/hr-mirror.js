@@ -45,6 +45,7 @@ export function mirrorText(key, f = {}) {
     case "birthPlace": return f.birthPlace?.abroad ? s(f.birthPlace.country) : place(f.birthPlace);
     case "residenceComune": return place(f.residenceComune);
     case "residenceCap": return oneLine(f.residenceCap, 20);
+    case "location": return oneLine(f.location?.address, 300);
     case "skillLevels": {
       const sm = normalizeSkillMap(f.skillLevels);
       return SKILL_AREAS.map((a) => {
@@ -301,6 +302,7 @@ export function parseMirror(key, text, { comuni = null } = {}) {
     case "learnWish": r = parseLearnWish(text); break;
     case "pastRoles": r = parsePastRoles(text); break;
     case "residenceCap": case "otherSkills": r = { value: s(text) || null, unknown: [] }; break;
+    case "location": r = { value: s(text) ? { address: s(text), lat: null, lng: null } : null, unknown: [] }; break;
     default: return { ok: false, value: null, unknown: [], reason: "campo sconosciuto" };
   }
   const ok = !r.unknown.length && !r.reason;

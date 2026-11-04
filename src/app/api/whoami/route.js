@@ -7,7 +7,8 @@ import { getCreatorScope } from "@/lib/creator-scope";
 import { resolveWorkspace } from "@/lib/workspace-store";
 import { defaultWorkspace } from "@/lib/workspaces";
 import { restrictionFor } from "@/lib/restricted-roles";
-import { hasAccountingAccess } from "@/lib/compensi-access";
+import { hasAccountingAccess, isAccountingOwner } from "@/lib/compensi-access";
+import { hasPresenzeAccess } from "@/lib/presenze-access";
 import { serverTiming } from "@/lib/server-timing";
 
 export async function GET() {
@@ -37,6 +38,9 @@ export async function GET() {
     // dato solo dal titolare (lib/compensi-access). Pseudo-permesso solo per mostrare la voce di menu;
     // le API si difendono da sole. In "Vedi come" mai.
     if (!va && (await hasAccountingAccess(userId).catch(() => false))) capabilities["accounting.private"] = "all";
+    if (!va && isAccountingOwner(userId)) capabilities["owner.private"] = "all";
+    // Presenze Discord (03/11/2026): accesso a parte come la Contabilità (lib/presenze-access)
+    if (!va && hasPresenzeAccess(userId)) capabilities["presenze.private"] = "all";
     // appena attivata la 2FA la cache del controllo si aggiorna subito
     if (adminRaw && user?.twoFactorEnabled) await kv.set(`mfa:ok:${userId}`, 1, { ex: 600 }).catch(() => {});
     st.mark("rest");

@@ -10,7 +10,7 @@ import {
   valueHash, dropUnchangedSinceBase, matchPendingAssignment,
 } from "../src/lib/hr-people-core.js";
 import {
-  decodeDropdown, decodeLabels, decodeCustomField, msToIsoDate, isoDateToMs, taskToPerson, personToClickup,
+  decodeDropdown, decodeLabels, decodeCustomField, msToIsoDate, isoDateToMs, taskToPerson, personToClickup, clickupDrift,
   createTaskPayload, statusForCollaboration, parseHocBlock, withHocBlock, stripHocBlock, HOC_BLOCK_START,
   encodeFieldValue, incomingTimestamps,
 } from "../src/lib/hr-clickup-map.js";
@@ -173,6 +173,16 @@ const meta = task.custom_fields.map(({ value, ...f }) => f);
   const meta2 = [...meta, { id: "f-cf", name: "Codice fiscale", type: "short_text" }];
   const plan2 = personToClickup(person, meta2, { cfPlain: "RSSMRA85T10A562S" });
   eq(plan2.fieldOps.find((o) => o.key === "codiceFiscale").body, { value: "RSSMRA85T10A562S" }, "CF sul campo dedicato");
+  // indirizzo (04/11/2026): campo «Indirizzo» sulla lista → testo lì, niente riga nel blocco
+  const meta3 = [...meta, { id: "f-ind", name: "Indirizzo", type: "short_text" }];
+  const planInd = personToClickup(person, meta3, {});
+  eq(planInd.fieldOps.find((o) => o.key === "location").body, { value: "Roma" }, "indirizzo come testo nel campo «Indirizzo»");
+  ok(!planInd.description.includes("Dove vive (testo)"), "con il campo «Indirizzo» niente riga nel blocco");
+  const back = taskToPerson({ id: "t1", name: "Anna Bianchi", custom_fields: [{ id: "f-ind", name: "Indirizzo", type: "short_text", value: "Via Garibaldi 5" }] });
+  eq(back.fields.location, { address: "Via Garibaldi 5", lat: null, lng: null }, "indirizzo corretto su ClickUp torna in app");
+  const empty = taskToPerson({ id: "t1", name: "Anna", custom_fields: [{ id: "f-ind", name: "Indirizzo", type: "short_text" }] });
+  eq(empty.fields.location, null, "«Indirizzo» vuoto su ClickUp = indirizzo vuoto");
+  eq(clickupDrift(person, { id: "t1", name: "Anna Bianchi", custom_fields: [{ id: "f-ind", name: "Indirizzo", type: "short_text" }] }, meta3).includes("location"), true, "indirizzo mancante su ClickUp = differenza da riparare");
   ok(!plan2.description.includes("Codice fiscale"), "con campo dedicato il CF non va nel blocco");
   const plan3 = personToClickup(person, meta2, { cfPlain: undefined });
   ok(plan3.skipped.some((x) => x.key === "codiceFiscale"), "senza chiave il CF non si spinge (e non si cancella)");
@@ -1047,6 +1057,20 @@ console.log(`hr-people: ${n} asserzioni OK`);
   const sNew = await H.getPerson(sara.id);
   t(sNew.fields.source === "Ho visto un annuncio o un post sui social", "campo nuovo e vuoto su ClickUp: il valore dell'app resta");
   t(recNew.parityChecked >= 1 && recNew.drift.length === 0 && cu.tasks.get(taskId).values["f-prov"] === "o-alt", "parità: il campo nuovo su ClickUp viene riempito dall'app");
+  FIELDS_META.pop();
+
+  // 2c) incidente 04/11: campo specchio nuovo («Indirizzo») vuoto su ClickUp con una base
+  //     ereditata dal campo vecchio («Location»): l'app non si svuota e la parità lo riempie
+  await H.savePerson({ id: sara.id, input: { location: "Via Roma 1" }, actor: "admin", source: "app" });
+  const sLoc = await H.getPerson(sara.id);
+  await fake.set(`hr:person:${sara.id}`, { ...sLoc, cuBase: { ...(sLoc.cuBase || {}), location: valueHash(null) }, fieldUpdatedAt: { ...(sLoc.fieldUpdatedAt || {}), location: 1 } });
+  FIELDS_META.push({ id: "f-ind", name: "Indirizzo", type: "short_text" });
+  const recInd = await H.importFromClickup({ mode: "reconcile", by: "test" });
+  t((await H.getPerson(sara.id)).fields.location?.address === "Via Roma 1", "«Indirizzo» nuovo e vuoto con base vecchia: l'indirizzo dell'app resta");
+  t(recInd.drift.length === 0 && cu.tasks.get(taskId).values["f-ind"] === "Via Roma 1", "parità: «Indirizzo» riempito dall'app");
+  editOnClickup(taskId, "Indirizzo", null);
+  await webhook(taskId, ["Indirizzo"]);
+  t((await H.getPerson(sara.id)).fields.location == null, "chi cancella l'indirizzo su ClickUp lo cancella anche in app");
   FIELDS_META.pop();
 
   // 3) modifica vera su ClickUp → l'app si aggiorna (anche le etichette Skills seguono)

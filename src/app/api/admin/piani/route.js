@@ -26,7 +26,12 @@ async function gate() {
   if (!isAdmin && !social.ok) return { err: Response.json({ error: "Non hai il permesso per questa azione" }, { status: 403 }) };
   const caps = new Set([...(social.ok ? ["social.manage"] : [])]);
   let name = userId;
-  try { const u = await currentUser(); name = u?.fullName || u?.firstName || name; } catch {}
+  // chi non ha il nome in Clerk (es. Luis: solo l'email) firma col nome preso dall'email, mai con l'id utente
+  try {
+    const u = await currentUser();
+    const local = String(u?.primaryEmailAddress?.emailAddress || u?.emailAddresses?.[0]?.emailAddress || "").split("@")[0].split(/[._-]/)[0];
+    name = u?.fullName || u?.firstName || (local ? local[0].toUpperCase() + local.slice(1) : name);
+  } catch {}
   return { by: { userId, name }, admin: isAdmin, canSee: (p) => isAdmin || (p.cap && caps.has(p.cap)) };
 }
 

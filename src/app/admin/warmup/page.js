@@ -22,6 +22,7 @@ import {
 import { GuideIG, GuideX } from "@/components/warmup/guide";
 import XRefs from "@/components/warmup/xrefs";
 import ClipRadar from "@/components/warmup/clip-radar";
+import TrendModelle from "@/components/warmup/trend-modelle";
 import {
   DAY, PLATS, platOf, isX, keyOf, norm, todayKey, startOfDay, fmtDur, mmss, weekKey, weekLabel, lastWeeks,
   numFmt, delta, planFor, planForDate, visibleItems, dayProgress, tasksOn, adherence, hasArrears,
@@ -815,7 +816,8 @@ export default function WarmupPage() {
       const bits = g.rows.map((r) => ({ ...r, ...taskBits(r.a, r.item, r.done, tk) }));
       return { ...g, bits, open: bits.filter((b) => !b.on).length };
     });
-    const req = all.filter((g) => !g.item.opt && g.open).sort((x, y) => y.open - x.open);
+    // Ordine del piano, fisso: una card scende tra le «già fatte» solo quando è spuntata su TUTTI i profili.
+    const req = all.filter((g) => !g.item.opt && g.open);
     const opt = all.filter((g) => g.item.opt && g.open);
     const doneAll = all.filter((g) => !g.open);
     const rich = (item) => Boolean(item.timer) || Boolean(pubKindOfTask(item.id));
@@ -857,8 +859,8 @@ export default function WarmupPage() {
             {extras.map((x) => <div key={x.a.id} style={{ ...cardBox, padding: 0, marginBottom: 10 }}><div style={{ padding: "10px 14px 0", fontSize: 14, fontWeight: 500 }}>{x.a.username}</div>{x.el}</div>)}
           </>
         )}
-        {opt.length > 0 && <Fold title={`${opt.length} ${opt.length === 1 ? "azione facoltativa" : "azioni facoltative"}`}>{opt.map(card)}</Fold>}
         {doneAll.length > 0 && <Fold title={`${doneAll.length} ${doneAll.length === 1 ? "azione già fatta" : "azioni già fatte"} su tutti i profili`}>{doneAll.map(card)}</Fold>}
+        {opt.length > 0 && <Fold title={`${opt.length} ${opt.length === 1 ? "azione facoltativa" : "azioni facoltative"}`}>{opt.map(card)}</Fold>}
       </>
     );
   }
@@ -1669,6 +1671,7 @@ export default function WarmupPage() {
     else if (tab === "admin" && admin) body = viewAdmin();
     else if (tab === "xrefs" && plat === "x") body = <XRefs />;
     else if (tab === "radar") body = <ClipRadar />;
+    else if (tab === "trend") body = <TrendModelle />;
     else if (tab === "guide") body = <>{plat === "x"
       ? <HeroHead eyebrow="Guida" title="Come si lavora un profilo" accent="X" sub="Il riassunto del documento Account X: perché conta, i numeri di riferimento, cosa dipende da noi."
           numbers={<><BigNum label="Visualizzazioni a post con Premium" value={600} strong /><BigNum label="Follower attivi per le prime sub" value={500} /></>} />
@@ -1680,7 +1683,7 @@ export default function WarmupPage() {
   const modalA = modal?.id ? byId(modal.id) : null;
   // Ispirazioni: reference di creator su X (per Instagram c'è il Radar creator)
   // Contenuti (29/10/2026): l'Editoriale dentro Social, solo per Instagram
-  const tabs = [TABS[0], ...(plat === "ig" ? [["contenuti", "Contenuti"]] : []), ...TABS.slice(1, 3), ...(plat === "x" ? [["xrefs", "Ispirazioni"]] : []), ["radar", "Radar clipping"], ...TABS.slice(3), ...(admin ? [["admin", "Admin"]] : [])];
+  const tabs = [TABS[0], ...(plat === "ig" ? [["contenuti", "Contenuti"]] : []), ...TABS.slice(1, 3), ...(plat === "x" ? [["xrefs", "Ispirazioni"]] : []), ["radar", "Radar clipping"], ["trend", "Trend modelle"], ...TABS.slice(3), ...(admin ? [["admin", "Admin"]] : [])];
   const openToday = ACC.reduce((t, a) => t + tasksOn(a, todayKey()).open.length, 0);
 
   return (
