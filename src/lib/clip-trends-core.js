@@ -4,7 +4,7 @@
 // guarda PROFILI scelti a mano; un trend invece nasce su decine di account piccoli che rifanno lo
 // stesso formato nelle stesse settimane (es. la cascata «me when him»: 9,1 mln su un profilo da 2 mila
 // follower, poi rifatta da decine di altri). Per trovarlo si cerca per FORMATO, non per profilo:
-// ogni settimana le ricerche salvate («me when him», «behind the screen»…) passano su TikTok e
+// ogni giorno (dal 4/11; prima ogni settimana) le ricerche salvate («me when him»…) passano su TikTok e
 // Instagram, e qui si misura quanto il formato è vivo adesso.
 //
 // Il segnale di trend, in ordine di peso:
@@ -26,7 +26,14 @@ export const MIN_SOUND_ACCOUNTS = 3;   // account diversi perché un audio conti
 export const MAX_QUERIES = 20;
 export const PER_QUERY = { tt: 30, ig: 20 };
 export const TREND_PRICE = { tt: 0.0023, ig: 0.0021 }; // $ a risultato (listino Apify, tier attuale)
-export const REFRESH_DAYS = 7;
+// ogni giorno (4/11, Nicholas: un meme sale e si spegne in pochi giorni, a settimana arrivavamo tardi)
+export const REFRESH_HOURS = 20;
+// «in salita / in calo» si confronta con il giro di circa una settimana prima, non con ieri
+export const HEAT_BACK_DAYS = 6.5;
+export const HIST_KEEP = 10;
+// musica in salita negli USA (classifiche TikTok Popular+Viral, crescita sui 7 giorni)
+export const MUSIC_ROWS = 30;
+export const MUSIC_PRICE = 0.0027;
 export const MAX_CANDIDATES = 30;
 // oltre questi follower (solo TikTok li dice) è una pagina media o una celebrità, non una pagina da cui imparare il formato
 export const BIG_ACCOUNT = 1_000_000;
@@ -147,7 +154,7 @@ const formatRank = (a, b) => (b.hits - a.hits) || ((b.shareRate ?? -1) - (a.shar
  * Dal giro di ricerche ai trend da mostrare.
  * queries: [{ id, text, country }]; posts: post normalizzati (con .query); prev: { [queryId]: summary } della settimana prima.
  */
-export function buildTrends(queries, posts, prev = {}, now = Date.now()) {
+export function buildTrends(queries, posts, prev = {}, now = Date.now(), extra = []) {
   const byText = new Map();
   for (const p of posts || []) if (p?.query) (byText.get(p.query) || byText.set(p.query, []).get(p.query)).push(p);
   const formats = (queries || []).map((q) => {
@@ -158,15 +165,24 @@ export function buildTrends(queries, posts, prev = {}, now = Date.now()) {
   // audio che tornano su più account (con il paese della ricerca che li ha trovati)
   const countryOf = new Map((queries || []).map((q) => [q.text, q.country]));
   const bySound = new Map();
-  for (const p of posts || []) {
-    if (!p?.soundId) continue;
-    const g = bySound.get(p.soundId) || { id: p.soundId, name: p.sound || "", posts: [], countries: new Set() };
+  // anche i video dei profili del Radar: un audio che torna su più pagine di clipping è un meme
+  // anche se nessuna ricerca lo trova (4/11)
+  const nameKey = new Map();
+  for (const p of [...(posts || []), ...(extra || [])]) {
+    let k = soundKey(p);
+    if (!k) continue;
+    // lo stesso audio trovato per id (ricerche) e per nome (Radar) è uno solo
+    const nk = p.sound ? `${p.platform}:n:${String(p.sound).trim().toLowerCase()}` : null;
+    if (p.soundId && nk) { if (!nameKey.has(nk)) nameKey.set(nk, p.soundId); }
+    else if (nk && nameKey.has(nk)) k = nameKey.get(nk);
+    const g = bySound.get(k) || { id: k, name: p.sound || "", posts: [], countries: new Set(), radar: 0 };
     g.posts.push(p); g.name = g.name || p.sound || "";
+    if (!p.query) g.radar++;
     if (countryOf.has(p.query)) g.countries.add(countryOf.get(p.query));
-    bySound.set(p.soundId, g);
+    bySound.set(k, g);
   }
   const sounds = [...bySound.values()]
-    .map((g) => ({ id: g.id, name: g.name, countries: [...g.countries], ...summarize(g.posts, now) }))
+    .map((g) => ({ id: g.id, name: g.name, countries: [...g.countries], radar: g.radar, ...summarize(g.posts, now) }))
     .filter((s) => s.accounts >= MIN_SOUND_ACCOUNTS && s.hits >= 1)
     .sort(formatRank)
     .slice(0, 12);
@@ -221,7 +237,64 @@ export const prevSnapshot = (formats) => Object.fromEntries((formats || []).map(
 /** Tetto di spesa di un giro: risultati attesi × prezzo × 1,5 + avvii. */
 // TikTok da un paese costa un supplemento a risultato (add-on «Scrape as in country»)
 export const COUNTRY_ADDON = 0.0008;
-export const trendBudget = (nQueries) => Math.round((nQueries * (PER_QUERY.tt * (TREND_PRICE.tt + COUNTRY_ADDON) + PER_QUERY.ig * TREND_PRICE.ig) * 1.5 + 0.08) * 100) / 100;
+export const trendBudget = (nQueries) => Math.round((nQueries * (PER_QUERY.tt * (TREND_PRICE.tt + COUNTRY_ADDON) + PER_QUERY.ig * TREND_PRICE.ig) * 1.5 + MUSIC_ROWS * MUSIC_PRICE + 0.08) * 100) / 100;
 
-/** Il giro va fatto? Una volta a settimana, o subito se non c'è mai stato. */
-export const trendsDue = (last, now) => !last?.at || now - last.at >= (REFRESH_DAYS - 0.5) * DAY;
+/** Il giro va fatto? Una volta al giorno (20 ore di margine: il giro notturno slitta), o subito se non c'è mai stato. */
+export const trendsDue = (last, now) => !last?.at || now - last.at >= REFRESH_HOURS * 3_600_000;
+
+/**
+ * Lo storico dei giri (solo i numeri per `heat`), il più recente in fondo. Con il giro giornaliero il
+ * confronto si fa con il giro di circa una settimana prima: il più recente fatto almeno HEAT_BACK_DAYS
+ * giorni fa. Se non c'è ancora (prima settimana), il più vecchio che c'è purché di almeno 2 giorni;
+ * altrimenti niente confronto.
+ */
+export function pickPrev(hist, now) {
+  const h = (hist || []).filter((x) => x?.at && x.snap);
+  const back = h.filter((x) => now - x.at >= HEAT_BACK_DAYS * DAY);
+  if (back.length) return back[back.length - 1];
+  const old = h.filter((x) => now - x.at >= 2 * DAY);
+  return old[0] || null;
+}
+export const pushHist = (hist, at, snap) => [...(hist || []).filter((x) => x?.at && x.snap), { at, snap }].slice(-HIST_KEEP);
+
+/**
+ * Una riga della classifica musica (trendingtiktoksongs/tiktok-trending-sounds-history, modalità
+ * crescita) → { id, title, artist, usage, change, growthPct, url, cover, commercial, charts, rank }.
+ * La stessa canzone esce due volte (Popular e Viral): si fonde in `musicList`.
+ */
+export function normalizeMusicRow(row) {
+  if (!row?.sound_id || !row.title) return null;
+  return {
+    id: `tt:${row.sound_id}`, title: String(row.title).slice(0, 120), artist: String(row.artist || "").slice(0, 120),
+    usage: num(row.usage_count), change: num(row.usage_change),
+    growthPct: num(row.usage_growth_pct) != null ? Math.round(num(row.usage_growth_pct)) : null,
+    url: String(row.tiktok_url || "").slice(0, 300) || null, cover: String(row.cover_url || "").slice(0, 1200) || null,
+    commercial: Boolean(row.is_commerce_music), original: Boolean(row.is_original_sound),
+    charts: row.chart_type ? [String(row.chart_type)] : [], rank: num(row.rank),
+  };
+}
+export function musicList(rows) {
+  const by = new Map();
+  for (const r of rows || []) {
+    const m = normalizeMusicRow(r);
+    if (!m) continue;
+    const ex = by.get(m.id);
+    if (!ex) { by.set(m.id, m); continue; }
+    ex.charts = [...new Set([...ex.charts, ...m.charts])];
+    ex.rank = Math.min(ex.rank ?? Infinity, m.rank ?? Infinity);
+    if ((m.change ?? -1) > (ex.change ?? -1)) Object.assign(ex, { usage: m.usage, change: m.change, growthPct: m.growthPct });
+  }
+  return [...by.values()].filter((m) => (m.change ?? 0) > 0).sort((a, b) => b.change - a.change).slice(0, 15);
+}
+
+/**
+ * La chiave dell'audio di un video: l'id quando c'è (ricerche), altrimenti il nome (i video del Radar
+ * hanno solo il nome). L'audio originale del profilo stesso non è un trend: null.
+ */
+export function soundKey(p) {
+  if (p?.soundId) return p.soundId;
+  const name = String(p?.sound || "").trim().toLowerCase();
+  if (!name || !p?.platform) return null;
+  if (/original|originale/.test(name) && p.owner && name.includes(String(p.owner).toLowerCase())) return null;
+  return `${p.platform}:n:${name}`;
+}

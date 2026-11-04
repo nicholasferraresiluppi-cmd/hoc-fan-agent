@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import {
   parseQuery, queryId, igQueryFromUrl, normalizeTrendRow, summarize, heat, buildTrends, prevSnapshot,
-  trendBudget, trendsDue, HIT_VIEWS, DEFAULT_QUERIES, candidateAccounts, SEARCH_COUNTRY, COUNTRY_ADDON,
+  trendBudget, trendsDue, pickPrev, pushHist, musicList, soundKey, buildTrends as bt, HIST_KEEP, HIT_VIEWS, DEFAULT_QUERIES, candidateAccounts, SEARCH_COUNTRY, COUNTRY_ADDON,
 } from "../src/lib/clip-trends-core.js";
 
 let n = 0;
@@ -89,7 +89,7 @@ eq(t2.formats.find((f) => f.id === "ita:io quando lui").heat, "stabile", "zero e
 eq(buildTrends([{ id: "eng:new", text: "new", country: "eng" }], [], snap, NOW).formats[0].heat, "nuovo", "ricerca aggiunta in settimana");
 
 // --- spesa e cadenza
-eq(trendBudget(9), Math.round((9 * (30 * (0.0023 + COUNTRY_ADDON) + 20 * 0.0021) * 1.5 + 0.08) * 100) / 100, "tetto del giro (con TikTok da un paese)");
+eq(trendBudget(9), Math.round((9 * (30 * (0.0023 + COUNTRY_ADDON) + 20 * 0.0021) * 1.5 + 30 * 0.0027 + 0.08) * 100) / 100, "tetto del giro (TikTok da un paese + musica USA)");
 eq(SEARCH_COUNTRY, { eng: "US", ita: "IT" }, "inglese dagli USA, italiano dall'Italia");
 
 // --- profili da seguire
@@ -120,7 +120,41 @@ ok(!cand.some((c) => c.id === "tt:mediapage"), "scarta le pagine sopra il milion
 ok(!cand.some((c) => ["tt:piccolo", "tt:vecchio"].includes(c.id)), "scarta sotto soglia e vecchi");
 eq(candidateAccounts([], queries, [], NOW), [], "niente post, niente profili");
 ok(trendsDue(null, NOW), "mai fatto: sì");
-ok(!trendsDue({ at: NOW - 2 * D }, NOW), "2 giorni fa: no");
-ok(trendsDue({ at: NOW - 7 * D }, NOW), "una settimana fa: sì");
+ok(!trendsDue({ at: NOW - 10 * 3_600_000 }, NOW), "10 ore fa: no");
+ok(trendsDue({ at: NOW - 21 * 3_600_000 }, NOW), "ieri notte (anche se il cron slitta): sì");
+
+// storico per «in salita / in calo»: il giro di circa una settimana prima
+const H = [1, 3, 5, 6, 7, 8].map((d) => ({ at: NOW - d * D, snap: { d } })).reverse();
+eq(pickPrev(H, NOW).snap.d, 7, "il più recente fatto almeno 6,5 giorni fa");
+eq(pickPrev(H.filter((x) => x.snap.d <= 5), NOW).snap.d, 5, "prima settimana: il più vecchio di almeno 2 giorni");
+eq(pickPrev([{ at: NOW - D, snap: {} }], NOW), null, "solo ieri: niente confronto");
+eq(pickPrev(null, NOW), null, "niente storico");
+let hh = [];
+for (let i = 0; i < HIST_KEEP + 3; i++) hh = pushHist(hh, i, { i });
+eq([hh.length, hh[0].at, hh[hh.length - 1].at], [HIST_KEEP, 3, HIST_KEEP + 2], "lo storico tiene gli ultimi giri");
+
+// musica: la stessa canzone in Popular e Viral è una sola
+const mus = musicList([
+  { sound_id: "1", title: "Housewife", artist: "Tate", usage_count: 482106, usage_change: 154814, usage_growth_pct: 47.3, chart_type: "popular", rank: 2 },
+  { sound_id: "1", title: "Housewife", artist: "Tate", usage_count: 482106, usage_change: 154815, usage_growth_pct: 47.3, chart_type: "viral", rank: 16 },
+  { sound_id: "2", title: "Ramalama", artist: "R", usage_count: 840079, usage_change: 328026, chart_type: "popular", rank: 30 },
+  { sound_id: "3", title: "Ferma", usage_count: 10, usage_change: 0, chart_type: "popular" },
+  { title: "senza id" },
+]);
+eq(mus.map((m) => m.id), ["tt:2", "tt:1"], "ordine per crescita, scarta chi non cresce e le righe rotte");
+eq([mus[1].charts.sort(), mus[1].rank, mus[1].change, mus[1].growthPct], [["popular", "viral"], 2, 154815, 47], "fusione delle due classifiche");
+
+// audio: il proprio audio originale non conta; i video del Radar si sommano a quelli delle ricerche
+eq(soundKey({ platform: "ig", owner: "imsophri", sound: "Original audio · imsophri" }), null, "audio originale del profilo stesso");
+eq(soundKey({ platform: "ig", owner: "altra", sound: "Original audio · imsophri" }), "ig:n:original audio · imsophri", "audio originale di un altro: è un riuso");
+eq(soundKey({ platform: "tt", soundId: "tt:9", sound: "x" }), "tt:9", "l'id vince sul nome");
+const rv = (owner, views, sound) => ({ platform: "ig", owner, views, postedAt: NOW - 2 * D, sound, url: "u" });
+const igs = (code, owner, views) => ({ ...normalizeTrendRow({ shortCode: code, type: "Video", ownerUsername: owner, videoPlayCount: views, timestamp: iso(2),
+  musicInfo: { audio_id: "77", song_name: "Angel Of My Dreams", artist_name: "JADE" }, inputUrl: "https://www.instagram.com/explore/search/keyword/?q=me%20when%20him" }, "ig") });
+const snd = bt(queries, [igs("A1", "s1", 400_000)], {}, NOW, [rv("r1", 80_000, "Angel Of My Dreams · JADE"), rv("r2", 60_000, "Angel Of My Dreams · JADE"), rv("r3", 900, "Original audio · r3")]).sounds;
+eq(snd.length, 1, "un solo audio che torna");
+eq([snd[0].id, snd[0].accounts, snd[0].hits, snd[0].radar], ["ig:77", 3, 3, 2], "stesso audio per id (ricerca) e per nome (Radar)");
+const onlyRadar = bt(queries, [], {}, NOW, ["a", "b", "c"].map((o) => rv(o, 70_000, "Meme audio · x"))).sounds;
+eq([onlyRadar.length, onlyRadar[0].countries], [1, []], "un audio solo dal Radar si trova anche senza ricerche");
 
 console.log(`clip-trends: ${n} asserzioni ok`);
