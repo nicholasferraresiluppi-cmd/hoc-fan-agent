@@ -9,7 +9,7 @@
 // La spesa va nello stesso tetto mensile del Radar (clipradar:spend:{YYYY-MM}).
 import { kv } from "@vercel/kv";
 import { apifyConfigured, capUsd, spentThisMonth, addSpend, listProfiles } from "@/lib/clip-radar";
-import { SIMILAR_PER_SEED, SIMILAR_PRICE, similarBudget, similarDue, similarList } from "@/lib/clip-trends-core";
+import { SIMILAR_PER_SEED, SIMILAR_PRICE, similarBudget, similarDue, similarList, pickSeeds } from "@/lib/clip-trends-core";
 
 const API = "https://api.apify.com/v2";
 const ACTOR = "memo23~instagram-similar-profiles-scraper";
@@ -26,8 +26,8 @@ async function apify(path, init) {
   return text ? JSON.parse(text) : null;
 }
 
-/** Le pagine di partenza: i profili Instagram del Radar che non sono nostri. */
-const seedsOf = (profiles) => profiles.filter((p) => p.platform === "ig" && !p.ours).map((p) => ({ handle: p.handle, country: p.country || null }));
+// le pagine di partenza: quelle segnate (o tutte le Instagram non nostre, se nessuna è segnata)
+const seedsOf = pickSeeds;
 
 /** Avvia il giro (se è il momento, o `force`). Ritorna { started } | { busy } | { idle } | { skip }. */
 export async function startSimilar({ force = false, by = null } = {}) {
@@ -88,5 +88,6 @@ export async function loadSimilar() {
   // chi nel frattempo è entrato nel Radar non si propone più
   const inRadar = new Set(profiles.map((p) => p.id));
   if (l?.list) l.list = l.list.filter((c) => !inRadar.has(c.id));
-  return { last: l, running: j ? { startedAt: j.startedAt, by: j.by } : null, budget: similarBudget(seedsOf(profiles).length) };
+  const pages = profiles.filter((p) => p.platform === "ig" && !p.ours).map((p) => ({ id: p.id, handle: p.handle, seed: Boolean(p.similarSeed) }));
+  return { last: l, running: j ? { startedAt: j.startedAt, by: j.by } : null, budget: similarBudget(seedsOf(profiles).length), pages, chosen: pages.some((p) => p.seed) };
 }

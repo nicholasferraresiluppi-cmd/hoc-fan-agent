@@ -6,7 +6,7 @@
 // sulle pagine del Radar + musica in salita negli USA.
 import { useState } from "react";
 import useSWR from "swr";
-import { ExternalLink, Music, Play, Plus, RefreshCw, Trash2, Users } from "lucide-react";
+import { Check, ExternalLink, Music, Play, Plus, RefreshCw, Trash2, Users } from "lucide-react";
 import { CP } from "@/lib/brand";
 import { Notice, NUM, FilterBar, EmptyState, SectionTitle } from "@/components/ds";
 import { confirmDialog } from "@/components/AppDialogs";
@@ -264,8 +264,24 @@ export default function ClipTrends({ cf, setCf }) {
           : !sim.last ? <p style={{ ...hint, margin: "6px 0 10px" }}>Ancora nessuna ricerca dei simili. Parte da sola una volta a settimana; la prima la puoi far partire adesso.</p>
           : !similar.length ? <p style={{ ...hint, margin: "6px 0 10px" }}>Nessun profilo simile nuovo{sim.last.error ? ` (ultimo giro: ${sim.last.error})` : ""}.</p>
           : similar.map((c) => <SimilarRow key={c.id} c={c} busy={!!busy} onAdd={follow} />)}
+        {sim.pages?.length > 0 && (
+          <div style={{ paddingTop: 10, borderTop: `1px solid ${CP.borderSoft}` }}>
+            <div style={{ ...hint, fontSize: 12.5, marginBottom: 6 }}>
+              Si parte da: {sim.chosen ? "le pagine segnate" : "tutte le pagine Instagram del Radar (nessuna segnata)"}. Segna solo le pagine del genere che cerchi: da una pagina di modelle Instagram suggerisce altre modelle, da una di meme altre pagine di meme. Vale dalla prossima ricerca.
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {sim.pages.map((p) => (
+                <button key={p.id} type="button" aria-pressed={p.seed} disabled={!!busy}
+                  onClick={() => run(`seed:${p.id}`, { action: "similar_seed", id: p.id, on: !p.seed }, null)}
+                  style={{ ...btnSm, ...(p.seed ? { background: CP.accentSoft, borderColor: CP.accent, color: CP.accentSoftText } : {}) }}>
+                  {p.seed ? <Check size={12} /> : null}@{p.handle}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {!sim.running && (
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", paddingTop: 10, borderTop: similar.length ? `1px solid ${CP.borderSoft}` : "none" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", paddingTop: 10, marginTop: sim.pages?.length ? 10 : 0, borderTop: similar.length || sim.pages?.length ? `1px solid ${CP.borderSoft}` : "none" }}>
             <button type="button" style={btnSm} disabled={!!busy || !data.configured} onClick={refreshSimilar}><RefreshCw size={13} />{busy === "similar" ? "Avvio…" : `Cerca simili adesso (~${String(sim.budget ?? 0).replace(".", ",")} $)`}</button>
             {sim.last?.at && <span style={{ ...hint, fontSize: 12.5 }}>ultima ricerca {when(sim.last.at)}, da {sim.last.seeds?.length || 0} pagine</span>}
           </div>
