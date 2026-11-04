@@ -176,7 +176,8 @@ t("import telefoni: nome ripulito", () => {
 
 t("ruolo ristretto social", () => {
   const r = restrictionFor({ admin: false, roles: ["social"] });
-  assert.equal(r.home, "/admin/supervisor");
+  assert.equal(r.home, "/admin/warmup"); // dal 22/10/2026 si arriva sul Warm-up, il lavoro di ogni giorno
+  assert.equal(pathAllowed(r, "/admin/warmup"), true);
   assert.equal(pathAllowed(r, "/admin/supervisor"), true);
   assert.equal(pathAllowed(r, "/admin/supervisor/"), true);
   assert.equal(pathAllowed(r, "/admin"), false);

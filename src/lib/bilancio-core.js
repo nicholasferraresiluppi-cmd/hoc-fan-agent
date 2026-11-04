@@ -103,14 +103,19 @@ export function buildBilancio({ creators = [], daily = [], prevTotals = {}, goal
   const prevDay = cal.day > 1 ? `${cal.month}-${pad(cal.day - 1)}` : null;
 
   // venduto per account: giorno → net (solo il mese del giorno scelto, fino a quel giorno)
-  const byId = new Map();
+  // byMonth = tutto il mese fino a OGGI: serve all'andamento, che non dipende dal giorno scelto (3/11)
+  const byId = new Map(), byMonth = new Map();
+  const add = (map, id, date, v) => {
+    if (!map.has(id)) map.set(id, new Map());
+    const m = map.get(id);
+    m.set(date, (m.get(date) || 0) + v);
+  };
   for (const r of daily) {
     const date = String(r.date);
-    if (!date.startsWith(cal.month) || date > day) continue;
+    if (!date.startsWith(cal.month) || date > today) continue;
     const id = Number(r.creator_id);
-    if (!byId.has(id)) byId.set(id, new Map());
-    const m = byId.get(id);
-    m.set(date, (m.get(date) || 0) + n(r.net));
+    add(byMonth, id, date, n(r.net));
+    if (date <= day) add(byId, id, date, n(r.net));
   }
 
   const derive = (o) => {
@@ -188,14 +193,16 @@ export function buildBilancio({ creators = [], daily = [], prevTotals = {}, goal
   for (const g of eco) g.rank = g.reach != null ? ++grank : null;
   if (rest.length) eco.push({ id: "_altre", name: eco.length ? "Altre creator" : "Tutte le creator", other: true, rank: null, creators: rest, ...sumRows(rest.flatMap((c) => c.accounts)) });
 
-  // Andamento del mese: una riga per giorno, colonne per paese.
+  // Andamento del mese: una riga per giorno, colonne per paese. Mostra sempre il mese fino a oggi,
+  // anche se si è scelto un giorno passato (3/11, Nicholas: «non va in base alla selezione del giorno»):
+  // il giorno scelto resta evidenziato, i giorni dopo non spariscono.
   const countryOf = new Map();
   for (const c of creators) for (const a of c.accounts || []) countryOf.set(Number(a.creator_id), a.country);
   const days = [];
   for (let d = 1; d <= cal.daysInMonth; d++) {
     const date = `${cal.month}-${pad(d)}`;
-    const row = { date, day: d, weekday: new Date(`${date}T00:00:00Z`).getUTCDay(), future: date > day, partial: live && date === day, selected: date === day, IT: 0, EN: 0, ES: 0, total: 0 };
-    for (const [id, m] of byId) {
+    const row = { date, day: d, weekday: new Date(`${date}T00:00:00Z`).getUTCDay(), future: date > today, partial: date === today, selected: date === day, IT: 0, EN: 0, ES: 0, total: 0 };
+    for (const [id, m] of byMonth) {
       const v = m.get(date);
       if (!v) continue;
       const k = countryOf.get(id);

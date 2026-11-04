@@ -50,15 +50,6 @@ export function lkClicksSql(refs, ids, range) {
     FROM b GROUP BY 1, 2`;
 }
 
-/** Welcome mass unlocks — andamento giornaliero di subs_count e unlocks_count (le due linee di Looker). */
-export function lkWelcomeDailySql(refs, ids, range) {
-  return `
-    SELECT FORMAT_DATE('%Y-%m-%d', calendar_date) AS day, SUM(subs_count) AS subs, SUM(unlocks_count) AS unlocks
-    FROM \`${refs.welcomeUnlocks}\`
-    WHERE creator_id IN (${idList(ids)}) AND calendar_date BETWEEN ${d(range.from)} AND ${d(range.to)}
-    GROUP BY 1 ORDER BY 1`;
-}
-
 /**
  * Performance KPI per creators — onlyfans.transactions_analytics per creator: new_subs, num_transactions,
  * tot_revenue (senza abbonamenti), unique_users (spending users), revenue per transazione e per utente,

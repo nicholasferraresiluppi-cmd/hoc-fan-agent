@@ -1,0 +1,268 @@
+"use client";
+
+// Stile "Vetro caldo" in PROVA (25/10/2026, scelta di Nicholas dai reel di @code.xr): solo su Casa
+// (/admin) e Le mie creator. Non è un tema: ridefinisce le variabili CP sul contenitore, così le
+// pagine non cambiano codice; fondo sfumato fatto in CSS (niente foto), vetro sfocato sui riquadri
+// e sulle tabelle, riquadri che entrano sfocati e vanno a fuoco. Spegnibile per persona
+// (localStorage hoc:vetro = "0"), di base acceso. Con "Riduci movimento" niente entrata.
+// "Riduci trasparenza" (hoc:vetro:solid): riquadri quasi pieni e niente sfocatura; senza una scelta
+// segue l'impostazione di sistema (prefers-reduced-transparency). <VetroNum> fa salire i numeri
+// fino al valore alla prima apparizione, solo dentro il vetro acceso (fuori: il testo com'è).
+// 26/10/2026: due tinte (hoc:vetro:tinta) — "blu" (vetro bianco su azzurro, accento viola HOC, la
+// prima prova del canvas che Nicholas ha scelto: di base) e "caldo" (il vetro sabbia di prima).
+// Sempre 26/10: sulle pagine in prova (VETRO_PATHS) AppShell avvolge tutto il guscio, così anche il menu
+// a sinistra diventa una lastra di vetro staccata dal bordo, con la voce attiva piena di viola (reel 1).
+// 4/11/2026: tinta «notte» = il vetro sul tema scuro. Segue il selettore sole/luna (hoc:theme), che col
+// vetro su tutta l'app non cambiava più niente.
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { CP_VETRO, CP_VETRO_BLU, CP_VETRO_NOTTE } from "@/lib/brand";
+import { useTheme } from "@/lib/theme-client";
+
+const KEY = "hoc:vetro";
+const EVT = "hoc:vetro-change";
+
+export function useVetro() {
+  const [on, setOn] = useState(true);
+  useEffect(() => {
+    // 27/10/2026: stile unico vetro (decisione di Nicholas) → niente più «spegni»; chi l'aveva spento lo ritrova
+    const read = () => { try { if (localStorage.getItem(KEY) === "0") localStorage.removeItem(KEY); } catch {} setOn(true); };
+    read();
+    window.addEventListener(EVT, read);
+    return () => window.removeEventListener(EVT, read);
+  }, []);
+  const set = (v) => {
+    try { localStorage.setItem(KEY, v ? "1" : "0"); } catch {}
+    setOn(v);
+    window.dispatchEvent(new Event(EVT));
+  };
+  return [on, set];
+}
+
+const SOLID_KEY = "hoc:vetro:solid";
+
+export function useVetroSolid() {
+  const [solid, setSolid] = useState(false);
+  useEffect(() => {
+    const read = () => {
+      let v = null;
+      try { v = localStorage.getItem(SOLID_KEY); } catch {}
+      setSolid(v == null ? Boolean(window.matchMedia?.("(prefers-reduced-transparency: reduce)").matches) : v === "1");
+    };
+    read();
+    window.addEventListener(EVT, read);
+    return () => window.removeEventListener(EVT, read);
+  }, []);
+  const set = (v) => {
+    try { localStorage.setItem(SOLID_KEY, v ? "1" : "0"); } catch {}
+    setSolid(v);
+    window.dispatchEvent(new Event(EVT));
+  };
+  return [solid, set];
+}
+
+const TINT_KEY = "hoc:vetro:tinta";
+
+export function useVetroTint() {
+  // vetro bianco col tema chiaro, vetro notte col tema scuro (la prova «caldo» è chiusa)
+  const [theme] = useTheme();
+  const tint = theme === "dark" ? "notte" : "blu";
+  const set = (v) => {
+    try { localStorage.setItem(TINT_KEY, v); } catch {}
+    window.dispatchEvent(new Event(EVT));
+  };
+  return [tint, set];
+}
+
+/** Pagine in prova: qui il vetro avvolge anche il menu e le schede in alto (AppShell). */
+export const VETRO_PATHS = ["/admin/warmup", "/admin", "/admin/le-mie-creator", "/admin/bilancio", "/admin/revenue-pacing", "/leaderboard/sales-cp", "/leaderboard/creators", "/admin/hr", "/admin/sales-coaching", "/admin/analisi-vendite", "/admin/publisher-x", "/admin/referral", "/me/porta-un-amico", "/admin/editoriale", "/admin/s4s", "/admin/chat-monitor", "/admin/fan-da-recuperare", "/admin/pnl-live", "/admin/profiles-compare", "/admin/comp-calendar", "/admin/threshold-study", "/admin/comp-review", "/admin/comp-exam", "/admin/payout-tree", "/admin/payment-profiles", "/admin/shift-research", "/admin/retention", "/admin/telegram", "/admin/sales-ai", "/admin/prova-fedelta", "/admin/conversation-intelligence", "/admin/looker", "/admin/manuale-vendite", "/admin/creator-split", "/leaderboard/creators/heatmap", "/admin/shift-quality", "/me/score", "/me/compenso", "/me/percorso", "/me/turno", "/me/qualita", "/me/coaching", "/me/contestazioni", "/me/allenatore", "/profilo", "/admin/settimana", "/admin/action-center", "/admin/coaching-center", "/admin/coaching-sessions", "/admin/ruoli", "/admin/ruoli-custom", "/admin/team", "/cm-cockpit", "/admin/scouting", "/admin/studio-social", "/admin/supervisor", "/admin/social-proxies", "/admin/social-accounts", "/admin/ads", "/academy/vendere", "/academy/lezioni", "/academy/tapes", "/playbook", "/leaderboard", "/leaderboard/leghe", "/leaderboard/storico", "/profilo/certificazioni", "/admin/sessions", "/admin/review", "/admin/outcomes", "/admin/qa-reviews", "/admin/academy-tapes", "/admin/academy-signals", "/admin/transfer", "/admin/activation", "/admin/infloww-ingest", "/admin/dashboard", "/admin/alerts", "/admin/attribution-drilldown", "/admin/candidate-assessments", "/admin/creator-difficulty", "/admin/creators", "/admin/creatorspro-sync", "/admin/debug-mapping", "/admin/disputes", "/admin/employee-profiles", "/admin/fan-archetypes", "/admin/group-categories", "/admin/group-languages", "/admin/infloww-agency", "/admin/infloww-reconcile", "/admin/infloww-revenue", "/admin/leaderboard-exclusions", "/admin/leaderboard-import", "/admin/leaderboard-settings", "/admin/loop", "/admin/operator-signals", "/admin/piani", "/admin/priority-queue", "/admin/qualita", "/admin/reports", "/admin/roadmap", "/admin/score-config-drafts", "/admin/score-config-history", "/admin/seed", "/admin/seniority", "/admin/user-mapping", "/admin/utilizzo", "/admin/wage-audit", "/contabilita", "/contabilita/split", "/cultura", "/grazie", "/guida", "/leaderboard/operational", "/welcome", "/welcome/score-explained", "/welcome/score-friendly", "/admin/creator-ai", "/admin/presenze-discord", "/admin/benvenuto"];
+// pagine con una parte variabile nell'indirizzo (la scheda di una persona, i suoi contratti): basta l'inizio
+export const VETRO_PREFIXES = ["/admin/hr/", "/academy/lezioni/", "/admin/sessions/", "/leaderboard/operational/", "/admin/operator-signals/"];
+export const isVetroPath = (p) => {
+  const x = String(p || "").replace(/\/$/, "") || "/";
+  return VETRO_PATHS.includes(x) || VETRO_PREFIXES.some((pre) => x.startsWith(pre));
+};
+
+const VetroCtx = createContext(false);
+/** true dentro il vetro acceso: per le cose che esistono solo nella prova (es. la scheda che si apre). */
+export const useInVetro = () => useContext(VetroCtx);
+
+// "$248.300", "1.210", "62%", "$1.234,50" → prefisso, numero, decimali, suffisso. Altro (—, testo) = com'è.
+const NUM_RE = /^(\D*?)(\d{1,3}(?:\.\d{3})+|\d+)(,\d+)?(\D*)$/;
+const group = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+/** Numero che sale fino al valore la prima volta che compare (dentro il vetro acceso). */
+export function VetroNum({ value }) {
+  const active = useContext(VetroCtx);
+  const m = typeof value === "string" ? value.match(NUM_RE) : null;
+  const target = m ? Number(m[2].replace(/\./g, "") + (m[3] ? "." + m[3].slice(1) : "")) : null;
+  const done = useRef(false);
+  const [shown, setShown] = useState(null);
+  useEffect(() => {
+    if (!active || target == null || done.current) return;
+    done.current = true;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    let raf; const t0 = performance.now(), dur = 900;
+    const step = (now) => {
+      const x = Math.min(1, (now - t0) / dur);
+      setShown(target * (1 - Math.pow(1 - x, 3)));
+      if (x < 1) raf = requestAnimationFrame(step); else setShown(null);
+    };
+    setShown(0);
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [active, target]);
+  if (!m || shown == null) return value;
+  const dec = m[3] ? m[3].length - 1 : 0;
+  const [int, frac] = shown.toFixed(dec).split(".");
+  return `${m[1]}${group(int)}${frac ? "," + frac : ""}${m[4]}`;
+}
+
+const toVars = (o) => Object.entries(o).map(([k, v]) => `--cp-${k}:${v};`).join("");
+// Per tinta: variabili, fondo, ombra del vetro, colore della "cifra" principale, tessere delle icone,
+// riquadri quando la trasparenza è ridotta.
+const TINTS = {
+  caldo: {
+    vars: toVars(CP_VETRO),
+    bg: "linear-gradient(180deg,rgba(60,38,24,.5) 0,rgba(60,38,24,0) 140px,rgba(255,255,255,0) 70%,rgba(110,80,58,.4) 100%),linear-gradient(90deg,#3a2a20 0%,#6b4a35 7%,#d9c7b4 14%,#eadccc 38%,#c9a888 50%,#ecdfd0 60%,#f1e7db 86%,#7b5a43 94%,#3b2b21 100%)",
+    shadow: "0 18px 44px rgba(60,35,15,.16),inset 0 1px 0 rgba(255,255,255,.55)",
+    ink: "linear-gradient(160deg,#2c211a,#16100c)",
+    tiles: ["#e9c46a", "#14714a", "#1d1510", "#b8573a", "#2d6b6b", "#8a6a4a"],
+    solid: "--cp-surface:rgba(251,246,239,.95);--cp-surfaceAlt:#fffaf3;--cp-border:rgba(60,35,15,.12)",
+    series: ["#1d1510", "#14714a", "#b8573a", "#2d6b6b", "#8a6a4a", "#a89a8c"],
+    darkTiles: [0], lvl1: "rgba(122,79,20,.5)", lvl2: "rgba(158,42,51,.55)",
+  },
+  blu: {
+    vars: toVars(CP_VETRO_BLU),
+    // macchie di colore sfocate come nella copertina del reel: azzurro, lilla, acqua
+    bg: "radial-gradient(620px 620px at 28% -6%,#c9d8ff 0,rgba(201,216,255,0) 70%),radial-gradient(560px 560px at 104% 38%,#e4dcff 0,rgba(228,220,255,0) 70%),radial-gradient(520px 520px at -4% 96%,#d4f1f4 0,rgba(212,241,244,0) 70%),#eef2f8",
+    shadow: "0 10px 40px rgba(40,60,120,.10),inset 0 1px 0 rgba(255,255,255,.9)",
+    ink: "linear-gradient(160deg,#7466ee,#4e3fcf)",
+    tiles: ["#6353e0", "#2f6bff", "#0f8a8a", "#147a4c", "#e0a33b", "#c2508a"],
+    solid: "--cp-surface:rgba(255,255,255,.96);--cp-surfaceAlt:#ffffff;--cp-border:rgba(20,30,60,.10)",
+    // serie dei grafici: validate_palette (dataviz) passa lightness, chroma, daltonici e contrasto; ultima = «Altre»
+    series: ["#6353e0", "#009b9d", "#c97a10", "#c2508a", "#2f6bff", "#9aa2b5"],
+    darkTiles: [4], lvl1: "rgba(224,163,59,.75)", lvl2: "rgba(180,48,61,.55)",
+  },
+  notte: {
+    scheme: "dark",
+    vars: toVars(CP_VETRO_NOTTE),
+    // stesse macchie del vetro bianco, accese su un fondo quasi nero
+    bg: "radial-gradient(620px 620px at 28% -6%,rgba(99,83,224,.34) 0,rgba(99,83,224,0) 70%),radial-gradient(560px 560px at 104% 38%,rgba(47,107,255,.22) 0,rgba(47,107,255,0) 70%),radial-gradient(520px 520px at -4% 96%,rgba(15,138,138,.22) 0,rgba(15,138,138,0) 70%),#0a0d16",
+    shadow: "0 10px 40px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.07)",
+    ink: "linear-gradient(160deg,#7466ee,#4e3fcf)",
+    tiles: ["#6353e0", "#2f6bff", "#0f8a8a", "#147a4c", "#e0a33b", "#c2508a"],
+    solid: "--cp-surface:rgba(22,28,44,.97);--cp-surfaceAlt:#262f47;--cp-border:rgba(255,255,255,.12)",
+    // validate_palette --mode dark sul fondo #141a28: lightness, chroma, daltonici e contrasto passano
+    series: ["#8b7cf6", "#14a8aa", "#bf8320", "#d06aa0", "#5c87f0", "#7d869c"],
+    darkTiles: [4], lvl1: "rgba(224,163,59,.7)", lvl2: "rgba(240,140,140,.55)",
+  },
+};
+// :root davanti = vince sulle regole dello stile Casa ([data-style="v3"] .ds-hero …)
+const SEL = [".vt-glass", ".ds-hero", ".ds-open", ".ds-tbl-wrap", ".ds-notice", ".hub-tool"].map((c) => `:root .hoc-vetro ${c}`).join(",");
+const cssFor = (t) => {
+  const T = TINTS[t];
+  const GLASS = `background:var(--cp-surface) !important;border:1px solid var(--cp-border) !important;box-shadow:${T.shadow} !important;backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%)`;
+  return `
+.hoc-vetro,.hoc-vetro-pop{${T.series.map((c, i) => `--vt-c${i === 5 ? "x" : i}:${c};`).join("")}}
+.hoc-vetro{${T.vars}color-scheme:${T.scheme || "light"};position:relative;isolation:isolate;min-height:100vh;color:var(--cp-textPrimary);background:${T.bg};background-attachment:fixed}
+${SEL}{${GLASS};border-radius:22px !important}
+:root .hoc-vetro .hub-tool{border-radius:16px !important}
+:root .hoc-vetro .hub-tool:hover{background:var(--cp-surfaceAlt) !important}
+:root .hoc-vetro .ds-tbl-wrap .ds-tr > td{background-color:transparent !important}
+:root .hoc-vetro .vt-glass[data-lvl="1"]{border-color:${T.lvl1} !important}
+:root .hoc-vetro .vt-glass[data-lvl="2"]{border-color:${T.lvl2} !important}
+/* Colore = stato (come la pipeline di «rapport»): giallo attenzione, verde bene, rosso da guardare */
+:root .hoc-vetro .vt-hero .ds-hero{border-color:transparent !important;--cp-textPrimary:#fff;--cp-textSecondary:rgba(255,255,255,.84);--cp-textMuted:rgba(255,255,255,.74);--cp-border:rgba(255,255,255,.3);--cp-accentGreen:#bdf0d3;--cp-accentRed:#ffc2c2;--cp-attn:#fff;--cp-gold:#f3d58a;--cp-accent:#fff}
+:root .hoc-vetro .vt-hero[data-tone="good"] .ds-hero{background:linear-gradient(160deg,#1f8a5b,#11653f) !important}
+:root .hoc-vetro .vt-hero[data-tone="ink"] .ds-hero{background:${T.ink} !important}
+.hoc-vetro .vt-head{margin:-18px -18px 0;padding:16px 18px;border-radius:21px 21px 0 0}
+.hoc-vetro [data-lvl="0"] .vt-head{background:#14714a;--cp-textPrimary:#fff;--cp-textMuted:rgba(255,255,255,.78)}
+.hoc-vetro [data-lvl="1"] .vt-head{background:#e9c46a;--cp-textPrimary:#1d1510;--cp-textMuted:rgba(29,21,16,.7)}
+.hoc-vetro [data-lvl="2"] .vt-head{background:#b23a3a;--cp-textPrimary:#fff;--cp-textMuted:rgba(255,255,255,.8)}
+/* Schede «da fare» piene di colore (come le «Hot deals» di rapport): rosso = critico, inchiostro = da fare, verde = tutto a posto */
+.hoc-vetro .vt-hot{display:grid;gap:4px;align-content:start;min-width:0;border-radius:20px;padding:14px 16px;text-decoration:none;color:var(--cp-textPrimary)}
+.hoc-vetro .vt-hot[data-lvl="2"]{background:#b23a3a;--cp-textPrimary:#fff;--cp-textSecondary:rgba(255,255,255,.86);--cp-textMuted:rgba(255,255,255,.76)}
+.hoc-vetro .vt-hot[data-lvl="ink"]{background:${T.ink};--cp-textPrimary:#fff;--cp-textSecondary:rgba(255,255,255,.84);--cp-textMuted:rgba(255,255,255,.7)}
+.hoc-vetro .vt-hot[data-lvl="0"]{background:#14714a;--cp-textPrimary:#fff;--cp-textSecondary:rgba(255,255,255,.86);--cp-textMuted:rgba(255,255,255,.76)}
+.hoc-vetro a.vt-hot:hover{filter:brightness(1.06)}
+.hoc-vetro .vt-head .vt-pill{${T.scheme === "dark" ? "background:rgba(255,255,255,.2) !important;border-color:rgba(255,255,255,.4) !important;color:var(--cp-textPrimary) !important" : "background:rgba(255,255,255,.92) !important;border-color:transparent !important"}}
+.hoc-vetro .vt-ico{width:34px;height:34px;border-radius:11px;align-items:center;justify-content:center;margin-top:0 !important}
+.hoc-vetro .vt-ico svg{stroke:#fff}
+${T.tiles.map((c, i) => `.hoc-vetro .vt-ico[data-tone="${i}"]{background:${c}}`).join("")}
+${T.darkTiles.map((i) => `.hoc-vetro .vt-ico[data-tone="${i}"] svg{stroke:#1d1510}`).join("")}
+/* menu a sinistra: lastra staccata dal bordo (computer), voce attiva piena d'accento */
+:root:not([data-style="v3"]) .hoc-vetro .hoc-desk .hoc-side{top:12px !important;left:12px !important;bottom:12px !important;width:240px !important;border-radius:24px !important;border:1px solid var(--cp-border) !important;background:var(--cp-surface) !important;box-shadow:${T.shadow};backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%)}
+@media (min-width:900px){:root:not([data-style="v3"]) .hoc-vetro .hoc-main{margin-left:264px}}
+:root:not([data-style="v3"]) .hoc-vetro .hoc-side > div:first-child{padding-left:14px !important;padding-right:10px !important}
+:root:not([data-style="v3"]) .hoc-vetro .hoc-side > div{border-color:var(--cp-borderSoft) !important;background:transparent !important}
+:root:not([data-style="v3"]) .hoc-vetro .hoc-side a{border-radius:12px !important;padding-top:9px !important;padding-bottom:9px !important}
+:root:not([data-style="v3"]) .hoc-vetro .hoc-side a:hover{background:var(--cp-surfaceAlt) !important}
+:root:not([data-style="v3"]) .hoc-vetro .hoc-side a[data-on]{background:var(--cp-accent) !important;color:var(--cp-accentInk) !important;box-shadow:0 6px 18px color-mix(in srgb,var(--cp-accent) 35%,transparent) !important}
+:root:not([data-style="v3"]) .hoc-vetro .hoc-side a[data-on] svg{stroke:var(--cp-accentInk) !important}
+:root:not([data-style="v3"]) .hoc-vetro .hoc-side a[data-on] > span[style*="absolute"]{display:none}
+:root:not([data-style="v3"]) .hoc-vetro .hoc-side .hoc-grp{font-family:inherit !important;letter-spacing:.02em !important;font-size:11.5px !important;font-weight:500 !important}
+:root .hoc-vetro .hoc-mhead-v2{background:var(--cp-surfaceAlt) !important;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.hoc-vetro .vt-row21{display:grid;gap:14px;grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+@media (max-width:999px){.hoc-vetro .vt-row21{grid-template-columns:minmax(0,1fr)}.hoc-vetro .vt-row21 > .vt-side{order:-1}}
+@keyframes vt-in{from{opacity:0;filter:blur(14px);transform:scale(.985)}to{opacity:1;filter:none;transform:none}}
+.hoc-vetro .vt-glass,.hoc-vetro .ds-hero,.hoc-vetro .ds-open,.hoc-vetro .hub-tool{animation:vt-in .7s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--vt-i,0) * 80ms)}
+.hoc-vetro .ds-open{--vt-i:2}.hoc-vetro .hub-tool{--vt-i:4}
+@media (prefers-reduced-motion: reduce){.hoc-vetro .vt-glass,.hoc-vetro .ds-hero,.hoc-vetro .ds-open,.hoc-vetro .hub-tool{animation:none}}
+@media (max-width:699px){:root .hoc-vetro .vt-glass,:root .hoc-vetro .ds-hero,:root .hoc-vetro .ds-open{backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}}
+.hoc-vetro[data-solid]{${T.solid}}
+${SEL.split(",").map((x) => x.replace(".hoc-vetro", ".hoc-vetro[data-solid]")).join(",")}{backdrop-filter:none !important;-webkit-backdrop-filter:none !important}
+`;
+};
+// Ogni regola prende davanti il selettore del tema: il browser applica da solo la tinta giusta
+// (bianco col chiaro, notte con lo scuro) già al primo disegno, senza aspettare JavaScript.
+// Dentro @media le regole prendono il prefisso, dentro @keyframes restano com'erano.
+export function scopeCss(css, root) {
+  let out = "", buf = "", depth = 0, kf = -1;
+  for (const ch of css.replace(/\/\*[\s\S]*?\*\//g, "")) {
+    if (ch === "{") {
+      const s = buf.trim();
+      if (kf < 0 && s && !s.startsWith("@")) {
+        out += s.split(",").map((x) => { x = x.trim(); return x.startsWith(":root") ? root + x.slice(5) : `${root} ${x}`; }).join(",");
+      } else out += s;
+      if (kf < 0 && s.startsWith("@keyframes")) kf = depth;
+      out += "{"; buf = ""; depth++;
+    } else if (ch === "}") {
+      out += buf + "}"; buf = ""; depth--;
+      if (kf === depth) kf = -1;
+    } else buf += ch;
+  }
+  return out + buf;
+}
+// finestre aperte sopra la pagina (portal su body: fuori dal contenitore, stesse variabili della tinta)
+const popFor = (t) => `.hoc-vetro-pop{${TINTS[t].vars}color-scheme:${TINTS[t].scheme || "light"};color:var(--cp-textPrimary)}`;
+const ALL_CSS = scopeCss(cssFor("blu") + popFor("blu"), ':root[data-theme="light"]')
+  + scopeCss(cssFor("notte") + popFor("notte"), ':root:not([data-theme="light"])');
+
+export default function VetroScope({ on, stable = false, children }) {
+  const [solid] = useVetroSolid();
+  const outer = useContext(VetroCtx);
+  // stable (guscio dell'app): stessi elementi acceso o spento, così cambiare pagina non rimonta il menu
+  if (stable) {
+    const live = on && !outer;
+    return (
+      <div className={live ? "hoc-vetro" : undefined} data-solid={live && solid ? "" : undefined}>
+        {live && <style>{ALL_CSS}</style>}
+        <VetroCtx.Provider value={outer || live}>{children}</VetroCtx.Provider>
+      </div>
+    );
+  }
+  if (!on || outer) return children; // già dentro un vetro (AppShell avvolge le pagine in prova)
+  return (
+    <div className="hoc-vetro" data-solid={solid ? "" : undefined}>
+      <style>{ALL_CSS}</style>
+      <VetroCtx.Provider value={true}>{children}</VetroCtx.Provider>
+    </div>
+  );
+}
+
+/**
+ * Era l'interruttore della prova nell'intestazione delle pagine. Dal 29/10/2026 non mostra niente:
+ * i comandi di stile non stanno dentro le pagine (regole d'uso), lo stile è uno solo. «Riduci
+ * trasparenza» segue l'impostazione di sistema (prefers-reduced-transparency).
+ */
+export function VetroSwitch() { return null; }

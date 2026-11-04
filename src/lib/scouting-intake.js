@@ -212,7 +212,7 @@ export async function processSignal({ text, by, why }) {
   const sig = sigFromLink(link0);
   const now = Date.now();
   profiles.push({
-    h, fol: row.fol, medv: row.medv, vf: row.vf ?? null, sig, hl: hlLinks.length > 0, hlLinks, ...(hlVia ? { hlVia } : {}),
+    h, fol: row.fol, medv: row.medv, vf: row.vf ?? null, er: row.er ?? null, sig, hl: hlLinks.length > 0, hlLinks, ...(hlVia ? { hlVia } : {}),
     nic: "", fmt: "nessuno", u: 0, nota: "", ours: false, ag: false, chk: false,
     g: "Da classificare", src: "segnalata", url: row.url || "", bio: row.bio || "",
     hist: [[weekKey(new Date(now)), row.fol, row.medv]], firstSeen: now, lastSeen: now, missing: 0,

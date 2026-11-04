@@ -241,7 +241,7 @@ export default function SquadraTab({ splitId, names, coachingOps }) {
       </p>
 
       {msg && (
-        <div role="status" style={{ position: "fixed", bottom: "calc(16px + env(safe-area-inset-bottom, 0px))", left: "50%", transform: "translateX(-50%)", zIndex: 50, background: CP.panel || CP.surface, border: `1px solid ${msg.ok ? CP.border : CP.accentRed}`, color: msg.ok ? CP.textPrimary : CP.accentRed, borderRadius: 10, padding: "10px 14px", fontSize: 13, display: "flex", gap: 12, alignItems: "center", maxWidth: "calc(100vw - 32px)" }}>
+        <div role="status" className="hoc-dock" style={{ position: "fixed", bottom: "calc(16px + env(safe-area-inset-bottom, 0px))", left: "50%", transform: "translateX(-50%)", zIndex: 50, background: CP.panel || CP.surface, border: `1px solid ${msg.ok ? CP.border : CP.accentRed}`, color: msg.ok ? CP.textPrimary : CP.accentRed, borderRadius: 10, padding: "10px 14px", fontSize: 13, display: "flex", gap: 12, alignItems: "center", maxWidth: "calc(100vw - 32px)" }}>
           <span>{msg.text}</span>
           <button type="button" style={btnSm} onClick={() => setMsg(null)}>Chiudi</button>
         </div>

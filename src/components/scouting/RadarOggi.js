@@ -4,8 +4,8 @@
 // le ultime segnalazioni e da dove vengono i dati.
 import { useEffect, useMemo, useState } from "react";
 import { CP, alpha } from "@/lib/brand";
-import { pickToday, movers, whyLines, reviewQueue } from "@/lib/scouting-core";
-import { SERIF, NUM, fmtFull, fmtDate, btn, btnPrimary, btnQuiet, Initials, LinkChip, Growth, Spark, H2, BigNum, STAGE_LABEL } from "./radar-ui";
+import { pickToday, movers, whyLines, reviewQueue, RATINGS } from "@/lib/scouting-core";
+import { SERIF, NUM, fmtFull, fmtDate, btn, btnPrimary, btnQuiet, Initials, LinkChip, Growth, Spark, H2, BigNum, STAGE_LABEL, RatingChips } from "./radar-ui";
 
 
 export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, act, busy, inbox, onSegnala, onValuta, onReload }) {
@@ -69,9 +69,8 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
                   <LinkChip link={c.link} sig={c.sig} />
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button style={btnPrimary} onClick={() => onOpen(c)}>Apri la scheda</button>
-                    <button style={btn} disabled={busy} onClick={() => act({ action: "stage", id: c.id, stage: "interessante" }, `${c.name}: interessante.`)}>Interessante</button>
-                    <button style={btnQuiet} disabled={busy} onClick={() => act({ action: "stage", id: c.id, stage: "scartata" }, `${c.name}: scartata.`)}>Scarta</button>
                   </div>
+                  <RatingChips value={c.rating} disabled={busy} onRate={(id) => act({ action: "review", id: c.id, decision: id }, `${c.name}: ${RATINGS.find((r) => r.id === id).label}.`)} />
                 </article>
               );
             })}

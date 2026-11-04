@@ -43,7 +43,7 @@ const SKILL_DIMENSIONS = [
 ];
 
 // Stili condivisi della pagina (solo token CP, seguono il tema chiaro/scuro).
-const WRAP = { padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body };
+const WRAP = { padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body };
 const BTN = { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 18px", borderRadius: 8, fontSize: 14, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };
 const BTN_PRIMARY = { ...BTN, background: CP.accent, color: CP.accentInk, border: `1px solid ${CP.accent}` };
 const BTN_SECONDARY = { ...BTN, background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}` };

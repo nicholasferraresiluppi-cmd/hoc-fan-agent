@@ -62,7 +62,10 @@ const PHONE_CSS = `
   .rs-stages{flex-direction:row !important;flex-wrap:wrap}
   .rs-stages button{padding:8px 12px !important;font-size:13.5px !important}
   .rc-scroll{overflow:visible !important}
-  [data-style="v3"] .rv-bar{bottom:calc(80px + env(safe-area-inset-bottom)) !important}
+  /* Valuta (21/10/2026): mentre si vota, via la barra dell'app e il pulsante dei commenti */
+  html.rv-focus .hoc-v3-tabbar, html.rv-focus .hoc-fb{display:none !important}
+  .rv-bar{bottom:calc(8px + env(safe-area-inset-bottom)) !important}
+  .rv-fig{font-size:17px !important}
   .rf-later > div{grid-template-columns:1fr !important;gap:4px !important}
   .rc-cols{grid-template-columns:1fr !important;min-width:0 !important}
 }`;
@@ -130,10 +133,10 @@ export default function ScoutingPage() {
     } finally { setBusy(false); }
   }
 
-  const line2 = sel || !data ? null : tab === "oggi" ? `${fmtFull(paid)} creator con un profilo a pagamento.` : tab === "mercato" ? "Dove c'è spazio, cosa funziona." : tab === "format" ? "I format che esistono già." : tab === "contatti" ? "Dalla scelta alla firma." : tab === "valuta" ? "Una alla volta, nessuna saltata." : `${fmtFull(creators.length)} creator italiane.`;
+  const line2 = sel || !data ? null : tab === "oggi" ? `${fmtFull(paid)} creator con un profilo a pagamento.` : tab === "mercato" ? "Dove c'è spazio, cosa funziona." : tab === "format" ? "I format che esistono già." : tab === "contatti" ? "Dalla scelta alla firma." : tab === "valuta" ? "Un voto per ognuna, nessuna saltata." : `${fmtFull(creators.length)} creator italiane.`;
 
   return (
-    <div className="rx-page" data-sel={sel ? "1" : undefined} style={{ maxWidth: 1280, margin: "0 auto", padding: "24px 20px 72px" }}>
+    <div className="rx-page" data-sel={sel ? "1" : undefined} style={{ maxWidth: 1600, margin: "0 auto", padding: "24px 20px 72px" }}>
       <style>{PHONE_CSS}</style>
       <PageHead
         crumbs={[{ label: "Admin", href: "/admin" }, { label: "Marketing" }]}
@@ -152,7 +155,7 @@ export default function ScoutingPage() {
         </nav>
       )}
 
-      {msg && <div style={{ position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)", zIndex: 900, maxWidth: "calc(100% - 32px)" }}><Notice>{msg} <button onClick={() => setMsg(null)} style={{ ...btn, minHeight: 0, padding: "2px 10px", marginLeft: 8 }}>Ok</button></Notice></div>}
+      {msg && <div className="hoc-dock" style={{ position: "fixed", left: "50%", bottom: "calc(24px + env(safe-area-inset-bottom))", transform: "translateX(-50%)", zIndex: 900, maxWidth: "calc(100% - 32px)" }}><Notice>{msg} <button onClick={() => setMsg(null)} style={{ ...btn, minHeight: 0, padding: "2px 10px", marginLeft: 8 }}>Ok</button></Notice></div>}
       {error && <Notice danger>{error.message}</Notice>}
       {isLoading && <p style={{ color: CP.textMuted }}>Caricamento…</p>}
       {data && creators.length === 0 && <Notice>Il radar è vuoto: si carica con lo script di importazione della ricerca (scripts/scouting-import.mjs) o segnalando una creator.</Notice>}
